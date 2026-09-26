@@ -1776,6 +1776,19 @@ function clampMLevel(n){ return mx(1, mn(NMLVL, Math.round(n))); }
 function monsterLevelForDepth(d){
   return clampMLevel(d*2);
 }
+// item level for loot: the level of what you're actually fighting, on the
+// same 1-20 scale the weapon/armor/affix tables unlock on - a floor's
+// monster level in a dungeon, your own level out on the road (roadside
+// fights match you, see generateArena), your level anywhere else
+function lootLevel(){
+  if (G.gameMode===1) return monsterLevelForDepth(G.depth||1);
+  return clampMLevel(G.player ? G.player.level : 1);
+}
+// a site boss outclasses its floors by a few levels (see its own bossLevel)
+// and its loot is rolled at that level - a real step up, not a jump to 20
+function bossLootLevel(){
+  return clampMLevel(monsterLevelForDepth(G.dungeonMaxDepth||1) + 3);
+}
 // pick a monster table entry "around" a target level, with a little jitter
 // so a single floor isn't always exactly one creature type
 function pickedMonsterLevel(targetLevel, jitter){
@@ -2206,7 +2219,7 @@ function rollOneAffix(it, d, scl, wantPre, usedNames){
     if (lreq > d+1) continue;
     if (usedNames.includes(kind)) continue;
     elig.push(i);
-    wt.push(mx(1, 22 - tier*4));
+    wt.push(mx(1, 22 - tier*4) * (1 + 1.5*mx(0, 1 - (d-lreq)/8)));
     tot += wt[wt.length-1];
   }
   if (elig.length===0) return;
@@ -2447,7 +2460,7 @@ function itemSentienceOnKill(it){
   if (next===undefined || it.kills<next) return;
   it.sentientTier = tier+1;
   const used = it.aff.map(a=>a.kind);
-  rollOneAffix(it, mx(it.ilvl||1, G.depth||1), 'w', chn(0.5)?1:0, used);
+  rollOneAffix(it, mx(it.ilvl||1, lootLevel()), 'w', chn(0.5)?1:0, used);
   if (afLastWord) logMsg(`your ${it.nm} stirs with new power - it grows ${afLastWord.toLowerCase()}`, 'magic', true);
 }
 
@@ -2504,6 +2517,15 @@ function canEquip(item){
 // general store only offers a class its own player can use); item drops
 // leave classOnly unset and draw from the full D&D equipment list, same as
 // any ARPG loot table - other classes' gear still drops, just to sell
+// weighted pick among eligible bases: anything unlocked within the last
+// ~10 levels counts up to 4x as often as the oldest starter bases, so a
+// level-18 drop is usually plate or a greatsword, not a dagger or cloth
+function pickNearLevel(elig, minOf, d){
+  let tot = 0; const w = elig.map(i=>{ const x = 1 + 3*mx(0, 1 - (d+1-minOf(i))/10); tot += x; return x; });
+  let r = Math.random()*tot;
+  for (let k=0;k<elig.length;k++){ if (r < w[k]) return elig[k]; r -= w[k]; }
+  return elig[elig.length-1];
+}
 function genBaseInto(it, d, kind, classOnly){
   if (kind==='weapon'){
     let elig=[];
@@ -2514,7 +2536,7 @@ function genBaseInto(it, d, kind, classOnly){
     }
     if (elig.length===0) for (let i=0;i<WEAPONS.length;i++) if (WEAPONS[i][4] <= d+1) elig.push(i);
     if (elig.length===0) elig.push(0);
-    const pick = elig[rn(elig.length)];
+    const pick = pickNearLevel(elig, i=>WEAPONS[i][4], d);
     it.used=1; it.basis=WEAPONS[pick][0];
     it.d1=WEAPONS[pick][1]; it.d2=WEAPONS[pick][2]; it.bonus=WEAPONS[pick][3];
     it.range = WEAPONS[pick][7]||0; // a ranged weapon (bow) only - see the WEAPONS header comment
@@ -2531,7 +2553,7 @@ function genBaseInto(it, d, kind, classOnly){
   }
   if (elig.length===0) for (let i=0;i<table.length;i++) if (table[i][2] <= d+1) elig.push(i);
   if (elig.length===0) elig.push(0);
-  const pick = elig[rn(elig.length)];
+  const pick = pickNearLevel(elig, i=>table[i][2], d);
   const mi = slotMetaIndex(kind);
   it.used=1; it.slot=kind;
   if (isJewel){
@@ -2564,7 +2586,7 @@ function rollSetPiece(kind){
 }
 function buildUnique(id, d, classOnly){
   const it = newItem();
-  genBaseInto(it, mx(d,14), UNIQUES[id-1][1], classOnly);
+  genBaseInto(it, mn(NMLVL, d+4), UNIQUES[id-1][1], classOnly);
   it.quality=4; it.uniqueId=id; it.ilvl=d; it.nm = UNIQUES[id-1][0];
   switch(id){
     case 1: afAdd(it,'edmg',45,0,0); afAdd(it,'flatdmg',3,0,0); afAdd(it,'str',2,0,0); break;
@@ -2583,12 +2605,22 @@ function buildUnique(id, d, classOnly){
     case 14: afAdd(it,'regen',3,0,0); afAdd(it,'resist',10,0,0); afAdd(it,'wis',2,0,0); break;
     case 15: afAdd(it,'healkill',5,0,0); afAdd(it,'thorns',0,0,.15); afAdd(it,'con',2,0,0); break;
   }
+  // a unique's signature stats are tuned for the endgame - one found early
+  // carries a scaled-down version (40% at item level 1, full at 20) so it
+  // is a great find for its level rather than the last upgrade you'll ever
+  // need; its named on-hit power (UNIQUE_PROCS) is untouched
+  const k = 0.4 + 0.6*mn(1, (d||1)/NMLVL);
+  for (const a of it.aff){
+    if (a.kind==='fire' || a.kind==='cold' || a.kind==='pois' || a.kind==='crit') continue;
+    if (a.i1) a.i1 = mx(1, Math.round(a.i1*k));
+    if (a.f) a.f = +(a.f*k).toFixed(3);
+  }
   return it;
 }
 function buildSetPiece(spid, d, classOnly){
   const it = newItem();
   const kind = SETPIECES[spid-1][2];
-  genBaseInto(it, mx(d,8), kind, classOnly);
+  genBaseInto(it, mn(NMLVL, d+3), kind, classOnly);
   it.quality=3; it.setId=SETPIECES[spid-1][1]; it.ilvl=d; it.nm=SETPIECES[spid-1][0];
   const scl = slotClass(kind);
   // sets always come fully socketed (jewelry excluded - it never takes
@@ -2683,26 +2715,28 @@ function genItem(d, kind, maxQuality, classOnly){
 // Failing that (or at any other site kind), a random unique for the slot at
 // a chance set by SITE_POWER (guaranteed at castle/necro/temple/lair), else
 // a heavily-rolled rare
-function genBossLoot(kind){
-  const sp = sitePower();
+function genBossLoot(kind, lvl){
+  const sp = sitePower(), L = lvl || bossLootLevel();
   if (G.siteKind==='lair' || G.siteKind==='necro'){
     const sid = rollSetPiece(kind);
-    if (sid>0 && chn(0.3)) return buildSetPiece(sid, 20);
+    if (sid>0 && chn(0.3)) return buildSetPiece(sid, L);
   }
   const uid = rollUnique(kind);
-  if (uid>0 && chn(sp.bossLootGuarantee)) return buildUnique(uid, 20);
+  if (uid>0 && chn(sp.bossLootGuarantee)) return buildUnique(uid, L);
   const scl = slotClass(kind);
   const it = newItem();
-  genBaseInto(it, 20, kind);
-  it.quality=2; it.ilvl=20;
+  genBaseInto(it, L, kind);
+  it.quality=2; it.ilvl=L;
   // boss loot never went through genItem()'s normal rollSockets() call, so a
   // boss drop could literally never have an open socket - fixed here with a
   // deliberately generous chance (well above a normal rare's) since this is
   // meant to be the best gear a player sees, not just an average rare
   if ((scl==='w'||scl==='a') && chn(0.55)) it.sockets = new Array(1+rn(3)).fill(null);
   const used=[];
-  for (let i=0;i<3;i++) rollOneAffix(it,20,scl,1,used);
-  for (let i=0;i<3;i++) rollOneAffix(it,20,scl,0,used);
+  // a heavily-rolled rare: 4-6 affixes, where an ordinary rare gets 3-6
+  const nx = 4 + rn(3), np = mn(3, 2 + rn(2));
+  for (let i=0;i<np;i++) rollOneAffix(it,L,scl,1,used);
+  for (let i=0;i<nx-np;i++) rollOneAffix(it,L,scl,0,used);
   it.nm = rareName();
   return it;
 }
@@ -4971,15 +5005,16 @@ function monsterDies(mi){
   if (m.corrupted) dropChance = mn(0.85, dropChance+0.15);
   if (chn(dropChance)){
     if (chn(0.22)){
-      addToInventory(genPotion(mx(1,G.depth||1)));
+      addToInventory(genPotion(lootLevel()));
     } else if (chn(0.12)){
-      addToInventory(chn(0.75) ? genScroll(mx(1,G.depth||1)) : genWand(mx(1,G.depth||1)));
+      addToInventory(chn(0.75) ? genScroll(lootLevel()) : genWand(lootLevel()));
     } else {
       const kinds = ['weapon','head','chest','legs','arms','necklace','ring'];
       const kind = kinds[rn(7)];
       // ordinary monsters can drop up to Set quality - Unique ("legendary")
       // gear only ever comes from a boss kill (see genBossLoot)
-      addToInventory(genItem((G.depth||1)+playerMF()+sp.lootBonus+corruptionBonus(), kind, 3));
+      // half of all gear drops are rolled for something your class can use
+      addToInventory(genItem(lootLevel()+playerMF()+sp.lootBonus+corruptionBonus(), kind, 3, chn(0.5)));
     }
   }
   // a champion (see upgradeToElite/triggerOverworldEncounter) always
@@ -4992,7 +5027,7 @@ function monsterDies(mi){
     // a named elite's drop replaces the ordinary champion gear roll below
     // entirely (guaranteed Unique-tier, not just "a few item-levels
     // higher") - see guaranteedEliteDrop's own comment for the cascade
-    const drop = guaranteedEliteDrop(mx(G.depth||1, G.player.level));
+    const drop = guaranteedEliteDrop(mn(NMLVL, lootLevel()+3));
     logMsg(`${m.nm} drops ${itemNameHtml(drop)}!`, 'loot', true);
     addToInventory(drop);
     const bonusGold = roundH((60+rn(80)+G.player.level*10)*goldFindMult());
@@ -5009,7 +5044,7 @@ function monsterDies(mi){
     }
   } else if (m.elite){
     const eliteKind = ['weapon','head','chest','legs','arms','necklace','ring'][rn(7)];
-    addToInventory(genItem(mx(G.depth||1, G.player.level)+3, eliteKind, 3));
+    addToInventory(genItem(mn(NMLVL, lootLevel()+2)+playerMF(), eliteKind, 3, chn(0.5)));
     const bonusGold = roundH((25+rn(35)+G.player.level*5)*goldFindMult());
     G.player.gold += bonusGold;
     logMsg(`the champion's hoard yields ${bonusGold} extra gold`, 'good');
@@ -6148,7 +6183,7 @@ function tryMove(dx,dy){
     case T_CORRUPT_CHEST: {
       G.map[nx][ny] = T_FLOOR;
       gainCorruption(5);
-      const treasure = genItem((G.depth||1)+playerMF()+corruptionBonus(), vaultLootSlot());
+      const treasure = genItem(lootLevel()+1+playerMF()+corruptionBonus(), vaultLootSlot());
       logMsg(`you crack open a corrupted chest - dark power floods into you as ${itemNameHtml(treasure)} spills out`, 'loot', true);
       addToInventory(treasure);
       sfx('loot');
@@ -8502,7 +8537,7 @@ function vaultFinish(){
     G.player.gold += goldWon;
     logMsg(`you crack the vault's combination and claim ${goldWon} gold!`, 'good');
     gainCorruption(5); // sealed vaults hum with the same dark power a corrupted kill does
-    const treasure = genItem(G.depth+3+playerMF()+corruptionBonus(), vaultLootSlot());
+    const treasure = genItem(lootLevel()+3+playerMF()+corruptionBonus(), vaultLootSlot());
     addToInventory(treasure);
   } else if (v.attempt>=v.maxAttempts){
     G.map[v.vx][v.vy] = T_FLOOR;
