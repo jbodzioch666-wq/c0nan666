@@ -2360,9 +2360,15 @@ function itemPrice(it){
 function sellPrice(it){ return mx(1, roundH(itemPrice(it)*0.4)); }
 
 // rough "is this an upgrade" heuristic
+// a weapon your class isn't trained with can still be wielded - you just
+// lose your proficiency bonus to hit (see attackBonus) - so it's scored for
+// what it's really worth to you, not written off
+function isWeaponLike(it){ return it.slot==='weapon' || (it.slot==='ranged' && it.kind!=='wand'); }
+function untrainedFactor(){ return mx(0.35, 1 - proficiencyBonus(G.player.level)*0.08); }
 function itemScore(it){
   if (!it.used) return -1;
-  if (!canEquip(it)) return -1; // your class can't wear/wield it, so it's never "better" than what's equipped
+  const untrained = !canEquip(it);
+  if (untrained && !isWeaponLike(it)) return -1; // armor your class can't wear at all is never "better" than what's equipped
   let s = (it.slot==='weapon' || it.slot==='ranged') ? weaponAvg(it) : (it.ac*(1+afSumI(it,'edef')/100) + afSumI(it,'flatac'));
   for (let i=0;i<it.naff;i++){
     const a = it.aff[i]; const k=a.kind;
@@ -2384,6 +2390,7 @@ function itemScore(it){
   }
   if (it.quality>=3) s += 4;
   if (it.sockets && it.sockets.length) s += it.sockets.filter(r=>!r).length; // open sockets = future value
+  if (untrained) s *= untrainedFactor(); // missing the proficiency bonus means missing a lot more swings
   return s;
 }
 
@@ -4089,7 +4096,7 @@ function lootArrow(it){
   // regardless of how its raw stats happen to compare to what's
   // equipped - so it shows the same down-arrow (and gets swept up by the
   // "sell junk" bulk action) as an ordinary stat downgrade would
-  if (!canEquip(it)) return 'down';
+  if (!canEquip(it) && !isWeaponLike(it)) return 'down';
   const equipped = curEquipFor(it);
   const a = itemScore(it), b = itemScore(equipped);
   if (a>b) return 'up'; if (a<b) return 'down'; return '';
@@ -15704,11 +15711,13 @@ function itemCompareTooltipHtml(it){
     <div class="muted" style="margin-bottom:4px;">${QNAME[it.quality]?esc(QNAME[it.quality]+' '+it.basis):esc(it.basis)}</div>
     ${itemModListHtml(it)}`;
   if (!canEquip(it)){
-    html += `<div style="color:${COL.red};margin-top:4px;">your class can't use this</div>`;
+    html += isWeaponLike(it) && it.kind!=='wand'
+      ? `<div style="color:${COL.amber};margin-top:4px;">untrained - you can wield it, but without your ${fmtMod(proficiencyBonus(G.player.level))} proficiency bonus to hit</div>`
+      : `<div style="color:${COL.red};margin-top:4px;">your class can't use this</div>`;
   }
   html += `<hr><div class="muted">equipped: ${equipped && equipped.used ? esc(equipped.nm) : '(nothing)'}</div>`;
   if (equipped && equipped.used) html += itemModListHtml(equipped);
-  if (canEquip(it)){
+  if (canEquip(it) || (isWeaponLike(it) && it.kind!=='wand')){
     const s1 = itemScore(it), s2 = itemScore(equipped);
     const verdict = s1>s2 ? ['upgrade',COL.green] : (s1<s2 ? ['downgrade',COL.red] : ['sidegrade',COL.dim]);
     html += `<div style="margin-top:4px;color:${verdict[1]};">${verdict[0]}</div>`;
@@ -16074,7 +16083,7 @@ function buildInventory(){
       // a wand only a Wizard/Warlock can channel, ...) is only ever worth
       // selling - flagged right in the list so it's obvious at a glance
       // without having to click into every single row to find out
-      const junk = !it.consumable && it.kind!=='scroll' && !canEquip(it);
+      const junk = !it.consumable && it.kind!=='scroll' && !canEquip(it) && !(isWeaponLike(it) && it.kind!=='wand');
       const cls = i===sel ? '' : (junk ? 'muted' : rarityColorClass(it));
       const style = i===sel ? `color:${COL.amber};` : '';
       const junkTag = junk ? `<span style="color:${COL.red};font-size:10px;margin-right:4px;">[JUNK]</span>` : '';
@@ -16101,6 +16110,7 @@ function buildInventory(){
       // below - a real, pre-existing gap, not something new to this turn)
       body += itemModListHtml(it);
       if (it.kind==='wand' && !canEquip(it)) body += `<div style="color:${COL.red}">${it.wandSpell.kind==='heal'?'has nothing to attack with':'only a Wizard, Warlock or Sorcerer can channel this'} - worth selling only</div>`;
+      else if (!canEquip(it) && isWeaponLike(it)) body += `<div style="color:${COL.amber}">untrained - you can wield it, but without your ${fmtMod(proficiencyBonus(G.player.level))} proficiency bonus to hit</div>`;
       else if (!canEquip(it)) body += `<div style="color:${COL.red}">your class can't use this - worth selling only</div>`;
       if ((it.slot==='weapon' || it.range) && it.kind!=='wand' && (it.kills||0)>0) body += `<div class="muted">${it.kills} kill${it.kills===1?'':'s'}${(it.sentientTier||0)>0?` &middot; awakened x${it.sentientTier}`:''}</div>`;
       const worn = curEquipFor(it);
@@ -16483,7 +16493,8 @@ function buildCharSheetDetail(){
   if (it.runewordName) body += `<div style="color:${COL.purple}" onmouseenter="showRunewordTooltip(event,'${jsStr(it.runewordName)}')" onmousemove="moveItemTooltip(event)" onmouseleave="hideItemTooltip()">[Runeword: ${esc(it.runewordName)}]</div>`;
   if (it.uniqueId && UNIQUE_PROCS[it.nm]) body += `<div style="color:${COL.gold}">[${roundH(UNIQUE_PROCS[it.nm].chance*100)}% chance on hit: ${esc(UNIQUE_PROCS[it.nm].desc)}]</div>`;
   if ((it.slot==='weapon' || it.range) && it.kind!=='wand' && (it.kills||0)>0) body += `<div class="muted">${it.kills} kill${it.kills===1?'':'s'}${(it.sentientTier||0)>0?` &middot; awakened x${it.sentientTier}`:''}</div>`;
-  if (!canEquip(it)) body += `<div style="color:${COL.red}">your class can't use this${it.kind==='wand'?' - worth selling only':''}</div>`;
+  if (!canEquip(it) && isWeaponLike(it)) body += `<div style="color:${COL.amber}">untrained - no ${fmtMod(proficiencyBonus(G.player.level))} proficiency bonus to hit</div>`;
+  else if (!canEquip(it)) body += `<div style="color:${COL.red}">your class can't use this${it.kind==='wand'?' - worth selling only':''}</div>`;
 
   let socketHtml = '';
   if (it.sockets && it.sockets.length){
