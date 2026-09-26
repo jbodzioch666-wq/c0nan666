@@ -4815,7 +4815,7 @@ function occupiedBy(nx,ny,exceptIdx){
 }
 function noteFoe(mi){
   const m = G.mon[mi];
-  G.lastFoe = { nm:m.nm, sym:m.sym, col:m.col, maxHp:m.maxHp, ac:m.ac, atkBonus:m.atkBonus, dmg1:m.dmg1, dmg2:m.dmg2, hp:m.hp,
+  G.lastFoe = { nm:m.nm, sym:m.sym, col:m.col, undead:!!m.undead, maxHp:m.maxHp, ac:m.ac, atkBonus:m.atkBonus, dmg1:m.dmg1, dmg2:m.dmg2, hp:m.hp,
     art:m.art, abilities: monAbilities(m).slice() };
 }
 function monsterDies(mi){
@@ -8239,7 +8239,7 @@ function buildBestiary(){
 function renderBestiaryArt(){
   const seen = G.player.codexSeen||[];
   for (const m of MONSTER_LEVELS){
-    if (seen.includes(m.nm)) renderMiniMonsterArt('bestiaryArt'+m.lvl, m.art, monsterCol(m));
+    if (seen.includes(m.nm)) renderMiniMonsterArt('bestiaryArt'+m.lvl, m.art, monsterCol(m), m.nm, m.undead);
   }
 }
 
@@ -8423,15 +8423,25 @@ function drawMonsterArt(px, py, size, recipe, color, targetCtx){
 // own (0,0) origin, and this keeps a creature looking centered on its tile
 // instead of high-and-cramped.
 function drawMonsterIcon(x, y, m, color){
+  const ud = undeadPortraitFor(m.nm, m.undead);
+  if (ud){
+    const img = fpUndeadSprite(ud, m.corrupted);
+    let h = cellPx*0.92, w = h*img.aspect;
+    if (w > cellPx*1.05){ w = cellPx*1.05; h = w/img.aspect; }
+    ctx.drawImage(img.img, x*cellPx+cellPx/2-w/2, y*cellPx+cellPx-h-cellPx*0.02, w, h);
+    return;
+  }
   if (!m.art || !m.art.length){ drawGlyph(x, y, m.sym, color, 700); return; }
   const size = cellPx*0.88;
   drawMonsterArt(x*cellPx+cellPx/2, y*cellPx+cellPx/2+size*0.12, size, m.art, color);
 }
-function renderMiniMonsterArt(cvId, recipe, color){
+function renderMiniMonsterArt(cvId, recipe, color, nm, undead){
   const cv = document.getElementById(cvId);
   if (!cv) return;
   const mctx = cv.getContext('2d');
   mctx.clearRect(0,0,cv.width,cv.height);
+  const ud = undeadPortraitFor(nm, undead);
+  if (ud){ const sz = Math.min(cv.width,cv.height)*0.94; drawUndeadPortrait(mctx, cv.width/2, cv.height/2, sz, ud); return; }
   if (!recipe) return;
   const size = Math.min(cv.width,cv.height)*0.9;
   drawMonsterArtShaded(mctx, cv.width/2, cv.height/2 + size*0.12, size, recipe, color);
@@ -9509,7 +9519,7 @@ function renderHud(){
   if (hud.__lastHtml !== hudHtml){
     hud.innerHTML = hudHtml;
     hud.__lastHtml = hudHtml;
-    if (lf) renderMiniMonsterArt('lastFoeArt', lf.art, lf.col);
+    if (lf) renderMiniMonsterArt('lastFoeArt', lf.art, lf.col, lf.nm, lf.undead);
   }
   renderSpellCol();
 }
@@ -9957,7 +9967,7 @@ const FP_FLAME_ART = [['p',[0,-44, 16,-12, 12,16, 0,30, -12,16, -16,-12]], ['e',
 // renders a recipe once into its own canvas, cropped to the art's real
 // bounds so a creature's feet land on the floor, plus black/white copies
 // used to darken it by distance and flash it when it takes a hit
-function fpBuildSprite(draw, fancy){
+function fpBuildSprite(draw, fancy, soft){
   const S = fancy ? 256 : 160;
   const raw = document.createElement('canvas'); raw.width = raw.height = S;
   const rc = raw.getContext('2d');
@@ -9978,15 +9988,15 @@ function fpBuildSprite(draw, fancy){
   const img = mk(), ic = img.getContext('2d');
   // dark outline so a creature reads against any wall, then the art itself,
   // then a top-lit/bottom-shaded wash for a bit of volume
-  ic.globalAlpha = 0.85;
-  for (const [ox,oy] of [[-2,0],[2,0],[0,-2],[0,2]]) ic.drawImage(sil, ox, oy);
+  ic.globalAlpha = soft ? 0 : 0.85;
+  if (!soft) for (const [ox,oy] of [[-2,0],[2,0],[0,-2],[0,2]]) ic.drawImage(sil, ox, oy);
   ic.globalAlpha = 1;
   ic.drawImage(raw, minX-pad, minY-pad, w, h, 0, 0, w, h);
   ic.globalCompositeOperation = 'source-atop';
   const gr = ic.createLinearGradient(0,0,0,h);
   gr.addColorStop(0,'rgba(255,255,255,0.22)'); gr.addColorStop(0.45,'rgba(255,255,255,0)'); gr.addColorStop(1,'rgba(0,0,0,0.38)');
   ic.fillStyle = gr; ic.fillRect(0,0,w,h);
-  if (fancy){
+  if (fancy && !soft){
     // fine skin/fur grain, then a thin moonlit rim along the upper-left edge
     ic.globalAlpha = 0.16; ic.fillStyle = fpGrainPattern(ic); ic.fillRect(0,0,w,h); ic.globalAlpha = 1;
     const rim = mk(), rmc = rim.getContext('2d');
@@ -10109,6 +10119,610 @@ function fpGlyphSprite(ch, color){
       c.fillText(ch, S/2, S/2);
     });
     FP.glyphs.set(key, e);
+  }
+  return e;
+}
+
+// ---------- painted undead ----------
+// the undead roster gets hand-painted figures instead of the generic
+// body-plan recipes: real bones, rotting flesh, bandages, plate armor and
+// translucent spectral robes, each with its own lighting. Painted in the
+// same -50..50 authoring box as the recipes (feet at the bottom edge), so
+// the sprite builder, depth shading and portrait panels all treat them
+// exactly like any other art. UNDEAD_PORTRAITS maps a creature's name to a
+// painter plus its variant options; h scales its standing height relative
+// to an ordinary monster (a crouched ghoul is shorter, a death knight
+// towers) and lift floats a spirit above the ground.
+function udCurve(c, cmds){
+  c.beginPath();
+  for (const k of cmds){
+    const t = k[0];
+    if (t==='M') c.moveTo(k[1],k[2]);
+    else if (t==='L') c.lineTo(k[1],k[2]);
+    else if (t==='Q') c.quadraticCurveTo(k[1],k[2],k[3],k[4]);
+    else if (t==='C') c.bezierCurveTo(k[1],k[2],k[3],k[4],k[5],k[6]);
+    else if (t==='Z') c.closePath();
+  }
+}
+function udLin(c,x0,y0,x1,y1,stops){ const g=c.createLinearGradient(x0,y0,x1,y1); for (const [o,col] of stops) g.addColorStop(o,col); return g; }
+function udRad(c,x,y,r,stops,fx,fy){ const g=c.createRadialGradient(fx!==undefined?fx:x, fy!==undefined?fy:y, 0, x, y, r); for (const [o,col] of stops) g.addColorStop(o,col); return g; }
+function udGlow(c,x,y,r,rgb,a){
+  c.save(); c.globalCompositeOperation='lighter';
+  c.fillStyle = udRad(c,x,y,r,[[0,`rgba(${rgb},${a})`],[0.4,`rgba(${rgb},${a*0.45})`],[1,`rgba(${rgb},0)`]]);
+  c.beginPath(); c.arc(x,y,r,0,Math.PI*2); c.fill(); c.restore();
+}
+// a pair of eyes: dark sockets, then either a wet glint or a burning glow
+function udEyes(c, x, y, gap, r, glow){
+  for (const s of [-1,1]){
+    c.fillStyle = '#0b0806'; c.beginPath(); c.ellipse(x+s*gap, y, r*1.25, r, 0, 0, Math.PI*2); c.fill();
+    if (glow){
+      c.fillStyle = `rgb(${glow})`; c.beginPath(); c.arc(x+s*gap, y, r*0.55, 0, Math.PI*2); c.fill();
+      udGlow(c, x+s*gap, y, r*3.2, glow, 0.9);
+    }
+  }
+}
+function udBone(c,x1,y1,x2,y2,w,bone,shade){
+  c.lineCap='round';
+  c.strokeStyle=shade; c.lineWidth=w*1.25; c.beginPath(); c.moveTo(x1,y1); c.lineTo(x2,y2); c.stroke();
+  c.strokeStyle=bone; c.lineWidth=w*0.8; c.beginPath(); c.moveTo(x1-0.3,y1-0.3); c.lineTo(x2-0.3,y2-0.3); c.stroke();
+  for (const [x,y] of [[x1,y1],[x2,y2]]){
+    c.fillStyle=shade; c.beginPath(); c.arc(x,y,w*0.85,0,Math.PI*2); c.fill();
+    c.fillStyle=bone; c.beginPath(); c.arc(x-0.3,y-0.3,w*0.62,0,Math.PI*2); c.fill();
+  }
+}
+function udSkull(c, x, y, s, o){
+  const bone = o.bone||'#ddd5bf', shade = o.shade||'#8a7f66';
+  // cranium and cheekbones
+  c.fillStyle = udRad(c, x, y, s*1.2, [[0,'#f4efe0'],[0.55,bone],[1,shade]], x-s*0.35, y-s*0.5);
+  udCurve(c, [['M',x-s,y-s*0.1],['C',x-s*1.05,y-s*1.25,x+s*1.05,y-s*1.25,x+s,y-s*0.1],['Q',x+s*0.95,y+s*0.45,x+s*0.6,y+s*0.55],
+    ['L',x+s*0.5,y+s*0.95],['L',x-s*0.5,y+s*0.95],['L',x-s*0.6,y+s*0.55],['Q',x-s*0.95,y+s*0.45,x-s,y-s*0.1],['Z']]);
+  c.fill();
+  c.strokeStyle='rgba(60,50,35,0.55)'; c.lineWidth=0.5; c.stroke();
+  // temple crack
+  c.strokeStyle='rgba(60,45,30,0.6)'; c.lineWidth=0.45;
+  c.beginPath(); c.moveTo(x+s*0.3,y-s*0.95); c.lineTo(x+s*0.45,y-s*0.6); c.lineTo(x+s*0.35,y-s*0.4); c.stroke();
+  udEyes(c, x, y+s*0.08, s*0.4, s*0.24, o.eyes);
+  // nasal cavity
+  c.fillStyle='#120d08'; udCurve(c,[['M',x,y+s*0.3],['L',x-s*0.12,y+s*0.55],['L',x+s*0.12,y+s*0.55],['Z']]); c.fill();
+  // teeth
+  c.fillStyle='#efe8d4'; c.fillRect(x-s*0.42, y+s*0.62, s*0.84, s*0.24);
+  c.strokeStyle='#3a2e20'; c.lineWidth=0.35;
+  for (let i=-3;i<=3;i++){ c.beginPath(); c.moveTo(x+i*s*0.12, y+s*0.62); c.lineTo(x+i*s*0.12, y+s*0.86); c.stroke(); }
+  c.beginPath(); c.moveTo(x-s*0.42,y+s*0.74); c.lineTo(x+s*0.42,y+s*0.74); c.stroke();
+}
+// a shaded blade held at an angle
+function udSword(c, hx, hy, ang, len, o){
+  c.save(); c.translate(hx,hy); c.rotate(ang);
+  const w = o.w||2.6;
+  c.fillStyle = udLin(c,-w,0,w,0,[[0,o.dark||'#50575d'],[0.45,o.light||'#dfe5e8'],[0.55,o.mid||'#a9b2b8'],[1,o.dark||'#50575d']]);
+  udCurve(c,[['M',-w,-3],['L',-w,-len*0.88],['L',0,-len],['L',w,-len*0.88],['L',w,-3],['Z']]); c.fill();
+  if (o.rust){ c.fillStyle='rgba(120,60,20,0.45)'; for (let i=0;i<5;i++){ c.beginPath(); c.arc((i%2?1:-1)*w*0.4, -len*(0.2+i*0.14), w*0.55, 0, Math.PI*2); c.fill(); } }
+  c.fillStyle = o.guard||'#6b5534'; c.fillRect(-w*3,-4,w*6,2.4);
+  c.fillStyle = '#3b2a1a'; c.fillRect(-w*0.6,-2,w*1.2,7);
+  c.fillStyle = o.guard||'#6b5534'; c.beginPath(); c.arc(0,5.8,w*0.9,0,Math.PI*2); c.fill();
+  c.restore();
+}
+function udHand(c, x, y, ang, len, col, shade){
+  c.save(); c.translate(x,y); c.rotate(ang); c.lineCap='round';
+  for (let i=-1.5;i<=1.5;i++){
+    c.strokeStyle=shade; c.lineWidth=1.3; c.beginPath(); c.moveTo(i*1.2,0); c.quadraticCurveTo(i*1.8,len*0.6,i*1.5+0.8,len); c.stroke();
+    c.strokeStyle=col; c.lineWidth=0.7; c.beginPath(); c.moveTo(i*1.2,0); c.quadraticCurveTo(i*1.8,len*0.6,i*1.5+0.8,len); c.stroke();
+  }
+  c.restore();
+}
+
+// ---- skeleton / skeletal warrior / skeletal knight ----
+function udPaintSkeleton(c, o){
+  const bone='#ddd5bf', shade='#7e735c';
+  // legs
+  for (const s of [-1,1]){
+    udBone(c, s*6, 6, s*8, 26, 2.6, bone, shade);
+    udBone(c, s*8, 27, s*9, 45, 2.2, bone, shade);
+    c.fillStyle=shade; c.beginPath(); c.ellipse(s*10.5, 47.5, 4.2, 2, 0, 0, Math.PI*2); c.fill();
+    c.fillStyle=bone; c.beginPath(); c.ellipse(s*10.2, 47, 3.4, 1.4, 0, 0, Math.PI*2); c.fill();
+  }
+  // pelvis
+  c.fillStyle = udRad(c,0,4,12,[[0,'#efe8d5'],[1,shade]],-3,1);
+  udCurve(c,[['M',-11,0],['Q',-12,8,-5,10],['L',0,7],['L',5,10],['Q',12,8,11,0],['Q',0,4,-11,0],['Z']]); c.fill();
+  c.fillStyle='#1a140d'; c.beginPath(); c.ellipse(-5,5,2,2.4,0,0,Math.PI*2); c.ellipse(5,5,2,2.4,0,0,Math.PI*2); c.fill();
+  // spine
+  for (let y=-24; y<=2; y+=3.2){ c.fillStyle=shade; c.fillRect(-1.8,y,3.6,2.6); c.fillStyle=bone; c.fillRect(-1.4,y+0.2,2.8,1.8); }
+  // ribcage
+  c.lineCap='round';
+  for (let i=0;i<6;i++){
+    const y = -21 + i*3.4, wdt = 11 - Math.abs(i-2)*1.1;
+    for (const s of [-1,1]){
+      c.strokeStyle=shade; c.lineWidth=2.1; c.beginPath(); c.moveTo(0,y); c.quadraticCurveTo(s*wdt*1.15, y-1.5, s*wdt*0.75, y+4); c.stroke();
+      c.strokeStyle=bone; c.lineWidth=1.3; c.beginPath(); c.moveTo(0,y-0.3); c.quadraticCurveTo(s*wdt*1.15, y-1.8, s*wdt*0.75, y+3.6); c.stroke();
+    }
+  }
+  c.fillStyle=bone; c.fillRect(-1.3,-22,2.6,14);
+  // collarbones and arms
+  udBone(c,-13,-24,13,-24,1.8,bone,shade);
+  udBone(c,-14,-23,-18,-6,2.2,bone,shade);
+  udBone(c,-18,-6,-17,10,1.8,bone,shade);
+  udHand(c,-17,11,0.1,6,bone,shade);
+  if (o.shield){
+    c.fillStyle = udLin(c,-30,-10,-12,14,[[0,'#6d6f6c'],[0.5,'#4a4c49'],[1,'#2c2d2b']]);
+    udCurve(c,[['M',-29,-10],['L',-13,-10],['L',-13,4],['Q',-14,14,-21,17],['Q',-28,14,-29,4],['Z']]); c.fill();
+    c.strokeStyle='#8c7a4a'; c.lineWidth=1.2; c.stroke();
+    c.strokeStyle='rgba(20,20,20,0.6)'; c.lineWidth=0.6; c.beginPath(); c.moveTo(-24,-6); c.lineTo(-18,6); c.moveTo(-26,2); c.lineTo(-20,-4); c.stroke();
+  }
+  // weapon arm raised
+  udBone(c,14,-23,20,-14,2.2,bone,shade);
+  udBone(c,20,-14,23,-25,1.8,bone,shade);
+  udSword(c, 23.5, -25, 0.55, 27, {rust:true, w:2.2});
+  // skull
+  udSkull(c, 0, -35, 8.6, {bone, shade, eyes: o.eyes});
+  if (o.helm){
+    c.fillStyle = udLin(c,-10,-48,10,-36,[[0,'#8d9092'],[0.5,'#5c5f61'],[1,'#303234']]);
+    udCurve(c,[['M',-10,-37],['C',-11,-50,11,-50,10,-37],['L',7,-38],['L',-7,-38],['Z']]); c.fill();
+    c.fillStyle='#3d4042'; c.fillRect(-1.2,-45,2.4,11);
+    c.strokeStyle='rgba(200,200,200,0.35)'; c.lineWidth=0.6; c.beginPath(); c.arc(0,-40,7.5,-2.6,-1.2); c.stroke();
+  }
+  if (o.armor){
+    c.fillStyle = udLin(c,-12,-22,12,-4,[[0,'#7a7d7f'],[0.5,'#4b4e50'],[1,'#27292b']]);
+    udCurve(c,[['M',-12,-23],['L',12,-23],['L',10,-9],['Q',0,-5,-10,-9],['Z']]); c.fill();
+    c.fillStyle='rgba(110,55,20,0.4)'; c.beginPath(); c.arc(5,-14,2.5,0,Math.PI*2); c.arc(-6,-18,1.8,0,Math.PI*2); c.fill();
+  }
+}
+
+// ---- zombies: shambling rotten corpses ----
+function udPaintZombie(c, o){
+  const skin=o.skin||'#7f8f6a', skinD=o.skinD||'#3f4a33', cloth=o.cloth||'#4c4033', clothD=o.clothD||'#241d15';
+  // legs in torn trousers
+  for (const s of [-1,1]){
+    c.fillStyle = udLin(c,s*9,8,s*3,8,[[0,clothD],[0.5,cloth],[1,clothD]]);
+    udCurve(c,[['M',s*2,6],['L',s*11,6],['L',s*(10+ (s>0?1:0)),44],['L',s*4,44],['Z']]); c.fill();
+    c.fillStyle=skinD; c.fillRect(s>0?4:-10,40,6,4);
+    c.fillStyle='#2a2119'; c.beginPath(); c.ellipse(s*7.5, 47, 5.5, 2.6, 0, 0, Math.PI*2); c.fill();
+  }
+  c.fillStyle='rgba(20,15,10,0.5)'; c.beginPath(); c.moveTo(-9,30); c.lineTo(-5,36); c.lineTo(-10,38); c.fill();
+  // torso in a ragged shirt
+  c.fillStyle = udLin(c,-14,0,14,0,[[0,clothD],[0.35,cloth],[0.7,cloth],[1,clothD]]);
+  udCurve(c,[['M',-13,-24],['Q',0,-27,13,-24],['L',12,8],['L',8,5],['L',5,9],['L',1,6],['L',-3,10],['L',-7,6],['L',-12,9],['Z']]); c.fill();
+  // rotten flesh showing through a tear, with ribs
+  c.fillStyle = udRad(c,4,-10,8,[[0,'#9a5c4c'],[0.6,'#6e3a2e'],[1,'#3a1d16']]);
+  udCurve(c,[['M',-1,-17],['Q',8,-19,9,-11],['Q',8,-2,1,-3],['Q',-3,-10,-1,-17],['Z']]); c.fill();
+  c.strokeStyle='#d8ccb0'; c.lineWidth=0.9; c.lineCap='round';
+  for (let i=0;i<3;i++){ c.beginPath(); c.moveTo(1,-15+i*4); c.quadraticCurveTo(5,-16+i*4,8,-13+i*4); c.stroke(); }
+  // blood and grime
+  c.fillStyle='rgba(90,20,15,0.55)'; c.beginPath(); c.ellipse(-6,-6,3,5,0.3,0,Math.PI*2); c.fill();
+  // arms reaching forward
+  for (const s of [-1,1]){
+    c.fillStyle = udLin(c,s*12,-22,s*20,-8,[[0,skin],[1,skinD]]);
+    udCurve(c,[['M',s*11,-23],['Q',s*19,-22,s*21,-13],['L',s*19,-4],['L',s*15,-6],['Q',s*14,-14,s*10,-15],['Z']]); c.fill();
+    c.fillStyle=cloth; udCurve(c,[['M',s*11,-24],['Q',s*18,-23,s*19,-16],['L',s*14,-15],['Z']]); c.fill();
+    udHand(c, s*18, -5, s*0.25, 7, skin, skinD);
+  }
+  // head lolling to one side
+  c.save(); c.translate(-1.5,-33); c.rotate(-0.18);
+  c.fillStyle = skinD; c.fillRect(-3,4,6,6);
+  c.fillStyle = udRad(c,0,0,10,[[0,o.skinL||'#a3b08a'],[0.6,skin],[1,skinD]],-3,-4);
+  udCurve(c,[['M',-7,-6],['C',-8,-12,8,-12,7,-6],['Q',8,2,5,7],['Q',0,10,-5,7],['Q',-8,2,-7,-6],['Z']]); c.fill();
+  // stringy hair
+  c.strokeStyle=o.hair||'#2b261d'; c.lineWidth=0.7;
+  for (let i=-5;i<=5;i+=1.6){ c.beginPath(); c.moveTo(i,-9); c.quadraticCurveTo(i*1.3,-4,i*1.4+(i>0?1:-1),1); c.stroke(); }
+  udEyes(c, 0, -2, 3, 1.5, o.eyes);
+  // slack jaw
+  c.fillStyle='#1b0f0b'; c.beginPath(); c.ellipse(0.5,4.2,2.6,1.8,0,0,Math.PI*2); c.fill();
+  c.fillStyle='#cfc4a8'; c.fillRect(-1.5,2.7,3.5,0.8);
+  c.restore();
+  if (o.weed){
+    c.strokeStyle='#2f5a3a'; c.lineWidth=1.2;
+    for (const [x,y,l] of [[-9,-22,14],[8,-2,12],[-5,-40,10],[12,-18,9]]){ c.beginPath(); c.moveTo(x,y); c.quadraticCurveTo(x+3,y+l*0.5,x-1,y+l); c.stroke(); }
+    c.fillStyle='rgba(120,180,200,0.5)'; for (const [x,y] of [[-4,-20],[6,12],[-12,20]]){ c.beginPath(); c.ellipse(x,y,0.8,1.4,0,0,Math.PI*2); c.fill(); }
+  }
+  if (o.moss){
+    c.fillStyle='rgba(70,95,40,0.75)';
+    for (const [x,y,r] of [[-10,-20,3],[9,-18,2.5],[-3,-42,3],[6,20,3],[-8,30,2.5]]){ c.beginPath(); c.arc(x,y,r,0,Math.PI*2); c.fill(); }
+  }
+  if (o.crown){
+    c.fillStyle = udLin(c,-8,-50,8,-42,[[0,'#f1d27a'],[1,'#8a6a22']]);
+    udCurve(c,[['M',-8,-42],['L',-8,-48],['L',-5,-45],['L',-2,-50],['L',1,-45],['L',4,-50],['L',6,-45],['L',8,-48],['L',8,-42],['Z']]); c.fill();
+    c.fillStyle='rgba(150,190,80,0.8)'; for (const [x,y,r] of [[-12,-14,3.2],[11,-6,2.6],[-9,4,2.2],[13,-20,2]]){ c.beginPath(); c.arc(x,y,r,0,Math.PI*2); c.fill(); c.fillStyle='rgba(210,230,140,0.8)'; c.beginPath(); c.arc(x-r*0.3,y-r*0.3,r*0.35,0,Math.PI*2); c.fill(); c.fillStyle='rgba(150,190,80,0.8)'; }
+  }
+}
+
+// ---- ghouls / ghasts: hunched, starved flesh-eaters with long claws ----
+function udPaintGhoul(c, o){
+  const skin=o.skin||'#8e8aa0', skinD=o.skinD||'#433e55', skinL=o.skinL||'#bdb8cc';
+  // crouched legs
+  for (const s of [-1,1]){
+    c.fillStyle = udLin(c,s*4,10,s*16,40,[[0,skin],[1,skinD]]);
+    udCurve(c,[['M',s*4,8],['Q',s*18,14,s*17,28],['L',s*12,46],['L',s*7,46],['L',s*10,30],['Q',s*6,22,s*2,18],['Z']]); c.fill();
+    c.fillStyle=skinD; c.beginPath(); c.ellipse(s*11,47.5,5,2,0,0,Math.PI*2); c.fill();
+    c.strokeStyle='#1a1510'; c.lineWidth=0.8; for (let i=0;i<3;i++){ c.beginPath(); c.moveTo(s*(8+i*2.2),48); c.lineTo(s*(8.5+i*2.4),49.8); c.stroke(); }
+  }
+  c.fillStyle='#2e2618'; udCurve(c,[['M',-7,4],['L',7,4],['L',5,14],['L',-5,14],['Z']]); c.fill();
+  // hunched, emaciated torso leaning forward
+  c.fillStyle = udRad(c,0,-8,20,[[0,skinL],[0.55,skin],[1,skinD]],-4,-14);
+  udCurve(c,[['M',-13,-18],['Q',0,-26,13,-18],['Q',15,-4,8,8],['Q',0,11,-8,8],['Q',-15,-4,-13,-18],['Z']]); c.fill();
+  c.strokeStyle='rgba(40,34,52,0.65)'; c.lineWidth=0.9;
+  for (let i=0;i<4;i++){ for (const s of [-1,1]){ c.beginPath(); c.moveTo(s*2,-13+i*4); c.quadraticCurveTo(s*8,-15+i*4,s*11,-10+i*4); c.stroke(); } }
+  c.beginPath(); c.moveTo(0,-16); c.lineTo(0,4); c.stroke();
+  // long dangling arms with hooked claws
+  for (const s of [-1,1]){
+    c.fillStyle = udLin(c,s*12,-18,s*22,20,[[0,skin],[1,skinD]]);
+    udCurve(c,[['M',s*11,-19],['Q',s*23,-14,s*22,4],['L',s*23,24],['L',s*19,24],['L',s*17,6],['Q',s*16,-8,s*10,-12],['Z']]); c.fill();
+    c.strokeStyle='#e6ddc8'; c.lineWidth=1; c.lineCap='round';
+    for (let i=0;i<4;i++){ c.beginPath(); c.moveTo(s*(18.5+i*1.4),24); c.quadraticCurveTo(s*(19+i*1.6),31,s*(16.5+i*1.5),34); c.stroke(); }
+  }
+  // gaunt head thrust forward: pointed ears, sunken cheeks, long teeth
+  const hx=0, hy=-27;
+  for (const s of [-1,1]){ c.fillStyle=skinD; udCurve(c,[['M',hx+s*6,hy-4],['L',hx+s*13,hy-11],['L',hx+s*7,hy+1],['Z']]); c.fill(); }
+  c.fillStyle = udRad(c,hx,hy,10,[[0,skinL],[0.6,skin],[1,skinD]],hx-3,hy-5);
+  udCurve(c,[['M',hx-7,hy-5],['C',hx-7,hy-13,hx+7,hy-13,hx+7,hy-5],['Q',hx+7,hy+3,hx+3,hy+8],['L',hx-3,hy+8],['Q',hx-7,hy+3,hx-7,hy-5],['Z']]); c.fill();
+  c.fillStyle='rgba(40,30,50,0.45)'; c.beginPath(); c.ellipse(hx-4,hy+2,1.5,3,0,0,Math.PI*2); c.ellipse(hx+4,hy+2,1.5,3,0,0,Math.PI*2); c.fill();
+  udEyes(c, hx, hy-3, 3.1, 1.5, o.eyes||'255,210,90');
+  c.fillStyle='#1a0707'; c.beginPath(); c.ellipse(hx,hy+5,3.4,2.3,0,0,Math.PI*2); c.fill();
+  c.fillStyle='#efe6cf'; for (let i=-2;i<=2;i++){ udCurve(c,[['M',hx+i*1.3-0.5,hy+3.2],['L',hx+i*1.3+0.5,hy+3.2],['L',hx+i*1.3,hy+5.4],['Z']]); c.fill(); }
+  if (o.scars){ c.strokeStyle='rgba(120,20,20,0.8)'; c.lineWidth=0.8; c.beginPath(); c.moveTo(-9,-14); c.lineTo(-2,-4); c.moveTo(4,-16); c.lineTo(10,-8); c.stroke(); }
+  if (o.drool){ c.fillStyle='rgba(120,160,60,0.7)'; c.beginPath(); c.ellipse(hx+1,hy+10,0.9,2.6,0,0,Math.PI*2); c.fill(); }
+}
+
+// ---- wights / revenants: armored corpses that still remember their war ----
+function udPaintWight(c, o){
+  const skin=o.skin||'#8f8a78', skinD=o.skinD||'#3d3a31', mail='#5d6264', mailD='#2a2d2f';
+  // tattered cloak behind
+  c.fillStyle = udLin(c,-18,-24,18,46,[[0,o.cloak||'#2c3036'],[1,'#121417']]);
+  udCurve(c,[['M',-13,-24],['L',13,-24],['L',19,40],['L',14,34],['L',10,44],['L',5,37],['L',0,46],['L',-5,37],['L',-10,44],['L',-14,34],['L',-19,40],['Z']]); c.fill();
+  // legs in greaves
+  for (const s of [-1,1]){
+    c.fillStyle = udLin(c,s*3,0,s*11,0,[[0,mailD],[0.5,mail],[1,mailD]]);
+    c.fillRect(s>0?2.5:-10.5, 6, 8, 38);
+    c.fillStyle='#1b1c1d'; c.beginPath(); c.ellipse(s*7,47,5.5,2.4,0,0,Math.PI*2); c.fill();
+  }
+  // chainmail hauberk
+  c.fillStyle = udLin(c,-14,0,14,0,[[0,mailD],[0.4,mail],[0.6,mail],[1,mailD]]);
+  udCurve(c,[['M',-14,-25],['L',14,-25],['L',13,12],['L',-13,12],['Z']]); c.fill();
+  c.strokeStyle='rgba(15,15,15,0.45)'; c.lineWidth=0.4;
+  for (let y=-23;y<12;y+=2){ c.beginPath(); for (let x=-13;x<13;x+=2){ c.moveTo(x,y); c.arc(x+1,y,1,Math.PI,0,true); } c.stroke(); }
+  c.fillStyle='#3b2a1c'; c.fillRect(-14,2,28,3); c.fillStyle='#8a7442'; c.fillRect(-2,1.5,4,4);
+  c.fillStyle='rgba(120,70,30,0.35)'; c.beginPath(); c.arc(-6,-12,3,0,Math.PI*2); c.arc(7,-2,2.4,0,Math.PI*2); c.fill();
+  // pauldrons
+  for (const s of [-1,1]){
+    c.fillStyle = udRad(c,s*14,-24,7,[[0,'#8e9496'],[1,'#303436']],s*12,-27);
+    c.beginPath(); c.ellipse(s*14,-23,7,4.5,0,Math.PI,0); c.fill();
+  }
+  // withered arms: one gripping the weapon, one clawing
+  c.fillStyle = udLin(c,-20,-20,-14,10,[[0,skin],[1,skinD]]);
+  udCurve(c,[['M',-17,-21],['Q',-22,-8,-19,6],['L',-16,6],['Q',-17,-8,-13,-19],['Z']]); c.fill();
+  udHand(c,-17.5,6,0.15,6,skin,skinD);
+  c.fillStyle = udLin(c,14,-20,20,-2,[[0,skin],[1,skinD]]);
+  udCurve(c,[['M',13,-21],['Q',21,-14,20,-3],['L',16,-4],['Q',16,-12,12,-17],['Z']]); c.fill();
+  if (o.axe){
+    c.save(); c.translate(18,-4); c.rotate(-0.35);
+    c.fillStyle='#4a3524'; c.fillRect(-1.2,-34,2.4,42);
+    c.fillStyle = udLin(c,0,-40,18,-18,[[0,'#dfe4e6'],[0.5,'#8e969b'],[1,'#3d4347']]);
+    udCurve(c,[['M',1,-36],['Q',9,-40,15,-44],['Q',21,-30,15,-14],['Q',9,-19,1,-21],['Z']]); c.fill();
+    c.strokeStyle='rgba(255,255,255,0.7)'; c.lineWidth=0.6; c.beginPath(); c.moveTo(15,-43); c.quadraticCurveTo(20.5,-30,15,-15); c.stroke();
+    c.fillStyle='#2c2f33'; c.fillRect(-2,-37,4,17);
+    c.fillStyle='rgba(110,20,15,0.65)'; c.beginPath(); c.arc(14,-24,2.2,0,Math.PI*2); c.arc(16,-32,1.4,0,Math.PI*2); c.fill();
+    c.restore();
+  } else udSword(c, 18, -4, 0.25, 36, {w:2.4, dark:'#3c4247', light:'#c7cfd4', mid:'#8a949a'});
+  // desiccated head, drawn-back lips, burning eyes
+  const hy=-35;
+  c.fillStyle=skinD; c.fillRect(-3,hy+6,6,5);
+  c.fillStyle = udRad(c,0,hy,9,[[0,'#b6ae98'],[0.6,skin],[1,skinD]],-3,hy-4);
+  udCurve(c,[['M',-7,hy-4],['C',-7,hy-12,7,hy-12,7,hy-4],['Q',7,hy+4,3,hy+8],['L',-3,hy+8],['Q',-7,hy+4,-7,hy-4],['Z']]); c.fill();
+  c.fillStyle='rgba(30,25,20,0.5)'; c.beginPath(); c.ellipse(-4,hy+2,1.4,2.6,0,0,Math.PI*2); c.ellipse(4,hy+2,1.4,2.6,0,0,Math.PI*2); c.fill();
+  udEyes(c, 0, hy-2, 3, 1.5, o.eyes||'140,210,255');
+  c.fillStyle='#1b120c'; c.fillRect(-3,hy+4,6,2.2);
+  c.fillStyle='#d8cdb2'; for (let i=-2;i<=2;i++) c.fillRect(i*1.2-0.4,hy+4,0.8,1.2);
+  c.strokeStyle='#cfcac0'; c.lineWidth=0.5;
+  for (let i=-6;i<=6;i+=1.5){ c.beginPath(); c.moveTo(i,hy-9); c.quadraticCurveTo(i*1.4,hy-2,i*1.6,hy+6); c.stroke(); }
+  if (o.helm){
+    c.fillStyle = udLin(c,-9,hy-12,9,hy-4,[[0,'#7c8284'],[1,'#2c3032']]);
+    udCurve(c,[['M',-8.5,hy-3],['C',-9,hy-14,9,hy-14,8.5,hy-3],['Z']]); c.fill();
+    c.fillStyle='#9a8452'; c.fillRect(-8.6,hy-4,17.2,1.4);
+  }
+}
+
+// ---- spirits: wraiths, specters, shadows, banshees ----
+function udPaintSpirit(c, o){
+  const body=o.body||'45,52,68', edge=o.edge||'120,140,170';
+  // wispy lower body trailing away into nothing
+  c.fillStyle = udLin(c,0,-10,0,48,[[0,`rgba(${body},0.95)`],[0.55,`rgba(${body},0.6)`],[1,`rgba(${body},0)`]]);
+  udCurve(c,[['M',-14,-22],['Q',-22,6,-16,22],['Q',-19,34,-12,46],['Q',-8,36,-5,44],['Q',-1,34,2,47],['Q',5,35,9,43],['Q',12,33,17,44],['Q',21,26,17,10],['Q',21,-8,14,-22],['Z']]);
+  c.fill();
+  // flowing robe folds
+  c.strokeStyle=`rgba(${edge},0.35)`; c.lineWidth=0.9;
+  for (const x of [-9,-4,2,8]){ c.beginPath(); c.moveTo(x,-14); c.quadraticCurveTo(x+(x>0?3:-3),10,x+(x>0?2:-2),32); c.stroke(); }
+  // arms outstretched with long spectral claws
+  for (const s of [-1,1]){
+    c.fillStyle = udLin(c,s*12,-20,s*30,0,[[0,`rgba(${body},0.95)`],[1,`rgba(${body},0.55)`]]);
+    udCurve(c,[['M',s*11,-22],['Q',s*26,-20,s*30,-6],['L',s*25,-3],['Q',s*21,-12,s*11,-12],['Z']]); c.fill();
+    if (!o.noHands) udHand(c, s*28, -4, s*0.55, 8, `rgba(${o.hand||'200,210,225'},0.9)`, `rgba(${body},0.8)`);
+  }
+  if (o.sword) udSword(c, 27, -6, 0.3, 30, {w:2.2, dark:'#1c2230', light:'#9fb3d6', mid:'#5a6a8a'});
+  // hood (or wild hair for a banshee) around a face of darkness
+  if (o.hair){
+    c.fillStyle = udLin(c,0,-48,0,-4,[[0,`rgba(${o.hair},0.95)`],[1,`rgba(${o.hair},0)`]]);
+    udCurve(c,[['M',-9,-44],['Q',-20,-36,-18,-10],['Q',-12,-20,-10,-30],['L',10,-30],['Q',12,-20,18,-10],['Q',20,-36,9,-44],['Q',0,-50,-9,-44],['Z']]); c.fill();
+    c.fillStyle = udRad(c,0,-34,9,[[0,'rgba(236,240,248,0.98)'],[0.7,'rgba(190,200,220,0.95)'],[1,'rgba(120,130,160,0.9)']],-2,-38);
+    udCurve(c,[['M',-6,-40],['C',-7,-46,7,-46,6,-40],['Q',7,-30,0,-25],['Q',-7,-30,-6,-40],['Z']]); c.fill();
+    udEyes(c, 0, -36, 2.6, 1.3, o.eyes||'170,220,255');
+    c.fillStyle='#0c0a10'; c.beginPath(); c.ellipse(0,-30,1.8,2.8,0,0,Math.PI*2); c.fill();
+  } else {
+    c.fillStyle = udLin(c,-12,-48,12,-24,[[0,`rgba(${edge},0.95)`],[0.4,`rgba(${body},1)`],[1,`rgba(${body},0.95)`]]);
+    udCurve(c,[['M',-12,-22],['Q',-14,-40,0,-49],['Q',14,-40,12,-22],['Q',0,-26,-12,-22],['Z']]); c.fill();
+    c.fillStyle = udRad(c,0,-33,9,[[0,'#000'],[0.8,'#05060a'],[1,'rgba(5,6,10,0)']]);
+    c.beginPath(); c.ellipse(0,-33,7,9,0,0,Math.PI*2); c.fill();
+    udEyes(c, 0, -34, 2.8, 1.4, o.eyes||'150,220,255');
+  }
+  if (o.crown){
+    c.fillStyle = udLin(c,-8,-50,8,-44,[[0,'#d8c27a'],[1,'#6e5a24']]);
+    udCurve(c,[['M',-7,-44],['L',-8,-50],['L',-4,-46],['L',0,-51],['L',4,-46],['L',8,-50],['L',7,-44],['Z']]); c.fill();
+  }
+  if (o.drip){ c.fillStyle=`rgba(${edge},0.6)`; for (const [x,y] of [[-14,6],[16,2],[-6,24],[9,30]]){ c.beginPath(); c.ellipse(x,y,0.8,2,0,0,Math.PI*2); c.fill(); } }
+  if (o.frost){ c.strokeStyle='rgba(220,240,255,0.7)'; c.lineWidth=0.6; for (const [x,y] of [[-16,-4],[14,-16],[-4,14],[10,20]]){ for (let a=0;a<3;a++){ const an=a*Math.PI/3; c.beginPath(); c.moveTo(x-Math.cos(an)*2,y-Math.sin(an)*2); c.lineTo(x+Math.cos(an)*2,y+Math.sin(an)*2); c.stroke(); } } }
+  udGlow(c, 0, -10, 34, edge, o.aura||0.12);
+}
+
+// ---- mummies: linen-bound dead of the desert tombs ----
+function udPaintMummy(c, o){
+  const lin='#cbbd98', linD='#6f6147', linL='#e9dfc2';
+  // bandage-wrapped silhouette (legs, torso, arms reaching, head)
+  const shape = ()=>{
+    udCurve(c,[['M',-10,-26],['Q',0,-29,10,-26],['L',12,6],['L',10,46],['L',3,46],['L',1,12],['L',-1,12],['L',-3,46],['L',-10,46],['L',-12,6],['Z']]);
+  };
+  c.fillStyle = udLin(c,-12,0,12,0,[[0,linD],[0.35,lin],[0.6,linL],[1,linD]]); shape(); c.fill();
+  // wrapped arms reaching forward, hands clawing
+  for (const s of [-1,1]){
+    c.fillStyle = udLin(c,s*9,-24,s*20,-4,[[0,linL],[0.5,lin],[1,linD]]);
+    udCurve(c,[['M',s*8,-26],['Q',s*18,-25,s*20,-14],['L',s*21,-4],['L',s*15,-4],['L',s*14,-13],['Q',s*12,-17,s*8,-17],['Z']]); c.fill();
+    c.strokeStyle='rgba(70,58,38,0.6)'; c.lineWidth=0.55;
+    for (let k=0;k<6;k++){ const yy=-22+k*3.2; c.beginPath(); c.moveTo(s*(10+k*0.9),yy); c.lineTo(s*(18+k*0.5),yy+1.4); c.stroke(); }
+    udHand(c, s*18, -4, s*0.15, 6, lin, linD);
+  }
+  // wrapping strips at slight angles
+  c.save(); shape(); c.clip();
+  for (let y=-26; y<46; y+=3.1){
+    const tilt = Math.sin(y*1.7)*1.4;
+    c.strokeStyle='rgba(70,58,38,0.55)'; c.lineWidth=0.6;
+    c.beginPath(); c.moveTo(-13,y+tilt); c.lineTo(13,y-tilt); c.stroke();
+    c.strokeStyle='rgba(255,250,230,0.25)'; c.lineWidth=0.5;
+    c.beginPath(); c.moveTo(-13,y+tilt+0.8); c.lineTo(13,y-tilt+0.8); c.stroke();
+  }
+  c.fillStyle='rgba(60,45,25,0.3)'; c.beginPath(); c.ellipse(-4,20,4,7,0.3,0,Math.PI*2); c.ellipse(6,-6,3,5,-0.2,0,Math.PI*2); c.fill();
+  c.restore();
+  // loose trailing bandage ends
+  c.strokeStyle=lin; c.lineWidth=1.8; c.lineCap='round';
+  for (const [x,y,dx,dy] of [[12,-2,5,12],[-11,10,-6,11],[-3,30,-3,10]]){ c.beginPath(); c.moveTo(x,y); c.quadraticCurveTo(x+dx*0.7,y+dy*0.4,x+dx,y+dy); c.stroke(); }
+  // head
+  const hy=-35;
+  c.fillStyle = udRad(c,0,hy,10,[[0,linL],[0.6,lin],[1,linD]],-3,hy-4);
+  c.beginPath(); c.ellipse(0,hy,7.5,9,0,0,Math.PI*2); c.fill();
+  c.save(); c.beginPath(); c.ellipse(0,hy,7.5,9,0,0,Math.PI*2); c.clip();
+  for (let y=hy-9;y<hy+9;y+=2.4){ c.strokeStyle='rgba(80,64,40,0.55)'; c.lineWidth=0.5; c.beginPath(); c.moveTo(-8,y+1.2); c.lineTo(8,y-1.2); c.stroke(); }
+  c.restore();
+  // one eye gleaming through a gap in the wrappings
+  c.fillStyle='#0d0906'; c.fillRect(-5.5,hy-2.8,11,2.6);
+  c.fillStyle=`rgb(${o.eyes||'120,230,160'})`; c.beginPath(); c.arc(2.6,hy-1.5,0.9,0,Math.PI*2); c.fill();
+  udGlow(c,2.6,hy-1.5,4.5,o.eyes||'120,230,160',0.9);
+  if (o.nemes){
+    // striped royal headdress and a broad jeweled collar
+    const gold='#d9b44a';
+    c.fillStyle=gold; udCurve(c,[['M',-9,hy-8],['Q',0,hy-14,9,hy-8],['L',12,hy+14],['L',7,hy+6],['L',-7,hy+6],['L',-12,hy+14],['Z']]); c.fill();
+    c.save(); c.clip();
+    for (let y=hy-12;y<hy+16;y+=2.2){ c.fillStyle='#2b4f8a'; c.fillRect(-13,y,26,1.1); }
+    c.restore();
+    c.fillStyle = udLin(c,-12,-26,12,-18,[[0,'#f6dc86'],[1,'#8a6a22']]);
+    udCurve(c,[['M',-12,-26],['Q',0,-16,12,-26],['L',10,-21],['Q',0,-12,-10,-21],['Z']]); c.fill();
+    for (let i=-8;i<=8;i+=4){ c.fillStyle= i%8===0 ? '#3aa0a0' : '#b83a2a'; c.beginPath(); c.arc(i,-20+Math.abs(i)*0.2,1.1,0,Math.PI*2); c.fill(); }
+    if (o.mask){
+      c.fillStyle = udRad(c,0,hy,9,[[0,'#fff0b0'],[0.5,'#e2bf55'],[1,'#8c6a1e']],-3,hy-4);
+      c.beginPath(); c.ellipse(0,hy+0.5,6.5,8,0,0,Math.PI*2); c.fill();
+      c.fillStyle='#1b2f52'; c.fillRect(-5,hy-2,4,1.6); c.fillRect(1,hy-2,4,1.6);
+      c.fillStyle='#f4ffe8'; c.beginPath(); c.arc(-3,hy-1.2,0.8,0,Math.PI*2); c.arc(3,hy-1.2,0.8,0,Math.PI*2); c.fill();
+      udGlow(c,-3,hy-1.2,4,'255,230,140',0.9); udGlow(c,3,hy-1.2,4,'255,230,140',0.9);
+      c.fillStyle='#2b4f8a'; c.fillRect(-1,hy+6,2,5);
+    }
+    if (o.crook){
+      c.strokeStyle='#d9b44a'; c.lineWidth=2; c.lineCap='round';
+      c.beginPath(); c.moveTo(-21,-8); c.lineTo(-24,40); c.stroke();
+      c.beginPath(); c.moveTo(-21,-8); c.quadraticCurveTo(-20,-18,-26,-16); c.stroke();
+      c.strokeStyle='#2b4f8a'; c.lineWidth=2.1; for (let y=0;y<36;y+=6){ c.beginPath(); c.moveTo(-21.4-y*0.06,y); c.lineTo(-21.7-y*0.06,y+2.4); c.stroke(); }
+    }
+  }
+}
+
+// ---- death knight: black plate, a burning helm and a greatsword ----
+function udPaintDeathKnight(c, o){
+  const plate='#3a3d44', plateL='#8b919c', plateD='#101216', trim='#8a1f1f';
+  // tattered cape
+  c.fillStyle = udLin(c,-20,-26,20,48,[[0,'#5a1414'],[1,'#1c0505']]);
+  udCurve(c,[['M',-15,-26],['L',15,-26],['L',22,46],['L',16,40],['L',11,48],['L',5,41],['L',0,48],['L',-6,41],['L',-12,48],['L',-17,40],['L',-22,46],['Z']]); c.fill();
+  // legs in plate
+  for (const s of [-1,1]){
+    c.fillStyle = udLin(c,s*2,0,s*12,0,[[0,plateD],[0.45,plateL],[0.6,plate],[1,plateD]]);
+    c.fillRect(s>0?2:-11, 8, 9, 36);
+    c.fillStyle=plateL; c.beginPath(); c.ellipse(s*6.5,26,4.8,3,0,0,Math.PI*2); c.fill();
+    c.fillStyle=plateD; c.beginPath(); c.ellipse(s*7,47,6,2.6,0,0,Math.PI*2); c.fill();
+  }
+  // cuirass
+  c.fillStyle = udLin(c,-15,0,15,0,[[0,plateD],[0.35,plate],[0.5,plateL],[0.65,plate],[1,plateD]]);
+  udCurve(c,[['M',-15,-26],['L',15,-26],['L',13,-2],['L',11,10],['L',-11,10],['L',-13,-2],['Z']]); c.fill();
+  c.strokeStyle=trim; c.lineWidth=1.1; c.beginPath(); c.moveTo(0,-24); c.lineTo(0,8); c.moveTo(-12,-2); c.quadraticCurveTo(0,4,12,-2); c.stroke();
+  c.fillStyle=trim; c.beginPath(); c.arc(0,-14,2.3,0,Math.PI*2); c.fill();
+  // spiked pauldrons
+  for (const s of [-1,1]){
+    c.fillStyle = udRad(c,s*16,-24,9,[[0,plateL],[0.5,plate],[1,plateD]],s*14,-28);
+    c.beginPath(); c.ellipse(s*16,-23,9,6,0,Math.PI,0); c.fill();
+    c.fillStyle=plateD; udCurve(c,[['M',s*12,-28],['L',s*16,-38],['L',s*18,-28],['Z']]); c.fill();
+  }
+  // gauntlets resting on a planted greatsword
+  c.save();
+  c.fillStyle = udLin(c,-2.8,0,2.8,0,[[0,'#2a2e36'],[0.5,'#c4ccd8'],[1,'#2a2e36']]);
+  udCurve(c,[['M',-2.8,2],['L',-2.8,44],['L',0,48],['L',2.8,44],['L',2.8,2],['Z']]); c.fill();
+  c.strokeStyle='rgba(180,40,40,0.8)'; c.lineWidth=0.7; c.beginPath(); c.moveTo(0,6); c.lineTo(0,40); c.stroke();
+  c.fillStyle='#1d1f24'; c.fillRect(-10,-1,20,3.2);
+  c.fillStyle='#2a1a14'; c.fillRect(-1.5,-10,3,9);
+  c.fillStyle=trim; c.beginPath(); c.arc(0,-11,2.2,0,Math.PI*2); c.fill();
+  c.restore();
+  for (const s of [-1,1]){
+    c.fillStyle = udLin(c,s*15,-20,s*4,-6,[[0,plate],[1,plateD]]);
+    udCurve(c,[['M',s*13,-22],['Q',s*16,-12,s*5,-8],['L',s*2,-5],['L',s*2,-1],['L',s*6,-2],['Q',s*18,-8,s*18,-20],['Z']]); c.fill();
+  }
+  // horned great helm with a burning eye slit
+  const hy=-36;
+  for (const s of [-1,1]){ c.fillStyle='#1a1b1f'; udCurve(c,[['M',s*6,hy-5],['Q',s*16,hy-10,s*15,hy-20],['Q',s*12,hy-12,s*5,hy-9],['Z']]); c.fill(); }
+  c.fillStyle = udLin(c,-8,hy-10,8,hy+8,[[0,plateL],[0.4,plate],[1,plateD]]);
+  udCurve(c,[['M',-8,hy+8],['L',-8.5,hy-5],['Q',0,hy-14,8.5,hy-5],['L',8,hy+8],['Q',0,hy+10,-8,hy+8],['Z']]); c.fill();
+  c.fillStyle='#050305'; c.fillRect(-6,hy-2,12,2.2);
+  c.fillStyle='#ff5a3c'; c.fillRect(-4.6,hy-1.6,3,1.3); c.fillRect(1.6,hy-1.6,3,1.3);
+  udGlow(c,-3,hy-1,6,'255,70,40',0.9); udGlow(c,3,hy-1,6,'255,70,40',0.9);
+  c.strokeStyle='rgba(0,0,0,0.7)'; c.lineWidth=0.5; for (let i=-4;i<=4;i+=2){ c.beginPath(); c.moveTo(i,hy+2); c.lineTo(i,hy+7); c.stroke(); }
+  udGlow(c, 0, -6, 30, '160,20,20', 0.14);
+}
+
+// ---- vampire spawn: pale, gaunt and hungry ----
+function udPaintVampire(c, o){
+  const skin='#d9d3d6', skinD='#7a6c78';
+  // high-collared cape
+  c.fillStyle = udLin(c,-20,-30,20,46,[[0,'#241424'],[1,'#0a060a']]);
+  udCurve(c,[['M',-9,-30],['L',-17,-36],['L',-15,-24],['Q',-24,10,-21,44],['L',21,44],['Q',24,10,15,-24],['L',17,-36],['L',9,-30],['Z']]); c.fill();
+  c.fillStyle='#6a0f1e'; udCurve(c,[['M',-9,-28],['L',-14,-33],['L',-12,-24],['L',-6,-22],['Z']]); c.fill();
+  c.fillStyle='#6a0f1e'; udCurve(c,[['M',9,-28],['L',14,-33],['L',12,-24],['L',6,-22],['Z']]); c.fill();
+  // body in a torn dark coat
+  for (const s of [-1,1]){ c.fillStyle='#1a1418'; c.fillRect(s>0?2:-9, 6, 7, 38); c.fillStyle='#0c0a0c'; c.beginPath(); c.ellipse(s*5.5,46.5,5,2.2,0,0,Math.PI*2); c.fill(); }
+  c.fillStyle = udLin(c,-12,0,12,0,[[0,'#140f13'],[0.5,'#3a2c36'],[1,'#140f13']]);
+  udCurve(c,[['M',-11,-24],['L',11,-24],['L',10,10],['L',-10,10],['Z']]); c.fill();
+  c.fillStyle='#d8d0cc'; udCurve(c,[['M',-4,-24],['L',4,-24],['L',0,-12],['Z']]); c.fill();
+  c.fillStyle='rgba(140,10,20,0.8)'; c.beginPath(); c.ellipse(1,-16,1.4,3,0,0,Math.PI*2); c.fill();
+  // clawed hands raised to strike
+  for (const s of [-1,1]){
+    c.fillStyle='#231a21'; udCurve(c,[['M',s*10,-23],['Q',s*21,-20,s*22,-30],['L',s*18,-33],['Q',s*16,-25,s*9,-16],['Z']]); c.fill();
+    c.save(); c.translate(s*20,-33); c.rotate(s*0.2+Math.PI);
+    c.fillStyle=skin; c.beginPath(); c.ellipse(0,1,2.4,3,0,0,Math.PI*2); c.fill();
+    c.strokeStyle='#e9e2e4'; c.lineWidth=0.8; c.lineCap='round';
+    for (let i=-1.5;i<=1.5;i++){ c.beginPath(); c.moveTo(i*1.2,2); c.quadraticCurveTo(i*1.6,7,i*1.3+0.6,10); c.stroke(); }
+    c.restore();
+  }
+  // pale, hollow-cheeked face, slicked hair, fangs
+  const hy=-36;
+  c.fillStyle = udRad(c,0,hy,10,[[0,'#f6f1f3'],[0.6,skin],[1,skinD]],-3,hy-4);
+  udCurve(c,[['M',-6.5,hy-4],['C',-7,hy-12,7,hy-12,6.5,hy-4],['Q',6.5,hy+4,2,hy+9],['L',-2,hy+9],['Q',-6.5,hy+4,-6.5,hy-4],['Z']]); c.fill();
+  c.fillStyle='#110c10'; udCurve(c,[['M',-7,hy-3],['C',-8,hy-13,8,hy-13,7,hy-3],['Q',3,hy-8,0,hy-5],['Q',-3,hy-8,-7,hy-3],['Z']]); c.fill();
+  for (const s of [-1,1]){ c.fillStyle=skinD; udCurve(c,[['M',s*6.3,hy-2],['L',s*9.5,hy-7],['L',s*6.5,hy+2],['Z']]); c.fill(); }
+  udEyes(c, 0, hy-1.5, 2.8, 1.35, '255,40,50');
+  c.fillStyle='#3a0610'; c.beginPath(); c.ellipse(0,hy+5,2.8,1.8,0,0,Math.PI*2); c.fill();
+  c.fillStyle='#fff'; udCurve(c,[['M',-1.9,hy+3.6],['L',-1.1,hy+3.6],['L',-1.5,hy+6.4],['Z']]); c.fill();
+  udCurve(c,[['M',1.1,hy+3.6],['L',1.9,hy+3.6],['L',1.5,hy+6.4],['Z']]); c.fill();
+  c.fillStyle='rgba(150,10,20,0.85)'; c.beginPath(); c.ellipse(0.8,hy+8,0.7,1.6,0,0,Math.PI*2); c.fill();
+}
+
+// ---- liches: robed sorcerer-skeletons crowned in stolen power ----
+function udPaintLich(c, o){
+  const robe=o.robe||'#3a2350', robeD=o.robeD||'#150a1f', gold='#caa24a';
+  if (o.aura) udGlow(c, 0, -14, 46, o.auraCol||'170,110,255', o.aura);
+  // robe
+  c.fillStyle = udLin(c,-18,0,18,0,[[0,robeD],[0.35,robe],[0.6,robe],[1,robeD]]);
+  udCurve(c,[['M',-12,-26],['L',12,-26],['Q',17,10,21,47],['L',-21,47],['Q',-17,10,-12,-26],['Z']]); c.fill();
+  c.strokeStyle='rgba(0,0,0,0.45)'; c.lineWidth=0.9;
+  for (const x of [-10,-4,3,9]){ c.beginPath(); c.moveTo(x*0.6,-18); c.quadraticCurveTo(x,14,x*1.4,46); c.stroke(); }
+  c.fillStyle=gold; udCurve(c,[['M',-21,47],['L',21,47],['L',20.5,43],['L',-20.5,43],['Z']]); c.fill();
+  c.fillStyle=gold; c.fillRect(-1.6,-24,3.2,68);
+  c.fillStyle='rgba(20,10,30,0.8)'; for (let y=-20;y<42;y+=6){ c.beginPath(); c.arc(0,y,0.9,0,Math.PI*2); c.fill(); }
+  // high collar
+  for (const s of [-1,1]){ c.fillStyle = robeD; udCurve(c,[['M',s*4,-26],['L',s*14,-40],['L',s*15,-24],['Z']]); c.fill(); c.strokeStyle=gold; c.lineWidth=0.7; c.stroke(); }
+  // bony arms: one grips a staff, one cradles a spell
+  c.fillStyle=robe; udCurve(c,[['M',-11,-24],['Q',-22,-18,-22,-4],['L',-16,-4],['Q',-16,-14,-9,-16],['Z']]); c.fill();
+  udBone(c,-19,-4,-21,4,1.5,'#ddd5bf','#7e735c');
+  udHand(c,-21,4,0.1,5,'#ddd5bf','#7e735c');
+  c.fillStyle=robe; udCurve(c,[['M',11,-24],['Q',22,-22,23,-10],['L',18,-8],['Q',16,-16,9,-16],['Z']]); c.fill();
+  // staff with a crowning gem
+  c.strokeStyle = udLin(c,24,-48,24,48,[[0,'#5a4028'],[1,'#2a1c10']]); c.lineWidth=2.2; c.lineCap='round';
+  c.beginPath(); c.moveTo(22,-40); c.lineTo(25,47); c.stroke();
+  c.strokeStyle=gold; c.lineWidth=1.1; c.beginPath(); c.arc(22,-44,4.6,0.4,Math.PI*2-0.4); c.stroke();
+  c.fillStyle=`rgb(${o.gem||'190,130,255'})`; c.beginPath(); c.arc(22,-44,2.6,0,Math.PI*2); c.fill();
+  udGlow(c,22,-44,11,o.gem||'190,130,255',1);
+  udHand(c,21,-9,-0.3,5,'#ddd5bf','#7e735c');
+  // a spell gathering in the free hand
+  udGlow(c,-21,8,9,o.gem||'190,130,255',0.9);
+  c.fillStyle='rgba(255,245,255,0.9)'; c.beginPath(); c.arc(-21,8,1.6,0,Math.PI*2); c.fill();
+  // skull, hood thrown back, crown
+  if (!o.noHood){ c.fillStyle=robeD; udCurve(c,[['M',-11,-24],['Q',-13,-44,0,-47],['Q',13,-44,11,-24],['Q',0,-30,-11,-24],['Z']]); c.fill(); }
+  udSkull(c, 0, -35, 8, {eyes: o.eyes||'200,150,255'});
+  if (o.crown){
+    c.fillStyle = udLin(c,-9,-52,9,-42,[[0,'#ffe28a'],[1,'#8a6a22']]);
+    udCurve(c,[['M',-8,-42],['L',-9,-50],['L',-5,-45],['L',-2,-53],['L',0,-45],['L',2,-53],['L',5,-45],['L',9,-50],['L',8,-42],['Z']]); c.fill();
+    c.fillStyle=`rgb(${o.gem||'190,130,255'})`; c.beginPath(); c.arc(0,-44,1.4,0,Math.PI*2); c.fill();
+  }
+  if (o.spikes){
+    for (const s of [-1,1]){
+      c.fillStyle = udLin(c,s*14,-40,s*26,-30,[[0,'#caa24a'],[1,'#4a3510']]);
+      udCurve(c,[['M',s*14,-30],['L',s*28,-44],['L',s*18,-27],['Z']]); c.fill();
+      udGlow(c,s*28,-44,5,o.gem||'190,130,255',0.8);
+    }
+  }
+}
+
+const UNDEAD_PORTRAITS = {
+  'skeleton':          {paint:udPaintSkeleton, o:{eyes:null}},
+  'skeletal warrior':  {paint:udPaintSkeleton, o:{eyes:'255,180,80', armor:true}},
+  'skeletal knight':   {paint:udPaintSkeleton, o:{eyes:'120,200,255', armor:true, helm:true, shield:true}, h:1.04},
+  'zombie':            {paint:udPaintZombie, o:{}},
+  'bog zombie':        {paint:udPaintZombie, o:{skin:'#6f6a48', skinD:'#34301c', skinL:'#958e62', cloth:'#3d3524', moss:true}},
+  'drowned wretch':    {paint:udPaintZombie, o:{skin:'#7f98a0', skinD:'#34464d', skinL:'#aac0c6', cloth:'#2e3c40', clothD:'#141c1f', weed:true, eyes:'140,230,230'}},
+  'the rot king':      {paint:udPaintZombie, o:{skin:'#6f7a4c', skinD:'#2f3620', skinL:'#9aa36a', cloth:'#4a2a3a', clothD:'#1e0f18', crown:true, eyes:'200,255,120'}, h:1.12},
+  'ghoul':             {paint:udPaintGhoul, o:{}, h:0.84},
+  'ghoul pack leader': {paint:udPaintGhoul, o:{scars:true, eyes:'255,120,60'}, h:0.92},
+  'ghast':             {paint:udPaintGhoul, o:{skin:'#8a9a78', skinD:'#3c4a30', skinL:'#b9c6a2', drool:true}, h:0.84},
+  'ghast marauder':    {paint:udPaintGhoul, o:{skin:'#8a9a78', skinD:'#3c4a30', skinL:'#b9c6a2', drool:true, scars:true, eyes:'255,120,60'}, h:0.92},
+  'wight':             {paint:udPaintWight, o:{}},
+  'revenant':          {paint:udPaintWight, o:{axe:true, helm:true, eyes:'255,80,50', cloak:'#3a1e1c', skin:'#8e7b6c'}},
+  'wraith':            {paint:udPaintSpirit, o:{}, lift:0.12, spirit:true},
+  'barrow wraith':     {paint:udPaintSpirit, o:{crown:true, body:'40,50,48', edge:'140,170,150', eyes:'170,255,190'}, lift:0.12, spirit:true},
+  'dread wraith':      {paint:udPaintSpirit, o:{sword:true, body:'22,18,28', edge:'150,60,80', eyes:'255,60,70', aura:0.2}, lift:0.12, h:1.12, spirit:true},
+  'wraith of the depths': {paint:udPaintSpirit, o:{drip:true, body:'24,56,66', edge:'90,200,210', eyes:'120,255,240'}, lift:0.12, spirit:true},
+  'the winter wraith': {paint:udPaintSpirit, o:{frost:true, body:'150,180,205', edge:'230,245,255', eyes:'200,240,255', hand:'240,250,255', aura:0.2}, lift:0.12, h:1.1, spirit:true},
+  'specter':           {paint:udPaintSpirit, o:{body:'110,135,175', edge:'210,230,255', eyes:'230,245,255', aura:0.18}, lift:0.16, spirit:true},
+  'shadow':            {paint:udPaintSpirit, o:{body:'8,8,12', edge:'40,40,56', eyes:'230,230,255', aura:0.02, hand:'30,30,40'}, lift:0.06, spirit:true},
+  'banshee':           {paint:udPaintSpirit, o:{hair:'235,240,250', body:'150,165,200', edge:'225,235,255', eyes:'180,230,255', aura:0.2}, lift:0.16, spirit:true},
+  'mummy':             {paint:udPaintMummy, o:{}},
+  'mummy lord':        {paint:udPaintMummy, o:{nemes:true, crook:true}, h:1.06},
+  'the sun-scorched pharaoh': {paint:udPaintMummy, o:{nemes:true, mask:true, crook:true, eyes:'255,220,120'}, h:1.1},
+  'death knight':      {paint:udPaintDeathKnight, o:{}, h:1.12},
+  'vampire spawn':     {paint:udPaintVampire, o:{}},
+  'lich acolyte':      {paint:udPaintLich, o:{robe:'#2c2c3a', robeD:'#0e0e16', gem:'120,200,255', eyes:'140,210,255'}},
+  'lich':              {paint:udPaintLich, o:{crown:true, aura:0.14, noHood:true}, h:1.06},
+  'archlich':          {paint:udPaintLich, o:{crown:true, spikes:true, aura:0.22, noHood:true, robe:'#1c2a46', robeD:'#070c18', gem:'120,220,255', eyes:'150,230,255', auraCol:'110,190,255'}, h:1.12},
+  'risen lich-lord':   {paint:udPaintLich, o:{crown:true, spikes:true, aura:0.22, noHood:true}, h:1.12},
+};
+const UNDEAD_PORTRAIT_KEYS = Object.keys(UNDEAD_PORTRAITS).sort((a,b)=>b.length-a.length);
+// matches a live monster's (possibly decorated) name - "Champion ghoul",
+// "Gravemaw the wight", "zombie overlord" - back to its base undead kind
+function undeadPortraitFor(nm, undead){
+  if (!undead || !nm) return null;
+  const n = String(nm).toLowerCase();
+  for (const k of UNDEAD_PORTRAIT_KEYS) if (n.includes(k)) return UNDEAD_PORTRAITS[k];
+  return null;
+}
+// paints a portrait into a 2D context centered at (px,py) filling a size box
+// - the painted-undead counterpart of drawMonsterArt/drawMonsterArtShaded
+function drawUndeadPortrait(c, px, py, size, entry){
+  c.save(); c.translate(px,py); c.scale(size/100, size/100);
+  c.lineJoin='round';
+  entry.paint(c, entry.o||{});
+  c.restore();
+}
+function fpUndeadSprite(entry, corrupted){
+  const key = corrupted ? '|corrupt' : '|plain';
+  let byE = FP.sprites.get(entry);
+  if (!byE){ byE = new Map(); FP.sprites.set(entry, byE); }
+  let e = byE.get(key);
+  if (!e){
+    e = fpBuildSprite((c,S)=>{
+      drawUndeadPortrait(c, S/2, S/2, S*0.92, entry);
+      if (corrupted){
+        // a corrupted creature seethes with violet taint
+        c.save(); c.globalCompositeOperation='source-atop';
+        c.fillStyle='rgba(150,70,220,0.35)'; c.fillRect(0,0,S,S); c.restore();
+      }
+    }, true, !!entry.spirit);
+    byE.set(key, e);
   }
   return e;
 }
@@ -10583,11 +11197,13 @@ function fpCollectSprites(vis){
     pos.x += (m.x+0.5-pos.x)*kk; pos.y += (m.y+0.5-pos.y)*kk;
     const isBoss = G.gameMode===1 && G.isBossFloor && i===G.bossIdx;
     const col = m.corrupted ? COL.purple : m.col;
-    const spr = (m.art && m.art.length) ? fpSprite(m.art, col, !!m.undead) : fpGlyphSprite(m.sym||'?', col);
-    const breathe = 1 + Math.sin(FP.t*3 + i*1.3)*0.025;
+    const ud = undeadPortraitFor(m.nm, m.undead);
+    const spr = ud ? fpUndeadSprite(ud, m.corrupted) : (m.art && m.art.length) ? fpSprite(m.art, col, !!m.undead) : fpGlyphSprite(m.sym||'?', col);
+    const breathe = (1 + Math.sin(FP.t*3 + i*1.3)*0.025) * (ud && ud.h ? ud.h : 1);
+    const hover = ud && ud.lift ? ud.lift + Math.sin(FP.t*2.2 + i)*0.035 : 0;
     let fl = FP.monFlash.get(m)||0;
     if (fl>0){ fl = Math.max(0, fl-FP.dt*4); FP.monFlash.set(m, fl); }
-    S.push({x:pos.x, y:pos.y, spr, h:(isBoss?1.02:0.74)*breathe, lift:0, shadow:true, flash:fl,
+    S.push({x:pos.x, y:pos.y, spr, h:(isBoss?1.02:0.74)*breathe, lift:hover, shadow:true, flash:fl,
       hp: m.hp<m.maxHp ? clamp(m.hp/m.maxHp,0,1) : null, boss:isBoss});
   }
   const comp = G.player.companion;
@@ -11158,7 +11774,7 @@ function renderOverlay(){
     case 'vault': el.innerHTML = buildVault(); break;
     case 'inventory': el.innerHTML = buildInventory(); break;
     case 'charsheet': el.innerHTML = buildCharSheet(); renderPaperDollIcons(); break;
-    case 'bossPreview': el.innerHTML = buildBossPreview(); renderMiniMonsterArt('bossPreviewArt', G.mon[G.bossIdx].art, G.mon[G.bossIdx].col); break;
+    case 'bossPreview': el.innerHTML = buildBossPreview(); renderMiniMonsterArt('bossPreviewArt', G.mon[G.bossIdx].art, G.mon[G.bossIdx].col, G.mon[G.bossIdx].nm, G.mon[G.bossIdx].undead); break;
     case 'victory': el.innerHTML = buildVictory(); break;
     case 'death': el.innerHTML = buildDeath(); break;
     case 'help': el.innerHTML = buildHelp(); break;
