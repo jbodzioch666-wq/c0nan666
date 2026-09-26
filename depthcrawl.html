@@ -9517,6 +9517,8 @@ function renderGame(){
   // anticipate; only actually touches the DOM/resizes the canvas on the
   // frame the mode genuinely changes, not every frame
   if (G._layoutKey !== layoutKey()) setupCanvas();
+  // start sculpting the 3D skeleton in the background as soon as three.js is in
+  if (G.player && SK3.ok===null && typeof THREE!=='undefined') sk3Init();
   const wantVillageMode = G.gameMode===3;
   if (wantVillageMode !== G._villageModeActive){
     G._villageModeActive = wantVillageMode;
@@ -12569,22 +12571,511 @@ function drawObjIcon(x, y, entry, frac){
   ctx.drawImage(spr.img, x*cellPx+(cellPx-ww)/2, y*cellPx+cellPx*0.94-h2, ww, h2);
 }
 
+// ---- signed-distance sculpting: every bone is modelled as a smooth blend of
+// simple solids (spheres, ellipsoids, tapered capsules, flat blades, plates),
+// with holes carved out of it, then meshed with surface nets. Crevices get
+// darkened from the distance field itself (ambient occlusion baked into the
+// vertex colours), which is most of what makes old bone read as real.
+const SDF = (()=>{
+  const sub3 = (a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]], add3=(a,b)=>[a[0]+b[0],a[1]+b[1],a[2]+b[2]], mul3=(a,s)=>[a[0]*s,a[1]*s,a[2]*s];
+  const dot = (a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2], len = a=>Math.sqrt(dot(a,a));
+  const cross = (a,b)=>[a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
+  const norm = a=>{ const l = len(a)||1; return [a[0]/l,a[1]/l,a[2]/l]; };
+  const box = (c, r)=>({ lo:[c[0]-r,c[1]-r,c[2]-r], hi:[c[0]+r,c[1]+r,c[2]+r] });
+  // primitives: each has an AABB (lo/hi) and a distance function
+  const sph = (c, r)=> Object.assign(box(c,r), { d:(x,y,z)=> Math.hypot(x-c[0],y-c[1],z-c[2]) - r });
+  // ellipsoid, optionally rotated by an orthonormal basis [ex,ey,ez]
+  const ell = (c, r, B)=> Object.assign(box(c, Math.max(r[0],r[1],r[2])), { d:(x,y,z)=>{
+    let px = x-c[0], py = y-c[1], pz = z-c[2];
+    if (B){ const a = px*B[0][0]+py*B[0][1]+pz*B[0][2], b = px*B[1][0]+py*B[1][1]+pz*B[1][2], e = px*B[2][0]+py*B[2][1]+pz*B[2][2]; px=a; py=b; pz=e; }
+    const k0 = Math.hypot(px/r[0], py/r[1], pz/r[2]), k1 = Math.hypot(px/(r[0]*r[0]), py/(r[1]*r[1]), pz/(r[2]*r[2]));
+    return k1>1e-9 ? k0*(k0-1)/k1 : -Math.min(r[0],r[1],r[2]);
+  }});
+  // hollow ellipsoid shell of thickness t
+  const shellEll = (c, r, t)=>{ const e = ell(c, r); return Object.assign(box(c, Math.max(r[0],r[1],r[2])+t), { d:(x,y,z)=> Math.abs(e.d(x,y,z)+t*0.5) - t*0.5 }); };
+  // tapered capsule a->b, radii ra->rb
+  const cap = (a, b, ra, rb)=>{
+    const ba = sub3(b,a), bb = dot(ba,ba), R = Math.max(ra, rb===undefined?ra:rb); rb = rb===undefined ? ra : rb;
+    return { lo:[Math.min(a[0],b[0])-R, Math.min(a[1],b[1])-R, Math.min(a[2],b[2])-R], hi:[Math.max(a[0],b[0])+R, Math.max(a[1],b[1])+R, Math.max(a[2],b[2])+R],
+      d:(x,y,z)=>{ const px=x-a[0], py=y-a[1], pz=z-a[2]; let t = (px*ba[0]+py*ba[1]+pz*ba[2])/bb; t = t<0?0:t>1?1:t;
+        return Math.hypot(px-ba[0]*t, py-ba[1]*t, pz-ba[2]*t) - (ra+(rb-ra)*t); } };
+  };
+  // capsule with an elliptical (flat) cross-section: rw across (perpendicular to
+  // both the segment and 'up'), rh along the remaining direction
+  const flat = (a, b, rw0, rh0, up, rw1, rh1, sq)=>{
+    const ba = sub3(b,a), bb = dot(ba,ba), bh = norm(ba);
+    let w = cross(bh, up); if (len(w)<1e-6) w = cross(bh,[1,0,0]); w = norm(w);
+    const hv = norm(cross(w, bh)); rw1 = rw1===undefined ? rw0 : rw1; rh1 = rh1===undefined ? rh0 : rh1;
+    const R = Math.max(rw0,rh0,rw1,rh1);
+    return { lo:[Math.min(a[0],b[0])-R, Math.min(a[1],b[1])-R, Math.min(a[2],b[2])-R], hi:[Math.max(a[0],b[0])+R, Math.max(a[1],b[1])+R, Math.max(a[2],b[2])+R],
+      d:(x,y,z)=>{ const px=x-a[0], py=y-a[1], pz=z-a[2], L = Math.sqrt(bb);
+        const sa = px*bh[0]+py*bh[1]+pz*bh[2], t = sa<0?0:sa>L?1:sa/L;
+        const vx = px-bh[0]*sa, vy = py-bh[1]*sa, vz = pz-bh[2]*sa;
+        const rw = rw0+(rw1-rw0)*t, rh = rh0+(rh1-rh0)*t, rm = Math.min(rw,rh);
+        const u = (vx*w[0]+vy*w[1]+vz*w[2])/rw, v = (vx*hv[0]+vy*hv[1]+vz*hv[2])/rh;
+        // elliptical section extruded along the segment with squared-off ends
+        // (a chain's neighbouring segments overlap, so no pinch at the joints)
+        const e = (Math.sqrt(u*u+v*v) - 1)*rm, al = Math.abs(sa - L*0.5) - L*0.5;
+        if (!sq) return al>0 ? (Math.sqrt(u*u+v*v+(al/rm)*(al/rm)) - 1)*rm : e;
+        return Math.min(Math.max(e, al), 0) + Math.hypot(Math.max(e,0), Math.max(al,0)); } };
+  };
+  // rounded cylinder along y with an elliptical section
+  const cylE = (c, rx, rz, hh, round)=> Object.assign(box(c, Math.max(rx,rz,hh)+round), { d:(x,y,z)=>{
+    const px = x-c[0], py = y-c[1], pz = z-c[2], m = Math.min(rx,rz);
+    const dxz = (Math.hypot(px/rx, pz/rz)-1)*m, dy = Math.abs(py)-hh;
+    return Math.min(Math.max(dxz,dy),0) + Math.hypot(Math.max(dxz,0), Math.max(dy,0)) - round; } });
+  // torus around axis ay (unit), centre c
+  const torus = (c, R, r, ay)=>{ ay = norm(ay); return Object.assign(box(c, R+r), { d:(x,y,z)=>{
+    const px=x-c[0], py=y-c[1], pz=z-c[2], h = px*ay[0]+py*ay[1]+pz*ay[2];
+    const rx = px-ay[0]*h, ry = py-ay[1]*h, rz = pz-ay[2]*h;
+    return Math.hypot(Math.hypot(rx,ry,rz)-R, h) - r; } }); };
+  // triangle with thickness (for plates)
+  const tri = (a, b, c, th)=>{
+    const ba = sub3(b,a), cb = sub3(c,b), ac = sub3(a,c), nor = cross(ba, ac);
+    const nn = dot(nor,nor), c1 = cross(ba,nor), c2 = cross(cb,nor), c3 = cross(ac,nor);
+    const lo = [0,1,2].map(i=>Math.min(a[i],b[i],c[i])-th), hi = [0,1,2].map(i=>Math.max(a[i],b[i],c[i])+th);
+    const d2seg = (p, s, v)=>{ const ps = sub3(p,s); let t = dot(ps,v)/dot(v,v); t = t<0?0:t>1?1:t; const q = sub3(ps, mul3(v,t)); return dot(q,q); };
+    return { lo, hi, d:(x,y,z)=>{
+      const p = [x,y,z], pa = sub3(p,a), pb = sub3(p,b), pc = sub3(p,c);
+      const s = Math.sign(dot(c1,pa)) + Math.sign(dot(c2,pb)) + Math.sign(dot(c3,pc));
+      const dd = s<2 ? Math.min(d2seg(p,a,ba), d2seg(p,b,cb), d2seg(p,c,ac)) : dot(nor,pa)*dot(nor,pa)/nn;
+      return Math.sqrt(dd) - th; } };
+  };
+  // grid + smooth union/subtraction by splatting each primitive over its box
+  const part = (min, max, h)=>{
+    const nx = Math.ceil((max[0]-min[0])/h)+1, ny = Math.ceil((max[1]-min[1])/h)+1, nz = Math.ceil((max[2]-min[2])/h)+1;
+    const g = new Float32Array(nx*ny*nz).fill(1), mt = new Uint8Array(nx*ny*nz);
+    const P = { min, h, nx, ny, nz, g, mt };
+    P.op = (pr, k, m, sub)=>{
+      const pad = k + 2*h;
+      const i0 = Math.max(0, Math.floor((pr.lo[0]-pad-min[0])/h)), i1 = Math.min(nx-1, Math.ceil((pr.hi[0]+pad-min[0])/h));
+      const j0 = Math.max(0, Math.floor((pr.lo[1]-pad-min[1])/h)), j1 = Math.min(ny-1, Math.ceil((pr.hi[1]+pad-min[1])/h));
+      const k0 = Math.max(0, Math.floor((pr.lo[2]-pad-min[2])/h)), k1 = Math.min(nz-1, Math.ceil((pr.hi[2]+pad-min[2])/h));
+      const d = pr.d, ik = k>0 ? 1/k : 0;
+      for (let kk=k0; kk<=k1; kk++){ const z = min[2]+kk*h;
+        for (let jj=j0; jj<=j1; jj++){ const y = min[1]+jj*h, row = (kk*ny+jj)*nx;
+          for (let ii=i0; ii<=i1; ii++){
+            const x = min[0]+ii*h, idx = row+ii, cur = g[idx];
+            let dv = d(x,y,z), nv;
+            if (!sub){
+              if (k>0){ const q = Math.max(k-Math.abs(cur-dv),0)*ik; nv = Math.min(cur,dv) - q*q*k*0.25; } else nv = Math.min(cur,dv);
+              if (dv < cur) mt[idx] = m;
+            } else {
+              dv = -dv;
+              if (k>0){ const q = Math.max(k-Math.abs(cur-dv),0)*ik; nv = Math.max(cur,dv) + q*q*k*0.25; } else nv = Math.max(cur,dv);
+            }
+            g[idx] = nv;
+          } } }
+    };
+    P.add = (pr, k, m)=> P.op(pr, k===undefined?0.003:k, m||0, false);
+    P.sub = (pr, k)=> P.op(pr, k===undefined?0.0015:k, 0, true);
+    // a smooth chain of flat/round capsules through points (Catmull-Rom)
+    P.chain = (pts, prof, o)=>{
+      o = o||{}; const n = o.seg || 12, up = o.up || [0,1,0];
+      const curve = new THREE.CatmullRomCurve3(pts.map(p=>new THREE.Vector3(p[0],p[1],p[2])), !!o.closed);
+      let prev = curve.getPointAt(0), pr0 = prof(0);
+      for (let i=1;i<=n;i++){
+        const t = i/n, c = curve.getPointAt(Math.min(1,t)), pr1 = prof(t);
+        // overlap neighbouring segments a little so bends stay smooth
+        const dx = c.x-prev.x, dy = c.y-prev.y, dz = c.z-prev.z, l = Math.hypot(dx,dy,dz)||1, ex = Math.min(pr0[0],pr0[1],pr1[0],pr1[1])*0.5/l;
+        const a0 = i>1 ? [prev.x-dx*ex, prev.y-dy*ex, prev.z-dz*ex] : [prev.x,prev.y,prev.z], b0 = i<n ? [c.x+dx*ex, c.y+dy*ex, c.z+dz*ex] : [c.x,c.y,c.z];
+        P.add(flat(a0, b0, pr0[0], pr0[1], up, pr1[0], pr1[1], true), o.k===undefined?0.0025:o.k, o.m||0);
+        prev = c; pr0 = pr1;
+      }
+    };
+    // a plate following a parametric surface S(u,v) -> [x,y,z], thickness th(u,v)
+    P.plate = (S, nu, nv, th, o)=>{
+      o = o||{};
+      for (let i=0;i<nu;i++) for (let j=0;j<nv;j++){
+        const a = S(i/nu,j/nv), b = S((i+1)/nu,j/nv), c = S((i+1)/nu,(j+1)/nv), e = S(i/nu,(j+1)/nv), t = th((i+0.5)/nu,(j+0.5)/nv)/2;
+        P.add(tri(a,b,c,t), o.k===undefined?0.0015:o.k, o.m||0); P.add(tri(a,c,e,t), o.k===undefined?0.0015:o.k, o.m||0);
+      }
+    };
+    return P;
+  };
+  // trilinear sample of the grid
+  const sample = (P, x, y, z)=>{
+    const { min, h, nx, ny, nz, g } = P;
+    let fx = (x-min[0])/h, fy = (y-min[1])/h, fz = (z-min[2])/h;
+    if (fx<0||fy<0||fz<0||fx>=nx-1||fy>=ny-1||fz>=nz-1) return 1;
+    const i = fx|0, j = fy|0, k = fz|0, tx = fx-i, ty = fy-j, tz = fz-k, o = (k*ny+j)*nx+i, sy = nx, sz = nx*ny;
+    const c00 = g[o]+(g[o+1]-g[o])*tx, c10 = g[o+sy]+(g[o+sy+1]-g[o+sy])*tx, c01 = g[o+sz]+(g[o+sz+1]-g[o+sz])*tx, c11 = g[o+sz+sy]+(g[o+sz+sy+1]-g[o+sz+sy])*tx;
+    const c0 = c00+(c10-c00)*ty, c1 = c01+(c11-c01)*ty; return c0+(c1-c0)*tz;
+  };
+  // surface nets -> BufferGeometry with normals and AO/material vertex colours
+  const COLS = [[0.6,0.53,0.4],[0.42,0.39,0.31],[0.68,0.62,0.47],[0.02,0.015,0.01]];
+  const hash3 = (x,y,z)=>{ const s = Math.sin(x*127.1+y*311.7+z*74.7)*43758.5453; return s-Math.floor(s); };
+  const vnoise = (x,y,z)=>{ const xi=Math.floor(x), yi=Math.floor(y), zi=Math.floor(z), tx=x-xi, ty=y-yi, tz=z-zi;
+    const l = (a,b,t)=>a+(b-a)*t*t*(3-2*t);
+    return l(l(l(hash3(xi,yi,zi),hash3(xi+1,yi,zi),tx), l(hash3(xi,yi+1,zi),hash3(xi+1,yi+1,zi),tx), ty),
+             l(l(hash3(xi,yi,zi+1),hash3(xi+1,yi,zi+1),tx), l(hash3(xi,yi+1,zi+1),hash3(xi+1,yi+1,zi+1),tx), ty), tz); };
+  const mesh = (P)=>{
+    const { min, h, nx, ny, nz, g, mt } = P, sy = nx, sz = nx*ny;
+    const vid = new Int32Array(nx*ny*nz).fill(-1);
+    const pos = [], vm = [];
+    const co = [0,1,sy,sy+1,sz,sz+1,sz+sy,sz+sy+1], cx = [0,1,0,1,0,1,0,1], cyv = [0,0,1,1,0,0,1,1], cz = [0,0,0,0,1,1,1,1];
+    const E = [[0,1],[2,3],[4,5],[6,7],[0,2],[1,3],[4,6],[5,7],[0,4],[1,5],[2,6],[3,7]];
+    let count = 0;
+    for (let k=0;k<nz-1;k++) for (let j=0;j<ny-1;j++) for (let i=0;i<nx-1;i++){
+      const base = (k*ny+j)*nx+i;
+      let neg = 0; for (let c=0;c<8;c++) if (g[base+co[c]]<0) neg++;
+      if (neg===0 || neg===8) continue;
+      let ax=0, ay=0, az=0, n=0, bm = 0, bv = 1e9;
+      for (const [a,b] of E){
+        const va = g[base+co[a]], vb = g[base+co[b]];
+        if ((va<0)!==(vb<0)){ const t = va/(va-vb); ax += cx[a]+(cx[b]-cx[a])*t; ay += cyv[a]+(cyv[b]-cyv[a])*t; az += cz[a]+(cz[b]-cz[a])*t; n++; }
+      }
+      for (let c=0;c<8;c++){ const v = g[base+co[c]]; if (v<bv){ bv = v; bm = mt[base+co[c]]; } }
+      pos.push(min[0]+(i+ax/n)*h, min[1]+(j+ay/n)*h, min[2]+(k+az/n)*h); vm.push(bm);
+      vid[base] = count++;
+    }
+    const idx = [];
+    // the cell order passed in winds counter-clockwise around the +axis
+    // edge, so it faces +axis - flipped when the solid is on the far side
+    const quad = (a,b,c,d, axis, inside)=>{
+      if (a<0||b<0||c<0||d<0) return;
+      if (inside) idx.push(a,b,c, a,c,d); else idx.push(a,c,b, a,d,c);
+    };
+    for (let k=0;k<nz-1;k++) for (let j=0;j<ny-1;j++) for (let i=0;i<nx-1;i++){
+      const base = (k*ny+j)*nx+i, v0 = g[base]<0;
+      if (j>0 && k>0 && (v0 !== (g[base+1]<0))) quad(vid[base], vid[base-sy], vid[base-sy-sz], vid[base-sz], 0, v0);
+      if (i>0 && k>0 && (v0 !== (g[base+sy]<0))) quad(vid[base], vid[base-sz], vid[base-1-sz], vid[base-1], 1, v0);
+      if (i>0 && j>0 && (v0 !== (g[base+sz]<0))) quad(vid[base], vid[base-1], vid[base-1-sy], vid[base-sy], 2, v0);
+    }
+    const N = count, nor = new Float32Array(N*3), col = new Float32Array(N*3);
+    for (let v=0; v<N; v++){
+      const x = pos[v*3], y = pos[v*3+1], z = pos[v*3+2], e = h*0.9;
+      let gx = sample(P,x+e,y,z)-sample(P,x-e,y,z), gy = sample(P,x,y+e,z)-sample(P,x,y-e,z), gz = sample(P,x,y,z+e)-sample(P,x,y,z-e);
+      const gl = Math.hypot(gx,gy,gz)||1; gx/=gl; gy/=gl; gz/=gl;
+      nor[v*3]=gx; nor[v*3+1]=gy; nor[v*3+2]=gz;
+      // ambient occlusion from the field: how much solid lies just outside this point
+      let occ = 0;
+      for (let s=1, w=0.5; s<=5; s++, w*=0.55){
+        const dd = 0.0018*s*s; occ += w*Math.max(0, dd - sample(P, x+gx*dd, y+gy*dd, z+gz*dd))/dd;
+      }
+      const ao = Math.max(0.12, 1 - occ*1.35);
+      const m = vm[v], c = COLS[m] || COLS[0];
+      const nz2 = 0.9 + 0.14*(vnoise(x*90,y*90,z*90)-0.5) + 0.1*(vnoise(x*22+5,y*22,z*22)-0.5);
+      const grime = (1-ao)*0.35;
+      col[v*3]   = c[0]*nz2*ao*(1-grime*0.15);
+      col[v*3+1] = c[1]*nz2*ao*(1-grime*0.3);
+      col[v*3+2] = c[2]*nz2*ao*(1-grime*0.6);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    geo.setIndex(N > 65535 ? new THREE.Uint32BufferAttribute(idx,1) : new THREE.Uint16BufferAttribute(idx,1));
+    return geo;
+  };
+  const basis = (ez, up)=>{ ez = norm(ez); let ex = norm(cross(up||[0,1,0], ez)); const ey = cross(ez, ex); return [ex, ey, ez]; };
+  return { sph, ell, shellEll, cap, flat, cylE, torus, tri, part, mesh, sample, basis, norm, cross, add3, sub3, mul3 };
+})();
+// ---- the skeleton's anatomy, one sculpted part per rigid piece of the rig.
+// Each entry returns a finished BufferGeometry in its joint's local frame
+// (model faces +z, its right side is -x, y up, metres).
+const SK3_PARTS = (()=>{
+  const { sph, ell, shellEll, cap, flat, cylE, torus, part, basis } = SDF;
+  const V = (x,y,z)=>[x,y,z];
+  const lerp3 = (a,b,t)=>[a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t, a[2]+(b[2]-a[2])*t];
+  const bump = (t, c, w)=> Math.exp(-Math.pow((t-c)/w, 2));
+  // a vertebra centred at c: body, arch, spinous and transverse processes
+  const vertebra = (P, c, r, h, spin, trans, spinAng, rz)=>{
+    rz = rz || 0.85;
+    const R = (x,y,z)=>[c[0]+x, c[1]+y, c[2]+z];
+    P.add(cylE(c, r, r*rz, h*0.5, h*0.12), 0.002);
+    P.add(torus(R(0,h*0.44,0), r*0.93, h*0.1, [0,1,0]), 0.001);              // raised rim of the end plate
+    P.add(torus(R(0,-h*0.44,0), r*0.93, h*0.1, [0,1,0]), 0.001);
+    const back = -r*rz;
+    for (const s of [-1,1]){
+      P.add(cap(R(s*r*0.55,0,back*0.7), R(s*r*0.5,0,back*1.45), h*0.2, h*0.17), 0.0025);  // pedicle
+      P.add(cap(R(s*r*0.5,0,back*1.45), R(0,-h*0.05,back*1.85), h*0.17, h*0.16), 0.0025); // lamina
+      P.add(cap(R(s*r*0.52,0,back*1.3), R(s*(r*0.55+trans),h*0.12,back*1.55), h*0.17, h*0.12), 0.002); // transverse
+      P.add(sph(R(s*r*0.45,h*0.45,back*1.4), h*0.14), 0.002);                // articular processes
+    }
+    const tip = R(0, -spin*Math.sin(spinAng), back*1.85 - spin*Math.cos(spinAng));
+    P.add(flat(R(0,-h*0.05,back*1.85), tip, h*0.12, h*0.32, [1,0,0], h*0.1, h*0.22), 0.002);
+    P.add(ell(tip, [h*0.14,h*0.24,h*0.14]), 0.002);
+    P.sub(ell(R(0,0,back*1.45), [r*0.42,h*0.9,r*0.32]), 0.001);              // spinal canal
+  };
+  const parts = {};
+  // ---------------- skull ----------------
+  parts.skull = ()=>{
+    const P = part([-0.086,0.012,-0.118],[0.086,0.205,0.108], 0.0017);
+    const C = [0,0.108,-0.01];
+    P.add(shellEll(C, [0.071,0.079,0.096], 0.0065), 0);
+    // flatter base of the skull behind the face
+    P.add(ell([0,0.058,-0.03],[0.058,0.022,0.06]), 0.02);
+    P.add(ell([0,0.075,-0.098],[0.032,0.02,0.014]), 0.02);                   // occipital bump
+    // brow ridge and glabella
+    P.add(ell([0,0.119,0.073],[0.048,0.0065,0.009]), 0.016);
+    // face: maxilla block, cheekbones, zygomatic arches, nasal bones
+    P.add(ell([0,0.058,0.058],[0.032,0.03,0.03]), 0.012);
+    for (const s of [-1,1]){
+      P.add(ell([s*0.047,0.077,0.06],[0.011,0.011,0.01]), 0.012);
+      P.chain([[s*0.054,0.075,0.058],[s*0.066,0.073,0.03],[s*0.07,0.075,0.0],[s*0.068,0.078,-0.016]], t=>[0.0032, 0.0058-0.0012*t], {seg:24, k:0.004});
+      P.add(ell([s*0.058,0.046,-0.022],[0.008,0.013,0.009]), 0.008);          // mastoid
+    }
+    P.add(ell([0,0.087,0.087],[0.006,0.009,0.004]), 0.008);                    // nasal bones
+    P.add(flat([-0.03,0.04,0.064],[0.03,0.04,0.064], 0.004, 0.008, [0,0,1]), 0.006); // alveolar ridge
+    for (const s of [-1,1]) P.add(flat([s*0.03,0.04,0.064],[s*0.034,0.041,0.03], 0.004, 0.008, [0,1,0]), 0.006);
+    // carve: orbits, nasal aperture, temporal fossae, foramen magnum
+    for (const s of [-1,1]){
+      P.sub(ell([s*0.032,0.099,0.088],[0.0175,0.0155,0.035]), 0.003);
+      P.sub(ell([s*0.03,0.098,0.06],[0.014,0.013,0.03]), 0.004);
+      P.sub(ell([s*0.062,0.062,0.03],[0.01,0.01,0.018]), 0.006);            // under the zygomatic arch
+    }
+    P.sub(ell([0,0.069,0.092],[0.0085,0.014,0.03]), 0.002);
+    P.sub(ell([0,0.058,0.09],[0.011,0.008,0.03]), 0.002);
+    P.sub(sph([0,0.04,-0.012], 0.015), 0.003);
+    // upper teeth
+    for (let i=0;i<14;i++){
+      const a = (i-6.5)/6.5*1.25, k = Math.abs(i-6.5), x = Math.sin(a)*0.027, z = 0.078 - (1-Math.cos(a))*0.034;
+      const r = k<1.5 ? 0.0031 : k<2.5 ? 0.0029 : k<3.5 ? 0.0034 : 0.0041, len = k<1.5 ? 0.009 : k<2.5 ? 0.0105 : 0.007;
+      if (k<2.5) P.add(flat([x,0.041,z],[x,0.041-len,z], r*1.05, r*0.55, [Math.cos(a)*0,0,1], r*0.9, r*0.4), 0.0008, 2);
+      else P.add(cap([x,0.04,z],[x,0.041-len,z], r, r*0.85), 0.0008, 2);
+    }
+    return SDF.mesh(P);
+  };
+  // ---------------- mandible (jaw pivot at the condyles) ----------------
+  parts.jaw = ()=>{
+    const P = part([-0.072,-0.075,-0.02],[0.072,0.018,0.09], 0.0014);
+    const J = (x,y,z)=>[x, y-0.058, z-0.004];
+    for (const s of [-1,1]){
+      P.add(ell(J(s*0.057,0.061,-0.004),[0.009,0.0055,0.006]), 0.003);       // condyle
+      // ramus: a broad flat plate from the condyle and coronoid down to the angle
+      const Rm0 = (u,v)=>{ const top = [s*(0.056-u*0.01), 0.058-u*0.004+(u>0.7?(u-0.7)*0.01:0), -0.002+u*0.028], bot = [s*(0.05-u*0.004), 0.012, 0.004+u*0.03];
+        const p = lerp3(bot, top, v); if (u>0.3 && u<0.75) p[1] -= Math.sin((u-0.3)/0.45*Math.PI)*0.014*v; return J(p[0],p[1],p[2]); };
+      P.add(flat(J(s*0.056,0.057,-0.001), J(s*0.05,0.014,0.012), 0.012, 0.0042, [1,0,0], 0.016, 0.0048), 0.006);   // ramus
+      P.add(flat(J(s*0.049,0.03,0.022), J(s*0.046,0.054,0.026), 0.007, 0.0035, [1,0,0], 0.003, 0.003), 0.004);     // coronoid
+      P.chain([J(s*0.051,0.014,0.004),J(s*0.047,0.008,0.03),J(s*0.034,0.005,0.056),J(s*0.014,0.004,0.072),J(0,0.004,0.076)],
+        t=>[0.0048, 0.0098 + 0.002*t], {seg:30, up:[1,0,0], k:0.004});
+    }
+    P.add(ell(J(0,0.004,0.074),[0.012,0.009,0.006]), 0.008);                   // chin
+    for (let i=0;i<14;i++){
+      const a = (i-6.5)/6.5*1.25, k = Math.abs(i-6.5), x = Math.sin(a)*0.0245, z = 0.071 - (1-Math.cos(a))*0.031;
+      const r = k<1.5 ? 0.0026 : k<2.5 ? 0.0028 : k<3.5 ? 0.0032 : 0.004, len = k<2.5 ? 0.0085 : 0.006;
+      P.add(cap(J(x,0.016,z), J(x,0.016+len,z), r, r*0.85), 0.0008, 2);
+    }
+    return SDF.mesh(P);
+  };
+  // ---------------- neck (cervical vertebrae) ----------------
+  parts.neck = ()=>{
+    const P = part([-0.05,-0.014,-0.06],[0.05,0.11,0.03], 0.0014);
+    for (let i=0;i<6;i++) vertebra(P, [0, i*0.0175, 0.006*Math.sin(Math.PI*i/5)], 0.0115, 0.0125, 0.013 + (i===5?0.012:0), 0.013, 0.35);
+    for (let i=0;i<5;i++) P.add(cylE([0, i*0.0175+0.00875, 0.006*Math.sin(Math.PI*(i+0.5)/5)], 0.0105, 0.009, 0.002, 0.001), 0.001, 1);
+    return SDF.mesh(P);
+  };
+  // ---------------- lumbar spine ----------------
+  parts.lumbar = ()=>{
+    const P = part([-0.075,-0.01,-0.1],[0.075,0.19,0.05], 0.0018);
+    for (let i=0;i<5;i++) vertebra(P, [0, 0.017+i*0.034, 0.012*Math.sin(Math.PI*i/4)], 0.022, 0.026, 0.026, 0.03, 0.15);
+    for (let i=0;i<5;i++) P.add(cylE([0, 0.034+i*0.034, 0.012*Math.sin(Math.PI*(i+0.5)/4)], 0.021, 0.018, 0.003, 0.0015), 0.0015, 1);
+    return SDF.mesh(P);
+  };
+  // ---------------- thorax: thoracic spine, ribs, cartilage, sternum, clavicles, scapulae ----------------
+  const TV = [];
+  for (let i=0;i<12;i++){ const y = 0.28 - (0.012 + i*0.0235), z = -0.028*Math.sin(Math.PI*i/11.5); TV.push({ y, z }); }
+  TV.reverse();   // TV[0] = T1 at the top
+  const ST = { top:[0,0.285,0.105], bot:[0,0.135,0.145] };
+  const sternumAt = k=> lerp3(ST.top, ST.bot, k);
+  parts.thorax = ()=>{
+    const P = part([-0.205,-0.03,-0.135],[0.205,0.335,0.19], 0.003);
+    for (let i=0;i<12;i++) vertebra(P, [0, TV[11-i].y, TV[11-i].z], 0.0145+i*0.0006, 0.017, 0.032, 0.024, 0.9-i*0.03);
+    const ribW = [0.055,0.078,0.095,0.108,0.116,0.121,0.124,0.125,0.121,0.114,0.1,0.082];
+    const ribDrop = [0.028,0.042,0.055,0.065,0.074,0.082,0.09,0.096,0.1,0.098,0.07,0.05];
+    const ends = [];
+    for (let i=0;i<12;i++){
+      const vb = TV[i], a = ribW[i], b = 0.105 + Math.min(i,6)*0.006, zc = vb.z - 0.035 + b;
+      const psiEnd = i<7 ? 0.95 - i*0.04 : i<10 ? 0.75 - (i-7)*0.1 : (i===10 ? 0.05 : -0.45), psi0 = -Math.PI/2 + 0.28;
+      for (const s of [-1,1]){
+        const pts = [[s*0.013, vb.y, vb.z - 0.013], [s*0.034, vb.y + 0.004, vb.z - 0.03]];
+        for (let j=1;j<=10;j++){
+          const t = j/10, psi = psi0 + (psiEnd-psi0)*t;
+          pts.push([s*a*Math.cos(psi), vb.y - ribDrop[i]*Math.pow(t,1.25) + 0.004*Math.sin(t*Math.PI), zc + b*Math.sin(psi)]);
+        }
+        P.add(sph(pts[0], 0.0045), 0.002);                                  // rib head
+        P.chain(pts, t=>[0.0032 + 0.0012*bump(t,0,0.08), (0.0042 + 0.0034*Math.sin(Math.min(1,t*1.4)*Math.PI*0.5))*(i<1?0.85:1)], {seg:22, up:[0,1,0], k:0.0012});
+        const end = pts[pts.length-1]; if (s>0) ends[i] = end;
+        if (i<7){
+          const sp = SDF.add3(sternumAt(i/6*0.92), [s*0.015,0,0]);
+          const mid = SDF.add3(lerp3(end,sp,0.5), [s*0.012,-0.004,0.012]);
+          P.chain([end, mid, sp], ()=>[0.0034, 0.0062], {seg:8, up:[0,1,0], m:1, k:0.0015});
+        } else if (i<10){
+          const tgt = [s*Math.abs(ends[6][0])*0.75, ends[6][1] - 0.01 - (i-7)*0.004, ends[6][2] + 0.005];
+          P.chain([end, SDF.add3(lerp3(end,tgt,0.5),[s*0.012,0.004,0.01]), tgt], ()=>[0.003, 0.0056], {seg:8, up:[0,1,0], m:1, k:0.0015});
+        }
+      }
+    }
+    // sternum
+    P.add(ell(SDF.add3(ST.top,[0,-0.01,0.002]), [0.026,0.022,0.0065], basis([0,0.25,1])), 0.004);
+    P.chain([SDF.add3(ST.top,[0,-0.028,0.004]), SDF.add3(sternumAt(0.5),[0,0,0.006]), ST.bot], t=>[0.016 - t*0.004 + 0.0015*Math.sin(t*9), 0.0055], {seg:10, up:[0,0,1], k:0.003});
+    P.add(ell(SDF.add3(ST.bot,[0,-0.02,0.003]), [0.008,0.017,0.004], basis([0,0.35,1])), 0.003);
+    P.sub(sph(SDF.add3(ST.top,[0,0.014,0.002]), 0.008), 0.003);              // jugular notch
+    for (const s of [-1,1]){
+      // clavicle (a gentle S)
+      P.chain([SDF.add3(ST.top,[s*0.02,0.008,-0.004]), [s*0.06,0.3,0.1], [s*0.11,0.305,0.06], [s*0.155,0.302,0.0]],
+        t=>[0.0062+0.003*bump(t,0,0.15)+0.003*bump(t,1,0.12), 0.0058+0.002*bump(t,1,0.12)], {seg:14, up:[0,1,0], k:0.002});
+      // scapula: a thin triangular blade wrapped round the back of the ribs
+      const S = (u,v)=>{ const x = s*(0.045 + u*0.098 - v*0.02*u), y = 0.286 - v*(0.165 - u*0.105) - u*0.02; return [x, y, -0.078 - 0.03*Math.cos((x*s-0.09)*9) + 0.01*u]; };
+      P.plate(S, 9, 9, (u,v)=>0.003, {k:0.002});
+      P.chain([S(0,0),S(0,0.5),S(0,1)], ()=>[0.004,0.004], {seg:6, k:0.002});      // medial border
+      P.chain([S(0,1),S(0.5,0.75),S(1,0.35),S(1,0)], ()=>[0.0055,0.0055], {seg:8, k:0.002}); // lateral border
+      P.chain([[s*0.05,0.264,-0.1],[s*0.1,0.277,-0.101],[s*0.14,0.29,-0.073],[s*0.162,0.297,-0.032]], t=>[0.0035+0.004*t, 0.0065+0.004*t], {seg:10, up:[0,1,0], k:0.002}); // spine of scapula
+      P.add(ell([s*0.163,0.298,-0.02],[0.017,0.0055,0.02]), 0.004);            // acromion
+      P.add(cap([s*0.13,0.27,-0.06],[s*0.14,0.278,-0.02],0.005,0.004), 0.003);  // coracoid
+      P.add(ell([s*0.153,0.262,-0.036],[0.01,0.018,0.014]), 0.004);            // glenoid neck
+      P.sub(sph([s*0.172,0.262,-0.03],0.017), 0.002);                          // glenoid fossa
+    }
+    return SDF.mesh(P);
+  };
+  // ---------------- pelvis ----------------
+  parts.pelvis = ()=>{
+    const P = part([-0.185,-0.19,-0.125],[0.185,0.165,0.13], 0.003);
+    for (const s of [-1,1]){
+      const A = [s*0.088,-0.062,0.018];
+      const C0 = [s*0.036,0.06,-0.07], C1 = [s*0.152,0.138,-0.018], C2 = [s*0.118,0.058,0.072];
+      const crest = u=>{ const a = (1-u)*(1-u), b = 2*u*(1-u), c = u*u; return [C0[0]*a+C1[0]*b+C2[0]*c, C0[1]*a+C1[1]*b+C2[1]*c, C0[2]*a+C1[2]*b+C2[2]*c]; };
+      const S = (u,v)=>{ const c = crest(u), a = [A[0]-s*0.012*(1-u), A[1]+0.015, A[2]+(u-0.5)*0.055]; const p = lerp3(a, c, Math.pow(v,0.85)); p[0] += s*0.02*Math.sin(Math.PI*v)*Math.sin(Math.PI*u); return p; };
+      P.plate(S, 12, 10, (u,v)=>0.004 + 0.016*Math.pow(1-v,3), {k:0.0025});
+      const cr = []; for (let i=0;i<=8;i++) cr.push(S(i/8,1));
+      P.chain(cr, t=>[0.005+0.002*bump(t,0.45,0.3), 0.006], {seg:14, k:0.003});    // iliac crest
+      P.add(ell(SDF.add3(C2,[0,-0.004,0.004]),[0.007,0.009,0.008]), 0.004);      // anterior superior spine
+      // acetabulum: a thick cup facing out, down and forward
+      P.add(ell(A, [0.028,0.03,0.03]), 0.008);
+      P.sub(sph(SDF.add3(A,[s*0.02,-0.004,0.006]), 0.024), 0.002);
+      // pubis and ischium around the obturator foramen
+      P.chain([SDF.add3(A,[-s*0.004,-0.01,0.024]), [s*0.05,-0.078,0.074], [s*0.017,-0.097,0.076], [s*0.022,-0.13,0.052], [s*0.056,-0.155,0.0], [s*0.072,-0.13,-0.035], SDF.add3(A,[-s*0.005,-0.02,-0.028])],
+        t=>[0.0095 + 0.009*bump(t,0.62,0.1), 0.011 + 0.006*bump(t,0.62,0.12)], {seg:22, k:0.004});
+      P.add(ell([s*0.056,-0.158,-0.004],[0.013,0.012,0.016]), 0.006);           // ischial tuberosity
+      P.add(cap([s*0.016,-0.08,0.078],[s*0.016,-0.1,0.077],0.006), 0.002, 1);   // pubic symphysis pad
+      // sacroiliac joint
+      P.add(ell([s*0.042,0.02,-0.07],[0.012,0.03,0.012]), 0.008);
+    }
+    // sacrum: a curved, tapering wedge with its foramina, and the coccyx
+    P.plate((u,v)=>{ const w = 0.056*(1-v*0.72); return [(u-0.5)*2*w, 0.058 - v*0.15, -0.075 + Math.sin(v*Math.PI*0.9)*0.022 - Math.pow(Math.abs(u-0.5)*2,2)*0.01]; }, 8, 8, (u,v)=>0.02*(1-v*0.55), {k:0.003});
+    P.add(cylE([0,0.062,-0.058],0.024,0.018,0.006,0.002), 0.004);              // sacral promontory / S1 body
+    for (let i=0;i<4;i++) for (const s of [-1,1]) P.sub(sph([s*0.021*(1-i*0.12), 0.034-i*0.029, -0.064+Math.sin(i/4*2.8)*0.022], 0.0042), 0.001);
+    for (let i=0;i<3;i++) P.add(ell([0,-0.1-i*0.012,-0.058+i*0.008],[0.008-i*0.002,0.006,0.006]), 0.002);
+    return SDF.mesh(P);
+  };
+  // ---------------- arm ----------------
+  parts.humerus = (s)=>{
+    const P = part([-0.042,-0.325,-0.04],[0.042,0.03,0.035], 0.0024);
+    P.add(ell([-s*0.004,0,-0.004],[0.022,0.023,0.022]), 0.004);
+    P.add(ell([s*0.014,-0.006,0.007],[0.011,0.016,0.012]), 0.006);            // greater tubercle
+    P.add(ell([-s*0.004,-0.012,0.013],[0.007,0.01,0.007]), 0.005);            // lesser tubercle
+    P.chain([[0,-0.014,0],[s*0.003,-0.1,0.004],[0,-0.2,0.002],[0,-0.27,-0.004]], t=>{ const r = 0.0105+0.004*bump(t,0,0.1); return [r, r*0.95]; }, {seg:12, k:0.004});
+    P.add(ell([s*0.012,-0.12,0.004],[0.006,0.02,0.006]), 0.006);               // deltoid tuberosity
+    P.add(ell([0,-0.295,-0.004],[0.027,0.011,0.012]), 0.008);                 // epicondyles
+    P.add(ell([-s*0.006,-0.303,0.004],[0.012,0.01,0.011]), 0.003);            // trochlea
+    P.add(sph([s*0.012,-0.302,0.006],0.0085), 0.003);                          // capitulum
+    P.sub(ell([0,-0.29,-0.015],[0.009,0.008,0.006]), 0.003);                   // olecranon fossa
+    return SDF.mesh(P);
+  };
+  parts.forearm = (s)=>{
+    const P = part([-0.036,-0.272,-0.034],[0.036,0.034,0.028], 0.0018);
+    P.add(ell([-s*0.006,0.012,-0.012],[0.009,0.016,0.011]), 0.003);            // olecranon
+    P.chain([[-s*0.007,0.004,-0.006],[-s*0.01,-0.08,-0.002],[-s*0.012,-0.17,0.0],[-s*0.014,-0.24,0.002]], t=>{ const r = 0.0068*(1-t*0.35); return [r, r*1.1]; }, {seg:12, k:0.003});
+    P.add(sph([-s*0.014,-0.245,0.002],0.0055), 0.003);
+    P.add(cap([-s*0.017,-0.244,0.0],[-s*0.018,-0.256,0.0],0.0025,0.0018), 0.002);   // ulnar styloid
+    P.add(cylE([s*0.011,-0.004,0.002],0.0092,0.0092,0.0035,0.0015), 0.002);     // radial head
+    P.chain([[s*0.011,-0.008,0.002],[s*0.011,-0.09,0.006],[s*0.008,-0.18,0.008],[s*0.004,-0.236,0.006]], t=>{ const r = 0.0052+0.006*bump(t,1,0.12); return [r, r*0.8]; }, {seg:12, k:0.003});
+    P.add(ell([s*0.003,-0.244,0.006],[0.014,0.007,0.011]), 0.004);            // distal radius
+    return SDF.mesh(P);
+  };
+  // hand, fingers baked closed around a grip (curl 0..1)
+  parts.hand = (s, curl)=>{
+    const P = part([-0.05,-0.19,-0.05],[0.05,0.012,0.075], 0.0015);
+    for (let i=0;i<8;i++) P.add(ell([(i%4-1.5)*0.0085, -0.008-Math.floor(i/4)*0.011, (i%2)*0.003 + (i<4?0:0.002)],[0.0055,0.005,0.0055]), 0.0018);
+    const rotX = (v, a)=>[v[0], v[1]*Math.cos(a)-v[2]*Math.sin(a), v[1]*Math.sin(a)+v[2]*Math.cos(a)];
+    for (let f=0; f<4; f++){
+      const fx = -s*(f-1.5)*0.0105, L = [0.058,0.063,0.058,0.05][f];
+      const mb = [fx*0.8,-0.02,0.001], me = [fx*1.05,-0.02-L,0.003];
+      P.chain([mb, [fx,-0.02-L*0.5,0.0], me], t=>{ const r = 0.003 + 0.0016*bump(t,1,0.12) + 0.0012*bump(t,0,0.1); return [r, r*0.9]; }, {seg:6, k:0.0015});
+      P.add(sph(me, 0.0046), 0.0015);
+      let p = me, a = 0;
+      const segs = [0.033,0.022,0.017].map(x=>x*(f===3?0.8:1));
+      segs.forEach((l,k)=>{
+        a -= curl*(k===0?1.35:1.45);
+        const d = rotX([0,-l,0], a), q = [p[0]+d[0], p[1]+d[1], p[2]+d[2]], r = 0.0031 - k*0.0006;
+        P.add(cap(p, q, r*1.05, r*0.8), 0.0012);
+        P.add(sph(q, r*0.95), 0.001);
+        p = q;
+      });
+    }
+    // thumb
+    let tb = [-s*-0.019*-1, -0.012, 0.008]; tb = [s*0.019, -0.012, 0.008];
+    const t1 = [s*0.031,-0.03,0.022], t2 = [s*0.036,-0.046,0.03+curl*0.012], t3 = [s*0.03,-0.058+curl*0.01,0.036+curl*0.014];
+    P.add(cap(tb, t1, 0.0038, 0.0035), 0.0015); P.add(sph(t1,0.0042), 0.0012);
+    P.add(cap(t1, t2, 0.0034, 0.0031), 0.0012); P.add(sph(t2,0.0036), 0.0012);
+    P.add(cap(t2, t3, 0.003, 0.0024), 0.0012);
+    return SDF.mesh(P);
+  };
+  // ---------------- leg ----------------
+  parts.femur = (s)=>{
+    const P = part([s<0?-0.075:-0.03,-0.47,-0.045],[s<0?0.03:0.075,0.03,0.04], 0.0029);
+    P.add(sph([0,0,0],0.0235), 0.004);
+    P.add(flat([0,0,0],[s*0.046,-0.04,-0.002], 0.011, 0.0135, [0,0,1]), 0.006);          // neck
+    P.add(ell([s*0.058,-0.034,-0.008],[0.015,0.024,0.017]), 0.008);                       // greater trochanter
+    P.add(ell([s*0.022,-0.076,-0.014],[0.008,0.011,0.009]), 0.006);                       // lesser trochanter
+    P.chain([[s*0.05,-0.045,0],[s*0.041,-0.16,0.01],[s*0.028,-0.3,0.008],[s*0.015,-0.405,-0.003]], t=>{ const r = 0.0132+0.004*bump(t,0,0.12)+0.009*bump(t,1,0.12); return [r, r*0.95]; }, {seg:14, k:0.006});
+    P.chain([[s*0.044,-0.12,-0.01],[s*0.034,-0.25,-0.006],[s*0.024,-0.36,-0.012]], ()=>[0.0035,0.0035], {seg:6, k:0.006}); // linea aspera
+    for (const c of [-1,1]) P.add(ell([s*0.013 + c*0.019, -0.44, -0.008],[0.0145,0.018,0.023]), 0.008);   // condyles
+    P.sub(ell([s*0.013,-0.455,-0.014],[0.006,0.012,0.016]), 0.004);                         // intercondylar notch
+    return SDF.mesh(P);
+  };
+  parts.shin = (s)=>{
+    const P = part([-0.052,-0.42,-0.045],[0.052,0.05,0.045], 0.0027);
+    P.add(ell([0,0.024,0.026],[0.016,0.019,0.0075]), 0.001);                              // patella
+    P.add(ell([0,-0.012,-0.002],[0.036,0.012,0.028]), 0.006);                             // tibial plateau
+    for (const c of [-1,1]) P.sub(ell([c*0.017,-0.001,-0.003],[0.012,0.004,0.016]), 0.003);
+    P.add(ell([0,-0.036,0.022],[0.009,0.012,0.008]), 0.006);                              // tuberosity
+    P.chain([[0,-0.02,0],[0,-0.12,0.008],[-s*0.003,-0.28,0.004],[-s*0.006,-0.37,-0.002]], t=>{ const r = 0.012+0.012*bump(t,0,0.12)+0.006*bump(t,1,0.08); return [r*1.05, r*0.95]; }, {seg:14, k:0.007});
+    P.add(ell([-s*0.019,-0.384,0.0],[0.0065,0.013,0.009]), 0.004);                          // medial malleolus
+    P.add(ell([s*0.03,-0.032,-0.013],[0.008,0.009,0.008]), 0.003);                          // fibular head
+    P.chain([[s*0.03,-0.035,-0.013],[s*0.032,-0.2,-0.012],[s*0.029,-0.38,-0.01]], ()=>[0.0045,0.0048], {seg:10, k:0.003});
+    P.add(ell([s*0.03,-0.392,-0.008],[0.006,0.014,0.009]), 0.003);                           // lateral malleolus
+    return SDF.mesh(P);
+  };
+  parts.foot = (s)=>{
+    const P = part([-0.045,-0.078,-0.07],[0.045,0.012,0.185], 0.0017);
+    P.add(ell([0,-0.008,0.005],[0.016,0.012,0.021]), 0.003);                                // talus
+    P.add(ell([s*0.004,-0.032,-0.03],[0.016,0.019,0.03]), 0.005);                            // calcaneus
+    P.add(ell([s*0.004,-0.04,-0.05],[0.013,0.014,0.012]), 0.004);
+    P.add(ell([-s*0.012,-0.022,0.03],[0.012,0.009,0.008]), 0.003);                           // navicular
+    P.add(ell([s*0.014,-0.036,0.028],[0.011,0.01,0.012]), 0.003);                            // cuboid
+    for (let i=0;i<3;i++) P.add(ell([-s*(0.018-i*0.01),-0.03,0.045],[0.0055,0.009,0.009]), 0.002); // cuneiforms
+    for (let t=0;t<5;t++){
+      const tx = s*(-0.02 + t*0.0105), big = t===0;
+      const a = [tx*0.8,-0.034,0.052], b = [tx*1.1,-0.056,0.105];
+      P.add(cap(a, b, big?0.0062:0.0036, big?0.006:0.0034), 0.002); P.add(sph(b, big?0.0068:0.0042), 0.0015);
+      const segs = big ? [0.028,0.022] : [0.021,0.011,0.009];
+      let p = b;
+      segs.forEach((l,k)=>{ const r = (big?0.0055:0.0028)*(1-k*0.15), q = [p[0]*1.01, p[1]-0.003-(k===segs.length-1?0.002:0), p[2]+l];
+        P.add(cap(p, q, r, r*0.85), 0.0012); P.add(sph(q, r*0.95), 0.001); p = q; });
+    }
+    return SDF.mesh(P);
+  };
+  return parts;
+})();
 // ---------- real-time 3D skeleton warriors ----------
-// skeletons are the one creature drawn as a true 3D model rather than a
-// painted card: a full skeleton (lathe-turned long bones, a sculpted skull
-// with a working jaw, a ribcage of curved ribs, spine, pelvis, hands and
-// feet) carrying a rusted sword and a battered round shield, lit by the
-// torch or moonlight where it stands and animated - an idle combat stance,
-// a walk cycle when it moves, a sword swing when it hits you, a stagger
-// when you hit it. Rendered with three.js (loaded from a CDN) into a small
-// offscreen WebGL canvas and dropped into the scene as a sprite, so it
-// clips against walls and fades into the dark like everything else. If
-// three.js isn't available the painted skeleton is used instead.
-const SK3 = { ok:null, W:300, H:400, frameH:2.12, inst:new WeakMap() };
+// skeletons are drawn as a true 3D model rather than a painted card: an
+// anatomically built human skeleton (sculpted skull with a hinged jaw and
+// individual teeth, vertebrae with their processes, blade-flat ribs joined
+// to the breastbone by cartilage, shoulder blades, a flared pelvis with
+// hip sockets, shaped long bones, jointed hands and feet) carrying a rusted
+// sword and a battered round shield, self-shadowed and lit by the torch or
+// moonlight where it stands, and animated - a guarded stance, a walk cycle,
+// a stagger when hit, a sword cut when it strikes. Rendered with three.js
+// (loaded from a CDN) at the size it appears on screen, so it stays sharp,
+// then dropped into the scene as a sprite so it clips against walls and
+// fades into the dark like everything else. Without three.js the painted
+// skeleton is used instead.
+const SK3 = { ok:null, building:false, MW:900, MH:1200, frameH:2.2, inst:new WeakMap() };
 function sk3Wanted(m){ return !!(m && m.nm && /skelet/.test(m.nm.toLowerCase()) && !/dragon|giant|horse|hound|wolf|mage|archer/.test(m.nm.toLowerCase())); }
 function sk3Canvas(w,h){ const c=document.createElement('canvas'); c.width=w; c.height=h; return c; }
 function sk3Noise2(){
-  // a small tiling value-noise field, reused by all the procedural textures
   const N = 64, v = new Float32Array(N*N);
   for (let i=0;i<v.length;i++) v[i] = Math.random();
   return (x,y)=>{ const xi=Math.floor(x), yi=Math.floor(y), tx=x-xi, ty=y-yi;
@@ -12597,286 +13088,247 @@ function sk3Tex(w, h, fn){
   x.putImageData(id,0,0);
   const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping;
   if (THREE.sRGBEncoding) t.encoding = THREE.sRGBEncoding;
+  t.anisotropy = 4;
   return t;
 }
 function sk3Build(){
-  const T = THREE, n = sk3Noise2();
+  const T = THREE, n = sk3Noise2(), V = (x,y,z)=> new T.Vector3(x,y,z);
   const fbm = (x,y)=> n(x,y)*0.5 + n(x*2.1,y*2.1)*0.25 + n(x*4.3,y*4.3)*0.15 + n(x*8.7,y*8.7)*0.1;
-  // aged bone: ivory with brown grime in the pores and darker stained patches
-  const boneMap = sk3Tex(256,256,(x,y)=>{
-    const f = fbm(x/9,y/9), g = fbm(x/2.2+40,y/2.2), stain = Math.max(0, fbm(x/28+9,y/28)-0.52)*2.4;
-    let k = 0.78 + f*0.3 - stain*0.35 - (g>0.82 ? 0.25 : 0);
-    return [214*k, 204*k-stain*12, 180*k-stain*28];
+  const steelMap = sk3Tex(128,512,(x,y)=>{
+    const rust = Math.max(0, fbm(x/16+3,y/16)-0.48)*2.4, scratch = n(x*0.5, y*6)>0.84 ? 26 : 0, k = 0.66 + fbm(x/6,y/6)*0.22;
+    return [150*k+rust*70+scratch, 152*k+rust*24+scratch, 156*k-rust*26+scratch];
   });
-  const boneBump = sk3Tex(128,128,(x,y)=>{ const v = 255*(fbm(x/4,y/4)*0.7 + (n(x*1.7,y*1.7)>0.8?0.3:0)); return [v,v,v]; });
-  const steelMap = sk3Tex(128,256,(x,y)=>{
-    const rust = Math.max(0, fbm(x/14+3,y/14)-0.5)*2.6, scratch = n(x*0.6, y*9)>0.86 ? 30 : 0;
-    const k = 0.62 + fbm(x/6,y/6)*0.25;
-    return [150*k+rust*80+scratch, 152*k+rust*30+scratch, 156*k-rust*20+scratch];
+  const woodMap = sk3Tex(512,512,(x,y)=>{
+    const plank = Math.floor(x/102), px = x%102, edge = px<3||px>98 ? 0.4 : 1;
+    const grain = 0.72 + 0.14*Math.sin(x*0.45 + fbm(x/24, y/80+plank*7)*30) + fbm(x/4,y/60)*0.22;
+    const cx = x-256, cy = y-256, r = Math.hypot(cx,cy);
+    const paint = (Math.sign(cx)*Math.sign(cy) > 0 && r<236) && fbm(x/12+20,y/12) > 0.44;
+    let c = [112*grain*edge, 74*grain*edge, 42*grain*edge];
+    if (paint) c = [124*edge*(0.8+fbm(x/8,y/8)*0.3), 28*edge, 24*edge];
+    const dirt = fbm(x/36+5,y/36)*0.5; return c.map(v=>v*(1.08-dirt*0.5));
   });
-  const woodMap = sk3Tex(256,256,(x,y)=>{
-    const plank = Math.floor(x/51), px = x%51, edge = px<2||px>48 ? 0.45 : 1;
-    const grain = 0.7 + 0.3*Math.sin((x*0.9 + fbm(x/12, y/40+plank*7)*40)) * 0.5 + fbm(x/3,y/30)*0.3;
-    const cx = x-128, cy = y-128, r = Math.hypot(cx,cy);
-    // faded red paint in a quartered pattern, flaking off the wood
-    const paint = (Math.sign(cx)*Math.sign(cy) > 0 && r<118) && fbm(x/7+20,y/7) > 0.42;
-    let c = [118*grain*edge, 78*grain*edge, 44*grain*edge];
-    if (paint) c = [132*edge*(0.8+fbm(x/5,y/5)*0.3), 30*edge, 26*edge];
-    const dirt = fbm(x/20+5,y/20)*0.5; return c.map(v=>v*(1.1-dirt*0.5));
-  });
-  const leatherMap = sk3Tex(64,64,(x,y)=>{ const k = 0.6+fbm(x/3,y/3)*0.4 - ((y%8)<1?0.25:0); return [70*k,44*k,26*k]; });
-  const bone = new T.MeshStandardMaterial({ map:boneMap, bumpMap:boneBump, bumpScale:0.004, roughness:0.82, metalness:0, vertexColors:true });
-  const boneNoVC = new T.MeshStandardMaterial({ map:boneMap, bumpMap:boneBump, bumpScale:0.004, roughness:0.82, metalness:0 });
-  const dark = new T.MeshStandardMaterial({ color:0x120d0a, roughness:1 });
-  const steel = new T.MeshStandardMaterial({ map:steelMap, roughness:0.38, metalness:0.85 });
-  const iron = new T.MeshStandardMaterial({ color:0x3a3632, roughness:0.55, metalness:0.8 });
-  const wood = new T.MeshStandardMaterial({ map:woodMap, roughness:0.85, metalness:0 });
+  const leatherMap = sk3Tex(64,64,(x,y)=>{ const k = 0.6+fbm(x/3,y/3)*0.4 - ((y%8)<1?0.25:0); return [66*k,42*k,26*k]; });
+  const cavity = new T.MeshStandardMaterial({ color:0x0b0806, roughness:1 });
+  const steel = new T.MeshStandardMaterial({ map:steelMap, roughness:0.36, metalness:0.85 });
+  const iron = new T.MeshStandardMaterial({ color:0x3b3733, roughness:0.5, metalness:0.8 });
+  const wood = new T.MeshStandardMaterial({ map:woodMap, roughness:0.85 });
   const leather = new T.MeshStandardMaterial({ map:leatherMap, roughness:0.9 });
   const eyeMat = new T.MeshBasicMaterial({ color:0xff5a3c }); SK3.eyeMat = eyeMat;
 
-  const M = (g, m)=>{ const o = new T.Mesh(g, m||boneNoVC); o.castShadow = false; return o; };
-  // a long bone turned on a lathe: slim shaft, knobbly ends, pointing down -y from its joint
-  const longBone = (len, rs, knobA, knobB)=>{
-    const pts = [], N = 22;
-    for (let i=0;i<=N;i++){
-      const t = i/N, y = -t*len;
-      let r = rs*(1 + (knobA||1.1)*Math.exp(-Math.pow(t/0.09,2)) + (knobB||1.0)*Math.exp(-Math.pow((1-t)/0.09,2)));
-      if (i===0 || i===N) r *= 0.45;
-      pts.push(new T.Vector2(r, y));
+  const mesh = (g, m)=>{ const o = new T.Mesh(g, m||iron); o.castShadow = true; o.receiveShadow = true; return o; };
+  // ellipsoid
+  const ell = (rx, ry, rz, x, y, z, m, seg)=>{ m = m||iron; const o = mesh(new T.SphereGeometry(1, seg||16, Math.max(8,(seg||16)*0.75|0)), m); o.scale.set(rx,ry,rz); o.position.set(x,y,z); return o; };
+  // a swept tube with an elliptical, varying cross-section: prof(t) -> [radius across, radius up]
+  const sweep = (pts, prof, m, o)=>{ m = m||iron;
+    o = o||{};
+    const curve = new T.CatmullRomCurve3(pts.map(p=>p.isVector3 ? p : V(p[0],p[1],p[2])), !!o.closed);
+    const NS = o.seg || 24, NR = o.rad || 12, up = o.up || V(0,1,0);
+    const pos = [], idx = [], uv = [];
+    for (let i=0;i<=NS;i++){
+      const t = i/NS, c = curve.getPointAt(t), tg = curve.getTangentAt(t);
+      let b = new T.Vector3().crossVectors(tg, up); if (b.lengthSq()<1e-6) b = new T.Vector3().crossVectors(tg, V(1,0,0)); b.normalize();
+      const nn = new T.Vector3().crossVectors(b, tg).normalize();
+      const [ra, rb] = prof(t);
+      for (let j=0;j<=NR;j++){
+        const a = j/NR*Math.PI*2, ca = Math.cos(a), sa = Math.sin(a);
+        pos.push(c.x + b.x*ca*ra + nn.x*sa*rb, c.y + b.y*ca*ra + nn.y*sa*rb, c.z + b.z*ca*ra + nn.z*sa*rb);
+        uv.push(j/NR*0.3, t*(o.len||1)*2);
+      }
     }
-    return M(new T.LatheGeometry(pts, 14));
+    for (let i=0;i<NS;i++) for (let j=0;j<NR;j++){
+      const a = i*(NR+1)+j, b2 = a+NR+1;
+      idx.push(a, b2, a+1, b2, b2+1, a+1);
+    }
+    if (!o.closed){
+      // caps
+      for (const [i0, s] of [[0,-1],[NS,1]]){
+        const c = curve.getPointAt(i0/NS), ci = pos.length/3; pos.push(c.x,c.y,c.z); uv.push(0,0);
+        for (let j=0;j<NR;j++){ const a = i0*(NR+1)+j; if (s<0) idx.push(ci, a+1, a); else idx.push(ci, a, a+1); }
+      }
+    }
+    const g = new T.BufferGeometry();
+    g.setAttribute('position', new T.Float32BufferAttribute(pos,3)); g.setAttribute('uv', new T.Float32BufferAttribute(uv,2));
+    g.setIndex(idx); g.computeVertexNormals();
+    return mesh(g, m);
   };
-  const ball = (r, m)=> M(new T.SphereGeometry(r, 14, 10), m);
-  const tube = (points, r, m, seg)=> M(new T.TubeGeometry(new T.CatmullRomCurve3(points.map(p=>new T.Vector3(p[0],p[1],p[2]))), seg||20, r, 6, false), m);
+  // thick curved plate from a parametric surface P(u,v), thickness th(u,v)
+  const shell = (P, nu, nv, th, m)=>{
+    const pos = [], idx = [], uv = [], grid = [];
+    const eps = 1e-3;
+    for (let i=0;i<=nu;i++){ grid[i] = []; for (let j=0;j<=nv;j++){
+      const u = i/nu, v = j/nv, p = P(u,v);
+      const du = P(Math.min(1,u+eps),v).sub(P(Math.max(0,u-eps),v)), dv = P(u,Math.min(1,v+eps)).sub(P(u,Math.max(0,v-eps)));
+      const nrm = new T.Vector3().crossVectors(du, dv).normalize(), t = th(u,v)/2;
+      grid[i][j] = [p.clone().addScaledVector(nrm, t), p.clone().addScaledVector(nrm, -t)];
+    }}
+    const add = (p,u,v)=>{ pos.push(p.x,p.y,p.z); uv.push(u,v); return pos.length/3-1; };
+    const F = [], B = [];
+    for (let i=0;i<=nu;i++){ F[i]=[]; B[i]=[]; for (let j=0;j<=nv;j++){ F[i][j] = add(grid[i][j][0], i/nu, j/nv); B[i][j] = add(grid[i][j][1], i/nu, j/nv); } }
+    for (let i=0;i<nu;i++) for (let j=0;j<nv;j++){
+      idx.push(F[i][j], F[i+1][j], F[i][j+1], F[i+1][j], F[i+1][j+1], F[i][j+1]);
+      idx.push(B[i][j], B[i][j+1], B[i+1][j], B[i+1][j], B[i][j+1], B[i+1][j+1]);
+    }
+    const rim = (a,b)=>{ idx.push(F[a[0]][a[1]], B[a[0]][a[1]], F[b[0]][b[1]], B[a[0]][a[1]], B[b[0]][b[1]], F[b[0]][b[1]]); };
+    for (let i=0;i<nu;i++){ rim([i+1,0],[i,0]); rim([i,nv],[i+1,nv]); }
+    for (let j=0;j<nv;j++){ rim([0,j],[0,j+1]); rim([nu,j+1],[nu,j]); }
+    const g = new T.BufferGeometry();
+    g.setAttribute('position', new T.Float32BufferAttribute(pos,3)); g.setAttribute('uv', new T.Float32BufferAttribute(uv,2));
+    g.setIndex(idx); g.computeVertexNormals();
+    return mesh(g, m||iron);
+  };
+  const bump = (t, c, w)=> Math.exp(-Math.pow((t-c)/w, 2));
+  const G3 = ()=> new T.Group();
 
-  const root = new T.Group();
-  const pelvis = new T.Group(); pelvis.position.set(0, 0.96, 0); root.add(pelvis);
-  // pelvis: two flared iliac wings, a sacrum and the pelvic ring
-  for (const s of [-1,1]){
-    // iliac wing: a thin flared fan of bone, not a ball
-    const w = M(new T.SphereGeometry(0.075, 20, 14, 0, Math.PI*2, 0, Math.PI*0.62)); w.scale.set(0.95, 0.9, 0.28);
-    w.position.set(s*0.07, 0.0, -0.01); w.rotation.set(-0.2, s*0.95, s*0.25); pelvis.add(w);
-    const ring = tube([[s*0.02,-0.05,0.07],[s*0.075,-0.04,0.045],[s*0.095,-0.01,-0.01],[s*0.05,0.02,-0.05]], 0.012);
-    pelvis.add(ring);
-  }
-  const sacrum = ball(0.036); sacrum.scale.set(0.9,1.4,0.5); sacrum.position.set(0,-0.01,-0.045); pelvis.add(sacrum);
-  pelvis.add(tube([[-0.04,-0.06,0.05],[-0.015,-0.075,0.07],[0.015,-0.075,0.07],[0.04,-0.06,0.05]], 0.009));   // pubic arch
-  // spine: lumbar vertebrae up to the chest
-  const spine = new T.Group(); spine.position.set(0, 0.07, -0.035); pelvis.add(spine);
-  const vert = (g, y, r, z)=>{ const v = M(new T.CylinderGeometry(r, r*1.05, r*1.05, 10)); v.position.set(0,y,z||0); g.add(v);
-    const p = M(new T.BoxGeometry(r*0.5, r*0.6, r*1.6)); p.position.set(0,y,(z||0)-r*1.1); p.rotation.x = 0.5; g.add(p); };
-  for (let i=0;i<5;i++) vert(spine, i*0.036, 0.021, Math.sin(i/4*Math.PI)*0.012);
-  const chest = new T.Group(); chest.position.set(0, 0.19, 0.005); spine.add(chest);
-  for (let i=0;i<9;i++) vert(chest, i*0.029, 0.016 - i*0.0005, -0.015 - Math.sin(i/8*Math.PI)*0.018);
-  // ribcage: curved ribs sweeping from the spine round to the breastbone
-  for (let i=0;i<8;i++){
-    const y = 0.25 - i*0.028, a = 0.08 + Math.sin(Math.min(1,(i+1)/4)*Math.PI/2)*0.06, b = 0.075 + Math.min(i,4)*0.008;
-    const front = i<7 ? 0.92 : 0.45, drop = 0.06 + i*0.004;
-    for (const s of [-1,1]){
-      const pts = [];
-      for (let j=0;j<=8;j++){
-        const t = j/8, ph = -Math.PI/2 + t*Math.PI*front;
-        pts.push([s*(0.018 + a*Math.cos(ph)), y - drop*t*t - 0.01*Math.sin(t*Math.PI), -0.03 + b*Math.sin(ph) + b*0.02]);
-      }
-      chest.add(tube(pts, 0.0072 - i*0.0002, boneNoVC, 16));
-    }
-  }
-  const sternum = M(new T.BoxGeometry(0.03, 0.15, 0.012)); sternum.position.set(0, 0.175, 0.078); sternum.rotation.x = 0.18; chest.add(sternum);
-  // clavicles and shoulder blades
-  for (const s of [-1,1]){
-    chest.add(tube([[s*0.012,0.262,0.07],[s*0.07,0.272,0.05],[s*0.13,0.268,0.0],[s*0.155,0.262,-0.02]], 0.0085));
-    const sc = M(new T.BoxGeometry(0.09, 0.11, 0.008)); sc.position.set(s*0.085, 0.2, -0.085); sc.rotation.z = s*0.2; sc.rotation.y = s*0.25; chest.add(sc);
-  }
-  // neck and skull
-  const neck = new T.Group(); neck.position.set(0, 0.27, -0.02); chest.add(neck);
-  for (let i=0;i<4;i++) vert(neck, i*0.024, 0.013, 0.004*i);
-  const head = new T.Group(); head.position.set(0, 0.1, 0.01); head.scale.setScalar(1.14); neck.add(head);
-  {
-    const g = new T.SphereGeometry(1, 48, 36), pos = g.attributes.position, col = new Float32Array(pos.count*3);
-    const socket = (x,y,z,cx,cy,r)=> Math.max(0, 1 - Math.hypot((x-cx)/r, (y-cy)/(r*0.9)));
-    for (let i=0;i<pos.count;i++){
-      let x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
-      // cranium proportions: long front-to-back, narrower low at the face
-      let sx = 0.074, sy = 0.088, sz = 0.098;
-      if (y < 0){ sx *= 1 - (-y)*0.28*(z>0?1:0.5); if (z<0) sy *= 0.8; }
-      if (z > 0 && y < 0.15){ sz *= 1 + 0.08*z; }                          // face pushed forward
-      let X = x*sx, Y = y*sy + 0.1, Z = z*sz + 0.008;
-      let d = 0, c = 1;
-      if (z > 0.35){
-        // eye sockets, nasal cavity - pressed in and darkened
-        const e = Math.max(socket(X,Y,Z, 0.031,0.098,0.026), socket(X,Y,Z,-0.031,0.098,0.026));
-        const nz = Math.max(0, 1 - Math.hypot(X/0.012, (Y-0.066)/0.02));
-        d = e*0.028 + nz*0.018; c = 1 - Math.min(1, e*1.6)*0.95 - Math.min(1,nz*1.5)*0.9;
-        // brow ridge and cheekbones stand proud
-        const brow = Math.max(0, 1 - Math.abs(Y-0.127)/0.01) * (Math.abs(X)<0.06 ? 1 : 0);
-        const cheek = Math.max(0, 1 - Math.hypot((Math.abs(X)-0.05)/0.02, (Y-0.07)/0.014));
-        Z += brow*0.006 + cheek*0.006;
-      }
-      if (y < -0.72 && z > 0){ Y = Math.max(Y, 0.028); }                    // upper jaw line flattened for the teeth
-      Z -= d; X *= 1 - d*3;
-      pos.setXYZ(i, X, Y, Z);
-      col[i*3] = col[i*3+1] = col[i*3+2] = Math.max(0.04, c);
-    }
-    g.setAttribute('color', new T.BufferAttribute(col, 3)); g.computeVertexNormals();
-    head.add(M(g, bone));
-    // eye glints deep in the sockets
-    for (const s of [-1,1]){ const e = M(new T.SphereGeometry(0.0055, 8, 6), eyeMat); e.position.set(s*0.031, 0.097, 0.083); head.add(e); }
-    // upper teeth
-    for (let i=0;i<10;i++){ const a = (i-4.5)/4.5*0.95, t = M(new T.BoxGeometry(0.0085, 0.013, 0.008));
-      t.position.set(Math.sin(a)*0.042, 0.028, 0.052+Math.cos(a)*0.035); t.rotation.y = a; head.add(t); }
-    // lower jaw on a hinge so it can chatter
-    const jaw = new T.Group(); jaw.position.set(0, 0.045, 0.0); head.add(jaw);
-    jaw.add(tube([[-0.055,0.0,0.005],[-0.05,-0.035,0.03],[-0.03,-0.045,0.07],[0,-0.048,0.085],[0.03,-0.045,0.07],[0.05,-0.035,0.03],[0.055,0.0,0.005]], 0.0095, boneNoVC, 24));
-    for (let i=0;i<10;i++){ const a = (i-4.5)/4.5*0.95, t = M(new T.BoxGeometry(0.008, 0.012, 0.007));
-      t.position.set(Math.sin(a)*0.04, -0.03, 0.05+Math.cos(a)*0.03); t.rotation.y = a; jaw.add(t); }
-    head.userData.jaw = jaw;
-  }
-  // arms: shoulder -> humerus -> elbow -> radius & ulna -> hand
+  const root = G3();
+  const pelvis = G3(); pelvis.position.set(0, 0.98, 0); root.add(pelvis);
+  const spine = G3(); spine.position.set(0, 0.075, -0.052); pelvis.add(spine);
+  const chest = G3(); chest.position.set(0, 0.175, 0.0); spine.add(chest);
+  const neck = G3(); neck.position.set(0, 0.29, -0.026); chest.add(neck);
+  const head = G3(); head.position.set(0, 0.11, 0.008); neck.add(head);
+  const jaw = G3(); jaw.position.set(0, 0.058, 0.004); head.add(jaw); head.userData.jaw = jaw;
+  // the dark inside of the skull (seen through the orbits and nose) and a
+  // faint ember deep in each socket
+  const lining = mesh(new T.SphereGeometry(1, 32, 24), new T.MeshBasicMaterial({ color:0x050403 })); lining.scale.set(0.062,0.068,0.086); lining.position.set(0,0.108,-0.012); lining.castShadow = false; head.add(lining);
+  const lining2 = mesh(new T.SphereGeometry(1, 16, 12), lining.material); lining2.scale.set(0.024,0.024,0.03); lining2.position.set(0,0.062,0.058); lining2.castShadow = false; head.add(lining2);
+  eyeMat.toneMapped = false;
+  for (const s of [-1,1]){ const e = mesh(new T.SphereGeometry(0.0028, 10, 8), eyeMat); e.castShadow = false; e.position.set(s*0.031, 0.098, 0.064); head.add(e); }
+  const SHP = [V(-0.172, 0.262, -0.03), V(0.172, 0.262, -0.03)];
   const arm = (s)=>{
-    const sh = new T.Group(); sh.position.set(s*0.165, 0.25, -0.02); chest.add(sh);
-    sh.add(ball(0.022));
-    sh.add(longBone(0.29, 0.0115, 1.0, 0.8));
-    const el = new T.Group(); el.position.set(0, -0.29, 0); sh.add(el);
-    const r1 = longBone(0.25, 0.0078, 0.9, 0.9); r1.position.x = s*0.009; el.add(r1);
-    const r2 = longBone(0.25, 0.0068, 1.1, 0.7); r2.position.x = -s*0.009; el.add(r2);
-    const hand = new T.Group(); hand.position.set(0, -0.255, 0); el.add(hand);
-    const palm = ball(0.022); palm.scale.set(1, 1.3, 0.55); palm.position.y = -0.025; hand.add(palm);
-    for (let f=0; f<4; f++){
-      const fx = (f-1.5)*0.012;
-      hand.add(tube([[fx,-0.045,0],[fx,-0.065,0.012],[fx,-0.07,0.03],[fx,-0.06,0.04]], 0.004, boneNoVC, 8));
-    }
-    hand.add(tube([[s*-0.02,-0.03,0.01],[s*-0.028,-0.05,0.03],[s*-0.02,-0.06,0.045]], 0.0045, boneNoVC, 6));
-    return { sh, el, hand };
+    const sh = G3(); sh.position.copy(SHP[s<0?0:1]); chest.add(sh);
+    const el = G3(); el.position.set(0, -0.305, 0); sh.add(el);
+    const wr = G3(); wr.position.set(0, -0.255, 0.004); el.add(wr);
+    return { sh, el, hand:wr };
   };
-  const R = arm(-1), L = arm(1);   // model faces +z, so its right side is -x
-  // legs: hip -> femur -> knee -> tibia & fibula -> foot
+  const R = arm(-1), L = arm(1);
   const leg = (s)=>{
-    const hip = new T.Group(); hip.position.set(s*0.085, -0.02, 0); pelvis.add(hip);
-    hip.add(ball(0.024));
-    const fem = longBone(0.43, 0.013, 1.0, 1.0); fem.rotation.z = s*0.05; hip.add(fem);
-    const kn = new T.Group(); kn.position.set(s*0.02, -0.43, 0); hip.add(kn);
-    const pat = ball(0.016); pat.position.set(0, 0.0, 0.02); kn.add(pat);
-    kn.add(longBone(0.4, 0.0115, 1.2, 0.8));
-    const fib = longBone(0.39, 0.005, 1.0, 1.0); fib.position.set(s*0.022, -0.005, -0.006); kn.add(fib);
-    const ft = new T.Group(); ft.position.set(0, -0.405, 0); kn.add(ft);
-    const heel = ball(0.02); heel.scale.set(1, 0.8, 1.3); heel.position.set(0, -0.02, -0.01); ft.add(heel);
-    for (let t=0;t<5;t++){ const tx = (t-2)*0.011*s*-1 + s*0.004;
-      ft.add(tube([[tx*0.6,-0.025,0.01],[tx,-0.035,0.06],[tx*1.1,-0.04,0.1],[tx*1.15,-0.045,0.115]], 0.0045 - Math.abs(t-2)*0.0004, boneNoVC, 8)); }
+    const hip = G3(); hip.position.set(s*0.088, -0.062, 0.018); pelvis.add(hip);
+    const kn = G3(); kn.position.set(s*0.012, -0.455, 0); hip.add(kn);
+    const ft = G3(); ft.position.set(0, -0.402, 0); kn.add(ft);
     return { hip, kn, ft };
   };
   const RL = leg(-1), LL = leg(1);
-  // a notched, rusty arming sword in the right hand
-  const sword = new T.Group();
+  // the sculpted bones, built a piece at a time in the background
+  const boneMat = new T.MeshStandardMaterial({ vertexColors:true, roughness:0.62, metalness:0 });
+  const put = (grp, geo)=>{ const o = mesh(geo, boneMat); grp.add(o); };
+  const steps = [
+    ()=> put(head, SK3_PARTS.skull()), ()=> put(jaw, SK3_PARTS.jaw()), ()=> put(neck, SK3_PARTS.neck()),
+    ()=> put(spine, SK3_PARTS.lumbar()), ()=> put(chest, SK3_PARTS.thorax()), ()=> put(pelvis, SK3_PARTS.pelvis()),
+    ()=> put(R.sh, SK3_PARTS.humerus(-1)), ()=> put(L.sh, SK3_PARTS.humerus(1)),
+    ()=> put(R.el, SK3_PARTS.forearm(-1)), ()=> put(L.el, SK3_PARTS.forearm(1)),
+    ()=> put(R.hand, SK3_PARTS.hand(-1, 0.95)), ()=> put(L.hand, SK3_PARTS.hand(1, 0.75)),
+    ()=> put(RL.hip, SK3_PARTS.femur(-1)), ()=> put(LL.hip, SK3_PARTS.femur(1)),
+    ()=> put(RL.kn, SK3_PARTS.shin(-1)), ()=> put(LL.kn, SK3_PARTS.shin(1)),
+    ()=> put(RL.ft, SK3_PARTS.foot(-1)), ()=> put(LL.ft, SK3_PARTS.foot(1)),
+  ];
+  // ---- a notched, rusted arming sword ----
+  const sword = G3();
   {
-    const sh = new T.Shape(); const L0 = 0.7, w = 0.024;
+    const sh = new T.Shape(), L0 = 0.72, w = 0.024;
     sh.moveTo(-w, 0); sh.lineTo(-w*0.92, L0*0.78); sh.lineTo(-w*0.35, L0*0.97); sh.lineTo(0, L0); sh.lineTo(w*0.35, L0*0.97);
-    sh.lineTo(w*0.9, L0*0.6); sh.lineTo(w*0.7, L0*0.57); sh.lineTo(w*0.92, L0*0.54); sh.lineTo(w, 0); sh.lineTo(-w, 0);
-    const bg = new T.ExtrudeGeometry(sh, { depth:0.004, bevelEnabled:true, bevelThickness:0.003, bevelSize:0.004, bevelSegments:1, steps:1 });
-    bg.translate(0, 0, -0.002);
-    const blade = M(bg, steel); blade.position.y = 0.05; sword.add(blade);
-    const fuller = M(new T.BoxGeometry(0.008, 0.42, 0.0105), iron); fuller.position.y = 0.3; sword.add(fuller);
-    const guard = M(new T.BoxGeometry(0.17, 0.018, 0.026), iron); guard.position.y = 0.045; sword.add(guard);
-    for (const s of [-1,1]){ const q = M(new T.SphereGeometry(0.014, 8, 6), iron); q.position.set(s*0.088, 0.045, 0); sword.add(q); }
-    const grip = M(new T.CylinderGeometry(0.013, 0.014, 0.11, 10), leather); grip.position.y = -0.015; sword.add(grip);
-    const pommel = M(new T.SphereGeometry(0.021, 12, 8), iron); pommel.position.y = -0.08; sword.add(pommel);
+    sh.lineTo(w*0.9, L0*0.62); sh.lineTo(w*0.66, L0*0.59); sh.lineTo(w*0.92, L0*0.56); sh.lineTo(w*0.96, L0*0.3); sh.lineTo(w*0.8, L0*0.28); sh.lineTo(w, L0*0.25); sh.lineTo(w, 0); sh.lineTo(-w, 0);
+    const bg = new T.ExtrudeGeometry(sh, { depth:0.003, bevelEnabled:true, bevelThickness:0.0035, bevelSize:0.006, bevelSegments:2, steps:1 });
+    bg.translate(0, 0, -0.0015);
+    const blade = mesh(bg, steel); blade.position.y = 0.055; sword.add(blade);
+    const fuller = mesh(new T.BoxGeometry(0.007, 0.44, 0.0088), iron); fuller.position.y = 0.31; sword.add(fuller);
+    const guard = sweep([V(-0.09,0.058,0.0),V(-0.045,0.048,0),V(0,0.046,0),V(0.045,0.048,0),V(0.09,0.058,0)], t=>[0.0075+0.004*(bump(t,0,0.08)+bump(t,1,0.08)), 0.011], iron, {seg:16, rad:8});
+    sword.add(guard);
+    const grip = mesh(new T.CylinderGeometry(0.0125, 0.0135, 0.11, 12), leather); grip.position.y = -0.012; sword.add(grip);
+    for (let i=0;i<6;i++){ const r = mesh(new T.TorusGeometry(0.0132, 0.0016, 4, 14), leather); r.rotation.x = Math.PI/2; r.position.y = -0.058 + i*0.018; sword.add(r); }
+    const pommel = mesh(new T.SphereGeometry(0.02, 14, 10), iron); pommel.scale.y = 0.8; pommel.position.y = -0.078; sword.add(pommel);
   }
-  sword.position.set(0, -0.06, 0.03); R.hand.add(sword);
-  // a battered round shield on the left arm
-  const shield = new T.Group();
+  // ---- a battered round shield ----
+  const shield = G3();
   {
-    const board = M(new T.CylinderGeometry(0.26, 0.26, 0.028, 40, 1), [wood, wood, wood]);
+    const board = mesh(new T.CylinderGeometry(0.26, 0.26, 0.024, 48, 1), wood);
     board.material = [ new T.MeshStandardMaterial({ color:0x2a1c10, roughness:0.9 }), wood, new T.MeshStandardMaterial({ color:0x3a2616, roughness:0.9 }) ];
     board.rotation.x = Math.PI/2; shield.add(board);
-    const rim = M(new T.TorusGeometry(0.262, 0.012, 8, 48), iron); shield.add(rim);
-    const boss = M(new T.SphereGeometry(0.06, 20, 12, 0, Math.PI*2, 0, Math.PI/2), steel); boss.rotation.x = Math.PI/2; boss.position.z = 0.012; shield.add(boss);
-    const bossRim = M(new T.TorusGeometry(0.062, 0.008, 6, 24), iron); bossRim.position.z = 0.014; shield.add(bossRim);
-    for (let i=0;i<12;i++){ const a = i/12*Math.PI*2, r = M(new T.SphereGeometry(0.008, 6, 4), iron); r.position.set(Math.cos(a)*0.235, Math.sin(a)*0.235, 0.016); shield.add(r); }
-    // a chunk hacked out of the rim
-    const notch = M(new T.BoxGeometry(0.07, 0.05, 0.034), dark); notch.position.set(0.19, 0.17, 0); notch.rotation.z = 0.8; shield.add(notch);
+    const rim = mesh(new T.TorusGeometry(0.262, 0.011, 8, 64), iron); shield.add(rim);
+    const boss = mesh(new T.SphereGeometry(0.058, 24, 14, 0, Math.PI*2, 0, Math.PI/2), steel); boss.rotation.x = Math.PI/2; boss.position.z = 0.012; shield.add(boss);
+    const bossRim = mesh(new T.TorusGeometry(0.06, 0.008, 6, 28), iron); bossRim.position.z = 0.013; shield.add(bossRim);
+    for (let i=0;i<14;i++){ const a = i/14*Math.PI*2, r = mesh(new T.SphereGeometry(0.0075, 8, 6), iron); r.position.set(Math.cos(a)*0.238, Math.sin(a)*0.238, 0.013); shield.add(r); }
+    const strap = sweep([V(-0.12,0.06,-0.014),V(0,0.075,-0.03),V(0.12,0.06,-0.014)], ()=>[0.004,0.012], leather, {seg:10, rad:6}); shield.add(strap);
+    const notch = mesh(new T.BoxGeometry(0.075, 0.05, 0.03), cavity); notch.position.set(0.19, 0.17, 0); notch.rotation.z = 0.8; shield.add(notch);
   }
-  shield.position.set(0.05, -0.15, 0.06); L.el.add(shield);
-
-  // a rotted leather belt with a few ragged strips of cloth hanging from it
-  {
-    const clothMat = new T.MeshStandardMaterial({ color:0x2a2018, roughness:1, side:T.DoubleSide });
-    for (let i=0;i<7;i++){
-      const a = (i-3)/3*1.1, len = 0.12 + Math.random()*0.1, g = new T.PlaneGeometry(0.035, len, 1, 4), p = g.attributes.position;
-      for (let j=0;j<p.count;j++){ const y = p.getY(j); p.setZ(j, (y*y)*0.8); p.setX(j, p.getX(j)*(1 - (0.5 - y/len)*0.5)); }
-      g.translate(0, -len/2, 0); g.computeVertexNormals();
-      const strip = M(g, clothMat); strip.position.set(Math.sin(a)*0.1, 0.02, Math.cos(a)*0.085); strip.rotation.y = a; strip.rotation.x = -0.1; pelvis.add(strip);
-    }
-    const belt = M(new T.TorusGeometry(0.1, 0.011, 6, 24), leather); belt.rotation.x = Math.PI/2; belt.scale.set(1, 0.85, 1); belt.position.set(0, 0.03, 0.005); pelvis.add(belt);
-    const buckle = M(new T.BoxGeometry(0.03, 0.026, 0.008), iron); buckle.position.set(0, 0.03, 0.088); pelvis.add(buckle);
-  }
-  return { root, pelvis, spine, chest, neck, head, R, L, RL, LL, sword, shield };
+  sword.position.set(0, -0.058, 0.012); R.hand.add(sword);
+  shield.position.set(0.03, -0.2, 0.075); L.el.add(shield);
+  return { root, pelvis, spine, chest, neck, head, R, L, RL, LL, sword, shield, steps };
 }
 function sk3Init(){
-  if (SK3.ok!==null) return SK3.ok;
-  if (typeof THREE==='undefined'){ return false; }  // still loading (or offline) - painted skeleton for now
+  if (SK3.ok===true) return true;
+  if (SK3.building || SK3.ok===false && SK3.r) return false;
+  if (typeof THREE==='undefined') return false;   // still loading (or offline) - painted skeleton for now
   try{
     const T = THREE;
-    SK3.cv = sk3Canvas(SK3.W, SK3.H);
+    SK3.cv = sk3Canvas(SK3.MW, SK3.MH);
     SK3.r = new T.WebGLRenderer({ canvas:SK3.cv, alpha:true, antialias:true, preserveDrawingBuffer:true });
-    SK3.r.setPixelRatio(1); SK3.r.setSize(SK3.W, SK3.H, false);
+    SK3.r.setPixelRatio(1); SK3.r.setSize(SK3.MW, SK3.MH, false);
     if (T.sRGBEncoding) SK3.r.outputEncoding = T.sRGBEncoding;
+    SK3.r.toneMapping = T.ACESFilmicToneMapping; SK3.r.toneMappingExposure = 1.0;
+    SK3.r.shadowMap.enabled = true; SK3.r.shadowMap.type = T.PCFSoftShadowMap;
     SK3.r.setClearColor(0x000000, 0);
     SK3.scene = new T.Scene();
-    SK3.cam = new T.PerspectiveCamera(18, SK3.W/SK3.H, 0.5, 30);
-    SK3.amb = new T.HemisphereLight(0xbfc6d6, 0x2a2018, 0.55); SK3.scene.add(SK3.amb);
-    SK3.key = new T.DirectionalLight(0xffd7a0, 1.5); SK3.key.position.set(-1.2, 2.2, 3); SK3.scene.add(SK3.key);
-    SK3.fill = new T.PointLight(0xffb070, 0.9, 12); SK3.fill.position.set(0.3, 1.2, 3.2); SK3.scene.add(SK3.fill);
-    SK3.rim = new T.DirectionalLight(0x9fb4ff, 0.9); SK3.rim.position.set(1.5, 1.8, -2.5); SK3.scene.add(SK3.rim);
-    SK3.eyeL = new T.PointLight(0xff4020, 0.25, 0.4);
+    SK3.cam = new T.PerspectiveCamera(19.6, SK3.MW/SK3.MH, 0.5, 30);
+    SK3.amb = new T.HemisphereLight(0xc8d0e0, 0x2a2018, 0.55); SK3.scene.add(SK3.amb);
+    SK3.key = new T.DirectionalLight(0xffd7a0, 2.2); SK3.key.castShadow = true;
+    SK3.key.shadow.mapSize.set(2048, 2048); SK3.key.shadow.bias = -0.0004; SK3.key.shadow.normalBias = 0.002; SK3.key.shadow.radius = 3;
+    const sc = SK3.key.shadow.camera; sc.left = -1.1; sc.right = 1.1; sc.top = 2.3; sc.bottom = -0.2; sc.near = 0.5; sc.far = 12;
+    SK3.scene.add(SK3.key); SK3.scene.add(SK3.key.target); SK3.key.target.position.set(0, 1, 0);
+    SK3.fill = new T.PointLight(0xffb070, 0.5, 12); SK3.scene.add(SK3.fill);
+    SK3.rim = new T.DirectionalLight(0x9fb4ff, 1.1); SK3.rim.position.set(1.5, 1.8, -2.5); SK3.scene.add(SK3.rim);
+    SK3.eyeL = new T.PointLight(0xff4020, 0.3, 0.35);
     SK3.m = sk3Build(); SK3.scene.add(SK3.m.root);
-    SK3.m.head.add(SK3.eyeL); SK3.eyeL.position.set(0, 0.1, 0.1);
-    SK3.ok = true;
+    SK3.m.head.add(SK3.eyeL); SK3.eyeL.position.set(0, 0.098, 0.074);
+    // sculpt the bones one piece per tick so the game never stalls; the
+    // painted skeleton stands in until the model is complete
+    SK3.ok = false; SK3.building = true;
+    const steps = SK3.m.steps.slice();
+    const next = ()=>{
+      try{ const f = steps.shift(); if (f) f(); }catch(e){ SK3.building = false; return; }
+      if (steps.length) setTimeout(next, 16); else { SK3.ok = true; SK3.building = false; }
+    };
+    setTimeout(next, 0);
+    return false;
   }catch(e){ SK3.ok = false; }
   return SK3.ok;
 }
 // poses the rig: t seconds, walk 0..1, atk 0..1 swing progress, hit 0..1 stagger
 function sk3Pose(t, walk, atk, hit, seed){
-  const m = SK3.m, s = Math.sin, br = s(t*1.7+seed)*0.5+0.5;
-  const wk = walk>0.01 ? s(t*9) : 0, W = walk;
-  m.root.rotation.y = s(t*0.6+seed)*0.12;
-  m.pelvis.position.y = 0.94 - 0.03 - Math.abs(wk)*0.02*W;
-  m.pelvis.rotation.set(0, wk*0.12*W, 0);
-  m.spine.rotation.set(0.12 + hit*0.25, -wk*0.1*W, 0);
-  m.chest.rotation.set(0.08 + br*0.02 - atk*0.15, s(atk*Math.PI)*-0.35, 0);
-  m.neck.rotation.set(-0.12 - hit*0.3, s(t*0.9+seed)*0.2, 0);
-  m.head.rotation.set(-0.05 + s(t*0.5)*0.05, 0, s(t*0.7+seed)*0.06);
-  m.head.userData.jaw.rotation.x = 0.08 + Math.max(0, s(t*11+seed))*0.1*(0.4+hit) + atk*0.25;
-  // legs: a guarded stance, stepping when walking
-  const leg = (L, side, ph)=>{
+  const m = SK3.m, s = Math.sin, br = s(t*1.7+seed)*0.5+0.5, W = walk;
+  m.root.rotation.y = s(t*0.6+seed)*0.1;
+  m.pelvis.position.y = 0.95 - Math.abs(s(t*9))*0.02*W;
+  m.pelvis.rotation.set(0.05, s(t*9)*0.1*W, 0);
+  m.spine.rotation.set(0.1 + hit*0.25, -s(t*9)*0.08*W, 0);
+  m.chest.rotation.set(0.06 + br*0.02 - atk*0.12, s(atk*Math.PI)*-0.35, 0);
+  m.neck.rotation.set(-0.16 - hit*0.3, s(t*0.9+seed)*0.2, 0);
+  m.head.rotation.set(-0.08 + s(t*0.5)*0.05, 0, s(t*0.7+seed)*0.06);
+  m.head.userData.jaw.rotation.x = 0.06 + Math.max(0, s(t*11+seed))*0.08*(0.4+hit) + atk*0.3;
+  const leg = (L, side, ph, fwd)=>{
     const sw = W*s(t*9+ph)*0.45;
-    L.hip.rotation.set(-0.28 - sw, 0, side*0.08);
-    L.kn.rotation.set(0.42 + Math.max(0, -s(t*9+ph))*0.6*W, 0, 0);
-    L.ft.rotation.set(-0.14 + sw*0.3, 0, 0);
+    L.hip.rotation.set(-0.22 - sw - fwd, 0, side*0.06);
+    L.kn.rotation.set(0.36 + fwd*0.2 + Math.max(0, -s(t*9+ph))*0.6*W, 0, 0);
+    L.ft.rotation.set(-0.14 + sw*0.3 + fwd*0.2, 0, 0);
   };
-  leg(m.RL, -1, 0); leg(m.LL, 1, Math.PI);
-  m.RL.hip.rotation.x += 0.18; m.RL.kn.rotation.x -= 0.1;          // right foot back, left forward
-  m.LL.hip.rotation.x -= 0.12;
-  // sword arm: raised ready, then a downward diagonal cut
-  const up = atk<0.35 ? atk/0.35 : 1 - (atk-0.35)/0.65;
-  m.R.sh.rotation.set(-0.5 - up*1.9 + (atk>0.35 ? (atk-0.35)*2.2 : 0), 0.2, -0.35 - up*0.35);
-  m.R.el.rotation.set(-1.15 + up*0.5, 0, 0);
-  m.R.hand.rotation.set(-0.2 - up*0.5, 0, -0.1);
-  m.sword.rotation.set(1.35 - up*0.2, 0, 0.12);
-  // shield arm: held up in front of the chest
-  m.L.sh.rotation.set(-0.55 - hit*0.3 + br*0.03, -0.1, 0.42);
+  leg(m.RL, -1, 0, -0.16); leg(m.LL, 1, Math.PI, 0.1);
+  // sword arm: raised ready, then a downward cut
+  const up = atk<0.35 ? atk/0.35 : 1 - (atk-0.35)/0.65, cut = atk>0.35 ? (atk-0.35)/0.65 : 0;
+  m.R.sh.rotation.set(-0.45 - up*1.9 + cut*0.9, 0.25, -0.3 - up*0.4);
+  m.R.el.rotation.set(-1.2 + up*0.55 + cut*0.3, 0, 0);
+  m.R.hand.rotation.set(-0.1, 0, 0);
+  m.sword.rotation.set(Math.PI/2 + 0.1 - up*0.3, 0.0, 0.35);
+  // shield arm: held out front-left
+  m.L.sh.rotation.set(-0.55 - hit*0.3 + br*0.03, -0.1, 0.4);
   m.L.el.rotation.set(-1.05, 0.5, -0.1);
-  m.L.hand.rotation.set(0, 0, 0);
   m.shield.rotation.set(1.1, 0.55 - hit*0.2, 0.35);
 }
-// the per-monster sprite (its own 2D copy of the render plus the dark/white
-// silhouettes the sprite pass uses for distance shading and hit flashes)
-function sk3Sprite(m, pos, light){
+// the per-monster sprite: its own 2D copy of the render (at the size it will
+// appear on screen) plus the dark/white silhouettes the sprite pass uses for
+// distance shading and hit flashes
+function sk3Sprite(m, pos, light, pxH){
   if (!sk3Init()) return null;
   let e = SK3.inst.get(m);
-  if (!e){
-    const mk = ()=> sk3Canvas(SK3.W, SK3.H);
-    e = { img:mk(), shade:mk(), wht:mk(), aspect:SK3.W/SK3.H, seed:Math.random()*10, atk:0, pHp:G.player.hp, n:0 };
-    SK3.inst.set(m, e);
-  }
+  if (!e){ e = { img:sk3Canvas(1,1), shade:sk3Canvas(1,1), wht:sk3Canvas(1,1), aspect:SK3.MW/SK3.MH, seed:Math.random()*10, atk:0, pHp:G.player.hp, n:0 }; SK3.inst.set(m, e); }
+  // render height snapped to 64px steps so the canvases aren't reallocated every frame
+  const H = clamp(Math.ceil((pxH||400)/64)*64, 128, SK3.MH), Wd = Math.round(H*SK3.MW/SK3.MH);
   const moving = Math.min(1, Math.hypot(m.x+0.5-pos.x, m.y+0.5-pos.y)*3);
   // you just took damage with this skeleton beside you - it swings
   if (G.player.hp < e.pHp && Math.abs(m.x-G.player.x)+Math.abs(m.y-G.player.y)===1 && e.atk===0) e.atk = 0.001;
@@ -12885,30 +13337,33 @@ function sk3Sprite(m, pos, light){
   const hit = FP.monFlash.get(m)||0;
   // far-off idle skeletons only need a fresh frame now and then
   const far = Math.hypot(pos.x-FP.cam.x, pos.y-FP.cam.y);
-  if (e.n++ > 0 && far > 5 && !e.atk && !hit && moving<0.02 && (e.n % 4)) return e;
+  if (e.n++ > 0 && e.img.height===H && !e.atk && !hit && moving<0.02 && (far > 5 ? (e.n % 4) : (e.n % 2))) return e;
   const nm = m.nm.toLowerCase(), eye = m.corrupted ? 0xc070ff : /knight/.test(nm) ? 0x78c8ff : /warrior/.test(nm) ? 0xffb050 : 0xff5a3c;
   SK3.eyeMat.color.setHex(eye); SK3.eyeL.color.setHex(eye);
   sk3Pose(FP.t, moving, e.atk, hit, e.seed);
   // aim the camera from where the player really is, so the skeleton turns
   // properly when it's off to one side
   const c = FP.cam, dx = c.x-pos.x, dy = c.y-pos.y;
-  const faceA = Math.atan2(G.player.y+0.5-pos.y, G.player.x+0.5-pos.x);   // it faces the player
+  const faceA = Math.atan2(G.player.y+0.5-pos.y, G.player.x+0.5-pos.x);
   const viewA = Math.atan2(dy, dx) - faceA;
-  const D = 6.4, cy = 1.18;
-  SK3.cam.position.set(Math.sin(viewA)*D, cy, Math.cos(viewA)*D);
-  SK3.cam.lookAt(0, SK3.frameH/2 - 0.02, 0);
+  const D = 6.4;
+  SK3.cam.position.set(Math.sin(viewA)*D, 1.12, Math.cos(viewA)*D);
+  SK3.cam.lookAt(0, SK3.frameH/2 - 0.03, 0);
   SK3.cam.updateMatrixWorld();
-  // key light takes on the local torch / moonlight colour
-  const k = light || [1,0.85,0.65];
-  SK3.key.color.setRGB(Math.min(1,k[0]), Math.min(1,k[1]), Math.min(1,k[2]));
-  SK3.fill.color.setRGB(Math.min(1,k[0]), Math.min(1,k[1]*0.9), Math.min(1,k[2]*0.8));
-  SK3.key.position.set(SK3.cam.position.x*0.4 - 1.2, 2.4, SK3.cam.position.z*0.4 + 1);
+  const k = light || [1,0.85,0.65], cl = v=>Math.min(1,Math.max(0,v));
+  SK3.key.color.setRGB(cl(k[0]), cl(k[1]), cl(k[2]));
+  SK3.fill.color.setRGB(cl(k[0]), cl(k[1]*0.9), cl(k[2]*0.8));
+  SK3.key.position.set(SK3.cam.position.x*0.35 - 1.6, 3.0, SK3.cam.position.z*0.35 + 1.2);
   SK3.fill.position.set(SK3.cam.position.x*0.5, 1.3, SK3.cam.position.z*0.5);
+  SK3.r.setViewport(0, 0, Wd, H);
+  SK3.r.setScissor(0, 0, Wd, H); SK3.r.setScissorTest(true);
   SK3.r.render(SK3.scene, SK3.cam);
-  const g = e.img.getContext('2d'); g.clearRect(0,0,SK3.W,SK3.H); g.drawImage(SK3.cv, 0, 0);
+  SK3.r.setScissorTest(false);
+  for (const cv of [e.img, e.shade, e.wht]) if (cv.width!==Wd || cv.height!==H){ cv.width = Wd; cv.height = H; }
+  const g = e.img.getContext('2d'); g.clearRect(0,0,Wd,H); g.drawImage(SK3.cv, 0, SK3.MH-H, Wd, H, 0, 0, Wd, H);
   for (const [cv, col] of [[e.shade,'#000'],[e.wht,'#fff']]){
-    const x = cv.getContext('2d'); x.globalCompositeOperation='source-over'; x.clearRect(0,0,SK3.W,SK3.H);
-    x.drawImage(e.img,0,0); x.globalCompositeOperation='source-in'; x.fillStyle=col; x.fillRect(0,0,SK3.W,SK3.H);
+    const x = cv.getContext('2d'); x.globalCompositeOperation='source-over'; x.clearRect(0,0,Wd,H);
+    x.drawImage(e.img,0,0); x.globalCompositeOperation='source-in'; x.fillStyle=col; x.fillRect(0,0,Wd,H);
   }
   return e;
 }
@@ -13440,13 +13895,17 @@ function fpCollectSprites(vis){
         const lan = d>=env.R ? 0 : Math.pow(1-d/env.R,1.6)*env.lanK;
         const lc = [0,1,2].map(c=> env.amb[c] + lan*env.lan[c] + (li>=0 ? [FP.L4r,FP.L4g,FP.L4b][c][li] : 0));
         const mxc = Math.max(0.05, lc[0], lc[1], lc[2]);
-        sk = sk3Sprite(m, pos, lc.map(v=>0.35 + 0.75*v/mxc));
+        // render at the height it will actually cover on screen, so it stays crisp
+        const dirX = Math.cos(FP.cam.a), dirY = Math.sin(FP.cam.a);
+        const depth = Math.max(0.4, (pos.x-FP.cam.x)*dirX + (pos.y-FP.cam.y)*dirY);
+        const pxH = canvas.width/(2*FP_PLANE) * (isBoss?1.0:0.88) / depth;
+        sk = sk3Sprite(m, pos, lc.map(v=>0.35 + 0.75*v/mxc), pxH);
       }
     }
     if (sk){
       let fl = FP.monFlash.get(m)||0;
       if (fl>0){ fl = Math.max(0, fl-FP.dt*4); FP.monFlash.set(m, fl); }
-      S.push({x:pos.x, y:pos.y, spr:sk, h:(isBoss?1.0:0.86), lift:0, shadow:true, flash:fl*0.6,
+      S.push({x:pos.x, y:pos.y, spr:sk, h:(isBoss?1.0:0.88), lift:0, shadow:true, flash:fl*0.6,
         hp: m.hp<m.maxHp ? clamp(m.hp/m.maxHp,0,1) : null, boss:isBoss});
       continue;
     }
