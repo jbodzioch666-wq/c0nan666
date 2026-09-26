@@ -2359,38 +2359,98 @@ function itemPrice(it){
 }
 function sellPrice(it){ return mx(1, roundH(itemPrice(it)*0.4)); }
 
-// rough "is this an upgrade" heuristic
-// a weapon your class isn't trained with can still be wielded - you just
-// lose your proficiency bonus to hit (see attackBonus) - so it's scored for
-// what it's really worth to you, not written off
+// "is this an upgrade": the candidate is put on for real (in the slot it
+// would actually go into) and the WHOLE loadout is scored with the same
+// functions combat uses - every affix, runeword, set bonus (a piece that
+// completes or breaks a set counts), stat point (through your class's real
+// melee/casting stat), proficiency (an untrained weapon loses its bonus to
+// hit via playerAtkBonus), crit, deadly strike, elemental dice, life steal,
+// regen, thorns, resist and unique on-hit procs all count, then the gear is
+// put back. A weapon that looks worse on paper but finishes your set, or a
+// helm that adds nothing but a +damage runeword, now compares correctly.
 function isWeaponLike(it){ return it.slot==='weapon' || (it.slot==='ranged' && it.kind!=='wand'); }
-function untrainedFactor(){ return mx(0.35, 1 - proficiencyBonus(G.player.level)*0.08); }
-function itemScore(it){
-  if (!it.used) return -1;
-  const untrained = !canEquip(it);
-  if (untrained && !isWeaponLike(it)) return -1; // armor your class can't wear at all is never "better" than what's equipped
-  let s = (it.slot==='weapon' || it.slot==='ranged') ? weaponAvg(it) : (it.ac*(1+afSumI(it,'edef')/100) + afSumI(it,'flatac'));
-  for (let i=0;i<it.naff;i++){
-    const a = it.aff[i]; const k=a.kind;
-    switch(k){
-      case 'life': s += a.i1*0.15; break;
-      case 'str': case 'dex': case 'con': case 'int': case 'wis': case 'cha': s += a.i1*1.2; break;
-      case 'allstat': s += a.i1*5; break;
-      case 'resist': s += a.i1*0.7; break;
-      case 'regen': s += a.i1*1.5; break;
-      case 'atk': s += a.i1*0.4; break;
-      case 'healkill': s += a.i1*1.2; break;
-      case 'magicfind': s += a.i1*0.8; break;
-      case 'crit': s += a.i1*3; break;
-      case 'fire': case 'cold': case 'pois': s += a.i1*(a.i2+1)/2; break;
-      case 'thorns': case 'goldfind': case 'xpfind': s += a.f*10; break;
-      case 'lifesteal': s += a.f*40; break;
-      case 'deadly': s += a.f*25; break;
-    }
+const GEAR_KEYS = ['weapon','head','chest','legs','arms','necklace','ring1','ring2'];
+// rough value of one unique proc firing, in damage-per-turn terms
+const PROC_VALUE = { 'The Gnasher':7, 'Doombringer':4, 'Widowmaker':2, 'Crown of Thieves':2, 'Visage of the Sage':2 };
+// expected damage of one weapon swing (whatever is in G.gear.weapon) against AC ac
+function swingEV(ac){
+  const w = G.gear.weapon;
+  const has = w && w.used;
+  const base = has ? mx(1, (w.d1*(w.d2+1)/2 + w.bonus + gearFlatDmg())*gearDmgMult() + meleeStatMod())
+                   : mx(1, 2.5 + meleeStatMod());
+  const need = mx(2, roundH(ac - (playerAtkBonus() + gearStatI('atk'))));
+  const pHit = mx(0.02, (21-mn(21,need))/20);                   // a natural 1 always misses
+  const pCrit = mn(pHit, mx(0, 21-mx(need, weaponCritThreshold()))/20);
+  const deadly = mn(1, gearStatF('deadly'));
+  let elem = 0;
+  if (has) for (const a of w.aff) if (a.kind==='fire'||a.kind==='cold'||a.kind==='pois') elem += a.i1*(a.i2+1)/2;
+  let ev = pCrit*base*2 + (pHit-pCrit)*base*(1+deadly) + pHit*elem;
+  for (const k of GEAR_KEYS){
+    const it = G.gear[k];
+    if (it && it.used && it.uniqueId && UNIQUE_PROCS[it.nm]) ev += pHit*UNIQUE_PROCS[it.nm].chance*(PROC_VALUE[it.nm]||3);
   }
-  if (it.quality>=3) s += 4;
-  if (it.sockets && it.sockets.length) s += it.sockets.filter(r=>!r).length; // open sockets = future value
-  if (untrained) s *= untrainedFactor(); // missing the proficiency bonus means missing a lot more swings
+  return ev;
+}
+function typicalFoeAC(){ return 12 + (G.player.level||1)/4; }
+// damage per shot of a ranged-slot item (bow via the same to-hit/crit math, wand via its spell)
+function rangedEV(it){
+  if (!it || !it.used) return 0;
+  if (it.kind==='wand'){
+    if (!it.wandSpell || !WAND_CLASSES.includes(G.player.cls)) return 0;
+    const sp = it.wandSpell;
+    if (!sp.d1) return 1; // utility wand (heal/buff) - worth something, not damage
+    return mx(1, sp.d1*(sp.d2+1)/2*spellPowerMult() + (it.wandHasStat ? md(effStat(clsRow()[1])) : 0));
+  }
+  const saved = G.gear.weapon;
+  G.gear.weapon = it;
+  try { return swingEV(typicalFoeAC()); } finally { G.gear.weapon = saved; } // one shot per turn, no Extra Attack
+}
+// how good the currently worn loadout is: roughly "foes killed per life"
+// against a typical monster of your level, nudged by find/XP bonuses
+function loadoutScore(){
+  const L = G.player.level||1;
+  let off = swingEV(typicalFoeAC()) * playerAttackCount();
+  const ct = casterType(G.player.cls);
+  if (ct){ // casters split their turns between spells (driven by their casting stat) and the weapon
+    const share = ct==='full' ? 0.6 : 0.3;
+    const spell = mx(1, 4.5*spellPowerMult() + md(effStat(clsRow()[1])));
+    off = off*(1-share) + spell*share;
+  }
+  const foeHp = 8 + 7*L, foeAtk = 1 + 0.85*L, foeDmg = 3 + 1.4*L;
+  const needMe = mx(2, roundH(playerAC() - foeAtk));
+  const pHitMe = mx(0.05, (21-mn(21,needMe))/20);
+  const res = mn(75, gearStatI('resist'))/100;
+  const incoming = foeDmg*pHitMe*(1-res);
+  off += incoming*thornsPct();
+  const sustain = regenAmount() + off*gearStatF('lifesteal') + gearStatI('healkill')*off/foeHp;
+  const net = mx(incoming*0.15, incoming - sustain);
+  let score = (effMaxHp()/net) * (off/foeHp);
+  // saving throws, carry weight, skill checks... every ability point is worth a little on its own
+  let mods = 0;
+  for (const k of ['str','dex','con','int','wis','cha']) mods += md(effStat(k));
+  score *= 1 + 0.015*mods;
+  score *= 1 + gearStatI('magicfind')*0.003 + gearStatF('goldfind')*0.15 + gearStatF('xpfind')*0.3;
+  return score;
+}
+function gearKeyFor(it){
+  for (const k of GEAR_KEYS) if (G.gear[k]===it) return k; // already worn: score it where it is
+  if (it.slot==='weapon') return 'weapon';
+  if (it.slot==='ring') return chooseRingSlot();
+  return it.slot;
+}
+// the loadout's score with `it` worn in slot key k (an unused item = that slot empty)
+function scoreWearing(k, it){
+  const old = G.gear[k];
+  G.gear[k] = it;
+  try { return loadoutScore(); } finally { G.gear[k] = old; }
+}
+function itemScore(it){
+  if (!it) return -1;
+  if (it.used && !canEquip(it) && !isWeaponLike(it)) return -1; // armor your class can't wear at all is never "better" than what's equipped
+  if (it.slot==='ranged' || it.kind==='wand') return rangedEV(it);
+  if (!it.slot) return -1;
+  let s = 100*Math.log(mx(1e-6, scoreWearing(gearKeyFor(it), it)));
+  if (it.sockets && it.sockets.length) s += 0.5*it.sockets.filter(r=>!r).length; // open sockets = future runeword value, only a tie-breaker
   return s;
 }
 
@@ -4074,7 +4134,9 @@ function setGearSlot(slot, it){ G.gear[slot] = it; }
 function chooseRingSlot(){
   if (!G.gear.ring1.used) return 'ring1';
   if (!G.gear.ring2.used) return 'ring2';
-  return itemScore(G.gear.ring1) <= itemScore(G.gear.ring2) ? 'ring1' : 'ring2';
+  // swap out whichever ring you'd miss least
+  const blank = newItem();
+  return scoreWearing('ring1', blank) >= scoreWearing('ring2', blank) ? 'ring1' : 'ring2';
 }
 function equipItem(item){
   let ky;
@@ -5073,7 +5135,13 @@ function monsterDies(mi){
 // featBonusI are documented as slotting into every other stat calculation
 // "with no separate... path needed anywhere else" - a Halfling's Nimble
 // trait (crit:1) was never actually being applied to the real crit roll
-function weaponCritThreshold(){ return 20 - afSumI(G.gear.weapon,'crit') - subclassBonusI('crit') - featBonusI('crit') - raceBonusI('crit'); }
+function weaponCritThreshold(){ return 20 - gearStatI('crit'); }
+// +damage / +% damage from EVERYWHERE, not just the weapon's own affixes: a
+// "+3 damage" gauntlet, a runeword, a set bonus, Dragonborn's Draconic Might
+// or a Berserker's fury all add to every weapon swing. gearStatI already
+// includes the weapon in hand (a bow swapped in by rangedAttack included)
+function gearFlatDmg(){ return gearStatI('flatdmg'); }
+function gearDmgMult(){ return 1 + gearStatI('edmg')/100; }
 function weaponElemental(){
   let e=0, tag='';
   for (const a of G.gear.weapon.aff){
@@ -5349,8 +5417,8 @@ function singlePlayerAttack(mi){
       return false;
     }
   }
-  let raw = rollDice(G.gear.weapon.d1, G.gear.weapon.d2) + G.gear.weapon.bonus + afSumI(G.gear.weapon,'flatdmg');
-  raw = raw*(1+afSumI(G.gear.weapon,'edmg')/100) + meleeStatMod();
+  let raw = rollDice(G.gear.weapon.d1, G.gear.weapon.d2) + G.gear.weapon.bonus + gearFlatDmg();
+  raw = raw*gearDmgMult() + meleeStatMod();
   let dmg = mx(1, roundH(raw));
   let tag = '';
   const isCrit = incapacitated || (roll >= weaponCritThreshold());
@@ -5807,8 +5875,8 @@ function useAbility(){
       const hasStaff = w && w.used && w.basis==='Quarterstaff';
       function flurryStrike(){
         if (!hasStaff) return mx(1, rollDie(4)+meleeStatMod());
-        let raw = rollDice(w.d1,w.d2) + w.bonus + afSumI(w,'flatdmg');
-        raw = raw*(1+afSumI(w,'edmg')/100) + meleeStatMod();
+        let raw = rollDice(w.d1,w.d2) + w.bonus + gearFlatDmg();
+        raw = raw*gearDmgMult() + meleeStatMod();
         return mx(1, roundH(raw));
       }
       const dmg = flurryStrike() + flurryStrike();
