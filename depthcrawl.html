@@ -4687,7 +4687,7 @@ function placeWallTorches(){
   }
 }
 
-function loadLevel(d, arrivingFromBelow){
+function loadLevel(d, arrivingFromBelow, fellThrough){
   G.depth = d;
   G.isBossFloor = 0;
   G.activeZones = []; // a point-placed zone's coordinates belong to the floor you cast it on, not the next one
@@ -4735,6 +4735,18 @@ function loadLevel(d, arrivingFromBelow){
     if (!found){ G.player.x=G.genStart.x; G.player.y=G.genStart.y; }
   } else {
     G.player.x = G.genStart.x; G.player.y = G.genStart.y;
+  }
+  // dropping through a pit trap lands you wherever the hole let out, not
+  // neatly on this floor's staircase - any plain floor tile with no monster
+  // on it or right next to it (falling straight into a fight would be unfair)
+  if (fellThrough){
+    const spots = [];
+    for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++){
+      if (G.map[x][y]!==T_FLOOR || (G.dungeonDeco && G.dungeonDeco[x][y])) continue;
+      if (G.mon.some(m=>m.alive && Math.abs(m.x-x)+Math.abs(m.y-y)<=1)) continue;
+      spots.push({x,y});
+    }
+    if (spots.length){ const sp = spots[rn(spots.length)]; G.player.x = sp.x; G.player.y = sp.y; }
   }
   if (G.gameMode===1 && d===1) G.map[G.genStart.x][G.genStart.y] = T_EXIT;
   G.player.facing = pickInitialFacing(G.player.x, G.player.y);
@@ -6048,7 +6060,7 @@ function tryMove(dx,dy){
       G.player.hp -= fd;
       if (G.player.hp<=0 && !checkDeathWard()){ playerDies('fall'); break; }
       G.map[nx][ny] = T_FLOOR;
-      if (G.gameMode===1 && G.depth<G.dungeonMaxDepth){ leavingFloor=true; loadLevel(G.depth+1, false); }
+      if (G.gameMode===1 && G.depth<G.dungeonMaxDepth){ leavingFloor=true; saveLevelCache(G.depth); loadLevel(G.depth+1, false, true); logMsg('you crash down onto the floor below', 'hit'); }
       break;
     }
   }
@@ -8422,7 +8434,7 @@ function renderMiniMonsterArt(cvId, recipe, color){
   mctx.clearRect(0,0,cv.width,cv.height);
   if (!recipe) return;
   const size = Math.min(cv.width,cv.height)*0.9;
-  drawMonsterArt(cv.width/2, cv.height/2 + size*0.12, size, recipe, color, mctx);
+  drawMonsterArtShaded(mctx, cv.width/2, cv.height/2 + size*0.12, size, recipe, color);
 }
 
 const DUNGEON_VISION_RADIUS = 7;
@@ -9657,6 +9669,7 @@ const FP_TR = 128;          // rendered texture resolution (power of two, tiles 
 const FP_PLANE = 0.66;      // camera plane half-width - ~66 degree field of view
 const FP_LS = 4;            // light-map subcells per tile
 const FP_EYE_BACK = 0.32;   // how far behind its tile's center the camera sits
+const FP_MOON_AZ = -2.3;    // where the moon hangs in an open night sky (world bearing, radians)
 let fp3dPref = true;
 try{ if (localStorage.getItem('depthcrawl_view3d')==='0') fp3dPref = false; }catch(e){}
 function fp3dActive(){ return fp3dPref && (G.gameMode===1 || G.gameMode===2) && !!G.map; }
@@ -9825,15 +9838,6 @@ function fpRuneWall(fn, col){
     return fn(x,y);
   };
 }
-function fpStairs(fn, down){
-  return (x,y)=>{
-    const d = Math.max(Math.abs(x-31.5), Math.abs(y-31.5));
-    if (d>29) return fn(x,y);
-    const step = Math.floor(d/5.8), edge = (d%5.8)<1.1;
-    const k = down ? 0.1 + step*0.14 : 1.28 - step*0.07;
-    return fpScale(fn(x,y), edge ? k*(down?1.6:0.55) : k);
-  };
-}
 function fpPit(fn){
   return (x,y)=>{
     const r = Math.hypot(x-31.5, y-31.5), jag = 19 + fpNoise(x,y,8,99)*7;
@@ -9888,9 +9892,10 @@ const FP_THEME_SPECS = {
   graveyard: {
     wall: fpBricks({base:[122,120,112], mc:[44,42,38], rows:5, cols:2, seed:51, moss:0.45}),
     wall2: fpBricks({base:[112,112,104], mc:[40,40,36], rows:5, cols:2, seed:57, moss:0.7}),
-    floor: fpDirt({base:[102,86,66], seed:52}),
-    floor2: fpGrass({base:[70,84,52], seed:54}),
-    ceil: fpRock({base:[62,60,56], seed:53}),
+    floor: fpGrass({base:[66,82,52], seed:54}),
+    floor2: fpDirt({base:[98,84,64], seed:52}),
+    // no ceiling - a graveyard is an open walled plot under a moonlit sky
+    outdoor:true, sky:[[6,9,22],[30,38,58]],
   },
   mine: {
     wall: fpBeams(fpRock({base:[136,104,78], seed:61})),
@@ -9923,8 +9928,8 @@ const FP_THEME_SPECS = {
     wall: fpRock({base:[98,114,122], seed:101}), wall2: fpRock({base:[90,104,110], seed:102}),
     floor: fpBricks({base:[134,100,66], mc:[60,40,24], rows:4, cols:1, seed:103, jitter:0.2}), floor2: fpBricks({base:[126,94,62], mc:[56,38,22], rows:4, cols:1, seed:104}), edge: fpWater({seed:105}) },
 };
-// floor texture slots: 0 floor, 1 floor variant, 2 stairs down, 3 stairs up,
-// 4 revealed pit, 5 glowing rune, 6 water pool, 7 field edge
+// floor texture slots: 0 floor, 1 floor variant, 2-3 unused (stairs are real
+// geometry now, see fpDrawStairs), 4 revealed pit, 5 glowing rune, 6 water pool, 7 field edge
 function fpTheme(){
   const key = G.gameMode===2 ? (FP_THEME_SPECS[G.arenaTheme] ? G.arenaTheme : 'forest')
     : (FP_THEME_SPECS[G.siteKind] ? G.siteKind : 'dungeon');
@@ -9934,9 +9939,14 @@ function fpTheme(){
   T.wall = fpMakeTex(s.wall);
   T.wall2 = fpMakeTex(s.wall2 || s.wall);
   T.wallTorch = fpMakeTex(fpSconce(s.wall));
-  T.floors = [s.floor, s.floor2||s.floor, fpStairs(s.floor,true), fpStairs(s.floor,false),
+  T.floors = [s.floor, s.floor2||s.floor, s.floor, s.floor,
     fpPit(s.floor), fpRuneFloor(s.floor), fpWater(), s.edge||s.floor].map(fpMakeTex);
   T.ceil = s.ceil ? fpMakeTex(s.ceil) : null;
+  // average stone color, used to shade the staircase geometry to match
+  const f0 = T.floors[0]; let ar=0, ag=0, ab=0;
+  for (let i=0;i<f0.r.length;i++){ ar+=f0.r[i]; ag+=f0.g[i]; ab+=f0.b[i]; }
+  const n0 = f0.r.length;
+  T.stone = [ar/n0*1.08, ag/n0*1.08, ab/n0*1.08];
   FP.themes[key] = T;
   return T;
 }
@@ -9947,8 +9957,8 @@ const FP_FLAME_ART = [['p',[0,-44, 16,-12, 12,16, 0,30, -12,16, -16,-12]], ['e',
 // renders a recipe once into its own canvas, cropped to the art's real
 // bounds so a creature's feet land on the floor, plus black/white copies
 // used to darken it by distance and flash it when it takes a hit
-function fpBuildSprite(draw){
-  const S = 160;
+function fpBuildSprite(draw, fancy){
+  const S = fancy ? 256 : 160;
   const raw = document.createElement('canvas'); raw.width = raw.height = S;
   const rc = raw.getContext('2d');
   draw(rc, S);
@@ -9976,18 +9986,118 @@ function fpBuildSprite(draw){
   const gr = ic.createLinearGradient(0,0,0,h);
   gr.addColorStop(0,'rgba(255,255,255,0.22)'); gr.addColorStop(0.45,'rgba(255,255,255,0)'); gr.addColorStop(1,'rgba(0,0,0,0.38)');
   ic.fillStyle = gr; ic.fillRect(0,0,w,h);
+  if (fancy){
+    // fine skin/fur grain, then a thin moonlit rim along the upper-left edge
+    ic.globalAlpha = 0.16; ic.fillStyle = fpGrainPattern(ic); ic.fillRect(0,0,w,h); ic.globalAlpha = 1;
+    const rim = mk(), rmc = rim.getContext('2d');
+    rmc.drawImage(sil,0,0); rmc.globalCompositeOperation='source-in'; rmc.fillStyle='rgba(255,246,225,0.55)'; rmc.fillRect(0,0,w,h);
+    rmc.globalCompositeOperation='destination-out'; rmc.drawImage(sil, 3, 3);
+    ic.drawImage(rim,0,0);
+  }
+  ic.globalCompositeOperation = 'source-over';
   const shade = mk(), shc = shade.getContext('2d');
   shc.drawImage(img,0,0); shc.globalCompositeOperation='source-in'; shc.fillStyle='#000'; shc.fillRect(0,0,w,h);
   const wht = mk(), wc = wht.getContext('2d');
   wc.drawImage(img,0,0); wc.globalCompositeOperation='source-in'; wc.fillStyle='#fff'; wc.fillRect(0,0,w,h);
   return { img, shade, wht, aspect: w/h };
 }
-function fpSprite(recipe, color){
+function fpSprite(recipe, color, glowEyes){
   let byR = FP.sprites.get(recipe);
   if (!byR){ byR = new Map(); FP.sprites.set(recipe, byR); }
-  let e = byR.get(color);
-  if (!e){ e = fpBuildSprite((c,S)=>drawMonsterArt(S/2, S/2, S*0.92, recipe, color, c)); byR.set(color, e); }
+  const key = color + (glowEyes ? '|g' : '');
+  let e = byR.get(key);
+  if (!e){ e = fpBuildSprite((c,S)=>drawMonsterArtShaded(c, S/2, S/2, S*0.92, recipe, color, glowEyes), true); byR.set(key, e); }
   return e;
+}
+function fpGrainPattern(c){
+  if (!FP.grain){
+    const g = document.createElement('canvas'); g.width = g.height = 64;
+    const gc = g.getContext('2d'), im = gc.createImageData(64,64);
+    for (let i=0;i<64*64;i++){
+      const v = fpHash(i&63, i>>6, 21), dark = v<0.5;
+      im.data[i*4] = im.data[i*4+1] = im.data[i*4+2] = dark ? 0 : 255;
+      im.data[i*4+3] = Math.abs(v-0.5)*2*255*(fpHash(i&63, i>>6, 22)>0.55 ? 1 : 0.3);
+    }
+    gc.putImageData(im,0,0);
+    FP.grain = g;
+  }
+  return c.createPattern(FP.grain, 'repeat');
+}
+// ---------- volumetric monster art ----------
+// the same vector recipes drawMonsterArt paints flat, but every primitive
+// gets lit like a solid form: ellipses and heads become shaded spheres,
+// limbs become lit cylinders, bodies get a soft key light from the upper
+// left and fall off into shadow, and eyes get a wet highlight (or an eerie
+// glow on the undead)
+function fpParseCol(c){
+  if (c[0]==='#'){
+    let h = c.slice(1); if (h.length===3) h = h.split('').map(x=>x+x).join('');
+    const n = parseInt(h,16); return [(n>>16)&255,(n>>8)&255,n&255];
+  }
+  const m = c.match(/[\d.]+/g); return m ? [+m[0],+m[1],+m[2]] : [200,200,200];
+}
+function fpTone(rgb,k){
+  return k>=0 ? `rgb(${rgb.map(v=>Math.round(v+(255-v)*k)).join(',')})`
+              : `rgb(${rgb.map(v=>Math.round(v*(1+k))).join(',')})`;
+}
+function drawMonsterArtShaded(c, px, py, size, recipe, color, glowEyes){
+  if (!recipe || !recipe.length) return;
+  const base = fpParseCol(color);
+  const hi = fpTone(base,0.42), mid = color, lo = fpTone(base,-0.58), deep = fpTone(base,-0.78);
+  const s = size/100;
+  c.save(); c.translate(px,py); c.scale(s,s);
+  c.lineCap = 'round'; c.lineJoin = 'round';
+  for (const seg of recipe){
+    const k = seg[0];
+    c.beginPath();
+    if (k==='e' || k==='c'){
+      const cx=seg[1], cy=seg[2], rx=seg[3], ry = k==='e' ? seg[4] : seg[3];
+      const g = c.createRadialGradient(cx-rx*0.38, cy-ry*0.45, Math.min(rx,ry)*0.08, cx, cy, Math.max(rx,ry)*1.08);
+      g.addColorStop(0,hi); g.addColorStop(0.5,mid); g.addColorStop(0.85,lo); g.addColorStop(1,deep);
+      c.fillStyle = g;
+      if (k==='e') c.ellipse(cx,cy,rx,ry,0,0,Math.PI*2); else c.arc(cx,cy,rx,0,Math.PI*2);
+      c.fill();
+    } else if (k==='r'){
+      const x=seg[1], y=seg[2], w=seg[3], h=seg[4];
+      const g = w<h ? c.createLinearGradient(x,0,x+w,0) : c.createLinearGradient(0,y,0,y+h);
+      g.addColorStop(0,mid); g.addColorStop(0.3,hi); g.addColorStop(0.65,mid); g.addColorStop(1,deep);
+      c.fillStyle = g; c.fillRect(x,y,w,h);
+    } else if (k==='p'){
+      const pts = seg[1];
+      let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+      for (let i=0;i<pts.length;i+=2){ x0=Math.min(x0,pts[i]); x1=Math.max(x1,pts[i]); y0=Math.min(y0,pts[i+1]); y1=Math.max(y1,pts[i+1]); }
+      const w=x1-x0, h=y1-y0;
+      const g = c.createRadialGradient(x0+w*0.32, y0+h*0.25, 1, x0+w*0.5, y0+h*0.5, Math.max(w,h)*0.85);
+      g.addColorStop(0,hi); g.addColorStop(0.5,mid); g.addColorStop(1,deep);
+      c.fillStyle = g;
+      c.moveTo(pts[0],pts[1]); for (let i=2;i<pts.length;i+=2) c.lineTo(pts[i],pts[i+1]); c.closePath(); c.fill();
+    } else if (k==='l' || k==='q'){
+      const lw = (k==='l' ? seg[5] : seg[7]) || 3;
+      const path = ()=>{ c.beginPath(); c.moveTo(seg[1],seg[2]); if (k==='l') c.lineTo(seg[3],seg[4]); else c.quadraticCurveTo(seg[3],seg[4],seg[5],seg[6]); };
+      // a lit tube: dark core outline, body, then a narrow highlight
+      path(); c.strokeStyle = deep; c.lineWidth = lw*1.2; c.stroke();
+      path(); c.strokeStyle = mid; c.lineWidth = lw*0.9; c.stroke();
+      c.save(); c.translate(-lw*0.18,-lw*0.2);
+      path(); c.strokeStyle = hi; c.lineWidth = lw*0.32; c.stroke();
+      c.restore();
+    } else if (k==='d'){
+      const cx=seg[1], cy=seg[2], r=seg[3], fixed = seg[4];
+      const isEye = !fixed || fixed==='#1a1a1a' || fixed==='#0a0a0a';
+      if (isEye && glowEyes){
+        const g = c.createRadialGradient(cx,cy,0,cx,cy,r*2.6);
+        g.addColorStop(0,'rgba(170,255,240,1)'); g.addColorStop(0.35,'rgba(90,230,210,0.85)'); g.addColorStop(1,'rgba(40,200,180,0)');
+        c.fillStyle = g; c.arc(cx,cy,r*2.6,0,Math.PI*2); c.fill();
+      } else {
+        const fc = fixed || '#141210';
+        c.fillStyle = fc; c.arc(cx,cy,r,0,Math.PI*2); c.fill();
+        if (isEye){
+          c.beginPath(); c.fillStyle = 'rgba(255,255,255,0.9)';
+          c.arc(cx-r*0.32, cy-r*0.34, Math.max(0.6, r*0.34), 0, Math.PI*2); c.fill();
+        }
+      }
+    }
+  }
+  c.restore();
 }
 function fpGlyphSprite(ch, color){
   const key = ch+'|'+color;
@@ -10068,7 +10178,13 @@ function fpLightIdx(wx,wy){
 function fpEnv(){
   const race = raceRow();
   const R = DUNGEON_VISION_RADIUS + (race ? (race[6]||0) : 0) + 0.5;
-  if (G.gameMode!==2) return { amb:[0.03,0.036,0.05], lan:[1.0,0.86,0.66], lanK:1.35, R, fog:null };
+  if (G.gameMode!==2){
+    const T = fpTheme();
+    // an open-air site (the graveyard) is always a misty moonlit night
+    if (T.outdoor) return { amb:[0.13,0.16,0.27], lan:[1.0,0.86,0.66], lanK:1.3, R, sky:T.sky, fog:[22,28,44],
+      fogNear:3, fogFar:13, night:true, moon:true };
+    return { amb:[0.03,0.036,0.05], lan:[1.0,0.86,0.66], lanK:1.35, R, fog:null };
+  }
   const night = isNightTime(), storm = G.weather==='storm', fogw = G.weather==='fog', rain = G.weather==='rain';
   let amb = night ? [0.2,0.24,0.38] : [0.95,0.94,0.9];
   if (storm) amb = fpScale(amb, 0.6); else if (rain) amb = fpScale(amb, 0.8);
@@ -10078,7 +10194,7 @@ function fpEnv(){
   if (storm){ top = fpMix(top,[40,42,50],0.7); hor = fpMix(hor,[80,82,90],0.7); }
   else if (fogw || rain){ top = fpMix(top,[150,154,160],0.5); hor = fpMix(hor,[176,178,182],0.6); }
   return { amb, lan:[1.0,0.86,0.66], lanK: night ? 1.1 : 0.25, R: night ? R : R+4, sky:[top,hor], fog:hor,
-    fogNear: fogw ? 2 : 7, fogFar: fogw ? 9 : 22, night };
+    fogNear: fogw ? 2 : 7, fogFar: fogw ? 9 : 22, night, moon: night && !storm && !fogw };
 }
 
 // ---------- camera ----------
@@ -10131,9 +10247,7 @@ function fpFloorSlots(T){
   for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
     const t = G.map[x][y];
     let s = fpHash(x,y,7)>0.78 ? 1 : 0;
-    if (t===T_STAIRSD) s = 2;
-    else if (t===T_STAIRSU) s = 3;
-    else if (t===T_TRAP && G.trapSeen && G.trapSeen[x][y]) s = 4;
+    if (t===T_TRAP && G.trapSeen && G.trapSeen[x][y]) s = 4;
     else if (G.gameMode===2 && (t===T_FLEE)) s = 7;
     else if (G.gameMode===1 && G.dungeonDeco){
       const d = G.dungeonDeco[x][y];
@@ -10174,6 +10288,7 @@ function fpRenderWorld(env, T, camZ, horizon){
     }
   }
   const starBase = Math.floor(c.a/(Math.PI*2)*W*4.8);
+  const moonY = horizon*0.32, moonR = W*0.034;
   for (let x=0;x<W;x++){
     const camX = 2*(x+0.5)/W - 1;
     const rdx = dirX+plX*camX, rdy = dirY+plY*camX;
@@ -10243,10 +10358,28 @@ function fpRenderWorld(env, T, camZ, horizon){
     }
     // ceiling (or open sky) above it
     const cEnd = Math.min(H-1, Math.ceil(top)-1, Math.floor(horizon));
+    let moonDx = 1e9;
+    if (outdoor && env.moon){
+      let da = c.a + Math.atan(camX*FP_PLANE) - FP_MOON_AZ;
+      while (da>Math.PI) da -= Math.PI*2; while (da<-Math.PI) da += Math.PI*2;
+      moonDx = da*proj;
+    }
     for (let y=0; y<=cEnd && y<H; y++){
       if (outdoor){
         let px = skyRow[y];
         if (env.night && fpHash(starBase+x, y, 5)>0.9965) px = 0xffe8e0d8;
+        if (moonDx < moonR*5 && moonDx > -moonR*5){
+          const md2 = Math.hypot(moonDx, y-moonY);
+          if (md2 < moonR){
+            // a pale moon, faintly cratered and lit from one side
+            const cr = 0.86 + 0.14*fpNoise((moonDx/moonR*16+32)&63, ((y-moonY)/moonR*16+32)&63, 8, 77) - Math.max(0,(moonDx/moonR))*0.12;
+            px = (255<<24) | ((236*cr|0)<<16) | ((236*cr|0)<<8) | (226*cr|0);
+          } else if (md2 < moonR*5){
+            const gl = Math.pow(1-(md2-moonR)/(moonR*4), 2)*0.35;
+            const r0 = px&255, g0 = (px>>8)&255, b0 = (px>>16)&255;
+            px = (255<<24) | ((b0+(220-b0)*gl|0)<<16) | ((g0+(215-g0)*gl|0)<<8) | (r0+(200-r0)*gl|0);
+          }
+        }
         u32[y*W+x] = px;
         continue;
       }
@@ -10256,12 +10389,165 @@ function fpRenderWorld(env, T, camZ, horizon){
       const li = fpLightIdx(fx,fy), lan = rowL[y]*0.8;
       let lr = ambR + lan*lcR, lg = ambG + lan*lcG, lb = ambB + lan*lcB;
       if (li>=0){ lr += L4r[li]*0.7; lg += L4g[li]*0.7; lb += L4b[li]*0.7; }
-      const r = ceil.r[ti]*lr, g = ceil.g[ti]*lg, b = ceil.b[ti]*lb;
+      let r = ceil.r[ti]*lr, g = ceil.g[ti]*lg, b = ceil.b[ti]*lb;
+      const cX = Math.floor(fx), cY = Math.floor(fy);
+      if (cX>=0 && cY>=0 && cX<COLS && cY<ROWS && G.map[cX][cY]===T_STAIRSU){
+        // the stairwell opening the steps below climb up into
+        const ex = Math.min(fx-cX, 1-(fx-cX), fy-cY, 1-(fy-cY));
+        const k2 = ex<0.08 ? 0.55 : 0.08;
+        r *= k2; g *= k2; b *= k2;
+      }
       u32[y*W+x] = (255<<24) | ((b>255?255:b|0)<<16) | ((g>255?255:g|0)<<8) | (r>255?255:r|0);
     }
   }
   FP.octx.putImageData(FP.img, 0, 0);
   return { dirX, dirY, plX, plY, proj };
+}
+
+// ---------- staircases ----------
+// stairs are real stepped geometry rather than a floor decal: an up-staircase
+// is a flight of solid steps rising toward a stairwell in the ceiling, a
+// down-staircase is an opening in the floor with steps descending into the
+// dark below it. Both face whichever open neighbor you'd walk onto them from.
+// Faces are projected in camera space (near-plane clipped), back-face culled,
+// painter-sorted, and clipped to the columns where no nearer wall hides them.
+const FP_STEPS = 5;
+function fpStairDir(x,y){
+  for (const [dx,dy] of FACING_VECT){
+    const t = tileAt(x+dx,y+dy);
+    if (t!==T_WALL && t!==T_STAIRSU && t!==T_STAIRSD) return [dx,dy];
+  }
+  return [0,1];
+}
+function fpCamSpace(P, wx, wy, z){
+  const c = FP.cam, rx = wx-c.x, ry = wy-c.y;
+  const inv = 1/(P.plX*P.dirY - P.dirX*P.plY);
+  return { tx: inv*(P.dirY*rx - P.dirX*ry), d: inv*(-P.plY*rx + P.plX*ry), z };
+}
+function fpClipNear(poly, near){
+  const out = [];
+  for (let i=0;i<poly.length;i++){
+    const a = poly[i], b = poly[(i+1)%poly.length];
+    const ain = a.d>=near, bin = b.d>=near;
+    if (ain) out.push(a);
+    if (ain!==bin){
+      const t = (near-a.d)/(b.d-a.d);
+      out.push({tx:a.tx+(b.tx-a.tx)*t, d:near, z:a.z+(b.z-a.z)*t});
+    }
+  }
+  return out;
+}
+function fpDrawStairs(P, env, T, camZ, horizon, k, vis){
+  const W = FP.W, zb = FP.zbuf, c = FP.cam;
+  for (let ty=0; ty<ROWS; ty++) for (let tx=0; tx<COLS; tx++){
+    const tile = G.map[tx][ty];
+    if (tile!==T_STAIRSU && tile!==T_STAIRSD) continue;
+    if (!vis.has(tx+','+ty)) continue;
+    if (tx===G.player.x && ty===G.player.y) continue; // standing on it - nothing sensible to draw from inside
+    const up = tile===T_STAIRSU;
+    const [ex,ey] = fpStairDir(tx,ty);
+    const ax = -ex, ay = -ey, bx = -ay, by = ax;            // a: away from the entry side, b: across the flight
+    const cx = tx+0.5, cy = ty+0.5;
+    const W3 = (t,s,z)=>[cx+ax*t+bx*s, cy+ay*t+by*s, z];
+    const faces = [];
+    const quad = (pts, nx, ny, nz, shade, shaft)=>faces.push({pts, nx, ny, nz, shade, shaft:!!shaft});
+    // a down-flight drops gently enough that its treads stay in view past
+    // the lip of the opening (anything steeper hides behind the near edge)
+    const H = up ? 0.92 : -0.55, n = FP_STEPS;
+    for (let i=0;i<n;i++){
+      const t0 = -0.5 + i/n, t1 = -0.5 + (i+1)/n;
+      const zPrev = H*i/n, z = H*(i+1)/n;
+      if (up){
+        quad([W3(t0,-0.5,z),W3(t1,-0.5,z),W3(t1,0.5,z),W3(t0,0.5,z)], 0,0,1, 1.0);                 // tread
+        faces[faces.length-1].nosing = [W3(t0,-0.5,z), W3(t0,0.5,z)];
+        quad([W3(t0,-0.5,zPrev),W3(t0,0.5,zPrev),W3(t0,0.5,z),W3(t0,-0.5,z)], -ax,-ay,0, 0.7);      // riser
+        quad([W3(t0,-0.5,zPrev),W3(0.5,-0.5,zPrev),W3(0.5,-0.5,z),W3(t0,-0.5,z)], -bx,-by,0, 0.55); // left side
+        quad([W3(t0,0.5,zPrev),W3(0.5,0.5,zPrev),W3(0.5,0.5,z),W3(t0,0.5,z)], bx,by,0, 0.55);       // right side
+      } else {
+        quad([W3(t0,-0.5,z),W3(t1,-0.5,z),W3(t1,0.5,z),W3(t0,0.5,z)], 0,0,1, 1.05);                 // tread
+        faces[faces.length-1].nosing = [W3(t1,-0.5,z), W3(t1,0.5,z)];
+        quad([W3(t0,-0.5,zPrev),W3(t0,0.5,zPrev),W3(t0,0.5,z),W3(t0,-0.5,z)], ax,ay,0, 0.65);       // riser (faces down the flight)
+      }
+    }
+    if (up){
+      quad([W3(0.5,-0.5,0),W3(0.5,0.5,0),W3(0.5,0.5,H),W3(0.5,-0.5,H)], ax,ay,0, 0.5);             // back
+    } else {
+      // the shaft walls around the opening, facing inward
+      const Z = -1.2;
+      quad([W3(-0.5,-0.5,0),W3(-0.5,0.5,0),W3(-0.5,0.5,Z),W3(-0.5,-0.5,Z)], ax,ay,0, 0.32, true);
+      quad([W3(0.5,-0.5,0),W3(0.5,0.5,0),W3(0.5,0.5,Z),W3(0.5,-0.5,Z)], -ax,-ay,0, 0.26, true);
+      quad([W3(-0.5,-0.5,0),W3(0.5,-0.5,0),W3(0.5,-0.5,Z),W3(-0.5,-0.5,Z)], bx,by,0, 0.28, true);
+      quad([W3(-0.5,0.5,0),W3(0.5,0.5,0),W3(0.5,0.5,Z),W3(-0.5,0.5,Z)], -bx,-by,0, 0.28, true);
+    }
+    // lighting and depth clip for this staircase as a whole
+    const pc = fpCamSpace(P, cx, cy, 0);
+    if (pc.d < 0.15) continue;
+    const li = fpLightIdx(cx - ex*0.3, cy - ey*0.3);
+    const lan = pc.d>=env.R ? 0 : Math.pow(1-pc.d/env.R,1.6)*env.lanK;
+    const L0 = [env.amb[0]+lan*env.lan[0]+(li>=0?FP.L4r[li]:0), env.amb[1]+lan*env.lan[1]+(li>=0?FP.L4g[li]:0), env.amb[2]+lan*env.lan[2]+(li>=0?FP.L4b[li]:0)];
+    const L = up ? L0 : L0.map(v=>v*1.35+0.04);
+    ctx.save();
+    // only the columns where no nearer wall covers this tile
+    ctx.beginPath();
+    let run = -1;
+    const dLimit = pc.d - 0.75;
+    for (let x=0; x<=W; x++){
+      const open = x<W && zb[x] > dLimit;
+      if (open && run<0) run = x;
+      if (!open && run>=0){ ctx.rect(run*k, 0, (x-run)*k, canvas.height); run = -1; }
+    }
+    ctx.clip();
+    const project = poly=>poly.map(v=>[ (W/2)*(1+v.tx/v.d)*k, (horizon + (camZ - v.z)*P.proj/v.d)*k ]);
+    if (!up){
+      // everything below floor level only shows through the opening itself
+      let rim = [W3(-0.5,-0.5,0),W3(0.5,-0.5,0),W3(0.5,0.5,0),W3(-0.5,0.5,0)].map(p=>fpCamSpace(P,p[0],p[1],p[2]));
+      rim = fpClipNear(rim, 0.08);
+      if (rim.length<3){ ctx.restore(); continue; }
+      const rp = project(rim);
+      ctx.beginPath(); ctx.moveTo(rp[0][0],rp[0][1]); for (let i=1;i<rp.length;i++) ctx.lineTo(rp[i][0],rp[i][1]); ctx.closePath();
+      ctx.fillStyle = 'rgb(4,4,6)'; ctx.fill();
+      ctx.clip();
+    }
+    const drawn = [];
+    for (const f of faces){
+      const p0 = f.pts[0];
+      if (f.nx*(c.x-p0[0]) + f.ny*(c.y-p0[1]) + f.nz*(camZ-p0[2]) <= 0) continue; // facing away
+      let poly = f.pts.map(p=>fpCamSpace(P,p[0],p[1],p[2]));
+      const depth = poly.reduce((a,v)=>a+v.d,0)/poly.length;
+      poly = fpClipNear(poly, 0.08);
+      if (poly.length<3) continue;
+      const zAvg = f.pts.reduce((a,p)=>a+p[2],0)/f.pts.length;
+      drawn.push({poly, depth, shade:f.shade, zAvg, shaft:f.shaft, nosing:f.nosing});
+    }
+    drawn.sort((a,b)=>(b.shaft-a.shaft) || (b.depth-a.depth));
+    let sxMin = 1e9, sxMax = -1e9;
+    for (const f of drawn){
+      // deeper into a down-shaft the steps fall away into darkness
+      const sink = f.zAvg<0 ? Math.max(0.3, 1 + f.zAvg*0.55) : 1;
+      const m = f.shade*sink;
+      const col = [0,1,2].map(i=>Math.min(255, T.stone[i]*L[i]*m)|0);
+      const pp = project(f.poly);
+      for (const q of pp){ sxMin = Math.min(sxMin, q[0]/k); sxMax = Math.max(sxMax, q[0]/k); }
+      ctx.beginPath(); ctx.moveTo(pp[0][0],pp[0][1]); for (let i=1;i<pp.length;i++) ctx.lineTo(pp[i][0],pp[i][1]); ctx.closePath();
+      ctx.fillStyle = `rgb(${col[0]},${col[1]},${col[2]})`; ctx.fill();
+      ctx.strokeStyle = `rgba(0,0,0,${0.35*Math.min(1,m+0.3)})`; ctx.lineWidth = Math.max(1, k*0.6); ctx.stroke();
+      if (f.nosing){
+        // the worn front edge of each step catches the light
+        let e = fpClipNear(f.nosing.map(p=>fpCamSpace(P,p[0],p[1],p[2])), 0.08);
+        if (e.length===2){
+          const ep = project(e);
+          ctx.beginPath(); ctx.moveTo(ep[0][0],ep[0][1]); ctx.lineTo(ep[1][0],ep[1][1]);
+          ctx.strokeStyle = `rgba(255,236,200,${0.35*Math.min(1,m)})`; ctx.lineWidth = Math.max(1.2, k*1.1); ctx.stroke();
+        }
+      }
+    }
+    ctx.restore();
+    // a rising flight is solid enough to hide what's behind it (a torch on
+    // the far wall, a monster beyond) - fold it into the wall depth buffer
+    if (up && sxMax>sxMin){
+      for (let x=Math.max(0,Math.floor(sxMin)); x<=Math.min(W-1,Math.ceil(sxMax)); x++) zb[x] = Math.min(zb[x], pc.d+0.3);
+    }
+  }
 }
 
 // ---------- sprite pass ----------
@@ -10297,7 +10583,7 @@ function fpCollectSprites(vis){
     pos.x += (m.x+0.5-pos.x)*kk; pos.y += (m.y+0.5-pos.y)*kk;
     const isBoss = G.gameMode===1 && G.isBossFloor && i===G.bossIdx;
     const col = m.corrupted ? COL.purple : m.col;
-    const spr = (m.art && m.art.length) ? fpSprite(m.art, col) : fpGlyphSprite(m.sym||'?', col);
+    const spr = (m.art && m.art.length) ? fpSprite(m.art, col, !!m.undead) : fpGlyphSprite(m.sym||'?', col);
     const breathe = 1 + Math.sin(FP.t*3 + i*1.3)*0.025;
     let fl = FP.monFlash.get(m)||0;
     if (fl>0){ fl = Math.max(0, fl-FP.dt*4); FP.monFlash.set(m, fl); }
@@ -10321,8 +10607,6 @@ function fpCollectSprites(vis){
     if (t===T_WALL) continue;
     const add = (recipe, color, h, lift, extra)=> S.push(Object.assign({x:cx, y:cy, spr:fpSprite(recipe,color), h, lift}, extra||{}));
     switch(t){
-      case T_STAIRSD: add(STAIRS_DOWN_ART, COL.amber, 0.26, 0.34+bob, {emissive:true, glow:COL.amber}); break;
-      case T_STAIRSU: add(STAIRS_UP_ART, COL.green, 0.26, 0.34+bob, {emissive:true, glow:COL.green}); break;
       case T_EXIT: add(EXIT_ART, COL.cyan, 0.86, 0, {glow:COL.cyan}); break;
       case T_FLEE:
         if (G.gameMode===1) add(EXIT_ART, COL.red, 0.86, 0, {glow:COL.red});
@@ -10744,6 +11028,7 @@ function renderFirstPerson(){
   ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(FP.off, 0, 0, canvas.width, canvas.height);
   const sprites = fpCollectSprites(vis);
+  if (G.gameMode===1) fpDrawStairs(P, env, T, camZ, horizon, k, vis);
   fpDrawSprites(sprites, P, env, camZ, horizon, k);
   fpDrawParticles(P, camZ, horizon, k);
   if (G.gameMode===2 && (G.weather==='rain' || G.weather==='storm')) fpDrawRain();
