@@ -13338,7 +13338,7 @@ function sk3Build(){
     const plank = Math.floor(x/102), px = x%102, edge = px<3||px>98 ? 0.4 : 1;
     const grain = 0.72 + 0.14*Math.sin(x*0.45 + fbm(x/24, y/80+plank*7)*30) + fbm(x/4,y/60)*0.22;
     const cx = x-256, cy = y-256, r = Math.hypot(cx,cy);
-    const paint = (Math.sign(cx)*Math.sign(cy) > 0 && r<236) && fbm(x/12+20,y/12) > 0.44;
+    const paint = false; // bare, weathered wood like the drawing
     let c = [112*grain*edge, 74*grain*edge, 42*grain*edge];
     if (paint) c = [124*edge*(0.8+fbm(x/8,y/8)*0.3), 28*edge, 24*edge];
     const dirt = fbm(x/36+5,y/36)*0.5; return c.map(v=>v*(1.08-dirt*0.5));
@@ -13481,6 +13481,7 @@ function sk3Build(){
     const rim = mesh(new T.TorusGeometry(0.262, 0.011, 8, 64), iron); shield.add(rim);
     const boss = mesh(new T.SphereGeometry(0.058, 24, 14, 0, Math.PI*2, 0, Math.PI/2), steel); boss.rotation.x = Math.PI/2; boss.position.z = 0.012; shield.add(boss);
     const bossRim = mesh(new T.TorusGeometry(0.06, 0.008, 6, 28), iron); bossRim.position.z = 0.013; shield.add(bossRim);
+    const ring = mesh(new T.TorusGeometry(0.205, 0.006, 6, 64), iron); ring.position.z = 0.012; ring.scale.z = 0.5; shield.add(ring);   // the inlaid iron ring
     for (let i=0;i<14;i++){ const a = i/14*Math.PI*2, r = mesh(new T.SphereGeometry(0.0075, 8, 6), iron); r.position.set(Math.cos(a)*0.238, Math.sin(a)*0.238, 0.013); shield.add(r); }
     const strap = sweep([V(-0.12,0.06,-0.014),V(0,0.075,-0.03),V(0.12,0.06,-0.014)], ()=>[0.004,0.012], leather, {seg:10, rad:6}); shield.add(strap);
     const notch = mesh(new T.BoxGeometry(0.075, 0.05, 0.03), cavity); notch.position.set(0.19, 0.17, 0); notch.rotation.z = 0.8; shield.add(notch);
@@ -13493,6 +13494,102 @@ function sk3Build(){
   sword.rotation.set(0, 0, Math.PI/2); sword.position.set(GRIP_S[0]-0.012, GRIP_S[1], GRIP_S[2]); R.hand.add(sword);
   const bar = mesh(new T.CylinderGeometry(0.011, 0.011, 0.12, 10), leather); bar.rotation.z = Math.PI/2; bar.position.set(GRIP[0], GRIP[1], GRIP[2]); L.hand.add(bar);
   shield.rotation.set(Math.PI/2, 0, 0.6); shield.position.set(GRIP[0], GRIP[1]-0.034, GRIP[2]); L.hand.add(shield);
+  // ---- the barbarian kit: a shaggy fur mantle over the shoulders, a
+  // strapped leather bracer on the sword arm, a buckled belt, and wrapped
+  // boots with fur cuffs. The fur is hundreds of small tufts merged into
+  // one mesh per piece, darker at the root and lighter at the tips ----
+  const furMap = sk3Tex(64,256,(x,y)=>{ const k = 0.62 + n(x*0.9, y/9)*0.45 + (n(x*2.3+9,y/3)>0.72?0.12:0); return [128*k, 118*k, 104*k]; });
+  const furMat = new T.MeshStandardMaterial({ map:furMap, vertexColors:true, roughness:1, side:T.DoubleSide });
+  const furBase = new T.MeshStandardMaterial({ color:0x4a4034, roughness:1 });
+  const strapMat = new T.MeshStandardMaterial({ color:0x3a2616, roughness:0.85 });
+  const tuftGeo = new T.ConeGeometry(1, 1, 5, 1, true).toNonIndexed(); tuftGeo.translate(0, 0.5, 0);
+  const tufts = (list)=>{
+    const bp = tuftGeo.attributes.position.array, bn = tuftGeo.attributes.normal.array, bu = tuftGeo.attributes.uv.array;
+    const pos = [], nor = [], uv = [], col = [];
+    const up = V(0,1,0), q = new T.Quaternion(), mt = new T.Matrix4(), nm = new T.Matrix3(), v = new T.Vector3();
+    for (const t of list){
+      const len = t.d.length(); q.setFromUnitVectors(up, t.d.clone().normalize());
+      mt.compose(t.p, q, V(t.r, len, t.r)); nm.getNormalMatrix(mt);
+      for (let i=0;i<bp.length;i+=3){
+        v.set(bp[i],bp[i+1],bp[i+2]).applyMatrix4(mt); pos.push(v.x,v.y,v.z);
+        v.set(bn[i],bn[i+1],bn[i+2]).applyMatrix3(nm).normalize(); nor.push(v.x,v.y,v.z);
+        const k = t.c*(0.45 + 0.55*bp[i+1]); col.push(k, k*0.97, k*0.93);
+      }
+      for (let i=0;i<bu.length;i+=2) uv.push(bu[i]*0.25 + t.u, bu[i+1]);
+    }
+    const g = new T.BufferGeometry();
+    g.setAttribute('position', new T.Float32BufferAttribute(pos,3)); g.setAttribute('normal', new T.Float32BufferAttribute(nor,3));
+    g.setAttribute('uv', new T.Float32BufferAttribute(uv,2)); g.setAttribute('color', new T.Float32BufferAttribute(col,3));
+    const o = mesh(g, furMat); o.castShadow = true; return o;
+  };
+  const jit = (a)=> (Math.random()*2-1)*a;
+  // the collar: a flared ring around the neck, falling over the shoulder
+  // tops and the upper chest and back
+  const collar = (a, v)=>{
+    const rx = 0.085 + 0.155*v, rz = 0.07 + 0.1*v;
+    const droop = 0.05*v*(0.6 + 0.4*Math.abs(Math.sin(a)));
+    return V(Math.cos(a)*rx, 0.315 - 0.1*v - droop, -0.03 + Math.sin(a)*rz);
+  };
+  {
+    const under = shell((u,v)=> collar(u*Math.PI*2, 0.08 + v*0.9), 48, 6, ()=>0.03, furBase);
+    chest.add(under);
+    const list = [];
+    for (let ring=0; ring<9; ring++){
+      const v = ring/8, na = Math.round(40 + v*46);
+      for (let i=0;i<na;i++){
+        const a = (i + (ring%2)*0.5)/na*Math.PI*2 + jit(0.05), p = collar(a, mn(1, v + jit(0.04)));
+        const out = V(Math.cos(a), 0, Math.sin(a)*1.25).normalize();
+        const d = out.multiplyScalar(0.75 - 0.35*v).add(V(jit(0.25), 0.55 - 1.5*v + jit(0.25), jit(0.25))).normalize();
+        const len = 0.04 + v*0.055 + Math.random()*0.03;
+        list.push({ p:p.addScaledVector(d, -0.012), d:d.multiplyScalar(len), r:0.024 + Math.random()*0.016, c:0.55 + Math.random()*0.5, u:Math.random() });
+      }
+    }
+    chest.add(tufts(list));
+  }
+  // leather bracer, laced shut and cinched by three iron-buckled straps
+  {
+    const br = sweep([V(0,-0.06,0.001),V(0,-0.14,0.002),V(0,-0.225,0.004)], t=>[0.036-0.008*t, 0.033-0.007*t], leather, {seg:10, rad:14});
+    R.el.add(br);
+    for (const y of [-0.08,-0.145,-0.205]){
+      const k = 1 - (-y-0.06)/0.165*0.22;
+      const band = mesh(new T.TorusGeometry(0.036*k+0.002, 0.005, 5, 20), strapMat); band.rotation.x = Math.PI/2; band.scale.y = 0.92; band.position.set(0, y, 0.002); R.el.add(band);
+      const bk = mesh(new T.BoxGeometry(0.014, 0.012, 0.006), iron); bk.position.set(0.036*k+0.004, y, 0.002); R.el.add(bk);
+    }
+    for (let i=0;i<5;i++){ const y = -0.075 - i*0.033; const x = mesh(new T.BoxGeometry(0.02, 0.003, 0.004), strapMat); x.position.set(0, y, 0.037-0.001*i); x.rotation.z = (i%2?1:-1)*0.6; R.el.add(x); }
+  }
+  // a thick buckled belt riding on the hip bones
+  {
+    const pts = []; for (let i=0;i<24;i++){ const a = i/24*Math.PI*2; pts.push(V(Math.cos(a)*0.158, 0.1 - 0.012*Math.sin(a), -0.02 + Math.sin(a)*0.112)); }
+    const belt = sweep(pts, ()=>[0.007, 0.024], leather, {closed:true, seg:48, rad:8}); pelvis.add(belt);
+    const buckle = mesh(new T.TorusGeometry(0.026, 0.0045, 4, 4), iron); buckle.rotation.z = Math.PI/4; buckle.scale.set(1.1, 0.9, 1); buckle.position.set(0, 0.088, 0.1); pelvis.add(buckle);
+    const tongue = mesh(new T.BoxGeometry(0.004, 0.03, 0.005), iron); tongue.position.set(0, 0.088, 0.104); pelvis.add(tongue);
+    const tail = mesh(new T.BoxGeometry(0.03, 0.07, 0.006), leather); tail.position.set(0.045, 0.06, 0.094); tail.rotation.z = -0.25; pelvis.add(tail);
+    const pouch = ell(0.03, 0.036, 0.02, -0.14, 0.055, 0.05, leather, 12); pouch.rotation.y = -0.8; pelvis.add(pouch);
+  }
+  // wrapped boots: leather over the foot, criss-crossed wraps up the shin,
+  // and a ragged fur cuff at the top
+  for (const [Lg, sd] of [[RL,-1],[LL,1]]){
+    const wraps = sweep([V(sd*0.004,-0.2,0.006),V(sd*0.004,-0.31,0.008),V(0,-0.42,0.006)], t=>[0.052-0.006*t, 0.046-0.005*t], leather, {seg:8, rad:14});
+    Lg.kn.add(wraps);
+    for (let i=0;i<7;i++){ const b = mesh(new T.TorusGeometry(0.053-i*0.001, 0.0035, 4, 18), strapMat); b.rotation.set(Math.PI/2 + (i%2?0.28:-0.28), 0, 0); b.position.set(0, -0.225 - i*0.027, 0.007); Lg.kn.add(b); }
+    // closed shapes, so no toe bone can show through: an ankle cuff, the
+    // heel, the foot and a rounded toe, on a dark sole
+    Lg.ft.add(mesh(new T.CylinderGeometry(0.047, 0.05, 0.08, 16), leather));
+    Lg.ft.add(ell(0.052, 0.052, 0.066, 0, -0.03, -0.012, leather, 16));
+    const foot = ell(0.05, 0.036, 0.1, 0, -0.04, 0.075, leather, 18); foot.rotation.x = 0.1; Lg.ft.add(foot);
+    Lg.ft.add(ell(0.043, 0.028, 0.045, 0, -0.05, 0.155, leather, 14));
+    Lg.ft.add(ell(0.052, 0.009, 0.125, 0, -0.072, 0.07, strapMat, 16));
+    const list = [];
+    for (let i=0;i<80;i++){
+      const a = i/80*Math.PI*2*2 + jit(0.08), y = -0.185 - Math.random()*0.035;
+      const out = V(Math.cos(a), 0, Math.sin(a));
+      const d = out.clone().multiplyScalar(0.55).add(V(jit(0.3), -0.9 + jit(0.2), jit(0.3))).normalize();
+      list.push({ p:V(out.x*0.048, y, 0.007 + out.z*0.048), d:d.multiplyScalar(0.035 + Math.random()*0.03), r:0.012 + Math.random()*0.008, c:0.6 + Math.random()*0.45, u:Math.random() });
+    }
+    Lg.kn.add(tufts(list));
+  }
+  // a big, heavy skull, like the drawing
+  head.scale.setScalar(1.1);
   return { root, pelvis, spine, chest, neck, head, R, L, RL, LL, sword, shield, steps };
 }
 function sk3Init(){
@@ -13534,6 +13631,14 @@ function sk3Init(){
   return SK3.ok;
 }
 // poses the rig: t seconds, walk 0..1, atk 0..1 swing progress, hit 0..1 stagger
+const SKI = {
+  rest: { sh:[-0.3, -1.2, -0.7], el:[-2.15, 0, 0], hand:[0.3, 0.8, -0.6] },   // sword cocked high, blade tilted in over the head
+  wind: { sh:[-2.4, 0.2, -0.7],  el:[-0.9, 0, 0], hand:[0.4, 0.8, -0.6] },
+  cut:  { sh:[-0.9, 0.2, -0.1],  el:[-0.3, 0, 0], hand:[0.9, 0.8, -0.6] },
+  shield: { sh:[-0.3, -0.45, 0.15], el:[-1.35, 0.4, 0], hand:[0.25, 0.7, 0] }, // shield across the belly
+  legR: [-0.4, -0.16, 1.0, -0.5],   // [hip fwd, hip out, knee bend, ankle]: sword-side knee bent, braced
+  legL: [-0.15, 0.06, 0.12, 0.0],
+};
 function sk3Pose(t, walk, atk, hit, seed){
   const m = SK3.m, s = Math.sin, br = s(t*1.7+seed)*0.5+0.5, W = walk;
   m.root.rotation.y = s(t*0.6+seed)*0.1;
@@ -13544,22 +13649,32 @@ function sk3Pose(t, walk, atk, hit, seed){
   m.neck.rotation.set(-0.16 - hit*0.3, s(t*0.9+seed)*0.2, 0);
   m.head.rotation.set(-0.08 + s(t*0.5)*0.05, 0, s(t*0.7+seed)*0.06);
   m.head.userData.jaw.rotation.x = 0.06 + Math.max(0, s(t*11+seed))*0.08*(0.4+hit) + atk*0.3;
-  const leg = (L, side, ph, fwd)=>{
-    const sw = W*s(t*9+ph)*0.45;
-    L.hip.rotation.set(-0.22 - sw - fwd, 0, side*0.06);
-    L.kn.rotation.set(0.36 + fwd*0.2 + Math.max(0, -s(t*9+ph))*0.6*W, 0, 0);
-    L.ft.rotation.set(-0.14 + sw*0.3 + fwd*0.2, 0, 0);
+  // a braced fighting stance (walking blends toward an even stride)
+  const leg = (L, ph, st)=>{
+    const sw = W*s(t*9+ph)*0.45, k = 1-W*0.6;
+    L.hip.rotation.set(st[0]*k - 0.2*(1-k) - sw, 0, st[1]*k);
+    L.kn.rotation.set(st[2]*k + 0.36*(1-k) + Math.max(0, -s(t*9+ph))*0.6*W, 0, 0);
+    L.ft.rotation.set(st[3]*k - 0.14*(1-k) + sw*0.3, 0, 0);
   };
-  leg(m.RL, -1, 0, -0.16); leg(m.LL, 1, Math.PI, 0.1);
-  // sword arm: raised ready, then a downward cut
-  const up = atk<0.35 ? atk/0.35 : 1 - (atk-0.35)/0.65, cut = atk>0.35 ? (atk-0.35)/0.65 : 0;
-  m.R.sh.rotation.set(-0.45 - up*1.9 + cut*0.9, 0.25, -0.3 - up*0.4);
-  m.R.el.rotation.set(-1.2 + up*0.55 + cut*0.3, 0, 0);
-  m.R.hand.rotation.set(0.8 - up*0.4, 0.8, -0.6);   // fist rolled so the blade stands up, tipped a little outward
+  leg(m.RL, 0, SKI.legR); leg(m.LL, Math.PI, SKI.legL);
+  // sword arm: at rest it's cocked high beside the head, blade up (like
+  // the reference art); a strike winds it back over the shoulder, cuts
+  // down and forward, then recovers to the guard
+  const P = SKI, lerp3 = (a,b,k)=> [a[0]+(b[0]-a[0])*k, a[1]+(b[1]-a[1])*k, a[2]+(b[2]-a[2])*k];
+  let A, B, k;
+  if (atk<0.3){ A = P.rest; B = P.wind; k = atk/0.3; }
+  else if (atk<0.6){ A = P.wind; B = P.cut; k = (atk-0.3)/0.3; }
+  else { A = P.cut; B = P.rest; k = (atk-0.6)/0.4; }
+  k = k*k*(3-2*k);
+  const sh = lerp3(A.sh,B.sh,k), el = lerp3(A.el,B.el,k), hd = lerp3(A.hand,B.hand,k);
+  m.R.sh.rotation.set(sh[0] + br*0.03, sh[1], sh[2]);
+  m.R.el.rotation.set(el[0], el[1], el[2]);
+  m.R.hand.rotation.set(hd[0], hd[1], hd[2]);
   // shield arm: held out front-left
-  m.L.sh.rotation.set(-0.1 - hit*0.3 + br*0.03, -0.2, 0.2);
-  m.L.el.rotation.set(-2.0 + hit*0.2, 0.3, 0);
-  m.L.hand.rotation.set(0.25, 0.7, 0);
+  const Sh = SKI.shield;
+  m.L.sh.rotation.set(Sh.sh[0] - hit*0.3 + br*0.03, Sh.sh[1], Sh.sh[2]);
+  m.L.el.rotation.set(Sh.el[0] + hit*0.2, Sh.el[1], Sh.el[2]);
+  m.L.hand.rotation.set(Sh.hand[0], Sh.hand[1], Sh.hand[2]);
 }
 // the per-monster sprite: its own 2D copy of the render (at the size it will
 // appear on screen) plus the dark/white silhouettes the sprite pass uses for
