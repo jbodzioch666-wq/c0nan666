@@ -2391,7 +2391,7 @@ function swingEV(ac){
   }
   return ev;
 }
-function typicalFoeAC(){ return 12 + (G.player.level||1)/4; }
+function typicalFoeAC(){ const e = MONSTER_LEVELS[clampMLevel(lootLevel())-1]; return e ? e.ac : 12 + (G.player.level||1)/4; }
 // damage per shot of a ranged-slot item (bow via the same to-hit/crit math, wand via its spell)
 function rangedEV(it){
   if (!it || !it.used) return 0;
@@ -2405,31 +2405,55 @@ function rangedEV(it){
   G.gear.weapon = it;
   try { return swingEV(typicalFoeAC()); } finally { G.gear.weapon = saved; } // one shot per turn, no Extra Attack
 }
-// how good the currently worn loadout is: roughly "foes killed per life"
-// against a typical monster of your level, nudged by find/XP bonuses
-function loadoutScore(){
-  const L = G.player.level||1;
-  let off = swingEV(typicalFoeAC()) * playerAttackCount();
+// how good the currently worn loadout is: "foes killed per life", taken
+// against the real Monster Manual entries around the level you're fighting
+// (a couple below to a few above it) plus a boss. A boss is built around
+// YOU when it spawns (spawnBoss: its to-hit tracks your AC, its AC tracks
+// your to-hit, its damage tracks your max HP), so against it only damage
+// reduction, regen, life steal and raw damage really move the needle - and
+// against weak foes a huge AC stops mattering once nothing can hit it.
+// Averaged in log space so no single matchup dominates.
+function foeMatchup(foeAC, pHitMe, dmgRound, foeHp){
   const ct = casterType(G.player.cls);
-  if (ct){ // casters split their turns between spells (driven by their casting stat) and the weapon
+  let off = swingEV(foeAC) * playerAttackCount();
+  if (ct){ // casters split their turns between auto-hitting spells (driven by their casting stat) and the weapon
     const share = ct==='full' ? 0.6 : 0.3;
     const spell = mx(1, 4.5*spellPowerMult() + md(effStat(clsRow()[1])));
     off = off*(1-share) + spell*share;
   }
-  const foeHp = 8 + 7*L, foeAtk = 1 + 0.85*L, foeDmg = 3 + 1.4*L;
-  const needMe = mx(2, roundH(playerAC() - foeAtk));
-  const pHitMe = mx(0.05, (21-mn(21,needMe))/20);
   const res = mn(75, gearStatI('resist'))/100;
-  const incoming = foeDmg*pHitMe*(1-res);
+  const incoming = mx(0.01, dmgRound*pHitMe*(1-res));
   off += incoming*thornsPct();
   const sustain = regenAmount() + off*gearStatF('lifesteal') + gearStatI('healkill')*off/foeHp;
-  const net = mx(incoming*0.15, incoming - sustain);
-  let score = (effMaxHp()/net) * (off/foeHp);
-  // saving throws, carry weight, skill checks... every ability point is worth a little on its own
+  // healing offsets damage with diminishing returns - never a hard floor
+  // where more regen suddenly stops counting
+  const net = incoming*incoming/(incoming+mx(0,sustain));
+  return Math.log(effMaxHp()/net) + Math.log(mx(0.01, off)/foeHp);
+}
+function loadoutScore(){
+  const L = clampMLevel(lootLevel());
+  const sp = sitePower();
+  const myAC = playerAC(), myHit = playerAtkBonus() + gearStatI('atk');
+  let tot = 0, wsum = 0;
+  for (let d=-2; d<=3; d++){
+    const e = MONSTER_LEVELS[clampMLevel(L+d)-1];
+    if (!e) continue;
+    const need = mx(2, myAC - e.atk);                                   // a natural 1 always misses; nothing auto-hits
+    const pHitMe = mx(0.02, (21-mn(21,need))/20);
+    const dmgRound = (e.dmg1||1)*((e.dmg2||4)+1)/2 * multiattackCount({abilities:e.abilities||[]}) * sp.dmg;
+    const w = d>=0 ? 1 : 0.6;
+    tot += w*foeMatchup(e.ac, pHitMe, dmgRound, mx(4, e.hd*5.5)*sp.hp); wsum += w;
+  }
+  const dd = G.dungeonMaxDepth||1;
+  const bossHitMe = mn(0.95, (11 + Math.floor(dd/3))/20);
+  const bossAC = 10 + Math.floor(dd/4) + myHit;                           // you need ~10+ whatever your bonus
+  tot += 2*foeMatchup(bossAC, bossHitMe, effMaxHp()/8*sp.dmg, (100 + 35*dd)*sp.bossHp); wsum += 2;
+  let score = tot/wsum;
+  // saving throws, skill checks... every ability point is worth a little on its own
   let mods = 0;
   for (const k of ['str','dex','con','int','wis','cha']) mods += md(effStat(k));
-  score *= 1 + 0.015*mods;
-  score *= 1 + gearStatI('magicfind')*0.003 + gearStatF('goldfind')*0.15 + gearStatF('xpfind')*0.3;
+  score += Math.log(1 + 0.015*mx(-20,mods));
+  score += Math.log(1 + gearStatI('magicfind')*0.003 + gearStatF('goldfind')*0.15 + gearStatF('xpfind')*0.3);
   return score;
 }
 function gearKeyFor(it){
@@ -2449,7 +2473,7 @@ function itemScore(it){
   if (it.used && !canEquip(it) && !isWeaponLike(it)) return -1; // armor your class can't wear at all is never "better" than what's equipped
   if (it.slot==='ranged' || it.kind==='wand') return rangedEV(it);
   if (!it.slot) return -1;
-  let s = 100*Math.log(mx(1e-6, scoreWearing(gearKeyFor(it), it)));
+  let s = 100*scoreWearing(gearKeyFor(it), it);
   if (it.sockets && it.sockets.length) s += 0.5*it.sockets.filter(r=>!r).length; // open sockets = future runeword value, only a tie-breaker
   return s;
 }
