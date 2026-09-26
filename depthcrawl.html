@@ -4666,6 +4666,7 @@ function invalidateDungeonCache(slot){
 // for how a seen torch then lights up its own surroundings, past the
 // player's own vision radius, same idea as GRIMVAULT's light sources.
 function placeWallTorches(){
+  if (G.siteKind==='graveyard') return; // no walls to hang them on - just railings and tombs under the moon
   const candidates = [];
   for (let x=1;x<COLS-1;x++){
     for (let y=1;y<ROWS-1;y++){
@@ -8535,9 +8536,17 @@ function renderDungeonMapOrtho(){
       const t = G.map[x][y];
       const lit = vis.has(x+','+y);
       ctx.globalAlpha = lit ? 1 : 0.38; // remembered-but-dark tiles read dim, like a torch that's moved on
+      if (t===T_WALL && G.siteKind==='graveyard'){
+        // an open plot - tombs and railings stand on the grass instead of walls
+        drawTileBg(x,y,COL.floor);
+        const edge = x===0||y===0||x===COLS-1||y===ROWS-1;
+        if (edge){ const spr = fpUndeadSprite(obEntry('railing'), false); ctx.drawImage(spr.img, x*cellPx, y*cellPx+cellPx*0.28, cellPx, cellPx*0.5); }
+        else drawObjIcon(x,y,obEntry('tomb'),0.82);
+        ctx.globalAlpha=1; continue;
+      }
       if (t===T_WALL){
         drawTileBg(x,y,COL.wall);
-        if (G.dungeonDeco && G.dungeonDeco[x][y]==='torch') drawTileArt(x,y,TORCH_ART,COL.amber,cellPx*0.6);
+        if (G.dungeonDeco && G.dungeonDeco[x][y]==='torch') drawObjIcon(x,y,obEntry('flame'),0.5);
         ctx.globalAlpha=1; continue;
       }
       drawTileBg(x,y,COL.floor);
@@ -8548,15 +8557,16 @@ function renderDungeonMapOrtho(){
       // other floor tile)
       if (t===T_FLOOR){
         const deco = G.dungeonDeco && G.dungeonDeco[x] && G.dungeonDeco[x][y];
-        const da = deco && DECO_ART[deco];
-        if (da) drawTileArt(x,y,da[0],da[1]);
+        const oe = deco && deco!=='rune' && deco!=='pool' && obDecoEntry(deco, x, y);
+        if (oe) drawObjIcon(x,y,oe,{throne:0.9,banner:0.9,grave:0.72,ore:0.5}[deco]||0.8);
+        else { const da = deco && DECO_ART[deco]; if (da) drawTileArt(x,y,da[0],da[1]); }
       }
       switch(t){
         case T_STAIRSD: drawStairsIcon(x,y,true,COL.amber); break;
         case T_STAIRSU: drawStairsIcon(x,y,false,COL.green); break;
-        case T_EXIT: drawTileArt(x,y,EXIT_ART,COL.cyan); break;
-        case T_FLEE: drawTileArt(x,y,EXIT_ART,COL.red); break;
-        case T_GOLD: drawDot(x,y,COL.gold); break;
+        case T_EXIT: drawObjIcon(x,y,obEntry('portal',{rgb:'90,220,255'}),0.9); break;
+        case T_FLEE: drawObjIcon(x,y,obEntry('portal',{rgb:'255,90,70'}),0.9); break;
+        case T_GOLD: drawObjIcon(x,y,obEntry('gold'),0.5); break;
         case T_TRAP: {
           // pits are secret until the player notices them nearby (dex check in
           // scanForHiddenTraps) - an undetected one just looks like plain floor
@@ -8566,23 +8576,21 @@ function renderDungeonMapOrtho(){
           }
           break;
         }
-        case T_SHOP: drawTileArt(x,y,SHOP_ART,COL.gold); break;
+        case T_SHOP: drawObjIcon(x,y,obEntry('stall'),0.85); break;
         // a sealed vault (a color-code puzzle) and a corrupted chest used to
         // share both the same chest-shaped icon AND the same purple, reading
         // as the same tile at a glance - vault stays gold (a plain treasure
         // lock, matches the puzzle's own reward) so the two are only
         // confusable if you're not looking at either the shape or the color
-        case T_VAULT: drawTileArt(x,y,VAULT_ART,COL.gold); break;
-        case T_CORRUPT_CHEST: drawTileArt(x,y,CORRUPT_CHEST_ART,COL.purple); break;
-        case T_TAVERN: drawTileArt(x,y,TAVERN_ART,COL.tavern); break;
-        case T_BLACKSMITH: drawTileArt(x,y,BLACKSMITH_ART,COL.dim); break;
-        case T_ALCHEMIST: drawTileArt(x,y,ALCHEMIST_ART,COL.green); break;
+        case T_VAULT: drawObjIcon(x,y,obEntry('chest',{gold:true}),0.66); break;
+        case T_CORRUPT_CHEST: drawObjIcon(x,y,obEntry('chest',{corrupt:true}),0.66); break;
+        case T_TAVERN: drawObjIcon(x,y,obEntry('tavern'),0.8); break;
+        case T_BLACKSMITH: drawObjIcon(x,y,obEntry('anvil'),0.6); break;
+        case T_ALCHEMIST: drawObjIcon(x,y,obEntry('cauldron'),0.7); break;
         case T_ITEM: {
           const fi = G.floorItem[x][y];
           if (fi){
-            if (fi.consumable) drawTileArt(x,y,ITEM_POTION_ART,'#ff8fa3');
-            else if (fi.slot==='weapon' || fi.slot==='ranged') drawTileArt(x,y,ITEM_WEAPON_ART,'#e6e6e6');
-            else drawTileArt(x,y,ITEM_MISC_ART,COL.cyan);
+            drawObjIcon(x,y,obItemEntry(fi),0.62);
           }
           break;
         }
@@ -9725,13 +9733,14 @@ function fpScale(c,k){ return [c[0]*k, c[1]*k, c[2]*k, c[3]||0]; }
 function fpMakeTex(fn){
   const n = FP_TR*FP_TR, r = new Uint8Array(n), g = new Uint8Array(n), b = new Uint8Array(n);
   const st = FP_TEX/FP_TR;
-  let e = null;
+  let e = null, a = null;
   for (let y=0;y<FP_TR;y++) for (let x=0;x<FP_TR;x++){
     const c = fn(x*st,y*st), i = y*FP_TR+x;
+    if (!c){ if (!a) a = new Uint8Array(n); a[i] = 1; continue; }
     r[i] = clamp(c[0],0,255); g[i] = clamp(c[1],0,255); b[i] = clamp(c[2],0,255);
     if (c[3]){ if (!e) e = new Uint8Array(n); e[i] = clamp(c[3],0,255); }
   }
-  return {r,g,b,e};
+  return {r,g,b,e,a};
 }
 function fpBricks(o){
   const rows=o.rows||4, cols=o.cols||2, bh=FP_TEX/rows, bw=FP_TEX/cols, m=o.mortar||2, s=o.seed||1;
@@ -9841,6 +9850,71 @@ function fpSconce(fn){
     return d<16 ? fpScale(c, 0.8 + d/80) : c;         // soot stain above the flame
   };
 }
+// a little stone mausoleum: pitched pediment roof (open sky above it), carved
+// cross, pilasters and an arched iron door - or, for the variant, a sealed slab
+function fpMausoleum(o){
+  const stone = fpBricks({base:o.base, mc:fpScale(o.base,0.4), rows:6, cols:2, seed:o.seed, moss:0.3});
+  const s = o.seed;
+  return (x,y)=>{
+    const ax = Math.abs(x-31.5);
+    const roofY = 3 + ax*0.42;
+    if (y < roofY) return null;
+    const n = fpFbm(x,y,s+9);
+    if (y < roofY+2.2) return fpScale(o.base, 1.25+n*0.25);              // lit roof edge
+    if (y < roofY+6) return fpScale(o.base, 0.62+n*0.3);                  // roof slope
+    if (y < 19) {
+      // pediment with a carved cross
+      if ((ax<1.6 && y>8 && y<17.5) || (Math.abs(y-11.5)<1.4 && ax<4.4)) return fpScale(o.base, 0.38+n*0.2);
+      return fpScale(o.base, 0.95+n*0.3);
+    }
+    if (y < 23) return fpScale(o.base, y<20 ? 1.3 : (y>21.8 ? 0.5 : 0.85+n*0.2)); // cornice
+    if (y > 58) return fpScale(o.base, y<59.2 ? 1.2 : 0.55+n*0.25);       // plinth
+    // pilasters
+    const px = Math.min(Math.abs(x-7), Math.abs(x-56));
+    if (px < 3.5) return fpScale(o.base, (px<1 ? 1.25 : (px>2.6 ? 0.62 : 1.05)) * (0.85+n*0.3) * (y<25 ? 1.15 : 1));
+    // doorway: an arch over a dark iron (or sealed stone) door
+    const dx = x-31.5, archCy = 36;
+    const inArch = ax < 10 && (y > archCy || Math.hypot(dx, y-archCy) < 10);
+    const inFrame = ax < 12.5 && (y > archCy || Math.hypot(dx, y-archCy) < 12.5);
+    if (inArch){
+      if (o.sealed){
+        const plaque = ax<6 && y>40 && y<48;
+        if (plaque) return fpScale([150,142,120], (y<41||ax>5.2)?0.6:0.9+n*0.2);
+        if (ax<1.2 && y>50 && y<57) return fpScale(o.base,0.4);
+        return fpScale(o.base, 0.75+n*0.3);
+      }
+      let k = 0.26 + n*0.12;
+      if (ax>0.6 && ax<1.4 && y>archCy-2) k = 0.12;                      // the gap between the two leaves
+      if (Math.abs(y-40)<0.8 || Math.abs(y-52)<0.8) k = 0.42;             // iron straps
+      if ((Math.abs(y-40)<1.3 || Math.abs(y-52)<1.3) && (Math.abs(ax-4)<1.1 || Math.abs(ax-8)<1.1)) k = 0.7; // rivets
+      if (ax>2 && ax<3.4 && Math.abs(y-46)<1.4) k = 0.8;                  // ring pulls
+      return fpScale([90,94,104], k);
+    }
+    if (inFrame) return fpScale(o.base, 1.15+n*0.2);
+    return fpScale(stone(x,y), 1);
+  };
+}
+// wrought-iron railings: spear-tipped bars on rails between stone posts,
+// open above and between the bars so the misty field beyond shows through
+function fpIronFence(){
+  return (x,y)=>{
+    const post = x<4 || x>=60;
+    if (post){
+      if (y < 30) return null;
+      const lx = x<4 ? x : x-60;
+      if (y < 32) return [150,146,138];
+      return fpScale([112,108,100], (lx<1 ? 1.25 : lx>3 ? 0.6 : 0.9) * (0.8+fpFbm(x,y,5)*0.4));
+    }
+    const bx = (x-4) % 7, fromBar = Math.abs(bx-3.5);
+    // spear tips
+    if (y>=33 && y<38){ const w = (y-33)*0.45; if (fromBar < w) return [70,72,80]; return null; }
+    if (y >= 38 && fromBar < 0.9) return fpScale([54,56,64], bx<3.5 ? 1.3 : 0.8);
+    if ((y>=40 && y<42) || (y>=58 && y<60)) return fpScale([60,62,70], y===40||y===58 ? 1.3 : 0.85);
+    // little scroll between the bars under the top rail
+    if (y>=42 && y<46 && Math.abs(Math.hypot(bx-0, y-44)-2)<0.6) return [58,60,68];
+    return null;
+  };
+}
 function fpRuneWall(fn, col){
   return (x,y)=>{
     const d = Math.hypot(x-31.5, y-31.5), a = Math.atan2(y-31.5, x-31.5);
@@ -9902,12 +9976,15 @@ const FP_THEME_SPECS = {
     ceil: fpRock({base:[60,74,70], seed:43}),
   },
   graveyard: {
-    wall: fpBricks({base:[122,120,112], mc:[44,42,38], rows:5, cols:2, seed:51, moss:0.45}),
-    wall2: fpBricks({base:[112,112,104], mc:[40,40,36], rows:5, cols:2, seed:57, moss:0.7}),
+    // no walls either: the plot is ringed by iron railings you can see through
+    // and the solid blocks inside are free-standing mausoleums
+    wall: fpMausoleum({base:[128,126,118], seed:51}),
+    wall2: fpMausoleum({base:[118,118,110], seed:57, sealed:true}),
+    fence: fpIronFence(),
     floor: fpGrass({base:[66,82,52], seed:54}),
     floor2: fpDirt({base:[98,84,64], seed:52}),
-    // no ceiling - a graveyard is an open walled plot under a moonlit sky
-    outdoor:true, sky:[[6,9,22],[30,38,58]],
+    // no ceiling - a graveyard is an open plot under a moonlit sky
+    outdoor:true, yard:true, sky:[[6,9,22],[30,38,58]],
   },
   mine: {
     wall: fpBeams(fpRock({base:[136,104,78], seed:61})),
@@ -9947,7 +10024,8 @@ function fpTheme(){
     : (FP_THEME_SPECS[G.siteKind] ? G.siteKind : 'dungeon');
   if (FP.themes[key]) return FP.themes[key];
   const s = FP_THEME_SPECS[key];
-  const T = { key, outdoor:!!s.outdoor, sky:s.sky };
+  const T = { key, outdoor:!!s.outdoor, sky:s.sky, yard:!!s.yard };
+  T.fence = s.fence ? fpMakeTex(s.fence) : null;
   T.wall = fpMakeTex(s.wall);
   T.wall2 = fpMakeTex(s.wall2 || s.wall);
   T.wallTorch = fpMakeTex(fpSconce(s.wall));
@@ -11709,6 +11787,514 @@ function monsterPortraitFor(nm, undead){
   return null;
 }
 
+// ---------- painted objects ----------
+// everything on the floor that isn't a creature - treasure, loot, shrines,
+// headstones, portals, the flame on a wall torch - painted the same way as
+// the monsters (the -50..50 box, resting on y=46) instead of flat one-color
+// shapes, and shared by the 3D view and the top-down map
+function obShadow(c, x, y, rx, ry){
+  c.fillStyle = udRad(c, x, y, rx, [[0,'rgba(0,0,0,0.45)'],[1,'rgba(0,0,0,0)']]);
+  c.save(); c.translate(x,y); c.scale(1, ry/rx); c.beginPath(); c.arc(0,0,rx,0,Math.PI*2); c.fill(); c.restore();
+}
+function obStone(c, x0, x1, base){
+  return udLin(c, x0, 0, x1, 0, [[0,mpTone(base,-0.45)],[0.35,mpTone(base,0.18)],[0.6,base],[1,mpTone(base,-0.5)]]);
+}
+function obSparkle(c, x, y, r){
+  c.save(); c.globalCompositeOperation='lighter'; c.fillStyle='rgba(255,250,220,0.95)';
+  udCurve(c,[['M',x,y-r],['Q',x,y,x+r,y],['Q',x,y,x,y+r],['Q',x,y,x-r,y],['Q',x,y,x,y-r],['Z']]); c.fill();
+  c.restore();
+}
+function obCoin(c, x, y, r, tilt){
+  c.fillStyle = mpTone('#b8862a',-0.35); c.beginPath(); c.ellipse(x, y+1.1, r, r*tilt, 0, 0, Math.PI*2); c.fill();
+  c.fillStyle = udRad(c, x-r*0.3, y-r*0.2, r*1.2, [[0,'#fff1a8'],[0.5,'#e8b940'],[1,'#8d5f16']]);
+  c.beginPath(); c.ellipse(x, y, r, r*tilt, 0, 0, Math.PI*2); c.fill();
+  c.strokeStyle='rgba(120,78,16,0.8)'; c.lineWidth=0.5; c.beginPath(); c.ellipse(x, y, r*0.66, r*tilt*0.66, 0, 0, Math.PI*2); c.stroke();
+}
+function obPaintGold(c, o){
+  obShadow(c, 0, 44, 34, 7);
+  c.fillStyle = udRad(c, -4, 30, 34, [[0,'#ffe48a'],[0.55,'#c9922c'],[1,'#6a4410']]);
+  udCurve(c,[['M',-32,45],['Q',-24,24,-6,20],['Q',8,14,18,24],['Q',30,32,32,45],['Z']]); c.fill();
+  const pts = [[-24,40],[-14,42],[-2,43],[10,42],[22,41],[-18,33],[-6,34],[6,33],[16,35],[-10,26],[2,25],[10,28],[-2,19]];
+  pts.forEach(([x,y],i)=> obCoin(c, x+(fpHash(i,1,5)-0.5)*3, y, 5.4, 0.45+fpHash(i,2,5)*0.35));
+  obCoin(c, 26, 44, 4.6, 0.95); obCoin(c, -30, 44, 4.2, 0.9);
+  obSparkle(c, -6, 22, 5); obSparkle(c, 14, 30, 3.4);
+}
+// a heavy chest: wood planks, iron straps, a domed lid; o.corrupt turns it
+// into a blackened thing seeping violet light, o.gold gives it gilt fittings
+function obPaintChest(c, o){
+  obShadow(c, 0, 45, 40, 7);
+  const wood = o.corrupt ? '#3a2438' : '#7a4e28', metal = o.corrupt ? '#4a3a58' : (o.gold ? '#d9a93a' : '#6e7478');
+  // body
+  c.fillStyle = udLin(c, 0, 4, 0, 46, [[0,mpTone(wood,0.15)],[1,mpTone(wood,-0.45)]]);
+  c.fillRect(-34, 4, 68, 42);
+  c.strokeStyle = mpTone(wood,-0.55); c.lineWidth = 0.8;
+  for (const y of [15, 26, 37]){ c.beginPath(); c.moveTo(-34,y); c.lineTo(34,y); c.stroke(); }
+  // lid
+  c.fillStyle = udLin(c, 0, -20, 0, 4, [[0,mpTone(wood,0.35)],[1,mpTone(wood,-0.2)]]);
+  udCurve(c,[['M',-36,4],['L',-36,-6],['Q',-36,-22,0,-22],['Q',36,-22,36,-6],['L',36,4],['Z']]); c.fill();
+  c.strokeStyle = mpTone(wood,-0.5); c.lineWidth = 0.7;
+  for (const y of [-14, -6]){ c.beginPath(); c.moveTo(-35,y); c.lineTo(35,y); c.stroke(); }
+  // straps and corners
+  const strap = udLin(c, 0, -22, 0, 46, [[0,mpTone(metal,0.35)],[0.5,metal],[1,mpTone(metal,-0.45)]]);
+  c.fillStyle = strap;
+  for (const x of [-26, 20]){
+    udCurve(c,[['M',x,46],['L',x,-6],['Q',x,-19.5,x+3,-20.5],['L',x+6,-20.5],['Q',x+6,-19.5,x+6,-6],['L',x+6,46],['Z']]); c.fill();
+  }
+  c.fillRect(-37, 2, 74, 5);
+  for (const [x,y] of [[-34,44],[34,44]]){ c.beginPath(); c.moveTo(x,y); c.lineTo(x+(x<0?8:-8),y); c.lineTo(x,y-8); c.fill(); }
+  c.fillStyle = mpTone(metal,0.55);
+  for (const x of [-23, 23]) for (const y of [-12, 12, 30, 42]){ c.beginPath(); c.arc(x,y,1,0,Math.PI*2); c.fill(); }
+  // lock plate
+  c.fillStyle = strap; c.fillRect(-7, 0, 14, 16);
+  c.fillStyle = '#120c08'; c.beginPath(); c.arc(0, 7, 2.2, 0, Math.PI*2); c.fill(); c.fillRect(-1, 7, 2, 5);
+  if (o.corrupt){
+    // a crack under the lid spilling violet light, a staring eye on the lock
+    c.save(); c.globalCompositeOperation='lighter';
+    c.fillStyle = udLin(c, 0, -2, 0, 10, [[0,'rgba(200,120,255,0)'],[0.5,'rgba(210,140,255,0.9)'],[1,'rgba(200,120,255,0)']]);
+    c.fillRect(-36, 1, 72, 8);
+    c.restore();
+    udGlow(c, 0, 5, 44, '170,90,240', 0.35);
+    c.fillStyle = '#e8d8ff'; c.beginPath(); c.ellipse(0, 7, 4.6, 3, 0, 0, Math.PI*2); c.fill();
+    c.fillStyle = '#7a1fd0'; c.beginPath(); c.arc(0, 7, 2.2, 0, Math.PI*2); c.fill();
+    c.fillStyle = '#000'; c.beginPath(); c.ellipse(0, 7, 0.7, 2, 0, 0, Math.PI*2); c.fill();
+    c.strokeStyle = 'rgba(40,10,60,0.9)'; c.lineWidth = 1.6; c.lineCap='round';
+    for (const [x,s] of [[-30,1],[30,-1]]){ udCurve(c,[['M',x,46],['Q',x+s*-8,50,x+s*-14,47]]); c.stroke(); }
+  } else if (o.gold){
+    c.save(); c.globalCompositeOperation='lighter';
+    c.fillStyle = 'rgba(255,220,120,0.55)'; c.fillRect(-30, 1, 60, 3);
+    c.restore();
+    obSparkle(c, 22, -16, 4); obSparkle(c, -18, 10, 3);
+  }
+}
+function obPaintPotion(c, o){
+  const liq = o.col || '#d63a4a';
+  obShadow(c, 0, 45, 22, 5);
+  // flask body
+  c.fillStyle = 'rgba(200,225,235,0.28)';
+  udCurve(c,[['M',-5,-18],['L',-5,-4],['Q',-24,4,-24,24],['Q',-24,46,0,46],['Q',24,46,24,24],['Q',24,4,5,-4],['L',5,-18],['Z']]); c.fill();
+  // liquid
+  c.fillStyle = udRad(c, -6, 22, 30, [[0,mpTone(liq,0.45)],[0.5,liq],[1,mpTone(liq,-0.55)]]);
+  udCurve(c,[['M',-22.5,16],['Q',0,11,22.5,16],['Q',24,20,23.4,26],['Q',22,45,0,45],['Q',-22,45,-23.4,26],['Q',-24,20,-22.5,16],['Z']]); c.fill();
+  c.fillStyle = mpTone(liq,0.3); c.beginPath(); c.ellipse(0, 15.5, 22, 3.4, 0, 0, Math.PI*2); c.fill();
+  udGlow(c, 0, 30, 30, fpParseCol(liq).join(','), 0.28);
+  // glass edge and highlights
+  c.strokeStyle = 'rgba(230,245,250,0.55)'; c.lineWidth = 1.1;
+  udCurve(c,[['M',-5,-18],['L',-5,-4],['Q',-24,4,-24,24],['Q',-24,46,0,46],['Q',24,46,24,24],['Q',24,4,5,-4],['L',5,-18]]); c.stroke();
+  c.fillStyle = 'rgba(255,255,255,0.65)';
+  udCurve(c,[['M',-17,14],['Q',-19,24,-15,34],['Q',-20,26,-17,14],['Z']]); c.fill();
+  c.beginPath(); c.ellipse(-12, 8, 2.6, 1.6, -0.6, 0, Math.PI*2); c.fill();
+  // bubbles
+  c.fillStyle = 'rgba(255,255,255,0.5)';
+  for (const [x,y,r] of [[6,30,1.4],[10,24,1],[2,36,0.9],[-4,26,0.8]]){ c.beginPath(); c.arc(x,y,r,0,Math.PI*2); c.fill(); }
+  // cork and wax
+  c.fillStyle = udLin(c, -6, 0, 6, 0, [[0,'#6b4524'],[0.5,'#b98a54'],[1,'#6b4524']]); c.fillRect(-6, -28, 12, 11);
+  c.fillStyle = mpTone(liq,-0.3); c.fillRect(-7, -19, 14, 3);
+}
+function obPaintScroll(c, o){
+  obShadow(c, 0, 44, 30, 5);
+  c.save(); c.translate(0, 30); c.rotate(-0.18);
+  // unrolled sheet
+  c.fillStyle = udLin(c, 0, -14, 0, 12, [[0,'#efe0b8'],[1,'#b99a64']]);
+  udCurve(c,[['M',-24,-10],['Q',0,-14,24,-10],['L',24,10],['Q',0,6,-24,10],['Z']]); c.fill();
+  c.strokeStyle = 'rgba(90,50,30,0.7)'; c.lineWidth = 0.8;
+  for (let i=0;i<4;i++){ c.beginPath(); c.moveTo(-16, -6+i*4.2); c.lineTo(8+fpHash(i,3,9)*8, -6.5+i*4.2); c.stroke(); }
+  // rolled ends
+  for (const x of [-26, 26]){
+    c.fillStyle = udLin(c, 0, -13, 0, 13, [[0,'#f4e6c0'],[0.5,'#d8bf8c'],[1,'#8a6c40']]);
+    c.beginPath(); c.ellipse(x, 0, 4.2, 13, 0, 0, Math.PI*2); c.fill();
+    c.fillStyle = '#6a4a28'; c.beginPath(); c.ellipse(x, -12, 3, 1.4, 0, 0, Math.PI*2); c.fill();
+  }
+  // wax seal and ribbon
+  c.fillStyle = '#8c1c1c'; c.fillRect(2, 6, 3, 12); c.fillRect(7, 6, 3, 10);
+  c.fillStyle = udRad(c, 5, 5, 6, [[0,'#e04848'],[1,'#7a1414']]); c.beginPath(); c.arc(5, 5, 5, 0, Math.PI*2); c.fill();
+  c.restore();
+}
+// a weapon lying on the ground (a bow, wand or blade by the item's basis)
+function obPaintWeapon(c, o){
+  obShadow(c, 0, 44, 36, 5);
+  const k = o.kind || 'sword';
+  if (k==='wand'){
+    c.save(); c.translate(0, 36); c.rotate(-0.45);
+    c.fillStyle = udLin(c, 0, -2, 0, 2, [[0,'#8a5a30'],[0.5,'#d8a868'],[1,'#4a2a14']]);
+    c.fillRect(-26, -2, 46, 4);
+    c.fillStyle = '#c9a44a'; c.fillRect(-10, -2.6, 3, 5.2); c.fillRect(-26, -2.6, 4, 5.2);
+    c.restore();
+    const gx = 18*Math.cos(-0.45)+0, gy = 36+18*Math.sin(-0.45)*1;
+    c.fillStyle = udRad(c, gx, gy, 6, [[0,'#ffffff'],[0.4,'#9fe8ff'],[1,'#2a70c0']]);
+    c.beginPath(); c.arc(gx, gy, 5, 0, Math.PI*2); c.fill();
+    udGlow(c, gx, gy, 20, '120,200,255', 0.8);
+    return;
+  }
+  const s = k==='greatsword'||k==='greataxe'||k==='hammer' ? 1.45 : k==='dagger' ? 1.6 : k==='bow'||k==='spear'||k==='staff' ? 1.2 : 1.35;
+  mpWeapon(c, k, k==='bow' ? 4 : -18, k==='bow' ? 30 : 38, k==='bow' ? 0.35 : 1.1, s, {});
+}
+function obPaintArmor(c, o){
+  obShadow(c, 0, 45, 30, 6);
+  const m = o.metal || '#9aa3a8';
+  const plate = udLin(c, -24, 0, 24, 0, [[0,mpTone(m,-0.55)],[0.35,mpTone(m,0.35)],[0.55,m],[1,mpTone(m,-0.6)]]);
+  const k = o.kind || 'chest';
+  if (k==='chest'){
+    c.fillStyle = plate;
+    udCurve(c,[['M',-14,-8],['Q',-26,-6,-30,4],['L',-24,12],['L',-20,10],['Q',-20,30,-16,42],['Q',0,46,16,42],['Q',20,30,20,10],['L',24,12],['L',30,4],['Q',26,-6,14,-8],['Q',0,2,-14,-8],['Z']]); c.fill();
+    c.strokeStyle = mpTone(m,-0.6); c.lineWidth = 0.9;
+    udCurve(c,[['M',0,0],['L',0,42]]); c.stroke();
+    for (const y of [26, 34]){ udCurve(c,[['M',-18,y],['Q',0,y+4,18,y]]); c.stroke(); }
+    c.fillStyle = mpTone(m,0.6); for (const [x,y] of [[-22,4],[22,4],[-12,12],[12,12]]){ c.beginPath(); c.arc(x,y,1.1,0,Math.PI*2); c.fill(); }
+  } else if (k==='head'){
+    c.fillStyle = plate;
+    udCurve(c,[['M',-22,40],['L',-22,10],['Q',-22,-14,0,-16],['Q',22,-14,22,10],['L',22,40],['Q',12,44,8,36],['L',8,22],['L',-8,22],['L',-8,36],['Q',-12,44,-22,40],['Z']]); c.fill();
+    c.fillStyle = '#0c0c10'; c.fillRect(-16, 12, 32, 4); c.fillRect(-2.5, 16, 5, 16);
+    c.fillStyle = '#9a2020'; udCurve(c,[['M',-3,-15],['Q',0,-30,14,-34],['Q',6,-24,3,-15],['Z']]); c.fill();
+  } else if (k==='arms'){
+    for (const s of [-1,1]){
+      c.save(); c.translate(s*12, 22); c.scale(s,1);
+      c.fillStyle = plate;
+      udCurve(c,[['M',-8,-22],['L',8,-22],['L',9,2],['Q',14,6,12,14],['L',-10,18],['Q',-12,8,-8,2],['Z']]); c.fill();
+      c.strokeStyle = mpTone(m,-0.55); c.lineWidth=0.8; for (const y of [-12,-4]){ c.beginPath(); c.moveTo(-8,y); c.lineTo(8,y); c.stroke(); }
+      c.restore();
+    }
+  } else if (k==='legs'){
+    for (const s of [-1,1]){
+      c.save(); c.translate(s*11, 0);
+      c.fillStyle = udLin(c, -8, 0, 8, 0, [[0,'#3a2616'],[0.5,'#7a5230'],[1,'#3a2616']]);
+      udCurve(c,[['M',-7,-8],['L',7,-8],['L',7,34],['Q',s*16+2,36,s*16+2,44],['L',-7,44],['Z']]); c.fill();
+      c.fillStyle = plate; c.fillRect(-7.5, -8, 15, 20);
+      c.fillStyle = mpTone(m,0.4); c.beginPath(); c.arc(0, 12, 4, 0, Math.PI*2); c.fill();
+      c.restore();
+    }
+  } else if (k==='ring'){
+    const g = o.gem || '#d63a4a';
+    c.lineWidth = 5; c.strokeStyle = udLin(c, -18, 0, 18, 0, [[0,'#7a5214'],[0.4,'#ffe38a'],[0.6,'#d9a93a'],[1,'#6a4410']]);
+    c.beginPath(); c.ellipse(0, 30, 16, 9, 0, 0, Math.PI*2); c.stroke();
+    c.fillStyle = '#c9982c'; c.beginPath(); c.moveTo(-7,20); c.lineTo(7,20); c.lineTo(4,14); c.lineTo(-4,14); c.fill();
+    c.fillStyle = udRad(c, -2, 8, 10, [[0,'#ffffff'],[0.3,mpTone(g,0.3)],[1,mpTone(g,-0.5)]]);
+    c.beginPath(); c.moveTo(0,0); c.lineTo(8,8); c.lineTo(0,16); c.lineTo(-8,8); c.closePath(); c.fill();
+    udGlow(c, 0, 8, 18, fpParseCol(g).join(','), 0.5);
+  } else {
+    // necklace / amulet
+    const g = o.gem || '#3aa0d6';
+    c.lineWidth = 1.6; c.strokeStyle = '#d9a93a';
+    udCurve(c,[['M',-20,-14],['Q',-26,14,0,22],['Q',26,14,20,-14]]); c.stroke();
+    c.setLineDash([1.6,1.4]); c.strokeStyle='#fff1a8'; c.lineWidth=0.8; c.stroke(); c.setLineDash([]);
+    c.fillStyle = udLin(c, -10, 0, 10, 0, [[0,'#7a5214'],[0.5,'#ffe38a'],[1,'#6a4410']]);
+    c.beginPath(); c.arc(0, 30, 11, 0, Math.PI*2); c.fill();
+    c.fillStyle = udRad(c, -3, 27, 10, [[0,'#ffffff'],[0.35,mpTone(g,0.2)],[1,mpTone(g,-0.6)]]);
+    c.beginPath(); c.arc(0, 30, 7.5, 0, Math.PI*2); c.fill();
+    udGlow(c, 0, 30, 22, fpParseCol(g).join(','), 0.55);
+  }
+}
+// a stone archway filled with a swirling portal (the way out, or back)
+function obPaintPortal(c, o){
+  const rgb = o.rgb || '90,220,255';
+  obShadow(c, 0, 46, 40, 6);
+  const st = '#8a8a90';
+  c.fillStyle = obStone(c, -38, 38, st);
+  udCurve(c,[['M',-36,46],['L',-36,-8],['Q',-36,-44,0,-44],['Q',36,-44,36,-8],['L',36,46],['L',24,46],['L',24,-8],['Q',24,-32,0,-32],['Q',-24,-32,-24,-8],['L',-24,46],['Z']]); c.fill();
+  // voussoir joints
+  c.strokeStyle = 'rgba(30,30,36,0.7)'; c.lineWidth = 0.8;
+  for (let i=0;i<=8;i++){ const a = Math.PI + i*Math.PI/8; c.beginPath(); c.moveTo(Math.cos(a)*24, -8+Math.sin(a)*24); c.lineTo(Math.cos(a)*36, -8+Math.sin(a)*36); c.stroke(); }
+  for (const y of [4, 18, 32]) for (const x of [-36, 24]){ c.beginPath(); c.moveTo(x,y); c.lineTo(x+12,y); c.stroke(); }
+  // keystone rune
+  c.fillStyle = `rgb(${rgb})`; udGlow(c, 0, -38, 10, rgb, 0.9);
+  // portal
+  c.save();
+  udCurve(c,[['M',-24,46],['L',-24,-8],['Q',-24,-32,0,-32],['Q',24,-32,24,-8],['L',24,46],['Z']]); c.clip();
+  c.fillStyle = udRad(c, 0, 10, 40, [[0,'rgba(255,255,255,0.95)'],[0.2,`rgba(${rgb},0.9)`],[0.7,`rgba(${rgb.split(',').map(v=>v*0.35|0).join(',')},0.95)`],[1,'rgba(4,6,14,1)']]);
+  c.fillRect(-26, -34, 52, 82);
+  c.globalCompositeOperation = 'lighter'; c.lineWidth = 1.4; c.lineCap='round';
+  for (let i=0;i<7;i++){
+    c.strokeStyle = `rgba(${rgb},${0.25+fpHash(i,1,3)*0.35})`;
+    c.beginPath();
+    for (let t=0;t<=1.001;t+=0.05){ const a = i*0.9 + t*5, r = 3 + t*26; const x = Math.cos(a)*r, y = 10 + Math.sin(a)*r*1.3; t===0 ? c.moveTo(x,y) : c.lineTo(x,y); }
+    c.stroke();
+  }
+  c.restore();
+  udGlow(c, 0, 12, 46, rgb, 0.35);
+}
+function obPaintSignpost(c, o){
+  obShadow(c, 0, 45, 18, 4);
+  c.fillStyle = udLin(c, -3, 0, 3, 0, [[0,'#3a2716'],[0.5,'#86592f'],[1,'#3a2716']]); c.fillRect(-3, -30, 6, 76);
+  const col = o.sealed ? '#6a6a6a' : '#a02828';
+  c.fillStyle = udLin(c, 0, -26, 0, -8, [[0,mpTone('#9a6a3a',0.2)],[1,mpTone('#9a6a3a',-0.35)]]);
+  udCurve(c,[['M',-26,-26],['L',18,-26],['L',30,-17],['L',18,-8],['L',-26,-8],['Z']]); c.fill();
+  c.strokeStyle = '#3a2210'; c.lineWidth = 1; c.stroke();
+  c.fillStyle = col; udCurve(c,[['M',-18,-17],['L',8,-17],['M',2,-22],['L',10,-17],['L',2,-12]]);
+  c.strokeStyle = col; c.lineWidth = 2.4; c.stroke();
+  if (o.sealed){ c.strokeStyle='#222'; c.lineWidth=3; udCurve(c,[['M',-20,-30],['L',24,-4],['M',24,-30],['L',-20,-4]]); c.stroke(); }
+}
+function obPaintThrone(c, o){
+  obShadow(c, 0, 45, 34, 6);
+  const gold = udLin(c, -30, 0, 30, 0, [[0,'#6a4410'],[0.3,'#ffe38a'],[0.55,'#d9a93a'],[1,'#5a3a0c']]);
+  // dais
+  c.fillStyle = obStone(c, -36, 36, '#6a6470'); c.fillRect(-36, 38, 72, 8);
+  c.fillStyle = gold;
+  // tall back with crest
+  udCurve(c,[['M',-22,20],['L',-22,-30],['Q',-22,-44,-10,-40],['Q',0,-50,10,-40],['Q',22,-44,22,-30],['L',22,20],['Z']]); c.fill();
+  c.fillStyle = udLin(c, 0, -36, 0, 16, [[0,'#8a1a28'],[1,'#3a0610']]);
+  udCurve(c,[['M',-15,16],['L',-15,-28],['Q',0,-38,15,-28],['L',15,16],['Z']]); c.fill();
+  c.fillStyle = 'rgba(255,220,140,0.5)'; for (let y=-24;y<14;y+=8) for (let x=-10;x<=10;x+=10){ c.beginPath(); c.arc(x,y,0.9,0,Math.PI*2); c.fill(); }
+  // seat and arms
+  c.fillStyle = gold; c.fillRect(-28, 12, 56, 8);
+  c.fillStyle = udLin(c, 0, 12, 0, 20, [[0,'#b02838'],[1,'#5a0c18']]); c.fillRect(-20, 10, 40, 5);
+  c.fillStyle = gold;
+  for (const s of [-1,1]){
+    c.fillRect(s>0?20:-30, -2, 10, 14);
+    c.beginPath(); c.arc(s*25, -3, 5.5, 0, Math.PI*2); c.fill();
+    c.fillRect(s>0?22:-28, 20, 6, 18);
+  }
+  c.fillStyle = '#c02030'; c.beginPath(); c.arc(0, -40, 3.2, 0, Math.PI*2); c.fill();
+  obSparkle(c, 0, -40, 4);
+}
+function obPaintBanner(c, o){
+  obShadow(c, 0, 45, 14, 3);
+  c.fillStyle = udLin(c, -2, 0, 2, 0, [[0,'#3a2716'],[0.5,'#8a5c30'],[1,'#3a2716']]); c.fillRect(-2, -44, 4, 90);
+  c.fillStyle = '#d9a93a'; c.beginPath(); c.arc(0, -45, 3, 0, Math.PI*2); c.fill();
+  c.fillStyle = udLin(c, -24, 0, 24, 0, [[0,'#4a1a0c'],[0.5,'#8a6a3a'],[1,'#4a1a0c']]); c.fillRect(-24, -38, 48, 3);
+  const cl = o.col || '#a01e28';
+  c.fillStyle = udLin(c, -22, 0, 22, 0, [[0,mpTone(cl,-0.5)],[0.25,mpTone(cl,0.1)],[0.5,mpTone(cl,-0.25)],[0.75,mpTone(cl,0.1)],[1,mpTone(cl,-0.5)]]);
+  udCurve(c,[['M',-22,-35],['L',22,-35],['L',22,18],['L',0,30],['L',-22,18],['Z']]); c.fill();
+  c.strokeStyle = '#d9a93a'; c.lineWidth = 1.4;
+  udCurve(c,[['M',-19,-32],['L',19,-32],['L',19,16],['L',0,26.5],['L',-19,16],['Z']]); c.stroke();
+  // heraldic device - a rampant crowned shape
+  c.fillStyle = '#e8c860';
+  udCurve(c,[['M',-8,-8],['L',-10,-20],['L',-5,-14],['L',0,-22],['L',5,-14],['L',10,-20],['L',8,-8],['Z']]); c.fill();
+  c.beginPath(); c.moveTo(0,-4); c.lineTo(8,4); c.lineTo(0,14); c.lineTo(-8,4); c.closePath(); c.fill();
+}
+function obPaintAltar(c, o){
+  obShadow(c, 0, 45, 40, 6);
+  const st = '#6e6878';
+  c.fillStyle = obStone(c, -34, 34, st); c.fillRect(-32, 0, 64, 46);
+  c.fillStyle = obStone(c, -38, 38, mpTone(st,0.15)); c.fillRect(-38, -6, 76, 8);
+  c.strokeStyle = 'rgba(20,16,26,0.7)'; c.lineWidth = 0.8;
+  c.strokeRect(-24, 8, 48, 30);
+  // carved sigil glowing faintly
+  c.strokeStyle = '#c070ff'; c.lineWidth = 1.2;
+  c.beginPath(); c.arc(0, 23, 9, 0, Math.PI*2); c.stroke();
+  udCurve(c,[['M',0,13],['L',8,28],['L',-8,28],['Z']]); c.stroke();
+  udGlow(c, 0, 23, 20, '180,100,255', 0.45);
+  // cloth runner
+  c.fillStyle = udLin(c, 0, -6, 0, 18, [[0,'#6a1a8a'],[1,'#2a0a3a']]);
+  udCurve(c,[['M',-10,-6],['L',10,-6],['L',10,14],['L',0,10],['L',-10,14],['Z']]); c.fill();
+  // candles
+  for (const x of [-28, -18, 18, 28]){
+    const h = 10 + fpHash(x,1,4)*6;
+    c.fillStyle = udLin(c, x-2, 0, x+2, 0, [[0,'#b8a888'],[0.5,'#f4ecd8'],[1,'#a89878']]);
+    c.fillRect(x-2, -6-h, 4, h);
+    c.fillStyle = udRad(c, x, -9-h, 4, [[0,'#ffffff'],[0.3,'#ffe08a'],[1,'rgba(255,140,40,0)']]);
+    c.beginPath(); c.ellipse(x, -9-h, 2, 4, 0, 0, Math.PI*2); c.fill();
+    udGlow(c, x, -9-h, 10, '255,190,90', 0.6);
+  }
+  // a relic on top
+  c.fillStyle = udRad(c, -2, -14, 8, [[0,'#ffffff'],[0.3,'#e0a0ff'],[1,'#5a1a9a']]);
+  c.beginPath(); c.moveTo(0,-24); c.lineTo(6,-14); c.lineTo(0,-6); c.lineTo(-6,-14); c.closePath(); c.fill();
+  udGlow(c, 0, -15, 16, '200,130,255', 0.7);
+}
+function obPaintIdol(c, o){
+  obShadow(c, 0, 45, 26, 5);
+  const st = o.stone || '#5c7a74';
+  // plinth
+  c.fillStyle = obStone(c, -22, 22, mpTone(st,-0.2)); c.fillRect(-22, 30, 44, 16);
+  c.fillStyle = obStone(c, -24, 24, mpTone(st,0.05)); c.fillRect(-24, 27, 48, 5);
+  // squat seated figure with a many-armed silhouette
+  c.fillStyle = obStone(c, -22, 22, st);
+  udCurve(c,[['M',-18,27],['Q',-22,8,-12,-2],['L',12,-2],['Q',22,8,18,27],['Z']]); c.fill();
+  c.lineWidth = 5; c.lineCap = 'round'; c.strokeStyle = obStone(c, -30, 30, mpTone(st,-0.1));
+  for (const s of [-1,1]){
+    udCurve(c,[['M',s*12,2],['Q',s*26,0,s*24,-14]]); c.stroke();
+    udCurve(c,[['M',s*14,8],['Q',s*28,14,s*22,22]]); c.stroke();
+  }
+  c.fillStyle = obStone(c, -14, 14, mpTone(st,0.1));
+  c.beginPath(); c.ellipse(0, -14, 12, 13, 0, 0, Math.PI*2); c.fill();
+  // headdress
+  c.fillStyle = obStone(c, -16, 16, mpTone(st,-0.15));
+  udCurve(c,[['M',-13,-20],['L',-16,-36],['L',-6,-26],['L',0,-40],['L',6,-26],['L',16,-36],['L',13,-20],['Z']]); c.fill();
+  // carved face with gem eyes
+  c.strokeStyle = 'rgba(10,20,20,0.7)'; c.lineWidth = 0.9;
+  udCurve(c,[['M',-5,-6],['Q',0,-3,5,-6]]); c.stroke();
+  const eye = o.eye || '80,230,255';
+  for (const s of [-1,1]){ c.fillStyle = `rgb(${eye})`; c.beginPath(); c.ellipse(s*4.5, -14, 2.4, 1.6, 0, 0, Math.PI*2); c.fill(); udGlow(c, s*4.5, -14, 8, eye, 0.9); }
+  c.strokeStyle = 'rgba(10,20,20,0.6)'; c.lineWidth = 0.7;
+  udCurve(c,[['M',-10,6],['L',10,6],['M',-12,16],['L',12,16]]); c.stroke();
+}
+// headstones - a few shapes chosen per plot
+function obPaintGrave(c, o){
+  obShadow(c, 0, 45, 26, 5);
+  const st = o.stone || '#8c8c90', v = o.v|0;
+  // a low mound of turned earth in front
+  c.fillStyle = udRad(c, 0, 44, 30, [[0,'#4a3a28'],[1,'rgba(40,30,20,0)']]);
+  c.beginPath(); c.ellipse(0, 44, 28, 5, 0, 0, Math.PI*2); c.fill();
+  c.fillStyle = obStone(c, -18, 18, st);
+  if (v===0){
+    udCurve(c,[['M',-15,46],['L',-15,-14],['Q',-15,-32,0,-32],['Q',15,-32,15,-14],['L',15,46],['Z']]); c.fill();
+  } else if (v===1){
+    udCurve(c,[['M',-5,46],['L',-5,-6],['L',-20,-6],['L',-20,-16],['L',-5,-16],['L',-5,-36],['L',5,-36],['L',5,-16],['L',20,-16],['L',20,-6],['L',5,-6],['L',5,46],['Z']]); c.fill();
+    c.strokeStyle = mpTone(st,-0.45); c.lineWidth = 1.2; c.beginPath(); c.arc(0, -11, 8.5, 0, Math.PI*2); c.stroke();
+  } else if (v===2){
+    udCurve(c,[['M',-11,46],['L',-8,-22],['L',0,-38],['L',8,-22],['L',11,46],['Z']]); c.fill();
+    c.fillStyle = obStone(c, -15, 15, mpTone(st,-0.1)); c.fillRect(-15, 36, 30, 10);
+  } else {
+    udCurve(c,[['M',-18,46],['L',-18,-8],['L',-12,-20],['L',12,-20],['L',18,-8],['L',18,46],['Z']]); c.fill();
+    c.fillStyle = mpTone(st,-0.35); c.fillRect(-18, -8, 36, 2);
+  }
+  // weathering: crack, moss, and a carved name
+  c.strokeStyle = 'rgba(20,20,24,0.55)'; c.lineWidth = 0.8;
+  if (v!==1){ for (let i=0;i<3;i++){ c.beginPath(); c.moveTo(-7, -4+i*6); c.lineTo(7-fpHash(i,v,3)*5, -4+i*6); c.stroke(); } }
+  udCurve(c,[['M',8,-10],['L',5,0],['L',9,8],['L',6,16]]); c.stroke();
+  c.fillStyle = 'rgba(70,110,50,0.75)';
+  for (let i=0;i<14;i++){ const x = (fpHash(i,1,v+11)-0.5)*26, y = 30+fpHash(i,2,v+11)*16; c.beginPath(); c.arc(x, y, 1.2+fpHash(i,3,v)*1.8, 0, Math.PI*2); c.fill(); }
+  // grass tufts at the base
+  c.strokeStyle = '#4e6a38'; c.lineWidth = 0.9;
+  for (let i=0;i<12;i++){ const x = -22+i*4; c.beginPath(); c.moveTo(x, 46); c.lineTo(x+(fpHash(i,4,v)-0.5)*4, 40-fpHash(i,5,v)*4); c.stroke(); }
+}
+function obPaintOre(c, o){
+  obShadow(c, 0, 45, 30, 5);
+  c.fillStyle = udRad(c, -8, 18, 36, [[0,'#8a7a6a'],[0.6,'#5a4c40'],[1,'#2a221c']]);
+  udCurve(c,[['M',-30,46],['L',-32,26],['L',-18,8],['L',-4,4],['L',14,10],['L',28,24],['L',30,46],['Z']]); c.fill();
+  c.strokeStyle = 'rgba(20,16,12,0.6)'; c.lineWidth = 0.8;
+  udCurve(c,[['M',-18,8],['L',-12,28],['L',-24,46],['M',-12,28],['L',8,30],['L',14,10],['M',8,30],['L',14,46]]); c.stroke();
+  // glittering veins and a few gold nuggets
+  c.strokeStyle = '#e8c050'; c.lineWidth = 1.4;
+  udCurve(c,[['M',-26,32],['Q',-16,24,-6,30],['Q',4,36,18,26]]); c.stroke();
+  for (const [x,y,r] of [[-8,18,4],[10,20,3.2],[-20,36,3],[18,38,3.6],[2,40,2.4]]){
+    c.fillStyle = udRad(c, x-1, y-1, r*1.5, [[0,'#fff1a8'],[0.5,'#e0a830'],[1,'#7a4c10']]);
+    c.beginPath(); c.moveTo(x,y-r); c.lineTo(x+r,y); c.lineTo(x+r*0.4,y+r); c.lineTo(x-r,y+r*0.6); c.lineTo(x-r*0.8,y-r*0.4); c.closePath(); c.fill();
+  }
+  obSparkle(c, -8, 14, 4); obSparkle(c, 18, 34, 3);
+}
+function obPaintStall(c, o){
+  obShadow(c, 0, 45, 38, 6);
+  c.fillStyle = '#4a3020'; for (const x of [-34, 30]) c.fillRect(x, -26, 4, 72);
+  c.fillStyle = udLin(c, 0, 14, 0, 46, [[0,'#8a5c30'],[1,'#3a2410']]); c.fillRect(-34, 14, 68, 32);
+  for (let i=0;i<6;i++){
+    c.fillStyle = i%2 ? '#e8dcc0' : '#b02838';
+    c.beginPath(); c.moveTo(-38+i*12.7, -30); c.lineTo(-38+(i+1)*12.7, -30); c.lineTo(-38+(i+1)*12.7, -18); c.quadraticCurveTo(-38+(i+0.5)*12.7, -12, -38+i*12.7, -18); c.fill();
+  }
+  // wares: sacks, a potion, coins
+  c.fillStyle = udRad(c, -18, 6, 12, [[0,'#d8c090'],[1,'#7a6040']]); c.beginPath(); c.ellipse(-18, 7, 9, 8, 0, 0, Math.PI*2); c.fill();
+  c.fillStyle = udRad(c, 0, 8, 10, [[0,'#ff8a8a'],[1,'#7a1a1a']]); c.beginPath(); c.arc(0, 8, 6, 0, Math.PI*2); c.fill(); c.fillRect(-1.5, -2, 3, 5);
+  obCoin(c, 16, 12, 4, 0.5); obCoin(c, 20, 10, 4, 0.5); obCoin(c, 18, 7, 4, 0.5);
+}
+function obPaintAnvil(c, o){
+  obShadow(c, 0, 45, 30, 6);
+  c.fillStyle = udLin(c, 0, 20, 0, 46, [[0,'#6a4a2a'],[1,'#2a1a0c']]); c.fillRect(-14, 20, 28, 26);
+  const iron = udLin(c, 0, -6, 0, 20, [[0,'#b0b8c0'],[0.3,'#5a6068'],[1,'#22262a']]);
+  c.fillStyle = iron;
+  udCurve(c,[['M',-36,-4],['Q',-24,-6,-18,-6],['L',24,-6],['L',24,4],['L',12,6],['L',10,14],['L',16,20],['L',-16,20],['L',-10,14],['L',-12,6],['L',-22,4],['Q',-30,2,-36,-4],['Z']]); c.fill();
+  c.strokeStyle = 'rgba(255,255,255,0.5)'; c.lineWidth = 1; c.beginPath(); c.moveTo(-18,-5.5); c.lineTo(24,-5.5); c.stroke();
+  // hammer resting on it
+  c.save(); c.translate(6, -12); c.rotate(-0.3);
+  c.fillStyle = '#6a4424'; c.fillRect(-2, -2, 30, 4);
+  c.fillStyle = iron; c.fillRect(-8, -7, 10, 14);
+  c.restore();
+  udGlow(c, -6, -8, 10, '255,140,60', 0.5);
+}
+function obPaintCauldron(c, o){
+  obShadow(c, 0, 45, 30, 6);
+  for (const x of [-12, 0, 12]){ c.fillStyle = udRad(c, x, 42, 7, [[0,'#ffe08a'],[0.5,'#ff7a20'],[1,'rgba(160,30,0,0)']]); c.beginPath(); c.ellipse(x, 40, 5, 8, 0, 0, Math.PI*2); c.fill(); }
+  c.fillStyle = udRad(c, -8, 10, 36, [[0,'#5a5e66'],[0.6,'#26282e'],[1,'#0c0c10']]);
+  c.beginPath(); c.ellipse(0, 16, 30, 22, 0, 0, Math.PI*2); c.fill();
+  c.fillStyle = '#1a1a1e'; c.beginPath(); c.ellipse(0, -2, 28, 6, 0, 0, Math.PI*2); c.fill();
+  c.fillStyle = udRad(c, 0, -2, 26, [[0,'#b8ffb0'],[0.5,'#3ac050'],[1,'#0c4a18']]);
+  c.beginPath(); c.ellipse(0, -1, 24, 4.4, 0, 0, Math.PI*2); c.fill();
+  udGlow(c, 0, -4, 30, '90,240,120', 0.5);
+  c.fillStyle = 'rgba(180,255,180,0.5)';
+  for (const [x,y,r] of [[-8,-10,3],[4,-16,2.2],[10,-8,2.6],[-2,-22,1.6]]){ c.beginPath(); c.arc(x,y,r,0,Math.PI*2); c.fill(); }
+}
+function obPaintTavern(c, o){
+  obShadow(c, 0, 45, 26, 6);
+  c.fillStyle = udLin(c, -22, 0, 22, 0, [[0,'#3a2410'],[0.4,'#9a6a3a'],[1,'#3a2410']]);
+  udCurve(c,[['M',-18,46],['Q',-24,14,-18,-18],['L',18,-18],['Q',24,14,18,46],['Z']]); c.fill();
+  c.fillStyle = '#5a5e64'; for (const y of [-12, 14, 40]) c.fillRect(-21, y, 42, 3);
+  // a foaming mug on top
+  c.fillStyle = udLin(c, -8, 0, 8, 0, [[0,'#7a5a2a'],[0.5,'#e0b060'],[1,'#7a5a2a']]); c.fillRect(-7, -34, 14, 16);
+  c.fillStyle = '#f4f0e0'; c.beginPath(); c.ellipse(0, -35, 8, 4, 0, 0, Math.PI*2); c.fill();
+  c.strokeStyle = '#7a5a2a'; c.lineWidth = 2; c.beginPath(); c.arc(9, -26, 4, -1.4, 1.4); c.stroke();
+}
+// a living flame - soft-edged and additive, for wall torches
+function obPaintFlame(c, o){
+  const g = udRad(c, 0, 18, 44, [[0,'rgba(255,250,220,1)'],[0.25,'rgba(255,214,110,0.95)'],[0.6,'rgba(255,120,30,0.7)'],[1,'rgba(200,40,0,0)']]);
+  c.fillStyle = g;
+  udCurve(c,[['M',0,-46],['Q',6,-24,18,-8],['Q',26,10,14,26],['Q',6,34,0,34],['Q',-6,34,-14,26],['Q',-26,10,-18,-8],['Q',-10,4,-8,-10],['Q',-6,-26,0,-46],['Z']]); c.fill();
+  c.fillStyle = udRad(c, 0, 18, 14, [[0,'rgba(255,255,255,1)'],[1,'rgba(255,240,180,0)']]);
+  c.beginPath(); c.ellipse(0, 16, 8, 14, 0, 0, Math.PI*2); c.fill();
+}
+
+// map-view stand-ins for the graveyard's mausoleums and iron railings
+function obPaintTomb(c, o){
+  const st = '#8a887e';
+  c.fillStyle = obStone(c, -38, 38, mpTone(st,-0.1)); c.fillRect(-40, 36, 80, 10);
+  c.fillStyle = obStone(c, -34, 34, st); c.fillRect(-34, -10, 68, 48);
+  c.fillStyle = obStone(c, -40, 40, mpTone(st,0.15));
+  udCurve(c,[['M',-42,-8],['L',0,-40],['L',42,-8],['Z']]); c.fill();
+  c.fillStyle = mpTone(st,-0.45); c.fillRect(-3, -32, 6, 18); c.fillRect(-9, -26, 18, 5);
+  c.fillStyle = obStone(c, -34, 34, mpTone(st,0.25)); for (const x of [-30, 22]) c.fillRect(x, -8, 8, 44);
+  c.fillStyle = '#1a1c22'; udCurve(c,[['M',-12,38],['L',-12,8],['Q',0,-6,12,8],['L',12,38],['Z']]); c.fill();
+  c.fillStyle = 'rgba(80,110,50,0.8)'; for (let i=0;i<10;i++){ c.beginPath(); c.arc(-30+fpHash(i,1,7)*60, 30+fpHash(i,2,7)*12, 2+fpHash(i,3,7)*2, 0, Math.PI*2); c.fill(); }
+}
+function obPaintRailing(c, o){
+  c.strokeStyle = '#3a3c44'; c.lineWidth = 3;
+  for (const y of [-6, 36]){ c.beginPath(); c.moveTo(-50,y); c.lineTo(50,y); c.stroke(); }
+  c.lineWidth = 2.6;
+  for (let x=-44; x<=44; x+=11){
+    c.beginPath(); c.moveTo(x, 44); c.lineTo(x, -14); c.stroke();
+    c.fillStyle = '#4a4c56'; c.beginPath(); c.moveTo(x-3.4,-12); c.lineTo(x,-22); c.lineTo(x+3.4,-12); c.closePath(); c.fill();
+  }
+}
+const OB_PAINTERS = { gold:obPaintGold, chest:obPaintChest, potion:obPaintPotion, scroll:obPaintScroll, weapon:obPaintWeapon,
+  armor:obPaintArmor, portal:obPaintPortal, sign:obPaintSignpost, throne:obPaintThrone, banner:obPaintBanner, altar:obPaintAltar,
+  idol:obPaintIdol, grave:obPaintGrave, ore:obPaintOre, stall:obPaintStall, anvil:obPaintAnvil, cauldron:obPaintCauldron,
+  tavern:obPaintTavern, flame:obPaintFlame, tomb:obPaintTomb, railing:obPaintRailing };
+// one shared entry per painter+options, so each is only ever rendered once
+const OB_ENTRIES = new Map();
+function obEntry(kind, o){
+  const key = kind + JSON.stringify(o||{});
+  let e = OB_ENTRIES.get(key);
+  if (!e){ e = { paint:OB_PAINTERS[kind], o:o||{}, spirit: kind==='flame' }; OB_ENTRIES.set(key, e); }
+  return e;
+}
+const OB_WEAPON_KIND = [['greatsword','greatsword'],['greataxe','greataxe'],['maul','hammer'],['warhammer','hammer'],['hammer','hammer'],
+  ['halberd','spear'],['spear','spear'],['pike','spear'],['trident','trident'],['quarterstaff','staff'],['staff','staff'],['axe','axe'],['pick','axe'],
+  ['scimitar','scimitar'],['sickle','scimitar'],['dagger','dagger'],['club','club'],['mace','mace'],['morningstar','mace'],['flail','mace'],
+  ['bow','bow'],['crossbow','bow'],['sling','club'],['dart','dagger'],['javelin','spear']];
+const OB_GEMS = ['#d63a4a','#3aa0d6','#3ac070','#b060e0','#e8c040','#e87a30'];
+// the painted icon for a floor item, by what kind of thing it is
+function obItemEntry(fi){
+  const q = fi.quality|0;
+  if (fi.kind==='scroll') return obEntry('scroll');
+  if (fi.consumable){
+    const n = (fi.nm||'').toLowerCase();
+    const col = /heal|life|vital/.test(n) ? '#d63a4a' : /mana|magic|mind/.test(n) ? '#3a70e0' : /strength|giant|might/.test(n) ? '#e87a30'
+      : /speed|haste|swift/.test(n) ? '#e8d040' : /invis|shadow/.test(n) ? '#8a8aa8' : /poison|venom|antidote/.test(n) ? '#4ac040' : OB_GEMS[(n.length*7)%OB_GEMS.length];
+    return obEntry('potion', {col});
+  }
+  if (fi.kind==='wand') return obEntry('weapon', {kind:'wand'});
+  if (fi.slot==='weapon' || fi.slot==='ranged'){
+    const b = (fi.basis||fi.nm||'').toLowerCase();
+    let kind = fi.slot==='ranged' ? 'bow' : 'sword';
+    for (const [k,v] of OB_WEAPON_KIND) if (b.includes(k)){ kind = v; break; }
+    return obEntry('weapon', {kind});
+  }
+  const metal = ['#8e969c','#9aa8b8','#c8b060','#6ac0a0','#e0b040'][q] || '#9aa3a8';
+  if (fi.slot==='ring') return obEntry('armor', {kind:'ring', gem:OB_GEMS[q%OB_GEMS.length]});
+  if (fi.slot==='necklace') return obEntry('armor', {kind:'amulet', gem:OB_GEMS[(q+1)%OB_GEMS.length]});
+  const kind = fi.slot==='head' ? 'head' : fi.slot==='arms' ? 'arms' : fi.slot==='legs' ? 'legs' : 'chest';
+  return obEntry('armor', {kind, metal});
+}
+// the painted icon for a dungeon decoration (headstones pick a shape per plot)
+function obDecoEntry(deco, x, y){
+  if (deco==='grave') return obEntry('grave', {v: Math.floor(fpHash(x,y,91)*4), stone: fpHash(x,y,92)>0.5 ? '#8c8c90' : '#9a968a'});
+  if (deco==='banner') return obEntry('banner', {col: G.siteKind==='necro' ? '#4a2a70' : '#a01e28'});
+  if (deco==='idol') return obEntry('idol', {});
+  if (OB_PAINTERS[deco]) return obEntry(deco, {});
+  return null;
+}
+// draws a painted object into a map cell, sized to the cell
+function drawObjIcon(x, y, entry, frac){
+  const spr = fpUndeadSprite(entry, false);
+  const hh = cellPx*(frac||0.78), ww = Math.min(cellPx*1.02, hh*spr.aspect), h2 = ww/spr.aspect;
+  ctx.drawImage(spr.img, x*cellPx+(cellPx-ww)/2, y*cellPx+cellPx*0.94-h2, ww, h2);
+}
+
 // ---------- lighting ----------
 // wall torches bake a falloff map (with line of sight, so light doesn't leak
 // through stone) whenever the set of torches you've seen changes; each frame
@@ -11866,6 +12452,14 @@ function fpRenderWorld(env, T, camZ, horizon){
   const ftile = FP.ftile, floors = T.floors, ceil = T.ceil;
   const MASK = FP_TR-1;
   const lanOf = d => d>=R ? 0 : Math.pow(1-d/R, 1.6)*lanK;
+  const yard = !!(T.yard && G.gameMode===1);
+  if (!FP.layers){ FP.layers = { perp:new Float32Array(8), side:new Uint8Array(8), kind:new Uint8Array(8), mx:new Int32Array(8), my:new Int32Array(8) }; }
+  const LY_perp = FP.layers.perp, LY_side = FP.layers.side, LY_kind = FP.layers.kind, LY_mx = FP.layers.mx, LY_my = FP.layers.my;
+  // wall pixels are staged per column and laid over the floor/sky afterward,
+  // since in the graveyard the background shows through gaps in them
+  if (!FP.fgBuf || FP.fgBuf.length!==H){ FP.fgBuf = new Uint32Array(H); FP.fgSet = new Uint32Array(H); FP.colStamp = 1; }
+  const fgBuf = FP.fgBuf, fgSet = FP.fgSet;
+  let colStamp = FP.colStamp;
   // per-row floor/ceiling distance and lantern falloff
   for (let y=0;y<H;y++){
     const dy = y+0.5-horizon;
@@ -11893,48 +12487,72 @@ function fpRenderWorld(env, T, camZ, horizon){
     let stepX, stepY, sdx, sdy;
     if (rdx<0){ stepX=-1; sdx=(c.x-mapX)*ddx; } else { stepX=1; sdx=(mapX+1-c.x)*ddx; }
     if (rdy<0){ stepY=-1; sdy=(c.y-mapY)*ddy; } else { stepY=1; sdy=(mapY+1-c.y)*ddy; }
-    let hit = false, side = 0;
+    // collect what the ray passes: normally just the first solid wall, but in
+    // the open graveyard the mausoleum roofs and the iron railings have holes,
+    // so the ray keeps going and every layer it crossed is drawn far to near
+    let nL = 0, prevWall = false;
     for (let i=0;i<80;i++){
+      let side;
       if (sdx<sdy){ sdx+=ddx; mapX+=stepX; side=0; } else { sdy+=ddy; mapY+=stepY; side=1; }
-      if (mapX<0||mapY<0||mapX>=COLS||mapY>=ROWS){ if (!outdoor) hit = true; break; }
-      if (G.map[mapX][mapY]===T_WALL){ hit = true; break; }
+      if (mapX<0||mapY<0||mapX>=COLS||mapY>=ROWS){
+        if (!outdoor){ LY_perp[nL] = side===0 ? sdx-ddx : sdy-ddy; LY_side[nL] = side; LY_kind[nL] = 0; LY_mx[nL] = mapX; LY_my[nL] = mapY; nL++; }
+        break;
+      }
+      if (G.map[mapX][mapY]===T_WALL){
+        const edge = yard && (mapX===0||mapY===0||mapX===COLS-1||mapY===ROWS-1);
+        if (!prevWall || edge){
+          LY_perp[nL] = side===0 ? sdx-ddx : sdy-ddy; LY_side[nL] = side; LY_mx[nL] = mapX; LY_my[nL] = mapY;
+          LY_kind[nL] = edge ? 2 : 1; nL++;
+        }
+        if (!yard || edge || nL>=4) break;
+        prevWall = true;
+      } else prevWall = false;
     }
     let top = horizon, bot = horizon - 1, perp = 1e9;
-    if (hit){
-      perp = side===0 ? sdx-ddx : sdy-ddy;
-      if (perp<0.02) perp = 0.02;
-      const lineH = proj/perp;
-      top = horizon - (1-camZ)*lineH; bot = horizon + camZ*lineH;
+    for (let li0=nL-1; li0>=0; li0--){
+      const side = LY_side[li0], mX = LY_mx[li0], mY = LY_my[li0];
+      let lp = LY_perp[li0];
+      if (lp<0.02) lp = 0.02;
+      const lineH = proj/lp;
+      const ltop = horizon - (1-camZ)*lineH, lbot = horizon + camZ*lineH;
       // texture + lighting for this wall slice
       let tex = T.wall;
-      if (mapX>=0 && mapY>=0 && mapX<COLS && mapY<ROWS){
+      if (LY_kind[li0]===2) tex = T.fence;
+      else if (mX>=0 && mY>=0 && mX<COLS && mY<ROWS){
         if (G.gameMode===1){
-          if (G.dungeonDeco && G.dungeonDeco[mapX][mapY]==='torch') tex = T.wallTorch;
-          else if (fpHash(mapX,mapY,3)>0.72) tex = T.wall2;
-        } else if (G.arenaDeco && G.arenaDeco[mapX] && G.arenaDeco[mapX][mapY]==='rock') tex = T.wall2;
+          if (!yard && G.dungeonDeco && G.dungeonDeco[mX][mY]==='torch') tex = T.wallTorch;
+          else if (fpHash(mX,mY,3)>0.72) tex = T.wall2;
+        } else if (G.arenaDeco && G.arenaDeco[mX] && G.arenaDeco[mX][mY]==='rock') tex = T.wall2;
       }
-      const hx = c.x+perp*rdx, hy = c.y+perp*rdy;
+      const hx = c.x+lp*rdx, hy = c.y+lp*rdy;
       let wallX = side===0 ? hy : hx; wallX -= Math.floor(wallX);
       let texX = Math.floor(wallX*FP_TR);
       if ((side===0 && rdx>0) || (side===1 && rdy<0)) texX = FP_TR-1-texX;
       const li = side===0 ? fpLightIdx(hx-stepX*0.45, hy) : fpLightIdx(hx, hy-stepY*0.45);
       const shade = side===1 ? 0.8 : 1;
-      const lan = lanOf(perp);
+      const lan = lanOf(lp);
       const lr = (ambR + lan*lcR + (li>=0?L4r[li]:0))*shade;
       const lg = (ambG + lan*lcG + (li>=0?L4g[li]:0))*shade;
       const lb = (ambB + lan*lcB + (li>=0?L4b[li]:0))*shade;
-      const fogT = fog ? clamp((perp-fogNear)/fogSpan,0,1) : 0;
-      const y0 = mx(0, Math.ceil(top)), y1 = mn(H-1, Math.floor(bot));
-      const span = bot-top, tr = tex.r, tg = tex.g, tb = tex.b, te = tex.e;
+      const fogT = fog ? clamp((lp-fogNear)/fogSpan,0,1) : 0;
+      const y0 = mx(0, Math.ceil(ltop)), y1 = mn(H-1, Math.floor(lbot));
+      const span = lbot-ltop, tr = tex.r, tg = tex.g, tb = tex.b, te = tex.e, ta = tex.a;
       for (let y=y0; y<=y1; y++){
-        const texY = clamp(Math.floor((y+0.5-top)/span*FP_TR), 0, MASK);
-        const ti = texY*FP_TR+texX, ao = FP.ao[texY];
+        const texY = clamp(Math.floor((y+0.5-ltop)/span*FP_TR), 0, MASK);
+        const ti = texY*FP_TR+texX;
+        if (ta && ta[ti]) continue;
+        const ao = ta ? 1 : FP.ao[texY];
         let er = 0; if (te){ er = te[ti]/170; }
         let r = tr[ti]*(lr*ao+er), g = tg[ti]*(lg*ao+er), b = tb[ti]*(lb*ao+er);
         if (fogT){ r += (fog[0]-r)*fogT; g += (fog[1]-g)*fogT; b += (fog[2]-b)*fogT; }
-        u32[y*W+x] = (255<<24) | ((b>255?255:b|0)<<16) | ((g>255?255:g|0)<<8) | (r>255?255:r|0);
+        fgBuf[y] = (255<<24) | ((b>255?255:b|0)<<16) | ((g>255?255:g|0)<<8) | (r>255?255:r|0);
+        fgSet[y] = colStamp;
       }
+      perp = lp;
+      if (LY_kind[li0]!==2){ top = ltop; bot = lbot; }
     }
+    colStamp++;
+    const myStamp = colStamp-1;
     zb[x] = perp;
     // floor below the wall slice
     for (let y=mx(Math.floor(bot)+1, Math.ceil(horizon)); y<H; y++){
@@ -11953,7 +12571,16 @@ function fpRenderWorld(env, T, camZ, horizon){
       u32[y*W+x] = (255<<24) | ((b>255?255:b|0)<<16) | ((g>255?255:g|0)<<8) | (r>255?255:r|0);
     }
     // ceiling (or open sky) above it
-    const cEnd = Math.min(H-1, Math.ceil(top)-1, Math.floor(horizon));
+    const cEnd = yard ? Math.min(H-1, Math.floor(horizon)) : Math.min(H-1, Math.ceil(top)-1, Math.floor(horizon));
+    // a ragged line of dark trees far off beyond the graveyard railings
+    let treeTop = 1e9;
+    if (yard){
+      const az = c.a + Math.atan(camX*FP_PLANE);
+      const u = (az/(Math.PI*2))*64*9;
+      const tu = ((u%576)+576)%576;
+      const hN = fpNoise(tu%64, 7, 8, 311+Math.floor(tu/64))*0.6 + fpNoise(tu%64, 21, 32, 313+Math.floor(tu/64))*0.4;
+      treeTop = horizon - proj*(0.035 + hN*0.075);
+    }
     let moonDx = 1e9;
     if (outdoor && env.moon){
       let da = c.a + Math.atan(camX*FP_PLANE) - FP_MOON_AZ;
@@ -11976,6 +12603,10 @@ function fpRenderWorld(env, T, camZ, horizon){
             px = (255<<24) | ((b0+(220-b0)*gl|0)<<16) | ((g0+(215-g0)*gl|0)<<8) | (r0+(200-r0)*gl|0);
           }
         }
+        if (y >= treeTop){
+          const k = 0.55 + 0.25*(y-treeTop)/Math.max(1, horizon-treeTop);
+          px = (255<<24) | ((fog[2]*k|0)<<16) | ((fog[1]*k|0)<<8) | (fog[0]*k|0);
+        }
         u32[y*W+x] = px;
         continue;
       }
@@ -11995,7 +12626,9 @@ function fpRenderWorld(env, T, camZ, horizon){
       }
       u32[y*W+x] = (255<<24) | ((b>255?255:b|0)<<16) | ((g>255?255:g|0)<<8) | (r>255?255:r|0);
     }
+    for (let y=0; y<H; y++) if (fgSet[y]===myStamp) u32[y*W+x] = fgBuf[y];
   }
+  FP.colStamp = colStamp;
   FP.octx.putImageData(FP.img, 0, 0);
   return { dirX, dirY, plX, plY, proj };
 }
@@ -12204,44 +12837,43 @@ function fpCollectSprites(vis){
     if (x===G.player.x && y===G.player.y) continue; // whatever you're standing on is underfoot, not in view
     const t = G.map[x][y], cx = x+0.5, cy = y+0.5;
     if (t===T_WALL) continue;
-    const add = (recipe, color, h, lift, extra)=> S.push(Object.assign({x:cx, y:cy, spr:fpSprite(recipe,color), h, lift}, extra||{}));
+    const addP = (entry, h, lift, extra)=> S.push(Object.assign({x:cx, y:cy, spr:fpUndeadSprite(entry,false), h, lift}, extra||{}));
     switch(t){
-      case T_EXIT: add(EXIT_ART, COL.cyan, 0.86, 0, {glow:COL.cyan}); break;
+      case T_EXIT: addP(obEntry('portal',{rgb:'90,220,255'}), 0.92, 0, {glow:COL.cyan}); break;
       case T_FLEE:
-        if (G.gameMode===1) add(EXIT_ART, COL.red, 0.86, 0, {glow:COL.red});
+        if (G.gameMode===1) addP(obEntry('portal',{rgb:'255,90,70'}), 0.92, 0, {glow:COL.red});
         else if ((x===0&&y===midY)||(x===COLS-1&&y===midY)||(y===0&&x===midX)||(y===ROWS-1&&x===midX)){
           const sealed = G.mandatoryFight && G.mon.some(m=>m.alive);
-          S.push({x:cx, y:cy, spr:fpGlyphSprite(sealed?'x':'<', sealed?COL.dim:COL.red), h:0.3, lift:0.3+bob, emissive:true});
+          addP(obEntry('sign',{sealed:!!sealed}), 0.62, 0, {shadow:true});
         }
         break;
-      case T_GOLD: add(FP_GOLD_ART, COL.gold, 0.2, 0, {shine:true}); break;
-      case T_SHOP: add(SHOP_ART, COL.gold, 0.5, 0, {shadow:true}); break;
-      case T_VAULT: add(VAULT_ART, COL.gold, 0.46, 0, {shadow:true, shine:true}); break;
-      case T_CORRUPT_CHEST: add(CORRUPT_CHEST_ART, COL.purple, 0.46, 0, {shadow:true, glow:COL.purple}); break;
-      case T_TAVERN: add(TAVERN_ART, COL.tavern, 0.7, 0, {shadow:true}); break;
-      case T_BLACKSMITH: add(BLACKSMITH_ART, COL.dim, 0.5, 0, {shadow:true}); break;
-      case T_ALCHEMIST: add(ALCHEMIST_ART, COL.green, 0.55, 0, {shadow:true}); break;
+      case T_GOLD: addP(obEntry('gold'), 0.24, 0, {shine:true}); break;
+      case T_SHOP: addP(obEntry('stall'), 0.62, 0, {shadow:true}); break;
+      case T_VAULT: addP(obEntry('chest',{gold:true}), 0.4, 0, {shadow:true, shine:true}); break;
+      case T_CORRUPT_CHEST: addP(obEntry('chest',{corrupt:true}), 0.42, 0, {shadow:true, glow:COL.purple}); break;
+      case T_TAVERN: addP(obEntry('tavern'), 0.55, 0, {shadow:true}); break;
+      case T_BLACKSMITH: addP(obEntry('anvil'), 0.36, 0, {shadow:true}); break;
+      case T_ALCHEMIST: addP(obEntry('cauldron'), 0.42, 0, {shadow:true, glow:COL.green}); break;
       case T_ITEM: {
         const fi = G.floorItem[x][y];
         if (!fi) break;
-        if (fi.consumable) add(ITEM_POTION_ART, '#ff8fa3', 0.3, 0.05+bob, {shine:true, shadow:true});
-        else if (fi.slot==='weapon' || fi.slot==='ranged') add(ITEM_WEAPON_ART, '#e6e6e6', 0.34, 0.05+bob, {shine:true, shadow:true});
-        else add(ITEM_MISC_ART, qualityColor(fi.quality|0)||COL.cyan, 0.3, 0.05+bob, {shine:true, shadow:true});
+        const q = fi.quality|0;
+        addP(obItemEntry(fi), fi.consumable ? 0.24 : 0.26, 0.02+bob*0.5, {shine:true, shadow:true, glow: q>=2 ? qualityColor(q) : null});
         break;
       }
     }
     if (t===T_FLOOR && G.gameMode===1 && G.dungeonDeco){
-      const deco = G.dungeonDeco[x][y], da = deco && DECO_ART[deco];
-      if (da && deco!=='rune' && deco!=='pool'){
-        const h = {throne:0.9, banner:0.82, altar:0.55, idol:0.78, grave:0.62, ore:0.28}[deco] || 0.6;
-        add(da[0], da[1], h, 0, {shadow:true, glow: deco==='idol'||deco==='altar' ? da[1] : null});
+      const deco = G.dungeonDeco[x][y], oe = deco && deco!=='rune' && deco!=='pool' && deco!=='torch' && obDecoEntry(deco, x, y);
+      if (oe){
+        const h = {throne:0.9, banner:0.86, altar:0.5, idol:0.7, grave:0.5, ore:0.3}[deco] || 0.6;
+        addP(oe, h, 0, {shadow:true, glow: deco==='idol' ? COL.cyan : deco==='altar' ? COL.purple : null});
       }
     }
   }
   // torch flames
   for (const f of (FP.flames||[])){
     const fl = 0.9 + 0.12*Math.sin(FP.t*13+f.seed*40) + 0.06*Math.sin(FP.t*31+f.seed*9);
-    S.push({x:f.x, y:f.y, spr:fpSprite(FP_FLAME_ART, COL.amber), h:0.2*fl, lift:0.5, emissive:true, glow:'#ffab4a', glowR:1.4});
+    S.push({x:f.x, y:f.y, spr:fpUndeadSprite(obEntry('flame'), false), h:0.2*fl, lift:0.5, emissive:true, glow:'#ffab4a', glowR:1.4});
     if (Math.random() < FP.dt*2.2) FP.parts.push({x:f.x+(Math.random()-0.5)*0.05, y:f.y+(Math.random()-0.5)*0.05, z:0.66,
       vx:(Math.random()-0.5)*0.08, vy:(Math.random()-0.5)*0.08, vz:0.25+Math.random()*0.2, life:1.2+Math.random(), age:0, col:'#ffb45c', add:true, r:0.012});
   }
