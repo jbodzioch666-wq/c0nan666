@@ -431,6 +431,20 @@
     .dh-tools button{ width:28px; height:28px; font-size:12px; }
     body.immersive .hud, body.immersive .spellcol{ width:calc(100vw - 24px); } body.immersive .spellcol{ right:12px; top:auto; bottom:130px; }
   }
+
+  /* 3D town hub: name plates and the town banner */
+  .v3plate{ position:absolute; left:0; top:0; white-space:nowrap; padding:2px 9px 3px; border-radius:4px; background:rgba(10,8,6,0.62);
+    border:1px solid rgba(199,154,84,0.35); color:#f0e0b8; font:600 10px 'JetBrains Mono',monospace; text-align:center; text-shadow:0 1px 2px #000; transition:box-shadow .15s, border-color .15s; }
+  .v3plate b{ display:block; font-family:'Cinzel',Georgia,serif; font-size:12.5px; color:#ffd98a; letter-spacing:0.04em; }
+  .v3plate span{ color:#cdbb95; }
+  .v3plate.hot{ border-color:#ffd060; box-shadow:0 0 12px rgba(255,200,90,0.65); }
+  .v3plate.bld{ background:rgba(10,8,6,0.35); border-color:rgba(199,154,84,0.2); } .v3plate.bld b{ font-size:14px; color:#f4e8c8; }
+  .v3plate.small b{ font-size:11px; color:#9fe8ff; }
+  #v3banner{ position:absolute; left:50%; top:16%; transform:translateX(-50%); text-align:center; pointer-events:none; opacity:0; z-index:5; text-shadow:0 2px 12px #000, 0 0 3px #000; }
+  #v3banner b{ display:block; font-family:'Cinzel',Georgia,serif; font-size:clamp(20px, 3vw, 40px); white-space:nowrap; color:#ffe2a0; letter-spacing:0.12em; }
+  #v3banner span{ font-size:clamp(9px, 1vw, 13px); color:#e8d8b8; letter-spacing:0.2em; text-transform:uppercase; }
+  #v3banner.show{ animation:v3ban 4.5s ease forwards; }
+  @keyframes v3ban{ 0%{opacity:0; transform:translate(-50%,10px);} 12%{opacity:1; transform:translate(-50%,0);} 70%{opacity:1;} 100%{opacity:0;} }
   @media (prefers-reduced-motion: reduce){ *{ animation-duration:0.001ms !important; transition-duration:0.001ms !important; } }
 </style>
 
@@ -521,7 +535,11 @@ function recomputeWorldSizeConstants(){
 recomputeWorldSizeConstants();
 const T_WALL=0, T_FLOOR=1, T_STAIRSD=2, T_STAIRSU=3, T_GOLD=4, T_TRAP=5,
       T_ITEM=6, T_SHOP=7, T_TAVERN=8, T_VAULT=9, T_EXIT=10, T_FLEE=11,
-      T_BLACKSMITH=12, T_ALCHEMIST=13, T_CORRUPT_CHEST=14;
+      T_BLACKSMITH=12, T_ALCHEMIST=13, T_CORRUPT_CHEST=14,
+      // town-hub fixtures you interact with by walking into them (they
+      // never let you stand on them): the waypoint, the stash chest, the
+      // quest-giver and each vendor standing outside their shop
+      T_WAYPOINT=15, T_STASH=16, T_QUESTGIVER=17, T_VENDOR=18;
 const OW_GRASS=0, OW_FOREST=1, OW_WATER=2, OW_MOUNTAIN=3, OW_DUNGEON=4, OW_TOWN=5,
       OW_TUNDRA=6, OW_DESERT=7, OW_SWAMP=8, OW_RIVER=9, OW_CASTLE=10, OW_NECROTOWER=11,
       OW_TEMPLE=12, OW_GRAVEYARD=13, OW_MINE=14, OW_LAIR=15, OW_MOUNTAINPASS=16;
@@ -6087,6 +6105,8 @@ function tryMove(dx,dy){
     return;
   }
   if (tileAt(nx,ny)===T_WALL) return; // bumping a wall isn't an action - no turn spent
+  { const ht = tileAt(nx,ny);
+    if (ht===T_WAYPOINT || ht===T_STASH || ht===T_QUESTGIVER || ht===T_VENDOR){ villageInteract(nx,ny); return; } }
   // only a camp-interrupting ambush (G.mandatoryFight) is inescapable -
   // every way out stays sealed (acts like a wall) for as long as a single
   // monster is still alive. An ordinary roadside encounter never sets this
@@ -7646,6 +7666,91 @@ function fullyRestPlayer(){
   G.activeZones = [];
   return true;
 }
+// walking into a waypoint, the stash, the quest-giver or a vendor
+function villageInteract(x,y){
+  const t = tileAt(x,y);
+  if (t===T_WAYPOINT){ setUi('waypoint'); sfx && sfx('spell'); return; }
+  if (t===T_STASH){ setUi('stash'); return; }
+  const npc = (G.villageNpcs||[]).find(n=>n.x===x && n.y===y);
+  if (t===T_QUESTGIVER || (npc && npc.service==='questgiver')){ setUi('questgiver'); return; }
+  if (npc) setUi(npc.service);
+}
+function villageNpcFor(service){ return (G.villageNpcs||[]).find(n=>n.service===service); }
+function villageNpcTitle(service){ const n = villageNpcFor(service); return n ? `${esc(n.name)} &middot; ${esc(n.role)}` : ''; }
+// ---- waypoint: travel between the towns you've found ----
+function buildWaypoint(){
+  const towns = (G.ow.visitedTowns||[]);
+  const rows = towns.map((key,i)=>{
+    const [x,y] = key.split(',').map(Number), f = townFlavorAt(x,y), here = (x===G.owPos.x && y===G.owPos.y);
+    return `<div class="choice-row ${here?'sel':''}" ${here?'':`onclick="waypointTravel('${key}')"`} style="cursor:${here?'default':'pointer'};">
+      <span class="key">${i+1}</span><span>${f ? esc(f.name) : 'a town'}${here ? ' <span class="muted">(you are here)</span>' : ''}</span>
+      <span class="muted">${f ? esc(f.adj) : ''}</span></div>`;
+  }).join('');
+  return `<h2 class="panel-title" style="color:#8fe6ff;">WAYPOINT</h2>
+    <div class="sub">the old stone hums under your hand - step through to any town whose waypoint you have touched</div>
+    <div class="ovbody">${rows || '<div class="muted">no other waypoints attuned yet</div>'}
+      <div class="btnrow"><button class="btn primary" onclick="setUi('playing')">ESC &middot; step away</button></div></div>`;
+}
+function waypointTravel(key){
+  const [x,y] = key.split(',').map(Number);
+  if (!(G.ow.visitedTowns||[]).includes(key)) return;
+  if (x===G.owPos.x && y===G.owPos.y){ setUi('playing'); return; }
+  G.owPos.x = x; G.owPos.y = y;
+  enterVillage();
+  logMsg('the waypoint flares and the world folds - you step out into another town', 'magic');
+  sfx && sfx('spell');
+  saveCurrentGame();
+}
+// ---- stash: storage that stays in town, shared by every town's chest ----
+const MAXSTASH = 60;
+function buildStash(){
+  const st = G.player.stash || (G.player.stash = []);
+  const row = (it, i, act, arrow)=> `<div class="invrow" onclick="${act}(${i})"><span class="arrow-up">${arrow}</span><span>${itemNameHtml(it)}</span></div>`;
+  const inv = G.inv.map((it,i)=> row(it,i,'stashDeposit','&rarr;')).join('') || '<div class="muted">your pack is empty</div>';
+  const box = st.map((it,i)=> row(it,i,'stashWithdraw','&larr;')).join('') || '<div class="muted">the stash is empty</div>';
+  return `<h2 class="panel-title">STASH</h2>
+    <div class="sub">click an item to move it between your pack and the stash - anything left here is waiting in every town's chest</div>
+    <div class="ovbody" style="max-width:860px;display:flex;gap:16px;flex-wrap:wrap;">
+      <div class="panel" style="flex:1 1 320px;"><h4>Pack &middot; ${G.inv.length}/${MAXINV}</h4><div class="invlist" style="max-height:52vh;">${inv}</div></div>
+      <div class="panel" style="flex:1 1 320px;"><h4>Stash &middot; ${st.length}/${MAXSTASH}</h4><div class="invlist" style="max-height:52vh;">${box}</div></div>
+    </div>
+    <div class="btnrow"><button class="btn primary" onclick="setUi('playing')">ESC &middot; close</button></div>`;
+}
+function stashDeposit(i){
+  const st = G.player.stash || (G.player.stash = []);
+  if (st.length >= MAXSTASH){ logMsg('the stash is full', 'hit'); return; }
+  const it = G.inv[i]; if (!it) return;
+  invRemove(i); st.push(it); renderOverlay(); saveCurrentGame();
+}
+function stashWithdraw(i){
+  const st = G.player.stash || (G.player.stash = []);
+  if (G.inv.length >= MAXINV){ logMsg('your pack is full', 'hit'); return; }
+  const it = st[i]; if (!it) return;
+  st.splice(i,1); G.inv.push(it); renderOverlay(); saveCurrentGame();
+}
+// ---- the quest-giver: the town's notice board ----
+function buildQuestGiver(){
+  const npc = villageNpcFor('questgiver');
+  const board = G.questBoard.map(q=>`<div class="shoprow" onclick="acceptQuest('${q.id}')" style="cursor:pointer;">
+      <span style="color:#ffd35a;font-weight:700;">!</span><span class="desc">${esc(q.text)}</span><span class="price">${q.rewardGold}g/${q.rewardXp}xp</span></div>`).join('')
+    || `<div class="muted">nothing posted right now</div>`;
+  const active = (G.player.quests||[]).map(q=>{ const ready = questIsReady(q);
+    return `<div class="shoprow" ${ready?`onclick="turnInQuest('${q.id}')" style="cursor:pointer;"`:''}>
+      <span style="color:${ready?'#ffd35a':'var(--ink-faint)'};font-weight:700;">${ready?'?':'&middot;'}</span><span class="desc">${questProgressText(q)}${ready?' <span style="color:#74bf7e">- ready to turn in</span>':''}</span>
+      <span class="price">${q.rewardGold}g/${q.rewardXp}xp</span></div>`; }).join('') || `<div class="muted">you haven't taken any work yet</div>`;
+  return `<h2 class="panel-title">${npc ? esc(npc.name).toUpperCase() : 'THE NOTICE BOARD'}</h2>
+    <div class="sub">${npc ? esc(npc.role)+' &middot; ' : ''}"There's always work for a blade in these parts. Take what you can handle - three at a time."</div>
+    <div class="ovbody">
+      <h4 style="color:var(--ink-faint);margin-bottom:6px;">POSTED WORK</h4>${board}
+      <h4 style="color:var(--ink-faint);margin:14px 0 6px;">YOUR QUESTS &middot; ${(G.player.quests||[]).length}/3</h4>${active}
+      <div class="btnrow"><button class="btn primary" onclick="setUi('playing')">ESC &middot; leave</button></div>
+    </div>`;
+}
+function villageQuestMarker(){
+  if ((G.player.quests||[]).some(q=>questIsReady(q))) return '?';
+  if (G.questBoard.length && (G.player.quests||[]).length<3) return '!';
+  return '';
+}
 function villageRest(){
   if (fullyRestPlayer()) logMsg('you rest at the village - fully healed and refreshed', 'good');
   else logMsg('the village is quiet - you are already at full strength', '');
@@ -7724,80 +7829,72 @@ function generateAlchemistStock(){
 // "THE PEDDLER", buildBlacksmith's "THE BLACKSMITH", etc.) so the label
 // painted on the building in renderVillageMap says the same thing you see
 // once you actually walk in
+// the town hub: a walled village around a cobbled plaza. Every building's
+// door faces the camera (south, or east for the west side) so it can be seen
+// in the 3D hub view; each vendor also stands out front (npc) and walking
+// into them opens their shop just like the door does.
 const VILLAGE_BUILDINGS = [
-  { tile:T_SHOP,       deco:'buildingShop',   x0:3,  y0:3,  door:{x:4,  y:4},  entrance:{x:4,  y:5},  name:'The Peddler'    },
-  { tile:T_BLACKSMITH, deco:'buildingSmith',  x0:14, y0:3,  door:{x:15, y:4},  entrance:{x:15, y:5},  name:'The Blacksmith' },
-  { tile:T_ALCHEMIST,  deco:'buildingAlch',   x0:3,  y0:14, door:{x:4,  y:15}, entrance:{x:4,  y:14}, name:'The Alchemist'  },
-  { tile:T_TAVERN,     deco:'buildingTavern', x0:14, y0:14, door:{x:15, y:15}, entrance:{x:15, y:14}, name:'The Tavern'     },
+  { key:'smith',  tile:T_BLACKSMITH, deco:'buildingSmith',  x0:2,  y0:2, w:4, h:4, door:{x:3,y:5},  face:'s', floors:1, name:'The Blacksmith', npc:{x:6,y:6},  role:'Blacksmith', service:'blacksmith' },
+  { key:'tavern', tile:T_TAVERN,     deco:'buildingTavern', x0:8,  y0:2, w:5, h:5, door:{x:10,y:6}, face:'s', floors:2, name:'The Tavern',     npc:{x:12,y:7}, role:'Innkeeper',  service:'tavern' },
+  { key:'alch',   tile:T_ALCHEMIST,  deco:'buildingAlch',   x0:15, y0:2, w:3, h:4, door:{x:16,y:5}, face:'s', floors:2, name:'The Alchemist',  npc:{x:14,y:6}, role:'Alchemist',  service:'alchemist' },
+  { key:'shop',   tile:T_SHOP,       deco:'buildingShop',   x0:2,  y0:9, w:3, h:4, door:{x:4,y:10}, face:'e', floors:1, name:'The Peddler',    npc:{x:5,y:12}, role:'Peddler',    service:'shop' },
 ];
-// which row a building's own name label sits on - above its footprint for
-// the two nearer the top edge (Peddler/Blacksmith), below for the two
-// nearer the bottom edge (Alchemist/Tavern), so every label points away
-// from the crowded central plaza instead of toward it. Shared by both
-// renderVillageMap (where the label actually gets drawn) and
-// generateVillage's tree-placement exclusion zone below, so the two can
-// never drift out of sync with each other.
-function villageLabelRow(b){ return b.y0 < ROWS/2 ? b.y0-1 : b.y0+3; }
+// houses and a guard barracks - scenery only
+const VILLAGE_HOUSES = [
+  { x0:2, y0:15, w:3, h:3, floors:1 }, { x0:15, y0:14, w:3, h:4, floors:2 }, { x0:16, y0:9, w:2, h:3, floors:1, barracks:true },
+];
+const VILLAGE_NPC_NAMES = {
+  human: ['Aldric','Bram','Corwin','Doran','Edric','Hilda','Isolde','Marta','Osric','Rowena','Tobin','Wynne','Garrick','Elsa'],
+  elf:   ['Aelar','Caelynn','Erevan','Ilyana','Lirael','Naivara','Quelenna','Soveliss','Thamior','Vaelen','Faelar','Sariel'],
+  dwarf: ['Bruenor','Dagna','Eberk','Gunnloda','Harbek','Kathra','Morgran','Rurik','Thorin','Vistra','Brottor','Hlin'],
+  orc:   ['Dench','Feng','Gell','Holg','Krusk','Mhurren','Ront','Shump','Thokk','Baggi','Engong','Ownka'],
+};
+function villageSeed(){ return ((G.owPos.x*73856093) ^ (G.owPos.y*19349663)) >>> 0; }
 function generateVillage(){
   G.map = makeGrid(T_FLOOR);
   G.floorItem = makeItemGrid();
   G.villageDeco = makeGrid('grass', COLS, ROWS);
-
-  // outer boundary reads as a tree/hedge line around the village rather
-  // than dungeon rock
-  for (let x=0;x<COLS;x++){ G.map[x][0]=T_WALL; G.map[x][ROWS-1]=T_WALL; G.villageDeco[x][0]='hedge'; G.villageDeco[x][ROWS-1]='hedge'; }
-  for (let y=0;y<ROWS;y++){ G.map[0][y]=T_WALL; G.map[COLS-1][y]=T_WALL; G.villageDeco[0][y]='hedge'; G.villageDeco[COLS-1][y]='hedge'; }
-
+  const W = (x,y,d)=>{ G.map[x][y] = T_WALL; G.villageDeco[x][y] = d; };
+  const P = (x,y)=>{ if (G.map[x][y]===T_FLOOR) G.villageDeco[x][y] = 'path'; };
+  // the palisade ringing the town, with the gate on the south side
+  for (let x=0;x<COLS;x++){ W(x,0,'hedge'); W(x,ROWS-1,'hedge'); }
+  for (let y=0;y<ROWS;y++){ W(0,y,'hedge'); W(COLS-1,y,'hedge'); }
+  const cx = Math.floor(COLS/2);
+  G.map[cx][ROWS-1] = T_EXIT; G.villageDeco[cx][ROWS-1] = 'gate';
+  // cobbled plaza, main street to the gate, and a lane past every door
+  for (let x=7;x<=14;x++) for (let y=8;y<=15;y++) G.villageDeco[x][y] = 'path';
+  for (let y=8;y<ROWS-1;y++) G.villageDeco[cx][y] = 'path';
+  for (let x=2;x<=17;x++) { G.villageDeco[x][7] = 'path'; }
+  for (let x=5;x<=7;x++) G.villageDeco[x][10] = 'path';
   for (const b of VILLAGE_BUILDINGS){
-    for (let x=b.x0; x<b.x0+3; x++){
-      for (let y=b.y0; y<b.y0+3; y++){
-        if (x===b.door.x && y===b.door.y){ G.map[x][y]=b.tile; G.villageDeco[x][y]='path'; }
-        else if (x===b.entrance.x && y===b.entrance.y){ G.map[x][y]=T_FLOOR; G.villageDeco[x][y]='path'; }
-        else { G.map[x][y]=T_WALL; G.villageDeco[x][y]=b.deco; }
-      }
-    }
+    for (let x=b.x0; x<b.x0+b.w; x++) for (let y=b.y0; y<b.y0+b.h; y++) W(x,y,b.deco);
+    G.map[b.door.x][b.door.y] = b.tile;
+    const ax = b.door.x + (b.face==='e'?1:0), ay = b.door.y + (b.face==='s'?1:0);
+    G.villageDeco[ax][ay] = 'path';
+    for (let y=ay; y<=7; y++) G.villageDeco[ax][y] = 'path';
   }
-
-  // town square: a paved plaza around a central fountain, linked to every
-  // building by a short cobbled spur and to the south gate by a main street
-  const cx = Math.floor(COLS/2), cy = Math.floor(ROWS/2);
-  for (let x=cx-6; x<=cx+5; x++) for (let y=cy-1; y<=cy+1; y++) G.villageDeco[x][y]='path';
-  G.map[cx][cy] = T_WALL; G.villageDeco[cx][cy] = 'fountain';
-
-  function spur(x,y0,y1){ for (let y=y0;y<=y1;y++) G.villageDeco[x][y]='path'; }
-  spur(4, 6, 8);          // shop door -> plaza
-  spur(15, 6, 8);         // blacksmith door -> plaza
-  spur(4, 12, 13);        // alchemist door -> plaza
-  spur(15, 12, 13);       // tavern door -> plaza
-  spur(cx, cy+2, ROWS-2); // plaza -> south gate (also where the player stands)
-
-  G.player.x = cx; G.player.y = ROWS-3;
-  G.map[cx][ROWS-1] = T_EXIT;
-  G.villageDeco[cx][ROWS-1] = 'gate';
-
-  // reserve a band of tiles at each building's own label row (see
-  // villageLabelRow) so the tree scatter below can never plant one over a
-  // name - marked with a deco tag that isn't 'grass' (so it's skipped the
-  // same way a path/building tile already is) but also isn't 'path' (so it
-  // still renders as plain ground color, not a path that leads nowhere)
-  for (const b of VILLAGE_BUILDINGS){
-    const ly = villageLabelRow(b);
-    if (ly<1 || ly>ROWS-2) continue;
-    for (let x=b.x0-3; x<=b.x0+5; x++){
-      if (x<1 || x>COLS-2) continue;
-      if (G.villageDeco[x][ly]==='grass') G.villageDeco[x][ly] = 'labelZone';
-    }
-  }
-  // trees scattered across whatever grass is left - never on a building,
-  // path, plaza, gate or a building's own label row, since those tiles
-  // already moved off 'grass' above
-  const decoN = 40+rn(15);
-  for (let i=0;i<decoN;i++){
-    const x=2+rn(COLS-4), y=2+rn(ROWS-4);
-    if (G.villageDeco[x][y] !== 'grass' || G.map[x][y] !== T_FLOOR) continue;
-    G.map[x][y] = T_WALL;
-    G.villageDeco[x][y] = 'tree';
-  }
+  for (const h of VILLAGE_HOUSES) for (let x=h.x0; x<h.x0+h.w; x++) for (let y=h.y0; y<h.y0+h.h; y++) W(x,y, h.barracks ? 'buildingBarracks' : 'buildingHouse');
+  // the smithy's forge lean-to and the peddler's market stall
+  W(6,3,'forge'); W(6,4,'anvil'); W(6,11,'stall');
+  // hub fixtures
+  G.map[cx][12] = T_WAYPOINT;  G.villageDeco[cx][12] = 'waypoint';
+  G.map[13][10] = T_STASH;     G.villageDeco[13][10] = 'stash';
+  W(15,8,'board');
+  G.map[14][9] = T_QUESTGIVER; G.villageDeco[14][9] = 'questgiver';
+  // vendors out front of their shops
+  G.villageNpcs = [];
+  const seed = villageSeed(), names = VILLAGE_NPC_NAMES[G.villageRace] || VILLAGE_NPC_NAMES.human;
+  const nm = i=> names[(seed + i*5) % names.length];
+  VILLAGE_BUILDINGS.forEach((b,i)=>{
+    G.map[b.npc.x][b.npc.y] = T_VENDOR; G.villageDeco[b.npc.x][b.npc.y] = 'npc';
+    G.villageNpcs.push({ x:b.npc.x, y:b.npc.y, name:nm(i), role:b.role, service:b.service, key:b.key });
+  });
+  G.villageNpcs.push({ x:14, y:9, name:nm(5), role:'Captain of the Watch', service:'questgiver', key:'quest' });
+  // lamp posts round the plaza and a few trees and barrels
+  for (const [x,y] of [[7,8],[14,15],[7,15],[11,8]]) W(x,y,'lamp');
+  for (const [x,y] of [[6,16],[13,17],[17,13],[6,8],[1+1,13]]) if (G.map[x][y]===T_FLOOR) W(x,y,'tree');
+  for (const [x,y] of [[13,6],[13,5]]) W(x,y,'barrels');
+  G.player.x = cx; G.player.y = ROWS-3; G.player.facing = 0;
 
   G.mon = [];
   generateVillageShop();
@@ -7806,13 +7903,13 @@ function generateVillage(){
   // (see moveVillagers, ticked from tryMove whenever gameMode===3), all the
   // same race as the village itself (see enterVillage's G.villageRace)
   G.villagers = [];
-  const villagerN = 3+rn(4);
+  const villagerN = 4+rn(4);
   for (let i=0;i<villagerN;i++){
-    for (let tries=0; tries<40; tries++){
-      const x = 2+rn(COLS-4), y = 2+rn(ROWS-4);
+    for (let tries=0; tries<60; tries++){
+      const x = 2+rn(COLS-4), y = 6+rn(ROWS-8);
       if (G.map[x][y]!==T_FLOOR) continue;
       if (x===G.player.x && y===G.player.y) continue;
-      G.villagers.push({x,y});
+      G.villagers.push({x,y,look:i});
       break;
     }
   }
@@ -8436,7 +8533,7 @@ function toggleLayout(){
   setupCanvas(); if (G.player) renderGame();
 }
 // the layout the canvas was last sized for - re-sized whenever it changes
-function layoutKey(){ return immersiveUi ? ('imm|'+(fp3dActive()?'3d':'sq')+'|'+window.innerWidth+'x'+window.innerHeight) : 'classic'; }
+function layoutKey(){ return immersiveUi ? ('imm|'+((fp3dActive() || v3Active())?'3d':'sq')+'|'+window.innerWidth+'x'+window.innerHeight) : 'classic'; }
 function setupCanvas(){
   const wrap = canvas.parentElement;
   G._layoutKey = layoutKey();
@@ -8446,7 +8543,7 @@ function setupCanvas(){
     dpr = Math.min(2, window.devicePixelRatio||1);
     const vw = wrap.clientWidth || window.innerWidth, vh = wrap.clientHeight || window.innerHeight;
     let cw, chh, left, top;
-    if (fp3dActive()){ cw = vw; chh = vh; left = 0; top = 0; }
+    if (fp3dActive() || v3Active()){ cw = vw; chh = vh; left = 0; top = 0; }
     else {
       const barH = 112, S = Math.max(200, Math.min(vw-16, vh-barH-12));
       cw = chh = S; left = Math.round((vw-S)/2); top = Math.max(6, Math.round((vh-barH-S)/2));
@@ -9053,6 +9150,8 @@ function renderVillageMap(){
         case T_TAVERN: drawGlyph(x,y,'H',COL.tavern); break;
         case T_BLACKSMITH: drawGlyph(x,y,'&',COL.dim); break;
         case T_ALCHEMIST: drawGlyph(x,y,'*',COL.green); break;
+        case T_WAYPOINT: drawObjIcon(x,y,obEntry('portal',{rgb:'90,220,255'}),0.9); break;
+        case T_STASH: drawObjIcon(x,y,obEntry('chest',{gold:true}),0.66); break;
         case T_ITEM: {
           const fi = G.floorItem[x][y];
           if (fi){
@@ -9070,9 +9169,11 @@ function renderVillageMap(){
   // foundation fill above rather than replacing it, so a bit of the plain
   // tile color still peeks out around the silhouette like a building sitting
   // on its own lot
+  for (const h of VILLAGE_HOUSES) drawMonsterArt((h.x0+h.w/2)*cellPx, (h.y0+h.h/2)*cellPx, cellPx*Math.min(h.w,h.h)*0.9, raceTheme.art, raceTheme.color);
+  for (const n of (G.villageNpcs||[])) drawMonsterArt(n.x*cellPx+cellPx/2, n.y*cellPx+cellPx/2, cellPx*0.85, VILLAGER_ART, n.service==='questgiver' ? COL.gold : COL.cyan);
   for (const b of VILLAGE_BUILDINGS){
-    const px = (b.x0+1)*cellPx + cellPx/2, py = (b.y0+1)*cellPx + cellPx/2;
-    drawMonsterArt(px, py, cellPx*2.7, raceTheme.art, raceTheme.color);
+    const px = (b.x0+b.w/2)*cellPx, py = (b.y0+b.h/2)*cellPx;
+    drawMonsterArt(px, py, cellPx*Math.min(b.w,b.h)*0.9, raceTheme.art, raceTheme.color);
     // the building's real name (matches its own screen title exactly, see
     // VILLAGE_BUILDINGS), painted on its own reserved row (villageLabelRow -
     // above the building for the top two, below for the bottom two, so it
@@ -9080,7 +9181,7 @@ function renderVillageMap(){
     // the building art itself - a dark stroke-outline keeps it legible over
     // any of the 4 race colors/the ground color underneath, instead of
     // picking one fixed color that might blend into some of them
-    const labelY = villageLabelRow(b)*cellPx + cellPx/2;
+    const labelY = (b.y0+b.h)*cellPx - cellPx*0.3;
     ctx.font = `700 ${Math.round(cellPx*0.32)}px 'JetBrains Mono', 'DepthcrawlCardSuits', monospace`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.lineWidth = Math.max(2, dpr*2.2);
@@ -9517,6 +9618,7 @@ function renderGame(){
   // anticipate; only actually touches the DOM/resizes the canvas on the
   // frame the mode genuinely changes, not every frame
   if (G._layoutKey !== layoutKey()) setupCanvas();
+  if (G.gameMode!==3 || !v3Active()) v3Hide();
   // start sculpting the 3D skeleton in the background as soon as three.js is in
   if (G.player && SK3.ok===null && typeof THREE!=='undefined') sk3Init();
   const wantVillageMode = G.gameMode===3;
@@ -9527,7 +9629,7 @@ function renderGame(){
     setupCanvas();
   }
   if (G.gameMode===0) { if (G.owZoomedOut) renderOverworldMapZoomed(); else renderOverworldMap(); }
-  else if (G.gameMode===3) renderVillageMap();
+  else if (G.gameMode===3){ if (!(v3Active() && v3Render())){ v3Hide(); renderVillageMap(); } }
   else if (fp3dActive()) renderFirstPerson(); // first-person 3D view of a dungeon floor or roadside fight (M flips to the top-down map)
   else if (G.gameMode===2) renderArenaMap(); // roadside encounter - an open field, not a dungeon floor
   else renderDungeonMap(); // dungeons, castles and necromancer towers
@@ -9751,7 +9853,7 @@ function renderImmersiveHud(){
     slot('I', im(obEntry('chest',{gold:true})), 'inventory', G.inv.length||'', 'sep'),
     slot('P', im(obEntry('armor',{kind:'chest', metal:'#9aa3a8'})), 'character sheet', ''),
     slot('B', im(monsterPortraitFor('skeleton', true)), 'bestiary', '', 'minor'),
-    slot('M', `<span class="ico">${G.gameMode===0 ? (G.owZoomedOut ? '&minus;' : '&#9635;') : (fp3dActive() ? '&#9638;' : '&#9650;')}</span>`, G.gameMode===0 ? 'world map zoom' : (fp3dActive() ? 'top-down map' : 'first-person view'), '', 'minor'),
+    slot('M', `<span class="ico">${G.gameMode===0 ? (G.owZoomedOut ? '&minus;' : '&#9635;') : (fp3dActive() || v3Active() ? '&#9638;' : '&#9650;')}</span>`, G.gameMode===0 ? 'world map zoom' : G.gameMode===3 ? (v3Active() ? 'town map' : '3D town') : (fp3dActive() ? 'top-down map' : 'first-person view'), '', 'minor'),
     G.gameMode===0 && G.owZoomedOut ? slot('T', `<span class="ico">&#10148;</span>`, 'fast travel', '', 'minor') : '',
     slot('C', im(obEntry('flame')), 'camp', '', 'minor'),
   ].join('');
@@ -13373,6 +13475,817 @@ function sk3Sprite(m, pos, light, pxH){
   return e;
 }
 
+// ===================== SECTION: 3D TOWN HUB =====================
+// the village drawn as a real 3D town seen from an angled action-RPG camera:
+// timber-framed buildings with shingled roofs, glowing windows at night, a
+// smithy forge, an alchemist's cauldron, a market stall, a waypoint on the
+// plaza, a palisade and gate, lamp posts and trees - all built from code.
+// People (you, the vendors, the townsfolk) are the same painted figures the
+// rest of the game uses, standing in the scene as billboards. The game still
+// runs on its tile grid: clicking the ground or someone walks you there one
+// step at a time through the normal move rules. Without three.js (offline)
+// the flat village map is used instead.
+let v3Pref = true;
+try{ v3Pref = localStorage.getItem('depthcrawl_town3d')!=='0'; }catch(e){}
+const V3 = { ok:null, mapRef:null, path:[], stepT:0, hover:null, dist:13.5, pos:null, tex:{} };
+function v3Active(){ return v3Pref && G.gameMode===3 && typeof THREE!=='undefined' && V3.ok!==false && !!G.villageNpcs; }
+function v3Toggle(){
+  v3Pref = !v3Pref;
+  try{ localStorage.setItem('depthcrawl_town3d', v3Pref?'1':'0'); }catch(e){}
+  logMsg(v3Pref ? '3D town view (M for the town map)' : 'town map (M for the 3D view)', '');
+  renderGame();
+}
+// ---------- small helpers ----------
+function v3Canvas(w,h){ const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+function v3CanvasTex(c, rep){
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; if (rep) t.repeat.set(rep, rep);
+  if (THREE.sRGBEncoding) t.encoding = THREE.sRGBEncoding;
+  t.anisotropy = 8; return t;
+}
+function v3Noise(seed){
+  const N = 64, v = new Float32Array(N*N); let s = seed||1;
+  for (let i=0;i<v.length;i++){ s = (s*16807)%2147483647; v[i] = s/2147483647; }
+  return (x,y)=>{ const xi=Math.floor(x), yi=Math.floor(y), tx=x-xi, ty=y-yi;
+    const a=v[((yi&63)*N)+(xi&63)], b=v[((yi&63)*N)+((xi+1)&63)], c=v[(((yi+1)&63)*N)+(xi&63)], d=v[(((yi+1)&63)*N)+((xi+1)&63)];
+    const sx=tx*tx*(3-2*tx), sy=ty*ty*(3-2*ty); return a+(b-a)*sx+(c-a)*sy+(a-b-c+d)*sx*sy; };
+}
+const v3rgb = (c,k)=>`rgb(${Math.round(c[0]*k)},${Math.round(c[1]*k)},${Math.round(c[2]*k)})`;
+const v3hex = h=>{ const n = parseInt(h.slice(1),16); return [(n>>16)&255,(n>>8)&255,n&255]; };
+// planar UVs in world units (1 texture repeat per unit) so every face of a
+// box, roof or wall gets evenly scaled texture no matter its size
+function v3WorldUV(g, sc){
+  sc = sc||1; const p = g.attributes.position, n = g.attributes.normal, uv = new Float32Array(p.count*2);
+  for (let i=0;i<p.count;i++){
+    const ax = Math.abs(n.getX(i)), ay = Math.abs(n.getY(i)), az = Math.abs(n.getZ(i));
+    let u, v;
+    if (ay>=ax && ay>=az){ u = p.getX(i); v = p.getZ(i); } else if (ax>=az){ u = p.getZ(i); v = p.getY(i); } else { u = p.getX(i); v = p.getY(i); }
+    uv[i*2] = u*sc; uv[i*2+1] = v*sc;
+  }
+  g.setAttribute('uv', new THREE.BufferAttribute(uv,2)); return g;
+}
+// ---------- procedural textures ----------
+function v3TexPlaster(col){
+  const c = v3Canvas(256,256), x = c.getContext('2d'), n = v3Noise(11), b = v3hex(col);
+  const id = x.createImageData(256,256);
+  for (let y=0;y<256;y++) for (let i=0;i<256;i++){ const k = 0.86 + n(i/18,y/18)*0.16 + n(i/4,y/4)*0.06 - Math.max(0,(y-200)/56)*0.18*n(i/9,3);
+    const o=(y*256+i)*4; id.data[o]=b[0]*k; id.data[o+1]=b[1]*k; id.data[o+2]=b[2]*k; id.data[o+3]=255; }
+  x.putImageData(id,0,0); return v3CanvasTex(c);
+}
+function v3TexStone(col, big){
+  const c = v3Canvas(256,256), x = c.getContext('2d'), b = v3hex(col), n = v3Noise(5);
+  x.fillStyle = v3rgb(b,0.45); x.fillRect(0,0,256,256);
+  const rows = big ? 4 : 6, rh = 256/rows;
+  for (let r=0;r<rows;r++){
+    let px = (r%2)*rh*0.6 - rh;
+    while (px < 256){
+      const w = rh*(1.1 + n(px/30, r*3)*0.9), k = 0.78 + n(px/7, r*5)*0.35;
+      x.fillStyle = v3rgb(b,k); x.beginPath();
+      const r0 = 5; x.roundRect ? x.roundRect(px+2, r*rh+2, w-4, rh-4, r0) : x.rect(px+2, r*rh+2, w-4, rh-4); x.fill();
+      x.fillStyle = 'rgba(255,255,255,0.08)'; x.fillRect(px+3, r*rh+3, w-6, 3);
+      x.fillStyle = 'rgba(0,0,0,0.18)'; x.fillRect(px+3, r*rh+rh-6, w-6, 3);
+      px += w;
+    }
+  }
+  for (let i=0;i<2500;i++){ x.fillStyle = `rgba(0,0,0,${Math.random()*0.08})`; x.fillRect(Math.random()*256, Math.random()*256, 2, 2); }
+  return v3CanvasTex(c);
+}
+function v3TexWood(col, planks){
+  const c = v3Canvas(256,256), x = c.getContext('2d'), b = v3hex(col), n = v3Noise(8);
+  const id = x.createImageData(256,256);
+  for (let y=0;y<256;y++) for (let i=0;i<256;i++){
+    const pl = planks ? Math.floor(i/(256/planks)) : 0, edge = planks && (i%(256/planks))<2 ? 0.55 : 1;
+    const k = (0.78 + 0.12*Math.sin(y*0.12 + n(i/10+pl*9, y/60)*9) + n(i/2, y/30)*0.12) * edge;
+    const o=(y*256+i)*4; id.data[o]=b[0]*k; id.data[o+1]=b[1]*k; id.data[o+2]=b[2]*k; id.data[o+3]=255; }
+  x.putImageData(id,0,0); return v3CanvasTex(c);
+}
+function v3TexShingle(col, thatch){
+  const c = v3Canvas(256,256), x = c.getContext('2d'), b = v3hex(col), n = v3Noise(3);
+  x.fillStyle = v3rgb(b,0.4); x.fillRect(0,0,256,256);
+  if (thatch){
+    for (let i=0;i<5000;i++){ const px = Math.random()*256, py = Math.random()*256, k = 0.6+Math.random()*0.6;
+      x.strokeStyle = v3rgb(b,k); x.lineWidth = 1.5; x.beginPath(); x.moveTo(px,py); x.lineTo(px+(Math.random()-0.5)*4, py+10+Math.random()*10); x.stroke(); }
+    return v3CanvasTex(c);
+  }
+  const rows = 8, rh = 256/rows, sw = 32;
+  for (let r=rows-1;r>=0;r--){
+    for (let i=-1;i<9;i++){
+      const px = i*sw + (r%2)*sw/2, k = 0.7 + n(i*3+r, r)*0.5;
+      x.fillStyle = v3rgb(b,k);
+      x.beginPath(); x.moveTo(px+1, r*rh); x.lineTo(px+sw-1, r*rh); x.lineTo(px+sw-1, r*rh+rh*1.25); x.quadraticCurveTo(px+sw/2, r*rh+rh*1.45, px+1, r*rh+rh*1.25); x.closePath(); x.fill();
+      x.fillStyle = 'rgba(0,0,0,0.25)'; x.fillRect(px+1, r*rh, sw-2, 3);
+    }
+  }
+  return v3CanvasTex(c);
+}
+function v3TexStripes(a, b2){
+  const c = v3Canvas(128,128), x = c.getContext('2d');
+  for (let i=0;i<8;i++){ x.fillStyle = i%2 ? a : b2; x.fillRect(i*16,0,16,128); }
+  x.fillStyle = 'rgba(0,0,0,0.12)'; for (let i=0;i<600;i++) x.fillRect(Math.random()*128, Math.random()*128, 2, 2);
+  return v3CanvasTex(c);
+}
+function v3TexRunes(){
+  const c = v3Canvas(512,512), x = c.getContext('2d');
+  x.clearRect(0,0,512,512); x.translate(256,256);
+  x.strokeStyle = 'rgba(140,235,255,1)'; x.lineWidth = 6;
+  x.beginPath(); x.arc(0,0,236,0,Math.PI*2); x.stroke();
+  x.lineWidth = 3; x.beginPath(); x.arc(0,0,200,0,Math.PI*2); x.stroke();
+  x.lineWidth = 4;
+  for (let i=0;i<16;i++){
+    x.save(); x.rotate(i/16*Math.PI*2); x.translate(0,-218);
+    x.beginPath(); const r = i%4;
+    if (r===0){ x.moveTo(-8,-10); x.lineTo(0,10); x.lineTo(8,-10); }
+    else if (r===1){ x.moveTo(0,-11); x.lineTo(0,11); x.moveTo(-8,-2); x.lineTo(8,4); }
+    else if (r===2){ x.moveTo(-8,-10); x.lineTo(8,-10); x.lineTo(-8,10); x.lineTo(8,10); }
+    else { x.arc(0,0,8,0,Math.PI*1.5); }
+    x.stroke(); x.restore();
+  }
+  x.lineWidth = 3;
+  for (let i=0;i<8;i++){ const a = i/8*Math.PI*2; x.beginPath(); x.moveTo(Math.cos(a)*60, Math.sin(a)*60); x.lineTo(Math.cos(a)*190, Math.sin(a)*190); x.stroke(); }
+  x.beginPath(); x.arc(0,0,60,0,Math.PI*2); x.stroke();
+  const t = new THREE.CanvasTexture(c); return t;
+}
+function v3TexNotices(){
+  const c = v3Canvas(256,160), x = c.getContext('2d');
+  x.fillStyle = '#5a3a22'; x.fillRect(0,0,256,160);
+  for (let i=0;i<7;i++){
+    const px = 12+(i%4)*60+Math.random()*8, py = 10+Math.floor(i/4)*72+Math.random()*8, w = 44, h = 58;
+    x.save(); x.translate(px+w/2, py+h/2); x.rotate((Math.random()-0.5)*0.2);
+    x.fillStyle = '#e8dcb8'; x.fillRect(-w/2,-h/2,w,h);
+    x.fillStyle = 'rgba(60,40,20,0.7)'; for (let l=0;l<6;l++) x.fillRect(-w/2+6, -h/2+10+l*7, w-12-(l%3)*6, 2);
+    x.fillStyle = '#a02020'; x.beginPath(); x.arc(0,-h/2+4,3,0,Math.PI*2); x.fill();
+    x.restore();
+  }
+  return v3CanvasTex(c);
+}
+// the whole town's ground painted in one texture: grass (or sand/snow/rock),
+// cobbled streets and plaza, packed earth under the buildings, flagstones
+// around the waypoint, and a dirt road out of the gate
+const V3_GROUND = { forest:[74,108,52], swamp:[70,82,50], desert:[196,168,116], tundra:[222,230,238], mountain:[112,110,100] };
+function v3GroundTexture(theme){
+  const PX = 64, M = 8, N = COLS + M*2, c = v3Canvas(N*PX, N*PX), x = c.getContext('2d');
+  const base = V3_GROUND[theme] || V3_GROUND.forest, n = v3Noise(21);
+  const id = x.createImageData(c.width, c.height), d = id.data;
+  for (let y=0;y<c.height;y++) for (let i=0;i<c.width;i++){
+    const k = 0.82 + n(i/70,y/70)*0.22 + n(i/14,y/14)*0.08 + (Math.random()-0.5)*0.05;
+    const o=(y*c.width+i)*4; d[o]=base[0]*k; d[o+1]=base[1]*k; d[o+2]=base[2]*k; d[o+3]=255; }
+  x.putImageData(id,0,0);
+  if (theme==='forest' || theme==='swamp'){
+    for (let i=0;i<22000;i++){ const px = Math.random()*c.width, py = Math.random()*c.height, k = 0.7+Math.random()*0.6;
+      x.strokeStyle = v3rgb(base, k); x.lineWidth = 1.2; x.beginPath(); x.moveTo(px,py); x.lineTo(px+(Math.random()-0.5)*5, py-4-Math.random()*6); x.stroke(); }
+  }
+  const T = (tx,ty)=> [(tx+M)*PX, (ty+M)*PX];
+  const deco = (tx,ty)=> (tx>=0&&ty>=0&&tx<COLS&&ty<ROWS) ? (G.villageDeco[tx][ty]||'grass') : 'out';
+  const paved = d=> d==='path' || d==='gate' || d==='waypoint' || d==='stash' || d==='questgiver' || d==='npc' || d==='lamp';
+  // dirt road leaving the gate, and bare earth round paving and buildings
+  const dirt = theme==='desert' ? [170,130,80] : theme==='tundra' ? [160,150,140] : [110,86,58];
+  const blob = (px,py,r,col,a)=>{ const g = x.createRadialGradient(px,py,0,px,py,r); g.addColorStop(0, `rgba(${col[0]},${col[1]},${col[2]},${a})`); g.addColorStop(1, `rgba(${col[0]},${col[1]},${col[2]},0)`); x.fillStyle = g; x.fillRect(px-r,py-r,r*2,r*2); };
+  for (let ty=ROWS-1; ty<ROWS+M; ty++){ const [px,py] = T(Math.floor(COLS/2), ty); for (let k=0;k<6;k++) blob(px+PX/2+(Math.random()-0.5)*PX, py+Math.random()*PX, PX*0.9, dirt, 0.5); }
+  for (let tx=0;tx<COLS;tx++) for (let ty=0;ty<ROWS;ty++){
+    const dd = deco(tx,ty), [px,py] = T(tx,ty);
+    if (paved(dd) || dd.indexOf('building')===0) for (let k=0;k<3;k++) blob(px+PX/2+(Math.random()-0.5)*PX*0.6, py+PX/2+(Math.random()-0.5)*PX*0.6, PX*0.95, dirt, 0.45);
+  }
+  // cobbles
+  const stone = theme==='desert' ? [188,168,132] : theme==='tundra' ? [150,152,158] : [128,122,112];
+  for (let tx=0;tx<COLS;tx++) for (let ty=0;ty<ROWS;ty++){
+    if (!paved(deco(tx,ty))) continue;
+    const [px,py] = T(tx,ty);
+    x.fillStyle = v3rgb(stone, 0.5); x.fillRect(px-2, py-2, PX+4, PX+4);
+    const g = 6;
+    for (let a=0;a<g;a++) for (let b=0;b<g;b++){
+      const sw = PX/g, cxp = px + a*sw + sw/2 + (Math.random()-0.5)*3, cyp = py + b*sw + sw/2 + (Math.random()-0.5)*3, r = sw*0.46;
+      const k = 0.8 + Math.random()*0.26;
+      x.fillStyle = v3rgb(stone, k); x.beginPath();
+      for (let v=0; v<7; v++){ const an = v/7*Math.PI*2, rr = r*(0.82+Math.random()*0.22); x.lineTo(cxp+Math.cos(an)*rr, cyp+Math.sin(an)*rr*0.9); }
+      x.closePath(); x.fill();
+      x.fillStyle = 'rgba(255,255,255,0.06)'; x.beginPath(); x.arc(cxp-r*0.25, cyp-r*0.3, r*0.35, 0, Math.PI*2); x.fill();
+    }
+  }
+  // flagstone ring round the waypoint
+  const wp = G.villageNpcs && T(Math.floor(COLS/2), 12);
+  if (wp){ const cxp = wp[0]+PX/2, cyp = wp[1]+PX/2;
+    for (let ring=0; ring<3; ring++) for (let i=0;i<10+ring*6;i++){
+      const a0 = i/(10+ring*6)*Math.PI*2, a1 = (i+0.92)/(10+ring*6)*Math.PI*2, r0 = PX*(0.3+ring*0.55), r1 = r0 + PX*0.5, k = 0.7+Math.random()*0.3;
+      x.fillStyle = v3rgb([150,150,160],k); x.beginPath(); x.arc(cxp,cyp,r1,a0,a1); x.arc(cxp,cyp,r0,a1,a0,true); x.closePath(); x.fill();
+    } }
+  const t = v3CanvasTex(c); t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+  return { tex:t, size:N, M };
+}
+// ---------- materials per town look ----------
+const V3_RACE = {
+  human: { plaster:'#d6c9a8', stone:'#8c8780', wood:'#4a3222', roof:'#8a3b2b', frame:true },
+  elf:   { plaster:'#d2dbc4', stone:'#9aa296', wood:'#7a6444', roof:'#3b6a5a', frame:true },
+  dwarf: { plaster:'#8e8a84', stone:'#7a7874', wood:'#3a2a1e', roof:'#4a505c', frame:false, stoneWalls:true },
+  orc:   { plaster:'#8a7658', stone:'#6a6258', wood:'#3a2616', roof:'#6a5030', frame:true, thatch:true },
+};
+function v3Materials(){
+  const T = THREE, r = V3_RACE[G.villageRace] || V3_RACE.human, th = G.villageTheme;
+  const plaster = th==='desert' ? '#d8b98c' : r.plaster, roof = th==='desert' ? '#a8603a' : r.roof;
+  const std = (o)=> new T.MeshStandardMaterial(Object.assign({ roughness:0.88, metalness:0 }, o));
+  const m = {
+    plaster: std({ map: v3TexPlaster(plaster) }),
+    stone: std({ map: v3TexStone(r.stone) }),
+    stoneBig: std({ map: v3TexStone(r.stone, true) }),
+    wood: std({ map: v3TexWood(r.wood) }),
+    planks: std({ map: v3TexWood(r.wood, 4) }),
+    lightWood: std({ map: v3TexWood('#8a6a44', 3) }),
+    roof: std({ map: v3TexShingle(roof, r.thatch), side:T.DoubleSide }),
+    iron: std({ color:0x2e2c2a, roughness:0.5, metalness:0.7 }),
+    gold: std({ color:0xc8a040, roughness:0.35, metalness:0.9 }),
+    glass: std({ color:0x2a2418, emissive:0xff9a38, emissiveIntensity:0, roughness:0.3 }),
+    coal: std({ color:0x2a1008, emissive:0xff5a10, emissiveIntensity:1.6 }),
+    brew: std({ color:0x1a4a20, emissive:0x40ff70, emissiveIntensity:1.2, roughness:0.2 }),
+    crystal: std({ color:0x80e0ff, emissive:0x40c8ff, emissiveIntensity:2.2, roughness:0.1, metalness:0.1, transparent:true, opacity:0.9 }),
+    runes: new T.MeshBasicMaterial({ map:v3TexRunes(), transparent:true, blending:T.AdditiveBlending, depthWrite:false, color:0x80e8ff }),
+    awning: std({ map: v3TexStripes('#b02838','#e8dcc0'), side:T.DoubleSide }),
+    notices: std({ map: v3TexNotices() }),
+    leaf: std({ color: th==='swamp' ? 0x4a5a30 : th==='desert' ? 0x5a8a3a : th==='tundra' ? 0x2e4a3a : 0x3f6a2e, roughness:0.95, flatShading:true }),
+    leaf2: std({ color: th==='swamp' ? 0x3a4a26 : th==='tundra' ? 0x24382e : 0x4f7a34, roughness:0.95, flatShading:true }),
+    bark: std({ color:0x4a3526, roughness:1 }),
+    leafDS: std({ color: th==='desert' ? 0x5a8a3a : 0x3f6a2e, roughness:0.9, side:T.DoubleSide }),
+    snow: std({ color:0xf0f4f8, roughness:0.9 }),
+    cloth: std({ color:0x6a2020, side:T.DoubleSide }),
+    shadow: new T.MeshBasicMaterial({ color:0x000000, transparent:true, opacity:0.35, depthWrite:false }),
+  };
+  return m;
+}
+// a soft round blob texture for glows, smoke and shadows
+function v3Blob(col){
+  const k = 'blob'+col; if (V3.tex[k]) return V3.tex[k];
+  const c = v3Canvas(64,64), x = c.getContext('2d'), g = x.createRadialGradient(32,32,0,32,32,32);
+  g.addColorStop(0, col); g.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g; x.fillRect(0,0,64,64);
+  return (V3.tex[k] = new THREE.CanvasTexture(c));
+}
+// ---------- geometry builders ----------
+function v3Box(w,h,d, mat, x,y,z, uv){ const g = new THREE.BoxGeometry(w,h,d); if (uv!==false) v3WorldUV(g); const o = new THREE.Mesh(g, mat); o.position.set(x,y,z); o.castShadow = o.receiveShadow = true; return o; }
+function v3Cyl(r0,r1,h,seg, mat, x,y,z){ const g = new THREE.CylinderGeometry(r0,r1,h,seg); const o = new THREE.Mesh(g, mat); o.position.set(x,y,z); o.castShadow = o.receiveShadow = true; return o; }
+// gable roof over a footprint; the ridge runs along the longer side
+function v3Roof(x0,z0,w,d,y, h, mats, grp, snow){
+  const T = THREE, o = 0.28, alongX = w >= d;
+  const L = alongX ? w : d, S = alongX ? d : w;
+  const pos = [], uv = [], idx = [];
+  const slopeLen = Math.hypot(S/2+o, h);
+  const quad = (a,b,c,e, ua)=>{ const i = pos.length/3; pos.push(...a,...b,...c,...e); uv.push(...ua); idx.push(i,i+1,i+2, i,i+2,i+3); };
+  for (const sgn of [-1,1]){
+    // eave edge, then ridge
+    const p = (l, s, yy)=> alongX ? [x0+l, y+yy, z0+d/2 + s] : [x0+w/2 + s, y+yy, z0+l];
+    const e1 = p(-o, sgn*(S/2+o), 0), e2 = p(L+o, sgn*(S/2+o), 0), r2 = p(L+o, 0, h), r1 = p(-o, 0, h);
+    const U = (L+2*o)*1.3, Vv = slopeLen*1.6;
+    if (sgn>0) quad(e1,e2,r2,r1,[0,0, U,0, U,Vv, 0,Vv]); else quad(e2,e1,r1,r2,[U,0, 0,0, 0,Vv, U,Vv]);
+  }
+  const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(pos,3)); g.setAttribute('uv', new T.Float32BufferAttribute(uv,2)); g.setIndex(idx); g.computeVertexNormals();
+  const roof = new T.Mesh(g, mats.roof); roof.castShadow = roof.receiveShadow = true; grp.add(roof);
+  // gable ends
+  const gp = [];
+  for (const end of [0, L]){
+    const p = (s, yy)=> alongX ? [x0+end, y+yy, z0+d/2+s] : [x0+w/2+s, y+yy, z0+end];
+    gp.push(...p(-S/2,0), ...p(S/2,0), ...p(0,h*0.94));
+  }
+  const gg = new T.BufferGeometry(); gg.setAttribute('position', new T.Float32BufferAttribute(gp,3)); gg.computeVertexNormals(); v3WorldUV(gg);
+  const gm = new T.Mesh(gg, mats.frame ? mats.plaster : mats.stone); gm.material = gm.material.clone(); gm.material.side = T.DoubleSide; gm.castShadow = true; grp.add(gm);
+  // ridge beam and snow
+  const rb = alongX ? v3Box(L+2*o, 0.08, 0.1, mats.wood, x0+w/2, y+h+0.02, z0+d/2) : v3Box(0.1, 0.08, L+2*o, mats.wood, x0+w/2, y+h+0.02, z0+d/2); grp.add(rb);
+  if (snow){ const sn = new T.Mesh(g.clone(), mats.snow); sn.position.y = 0.035; sn.scale.set(1,1,1); grp.add(sn); }
+}
+// a timber-framed (or stone) building with windows, door, sign and chimney
+function v3Building(b, mats, grp, opt){
+  const T = THREE, race = V3_RACE[G.villageRace] || V3_RACE.human, stoneWalls = race.stoneWalls || opt.stoneWalls;
+  const x0 = b.x0+0.06, z0 = b.y0+0.06, w = b.w-0.12, d = b.h-0.12, floors = b.floors||1, FH = 1.2, base = 0.28;
+  const H = floors*FH, top = base + H;
+  grp.add(v3Box(w+0.12, base, d+0.12, mats.stoneBig, x0+w/2, base/2, z0+d/2));
+  const walls = v3Box(w, H, d, stoneWalls ? mats.stone : mats.plaster, x0+w/2, base+H/2, z0+d/2); grp.add(walls);
+  // jettied upper floor overhang for two-storey timber houses
+  if (floors>1 && !stoneWalls){ grp.add(v3Box(w+0.16, 0.12, d+0.16, mats.wood, x0+w/2, base+FH, z0+d/2)); }
+  const doorFace = opt.face || 's', doorAt = opt.door;
+  const faces = [ { f:'s', along:'x', fixed:z0+d, len:w, o:x0, n:[0,0,1] }, { f:'e', along:'z', fixed:x0+w, len:d, o:z0, n:[1,0,0] },
+                  { f:'n', along:'x', fixed:z0, len:w, o:x0, n:[0,0,-1] }, { f:'w', along:'z', fixed:x0, len:d, o:z0, n:[-1,0,0] } ];
+  const at = (F, a, yy, out)=> F.along==='x' ? [F.o + a, yy, F.fixed + F.n[2]*out] : [F.fixed + F.n[0]*out, yy, F.o + a];
+  const put = (F, a, yy, out, ww, hh, dd, mat)=>{ const p = at(F,a,yy,out); const m = F.along==='x' ? v3Box(ww,hh,dd,mat,p[0],p[1],p[2]) : v3Box(dd,hh,ww,mat,p[0],p[1],p[2]); grp.add(m); return m; };
+  V3.windows = V3.windows || [];
+  for (const F of faces){
+    const visible = F.f==='s' || F.f==='e';
+    const bays = Math.max(1, Math.round(F.len));
+    const bw = F.len / bays;
+    // timber frame: posts, rails and braces
+    if (race.frame && !stoneWalls){
+      for (let i=0;i<=bays;i++) put(F, i*bw, base+H/2, 0.03, 0.1, H, 0.06, mats.wood);
+      for (let f=0; f<=floors; f++) put(F, F.len/2, base + f*FH - (f===floors?0.05:0) + (f===0?0.05:0), 0.035, F.len+0.04, 0.09, 0.06, mats.wood);
+      if (visible) for (let i=0;i<bays;i++) for (let f=0; f<floors; f++){
+        if ((i+f)%2) continue;
+        const isDoorBay = doorAt && F.f===doorFace && f===0 && Math.abs((doorFace==='s' ? doorAt.x+0.5 - x0 : doorAt.y+0.5 - z0) - (i+0.5)*bw) < bw*0.6;
+        if (isDoorBay) continue;
+        const brace = put(F, (i+0.5)*bw, base + f*FH + FH/2, 0.03, Math.hypot(bw, FH)*0.9, 0.07, 0.05, mats.wood);
+        brace.rotation[F.along==='x' ? 'z' : 'x'] = (F.along==='x' ? 1 : -1) * Math.atan2(FH, bw) * (i%2?1:-1);
+      }
+    } else if (stoneWalls){
+      for (const a of [0, F.len]) put(F, a, base+H/2, 0.02, 0.18, H, 0.1, mats.stoneBig);
+    }
+    if (!visible) continue;
+    // windows on every other bay of every floor, the door bay left clear
+    for (let f=0; f<floors; f++) for (let i=0;i<bays;i++){
+      const a = (i+0.5)*bw;
+      const doorHere = doorAt && F.f===doorFace && f===0 && Math.abs((doorFace==='s' ? doorAt.x+0.5 - x0 : doorAt.y+0.5 - z0) - a) < bw*0.6;
+      if (doorHere) continue;
+      if (f===0 && bays>2 && i%2===1) continue;
+      const wy = base + f*FH + FH*0.55;
+      const glass = put(F, a, wy, 0.02, 0.34, 0.42, 0.04, mats.glass); V3.windows.push(glass);
+      put(F, a, wy+0.24, 0.05, 0.46, 0.06, 0.07, mats.wood); put(F, a, wy-0.24, 0.06, 0.48, 0.06, 0.1, mats.wood);
+      put(F, a, wy, 0.045, 0.05, 0.42, 0.05, mats.wood);
+      const s1 = put(F, a-0.3, wy, 0.1, 0.16, 0.46, 0.03, mats.planks), s2 = put(F, a+0.3, wy, 0.1, 0.16, 0.46, 0.03, mats.planks);
+      s1.rotation.y = s2.rotation.y = F.along==='x' ? 0.35 : 0.35+Math.PI/2;
+    }
+  }
+  // door with stone surround, step, lantern and hanging sign
+  if (doorAt){
+    const F = faces.find(q=>q.f===doorFace), a = doorFace==='s' ? doorAt.x+0.5 - x0 : doorAt.y+0.5 - z0;
+    put(F, a, base+0.47, 0.03, 0.6, 0.94, 0.06, mats.planks);
+    put(F, a-0.36, base+0.52, 0.05, 0.12, 1.04, 0.1, mats.stoneBig); put(F, a+0.36, base+0.52, 0.05, 0.12, 1.04, 0.1, mats.stoneBig);
+    put(F, a, base+1.08, 0.05, 0.84, 0.14, 0.1, mats.stoneBig);
+    put(F, a, 0.08, 0.2, 0.8, 0.16, 0.3, mats.stoneBig);
+    put(F, a+0.1, base+0.45, 0.07, 0.05, 0.05, 0.05, mats.iron);
+    const lp = at(F, a+0.55, base+1.0, 0.16);
+    const lantern = v3Box(0.12, 0.18, 0.12, mats.glass, lp[0], lp[1], lp[2]); grp.add(lantern); V3.windows.push(lantern);
+    V3.lamps.push({ p:[lp[0], lp[1], lp[2]], col:0xffb45c, r:5, main:!!opt.sign });
+    if (opt.sign){
+      const sp = at(F, a-0.75, base+1.15, 0.35);
+      const arm = F.along==='x' ? v3Box(0.05,0.05,0.55,mats.iron,sp[0],sp[1]+0.3,sp[2]-0.2) : v3Box(0.55,0.05,0.05,mats.iron,sp[0]-0.2,sp[1]+0.3,sp[2]); grp.add(arm);
+      const sc = v3Canvas(128,128), sx = sc.getContext('2d');
+      sx.fillStyle = '#5a3a22'; sx.fillRect(0,0,128,128); sx.strokeStyle = '#2a1a10'; sx.lineWidth = 8; sx.strokeRect(4,4,120,120);
+      try{ const im = fpUndeadSprite(opt.sign,false).img, k = Math.min(96/im.width, 96/im.height); sx.drawImage(im, 64-im.width*k/2, 64-im.height*k/2, im.width*k, im.height*k); }catch(e){}
+      const sm = new T.MeshStandardMaterial({ map: v3CanvasTex(sc), roughness:0.8 });
+      const board = new T.Mesh(new T.BoxGeometry(0.5,0.5,0.04), [mats.wood,mats.wood,mats.wood,mats.wood,sm,sm]);
+      board.position.set(sp[0], sp[1], sp[2]); if (F.along!=='x') board.rotation.y = Math.PI/2; board.castShadow = true; grp.add(board);
+      V3.signs.push(board);
+    }
+  }
+  // roof and chimney
+  const rh = Math.min(w,d)*0.5 + 0.25;
+  v3Roof(x0, z0, w, d, top, rh, Object.assign({}, mats, { frame: race.frame && !stoneWalls }), grp, G.villageTheme==='tundra');
+  if (opt.chimney !== false){
+    const cxp = x0 + w*0.78, czp = z0 + d*0.3;
+    grp.add(v3Box(0.36, rh+0.6, 0.36, mats.stone, cxp, top + (rh+0.6)/2 - 0.05, czp));
+    V3.smoke.push({ p:[cxp, top+rh+0.6, czp], t:Math.random(), rate: opt.smokeRate||1 });
+  }
+  return { top, rh };
+}
+// ---------- props ----------
+function v3Barrel(x,z,mats,grp,s){ s=s||1; const b = v3Cyl(0.2*s,0.18*s,0.52*s,12,mats.planks,x,0.26*s,z); grp.add(b);
+  for (const y of [0.1,0.42]){ const r = new THREE.Mesh(new THREE.TorusGeometry(0.2*s,0.012,4,16), mats.iron); r.rotation.x = Math.PI/2; r.position.set(x,y*s,z); grp.add(r); } }
+function v3Crate(x,z,mats,grp,s,y){ s=s||1; grp.add(v3Box(0.42*s,0.42*s,0.42*s,mats.planks,x,(y||0)+0.21*s,z)); }
+function v3Tree(x,z,mats,grp,kind,s){
+  s = s||1; const T = THREE, g = new T.Group(); g.position.set(x,0,z); g.scale.setScalar(s); g.rotation.y = Math.random()*6;
+  const th = G.villageTheme;
+  if (kind==='pine' || th==='tundra' || th==='mountain'){
+    g.add(v3Cyl(0.08,0.12,0.8,6,mats.bark,0,0.4,0));
+    for (let i=0;i<4;i++){ const c = new T.Mesh(new T.ConeGeometry(0.75-i*0.15, 0.9, 7), mats.leaf); c.position.y = 0.8+i*0.45; c.castShadow = true; g.add(c);
+      if (th==='tundra'){ const sn = new T.Mesh(new T.ConeGeometry(0.5-i*0.1, 0.35, 7), mats.snow); sn.position.y = 1.15+i*0.45; g.add(sn); } }
+  } else if (th==='desert'){
+    const trunk = v3Cyl(0.07,0.11,2.2,6,mats.bark,0,1.1,0); trunk.rotation.z = 0.12; g.add(trunk);
+    for (let i=0;i<9;i++){
+      const geo = new T.PlaneGeometry(1.25, 0.3, 10, 2), p = geo.attributes.position;
+      for (let v=0; v<p.count; v++){ const u = (p.getX(v)+0.625)/1.25; p.setY(v, p.getY(v)*(1-u*0.85)*(0.6+Math.sin(u*Math.PI)*0.6)); p.setZ(v, -u*u*0.55 + Math.abs(p.getY(v))*0.4); p.setX(v, u*1.25); }
+      geo.rotateX(-Math.PI/2); geo.computeVertexNormals();
+      const l = new T.Mesh(geo, mats.leaf); l.material = mats.leafDS; l.position.set(0.1, 2.2, 0); l.rotation.y = i/9*Math.PI*2 + Math.random()*0.3; l.rotation.z = 0.25 + Math.random()*0.2; l.castShadow = true; g.add(l);
+    }
+    for (let i=0;i<3;i++){ const nut = new T.Mesh(new T.SphereGeometry(0.07,8,6), mats.bark); nut.position.set(Math.cos(i*2)*0.12, 2.12, Math.sin(i*2)*0.12); g.add(nut); }
+  } else if (th==='swamp' && Math.random()<0.4){
+    g.add(v3Cyl(0.06,0.14,1.8,6,mats.bark,0,0.9,0));
+    for (let i=0;i<4;i++){ const br = v3Cyl(0.02,0.04,0.8,5,mats.bark,Math.cos(i*1.6)*0.25,1.3+i*0.1,Math.sin(i*1.6)*0.25); br.rotation.z = Math.cos(i*1.6)*0.9; br.rotation.x = Math.sin(i*1.6)*0.9; g.add(br); }
+  } else {
+    g.add(v3Cyl(0.08,0.13,1.1,7,mats.bark,0,0.55,0));
+    for (let i=0;i<5;i++){ const geo = new T.IcosahedronGeometry(0.55 - (i===0?0:0.12), 1), p = geo.attributes.position;
+      for (let v=0; v<p.count; v++) p.setXYZ(v, p.getX(v)*(1+(Math.random()-0.5)*0.25), p.getY(v)*(1+(Math.random()-0.5)*0.25), p.getZ(v)*(1+(Math.random()-0.5)*0.25));
+      geo.computeVertexNormals();
+      const b = new T.Mesh(geo, i%2 ? mats.leaf2 : mats.leaf); b.position.set(i===0?0:Math.cos(i*1.7)*0.35, i===0?1.55:1.25+Math.random()*0.3, i===0?0:Math.sin(i*1.7)*0.35); b.castShadow = true; g.add(b); }
+  }
+  grp.add(g);
+}
+function v3Lamp(x,z,mats,grp){
+  grp.add(v3Cyl(0.04,0.06,1.9,8,mats.iron,x,0.95,z));
+  grp.add(v3Cyl(0.12,0.14,0.14,8,mats.stoneBig,x,0.07,z));
+  grp.add(v3Box(0.35,0.03,0.03,mats.iron,x+0.12,1.85,z));
+  const l = v3Box(0.16,0.22,0.16,mats.glass,x+0.26,1.72,z); grp.add(l); V3.windows.push(l);
+  grp.add(v3Box(0.2,0.04,0.2,mats.iron,x+0.26,1.85,z));
+  V3.lamps.push({ p:[x+0.26,1.72,z], col:0xffc070, r:6, main:true });
+}
+function v3Palisade(mats,grp){
+  const T = THREE, cx = Math.floor(COLS/2);
+  const stakes = [];
+  const along = (x0,z0,x1,z1)=>{ const L = Math.hypot(x1-x0,z1-z0), n = Math.round(L/0.28);
+    for (let i=0;i<=n;i++){ const t = i/n, x = x0+(x1-x0)*t, z = z0+(z1-z0)*t;
+      if (z > ROWS-1 && Math.abs(x-(cx+0.5)) < 1.1) continue;   // the gateway
+      stakes.push([x + (Math.random()-0.5)*0.04, z + (Math.random()-0.5)*0.04, 1.5+Math.random()*0.3]); } };
+  along(0.5,0.5,COLS-0.5,0.5); along(0.5,ROWS-0.5,COLS-0.5,ROWS-0.5); along(0.5,0.5,0.5,ROWS-0.5); along(COLS-0.5,0.5,COLS-0.5,ROWS-0.5);
+  const body = new T.InstancedMesh(new T.CylinderGeometry(0.13,0.14,1,7), mats.wood, stakes.length);
+  const tip = new T.InstancedMesh(new T.ConeGeometry(0.13,0.3,7), mats.wood, stakes.length);
+  const M4 = new T.Matrix4();
+  stakes.forEach((s,i)=>{ M4.compose(new T.Vector3(s[0], s[2]/2, s[1]), new T.Quaternion(), new T.Vector3(1, s[2], 1)); body.setMatrixAt(i, M4);
+    M4.compose(new T.Vector3(s[0], s[2]+0.15, s[1]), new T.Quaternion(), new T.Vector3(1,1,1)); tip.setMatrixAt(i, M4); });
+  body.castShadow = tip.castShadow = true; body.receiveShadow = true; grp.add(body); grp.add(tip);
+  // rails on the inside
+  for (const [x0,z0,x1,z1] of [[0.5,0.72,COLS-0.5,0.72],[0.72,0.5,0.72,ROWS-0.5],[COLS-0.72,0.5,COLS-0.72,ROWS-0.5]])
+    grp.add(v3Box(Math.max(0.06,Math.abs(x1-x0)), 0.08, Math.max(0.06,Math.abs(z1-z0)), mats.wood, (x0+x1)/2, 1.1, (z0+z1)/2));
+  // gate towers and arch with banners and torches
+  for (const s of [-1,1]){
+    const tx = cx+0.5 + s*1.3, tz = ROWS-0.5;
+    for (const [dx,dz] of [[-0.35,-0.35],[0.35,-0.35],[-0.35,0.35],[0.35,0.35]]) grp.add(v3Cyl(0.08,0.1,2.8,6,mats.wood,tx+dx,1.4,tz+dz));
+    grp.add(v3Box(0.95,0.1,0.95,mats.planks,tx,2.6,tz));
+    for (const [dx,dz,w2,d2] of [[0,-0.45,0.95,0.06],[0,0.45,0.95,0.06],[-0.45,0,0.06,0.95],[0.45,0,0.06,0.95]]) grp.add(v3Box(w2,0.4,d2,mats.planks,tx+dx,2.85,tz+dz));
+    const r = new T.Mesh(new T.ConeGeometry(0.85,0.8,4), mats.roof); r.position.set(tx,3.5,tz); r.rotation.y = Math.PI/4; r.castShadow = true; grp.add(r);
+    const flame = v3Flame(tx - s*0.45, 1.7, tz+0.5, grp); V3.lamps.push({ p:[tx - s*0.45, 1.8, tz+0.5], col:0xff9a40, r:6, main:true, flame });
+  }
+  grp.add(v3Box(3.2,0.22,0.22,mats.wood,cx+0.5,2.35,ROWS-0.5));
+  const ban = new T.Mesh(new T.PlaneGeometry(0.7,1.0), mats.cloth); ban.position.set(cx+0.5, 1.75, ROWS-0.36); grp.add(ban);
+}
+// a flickering flame: two additive sprites
+function v3Flame(x,y,z,grp){
+  const T = THREE, g = new T.Group(); g.position.set(x,y,z);
+  let img = null; try{ img = fpUndeadSprite(obEntry('flame'),false).img; }catch(e){}
+  const tx = img ? new T.CanvasTexture(img) : v3Blob('rgba(255,170,60,1)');
+  const s1 = new T.Sprite(new T.SpriteMaterial({ map:tx, blending:T.AdditiveBlending, depthWrite:false, transparent:true }));
+  s1.scale.set(0.22,0.34,1); s1.center.set(0.5,0.1); g.add(s1);
+  const s2 = new T.Sprite(new T.SpriteMaterial({ map:v3Blob('rgba(255,150,60,0.8)'), blending:T.AdditiveBlending, depthWrite:false, transparent:true, opacity:0.5 }));
+  s2.scale.set(0.9,0.9,1); s2.position.y = 0.15; g.add(s2);
+  grp.add(g); V3.flames.push(g); return g;
+}
+// ---------- people ----------
+const V3_LOOK = {
+  blacksmith: ()=>HUM({ outfit:'leather', cloth:'#4a3020', weapon:'hammer', bulk:1.18, beard:'#3a2616', hair:'#3a2616' }),
+  tavern:     ()=>HUM({ outfit:'rags', cloth:'#8a6a44', bulk:1.15, hair:'#6a4a2a', beard:'#6a4a2a' }),
+  alchemist:  ()=>HUM({ outfit:'robe', cloth:'#2a5a4a', head:'hood', faceShow:true, weapon:'staff', gem:'120,255,160', trim:'#b8943a' }),
+  shop:       ()=>HUM({ outfit:'robe', cloth:'#6a3a7a', hair:'#2a1a10', beard:'#2a1a10', trim:'#d8b050' }),
+  questgiver: ()=>HUM({ outfit:'chain', tabard:'#2a4a8a', emblem:'#d8b050', weapon:'spear', helm:'kettle', cape:'#2a3a6a', hair:'#5a3a20' }),
+};
+const V3_RACE_LOOK = { human:{}, elf:{ hair:'#e0d090', skin:'#f0d8c0' }, dwarf:{ bulk:1.22, beard:'#6a3a1a', hair:'#6a3a1a' }, orc:{ head:'orc', skin:'#6a8a4a' } };
+function v3PlayerLook(){
+  const c = G.player.cls, race = (G.player.race||'').toLowerCase();
+  const base = { Fighter:{outfit:'plate', weapon:'sword', shield:{col:'#8a2424',rim:'#c8c8c8',emblem:'#e8e0c0'}, helm:'kettle'},
+    Barbarian:{outfit:'fur', weapon:'greataxe', bulk:1.15}, Paladin:{outfit:'plate', weapon:'sword', shield:{col:'#e8e0c8',rim:'#c89a2a',emblem:'#c89a2a'}, cape:'#e8e0c8'},
+    Ranger:{outfit:'leather', cloth:'#3a5a2a', weapon:'bow', cape:'#2a4a2a', helm:'cowl', cloth2:'#2a4a2a'}, Rogue:{outfit:'leather', cloth:'#2a2a30', weapon:'dagger', helm:'cowl', cloth2:'#1a1a22'},
+    Wizard:{outfit:'robe', cloth:'#2a3a8a', head:'hood', faceShow:true, weapon:'staff', gem:'140,180,255'}, Sorcerer:{outfit:'robe', cloth:'#7a2a2a', weapon:'staff', gem:'255,140,80'},
+    Warlock:{outfit:'robe', cloth:'#3a1a4a', head:'hood', faceShow:true, weapon:'staff', gem:'200,120,255'}, Cleric:{outfit:'chain', tabard:'#e8e0c8', emblem:'#c89a2a', weapon:'mace', shield:{col:'#e8e0c8',rim:'#c89a2a'}},
+    Druid:{outfit:'robe', cloth:'#4a5a2a', weapon:'staff', gem:'140,255,140'}, Monk:{outfit:'robe', cloth:'#c07a2a', weapon:'staff'}, Bard:{outfit:'leather', cloth:'#7a2a4a', weapon:'sword', cape:'#3a1a2a'} }[c] || {outfit:'leather', weapon:'sword'};
+  const r = /orc/.test(race) ? { head:'orc', skin:'#7a9a5a' } : /dwarf/.test(race) ? { bulk:1.2, beard:'#8a4a20', hair:'#8a4a20' } : /elf/.test(race) ? { hair:'#e8d8a0' } : /tiefling/.test(race) ? { skin:'#b05050' } : {};
+  return HUM(Object.assign({}, r, base));
+}
+function v3VillagerLook(i){
+  const cloths = ['#6a4a2a','#4a5a6a','#7a3a2a','#5a6a3a','#6a5a7a','#8a7a5a','#3a4a3a'];
+  const outfits = ['rags','leather','robe','rags','leather'];
+  return HUM(Object.assign({ outfit: outfits[i%outfits.length], cloth: cloths[i%cloths.length], hair: ['#3a2618','#8a6a3a','#1a1210','#aaa090'][i%4], beard: i%3===0 ? '#4a3018' : undefined }, V3_RACE_LOOK[G.villageRace]||{}));
+}
+function v3Person(entry, height, grp){
+  const T = THREE; let img = null; try{ img = fpUndeadSprite(entry,false).img; }catch(e){}
+  const tex = img ? new T.CanvasTexture(img) : v3Blob('rgba(200,200,200,1)'); if (T.sRGBEncoding) tex.encoding = T.sRGBEncoding;
+  const mat = new T.SpriteMaterial({ map:tex, transparent:true, alphaTest:0.3 });
+  const sp = new T.Sprite(mat); const asp = img ? img.width/img.height : 0.5;
+  sp.scale.set(height*asp, height, 1); sp.center.set(0.5, 0.02); sp.userData.asp = asp; sp.userData.h = height;
+  const sh = new T.Mesh(new T.CircleGeometry(0.28, 20), new T.MeshBasicMaterial({ map:v3Blob('rgba(0,0,0,0.6)'), transparent:true, depthWrite:false }));
+  sh.rotation.x = -Math.PI/2; sh.position.y = 0.012;
+  const g = new T.Group(); g.add(sh); g.add(sp); grp.add(g);
+  return { g, sp, sh };
+}
+function v3MarkerTex(ch){
+  const k = 'mark'+ch; if (V3.tex[k]) return V3.tex[k];
+  const c = v3Canvas(64,96), x = c.getContext('2d');
+  x.font = '900 84px Georgia, serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.lineWidth = 8; x.strokeStyle = '#3a2400'; x.strokeText(ch, 32, 50); x.fillStyle = '#ffd24a'; x.fillText(ch, 32, 50);
+  return (V3.tex[k] = new THREE.CanvasTexture(c));
+}
+// ---------- build the whole town ----------
+function v3BuildScene(){
+  const T = THREE, sc = V3.scene;
+  if (V3.world){ sc.remove(V3.world); V3.world.traverse(o=>{ if (o.geometry) o.geometry.dispose(); }); }
+  const grp = V3.world = new T.Group(); sc.add(grp);
+  V3.windows = []; V3.lamps = []; V3.smoke = []; V3.flames = []; V3.signs = []; V3.hits = []; V3.people = []; V3.parts = [];
+  const mats = V3.mats = v3Materials();
+  // ground: the painted town square plus the wide surrounding land
+  const gt = v3GroundTexture(G.villageTheme), gsz = gt.size;
+  const ground = new T.Mesh(new T.PlaneGeometry(gsz, gsz), new T.MeshStandardMaterial({ map:gt.tex, roughness:0.95 }));
+  ground.rotation.x = -Math.PI/2; ground.position.set(COLS/2, 0, ROWS/2); ground.receiveShadow = true; grp.add(ground); V3.ground = ground;
+  const far = new T.Mesh(new T.PlaneGeometry(200,200), new T.MeshStandardMaterial({ color: new T.Color().setRGB(...(V3_GROUND[G.villageTheme]||V3_GROUND.forest).map(v=>Math.pow(v/255,2.2)*0.8)), roughness:1 }));
+  far.rotation.x = -Math.PI/2; far.position.set(COLS/2,-0.01,ROWS/2); grp.add(far);
+  // buildings
+  const icon = { smith:obEntry('anvil'), tavern:obEntry('tavern'), alch:obEntry('cauldron'), shop:obEntry('stall') };
+  V3.occ = [];
+  const occluder = (b, g)=>{ const ob = new T.Mesh(new T.BoxGeometry(b.w, (b.floors||1)*1.2+1.9, b.h), new T.MeshBasicMaterial({ visible:false }));
+    ob.position.set(b.x0+b.w/2, ((b.floors||1)*1.2+1.9)/2, b.y0+b.h/2); ob.userData.grp = g; grp.add(ob); V3.occ.push(ob); };
+  for (const b of VILLAGE_BUILDINGS){
+    const g = new T.Group(); grp.add(g);
+    v3Building(b, mats, g, { face:b.face, door:b.door, sign:icon[b.key], smokeRate: b.key==='smith' ? 2 : 1 });
+    occluder(b, g);
+    const hb = new T.Mesh(new T.BoxGeometry(b.w, 3.2, b.h), new T.MeshBasicMaterial({ visible:false })); hb.position.set(b.x0+b.w/2, 1.6, b.y0+b.h/2);
+    hb.userData.act = { kind:'building', b }; grp.add(hb); V3.hits.push(hb);
+  }
+  for (const h of VILLAGE_HOUSES){ const g = new T.Group(); grp.add(g); v3Building(h, mats, g, { face:'s', stoneWalls: h.barracks, chimney: !h.barracks }); occluder(h, g); }
+  // smithy forge lean-to, anvil, trough and rack
+  { const x = 6.5, z = 4;
+    for (const [dx,dz] of [[0.4,-1.2],[0.4,1.2]]) grp.add(v3Cyl(0.06,0.07,1.9,6,mats.wood,x+dx,0.95,z+dz));
+    const lean = v3Box(1.3, 0.06, 2.8, mats.roof, x-0.05, 1.95, z); lean.rotation.z = 0.35; grp.add(lean);
+    grp.add(v3Box(0.9,0.7,0.9,mats.stone,x-0.1,0.35,z-0.8)); const coal = v3Box(0.7,0.08,0.7,mats.coal,x-0.1,0.72,z-0.8); grp.add(coal);
+    grp.add(v3Box(0.36,0.9,0.36,mats.stone,x-0.35,1.15,z-0.95));
+    V3.lamps.push({ p:[x-0.1,1.0,z-0.8], col:0xff6a20, r:5, main:true, forge:true });
+    V3.sparks = { p:[x-0.1,0.8,z-0.8] };
+    grp.add(v3Box(0.18,0.4,0.14,mats.iron,x,0.2,z+0.3)); grp.add(v3Box(0.46,0.12,0.2,mats.iron,x,0.46,z+0.3));
+    const horn = new T.Mesh(new T.ConeGeometry(0.07,0.24,8), mats.iron); horn.rotation.z = Math.PI/2; horn.position.set(x+0.34,0.46,z+0.3); grp.add(horn);
+    grp.add(v3Box(0.35,0.3,0.8,mats.planks,x+0.1,0.15,z+1.0));
+  }
+  // alchemist cauldron
+  { const x = 14.5, z = 5.4;
+    const pot = new T.Mesh(new T.SphereGeometry(0.34, 16, 10, 0, Math.PI*2, Math.PI*0.35, Math.PI*0.65), mats.iron); pot.position.set(x,0.42,z); pot.castShadow = true; grp.add(pot);
+    const brew = v3Cyl(0.3,0.3,0.04,16,mats.brew,x,0.56,z); grp.add(brew); V3.brew = brew;
+    for (let i=0;i<3;i++){ const a = i/3*Math.PI*2; const leg = v3Cyl(0.02,0.02,0.5,5,mats.iron,x+Math.cos(a)*0.3,0.2,z+Math.sin(a)*0.3); grp.add(leg); }
+    V3.lamps.push({ p:[x,0.8,z], col:0x50ff80, r:4, main:true });
+    V3.bubbles = { p:[x,0.58,z] };
+    grp.add(v3Box(0.5,0.9,0.25,mats.planks,x+0.9,0.45,z-0.55));
+  }
+  // peddler's market stall
+  { const x = 6.5, z = 11.5;
+    for (const [dx,dz] of [[-0.42,-0.42],[0.42,-0.42],[-0.42,0.42],[0.42,0.42]]) grp.add(v3Cyl(0.04,0.04,1.6,6,mats.wood,x+dx,0.8,z+dz));
+    grp.add(v3Box(0.95,0.08,0.95,mats.planks,x,0.75,z));
+    const aw = new T.Mesh(new T.PlaneGeometry(1.3,1.25), mats.awning); aw.rotation.x = -Math.PI/2+0.35; aw.rotation.z = Math.PI/2; aw.position.set(x,1.75,z); aw.castShadow = true; grp.add(aw);
+    for (let i=0;i<6;i++){ const c = new T.Mesh(new T.SphereGeometry(0.06,8,6), new T.MeshStandardMaterial({ color:[0xc03020,0xe0a020,0x40a030][i%3], roughness:0.6 })); c.position.set(x-0.3+i*0.12, 0.83, z-0.2+(i%2)*0.2); grp.add(c); }
+    v3Crate(x-0.7,z+0.6,mats,grp,1); v3Crate(x-0.7,z+0.6,mats,grp,0.8,0.42); v3Barrel(x+0.7,z+0.7,mats,grp,0.9);
+  }
+  // tavern barrels and a bench
+  v3Barrel(13.3,5.3,mats,grp); v3Barrel(13.7,5.7,mats,grp); v3Barrel(13.35,5.8,mats,grp,0.9); v3Barrel(13.5,6.4,mats,grp);
+  grp.add(v3Box(1.2,0.06,0.35,mats.planks,8.2,0.45,7.4)); grp.add(v3Box(1.2,0.4,0.06,mats.wood,8.2,0.22,7.4));
+  // waypoint: a runed stone dais with a floating crystal
+  { const x = Math.floor(COLS/2)+0.5, z = 12.5;
+    grp.add(v3Cyl(1.15,1.25,0.22,8,mats.stoneBig,x,0.11,z));
+    grp.add(v3Cyl(0.95,1.02,0.16,8,mats.stone,x,0.28,z));
+    const rn = new T.Mesh(new T.CircleGeometry(0.92, 48), mats.runes); rn.rotation.x = -Math.PI/2; rn.position.set(x,0.37,z); grp.add(rn); V3.runes = rn;
+    for (let i=0;i<4;i++){ const a = i/4*Math.PI*2+Math.PI/4; grp.add(v3Box(0.18,0.9,0.18,mats.stoneBig,x+Math.cos(a)*1.0,0.6,z+Math.sin(a)*1.0));
+      const cap = new T.Mesh(new T.OctahedronGeometry(0.09), mats.crystal); cap.position.set(x+Math.cos(a)*1.0,1.12,z+Math.sin(a)*1.0); grp.add(cap); }
+    const cr = new T.Mesh(new T.OctahedronGeometry(0.3), mats.crystal); cr.scale.y = 1.7; cr.position.set(x,1.3,z); grp.add(cr); V3.crystal = cr;
+    const glow = new T.Sprite(new T.SpriteMaterial({ map:v3Blob('rgba(90,220,255,1)'), blending:T.AdditiveBlending, depthWrite:false, transparent:true, opacity:0.6 })); glow.scale.set(2.2,2.2,1); glow.position.set(x,1.3,z); grp.add(glow); V3.cglow = glow;
+    V3.lamps.push({ p:[x,1.4,z], col:0x60d8ff, r:6, main:true, always:true });
+    V3.motes = { p:[x,0.4,z] };
+    const hb = new T.Mesh(new T.CylinderGeometry(1.1,1.1,2,8), new T.MeshBasicMaterial({ visible:false })); hb.position.set(x,1,z); hb.userData.act = { kind:'tile', x:Math.floor(COLS/2), y:12, label:'Waypoint' }; grp.add(hb); V3.hits.push(hb);
+  }
+  // stash chest
+  { const x = 13.5, z = 10.5;
+    grp.add(v3Box(0.8,0.45,0.5,mats.planks,x,0.23,z));
+    const lid = new T.Mesh(new T.CylinderGeometry(0.25,0.25,0.8,12,1,false,0,Math.PI), mats.planks); lid.rotation.z = Math.PI/2; lid.position.set(x,0.45,z); lid.castShadow = true; grp.add(lid);
+    for (const dx of [-0.28,0.28]) grp.add(v3Box(0.06,0.5,0.52,mats.gold,x+dx,0.25,z));
+    grp.add(v3Box(0.12,0.14,0.04,mats.gold,x,0.4,z+0.26));
+    const hb = new T.Mesh(new T.BoxGeometry(0.9,0.9,0.9), new T.MeshBasicMaterial({ visible:false })); hb.position.set(x,0.45,z); hb.userData.act = { kind:'tile', x:13, y:10, label:'Stash' }; grp.add(hb); V3.hits.push(hb);
+  }
+  // notice board
+  { const x = 15.5, z = 8.5;
+    for (const dx of [-0.55,0.55]) grp.add(v3Cyl(0.05,0.06,1.9,6,mats.wood,x+dx,0.95,z));
+    const bd = v3Box(1.2,0.8,0.06,mats.notices,x,1.3,z); grp.add(bd);
+    const rf = v3Box(1.4,0.05,0.4,mats.roof,x,1.82,z); rf.rotation.x = -0.3; grp.add(rf);
+  }
+  // lamps, trees, extra scenery
+  for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++){
+    const dd = G.villageDeco[x][y];
+    if (dd==='lamp') v3Lamp(x+0.5, y+0.5, mats, grp);
+    else if (dd==='tree') v3Tree(x+0.5, y+0.5, mats, grp, null, 0.9+Math.random()*0.3);
+  }
+  for (let i=0;i<90;i++){
+    const a = Math.random()*Math.PI*2, r = 12.5 + Math.random()*12, x = COLS/2 + Math.cos(a)*r, z = ROWS/2 + Math.sin(a)*r;
+    if (z > ROWS-1 && Math.abs(x - COLS/2) < 2.5) continue;        // keep the road clear
+    if (x>-0.5 && x<COLS+0.5 && z>-0.5 && z<ROWS+0.5) continue;
+    v3Tree(x, z, mats, grp, Math.random()<0.35 ? 'pine' : null, 1.0+Math.random()*0.6);
+  }
+  for (let i=0;i<14;i++){ const x = 1.6+Math.random()*16.5, z = 7+Math.random()*11; if (G.map[Math.floor(x)] && G.map[Math.floor(x)][Math.floor(z)]===T_FLOOR && G.villageDeco[Math.floor(x)][Math.floor(z)]==='grass'){
+    const f = new T.Mesh(new T.IcosahedronGeometry(0.16,0), mats.leaf2); f.position.set(x,0.1,z); f.scale.y = 0.6; grp.add(f); } }
+  v3Palisade(mats, grp);
+  // people
+  const P = (entry, h, x, y)=>{ const p = v3Person(entry, h, grp); p.g.position.set(x+0.5, 0, y+0.5); return p; };
+  V3.player = P(v3PlayerLook(), 1.0, G.player.x, G.player.y); V3.player.at = [G.player.x, G.player.y];
+  V3.npcs = (G.villageNpcs||[]).map(n=>{ const look = V3_LOOK[n.service] ? V3_LOOK[n.service]() : v3VillagerLook(0);
+    const p = P(Object.assign(look, { o:Object.assign({}, look.o, V3_RACE_LOOK[G.villageRace]||{}) }), 1.02, n.x, n.y); p.n = n;
+    p.sp.userData.act = { kind:'tile', x:n.x, y:n.y, label:n.name }; V3.hits.push(p.sp);
+    if (n.service==='questgiver'){ const mk = new T.Sprite(new T.SpriteMaterial({ map:v3MarkerTex('!'), transparent:true, depthTest:false })); mk.scale.set(0.42,0.63,1); mk.position.y = 1.75; p.g.add(mk); V3.marker = mk; }
+    return p; });
+  V3.villagers = (G.villagers||[]).map((v,i)=>{ const p = P(v3VillagerLook(v.look||i), 0.94, v.x, v.y); p.v = v; return p; });
+  // particle pool (smoke, sparks, motes, bubbles)
+  V3.partMatSmoke = new T.SpriteMaterial({ map:v3Blob('rgba(150,150,150,0.9)'), transparent:true, depthWrite:false, opacity:0.5 });
+  V3.partMatSpark = new T.SpriteMaterial({ map:v3Blob('rgba(255,180,80,1)'), blending:T.AdditiveBlending, transparent:true, depthWrite:false });
+  V3.partMatMote = new T.SpriteMaterial({ map:v3Blob('rgba(120,230,255,1)'), blending:T.AdditiveBlending, transparent:true, depthWrite:false });
+  V3.partMatBubble = new T.SpriteMaterial({ map:v3Blob('rgba(120,255,150,1)'), blending:T.AdditiveBlending, transparent:true, depthWrite:false });
+  // point lights (a fixed handful, reused)
+  V3.plights.forEach(l=>{ l.intensity = 0; });
+  const mains = V3.lamps.filter(l=>l.main).slice(0, V3.plights.length);
+  mains.forEach((l,i)=>{ const pl = V3.plights[i]; pl.position.set(l.p[0], l.p[1], l.p[2]); pl.color.setHex(l.col); pl.distance = l.r; pl.userData = l; });
+  // name plates
+  V3.labels.innerHTML = '';
+  V3.plates = [];
+  for (const p of V3.npcs){ const el = document.createElement('div'); el.className = 'v3plate'; el.innerHTML = `<b>${esc(p.n.name)}</b><span>${esc(p.n.role)}</span>`; V3.labels.appendChild(el); V3.plates.push({ el, obj:p.g, y:1.2 }); p.plate = el; }
+  for (const [txt, x, y, z] of [['Waypoint', Math.floor(COLS/2)+0.5, 1.95, 12.5], ['Stash', 13.5, 0.95, 10.5]]){
+    const el = document.createElement('div'); el.className = 'v3plate small'; el.innerHTML = `<b>${txt}</b>`; V3.labels.appendChild(el);
+    V3.plates.push({ el, pos:new T.Vector3(x,y,z) });
+  }
+  for (const b of VILLAGE_BUILDINGS){ const el = document.createElement('div'); el.className = 'v3plate bld'; el.innerHTML = `<b>${esc(b.name)}</b>`; V3.labels.appendChild(el);
+    V3.plates.push({ el, pos:new T.Vector3(b.x0+b.w/2, (b.floors||1)*1.2+1.6, b.y0+b.h/2) }); }
+  const f = townFlavorAt(G.owPos.x, G.owPos.y);
+  let bn = document.getElementById('v3banner');
+  if (!bn){ bn = document.createElement('div'); bn.id = 'v3banner'; document.querySelector('.mapwrap').appendChild(bn); }
+  bn.innerHTML = f ? `<b>${esc(f.name)}</b><span>${esc(article(f.adj))} ${esc(f.adj)} settlement</span>` : '<b>A Village</b>';
+  bn.classList.remove('show'); void bn.offsetWidth; bn.classList.add('show');
+  const seen = new Set();
+  V3.world.traverse(o=>{ const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : [];
+    for (const m of ms){ if (seen.has(m) || m.userData.lin) continue; seen.add(m); m.userData.lin = true;
+      if (m.color && !m.map) m.color.convertSRGBToLinear(); if (m.emissive) m.emissive.convertSRGBToLinear(); } });
+  V3.night = null;
+  v3ApplyTime(true);
+}
+// ---------- day / night ----------
+function v3ApplyTime(force){
+  const night = (typeof isNightTime==='function') && isNightTime();
+  if (!force && night===V3.night) return;
+  V3.night = night;
+  const th = G.villageTheme;
+  const skyDay = th==='desert' ? 0xd8c8a0 : th==='tundra' ? 0xc8d4e0 : th==='swamp' ? 0x8a9a88 : 0x9ab8d8;
+  V3.scene.background = new THREE.Color(night ? 0x0a0f1e : skyDay);
+  V3.scene.fog = new THREE.Fog(night ? 0x0a0f1e : skyDay, 18, 42);
+  V3.hemi.color.setHex(night ? 0x3a4a78 : 0xdde8ff); V3.hemi.groundColor.setHex(night ? 0x151210 : 0x5a4a30);
+  V3.hemi.intensity = night ? 0.12 : 0.85;
+  V3.sun.color.setHex(night ? 0x7a90e0 : 0xfff0d8); V3.sun.intensity = night ? 0.22 : 1.8;
+  V3.sun.position.set(COLS/2 - 8, 16, ROWS/2 + (night ? -4 : 6));
+  V3.renderer.toneMappingExposure = 1.0;
+  (V3.windows||[]).forEach(w=>{ w.material = w.material; });
+  V3.mats.glass.emissiveIntensity = night ? 0.85 : 0.08;
+  V3.plights.forEach(pl=>{ const l = pl.userData; pl.intensity = !l || !l.p ? 0 : (night || l.always || l.forge) ? (night ? 2.6 : 1.2) : 0; pl.distance = l && l.r ? l.r*(night?1.4:1) : 5; });
+}
+// ---------- setup ----------
+function v3Init(){
+  if (V3.ok!==null) return V3.ok;
+  if (typeof THREE==='undefined') return false;
+  try{
+    const T = THREE, wrap = document.querySelector('.mapwrap');
+    const cv = document.createElement('canvas'); cv.id = 'villageGL'; cv.style.cssText = 'position:absolute;display:none;touch-action:none;';
+    wrap.appendChild(cv); V3.cv = cv;
+    const lab = document.createElement('div'); lab.id = 'v3labels'; lab.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:hidden;display:none;'; wrap.appendChild(lab); V3.labels = lab;
+    const R = V3.renderer = new T.WebGLRenderer({ canvas:cv, antialias:true });
+    R.shadowMap.enabled = true; R.shadowMap.type = T.PCFSoftShadowMap;
+    if (T.sRGBEncoding) R.outputEncoding = T.sRGBEncoding;
+    R.toneMapping = T.ACESFilmicToneMapping;
+    V3.scene = new T.Scene();
+    V3.cam = new T.PerspectiveCamera(32, 1, 0.5, 120);
+    V3.hemi = new T.HemisphereLight(0xdde8ff, 0x5a4a30, 0.85); V3.scene.add(V3.hemi);
+    const sun = V3.sun = new T.DirectionalLight(0xfff0d8, 1.8); sun.castShadow = true;
+    sun.shadow.mapSize.set(2048,2048); const s = sun.shadow.camera; s.left = -16; s.right = 16; s.top = 16; s.bottom = -16; s.near = 1; s.far = 60; sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.02;
+    sun.target.position.set(COLS/2, 0, ROWS/2); V3.scene.add(sun); V3.scene.add(sun.target);
+    V3.plights = []; for (let i=0;i<8;i++){ const pl = new T.PointLight(0xffb060, 0, 5, 2); V3.scene.add(pl); V3.plights.push(pl); }
+    V3.ray = new T.Raycaster(); V3.plane = new T.Plane(new T.Vector3(0,1,0), 0);
+    v3Input(cv);
+    V3.ok = true;
+  }catch(e){ V3.ok = false; }
+  return V3.ok;
+}
+// ---------- walking: breadth-first path over walkable tiles ----------
+function v3Walkable(x,y){ if (x<0||y<0||x>=COLS||y>=ROWS) return false; const t = G.map[x][y]; return t===T_FLOOR || t===T_EXIT || t===T_GOLD || t===T_ITEM; }
+function v3PathTo(tx, ty, bump){
+  const sx = G.player.x, sy = G.player.y, key = (x,y)=>x+','+y, prev = new Map([[key(sx,sy), null]]), q = [[sx,sy]];
+  const goal = (x,y)=> bump ? (Math.abs(x-tx)+Math.abs(y-ty)===1) : (x===tx && y===ty);
+  let end = goal(sx,sy) ? [sx,sy] : null;
+  while (q.length && !end){
+    const [x,y] = q.shift();
+    for (const [dx,dy] of [[0,-1],[1,0],[0,1],[-1,0]]){
+      const nx = x+dx, ny = y+dy, k = key(nx,ny);
+      if (prev.has(k)) continue;
+      const doorOk = !bump && nx===tx && ny===ty && G.map[nx] && [T_SHOP,T_TAVERN,T_BLACKSMITH,T_ALCHEMIST].includes(G.map[nx][ny]);
+      if (!v3Walkable(nx,ny) && !doorOk) continue;
+      prev.set(k, [x,y]); if (goal(nx,ny)){ end = [nx,ny]; break; } q.push([nx,ny]);
+    }
+  }
+  if (!end) return null;
+  const steps = []; let c = end;
+  while (c && !(c[0]===sx && c[1]===sy)){ const p = prev.get(key(c[0],c[1])); steps.unshift([c[0]-p[0], c[1]-p[1]]); c = p; }
+  if (bump) steps.push([tx-end[0], ty-end[1]]);
+  return steps;
+}
+function v3WalkTo(act){
+  let path = null;
+  if (act.kind==='building'){ const b = act.b; path = v3PathTo(b.door.x, b.door.y, false); }
+  else if (act.kind==='tile') path = v3PathTo(act.x, act.y, true);
+  else if (act.kind==='ground'){
+    let { x, y } = act;
+    if (!v3Walkable(x,y)){ // nearest walkable tile to where you clicked
+      let best = null, bd = 1e9; for (let i=0;i<COLS;i++) for (let j=0;j<ROWS;j++) if (v3Walkable(i,j)){ const d = (i-x)*(i-x)+(j-y)*(j-y); if (d<bd){ bd=d; best=[i,j]; } }
+      if (!best) return; [x,y] = best; }
+    path = v3PathTo(x, y, false);
+    V3.clickFx = { x:act.fx, z:act.fz, t:0 };
+  }
+  V3.path = path || []; V3.stepT = 0.08;
+}
+// ---------- input ----------
+function v3Pick(e){
+  const r = V3.cv.getBoundingClientRect(), T = THREE;
+  const m = new T.Vector2(((e.clientX-r.left)/r.width)*2-1, -((e.clientY-r.top)/r.height)*2+1);
+  V3.ray.setFromCamera(m, V3.cam);
+  const hits = V3.ray.intersectObjects(V3.hits, false);
+  if (hits.length) return hits[0].object.userData.act;
+  const p = new T.Vector3(); if (V3.ray.ray.intersectPlane(V3.plane, p)) return { kind:'ground', x:Math.floor(p.x), y:Math.floor(p.z), fx:p.x, fz:p.z };
+  return null;
+}
+function v3Input(cv){
+  cv.addEventListener('pointermove', e=>{ if (!v3Active()) return; const a = v3Pick(e); V3.hover = a && a.kind!=='ground' ? a : null; cv.style.cursor = V3.hover ? 'pointer' : 'default'; });
+  cv.addEventListener('pointerdown', e=>{ if (!v3Active() || G.ui!=='playing' || e.button!==0) return; const a = v3Pick(e); if (a) v3WalkTo(a); });
+  cv.addEventListener('wheel', e=>{ if (!v3Active()) return; e.preventDefault(); V3.dist = clamp(V3.dist * (e.deltaY>0 ? 1.1 : 0.9), 6.5, 20); }, { passive:false });
+}
+// ---------- per-frame ----------
+function v3Hide(){ if (V3.cv){ V3.cv.style.display = 'none'; V3.labels.style.display = 'none'; } }
+function v3Render(){
+  if (!v3Init()) return false;
+  const T = THREE, now = performance.now(), dt = V3.last ? Math.min(0.1, (now-V3.last)/1000) : 0.016; V3.last = now; V3.t = (V3.t||0) + dt;
+  if (V3.mapRef !== G.map){ V3.mapRef = G.map; v3BuildScene(); V3.path = []; V3.camPos = null; }
+  // match the game canvas' box
+  const mc = canvas, cv = V3.cv;
+  cv.style.display = 'block'; V3.labels.style.display = 'block';
+  cv.style.left = mc.style.left || '0px'; cv.style.top = mc.style.top || '0px';
+  const cw = mc.clientWidth, ch = mc.clientHeight;
+  cv.style.width = cw+'px'; cv.style.height = ch+'px';
+  const pr = Math.min(2, window.devicePixelRatio||1);
+  if (V3.sz !== cw+'x'+ch+'@'+pr){ V3.sz = cw+'x'+ch+'@'+pr; V3.renderer.setPixelRatio(pr); V3.renderer.setSize(cw, ch, false); V3.cam.aspect = cw/Math.max(1,ch); V3.cam.updateProjectionMatrix(); }
+  V3.labels.style.left = cv.style.left; V3.labels.style.top = cv.style.top; V3.labels.style.width = cw+'px'; V3.labels.style.height = ch+'px'; V3.labels.style.inset = 'auto';
+  v3ApplyTime(false);
+  // walking along a clicked path, one grid step at a time
+  if (V3.path.length && G.ui==='playing' && !G.gameOver){
+    V3.stepT -= dt;
+    if (V3.stepT <= 0){ const [dx,dy] = V3.path.shift(); moveDir(dx,dy); V3.stepT = 0.17; if (G.ui!=='playing' || G.gameMode!==3) V3.path = []; }
+  } else if (G.ui!=='playing') V3.path = [];
+  if (G.gameMode!==3 || V3.mapRef!==G.map) return true;
+  // people: glide between tiles, bob while walking, face the way they move
+  const glide = (p, x, y, spd)=>{
+    const tx = x+0.5, tz = y+0.5, g = p.g.position, k = 1-Math.exp(-dt*(spd||11));
+    const dx = tx-g.x, dz = tz-g.z, moving = Math.hypot(dx,dz) > 0.03;
+    g.x += dx*k; g.z += dz*k;
+    const sx = dx - dz;                    // screen-horizontal direction for this camera
+    if (Math.abs(sx) > 0.05) p.face = sx < 0 ? -1 : 1;
+    p.walk = (p.walk||0) + (moving ? dt*12 : 0);
+    const bob = moving ? Math.abs(Math.sin(p.walk))*0.05 : Math.sin(V3.t*1.6 + (p.ph||(p.ph=Math.random()*6)))*0.006;
+    p.sp.position.y = bob;
+    p.sp.scale.x = p.sp.userData.h * p.sp.userData.asp * (p.face||1);
+  };
+  glide(V3.player, G.player.x, G.player.y);
+  V3.villagers.forEach(p=> glide(p, p.v.x, p.v.y, 6));
+  V3.npcs.forEach(p=> glide(p, p.n.x, p.n.y));
+  // camera follows you from the south-east at an angle
+  const pp = V3.player.g.position, yaw = 0.52, D = V3.dist;
+  const want = new T.Vector3(pp.x + Math.sin(yaw)*D*0.72, D*0.92, pp.z + Math.cos(yaw)*D*0.72);
+  if (!V3.camPos) V3.camPos = want.clone(); else V3.camPos.lerp(want, 1-Math.exp(-dt*6));
+  V3.cam.position.copy(V3.camPos); V3.cam.lookAt(V3.camPos.x - Math.sin(yaw)*D*0.72, 0.6, V3.camPos.z - Math.cos(yaw)*D*0.72);
+  // living details
+  if (V3.crystal){ V3.crystal.rotation.y += dt*0.8; V3.crystal.position.y = 1.3 + Math.sin(V3.t*1.8)*0.08; V3.cglow.material.opacity = 0.45 + Math.sin(V3.t*2.4)*0.15; }
+  if (V3.runes){ V3.runes.rotation.z += dt*0.15; V3.runes.material.opacity = 0.65 + Math.sin(V3.t*2)*0.25; }
+  if (V3.marker){ const m = villageQuestMarker(); V3.marker.visible = !!m; if (m){ V3.marker.material.map = v3MarkerTex(m); V3.marker.position.y = 1.75 + Math.sin(V3.t*3)*0.07; } }
+  V3.flames.forEach((f,i)=>{ const k = 0.9 + Math.sin(V3.t*13+i*2)*0.08 + Math.sin(V3.t*29+i)*0.05; f.scale.set(k,k,k); });
+  V3.plights.forEach((pl,i)=>{ const l = pl.userData; if (!l || !pl.intensity) return; if (!l.always) pl.intensity = (V3.night ? 2.6 : 1.2) * (0.88 + Math.sin(V3.t*11+i*3)*0.06 + Math.sin(V3.t*23+i)*0.05); });
+  // particles
+  const spawn = (mat, p, v, life, s0, s1)=>{ const sp = new T.Sprite(mat===V3.partMatSmoke ? mat.clone() : mat); sp.position.set(p[0],p[1],p[2]); sp.scale.setScalar(s0); V3.world.add(sp); V3.parts.push({ sp, v, life, age:0, s0, s1 }); };
+  V3.smoke.forEach(s=>{ s.t -= dt*s.rate; if (s.t<=0){ s.t = 0.35; spawn(V3.partMatSmoke, s.p, [0.12+Math.random()*0.1, 0.5+Math.random()*0.2, -0.05+Math.random()*0.1], 3.2, 0.25, 1.1); } });
+  if (V3.sparks && Math.random() < dt*6) for (let i=0;i<3;i++) spawn(V3.partMatSpark, V3.sparks.p, [(Math.random()-0.5)*1.2, 1+Math.random()*1.2, (Math.random()-0.5)*1.2], 0.6, 0.05, 0.02);
+  if (V3.motes && Math.random() < dt*8) spawn(V3.partMatMote, [V3.motes.p[0]+(Math.random()-0.5)*1.4, V3.motes.p[1], V3.motes.p[2]+(Math.random()-0.5)*1.4], [0,0.5+Math.random()*0.4,0], 2.2, 0.08, 0.02);
+  if (V3.bubbles && Math.random() < dt*5) spawn(V3.partMatBubble, [V3.bubbles.p[0]+(Math.random()-0.5)*0.4, V3.bubbles.p[1], V3.bubbles.p[2]+(Math.random()-0.5)*0.4], [0,0.25,0], 0.9, 0.06, 0.1);
+  for (let i=V3.parts.length-1;i>=0;i--){ const q = V3.parts[i]; q.age += dt; const t = q.age/q.life;
+    if (t>=1){ V3.world.remove(q.sp); if (q.sp.material.map===V3.partMatSmoke.map) q.sp.material.dispose(); V3.parts.splice(i,1); continue; }
+    q.sp.position.x += q.v[0]*dt; q.sp.position.y += q.v[1]*dt; q.sp.position.z += q.v[2]*dt;
+    if (q.sp.material===V3.partMatSpark) q.v[1] -= dt*3;
+    q.sp.scale.setScalar(q.s0 + (q.s1-q.s0)*t); if (q.sp.material.map===V3.partMatSmoke.map) q.sp.material.opacity = 0.45*(1-t);
+  }
+  // click marker
+  if (V3.clickFx){ V3.clickFx.t += dt; if (!V3.clickRing){ V3.clickRing = new T.Mesh(new T.RingGeometry(0.18,0.26,24), new T.MeshBasicMaterial({ color:0xffd060, transparent:true, depthWrite:false })); V3.clickRing.rotation.x = -Math.PI/2; V3.scene.add(V3.clickRing); }
+    V3.clickRing.visible = V3.clickFx.t < 0.5; V3.clickRing.position.set(V3.clickFx.x, 0.03, V3.clickFx.z); V3.clickRing.scale.setScalar(1 + V3.clickFx.t*1.5); V3.clickRing.material.opacity = 1 - V3.clickFx.t*2; }
+  // see-through buildings: anything between the camera and you fades out
+  if (V3.occ && V3.occ.length){
+    const faded = new Set(), tgt = new T.Vector3();
+    for (const hy of [0.15, 0.55, 0.95]){
+      tgt.set(pp.x, hy, pp.z); const dir = tgt.clone().sub(V3.cam.position); const len = dir.length(); dir.normalize();
+      V3.ray.set(V3.cam.position, dir); V3.ray.far = len - 0.2;
+      for (const h of V3.ray.intersectObjects(V3.occ, false)) faded.add(h.object.userData.grp);
+    }
+    V3.ray.far = Infinity;
+    for (const ob of V3.occ){ const g = ob.userData.grp, want = faded.has(g);
+      g.userData.fade = (g.userData.fade||0) + ((want?1:0) - (g.userData.fade||0))*Math.min(1, dt*8);
+      const f = g.userData.fade;
+      if (f > 0.02 || g.userData.faded){
+        g.traverse(o=>{ if (!o.isMesh) return;
+          if (!o.userData.mat0) o.userData.mat0 = o.material;
+          if (f > 0.02){ if (!o.userData.matF){ const src = o.userData.mat0; o.userData.matF = Array.isArray(src) ? src.map(m=>{ const c = m.clone(); c.transparent = true; c.depthWrite = false; return c; }) : Object.assign(src.clone(), { transparent:true, depthWrite:false }); }
+            o.material = o.userData.matF; (Array.isArray(o.material) ? o.material : [o.material]).forEach(m=>{ m.opacity = 1 - f*0.8; }); o.castShadow = true; }
+          else o.material = o.userData.mat0; });
+        g.userData.faded = f > 0.02;
+      }
+    }
+  }
+  V3.renderer.render(V3.scene, V3.cam);
+  // name plates follow their owners on screen
+  const v = new T.Vector3();
+  for (const pl of V3.plates){
+    if (pl.obj){ v.copy(pl.obj.position); v.y += pl.y; } else v.copy(pl.pos);
+    v.project(V3.cam);
+    const vis = v.z < 1 && Math.abs(v.x) < 1.1 && Math.abs(v.y) < 1.1;
+    pl.el.style.display = vis ? 'block' : 'none';
+    if (vis){ pl.el.style.transform = `translate(-50%,-100%) translate(${(v.x*0.5+0.5)*cw}px, ${(-v.y*0.5+0.5)*ch}px)`; }
+  }
+  const hv = V3.hover;
+  V3.npcs.forEach(p=> p.plate.classList.toggle('hot', !!hv && hv.kind==='tile' && hv.x===p.n.x && hv.y===p.n.y));
+  return true;
+}
+
 // ---------- lighting ----------
 // wall torches bake a falloff map (with line of sight, so light doesn't leak
 // through stone) whenever the set of torches you've seen changes; each frame
@@ -14465,6 +15378,7 @@ function backOut(){
     case 'blacksmith': setUi('playing'); break;
     case 'alchemist': setUi('playing'); break;
     case 'tavern': setUi('playing'); break;
+    case 'waypoint': case 'stash': case 'questgiver': setUi('playing'); break;
     case 'inventory': setUi('playing'); break;
     case 'charsheet': setUi('playing'); break;
     case 'vault': /* handled inside vault (only closes when solved/jammed) */ break;
@@ -14488,6 +15402,9 @@ function renderOverlay(){
     case 'blacksmith': el.innerHTML = buildBlacksmith(); break;
     case 'alchemist': el.innerHTML = buildAlchemist(); break;
     case 'tavern': el.innerHTML = buildTavern(); break;
+    case 'waypoint': el.innerHTML = buildWaypoint(); break;
+    case 'stash': el.innerHTML = buildStash(); break;
+    case 'questgiver': el.innerHTML = buildQuestGiver(); break;
     case 'vault': el.innerHTML = buildVault(); break;
     case 'inventory': el.innerHTML = buildInventory(); break;
     case 'charsheet': el.innerHTML = buildCharSheet(); renderPaperDollIcons(); break;
@@ -15046,7 +15963,7 @@ function buildTavern(){
   const corruptionGold = Math.round((G.player.corruption||0)*4);
   return `
     <h2 class="panel-title">THE TAVERN</h2>
-    <div class="sub">Gold ${G.player.gold} &middot; HP ${G.player.hp}/${effMaxHp()}</div>
+    <div class="sub">${villageNpcTitle('tavern') ? villageNpcTitle('tavern')+' &middot; ' : ''}Gold ${G.player.gold} &middot; HP ${G.player.hp}/${effMaxHp()}</div>
     <div class="ovbody">
       <div class="btnrow" style="margin-bottom:14px;">
         <button class="btn" onclick="villageRest(); renderOverlay();">R &middot; rest (full heal)</button>
@@ -15056,10 +15973,7 @@ function buildTavern(){
         <div class="muted" style="font-size:11px;margin-bottom:8px;">banked corruption raises loot odds and monster danger together - purge it here for gold if you'd rather play it safe for a while</div>
         <button class="btn" ${(G.player.corruption||0)<1?'disabled':''} onclick="ventCorruption()">purge corruption for ${corruptionGold}g</button>
       </div>
-      <h4 style="color:var(--ink-faint);margin-bottom:6px;">QUEST BOARD</h4>
-      ${board}
-      <h4 style="color:var(--ink-faint);margin:14px 0 6px;">YOUR QUESTS</h4>
-      ${active}
+      ${villageNpcFor('questgiver') ? `<div class="muted" style="margin-bottom:10px;">looking for work? ${esc(villageNpcFor('questgiver').name)}, the ${esc(villageNpcFor('questgiver').role)}, keeps the notice board out on the plaza</div>` : `<h4 style="color:var(--ink-faint);margin-bottom:6px;">QUEST BOARD</h4>${board}<h4 style="color:var(--ink-faint);margin:14px 0 6px;">YOUR QUESTS</h4>${active}`}
       <div class="btnrow"><button class="btn primary" onclick="setUi('playing')">L / ESC &middot; leave</button></div>
     </div>
   `;
@@ -15715,6 +16629,8 @@ function buildHelp(){
       <div style="margin-top:10px;color:var(--ink-faint);">FIRST-PERSON DUNGEONS</div>
       <div>dungeons, castles, towers, temples, graveyards, mines and roadside fights play in a first-person 3D view: <kbd>W</kbd>/<kbd>&uarr;</kbd> step forward, <kbd>S</kbd>/<kbd>&darr;</kbd> step back, <kbd>A</kbd>/<kbd>D</kbd> strafe, <kbd>&larr;</kbd>/<kbd>&rarr;</kbd> (or <kbd>Z</kbd>/<kbd>X</kbd>) turn. Turning is free &mdash; it never spends a turn. Click the left or right edge of the view to turn, the middle to step forward. Walk into a monster to attack it. The minimap sits in the top-right corner, red arrows at the screen edge warn of a monster beside or behind you, and <kbd>M</kbd> flips between the 3D view and the classic top-down map.</div>
       <div>the game fills the whole window: life and ability (or spell-slot) orbs sit either side of the skill bar, whose buttons do the same as their hotkeys. <kbd>Tab</kbd> slides out the full stats and spells panels, and the buttons in the corner go fullscreen or switch back to the classic side-by-side layout.</div>
+      <div style="margin-top:10px;color:var(--ink-faint);">TOWNS</div>
+      <div>towns are a 3D hub: click the ground to walk there, or click a vendor, the waypoint or the stash to walk over and use it (WASD still works, the mouse wheel zooms, <kbd>M</kbd> flips to the flat town map). The blacksmith, alchemist, peddler and innkeeper stand outside their shops; the Captain of the Watch by the notice board hands out quests (a gold <b>!</b> means new work, <b>?</b> means a quest is ready to turn in). The waypoint takes you to any town you've visited, and the stash chest holds up to 60 items, shared by every town.</div>
       <div style="margin-top:10px;color:var(--ink-faint);">COMBAT IS TURN-BASED</div>
       <div>monsters never act on their own clock &mdash; they only ever take their turn right after you take yours (a step, an attack, a spell or a potion). Take your time; nothing moves until you do.</div>
       <div style="margin-top:12px;color:var(--ink-faint);">D&amp;D ARMOR CLASS &amp; MONSTER MANUAL ABILITIES</div>
@@ -15786,6 +16702,7 @@ function moveDir(dx,dy){
   saveCurrentGame();
 }
 function handlePlayingKey(k){
+  if (G.gameMode===3 && V3.path) V3.path = [];  // any key takes over from click-walking
   if (fpHandleKey(k)) return; // first-person view: relative movement, turning, and M to flip views
   switch(k){
     case 'ArrowUp': case 'w': case 'W': moveDir(0,-1); break;
@@ -15798,7 +16715,7 @@ function handlePlayingKey(k){
     case 'r': case 'R': if (G.gameMode!==0){ rangedAttack(); renderGame(); } break;
     case 'i': case 'I': setUi('inventory'); break;
     case 'p': case 'P': G.charSheetInvSel = -1; setUi('charsheet'); break;
-    case 'm': case 'M': toggleOwZoom(); break;
+    case 'm': case 'M': if (G.gameMode===3) v3Toggle(); else toggleOwZoom(); break;
     case 'c': case 'C': campOutside(); break;
     case 'b': case 'B': setUi('bestiary'); break;
     case 'h': case 'H': setUi('achievements'); break;
@@ -15876,6 +16793,12 @@ function handleKeydown(e){
       else if (['l','L','Escape'].includes(k)) setUi('playing');
       break;
     }
+    case 'waypoint': {
+      if (k>='1' && k<='9'){ const key = (G.ow.visitedTowns||[])[k.charCodeAt(0)-49]; if (key) waypointTravel(key); }
+      else if (k==='Escape') setUi('playing');
+      break;
+    }
+    case 'stash': case 'questgiver': { if (k==='Escape') setUi('playing'); break; }
     case 'vault': {
       const v = G.vault;
       if (v.solved || v.attempt>=v.maxAttempts){
