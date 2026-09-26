@@ -358,7 +358,7 @@
     <div class="item-tooltip" id="itemTooltip" style="display:none;"></div>
   </div>
 
-  <div class="footnote">arrows / WASD move &middot; F ability &middot; G spells (casters) &middot; Q potion &middot; R ranged attack (wand/bow) &middot; I inventory &middot; P character sheet &middot; M overworld map &middot; C camp (overworld or cleared floor) &middot; ESC back<br>B bestiary &middot; H honors &middot; T fast travel (zoomed out) &middot; K ascend at level 20 &middot; V sound &nbsp;&#8212;&nbsp; <span id="helpToggle" style="cursor:pointer;text-decoration:underline;">controls &amp; legend</span></div>
+  <div class="footnote">arrows / WASD move &middot; F ability &middot; G spells (casters) &middot; Q potion &middot; R ranged attack (wand/bow) &middot; I inventory &middot; P character sheet &middot; M overworld map / 3D&harr;map in dungeons &middot; &larr;&rarr; turn, A/D strafe in 3D &middot; C camp (overworld or cleared floor) &middot; ESC back<br>B bestiary &middot; H honors &middot; T fast travel (zoomed out) &middot; K ascend at level 20 &middot; V sound &nbsp;&#8212;&nbsp; <span id="helpToggle" style="cursor:pointer;text-decoration:underline;">controls &amp; legend</span></div>
 </div>
 
 <div class="controls" id="touchControls">
@@ -9354,6 +9354,7 @@ function renderGame(){
   }
   if (G.gameMode===0) { if (G.owZoomedOut) renderOverworldMapZoomed(); else renderOverworldMap(); }
   else if (G.gameMode===3) renderVillageMap();
+  else if (fp3dActive()) renderFirstPerson(); // first-person 3D view of a dungeon floor or roadside fight (M flips to the top-down map)
   else if (G.gameMode===2) renderArenaMap(); // roadside encounter - an open field, not a dungeon floor
   else renderDungeonMap(); // dungeons, castles and necromancer towers
   renderHud();
@@ -9637,6 +9638,1188 @@ function renderLog(){
   const recent = G.log.slice(-MAXLOG);
   el.innerHTML = recent.map(l=>`<div class="line cls-${l.cls}">${l.raw ? l.msg : esc(l.msg)}</div>`).reverse().join('');
 }
+
+// ===================== SECTION: FIRST-PERSON 3D VIEW =====================
+// a textured, torch-lit raycast view for dungeon-type sites (gameMode 1) and
+// roadside encounters (gameMode 2). Purely a renderer: the game still runs on
+// the same COLS x ROWS tile grid and the same tryMove()/fight()/tickMonsters()
+// turn logic - the only new state is G.player.facing (which already existed,
+// see pickInitialFacing) steering which way "forward" is. The world (walls,
+// floor, ceiling/sky) is raycast per pixel into a small offscreen buffer and
+// scaled up smoothly; everything that stands in the world (monsters, loot,
+// stairs, torch flames, ...) is a billboard sprite built once from the same
+// vector art recipes the top-down map already uses (see drawMonsterArt), clipped
+// per column against the wall depth buffer. M flips between this view and the
+// original top-down map (renderDungeonMapOrtho/renderArenaMap), remembered per
+// browser. Villages and the overworld stay top-down.
+const FP_TEX = 64;          // procedural texture design space - generators below are written in 0..63 coordinates
+const FP_TR = 128;          // rendered texture resolution (power of two, tiles seamlessly) - generators are sampled at half-texel steps
+const FP_PLANE = 0.66;      // camera plane half-width - ~66 degree field of view
+const FP_LS = 4;            // light-map subcells per tile
+const FP_EYE_BACK = 0.32;   // how far behind its tile's center the camera sits
+let fp3dPref = true;
+try{ if (localStorage.getItem('depthcrawl_view3d')==='0') fp3dPref = false; }catch(e){}
+function fp3dActive(){ return fp3dPref && (G.gameMode===1 || G.gameMode===2) && !!G.map; }
+function toggleView3d(){
+  fp3dPref = !fp3dPref;
+  try{ localStorage.setItem('depthcrawl_view3d', fp3dPref?'1':'0'); }catch(e){}
+  logMsg(fp3dPref ? 'first-person view (M for the top-down map)' : 'top-down map view (M for first-person)', '');
+  renderGame();
+}
+
+const FP = {
+  W:0, off:null, octx:null, img:null, u32:null, zbuf:null, rowD:null, rowL:null,
+  cam:null, mapRef:null, lastTs:0, t:0, moving:0,
+  swing:0, cast:0, hurt:0, heal:0, glow:0, fade:0, shake:0, lastHp:null,
+  monHp:new WeakMap(), monAlive:new WeakMap(), monFlash:new WeakMap(), monPos:new WeakMap(),
+  floats:[], parts:[], sprites:new Map(), glyphs:new Map(), themes:{},
+  lightKey:'', torches:[], torchW:[], L4r:null, L4g:null, L4b:null, ftile:null, vig:null, vigW:0,
+};
+
+// ---------- procedural textures ----------
+function fpHash(x,y,s){
+  let h = Math.imul(x|0, 374761393) ^ Math.imul(y|0, 668265263) ^ Math.imul(s|0, 1442695041);
+  h = Math.imul(h ^ (h>>>13), 1274126177);
+  h ^= h>>>16;
+  return (h>>>0)/4294967296;
+}
+// value noise with L lattice cells across the texture, wrapping at the edges
+// so every texture tiles without a seam
+function fpNoise(x,y,L,s){
+  const fx = x/FP_TEX*L, fy = y/FP_TEX*L;
+  const ix = Math.floor(fx), iy = Math.floor(fy);
+  const tx = fx-ix, ty = fy-iy;
+  const sx = tx*tx*(3-2*tx), sy = ty*ty*(3-2*ty);
+  const x0 = ((ix%L)+L)%L, x1 = (x0+1)%L, y0 = ((iy%L)+L)%L, y1 = (y0+1)%L;
+  const a = fpHash(x0,y0,s), b = fpHash(x1,y0,s), c = fpHash(x0,y1,s), d = fpHash(x1,y1,s);
+  return a + (b-a)*sx + (c-a)*sy + (a-b-c+d)*sx*sy;
+}
+function fpFbm(x,y,s){ return fpNoise(x,y,4,s)*0.5 + fpNoise(x,y,8,s+1)*0.25 + fpNoise(x,y,16,s+2)*0.15 + fpNoise(x,y,32,s+3)*0.1; }
+function fpMix(a,b,t){ return [a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t, a[2]+(b[2]-a[2])*t, a[3]||0]; }
+function fpScale(c,k){ return [c[0]*k, c[1]*k, c[2]*k, c[3]||0]; }
+function fpMakeTex(fn){
+  const n = FP_TR*FP_TR, r = new Uint8Array(n), g = new Uint8Array(n), b = new Uint8Array(n);
+  const st = FP_TEX/FP_TR;
+  let e = null;
+  for (let y=0;y<FP_TR;y++) for (let x=0;x<FP_TR;x++){
+    const c = fn(x*st,y*st), i = y*FP_TR+x;
+    r[i] = clamp(c[0],0,255); g[i] = clamp(c[1],0,255); b[i] = clamp(c[2],0,255);
+    if (c[3]){ if (!e) e = new Uint8Array(n); e[i] = clamp(c[3],0,255); }
+  }
+  return {r,g,b,e};
+}
+function fpBricks(o){
+  const rows=o.rows||4, cols=o.cols||2, bh=FP_TEX/rows, bw=FP_TEX/cols, m=o.mortar||2, s=o.seed||1;
+  return (x,y)=>{
+    const row = Math.floor(y/bh);
+    const off = o.stagger===false ? 0 : (row%2)*bw/2;
+    const bx = (x+off)%FP_TEX, col = Math.floor(bx/bw);
+    const lx = bx-col*bw, ly = y-row*bh;
+    const n = fpFbm(x,y,s);
+    if (lx<m || ly<m) return fpScale(o.mc, 0.55+n*0.6);
+    let k = (0.7 + n*0.55) * (1 + (fpHash(col,row,s+7)-0.5)*(o.jitter||0.3));
+    if (lx-m<1 || ly-m<1) k *= 1.2;                  // lit top/left bevel
+    else if (bw-1-lx<1 || bh-1-ly<1) k *= 0.66;      // shadowed bottom/right bevel
+    let c = fpScale(o.base, k);
+    if (o.moss){
+      const mv = fpNoise(x,y,8,s+20)*0.8 + (ly/bh)*0.25;
+      if (mv > 1-o.moss) c = fpMix(c, fpScale(o.mossCol||[62,96,48], 0.7+n*0.5), Math.min(1,(mv-(1-o.moss))/0.12)*0.85);
+    }
+    const sp = fpHash(x,y,s+3);
+    if (sp>0.975) c = fpScale(c,1.22); else if (sp<0.03) c = fpScale(c,0.72);
+    return c;
+  };
+}
+function fpRock(o){
+  const s = o.seed||5;
+  return (x,y)=>{
+    const n = fpFbm(x,y,s);
+    const r = Math.abs(fpNoise(x,y,8,s+9)*2-1);
+    let k = 0.5 + n*0.8;
+    if (r<0.07) k *= 0.45 + r*7;
+    const sp = fpHash(x,y,s+4); if (sp>0.965) k *= 1.25;
+    let c = fpScale(o.base, k);
+    if (o.lava){
+      const v = Math.abs((fpNoise(x,y,4,s+50)*0.7 + fpNoise(x,y,8,s+51)*0.3)*2-1);
+      if (v<0.035) return [255, 80+v*1600, 18, 110];
+      if (v<0.075) c = fpMix(c, [150,44,16], (0.075-v)/0.04*0.8);
+    }
+    if (o.ore && fpNoise(x,y,16,s+30)>0.74 && fpHash(x,y,s+31)>0.35) return [236,196,96,70];
+    return c;
+  };
+}
+function fpDirt(o){
+  const s = o.seed||9;
+  return (x,y)=>{
+    const n = fpFbm(x,y,s), p = fpHash(x,y,s+2);
+    let k = 0.62 + n*0.55;
+    if (p>0.96) k *= 1.3; else if (p<0.05) k *= 0.7;
+    if (fpNoise(x,y,16,s+6)>0.76) k *= 1.15;       // pebbles
+    return fpScale(o.base, k);
+  };
+}
+function fpGrass(o){
+  const s = o.seed||7;
+  return (x,y)=>{
+    const n = fpFbm(x,y,s), b = fpHash(x,y,s+5);
+    let k = 0.62 + n*0.55;
+    if (b>0.9) k *= 1.28; else if (b<0.1) k *= 0.72;
+    let c = fpScale(o.base, k);
+    if (o.flowers && b>0.996) c = [230,210,120];
+    return c;
+  };
+}
+function fpSand(o){
+  const s = o.seed||8;
+  return (x,y)=>{
+    const n = fpFbm(x,y,s);
+    const rip = Math.sin((y + fpNoise(x,y,4,s+3)*14) * (Math.PI*2/8));
+    return fpScale(o.base, 0.8 + n*0.3 + rip*0.07 + (fpHash(x,y,s+1)>0.97?0.15:0));
+  };
+}
+function fpSnow(o){
+  const s = o.seed||6;
+  return (x,y)=>{
+    const n = fpFbm(x,y,s);
+    const sp = fpHash(x,y,s+2)>0.985 ? 0.18 : 0;
+    return fpScale(o.base, 0.84 + n*0.2 + sp);
+  };
+}
+function fpHedge(o){
+  const s = o.seed||71;
+  return (x,y)=>{
+    const n = fpFbm(x,y,s), leaf = fpNoise(x,y,16,s+3), b = fpHash(x,y,s+8);
+    let k = 0.4 + n*0.55 + (leaf>0.58 ? 0.28 : 0) + (b>0.92 ? 0.2 : 0) - (b<0.06 ? 0.2 : 0);
+    k *= 0.78 + 0.4*(1-y/FP_TEX);                     // sunlit crown, shaded base
+    return fpScale(o.base, k);
+  };
+}
+function fpBeams(fn){
+  return (x,y)=>{
+    const post = x<7 || x>=57, lintel = y<7;
+    if (!post && !lintel) return fn(x,y);
+    const grain = post ? fpNoise(x*4%FP_TEX, y, 16, 41) : fpNoise(x, y*4%FP_TEX, 16, 43);
+    let k = 0.55 + grain*0.45 + fpFbm(x,y,44)*0.2;
+    if (x===6 || x===57 || y===6) k *= 0.45;
+    if ((post && (y===20 || y===44) && (x===3 || x===60))) return [70,70,76];   // iron nails
+    return fpScale([118,78,44], k);
+  };
+}
+// iron sconce riveted to a wall - the flame itself is a separate glowing sprite
+function fpSconce(fn){
+  return (x,y)=>{
+    if (x>=27 && x<=36 && y>=38 && y<=46) return fpScale([58,54,50], (x===27||y===38)?1.4:0.9);
+    if (x>=30 && x<=33 && y>=30 && y<38) return fpScale([48,44,40], x===30?1.4:1);
+    if (x>=28 && x<=35 && y>=26 && y<30) return [86,60,34];
+    const d = Math.hypot(x-31.5, y-24);
+    const c = fn(x,y);
+    return d<16 ? fpScale(c, 0.8 + d/80) : c;         // soot stain above the flame
+  };
+}
+function fpRuneWall(fn, col){
+  return (x,y)=>{
+    const d = Math.hypot(x-31.5, y-31.5), a = Math.atan2(y-31.5, x-31.5);
+    const ring = d>13 && d<15.5;
+    const spoke = d<13 && Math.abs(Math.sin(a*2.5))<0.12;
+    if (ring || spoke) return [col[0], col[1], col[2], 190];
+    return fn(x,y);
+  };
+}
+function fpStairs(fn, down){
+  return (x,y)=>{
+    const d = Math.max(Math.abs(x-31.5), Math.abs(y-31.5));
+    if (d>29) return fn(x,y);
+    const step = Math.floor(d/5.8), edge = (d%5.8)<1.1;
+    const k = down ? 0.1 + step*0.14 : 1.28 - step*0.07;
+    return fpScale(fn(x,y), edge ? k*(down?1.6:0.55) : k);
+  };
+}
+function fpPit(fn){
+  return (x,y)=>{
+    const r = Math.hypot(x-31.5, y-31.5), jag = 19 + fpNoise(x,y,8,99)*7;
+    if (r<jag) return fpScale([30,26,22], Math.pow(r/jag,3)*0.8);
+    if (r<jag+2.5) return fpScale(fn(x,y), 0.5);
+    return fn(x,y);
+  };
+}
+function fpRuneFloor(fn){
+  return fpRuneWall(fn, [196,130,255]);
+}
+function fpWater(o){
+  const s = (o&&o.seed)||91;
+  return (x,y)=>{
+    const n = fpFbm(x,y,s), c = 1 - Math.abs(fpNoise(x,y,8,s+1)*2-1);
+    const k = 0.5 + n*0.3 + Math.pow(c,6)*0.6;
+    return [36*k, 92*k, 128*k, c>0.93 ? 40 : 0];
+  };
+}
+
+// per-site look. Colors are albedo; the lighting pass decides how bright
+// any of it actually ends up.
+const FP_THEME_SPECS = {
+  dungeon: {
+    wall: fpBricks({base:[132,128,124], mc:[46,44,44], rows:4, cols:2, seed:11, jitter:0.35}),
+    wall2: fpBricks({base:[124,124,118], mc:[42,42,40], rows:4, cols:2, seed:17, jitter:0.4, moss:0.3}),
+    floor: fpBricks({base:[108,100,94], mc:[38,35,32], rows:2, cols:2, seed:12, mortar:3, stagger:false}),
+    floor2: fpRock({base:[98,94,90], seed:14}),
+    ceil: fpRock({base:[70,68,70], seed:13}),
+  },
+  castle: {
+    wall: fpBricks({base:[172,150,118], mc:[72,62,50], rows:3, cols:2, seed:21, jitter:0.22}),
+    wall2: fpBricks({base:[160,140,112], mc:[66,56,46], rows:3, cols:2, seed:27, jitter:0.3, moss:0.18}),
+    floor: fpBricks({base:[138,122,106], mc:[60,52,44], rows:4, cols:4, seed:22, stagger:false}),
+    floor2: fpBricks({base:[120,62,58], mc:[60,40,34], rows:4, cols:4, seed:24, stagger:false, jitter:0.15}),
+    ceil: fpBeams(fpBricks({base:[112,78,50], mc:[40,26,16], rows:1, cols:4, seed:23, stagger:false})),
+  },
+  necro: {
+    wall: fpBricks({base:[96,82,118], mc:[24,18,32], rows:4, cols:2, seed:31}),
+    wall2: fpRuneWall(fpBricks({base:[92,78,112], mc:[24,18,32], rows:4, cols:2, seed:37}), [180,110,255]),
+    floor: fpRock({base:[70,62,84], seed:32}),
+    floor2: fpBricks({base:[74,64,88], mc:[22,18,28], rows:2, cols:2, seed:34, stagger:false}),
+    ceil: fpRock({base:[46,40,58], seed:33}),
+  },
+  temple: {
+    wall: fpBricks({base:[112,142,128], mc:[36,48,44], rows:3, cols:2, seed:41, moss:0.35}),
+    wall2: fpBricks({base:[104,136,122], mc:[34,46,42], rows:3, cols:2, seed:47, moss:0.6}),
+    floor: fpBricks({base:[96,116,110], mc:[30,40,38], rows:2, cols:2, seed:42, stagger:false, moss:0.25}),
+    floor2: fpWater({seed:44}),
+    ceil: fpRock({base:[60,74,70], seed:43}),
+  },
+  graveyard: {
+    wall: fpBricks({base:[122,120,112], mc:[44,42,38], rows:5, cols:2, seed:51, moss:0.45}),
+    wall2: fpBricks({base:[112,112,104], mc:[40,40,36], rows:5, cols:2, seed:57, moss:0.7}),
+    floor: fpDirt({base:[102,86,66], seed:52}),
+    floor2: fpGrass({base:[70,84,52], seed:54}),
+    ceil: fpRock({base:[62,60,56], seed:53}),
+  },
+  mine: {
+    wall: fpBeams(fpRock({base:[136,104,78], seed:61})),
+    wall2: fpRock({base:[128,98,74], seed:67, ore:true}),
+    floor: fpDirt({base:[108,90,66], seed:62}),
+    floor2: fpRock({base:[100,84,64], seed:64}),
+    ceil: fpRock({base:[78,64,54], seed:63}),
+  },
+  lair: {
+    wall: fpRock({base:[126,74,56], seed:81, lava:true}),
+    wall2: fpRock({base:[118,68,52], seed:87}),
+    floor: fpRock({base:[94,60,48], seed:82}),
+    floor2: fpRock({base:[90,50,40], seed:84, lava:true}),
+    ceil: fpRock({base:[66,42,34], seed:83}),
+  },
+  // roadside encounters - open sky, obstacles become hedges and boulders
+  forest: { outdoor:true, sky:[[70,124,194],[198,222,234]],
+    wall: fpHedge({base:[62,108,58], seed:71}), wall2: fpRock({base:[128,128,124], seed:72}),
+    floor: fpGrass({base:[80,122,64], seed:73, flowers:true}), floor2: fpGrass({base:[74,114,58], seed:75}), edge: fpDirt({base:[116,96,68], seed:74}) },
+  swamp: { outdoor:true, sky:[[86,102,96],[164,174,152]],
+    wall: fpHedge({base:[72,92,54], seed:76}), wall2: fpRock({base:[96,100,86], seed:77}),
+    floor: fpGrass({base:[74,86,52], seed:78}), floor2: fpWater({seed:79}), edge: fpDirt({base:[80,70,52], seed:80}) },
+  desert: { outdoor:true, sky:[[92,148,210],[238,216,172]],
+    wall: fpRock({base:[200,160,106], seed:85}), wall2: fpRock({base:[176,140,96], seed:86}),
+    floor: fpSand({base:[216,184,130], seed:87}), floor2: fpSand({base:[206,176,124], seed:88}), edge: fpSand({base:[194,162,114], seed:89}) },
+  tundra: { outdoor:true, sky:[[118,148,190],[222,232,242]],
+    wall: fpRock({base:[180,200,216], seed:95}), wall2: fpRock({base:[150,160,170], seed:96}),
+    floor: fpSnow({base:[226,234,244], seed:97}), floor2: fpSnow({base:[214,224,236], seed:98}), edge: fpSnow({base:[200,210,222], seed:99}) },
+  sea: { outdoor:true, sky:[[68,118,180],[192,216,232]],
+    wall: fpRock({base:[98,114,122], seed:101}), wall2: fpRock({base:[90,104,110], seed:102}),
+    floor: fpBricks({base:[134,100,66], mc:[60,40,24], rows:4, cols:1, seed:103, jitter:0.2}), floor2: fpBricks({base:[126,94,62], mc:[56,38,22], rows:4, cols:1, seed:104}), edge: fpWater({seed:105}) },
+};
+// floor texture slots: 0 floor, 1 floor variant, 2 stairs down, 3 stairs up,
+// 4 revealed pit, 5 glowing rune, 6 water pool, 7 field edge
+function fpTheme(){
+  const key = G.gameMode===2 ? (FP_THEME_SPECS[G.arenaTheme] ? G.arenaTheme : 'forest')
+    : (FP_THEME_SPECS[G.siteKind] ? G.siteKind : 'dungeon');
+  if (FP.themes[key]) return FP.themes[key];
+  const s = FP_THEME_SPECS[key];
+  const T = { key, outdoor:!!s.outdoor, sky:s.sky };
+  T.wall = fpMakeTex(s.wall);
+  T.wall2 = fpMakeTex(s.wall2 || s.wall);
+  T.wallTorch = fpMakeTex(fpSconce(s.wall));
+  T.floors = [s.floor, s.floor2||s.floor, fpStairs(s.floor,true), fpStairs(s.floor,false),
+    fpPit(s.floor), fpRuneFloor(s.floor), fpWater(), s.edge||s.floor].map(fpMakeTex);
+  T.ceil = s.ceil ? fpMakeTex(s.ceil) : null;
+  FP.themes[key] = T;
+  return T;
+}
+
+// ---------- sprites (billboards built from the existing vector art) ----------
+const FP_GOLD_ART = [['e',-14,26,16,7],['e',12,28,17,7],['e',-2,20,15,6],['e',6,12,12,5],['e',-8,10,10,4],['d',-4,8,3,'#fff6c8'],['d',10,24,3,'#fff6c8']];
+const FP_FLAME_ART = [['p',[0,-44, 16,-12, 12,16, 0,30, -12,16, -16,-12]], ['e',0,12,9,14], ['d',0,10,7,'#fff3c4']];
+// renders a recipe once into its own canvas, cropped to the art's real
+// bounds so a creature's feet land on the floor, plus black/white copies
+// used to darken it by distance and flash it when it takes a hit
+function fpBuildSprite(draw){
+  const S = 160;
+  const raw = document.createElement('canvas'); raw.width = raw.height = S;
+  const rc = raw.getContext('2d');
+  draw(rc, S);
+  let minX=S, minY=S, maxX=-1, maxY=-1;
+  try{
+    const d = rc.getImageData(0,0,S,S).data;
+    for (let y=0;y<S;y++) for (let x=0;x<S;x++) if (d[(y*S+x)*4+3]>8){
+      if (x<minX) minX=x; if (x>maxX) maxX=x; if (y<minY) minY=y; if (y>maxY) maxY=y;
+    }
+  }catch(e){ minX=0; minY=0; maxX=S-1; maxY=S-1; }
+  if (maxX<0){ minX=0; minY=0; maxX=S-1; maxY=S-1; }
+  const pad = 3, w = maxX-minX+1+pad*2, h = maxY-minY+1+pad*2;
+  const mk = ()=>{ const c=document.createElement('canvas'); c.width=w; c.height=h; return c; };
+  const sil = mk(), sc = sil.getContext('2d');
+  sc.drawImage(raw, minX-pad, minY-pad, w, h, 0, 0, w, h);
+  sc.globalCompositeOperation = 'source-in'; sc.fillStyle = '#000'; sc.fillRect(0,0,w,h);
+  const img = mk(), ic = img.getContext('2d');
+  // dark outline so a creature reads against any wall, then the art itself,
+  // then a top-lit/bottom-shaded wash for a bit of volume
+  ic.globalAlpha = 0.85;
+  for (const [ox,oy] of [[-2,0],[2,0],[0,-2],[0,2]]) ic.drawImage(sil, ox, oy);
+  ic.globalAlpha = 1;
+  ic.drawImage(raw, minX-pad, minY-pad, w, h, 0, 0, w, h);
+  ic.globalCompositeOperation = 'source-atop';
+  const gr = ic.createLinearGradient(0,0,0,h);
+  gr.addColorStop(0,'rgba(255,255,255,0.22)'); gr.addColorStop(0.45,'rgba(255,255,255,0)'); gr.addColorStop(1,'rgba(0,0,0,0.38)');
+  ic.fillStyle = gr; ic.fillRect(0,0,w,h);
+  const shade = mk(), shc = shade.getContext('2d');
+  shc.drawImage(img,0,0); shc.globalCompositeOperation='source-in'; shc.fillStyle='#000'; shc.fillRect(0,0,w,h);
+  const wht = mk(), wc = wht.getContext('2d');
+  wc.drawImage(img,0,0); wc.globalCompositeOperation='source-in'; wc.fillStyle='#fff'; wc.fillRect(0,0,w,h);
+  return { img, shade, wht, aspect: w/h };
+}
+function fpSprite(recipe, color){
+  let byR = FP.sprites.get(recipe);
+  if (!byR){ byR = new Map(); FP.sprites.set(recipe, byR); }
+  let e = byR.get(color);
+  if (!e){ e = fpBuildSprite((c,S)=>drawMonsterArt(S/2, S/2, S*0.92, recipe, color, c)); byR.set(color, e); }
+  return e;
+}
+function fpGlyphSprite(ch, color){
+  const key = ch+'|'+color;
+  let e = FP.glyphs.get(key);
+  if (!e){
+    e = fpBuildSprite((c,S)=>{
+      c.fillStyle = color; c.textAlign='center'; c.textBaseline='middle';
+      c.font = `700 ${Math.round(S*0.8)}px 'JetBrains Mono', 'DepthcrawlCardSuits', monospace`;
+      c.fillText(ch, S/2, S/2);
+    });
+    FP.glyphs.set(key, e);
+  }
+  return e;
+}
+
+// ---------- lighting ----------
+// wall torches bake a falloff map (with line of sight, so light doesn't leak
+// through stone) whenever the set of torches you've seen changes; each frame
+// only re-weights them by their own flicker and upsamples to a smooth
+// FP_LS-per-tile light map
+const FP_TORCH_REACH = TORCH_LIGHT_RADIUS + 1.5;
+function fpPrepareLights(vis){
+  const torches = [];
+  if (G.gameMode===1 && G.dungeonDeco){
+    for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
+      if (G.dungeonDeco[x][y]!=='torch') continue;
+      if ((G.dungeonSeen && G.dungeonSeen[x][y]) || vis.has(x+','+y)) torches.push({x,y});
+    }
+  }
+  const key = torches.map(t=>t.x+','+t.y).join(';');
+  if (key!==FP.lightKey){
+    FP.lightKey = key; FP.torches = torches;
+    FP.torchW = torches.map(t=>{
+      const w = new Float32Array(COLS*ROWS);
+      for (let y=mx(0,t.y-6); y<=mn(ROWS-1,t.y+6); y++) for (let x=mx(0,t.x-6); x<=mn(COLS-1,t.x+6); x++){
+        const d = Math.hypot(x-t.x, y-t.y);
+        if (d>FP_TORCH_REACH) continue;
+        if (d>1.5 && !hasLineOfSight(t.x,t.y,x,y)) continue;
+        w[y*COLS+x] = Math.pow(1-d/FP_TORCH_REACH, 1.3) * 1.35;
+      }
+      return w;
+    });
+    // flame sprite positions: one per open face of the torch's wall tile
+    FP.flames = [];
+    for (const t of torches) for (const [dx,dy] of FACING_VECT){
+      if (tileAt(t.x+dx,t.y+dy)===T_WALL) continue;
+      FP.flames.push({x:t.x+0.5+dx*0.53, y:t.y+0.5+dy*0.53, seed:fpHash(t.x,t.y,dx*3+dy)});
+    }
+  }
+  const n = COLS*ROWS;
+  if (!FP.Lr){ FP.Lr = new Float32Array(n); FP.Lg = new Float32Array(n); FP.Lb = new Float32Array(n); }
+  FP.Lr.fill(0); FP.Lg.fill(0); FP.Lb.fill(0);
+  for (let j=0;j<FP.torches.length;j++){
+    const f = 0.84 + 0.1*Math.sin(FP.t*8.3+j*1.7) + 0.06*Math.sin(FP.t*21.1+j*4.3);
+    const w = FP.torchW[j];
+    for (let i=0;i<n;i++){ const v = w[i]; if (v){ FP.Lr[i]+=v*f; FP.Lg[i]+=v*f*0.6; FP.Lb[i]+=v*f*0.28; } }
+  }
+  const LW = COLS*FP_LS, LH = ROWS*FP_LS;
+  if (!FP.L4r){ FP.L4r = new Float32Array(LW*LH); FP.L4g = new Float32Array(LW*LH); FP.L4b = new Float32Array(LW*LH); }
+  for (let sy=0; sy<LH; sy++){
+    const gy = (sy+0.5)/FP_LS - 0.5, y0 = clamp(Math.floor(gy),0,ROWS-1), y1 = mn(ROWS-1,y0+1), ty = clamp(gy-y0,0,1);
+    for (let sx=0; sx<LW; sx++){
+      const gx = (sx+0.5)/FP_LS - 0.5, x0 = clamp(Math.floor(gx),0,COLS-1), x1 = mn(COLS-1,x0+1), tx = clamp(gx-x0,0,1);
+      const a=y0*COLS+x0, b=y0*COLS+x1, c=y1*COLS+x0, d=y1*COLS+x1, o=sy*LW+sx;
+      const w00=(1-tx)*(1-ty), w10=tx*(1-ty), w01=(1-tx)*ty, w11=tx*ty;
+      FP.L4r[o] = FP.Lr[a]*w00+FP.Lr[b]*w10+FP.Lr[c]*w01+FP.Lr[d]*w11;
+      FP.L4g[o] = FP.Lg[a]*w00+FP.Lg[b]*w10+FP.Lg[c]*w01+FP.Lg[d]*w11;
+      FP.L4b[o] = FP.Lb[a]*w00+FP.Lb[b]*w10+FP.Lb[c]*w01+FP.Lb[d]*w11;
+    }
+  }
+}
+function fpLightIdx(wx,wy){
+  const sx = Math.floor(wx*FP_LS), sy = Math.floor(wy*FP_LS);
+  if (sx<0||sy<0||sx>=COLS*FP_LS||sy>=ROWS*FP_LS) return -1;
+  return sy*COLS*FP_LS+sx;
+}
+// ambient + carried-lantern settings for the current place and time
+function fpEnv(){
+  const race = raceRow();
+  const R = DUNGEON_VISION_RADIUS + (race ? (race[6]||0) : 0) + 0.5;
+  if (G.gameMode!==2) return { amb:[0.03,0.036,0.05], lan:[1.0,0.86,0.66], lanK:1.35, R, fog:null };
+  const night = isNightTime(), storm = G.weather==='storm', fogw = G.weather==='fog', rain = G.weather==='rain';
+  let amb = night ? [0.2,0.24,0.38] : [0.95,0.94,0.9];
+  if (storm) amb = fpScale(amb, 0.6); else if (rain) amb = fpScale(amb, 0.8);
+  const T = fpTheme();
+  let top = T.sky[0], hor = T.sky[1];
+  if (night){ top = [8,12,30]; hor = [34,44,74]; }
+  if (storm){ top = fpMix(top,[40,42,50],0.7); hor = fpMix(hor,[80,82,90],0.7); }
+  else if (fogw || rain){ top = fpMix(top,[150,154,160],0.5); hor = fpMix(hor,[176,178,182],0.6); }
+  return { amb, lan:[1.0,0.86,0.66], lanK: night ? 1.1 : 0.25, R: night ? R : R+4, sky:[top,hor], fog:hor,
+    fogNear: fogw ? 2 : 7, fogFar: fogw ? 9 : 22, night };
+}
+
+// ---------- camera ----------
+const FP_FACING_ANGLE = [-Math.PI/2, 0, Math.PI/2, Math.PI];
+function fpFaceNearestFoe(){
+  let best=null, bd=1e9;
+  for (const m of G.mon){ if (!m.alive) continue; const d=Math.abs(m.x-G.player.x)+Math.abs(m.y-G.player.y); if (d<bd){ bd=d; best=m; } }
+  if (!best) return G.player.facing|0;
+  const dx = best.x-G.player.x, dy = best.y-G.player.y;
+  return Math.abs(dx)>=Math.abs(dy) ? (dx>0?1:3) : (dy>0?2:0);
+}
+function fpUpdateCamera(dt){
+  const p = G.player;
+  const mapChanged = FP.mapRef!==G.map;
+  if (mapChanged){
+    if (FP.mapRef) FP.fade = 1;
+    FP.mapRef = G.map; FP.lightKey = null; FP.floats = []; FP.parts = []; FP.lastHp = p.hp;
+    if (G.gameMode===2) p.facing = fpFaceNearestFoe();
+  }
+  // the eye sits toward the back of its tile, like a classic grid crawler, so
+  // a wall or a monster one step ahead is framed instead of filling the view
+  const ta = FP_FACING_ANGLE[(p.facing|0)&3];
+  const tx = p.x+0.5-Math.cos(ta)*FP_EYE_BACK, ty = p.y+0.5-Math.sin(ta)*FP_EYE_BACK;
+  let c = FP.cam;
+  if (!c || mapChanged || Math.hypot(c.x-tx,c.y-ty)>2.5){ c = FP.cam = {x:tx, y:ty, a:ta}; }
+  const k = 1-Math.exp(-dt*15);
+  c.x += (tx-c.x)*k; c.y += (ty-c.y)*k;
+  let da = ta-c.a; while (da>Math.PI) da -= Math.PI*2; while (da<-Math.PI) da += Math.PI*2;
+  c.a += da*(1-Math.exp(-dt*13));
+  FP.moving = Math.min(1, Math.hypot(tx-c.x, ty-c.y));
+}
+
+// ---------- world raycast ----------
+function fpEnsureBuffer(){
+  const W = clamp(Math.round(canvas.width/2.1), 220, 460);
+  if (FP.W===W && FP.off) return;
+  FP.W = W;
+  FP.off = document.createElement('canvas'); FP.off.width = W; FP.off.height = W;
+  FP.octx = FP.off.getContext('2d');
+  FP.img = FP.octx.createImageData(W, W);
+  FP.u32 = new Uint32Array(FP.img.data.buffer);
+  FP.zbuf = new Float32Array(W); FP.rowD = new Float32Array(W); FP.rowL = new Float32Array(W);
+  FP.ao = new Float32Array(FP_TR);
+  for (let i=0;i<FP_TR;i++) FP.ao[i] = 0.62 + 0.38*Math.min(1, Math.min(i+1, FP_TR-i)/22);
+}
+function fpFloorSlots(T){
+  const n = COLS*ROWS;
+  if (!FP.ftile) FP.ftile = new Uint8Array(n);
+  const f = FP.ftile;
+  for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
+    const t = G.map[x][y];
+    let s = fpHash(x,y,7)>0.78 ? 1 : 0;
+    if (t===T_STAIRSD) s = 2;
+    else if (t===T_STAIRSU) s = 3;
+    else if (t===T_TRAP && G.trapSeen && G.trapSeen[x][y]) s = 4;
+    else if (G.gameMode===2 && (t===T_FLEE)) s = 7;
+    else if (G.gameMode===1 && G.dungeonDeco){
+      const d = G.dungeonDeco[x][y];
+      if (d==='rune') s = 5; else if (d==='pool') s = 6;
+    }
+    f[y*COLS+x] = s;
+  }
+}
+function fpRenderWorld(env, T, camZ, horizon){
+  const W = FP.W, H = W, u32 = FP.u32, zb = FP.zbuf, rowD = FP.rowD, rowL = FP.rowL;
+  const c = FP.cam, dirX = Math.cos(c.a), dirY = Math.sin(c.a);
+  const plX = -dirY*FP_PLANE, plY = dirX*FP_PLANE;
+  const proj = (W/2)/FP_PLANE;
+  const R = env.R, lanK = env.lanK;
+  const ambR = env.amb[0], ambG = env.amb[1], ambB = env.amb[2];
+  const lcR = env.lan[0], lcG = env.lan[1], lcB = env.lan[2];
+  const outdoor = T.outdoor, fog = env.fog;
+  const fogNear = env.fogNear||0, fogSpan = (env.fogFar||1)-(env.fogNear||0);
+  const L4r = FP.L4r, L4g = FP.L4g, L4b = FP.L4b, LW = COLS*FP_LS;
+  const ftile = FP.ftile, floors = T.floors, ceil = T.ceil;
+  const MASK = FP_TR-1;
+  const lanOf = d => d>=R ? 0 : Math.pow(1-d/R, 1.6)*lanK;
+  // per-row floor/ceiling distance and lantern falloff
+  for (let y=0;y<H;y++){
+    const dy = y+0.5-horizon;
+    const d = dy>0 ? camZ*proj/dy : (dy<0 ? (1-camZ)*proj/(-dy) : 1e9);
+    rowD[y] = d; rowL[y] = lanOf(d);
+  }
+  // sky colors per row (outdoor only)
+  let skyRow = null;
+  if (outdoor){
+    skyRow = FP.skyRow && FP.skyRow.length===H ? FP.skyRow : (FP.skyRow = new Uint32Array(H));
+    const top = env.sky[0], hor = env.sky[1];
+    for (let y=0;y<H;y++){
+      const t = clamp(y/Math.max(1,horizon), 0, 1), tt = t*t;
+      const r = top[0]+(hor[0]-top[0])*tt, g = top[1]+(hor[1]-top[1])*tt, b = top[2]+(hor[2]-top[2])*tt;
+      skyRow[y] = (255<<24)|((b|0)<<16)|((g|0)<<8)|(r|0);
+    }
+  }
+  const starBase = Math.floor(c.a/(Math.PI*2)*W*4.8);
+  for (let x=0;x<W;x++){
+    const camX = 2*(x+0.5)/W - 1;
+    const rdx = dirX+plX*camX, rdy = dirY+plY*camX;
+    let mapX = Math.floor(c.x), mapY = Math.floor(c.y);
+    const ddx = rdx===0 ? 1e30 : Math.abs(1/rdx), ddy = rdy===0 ? 1e30 : Math.abs(1/rdy);
+    let stepX, stepY, sdx, sdy;
+    if (rdx<0){ stepX=-1; sdx=(c.x-mapX)*ddx; } else { stepX=1; sdx=(mapX+1-c.x)*ddx; }
+    if (rdy<0){ stepY=-1; sdy=(c.y-mapY)*ddy; } else { stepY=1; sdy=(mapY+1-c.y)*ddy; }
+    let hit = false, side = 0;
+    for (let i=0;i<80;i++){
+      if (sdx<sdy){ sdx+=ddx; mapX+=stepX; side=0; } else { sdy+=ddy; mapY+=stepY; side=1; }
+      if (mapX<0||mapY<0||mapX>=COLS||mapY>=ROWS){ if (!outdoor) hit = true; break; }
+      if (G.map[mapX][mapY]===T_WALL){ hit = true; break; }
+    }
+    let top = horizon, bot = horizon - 1, perp = 1e9;
+    if (hit){
+      perp = side===0 ? sdx-ddx : sdy-ddy;
+      if (perp<0.02) perp = 0.02;
+      const lineH = proj/perp;
+      top = horizon - (1-camZ)*lineH; bot = horizon + camZ*lineH;
+      // texture + lighting for this wall slice
+      let tex = T.wall;
+      if (mapX>=0 && mapY>=0 && mapX<COLS && mapY<ROWS){
+        if (G.gameMode===1){
+          if (G.dungeonDeco && G.dungeonDeco[mapX][mapY]==='torch') tex = T.wallTorch;
+          else if (fpHash(mapX,mapY,3)>0.72) tex = T.wall2;
+        } else if (G.arenaDeco && G.arenaDeco[mapX] && G.arenaDeco[mapX][mapY]==='rock') tex = T.wall2;
+      }
+      const hx = c.x+perp*rdx, hy = c.y+perp*rdy;
+      let wallX = side===0 ? hy : hx; wallX -= Math.floor(wallX);
+      let texX = Math.floor(wallX*FP_TR);
+      if ((side===0 && rdx>0) || (side===1 && rdy<0)) texX = FP_TR-1-texX;
+      const li = side===0 ? fpLightIdx(hx-stepX*0.45, hy) : fpLightIdx(hx, hy-stepY*0.45);
+      const shade = side===1 ? 0.8 : 1;
+      const lan = lanOf(perp);
+      const lr = (ambR + lan*lcR + (li>=0?L4r[li]:0))*shade;
+      const lg = (ambG + lan*lcG + (li>=0?L4g[li]:0))*shade;
+      const lb = (ambB + lan*lcB + (li>=0?L4b[li]:0))*shade;
+      const fogT = fog ? clamp((perp-fogNear)/fogSpan,0,1) : 0;
+      const y0 = mx(0, Math.ceil(top)), y1 = mn(H-1, Math.floor(bot));
+      const span = bot-top, tr = tex.r, tg = tex.g, tb = tex.b, te = tex.e;
+      for (let y=y0; y<=y1; y++){
+        const texY = clamp(Math.floor((y+0.5-top)/span*FP_TR), 0, MASK);
+        const ti = texY*FP_TR+texX, ao = FP.ao[texY];
+        let er = 0; if (te){ er = te[ti]/170; }
+        let r = tr[ti]*(lr*ao+er), g = tg[ti]*(lg*ao+er), b = tb[ti]*(lb*ao+er);
+        if (fogT){ r += (fog[0]-r)*fogT; g += (fog[1]-g)*fogT; b += (fog[2]-b)*fogT; }
+        u32[y*W+x] = (255<<24) | ((b>255?255:b|0)<<16) | ((g>255?255:g|0)<<8) | (r>255?255:r|0);
+      }
+    }
+    zb[x] = perp;
+    // floor below the wall slice
+    for (let y=mx(Math.floor(bot)+1, Math.ceil(horizon)); y<H; y++){
+      const d = rowD[y];
+      const fx = c.x+d*rdx, fy = c.y+d*rdy;
+      const tX = Math.floor(fx), tY = Math.floor(fy);
+      let tex = floors[0];
+      if (tX>=0 && tY>=0 && tX<COLS && tY<ROWS) tex = floors[ftile[tY*COLS+tX]];
+      const ti = (Math.floor((fy-tY)*FP_TR)&MASK)*FP_TR + (Math.floor((fx-tX)*FP_TR)&MASK);
+      const li = fpLightIdx(fx,fy), lan = rowL[y];
+      let lr = ambR + lan*lcR, lg = ambG + lan*lcG, lb = ambB + lan*lcB;
+      if (li>=0){ lr += L4r[li]; lg += L4g[li]; lb += L4b[li]; }
+      if (tex.e){ const e = tex.e[ti]/170; lr += e; lg += e; lb += e; }
+      let r = tex.r[ti]*lr, g = tex.g[ti]*lg, b = tex.b[ti]*lb;
+      if (fog){ const ft = clamp((d-fogNear)/fogSpan,0,1); r += (fog[0]-r)*ft; g += (fog[1]-g)*ft; b += (fog[2]-b)*ft; }
+      u32[y*W+x] = (255<<24) | ((b>255?255:b|0)<<16) | ((g>255?255:g|0)<<8) | (r>255?255:r|0);
+    }
+    // ceiling (or open sky) above it
+    const cEnd = Math.min(H-1, Math.ceil(top)-1, Math.floor(horizon));
+    for (let y=0; y<=cEnd && y<H; y++){
+      if (outdoor){
+        let px = skyRow[y];
+        if (env.night && fpHash(starBase+x, y, 5)>0.9965) px = 0xffe8e0d8;
+        u32[y*W+x] = px;
+        continue;
+      }
+      const d = rowD[y];
+      const fx = c.x+d*rdx, fy = c.y+d*rdy;
+      const ti = (Math.floor(fy*FP_TR)&MASK)*FP_TR + (Math.floor(fx*FP_TR)&MASK);
+      const li = fpLightIdx(fx,fy), lan = rowL[y]*0.8;
+      let lr = ambR + lan*lcR, lg = ambG + lan*lcG, lb = ambB + lan*lcB;
+      if (li>=0){ lr += L4r[li]*0.7; lg += L4g[li]*0.7; lb += L4b[li]*0.7; }
+      const r = ceil.r[ti]*lr, g = ceil.g[ti]*lg, b = ceil.b[ti]*lb;
+      u32[y*W+x] = (255<<24) | ((b>255?255:b|0)<<16) | ((g>255?255:g|0)<<8) | (r>255?255:r|0);
+    }
+  }
+  FP.octx.putImageData(FP.img, 0, 0);
+  return { dirX, dirY, plX, plY, proj };
+}
+
+// ---------- sprite pass ----------
+function fpLightAt(env, wx, wy, dist){
+  const li = fpLightIdx(wx,wy);
+  const lan = dist>=env.R ? 0 : Math.pow(1-dist/env.R,1.6)*env.lanK;
+  const r = env.amb[0]+lan*env.lan[0]+(li>=0?FP.L4r[li]:0);
+  const g = env.amb[1]+lan*env.lan[1]+(li>=0?FP.L4g[li]:0);
+  return clamp(Math.max(r,g)*1.05, 0, 1);
+}
+function fpCollectSprites(vis){
+  const S = [];
+  const seeTile = (x,y)=> G.gameMode===2 || vis.has(x+','+y);
+  const bob = Math.sin(FP.t*2.6)*0.03;
+  // monsters: smooth their step between tiles, notice hits and deaths
+  for (let i=0;i<G.mon.length;i++){
+    const m = G.mon[i];
+    const was = FP.monAlive.get(m);
+    FP.monAlive.set(m, m.alive);
+    const prevHp = FP.monHp.get(m);
+    FP.monHp.set(m, m.hp);
+    let pos = FP.monPos.get(m);
+    if (!pos){ pos = {x:m.x+0.5, y:m.y+0.5}; FP.monPos.set(m,pos); }
+    if (prevHp!==undefined && m.hp<prevHp && seeTile(m.x,m.y)){
+      FP.floats.push({x:pos.x, y:pos.y, z:0.95, txt:String(prevHp-Math.max(0,m.hp)), col:'#ffd27a', age:0});
+      FP.monFlash.set(m, 1);
+      fpBurst(pos.x, pos.y, 0.45, '#fff2c0', 6, 1.2);
+    }
+    if (was && !m.alive && seeTile(m.x,m.y)) fpBurst(pos.x, pos.y, 0.35, m.col||'#999', 22, 1.6);
+    if (!m.alive || !seeTile(m.x,m.y)){ pos.x = m.x+0.5; pos.y = m.y+0.5; continue; }
+    const kk = 1-Math.exp(-FP.dt*12);
+    if (Math.hypot(m.x+0.5-pos.x, m.y+0.5-pos.y)>2){ pos.x = m.x+0.5; pos.y = m.y+0.5; }
+    pos.x += (m.x+0.5-pos.x)*kk; pos.y += (m.y+0.5-pos.y)*kk;
+    const isBoss = G.gameMode===1 && G.isBossFloor && i===G.bossIdx;
+    const col = m.corrupted ? COL.purple : m.col;
+    const spr = (m.art && m.art.length) ? fpSprite(m.art, col) : fpGlyphSprite(m.sym||'?', col);
+    const breathe = 1 + Math.sin(FP.t*3 + i*1.3)*0.025;
+    let fl = FP.monFlash.get(m)||0;
+    if (fl>0){ fl = Math.max(0, fl-FP.dt*4); FP.monFlash.set(m, fl); }
+    S.push({x:pos.x, y:pos.y, spr, h:(isBoss?1.02:0.74)*breathe, lift:0, shadow:true, flash:fl,
+      hp: m.hp<m.maxHp ? clamp(m.hp/m.maxHp,0,1) : null, boss:isBoss});
+  }
+  const comp = G.player.companion;
+  if (comp && comp.x!==undefined && seeTile(comp.x,comp.y)){
+    const recipe = COMPANION_ART[comp.kind];
+    S.push({x:comp.x+0.5, y:comp.y+0.5, spr: recipe ? fpSprite(recipe, comp.col) : fpGlyphSprite(comp.sym||'c', comp.col), h:0.56, lift:0, shadow:true});
+  }
+  const summ = G.player.summon;
+  if (summ && summ.x!==undefined && seeTile(summ.x,summ.y))
+    S.push({x:summ.x+0.5, y:summ.y+0.5, spr:fpSprite(SUMMON_ART, summ.col), h:0.46, lift:0.22+bob, glow:summ.col, emissive:true});
+  // tile contents
+  const midX = Math.floor(COLS/2), midY = Math.floor(ROWS/2);
+  for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
+    if (!seeTile(x,y)) continue;
+    if (x===G.player.x && y===G.player.y) continue; // whatever you're standing on is underfoot, not in view
+    const t = G.map[x][y], cx = x+0.5, cy = y+0.5;
+    if (t===T_WALL) continue;
+    const add = (recipe, color, h, lift, extra)=> S.push(Object.assign({x:cx, y:cy, spr:fpSprite(recipe,color), h, lift}, extra||{}));
+    switch(t){
+      case T_STAIRSD: add(STAIRS_DOWN_ART, COL.amber, 0.26, 0.34+bob, {emissive:true, glow:COL.amber}); break;
+      case T_STAIRSU: add(STAIRS_UP_ART, COL.green, 0.26, 0.34+bob, {emissive:true, glow:COL.green}); break;
+      case T_EXIT: add(EXIT_ART, COL.cyan, 0.86, 0, {glow:COL.cyan}); break;
+      case T_FLEE:
+        if (G.gameMode===1) add(EXIT_ART, COL.red, 0.86, 0, {glow:COL.red});
+        else if ((x===0&&y===midY)||(x===COLS-1&&y===midY)||(y===0&&x===midX)||(y===ROWS-1&&x===midX)){
+          const sealed = G.mandatoryFight && G.mon.some(m=>m.alive);
+          S.push({x:cx, y:cy, spr:fpGlyphSprite(sealed?'x':'<', sealed?COL.dim:COL.red), h:0.3, lift:0.3+bob, emissive:true});
+        }
+        break;
+      case T_GOLD: add(FP_GOLD_ART, COL.gold, 0.2, 0, {shine:true}); break;
+      case T_SHOP: add(SHOP_ART, COL.gold, 0.5, 0, {shadow:true}); break;
+      case T_VAULT: add(VAULT_ART, COL.gold, 0.46, 0, {shadow:true, shine:true}); break;
+      case T_CORRUPT_CHEST: add(CORRUPT_CHEST_ART, COL.purple, 0.46, 0, {shadow:true, glow:COL.purple}); break;
+      case T_TAVERN: add(TAVERN_ART, COL.tavern, 0.7, 0, {shadow:true}); break;
+      case T_BLACKSMITH: add(BLACKSMITH_ART, COL.dim, 0.5, 0, {shadow:true}); break;
+      case T_ALCHEMIST: add(ALCHEMIST_ART, COL.green, 0.55, 0, {shadow:true}); break;
+      case T_ITEM: {
+        const fi = G.floorItem[x][y];
+        if (!fi) break;
+        if (fi.consumable) add(ITEM_POTION_ART, '#ff8fa3', 0.3, 0.05+bob, {shine:true, shadow:true});
+        else if (fi.slot==='weapon' || fi.slot==='ranged') add(ITEM_WEAPON_ART, '#e6e6e6', 0.34, 0.05+bob, {shine:true, shadow:true});
+        else add(ITEM_MISC_ART, qualityColor(fi.quality|0)||COL.cyan, 0.3, 0.05+bob, {shine:true, shadow:true});
+        break;
+      }
+    }
+    if (t===T_FLOOR && G.gameMode===1 && G.dungeonDeco){
+      const deco = G.dungeonDeco[x][y], da = deco && DECO_ART[deco];
+      if (da && deco!=='rune' && deco!=='pool'){
+        const h = {throne:0.9, banner:0.82, altar:0.55, idol:0.78, grave:0.62, ore:0.28}[deco] || 0.6;
+        add(da[0], da[1], h, 0, {shadow:true, glow: deco==='idol'||deco==='altar' ? da[1] : null});
+      }
+    }
+  }
+  // torch flames
+  for (const f of (FP.flames||[])){
+    const fl = 0.9 + 0.12*Math.sin(FP.t*13+f.seed*40) + 0.06*Math.sin(FP.t*31+f.seed*9);
+    S.push({x:f.x, y:f.y, spr:fpSprite(FP_FLAME_ART, COL.amber), h:0.2*fl, lift:0.5, emissive:true, glow:'#ffab4a', glowR:1.4});
+    if (Math.random() < FP.dt*2.2) FP.parts.push({x:f.x+(Math.random()-0.5)*0.05, y:f.y+(Math.random()-0.5)*0.05, z:0.66,
+      vx:(Math.random()-0.5)*0.08, vy:(Math.random()-0.5)*0.08, vz:0.25+Math.random()*0.2, life:1.2+Math.random(), age:0, col:'#ffb45c', add:true, r:0.012});
+  }
+  return S;
+}
+function fpBurst(x,y,z,col,n,spd){
+  for (let i=0;i<n;i++){
+    const a = Math.random()*Math.PI*2, s = (0.3+Math.random()*0.7)*spd;
+    FP.parts.push({x, y, z, vx:Math.cos(a)*s*0.5, vy:Math.sin(a)*s*0.5, vz:(Math.random()*0.9+0.2)*s, g:2.4,
+      life:0.5+Math.random()*0.5, age:0, col, r:0.02+Math.random()*0.02});
+  }
+}
+function fpProject(P, wx, wy){
+  const c = FP.cam, relX = wx-c.x, relY = wy-c.y;
+  const inv = 1/(P.plX*P.dirY - P.dirX*P.plY);
+  const tX = inv*(P.dirY*relX - P.dirX*relY);
+  const tY = inv*(-P.plY*relX + P.plX*relY);
+  return { sx:(FP.W/2)*(1+tX/tY), depth:tY };
+}
+function fpDrawSprites(S, P, env, camZ, horizon, k){
+  const W = FP.W, zb = FP.zbuf;
+  for (const s of S){ const pr = fpProject(P, s.x, s.y); s.sx = pr.sx; s.depth = pr.depth; }
+  S.sort((a,b)=>b.depth-a.depth);
+  for (const s of S){
+    if (s.depth<0.4) continue;
+    const img = s.spr;
+    const hPx = P.proj*s.h/s.depth, wPx = hPx*img.aspect;
+    const bottom = horizon + (camZ - s.lift)*P.proj/s.depth, topY = bottom-hPx;
+    const x0 = s.sx - wPx/2, x1 = s.sx + wPx/2;
+    if (x1<0 || x0>=W) continue;
+    const dark = s.emissive ? 0 : 1 - fpLightAt(env, s.x, s.y, s.depth);
+    if (dark>0.97 && !s.glow) continue;
+    const ci = clamp(Math.floor(s.sx),0,W-1);
+    if (s.shadow && zb[ci]>s.depth){
+      const fy = horizon + camZ*P.proj/s.depth;
+      ctx.fillStyle = `rgba(0,0,0,${0.4*(1-dark)})`;
+      ctx.beginPath(); ctx.ellipse(s.sx*k, fy*k, wPx*0.42*k, wPx*0.1*k, 0, 0, Math.PI*2); ctx.fill();
+    }
+    if (s.glow && zb[ci]>s.depth-0.3){
+      const gr = (s.glowR||0.8)*P.proj/s.depth*0.5*k, gx = s.sx*k, gy = (topY+hPx*0.45)*k;
+      ctx.save(); ctx.globalCompositeOperation = 'lighter';
+      const g = ctx.createRadialGradient(gx,gy,0,gx,gy,gr);
+      g.addColorStop(0, fpRgba(s.glow, 0.34)); g.addColorStop(1, fpRgba(s.glow, 0));
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(gx,gy,gr,0,Math.PI*2); ctx.fill();
+      ctx.restore();
+    }
+    // column-clip against the wall depth buffer, drawing contiguous runs
+    let a = mx(0, Math.floor(x0));
+    const end = mn(W, Math.ceil(x1));
+    while (a<end){
+      while (a<end && zb[a]<=s.depth) a++;
+      let b = a;
+      while (b<end && zb[b]>s.depth) b++;
+      if (b>a){
+        const u0 = (a-x0)/wPx*img.img.width, u1 = (b-x0)/wPx*img.img.width;
+        const su = clamp(u0,0,img.img.width), sw = clamp(u1,0,img.img.width)-su;
+        if (sw>0){
+          const dx = (x0 + su/img.img.width*wPx)*k, dw = sw/img.img.width*wPx*k;
+          ctx.drawImage(img.img, su,0,sw,img.img.height, dx, topY*k, dw, hPx*k);
+          if (dark>0.02){ ctx.globalAlpha = dark; ctx.drawImage(img.shade, su,0,sw,img.img.height, dx, topY*k, dw, hPx*k); ctx.globalAlpha = 1; }
+          if (s.flash){ ctx.globalAlpha = s.flash*0.85; ctx.drawImage(img.wht, su,0,sw,img.img.height, dx, topY*k, dw, hPx*k); ctx.globalAlpha = 1; }
+        }
+      }
+      a = b;
+    }
+    if (s.shine && zb[ci]>s.depth && dark<0.8){
+      const tw = (Math.sin(FP.t*4 + s.x*7 + s.y*3)+1)/2;
+      if (tw>0.75){
+        const r = (tw-0.75)*4*Math.max(2, wPx*0.18)*k, gx = (s.sx+wPx*0.18)*k, gy = (topY+hPx*0.3)*k;
+        ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.strokeStyle='rgba(255,250,220,0.9)'; ctx.lineWidth=Math.max(1,k*0.8);
+        ctx.beginPath(); ctx.moveTo(gx-r,gy); ctx.lineTo(gx+r,gy); ctx.moveTo(gx,gy-r); ctx.lineTo(gx,gy+r); ctx.stroke(); ctx.restore();
+      }
+    }
+    if (s.hp!==null && s.hp!==undefined && zb[ci]>s.depth && dark<0.9){
+      const bw = Math.max(18, Math.min(90, wPx*0.8))*k, bh = Math.max(3, 4*k*(s.boss?1.4:1));
+      const bx = s.sx*k - bw/2, by = topY*k - bh - 6*k;
+      ctx.fillStyle = 'rgba(0,0,0,0.65)'; ctx.fillRect(bx-1, by-1, bw+2, bh+2);
+      ctx.fillStyle = s.hp>0.5 ? '#74bf7e' : s.hp>0.25 ? '#e8a54b' : '#d1495b';
+      ctx.fillRect(bx, by, bw*s.hp, bh);
+    }
+  }
+}
+function fpRgba(hex, a){
+  if (hex.startsWith('rgb')) return hex;
+  const h = hex.replace('#','');
+  const f = h.length===3 ? h.split('').map(c=>c+c).join('') : h;
+  const n = parseInt(f,16);
+  return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`;
+}
+function fpDrawParticles(P, camZ, horizon, k){
+  const W = FP.W, zb = FP.zbuf, dt = FP.dt;
+  const keep = [];
+  for (const p of FP.parts){
+    p.age += dt;
+    if (p.age>p.life) continue;
+    p.x += p.vx*dt; p.y += p.vy*dt; p.z += p.vz*dt;
+    if (p.g) p.vz -= p.g*dt;
+    if (p.z<0.02){ p.z = 0.02; p.vz *= -0.3; p.vx *= 0.6; p.vy *= 0.6; }
+    keep.push(p);
+    const pr = fpProject(P, p.x, p.y);
+    if (pr.depth<0.2) continue;
+    const ci = Math.floor(pr.sx);
+    if (ci<0 || ci>=W || zb[ci]<=pr.depth) continue;
+    const sy = horizon + (camZ-p.z)*P.proj/pr.depth;
+    const r = Math.max(0.6, p.r*P.proj/pr.depth)*k;
+    const a = 1 - p.age/p.life;
+    ctx.globalAlpha = a;
+    if (p.add) ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = p.col;
+    ctx.beginPath(); ctx.arc(pr.sx*k, sy*k, r, 0, Math.PI*2); ctx.fill();
+    ctx.globalCompositeOperation = 'source-over';
+  }
+  ctx.globalAlpha = 1;
+  FP.parts = keep.length>400 ? keep.slice(-400) : keep;
+  // floating damage numbers
+  const fk = [];
+  for (const f of FP.floats){
+    f.age += dt;
+    if (f.age>1.1) continue;
+    fk.push(f);
+    const pr = fpProject(P, f.x, f.y);
+    if (pr.depth<0.2) continue;
+    const sy = horizon + (camZ-(f.z+f.age*0.45))*P.proj/pr.depth;
+    const size = clamp(0.2*P.proj/pr.depth, 11, 34)*k*(f.age<0.12 ? 0.7+f.age*2.5 : 1);
+    ctx.globalAlpha = clamp((1.1-f.age)/0.4, 0, 1);
+    ctx.font = `800 ${Math.round(size)}px 'JetBrains Mono', monospace`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.lineWidth = Math.max(2, size*0.16); ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+    ctx.strokeText(f.txt, pr.sx*k, sy*k);
+    ctx.fillStyle = f.col; ctx.fillText(f.txt, pr.sx*k, sy*k);
+  }
+  ctx.globalAlpha = 1;
+  FP.floats = fk;
+}
+
+// ---------- first-person weapon ----------
+function fpWeaponKind(){
+  const w = G.gear.weapon, b = (w && w.basis) || '';
+  if (/Quarterstaff/.test(b)) return 'staff';
+  if (/Spear|Halberd/.test(b)) return 'spear';
+  if (/axe|Axe|Sickle|Pick/.test(b)) return 'axe';
+  if (/Club|Mace|Hammer|Morningstar|Flail|Maul/.test(b)) return 'blunt';
+  if (/Dagger/.test(b)) return 'dagger';
+  return 'sword';
+}
+function fpDrawWeapon(k){
+  const cw = canvas.width;
+  const kind = fpWeaponKind();
+  const u = cw/100;
+  const sw = FP.swing;                                   // 1 -> 0 over the swing
+  const phase = sw>0 ? Math.sin((1-sw)*Math.PI) : 0;
+  const bobX = Math.sin(FP.t*1.3)*0.4*u + Math.sin(FP.stepPhase||0)*1.2*u;
+  const bobY = Math.abs(Math.cos(FP.stepPhase||0))*1.4*u + Math.sin(FP.t*1.9)*0.35*u;
+  const px = cw*0.8 + bobX - phase*24*u, py = cw*1.05 + bobY - phase*6*u;
+  const rot = -0.42 - phase*1.05;
+  ctx.save();
+  ctx.translate(px, py); ctx.rotate(rot);
+  const metal = ctx.createLinearGradient(-3*u,0,3*u,0);
+  metal.addColorStop(0,'#5d666d'); metal.addColorStop(0.45,'#e9eef1'); metal.addColorStop(0.55,'#b9c3c9'); metal.addColorStop(1,'#4b5359');
+  const wood = ctx.createLinearGradient(-1.6*u,0,1.6*u,0);
+  wood.addColorStop(0,'#3d2614'); wood.addColorStop(0.5,'#8a5a32'); wood.addColorStop(1,'#3a2413');
+  const brass = '#b88a3e';
+  ctx.lineJoin = 'round';
+  if (kind==='sword' || kind==='dagger'){
+    const L = (kind==='dagger' ? 22 : 38)*u, bw = (kind==='dagger' ? 2.6 : 3.2)*u;
+    ctx.fillStyle = wood; ctx.fillRect(-1.5*u, -2*u, 3*u, 10*u);
+    ctx.fillStyle = brass; ctx.fillRect(-7*u, -4*u, 14*u, 2.6*u);
+    ctx.fillStyle = metal;
+    ctx.beginPath(); ctx.moveTo(-bw,-4*u); ctx.lineTo(-bw,-4*u-L*0.86); ctx.lineTo(0,-4*u-L); ctx.lineTo(bw,-4*u-L*0.86); ctx.lineTo(bw,-4*u); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(40,46,52,0.6)'; ctx.lineWidth = 0.5*u;
+    ctx.beginPath(); ctx.moveTo(0,-6*u); ctx.lineTo(0,-4*u-L*0.8); ctx.stroke();
+  } else if (kind==='axe'){
+    ctx.fillStyle = wood; ctx.fillRect(-1.6*u, -40*u, 3.2*u, 50*u);
+    ctx.fillStyle = metal;
+    ctx.beginPath(); ctx.moveTo(1*u,-38*u); ctx.quadraticCurveTo(16*u,-44*u,17*u,-30*u); ctx.quadraticCurveTo(12*u,-24*u,17*u,-16*u);
+    ctx.quadraticCurveTo(10*u,-20*u,1*u,-24*u); ctx.closePath(); ctx.fill();
+  } else if (kind==='blunt'){
+    ctx.fillStyle = wood; ctx.fillRect(-1.6*u, -30*u, 3.2*u, 40*u);
+    const g = ctx.createRadialGradient(-2*u,-36*u,1*u,0,-33*u,8*u);
+    g.addColorStop(0,'#e8edf0'); g.addColorStop(1,'#444b52');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0,-33*u,6.5*u,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#6a737a';
+    for (let i=0;i<6;i++){ const a=i/6*Math.PI*2; ctx.beginPath(); ctx.moveTo(Math.cos(a)*6*u, -33*u+Math.sin(a)*6*u); ctx.lineTo(Math.cos(a)*10*u, -33*u+Math.sin(a)*10*u); ctx.lineTo(Math.cos(a+0.3)*6*u, -33*u+Math.sin(a+0.3)*6*u); ctx.fill(); }
+  } else if (kind==='spear'){
+    ctx.fillStyle = wood; ctx.fillRect(-1.3*u, -52*u, 2.6*u, 64*u);
+    ctx.fillStyle = metal;
+    ctx.beginPath(); ctx.moveTo(0,-68*u); ctx.lineTo(3.4*u,-56*u); ctx.lineTo(0,-50*u); ctx.lineTo(-3.4*u,-56*u); ctx.closePath(); ctx.fill();
+  } else {
+    ctx.fillStyle = wood; ctx.fillRect(-1.6*u, -56*u, 3.2*u, 68*u);
+    const orbY = -60*u, pulse = 0.75+0.25*Math.sin(FP.t*3);
+    ctx.save(); ctx.globalCompositeOperation='lighter';
+    const g = ctx.createRadialGradient(0,orbY,0,0,orbY,12*u*pulse);
+    g.addColorStop(0,'rgba(200,170,255,0.9)'); g.addColorStop(1,'rgba(140,90,255,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0,orbY,12*u*pulse,0,Math.PI*2); ctx.fill(); ctx.restore();
+    ctx.fillStyle = '#e6d9ff'; ctx.beginPath(); ctx.arc(0,orbY,3*u,0,Math.PI*2); ctx.fill();
+  }
+  // gauntleted hand around the grip
+  const hand = ctx.createLinearGradient(-6*u,0,6*u,0);
+  hand.addColorStop(0,'#2a2420'); hand.addColorStop(0.5,'#6b5846'); hand.addColorStop(1,'#241e1a');
+  ctx.fillStyle = hand;
+  ctx.beginPath(); ctx.ellipse(0, 4*u, 6*u, 7.5*u, 0, 0, Math.PI*2); ctx.fill();
+  ctx.fillRect(-5.5*u, 6*u, 11*u, 18*u);
+  ctx.restore();
+  // off-hand spell glow when a spell goes off
+  if (FP.cast>0){
+    const gx = cw*0.2, gy = cw*0.96, r = cw*0.2*(0.6+FP.cast*0.5);
+    ctx.save(); ctx.globalCompositeOperation='lighter';
+    const g = ctx.createRadialGradient(gx,gy,0,gx,gy,r);
+    g.addColorStop(0,`rgba(214,190,255,${0.8*FP.cast})`); g.addColorStop(0.4,`rgba(150,100,255,${0.45*FP.cast})`); g.addColorStop(1,'rgba(120,80,255,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(gx,gy,r,0,Math.PI*2); ctx.fill(); ctx.restore();
+  }
+}
+
+// ---------- screen overlays: minimap, compass, target, damage feedback ----------
+function fpDrawMinimap(vis){
+  const cw = canvas.width, size = cw*0.25, pad = cw*0.018;
+  const x0 = cw - size - pad, y0 = pad, cp = size/COLS;
+  ctx.save();
+  ctx.fillStyle = 'rgba(6,8,12,0.72)';
+  ctx.strokeStyle = 'rgba(232,165,75,0.35)'; ctx.lineWidth = Math.max(1,dpr);
+  ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x0-4*dpr, y0-4*dpr, size+8*dpr, size+8*dpr, 6*dpr) : ctx.rect(x0-4*dpr, y0-4*dpr, size+8*dpr, size+8*dpr);
+  ctx.fill(); ctx.stroke();
+  const seen = G.dungeonSeen;
+  for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
+    const known = G.gameMode===2 || (seen && seen[x][y]);
+    if (!known) continue;
+    const t = G.map[x][y], lit = G.gameMode===2 || vis.has(x+','+y);
+    let col = t===T_WALL ? (lit?'#56616d':'#343c45') : (lit?'#26303a':'#1a2027');
+    if (t===T_STAIRSD) col = COL.amber; else if (t===T_STAIRSU) col = COL.green;
+    else if (t===T_EXIT) col = COL.cyan;
+    else if (t===T_FLEE && G.gameMode===1) col = COL.red;
+    else if (t===T_VAULT || t===T_GOLD) col = lit ? COL.gold : col;
+    else if (t===T_ITEM && lit) col = '#b6d7e6';
+    ctx.fillStyle = col;
+    ctx.fillRect(x0+x*cp, y0+y*cp, Math.ceil(cp), Math.ceil(cp));
+  }
+  if (G.gameMode===1 && G.dungeonDeco) for (const t of FP.torches){ ctx.fillStyle='#ffb45c'; ctx.fillRect(x0+t.x*cp+cp*0.3, y0+t.y*cp+cp*0.3, cp*0.4, cp*0.4); }
+  for (const m of G.mon){
+    if (!m.alive || !(G.gameMode===2 || vis.has(m.x+','+m.y))) continue;
+    ctx.fillStyle = m.corrupted ? COL.purple : '#ff5a5a';
+    ctx.beginPath(); ctx.arc(x0+(m.x+0.5)*cp, y0+(m.y+0.5)*cp, cp*0.34, 0, Math.PI*2); ctx.fill();
+  }
+  const c = FP.cam, pxm = x0+(c.x+Math.cos(c.a)*FP_EYE_BACK)*cp, pym = y0+(c.y+Math.sin(c.a)*FP_EYE_BACK)*cp;
+  // view cone
+  ctx.fillStyle = 'rgba(255,230,170,0.14)';
+  ctx.beginPath(); ctx.moveTo(pxm,pym);
+  ctx.arc(pxm, pym, cp*4.5, c.a-0.58, c.a+0.58); ctx.closePath(); ctx.fill();
+  ctx.translate(pxm, pym); ctx.rotate(c.a);
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath(); ctx.moveTo(cp*0.7,0); ctx.lineTo(-cp*0.45,cp*0.45); ctx.lineTo(-cp*0.2,0); ctx.lineTo(-cp*0.45,-cp*0.45); ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+function fpDrawCompass(){
+  const cw = canvas.width, w = cw*0.34, h = 20*dpr, x0 = (cw-w)/2, y0 = 8*dpr;
+  ctx.save();
+  ctx.fillStyle = 'rgba(6,8,12,0.55)';
+  ctx.fillRect(x0, y0, w, h);
+  ctx.beginPath(); ctx.rect(x0, y0, w, h); ctx.clip();
+  const deg = FP.cam.a*180/Math.PI + 90;                 // 0 = north
+  const pxPerDeg = w/140;
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  for (let d=-180; d<=540; d+=15){
+    const off = ((d - deg + 540) % 360) - 180;
+    const x = x0 + w/2 + off*pxPerDeg;
+    if (x<x0-10 || x>x0+w+10) continue;
+    const card = ((d%360)+360)%360;
+    const label = {0:'N',90:'E',180:'S',270:'W'}[card];
+    if (label){ ctx.fillStyle = label==='N' ? COL.amber : COL.text; ctx.font = `700 ${Math.round(11*dpr)}px 'JetBrains Mono', monospace`; ctx.fillText(label, x, y0+h/2+0.5); }
+    else { ctx.fillStyle = 'rgba(205,214,217,0.4)'; ctx.fillRect(x-0.5*dpr, y0+h*0.35, 1*dpr, h*0.3); }
+  }
+  ctx.restore();
+  ctx.fillStyle = COL.amber;
+  ctx.beginPath(); ctx.moveTo(cw/2-4*dpr, y0+h+5*dpr); ctx.lineTo(cw/2+4*dpr, y0+h+5*dpr); ctx.lineTo(cw/2, y0+h); ctx.fill();
+}
+function fpDrawLocation(){
+  const label = G.gameMode===2 ? 'open field' : (ASCEND_SITES[G.siteKind] ? `floor ${G.depth}` : `depth ${G.depth}`) + (G.isBossFloor ? ' · lair' : '');
+  ctx.save();
+  ctx.font = `600 ${Math.round(11*dpr)}px 'JetBrains Mono', monospace`;
+  ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillText(label, 11*dpr, 11*dpr);
+  ctx.fillStyle = 'rgba(232,165,75,0.95)'; ctx.fillText(label, 10*dpr, 10*dpr);
+  if (G.gameMode===2 && (isNightTime() || G.weather!=='clear')){
+    ctx.fillStyle = 'rgba(230,230,235,0.85)';
+    ctx.fillText(`${timeOfDayLabel()}${G.weather!=='clear' ? ' · '+G.weather : ''}`, 10*dpr, 26*dpr);
+  }
+  ctx.restore();
+}
+// name + health of whatever stands in the tile straight ahead, and red
+// chevrons at the screen edge for anything adjacent that's out of view
+function fpDrawTargetAndThreats(){
+  const cw = canvas.width, p = G.player, f = (p.facing|0)&3, v = FACING_VECT[f];
+  let target = null;
+  for (let s=1; s<=5 && !target; s++){
+    const tx = p.x+v[0]*s, ty = p.y+v[1]*s;
+    if (tileAt(tx,ty)===T_WALL) break;
+    for (const m of G.mon) if (m.alive && m.x===tx && m.y===ty){ target = m; break; }
+  }
+  if (target){
+    const w = cw*0.34, x0 = (cw-w)/2, y0 = 36*dpr;
+    ctx.save();
+    ctx.fillStyle = 'rgba(6,8,12,0.66)'; ctx.fillRect(x0, y0, w, 30*dpr);
+    ctx.fillStyle = target.corrupted ? COL.purple : (target.col||COL.text);
+    ctx.font = `700 ${Math.round(11*dpr)}px 'JetBrains Mono', monospace`; ctx.textAlign='center'; ctx.textBaseline='top';
+    ctx.fillText(`${target.nm}  ${Math.max(0,target.hp)}/${target.maxHp}`, cw/2, y0+4*dpr);
+    const hp = clamp(target.hp/target.maxHp,0,1);
+    ctx.fillStyle = '#1a222a'; ctx.fillRect(x0+8*dpr, y0+20*dpr, w-16*dpr, 5*dpr);
+    ctx.fillStyle = hp>0.5 ? '#74bf7e' : hp>0.25 ? '#e8a54b' : '#d1495b';
+    ctx.fillRect(x0+8*dpr, y0+20*dpr, (w-16*dpr)*hp, 5*dpr);
+    ctx.restore();
+  }
+  const pulse = 0.55 + 0.45*Math.sin(FP.t*6);
+  for (const m of G.mon){
+    if (!m.alive) continue;
+    const dx = m.x-p.x, dy = m.y-p.y;
+    if (Math.abs(dx)+Math.abs(dy)!==1) continue;
+    let rel = (FACING_VECT.findIndex(q=>q[0]===dx && q[1]===dy) - f + 4) % 4;
+    if (rel===0) continue;
+    ctx.save();
+    ctx.fillStyle = `rgba(255,70,70,${0.75*pulse})`;
+    const s = 14*dpr;
+    if (rel===1){ ctx.translate(cw-8*dpr, cw/2); ctx.rotate(0); }
+    else if (rel===3){ ctx.translate(8*dpr, cw/2); ctx.rotate(Math.PI); }
+    else { ctx.translate(cw/2, cw-8*dpr); ctx.rotate(Math.PI/2); }
+    ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(-s,-s*0.8); ctx.lineTo(-s*0.6,0); ctx.lineTo(-s,s*0.8); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+}
+function fpDrawPost(){
+  const cw = canvas.width;
+  if (!FP.vig || FP.vigW!==cw){
+    FP.vigW = cw;
+    const g = ctx.createRadialGradient(cw/2,cw/2,cw*0.32,cw/2,cw/2,cw*0.75);
+    g.addColorStop(0,'rgba(0,0,0,0)'); g.addColorStop(1,'rgba(0,0,0,0.6)');
+    FP.vig = g;
+  }
+  ctx.fillStyle = FP.vig; ctx.fillRect(0,0,cw,cw);
+  const p = G.player, lowHp = p.hp>0 && p.hp < p.maxHp*0.3 ? (0.25+0.2*Math.sin(FP.t*4)) : 0;
+  const edge = (rgb, a)=>{
+    if (a<=0.01) return;
+    const g = ctx.createRadialGradient(cw/2,cw/2,cw*0.25,cw/2,cw/2,cw*0.72);
+    g.addColorStop(0,`rgba(${rgb},0)`); g.addColorStop(1,`rgba(${rgb},${a})`);
+    ctx.fillStyle = g; ctx.fillRect(0,0,cw,cw);
+  };
+  edge('200,20,30', Math.max(FP.hurt*0.7, lowHp));
+  edge('90,220,120', FP.heal*0.45);
+  edge('240,200,90', FP.glow*0.5);
+  if (FP.fade>0){ ctx.fillStyle = `rgba(0,0,0,${FP.fade})`; ctx.fillRect(0,0,cw,cw); }
+}
+
+// ---------- frame ----------
+function renderFirstPerson(){
+  const now = performance.now();
+  const dt = FP.lastTs ? clamp((now-FP.lastTs)/1000, 0, 0.1) : 0.016;
+  FP.lastTs = now; FP.dt = dt; FP.t += dt;
+  fpEnsureBuffer();
+  const vis = G.gameMode===1 ? computeDungeonVisible() : new Set();
+  if (G.gameMode===1){
+    if (!G.dungeonSeen) G.dungeonSeen = makeGrid(false);
+    for (const key of vis){ const c = key.split(','); G.dungeonSeen[+c[0]][+c[1]] = true; }
+  }
+  fpUpdateCamera(dt);
+  // damage/heal feedback straight off the HP bar, so every source counts
+  const p = G.player;
+  if (FP.lastHp!==null && p.hp < FP.lastHp){ FP.hurt = Math.min(1, 0.45 + (FP.lastHp-p.hp)/Math.max(1,p.maxHp)*3); FP.shake = Math.min(1, FP.shake+0.6); }
+  else if (FP.lastHp!==null && p.hp > FP.lastHp + 0.5) FP.heal = 1;
+  FP.lastHp = p.hp;
+  FP.hurt = Math.max(0, FP.hurt-dt*1.8); FP.heal = Math.max(0, FP.heal-dt*1.6); FP.glow = Math.max(0, FP.glow-dt*1.2);
+  FP.cast = Math.max(0, FP.cast-dt*2.2); FP.swing = Math.max(0, FP.swing-dt*3.6); FP.fade = Math.max(0, FP.fade-dt*2.5);
+  FP.shake = Math.max(0, FP.shake-dt*3);
+  if (FP.moving>0.02) FP.stepPhase = (FP.stepPhase||0) + dt*9;
+
+  const T = fpTheme();
+  const env = fpEnv();
+  fpPrepareLights(vis);
+  fpFloorSlots(T);
+  const W = FP.W;
+  const camZ = 0.5 + Math.sin(FP.moving*Math.PI)*0.028;
+  const horizon = W/2;
+  const P = fpRenderWorld(env, T, camZ, horizon);
+  const k = canvas.width / W;
+  ctx.save();
+  if (FP.shake>0){ const s = FP.shake*6*dpr; ctx.translate((Math.random()-0.5)*s, (Math.random()-0.5)*s); }
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(FP.off, 0, 0, canvas.width, canvas.height);
+  const sprites = fpCollectSprites(vis);
+  fpDrawSprites(sprites, P, env, camZ, horizon, k);
+  fpDrawParticles(P, camZ, horizon, k);
+  if (G.gameMode===2 && (G.weather==='rain' || G.weather==='storm')) fpDrawRain();
+  ctx.restore();
+  fpDrawWeapon(k);
+  fpDrawPost();
+  fpDrawTargetAndThreats();
+  fpDrawCompass();
+  fpDrawLocation();
+  fpDrawMinimap(vis);
+}
+function fpDrawRain(){
+  const cw = canvas.width, n = G.weather==='storm' ? 140 : 70;
+  ctx.save(); ctx.strokeStyle = 'rgba(200,215,235,0.35)'; ctx.lineWidth = Math.max(1,dpr*0.8);
+  ctx.beginPath();
+  for (let i=0;i<n;i++){
+    const x = (fpHash(i,1,3)*cw + FP.t*60*dpr) % cw;
+    const y = (fpHash(i,2,3)*cw + FP.t*(700+fpHash(i,3,3)*300)*dpr) % cw;
+    ctx.moveTo(x,y); ctx.lineTo(x-3*dpr, y+14*dpr);
+  }
+  ctx.stroke(); ctx.restore();
+}
+
+// ---------- controls ----------
+// forward/back/strafe are relative to where you're looking; turning is free
+// (no turn spent) since it doesn't change anything the monsters care about
+function fpStep(rel){
+  const f = ((G.player.facing|0) + rel) & 3, v = FACING_VECT[f];
+  moveDir(v[0], v[1]);
+}
+function fpTurn(d){
+  if (G.ui!=='playing' || G.gameOver) return;
+  G.player.facing = ((G.player.facing|0) + d + 4) & 3;
+  renderGame();
+}
+function fpHandleKey(k){
+  if (G.gameMode!==1 && G.gameMode!==2) return false;
+  if (k==='m' || k==='M'){ toggleView3d(); return true; }
+  if (!fp3dActive()) return false;
+  switch(k){
+    case 'ArrowUp': case 'w': case 'W': fpStep(0); return true;
+    case 'ArrowDown': case 's': case 'S': fpStep(2); return true;
+    case 'a': case 'A': fpStep(3); return true;
+    case 'd': case 'D': fpStep(1); return true;
+    case 'ArrowLeft': case 'z': case 'Z': fpTurn(-1); return true;
+    case 'ArrowRight': case 'x': case 'X': fpTurn(1); return true;
+  }
+  return false;
+}
+// touch d-pad: up/down walk, left/right turn while in first person
+function fpDpad(dir){
+  if (fp3dActive()){
+    if (dir==='up') fpStep(0); else if (dir==='down') fpStep(2);
+    else if (dir==='left') fpTurn(-1); else if (dir==='right') fpTurn(1);
+    return;
+  }
+  if (dir==='up') moveDir(0,-1); else if (dir==='down') moveDir(0,1);
+  else if (dir==='left') moveDir(-1,0); else if (dir==='right') moveDir(1,0);
+}
+// clicking the view: left/right thirds turn, the middle steps forward
+canvas.addEventListener('click', (e)=>{
+  if (!fp3dActive() || G.ui!=='playing') return;
+  const r = canvas.getBoundingClientRect(), fx = (e.clientX-r.left)/r.width;
+  if (fx<0.3) fpTurn(-1); else if (fx>0.7) fpTurn(1); else fpStep(0);
+});
+// weapon swing / spell glow cues ride along on the existing sound hooks, so
+// every attack and cast path gets them without touching combat code
+const fpBaseSfx = sfx;
+sfx = function(name){
+  if (G && (G.gameMode===1 || G.gameMode===2)){
+    if (name==='hit' || name==='miss' || name==='crit') FP.swing = 1;
+    else if (name==='spell') FP.cast = 1;
+    else if (name==='levelUp' || name==='achievement') FP.glow = 1;
+  }
+  return fpBaseSfx(name);
+};
 
 // ===================== SECTION: UI OVERLAY SYSTEM =====================
 function setUi(mode, isHelp){
@@ -10911,6 +12094,8 @@ function buildHelp(){
     <div class="ovbody helplist">
       <div><kbd>&uarr;&darr;&larr;&rarr;</kbd> / <kbd>WASD</kbd> &mdash; move on the overworld, in villages, and in dungeons (walk into a monster to attack)</div>
       <div><kbd>F</kbd> &mdash; class feature &nbsp; <kbd>G</kbd> &mdash; spellbook (casters only) &nbsp; <kbd>Q</kbd> &mdash; quaff potion &nbsp; <kbd>R</kbd> &mdash; ranged attack (wand/bow) &nbsp; <kbd>I</kbd> &mdash; inventory &nbsp; <kbd>P</kbd> &mdash; character sheet &nbsp; <kbd>M</kbd> &mdash; zoom the overworld map &nbsp; <kbd>Esc</kbd> &mdash; back</div>
+      <div style="margin-top:10px;color:var(--ink-faint);">FIRST-PERSON DUNGEONS</div>
+      <div>dungeons, castles, towers, temples, graveyards, mines and roadside fights play in a first-person 3D view: <kbd>W</kbd>/<kbd>&uarr;</kbd> step forward, <kbd>S</kbd>/<kbd>&darr;</kbd> step back, <kbd>A</kbd>/<kbd>D</kbd> strafe, <kbd>&larr;</kbd>/<kbd>&rarr;</kbd> (or <kbd>Z</kbd>/<kbd>X</kbd>) turn. Turning is free &mdash; it never spends a turn. Click the left or right edge of the view to turn, the middle to step forward. Walk into a monster to attack it. The minimap sits in the top-right corner, red arrows at the screen edge warn of a monster beside or behind you, and <kbd>M</kbd> flips between the 3D view and the classic top-down map.</div>
       <div style="margin-top:10px;color:var(--ink-faint);">COMBAT IS TURN-BASED</div>
       <div>monsters never act on their own clock &mdash; they only ever take their turn right after you take yours (a step, an attack, a spell or a potion). Take your time; nothing moves until you do.</div>
       <div style="margin-top:12px;color:var(--ink-faint);">D&amp;D ARMOR CLASS &amp; MONSTER MANUAL ABILITIES</div>
@@ -10982,6 +12167,7 @@ function moveDir(dx,dy){
   saveCurrentGame();
 }
 function handlePlayingKey(k){
+  if (fpHandleKey(k)) return; // first-person view: relative movement, turning, and M to flip views
   switch(k){
     case 'ArrowUp': case 'w': case 'W': moveDir(0,-1); break;
     case 'ArrowDown': case 's': case 'S': moveDir(0,1); break;
@@ -11206,11 +12392,7 @@ window.addEventListener('mouseup', ()=>{
 function bindTouch(){
   document.querySelectorAll('.dpad [data-dir]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
-      const dir = btn.dataset.dir;
-      if (dir==='up') moveDir(0,-1);
-      else if (dir==='down') moveDir(0,1);
-      else if (dir==='left') moveDir(-1,0);
-      else if (dir==='right') moveDir(1,0);
+      fpDpad(btn.dataset.dir); // plain cardinal steps, or walk/turn in the first-person view
     });
   });
   document.getElementById('btnAbility').addEventListener('click', ()=>{ if (G.ui==='playing' && G.gameMode!==0){ useAbility(); renderGame(); } });
