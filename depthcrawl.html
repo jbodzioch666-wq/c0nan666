@@ -1,4 +1,5 @@
 <title>Depthcrawl</title>
+<script src="https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js" async></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap">
 <style>
@@ -12568,6 +12569,350 @@ function drawObjIcon(x, y, entry, frac){
   ctx.drawImage(spr.img, x*cellPx+(cellPx-ww)/2, y*cellPx+cellPx*0.94-h2, ww, h2);
 }
 
+// ---------- real-time 3D skeleton warriors ----------
+// skeletons are the one creature drawn as a true 3D model rather than a
+// painted card: a full skeleton (lathe-turned long bones, a sculpted skull
+// with a working jaw, a ribcage of curved ribs, spine, pelvis, hands and
+// feet) carrying a rusted sword and a battered round shield, lit by the
+// torch or moonlight where it stands and animated - an idle combat stance,
+// a walk cycle when it moves, a sword swing when it hits you, a stagger
+// when you hit it. Rendered with three.js (loaded from a CDN) into a small
+// offscreen WebGL canvas and dropped into the scene as a sprite, so it
+// clips against walls and fades into the dark like everything else. If
+// three.js isn't available the painted skeleton is used instead.
+const SK3 = { ok:null, W:300, H:400, frameH:2.12, inst:new WeakMap() };
+function sk3Wanted(m){ return !!(m && m.nm && /skelet/.test(m.nm.toLowerCase()) && !/dragon|giant|horse|hound|wolf|mage|archer/.test(m.nm.toLowerCase())); }
+function sk3Canvas(w,h){ const c=document.createElement('canvas'); c.width=w; c.height=h; return c; }
+function sk3Noise2(){
+  // a small tiling value-noise field, reused by all the procedural textures
+  const N = 64, v = new Float32Array(N*N);
+  for (let i=0;i<v.length;i++) v[i] = Math.random();
+  return (x,y)=>{ const xi=Math.floor(x), yi=Math.floor(y), tx=x-xi, ty=y-yi;
+    const a=v[((yi&63)*N)+(xi&63)], b=v[((yi&63)*N)+((xi+1)&63)], c=v[(((yi+1)&63)*N)+(xi&63)], d=v[(((yi+1)&63)*N)+((xi+1)&63)];
+    const sx=tx*tx*(3-2*tx), sy=ty*ty*(3-2*ty); return a+(b-a)*sx+(c-a)*sy+(a-b-c+d)*sx*sy; };
+}
+function sk3Tex(w, h, fn){
+  const c = sk3Canvas(w,h), x = c.getContext('2d'), id = x.createImageData(w,h), d = id.data;
+  for (let y=0;y<h;y++) for (let i=0;i<w;i++){ const o=(y*w+i)*4, p=fn(i,y); d[o]=p[0]; d[o+1]=p[1]; d[o+2]=p[2]; d[o+3]=255; }
+  x.putImageData(id,0,0);
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  if (THREE.sRGBEncoding) t.encoding = THREE.sRGBEncoding;
+  return t;
+}
+function sk3Build(){
+  const T = THREE, n = sk3Noise2();
+  const fbm = (x,y)=> n(x,y)*0.5 + n(x*2.1,y*2.1)*0.25 + n(x*4.3,y*4.3)*0.15 + n(x*8.7,y*8.7)*0.1;
+  // aged bone: ivory with brown grime in the pores and darker stained patches
+  const boneMap = sk3Tex(256,256,(x,y)=>{
+    const f = fbm(x/9,y/9), g = fbm(x/2.2+40,y/2.2), stain = Math.max(0, fbm(x/28+9,y/28)-0.52)*2.4;
+    let k = 0.78 + f*0.3 - stain*0.35 - (g>0.82 ? 0.25 : 0);
+    return [214*k, 204*k-stain*12, 180*k-stain*28];
+  });
+  const boneBump = sk3Tex(128,128,(x,y)=>{ const v = 255*(fbm(x/4,y/4)*0.7 + (n(x*1.7,y*1.7)>0.8?0.3:0)); return [v,v,v]; });
+  const steelMap = sk3Tex(128,256,(x,y)=>{
+    const rust = Math.max(0, fbm(x/14+3,y/14)-0.5)*2.6, scratch = n(x*0.6, y*9)>0.86 ? 30 : 0;
+    const k = 0.62 + fbm(x/6,y/6)*0.25;
+    return [150*k+rust*80+scratch, 152*k+rust*30+scratch, 156*k-rust*20+scratch];
+  });
+  const woodMap = sk3Tex(256,256,(x,y)=>{
+    const plank = Math.floor(x/51), px = x%51, edge = px<2||px>48 ? 0.45 : 1;
+    const grain = 0.7 + 0.3*Math.sin((x*0.9 + fbm(x/12, y/40+plank*7)*40)) * 0.5 + fbm(x/3,y/30)*0.3;
+    const cx = x-128, cy = y-128, r = Math.hypot(cx,cy);
+    // faded red paint in a quartered pattern, flaking off the wood
+    const paint = (Math.sign(cx)*Math.sign(cy) > 0 && r<118) && fbm(x/7+20,y/7) > 0.42;
+    let c = [118*grain*edge, 78*grain*edge, 44*grain*edge];
+    if (paint) c = [132*edge*(0.8+fbm(x/5,y/5)*0.3), 30*edge, 26*edge];
+    const dirt = fbm(x/20+5,y/20)*0.5; return c.map(v=>v*(1.1-dirt*0.5));
+  });
+  const leatherMap = sk3Tex(64,64,(x,y)=>{ const k = 0.6+fbm(x/3,y/3)*0.4 - ((y%8)<1?0.25:0); return [70*k,44*k,26*k]; });
+  const bone = new T.MeshStandardMaterial({ map:boneMap, bumpMap:boneBump, bumpScale:0.004, roughness:0.82, metalness:0, vertexColors:true });
+  const boneNoVC = new T.MeshStandardMaterial({ map:boneMap, bumpMap:boneBump, bumpScale:0.004, roughness:0.82, metalness:0 });
+  const dark = new T.MeshStandardMaterial({ color:0x120d0a, roughness:1 });
+  const steel = new T.MeshStandardMaterial({ map:steelMap, roughness:0.38, metalness:0.85 });
+  const iron = new T.MeshStandardMaterial({ color:0x3a3632, roughness:0.55, metalness:0.8 });
+  const wood = new T.MeshStandardMaterial({ map:woodMap, roughness:0.85, metalness:0 });
+  const leather = new T.MeshStandardMaterial({ map:leatherMap, roughness:0.9 });
+  const eyeMat = new T.MeshBasicMaterial({ color:0xff5a3c }); SK3.eyeMat = eyeMat;
+
+  const M = (g, m)=>{ const o = new T.Mesh(g, m||boneNoVC); o.castShadow = false; return o; };
+  // a long bone turned on a lathe: slim shaft, knobbly ends, pointing down -y from its joint
+  const longBone = (len, rs, knobA, knobB)=>{
+    const pts = [], N = 22;
+    for (let i=0;i<=N;i++){
+      const t = i/N, y = -t*len;
+      let r = rs*(1 + (knobA||1.1)*Math.exp(-Math.pow(t/0.09,2)) + (knobB||1.0)*Math.exp(-Math.pow((1-t)/0.09,2)));
+      if (i===0 || i===N) r *= 0.45;
+      pts.push(new T.Vector2(r, y));
+    }
+    return M(new T.LatheGeometry(pts, 14));
+  };
+  const ball = (r, m)=> M(new T.SphereGeometry(r, 14, 10), m);
+  const tube = (points, r, m, seg)=> M(new T.TubeGeometry(new T.CatmullRomCurve3(points.map(p=>new T.Vector3(p[0],p[1],p[2]))), seg||20, r, 6, false), m);
+
+  const root = new T.Group();
+  const pelvis = new T.Group(); pelvis.position.set(0, 0.96, 0); root.add(pelvis);
+  // pelvis: two flared iliac wings, a sacrum and the pelvic ring
+  for (const s of [-1,1]){
+    // iliac wing: a thin flared fan of bone, not a ball
+    const w = M(new T.SphereGeometry(0.075, 20, 14, 0, Math.PI*2, 0, Math.PI*0.62)); w.scale.set(0.95, 0.9, 0.28);
+    w.position.set(s*0.07, 0.0, -0.01); w.rotation.set(-0.2, s*0.95, s*0.25); pelvis.add(w);
+    const ring = tube([[s*0.02,-0.05,0.07],[s*0.075,-0.04,0.045],[s*0.095,-0.01,-0.01],[s*0.05,0.02,-0.05]], 0.012);
+    pelvis.add(ring);
+  }
+  const sacrum = ball(0.036); sacrum.scale.set(0.9,1.4,0.5); sacrum.position.set(0,-0.01,-0.045); pelvis.add(sacrum);
+  pelvis.add(tube([[-0.04,-0.06,0.05],[-0.015,-0.075,0.07],[0.015,-0.075,0.07],[0.04,-0.06,0.05]], 0.009));   // pubic arch
+  // spine: lumbar vertebrae up to the chest
+  const spine = new T.Group(); spine.position.set(0, 0.07, -0.035); pelvis.add(spine);
+  const vert = (g, y, r, z)=>{ const v = M(new T.CylinderGeometry(r, r*1.05, r*1.05, 10)); v.position.set(0,y,z||0); g.add(v);
+    const p = M(new T.BoxGeometry(r*0.5, r*0.6, r*1.6)); p.position.set(0,y,(z||0)-r*1.1); p.rotation.x = 0.5; g.add(p); };
+  for (let i=0;i<5;i++) vert(spine, i*0.036, 0.021, Math.sin(i/4*Math.PI)*0.012);
+  const chest = new T.Group(); chest.position.set(0, 0.19, 0.005); spine.add(chest);
+  for (let i=0;i<9;i++) vert(chest, i*0.029, 0.016 - i*0.0005, -0.015 - Math.sin(i/8*Math.PI)*0.018);
+  // ribcage: curved ribs sweeping from the spine round to the breastbone
+  for (let i=0;i<8;i++){
+    const y = 0.25 - i*0.028, a = 0.08 + Math.sin(Math.min(1,(i+1)/4)*Math.PI/2)*0.06, b = 0.075 + Math.min(i,4)*0.008;
+    const front = i<7 ? 0.92 : 0.45, drop = 0.06 + i*0.004;
+    for (const s of [-1,1]){
+      const pts = [];
+      for (let j=0;j<=8;j++){
+        const t = j/8, ph = -Math.PI/2 + t*Math.PI*front;
+        pts.push([s*(0.018 + a*Math.cos(ph)), y - drop*t*t - 0.01*Math.sin(t*Math.PI), -0.03 + b*Math.sin(ph) + b*0.02]);
+      }
+      chest.add(tube(pts, 0.0072 - i*0.0002, boneNoVC, 16));
+    }
+  }
+  const sternum = M(new T.BoxGeometry(0.03, 0.15, 0.012)); sternum.position.set(0, 0.175, 0.078); sternum.rotation.x = 0.18; chest.add(sternum);
+  // clavicles and shoulder blades
+  for (const s of [-1,1]){
+    chest.add(tube([[s*0.012,0.262,0.07],[s*0.07,0.272,0.05],[s*0.13,0.268,0.0],[s*0.155,0.262,-0.02]], 0.0085));
+    const sc = M(new T.BoxGeometry(0.09, 0.11, 0.008)); sc.position.set(s*0.085, 0.2, -0.085); sc.rotation.z = s*0.2; sc.rotation.y = s*0.25; chest.add(sc);
+  }
+  // neck and skull
+  const neck = new T.Group(); neck.position.set(0, 0.27, -0.02); chest.add(neck);
+  for (let i=0;i<4;i++) vert(neck, i*0.024, 0.013, 0.004*i);
+  const head = new T.Group(); head.position.set(0, 0.1, 0.01); head.scale.setScalar(1.14); neck.add(head);
+  {
+    const g = new T.SphereGeometry(1, 48, 36), pos = g.attributes.position, col = new Float32Array(pos.count*3);
+    const socket = (x,y,z,cx,cy,r)=> Math.max(0, 1 - Math.hypot((x-cx)/r, (y-cy)/(r*0.9)));
+    for (let i=0;i<pos.count;i++){
+      let x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+      // cranium proportions: long front-to-back, narrower low at the face
+      let sx = 0.074, sy = 0.088, sz = 0.098;
+      if (y < 0){ sx *= 1 - (-y)*0.28*(z>0?1:0.5); if (z<0) sy *= 0.8; }
+      if (z > 0 && y < 0.15){ sz *= 1 + 0.08*z; }                          // face pushed forward
+      let X = x*sx, Y = y*sy + 0.1, Z = z*sz + 0.008;
+      let d = 0, c = 1;
+      if (z > 0.35){
+        // eye sockets, nasal cavity - pressed in and darkened
+        const e = Math.max(socket(X,Y,Z, 0.031,0.098,0.026), socket(X,Y,Z,-0.031,0.098,0.026));
+        const nz = Math.max(0, 1 - Math.hypot(X/0.012, (Y-0.066)/0.02));
+        d = e*0.028 + nz*0.018; c = 1 - Math.min(1, e*1.6)*0.95 - Math.min(1,nz*1.5)*0.9;
+        // brow ridge and cheekbones stand proud
+        const brow = Math.max(0, 1 - Math.abs(Y-0.127)/0.01) * (Math.abs(X)<0.06 ? 1 : 0);
+        const cheek = Math.max(0, 1 - Math.hypot((Math.abs(X)-0.05)/0.02, (Y-0.07)/0.014));
+        Z += brow*0.006 + cheek*0.006;
+      }
+      if (y < -0.72 && z > 0){ Y = Math.max(Y, 0.028); }                    // upper jaw line flattened for the teeth
+      Z -= d; X *= 1 - d*3;
+      pos.setXYZ(i, X, Y, Z);
+      col[i*3] = col[i*3+1] = col[i*3+2] = Math.max(0.04, c);
+    }
+    g.setAttribute('color', new T.BufferAttribute(col, 3)); g.computeVertexNormals();
+    head.add(M(g, bone));
+    // eye glints deep in the sockets
+    for (const s of [-1,1]){ const e = M(new T.SphereGeometry(0.0055, 8, 6), eyeMat); e.position.set(s*0.031, 0.097, 0.083); head.add(e); }
+    // upper teeth
+    for (let i=0;i<10;i++){ const a = (i-4.5)/4.5*0.95, t = M(new T.BoxGeometry(0.0085, 0.013, 0.008));
+      t.position.set(Math.sin(a)*0.042, 0.028, 0.052+Math.cos(a)*0.035); t.rotation.y = a; head.add(t); }
+    // lower jaw on a hinge so it can chatter
+    const jaw = new T.Group(); jaw.position.set(0, 0.045, 0.0); head.add(jaw);
+    jaw.add(tube([[-0.055,0.0,0.005],[-0.05,-0.035,0.03],[-0.03,-0.045,0.07],[0,-0.048,0.085],[0.03,-0.045,0.07],[0.05,-0.035,0.03],[0.055,0.0,0.005]], 0.0095, boneNoVC, 24));
+    for (let i=0;i<10;i++){ const a = (i-4.5)/4.5*0.95, t = M(new T.BoxGeometry(0.008, 0.012, 0.007));
+      t.position.set(Math.sin(a)*0.04, -0.03, 0.05+Math.cos(a)*0.03); t.rotation.y = a; jaw.add(t); }
+    head.userData.jaw = jaw;
+  }
+  // arms: shoulder -> humerus -> elbow -> radius & ulna -> hand
+  const arm = (s)=>{
+    const sh = new T.Group(); sh.position.set(s*0.165, 0.25, -0.02); chest.add(sh);
+    sh.add(ball(0.022));
+    sh.add(longBone(0.29, 0.0115, 1.0, 0.8));
+    const el = new T.Group(); el.position.set(0, -0.29, 0); sh.add(el);
+    const r1 = longBone(0.25, 0.0078, 0.9, 0.9); r1.position.x = s*0.009; el.add(r1);
+    const r2 = longBone(0.25, 0.0068, 1.1, 0.7); r2.position.x = -s*0.009; el.add(r2);
+    const hand = new T.Group(); hand.position.set(0, -0.255, 0); el.add(hand);
+    const palm = ball(0.022); palm.scale.set(1, 1.3, 0.55); palm.position.y = -0.025; hand.add(palm);
+    for (let f=0; f<4; f++){
+      const fx = (f-1.5)*0.012;
+      hand.add(tube([[fx,-0.045,0],[fx,-0.065,0.012],[fx,-0.07,0.03],[fx,-0.06,0.04]], 0.004, boneNoVC, 8));
+    }
+    hand.add(tube([[s*-0.02,-0.03,0.01],[s*-0.028,-0.05,0.03],[s*-0.02,-0.06,0.045]], 0.0045, boneNoVC, 6));
+    return { sh, el, hand };
+  };
+  const R = arm(-1), L = arm(1);   // model faces +z, so its right side is -x
+  // legs: hip -> femur -> knee -> tibia & fibula -> foot
+  const leg = (s)=>{
+    const hip = new T.Group(); hip.position.set(s*0.085, -0.02, 0); pelvis.add(hip);
+    hip.add(ball(0.024));
+    const fem = longBone(0.43, 0.013, 1.0, 1.0); fem.rotation.z = s*0.05; hip.add(fem);
+    const kn = new T.Group(); kn.position.set(s*0.02, -0.43, 0); hip.add(kn);
+    const pat = ball(0.016); pat.position.set(0, 0.0, 0.02); kn.add(pat);
+    kn.add(longBone(0.4, 0.0115, 1.2, 0.8));
+    const fib = longBone(0.39, 0.005, 1.0, 1.0); fib.position.set(s*0.022, -0.005, -0.006); kn.add(fib);
+    const ft = new T.Group(); ft.position.set(0, -0.405, 0); kn.add(ft);
+    const heel = ball(0.02); heel.scale.set(1, 0.8, 1.3); heel.position.set(0, -0.02, -0.01); ft.add(heel);
+    for (let t=0;t<5;t++){ const tx = (t-2)*0.011*s*-1 + s*0.004;
+      ft.add(tube([[tx*0.6,-0.025,0.01],[tx,-0.035,0.06],[tx*1.1,-0.04,0.1],[tx*1.15,-0.045,0.115]], 0.0045 - Math.abs(t-2)*0.0004, boneNoVC, 8)); }
+    return { hip, kn, ft };
+  };
+  const RL = leg(-1), LL = leg(1);
+  // a notched, rusty arming sword in the right hand
+  const sword = new T.Group();
+  {
+    const sh = new T.Shape(); const L0 = 0.7, w = 0.024;
+    sh.moveTo(-w, 0); sh.lineTo(-w*0.92, L0*0.78); sh.lineTo(-w*0.35, L0*0.97); sh.lineTo(0, L0); sh.lineTo(w*0.35, L0*0.97);
+    sh.lineTo(w*0.9, L0*0.6); sh.lineTo(w*0.7, L0*0.57); sh.lineTo(w*0.92, L0*0.54); sh.lineTo(w, 0); sh.lineTo(-w, 0);
+    const bg = new T.ExtrudeGeometry(sh, { depth:0.004, bevelEnabled:true, bevelThickness:0.003, bevelSize:0.004, bevelSegments:1, steps:1 });
+    bg.translate(0, 0, -0.002);
+    const blade = M(bg, steel); blade.position.y = 0.05; sword.add(blade);
+    const fuller = M(new T.BoxGeometry(0.008, 0.42, 0.0105), iron); fuller.position.y = 0.3; sword.add(fuller);
+    const guard = M(new T.BoxGeometry(0.17, 0.018, 0.026), iron); guard.position.y = 0.045; sword.add(guard);
+    for (const s of [-1,1]){ const q = M(new T.SphereGeometry(0.014, 8, 6), iron); q.position.set(s*0.088, 0.045, 0); sword.add(q); }
+    const grip = M(new T.CylinderGeometry(0.013, 0.014, 0.11, 10), leather); grip.position.y = -0.015; sword.add(grip);
+    const pommel = M(new T.SphereGeometry(0.021, 12, 8), iron); pommel.position.y = -0.08; sword.add(pommel);
+  }
+  sword.position.set(0, -0.06, 0.03); R.hand.add(sword);
+  // a battered round shield on the left arm
+  const shield = new T.Group();
+  {
+    const board = M(new T.CylinderGeometry(0.26, 0.26, 0.028, 40, 1), [wood, wood, wood]);
+    board.material = [ new T.MeshStandardMaterial({ color:0x2a1c10, roughness:0.9 }), wood, new T.MeshStandardMaterial({ color:0x3a2616, roughness:0.9 }) ];
+    board.rotation.x = Math.PI/2; shield.add(board);
+    const rim = M(new T.TorusGeometry(0.262, 0.012, 8, 48), iron); shield.add(rim);
+    const boss = M(new T.SphereGeometry(0.06, 20, 12, 0, Math.PI*2, 0, Math.PI/2), steel); boss.rotation.x = Math.PI/2; boss.position.z = 0.012; shield.add(boss);
+    const bossRim = M(new T.TorusGeometry(0.062, 0.008, 6, 24), iron); bossRim.position.z = 0.014; shield.add(bossRim);
+    for (let i=0;i<12;i++){ const a = i/12*Math.PI*2, r = M(new T.SphereGeometry(0.008, 6, 4), iron); r.position.set(Math.cos(a)*0.235, Math.sin(a)*0.235, 0.016); shield.add(r); }
+    // a chunk hacked out of the rim
+    const notch = M(new T.BoxGeometry(0.07, 0.05, 0.034), dark); notch.position.set(0.19, 0.17, 0); notch.rotation.z = 0.8; shield.add(notch);
+  }
+  shield.position.set(0.05, -0.15, 0.06); L.el.add(shield);
+
+  // a rotted leather belt with a few ragged strips of cloth hanging from it
+  {
+    const clothMat = new T.MeshStandardMaterial({ color:0x2a2018, roughness:1, side:T.DoubleSide });
+    for (let i=0;i<7;i++){
+      const a = (i-3)/3*1.1, len = 0.12 + Math.random()*0.1, g = new T.PlaneGeometry(0.035, len, 1, 4), p = g.attributes.position;
+      for (let j=0;j<p.count;j++){ const y = p.getY(j); p.setZ(j, (y*y)*0.8); p.setX(j, p.getX(j)*(1 - (0.5 - y/len)*0.5)); }
+      g.translate(0, -len/2, 0); g.computeVertexNormals();
+      const strip = M(g, clothMat); strip.position.set(Math.sin(a)*0.1, 0.02, Math.cos(a)*0.085); strip.rotation.y = a; strip.rotation.x = -0.1; pelvis.add(strip);
+    }
+    const belt = M(new T.TorusGeometry(0.1, 0.011, 6, 24), leather); belt.rotation.x = Math.PI/2; belt.scale.set(1, 0.85, 1); belt.position.set(0, 0.03, 0.005); pelvis.add(belt);
+    const buckle = M(new T.BoxGeometry(0.03, 0.026, 0.008), iron); buckle.position.set(0, 0.03, 0.088); pelvis.add(buckle);
+  }
+  return { root, pelvis, spine, chest, neck, head, R, L, RL, LL, sword, shield };
+}
+function sk3Init(){
+  if (SK3.ok!==null) return SK3.ok;
+  if (typeof THREE==='undefined'){ return false; }  // still loading (or offline) - painted skeleton for now
+  try{
+    const T = THREE;
+    SK3.cv = sk3Canvas(SK3.W, SK3.H);
+    SK3.r = new T.WebGLRenderer({ canvas:SK3.cv, alpha:true, antialias:true, preserveDrawingBuffer:true });
+    SK3.r.setPixelRatio(1); SK3.r.setSize(SK3.W, SK3.H, false);
+    if (T.sRGBEncoding) SK3.r.outputEncoding = T.sRGBEncoding;
+    SK3.r.setClearColor(0x000000, 0);
+    SK3.scene = new T.Scene();
+    SK3.cam = new T.PerspectiveCamera(18, SK3.W/SK3.H, 0.5, 30);
+    SK3.amb = new T.HemisphereLight(0xbfc6d6, 0x2a2018, 0.55); SK3.scene.add(SK3.amb);
+    SK3.key = new T.DirectionalLight(0xffd7a0, 1.5); SK3.key.position.set(-1.2, 2.2, 3); SK3.scene.add(SK3.key);
+    SK3.fill = new T.PointLight(0xffb070, 0.9, 12); SK3.fill.position.set(0.3, 1.2, 3.2); SK3.scene.add(SK3.fill);
+    SK3.rim = new T.DirectionalLight(0x9fb4ff, 0.9); SK3.rim.position.set(1.5, 1.8, -2.5); SK3.scene.add(SK3.rim);
+    SK3.eyeL = new T.PointLight(0xff4020, 0.25, 0.4);
+    SK3.m = sk3Build(); SK3.scene.add(SK3.m.root);
+    SK3.m.head.add(SK3.eyeL); SK3.eyeL.position.set(0, 0.1, 0.1);
+    SK3.ok = true;
+  }catch(e){ SK3.ok = false; }
+  return SK3.ok;
+}
+// poses the rig: t seconds, walk 0..1, atk 0..1 swing progress, hit 0..1 stagger
+function sk3Pose(t, walk, atk, hit, seed){
+  const m = SK3.m, s = Math.sin, br = s(t*1.7+seed)*0.5+0.5;
+  const wk = walk>0.01 ? s(t*9) : 0, W = walk;
+  m.root.rotation.y = s(t*0.6+seed)*0.12;
+  m.pelvis.position.y = 0.94 - 0.03 - Math.abs(wk)*0.02*W;
+  m.pelvis.rotation.set(0, wk*0.12*W, 0);
+  m.spine.rotation.set(0.12 + hit*0.25, -wk*0.1*W, 0);
+  m.chest.rotation.set(0.08 + br*0.02 - atk*0.15, s(atk*Math.PI)*-0.35, 0);
+  m.neck.rotation.set(-0.12 - hit*0.3, s(t*0.9+seed)*0.2, 0);
+  m.head.rotation.set(-0.05 + s(t*0.5)*0.05, 0, s(t*0.7+seed)*0.06);
+  m.head.userData.jaw.rotation.x = 0.08 + Math.max(0, s(t*11+seed))*0.1*(0.4+hit) + atk*0.25;
+  // legs: a guarded stance, stepping when walking
+  const leg = (L, side, ph)=>{
+    const sw = W*s(t*9+ph)*0.45;
+    L.hip.rotation.set(-0.28 - sw, 0, side*0.08);
+    L.kn.rotation.set(0.42 + Math.max(0, -s(t*9+ph))*0.6*W, 0, 0);
+    L.ft.rotation.set(-0.14 + sw*0.3, 0, 0);
+  };
+  leg(m.RL, -1, 0); leg(m.LL, 1, Math.PI);
+  m.RL.hip.rotation.x += 0.18; m.RL.kn.rotation.x -= 0.1;          // right foot back, left forward
+  m.LL.hip.rotation.x -= 0.12;
+  // sword arm: raised ready, then a downward diagonal cut
+  const up = atk<0.35 ? atk/0.35 : 1 - (atk-0.35)/0.65;
+  m.R.sh.rotation.set(-0.5 - up*1.9 + (atk>0.35 ? (atk-0.35)*2.2 : 0), 0.2, -0.35 - up*0.35);
+  m.R.el.rotation.set(-1.15 + up*0.5, 0, 0);
+  m.R.hand.rotation.set(-0.2 - up*0.5, 0, -0.1);
+  m.sword.rotation.set(1.35 - up*0.2, 0, 0.12);
+  // shield arm: held up in front of the chest
+  m.L.sh.rotation.set(-0.55 - hit*0.3 + br*0.03, -0.1, 0.42);
+  m.L.el.rotation.set(-1.05, 0.5, -0.1);
+  m.L.hand.rotation.set(0, 0, 0);
+  m.shield.rotation.set(1.1, 0.55 - hit*0.2, 0.35);
+}
+// the per-monster sprite (its own 2D copy of the render plus the dark/white
+// silhouettes the sprite pass uses for distance shading and hit flashes)
+function sk3Sprite(m, pos, light){
+  if (!sk3Init()) return null;
+  let e = SK3.inst.get(m);
+  if (!e){
+    const mk = ()=> sk3Canvas(SK3.W, SK3.H);
+    e = { img:mk(), shade:mk(), wht:mk(), aspect:SK3.W/SK3.H, seed:Math.random()*10, atk:0, pHp:G.player.hp, n:0 };
+    SK3.inst.set(m, e);
+  }
+  const moving = Math.min(1, Math.hypot(m.x+0.5-pos.x, m.y+0.5-pos.y)*3);
+  // you just took damage with this skeleton beside you - it swings
+  if (G.player.hp < e.pHp && Math.abs(m.x-G.player.x)+Math.abs(m.y-G.player.y)===1 && e.atk===0) e.atk = 0.001;
+  e.pHp = G.player.hp;
+  if (e.atk>0){ e.atk += FP.dt*2.2; if (e.atk>=1) e.atk = 0; }
+  const hit = FP.monFlash.get(m)||0;
+  // far-off idle skeletons only need a fresh frame now and then
+  const far = Math.hypot(pos.x-FP.cam.x, pos.y-FP.cam.y);
+  if (e.n++ > 0 && far > 5 && !e.atk && !hit && moving<0.02 && (e.n % 4)) return e;
+  const nm = m.nm.toLowerCase(), eye = m.corrupted ? 0xc070ff : /knight/.test(nm) ? 0x78c8ff : /warrior/.test(nm) ? 0xffb050 : 0xff5a3c;
+  SK3.eyeMat.color.setHex(eye); SK3.eyeL.color.setHex(eye);
+  sk3Pose(FP.t, moving, e.atk, hit, e.seed);
+  // aim the camera from where the player really is, so the skeleton turns
+  // properly when it's off to one side
+  const c = FP.cam, dx = c.x-pos.x, dy = c.y-pos.y;
+  const faceA = Math.atan2(G.player.y+0.5-pos.y, G.player.x+0.5-pos.x);   // it faces the player
+  const viewA = Math.atan2(dy, dx) - faceA;
+  const D = 6.4, cy = 1.18;
+  SK3.cam.position.set(Math.sin(viewA)*D, cy, Math.cos(viewA)*D);
+  SK3.cam.lookAt(0, SK3.frameH/2 - 0.02, 0);
+  SK3.cam.updateMatrixWorld();
+  // key light takes on the local torch / moonlight colour
+  const k = light || [1,0.85,0.65];
+  SK3.key.color.setRGB(Math.min(1,k[0]), Math.min(1,k[1]), Math.min(1,k[2]));
+  SK3.fill.color.setRGB(Math.min(1,k[0]), Math.min(1,k[1]*0.9), Math.min(1,k[2]*0.8));
+  SK3.key.position.set(SK3.cam.position.x*0.4 - 1.2, 2.4, SK3.cam.position.z*0.4 + 1);
+  SK3.fill.position.set(SK3.cam.position.x*0.5, 1.3, SK3.cam.position.z*0.5);
+  SK3.r.render(SK3.scene, SK3.cam);
+  const g = e.img.getContext('2d'); g.clearRect(0,0,SK3.W,SK3.H); g.drawImage(SK3.cv, 0, 0);
+  for (const [cv, col] of [[e.shade,'#000'],[e.wht,'#fff']]){
+    const x = cv.getContext('2d'); x.globalCompositeOperation='source-over'; x.clearRect(0,0,SK3.W,SK3.H);
+    x.drawImage(e.img,0,0); x.globalCompositeOperation='source-in'; x.fillStyle=col; x.fillRect(0,0,SK3.W,SK3.H);
+  }
+  return e;
+}
+
 // ---------- lighting ----------
 // wall torches bake a falloff map (with line of sight, so light doesn't leak
 // through stone) whenever the set of torches you've seen changes; each frame
@@ -13087,6 +13432,24 @@ function fpCollectSprites(vis){
     const isBoss = G.gameMode===1 && G.isBossFloor && i===G.bossIdx;
     const col = m.corrupted ? COL.purple : m.col;
     const ud = monsterPortraitFor(m.nm, m.undead);
+    // skeletons get the real-time 3D model when WebGL + three.js are available
+    let sk = null;
+    if (sk3Wanted(m)){
+      const li = fpLightIdx(pos.x, pos.y), d = Math.hypot(pos.x-FP.cam.x, pos.y-FP.cam.y), env = FP.envNow;
+      if (env){
+        const lan = d>=env.R ? 0 : Math.pow(1-d/env.R,1.6)*env.lanK;
+        const lc = [0,1,2].map(c=> env.amb[c] + lan*env.lan[c] + (li>=0 ? [FP.L4r,FP.L4g,FP.L4b][c][li] : 0));
+        const mxc = Math.max(0.05, lc[0], lc[1], lc[2]);
+        sk = sk3Sprite(m, pos, lc.map(v=>0.35 + 0.75*v/mxc));
+      }
+    }
+    if (sk){
+      let fl = FP.monFlash.get(m)||0;
+      if (fl>0){ fl = Math.max(0, fl-FP.dt*4); FP.monFlash.set(m, fl); }
+      S.push({x:pos.x, y:pos.y, spr:sk, h:(isBoss?1.0:0.86), lift:0, shadow:true, flash:fl*0.6,
+        hp: m.hp<m.maxHp ? clamp(m.hp/m.maxHp,0,1) : null, boss:isBoss});
+      continue;
+    }
     const spr = ud ? fpUndeadSprite(ud, m.corrupted) : (m.art && m.art.length) ? fpSprite(m.art, col, !!m.undead) : fpGlyphSprite(m.sym||'?', col);
     const breathe = (1 + Math.sin(FP.t*3 + i*1.3)*0.025) * (ud && ud.h ? ud.h : 1);
     const hover = ud && ud.lift ? ud.lift + Math.sin(FP.t*2.2 + i)*0.035 : 0;
@@ -13521,7 +13884,7 @@ function renderFirstPerson(){
   if (FP.moving>0.02) FP.stepPhase = (FP.stepPhase||0) + dt*9;
 
   const T = fpTheme();
-  const env = fpEnv();
+  const env = fpEnv(); FP.envNow = env;
   fpPrepareLights(vis);
   fpFloorSlots(T);
   const W = FP.W;
