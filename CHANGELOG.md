@@ -21,13 +21,16 @@ The overworld has been rebuilt as a 3D landscape, and the world map is now a pai
 - You ride a little sailboat on open water.
 - Click anywhere to walk there, or click a landmark to travel to it and go in. WASD still works, and the mouse wheel zooms.
 - **O** switches between the 3D view and the classic flat map.
+- When you conquer a site, it disappears from the 3D land as soon as you come back out, and its replacement appears elsewhere.
 
 ### Painted world map (M)
 - The world map is an old parchment chart that fills the screen:
   - inked coastlines, a blue-grey sea with ripple lines along the shore, and land washed in the colour of each region;
   - hand-drawn mountains, forests, marsh tufts, dunes and rivers;
   - every site in coloured ink, village names lettered on, a compass rose and an illustrated legend.
-- **Fog of war:** land you haven't been near is hidden under drifting cloud until you explore it. Your explored map is saved with your game.
+- Sites are bright icons on dark round badges, with a large illustrated legend.
+- A big red "You" marker always shows where you are.
+- **Fog of war:** land you haven't been near is veiled by drifting cloud. You can still make out coastlines and mountains through it, but its towns and dungeons stay hidden until you get close. Your explored map is saved with your game.
   - For saves from before this update, the land around every town you've visited starts uncovered.
 
 ## v146 — The 3D update
