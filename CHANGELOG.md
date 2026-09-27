@@ -1,5 +1,21 @@
 # Depthcrawl patch notes
 
+## v159 — A living town
+
+### People in 3D
+- Everyone in town is now a real 3D figure, built the same way as the monsters: you, the vendors, the Captain of the Watch and the wandering townsfolk. They replace the flat painted cut-outs.
+  - Each keeps its look: the smith's leather apron and hammer, the alchemist's hood and staff, the captain's chainmail, tabard, cape and spear.
+  - Townsfolk wear their own clothes and hair, dwarves are stocky and bearded, and orcs have tusks.
+  - Your character carries their own class's gear.
+- In town everyone stands at ease, with arms hanging loose and swinging as they walk. They turn to face the way they're going.
+- Vendors and the captain turn to face you as you come near.
+- Out on the overworld you're a 3D figure too, and at sea you face the bow of your boat.
+
+### Greener, fuller town
+- **Grass:** grassy ground is a carpet of real blades swaying in the breeze, both inside the walls and on the land around the town.
+- **Wildflowers:** yellow, white, pink and violet flowers are dotted through the grass.
+- **Trees:** trees have a trunk that forks into boughs, under a crown of soft, leafy clumps with a real leaf texture, instead of faceted green blobs.
+
 ## v158 — Graveyard fixes
 
 - **Stairs:** staircases are now real stone steps inside the 3D scene instead of a picture painted over it.

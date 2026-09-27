@@ -14778,13 +14778,77 @@ function v3Tree(x,z,mats,grp,kind,s){
     g.add(v3Cyl(0.06,0.14,1.8,6,mats.bark,0,0.9,0));
     for (let i=0;i<4;i++){ const br = v3Cyl(0.02,0.04,0.8,5,mats.bark,Math.cos(i*1.6)*0.25,1.3+i*0.1,Math.sin(i*1.6)*0.25); br.rotation.z = Math.cos(i*1.6)*0.9; br.rotation.x = Math.sin(i*1.6)*0.9; g.add(br); }
   } else {
-    g.add(v3Cyl(0.08,0.13,1.1,7,mats.bark,0,0.55,0));
-    for (let i=0;i<5;i++){ const geo = new T.IcosahedronGeometry(0.55 - (i===0?0:0.12), 1), p = geo.attributes.position;
-      for (let v=0; v<p.count; v++) p.setXYZ(v, p.getX(v)*(1+(Math.random()-0.5)*0.25), p.getY(v)*(1+(Math.random()-0.5)*0.25), p.getZ(v)*(1+(Math.random()-0.5)*0.25));
-      geo.computeVertexNormals();
-      const b = new T.Mesh(geo, i%2 ? mats.leaf2 : mats.leaf); b.position.set(i===0?0:Math.cos(i*1.7)*0.35, i===0?1.55:1.25+Math.random()*0.3, i===0?0:Math.sin(i*1.7)*0.35); b.castShadow = true; g.add(b); }
+    // a trunk that forks into boughs, under a crown of soft, leafy clumps
+    const trunk = v3Cyl(0.08,0.14,1.15,9,mats.bark,0,0.575,0); g.add(trunk);
+    for (let i=0;i<3;i++){ const a = i*2.1 + Math.random(), br = v3Cyl(0.03,0.06,0.6,6,mats.bark,Math.cos(a)*0.14,1.2,Math.sin(a)*0.14); br.rotation.z = Math.cos(a)*0.7; br.rotation.x = -Math.sin(a)*0.7; g.add(br); }
+    const leafMats = v3LeafMats(mats);
+    for (let i=0;i<9;i++){
+      const a = i*2.4 + Math.random()*0.5, r = i===0 ? 0 : 0.28 + Math.random()*0.2, y = i===0 ? 1.62 : 1.25 + Math.random()*0.45 + (i>5 ? 0.25 : 0);
+      const b = new T.Mesh(v3LeafGeo(i%4), leafMats[i%2]); b.position.set(Math.cos(a)*r, y, Math.sin(a)*r);
+      b.scale.setScalar((i===0 ? 0.5 : 0.36 + Math.random()*0.12)); b.rotation.set(Math.random()*6, Math.random()*6, 0); b.castShadow = true; b.receiveShadow = true; g.add(b);
+    }
   }
   grp.add(g);
+}
+// grass: tufts of blades on every grassy tile and out round the palisade, swaying in a vertex shader, with wildflowers among them
+function v3Grass(grp){
+  const T = THREE, th = G.villageTheme;
+  if (th==='desert' || th==='tundra') return;
+  const col = th==='swamp' ? [86,100,56] : th==='mountain' ? [96,112,72] : [92,140,64];
+  const pos = [], cl = [];
+  for (let b=0;b<3;b++){ const a = b*2.1 + 0.4, ca = Math.cos(a), sa = Math.sin(a), w = 0.016, lean = 0.25 + b*0.1;
+    const P = (px,py,pz)=>pos.push(px*ca - pz*sa, py, px*sa + pz*ca);
+    P(-w,0,0); cl.push(0.35,0.35,0.35); P(w,0,0); cl.push(0.35,0.35,0.35); P(lean*0.3,1,0.02); cl.push(1.1,1.1,1.1); }
+  const bg = new T.BufferGeometry(); bg.setAttribute('position', new T.Float32BufferAttribute(pos,3)); bg.setAttribute('color', new T.Float32BufferAttribute(cl,3)); bg.computeVertexNormals();
+  V3.grassT = V3.grassT || { value:0 };
+  const sway = (m)=>{ m.onBeforeCompile = (sh)=>{ sh.uniforms.uT = V3.grassT;
+    sh.vertexShader = 'uniform float uT;\n' + sh.vertexShader.replace('#include <begin_vertex>',
+      '#include <begin_vertex>\n  vec4 gip = instanceMatrix*vec4(0.0,0.0,0.0,1.0); float gsw = position.y*position.y;\n  transformed.x += sin(uT*1.7 + gip.x*0.9 + gip.z*0.6)*0.07*gsw; transformed.z += cos(uT*1.3 + gip.x*0.5 - gip.z*0.8)*0.05*gsw;'); }; return m; };
+  const gm = sway(new T.MeshLambertMaterial({ color:new T.Color(col[0]/255, col[1]/255, col[2]/255).convertSRGBToLinear(), vertexColors:true, side:T.DoubleSide }));
+  gm.userData.lin = true;
+  const spots = [];
+  const ok = (x,y)=>{
+    if (x>=0 && y>=0 && x<COLS && y<ROWS) return G.map[x][y]===T_FLOOR && G.villageDeco[x][y]==='grass';
+    return !(y >= ROWS-1 && Math.abs(x+0.5 - COLS/2) < 2.5);                      // outside the walls, except the road
+  };
+  for (let y=-5;y<ROWS+5;y++) for (let x=-5;x<COLS+5;x++){
+    if (!ok(x,y)) continue;
+    const n = (x<0||y<0||x>=COLS||y>=ROWS) ? 14 : 26;
+    for (let i=0;i<n;i++) spots.push(x + fpHash(x*31+i, y+50, 61), y + fpHash(x+50, y*29+i, 62), fpHash(x+i+50, y-i+50, 63));
+  }
+  const N = spots.length/3; if (!N) return;
+  const im = new T.InstancedMesh(bg, gm, N), M4 = new T.Matrix4(), Q = new T.Quaternion(), S = new T.Vector3(), V = new T.Vector3(), Y = new T.Vector3(0,1,0);
+  for (let i=0;i<N;i++){ const r = spots[i*3+2]; Q.setFromAxisAngle(Y, r*40); S.set(1+r*0.6, 0.12+r*0.16, 1+r*0.6); V.set(spots[i*3], 0, spots[i*3+1]); im.setMatrixAt(i, M4.compose(V, Q, S)); }
+  im.frustumCulled = false; im.receiveShadow = true; grp.add(im);
+  // wildflowers: a little head of petals on a stem, dotted through the grass
+  const fl = []; for (let i=0;i<N;i+=9){ const r = spots[i*3+2]; if (r < 0.55) continue; fl.push([spots[i*3]+0.05, spots[i*3+1]-0.04, r]); }
+  if (fl.length){
+    const hg = new T.IcosahedronGeometry(0.035, 0); hg.scale(1, 0.55, 1); hg.translate(0, 0.2, 0);
+    const pal = th==='swamp' ? [0xd8d8a0, 0xa0a0d8] : [0xf0e060, 0xf0f0f0, 0xd07080, 0x9080e0];
+    pal.forEach((c, k)=>{
+      const list = fl.filter((f,j)=>j%pal.length===k); if (!list.length) return;
+      const fm = sway(new T.MeshLambertMaterial({ color:new T.Color(c).convertSRGBToLinear(), emissive:new T.Color(c).convertSRGBToLinear(), emissiveIntensity:0.12 })); fm.userData.lin = true;
+      const fi = new T.InstancedMesh(hg, fm, list.length);
+      list.forEach((f,j)=>{ S.setScalar(0.8+f[2]*0.6); V.set(f[0], 0, f[1]); Q.setFromAxisAngle(Y, f[2]*9); fi.setMatrixAt(j, M4.compose(V, Q, S)); });
+      fi.frustumCulled = false; grp.add(fi);
+    });
+  }
+}
+// leafy clumps: lumpy, smooth-shaded balls with a leaf texture and relief
+function v3LeafGeo(k){ V3.leafGeo = V3.leafGeo || []; return V3.leafGeo[k] || (V3.leafGeo[k] = fpdLumpy(2, 0.22, 700+k*7, false)); }
+function v3LeafMats(mats){
+  if (V3.leafMats && V3.leafMats.src===mats) return V3.leafMats;
+  if (!V3.leafTex){
+    const N = 256, mk = ()=>{ const c = v3Canvas(N,N); return [c, c.getContext('2d')]; }, [mc, mx] = mk(), [nc, nx] = mk(), md = mx.createImageData(N,N), nd = nx.createImageData(N,N), h = new Float32Array(N*N), W = (v)=>(v+N)%N;
+    for (let y=0;y<N;y++) for (let x=0;x<N;x++){ const X = x/4, Y = y/4, l = fpNoise(X,Y,32,720), l2 = fpNoise(X,Y,64,721), hv = Math.pow(l*0.6+l2*0.4, 1.5); h[y*N+x] = hv; const t = (0.35 + hv*1.1)*255/1.45, p = (y*N+x)*4; md.data[p]=md.data[p+1]=md.data[p+2]=Math.min(255,t); md.data[p+3]=255; }
+    for (let y=0;y<N;y++) for (let x=0;x<N;x++){ const ax = (h[y*N+W(x-1)]-h[y*N+W(x+1)])*5, ay = (h[W(y+1)*N+x]-h[W(y-1)*N+x])*5, l = Math.hypot(ax,ay,1), p = (y*N+x)*4; nd.data[p]=(ax/l*0.5+0.5)*255; nd.data[p+1]=(ay/l*0.5+0.5)*255; nd.data[p+2]=(1/l*0.5+0.5)*255; nd.data[p+3]=255; }
+    mx.putImageData(md,0,0); nx.putImageData(nd,0,0);
+    const map = new THREE.CanvasTexture(mc), nrm = new THREE.CanvasTexture(nc); map.encoding = THREE.sRGBEncoding;
+    for (const t of [map, nrm]){ t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(2,2); }
+    V3.leafTex = { map, nrm };
+  }
+  const mk = (src)=>{ const m = new THREE.MeshStandardMaterial({ color:src.color.clone(), map:V3.leafTex.map, normalMap:V3.leafTex.nrm, roughness:0.85 }); m.color.multiplyScalar(1.35); m.userData.lin = src.userData.lin; return m; };
+  return (V3.leafMats = Object.assign([mk(mats.leaf), mk(mats.leaf2)], { src:mats }));
 }
 function v3Lamp(x,z,mats,grp){
   grp.add(v3Cyl(0.04,0.06,1.9,8,mats.iron,x,0.95,z));
@@ -14860,7 +14924,19 @@ function v3VillagerLook(i){
   return HUM(Object.assign({ outfit: outfits[i%outfits.length], cloth: cloths[i%cloths.length], hair: ['#3a2618','#8a6a3a','#1a1210','#aaa090'][i%4], beard: i%3===0 ? '#4a3018' : undefined }, V3_RACE_LOOK[G.villageRace]||{}));
 }
 function v3Person(entry, height, grp){
-  const T = THREE; let img = null; try{ img = fpUndeadSprite(entry,false).img; }catch(e){}
+  const T = THREE;
+  // the same jointed 3D figures the monsters in the dungeons are (the painted sprite below is the fallback)
+  if (typeof m3dInstance==='function'){
+    try{
+      const e = m3dInstance({}, entry);
+      e.holder.scale.setScalar(height/e.H);
+      e.holder.traverse(o=>{ if (o.isMesh){ if (!(o.material && o.material.transparent)){ o.castShadow = true; o.receiveShadow = true; } const ms = Array.isArray(o.material) ? o.material : [o.material]; ms.forEach(m=>{ if (m) m.userData.lin = true; }); } });
+      const g = new T.Group(); g.add(e.holder); grp.add(g);
+      const hb = new T.Mesh(new T.BoxGeometry(0.5, height, 0.5), new T.MeshBasicMaterial({ visible:false })); hb.position.y = height/2; g.add(hb);   // (what a click hits)
+      return { g, sp:hb, sh:e.holder.children.find(c=>c.isMesh && c.geometry && c.geometry.type==='PlaneGeometry') || new T.Group(), e, yaw:0 };
+    }catch(err){ console.error(err); }
+  }
+  let img = null; try{ img = fpUndeadSprite(entry,false).img; }catch(e){}
   const tex = img ? new T.CanvasTexture(img) : v3Blob('rgba(200,200,200,1)'); if (T.sRGBEncoding) tex.encoding = T.sRGBEncoding;
   const mat = new T.SpriteMaterial({ map:tex, transparent:true, alphaTest:0.3 });
   const sp = new T.Sprite(mat); const asp = img ? img.width/img.height : 0.5;
@@ -14977,6 +15053,7 @@ function v3BuildScene(){
   for (let i=0;i<14;i++){ const x = 1.6+Math.random()*16.5, z = 7+Math.random()*11; if (G.map[Math.floor(x)] && G.map[Math.floor(x)][Math.floor(z)]===T_FLOOR && G.villageDeco[Math.floor(x)][Math.floor(z)]==='grass'){
     const f = new T.Mesh(new T.IcosahedronGeometry(0.16,0), mats.leaf2); f.position.set(x,0.1,z); f.scale.y = 0.6; grp.add(f); } }
   v3Palisade(mats, grp);
+  v3Grass(grp);
   // people
   const P = (entry, h, x, y)=>{ const p = v3Person(entry, h, grp); p.g.position.set(x+0.5, 0, y+0.5); return p; };
   V3.player = P(v3PlayerLook(), 1.0, G.player.x, G.player.y); V3.player.at = [G.player.x, G.player.y];
@@ -15134,6 +15211,7 @@ function v3Render(){
     if (V3.stepT <= 0){ const [dx,dy] = V3.path.shift(); moveDir(dx,dy); V3.stepT = 0.17; if (G.ui!=='playing' || G.gameMode!==3) V3.path = []; }
   } else if (G.ui!=='playing') V3.path = [];
   if (G.gameMode!==3 || V3.mapRef!==G.map) return true;
+  if (V3.grassT) V3.grassT.value = V3.t;
   // people: glide between tiles, bob while walking, face the way they move
   const glide = (p, x, y, spd)=>{
     const tx = x+0.5, tz = y+0.5, g = p.g.position, k = 1-Math.exp(-dt*(spd||11));
@@ -15143,6 +15221,26 @@ function v3Render(){
     if (Math.abs(sx) > 0.05) p.face = sx < 0 ? -1 : 1;
     p.walk = (p.walk||0) + (moving ? dt*12 : 0);
     const bob = moving ? Math.abs(Math.sin(p.walk))*0.05 : Math.sin(V3.t*1.6 + (p.ph||(p.ph=Math.random()*6)))*0.006;
+    if (p.e){
+      // turn toward where they're walking; standing still, the townsfolk you can talk to turn to face you
+      let want = p.yaw;
+      if (moving) want = Math.atan2(dx, dz);
+      else if (p.n){ const q = V3.player.g.position; if (Math.hypot(q.x-g.x, q.z-g.z) < 4.5) want = Math.atan2(q.x-g.x, q.z-g.z); }
+      let da = want - p.yaw; da = Math.atan2(Math.sin(da), Math.cos(da)); p.yaw += da*Math.min(1, dt*8);
+      p.e.holder.rotation.y = p.yaw;
+      const tt = V3.t + (p.ph||(p.ph=Math.random()*6)), mv = moving ? 1 : 0;
+      m3dPoseHumanoid(p.e.rig, tt, mv, 0, 0, 0, p.e);
+      // at ease in town: arms hang loose and swing with the stride (a weapon is carried pointing down)
+      const r = p.e.rig, sw = Math.sin(tt*9)*mv, br = Math.sin(tt*2.2);
+      if (r.arms && !r.zombie){
+        const [R, L] = r.arms;
+        R.sh.rotation.x = -0.08 - sw*0.45 + br*0.02; R.sh.rotation.z = -0.12; R.el.rotation.x = r.weapon ? -0.5 : -0.25;
+        L.sh.rotation.x = (r.shield ? -0.25 : -0.08) + sw*0.45 + br*0.02; L.sh.rotation.z = 0.12; L.el.rotation.x = r.shield ? -0.9 : -0.25;
+        if (r.twoHand){ R.sh.rotation.x = -0.35; R.el.rotation.x = -0.9; L.sh.rotation.x = -0.1 + sw*0.3; L.el.rotation.x = -0.3; }
+        if (r.torso){ r.torso.rotation.x = 0.03 + br*0.012; r.torso.rotation.y = sw*0.08; }
+      }
+      return;
+    }
     p.sp.position.y = bob;
     p.sp.scale.x = p.sp.userData.h * p.sp.userData.asp * (p.face||1);
   };
@@ -15875,8 +15973,20 @@ function o3Render(){
   P.g.position.set(0, sailing ? 0.1 : 0, sailing ? -0.18 : 0);
   const sx = dxs - dzs; if (Math.abs(sx) > 0.05) P.face = sx < 0 ? -1 : 1;
   P.walk = (P.walk||0) + (moving ? dt*12 : 0);
-  P.sp.position.y = (moving && !sailing) ? Math.abs(Math.sin(P.walk))*0.05 : 0;
-  P.sp.scale.x = P.sp.userData.h * P.sp.userData.asp * (P.face||1);
+  if (P.e){
+    // the 3D figure: turn to face the way you're walking (at sea, face the bow) and stride when you move
+    let want = sailing ? (O3.boatYaw||0) : (moving ? Math.atan2(dxs, dzs) : P.yaw);
+    let da = want - P.yaw; da = Math.atan2(Math.sin(da), Math.cos(da)); P.yaw += da*Math.min(1, dt*8);
+    P.e.holder.rotation.y = P.yaw;
+    const mv = (moving && !sailing) ? 1 : 0, r = P.e.rig, tt = O3.t, sw = Math.sin(tt*9)*mv;
+    m3dPoseHumanoid(r, tt, mv, 0, 0, 0, P.e);
+    if (r.arms){ const [R, L] = r.arms; R.sh.rotation.x = -0.08 - sw*0.45; R.sh.rotation.z = -0.12; R.el.rotation.x = r.weapon ? -0.5 : -0.25;
+      L.sh.rotation.x = (r.shield ? -0.25 : -0.08) + sw*0.45; L.sh.rotation.z = 0.12; L.el.rotation.x = r.shield ? -0.9 : -0.25;
+      if (r.twoHand){ R.sh.rotation.x = -0.35; R.el.rotation.x = -0.9; } }
+  } else {
+    P.sp.position.y = (moving && !sailing) ? Math.abs(Math.sin(P.walk))*0.05 : 0;
+    P.sp.scale.x = P.sp.userData.h * P.sp.userData.asp * (P.face||1);
+  }
   if (sailing){
     if (moving) O3.boatYaw = Math.atan2(dxs, dzs);           // turn to the way you're sailing, and keep that heading when you stop
     O3.boat.rotation.set(Math.sin(O3.t*1.3)*0.03, O3.boatYaw||0, Math.sin(O3.t*1.6)*0.05);
