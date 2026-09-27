@@ -16263,7 +16263,39 @@ function fpdInit(){
     gr.addColorStop(0,'rgba(255,236,200,1)'); gr.addColorStop(1,'rgba(255,236,200,0)'); dx.fillStyle = gr; dx.fillRect(0,0,32,32);
     const dust = new T.Points(dg, new T.PointsMaterial({ size:0.014, map:new T.CanvasTexture(dc), transparent:true, opacity:0.5, depthWrite:false, blending:T.AdditiveBlending, color:0xffe2b8 }));
     dust.frustumCulled = false; scene.add(dust);
-    Object.assign(FPD, { r, cv, scene, cam, amb, lan, torches, dust, dustSeed:dp, world:null, mats:{}, lightKey:'' });
+    // out of doors: the sun (or moon) with one shadow map over the whole field, a sky dome, the moon itself
+    const sun = new T.DirectionalLight(0xfff2dc, 0); sun.castShadow = true; sun.shadow.mapSize.set(2048,2048); sun.shadow.bias = -0.0008; sun.shadow.normalBias = 0.02;
+    scene.add(sun, sun.target);
+    const hemi = new T.HemisphereLight(0xbfd8ff, 0x4a4030, 0); scene.add(hemi);
+    const sky = new T.Mesh(new T.SphereGeometry(50, 32, 16), new T.ShaderMaterial({
+      uniforms:{ top:{value:new T.Color()}, hor:{value:new T.Color()}, night:{value:0}, cloud:{value:0.6}, time:{value:0}, stars:{value:1} },
+      vertexShader:'varying vec3 vDir; void main(){ vDir = (modelMatrix*vec4(position,1.0)).xyz - cameraPosition; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); gl_Position.z = gl_Position.w; }',
+      fragmentShader:[
+        'uniform vec3 top; uniform vec3 hor; uniform float night; uniform float cloud; uniform float time; uniform float stars; varying vec3 vDir;',
+        'float h(vec2 p){ p = fract(p*vec2(0.1031, 0.1030)); p += dot(p, p.yx+33.33); return fract((p.x+p.y)*p.x); }',
+        'float n(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(h(i),h(i+vec2(1.0,0.0)),f.x), mix(h(i+vec2(0.0,1.0)),h(i+vec2(1.0,1.0)),f.x), f.y); }',
+        'float fbm(vec2 p){ float s=0.0, a=0.5; for (int i=0;i<5;i++){ s+=a*n(p); p*=2.03; a*=0.5; } return s; }',
+        'void main(){ vec3 d = normalize(vDir); float t = clamp(d.y*2.2, 0.0, 1.0);',
+        '  vec3 col = mix(hor, top, pow(t, 0.7));',
+        '  if (d.y > 0.0){',
+        '    vec2 uv = d.xz/(d.y+0.15)*1.3 + vec2(time*0.012, time*0.004);',
+        '    float c = smoothstep(0.48, 0.82, fbm(uv))*cloud*smoothstep(0.0, 0.2, d.y);',
+        '    vec3 cc = night > 0.5 ? hor*1.25 : mix(vec3(1.0), hor, 0.3);',
+        '    col = mix(col, cc*(0.82+0.18*fbm(uv*2.0+3.0)), c*0.85);',
+        '    if (night > 0.5){ vec2 sp = floor(d.xz/(d.y+0.35)*260.0); float st = step(0.994, h(sp))*(1.0-c)*stars*smoothstep(0.03, 0.25, d.y); col += vec3(0.85, 0.83, 0.8)*st*(0.6+0.4*h(sp+7.0)); }',
+        '  }',
+        '  gl_FragColor = vec4(col, 1.0); }'].join('\n'),
+      side:T.BackSide, depthWrite:false, fog:false }));
+    sky.renderOrder = -10; sky.frustumCulled = false; sky.visible = false; scene.add(sky);
+    const mc = v3Canvas(128,128), mx2 = mc.getContext('2d');
+    const mg = mx2.createRadialGradient(64,64,10,64,64,64); mg.addColorStop(0,'rgba(220,225,235,0.55)'); mg.addColorStop(1,'rgba(220,225,235,0)');
+    mx2.fillStyle = mg; mx2.fillRect(0,0,128,128);
+    mx2.fillStyle = '#ecece2'; mx2.beginPath(); mx2.arc(64,64,17,0,Math.PI*2); mx2.fill();
+    mx2.fillStyle = 'rgba(170,170,160,0.45)'; for (const [cx2,cy2,cr] of [[58,58,4],[70,68,3],[62,72,2.5],[72,56,2]]){ mx2.beginPath(); mx2.arc(cx2,cy2,cr,0,Math.PI*2); mx2.fill(); }
+    const mt = new T.CanvasTexture(mc); mt.encoding = T.sRGBEncoding;
+    const moon = new T.Sprite(new T.SpriteMaterial({ map:mt, transparent:true, depthWrite:false, fog:false }));
+    moon.scale.setScalar(9); moon.renderOrder = -9; moon.visible = false; scene.add(moon);
+    Object.assign(FPD, { r, cv, scene, cam, amb, lan, torches, dust, dustSeed:dp, world:null, mats:{}, lightKey:'', sun, hemi, sky, moon, grassT:{ value:0 } });
     cv.addEventListener('webglcontextlost', ()=>{ FPD.ok = false; });   // the raycaster takes back over
     FPD.ok = true;
   }catch(e){ FPD.ok = false; }
@@ -16278,12 +16310,13 @@ function fpdMaterial(key, fn, o){
   const T = THREE, N = 256, st = FP_TEX/N;
   const cc = v3Canvas(N,N), cx = cc.getContext('2d'), id = cx.createImageData(N,N), d = id.data;
   const nc = v3Canvas(N,N), nx = nc.getContext('2d'), nd = nx.createImageData(N,N), ndd = nd.data;
-  let ec = null, ed = null, eid = null;
+  let ec = null, ed = null, eid = null, holes = false;
   const h = new Float32Array(N*N);
   for (let y=0;y<N;y++) for (let x=0;x<N;x++){
-    const c = fn(x*st, y*st) || [0,0,0], i = y*N+x, p = i*4;
+    const c0 = fn(x*st, y*st), c = c0 || [0,0,0], i = y*N+x, p = i*4;
     const r = clamp(c[0],0,255), g = clamp(c[1],0,255), b = clamp(c[2],0,255);
-    d[p] = r; d[p+1] = g; d[p+2] = b; d[p+3] = 255;
+    d[p] = r; d[p+1] = g; d[p+2] = b; d[p+3] = c0 ? 255 : 0;          // (a railing or a roofline has open sky through it)
+    if (!c0) holes = true;
     h[i] = (r*0.3 + g*0.55 + b*0.15)/255;
     if (c[3]){
       if (!ec){ ec = v3Canvas(N,N); eid = ec.getContext('2d').createImageData(N,N); ed = eid.data; for (let k=3;k<ed.length;k+=4) ed[k] = 255; }
@@ -16308,7 +16341,8 @@ function fpdMaterial(key, fn, o){
   map.wrapS = map.wrapT = nmap.wrapS = nmap.wrapT = T.RepeatWrapping;
   // Phong keeps the stone matte with a controllable glint (a PBR dielectric washes the whole wall in a grey sheen at lantern range)
   const sh = o.rough!==undefined ? o.rough : 0.9;
-  const m = new T.MeshPhongMaterial({ map, normalMap:nmap, vertexColors:true, shininess: 6 + (1-sh)*80, specular: new T.Color().setScalar(0.02 + (1-sh)*0.35) });
+  const m = new T.MeshPhongMaterial({ map, normalMap:nmap, vertexColors:o.vc!==false, shininess: 6 + (1-sh)*80, specular: new T.Color().setScalar(0.02 + (1-sh)*0.35) });
+  if (holes){ m.alphaTest = 0.5; m.side = T.DoubleSide; }
   if (ec){ ec.getContext('2d').putImageData(eid,0,0); const em = new T.CanvasTexture(ec); em.encoding = T.sRGBEncoding; em.wrapS = em.wrapT = T.RepeatWrapping; m.emissiveMap = em; m.emissive = new T.Color(0xffffff); m.emissiveIntensity = o.glow || 1.4; }
   FPD.mats[key] = m;
   return m;
@@ -16320,7 +16354,9 @@ function fpdBuild(T){
   if (FPD.world){ FPD.scene.remove(FPD.world); FPD.world.traverse(o=>{ if (o.geometry) o.geometry.dispose(); }); }
   const B = {};
   const bucket = (k)=> B[k] || (B[k] = { pos:[], nor:[], uv:[], col:[], idx:[] });
-  const solid = (x,y)=> x<0 || y<0 || x>=COLS || y>=ROWS || G.map[x][y]===T_WALL;
+  // indoors the map's edge is solid rock; out of doors it's open ground running off to the horizon
+  const out = T.outdoor, yard = !!(T.yard && G.gameMode===1), field = G.gameMode===2;
+  const solid = (x,y)=> (x<0 || y<0 || x>=COLS || y>=ROWS) ? !out : G.map[x][y]===T_WALL;
   // a grid of vertices over one face: origin O, edge vectors U and V, samples along each
   // (uvs scales the texture to the face's real size, for the small trims)
   const face = (k, O, U, V, N, us, vs, ao, uvs)=>{
@@ -16343,17 +16379,18 @@ function fpdBuild(T){
     // walls around this open tile
     for (const [dx,dy] of FACING_VECT){
       const wx = x+dx, wy = y+dy;
-      if (!solid(wx,wy)) continue;
+      if (!solid(wx,wy) || field) continue;                     // (a field's obstacles are bushes and boulders, built below)
       let wk = 'wall';
       if (wx>=0 && wy>=0 && wx<COLS && wy<ROWS){
-        if (G.dungeonDeco && G.dungeonDeco[wx][wy]==='torch') wk = 'wallTorch';
+        if (yard && (wx===0 || wy===0 || wx===COLS-1 || wy===ROWS-1)) wk = 'fence';
+        else if (!yard && G.dungeonDeco && G.dungeonDeco[wx][wy]==='torch') wk = 'wallTorch';
         else if (fpHash(wx,wy,3)>0.72) wk = 'wall2';
       }
       const ux = -dy, uz = dx;                                  // along the face, so U x up points back into the room
       const cL = solid(x-ux, y-uz), cR = solid(x+ux, y+uz);     // inner corners at either end
       const O = [x+0.5+dx*0.5-ux*0.5, 0, y+0.5+dy*0.5-uz*0.5];
       face(wk, O, [ux,0,uz], [0,1,0], [-dx,0,-dy], S5, S5, (u,v)=>
-        ramp(v,0.5) * ramp(1-v,0.62) * (cL ? ramp(u,0.55) : 1) * (cR ? ramp(1-u,0.55) : 1));
+        ramp(v,0.5) * (out ? 1 : ramp(1-v,0.62)) * (cL ? ramp(u,0.55) : 1) * (cR ? ramp(1-u,0.55) : 1));
     }
     // floor, darkened toward any wall it runs into
     const aoF = (px,py)=>{
@@ -16367,7 +16404,7 @@ function fpdBuild(T){
     };
     const slot = FP.ftile ? FP.ftile[y*COLS+x] : 0;
     face('floor'+slot, [x,0,y+1], [1,0,0], [0,0,-1], [0,1,0], S5, S5, (u,v)=>aoF(x+u, y+1-v));
-    if (G.map[x][y]===T_STAIRSU){
+    if (G.map[x][y]===T_STAIRSU && !out){
       // an open stairwell climbing into the dark above the steps
       for (const [dx,dy] of FACING_VECT){
         const ux = -dy, uz = dx;
@@ -16389,7 +16426,7 @@ function fpdBuild(T){
   };
   // a low stone plinth along the foot of every wall
   const PD = 0.035, PH = 0.075;
-  for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
+  if (!out) for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
     if (solid(x,y)) continue;
     for (const [dx,dy] of FACING_VECT){
       if (!solid(x+dx,y+dy)) continue;
@@ -16405,7 +16442,7 @@ function fpdBuild(T){
     }
   }
   // square stone pillars wherever a wall turns a corner into open floor
-  for (let y=0;y<=ROWS;y++) for (let x=0;x<=COLS;x++){
+  if (!out) for (let y=0;y<=ROWS;y++) for (let x=0;x<=COLS;x++){
     const q = [solid(x-1,y-1), solid(x,y-1), solid(x-1,y), solid(x,y)], nw = q.filter(Boolean).length;
     if (nw!==1 && nw!==3) continue;
     if (nw===3 && ((x+y)&1)) continue;                     // every other inner corner, so rooms don't bristle with them
@@ -16417,7 +16454,7 @@ function fpdBuild(T){
   // corridors get a rib across the ceiling every other tile: dressed stone in
   // most places, a timber frame (two posts and a crossbeam) in mines and keeps
   const timber = /mine|castle/.test(key), ribK = timber ? 'wood' : 'trim';
-  for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
+  if (!out) for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
     if (solid(x,y) || G.map[x][y]===T_STAIRSU || ((x+y)&1)) continue;
     const ns = solid(x,y-1) && solid(x,y+1), ew = solid(x-1,y) && solid(x+1,y);
     if (ns===ew) continue;                                 // not a straight corridor
@@ -16435,16 +16472,29 @@ function fpdBuild(T){
   const bw = /mine|lair/.test(key) ? 5 : 11;
   const matFor = (k)=>{
     if (k==='wall') return fpdMaterial(key+':wall', spec.wall, { bump:bw });
+    if (k==='fence') return fpdMaterial(key+':fence', spec.fence, { bump:6, rough:0.5 });
+    if (k==='bush') return fpdMaterial(key+':bush', spec.wall, { vc:false, bump:9 });
+    if (k==='rock') return fpdMaterial(key+':rock', /desert|tundra/.test(key) ? spec.wall : spec.wall2, { vc:false, bump:6 });
+    if (k==='crate') return fpdMaterial('crate', (x,y)=>{
+      const edge = x<6 || x>=58 || y<6 || y>=58, pl = Math.floor(y/14.5);
+      let k2 = 0.55 + fpNoise(x, y*3%FP_TEX, 16, 51+pl)*0.3 + fpFbm(x,y,52)*0.2;
+      if (!edge && y%14.5 < 1.2) k2 *= 0.45;
+      if (edge) k2 *= (x<1 || x>=63 || y<1 || y>=63) ? 0.5 : 0.85;
+      if (edge && ((x<6&&y<6) || (x>=58&&y<6) || (x<6&&y>=58) || (x>=58&&y>=58))) return fpScale([70,68,66], 0.8+fpFbm(x,y,53)*0.4);
+      return fpScale([128,90,52], k2);
+    }, { vc:false, bump:10 });
     if (k==='wall2') return fpdMaterial(key+':wall2', spec.wall2||spec.wall, { bump:bw });
     if (k==='wallTorch') return fpdMaterial(key+':wallT', fpSconce(spec.wall), { bump:bw });
     if (k==='ceil') return fpdMaterial(key+':ceil', spec.ceil, { bump:6 });
     if (k==='trim') return fpdMaterial(key+':trim', key==='mine' ? spec.ceil : key==='lair' ? spec.wall2 : spec.wall, { bump:bw });
-    if (k==='wood') return fpdMaterial('wood', (x,y)=>{
+    if (k==='wood') return fpdMaterial(field ? 'woodF' : 'wood', (x,y)=>{
       const g = fpNoise(x, y*4%FP_TEX, 16, 41), k2 = 0.5 + g*0.4 + fpFbm(x,y,44)*0.25 - (fpNoise(x, y*8%FP_TEX, 32, 45)>0.8 ? 0.15 : 0);
       return fpScale([112,74,42], k2);
-    }, { bump:8 });
-    const s = +k.slice(5);
-    return fpdMaterial(key+':f'+s, slotFns[s], s===6 ? { rough:0.15, bump:3, glow:0.6 } : { rough:0.55, glow:1.6, bump:bw*0.8 });
+    }, { bump:8, vc:!field });
+    const s = +k.slice(5), wet = s===6 || (key==='swamp' && s===1) || (key==='sea' && s===7);
+    const fm = fpdMaterial(key+':f'+s, slotFns[s], wet ? { rough:0.15, bump:3, glow:0.6 } : { rough:0.55, glow:1.6, bump:bw*0.8 });
+    if (key==='swamp' && s===1) fm.color.setRGB(0.4, 0.48, 0.3);         // marsh water is murky, not sea blue
+    return fm;
   };
   const world = new TH.Group();
   for (const k in B){
@@ -16458,8 +16508,141 @@ function fpdBuild(T){
     mesh.castShadow = true; mesh.receiveShadow = true;
     world.add(mesh);
   }
+  if (out) fpdOutdoor(T, spec, world, matFor);
   FPD.scene.add(world); FPD.world = world;
   FPD.shadowFrames = 3; FPD.lightKey = ''; FPD.warm = true;
+}
+// out of doors: ground running on to the horizon, a field's obstacles as real
+// bushes, boulders or (on a ship's deck) cargo crates, grass that sways in the
+// wind, and a far tree line or range of hills standing against the sky
+function fpdLumpy(detail, amp, seed, smooth){
+  const g = new THREE.IcosahedronGeometry(1, detail), p = g.attributes.position;
+  for (let i=0;i<p.count;i++){
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+    const k = 1 + (fpNoise((x+1.3)*18, (z+1.3)*18 + (y+1)*7, 4, seed) - 0.5)*amp*2 + (fpNoise((x+1.3)*30, (y+1.3)*30, 8, seed+1) - 0.5)*amp;
+    p.setXYZ(i, x*k, y*k, z*k);
+  }
+  if (smooth){ const n = g.attributes.normal; for (let i=0;i<p.count;i++){ const v = new THREE.Vector3(p.getX(i), p.getY(i), p.getZ(i)).normalize(); n.setXYZ(i, v.x, v.y, v.z); } }
+  else g.computeVertexNormals();
+  return g;
+}
+function fpdHorizonTex(kind, seed){
+  const W = 2048, H = 256, c = v3Canvas(W, H), x = c.getContext('2d');
+  x.fillStyle = '#fff'; x.strokeStyle = '#fff';
+  const r = (i)=>fpHash(i, seed, 97);
+  if (kind==='hills'){
+    x.beginPath(); x.moveTo(0, H);
+    for (let i=0;i<=W;i+=8){ const t = i/W*64; x.lineTo(i, H*(0.72 - 0.3*fpNoise(t, 3, 4, seed) - 0.12*fpNoise(t, 9, 16, seed+1))); }
+    x.lineTo(W, H); x.closePath(); x.fill();
+  } else {
+    // a ragged wall of woodland: conifers, round-crowned trees and (in marsh and graveyard) bare ones
+    x.fillRect(0, H*0.9, W, H*0.1);
+    const n = 230;
+    for (let i=0;i<n;i++){
+      const tx = (i + r(i)*0.8)/n*W, th = H*(0.28 + r(i+500)*0.42), kind2 = r(i+900);
+      const base = H*0.95;
+      if (kind2 < (kind==='bare' ? 0.25 : 0.55)){                    // conifer
+        const w = th*0.32;
+        x.beginPath(); x.moveTo(tx, base-th);
+        for (let k=1;k<=4;k++){ const yy = base-th+th*k/4.4; x.lineTo(tx + w*k/4, yy); x.lineTo(tx + w*k/7, yy); }
+        x.lineTo(tx+w, base); x.lineTo(tx-w, base);
+        for (let k=4;k>=1;k--){ const yy = base-th+th*k/4.4; x.lineTo(tx - w*k/7, yy); x.lineTo(tx - w*k/4, yy); }
+        x.closePath(); x.fill();
+      } else if (kind2 < (kind==='bare' ? 0.6 : 0.97)){              // broadleaf crown on a trunk
+        x.fillRect(tx-2, base-th*0.5, 4, th*0.5);
+        for (let k=0;k<6;k++){ x.beginPath(); x.arc(tx + (r(i*7+k)-0.5)*th*0.5, base-th*0.62 + (r(i*5+k)-0.5)*th*0.35, th*(0.16+r(i*3+k)*0.12), 0, Math.PI*2); x.fill(); }
+      } else {                                                       // a thin, straggly crown (dead or half-bare)
+        x.fillRect(tx-2, base-th*0.8, 5, th*0.8);
+        for (let k=0;k<4;k++){ x.beginPath(); x.ellipse(tx + (r(i*9+k)-0.5)*th*0.4, base-th*(0.55+k*0.1), th*0.12, th*0.07, 0, 0, Math.PI*2); x.fill(); }
+      }
+    }
+  }
+  const t = new THREE.CanvasTexture(c); t.wrapS = THREE.RepeatWrapping; t.repeat.x = 3;
+  return t;
+}
+function fpdOutdoor(T, spec, world, matFor){
+  const TH = THREE, key = T.key, field = G.gameMode===2;
+  const add = (m, cast)=>{ m.castShadow = cast!==false; m.receiveShadow = true; world.add(m); return m; };
+  const cxm = COLS/2, czm = ROWS/2;
+  // ground beyond the map's edge (the sea's is open water)
+  const gg = new TH.PlaneGeometry(160, 160, 1, 1); gg.rotateX(-Math.PI/2); gg.translate(cxm, -0.004, czm);
+  const gp = gg.attributes.position, guv = gg.attributes.uv;
+  for (let i=0;i<gp.count;i++) guv.setXY(i, gp.getX(i), -gp.getZ(i));
+  gg.setAttribute('color', new TH.Float32BufferAttribute(new Array(gp.count*3).fill(0.92), 3));
+  add(new TH.Mesh(gg, matFor(key==='sea' ? 'floor7' : 'floor0')), false);
+  // the field's obstacles
+  if (field){
+    const rockG = [fpdLumpy(2, 0.2, 3), fpdLumpy(2, 0.24, 9)], bushG = [fpdLumpy(2, 0.16, 5, true), fpdLumpy(2, 0.2, 12, true)];
+    const boxG = new TH.BoxGeometry(1,1,1), barrelG = new TH.CylinderGeometry(0.2, 0.2, 0.5, 14);
+    for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
+      if (G.map[x][y]!==T_WALL) continue;
+      const deco = G.arenaDeco && G.arenaDeco[x] ? G.arenaDeco[x][y] : '', h = (i)=>fpHash(x,y,40+i);
+      const kind = key==='sea' ? 'crate' : (deco==='rock' || key==='desert' || key==='tundra') ? 'rock' : 'bush';
+      const px = x+0.5, pz = y+0.5;
+      if (kind==='bush'){
+        const m = matFor('bush');
+        for (let i=0;i<7;i++){
+          const r = 0.26 + h(i)*0.16, ang = i/7*Math.PI*2 + h(i+9), d = i ? 0.22 + h(i+3)*0.1 : 0;
+          const b = add(new TH.Mesh(bushG[i&1], m));
+          b.position.set(px + Math.cos(ang)*d, r*0.8 + (i ? h(i+20)*0.2 : 0.3), pz + Math.sin(ang)*d);
+          b.scale.set(r, r*0.86, r); b.rotation.set(h(i+30)*6, h(i+31)*6, 0);
+        }
+      } else if (kind==='rock'){
+        const m = matFor('rock');
+        const b = add(new TH.Mesh(rockG[h(1)>0.5?1:0], m)); b.position.set(px, 0.28, pz); b.scale.set(0.55, 0.45 + h(2)*0.15, 0.5); b.rotation.set(h(3)*0.4, h(4)*6, h(5)*0.3);
+        for (let i=0;i<2;i++){ const s2 = add(new TH.Mesh(rockG[i], m)); const ang = h(6+i)*6.28; s2.position.set(px+Math.cos(ang)*0.42, 0.06, pz+Math.sin(ang)*0.42); s2.scale.setScalar(0.12+h(8+i)*0.08); s2.rotation.set(h(10+i)*6, h(12+i)*6, 0); }
+      } else {
+        const m = matFor('crate');
+        const b = add(new TH.Mesh(boxG, m)); b.position.set(px, 0.37, pz); b.scale.setScalar(0.74); b.rotation.y = (h(1)-0.5)*0.5;
+        const b2 = add(new TH.Mesh(boxG, m)); b2.position.set(px+(h(2)-0.5)*0.2, 0.74+0.22, pz+(h(3)-0.5)*0.2); b2.scale.setScalar(0.44); b2.rotation.y = h(4)*3;
+        const br = add(new TH.Mesh(barrelG, matFor('wood'))); br.position.set(px+0.42*(h(5)>0.5?1:-1), 0.25, pz+0.36); 
+      }
+    }
+  }
+  // grass: tufts of three blades, swaying in a vertex shader so they cost nothing to animate
+  if (/forest|swamp|graveyard/.test(key)){
+    const pos = [], col = [];
+    for (let b=0;b<3;b++){
+      const a = b*2.1 + 0.4, ca = Math.cos(a), sa = Math.sin(a), w = 0.014, lean = 0.25 + b*0.1;
+      const P = (px,py,pz)=>pos.push(px*ca - pz*sa, py, px*sa + pz*ca);
+      P(-w,0,0); col.push(0.3,0.3,0.3); P(w,0,0); col.push(0.3,0.3,0.3); P(lean*0.3,1,0.02); col.push(1.05,1.05,1.05);
+    }
+    const bg = new TH.BufferGeometry(); bg.setAttribute('position', new TH.Float32BufferAttribute(pos,3)); bg.setAttribute('color', new TH.Float32BufferAttribute(col,3)); bg.computeVertexNormals();
+    const gc = key==='forest' ? [96,146,70] : key==='swamp' ? [92,104,58] : [80,98,62];
+    const gm = new TH.MeshLambertMaterial({ color:new TH.Color(gc[0]/255, gc[1]/255, gc[2]/255).convertSRGBToLinear(), vertexColors:true, side:TH.DoubleSide });
+    gm.onBeforeCompile = (sh)=>{ sh.uniforms.uT = FPD.grassT;
+      sh.vertexShader = 'uniform float uT;\n' + sh.vertexShader.replace('#include <begin_vertex>',
+        '#include <begin_vertex>\n  vec4 gip = instanceMatrix*vec4(0.0,0.0,0.0,1.0); float gsw = position.y*position.y;\n  transformed.x += sin(uT*1.7 + gip.x*0.9 + gip.z*0.6)*0.06*gsw; transformed.z += cos(uT*1.3 + gip.x*0.5 - gip.z*0.8)*0.04*gsw;'); };
+    const spots = [];
+    const ok = (s)=> s===0 || (s===1 && key==='forest');
+    for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
+      if (G.map[x][y]===T_WALL || !ok(FP.ftile[y*COLS+x])) continue;
+      for (let i=0;i<24;i++) spots.push(x + fpHash(x*31+i, y, 61), y + fpHash(x, y*29+i, 62), fpHash(x+i, y-i, 63));
+    }
+    const n = spots.length/3;
+    if (n){
+      const im = new TH.InstancedMesh(bg, gm, n), M4 = new TH.Matrix4(), Q = new TH.Quaternion(), S = new TH.Vector3(), V = new TH.Vector3(), Y = new TH.Vector3(0,1,0);
+      for (let i=0;i<n;i++){
+        const r = spots[i*3+2];
+        Q.setFromAxisAngle(Y, r*40); S.set(1 + r*0.6, 0.07 + r*0.11, 1 + r*0.6); V.set(spots[i*3], 0, spots[i*3+1]);
+        im.setMatrixAt(i, M4.compose(V, Q, S));
+      }
+      im.frustumCulled = false; add(im, false);
+    }
+  }
+  // the horizon
+  const ring = /forest|swamp|graveyard/.test(key) ? 'trees' : /desert|tundra/.test(key) ? 'hills' : null;
+  FPD.ring = null;
+  if (ring){
+    // (built at unit radius and scaled to sit just inside the haze, so it hides the fogged far ground and keeps the same size in view)
+    const rg = new TH.CylinderGeometry(1, 1, 0.16, 96, 1, true); rg.translate(0, 0.04, 0);
+    const rm = new TH.Mesh(rg, new TH.MeshBasicMaterial({ map:fpdHorizonTex(ring, key.length*7), transparent:true, alphaTest:0.5, side:TH.BackSide, fog:false }));
+    rm.renderOrder = -8; rm.frustumCulled = false; world.add(rm); FPD.ring = rm; FPD.ringKind = ring;
+  }
+  // one shadow map over the whole field
+  const sc = FPD.sun.shadow.camera, R = Math.max(COLS, ROWS)*0.72 + 2;
+  sc.left = -R; sc.right = R; sc.top = R; sc.bottom = -R; sc.near = 1; sc.far = 90; sc.updateProjectionMatrix();
+  FPD.sunCentre = [cxm, czm];
 }
 function fpdRender(env, T, camZ){
   const TH = THREE, cw = canvas.width, ch = canvas.height;
@@ -16480,10 +16663,47 @@ function fpdRender(env, T, camZ){
   cam.position.set(c.x, camZ, c.y); cam.lookAt(c.x+Math.cos(c.a), camZ, c.y+Math.sin(c.a));
   // lantern and ambient, as the raycaster had them
   const lan = env.lan;
-  FPD.lan.color.setRGB(lan[0], lan[1]*0.74, lan[2]*0.5);   // (lit in linear space, so the lantern's tint needs pushing to read as warm as it did) FPD.lan.intensity = env.lanK*0.75; FPD.lan.distance = env.R*1.35;
+    // (lit in linear space, so the lantern's tint needs pushing to read as warm as it did)
+  FPD.lan.color.setRGB(lan[0], lan[1]*0.74, lan[2]*0.5); FPD.lan.intensity = env.lanK*0.75; FPD.lan.distance = env.R*1.35;
   FPD.lan.position.set(c.x - Math.cos(c.a)*0.15, camZ+0.12, c.y - Math.sin(c.a)*0.15);
   const a = env.amb, am = Math.max(a[0],a[1],a[2],1e-3);
-  FPD.amb.color.setRGB(a[0]/am, a[1]/am, a[2]/am); FPD.amb.intensity = am*2;
+  FPD.amb.color.setRGB(a[0]/am, a[1]/am, a[2]/am); FPD.amb.intensity = T.outdoor ? 0 : am*2;
+  const out = T.outdoor, fog = FPD.scene.fog;
+  FPD.sky.visible = out; FPD.dust.visible = !out; cam.far = out ? 90 : 40; cam.updateProjectionMatrix();
+  if (out){
+    // sky, fog and horizon all blend into the same colour at the edge of sight
+    const s0 = env.sky[0], s1 = env.sky[1], fc = env.fog || s1, u = FPD.sky.material.uniforms;
+    u.top.value.setRGB(s0[0]/255, s0[1]/255, s0[2]/255); u.hor.value.setRGB(s1[0]/255, s1[1]/255, s1[2]/255);
+    u.night.value = env.night ? 1 : 0; u.time.value = FP.t;
+    const wx = G.gameMode===2 ? G.weather : '';
+    u.cloud.value = wx==='storm' ? 1.1 : wx==='rain' ? 0.95 : wx==='fog' ? 0.4 : env.night ? 0.4 : 0.6;
+    u.stars.value = (wx==='storm' || wx==='rain' || wx==='fog') ? 0 : 1;   // (an overcast night has none)
+    FPD.sky.position.copy(cam.position);
+    fog.color.setRGB(fc[0]/255, fc[1]/255, fc[2]/255).convertSRGBToLinear(); fog.near = env.fogNear||7; fog.far = env.fogFar||22;
+    FPD.moon.visible = !!env.moon;
+    const mEl = 0.26; FPD.moon.position.set(cam.position.x + Math.cos(FP_MOON_AZ)*40, cam.position.y + 40*mEl, cam.position.z + Math.sin(FP_MOON_AZ)*40);
+    // the sun by day, the moon by night: one light with a shadow over the whole field
+    const night = !!env.night, avg = (a[0]+a[1]+a[2])/3, dim = wx==='storm' ? 0.35 : wx==='fog' ? 0.5 : wx==='rain' ? 0.6 : 1;
+    const dir = night ? [Math.cos(FP_MOON_AZ), 0.55, Math.sin(FP_MOON_AZ)] : [0.55, 0.8, 0.35];
+    const sc = FPD.sunCentre || [COLS/2, ROWS/2];
+    FPD.sun.position.set(sc[0] + dir[0]*40, dir[1]*40, sc[1] + dir[2]*40); FPD.sun.target.position.set(sc[0], 0, sc[1]); FPD.sun.target.updateMatrixWorld();
+    FPD.sun.color.setHex(night ? 0x9fb6e6 : 0xfff0d6); FPD.sun.intensity = (night ? 0.55 : 0.95)*Math.min(1, avg*1.4)*dim + (night ? 0.08 : 0);
+    FPD.hemi.color.setRGB(s0[0]/255, s0[1]/255, s0[2]/255).convertSRGBToLinear().lerp(new THREE.Color(1,1,1), 0.35);
+    FPD.hemi.groundColor.setHex(night ? 0x1a1c24 : 0x5a5040); FPD.hemi.intensity = avg*(night ? 1.6 : 0.8);
+    const sk = night ? 'n' : 'd';
+    if (FPD.sunKey!==sk){ FPD.sunKey = sk; FPD.shadowFrames = 3; }
+    if (FPD.ring){
+      const rr = Math.min(30, (env.fogFar||22)*0.92);
+      FPD.ring.visible = rr > 11; FPD.ring.scale.setScalar(rr); FPD.ring.position.set(cam.position.x, camZ, cam.position.z);
+      // far trees are a dark silhouette in the haze; far hills are paler, nearly the colour of the sky
+      const k = FPD.ringKind==='hills' ? 0.7 : (env.night ? 0.45 : 0.38), base = FPD.ringKind==='hills' ? (T.key==='tundra' ? [200,210,226] : [196,160,118]) : [30,44,34];
+      FPD.ring.material.color.setRGB((base[0]+(fc[0]-base[0])*k)/255, (base[1]+(fc[1]-base[1])*k)/255, (base[2]+(fc[2]-base[2])*k)/255).convertSRGBToLinear();
+    }
+    FPD.grassT.value = FP.t;
+  } else {
+    fog.color.setHex(0x030407); fog.near = 6; fog.far = 17;
+    FPD.sun.intensity = 0; FPD.hemi.intensity = 0; FPD.moon.visible = false;
+  }
   // the nearest torches get the real lights; the chosen set only changes as you move
   const fl = (FP.flames||[]).map((f,i)=>({ f, i, d:Math.hypot(f.x-c.x, f.y-c.y) })).filter(o=>o.d<11).sort((p,q)=>p.d-q.d).slice(0, FPD.MAXT);
   const key = fl.map(o=>o.i).sort((p,q)=>p-q).join(',');
@@ -17502,7 +17722,7 @@ function renderFirstPerson(){
   const W = FP.W;
   const camZ = 0.5 + Math.sin(FP.moving*Math.PI)*0.028;
   const horizon = FP.H/2;
-  let gpu = G.gameMode===1 && !T.outdoor && fpdInit();
+  let gpu = fpdInit();
   let P = fpRenderWorld(env, T, camZ, horizon, gpu);
   if (gpu){ try{ fpdRender(env, T, camZ); }catch(e){ console.error(e); FPD.ok = false; gpu = false; P = fpRenderWorld(env, T, camZ, horizon, false); } }
   const k = canvas.width / W;

@@ -1,5 +1,28 @@
 # Depthcrawl patch notes
 
+## v152 — Under open skies
+
+The graveyard and every roadside fight now use the new 3D renderer too, so all of first person is in full 3D.
+
+### Roadside fights
+- **Sky:** a real sky with drifting clouds by day, and stars and the moon by night. Clouds thicken in rain and storms, and an overcast night has no stars.
+- **Sun and moon:** the sun, or the moon at night, lights the field and casts shadows from everything standing on it.
+- **Horizon:** the land runs on to the horizon, with a far tree line in forests and marshes, and rolling hills in deserts and snowfields. It fades into the haze and vanishes in thick fog.
+- **Obstacles are real objects:**
+  - leafy bushes in forests and marshes;
+  - boulders on rocky ground, in the desert and in the snow;
+  - stacked cargo crates and a barrel on a ship's deck.
+- **Grass:** forest and marsh grass is a carpet of real blades swaying in the wind.
+- **Water:** marsh water is dark and murky instead of sea-blue, and the sea runs to the horizon beyond a ship's deck.
+
+### The graveyard
+- The wrought-iron railings are real see-through fences with spear-tipped bars and stone posts.
+- Mausoleums stand as solid little tombs, with their gabled roofs against a starry sky.
+- Grass sways between the graves, and a dark tree line rings the plot.
+
+### Fixes
+- Your lantern in dungeons now has its proper brightness and reach. The previous update had left it at a fixed default.
+
 ## v151 — Deeper dungeons
 
 Dungeons in first person are now drawn by your graphics card in full 3D, instead of the old software renderer.
@@ -26,7 +49,6 @@ Dungeons in first person are now drawn by your graphics card in full 3D, instead
 ### Performance
 - If your computer struggles, the dungeon view lowers its resolution until it runs smoothly, then raises it again when it can.
 - If 3D graphics aren't available, the game falls back to the classic renderer.
-- The graveyard and roadside fights still use the classic renderer.
 
 ## v150 — Every weapon fights its own way
 
