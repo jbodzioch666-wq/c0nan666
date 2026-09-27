@@ -1,5 +1,31 @@
 # Depthcrawl patch notes
 
+## v154 — Monsters in 3D, part one
+
+In first person, monsters are becoming real 3D models instead of painted cut-outs. This update covers every humanoid and four-legged beast, 108 kinds of creature in all. The rest follow in later updates.
+
+### Humanoids
+- **Covered:** goblins, kobolds, orcs, hobgoblins, gnolls, bugbears, ogres, trolls, giants, fiends, cultists, knights and every other two-legged foe.
+- **Built to match its painting:**
+  - the face, with pointed goblin ears, orc tusks, kobold snouts, gnoll muzzles, fiendish horns, hooded faces with glowing eyes, and golem heads;
+  - its skin and outfit: robes, rags, leather, chain, plate with pauldrons, fur, loincloths, or a body of living stone or ice;
+  - helmets, crowns, capes, tabards, wings and tails.
+- **Weapons and shields:** each one wields its real weapon, from the same 3D models you fight with, and carries its shield on its arm.
+
+### Beasts
+- **Covered:** rats, wolves, dire wolves, winter wolves, bears, panthers, boars, elk, jackals, owlbears, displacer beasts, the rust monster and the manticore.
+- **Built from their parts:** each has its own head, fur, tail, claws or hooves, plus manes, bristles, antlers, carapaces, wings or tentacles where they have them.
+
+### Alive
+- **Idle:** monsters breathe, turn to face you, and walk with a real stride when they move. Beasts stand side-on and look about until they strike.
+- **Attacking:** humanoids draw their weapon back over the shoulder and bring it down, and beasts lunge.
+- **Hit and killed:** a hit makes a monster flash and flinch, and a killing blow knocks it over.
+- **In the world:** monsters are lit by the torches and your lantern, are hidden properly behind walls, and cast a soft shadow on the ground.
+- Skeletons keep their sculpted 3D model, and every other creature keeps its painted figure for now.
+
+### Fixes
+- Roadside fights were quietly falling back to the old flat renderer after the graveyard update. They now use the full 3D view again.
+
 ## v153 — The crypt and the catacombs
 
 Graveyards are now a real place: carved headstones and stone tombs up top, a crypt holding the way down, and catacombs below.
