@@ -1,5 +1,36 @@
 # Depthcrawl patch notes
 
+## v148 — Quests worth taking
+
+Quests now send you to real places, track your progress on screen, and let you choose your reward.
+
+### Quests with a place
+- Every town's Captain of the Watch has their own board of three jobs, set in the land around that town:
+  - **Conquer** a specific dungeon, keep, tower, temple, graveyard, mine or lair.
+  - **Wanted:** hunt down a named villain, like *Skarn the Cruel*, who roams near where they were last seen.
+  - **Break a camp:** storm a bandit hideout, orc raiding camp or cultist circle and defeat its chieftain.
+  - **Rescue** a captive held on a given floor of a site: clear that floor to free them, then bring them home. If you fall, they're dragged back.
+  - **Escort** a merchant to another town. They walk at your heels, and if you fall, they're lost.
+  - The old errands are still around too: hunts, supply runs and deliveries.
+- Each job tells you where to go, like "29 leagues south of Ingrid's Crossing", and uncovers that spot on your world map.
+- Objectives are marked on the 3D land with a pillar of light and a floating **!** (a blue **?** when it's time to turn in). Wanted foes have a bounty marker, and camps have tents and a campfire.
+- The world map shows a pin for each objective, with a dashed trail to the one you're tracking.
+
+### Quest tracker
+- Your active quests sit on the right of the screen with live progress. Click one to track it.
+- The tracked quest shows an arrow pointing the way, with the distance and direction.
+- A banner pops up whenever a quest moves forward.
+
+### Better rewards
+- Turning in a quest lets you pick **one of three rewards**: a weapon, a piece of armour or jewellery, or a heavy purse with a rune.
+- Harder jobs (conquests, wanted foes and rescues) offer a **legendary pick** in place of the purse: a unique item when one exists.
+- Reward gear is always at least magic quality and matched to your level.
+- **Town reputation:** every quest raises your standing with the town that posted it.
+  - **Friend:** 5% off in its shops.
+  - **Ally:** 10% off, and the peddler keeps an extra piece back for you.
+  - **Champion:** 15% off, and the peddler's best stock is yours.
+  - The Captain shows your standing and how close you are to the next rank.
+
 ## v147 — The open world
 
 The overworld has been rebuilt as a 3D landscape, and the world map is now a painted parchment chart.
