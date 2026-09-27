@@ -1,5 +1,41 @@
 # Depthcrawl patch notes
 
+## v155 — Monsters in 3D, part two
+
+Every monster in the game is now a real 3D model in first person: 170 creatures and 30 kinds of undead.
+
+### New models
+- **Dragons:**
+  - dragons with great bat wings spread wide, horned heads, jaws that open, a glow of fire, frost or acid in the throat, and a long tail;
+  - wyverns that stand on two legs, with a stinger in the tail;
+  - plesiosaurs with flippers;
+  - the dragon turtle under its great shell.
+- **Hydras:** five heads on swaying necks, each snapping on its own.
+- **Serpents:** snakes coiled on the ground and reared to strike, with a flicking tongue and a hooded frill on the poison wyrm. Also eels, leeches, the remorhaz with its glowing back spines, and purple worms and sandworms rearing out of the ground with a ring of teeth.
+- **Tentacled horrors:** octopuses and the kraken, tentacled horrors crowned in gold, floating eye-beasts ringed with eyestalks, and the stony roper.
+- **Oozes:** quivering translucent jellies with bubbles rising inside, drifting jellyfish, a surging water elemental, the vine-heaped shambling mound, and the will-o'-wisp with its orbiting sparks.
+- **Arachnids:** giant spiders, frost spiders, crabs with snapping pincers, and scorpions with their stingers arched to strike.
+- **And the rest:**
+  - sharks with sweeping tails;
+  - owls, hawks and vultures in flapping flight;
+  - frogs and toads with lashing tongues, and snapping crocodiles;
+  - treants and the thorned verdant horror;
+  - the xorn;
+  - the dust devil's spinning funnel;
+  - packs and swarms moving together.
+
+### The undead
+- **Zombies:** shamble with arms outstretched, and the Rot King wears his crown.
+- **Ghouls and ghasts:** hunch low on clawed feet.
+- **Wights and revenants:** stand in mail and grave-cloaks.
+- **Wraiths, specters, shadows and banshees:** translucent, glowing hooded shapes that drift above the floor.
+- **Mummies:** wrapped in bandages, with the pharaoh's striped headdress and golden mask.
+- **Others:** death knights in black plate, pale vampires with red eyes, and liches with bare skulls, crowns and staves.
+- Skeletons keep their sculpted model.
+
+### Fixes
+- Capes on knights, warlords, giant jarls and other caped foes weren't showing. They're back.
+
 ## v154 — Monsters in 3D, part one
 
 In first person, monsters are becoming real 3D models instead of painted cut-outs. This update covers every humanoid and four-legged beast, 108 kinds of creature in all. The rest follow in later updates.
@@ -21,7 +57,6 @@ In first person, monsters are becoming real 3D models instead of painted cut-out
 - **Attacking:** humanoids draw their weapon back over the shoulder and bring it down, and beasts lunge.
 - **Hit and killed:** a hit makes a monster flash and flinch, and a killing blow knocks it over.
 - **In the world:** monsters are lit by the torches and your lantern, are hidden properly behind walls, and cast a soft shadow on the ground.
-- Skeletons keep their sculpted 3D model, and every other creature keeps its painted figure for now.
 
 ### Fixes
 - Roadside fights were quietly falling back to the old flat renderer after the graveyard update. They now use the full 3D view again.
