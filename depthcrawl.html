@@ -9878,10 +9878,13 @@ const SUMMON_ART = [['c',0,0,14],['q',-14,10,-22,-6,-10,-20,4],['q',14,10,22,-6,
 // shown on the overworld tile the player is standing on while G.player.hasBoat
 // and actually out on open water (see renderOverworldMap's sailing check)
 const BOAT_ART = [
-  ['p',[-30,4,30,4,16,24,-16,24]],
-  ['l',0,4,0,-32,4],
-  ['p',[2,-30,2,2,-24,2]],
-  ['d',0,14,3,'#3a2a18'],
+  ['p',[-38,6,38,6,30,16,20,24,-24,24,-32,16]],          // hull, bow to the right
+  ['l',-34,6,36,6,3],                                   // gunwale
+  ['l',-4,6,-4,-40,4],                                  // mast
+  ['p',[-2,-38,-2,-2,26,-2,20,-20]],                    // sail, bellied
+  ['p',[-6,-36,-6,-4,-26,-4]],                          // jib
+  ['p',[-4,-40,10,-44,-4,-36]],                         // pennant
+  ['d',-14,14,3,'#3a2a18'], ['d',4,14,3,'#3a2a18'], ['d',22,14,3,'#3a2a18'],
 ];
 // a real staircase silhouette (three receding steps) in place of the old
 // plain '<'/'>' glyphs, shared between the up and down variants so they
@@ -15596,6 +15599,66 @@ function o3SyncEscort(pp, dxs, dzs, sailing){
   const sx = dxs - dzs; if (Math.abs(sx) > 0.05) E.face = sx < 0 ? -1 : 1;
   E.sp.scale.x = E.sp.userData.h * E.sp.userData.asp * (E.face||1);
 }
+// the little sailboat you cross open water in: a lofted plank hull with a
+// pointed bow and a raised stern, gunwale rails, a keel, thwarts, a mast and
+// yard carrying a striped sail that bellies out in the wind, a pennant, and
+// a foam wake; you stand aboard behind the mast
+function o3BuildBoat(){
+  const T = THREE, g = new T.Group();
+  const plank = new T.MeshStandardMaterial({ map:v3TexWood('#7a5030', true), roughness:0.8, side:T.DoubleSide });
+  const darkW = new T.MeshStandardMaterial({ map:v3TexWood('#3e2614', true), roughness:0.85 });
+  const L = 1.5, W = 0.34, D = 0.24, NS = 28, NT = 14;
+  const station = (u)=>{   // u: -1 stern .. +1 bow
+    const taper = u > 0 ? 1 - Math.pow(u, 1.5) : 1 - Math.pow(-u, 2.4)*0.62;
+    return { w: W*Math.max(0.015, taper), d: D*(0.5 + 0.5*Math.max(0, taper)), sheer: 0.05*u*u + (u > 0 ? 0.09*Math.pow(u,3) : 0.04*u*u) };
+  };
+  const pos = [], uv = [], idx = [];
+  for (let i=0;i<=NS;i++){
+    const u = i/NS*2 - 1, st = station(u), z = u*L/2;
+    for (let j=0;j<=NT;j++){
+      const t = -Math.PI/2 + j/NT*Math.PI, sn = Math.sin(t), cs = Math.cos(t);
+      const x = sn*st.w, y = -cs*st.d + st.sheer*Math.pow(Math.abs(sn), 3);
+      pos.push(x, y, z); uv.push(j/NT*1.5, u*2.2);
+    }
+  }
+  for (let i=0;i<NS;i++) for (let j=0;j<NT;j++){ const a = i*(NT+1)+j, b = a+NT+1; idx.push(a, b, a+1, b, b+1, a+1); }
+  const hg = new T.BufferGeometry(); hg.setAttribute('position', new T.Float32BufferAttribute(pos,3)); hg.setAttribute('uv', new T.Float32BufferAttribute(uv,2)); hg.setIndex(idx); hg.computeVertexNormals();
+  const hull = new T.Mesh(hg, plank); g.add(hull);
+  // a flat transom closing the stern
+  const st0 = station(-1), tr = new T.Shape(); tr.moveTo(-st0.w, st0.sheer); tr.quadraticCurveTo(-st0.w, -st0.d, 0, -st0.d); tr.quadraticCurveTo(st0.w, -st0.d, st0.w, st0.sheer); tr.lineTo(-st0.w, st0.sheer);
+  const transom = new T.Mesh(new T.ShapeGeometry(tr), darkW); transom.position.z = -L/2; g.add(transom);
+  // gunwale rails and the keel, swept along the hull
+  const rail = (side)=>{ const pts = []; for (let i=0;i<=NS;i++){ const u = i/NS*2-1, st = station(u); pts.push(new T.Vector3(side*st.w, st.sheer+0.008, u*L/2)); } return new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(pts), 40, 0.018, 6), darkW); };
+  g.add(rail(-1)); g.add(rail(1));
+  const kpts = []; for (let i=0;i<=NS;i++){ const u = i/NS*2-1, st = station(u); kpts.push(new T.Vector3(0, -st.d - 0.012 + (u>0.85 ? (u-0.85)*1.6 : 0), u*L/2)); }
+  g.add(new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(kpts), 40, 0.016, 5), darkW));
+  // stem post rising at the bow
+  const stem = new T.Mesh(new T.CylinderGeometry(0.018, 0.022, 0.2, 6), darkW); stem.position.set(0, station(1).sheer + 0.05, L/2 - 0.01); stem.rotation.x = 0.35; g.add(stem);
+  // thwarts (bench seats) and a floor
+  for (const u of [-0.45, 0.05]){ const st = station(u); const b = new T.Mesh(new T.BoxGeometry(st.w*1.9, 0.02, 0.09), darkW); b.position.set(0, st.sheer - 0.05, u*L/2); g.add(b); }
+  const fl = new T.Mesh(new T.BoxGeometry(W*0.95, 0.015, L*0.55), darkW); fl.position.set(0, -D*0.5, -0.06); g.add(fl);
+  // mast, yard and a bellied, striped sail
+  const mz = L*0.18, mast = new T.Mesh(new T.CylinderGeometry(0.02, 0.028, 1.35, 8), darkW); mast.position.set(0, 0.55, mz); g.add(mast);
+  const yard = new T.Mesh(new T.CylinderGeometry(0.014, 0.014, 0.9, 6), darkW); yard.rotation.z = Math.PI/2; yard.position.set(0, 1.12, mz+0.03); g.add(yard);
+  const sc = v3Canvas(64,64), sx = sc.getContext('2d');
+  for (let i=0;i<4;i++){ sx.fillStyle = i%2 ? '#e8dcc0' : '#9a2a22'; sx.fillRect(i*16,0,16,64); }
+  sx.fillStyle = 'rgba(0,0,0,0.12)'; for (let y=0;y<64;y+=8) sx.fillRect(0,y,64,1);
+  const stex = new T.CanvasTexture(sc); if (T.sRGBEncoding) stex.encoding = T.sRGBEncoding;
+  const sg = new T.PlaneGeometry(0.84, 0.74, 10, 8), sp = sg.attributes.position;
+  for (let i=0;i<sp.count;i++){ const x = sp.getX(i), y = sp.getY(i); sp.setZ(i, 0.13*(1 - Math.pow(x/0.42,2)) * (0.55 + 0.45*(0.5 - y/0.74))); }
+  sg.computeVertexNormals();
+  const sail = new T.Mesh(sg, new T.MeshStandardMaterial({ map:stex, roughness:0.9, side:T.DoubleSide })); sail.position.set(0, 0.74, mz+0.05); g.add(sail); O3.sail = sail;
+  const pen = new T.Mesh(new T.PlaneGeometry(0.24, 0.07), new T.MeshStandardMaterial({ color:0x9a2a22, side:T.DoubleSide })); pen.position.set(0, 1.26, mz-0.12); pen.rotation.y = Math.PI/2; g.add(pen); O3.pennant = pen;
+  // foam where the hull cuts the water
+  const fc = v3Canvas(64,64), fx2 = fc.getContext('2d'), gr = fx2.createRadialGradient(32,32,10,32,32,32); gr.addColorStop(0,'rgba(255,255,255,0)'); gr.addColorStop(0.7,'rgba(255,255,255,0.55)'); gr.addColorStop(1,'rgba(255,255,255,0)');
+  fx2.fillStyle = gr; fx2.fillRect(0,0,64,64);
+  const foam = new T.Mesh(new T.PlaneGeometry(0.9, 1.9), new T.MeshBasicMaterial({ map:new T.CanvasTexture(fc), transparent:true, depthWrite:false }));
+  foam.rotation.x = -Math.PI/2; foam.position.y = 0.01; O3.foam = foam;
+  g.traverse(o=>{ if (o.isMesh){ o.castShadow = true; o.receiveShadow = true; } });
+  // float so the waterline sits a third of the way up the hull; the foam lies on the water itself
+  const inner = new T.Group(); inner.add(g); inner.add(foam); g.position.y = D*0.55;
+  return inner;
+}
 // ---------- setup ----------
 function o3Init(){
   if (O3.ok!==null) return O3.ok;
@@ -15620,12 +15683,7 @@ function o3Init(){
     // the player: the same painted figure as in town, or a little boat on the water
     O3.pgrp = new T.Group(); O3.scene.add(O3.pgrp);
     O3.player = v3Person(v3PlayerLook(), 0.95, O3.pgrp);
-    const boat = O3.boat = new T.Group();
-    const hull = new T.Mesh(new T.CylinderGeometry(0.28, 0.2, 0.9, 10, 1, false, 0, Math.PI), new T.MeshStandardMaterial({ map:v3TexWood('#6a4a2a', true), roughness:0.9, side:T.DoubleSide }));
-    hull.rotation.set(Math.PI/2, 0, Math.PI); hull.position.y = 0.12; boat.add(hull);
-    const mast = new T.Mesh(new T.CylinderGeometry(0.015,0.02,0.9,5), new T.MeshStandardMaterial({ color:0x4a3420 })); mast.position.y = 0.5; boat.add(mast);
-    const sail = new T.Mesh(new T.PlaneGeometry(0.45,0.5), new T.MeshStandardMaterial({ color:0xe8dcc0, side:T.DoubleSide, roughness:0.9 })); sail.position.set(0,0.62,0.02); boat.add(sail);
-    boat.traverse(o=>{ if (o.isMesh) o.castShadow = true; });
+    const boat = O3.boat = o3BuildBoat();
     O3.pgrp.add(boat);
     // rain streaks
     const RN = 900, rp = new Float32Array(RN*6);
@@ -15753,12 +15811,21 @@ function o3Render(){
   const gy = O3.heightAt(pp.x, pp.z);
   pp.y = sailing ? -0.14 : Math.max(gy, -0.14);
   O3.pgrp.position.copy(pp);
-  const P = O3.player; P.g.visible = !sailing; O3.boat.visible = sailing;
+  const P = O3.player; P.g.visible = true; O3.boat.visible = sailing;
+  P.sh.visible = !sailing;                                  // no ground shadow on the water; you stand in the boat instead
+  P.g.position.set(0, sailing ? 0.1 : 0, sailing ? -0.18 : 0);
   const sx = dxs - dzs; if (Math.abs(sx) > 0.05) P.face = sx < 0 ? -1 : 1;
   P.walk = (P.walk||0) + (moving ? dt*12 : 0);
-  P.sp.position.y = moving ? Math.abs(Math.sin(P.walk))*0.05 : 0;
+  P.sp.position.y = (moving && !sailing) ? Math.abs(Math.sin(P.walk))*0.05 : 0;
   P.sp.scale.x = P.sp.userData.h * P.sp.userData.asp * (P.face||1);
-  if (sailing){ O3.boat.rotation.y = Math.atan2(dxs, dzs) || O3.boat.rotation.y; O3.boat.position.y = Math.sin(O3.t*2)*0.02; O3.boat.rotation.z = Math.sin(O3.t*1.6)*0.05; }
+  if (sailing){
+    if (moving) O3.boatYaw = Math.atan2(dxs, dzs);           // turn to the way you're sailing, and keep that heading when you stop
+    O3.boat.rotation.set(Math.sin(O3.t*1.3)*0.03, O3.boatYaw||0, Math.sin(O3.t*1.6)*0.05);
+    O3.boat.position.y = Math.sin(O3.t*2)*0.025;
+    P.g.position.x = -Math.sin(O3.boatYaw||0)*0.2; P.g.position.z = -Math.cos(O3.boatYaw||0)*0.2;   // behind the mast
+    if (O3.pennant) O3.pennant.rotation.x = Math.sin(O3.t*6)*0.25;
+    if (O3.foam){ O3.foam.material.opacity = moving ? 0.9 : 0.45; }
+  }
   o3ApplyTime();
   o3SyncEscort(pp, dxs, dzs, sailing);
   O3.lantern.position.set(pp.x, pp.y+0.9, pp.z+0.2);

@@ -50,7 +50,7 @@ The overworld has been rebuilt as a 3D landscape, and the world map is now a pai
 - Village names float over the towns. Other landmarks show their name when you're close or hover over them.
 - Roaming encounters and mythic beasts are marked on the land, so you can see danger coming.
 - The sun moves across the sky with the in-game clock. Nights are dark with your lantern lit, and rain, fog and thunderstorms are real weather.
-- You ride a little sailboat on open water.
+- You sail open water in a proper little boat: a curved plank hull with benches and rails, a mast with a striped sail and pennant, and a foam wake. You stand aboard, and it turns to face the way you're sailing.
 - Click anywhere to walk there, or click a landmark to travel to it and go in. WASD still works, and the mouse wheel zooms.
 - Zooming the camera out keeps you and the land around you clear; weather haze only closes in beyond that.
 - **O** switches between the 3D view and the classic flat map.
