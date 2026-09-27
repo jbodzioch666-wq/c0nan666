@@ -1,5 +1,77 @@
 # Depthcrawl patch notes
 
+## RS-1 — The RuneScape branch
+
+This branch of Depthcrawl drops the D&D rules for RuneScape's. There are no classes and no character levels any more. You become whatever you train.
+
+### Skills, not classes
+- **Character creation:** pick a race and a starting kit.
+  - **Warrior:** bronze sword, full helm, platebody and platelegs.
+  - **Archer:** shortbow, 150 arrows, bronze dagger, and a leather coif, body and chaps.
+  - **Mage:** staff of air, wizard hat and robes, and a pouch of runes. Wind Strike is set to autocast.
+- **Seven combat skills,** 1 to 99, trained by use:
+  - **Attack:** accuracy, and the level metal weapons need.
+  - **Strength:** how hard you hit.
+  - **Defence:** armour, and the level armour needs.
+  - **Hitpoints:** 2 life per level. Starts at 10.
+  - **Ranged:** bows.
+  - **Magic:** spells.
+  - **Prayer:** prayer points and new prayers.
+- **Combat level** comes from your skills, using RuneScape's formula. Everyone starts at combat 3. The Skills screen (J) shows every skill along with your combat level and total level.
+
+### How you train
+- **XP from hits:** every hit you land gives 3 XP per point of damage to the skill your attack style trains, plus 1 XP to Hitpoints.
+- **Attack styles (F):**
+  - **Accurate:** +2 to hit. Trains Attack.
+  - **Aggressive:** +2 damage. Trains Strength.
+  - **Defensive:** +2 armour. Trains Defence.
+  - **Controlled:** +1 to all three, and the XP is shared.
+  - Bows and spells always train Ranged or Magic. In the Defensive style they share the XP with Defence.
+- **Quest rewards:** they give a lump of XP to the skill you're training.
+
+### The combat triangle
+- **Melee beats ranged, ranged beats magic, and magic beats melee.**
+  - Attacking with the style that beats a monster gives +3 to hit and 20% more damage. The wrong style gives -3 and 15% less.
+- **It works on defence too:**
+  - Plate armour (melee gear) turns arrows but lets spells through.
+  - Dragonhide (ranged gear) turns spells.
+  - Robes (magic gear) turn blades.
+- **Monster styles:** spellcasters count as magic foes, and archers and scouts count as ranged foes.
+
+### Gear tiers
+- **Metal:** bronze, iron, steel, mithril, adamant, rune and dragon.
+  - Weapons need an Attack level: steel 5, mithril 20, adamant 30, rune 40, dragon 60. Armour needs the same Defence levels.
+  - Melee weapons: daggers, maces, swords, scimitars, spears, longswords, warhammers, battleaxes, halberds and 2h swords.
+- **Bows:** shortbow, oak, willow, maple, yew and magic. Each needs a Ranged level.
+- **Leather and dragonhide:** coifs, bodies, chaps and vambraces. They need Ranged, and add to ranged accuracy.
+- **Staves:** elemental staves give an endless supply of their element's runes. Battlestaves, mystic staves and the Ancient Staff need Magic.
+- **Robes:** wizard, splitbark, mystic, infinity and Ahrim's. They need Magic and add to magic accuracy. Metal armour spoils spellcasting.
+- **Jewellery:**
+  - Amulets of accuracy, strength, defence, magic, power, glory and fury.
+  - Gem rings, the Ring of Recoil and the Ring of Wealth.
+  - Warrior, Berserker, Archers and Seers rings.
+- **What's gone:** random affixes, sockets, runewords and sets are gone.
+- **Uniques:** they're still here, as rare named boss and champion drops.
+- **Gear you can't use yet:** it still drops, and shows as the upgrade it will be. The shops stock gear you can already use.
+- **First-person weapons:** your weapon's blade takes its metal's colour.
+
+### Magic (G)
+- **The standard spellbook:** strikes, bolts, blasts, waves and surges of wind, water, earth and fire. They unlock as your Magic level rises, from Wind Strike at 1 to Fire Surge at 95.
+- **Runes:** every spell costs runes. They drop from monsters and the alchemist sells them.
+- **R** casts your selected spell at the nearest foe in sight when you don't have a bow equipped.
+- **Autocast:** with a staff in hand you can turn on autocast, and every melee bump casts your spell.
+
+### Prayer (N)
+- **Burying bones:** kills leave bones, big bones or dragon bones. Bury them to train Prayer.
+- **Twenty prayers,** from Thick Skin at level 1 to Piety at 70, including the three protection prayers at 37, 40 and 43. Each protection prayer blocks 60% of that style's damage.
+- **Drain and recharge:** prayers drain points every turn of a fight. Pray at a dungeon altar, rest at an inn or make camp to restore them.
+- **HUD:** the right-hand orb now shows your prayer points.
+
+### Smithing
+- **Coal:** you can now mine coal (Mining 30).
+- **Steel bars:** smelt 1 iron ore and 2 coal into a steel bar. Mithril, adamant and rune bars need more coal.
+- **Forging:** each bar forges its own metal's dagger, sword, scimitar, longsword, warhammer, battleaxe, 2h sword, full helm, gauntlets, platelegs or platebody. Silver bars make rings and amulets.
+
 ## v160 — Skills & Trades
 
 RuneScape-style skills. Eight skills and eight weapon masteries each level from **1 to 99** on the classic curve (every level costs about a tenth more than the last), completely apart from your character level. Press **J** to see them all.
