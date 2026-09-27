@@ -1,5 +1,35 @@
 # Depthcrawl patch notes
 
+## v147 — The open world
+
+The overworld has been rebuilt as a 3D landscape, and the world map is now a painted parchment chart.
+
+### 3D overworld
+- The wilds are real 3D land, seen from the same angled camera as the town:
+  - rolling grassland, dense forests, snow-capped mountains, sandy deserts, frozen tundra and murky swamps that blend into each other;
+  - lakes, rivers and the sea under rippling water, with beaches along the shore;
+  - oaks, pines, snowy pines, swamp willows, dead trees, bushes, rocks and cacti.
+- Every place you can visit is a landmark you can see from a distance:
+  - walled villages with chimney smoke and glowing windows at night;
+  - cave mouths flanked by torches, and castles with towers and a flag;
+  - a necromancer's spire with a floating violet light, and a sunken temple glowing teal;
+  - graveyards with a crypt and drifting mist, mines with a timber entrance and a cart track;
+  - dragon's lairs ringed by jagged rocks, with smoke and an ember glow.
+- Village names float over the towns. Other landmarks show their name when you're close or hover over them.
+- Roaming encounters and mythic beasts are marked on the land, so you can see danger coming.
+- The sun moves across the sky with the in-game clock. Nights are dark with your lantern lit, and rain, fog and thunderstorms are real weather.
+- You ride a little sailboat on open water.
+- Click anywhere to walk there, or click a landmark to travel to it and go in. WASD still works, and the mouse wheel zooms.
+- **O** switches between the 3D view and the classic flat map.
+
+### Painted world map (M)
+- The world map is an old parchment chart that fills the screen:
+  - inked coastlines, a blue-grey sea with ripple lines along the shore, and land washed in the colour of each region;
+  - hand-drawn mountains, forests, marsh tufts, dunes and rivers;
+  - every site in coloured ink, village names lettered on, a compass rose and an illustrated legend.
+- **Fog of war:** land you haven't been near is hidden under drifting cloud until you explore it. Your explored map is saved with your game.
+  - For saves from before this update, the land around every town you've visited starts uncovered.
+
 ## v146 — The 3D update
 
 Everything since v145: dungeons in first-person 3D, a hub town you can walk around, hand-painted monsters, a new action-RPG HUD, loot that keeps up with you, and item comparisons you can trust.

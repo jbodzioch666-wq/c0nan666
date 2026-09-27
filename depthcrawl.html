@@ -437,6 +437,8 @@
     border:1px solid rgba(199,154,84,0.35); color:#f0e0b8; font:600 10px 'JetBrains Mono',monospace; text-align:center; text-shadow:0 1px 2px #000; transition:box-shadow .15s, border-color .15s; }
   .v3plate b{ display:block; font-family:'Cinzel',Georgia,serif; font-size:12.5px; color:#ffd98a; letter-spacing:0.04em; }
   .v3plate span{ color:#cdbb95; }
+  .v3plate.o3site{ background:rgba(10,8,6,0.45); } .v3plate.o3site b{ font-size:11px; color:#e8dcc0; }
+  .o3time{ position:absolute; left:50%; transform:translateX(-50%); top:10px; font:600 12px 'JetBrains Mono',monospace; color:rgba(235,235,240,0.85); text-shadow:0 1px 3px #000; }
   .v3plate.hot{ border-color:#ffd060; box-shadow:0 0 12px rgba(255,200,90,0.65); }
   .v3plate.bld{ background:rgba(10,8,6,0.35); border-color:rgba(199,154,84,0.2); } .v3plate.bld b{ font-size:14px; color:#f4e8c8; }
   .v3plate.small b{ font-size:11px; color:#9fe8ff; }
@@ -6360,7 +6362,7 @@ function serializeGame(){
     player: G.player, gear: G.gear, inv: G.inv,
     owSeed: G.ow.seed, owOverrides: G.ow.overrides||{}, owSiteMoves: G.ow.siteMoves||{},
     owTownPositions: G.ow.townPositions||{}, owPos: {x:G.owPos.x,y:G.owPos.y},
-    owVisitedTowns: G.ow.visitedTowns||[], weather: G.weather||'clear',
+    owVisitedTowns: G.ow.visitedTowns||[], weather: G.weather||'clear', owSeen: owSeenEncode(),
     // the map's own dimensions have to be restored BEFORE generateOverworld(owSeed)
     // re-runs on load (see loadGame) - the same seed at a different size
     // produces a different map entirely, since every placement roll is a
@@ -6495,6 +6497,12 @@ function loadGame(id){
   trackVisitedTown(G.ow.spawnPos.x, G.ow.spawnPos.y); // retroactively covers saves made before spawn towns were auto-tracked
   G.weather = data.weather||'clear';
   G.owPos = data.owPos || G.owPos;
+  // explored land on the world map; a save from before it was tracked
+  // starts with the country around every town you've visited uncovered
+  if (!owSeenDecode(data.owSeen)){
+    for (const k of G.ow.visitedTowns){ const [tx,ty] = k.split(',').map(Number); owReveal(tx, ty, 10); }
+    owReveal(G.owPos.x, G.owPos.y, 10);
+  }
   G.gameMode = data.gameMode||0;
   G.depth = data.depth||1;
   G.dungeonMaxDepth = data.dungeonMaxDepth||1;
@@ -6875,6 +6883,7 @@ function ensureSpawnEscape(){
 // reproduced exactly from just the seed on save/load.
 function generateOverworld(seed){
   G.ow.seed = seed;
+  G.ow.seen = null; G.ow.seenVer = (G.ow.seenVer||0) + 1;   // a fresh world starts unexplored
   G.ow.map = makeGrid(OW_GRASS, OW_COLS, OW_ROWS);
   G.ow.dungeonMax = makeGrid(0, OW_COLS, OW_ROWS);
   G.ow.dungeonIdx = makeGrid(0, OW_COLS, OW_ROWS);
@@ -7387,6 +7396,7 @@ function tryMoveOverworld(dx,dy){
   if (t===OW_MOUNTAIN) return;
   if (t===OW_WATER && !G.player.hasBoat) return;
   G.owPos.x=nx; G.owPos.y=ny;
+  owReveal(nx, ny, 8);
   G.player.turnCount = (G.player.turnCount||0)+1;
   rerollWeatherIfDue();
   if (t===OW_TOWN){
@@ -8667,7 +8677,8 @@ function toggleLayout(){
   setupCanvas(); if (G.player) renderGame();
 }
 // the layout the canvas was last sized for - re-sized whenever it changes
-function layoutKey(){ return immersiveUi ? ('imm|'+((fp3dActive() || v3Active())?'3d':'sq')+'|'+window.innerWidth+'x'+window.innerHeight) : 'classic'; }
+function pmFullWindow(){ return G.gameMode===0 && !!G.owZoomedOut; }
+function layoutKey(){ return immersiveUi ? ('imm|'+((fp3dActive() || v3Active() || o3Active() || pmFullWindow())?'3d':'sq')+'|'+window.innerWidth+'x'+window.innerHeight) : 'classic'; }
 function setupCanvas(){
   const wrap = canvas.parentElement;
   G._layoutKey = layoutKey();
@@ -8677,7 +8688,7 @@ function setupCanvas(){
     dpr = Math.min(2, window.devicePixelRatio||1);
     const vw = wrap.clientWidth || window.innerWidth, vh = wrap.clientHeight || window.innerHeight;
     let cw, chh, left, top;
-    if (fp3dActive() || v3Active()){ cw = vw; chh = vh; left = 0; top = 0; }
+    if (fp3dActive() || v3Active() || o3Active() || pmFullWindow()){ cw = vw; chh = vh; left = 0; top = 0; }
     else {
       const barH = 112, S = Math.max(200, Math.min(vw-16, vh-barH-12));
       cw = chh = S; left = Math.round((vw-S)/2); top = Math.max(6, Math.round((vh-barH-S)/2));
@@ -9545,6 +9556,7 @@ function drawSummonIcon(x,y,color){
 const OW_MAIN_ZOOM_STEP = 1.25, OW_MAIN_ZOOM_MIN = 0.5, OW_MAIN_ZOOM_MAX = 3;
 function owMainZoomScale(){ return G.owMainZoomScale || 1; }
 function renderOverworldMap(){
+  owReveal(G.owPos.x, G.owPos.y, 8); pmPrebuild();
   const savedCellPx = cellPx;
   cellPx = savedCellPx * owMainZoomScale();
   const viewCols = Math.ceil(canvas.width/cellPx), viewRows = Math.ceil(canvas.height/cellPx);
@@ -9642,98 +9654,283 @@ function owZoomCenter(){
   return G.owZoomCenter;
 }
 let owZoomLastCellPx = 1; // this view's own last-rendered cellPx, read by the drag handler to convert a mouse-pixel delta into a tile delta
+// ===================== SECTION: PAINTED WORLD MAP =====================
+// the zoomed-out world map drawn as an old parchment chart: washed-in land
+// tinted by region, a blue-grey sea with ripple lines along the shore, an
+// inked coastline, little hand-drawn mountains, trees, marsh tufts, dunes
+// and rivers, site icons in coloured ink, town names lettered on, a compass
+// rose, and unexplored land hidden under drifting fog until you've been near
+// it. The chart itself is painted once per world into an offscreen canvas;
+// fog, icons, names and markers go on top each frame so they stay crisp at
+// any zoom.
+const PM = { key:null, cv:null, P:8, fogVer:-1 };
+// ---- fog of war: which tiles you've been close enough to see ----
+function owSeenArr(){
+  if (!G.ow.seen || G.ow.seen.length !== OW_COLS*OW_ROWS) G.ow.seen = new Uint8Array(OW_COLS*OW_ROWS);
+  return G.ow.seen;
+}
+function owReveal(cx, cy, r){
+  const s = owSeenArr(); let changed = false;
+  for (let dy=-r; dy<=r; dy++) for (let dx=-r; dx<=r; dx++){
+    if (dx*dx+dy*dy > r*r+r) continue;
+    const x = cx+dx, y = cy+dy; if (x<0||y<0||x>=OW_COLS||y>=OW_ROWS) continue;
+    const i = y*OW_COLS+x; if (!s[i]){ s[i] = 1; changed = true; }
+  }
+  if (changed) G.ow.seenVer = (G.ow.seenVer||0) + 1;
+}
+// paint the chart in the background a moment after you reach the overworld, so opening the map is instant
+function pmPrebuild(){
+  if (PM.cv || PM.sched || !G.ow || !G.ow.map) return;
+  PM.sched = true;
+  setTimeout(()=>{ PM.sched = false; if (!PM.cv && G.ow && G.ow.map) try{ pmBuild(); }catch(e){} }, 1500);
+  setTimeout(()=>{ try{ pmFogPattern(document.createElement('canvas').getContext('2d')); }catch(e){} }, 2600);
+}
+function owSeen(x,y){ const s = owSeenArr(); return x>=0 && y>=0 && x<OW_COLS && y<OW_ROWS && !!s[y*OW_COLS+x]; }
+// saved as run lengths of alternating unseen/seen tiles, in base 36
+function owSeenEncode(){
+  const s = owSeenArr(), runs = []; let cur = 0, n = 0;
+  for (let i=0;i<s.length;i++){ if (s[i]===cur) n++; else { runs.push(n.toString(36)); cur = s[i]; n = 1; } }
+  runs.push(n.toString(36)); return runs.join('.');
+}
+function owSeenDecode(str){
+  const s = owSeenArr(); s.fill(0);
+  if (!str) return false;
+  let i = 0, cur = 0;
+  for (const r of String(str).split('.')){ const n = parseInt(r,36)||0; if (cur) s.fill(1, i, Math.min(s.length, i+n)); i += n; cur ^= 1; }
+  G.ow.seenVer = (G.ow.seenVer||0) + 1;
+  return true;
+}
+// ---- the painted chart ----
+const PM_TINT = { [OW_GRASS]:[214,200,150], [OW_FOREST]:[160,172,112], [OW_TUNDRA]:[232,234,230], [OW_DESERT]:[228,196,128],
+  [OW_SWAMP]:[168,166,112], [OW_MOUNTAIN]:[190,168,132], [OW_MOUNTAINPASS]:[196,176,138], [OW_RIVER]:[200,196,150] };
+function pmMapKey(){
+  let h = 0; const m = G.ow.map;
+  for (let x=0;x<OW_COLS;x++){ const col = m[x]; for (let y=0;y<OW_ROWS;y++) h = (h*31 + col[y]*(y+7)) | 0; }
+  return OW_COLS+'x'+OW_ROWS+':'+h;
+}
+function pmBuild(){
+  const P = PM.P = Math.max(5, Math.min(9, Math.round(1150/Math.max(OW_COLS,OW_ROWS))));
+  const W = OW_COLS*P, H = OW_ROWS*P;
+  const c = PM.cv = PM.cv || document.createElement('canvas'); c.width = W; c.height = H;
+  const x = c.getContext('2d'), id = x.createImageData(W,H), d = id.data;
+  const n = v3Noise(5), n2 = v3Noise(17), n3 = v3Noise(29), m = G.ow.map;
+  const tileAt = (tx,ty)=> (tx<0||ty<0||tx>=OW_COLS||ty>=OW_ROWS) ? OW_WATER : m[tx][ty];
+  const isWater = t=> t===OW_WATER;
+  // per-tile land value and tint, sampled bilinearly per pixel for soft, organic shapes
+  const land = new Float32Array((OW_COLS+2)*(OW_ROWS+2)), tint = new Float32Array((OW_COLS+2)*(OW_ROWS+2)*3), K = (tx,ty)=> (ty+1)*(OW_COLS+2)+(tx+1);
+  for (let tx=-1; tx<=OW_COLS; tx++) for (let ty=-1; ty<=OW_ROWS; ty++){
+    const t = tileAt(tx,ty), k = K(tx,ty);
+    land[k] = isWater(t) ? 0 : 1;
+    const g = OW_SITE_TILES.includes(t) ? OW_GRASS : t, c3 = PM_TINT[g] || PM_TINT[OW_GRASS];
+    tint[k*3] = c3[0]; tint[k*3+1] = c3[1]; tint[k*3+2] = c3[2];
+  }
+  const samp = (arr, fx, fy, ch, stride)=>{
+    const tx = Math.floor(fx), ty = Math.floor(fy), ax = fx-tx, ay = fy-ty;
+    const g = (i,j)=>{ const cx = Math.max(-1, Math.min(OW_COLS, i)), cy = Math.max(-1, Math.min(OW_ROWS, j)); return arr[K(cx,cy)*stride+ch]; };
+    return g(tx,ty)*(1-ax)*(1-ay) + g(tx+1,ty)*ax*(1-ay) + g(tx,ty+1)*(1-ax)*ay + g(tx+1,ty+1)*ax*ay;
+  };
+  for (let py=0; py<H; py++) for (let px=0; px<W; px++){
+    const fx = px/P - 0.5, fy = py/P - 0.5;
+    const L = samp(land, fx, fy, 0, 1) + (n(px/(P*1.1), py/(P*1.1))-0.5)*0.32 + (n3(px/(P*0.35), py/(P*0.35))-0.5)*0.08;
+    // aged paper: large stains, fine grain, darker toward the edges
+    const edge = Math.min(px, py, W-1-px, H-1-py) / Math.min(W,H);
+    const age = 0.9 + n2(px/140, py/140)*0.1 + (n(px/2.2, py/2.2)-0.5)*0.05 - Math.max(0, 0.08-edge)*1.6;
+    let r, g, b;
+    if (L > 0.5){
+      const tr = samp(tint, fx, fy, 0, 3), tg = samp(tint, fx, fy, 1, 3), tb = samp(tint, fx, fy, 2, 3);
+      r = tr*0.62 + 232*0.38; g = tg*0.62 + 214*0.38; b = tb*0.62 + 172*0.38;
+      if (L < 0.58){ const k = (0.58-L)/0.08; r *= 1-k*0.1; g *= 1-k*0.1; b *= 1-k*0.12; }   // a shaded rim inside the coast
+    } else {
+      const deep = Math.max(0, Math.min(1, (0.5-L)*2.2));
+      r = 160 - deep*40; g = 186 - deep*30; b = 192 - deep*14;
+      // ripple lines hugging the shore
+      const band = (L*9) % 1; if (L > 0.12 && L < 0.46 && band < 0.1) { r -= 26; g -= 22; b -= 14; }
+    }
+    // the inked coastline
+    const ink = Math.abs(L-0.5);
+    if (ink < 0.035){ const k = 1 - ink/0.035; r += (62-r)*k; g += (44-g)*k; b += (28-b)*k; }
+    const o = (py*W+px)*4;
+    d[o] = Math.max(0,Math.min(255,r*age)); d[o+1] = Math.max(0,Math.min(255,g*age)); d[o+2] = Math.max(0,Math.min(255,b*age)); d[o+3] = 255;
+  }
+  x.putImageData(id, 0, 0);
+  const hsh = (tx,ty,s)=> o3Hash(tx,ty,s+77);
+  const inkC = 'rgba(58,40,24,0.9)';
+  x.lineCap = 'round'; x.lineJoin = 'round';
+  // rivers: a blue ink line joining neighbouring river tiles
+  x.strokeStyle = 'rgba(70,100,130,0.85)'; x.lineWidth = Math.max(1.4, P*0.28);
+  for (let tx=0; tx<OW_COLS; tx++) for (let ty=0; ty<OW_ROWS; ty++){
+    if (m[tx][ty]!==OW_RIVER) continue;
+    const cx = (tx+0.5)*P, cy = (ty+0.5)*P;
+    for (const [dx,dy] of [[1,0],[0,1],[1,1],[1,-1]]){ const u = tileAt(tx+dx,ty+dy); if (u===OW_RIVER || (u===OW_WATER && (dx===0||dy===0))){ x.beginPath(); x.moveTo(cx,cy); x.quadraticCurveTo(cx+dx*P*0.5+(hsh(tx,ty,1)-0.5)*P*0.5, cy+dy*P*0.5+(hsh(tx,ty,2)-0.5)*P*0.5, cx+dx*P, cy+dy*P); x.stroke(); } }
+  }
+  // glyphs, drawn back to front so nearer ones overlap farther ones
+  const glyphs = [];
+  for (let tx=0; tx<OW_COLS; tx++) for (let ty=0; ty<OW_ROWS; ty++){
+    const t = m[tx][ty], h = (s)=> hsh(tx,ty,s);
+    const gx = (tx+0.2+h(1)*0.6)*P, gy = (ty+0.3+h(2)*0.5)*P;
+    if (t===OW_MOUNTAIN){ if (h(3) < 0.62) glyphs.push(['mtn', gx, gy, P*(0.9+h(4)*0.7)]); }
+    else if (t===OW_FOREST){ if (h(3) < 0.75) glyphs.push(['tree', gx, gy, P*(0.55+h(4)*0.3), h(5)]); if (h(6) < 0.35) glyphs.push(['tree', (tx+h(7))*P, (ty+h(8))*P, P*(0.5+h(9)*0.25), h(10)]); }
+    else if (t===OW_SWAMP){ if (h(3) < 0.45) glyphs.push(['tuft', gx, gy, P*0.5]); }
+    else if (t===OW_DESERT){ if (h(3) < 0.3) glyphs.push(['dune', gx, gy, P*0.8]); }
+    else if (t===OW_TUNDRA){ if (h(3) < 0.18) glyphs.push(['snow', gx, gy, P*0.35]); }
+    else if (t===OW_GRASS){ if (h(3) < 0.05) glyphs.push(['grass', gx, gy, P*0.4]); }
+  }
+  glyphs.sort((a,b)=> a[2]-b[2]);
+  for (const [k, gx, gy, s, v] of glyphs){
+    x.strokeStyle = inkC;
+    if (k==='mtn'){
+      x.lineWidth = Math.max(1, P*0.14);
+      x.beginPath(); x.moveTo(gx-s, gy+s*0.55); x.lineTo(gx-s*0.1, gy-s*0.75); x.lineTo(gx+s*0.95, gy+s*0.55); x.closePath();
+      x.fillStyle = 'rgba(236,222,186,0.95)'; x.fill();
+      // shaded east face with hatching
+      x.save(); x.beginPath(); x.moveTo(gx-s*0.1, gy-s*0.75); x.lineTo(gx+s*0.95, gy+s*0.55); x.lineTo(gx+s*0.15, gy+s*0.55); x.closePath(); x.clip();
+      x.fillStyle = 'rgba(150,120,84,0.55)'; x.fillRect(gx-s, gy-s, s*2, s*2);
+      x.lineWidth = Math.max(0.6, P*0.07); for (let i=-3;i<6;i++){ x.beginPath(); x.moveTo(gx+i*s*0.22, gy+s*0.6); x.lineTo(gx+i*s*0.22+s*0.5, gy-s*0.3); x.stroke(); }
+      x.restore();
+      x.lineWidth = Math.max(1, P*0.14); x.beginPath(); x.moveTo(gx-s, gy+s*0.55); x.lineTo(gx-s*0.1, gy-s*0.75); x.lineTo(gx+s*0.95, gy+s*0.55); x.stroke();
+      x.beginPath(); x.moveTo(gx-s*0.1, gy-s*0.75); x.lineTo(gx+s*0.15, gy+s*0.55); x.lineWidth = Math.max(0.6, P*0.08); x.stroke();
+    } else if (k==='tree'){
+      x.lineWidth = Math.max(0.8, P*0.1);
+      x.beginPath(); x.moveTo(gx, gy+s*0.2); x.lineTo(gx, gy+s*0.95); x.stroke();
+      x.beginPath(); x.arc(gx, gy-s*0.15, s*0.62, 0, Math.PI*2);
+      x.fillStyle = v < 0.5 ? 'rgba(122,142,84,0.95)' : 'rgba(104,128,74,0.95)'; x.fill(); x.stroke();
+      x.beginPath(); x.arc(gx+s*0.18, gy-s*0.05, s*0.34, 0.2, 1.8); x.lineWidth = Math.max(0.5, P*0.06); x.stroke();
+    } else if (k==='tuft'){
+      x.lineWidth = Math.max(0.7, P*0.08);
+      for (const a of [-0.5, 0, 0.5]){ x.beginPath(); x.moveTo(gx, gy+s*0.5); x.lineTo(gx+a*s, gy-s*0.4+Math.abs(a)*s*0.4); x.stroke(); }
+      x.beginPath(); x.moveTo(gx-s*0.8, gy+s*0.55); x.lineTo(gx+s*0.8, gy+s*0.55); x.stroke();
+    } else if (k==='dune'){
+      x.lineWidth = Math.max(0.7, P*0.08); x.strokeStyle = 'rgba(120,86,40,0.7)';
+      x.beginPath(); x.moveTo(gx-s, gy+s*0.2); x.quadraticCurveTo(gx-s*0.3, gy-s*0.4, gx+s*0.2, gy+s*0.1); x.quadraticCurveTo(gx+s*0.6, gy-s*0.1, gx+s, gy+s*0.25); x.stroke();
+    } else if (k==='snow'){
+      x.lineWidth = Math.max(0.6, P*0.06); x.strokeStyle = 'rgba(90,100,110,0.6)';
+      for (let i=0;i<3;i++){ const a = i*Math.PI/3; x.beginPath(); x.moveTo(gx-Math.cos(a)*s, gy-Math.sin(a)*s); x.lineTo(gx+Math.cos(a)*s, gy+Math.sin(a)*s); x.stroke(); }
+    } else if (k==='grass'){
+      x.lineWidth = Math.max(0.6, P*0.06); x.strokeStyle = 'rgba(90,96,50,0.6)';
+      for (const a of [-0.4, 0.1, 0.5]){ x.beginPath(); x.moveTo(gx+a*s, gy+s*0.4); x.lineTo(gx+a*s*1.4, gy-s*0.3); x.stroke(); }
+    }
+  }
+  // a double inked border
+  x.strokeStyle = 'rgba(58,40,24,0.95)'; x.lineWidth = Math.max(2, P*0.35); x.strokeRect(P*0.6, P*0.6, W-P*1.2, H-P*1.2);
+  x.lineWidth = Math.max(1, P*0.12); x.strokeRect(P*1.3, P*1.3, W-P*2.6, H-P*2.6);
+  PM.key = pmMapKey();
+}
+// the fog: an unexplored-tiles mask, softened by scaling up, filled with drifting cloud texture
+function pmFogPattern(ctx){
+  if (!PM.cloud){
+    // 1024px at 1/16 and 1/8 scale lands exactly on the noise's 64-cell period, so the clouds tile seamlessly
+    const Z = 1024, c = v3Canvas(Z,Z), x = c.getContext('2d'), id = x.createImageData(Z,Z), n = v3Noise(41), n2 = v3Noise(43);
+    for (let y=0;y<Z;y++) for (let i=0;i<Z;i++){ const o = (y*Z+i)*4, v = n(i/16,y/16)*0.7 + n2(i/8,y/8)*0.3, k = v*v*(3-2*v);
+      id.data[o] = 188 + k*50; id.data[o+1] = 172 + k*48; id.data[o+2] = 140 + k*42; id.data[o+3] = 255; }
+    x.putImageData(id,0,0); PM.cloud = c;
+  }
+  return ctx.createPattern(PM.cloud, 'repeat');
+}
+function pmFogMask(){
+  // one pixel per tile, with a one-tile fogged border so the edges scale cleanly
+  if (PM.fogVer === G.ow.seenVer && PM.fog && PM.fog.width===OW_COLS+2) return PM.fog;
+  const c = PM.fog = PM.fog || document.createElement('canvas'); c.width = OW_COLS+2; c.height = OW_ROWS+2;
+  const x = c.getContext('2d'), id = x.createImageData(OW_COLS+2, OW_ROWS+2), s = owSeenArr();
+  for (let y=0;y<OW_ROWS+2;y++) for (let i=0;i<OW_COLS+2;i++){ const tx = i-1, ty = y-1, seen = tx>=0 && ty>=0 && tx<OW_COLS && ty<OW_ROWS && s[ty*OW_COLS+tx]; id.data[(y*(OW_COLS+2)+i)*4+3] = seen ? 0 : 255; }
+  x.putImageData(id,0,0); PM.fogVer = G.ow.seenVer;
+  // upsample to 4px per tile and blur, so the fog's edge is a soft, rolling bank
+  const S = 4, hi = PM.fogHi = PM.fogHi || document.createElement('canvas'); hi.width = c.width*S; hi.height = c.height*S;
+  const hx = hi.getContext('2d'); hx.clearRect(0,0,hi.width,hi.height); hx.imageSmoothingEnabled = true; hx.imageSmoothingQuality = 'high';
+  if ('filter' in hx) hx.filter = 'blur(5px)';
+  hx.drawImage(c, 0, 0, hi.width, hi.height); hx.drawImage(c, 0, 0, hi.width, hi.height);
+  if ('filter' in hx) hx.filter = 'none';
+  return c;
+}
+const PM_SITE_INK = { [OW_TOWN]:'#7a2418', [OW_DUNGEON]:'#5a3a1a', [OW_CASTLE]:'#8a1a1a', [OW_NECROTOWER]:'#5a2a7a', [OW_TEMPLE]:'#1a6a6a',
+  [OW_GRAVEYARD]:'#3a3a3a', [OW_MINE]:'#8a4a1a', [OW_LAIR]:'#b0401a' };
+function pmCompass(x, cx, cy, R){
+  x.save(); x.translate(cx, cy);
+  x.fillStyle = 'rgba(236,222,186,0.85)'; x.beginPath(); x.arc(0,0,R*1.08,0,Math.PI*2); x.fill();
+  x.strokeStyle = 'rgba(58,40,24,0.9)'; x.lineWidth = Math.max(1, R*0.04); x.stroke();
+  x.beginPath(); x.arc(0,0,R*0.9,0,Math.PI*2); x.stroke();
+  for (let i=0;i<8;i++){
+    const a = i*Math.PI/4 - Math.PI/2, big = i%2===0, r = big ? R*0.95 : R*0.55, w = big ? R*0.16 : R*0.12;
+    const tip = [Math.cos(a)*r, Math.sin(a)*r], l = [Math.cos(a-Math.PI/2)*w, Math.sin(a-Math.PI/2)*w], rt = [-l[0], -l[1]];
+    x.beginPath(); x.moveTo(0,0); x.lineTo(l[0],l[1]); x.lineTo(tip[0],tip[1]); x.closePath(); x.fillStyle = i===0 ? '#8a1a1a' : 'rgba(58,40,24,0.9)'; x.fill();
+    x.beginPath(); x.moveTo(0,0); x.lineTo(rt[0],rt[1]); x.lineTo(tip[0],tip[1]); x.closePath(); x.fillStyle = 'rgba(236,222,186,0.95)'; x.fill(); x.stroke();
+  }
+  x.fillStyle = '#3a2818'; x.font = `700 ${Math.round(R*0.32)}px Cinzel, Georgia, serif`; x.textAlign = 'center'; x.textBaseline = 'bottom';
+  x.fillText('N', 0, -R*0.98);
+  x.restore();
+}
 function renderOverworldMapZoomed(){
   const savedCellPx = cellPx;
-  cellPx = (canvas.width / OW_COLS) * owZoomScale();
+  cellPx = Math.max(canvas.width / OW_COLS, canvas.height / OW_ROWS) * owZoomScale();
   owZoomLastCellPx = cellPx;
   const viewCols = Math.ceil(canvas.width / cellPx), viewRows = Math.ceil(canvas.height / cellPx);
   const center = owZoomCenter();
   // dragging (see the mousemove listener below) moves center.x/y by
-  // fractional mouse-pixel deltas, so the camera itself must floor back to
-  // a whole tile here - G.ow.map is indexed by integer, and a fractional
-  // key like 71.75 silently reads as undefined instead of throwing, which
-  // is what actually broke this (caught via a real drag during testing,
-  // not a hunch) rather than an out-of-bounds index
+  // fractional mouse-pixel deltas; the chart itself pans smoothly, but the
+  // camera origin is floored to a whole tile the same as before so every
+  // tile-indexed lookup (G.ow.map, the seen mask) stays an integer
   const zCamX = Math.floor(clamp(center.x - Math.floor(viewCols/2), 0, mx(0, OW_COLS-viewCols)));
   const zCamY = Math.floor(clamp(center.y - Math.floor(viewRows/2), 0, mx(0, OW_ROWS-viewRows)));
-  ctx.fillStyle = COL.wall;
-  ctx.fillRect(0,0,canvas.width,canvas.height);
-  for (let vy=0;vy<viewRows;vy++){
-    for (let vx=0;vx<viewCols;vx++){
-      const x=zCamX+vx, y=zCamY+vy;
-      if (x<0||y<0||x>=OW_COLS||y>=OW_ROWS) continue;
-      ctx.fillStyle = owBaseColor(G.ow.map[x][y], x, y);
-      ctx.fillRect(vx*cellPx, vy*cellPx, Math.ceil(cellPx)+0.5, Math.ceil(cellPx)+0.5);
-    }
+  owReveal(G.owPos.x, G.owPos.y, 8);
+  if (!PM.cv || PM.key !== pmMapKey()) pmBuild();
+  const P = PM.P, cw = canvas.width, ch = canvas.height;
+  ctx.fillStyle = '#2a1e12'; ctx.fillRect(0,0,cw,ch);
+  // the parchment chart
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+  const sx = zCamX*P, sy = zCamY*P, sw = viewCols*P, sh = viewRows*P;
+  ctx.drawImage(PM.cv, sx, sy, sw, sh, 0, 0, viewCols*cellPx, viewRows*cellPx);
+  // fog over what you haven't explored
+  const fog = pmFogMask();
+  if (!PM.fogTmp) PM.fogTmp = document.createElement('canvas');
+  const ft = PM.fogTmp; if (ft.width!==cw || ft.height!==ch){ ft.width = cw; ft.height = ch; }
+  const fx = ft.getContext('2d'); fx.globalCompositeOperation = 'source-over'; fx.clearRect(0,0,cw,ch);
+  fx.imageSmoothingEnabled = true; fx.imageSmoothingQuality = 'high';
+  const fw = Math.min(viewCols, OW_COLS+1-zCamX), fh = Math.min(viewRows, OW_ROWS+1-zCamY);
+  const FS = 4; fx.drawImage(PM.fogHi, (zCamX+1)*FS, (zCamY+1)*FS, fw*FS, fh*FS, 0, 0, fw*cellPx, fh*cellPx);
+  fx.globalCompositeOperation = 'source-in';
+  const pat = pmFogPattern(fx), t = (performance.now()/1000)*6 % 1024;
+  fx.save(); fx.translate(t, t*0.4); fx.fillStyle = pat; fx.fillRect(-t, -t*0.4, cw, ch); fx.restore();
+  ctx.globalAlpha = 0.94; ctx.drawImage(ft, 0, 0); ctx.globalAlpha = 1;
+  // sites, in coloured ink on a paper halo - only where you've explored
+  const iconS = clamp(cellPx*1.9, 16*dpr, 40*dpr);
+  const names = [];
+  for (let vy=-1; vy<=viewRows; vy++) for (let vx=-1; vx<=viewCols; vx++){
+    const x = zCamX+vx, y = zCamY+vy;
+    if (x<0||y<0||x>=OW_COLS||y>=OW_ROWS) continue;
+    const t2 = G.ow.map[x][y];
+    if (!OW_SITE_TILES.includes(t2) || !owSeen(x,y)) continue;
+    const px = vx*cellPx + cellPx/2, py = vy*cellPx + cellPx/2;
+    ctx.fillStyle = 'rgba(240,226,190,0.8)'; ctx.beginPath(); ctx.ellipse(px, py+iconS*0.05, iconS*0.55, iconS*0.45, 0, 0, Math.PI*2); ctx.fill();
+    drawMonsterArt(px, py+iconS*0.08, iconS, SITE_ART[t2], PM_SITE_INK[t2]||'#3a2818');
+    if (t2===OW_TOWN) names.push([px, py + iconS*0.62, o3TownName(x,y), (G.ow.visitedTowns||[]).includes(x+','+y)]);
   }
-
-  // sites are drawn as a labelled badge (not just a coloured dot) so the
-  // kind of place is obvious straight off the map, even zoomed this far out
-  const badgeR = clamp(cellPx*0.85, 5*dpr, 11*dpr);
-  function siteBadge(vx,vy,ch,color){
-    const px = vx*cellPx+cellPx/2, py = vy*cellPx+cellPx/2;
-    ctx.beginPath();
-    ctx.fillStyle = 'rgba(8,10,14,0.88)';
-    ctx.arc(px,py,badgeR,0,Math.PI*2);
-    ctx.fill();
-    ctx.lineWidth = Math.max(1,dpr);
-    ctx.strokeStyle = color;
-    ctx.stroke();
-    ctx.fillStyle = color;
-    ctx.font = `800 ${Math.round(badgeR*1.3)}px 'JetBrains Mono', 'DepthcrawlCardSuits', monospace`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(ch, px, py+0.5);
-  }
-  for (let vy=0;vy<viewRows;vy++){
-    for (let vx=0;vx<viewCols;vx++){
-      const x=zCamX+vx, y=zCamY+vy;
-      if (x<0||y<0||x>=OW_COLS||y>=OW_ROWS) continue;
-      const t = G.ow.map[x][y];
-      if (t===OW_TOWN) siteBadge(vx,vy,'H',COL.brightGreen);
-      else if (t===OW_DUNGEON) siteBadge(vx,vy,'D',COL.amber);
-      else if (t===OW_CASTLE) siteBadge(vx,vy,'C',COL.brightRed);
-      else if (t===OW_NECROTOWER) siteBadge(vx,vy,'N',COL.purple);
-      else if (t===OW_TEMPLE) siteBadge(vx,vy,'T',COL.cyan);
-      else if (t===OW_GRAVEYARD) siteBadge(vx,vy,'G',COL.dim);
-      else if (t===OW_MINE) siteBadge(vx,vy,'M',COL.copper);
-      else if (t===OW_LAIR) siteBadge(vx,vy,'L',COL.bossOrange);
-    }
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  for (const [px, py, nm, visited] of names){
+    ctx.font = `${visited?'700':'600 italic'} ${Math.round(clamp(cellPx*1.1, 11*dpr, 17*dpr))}px Cinzel, Georgia, serif`;
+    ctx.lineWidth = 3*dpr; ctx.strokeStyle = 'rgba(240,226,190,0.9)'; ctx.strokeText(nm, px, py);
+    ctx.fillStyle = visited ? '#3a1a0a' : '#5a4028'; ctx.fillText(nm, px, py);
   }
   applyOverworldTint();
-  drawDot(G.owPos.x-zCamX, G.owPos.y-zCamY, COL.white, mx(2.6,cellPx*0.55));
-  // outline of the normal scrolled viewport, so zooming back in is predictable -
-  // sized off the main view's OWN current zoom level (owMainZoomScale), not
-  // always the fixed COLS x ROWS window, now that that view can zoom too
-  const mainCellPx = (canvas.width/COLS) * owMainZoomScale();
-  const mainViewCols = Math.ceil(canvas.width/mainCellPx), mainViewRows = Math.ceil(canvas.height/mainCellPx);
-  const {camX,camY} = overworldCamera(mainViewCols, mainViewRows);
-  ctx.strokeStyle = 'rgba(255,255,255,0.6)';
-  ctx.lineWidth = Math.max(1,dpr);
-  ctx.strokeRect((camX-zCamX)*cellPx+0.5, (camY-zCamY)*cellPx+0.5, mainViewCols*cellPx, mainViewRows*cellPx);
-
-  // small legend spelling out what each badge letter means
-  const legend = [['H',COL.brightGreen,'village'],['D',COL.amber,'dungeon'],['C',COL.brightRed,'castle'],['N',COL.purple,'necro tower'],
-    ['T',COL.cyan,'sunken temple'],['G',COL.dim,'graveyard'],['M',COL.copper,'mine'],['L',COL.bossOrange,'dragon lair']];
-  const pad = 7*dpr, lh = 15*dpr, boxW = 128*dpr, boxH = pad*2 + lh*legend.length;
-  const bx = canvas.width-boxW-6*dpr, by = canvas.height-boxH-6*dpr;
-  ctx.fillStyle = 'rgba(8,10,14,0.84)';
-  ctx.fillRect(bx,by,boxW,boxH);
-  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-  ctx.lineWidth = Math.max(1,dpr);
-  ctx.strokeRect(bx+0.5,by+0.5,boxW-1,boxH-1);
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
-  legend.forEach(([ch,color,label],i)=>{
+  // you are here: a red ring and dot, gently pulsing
+  const ppx = (G.owPos.x-zCamX)*cellPx + cellPx/2, ppy = (G.owPos.y-zCamY)*cellPx + cellPx/2, pr = mx(5*dpr, cellPx*0.6), pulse = 1 + Math.sin(performance.now()/260)*0.15;
+  ctx.strokeStyle = 'rgba(150,20,20,0.9)'; ctx.lineWidth = 2*dpr; ctx.beginPath(); ctx.arc(ppx, ppy, pr*1.6*pulse, 0, Math.PI*2); ctx.stroke();
+  ctx.fillStyle = '#9a1a1a'; ctx.beginPath(); ctx.arc(ppx, ppy, pr*0.55, 0, Math.PI*2); ctx.fill();
+  ctx.strokeStyle = 'rgba(240,226,190,0.95)'; ctx.lineWidth = 1.5*dpr; ctx.stroke();
+  const hudTop = immersiveUi ? 64*dpr : 0, hudBottom = immersiveUi ? 128*dpr : 0;   // keep clear of the overlaid HUD
+  pmCompass(ctx, cw - 58*dpr, hudTop + 62*dpr, 42*dpr);
+  // legend: the ink icon for each kind of place
+  const legend = [[OW_TOWN,'village'],[OW_DUNGEON,'dungeon'],[OW_CASTLE,'castle'],[OW_NECROTOWER,'necro tower'],[OW_TEMPLE,'sunken temple'],[OW_GRAVEYARD,'graveyard'],[OW_MINE,'mine'],[OW_LAIR,'dragon lair']];
+  const pad = 8*dpr, lh = 19*dpr, boxW = 150*dpr, boxH = pad*2 + lh*legend.length;
+  const bx = cw-boxW-8*dpr, by = ch-boxH-8*dpr-hudBottom;
+  ctx.fillStyle = 'rgba(236,222,186,0.94)'; ctx.fillRect(bx,by,boxW,boxH);
+  ctx.strokeStyle = 'rgba(58,40,24,0.85)'; ctx.lineWidth = Math.max(1,dpr*1.5); ctx.strokeRect(bx+0.5,by+0.5,boxW-1,boxH-1);
+  ctx.lineWidth = Math.max(1,dpr*0.7); ctx.strokeRect(bx+3*dpr,by+3*dpr,boxW-6*dpr,boxH-6*dpr);
+  ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  legend.forEach(([t2,label],i)=>{
     const ly = by+pad+lh*i+lh/2;
-    ctx.fillStyle = color;
-    ctx.font = `800 ${Math.round(11*dpr)}px 'JetBrains Mono', 'DepthcrawlCardSuits', monospace`;
-    ctx.fillText(ch, bx+pad, ly);
-    ctx.fillStyle = COL.text;
-    ctx.font = `500 ${Math.round(10*dpr)}px 'JetBrains Mono', 'DepthcrawlCardSuits', monospace`;
-    ctx.fillText(label, bx+pad+15*dpr, ly);
+    drawMonsterArt(bx+pad+8*dpr, ly+1*dpr, 17*dpr, SITE_ART[t2], PM_SITE_INK[t2]);
+    ctx.fillStyle = '#3a2818'; ctx.font = `600 ${Math.round(11*dpr)}px Cinzel, Georgia, serif`;
+    ctx.fillText(label, bx+pad+22*dpr, ly);
   });
-
   cellPx = savedCellPx;
 }
 
@@ -9753,6 +9950,7 @@ function renderGame(){
   // frame the mode genuinely changes, not every frame
   if (G._layoutKey !== layoutKey()) setupCanvas();
   if (G.gameMode!==3 || !v3Active()) v3Hide();
+  if (!o3Active()) o3Hide();
   // start sculpting the 3D skeleton in the background as soon as three.js is in
   if (G.player && SK3.ok===null && typeof THREE!=='undefined') sk3Init();
   const wantVillageMode = G.gameMode===3;
@@ -9762,7 +9960,7 @@ function renderGame(){
     if (stageEl) stageEl.classList.toggle('village-mode', wantVillageMode);
     setupCanvas();
   }
-  if (G.gameMode===0) { if (G.owZoomedOut) renderOverworldMapZoomed(); else renderOverworldMap(); }
+  if (G.gameMode===0) { if (G.owZoomedOut) renderOverworldMapZoomed(); else if (!(o3Active() && o3Render())){ o3Hide(); renderOverworldMap(); } }
   else if (G.gameMode===3){ if (!(v3Active() && v3Render())){ v3Hide(); renderVillageMap(); } }
   else if (fp3dActive()) renderFirstPerson(); // first-person 3D view of a dungeon floor or roadside fight (M flips to the top-down map)
   else if (G.gameMode===2) renderArenaMap(); // roadside encounter - an open field, not a dungeon floor
@@ -9988,6 +10186,7 @@ function renderImmersiveHud(){
     slot('P', im(obEntry('armor',{kind:'chest', metal:'#9aa3a8'})), 'character sheet', ''),
     slot('B', im(monsterPortraitFor('skeleton', true)), 'bestiary', '', 'minor'),
     slot('M', `<span class="ico">${G.gameMode===0 ? (G.owZoomedOut ? '&minus;' : '&#9635;') : (fp3dActive() || v3Active() ? '&#9638;' : '&#9650;')}</span>`, G.gameMode===0 ? 'world map zoom' : G.gameMode===3 ? (v3Active() ? 'town map' : '3D town') : (fp3dActive() ? 'top-down map' : 'first-person view'), '', 'minor'),
+    G.gameMode===0 && !G.owZoomedOut && typeof THREE!=='undefined' ? slot('O', `<span class="ico">${o3Active() ? '&#9638;' : '&#9650;'}</span>`, o3Active() ? 'flat overworld map' : '3D overworld', '', 'minor') : '',
     G.gameMode===0 && G.owZoomedOut ? slot('T', `<span class="ico">&#10148;</span>`, 'fast travel', '', 'minor') : '',
     slot('C', im(obEntry('flame')), 'camp', '', 'minor'),
   ].join('');
@@ -14535,6 +14734,594 @@ function v3Render(){
   return true;
 }
 
+// ===================== SECTION: 3D OVERWORLD =====================
+// the wilds drawn as real 3D land under the same angled action-RPG camera as
+// the town: rolling ground whose colour follows the terrain (grass, forest
+// floor, sand, snow, swamp, rock), mountains raised into snow-capped peaks,
+// lakes and rivers under a rippling water surface, forests of instanced
+// trees (broadleaf, pine, snowy pine, swamp willow), scattered rocks and
+// cacti, and every site as its own landmark - a walled village, a cave
+// mouth, a castle, a necromancer's spire, a sunken temple, a graveyard, a
+// mine and a dragon's lair. Roaming encounters and mythic beasts stand on
+// the land as markers. Day and night follow the in-game clock, and rain,
+// fog and storms show up as real weather. The world is still the same tile
+// grid underneath: the land is built for a window around you and rebuilt as
+// you travel, clicking walks you there step by step through the normal move
+// rules, WASD still works, the wheel zooms, O flips to the flat map (also
+// the fallback when three.js is missing), and M opens the world map.
+let o3Pref = true;
+try{ o3Pref = localStorage.getItem('depthcrawl_world3d')!=='0'; }catch(e){}
+const O3 = { ok:null, win:null, path:[], stepT:0, dist:15, tex:{}, t:0, hits:[], plates:[], rain:null };
+const O3_W = 72;                    // tiles per side of the land built around you
+const O3_R = 2;                     // terrain vertices per tile
+function o3Active(){ return o3Pref && G.gameMode===0 && !G.owZoomedOut && typeof THREE!=='undefined' && O3.ok!==false && !!(G.ow && G.ow.map && G.owPos); }
+function o3Toggle(){
+  o3Pref = !o3Pref;
+  try{ localStorage.setItem('depthcrawl_world3d', o3Pref?'1':'0'); }catch(e){}
+  logMsg(o3Pref ? '3D overworld (O for the flat map)' : 'flat overworld map (O for the 3D view)', '');
+  renderGame();
+}
+function o3Hide(){ if (O3.cv){ O3.cv.style.display = 'none'; O3.labels.style.display = 'none'; } }
+// ---------- terrain sampling ----------
+function o3Tile(x,y){ if (x<0||y<0||x>=OW_COLS||y>=OW_ROWS) return OW_WATER; return G.ow.map[x][y]; }
+// what the ground under a site really is (a village sits on grass, a keep on the tundra...)
+function o3Ground(x,y){
+  const t = o3Tile(x,y);
+  if (!OW_SITE_TILES.includes(t)) return t;
+  const cache = G.ow.siteBiomeCache || (G.ow.siteBiomeCache = {}), k = x+','+y;
+  if (!(k in cache)) cache[k] = detectRegionBiome(x,y);
+  const b = cache[k];
+  return (b===null || b===undefined || b===OW_WATER || b===OW_RIVER || b===OW_MOUNTAIN) ? OW_GRASS : b;
+}
+function o3Hash(x,y,s){ let h = (x*374761393 + y*668265263 + (s||0)*2147483647) | 0; h = (h ^ (h>>>13)) * 1274126177 | 0; return ((h ^ (h>>>16)) >>> 0) / 4294967296; }
+const O3_COL = {
+  [OW_GRASS]:[82,126,48], [OW_FOREST]:[52,84,38], [OW_WATER]:[64,72,54], [OW_RIVER]:[70,76,56], [OW_MOUNTAIN]:[92,88,86],
+  [OW_TUNDRA]:[200,210,220], [OW_DESERT]:[198,164,108], [OW_SWAMP]:[74,84,48], [OW_MOUNTAINPASS]:[128,112,86],
+};
+// ---------- build the land around a centre tile ----------
+function o3Mat(col, o){ return new THREE.MeshStandardMaterial(Object.assign({ color: new THREE.Color(col).convertSRGBToLinear(), roughness:0.9 }, o||{})); }
+function o3Textures(){
+  if (O3.tex.detail) return O3.tex;
+  const T = THREE, n = v3Noise(21);
+  const c = v3Canvas(256,256), x = c.getContext('2d'), id = x.createImageData(256,256);
+  for (let y=0;y<256;y++) for (let i=0;i<256;i++){
+    const k = 0.84 + n(i/10,y/10)*0.14 + n(i/3,y/3)*0.08 + (n(i*1.7,y*1.7)>0.8?0.05:0), o = (y*256+i)*4;
+    id.data[o] = id.data[o+1] = id.data[o+2] = Math.round(255*Math.min(1,k)); id.data[o+3] = 255;
+  }
+  x.putImageData(id,0,0);
+  O3.tex.detail = v3CanvasTex(c); O3.tex.detail.encoding = T.LinearEncoding;
+  // ripple normal map for the water, scrolled every frame
+  const w = v3Canvas(256,256), wx = w.getContext('2d'), wd = wx.createImageData(256,256), m = v3Noise(33);
+  const hgt = (i,j)=> m(i/14,j/14)*0.6 + m(i/5+40,j/5)*0.4;
+  for (let y=0;y<256;y++) for (let i=0;i<256;i++){
+    const dx = hgt(i+1,y)-hgt(i-1,y), dy = hgt(i,y+1)-hgt(i,y-1), o = (y*256+i)*4;
+    wd.data[o] = 128 + dx*420; wd.data[o+1] = 128 + dy*420; wd.data[o+2] = 255; wd.data[o+3] = 255;
+  }
+  wx.putImageData(wd,0,0);
+  O3.tex.ripple = new T.CanvasTexture(w); O3.tex.ripple.wrapS = O3.tex.ripple.wrapT = T.RepeatWrapping; O3.tex.ripple.repeat.set(10,10);
+  return O3.tex;
+}
+function o3Build(cx, cy){
+  const T = THREE, sc = O3.scene;
+  if (O3.world){ sc.remove(O3.world); O3.world.traverse(o=>{ if (o.geometry) o.geometry.dispose(); }); }
+  const grp = O3.world = new T.Group(); sc.add(grp);
+  O3.hits = []; O3.plates.forEach(p=>p.el.remove()); O3.plates = []; O3.flames = []; O3.glows = []; O3.smoke = []; O3.parts = []; O3.windows = [];
+  const W = O3_W, x0 = cx - W/2, y0 = cy - W/2, M = 5;   // M: margin sampled around the window
+  O3.win = { cx, cy, x0, y0 };
+  const tex = o3Textures();
+  // mountain depth: how far inside a range each mountain tile sits (peaks rise toward the middle)
+  const dep = {};
+  const dk = (x,y)=> (x-x0+M)*(W+2*M+1) + (y-y0+M);
+  for (let x=x0-M; x<=x0+W+M; x++) for (let y=y0-M; y<=y0+W+M; y++){
+    if (o3Tile(x,y)!==OW_MOUNTAIN){ dep[dk(x,y)] = 0; continue; }
+    let d = 4;
+    for (let r=1;r<=3 && d===4;r++) for (let i=-r;i<=r && d===4;i++) for (let j=-r;j<=r;j++){ if (Math.max(Math.abs(i),Math.abs(j))!==r) continue; if (o3Tile(x+i,y+j)!==OW_MOUNTAIN){ d = r; break; } }
+    dep[dk(x,y)] = d;
+  }
+  const n1 = v3Noise(7), n2 = v3Noise(9);
+  const tileH = (x,y)=>{
+    const t = o3Tile(x,y);
+    if (t===OW_WATER) return -0.62;
+    if (t===OW_RIVER) return -0.42;
+    if (t===OW_MOUNTAIN){ const d = dep[dk(x,y)]||1; return 0.75 + d*0.95 + o3Hash(x,y,3)*0.9; }
+    if (t===OW_MOUNTAINPASS) return 0.3;
+    if (t===OW_SWAMP) return -0.06;
+    return 0.04;
+  };
+  // vertex grid: R per tile, heights averaged from the tiles touching each vertex, then roughened
+  const NV = W*O3_R + 1, pos = new Float32Array(NV*NV*3), col = new Float32Array(NV*NV*3), uv = new Float32Array(NV*NV*2);
+  const H = new Float32Array(NV*NV);
+  const lin = v=> Math.pow(v/255, 2.2);
+  for (let j=0;j<NV;j++) for (let i=0;i<NV;i++){
+    const wx = x0 + i/O3_R, wz = y0 + j/O3_R;
+    // the (up to 4) tiles this vertex touches
+    const fx = wx - 0.5, fz = wz - 0.5, tx = Math.floor(fx), tz = Math.floor(fz), ax = fx-tx, az = fz-tz;
+    const ws = [[tx,tz,(1-ax)*(1-az)],[tx+1,tz,ax*(1-az)],[tx,tz+1,(1-ax)*az],[tx+1,tz+1,ax*az]];
+    let h = 0, r = 0, g = 0, b = 0, mtn = 0, snowy = 0, desert = 0;
+    for (const [px,pz,w] of ws){
+      h += tileH(px,pz)*w;
+      const gt = o3Ground(px,pz), c = O3_COL[gt] || O3_COL[OW_GRASS];
+      r += c[0]*w; g += c[1]*w; b += c[2]*w;
+      if (gt===OW_MOUNTAIN) mtn += w; if (gt===OW_TUNDRA) snowy += w; if (gt===OW_DESERT) desert += w;
+    }
+    // gentle rolling ground everywhere, rocky crags on the mountains, dunes in the desert
+    h += (n1(wx/5, wz/5)-0.5)*0.35 + (n2(wx*1.3, wz*1.3)-0.5)*0.08;
+    h += mtn * ((n2(wx*0.9+20, wz*0.9)-0.5)*1.1 + (n1(wx*2.3, wz*2.3)-0.5)*0.35);
+    h += desert * Math.sin(wx*1.3 + n1(wx/3,wz/3)*4)*0.12;
+    // a level pad under every landmark, so a lair ringed by peaks isn't buried in them
+    for (let sx=tx; sx<=tx+1; sx++) for (let sz=tz; sz<=tz+1; sz++){
+      if (!OW_SITE_TILES.includes(o3Tile(sx,sz))) continue;
+      const d = Math.hypot(wx-(sx+0.5), wz-(sz+0.5)), f = Math.max(0, Math.min(1, (1.25-d)/0.6));
+      h += (0.12 - h)*f;
+    }
+    const k = j*NV+i; H[k] = h;
+    pos[k*3] = wx; pos[k*3+1] = h; pos[k*3+2] = wz;
+    // colour: terrain blend, varied, then snow on the high peaks and rock on steep ground
+    const v = 0.82 + n1(wx*0.7+50, wz*0.7)*0.26, hue = (n2(wx/9+70, wz/9)-0.5)*0.22;
+    let cr = r*v*(1+hue), cg = g*v, cb = b*v*(1-hue);
+    const snow = Math.min(1, Math.max(0, (h - 2.4)/0.6)) * mtn + snowy*0.0;
+    cr += (236-cr)*snow; cg += (240-cg)*snow; cb += (246-cb)*snow;
+    if (h < -0.2){ const wet = Math.min(1, (-0.2-h)/0.3); cr *= 1-wet*0.35; cg *= 1-wet*0.3; cb *= 1-wet*0.2; }
+    else if (h < 0.02 && mtn < 0.1){ const sand = Math.min(1, (0.02-h)/0.2) * (1-snowy); cr += (196-cr)*sand*0.6; cg += (178-cg)*sand*0.6; cb += (128-cb)*sand*0.6; }
+    col[k*3] = lin(cr); col[k*3+1] = lin(cg); col[k*3+2] = lin(cb);
+    uv[k*2] = wx/3; uv[k*2+1] = wz/3;
+  }
+  const idx = [];
+  for (let j=0;j<NV-1;j++) for (let i=0;i<NV-1;i++){ const a = j*NV+i, b2 = a+1, c = a+NV, d = c+1; idx.push(a,c,b2, b2,c,d); }
+  const geo = new T.BufferGeometry();
+  geo.setAttribute('position', new T.BufferAttribute(pos,3)); geo.setAttribute('color', new T.BufferAttribute(col,3)); geo.setAttribute('uv', new T.BufferAttribute(uv,2));
+  geo.setIndex(idx); geo.computeVertexNormals();
+  // steep faces read as bare rock
+  const nr = geo.attributes.normal;
+  for (let k=0;k<NV*NV;k++){ const st = 1 - nr.getY(k); if (st > 0.25 && H[k] > 0.4){ const f = Math.min(1,(st-0.25)*2.2)*0.85, rk = lin(78); col[k*3] += (rk-col[k*3])*f; col[k*3+1] += (rk*0.97-col[k*3+1])*f; col[k*3+2] += (rk*0.94-col[k*3+2])*f; } }
+  const land = new T.Mesh(geo, new T.MeshStandardMaterial({ vertexColors:true, map:tex.detail, roughness:0.95 }));
+  land.receiveShadow = true; land.castShadow = true; grp.add(land); O3.land = land;
+  O3.heightAt = (wx, wz)=>{
+    const fi = (wx-x0)*O3_R, fj = (wz-y0)*O3_R, i = Math.max(0, Math.min(NV-2, Math.floor(fi))), j = Math.max(0, Math.min(NV-2, Math.floor(fj))), a = fi-i, b2 = fj-j;
+    return H[j*NV+i]*(1-a)*(1-b2) + H[j*NV+i+1]*a*(1-b2) + H[(j+1)*NV+i]*(1-a)*b2 + H[(j+1)*NV+i+1]*a*b2;
+  };
+  // water: one rippling sheet at sea level
+  const water = new T.Mesh(new T.PlaneGeometry(W+2*M, W+2*M), new T.MeshStandardMaterial({ color:new T.Color(0x2c6490).convertSRGBToLinear(), roughness:0.12, metalness:0.25, transparent:true, opacity:0.84, normalMap:tex.ripple, normalScale:new T.Vector2(0.55,0.55) }));
+  water.rotation.x = -Math.PI/2; water.position.set(cx, -0.14, cy); water.receiveShadow = true; grp.add(water); O3.water = water;
+  // a big dim plane far out so the edge of the built window never shows
+  const far = new T.Mesh(new T.PlaneGeometry(600,600), new T.MeshStandardMaterial({ color:new T.Color(0x2a4a2a).convertSRGBToLinear(), roughness:1 }));
+  far.rotation.x = -Math.PI/2; far.position.set(cx,-0.5,cy); grp.add(far);
+  o3Vegetation(grp, x0, y0, W);
+  o3Sites(grp, x0, y0, W);
+  O3.encGrp = new T.Group(); grp.add(O3.encGrp); O3.encKey = null;
+}
+// ---------- trees, rocks and cacti (instanced) ----------
+function o3Vegetation(grp, x0, y0, W){
+  const T = THREE, put = [];   // [kind, x, z, scale, rot, shade]
+  for (let x=x0; x<x0+W; x++) for (let y=y0; y<y0+W; y++){
+    const t = o3Tile(x,y), h = (s)=> o3Hash(x,y,s);
+    let nearSnow = false, nearSwamp = false, nearMtn = false;
+    for (const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1],[2,0],[-2,0],[0,2],[0,-2]]){ const u = o3Tile(x+dx,y+dy); if (u===OW_TUNDRA) nearSnow = true; if (u===OW_SWAMP) nearSwamp = true; if (u===OW_MOUNTAIN) nearMtn = true; }
+    if (t===OW_FOREST){
+      const n = 3 + (h(1)>0.5?1:0);
+      for (let k=0;k<n;k++){
+        const kind = nearSnow ? 'snowpine' : nearSwamp ? (h(10+k)>0.5 ? 'willow' : 'dead') : (nearMtn || h(20+k)<0.3) ? 'pine' : 'oak';
+        put.push([kind, x + 0.15 + h(30+k)*0.7, y + 0.15 + h(40+k)*0.7, 0.75 + h(50+k)*0.5, h(60+k)*6.28, h(70+k)]);
+      }
+    } else if (t===OW_GRASS){
+      if (h(1)<0.1) put.push([h(2)<0.35?'pine':'oak', x+0.2+h(3)*0.6, y+0.2+h(4)*0.6, 0.7+h(5)*0.4, h(6)*6.28, h(7)]);
+      else if (h(1)<0.3) put.push(['bush', x+h(3), y+h(4), 0.8+h(5)*0.8, h(6)*6.28, h(7)]);
+      if (h(11)<0.5) put.push(['bush', x+h(12), y+h(13), 0.6+h(14)*0.6, h(15)*6.28, h(16)]);
+      else if (h(1)<0.26) put.push(['rock', x+h(3), y+h(4), 0.35+h(5)*0.4, h(6)*6.28, h(7)]);
+    } else if (t===OW_TUNDRA){
+      if (h(1)<0.1) put.push(['snowpine', x+0.2+h(3)*0.6, y+0.2+h(4)*0.6, 0.6+h(5)*0.4, h(6)*6.28, h(7)]);
+      else if (h(1)<0.2) put.push(['rock', x+h(3), y+h(4), 0.4+h(5)*0.5, h(6)*6.28, h(7)]);
+    } else if (t===OW_DESERT){
+      if (h(1)<0.06) put.push(['cactus', x+0.2+h(3)*0.6, y+0.2+h(4)*0.6, 0.7+h(5)*0.5, h(6)*6.28, h(7)]);
+      else if (h(1)<0.14) put.push(['rock', x+h(3), y+h(4), 0.4+h(5)*0.6, h(6)*6.28, h(7)]);
+    } else if (t===OW_SWAMP){
+      if (h(1)<0.18) put.push([h(2)<0.5?'dead':'willow', x+0.2+h(3)*0.6, y+0.2+h(4)*0.6, 0.6+h(5)*0.4, h(6)*6.28, h(7)]);
+      else if (h(1)<0.4) put.push(['reed', x+h(3), y+h(4), 0.6+h(5)*0.5, h(6)*6.28, h(7)]);
+    } else if (t===OW_MOUNTAIN || t===OW_MOUNTAINPASS){
+      if (h(1)<0.35) put.push(['rock', x+h(3), y+h(4), 0.6+h(5)*0.9, h(6)*6.28, h(7)]);
+    }
+  }
+  // parts per kind: [geometry, material colour(s), local transform]
+  const bark = '#5a4028', PARTS = {
+    oak:      [['trunk', new T.CylinderGeometry(0.05,0.08,0.7,6).translate(0,0.35,0), bark], ['leaf', new T.IcosahedronGeometry(0.42,1).scale(1,0.85,1).translate(0,0.95,0), '#4a7a32']],
+    pine:     [['trunk', new T.CylinderGeometry(0.04,0.06,0.5,6).translate(0,0.25,0), bark], ['leaf', new T.ConeGeometry(0.36,0.8,8).translate(0,0.72,0), '#2e5a30'], ['leaf2', new T.ConeGeometry(0.27,0.6,8).translate(0,1.12,0), '#2e5a30']],
+    snowpine: [['trunk', new T.CylinderGeometry(0.04,0.06,0.5,6).translate(0,0.25,0), bark], ['leaf', new T.ConeGeometry(0.36,0.8,8).translate(0,0.72,0), '#3a5a44'], ['snow', new T.ConeGeometry(0.28,0.55,8).translate(0,1.12,0), '#e8eef4']],
+    willow:   [['trunk', new T.CylinderGeometry(0.05,0.09,0.6,6).translate(0,0.3,0), '#4a3a28'], ['leaf', new T.SphereGeometry(0.45,10,7,0,6.283,0,1.9).scale(1,0.9,1).translate(0,0.62,0), '#5a6a30']],
+    dead:     [['trunk', new T.CylinderGeometry(0.02,0.07,1.0,5).translate(0,0.5,0), '#5a5046'], ['branch', new T.CylinderGeometry(0.012,0.03,0.5,4).rotateZ(0.9).translate(0.18,0.72,0), '#5a5046'], ['branch2', new T.CylinderGeometry(0.012,0.03,0.4,4).rotateZ(-0.8).translate(-0.14,0.58,0), '#5a5046']],
+    bush:     [['leaf', new T.IcosahedronGeometry(0.2,1).scale(1.2,0.7,1).translate(0,0.1,0), '#557a34']],
+    rock:     [['stone', new T.DodecahedronGeometry(0.28,0).scale(1,0.6,0.85).translate(0,0.08,0), '#8a8580']],
+    cactus:   [['cact', new T.CylinderGeometry(0.07,0.08,0.7,8).translate(0,0.35,0), '#5a8a44'], ['arm', new T.CylinderGeometry(0.045,0.05,0.3,6).translate(0.15,0.45,0), '#5a8a44'], ['arm2', new T.CylinderGeometry(0.04,0.05,0.24,6).translate(-0.13,0.38,0), '#5a8a44']],
+    reed:     [['reed', new T.ConeGeometry(0.1,0.4,5).translate(0,0.2,0), '#7a8a4a']],
+  };
+  const byKind = {};
+  for (const p of put) (byKind[p[0]] = byKind[p[0]] || []).push(p);
+  const m4 = new T.Matrix4(), q = new T.Quaternion(), s = new T.Vector3(), v = new T.Vector3(), c = new T.Color(), up = new T.Vector3(0,1,0);
+  for (const kind in byKind){
+    const list = byKind[kind];
+    for (const [, geo, colr] of PARTS[kind]){
+      const mat = new T.MeshStandardMaterial({ color:0xffffff, roughness:0.85, flatShading: kind==='rock' || kind==='oak' || kind==='bush' });
+      const im = new T.InstancedMesh(geo, mat, list.length);
+      im.castShadow = true; im.receiveShadow = true;
+      im.frustumCulled = false;   // its bounds are the one tree at the origin, not the whole forest
+      const base = new T.Color(colr).convertSRGBToLinear();
+      list.forEach((p,i)=>{
+        const [, x, z, sc, rot, shade] = p, y = O3.heightAt(x, z);
+        q.setFromAxisAngle(up, rot); s.setScalar(sc*0.62); v.set(x, y - 0.02, z);   // trees stay smaller than the landmarks
+        m4.compose(v, q, s); im.setMatrixAt(i, m4);
+        c.copy(base).multiplyScalar(0.8 + shade*0.4); im.setColorAt(i, c);
+      });
+      im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true;
+      grp.add(im);
+    }
+  }
+}
+// ---------- landmarks ----------
+function o3Mats(){
+  if (O3.mats) return O3.mats;
+  const T = THREE, st = (c,b)=>{ const t = v3TexStone(c,b); return t; };
+  return (O3.mats = {
+    stone: new T.MeshStandardMaterial({ map:st('#8a8478'), roughness:0.9 }),
+    dark: new T.MeshStandardMaterial({ map:st('#4a4550', true), roughness:0.9 }),
+    black: new T.MeshStandardMaterial({ color:0x0a0806, roughness:1 }),
+    plaster: new T.MeshStandardMaterial({ map:v3TexPlaster('#d8ccb0'), roughness:0.95 }),
+    wood: new T.MeshStandardMaterial({ map:v3TexWood('#6a4a2a', true), roughness:0.9 }),
+    roof: new T.MeshStandardMaterial({ map:v3TexShingle('#7a3a2a'), roughness:0.85 }),
+    roofBlue: new T.MeshStandardMaterial({ map:v3TexShingle('#34466a'), roughness:0.85 }),
+    iron: new T.MeshStandardMaterial({ color:0x2a2a2e, roughness:0.5, metalness:0.7 }),
+    rock: new T.MeshStandardMaterial({ color:new T.Color(0x5a5048).convertSRGBToLinear(), roughness:0.95, flatShading:true }),
+    bone: new T.MeshStandardMaterial({ color:new T.Color(0xd8ccb0).convertSRGBToLinear(), roughness:0.7 }),
+    win: new T.MeshStandardMaterial({ color:0x2a2010, emissive:new T.Color(0xffb050), emissiveIntensity:0.1 }),
+    purple: new T.MeshStandardMaterial({ color:0x1a0a2a, emissive:new T.Color(0xb060ff), emissiveIntensity:1.4 }),
+    cyan: new T.MeshStandardMaterial({ color:0x0a2a2a, emissive:new T.Color(0x50e0d0), emissiveIntensity:0.9 }),
+    ember: new T.MeshStandardMaterial({ color:0x2a0a00, emissive:new T.Color(0xff6a1a), emissiveIntensity:1.6 }),
+    banner: new T.MeshStandardMaterial({ color:new T.Color(0x9a1e1e).convertSRGBToLinear(), roughness:0.8, side:T.DoubleSide }),
+    moss: new T.MeshStandardMaterial({ map:st('#6a7a5a'), roughness:0.95 }),
+  });
+}
+function o3Glow(col, size){
+  const T = THREE, k = 'glow'+col;
+  if (!O3.tex[k]){ const c = v3Canvas(64,64), x = c.getContext('2d'), g = x.createRadialGradient(32,32,0,32,32,32);
+    g.addColorStop(0, col); g.addColorStop(0.35, col.replace(/[\d.]+\)$/, '0.45)')); g.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g; x.fillRect(0,0,64,64);
+    O3.tex[k] = new T.CanvasTexture(c); }
+  const sp = new T.Sprite(new T.SpriteMaterial({ map:O3.tex[k], transparent:true, depthWrite:false, blending:T.AdditiveBlending }));
+  sp.scale.setScalar(size); return sp;
+}
+function o3Gable(w, d, h, mat){
+  const T = THREE, s = new T.Shape(); s.moveTo(-w/2,0); s.lineTo(0,h); s.lineTo(w/2,0); s.lineTo(-w/2,0);
+  const g = new T.ExtrudeGeometry(s, { depth:d, bevelEnabled:false }); g.translate(0,0,-d/2); v3WorldUV(g, 2);
+  const o = new T.Mesh(g, mat); o.castShadow = o.receiveShadow = true; return o;
+}
+function o3House(g, x, z, w, d, mats, rot){
+  const T = THREE, hg = new T.Group(); hg.position.set(x, 0, z); hg.rotation.y = rot||0; g.add(hg);
+  const body = v3Box(w, 0.36, d, mats.plaster, 0, 0.18, 0); hg.add(body);
+  const roof = o3Gable(w*1.15, d*1.1, 0.28, mats.roof); roof.position.y = 0.36; hg.add(roof);
+  for (const s of [-1,1]){ const win = new T.Mesh(new T.PlaneGeometry(0.07,0.08), mats.win); win.position.set(s*w*0.25, 0.2, d/2+0.002); hg.add(win); O3.windows.push(win); }
+  return hg;
+}
+function o3Site(t, gx, gz){
+  const T = THREE, mats = o3Mats(), g = new T.Group(), rnd = (s)=> o3Hash(Math.floor(gx), Math.floor(gz), s);
+  const flame = (x,y,z)=>{ const f = o3Glow('rgba(255,170,60,1)', 0.28); f.position.set(x,y,z); g.add(f); O3.flames.push(f); };
+  if (t===OW_TOWN){
+    const layout = [[-0.32,-0.28,0.34,0.28,0.2],[0.3,-0.25,0.3,0.26,-0.3],[-0.3,0.3,0.28,0.3,0.4],[0.32,0.3,0.36,0.26,-0.1]];
+    layout.forEach(([x,z,w,d,r])=> o3House(g, x, z, w, d, mats, r));
+    const tower = v3Box(0.22, 0.7, 0.22, mats.stone, 0, 0.35, 0); g.add(tower);
+    const cap = new T.Mesh(new T.ConeGeometry(0.2, 0.3, 4), mats.roof); cap.rotation.y = Math.PI/4; cap.position.y = 0.85; cap.castShadow = true; g.add(cap);
+    for (let i=0;i<22;i++){ const a = i/22*Math.PI*2; const p = v3Cyl(0.035,0.04,0.3,5,mats.wood, Math.cos(a)*0.72, 0.15, Math.sin(a)*0.72); g.add(p); }
+    O3.smoke.push({ p:[gx+0.3, O3.heightAt(gx,gz)+0.7, gz-0.25], t:rnd(1)*0.4 });
+    flame(0.0, 0.5, 0.74);
+  } else if (t===OW_DUNGEON){
+    const mound = new T.Mesh(new T.DodecahedronGeometry(0.62,1), mats.rock); mound.scale.set(1,0.62,0.9); mound.position.y = 0.05; mound.castShadow = mound.receiveShadow = true; g.add(mound);
+    const mouth = new T.Mesh(new T.CircleGeometry(0.22, 20, 0, Math.PI), mats.black); mouth.position.set(0, 0.02, 0.52); mouth.rotation.x = -0.25; g.add(mouth);
+    for (const s of [-1,1]){ const post = v3Cyl(0.03,0.035,0.36,5,mats.wood, s*0.3, 0.18, 0.54); g.add(post); flame(s*0.3, 0.42, 0.54); }
+  } else if (t===OW_CASTLE){
+    const wallH = 0.38, R = 0.52;
+    for (const [x,z,w,d] of [[0,-R,2*R,0.1],[0,R,2*R,0.1],[-R,0,0.1,2*R],[R,0,0.1,2*R]]){ g.add(v3Box(w, wallH, d, mats.stone, x, wallH/2, z));
+      const n = 6; for (let i=0;i<n;i++){ const f = (i+0.5)/n - 0.5; g.add(v3Box(w>d?0.07:0.1, 0.07, w>d?0.1:0.07, mats.stone, x + (w>d?f*w:0), wallH+0.035, z + (w>d?0:f*d))); } }
+    for (const [x,z] of [[-R,-R],[R,-R],[-R,R],[R,R]]){ g.add(v3Cyl(0.13,0.14,0.6,10,mats.stone,x,0.3,z)); const c = new T.Mesh(new T.ConeGeometry(0.17,0.3,10), mats.roofBlue); c.position.set(x,0.75,z); c.castShadow = true; g.add(c); }
+    g.add(v3Box(0.42, 0.78, 0.42, mats.stone, 0, 0.39, -0.05));
+    const kc = new T.Mesh(new T.ConeGeometry(0.34,0.36,4), mats.roofBlue); kc.rotation.y = Math.PI/4; kc.position.set(0,0.96,-0.05); kc.castShadow = true; g.add(kc);
+    const pole = v3Cyl(0.01,0.01,0.4,4,mats.iron,0,1.3,-0.05); g.add(pole);
+    const flag = new T.Mesh(new T.PlaneGeometry(0.22,0.12), mats.banner); flag.position.set(0.11,1.42,-0.05); g.add(flag); O3.glows.push({ flag });
+    g.add(v3Box(0.18, 0.22, 0.02, mats.black, 0, 0.11, R+0.052));
+    flame(-0.14, 0.3, R+0.08); flame(0.14, 0.3, R+0.08);
+  } else if (t===OW_NECROTOWER){
+    const tw = new T.Mesh(new T.CylinderGeometry(0.16, 0.26, 1.7, 8), mats.dark); tw.position.y = 0.85; tw.castShadow = tw.receiveShadow = true; g.add(tw);
+    for (let i=0;i<5;i++){ const a = i/5*Math.PI*2, sp = new T.Mesh(new T.ConeGeometry(0.05,0.34,5), mats.dark); sp.position.set(Math.cos(a)*0.15, 1.82, Math.sin(a)*0.15); sp.castShadow = true; g.add(sp); }
+    const top = new T.Mesh(new T.ConeGeometry(0.1,0.5,6), mats.dark); top.position.y = 1.95; g.add(top);
+    for (const y of [0.55, 1.0, 1.4]){ const w = new T.Mesh(new T.PlaneGeometry(0.06,0.12), mats.purple); w.position.set(0, y, 0.21 - (y-0.5)*0.05); g.add(w); }
+    const orb = o3Glow('rgba(190,110,255,1)', 0.9); orb.position.y = 2.3; g.add(orb); O3.glows.push({ orb, base:2.3, ph:rnd(2)*6 });
+    const base = new T.Mesh(new T.CylinderGeometry(0.45,0.55,0.12,10), mats.dark); base.position.y = 0.04; base.receiveShadow = true; g.add(base);
+  } else if (t===OW_TEMPLE){
+    const steps = [[1.1,0.08],[0.9,0.16],[0.72,0.24]];
+    steps.forEach(([w,y])=> g.add(v3Box(w, 0.08, w*0.8, mats.moss, 0, y-0.04, 0)));
+    for (let i=0;i<3;i++) for (const s of [-1,1]){ const broken = (i===2 && s===1); const h = broken ? 0.22 : 0.46; g.add(v3Cyl(0.045,0.05,h,8,mats.stone, (i-1)*0.26, 0.24+h/2, s*0.2)); }
+    const ped = o3Gable(0.78, 0.5, 0.18, mats.stone); ped.position.set(-0.03, 0.7, 0); ped.rotation.z = 0.08; g.add(ped);
+    const glow = o3Glow('rgba(80,230,210,1)', 0.8); glow.position.y = 0.45; g.add(glow); O3.glows.push({ orb:glow, base:0.45, ph:rnd(3)*6, amp:0.03 });
+  } else if (t===OW_GRAVEYARD){
+    for (let i=0;i<7;i++){ const x = (rnd(10+i)-0.5)*0.9, z = (rnd(20+i)-0.5)*0.8; const st = v3Box(0.09, 0.14, 0.03, mats.stone, x, 0.07, z); st.rotation.set((rnd(30+i)-0.5)*0.3, (rnd(40+i)-0.5)*0.6, (rnd(50+i)-0.5)*0.3); g.add(st); }
+    const crypt = v3Box(0.34, 0.3, 0.3, mats.dark, 0.18, 0.15, -0.26); g.add(crypt);
+    const cr = o3Gable(0.4, 0.34, 0.16, mats.dark); cr.position.set(0.18, 0.3, -0.26); g.add(cr);
+    for (let i=0;i<26;i++){ const a = i/26*Math.PI*2; g.add(v3Cyl(0.01,0.01,0.24,4,mats.iron, Math.cos(a)*0.62, 0.12, Math.sin(a)*0.55)); }
+    const dt = new T.Mesh(new T.CylinderGeometry(0.02,0.06,0.8,5), mats.wood); dt.position.set(-0.36,0.4,-0.2); dt.rotation.z = 0.15; g.add(dt);
+    for (const s of [-1,1]){ const b = new T.Mesh(new T.CylinderGeometry(0.01,0.025,0.34,4), mats.wood); b.position.set(-0.36+s*0.12, 0.62, -0.2); b.rotation.z = -s*0.9; g.add(b); }
+    const mist = o3Glow('rgba(170,230,180,0.5)', 1.3); mist.position.y = 0.12; g.add(mist); O3.glows.push({ orb:mist, base:0.12, ph:rnd(4)*6, amp:0.02 });
+  } else if (t===OW_MINE){
+    const hill = new T.Mesh(new T.DodecahedronGeometry(0.6,1), mats.rock); hill.scale.set(1.1,0.7,0.9); hill.position.set(0,0.05,-0.12); hill.castShadow = hill.receiveShadow = true; g.add(hill);
+    const hole = new T.Mesh(new T.PlaneGeometry(0.3,0.32), mats.black); hole.position.set(0,0.2,0.43); g.add(hole);
+    for (const s of [-1,1]) g.add(v3Box(0.05,0.4,0.05, mats.wood, s*0.18, 0.2, 0.45));
+    g.add(v3Box(0.46,0.06,0.07, mats.wood, 0, 0.42, 0.45));
+    for (const s of [-1,1]) g.add(v3Box(0.02,0.015,0.6, mats.iron, s*0.07, 0.01, 0.75));
+    for (let i=0;i<5;i++) g.add(v3Box(0.2,0.012,0.035, mats.wood, 0, 0.005, 0.5+i*0.12));
+    const cart = v3Box(0.16,0.1,0.2, mats.wood, 0, 0.08, 0.85); g.add(cart);
+    flame(0.24, 0.46, 0.5);
+  } else if (t===OW_LAIR){
+    for (let i=0;i<7;i++){ const a = i/7*Math.PI*2 + rnd(60+i), r = 0.35 + rnd(70+i)*0.25, h = 0.5 + rnd(80+i)*0.7; const sp = new T.Mesh(new T.ConeGeometry(0.12+rnd(90+i)*0.08, h, 5), mats.rock); sp.position.set(Math.cos(a)*r, h/2-0.05, Math.sin(a)*r*0.8 - 0.1); sp.rotation.set((rnd(100+i)-0.5)*0.4, 0, (rnd(110+i)-0.5)*0.4); sp.castShadow = true; g.add(sp); }
+    const mouth = new T.Mesh(new T.CircleGeometry(0.2, 18, 0, Math.PI), mats.ember); mouth.position.set(0, 0.02, 0.3); g.add(mouth);
+    const glow = o3Glow('rgba(255,110,30,1)', 1.1); glow.position.set(0, 0.2, 0.35); g.add(glow); O3.glows.push({ orb:glow, base:0.2, ph:rnd(5)*6, amp:0.02, flick:true });
+    for (let i=0;i<4;i++){ const b = v3Cyl(0.015,0.015,0.2,4, mats.bone, (rnd(120+i)-0.5)*0.6, 0.02, 0.45+rnd(130+i)*0.2); b.rotation.z = Math.PI/2; b.rotation.y = rnd(140+i)*3; g.add(b); }
+    O3.smoke.push({ p:[gx, O3.heightAt(gx,gz)+0.6, gz-0.1], t:rnd(1)*0.4, dark:true });
+  }
+  g.traverse(o=>{ if (o.isMesh){ o.castShadow = true; o.receiveShadow = true; } });
+  return g;
+}
+const O3_SITE_NAME = { [OW_DUNGEON]:'Dungeon', [OW_CASTLE]:'Castle', [OW_NECROTOWER]:'Necromancer\'s Tower', [OW_TEMPLE]:'Sunken Temple', [OW_GRAVEYARD]:'Graveyard', [OW_MINE]:'Mine', [OW_LAIR]:'Dragon\'s Lair' };
+function o3TownName(x,y){
+  const tp = G.ow.townPositions || {};
+  for (const k in tp){ const p = tp[k]; if (p && p.x===x && p.y===y){ const f = G.ow.townFlavor && G.ow.townFlavor[k]; return f ? f.name : 'Village'; } }
+  return 'Village';
+}
+function o3Sites(grp, x0, y0, W){
+  const T = THREE;
+  for (let x=x0; x<x0+W; x++) for (let y=y0; y<y0+W; y++){
+    const t = o3Tile(x,y);
+    if (!OW_SITE_TILES.includes(t)) continue;
+    const gx = x+0.5, gz = y+0.5, g = o3Site(t, gx, gz);
+    g.scale.setScalar(1.3); g.position.set(gx, O3.heightAt(gx,gz), gz); g.rotation.y = 0.52 + (t===OW_TOWN ? 0 : (o3Hash(x,y,9)-0.5)*0.3);   // entrances face the camera
+    grp.add(g);
+    // an invisible box to click/hover the whole landmark
+    const hb = new T.Mesh(new T.BoxGeometry(1,1.2,1), new T.MeshBasicMaterial({ visible:false })); hb.position.set(gx, g.position.y+0.6, gz);
+    hb.userData.act = { kind:'site', x, y, t }; grp.add(hb); O3.hits.push(hb);
+    const el = document.createElement('div'); el.className = 'v3plate' + (t===OW_TOWN ? ' vendor' : ' o3site');
+    el.innerHTML = `<b>${esc(t===OW_TOWN ? o3TownName(x,y) : (O3_SITE_NAME[t]||''))}</b>`;
+    O3.labels.appendChild(el);
+    O3.plates.push({ el, pos:new T.Vector3(gx, g.position.y + 1.3*(t===OW_NECROTOWER ? 2.6 : t===OW_CASTLE ? 1.7 : 1.15), gz), town: t===OW_TOWN, x, y });
+  }
+}
+// ---------- roaming encounters and mythic beasts ----------
+function o3IconTex(key, recipe, color, ring){
+  if (O3.tex[key]) return O3.tex[key];
+  const c = v3Canvas(128,128), x = c.getContext('2d');
+  x.fillStyle = 'rgba(10,8,8,0.82)'; x.beginPath(); x.arc(64,64,56,0,Math.PI*2); x.fill();
+  x.lineWidth = 6; x.strokeStyle = ring; x.stroke();
+  drawMonsterArt(64, 64, 84, recipe, color, x);
+  const t = new THREE.CanvasTexture(c); if (THREE.sRGBEncoding) t.encoding = THREE.sRGBEncoding;
+  return (O3.tex[key] = t);
+}
+function o3SyncEncounters(){
+  const T = THREE, list = [];
+  for (const e of (G.ow.encounters||[])) list.push(['enc', e.x, e.y]);
+  for (const b of (G.ow.mythicBeasts||[])) if (!b.slain) list.push(['myth', b.x, b.y]);
+  const key = list.map(l=>l.join(':')).join('|');
+  if (key === O3.encKey) return;
+  O3.encKey = key;
+  const g = O3.encGrp; while (g.children.length) g.remove(g.children[0]);
+  O3.encMarks = [];
+  for (const [k,x,y] of list){
+    const gx = x+0.5, gz = y+0.5;
+    if (Math.abs(gx-O3.win.cx) > O3_W/2 || Math.abs(gz-O3.win.cy) > O3_W/2) continue;
+    const myth = k==='myth';
+    const tex = myth ? o3IconTex('myth', MYTHIC_ART, COL.mythic, '#e0a0ff') : o3IconTex('enc', ENCOUNTER_ART, COL.encounter, '#ff5a3a');
+    const sp = new T.Sprite(new T.SpriteMaterial({ map:tex, transparent:true, depthTest:true }));
+    sp.scale.setScalar(myth ? 0.8 : 0.6);
+    const y0 = Math.max(O3.heightAt(gx,gz), -0.14);
+    sp.position.set(gx, y0 + (myth ? 1.0 : 0.75), gz);
+    const ring = new T.Mesh(new T.RingGeometry(0.28, 0.36, 28), new T.MeshBasicMaterial({ color: myth ? 0xc070ff : 0xff4a2a, transparent:true, opacity:0.7, depthWrite:false }));
+    ring.rotation.x = -Math.PI/2; ring.position.set(gx, y0 + 0.03, gz);
+    g.add(sp); g.add(ring); O3.encMarks.push({ sp, ring, base: sp.position.y, ph: (x*7+y*3)%6 });
+  }
+}
+// ---------- setup ----------
+function o3Init(){
+  if (O3.ok!==null) return O3.ok;
+  if (typeof THREE==='undefined') return false;
+  try{
+    const T = THREE, wrap = document.querySelector('.mapwrap');
+    const cv = document.createElement('canvas'); cv.id = 'worldGL'; cv.style.cssText = 'position:absolute;display:none;touch-action:none;';
+    wrap.appendChild(cv); O3.cv = cv;
+    const lab = document.createElement('div'); lab.id = 'o3labels'; lab.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:hidden;display:none;'; wrap.appendChild(lab); O3.labels = lab;
+    const R = O3.renderer = new T.WebGLRenderer({ canvas:cv, antialias:true });
+    R.shadowMap.enabled = true; R.shadowMap.type = T.PCFSoftShadowMap;
+    if (T.sRGBEncoding) R.outputEncoding = T.sRGBEncoding;
+    R.toneMapping = T.ACESFilmicToneMapping;
+    O3.scene = new T.Scene();
+    O3.cam = new T.PerspectiveCamera(34, 1, 0.5, 160);
+    O3.hemi = new T.HemisphereLight(0xdde8ff, 0x4a4030, 0.8); O3.scene.add(O3.hemi);
+    const sun = O3.sun = new T.DirectionalLight(0xfff0d8, 1.8); sun.castShadow = true;
+    sun.shadow.mapSize.set(2048,2048); const s = sun.shadow.camera; s.left = -22; s.right = 22; s.top = 22; s.bottom = -22; s.near = 1; s.far = 80; sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.03;
+    O3.scene.add(sun); O3.scene.add(sun.target);
+    O3.lantern = new T.PointLight(0xffc070, 0, 6, 2); O3.scene.add(O3.lantern);
+    O3.ray = new T.Raycaster();
+    // the player: the same painted figure as in town, or a little boat on the water
+    O3.pgrp = new T.Group(); O3.scene.add(O3.pgrp);
+    O3.player = v3Person(v3PlayerLook(), 0.95, O3.pgrp);
+    const boat = O3.boat = new T.Group();
+    const hull = new T.Mesh(new T.CylinderGeometry(0.28, 0.2, 0.9, 10, 1, false, 0, Math.PI), new T.MeshStandardMaterial({ map:v3TexWood('#6a4a2a', true), roughness:0.9, side:T.DoubleSide }));
+    hull.rotation.set(Math.PI/2, 0, Math.PI); hull.position.y = 0.12; boat.add(hull);
+    const mast = new T.Mesh(new T.CylinderGeometry(0.015,0.02,0.9,5), new T.MeshStandardMaterial({ color:0x4a3420 })); mast.position.y = 0.5; boat.add(mast);
+    const sail = new T.Mesh(new T.PlaneGeometry(0.45,0.5), new T.MeshStandardMaterial({ color:0xe8dcc0, side:T.DoubleSide, roughness:0.9 })); sail.position.set(0,0.62,0.02); boat.add(sail);
+    boat.traverse(o=>{ if (o.isMesh) o.castShadow = true; });
+    O3.pgrp.add(boat);
+    // rain streaks
+    const RN = 900, rp = new Float32Array(RN*6);
+    const rg = new T.BufferGeometry(); rg.setAttribute('position', new T.BufferAttribute(rp,3));
+    O3.rain = new T.LineSegments(rg, new T.LineBasicMaterial({ color:0xaabbd0, transparent:true, opacity:0.45 })); O3.rain.frustumCulled = false; O3.scene.add(O3.rain);
+    O3.rainDrops = Array.from({length:RN}, ()=>[Math.random()*30-15, Math.random()*12, Math.random()*30-15]);
+    o3Input(cv);
+    O3.ok = true;
+  }catch(e){ O3.ok = false; }
+  return O3.ok;
+}
+function o3ApplyTime(){
+  const T = THREE, p = dayPhase();                           // 0 midnight .. 0.5 noon
+  const sunUp = Math.sin((p-0.25)*Math.PI*2);                // -1 .. 1
+  const day = Math.max(0, Math.min(1, (sunUp+0.15)/0.45));   // soft dawn and dusk
+  const dusk = Math.max(0, 1 - Math.abs(sunUp)/0.3) ;        // warm light near the horizon
+  const wx = G.weather||'clear', gloom = wx==='storm' ? 0.8 : wx==='rain' ? 0.35 : wx==='fog' ? 0.2 : 0;
+  const lerpC = (a,b,k)=> new T.Color(a).lerp(new T.Color(b), k);
+  const sky = lerpC(0x0b1022, 0x8fb4dc, day).lerp(new T.Color(0xe8a070), dusk*0.35*day).lerp(new T.Color(wx==='fog' ? 0xb8bcc0 : wx==='storm' ? 0x2a3038 : 0x5a6068), gloom*(0.4+0.6*day));
+  O3.scene.background = sky;
+  const fogNear = wx==='fog' ? 6 : wx==='storm' ? 12 : 20, fogFar = wx==='fog' ? 22 : wx==='storm' ? 34 : 46;
+  O3.scene.fog = new T.Fog(sky, fogNear, fogFar);
+  O3.hemi.color = lerpC(0x3a4a78, 0xdde8ff, day); O3.hemi.groundColor = lerpC(0x151210, 0x5a4a30, day);
+  O3.hemi.intensity = (0.16 + day*0.55) * (1 - gloom*0.35);
+  O3.sun.color = lerpC(0x7a90e0, 0xfff0d8, day).lerp(new T.Color(0xffa060), dusk*0.5*day);
+  O3.sun.intensity = (0.25 + day*1.45) * (1 - gloom*0.55);
+  // the sun (or moon) swings across the sky with the clock
+  const a = (p-0.25)*Math.PI*2, pp = O3.pgrp.position;
+  const up = day > 0.05 ? Math.max(0.35, Math.sin(a)) : 0.8;
+  O3.sun.position.set(pp.x - Math.cos(a)*14, 6 + up*14, pp.z + 8);
+  O3.sun.target.position.copy(pp);
+  const night = 1 - day;
+  O3.mats && (O3.mats.win.emissiveIntensity = 0.1 + night*1.6);
+  O3.lantern.intensity = night*1.3;
+  O3.night = night;
+}
+// ---------- walking: breadth-first path over tiles you can actually step on ----------
+function o3Passable(x,y){ if (x<0||y<0||x>=OW_COLS||y>=OW_ROWS) return false; const t = G.ow.map[x][y]; if (t===OW_MOUNTAIN) return false; if (t===OW_WATER && !G.player.hasBoat) return false; return true; }
+function o3PathTo(tx, ty){
+  const sx = G.owPos.x, sy = G.owPos.y, key = (x,y)=>x+','+y, prev = new Map([[key(sx,sy), null]]), q = [[sx,sy]], lim = 60;
+  let end = null;
+  while (q.length && !end){
+    const [x,y] = q.shift();
+    for (const [dx,dy] of [[0,-1],[1,0],[0,1],[-1,0]]){
+      const nx = x+dx, ny = y+dy, k = key(nx,ny);
+      if (prev.has(k) || Math.abs(nx-sx)>lim || Math.abs(ny-sy)>lim || !o3Passable(nx,ny)) continue;
+      // don't route THROUGH a site (stepping on one enters it) unless it's where you're going
+      const t = G.ow.map[nx][ny];
+      if (OW_SITE_TILES.includes(t) && !(nx===tx && ny===ty)) continue;
+      prev.set(k, [x,y]); if (nx===tx && ny===ty){ end = [nx,ny]; break; } q.push([nx,ny]);
+    }
+  }
+  if (!end) return null;
+  const steps = []; let c = end;
+  while (c && !(c[0]===sx && c[1]===sy)){ const p = prev.get(key(c[0],c[1])); steps.unshift([c[0]-p[0], c[1]-p[1]]); c = p; }
+  return steps;
+}
+function o3WalkTo(act){
+  let { x, y } = act;
+  if (!o3Passable(x,y)){   // nearest tile you can reach around where you clicked
+    let best = null, bd = 1e9;
+    for (let i=-4;i<=4;i++) for (let j=-4;j<=4;j++){ const nx = x+i, ny = y+j; if (!o3Passable(nx,ny)) continue; const d = i*i+j*j; if (d<bd){ bd = d; best = [nx,ny]; } }
+    if (!best) return; [x,y] = best;
+  }
+  O3.path = o3PathTo(x, y) || [];
+  O3.stepT = 0.05;
+  if (act.fx!==undefined) O3.clickFx = { x:act.fx, y:act.fy, z:act.fz, t:0 };
+}
+function o3Pick(e){
+  const r = O3.cv.getBoundingClientRect(), T = THREE;
+  const m = new T.Vector2(((e.clientX-r.left)/r.width)*2-1, -((e.clientY-r.top)/r.height)*2+1);
+  O3.ray.setFromCamera(m, O3.cam);
+  const hits = O3.ray.intersectObjects(O3.hits, false);
+  if (hits.length) return hits[0].object.userData.act;
+  const lh = O3.land ? O3.ray.intersectObject(O3.land, false) : [];
+  if (lh.length){ const p = lh[0].point; return { kind:'ground', x:Math.floor(p.x), y:Math.floor(p.z), fx:p.x, fy:Math.max(p.y,-0.14), fz:p.z }; }
+  return null;
+}
+function o3Input(cv){
+  cv.addEventListener('pointermove', e=>{ if (!o3Active()) return; const a = o3Pick(e); O3.hover = a && a.kind==='site' ? a : null; cv.style.cursor = O3.hover ? 'pointer' : 'default'; });
+  cv.addEventListener('pointerdown', e=>{ if (!o3Active() || G.ui!=='playing' || e.button!==0) return; const a = o3Pick(e); if (a) o3WalkTo(a); });
+  cv.addEventListener('wheel', e=>{ if (!o3Active()) return; e.preventDefault(); O3.dist = clamp(O3.dist * (e.deltaY>0 ? 1.1 : 0.9), 7, 28); }, { passive:false });
+}
+// ---------- per-frame ----------
+function o3Render(){
+  if (!o3Init()) return false;
+  const T = THREE, now = performance.now(), dt = O3.last ? Math.min(0.1, (now-O3.last)/1000) : 0.016; O3.last = now; O3.t += dt;
+  // (re)build the land when you get near the edge of what's built, or the world changed
+  const px = G.owPos.x, py = G.owPos.y;
+  if (!O3.win || O3.mapRef!==G.ow.map || Math.abs(px - O3.win.cx) > O3_W/2 - 16 || Math.abs(py - O3.win.cy) > O3_W/2 - 16){
+    O3.mapRef = G.ow.map; o3Build(px, py); O3.path = O3.path||[];
+    if (!O3.ppos) O3.ppos = new T.Vector3(px+0.5, 0, py+0.5);
+  }
+  const mc = canvas, cv = O3.cv;
+  cv.style.display = 'block'; O3.labels.style.display = 'block';
+  cv.style.left = mc.style.left || '0px'; cv.style.top = mc.style.top || '0px';
+  const cw = mc.clientWidth, ch = mc.clientHeight;
+  cv.style.width = cw+'px'; cv.style.height = ch+'px';
+  const pr = Math.min(2, window.devicePixelRatio||1);
+  if (O3.sz !== cw+'x'+ch+'@'+pr){ O3.sz = cw+'x'+ch+'@'+pr; O3.renderer.setPixelRatio(pr); O3.renderer.setSize(cw, ch, false); O3.cam.aspect = cw/Math.max(1,ch); O3.cam.updateProjectionMatrix(); }
+  Object.assign(O3.labels.style, { left:cv.style.left, top:cv.style.top, width:cw+'px', height:ch+'px', inset:'auto' });
+  // click-walking, one grid step at a time through the normal move rules
+  if (O3.path.length && G.ui==='playing' && !G.gameOver){
+    O3.stepT -= dt;
+    if (O3.stepT <= 0){ const [dx,dy] = O3.path.shift(); moveDir(dx,dy); O3.stepT = 0.16; if (G.ui!=='playing' || G.gameMode!==0 || G.owPos.x!==px+dx || G.owPos.y!==py+dy) O3.path = []; }
+  } else if (G.ui!=='playing') O3.path = [];
+  if (G.gameMode!==0) return true;
+  owReveal(G.owPos.x, G.owPos.y, 8); pmPrebuild();
+  o3SyncEncounters();
+  // you glide between tiles; on water you ride a boat
+  const sailing = G.ow.map[G.owPos.x][G.owPos.y]===OW_WATER;   // only open water needs the boat; rivers are waded
+  const tx = G.owPos.x+0.5, tz = G.owPos.y+0.5, pp = O3.ppos || (O3.ppos = new T.Vector3(tx,0,tz));
+  const k = 1-Math.exp(-dt*10), dxs = tx-pp.x, dzs = tz-pp.z, moving = Math.hypot(dxs,dzs) > 0.03;
+  if (Math.hypot(dxs,dzs) > 3){ pp.x = tx; pp.z = tz; } else { pp.x += dxs*k; pp.z += dzs*k; }
+  const gy = O3.heightAt(pp.x, pp.z);
+  pp.y = sailing ? -0.14 : Math.max(gy, -0.14);
+  O3.pgrp.position.copy(pp);
+  const P = O3.player; P.g.visible = !sailing; O3.boat.visible = sailing;
+  const sx = dxs - dzs; if (Math.abs(sx) > 0.05) P.face = sx < 0 ? -1 : 1;
+  P.walk = (P.walk||0) + (moving ? dt*12 : 0);
+  P.sp.position.y = moving ? Math.abs(Math.sin(P.walk))*0.05 : 0;
+  P.sp.scale.x = P.sp.userData.h * P.sp.userData.asp * (P.face||1);
+  if (sailing){ O3.boat.rotation.y = Math.atan2(dxs, dzs) || O3.boat.rotation.y; O3.boat.position.y = Math.sin(O3.t*2)*0.02; O3.boat.rotation.z = Math.sin(O3.t*1.6)*0.05; }
+  o3ApplyTime();
+  O3.lantern.position.set(pp.x, pp.y+0.9, pp.z+0.2);
+  // camera: follows you from the south-east, looking down across the land
+  const yaw = 0.52, D = O3.dist;
+  const want = new T.Vector3(pp.x + Math.sin(yaw)*D*0.66, pp.y + D*0.82, pp.z + Math.cos(yaw)*D*0.66);
+  if (!O3.camPos || O3.camPos.distanceTo(want) > 20) O3.camPos = want.clone(); else O3.camPos.lerp(want, 1-Math.exp(-dt*5));
+  O3.cam.position.copy(O3.camPos); O3.cam.lookAt(O3.camPos.x - Math.sin(yaw)*D*0.66, O3.camPos.y - D*0.82 + 0.5, O3.camPos.z - Math.cos(yaw)*D*0.66);
+  // living details
+  O3.tex.ripple.offset.set(O3.t*0.012, O3.t*0.007);
+  O3.flames.forEach((f,i)=>{ const s = 0.26 * (0.85 + Math.sin(O3.t*13+i*2)*0.1 + Math.sin(O3.t*29+i)*0.06); f.scale.setScalar(s); f.material.opacity = 0.5 + O3.night*0.5; });
+  O3.glows.forEach(g=>{ if (g.flag){ g.flag.rotation.y = Math.sin(O3.t*3)*0.25; return; } g.orb.position.y = g.base + Math.sin(O3.t*1.6 + g.ph)*(g.amp||0.1); if (g.flick) g.orb.material.opacity = 0.75 + Math.sin(O3.t*9+g.ph)*0.15; });
+  (O3.encMarks||[]).forEach(m=>{ m.sp.position.y = m.base + Math.sin(O3.t*2.2 + m.ph)*0.06; m.ring.material.opacity = 0.45 + Math.sin(O3.t*3 + m.ph)*0.25; });
+  // chimney and lair smoke
+  const smokeTex = O3.tex.smoke || (O3.tex.smoke = v3Blob('rgba(200,200,200,1)'));
+  O3.smoke.forEach(s=>{ s.t -= dt; if (s.t<=0){ s.t = 0.4; const sp = new T.Sprite(new T.SpriteMaterial({ map:smokeTex, transparent:true, depthWrite:false, color: s.dark ? 0x3a3430 : 0xbcb8b4, opacity:0.4 })); sp.position.set(s.p[0], s.p[1], s.p[2]); sp.scale.setScalar(0.2); O3.world.add(sp); O3.parts.push({ sp, v:[0.1+Math.random()*0.08, 0.45, -0.04+Math.random()*0.08], life:3, age:0 }); } });
+  for (let i=O3.parts.length-1;i>=0;i--){ const q = O3.parts[i]; q.age += dt; const f = q.age/q.life;
+    if (f>=1){ O3.world.remove(q.sp); q.sp.material.dispose(); O3.parts.splice(i,1); continue; }
+    q.sp.position.x += q.v[0]*dt; q.sp.position.y += q.v[1]*dt; q.sp.position.z += q.v[2]*dt; q.sp.scale.setScalar(0.2 + f*0.9); q.sp.material.opacity = 0.4*(1-f); }
+  // rain and storms
+  const wet = G.weather==='rain' || G.weather==='storm';
+  O3.rain.visible = wet;
+  if (wet){
+    const a = O3.rain.geometry.attributes.position, fall = dt*14, len = 0.35;
+    O3.rainDrops.forEach((d,i)=>{ d[1] -= fall; if (d[1] < -1){ d[0] = Math.random()*30-15; d[1] = 10+Math.random()*2; d[2] = Math.random()*30-15; }
+      a.setXYZ(i*2, pp.x+d[0], pp.y+d[1], pp.z+d[2]); a.setXYZ(i*2+1, pp.x+d[0]-0.04, pp.y+d[1]-len, pp.z+d[2]-0.02); });
+    a.needsUpdate = true;
+    if (G.weather==='storm'){ if (!O3.flash && Math.random() < dt*0.12) O3.flash = 0.35; }
+  }
+  if (O3.flash){ O3.flash -= dt; O3.hemi.intensity += Math.max(0, O3.flash)*4; if (O3.flash <= 0) O3.flash = 0; }
+  // click marker
+  if (O3.clickFx){ O3.clickFx.t += dt; if (!O3.clickRing){ O3.clickRing = new T.Mesh(new T.RingGeometry(0.18,0.26,24), new T.MeshBasicMaterial({ color:0xffd060, transparent:true, depthWrite:false })); O3.clickRing.rotation.x = -Math.PI/2; O3.scene.add(O3.clickRing); }
+    O3.clickRing.visible = O3.clickFx.t < 0.5; O3.clickRing.position.set(O3.clickFx.x, O3.clickFx.y+0.04, O3.clickFx.z); O3.clickRing.scale.setScalar(1 + O3.clickFx.t*1.5); O3.clickRing.material.opacity = 1 - O3.clickFx.t*2; }
+  O3.renderer.render(O3.scene, O3.cam);
+  // name plates: town names always, other sites when near or hovered
+  const v = new T.Vector3(), hv = O3.hover;
+  for (const pl of O3.plates){
+    const near = Math.abs(pl.x - G.owPos.x) + Math.abs(pl.y - G.owPos.y) <= 6, hot = !!hv && hv.x===pl.x && hv.y===pl.y;
+    v.copy(pl.pos); v.project(O3.cam);
+    const vis = (pl.town || near || hot) && v.z < 1 && Math.abs(v.x) < 1.05 && Math.abs(v.y) < 1.05;
+    pl.el.style.display = vis ? 'block' : 'none';
+    if (vis){ pl.el.style.transform = `translate(-50%,-100%) translate(${(v.x*0.5+0.5)*cw}px, ${(-v.y*0.5+0.5)*ch}px)`; pl.el.classList.toggle('hot', hot); }
+  }
+  // the time and weather readout the flat map shows
+  if (!O3.hudEl){ O3.hudEl = document.createElement('div'); O3.hudEl.className = 'o3time'; O3.labels.appendChild(O3.hudEl); }
+  const lbl = `${timeOfDayLabel()}${G.weather!=='clear' ? ' \u00b7 '+G.weather : ''}`;
+  if (O3.hudEl.textContent !== lbl) O3.hudEl.textContent = lbl;
+  return true;
+}
+
 // ---------- lighting ----------
 // wall torches bake a falloff map (with line of sight, so light doesn't leak
 // through stone) whenever the set of torches you've seen changes; each frame
@@ -15413,7 +16200,7 @@ function fpDrawCompass(){
   ctx.beginPath(); ctx.moveTo(cw/2-4*dpr, y0+h+5*dpr); ctx.lineTo(cw/2+4*dpr, y0+h+5*dpr); ctx.lineTo(cw/2, y0+h); ctx.fill();
 }
 function fpDrawLocation(){
-  const label = G.gameMode===2 ? 'open field' : (ASCEND_SITES[G.siteKind] ? `floor ${G.depth}` : `depth ${G.depth}`) + (G.isBossFloor ? ' · lair' : '');
+  const label = G.gameMode===2 ? 'open field' : (ASCEND_SITES[G.siteKind] ? `floor ${G.depth}` : `depth ${G.depth}`) + (G.isBossFloor ? ' \u00b7 lair' : '');
   ctx.save();
   ctx.font = `600 ${Math.round(11*dpr)}px 'JetBrains Mono', monospace`;
   ctx.textAlign = 'left'; ctx.textBaseline = 'top';
@@ -15421,7 +16208,7 @@ function fpDrawLocation(){
   ctx.fillStyle = 'rgba(232,165,75,0.95)'; ctx.fillText(label, 10*dpr, 10*dpr);
   if (G.gameMode===2 && (isNightTime() || G.weather!=='clear')){
     ctx.fillStyle = 'rgba(230,230,235,0.85)';
-    ctx.fillText(`${timeOfDayLabel()}${G.weather!=='clear' ? ' · '+G.weather : ''}`, 10*dpr, 26*dpr);
+    ctx.fillText(`${timeOfDayLabel()}${G.weather!=='clear' ? ' \u00b7 '+G.weather : ''}`, 10*dpr, 26*dpr);
   }
   ctx.restore();
 }
@@ -16956,6 +17743,7 @@ function moveDir(dx,dy){
 }
 function handlePlayingKey(k){
   if (G.gameMode===3 && V3.path) V3.path = [];  // any key takes over from click-walking
+  if (G.gameMode===0 && O3.path) O3.path = [];
   if (fpHandleKey(k)) return; // first-person view: relative movement, turning, and M to flip views
   switch(k){
     case 'ArrowUp': case 'w': case 'W': moveDir(0,-1); break;
@@ -16978,6 +17766,7 @@ function handlePlayingKey(k){
       else { logMsg('you must reach level 20 to ascend to New Game+', ''); renderGame(); }
       break;
     case 'v': case 'V': toggleSound(); break;
+    case 'o': case 'O': if (G.gameMode===0 && !G.owZoomedOut) o3Toggle(); break;
     case 'Escape': setUi('help', true); break;
   }
 }
