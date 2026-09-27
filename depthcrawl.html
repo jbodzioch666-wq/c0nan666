@@ -16792,27 +16792,98 @@ function fpwEnchant(w){
   return e;
 }
 const FPW_ENCH = { fire:[0xff6a1a,'rgba(255,140,50,1)'], cold:[0x60c8ff,'rgba(150,220,255,1)'], pois:[0x70e040,'rgba(150,255,110,1)'], unique:[0xffa030,'rgba(255,190,90,1)'] };
+// how each kind of weapon is carried and swung in first person, following
+// the usual conventions of first-person melee games: a one-handed blade rests
+// on the right, tip up and angled in, and cuts diagonally; a dagger is held
+// low with the point forward and stabs; a rapier is extended in a fencing
+// guard and lunges; one-handed axes, maces, hammers and picks are held head-up
+// and chop down from overhead; two-handed weapons show both hands on the grip
+// - a greatsword cleaves across, great axes, mauls and halberds come down in a
+// heavy overhead smash that shakes the view on impact; a spear is carried in
+// both hands with the point forward and thrusts; a quarterstaff is held
+// across the body and sweeps; and with nothing in hand you raise both fists
+// and jab. Heavier weapons wind up longer. The weapon breathes at rest, bobs
+// as you walk and lags a little behind the view when you turn.
+// hp: where the grip sits (camera space); rot: its tilt; left: where a second
+// hand grips, along the weapon; atk: the attack; dur: its length in seconds
+const FPW_STYLE = {
+  blade1:  { hp:[0.42,-0.26,-1.1],  rot:[-0.3,0.3,0.42],   atk:'slash',  dur:0.34 },
+  dagger:  { hp:[0.33,-0.27,-0.98], rot:[-1.2,0.3,0.3],    atk:'stab',   dur:0.24 },
+  rapier:  { hp:[0.33,-0.26,-0.95], rot:[-1.32,0.38,0.12], atk:'lunge',  dur:0.3 },
+  blade2:  { hp:[0.24,-0.2,-1.25],  rot:[-0.35,0.25,0.72], left:-0.14, atk:'cleave', dur:0.55 },
+  head1:   { hp:[0.4,-0.26,-1.05],   rot:[-0.12,0.25,0.12], atk:'chop',   dur:0.4 },
+  head2:   { hp:[0.3,-0.24,-1.25],  rot:[-0.18,0.3,-0.3],  left:-0.17, atk:'smash', dur:0.62 },
+  polearm: { hp:[0.32,-0.26,-1.25], rot:[-0.45,0.3,-0.25], left:-0.18, atk:'smash', dur:0.62 },
+  spear:   { hp:[0.38,-0.3,-0.95],  rot:[-1.36,0.4,0.04],  left:0.36,  atk:'thrust', dur:0.34 },
+  staff:   { hp:[0.3,-0.3,-1.1],    rot:[-0.3,0.2,0.95],   left:0.48,  atk:'sweep',  dur:0.42 },
+  fists:   { hp:[0.32,-0.28,-0.95], rot:[-0.25,0.55,-0.35],  atk:'punch',  dur:0.24 },
+};
+function fpwStyleFor(w){
+  if (!w || !w.used) return 'fists';
+  const b = w.basis||'';
+  if (/Dagger/i.test(b)) return 'dagger';
+  if (/Rapier/i.test(b)) return 'rapier';
+  if (/Greatsword/i.test(b)) return 'blade2';
+  if (/Greataxe|Maul/i.test(b)) return 'head2';
+  if (/Halberd/i.test(b)) return 'polearm';
+  if (/Spear/i.test(b)) return 'spear';
+  if (/Quarterstaff/i.test(b)) return 'staff';
+  if (/axe|Pick|Club|Mace|Hammer|Morningstar|Flail/i.test(b)) return 'head1';
+  return 'blade1';
+}
+// [time, rig offset, rig rotation, wrist roll]; the rig pivots at your chest
+const FPW_ATK = {
+  slash:  [[0,[0,0,0],[0,0,0],0],[0.15,[0.04,0.06,0],[0.1,0,-0.12],-0.5],[0.42,[-0.12,0.08,0],[-0.05,-0.05,0.25],0.5],[0.68,[-0.3,0.1,0],[-0.15,-0.1,0.42],1.25],[1,[0,0,0],[0,0,0],0]],
+  stab:   [[0,[0,0,0],[0,0,0],0],[0.25,[0.03,-0.02,0.12],[0.1,0,0],0],[0.5,[-0.12,0.05,-0.34],[-0.05,0.05,0],0],[0.7,[-0.1,0.04,-0.3],[-0.05,0.05,0],0],[1,[0,0,0],[0,0,0],0]],
+  lunge:  [[0,[0,0,0],[0,0,0],0],[0.25,[0.04,0,0.1],[0.05,0,0],0],[0.52,[-0.16,0.06,-0.45],[-0.04,0.08,0],0],[0.72,[-0.14,0.05,-0.42],[-0.04,0.08,0],0],[1,[0,0,0],[0,0,0],0]],
+  chop:   [[0,[0,0,0],[0,0,0],0],[0.3,[0.02,0.08,0.06],[0.3,0,-0.08],-0.2],[0.58,[-0.1,-0.02,-0.06],[-0.3,0,0.12],0.25],[0.75,[-0.1,-0.03,-0.06],[-0.33,0,0.13],0.25],[1,[0,0,0],[0,0,0],0]],
+  cleave: [[0,[0,0,0],[0,0,0],0],[0.3,[0.1,0.14,0.05],[0.25,0,-0.35],-0.3],[0.62,[-0.3,0.06,-0.04],[-0.1,-0.15,0.6],0.5],[0.78,[-0.32,0.05,-0.04],[-0.12,-0.15,0.64],0.5],[1,[0,0,0],[0,0,0],0]],
+  smash:  [[0,[0,0,0],[0,0,0],0],[0.36,[0.02,0.1,0.08],[0.42,0,-0.1],-0.15],[0.6,[-0.1,-0.03,-0.08],[-0.34,0,0.12],0.2],[0.8,[-0.1,-0.04,-0.08],[-0.37,0,0.12],0.2],[1,[0,0,0],[0,0,0],0]],
+  thrust: [[0,[0,0,0],[0,0,0],0],[0.28,[0.03,0,0.14],[0.04,0,0],0],[0.55,[-0.1,0.05,-0.5],[-0.04,0.05,0],0],[0.72,[-0.1,0.05,-0.46],[-0.04,0.05,0],0],[1,[0,0,0],[0,0,0],0]],
+  sweep:  [[0,[0,0,0],[0,0,0],0],[0.25,[0.1,0.03,0],[0,0.3,-0.2],0],[0.6,[-0.3,0.02,-0.05],[0,-0.5,0.3],0],[0.78,[-0.32,0.02,-0.05],[0,-0.52,0.3],0],[1,[0,0,0],[0,0,0],0]],
+  punch:  [[0,[0,0,0],[0,0,0],0],[0.2,[0.02,0,0.05],[0,0,0],0],[0.45,[-0.14,0.06,-0.36],[0,0.1,0],0],[0.6,[-0.13,0.06,-0.33],[0,0.1,0],0],[1,[0,0,0],[0,0,0],0]],
+};
+const FPW_CONTACT = { slash:0.5, stab:0.5, lunge:0.52, chop:0.58, cleave:0.6, smash:0.6, thrust:0.55, sweep:0.58, punch:0.45 };
+const FPW_CHEST = [0.02, -0.62, -0.35];
 function fpwSetWeapon(){
   const w = G.gear.weapon, key = w && w.used ? (w.basis+'|'+(w.quality||0)+'|'+fpwEnchant(w)) : 'fists';
   if (key===FPW.wkey) return;
   FPW.wkey = key;
-  const T = THREE;
-  while (FPW.rig.children.length){ const c = FPW.rig.children[0]; FPW.rig.remove(c); c.traverse(o=>{ if (o.geometry) o.geometry.dispose(); }); }
-  FPW.flail = false;
+  const T = THREE, M = FPW.m;
+  const clear = (grp)=>{ while (grp.children.length){ const c = grp.children[0]; grp.remove(c); c.traverse(o=>{ if (o.geometry) o.geometry.dispose(); }); } };
+  clear(FPW.rig); if (FPW.armGrp) clear(FPW.armGrp); else { FPW.armGrp = new T.Group(); FPW.scene.add(FPW.armGrp); }
+  const styleKey = fpwStyleFor(w), st = FPW_STYLE[styleKey];
+  FPW.style = styleKey; FPW.st = st;
   const { g, info } = fpwBuild(w && w.basis, w);
-  const hand = fpwHand();
-  const held = new T.Group(); held.add(g); held.add(hand);
+  const held = new T.Group(); held.add(g);
+  const right = fpwHand(); held.add(right);
+  const hands = [{ h:right, shoulder:[0.46,-1.75,-0.8] }];
+  if (st.left!==undefined){                       // a second hand further along the grip or shaft
+    const left = fpwHand(); left.scale.x = -1; left.position.y = st.left; g.add(left);
+    hands.push({ h:left, shoulder:[-0.42,-1.75,-0.8] });
+  }
+  if (styleKey==='fists'){                          // both fists up in a guard
+    const left = fpwHand(); left.scale.x = -1; FPW.rig.add(left);
+    left.position.set(-0.3-FPW_CHEST[0], -0.17-FPW_CHEST[1], -1.0-FPW_CHEST[2]); left.rotation.set(-0.1, -0.5, 0.25); left.scale.set(-0.78,0.78,0.78);
+    hands.push({ h:left, shoulder:[-0.42,-1.75,-0.8] }); FPW.leftFist = left;
+  } else FPW.leftFist = null;
   FPW.rig.add(held); FPW.held = held; FPW.info = info; FPW.weaponG = g;
-  // the rig's origin is your shoulder, off the bottom right of the screen; the
-  // hand sits out in front of it, tilted the way a sword rests - blade up and inward
-  held.position.set(-0.25, 0.55, -0.45); held.rotation.set(-0.3, 0.3, 0.42); held.scale.setScalar(0.78);
-  held.updateMatrix();
-  // the forearm always runs from the wrist back toward the shoulder, so a swing never flips it into view
-  const wrist = new T.Vector3(-0.07, -0.1, 0).applyMatrix4(held.matrix), dir = wrist.clone().negate(), len = dir.length(); dir.normalize();
-  const up = new T.Vector3(0,1,0), M = FPW.m;
-  const arm = new T.Mesh(new T.CylinderGeometry(0.062, 0.08, len, 12), M.leather); arm.position.copy(wrist).addScaledVector(dir, len/2); arm.quaternion.setFromUnitVectors(up, dir); FPW.rig.add(arm);
-  const vam = new T.Mesh(new T.CylinderGeometry(0.068, 0.08, 0.3, 12, 1, true, -0.6, 3.0), M.plate); vam.position.copy(wrist).addScaledVector(dir, 0.2); vam.quaternion.setFromUnitVectors(up, dir); vam.material = M.plate; FPW.rig.add(vam);
-  for (let i=0;i<3;i++){ const r = new T.Mesh(new T.SphereGeometry(0.009, 6, 5), M.rivet); r.position.copy(wrist).addScaledVector(dir, 0.1 + i*0.08).add(new T.Vector3(0, 0, 0.075)); FPW.rig.add(r); }
+  held.position.set(st.hp[0]-FPW_CHEST[0], st.hp[1]-FPW_CHEST[1], st.hp[2]-FPW_CHEST[2]);
+  held.rotation.set(st.rot[0], st.rot[1], st.rot[2]); held.scale.setScalar(0.78);
+  // forearms: rebuilt every frame from each wrist back to its shoulder, off-screen, so they never flip into view
+  FPW.arms = hands.map(({h, shoulder})=>{
+    const arm = new T.Mesh(new T.CylinderGeometry(0.03, 0.04, 1, 12), FPW.sleeve || (FPW.sleeve = (()=>{ const m = M.leather.clone(); m.color = new T.Color(0x5a3e2a); return m; })()));
+    const vam = new T.Mesh(new T.CylinderGeometry(0.036, 0.042, 0.13, 12), M.plate);   // the steel cuff of the gauntlet running up the wrist
+    FPW.armGrp.add(arm); FPW.armGrp.add(vam);
+    return { h, shoulder:new T.Vector3(...shoulder), arm, vam };
+  });
+  // a flail's chain and ball hang from a pivot so they can swing
+  FPW.flailHead = null;
+  if (/Flail/i.test((w&&w.basis)||'')){
+    const pivot = new T.Group(); pivot.position.y = 0.28; g.add(pivot);
+    for (const c of g.children.slice()){ if (c!==pivot && c.position.y >= 0.29 && !c.isSprite){ g.remove(c); c.position.y -= 0.28; pivot.add(c); } }
+    FPW.flailHead = pivot;
+  }
   const ench = fpwEnchant(w);
   FPW.ench = ench; FPW.motes = [];
   if (ench && !info.fists){
@@ -16823,47 +16894,69 @@ function fpwSetWeapon(){
     FPW.glow.color.setHex(hex);
     if (info.blade){ info.blade.material = info.blade.material.clone(); info.blade.material.emissive = new T.Color(hex); info.blade.material.emissiveIntensity = ench==='unique' ? 0.06 : ench==='cold' ? 0.12 : 0.07; }
   }
+  FPW.atk = null;
 }
 function fpwDraw(){
   if (!fpwInit()) return false;
-  const T = THREE, cw = canvas.width, chh = canvas.height;
+  const T = THREE, cw = canvas.width, chh = canvas.height, dt = Math.min(0.05, FP.dt || 0.016);
   if (FPW.cv.width !== cw || FPW.cv.height !== chh){ FPW.r.setPixelRatio(1); FPW.r.setSize(cw, chh, false); FPW.cam.aspect = cw/chh; FPW.cam.updateProjectionMatrix(); }
   fpwSetWeapon();
-  FPW.t += FP.dt || 0.016;
+  FPW.t += dt;
   // light it like the spot you're standing in
   let lit = 0.8; try{ lit = clamp(fpLightAt(FP.envNow || fpEnv(), G.player.x+0.5, G.player.y+0.5, 0.3), 0.18, 1.1); }catch(e){}
   const env = FP.envNow, lan = env && env.lan ? env.lan : [1,0.8,0.55];
   FPW.key.color.setRGB(clamp(lan[0],0,1), clamp(lan[1]*0.95,0,1), clamp(lan[2]*0.85,0,1));
   FPW.key.intensity = 0.6 + lit*1.6; FPW.hemi.intensity = 0.15 + lit*0.4; FPW.rim.intensity = 0.35 + lit*0.5;
   FPW.r.toneMappingExposure = 0.9 + lit*0.3;
-  // pose: idle sway, walking bob, and a diagonal slash when you swing
-  const S = Math.min(cw, chh), aspect = cw/chh;
-  const sw = FP.swing, p = sw>0 ? 1-sw : 0;
-  // keyframed swing: wind up high to the right, cut diagonally across the
-  // middle of the screen down to the left, then settle back to the guard
-  // [time, shoulder offset, shoulder rotation, extra wrist roll]
-  const KF = [ [0,    [0,0,0],           [0,0,0],             0],
-               [0.15, [0.04,0.06,0],     [0.1,0,-0.12],     -0.5],
-               [0.42, [-0.12,0.08,0],    [-0.05,-0.05,0.25], 0.5],
-               [0.68, [-0.3,0.1,0],      [-0.15,-0.1,0.42],  1.25],
-               [1,    [0,0,0],           [0,0,0],             0] ];
+  // an attack starts whenever the game plays a swing (FP.swing jumps back up to 1)
+  const st = FPW.st, sw = FP.swing||0;
+  if (sw > (FPW.prevSwing||0) + 0.2) FPW.atk = { t:0, hold:0, landed:false, hit: FPW.lastSwing!=='miss' };
+  FPW.prevSwing = sw;
+  let p = 0;
+  if (FPW.atk){
+    const a = FPW.atk, contact = FPW_CONTACT[st.atk]||0.5;
+    if (a.hold > 0) a.hold -= dt; else a.t += dt / st.dur;
+    // a heavy blow that connects: a moment's hitstop and a jolt through the view
+    if (!a.landed && a.t >= contact){ a.landed = true; if (a.hit){ const heavy = st.atk==='smash' || st.atk==='cleave'; a.hold = heavy ? 0.07 : 0.035; if (heavy) FP.shake = Math.max(FP.shake||0, 0.45); } }
+    p = Math.min(1, a.t);
+    if (a.t >= 1) FPW.atk = null;
+  }
+  if (window.__fpwP !== undefined) p = window.__fpwP;       // (tests pin a pose)
+  const KF = FPW_ATK[st.atk] || FPW_ATK.slash;
   let a = KF[0], b2 = KF[KF.length-1];
   for (let i=0;i<KF.length-1;i++) if (p>=KF[i][0] && p<=KF[i+1][0]){ a = KF[i]; b2 = KF[i+1]; break; }
   let f = (p - a[0]) / Math.max(1e-6, b2[0]-a[0]); f = f*f*(3-2*f);
   const off = [0,1,2].map(i=> a[1][i] + (b2[1][i]-a[1][i])*f), rr = [0,1,2].map(i=> a[2][i] + (b2[2][i]-a[2][i])*f), wr = a[3] + (b2[3]-a[3])*f;
-  const bobX = Math.sin(FP.t*1.3)*0.006 + Math.sin(FP.stepPhase||0)*0.018, bobY = Math.abs(Math.cos(FP.stepPhase||0))*0.022 + Math.sin(FP.t*1.9)*0.005;
-  const lift = immersiveUi ? 0.1 : 0;
-  const baseX = (immersiveUi ? 0.3 : 0.36) * Math.min(1.6, aspect), baseY = -0.34 + lift;
+  // breathing at rest, a figure-eight bob as you walk, and lag behind turns
+  const breath = Math.sin(FPW.t*1.6);
+  const bobX = Math.sin(FP.stepPhase||0)*0.018, bobY = Math.abs(Math.cos(FP.stepPhase||0))*0.022;
+  const yaw = FP.cam ? FP.cam.a : 0; let dA = yaw - (FPW.lastYaw===undefined ? yaw : FPW.lastYaw); FPW.lastYaw = yaw;
+  dA = Math.atan2(Math.sin(dA), Math.cos(dA));
+  FPW.sway = clamp((FPW.sway||0)*Math.exp(-dt*7) - dA*0.9, -0.35, 0.35);
+  const aspect = cw/chh, xs = Math.min(1, Math.min(aspect, 1.8)/1.78), lift = immersiveUi ? 0.1 : 0;
   const R = FPW.rig;
-  R.position.set(baseX + 0.25 + bobX + off[0], baseY - 0.55 - bobY + off[1], -0.75 + off[2]);
-  R.rotation.set(rr[0], rr[1], rr[2]);
-  if (FPW.held) FPW.held.rotation.z = 0.42 + wr;
-  if (FPW.info && FPW.info.crystal){ FPW.info.crystal.rotation.y += (FP.dt||0.016)*1.5; FPW.m.crystal.emissiveIntensity = 1.2 + Math.sin(FPW.t*3)*0.4 + (FP.cast||0)*2; FPW.info.halo.scale.setScalar(0.26 + Math.sin(FPW.t*3)*0.04 + (FP.cast||0)*0.3); }
+  R.position.set(FPW_CHEST[0] + (st.hp[0]*xs - st.hp[0]) + bobX + off[0] + FPW.sway*0.25, FPW_CHEST[1] + lift - bobY + breath*0.006 + off[1], FPW_CHEST[2] + off[2]);
+  R.rotation.set(rr[0] + breath*0.01, rr[1] + FPW.sway, rr[2]);
+  FPW.held.rotation.z = st.rot[2] + wr;
+  if (FPW.leftFist) FPW.leftFist.position.y = -0.17-FPW_CHEST[1] + Math.sin(FPW.t*1.6+1)*0.008;
+  // the flail's head swings on its chain, and whirls round in an attack
+  if (FPW.flailHead){ FPW.flailHead.rotation.z = Math.sin(FPW.t*2.1)*0.18 - FPW.sway*1.5 - bobX*4; FPW.flailHead.rotation.x = p>0 && p<0.8 ? -p/0.8*Math.PI*2 : Math.sin(FPW.t*1.7)*0.1; }
+  // forearms from each wrist back to its shoulder
+  FPW.scene.updateMatrixWorld(true);
+  const up = new T.Vector3(0,1,0);
+  for (const A of (FPW.arms||[])){
+    const wrist = A.h.localToWorld(new T.Vector3(-0.07,-0.1,0));
+    const sh = A.shoulder.clone().add(new T.Vector3(bobX, -bobY + lift, 0));
+    const dir = sh.clone().sub(wrist), len = Math.max(0.05, dir.length()); dir.normalize();
+    A.arm.position.copy(wrist).addScaledVector(dir, len/2); A.arm.quaternion.setFromUnitVectors(up, dir); A.arm.scale.set(1, len, 1);
+    A.vam.position.copy(wrist).addScaledVector(dir, 0.06); A.vam.quaternion.setFromUnitVectors(up, dir);
+  }
+  if (FPW.info && FPW.info.crystal){ FPW.info.crystal.rotation.y += dt*1.5; FPW.m.crystal.emissiveIntensity = 1.2 + Math.sin(FPW.t*3)*0.4 + (FP.cast||0)*2; FPW.info.halo.scale.setScalar(0.26 + Math.sin(FPW.t*3)*0.04 + (FP.cast||0)*0.3); }
   if (FPW.info && FPW.info.rune) FPW.info.rune.material.opacity = 0.45 + Math.sin(FPW.t*2.2)*0.2;
   // enchantment motes drifting up the weapon, and its glow on the gauntlet
   const tipY = FPW.info ? FPW.info.tipY : 0.8;
-  for (const m of (FPW.motes||[])){ m.t += (FP.dt||0.016)*m.s; if (m.t > 1) m.t -= 1;
-    const y = 0.1 + m.t*(tipY-0.1), a = m.t*9 + m.s*20; m.sp.position.set(Math.cos(a)*0.035, y, Math.sin(a)*0.035 + 0.01); m.sp.material.opacity = Math.sin(m.t*Math.PI)*0.9; m.sp.scale.setScalar(0.03 + 0.04*Math.sin(m.t*Math.PI)); }
+  for (const m of (FPW.motes||[])){ m.t += dt*m.s; if (m.t > 1) m.t -= 1;
+    const y = 0.1 + m.t*(tipY-0.1), ang = m.t*9 + m.s*20; m.sp.position.set(Math.cos(ang)*0.035, y, Math.sin(ang)*0.035 + 0.01); m.sp.material.opacity = Math.sin(m.t*Math.PI)*0.9; m.sp.scale.setScalar(0.03 + 0.04*Math.sin(m.t*Math.PI)); }
   if (FPW.ench && !(FPW.info && FPW.info.fists)){ const wp = new T.Vector3(0, tipY*0.5, 0); FPW.weaponG.localToWorld(wp); FPW.glow.position.copy(wp); FPW.glow.intensity = 0.8 + Math.sin(FPW.t*7)*0.2; } else FPW.glow.intensity = 0;
   FPW.r.render(FPW.scene, FPW.cam);
   ctx.drawImage(FPW.cv, 0, 0, cw, chh);
@@ -17195,7 +17288,7 @@ canvas.addEventListener('click', (e)=>{
 const fpBaseSfx = sfx;
 sfx = function(name){
   if (G && (G.gameMode===1 || G.gameMode===2)){
-    if (name==='hit' || name==='miss' || name==='crit') FP.swing = 1;
+    if (name==='hit' || name==='miss' || name==='crit'){ FP.swing = 1; FPW.lastSwing = name; }
     else if (name==='spell') FP.cast = 1;
     else if (name==='levelUp' || name==='achievement') FP.glow = 1;
   }

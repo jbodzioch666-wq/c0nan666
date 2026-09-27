@@ -1,5 +1,37 @@
 # Depthcrawl patch notes
 
+## v150 — Every weapon fights its own way
+
+Each weapon type now has its own grip, stance and attack in first person, modelled on how melee games handle first-person weapons.
+
+### Grips and stances
+- **Swords, scimitars, sickles:** held upright at your right side, ready to cut.
+- **Daggers:** held low and point-forward, close to the body.
+- **Rapiers:** held point-first toward the enemy in a fencing line.
+- **Greatswords:** both hands on the long grip, blade raised across your view.
+- **Axes, maces, hammers, clubs, picks, morningstars:** held upright by the haft, head up and ready to fall.
+- **Greataxes and mauls:** gripped in both hands and carried back over the shoulder.
+- **Halberds:** both hands on the shaft, head high.
+- **Spears:** both hands on the shaft and the point levelled at the enemy.
+- **Quarterstaves:** both hands on the staff, held across your body.
+- **Unarmed:** both fists raised in a guard.
+- The flail's head hangs from its chain and sways as you move.
+
+### Attacks
+- Swords **slash** across from upper right to lower left.
+- Daggers **stab** forward; rapiers **lunge** with a long reach.
+- One-handed axes and blunt weapons **chop** down from overhead.
+- Greatswords **cleave** in a heavy two-handed arc.
+- Greataxes, mauls and halberds **smash** down with a long windup.
+- Spears **thrust** straight out; staves **sweep** across.
+- Fists **punch** straight ahead.
+- The flail whirls its head round on the chain as you swing.
+- Hits connect with a brief hitstop, and heavy blows jolt the view.
+
+### Feel
+- The weapon lags a little behind when you turn and bobs as you walk.
+- Your arms follow your hands, with slim leather sleeves and steel cuffs.
+
 ## v149 — Steel in hand
 
 ### First-person weapons in 3D
@@ -12,7 +44,6 @@
 - The weapon is lit by the torch or lantern light where you stand, and polished steel catches the light.
 - Better weapons look better: rare blades have glowing runes etched along them, and uniques have gold fittings.
 - Fire, frost and poison enchantments glow along the weapon, with drifting motes of their colour.
-- Attacking is a real swing: you wind up to the right, cut across to the lower left, and settle back to your guard.
 
 ## v148 — Quests worth taking
 
