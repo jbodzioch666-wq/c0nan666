@@ -1,5 +1,53 @@
 # Depthcrawl patch notes
 
+## v160 — Skills & Trades
+
+RuneScape-style skills. Eight skills and eight weapon masteries each level from **1 to 99** on the classic curve (every level costs about a tenth more than the last), completely apart from your character level. Press **J** to see them all.
+
+### Gathering (press E)
+- **Fishing:** stand by a river or the sea, or fish from your boat.
+  - Rivers give trout, salmon, pike and cave eels.
+  - The sea gives shrimp, sardines, tuna, lobster, swordfish, sharks and, at level 85, kraken spawn.
+- **Mining:** mine the rock beside mountains for copper, iron and silver. The rich ores (mithril, adamantite and runite) are only found in the veins in mines, and each vein runs out after a few ores.
+- **Woodcutting:** fell trees in forests and marshes for logs, oak, willow (marsh only), maple, yew and magic logs.
+- **Foraging:** search open ground for herbs: Silverleaf, Bloodmoss, Ghostcap, Sunpetal, Dragon's Tongue and Starlily.
+
+How it works:
+- **Automatic:** once you start, you keep working on your own, a catch every few tries, until you press E again or move away.
+- **Your character works:** you swing at rock and timber, cast a line over the water, or stoop to search the ground.
+- **Time passes while you work,** and out in the wilds something may creep up on you.
+- **Better skill** means better finds and fewer failed tries.
+
+### Tools
+- The blacksmith sells a **fishing rod, pickaxe and hatchet**, and upgrades them from bronze through iron, steel, mithril and adamant to rune as your skill allows. Better tools work faster.
+
+### Trades
+- **Cooking:** cook fish and meat at the tavern hearth or your own campfire.
+  - Beasts you kill drop raw meat, big beasts drop prime cuts, and dragons and hydras drop dragon steaks.
+  - At low levels food sometimes burns. Open fires burn a little more than the hearth.
+- **Eating (U):** eat the cooked food that best fits the health you're missing. Better food heals more, from a tenth of your health for shrimp to half for kraken spawn. Eating in a fight takes your turn.
+- **Firemaking:** burn logs to light a campfire where you stand (E). Better logs burn longer.
+  - You can cook at it.
+  - Camping beside it (C) is much safer from ambushes.
+- **Smithing:** at the blacksmith, smelt 2 ore into a bar, then forge bars into gear:
+  - bronze, iron, mithril, adamant and rune bars make weapons, helms, body armour, leg armour and gauntlets;
+  - silver bars make rings and amulets.
+  - The further your Smithing is past a metal's level, the finer the gear: magic at +10, rare at +30.
+- **Alchemy:** at the alchemist, brew 2 herbs into a healing potion. Each herb makes its own tier, up to Supreme.
+
+### Weapon mastery
+- **Every kind of weapon has its own mastery,** raised by landing hits with it: swords, axes, maces and hammers, spears and polearms, daggers, staves, bows, and your bare fists.
+- **Bonuses:** mastery gives +1 to hit every 20 levels and +1 damage every 25, on top of everything your class and gear give you.
+
+### Screens and controls
+- **Skills & Trades (J):** every skill and mastery with its level and progress bar, your bag of gathered goods, and buttons for whatever you can do where you stand.
+- **New keys:** **E** gathers or works, **U** eats and **J** opens Skills. All three are also on the action bar. The E button shows what you can do where you are.
+- **Level-ups** get a fanfare and a banner, and tell you what you've unlocked.
+- Everything saves with your character.
+
+### Fixes
+- The merchant you escort on a quest now walks beside you properly as a 3D figure. The previous update had left them stiff and not turning.
+
 ## v159 — A living town
 
 ### People in 3D

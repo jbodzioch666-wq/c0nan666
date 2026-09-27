@@ -473,6 +473,17 @@
   #v3banner b{ display:block; font-family:'Cinzel',Georgia,serif; font-size:clamp(20px, 3vw, 40px); white-space:nowrap; color:#ffe2a0; letter-spacing:0.12em; }
   #v3banner span{ font-size:clamp(9px, 1vw, 13px); color:#e8d8b8; letter-spacing:0.2em; text-transform:uppercase; }
   #v3banner.show{ animation:v3ban 4.5s ease forwards; }
+  #skbanner{ position:absolute; left:50%; top:26%; transform:translateX(-50%); text-align:center; pointer-events:none; opacity:0; z-index:6; text-shadow:0 2px 12px #000, 0 0 3px #000; }
+  #skbanner small{ display:block; font-size:11px; letter-spacing:0.3em; color:#9fe8a0; }
+  #skbanner b{ display:block; font-family:'Cinzel',Georgia,serif; font-size:clamp(18px, 2.4vw, 32px); white-space:nowrap; color:#fff0c0; letter-spacing:0.1em; }
+  #skbanner.show{ animation:v3ban 3.2s ease forwards; }
+  .skgrid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:8px; }
+  .skcard{ display:flex; gap:9px; align-items:center; padding:7px 9px; background:rgba(255,255,255,0.03); border:1px solid rgba(199,154,84,0.18); border-radius:6px; }
+  .skico{ flex:0 0 30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#140e08; font-size:17px; font-weight:700; box-shadow:inset 0 -3px 6px rgba(0,0,0,0.35); }
+  .skbody{ flex:1; min-width:0; } .skbody > div:first-child{ display:flex; justify-content:space-between; }
+  .sklv{ font-family:'Cinzel',Georgia,serif; color:var(--amber); font-weight:700; }
+  .skbar{ height:5px; background:rgba(0,0,0,0.45); border-radius:3px; margin:4px 0 2px; overflow:hidden; } .skbar i{ display:block; height:100%; }
+  .skbag{ display:flex; flex-wrap:wrap; gap:6px; } .skitem{ padding:3px 8px; border-radius:4px; background:rgba(255,255,255,0.05); font-size:12px; }
   @keyframes v3ban{ 0%{opacity:0; transform:translate(-50%,10px);} 12%{opacity:1; transform:translate(-50%,0);} 70%{opacity:1;} 100%{opacity:0;} }
   @media (prefers-reduced-motion: reduce){ *{ animation-duration:0.001ms !important; transition-duration:0.001ms !important; } }
 </style>
@@ -5131,6 +5142,7 @@ function monsterDies(mi){
   if (!G.player.codexSeen.includes(m.nm)){ G.player.codexSeen.push(m.nm); logMsg(`bestiary entry unlocked: ${m.nm}`, 'magic'); }
   checkAchievements();
   gainXP(m.xp);
+  skOnKill(m);
   const dg = roundH(rn(m.xp)*goldFindMult());
   if (dg>0){ G.player.gold += dg; logMsg(`it drops ${dg} gold`, 'good'); }
   const hk = gearStatI('healkill');
@@ -5466,7 +5478,7 @@ function singlePlayerAttack(mi){
     G.player.arrows--;
   }
   let roll = rollDie(20);
-  let atkTotal = roll + playerAtkBonus() + gearStatI('atk') + frightPenalty();
+  let atkTotal = roll + playerAtkBonus() + gearStatI('atk') + frightPenalty() + masteryAtk();
   const sneak = (G.player.cls==='Rogue') && G.player.sneakPrimed;
   // real D&D: attacks against a paralyzed/incapacitated creature auto-hit
   // and are automatic critical hits - a control-kind spell (Sleep, Hold
@@ -5485,7 +5497,7 @@ function singlePlayerAttack(mi){
     if (hasFeat('lucky') && (G.player.luckyCharges||0)>0){
       G.player.luckyCharges--;
       roll = rollDie(20);
-      atkTotal = roll + playerAtkBonus() + gearStatI('atk') + frightPenalty();
+      atkTotal = roll + playerAtkBonus() + gearStatI('atk') + frightPenalty() + masteryAtk();
       logMsg('a lucky reroll turns your swing around!', 'magic');
     }
     if (!sneak && (roll===1 || atkTotal < effAC)){
@@ -5494,7 +5506,7 @@ function singlePlayerAttack(mi){
       return false;
     }
   }
-  let raw = rollDice(G.gear.weapon.d1, G.gear.weapon.d2) + G.gear.weapon.bonus + gearFlatDmg();
+  let raw = rollDice(G.gear.weapon.d1, G.gear.weapon.d2) + G.gear.weapon.bonus + gearFlatDmg() + masteryDmg();
   raw = raw*gearDmgMult() + meleeStatMod();
   let dmg = mx(1, roundH(raw));
   let tag = '';
@@ -5545,6 +5557,7 @@ function singlePlayerAttack(mi){
   if (extra>0 && hasAbility(m,'regen') && extraTag.includes('fire')) m.tookFireLastHit = true;
   const total = dmg+extra;
   m.hp -= total;
+  skMasteryHit(total);
   G.lastFoe.hp = m.hp;
   logMsg(`you hit the ${m.nm} for ${total}${extraTag}${tag}`, 'hit');
   sfx((sneak||isCrit||isDeadly) ? 'crit' : 'hit');
@@ -7973,7 +7986,8 @@ function campAmbushChance(){
     [OW_FOREST]: 0.26, [OW_SWAMP]: 0.24, [OW_DESERT]: 0.17, [OW_TUNDRA]: 0.16,
     [OW_WATER]: 0.11, [OW_RIVER]: 0.13, [OW_GRASS]: 0.13,
   };
-  return (t in table) ? table[t] : 0.13;
+  const base = (t in table) ? table[t] : 0.13;
+  return skFireHere() ? base*0.4 : base;              // (sleeping beside your own campfire is much safer)
 }
 // resting outside a village: usually a free heal-and-recover like
 // villageRest, but camping in the open risks a night-time ambush that
@@ -8005,12 +8019,387 @@ function campOutside(){
     saveCurrentGame();
     return;
   }
-  if (fullyRestPlayer()) logMsg('you make camp for the night and wake fully healed and refreshed', 'good');
+  if (fullyRestPlayer()) logMsg(skFireHere() ? 'you sleep by your campfire and wake fully healed and refreshed' : 'you make camp for the night and wake fully healed and refreshed', 'good');
   else logMsg('you make camp - the night passes quietly, though you were already at full strength', '');
   G.player.campCount = (G.player.campCount||0)+1;
   checkAchievements();
   renderGame();
   saveCurrentGame();
+}
+
+// ===================== SECTION: SKILLS & TRADES =====================
+// RuneScape-style skills that level on their own, apart from your class and
+// character level: gathering (fishing, mining, woodcutting, foraging), the
+// trades that turn what you gather into something (cooking, smithing,
+// alchemy, firemaking), and a mastery for every kind of weapon you fight
+// with. Each goes from 1 to 99 on the classic curve (every level costs about
+// a tenth more than the last). Everything lives on the player object, so it
+// saves with the character.
+const SK_DEFS = [
+  ['fishing',    'Fishing',     '&#8776;',  '#5aa8e0', 'stand by a river or the sea (or sail out) and press E'],
+  ['cooking',    'Cooking',     '&#9832;',  '#e08a3a', 'cook fish and meat at a tavern hearth or your own campfire'],
+  ['mining',     'Mining',      '&#9874;',  '#a8a0b0', 'mine rock beside mountains, or the ore veins in a mine'],
+  ['smithing',   'Smithing',    '&#9876;',  '#c8b070', 'smelt ore into bars and forge gear at a blacksmith'],
+  ['woodcutting','Woodcutting', '&#9650;',  '#6ab04a', 'fell trees in forest and marsh'],
+  ['firemaking', 'Firemaking',  '&#9650;',  '#f0a030', 'burn logs to make a campfire (safer camping, and somewhere to cook)'],
+  ['foraging',   'Foraging',    '&#10047;', '#9ad06a', 'search open ground for herbs'],
+  ['alchemy',    'Alchemy',     '&#9879;',  '#b07ae0', 'brew healing potions from herbs at an alchemist'],
+];
+const SK_MASTERY = [['sword','Swords'],['axe','Axes'],['blunt','Maces & Hammers'],['polearm','Spears & Polearms'],['dagger','Daggers'],['staff','Staves'],['bow','Bows'],['unarmed','Unarmed']];
+// the classic curve, scaled down so a dungeon crawler's play sessions get somewhere
+const SK_XP = (()=>{ const t = [0,0]; let pts = 0; for (let L=1; L<=99; L++){ pts += Math.floor(L + 300*Math.pow(2, L/7)); t[L+1] = Math.floor(pts/4/12); } return t; })();
+function skLevelOf(xp){ let L = 1; while (L<99 && xp >= SK_XP[L+1]) L++; return L; }
+// what you can gather, make and cook: [id, name, level needed, xp, ...]
+const SK_FISH = [ // water: s = sea, r = river
+  { id:'shrimp',   nm:'Shrimp',       lvl:1,  xp:10,  w:'s', heal:0.08, cook:1,  cxp:30 },
+  { id:'trout',    nm:'Trout',        lvl:1,  xp:14,  w:'r', heal:0.10, cook:1,  cxp:35 },
+  { id:'sardine',  nm:'Sardine',      lvl:10, xp:25,  w:'s', heal:0.11, cook:8,  cxp:45 },
+  { id:'salmon',   nm:'Salmon',       lvl:20, xp:45,  w:'r', heal:0.15, cook:20, cxp:70 },
+  { id:'tuna',     nm:'Tuna',         lvl:30, xp:65,  w:'s', heal:0.18, cook:30, cxp:95 },
+  { id:'pike',     nm:'Pike',         lvl:35, xp:70,  w:'r', heal:0.20, cook:35, cxp:105 },
+  { id:'lobster',  nm:'Lobster',      lvl:40, xp:90,  w:'s', heal:0.24, cook:40, cxp:120 },
+  { id:'eel',      nm:'Cave Eel',     lvl:50, xp:100, w:'r', heal:0.27, cook:50, cxp:135 },
+  { id:'swordfish',nm:'Swordfish',    lvl:55, xp:110, w:'s', heal:0.30, cook:55, cxp:140 },
+  { id:'shark',    nm:'Shark',        lvl:70, xp:130, w:'s', heal:0.38, cook:70, cxp:210 },
+  { id:'kraken',   nm:'Kraken Spawn', lvl:85, xp:160, w:'s', heal:0.50, cook:85, cxp:260 },
+];
+const SK_MEAT = [
+  { id:'meat',   nm:'Raw Meat',     heal:0.10, cook:1,  cxp:30 },
+  { id:'prime',  nm:'Prime Cut',    heal:0.20, cook:25, cxp:80 },
+  { id:'dsteak', nm:'Dragon Steak', heal:0.45, cook:65, cxp:220 },
+];
+const SK_ORE = [
+  { id:'copper',  nm:'Copper Ore',     lvl:1,  xp:18 },
+  { id:'iron',    nm:'Iron Ore',       lvl:15, xp:35 },
+  { id:'silver',  nm:'Silver Ore',     lvl:25, xp:40 },
+  { id:'mithril', nm:'Mithril Ore',    lvl:45, xp:80 },
+  { id:'adamant', nm:'Adamantite Ore', lvl:60, xp:95 },
+  { id:'runite',  nm:'Runite Ore',     lvl:80, xp:125 },
+];
+// bars: the ore they're smelted from, smithing level, xp per bar, the item level the gear comes out at
+const SK_BAR = [
+  { id:'bronze',  nm:'Bronze Bar',     ore:'copper',  lvl:1,  xp:12, ilvl:3 },
+  { id:'ironb',   nm:'Iron Bar',       ore:'iron',    lvl:15, xp:25, ilvl:7 },
+  { id:'silverb', nm:'Silver Bar',     ore:'silver',  lvl:25, xp:32, ilvl:10, jewel:true },
+  { id:'mithrilb',nm:'Mithril Bar',    ore:'mithril', lvl:45, xp:50, ilvl:13 },
+  { id:'adamantb',nm:'Adamant Bar',    ore:'adamant', lvl:60, xp:62, ilvl:17 },
+  { id:'runeb',   nm:'Rune Bar',       ore:'runite',  lvl:80, xp:75, ilvl:20 },
+];
+const SK_FORGE = { weapon:['Weapon',3], head:['Helm',2], chest:['Body Armour',5], legs:['Leg Armour',3], arms:['Gauntlets',2], ring:['Ring',1], necklace:['Amulet',2] };
+const SK_LOG = [
+  { id:'logs',   nm:'Logs',       lvl:1,  xp:25,  fxp:40,  flvl:1 },
+  { id:'oak',    nm:'Oak Logs',   lvl:15, xp:38,  fxp:60,  flvl:15 },
+  { id:'willow', nm:'Willow Logs',lvl:30, xp:68,  fxp:90,  flvl:30, marsh:true },
+  { id:'maple',  nm:'Maple Logs', lvl:45, xp:100, fxp:135, flvl:45 },
+  { id:'yew',    nm:'Yew Logs',   lvl:60, xp:175, fxp:200, flvl:60 },
+  { id:'magic',  nm:'Magic Logs', lvl:75, xp:250, fxp:300, flvl:75 },
+];
+// herbs brew the matching tier of POTIONS
+const SK_HERB = [
+  { id:'silverleaf', nm:'Silverleaf',     lvl:1,  xp:8,  axp:25 },
+  { id:'bloodmoss',  nm:'Bloodmoss',      lvl:12, xp:15, axp:45 },
+  { id:'ghostcap',   nm:'Ghostcap',       lvl:25, xp:25, axp:70 },
+  { id:'sunpetal',   nm:'Sunpetal',       lvl:35, xp:35, axp:95 },
+  { id:'dragontongue',nm:"Dragon's Tongue",lvl:50, xp:50, axp:130 },
+  { id:'starlily',   nm:'Starlily',       lvl:65, xp:70, axp:170 },
+];
+const SK_TOOLS = [
+  { id:'rod', nm:'Fishing Rod', skill:'fishing' },
+  { id:'pick', nm:'Pickaxe', skill:'mining' },
+  { id:'axe', nm:'Hatchet', skill:'woodcutting' },
+];
+const SK_TIER = [ // name, skill level to use, price
+  ['Bronze', 1, 20], ['Iron', 10, 60], ['Steel', 20, 160], ['Mithril', 40, 420], ['Adamant', 55, 950], ['Rune', 70, 2100],
+];
+function skP(){
+  const p = G.player;
+  if (!p.skills){ p.skills = {}; }
+  for (const [k] of SK_DEFS) if (p.skills[k]===undefined) p.skills[k] = 0;
+  if (!p.mastery) p.mastery = {};
+  if (!p.bag) p.bag = {};
+  if (!p.tools) p.tools = { rod:0, pick:0, axe:0 };
+  return p;
+}
+function skLvl(k){ return skLevelOf(skP().skills[k]||0); }
+function skMastLvl(k){ return skLevelOf(skP().mastery[k]||0); }
+function skAllItems(){ return [].concat(SK_FISH, SK_MEAT, SK_ORE, SK_BAR, SK_LOG, SK_HERB).concat(SK_FISH.map(f=>({ id:'c_'+f.id, nm:'Cooked '+f.nm })), SK_MEAT.map(f=>({ id:'c_'+f.id, nm:f.id==='meat' ? 'Cooked Meat' : f.id==='prime' ? 'Grilled Prime Cut' : 'Seared Dragon Steak' })), [{ id:'burnt', nm:'Burnt Food' }]); }
+function skName(id){ const e = skAllItems().find(e=>e.id===id); return e ? e.nm : id; }
+function skHave(id){ return skP().bag[id]||0; }
+function skAdd(id, n){ const b = skP().bag; b[id] = (b[id]||0) + n; if (b[id]<=0) delete b[id]; }
+// xp in, level-ups out (with a fanfare and a banner)
+function skGainXP(k, amount, mastery){
+  const p = skP(), store = mastery ? p.mastery : p.skills, before = skLevelOf(store[k]||0);
+  store[k] = (store[k]||0) + Math.max(1, Math.round(amount));
+  const after = skLevelOf(store[k]);
+  if (after > before){
+    const nm = mastery ? (SK_MASTERY.find(m=>m[0]===k)||[k,k])[1]+' mastery' : SK_DEFS.find(d=>d[0]===k)[1];
+    logMsg(`your ${nm} level is now ${after}!${skUnlockText(k, after, mastery)}`, 'magic');
+    sfx('levelUp'); skBanner(`${nm} level ${after}`);
+  }
+}
+function skUnlockText(k, L, mastery){
+  if (mastery){ if (L%20===0) return ' (+1 to hit with it)'; if (L%25===0) return ' (+1 damage with it)'; return ''; }
+  const hit = (list, f)=>{ const e = list.find(e=>(f ? e[f] : e.lvl)===L); return e ? ` - you can now ${k==='smithing' ? 'work' : k==='cooking' ? 'cook' : k==='alchemy' ? 'brew with' : k==='firemaking' ? 'burn' : 'gather'} ${e.nm}` : ''; };
+  if (k==='fishing') return hit(SK_FISH); if (k==='mining') return hit(SK_ORE); if (k==='woodcutting') return hit(SK_LOG);
+  if (k==='foraging') return hit(SK_HERB); if (k==='smithing') return hit(SK_BAR); if (k==='firemaking') return hit(SK_LOG, 'flvl');
+  if (k==='alchemy') return hit(SK_HERB);
+  if (k==='cooking'){ const e = SK_FISH.concat(SK_MEAT).find(e=>e.cook===L); return e ? ` - you can now cook ${e.nm}` : ''; }
+  return '';
+}
+function skBanner(txt){
+  let b = document.getElementById('skbanner');
+  if (!b){ b = document.createElement('div'); b.id = 'skbanner'; (document.querySelector('.mapwrap')||document.body).appendChild(b); }
+  b.innerHTML = `<small>LEVEL UP</small><b>${esc(txt)}</b>`; b.classList.remove('show'); void b.offsetWidth; b.classList.add('show');
+}
+// ---- weapon mastery ----
+function skWeaponKind(){
+  const w = G.gear.weapon;
+  if (!w || !w.used) return 'unarmed';
+  const b = w.basis || w.nm || '';
+  if (w.range || /bow/i.test(b)) return 'bow';
+  if (/dagger|knife|sickle/i.test(b)) return 'dagger';
+  if (/staff|quarterstaff/i.test(b)) return 'staff';
+  if (/spear|halberd|glaive|pike|trident|lance/i.test(b)) return 'polearm';
+  if (/axe|pick/i.test(b)) return 'axe';
+  if (/mace|hammer|maul|club|flail|morningstar/i.test(b)) return 'blunt';
+  return 'sword';
+}
+function masteryAtk(){ return G.player ? Math.min(4, Math.floor(skMastLvl(skWeaponKind())/20)) : 0; }
+function masteryDmg(){ return G.player ? Math.min(3, Math.floor(skMastLvl(skWeaponKind())/25)) : 0; }
+function skMasteryHit(dmg){ if (G.player) skGainXP(skWeaponKind(), 6 + dmg*4, true); }
+// ---- food: eaten from the bag (U), best fit for the damage you've taken ----
+function skFoods(){
+  const out = [];
+  for (const f of SK_FISH.concat(SK_MEAT)) if (skHave('c_'+f.id)) out.push({ id:'c_'+f.id, nm:skName('c_'+f.id), heal:f.heal, n:skHave('c_'+f.id) });
+  return out;
+}
+function skFoodHeal(f){ return Math.max(2, Math.round(effMaxHp()*f.heal) + 2); }
+function eatFood(){
+  if (G.gameOver || !G.player) return;
+  if (G.player.stunTurns>0){ consumeStunnedTurn(); return; }
+  const foods = skFoods();
+  if (!foods.length){ logMsg('you have no cooked food - cook fish or meat at a hearth or campfire', 'hit'); return; }
+  const miss = effMaxHp() - G.player.hp;
+  if (miss <= 0){ logMsg('you are already at full HP', ''); return; }
+  foods.sort((a,b)=>a.heal-b.heal);
+  const f = foods.find(f=>skFoodHeal(f) >= miss) || foods[foods.length-1];
+  const h = Math.min(miss, skFoodHeal(f));
+  G.player.hp += h; skAdd(f.id, -1);
+  logMsg(`you eat the ${f.nm} and recover ${h} HP`, 'good'); sfx('potion');
+  if ((G.gameMode===1 || G.gameMode===2) && !G.gameOver) tickMonsters();   // eating in a fight takes your turn
+  saveCurrentGame();
+}
+// ---- what can be done where you're standing ----
+function skOwTile(x, y){ return (G.ow && G.ow.map[x] && G.ow.map[x][y]!==undefined) ? G.ow.map[x][y] : -1; }
+function skNear(pred){
+  const px = G.owPos.x, py = G.owPos.y;
+  for (let dy=-1; dy<=1; dy++) for (let dx=-1; dx<=1; dx++){ const t = skOwTile(px+dx, py+dy); if (pred(t)) return { x:px+dx, y:py+dy, t }; }
+  return null;
+}
+function skFireHere(){ const f = skP().fire; return f && G.gameMode===0 && f.x===G.owPos.x && f.y===G.owPos.y && (G.player.turnCount||0) < f.until ? f : null; }
+function skOptions(){
+  const opts = [];
+  if (!G.player || G.gameOver) return opts;
+  if (G.gameMode===0 && !G.owZoomedOut){
+    const own = skOwTile(G.owPos.x, G.owPos.y);
+    const sea = own===OW_WATER ? { x:G.owPos.x, y:G.owPos.y } : skNear(t=>t===OW_WATER), river = own===OW_RIVER ? { x:G.owPos.x, y:G.owPos.y } : skNear(t=>t===OW_RIVER);
+    if (sea || river) opts.push({ k:'fishing', label:'Fish', w: river && !sea ? 'r' : sea && !river ? 's' : 'b', at:river||sea });
+    const tree = skNear(t=>t===OW_FOREST || t===OW_SWAMP);
+    if (tree) opts.push({ k:'woodcutting', label:'Chop trees', marsh: tree.t===OW_SWAMP, at:tree });
+    const rock = skNear(t=>t===OW_MOUNTAIN || t===OW_MOUNTAINPASS);
+    if (rock) opts.push({ k:'mining', label:'Mine rock', at:rock });
+    if (own!==OW_WATER && own!==OW_RIVER) opts.push({ k:'foraging', label:'Forage', at:{ x:G.owPos.x, y:G.owPos.y } });
+    if (skFireHere() && skRawFoods().length) opts.push({ k:'cooking', label:'Cook at the fire' });
+    else if (own!==OW_WATER && own!==OW_RIVER && SK_LOG.some(l=>skHave(l.id))) opts.push({ k:'firemaking', label:'Light a fire' });
+  } else if (G.gameMode===1 && G.dungeonDeco){
+    const px = G.player.x, py = G.player.y;
+    for (let dy=-1; dy<=1; dy++) for (let dx=-1; dx<=1; dx++){ const x = px+dx, y = py+dy; if (G.dungeonDeco[x] && G.dungeonDeco[x][y]==='ore'){ opts.unshift({ k:'mining', label:'Mine the vein', vein:{x,y} }); dy = 2; break; } }
+  }
+  return opts;
+}
+function skRawFoods(){ const out = []; for (const f of SK_FISH.concat(SK_MEAT)) if (skHave(f.id)) out.push(f); return out; }
+// ---- gathering: repeats on its own until you move, fill up on danger, or run out ----
+function skStartOrStop(){
+  if (G.gather){ skStop('you stop'); return; }
+  const opts = skOptions();
+  if (!opts.length){ logMsg(G.gameMode===0 ? 'there is nothing to gather here' : G.gameMode===1 ? 'there is nothing to gather here - look for ore veins in the mines' : 'you can only gather in the wilds or in a mine', ''); renderGame(); return; }
+  skDo(opts[0]);
+}
+function skDo(o){
+  if (o.k==='firemaking'){ skLightFire(); return; }
+  if (o.k==='cooking'){ G.cookAt = 'fire'; setUi('cook'); return; }
+  const tool = { fishing:'rod', mining:'pick', woodcutting:'axe' }[o.k];
+  if (tool && !skP().tools[tool]){ logMsg(`you need a ${SK_TOOLS.find(t=>t.id===tool).nm.toLowerCase()} - the blacksmith sells them`, 'hit'); renderGame(); return; }
+  G.gather = { o, next:performance.now()+1500, pos:G.gameMode===0 ? G.owPos.x+','+G.owPos.y : G.player.x+','+G.player.y, mode:G.gameMode, n:0 };
+  logMsg(`you start ${{ fishing:'fishing', mining:'mining', woodcutting:'chopping', foraging:'foraging' }[o.k]}...`, '');
+  renderGame();
+}
+function skStop(msg){ if (!G.gather) return; G.gather = null; if (msg) logMsg(msg, ''); renderGame(); }
+function skGatherTick(now){
+  const g = G.gather; if (!g) return;
+  const here = G.gameMode===0 ? G.owPos.x+','+G.owPos.y : G.player.x+','+G.player.y;
+  if (G.gameOver || G.ui!=='playing' || G.gameMode!==g.mode || here!==g.pos){ G.gather = null; return; }
+  if (now < g.next) return;
+  g.next = now + 1400; g.n++;
+  const o = g.o, k = o.k, L = skLvl(k), tier = { fishing:skP().tools.rod, mining:skP().tools.pick, woodcutting:skP().tools.axe }[k] || 0;
+  // time passes, and out in the wilds something may come looking
+  G.player.turnCount = (G.player.turnCount||0) + 2;
+  if (G.gameMode===1){ tickMonsters(); if (G.mon.some(m=>m.alive && Math.abs(m.x-G.player.x)<=1 && Math.abs(m.y-G.player.y)<=1)){ skStop('something is upon you - you stop mining'); return; } }
+  else if (G.gameMode===0 && chn(0.012)){ G.gather = null; logMsg('while you work, something creeps up on you!', 'new'); randomEncounter(true); renderGame(); saveCurrentGame(); return; }
+  // pick what you're working on: the best you can manage, sometimes something lesser
+  let list;
+  if (k==='fishing') list = SK_FISH.filter(f=>o.w==='b' || f.w===o.w);
+  else if (k==='mining') list = SK_ORE.filter(e=>G.gameMode===1 || e.lvl<=45);   // the richest ores are only down in the mines
+  else if (k==='woodcutting') list = SK_LOG.filter(l=>!l.marsh || o.marsh);
+  else list = SK_HERB;
+  const ok = list.filter(e=>e.lvl<=L); if (!ok.length){ skStop('nothing here you are skilled enough to gather'); return; }
+  let pick = ok[ok.length-1]; if (ok.length>1 && chn(0.45)) pick = ok[rn(ok.length-1)];
+  const chance = clamp(0.3 + (L - pick.lvl)*0.012 + tier*0.06 + (G.gameMode===1 ? 0.1 : 0), 0.12, 0.92);
+  if (!chn(chance)){ renderGame(); return; }
+  skAdd(pick.id, 1); skGainXP(k, pick.xp * (G.gameMode===1 ? 1.2 : 1));
+  logMsg(`you ${{ fishing:'catch', mining:'mine', woodcutting:'cut', foraging:'find' }[k]} ${/^[AEIOU]/.test(pick.nm) ? 'an' : 'a'} ${pick.nm}`, 'loot'); sfx('loot');
+  if (k==='mining' && o.vein){ const key = o.vein.x+','+o.vein.y; G.veinLeft = G.veinLeft || {}; G.veinLeft[key] = (G.veinLeft[key]===undefined ? 3+rn(3) : G.veinLeft[key]) - 1;
+    if (G.veinLeft[key] <= 0){ G.dungeonDeco[o.vein.x][o.vein.y] = ''; G.gather = null; logMsg('the vein is worked out', ''); } }
+  renderGame(); saveCurrentGame();
+}
+// ---- firemaking and campfires ----
+function skLightFire(){
+  const L = skLvl('firemaking'), logs = SK_LOG.filter(l=>skHave(l.id) && l.flvl<=L);
+  if (!logs.length){ logMsg("you have no logs you're skilled enough to burn", 'hit'); renderGame(); return; }
+  const lg = logs[logs.length-1];
+  skAdd(lg.id, -1); skGainXP('firemaking', lg.fxp);
+  // a better log burns longer
+  skP().fire = { x:G.owPos.x, y:G.owPos.y, until:(G.player.turnCount||0) + 60 + SK_LOG.indexOf(lg)*25 };
+  logMsg(`you light a fire with the ${lg.nm} - you can cook here, and camp more safely beside it`, 'good');
+  renderGame(); saveCurrentGame();
+}
+// ---- cooking ----
+function skCook(id, all){
+  const f = SK_FISH.concat(SK_MEAT).find(f=>f.id===id); if (!f) return;
+  const L = skLvl('cooking');
+  if (L < f.cook){ logMsg(`you need Cooking level ${f.cook} to cook ${f.nm}`, 'hit'); renderOverlay(); return; }
+  let n = all ? skHave(id) : Math.min(1, skHave(id)), ok = 0, burnt = 0;
+  for (let i=0;i<n;i++){
+    const burn = clamp(0.42 - (L - f.cook)*0.03 + (G.cookAt==='fire' ? 0.05 : 0), 0, 0.5);
+    skAdd(id, -1);
+    if (chn(burn)){ burnt++; skAdd('burnt', 1); } else { ok++; skAdd('c_'+id, 1); skGainXP('cooking', f.cxp); }
+  }
+  logMsg(`you cook ${ok} ${f.nm}${burnt ? ` and burn ${burnt}` : ''}`, ok ? 'good' : 'hit'); sfx(ok ? 'loot' : 'error');
+  renderOverlay(); saveCurrentGame();
+}
+function buildCook(){
+  const L = skLvl('cooking'), raw = skRawFoods();
+  const rows = raw.map(f=>{ const can = L >= f.cook, burn = Math.round(clamp(0.42 - (L - f.cook)*0.03 + (G.cookAt==='fire' ? 0.05 : 0), 0, 0.5)*100);
+    return `<div class="shoprow"><span class="muted">&times;${skHave(f.id)}</span><span>${esc(f.nm)}</span>
+      <span class="desc">${can ? `heals ${skFoodHeal(f)} HP &middot; ${burn}% burn chance &middot; ${f.cxp} xp each` : `needs Cooking ${f.cook}`}</span>
+      <span>${can ? `<button class="btn" onclick="skCook('${f.id}')">cook 1</button> <button class="btn" onclick="skCook('${f.id}',1)">cook all</button>` : ''}</span></div>`; }).join('')
+    || `<div class="muted" style="text-align:center;">nothing raw to cook - catch fish, or take meat from the beasts you kill</div>`;
+  return `<h2 class="panel-title">${G.cookAt==='fire' ? 'YOUR CAMPFIRE' : 'THE HEARTH'}</h2>
+    <div class="sub">Cooking level ${L}. ${G.cookAt==='fire' ? 'Food cooked over an open fire burns a little more often than on the tavern hearth.' : 'The tavern lets you use its hearth.'}</div>
+    <div class="ovbody">${rows}${skHave('burnt') ? `<div class="muted" style="margin-top:8px;">${skHave('burnt')} burnt food in your bag <button class="btn" onclick="skAdd('burnt',-skHave('burnt')); renderOverlay();">throw it away</button></div>` : ''}
+      <div class="btnrow"><button class="btn primary" onclick="setUi(G.cookAt==='fire' ? 'playing' : 'tavern')">ESC &middot; done</button></div></div>`;
+}
+// ---- smithing: tools, smelting and forging (at the blacksmith) ----
+function skBuyTool(tid){
+  const p = skP(), cur = p.tools[tid]||0, nx = SK_TIER[cur]; if (!nx) return;
+  const tool = SK_TOOLS.find(t=>t.id===tid), price = repPrice(nx[2]);
+  if (skLvl(tool.skill) < nx[1]){ logMsg(`you need ${SK_DEFS.find(d=>d[0]===tool.skill)[1]} level ${nx[1]} to use a ${nx[0].toLowerCase()} ${tool.nm.toLowerCase()}`, 'hit'); renderOverlay(); return; }
+  if (G.player.gold < price){ logMsg("you can't afford that", 'hit'); renderOverlay(); return; }
+  G.player.gold -= price; p.tools[tid] = cur+1; logMsg(`you buy a ${nx[0]} ${tool.nm}`, 'loot'); sfx('gold');
+  renderOverlay(); saveCurrentGame();
+}
+function skSmelt(bid, all){
+  const b = SK_BAR.find(b=>b.id===bid); if (!b) return;
+  if (skLvl('smithing') < b.lvl){ logMsg(`you need Smithing level ${b.lvl}`, 'hit'); renderOverlay(); return; }
+  const n = all ? Math.floor(skHave(b.ore)/2) : Math.min(1, Math.floor(skHave(b.ore)/2));
+  if (!n){ logMsg(`smelting a ${b.nm} takes 2 ${skName(b.ore)}`, 'hit'); renderOverlay(); return; }
+  skAdd(b.ore, -2*n); skAdd(b.id, n); skGainXP('smithing', b.xp*n);
+  logMsg(`you smelt ${n} ${b.nm}${n>1?'s':''}`, 'good'); sfx('hit'); renderOverlay(); saveCurrentGame();
+}
+function skForge(bid, slot){
+  const b = SK_BAR.find(b=>b.id===bid), f = SK_FORGE[slot]; if (!b || !f) return;
+  const L = skLvl('smithing');
+  if (L < b.lvl){ logMsg(`you need Smithing level ${b.lvl}`, 'hit'); renderOverlay(); return; }
+  if (skHave(b.id) < f[1]){ logMsg(`that takes ${f[1]} ${b.nm}s`, 'hit'); renderOverlay(); return; }
+  if (G.inv.length >= MAXINV){ logMsg('your pack is full', 'hit'); renderOverlay(); return; }
+  // the further your skill runs past the metal's own, the finer the work: magic from +10, rare from +30
+  const margin = L - b.lvl, want = margin >= 30 ? 2 : margin >= 10 ? 1 : 0, d = b.ilvl + Math.floor(margin/15);
+  let best = null;
+  for (let i=0;i<40;i++){ const it = genItem(d, slot, 2, true); if (!best || (it.quality||0) > (best.quality||0)) best = it; if ((best.quality||0) >= want) break; }
+  skAdd(b.id, -f[1]); skGainXP('smithing', b.xp*f[1]*2);
+  addToInventory(best); logMsg(`you forge ${itemNameHtml(best)} from ${f[1]} ${b.nm}${f[1]>1?'s':''}`, 'loot'); sfx('crit');
+  renderOverlay(); saveCurrentGame();
+}
+function buildSmithing(){
+  const p = skP(), L = skLvl('smithing');
+  const tools = SK_TOOLS.map(t=>{ const cur = p.tools[t.id]||0, nx = SK_TIER[cur], has = cur ? SK_TIER[cur-1][0]+' '+t.nm : 'none';
+    return `<div class="shoprow"><span class="muted">${t.nm}</span><span>${esc(has)}</span>
+      <span class="desc">${nx ? `${cur ? 'upgrade to' : 'buy a'} ${nx[0]} ${t.nm.toLowerCase()} (needs ${SK_DEFS.find(d=>d[0]===t.skill)[1]} ${nx[1]})` : 'the finest there is'}</span>
+      <span>${nx ? `<button class="btn" onclick="skBuyTool('${t.id}')">${repPrice(nx[2])}g</button>` : ''}</span></div>`; }).join('');
+  const smelt = SK_BAR.filter(b=>skHave(b.ore)).map(b=>`<div class="shoprow"><span class="muted">&times;${skHave(b.ore)}</span><span>${esc(skName(b.ore))} &rarr; ${esc(b.nm)}</span>
+      <span class="desc">${L>=b.lvl ? `2 ore per bar &middot; ${b.xp} xp` : `needs Smithing ${b.lvl}`}</span>
+      <span>${L>=b.lvl ? `<button class="btn" onclick="skSmelt('${b.id}')">smelt 1</button> <button class="btn" onclick="skSmelt('${b.id}',1)">smelt all</button>` : ''}</span></div>`).join('') || `<div class="muted">no ore to smelt - mine rock by the mountains or the veins in a mine</div>`;
+  const forge = SK_BAR.filter(b=>skHave(b.id)).map(b=>{
+    const slots = Object.keys(SK_FORGE).filter(s=> b.jewel ? (s==='ring' || s==='necklace') : !(s==='ring' || s==='necklace'));
+    return `<div class="shoprow"><span class="muted">&times;${skHave(b.id)}</span><span>${esc(b.nm)}</span>
+      <span class="desc">${L>=b.lvl ? slots.map(s=>`<button class="btn" ${skHave(b.id)>=SK_FORGE[s][1]?'':'disabled'} onclick="skForge('${b.id}','${s}')">${SK_FORGE[s][0]} (${SK_FORGE[s][1]})</button>`).join(' ') : `needs Smithing ${b.lvl}`}</span><span></span></div>`; }).join('') || `<div class="muted">no bars yet</div>`;
+  return `<div class="panel" style="margin-top:14px;"><h4 style="color:${COL.amber};">TOOLS</h4>${tools}</div>
+    <div class="panel" style="margin-top:14px;"><h4 style="color:${COL.amber};">SMELTING &middot; Smithing ${L}</h4>${smelt}</div>
+    <div class="panel" style="margin-top:14px;"><h4 style="color:${COL.amber};">FORGING</h4><div class="muted" style="font-size:11px;margin-bottom:6px;">the further your Smithing is past a metal's level, the finer the gear: magic at +10, rare at +30</div>${forge}</div>`;
+}
+// ---- alchemy (at the alchemist) ----
+function skBrew(hid, all){
+  const i = SK_HERB.findIndex(h=>h.id===hid), h = SK_HERB[i]; if (!h) return;
+  if (skLvl('alchemy') < h.lvl){ logMsg(`you need Alchemy level ${h.lvl}`, 'hit'); renderOverlay(); return; }
+  const n = all ? Math.floor(skHave(hid)/2) : Math.min(1, Math.floor(skHave(hid)/2));
+  if (!n){ logMsg(`a brew takes 2 ${h.nm}`, 'hit'); renderOverlay(); return; }
+  let made = 0;
+  for (let k=0;k<n;k++){ if (G.inv.length >= MAXINV) break; const pt = POTIONS[Math.min(i, POTIONS.length-1)], it = newItem();
+    it.used=1; it.nm=pt[0]; it.consumable=1; it.kind='heal'; it.hd1=pt[1]; it.hd2=pt[2]; it.price=pt[4];
+    skAdd(hid, -2); invPush(it); made++; skGainXP('alchemy', h.axp); }
+  logMsg(made ? `you brew ${made} ${POTIONS[Math.min(i, POTIONS.length-1)][0]}${made>1?'s':''}` : 'your pack is full', made ? 'good' : 'hit'); if (made) sfx('potion');
+  renderOverlay(); saveCurrentGame();
+}
+function buildBrewing(){
+  const L = skLvl('alchemy');
+  const rows = SK_HERB.map((h,i)=>skHave(h.id) ? `<div class="shoprow"><span class="muted">&times;${skHave(h.id)}</span><span>${esc(h.nm)} &rarr; ${esc(POTIONS[Math.min(i, POTIONS.length-1)][0])}</span>
+    <span class="desc">${L>=h.lvl ? `2 herbs per potion &middot; ${h.axp} xp` : `needs Alchemy ${h.lvl}`}</span>
+    <span>${L>=h.lvl ? `<button class="btn" onclick="skBrew('${h.id}')">brew 1</button> <button class="btn" onclick="skBrew('${h.id}',1)">brew all</button>` : ''}</span></div>` : '').join('') || `<div class="muted">no herbs - forage for them out in the wilds (E)</div>`;
+  return `<div class="panel" style="margin-top:14px;"><h4 style="color:${COL.purple};">BREWING &middot; Alchemy ${L}</h4>${rows}</div>`;
+}
+// ---- the Skills screen (J) ----
+function buildSkills(){
+  const p = skP();
+  const card = (nm, ico, col, xp, hint)=>{ const L = skLevelOf(xp), a = SK_XP[L], b = SK_XP[L+1]||a, f = L>=99 ? 1 : (xp-a)/Math.max(1,b-a);
+    return `<div class="skcard" title="${esc(hint||'')}"><span class="skico" style="background:${col}">${ico}</span><div class="skbody"><div><b>${esc(nm)}</b><span class="sklv">${L}</span></div>
+      <div class="skbar"><i style="width:${f*100}%;background:${col}"></i></div><div class="muted" style="font-size:10px;">${L>=99 ? 'mastered' : `${xp} / ${b} xp`}</div></div></div>`; };
+  const skills = SK_DEFS.map(([k,nm,ico,col,hint])=>card(nm, ico, col, p.skills[k]||0, hint)).join('');
+  const mast = SK_MASTERY.map(([k,nm])=>card(nm, '&#9876;', '#c85a4a', p.mastery[k]||0, 'raised by landing hits with this kind of weapon: +1 to hit every 20 levels, +1 damage every 25')).join('');
+  const bag = Object.keys(p.bag).filter(id=>p.bag[id]>0).map(id=>`<span class="skitem">${esc(skName(id))} <b>&times;${p.bag[id]}</b></span>`).join('') || '<span class="muted">empty</span>';
+  const opts = skOptions().map((o,i)=>`<button class="btn" onclick="setUi('playing'); skDo(skOptions()[${i}])">${esc(o.label)}</button>`).join(' ');
+  const foods = skFoods();
+  return `<h2 class="panel-title">SKILLS &amp; TRADES</h2>
+    <div class="sub">Skills level on their own, from 1 to 99, apart from your character level. Press <kbd>E</kbd> to gather or work wherever you stand, <kbd>U</kbd> to eat.</div>
+    <div class="ovbody">
+      <div class="skgrid">${skills}</div>
+      <h4 style="color:var(--ink-faint);margin:12px 0 6px;">WEAPON MASTERY &middot; wielding: ${esc((SK_MASTERY.find(m=>m[0]===skWeaponKind())||['',''])[1])} (+${masteryAtk()} hit, +${masteryDmg()} dmg)</h4>
+      <div class="skgrid">${mast}</div>
+      <h4 style="color:var(--ink-faint);margin:12px 0 6px;">BAG</h4><div class="skbag">${bag}</div>
+      <div class="btnrow" style="margin-top:12px;">${opts}${foods.length ? `<button class="btn" onclick="eatFood(); renderOverlay();">U &middot; eat (${foods.reduce((a,f)=>a+f.n,0)} food)</button>` : ''}
+        <button class="btn primary" onclick="setUi('playing')">J / ESC &middot; close</button></div>
+    </div>`;
+}
+// ---- meat from the beasts you kill ----
+function skOnKill(m){
+  const pt = monsterPortraitFor(m.nm, m.undead); if (!pt || m.undead) return;
+  const paint = pt.paint;
+  let id = null;
+  if (paint===mpDragon || paint===mpHydra){ if (chn(0.6)) id = 'dsteak'; }
+  else if (paint===mpBeast || paint===mpFrog || paint===mpBird || paint===mpFish || paint===mpSerpent){
+    const big = pt.o && ((pt.o.tall||1) > 1.05 || /bear|boar|elk|owl/.test(pt.o.head||''));
+    if (chn(0.5)) id = big ? 'prime' : 'meat';
+  }
+  if (id){ skAdd(id, 1); logMsg(`you carve off ${id==='meat' ? 'some raw meat' : id==='prime' ? 'a prime cut' : 'a dragon steak'}`, 'loot'); }
 }
 
 // ===================== SECTION: WALKABLE VILLAGE =====================
@@ -10639,6 +11028,9 @@ function renderImmersiveHud(){
     G.gameMode===0 && !G.owZoomedOut && typeof THREE!=='undefined' ? slot('O', `<span class="ico">${o3Active() ? '&#9638;' : '&#9650;'}</span>`, o3Active() ? 'flat overworld map' : '3D overworld', '', 'minor') : '',
     G.gameMode===0 && G.owZoomedOut ? slot('T', `<span class="ico">&#10148;</span>`, 'fast travel', '', 'minor') : '',
     slot('C', im(obEntry('flame')), 'camp', '', 'minor'),
+    (()=>{ const o = skOptions()[0]; return slot('E', `<span class="ico">${G.gather ? '&#9632;' : '&#9874;'}</span>`, G.gather ? 'stop '+G.gather.o.label.toLowerCase() : o ? o.label : 'nothing to gather here', '', G.gather ? '' : o ? '' : 'off'); })(),
+    slot('U', im(obEntry('potion',{col:'#c8843a'})), 'eat food', skFoods().reduce((a,f)=>a+f.n,0)||'', skFoods().length ? 'minor' : 'minor off'),
+    slot('J', `<span class="ico">&#9733;</span>`, 'skills &amp; trades', '', 'minor'),
   ].join('');
   let ally = '';
   if (p.companion) ally += `<div class="dh-ally" style="color:${p.companion.col}">&#9670; ${esc(p.companion.nm)}</div>`;
@@ -15735,6 +16127,25 @@ function o3SyncQuests(){
   }
 }
 // the merchant you're escorting walks at your heels
+// your campfire on the overworld: a ring of stones, crossed logs and a flickering flame with its own light
+function o3Campfire(T){
+  const f = G.player && skFireHere ? skP().fire : null, lit = f && (G.player.turnCount||0) < f.until;
+  if (!lit){ if (O3.fireGrp) O3.fireGrp.visible = false; return; }
+  if (!O3.fireGrp){
+    const g = O3.fireGrp = new T.Group(); O3.scene.add(g);
+    const stone = new T.MeshStandardMaterial({ color:0x7a766e, roughness:0.95 }), wood = new T.MeshStandardMaterial({ color:0x5a3a20, roughness:0.9 });
+    for (let i=0;i<9;i++){ const a = i/9*Math.PI*2, s2 = new T.Mesh(new T.DodecahedronGeometry(0.045, 0), stone); s2.position.set(Math.cos(a)*0.17, 0.02, Math.sin(a)*0.17); s2.castShadow = true; g.add(s2); }
+    for (let i=0;i<4;i++){ const lg = new T.Mesh(new T.CylinderGeometry(0.025, 0.03, 0.3, 6), wood); lg.rotation.z = Math.PI/2 - 0.35; lg.rotation.y = i*Math.PI/2; lg.position.y = 0.05; g.add(lg); }
+    const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), gr = x.createRadialGradient(32,40,2,32,36,30);
+    gr.addColorStop(0,'rgba(255,240,180,1)'); gr.addColorStop(0.35,'rgba(255,160,50,0.9)'); gr.addColorStop(1,'rgba(255,80,10,0)'); x.fillStyle = gr; x.fillRect(0,0,64,64);
+    const fl = O3.fireFlame = new T.Sprite(new T.SpriteMaterial({ map:new T.CanvasTexture(c), transparent:true, depthWrite:false, blending:T.AdditiveBlending })); fl.position.y = 0.18; fl.scale.set(0.3, 0.42, 1); g.add(fl);
+    const L = O3.fireLight = new T.PointLight(0xff9a40, 1.4, 4, 2); L.position.y = 0.3; g.add(L);
+  }
+  const g = O3.fireGrp; g.visible = true;
+  g.position.set(f.x+0.5, Math.max(O3.heightAt(f.x+0.5, f.y+0.5), -0.1), f.y+0.5);
+  const fl = 0.85 + Math.sin(O3.t*13)*0.1 + Math.sin(O3.t*29)*0.05;
+  O3.fireFlame.scale.set(0.3*fl, 0.42*(0.9+fl*0.2), 1); O3.fireLight.intensity = 1.4*fl;
+}
 function o3SyncEscort(pp, dxs, dzs, sailing){
   const esc2 = (G.player.quests||[]).find(q=>q.kind==='escort' && !q.arrived);
   if (!esc2){ if (O3.escort) O3.escort.g.visible = false; return; }
@@ -15746,6 +16157,12 @@ function o3SyncEscort(pp, dxs, dzs, sailing){
   O3.escortPos.y = Math.max(O3.heightAt(O3.escortPos.x, O3.escortPos.z), -0.14);
   E.g.position.copy(O3.escortPos);
   const moving = Math.hypot(want.x-O3.escortPos.x, want.z-O3.escortPos.z) > 0.05;
+  if (E.e){
+    if (moving) E.yaw = Math.atan2(want.x-O3.escortPos.x, want.z-O3.escortPos.z);
+    E.e.holder.rotation.y = E.yaw||0; m3dPoseHumanoid(E.e.rig, O3.t, moving ? 1 : 0, 0, 0, 0, E.e);
+    if (E.e.rig.arms){ const [R, L] = E.e.rig.arms, sw = Math.sin(O3.t*9)*(moving?1:0); R.sh.rotation.x = -0.08 - sw*0.45; L.sh.rotation.x = -0.08 + sw*0.45; R.el.rotation.x = L.el.rotation.x = -0.25; R.sh.rotation.z = -0.12; L.sh.rotation.z = 0.12; }
+    return;
+  }
   E.walk = (E.walk||0) + (moving ? 0.2 : 0); E.sp.position.y = moving ? Math.abs(Math.sin(E.walk))*0.05 : 0;
   const sx = dxs - dzs; if (Math.abs(sx) > 0.05) E.face = sx < 0 ? -1 : 1;
   E.sp.scale.x = E.sp.userData.h * E.sp.userData.asp * (E.face||1);
@@ -15982,11 +16399,21 @@ function o3Render(){
     m3dPoseHumanoid(r, tt, mv, 0, 0, 0, P.e);
     if (r.arms){ const [R, L] = r.arms; R.sh.rotation.x = -0.08 - sw*0.45; R.sh.rotation.z = -0.12; R.el.rotation.x = r.weapon ? -0.5 : -0.25;
       L.sh.rotation.x = (r.shield ? -0.25 : -0.08) + sw*0.45; L.sh.rotation.z = 0.12; L.el.rotation.x = r.shield ? -0.9 : -0.25;
-      if (r.twoHand){ R.sh.rotation.x = -0.35; R.el.rotation.x = -0.9; } }
+      if (r.twoHand){ R.sh.rotation.x = -0.35; R.el.rotation.x = -0.9; }
+      // at work: face what you're working on - swing at rock and timber, hold a line out over the water, stoop to forage
+      const gw = G.gather && G.gather.mode===0 ? G.gather.o : null;
+      if (gw){
+        if (gw.at && (gw.at.x!==G.owPos.x || gw.at.y!==G.owPos.y)){ const want2 = Math.atan2(gw.at.x - G.owPos.x, gw.at.y - G.owPos.y); let d2 = want2 - P.yaw; d2 = Math.atan2(Math.sin(d2), Math.cos(d2)); P.yaw += d2*Math.min(1, dt*8); P.e.holder.rotation.y = P.yaw; }
+        if (gw.k==='woodcutting' || gw.k==='mining'){ const c = (Math.sin(tt*6)+1)/2; R.sh.rotation.x = -2.4 + c*2.0; L.sh.rotation.x = -2.2 + c*1.9; R.el.rotation.x = L.el.rotation.x = -0.3; R.sh.rotation.z = -0.05; L.sh.rotation.z = 0.35; if (r.torso) r.torso.rotation.x = 0.05 + c*0.25; }
+        else if (gw.k==='fishing'){ R.sh.rotation.x = -1.15 + Math.sin(tt*1.3)*0.05; R.el.rotation.x = -0.35; L.sh.rotation.x = -0.9; L.sh.rotation.z = 0.5; L.el.rotation.x = -0.6; }
+        else if (gw.k==='foraging'){ if (r.torso) r.torso.rotation.x = 0.7; R.sh.rotation.x = -0.9 + Math.sin(tt*3)*0.2; L.sh.rotation.x = -0.7; }
+      }
+    }
   } else {
     P.sp.position.y = (moving && !sailing) ? Math.abs(Math.sin(P.walk))*0.05 : 0;
     P.sp.scale.x = P.sp.userData.h * P.sp.userData.asp * (P.face||1);
   }
+  o3Campfire(T);
   if (sailing){
     if (moving) O3.boatYaw = Math.atan2(dxs, dzs);           // turn to the way you're sailing, and keep that heading when you stop
     O3.boat.rotation.set(Math.sin(O3.t*1.3)*0.03, O3.boatYaw||0, Math.sin(O3.t*1.6)*0.05);
@@ -19537,6 +19964,8 @@ function backOut(){
     case 'waypoint': case 'stash': case 'questgiver': setUi('playing'); break;
     case 'inventory': setUi('playing'); break;
     case 'charsheet': setUi('playing'); break;
+    case 'skills': setUi('playing'); break;
+    case 'cook': setUi(G.cookAt==='fire' ? 'playing' : 'tavern'); break;
     case 'vault': /* handled inside vault (only closes when solved/jammed) */ break;
     default: break;
   }
@@ -19579,6 +20008,8 @@ function renderOverlay(){
     case 'achievements': el.innerHTML = buildAchievements(); break;
     case 'bestiary': el.innerHTML = buildBestiary(); renderBestiaryArt(); break;
     case 'fastTravel': el.innerHTML = buildFastTravel(); break;
+    case 'skills': el.innerHTML = buildSkills(); break;
+    case 'cook': el.innerHTML = buildCook(); break;
     default: el.innerHTML = '';
   }
 }
@@ -20062,7 +20493,7 @@ function buildBlacksmith(){
   return `
     <h2 class="panel-title">THE BLACKSMITH</h2>
     <div class="sub">You have ${G.player.gold} gold. Click a piece of worn weapon or armor to have the forge drill a new socket into it - ${SOCKET_FORGE_COST}g each, up to ${MAX_SOCKETS} sockets per piece. Jewelry can't be socketed.</div>
-    <div class="ovbody">${rows}
+    <div class="ovbody">${rows}${buildSmithing()}
       <div class="btnrow"><button class="btn primary" onclick="setUi('playing')">L / ESC &middot; leave</button></div>
     </div>
   `;
@@ -20084,7 +20515,7 @@ function buyAlchemistPotion(i){
 }
 function buildAlchemist(){
   if (!G.alchemistStock || G.alchemistStock.length===0){
-    return `<h2 class="panel-title">THE ALCHEMIST</h2><div class="sub">You have ${G.player.gold} gold.</div><div class="ovbody"><div class="muted" style="text-align:center;">the shelves are bare for now</div>
+    return `<h2 class="panel-title">THE ALCHEMIST</h2><div class="sub">You have ${G.player.gold} gold.</div><div class="ovbody"><div class="muted" style="text-align:center;">the shelves are bare for now</div>${buildBrewing()}
       <div class="btnrow"><button class="btn primary" onclick="setUi('playing')">L &middot; leave</button></div></div>`;
   }
   const rows = G.alchemistStock.map((it,i)=>`
@@ -20097,7 +20528,7 @@ function buildAlchemist(){
   return `
     <h2 class="panel-title">THE ALCHEMIST</h2>
     <div class="sub">You have ${G.player.gold} gold. Click a potion to buy, or press its number.</div>
-    <div class="ovbody">${rows}
+    <div class="ovbody">${rows}${buildBrewing()}
       <div class="btnrow"><button class="btn primary" onclick="setUi('playing')">L / ESC &middot; leave</button></div>
     </div>
   `;
@@ -20127,6 +20558,7 @@ function buildTavern(){
     <div class="ovbody">
       <div class="btnrow" style="margin-bottom:14px;">
         <button class="btn" onclick="villageRest(); renderOverlay();">R &middot; rest (full heal)</button>
+        <button class="btn" onclick="G.cookAt='hearth'; setUi('cook');">cook at the hearth</button>
       </div>
       <div class="panel" style="margin-bottom:14px;">
         <h4 style="color:${COL.purple};">Corruption: ${Math.round(G.player.corruption||0)}%</h4>
@@ -20818,6 +21250,7 @@ function buildHelp(){
       <div><span style="color:${COL.encounter}">!</span> a wandering threat, visible and moving around the map - walk into one to trigger it, or steer around it if you'd rather not fight right now. It'll drift toward you if you wander close, faster at night or in bad weather. Roughly 50 are out there at once, thinning out as you clear them and slowly replaced over time &middot; <span style="color:${COL.blue}">~</span> rivers trace downhill from the peaks to the sea</div>
       <div>most encounters are an ordinary fight, but not all of them: a wandering merchant sometimes hails you with a one-time stock instead of a fight; a pack occasionally has a tougher named champion leading it, worth real bonus loot; and the desert, swamp and tundra each hide their own unique set-piece encounter (a buried tomb, a bog ambush, a frozen cache) with a guaranteed bonus reward on top of the fight itself.</div>
       <div>open water blocks the way until you own a boat (buy one at any general store) &mdash; once you have one you can sail freely, though the open sea has its own dangers</div>
+      <div><b>Skills &amp; trades</b> (<kbd>J</kbd>): fishing, mining, woodcutting and foraging, and the trades that use what you gather - cooking, smithing, alchemy and firemaking - each level from 1 to 99 on its own, apart from your character level. Press <kbd>E</kbd> to gather wherever you stand (by water, trees, mountains or open ground, or an ore vein in a mine; press it again or move to stop), light a campfire from your logs, or cook at your fire. Buy a fishing rod, pickaxe and hatchet (and better ones as you level) at the blacksmith, who also smelts your ore into bars and forges them into gear; brew herbs into potions at the alchemist; cook at the tavern hearth. Press <kbd>U</kbd> to eat the best-fitting cooked food (in a fight it takes your turn). Every kind of weapon also has its own mastery, raised by landing hits: +1 to hit every 20 levels, +1 damage every 25.</div>
       <div>press <kbd>C</kbd> to make camp wherever you're standing &mdash; usually a free heal that also refills your ability charges, spell slots and wand charges, same as a village rest, but sleeping in the open risks a night-time ambush that interrupts the rest entirely (no healing, straight into a fight, and every exit is sealed until the last monster drops). Safer on grass, riskier in forest/swamp, and impossible while zoomed out. You can also camp inside any dungeon-type site once you've cleared every monster off the current floor &mdash; nothing left down there to ambush you, so it's just as safe as a village rest.</div>
       <div>press <kbd>M</kbd> (or the <b>+</b> icon) to zoom out and see the whole continent at once &mdash; press again to zoom back in and move; while zoomed out, press <kbd>T</kbd> to instantly fast-travel to any village you've already visited</div>
       <div>day turns to night and back on a steady cycle, and the weather shifts between clear, rain, fog and the occasional storm &mdash; both are shown in the corner of the overworld map. Night and bad weather raise the odds of a random encounter, so an easy stretch of road can turn dangerous after dark.</div>
@@ -20880,6 +21313,9 @@ function handlePlayingKey(k){
     case 'p': case 'P': G.charSheetInvSel = -1; setUi('charsheet'); break;
     case 'm': case 'M': if (G.gameMode===3) v3Toggle(); else toggleOwZoom(); break;
     case 'c': case 'C': campOutside(); break;
+    case 'e': case 'E': skStartOrStop(); break;
+    case 'j': case 'J': setUi('skills'); break;
+    case 'u': case 'U': eatFood(); renderGame(); break;
     case 'b': case 'B': setUi('bestiary'); break;
     case 'h': case 'H': setUi('achievements'); break;
     case 't': case 'T': if (G.gameMode===0 && G.owZoomedOut) setUi('fastTravel'); break;
@@ -21049,6 +21485,8 @@ function handleKeydown(e){
     case 'achievements': { if (['h','H','Escape'].includes(k)) setUi('playing'); break; }
     case 'bestiary': { if (['b','B','Escape'].includes(k)) setUi('playing'); break; }
     case 'fastTravel': { if (['t','T','Escape'].includes(k)) setUi('playing'); break; }
+    case 'skills': { if (['j','J','Escape'].includes(k)) setUi('playing'); else if (['u','U'].includes(k)){ eatFood(); renderOverlay(); } break; }
+    case 'cook': { if (k==='Escape') setUi(G.cookAt==='fire' ? 'playing' : 'tavern'); break; }
     case 'playing': handlePlayingKey(k); break;
   }
 }
@@ -21113,6 +21551,7 @@ function bindTouch(){
 // ===================== SECTION: GAME LOOP / BOOT =====================
 let lastAutosaveTs = 0;
 function frameLoop(ts){
+  if (G.player && G.gather) skGatherTick(performance.now());
   if (G.player){
     // combat is turn-based: monsters only ever act in direct response to a
     // player action (see the tickMonsters() calls in tryMove/useAbility/
