@@ -1,5 +1,30 @@
 # Depthcrawl patch notes
 
+## v153 — The crypt and the catacombs
+
+Graveyards are now a real place: carved headstones and stone tombs up top, a crypt holding the way down, and catacombs below.
+
+### The graveyard
+- **Tombs:** every tomb is a real stone mausoleum:
+  - a weathered, rain-streaked body on a plinth, with corner pilasters and a cornice;
+  - a gabled roof topped with a cross, or a stepped top with a stone urn;
+  - a framed, riveted iron door, or a sealed slab carved with a worn inscription.
+- **Headstones:** real carved stones in five shapes: round-topped, shouldered, plain crosses, Celtic crosses with a ring, and obelisks. They're weathered and spotted with lichen, a little tilted, and lettered.
+- **Graves:** each headstone stands over its grave, either a grassy mound or a stone ledger slab.
+- **The crypt:** the way down is inside a large walk-in crypt in the corner of the plot:
+  - a pitched roof topped with a cross;
+  - a columned porch with its own small gable over the doorway;
+  - a stone hall inside, with candles burning and the stair down at the back.
+
+### The catacombs
+- Every floor below a graveyard is now catacombs, a warren of burial passages and chambers. Before, every floor was another open graveyard.
+- Their walls are lined with two rows of real burial niches cut into the stone. The niches hold:
+  - skulls resting on heaps of bones;
+  - bodies wrapped in shrouds;
+  - little clusters of candles.
+- Heaps of bones and skulls, and guttering candles, line the passages.
+- Wall torches light the catacombs.
+
 ## v152 — Under open skies
 
 The graveyard and every roadside fight now use the new 3D renderer too, so all of first person is in full 3D.
