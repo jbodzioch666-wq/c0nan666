@@ -7,6 +7,9 @@
   - A stair down is a real opening in the floor, with steps dropping into a dark shaft. Before, the grass underneath showed through the crypt's opening.
 - **Crypt ceiling:** the ceiling inside the crypt no longer flickers. It was sitting exactly on the roof ledge above it.
 - **Crosses:** the middle of stone crosses on graves, tombs and the crypt no longer flickers where the two arms meet.
+- **Crypt entrance:** the stonework above the crypt's entrance no longer flickers. The beam over the porch now hangs just below the roof ledge instead of sharing its underside.
+- **Tomb edges:** the corner pillars on the small tombs stand slightly proud of their sides, so the tomb edges no longer shimmer.
+- **Roof ridges:** the ends of the roof ridges no longer flicker where the two slopes meet.
 
 ## v157 — Eye to eye
 
