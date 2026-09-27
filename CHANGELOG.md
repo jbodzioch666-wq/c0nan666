@@ -15,6 +15,7 @@ Quests now send you to real places, track your progress on screen, and let you c
 - Each job tells you where to go, like "29 leagues south of Ingrid's Crossing", and uncovers that spot on your world map.
 - Objectives are marked on the 3D land with a pillar of light and a floating **!** (a blue **?** when it's time to turn in). Wanted foes have a bounty marker, and camps have tents and a campfire.
 - The world map shows a pin for each objective, with a dashed trail to the one you're tracking.
+- When a site moves (a conquered site rises again somewhere else), any quest about it follows it to its new home, or points to the nearest site of the same kind. You're told where the new mark is.
 
 ### Quest tracker
 - Your active quests sit on the right of the screen with live progress. Click one to track it.

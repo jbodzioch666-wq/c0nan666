@@ -6537,6 +6537,7 @@ function loadGame(id){
   G.siteKind = data.siteKind||'dungeon';
   G.dungeonModifier = data.dungeonModifier||null;
   G.questBoards = data.questBoards||{};
+  setTimeout(()=>{ try{ questValidateAll(); }catch(e){} }, 0);   // sites may have moved since these were posted
   G.questBoard = (G.gameMode===3 && G.questBoards[questTownKey(G.owPos.x,G.owPos.y)]) || data.questBoard||[];
   G.tavernCursor = data.tavernCursor||(1+rn(5));
   G.log = data.log||[];
@@ -8151,6 +8152,7 @@ function enterVillage(){
   const flavor = townFlavorAt(G.owPos.x, G.owPos.y);
   G.villageRace = (flavor && VILLAGE_RACE_THEME[flavor.race]) ? flavor.race : 'human';
   generateVillage();
+  questValidateAll();
   ensureTownQuestBoard();
   setUi('playing');
   logMsg(flavor
@@ -8232,7 +8234,7 @@ function generateQuestOffer(tx, ty){
     const s = questNearbySites(tx, ty, 4, 45);
     if (s.length){ const pickS = s[Math.min(s.length-1, Math.floor(Math.pow(Math.random(),1.6)*Math.min(s.length,8)))];
       const word = SITE_WORD[pickS.kind]||'dungeon';
-      return questReward(Object.assign(base, { kind:'conquest', siteX:pickS.x, siteY:pickS.y, siteKind:pickS.kind, target:1, progress:0,
+      return questReward(Object.assign(base, { kind:'conquest', siteX:pickS.x, siteY:pickS.y, siteKind:pickS.kind, slot:G.ow.dungeonIdx[pickS.x][pickS.y], target:1, progress:0,
         text:`Conquer the ${word} ${placeDesc(pickS.x,pickS.y,tx,ty,town)} - defeat the master of that place` }), 60+lvl*14+pickS.d*1.5, 50+lvl*18, 3, true);
     }
   } else if (r < 0.42){
@@ -8252,7 +8254,7 @@ function generateQuestOffer(tx, ty){
     if (s.length){ const pickS = s[Math.floor(Math.random()*Math.min(s.length,6))];
       const maxD = mx(1, (G.ow.dungeonMax[pickS.x] && G.ow.dungeonMax[pickS.x][pickS.y]) || 3), floor = 1 + rn(mn(4, maxD));
       const who = pick(QUEST_CAPTIVES), word = SITE_WORD[pickS.kind]||'dungeon';
-      return questReward(Object.assign(base, { kind:'rescue', siteX:pickS.x, siteY:pickS.y, siteKind:pickS.kind, floor, captive:who, freed:false, target:1, progress:0,
+      return questReward(Object.assign(base, { kind:'rescue', siteX:pickS.x, siteY:pickS.y, siteKind:pickS.kind, slot:G.ow.dungeonIdx[pickS.x][pickS.y], floor, captive:who, freed:false, target:1, progress:0,
         text:`Rescue ${who}, held on floor ${floor} of the ${word} ${placeDesc(pickS.x,pickS.y,tx,ty,town)}` }), 55+lvl*12+floor*15, 45+lvl*16+floor*10, 3, true);
     }
   } else if (r < 0.86){
@@ -8302,6 +8304,52 @@ function ensureTownQuestBoard(){
   const b = G.questBoards[k] = G.questBoards[k] || [];
   while (b.length < 3) b.push(generateQuestOffer(G.owPos.x, G.owPos.y));
   G.questBoard = b;
+}
+// sites don't stay put: a conquered site is reclaimed by the wild and rises
+// again elsewhere. A quest (or a posted offer) about a site follows it to its
+// new home by its slot, or failing that is re-pointed at the nearest site of
+// the same kind; an offer that has nowhere left to point is replaced.
+function questSiteGone(q){
+  if ((q.kind!=='conquest' && q.kind!=='rescue') || q.siteX===undefined) return false;
+  if (q.kind==='conquest' && q.progress>=q.target) return false;
+  if (q.kind==='rescue' && q.freed) return false;
+  const want = SITE_KIND_TILE[q.siteKind] || OW_DUNGEON;
+  return !(G.ow.map[q.siteX] && G.ow.map[q.siteX][q.siteY]===want);
+}
+function questRetarget(q, quiet){
+  if (!questSiteGone(q)) return true;
+  const want = SITE_KIND_TILE[q.siteKind] || OW_DUNGEON, oldX = q.siteX, oldY = q.siteY;
+  let to = null;
+  const mv = q.slot && G.ow.siteMoves && G.ow.siteMoves[q.slot];
+  if (mv && G.ow.map[mv.x] && G.ow.map[mv.x][mv.y]===want) to = { x:mv.x, y:mv.y };
+  if (!to){
+    let bd = 1e9;
+    for (let x=mx(0,oldX-70); x<=mn(OW_COLS-1,oldX+70); x++) for (let y=mx(0,oldY-70); y<=mn(OW_ROWS-1,oldY+70); y++){
+      if (G.ow.map[x][y]!==want) continue;
+      if ((G.player.quests||[]).some(o=>o!==q && o.siteX===x && o.siteY===y && o.kind===q.kind)) continue;
+      const d = (x-oldX)*(x-oldX)+(y-oldY)*(y-oldY); if (d<bd){ bd = d; to = {x,y}; }
+    }
+  }
+  if (!to) return false;
+  q.siteX = to.x; q.siteY = to.y; q.slot = G.ow.dungeonIdx[to.x][to.y];
+  if (q.kind==='rescue'){ const md = (G.ow.dungeonMax[to.x] && G.ow.dungeonMax[to.x][to.y]) || q.floor; q.floor = mx(1, mn(q.floor, md)); }
+  const word = SITE_WORD[q.siteKind]||'dungeon', home = q.townKey ? questKeyXY(q.townKey) : G.owPos, where = placeDesc(to.x, to.y, home.x, home.y, q.townName||'town');
+  q.text = q.kind==='conquest' ? `Conquer the ${word} ${where} - defeat the master of that place` : `Rescue ${q.captive}, held on floor ${q.floor} of the ${word} ${where}`;
+  if (!quiet){
+    owReveal(to.x, to.y, 4);
+    logMsg(`word reaches you - the ${word} you were sent to is gone, and your quest now points to the ${word} ${where}`, 'new');
+    questToast(questTitle(q), `The ${word} moved - new mark: ${where}`);
+  }
+  return true;
+}
+function questValidateAll(){
+  if (!G.ow || !G.ow.map || !G.player) return;
+  const qs = G.player.quests||[];
+  for (let i=qs.length-1;i>=0;i--) if (!questRetarget(qs[i], false)){ logMsg(`the ${SITE_WORD[qs[i].siteKind]||'site'} for "${questTitle(qs[i])}" is gone and none like it remains - the quest is abandoned`, 'hit'); qs.splice(i,1); }
+  for (const k in (G.questBoards||{})){
+    const b = G.questBoards[k], t = questKeyXY(k);
+    for (let i=0;i<b.length;i++) if (!questRetarget(b[i], true)) b[i] = generateQuestOffer(t.x, t.y);
+  }
 }
 function questIsReady(q){
   const here = curTownKey();
@@ -8401,6 +8449,7 @@ function acceptQuest(id){
 }
 // a wanted foe drifts around its haunt; walking onto it (or it onto you) starts the fight
 function questOverworldTurn(){
+  questValidateAll();
   for (const q of (G.player.quests||[])){
     if (q.kind!=='wanted' || q.progress>=q.target || !chn(0.35)) continue;
     const d = [[1,0],[-1,0],[0,1],[0,-1]][rn(4)], nx = q.x+d[0], ny = q.y+d[1];
