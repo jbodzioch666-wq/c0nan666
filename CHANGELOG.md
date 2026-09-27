@@ -8,10 +8,11 @@ Each weapon type now has its own grip, stance and attack in first person, modell
 - **Swords, scimitars, sickles:** held upright at your right side, ready to cut.
 - **Daggers:** held low and point-forward, close to the body.
 - **Rapiers:** held point-first toward the enemy in a fencing line.
-- **Greatswords:** both hands on the long grip, blade raised across your view.
+- **Greatswords, greataxes, mauls and halberds** are held upright in a proper two-handed grip:
+  - the right hand high on the grip, by the guard, with its arm coming in from the lower right;
+  - the left hand just below it, with its arm coming in from the lower left;
+  - both sets of knuckles face forward, with the fingers wrapped round the grip toward you.
 - **Axes, maces, hammers, clubs, picks, morningstars:** held upright by the haft, head up and ready to fall.
-- **Greataxes and mauls:** gripped in both hands, the head held high and angled to fall.
-- **Halberds:** both hands on the shaft, head high.
 - **Spears:** both hands on the shaft and the point levelled at the enemy.
 - **Quarterstaves:** both hands on the staff, held across your body.
 - **Unarmed:** both fists raised in a guard.
