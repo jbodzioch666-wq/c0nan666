@@ -15914,7 +15914,7 @@ function fpPrepareLights(vis){
     FP.flames = [];
     for (const t of torches) for (const [dx,dy] of FACING_VECT){
       if (tileAt(t.x+dx,t.y+dy)===T_WALL) continue;
-      FP.flames.push({x:t.x+0.5+dx*0.53, y:t.y+0.5+dy*0.53, seed:fpHash(t.x,t.y,dx*3+dy)});
+      FP.flames.push({x:t.x+0.5+dx*0.53, y:t.y+0.5+dy*0.53, dx, dy, seed:fpHash(t.x,t.y,dx*3+dy)});
     }
   }
   const n = COLS*ROWS;
@@ -16027,7 +16027,7 @@ function fpFloorSlots(T){
     f[y*COLS+x] = s;
   }
 }
-function fpRenderWorld(env, T, camZ, horizon){
+function fpRenderWorld(env, T, camZ, horizon, depthOnly){
   const W = FP.W, H = FP.H, u32 = FP.u32, zb = FP.zbuf, rowD = FP.rowD, rowL = FP.rowL;
   const c = FP.cam, dirX = Math.cos(c.a), dirY = Math.sin(c.a);
   const plX = -dirY*FP_PLANE, plY = dirX*FP_PLANE;
@@ -16097,6 +16097,8 @@ function fpRenderWorld(env, T, camZ, horizon){
         prevWall = true;
       } else prevWall = false;
     }
+    // (when the GPU draws the stone, only the depth each column hits is needed)
+    if (depthOnly){ zb[x] = nL ? Math.max(0.02, LY_perp[0]) : 1e9; continue; }
     let top = horizon, bot = horizon - 1, perp = 1e9;
     for (let li0=nL-1; li0>=0; li0--){
       const side = LY_side[li0], mX = LY_mx[li0], mY = LY_my[li0];
@@ -16218,8 +16220,294 @@ function fpRenderWorld(env, T, camZ, horizon){
     for (let y=0; y<H; y++) if (fgSet[y]===myStamp) u32[y*W+x] = fgBuf[y];
   }
   FP.colStamp = colStamp;
-  FP.octx.putImageData(FP.img, 0, 0);
+  if (!depthOnly) FP.octx.putImageData(FP.img, 0, 0);
   return { dirX, dirY, plX, plY, proj };
+}
+
+// ---------- GPU dungeon renderer ----------
+// Indoor dungeons are drawn by three.js at full resolution rather than by the
+// software raycaster: the same procedural stone, sampled finer and given a
+// normal map so mortar and cracks catch the light, real torch lights that
+// cast shadows down the halls, the carried lantern, soft corner shading
+// where walls meet floor and ceiling, a stairwell rising into the ceiling
+// over up-stairs, and dust drifting in the lantern light. The raycaster
+// still runs (without shading) to fill the depth buffer the sprites and
+// stairs are clipped against, and takes over if WebGL is unavailable.
+const FPD = { ok:null, MAXT:4, scale:1, dtAvg:1/60, adj:0 };
+function fpdInit(){
+  if (FPD.ok!==null) return FPD.ok;
+  FPD.ok = false;
+  if (typeof THREE==='undefined' || window.__noFpd) return false;
+  try{
+    const T = THREE, cv = document.createElement('canvas');
+    const r = new T.WebGLRenderer({ canvas:cv, antialias:true, preserveDrawingBuffer:true, powerPreference:'high-performance' });
+    r.outputEncoding = T.sRGBEncoding; r.toneMapping = T.NoToneMapping;
+    r.shadowMap.enabled = true; r.shadowMap.type = T.PCFShadowMap; r.shadowMap.autoUpdate = false;
+    const scene = new T.Scene(), cam = new T.PerspectiveCamera(60, 16/9, 0.03, 40);
+    scene.background = new T.Color(0x000000);
+    scene.fog = new T.Fog(0x030407, 6, 17);
+    const amb = new T.AmbientLight(0xffffff, 0.1), lan = new T.PointLight(0xffdca8, 1, 8, 1.4);
+    scene.add(amb, lan);
+    const torches = [];
+    for (let i=0;i<FPD.MAXT;i++){
+      const L = new T.PointLight(0xff8a36, 0, 6.5, 1.4);
+      L.castShadow = true; L.shadow.mapSize.set(256,256); L.shadow.bias = -0.006; L.shadow.normalBias = 0.02;
+      L.shadow.camera.near = 0.05; L.shadow.camera.far = 7;
+      scene.add(L); torches.push(L);
+    }
+    // dust hanging in the air, only noticeable close by in the lantern light
+    const nD = 180, dp = new Float32Array(nD*3);
+    for (let i=0;i<nD*3;i++) dp[i] = Math.random();
+    const dg = new T.BufferGeometry(); dg.setAttribute('position', new T.BufferAttribute(new Float32Array(nD*3), 3));
+    const dc = v3Canvas(32,32), dx = dc.getContext('2d'), gr = dx.createRadialGradient(16,16,0,16,16,16);
+    gr.addColorStop(0,'rgba(255,236,200,1)'); gr.addColorStop(1,'rgba(255,236,200,0)'); dx.fillStyle = gr; dx.fillRect(0,0,32,32);
+    const dust = new T.Points(dg, new T.PointsMaterial({ size:0.014, map:new T.CanvasTexture(dc), transparent:true, opacity:0.5, depthWrite:false, blending:T.AdditiveBlending, color:0xffe2b8 }));
+    dust.frustumCulled = false; scene.add(dust);
+    Object.assign(FPD, { r, cv, scene, cam, amb, lan, torches, dust, dustSeed:dp, world:null, mats:{}, lightKey:'' });
+    cv.addEventListener('webglcontextlost', ()=>{ FPD.ok = false; });   // the raycaster takes back over
+    FPD.ok = true;
+  }catch(e){ FPD.ok = false; }
+  return FPD.ok;
+}
+// a procedural texture sampled at 256px, with a normal map derived from its
+// brightness (mortar and cracks are dark, so they read as recessed) and an
+// emissive map for anything that glows (lava seams, runes, ore)
+function fpdMaterial(key, fn, o){
+  o = o || {};
+  if (FPD.mats[key]) return FPD.mats[key];
+  const T = THREE, N = 256, st = FP_TEX/N;
+  const cc = v3Canvas(N,N), cx = cc.getContext('2d'), id = cx.createImageData(N,N), d = id.data;
+  const nc = v3Canvas(N,N), nx = nc.getContext('2d'), nd = nx.createImageData(N,N), ndd = nd.data;
+  let ec = null, ed = null, eid = null;
+  const h = new Float32Array(N*N);
+  for (let y=0;y<N;y++) for (let x=0;x<N;x++){
+    const c = fn(x*st, y*st) || [0,0,0], i = y*N+x, p = i*4;
+    const r = clamp(c[0],0,255), g = clamp(c[1],0,255), b = clamp(c[2],0,255);
+    d[p] = r; d[p+1] = g; d[p+2] = b; d[p+3] = 255;
+    h[i] = (r*0.3 + g*0.55 + b*0.15)/255;
+    if (c[3]){
+      if (!ec){ ec = v3Canvas(N,N); eid = ec.getContext('2d').createImageData(N,N); ed = eid.data; for (let k=3;k<ed.length;k+=4) ed[k] = 255; }
+      const k = Math.min(1, c[3]/170); ed[p] = r*k; ed[p+1] = g*k; ed[p+2] = b*k;
+    }
+  }
+  // soften the height a touch, then take its slope for the normals (wrapping, as the textures tile)
+  // (a wide blur keeps the mortar joints and cracks but melts single-pixel speckle into the surface)
+  const hs = new Float32Array(N*N), tmp = new Float32Array(N*N), W = (v)=>(v+N)%N, R = 3;
+  for (let y=0;y<N;y++) for (let x=0;x<N;x++){ let s = 0; for (let i=-R;i<=R;i++) s += h[y*N+W(x+i)]; tmp[y*N+x] = s/(2*R+1); }
+  for (let y=0;y<N;y++) for (let x=0;x<N;x++){ let s = 0; for (let j=-R;j<=R;j++) s += tmp[W(y+j)*N+x]; hs[y*N+x] = s/(2*R+1); }
+  const str = o.bump || 20;
+  for (let y=0;y<N;y++) for (let x=0;x<N;x++){
+    const ax = (hs[y*N+W(x-1)] - hs[y*N+W(x+1)])*str, ay = (hs[W(y+1)*N+x] - hs[W(y-1)*N+x])*str;
+    const l = Math.hypot(ax, ay, 1), p = (y*N+x)*4;
+    ndd[p] = (ax/l*0.5+0.5)*255; ndd[p+1] = (ay/l*0.5+0.5)*255; ndd[p+2] = (1/l*0.5+0.5)*255; ndd[p+3] = 255;
+  }
+  cx.putImageData(id,0,0); nx.putImageData(nd,0,0);
+  const aniso = Math.min(8, FPD.r.capabilities.getMaxAnisotropy());
+  const map = new T.CanvasTexture(cc); map.encoding = T.sRGBEncoding; map.anisotropy = aniso;
+  const nmap = new T.CanvasTexture(nc); nmap.anisotropy = aniso;
+  map.wrapS = map.wrapT = nmap.wrapS = nmap.wrapT = T.RepeatWrapping;
+  // Phong keeps the stone matte with a controllable glint (a PBR dielectric washes the whole wall in a grey sheen at lantern range)
+  const sh = o.rough!==undefined ? o.rough : 0.9;
+  const m = new T.MeshPhongMaterial({ map, normalMap:nmap, vertexColors:true, shininess: 6 + (1-sh)*80, specular: new T.Color().setScalar(0.02 + (1-sh)*0.35) });
+  if (ec){ ec.getContext('2d').putImageData(eid,0,0); const em = new T.CanvasTexture(ec); em.encoding = T.sRGBEncoding; em.wrapS = em.wrapT = T.RepeatWrapping; m.emissiveMap = em; m.emissive = new T.Color(0xffffff); m.emissiveIntensity = o.glow || 1.4; }
+  FPD.mats[key] = m;
+  return m;
+}
+// the level's stone: a face for every side of a wall that borders open floor,
+// floor and ceiling tiles, each vertex darkened where surfaces meet
+function fpdBuild(T){
+  const TH = THREE, spec = FP_THEME_SPECS[T.key], key = T.key;
+  if (FPD.world){ FPD.scene.remove(FPD.world); FPD.world.traverse(o=>{ if (o.geometry) o.geometry.dispose(); }); }
+  const B = {};
+  const bucket = (k)=> B[k] || (B[k] = { pos:[], nor:[], uv:[], col:[], idx:[] });
+  const solid = (x,y)=> x<0 || y<0 || x>=COLS || y>=ROWS || G.map[x][y]===T_WALL;
+  // a grid of vertices over one face: origin O, edge vectors U and V, samples along each
+  // (uvs scales the texture to the face's real size, for the small trims)
+  const face = (k, O, U, V, N, us, vs, ao, uvs)=>{
+    const b = bucket(k), base = b.pos.length/3;
+    for (const v of vs) for (const u of us){
+      b.pos.push(O[0]+U[0]*u+V[0]*v, O[1]+U[1]*u+V[1]*v, O[2]+U[2]*u+V[2]*v);
+      b.nor.push(N[0],N[1],N[2]); b.uv.push(uvs ? uvs[0]*u + (uvs[2]||0) : u, uvs ? uvs[1]*v + (uvs[3]||0) : v);
+      const a = ao(u,v); b.col.push(a,a,a);
+    }
+    const nu = us.length;
+    for (let j=0;j<vs.length-1;j++) for (let i=0;i<nu-1;i++){
+      const a = base+j*nu+i, bb = a+1, c = a+nu+1, dd = a+nu;
+      b.idx.push(a,bb,dd, bb,c,dd);
+    }
+  };
+  const S5 = [0,0.14,0.5,0.86,1];
+  const ramp = (t, lo)=> lo + (1-lo)*Math.min(1, t/0.14);
+  for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
+    if (solid(x,y)) continue;
+    // walls around this open tile
+    for (const [dx,dy] of FACING_VECT){
+      const wx = x+dx, wy = y+dy;
+      if (!solid(wx,wy)) continue;
+      let wk = 'wall';
+      if (wx>=0 && wy>=0 && wx<COLS && wy<ROWS){
+        if (G.dungeonDeco && G.dungeonDeco[wx][wy]==='torch') wk = 'wallTorch';
+        else if (fpHash(wx,wy,3)>0.72) wk = 'wall2';
+      }
+      const ux = -dy, uz = dx;                                  // along the face, so U x up points back into the room
+      const cL = solid(x-ux, y-uz), cR = solid(x+ux, y+uz);     // inner corners at either end
+      const O = [x+0.5+dx*0.5-ux*0.5, 0, y+0.5+dy*0.5-uz*0.5];
+      face(wk, O, [ux,0,uz], [0,1,0], [-dx,0,-dy], S5, S5, (u,v)=>
+        ramp(v,0.5) * ramp(1-v,0.62) * (cL ? ramp(u,0.55) : 1) * (cR ? ramp(1-u,0.55) : 1));
+    }
+    // floor, darkened toward any wall it runs into
+    const aoF = (px,py)=>{
+      let dm = 1;
+      for (let j=-1;j<=1;j++) for (let i=-1;i<=1;i++){
+        if (!(i||j) || !solid(x+i,y+j)) continue;
+        const qx = Math.max(x+i-px, 0, px-(x+i+1)), qy = Math.max(y+j-py, 0, py-(y+j+1));
+        dm = Math.min(dm, Math.hypot(qx,qy));
+      }
+      const t = Math.min(1, dm/0.42); return 0.45 + 0.55*t*t*(3-2*t);
+    };
+    const slot = FP.ftile ? FP.ftile[y*COLS+x] : 0;
+    face('floor'+slot, [x,0,y+1], [1,0,0], [0,0,-1], [0,1,0], S5, S5, (u,v)=>aoF(x+u, y+1-v));
+    if (G.map[x][y]===T_STAIRSU){
+      // an open stairwell climbing into the dark above the steps
+      for (const [dx,dy] of FACING_VECT){
+        const ux = -dy, uz = dx;
+        face('wall', [x+0.5+dx*0.5-ux*0.5, 1, y+0.5+dy*0.5-uz*0.5], [ux,0,uz], [0,1.4,0], [-dx,0,-dy], [0,1], [0,0.5,1], (u,v)=>0.5*(1-v)*(1-v));
+      }
+    } else if (spec.ceil){
+      face('ceil', [x,1,y], [1,0,0], [0,0,1], [0,-1,0], S5, S5, (u,v)=>Math.min(1, aoF(x+u, y+v)+0.12));
+    }
+  }
+  // an upright block (no bottom), shaded darker toward its foot
+  const box = (k, x0, y0, z0, x1, y1, z1, lo)=>{
+    const ao = (u,v)=> lo + (1-lo)*Math.min(1, v/0.12);
+    const w = x1-x0, d = z1-z0, hh = y1-y0, sv = [w, hh, 0, y0], sd = [d, hh, 0.37, y0];
+    face(k, [x0,y0,z1], [w,0,0], [0,hh,0], [0,0,1], [0,1], [0,0.12,1], ao, sv);
+    face(k, [x1,y0,z0], [-w,0,0], [0,hh,0], [0,0,-1], [0,1], [0,0.12,1], ao, sv);
+    face(k, [x0,y0,z0], [0,0,d], [0,hh,0], [-1,0,0], [0,1], [0,0.12,1], ao, sd);
+    face(k, [x1,y0,z1], [0,0,-d], [0,hh,0], [1,0,0], [0,1], [0,0.12,1], ao, sd);
+    face(k, [x0,y1,z1], [w,0,0], [0,0,-d], [0,1,0], [0,1], [0,1], ()=>1, [w, d]);
+  };
+  // a low stone plinth along the foot of every wall
+  const PD = 0.035, PH = 0.075;
+  for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
+    if (solid(x,y)) continue;
+    for (const [dx,dy] of FACING_VECT){
+      if (!solid(x+dx,y+dy)) continue;
+      const ux = -dy, uz = dx, cL = solid(x-ux, y-uz), cR = solid(x+ux, y+uz);
+      const fx = x+0.5+dx*(0.5-PD), fz = y+0.5+dy*(0.5-PD);
+      const a0 = cL ? -0.5+PD : -0.5, a1 = cR ? 0.5-PD : 0.5;
+      const L = a1-a0;
+      face('trim', [fx+ux*a0, 0, fz+uz*a0], [ux*L,0,uz*L], [0,PH,0], [-dx,0,-dy], [0,1], [0,1], (u,v)=>0.55+0.3*v, [L, PH, a0+0.5, 0.3]);
+      face('trim', [fx+ux*a0, PH, fz+uz*a0], [ux*L,0,uz*L], [dx*PD,0,dy*PD], [0,1,0], [0,1], [0,1], ()=>0.9, [L, PD, a0+0.5, 0.5]);
+      // where the wall ends at an open corner, cap the plinth's end
+      if (!cL) face('trim', [fx+ux*a0, 0, fz+uz*a0], [dx*PD,0,dy*PD], [0,PH,0], [-ux,0,-uz], [0,1], [0,1], ()=>0.7, [PD, PH, 0.2, 0.3]);
+      if (!cR) face('trim', [fx+ux*a1+dx*PD, 0, fz+uz*a1+dy*PD], [-dx*PD,0,-dy*PD], [0,PH,0], [ux,0,uz], [0,1], [0,1], ()=>0.7, [PD, PH, 0.6, 0.3]);
+    }
+  }
+  // square stone pillars wherever a wall turns a corner into open floor
+  for (let y=0;y<=ROWS;y++) for (let x=0;x<=COLS;x++){
+    const q = [solid(x-1,y-1), solid(x,y-1), solid(x-1,y), solid(x,y)], nw = q.filter(Boolean).length;
+    if (nw!==1 && nw!==3) continue;
+    if (nw===3 && ((x+y)&1)) continue;                     // every other inner corner, so rooms don't bristle with them
+    const r = nw===1 ? 0.085 : 0.065;
+    box('trim', x-r, 0, y-r, x+r, 1, y+r, 0.5);
+    box('trim', x-r-0.025, 0, y-r-0.025, x+r+0.025, 0.1, y+r+0.025, 0.55);   // its footing
+    box('trim', x-r-0.02, 0.92, y-r-0.02, x+r+0.02, 0.97, y+r+0.02, 0.8);   // and a capital under the ceiling
+  }
+  // corridors get a rib across the ceiling every other tile: dressed stone in
+  // most places, a timber frame (two posts and a crossbeam) in mines and keeps
+  const timber = /mine|castle/.test(key), ribK = timber ? 'wood' : 'trim';
+  for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
+    if (solid(x,y) || G.map[x][y]===T_STAIRSU || ((x+y)&1)) continue;
+    const ns = solid(x,y-1) && solid(x,y+1), ew = solid(x-1,y) && solid(x+1,y);
+    if (ns===ew) continue;                                 // not a straight corridor
+    const t = 0.06, dz = 0.07;
+    if (ns){                                               // corridor runs east-west, so the rib spans north-south
+      box(ribK, x+0.5-t, 1-dz, y, x+0.5+t, 1, y+1, 0.75);
+      if (timber){ box(ribK, x+0.5-t, 0, y, x+0.5+t, 1-dz, y+0.09, 0.6); box(ribK, x+0.5-t, 0, y+0.91, x+0.5+t, 1-dz, y+1, 0.6); }
+    } else {
+      box(ribK, x, 1-dz, y+0.5-t, x+1, 1, y+0.5+t, 0.75);
+      if (timber){ box(ribK, x, 0, y+0.5-t, x+0.09, 1-dz, y+0.5+t, 0.6); box(ribK, x+0.91, 0, y+0.5-t, x+1, 1-dz, y+0.5+t, 0.6); }
+    }
+  }
+  const slotFns = [spec.floor, spec.floor2||spec.floor, spec.floor, spec.floor, fpPit(spec.floor), fpRuneFloor(spec.floor), fpWater(), spec.edge||spec.floor];
+  // rough-hewn rock varies a lot in brightness, so it takes a much gentler bump than laid stone
+  const bw = /mine|lair/.test(key) ? 5 : 11;
+  const matFor = (k)=>{
+    if (k==='wall') return fpdMaterial(key+':wall', spec.wall, { bump:bw });
+    if (k==='wall2') return fpdMaterial(key+':wall2', spec.wall2||spec.wall, { bump:bw });
+    if (k==='wallTorch') return fpdMaterial(key+':wallT', fpSconce(spec.wall), { bump:bw });
+    if (k==='ceil') return fpdMaterial(key+':ceil', spec.ceil, { bump:6 });
+    if (k==='trim') return fpdMaterial(key+':trim', key==='mine' ? spec.ceil : key==='lair' ? spec.wall2 : spec.wall, { bump:bw });
+    if (k==='wood') return fpdMaterial('wood', (x,y)=>{
+      const g = fpNoise(x, y*4%FP_TEX, 16, 41), k2 = 0.5 + g*0.4 + fpFbm(x,y,44)*0.25 - (fpNoise(x, y*8%FP_TEX, 32, 45)>0.8 ? 0.15 : 0);
+      return fpScale([112,74,42], k2);
+    }, { bump:8 });
+    const s = +k.slice(5);
+    return fpdMaterial(key+':f'+s, slotFns[s], s===6 ? { rough:0.15, bump:3, glow:0.6 } : { rough:0.55, glow:1.6, bump:bw*0.8 });
+  };
+  const world = new TH.Group();
+  for (const k in B){
+    const b = B[k], g = new TH.BufferGeometry();
+    g.setAttribute('position', new TH.Float32BufferAttribute(b.pos, 3));
+    g.setAttribute('normal', new TH.Float32BufferAttribute(b.nor, 3));
+    g.setAttribute('uv', new TH.Float32BufferAttribute(b.uv, 2));
+    g.setAttribute('color', new TH.Float32BufferAttribute(b.col, 3));
+    g.setIndex(b.idx);
+    const mesh = new TH.Mesh(g, matFor(k));
+    mesh.castShadow = true; mesh.receiveShadow = true;
+    world.add(mesh);
+  }
+  FPD.scene.add(world); FPD.world = world;
+  FPD.shadowFrames = 3; FPD.lightKey = ''; FPD.warm = true;
+}
+function fpdRender(env, T, camZ){
+  const TH = THREE, cw = canvas.width, ch = canvas.height;
+  // rebuild the stone when the level (or which floor tiles show a pit, rune or pool) changes
+  const ft = FP.ftile;
+  let stale = FPD.mapRef!==G.map || FPD.theme!==T.key || !FPD.ftile || FPD.ftile.length!==ft.length;
+  if (!stale) for (let i=0;i<ft.length;i++) if (ft[i]!==FPD.ftile[i]){ stale = true; break; }
+  if (stale){ FPD.mapRef = G.map; FPD.theme = T.key; FPD.ftile = ft.slice(); fpdBuild(T); }
+  // resolution adapts to keep the frame rate up on slower graphics: it steps down while frames run long, and back up when there's headroom
+  FPD.dtAvg += ((FP.dt||1/60) - FPD.dtAvg)*0.08;
+  if (++FPD.adj >= 30){ FPD.adj = 0;
+    if (FPD.dtAvg > 1/38) FPD.scale = Math.max(0.5, FPD.scale*0.88); else if (FPD.dtAvg < 1/56) FPD.scale = Math.min(1, FPD.scale*1.06); }
+  const scl = window.__fpdScale || FPD.scale;
+  const sc = Math.min(1, 1280/cw)*scl, w = Math.max(2, Math.round(cw*sc)), h = Math.max(2, Math.round(ch*sc));
+  if (FPD.cv.width!==w || FPD.cv.height!==h){ FPD.r.setPixelRatio(1); FPD.r.setSize(w, h, false); }
+  const c = FP.cam, cam = FPD.cam;
+  cam.aspect = w/h; cam.fov = 2*Math.atan(FP_PLANE/cam.aspect)*180/Math.PI; cam.updateProjectionMatrix();
+  cam.position.set(c.x, camZ, c.y); cam.lookAt(c.x+Math.cos(c.a), camZ, c.y+Math.sin(c.a));
+  // lantern and ambient, as the raycaster had them
+  const lan = env.lan;
+  FPD.lan.color.setRGB(lan[0], lan[1]*0.74, lan[2]*0.5);   // (lit in linear space, so the lantern's tint needs pushing to read as warm as it did) FPD.lan.intensity = env.lanK*0.75; FPD.lan.distance = env.R*1.35;
+  FPD.lan.position.set(c.x - Math.cos(c.a)*0.15, camZ+0.12, c.y - Math.sin(c.a)*0.15);
+  const a = env.amb, am = Math.max(a[0],a[1],a[2],1e-3);
+  FPD.amb.color.setRGB(a[0]/am, a[1]/am, a[2]/am); FPD.amb.intensity = am*2;
+  // the nearest torches get the real lights; the chosen set only changes as you move
+  const fl = (FP.flames||[]).map((f,i)=>({ f, i, d:Math.hypot(f.x-c.x, f.y-c.y) })).filter(o=>o.d<11).sort((p,q)=>p.d-q.d).slice(0, FPD.MAXT);
+  const key = fl.map(o=>o.i).sort((p,q)=>p-q).join(',');
+  if (key!==FPD.lightKey){
+    FPD.lightKey = key;
+    FPD.torches.forEach((L,j)=>{ const o = fl[j]; L.visible = !!o; if (o) L.position.set(o.f.x + (o.f.dx||0)*0.14, 0.62, o.f.y + (o.f.dy||0)*0.14); });
+    FPD.shadowFrames = 3;
+  }
+  // the stone never moves, so shadows are only redrawn for a few frames after the lit set changes
+  if (FPD.shadowFrames > 0){ FPD.shadowFrames--; FPD.r.shadowMap.needsUpdate = true; }
+  FPD.torches.forEach((L,j)=>{ const o = fl[j]; if (!o) return; const s = o.f.seed*40;
+    L.intensity = 1.5*(0.84 + 0.1*Math.sin(FP.t*8.3+s) + 0.06*Math.sin(FP.t*21.1+s*2.3)); });
+  // dust: a loose cloud kept centered on you
+  const dp = FPD.dust.geometry.attributes.position, sd = FPD.dustSeed, n = dp.count;
+  for (let i=0;i<n;i++){
+    const t = FP.t*0.03;
+    const px = sd[i*3]*6 + Math.sin(t*3+i)*0.2 + t, py = sd[i*3+1] + Math.sin(t*5+i*1.7)*0.05, pz = sd[i*3+2]*6 + Math.cos(t*2+i)*0.2;
+    dp.setXYZ(i, c.x-3 + (((px - (c.x-3))%6)+6)%6, 0.05 + ((py%1)+1)%1*0.9, c.y-3 + (((pz - (c.y-3))%6)+6)%6);
+  }
+  dp.needsUpdate = true;
+  // (the shadow maps only exist after their first pass, so a fresh level gets a warm-up render)
+  if (FPD.warm){ FPD.warm = false; FPD.r.render(FPD.scene, cam); }
+  FPD.r.render(FPD.scene, cam);
+  return true;
 }
 
 // ---------- staircases ----------
@@ -17214,12 +17502,14 @@ function renderFirstPerson(){
   const W = FP.W;
   const camZ = 0.5 + Math.sin(FP.moving*Math.PI)*0.028;
   const horizon = FP.H/2;
-  const P = fpRenderWorld(env, T, camZ, horizon);
+  let gpu = G.gameMode===1 && !T.outdoor && fpdInit();
+  let P = fpRenderWorld(env, T, camZ, horizon, gpu);
+  if (gpu){ try{ fpdRender(env, T, camZ); }catch(e){ console.error(e); FPD.ok = false; gpu = false; P = fpRenderWorld(env, T, camZ, horizon, false); } }
   const k = canvas.width / W;
   ctx.save();
   if (FP.shake>0){ const s = FP.shake*6*dpr; ctx.translate((Math.random()-0.5)*s, (Math.random()-0.5)*s); }
   ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(FP.off, 0, 0, canvas.width, canvas.height);
+  ctx.drawImage(gpu ? FPD.cv : FP.off, 0, 0, canvas.width, canvas.height);
   const sprites = fpCollectSprites(vis);
   if (G.gameMode===1) fpDrawStairs(P, env, T, camZ, horizon, k, vis);
   fpDrawSprites(sprites, P, env, camZ, horizon, k);

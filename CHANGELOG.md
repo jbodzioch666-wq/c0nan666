@@ -1,5 +1,33 @@
 # Depthcrawl patch notes
 
+## v151 — Deeper dungeons
+
+Dungeons in first person are now drawn by your graphics card in full 3D, instead of the old software renderer.
+
+### Sharper stone
+- The view is drawn at your screen's full resolution, so walls, floors and ceilings are crisp instead of chunky.
+- Stone has real depth: mortar joints, cracks and chisel marks catch the light and cast tiny shadows as you move past.
+- Floors have a faint sheen, and pools of water are glossy.
+- Lava seams, glowing runes and gold ore shine on their own in the dark.
+
+### Light and shadow
+- Every nearby wall torch is a real light: it throws a warm pool across the floor and walls, and casts shadows around pillars and corners.
+- Your lantern lights the stone around you, and the dark closes in beyond it.
+- Corners are softly shaded where walls meet the floor and ceiling.
+- Dust drifts in the air around you.
+
+### Built like a dungeon
+- Square stone pillars stand wherever a wall turns a corner.
+- A low stone plinth runs along the foot of every wall.
+- Corridors have ribs across the ceiling. Mines and keeps are shored up with timber frames: a post on each side and a beam overhead.
+- Up-staircases climb into a dark stairwell in the ceiling.
+- Every site keeps its own look: stone halls, castle keeps, necromancer towers, overgrown temples, mines and lava lairs.
+
+### Performance
+- If your computer struggles, the dungeon view lowers its resolution until it runs smoothly, then raises it again when it can.
+- If 3D graphics aren't available, the game falls back to the classic renderer.
+- The graveyard and roadside fights still use the classic renderer.
+
 ## v150 — Every weapon fights its own way
 
 Each weapon type now has its own grip, stance and attack in first person, modelled on how melee games handle first-person weapons.
