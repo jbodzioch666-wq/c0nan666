@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## v158 — Graveyard fixes
+
+- **Stairs:** staircases are now real stone steps inside the 3D scene instead of a picture painted over it.
+  - Headstones, candles, columns and monsters in front of a staircase now hide it properly. Before, the crypt's way down showed through whatever stood in front of it.
+  - A stair down is a real opening in the floor, with steps dropping into a dark shaft. Before, the grass underneath showed through the crypt's opening.
+- **Crypt ceiling:** the ceiling inside the crypt no longer flickers. It was sitting exactly on the roof ledge above it.
+- **Crosses:** the middle of stone crosses on graves, tombs and the crypt no longer flickers where the two arms meet.
+
 ## v157 — Eye to eye
 
 ### Heads that face you
