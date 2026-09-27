@@ -20,6 +20,7 @@ The overworld has been rebuilt as a 3D landscape, and the world map is now a pai
 - The sun moves across the sky with the in-game clock. Nights are dark with your lantern lit, and rain, fog and thunderstorms are real weather.
 - You ride a little sailboat on open water.
 - Click anywhere to walk there, or click a landmark to travel to it and go in. WASD still works, and the mouse wheel zooms.
+- Zooming the camera out keeps you and the land around you clear; weather haze only closes in beyond that.
 - **O** switches between the 3D view and the classic flat map.
 - When you conquer a site, it disappears from the 3D land as soon as you come back out, and its replacement appears elsewhere.
 
@@ -30,7 +31,7 @@ The overworld has been rebuilt as a 3D landscape, and the world map is now a pai
   - every site in coloured ink, village names lettered on, a compass rose and an illustrated legend.
 - Sites are bright icons on dark round badges, with a large illustrated legend.
 - A big red "You" marker always shows where you are.
-- **Fog of war:** land you haven't been near is veiled by drifting cloud. You can still make out coastlines and mountains through it, but its towns and dungeons stay hidden until you get close. Your explored map is saved with your game.
+- **Fog of war:** land you haven't been near is hidden under drifting cloud until you explore it. Your explored map is saved with your game.
   - For saves from before this update, the land around every town you've visited starts uncovered.
 
 ## v146 — The 3D update
