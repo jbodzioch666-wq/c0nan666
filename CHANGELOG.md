@@ -1,5 +1,24 @@
 # Depthcrawl patch notes
 
+## v157 — Eye to eye
+
+### Heads that face you
+- **Dragons:** the dragon's head now turns down and looks straight at you, instead of staring off over your head, and it tips forward when it strikes.
+- **Hydras:** all five heads turn to face you, each weaving on its own neck.
+- **Snakes and eels:** snakes, wyrms and eels keep their eyes on you as they sway.
+
+### Sculpted serpent heads
+- **The head:** snakes, wyrms, eels and every hydra head have a real serpent's head:
+  - a flat, wedge-shaped skull swelling at the venom glands;
+  - scaled brows over the eyes;
+  - nostrils and heat pits;
+  - a separate jaw that opens wide.
+- **Mouth:** a pair of curved fangs, and a forked tongue that flicks out.
+
+### Shields
+- **Shape:** shields are now proper round shields held by the centre grip, with a face of painted wooden planks that domes gently outward.
+- **Metalwork:** a thin iron band round the rim, a domed iron boss in the middle, and a ring of rivets.
+
 ## v156 — Flesh and scale
 
 The 3D monsters are sculpted in far more detail: real anatomy instead of tubes and balls, and surfaces you can see up close.
