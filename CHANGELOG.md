@@ -10,7 +10,7 @@ Each weapon type now has its own grip, stance and attack in first person, modell
 - **Rapiers:** held point-first toward the enemy in a fencing line.
 - **Greatswords:** both hands on the long grip, blade raised across your view.
 - **Axes, maces, hammers, clubs, picks, morningstars:** held upright by the haft, head up and ready to fall.
-- **Greataxes and mauls:** gripped in both hands and carried back over the shoulder.
+- **Greataxes and mauls:** gripped in both hands, the head held high and angled to fall.
 - **Halberds:** both hands on the shaft, head high.
 - **Spears:** both hands on the shaft and the point levelled at the enemy.
 - **Quarterstaves:** both hands on the staff, held across your body.
