@@ -13616,7 +13616,7 @@ const SDF = (()=>{
     const c0 = c00+(c10-c00)*ty, c1 = c01+(c11-c01)*ty; return c0+(c1-c0)*tz;
   };
   // surface nets -> BufferGeometry with normals and AO/material vertex colours
-  const COLS = [[0.6,0.53,0.4],[0.42,0.39,0.31],[0.68,0.62,0.47],[0.02,0.015,0.01]];
+  const COLS = [[0.6,0.53,0.4],[0.42,0.39,0.31],[0.68,0.62,0.47],[0.02,0.015,0.01],[1,1,1]];   // (the last is neutral: shading only, for parts coloured by their material)
   const hash3 = (x,y,z)=>{ const s = Math.sin(x*127.1+y*311.7+z*74.7)*43758.5453; return s-Math.floor(s); };
   const vnoise = (x,y,z)=>{ const xi=Math.floor(x), yi=Math.floor(y), zi=Math.floor(z), tx=x-xi, ty=y-yi, tz=z-zi;
     const l = (a,b,t)=>a+(b-a)*t*t*(3-2*t);
@@ -16817,6 +16817,8 @@ function fpdBuild(T){
   if (props.skull.length || props.bone.length || props.candle.length || props.shroud.length) fpdCatacombProps(props, matFor, world);
   FPD.scene.add(world); FPD.world = world;
   FPD.shadowFrames = 3; FPD.lightKey = ''; FPD.warm = true;
+  // sculpt every creature on this floor now, under the fade-in, rather than mid-fight when it first steps into view
+  try{ for (const m of G.mon||[]){ const pt = m3dPortrait(m); if (pt) m3dTemplate(pt); } }catch(e){}
 }
 // out of doors: ground running on to the horizon, a field's obstacles as real
 // bushes, boulders or (on a ship's deck) cargo crates, grass that sways in the
@@ -17065,16 +17067,286 @@ function m3dGrain(){
   const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping;
   return (M3D.tex = t);
 }
+// ---- surface detail: each finish gets its own tiling pattern and relief
+// (pores, weave, grain, strands, scales, scratches, rings, ridges, cracks)
+function m3dPattern(kind){
+  M3D.pat = M3D.pat || {};
+  if (M3D.pat[kind]) return M3D.pat[kind];
+  const N = 256, st = FP_TEX/N, h = new Float32Array(N*N), tone = new Float32Array(N*N);
+  const W = (v)=>(v+N)%N;
+  for (let y=0;y<N;y++) for (let x=0;x<N;x++){
+    const X = x*st, Y = y*st, i = y*N+x, n = fpFbm(X,Y,501), f = fpNoise(X,Y,32,502);
+    let hv = 0.5, tv = 1;
+    if (kind==='skin'){ hv = 0.5 + (fpNoise(X,Y,64,503)-0.5)*0.35 + (n-0.5)*0.3; tv = 0.9 + (n-0.5)*0.22 + (fpNoise(X,Y,8,504)-0.5)*0.1; }
+    else if (kind==='cloth'){ const wv = Math.sin(x*Math.PI/2)*Math.sin(y*Math.PI/2); hv = 0.5 + wv*0.28 + (f-0.5)*0.2; tv = 0.88 + wv*0.06 + (n-0.5)*0.25; }
+    else if (kind==='leather'){ const c = Math.abs(fpNoise(X,Y,16,505)*2-1); hv = 0.55 + (f-0.5)*0.35 - (c<0.06 ? 0.35 : 0); tv = 0.85 + (n-0.5)*0.35 - (c<0.06 ? 0.15 : 0); }
+    else if (kind==='fur'){ const s = fpNoise(X*6%FP_TEX, Y*0.7, 32, 506); hv = s; tv = 0.72 + s*0.4 + (n-0.5)*0.2; }
+    else if (kind==='scales'){
+      const R = 16, row = Math.floor(y/(R*0.75)), off = (row&1) ? R/2 : 0, cx = Math.floor((x+off)/R)*R - off + R/2, cy = row*R*0.75 + R/2;
+      const d = Math.hypot((x-cx)/R, (y-cy)/(R*0.8)); hv = Math.max(0, 1 - d*1.3) + (f-0.5)*0.15; tv = 0.7 + Math.max(0, 0.6 - d*0.7) + (n-0.5)*0.15;
+    }
+    else if (kind==='metal'){ const br = fpNoise(X*8%FP_TEX, Y*0.25, 32, 507); const sc = (fpHash(Math.floor(x/3), Math.floor(y/40), 508) > 0.985) ? -0.3 : 0; hv = 0.5 + (br-0.5)*0.15 + sc; tv = 0.86 + (br-0.5)*0.14 + (n-0.5)*0.12 + sc*0.3; }
+    else if (kind==='chain'){ const cx = (x%8)-3.5, cy = ((y + (Math.floor(x/8)&1)*4)%8)-3.5, r = Math.hypot(cx, cy); const ring = Math.max(0, 1 - Math.abs(r-2.6)/1.2); hv = ring; tv = 0.35 + ring*0.75; }
+    else if (kind==='horn'){ const b = Math.sin(y*0.35 + fpNoise(X,Y,4,509)*6); hv = 0.5 + b*0.25 + (f-0.5)*0.15; tv = 0.85 + b*0.08 + (n-0.5)*0.2; }
+    else if (kind==='stone'){ const c = Math.abs(fpNoise(X,Y,8,510)*2-1); hv = 0.5 + (n-0.5)*0.5 - (c<0.05 ? 0.4 : 0); tv = 0.8 + (n-0.5)*0.4 - (c<0.05 ? 0.25 : 0); }
+    h[i] = hv; tone[i] = tv;
+  }
+  const mk = ()=>{ const c = v3Canvas(N,N); return [c, c.getContext('2d')]; };
+  const [mc, mx] = mk(), [nc, nx] = mk(), md = mx.createImageData(N,N), nd = nx.createImageData(N,N);
+  const str = { skin:2, cloth:3, leather:4, fur:6, scales:5, metal:2, chain:6, horn:3, stone:5 }[kind] || 3;
+  for (let y=0;y<N;y++) for (let x=0;x<N;x++){
+    const i = y*N+x, p = i*4, t = Math.max(0, Math.min(1.3, tone[i]))/1.3*255;
+    md.data[p] = md.data[p+1] = md.data[p+2] = t; md.data[p+3] = 255;
+    const ax = (h[y*N+W(x-1)] - h[y*N+W(x+1)])*str, ay = (h[W(y+1)*N+x] - h[W(y-1)*N+x])*str, l = Math.hypot(ax, ay, 1);
+    nd.data[p] = (ax/l*0.5+0.5)*255; nd.data[p+1] = (ay/l*0.5+0.5)*255; nd.data[p+2] = (1/l*0.5+0.5)*255; nd.data[p+3] = 255;
+  }
+  mx.putImageData(md,0,0); nx.putImageData(nd,0,0);
+  const map = new THREE.CanvasTexture(mc), nrm = new THREE.CanvasTexture(nc);
+  for (const t of [map, nrm]){ t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; }
+  return (M3D.pat[kind] = { map, nrm });
+}
+// a soft rim of light round every creature, so its outline reads against the dark
+M3D.rim = { value:null };                             // (made on first use: three.js may never load)
+function m3dRimify(m){
+  if (!m || m.isMeshBasicMaterial || m.isSpriteMaterial) return m;
+  m.onBeforeCompile = (sh)=>{
+    if (!M3D.rim.value) M3D.rim.value = new THREE.Color(0.12, 0.1, 0.08);
+    sh.uniforms.uRim = M3D.rim;
+    sh.fragmentShader = 'uniform vec3 uRim;\n' + sh.fragmentShader.replace('#include <output_fragment>',
+      'float rimF = pow(1.0 - clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0), 3.0);\n  outgoingLight += uRim * rimF;\n#include <output_fragment>');
+  };
+  m.customProgramCacheKey = ()=>'m3drim';
+  m.userData.rim = true;
+  return m;
+}
+// cylindrical texture coordinates for a sculpted part (the seam falls behind it)
+function m3dUV(geo, rep){
+  // (projected from whichever side each point faces, so nothing stretches round a snout or a limb)
+  const p = geo.attributes.position, n = geo.attributes.normal, uv = new Float32Array(p.count*2), k = rep||7;
+  for (let i=0;i<p.count;i++){
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i), ax = Math.abs(n.getX(i)), ay = Math.abs(n.getY(i)), az = Math.abs(n.getZ(i));
+    if (ax >= ay && ax >= az){ uv[i*2] = z*k; uv[i*2+1] = y*k; } else if (ay >= az){ uv[i*2] = x*k; uv[i*2+1] = z*k; } else { uv[i*2] = x*k; uv[i*2+1] = y*k; }
+  }
+  geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  return geo;
+}
+// ---- sculpted anatomy (smooth-blended solids meshed with surface nets, crevices shaded)
+function m3dSculpt(key, bounds, h, build){
+  M3D.sculpt = M3D.sculpt || new Map();
+  if (M3D.sculpt.has(key)) return M3D.sculpt.get(key);
+  const P = SDF.part(bounds[0], bounds[1], h); build(P);
+  const g = m3dUV(SDF.mesh(P));
+  M3D.sculpt.set(key, g);
+  return g;
+}
+function m3dTorsoGeo(b, hunch){
+  b = Math.round(b*10)/10;                           // (near-identical builds share one sculpt)
+  const { ell, sph, cap } = SDF, bs = Math.sqrt(b), M = 4;
+  return m3dSculpt('torso|'+b.toFixed(2), [[-0.19*b,-0.1,-0.13*bs],[0.19*b,0.37,0.13*bs]], 0.0055, P=>{
+    P.add(ell([0,0.0,0],[0.085*b,0.06,0.07*bs]), 0.02, M);                                  // pelvis
+    for (const s of [-1,1]) P.add(ell([s*0.042*b,-0.02,-0.035*bs],[0.048*b,0.055,0.042*bs]), 0.03, M);   // seat
+    P.add(ell([0,0.1,0.005],[0.078*b,0.09,0.062*bs]), 0.04, M);                             // belly and waist
+    P.add(ell([0,0.2,-0.005],[0.1*b,0.1,0.07*bs]), 0.04, M);                                // ribcage
+    for (const s of [-1,1]) P.add(ell([s*0.045*b,0.225,0.04*bs],[0.052*b,0.042,0.03*bs]), 0.03, M);      // chest
+    for (const s of [-1,1]) P.add(ell([s*0.075*b,0.12,0.02],[0.03*b,0.08,0.04*bs]), 0.03, M);            // flanks
+    for (const s of [-1,1]) P.add(sph([s*0.112*b,0.268,0], 0.043*b), 0.035, M);                          // shoulders
+    for (const s of [-1,1]) P.add(cap([s*0.02,0.31,-0.01],[s*0.1*b,0.275,-0.005], 0.03*b, 0.024*b), 0.035, M);   // trapezius
+    P.add(cap([0,0.27,-0.005],[0,0.35,0.0], 0.034*bs, 0.031*bs), 0.03, M);                                       // neck
+    for (const s of [-1,1]) P.add(ell([s*0.05*b,0.23,-0.05*bs],[0.05*b,0.06,0.03*bs]), 0.03, M);         // shoulder blades
+    P.sub(cap([0,0.05,-0.075*bs],[0,0.27,-0.075*bs], 0.007, 0.007), 0.012);                             // spine groove
+    P.sub(cap([0,0.21,0.075*bs],[0,0.16,0.07*bs], 0.005, 0.005), 0.01);                                 // breastbone
+    for (let i=0;i<3;i++) P.sub(cap([-0.03*b,0.13-i*0.03,0.068*bs],[0.03*b,0.13-i*0.03,0.068*bs], 0.0035, 0.0035), 0.01);   // abdominal lines
+  });
+}
+function m3dLimbGeo(kind, b){
+  b = Math.round(b*10)/10;
+  const { ell, sph, cap } = SDF, M = 4, k = kind+'|'+b.toFixed(2);
+  if (kind==='upper') return m3dSculpt(k, [[-0.06*b,-0.22,-0.06*b],[0.06*b,0.04,0.06*b]], 0.004, P=>{
+    P.add(cap([0,0,0],[0,-0.18,0], 0.034*b, 0.025*b), 0.02, M);
+    P.add(ell([0,-0.075,0.014*b],[0.029*b,0.055,0.026*b]), 0.03, M);                     // biceps
+    P.add(ell([0,-0.07,-0.014*b],[0.028*b,0.06,0.025*b]), 0.03, M);                      // triceps
+    P.add(sph([0,-0.18,-0.006], 0.025*b), 0.02, M);                                      // elbow
+  });
+  if (kind==='fore') return m3dSculpt(k, [[-0.05*b,-0.2,-0.05*b],[0.05*b,0.03,0.05*b]], 0.0035, P=>{
+    P.add(cap([0,0,0],[0,-0.17,0], 0.027*b, 0.018*b), 0.02, M);
+    P.add(ell([0.004,-0.05,0.004],[0.029*b,0.06,0.026*b]), 0.03, M);
+    P.add(ell([0,-0.165,0],[0.021*b,0.012,0.015*b]), 0.015, M);                          // wrist
+  });
+  if (kind==='thigh') return m3dSculpt(k, [[-0.07*b,-0.27,-0.07*b],[0.07*b,0.04,0.07*b]], 0.0045, P=>{
+    P.add(cap([0,0,0],[0,-0.23,0], 0.045*b, 0.03*b), 0.02, M);
+    P.add(ell([0,-0.09,0.016*b],[0.038*b,0.085,0.032*b]), 0.035, M);                     // quadriceps
+    P.add(ell([0,-0.085,-0.016*b],[0.034*b,0.08,0.03*b]), 0.035, M);                     // hamstrings
+    P.add(sph([0,-0.228,0.012], 0.03*b), 0.02, M); P.add(sph([0,-0.225,0.03*b], 0.015*b), 0.012, M);   // knee and kneecap
+  });
+  if (kind==='shin') return m3dSculpt(k, [[-0.055*b,-0.25,-0.06*b],[0.055*b,0.03,0.055*b]], 0.004, P=>{
+    P.add(cap([0,0,0],[0,-0.22,0], 0.03*b, 0.02*b), 0.02, M);
+    P.add(ell([0,-0.075,-0.017*b],[0.028*b,0.065,0.03*b]), 0.035, M);                    // calf
+    for (const s of [-1,1]) P.add(sph([s*0.017*b,-0.212,0], 0.011*b), 0.01, M);          // ankle bones
+  });
+  if (kind==='boot') return m3dSculpt(k, [[-0.04*b,-0.05,-0.05*b],[0.04*b,0.04,0.1*b]], 0.0035, P=>{
+    P.add(cap([0,0.02,0],[0,-0.015,0], 0.028*b, 0.026*b), 0.015, M);
+    P.add(ell([0,-0.017,0.028*b],[0.025*b,0.017,0.052*b]), 0.02, M);                     // foot
+    P.add(ell([0,-0.03,0.02*b],[0.027*b,0.004,0.06*b]), 0.004, M);                       // sole
+    P.add(sph([0,-0.013,-0.012], 0.022*b), 0.015, M);                                    // heel
+  });
+  if (kind==='hand') return m3dSculpt(k, [[-0.05*b,-0.1,-0.04*b],[0.05*b,0.02,0.07*b]], 0.0032, P=>{
+    // a hand closed round a grip: palm, four curled fingers, thumb over them
+    P.add(ell([0,-0.03,0.004],[0.026*b,0.032,0.013*b]), 0.012, M);
+    for (let i=0;i<4;i++){ const x = (-0.018 + i*0.012)*b, r = 0.0068*b*(i===3 ? 0.85 : 1);
+      P.add(cap([x,-0.058,0.006],[x,-0.07,0.026*b], r, r), 0.006, M);
+      P.add(cap([x,-0.07,0.026*b],[x,-0.058,0.042*b], r, r*0.9), 0.005, M);
+      P.add(cap([x,-0.058,0.042*b],[x,-0.044,0.036*b], r*0.9, r*0.8), 0.004, M);
+      P.add(sph([x,-0.06,0.012], r*1.15), 0.004, M); }                                   // knuckles
+    P.add(cap([-0.026*b,-0.028,0.012],[-0.028*b,-0.046,0.03*b], 0.009*b, 0.0075*b), 0.008, M);
+    P.add(cap([-0.028*b,-0.046,0.03*b],[-0.012*b,-0.056,0.044*b], 0.0075*b, 0.0065*b), 0.006, M);
+  });
+  return null;
+}
+
+// a four-legged body: ribcage and deep chest, shoulders, a tucked-up belly, haunches
+function m3dBeastBodyGeo(L, R){
+  const { ell, cap } = SDF, M = 4;
+  return m3dSculpt('bbody|'+L.toFixed(3)+'|'+R.toFixed(3), [[-R*1.4,-R*1.4,-L*0.5-R*1.2],[R*1.4,R*1.6,L*0.5+R*1.6]], R*0.07, P=>{
+    P.add(ell([0,R*0.1,L*0.26],[R*0.95,R*1.06,L*0.4]), 0, M);                          // ribcage
+    P.add(ell([0,-R*0.35,L*0.3],[R*0.68,R*0.72,L*0.26]), R*0.3, M);                     // deep chest
+    P.add(ell([0,R*0.15,-L*0.14],[R*0.74,R*0.8,L*0.32]), R*0.35, M);                    // loin
+    P.add(ell([0,R*0.18,-L*0.44],[R*0.82,R*0.86,R*0.82]), R*0.3, M);                    // rump
+    for (const s of [-1,1]){
+      P.add(ell([s*R*0.48,0,-L*0.42],[R*0.5,R*0.9,R*0.86]), R*0.3, M);                  // haunches
+      P.add(ell([s*R*0.55,R*0.08,L*0.42],[R*0.44,R*0.9,R*0.62]), R*0.3, M);             // shoulders
+    }
+    P.add(cap([0,R*0.35,L*0.42],[0,R*0.95,L*0.5+R*0.7], R*0.66, R*0.5), R*0.3, M);      // root of the neck
+    P.sub(ell([0,-R*1.08,-L*0.08],[R*0.95,R*0.42,L*0.32]), R*0.25);                     // belly tucked up to the loin
+    P.add(cap([0,R*0.98,-L*0.4],[0,R*1.02,L*0.4], R*0.12, R*0.12), R*0.25, M);          // spine
+  });
+}
+function m3dBeastLegGeo(part, len, t){
+  const { ell, sph, cap } = SDF, M = 4, k = 'bleg|'+part+'|'+len.toFixed(3)+'|'+t.toFixed(2);
+  if (part==='up') return m3dSculpt(k, [[-0.07*t,-len-0.03,-0.07*t],[0.07*t,0.04,0.07*t]], 0.0035, P=>{
+    P.add(cap([0,0,0],[0,-len,0], 0.045*t, 0.028*t), 0.02, M);
+    P.add(ell([0,-len*0.32,0.005],[0.05*t,len*0.42,0.055*t]), 0.03, M);
+    P.add(sph([0,-len,0], 0.028*t), 0.015, M);
+  });
+  if (part==='lo') return m3dSculpt(k, [[-0.05*t,-len-0.05,-0.05*t],[0.05*t,0.03,0.08*t]], 0.003, P=>{
+    P.add(cap([0,0,0],[0,-len,0.005], 0.028*t, 0.019*t), 0.015, M);
+    P.add(sph([0,-len*0.12,-0.006], 0.026*t), 0.015, M);                                  // the joint
+    P.add(ell([0,-len-0.004,0.016*t],[0.027*t,0.014,0.034*t]), 0.012, M);                  // paw
+    for (let i=0;i<4;i++) P.add(sph([(-0.015+i*0.01)*t,-len-0.006,0.04*t], 0.008*t), 0.006, M);   // toes
+  });
+  return null;
+}
+// a beast's head: skull, muzzle, cheeks, brow and jaw in one piece
+function m3dBeastHeadGeo(t, R, SL, SR){
+  const { ell, sph, cap } = SDF, M = 4;
+  return m3dSculpt('bhead|'+t, [[-R*1.4,-R*1.3,-R*1.3],[R*1.4,R*1.3,R*0.9+SL+SR*1.5]], R*0.045, P=>{
+    P.add(ell([0,0,0],[R,R*0.9,R*1.02]), 0, M);                                           // skull
+    if (SL > 0){
+      P.add(cap([0,-R*0.15,R*0.45],[0,-R*0.25,R*0.7+SL], SR*1.05, SR*0.72), R*0.3, M);    // muzzle
+      P.add(cap([0,-R*0.55,R*0.35],[0,-R*0.5,R*0.62+SL*0.9], SR*0.8, SR*0.45), R*0.2, M); // lower jaw
+      P.sub(cap([-SR*0.55,-R*0.42,R*0.9+SL*0.6],[SR*0.55,-R*0.42,R*0.9+SL*0.6], SR*0.12, SR*0.12), R*0.08);   // lips parting
+    }
+    for (const s of [-1,1]) P.add(sph([s*R*0.55,-R*0.2,R*0.3], R*0.45), R*0.35, M);       // cheeks
+    P.add(cap([-R*0.5,R*0.38,R*0.55],[R*0.5,R*0.38,R*0.55], R*0.2, R*0.2), R*0.3, M);      // brow
+    for (const s of [-1,1]) P.sub(sph([s*R*0.42,R*0.22,R*0.78], R*0.2), R*0.1);           // eye sockets
+    if (t==='bear' || t==='boar') P.add(ell([0,-R*0.1,-R*0.25],[R*1.1,R*1.0,R*0.8]), R*0.4, M);   // heavy jowls and ruff
+  });
+}
+
+
+// a dragon's head: long snout with nostrils, heavy brow ridges, cheek frills; the jaw is its own piece so it can open
+function m3dDragonHeadGeo(part){
+  const { ell, sph, cap } = SDF, M = 4;
+  if (part==='jaw') return m3dSculpt('dhead|jaw', [[-0.07,-0.06,-0.04],[0.07,0.03,0.2]], 0.0028, P=>{
+    P.add(cap([0,-0.012,0.0],[0,-0.012,0.15], 0.036, 0.018), 0.02, M);
+    for (const s of [-1,1]) P.add(cap([s*0.03,-0.02,0.0],[s*0.018,-0.015,0.13], 0.01, 0.006), 0.01, M);   // jaw ridges
+    P.sub(cap([0,0.02,0.02],[0,0.012,0.14], 0.022, 0.012), 0.008);                                   // hollow of the mouth
+  });
+  return m3dSculpt('dhead|top', [[-0.12,-0.06,-0.13],[0.12,0.13,0.24]], 0.0032, P=>{
+    P.add(ell([0,0.025,-0.01],[0.068,0.058,0.075]), 0, M);                                  // skull
+    P.add(cap([0,0.025,0.03],[0,0.012,0.18], 0.046, 0.024), 0.03, M);                       // snout
+    for (const s of [-1,1]){
+      P.add(cap([s*0.045,0.065,0.05],[s*0.035,0.075,-0.05], 0.018, 0.012), 0.02, M);         // brow ridges
+      P.add(cap([s*0.05,0.0,0.0],[s*0.085,-0.01,-0.07], 0.018, 0.004), 0.02, M);             // cheek frills
+      P.add(sph([s*0.018,0.03,0.175], 0.01), 0.008, M);                                      // nostril bumps
+      P.sub(sph([s*0.018,0.03,0.186], 0.005), 0.003);                                        // nostrils
+      P.sub(sph([s*0.042,0.045,0.06], 0.014), 0.008);                                        // eye sockets
+    }
+    for (let i=0;i<4;i++) P.add(sph([0,0.09-i*0.004,-0.02-i*0.03], 0.011-i*0.0015), 0.012, M);    // crest
+    P.sub(ell([0,-0.03,0.09],[0.05,0.02,0.12]), 0.01);                                       // underside, where the jaw closes
+  });
+}
+
+// sculpted faces, one per kind of head (the ones built from other parts keep them)
+const M3D_FACES = ['human','orc','goblin','troll','hag','fiend','dryad','kobold','lizard','gnoll','canine','hyena','bugbear','yeti'];
+function m3dHeadGeo(type){
+  const { ell, sph, cap } = SDF, M = 4, t = type||'human';
+  return m3dSculpt('head|'+t, [[-0.17,-0.03,-0.11],[0.17,0.2,0.2]], 0.0034, P=>{
+    const wide = t==='orc' ? 1.15 : t==='troll' ? 1.08 : t==='bugbear'||t==='yeti' ? 1.12 : t==='goblin' ? 1.08 : 1;
+    const snout = ['kobold','lizard','gnoll','canine','hyena'].includes(t);
+    P.add(ell([0,0.088,-0.008],[0.064*wide,0.072,0.076]), 0, M);                               // cranium
+    P.add(cap([0,-0.02,-0.012],[0,0.05,-0.01], 0.031, 0.033), 0.03, M);                        // neck
+    if (snout){
+      const long = t==='kobold'||t==='lizard' ? 0.13 : 0.12, dog = !(t==='kobold'||t==='lizard');
+      P.add(cap([0,0.06,0.03],[0,0.05,long], 0.038, dog ? 0.022 : 0.02), 0.03, M);                  // muzzle
+      P.add(cap([0,0.03,0.02],[0,0.035,long-0.01], 0.03, 0.016), 0.02, M);                          // lower jaw
+      P.add(cap([-0.045,0.093,0.045],[0.045,0.093,0.045], 0.013, 0.013), 0.02, M);                  // brow
+      for (const s of [-1,1]) P.add(sph([s*0.036,0.068,0.05], 0.02), 0.02, M);                      // cheeks
+      if (dog){ P.add(sph([0,0.057,long+0.003], 0.013), 0.006, M); for (const s of [-1,1]) P.add(ell([s*0.042,0.15,-0.01],[0.012,0.04,0.024]), 0.012, M); }
+      else for (let i=0;i<4;i++) P.add(sph([0,0.155-i*0.012,-0.03-i*0.022], 0.012-i*0.0015), 0.01, M);   // head crest
+      for (const s of [-1,1]) P.sub(sph([s*0.03,0.08,0.058], 0.012), 0.006);                       // eye sockets
+      P.sub(cap([-0.02,0.043,long-0.005],[0.02,0.043,long-0.005], 0.004, 0.004), 0.004);             // mouth line
+      return;
+    }
+    P.add(ell([0,0.036,0.028],[0.048*wide*(t==='orc' ? 1.18 : 1),0.042*(t==='troll'||t==='hag' ? 1.15 : 1),0.048*(t==='orc'||t==='troll' ? 1.15 : 1)]), 0.03, M);   // jaw
+    P.add(ell([0,0.02,0.052*(t==='orc'||t==='troll' ? 1.2 : 1)*(t==='hag' ? 1.25 : 1)],[0.02,0.018,0.02]), 0.02, M);   // chin
+    for (const s of [-1,1]) P.add(sph([s*0.04*wide,0.064,0.048], t==='hag' ? 0.014 : 0.02), 0.022, M);   // cheekbones
+    const brow = t==='orc'||t==='troll' ? 0.017 : t==='fiend' ? 0.012 : 0.011;
+    P.add(cap([-0.043*wide,0.094,0.056],[0.043*wide,0.094,0.056], brow, brow), 0.018, M);             // brow ridge
+    for (const s of [-1,1]) P.sub(ell([s*0.026,0.077,0.066],[0.014,0.011,0.012]), 0.008);             // eye sockets
+    // the nose
+    if (t==='goblin') P.add(cap([0,0.08,0.066],[0,0.05,0.13], 0.011, 0.006), 0.012, M);
+    else if (t==='troll') P.add(cap([0,0.085,0.066],[0,0.035,0.125], 0.013, 0.016), 0.014, M);
+    else if (t==='hag') { P.add(cap([0,0.085,0.066],[0,0.05,0.105], 0.01, 0.006), 0.01, M); P.add(sph([0,0.05,0.1], 0.008), 0.006, M); }
+    else if (t==='orc'){ P.add(cap([0,0.078,0.07],[0,0.06,0.088], 0.013, 0.018), 0.012, M); for (const s of [-1,1]) P.add(sph([s*0.012,0.058,0.085], 0.009), 0.006, M); }
+    else { P.add(cap([0,0.083,0.068],[0,0.058,0.086], 0.008, 0.011), 0.01, M); for (const s of [-1,1]) P.add(sph([s*0.009,0.056,0.08], 0.007), 0.005, M); }
+    // lips and mouth
+    P.add(ell([0,0.043,0.074*(t==='orc'||t==='troll' ? 1.12 : 1)],[0.02*wide,0.0055,0.009]), 0.008, M);
+    P.add(ell([0,0.033,0.072*(t==='orc'||t==='troll' ? 1.12 : 1)],[0.018*wide,0.005,0.008]), 0.008, M);
+    P.sub(cap([-0.017*wide,0.038,0.082],[0.017*wide,0.038,0.082], 0.0025, 0.0025), 0.003);
+    // ears
+    if (t==='goblin') for (const s of [-1,1]) P.add(cap([s*0.06,0.08,-0.005],[s*0.16,0.11,-0.035], 0.016, 0.004), 0.012, M);
+    else if (t==='orc'||t==='fiend'||t==='troll') for (const s of [-1,1]) P.add(cap([s*0.062,0.075,-0.005],[s*0.1,0.1,-0.03], 0.012, 0.004), 0.01, M);
+    else if (t==='bugbear'||t==='yeti') for (const s of [-1,1]) P.add(sph([s*0.058,0.13,-0.01], 0.02), 0.012, M);
+    else for (const s of [-1,1]) P.add(ell([s*0.066,0.074,-0.004],[0.008,0.022,0.014]), 0.008, M);
+    if (t==='hag') for (const s of [-1,1]) P.sub(sph([s*0.045,0.05,0.045], 0.014), 0.012);       // sunken cheeks
+  });
+}
+
 // one material per colour and finish, shared by a creature's template
-function m3dMat(cache, hex, kind){
-  const k = hex+'|'+kind; if (cache[k]) return cache[k];
-  const T = THREE, g = m3dGrain(), o = { color:m3dCol(hex), map:g, bumpMap:g };
+function m3dMat(cache, hex, kind, vc){
+  const k = hex+'|'+kind+(vc ? '|vc' : ''); if (cache[k]) return cache[k];
+  const T = THREE;
   let m;
-  if (kind==='metal') m = new T.MeshStandardMaterial(Object.assign(o, { metalness:0.65, roughness:0.32, bumpScale:0.3 }));
-  else if (kind==='glow') m = new T.MeshBasicMaterial({ color:m3dCol(hex) });
-  else if (kind==='ice') m = new T.MeshStandardMaterial(Object.assign(o, { roughness:0.15, metalness:0.1, transparent:true, opacity:0.88, bumpScale:0.4 }));
-  else m = new T.MeshStandardMaterial(Object.assign(o, { roughness: kind==='skin' ? 0.62 : kind==='leather' ? 0.55 : kind==='horn' ? 0.45 : 0.92, metalness:0, bumpScale: kind==='fur' ? 0.6 : kind==='stone' ? 1.6 : kind==='skin' ? 0.08 : 0.2 }));
+  if (kind==='glow') m = new T.MeshBasicMaterial({ color:m3dCol(hex) });
+  else {
+    const pk = { skin:'skin', leather:'leather', cloth:'cloth', fur:'fur', metal:'metal', ice:'skin', horn:'horn', stone:'stone', scales:'scales', chain:'chain' }[kind] || 'cloth';
+    const pt = m3dPattern(pk), o = { color:m3dCol(hex), map:pt.map, normalMap:pt.nrm, vertexColors:!!vc };
+    const ns = { skin:0.3, leather:0.4, cloth:0.6, fur:1.0, metal:0.45, ice:0.3, horn:0.6, stone:1.2, scales:0.7, chain:1.1 }[kind] || 0.6;
+    o.normalScale = new T.Vector2(ns, ns);
+    if (kind==='metal' || kind==='chain') m = new T.MeshStandardMaterial(Object.assign(o, { metalness: kind==='chain' ? 0.5 : 0.55, roughness: kind==='chain' ? 0.55 : 0.38 }));
+    else if (kind==='ice') m = new T.MeshStandardMaterial(Object.assign(o, { roughness:0.15, metalness:0.1, transparent:true, opacity:0.88 }));
+    else m = new T.MeshStandardMaterial(Object.assign(o, { roughness: kind==='skin' ? 0.55 : kind==='leather' ? 0.5 : kind==='horn' ? 0.4 : kind==='scales' ? 0.45 : 0.92, metalness:0 }));
+    m3dRimify(m);
+  }
+  m.userData.hex = hex; m.userData.kind = kind;
   return (cache[k] = m);
+}
+// the same finish, reading the shading baked into a sculpted part's vertices
+function m3dVC(cache, m){
+  if (m.userData.hex && !m.userData.special) return m3dMat(cache, m.userData.hex, m.userData.kind, true);
+  M3D.vcTwin = M3D.vcTwin || new WeakMap();
+  if (!M3D.vcTwin.has(m)){ const c = m.clone(); c.vertexColors = true; if (m.userData.rim) m3dRimify(c); M3D.vcTwin.set(m, c); }
+  return M3D.vcTwin.get(m);
 }
 const M3D_WEAPON = { sword:'Longsword', staff:'Quarterstaff', greataxe:'Greataxe', dagger:'Dagger', greatsword:'Greatsword', trident:'Spear', spear:'Spear', hammer:'Warhammer', mace:'Mace', club:'Club', axe:'Battleaxe', scimitar:'Scimitar' };
 function m3dWeapon(kind, mats){
@@ -17102,13 +17374,18 @@ function m3dLimb(parent, len, r0, r1, mat, cap){
   const end = new T.Group(); end.position.y = -len; g.add(end);
   return { g, end };
 }
+function m3dLimbS0(parent, geo, len, mat){ const g = new THREE.Group(); parent.add(g); g.add(new THREE.Mesh(geo, mat)); const end = new THREE.Group(); end.position.y = -len; g.add(end); return { g, end }; }
+function m3dLimbS(parent, kind, b, len, mat){ const g = new THREE.Group(); parent.add(g); g.add(new THREE.Mesh(m3dLimbGeo(kind, b), mat)); const end = new THREE.Group(); end.position.y = -len; g.add(end); return { g, end }; }
 function m3dSphere(parent, r, mat, x, y, z, sx, sy, sz){ const m = new THREE.Mesh(new THREE.SphereGeometry(r, 14, 10), mat); m.position.set(x||0, y||0, z||0); m.scale.set(sx||1, sy||sx||1, sz||sx||1); parent.add(m); return m; }
 function m3dCone(parent, r, h, mat, x, y, z, rx, ry, rz, seg){ const m = new THREE.Mesh(new THREE.ConeGeometry(r, h, seg||8), mat); m.position.set(x||0, y||0, z||0); m.rotation.set(rx||0, ry||0, rz||0); parent.add(m); return m; }
 function m3dBox(parent, w, h, d, mat, x, y, z){ const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x||0, y||0, z||0); parent.add(m); return m; }
 function m3dEyes(head, o, mats, y, z, sep, r, dark){
   const glow = o.eyes ? '#'+o.eyes.split(',').map(v=>(+v).toString(16).padStart(2,'0')).join('') : null;
   const m = glow ? m3dMat(mats, glow, 'glow') : m3dMat(mats, dark||'#140c08', 'horn');
-  for (const s of [-1,1]) m3dSphere(head, r||0.011, m, s*(sep||0.028), y, z);
+  for (const s of [-1,1]){
+    if (glow || dark) m3dSphere(head, r||0.011, m, s*(sep||0.028), y, z);
+    else { const rr = (r||0.011)*0.78; m3dSphere(head, rr, m3dMat(mats, '#b8ae9c', 'horn'), s*(sep||0.028), y, z - rr*0.35); m3dSphere(head, rr*0.58, m3dMat(mats, '#2a1a10', 'horn'), s*(sep||0.028), y, z + rr*0.3); }
+  }
   if (glow){ const sp = new THREE.Sprite(M3D.glowMat(glow)); sp.scale.setScalar(0.07); sp.position.set(0, y, z+0.01); head.add(sp); }
 }
 // ---- heads: built around a neck joint at the origin, facing +z
@@ -17159,6 +17436,23 @@ function m3dHead(type, o, mats, skinM, darkM){
     const fg = new T.ShapeGeometry(sh); const f = new T.Mesh(fg, fin); f.material.side = T.DoubleSide; f.rotation.y = Math.PI/2; f.position.set(0, 0.12, -0.04); h.add(f);
     return h;
   }
+  if (M3D_FACES.includes(t)){
+    // a sculpted face, then whatever grows on it
+    h.add(new T.Mesh(m3dHeadGeo(t), m3dVC(mats, skinM)));
+    const wide = t==='orc' ? 1.15 : t==='troll' ? 1.08 : t==='bugbear'||t==='yeti' ? 1.12 : t==='goblin' ? 1.08 : 1;
+    const snout = ['kobold','lizard','gnoll','canine','hyena'].includes(t);
+    if (t==='orc'){ const tusk = m3dMat(mats, '#e8dcc0', 'horn'); for (const s of [-1,1]) m3dCone(h, 0.007, 0.03, tusk, s*0.026, 0.05, 0.085, -0.2); }
+    if (t==='fiend' || o.horns){ const hm = m3dMat(mats, o.hornCol||'#2a1a14', 'horn'); for (const s of [-1,1]) m3dCone(h, 0.016, 0.1, hm, s*0.042, 0.165, 0.0, -0.4, 0, -s*0.4); }
+    if (t==='kobold' || t==='lizard') for (const s of [-1,1]) m3dCone(h, 0.011, 0.06, m3dMat(mats, '#d8cca8', 'horn'), s*0.035, 0.14, -0.045, -1.0, 0, s*0.2);
+    if (t==='gnoll' || o.mane) for (let i=0;i<7;i++) m3dCone(h, 0.013, 0.055, hairM||darkM, 0, 0.15 - i*0.02, -0.06 - i*0.012, -1.2);
+    if (t==='hag' || o.longHair){ const hm = hairM || m3dMat(mats, '#6a6a6a', 'fur'); for (let i=0;i<9;i++){ const a = (i/8-0.5)*2.6; const st = new T.Mesh(new T.CylinderGeometry(0.008, 0.003, 0.22, 5), hm); st.position.set(Math.sin(a)*0.068, 0.03, Math.cos(a)*0.03-0.05); st.rotation.z = Math.sin(a)*0.12; h.add(st); } m3dSphere(h, 0.07, hm, 0, 0.105, -0.02, 1.02, 0.8, 1.05); }
+    if (t==='dryad'){ const lm = m3dMat(mats, o.hair||'#4a8a3a', 'fur'); for (let i=0;i<14;i++){ const a = i/14*Math.PI*2; m3dSphere(h, 0.028, lm, Math.cos(a)*0.06, 0.12+Math.sin(i*1.7)*0.03, Math.sin(a)*0.05-0.02); } }
+    else if (hairM && t!=='hag' && !snout) m3dSphere(h, 0.068, hairM, 0, 0.105, -0.018, wide*1.03, 0.82, 1.06);
+    if (o.beard) m3dCone(h, 0.042, 0.1, m3dMat(mats, o.beard, 'fur'), 0, -0.002, 0.058, Math.PI);
+    if (o.warts) for (let i=0;i<5;i++) m3dSphere(h, 0.006, darkM, (fpHash(i,1,5)-0.5)*0.08, 0.05+fpHash(i,2,5)*0.05, 0.072);
+    if (snout) m3dEyes(h, o, mats, 0.08, 0.058, 0.03, 0.01); else m3dEyes(h, o, mats, 0.077, 0.063, 0.026, 0.0105);
+    return h;
+  }
   if (['cat','bear','owl','rat','elk','boar','bug'].includes(t)){ const bh = m3dBeastHead(t, o, mats, skinM, darkM, 1); bh.position.set(0, 0.07, 0.01); h.add(bh); return h; }
   // everything else starts from a face on a skull
   const wide = t==='orc' ? 1.15 : t==='troll' ? 1.05 : t==='bugbear' || t==='yeti' ? 1.12 : 1;
@@ -17199,8 +17493,13 @@ function m3dBeastHead(t, o, mats, furM, darkM, onBody){
   const T = THREE, h = new T.Group(), hornM = m3dMat(mats, '#d8ccb0', 'horn');
   const base = { rat:[0.05, 0.1, 0.022], cat:[0.065, 0.06, 0.035], canine:[0.062, 0.11, 0.033], hyena:[0.066, 0.1, 0.036], bear:[0.075, 0.07, 0.042], owl:[0.08, 0.0, 0], boar:[0.07, 0.1, 0.045], elk:[0.06, 0.13, 0.035], bug:[0.06, 0.05, 0.03] }[t] || [0.065, 0.08, 0.035];
   const [R, SL, SR] = base;
-  m3dSphere(h, R, furM, 0, 0, 0, 1, 0.92, 1.05);
-  if (SL > 0){ const s = new T.Mesh(new T.CylinderGeometry(SR*0.65, SR, SL, 10), furM); s.rotation.x = Math.PI/2; s.position.set(0, -R*0.25, R*0.7 + SL/2); h.add(s); m3dSphere(h, SR*0.55, darkM, 0, -R*0.18, R*0.7 + SL); }
+  if (['rat','cat','canine','hyena','bear','boar','elk'].includes(t)){
+    h.add(new T.Mesh(m3dBeastHeadGeo(t, R, SL, SR), m3dVC(mats, furM)));
+    m3dSphere(h, SR*0.5, darkM, 0, -R*0.2, R*0.7 + SL + SR*0.1, 1.2, 0.8, 0.8);            // nose
+  } else {
+    m3dSphere(h, R, furM, 0, 0, 0, 1, 0.92, 1.05);
+    if (SL > 0){ const s = new T.Mesh(new T.CylinderGeometry(SR*0.65, SR, SL, 10), furM); s.rotation.x = Math.PI/2; s.position.set(0, -R*0.25, R*0.7 + SL/2); h.add(s); m3dSphere(h, SR*0.55, darkM, 0, -R*0.18, R*0.7 + SL); }
+  }
   const earL = { rat:[0.03,'round'], cat:[0.045,'point'], canine:[0.055,'point'], hyena:[0.04,'round'], bear:[0.022,'round'], boar:[0.04,'point'], elk:[0.05,'point'], bug:[0,'none'], owl:[0.05,'tuft'] }[t] || [0.04,'point'];
   for (const s of [-1,1]){
     if (earL[1]==='round') m3dSphere(h, earL[0], furM, s*R*0.72, R*0.75, -R*0.2, 1, 1, 0.45);
@@ -17221,49 +17520,50 @@ function m3dHumanoid(o){
   const T = THREE, mats = {}, b = o.bulk||1, root = new T.Group(), rig = {};
   const outfit = o.outfit||'leather', skinHex = o.skin||'#c9a07c', clothHex = o.cloth||'#5a4630';
   const bodyKind = { stone:'stone', ice:'ice', sand:'stone', metal:'metal', vines:'fur' }[outfit];
-  const skinM = o.wrap ? m3dSpecialMat(mats, skinHex, 'wrap') : m3dMat(mats, bodyKind==='stone' && outfit==='sand' ? '#c8a870' : skinHex, bodyKind || (outfit==='scales' ? 'leather' : 'skin'));
+  const skinM = o.wrap ? m3dSpecialMat(mats, skinHex, 'wrap') : m3dMat(mats, bodyKind==='stone' && outfit==='sand' ? '#c8a870' : skinHex, bodyKind || (outfit==='scales' ? 'scales' : 'skin'));
   const darkM = m3dMat(mats, mpTone(skinHex, -0.6), 'horn');
   const clothM = o.wrap ? m3dSpecialMat(mats, clothHex, 'wrap') : m3dMat(mats, clothHex, outfit==='leather' ? 'leather' : 'cloth');
-  const plateM = m3dMat(mats, o.plate || '#8a9098', 'metal'), chainM = m3dMat(mats, '#7a8088', 'metal');
+  const plateM = m3dMat(mats, o.plate || '#8a9098', 'metal'), chainM = m3dMat(mats, '#6a7078', 'chain');
   const furM = m3dMat(mats, o.furCol || '#6b5236', 'fur');
   const bare = ['none','loin','fur','stone','ice','metal','sand','vines','scales'].includes(outfit);
   const torsoM = outfit==='plate' ? plateM : outfit==='chain' ? chainM : bare ? skinM : clothM;
   const limbM = outfit==='plate' ? plateM : bare ? skinM : clothM, legM = outfit==='plate' ? plateM : bare ? skinM : m3dMat(mats, mpTone(clothHex, -0.4), outfit==='leather' ? 'leather' : 'cloth');
   const hips = new T.Group(); hips.position.y = 0.47; root.add(hips); rig.hips = hips;
-  m3dSphere(hips, 0.085, legM, 0, 0, 0, b*1.05, 0.7, 0.75);
   // legs
   rig.legs = [];
   for (const s of [-1,1]){
     const hip = new T.Group(); hip.position.set(s*0.05*b, -0.02, 0); hips.add(hip);
-    const th = m3dLimb(hip, 0.23, 0.042*b, 0.033*b, legM);
+    const th = m3dLimbS(hip, 'thigh', b, 0.23, m3dVC(mats, legM));
     const kn = new T.Group(); th.end.add(kn);
-    const sh = m3dLimb(kn, 0.22, 0.033*b, 0.026*b, outfit==='plate' ? plateM : (bare ? skinM : m3dMat(mats, '#3a2a1c', 'leather')));
+    const sh = m3dLimbS(kn, 'shin', b, 0.22, m3dVC(mats, outfit==='plate' ? plateM : (bare ? skinM : m3dMat(mats, '#3a2a1c', 'leather'))));
     const f = o.feet==='claw' ? (()=>{ const g = new T.Group(); for (let i=-1;i<=1;i++) m3dCone(g, 0.009, 0.05, darkM, i*0.015, -0.01, 0.035, Math.PI/2); return g; })()
       : o.feet==='paw' ? m3dSphere(new T.Group(), 0.03, skinM, 0, -0.012, 0.02, 1, 0.6, 1.3).parent
-      : m3dSphere(new T.Group(), 0.032, outfit==='plate' ? plateM : m3dMat(mats, '#2e2218', 'leather'), 0, -0.012, 0.025, 0.9, 0.55, 1.5).parent;
+      : (()=>{ const g = new T.Group(); g.add(new T.Mesh(m3dLimbGeo('boot', b), m3dVC(mats, outfit==='plate' ? plateM : bare ? skinM : m3dMat(mats, '#2e2218', 'leather')))); return g; })();
     sh.end.add(f);
     rig.legs.push({ hip, knee:kn, s });
   }
   // torso
   const torso = new T.Group(); hips.add(torso); rig.torso = torso;
   const prof = [[0.001,0],[0.078,0.0],[0.085,0.05],[0.08,0.12],[0.1,0.2],[0.108,0.25],[0.09,0.29],[0.04,0.315],[0.001,0.318]].map(p=>new T.Vector2(p[0], p[1]));
-  const chest = new T.Mesh(new T.LatheGeometry(prof, 16), torsoM); chest.scale.set(b*1.12, 1, 0.7*Math.sqrt(b)); torso.add(chest);
+  const chest = new T.Mesh(m3dTorsoGeo(b), m3dVC(mats, torsoM)); torso.add(chest);          // (pelvis to neck in one sculpted piece)
   if (outfit==='plate' || o.pauldrons) for (const s of [-1,1]) m3dSphere(torso, 0.05*b, plateM, s*0.1*b, 0.285, 0, 1.1, 0.75, 1);
-  if (o.tabard){ m3dBox(torso, 0.1*b, 0.3, 0.012, m3dMat(mats, o.tabard, 'cloth'), 0, 0.04, 0.066*Math.sqrt(b)); if (o.emblem) m3dSphere(torso, 0.022, m3dMat(mats, o.emblem, 'metal'), 0, 0.14, 0.074*Math.sqrt(b), 1, 1, 0.3); }
+  if (o.tabard){ m3dBox(torso, 0.1*b, 0.3, 0.012, m3dMat(mats, o.tabard, 'cloth'), 0, 0.04, 0.078*Math.sqrt(b)); if (o.emblem) m3dSphere(torso, 0.022, m3dMat(mats, o.emblem, 'metal'), 0, 0.14, 0.086*Math.sqrt(b), 1, 1, 0.3); }
   if (outfit!=='robe' && !bare) m3dBox(torso, 0.19*b, 0.025, 0.14*Math.sqrt(b), m3dMat(mats, '#2a1c12', 'leather'), 0, 0.025, 0);            // belt
   if (outfit==='fur'){ const ring = new T.Mesh(new T.TorusGeometry(0.075*b, 0.035, 8, 16), furM); ring.rotation.x = Math.PI/2; ring.position.y = 0.29; ring.scale.set(1.2, 0.85, 1); torso.add(ring); }
   if (outfit==='loin' || outfit==='fur'){ m3dBox(hips, 0.1*b, 0.14, 0.01, outfit==='fur' ? furM : clothM, 0, -0.07, 0.065); m3dBox(hips, 0.1*b, 0.12, 0.01, outfit==='fur' ? furM : clothM, 0, -0.06, -0.065); }
   if (outfit==='robe' || outfit==='rags'){
     const long = outfit==='robe', skirt = new T.Mesh(new T.CylinderGeometry(0.085*b, (long ? 0.15 : 0.12)*b, long ? 0.48 : 0.24, 14, 1, true), clothM);
     skirt.material.side = T.DoubleSide; skirt.position.y = long ? -0.23 : -0.1; hips.add(skirt);
+    { const sg = new T.CylinderGeometry(0.085*b, (long ? 0.15 : 0.12)*b, long ? 0.48 : 0.24, 48, 6, true), p = sg.attributes.position, hh = long ? 0.24 : 0.12;
+      for (let i=0;i<p.count;i++){ const x = p.getX(i), y = p.getY(i), z = p.getZ(i), a = Math.atan2(x, z), f = 1 + Math.sin(a*9 + Math.sin(a*3)*0.8)*0.07*(0.3 + (hh - y)/(2*hh)); p.setX(i, x*f); p.setZ(i, z*f); }
+      sg.computeVertexNormals(); skirt.geometry = sg; }                          // (pleats, deepening toward the hem)
     if (outfit==='rags'){ const p = skirt.geometry.attributes.position; for (let i=0;i<p.count;i++) if (p.getY(i) < 0) p.setY(i, p.getY(i) - fpHash(i,1,77)*0.06); p.needsUpdate = true; }
     rig.robe = long;
   }
-  if (o.cape){ const cg = new T.PlaneGeometry(0.2*b, 0.46, 1, 4); cg.translate(0, -0.23, 0); const p = cg.attributes.position; for (let i=0;i<p.count;i++) p.setZ(i, -Math.pow(Math.max(0, -p.getY(i))/0.46, 1.5)*0.08); const cm = m3dMat(mats, o.cape, 'cloth'); cm.side = T.DoubleSide; const c = new T.Mesh(cg, cm); c.position.set(0, 0.29, -0.07*Math.sqrt(b)); torso.add(c); rig.cape = c; }
+  if (o.cape){ const cg = new T.PlaneGeometry(0.22*b, 0.46, 12, 8); cg.translate(0, -0.23, 0); const p = cg.attributes.position; for (let i=0;i<p.count;i++){ const dn = Math.max(0, -p.getY(i))/0.46; p.setZ(i, -Math.pow(dn, 1.5)*0.08 + Math.sin(p.getX(i)*60)*0.012*dn); } cg.computeVertexNormals(); const cm = m3dMat(mats, o.cape, 'cloth'); cm.side = T.DoubleSide; const c = new T.Mesh(cg, cm); c.position.set(0, 0.29, -0.07*Math.sqrt(b)); torso.add(c); rig.cape = c; }
   if (outfit==='vines') for (let i=0;i<5;i++){ const pts = []; for (let k=0;k<6;k++) pts.push(new T.Vector3(Math.sin(k+i)*0.09*b, 0.3 - k*0.07, Math.cos(k*1.3+i)*0.07)); torso.add(new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(pts), 16, 0.008, 5), m3dMat(mats, '#3a6a2a', 'fur'))); }
   // neck and head
   const neck = new T.Group(); neck.position.y = 0.31; torso.add(neck); rig.neck = neck;
-  m3dLimb(neck, 0.035, 0.03*b, 0.034*b, skinM, false).g.rotation.x = Math.PI;
   const head = m3dHead(o.head, o, mats, skinM, darkM); head.position.y = 0.02 + (o.headLift||0)*0.002; head.scale.setScalar((o.headScale||1)*(o.head==='hood' ? 1 : 1)); neck.add(head); rig.head = head;
   const helm = o.helm, hm = m3dMat(mats, o.helmCol || '#8a8a90', helm==='cowl' || helm==='bandana' ? 'cloth' : 'metal');
   if (helm==='kettle'){ m3dSphere(head, 0.078, hm, 0, 0.1, 0, 1, 0.7, 1); const br = new T.Mesh(new T.CylinderGeometry(0.11, 0.11, 0.01, 18), hm); br.position.y = 0.1; head.add(br); }
@@ -17282,18 +17582,18 @@ function m3dHumanoid(o){
   rig.arms = [];
   for (const s of [-1,1]){
     const sh = new T.Group(); sh.position.set(s*0.115*b, 0.27, 0); torso.add(sh);
-    const up = m3dLimb(sh, 0.18, 0.034*b, 0.028*b, rig.robe ? clothM : limbM);
+    const up = m3dLimbS(sh, 'upper', b, 0.18, m3dVC(mats, rig.robe ? clothM : limbM));
     const el = new T.Group(); up.end.add(el);
-    const fo = m3dLimb(el, 0.17, 0.028*b, 0.023*b, rig.robe ? clothM : (outfit==='plate' ? plateM : bare ? skinM : m3dMat(mats, mpTone(clothHex, -0.2), 'leather')));
+    const fo = m3dLimbS(el, 'fore', b, 0.17, m3dVC(mats, rig.robe ? clothM : (outfit==='plate' ? plateM : bare ? skinM : m3dMat(mats, mpTone(clothHex, -0.2), 'leather'))));
     const hand = new T.Group(); hand.position.y = -0.015; fo.end.add(hand);
-    m3dSphere(hand, 0.028*b, skinM, 0, 0, 0, 0.85, 1, 0.9);
-    if (o.claws || o.weapon==='claws') for (let i=-1;i<=1;i++) m3dCone(hand, 0.006, 0.04, darkM, i*0.012, -0.035, 0.012, Math.PI*0.95);
+    const hs = new T.Mesh(m3dLimbGeo('hand', b), m3dVC(mats, outfit==='plate' ? plateM : skinM)); hs.position.y = 0.015; hand.add(hs);
+    if (o.claws || o.weapon==='claws') for (let i=0;i<4;i++) m3dCone(hand, 0.005, 0.035, darkM, (-0.018+i*0.012)*b, -0.03, 0.05*b, Math.PI*0.6);
     rig.arms.push({ sh, el, hand, s });
   }
   // weapon in the right hand (the one on its right, -x), shield on the left
   const wk = o.weapon && o.weapon!=='claws' ? o.weapon : null;
   const wpn = wk ? m3dWeapon(wk, mats) : null;
-  if (wpn){ const R = rig.arms[0]; wpn.rotation.x = Math.PI/2; wpn.scale.setScalar(0.42*(o.weaponScale||1)); R.hand.add(wpn); rig.weapon = wpn; rig.twoHand = /greataxe|greatsword|staff|spear|trident/.test(wk); rig.wk = wk; }
+  if (wpn){ const R = rig.arms[0]; wpn.rotation.x = Math.PI/2; wpn.position.set(0, -0.042, 0.024*b); wpn.scale.setScalar(0.42*(o.weaponScale||1)); R.hand.add(wpn); rig.weapon = wpn; rig.twoHand = /greataxe|greatsword|staff|spear|trident/.test(wk); rig.wk = wk; }
   if (o.shield){ const sm = m3dMat(mats, o.shield.col||'#5a3a20', 'leather'), rm = m3dMat(mats, o.shield.rim||'#6a6a6a', 'metal');
     const sg = new T.Group(); const disc = new T.Mesh(new T.CylinderGeometry(0.11, 0.11, 0.018, 20), sm); sg.add(disc);        // (faces along the forearm, so it's toward you when the arm is up)
     const rim = new T.Mesh(new T.TorusGeometry(0.11, 0.009, 6, 24), rm); rim.rotation.x = Math.PI/2; sg.add(rim); m3dSphere(sg, 0.025, rm, 0, -0.012, 0, 1, 0.6, 1);
@@ -17337,19 +17637,18 @@ function m3dBeast(o){
   const L = 0.36*(o.len||1), tall = o.tall||1, legH = (o.legs==='short' ? 0.13 : o.legs==='long' ? 0.3 : 0.2)*tall, bodyR = 0.1*tall;
   const furHex = o.fur||'#7a6a5a', furM = m3dMat(mats, furHex, 'fur'), darkM = m3dMat(mats, mpTone(furHex, -0.65), 'horn');
   const body = new T.Group(); body.position.y = legH + bodyR*0.9; root.add(body); rig.body = body;
-  const trunk = new T.Mesh(new T.CapsuleGeometry(bodyR, L, 6, 14), furM); trunk.rotation.x = Math.PI/2; trunk.scale.set(1, 1, 0.92); body.add(trunk);
-  m3dSphere(body, bodyR*1.08, furM, 0, bodyR*0.1, L*0.35, 1.05, 1.05, 1);                    // chest
+  body.add(new T.Mesh(m3dBeastBodyGeo(L, bodyR), m3dVC(mats, furM)));                       // (the whole body sculpted in one piece)
   if (o.belly) m3dSphere(body, bodyR*0.8, m3dMat(mats, o.belly, 'fur'), 0, -bodyR*0.4, 0, 0.9, 0.5, 1.6);
   if (o.carapace) for (let i=0;i<4;i++){ const sg = new T.Mesh(new T.SphereGeometry(bodyR*1.12, 12, 6, 0, Math.PI*2, 0, Math.PI*0.45), m3dMat(mats, mpTone(furHex, -0.2), 'horn')); sg.position.z = -L*0.45 + i*L*0.3; sg.scale.set(1, 0.9, 0.35); body.add(sg); }
   if (o.bristle) for (let i=0;i<9;i++) m3dCone(body, 0.012, 0.06, darkM, 0, bodyR*0.95, -L*0.5 + i*L*0.13, -0.3);
   // legs
   for (const [fx, fz] of [[-1,1],[1,1],[-1,-1],[1,-1]]){
     const hip = new T.Group(); hip.position.set(fx*bodyR*0.62, -bodyR*0.35, fz*L*0.45); body.add(hip);
-    const up = m3dLimb(hip, legH*0.62, 0.042*tall, 0.03*tall, furM);
+    const up = m3dLimbS0(hip, m3dBeastLegGeo('up', legH*0.62, tall), legH*0.62, m3dVC(mats, furM));
     const kn = new T.Group(); up.end.add(kn);
-    const lo = m3dLimb(kn, legH*0.55, 0.028*tall, 0.022*tall, furM);
+    const lo = m3dLimbS0(kn, m3dBeastLegGeo('lo', legH*0.55, tall), legH*0.55, m3dVC(mats, furM));
     if (o.hoof) m3dBox(lo.end, 0.035*tall, 0.03, 0.04*tall, darkM, 0, -0.005, 0.005);
-    else { m3dSphere(lo.end, 0.03*tall, furM, 0, 0, 0.012, 1, 0.55, 1.3); if (o.claws) for (let i=-1;i<=1;i++) m3dCone(lo.end, 0.006, 0.03, m3dMat(mats, '#e8e0cc', 'horn'), i*0.012, -0.005, 0.045, Math.PI/2); }
+    else if (o.claws) for (let i=-1;i<=1;i++) m3dCone(lo.end, 0.005, 0.028, m3dMat(mats, '#e8e0cc', 'horn'), i*0.011*tall, -0.008, 0.05*tall, Math.PI/2);
     rig.legs.push({ hip, knee:kn, fx, fz });
   }
   // neck and head
@@ -17409,33 +17708,33 @@ function m3dWrapTex(){
 function m3dSpecialMat(mats, hex, kind){
   const k = hex+'|'+kind; if (mats[k]) return mats[k];
   const T = THREE;
-  if (kind==='bark'){ const t = m3dBarkTex(); return (mats[k] = new T.MeshStandardMaterial({ color:m3dCol(hex), map:t, bumpMap:t, bumpScale:2, roughness:0.95 })); }
-  if (kind==='wrap'){ const t = m3dWrapTex(); return (mats[k] = new T.MeshStandardMaterial({ color:m3dCol(hex), map:t, bumpMap:t, bumpScale:0.6, roughness:0.95 })); }
-  if (kind==='slime') return (mats[k] = new T.MeshStandardMaterial({ color:m3dCol(hex), roughness:0.12, metalness:0.05, transparent:true, opacity:0.72, emissive:m3dCol(hex), emissiveIntensity:0.12 }));
-  if (kind==='ghost') return (mats[k] = new T.MeshStandardMaterial({ color:m3dCol(hex), roughness:0.6, transparent:true, opacity:0.55, depthWrite:false, emissive:m3dCol(hex), emissiveIntensity:0.35, side:T.DoubleSide }));
+  const sp = (m)=>{ m.userData.special = true; return (mats[k] = m3dRimify(m)); };
+  if (kind==='bark'){ const t = m3dBarkTex(); return sp(new T.MeshStandardMaterial({ color:m3dCol(hex), map:t, bumpMap:t, bumpScale:2, roughness:0.95 })); }
+  if (kind==='wrap'){ const t = m3dWrapTex(); return sp(new T.MeshStandardMaterial({ color:m3dCol(hex), map:t, bumpMap:t, bumpScale:0.6, roughness:0.95 })); }
+  if (kind==='slime') return sp(new T.MeshStandardMaterial({ color:m3dCol(hex), roughness:0.12, metalness:0.05, transparent:true, opacity:0.72, emissive:m3dCol(hex), emissiveIntensity:0.12 }));
+  if (kind==='ghost') return sp(new T.MeshStandardMaterial({ color:m3dCol(hex), roughness:0.6, transparent:true, opacity:0.55, depthWrite:false, emissive:m3dCol(hex), emissiveIntensity:0.35, side:T.DoubleSide }));
   return m3dMat(mats, hex, kind);
 }
 function m3dFinish(root, rig, anim, extra){ const box = new THREE.Box3().setFromObject(root), sz = box.getSize(new THREE.Vector3()); M3D.meta.set(root, Object.assign({ rig, anim, height: Math.max(0.05, box.max.y, Math.max(sz.x, sz.z)*0.62) }, extra||{})); return root; }
 // a reptile head: snout, lower jaw on a hinge, horns, eyes, and fire in the throat
 function m3dReptileHead(parent, o, mats, scaleM, bellyM, s){
   const T = THREE, h = new T.Group(); parent.add(h); h.scale.setScalar(s||1);
-  m3dSphere(h, 0.07, scaleM, 0, 0.02, 0, 1, 0.85, 1.1);
-  const snout = new T.Mesh(new T.CylinderGeometry(0.03, 0.05, 0.13, 10), scaleM); snout.rotation.x = Math.PI/2; snout.position.set(0, 0.02, 0.1); h.add(snout);
+  h.add(new T.Mesh(m3dDragonHeadGeo('top'), m3dVC(mats, scaleM)));
   const jaw = new T.Group(); jaw.position.set(0, -0.015, 0.02); h.add(jaw);
-  const jm = new T.Mesh(new T.CylinderGeometry(0.02, 0.04, 0.13, 10), bellyM); jm.rotation.x = Math.PI/2; jm.position.set(0, -0.012, 0.075); jaw.add(jm);
+  jaw.add(new T.Mesh(m3dDragonHeadGeo('jaw'), m3dVC(mats, bellyM)));
   const tooth = m3dMat(mats, '#ece2c8', 'horn');
-  for (const s2 of [-1,1]){ for (let i=0;i<3;i++) m3dCone(h, 0.006, 0.02, tooth, s2*0.022, -0.012, 0.1 + i*0.025, Math.PI); }
-  if (o.horns!==false) for (const s2 of [-1,1]) m3dCone(h, 0.016, 0.1, m3dMat(mats, '#d8ccb0', 'horn'), s2*0.04, 0.07, -0.06, -1.1, 0, s2*0.25);
-  m3dEyes(h, o, mats, 0.05, 0.06, 0.04, 0.012);
+  for (const s2 of [-1,1]){ for (let i=0;i<5;i++) m3dCone(h, 0.005, 0.02, tooth, s2*(0.03-i*0.003), -0.008, 0.06 + i*0.024, Math.PI); }
+  if (o.horns!==false) for (const s2 of [-1,1]){ m3dCone(h, 0.017, 0.12, m3dMat(mats, '#d8ccb0', 'horn'), s2*0.04, 0.08, -0.07, -1.15, 0, s2*0.25); m3dCone(h, 0.009, 0.05, m3dMat(mats, '#d8ccb0', 'horn'), s2*0.07, 0.03, -0.05, -1.3, 0, s2*0.9); }
+  m3dEyes(h, o, mats, 0.045, 0.062, 0.042, 0.011);
   if (o.breath){ const sp = new T.Sprite(M3D.glowMat(m3dRgb(o.breath), 0.7)); sp.scale.setScalar(0.14); sp.position.set(0, 0, 0.17); h.add(sp); }
   return { h, jaw };
 }
 function m3dDragon(o){
   const T = THREE, mats = {}, root = new T.Group(), rig = { legs:[] };
-  const sM = m3dMat(mats, o.scale||'#4a6a4a', 'leather'), bM = m3dMat(mats, o.belly||mpTone(o.scale||'#4a6a4a', 0.4), 'leather');
+  const sM = m3dMat(mats, o.scale||'#4a6a4a', 'scales'), bM = m3dMat(mats, o.belly||mpTone(o.scale||'#4a6a4a', 0.4), 'leather');
   const legH = o.flippers ? 0.08 : 0.2, bodyR = 0.12, L = 0.34;
   const body = new T.Group(); body.position.y = legH + bodyR; root.add(body); rig.body = body;
-  const trunk = new T.Mesh(new T.CapsuleGeometry(bodyR, L, 6, 14), sM); trunk.rotation.x = Math.PI/2; body.add(trunk);
+  body.add(new T.Mesh(m3dBeastBodyGeo(L, bodyR), m3dVC(mats, sM)));
   m3dSphere(body, bodyR*0.9, bM, 0, -bodyR*0.35, 0.02, 0.95, 0.6, 1.9);
   for (let i=0;i<7;i++) m3dCone(body, 0.018, 0.06, m3dMat(mats, mpTone(o.scale||'#4a6a4a', -0.4), 'horn'), 0, bodyR*0.95, -L*0.5 + i*L*0.16, -0.35);
   if (o.shell){ const sh = new T.Mesh(new T.SphereGeometry(bodyR*1.7, 16, 10, 0, Math.PI*2, 0, Math.PI/2), m3dMat(mats, mpTone(o.scale||'#4a7a4a', -0.3), 'horn')); sh.scale.set(1, 0.7, 1.3); sh.position.y = -bodyR*0.1; body.add(sh); }
@@ -17444,8 +17743,8 @@ function m3dDragon(o){
   if (o.flippers) for (const [fx,fz] of spots){ const f = m3dBox(body, 0.16, 0.015, 0.07, sM, fx*bodyR*1.1, -bodyR*0.6, fz*L*0.4); f.rotation.z = fx*0.3; }
   else for (const [fx,fz] of spots.slice(0, nLegs)){
     const hip = new T.Group(); hip.position.set(fx*bodyR*0.75, -bodyR*0.3, fz*L*0.42); body.add(hip);
-    const up = m3dLimb(hip, legH*0.65, 0.045, 0.034, sM); const kn = new T.Group(); up.end.add(kn);
-    const lo = m3dLimb(kn, legH*0.55, 0.032, 0.026, sM);
+    const up = m3dLimbS0(hip, m3dBeastLegGeo('up', legH*0.65, 1.15), legH*0.65, m3dVC(mats, sM)); const kn = new T.Group(); up.end.add(kn);
+    const lo = m3dLimbS0(kn, m3dBeastLegGeo('lo', legH*0.55, 1.15), legH*0.55, m3dVC(mats, sM));
     for (let i=-1;i<=1;i++) m3dCone(lo.end, 0.008, 0.04, m3dMat(mats, '#d8ccb0', 'horn'), i*0.016, -0.01, 0.03, Math.PI/2);
     rig.legs.push({ hip, knee:kn, fx, fz });
   }
@@ -17490,7 +17789,7 @@ function m3dSnakeHead(parent, o, mats, sM, bM, s){
 }
 function m3dHydra(o){
   const T = THREE, mats = {}, root = new T.Group(), rig = { legs:[], necks:[] };
-  const sM = m3dMat(mats, o.scale||'#4a7a4a', 'leather'), bM = m3dMat(mats, mpTone(o.scale||'#4a7a4a', 0.35), 'leather');
+  const sM = m3dMat(mats, o.scale||'#4a7a4a', 'scales'), bM = m3dMat(mats, mpTone(o.scale||'#4a7a4a', 0.35), 'leather');
   const body = new T.Group(); body.position.y = 0.26; root.add(body); rig.body = body;
   const tr = new T.Mesh(new T.CapsuleGeometry(0.15, 0.22, 6, 14), sM); tr.rotation.x = Math.PI/2; body.add(tr);
   m3dSphere(body, 0.13, bM, 0, -0.06, 0, 1, 0.55, 1.7);
@@ -17511,7 +17810,7 @@ function m3dHydra(o){
 }
 function m3dSerpent(o){
   const T = THREE, mats = {}, root = new T.Group(), rig = {}, k = o.kind||'snake', th = o.thick||1;
-  const sM = m3dMat(mats, o.scale||'#6a7a3a', 'leather'), bM = m3dMat(mats, o.belly || mpTone(o.scale||'#6a7a3a', 0.35), 'leather');
+  const sM = m3dMat(mats, o.scale||'#6a7a3a', 'scales'), bM = m3dMat(mats, o.belly || mpTone(o.scale||'#6a7a3a', 0.35), 'leather');
   const band = o.bands ? m3dMat(mats, mpTone(o.scale||'#6a7a3a', -0.5), 'leather') : null;
   if (k==='worm'){
     // a vast worm rearing out of the ground, its round maw of teeth turned on you
@@ -17826,7 +18125,7 @@ function m3dTemplate(pt){
 // a copy of the template with its own rig and its own materials (so it can flash on its own)
 function m3dInstance(m, pt){
   const T = THREE, tpl = m3dTemplate(pt), root = tpl.clone(true), mmap = new Map();
-  root.traverse(o=>{ if (o.isMesh && o.material){ if (!mmap.has(o.material)) mmap.set(o.material, o.material.clone()); o.material = mmap.get(o.material); } });
+  root.traverse(o=>{ if (o.isMesh && o.material){ if (!mmap.has(o.material)){ const c = o.material.clone(); if (o.material.userData.rim) m3dRimify(c); mmap.set(o.material, c); } o.material = mmap.get(o.material); } });
   // rebuild the rig map by walking both trees in step
   const byT = new Map(); const walk = (a, b2)=>{ byT.set(a, b2); a.children.forEach((c,i)=>walk(c, b2.children[i])); }; walk(tpl, root);
   const meta = M3D.meta.get(tpl), map = (g)=>g ? byT.get(g) : null;

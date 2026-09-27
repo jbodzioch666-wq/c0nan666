@@ -1,5 +1,39 @@
 # Depthcrawl patch notes
 
+## v156 — Flesh and scale
+
+The 3D monsters are sculpted in far more detail: real anatomy instead of tubes and balls, and surfaces you can see up close.
+
+### Sculpted bodies
+- **Humanoids** have one smoothly sculpted body from hip to neck:
+  - a ribcage and chest, shoulder muscles and shoulder blades, a waist, flanks and a seat;
+  - a groove down the spine and lines across the stomach.
+- **Arms and legs:** biceps and triceps, forearms tapering to the wrist, thighs with a kneecap, calves and ankle bones.
+- **Hands and feet:** hands have knuckles, curled fingers and a thumb closed round the weapon grip, and feet wear real boots with heels and soles.
+- **Faces:** every kind of face is sculpted, with a brow ridge, deep eye sockets, cheekbones, a nose, lips, a chin and ears:
+  - the goblin's long nose and huge swept ears;
+  - the orc's broad flat nose, heavy jaw and tusks;
+  - the troll's drooping nose;
+  - the hag's hooked nose and sunken cheeks;
+  - the kobold's and lizardfolk's scaly snouts and crests;
+  - the gnoll's hyena muzzle.
+- **Beasts:** one sculpted body with a deep chest, tucked-up belly, a ridge of spine, shoulders and haunches. Their legs are muscled, with paws and toes, and their heads have real muzzles, cheeks, brows and a parting jaw.
+- **Dragons:** long snouts with flared nostrils, heavy brow ridges, cheek frills, a crest down the skull, a separate jaw lined with teeth, and a second pair of horns.
+
+### Real surfaces
+- **Materials:** every material has its own texture and relief:
+  - fine pores on skin and grain on leather;
+  - woven cloth and strands of fur;
+  - overlapping scales on dragons, hydras, serpents and lizardfolk;
+  - linked rings on chainmail, and brushed, scratched plate;
+  - growth rings on horn and cracks in stone.
+- **Eyes:** eyes that don't glow now have whites and irises.
+- **Cloth:** robes hang in pleats that deepen toward the hem, and capes fall in folds.
+- **Lighting:** a soft rim of light traces every monster's outline, so it stands out from the dark behind it.
+
+### Smooth play
+- Each new kind of monster is sculpted while the floor loads, so detailed models never stall a fight.
+
 ## v155 — Monsters in 3D, part two
 
 Every monster in the game is now a real 3D model in first person: 170 creatures and 30 kinds of undead.
