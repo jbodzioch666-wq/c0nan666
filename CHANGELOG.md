@@ -1,5 +1,19 @@
 # Depthcrawl patch notes
 
+## v149 — Steel in hand
+
+### First-person weapons in 3D
+- The weapon in your hand in first person is now a real 3D model instead of a flat painting, gripped in an armoured gauntlet.
+- Every weapon type has its own model:
+  - **Blades:** a dagger, shortsword, longsword and greatsword, a curved scimitar and a swept-hilt rapier.
+  - **Axes and picks:** a hand axe, battleaxe and double-headed greataxe, a sickle and a war pick.
+  - **Blunt weapons:** a knotted club, a light hammer, warhammer and maul, a flanged mace, a spiked morningstar and a chained flail.
+  - **Polearms and staves:** a spear, a halberd, and a quarterstaff topped with a glowing crystal.
+- The weapon is lit by the torch or lantern light where you stand, and polished steel catches the light.
+- Better weapons look better: rare blades have glowing runes etched along them, and uniques have gold fittings.
+- Fire, frost and poison enchantments glow along the weapon, with drifting motes of their colour.
+- Attacking is a real swing: you wind up to the right, cut across to the lower left, and settle back to your guard.
+
 ## v148 — Quests worth taking
 
 Quests now send you to real places, track your progress on screen, and let you choose your reward.
