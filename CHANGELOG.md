@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-32 — Stairs back against the walls
+
+- **Stairs in the graveyard's catacombs sit against a wall again.** Stair placement skipped every graveyard floor, because the surface's way down is inside the mausoleum. That also skipped the catacomb floors below, so their stairs could stand in the middle of a passage and block it. Only the surface is skipped now.
+- **A stair always finds a wall:** the search for a spot now covers the whole floor, not just the 12 steps around it. This fixed an occasional stair left out in the open in the mines. Checked across 150 floors of every site type: every stair is against a wall.
+- **Floors you've already visited get fixed too:** floors saved in your game have their stairs moved against a wall the next time you enter them.
+
 ## RS-31 — No more jumping across the map
 
 - **A long click-to-walk on the overworld (or in town) no longer teleports you to the end of the path, then freezes.** Taking a step redrew the screen, and that redraw took the next step before the step timer had been reset. So one frame walked the whole path at once and drew a full 3D frame for every tile on the way, which caused the pause. Now each frame takes at most one step, and you walk the whole way at the normal pace, about a third of a second per tile. (This was also the real reason short clicks used to "zoom" you to the spot.)
