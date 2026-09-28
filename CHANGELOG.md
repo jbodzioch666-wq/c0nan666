@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-10 — Forged gear is the best gear
+
+- **Forged gear beats drops:** anything you forge yourself is better made than anything a monster drops.
+  - Every bonus rises by 15%, plus 1% for each Smithing level you have past the bar's own, up to +45%.
+  - Up to +24% it's **Fine**; from +25% it's a **Masterwork**, coloured as a rarer find.
+  - It says who forged it: "forged by <your name>: +45% bonuses".
+- **Example:** a steel scimitar dropped by a monster is attack +16 / strength +14. Forged at Smithing 60 it's a Masterwork at +23 / +20. A Masterwork steel platebody matches a dropped mithril one.
+
 ## RS-9 — Shops with a purpose, and a reason to mine
 
 - **The blacksmith only racks bronze and iron.**
