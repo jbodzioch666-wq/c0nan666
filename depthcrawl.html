@@ -2657,6 +2657,27 @@ function rsUniqueify(it){
   }
   it.aff = keep; it.naff = keep.length; it.rsu = 1;
   if (it.rs) it.price = Math.round((it.price||50)*2.5);
+  return rsUniqueBuff(it);
+}
+// no unique should be weaker than a good piece of its level: its RuneScape bonuses add up
+// to at least a budget set by its item level and slot, raised evenly if they fall short
+// (and given to the slot's natural stat - attack/strength, defence, or a spread for
+// jewellery - when it had none)
+function rsUniqueBuff(it){
+  if (!it || !it.used || (it.rsu||0) >= 2) return it;
+  const keys = ['acc','dmgB','ac','rngAcc','magAcc'], L = Math.max(1, it.ilvl||8);
+  const slotF = { weapon:1.25, ranged:1.2, chest:1.0, legs:0.8, head:0.65, arms:0.55, necklace:0.75, ring:0.55 }[it.slot] || 0.7;
+  const budget = Math.round((24 + L*6)*slotF);
+  const tot = keys.reduce((t,k)=>t+Math.max(0, it[k]||0), 0);
+  if (tot <= 0){
+    const give = it.slot==='weapon' ? (it.rsStaff ? { magAcc:0.6, acc:0.2, dmgB:0.2 } : { acc:0.5, dmgB:0.5 }) : it.slot==='ranged' ? { acc:1 }
+      : (it.slot==='necklace' || it.slot==='ring') ? { acc:0.2, dmgB:0.2, ac:0.2, rngAcc:0.2, magAcc:0.2 } : { ac:1 };
+    for (const k in give) it[k] = Math.round(budget*give[k]);
+  } else if (tot < budget){
+    const f = budget/tot;
+    for (const k of keys) if ((it[k]||0) > 0) it[k] = Math.round(it[k]*f);
+  }
+  it.rsu = 2;
   return it;
 }
 function buildSetPiece(spid, d, classOnly){
@@ -8567,6 +8588,7 @@ function rsMakeJewel(kind, idx){
 // gear from before the bonus rework used small whole numbers on the d20 scale - scale it up once
 function rsMigrateItem(it){
   if (it && it.used && it.rs && it.uniqueId && !it.rsu){ rsMigrateItem2(it); rsUniqueify(it); return; }
+  if (it && it.used && it.rs && it.uniqueId && it.rsu===1){ rsMigrateItem2(it); rsUniqueBuff(it); return; }
   rsMigrateItem2(it);
 }
 function rsMigrateItem2(it){
@@ -8718,7 +8740,7 @@ function rsApplyKit(ki){
   } else if (ki===2){
     G.gear.weapon = rsMakeStaff(1);
     G.gear.head = rsMakeArmour('cloth', 0, 'head'); G.gear.chest = rsMakeArmour('cloth', 0, 'chest'); G.gear.legs = rsMakeArmour('cloth', 0, 'legs');
-    skAdd('r_mind', 200); skAdd('r_water', 60); skAdd('r_earth', 60); skAdd('r_fire', 60);
+    skAdd('r_mind', 200); skAdd('r_air', 100); skAdd('r_water', 60); skAdd('r_earth', 60); skAdd('r_fire', 60);
     p.rsSpell = 'windstrike'; p.rsAutocast = true;
   } else {
     G.gear.weapon = rsMakeWeapon(0, 2);
@@ -8776,6 +8798,8 @@ function rsCastAt(mi, id){
   noteFoe(mi);
   rsSpendRunes(sp);
   isoShot(m, 'spell', ISO_ELEM_COL[sp[6]]);
+  const stEl = rsStaffElem();
+  if (stEl && sp[4][stEl] && !G.player.rsStaffTip){ G.player.rsStaffTip = 1; logMsg(`your staff supplies the ${stEl} runes for ${sp[1]} - you only spend the others`, 'magic'); }
   const roll = rollDie(20);
   const tot = rsAttackTotal(roll, m, 'magic');
   const ac = m.ac - ((m.debuffACTurns>0) ? (m.debuffACAmt||0) : 0);
@@ -8813,13 +8837,13 @@ function buildRsMagic(){
   const p = G.player, L = rsLvl('magic'), el = rsStaffElem();
   const rows = RS_SPELLS.map(sp=>{
     const lvlOk = L >= sp[2], runesOk = rsRunesOk(sp), sel = p.rsSpell===sp[0];
-    const runes = Object.keys(sp[4]).map(r=>`<span style="color:${r===el ? COL.cyan : skHave('r_'+r)>=sp[4][r] ? COL.text : COL.red}">${sp[4][r]} ${r}</span>`).join(' ');
+    const runes = Object.keys(sp[4]).map(r=>`<span style="color:${r===el ? COL.cyan : skHave('r_'+r)>=sp[4][r] ? COL.text : COL.red}" title="${r===el ? 'free - your staff supplies it' : 'you have '+skHave('r_'+r)}">${sp[4][r]} ${r}${r===el ? ' (staff)' : ''}</span>`).join(' ');
     return `<div class="shoprow ${sel ? 'sel' : ''}" style="${lvlOk ? '' : 'opacity:0.45;'}${sel ? 'outline:1px solid var(--amber);' : ''}">
       <span class="muted">${sp[2]}</span><span>${esc(sp[1])}</span>
       <span class="desc">max hit ${lvlOk ? rsSpellMax(sp) : Math.round(sp[3]*1.5)} &middot; ${runes}</span>
       <span>${lvlOk ? `<button class="btn" onclick="rsSelectSpell('${sp[0]}')">${sel ? 'selected' : 'select'}</button>${runesOk && G.gameMode!==0 ? ` <button class="btn primary" onclick="rsCastFromBook('${sp[0]}')">cast</button>` : ''}` : `needs Magic ${sp[2]}`}</span></div>`;
   }).join('');
-  const pouch = RS_RUNES.map(r=>`<span class="skitem" style="border-color:${r[2]}"><b style="color:${r[2]}">${r[1]}</b> &times;${skHave('r_'+r[0])}</span>`).join('');
+  const pouch = RS_RUNES.map(r=>`<span class="skitem" style="border-color:${r[2]}"><b style="color:${r[2]}">${r[1]}</b> ${r[0]===el ? '&infin; (staff)' : '&times;'+skHave('r_'+r[0])}</span>`).join('');
   const w = G.gear.weapon, staff = w && w.used && w.rsStaff;
   return `<h2 class="panel-title">STANDARD SPELLBOOK</h2>
     <div class="sub">Magic level ${L}. Select a spell: <kbd>R</kbd> casts it at the nearest foe you can see (when you have no bow equipped). ${staff ? `With a staff in hand you can <b>autocast</b> - every melee bump casts the spell instead.` : 'Wield a staff to autocast.'}${el ? ` Your staff gives endless ${el} runes.` : ''}</div>
@@ -8830,6 +8854,13 @@ function buildRsMagic(){
       <div class="muted" style="font-size:11px;margin-top:6px;">monsters drop runes, and the alchemist sells them</div>
       <div class="btnrow" style="margin-top:12px;"><button class="btn primary" onclick="setUi('playing')">G / ESC &middot; close</button></div>
     </div>`;
+}
+// the rune pouch, as the inventory and spellbook show it: a staff's element is endless
+function rsRunePouchHtml(){
+  const el = rsStaffElem();
+  const cells = RS_RUNES.map(r=>`<span class="skitem" style="border-color:${r[2]}"><b style="color:${r[2]}">${r[1]}</b> ${r[0]===el ? '&infin; <span class="muted">(your staff)</span>' : '&times;'+skHave('r_'+r[0])}</span>`).join('');
+  return `<h4 style="color:var(--ink-faint);margin:12px 0 6px;">RUNE POUCH &middot; <span class="muted" style="font-weight:400;">${G.player.arrows||0} arrows</span></h4><div class="skbag">${cells}</div>
+    <div class="muted" style="font-size:11px;margin-top:4px;">monsters drop runes and the alchemist sells them; an elemental staff (Staff of Air, Fire...) gives endless runes of its element, as in RuneScape</div>`;
 }
 // the alchemist's rune counter
 function rsBuyRunes(r, n){
@@ -15830,6 +15861,14 @@ function v3Tree(x,z,mats,grp,kind,s){
     }
   }
   grp.add(g);
+  v3Occluder(grp, g, x, z, 1.3*s, 2.6*s);
+}
+// an invisible box the camera's line to you is tested against: whatever it belongs to
+// (a building, a tree, a market stall) fades out while it stands between the camera and you
+function v3Occluder(grp, g, x, z, w, h){
+  if (!V3.occ) return;
+  const ob = new THREE.Mesh(new THREE.BoxGeometry(w, h, w), new THREE.MeshBasicMaterial({ visible:false }));
+  ob.position.set(x, h/2, z); ob.userData.grp = g; grp.add(ob); V3.occ.push(ob);
 }
 // grass: tufts of blades on every grassy tile and out round the palisade, swaying in a vertex shader, with wildflowers among them
 function v3Grass(grp){
@@ -15948,17 +15987,9 @@ const V3_LOOK = {
   questgiver: ()=>HUM({ outfit:'chain', tabard:'#2a4a8a', emblem:'#d8b050', weapon:'spear', helm:'kettle', cape:'#2a3a6a', hair:'#5a3a20' }),
 };
 const V3_RACE_LOOK = { human:{}, elf:{ hair:'#e0d090', skin:'#f0d8c0' }, dwarf:{ bulk:1.22, beard:'#6a3a1a', hair:'#6a3a1a' }, orc:{ head:'orc', skin:'#6a8a4a' } };
-function v3PlayerLook(){
-  const c = G.player.cls, race = (G.player.race||'').toLowerCase();
-  const base = { Fighter:{outfit:'plate', weapon:'sword', shield:{col:'#8a2424',rim:'#c8c8c8',emblem:'#e8e0c0'}, helm:'kettle'},
-    Barbarian:{outfit:'fur', weapon:'greataxe', bulk:1.15}, Paladin:{outfit:'plate', weapon:'sword', shield:{col:'#e8e0c8',rim:'#c89a2a',emblem:'#c89a2a'}, cape:'#e8e0c8'},
-    Ranger:{outfit:'leather', cloth:'#3a5a2a', weapon:'bow', cape:'#2a4a2a', helm:'cowl', cloth2:'#2a4a2a'}, Rogue:{outfit:'leather', cloth:'#2a2a30', weapon:'dagger', helm:'cowl', cloth2:'#1a1a22'},
-    Wizard:{outfit:'robe', cloth:'#2a3a8a', head:'hood', faceShow:true, weapon:'staff', gem:'140,180,255'}, Sorcerer:{outfit:'robe', cloth:'#7a2a2a', weapon:'staff', gem:'255,140,80'},
-    Warlock:{outfit:'robe', cloth:'#3a1a4a', head:'hood', faceShow:true, weapon:'staff', gem:'200,120,255'}, Cleric:{outfit:'chain', tabard:'#e8e0c8', emblem:'#c89a2a', weapon:'mace', shield:{col:'#e8e0c8',rim:'#c89a2a'}},
-    Druid:{outfit:'robe', cloth:'#4a5a2a', weapon:'staff', gem:'140,255,140'}, Monk:{outfit:'robe', cloth:'#c07a2a', weapon:'staff'}, Bard:{outfit:'leather', cloth:'#7a2a4a', weapon:'sword', cape:'#3a1a2a'} }[c] || {outfit:'leather', weapon:'sword'};
-  const r = /orc/.test(race) ? { head:'orc', skin:'#7a9a5a' } : /dwarf/.test(race) ? { bulk:1.2, beard:'#8a4a20', hair:'#8a4a20' } : /elf/.test(race) ? { hair:'#e8d8a0' } : /tiefling/.test(race) ? { skin:'#b05050' } : {};
-  return HUM(Object.assign({}, r, base));
-}
+function rsLookKey(){ const g = G.gear, p = G.player; return ['weapon','ranged','head','chest'].map(k=>g[k] && g[k].used ? g[k].nm : '-').join('|') + p.race + (p.rsLastType==='ranged' ? '|bow' : ''); }
+// you look the same everywhere: the figure is built from what you wear (see rsPlayerLook)
+function v3PlayerLook(){ return rsPlayerLook(); }
 function v3VillagerLook(i){
   const cloths = ['#6a4a2a','#4a5a6a','#7a3a2a','#5a6a3a','#6a5a7a','#8a7a5a','#3a4a3a'];
   const outfits = ['rags','leather','robe','rags','leather'];
@@ -16009,7 +16040,7 @@ function v3BuildScene(){
   far.rotation.x = -Math.PI/2; far.position.set(COLS/2,-0.01,ROWS/2); grp.add(far);
   // buildings
   const icon = { smith:obEntry('anvil'), tavern:obEntry('tavern'), alch:obEntry('cauldron'), shop:obEntry('stall') };
-  V3.occ = [];
+  V3.occ = []; V3.occDyn = new Set();
   const occluder = (b, g)=>{ const ob = new T.Mesh(new T.BoxGeometry(b.w, (b.floors||1)*1.2+1.9, b.h), new T.MeshBasicMaterial({ visible:false }));
     ob.position.set(b.x0+b.w/2, ((b.floors||1)*1.2+1.9)/2, b.y0+b.h/2); ob.userData.grp = g; grp.add(ob); V3.occ.push(ob); };
   for (const b of VILLAGE_BUILDINGS){
@@ -16042,10 +16073,11 @@ function v3BuildScene(){
     grp.add(v3Box(0.5,0.9,0.25,mats.planks,x+0.9,0.45,z-0.55));
   }
   // peddler's market stall
-  { const x = 6.5, z = 11.5;
-    for (const [dx,dz] of [[-0.42,-0.42],[0.42,-0.42],[-0.42,0.42],[0.42,0.42]]) grp.add(v3Cyl(0.04,0.04,1.6,6,mats.wood,x+dx,0.8,z+dz));
-    grp.add(v3Box(0.95,0.08,0.95,mats.planks,x,0.75,z));
-    const aw = new T.Mesh(new T.PlaneGeometry(1.3,1.25), mats.awning); aw.rotation.x = -Math.PI/2+0.35; aw.rotation.z = Math.PI/2; aw.position.set(x,1.75,z); aw.castShadow = true; grp.add(aw);
+  { const x = 6.5, z = 11.5, sg = new T.Group(); grp.add(sg);
+    for (const [dx,dz] of [[-0.42,-0.42],[0.42,-0.42],[-0.42,0.42],[0.42,0.42]]) sg.add(v3Cyl(0.04,0.04,1.6,6,mats.wood,x+dx,0.8,z+dz));
+    sg.add(v3Box(0.95,0.08,0.95,mats.planks,x,0.75,z));
+    const aw = new T.Mesh(new T.PlaneGeometry(1.3,1.25), mats.awning); aw.rotation.x = -Math.PI/2+0.35; aw.rotation.z = Math.PI/2; aw.position.set(x,1.75,z); aw.castShadow = true; sg.add(aw);
+    v3Occluder(grp, sg, x, z, 1.4, 2.0);
     for (let i=0;i<6;i++){ const c = new T.Mesh(new T.SphereGeometry(0.06,8,6), new T.MeshStandardMaterial({ color:[0xc03020,0xe0a020,0x40a030][i%3], roughness:0.6 })); c.position.set(x-0.3+i*0.12, 0.83, z-0.2+(i%2)*0.2); grp.add(c); }
     v3Crate(x-0.7,z+0.6,mats,grp,1); v3Crate(x-0.7,z+0.6,mats,grp,0.8,0.42); v3Barrel(x+0.7,z+0.7,mats,grp,0.9);
   }
@@ -16285,6 +16317,10 @@ function v3Render(){
     p.sp.position.y = bob;
     p.sp.scale.x = p.sp.userData.h * p.sp.userData.asp * (p.face||1);
   };
+  if (V3.player && V3.lookKey !== rsLookKey()){            // (you changed your gear: dress the figure again)
+    const old = V3.player, grp = old.g.parent; V3.lookKey = rsLookKey();
+    if (grp){ const np = v3Person(v3PlayerLook(), 1.0, grp); np.g.position.copy(old.g.position); np.at = old.at; np.yaw = old.yaw||0; grp.remove(old.g); V3.player = np; }
+  }
   glide(V3.player, G.player.x, G.player.y);
   V3.villagers.forEach(p=> glide(p, p.v.x, p.v.y, 6));
   V3.npcs.forEach(p=> glide(p, p.n.x, p.n.y));
@@ -16322,8 +16358,24 @@ function v3Render(){
       V3.ray.set(V3.cam.position, dir); V3.ray.far = len - 0.2;
       for (const h of V3.ray.intersectObjects(V3.occ, false)) faded.add(h.object.userData.grp);
     }
+    // anything else standing over you - a lamp's hood, a well's roof, a tree the town didn't mark -
+    // fades the same way: whatever the camera's line to you passes through, above knee height
+    const people = new Set([V3.player && V3.player.g, ...(V3.npcs||[]).map(p=>p.g), ...(V3.villagers||[]).map(p=>p.g)]);
+    const cands = V3.world.children.filter(o=>!people.has(o) && o!==V3.ground && !o.isInstancedMesh && !o.isPoints && !o.isSprite && o.visible!==false && !(o.isMesh && o.geometry && o.geometry.type==='PlaneGeometry'));
+    V3.occDyn = V3.occDyn || new Set();
+    V3.ray.camera = V3.cam;                                  // (sprites in the town need it to be hit-tested)
+    for (const hy of [0.3, 0.8]){
+      tgt.set(pp.x, hy, pp.z); const dir = tgt.clone().sub(V3.cam.position); const len = dir.length(); dir.normalize();
+      V3.ray.set(V3.cam.position, dir); V3.ray.far = len - 0.25;
+      for (const h of V3.ray.intersectObjects(cands, true)){
+        if (h.point.y < 0.35 || !h.object.visible || (h.object.material && h.object.material.visible===false)) continue;
+        let top = h.object; while (top.parent && top.parent!==V3.world) top = top.parent;
+        if (top.parent===V3.world && !people.has(top)){ faded.add(top); V3.occDyn.add(top); }
+      }
+    }
     V3.ray.far = Infinity;
-    for (const ob of V3.occ){ const g = ob.userData.grp, want = faded.has(g);
+    const occGroups = new Set([...V3.occ.map(o=>o.userData.grp), ...V3.occDyn]);
+    for (const g of occGroups){ const want = faded.has(g);
       g.userData.fade = (g.userData.fade||0) + ((want?1:0) - (g.userData.fade||0))*Math.min(1, dt*8);
       const f = g.userData.fade;
       if (f > 0.02 || g.userData.faded){
@@ -17034,6 +17086,11 @@ function o3Render(){
   const gy = O3.heightAt(pp.x, pp.z);
   pp.y = sailing ? -0.14 : Math.max(gy, -0.14);
   O3.pgrp.position.copy(pp);
+  if (O3.lookKey !== rsLookKey()){                          // (you changed your gear: dress the figure again)
+    const old = O3.player; O3.lookKey = rsLookKey();
+    if (old && old.g.parent) old.g.parent.remove(old.g);
+    O3.player = v3Person(v3PlayerLook(), 0.95, O3.pgrp); if (old) O3.player.yaw = old.yaw||0;
+  }
   const P = O3.player; P.g.visible = true; O3.boat.visible = sailing;
   P.sh.visible = !sailing;                                  // no ground shadow on the water; you stand in the boat instead
   P.g.position.set(0, sailing ? 0.1 : 0, sailing ? -0.18 : 0);
@@ -20681,7 +20738,7 @@ function rsPlayerLook(){
 }
 function isoSyncPlayer(){
   const T = THREE, p = G.player;
-  const g = G.gear, key = ['weapon','ranged','head','chest'].map(k=>g[k] && g[k].used ? g[k].nm : '-').join('|') + p.race + (p.rsLastType==='ranged' ? '|bow' : '');
+  const key = rsLookKey();
   if (!ISO.player || ISO.lookKey!==key){
     if (ISO.player && ISO.player.holder.parent) ISO.player.holder.parent.remove(ISO.player.holder);
     ISO.lookKey = key;
@@ -21814,16 +21871,7 @@ function buildInventory(){
       ${body}
     </div>`;
   }
-  const runeEntries = Object.keys(G.player.runes||{}).filter(r=>G.player.runes[r]>0);
-  // sockets are filled from the Character Sheet now (P), where you pick the
-  // exact piece a rune goes into - this list is read-only, just a quick
-  // "what am I carrying" reference, hover any rune to see what it's for
-  const runesHtml = runeEntries.length ? `
-    <h4 style="color:var(--ink-faint);margin:12px 0 6px;">RUNES</h4>
-    <div class="runerow">
-      ${runeEntries.map(r=>`<span style="color:${runeColor(r)}" onmouseenter="showRuneTooltip(event,'${r}')" onmousemove="moveItemTooltip(event)" onmouseleave="hideItemTooltip()">${r} &times;${G.player.runes[r]}</span>`).join('')}
-    </div>
-  ` : '';
+  const runesHtml = rsRunePouchHtml();
   return `
     <h2 class="panel-title">INVENTORY</h2>
     <div class="sub">Gold ${G.player.gold} &middot; click an item, then choose an action below</div>

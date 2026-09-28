@@ -1,5 +1,18 @@
 # Depthcrawl patch notes
 
+## RS-8 — Stronger uniques, the same you everywhere, and your rune pouch
+
+- **Stronger uniques:** no unique is weak for its level any more. Each one's bonuses add up to at least a budget set by its item level and slot, and the budget goes to its natural stat when it had none. Crown of Thieves, for example, goes from defence +5 to defence +55. Uniques in existing saves are topped up when you load.
+- **The same figure everywhere:**
+  - In town and on the overworld, your figure now wears your actual gear, as it already did in dungeons: plate in its metal's colour, hide, robes, your helm and your very weapon (or your bow after shooting).
+  - The figure is re-dressed the moment you change gear.
+- **You can always see yourself in town:** anything between the camera and you now fades out of the way, not only buildings. That covers trees, the market stall, lamp hoods and well roofs.
+- **Rune pouch:**
+  - The inventory (I) now has a rune pouch showing every rune you carry, plus your arrows.
+  - **Staff runes:** an elemental staff's runes show as ∞ ("your staff"). In RuneScape, a Staff of Air gives endless air runes, which is why Wind Strike cast without spending any.
+  - The spellbook marks those runes "(staff)", and the first time a staff saves you runes the log says so.
+  - The Mage kit now also carries 100 air runes, for when you put the staff down.
+
 ## RS-7 — All gear on the RuneScape system
 
 - **Uniques use RuneScape bonuses:** every named unique now carries attack, strength, defence, ranged and magic bonuses instead of D&D stats.
