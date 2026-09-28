@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-31 — No more jumping across the map
+
+- **A long click-to-walk on the overworld (or in town) no longer teleports you to the end of the path, then freezes.** Taking a step redrew the screen, and that redraw took the next step before the step timer had been reset. So one frame walked the whole path at once and drew a full 3D frame for every tile on the way, which caused the pause. Now each frame takes at most one step, and you walk the whole way at the normal pace, about a third of a second per tile. (This was also the real reason short clicks used to "zoom" you to the spot.)
+
 ## RS-30 — Far clicks walk where you point
 
 - **Clicking far away walks you there again, on the overworld, in town and in the dungeons.** Seen from the high camera, a far click comes in at a shallow angle and used to clip something standing up in between:
