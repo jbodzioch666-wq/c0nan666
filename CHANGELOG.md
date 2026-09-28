@@ -1,5 +1,18 @@
 # Depthcrawl patch notes
 
+## RS-33 - Key binds page and a new legend
+
+- **The Esc page now has three tabs.** The page opens on Key Binds; Legend and Guide are the other two.
+- **Key Binds** lists every key by what it's for: moving, fighting, skills and camping, windows, keys inside windows, and the title screen. Each key sits next to its hotbar icon. It also covers the mouse: click to walk, fight, gather or use, and the wheel to zoom. It notes where a key does something different; for example, X turns the camera in dungeons but opens crafting everywhere else.
+- **Legend** now matches the current 3D game instead of the old letter glyphs:
+  - the world map's site badges, painted from the map itself, plus your marker and quest pins;
+  - what you can gather on the land, quest pillars, roaming monsters and water;
+  - every town building and what its workbenches do, plus the Captain's ! and ?, the waypoint, the stash and the road out;
+  - dungeon stairs, portals, vaults, corrupted chests, ore veins, cave pools and herbs, altars and minimap colours;
+  - the attack-style and spell icons and the melee/ranged/magic colours.
+- **Guide** keeps the longer how-to-play text. The quest and teleport paragraphs are updated.
+- **Footnote:** the one-line key summary under the game is updated.
+
 ## RS-32 — Stairs back against the walls
 
 - **Stairs in the graveyard's catacombs sit against a wall again.** Stair placement skipped every graveyard floor, because the surface's way down is inside the mausoleum. That also skipped the catacomb floors below, so their stairs could stand in the middle of a passage and block it. Only the surface is skipped now.
