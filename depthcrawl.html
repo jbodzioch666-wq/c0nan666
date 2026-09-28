@@ -8821,6 +8821,27 @@ function rsCastableSpell(){
   return best;
 }
 // why a spell can't be cast right now, in words
+// the elements a creature is weak to and shrugs off, as in RuneScape: fire burns the dead,
+// the frozen and anything that grows; water douses fire and demons; earth brings down what
+// flies; air wears away stone and the great brutes; the creatures of the deep resist water
+const RS_MON_ELEM = [
+  [/fire|flame|lava|magma|ember|hell|demon|imp|salamander|red dragon|ancient dragon|balor|efreet|phoenix/, 'water', 'fire'],
+  [/ice|frost|snow|yeti|white dragon|winter|frozen/, 'fire', 'water'],
+  [/stone|golem|earth|gargoyle|troll|ogre|giant|black dragon|ettin|minotaur|basilisk/, 'air', 'earth'],
+  [/bird|harpy|wyvern|bat|owl|hawk|griffon|blue dragon|storm|wisp|manticore|vrock|dragonfly/, 'earth', 'air'],
+  [/fish|crab|kraken|eel|merfolk|mer|drown|serpent|hydra|frog|lizardfolk|crocodile|sahuagin|abyss|depths/, 'air', 'water'],
+  [/spider|plant|treant|dryad|vine|fung|mold|ooze|slime|swarm|worm|beetle|scorpion/, 'fire', ''],
+];
+function rsMonElem(m){
+  if (!m) return {};
+  if (m.rsElem) return m.rsElem;
+  const n = (m.nm||'').toLowerCase();
+  let e = { weak:'', resist:'' };
+  for (const [re, weak, resist] of RS_MON_ELEM) if (re.test(n)){ e = { weak, resist }; break; }
+  if (!e.weak && (m.undead || hasAbility(m,'vulnFire'))) e = { weak:'fire', resist:'' };
+  m.rsElem = e;
+  return e;
+}
 function rsMissingRunes(sp){
   const el = rsStaffElem(), miss = [];
   for (const r in sp[4]) if (r!==el && skHave('r_'+r) < sp[4][r]) miss.push(`${sp[4][r]} ${r}`);
@@ -8849,7 +8870,8 @@ function rsCastAt(mi, id){
   const stEl = rsStaffElem();
   if (stEl && sp[4][stEl] && !G.player.rsStaffTip){ G.player.rsStaffTip = 1; logMsg(`your staff supplies the ${stEl} runes for ${sp[1]} - you only spend the others`, 'magic'); }
   const roll = rollDie(20);
-  const tot = rsAttackTotal(roll, m, 'magic');
+  const onStaff = rsStaffElem()===sp[6];                   // an elemental staff focuses its own element: +2 to hit, +20% damage
+  const tot = rsAttackTotal(roll, m, 'magic') + (onStaff ? 2 : 0);
   const ac = m.ac - ((m.debuffACTurns>0) ? (m.debuffACAmt||0) : 0);
   sfx('spell');
   if (roll===1 || (roll<20 && tot < ac)){
@@ -8861,7 +8883,10 @@ function rsCastAt(mi, id){
   let dmg = Math.ceil(mxh/2) + rn(Math.floor(mxh/2)+1);
   dmg = Math.max(1, Math.round(dmg * (1 + rsPrayBonus('mdmg')) * rsTriDmgMult('magic', m)));
   let tag = '';
-  if (sp[6]==='fire' && hasAbility(m,'vulnFire')){ dmg *= 2; tag = ' (vulnerable to fire!)'; }
+  if (onStaff) dmg = Math.round(dmg*1.2);
+  const ew = rsMonElem(m);
+  if (ew.weak===sp[6]){ dmg = Math.round(dmg*1.5); tag = ` (weak to ${sp[6]}!)`; }
+  else if (ew.resist===sp[6]){ dmg = Math.max(1, Math.round(dmg*0.5)); tag = ` (it shrugs off ${sp[6]})`; }
   if (sp[6]==='fire' && hasAbility(m,'regen')) m.tookFireLastHit = true;
   m.hp -= dmg;
   G.lastFoe.hp = m.hp;
@@ -8894,7 +8919,7 @@ function buildRsMagic(){
   const pouch = RS_RUNES.map(r=>`<span class="skitem" style="border-color:${r[2]}"><b style="color:${r[2]}">${r[1]}</b> ${r[0]===el ? '&infin; (staff)' : '&times;'+skHave('r_'+r[0])}</span>`).join('');
   const w = G.gear.weapon, staff = w && w.used && w.rsStaff;
   return `<h2 class="panel-title">STANDARD SPELLBOOK</h2>
-    <div class="sub">Magic level ${L}. Every combat spell costs air runes as well as its own element's, as in RuneScape - an elemental staff covers its own element only. If you run out of a rune, the strongest spell you can still afford is cast instead. Select a spell: <kbd>R</kbd> casts it at the nearest foe you can see (when you have no bow equipped). ${staff ? `With a staff in hand you can <b>autocast</b> - every melee bump casts the spell instead.` : 'Wield a staff to autocast.'}${el ? ` Your staff gives endless ${el} runes.` : ''}</div>
+    <div class="sub">Magic level ${L}. Every combat spell costs air runes as well as its own element's, as in RuneScape - an elemental staff covers its own element only. If you run out of a rune, the strongest spell you can still afford is cast instead. Select a spell: <kbd>R</kbd> casts it at the nearest foe you can see (when you have no bow equipped). ${staff ? `With a staff in hand you can <b>autocast</b> - every melee bump casts the spell instead.` : 'Wield a staff to autocast.'}${el ? ` Your staff gives endless ${el} runes, and your ${el} spells hit 20% harder and truer.` : ''} Hit a monster with the element it's weak to for 50% more damage (hover a monster to see); its own element does half.</div>
     <div class="ovbody">
       <div class="btnrow" style="justify-content:flex-start;margin:0 0 8px;">${staff ? `<button class="btn ${p.rsAutocast ? 'primary' : ''}" onclick="rsToggleAutocast()">autocast: ${p.rsAutocast ? 'ON' : 'off'}</button>` : ''}</div>
       ${rows}
@@ -20897,7 +20922,7 @@ function isoDrawHover(){
   ctx.save(); ctx.strokeStyle = m ? 'rgba(255,80,60,0.85)' : 'rgba(255,230,140,0.45)'; ctx.lineWidth = 1.5*dpr;
   ctx.beginPath(); c.forEach((q,i)=> i ? ctx.lineTo(q.sx,q.sy) : ctx.moveTo(q.sx,q.sy)); ctx.closePath(); ctx.stroke();
   if (m){
-    const txt = `Attack ${m.nm} (level ${m.mlevel||'?'})`, top = isoProject(m.x+0.5, m.y+0.5, 1.3);
+    const ew = rsMonElem(m), txt = `Attack ${m.nm} (level ${m.mlevel||'?'})${ew.weak ? ' - weak to '+ew.weak : ''}`, top = isoProject(m.x+0.5, m.y+0.5, 1.3);
     ctx.font = `700 ${Math.round(12*dpr)}px 'JetBrains Mono', monospace`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
     ctx.lineWidth = 3*dpr; ctx.strokeStyle = 'rgba(0,0,0,0.85)'; ctx.strokeText(txt, top.sx, top.sy);
     ctx.fillStyle = '#ffe070'; ctx.fillText(txt, top.sx, top.sy);

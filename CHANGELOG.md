@@ -1,5 +1,17 @@
 # Depthcrawl patch notes
 
+## RS-13 — Elements matter
+
+- **Monsters have elemental weaknesses, as in RuneScape:**
+  - **Fire** burns the undead, frozen things, spiders, plants and oozes.
+  - **Water** douses fire creatures and demons.
+  - **Earth** brings down fliers: birds, bats, wyverns, harpies and blue dragons.
+  - **Air** wears away stone, golems, trolls, ogres, giants and black dragons, as well as the creatures of the deep.
+- **Weakness and resistance:** a spell of the element a monster is weak to does 50% more damage; its own element does only half.
+- **Hover a monster** to see its weakness, for example "Attack troll (level 14) - weak to air".
+- **Elemental staves focus their element:** a Staff of Fire gives endless fire runes, and your fire spells gain +2 to hit and +20% damage. The same goes for Air, Water and Earth (and the battlestaves and mystic staves).
+- **Example:** against a skeleton, Fire Strike from a Staff of Fire averaged about 26 damage, against about 11 for Water Strike. Against a fire creature, water does twice what fire does.
+
 ## RS-12 — Every staff casts
 
 - **Why only the Staff of Air seemed to work:** as in RuneScape, every combat spell costs air runes as well as its own element's. Water Strike, for example, needs water, air and mind runes. A Staff of Air covers the air, but a Staff of Water, Earth or Fire covers only its own element. Without air runes in your pouch, autocast used to give up silently and you simply swung the staff.
