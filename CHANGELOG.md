@@ -1,5 +1,19 @@
 # Depthcrawl patch notes
 
+## RS-28 — No more painted cut-outs in the dungeons
+
+In the isometric dungeons, everything that was still a flat painted picture standing in the 3D scene is now a real 3D model, lit by the torches:
+- **Gold** is a scattered pile of coins.
+- **Chests:** the vault chest is banded in gold. The corrupted chest is violet-black with glowing cracks.
+- **Items on the floor** turn slowly and bob, shaped by what they are:
+  - the actual weapon model (sword, axe, hammer, bow, staff and so on), tinted with its metal
+  - a helm, platebody, robe, legs or gloves in their own colour
+  - a ring or amulet with its gem, a potion bottle, a rolled scroll or a wand
+  - fine and better items glow on the floor in their quality colour
+- **Room fixtures:** a carved throne with red velvet and gold finials, banners that sway (violet in necromancer towers), a candle-lit stone altar with a glowing rune, and an idol with glowing eyes.
+- **Arena exits** have a signpost, crossed out in red while the fight holds you in.
+- **Wall-torch flames** are layered, flickering fire instead of a painted flame.
+
 ## RS-27 — Fishing rods, waypoint portals, an unhurried pace
 
 - **You hold a fishing rod while you fish:** a long tapering rod with a cork grip, a reel and rings, tipped in your rod's tier of metal. Your weapon is put away while you fish, on the overworld and at dungeon cave pools. The line and float now run from the rod's tip.
