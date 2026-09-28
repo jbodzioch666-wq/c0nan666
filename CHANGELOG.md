@@ -1,5 +1,16 @@
 # Depthcrawl patch notes
 
+## RS-3 — Bones and motion
+
+- **Skeletons are full 3D models** in the dungeon scene. Each has its own copy of the sculpted skeleton, with rusted sword, round shield and glowing eyes. They stand braced, stride, cut at you, rock back when struck and topple when they fall.
+- **Walking is one continuous stride.** You and every creature glide from tile to tile at an even pace, so a walked path no longer hops and stops at each tile. The camera eases after you.
+- **Hold a direction to keep walking.** Holding WASD or an arrow key walks at the same pace as a clicked path. Holding it toward a monster keeps swinging at the steady beat of a fight.
+- **Blows land:**
+  - You step into each swing and rock back when you're hit.
+  - Monsters lunge in when they strike and are knocked back by your blows.
+- **Arrows and spells fly:** arrows arc through the air, and spells streak across in their element's colour (white wind, blue water, brown earth, orange fire) and burst on impact. The hitsplat waits until the shot lands.
+- **Hover a monster** to see "Attack skeleton (level 4)" over it, with its tile outlined in red. Hovering the ground outlines the tile you'd walk to.
+
 ## RS-2 — An isometric world
 
 Everything is now seen from above at an isometric angle, like RuneScape.

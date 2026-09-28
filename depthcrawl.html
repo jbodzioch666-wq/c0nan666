@@ -4112,6 +4112,7 @@ function rangedAttack(){
     const t = nearestMonsterInRange(w.range);
     if (t===-1){ logMsg(`no target in range for your ${w.nm}`, ''); return; }
     noteFoe(t);
+    isoShot(G.mon[t], 'arrow');
     // singlePlayerAttack always reads G.gear.weapon directly (it's the
     // melee-attack function, reused here for the exact same to-hit roll,
     // crit, Sneak Attack and Hunter's Mark logic) - swap the bow in for
@@ -8655,6 +8656,7 @@ function rsCastAt(mi, id){
   const m = G.mon[mi];
   noteFoe(mi);
   rsSpendRunes(sp);
+  isoShot(m, 'spell', ISO_ELEM_COL[sp[6]]);
   const roll = rollDie(20);
   const tot = rsAttackTotal(roll, m, 'magic');
   const ac = m.ac - ((m.debuffACTurns>0) ? (m.debuffACAmt||0) : 0);
@@ -15168,8 +15170,8 @@ const SKI = {
   legR: [-0.4, -0.16, 1.0, -0.5],   // [hip fwd, hip out, knee bend, ankle]: sword-side knee bent, braced
   legL: [-0.15, 0.06, 0.12, 0.0],
 };
-function sk3Pose(t, walk, atk, hit, seed){
-  const m = SK3.m, s = Math.sin, br = s(t*1.7+seed)*0.5+0.5, W = walk;
+function sk3Pose(t, walk, atk, hit, seed, rig){
+  const m = rig || SK3.m, s = Math.sin, br = s(t*1.7+seed)*0.5+0.5, W = walk;
   m.root.rotation.y = s(t*0.6+seed)*0.1;
   m.pelvis.position.y = 0.95 - Math.abs(s(t*9))*0.02*W;
   m.pelvis.rotation.set(0.05, s(t*9)*0.1*W, 0);
@@ -15251,6 +15253,59 @@ function sk3Sprite(m, pos, light, pxH){
     x.drawImage(e.img,0,0); x.globalCompositeOperation='source-in'; x.fillStyle=col; x.fillRect(0,0,Wd,H);
   }
   return e;
+}
+
+// the skeleton as a real model standing in the dungeon scene (the isometric
+// view): a copy of the sculpted rig for each skeleton, posed every frame with
+// the same stance, stride and sword swing, so it lives in the world with the
+// other creatures instead of being a painted cut-out
+function sk3Instance(m){
+  if (!sk3Init() || !SK3.ok) return null;
+  const T = THREE, src = SK3.m, jaw = src.head.userData.jaw;
+  delete src.head.userData.jaw;                                  // (clone() copies userData as JSON - keep the jaw node out of it)
+  src.head.remove(SK3.eyeL);
+  let root;
+  try{ root = src.root.clone(true); } finally { src.head.userData.jaw = jaw; src.head.add(SK3.eyeL); }
+  const byT = new Map(), walk = (a,b)=>{ byT.set(a,b); a.children.forEach((c,i)=>walk(c, b.children[i])); };
+  walk(src.root, root);
+  const R = (o)=>byT.get(o), limb = (L)=>{ const o = {}; for (const k in L) o[k] = R(L[k]); return o; };
+  const rig = { root, pelvis:R(src.pelvis), spine:R(src.spine), chest:R(src.chest), neck:R(src.neck), head:R(src.head), R:limb(src.R), L:limb(src.L), RL:limb(src.RL), LL:limb(src.LL) };
+  rig.head.userData = { jaw:R(jaw) };
+  // its own materials, so its eyes and hit flash are its own
+  const mmap = new Map();
+  // (lit by the dungeon's lantern and torches now, not its own studio lights: a faint rim and a touch of glow keep the bone reading pale in the dark)
+  const own = (mt)=>{ if (!mt || !mt.clone) return mt; if (!mmap.has(mt)){ const c = mt.clone(); if (c.isMeshStandardMaterial){ m3dRimify(c); if (!c.map && c.vertexColors){ c.emissive = new THREE.Color(0x2a2620); } } mmap.set(mt, c); } return mmap.get(mt); };
+  root.traverse(o=>{ if ((o.isMesh || o.isInstancedMesh) && o.material) o.material = Array.isArray(o.material) ? o.material.map(own) : own(o.material); });
+  const nm = m.nm.toLowerCase(), eye = m.corrupted ? 0xc070ff : /knight/.test(nm) ? 0x78c8ff : /warrior/.test(nm) ? 0xffb050 : 0xff5a3c;
+  const eyeM = mmap.get(SK3.eyeMat); if (eyeM) eyeM.color.setHex(eye);
+  if (!SK3.height){ const bb = new T.Box3().setFromObject(src.root); SK3.height = Math.max(1.2, bb.max.y - Math.min(0, bb.min.y)); }
+  const isBoss = G.gameMode===1 && G.isBossFloor && G.mon.indexOf(m)===G.bossIdx, H = isBoss ? 1.1 : 0.95;
+  const inner = new T.Group(); inner.add(root); inner.scale.setScalar(H/SK3.height*1.12);
+  const holder = new T.Group(); holder.add(inner);
+  const sh = new T.Mesh(new T.PlaneGeometry(1,1), m3dShadowMat()); sh.rotation.x = -Math.PI/2; sh.position.y = 0.004; sh.scale.setScalar(0.42); holder.add(sh);
+  const mats = [...mmap.values()].filter(x=>x.emissive && x!==eyeM);
+  return { holder, root:inner, rig, mats, H, sk:true, seed:Math.random()*10, atk:0, pHp:G.player.hp, hurt:0, lift:0, dying:-1, stamp:0 };
+}
+function sk3Update(m, pos, flash, moving){
+  if (!FPD.ok || !FPD.scene) return 0;
+  let e = M3D.inst.get(m);
+  if (e && !e.sk){ if (e.holder.parent) e.holder.parent.remove(e.holder); M3D.live.delete(e); e = null; }
+  if (!e){ e = sk3Instance(m); if (!e) return 0; M3D.inst.set(m, e); }
+  if (!e.holder.parent) FPD.scene.add(e.holder);
+  e.stamp = M3D.stamp; M3D.live.add(e);
+  // it swings when you take a hit beside it
+  if (G.player.hp < e.pHp && Math.abs(m.x-G.player.x)+Math.abs(m.y-G.player.y)<=1 && e.atk===0) e.atk = 0.001;
+  e.pHp = G.player.hp;
+  if (e.atk>0){ e.atk += FP.dt*2.2; if (e.atk>=1) e.atk = 0; }
+  if (flash > 0.5 && e.hurt < 0.2) e.hurt = 1; e.hurt = Math.max(0, e.hurt - FP.dt*3);
+  const fa = Math.atan2(G.player.x+0.5 - pos.x, G.player.y+0.5 - pos.y);
+  let da = fa - (e.face===undefined ? fa : e.face); da = Math.atan2(Math.sin(da), Math.cos(da)); e.face = (e.face===undefined ? fa : e.face) + da*Math.min(1, FP.dt*8);
+  const lunge = e.atk>0.25 && e.atk<0.8 ? Math.sin((e.atk-0.25)/0.55*Math.PI)*0.16 : 0;
+  const back = e.hurt*0.09 - lunge;   // knocked back a touch by your blow, stepping in as it cuts
+  e.holder.position.set(pos.x - Math.sin(e.face)*back, 0, pos.y - Math.cos(e.face)*back); e.holder.rotation.y = e.face;
+  for (const mt of e.mats){ if (!mt.userData.em0) mt.userData.em0 = mt.emissive.clone(); mt.emissive.copy(mt.userData.em0).addScalar(flash*0.5); }
+  sk3Pose(FP.t, moving, e.atk, Math.max(e.hurt, flash*0.5), e.seed, e.rig);
+  return e.H;
 }
 
 // ===================== SECTION: 3D TOWN HUB =====================
@@ -19229,7 +19284,9 @@ function m3dPose(e, pos, m, moving, flash){
   // (a beast stands a little side-on, looking about, and squares up to you when it strikes)
   const fa = Math.atan2(G.player.x+0.5 - pos.x, G.player.y+0.5 - pos.y) + (e.beast && !e.atk ? 0.55*Math.sin(t*0.35) + (e.seed>5 ? 0.35 : -0.35) : 0);
   let da = fa - (e.face===undefined ? fa : e.face); da = Math.atan2(Math.sin(da), Math.cos(da)); e.face = (e.face===undefined ? fa : e.face) + da*Math.min(1, FP.dt*8);
-  e.holder.position.set(pos.x, e.lift ? e.lift + Math.sin(t*2.2)*0.03 : 0, pos.y); e.holder.rotation.y = e.face;
+  const lunge = e.atk>0.3 && e.atk<0.85 ? Math.sin((e.atk-0.3)/0.55*Math.PI)*0.16 : 0;
+  const back = (e.hurt||0)*0.08 - lunge;   // rocked back a touch by your blow, lunging in when it strikes
+  e.holder.position.set(pos.x - Math.sin(e.face)*back, e.lift ? e.lift + Math.sin(t*2.2)*0.03 : 0, pos.y - Math.cos(e.face)*back); e.holder.rotation.y = e.face;
   // you just took a hit with this creature beside you: it struck
   if (G.player.hp < e.pHp && Math.abs(m.x-G.player.x)+Math.abs(m.y-G.player.y)<=1 && e.atk===0) e.atk = 0.001;
   e.pHp = G.player.hp;
@@ -19283,7 +19340,7 @@ function m3dUpdate(m, pos, flash){
   if (!e){ e = m3dInstance(m, pt); e.pt = pt; M3D.inst.set(m, e); }
   if (!e.holder.parent) FPD.scene.add(e.holder);
   e.stamp = M3D.stamp; M3D.live.add(e);
-  const moving = Math.min(1, Math.hypot(m.x+0.5-pos.x, m.y+0.5-pos.y)*3);
+  const moving = pos.mv!==undefined ? pos.mv : Math.min(1, Math.hypot(m.x+0.5-pos.x, m.y+0.5-pos.y)*3);
   m3dPose(e, pos, m, moving, flash);
   return e.H + (e.lift||0);
 }
@@ -19470,21 +19527,30 @@ function fpCollectSprites(vis){
     let pos = FP.monPos.get(m);
     if (!pos){ pos = {x:m.x+0.5, y:m.y+0.5}; FP.monPos.set(m,pos); }
     if (prevHp!==undefined && m.hp<prevHp && seeTile(m.x,m.y)){
-      FP.floats.push({x:pos.x, y:pos.y, z:0.95, txt:String(prevHp-Math.max(0,m.hp)), col:'#ffd27a', age:0});
+      FP.floats.push({x:pos.x, y:pos.y, z:0.95, txt:String(prevHp-Math.max(0,m.hp)), col:'#ffd27a', age:-(ISO.on ? isoShotDelay(pos.x, pos.y) : 0)});
       FP.monFlash.set(m, 1);
       fpBurst(pos.x, pos.y, 0.45, '#fff2c0', 6, 1.2);
     }
     if (was && !m.alive && seeTile(m.x,m.y)){ fpBurst(pos.x, pos.y, 0.35, m.col||'#999', 22, 1.6); m3dKill(m); }
     if (!m.alive || !seeTile(m.x,m.y)){ pos.x = m.x+0.5; pos.y = m.y+0.5; continue; }
-    const kk = 1-Math.exp(-FP.dt*12);
     if (Math.hypot(m.x+0.5-pos.x, m.y+0.5-pos.y)>2){ pos.x = m.x+0.5; pos.y = m.y+0.5; }
-    pos.x += (m.x+0.5-pos.x)*kk; pos.y += (m.y+0.5-pos.y)*kk;
+    if (ISO.on && FPD.ok) isoGlide(pos, m.x+0.5, m.y+0.5);   // an even walking pace from tile to tile
+    else { const kk = 1-Math.exp(-FP.dt*12); pos.x += (m.x+0.5-pos.x)*kk; pos.y += (m.y+0.5-pos.y)*kk; }
     const isBoss = G.gameMode===1 && G.isBossFloor && i===G.bossIdx;
     const col = m.corrupted ? COL.purple : m.col;
     const ud = monsterPortraitFor(m.nm, m.undead);
     // a real 3D model in the dungeon scene when this creature has one (see M3D)
     if (!sk3Wanted(m)){
       const fl0 = FP.monFlash.get(m)||0, mh = m3dUpdate(m, pos, fl0);
+      if (mh){
+        if (fl0>0) FP.monFlash.set(m, Math.max(0, fl0-FP.dt*4));
+        S.push({x:pos.x, y:pos.y, model:true, h:mh, lift:0, hp: m.hp<m.maxHp ? clamp(m.hp/m.maxHp,0,1) : null, boss:isBoss});
+        continue;
+      }
+    }
+    // seen from above, a skeleton is a real model in the scene too
+    if (sk3Wanted(m) && ISO.on && FPD.ok){
+      const fl0 = FP.monFlash.get(m)||0, mh = sk3Update(m, pos, fl0, pos.mv||0);
       if (mh){
         if (fl0>0) FP.monFlash.set(m, Math.max(0, fl0-FP.dt*4));
         S.push({x:pos.x, y:pos.y, model:true, h:mh, lift:0, hp: m.hp<m.maxHp ? clamp(m.hp/m.maxHp,0,1) : null, boss:isBoss});
@@ -20303,12 +20369,23 @@ function fpDrawPost(){
 // diagonals, Z/X turn the camera a quarter-turn and the mouse wheel zooms.
 const ISO_YAW = Math.PI/4;   // every 3D view (dungeon, town, overworld) looks in from the south-east at 45 degrees
 const ISO = { on:true, rot:0, el:0.66, dist:12, path:[], target:null, nextStep:0, focus:null, player:null, lookKey:'', sprites:[], texCache:new WeakMap(), grp:null };
-function isoYaw(){ return Math.PI/4 + ISO.rot*Math.PI/2; }
+function isoYaw(){ return ISO_YAW + ISO.rot*Math.PI/2; }
+const ISO_STEP_MS = 200, ISO_SWING_MS = 620;   // a walked step, and the beat of a sustained fight
+// moves a figure toward its tile at an even walking pace, so a walked path
+// reads as one continuous stride rather than a hop and a stop per tile;
+// pos.mv is how much it's walking (eased, so the stride doesn't flicker between steps)
+function isoGlide(pos, tx, ty){
+  const dx = tx-pos.x, dy = ty-pos.y, d = Math.hypot(dx, dy), sp = FP.dt*(1000/ISO_STEP_MS)*(d>1.1 ? 1.8 : 1.05);
+  if (d <= sp){ pos.x = tx; pos.y = ty; } else { pos.x += dx/d*sp; pos.y += dy/d*sp; }
+  const want = d>0.02 ? 1 : 0, mv = pos.mv||0;
+  pos.mv = mv + (want-mv)*Math.min(1, FP.dt*(want ? 16 : 5));
+}
 function isoOn(){ return ISO.on && FPD.ok && fp3dActive(); }
 function isoCamera(cam, aspect){
-  const p = G.player, tx = p.x+0.5, ty = p.y+0.5;
+  const p = G.player, pp = ISO.player && ISO.player.pos && ISO.player.map===G.map ? ISO.player.pos : null;
+  const tx = pp ? pp.x : p.x+0.5, ty = pp ? pp.y : p.y+0.5;
   if (!ISO.focus || ISO.focus.map!==G.map || Math.hypot(ISO.focus.x-tx, ISO.focus.y-ty) > 4) ISO.focus = { x:tx, y:ty, map:G.map };
-  const k = 1-Math.exp(-(FP.dt||0.016)*10);
+  const k = 1-Math.exp(-(FP.dt||0.016)*7);
   ISO.focus.x += (tx-ISO.focus.x)*k; ISO.focus.y += (ty-ISO.focus.y)*k;
   const yaw = isoYaw(), el = ISO.el, D = ISO.dist, f = ISO.focus;
   if (ISO.yawNow===undefined) ISO.yawNow = yaw;
@@ -20379,18 +20456,79 @@ function isoSyncPlayer(){
   const e = ISO.player;
   if (e.holder.parent!==FPD.scene) FPD.scene.add(e.holder);
   if (!e.pos || e.map!==G.map || Math.hypot(e.pos.x-(p.x+0.5), e.pos.y-(p.y+0.5)) > 2.5){ e.pos = { x:p.x+0.5, y:p.y+0.5 }; e.map = G.map; }
-  const k = 1-Math.exp(-FP.dt*12);
-  e.pos.x += (p.x+0.5-e.pos.x)*k; e.pos.y += (p.y+0.5-e.pos.y)*k;
-  const moving = Math.min(1, Math.hypot(p.x+0.5-e.pos.x, p.y+0.5-e.pos.y)*3);
+  isoGlide(e.pos, p.x+0.5, p.y+0.5);
+  const moving = e.pos.mv;
   const v = FACING_VECT[(p.facing|0)&3], fa = Math.atan2(v[0], v[1]);
   let da = fa - (e.face===undefined ? fa : e.face); da = Math.atan2(Math.sin(da), Math.cos(da)); e.face = (e.face===undefined ? fa : e.face) + da*Math.min(1, FP.dt*12);
-  e.holder.position.set(e.pos.x, 0, e.pos.y); e.holder.rotation.y = e.face;
   const a = FP.swing>0 ? 1-FP.swing : 0, wind = a>0 ? (a<0.4 ? a/0.4 : Math.max(0, 1-(a-0.4)/0.25)) : 0, strike = a>0.4 && a<0.8 ? Math.sin((a-0.4)/0.4*Math.PI) : 0;
+  const lunge = strike*0.2 - FP.hurt*0.06;   // step into the blow; rock back when you're hit
+  e.holder.position.set(e.pos.x + Math.sin(e.face)*lunge, 0, e.pos.y + Math.cos(e.face)*lunge); e.holder.rotation.y = e.face;
   m3dPoseHumanoid(e.rig, FP.t + e.seed, moving, wind + FP.cast*0.4, strike, FP.hurt*0.6, e);
 }
+// ---- arrows and spells in flight ----
+const ISO_ELEM_COL = { air:'#e8f0ff', water:'#5aa0ff', earth:'#b08a4a', fire:'#ff7a2a' };
+function isoShot(m, kind, col){
+  if (!ISO.on || !FPD.ok || !m) return;
+  const p = G.player, d = Math.hypot(m.x-p.x, m.y-p.y), dur = 0.12 + d*0.045;
+  (ISO.shots = ISO.shots || []).push({ x0:p.x+0.5, y0:p.y+0.5, x1:m.x+0.5, y1:m.y+0.5, t:0, dur, kind, col:col||'#fff', m });
+  FP.cast = kind==='spell' ? 1 : FP.cast;
+}
+// how long until a shot already flying at this spot lands (so its hitsplat waits for it)
+function isoShotDelay(x, y){ let d = 0; for (const s of ISO.shots||[]) if (Math.hypot(s.x1-x, s.y1-y) < 0.8) d = Math.max(d, s.dur - s.t); return d; }
+function isoDrawShots(){
+  const keep = [], ppu = ISO.ppu || 40;
+  for (const s of ISO.shots||[]){
+    s.t += FP.dt; if (s.t > s.dur){ fpBurst(s.x1, s.y1, 0.5, s.col, s.kind==='spell' ? 14 : 5, s.kind==='spell' ? 1.3 : 0.7); continue; }
+    keep.push(s);
+    const k = s.t/s.dur, arc = s.kind==='arrow' ? Math.sin(k*Math.PI)*0.35 : 0.08*Math.sin(k*Math.PI);
+    const at = (kk)=>isoProject(s.x0+(s.x1-s.x0)*kk, s.y0+(s.y1-s.y0)*kk, 0.55 + (s.kind==='arrow' ? Math.sin(kk*Math.PI)*0.35 : arc));
+    const a = at(k), b = at(Math.max(0, k-0.12));
+    if (!a.ok) continue;
+    ctx.save();
+    if (s.kind==='arrow'){
+      ctx.strokeStyle = '#d8c8a0'; ctx.lineWidth = Math.max(1.5, ppu*0.035); ctx.beginPath(); ctx.moveTo(b.sx, b.sy); ctx.lineTo(a.sx, a.sy); ctx.stroke();
+      ctx.fillStyle = '#9aa3a8'; ctx.beginPath(); ctx.arc(a.sx, a.sy, Math.max(1.5, ppu*0.03), 0, Math.PI*2); ctx.fill();
+    } else {
+      ctx.globalCompositeOperation = 'lighter';
+      for (let i=4;i>=0;i--){ const q = at(Math.max(0, k-i*0.06)); const r = ppu*(0.14 - i*0.02);
+        const g = ctx.createRadialGradient(q.sx, q.sy, 0, q.sx, q.sy, Math.max(2, r*2)); g.addColorStop(0, s.col); g.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.globalAlpha = 1 - i*0.18; ctx.fillStyle = g; ctx.beginPath(); ctx.arc(q.sx, q.sy, Math.max(2, r*2), 0, Math.PI*2); ctx.fill(); }
+    }
+    ctx.restore();
+  }
+  ISO.shots = keep;
+}
+// ---- what's under the mouse: the tile, and a monster's name ----
+function isoHoverTile(){
+  if (!ISO.mouse) return null;
+  const r = canvas.getBoundingClientRect(), nx = (ISO.mouse.x-r.left)/r.width*2-1, ny = -((ISO.mouse.y-r.top)/r.height*2-1);
+  if (nx<-1 || nx>1 || ny<-1 || ny>1) return null;
+  const ray = ISO.ray || (ISO.ray = new THREE.Raycaster());
+  ray.setFromCamera({ x:nx, y:ny }, FPD.cam);
+  const o = ray.ray.origin, d = ray.ray.direction; if (d.y>=0) return null;
+  const t = -o.y/d.y; return [Math.floor(o.x + d.x*t), Math.floor(o.z + d.z*t)];
+}
+function isoDrawHover(){
+  const h = isoHoverTile(); if (!h || !isoPassable(h[0], h[1])) return;
+  const m = G.mon.find(q=>q.alive && q.x===h[0] && q.y===h[1] && (G.gameMode===2 || (G.dungeonSeen && G.dungeonSeen[q.x] && G.dungeonSeen[q.x][q.y])));
+  const c = [[0,0],[1,0],[1,1],[0,1]].map(([a,b])=>isoProject(h[0]+a, h[1]+b, 0.01));
+  ctx.save(); ctx.strokeStyle = m ? 'rgba(255,80,60,0.85)' : 'rgba(255,230,140,0.45)'; ctx.lineWidth = 1.5*dpr;
+  ctx.beginPath(); c.forEach((q,i)=> i ? ctx.lineTo(q.sx,q.sy) : ctx.moveTo(q.sx,q.sy)); ctx.closePath(); ctx.stroke();
+  if (m){
+    const txt = `Attack ${m.nm} (level ${m.mlevel||'?'})`, top = isoProject(m.x+0.5, m.y+0.5, 1.3);
+    ctx.font = `700 ${Math.round(12*dpr)}px 'JetBrains Mono', monospace`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.lineWidth = 3*dpr; ctx.strokeStyle = 'rgba(0,0,0,0.85)'; ctx.strokeText(txt, top.sx, top.sy);
+    ctx.fillStyle = '#ffe070'; ctx.fillText(txt, top.sx, top.sy);
+  }
+  ctx.restore();
+}
+canvas.addEventListener('mousemove', (e)=>{ ISO.mouse = { x:e.clientX, y:e.clientY }; });
+canvas.addEventListener('mouseleave', ()=>{ ISO.mouse = null; });
 // ---- health bars, damage numbers and sparks, drawn over the scene ----
 function isoDrawOverlay(S){
   const dt = FP.dt, ppu = ISO.ppu || 40;
+  isoDrawHover();
+  isoDrawShots();
   for (const s of S){
     if (s.hp===null || s.hp===undefined) continue;
     const pr = isoProject(s.x, s.y, (s.lift||0) + s.h + 0.14); if (!pr.ok) continue;
@@ -20416,6 +20554,7 @@ function isoDrawOverlay(S){
   const fk = [];
   for (const f of FP.floats){
     f.age += dt; if (f.age>1.1) continue; fk.push(f);
+    if (f.age < 0) continue;                             // (still waiting for its arrow or spell to land)
     const pr = isoProject(f.x, f.y, f.z + 0.2 + f.age*0.5); if (!pr.ok) continue;
     // a hitsplat: a red splash with the damage in white, as in RuneScape
     const size = clamp(ppu*0.3, 12*dpr, 22*dpr)*(f.age<0.12 ? 0.7+f.age*2.5 : 1);
@@ -20445,7 +20584,27 @@ function isoStep(fi){
   G.player.facing = fi;
   moveDir(v[0], v[1]);
 }
+// holding a direction keeps walking at the same even pace (the keyboard's own repeat is ignored)
+function isoHeldDir(k){ return { arrowup:[1,-1], w:[1,-1], arrowdown:[-1,1], s:[-1,1], arrowleft:[-1,-1], a:[-1,-1], arrowright:[1,1], d:[1,1] }[String(k).toLowerCase()]; }
+function isoTickHeld(now){
+  if (!ISO.heldKey) return;
+  if (G.ui!=='playing' || G.gameOver){ ISO.heldKey = null; return; }
+  if (now < ISO.heldNext) return;
+  const d = isoHeldDir(ISO.heldKey), fi = isoDirFor(d[0], d[1]);
+  ISO.heldNext = now + isoStepDelay(fi);
+  isoStep(fi);
+}
+// a step into a monster is a swing, which keeps the slower beat of a fight
+function isoStepDelay(fi){ const v = FACING_VECT[fi], p = G.player; return G.mon.some(m=>m.alive && m.x===p.x+v[0] && m.y===p.y+v[1]) ? ISO_SWING_MS : ISO_STEP_MS; }
+document.addEventListener('keyup', (e)=>{ if (ISO.heldKey && String(e.key).toLowerCase()===ISO.heldKey) ISO.heldKey = null; });
+window.addEventListener('blur', ()=>{ ISO.heldKey = null; });
 function isoHandleKey(k){
+  const hd = isoHeldDir(k);
+  if (hd){
+    const kl = String(k).toLowerCase();
+    if (ISO.heldKey===kl) return true;                 // (a key-repeat while already walking)
+    ISO.heldKey = kl; ISO.heldNext = performance.now() + isoStepDelay(isoDirFor(hd[0], hd[1]));
+  }
   switch(k){
     case 'ArrowUp': case 'w': case 'W': ISO.path = []; ISO.fighting = null; isoStep(isoDirFor(1,-1)); return true;
     case 'ArrowDown': case 's': case 'S': ISO.path = []; ISO.fighting = null; isoStep(isoDirFor(-1,1)); return true;
@@ -20493,7 +20652,7 @@ function isoClick(e){
   if (mon){
     const dx = mon.x-p.x, dy = mon.y-p.y;
     ISO.fighting = mon;
-    if (Math.abs(dx)+Math.abs(dy)===1){ ISO.path = []; ISO.nextStep = performance.now() + 650; isoStep(FACING_VECT.findIndex(v=>v[0]===dx && v[1]===dy)); return; }
+    if (Math.abs(dx)+Math.abs(dy)===1){ ISO.path = []; ISO.nextStep = performance.now() + ISO_SWING_MS; isoStep(FACING_VECT.findIndex(v=>v[0]===dx && v[1]===dy)); return; }
     if (Math.abs(dx)+Math.abs(dy)>1 && (G.gear.ranged && G.gear.ranged.used && G.gear.ranged.range || rsAutocastOn())){ ISO.path = []; rangedAttack(); renderGame(); return; }
     const path = isoFindPath(mon.x, mon.y, true);
     ISO.path = path || []; ISO.target = mon; ISO.nextStep = 0;
@@ -20509,7 +20668,7 @@ function isoTickPath(now){
   if (G.ui!=='playing' || G.gameOver){ ISO.path = []; ISO.fighting = null; return; }
   if (!ISO.path.length){ isoTickFight(now); return; }
   if (now < ISO.nextStep) return;
-  ISO.nextStep = now + 190;
+  ISO.nextStep = now + ISO_STEP_MS;
   const p = G.player, [nx, ny] = ISO.path.shift(), dx = nx-p.x, dy = ny-p.y;
   if (Math.abs(dx)+Math.abs(dy)!==1){ ISO.path = []; return; }
   const map0 = G.map, hp0 = p.hp;
@@ -20517,7 +20676,7 @@ function isoTickPath(now){
   if (G.map!==map0 || p.x!==nx || p.y!==ny || p.hp<hp0){ ISO.path = []; return; }
   const tgt = ISO.target;
   if (tgt && tgt.alive && Math.abs(tgt.x-p.x)+Math.abs(tgt.y-p.y)===1 && !ISO.path.length){
-    ISO.target = null; ISO.nextStep = now + 190;
+    ISO.target = null; ISO.nextStep = now + ISO_STEP_MS;
     const fx = tgt.x-p.x, fy = tgt.y-p.y; ISO.path = [[tgt.x, tgt.y]]; p.facing = FACING_VECT.findIndex(v=>v[0]===fx && v[1]===fy);
     return;
   }
@@ -20533,7 +20692,7 @@ function isoTickFight(now){
   const p = G.player;
   if (p.hp < effMaxHp()*0.2){ ISO.fighting = null; logMsg('you break off the fight - you are badly hurt', 'hit'); renderGame(); return; }
   const dx = m.x-p.x, dy = m.y-p.y;
-  if (Math.abs(dx)+Math.abs(dy)===1){ ISO.nextStep = now + 650; isoStep(FACING_VECT.findIndex(v=>v[0]===dx && v[1]===dy)); return; }
+  if (Math.abs(dx)+Math.abs(dy)===1){ ISO.nextStep = now + ISO_SWING_MS; isoStep(FACING_VECT.findIndex(v=>v[0]===dx && v[1]===dy)); return; }
   const path = isoFindPath(m.x, m.y, true);
   if (!path || path.length > 8){ ISO.fighting = null; return; }
   ISO.path = path; ISO.target = m; ISO.nextStep = now;
@@ -20574,7 +20733,7 @@ function renderFirstPerson(){
   const sprites = fpCollectSprites(vis);            // (also places the 3D creatures, so they're drawn this frame)
   m3dSweep();
   const iso = gpu && ISO.on;
-  if (iso){ isoTickPath(now); try{ isoSyncSprites(sprites, env); isoSyncPlayer(); }catch(e){ console.error(e); } }
+  if (iso){ isoTickPath(now); isoTickHeld(now); try{ isoSyncSprites(sprites, env); isoSyncPlayer(); }catch(e){ console.error(e); } }
   else isoHideSprites();
   if (gpu){ try{ fpdRender(env, T, camZ); }catch(e){ console.error(e); FPD.ok = false; gpu = false; P = fpRenderWorld(env, T, camZ, horizon, false); } }
   const k = canvas.width / W;
@@ -21901,7 +22060,7 @@ function buildHelp(){
       <div><kbd>&uarr;&darr;&larr;&rarr;</kbd> / <kbd>WASD</kbd> &mdash; move on the overworld, in villages, and in dungeons (walk into a monster to attack)</div>
       <div><kbd>F</kbd> &mdash; attack style &nbsp; <kbd>G</kbd> &mdash; spellbook &nbsp; <kbd>N</kbd> &mdash; prayers &nbsp; <kbd>Q</kbd> &mdash; quaff potion &nbsp; <kbd>R</kbd> &mdash; shoot your bow, or cast your spell &nbsp; <kbd>I</kbd> &mdash; inventory &nbsp; <kbd>P</kbd> &mdash; character sheet &nbsp; <kbd>M</kbd> &mdash; zoom the overworld map &nbsp; <kbd>Esc</kbd> &mdash; back</div>
       <div style="margin-top:10px;color:var(--ink-faint);">AN ISOMETRIC WORLD</div>
-      <div>everything is seen from above at an isometric angle, like RuneScape &mdash; the overworld, the towns, and every dungeon, castle, tower, temple, graveyard, mine and roadside fight, with your own character standing in the scene in the gear you wear. <b>Click the ground</b> to walk there, or <b>click a monster</b> to walk up to it and fight: you keep attacking until it falls, you click elsewhere, press a key, or drop below a fifth of your life. With a bow or an autocasting staff, clicking a foe out of reach shoots it instead. <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> (or the arrows) step one tile along the screen's diagonals, <kbd>Z</kbd>/<kbd>X</kbd> turn the camera a quarter-turn, and the mouse wheel zooms. The walls on the camera's side of a room drop away so they never hide you, the minimap sits in the top-right corner, and <kbd>M</kbd> flips a dungeon to a flat isometric map and back.</div>
+      <div>everything is seen from above at an isometric angle, like RuneScape &mdash; the overworld, the towns, and every dungeon, castle, tower, temple, graveyard, mine and roadside fight, with your own character standing in the scene in the gear you wear. <b>Click the ground</b> to walk there, or <b>click a monster</b> to walk up to it and fight: you keep attacking until it falls, you click elsewhere, press a key, or drop below a fifth of your life. With a bow or an autocasting staff, clicking a foe out of reach shoots it instead &mdash; you'll see the arrow or spell fly. Hover over a monster to see its name and level. <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> (or the arrows) step along the screen's diagonals &mdash; hold one to keep walking, <kbd>Z</kbd>/<kbd>X</kbd> turn the camera a quarter-turn, and the mouse wheel zooms. The walls on the camera's side of a room drop away so they never hide you, the minimap sits in the top-right corner, and <kbd>M</kbd> flips a dungeon to a flat isometric map and back.</div>
       <div>the game fills the whole window: life and prayer orbs sit either side of the skill bar, whose buttons do the same as their hotkeys. <kbd>Tab</kbd> slides out the full stats and spells panels, and the buttons in the corner go fullscreen or switch back to the classic side-by-side layout.</div>
       <div style="margin-top:10px;color:var(--ink-faint);">TOWNS</div>
       <div>towns are a 3D hub: click the ground to walk there, or click a vendor, the waypoint or the stash to walk over and use it (WASD still works, the mouse wheel zooms, <kbd>M</kbd> flips to the flat town map). The blacksmith, alchemist, peddler and innkeeper stand outside their shops; the Captain of the Watch by the notice board hands out quests (a gold <b>!</b> means new work, <b>?</b> means a quest is ready to turn in). Quests send you to real places around the town - a site to conquer, a wanted foe, a raider camp, a captive to rescue, a merchant to escort - marked with a pillar of light and a <b>!</b> on the land and a pin on the world map; the tracker on the right shows your progress and points the way (click a quest to track it). Turning one in lets you pick one of three rewards, and every town remembers the work you do for it: Friends, Allies and Champions get better prices and stock. The waypoint takes you to any town you've visited, and the stash chest holds up to 60 items, shared by every town.</div>
