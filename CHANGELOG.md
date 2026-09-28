@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-34 - No more X crafting menu
+
+- **The X key no longer opens a crafting menu.** Crafting happens at the workbenches inside the Tailor, the Blacksmith and the other shops.
+  - The Skills page's "crafting recipes" button is removed.
+  - Help text that pointed to it is removed too.
+  - X now only turns the camera, in dungeons and roadside fights.
+
 ## RS-33 - Key binds page and a new legend
 
 - **The Esc page now has three tabs.** The page opens on Key Binds; Legend and Guide are the other two.
