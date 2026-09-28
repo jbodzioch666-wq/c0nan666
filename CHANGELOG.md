@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## RS-12 — Every staff casts
+
+- **Why only the Staff of Air seemed to work:** as in RuneScape, every combat spell costs air runes as well as its own element's. Water Strike, for example, needs water, air and mind runes. A Staff of Air covers the air, but a Staff of Water, Earth or Fire covers only its own element. Without air runes in your pouch, autocast used to give up silently and you simply swung the staff.
+- **Now, when you run out of a rune:**
+  - Autocast and R cast the strongest spell you can still afford, and say so: "out of runes for Fire Bolt (needs 1 chaos) - casting Fire Strike instead".
+  - If you can't cast anything at all, the log tells you exactly which runes you're missing, and that your staff only supplies its own element.
+- **Spellbook:** each spell you can't afford shows what it still needs, and the page explains the air-rune rule.
+- **Air runes drop more often:** they're now the commonest rune monsters drop. The alchemist also sells them.
+
 ## RS-11 — Swinging a pickaxe
 
 - **Mining is animated:** you take up a real pickaxe in both hands, in the colour of your pick's tier (bronze through rune), and put your weapon and shield away while you work.

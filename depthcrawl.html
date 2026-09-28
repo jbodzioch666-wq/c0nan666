@@ -4144,7 +4144,10 @@ function rangedAttack(){
   const w = G.gear.ranged;
   if (!w || !w.used || w.kind==='wand'){
     if (!G.player.rsSpell){ logMsg('you have no bow and no spell selected - open the spellbook (G) or equip a bow', ''); return; }
-    if (!rsCastAt(-1)) return;
+    const sp = rsCastableSpell();
+    if (!sp){ G.player.rsNoteAt = 0; rsSpellNote(null); return; }
+    if (sp[0]!==G.player.rsSpell){ G.player.rsNoteAt = 0; rsSpellNote(sp, true); }
+    if (!rsCastAt(-1, sp[0])) return;
     if (!G.gameOver) tickMonsters();
     saveCurrentGame();
     return;
@@ -5393,8 +5396,11 @@ function singlePlayerAttack(mi){
 function fight(mi){
   noteFoe(mi);
   // a staff with autocast on casts the chosen spell instead of swinging
-  if (rsAutocastOn() && rsSpellCastable(rsSpell(G.player.rsSpell))){
-    rsCastAt(mi);
+  const acSp = rsAutocastOn() ? rsCastableSpell() : null;
+  if (rsAutocastOn() && !acSp) rsSpellNote(null);
+  if (acSp){
+    if (acSp[0]!==G.player.rsSpell) rsSpellNote(acSp, true);
+    rsCastAt(mi, acSp[0]);
     if (G.gameOver || !G.mon[mi] || !G.mon[mi].alive) return;
     monsterStrikesPlayer(mi, 'attacks', 'hits');
     return;
@@ -8805,6 +8811,28 @@ function rsRunesOk(sp){ const el = rsStaffElem(); for (const r in sp[4]) if (r!=
 function rsSpendRunes(sp){ const el = rsStaffElem(); for (const r in sp[4]) if (r!==el) skAdd('r_'+r, -sp[4][r]); }
 function rsSpellMax(sp){ return Math.round(sp[3]*1.5) + Math.floor(rsEff('magic')/10) + rsGearSum('magDmg'); }
 function rsSpellCastable(sp){ return rsLvl('magic') >= sp[2] && rsRunesOk(sp); }
+// the spell a cast actually uses: the one you picked, or - when you're out of a rune it needs -
+// the strongest spell you can still cast (a Staff of Fire covers fire runes, but every combat
+// spell also costs air, as in RuneScape). null when nothing can be cast at all
+function rsCastableSpell(){
+  const p = G.player, sel = rsSpell(p.rsSpell);
+  if (sel && rsSpellCastable(sel)) return sel;
+  let best = null; for (const sp of RS_SPELLS) if (rsSpellCastable(sp)) best = sp;
+  return best;
+}
+// why a spell can't be cast right now, in words
+function rsMissingRunes(sp){
+  const el = rsStaffElem(), miss = [];
+  for (const r in sp[4]) if (r!==el && skHave('r_'+r) < sp[4][r]) miss.push(`${sp[4][r]} ${r}`);
+  return miss;
+}
+function rsSpellNote(sp, fellBack){
+  const t = Date.now(); if (G.player.rsNoteAt && t - G.player.rsNoteAt < 4000) return;
+  G.player.rsNoteAt = t;
+  const sel = rsSpell(G.player.rsSpell), el = rsStaffElem();
+  if (sp && fellBack && sel) logMsg(`out of runes for ${sel[1]} (needs ${rsMissingRunes(sel).join(', ')}) - casting ${sp[1]} instead`, 'magic');
+  else if (!sp) logMsg(`you have no runes for any spell${sel ? ` - ${sel[1]} needs ${rsMissingRunes(sel).join(', ')}` : ''}${el && el!=='air' ? `. Your staff only supplies ${el} runes; every combat spell also needs air runes (monsters drop them, the alchemist sells them)` : ''}`, 'hit');
+}
 function rsAutocastOn(){ const w = G.gear.weapon, p = G.player; return !!(p && p.rsAutocast && p.rsSpell && w && w.used && w.rsStaff); }
 // casts at the nearest foe in sight (or at `mi`). false = nothing happened, the turn isn't spent
 function rsCastAt(mi, id){
@@ -8861,12 +8889,12 @@ function buildRsMagic(){
     return `<div class="shoprow ${sel ? 'sel' : ''}" style="${lvlOk ? '' : 'opacity:0.45;'}${sel ? 'outline:1px solid var(--amber);' : ''}">
       <span class="muted">${sp[2]}</span><span>${esc(sp[1])}</span>
       <span class="desc">max hit ${lvlOk ? rsSpellMax(sp) : Math.round(sp[3]*1.5)} &middot; ${runes}</span>
-      <span>${lvlOk ? `<button class="btn" onclick="rsSelectSpell('${sp[0]}')">${sel ? 'selected' : 'select'}</button>${runesOk && G.gameMode!==0 ? ` <button class="btn primary" onclick="rsCastFromBook('${sp[0]}')">cast</button>` : ''}` : `needs Magic ${sp[2]}`}</span></div>`;
+      <span>${lvlOk ? `<button class="btn" onclick="rsSelectSpell('${sp[0]}')">${sel ? 'selected' : 'select'}</button>${runesOk && G.gameMode!==0 ? ` <button class="btn primary" onclick="rsCastFromBook('${sp[0]}')">cast</button>` : ''}${!runesOk ? ` <span style="color:${COL.red};font-size:11px;">need ${rsMissingRunes(sp).join(', ')}</span>` : ''}` : `needs Magic ${sp[2]}`}</span></div>`;
   }).join('');
   const pouch = RS_RUNES.map(r=>`<span class="skitem" style="border-color:${r[2]}"><b style="color:${r[2]}">${r[1]}</b> ${r[0]===el ? '&infin; (staff)' : '&times;'+skHave('r_'+r[0])}</span>`).join('');
   const w = G.gear.weapon, staff = w && w.used && w.rsStaff;
   return `<h2 class="panel-title">STANDARD SPELLBOOK</h2>
-    <div class="sub">Magic level ${L}. Select a spell: <kbd>R</kbd> casts it at the nearest foe you can see (when you have no bow equipped). ${staff ? `With a staff in hand you can <b>autocast</b> - every melee bump casts the spell instead.` : 'Wield a staff to autocast.'}${el ? ` Your staff gives endless ${el} runes.` : ''}</div>
+    <div class="sub">Magic level ${L}. Every combat spell costs air runes as well as its own element's, as in RuneScape - an elemental staff covers its own element only. If you run out of a rune, the strongest spell you can still afford is cast instead. Select a spell: <kbd>R</kbd> casts it at the nearest foe you can see (when you have no bow equipped). ${staff ? `With a staff in hand you can <b>autocast</b> - every melee bump casts the spell instead.` : 'Wield a staff to autocast.'}${el ? ` Your staff gives endless ${el} runes.` : ''}</div>
     <div class="ovbody">
       <div class="btnrow" style="justify-content:flex-start;margin:0 0 8px;">${staff ? `<button class="btn ${p.rsAutocast ? 'primary' : ''}" onclick="rsToggleAutocast()">autocast: ${p.rsAutocast ? 'ON' : 'off'}</button>` : ''}</div>
       ${rows}
@@ -8995,7 +9023,7 @@ function rsOnKill(m){
   }
   const L = m.mlevel || lootLevel();
   if (chn(0.3)){
-    const pool = ['air','mind','water','earth','fire'];
+    const pool = ['air','air','air','mind','mind','water','earth','fire'];   // (every combat spell needs air, so it's the commonest)
     if (L>=5) pool.push('chaos','chaos'); if (L>=10) pool.push('death'); if (L>=14) pool.push('blood');
     const r = pick(pool), q = r==='blood' || r==='death' ? 1+rn(3) : r==='chaos' ? 2+rn(5) : 4+rn(10);
     skAdd('r_'+r, q); logMsg(`it drops ${q} ${rsRuneName(r).toLowerCase()}s`, 'loot');
