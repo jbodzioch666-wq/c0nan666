@@ -9712,9 +9712,28 @@ function questOnFloorLoaded(){
     }
   }
 }
+// living monsters you could actually walk up to (one sealed in a walled-off pocket never blocks a rescue)
+function rescueFoesLeft(){
+  const alive = G.mon.filter(m=>m.alive);
+  if (!alive.length) return 0;
+  const sig = alive.length+':'+G.depth+':'+G.player.x+','+G.player.y;
+  if (rescueFoesLeft.sig === sig) return rescueFoesLeft.n;
+  const seen = new Uint8Array(COLS*ROWS), q = [[G.player.x, G.player.y]];
+  seen[G.player.y*COLS+G.player.x] = 1;
+  while (q.length){
+    const [x,y] = q.pop();
+    for (const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){
+      const nx = x+dx, ny = y+dy;
+      if (nx<0 || ny<0 || nx>=COLS || ny>=ROWS || seen[ny*COLS+nx] || !isoPassable(nx, ny)) continue;
+      seen[ny*COLS+nx] = 1; q.push([nx, ny]);
+    }
+  }
+  rescueFoesLeft.sig = sig;
+  return rescueFoesLeft.n = alive.filter(m=>seen[m.y*COLS+m.x]).length;
+}
 function questFrameCheck(){
   if (!G.rescueHere || G.gameMode!==1 || !G.mon) return;
-  if (G.mon.some(m=>m.alive)) return;
+  if (rescueFoesLeft() > 0) return;
   const q = (G.player.quests||[]).find(q=>q.id===G.rescueHere);
   G.rescueHere = null;
   if (!q || q.freed) return;
@@ -9728,13 +9747,14 @@ function questOnEnterTown(){
     if (q.kind==='escort' && !q.arrived && G.owPos.x===q.destX && G.owPos.y===q.destY){ q.arrived = true; q.progress = q.target; questAdvanced(q); }
   }
 }
-// dying loses an escort, and a freed captive is dragged back
+// dying loses an escort; a captive you already freed stays free and finds their own way
+// home, so the rescue only needs turning in
 function questOnDeath(){
   const qs = G.player.quests||[];
   for (let i=qs.length-1;i>=0;i--){
     const q = qs[i];
     if (q.kind==='escort' && !q.arrived){ qs.splice(i,1); logMsg(`${q.merchant} was lost when you fell - the escort has failed`, 'hit'); }
-    else if (q.kind==='rescue' && q.freed){ q.freed = false; logMsg(`${q.captive} was recaptured when you fell`, 'hit'); }
+    else if (q.kind==='rescue' && q.freed) logMsg(`${q.captive} slips away while you fall and makes for ${q.townName||'town'} - meet them there`, 'new');
   }
 }
 // ---- turning in: pick one of three rewards ----
@@ -9855,7 +9875,7 @@ function renderQuestTracker(){
       dir = dist < 1 ? `<div class="qt-d">you are here</div>`
         : `<div class="qt-d"><span class="qt-ar" style="transform:rotate(${Math.round(questScreenAngle(t)*180/Math.PI)}deg)"><svg viewBox="0 0 16 16" width="16" height="16"><path d="M1 8h10M7 3.5 12.5 8 7 12.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>${dist} leagues ${dirWord(t.x-G.owPos.x, t.y-G.owPos.y)}</div>`;
     } else if (on && q.kind==='rescue' && !q.freed && G.gameMode===1 && G.dungeonEntrance && q.siteX===G.dungeonEntrance.x && q.siteY===G.dungeonEntrance.y){
-      dir = `<div class="qt-d">${G.depth===q.floor ? 'on this floor' : `floor ${q.floor} &middot; you are on ${G.depth}`}</div>`;
+      dir = `<div class="qt-d">${G.depth===q.floor ? `on this floor &middot; ${rescueFoesLeft()} monsters left` : `floor ${q.floor} &middot; you are on ${G.depth}`}</div>`;
     }
     html += `<div class="qt-q${on?' on':''}${ready?' ready':''}" onclick="trackQuest('${q.id}')"><div class="qt-n">${esc(questTitle(q))}${ready?' <span class="qt-done">done</span>':''}</div><div class="qt-o">${esc(questObjective(q))}</div>${dir}</div>`;
   }

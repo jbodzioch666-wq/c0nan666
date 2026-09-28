@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-18 — Rescues stick
+
+- **A freed captive stays freed when you die.** Before, dying anywhere after a rescue dragged the captive back into their cell. That reset the quest to "clear floor N" on a floor that had filled back up with monsters. Now they slip away and make for the town that posted the quest. All that's left is to turn it in there.
+- **"Clear the floor" only counts monsters you can reach.** A monster sealed in a walled-off pocket no longer keeps a captive locked up forever.
+- **The quest tracker shows how many monsters are left** while you're on the rescue floor.
+
 ## RS-17 — Stats drawer below the top-right buttons
 
 - **The stats drawer (Tab) no longer covers the menu, fullscreen, layout and help buttons:** it now opens just below them, and so does the spell panel beside it.
