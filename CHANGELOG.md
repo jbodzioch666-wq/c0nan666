@@ -4,6 +4,12 @@
 
 - **You hold a fishing rod while you fish:** a long tapering rod with a cork grip, a reel and rings, tipped in your rod's tier of metal. Your weapon is put away while you fish, on the overworld and at dungeon cave pools. The line and float now run from the rod's tip.
 - **Waypoint travel goes through a portal:** a glowing portal opens beside you at the waypoint and you walk into it and fade away. In the town you chose, another portal opens in the plaza, just south of the waypoint (instead of dropping you at the town gate). You step out of it, and it closes behind you.
+- **The last text-only hotbar slots have drawn icons:**
+  - **F:** a target, sword, shield or balance for your attack style, with its three letters.
+  - **R:** a spell orb in your selected spell's element colour (or the bow when you carry one).
+  - **M and O:** a map and a 3D cube.
+  - **E:** a tool matching what's beside you: pickaxe, hatchet, rod, a flower in the herb's colour, a cooking pot or a flame. A stop sign while you're working.
+  - **J:** a skills chart with a gold star.
 - **Click-to-walk is slower:** you now walk at an even pace, about a third of a second per tile, in town, on the overworld and in the dungeons, instead of rushing to the spot you clicked.
 
 ## RS-26 — Resources in the inventory
