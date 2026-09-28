@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-16 — Escape no longer throws you out of fullscreen
+
+- **Escape stays in the game in fullscreen:** after you go fullscreen with the game's own fullscreen button, the game asks the browser to lock the Escape key. In Chrome, Edge and Opera, tapping Esc then closes menus as usual. Holding Esc leaves fullscreen.
+- **` (backtick) works as Escape everywhere:** it closes panels and opens the help screen. Use it in browsers without the Escape lock, such as Firefox and Safari.
+
 ## RS-15 — Unique abilities explained on hover
 
 - **Every special effect on gear now explains itself.** This covers a unique's on-hit ability and effects like life steal, regeneration, damage reduction, deadly strike, thorns, elemental damage, gold/magic/XP find and heal on kill. Each one gets a short plain-language line under it. Hovering the line shows the full explanation. For example, Doombringer's "strike of pure dread" says: "Each time you hit, a 15% chance: terrifies the foe for 2 turns - it runs from you instead of fighting."
