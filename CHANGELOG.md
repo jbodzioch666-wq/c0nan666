@@ -1,5 +1,25 @@
 # Depthcrawl patch notes
 
+## RS-23 — Crafting: gear for mages and archers
+
+Warriors could always mine and smith their own gear. Now mages and archers can make theirs, with a new **Crafting** skill (1–99). Open it with **X**, from the Skills panel or at the alchemist's crafting bench. Like forged metal, everything you craft beats a drop: **+15% to +45%** bonuses depending on how far your level is above the recipe's. The best ones are Masterwork, which also adds +1 spell damage to staves and robes, or +1 damage to bows.
+
+- **Materials:**
+  - **Flax** grows in blue-flowered patches on grassland, mostly near rivers and the coast. Spin it into **linen cloth** or **bowstrings**.
+  - **Hides:** beasts drop cowhides and dragons drop dragonhide, green, blue, red or black by the dragon's level. Tan them for a few coins into leather, hard leather or dragon leather.
+  - **Bark** comes off maple, yew and magic trees as you chop them.
+  - **Orbs:** blow a silver bar into an unpowered orb, then charge it with 20 runes of an element.
+- **Magic gear:**
+  - **Robes** (hat, gloves, bottom, top) in every tier. Wizard robes take linen. Splitbark adds bark, Mystic adds ghostcap, Infinity adds starlily, and Ahrim's adds dragon's tongue and death runes.
+  - **Staves** carved from logs, with a charged orb for an element: elemental staves from logs, battlestaves from maple, mystic staves from yew, and master staves from magic logs. An orbless magic-log staff makes an **Ancient Staff**.
+- **Ranged gear:**
+  - **Leather armour** (coif, vambraces, chaps, body) from Leather through Hard and Studded (which adds an iron bar) to green, blue, red and black dragonhide.
+  - **Shortbows and longbows** from every wood, plus a bowstring.
+  - **Arrows** from any logs: 10 to 40 per log, depending on the wood.
+- **More spell damage from gear:**
+  - Mystic, Infinity and Ahrim's robe tops and bottoms add spell damage. Robes you already own gain it too.
+  - Two new amulets: the **Amulet of Mysticism** (magic +18, spell damage +1) and the **Occult Necklace** (+10% spell damage).
+
 ## RS-22 — One-handed tool swings
 
 - **Only your right arm swings the pickaxe or hatchet:** your left arm now stays still at your side while you mine or chop. Before, it swung along with the tool.
