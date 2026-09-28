@@ -1,5 +1,17 @@
 # Depthcrawl patch notes
 
+## RS-35 - Fullscreen by default
+
+- **The game now starts in fullscreen.** Browsers only allow fullscreen after a click or key press, so the page goes fullscreen on your first click or key.
+- **Starting or resuming a character** also goes back to fullscreen.
+- **Leaving fullscreen mid-game** is respected until the next game starts. To leave, hold Esc or use the corner button.
+- **Where fullscreen is blocked** (for example, some embedded players), the game simply stays windowed.
+- **Esc on itch.io:** browsers won't let a game inside a frame (as itch.io uses) keep the Escape key, so Esc there always leaves fullscreen.
+  - The game now treats that as the Esc press it was, so the menu opens as usual.
+  - Your next click or key puts it back into fullscreen.
+  - Only the fullscreen button in the corner switches to windowed play for good, until the next game starts.
+  - Outside a frame, in Chrome and Edge, Esc still stays in the game and holding it leaves fullscreen.
+
 ## RS-34 - No more X crafting menu
 
 - **The X key no longer opens a crafting menu.** Crafting happens at the workbenches inside the Tailor, the Blacksmith and the other shops.

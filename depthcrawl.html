@@ -12609,22 +12609,54 @@ function dhTogglePanels(){
 }
 function dhFullscreen(){
   try{
-    if (document.fullscreenElement) document.exitFullscreen();
+    if (document.fullscreenElement){ fsUserOff = true; document.exitFullscreen(); }
     else {
+      fsUserOff = false;
       const r = (document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen).call(document.documentElement);
       if (r && r.then) r.then(fsLockEscape, ()=>{});
     }
   }catch(e){ logMsg('your browser kept the page from going fullscreen here', ''); }
 }
+// the game plays fullscreen by default: browsers only allow it from a click or a
+// key press, so it goes fullscreen on the first one on the page, and again when
+// a game is started or resumed. Leaving fullscreen mid-game (hold Esc, or the
+// corner button) is respected until the next game starts.
+function fsDefault(){
+  try{
+    if (document.fullscreenElement || document.webkitFullscreenElement) return;
+    const el = document.documentElement, f = el.requestFullscreen || el.webkitRequestFullscreen;
+    if (!f) return;
+    const r = f.call(el); if (r && r.then) r.then(fsLockEscape, ()=>{});
+  }catch(e){}
+}
+(function(){
+  const first = ()=>{ window.removeEventListener('pointerdown', first, true); window.removeEventListener('keydown', first, true); fsDefault(); };
+  window.addEventListener('pointerdown', first, true); window.addEventListener('keydown', first, true);
+})();
 // in fullscreen, keep Escape for the game (menus) instead of dropping out of fullscreen:
 // Chrome/Edge's Keyboard Lock hands a tap of Escape to the page and only leaves
 // fullscreen when it is held down. Other browsers ignore this, so ` also works as Escape.
+let fsEscLocked = false, fsUserOff = false, fsLastEsc = 0;
 function fsLockEscape(){
-  try{ if (navigator.keyboard && navigator.keyboard.lock) navigator.keyboard.lock(['Escape']).catch(()=>{}); }catch(e){}
+  fsEscLocked = false;
+  try{ if (navigator.keyboard && navigator.keyboard.lock) navigator.keyboard.lock(['Escape']).then(()=>{ fsEscLocked = true; }, ()=>{}); }catch(e){}
+}
+// when the Escape lock isn't allowed - inside a frame, as on itch.io, or in
+// browsers without Keyboard Lock - any tap of Escape drops out of fullscreen
+// and the page never sees the key. So a drop-out the player didn't ask for
+// (not the corner button, not a held Escape under the lock) is treated as the
+// Escape press it was, and the next click or key goes back to fullscreen.
+function fsRearm(){
+  const again = ()=>{ window.removeEventListener('pointerdown', again, true); window.removeEventListener('keydown', again, true); if (!fsUserOff) fsDefault(); };
+  window.addEventListener('pointerdown', again, true); window.addEventListener('keydown', again, true);
 }
 document.addEventListener('fullscreenchange', ()=>{
-  if (document.fullscreenElement) fsLockEscape();
-  else try{ if (navigator.keyboard && navigator.keyboard.unlock) navigator.keyboard.unlock(); }catch(e){}
+  if (document.fullscreenElement) { fsLockEscape(); return; }
+  const locked = fsEscLocked; fsEscLocked = false;
+  try{ if (navigator.keyboard && navigator.keyboard.unlock) navigator.keyboard.unlock(); }catch(e){}
+  if (fsUserOff || locked) return;
+  if (performance.now() - fsLastEsc > 400) dhPress('Escape');   // (unless the page did get the key itself)
+  fsRearm();
 });
 function dhClassIcon(cls){
   if (WAND_CLASSES.includes(cls)) return obEntry('weapon',{kind:'wand'});
@@ -22763,7 +22795,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-34';
+const GAME_VERSION = 'rs-35';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -22791,7 +22823,7 @@ function buildTitleScreen(){
     </div>
   `;
 }
-function titleResume(id){ loadGame(id); }
+function titleResume(id){ fsUserOff = false; fsDefault(); loadGame(id); }
 function titleDelete(id){ deleteSaveById(id); renderOverlay(); }
 
 // ---- character creation ----
@@ -22799,6 +22831,7 @@ function ccSelectRace(i){ G.chosenRace = i; renderOverlay(); }
 function ccSelectClass(i){ G.chosenClass = i; renderOverlay(); }
 function ccReroll(){ for (let i=0;i<6;i++) G.preAb[i] = roll4d6dl(); renderOverlay(); }
 function ccBegin(){
+  fsUserOff = false; fsDefault();
   let nm = (G.pendingName||'').trim();
   if (!nm) nm = G.pendingNameSuggestion || NAME_POOL[rn(NAME_POOL.length)];
   startGame(nm.slice(0,18));
@@ -23956,7 +23989,7 @@ function buildHelpKeys(){
       ['Tab', 'slide out the stats and spells panels (full-window layout)'],
       ['V', 'sound on / off'],
       ['K', 'ascend to New Game+ (combat level 123)'],
-      ['Esc or &#96;', 'this page, or back out of any window. In fullscreen, hold <kbd>Esc</kbd> to leave fullscreen'],
+      ['Esc or &#96;', 'this page, or back out of any window. The game plays fullscreen: if Esc drops you out of it (as it does on itch.io), your next click or key goes back in. To play windowed, use the fullscreen button in the top-right corner'],
     ])}
     <div class="hnote">every window also closes with the key that opened it</div>
     ${sec('INSIDE WINDOWS', [
@@ -24146,6 +24179,7 @@ function handleKeydown(e){
     return;
   }
   const k = (e.key==='`') ? 'Escape' : e.key; // ` doubles as Escape (Escape can leave fullscreen)
+  if (e.key==='Escape') fsLastEsc = performance.now();
   if (k==='Tab' && immersiveUi && G.player && G.ui==='playing'){ if (e.preventDefault) e.preventDefault(); dhTogglePanels(); return; }
   const navKeys = ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '];
   if (navKeys.includes(k)) e.preventDefault();
