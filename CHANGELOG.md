@@ -1,5 +1,24 @@
 # Depthcrawl patch notes
 
+## RS-2 — An isometric world
+
+Everything is now seen from above at an isometric angle, like RuneScape.
+
+- **Dungeons are isometric:** castles, towers, temples, graveyards, mines and roadside fights too.
+  - The first-person view is gone. The same 3D scenes are now seen from above and to the south-east, with the ceilings lifted off.
+  - The walls on the camera's side of a room drop away, so they never hide you.
+- **You're in the scene:** your character is a 3D figure wearing what you have equipped.
+  - Plate takes its metal's colour, hide and robes show their colour, and you carry your sword, axe, mace, dagger, staff or bow.
+  - Your character walks, swings and flinches.
+- **Click to move:**
+  - **Click the ground** to walk there. The path avoids stairs, portals and traps unless you click right on them.
+  - **Click a monster** to walk up to it and fight it. You keep attacking until it dies, you click elsewhere, press a key, or fall below a fifth of your life.
+  - **Ranged targets:** with a bow, or a staff set to autocast, clicking a foe out of reach shoots or casts at it.
+- **Keys:** WASD and the arrow keys step one tile along the screen diagonals. Z and X turn the camera a quarter-turn, and the mouse wheel zooms.
+- **Hitsplats:** damage pops up as a red splash, and health bars are green over red.
+- **Towns and the overworld:** their cameras now use the same 45° angle.
+- **M in a dungeon** flips to a flat isometric map instead of the old top-down one.
+
 ## RS-1 — The RuneScape branch
 
 This branch of Depthcrawl drops the D&D rules for RuneScape's. There are no classes and no character levels any more. You become whatever you train.
