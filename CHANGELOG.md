@@ -1,5 +1,28 @@
 # Depthcrawl patch notes
 
+## RS-9 — Shops with a purpose, and a reason to mine
+
+- **The blacksmith only racks bronze and iron.**
+  - Steel, mithril, adamant and rune come from your own forge: mine the ore, smelt it into bars at the blacksmith, then forge the gear. Deep-dungeon drops are the other source.
+  - Dragon still only ever drops.
+- **The smith buys your ore and bars,** so mining pays even before you can use what you dig up.
+
+  | Ore / bar | Gold each |
+  |---|---|
+  | Copper ore | 3 |
+  | Iron ore | 8 |
+  | Coal | 10 |
+  | Silver ore | 15 |
+  | Mithril ore | 40 |
+  | Adamantite ore | 90 |
+  | Runite ore | 250 |
+  | Steel bar | 60 |
+  | Mithril bar | 150 |
+  | Adamant bar | 360 |
+  | Rune bar | 1000 |
+
+- **The peddler no longer sells metal.** Its stock is what a smith doesn't make: bows, leather and dragonhide, robes, staves and jewellery, all of tiers you can already use. It still sells arrows and boats.
+
 ## RS-8 — Stronger uniques, the same you everywhere, and your rune pouch
 
 - **Stronger uniques:** no unique is weak for its level any more. Each one's bonuses add up to at least a budget set by its item level and slot, and the budget goes to its natural stat when it had none. Crown of Thieves, for example, goes from defence +5 to defence +55. Uniques in existing saves are topped up when you load.

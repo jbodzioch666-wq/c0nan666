@@ -7650,16 +7650,12 @@ function generateVillageShop(){
   const SHOP_MAX_QUALITY = 3;
   // weapons/armor are filtered to gear this class is actually proficient
   // with (true D&D-style shop stock) - jewelry is unrestricted, same as tabletop
-  G.shopStock = [];
-  G.shopStock.push(genItem(d+1,'weapon', SHOP_MAX_QUALITY, true));
-  G.shopStock.push(genItem(d+1,'weapon', SHOP_MAX_QUALITY, true));
-  const aslots = ['head','chest','legs','arms'];
-  G.shopStock.push(genItem(d+1, aslots[rn(4)], SHOP_MAX_QUALITY, true));
-  G.shopStock.push(genItem(d+1, aslots[rn(4)], SHOP_MAX_QUALITY, true));
-  G.shopStock.push(genItem(d+1, chn(0.5)?'necklace':'ring', SHOP_MAX_QUALITY));
+  // the peddler deals in what a smith doesn't make: bows, leather and dragonhide, robes,
+  // staves and jewellery (metal is the blacksmith's - and past iron, your own forge's)
+  G.shopStock = ['bow','bow','staff','hide','hide','cloth','cloth','jewel'].map(k=>rsPeddlerWare(d+1, k));
   // a town that counts you as an Ally or Champion keeps better pieces back for you
   const tier = G.owPos ? repTier(repAt(questTownKey(G.owPos.x, G.owPos.y))) : REP_TIERS[0];
-  for (let i=0;i<tier.extra;i++) G.shopStock.push(genItem(d+2, pick(['weapon','head','chest','legs','arms']), SHOP_MAX_QUALITY, true));
+  for (let i=0;i<tier.extra;i++) G.shopStock.push(rsPeddlerWare(d+3, pick(['bow','staff','hide','cloth','jewel'])));
   // potions are the alchemist's business now, not the general store's
 }
 // heals HP, refills ability charges/spell slots and clears every timed
@@ -8633,6 +8629,16 @@ function rsQualityOf(it){
 }
 // the old base roller now hands out tiered gear, so uniques (built on top of
 // it) come out as a named piece of the right metal
+// one piece of the peddler's stock, of a tier you can already use
+function rsPeddlerWare(d, kind){
+  if (kind==='bow') return rsMakeBow(rsPickTier(RS_BOWS, d, i=>RS_BOWS[i][1]<=rsLvl('ranged')), chn(0.4));
+  if (kind==='staff') return rsMakeStaff(rsPickTier(RS_STAVES, d, i=>RS_STAVES[i][1]<=rsLvl('magic')));
+  if (kind==='hide' || kind==='cloth'){
+    const F = RS_ARMOUR[kind], sk = kind==='hide' ? 'ranged' : 'magic';
+    return rsMakeArmour(kind, rsPickTier(F.tiers, d, i=>F.tiers[i][1]<=rsLvl(sk)), pick(['head','chest','legs','arms']));
+  }
+  const it = newItem(); rsFillBase(it, d, chn(0.5) ? 'necklace' : 'ring'); return it;
+}
 function genBaseInto(it, d, kind, classOnly){ rsFillBase(it, d, kind, classOnly, true); }
 function genItem(d, kind, maxQuality, classOnly){
   const cap = maxQuality===undefined ? 4 : maxQuality;
@@ -21571,7 +21577,7 @@ function buildShop(){
   }).join('');
   return `
     <h2 class="panel-title">THE PEDDLER</h2>
-    <div class="sub">You have ${G.player.gold} gold. Click an item to buy, or press its number.</div>
+    <div class="sub">You have ${G.player.gold} gold. Bows and arrows, leather and dragonhide, robes, staves and jewellery - for metal, see the blacksmith. Click an item to buy, or press its number.</div>
     <div class="ovbody">${rows}
       ${boatRowHtml()}
       ${arrowRowHtml()}
@@ -21677,9 +21683,23 @@ function smithBuy(t, wi){
   G.player.gold -= price; addToInventory(it); sfx('gold');
   renderOverlay(); saveCurrentGame();
 }
+// what the smith pays for the ore you mine and the bars you smelt
+const SMITH_BUYS = { copper:3, iron:8, silver:15, coal:10, mithril:40, adamant:90, runite:250,
+  bronze:12, ironb:25, silverb:32, steelb:60, mithrilb:150, adamantb:360, runeb:1000 };
+function smithSell(id, all){
+  const n = all ? skHave(id) : Math.min(1, skHave(id)); if (!n) return;
+  const each = SMITH_BUYS[id]||1; skAdd(id, -n); G.player.gold += each*n;
+  logMsg(`you sell ${n} ${skName(id)}${n>1?'s':''} for ${each*n} gold`, 'loot'); sfx('gold'); renderOverlay(); saveCurrentGame();
+}
+function buildSmithBuysHtml(){
+  const rows = Object.keys(SMITH_BUYS).filter(id=>skHave(id)).map(id=>`<div class="shoprow"><span class="muted">&times;${skHave(id)}</span><span>${esc(skName(id))}</span><span class="desc">${SMITH_BUYS[id]}g each</span>
+    <span><button class="btn" onclick="smithSell('${id}')">sell 1</button> <button class="btn" onclick="smithSell('${id}',1)">sell all &middot; ${SMITH_BUYS[id]*skHave(id)}g</button></span></div>`).join('');
+  return `<div class="panel" style="margin-top:14px;"><h4 style="color:${COL.amber};">THE SMITH BUYS ORE AND BARS</h4>${rows || '<div class="muted">bring ore from the mines, or bars from the furnace - the smith pays well for the rarer metals</div>'}</div>`;
+}
 function buildBlacksmith(){
-  const topA = RS_METALS.reduce((b,m,i)=> i<6 && m[1]<=rsLvl('attack') ? i : b, 0), topD = RS_METALS.reduce((b,m,i)=> i<6 && m[1]<=rsLvl('defence') ? i : b, 0);
-  const top = Math.min(5, Math.max(topA, topD) + 1);
+  // a town smith only keeps bronze and iron on the racks: anything better you forge from
+  // ore you've mined yourself, or take from what the deeper dungeons leave behind
+  const top = 1;
   const rows = [];
   for (let t=0; t<=top; t++){
     const m = RS_METALS[t];
@@ -21690,10 +21710,11 @@ function buildBlacksmith(){
   const worn = ['weapon','head','chest','legs','arms'].map(k=>{ const it = G.gear[k]; return it && it.used ? `<div class="shoprow"><span class="muted" style="min-width:74px;">${k}</span><span class="${rarityColorClass(it)}">${esc(it.nm)}</span><span class="desc">${esc(itemDesc(it))}</span></div>` : ''; }).join('');
   return `
     <h2 class="panel-title">THE BLACKSMITH</h2>
-    <div class="sub">You have ${G.player.gold} gold. Metal weapons and plate from bronze up to the tier you can use (and the next, to show what's coming). Dragon is never for sale.</div>
+    <div class="sub">You have ${G.player.gold} gold. The racks hold bronze and iron only. Steel and better you forge yourself from the ore you mine (smelt it into bars below, then forge), or take from what the deep dungeons drop.</div>
     <div class="ovbody">${rows.join('')}
-      <div class="panel" style="margin-top:14px;"><h4 style="color:${COL.amber};">WHAT YOU WEAR</h4>${worn || '<div class="muted">nothing</div>'}</div>
       ${buildSmithing()}
+      ${buildSmithBuysHtml()}
+      <div class="panel" style="margin-top:14px;"><h4 style="color:${COL.amber};">WHAT YOU WEAR</h4>${worn || '<div class="muted">nothing</div>'}</div>
       <div class="btnrow"><button class="btn primary" onclick="setUi('playing')">L / ESC &middot; leave</button></div>
     </div>
   `;
@@ -22426,7 +22447,7 @@ function buildHelp(){
       <div style="margin-top:10px;color:var(--ink-faint);">YOUR PROGRESS</div>
       <div>each adventurer autosaves as you play &mdash; pick them up again from the title screen; dungeons you're mid-floor in regenerate fresh on return. Press <kbd>V</kbd> any time to mute or unmute sound.</div>
       <div style="margin-top:12px;color:var(--ink-faint);">IN A VILLAGE</div>
-      <div><span style="color:${COL.gold}">$</span> general store (gear and boats) &middot; <span style="color:${COL.dim}">&amp;</span> blacksmith (metal weapons and plate, tools, smelting and smithing) &middot; <span style="color:${COL.green}">*</span> alchemist (potions) &middot; <span style="color:${COL.tavern}">H</span> tavern (rest &amp; quests) &middot; <span style="color:${COL.cyan}">&lt;</span> road back out</div>
+      <div><span style="color:${COL.gold}">$</span> peddler (bows, arrows, hide, robes, staves, jewellery and boats) &middot; <span style="color:${COL.dim}">&amp;</span> blacksmith (bronze and iron gear, tools, smelting and forging - and buys your ore and bars; steel and better you forge yourself) &middot; <span style="color:${COL.green}">*</span> alchemist (potions) &middot; <span style="color:${COL.tavern}">H</span> tavern (rest &amp; quests) &middot; <span style="color:${COL.cyan}">&lt;</span> road back out</div>
       <div style="margin-top:10px;color:var(--ink-faint);">IN A DUNGEON, CASTLE OR TOWER</div>
       <div>no shop or tavern down here, and no loot lying on the floor &mdash; monsters carry it instead, so beat them down for gold, potions and gear</div>
       <div><span style="color:${COL.purple}">%</span> sealed vault (R/G/B/Y lock) &middot; <span style="color:${COL.amber}">&gt;</span> stairs down &middot; <span style="color:${COL.green}">&lt;</span> stairs up &middot; <span style="color:${COL.cyan}">&lt;</span> portal to overworld (depth 1)</div>
