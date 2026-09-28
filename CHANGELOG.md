@@ -1,5 +1,17 @@
 # Depthcrawl patch notes
 
+## RS-25 — Shops with rooms, workbenches for every craft
+
+- **Vendors work inside their buildings now.** Walk through a shop's door and you step into its room. The vendor stands behind a counter against the back wall, among shelves of their wares, lit by hanging lanterns. The near walls are cut away so you can see in. Bump the counter to trade, and step back onto the doorway to go out into the street. Only the Captain of the Watch still stands in the square.
+- **A workbench for each craft:** walk into a bench to use it.
+  - **The Blacksmith:** a furnace to smelt ore into bars, and two anvils to forge. The smith sells gear and tools at the counter.
+  - **The Alchemist:** two brewing cauldrons, bubbling green.
+  - **The Tavern:** a hearth to cook at, plus tables and stools.
+  - **The Tailor:** a spinning wheel for linen and bowstrings, a tanning rack for leather, an orb kiln for orbs, a loom for robes and leather armour, and a fletching bench for staves, bows and arrows.
+  - **The Peddler:** crates and barrels, and the counter.
+- **Nobody sells crafting materials any more.** You gather or loot everything you craft with. The Tailor now sells ready-made gear instead: plain Wizard robes, leather and hard leather, a shortbow, an oak shortbow, a plain staff and a staff of air. The Alchemist still sells runes, since they're spell ammunition rather than a crafting material.
+- **The spells panel lists your spells:** it no longer says "Adventurer has no spells". It shows every spell your Magic level allows, with its damage range, how many casts your runes cover (∞ for your staff's element), and the next spell you'll unlock. Click a spell to select it.
+
 ## RS-24 — The Tailor
 
 - **Every town has a Tailor:** a two-storey workshop in the south-east corner of the square, where a house used to stand. The tailor waits out front in leathers and a violet cape. Walk into them or through the door to go in.

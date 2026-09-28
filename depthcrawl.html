@@ -6151,7 +6151,9 @@ function tryMove(dx,dy){
   }
   if (tileAt(nx,ny)===T_WALL) return; // bumping a wall isn't an action - no turn spent
   { const ht = tileAt(nx,ny);
-    if (ht===T_WAYPOINT || ht===T_STASH || ht===T_QUESTGIVER || ht===T_VENDOR){ villageInteract(nx,ny); return; } }
+    if (ht===T_WAYPOINT || ht===T_STASH || ht===T_QUESTGIVER || ht===T_VENDOR){ villageInteract(nx,ny); return; }
+    if (ht===T_COUNTER){ const n = (G.villageNpcs||[])[0]; if (n) setUi(n.service); return; }
+    if (ht===T_BENCH){ useBench(benchAt(nx,ny)); return; } }
   // only a camp-interrupting ambush (G.mandatoryFight) is inescapable -
   // every way out stays sealed (acts like a wall) for as long as a single
   // monster is still alive. An ordinary roadside encounter never sets this
@@ -6188,7 +6190,8 @@ function tryMove(dx,dy){
       } else { G.map[nx][ny] = T_FLOOR; }
       break;
     }
-    case T_SHOP: setUi('shop'); break;
+    case T_SHOP: enterInterior('shop'); break;
+    case T_DOOROUT: exitInterior(); break;
     case T_VAULT: openVault(nx,ny); break;
     case T_CORRUPT_CHEST: {
       G.map[nx][ny] = T_FLOOR;
@@ -6199,10 +6202,10 @@ function tryMove(dx,dy){
       sfx('loot');
       break;
     }
-    case T_TAVERN: setUi('tavern'); break;
-    case T_BLACKSMITH: setUi('blacksmith'); break;
-    case T_ALCHEMIST: setUi('alchemist'); break;
-    case T_TAILOR: openTailor(); break;
+    case T_TAVERN: enterInterior('tavern'); break;
+    case T_BLACKSMITH: enterInterior('smith'); break;
+    case T_ALCHEMIST: enterInterior('alch'); break;
+    case T_TAILOR: enterInterior('tailor'); break;
     // which of these two tile types actually advances you deeper into the
     // site (vs retreats you toward the entrance) flips for a castle/necro
     // tower - see advanceTile()/retreatTile()
@@ -7714,7 +7717,183 @@ function villageInteract(x,y){
   if (t===T_QUESTGIVER || (npc && npc.service==='questgiver')){ setUi('questgiver'); return; }
   if (npc) setUi(npc.service);
 }
-function villageNpcFor(service){ return (G.villageNpcs||[]).find(n=>n.service===service); }
+function villageNpcFor(service){ return (G.villageNpcs||[]).find(n=>n.service===service) || (G.townVendors||[]).find(n=>n.service===service); }
+// ---- shop interiors: every vendor works inside their own building, behind a counter, with the
+// workbenches of their trade around the room. Walking through a shop's door loads its room (its own
+// small map); stepping back onto the doorway puts you out in the street in front of it again.
+const T_COUNTER = 20, T_BENCH = 21, T_DOOROUT = 22;
+const ROOM = { x0:5, x1:14, y0:5, y1:11, door:{ x:10, y:12 } };      // floor spans x0..x1, y0..y1
+const BENCHES = {
+  furnace:  { nm:'Furnace',         does:'smelt ore into bars' },
+  anvil:    { nm:'Anvil',           does:'forge bars into weapons, armour and jewellery' },
+  cauldron: { nm:'Brewing cauldron', does:'brew herbs into potions' },
+  hearth:   { nm:'Hearth',          does:'cook your fish and meat' },
+  spinning: { nm:'Spinning wheel',  does:'spin flax into linen and bowstrings', rows:['Spinning'] },
+  tanning:  { nm:'Tanning rack',    does:'tan hides into leather', rows:['Tanning'] },
+  kiln:     { nm:'Orb kiln',        does:'blow and charge orbs', rows:['Orbs'] },
+  loom:     { nm:'Loom',            does:'sew robes and leather armour', rows:r=>/robes$|armour$/.test(r) },
+  fletching:{ nm:'Fletching bench', does:'carve staves, bows and arrows', rows:r=>/^(Staves|Battlestaves|Mystic staves|Master staves)|bows$|^Arrows$/.test(r) },
+};
+// what stands in each building: [bench, x, y]
+const ROOM_LAYOUT = {
+  smith:  { benches:[['furnace',6,6],['anvil',8,6],['anvil',13,9]], decor:'smith' },
+  alch:   { benches:[['cauldron',6,7],['cauldron',13,9]], decor:'alch' },
+  tavern: { benches:[['hearth',6,6]], decor:'tavern' },
+  shop:   { benches:[], decor:'shop' },
+  tailor: { benches:[['spinning',6,6],['tanning',6,8],['kiln',6,10],['loom',13,8],['fletching',13,10]], decor:'tailor' },
+};
+function buildingByKey(k){ return VILLAGE_BUILDINGS.find(b=>b.key===k); }
+function enterInterior(key){
+  const b = buildingByKey(key); if (!b || G.interior) return;
+  const vendor = (G.townVendors||[]).find(v=>v.key===key);
+  G.townState = { map:G.map, deco:G.villageDeco, npcs:G.villageNpcs, villagers:G.villagers, floorItem:G.floorItem };
+  G.interior = { key, name:b.name, out:{ x:b.door.x + (b.face==='e' ? 1 : 0), y:b.door.y + (b.face==='s' ? 1 : 0) } };
+  G.map = makeGrid(T_WALL); G.villageDeco = makeGrid('', COLS, ROWS); G.floorItem = makeItemGrid();
+  for (let x=ROOM.x0; x<=ROOM.x1; x++) for (let y=ROOM.y0; y<=ROOM.y1; y++){ G.map[x][y] = T_FLOOR; G.villageDeco[x][y] = 'floor'; }
+  G.map[ROOM.door.x][ROOM.door.y] = T_DOOROUT; G.villageDeco[ROOM.door.x][ROOM.door.y] = 'doorway';
+  // the vendor behind a counter against the back wall
+  for (let x=9; x<=11; x++){ G.map[x][6] = T_COUNTER; G.villageDeco[x][6] = 'counter'; }
+  G.map[10][5] = T_VENDOR; G.villageDeco[10][5] = 'npc';
+  G.villageNpcs = vendor ? [Object.assign({}, vendor, { x:10, y:5 })] : [];
+  G.villagers = [];
+  for (const [k,x,y] of ROOM_LAYOUT[key].benches){ G.map[x][y] = T_BENCH; G.villageDeco[x][y] = 'bench:'+k; }
+  G.player.x = ROOM.door.x; G.player.y = ROOM.door.y - 1; G.player.facing = 0;
+  logMsg(`you step into ${b.name.toLowerCase()}`, 'new');
+  renderGame();
+}
+function exitInterior(){
+  if (!G.interior) return;
+  const s = G.townState, out = G.interior.out;
+  G.map = s.map; G.villageDeco = s.deco; G.villageNpcs = s.npcs; G.villagers = s.villagers; G.floorItem = s.floorItem;
+  G.interior = null; G.townState = null;
+  G.player.x = out.x; G.player.y = out.y; G.player.facing = 2;
+  renderGame();
+}
+function benchAt(x, y){ const d = G.villageDeco[x] && G.villageDeco[x][y]; return d && d.startsWith('bench:') ? d.slice(6) : null; }
+function useBench(kind){
+  G.bench = kind;
+  if (kind==='hearth'){ G.cookAt = 'hearth'; setUi('cook'); return; }
+  setUi('bench');
+}
+function buildBench(){
+  const k = G.bench, B = BENCHES[k] || { nm:'Workbench', does:'' };
+  let body = '';
+  if (k==='furnace') body = buildSmithing('smelt');
+  else if (k==='anvil') body = buildSmithing('forge');
+  else if (k==='cauldron') body = buildBrewing();
+  else body = buildCrafting(true, B.rows);
+  if (B.rows) return body;                       // the crafting benches carry their own title and close button
+  return `<h2 class="panel-title">${esc(B.nm.toUpperCase())}</h2><div class="sub">${esc(B.does)}</div>
+    <div class="ovbody">${body}<div class="btnrow" style="margin-top:12px;"><button class="btn primary" onclick="setUi('playing')">ESC &middot; step away</button></div></div>`;
+}
+// the tailor sells a few ready-made garments and weapons - never the materials
+function tailorWares(){
+  if (G.tailorStock && G.tailorStockAt===villageSeed()) return G.tailorStock;
+  const st = [];
+  for (const sl of ['head','chest','legs','arms']) st.push(rsMakeArmour('cloth', 0, sl));
+  for (const sl of ['head','chest','legs','arms']) st.push(rsMakeArmour('hide', 0, sl));
+  st.push(rsMakeArmour('hide', 1, 'chest'), rsMakeArmour('hide', 1, 'legs'));
+  st.push(rsMakeBow(0, false), rsMakeBow(1, false), rsMakeStaffOf(0, null), rsMakeStaffOf(0, 'air'));
+  G.tailorStockAt = villageSeed();
+  return (G.tailorStock = st);
+}
+function tailorBuy(i){
+  const it = tailorWares()[i]; if (!it) return;
+  const price = repPrice(Math.round(it.price*1.3));
+  if (G.player.gold < price){ logMsg("you can't afford that", 'hit'); renderOverlay(); return; }
+  if (G.inv.length >= MAXINV){ logMsg('your pack is full', 'hit'); renderOverlay(); return; }
+  G.player.gold -= price; addToInventory(JSON.parse(JSON.stringify(it)));
+  logMsg(`you buy ${itemNameHtml(it)} for ${price} gold`, 'loot', true); renderOverlay(); saveCurrentGame();
+}
+function buildTailorShop(){
+  const rows = tailorWares().map((it,i)=>`<div class="shoprow" onclick="tailorBuy(${i})" onmouseenter="showItemTooltip(event, tailorWares()[${i}])" onmousemove="moveItemTooltip(event)" onmouseleave="hideItemTooltip()" style="cursor:pointer;">
+      <span></span><span class="${rarityColorClass(it)}">${esc(it.nm)}</span><span class="desc">${esc(itemDesc(it))}</span><span class="price">${repPrice(Math.round(it.price*1.3))}g</span></div>`).join('');
+  return `<h2 class="panel-title">THE TAILOR</h2>
+    <div class="sub">${villageNpcTitle('tailor') ? villageNpcTitle('tailor')+' &middot; ' : ''}You have ${G.player.gold} gold. Plain robes, leathers, bows and staves off the rack - anything finer you make yourself at the benches in this workshop.</div>
+    <div class="ovbody">${rows}<div class="btnrow"><button class="btn primary" onclick="setUi('playing')">L / ESC &middot; leave</button></div></div>`;
+}
+function renderInteriorMap(){
+  ctx.fillStyle = '#0b0907'; ctx.fillRect(0,0,canvas.width,canvas.height);
+  for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
+    const t = G.map[x][y], b = benchAt(x,y);
+    if (t===T_WALL){ const edge = [[1,0],[-1,0],[0,1],[0,-1]].some(([a,c])=>G.map[x+a] && G.map[x+a][y+c]!==undefined && G.map[x+a][y+c]!==T_WALL); if (edge) drawTileBg(x,y,'#3a3028'); continue; }
+    drawTileBg(x,y,'#5a4430');
+    if (t===T_COUNTER) drawTileBg(x,y,'#7a5a38');
+    if (t===T_DOOROUT) drawGlyph(x,y,'<',COL.cyan);
+    if (b) drawGlyph(x,y,{furnace:'&',anvil:'T',cauldron:'*',hearth:'^',spinning:'@',tanning:'#',kiln:'o',loom:'=',fletching:'/'}[b]||'?', COL.amber);
+  }
+  for (const n of (G.villageNpcs||[])) drawMonsterArt(n.x*cellPx+cellPx/2, n.y*cellPx+cellPx/2, cellPx*0.85, VILLAGER_ART, COL.cyan);
+  drawPlayerIcon(G.player.x, G.player.y);
+}
+// ---- the room in 3D ----
+function v3BuildInterior(grp, mats){
+  const T = THREE, key = G.interior.key;
+  V3.crystal = V3.runes = V3.marker = V3.motes = V3.sparks = V3.bubbles = V3.brew = V3.cglow = null; V3.grassT = null;
+  V3.occ = []; V3.occDyn = new Set();
+  const dark = new T.Mesh(new T.PlaneGeometry(200,200), new T.MeshStandardMaterial({ color:0x0b0907, roughness:1 }));
+  dark.rotation.x = -Math.PI/2; dark.position.set(COLS/2, -0.02, ROWS/2); grp.add(dark); V3.ground = dark;
+  const fw = ROOM.x1-ROOM.x0+1, fd = ROOM.y1-ROOM.y0+1;
+  const floor = v3Box(fw, 0.06, fd+1, mats.planks, ROOM.x0+fw/2, -0.03, ROOM.y0+fd/2+0.5); grp.add(floor);
+  const wallM = key==='smith' ? mats.stone : mats.plaster, H = 2.7, low = 0.5;
+  // back (north, west) walls full height with beams and a window; the near (south, east) walls cut low so you can see in
+  grp.add(v3Box(fw+1, H, 0.3, wallM, ROOM.x0+fw/2-0.5, H/2, ROOM.y0-0.15));
+  grp.add(v3Box(0.3, H, fd+1, wallM, ROOM.x0-0.15, H/2, ROOM.y0+fd/2-0.5));
+  for (let x=ROOM.x0; x<=ROOM.x1+1; x+=3) grp.add(v3Box(0.14, H, 0.14, mats.wood, x-0.05, H/2, ROOM.y0-0.02));
+  for (let y=ROOM.y0; y<=ROOM.y1+1; y+=3) grp.add(v3Box(0.14, H, 0.14, mats.wood, ROOM.x0-0.02, H/2, y-0.05));
+  grp.add(v3Box(fw+1, 0.16, 0.2, mats.wood, ROOM.x0+fw/2-0.5, H-0.1, ROOM.y0));
+  for (const wx of [ROOM.x0+2.5, ROOM.x1-1.5]){ const win = v3Box(0.9, 0.9, 0.06, mats.glass, wx, 1.7, ROOM.y0+0.02); grp.add(win); V3.windows.push(win); grp.add(v3Box(1.02, 0.08, 0.14, mats.wood, wx, 1.22, ROOM.y0+0.05)); }
+  grp.add(v3Box(fw+1, low, 0.3, wallM, ROOM.x0+fw/2-0.5, low/2, ROOM.y1+1.15));
+  grp.add(v3Box(0.3, low, fd+1, wallM, ROOM.x1+1.15, low/2, ROOM.y0+fd/2-0.5));
+  { const dx = ROOM.door.x+0.5, dz = ROOM.y1+1.15; grp.add(v3Box(0.9, 0.04, 0.34, mats.planks, dx, low+0.02, dz)); for (const s of [-0.5,0.5]) grp.add(v3Box(0.12, 1.6, 0.34, mats.wood, dx+s, 0.8, dz)); grp.add(v3Box(1.1, 0.12, 0.34, mats.wood, dx, 1.62, dz));
+    const mat = v3Box(0.9, 0.02, 0.8, mats.cloth || mats.awning, dx, 0.02, dz-0.55); grp.add(mat); }
+  // the counter and shelves behind the vendor
+  grp.add(v3Box(3, 0.9, 0.7, mats.planks, 10.5, 0.45, 6.5)); grp.add(v3Box(3.1, 0.08, 0.78, mats.wood, 10.5, 0.93, 6.5));
+  for (const sx of [8.2, 12.8]){ grp.add(v3Box(1.3, 1.9, 0.35, mats.wood, sx, 0.95, ROOM.y0+0.25)); for (let i=0;i<3;i++) grp.add(v3Box(1.2, 0.05, 0.36, mats.planks, sx, 0.5+i*0.55, ROOM.y0+0.27)); }
+  const lin = c=>new T.Color(c).convertSRGBToLinear();
+  const jar = (x,y,z,c)=>{ const m = new T.Mesh(new T.CylinderGeometry(0.06,0.07,0.18,8), new T.MeshStandardMaterial({ color:lin(c), roughness:0.3, emissive:lin(c), emissiveIntensity:0.15 })); m.position.set(x,y,z); grp.add(m); };
+  const shelfCols = { smith:['#8a8a90','#6a5a4a','#c8a060'], alch:['#50e080','#e05050','#5080e0'], tavern:['#c89040','#6a4020','#e0d0a0'], shop:['#e0a020','#c03020','#40a030'], tailor:['#6a4ab0','#b08a5a','#e0e0d0'] }[key];
+  for (const sx of [8.2, 12.8]) for (let r=0;r<3;r++) for (let i=0;i<4;i++) jar(sx-0.45+i*0.3, 0.62+r*0.55, ROOM.y0+0.27, shelfCols[(i+r)%3]);
+  // hanging lanterns (the room's light)
+  for (const [lx,lz] of [[7.5,8.5],[12.5,8.5]]){ grp.add(v3Box(0.02, 0.5, 0.02, mats.iron, lx, 2.35, lz)); const l = new T.Mesh(new T.SphereGeometry(0.1,10,8), new T.MeshStandardMaterial({ color:0xffd28a, emissive:0xffb050, emissiveIntensity:1.2 })); l.position.set(lx, 2.05, lz); grp.add(l);
+    V3.lamps.push({ p:[lx, 2.0, lz], col:0xffc070, r:9, main:true, always:true }); }
+  // benches of the trade
+  for (const [k,x,y] of ROOM_LAYOUT[key].benches){ v3Bench(k, x+0.5, y+0.5, mats, grp); const hb = new T.Mesh(new T.BoxGeometry(0.95, 1.4, 0.95), new T.MeshBasicMaterial({ visible:false })); hb.position.set(x+0.5, 0.7, y+0.5); hb.userData.act = { kind:'tile', x, y, label:BENCHES[k].nm }; grp.add(hb); V3.hits.push(hb); }
+  // a few things for the look of the place
+  if (key==='tavern'){ for (const [tx,tz] of [[8.5,9.5],[11.5,9.5]]){ grp.add(v3Cyl(0.5,0.5,0.06,14,mats.planks,tx,0.72,tz)); grp.add(v3Cyl(0.08,0.12,0.7,8,mats.wood,tx,0.35,tz)); for (const a of [0,2.1,4.2]) grp.add(v3Cyl(0.16,0.16,0.42,8,mats.wood,tx+Math.cos(a)*0.75,0.21,tz+Math.sin(a)*0.75)); }
+    v3Barrel(13.4, 5.6, mats, grp); v3Barrel(13.4, 6.3, mats, grp); }
+  if (key==='shop'){ v3Crate(6.4,6.4,mats,grp,1.1); v3Crate(6.4,6.4,mats,grp,0.8,0.46); v3Crate(13.5,10.4,mats,grp); v3Barrel(13.4,6.0,mats,grp); v3Barrel(6.5,10.4,mats,grp); }
+  if (key==='smith'){ v3Barrel(13.4,6.0,mats,grp); for (let i=0;i<4;i++) grp.add(v3Box(0.05,1.1,0.05,mats.iron,6.2+i*0.25,0.55,10.6)); }
+  if (key==='alch'){ v3Crate(13.5,6.2,mats,grp); v3Barrel(6.5,10.4,mats,grp); }
+  if (key==='tailor'){ for (let i=0;i<3;i++){ const c = new T.Mesh(new T.CylinderGeometry(0.1,0.1,0.5,10), new T.MeshStandardMaterial({ color:lin(['#6a4ab0','#b0302a','#3a7ac8'][i]), roughness:0.9 })); c.rotation.z = Math.PI/2; c.position.set(13.2, 0.3+i*0.22, 5.8); grp.add(c); } v3Crate(9.2,10.6,mats,grp); }
+}
+function v3Bench(k, x, z, mats, grp){
+  const T = THREE, g = new T.Group(); g.position.set(x, 0, z); grp.add(g);
+  const lin = c=>new T.Color(c).convertSRGBToLinear(), M = (c,o)=>new T.MeshStandardMaterial(Object.assign({ color:lin(c), roughness:0.8 }, o||{}));
+  const add = (o)=>{ o.castShadow = o.receiveShadow = true; g.add(o); return o; };
+  const box = (w,h,d,m,px,py,pz)=>add(v3Box(w,h,d,m,px,py,pz)), cyl = (a,b,h,s,m,px,py,pz)=>add(v3Cyl(a,b,h,s,m,px,py,pz));
+  if (k==='furnace'){ box(0.9,1.0,0.8,mats.stone,0,0.5,-0.05); box(0.4,0.3,0.05,M('#1a0a04',{ emissive:lin('#ff6a20'), emissiveIntensity:1.6 }),0,0.4,0.36); cyl(0.14,0.18,1.2,8,mats.stone,0.2,1.55,-0.2);
+    V3.lamps.push({ p:[x,0.6,z+0.4], col:0xff6a20, r:4, main:true, forge:true }); V3.sparks = { p:[x,1.0,z+0.3] }; }
+  else if (k==='anvil'){ box(0.3,0.36,0.24,mats.wood,0,0.18,0); box(0.2,0.16,0.14,mats.iron,0,0.44,0); box(0.56,0.12,0.22,mats.iron,0,0.58,0); const horn = add(new T.Mesh(new T.ConeGeometry(0.08,0.26,8), mats.iron)); horn.rotation.z = Math.PI/2; horn.position.set(0.4,0.58,0);
+    const hm = box(0.06,0.3,0.06,mats.wood,-0.15,0.72,0.05); hm.rotation.z = 1.2; box(0.12,0.07,0.07,mats.iron,-0.25,0.68,0.05); }
+  else if (k==='cauldron'){ const pot = add(new T.Mesh(new T.SphereGeometry(0.34,16,10,0,Math.PI*2,Math.PI*0.35,Math.PI*0.65), mats.iron)); pot.position.y = 0.42; const brew = cyl(0.3,0.3,0.04,16,mats.brew,0,0.56,0); V3.brew = V3.brew || brew;
+    for (let i=0;i<3;i++){ const a = i/3*Math.PI*2; cyl(0.02,0.02,0.5,5,mats.iron,Math.cos(a)*0.3,0.2,Math.sin(a)*0.3); }
+    V3.lamps.push({ p:[x,0.8,z], col:0x50ff80, r:3.5, main:true, always:true }); V3.bubbles = V3.bubbles || { p:[x,0.58,z] }; }
+  else if (k==='hearth'){ box(1.0,1.4,0.5,mats.stone,0,0.7,-0.25); box(0.6,0.5,0.1,M('#120804'),0,0.35,0.02); const f = v3Flame(x, 0.25, z+0.08, grp); V3.lamps.push({ p:[x,0.5,z+0.2], col:0xff8030, r:5, main:true, forge:true }); cyl(0.2,0.24,1.6,8,mats.stone,0,2.0,-0.3); }
+  else if (k==='spinning'){ box(0.7,0.08,0.24,mats.wood,0,0.35,0); for (const s of [-0.3,0.3]) box(0.05,0.35,0.05,mats.wood,s,0.17,0); const w = add(new T.Mesh(new T.TorusGeometry(0.28,0.025,6,24), mats.wood)); w.position.set(-0.12,0.72,0); w.rotation.y = Math.PI/2;
+    for (let i=0;i<6;i++){ const sp = box(0.02,0.52,0.02,mats.wood,-0.12,0.72,0); sp.rotation.x = i*Math.PI/6; } box(0.05,0.4,0.05,mats.wood,-0.12,0.52,0); cyl(0.05,0.05,0.14,8,M('#d8d0a8'),0.25,0.48,0); }
+  else if (k==='tanning'){ for (const s of [-0.4,0.4]) box(0.06,1.3,0.06,mats.wood,s,0.65,0); box(0.9,0.06,0.06,mats.wood,0,1.28,0); box(0.9,0.06,0.06,mats.wood,0,0.25,0);
+    const hide = add(new T.Mesh(new T.PlaneGeometry(0.66,0.86), M('#9a6a3a', { side:T.DoubleSide }))); hide.position.set(0,0.76,0.02); }
+  else if (k==='kiln'){ const d = add(new T.Mesh(new T.SphereGeometry(0.42,14,10,0,Math.PI*2,0,Math.PI/2), mats.stone)); d.position.y = 0.05; box(0.26,0.22,0.1,M('#1a0a04',{ emissive:lin('#ff9a40'), emissiveIntensity:1.4 }),0,0.15,0.36);
+    for (let i=0;i<3;i++){ const o = add(new T.Mesh(new T.SphereGeometry(0.06,12,10), M(['#e8f0ff','#4a8ae0','#e05a2a'][i],{ roughness:0.1, emissive:lin(['#a0b0ff','#3060c0','#c04010'][i]), emissiveIntensity:0.6 }))); o.position.set(-0.35+i*0.12, 0.62, 0.3); }
+    box(0.5,0.5,0.3,mats.planks,-0.25,0.25,0.3); V3.lamps.push({ p:[x,0.4,z+0.4], col:0xff9a40, r:3, main:true, forge:true }); }
+  else if (k==='loom'){ for (const [sx,sz] of [[-0.42,-0.3],[0.42,-0.3],[-0.42,0.3],[0.42,0.3]]) box(0.06,1.1,0.06,mats.wood,sx,0.55,sz); box(0.95,0.06,0.06,mats.wood,0,1.08,-0.3); box(0.95,0.06,0.06,mats.wood,0,0.62,0.3);
+    const cl = add(new T.Mesh(new T.PlaneGeometry(0.78,0.5), M('#6a4ab0', { side:T.DoubleSide }))); cl.rotation.x = -0.9; cl.position.set(0,0.86,0); box(0.8,0.04,0.12,mats.wood,0,0.5,0.35); }
+  else if (k==='fletching'){ box(1.0,0.06,0.55,mats.planks,0,0.72,0); for (const [sx,sz] of [[-0.42,-0.22],[0.42,-0.22],[-0.42,0.22],[0.42,0.22]]) box(0.06,0.7,0.06,mats.wood,sx,0.35,sz);
+    const bow = add(new T.Mesh(new T.TorusGeometry(0.34,0.015,5,20,Math.PI*0.9), mats.wood)); bow.rotation.set(-Math.PI/2,0,0.2); bow.position.set(0,0.76,0);
+    for (let i=0;i<5;i++){ const a = box(0.6,0.012,0.012,mats.lightWood||mats.wood,0.05,0.77,-0.18+i*0.035); a.rotation.y = 0.1; }
+    const st = box(0.04,1.2,0.04,mats.wood,0.52,0.6,0.3); st.rotation.z = -0.25; }
+}
+
 function villageNpcTitle(service){ const n = villageNpcFor(service); return n ? `${esc(n.name)} &middot; ${esc(n.role)}` : ''; }
 // ---- waypoint: travel between the towns you've found ----
 function buildWaypoint(){
@@ -8370,7 +8549,7 @@ function buildCook(){
   return `<h2 class="panel-title">${G.cookAt==='fire' ? 'YOUR CAMPFIRE' : 'THE HEARTH'}</h2>
     <div class="sub">Cooking level ${L}. ${G.cookAt==='fire' ? 'Food cooked over an open fire burns a little more often than on the tavern hearth.' : 'The tavern lets you use its hearth.'}</div>
     <div class="ovbody">${rows}${skHave('burnt') ? `<div class="muted" style="margin-top:8px;">${skHave('burnt')} burnt food in your bag <button class="btn" onclick="skAdd('burnt',-skHave('burnt')); renderOverlay();">throw it away</button></div>` : ''}
-      <div class="btnrow"><button class="btn primary" onclick="setUi(G.cookAt==='fire' ? 'playing' : 'tavern')">ESC &middot; done</button></div></div>`;
+      <div class="btnrow"><button class="btn primary" onclick="setUi(G.cookAt==='fire' || G.interior ? 'playing' : 'tavern')">ESC &middot; done</button></div></div>`;
 }
 // ---- smithing: tools, smelting and forging (at the blacksmith) ----
 function skBuyTool(tid){
@@ -8407,7 +8586,7 @@ function skForge(bid, slot){
   addToInventory(best); logMsg(`you forge ${itemNameHtml(best)} from ${f[1]} ${b.nm}${f[1]>1?'s':''}`, 'loot', true); sfx('crit');
   renderOverlay(); saveCurrentGame();
 }
-function buildSmithing(){
+function buildSmithing(part){
   const p = skP(), L = skLvl('smithing');
   const tools = SK_TOOLS.map(t=>{ const cur = p.tools[t.id]||0, nx = SK_TIER[cur], has = cur ? SK_TIER[cur-1][0]+' '+t.nm : 'none';
     return `<div class="shoprow"><span class="muted">${t.nm}</span><span>${esc(has)}</span>
@@ -8420,9 +8599,8 @@ function buildSmithing(){
     const slots = Object.keys(SK_FORGE).filter(s=> b.jewel ? (s==='ring' || s==='necklace') : !(s==='ring' || s==='necklace'));
     return `<div class="shoprow"><span class="muted">&times;${skHave(b.id)}</span><span>${esc(b.nm)}</span>
       <span class="desc">${L>=b.lvl ? slots.map(s=>`<button class="btn" ${skHave(b.id)>=SK_FORGE[s][1]?'':'disabled'} onclick="skForge('${b.id}','${s}')">${SK_FORGE[s][0]} (${SK_FORGE[s][1]})</button>`).join(' ') : `needs Smithing ${b.lvl}`}</span><span></span></div>`; }).join('') || `<div class="muted">no bars yet</div>`;
-  return `<div class="panel" style="margin-top:14px;"><h4 style="color:${COL.amber};">TOOLS</h4>${tools}</div>
-    <div class="panel" style="margin-top:14px;"><h4 style="color:${COL.amber};">SMELTING &middot; Smithing ${L}</h4>${smelt}</div>
-    <div class="panel" style="margin-top:14px;"><h4 style="color:${COL.amber};">FORGING</h4><div class="muted" style="font-size:11px;margin-bottom:6px;">each metal forges its own tier of weapons and armour - steel needs coal (Mining 30). What you forge is better than any drop: <b>+${Math.min(45, 15 + Math.max(0, L - 1))}%</b> bonuses on bronze at your level (+15%, plus 1% per Smithing level past the bar's, up to +45%)</div>${forge}</div>`;
+  const secT = `<div class="panel" style="margin-top:14px;"><h4 style="color:${COL.amber};">TOOLS</h4>${tools}</div>`, secS = `<div class="panel" style="margin-top:14px;"><h4 style="color:${COL.amber};">SMELTING &middot; Smithing ${L}</h4>${smelt}</div>`, secF = `<div class="panel" style="margin-top:14px;"><h4 style="color:${COL.amber};">FORGING</h4><div class="muted" style="font-size:11px;margin-bottom:6px;">each metal forges its own tier of weapons and armour - steel needs coal (Mining 30). What you forge is better than any drop: <b>+${Math.min(45, 15 + Math.max(0, L - 1))}%</b> bonuses on bronze at your level (+15%, plus 1% per Smithing level past the bar's, up to +45%)</div>${forge}</div>`;
+  return part==='tools' ? secT : part==='smelt' ? secS : part==='forge' ? secF : secT+secS+secF;
 }
 // ---- alchemy (at the alchemist) ----
 function skBrew(hid, all){
@@ -8554,19 +8732,9 @@ function crRecipes(){
   return (crRecipes.list = R);
 }
 function crCan(r){ for (const k in r.need) if (crHave(k) < r.need[k]) return false; return (G.player.gold||0) >= (r.gold||0); }
-// the tailor sells the basics to get you started
-const TAILOR_WARES = [['flax', 3], ['cowhide', 6], ['bowstring', 12], ['linen', 10], ['orb', 80]];
-function crBuy(id, n){
-  const w = TAILOR_WARES.find(w=>w[0]===id); if (!w) return;
-  const price = repPrice(w[1]); let got = 0;
-  for (let k=0;k<(n||1);k++){ if (G.player.gold < price) break; G.player.gold -= price; skAdd(id, 1); got++; }
-  logMsg(got ? `you buy ${got} ${crName(id).toLowerCase()} for ${got*price} gold` : `you can't afford that`, got ? 'loot' : 'hit');
-  renderOverlay(); saveCurrentGame();
-}
-function openTailor(){ setUi('tailor'); }
 function crCraft(id, all){
   const r = crRecipes().find(r=>r.id===id); if (!r) return;
-  if (G.ui!=='tailor'){ logMsg("you need a tailor's workshop to craft - there's one in every town", 'hit'); renderOverlay(); return; }
+  if (G.ui!=='bench'){ logMsg("you craft at the workbenches in the Tailor's workshop - there's one in every town", 'hit'); renderOverlay(); return; }
   const L = skLvl('crafting');
   if (L < r.lvl){ logMsg(`you need Crafting level ${r.lvl}`, 'hit'); renderOverlay(); return; }
   let n = 0;
@@ -8586,35 +8754,38 @@ function crCraft(id, all){
   renderOverlay(); saveCurrentGame();
 }
 function crNeedText(r){ return Object.keys(r.need).map(k=>`${r.need[k]} ${crName(k).toLowerCase()}`).join(' + ') + (r.gold ? ` + ${r.gold}g` : ''); }
-function buildCrafting(atTailor){
-  const L = skLvl('crafting'), R = crRecipes(), tab = G.craftTab || 'magic';
-  const npc = atTailor && typeof villageNpcFor==='function' ? villageNpcFor('tailor') : null;
+function buildCrafting(atTailor, rowsOf){
+  const L = skLvl('crafting'), R0 = crRecipes(), tab = G.craftTab || 'magic';
+  const keep = rowsOf ? (typeof rowsOf==='function' ? rowsOf : (r=>rowsOf.includes(r))) : null, R = keep ? R0.filter(r=>keep(r.row)) : R0;
+  const bench = rowsOf && BENCHES[G.bench];
   const mats = SK_CRAFT_MATS.filter(m=>skHave(m.id)>0).map(m=>`<span class="skitem">${esc(m.nm)} <b>&times;${skHave(m.id)}</b></span>`).join('') || '<span class="muted">none yet</span>';
   const sec = (s)=>{
     const rows = {}; for (const r of R) if (r.sec===s) (rows[r.row] = rows[r.row] || []).push(r);
-    return Object.keys(rows).map(row=>{
+    return Object.keys(rows).length ? Object.keys(rows).map(row=>{
       const list = rows[row], minL = Math.min(...list.map(r=>r.lvl)), locked = L < minL;
       const btns = list.map(r=>{ const ok = atTailor && L>=r.lvl && crCan(r);
         return `<button class="btn" ${ok ? '' : 'disabled'} title="${esc(crNeedText(r))}${L<r.lvl ? ' - needs Crafting '+r.lvl : ''}" onclick="crCraft('${r.id}')">${esc(r.nm)}${L<r.lvl ? ` (${r.lvl})` : ''}</button>${r.all && ok ? `<button class="btn" title="make as many as you can" onclick="crCraft('${r.id}',1)">all</button>` : ''}`; }).join(' ');
       const need = list.length && list.every(r=>crNeedText(r)===crNeedText(list[0])) ? crNeedText(list[0]) : list.map(r=>`${r.nm}: ${crNeedText(r)}`).join(' &middot; ');
       return `<div class="shoprow" style="${locked ? 'opacity:0.55' : ''}"><span class="muted">${minL}</span><span>${esc(row)}</span><span class="desc">${btns}<div class="muted" style="font-size:10.5px;margin-top:3px;">${esc(need).replace(/&amp;middot;/g,'&middot;')}</div></span><span></span></div>`;
-    }).join('');
+    }).join('') : '';
   };
   const tabs = [['basics','MATERIALS'],['magic','MAGIC GEAR'],['ranged','RANGED GEAR']].map(([k,nm])=>`<button class="btn${tab===k ? ' primary' : ''}" onclick="G.craftTab='${k}'; renderOverlay();">${nm}</button>`).join(' ');
   const hint = { basics:'Spin foraged flax into linen and bowstrings. Tan hides from beasts and dragons (the tanner takes a few coins). Blow a silver bar into an orb, then charge it with 20 runes of an element.',
     magic:'Robes from linen, plus bark (maple, yew and magic trees), ghostcap, starlily or dragon\'s tongue for the finer grades. Staves from logs, with a charged orb for an element.',
     ranged:'Leather armour from tanned hides - studded adds an iron bar, dragonhide needs dragon leather. Bows from logs and a bowstring; arrows from any logs.' }[tab];
-  const wares = atTailor ? `<div class="panel" style="margin-bottom:10px;"><h4 style="color:${COL.amber};">FOR SALE</h4>${TAILOR_WARES.map(([id,pr])=>`<div class="shoprow"><span class="muted">&times;${skHave(id)}</span><span>${esc(crName(id))}</span>
-      <span class="desc"><button class="btn" ${G.player.gold>=repPrice(pr) ? '' : 'disabled'} onclick="crBuy('${id}')">buy 1</button> <button class="btn" ${G.player.gold>=repPrice(pr)*5 ? '' : 'disabled'} onclick="crBuy('${id}',5)">buy 5</button></span><span class="price">${repPrice(pr)}g</span></div>`).join('')}</div>` : '';
-  return `<h2 class="panel-title">${atTailor ? 'THE TAILOR' : 'CRAFTING RECIPES'} &middot; Crafting ${L}</h2>
-    <div class="sub">${atTailor ? `${npc ? esc(npc.name)+' the tailor' : 'The tailor'} lends you the loom, the tanning vats and the fletching bench. You have ${G.player.gold} gold. ` : `<b style="color:${COL.amber}">Crafting is done at the Tailor in any town</b> - these are the recipes. `}What you craft is better than any drop: <b>+15% to +45%</b> bonuses, the better your level over the recipe's. Hover a button for what it takes.</div>
+  if (bench) return `<h2 class="panel-title">${esc(bench.nm.toUpperCase())} &middot; Crafting ${L}</h2>
+    <div class="sub">${esc(cap(bench.does))}. What you craft is better than any drop: <b>+15% to +45%</b> bonuses, the better your level over the recipe's. Hover a button for what it takes.</div>
+    <div class="ovbody"><div class="panel">${['basics','magic','ranged'].map(sec).join('')}</div>
+      <h4 style="color:var(--ink-faint);margin:12px 0 6px;">CRAFTING MATERIALS</h4><div class="skbag">${mats}</div>
+      <div class="btnrow" style="margin-top:12px;"><button class="btn primary" onclick="setUi('playing')">ESC &middot; step away</button></div></div>`;
+  return `<h2 class="panel-title">CRAFTING RECIPES &middot; Crafting ${L}</h2>
+    <div class="sub"><b style="color:${COL.amber}">You craft at the workbenches in the Tailor's workshop, in any town</b> - the spinning wheel, tanning rack, orb kiln, loom and fletching bench. These are all the recipes. What you craft is better than any drop: <b>+15% to +45%</b> bonuses, the better your level over the recipe's.</div>
     <div class="ovbody">
-      ${wares}
       <div class="btnrow" style="justify-content:flex-start;margin-bottom:8px;">${tabs}</div>
       <div class="muted" style="font-size:11.5px;margin-bottom:8px;">${hint}</div>
       <div class="panel">${sec(tab)}</div>
       <h4 style="color:var(--ink-faint);margin:12px 0 6px;">CRAFTING MATERIALS</h4><div class="skbag">${mats}</div>
-      <div class="btnrow" style="margin-top:12px;">${atTailor ? `<button class="btn primary" onclick="setUi('playing')">L / ESC &middot; leave</button>` : `<button class="btn primary" onclick="setUi(G.craftBack||'playing')">X / ESC &middot; close</button>`}</div>
+      <div class="btnrow" style="margin-top:12px;"><button class="btn primary" onclick="setUi(G.craftBack||'playing')">X / ESC &middot; close</button></div>
     </div>`;
 }
 function openCrafting(back){ G.craftBack = back || 'playing'; setUi('crafting'); }
@@ -9633,10 +9804,8 @@ function generateVillage(){
   G.villageNpcs = [];
   const seed = villageSeed(), names = VILLAGE_NPC_NAMES[G.villageRace] || VILLAGE_NPC_NAMES.human;
   const nm = i=> names[(seed + i*5) % names.length];
-  VILLAGE_BUILDINGS.forEach((b,i)=>{
-    G.map[b.npc.x][b.npc.y] = T_VENDOR; G.villageDeco[b.npc.x][b.npc.y] = 'npc';
-    G.villageNpcs.push({ x:b.npc.x, y:b.npc.y, name:nm(i), role:b.role, service:b.service, key:b.key });
-  });
+  G.townVendors = VILLAGE_BUILDINGS.map((b,i)=>({ name:nm(i), role:b.role, service:b.service, key:b.key }));
+  G.interior = null; G.townState = null;
   G.villageNpcs.push({ x:14, y:9, name:nm(5), role:'Captain of the Watch', service:'questgiver', key:'quest' });
   // lamp posts round the plaza and a few trees and barrels
   for (const [x,y] of [[7,8],[14,15],[7,15],[11,8]]) W(x,y,'lamp');
@@ -9701,7 +9870,7 @@ function detectRegionBiome(x,y){
   return best;
 }
 function enterVillage(){
-  G.gameMode = 3;
+  G.gameMode = 3; G.interior = null;
   G.owZoomedOut = false;
   G.isBossFloor = 0; G.bossIdx = -1;
   // the spawn village sits in a patch forced to plain grass (see
@@ -11255,6 +11424,7 @@ const VILLAGE_PALETTE = {
   mountain: {bg:'#232323', ground:'#2c2c2e', obstacle:['^', '#8a8a92'],    hedgeColor:'#4a4a52'},
 };
 function renderVillageMap(){
+  if (G.interior){ renderInteriorMap(); return; }
   const pal = VILLAGE_PALETTE[G.villageTheme] || VILLAGE_PALETTE.forest;
   const raceTheme = VILLAGE_RACE_THEME[G.villageRace] || VILLAGE_RACE_THEME.human;
   ctx.fillStyle = pal.bg;
@@ -12205,7 +12375,7 @@ function renderImmersiveHud(){
   const p = G.player;
   if (!el) return;
   document.body.classList.toggle('dh-3d', fp3dActive());
-  document.body.classList.toggle('dh-caster', !!(G.player && isCaster(G.player.cls)));
+  document.body.classList.toggle('dh-caster', !!G.player);
   if (!p){ if (el.__lastHtml){ el.innerHTML=''; el.__lastHtml=''; } return; }
   const maxHp = effMaxHp(), hpF = clamp(p.hp/maxHp,0,1);
   // right orb: prayer points
@@ -12311,13 +12481,27 @@ applyLayoutClass();
 // column to the right of the main HUD sidebar - there's room for it there
 // on a wide-enough screen, and it keeps the Skills panel from ballooning
 // as a caster picks up more and more spells over 20 levels
+// the spell column for RuneScape magic: every spell you can cast, its damage and how many casts your runes allow
+function rsSpellColHtml(){
+  const p = G.player, L = rsLvl('magic'), el = rsStaffElem();
+  const casts = sp=>{ let n = Infinity; for (const r in sp[4]) if (r!==el) n = Math.min(n, Math.floor(skHave('r_'+r)/sp[4][r])); return n; };
+  const list = RS_SPELLS.filter(sp=>sp[2] <= L), next = RS_SPELLS.find(sp=>sp[2] > L);
+  const rows = list.map(sp=>{ const d = rsSpellDamage(sp), n = casts(sp), sel = p.rsSpell===sp[0];
+    return `<div class="spellrow" style="cursor:pointer;${sel ? 'color:var(--amber);' : ''}" onclick="rsSelectSpell('${sp[0]}'); renderGame();" title="click to select">
+      <span style="color:${ISO_ELEM_COL[sp[6]]||'inherit'}">&#9670;</span> ${esc(sp[1])} <span class="muted">${d.lo}&ndash;${d.hi}</span>
+      <span style="float:right;color:${n>0 ? 'var(--ink-dim)' : COL.red}">${n===Infinity ? '&infin;' : '&times;'+n}</span></div>`; }).join('');
+  return `<div class="panel"><h4>Spells &middot; Magic ${L}</h4>
+    <div class="muted" style="font-size:11px;margin-bottom:6px;">${rsAutocastOn() ? 'autocasting with your staff' : 'R casts the selected spell'} &middot; G opens the spellbook</div>
+    ${rows || '<div class="muted">no spells yet</div>'}
+    ${next ? `<div class="muted" style="font-size:11px;margin-top:6px;">next: ${esc(next[1])} at Magic ${next[2]}</div>` : ''}</div>`;
+}
 function renderSpellCol(){
   const el = document.getElementById('spellcol');
   if (!el) return;
   const p = G.player;
   if (!p || !isCaster(p.cls)){
-    const noneHtml = `<div class="panel"><h4>Spells</h4><div class="muted">${p ? esc(p.cls)+' has no spells.' : ''}</div></div>`;
-    if (el.__lastHtml !== noneHtml){ el.innerHTML = noneHtml; el.__lastHtml = noneHtml; }
+    const html = p ? rsSpellColHtml() : '';
+    if (el.__lastHtml !== html){ el.innerHTML = html; el.__lastHtml = html; }
     return;
   }
   const maxSlots = spellSlotsMaxTable(p.cls, p.level);
@@ -16629,6 +16813,7 @@ function v3BuildScene(){
   const grp = V3.world = new T.Group(); sc.add(grp);
   V3.windows = []; V3.lamps = []; V3.smoke = []; V3.flames = []; V3.signs = []; V3.hits = []; V3.people = []; V3.parts = [];
   const mats = V3.mats = v3Materials();
+  if (G.interior){ v3BuildInterior(grp, mats); v3BuildPeople(grp, mats); return; }
   // ground: the painted town square plus the wide surrounding land
   const gt = v3GroundTexture(G.villageTheme), gsz = gt.size;
   const ground = new T.Mesh(new T.PlaneGeometry(gsz, gsz), new T.MeshStandardMaterial({ map:gt.tex, roughness:0.95 }));
@@ -16724,12 +16909,16 @@ function v3BuildScene(){
     const f = new T.Mesh(new T.IcosahedronGeometry(0.16,0), mats.leaf2); f.position.set(x,0.1,z); f.scale.y = 0.6; grp.add(f); } }
   v3Palisade(mats, grp);
   v3Grass(grp);
+  v3BuildPeople(grp, mats);
+}
+function v3BuildPeople(grp, mats){
+  const T = THREE;
   // people
   const P = (entry, h, x, y)=>{ const p = v3Person(entry, h, grp); p.g.position.set(x+0.5, 0, y+0.5); return p; };
   V3.player = P(v3PlayerLook(), 1.0, G.player.x, G.player.y); V3.player.at = [G.player.x, G.player.y];
   V3.npcs = (G.villageNpcs||[]).map(n=>{ const look = V3_LOOK[n.service] ? V3_LOOK[n.service]() : v3VillagerLook(0);
     const p = P(Object.assign(look, { o:Object.assign({}, look.o, V3_RACE_LOOK[G.villageRace]||{}) }), 1.02, n.x, n.y); p.n = n;
-    p.sp.userData.act = { kind:'tile', x:n.x, y:n.y, label:n.name }; V3.hits.push(p.sp);
+    p.sp.userData.act = { kind:'tile', x:n.x, y:G.interior ? n.y+1 : n.y, label:n.name }; V3.hits.push(p.sp);
     if (n.service==='questgiver'){ const mk = new T.Sprite(new T.SpriteMaterial({ map:v3MarkerTex('!'), transparent:true, depthTest:false })); mk.scale.set(0.42,0.63,1); mk.position.y = 1.75; p.g.add(mk); V3.marker = mk; }
     return p; });
   V3.villagers = (G.villagers||[]).map((v,i)=>{ const p = P(v3VillagerLook(v.look||i), 0.94, v.x, v.y); p.v = v; return p; });
@@ -16746,16 +16935,18 @@ function v3BuildScene(){
   V3.labels.innerHTML = '';
   V3.plates = [];
   for (const p of V3.npcs){ const el = document.createElement('div'); el.className = 'v3plate'; el.innerHTML = `<b>${esc(p.n.name)}</b><span>${esc(p.n.role)}</span>`; V3.labels.appendChild(el); V3.plates.push({ el, obj:p.g, y:1.2 }); p.plate = el; }
-  for (const [txt, x, y, z] of [['Waypoint', Math.floor(COLS/2)+0.5, 1.95, 12.5], ['Stash', 13.5, 0.95, 10.5]]){
+  if (G.interior) for (const [k,x,y] of ROOM_LAYOUT[G.interior.key].benches){ const el = document.createElement('div'); el.className = 'v3plate small'; el.innerHTML = `<b>${esc(BENCHES[k].nm)}</b>`; V3.labels.appendChild(el); V3.plates.push({ el, pos:new T.Vector3(x+0.5, 1.45, y+0.5) }); }
+  if (G.interior){ const el = document.createElement('div'); el.className = 'v3plate small'; el.innerHTML = '<b>Door</b>'; V3.labels.appendChild(el); V3.plates.push({ el, pos:new T.Vector3(ROOM.door.x+0.5, 1.9, ROOM.door.y+0.2) }); }
+  if (!G.interior) for (const [txt, x, y, z] of [['Waypoint', Math.floor(COLS/2)+0.5, 1.95, 12.5], ['Stash', 13.5, 0.95, 10.5]]){
     const el = document.createElement('div'); el.className = 'v3plate small'; el.innerHTML = `<b>${txt}</b>`; V3.labels.appendChild(el);
     V3.plates.push({ el, pos:new T.Vector3(x,y,z) });
   }
-  for (const b of VILLAGE_BUILDINGS){ const el = document.createElement('div'); el.className = 'v3plate bld'; el.innerHTML = `<b>${esc(b.name)}</b>`; V3.labels.appendChild(el);
+  if (!G.interior) for (const b of VILLAGE_BUILDINGS){ const el = document.createElement('div'); el.className = 'v3plate bld'; el.innerHTML = `<b>${esc(b.name)}</b>`; V3.labels.appendChild(el);
     V3.plates.push({ el, pos:new T.Vector3(b.x0+b.w/2, (b.floors||1)*1.2+1.6, b.y0+b.h/2) }); }
   const f = townFlavorAt(G.owPos.x, G.owPos.y);
   let bn = document.getElementById('v3banner');
   if (!bn){ bn = document.createElement('div'); bn.id = 'v3banner'; document.querySelector('.mapwrap').appendChild(bn); }
-  bn.innerHTML = f ? `<b>${esc(f.name)}</b><span>${esc(article(f.adj))} ${esc(f.adj)} settlement</span>` : '<b>A Village</b>';
+  bn.innerHTML = G.interior ? `<b>${esc(G.interior.name)}</b><span>${esc(f ? f.name : 'the village')}</span>` : f ? `<b>${esc(f.name)}</b><span>${esc(article(f.adj))} ${esc(f.adj)} settlement</span>` : '<b>A Village</b>';
   bn.classList.remove('show'); void bn.offsetWidth; bn.classList.add('show');
   const seen = new Set();
   V3.world.traverse(o=>{ const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : [];
@@ -16781,6 +16972,12 @@ function v3ApplyTime(force){
   (V3.windows||[]).forEach(w=>{ w.material = w.material; });
   V3.mats.glass.emissiveIntensity = night ? 0.85 : 0.08;
   V3.plights.forEach(pl=>{ const l = pl.userData; pl.intensity = !l || !l.p ? 0 : (night || l.always || l.forge) ? (night ? 2.6 : 1.2) : 0; pl.distance = l && l.r ? l.r*(night?1.4:1) : 5; });
+  if (G.interior){                                    // indoors: lamplight, whatever the hour
+    V3.scene.background = new THREE.Color(0x0b0907); V3.scene.fog = new THREE.Fog(0x0b0907, 22, 48);
+    V3.hemi.color.setHex(0xffe0b0); V3.hemi.groundColor.setHex(0x2a1c10); V3.hemi.intensity = 0.55;
+    V3.sun.intensity = night ? 0.15 : 0.6; V3.sun.color.setHex(night ? 0x7a90e0 : 0xffe8c8); V3.mats.glass.emissiveIntensity = night ? 0.1 : 0.6;
+    V3.plights.forEach(pl=>{ const l = pl.userData; pl.intensity = l && l.p ? 2.2 : 0; pl.distance = l && l.r ? l.r : 5; });
+  }
 }
 // ---------- setup ----------
 function v3Init(){
@@ -16809,7 +17006,7 @@ function v3Init(){
   return V3.ok;
 }
 // ---------- walking: breadth-first path over walkable tiles ----------
-function v3Walkable(x,y){ if (x<0||y<0||x>=COLS||y>=ROWS) return false; const t = G.map[x][y]; return t===T_FLOOR || t===T_EXIT || t===T_GOLD || t===T_ITEM; }
+function v3Walkable(x,y){ if (x<0||y<0||x>=COLS||y>=ROWS) return false; const t = G.map[x][y]; return t===T_FLOOR || t===T_EXIT || t===T_GOLD || t===T_ITEM || t===T_DOOROUT; }
 function v3PathTo(tx, ty, bump){
   const sx = G.player.x, sy = G.player.y, key = (x,y)=>x+','+y, prev = new Map([[key(sx,sy), null]]), q = [[sx,sy]];
   const goal = (x,y)=> bump ? (Math.abs(x-tx)+Math.abs(y-ty)===1) : (x===tx && y===ty);
@@ -22070,8 +22267,8 @@ function backOut(){
     case 'charsheet': setUi('playing'); break;
     case 'skills': case 'rsmagic': case 'prayer': setUi('playing'); break;
     case 'crafting': setUi(G.craftBack||'playing'); break;
-    case 'tailor': setUi('playing'); break;
-    case 'cook': setUi(G.cookAt==='fire' ? 'playing' : 'tavern'); break;
+    case 'tailor': case 'bench': setUi('playing'); break;
+    case 'cook': setUi(G.cookAt==='fire' || G.interior ? 'playing' : 'tavern'); break;
     case 'vault': /* handled inside vault (only closes when solved/jammed) */ break;
     default: break;
   }
@@ -22116,7 +22313,8 @@ function renderOverlay(){
     case 'fastTravel': el.innerHTML = buildFastTravel(); break;
     case 'skills': el.innerHTML = buildSkills(); break;
     case 'crafting': el.innerHTML = buildCrafting(); break;
-    case 'tailor': el.innerHTML = buildCrafting(true); break;
+    case 'tailor': el.innerHTML = buildTailorShop(); break;
+    case 'bench': el.innerHTML = buildBench(); break;
     case 'rsmagic': el.innerHTML = buildRsMagic(); break;
     case 'prayer': el.innerHTML = buildPrayer(); break;
     case 'cook': el.innerHTML = buildCook(); break;
@@ -22577,9 +22775,10 @@ function buildBlacksmith(){
   const worn = ['weapon','head','chest','legs','arms'].map(k=>{ const it = G.gear[k]; return it && it.used ? `<div class="shoprow"><span class="muted" style="min-width:74px;">${k}</span><span class="${rarityColorClass(it)}">${esc(it.nm)}</span><span class="desc">${esc(itemDesc(it))}</span></div>` : ''; }).join('');
   return `
     <h2 class="panel-title">THE BLACKSMITH</h2>
-    <div class="sub">You have ${G.player.gold} gold. The racks hold bronze and iron only. Steel and better you forge yourself from the ore you mine (smelt it into bars below, then forge), or take from what the deep dungeons drop.</div>
+    <div class="sub">You have ${G.player.gold} gold. The racks hold bronze and iron only. Steel and better you forge yourself from the ore you mine (smelt it at the furnace, then forge at an anvil), or take from what the deep dungeons drop.</div>
     <div class="ovbody">${rows.join('')}
-      ${buildSmithing()}
+      ${buildSmithing('tools')}
+      <div class="muted" style="margin-top:10px;">smelt your ore at the furnace and forge bars at the anvils here in the smithy</div>
       ${buildSmithBuysHtml()}
       <div class="panel" style="margin-top:14px;"><h4 style="color:${COL.amber};">WHAT YOU WEAR</h4>${worn || '<div class="muted">nothing</div>'}</div>
       <div class="btnrow"><button class="btn primary" onclick="setUi('playing')">L / ESC &middot; leave</button></div>
@@ -22602,7 +22801,7 @@ function buyAlchemistPotion(i){
 }
 function buildAlchemist(){
   if (!G.alchemistStock || G.alchemistStock.length===0){
-    return `<h2 class="panel-title">THE ALCHEMIST</h2><div class="sub">You have ${G.player.gold} gold.</div><div class="ovbody"><div class="muted" style="text-align:center;">the shelves are bare for now</div>${buildRuneShop()}${buildBrewing()}
+    return `<h2 class="panel-title">THE ALCHEMIST</h2><div class="sub">You have ${G.player.gold} gold.</div><div class="ovbody"><div class="muted" style="text-align:center;">the shelves are bare for now</div>${buildRuneShop()}<div class="muted" style="margin-top:10px;">brew your herbs into potions at the cauldrons here in the shop</div>
       <div class="btnrow"><button class="btn primary" onclick="setUi('playing')">L &middot; leave</button></div></div>`;
   }
   const rows = G.alchemistStock.map((it,i)=>`
@@ -22615,7 +22814,7 @@ function buildAlchemist(){
   return `
     <h2 class="panel-title">THE ALCHEMIST</h2>
     <div class="sub">You have ${G.player.gold} gold. Click a potion to buy, or press its number.</div>
-    <div class="ovbody">${rows}${buildRuneShop()}${buildBrewing()}
+    <div class="ovbody">${rows}${buildRuneShop()}<div class="muted" style="margin-top:10px;">brew your herbs into potions at the cauldrons here in the shop</div>
       <div class="btnrow"><button class="btn primary" onclick="setUi('playing')">L / ESC &middot; leave</button></div>
     </div>
   `;
@@ -22645,7 +22844,6 @@ function buildTavern(){
     <div class="ovbody">
       <div class="btnrow" style="margin-bottom:14px;">
         <button class="btn" onclick="villageRest(); renderOverlay();">R &middot; rest (full heal)</button>
-        <button class="btn" onclick="G.cookAt='hearth'; setUi('cook');">cook at the hearth</button>
       </div>
       <div class="panel" style="margin-bottom:14px;">
         <h4 style="color:${COL.purple};">Corruption: ${Math.round(G.player.corruption||0)}%</h4>
@@ -23528,8 +23726,9 @@ function handleKeydown(e){
     case 'prayer': { if (['n','N','Escape'].includes(k)) setUi('playing'); break; }
     case 'crafting': { if (['x','X','Escape'].includes(k)) setUi(G.craftBack||'playing'); break; }
     case 'tailor': { if (['l','L','Escape'].includes(k)) setUi('playing'); break; }
+    case 'bench': { if (k==='Escape') setUi('playing'); break; }
     case 'skills': { if (['j','J','Escape'].includes(k)) setUi('playing'); else if (['u','U'].includes(k)){ eatFood(); renderOverlay(); } break; }
-    case 'cook': { if (k==='Escape') setUi(G.cookAt==='fire' ? 'playing' : 'tavern'); break; }
+    case 'cook': { if (k==='Escape') setUi(G.cookAt==='fire' || G.interior ? 'playing' : 'tavern'); break; }
     case 'playing': handlePlayingKey(k); break;
   }
 }
