@@ -1,5 +1,19 @@
 # Depthcrawl patch notes
 
+## RS-4 — Veins and stairs
+
+- **Ore veins stand out:** in a mine, every vein you've seen glows.
+  - It has a pulsing gold ring on the ground, and a glint runs over the rock.
+  - The rock is fully lit, even in the dark.
+  - Hover over one to see "Mine ore vein".
+  - Click one to walk beside it and start mining (you need a pickaxe).
+- **Old workings dimmed:** the gold flecks in mine walls are now dull traces of old workings. Bright gold now always means a vein you can mine.
+- **Stairs sit against a wall:** every floor's stairs (and its way in) are moved to the nearest spot squarely against a straight wall.
+  - The spot has open floor in front and to both sides, so a staircase never plugs a doorway, a corridor or the middle of a room.
+  - Stairs prefer the north and west walls, the ones the camera looks at, so a flight reads as climbing the wall rather than standing free.
+  - Down stairs open in the floor beside the wall, with the steps dropping away from you.
+- **Arriving on a floor:** you now land on the floor in front of the stairs, not inside them.
+
 ## RS-3 — Bones and motion
 
 - **Skeletons are full 3D models** in the dungeon scene. Each has its own copy of the sculpted skeleton, with rusted sword, round shield and glowing eyes. They stand braced, stride, cut at you, rock back when struck and topple when they fall.

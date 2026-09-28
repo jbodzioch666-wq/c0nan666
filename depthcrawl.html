@@ -4753,6 +4753,7 @@ function loadLevel(d, arrivingFromBelow, fellThrough){
   } else {
     generateLevel(d);
   }
+  if (fresh) settleStairs();
   // wall torches: purely a fresh-generation thing - a cached floor's torches
   // (like everything else about its layout) are already baked into the
   // restored G.dungeonDeco, so placing new ones on top would double up
@@ -4789,6 +4790,9 @@ function loadLevel(d, arrivingFromBelow, fellThrough){
     if (spots.length){ const sp = spots[rn(spots.length)]; G.player.x = sp.x; G.player.y = sp.y; }
   }
   if (G.gameMode===1 && d===1) G.map[G.genStart.x][G.genStart.y] = T_EXIT;
+  // step off the staircase you came by, onto the floor in front of it
+  if (!fellThrough && G.gameMode===1){ const t = G.map[G.player.x][G.player.y], w = (t===T_STAIRSU || t===T_STAIRSD) && stairWallDir(G.player.x, G.player.y);
+    if (w && G.map[G.player.x-w[0]][G.player.y-w[1]]===T_FLOOR && !G.mon.some(m=>m.alive && m.x===G.player.x-w[0] && m.y===G.player.y-w[1])){ G.player.x -= w[0]; G.player.y -= w[1]; } }
   G.player.facing = pickInitialFacing(G.player.x, G.player.y);
   placeCompanionNearPlayer(); // new floor, new map - drop the companion at your side again rather than wherever it stood on the last one
   placeSummonNearPlayer(); // same treatment for an active temporary summon, if one's still out
@@ -4816,6 +4820,52 @@ function tileAt(x,y){
 // helpers are the single place that decision lives, so tryMove()/loadLevel()
 // don't need to know which site they're in.
 function advanceTile(){ return ASCEND_SITES[G.siteKind] ? T_STAIRSU : T_STAIRSD; }
+// the generators drop a floor's stairs (and its way in) on any open tile - the
+// middle of a room, a doorway, a corridor - where a flight of steps blocks the
+// way and looks odd. This moves each to the nearest spot set squarely against
+// a straight stretch of wall, with open floor in front and to both sides, so
+// the flight climbs (or drops) toward the wall and never plugs a passage.
+// (north and west walls first: those are the walls the isometric camera looks at, so
+// a flight set against one reads as climbing the wall rather than standing free)
+const STAIR_WALL_ORDER = [[0,-1],[-1,0],[1,0],[0,1]];
+function stairWallDir(x, y, backOnly){
+  const open = (a,b)=>{ const t = tileAt(a,b); return t!==undefined && t!==null && t!==T_WALL; };
+  for (const [dx,dy] of (backOnly ? STAIR_WALL_ORDER.slice(0,2) : STAIR_WALL_ORDER)){
+    const px = -dy, py = dx;
+    if (tileAt(x+dx,y+dy)!==T_WALL || tileAt(x+dx+px,y+dy+py)!==T_WALL || tileAt(x+dx-px,y+dy-py)!==T_WALL) continue;   // a straight wall behind, no doorway beside it
+    if (open(x-dx,y-dy) && open(x+px,y+py) && open(x-px,y-py) && open(x-dx+px,y-dy+py) && open(x-dx-px,y-dy-py)) return [dx,dy];
+  }
+  return null;
+}
+function settleStairs(){
+  if (G.siteKind==='graveyard' || !G.map) return;          // (a graveyard's way down is its mausoleum)
+  const taken = (x,y)=> G.mon.some(m=>m.alive && m.x===x && m.y===y) || (G.dungeonDeco && G.dungeonDeco[x] && G.dungeonDeco[x][y]);
+  const spot = (x0, y0, backOnly)=>{
+    const seen = new Set([x0+','+y0]), q = [[x0,y0,0]];
+    while (q.length){
+      const [x,y,d] = q.shift();
+      if (G.map[x][y]===T_FLOOR && !taken(x,y) && stairWallDir(x,y,backOnly)) return [x,y];
+      if (d>=12) continue;
+      for (const [dx,dy] of FACING_VECT){ const nx = x+dx, ny = y+dy, k = nx+','+ny;
+        if (seen.has(k) || nx<1 || ny<1 || nx>=COLS-1 || ny>=ROWS-1 || G.map[nx][ny]===T_WALL) continue;
+        seen.add(k); q.push([nx,ny,d+1]); }
+    }
+    return null;
+  };
+  const moves = [];
+  for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++) if (G.map[x][y]===T_STAIRSU || G.map[x][y]===T_STAIRSD) moves.push([x,y]);
+  const startHasStair = moves.some(([x,y])=>x===G.genStart.x && y===G.genStart.y);
+  if (!startHasStair && G.map[G.genStart.x] && G.map[G.genStart.x][G.genStart.y]===T_FLOOR) moves.push([G.genStart.x, G.genStart.y]);
+  for (const [x,y] of moves){
+    if (stairWallDir(x,y,true)) continue;
+    const t = G.map[x][y];
+    if (t===T_STAIRSU || t===T_STAIRSD) G.map[x][y] = T_FLOOR;       // (free the old tile before searching, so it can't be chosen back)
+    const to = spot(x, y, true) || (stairWallDir(x,y) ? [x,y] : spot(x, y, false));
+    if (!to){ G.map[x][y] = t; continue; }
+    G.map[to[0]][to[1]] = t;
+    if (x===G.genStart.x && y===G.genStart.y){ G.genStart.x = to[0]; G.genStart.y = to[1]; }
+  }
+}
 function retreatTile(){ return ASCEND_SITES[G.siteKind] ? T_STAIRSD : T_STAIRSU; }
 // true if a straight line from (x0,y0) to (x1,y1) never crosses a wall
 // tile in between - a plain Bresenham walk, checking every intermediate
@@ -11793,7 +11843,8 @@ function fpRock(o){
       if (v<0.035) return [255, 80+v*1600, 18, 110];
       if (v<0.075) c = fpMix(c, [150,44,16], (0.075-v)/0.04*0.8);
     }
-    if (o.ore && fpNoise(x,y,16,s+30)>0.74 && fpHash(x,y,s+31)>0.35) return [236,196,96,70];
+    // (a dull, unlit trace of old workings - bright glowing gold is kept for the veins you can actually mine)
+    if (o.ore && fpNoise(x,y,16,s+30)>0.74 && fpHash(x,y,s+31)>0.35) return fpMix(c, [168,140,92], 0.5);
     return c;
   };
 }
@@ -19368,6 +19419,8 @@ function m3dSweep(){
 // painter-sorted, and clipped to the columns where no nearer wall hides them.
 const FP_STEPS = 5;
 function fpStairDir(x,y){
+  const w = stairWallDir(x, y);
+  if (w) return [-w[0], -w[1]];                 // you step on from the room; the flight runs toward the wall
   for (const [dx,dy] of FACING_VECT){
     const t = tileAt(x+dx,y+dy);
     if (t!==T_WALL && t!==T_STAIRSU && t!==T_STAIRSD) return [dx,dy];
@@ -19631,8 +19684,8 @@ function fpCollectSprites(vis){
     if (t===T_FLOOR && G.gameMode===1 && G.dungeonDeco){
       const deco = G.dungeonDeco[x][y], oe = deco && deco!=='rune' && deco!=='pool' && deco!=='torch' && !(deco==='grave' && FPD.ok) && obDecoEntry(deco, x, y);   // (headstones are modelled when the GPU renderer is up)
       if (oe){
-        const h = {throne:0.9, banner:0.86, altar:0.5, idol:0.7, grave:0.5, ore:0.3}[deco] || 0.6;
-        addP(oe, h, 0, {shadow:true, glow: deco==='idol' ? COL.cyan : deco==='altar' ? COL.purple : null});
+        const h = {throne:0.9, banner:0.86, altar:0.5, idol:0.7, grave:0.5, ore:0.46}[deco] || 0.6;
+        addP(oe, h, 0, {shadow:true, glow: deco==='idol' ? COL.cyan : deco==='altar' ? COL.purple : deco==='ore' ? '#ffd76b' : null, shine: deco==='ore', bright: deco==='ore'});
       }
     }
   }
@@ -20420,7 +20473,7 @@ function isoSyncSprites(S, env){
     if (m.map!==tex){ m.map = tex; m.needsUpdate = true; }
     const add = !!s.emissive;
     if ((m.blending===T.AdditiveBlending)!==add){ m.blending = add ? T.AdditiveBlending : T.NormalBlending; m.depthWrite = !add; m.needsUpdate = true; }
-    const lit = add ? 1 : clamp(fpLightAt(env, s.x, s.y, Math.hypot(s.x-px, s.y-py))*1.25 + 0.12, 0.12, 1);
+    const lit = add || s.bright ? 1 : clamp(fpLightAt(env, s.x, s.y, Math.hypot(s.x-px, s.y-py))*1.25 + 0.12, 0.12, 1);
     m.color.setScalar(Math.min(1.6, lit + (s.flash||0)*0.8));
     sp.visible = true; sp.position.set(s.x, s.lift||0, s.y); sp.scale.set(s.h*(s.spr.aspect||1), s.h, 1);
   }
@@ -20508,8 +20561,38 @@ function isoHoverTile(){
   const o = ray.ray.origin, d = ray.ray.direction; if (d.y>=0) return null;
   const t = -o.y/d.y; return [Math.floor(o.x + d.x*t), Math.floor(o.z + d.z*t)];
 }
+// ore veins in a mine: a pulsing gold ring on the ground and a glint, so they can't be missed
+function isoDrawVeins(){
+  if (G.gameMode!==1 || !G.dungeonDeco) return;
+  const ppu = ISO.ppu || 40, pulse = 0.55 + 0.45*Math.sin(FP.t*3.2);
+  ctx.save();
+  for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++){
+    if (G.dungeonDeco[x][y]!=='ore' || !(G.dungeonSeen && G.dungeonSeen[x][y])) continue;
+    const c = isoProject(x+0.5, y+0.5, 0.02); if (!c.ok) continue;
+    ctx.globalCompositeOperation = 'lighter';
+    const g = ctx.createRadialGradient(c.sx, c.sy, 0, c.sx, c.sy, ppu*0.75);
+    g.addColorStop(0, `rgba(255,205,90,${0.32*pulse})`); g.addColorStop(1, 'rgba(255,205,90,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(c.sx, c.sy, ppu*0.75, ppu*0.42, 0, 0, Math.PI*2); ctx.fill();
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.strokeStyle = `rgba(255,215,110,${0.45+0.4*pulse})`; ctx.lineWidth = 2*dpr;
+    const q = [[0.08,0.08],[0.92,0.08],[0.92,0.92],[0.08,0.92]].map(([a,b])=>isoProject(x+a, y+b, 0.02));
+    ctx.beginPath(); q.forEach((p,i)=> i ? ctx.lineTo(p.sx,p.sy) : ctx.moveTo(p.sx,p.sy)); ctx.closePath(); ctx.stroke();
+    // a glint that wanders over the rock
+    const ph = (FP.t*0.9 + x*0.37 + y*0.71) % 1, gl = isoProject(x+0.3+ph*0.4, y+0.5, 0.18+ph*0.2), r = ppu*0.09*Math.sin(ph*Math.PI);
+    ctx.strokeStyle = 'rgba(255,250,220,0.95)'; ctx.lineWidth = Math.max(1, dpr);
+    ctx.beginPath(); ctx.moveTo(gl.sx-r, gl.sy); ctx.lineTo(gl.sx+r, gl.sy); ctx.moveTo(gl.sx, gl.sy-r); ctx.lineTo(gl.sx, gl.sy+r); ctx.stroke();
+  }
+  ctx.restore();
+}
 function isoDrawHover(){
-  const h = isoHoverTile(); if (!h || !isoPassable(h[0], h[1])) return;
+  const h = isoHoverTile();
+  if (h && G.gameMode===1 && G.dungeonDeco && G.dungeonDeco[h[0]] && G.dungeonDeco[h[0]][h[1]]==='ore' && G.dungeonSeen && G.dungeonSeen[h[0]][h[1]]){
+    const top = isoProject(h[0]+0.5, h[1]+0.5, 0.8), txt = 'Mine ore vein';
+    ctx.save(); ctx.font = `700 ${Math.round(12*dpr)}px 'JetBrains Mono', monospace`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.lineWidth = 3*dpr; ctx.strokeStyle = 'rgba(0,0,0,0.85)'; ctx.strokeText(txt, top.sx, top.sy); ctx.fillStyle = '#ffd76b'; ctx.fillText(txt, top.sx, top.sy); ctx.restore();
+    return;
+  }
+  if (!h || !isoPassable(h[0], h[1])) return;
   const m = G.mon.find(q=>q.alive && q.x===h[0] && q.y===h[1] && (G.gameMode===2 || (G.dungeonSeen && G.dungeonSeen[q.x] && G.dungeonSeen[q.x][q.y])));
   const c = [[0,0],[1,0],[1,1],[0,1]].map(([a,b])=>isoProject(h[0]+a, h[1]+b, 0.01));
   ctx.save(); ctx.strokeStyle = m ? 'rgba(255,80,60,0.85)' : 'rgba(255,230,140,0.45)'; ctx.lineWidth = 1.5*dpr;
@@ -20527,6 +20610,7 @@ canvas.addEventListener('mouseleave', ()=>{ ISO.mouse = null; });
 // ---- health bars, damage numbers and sparks, drawn over the scene ----
 function isoDrawOverlay(S){
   const dt = FP.dt, ppu = ISO.ppu || 40;
+  isoDrawVeins();
   isoDrawHover();
   isoDrawShots();
   for (const s of S){
@@ -20649,6 +20733,13 @@ function isoClick(e){
   const t = -o.y/d.y, gx = Math.floor(o.x + d.x*t), gy = Math.floor(o.z + d.z*t);
   if (!mon) mon = G.mon.find(m=>m.alive && m.x===gx && m.y===gy) || null;
   const p = G.player;
+  if (!mon && G.gameMode===1 && G.dungeonDeco && G.dungeonDeco[gx] && G.dungeonDeco[gx][gy]==='ore'){
+    ISO.fighting = null; ISO.target = null;
+    if (Math.max(Math.abs(gx-p.x), Math.abs(gy-p.y))<=1){ ISO.path = []; isoStartMine(gx, gy); return; }
+    ISO.path = isoFindPath(gx, gy, true) || []; ISO.mineAt = ISO.path.length ? { x:gx, y:gy } : null; ISO.nextStep = 0;
+    return;
+  }
+  ISO.mineAt = null;
   if (mon){
     const dx = mon.x-p.x, dy = mon.y-p.y;
     ISO.fighting = mon;
@@ -20664,6 +20755,11 @@ function isoClick(e){
   ISO.path = isoFindPath(gx, gy, false) || []; ISO.target = null; ISO.nextStep = 0;
 }
 // walks one step of the clicked path per tick; stops when something comes at you
+function isoStartMine(x, y){
+  const p = G.player; if (G.gather) skStop();
+  const o = skOptions().find(o=>o.vein && o.vein.x===x && o.vein.y===y) || skOptions().find(o=>o.vein);
+  if (o){ const v = FACING_VECT.findIndex(d=>d[0]===Math.sign(x-p.x) && d[1]===Math.sign(y-p.y)); if (v>=0) p.facing = v; skDo(o); }
+}
 function isoTickPath(now){
   if (G.ui!=='playing' || G.gameOver){ ISO.path = []; ISO.fighting = null; return; }
   if (!ISO.path.length){ isoTickFight(now); return; }
@@ -20673,7 +20769,8 @@ function isoTickPath(now){
   if (Math.abs(dx)+Math.abs(dy)!==1){ ISO.path = []; return; }
   const map0 = G.map, hp0 = p.hp;
   isoStep(FACING_VECT.findIndex(v=>v[0]===dx && v[1]===dy));
-  if (G.map!==map0 || p.x!==nx || p.y!==ny || p.hp<hp0){ ISO.path = []; return; }
+  if (G.map!==map0 || p.x!==nx || p.y!==ny || p.hp<hp0){ ISO.path = []; ISO.mineAt = null; return; }
+  if (!ISO.path.length && ISO.mineAt){ const v = ISO.mineAt; ISO.mineAt = null; if (Math.max(Math.abs(v.x-p.x), Math.abs(v.y-p.y))<=1) isoStartMine(v.x, v.y); return; }
   const tgt = ISO.target;
   if (tgt && tgt.alive && Math.abs(tgt.x-p.x)+Math.abs(tgt.y-p.y)===1 && !ISO.path.length){
     ISO.target = null; ISO.nextStep = now + ISO_STEP_MS;
