@@ -1,5 +1,29 @@
 # Depthcrawl patch notes
 
+## RS-26 — Resources in the inventory
+
+- **The inventory has a Resources section** listing everything you gather, loot or craft with, grouped into:
+  - ores & bars
+  - logs
+  - fish & food
+  - herbs & flax
+  - crafting materials
+  - runes & ammunition
+  - bones
+
+  By default it shows what you're carrying. **Show every resource** lists the whole catalogue, with the ones you don't have greyed out.
+- **Hover any resource to see where it comes from and what it's for.** It lists every source:
+  - which trees, fishing spots, herb patches or mine floors give it, and the level each needs
+  - which monsters drop or can be skinned for it
+  - which bench and recipe make it
+  - which shop sells it
+
+  It also lists every use: what it smelts, forges, cooks, brews or crafts into, which spells burn it, how much it heals, or how much Prayer xp it gives. The Skills panel's bag uses the same tooltips.
+- **Gathering-spot tooltips list everything the spot can give or cause:**
+  - trees: bird's nests, bark from maples, yews and magic trees, and the treant risk on yews and magic trees
+  - fishing spots: which monster might take the line
+  - herb patches: the glowing double yield
+
 ## RS-25 — Shops with rooms, workbenches for every craft
 
 - **Vendors work inside their buildings now.** Walk through a shop's door and you step into its room. The vendor stands behind a counter against the back wall, among shelves of their wares, lit by hanging lanterns. The near walls are cut away so you can see in. Bump the counter to trade, and step back onto the doorway to go out into the street. Only the Captain of the Watch still stands in the square.
