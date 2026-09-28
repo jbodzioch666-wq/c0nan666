@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-17 — Stats drawer below the top-right buttons
+
+- **The stats drawer (Tab) no longer covers the menu, fullscreen, layout and help buttons:** it now opens just below them, and so does the spell panel beside it.
+- **The quest list moves out of the way:** while the stats drawer is open, the quest tracker slides down to sit under it. It slides back up when the drawer closes. If the list gets too long for the space left, it scrolls.
+
 ## RS-16 — Escape no longer throws you out of fullscreen
 
 - **Escape stays in the game in fullscreen:** after you go fullscreen with the game's own fullscreen button, the game asks the browser to lock the Escape key. In Chrome, Edge and Opera, tapping Esc then closes menus as usual. Holding Esc leaves fullscreen.
