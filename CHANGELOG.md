@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-21 — Your foe beside you
+
+- **The monster you're fighting now shows in a window right next to your player window, top left.** It has its portrait, name and level, a life bar with its current and maximum life, its attack style (melee, ranged or magic) and its elemental weakness or resistance.
+- **It follows the fight:** it appears as soon as you attack a monster or one attacks you, and it switches when you turn on another. It disappears when the monster dies or you leave the floor. It now works in the isometric view too; before, it was hidden there.
+
 ## RS-20 — Your figure wears what you wear
 
 - **Helmets cover your head:** metal helmets are now a dome that covers the whole head and hair down to the brow, with a brim. Before, the top and back of the head poked through. Great helms were enlarged the same way.
