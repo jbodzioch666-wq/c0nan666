@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-22 — One-handed tool swings
+
+- **Only your right arm swings the pickaxe or hatchet:** your left arm now stays still at your side while you mine or chop. Before, it swung along with the tool.
+
 ## RS-21 — Your foe beside you
 
 - **The monster you're fighting now shows in a window right next to your player window, top left.** It has its portrait, name and level, a life bar with its current and maximum life, its attack style (melee, ranged or magic) and its elemental weakness or resistance.
