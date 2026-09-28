@@ -589,7 +589,7 @@ const T_WALL=0, T_FLOOR=1, T_STAIRSD=2, T_STAIRSU=3, T_GOLD=4, T_TRAP=5,
       // town-hub fixtures you interact with by walking into them (they
       // never let you stand on them): the waypoint, the stash chest, the
       // quest-giver and each vendor standing outside their shop
-      T_WAYPOINT=15, T_STASH=16, T_QUESTGIVER=17, T_VENDOR=18;
+      T_WAYPOINT=15, T_STASH=16, T_QUESTGIVER=17, T_VENDOR=18, T_TAILOR=19;
 const OW_GRASS=0, OW_FOREST=1, OW_WATER=2, OW_MOUNTAIN=3, OW_DUNGEON=4, OW_TOWN=5,
       OW_TUNDRA=6, OW_DESERT=7, OW_SWAMP=8, OW_RIVER=9, OW_CASTLE=10, OW_NECROTOWER=11,
       OW_TEMPLE=12, OW_GRAVEYARD=13, OW_MINE=14, OW_LAIR=15, OW_MOUNTAINPASS=16;
@@ -2079,7 +2079,7 @@ const COL = {
 // per-shop building wall colors for the walkable village view
 const VILLAGE_BUILDING_COLORS = {
   buildingShop: '#8a6a3f', buildingSmith: '#5a5a60',
-  buildingAlch: '#4d6a4a', buildingTavern: '#7a4632',
+  buildingAlch: '#4d6a4a', buildingTavern: '#7a4632', buildingTailor: '#5a4a7a',
 };
 // every building in a village now reads as the SAME race's architecture
 // (color + a real silhouette drawn once per building, not a flat tile-by-
@@ -6202,6 +6202,7 @@ function tryMove(dx,dy){
     case T_TAVERN: setUi('tavern'); break;
     case T_BLACKSMITH: setUi('blacksmith'); break;
     case T_ALCHEMIST: setUi('alchemist'); break;
+    case T_TAILOR: openTailor(); break;
     // which of these two tile types actually advances you deeper into the
     // site (vs retreats you toward the entrance) flips for a castle/necro
     // tower - see advanceTile()/retreatTile()
@@ -7869,7 +7870,7 @@ const SK_DEFS = [
   ['firemaking', 'Firemaking',  '&#9650;',  '#f0a030', 'burn logs to make a campfire (safer camping, and somewhere to cook)'],
   ['foraging',   'Foraging',    '&#10047;', '#9ad06a', 'pick the flowering herb patches - each herb grows on its own kind of land, and starlilies only open at night'],
   ['alchemy',    'Alchemy',     '&#9879;',  '#b07ae0', 'brew healing potions from herbs at an alchemist'],
-  ['crafting',   'Crafting',    '&#9986;',  '#d0a070', 'spin flax, tan hides and craft robes, staves, leather, bows and arrows (X)'],
+  ['crafting',   'Crafting',    '&#9986;',  '#d0a070', 'spin flax, tan hides and craft robes, staves, leather, bows and arrows at the Tailor in any town (X shows the recipes)'],
 ];
 const SK_MASTERY = [['sword','Swords'],['axe','Axes'],['blunt','Maces & Hammers'],['polearm','Spears & Polearms'],['dagger','Daggers'],['staff','Staves'],['bow','Bows'],['unarmed','Unarmed']];
 // the classic curve, scaled down so a dungeon crawler's play sessions get somewhere
@@ -8460,7 +8461,7 @@ function buildSkills(){
       <div class="skgrid">${skills}</div>
       <h4 style="color:var(--ink-faint);margin:12px 0 6px;">BAG</h4><div class="skbag">${bag}</div>
       <div class="btnrow" style="margin-top:12px;">${opts}${foods.length ? `<button class="btn" onclick="eatFood(); renderOverlay();">U &middot; eat (${foods.reduce((a,f)=>a+f.n,0)} food)</button>` : ''}
-        <button class="btn" onclick="openCrafting('skills')">X &middot; crafting</button>
+        <button class="btn" onclick="openCrafting('skills')">X &middot; crafting recipes</button>
         <button class="btn primary" onclick="setUi('playing')">J / ESC &middot; close</button></div>
     </div>`;
 }
@@ -8553,8 +8554,19 @@ function crRecipes(){
   return (crRecipes.list = R);
 }
 function crCan(r){ for (const k in r.need) if (crHave(k) < r.need[k]) return false; return (G.player.gold||0) >= (r.gold||0); }
+// the tailor sells the basics to get you started
+const TAILOR_WARES = [['flax', 3], ['cowhide', 6], ['bowstring', 12], ['linen', 10], ['orb', 80]];
+function crBuy(id, n){
+  const w = TAILOR_WARES.find(w=>w[0]===id); if (!w) return;
+  const price = repPrice(w[1]); let got = 0;
+  for (let k=0;k<(n||1);k++){ if (G.player.gold < price) break; G.player.gold -= price; skAdd(id, 1); got++; }
+  logMsg(got ? `you buy ${got} ${crName(id).toLowerCase()} for ${got*price} gold` : `you can't afford that`, got ? 'loot' : 'hit');
+  renderOverlay(); saveCurrentGame();
+}
+function openTailor(){ setUi('tailor'); }
 function crCraft(id, all){
   const r = crRecipes().find(r=>r.id===id); if (!r) return;
+  if (G.ui!=='tailor'){ logMsg("you need a tailor's workshop to craft - there's one in every town", 'hit'); renderOverlay(); return; }
   const L = skLvl('crafting');
   if (L < r.lvl){ logMsg(`you need Crafting level ${r.lvl}`, 'hit'); renderOverlay(); return; }
   let n = 0;
@@ -8574,14 +8586,15 @@ function crCraft(id, all){
   renderOverlay(); saveCurrentGame();
 }
 function crNeedText(r){ return Object.keys(r.need).map(k=>`${r.need[k]} ${crName(k).toLowerCase()}`).join(' + ') + (r.gold ? ` + ${r.gold}g` : ''); }
-function buildCrafting(){
+function buildCrafting(atTailor){
   const L = skLvl('crafting'), R = crRecipes(), tab = G.craftTab || 'magic';
+  const npc = atTailor && typeof villageNpcFor==='function' ? villageNpcFor('tailor') : null;
   const mats = SK_CRAFT_MATS.filter(m=>skHave(m.id)>0).map(m=>`<span class="skitem">${esc(m.nm)} <b>&times;${skHave(m.id)}</b></span>`).join('') || '<span class="muted">none yet</span>';
   const sec = (s)=>{
     const rows = {}; for (const r of R) if (r.sec===s) (rows[r.row] = rows[r.row] || []).push(r);
     return Object.keys(rows).map(row=>{
       const list = rows[row], minL = Math.min(...list.map(r=>r.lvl)), locked = L < minL;
-      const btns = list.map(r=>{ const ok = L>=r.lvl && crCan(r);
+      const btns = list.map(r=>{ const ok = atTailor && L>=r.lvl && crCan(r);
         return `<button class="btn" ${ok ? '' : 'disabled'} title="${esc(crNeedText(r))}${L<r.lvl ? ' - needs Crafting '+r.lvl : ''}" onclick="crCraft('${r.id}')">${esc(r.nm)}${L<r.lvl ? ` (${r.lvl})` : ''}</button>${r.all && ok ? `<button class="btn" title="make as many as you can" onclick="crCraft('${r.id}',1)">all</button>` : ''}`; }).join(' ');
       const need = list.length && list.every(r=>crNeedText(r)===crNeedText(list[0])) ? crNeedText(list[0]) : list.map(r=>`${r.nm}: ${crNeedText(r)}`).join(' &middot; ');
       return `<div class="shoprow" style="${locked ? 'opacity:0.55' : ''}"><span class="muted">${minL}</span><span>${esc(row)}</span><span class="desc">${btns}<div class="muted" style="font-size:10.5px;margin-top:3px;">${esc(need).replace(/&amp;middot;/g,'&middot;')}</div></span><span></span></div>`;
@@ -8591,14 +8604,17 @@ function buildCrafting(){
   const hint = { basics:'Spin foraged flax into linen and bowstrings. Tan hides from beasts and dragons (the tanner takes a few coins). Blow a silver bar into an orb, then charge it with 20 runes of an element.',
     magic:'Robes from linen, plus bark (maple, yew and magic trees), ghostcap, starlily or dragon\'s tongue for the finer grades. Staves from logs, with a charged orb for an element.',
     ranged:'Leather armour from tanned hides - studded adds an iron bar, dragonhide needs dragon leather. Bows from logs and a bowstring; arrows from any logs.' }[tab];
-  return `<h2 class="panel-title">CRAFTING &middot; level ${L}</h2>
-    <div class="sub">What you craft is better than any drop: <b>+15% to +45%</b> bonuses, the better your level over the recipe's. Hover a button for what it takes.</div>
+  const wares = atTailor ? `<div class="panel" style="margin-bottom:10px;"><h4 style="color:${COL.amber};">FOR SALE</h4>${TAILOR_WARES.map(([id,pr])=>`<div class="shoprow"><span class="muted">&times;${skHave(id)}</span><span>${esc(crName(id))}</span>
+      <span class="desc"><button class="btn" ${G.player.gold>=repPrice(pr) ? '' : 'disabled'} onclick="crBuy('${id}')">buy 1</button> <button class="btn" ${G.player.gold>=repPrice(pr)*5 ? '' : 'disabled'} onclick="crBuy('${id}',5)">buy 5</button></span><span class="price">${repPrice(pr)}g</span></div>`).join('')}</div>` : '';
+  return `<h2 class="panel-title">${atTailor ? 'THE TAILOR' : 'CRAFTING RECIPES'} &middot; Crafting ${L}</h2>
+    <div class="sub">${atTailor ? `${npc ? esc(npc.name)+' the tailor' : 'The tailor'} lends you the loom, the tanning vats and the fletching bench. You have ${G.player.gold} gold. ` : `<b style="color:${COL.amber}">Crafting is done at the Tailor in any town</b> - these are the recipes. `}What you craft is better than any drop: <b>+15% to +45%</b> bonuses, the better your level over the recipe's. Hover a button for what it takes.</div>
     <div class="ovbody">
+      ${wares}
       <div class="btnrow" style="justify-content:flex-start;margin-bottom:8px;">${tabs}</div>
       <div class="muted" style="font-size:11.5px;margin-bottom:8px;">${hint}</div>
       <div class="panel">${sec(tab)}</div>
       <h4 style="color:var(--ink-faint);margin:12px 0 6px;">CRAFTING MATERIALS</h4><div class="skbag">${mats}</div>
-      <div class="btnrow" style="margin-top:12px;"><button class="btn primary" onclick="setUi(G.craftBack||'playing')">X / ESC &middot; close</button></div>
+      <div class="btnrow" style="margin-top:12px;">${atTailor ? `<button class="btn primary" onclick="setUi('playing')">L / ESC &middot; leave</button>` : `<button class="btn primary" onclick="setUi(G.craftBack||'playing')">X / ESC &middot; close</button>`}</div>
     </div>`;
 }
 function openCrafting(back){ G.craftBack = back || 'playing'; setUi('crafting'); }
@@ -9569,10 +9585,11 @@ const VILLAGE_BUILDINGS = [
   { key:'tavern', tile:T_TAVERN,     deco:'buildingTavern', x0:8,  y0:2, w:5, h:5, door:{x:10,y:6}, face:'s', floors:2, name:'The Tavern',     npc:{x:12,y:7}, role:'Innkeeper',  service:'tavern' },
   { key:'alch',   tile:T_ALCHEMIST,  deco:'buildingAlch',   x0:15, y0:2, w:3, h:4, door:{x:16,y:5}, face:'s', floors:2, name:'The Alchemist',  npc:{x:14,y:6}, role:'Alchemist',  service:'alchemist' },
   { key:'shop',   tile:T_SHOP,       deco:'buildingShop',   x0:2,  y0:9, w:3, h:4, door:{x:4,y:10}, face:'e', floors:1, name:'The Peddler',    npc:{x:5,y:12}, role:'Peddler',    service:'shop' },
+  { key:'tailor', tile:T_TAILOR,     deco:'buildingTailor', x0:15, y0:13, w:3, h:3, door:{x:16,y:15}, face:'s', floors:2, name:'The Tailor',    npc:{x:14,y:14}, role:'Tailor',     service:'tailor' },
 ];
 // houses and a guard barracks - scenery only
 const VILLAGE_HOUSES = [
-  { x0:2, y0:15, w:3, h:3, floors:1 }, { x0:15, y0:14, w:3, h:4, floors:2 }, { x0:16, y0:9, w:2, h:3, floors:1, barracks:true },
+  { x0:2, y0:15, w:3, h:3, floors:1 }, { x0:16, y0:9, w:2, h:3, floors:1, barracks:true },
 ];
 const VILLAGE_NPC_NAMES = {
   human: ['Aldric','Bram','Corwin','Doran','Edric','Hilda','Isolde','Marta','Osric','Rowena','Tobin','Wynne','Garrick','Elsa'],
@@ -9623,7 +9640,7 @@ function generateVillage(){
   G.villageNpcs.push({ x:14, y:9, name:nm(5), role:'Captain of the Watch', service:'questgiver', key:'quest' });
   // lamp posts round the plaza and a few trees and barrels
   for (const [x,y] of [[7,8],[14,15],[7,15],[11,8]]) W(x,y,'lamp');
-  for (const [x,y] of [[6,16],[13,17],[17,13],[6,8],[1+1,13]]) if (G.map[x][y]===T_FLOOR) W(x,y,'tree');
+  for (const [x,y] of [[6,16],[13,17],[18,17],[6,8],[1+1,13]]) if (G.map[x][y]===T_FLOOR) W(x,y,'tree');
   for (const [x,y] of [[13,6],[13,5]]) W(x,y,'barrels');
   G.player.x = cx; G.player.y = ROWS-3; G.player.facing = 0;
 
@@ -10944,6 +10961,7 @@ function renderDungeonMapOrtho(){
         case T_TAVERN: drawObjIcon(x,y,obEntry('tavern'),0.8); break;
         case T_BLACKSMITH: drawObjIcon(x,y,obEntry('anvil'),0.6); break;
         case T_ALCHEMIST: drawObjIcon(x,y,obEntry('cauldron'),0.7); break;
+        case T_TAILOR: drawObjIcon(x,y,obEntry('armor',{metal:'#6a4ab0'}),0.6); break;
         case T_ITEM: {
           const fi = G.floorItem[x][y];
           if (fi){
@@ -11085,6 +11103,7 @@ function renderDungeonMapIso(){
         case T_TAVERN: drawIsoGlyph(cx,cy,'H',COL.tavern); break;
         case T_BLACKSMITH: drawIsoGlyph(cx,cy,'&',COL.dim); break;
         case T_ALCHEMIST: drawIsoGlyph(cx,cy,'*',COL.green); break;
+        case T_TAILOR: drawIsoGlyph(cx,cy,'T',COL.purple); break;
         case T_ITEM: {
           const fi = G.floorItem[x][y];
           if (fi){
@@ -11273,6 +11292,7 @@ function renderVillageMap(){
         case T_TAVERN: drawGlyph(x,y,'H',COL.tavern); break;
         case T_BLACKSMITH: drawGlyph(x,y,'&',COL.dim); break;
         case T_ALCHEMIST: drawGlyph(x,y,'*',COL.green); break;
+        case T_TAILOR: drawGlyph(x,y,'T',COL.purple); break;
         case T_WAYPOINT: drawObjIcon(x,y,obEntry('portal',{rgb:'90,220,255'}),0.9); break;
         case T_STASH: drawObjIcon(x,y,obEntry('chest',{gold:true}),0.66); break;
         case T_ITEM: {
@@ -16560,6 +16580,7 @@ const V3_LOOK = {
   tavern:     ()=>HUM({ outfit:'rags', cloth:'#8a6a44', bulk:1.15, hair:'#6a4a2a', beard:'#6a4a2a' }),
   alchemist:  ()=>HUM({ outfit:'robe', cloth:'#2a5a4a', head:'hood', faceShow:true, weapon:'staff', gem:'120,255,160', trim:'#b8943a' }),
   shop:       ()=>HUM({ outfit:'robe', cloth:'#6a3a7a', hair:'#2a1a10', beard:'#2a1a10', trim:'#d8b050' }),
+  tailor:     ()=>HUM({ outfit:'leather', cloth:'#7a5a3a', legWear:'cloth', legCol:'#4a3a8a', hair:'#b0a090', weapon:'bow', cape:'#3a2a6a' }),
   questgiver: ()=>HUM({ outfit:'chain', tabard:'#2a4a8a', emblem:'#d8b050', weapon:'spear', helm:'kettle', cape:'#2a3a6a', hair:'#5a3a20' }),
 };
 const V3_RACE_LOOK = { human:{}, elf:{ hair:'#e0d090', skin:'#f0d8c0' }, dwarf:{ bulk:1.22, beard:'#6a3a1a', hair:'#6a3a1a' }, orc:{ head:'orc', skin:'#6a8a4a' } };
@@ -16615,7 +16636,7 @@ function v3BuildScene(){
   const far = new T.Mesh(new T.PlaneGeometry(200,200), new T.MeshStandardMaterial({ color: new T.Color().setRGB(...(V3_GROUND[G.villageTheme]||V3_GROUND.forest).map(v=>Math.pow(v/255,2.2)*0.8)), roughness:1 }));
   far.rotation.x = -Math.PI/2; far.position.set(COLS/2,-0.01,ROWS/2); grp.add(far);
   // buildings
-  const icon = { smith:obEntry('anvil'), tavern:obEntry('tavern'), alch:obEntry('cauldron'), shop:obEntry('stall') };
+  const icon = { smith:obEntry('anvil'), tavern:obEntry('tavern'), alch:obEntry('cauldron'), shop:obEntry('stall'), tailor:obEntry('armor', { metal:'#6a4ab0' }) };
   V3.occ = []; V3.occDyn = new Set();
   const occluder = (b, g)=>{ const ob = new T.Mesh(new T.BoxGeometry(b.w, (b.floors||1)*1.2+1.9, b.h), new T.MeshBasicMaterial({ visible:false }));
     ob.position.set(b.x0+b.w/2, ((b.floors||1)*1.2+1.9)/2, b.y0+b.h/2); ob.userData.grp = g; grp.add(ob); V3.occ.push(ob); };
@@ -16798,7 +16819,7 @@ function v3PathTo(tx, ty, bump){
     for (const [dx,dy] of [[0,-1],[1,0],[0,1],[-1,0]]){
       const nx = x+dx, ny = y+dy, k = key(nx,ny);
       if (prev.has(k)) continue;
-      const doorOk = !bump && nx===tx && ny===ty && G.map[nx] && [T_SHOP,T_TAVERN,T_BLACKSMITH,T_ALCHEMIST].includes(G.map[nx][ny]);
+      const doorOk = !bump && nx===tx && ny===ty && G.map[nx] && [T_SHOP,T_TAVERN,T_BLACKSMITH,T_ALCHEMIST,T_TAILOR].includes(G.map[nx][ny]);
       if (!v3Walkable(nx,ny) && !doorOk) continue;
       prev.set(k, [x,y]); if (goal(nx,ny)){ end = [nx,ny]; break; } q.push([nx,ny]);
     }
@@ -20620,6 +20641,7 @@ function fpCollectSprites(vis){
       case T_TAVERN: addP(obEntry('tavern'), 0.55, 0, {shadow:true}); break;
       case T_BLACKSMITH: addP(obEntry('anvil'), 0.36, 0, {shadow:true}); break;
       case T_ALCHEMIST: addP(obEntry('cauldron'), 0.42, 0, {shadow:true, glow:COL.green}); break;
+      case T_TAILOR: addP(obEntry('armor',{metal:'#6a4ab0'}), 0.4, 0, {shadow:true}); break;
       case T_ITEM: {
         const fi = G.floorItem[x][y];
         if (!fi) break;
@@ -22048,6 +22070,7 @@ function backOut(){
     case 'charsheet': setUi('playing'); break;
     case 'skills': case 'rsmagic': case 'prayer': setUi('playing'); break;
     case 'crafting': setUi(G.craftBack||'playing'); break;
+    case 'tailor': setUi('playing'); break;
     case 'cook': setUi(G.cookAt==='fire' ? 'playing' : 'tavern'); break;
     case 'vault': /* handled inside vault (only closes when solved/jammed) */ break;
     default: break;
@@ -22093,6 +22116,7 @@ function renderOverlay(){
     case 'fastTravel': el.innerHTML = buildFastTravel(); break;
     case 'skills': el.innerHTML = buildSkills(); break;
     case 'crafting': el.innerHTML = buildCrafting(); break;
+    case 'tailor': el.innerHTML = buildCrafting(true); break;
     case 'rsmagic': el.innerHTML = buildRsMagic(); break;
     case 'prayer': el.innerHTML = buildPrayer(); break;
     case 'cook': el.innerHTML = buildCook(); break;
@@ -22592,7 +22616,7 @@ function buildAlchemist(){
     <h2 class="panel-title">THE ALCHEMIST</h2>
     <div class="sub">You have ${G.player.gold} gold. Click a potion to buy, or press its number.</div>
     <div class="ovbody">${rows}${buildRuneShop()}${buildBrewing()}
-      <div class="btnrow"><button class="btn" onclick="openCrafting('alchemist')">crafting bench</button><button class="btn primary" onclick="setUi('playing')">L / ESC &middot; leave</button></div>
+      <div class="btnrow"><button class="btn primary" onclick="setUi('playing')">L / ESC &middot; leave</button></div>
     </div>
   `;
 }
@@ -23272,7 +23296,7 @@ function buildHelp(){
       <div><span style="color:${COL.encounter}">!</span> a wandering threat, visible and moving around the map - walk into one to trigger it, or steer around it if you'd rather not fight right now. It'll drift toward you if you wander close, faster at night or in bad weather. Roughly 50 are out there at once, thinning out as you clear them and slowly replaced over time &middot; <span style="color:${COL.blue}">~</span> rivers trace downhill from the peaks to the sea</div>
       <div>most encounters are an ordinary fight, but not all of them: a wandering merchant sometimes hails you with a one-time stock instead of a fight; a pack occasionally has a tougher named champion leading it, worth real bonus loot; and the desert, swamp and tundra each hide their own unique set-piece encounter (a buried tomb, a bog ambush, a frozen cache) with a guaranteed bonus reward on top of the fight itself.</div>
       <div>open water blocks the way until you own a boat (buy one at any general store) &mdash; once you have one you can sail freely, though the open sea has its own dangers</div>
-      <div><b>Skills &amp; trades</b> (<kbd>J</kbd>): fishing, mining, woodcutting and foraging, and the trades that use what you gather - cooking, smithing, alchemy and firemaking - each level from 1 to 99 alongside your combat skills. Gather at the spots you see on the land: marked trees, bubbling fishing spots and flowering herb patches (hover one to see what it gives and the level it needs, click it to walk over and start), rock beside mountains, and ore veins, cave pools and cave herbs in the dungeons. Each spot gives a few items and then is felled, fished out or picked clean, and grows back or moves on in time. <kbd>E</kbd> works the nearest spot beside you (press it again or move to stop), light a campfire from your logs, or cook at your fire. Buy a fishing rod, pickaxe and hatchet (and better ones as you level) at the blacksmith, who also smelts your ore into bars and forges them into gear; brew herbs into potions at the alchemist; cook at the tavern hearth. Press <kbd>U</kbd> to eat the best-fitting cooked food (in a fight it takes your turn). Press <kbd>X</kbd> to craft: spin flax, tan hides, and make robes, staves, leather armour, bows and arrows.</div>
+      <div><b>Skills &amp; trades</b> (<kbd>J</kbd>): fishing, mining, woodcutting and foraging, and the trades that use what you gather - cooking, smithing, alchemy and firemaking - each level from 1 to 99 alongside your combat skills. Gather at the spots you see on the land: marked trees, bubbling fishing spots and flowering herb patches (hover one to see what it gives and the level it needs, click it to walk over and start), rock beside mountains, and ore veins, cave pools and cave herbs in the dungeons. Each spot gives a few items and then is felled, fished out or picked clean, and grows back or moves on in time. <kbd>E</kbd> works the nearest spot beside you (press it again or move to stop), light a campfire from your logs, or cook at your fire. Buy a fishing rod, pickaxe and hatchet (and better ones as you level) at the blacksmith, who also smelts your ore into bars and forges them into gear; brew herbs into potions at the alchemist; cook at the tavern hearth. Press <kbd>U</kbd> to eat the best-fitting cooked food (in a fight it takes your turn). Visit the Tailor in any town to craft: spin flax, tan hides, and make robes, staves, leather armour, bows and arrows (<kbd>X</kbd> shows the recipes anywhere).</div>
       <div>press <kbd>C</kbd> to make camp wherever you're standing &mdash; usually a free heal that also refills your ability charges, spell slots and wand charges, same as a village rest, but sleeping in the open risks a night-time ambush that interrupts the rest entirely (no healing, straight into a fight, and every exit is sealed until the last monster drops). Safer on grass, riskier in forest/swamp, and impossible while zoomed out. You can also camp inside any dungeon-type site once you've cleared every monster off the current floor &mdash; nothing left down there to ambush you, so it's just as safe as a village rest.</div>
       <div>press <kbd>M</kbd> (or the <b>+</b> icon) to zoom out and see the whole continent at once &mdash; press again to zoom back in and move; while zoomed out, press <kbd>T</kbd> to instantly fast-travel to any village you've already visited</div>
       <div>day turns to night and back on a steady cycle, and the weather shifts between clear, rain, fog and the occasional storm &mdash; both are shown in the corner of the overworld map. Night and bad weather raise the odds of a random encounter, so an easy stretch of road can turn dangerous after dark.</div>
@@ -23503,6 +23527,7 @@ function handleKeydown(e){
     case 'rsmagic': { if (['g','G','Escape'].includes(k)) setUi('playing'); break; }
     case 'prayer': { if (['n','N','Escape'].includes(k)) setUi('playing'); break; }
     case 'crafting': { if (['x','X','Escape'].includes(k)) setUi(G.craftBack||'playing'); break; }
+    case 'tailor': { if (['l','L','Escape'].includes(k)) setUi('playing'); break; }
     case 'skills': { if (['j','J','Escape'].includes(k)) setUi('playing'); else if (['u','U'].includes(k)){ eatFood(); renderOverlay(); } break; }
     case 'cook': { if (k==='Escape') setUi(G.cookAt==='fire' ? 'playing' : 'tavern'); break; }
     case 'playing': handlePlayingKey(k); break;

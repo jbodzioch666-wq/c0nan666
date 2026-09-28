@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-24 — The Tailor
+
+- **Every town has a Tailor:** a two-storey workshop in the south-east corner of the square, where a house used to stand. The tailor waits out front in leathers and a violet cape. Walk into them or through the door to go in.
+- **Crafting happens at the Tailor's.** The loom, tanning vats and fletching bench are there, the same way smithing happens at the Blacksmith. Pressing **X** elsewhere still shows every recipe, so you can plan what to gather. The crafting bench is no longer at the Alchemist's.
+- **The Tailor sells the basics to get you started:** flax, cowhides, bowstrings, linen cloth and unpowered orbs.
+
 ## RS-23 — Crafting: gear for mages and archers
 
 Warriors could always mine and smith their own gear. Now mages and archers can make theirs, with a new **Crafting** skill (1–99). Open it with **X**, from the Skills panel or at the alchemist's crafting bench. Like forged metal, everything you craft beats a drop: **+15% to +45%** bonuses depending on how far your level is above the recipe's. The best ones are Masterwork, which also adds +1 spell damage to staves and robes, or +1 damage to bows.
