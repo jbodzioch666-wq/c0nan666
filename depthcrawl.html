@@ -4849,6 +4849,7 @@ function loadLevel(d, arrivingFromBelow, fellThrough){
   placeCompanionNearPlayer(); // new floor, new map - drop the companion at your side again rather than wherever it stood on the last one
   placeSummonNearPlayer(); // same treatment for an active temporary summon, if one's still out
 
+  if (G.gameMode===1 && fresh) skPlaceCaveNodes();
   if (G.gameMode===1 && d===G.dungeonMaxDepth && fresh){
     spawnBoss();
     setUi('bossPreview');
@@ -7852,13 +7853,13 @@ function campOutside(){
 // a tenth more than the last). Everything lives on the player object, so it
 // saves with the character.
 const SK_DEFS = [
-  ['fishing',    'Fishing',     '&#8776;',  '#5aa8e0', 'stand by a river or the sea (or sail out) and press E'],
+  ['fishing',    'Fishing',     '&#8776;',  '#5aa8e0', 'find a fishing spot - bubbling water on rivers, shores and the open sea (sail out for the deep) - and click it or press E beside it'],
   ['cooking',    'Cooking',     '&#9832;',  '#e08a3a', 'cook fish and meat at a tavern hearth or your own campfire'],
   ['mining',     'Mining',      '&#9874;',  '#a8a0b0', 'mine rock beside mountains, or the ore veins in a mine'],
   ['smithing',   'Smithing',    '&#9876;',  '#c8b070', 'smelt ore into bars and forge gear at a blacksmith'],
-  ['woodcutting','Woodcutting', '&#9650;',  '#6ab04a', 'fell trees in forest and marsh'],
+  ['woodcutting','Woodcutting', '&#9650;',  '#6ab04a', 'chop the marked trees - oaks inside forests, willows by water, maples and yews deeper in, magic trees in the oldest woods'],
   ['firemaking', 'Firemaking',  '&#9650;',  '#f0a030', 'burn logs to make a campfire (safer camping, and somewhere to cook)'],
-  ['foraging',   'Foraging',    '&#10047;', '#9ad06a', 'search open ground for herbs'],
+  ['foraging',   'Foraging',    '&#10047;', '#9ad06a', 'pick the flowering herb patches - each herb grows on its own kind of land, and starlilies only open at night'],
   ['alchemy',    'Alchemy',     '&#9879;',  '#b07ae0', 'brew healing potions from herbs at an alchemist'],
 ];
 const SK_MASTERY = [['sword','Swords'],['axe','Axes'],['blunt','Maces & Hammers'],['polearm','Spears & Polearms'],['dagger','Daggers'],['staff','Staves'],['bow','Bows'],['unarmed','Unarmed']];
@@ -8031,18 +8032,18 @@ function skOptions(){
   if (!G.player || G.gameOver) return opts;
   if (G.gameMode===0 && !G.owZoomedOut){
     const own = skOwTile(G.owPos.x, G.owPos.y);
-    const sea = own===OW_WATER ? { x:G.owPos.x, y:G.owPos.y } : skNear(t=>t===OW_WATER), river = own===OW_RIVER ? { x:G.owPos.x, y:G.owPos.y } : skNear(t=>t===OW_RIVER);
-    if (sea || river) opts.push({ k:'fishing', label:'Fish', w: river && !sea ? 'r' : sea && !river ? 's' : 'b', at:river||sea });
-    const tree = skNear(t=>t===OW_FOREST || t===OW_SWAMP);
-    if (tree) opts.push({ k:'woodcutting', label:'Chop trees', marsh: tree.t===OW_SWAMP, at:tree });
+    const px = G.owPos.x, py = G.owPos.y;
+    for (const n of skNodesNear().sort((a,b)=>(Math.abs(a.x-px)+Math.abs(a.y-py))-(Math.abs(b.x-px)+Math.abs(b.y-py)))) opts.push(skNodeOption(n));
     const rock = skNear(t=>t===OW_MOUNTAIN || t===OW_MOUNTAINPASS);
     if (rock) opts.push({ k:'mining', label:'Mine rock', at:rock });
-    if (own!==OW_WATER && own!==OW_RIVER) opts.push({ k:'foraging', label:'Forage', at:{ x:G.owPos.x, y:G.owPos.y } });
     if (skFireHere() && skRawFoods().length) opts.push({ k:'cooking', label:'Cook at the fire' });
     else if (own!==OW_WATER && own!==OW_RIVER && SK_LOG.some(l=>skHave(l.id))) opts.push({ k:'firemaking', label:'Light a fire' });
   } else if (G.gameMode===1 && G.dungeonDeco){
     const px = G.player.x, py = G.player.y;
-    for (let dy=-1; dy<=1; dy++) for (let dx=-1; dx<=1; dx++){ const x = px+dx, y = py+dy; if (G.dungeonDeco[x] && G.dungeonDeco[x][y]==='ore'){ opts.unshift({ k:'mining', label:'Mine '+skName(veinOre(x,y)).toLowerCase(), vein:{x,y} }); dy = 2; break; } }
+    for (let dy=-1; dy<=1; dy++) for (let dx=-1; dx<=1; dx++){ const x = px+dx, y = py+dy, d = G.dungeonDeco[x] && G.dungeonDeco[x][y];
+      if (d==='ore') opts.push({ k:'mining', label:'Mine '+skName(veinOre(x,y)).toLowerCase(), vein:{x,y} });
+      else if (d==='eelpool') opts.push({ k:'fishing', label:'Fish the cave pool', vein:{x,y}, cave:d });
+      else if (d==='cavherb') opts.push({ k:'foraging', label:'Pick '+skName(skCaveHerb()).toLowerCase(), vein:{x,y}, cave:d }); }
   }
   return opts;
 }
@@ -8055,12 +8056,201 @@ function veinOre(x, y){
   const h = fpHash(x, y, 311 + (G.depth||1)*7);
   return list[h < 0.62 ? 0 : Math.min(list.length-1, 1 + Math.floor((h-0.62)/0.38*(list.length-1)))];
 }
+// ---- gathering spots on the overworld: real trees, fishing spots and herb patches ----
+// Like a mine's ore veins, each one is a fixed, visible thing on the land. Each yields a few
+// items, then is felled (a stump that regrows), fished out (the shoal moves on down the
+// water) or picked clean (it grows back). Where a spot stands decides what it gives, so
+// better resources mean travelling: oaks inside forests, maples and yews deeper in,
+// willows by water, yews near graveyards, magic trees in the oldest woods.
+const SK_TREE = {
+  tree:   { nm:'Tree',       log:'logs',   n:2, canopy:'#4f8a36' },
+  oak:    { nm:'Oak',        log:'oak',    n:4, canopy:'#3a6a26' },
+  willow: { nm:'Willow',     log:'willow', n:5, canopy:'#9aa83a' },
+  maple:  { nm:'Maple',      log:'maple',  n:6, canopy:'#d0602a' },
+  yew:    { nm:'Yew',        log:'yew',    n:7, canopy:'#1e4a36' },
+  magic:  { nm:'Magic tree', log:'magic',  n:8, canopy:'#5adada' },
+};
+const SK_SPOT = {
+  river: { nm:'River fishing spot',     fish:['trout','salmon','pike'],             col:'#a8e0ff', n:6 },
+  shore: { nm:'Shore fishing spot',     fish:['shrimp','sardine','lobster'],        col:'#f4f8ff', n:6 },
+  deep:  { nm:'Deep-sea fishing spot',  fish:['tuna','swordfish','shark','kraken'], col:'#4a8ae8', n:7 },
+  cave:  { nm:'Cave pool',              fish:['eel'],                               col:'#5ac8b0', n:4 },
+};
+const SK_HERB_COL = { silverleaf:'#e2ecf4', bloodmoss:'#c02a30', ghostcap:'#b0c0ff', sunpetal:'#ffd23a', dragontongue:'#ff6a2a', starlily:'#efe6ff' };
+const SK_FISH_EPOCH = 150;            // turns a fishing spot stays put before the shoal drifts elsewhere
+const SKN = { st:new Map(), seed:null };
+function skNH(x, y, s){ return o3Hash(x, y, s + ((G.ow && G.ow.seed)||0)%100000); }
+function skTileIs(x, y, list){ const t = skOwTile(x, y); return list.includes(t); }
+function skWithin(x, y, r, list){ for (let i=-r;i<=r;i++) for (let j=-r;j<=r;j++) if (skTileIs(x+i, y+j, list)) return true; return false; }
+function skForestDepth(x, y){
+  if (skOwTile(x,y)!==OW_FOREST) return 0;
+  for (let r=1;r<=3;r++) for (let i=-r;i<=r;i++) for (let j=-r;j<=r;j++){ if (Math.max(Math.abs(i),Math.abs(j))!==r) continue; if (skOwTile(x+i,y+j)!==OW_FOREST) return r; }
+  return 4;
+}
+// what grows or swims at a tile, ignoring drift, time of day and depletion (cached per world)
+function skNodeStatic(x, y){
+  if (!G.ow || !G.ow.map) return null;
+  if (SKN.seed !== G.ow.seed || SKN.map !== G.ow.map){ SKN.st.clear(); SKN.seed = G.ow.seed; SKN.map = G.ow.map; }
+  const key = x*4096+y; if (SKN.st.has(key)) return SKN.st.get(key);
+  const t = skOwTile(x, y), h = skNH(x, y, 701), h2 = skNH(x, y, 702), holy = [OW_GRAVEYARD, OW_NECROTOWER, OW_TEMPLE];
+  let n = null;
+  const tree = (type)=>({ k:'woodcutting', type }), herb = (type)=>({ k:'foraging', type, glow: skNH(x,y,703) < 0.07 });
+  if (t===OW_FOREST){
+    const fd = skForestDepth(x, y), wet = skWithin(x, y, 1, [OW_RIVER, OW_SWAMP, OW_WATER]);
+    if (skWithin(x, y, 3, holy) && h < 0.35) n = tree('yew');
+    else if (wet && h < 0.3) n = tree('willow');
+    else if (fd>=3) n = h<0.05 ? tree('magic') : h<0.10 ? tree('yew') : h<0.22 ? tree('maple') : h<0.34 ? tree('oak') : null;
+    else if (fd===2) n = h<0.10 ? tree('maple') : h<0.30 ? tree('oak') : null;
+    else n = h<0.28 ? tree('tree') : null;
+    if (!n && h2 < 0.05) n = herb('silverleaf');
+  } else if (t===OW_GRASS){
+    if (o3Hash(x, y, 1) < 0.1) n = tree(skWithin(x, y, 1, [OW_RIVER, OW_SWAMP]) ? 'willow' : skWithin(x, y, 3, holy) ? 'yew' : 'tree');   // the lone trees you already see on the grass
+    else if (skWithin(x, y, 3, holy) && h < 0.16) n = herb('ghostcap');
+    else if (skWithin(x, y, 1, [OW_MOUNTAIN]) && h < 0.12) n = herb(h2 < 0.35 ? 'starlily' : 'dragontongue');
+    else if (h < 0.06) n = herb('silverleaf');
+    else if (h < 0.085) n = herb('sunpetal');
+  } else if (t===OW_SWAMP){
+    n = h < 0.2 ? tree('willow') : h < 0.3 ? herb('bloodmoss') : null;
+  } else if (t===OW_DESERT){
+    n = h < 0.06 ? herb('sunpetal') : (skWithin(x, y, 1, [OW_MOUNTAIN]) && h < 0.14) ? herb('dragontongue') : null;
+  } else if (t===OW_TUNDRA){
+    n = h < 0.06 ? tree('tree') : h < 0.12 ? herb('starlily') : null;
+  } else if (t===OW_MOUNTAINPASS){
+    n = h < 0.18 ? herb(h2 < 0.3 ? 'starlily' : 'dragontongue') : null;
+  } else if (t===OW_RIVER){
+    n = { k:'fishing', type:'river', dens:0.2 };
+  } else if (t===OW_WATER){
+    if (skWithin(x, y, 1, [OW_GRASS, OW_FOREST, OW_DESERT, OW_TUNDRA, OW_SWAMP, OW_MOUNTAIN, OW_MOUNTAINPASS, OW_TOWN])) n = { k:'fishing', type:'shore', dens:0.14 };
+    else if (!skWithin(x, y, 3, [OW_GRASS, OW_FOREST, OW_DESERT, OW_TUNDRA, OW_SWAMP, OW_MOUNTAIN, OW_MOUNTAINPASS, OW_TOWN, OW_RIVER])) n = { k:'fishing', type:'deep', dens:0.035 };
+  }
+  if (n){ n.x = x; n.y = y; }
+  SKN.st.set(key, n);
+  return n;
+}
+function skFishEpoch(x, y){ return Math.floor(((G.player && G.player.turnCount)||0) / SK_FISH_EPOCH + skNH(x, y, 707)); }
+function skUsed(){
+  const p = skP();
+  if (!p.used || p.used.seed !== (G.ow && G.ow.seed)) p.used = { seed: G.ow && G.ow.seed, m:{} };
+  return p.used.m;
+}
+// the spot at a tile right now: null when there is none, or { ..., left, max, gone } where gone
+// means felled / picked clean (and 'regrow' says when it's back)
+function skNodeAt(x, y){
+  const s = skNodeStatic(x, y); if (!s) return null;
+  const turn = (G.player && G.player.turnCount)||0;
+  if (s.k==='fishing'){
+    const e = skFishEpoch(x, y);
+    if (skNH(x, y, 900 + e) >= s.dens) return null;           // no fish here this while - they're elsewhere along the water
+    const u = skUsed()[x+','+y], max = SK_SPOT[s.type].n;
+    if (u && u.e===e && u.left<=0) return null;               // fished out: the shoal has moved on
+    return Object.assign({}, s, { e, max, left: u && u.e===e ? u.left : max });
+  }
+  if (s.type==='starlily' && !isNightTime()) return null;     // starlilies only open at night
+  const max = s.k==='woodcutting' ? SK_TREE[s.type].n : 2 + Math.floor(skNH(x, y, 705)*3);
+  const u = skUsed()[x+','+y];
+  if (u && u.left<=0 && turn >= u.until){ delete skUsed()[x+','+y]; return Object.assign({}, s, { max, left:max }); }
+  return Object.assign({}, s, { max, left: u ? u.left : max, gone: !!(u && u.left<=0), regrow: u && u.left<=0 ? u.until - turn : 0 });
+}
+function skNodeItems(n){
+  if (n.k==='woodcutting') return [SK_LOG.find(l=>l.id===SK_TREE[n.type].log)];
+  if (n.k==='fishing') return SK_SPOT[n.type].fish.map(id=>SK_FISH.find(f=>f.id===id));
+  if (n.k==='foraging') return [SK_HERB.find(hb=>hb.id===n.type)];
+  return [];
+}
+function skNodeName(n){
+  if (n.k==='woodcutting') return SK_TREE[n.type].nm;
+  if (n.k==='fishing') return SK_SPOT[n.type].nm;
+  return (n.glow ? 'Glowing ' : '') + skName(n.type) + ' patch';
+}
+function skNodeReq(n){ return Math.min(...skNodeItems(n).map(e=>e.lvl)); }
+function skNodeTipHtml(n){
+  const sk = SK_DEFS.find(d=>d[0]===n.k), L = skLvl(n.k), req = skNodeReq(n);
+  const col = n.k==='woodcutting' ? SK_TREE[n.type].canopy : n.k==='fishing' ? SK_SPOT[n.type].col : SK_HERB_COL[n.type];
+  let html = `<div style="font-weight:600;color:${col}">${esc(skNodeName(n))}</div>`;
+  html += `<div class="muted">${sk[1]} ${req}${L<req ? ` <span style="color:${COL.red}">(you have ${L})</span>` : ''}</div>`;
+  html += skNodeItems(n).map(e=>`<div${L<e.lvl ? ' class="muted"' : ''}>${esc(e.nm)} &middot; level ${e.lvl}</div>`).join('');
+  if (n.gone) html += `<div class="muted">${n.k==='woodcutting' ? 'felled - a stump for now' : 'picked clean'}; grows back in about ${Math.max(1, n.regrow)} turns</div>`;
+  else html += `<div class="muted">${n.left} ${n.k==='woodcutting' ? 'log' : n.k==='fishing' ? 'catch' : 'herb'}${n.left===1?'':n.k==='fishing'?'es':'s'} left${n.k==='fishing' ? ' before the shoal moves on' : ''}</div>`;
+  if (n.glow) html += `<div style="color:${COL.gold}">glowing: every herb picked here counts double</div>`;
+  if (n.type==='starlily') html += `<div class="muted">starlilies only open at night</div>`;
+  html += `<div class="muted" style="margin-top:3px">click to walk over and ${n.k==='woodcutting' ? 'chop' : n.k==='fishing' ? 'fish' : 'pick'}</div>`;
+  return html;
+}
+// the spots you can reach from where you stand (your own tile and the eight around it)
+function skNodesNear(){
+  const out = [], px = G.owPos.x, py = G.owPos.y;
+  for (let dy=-1; dy<=1; dy++) for (let dx=-1; dx<=1; dx++){ const n = skNodeAt(px+dx, py+dy); if (n && !n.gone) out.push(n); }
+  if (!G.player.hasBoat || skOwTile(px, py)!==OW_WATER) return out.filter(n=>n.type!=='deep');   // deep water needs you out on it in your boat
+  return out;
+}
+// nearest spot of a skill (or any), for pointing the way
+function skNearestNode(k, r){
+  let best = null, bd = 1e9; const px = G.owPos.x, py = G.owPos.y;
+  for (let i=-r;i<=r;i++) for (let j=-r;j<=r;j++){ const n = skNodeAt(px+i, py+j); if (!n || n.gone || (k && n.k!==k)) continue; const d = i*i+j*j; if (d<bd){ bd = d; best = n; } }
+  return best;
+}
+function skNodeOption(n){
+  const verb = n.k==='woodcutting' ? 'Chop' : n.k==='fishing' ? 'Fish at' : 'Pick';
+  return { k:n.k, label:`${verb} ${skNodeName(n).toLowerCase()}`, node:{ x:n.x, y:n.y }, at:{ x:n.x, y:n.y } };
+}
+function skNodeTake(n){
+  const key = n.x+','+n.y, m = skUsed(), left = n.left - 1;
+  if (n.k==='fishing'){ m[key] = { e:n.e, left }; return left<=0; }
+  m[key] = { left, until: left<=0 ? ((G.player.turnCount||0) + (n.k==='woodcutting' ? 150 : 100) + Math.floor(skNH(n.x, n.y, 711)*100)) : 0 };
+  return left<=0;
+}
+// a foe that answers the work: a treant woken by the axe, something huge on the line
+function skSpecialFoe(skin, name, msg){
+  const base = skin.find(e=>e.nm===name); if (!base) return;
+  G.gather = null;
+  randomEncounter(false);
+  const L = clampMLevel(G.player.level + 1), entry = Object.assign({}, MONSTER_LEVELS[L-1], base, { lvl:L }), m = G.mon[0];
+  G.mon = [m];
+  m.hp = m.maxHp = rollDice(entry.hd,8)+entry.hd; m.ac = entry.ac; m.atkBonus = entry.atk; m.dmg1 = entry.dmg1; m.dmg2 = entry.dmg2; m.xp = entry.xp;
+  m.sym = entry.sym; m.nm = entry.nm; m.col = monsterCol(entry); m.undead = entry.undead; m.mlevel = L; m.abilities = (entry.abilities||[]).slice(); m.art = entry.art;
+  if (skin===SEA_SKIN) G.arenaTheme = 'sea';
+  logMsg(msg, 'new');
+  renderGame(); saveCurrentGame();
+}
+function skBirdNest(){
+  const r = Math.random();
+  if (r < 0.4){ const g = 10 + rn(20) + G.player.level*2; G.player.gold += g; logMsg(`a bird's nest falls from the branches - ${g} gold glints inside`, 'loot'); }
+  else if (r < 0.75){ const ok = SK_HERB.filter(hb=>hb.lvl<=skLvl('foraging')+10), hb = ok[rn(ok.length)] || SK_HERB[0]; skAdd(hb.id, 1); logMsg(`a bird's nest falls from the branches - there's ${/^[AEIOU]/.test(hb.nm) ? 'an' : 'a'} ${hb.nm} tucked inside`, 'loot'); }
+  else { const it = genItem(mx(1, G.player.level), 'ring'); addToInventory(it); logMsg(`a bird's nest falls from the branches - a magpie's ring is caught in it`, 'loot'); }
+  sfx('loot');
+}
+// cave gathering in the dungeons: eel pools, and patches of cave herbs and mushrooms
+const SK_CAVE_DECOS = ['ore', 'eelpool', 'cavherb'];
+function skCaveHerb(){ const d = G.depth||1; return d<=2 ? 'bloodmoss' : d<=5 ? 'ghostcap' : 'dragontongue'; }
+function skPlaceCaveNodes(){
+  if (G.gameMode!==1 || !G.dungeonDeco) return;
+  const floors = [];
+  for (let x=1;x<COLS-1;x++) for (let y=1;y<ROWS-1;y++){
+    if (G.map[x][y]!==T_FLOOR || G.dungeonDeco[x][y] || (x===G.player.x && y===G.player.y)) continue;
+    if (G.mon.some(m=>m.alive && m.x===x && m.y===y)) continue;
+    let open = 0; for (const [dx,dy] of FACING_VECT) if (G.map[x+dx][y+dy]===T_FLOOR) open++;
+    if (open>=2) floors.push({x,y});
+  }
+  if (!floors.length) return;
+  const put = (deco)=>{ for (let t=0;t<20;t++){ const c = floors[rn(floors.length)]; if (!G.dungeonDeco[c.x][c.y]){ G.dungeonDeco[c.x][c.y] = deco; return; } } };
+  if (chn(G.siteKind==='mine' ? 0.6 : 0.4)) put('eelpool');
+  if (chn(0.7)){ const n = 1 + rn(3); for (let i=0;i<n;i++) put('cavherb'); }
+}
+function skCaveLabel(deco, x, y){
+  if (deco==='ore'){ const ore = SK_ORE.find(e=>e.id===veinOre(x, y)); return { txt:`Mine ${ore.nm.toLowerCase()} (Mining ${ore.lvl})`, col:'#ffd76b' }; }
+  if (deco==='eelpool') return { txt:'Fish cave eels (Fishing 50)', col:SK_SPOT.cave.col };
+  const hb = SK_HERB.find(e=>e.id===skCaveHerb()); return { txt:`Pick ${hb.nm.toLowerCase()} (Foraging ${hb.lvl})`, col:SK_HERB_COL[hb.id] };
+}
 function skRawFoods(){ const out = []; for (const f of SK_FISH.concat(SK_MEAT)) if (skHave(f.id)) out.push(f); return out; }
 // ---- gathering: repeats on its own until you move, fill up on danger, or run out ----
 function skStartOrStop(){
   if (G.gather){ skStop('you stop'); return; }
   const opts = skOptions();
-  if (!opts.length){ logMsg(G.gameMode===0 ? 'there is nothing to gather here' : G.gameMode===1 ? 'there is nothing to gather here - look for ore veins in the mines' : 'you can only gather in the wilds or in a mine', ''); renderGame(); return; }
+  if (!opts.length){
+    let msg = G.gameMode===1 ? 'there is nothing to gather here - look for ore veins, cave pools and cave herbs' : 'you can only gather in the wilds or in a dungeon';
+    if (G.gameMode===0){ const n = skNearestNode(null, 14);
+      msg = n ? `nothing to gather within reach - the nearest is ${/^[AEIOU]/.test(skNodeName(n)) ? 'an' : 'a'} ${skNodeName(n).toLowerCase()}, ${Math.round(Math.hypot(n.x-G.owPos.x, n.y-G.owPos.y))} leagues ${dirWord(n.x-G.owPos.x, n.y-G.owPos.y)} (click it to walk there)` : 'there is nothing to gather near here - look for marked trees, bubbling water and flowering patches'; }
+    logMsg(msg, ''); renderGame(); return; }
   skDo(opts[0]);
 }
 function skDo(o){
@@ -8085,8 +8275,21 @@ function skGatherTick(now){
   if (G.gameMode===1){ tickMonsters(); if (G.mon.some(m=>m.alive && Math.abs(m.x-G.player.x)<=1 && Math.abs(m.y-G.player.y)<=1)){ skStop('something is upon you - you stop mining'); return; } }
   else if (G.gameMode===0 && chn(0.012)){ G.gather = null; logMsg('while you work, something creeps up on you!', 'new'); randomEncounter(true); renderGame(); saveCurrentGame(); return; }
   // pick what you're working on: the best you can manage, sometimes something lesser
-  let list;
-  if (k==='fishing') list = SK_FISH.filter(f=>o.w==='b' || f.w===o.w);
+  let list, node = null;
+  if (o.node){
+    node = skNodeAt(o.node.x, o.node.y);
+    if (!node || node.gone){ skStop(k==='fishing' ? 'the fish have moved on - look for bubbles further along the water' : (node && node.gone) ? 'there is nothing left here' : 'the starlilies close as the dawn comes up'); return; }
+    list = skNodeItems(node);
+    const req = skNodeReq(node);
+    if (req > L){ skStop(`you need ${SK_DEFS.find(d=>d[0]===k)[1]} level ${req} for this ${skNodeName(node).toLowerCase()}`); return; }
+    if (k==='fishing' && chn(0.015)){                      // something big takes the line
+      const big = node.type==='deep' ? (G.player.level >= 30 ? 'giant shark' : 'giant octopus') : node.type==='river' ? 'giant eel' : 'giant crab';
+      skSpecialFoe(SEA_SKIN, big, `something huge takes your line - a ${big} surges out of the water!`); return;
+    }
+  }
+  else if (o.cave==='eelpool'){ list = [SK_FISH.find(f=>f.id==='eel')]; if (list[0].lvl > L){ skStop(`you need Fishing level ${list[0].lvl} to catch cave eels`); return; } }
+  else if (o.cave==='cavherb'){ list = [SK_HERB.find(hb=>hb.id===skCaveHerb())]; if (list[0].lvl > L){ skStop(`you need Foraging level ${list[0].lvl} to pick ${list[0].nm.toLowerCase()}`); return; } }
+  else if (k==='fishing') list = SK_FISH.filter(f=>o.w==='b' || f.w===o.w);
   else if (k==='mining' && o.vein){                     // a vein holds one ore, set by how deep the mine is
     const ore = SK_ORE.find(e=>e.id===veinOre(o.vein.x, o.vein.y));
     if (ore.lvl > L){ skStop(`you need Mining level ${ore.lvl} to mine ${ore.nm.toLowerCase()}`); return; }
@@ -8099,10 +8302,23 @@ function skGatherTick(now){
   let pick = ok[ok.length-1]; if (ok.length>1 && chn(0.45)) pick = ok[rn(ok.length-1)];
   const chance = clamp(0.3 + (L - pick.lvl)*0.012 + tier*0.06 + (G.gameMode===1 ? 0.1 : 0), 0.12, 0.92);
   if (!chn(chance)){ renderGame(); return; }
-  skAdd(pick.id, 1); skGainXP(k, pick.xp * (G.gameMode===1 ? 1.2 : 1));
-  logMsg(`you ${{ fishing:'catch', mining:'mine', woodcutting:'cut', foraging:'find' }[k]} ${/^[AEIOU]/.test(pick.nm) ? 'an' : 'a'} ${pick.nm}`, 'loot'); sfx('loot');
-  if (k==='mining' && o.vein){ const key = o.vein.x+','+o.vein.y; G.veinLeft = G.veinLeft || {}; G.veinLeft[key] = (G.veinLeft[key]===undefined ? 3+rn(3) : G.veinLeft[key]) - 1;
-    if (G.veinLeft[key] <= 0){ G.dungeonDeco[o.vein.x][o.vein.y] = ''; G.gather = null; logMsg('the vein is worked out', ''); } }
+  const amt = node && node.glow ? 2 : 1;
+  skAdd(pick.id, amt); skGainXP(k, pick.xp * amt * (G.gameMode===1 ? 1.2 : 1));
+  logMsg(`you ${{ fishing:'catch', mining:'mine', woodcutting:'cut', foraging:'find' }[k]} ${amt>1 ? 'two' : /s$/.test(pick.nm) ? 'some' : /^[AEIOU]/.test(pick.nm) ? 'an' : 'a'} ${/s$/.test(pick.nm) ? pick.nm.toLowerCase() : pick.nm}${amt>1 && !/s$/.test(pick.nm) ? 's' : ''}`, 'loot'); sfx('loot');
+  if (o.vein){ const key = G.dungeonSlot+'/'+G.depth+':'+o.vein.x+','+o.vein.y; G.veinLeft = G.veinLeft || {}; G.veinLeft[key] = (G.veinLeft[key]===undefined ? (o.cave==='eelpool' ? 4 : o.cave ? 2+rn(2) : 3+rn(3)) : G.veinLeft[key]) - 1;
+    if (G.veinLeft[key] <= 0){ G.dungeonDeco[o.vein.x][o.vein.y] = ''; G.gather = null; logMsg(o.cave==='eelpool' ? 'the eels have gone deep - the pool is fished out' : o.cave ? 'the patch is picked clean' : 'the vein is worked out', ''); } }
+  if (node){
+    const nm = skNodeName(node).toLowerCase();
+    if (k==='woodcutting' && chn(1/40)) skBirdNest();
+    if (skNodeTake(node)){
+      G.gather = null;
+      if (k==='woodcutting'){ logMsg(`the ${nm} creaks and comes crashing down - only a stump is left`, ''); O3.fall = { x:node.x, y:node.y, type:node.type, t:0 }; sfx('hit'); }
+      else if (k==='fishing') logMsg('the shoal moves on - look for bubbles further along the water', '');
+      else logMsg(`the ${nm} is picked clean - it will grow back in time`, '');
+    } else if (k==='woodcutting' && (node.type==='yew' || node.type==='magic') && chn(0.04)){
+      skSpecialFoe(BEAST_SKIN, 'treant', `the ${nm} groans and tears its roots from the earth - a treant wakes to defend its grove!`); return;
+    }
+  }
   renderGame(); saveCurrentGame();
 }
 // ---- firemaking and campfires ----
@@ -10700,6 +10916,8 @@ function renderDungeonMapIso(){
         else if (deco==='pool') drawIsoGlyph(cx,cy,'~',COL.blue);
         else if (deco==='grave') drawIsoGlyph(cx,cy,'+',COL.dim);
         else if (deco==='ore') drawIsoGlyph(cx,cy,'*',COL.yellow);
+        else if (deco==='eelpool') drawIsoGlyph(cx,cy,'~',SK_SPOT.cave.col);
+        else if (deco==='cavherb') drawIsoGlyph(cx,cy,'"',SK_HERB_COL[skCaveHerb()]);
       }
       switch(t){
         case T_STAIRSD: drawMonsterArt(cx, cy, cellPx*0.66, STAIRS_DOWN_ART, COL.amber); break;
@@ -11216,6 +11434,13 @@ function renderOverworldMap(){
     const vx = e.x-camX, vy = e.y-camY;
     if (vx<0||vy<0||vx>=viewCols||vy>=viewRows) continue;
     drawEncounterIcon(vx,vy,COL.encounter);
+  }
+  for (let i=-16;i<=16;i++) for (let j=-16;j<=16;j++){
+    const n = skNodeAt(G.owPos.x+i, G.owPos.y+j); if (!n || n.gone) continue;
+    const vx = n.x-camX, vy = n.y-camY; if (vx<0||vy<0||vx>=viewCols||vy>=viewRows) continue;
+    const col = n.k==='woodcutting' ? SK_TREE[n.type].canopy : n.k==='fishing' ? SK_SPOT[n.type].col : SK_HERB_COL[n.type];
+    ctx.fillStyle = col; ctx.strokeStyle = 'rgba(0,0,0,0.7)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc((vx+0.78)*cellPx, (vy+0.24)*cellPx, Math.max(2, cellPx*0.14), 0, Math.PI*2); ctx.fill(); ctx.stroke();
   }
   for (const b of (G.ow.mythicBeasts||[])){
     if (b.slain) continue;
@@ -16760,7 +16985,8 @@ function o3Build(cx, cy){
 function o3Vegetation(grp, x0, y0, W){
   const T = THREE, put = [];   // [kind, x, z, scale, rot, shade]
   for (let x=x0; x<x0+W; x++) for (let y=y0; y<y0+W; y++){
-    const t = o3Tile(x,y), h = (s)=> o3Hash(x,y,s);
+    const t = o3Tile(x,y), h = (s)=> o3Hash(x,y,s), nd = skNodeStatic(x,y), treeNode = !!(nd && nd.k==='woodcutting');
+    if (treeNode){ if (h(11)<0.5) put.push(['bush', x+h(12), y+h(13), 0.5+h(14)*0.4, h(15)*6.28, h(16)]); continue; }
     let nearSnow = false, nearSwamp = false, nearMtn = false;
     for (const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1],[2,0],[-2,0],[0,2],[0,-2]]){ const u = o3Tile(x+dx,y+dy); if (u===OW_TUNDRA) nearSnow = true; if (u===OW_SWAMP) nearSwamp = true; if (u===OW_MOUNTAIN) nearMtn = true; }
     if (t===OW_FOREST){
@@ -17195,6 +17421,154 @@ function o3ApplyTime(){
   O3.night = night;
 }
 // ---------- walking: breadth-first path over tiles you can actually step on ----------
+// ---------- gathering spots in the 3D overworld ----------
+function o3NodeGeo(){
+  if (O3.ng) return O3.ng;
+  const T = THREE, keep = g=>{ g.userData.keep = true; return g; };
+  return (O3.ng = {
+    trunk: keep(new T.CylinderGeometry(0.06, 0.1, 0.8, 7).translate(0, 0.4, 0)),
+    blob: keep(new T.IcosahedronGeometry(0.42, 1)),
+    cone: keep(new T.ConeGeometry(0.4, 0.85, 8)),
+    dome: keep(new T.SphereGeometry(0.5, 12, 8, 0, 6.283, 0, 1.9)),
+    stump: keep(new T.CylinderGeometry(0.1, 0.12, 0.14, 8).translate(0, 0.07, 0)),
+    ring: keep(new T.RingGeometry(0.16, 0.2, 24)),
+    bub: keep(new T.SphereGeometry(0.035, 6, 5)),
+    fin: keep(new T.ConeGeometry(0.05, 0.16, 4)),
+    stem: keep(new T.CylinderGeometry(0.008, 0.01, 0.16, 4).translate(0, 0.08, 0)),
+    bloom: keep(new T.IcosahedronGeometry(0.035, 0)),
+    leaf: keep(new T.SphereGeometry(0.07, 6, 4).scale(1, 0.35, 1)),
+    disc: keep(new T.CircleGeometry(0.46, 24)),
+  });
+}
+function o3NodeMat(key, col, o){
+  O3.nm = O3.nm || {};
+  return O3.nm[key] || (O3.nm[key] = new THREE.MeshStandardMaterial(Object.assign({ color:new THREE.Color(col).convertSRGBToLinear(), roughness:0.85 }, o||{})));
+}
+// one tree of a kind, standing at the origin (also used for the falling tree)
+function o3NodeTree(type){
+  const T = THREE, g = new T.Group(), G3 = o3NodeGeo(), c = SK_TREE[type].canopy;
+  const bark = o3NodeMat('bark'+(type==='magic'?'m':type==='willow'?'w':''), type==='magic' ? '#c8c8d8' : type==='willow' ? '#4a3a28' : '#5a4028');
+  const leaf = o3NodeMat('leaf_'+type, c, type==='magic' ? { emissive:new T.Color(c).convertSRGBToLinear(), emissiveIntensity:0.55 } : { flatShading:true });
+  const tr = new T.Mesh(G3.trunk, bark); g.add(tr);
+  const add = (geo, x, y, z, sx, sy, sz)=>{ const m = new T.Mesh(geo, leaf); m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.castShadow = true; g.add(m); return m; };
+  if (type==='yew'){ tr.scale.set(1.2, 0.7, 1.2); add(G3.cone, 0, 0.75, 0, 1.15, 1, 1.15); add(G3.cone, 0, 1.2, 0, 0.85, 0.85, 0.85); }
+  else if (type==='willow'){ tr.scale.set(1.1, 0.9, 1.1); add(G3.dome, 0, 0.7, 0, 1.25, 1.1, 1.25); }
+  else if (type==='oak'){ tr.scale.set(1.5, 1, 1.5); add(G3.blob, 0, 1.0, 0, 1.35, 1.05, 1.35); add(G3.blob, 0.3, 0.9, 0.15, 0.8, 0.7, 0.8); add(G3.blob, -0.28, 0.92, -0.1, 0.8, 0.7, 0.8); }
+  else if (type==='maple'){ tr.scale.set(1.2, 1.1, 1.2); add(G3.blob, 0, 1.05, 0, 1.2, 1.15, 1.2); add(G3.blob, 0.2, 1.35, 0.05, 0.7, 0.7, 0.7); }
+  else if (type==='magic'){ tr.scale.set(1, 1.15, 1); add(G3.blob, 0, 1.1, 0, 1.1, 1, 1.1); add(G3.blob, 0.22, 1.4, -0.1, 0.6, 0.6, 0.6); }
+  else add(G3.blob, 0, 0.95, 0, 1, 0.9, 1);
+  tr.castShadow = true;
+  g.scale.setScalar(0.72);
+  return g;
+}
+// the spots you can see: rebuilt when the set of them (or their state) changes
+function o3SyncNodes(){
+  const T = THREE, px = G.owPos.x, py = G.owPos.y, R = 20, turn = G.player.turnCount||0;
+  const list = [];
+  for (let i=-R;i<=R;i++) for (let j=-R;j<=R;j++){ const n = skNodeAt(px+i, py+j); if (n) list.push(n); }
+  const key = list.map(n=>n.x+','+n.y+n.type[0]+(n.gone?'g':'')+(n.glow?'*':'')).join('|') + '@' + (O3.win ? O3.win.cx+','+O3.win.cy : '');
+  if (key === O3.nodeKey && O3.nodeGrp && O3.nodeGrp.parent) return;
+  O3.nodeKey = key;
+  if (!O3.nodeGrp){ O3.nodeGrp = new T.Group(); }
+  if (O3.nodeGrp.parent !== O3.scene) O3.scene.add(O3.nodeGrp);
+  const g = O3.nodeGrp; while (g.children.length){ const c = g.children[0]; g.remove(c); c.traverse && c.traverse(o=>{ if (o.geometry && !o.geometry.userData.keep) o.geometry.dispose(); if (o.material && o.material.userData && o.material.userData.own) o.material.dispose(); }); }
+  O3.nodeHits = []; O3.nodeAnim = [];
+  const G3 = o3NodeGeo(), hitM = O3.nodeHitM || (O3.nodeHitM = new T.MeshBasicMaterial({ visible:false }));
+  const hitG = O3.nodeHitG || (O3.nodeHitG = new T.BoxGeometry(0.9, 1.3, 0.9).translate(0, 0.55, 0));
+  for (const n of list){
+    const gx = n.x+0.5, gz = n.y+0.5, wet = n.k==='fishing', y0 = wet ? -0.13 : O3.heightAt(gx, gz);
+    const grp = new T.Group(); grp.position.set(gx, y0, gz); g.add(grp);
+    const col = n.k==='woodcutting' ? SK_TREE[n.type].canopy : n.k==='fishing' ? SK_SPOT[n.type].col : SK_HERB_COL[n.type];
+    // a soft glow of the spot's own colour on the ground, so it stands out from the scenery
+    if (!n.gone){
+      const disc = new T.Mesh(G3.disc, new T.MeshBasicMaterial({ color:new T.Color(col).convertSRGBToLinear(), transparent:true, opacity:0.16, depthWrite:false, blending:T.AdditiveBlending }));
+      disc.material.userData.own = true; disc.rotation.x = -Math.PI/2; disc.position.y = 0.03; grp.add(disc); O3.nodeAnim.push({ kind:'disc', o:disc, ph:n.x*0.7+n.y*0.3 });
+    }
+    if (n.k==='woodcutting'){
+      if (n.gone){ const st = new T.Mesh(G3.stump, o3NodeMat('stump', '#6a5034')); st.castShadow = true; grp.add(st); const top = new T.Mesh(new T.CircleGeometry(0.1, 10), o3NodeMat('ring', '#c8a878')); top.rotation.x = -Math.PI/2; top.position.y = 0.141; grp.add(top); }
+      else { const tr = o3NodeTree(n.type); tr.rotation.y = skNH(n.x, n.y, 720)*6.28; grp.add(tr);
+        if (n.type==='magic'){ const gl = o3Glow('rgba(120,240,240,1)', 1.3); gl.position.y = 0.9; grp.add(gl); O3.nodeAnim.push({ kind:'glow', o:gl, ph:n.x }); } }
+    } else if (n.k==='fishing'){
+      for (let i=0;i<2;i++){ const r = new T.Mesh(G3.ring, new T.MeshBasicMaterial({ color:new T.Color(col).convertSRGBToLinear(), transparent:true, opacity:0.8, depthWrite:false, side:T.DoubleSide }));
+        r.material.userData.own = true; r.rotation.x = -Math.PI/2; r.position.y = 0.02; grp.add(r); O3.nodeAnim.push({ kind:'ripple', o:r, ph:i*0.5 + skNH(n.x,n.y,730) }); }
+      for (let i=0;i<4;i++){ const b = new T.Mesh(G3.bub, o3NodeMat('bub', '#ffffff', { roughness:0.2, transparent:true, opacity:0.85 })); grp.add(b); O3.nodeAnim.push({ kind:'bub', o:b, ph:i*0.25 + skNH(n.x,n.y,731), a:i*1.7 }); }
+      if (n.type==='deep'){ const f = new T.Mesh(G3.fin, o3NodeMat('fin', '#3a4a5a')); grp.add(f); O3.nodeAnim.push({ kind:'fin', o:f, ph:skNH(n.x,n.y,732)*6 }); }
+    } else if (!n.gone){
+      const bm = o3NodeMat('bloom_'+n.type+(n.glow?'g':''), col, (n.glow || n.type==='starlily') ? { emissive:new T.Color(col).convertSRGBToLinear(), emissiveIntensity:n.glow ? 0.9 : 0.5 } : {});
+      const lm = o3NodeMat('herbleaf'+(n.type==='bloodmoss'?'m':''), n.type==='bloodmoss' ? '#4a5a2a' : '#4a8a34');
+      const k = 7;
+      for (let i=0;i<k;i++){
+        const a = i/k*Math.PI*2 + skNH(n.x,n.y,740+i), r = 0.08 + skNH(n.x,n.y,750+i)*0.2;
+        const st = new T.Mesh(G3.stem, lm); st.position.set(Math.cos(a)*r, 0, Math.sin(a)*r); grp.add(st);
+        const lf = new T.Mesh(G3.leaf, lm); lf.position.set(Math.cos(a)*r, 0.03, Math.sin(a)*r); lf.rotation.y = a; grp.add(lf);
+        const bl = new T.Mesh(G3.bloom, bm); bl.position.set(Math.cos(a)*r, 0.16 + skNH(n.x,n.y,760+i)*0.05, Math.sin(a)*r); bl.scale.setScalar(n.type==='sunpetal' || n.type==='starlily' ? 1.4 : 1); grp.add(bl);
+      }
+      if (n.glow || n.type==='starlily'){ const gl = o3Glow(n.glow ? 'rgba(255,220,120,1)' : 'rgba(220,210,255,1)', 0.7); gl.position.y = 0.18; grp.add(gl); O3.nodeAnim.push({ kind:'glow', o:gl, ph:n.y }); }
+    }
+    const hit = new T.Mesh(hitG, hitM); hit.position.set(gx, y0, gz); hit.userData.act = { kind:'node', x:n.x, y:n.y }; g.add(hit); O3.nodeHits.push(hit);
+  }
+}
+function o3AnimNodes(dt){
+  const t = O3.t;
+  for (const a of (O3.nodeAnim||[])){
+    if (a.kind==='disc') a.o.material.opacity = 0.12 + 0.07*Math.sin(t*2.4 + a.ph);
+    else if (a.kind==='ripple'){ const f = ((t*0.6 + a.ph) % 1); a.o.scale.setScalar(0.6 + f*1.9); a.o.material.opacity = 0.75*(1-f); }
+    else if (a.kind==='bub'){ const f = ((t*0.9 + a.ph) % 1); a.o.position.set(Math.cos(a.a + t*0.3)*0.16, f*0.12, Math.sin(a.a + t*0.3)*0.16); a.o.scale.setScalar(1 - f*0.6); }
+    else if (a.kind==='fin'){ const ang = t*0.9 + a.ph; a.o.position.set(Math.cos(ang)*0.34, 0.05 + Math.sin(t*3)*0.01, Math.sin(ang)*0.34); a.o.rotation.set(0, -ang, 0); }
+    else if (a.kind==='glow') a.o.material.opacity = 0.55 + 0.25*Math.sin(t*2 + a.ph);
+  }
+  // a felled tree topples over, away from you, then settles and fades
+  const f = O3.fall;
+  if (f){
+    const T = THREE;
+    if (!f.obj){ f.obj = o3NodeTree(f.type); const gx = f.x+0.5, gz = f.y+0.5; f.obj.position.set(gx, O3.heightAt(gx, gz), gz);
+      f.dir = Math.atan2(f.x - G.owPos.x || 0.3, f.y - G.owPos.y || 0.3); f.obj.rotation.y = f.dir; O3.scene.add(f.obj);
+      f.obj.traverse(o=>{ if (o.material){ o.material = o.material.clone(); o.material.transparent = true; o.material.userData = { own:true }; } }); }
+    f.t += dt;
+    const k = Math.min(1, f.t/0.9), fallA = (k*k)*1.45 + (k>=1 ? Math.sin(Math.min(1,(f.t-0.9)/0.3)*Math.PI)*0.06 : 0);
+    f.obj.rotation.set(fallA, f.dir, 0, 'YXZ');
+    if (f.t > 1.6){ const fade = Math.max(0, 1 - (f.t-1.6)/0.8); f.obj.traverse(o=>{ if (o.material) o.material.opacity = fade; }); }
+    if (f.t > 2.4){ O3.scene.remove(f.obj); f.obj.traverse(o=>{ if (o.material && o.material.userData && o.material.userData.own) o.material.dispose(); }); O3.fall = null; }
+  }
+  // your line out to the spot you're fishing, with a bobbing float
+  const gw = G.gather && G.gather.mode===0 && G.gather.o.k==='fishing' ? G.gather.o : null;
+  if (!O3.fline){
+    const T = THREE, geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(new Float32Array(12*3), 3));
+    O3.fline = new T.Line(geo, new T.LineBasicMaterial({ color:0xe8e8e0, transparent:true, opacity:0.8 })); O3.fline.frustumCulled = false; O3.scene.add(O3.fline);
+    O3.float = new T.Mesh(new T.SphereGeometry(0.035, 8, 6), new T.MeshStandardMaterial({ color:0xd02a2a, roughness:0.5 })); O3.scene.add(O3.float);
+  }
+  O3.fline.visible = O3.float.visible = !!(gw && gw.at && O3.ppos);
+  if (O3.fline.visible){
+    const pp = O3.ppos, yaw = O3.player ? O3.player.yaw||0 : 0;
+    const hx = pp.x + Math.sin(yaw)*0.45, hz = pp.z + Math.cos(yaw)*0.45, hy = pp.y + 1.05;
+    const sx = gw.at.x+0.5, sz = gw.at.y+0.5, bob = Math.sin(O3.t*3)*0.012 + (Math.random()<0.004 ? -0.03 : 0), sy = -0.12 + bob;
+    const a = O3.fline.geometry.attributes.position;
+    for (let i=0;i<12;i++){ const u = i/11, sag = Math.sin(u*Math.PI)*0.18*(1-u*0.3); a.setXYZ(i, hx + (sx-hx)*u, hy + (sy-hy)*u - sag, hz + (sz-hz)*u); }
+    a.needsUpdate = true; O3.float.position.set(sx, sy, sz);
+  }
+}
+function o3NodeFromHit(a){ return a && a.kind==='node' ? skNodeAt(a.x, a.y) : null; }
+// walk to a spot and start working it: beside a tree or the water, onto a herb patch
+function o3GoGather(x, y){
+  const n = skNodeAt(x, y); if (!n || n.gone) return false;
+  const px = G.owPos.x, py = G.owPos.y;
+  const near = Math.max(Math.abs(x-px), Math.abs(y-py)) <= 1 && !(n.type==='deep' && !(G.player.hasBoat && skOwTile(px,py)===OW_WATER));
+  if (near){ O3.path = []; O3.gatherAt = null; if (G.gather) skStop(); skDo(skNodeOption(n)); return true; }
+  let best = null, bd = 1e9;
+  const cand = n.k==='foraging' ? [[0,0],[1,0],[-1,0],[0,1],[0,-1]] : [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
+  for (const [dx,dy] of cand){
+    const tx = x+dx, ty = y+dy, tt = skOwTile(tx, ty);
+    if (!o3Passable(tx, ty) || OW_SITE_TILES.includes(tt)) continue;
+    if (n.type==='deep' ? tt!==OW_WATER : (tt===OW_WATER && n.k!=='fishing')) continue;
+    const d = Math.hypot(tx-px, ty-py); if (d < bd){ bd = d; best = [tx, ty]; }
+  }
+  if (!best){ logMsg(n.type==='deep' ? 'you need a boat to reach the deep-sea fish' : `you can't find a way to that ${skNodeName(n).toLowerCase()}`, ''); renderGame(); return true; }
+  const path = o3PathTo(best[0], best[1]);
+  if (!path){ logMsg(`you can't find a way to that ${skNodeName(n).toLowerCase()}`, ''); renderGame(); return true; }
+  if (G.gather) skStop();
+  O3.path = path; O3.stepT = 0.05; O3.gatherAt = { x, y };
+  return true;
+}
 function o3Passable(x,y){ if (x<0||y<0||x>=OW_COLS||y>=OW_ROWS) return false; const t = G.ow.map[x][y]; if (t===OW_MOUNTAIN) return false; if (t===OW_WATER && !G.player.hasBoat) return false; return true; }
 function o3PathTo(tx, ty){
   const sx = G.owPos.x, sy = G.owPos.y, key = (x,y)=>x+','+y, prev = new Map([[key(sx,sy), null]]), q = [[sx,sy]], lim = 60;
@@ -17222,7 +17596,7 @@ function o3WalkTo(act){
     for (let i=-4;i<=4;i++) for (let j=-4;j<=4;j++){ const nx = x+i, ny = y+j; if (!o3Passable(nx,ny)) continue; const d = i*i+j*j; if (d<bd){ bd = d; best = [nx,ny]; } }
     if (!best) return; [x,y] = best;
   }
-  O3.path = o3PathTo(x, y) || [];
+  O3.path = o3PathTo(x, y) || []; O3.gatherAt = null;
   O3.stepT = 0.05;
   if (act.fx!==undefined) O3.clickFx = { x:act.fx, y:act.fy, z:act.fz, t:0 };
 }
@@ -17230,15 +17604,21 @@ function o3Pick(e){
   const r = O3.cv.getBoundingClientRect(), T = THREE;
   const m = new T.Vector2(((e.clientX-r.left)/r.width)*2-1, -((e.clientY-r.top)/r.height)*2+1);
   O3.ray.setFromCamera(m, O3.cam);
-  const hits = O3.ray.intersectObjects(O3.hits, false);
+  const hits = O3.ray.intersectObjects(O3.hits.concat(O3.nodeHits||[]), false);
   if (hits.length) return hits[0].object.userData.act;
   const lh = O3.land ? O3.ray.intersectObject(O3.land, false) : [];
   if (lh.length){ const p = lh[0].point; return { kind:'ground', x:Math.floor(p.x), y:Math.floor(p.z), fx:p.x, fy:Math.max(p.y,-0.14), fz:p.z }; }
   return null;
 }
 function o3Input(cv){
-  cv.addEventListener('pointermove', e=>{ if (!o3Active()) return; const a = o3Pick(e); O3.hover = a && a.kind==='site' ? a : null; cv.style.cursor = O3.hover ? 'pointer' : 'default'; });
-  cv.addEventListener('pointerdown', e=>{ if (!o3Active() || G.ui!=='playing' || e.button!==0) return; const a = o3Pick(e); if (a) o3WalkTo(a); });
+  cv.addEventListener('pointermove', e=>{ if (!o3Active()) return; const a = o3Pick(e); O3.hover = a && a.kind==='site' ? a : null;
+    const n = o3NodeFromHit(a);
+    if (n && G.ui==='playing'){ showTooltip(e, skNodeTipHtml(n)); O3.nodeTip = true; } else if (O3.nodeTip){ hideItemTooltip(); O3.nodeTip = false; }
+    cv.style.cursor = (O3.hover || n) ? 'pointer' : 'default'; });
+  cv.addEventListener('pointerleave', ()=>{ if (O3.nodeTip){ hideItemTooltip(); O3.nodeTip = false; } });
+  cv.addEventListener('pointerdown', e=>{ if (!o3Active() || G.ui!=='playing' || e.button!==0) return; const a = o3Pick(e);
+    if (a && a.kind==='node' && o3GoGather(a.x, a.y)) return;
+    if (a) o3WalkTo(a); });
   cv.addEventListener('wheel', e=>{ if (!o3Active()) return; e.preventDefault(); O3.dist = clamp(O3.dist * (e.deltaY>0 ? 1.1 : 0.9), 7, 28); }, { passive:false });
 }
 // ---------- per-frame ----------
@@ -17269,12 +17649,14 @@ function o3Render(){
   // click-walking, one grid step at a time through the normal move rules
   if (O3.path.length && G.ui==='playing' && !G.gameOver){
     O3.stepT -= dt;
-    if (O3.stepT <= 0){ const [dx,dy] = O3.path.shift(); moveDir(dx,dy); O3.stepT = 0.16; if (G.ui!=='playing' || G.gameMode!==0 || G.owPos.x!==px+dx || G.owPos.y!==py+dy) O3.path = []; }
+    if (O3.stepT <= 0){ const [dx,dy] = O3.path.shift(); moveDir(dx,dy); O3.stepT = 0.16; if (G.ui!=='playing' || G.gameMode!==0 || G.owPos.x!==px+dx || G.owPos.y!==py+dy){ O3.path = []; O3.gatherAt = null; }
+      else if (!O3.path.length && O3.gatherAt){ const v = O3.gatherAt; O3.gatherAt = null; o3GoGather(v.x, v.y); } }
   } else if (G.ui!=='playing') O3.path = [];
   if (G.gameMode!==0) return true;
   owReveal(G.owPos.x, G.owPos.y, 12); pmPrebuild();
   o3SyncEncounters();
   o3SyncQuests();
+  o3SyncNodes();
   // you glide between tiles; on water you ride a boat
   const sailing = G.ow.map[G.owPos.x][G.owPos.y]===OW_WATER;   // only open water needs the boat; rivers are waded
   const tx = G.owPos.x+0.5, tz = G.owPos.y+0.5, pp = O3.ppos || (O3.ppos = new T.Vector3(tx,0,tz));
@@ -17327,6 +17709,7 @@ function o3Render(){
     if (O3.foam){ O3.foam.material.opacity = moving ? 0.9 : 0.45; }
   }
   o3ApplyTime();
+  o3AnimNodes(dt);
   o3SyncEscort(pp, dxs, dzs, sailing);
   O3.lantern.position.set(pp.x, pp.y+0.9, pp.z+0.2);
   // camera: follows you from the south-east at the isometric angle, looking down across the land
@@ -20883,7 +21266,7 @@ function isoSyncSprites(S, env){
 // each vein is a real rock in the mine: grey stone studded with nuggets of its ore's own colour
 function isoSyncVeins(){
   const T = THREE;
-  const key = G.gameMode===1 && G.dungeonDeco ? [].concat(...G.dungeonDeco.map((col,x)=>col.map((d,y)=>d==='ore' ? x+','+y : '').filter(Boolean))).join(';') + '@' + G.depth : '';
+  const key = G.gameMode===1 && G.dungeonDeco ? [].concat(...G.dungeonDeco.map((col,x)=>col.map((d,y)=>SK_CAVE_DECOS.includes(d) ? x+','+y+','+d : '').filter(Boolean))).join(';') + '@' + G.depth : '';
   if (ISO.veinKey===key && ISO.veinMap===G.map && ISO.veinG && ISO.veinG.parent===FPD.scene) return;
   if (ISO.veinG){ if (ISO.veinG.parent) ISO.veinG.parent.remove(ISO.veinG); ISO.veinG.traverse(o=>{ if (o.geometry && !o.geometry.userData.keep) o.geometry.dispose(); }); }
   ISO.veinKey = key; ISO.veinMap = G.map; ISO.veinG = new T.Group(); FPD.scene.add(ISO.veinG);
@@ -20895,7 +21278,9 @@ function isoSyncVeins(){
   rockG.forEach(g=>g.userData.keep = true); nugG.userData.keep = true;
   ISO.oreM = ISO.oreM || {};
   for (const k of key.split('@')[0].split(';')){
-    const [x, y] = k.split(',').map(Number), ore = veinOre(x, y), col = ORE_COL[ore] || '#c89a4a';
+    const [xs, ys, deco] = k.split(','), x = +xs, y = +ys;
+    if (deco!=='ore'){ ISO.veinG.add(isoCaveNode(deco, x, y, lin)); continue; }
+    const ore = veinOre(x, y), col = ORE_COL[ore] || '#c89a4a';
     const om = ISO.oreM[ore] || (ISO.oreM[ore] = new T.MeshStandardMaterial({ color:lin(col), roughness: ore==='coal' ? 0.9 : 0.4, metalness: ore==='coal' ? 0 : 0.3,
       emissive:lin(col), emissiveIntensity: ore==='coal' ? 0 : 0.3, flatShading:true }));
     const h = (i)=>fpHash(x, y, 400+i), g = new T.Group(); g.position.set(x+0.5, 0, y+0.5);
@@ -20911,6 +21296,29 @@ function isoSyncVeins(){
     }
     ISO.veinG.add(g);
   }
+}
+// a cave pool with eels turning in it, or a clump of cave herbs and glowing mushrooms
+function isoCaveNode(deco, x, y, lin){
+  const T = THREE, g = new T.Group(), h = (i)=>fpHash(x, y, 800+i); g.position.set(x+0.5, 0, y+0.5);
+  if (deco==='eelpool'){
+    const rim = new T.Mesh(new T.RingGeometry(0.3, 0.42, 20), ISO.rimM || (ISO.rimM = new T.MeshStandardMaterial({ color:lin('#4a4540'), roughness:0.95, flatShading:true })));
+    rim.rotation.x = -Math.PI/2; rim.position.y = 0.012; g.add(rim);
+    const water = new T.Mesh(new T.CircleGeometry(0.31, 20), ISO.poolM || (ISO.poolM = new T.MeshStandardMaterial({ color:lin('#0e3a44'), roughness:0.1, metalness:0.3, emissive:lin('#1a6a70'), emissiveIntensity:0.35 })));
+    water.rotation.x = -Math.PI/2; water.position.y = 0.015; g.add(water);
+    const eelM = ISO.eelM || (ISO.eelM = new T.MeshStandardMaterial({ color:lin('#2a4a40'), roughness:0.5 }));
+    for (let i=0;i<2;i++){ const e = new T.Mesh(new T.CapsuleGeometry ? new T.CapsuleGeometry(0.025, 0.16, 3, 6) : new T.CylinderGeometry(0.025,0.025,0.2,6), eelM); e.rotation.z = Math.PI/2; e.position.y = 0.02; e.userData.eel = { ph:h(i)*6, r:0.12+i*0.07 }; g.add(e); }
+    g.userData.pool = true;
+  } else {
+    const herb = skCaveHerb(), col = SK_HERB_COL[herb];
+    const capM = ISO['cap_'+herb] || (ISO['cap_'+herb] = new T.MeshStandardMaterial({ color:lin(col), roughness:0.6, emissive:lin(col), emissiveIntensity:0.45 }));
+    const stemM = ISO.stemM || (ISO.stemM = new T.MeshStandardMaterial({ color:lin('#d8d0c0'), roughness:0.8 }));
+    for (let i=0;i<6;i++){
+      const a = h(i)*6.28, r = 0.05 + h(i+10)*0.2, ht = 0.05 + h(i+20)*0.08, sc = 0.6 + h(i+30)*0.7;
+      const st = new T.Mesh(new T.CylinderGeometry(0.012*sc, 0.016*sc, ht, 5), stemM); st.position.set(Math.cos(a)*r, ht/2, Math.sin(a)*r); g.add(st);
+      const cap = new T.Mesh(new T.SphereGeometry(0.045*sc, 8, 5, 0, 6.283, 0, 1.6), capM); cap.position.set(Math.cos(a)*r, ht, Math.sin(a)*r); g.add(cap);
+    }
+  }
+  return g;
 }
 function isoHideSprites(){
   if (ISO.veinG && ISO.veinG.parent) ISO.veinG.parent.remove(ISO.veinG); if (ISO.grp && ISO.grp.parent) ISO.grp.parent.remove(ISO.grp); if (ISO.player && ISO.player.holder.parent) ISO.player.holder.parent.remove(ISO.player.holder); }
@@ -20964,7 +21372,19 @@ function isoSyncPlayer(){
       fpBurst(vx - (vx-e.pos.x)*0.35, vy - (vy-e.pos.y)*0.35, 0.3, oc, 7, 1.0); fpBurst(vx - (vx-e.pos.x)*0.35, vy - (vy-e.pos.y)*0.35, 0.32, '#fff2c0', 4, 1.4);
       try{ fpBaseSfx('hit'); }catch(err){}
     }
-  } else rsHoldTool(e, null);
+  } else {
+    rsHoldTool(e, null);
+    // fishing a cave pool or picking cave herbs: face it, hold the line out or stoop to pick
+    const g2 = G.gather && G.gather.mode===1 && G.gather.o.vein ? G.gather.o : null;
+    if (g2){
+      const vx = g2.vein.x+0.5, vy = g2.vein.y+0.5, want = Math.atan2(vx - e.pos.x, vy - e.pos.y);
+      let d2 = want - e.face; d2 = Math.atan2(Math.sin(d2), Math.cos(d2)); e.face += d2*Math.min(1, FP.dt*10); e.holder.rotation.y = e.face;
+      const r = e.rig, tt = FP.t;
+      if (r.arms){ const [R, L] = r.arms;
+        if (g2.k==='fishing'){ R.sh.rotation.x = -1.15 + Math.sin(tt*1.3)*0.05; R.el.rotation.x = -0.35; L.sh.rotation.x = -0.9; L.sh.rotation.z = 0.5; L.el.rotation.x = -0.6; }
+        else { if (r.torso) r.torso.rotation.x = 0.7; R.sh.rotation.x = -0.9 + Math.sin(tt*3)*0.2; L.sh.rotation.x = -0.7; } }
+    }
+  }
 }
 // ---- arrows and spells in flight ----
 const ISO_ELEM_COL = { air:'#e8f0ff', water:'#5aa0ff', earth:'#b08a4a', fire:'#ff7a2a' };
@@ -21012,12 +21432,14 @@ function isoHoverTile(){
 // ore veins in a mine: a pulsing gold ring on the ground and a glint, so they can't be missed
 function isoDrawVeins(){
   if (G.gameMode!==1 || !G.dungeonDeco) return;
+  if (ISO.veinG) for (const g of ISO.veinG.children) if (g.userData.pool) for (const e of g.children) if (e.userData.eel){ const q = e.userData.eel, a = FP.t*1.3 + q.ph; e.position.set(Math.cos(a)*q.r, 0.02, Math.sin(a)*q.r); e.rotation.set(Math.PI/2, 0, -a, 'XZY'); }
   const ppu = ISO.ppu || 40, pulse = 0.55 + 0.45*Math.sin(FP.t*3.2);
   ctx.save();
   for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++){
-    if (G.dungeonDeco[x][y]!=='ore' || !(G.dungeonSeen && G.dungeonSeen[x][y])) continue;
+    const dk = G.dungeonDeco[x][y];
+    if (!SK_CAVE_DECOS.includes(dk) || !(G.dungeonSeen && G.dungeonSeen[x][y])) continue;
     const c = isoProject(x+0.5, y+0.5, 0.02); if (!c.ok) continue;
-    const oc = ORE_COL[veinOre(x, y)] || '#ffd76b';
+    const oc = dk==='ore' ? (ORE_COL[veinOre(x, y)] || '#ffd76b') : skCaveLabel(dk, x, y).col;
     if (oc!=='#262626'){                                  // (coal doesn't shine)
       ctx.globalCompositeOperation = 'lighter';
       const g = ctx.createRadialGradient(c.sx, c.sy, 0, c.sx, c.sy, ppu*0.6);
@@ -21034,10 +21456,10 @@ function isoDrawVeins(){
 }
 function isoDrawHover(){
   const h = isoHoverTile();
-  if (h && G.gameMode===1 && G.dungeonDeco && G.dungeonDeco[h[0]] && G.dungeonDeco[h[0]][h[1]]==='ore' && G.dungeonSeen && G.dungeonSeen[h[0]][h[1]]){
-    const ore = SK_ORE.find(e=>e.id===veinOre(h[0], h[1])), top = isoProject(h[0]+0.5, h[1]+0.5, 0.8), txt = `Mine ${ore.nm.toLowerCase()} (Mining ${ore.lvl})`;
+  if (h && G.gameMode===1 && G.dungeonDeco && G.dungeonDeco[h[0]] && SK_CAVE_DECOS.includes(G.dungeonDeco[h[0]][h[1]]) && G.dungeonSeen && G.dungeonSeen[h[0]][h[1]]){
+    const lb = skCaveLabel(G.dungeonDeco[h[0]][h[1]], h[0], h[1]), top = isoProject(h[0]+0.5, h[1]+0.5, 0.8), txt = lb.txt;
     ctx.save(); ctx.font = `700 ${Math.round(12*dpr)}px 'JetBrains Mono', monospace`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-    ctx.lineWidth = 3*dpr; ctx.strokeStyle = 'rgba(0,0,0,0.85)'; ctx.strokeText(txt, top.sx, top.sy); ctx.fillStyle = '#ffd76b'; ctx.fillText(txt, top.sx, top.sy); ctx.restore();
+    ctx.lineWidth = 3*dpr; ctx.strokeStyle = 'rgba(0,0,0,0.85)'; ctx.strokeText(txt, top.sx, top.sy); ctx.fillStyle = lb.col; ctx.fillText(txt, top.sx, top.sy); ctx.restore();
     return;
   }
   if (!h || !isoPassable(h[0], h[1])) return;
@@ -21230,7 +21652,7 @@ function isoClick(e){
   const t = -o.y/d.y, gx = Math.floor(o.x + d.x*t), gy = Math.floor(o.z + d.z*t);
   if (!mon) mon = G.mon.find(m=>m.alive && m.x===gx && m.y===gy) || null;
   const p = G.player;
-  if (!mon && G.gameMode===1 && G.dungeonDeco && G.dungeonDeco[gx] && G.dungeonDeco[gx][gy]==='ore'){
+  if (!mon && G.gameMode===1 && G.dungeonDeco && G.dungeonDeco[gx] && SK_CAVE_DECOS.includes(G.dungeonDeco[gx][gy])){
     ISO.fighting = null; ISO.target = null;
     if (Math.max(Math.abs(gx-p.x), Math.abs(gy-p.y))<=1){ ISO.path = []; isoStartMine(gx, gy); return; }
     ISO.path = isoFindPath(gx, gy, true) || []; ISO.mineAt = ISO.path.length ? { x:gx, y:gy } : null; ISO.nextStep = 0;
@@ -22681,7 +23103,7 @@ function buildHelp(){
       <div><span style="color:${COL.encounter}">!</span> a wandering threat, visible and moving around the map - walk into one to trigger it, or steer around it if you'd rather not fight right now. It'll drift toward you if you wander close, faster at night or in bad weather. Roughly 50 are out there at once, thinning out as you clear them and slowly replaced over time &middot; <span style="color:${COL.blue}">~</span> rivers trace downhill from the peaks to the sea</div>
       <div>most encounters are an ordinary fight, but not all of them: a wandering merchant sometimes hails you with a one-time stock instead of a fight; a pack occasionally has a tougher named champion leading it, worth real bonus loot; and the desert, swamp and tundra each hide their own unique set-piece encounter (a buried tomb, a bog ambush, a frozen cache) with a guaranteed bonus reward on top of the fight itself.</div>
       <div>open water blocks the way until you own a boat (buy one at any general store) &mdash; once you have one you can sail freely, though the open sea has its own dangers</div>
-      <div><b>Skills &amp; trades</b> (<kbd>J</kbd>): fishing, mining, woodcutting and foraging, and the trades that use what you gather - cooking, smithing, alchemy and firemaking - each level from 1 to 99 alongside your combat skills. Press <kbd>E</kbd> to gather wherever you stand (by water, trees, mountains or open ground, or an ore vein in a mine; press it again or move to stop), light a campfire from your logs, or cook at your fire. Buy a fishing rod, pickaxe and hatchet (and better ones as you level) at the blacksmith, who also smelts your ore into bars and forges them into gear; brew herbs into potions at the alchemist; cook at the tavern hearth. Press <kbd>U</kbd> to eat the best-fitting cooked food (in a fight it takes your turn).</div>
+      <div><b>Skills &amp; trades</b> (<kbd>J</kbd>): fishing, mining, woodcutting and foraging, and the trades that use what you gather - cooking, smithing, alchemy and firemaking - each level from 1 to 99 alongside your combat skills. Gather at the spots you see on the land: marked trees, bubbling fishing spots and flowering herb patches (hover one to see what it gives and the level it needs, click it to walk over and start), rock beside mountains, and ore veins, cave pools and cave herbs in the dungeons. Each spot gives a few items and then is felled, fished out or picked clean, and grows back or moves on in time. <kbd>E</kbd> works the nearest spot beside you (press it again or move to stop), light a campfire from your logs, or cook at your fire. Buy a fishing rod, pickaxe and hatchet (and better ones as you level) at the blacksmith, who also smelts your ore into bars and forges them into gear; brew herbs into potions at the alchemist; cook at the tavern hearth. Press <kbd>U</kbd> to eat the best-fitting cooked food (in a fight it takes your turn).</div>
       <div>press <kbd>C</kbd> to make camp wherever you're standing &mdash; usually a free heal that also refills your ability charges, spell slots and wand charges, same as a village rest, but sleeping in the open risks a night-time ambush that interrupts the rest entirely (no healing, straight into a fight, and every exit is sealed until the last monster drops). Safer on grass, riskier in forest/swamp, and impossible while zoomed out. You can also camp inside any dungeon-type site once you've cleared every monster off the current floor &mdash; nothing left down there to ambush you, so it's just as safe as a village rest.</div>
       <div>press <kbd>M</kbd> (or the <b>+</b> icon) to zoom out and see the whole continent at once &mdash; press again to zoom back in and move; while zoomed out, press <kbd>T</kbd> to instantly fast-travel to any village you've already visited</div>
       <div>day turns to night and back on a steady cycle, and the weather shifts between clear, rain, fog and the occasional storm &mdash; both are shown in the corner of the overworld map. Night and bad weather raise the odds of a random encounter, so an easy stretch of road can turn dangerous after dark.</div>

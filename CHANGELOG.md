@@ -1,5 +1,28 @@
 # Depthcrawl patch notes
 
+## RS-19 — Gathering spots: trees, fishing spots and herb patches
+
+Woodcutting, fishing and foraging now work like mining. Instead of standing anywhere and pressing E forever, you find real spots on the land, work them until they run out, and move on.
+
+- **Visible spots:** marked trees, bubbling fishing spots and flowering herb patches, each with a soft glow in its own colour. They also show as coloured dots on the flat map.
+  - Hover a spot to see what it gives, the level it needs and how much is left.
+  - Click it to walk over and start. E works the nearest spot beside you.
+- **Spots run out:**
+  - A tree gives a few logs, then creaks and crashes down, leaving a stump that regrows after a while.
+  - A fishing spot gives a few catches, then the shoal moves on. Fish also drift up and down the water over time, so you follow them.
+  - A herb patch is picked clean, then grows back.
+- **Where things grow:**
+  - **Trees:** ordinary trees at forest edges and on open grass, oaks inside forests, willows by rivers and in swamps, maples deeper in, yews deep in forests and near graveyards and temples, and rare glowing magic trees in the oldest woods.
+  - **Fish:** trout, salmon and pike in rivers; shrimp, sardines and lobster along the shore. Tuna, swordfish, sharks and kraken spawn are only in deep water, which you reach by boat.
+  - **Herbs:** silverleaf and sunpetal on grass, sunpetal in the desert, bloodmoss in swamps, ghostcap near graveyards, and dragon's tongue on mountain slopes. Starlily grows on high ground and tundra and only opens at night.
+- **Surprises:**
+  - Bird's nests fall while you chop, holding gold, a herb or a ring.
+  - A yew or magic tree may wake as a **treant**.
+  - Something big may take your line: a giant eel, a crab, an octopus or a shark.
+  - Rare **glowing** herb patches give double.
+- **Animations:** your fishing line and float stretch out to the spot you're fishing, and a felled tree topples before it leaves its stump.
+- **In the dungeons:** cave pools where you fish cave eels, and patches of glowing cave herbs and mushrooms. The herbs are bloodmoss near the top, then ghostcap, then dragon's tongue deeper down. They sit alongside the mine's ore veins: hover to see them, click to walk over and work them, and they run out the same way.
+
 ## RS-18 — Rescues stick
 
 - **A freed captive stays freed when you die.** Before, dying anywhere after a rescue dragged the captive back into their cell. That reset the quest to "clear floor N" on a floor that had filled back up with monsters. Now they slip away and make for the town that posted the quest. All that's left is to turn it in there.
