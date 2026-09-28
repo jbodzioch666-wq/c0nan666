@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-29 — Teleport from the map, clicks that always walk, a version number
+
+- **Teleport from anywhere in the open with T:** the list shows every town you've visited by name, with its race, distance and direction. Press its number or click it. On the overworld a portal opens beside you. You walk into it and step out of a portal in the plaza of the town you chose, the same as the town waypoints. It works from a town, too.
+- **World map towns are clickable:** on the world map (M), hovering a town shows its name and whether you can teleport there. A visited town gets a glowing ring, and clicking it teleports you. Dragging still pans the map.
+- **Clicking behind you walks again:** the combat log floats over the lower-left of the scene, which is where you click to walk "backwards" at the start. It used to swallow those clicks. Clicks on it now pass through to the scene, in dungeons, town and the overworld. The log still scrolls.
+- **Version number:** the title screen shows the build's version (now RS-29), and the itch.io zip is named after it (`depthcrawl-rs-29-itch.zip`).
+
 ## RS-28 — No more painted cut-outs in the dungeons
 
 In the isometric dungeons, everything that was still a flat painted picture standing in the 3D scene is now a real 3D model, lit by the torches:

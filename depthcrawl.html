@@ -7311,6 +7311,7 @@ function applyOverworldOverrides(){
 
 function tryMoveOverworld(dx,dy){
   if (G.gameOver) return;
+  if (G.owPortal){ if (!o3Active()){ const f = G.owPortal; G.owPortal = null; waypointArrive(f.key); } return; }
   const nx=G.owPos.x+dx, ny=G.owPos.y+dy;
   if (nx<0||ny<0||nx>=OW_COLS||ny>=OW_ROWS) return;
   const t = G.ow.map[nx][ny];
@@ -10863,26 +10864,72 @@ function buildAchievements(){
 function buildFastTravel(){
   const towns = (G.ow.visitedTowns||[]);
   if (towns.length===0){
-    return `<h2 class="panel-title">FAST TRAVEL</h2><div class="sub">you haven't found a town to remember yet</div>
+    return `<h2 class="panel-title">TELEPORT</h2><div class="sub">you haven't found a town to remember yet</div>
       <div class="ovbody"><div class="btnrow"><button class="btn primary" onclick="setUi('playing')">T / ESC &middot; close</button></div></div>`;
   }
   const rows = towns.map((key,i)=>{
-    const [x,y] = key.split(',').map(Number);
-    const here = (x===G.owPos.x && y===G.owPos.y);
-    return `<div class="choice-row" onclick="fastTravelTo('${key}')" style="cursor:pointer;">
-      <span class="key">${i+1}</span><span>a town you remember${here?' (you are here)':''}</span>
-      <span class="muted">(${x}, ${y})</span>
+    const [x,y] = key.split(',').map(Number), here = (G.gameMode===3 || G.gameMode===0) && x===G.owPos.x && y===G.owPos.y && G.gameMode===3;
+    const d = Math.round(Math.hypot(x-G.owPos.x, y-G.owPos.y)), f = townFlavorAt(x,y);
+    return `<div class="choice-row ${here?'sel':''}" ${here ? '' : `onclick="worldTeleport('${key}')"`} style="cursor:${here?'default':'pointer'};">
+      <span class="key">${i<9 ? i+1 : ''}</span><span><b>${esc(o3TownName(x,y))}</b>${here ? ' <span class="muted">(you are here)</span>' : ''}</span>
+      <span class="muted">${f ? esc(f.adj)+' &middot; ' : ''}${here ? '' : d+' leagues '+dirWord(x-G.owPos.x, y-G.owPos.y)}</span>
     </div>`;
   }).join('');
   return `
-    <h2 class="panel-title">FAST TRAVEL</h2>
-    <div class="sub">click a remembered town to travel there instantly</div>
+    <h2 class="panel-title">TELEPORT</h2>
+    <div class="sub">a portal opens beside you and carries you to the waypoint of any town you have visited - press its number or click it (you can also click a town on the world map, M)</div>
     <div class="ovbody">${rows}
       <div class="btnrow"><button class="btn primary" onclick="setUi('playing')">T / ESC &middot; close</button></div>
     </div>
   `;
 }
-
+// teleport to a remembered town from wherever you are in the open: through a portal
+function worldTeleport(key){
+  if (!(G.ow.visitedTowns||[]).includes(key)){ logMsg("you haven't been there yet - visit a town once to teleport to it", 'hit'); renderGame(); return; }
+  const [x,y] = key.split(',').map(Number);
+  setUi('playing');
+  if (G.gameMode===3){ if (x===G.owPos.x && y===G.owPos.y){ logMsg("you're already here", ''); renderGame(); return; } if (G.interior) exitInterior(); waypointTravel(key); return; }
+  if (G.gameMode!==0){ logMsg('you can only teleport from the overworld or a town', 'hit'); renderGame(); return; }
+  if (G.gather) skStop();
+  G.owZoomedOut = false;
+  if (!o3Active()){ waypointArrive(key); return; }
+  const px = G.owPos.x, py = G.owPos.y;
+  let best = null;
+  for (const [dx,dy] of [[1,1],[1,0],[0,1],[-1,1],[1,-1],[-1,0],[0,-1],[-1,-1]]){ const nx = px+dx, ny = py+dy; if (o3Passable(nx,ny) && skOwTile(nx,ny)!==OW_WATER){ best = [nx,ny]; break; } }
+  if (!best) best = [px+1, py+1];
+  O3.path = []; O3.gatherAt = null;
+  G.owPortal = { key, x:best[0], y:best[1], t:0 };
+  logMsg('you trace the sign of the waypoint and a portal tears open beside you', 'magic'); sfx && sfx('spell');
+  renderGame();
+}
+function o3PortalTick(dt, pp){
+  const f = G.owPortal, T = THREE;
+  if (!f){ if (O3.portal) O3.portal.visible = false; if (O3.pgrp) O3.pgrp.scale.setScalar(1); return; }
+  if (!O3.portal){
+    const g = O3.portal = new T.Group();
+    const ring = new T.Mesh(new T.TorusGeometry(0.46, 0.05, 10, 40), new T.MeshStandardMaterial({ color:0x3ab8ff, emissive:0x40c8ff, emissiveIntensity:1.6, roughness:0.3 }));
+    const core = new T.Mesh(new T.CircleGeometry(0.42, 40), new T.MeshBasicMaterial({ color:0x0a2a4a, transparent:true, opacity:0.9, side:T.DoubleSide }));
+    const swirl = new T.Mesh(new T.RingGeometry(0.08, 0.42, 40, 1, 0, Math.PI*1.6), new T.MeshBasicMaterial({ color:0x7ae0ff, transparent:true, opacity:0.7, side:T.DoubleSide, blending:T.AdditiveBlending, depthWrite:false }));
+    swirl.position.z = 0.01; g.add(core); g.add(swirl); g.add(ring); g.userData.swirl = swirl;
+    const glow = new T.Sprite(new T.SpriteMaterial({ map:v3Blob('rgba(90,200,255,1)'), blending:T.AdditiveBlending, depthWrite:false, transparent:true, opacity:0.7 })); glow.scale.set(2.2, 2.2, 1); g.add(glow);
+    O3.portalLight = new T.PointLight(0x60d0ff, 0, 5, 2); g.add(O3.portalLight);
+  }
+  const g = O3.portal; if (g.parent !== O3.scene) O3.scene.add(g); g.visible = true;
+  f.t += dt;
+  const gx = f.x+0.5, gz = f.y+0.5, gy = Math.max(O3.heightAt(gx, gz), -0.14);
+  g.position.set(gx, gy+0.62, gz); g.rotation.set(-0.5, ISO_YAW, 0, 'YXZ');
+  g.userData.swirl.rotation.z -= dt*3;
+  const sc = Math.min(1, f.t/0.45); g.scale.setScalar(sc);
+  O3.portalLight.intensity = 2.5*sc;
+  if (f.t >= 0.55){                                   // walk into it and fade away
+    if (!f.from) f.from = { x:pp.x, z:pp.z };
+    const u = Math.min(1, (f.t-0.55)/0.45);
+    pp.x = f.from.x + (gx-f.from.x)*u; pp.z = f.from.z + (gz-f.from.z)*u; O3.pgrp.position.copy(pp);
+    if (O3.player && O3.player.e){ const want = Math.atan2(gx-f.from.x, gz-f.from.z); O3.player.yaw = want; O3.player.e.holder.rotation.y = want; }
+    O3.pgrp.scale.setScalar(f.t < 0.9 ? 1 : Math.max(0.01, 1 - (f.t-0.9)/0.35));
+  }
+  if (f.t >= 1.3){ G.owPortal = null; O3.pgrp.scale.setScalar(1); g.visible = false; waypointArrive(f.key); }
+}
 // ===================== SECTION: MONSTER CODEX (bestiary) =====================
 function buildBestiary(){
   const seen = G.player.codexSeen||[];
@@ -12049,6 +12096,7 @@ function owZoomCenter(){
   if (!G.owZoomCenter) G.owZoomCenter = {x:G.owPos.x, y:G.owPos.y};
   return G.owZoomCenter;
 }
+let owZoomLastCam = null, owTownHover = null;   // the world map's last camera origin, and the town under the mouse
 let owZoomLastCellPx = 1; // this view's own last-rendered cellPx, read by the drag handler to convert a mouse-pixel delta into a tile delta
 // ===================== SECTION: PAINTED WORLD MAP =====================
 // the zoomed-out world map drawn as an old parchment chart: washed-in land
@@ -12277,6 +12325,7 @@ function renderOverworldMapZoomed(){
   // tile-indexed lookup (G.ow.map, the seen mask) stays an integer
   const zCamX = Math.floor(clamp(center.x - Math.floor(viewCols/2), 0, mx(0, OW_COLS-viewCols)));
   const zCamY = Math.floor(clamp(center.y - Math.floor(viewRows/2), 0, mx(0, OW_ROWS-viewRows)));
+  owZoomLastCam = { x:zCamX, y:zCamY };
   owReveal(G.owPos.x, G.owPos.y, 12);
   if (!PM.cv || PM.key !== pmMapKey()) pmBuild();
   const P = PM.P, cw = canvas.width, ch = canvas.height;
@@ -12307,6 +12356,8 @@ function renderOverworldMapZoomed(){
     if (!OW_SITE_TILES.includes(t2) || !owSeen(x,y)) continue;
     const px = vx*cellPx + cellPx/2, py = vy*cellPx + cellPx/2;
     pmBadge(ctx, px, py, iconR, t2);
+    if (t2===OW_TOWN && (G.ow.visitedTowns||[]).includes(x+','+y) && !(x===G.owPos.x && y===G.owPos.y) && owTownHover===x+','+y){   // a glowing ring round the town you're pointing at
+      ctx.save(); ctx.strokeStyle = 'rgba(90,200,255,0.95)'; ctx.lineWidth = 3*dpr; ctx.shadowColor = '#40c8ff'; ctx.shadowBlur = 12*dpr; ctx.beginPath(); ctx.arc(px, py, iconR*1.35, 0, Math.PI*2); ctx.stroke(); ctx.restore(); }
     if (t2===OW_TOWN) names.push([px, py + iconR*1.25 + (x===G.owPos.x && y===G.owPos.y ? clamp(cellPx*1.3, 14*dpr, 24*dpr)*0.5 : 0), o3TownName(x,y), (G.ow.visitedTowns||[]).includes(x+','+y)]);   // pushed below the You marker when you're standing in it
   }
   ctx.textAlign = 'center'; ctx.textBaseline = 'top';
@@ -18207,7 +18258,7 @@ function o3Input(cv){
     if (n && G.ui==='playing'){ showTooltip(e, skNodeTipHtml(n)); O3.nodeTip = true; } else if (O3.nodeTip){ hideItemTooltip(); O3.nodeTip = false; }
     cv.style.cursor = (O3.hover || n) ? 'pointer' : 'default'; });
   cv.addEventListener('pointerleave', ()=>{ if (O3.nodeTip){ hideItemTooltip(); O3.nodeTip = false; } });
-  cv.addEventListener('pointerdown', e=>{ if (!o3Active() || G.ui!=='playing' || e.button!==0) return; const a = o3Pick(e);
+  cv.addEventListener('pointerdown', e=>{ if (!o3Active() || G.ui!=='playing' || e.button!==0 || G.owPortal) return; const a = o3Pick(e);
     if (a && a.kind==='node' && o3GoGather(a.x, a.y)) return;
     if (a) o3WalkTo(a); });
   cv.addEventListener('wheel', e=>{ if (!o3Active()) return; e.preventDefault(); O3.dist = clamp(O3.dist * (e.deltaY>0 ? 1.1 : 0.9), 7, 28); }, { passive:false });
@@ -18257,6 +18308,7 @@ function o3Render(){
   const gy = O3.heightAt(pp.x, pp.z);
   pp.y = sailing ? -0.14 : Math.max(gy, -0.14);
   O3.pgrp.position.copy(pp);
+  o3PortalTick(dt, pp);
   if (O3.lookKey !== rsLookKey()){                          // (you changed your gear: dress the figure again)
     const old = O3.player; O3.lookKey = rsLookKey();
     if (old && old.g.parent) old.g.parent.remove(old.g);
@@ -22673,6 +22725,8 @@ function renderOverlay(){
 }
 
 // ---- title screen (resume a saved adventurer, or start new) ----
+// the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
+const GAME_VERSION = 'rs-29';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -22696,6 +22750,7 @@ function buildTitleScreen(){
         <button class="btn primary" onclick="goToCharCreate()">NEW &middot; create a character</button>
         <button class="btn" onclick="setUi('memorial')">HALL OF THE FALLEN</button>
       </div>
+      <div class="muted" style="text-align:center;font-size:11px;margin-top:10px;">version ${GAME_VERSION.toUpperCase()}</div>
     </div>
   `;
 }
@@ -23905,7 +23960,7 @@ function handlePlayingKey(k){
     case 'u': case 'U': eatFood(); renderGame(); break;
     case 'b': case 'B': setUi('bestiary'); break;
     case 'h': case 'H': setUi('achievements'); break;
-    case 't': case 'T': if (G.gameMode===0 && G.owZoomedOut) setUi('fastTravel'); break;
+    case 't': case 'T': if (G.gameMode===0 || G.gameMode===3) setUi('fastTravel'); else { logMsg('you can only teleport from the overworld or a town', ''); renderGame(); } break;
     case 'k': case 'K':
       if (G.player.level>=MAX_CHAR_LEVEL) setUi('ngplus');
       else { logMsg('you must reach combat level 123 to ascend to New Game+', ''); renderGame(); }
@@ -24071,7 +24126,7 @@ function handleKeydown(e){
     }
     case 'achievements': { if (['h','H','Escape'].includes(k)) setUi('playing'); break; }
     case 'bestiary': { if (['b','B','Escape'].includes(k)) setUi('playing'); break; }
-    case 'fastTravel': { if (['t','T','Escape'].includes(k)) setUi('playing'); break; }
+    case 'fastTravel': { if (['t','T','Escape'].includes(k)) setUi('playing'); else if (k>='1' && k<='9'){ const key = (G.ow.visitedTowns||[])[+k-1]; if (key) worldTeleport(key); } break; }
     case 'rsmagic': { if (['g','G','Escape'].includes(k)) setUi('playing'); break; }
     case 'prayer': { if (['n','N','Escape'].includes(k)) setUi('playing'); break; }
     case 'crafting': { if (['x','X','Escape'].includes(k)) setUi(G.craftBack||'playing'); break; }
@@ -24102,16 +24157,37 @@ canvas.addEventListener('wheel', (e)=>{
 // since owZoomCenter's clamp pins it in place). mousemove/mouseup listen on
 // window rather than the canvas so a drag started on the map keeps tracking
 // smoothly even if the cursor slips off it mid-drag, standard drag UX.
-let owZoomDragging = false, owZoomDragLastX = 0, owZoomDragLastY = 0;
+let owZoomDragging = false, owZoomDragLastX = 0, owZoomDragLastY = 0, owZoomDragMoved = 0;
+// the town (visited or not) under a point on the world map, if any
+function owTownAtClient(e){
+  if (!owZoomLastCam || !owZoomLastCellPx) return null;
+  const rect = canvas.getBoundingClientRect(), k = canvas.width/rect.width;
+  const cx = (e.clientX-rect.left)*k, cy = (e.clientY-rect.top)*k, R = clamp(owZoomLastCellPx*1.2, 11*dpr, 22*dpr)*1.4;
+  let best = null, bd = R*R;
+  for (const key in (G.ow.townPositions||{})){ const t = G.ow.townPositions[key]; if (!t || !owSeen(t.x,t.y)) continue;
+    const px = (t.x-owZoomLastCam.x)*owZoomLastCellPx + owZoomLastCellPx/2, py = (t.y-owZoomLastCam.y)*owZoomLastCellPx + owZoomLastCellPx/2, d = (px-cx)*(px-cx)+(py-cy)*(py-cy);
+    if (d < bd){ bd = d; best = t; } }
+  return best;
+}
+canvas.addEventListener('mousemove', (e)=>{
+  if (G.gameMode!==0 || !G.owZoomedOut || owZoomDragging || G.ui!=='playing') return;
+  const t = owTownAtClient(e), key = t ? t.x+','+t.y : null;
+  if (t){ const nm = o3TownName(t.x,t.y), vis = (G.ow.visitedTowns||[]).includes(key), here = t.x===G.owPos.x && t.y===G.owPos.y;
+    showTooltip(e, `<div style="font-weight:600">${esc(nm)}</div><div class="muted">${here ? 'you are here' : vis ? 'click to teleport here through a portal' : 'not visited yet - walk there once to be able to teleport to it'}</div>`); canvas.style.cursor = vis && !here ? 'pointer' : 'default'; }
+  else { hideItemTooltip(); canvas.style.cursor = ''; }
+  if (key !== owTownHover){ owTownHover = key; renderGame(); }
+});
+canvas.addEventListener('mouseleave', ()=>{ if (owTownHover){ owTownHover = null; hideItemTooltip(); } });
 canvas.addEventListener('mousedown', (e)=>{
   if (G.gameMode!==0 || !G.owZoomedOut) return;
-  owZoomDragging = true;
+  owZoomDragging = true; owZoomDragMoved = 0;
   owZoomDragLastX = e.clientX; owZoomDragLastY = e.clientY;
   canvas.style.cursor = 'grabbing';
 });
 window.addEventListener('mousemove', (e)=>{
   if (!owZoomDragging) return;
   const dx = e.clientX - owZoomDragLastX, dy = e.clientY - owZoomDragLastY;
+  owZoomDragMoved += Math.abs(dx) + Math.abs(dy);
   owZoomDragLastX = e.clientX; owZoomDragLastY = e.clientY;
   const rect = canvas.getBoundingClientRect();
   const pxScale = canvas.width / rect.width; // CSS pixels -> canvas-internal pixels, same ratio dpr scaling already uses elsewhere
@@ -24120,12 +24196,29 @@ window.addEventListener('mousemove', (e)=>{
   center.y = clamp(center.y - (dy*pxScale)/owZoomLastCellPx, 0, OW_ROWS-1);
   renderGame();
 });
-window.addEventListener('mouseup', ()=>{
+window.addEventListener('mouseup', (e)=>{
   if (!owZoomDragging) return;
   owZoomDragging = false;
   canvas.style.cursor = '';
+  if (owZoomDragMoved < 6 && G.ui==='playing'){          // a click, not a drag: a town you've visited teleports you there
+    const t = owTownAtClient(e);
+    if (t){ const key = t.x+','+t.y; hideItemTooltip(); if (t.x===G.owPos.x && t.y===G.owPos.y){ logMsg("you're already here", ''); renderGame(); } else worldTeleport(key); }
+  }
 });
 
+// the combat log floats over the lower-left of the play area: a click on it goes through to the
+// scene underneath, so you can still click to walk (or fight) behind it - it keeps its wheel scroll
+(function(){
+  const lp = document.getElementById('logPanel'); if (!lp) return;
+  const pass = (e)=>{
+    if (!document.body.classList.contains('immersive') || G.ui!=='playing') return;
+    lp.style.pointerEvents = 'none'; const el = document.elementFromPoint(e.clientX, e.clientY); lp.style.pointerEvents = '';
+    if (!el || el===lp || lp.contains(el)) return;
+    e.preventDefault(); e.stopPropagation();
+    el.dispatchEvent(new e.constructor(e.type, e));
+  };
+  for (const t of ['pointerdown','pointerup','mousedown','mouseup','click']) lp.addEventListener(t, pass);
+})();
 // touch controls
 function bindTouch(){
   document.querySelectorAll('.dpad [data-dir]').forEach(btn=>{

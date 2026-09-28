@@ -2,7 +2,8 @@
 # Builds an itch.io-ready HTML5 zip of Depthcrawl: index.html plus a local
 # copy of three.js and the two web fonts, so the game never depends on a
 # CDN at runtime (and plays fully offline). Needs curl, python3 and zip.
-#   tools/build-itch.sh            -> dist/depthcrawl-itch.zip
+#   tools/build-itch.sh            -> dist/depthcrawl-itch.zip, or dist/depthcrawl-<version>-itch.zip
+#                                     when the page defines const GAME_VERSION = '...'
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="$ROOT/dist"
@@ -45,6 +46,8 @@ if re.search(r'(src|href)="https?://', html): sys.exit('build-itch: an external 
 open(os.path.join(stage, 'index.html'), 'w').write(html)
 PY
 
-rm -f "$OUT/depthcrawl-itch.zip"
-(cd "$STAGE" && zip -qr9 "$OUT/depthcrawl-itch.zip" index.html three.min.js fonts licenses)
-echo "built $OUT/depthcrawl-itch.zip ($(du -h "$OUT/depthcrawl-itch.zip" | cut -f1))"
+VER="$(grep -oE "const GAME_VERSION = '[A-Za-z0-9._-]+'" "$ROOT/depthcrawl.html" | head -1 | sed -E "s/.*'(.*)'/\1/" || true)"
+ZIP="$OUT/depthcrawl${VER:+-$VER}-itch.zip"
+rm -f "$ZIP"
+(cd "$STAGE" && zip -qr9 "$ZIP" index.html three.min.js fonts licenses)
+echo "built $ZIP ($(du -h "$ZIP" | cut -f1))"
