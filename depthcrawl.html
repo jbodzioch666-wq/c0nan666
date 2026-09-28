@@ -4791,7 +4791,7 @@ function loadLevel(d, arrivingFromBelow, fellThrough){
   }
   if (G.gameMode===1 && d===1) G.map[G.genStart.x][G.genStart.y] = T_EXIT;
   // step off the staircase you came by, onto the floor in front of it
-  if (!fellThrough && G.gameMode===1){ const t = G.map[G.player.x][G.player.y], w = (t===T_STAIRSU || t===T_STAIRSD) && stairWallDir(G.player.x, G.player.y);
+  if (!fellThrough && G.gameMode===1){ const t = G.map[G.player.x][G.player.y], w = (t===T_STAIRSU || t===T_STAIRSD || t===T_EXIT) && stairWallDir(G.player.x, G.player.y);
     if (w && G.map[G.player.x-w[0]][G.player.y-w[1]]===T_FLOOR && !G.mon.some(m=>m.alive && m.x===G.player.x-w[0] && m.y===G.player.y-w[1])){ G.player.x -= w[0]; G.player.y -= w[1]; } }
   G.player.facing = pickInitialFacing(G.player.x, G.player.y);
   placeCompanionNearPlayer(); // new floor, new map - drop the companion at your side again rather than wherever it stood on the last one
@@ -5136,7 +5136,7 @@ function singleAttackRoll(mi, missVerb, hitVerb){
   const debuffedAtk = m.atkBonus - ((m.debuffAtkTurns>0) ? (m.debuffAtkAmt||0) : 0);
   const mstyle = rsMonStyle(m);
   const mtotal = mroll + debuffedAtk + 2*rsTriangle(mstyle, rsArmourStyle());
-  const ac = playerAC();
+  const ac = rsFrac(playerACExact());
   if (mroll===1 || mtotal < ac){
     logMsg(`the ${m.nm} ${missVerb} but misses (${mtotal} vs AC ${ac})`, '');
     return false;
@@ -6371,6 +6371,7 @@ function loadGame(id){
   } else {
     G.gameMode = 0;
   }
+  rsMigrateAll();
   rsSync();
   setUi('playing');
   logMsg(`welcome back, ${G.player.name} the ${G.player.race} ${G.player.kit||G.player.cls} - combat level ${G.player.combatLevel}.`, 'new');
@@ -8298,12 +8299,19 @@ function rsPrayOn(id){ return !!(G.player && G.player.prayers && G.player.prayer
 function rsPrayBonus(f){ let t = 0; if (!G.player || !G.player.prayers) return 0; for (const id of G.player.prayers){ const pr = RS_PRAYERS.find(p=>p.id===id); if (pr && pr[f]) t += pr[f]; } return t; }
 
 // ---- the numbers that feed the dice ----
+// Gear carries RuneScape-style bonuses (a bronze scimitar is attack +7 and
+// strength +6, a rune platebody defence +82), so every tier is a real step up
+// on every piece. They turn into the d20 engine's numbers at: 10 attack (or
+// ranged, or magic) bonus = +1 to hit, 8 strength = +1 damage, 20 defence =
+// +1 armour class. A fraction counts as a chance of the next point up.
+const RS_ATK_PER_HIT = 10, RS_STR_PER_DMG = 8, RS_DEF_PER_AC = 20;
+function rsFrac(v){ const f = Math.floor(v); return f + (Math.random() < v-f ? 1 : 0); }
 function rsAtkBonus(type){
   const st = rsStyle().id;
   let b = 2 + gearStatI('atk');
-  if (type==='ranged'){ const w = G.gear.weapon && G.gear.weapon.range ? G.gear.weapon : G.gear.ranged; b += Math.floor(rsEff('ranged')/8) + ((w && w.used && w.acc)||0) + rsGearSum('rngAcc') + rsPrayBonus('rng'); }
-  else if (type==='magic') b += Math.floor(rsEff('magic')/8) + rsGearSum('magAcc') + rsPrayBonus('mag');
-  else b += Math.floor(rsEff('attack')/8) + rsGearSum('acc') + rsPrayBonus('att');
+  if (type==='ranged'){ const w = G.gear.weapon && G.gear.weapon.range ? G.gear.weapon : G.gear.ranged; b += Math.floor(rsEff('ranged')/8) + (((w && w.used && w.acc)||0) + rsGearSum('rngAcc'))/RS_ATK_PER_HIT + rsPrayBonus('rng'); }
+  else if (type==='magic') b += Math.floor(rsEff('magic')/8) + rsGearSum('magAcc')/RS_ATK_PER_HIT + rsPrayBonus('mag');
+  else b += Math.floor(rsEff('attack')/8) + rsGearSum('acc')/RS_ATK_PER_HIT + rsPrayBonus('att');
   if (st==='accurate') b += 2; else if (st==='controlled') b += 1;
   return b;
 }
@@ -8311,27 +8319,29 @@ function rsMeleeDamage(){
   const w = G.gear.weapon, st = rsStyle().id;
   const has = w && w.used;
   let d = has ? rollDice(w.d1, w.d2) + (w.bonus||0) : 1 + rn(3);
-  d += Math.floor(rsEff('strength')/5) + rsGearSum('dmgB') + gearFlatDmg();
+  d += Math.floor(rsEff('strength')/5) + rsFrac(rsGearSum('dmgB')/RS_STR_PER_DMG) + gearFlatDmg();
   if (st==='aggressive') d += 2; else if (st==='controlled') d += 1;
   return d * (1 + rsPrayBonus('str')) * gearDmgMult();
 }
 function rsRangedDamage(){
   const w = G.gear.weapon, st = rsStyle().id;
-  let d = rollDice(w.d1, w.d2) + (w.bonus||0) + Math.floor(rsEff('ranged')/5) + rsGearSum('dmgB') + gearFlatDmg();
+  let d = rollDice(w.d1, w.d2) + (w.bonus||0) + Math.floor(rsEff('ranged')/5) + rsFrac(rsGearSum('dmgB')/RS_STR_PER_DMG) + gearFlatDmg();
   if (st==='aggressive') d += 1;
   return d * (1 + rsPrayBonus('rdmg')) * gearDmgMult();
 }
 function playerAtkBonus(){ return rsAtkBonus(rsAttackType()); }
 function playerAttackCount(){ return 1; }
 function effMaxHp(){ return G.player.maxHp + gearStatI('life'); }
-function playerAC(){
-  let ab = 0;
-  for (const key of ['head','chest','legs','arms','necklace','ring1','ring2']){ const it = G.gear[key]; if (it && it.used) ab += it.ac||0; }
+// armour class with the defence bonus's fraction kept (the attack roll uses it as a chance); shown rounded
+function playerACExact(){
+  let def = 0;
+  for (const key of ['head','chest','legs','arms','necklace','ring1','ring2']){ const it = G.gear[key]; if (it && it.used) def += it.ac||0; }
   const ed = gearStatI('edef'), st = rsStyle().id;
   const spellBuff = (G.player.buffACTurns>0) ? (G.player.buffACAmt||0) : 0;
-  return 10 + Math.floor(rsEff('defence')/20) + roundH(ab*(1+ed/100)) + gearStatI('flatac') + rsPrayBonus('def')
+  return 10 + Math.floor(rsEff('defence')/20) + def*(1+ed/100)/RS_DEF_PER_AC + gearStatI('flatac') + rsPrayBonus('def')
     + (st==='defensive' ? 2 : st==='controlled' ? 1 : 0) + spellBuff;
 }
+function playerAC(){ return Math.round(playerACExact()); }
 // xp for a hit that landed: the style's skill gets 4 per damage, Hitpoints 1.33
 function rsHitXP(dmg, type){
   if (!G.player || dmg<=0) return;
@@ -8346,7 +8356,7 @@ function rsHitXP(dmg, type){
 }
 // the attack roll's full bonus against one monster, triangle included
 function rsAttackTotal(roll, m, type){
-  return roll + rsAtkBonus(type) + frightPenalty() + 3*rsTriangle(type, rsMonStyle(m));
+  return roll + rsFrac(rsAtkBonus(type)) + frightPenalty() + 3*rsTriangle(type, rsMonStyle(m));
 }
 function rsTriDmgMult(type, m){ const t = rsTriangle(type, rsMonStyle(m)); return t>0 ? 1.2 : t<0 ? 0.85 : 1; }
 
@@ -8382,80 +8392,83 @@ function equipFromInv(idx){
 }
 
 // ---- the gear tables ----
-// metal: name, level to wield/wear, loot level it starts dropping at, accuracy, damage, colour
+// metal: name, level to wield/wear, loot level it starts dropping at, attack bonus, strength bonus, colour
+// (RuneScape's own scimitar bonuses; each weapon type scales them - see RS_WEAPONS)
 const RS_METALS = [
-  ['Bronze',  1,  1, 0, 0, '#b07a3c'],
-  ['Iron',    1,  3, 0, 1, '#8c8c8c'],
-  ['Steel',   5,  5, 1, 2, '#c0c4ca'],
-  ['Mithril', 20, 8, 1, 3, '#5064c0'],
-  ['Adamant', 30, 11, 2, 4, '#3c8a5a'],
-  ['Rune',    40, 14, 3, 6, '#46a8c8'],
-  ['Dragon',  60, 18, 4, 8, '#c83a2a'],
+  ['Bronze',  1,  1, 7,  6,  '#b07a3c'],
+  ['Iron',    1,  3, 10, 9,  '#8c8c8c'],
+  ['Steel',   5,  5, 15, 14, '#c0c4ca'],
+  ['Mithril', 20, 8, 21, 20, '#5064c0'],
+  ['Adamant', 30, 11, 29, 28, '#3c8a5a'],
+  ['Rune',    40, 14, 45, 44, '#46a8c8'],
+  ['Dragon',  60, 18, 67, 66, '#c83a2a'],
 ];
-// melee weapons: name, basis (the 3D model and weapon kind), dice, accuracy
+// melee weapons: name, basis (the 3D model and weapon kind), dice, attack and strength multipliers
+// (a dagger is quick and light, a 2h sword slow and brutal)
 const RS_WEAPONS = [
-  ['Dagger',    'Dagger',     1,4,  1],
-  ['Mace',      'Mace',       1,6,  0],
-  ['Sword',     'Shortsword', 1,6,  0],
-  ['Scimitar',  'Scimitar',   1,6,  1],
-  ['Spear',     'Spear',      1,6,  0],
-  ['Longsword', 'Longsword',  1,8,  0],
-  ['Warhammer', 'Warhammer',  1,8,  0],
-  ['Battleaxe', 'Battleaxe',  1,10, -1],
-  ['Halberd',   'Halberd',    1,10, -1],
-  ['2h Sword',  'Greatsword', 2,8,  -1],
+  ['Dagger',    'Dagger',     1,4,  1.0,  0.65],
+  ['Mace',      'Mace',       1,6,  0.95, 0.9],
+  ['Sword',     'Shortsword', 1,6,  1.0,  0.85],
+  ['Scimitar',  'Scimitar',   1,6,  1.05, 1.0],
+  ['Spear',     'Spear',      1,6,  1.0,  0.95],
+  ['Longsword', 'Longsword',  1,8,  1.0,  1.1],
+  ['Warhammer', 'Warhammer',  1,8,  0.9,  1.2],
+  ['Battleaxe', 'Battleaxe',  1,10, 0.9,  1.25],
+  ['Halberd',   'Halberd',    1,10, 0.9,  1.3],
+  ['2h Sword',  'Greatsword', 2,8,  0.85, 1.45],
 ];
-// armour families. ac/extra are per tier, per slot
+// armour families: defence bonus per tier and slot (20 defence = +1 armour class),
+// and the ranged or magic bonus hide and robes carry (10 = +1 to hit)
 const RS_ARMOUR = {
   metal: { req:'reqDef', names:{ head:'Full Helm', chest:'Platebody', legs:'Platelegs', arms:'Gauntlets' },
     tiers: RS_METALS.map(m=>[m[0], m[1], m[2], m[5]]),
-    ac: { chest:[1,2,2,3,3,4,4], legs:[1,1,1,1,2,2,3], head:[1,1,1,1,2,2,2], arms:[0,0,1,1,1,1,2] },
-    extra: { magAcc:{ chest:-2, legs:-1 } } },
+    def: { head:[4,6,9,13,19,30,45], chest:[15,21,32,46,65,82,109], legs:[8,11,17,24,33,51,68], arms:[2,3,4,6,8,11,15] },
+    magAcc: { chest:[-20,-20,-20,-20,-20,-20,-20], legs:[-10,-10,-10,-10,-10,-10,-10] } },
   hide: { req:'reqRng', names:{ head:'Coif', chest:'Body', legs:'Chaps', arms:'Vambraces' },
     tiers: [['Leather',1,1,'#8a5a30'],['Hard Leather',10,4,'#6a4424'],['Studded',20,7,'#7a5a3a'],["Green D'hide",40,10,'#3c8a3c'],["Blue D'hide",50,13,'#3c5ab0'],["Red D'hide",60,16,'#b03c3c'],["Black D'hide",70,19,'#2a2a2a']],
-    ac: { chest:[1,1,2,2,3,3,4], legs:[0,1,1,1,1,2,2], head:[0,0,1,1,1,1,2], arms:[0,0,0,1,1,1,1] },
-    rngAcc: { chest:[0,1,1,2,2,3,3], legs:[0,0,1,1,1,2,2], head:[0,0,0,0,1,1,1], arms:[1,1,1,1,1,1,2] } },
+    def: { head:[2,3,4,6,8,10,12], chest:[8,12,18,40,48,56,64], legs:[3,5,8,20,25,31,36], arms:[1,2,3,4,5,6,7] },
+    rngAcc: { head:[2,3,4,5,6,7,8], chest:[4,8,10,15,20,25,30], legs:[3,5,7,8,11,14,17], arms:[4,5,6,8,9,10,11] } },
   cloth: { req:'reqMag', names:{ head:'Hat', chest:'Robe Top', legs:'Robe Bottom', arms:'Gloves' },
     tiers: [['Wizard',1,1,'#3040a0'],['Splitbark',20,6,'#6a5a3a'],['Mystic',40,10,'#4a3ab0'],['Infinity',50,14,'#3a7ac8'],["Ahrim's",70,18,'#3a3a4a']],
-    ac: { chest:[0,1,1,2,2], legs:[0,0,1,1,2], head:[0,0,0,1,1], arms:[0,0,0,0,1] },
-    magAcc: { chest:[1,2,3,3,4], legs:[1,1,2,2,3], head:[0,1,1,1,2], arms:[0,1,1,1,1] } },
+    def: { head:[1,4,6,8,15], chest:[3,10,18,22,35], legs:[2,7,12,16,24], arms:[0,2,3,5,6] },
+    magAcc: { head:[2,3,4,6,8], chest:[6,10,20,22,30], legs:[4,7,15,16,22], arms:[1,4,5,5,6] } },
 };
-// bows: wood, Ranged level, loot level, damage bonus (shortbows are +1 accurate, longbows hit harder and reach further)
-const RS_BOWS = [['',1,1,0],['Oak',5,3,1],['Willow',20,6,2],['Maple',30,9,3],['Yew',40,12,4],['Magic',50,15,6]];
-// staves: name, Magic level, loot level, element (free runes of it), magic accuracy, spell damage
+// bows: wood, Ranged level, loot level, damage bonus, ranged bonus (a shortbow is a touch more accurate, a longbow reaches further)
+const RS_BOWS = [['',1,1,0,8],['Oak',5,3,1,14],['Willow',20,6,2,20],['Maple',30,9,3,29],['Yew',40,12,4,47],['Magic',50,15,6,69]];
+// staves: name, Magic level, loot level, element (free runes of it), magic bonus, spell damage
 const RS_STAVES = [
-  ['Staff',              1,  1, null,    1, 0],
-  ['Staff of Air',       1,  2, 'air',   2, 0],
-  ['Staff of Water',     1,  3, 'water', 2, 0],
-  ['Staff of Earth',     1,  3, 'earth', 2, 0],
-  ['Staff of Fire',      1,  4, 'fire',  2, 0],
-  ['Air Battlestaff',    30, 9, 'air',   4, 1],
-  ['Fire Battlestaff',   30, 10, 'fire', 4, 1],
-  ['Mystic Water Staff', 40, 12, 'water', 6, 2],
-  ['Mystic Fire Staff',  40, 13, 'fire', 6, 2],
-  ['Ancient Staff',      50, 16, null,   8, 3],
+  ['Staff',              1,  1, null,    10, 0],
+  ['Staff of Air',       1,  2, 'air',   20, 0],
+  ['Staff of Water',     1,  3, 'water', 20, 0],
+  ['Staff of Earth',     1,  3, 'earth', 20, 0],
+  ['Staff of Fire',      1,  4, 'fire',  20, 0],
+  ['Air Battlestaff',    30, 9, 'air',   40, 1],
+  ['Fire Battlestaff',   30, 10, 'fire', 40, 1],
+  ['Mystic Water Staff', 40, 12, 'water', 60, 2],
+  ['Mystic Fire Staff',  40, 13, 'fire', 60, 2],
+  ['Ancient Staff',      50, 16, null,   80, 3],
 ];
-// jewellery: name, loot level, bonuses
+// jewellery: name, loot level, bonuses (acc = melee attack, dmgB = strength, ac = defence)
 const RS_AMULETS = [
-  ['Amulet of Accuracy', 1,  { acc:1, rngAcc:1 }],
-  ['Amulet of Magic',    2,  { magAcc:2 }],
-  ['Amulet of Strength', 4,  { dmgB:1 }],
-  ['Amulet of Defence',  6,  { ac:1 }],
-  ['Amulet of Power',    10, { acc:1, rngAcc:1, magAcc:1, dmgB:1, ac:1 }],
-  ['Amulet of Glory',    14, { acc:2, rngAcc:2, magAcc:2, dmgB:2, ac:1 }],
-  ['Amulet of Fury',     19, { acc:3, rngAcc:3, magAcc:3, dmgB:3, ac:2 }],
+  ['Amulet of Accuracy', 1,  { acc:6, rngAcc:6 }],
+  ['Amulet of Magic',    2,  { magAcc:10 }],
+  ['Amulet of Strength', 4,  { dmgB:10 }],
+  ['Amulet of Defence',  6,  { ac:10 }],
+  ['Amulet of Power',    10, { acc:6, rngAcc:6, magAcc:6, dmgB:6, ac:6 }],
+  ['Amulet of Glory',    14, { acc:10, rngAcc:10, magAcc:10, dmgB:8, ac:8 }],
+  ['Amulet of Fury',     19, { acc:15, rngAcc:15, magAcc:15, dmgB:12, ac:15 }],
 ];
 const RS_RINGS = [
-  ['Sapphire Ring',  1,  { magAcc:1 }],
-  ['Emerald Ring',   3,  { acc:1 }],
-  ['Ruby Ring',      5,  { dmgB:1 }],
-  ['Diamond Ring',   8,  { ac:1 }],
+  ['Sapphire Ring',  1,  { magAcc:6 }],
+  ['Emerald Ring',   3,  { acc:6 }],
+  ['Ruby Ring',      5,  { dmgB:6 }],
+  ['Diamond Ring',   8,  { ac:10 }],
   ['Ring of Recoil', 6,  { recoil:true }],
   ['Ring of Wealth', 9,  { wealth:true }],
-  ['Warrior Ring',   15, { acc:3 }],
-  ['Berserker Ring', 16, { dmgB:3 }],
-  ['Archers Ring',   15, { rngAcc:3 }],
-  ['Seers Ring',     15, { magAcc:3 }],
+  ['Warrior Ring',   15, { acc:20 }],
+  ['Berserker Ring', 16, { dmgB:16 }],
+  ['Archers Ring',   15, { rngAcc:20 }],
+  ['Seers Ring',     15, { magAcc:20 }],
 ];
 const RS_TIER_PRICE = [15, 40, 110, 320, 850, 2200, 6500];
 // picks the tier index from a list whose [2] is the loot level it starts at,
@@ -8469,21 +8482,20 @@ function rsPickTier(list, d, reqOk){
   for (let k=0;k<elig.length;k++){ if (r < w[k]) return elig[k]; r -= w[k]; }
   return elig[elig.length-1];
 }
-function rsItem(slot){ const it = newItem(); it.used = 1; it.slot = slot; it.rs = 1; return it; }
+function rsItem(slot){ const it = newItem(); it.used = 1; it.slot = slot; it.rs = 1; it.rsv = 2; return it; }
 function rsMakeWeapon(t, wi){
   const m = RS_METALS[t], w = RS_WEAPONS[wi], it = rsItem('weapon');
   it.nm = `${m[0]} ${w[0]}`; it.basis = w[1]; it.baseMat = m[0]; it.rsTier = t; it.rsCol = m[5];
-  it.d1 = w[2]; it.d2 = w[3]; it.bonus = m[4]; it.acc = m[3] + w[4]; it.reqAtt = m[1];
+  it.d1 = w[2]; it.d2 = w[3]; it.bonus = 0; it.acc = Math.round(m[3]*w[4]); it.dmgB = Math.round(m[4]*w[5]); it.reqAtt = m[1];
   it.price = RS_TIER_PRICE[t] * 1.2;
   return it;
 }
 function rsMakeArmour(fam, t, slot){
   const F = RS_ARMOUR[fam], tr = F.tiers[t], it = rsItem(slot);
   it.nm = `${tr[0]} ${F.names[slot]}`; it.basis = F.names[slot]; it.baseMat = tr[0]; it.rsFam = fam; it.rsTier = t; it.rsCol = tr[3];
-  it.ac = F.ac[slot][t]; it[F.req] = tr[1];
-  if (fam==='metal'){ if (F.extra.magAcc[slot]) it.magAcc = F.extra.magAcc[slot]; }
-  if (F.rngAcc) it.rngAcc = F.rngAcc[slot][t];
-  if (F.magAcc) it.magAcc = F.magAcc[slot][t];
+  it.ac = F.def[slot][t]; it[F.req] = tr[1];
+  if (F.rngAcc && F.rngAcc[slot]) it.rngAcc = F.rngAcc[slot][t];
+  if (F.magAcc && F.magAcc[slot]) it.magAcc = F.magAcc[slot][t];
   if (fam==='hide' && t>=3 && slot==='chest') it.reqDef = 40;   // dragonhide bodies need Defence 40, as in RuneScape
   const pt = fam==='metal' ? t : fam==='hide' ? t : [0,2,3,4,6][t];
   it.price = RS_TIER_PRICE[pt] * ({ chest:1.5, legs:1, head:0.7, arms:0.5 }[slot]||1);
@@ -8492,14 +8504,14 @@ function rsMakeArmour(fam, t, slot){
 function rsMakeBow(t, long){
   const b = RS_BOWS[t], it = rsItem('ranged');
   it.nm = `${b[0] ? b[0]+' ' : ''}${long ? 'Longbow' : 'Shortbow'}`; it.basis = long ? 'Longbow' : 'Shortbow'; it.rsTier = t;
-  it.d1 = 1; it.d2 = long ? 8 : 6; it.bonus = b[3]; it.acc = long ? 0 : 1; it.range = long ? 10 : 8; it.reqRng = b[1];
+  it.d1 = 1; it.d2 = long ? 8 : 6; it.bonus = b[3]; it.acc = b[4] + (long ? 0 : 4); it.range = long ? 10 : 8; it.reqRng = b[1];
   it.price = RS_TIER_PRICE[Math.min(6, t+ (t>3?1:0))];
   return it;
 }
 function rsMakeStaff(si){
   const s = RS_STAVES[si], it = rsItem('weapon');
   it.nm = s[0]; it.basis = 'Quarterstaff'; it.baseMat = 'Staff'; it.d1 = 1; it.d2 = 6; it.bonus = 0;
-  it.reqMag = s[1]; it.rsElem = s[3]; it.magAcc = s[4]; it.magDmg = s[5]; it.rsStaff = 1;
+  it.reqMag = s[1]; it.rsElem = s[3]; it.magAcc = s[4]; it.magDmg = s[5]; it.rsStaff = 1; it.acc = 4; it.dmgB = 4;
   it.price = 20 + s[2]*s[2]*12;
   return it;
 }
@@ -8511,6 +8523,19 @@ function rsMakeJewel(kind, idx){
   if (j[2].wealth) afAdd(it, 'goldfind', 0, 0, 0.2);
   it.price = 30 + j[1]*j[1]*10;
   return it;
+}
+// gear from before the bonus rework used small whole numbers on the d20 scale - scale it up once
+function rsMigrateItem(it){
+  if (!it || !it.used || !it.rs || it.rsv) return;
+  it.ac = (it.ac||0)*RS_DEF_PER_AC; it.acc = (it.acc||0)*RS_ATK_PER_HIT; it.rngAcc = (it.rngAcc||0)*RS_ATK_PER_HIT; it.magAcc = (it.magAcc||0)*RS_ATK_PER_HIT;
+  it.dmgB = (it.dmgB||0)*RS_STR_PER_DMG;
+  if (it.slot==='weapon' && !it.rsStaff && it.bonus){ it.dmgB += it.bonus*RS_STR_PER_DMG; it.bonus = 0; }
+  it.rsv = 2;
+}
+function rsMigrateAll(){
+  for (const k in G.gear) rsMigrateItem(G.gear[k]);
+  for (const it of G.inv||[]) rsMigrateItem(it);
+  for (const it of (G.player && G.player.stash)||[]) rsMigrateItem(it);
 }
 // fills `it` with a tiered base for loot level d. `forMe` (shop stock) keeps
 // to gear you can already use
@@ -8583,20 +8608,20 @@ function itemScore(it){
   if (!it || !it.used) return 0;
   if (it.kind==='wand' || it.kind==='scroll' || it.consumable) return -1;
   const affs = (it.aff||[]).reduce((t,a)=>t+(a.i1||0)+(a.f||0)*20, 0);
-  if (it.slot==='weapon' || it.slot==='ranged') return (it.d1*(it.d2+1)/2) + (it.bonus||0) + (it.acc||0)*0.8 + (it.magAcc||0)*0.4 + (it.magDmg||0) + affs*0.5;
-  return (it.ac||0)*2 + (it.acc||0) + (it.rngAcc||0)*0.7 + (it.magAcc||0)*0.7 + (it.dmgB||0)*1.5 + affs*0.5;
+  const b = (it.acc||0)/RS_ATK_PER_HIT, st = (it.dmgB||0)/RS_STR_PER_DMG, df = (it.ac||0)/RS_DEF_PER_AC, ra = (it.rngAcc||0)/RS_ATK_PER_HIT, ma = (it.magAcc||0)/RS_ATK_PER_HIT;
+  if (it.slot==='weapon' || it.slot==='ranged') return (it.d1*(it.d2+1)/2) + (it.bonus||0) + st + b*0.8 + ma*0.4 + (it.magDmg||0) + affs*0.5;
+  return df*2 + b + ra*0.7 + ma*0.7 + st*1.5 + affs*0.5;
 }
 // the bonus lines under an item's name
+// RuneScape-style bonuses: attack/ranged/magic (10 = +1 to hit), strength (8 = +1 damage), defence (20 = +1 armour)
 function rsBonusLines(it){
   const out = [];
-  if (it.slot==='weapon' || it.slot==='ranged'){
-    out.push(`damage ${it.d1}d${it.d2}${it.bonus ? fmtMod(it.bonus) : ''}${it.range ? ` &middot; range ${it.range}` : ''}`);
-    if (it.acc) out.push(`accuracy ${fmtMod(it.acc)}`);
-  } else if (it.ac || it.rsFam) out.push(`armour ${fmtMod(it.ac||0)}`);
-  if (it.slot!=='weapon' && it.slot!=='ranged' && it.acc) out.push(`melee accuracy ${fmtMod(it.acc)}`);
-  if (it.rngAcc) out.push(`ranged accuracy ${fmtMod(it.rngAcc)}`);
-  if (it.magAcc) out.push(`magic accuracy ${fmtMod(it.magAcc)}`);
-  if (it.dmgB) out.push(`strength ${fmtMod(it.dmgB)} damage`);
+  if (it.slot==='weapon' || it.slot==='ranged') out.push(`damage ${it.d1}d${it.d2}${it.bonus ? fmtMod(it.bonus) : ''}${it.range ? ` &middot; range ${it.range}` : ''}`);
+  if (it.acc) out.push(`${it.slot==='ranged' ? 'ranged' : 'attack'} ${fmtMod(it.acc)}`);
+  if (it.dmgB) out.push(`strength ${fmtMod(it.dmgB)}`);
+  if (it.ac || it.rsFam) out.push(`defence ${fmtMod(it.ac||0)}`);
+  if (it.rngAcc) out.push(`ranged ${fmtMod(it.rngAcc)}`);
+  if (it.magAcc) out.push(`magic ${fmtMod(it.magAcc)}`);
   if (it.magDmg) out.push(`spell damage ${fmtMod(it.magDmg)}`);
   if (it.rsElem) out.push(`an endless supply of ${it.rsElem} runes`);
   return out;
@@ -8907,10 +8932,14 @@ function buildFullStatBlock(){
       ${row('Prayer', `${Math.ceil(p.prayPts||0)}/${rsLvl('prayer')}`)}
       ${row('Armour', playerAC())}
       ${row('Style', rsStyle().nm)}
-      ${row('Melee to hit', fmtMod(rsAtkBonus('melee')))}
-      ${row('Ranged to hit', fmtMod(rsAtkBonus('ranged')))}
-      ${row('Magic to hit', fmtMod(rsAtkBonus('magic')))}
-      ${row('Strength dmg', fmtMod(Math.floor(rsEff('strength')/5)+rsGearSum('dmgB')))}
+      ${row('Melee to hit', fmtMod(+rsAtkBonus('melee').toFixed(1)))}
+      ${row('Ranged to hit', fmtMod(+rsAtkBonus('ranged').toFixed(1)))}
+      ${row('Magic to hit', fmtMod(+rsAtkBonus('magic').toFixed(1)))}
+      ${row('Strength dmg', fmtMod(+(Math.floor(rsEff('strength')/5)+rsGearSum('dmgB')/RS_STR_PER_DMG).toFixed(1)))}
+      ${row('Attack bonus', fmtMod(rsGearSum('acc')))}
+      ${row('Strength bonus', fmtMod(rsGearSum('dmgB')))}
+      ${row('Defence bonus', fmtMod(['head','chest','legs','arms','necklace','ring1','ring2'].reduce((t,k)=>t+((G.gear[k]&&G.gear[k].used&&G.gear[k].ac)||0),0)))}
+      ${row('Ranged / magic', fmtMod(rsGearSum('rngAcc'))+' / '+fmtMod(rsGearSum('magAcc')))}
       ${row('Armour type', tri||'none')}
       ${row('Arrows', p.arrows||0)}
     </div>
@@ -17950,6 +17979,7 @@ function fpdBuild(T){
   if (out) fpdOutdoor(T, spec, world, matFor);
   if (yard) fpdGraveyard(world, matFor);
   if (props.skull.length || props.bone.length || props.candle.length || props.shroud.length) fpdCatacombProps(props, matFor, world);
+  fpdPortals(world);
   FPD.scene.add(world); FPD.world = world;
   FPD.shadowFrames = 3; FPD.lightKey = ''; FPD.warm = true;
   // sculpt every creature on this floor now, under the fade-in, rather than mid-fight when it first steps into view
@@ -17958,6 +17988,48 @@ function fpdBuild(T){
 // out of doors: ground running on to the horizon, a field's obstacles as real
 // bushes, boulders or (on a ship's deck) cargo crates, grass that sways in the
 // wind, and a far tree line or range of hills standing against the sky
+// ---- portals: a carved stone arch holding a swirling gate of light ----
+// the way out of a dungeon (blue) and a flee portal (red), stood against the
+// wall where there is one and facing into the room; the gate turns and pulses
+// (see fpdRender) and throws its colour on the floor around it
+function fpdPortals(world){
+  const T = THREE; FPD.portals = [];
+  if (G.gameMode!==1) return;
+  const stone = FPD.mats.portalStone || (FPD.mats.portalStone = new T.MeshStandardMaterial({ color:0x8a8478, roughness:0.85 }));
+  const rune = FPD.mats.portalRune || (FPD.mats.portalRune = new T.MeshBasicMaterial({ color:0xffffff }));
+  for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++){
+    const t = G.map[x][y]; if (t!==T_EXIT && t!==T_FLEE) continue;
+    const col = new T.Color(t===T_EXIT ? 0x4ad8ff : 0xff4a3a);
+    const w = stairWallDir(x, y), face = w ? [-w[0], -w[1]] : fpStairDir(x, y);
+    const g = new T.Group(); g.position.set(x+0.5 - face[0]*0.22, 0, y+0.5 - face[1]*0.22); g.rotation.y = Math.atan2(face[0], face[1]);
+    const box = (sx, sy, sz, px, py, pz, m)=>{ const b = new T.Mesh(new T.BoxGeometry(sx, sy, sz), m||stone); b.position.set(px, py, pz); b.castShadow = true; b.receiveShadow = true; g.add(b); return b; };
+    box(1.0, 0.07, 0.42, 0, 0.035, 0);                                   // the step it stands on
+    for (const sd of [-1,1]){ box(0.15, 0.92, 0.2, sd*0.4, 0.5, 0); box(0.2, 0.08, 0.26, sd*0.4, 0.08, 0); box(0.19, 0.06, 0.24, sd*0.4, 0.95, 0);
+      const r = box(0.03, 0.5, 0.012, sd*0.4, 0.55, 0.106, rune.clone()); r.material.color.copy(col); }
+    const arch = new T.Mesh(new T.TorusGeometry(0.4, 0.085, 10, 24, Math.PI), stone); arch.position.set(0, 0.98, 0); arch.scale.z = 1.15; arch.castShadow = true; g.add(arch);
+    box(0.1, 0.12, 0.24, 0, 1.4, 0);                                     // keystone
+    const mat = new T.ShaderMaterial({
+      uniforms:{ t:{ value:0 }, col:{ value:col } },
+      vertexShader:'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
+      fragmentShader:[
+        'uniform float t; uniform vec3 col; varying vec2 vUv;',
+        'void main(){ vec2 p = vUv*2.0-1.0; p.y = p.y*1.35 - 0.1;',
+        '  float r = length(p), a = atan(p.y, p.x);',
+        '  float sw = sin(a*4.0 + r*10.0 - t*3.2)*0.5+0.5, ring = sin(r*20.0 - t*5.0)*0.5+0.5;',
+        '  float inside = smoothstep(1.0, 0.82, r), core = smoothstep(0.75, 0.0, r);',
+        '  vec3 c = col*(0.45 + 0.9*sw*(0.6+0.4*ring)) + vec3(1.0)*core*core*0.7;',
+        '  gl_FragColor = vec4(c, inside*(0.5 + 0.5*sw)); }'].join('\n'),
+      transparent:true, depthWrite:false, blending:T.AdditiveBlending, side:T.DoubleSide });
+    const gate = new T.Mesh(new T.PlaneGeometry(0.66, 1.2), mat); gate.position.set(0, 0.68, 0.01); g.add(gate);
+    const glowC = v3Canvas(64,64), gx = glowC.getContext('2d'), gr = gx.createRadialGradient(32,32,0,32,32,32);
+    gr.addColorStop(0,'rgba(255,255,255,0.8)'); gr.addColorStop(1,'rgba(255,255,255,0)'); gx.fillStyle = gr; gx.fillRect(0,0,64,64);
+    const pool = new T.Mesh(new T.PlaneGeometry(1.6, 1.6), new T.MeshBasicMaterial({ map:new T.CanvasTexture(glowC), color:col, transparent:true, depthWrite:false, blending:T.AdditiveBlending }));
+    pool.rotation.x = -Math.PI/2; pool.position.set(0, 0.075, 0.35); g.add(pool);
+    const L = new T.PointLight(col, 0.9, 3.2, 1.6); L.position.set(0, 0.7, 0.35); g.add(L);
+    world.add(g);
+    FPD.portals.push({ mat, L, pool, seed:x*7+y });
+  }
+}
 function fpdLumpy(detail, amp, seed, smooth){
   const g = new THREE.IcosahedronGeometry(1, detail), p = g.attributes.position;
   for (let i=0;i<p.count;i++){
@@ -18176,6 +18248,7 @@ function fpdRender(env, T, camZ){
     dp.setXYZ(i, c.x-3 + (((px - (c.x-3))%6)+6)%6, 0.05 + ((py%1)+1)%1*0.9, c.y-3 + (((pz - (c.y-3))%6)+6)%6);
   }
   dp.needsUpdate = true;
+  for (const pt of FPD.portals||[]){ pt.mat.uniforms.t.value = FP.t + pt.seed; const k = 0.85 + 0.15*Math.sin(FP.t*3 + pt.seed); pt.L.intensity = 0.9*k; pt.pool.material.opacity = 0.55*k; }
   // (the shadow maps only exist after their first pass, so a fresh level gets a warm-up render)
   if (FPD.warm){ FPD.warm = false; FPD.r.render(FPD.scene, cam); }
   FPD.r.render(FPD.scene, cam);
@@ -19658,9 +19731,9 @@ function fpCollectSprites(vis){
     if (t===T_WALL) continue;
     const addP = (entry, h, lift, extra)=> S.push(Object.assign({x:cx, y:cy, spr:fpUndeadSprite(entry,false), h, lift}, extra||{}));
     switch(t){
-      case T_EXIT: addP(obEntry('portal',{rgb:'90,220,255'}), 0.92, 0, {glow:COL.cyan}); break;
+      case T_EXIT: if (!(FPD.ok && G.gameMode===1)) addP(obEntry('portal',{rgb:'90,220,255'}), 0.92, 0, {glow:COL.cyan}); break;
       case T_FLEE:
-        if (G.gameMode===1) addP(obEntry('portal',{rgb:'255,90,70'}), 0.92, 0, {glow:COL.red});
+        if (G.gameMode===1){ if (!FPD.ok) addP(obEntry('portal',{rgb:'255,90,70'}), 0.92, 0, {glow:COL.red}); }
         else if ((x===0&&y===midY)||(x===COLS-1&&y===midY)||(y===0&&x===midX)||(y===ROWS-1&&x===midX)){
           const sealed = G.mandatoryFight && G.mon.some(m=>m.alive);
           addP(obEntry('sign',{sealed:!!sealed}), 0.62, 0, {shadow:true});

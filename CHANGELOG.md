@@ -1,5 +1,31 @@
 # Depthcrawl patch notes
 
+## RS-5 — Portals, and gear bonuses that matter
+
+- **Portals are real:** the way out of a dungeon is now a carved stone arch.
+  - It holds a swirling, pulsing gate of blue light (red for a flee portal).
+  - Glowing runes run down its pillars, and it lights the floor around it.
+  - It stands against a wall facing into the room, and you arrive in front of it rather than inside it.
+- **Every tier is a real upgrade:** gear now carries RuneScape-style bonuses, so bronze to iron (and every step after) improves every piece.
+  - **Metal armour defence:**
+
+    | Piece | Bronze | Iron | Steel | Mithril | Adamant | Rune | Dragon |
+    |---|---|---|---|---|---|---|---|
+    | Full helm | 4 | 6 | 9 | 13 | 19 | 30 | 45 |
+    | Platebody | 15 | 21 | 32 | 46 | 65 | 82 | 109 |
+    | Platelegs | 8 | 11 | 17 | 24 | 33 | 51 | 68 |
+    | Gauntlets | 2 | 3 | 4 | 6 | 8 | 11 | 15 |
+
+  - **Weapons:** they carry attack and strength bonuses (a scimitar goes from +7/+6 in bronze to +70/+66 in dragon). Daggers lean on accuracy, and 2h swords and battleaxes on strength.
+  - **Ranged and magic gear:** bows, dragonhide, staves, robes and jewellery all carry ranged, magic, strength and defence bonuses in the same units.
+- **How bonuses convert:**
+  - 10 attack, ranged or magic = +1 to hit.
+  - 8 strength = +1 damage.
+  - 20 defence = +1 armour class.
+  - A leftover fraction counts as a chance of the next point, so even a small upgrade shows in your fights.
+- **Character sheet (P):** now lists your total attack, strength, defence, ranged and magic bonuses.
+- **Existing saves:** gear from older saves is converted automatically.
+
 ## RS-4 — Veins and stairs
 
 - **Ore veins stand out:** in a mine, every vein you've seen glows.
