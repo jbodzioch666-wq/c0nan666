@@ -1087,7 +1087,7 @@ const RARE_SUF = ["Bite","Song","Ward","Gaze","Fang","Spike","Brand","Call","Rea
   "Bane","Shroud","Edge","Maw","Light","Screech","Weaver","Fall","Thirst","Wail","Coil","Scar"];
 
 // quality tiers 0..4
-const QNAME = ["", "Magic", "Rare", "Set", "Unique"];
+const QNAME = ["", "", "", "Set", "Unique"];   // (tiered RuneScape gear needs no quality word - its metal says it)
 const QPRICE = [1, 2.4, 4.5, 7, 9];
 const QCOLOR_KEY = ["qN","qMagic","qRare","qSet","qUnique"]; // css classes / canvas colors resolved via colorFor()
 
@@ -2627,6 +2627,36 @@ function buildUnique(id, d, classOnly){
     if (a.i1) a.i1 = mx(1, Math.round(a.i1*k));
     if (a.f) a.f = +(a.f*k).toFixed(3);
   }
+  return rsUniqueify(it);
+}
+// a unique on the RuneScape rules: its old D&D stat mods turn into attack/strength/
+// defence/ranged/magic bonuses (and it is a cut above its tier), while what makes it
+// special beyond numbers - life, life steal, regeneration, resistances, elemental
+// damage, a crit edge, gold or xp find and its named on-hit power - stays as it was
+function rsUniqueify(it){
+  if (!it || !it.used || it.rsu) return it;
+  const add = (k, v)=>{ it[k] = Math.round((it[k]||0) + v); };
+  for (const k of ['acc','dmgB','ac','rngAcc','magAcc']) if (it[k] && it[k] > 0) it[k] = Math.round(it[k]*1.25);
+  const keep = [];
+  for (const a of it.aff||[]){
+    const v = a.i1||0;
+    switch (a.kind){
+      case 'str': add('dmgB', v*4); break;
+      case 'dex': add('rngAcc', v*5); add('acc', v*2); break;
+      case 'int': case 'wis': add('magAcc', v*5); break;
+      case 'con': add('ac', v*5); break;
+      case 'cha': break;
+      case 'allstat': for (const k of ['acc','dmgB','ac','rngAcc','magAcc']) add(k, v*3); break;
+      case 'edmg': add('dmgB', v/5); break;
+      case 'atk': add('acc', v*5); break;
+      case 'edef': add('ac', v/3); break;
+      case 'flatac': add('ac', v*RS_DEF_PER_AC); break;
+      case 'flatdmg': add('dmgB', v*RS_STR_PER_DMG); break;
+      default: keep.push(a);
+    }
+  }
+  it.aff = keep; it.naff = keep.length; it.rsu = 1;
+  if (it.rs) it.price = Math.round((it.price||50)*2.5);
   return it;
 }
 function buildSetPiece(spid, d, classOnly){
@@ -3724,14 +3754,10 @@ function ascendNewGamePlus(){
   p.quests = [];
   p.maxCharges = clsRow()[7]; p.charges = p.maxCharges;
   p.arrows = ['Ranger','Rogue'].includes(p.cls) ? STARTING_ARROWS : 0;
-  G.gear.weapon = findWeapon(clsRow()[3]);
-  G.gear.head = newItem();
-  G.gear.chest = makeStartingChest(clsRow()[4]);
-  G.gear.legs = newItem(); G.gear.arms = newItem(); G.gear.necklace = newItem();
-  G.gear.ring1 = newItem(); G.gear.ring2 = newItem();
-  G.gear.ranged = p.cls==='Ranger' ? findWeapon('Shortbow') : newItem(); // same Ranger-starts-with-a-bow-too rule as a fresh character - see buildPlayer
+  // your skills carry over (that's the whole character now); the gear starts again from your kit
   G.inv = [];
-  grantSpellProgressForLevel(1);
+  rsApplyKit(Math.max(0, RS_KITS.findIndex(k=>k.nm===p.kit)));
+  rsSync(); p.hp = effMaxHp();
   logMsg(`*** you ascend to New Game+ ${p.ngPlus} - the world grows far more dangerous, and far more rewarding ***`, 'good');
 }
 function ascendPlusConfirm(){
@@ -6322,7 +6348,7 @@ function loadGame(id){
   if (G.gear.weapon && G.gear.weapon.used && (G.gear.weapon.kind==='wand' || G.gear.weapon.range)){
     G.gear.ranged = G.gear.weapon;
     G.gear.ranged.slot = 'ranged';
-    G.gear.weapon = findWeapon(clsRow()[3]);
+    G.gear.weapon = rsMakeWeapon(0, 2);
   }
   G.inv = data.inv||[];
   G.ow.overrides = data.owOverrides||{};
@@ -8540,6 +8566,10 @@ function rsMakeJewel(kind, idx){
 }
 // gear from before the bonus rework used small whole numbers on the d20 scale - scale it up once
 function rsMigrateItem(it){
+  if (it && it.used && it.rs && it.uniqueId && !it.rsu){ rsMigrateItem2(it); rsUniqueify(it); return; }
+  rsMigrateItem2(it);
+}
+function rsMigrateItem2(it){
   if (!it || !it.used || !it.rs || it.rsv) return;
   it.ac = (it.ac||0)*RS_DEF_PER_AC; it.acc = (it.acc||0)*RS_ATK_PER_HIT; it.rngAcc = (it.rngAcc||0)*RS_ATK_PER_HIT; it.magAcc = (it.magAcc||0)*RS_ATK_PER_HIT;
   it.dmgB = (it.dmgB||0)*RS_STR_PER_DMG;
@@ -9256,8 +9286,8 @@ function legacyQuestOffer(id, lvl){
     q = { id, kind:'hunt', targetName:entry.nm, target, progress:0, text:`slay ${target} ${entry.nm}${target>1?'s':''}` };
     questReward(q, 25+target*14+lvl*7, 20+target*10+lvl*11, 1, false);
   } else if (r < 0.75){
-    const rarityReq = 1+rn(3), flavor = pick(QUEST_DELIVERY_FLAVORS);
-    q = { id, kind:'delivery', rarityReq, flavor, text:`bring back ${QNAME[rarityReq]}+ quality gear - ${flavor}` };
+    const rarityReq = 1+rn(3), tierReq = clamp(Math.floor(lvl/3) + rn(2), 1, 5), flavor = pick(QUEST_DELIVERY_FLAVORS);
+    q = { id, kind:'delivery', rarityReq, tierReq, flavor, text:`bring back a piece of ${RS_METALS[tierReq][0].toLowerCase()} gear or better - ${flavor}` };
     questReward(q, 40+rarityReq*45+lvl*8, 25+rarityReq*20+lvl*12, 1, false); q.rewardQuality = 3;
   } else if (chn(0.5)){
     const rune = pick(RUNES), target = 1+rn(3);
@@ -9332,7 +9362,7 @@ function questIsReady(q){
     case 'conquest': case 'wanted': case 'camp': return q.progress>=q.target;
     case 'rescue': return !!q.freed && here===q.townKey;      // you have to bring them home
     case 'escort': return !!q.arrived && here===questTownKey(q.destX,q.destY);
-    case 'delivery': return G.inv.some(it=>it.used && !it.consumable && it.quality>=q.rarityReq);
+    case 'delivery': return G.inv.some(it=>questDeliverable(q, it));
     case 'supply':
       if (q.itemKind==='rune') return (G.player.runes[q.runeType]||0) >= q.target;
       if (q.itemKind==='potion') return G.inv.filter(it=>it.used && it.consumable && it.kind==='heal' && it.nm===q.potionName).length >= q.target;
@@ -9369,7 +9399,7 @@ function questObjective(q){
     case 'camp': return `Clear out ${q.campName}`;
     case 'bounty': return `Slay monsters: ${q.progress}/${q.target}`;
     case 'hunt': return `Slay ${q.targetName}s: ${q.progress}/${q.target}`;
-    case 'delivery': return `Bring back ${QNAME[q.rarityReq]}+ quality gear`;
+    case 'delivery': return q.tierReq!==undefined ? `Bring back ${RS_METALS[q.tierReq][0].toLowerCase()} gear or better` : `Bring back ${QNAME[q.rarityReq]||'fine'}+ quality gear`;
     case 'supply': return `Bring ${q.target} ${q.itemKind==='rune'?q.runeType+' Rune':q.potionName}${q.target>1?'s':''}`;
   }
   return q.text||'';
@@ -9532,13 +9562,14 @@ function turnInQuest(id){
   const lvl = mx(1, G.player.level), qual = q.rewardQuality||2;
   const armorSlot = pick(['head','chest','legs','arms','necklace','ring']);
   // a reward is never plain gear: reroll until it reaches (near) the quest's quality
-  const good = (slot, classOnly)=>{ let best = null; for (let i=0;i<60;i++){ const it = genItem(lvl+1, slot, qual, classOnly); if (!best || it.quality > best.quality) best = it; if (best.quality >= qual) break; } return best; };
+  // the best of a handful of pieces you can already use - usually a step up from what you wear
+  const good = (slot, classOnly)=>{ let best = null; for (let i=0;i<24;i++){ const it = genItem(lvl+2, slot, 2, classOnly); if (!best || itemScore(it) > itemScore(best)) best = it; } return best; };
   const options = [
     { kind:'item', it: good('weapon', true), label:'A weapon' },
     { kind:'item', it: good(armorSlot, armorSlot!=='necklace' && armorSlot!=='ring'), label: armorSlot==='necklace'||armorSlot==='ring' ? 'A piece of jewellery' : 'A piece of armour' },
   ];
   if (q.hard) options.push({ kind:'item', it: guaranteedEliteDrop(lvl), label:'A legendary reward', special:true });
-  else options.push({ kind:'purse', gold: roundH(q.rewardGold*0.8), rune: pick(RUNES), label:'A heavy purse' });
+  else { const r = pick(lvl>=10 ? ['chaos','death','blood'] : lvl>=5 ? ['chaos','death'] : ['chaos','mind']); options.push({ kind:'purse', gold: roundH(q.rewardGold*0.8), rsRune:r, runeN: r==='blood' ? 10 : r==='death' ? 15 : 30, label:'A heavy purse' }); }
   G.pendingReward = { qid:id, options };
   setUi('questReward');
 }
@@ -9546,7 +9577,7 @@ function chooseQuestReward(i){
   const pr = G.pendingReward; if (!pr) return;
   const idx = G.player.quests.findIndex(q=>q.id===pr.qid); if (idx<0){ G.pendingReward = null; setUi('questgiver'); return; }
   const q = G.player.quests[idx], o = pr.options[i];
-  if (q.kind==='delivery'){ const ii = G.inv.findIndex(it=>it.used && !it.consumable && it.quality>=q.rarityReq); if (ii>=0) invRemove(ii); }
+  if (q.kind==='delivery'){ const ii = G.inv.findIndex(it=>questDeliverable(q, it)); if (ii>=0) invRemove(ii); }
   else if (q.kind==='supply'){
     if (q.itemKind==='rune') G.player.runes[q.runeType] = mx(0, (G.player.runes[q.runeType]||0) - q.target);
     else { let n = q.target; for (let j=G.inv.length-1; j>=0 && n>0; j--) if (G.inv[j].used && G.inv[j].consumable && G.inv[j].kind==='heal' && G.inv[j].nm===q.potionName){ invRemove(j); n--; } }
@@ -9555,7 +9586,9 @@ function chooseQuestReward(i){
   gainXP(q.rewardXp);
   let got = '';
   if (o.kind==='item'){ addToInventory(o.it); got = itemNameHtml(o.it); }
-  else { G.player.gold += o.gold; G.player.runes[o.rune] = (G.player.runes[o.rune]||0) + 1; got = `${o.gold} extra gold and a ${esc(o.rune)} Rune`; }
+  else { G.player.gold += o.gold;
+    if (o.rsRune){ skAdd('r_'+o.rsRune, o.runeN); got = `${o.gold} extra gold and ${o.runeN} ${rsRuneName(o.rsRune).toLowerCase()}s`; }
+    else { G.player.runes[o.rune] = (G.player.runes[o.rune]||0) + 1; got = `${o.gold} extra gold and a ${esc(o.rune)} Rune`; } }
   logMsg(`quest complete! you receive ${q.rewardGold} gold, ${q.rewardXp} XP, and ${got}`, 'good', true);
   // standing with the town that posted it
   if (q.townKey){
@@ -9581,7 +9614,7 @@ function buildQuestReward(){
       const a = lootArrow(o.it), arrow = a==='up' ? `<span style="color:${COL.green}">&uarr; upgrade</span>` : a==='down' ? `<span style="color:${COL.red}">&darr; not an upgrade</span>` : '';
       body = `<div class="${rarityColorClass(o.it)}" style="font-weight:700;font-size:15px;">${esc(o.it.nm)}</div>
         <div class="muted" style="margin:2px 0 6px;">${esc(QNAME[o.it.quality]||'')} ${esc(o.it.basis||'')} &middot; ${esc(itemDesc(o.it))}</div>${itemModListHtml(o.it)}<div style="margin-top:6px;">${arrow}</div>`;
-    } else body = `<div style="font-weight:700;font-size:15px;color:${COL.gold}">${o.gold} gold</div><div style="margin-top:6px;">and a <b>${esc(o.rune)} Rune</b></div>`;
+    } else body = `<div style="font-weight:700;font-size:15px;color:${COL.gold}">${o.gold} gold</div><div style="margin-top:6px;">and ${o.rsRune ? `<b>${o.runeN} ${esc(rsRuneName(o.rsRune).toLowerCase())}s</b>` : `a <b>${esc(o.rune)} Rune</b>`}</div>`;
     return `<div class="qreward${o.special?' special':''}" onclick="chooseQuestReward(${i})" onmouseenter="${o.kind==='item'?`showItemTooltip(event, G.pendingReward.options[${i}].it)`:''}" onmousemove="moveItemTooltip(event)" onmouseleave="hideItemTooltip()">
       <div class="qr-label">${i+1} &middot; ${esc(o.label)}</div>${body}</div>`;
   }).join('');
@@ -9598,6 +9631,13 @@ const REP_TIERS = [
 ];
 
 // ---- the quest tracker on the HUD, with a compass arrow to the tracked objective ----
+// a delivery asks for metal gear of a tier (or, on quests from before the RuneScape rules, a quality)
+function questDeliverable(q, it){
+  if (!it || !it.used || it.consumable || it.kind==='scroll' || it.kind==='wand') return false;
+  if (q.tierReq===undefined) return (it.quality||0) >= q.rarityReq;
+  const t = it.rsStaff ? Math.floor((it.reqMag||1)/10) : it.rsFam==='cloth' ? [0,2,3,4,6][it.rsTier||0] : it.rsTier;
+  return it.uniqueId ? true : (t!==undefined && t >= q.tierReq);
+}
 function questScreenAngle(t){
   const dx = t.x - G.owPos.x, dy = t.y - G.owPos.y;
   if (G.owZoomedOut || !o3Active()) return Math.atan2(dy, dx);      // flat maps: north is up
@@ -21568,40 +21608,39 @@ function forgeAddSocket(slotKey){
   renderOverlay();
   saveCurrentGame();
 }
+// the smith's racks: every metal weapon and piece of plate, from bronze up to the
+// tier you can use and one beyond it (to show what's next). Dragon is never sold -
+// it only comes from the deepest monsters, as in RuneScape.
+const SMITH_WARES = [['w',0],['w',3],['w',5],['w',7],['w',9],['a','head'],['a','chest'],['a','legs'],['a','arms']];
+function smithWare(t, ware){ return ware[0]==='w' ? rsMakeWeapon(t, ware[1]) : rsMakeArmour('metal', t, ware[1]); }
+function smithBuy(t, wi){
+  const it = smithWare(t, SMITH_WARES[wi]), price = repPrice(Math.round(it.price*1.4));
+  if (G.inv.length >= MAXINV){ logMsg('your pack is full', 'hit'); renderOverlay(); return; }
+  if (G.player.gold < price){ logMsg("you can't afford that", 'hit'); renderOverlay(); return; }
+  G.player.gold -= price; addToInventory(it); sfx('gold');
+  renderOverlay(); saveCurrentGame();
+}
 function buildBlacksmith(){
-  const slots = [['weapon','WEAPON'],['ranged','RANGED'],['head','HEAD'],['chest','CHEST'],['legs','LEGS'],
-    ['arms','ARMS'],['necklace','NECK'],['ring1','RING 1'],['ring2','RING 2']];
-  const rows = slots.map(([key,label])=>{
-    const it = G.gear[key];
-    if (!it || !it.used) return `<div class="shoprow"><span class="muted">${label}</span><span class="muted">(nothing worn)</span><span></span></div>`;
-    if (it.kind==='wand'){
-      return `<div class="shoprow"><span class="muted">${label}</span><span class="${rarityColorClass(it)}">${esc(it.nm)}</span><span class="desc">a wand can't be socketed</span></div>`;
-    }
-    const statTxt = (it.slot==='weapon' || it.slot==='ranged') ? `${it.d1}d${it.d2}${fmtMod(it.bonus)}` : `AC ${it.ac}`;
-    const scl = slotClass(it.slot);
-    const cur = it.sockets ? it.sockets.length : 0;
-    if (scl!=='w' && scl!=='a'){
-      return `<div class="shoprow"><span class="muted">${label}</span><span class="${rarityColorClass(it)}">${esc(it.nm)}</span><span class="desc">${statTxt} &middot; jewelry can't be socketed</span></div>`;
-    }
-    if (cur>=MAX_SOCKETS){
-      return `<div class="shoprow"><span class="muted">${label}</span><span class="${rarityColorClass(it)}">${esc(it.nm)}</span><span class="desc">${statTxt} &middot; ${cur}/${MAX_SOCKETS} sockets (max)</span></div>`;
-    }
-    return `<div class="shoprow" onclick="forgeAddSocket('${key}')" style="cursor:pointer;">
-      <span class="muted">${label}</span>
-      <span class="${rarityColorClass(it)}">${esc(it.nm)}</span>
-      <span class="desc">${statTxt} &middot; ${cur}/${MAX_SOCKETS} sockets &middot; drill a new socket</span>
-      <span class="price">${SOCKET_FORGE_COST}g</span>
-    </div>`;
-  }).join('');
+  const topA = RS_METALS.reduce((b,m,i)=> i<6 && m[1]<=rsLvl('attack') ? i : b, 0), topD = RS_METALS.reduce((b,m,i)=> i<6 && m[1]<=rsLvl('defence') ? i : b, 0);
+  const top = Math.min(5, Math.max(topA, topD) + 1);
+  const rows = [];
+  for (let t=0; t<=top; t++){
+    const m = RS_METALS[t];
+    const cells = SMITH_WARES.map((w,wi)=>{ const it = smithWare(t, w), price = repPrice(Math.round(it.price*1.4)), ok = canEquip(it);
+      return `<button class="btn" style="margin:2px;${ok ? '' : 'opacity:0.55;'}" title="${esc(it.nm)} - ${esc(itemDesc(it))}" onclick="smithBuy(${t},${wi})" onmouseenter="showItemTooltip(event, smithWare(${t}, SMITH_WARES[${wi}]))" onmousemove="moveItemTooltip(event)" onmouseleave="hideItemTooltip()">${esc(it.basis==='Shortsword' ? 'Sword' : it.nm.replace(m[0]+' ',''))} &middot; ${price}g</button>`; }).join('');
+    rows.push(`<div class="shoprow" style="align-items:flex-start;"><span style="color:${m[5]};min-width:74px;font-weight:700;">${m[0]}</span><span class="desc" style="flex:1;">${m[1]>1 ? `<span class="muted">needs Attack/Defence ${m[1]}</span><br>` : ''}${cells}</span></div>`);
+  }
+  const worn = ['weapon','head','chest','legs','arms'].map(k=>{ const it = G.gear[k]; return it && it.used ? `<div class="shoprow"><span class="muted" style="min-width:74px;">${k}</span><span class="${rarityColorClass(it)}">${esc(it.nm)}</span><span class="desc">${esc(itemDesc(it))}</span></div>` : ''; }).join('');
   return `
     <h2 class="panel-title">THE BLACKSMITH</h2>
-    <div class="sub">You have ${G.player.gold} gold. Click a piece of worn weapon or armor to have the forge drill a new socket into it - ${SOCKET_FORGE_COST}g each, up to ${MAX_SOCKETS} sockets per piece. Jewelry can't be socketed.</div>
-    <div class="ovbody">${rows}${buildSmithing()}
+    <div class="sub">You have ${G.player.gold} gold. Metal weapons and plate from bronze up to the tier you can use (and the next, to show what's coming). Dragon is never for sale.</div>
+    <div class="ovbody">${rows.join('')}
+      <div class="panel" style="margin-top:14px;"><h4 style="color:${COL.amber};">WHAT YOU WEAR</h4>${worn || '<div class="muted">nothing</div>'}</div>
+      ${buildSmithing()}
       <div class="btnrow"><button class="btn primary" onclick="setUi('playing')">L / ESC &middot; leave</button></div>
     </div>
   `;
 }
-
 // ---- alchemist (potions) ----
 function buyAlchemistPotion(i){
   const it = G.alchemistStock[i];
@@ -22339,7 +22378,7 @@ function buildHelp(){
       <div style="margin-top:10px;color:var(--ink-faint);">YOUR PROGRESS</div>
       <div>each adventurer autosaves as you play &mdash; pick them up again from the title screen; dungeons you're mid-floor in regenerate fresh on return. Press <kbd>V</kbd> any time to mute or unmute sound.</div>
       <div style="margin-top:12px;color:var(--ink-faint);">IN A VILLAGE</div>
-      <div><span style="color:${COL.gold}">$</span> general store (gear and boats) &middot; <span style="color:${COL.dim}">&amp;</span> blacksmith (drill sockets into worn gear) &middot; <span style="color:${COL.green}">*</span> alchemist (potions) &middot; <span style="color:${COL.tavern}">H</span> tavern (rest &amp; quests) &middot; <span style="color:${COL.cyan}">&lt;</span> road back out</div>
+      <div><span style="color:${COL.gold}">$</span> general store (gear and boats) &middot; <span style="color:${COL.dim}">&amp;</span> blacksmith (metal weapons and plate, tools, smelting and smithing) &middot; <span style="color:${COL.green}">*</span> alchemist (potions) &middot; <span style="color:${COL.tavern}">H</span> tavern (rest &amp; quests) &middot; <span style="color:${COL.cyan}">&lt;</span> road back out</div>
       <div style="margin-top:10px;color:var(--ink-faint);">IN A DUNGEON, CASTLE OR TOWER</div>
       <div>no shop or tavern down here, and no loot lying on the floor &mdash; monsters carry it instead, so beat them down for gold, potions and gear</div>
       <div><span style="color:${COL.purple}">%</span> sealed vault (R/G/B/Y lock) &middot; <span style="color:${COL.amber}">&gt;</span> stairs down &middot; <span style="color:${COL.green}">&lt;</span> stairs up &middot; <span style="color:${COL.cyan}">&lt;</span> portal to overworld (depth 1)</div>

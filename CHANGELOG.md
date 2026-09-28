@@ -1,5 +1,24 @@
 # Depthcrawl patch notes
 
+## RS-7 — All gear on the RuneScape system
+
+- **Uniques use RuneScape bonuses:** every named unique now carries attack, strength, defence, ranged and magic bonuses instead of D&D stats.
+  - Each one is a cut above its metal tier.
+  - Its old stat mods convert: strength becomes strength bonus, dexterity becomes ranged, intelligence and wisdom become magic, and "+% damage" or "+armour" become strength and defence bonus.
+  - What makes a unique special stays: life, life steal, regeneration, resistances, elemental damage, a crit edge, gold or xp find, and its named on-hit power.
+  - Uniques in existing saves are converted when you load.
+- **The blacksmith sells metal gear:**
+  - Every tier from bronze up to the one you can use, plus the next one (greyed out) so you can see what's coming.
+  - Stock: dagger, scimitar, longsword, battleaxe, 2h sword, full helm, platebody, platelegs and gauntlets.
+  - Dragon is never for sale; it only drops.
+  - A panel shows what you're wearing, and tools, smelting and forging are still there. The old socket drilling is gone.
+- **Quests:**
+  - Delivery quests ask for a metal tier, for example "bring back a piece of mithril gear or better".
+  - Item rewards are the best of a handful of pieces you can already use.
+  - The heavy purse now holds magic runes (chaos, death or blood) instead of a socket rune.
+- **New Game+:** you keep your skills and start again from your kit's bronze gear, instead of the old class kit.
+- **Item names:** they no longer carry the old "Magic" or "Rare" quality words; the metal tells you everything.
+
 ## RS-6 — Crypts, ores and your weapon
 
 - **The mausoleum roof fades away:** as you come up to (or into) a graveyard's mausoleum, its roof fades so you can see the stairs down inside. It returns when you walk off.
