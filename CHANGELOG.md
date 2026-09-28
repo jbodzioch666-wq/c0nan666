@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-15 — Unique abilities explained on hover
+
+- **Every special effect on gear now explains itself.** This covers a unique's on-hit ability and effects like life steal, regeneration, damage reduction, deadly strike, thorns, elemental damage, gold/magic/XP find and heal on kill. Each one gets a short plain-language line under it. Hovering the line shows the full explanation. For example, Doombringer's "strike of pure dread" says: "Each time you hit, a 15% chance: terrifies the foe for 2 turns - it runs from you instead of fighting."
+- **Hover tooltips wherever gear is listed:** hovering an item in the inventory list or the character sheet's pack list now opens the item tooltip. The paperdoll, shops and quest rewards already did. Every tooltip includes these explanations.
+
 ## RS-14 — Spell damage in the spellbook
 
 - **Damage range for every spell:** each spell in the spellbook (G) now shows its damage range as you stand now, with your Magic level, gear and prayers counted. It also shows the extra 20% from an elemental staff of the same element, and the XP it gives.
