@@ -1,5 +1,15 @@
 # Depthcrawl patch notes
 
+## RS-20 — Your figure wears what you wear
+
+- **Helmets cover your head:** metal helmets are now a dome that covers the whole head and hair down to the brow, with a brim. Before, the top and back of the head poked through. Great helms were enlarged the same way.
+- **Legs follow your legs slot:** before, the whole outfit came from your body armour, so a platebody made robe bottoms look like plate legs. Now:
+  - platelegs draw as plate, in their metal's colour
+  - chaps draw as leather
+  - robe bottoms draw as a robe skirt, even under a platebody
+  - an empty legs slot shows plain trousers
+- **Your figure updates when you change leg armour.** Before, only a new weapon, helmet or body armour redrew you.
+
 ## RS-19 — Gathering spots: trees, fishing spots and herb patches
 
 Woodcutting, fishing and foraging now work like mining. Instead of standing anywhere and pressing E forever, you find real spots on the land, work them until they run out, and move on.
