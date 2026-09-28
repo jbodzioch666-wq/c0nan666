@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-27 — Fishing rods, waypoint portals, an unhurried pace
+
+- **You hold a fishing rod while you fish:** a long tapering rod with a cork grip, a reel and rings, tipped in your rod's tier of metal. Your weapon is put away while you fish, on the overworld and at dungeon cave pools. The line and float now run from the rod's tip.
+- **Waypoint travel goes through a portal:** a glowing portal opens beside you at the waypoint and you walk into it and fade away. In the town you chose, another portal opens in the plaza, just south of the waypoint (instead of dropping you at the town gate). You step out of it, and it closes behind you.
+- **Click-to-walk is slower:** you now walk at an even pace, about a third of a second per tile, in town, on the overworld and in the dungeons, instead of rushing to the spot you clicked.
+
 ## RS-26 — Resources in the inventory
 
 - **The inventory has a Resources section** listing everything you gather, loot or craft with, grouped into:
