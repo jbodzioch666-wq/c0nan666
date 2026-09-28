@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-14 — Spell damage in the spellbook
+
+- **Damage range for every spell:** each spell in the spellbook (G) now shows its damage range as you stand now, with your Magic level, gear and prayers counted. It also shows the extra 20% from an elemental staff of the same element, and the XP it gives.
+- **Against your current target:** another line shows the damage against the monster you're fighting, your chance to hit, and whether it's weak to that element or resists it. For example: "vs skeleton: 15–28, 95% to hit · weak to fire".
+- **Colour-coded elements:** each spell's name carries its element's colour, and the page's explanation is shorter.
+
 ## RS-13 — Elements matter
 
 - **Monsters have elemental weaknesses, as in RuneScape:**

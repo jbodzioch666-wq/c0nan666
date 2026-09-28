@@ -8906,20 +8906,40 @@ function rsCastFromBook(id){
 }
 function rsSelectSpell(id){ G.player.rsSpell = id; renderOverlay(); saveCurrentGame(); }
 function rsToggleAutocast(){ G.player.rsAutocast = !G.player.rsAutocast; renderOverlay(); saveCurrentGame(); }
+// what a spell does as you stand now: its damage range (your Magic level, gear, prayers and the
+// staff's own-element focus all counted), and against a target, that target's weakness or
+// resistance, the combat triangle and your chance to hit - the same sums rsCastAt makes
+function rsSpellDamage(sp, m){
+  const mxh = rsSpellMax(sp), onStaff = rsStaffElem()===sp[6];
+  let k = (1 + rsPrayBonus('mdmg')) * (onStaff ? 1.2 : 1), note = '';
+  if (m){
+    k *= rsTriDmgMult('magic', m);
+    const ew = rsMonElem(m);
+    if (ew.weak===sp[6]){ k *= 1.5; note = 'weak to '+sp[6]; } else if (ew.resist===sp[6]){ k *= 0.5; note = 'resists '+sp[6]; }
+  }
+  const lo = Math.max(1, Math.round(Math.ceil(mxh/2)*k)), hi = Math.max(lo, Math.round((Math.ceil(mxh/2) + Math.floor(mxh/2))*k));
+  let hit = null;
+  if (m && m.ac){ const b = rsAtkBonus('magic') + (onStaff ? 2 : 0) + frightPenalty() + 3*rsTriangle('magic', rsMonStyle(m)); hit = clamp((21 - (m.ac - b))/20, 0.05, 0.95); }
+  return { lo, hi, onStaff, note, hit };
+}
 function buildRsMagic(){
   const p = G.player, L = rsLvl('magic'), el = rsStaffElem();
+  const foe = G.lastFoe && G.lastFoe.hp > 0 && (G.gameMode===1 || G.gameMode===2) ? G.lastFoe : null;
   const rows = RS_SPELLS.map(sp=>{
     const lvlOk = L >= sp[2], runesOk = rsRunesOk(sp), sel = p.rsSpell===sp[0];
     const runes = Object.keys(sp[4]).map(r=>`<span style="color:${r===el ? COL.cyan : skHave('r_'+r)>=sp[4][r] ? COL.text : COL.red}" title="${r===el ? 'free - your staff supplies it' : 'you have '+skHave('r_'+r)}">${sp[4][r]} ${r}${r===el ? ' (staff)' : ''}</span>`).join(' ');
     return `<div class="shoprow ${sel ? 'sel' : ''}" style="${lvlOk ? '' : 'opacity:0.45;'}${sel ? 'outline:1px solid var(--amber);' : ''}">
-      <span class="muted">${sp[2]}</span><span>${esc(sp[1])}</span>
-      <span class="desc">max hit ${lvlOk ? rsSpellMax(sp) : Math.round(sp[3]*1.5)} &middot; ${runes}</span>
+      <span class="muted">${sp[2]}</span><span style="min-width:108px;display:inline-block;"><span style="color:${ISO_ELEM_COL[sp[6]]};">&#9670;</span> ${esc(sp[1])}</span>
+      <span class="desc">${(()=>{ const d = rsSpellDamage(sp), t = foe ? rsSpellDamage(sp, foe) : null;
+        return `<b style="color:var(--ink);">${d.lo}&ndash;${d.hi} damage</b>${d.onStaff ? ' <span style="color:'+COL.cyan+'">(staff +20%)</span>' : ''} &middot; ${sp[5]} xp`
+          + (t ? `<br><span style="color:${t.note.startsWith('weak') ? COL.green : t.note ? COL.red : 'var(--ink-faint)'}">vs ${esc(foe.nm)}: ${t.lo}&ndash;${t.hi}, ${Math.round(t.hit*100)}% to hit${t.note ? ' &middot; '+t.note : ''}</span>` : '')
+          + `<br>${runes}`; })()}</span>
       <span>${lvlOk ? `<button class="btn" onclick="rsSelectSpell('${sp[0]}')">${sel ? 'selected' : 'select'}</button>${runesOk && G.gameMode!==0 ? ` <button class="btn primary" onclick="rsCastFromBook('${sp[0]}')">cast</button>` : ''}${!runesOk ? ` <span style="color:${COL.red};font-size:11px;">need ${rsMissingRunes(sp).join(', ')}</span>` : ''}` : `needs Magic ${sp[2]}`}</span></div>`;
   }).join('');
   const pouch = RS_RUNES.map(r=>`<span class="skitem" style="border-color:${r[2]}"><b style="color:${r[2]}">${r[1]}</b> ${r[0]===el ? '&infin; (staff)' : '&times;'+skHave('r_'+r[0])}</span>`).join('');
   const w = G.gear.weapon, staff = w && w.used && w.rsStaff;
   return `<h2 class="panel-title">STANDARD SPELLBOOK</h2>
-    <div class="sub">Magic level ${L}. Every combat spell costs air runes as well as its own element's, as in RuneScape - an elemental staff covers its own element only. If you run out of a rune, the strongest spell you can still afford is cast instead. Select a spell: <kbd>R</kbd> casts it at the nearest foe you can see (when you have no bow equipped). ${staff ? `With a staff in hand you can <b>autocast</b> - every melee bump casts the spell instead.` : 'Wield a staff to autocast.'}${el ? ` Your staff gives endless ${el} runes, and your ${el} spells hit 20% harder and truer.` : ''} Hit a monster with the element it's weak to for 50% more damage (hover a monster to see); its own element does half.</div>
+    <div class="sub">Magic level ${L}. <kbd>R</kbd> casts your selected spell at the nearest foe you can see${staff ? `; <b>autocast</b> casts it with every melee bump` : ' (wield a staff to autocast)'}. Every combat spell also costs air runes; an elemental staff supplies its own element${el ? ` - yours gives endless ${el} and makes ${el} spells hit 20% harder` : ''}. Out of a rune, the strongest spell you can afford is cast instead. A monster's weak element does +50% (hover it to see); its own does half.</div>
     <div class="ovbody">
       <div class="btnrow" style="justify-content:flex-start;margin:0 0 8px;">${staff ? `<button class="btn ${p.rsAutocast ? 'primary' : ''}" onclick="rsToggleAutocast()">autocast: ${p.rsAutocast ? 'ON' : 'off'}</button>` : ''}</div>
       ${rows}
