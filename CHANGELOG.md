@@ -1,5 +1,15 @@
 # Depthcrawl patch notes
 
+## RS-30 — Far clicks walk where you point
+
+- **Clicking far away walks you there again, on the overworld, in town and in the dungeons.** Seen from the high camera, a far click comes in at a shallow angle and used to clip something standing up in between:
+  - **Overworld:** the tall click boxes over trees, herb patches and fishing spots, which sent you to that spot instead, or nowhere.
+  - **Town:** the click boxes of people, benches and buildings.
+  - **Dungeons:** the walls. The flat floor behind a wall picked a tile you couldn't see or reach.
+
+  Now a gathering spot, person or building only counts when the ground you clicked is on or right beside it. In the dungeons a click takes the surface you actually see: a wall face picks the floor in front of it, and anything else picks the nearest walkable tile.
+- **The overworld teleport uses the waypoint's portal:** the same swirling rune-ring you walk into at a town waypoint.
+
 ## RS-29 — Teleport from the map, clicks that always walk, a version number
 
 - **Teleport from anywhere in the open with T:** the list shows every town you've visited by name, with its race, distance and direction. Press its number or click it. On the overworld a portal opens beside you. You walk into it and step out of a portal in the plaza of the town you chose, the same as the town waypoints. It works from a town, too.
