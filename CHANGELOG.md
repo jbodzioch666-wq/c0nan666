@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-11 — Swinging a pickaxe
+
+- **Mining is animated:** you take up a real pickaxe in both hands, in the colour of your pick's tier (bronze through rune), and put your weapon and shield away while you work.
+  - You turn to face the vein, heave the pick up over your shoulder, bring it down hard and recover, over and over.
+  - In a mine, every blow sends chips of the vein's own ore flying with a spark and rings on the rock.
+- **On the overworld:** the same swing and pickaxe when you mine the rock beside mountains, and a hatchet when you chop trees.
+- **Weapon comes back:** your weapon returns to your hand when you stop.
+
 ## RS-10 — Forged gear is the best gear
 
 - **Forged gear beats drops:** anything you forge yourself is better made than anything a monster drops.
