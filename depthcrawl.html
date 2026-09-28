@@ -7991,9 +7991,18 @@ function skOptions(){
     else if (own!==OW_WATER && own!==OW_RIVER && SK_LOG.some(l=>skHave(l.id))) opts.push({ k:'firemaking', label:'Light a fire' });
   } else if (G.gameMode===1 && G.dungeonDeco){
     const px = G.player.x, py = G.player.y;
-    for (let dy=-1; dy<=1; dy++) for (let dx=-1; dx<=1; dx++){ const x = px+dx, y = py+dy; if (G.dungeonDeco[x] && G.dungeonDeco[x][y]==='ore'){ opts.unshift({ k:'mining', label:'Mine the vein', vein:{x,y} }); dy = 2; break; } }
+    for (let dy=-1; dy<=1; dy++) for (let dx=-1; dx<=1; dx++){ const x = px+dx, y = py+dy; if (G.dungeonDeco[x] && G.dungeonDeco[x][y]==='ore'){ opts.unshift({ k:'mining', label:'Mine '+skName(veinOre(x,y)).toLowerCase(), vein:{x,y} }); dy = 2; break; } }
   }
   return opts;
+}
+// a mine's veins deepen with its floors, as RuneScape's rocks rise with the levels: copper at the top,
+// iron a floor or two down, then coal and silver, mithril, adamantite and at the very bottom runite
+const MINE_ORES_BY_FLOOR = [['copper'], ['copper','iron'], ['iron','copper'], ['iron','coal'], ['coal','silver','iron'], ['silver','coal','mithril'], ['mithril','coal'], ['mithril','adamant'], ['adamant','runite']];
+const ORE_COL = { copper:'#d0783a', iron:'#9a5a44', silver:'#dfe3e8', coal:'#262626', mithril:'#4a5ad0', adamant:'#3a9a5a', runite:'#48c8e0' };
+function veinOre(x, y){
+  const list = MINE_ORES_BY_FLOOR[Math.min(MINE_ORES_BY_FLOOR.length, Math.max(1, G.depth||1)) - 1];
+  const h = fpHash(x, y, 311 + (G.depth||1)*7);
+  return list[h < 0.62 ? 0 : Math.min(list.length-1, 1 + Math.floor((h-0.62)/0.38*(list.length-1)))];
 }
 function skRawFoods(){ const out = []; for (const f of SK_FISH.concat(SK_MEAT)) if (skHave(f.id)) out.push(f); return out; }
 // ---- gathering: repeats on its own until you move, fill up on danger, or run out ----
@@ -8027,7 +8036,12 @@ function skGatherTick(now){
   // pick what you're working on: the best you can manage, sometimes something lesser
   let list;
   if (k==='fishing') list = SK_FISH.filter(f=>o.w==='b' || f.w===o.w);
-  else if (k==='mining') list = SK_ORE.filter(e=>G.gameMode===1 || e.lvl<=45);   // the richest ores are only down in the mines
+  else if (k==='mining' && o.vein){                     // a vein holds one ore, set by how deep the mine is
+    const ore = SK_ORE.find(e=>e.id===veinOre(o.vein.x, o.vein.y));
+    if (ore.lvl > L){ skStop(`you need Mining level ${ore.lvl} to mine ${ore.nm.toLowerCase()}`); return; }
+    list = [ore];
+  }
+  else if (k==='mining') list = SK_ORE.filter(e=>e.lvl<=45);   // the richest ores are only down in the mines
   else if (k==='woodcutting') list = SK_LOG.filter(l=>!l.marsh || o.marsh);
   else list = SK_HERB;
   const ok = list.filter(e=>e.lvl<=L); if (!ok.length){ skStop('nothing here you are skilled enough to gather'); return; }
@@ -17591,6 +17605,7 @@ function fpdInscriptionTex(seed){
 }
 // headstones, mausoleums and the crypt over the stair down
 function fpdGraveyard(world, matFor){
+  FPD.cryptRoof = null;
   const TH = THREE, D = G.dungeonDeco, boxG = new TH.BoxGeometry(1,1,1);
   const add = (m, parent)=>{ m.castShadow = true; m.receiveShadow = true; (parent||world).add(m); return m; };
   const box = (parent, m, w,h,d, x,y,z)=>{ const b = add(new TH.Mesh(boxG, m), parent); b.scale.set(w,h,d); b.position.set(x,y,z); return b; };
@@ -17671,18 +17686,24 @@ function fpdGraveyard(world, matFor){
   for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){ const d = D[x][y]||''; if (!d.startsWith('crypt')) continue; x0 = Math.min(x0,x); x1 = Math.max(x1,x); y0 = Math.min(y0,y); y1 = Math.max(y1,y); if (d==='cryptDoor') door = [x,y]; }
   if (door){
     const W = x1-x0+1, Dp = y1-y0+1, stone = matFor('tomb'), g = new TH.Group(); g.position.set(x0+W/2, 0, y0+Dp/2); world.add(g);
-    box(g, stone, W+0.16, 0.1, Dp+0.16, 0, 1.05, 0);                                // cornice
-    roofOf(g, W+0.3, 0.7, Dp+0.3, 1.1, stone, matFor('tombRoof'));
+    // the roof and everything on it lives in its own group with its own materials, so it can
+    // fade away when you come close and let you see the stairs down inside (see fpdRender)
+    const rg = new TH.Group(); g.add(rg);
+    const rStone = stone.clone(), rTile = matFor('tombRoof').clone();
+    for (const m of [rStone, rTile]){ m.transparent = true; m.opacity = 1; }
+    FPD.cryptRoof = { g:rg, mats:[rStone, rTile], x0, x1, y0, y1, fade:1 };
+    box(rg, rStone, W+0.16, 0.1, Dp+0.16, 0, 1.05, 0);                              // cornice
+    roofOf(rg, W+0.3, 0.7, Dp+0.3, 1.1, rStone, rTile);
     const fz = Dp/2, dxl = door[0]+0.5 - (x0+W/2);
-    box(g, stone, 0.05, 0.3, 0.05, 0, 1.1+0.7+0.14, fz+0.12); box(g, stone, 0.18, 0.05, 0.042, 0, 1.1+0.7+0.2, fz+0.12);   // cross on the apex
+    box(rg, rStone, 0.05, 0.3, 0.05, 0, 1.1+0.7+0.14, fz+0.12); box(rg, rStone, 0.18, 0.05, 0.042, 0, 1.1+0.7+0.2, fz+0.12);   // cross on the apex
     const colG = new TH.CylinderGeometry(0.065, 0.075, 0.86, 16);
     for (const s of [-1,1]){
       const c = add(new TH.Mesh(colG, stone), g); c.position.set(dxl + s*0.72, 0.51, fz+0.2);
       box(g, stone, 0.2, 0.08, 0.2, dxl + s*0.72, 0.04, fz+0.2); box(g, stone, 0.19, 0.07, 0.19, dxl + s*0.72, 0.975, fz+0.2);
     }
-    box(g, stone, 1.8, 0.16, 0.36, dxl, 1.03, fz+0.18);                              // entablature (hangs below the cornice, so their undersides never share a plane)
-    const porch = new TH.Group(); porch.position.set(dxl, 0, fz+0.18); g.add(porch);
-    roofOf(porch, 1.9, 0.3, 0.36, 1.11, stone, matFor('tombRoof'));                    // little pediment over the porch
+    box(rg, rStone, 1.8, 0.16, 0.36, dxl, 1.03, fz+0.18);                            // entablature (hangs below the cornice, so their undersides never share a plane)
+    const porch = new TH.Group(); porch.position.set(dxl, 0, fz+0.18); rg.add(porch);
+    roofOf(porch, 1.9, 0.3, 0.36, 1.11, rStone, rTile);                                // little pediment over the porch
     box(g, stone, 1.3, 0.05, 0.4, dxl, 0.025, fz+0.2);                                // doorstep
     inscribe(g, 0.8, 0.12, dxl, 1.03, fz+0.365, 5);
   }
@@ -17714,6 +17735,7 @@ function fpdCatacombProps(props, matFor, world){
 // floor and ceiling tiles, each vertex darkened where surfaces meet
 function fpdBuild(T){
   const TH = THREE, spec = FP_THEME_SPECS[T.key], key = T.key;
+  FPD.cryptRoof = null;
   if (FPD.world){ FPD.scene.remove(FPD.world); FPD.world.traverse(o=>{ if (o.geometry) o.geometry.dispose(); }); }
   const B = {};
   const bucket = (k)=> B[k] || (B[k] = { pos:[], nor:[], uv:[], col:[], idx:[] });
@@ -17995,7 +18017,7 @@ function fpdBuild(T){
 function fpdPortals(world){
   const T = THREE; FPD.portals = [];
   if (G.gameMode!==1) return;
-  const stone = FPD.mats.portalStone || (FPD.mats.portalStone = new T.MeshStandardMaterial({ color:0x8a8478, roughness:0.85 }));
+  const stone = FPD.mats.portalStone || (FPD.mats.portalStone = new T.MeshStandardMaterial({ color:new T.Color('#6a655c').convertSRGBToLinear(), roughness:0.85 }));
   const rune = FPD.mats.portalRune || (FPD.mats.portalRune = new T.MeshBasicMaterial({ color:0xffffff }));
   for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++){
     const t = G.map[x][y]; if (t!==T_EXIT && t!==T_FLEE) continue;
@@ -18248,6 +18270,14 @@ function fpdRender(env, T, camZ){
     dp.setXYZ(i, c.x-3 + (((px - (c.x-3))%6)+6)%6, 0.05 + ((py%1)+1)%1*0.9, c.y-3 + (((pz - (c.y-3))%6)+6)%6);
   }
   dp.needsUpdate = true;
+  // the mausoleum's roof lifts away (fades) while you're at or inside it, so you can see the way down
+  const cr = FPD.cryptRoof;
+  if (cr && G.gameMode===1){
+    const p = G.player, near = p.x >= cr.x0-2 && p.x <= cr.x1+2 && p.y >= cr.y0-2 && p.y <= cr.y1+3;
+    cr.fade += ((near && ISO.on ? 0.12 : 1) - cr.fade)*Math.min(1, (FP.dt||0.016)*5);
+    for (const m of cr.mats){ m.opacity = cr.fade; m.depthWrite = cr.fade > 0.97; }
+    cr.g.traverse(o=>{ if (o.isMesh) o.castShadow = cr.fade > 0.5; });
+  }
   for (const pt of FPD.portals||[]){ pt.mat.uniforms.t.value = FP.t + pt.seed; const k = 0.85 + 0.15*Math.sin(FP.t*3 + pt.seed); pt.L.intensity = 0.9*k; pt.pool.material.opacity = 0.55*k; }
   // (the shadow maps only exist after their first pass, so a fresh level gets a warm-up render)
   if (FPD.warm){ FPD.warm = false; FPD.r.render(FPD.scene, cam); }
@@ -18590,7 +18620,7 @@ function m3dVC(cache, m){
   return M3D.vcTwin.get(m);
 }
 const M3D_WEAPON = { sword:'Longsword', staff:'Quarterstaff', greataxe:'Greataxe', dagger:'Dagger', greatsword:'Greatsword', trident:'Spear', spear:'Spear', hammer:'Warhammer', mace:'Mace', club:'Club', axe:'Battleaxe', scimitar:'Scimitar' };
-function m3dWeapon(kind, mats){
+function m3dWeapon(kind, mats, basisOver, tint){
   const T = THREE;
   if (kind==='bow'){
     const g = new T.Group(), wood = m3dMat(mats, '#6a4a2a', 'leather');
@@ -18598,12 +18628,15 @@ function m3dWeapon(kind, mats){
     const str = new T.Mesh(new T.CylinderGeometry(0.003, 0.003, 0.62, 4), m3dMat(mats, '#d8d0b8', 'cloth')); str.position.x = -0.02; g.add(str);
     return g;
   }
-  const basis = M3D_WEAPON[kind]; if (!basis || !fpwInit()) return null;
+  const basis = basisOver || M3D_WEAPON[kind]; if (!basis || !fpwInit()) return null;
   const { g } = fpwBuild(basis, { used:true, basis, quality:0 });
+  const blade = FPW.m.steel, plate = FPW.m.plate;
   // the first-person weapon's metals lean on a studio reflection; out here they need a finish that reads under torchlight
   const swap = new Map();
   g.traverse(o=>{ if (!o.isMesh || !o.material || o.material.isSpriteMaterial) return;
-    if (!swap.has(o.material)){ const s = o.material; const r = s.metalness > 0.8 ? new T.MeshStandardMaterial({ color:s.color.clone(), map:s.map||null, metalness:0.6, roughness:0.3, emissive:s.emissive ? s.emissive.clone() : new T.Color(0), emissiveIntensity:s.emissiveIntensity||0 }) : s; swap.set(s, r); }
+    if (!swap.has(o.material)){ const s = o.material; const r = s.metalness > 0.8 ? new T.MeshStandardMaterial({ color:s.color.clone(), map:s.map||null, metalness:0.6, roughness:0.3, emissive:s.emissive ? s.emissive.clone() : new T.Color(0), emissiveIntensity:s.emissiveIntensity||0 }) : s;
+      if (tint && (s===blade || s===plate)) r.color = new T.Color(tint).lerp(new T.Color(0xffffff), 0.25).multiplyScalar(1.2);   // (the blade in its metal's colour)
+      swap.set(s, r); }
     o.material = swap.get(o.material); });
   return g;
 }
@@ -18833,7 +18866,7 @@ function m3dHumanoid(o){
   }
   // weapon in the right hand (the one on its right, -x), shield on the left
   const wk = o.weapon && o.weapon!=='claws' ? o.weapon : null;
-  const wpn = wk ? m3dWeapon(wk, mats) : null;
+  const wpn = wk ? m3dWeapon(wk, mats, o.weaponBasis, o.weaponCol) : null;
   if (wpn){ const R = rig.arms[0]; wpn.rotation.x = Math.PI/2; wpn.position.set(0, -0.042, 0.024*b); wpn.scale.setScalar(0.42*(o.weaponScale||1)); R.hand.add(wpn); rig.weapon = wpn; rig.twoHand = /greataxe|greatsword|staff|spear|trident/.test(wk); rig.wk = wk; }
   if (o.shield){
     // a round shield held by its centre grip, so it faces out past the fist (-y along the forearm): a gently
@@ -19755,7 +19788,7 @@ function fpCollectSprites(vis){
       }
     }
     if (t===T_FLOOR && G.gameMode===1 && G.dungeonDeco){
-      const deco = G.dungeonDeco[x][y], oe = deco && deco!=='rune' && deco!=='pool' && deco!=='torch' && !(deco==='grave' && FPD.ok) && obDecoEntry(deco, x, y);   // (headstones are modelled when the GPU renderer is up)
+      const deco = G.dungeonDeco[x][y], oe = deco && deco!=='rune' && deco!=='pool' && deco!=='torch' && !(deco==='grave' && FPD.ok) && !(deco==='ore' && FPD.ok && ISO.on) && obDecoEntry(deco, x, y);   // (headstones are modelled when the GPU renderer is up)
       if (oe){
         const h = {throne:0.9, banner:0.86, altar:0.5, idol:0.7, grave:0.5, ore:0.46}[deco] || 0.6;
         addP(oe, h, 0, {shadow:true, glow: deco==='idol' ? COL.cyan : deco==='altar' ? COL.purple : deco==='ore' ? '#ffd76b' : null, shine: deco==='ore', bright: deco==='ore'});
@@ -20552,7 +20585,40 @@ function isoSyncSprites(S, env){
   }
   for (let i=n;i<ISO.sprites.length;i++) ISO.sprites[i].visible = false;
 }
-function isoHideSprites(){ if (ISO.grp && ISO.grp.parent) ISO.grp.parent.remove(ISO.grp); if (ISO.player && ISO.player.holder.parent) ISO.player.holder.parent.remove(ISO.player.holder); }
+// each vein is a real rock in the mine: grey stone studded with nuggets of its ore's own colour
+function isoSyncVeins(){
+  const T = THREE;
+  const key = G.gameMode===1 && G.dungeonDeco ? [].concat(...G.dungeonDeco.map((col,x)=>col.map((d,y)=>d==='ore' ? x+','+y : '').filter(Boolean))).join(';') + '@' + G.depth : '';
+  if (ISO.veinKey===key && ISO.veinMap===G.map && ISO.veinG && ISO.veinG.parent===FPD.scene) return;
+  if (ISO.veinG){ if (ISO.veinG.parent) ISO.veinG.parent.remove(ISO.veinG); ISO.veinG.traverse(o=>{ if (o.geometry && !o.geometry.userData.keep) o.geometry.dispose(); }); }
+  ISO.veinKey = key; ISO.veinMap = G.map; ISO.veinG = new T.Group(); FPD.scene.add(ISO.veinG);
+  if (!key.split('@')[0]) return;
+  const lin = (c)=>new T.Color(c).convertSRGBToLinear();   // (this scene lights in linear space)
+  const rockM = ISO.rockM || (ISO.rockM = new T.MeshStandardMaterial({ color:lin('#57504a'), roughness:0.95, flatShading:true }));
+  const rockG = ISO.rockG || (ISO.rockG = [fpdLumpy(2, 0.22, 21), fpdLumpy(2, 0.26, 27)]);
+  const nugG = ISO.nugG || (ISO.nugG = new T.IcosahedronGeometry(1, 0));
+  rockG.forEach(g=>g.userData.keep = true); nugG.userData.keep = true;
+  ISO.oreM = ISO.oreM || {};
+  for (const k of key.split('@')[0].split(';')){
+    const [x, y] = k.split(',').map(Number), ore = veinOre(x, y), col = ORE_COL[ore] || '#c89a4a';
+    const om = ISO.oreM[ore] || (ISO.oreM[ore] = new T.MeshStandardMaterial({ color:lin(col), roughness: ore==='coal' ? 0.9 : 0.4, metalness: ore==='coal' ? 0 : 0.3,
+      emissive:lin(col), emissiveIntensity: ore==='coal' ? 0 : 0.3, flatShading:true }));
+    const h = (i)=>fpHash(x, y, 400+i), g = new T.Group(); g.position.set(x+0.5, 0, y+0.5);
+    for (let i=0;i<3;i++){
+      const r = new T.Mesh(rockG[i&1], rockM), sc = i ? 0.13 + h(i)*0.06 : 0.24;
+      r.scale.set(sc*(1+h(i+5)*0.3), sc*0.8, sc); r.position.set(i ? (h(i+9)-0.5)*0.42 : 0, sc*0.55, i ? (h(i+11)-0.5)*0.42 : 0); r.rotation.y = h(i+13)*6;
+      r.castShadow = true; r.receiveShadow = true; g.add(r);
+    }
+    for (let i=0;i<12;i++){                               // the ore itself, bulging out of the rock
+      const a = h(i+20)*Math.PI*2, up = 0.06 + h(i+30)*0.26, rr = Math.sqrt(Math.max(0, 0.27*0.27 - (up-0.14)*(up-0.14)*0.9)) + 0.01, sc = 0.04 + h(i+50)*0.035;
+      const n = new T.Mesh(nugG, om);
+      n.position.set(Math.cos(a)*rr, up, Math.sin(a)*rr); n.scale.setScalar(sc); n.rotation.set(h(i+60)*6, h(i+61)*6, 0); g.add(n);
+    }
+    ISO.veinG.add(g);
+  }
+}
+function isoHideSprites(){
+  if (ISO.veinG && ISO.veinG.parent) ISO.veinG.parent.remove(ISO.veinG); if (ISO.grp && ISO.grp.parent) ISO.grp.parent.remove(ISO.grp); if (ISO.player && ISO.player.holder.parent) ISO.player.holder.parent.remove(ISO.player.holder); }
 // ---- you, in the scene ----
 function rsPlayerLook(){
   const w = G.gear.weapon, c = G.gear.chest, h = G.gear.head, r = G.gear.ranged, race = (G.player.race||'').toLowerCase();
@@ -20562,9 +20628,12 @@ function rsPlayerLook(){
   if (fam==='hide') o.cloth = c.rsCol;
   if (fam==='cloth'){ o.cloth = c.rsCol; o.cloth2 = c.rsCol; }
   if (!fam) o.cloth = '#6a5a44';
+  // the very weapon you're fighting with: the bow when you last shot, otherwise your melee weapon
+  // itself (a scimitar is a scimitar, a battleaxe a battleaxe), its blade in its metal's colour
   const b = w && w.used ? (w.basis||'') : '';
-  if (w && w.used) o.weapon = w.rsStaff ? 'staff' : /Dagger/.test(b) ? 'dagger' : /Mace|Warhammer/.test(b) ? 'mace' : /Battleaxe|Halberd|Greatsword|Greataxe/.test(b) ? 'greataxe' : 'sword';
-  else if (r && r.used && r.range) o.weapon = 'bow';
+  const kinds = { Dagger:'dagger', Mace:'mace', Shortsword:'sword', Scimitar:'scimitar', Spear:'spear', Longsword:'sword', Warhammer:'hammer', Battleaxe:'axe', Halberd:'spear', Greatsword:'greatsword', Quarterstaff:'staff' };
+  if (r && r.used && r.range && (G.player.rsLastType==='ranged' || !(w && w.used))) o.weapon = 'bow';
+  else if (w && w.used){ o.weapon = w.rsStaff ? 'staff' : (kinds[b] || 'sword'); o.weaponBasis = b; if (w.rsCol) o.weaponCol = w.rsCol; }
   if (o.weapon==='staff' && w.rsElem) o.gem = { air:'220,230,255', water:'120,170,255', earth:'180,140,90', fire:'255,130,70' }[w.rsElem];
   if (h && h.used){ if (h.rsFam==='metal') o.helm = 'kettle'; else if (h.rsFam==='hide') o.helm = 'cowl'; else { o.head = 'hood'; o.faceShow = true; } }
   const rl = /orc/.test(race) ? { head:o.head, skin:'#7a9a5a' } : /dwarf/.test(race) ? { bulk:1.2, beard:'#8a4a20', hair:'#8a4a20' } : /elf/.test(race) ? { hair:'#e8d8a0' } : /tiefling/.test(race) ? { skin:'#b05050' } : {};
@@ -20572,7 +20641,7 @@ function rsPlayerLook(){
 }
 function isoSyncPlayer(){
   const T = THREE, p = G.player;
-  const g = G.gear, key = ['weapon','ranged','head','chest'].map(k=>g[k] && g[k].used ? g[k].nm : '-').join('|') + p.race;
+  const g = G.gear, key = ['weapon','ranged','head','chest'].map(k=>g[k] && g[k].used ? g[k].nm : '-').join('|') + p.race + (p.rsLastType==='ranged' ? '|bow' : '');
   if (!ISO.player || ISO.lookKey!==key){
     if (ISO.player && ISO.player.holder.parent) ISO.player.holder.parent.remove(ISO.player.holder);
     ISO.lookKey = key;
@@ -20642,14 +20711,14 @@ function isoDrawVeins(){
   for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++){
     if (G.dungeonDeco[x][y]!=='ore' || !(G.dungeonSeen && G.dungeonSeen[x][y])) continue;
     const c = isoProject(x+0.5, y+0.5, 0.02); if (!c.ok) continue;
-    ctx.globalCompositeOperation = 'lighter';
-    const g = ctx.createRadialGradient(c.sx, c.sy, 0, c.sx, c.sy, ppu*0.75);
-    g.addColorStop(0, `rgba(255,205,90,${0.32*pulse})`); g.addColorStop(1, 'rgba(255,205,90,0)');
-    ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(c.sx, c.sy, ppu*0.75, ppu*0.42, 0, 0, Math.PI*2); ctx.fill();
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.strokeStyle = `rgba(255,215,110,${0.45+0.4*pulse})`; ctx.lineWidth = 2*dpr;
-    const q = [[0.08,0.08],[0.92,0.08],[0.92,0.92],[0.08,0.92]].map(([a,b])=>isoProject(x+a, y+b, 0.02));
-    ctx.beginPath(); q.forEach((p,i)=> i ? ctx.lineTo(p.sx,p.sy) : ctx.moveTo(p.sx,p.sy)); ctx.closePath(); ctx.stroke();
+    const oc = ORE_COL[veinOre(x, y)] || '#ffd76b';
+    if (oc!=='#262626'){                                  // (coal doesn't shine)
+      ctx.globalCompositeOperation = 'lighter';
+      const g = ctx.createRadialGradient(c.sx, c.sy, 0, c.sx, c.sy, ppu*0.6);
+      g.addColorStop(0, fpRgba(oc, 0.22*pulse)); g.addColorStop(1, fpRgba(oc, 0));
+      ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(c.sx, c.sy, ppu*0.6, ppu*0.34, 0, 0, Math.PI*2); ctx.fill();
+      ctx.globalCompositeOperation = 'source-over';
+    }
     // a glint that wanders over the rock
     const ph = (FP.t*0.9 + x*0.37 + y*0.71) % 1, gl = isoProject(x+0.3+ph*0.4, y+0.5, 0.18+ph*0.2), r = ppu*0.09*Math.sin(ph*Math.PI);
     ctx.strokeStyle = 'rgba(255,250,220,0.95)'; ctx.lineWidth = Math.max(1, dpr);
@@ -20660,7 +20729,7 @@ function isoDrawVeins(){
 function isoDrawHover(){
   const h = isoHoverTile();
   if (h && G.gameMode===1 && G.dungeonDeco && G.dungeonDeco[h[0]] && G.dungeonDeco[h[0]][h[1]]==='ore' && G.dungeonSeen && G.dungeonSeen[h[0]][h[1]]){
-    const top = isoProject(h[0]+0.5, h[1]+0.5, 0.8), txt = 'Mine ore vein';
+    const ore = SK_ORE.find(e=>e.id===veinOre(h[0], h[1])), top = isoProject(h[0]+0.5, h[1]+0.5, 0.8), txt = `Mine ${ore.nm.toLowerCase()} (Mining ${ore.lvl})`;
     ctx.save(); ctx.font = `700 ${Math.round(12*dpr)}px 'JetBrains Mono', monospace`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
     ctx.lineWidth = 3*dpr; ctx.strokeStyle = 'rgba(0,0,0,0.85)'; ctx.strokeText(txt, top.sx, top.sy); ctx.fillStyle = '#ffd76b'; ctx.fillText(txt, top.sx, top.sy); ctx.restore();
     return;
@@ -20903,7 +20972,7 @@ function renderFirstPerson(){
   const sprites = fpCollectSprites(vis);            // (also places the 3D creatures, so they're drawn this frame)
   m3dSweep();
   const iso = gpu && ISO.on;
-  if (iso){ isoTickPath(now); isoTickHeld(now); try{ isoSyncSprites(sprites, env); isoSyncPlayer(); }catch(e){ console.error(e); } }
+  if (iso){ isoTickPath(now); isoTickHeld(now); try{ isoSyncSprites(sprites, env); isoSyncPlayer(); isoSyncVeins(); }catch(e){ console.error(e); } }
   else isoHideSprites();
   if (gpu){ try{ fpdRender(env, T, camZ); }catch(e){ console.error(e); FPD.ok = false; gpu = false; P = fpRenderWorld(env, T, camZ, horizon, false); } }
   const k = canvas.width / W;

@@ -1,5 +1,27 @@
 # Depthcrawl patch notes
 
+## RS-6 — Crypts, ores and your weapon
+
+- **The mausoleum roof fades away:** as you come up to (or into) a graveyard's mausoleum, its roof fades so you can see the stairs down inside. It returns when you walk off.
+- **Your character carries your actual weapon:** a scimitar is a scimitar, a battleaxe a battleaxe and a 2h sword a 2h sword, with the blade in its metal's colour. After you shoot, the bow is in hand until you next swing.
+- **Mines deepen like RuneScape's rocks:**
+
+  | Mine floor | Veins |
+  |---|---|
+  | 1 | Copper |
+  | 2 | Copper and iron |
+  | 3 | Iron and copper |
+  | 4 | Iron and coal |
+  | 5 | Coal, silver and iron |
+  | 6 | Silver, coal and mithril |
+  | 7 | Mithril and coal |
+  | 8 | Mithril and adamantite |
+  | 9 and deeper | Adamantite and runite |
+
+  - Each vein holds one ore and needs that ore's Mining level. Hovering over a vein shows it, for example "Mine iron ore (Mining 15)".
+- **Each vein is a real rock:** dark stone studded with nuggets of its own ore's colour (copper orange, iron rust-red, coal black, silver white, mithril blue, adamant green, runite cyan).
+  - The gold outline is gone; a faint glow in the ore's colour remains (coal doesn't glow).
+
 ## RS-5 — Portals, and gear bonuses that matter
 
 - **Portals are real:** the way out of a dungeon is now a carved stone arch.
