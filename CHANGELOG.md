@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-48 - Colour-coded damage numbers
+
+- **The hitsplats on monsters now show what dealt the damage:** red for melee, green for ranged, blue for magic and olive for poison or lingering damage.
+- **A critical hit** is bigger, with a gold starburst behind it.
+
 ## RS-47 - Kill counts
 
 - **Every kind of monster now has a kill count.**
