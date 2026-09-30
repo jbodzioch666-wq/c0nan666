@@ -257,6 +257,17 @@
 245. [ ] (361) Inventory-full prompt - drop, bank, or process on the spot (cook fish, burn logs)
 246. [ ] (362) Skill-gated resource areas - mining guild, fishing platform, magic tree grove
 247. [ ] (363) Trophy fish and record ore - size and quality variants you can mount in your house
+248. [ ] (371) Crowd control spells - Bind, Snare, Entangle root a monster; Confuse, Weaken, Curse lower its stats
+249. [ ] (372) Area spells - fire burst, ice barrage hitting a group for extra runes
+250. [ ] (373) God spells - Saradomin Strike, Claws of Guthix, Flames of Zamorak, with god capes and staves
+251. [ ] (374) Healing and support spells - Heal Self, Cure Poison, Stat Restore, Vengeance
+252. [ ] (375) Multiple spellbooks switched at an altar - Standard, Ancient, Lunar, Arceuus
+253. [ ] (376) Spell hotbar - favourite spells on number keys
+254. [ ] (377) Spell details on hover - max hit, rune cost, accuracy against the target, element weakness
+255. [ ] (378) Combination runes - mist, dust, mud, lava, steam, smoke count as two elements
+256. [ ] (379) Mage off-hand - a book or tome for magic accuracy and damage
+257. [ ] (380) Spell animations per tier - small strike bolts up to huge surges with a screen effect
+258. [ ] (381) Casting animations - raise the staff, gather energy, release
 
 ## Backlog
 
@@ -286,8 +297,6 @@
 ### Combat
 - (62) Blocking and parrying - skip your attack to block; a shield reflects damage
 - (63) Readable enemy attacks - telegraphed tiles light up a turn before a big hit
-- (64) Ancient and lunar spellbooks - freezes, area-of-effect barrages, heal-other, teleports
-- (65) Curse and debuff spells - confuse, weaken, bind, snare
 - (66) Staves with built-in spells - trident-style staves that cast without runes
 - (67) Tick-eating and combo food - eat and attack in the same turn
 - (68) Stat-boosting potions - super attack, strength and defence; prayer and restore potions
@@ -420,3 +429,16 @@
 - (368) Double processing - gather and process in one step at high level
 - (369) Shared world resources with NPC gatherers
 - (370) Gathering leaderboard of personal records
+
+### Magic
+- (382) Utility spells - Bones to Bananas, Telekinetic Grab, Superheat Item, Charge
+- (383) Teleport spells to each town, house and dungeon entrances
+- (384) Elemental combos - water then lightning, fire then air
+- (385) Enchant spells for bolts, jewellery and staves
+- (386) Spell tomes as drops unlocking rare spells
+- (387) Staff special effects - Staff of the Dead, Kodai wand rune saving
+- (388) Magic armour set bonuses (Ahrim's, Infinity, Virtus)
+- (389) Rune-saving chance from Magic level and gear
+- (390) Magic Training Arena minigame
+- (391) Mage Arena challenge for the god spells
+- (392) Magic xp from utility spells
