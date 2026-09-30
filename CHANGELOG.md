@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-47 - Kill counts
+
+- **Every kind of monster now has a kill count.**
+- **The game announces it RuneScape-style** ("Your goblin kill count is: 25.") for every boss kill and at 10, 25, 50, 100, 250, 500 and 1000.
+- **Where it shows:** the bestiary lists each monster's kills and your total kills. The foe plate shows "kc" for the monster you're fighting, and examining a monster tells you how many you've killed.
+- **Filtering:** the combat log filters are the Combat, Loot, Skills and Quests tabs added in RS-46.
+
 ## RS-46 - Tabbed message log
 
 - **The message log has tabs along its bottom: All, Combat, Loot, Skills and Quests.** Each message is sorted into one as it's written. The tab you choose is remembered.
