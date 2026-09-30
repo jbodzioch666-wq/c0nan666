@@ -498,6 +498,19 @@
   #qtoast{ position:fixed; left:50%; top:86px; transform:translate(-50%,-12px); opacity:0; pointer-events:none; z-index:40; transition:opacity .35s, transform .35s;
     background:linear-gradient(rgba(30,22,12,0.95),rgba(18,14,8,0.95)); border:1px solid #c79a54; border-radius:6px; padding:9px 22px; text-align:center; box-shadow:0 6px 24px rgba(0,0,0,0.6); }
   #qtoast.show{ opacity:1; transform:translate(-50%,0); }
+  #xpDrops{ position:fixed; right:30px; top:34%; z-index:39; pointer-events:none; display:flex; flex-direction:column; align-items:flex-end; }
+  #xpDrops .xpcol{ display:flex; flex-direction:column; align-items:flex-end; gap:2px; animation:xpfloat 1.8s ease-out forwards; margin-top:-30px; }
+  @keyframes xpfloat{ 0%{ transform:translateY(40px); opacity:0; } 12%{ opacity:1; } 75%{ opacity:1; } 100%{ transform:translateY(-70px); opacity:0; } }
+  .xpd{ display:flex; align-items:center; gap:5px; font:700 15px 'JetBrains Mono',monospace; color:#fff; text-shadow:0 1px 2px #000, 0 0 5px #000; }
+  .xpi{ display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:4px; font-size:11px; color:#fff; box-shadow:0 1px 3px #000; }
+  #xpTracker{ position:fixed; left:14px; top:112px; width:230px; z-index:30; display:none; font-family:'JetBrains Mono',monospace; font-size:11px;
+    background:rgba(8,11,15,0.78); border:1px solid rgba(160,176,190,0.3); border-radius:8px; padding:6px 9px 7px; color:#d4dce2; }
+  #xpTracker .xpt-t{ font-size:10px; letter-spacing:1px; color:#b4c0ca; display:flex; justify-content:space-between; margin-bottom:3px; }
+  #xpTracker .xpt-x{ cursor:pointer; font-size:14px; line-height:10px; color:#b4c0ca; } #xpTracker .xpt-x:hover{ color:#fff; }
+  #xpTracker .xpt-row{ margin-top:5px; } #xpTracker .xpt-h{ display:flex; align-items:center; gap:5px; }
+  #xpTracker .xpt-g{ margin-left:auto; color:#ffd98a; }
+  #xpTracker .xpt-bar{ height:4px; background:rgba(255,255,255,0.1); border-radius:2px; margin:3px 0 2px; overflow:hidden; } #xpTracker .xpt-bar i{ display:block; height:100%; }
+  #xpTracker .xpt-s{ display:flex; justify-content:space-between; color:#9aa6b0; font-size:10px; }
   #notifyBox{ position:fixed; left:50%; top:150px; transform:translateX(-50%); display:flex; flex-direction:column; align-items:center; gap:6px; z-index:41; pointer-events:none; }
   #notifyBox .ntf{ font:700 13px 'JetBrains Mono',monospace; padding:6px 14px; border-radius:6px; background:rgba(12,16,20,0.9); border:1px solid #e0b050; color:#ffe6a8;
     box-shadow:0 6px 18px -6px rgba(0,0,0,0.8); opacity:0; transform:translateY(-8px); transition:opacity .3s, transform .3s; }
@@ -8311,8 +8324,10 @@ function skAdd(id, n){ const b = skP().bag; b[id] = (b[id]||0) + n; if (b[id]<=0
 // xp in, level-ups out (with a fanfare and a banner)
 function skGainXP(k, amount, mastery){
   const p = skP(), store = mastery ? p.mastery : p.skills, before = skLevelOf(store[k]||0);
-  store[k] = (store[k]||0) + Math.max(1, Math.round(amount));
+  const gain = Math.max(1, Math.round(amount));
+  store[k] = (store[k]||0) + gain;
   const after = skLevelOf(store[k]);
+  if (!mastery){ try { xpDrop(k, gain); xpTrack(k, gain); } catch(e){} }
   if (after > before){
     const nm = mastery ? (SK_MASTERY.find(m=>m[0]===k)||[k,k])[1]+' mastery' : RS_ALL_SKILLS().find(d=>d[0]===k)[1];
     if (k==='hitpoints' && G.player.hp>0) G.player.hp += 2*(after-before);
@@ -8320,6 +8335,45 @@ function skGainXP(k, amount, mastery){
     logMsg(`your ${nm} level is now ${after}!${skUnlockText(k, after, mastery)}`, 'magic');
     sfx('levelUp'); skBanner(`${nm} level ${after}`);
   }
+}
+// ---- XP drops and the XP tracker ----
+// every xp gain floats up the right of the screen as "+45" beside the skill's icon, RuneScape style
+// (gains in the same moment stack into one column); the tracker panel under your plate follows the
+// skills you've trained this session - xp gained, xp an hour, and how far to the next level
+function xpSkillDef(k){ return RS_ALL_SKILLS().find(d=>d[0]===k) || [k, k, '&#9679;', '#c8b070']; }
+function xpDrop(k, n){
+  let box = document.getElementById('xpDrops');
+  if (!box){ box = document.createElement('div'); box.id = 'xpDrops'; document.body.appendChild(box); }
+  const d = xpSkillDef(k), now = performance.now();
+  let col = box.lastElementChild;
+  if (!col || now - (+col.dataset.t) > 250){ col = document.createElement('div'); col.className = 'xpcol'; col.dataset.t = now; box.appendChild(col);
+    setTimeout(()=> col.remove(), 1900); }
+  const same = [...col.children].find(c=>c.dataset.k===k);
+  if (same){ same.dataset.n = +same.dataset.n + n; same.querySelector('b').textContent = '+' + same.dataset.n; return; }
+  const el = document.createElement('div'); el.className = 'xpd'; el.dataset.k = k; el.dataset.n = n;
+  el.innerHTML = `<span class="xpi" style="background:${d[3]}">${d[2]}</span><b>+${n}</b>`;
+  col.appendChild(el);
+}
+let XPT = { skills:{}, order:[], hidden:false };
+function xpTrack(k, n){
+  const t = XPT.skills[k] = XPT.skills[k] || { gained:0, since:Date.now() };
+  t.gained += n; XPT.hidden = false;
+  XPT.order = [k].concat(XPT.order.filter(x=>x!==k)).slice(0, 3);
+  clearTimeout(xpTrack.tm); xpTrack.tm = setTimeout(renderXpTracker, 120);
+}
+function renderXpTracker(){
+  let el = document.getElementById('xpTracker');
+  if (!el){ el = document.createElement('div'); el.id = 'xpTracker'; document.body.appendChild(el); }
+  if (XPT.hidden || !XPT.order.length || G.ui!=='playing' || !G.player){ el.style.display = 'none'; return; }
+  const p = skP(), rows = XPT.order.map(k=>{
+    const d = xpSkillDef(k), xp = p.skills[k]||0, L = skLevelOf(xp), lo = SK_XP[L]||0, hi = SK_XP[L+1] || xp, t = XPT.skills[k];
+    const f = hi>lo ? clamp((xp-lo)/(hi-lo), 0, 1) : 1, hrs = Math.max(1/60, (Date.now()-t.since)/3600000);
+    return `<div class="xpt-row"><div class="xpt-h"><span class="xpi" style="background:${d[3]}">${d[2]}</span><b>${esc(d[1])}</b> <span class="muted">${L}</span>
+        <span class="xpt-g">+${t.gained.toLocaleString()} xp</span></div>
+      <div class="xpt-bar"><i style="width:${f*100}%;background:${d[3]}"></i></div>
+      <div class="xpt-s"><span>${L<99 ? (hi-xp).toLocaleString()+' to level '+(L+1) : 'max level'}</span><span>${Math.round(t.gained/hrs).toLocaleString()} xp/h</span></div></div>`; }).join('');
+  el.innerHTML = `<div class="xpt-t">XP TRACKER <span class="xpt-x" onclick="XPT.hidden=true; renderXpTracker();" title="hide the tracker - it comes back with your next xp">&times;</span></div>${rows}`;
+  el.style.display = 'block';
 }
 function skUnlockText(k, L, mastery){
   if (mastery){ if (L%20===0) return ' (+1 to hit with it)'; if (L%25===0) return ' (+1 damage with it)'; return ''; }
@@ -12645,6 +12699,7 @@ function toggleOwZoom(){
 
 function renderGame(){
   if (G.ui==='playing') checkLowHp();
+  { const xe = document.getElementById('xpTracker'); if (xe && (xe.style.display==='none') !== (G.ui!=='playing' || XPT.hidden || !XPT.order.length)) renderXpTracker(); }
   // village mode gets the whole stage to itself (no HP/stats/spells to
   // track while browsing shops) - toggled here rather than at every
   // possible gameMode-3 entry/exit point (enterVillage, the T_EXIT handler,
@@ -23048,7 +23103,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-51';
+const GAME_VERSION = 'rs-52';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

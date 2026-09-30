@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-52 - XP drops and XP tracker
+
+- **Every XP gain now floats up the right side of the screen** as a skill icon with the amount. Gains that land together (like Attack and Hitpoints from one hit) stack in one column.
+- **New XP tracker under your player plate** shows the last three skills you trained: level, XP gained this session, a progress bar to the next level, XP left to level, and XP per hour.
+- Click the x to hide the tracker. It comes back the next time you gain XP, and it hides itself in menus.
+
 ## RS-51 - Notifications
 
 - **Important events now pop up as a notification card with a sound**, under the quest banner at the top of the screen.
