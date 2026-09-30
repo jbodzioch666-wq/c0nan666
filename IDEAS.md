@@ -295,6 +295,21 @@
 283. [ ] (442) Prayer drain shown - points per turn on the prayer screen and hotbar
 284. [ ] (443) Overhead prayer icons - the active protection prayer glows over your head, plus a light aura for boosts
 285. [ ] (444) Bone burying animation with a small effect
+286. [ ] (462) New biomes - volcanic region, jungle, haunted forest, snowy highlands, crystal wasteland
+287. [ ] (463) Level-banded regions - each region shows its recommended combat level on entry
+288. [ ] (464) Bridges, ferries and fords - river crossings, some broken until a quest repairs them
+289. [ ] (465) Wildlife - deer, rabbits, birds and boars roaming, some huntable, fleeing when you get close
+290. [ ] (466) Farms and hamlets between towns - farmer, mill, well, small jobs and trades
+291. [ ] (467) Growing monster camps - goblin or bandit camps expand if left alone and threaten nearby towns
+292. [ ] (468) Territory control - clear a region's camps to make it safer, with friendlier travellers
+293. [ ] (469) Scenic viewpoints - lookouts that reveal the map around them with a discovery bonus
+294. [ ] (470) Hidden caves and grottos in cliffs and behind waterfalls
+295. [ ] (471) Small walk-in ruins - 1-2 room mini-dungeons with a chest and lore
+296. [ ] (472) Better camps - campfire, tent, cooking spit, upgradable camp kit for safer rest
+297. [ ] (473) Auto-walk along roads to a chosen destination
+298. [ ] (474) World size choice at the start - small, medium or large
+299. [ ] (475) World seed sharing - play the same world as a friend
+300. [ ] (476) Continent types - archipelago, one big landmass, several continents
 
 ## Backlog
 
@@ -517,3 +532,13 @@
 - (459) Holy and unholy books as a prayer off-hand
 - (460) Overworld shrines with timed buffs
 - (461) Prayer activation and out-of-points sounds
+
+### Overworld
+- (477) Climbable mountains, passes and ledges (Agility or rope)
+- (478) Swimming and wading
+- (479) Underground tunnel network linking regions
+- (480) Travellers on the roads with rumours or requests
+- (481) Collectibles across the world with set rewards
+- (482) Discovery xp for new places
+- (483) Travel fatigue and rations (optional)
+- (484) Gliders and balloons for fast travel
