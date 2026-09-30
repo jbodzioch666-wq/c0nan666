@@ -233,6 +233,19 @@
 221. [ ] (316) High and low alchemy spells - turn items into gold with Magic
 222. [ ] (317) Wealth tracker - net worth (gold plus item values) on the stats page
 223. [ ] (318) Loot value - running total of a dungeon run's loot, shown when you leave
+224. [ ] (332) Gem cutting - uncut gems from mining, nests and monsters cut with a chisel (sapphire to onyx)
+225. [ ] (333) Jewellery - gold or silver bars plus gems at a furnace with moulds: rings, necklaces, amulets, bracelets
+226. [ ] (334) Pottery - clay on a potter's wheel, fired in a kiln: pots, bowls, pie dishes for Cooking and Herblore
+227. [ ] (335) Glassblowing - sand and seaweed into molten glass: vials, orbs, lantern lenses, fishbowls
+228. [ ] (336) Holy and unholy symbols - silver cast into Prayer-boosting amulets
+229. [ ] (337) Battlestaves for every element, plus mystic staves
+230. [ ] (338) Crafted lanterns and torches for dark dungeons
+231. [ ] (339) Crafted bags and pouches - gem bag, herb sack, coal bag holding resources outside the inventory
+232. [ ] (340) Crafting interface - recipe window with make 1, 5, 10 or all, a queue and a progress bar
+233. [ ] (341) Recipe discovery - recipes unlock by level or are learned from books, drops and quests
+234. [ ] (342) Masterwork chance - a rare critical craft with an extra stat or special effect
+235. [ ] (343) Rare boss materials - dragon hide, abyssal parts, zenyte shards for top-tier crafts
+236. [ ] (344) Crafting milestones - level 99 unlocks the best armours and a material-saving cape perk
 
 ## Backlog
 
@@ -377,3 +390,13 @@
 ### Pets (on hold)
 - (182) Pet items - eggs and stones that hatch into pets
 - (238) Boss pets - a rare drop from each boss that follows you
+
+### Crafting
+- (345) Snakeskin, spined and carapace armour from specific monster hides
+- (346) Signed items - 'Crafted by' your name
+- (347) Crafting outfit - bonus xp and a chance to save materials
+- (348) Portable crafting kits
+- (349) Tool quality - better needles, chisels and moulds
+- (350) Crafting quests
+- (351) Commissions from townsfolk for gold and reputation
+- (352) Repair kits for degrading gear
