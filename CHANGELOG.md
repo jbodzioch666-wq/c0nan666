@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-42 - Monster levels in RuneScape colours
+
+- **Monster levels now use the same scale as your combat level**, from 3 to 126, instead of the old 1-20 tier.
+- **Levels are coloured by how they compare with your combat level:** green when the monster is below you, yellow when it's even, and red when it's above. The shade deepens as the gap grows, reaching full green or red at 10 levels apart.
+- **Where the coloured level shows:** the hover label over a monster ("Attack goblin (level 9)"), the foe plate next to yours, examine text and the bestiary.
+
 ## RS-41 - Examine
 
 - **Shift+click anything** in the overworld, a town or a dungeon to examine it, RuneScape style. A short description appears in the message log.

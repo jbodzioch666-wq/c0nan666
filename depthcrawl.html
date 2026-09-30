@@ -9054,6 +9054,16 @@ function rsCombatLevel(){
   const mage = 0.325*Math.floor(L('magic')*1.5);
   return Math.floor(base + Math.max(melee, range, mage));
 }
+// a monster's level on the same scale as your combat level (monsters carry a 1-20 power tier, the
+// same tier rsSync maps combat 3..126 onto), and RuneScape's colour for it: green when it's below you,
+// yellow when it's even, red when it's above you - shading further the bigger the gap (full at 10)
+function monCombatLevel(m){ const t = (m && (m.mlevel || m.lvl)) || 1; return Math.max(1, Math.round(3 + (t-1)*123/19)); }
+function monLevelColor(m){
+  const d = monCombatLevel(m) - ((G.player && G.player.combatLevel) || 3);
+  const f = clamp(Math.abs(d)/10, 0, 1), mix = (a, b)=>'#'+[0,1,2].map(i=>Math.round(a[i]+(b[i]-a[i])*f).toString(16).padStart(2,'0')).join('');
+  return d===0 ? '#ffff00' : d<0 ? mix([255,255,0],[0,255,0]) : mix([255,255,0],[255,0,0]);
+}
+function monLevelHtml(m){ return `<span style="color:${monLevelColor(m)};font-weight:600;">level ${monCombatLevel(m)}</span>`; }
 function rsTotalLevel(){ return RS_ALL_SKILLS().reduce((t,[k])=>t+rsLvl(k), 0); }
 // the rest of the game (monster scaling, roadside encounters, loot outside
 // dungeons, boss sizing) still reads G.player.level as a 1-20 power tier,
@@ -11055,7 +11065,7 @@ function buildBestiary(){
     const known = seen.includes(m.nm);
     if (!known){
       return `<div class="choice-row" style="opacity:0.4">
-        <span style="min-width:26px;display:inline-block;">${m.lvl}</span>
+        <span style="min-width:34px;display:inline-block;color:${monLevelColor(m)}">${monCombatLevel(m)}</span>
         <span style="min-width:140px;display:inline-block;">???</span>
         <span class="muted">not yet encountered</span>
       </div>`;
@@ -11063,7 +11073,7 @@ function buildBestiary(){
     const abilStr = m.abilities.length ? m.abilities.join(', ') : 'none';
     return `<div class="choice-row" style="align-items:center;">
       <canvas id="bestiaryArt${m.lvl}" width="34" height="34" style="flex:0 0 auto;background:#00000030;border-radius:4px;margin-right:4px;"></canvas>
-      <span style="min-width:26px;display:inline-block;">${m.lvl}</span>
+      <span style="min-width:34px;display:inline-block;color:${monLevelColor(m)}" title="combat level ${monCombatLevel(m)} - green is below your level, yellow even, red above">${monCombatLevel(m)}</span>
       <span style="min-width:140px;display:inline-block;color:${monsterCol(m)}">${m.sym} ${esc(m.nm)}${m.undead?' (undead)':''}</span>
       <span class="muted">AC ${m.ac} &middot; ${m.hd}HD &middot; +${m.atk} to hit &middot; ${m.dmg1}d${m.dmg2} dmg &middot; ${m.xp} XP &middot; ${esc(abilStr)}</span>
     </div>`;
@@ -12846,7 +12856,7 @@ function renderImmersiveHud(){
     target = `<div class="dh-target pe" title="the monster you're fighting">
       <canvas id="dhFoeArt" width="56" height="56"></canvas>
       <div style="flex:1;min-width:0;">
-        <div class="dh-tname" style="color:${fm.col}">${esc(fm.nm)} <span class="muted" style="font-weight:400">&middot; level ${fm.mlevel||'?'}</span></div>
+        <div class="dh-tname" style="color:${fm.col}">${esc(fm.nm)} <span class="muted" style="font-weight:400">&middot; ${monLevelHtml(fm)}</span></div>
         <div class="dh-tbar"><i style="width:${hpF*100}%"></i></div>
         <div class="dh-tsub">${mx(0,fm.hp)}/${fm.maxHp} life &middot; <span style="color:${stCol}">${st}</span>${ew.weak ? ` &middot; weak to <span style="color:${ISO_ELEM_COL[ew.weak]||COL.gold}">${ew.weak}</span>` : ''}${ew.resist ? ` &middot; resists ${ew.resist}` : ''}</div>
       </div></div>`;
@@ -22415,10 +22425,11 @@ function isoDrawHover(){
   ctx.save(); ctx.strokeStyle = m ? 'rgba(255,80,60,0.85)' : 'rgba(255,230,140,0.45)'; ctx.lineWidth = 1.5*dpr;
   ctx.beginPath(); c.forEach((q,i)=> i ? ctx.lineTo(q.sx,q.sy) : ctx.moveTo(q.sx,q.sy)); ctx.closePath(); ctx.stroke();
   if (m){
-    const ew = rsMonElem(m), txt = `Attack ${m.nm} (level ${m.mlevel||'?'})${ew.weak ? ' - weak to '+ew.weak : ''}`, top = isoProject(m.x+0.5, m.y+0.5, 1.3);
-    ctx.font = `700 ${Math.round(12*dpr)}px 'JetBrains Mono', monospace`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-    ctx.lineWidth = 3*dpr; ctx.strokeStyle = 'rgba(0,0,0,0.85)'; ctx.strokeText(txt, top.sx, top.sy);
-    ctx.fillStyle = '#ffe070'; ctx.fillText(txt, top.sx, top.sy);
+    const ew = rsMonElem(m), top = isoProject(m.x+0.5, m.y+0.5, 1.3);
+    const parts = [[`Attack ${m.nm} `, '#ffe070'], [`(level ${monCombatLevel(m)})`, monLevelColor(m)], [ew.weak ? ' - weak to '+ew.weak : '', '#ffe070']];
+    ctx.font = `700 ${Math.round(12*dpr)}px 'JetBrains Mono', monospace`; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+    let x = top.sx - ctx.measureText(parts.map(q=>q[0]).join('')).width/2;
+    for (const [t, col] of parts){ if (!t) continue; ctx.lineWidth = 3*dpr; ctx.strokeStyle = 'rgba(0,0,0,0.85)'; ctx.strokeText(t, x, top.sy); ctx.fillStyle = col; ctx.fillText(t, x, top.sy); x += ctx.measureText(t).width; }
   }
   ctx.restore();
 }
@@ -22912,7 +22923,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-41';
+const GAME_VERSION = 'rs-42';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -24298,7 +24309,7 @@ const EXAMINE_MON = [
 function examineMonster(m){
   const nm = (m.nm||'').toLowerCase(), e = EXAMINE_MON.find(([re])=>re.test(nm));
   const ew = rsMonElem(m), st = rsMonStyle(m);
-  return `${e ? e[1] : 'A dangerous-looking creature.'} Level ${m.mlevel||'?'} ${m.nm}, fights with ${st}${ew.weak ? `, weak to ${ew.weak}` : ''}${ew.resist ? `, resists ${ew.resist}` : ''}.`;
+  return `${e ? e[1] : 'A dangerous-looking creature.'} Level ${monCombatLevel(m)} ${m.nm}, fights with ${st}${ew.weak ? `, weak to ${ew.weak}` : ''}${ew.resist ? `, resists ${ew.resist}` : ''}.`;
 }
 const EXAMINE_WEAPON = { Dagger:'Short and sharp - good for quick stabs.', Mace:'A spiked club for cracking armour.', Shortsword:'A light, handy blade.', Scimitar:'A curved blade, deadly in skilled hands.',
   Spear:'A long shaft with a pointed end.', Longsword:'A long, straight blade.', Warhammer:'Heavy enough to dent any helmet.', Battleaxe:'A big axe for big swings.',
