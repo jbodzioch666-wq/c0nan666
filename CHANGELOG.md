@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-45 - Site status on map badges
+
+- **Every site badge on the world map shows its recommended combat level** underneath, such as "Lv 48". It's coloured green, yellow or red against your own combat level, so you can spot safe places at a glance.
+- **Sites you've started** get a gold ring around the badge that fills as you go deeper. The label also shows your progress, such as "2/6 - Lv 74".
+- **The site hover** adds a "recommended" row.
+
 ## RS-44 - World map hover details
 
 - **Hover any dungeon, castle, tower, temple, graveyard, mine or dragon lair on the world map (M)** to see:

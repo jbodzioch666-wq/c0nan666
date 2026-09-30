@@ -16,7 +16,7 @@ _One pass over the tooltip, hover and label code_
 7. [x] (243) Monster levels in RuneScape colours - green easy, yellow even, red dangerous against your combat level
 8. [x] (162) Quest difficulty and length shown before you accept
 9. [x] (99) Hover details for everything - site name, history, boss, depth, loot tier, your best clear time
-10. [ ] (97) Site status on badges - cleared, in progress (deepest floor reached) or untouched, plus recommended combat level
+10. [x] (97) Site status on badges - cleared, in progress (deepest floor reached) or untouched, plus recommended combat level
 
 ### HUD feedback and log
 _The log panel, hitsplats and HUD overlays_
