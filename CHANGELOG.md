@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-49 - Site details on the 3D overworld, brighter log
+
+- **Hovering a dungeon, castle or other site in the 3D overworld** now shows the same details as on the world map. That covers its history, floors, recommended level, monster and boss levels, loot, your progress and your best clear. Hovering a town shows its name.
+- **Brighter log.** The unselected message-log tabs and the timestamps were too dark and are now much easier to read. The selected tab keeps its gold highlight.
+
 ## RS-48 - Colour-coded damage numbers
 
 - **The hitsplats on monsters now show what dealt the damage:** red for melee, green for ranged, blue for magic and olive for poison or lingering damage.
