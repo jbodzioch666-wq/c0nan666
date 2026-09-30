@@ -84,6 +84,25 @@
 72. [ ] (106) Animated parchment - drifting clouds, coastal waves, town smoke, birds
 73. [ ] (107) Explored areas fill with colour - from rough sketch to full painting as you explore
 74. [ ] (108) Detailed zoom levels - zoomed out shows regions, zoomed in shows buildings and trees
+75. [ ] (118) Town layouts that differ - port towns, walled cities, hill villages, swamp villages on stilts, built around the terrain
+76. [ ] (119) Town size tiers - hamlet (2 shops), village (5), city (10+ with districts)
+77. [ ] (120) Day and night in town - lamps light up, shops close at night, busy tavern, guards patrol with torches
+78. [ ] (121) Townsfolk routines - NPCs walk between home, work and the tavern; talk to them for gossip and hints
+79. [ ] (122) Ambient life - chickens, dogs, cats, market chatter, hammering, chimney smoke
+80. [ ] (123) Weather in town - puddles, snow on roofs, people ducking indoors
+81. [ ] (124) Bank building with a banker, replacing the stash chest
+82. [ ] (125) Temple or chapel - restore prayer, bless holy symbols, a priest with undead-hunting quests
+83. [ ] (126) Guild halls - Warriors', Rangers', Wizards', Cooks', Miners' and Crafting guilds with skill-level entry and better benches and resources
+84. [ ] (127) Arena or duel pit - fight waves of monsters for prizes and titles
+85. [ ] (128) Docks and harbour master - boat travel to other port towns and islands
+86. [ ] (129) Minigames - fishing contest, cooking competition, archery range, darts in the tavern
+87. [ ] (130) Tavern gambling - dice, cards, a wheel of fortune
+88. [ ] (131) Town upgrades - donate gold and materials for walls, a bigger market or new buildings, unlocking better stock
+89. [ ] (132) Town events - festivals, market days with rare traders, monster raids to defend against
+90. [ ] (133) Better building interiors - upstairs rooms, cellars, usable furniture (sit on chairs, read books)
+91. [ ] (134) Shop signs and banners that show what each building sells from a distance
+92. [ ] (135) Town welcome banner with the town's name and your reputation level when you arrive
+93. [ ] (136) Notice board news - rumours of nearby dungeons, bounty posters, events on the map
 
 ## Backlog
 
@@ -147,3 +166,14 @@
 - (115) Caravans - paid rides between towns, sometimes ambushed
 - (116) Hidden treasure - buried chests found from map fragments
 - (117) Seasons - spring to winter, changing resources and encounters, snow in the north
+
+### Towns
+- (137) General store and market square with rotating stalls (fish, gems, silk, furs)
+- (138) Magic shop - runes, staves and spell tomes, so the Alchemist focuses on potions
+- (139) Archery shop or fletcher
+- (140) Stable for buying mounts
+- (141) Library - lore books, bestiary entries, skill guides
+- (142) Jail, for players caught thieving
+- (143) Town jobs - deliveries, rat catching, firewood for the inn
+- (144) Town specialities - one rare item per town
+- (145) Rival towns - helping one annoys its rival and changes prices
