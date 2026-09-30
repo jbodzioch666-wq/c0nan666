@@ -103,6 +103,24 @@
 91. [ ] (134) Shop signs and banners that show what each building sells from a distance
 92. [ ] (135) Town welcome banner with the town's name and your reputation level when you arrive
 93. [ ] (136) Notice board news - rumours of nearby dungeons, bounty posters, events on the map
+94. [ ] (146) Main storyline - a continent-wide threat (waking lich or dragon cult) over 8-10 quests, ending in a unique final dungeon
+95. [ ] (147) Quest points - a running total that unlocks areas, guilds and gear, with a quest cape at the end
+96. [ ] (148) Quest requirements - skill levels and earlier quests needed, so the world opens up gradually
+97. [ ] (149) Dialogue choices that change rewards, allies or how a quest ends
+98. [ ] (150) Quest journal - every quest with its status and a written log of what happened
+99. [ ] (151) Puzzle quests - brazier order, riddle doors, sliding-tile locks, chess-knight crossings
+100. [ ] (152) Boss quests - a quest built around one named boss with a unique arena and mechanics
+101. [ ] (153) Chain quests - multi-part series (goblin war, haunted mine) where each part unlocks the next
+102. [ ] (154) Quest givers all over town - the blacksmith wants rare ore, the alchemist needs herbs, the innkeeper has rats
+103. [ ] (155) Quests found in the world - a note on a skeleton, a hermit in the woods, a ghost in a graveyard
+104. [ ] (156) Dungeon quests - a trapped adventurer on floor 3, a lost relic on the boss floor
+105. [ ] (157) Faction quests - Mages' Circle, Thieves' Guild, Royal Guard; quest lines, ranks and rewards
+106. [ ] (158) Unique quest rewards - gear, spells, prayers and shortcuts only quests give
+107. [ ] (159) Quest unlocks - new teleports, areas, shops or spellbooks
+108. [ ] (160) Achievement diaries - easy to elite task lists per region, with a reward item per tier
+109. [ ] (161) Quest map markers for every step, and a 'next step' line in the tracker
+110. [ ] (162) Quest difficulty and length shown before you accept
+111. [ ] (163) Abandon and retry failed quests - no permanent lockouts
 
 ## Backlog
 
@@ -177,3 +195,13 @@
 - (143) Town jobs - deliveries, rat catching, firewood for the inn
 - (144) Town specialities - one rare item per town
 - (145) Rival towns - helping one annoys its rival and changes prices
+
+### Quests
+- (164) Cutscenes - short camera moments for villains, waking bosses, opening doors
+- (165) Mystery quests - talk to suspects, find clues, accuse the right person
+- (166) Gathering and crafting quests - a wedding feast, a sword for the captain, a plague cure
+- (167) Delivery and courier quests with time limits or fragile cargo
+- (168) Stealth quests - sneak into a bandit fort unseen
+- (169) Defence quests - hold a town or tower against waves
+- (170) Companion quests - recruit an NPC ally who travels and fights with you
+- (171) Quest xp lamps - put xp into any skill you choose
