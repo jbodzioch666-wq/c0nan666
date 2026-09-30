@@ -121,6 +121,27 @@
 109. [ ] (161) Quest map markers for every step, and a 'next step' line in the tracker
 110. [ ] (162) Quest difficulty and length shown before you accept
 111. [ ] (163) Abandon and retry failed quests - no permanent lockouts
+112. [ ] (172) Boots and gloves slots - split from arms, with their own tiers (climbing boots, dragon boots, barrows gloves)
+113. [ ] (173) Cape slot - obsidian cape, fire cape, Ava's attractor (saves arrows), skill capes
+114. [ ] (174) Ammo slot - arrows, bolts and runes equipped as real items with stats
+115. [ ] (175) Second ring slot or a trinket slot for charms and totems
+116. [ ] (176) Rerolling - spend gold or a rare scroll to reroll one stat on a piece of gear
+117. [ ] (177) Weapon poison and enchant - apply poison or bolt enchantments to weapons
+118. [ ] (178) Two-handed and dual wield - off-hand daggers for double hits, two-handers for big single hits
+119. [ ] (179) Utility items - light source for dark dungeons, rope, shovel, keys for locked doors and chests
+120. [ ] (180) Treasure maps and clue scroll rewards - rare cosmetics and gilded armour
+121. [ ] (181) Tomes - use once to learn a spell or perk permanently
+122. [ ] (182) Pet items - eggs and stones that hatch into pets
+123. [ ] (183) Rare drop table - any monster has a small chance of big gems, rune items, half-keys or clue scrolls
+124. [ ] (184) Item compare tooltip - green and red numbers against what you're wearing
+125. [ ] (185) Inventory sort, filter and search
+126. [ ] (186) Lock items so they can't be sold or dropped by mistake
+127. [ ] (187) Salvage - break junk gear into bars, leather or cloth
+128. [ ] (188) Loot filter - hide junk drops, highlight uniques with a beam of light
+129. [ ] (189) Storable item sets - keep a full armour set as one item
+130. [ ] (190) Glowing and animated high-tier gear - dragon weapons glint, magic staves swirl
+131. [ ] (191) Unique items get their own 3D models instead of the base shape
+132. [ ] (192) Rarity-coloured drop beams on the ground
 
 ## Backlog
 
@@ -205,3 +226,12 @@
 - (169) Defence quests - hold a town or tower against waves
 - (170) Companion quests - recruit an NPC ally who travels and fights with you
 - (171) Quest xp lamps - put xp into any skill you choose
+
+### Items and gear
+- (193) Item upgrading - smith or imbue gear +1 to +5, with a failure chance at high levels
+- (194) Sockets and gems - gem slots in gear, gems cut with Crafting
+- (195) Enchanting jewellery - ring of recoil, games necklace, amulet of glory
+- (196) Charged items - trident, blowpipe, charged staves refilled with runes or scales
+- (197) Degrading gear - barrows armour wears down and needs repairs
+- (198) Consumables - stat potions, anti-fire, stamina, teleport tablets, bombs
+- (199) Equipment presets - save melee, ranged and magic loadouts, switch in one click
