@@ -246,6 +246,17 @@
 234. [ ] (342) Masterwork chance - a rare critical craft with an extra stat or special effect
 235. [ ] (343) Rare boss materials - dragon hide, abyssal parts, zenyte shards for top-tier crafts
 236. [ ] (344) Crafting milestones - level 99 unlocks the best armours and a material-saving cape perk
+237. [ ] (353) More resource variety - clay, sand, seaweed, gems and essence rocks as sources for the new crafts
+238. [ ] (354) Rich and rare nodes - sparkling gold vein, ancient oak, legendary fishing spot with triple yield, marked on the map while they last
+239. [ ] (355) Node size and quality - small, medium and large nodes; better quality deeper in the wild
+240. [ ] (356) Biome-specific resources - desert cacti and scarab shells, tundra frost lilies and ice fish, swamp bog iron and leeches
+241. [ ] (357) Seasonal and time-of-day resources - dawn-only fish, spring-only herbs
+242. [ ] (358) Harpoon fishing from a boat and ice fishing through holes
+243. [ ] (359) Gathering progress bar over your head with the chance per swing from level and tool
+244. [ ] (360) Continuous gathering - keep working nearby nodes until the inventory is full
+245. [ ] (361) Inventory-full prompt - drop, bank, or process on the spot (cook fish, burn logs)
+246. [ ] (362) Skill-gated resource areas - mining guild, fishing platform, magic tree grove
+247. [ ] (363) Trophy fish and record ore - size and quality variants you can mount in your house
 
 ## Backlog
 
@@ -400,3 +411,12 @@
 - (350) Crafting quests
 - (351) Commissions from townsfolk for gold and reputation
 - (352) Repair kits for degrading gear
+
+### Gathering
+- (364) Gathering mini-game - a timing bar for bonus yield
+- (365) Auto-bank or note resources at high level
+- (366) Bonus drops while gathering - clues, gems, seeds
+- (367) Portable processing - portable furnace, range, fletching kit
+- (368) Double processing - gather and process in one step at high level
+- (369) Shared world resources with NPC gatherers
+- (370) Gathering leaderboard of personal records
