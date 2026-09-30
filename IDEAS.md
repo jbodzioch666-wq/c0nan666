@@ -268,6 +268,17 @@
 256. [ ] (379) Mage off-hand - a book or tome for magic accuracy and damage
 257. [ ] (380) Spell animations per tier - small strike bolts up to huge surges with a screen effect
 258. [ ] (381) Casting animations - raise the staff, gather energy, release
+259. [ ] (393) Crossbows - a slower, harder-hitting weapon line using bolts, bronze to dragon
+260. [ ] (394) Shortbows and longbows - shortbows fire faster, longbows shoot further and hit harder
+261. [ ] (395) Famous bows - dark bow (two arrows), crystal bow (no ammo, degrades), twisted bow, seercull
+262. [ ] (396) Ranged attack styles - Accurate, Rapid, Longrange (more distance, Defence xp)
+263. [ ] (397) Range per weapon - each bow has its own reach
+264. [ ] (398) Line of sight - walls and pillars block shots, so cover matters
+265. [ ] (399) Ammo recovery - some arrows land on the ground to pick up after a fight
+266. [ ] (400) Ranged prayers - Sharp Eye, Hawk Eye, Eagle Eye, Rigour
+267. [ ] (401) Quiver - holds more ammo with a small bonus
+268. [ ] (402) Better projectiles - arrow trails, bolt sparks, spinning knives
+269. [ ] (403) Bow draw animation - pull, aim, release; arrows stick in monsters briefly
 
 ## Backlog
 
@@ -442,3 +453,16 @@
 - (390) Magic Training Arena minigame
 - (391) Mage Arena challenge for the god spells
 - (392) Magic xp from utility spells
+
+### Ranged
+- (404) Thrown weapons as a main weapon - throwing axes, javelins, knives
+- (405) Dwarf multicannon using cannonballs
+- (406) Ballista - heavy two-handed ranged weapon
+- (407) Kiting - step back and shoot with bonus accuracy
+- (408) Height advantage when shooting from higher ground
+- (409) Trick shots - piercing and ricochet at high level
+- (410) Ranged set bonuses (Karil's, Armadyl, void-style)
+- (411) Ranged amulets and rings (Archer's ring, anguish)
+- (412) Ranging guild target minigame
+- (413) Shooting birds for feathers and meat
+- (414) Ranged challenges and festival trick-shot contests
