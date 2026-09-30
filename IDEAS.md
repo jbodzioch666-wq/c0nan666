@@ -279,6 +279,14 @@
 267. [ ] (401) Quiver - holds more ammo with a small bonus
 268. [ ] (402) Better projectiles - arrow trails, bolt sparks, spinning knives
 269. [ ] (403) Bow draw animation - pull, aim, release; arrows stick in monsters briefly
+270. [ ] (415) Stab, slash and crush damage types - monsters and armour have weak spots per type (skeletons weak to crush)
+271. [ ] (416) Abyssal whip - fast, accurate mid-level upgrade
+272. [ ] (417) Dragon scimitar, dragon longsword and dragon dagger as sought-after drops
+273. [ ] (418) Godswords - Armadyl, Bandos, Saradomin, Zamorak two-handers built from boss shards
+274. [ ] (419) Barrows weapons - Dharok's greataxe, Guthan's spear (heals), Verac's flail (ignores armour), Torag's hammers
+275. [ ] (420) Cleave - big axes and swords also hit monsters beside the target
+276. [ ] (421) Weapon mastery - using a weapon type unlocks small permanent bonuses and moves
+277. [ ] (422) Swing animations per weapon type - stab, slash, overhead crush, halberd spin
 
 ## Backlog
 
@@ -466,3 +474,19 @@
 - (412) Ranging guild target minigame
 - (413) Shooting birds for feathers and meat
 - (414) Ranged challenges and festival trick-shot contests
+
+### Melee
+- (423) Attack style options per weapon (e.g. scimitar Chop or Lunge)
+- (424) Armour defence per damage type
+- (425) Granite maul - slow hit with an instant extra blow
+- (426) Obsidian weapons with a matching-necklace bonus
+- (427) Knockback from maces and hammers
+- (428) Lunge - step and strike in one turn
+- (429) Riposte - double damage after a block
+- (430) Execute - bonus damage under 20% health
+- (431) Offensive and defensive stances
+- (432) Strength and attack prayer ladder (Burst of Strength to Chivalry)
+- (433) Warriors' Guild minigame
+- (434) Defenders - tiered off-hand from bronze to dragon
+- (435) Impact feedback - sparks, heavier shake for two-handers, crit pause
+- (436) Weapon trails coloured by metal tier
