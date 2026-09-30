@@ -69,6 +69,21 @@
 57. [ ] (80) Total-level gates - areas and rewards that open at total level 500, 1000 and 1500
 58. [ ] (81) Better Cooking - pies, stews and pizzas from several ingredients that heal more; burn rate drops with level
 59. [ ] (82) Better Smithing - cannonballs, nails for Construction, dart tips, upgradable gear
+60. [ ] (94) Place names - regions, forests, mountains, lakes and roads lettered in calligraphy on the parchment
+61. [ ] (95) Custom map markers - drop your own pins (star, skull, pick) with a note
+62. [ ] (96) Map filters - toggle layers: sites, quests, resources, cleared or uncleared, danger
+63. [ ] (97) Site status on badges - cleared, in progress (deepest floor reached) or untouched, plus recommended combat level
+64. [ ] (98) Route planner - click to draw a dotted walking path, optionally auto-walk it
+65. [ ] (99) Hover details for everything - site name, history, boss, depth, loot tier, your best clear time
+66. [ ] (100) Travel log - discoveries, towns visited, % of the map explored, exploration achievements
+67. [ ] (101) Roads between towns - faster and safer to walk, fewer encounters
+68. [ ] (102) Points of interest - ruins, standing stones, abandoned camps, wishing wells, hermits, each with a small event or reward
+69. [ ] (103) World bosses - a giant that sometimes roams the map, with a marker when it's awake
+70. [ ] (104) Dynamic events - town under siege, a new bandit camp, a meteor strike with rare ore; shown on the map with a timer
+71. [ ] (105) Landmarks visible from afar in 3D - wizard tower, smoking volcano, giant tree
+72. [ ] (106) Animated parchment - drifting clouds, coastal waves, town smoke, birds
+73. [ ] (107) Explored areas fill with colour - from rough sketch to full painting as you explore
+74. [ ] (108) Detailed zoom levels - zoomed out shows regions, zoomed in shows buildings and trees
 
 ## Backlog
 
@@ -121,3 +136,14 @@
 - (91) Daily skilling tasks and challenges for bonus xp and gold
 - (92) Skill boosts - potions and foods that raise a skill for a while
 - (93) Better Firemaking - coloured fires, bonfires with a health boost, beacons
+
+### World map
+- (109) Resource layer - seen trees, fishing spots, herb patches and ore as icons
+- (110) Danger heat map - regions tinted by monster level
+- (111) Signposts at crossroads pointing to nearby towns and sites
+- (112) Mounts - buy or tame a horse for faster travel, with upgrades
+- (113) Fairy rings or spirit trees - a second fast-travel network, unlocked by finding its nodes
+- (114) Teleport runes and tablets to specific places
+- (115) Caravans - paid rides between towns, sometimes ambushed
+- (116) Hidden treasure - buried chests found from map fragments
+- (117) Seasons - spring to winter, changing resources and encounters, snow in the north
