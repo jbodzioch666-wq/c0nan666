@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-39 - Spell details on hover
+
+- **Hover any spell** in the spellbook (G), the spells panel or the G and R hotbar slots to see its details.
+- **Details shown:** element, Magic level needed (green or red), max hit, damage range, the matching-staff bonus, xp per cast, and each rune in the cost with how many you have (free runes from your staff in cyan). It also shows how many casts you have left.
+- **In a fight** it also shows the spell's damage and chance to hit against the monster you're fighting, and what that monster is weak to or resists.
+
 ## RS-38 - Item compare tooltip
 
 - **Item tooltips now compare stat by stat** against what you have equipped in that slot. Each stat shows a green +, red - or grey +/- for the change you'd get by swapping the item in.

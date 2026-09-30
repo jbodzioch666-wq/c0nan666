@@ -9753,13 +9753,37 @@ function rsSpellDamage(sp, m){
   if (m && m.ac){ const b = rsAtkBonus('magic') + (onStaff ? 2 : 0) + frightPenalty() + 3*rsTriangle('magic', rsMonStyle(m)); hit = clamp((21 - (m.ac - b))/20, 0.05, 0.95); }
   return { lo, hi, onStaff, note, hit };
 }
+// everything about one spell, for hovering it anywhere (spellbook, spell panel, the R slot)
+function rsSpellTipHtml(id){
+  const sp = RS_SPELLS.find(x=>x[0]===id); if (!sp) return '';
+  const L = rsLvl('magic'), el = rsStaffElem(), d = rsSpellDamage(sp);
+  const fm = G.foeRef && G.foeRef.alive && G.foeRef.hp>0 ? G.foeRef : (G.lastFoe && G.lastFoe.hp>0 && (G.gameMode===1 || G.gameMode===2) ? G.lastFoe : null);
+  const t = fm ? rsSpellDamage(sp, fm) : null;
+  const row = (k, v, col)=>`<div class="ttrow"><span class="muted">${k}</span><b style="color:${col||'var(--ink)'}">${v}</b></div>`;
+  let casts = Infinity; for (const r in sp[4]) if (r!==el) casts = Math.min(casts, Math.floor(skHave('r_'+r)/sp[4][r]));
+  let h = `<div style="font-weight:600;color:${ISO_ELEM_COL[sp[6]]||'var(--ink)'}">&#9670; ${esc(sp[1])}</div>
+    <div class="muted">${sp[6]} spell &middot; needs Magic <span style="color:${L>=sp[2] ? COL.green : COL.red}">${sp[2]}</span></div><hr>`;
+  h += row('max hit', rsSpellMax(sp)) + row('damage', `${d.lo}&ndash;${d.hi}`) + (d.onStaff ? row('matching staff', '+20% damage, +2 to hit', COL.cyan) : '') + row('xp per cast', sp[5]);
+  h += `<hr><div class="muted">rune cost</div>`;
+  for (const r in sp[4]){ const free = r===el, have = skHave('r_'+r);
+    h += row(`${sp[4][r]} ${rsRuneName(r)}`, free ? 'free (staff)' : `have ${have}`, free ? COL.cyan : have>=sp[4][r] ? COL.green : COL.red); }
+  h += row('casts left', casts===Infinity ? '&infin;' : casts, casts>0 ? COL.green : COL.red);
+  if (t){
+    const ew = rsMonElem(fm);
+    h += `<hr><div class="muted">against ${esc(fm.nm)}</div>` + row('damage', `${t.lo}&ndash;${t.hi}`, t.note.startsWith('weak') ? COL.green : t.note ? COL.red : null)
+      + (t.hit!=null ? row('chance to hit', Math.round(t.hit*100)+'%') : '')
+      + row('weak to', ew.weak || 'nothing', ew.weak===sp[6] ? COL.green : null) + (ew.resist ? row('resists', ew.resist, ew.resist===sp[6] ? COL.red : null) : '');
+  }
+  if (G.player.rsSpell===sp[0]) h += `<div class="muted" style="margin-top:4px;">selected${rsAutocastOn() ? ' &middot; autocasting' : ' &middot; R casts it'}</div>`;
+  return h;
+}
 function buildRsMagic(){
   const p = G.player, L = rsLvl('magic'), el = rsStaffElem();
   const foe = G.lastFoe && G.lastFoe.hp > 0 && (G.gameMode===1 || G.gameMode===2) ? G.lastFoe : null;
   const rows = RS_SPELLS.map(sp=>{
     const lvlOk = L >= sp[2], runesOk = rsRunesOk(sp), sel = p.rsSpell===sp[0];
     const runes = Object.keys(sp[4]).map(r=>`<span style="color:${r===el ? COL.cyan : skHave('r_'+r)>=sp[4][r] ? COL.text : COL.red}" title="${r===el ? 'free - your staff supplies it' : 'you have '+skHave('r_'+r)}">${sp[4][r]} ${r}${r===el ? ' (staff)' : ''}</span>`).join(' ');
-    return `<div class="shoprow ${sel ? 'sel' : ''}" style="${lvlOk ? '' : 'opacity:0.45;'}${sel ? 'outline:1px solid var(--amber);' : ''}">
+    return `<div class="shoprow ${sel ? 'sel' : ''}" data-tipspell="${sp[0]}" style="${lvlOk ? '' : 'opacity:0.45;'}${sel ? 'outline:1px solid var(--amber);' : ''}">
       <span class="muted">${sp[2]}</span><span style="min-width:108px;display:inline-block;"><span style="color:${ISO_ELEM_COL[sp[6]]};">&#9670;</span> ${esc(sp[1])}</span>
       <span class="desc">${(()=>{ const d = rsSpellDamage(sp), t = foe ? rsSpellDamage(sp, foe) : null;
         return `<b style="color:var(--ink);">${d.lo}&ndash;${d.hi} damage</b>${d.onStaff ? ' <span style="color:'+COL.cyan+'">(staff +20%)</span>' : ''} &middot; ${sp[5]} xp`
@@ -12775,15 +12799,15 @@ function renderImmersiveHud(){
   const wand = G.gear && G.gear.ranged;
   const hasRanged = !!(wand && wand.used);
   const inWorld = G.gameMode!==0;
-  const slot = (key, img, title, n, cls)=> `<button class="dh-slot pe ${cls||''}" data-k="${key}" title="${esc(title)} (${key})">${img}<span class="k">${key}</span>${n!==undefined && n!=='' ? `<span class="n">${n}</span>` : ''}</button>`;
+  const slot = (key, img, title, n, cls, tipSpell)=> `<button class="dh-slot pe ${cls||''}" data-k="${key}" title="${esc(title)} (${key})"${tipSpell ? ` data-tipspell="${tipSpell}"` : ''}>${img}<span class="k">${key}</span>${n!==undefined && n!=='' ? `<span class="n">${n}</span>` : ''}</button>`;
   const im = e=> `<img alt="" src="${dhIcon(e)}">`;
   const bow = hasRanged && wand.range;
   const slots = [
     slot('F', hbIcon(rsStyle().id), 'attack style: '+rsStyle().nm+' - '+rsStyle().hint, rsStyle().nm.slice(0,3).toUpperCase(), ''),
-    slot('G', im(obEntry('scroll')), spl ? 'spellbook - '+spl[1]+(rsAutocastOn() ? ' (autocast)' : '') : 'spellbook', rsAutocastOn() ? 'A' : '', ''),
+    slot('G', im(obEntry('scroll')), spl ? 'spellbook - '+spl[1]+(rsAutocastOn() ? ' (autocast)' : '') : 'spellbook', rsAutocastOn() ? 'A' : '', '', spl ? spl[0] : ''),
     slot('N', `<span class="ico" style="color:#e0d070">&#10013;</span>`, 'prayers', p.prayers.length||'', ''),
     slot('Q', im(obEntry('potion',{col:'#d63a4a'})), nPot ? G.inv[firstPotionIdx()].nm : 'no potions', nPot||'', (!inWorld || !nPot) ? 'off' : ''),
-    slot('R', bow || !spl ? im(obEntry('weapon',{kind:'bow'})) : hbIcon('spell', { col:ISO_ELEM_COL[spl[6]] }), bow ? `${wand.nm} (${p.arrows||0} arrows)` : spl ? 'cast '+spl[1] : 'no bow or spell', bow ? (p.arrows||0) : '', (!inWorld || (!bow && !spl)) ? 'off' : ''),
+    slot('R', bow || !spl ? im(obEntry('weapon',{kind:'bow'})) : hbIcon('spell', { col:ISO_ELEM_COL[spl[6]] }), bow ? `${wand.nm} (${p.arrows||0} arrows)` : spl ? 'cast '+spl[1] : 'no bow or spell', bow ? (p.arrows||0) : '', (!inWorld || (!bow && !spl)) ? 'off' : '', !bow && spl ? spl[0] : ''),
     slot('I', im(obEntry('chest',{gold:true})), 'inventory', G.inv.length||'', 'sep'),
     slot('P', im(obEntry('armor',{kind:'chest', metal:'#9aa3a8'})), 'character sheet', ''),
     slot('B', im(monsterPortraitFor('skeleton', true)), 'bestiary', '', 'minor'),
@@ -12867,7 +12891,7 @@ function rsSpellColHtml(){
   const casts = sp=>{ let n = Infinity; for (const r in sp[4]) if (r!==el) n = Math.min(n, Math.floor(skHave('r_'+r)/sp[4][r])); return n; };
   const list = RS_SPELLS.filter(sp=>sp[2] <= L), next = RS_SPELLS.find(sp=>sp[2] > L);
   const rows = list.map(sp=>{ const d = rsSpellDamage(sp), n = casts(sp), sel = p.rsSpell===sp[0];
-    return `<div class="spellrow" style="cursor:pointer;${sel ? 'color:var(--amber);' : ''}" onclick="rsSelectSpell('${sp[0]}'); renderGame();" title="click to select">
+    return `<div class="spellrow" style="cursor:pointer;${sel ? 'color:var(--amber);' : ''}" onclick="rsSelectSpell('${sp[0]}'); renderGame();" data-tipspell="${sp[0]}">
       <span style="color:${ISO_ELEM_COL[sp[6]]||'inherit'}">&#9670;</span> ${esc(sp[1])} <span class="muted">${d.lo}&ndash;${d.hi}</span>
       <span style="float:right;color:${n>0 ? 'var(--ink-dim)' : COL.red}">${n===Infinity ? '&infin;' : '&times;'+n}</span></div>`; }).join('');
   return `<div class="panel"><h4>Spells &middot; Magic ${L}</h4>
@@ -22875,7 +22899,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-38';
+const GAME_VERSION = 'rs-39';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -23122,8 +23146,9 @@ function ttTextHtml(t){
 }
 function ttEnd(){ if (ttHost){ ttHost = null; hideItemTooltip(); } }
 document.addEventListener('mouseover', (e)=>{
-  const el = e.target && e.target.closest ? e.target.closest('[title],[data-tipt],[data-tipstat]') : null;
+  const el = e.target && e.target.closest ? e.target.closest('[title],[data-tipt],[data-tipstat],[data-tipspell]') : null;
   if (!el){ ttEnd(); return; }
+  if (el.dataset.tipspell){ if (el.hasAttribute('title')) el.removeAttribute('title'); if (el!==ttHost){ ttHost = el; showTooltip(e, rsSpellTipHtml(el.dataset.tipspell)); } return; }
   if (el.dataset.tipstat){ if (el!==ttHost){ ttHost = el; showTooltip(e, rsStatTipHtml(el.dataset.tipstat)); } return; }
   if (el.hasAttribute('title')){ const t = el.getAttribute('title'); el.removeAttribute('title'); if (t) el.dataset.tipt = t; }
   if (!el.dataset.tipt){ ttEnd(); return; }
