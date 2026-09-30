@@ -498,6 +498,12 @@
   #qtoast{ position:fixed; left:50%; top:86px; transform:translate(-50%,-12px); opacity:0; pointer-events:none; z-index:40; transition:opacity .35s, transform .35s;
     background:linear-gradient(rgba(30,22,12,0.95),rgba(18,14,8,0.95)); border:1px solid #c79a54; border-radius:6px; padding:9px 22px; text-align:center; box-shadow:0 6px 24px rgba(0,0,0,0.6); }
   #qtoast.show{ opacity:1; transform:translate(-50%,0); }
+  #notifyBox{ position:fixed; left:50%; top:150px; transform:translateX(-50%); display:flex; flex-direction:column; align-items:center; gap:6px; z-index:41; pointer-events:none; }
+  #notifyBox .ntf{ font:700 13px 'JetBrains Mono',monospace; padding:6px 14px; border-radius:6px; background:rgba(12,16,20,0.9); border:1px solid #e0b050; color:#ffe6a8;
+    box-shadow:0 6px 18px -6px rgba(0,0,0,0.8); opacity:0; transform:translateY(-8px); transition:opacity .3s, transform .3s; }
+  #notifyBox .ntf.show{ opacity:1; transform:none; }
+  #notifyBox .ntf.warn{ border-color:#e05040; color:#ffb0a0; background:rgba(40,10,8,0.92); }
+  #notifyBox .ntf.good{ border-color:#60c060; color:#c0f0b0; }
   #qtoast .qt-t{ font:700 16px Cinzel,Georgia,serif; color:#ffd98a; } #qtoast .qt-l{ font:12px 'JetBrains Mono',monospace; color:#e8dcc0; margin-top:3px; }
   .qoffer{ display:grid; grid-template-columns:78px 1fr auto; gap:10px; align-items:center; padding:7px 9px; margin-bottom:5px; border:1px solid rgba(199,154,84,0.22); border-radius:5px; background:rgba(0,0,0,0.25); cursor:pointer; }
   .qoffer:hover{ border-color:rgba(255,210,90,0.7); } .qoffer.idle{ cursor:default; } .qoffer.ready{ border-color:#74bf7e; background:rgba(40,70,40,0.3); }
@@ -901,6 +907,9 @@ const SFX = {
   stairs:      ()=> playSeq([[220,0.08,'triangle',0.12],[330,0.1,'triangle',0.12]]),
   achievement: ()=> playSeq([[523,0.08,'triangle',0.16],[659,0.08,'triangle',0.16],[784,0.08,'triangle',0.16],[1046,0.2,'triangle',0.2]]),
   error:       ()=> playTone(120, 0.08, 'square', 0.1),
+  notify:      ()=> playSeq([[660,0.07,'sine',0.12],[880,0.11,'sine',0.12]]),
+  warn:        ()=> playSeq([[520,0.09,'triangle',0.14],[390,0.14,'triangle',0.14]]),
+  alarm:       ()=> playSeq([[300,0.12,'square',0.14],[240,0.12,'square',0.14],[300,0.12,'square',0.14]]),
   vault:       ()=> playSeq([[220,0.05,'square',0.1],[440,0.05,'square',0.1]]),
 };
 function sfx(name){ const f = SFX[name]; if (f){ try{ f(); }catch(e){} } }
@@ -2911,6 +2920,7 @@ function logMsg(msg, cls, raw){
   // dynamic parts, e.g. via itemNameHtml()) rather than plain text that
   // still needs escaping - see renderLog()
   G.log.push({msg, cls: cls||'', raw: !!raw, t: Date.now(), cat: logCat(msg, cls||'')});
+  try { notifyFromLog(msg); } catch(e){}
   if (G.log.length > MAXLOG) G.log.shift();
   renderLog();
 }
@@ -10508,12 +10518,44 @@ function trackedQuest(){
 }
 function trackQuest(id){ G.player.trackedQuest = id; renderHud && renderHud(); }
 // ---- a brief banner when a quest moves forward ----
+// pop-up notifications for things worth noticing mid-fight: a small card under the quest banner,
+// with its own sound; the same message won't repeat within a few seconds
+function notify(text, kind, sound){
+  const now = Date.now(); notify.last = notify.last || {};
+  if (notify.last[text] && now - notify.last[text] < 5000) return;
+  notify.last[text] = now;
+  let box = document.getElementById('notifyBox');
+  if (!box){ box = document.createElement('div'); box.id = 'notifyBox'; document.body.appendChild(box); }
+  const el = document.createElement('div'); el.className = 'ntf ' + (kind||'info'); el.textContent = text;
+  box.appendChild(el); while (box.children.length > 4) box.removeChild(box.firstChild);
+  void el.offsetWidth; el.classList.add('show');
+  setTimeout(()=>{ el.classList.remove('show'); setTimeout(()=> el.remove(), 400); }, 3600);
+  sfx(sound || (kind==='warn' ? 'warn' : 'notify'));
+}
+// the log lines that also deserve a pop-up
+const NOTIFY_RULES = [
+  [/your pack is full/i, 'Inventory full', 'warn'], [/run out of prayer points/i, 'Out of prayer points', 'warn'],
+  [/no arrows left/i, 'Out of arrows', 'warn'], [/you have no runes for any spell/i, 'Out of runes', 'warn'],
+  [/^\*\*\* .* falls silent/i, 'Boss defeated!', 'good'], [/kill count is/i, null, 'info'],
+];
+function notifyFromLog(msg){
+  const m = String(msg).replace(/<[^>]+>/g, '');
+  for (const [re, text, kind] of NOTIFY_RULES) if (re.test(m)){ notify(text || m, kind); return; }
+}
+// low health: warn once when you drop under a quarter of your life, again only after healing past half
+function checkLowHp(){
+  const p = G.player; if (!p || p.hp<=0) return;
+  const f = p.hp / Math.max(1, effMaxHp());
+  if (f < 0.25 && !p.lowHpWarned){ p.lowHpWarned = true; notify(`Low health! ${Math.max(0,Math.ceil(p.hp))} life left`, 'warn', 'alarm'); }
+  else if (f > 0.5) p.lowHpWarned = false;
+}
 function questToast(title, line){
   let el = document.getElementById('qtoast');
   if (!el){ el = document.createElement('div'); el.id = 'qtoast'; document.body.appendChild(el); }
   el.innerHTML = `<div class="qt-t">${esc(title)}</div><div class="qt-l">${esc(line)}</div>`;
   el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
   clearTimeout(questToast.tm); questToast.tm = setTimeout(()=> el.classList.remove('show'), 3200);
+  sfx('notify');
 }
 function questAdvanced(q){
   const ready = q.progress>=q.target || q.freed || q.arrived;
@@ -12602,6 +12644,7 @@ function toggleOwZoom(){
 }
 
 function renderGame(){
+  if (G.ui==='playing') checkLowHp();
   // village mode gets the whole stage to itself (no HP/stats/spells to
   // track while browsing shops) - toggled here rather than at every
   // possible gameMode-3 entry/exit point (enterVillage, the T_EXIT handler,
@@ -23005,7 +23048,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-50';
+const GAME_VERSION = 'rs-51';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

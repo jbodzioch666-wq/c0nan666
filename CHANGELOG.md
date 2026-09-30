@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-51 - Notifications
+
+- **Important events now pop up as a notification card with a sound**, under the quest banner at the top of the screen.
+- **Warnings** (red card, warning chime): inventory full, out of arrows, out of runes, out of prayer points, and low health when you drop under a quarter of your life. Low health uses a louder alarm and warns again only after you've healed past half.
+- **Good news:** boss defeated, and kill-count milestones.
+- **Repeats and limits:** the same notification won't repeat within five seconds, and at most four are shown at once.
+- **Quest banners** now play a soft chime too.
+
 ## RS-50 - Hit feedback
 
 - **Misses and blocks now show RuneScape's blue "0" hitsplat.** You see it over a monster when your swing, shot or spell misses it, and over yourself when a monster misses you.
