@@ -290,6 +290,7 @@
   .item-tooltip .ttrow{ display:flex; justify-content:space-between; gap:14px; }
   .item-tooltip .ttrow b{ color:var(--ink); font-weight:600; }
   [data-tipstat]{ cursor:help; }
+  .qsize{ font-size:11px; }
   .item-tooltip .examine{ font-style:italic; color:var(--ink-dim); margin:2px 0 4px; }
   .examine, .line.cls-examine{ color:#b8c4a0; font-style:italic; }
   .item-tooltip hr{ border:none; border-top:1px solid rgba(255,255,255,0.08); margin:6px 0 4px; }
@@ -8058,6 +8059,35 @@ function stashWithdraw(i){
   st.splice(i,1); G.inv.push(it); renderOverlay(); saveCurrentGame();
 }
 // ---- the quest-giver: the town's notice board ----
+// how hard and how long a quest looks before you take it: the monsters it will put in front of you
+// (on the same combat-level scale and colours as a monster's own level) against yours, and how far it
+// sends you - tiles from town, plus floors to go down for a site
+function questSizeUp(q){
+  const me = (G.player && G.player.level) || 1, tx = G.owPos ? G.owPos.x : 0, ty = G.owPos ? G.owPos.y : 0;
+  const tier = d=> monsterLevelForDepth(d) + (q.siteKind && q.siteKind!=='dungeon' ? 2 : 0);
+  let t = me, dist = 0, floors = 0;
+  const at = (x, y)=>{ dist = Math.round(Math.hypot(x-tx, y-ty)); };
+  if (q.kind==='conquest'){ floors = mx(1, (G.ow.dungeonMax[q.siteX] && G.ow.dungeonMax[q.siteX][q.siteY]) || 3); t = tier(floors) + 2; at(q.siteX, q.siteY); }
+  else if (q.kind==='rescue'){ floors = q.floor||1; t = tier(floors); at(q.siteX, q.siteY); }
+  else if (q.kind==='wanted'){ t = me + 2; at(q.x, q.y); }
+  else if (q.kind==='camp'){ t = me + 1; at(q.x, q.y); }
+  else if (q.kind==='escort'){ t = me; at(q.destX, q.destY); }
+  else if (q.kind==='hunt'){ const e = MONSTER_LEVELS.find(e=>e.nm===q.targetName); t = e ? e.lvl : me; }
+  else t = me - 1;
+  t = clampMLevel(t);
+  const d = t - me;
+  const diff = d<=-2 ? ['Easy', COL.green] : d<=1 ? ['Moderate', '#e8d040'] : d<=3 ? ['Hard', '#f08030'] : ['Very hard', COL.red];
+  const work = dist + floors*12;
+  const len = work<14 ? 'Short' : work<40 ? 'Medium' : 'Long';
+  const parts = [];
+  if (dist) parts.push(`${dist} tiles away`);
+  if (floors) parts.push(`${floors} floor${floors>1 ? 's' : ''}`);
+  return { diff, len, where:parts.join(', '), foe:monCombatLevel({mlevel:t}), foeCol:monLevelColor({mlevel:t}) };
+}
+function questSizeHtml(q){
+  let z; try { z = questSizeUp(q); } catch(e){ return ''; }
+  return `<br><span class="qsize"><b style="color:${z.diff[1]}">${z.diff[0]}</b> &middot; ${z.len}${z.where ? ` <span class="muted">(${z.where})</span>` : ''} &middot; <span class="muted">foes around</span> <b style="color:${z.foeCol}">level ${z.foe}</b></span>`;
+}
 function buildQuestGiver(){
   const npc = villageNpcFor('questgiver');
   const here = curTownKey(), town = G.owPos ? o3TownName(G.owPos.x, G.owPos.y) : 'this town';
@@ -8065,13 +8095,13 @@ function buildQuestGiver(){
   const kindTag = q=> ({conquest:'conquest', wanted:'bounty', camp:'camp', rescue:'rescue', escort:'escort'})[q.kind] || 'errand';
   const board = G.questBoard.map(q=>`<div class="qoffer" onclick="acceptQuest('${q.id}')">
       <span class="qtag ${kindTag(q)}">${kindTag(q)}</span>
-      <span class="desc"><b>${esc(questTitle(q))}</b><br><span class="muted">${esc(q.text)}</span></span>
+      <span class="desc"><b>${esc(questTitle(q))}</b><br><span class="muted">${esc(q.text)}</span>${questSizeHtml(q)}</span>
       <span class="price">${q.rewardGold}g &middot; ${q.rewardXp}xp${q.hard?'<br><span style="color:#e8a040">legendary pick</span>':''}</span></div>`).join('')
     || `<div class="muted">nothing posted right now</div>`;
   const active = (G.player.quests||[]).map(q=>{ const ready = questIsReady(q);
     return `<div class="qoffer ${ready?'ready':'idle'}" ${ready?`onclick="turnInQuest('${q.id}')"`:''}>
       <span class="qtag ${ready?'done':kindTag(q)}">${ready?'turn in':kindTag(q)}</span>
-      <span class="desc"><b>${esc(questTitle(q))}</b><br><span class="muted">${esc(questObjective(q))}</span></span>
+      <span class="desc"><b>${esc(questTitle(q))}</b><br><span class="muted">${esc(questObjective(q))}</span>${ready ? '' : questSizeHtml(q)}</span>
       <span class="price">${q.rewardGold}g &middot; ${q.rewardXp}xp</span></div>`; }).join('') || `<div class="muted">you haven't taken any work yet</div>`;
   return `<h2 class="panel-title">${npc ? esc(npc.name).toUpperCase() : 'THE NOTICE BOARD'}</h2>
     <div class="sub">${npc ? esc(npc.role)+' &middot; ' : ''}"There's always work for a blade in these parts. Take what you can handle - three at a time."</div>
@@ -22923,7 +22953,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-42';
+const GAME_VERSION = 'rs-43';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

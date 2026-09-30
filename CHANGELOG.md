@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-43 - Quest difficulty and length
+
+- **Every quest on the Captain's board shows how hard and how long it is** before you take it.
+- **Difficulty** is rated Easy, Moderate, Hard or Very hard. It compares the monsters the quest will put in front of you with your own level. The line also shows the foes' level in the same green, yellow or red as monster levels.
+- **Length** is Short, Medium or Long, from how many tiles the target is from town and how many floors you have to go down.
+- **Your quests in progress** show the same line until they're ready to hand in.
+
 ## RS-42 - Monster levels in RuneScape colours
 
 - **Monster levels now use the same scale as your combat level**, from 3 to 126, instead of the old 1-20 tier.
