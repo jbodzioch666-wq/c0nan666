@@ -29,7 +29,7 @@ _The log panel, hitsplats and HUD overlays_
 16. [x] (216) Notifications - crops ready, inventory full, low health - with sounds
 17. [x] (217) Low health warning - red screen edges and a heartbeat under 25% life
 18. [x] (209) Buff and debuff bar - icons with timers for poison, prayers, potion boosts, stun
-19. [ ] (208) Cooldown and charge overlays on hotbar icons
+19. [x] (208) Cooldown and charge overlays on hotbar icons
 
 ### Inventory management
 _The inventory and stash code_

@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-55 - Hotbar cooldown and charge overlays
+
+- **When you're stunned, every action slot on the hotbar darkens** and shows the turns left, so you can see at a glance why nothing works.
+- **While you're gathering, the gather slot shows a clock sweep** counting down to your next swing, chop or cast of the rod.
+- **The prayer slot has a charge bar** down its left edge for your prayer points. It turns red under 25%, and hovering shows your exact points.
+- **The R slot now shows how many casts your runes allow** when you're using magic instead of a bow. A staff's free element counts as unlimited. The count turns red when you have 5 casts or fewer left, and your arrow count turns red at 10 or fewer.
+
 ## RS-54 - Buff and debuff bar
 
 - **New row of status icons under your player plate** shows everything affecting you right now: poison, stun, fear, rage, accuracy and armour boosts, haste, frost armour, death ward, and each active prayer.

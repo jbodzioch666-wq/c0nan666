@@ -446,6 +446,15 @@
   .dh-slot .k{ position:absolute; left:3px; top:1px; font-size:9.5px; color:#e8d5a8; text-shadow:0 1px 2px #000; font-weight:700; }
   .dh-slot .n{ position:absolute; right:3px; bottom:1px; font-size:10px; color:#fff; text-shadow:0 1px 2px #000, 0 0 3px #000; font-weight:700; }
   .dh-slot.off{ opacity:0.45; }
+  .dh-slot .cdw{ position:absolute; inset:0; border-radius:inherit; pointer-events:none; background:conic-gradient(rgba(0,0,0,0.62) calc(var(--cd,0)*1turn), transparent 0); }
+  .dh-slot .cdw.run{ animation:cdSweep linear infinite; }
+  @property --cd{ syntax:'<number>'; inherits:false; initial-value:0; }
+  @keyframes cdSweep{ from{ --cd:1; } to{ --cd:0; } }
+  .dh-slot .cdn{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font:700 18px 'JetBrains Mono',monospace; color:#ffd24a; text-shadow:0 0 4px #000, 0 1px 2px #000; pointer-events:none; }
+  .dh-slot.stun{ border-color:#8a7420; }
+  .dh-slot .chg{ position:absolute; left:2px; top:4px; bottom:4px; width:4px; border-radius:2px; background:rgba(0,0,0,0.65); overflow:hidden; pointer-events:none; }
+  .dh-slot .chg i{ position:absolute; left:0; right:0; bottom:0; border-radius:2px; }
+  .dh-slot .n.low{ color:#ff6a50; }
   .dh-slot.sep{ margin-left:10px; }
   .dh-orb{ position:absolute; bottom:6px; width:112px; height:112px; border-radius:50%; overflow:hidden;
     background:radial-gradient(circle at 50% 50%, #0b0707 0%, #050404 70%);
@@ -9815,6 +9824,7 @@ function rsStaffElem(){ const w = G.gear.weapon; return w && w.used && w.rsElem;
 function rsRunesOk(sp){ const el = rsStaffElem(); for (const r in sp[4]) if (r!==el && skHave('r_'+r) < sp[4][r]) return false; return true; }
 function rsSpendRunes(sp){ const el = rsStaffElem(); for (const r in sp[4]) if (r!==el) skAdd('r_'+r, -sp[4][r]); }
 function rsSpellMax(sp){ return Math.round((Math.round(sp[3]*1.5) + Math.floor(rsEff('magic')/10) + rsGearSum('magDmg')) * (1 + rsGearSum('magDmgPct')/100)); }
+function rsCastsLeft(sp){ const el = rsStaffElem(); let c = Infinity; for (const r in sp[4]) if (r!==el) c = Math.min(c, Math.floor(skHave('r_'+r)/sp[4][r])); return c; }
 function rsSpellCastable(sp){ return rsLvl('magic') >= sp[2] && rsRunesOk(sp); }
 // the spell a cast actually uses: the one you picked, or - when you're out of a rune it needs -
 // the strongest spell you can still cast (a Staff of Fire covers fire runes, but every combat
@@ -9934,7 +9944,7 @@ function rsSpellTipHtml(id){
   const fm = G.foeRef && G.foeRef.alive && G.foeRef.hp>0 ? G.foeRef : (G.lastFoe && G.lastFoe.hp>0 && (G.gameMode===1 || G.gameMode===2) ? G.lastFoe : null);
   const t = fm ? rsSpellDamage(sp, fm) : null;
   const row = (k, v, col)=>`<div class="ttrow"><span class="muted">${k}</span><b style="color:${col||'var(--ink)'}">${v}</b></div>`;
-  let casts = Infinity; for (const r in sp[4]) if (r!==el) casts = Math.min(casts, Math.floor(skHave('r_'+r)/sp[4][r]));
+  const casts = rsCastsLeft(sp);
   let h = `<div style="font-weight:600;color:${ISO_ELEM_COL[sp[6]]||'var(--ink)'}">&#9670; ${esc(sp[1])}</div>
     <div class="muted">${sp[6]} spell &middot; needs Magic <span style="color:${L>=sp[2] ? COL.green : COL.red}">${sp[2]}</span></div><hr>`;
   h += row('max hit', rsSpellMax(sp)) + row('damage', `${d.lo}&ndash;${d.hi}`) + (d.onStaff ? row('matching staff', '+20% damage, +2 to hit', COL.cyan) : '') + row('xp per cast', sp[5]);
@@ -13046,15 +13056,29 @@ function renderImmersiveHud(){
   const wand = G.gear && G.gear.ranged;
   const hasRanged = !!(wand && wand.used);
   const inWorld = G.gameMode!==0;
-  const slot = (key, img, title, n, cls, tipSpell)=> `<button class="dh-slot pe ${cls||''}" data-k="${key}" title="${esc(title)} (${key})"${tipSpell ? ` data-tipspell="${tipSpell}"` : ''}>${img}<span class="k">${key}</span>${n!==undefined && n!=='' ? `<span class="n">${n}</span>` : ''}</button>`;
+  // hotbar overlays: a dark clock sweep while a slot is locked (stunned) or
+  // winding up (the next gathering swing), a charge bar down the left edge
+  // (prayer points), and a red count when a charge (arrows, casts) runs low
+  const stunT = p.stunTurns>0 ? p.stunTurns : 0;
+  const ACT_KEYS = 'FGNQRECU';
+  const ovHtml = (key, ov)=>{
+    let h = '';
+    if (stunT && ACT_KEYS.includes(key)) h += `<span class="cdw" style="--cd:1"></span><span class="cdn">${stunT}</span>`;
+    else if (ov && ov.sweep) h += `<span class="cdw run" style="animation-duration:${ov.sweep.dur}ms;animation-delay:-${Math.round(ov.sweep.el)}ms"></span>`;
+    if (ov && ov.fill) h += `<span class="chg"><i style="height:${Math.round(clamp(ov.fill[0],0,1)*100)}%;background:${ov.fill[1]}"></i></span>`;
+    return h;
+  };
+  const slot = (key, img, title, n, cls, tipSpell, ov)=> `<button class="dh-slot pe ${cls||''}${stunT && ACT_KEYS.includes(key) ? ' stun' : ''}" data-k="${key}" title="${esc(title)} (${key})${stunT && ACT_KEYS.includes(key) ? ' - stunned for '+stunT+' more turn'+(stunT===1?'':'s') : ''}"${tipSpell ? ` data-tipspell="${tipSpell}"` : ''}>${img}${ovHtml(key, ov)}<span class="k">${key}</span>${n!==undefined && n!=='' ? `<span class="n${ov && ov.low ? ' low' : ''}">${n}</span>` : ''}</button>`;
+  const castsLeft = spl ? rsCastsLeft(spl) : 0;
+  const prayF = (p.prayPts||0) / Math.max(1, rsLvl('prayer'));
   const im = e=> `<img alt="" src="${dhIcon(e)}">`;
   const bow = hasRanged && wand.range;
   const slots = [
     slot('F', hbIcon(rsStyle().id), 'attack style: '+rsStyle().nm+' - '+rsStyle().hint, rsStyle().nm.slice(0,3).toUpperCase(), ''),
     slot('G', im(obEntry('scroll')), spl ? 'spellbook - '+spl[1]+(rsAutocastOn() ? ' (autocast)' : '') : 'spellbook', rsAutocastOn() ? 'A' : '', '', spl ? spl[0] : ''),
-    slot('N', `<span class="ico" style="color:#e0d070">&#10013;</span>`, 'prayers - '+rsPrayDrainText(), p.prayers.length||'', ''),
+    slot('N', `<span class="ico" style="color:#e0d070">&#10013;</span>`, 'prayers - '+rsPrayDrainText()+' - '+Math.floor(p.prayPts||0)+'/'+rsLvl('prayer')+' prayer points', p.prayers.length||'', '', '', { fill:[prayF, prayF<0.25 ? '#e0503c' : '#5fc8e8'] }),
     slot('Q', im(obEntry('potion',{col:'#d63a4a'})), nPot ? G.inv[firstPotionIdx()].nm : 'no potions', nPot||'', (!inWorld || !nPot) ? 'off' : ''),
-    slot('R', bow || !spl ? im(obEntry('weapon',{kind:'bow'})) : hbIcon('spell', { col:ISO_ELEM_COL[spl[6]] }), bow ? `${wand.nm} (${p.arrows||0} arrows)` : spl ? 'cast '+spl[1] : 'no bow or spell', bow ? (p.arrows||0) : '', (!inWorld || (!bow && !spl)) ? 'off' : '', !bow && spl ? spl[0] : ''),
+    slot('R', bow || !spl ? im(obEntry('weapon',{kind:'bow'})) : hbIcon('spell', { col:ISO_ELEM_COL[spl[6]] }), bow ? `${wand.nm} (${p.arrows||0} arrows)` : spl ? 'cast '+spl[1] : 'no bow or spell', bow ? (p.arrows||0) : spl ? (castsLeft===Infinity ? '&infin;' : castsLeft) : '', (!inWorld || (!bow && !spl)) ? 'off' : '', !bow && spl ? spl[0] : '', { low: bow ? (p.arrows||0)<=10 : !!spl && castsLeft<=5 }),
     slot('I', im(obEntry('chest',{gold:true})), 'inventory', G.inv.length||'', 'sep'),
     slot('P', im(obEntry('armor',{kind:'chest', metal:'#9aa3a8'})), 'character sheet', ''),
     slot('B', im(monsterPortraitFor('skeleton', true)), 'bestiary', '', 'minor'),
@@ -13063,7 +13087,7 @@ function renderImmersiveHud(){
     G.gameMode===0 && G.owZoomedOut ? slot('T', `<span class="ico">&#10148;</span>`, 'fast travel', '', 'minor') : '',
     slot('C', im(obEntry('flame')), 'camp', '', 'minor'),
     (()=>{ const o = skOptions()[0], gk = G.gather ? 'stop' : !o ? 'hand' : { mining:'pick', woodcutting:'axe', fishing:'rod', foraging:'herb', cooking:'pot', firemaking:'flame' }[o.k] || 'hand';
-      return slot('E', hbIcon(gk, gk==='herb' && o && o.node ? { col:SK_HERB_COL[(skNodeAt(o.node.x,o.node.y)||{}).type] } : null), G.gather ? 'stop '+G.gather.o.label.toLowerCase() : o ? o.label : 'nothing to gather here', '', G.gather ? '' : o ? '' : 'off'); })(),
+      return slot('E', hbIcon(gk, gk==='herb' && o && o.node ? { col:SK_HERB_COL[(skNodeAt(o.node.x,o.node.y)||{}).type] } : null), G.gather ? 'stop '+G.gather.o.label.toLowerCase() : o ? o.label : 'nothing to gather here', '', G.gather ? '' : o ? '' : 'off', '', G.gather ? { sweep:{ dur:1400, el:clamp(1400-(G.gather.next-performance.now()), 0, 1399) } } : null); })(),
     slot('U', im(obEntry('potion',{col:'#c8843a'})), 'eat food', skFoods().reduce((a,f)=>a+f.n,0)||'', skFoods().length ? 'minor' : 'minor off'),
     slot('J', hbIcon('skills'), 'skills &amp; trades', '', 'minor'),
   ].join('');
@@ -23174,7 +23198,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-54';
+const GAME_VERSION = 'rs-55';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
