@@ -287,6 +287,14 @@
 275. [ ] (420) Cleave - big axes and swords also hit monsters beside the target
 276. [ ] (421) Weapon mastery - using a weapon type unlocks small permanent bonuses and moves
 277. [ ] (422) Swing animations per weapon type - stab, slash, overhead crush, halberd spin
+278. [ ] (437) Redemption prayer - heals you when you drop below 10% health
+279. [ ] (438) Protect Item prayer - keep one extra item on death
+280. [ ] (439) Ancient Curses - a second prayer book from a quest: soul split, deflect, leech, Turmoil
+281. [ ] (440) Boss prayer checks - bosses switch attack styles so you must swap protection prayers in time
+282. [ ] (441) Prayer bonus on gear - holy items, god robes and blessings slow prayer drain
+283. [ ] (442) Prayer drain shown - points per turn on the prayer screen and hotbar
+284. [ ] (443) Overhead prayer icons - the active protection prayer glows over your head, plus a light aura for boosts
+285. [ ] (444) Bone burying animation with a small effect
 
 ## Backlog
 
@@ -490,3 +498,22 @@
 - (434) Defenders - tiered off-hand from bronze to dragon
 - (435) Impact feedback - sparks, heavier shake for two-handers, crit pause
 - (436) Weapon trails coloured by metal tier
+
+### Prayer
+- (445) More bone types - bat, wolf, dragon, dagannoth, superior dragon
+- (446) Gilded altar - offer bones for 3.5x xp
+- (447) Ashes and ensouled heads for Prayer xp
+- (448) Bonecrusher - auto-buries bones
+- (449) Chaos altar in the Wilderness
+- (450) Retribution - damage nearby monsters when you die
+- (451) Smite - drain monsters' prayer
+- (452) Rapid Heal and Rapid Restore
+- (453) Preserve - potion boosts last longer
+- (454) Augury - the top magic prayer
+- (455) Swap prayer books at a special altar
+- (456) Prayer flicking rewarded against style-switching bosses
+- (457) Gods to follow - Saradomin, Zamorak, Guthix
+- (458) Priest blessings for a donation
+- (459) Holy and unholy books as a prayer off-hand
+- (460) Overworld shrines with timed buffs
+- (461) Prayer activation and out-of-points sounds
