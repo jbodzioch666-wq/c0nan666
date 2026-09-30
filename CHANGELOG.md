@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-36 - Better tooltips
+
+- **One tooltip style everywhere.** Every hover text in the game now uses the same styled box as the item tooltips, instead of the browser's plain grey popup. That covers hotbar buttons, skill cards, spell runes, map icons and the rest. Hotkeys show as key caps.
+- **Item tooltips have a picture** of the item beside its name.
+- **Requirements** stay green when you meet them and red when you don't.
+- **Where each stat comes from.** Hover Armour, Melee/Ranged/Magic to hit or Strength dmg on the character sheet (P), or AC on your plate, to see every part that adds up to the number: base, skill level, gear bonuses, prayers, attack style and other gear effects.
+
 ## RS-35 - Fullscreen by default
 
 - **The game now starts in fullscreen.** Browsers only allow fullscreen after a click or key press, so the page goes fullscreen on your first click or key.

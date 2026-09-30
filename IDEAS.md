@@ -7,7 +7,7 @@
 ### Info and tooltips
 _One pass over the tooltip, hover and label code_
 
-1. [ ] (212) Better tooltips - one style everywhere, icons, requirements in red or green, where each stat comes from
+1. [x] (212) Better tooltips - one style everywhere, icons, requirements in red or green, where each stat comes from
 2. [ ] (315) Item values everywhere - shop and high-alchemy value on every tooltip
 3. [ ] (184) Item compare tooltip - green and red numbers against what you're wearing
 4. [ ] (377) Spell details on hover - max hit, rune cost, accuracy against the target, element weakness

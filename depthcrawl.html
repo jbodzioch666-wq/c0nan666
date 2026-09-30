@@ -284,6 +284,12 @@
   .item-tooltip{ position:fixed; z-index:80; max-width:280px; background:var(--panel-2); border:1px solid var(--stone-hi);
     border-radius:8px; padding:10px 12px; font-size:11.5px; line-height:1.5; box-shadow:0 12px 30px -8px rgba(0,0,0,0.7); pointer-events:none; }
   .item-tooltip .aff{ color:var(--ink-dim); }
+  .item-tooltip .tt-head{ display:flex; gap:8px; align-items:center; margin-bottom:4px; }
+  .item-tooltip .tt-head canvas{ width:34px; height:34px; flex:0 0 34px; background:rgba(0,0,0,0.25); border:1px solid var(--stone-hi); border-radius:6px; }
+  .item-tooltip kbd.ttk{ background:var(--panel); border:1px solid var(--stone-hi); border-radius:4px; padding:0 5px; font-size:10.5px; color:var(--ink); }
+  .item-tooltip .ttrow{ display:flex; justify-content:space-between; gap:14px; }
+  .item-tooltip .ttrow b{ color:var(--ink); font-weight:600; }
+  [data-tipstat]{ cursor:help; }
   .item-tooltip hr{ border:none; border-top:1px solid rgba(255,255,255,0.08); margin:6px 0 4px; }
   .detailpane{ margin-top:16px; background:var(--panel); border:1px solid var(--stone-hi); border-radius:6px; padding:12px 14px; font-size:12.5px; }
   .detailpane .aff{ color:var(--teal); }
@@ -9524,8 +9530,8 @@ function itemModListHtml(it){
 }
 function itemCompareTooltipHtml(it){
   const equipped = curEquipFor(it);
-  let html = `<div class="${rarityColorClass(it)}" style="font-weight:600;">${esc(it.nm)}</div>
-    <div class="muted" style="margin-bottom:4px;">${esc(it.uniqueId ? 'unique '+(it.baseMat||'')+' '+it.basis : it.basis||'')}</div>
+  let html = `<div class="tt-head">${ttItemArt(it) ? '<canvas id="ttIcon" width="34" height="34"></canvas>' : ''}<div><div class="${rarityColorClass(it)}" style="font-weight:600;">${esc(it.nm)}</div>
+    <div class="muted">${esc(it.uniqueId ? 'unique '+(it.baseMat||'')+' '+it.basis : it.basis||'')}</div></div></div>
     ${itemModListHtml(it)}`;
   if (!canEquip(it)) html += `<div style="color:${COL.red};margin-top:4px;">you can't use this yet</div>`;
   html += `<hr><div class="muted">equipped: ${equipped && equipped.used ? esc(equipped.nm) : '(nothing)'}</div>`;
@@ -9874,10 +9880,47 @@ function buildRsCombatSkills(){
     <h4 style="color:var(--ink-faint);margin:12px 0 6px;">SKILLS &amp; TRADES</h4>`;
 }
 
+// where each combat number comes from - shown when you hover it on the character sheet
+function rsStatSources(which){
+  const st = rsStyle().id, parts = [];
+  const add = (nm, v)=>{ v = +(+v).toFixed(1); if (v) parts.push([nm, v]); };
+  const other = (v)=> add('other gear effects', v);
+  if (which==='armour'){
+    let def = 0; for (const k of ['head','chest','legs','arms','necklace','ring1','ring2']){ const it = G.gear[k]; if (it && it.used) def += it.ac||0; }
+    const ed = gearStatI('edef');
+    add('base', 10); add(`Defence level ${rsEff('defence')} (1 per 20)`, Math.floor(rsEff('defence')/20));
+    add(`gear defence +${def}${ed ? ` (+${ed}%)` : ''} (1 per ${RS_DEF_PER_AC})`, def*(1+ed/100)/RS_DEF_PER_AC);
+    add('prayers', rsPrayBonus('def')); add(`${rsStyle().nm} style`, st==='defensive' ? 2 : st==='controlled' ? 1 : 0);
+    add('spell buff', G.player.buffACTurns>0 ? (G.player.buffACAmt||0) : 0); other(gearStatI('flatac'));
+    return { title:'Armour', total:playerACExact(), parts };
+  }
+  if (which==='strength'){
+    add(`Strength level ${rsEff('strength')} (1 per 5)`, Math.floor(rsEff('strength')/5));
+    add(`gear strength +${rsGearSum('dmgB')} (1 per ${RS_STR_PER_DMG})`, rsGearSum('dmgB')/RS_STR_PER_DMG);
+    add(`${rsStyle().nm} style`, st==='aggressive' ? 2 : st==='controlled' ? 1 : 0); other(gearFlatDmg());
+    return { title:'Extra melee damage', total:parts.reduce((t,x)=>t+x[1],0), parts, note:rsPrayBonus('str') ? `prayers add ${Math.round(rsPrayBonus('str')*100)}% on top` : '' };
+  }
+  const type = which, sk = type==='melee' ? 'attack' : type;
+  add('base', 2);
+  add(`${sk[0].toUpperCase()+sk.slice(1)} level ${rsEff(sk)} (1 per 8)`, Math.floor(rsEff(sk)/8));
+  if (type==='ranged'){ const w = G.gear.weapon && G.gear.weapon.range ? G.gear.weapon : G.gear.ranged; const g = ((w && w.used && w.acc)||0) + rsGearSum('rngAcc'); add(`gear ranged +${g} (1 per ${RS_ATK_PER_HIT})`, g/RS_ATK_PER_HIT); add('prayers', rsPrayBonus('rng')); }
+  else if (type==='magic'){ add(`gear magic +${rsGearSum('magAcc')} (1 per ${RS_ATK_PER_HIT})`, rsGearSum('magAcc')/RS_ATK_PER_HIT); add('prayers', rsPrayBonus('mag')); }
+  else { add(`gear attack +${rsGearSum('acc')} (1 per ${RS_ATK_PER_HIT})`, rsGearSum('acc')/RS_ATK_PER_HIT); add('prayers', rsPrayBonus('att')); }
+  add(`${rsStyle().nm} style`, st==='accurate' ? 2 : st==='controlled' ? 1 : 0); other(gearStatI('atk'));
+  return { title:(type==='melee' ? 'Melee' : type==='ranged' ? 'Ranged' : 'Magic')+' to hit', total:rsAtkBonus(type), parts };
+}
+function rsStatTipHtml(which){
+  const b = rsStatSources(which);
+  let h = `<div style="font-weight:600;color:var(--ink);">${b.title} ${which==='armour' ? Math.round(b.total) : fmtMod(+b.total.toFixed(1))}</div><div class="muted">where it comes from:</div>`;
+  for (const [nm,v] of b.parts) h += `<div class="ttrow"><span>${esc(nm)}</span><b style="color:${v<0 ? COL.red : COL.green}">${fmtMod(v)}</b></div>`;
+  if (b.note) h += `<div class="muted" style="margin-top:4px;">${esc(b.note)}</div>`;
+  return h;
+}
+function rsStatTipAttr(which){ return `data-tipstat="${which}"`; }
 // ---- the stat block on the character sheet (P) ----
 function buildFullStatBlock(){
   const p = G.player; rsSync();
-  const row = (k, v)=>`<div class="muted" style="display:flex;justify-content:space-between;"><span>${k}</span><b style="color:var(--ink)">${v}</b></div>`;
+  const row = (k, v, src)=>`<div class="muted" style="display:flex;justify-content:space-between;${src ? 'text-decoration:underline dotted rgba(255,255,255,0.25);text-underline-offset:3px;' : ''}" ${src ? rsStatTipAttr(src) : ''}><span>${k}</span><b style="color:var(--ink)">${v}</b></div>`;
   const tri = rsArmourStyle();
   return `<div class="panel" style="flex:1 1 300px;min-width:260px;max-width:360px;padding:7px 10px;">
     <h4 style="margin:0 0 4px;padding-bottom:3px;">COMBAT &middot; level ${p.combatLevel}</h4>
@@ -9886,12 +9929,12 @@ function buildFullStatBlock(){
       ${row('Total level', rsTotalLevel())}
       ${row('Life', `${mx(0,p.hp)}/${effMaxHp()}`)}
       ${row('Prayer', `${Math.ceil(p.prayPts||0)}/${rsLvl('prayer')}`)}
-      ${row('Armour', playerAC())}
+      ${row('Armour', playerAC(), 'armour')}
       ${row('Style', rsStyle().nm)}
-      ${row('Melee to hit', fmtMod(+rsAtkBonus('melee').toFixed(1)))}
-      ${row('Ranged to hit', fmtMod(+rsAtkBonus('ranged').toFixed(1)))}
-      ${row('Magic to hit', fmtMod(+rsAtkBonus('magic').toFixed(1)))}
-      ${row('Strength dmg', fmtMod(+(Math.floor(rsEff('strength')/5)+rsGearSum('dmgB')/RS_STR_PER_DMG).toFixed(1)))}
+      ${row('Melee to hit', fmtMod(+rsAtkBonus('melee').toFixed(1)), 'melee')}
+      ${row('Ranged to hit', fmtMod(+rsAtkBonus('ranged').toFixed(1)), 'ranged')}
+      ${row('Magic to hit', fmtMod(+rsAtkBonus('magic').toFixed(1)), 'magic')}
+      ${row('Strength dmg', fmtMod(+(Math.floor(rsEff('strength')/5)+rsGearSum('dmgB')/RS_STR_PER_DMG).toFixed(1)), 'strength')}
       ${row('Attack bonus', fmtMod(rsGearSum('acc')))}
       ${row('Strength bonus', fmtMod(rsGearSum('dmgB')))}
       ${row('Defence bonus', fmtMod(['head','chest','legs','arms','necklace','ring1','ring2'].reduce((t,k)=>t+((G.gear[k]&&G.gear[k].used&&G.gear[k].ac)||0),0)))}
@@ -12742,7 +12785,7 @@ function renderImmersiveHud(){
       <div class="dh-name">${esc(p.name||p.cls)}</div>
       <div class="dh-sub">${p.ngPlus>0?`<span style="color:${COL.amber}">NG+${p.ngPlus}</span> &middot; `:''}Combat ${p.combatLevel} ${esc(p.race)} &middot; total ${rsTotalLevel()}</div>
       <div class="dh-loc">${loc}</div>
-      <div class="dh-stats"><span>AC <b>${playerAC()}</b></span><span>Gold <b>${p.gold}</b></span>${(p.corruption||0)>0 ? `<span style="color:${COL.purple}">Corruption <b style="color:${COL.purple}">${Math.round(p.corruption)}%</b></span>` : ''}</div>
+      <div class="dh-stats"><span ${rsStatTipAttr('armour')}>AC <b>${playerAC()}</b></span><span>Gold <b>${p.gold}</b></span>${(p.corruption||0)>0 ? `<span style="color:${COL.purple}">Corruption <b style="color:${COL.purple}">${Math.round(p.corruption)}%</b></span>` : ''}</div>
       ${ally}
     </div>
     ${target}
@@ -22795,7 +22838,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-35';
+const GAME_VERSION = 'rs-36';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -23022,7 +23065,36 @@ function showTooltip(e, html){
   el.style.display = 'block';
   moveItemTooltip(e);
 }
-function showItemTooltip(e, it){ showTooltip(e, itemCompareTooltipHtml(it)); }
+function showItemTooltip(e, it){ showTooltip(e, itemCompareTooltipHtml(it)); const a = ttItemArt(it); if (a) renderMiniMonsterArt('ttIcon', a, rarityColorCss(it)); }
+// the same little painted picture the character sheet shows for a piece of gear
+function ttItemArt(it){
+  if (!it || !it.used || it.consumable || !it.slot) return null;
+  try { return gearIconArtFor(it.slot==='ring' ? 'ring1' : it.slot, it); } catch(e){ return null; }
+}
+// every plain title="" in the game (hotbar, buttons, skill cards, map icons...) now shows in the
+// same styled box as the item tooltips instead of the browser's own grey popup. The text moves to
+// data-tipt on first hover so the browser's popup never appears; a newline starts a new line and a
+// leading "Name - " part is shown as the heading.
+let ttHost = null;
+function ttTextHtml(t){
+  const lines = String(t).split('\n');
+  const first = lines[0], cut = first.indexOf(' - ');
+  let html = cut>0 && cut<40 ? `<div style="font-weight:600;color:var(--ink);">${esc(first.slice(0,cut))}</div><div>${esc(first.slice(cut+3))}</div>` : `<div style="color:var(--ink);">${esc(first)}</div>`;
+  for (const l of lines.slice(1)) html += l.trim()==='' ? '<hr>' : `<div class="aff">${esc(l)}</div>`;
+  return html.replace(/\(([A-Z0-9`]|Tab|Esc)\)/g, '<kbd class="ttk">$1</kbd>');
+}
+function ttEnd(){ if (ttHost){ ttHost = null; hideItemTooltip(); } }
+document.addEventListener('mouseover', (e)=>{
+  const el = e.target && e.target.closest ? e.target.closest('[title],[data-tipt],[data-tipstat]') : null;
+  if (!el){ ttEnd(); return; }
+  if (el.dataset.tipstat){ if (el!==ttHost){ ttHost = el; showTooltip(e, rsStatTipHtml(el.dataset.tipstat)); } return; }
+  if (el.hasAttribute('title')){ const t = el.getAttribute('title'); el.removeAttribute('title'); if (t) el.dataset.tipt = t; }
+  if (!el.dataset.tipt){ ttEnd(); return; }
+  if (el===ttHost) return;
+  ttHost = el; showTooltip(e, ttTextHtml(el.dataset.tipt));
+}, true);
+document.addEventListener('mousemove', (e)=>{ if (!ttHost) return; if (!ttHost.isConnected){ ttEnd(); return; } moveItemTooltip(e); }, true);
+document.addEventListener('mouseout', (e)=>{ if (ttHost && !(e.relatedTarget && ttHost.contains(e.relatedTarget))) ttEnd(); }, true);
 function showRuneTooltip(e, runeName, slotKey){ showTooltip(e, runeInfoHtml(runeName, slotKey)); }
 // what a lone rune actually does: nothing on its own (unlike real D2) - it
 // only matters once it completes one of RUNEWORDS's exact sequences, so the
