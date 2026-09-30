@@ -4840,6 +4840,7 @@ function placeWallTorches(){
 function loadLevel(d, arrivingFromBelow, fellThrough){
   G.depth = d;
   G.isBossFloor = 0;
+  if (G.gameMode===1 && G.dungeonSlot && G.player){ const sd = G.player.siteDeepest = G.player.siteDeepest||{}; sd[G.dungeonSlot] = Math.max(sd[G.dungeonSlot]||0, d); }
   G.activeZones = []; // a point-placed zone's coordinates belong to the floor you cast it on, not the next one
   if (G.player){
     G.player.bestDepth = Math.max(G.player.bestDepth||0, d);
@@ -7395,6 +7396,7 @@ function enterDungeonConfirm(){
   G.dungeonMaxDepth = G.ow.dungeonMax[ex][ey];
   G.dungeonEntrance = {x:ex,y:ey};
   G.dungeonSlot = G.ow.dungeonIdx[ex][ey];
+  G.player.siteEnterTurn = G.player.turnCount||0;
   G.dungeonModifier = G.pendingDungeonModifier || null; // committed from the entry prompt's picker - see sitePower/dungeonModifierMult
   G.gameMode = 1;
   G.owZoomedOut = false;
@@ -10898,6 +10900,10 @@ function bossDefeated(){
   }
 
   G.isBossFloor = 0;
+  // your best clear of this kind of site, in turns from walking in to the boss falling; the site moves on, so its depth record starts over
+  { const turns = (G.player.turnCount||0) - (G.player.siteEnterTurn||0), bc = G.player.bestClear = G.player.bestClear||{};
+    if (turns>0 && (!bc[G.siteKind] || turns < bc[G.siteKind])){ bc[G.siteKind] = turns; logMsg(`a new best ${SITE_WORD[G.siteKind]||'dungeon'} clear: ${turns} turns`, 'good'); }
+    if (G.player.siteDeepest) delete G.player.siteDeepest[G.dungeonSlot]; }
   const newMax = G.siteKind==='dungeon' ? (1+rn(10)) : (3+rn(4));
   // the fallen site doesn't just refill where it stood - its land is
   // reclaimed by the wild, and word spreads of a fresh one risen elsewhere,
@@ -22953,7 +22959,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-43';
+const GAME_VERSION = 'rs-44';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -24635,9 +24641,42 @@ function owTownAtClient(e){
     if (d < bd){ bd = d; best = t; } }
   return best;
 }
+// the dungeon-type site under the mouse on the world map (the nearest seen one within reach of the cursor)
+function owSiteAtClient(e){
+  if (!owZoomLastCam || !owZoomLastCellPx) return null;
+  const rect = canvas.getBoundingClientRect(), k = canvas.width/rect.width;
+  const cx = (e.clientX-rect.left)*k, cy = (e.clientY-rect.top)*k, R = clamp(owZoomLastCellPx*1.2, 11*dpr, 22*dpr)*1.4, rt = Math.ceil(R/owZoomLastCellPx)+1;
+  const gx = Math.floor(cx/owZoomLastCellPx + owZoomLastCam.x), gy = Math.floor(cy/owZoomLastCellPx + owZoomLastCam.y);
+  let best = null, bd = R*R;
+  for (let x=gx-rt; x<=gx+rt; x++) for (let y=gy-rt; y<=gy+rt; y++){
+    if (x<0 || y<0 || x>=OW_COLS || y>=OW_ROWS || !owSiteKind(G.ow.map[x][y]) || !owSeen(x,y)) continue;
+    const px = (x-owZoomLastCam.x)*owZoomLastCellPx + owZoomLastCellPx/2, py = (y-owZoomLastCam.y)*owZoomLastCellPx + owZoomLastCellPx/2, d = (px-cx)*(px-cx)+(py-cy)*(py-cy);
+    if (d < bd){ bd = d; best = {x, y}; } }
+  return best;
+}
+const SITE_TITLE = { dungeon:'Dungeon', castle:'Fallen castle', necro:"Necromancer's tower", temple:'Sunken temple', graveyard:'Graveyard', mine:'Mine', lair:'Dragon lair' };
+function owSiteKind(t){ return t===OW_DUNGEON ? 'dungeon' : TILE_SITE_KIND[t] || null; }
+function owSiteTipHtml(x, y){
+  const kind = owSiteKind(G.ow.map[x][y]), slot = G.ow.dungeonIdx[x][y], floors = G.ow.dungeonMax[x][y] || 1;
+  const bump = kind==='dungeon' ? 0 : 2, first = clampMLevel(monsterLevelForDepth(1)+bump), bossT = clampMLevel(monsterLevelForDepth(floors)+bump+2);
+  const hist = G.ow.siteHistory && G.ow.siteHistory[slot];
+  const deepest = (G.player.siteDeepest||{})[slot] || 0, best = (G.player.bestClear||{})[kind];
+  const metal = RS_METALS[clamp(Math.floor((bossT-1)/3), 0, RS_METALS.length-1)][0];
+  const row = (k, v, col)=>`<div class="ttrow"><span class="muted">${k}</span><b style="color:${col||'var(--ink)'}">${v}</b></div>`;
+  const status = deepest ? [`explored to floor ${deepest} of ${floors}`, '#e8d040'] : ['not entered yet', 'var(--ink-dim)'];
+  return `<div style="font-weight:600;color:${PM_SITE_BRIGHT[G.ow.map[x][y]]||'var(--ink)'}">${SITE_TITLE[kind]||'Site'}</div>
+    ${hist ? `<div class="examine">once held by ${esc(hist.title)} ${esc(hist.name)}, who ${esc(hist.event)}</div>` : `<div class="examine">${esc(EXAMINE_OW[G.ow.map[x][y]]||'')}</div>`}<hr>
+    ${row(kind==='castle' || kind==='necro' ? 'floors up' : 'floors down', floors)}
+    ${row('monsters from', `level ${monCombatLevel({mlevel:first})}`, monLevelColor({mlevel:first}))}
+    ${row('the boss', `level ${monCombatLevel({mlevel:bossT})}`, monLevelColor({mlevel:bossT}))}
+    ${row('boss loot', `around ${metal}${kind!=='dungeon' ? ', plus a bonus item' : ''}`)}
+    ${row('progress', status[0], status[1])}
+    ${row(`best ${SITE_WORD[kind]||'site'} clear`, best ? best+' turns' : 'none yet')}`;
+}
 canvas.addEventListener('mousemove', (e)=>{
   if (G.gameMode!==0 || !G.owZoomedOut || owZoomDragging || G.ui!=='playing') return;
   const t = owTownAtClient(e), key = t ? t.x+','+t.y : null;
+  if (!t){ const st = owSiteAtClient(e); if (st){ showTooltip(e, owSiteTipHtml(st.x, st.y)); canvas.style.cursor = 'help'; if (owTownHover){ owTownHover = null; renderGame(); } return; } }
   if (t){ const nm = o3TownName(t.x,t.y), vis = (G.ow.visitedTowns||[]).includes(key), here = t.x===G.owPos.x && t.y===G.owPos.y;
     showTooltip(e, `<div style="font-weight:600">${esc(nm)}</div><div class="muted">${here ? 'you are here' : vis ? 'click to teleport here through a portal' : 'not visited yet - walk there once to be able to teleport to it'}</div>`); canvas.style.cursor = vis && !here ? 'pointer' : 'default'; }
   else { hideItemTooltip(); canvas.style.cursor = ''; }

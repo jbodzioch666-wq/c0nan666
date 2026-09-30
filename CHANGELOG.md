@@ -1,5 +1,17 @@
 # Depthcrawl patch notes
 
+## RS-44 - World map hover details
+
+- **Hover any dungeon, castle, tower, temple, graveyard, mine or dragon lair on the world map (M)** to see:
+  - its history
+  - how many floors it has
+  - the level of its first monsters and of its boss, coloured against your combat level
+  - the tier of loot the boss drops
+  - how far you've explored it
+  - your best clear time for that kind of site
+- **Floor progress:** the game now remembers the deepest floor you've reached in each site.
+- **Best clear time:** the game now records your best clear time, in turns from walking in to the boss falling, for each kind of site. A new record is announced in the log.
+
 ## RS-43 - Quest difficulty and length
 
 - **Every quest on the Captain's board shows how hard and how long it is** before you take it.
