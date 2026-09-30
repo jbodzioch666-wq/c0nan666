@@ -511,6 +511,9 @@
   #xpTracker .xpt-g{ margin-left:auto; color:#ffd98a; }
   #xpTracker .xpt-bar{ height:4px; background:rgba(255,255,255,0.1); border-radius:2px; margin:3px 0 2px; overflow:hidden; } #xpTracker .xpt-bar i{ display:block; height:100%; }
   #xpTracker .xpt-s{ display:flex; justify-content:space-between; color:#9aa6b0; font-size:10px; }
+  #lowHpEdge{ position:fixed; inset:0; pointer-events:none; z-index:39; opacity:0; transition:opacity .4s; box-shadow:inset 0 0 90px 30px rgba(200,0,0,0.75), inset 0 0 220px 40px rgba(120,0,0,0.45); }
+  #lowHpEdge.on{ opacity:var(--lhp,0.6); animation:lhpPulse var(--lhpspd,1s) ease-in-out infinite; }
+  @keyframes lhpPulse{ 0%,100%{ filter:brightness(0.75); } 15%{ filter:brightness(1.35); } 35%{ filter:brightness(0.95); } 50%{ filter:brightness(1.2); } }
   #notifyBox{ position:fixed; left:50%; top:150px; transform:translateX(-50%); display:flex; flex-direction:column; align-items:center; gap:6px; z-index:41; pointer-events:none; }
   #notifyBox .ntf{ font:700 13px 'JetBrains Mono',monospace; padding:6px 14px; border-radius:6px; background:rgba(12,16,20,0.9); border:1px solid #e0b050; color:#ffe6a8;
     box-shadow:0 6px 18px -6px rgba(0,0,0,0.8); opacity:0; transform:translateY(-8px); transition:opacity .3s, transform .3s; }
@@ -924,6 +927,7 @@ const SFX = {
   warn:        ()=> playSeq([[520,0.09,'triangle',0.14],[390,0.14,'triangle',0.14]]),
   alarm:       ()=> playSeq([[300,0.12,'square',0.14],[240,0.12,'square',0.14],[300,0.12,'square',0.14]]),
   vault:       ()=> playSeq([[220,0.05,'square',0.1],[440,0.05,'square',0.1]]),
+  heartbeat:   ()=> { playTone(62, 0.16, 'sine', 0.34); playTone(52, 0.2, 'sine', 0.26, 0.2); },
 };
 function sfx(name){ const f = SFX[name]; if (f){ try{ f(); }catch(e){} } }
 
@@ -10602,6 +10606,30 @@ function checkLowHp(){
   const f = p.hp / Math.max(1, effMaxHp());
   if (f < 0.25 && !p.lowHpWarned){ p.lowHpWarned = true; notify(`Low health! ${Math.max(0,Math.ceil(p.hp))} life left`, 'warn', 'alarm'); }
   else if (f > 0.5) p.lowHpWarned = false;
+  lowHpFx(f);
+}
+// red pulsing screen edges plus a heartbeat while life is under 25%; the
+// lower the life, the redder the edges and the faster the beat
+let LOWHP = { on:false, frac:1, tm:0 };
+function lowHpFx(f){
+  const on = f < 0.25 && G.ui==='playing' && G.player && G.player.hp>0;
+  let el = document.getElementById('lowHpEdge');
+  if (!el){ if (!on) return; el = document.createElement('div'); el.id = 'lowHpEdge'; document.body.appendChild(el); }
+  LOWHP.frac = f;
+  const sev = on ? Math.min(1, (0.25 - f) / 0.2) : 0;
+  el.style.setProperty('--lhp', (0.45 + 0.55*sev).toFixed(2));
+  el.style.setProperty('--lhpspd', (1.1 - 0.5*sev).toFixed(2)+'s');
+  el.classList.toggle('on', on);
+  if (on && !LOWHP.on){ LOWHP.on = true; lowHpBeat(); }
+  else if (!on) LOWHP.on = false;
+}
+function lowHpBeat(){
+  clearTimeout(LOWHP.tm);
+  const p = G.player;
+  if (!LOWHP.on || !p || p.hp<=0 || G.ui!=='playing' || p.hp/Math.max(1,effMaxHp()) >= 0.25){ LOWHP.on = false; const el = document.getElementById('lowHpEdge'); if (el) el.classList.remove('on'); return; }
+  sfx('heartbeat');
+  const sev = Math.min(1, (0.25 - LOWHP.frac) / 0.2);
+  LOWHP.tm = setTimeout(lowHpBeat, Math.round(1100 - 500*sev));
 }
 function questToast(title, line){
   let el = document.getElementById('qtoast');
@@ -12698,7 +12726,7 @@ function toggleOwZoom(){
 }
 
 function renderGame(){
-  if (G.ui==='playing') checkLowHp();
+  if (G.ui==='playing') checkLowHp(); else if (LOWHP.on) lowHpFx(1);
   { const xe = document.getElementById('xpTracker'); if (xe && (xe.style.display==='none') !== (G.ui!=='playing' || XPT.hidden || !XPT.order.length)) renderXpTracker(); }
   // village mode gets the whole stage to itself (no HP/stats/spells to
   // track while browsing shops) - toggled here rather than at every
@@ -23103,7 +23131,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-52';
+const GAME_VERSION = 'rs-53';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

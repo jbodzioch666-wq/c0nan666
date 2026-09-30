@@ -27,7 +27,7 @@ _The log panel, hitsplats and HUD overlays_
 14. [x] (51) Crits and hit feedback - bigger hitsplats, screen shake on big hits, miss and block splashes
 15. [x] (23) XP drops and a skill tracker
 16. [x] (216) Notifications - crops ready, inventory full, low health - with sounds
-17. [ ] (217) Low health warning - red screen edges and a heartbeat under 25% life
+17. [x] (217) Low health warning - red screen edges and a heartbeat under 25% life
 18. [ ] (209) Buff and debuff bar - icons with timers for poison, prayers, potion boosts, stun
 19. [ ] (208) Cooldown and charge overlays on hotbar icons
 

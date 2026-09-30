@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-53 - Low health warning
+
+- **When your life drops under 25%, the screen edges glow red and pulse, and you hear a heartbeat.** The lower your life, the redder the edges and the faster the heartbeat.
+- The warning stops as soon as you heal back above 25%, and it pauses while a menu is open.
+
 ## RS-52 - XP drops and XP tracker
 
 - **Every XP gain now floats up the right side of the screen** as a skill icon with the amount. Gains that land together (like Attack and Hitpoints from one hit) stack in one column.
