@@ -24,7 +24,7 @@ _The log panel, hitsplats and HUD overlays_
 11. [x] (215) Chat-style log with tabs - all, combat, loot, skills, quests - and timestamps
 12. [x] (60) Combat log filters and a kill-count tracker per monster
 13. [x] (59) Colour-coded damage numbers - melee, ranged, magic, poison and crit
-14. [ ] (51) Crits and hit feedback - bigger hitsplats, screen shake on big hits, miss and block splashes
+14. [x] (51) Crits and hit feedback - bigger hitsplats, screen shake on big hits, miss and block splashes
 15. [ ] (23) XP drops and a skill tracker
 16. [ ] (216) Notifications - crops ready, inventory full, low health - with sounds
 17. [ ] (217) Low health warning - red screen edges and a heartbeat under 25% life

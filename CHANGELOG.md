@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-50 - Hit feedback
+
+- **Misses and blocks now show RuneScape's blue "0" hitsplat.** You see it over a monster when your swing, shot or spell misses it, and over yourself when a monster misses you.
+- **Damage you take** appears as a red hitsplat over your character.
+- **The whole 3D view shakes** when you're hit, not just the overlay. The shake scales with how hard the hit was: a scratch barely moves the camera, while a hit for a fifth of your life shakes it hard.
+- **Landing a critical hit** gives a short shake too, alongside the bigger gold-starred crit splat from RS-48.
+
 ## RS-49 - Site details on the 3D overworld, brighter log
 
 - **Hovering a dungeon, castle or other site in the 3D overworld** now shows the same details as on the world map. That covers its history, floors, recommended level, monster and boss levels, loot, your progress and your best clear. Hovering a town shows its name.
