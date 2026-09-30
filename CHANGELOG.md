@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-38 - Item compare tooltip
+
+- **Item tooltips now compare stat by stat** against what you have equipped in that slot. Each stat shows a green +, red - or grey +/- for the change you'd get by swapping the item in.
+- **Stats compared:** average damage, attack or ranged, strength, defence, ranged, magic, spell damage and range.
+- **An empty slot** compares against wearing nothing.
+- The overall upgrade or downgrade verdict stays at the bottom.
+
 ## RS-37 - Item values everywhere
 
 - **Every gear tooltip shows what the item is worth:** its value, what shops pay for it, and its high and low alchemy value. RuneScape's ratios apply: shops and low alchemy give 40%, high alchemy 60%.

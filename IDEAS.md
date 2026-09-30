@@ -9,7 +9,7 @@ _One pass over the tooltip, hover and label code_
 
 1. [x] (212) Better tooltips - one style everywhere, icons, requirements in red or green, where each stat comes from
 2. [x] (315) Item values everywhere - shop and high-alchemy value on every tooltip
-3. [ ] (184) Item compare tooltip - green and red numbers against what you're wearing
+3. [x] (184) Item compare tooltip - green and red numbers against what you're wearing
 4. [ ] (377) Spell details on hover - max hit, rune cost, accuracy against the target, element weakness
 5. [ ] (442) Prayer drain shown - points per turn on the prayer screen and hotbar
 6. [ ] (211) Examine text for any object, monster or item
