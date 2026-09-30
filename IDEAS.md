@@ -222,6 +222,19 @@
 210. [ ] (294) Better spell effects - per-element particles (fire trails, water splash, earth rocks, swirling air)
 211. [ ] (295) Graphics quality settings - low, medium, high for shadows, draw distance and effects
 212. [ ] (296) FPS counter in settings
+213. [ ] (306) Dynamic shop prices - each copy you sell to a shop pays less, recovering over time
+214. [ ] (307) Shop restocking - limited stock that refills over time; rare items sell out
+215. [ ] (308) Teleport fees - waypoint travel costs gold, cheaper at high reputation
+216. [ ] (309) Property - buy a house or a shop that earns passive gold
+217. [ ] (310) Money-making guide - good ways to earn gold at your level
+218. [ ] (311) Daily and weekly contracts - deliver 50 logs, kill 20 goblins, for bigger rewards
+219. [ ] (312) Bounty board - wanted monsters with bonus gold, refreshed daily
+220. [ ] (313) Multiple currencies - tokkul, slayer points, quest points, guild tokens, each with its own shop
+221. [ ] (314) Coin pouch - gold goes to a pouch instead of taking an inventory slot
+222. [ ] (315) Item values everywhere - shop and high-alchemy value on every tooltip
+223. [ ] (316) High and low alchemy spells - turn items into gold with Magic
+224. [ ] (317) Wealth tracker - net worth (gold plus item values) on the stats page
+225. [ ] (318) Loot value - running total of a dungeon run's loot, shown when you leave
 
 ## Backlog
 
@@ -347,3 +360,18 @@
 - (303) Outline or cel shading option
 - (304) Pixel-art filter option
 - (305) Level of detail - simpler models in the distance
+
+### Economy
+- (319) Supply and demand between towns - buy cheap in one town, sell high in another
+- (320) Trade routes and caravans - haul goods for profit, more for dangerous routes
+- (321) Price history graph per item
+- (322) Haggling - reputation knocks a few percent off
+- (323) Repair costs for degrading gear
+- (324) Upkeep - mount feed, companion wages
+- (325) Temple donations for temporary blessings
+- (326) Cosmetics as a gold sink
+- (327) Grand Exchange trade tax
+- (328) Treasure hunting and selling relics to collectors
+- (329) Run your own shop stall and sell crafted goods over time
+- (330) Bank interest on stored gold
+- (331) Bank loans with interest
