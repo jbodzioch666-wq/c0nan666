@@ -35,15 +35,15 @@ _The log panel, hitsplats and HUD overlays_
 _The inventory and stash code_
 
 20. [x] (185) Inventory sort, filter and search
-21. [ ] (186) Lock items so they can't be sold or dropped by mistake
-22. [ ] (314) Coin pouch - gold goes to a pouch instead of taking an inventory slot
-23. [ ] (187) Salvage - break junk gear into bars, leather or cloth
-24. [ ] (188) Loot filter - hide junk drops, highlight uniques with a beam of light
-25. [ ] (192) Rarity-coloured drop beams on the ground
-26. [ ] (11) Ammo and rune pouches so they stop cluttering the inventory
-27. [ ] (339) Crafted bags and pouches - gem bag, herb sack, coal bag holding resources outside the inventory
-28. [ ] (189) Storable item sets - keep a full armour set as one item
-29. [ ] (361) Inventory-full prompt - drop, bank, or process on the spot (cook fish, burn logs)
+21. [x] (186) Lock items so they can't be sold or dropped by mistake
+22. [x] (314) Coin pouch - gold goes to a pouch instead of taking an inventory slot (gold never used a slot; the inventory now shows the coin pouch and pack slots)
+23. [x] (187) Salvage - break junk gear into bars, leather or cloth
+24. [x] (188) Loot filter - hide junk drops, highlight uniques with a beam of light
+25. [x] (192) Rarity-coloured drop beams on the ground
+26. [x] (11) Ammo and rune pouches so they stop cluttering the inventory (already the case: arrows and runes live in the resource bag, not pack slots)
+27. [x] (339) Crafted bags and pouches - gem bag, herb sack, coal bag holding resources outside the inventory (already the case: every gathered resource lives in the unlimited resource bag)
+28. [x] (189) Storable item sets - keep a full armour set as one item
+29. [x] (361) Inventory-full prompt - drop, bank, or process on the spot (cook fish, burn logs)
 
 ### Settings, saves and menus
 _Title, pause, death and settings screens in one go_

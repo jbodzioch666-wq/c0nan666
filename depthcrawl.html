@@ -446,9 +446,18 @@
   .dh-slot .k{ position:absolute; left:3px; top:1px; font-size:9.5px; color:#e8d5a8; text-shadow:0 1px 2px #000; font-weight:700; }
   .dh-slot .n{ position:absolute; right:3px; bottom:1px; font-size:10px; color:#fff; text-shadow:0 1px 2px #000, 0 0 3px #000; font-weight:700; }
   .dh-slot.off{ opacity:0.45; }
+  .invlock{ color:#1a1208; background:var(--amber); font-size:9px; font-weight:700; border-radius:3px; padding:0 3px; margin-right:4px; }
+  .invset{ color:#10202a; background:#6fc3e8; font-size:9px; font-weight:700; border-radius:3px; padding:0 3px; margin-right:4px; }
+  #packFull{ position:fixed; left:50%; bottom:128px; transform:translateX(-50%); z-index:42; display:none; max-width:560px; padding:9px 12px; border-radius:8px;
+    background:rgba(40,14,10,0.94); border:1px solid #c8603a; box-shadow:0 4px 18px rgba(0,0,0,0.6); font:12px 'JetBrains Mono',monospace; color:#e8dcc8; }
+  #packFull .pf-t{ color:#ff9a6a; font-weight:700; letter-spacing:1px; margin-bottom:3px; }
+  #packFull .pf-l{ margin-bottom:6px; line-height:1.4; }
+  #packFull .pf-b{ display:flex; flex-wrap:wrap; gap:5px; }
+  #packFull button{ background:rgba(60,30,20,0.95); color:#f0e0cc; border:1px solid #8a4a30; border-radius:5px; padding:3px 8px; font:11px 'JetBrains Mono',monospace; cursor:pointer; }
+  #packFull button:hover{ border-color:var(--amber); }
   .invbar{ display:flex; flex-wrap:wrap; gap:5px; align-items:center; margin:0 0 6px; }
   .invbar input, .invbar select{ background:rgba(10,14,18,0.85); color:var(--ink); border:1px solid #4a5560; border-radius:5px; padding:3px 6px; font:12px 'JetBrains Mono',monospace; }
-  .invbar input{ width:120px; } .invbar select{ width:118px; min-width:0; } .invbar input:focus{ outline:none; border-color:var(--amber); }
+  .invbar input{ width:120px; } .invbar select{ width:118px; min-width:0; } .invbar #lootFilterSel{ width:170px; } .invbar input:focus{ outline:none; border-color:var(--amber); }
   .invchip{ background:rgba(44,54,64,0.92); color:#d4dce2; border:1px solid #4a5560; border-radius:12px; padding:3px 9px; font:11px 'JetBrains Mono',monospace; cursor:pointer; }
   .invchip span{ opacity:0.65; } .invchip:hover{ border-color:var(--amber); }
   .invchip.on{ background:var(--amber); color:#1a1208; border-color:var(--amber); } .invchip.on span{ opacity:0.8; }
@@ -4132,7 +4141,7 @@ function curEquipFor(item){
   return getGearSlot(item.slot);
 }
 function lootArrow(it){
-  if (!it.used || it.consumable || it.kind==='scroll') return '';
+  if (!it.used || it.consumable || it.kind==='scroll' || it.kind==='set') return '';
   // gear your class can never wear at all is always worth selling,
   // regardless of how its raw stats happen to compare to what's
   // equipped - so it shows the same down-arrow (and gets swept up by the
@@ -4142,8 +4151,10 @@ function lootArrow(it){
   if (a>b) return 'up'; if (a<b) return 'down'; return '';
 }
 function addToInventory(item){
+  if (lootFilterTake(item)) return;
+  lootBeamFor(item);
+  if (G.inv.length >= MAXINV){ packFullHold(item); return; }
   if (item.consumable){
-    if (G.inv.length >= MAXINV){ logMsg(`your pack is full - you leave the ${itemNameHtml(item)} behind`, 'loot', true); return; }
     invPush(item);
     logMsg(`you pick up the ${itemNameHtml(item)}`, 'loot', true);
     return;
@@ -4156,12 +4167,6 @@ function addToInventory(item){
   // both those lists still flag an upgrade at a glance, so nothing about
   // spotting a better item was lost, only the game silently making that
   // call on the player's behalf the instant it dropped
-  if (G.inv.length >= MAXINV){
-    const g = sellPrice(item);
-    G.player.gold += g;
-    logMsg(`your pack is full - you sell the ${itemNameHtml(item)} for ${g} gold`, 'loot', true);
-    return;
-  }
   logMsg(`you pick up ${itemNameHtml(item)} (${esc(itemDesc(item))})`, 'loot', true);
   invPush(item);
 }
@@ -4212,6 +4217,7 @@ function useFromInv(idx){
 }
 function sellFromInv(idx){
   if (idx<0 || idx>=G.inv.length) return;
+  if (G.inv[idx].locked){ logMsg(`the ${G.inv[idx].nm} is locked - unlock it (L) before selling`, 'hit'); sfx('error'); return; }
   const price = sellPrice(G.inv[idx]);
   G.player.gold += price;
   logMsg(`you sell the ${G.inv[idx].nm} for ${price} gold`, 'loot');
@@ -4220,7 +4226,7 @@ function sellFromInv(idx){
 function sellJunk(){
   let total=0, cnt=0;
   for (let i=G.inv.length-1;i>=0;i--){
-    if (lootArrow(G.inv[i])==='down'){
+    if (lootArrow(G.inv[i])==='down' && !G.inv[i].locked){
       total += sellPrice(G.inv[i]); cnt++;
       G.player.gold += sellPrice(G.inv[i]);
       invRemove(i);
@@ -5105,6 +5111,7 @@ function monsterDies(mi){
   // deeper floors, magic find, a powerful site's loot bonus, and banked
   // corruption all raise the odds and quality of what they drop; a corrupted
   // kill specifically also nudges the drop chance itself, on top of that
+  G.dropAt = { x:m.x, y:m.y }; setTimeout(()=>{ G.dropAt = null; }, 0); // loot beams rise from the corpse
   const sp = sitePower();
   let dropChance = clamp(0.16 + (G.depth||1)*0.01 + playerMF()*0.01 + sp.lootBonus*0.04, 0.05, 0.65);
   if (m.corrupted) dropChance = mn(0.85, dropChance+0.15);
@@ -9371,6 +9378,7 @@ const RS_REQS = [['reqAtt','attack','Attack'],['reqStr','strength','Strength'],[
 function rsReqMissing(it){
   const out = [];
   if (!it || !it.used) return out;
+  if (it.kind==='set'){ for (const x of it.setItems||[]) for (const r of rsReqMissing(x)) if (!out.includes(r)) out.push(r); return out; }
   for (const [f,k,nm] of RS_REQS) if ((it[f]||0) > rsLvl(k)) out.push(`${nm} ${it[f]}`);
   return out;
 }
@@ -9634,6 +9642,7 @@ function guaranteedEliteDrop(level){
 // wands belong to the old rules - anything that used to stock one sells a scroll instead
 function genWand(d){ return genScroll(d); }
 function itemPrice(it){
+  if (it.kind==='set') return (it.setItems||[]).reduce((t,x)=>t+itemPrice(x), 0);
   if (it.consumable || it.kind==='wand' || it.kind==='scroll') return it.price||10;
   if (it.rs) return mx(3, roundH((it.price||20) * (it.uniqueId ? 3 : 1)));
   let b = (it.slot==='weapon' || it.slot==='ranged') ? (8+weaponAvg(it)*6) : (8+it.ac*7);
@@ -9668,6 +9677,7 @@ function rsBonusLines(it){
 }
 function itemDesc(it){
   if (!it.used) return '';
+  if (it.kind==='set') return (it.setItems||[]).map(x=>x.basis).join(', ') + (rsReqMissing(it).length ? `  [needs ${rsReqMissing(it).join(', ')}]` : '');
   if (it.kind==='scroll') return it.desc || 'a single-use scroll';
   if (it.kind==='wand') return 'a relic of another age - sell it';
   if (it.consumable) return `heals ${it.hd1}d${it.hd2} HP`;
@@ -12788,6 +12798,8 @@ function toggleOwZoom(){
 function renderGame(){
   if (G.ui==='playing') checkLowHp(); else if (LOWHP.on) lowHpFx(1);
   queueMicrotask(renderBuffBar); // after this render, so it can sit under the fresh player plate
+  if (G.player && G.player.lootHold && G.player.lootHold.length && G.inv.length < MAXINV) packHoldFlush();
+  renderPackFull();
   { const xe = document.getElementById('xpTracker'); if (xe && (xe.style.display==='none') !== (G.ui!=='playing' || XPT.hidden || !XPT.order.length)) renderXpTracker(); }
   // village mode gets the whole stage to itself (no HP/stats/spells to
   // track while browsing shops) - toggled here rather than at every
@@ -22630,6 +22642,27 @@ function isoShot(m, kind, col){
 }
 // how long until a shot already flying at this spot lands (so its hitsplat waits for it)
 function isoShotDelay(x, y){ let d = 0; for (const s of ISO.shots||[]) if (Math.hypot(s.x1-x, s.y1-y) < 0.8) d = Math.max(d, s.dur - s.t); return d; }
+// a column of light where loot fell, in the item's rarity colour - brighter,
+// taller and longer-lived the rarer it is; set and unique pieces also pulse
+function isoDrawBeams(){
+  if (!ISO.beams || !ISO.beams.length) return;
+  const keep = [], ppu = ISO.ppu || 40;
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  for (const b of ISO.beams){
+    b.t += FP.dt; if (b.t > b.life || b.depth!==G.depth || b.mode!==G.gameMode) continue; keep.push(b);
+    const fade = Math.min(1, b.t*4) * Math.min(1, (b.life-b.t)/0.8), pulse = b.q>=3 ? 0.75+0.25*Math.sin(FP.t*5) : 1;
+    const g0 = isoProject(b.x+0.5, b.y+0.5, 0), g1 = isoProject(b.x+0.5, b.y+0.5, 1.4 + b.q*0.45); if (!g0.ok) continue;
+    const w = ppu*(0.10 + b.q*0.025), a = fade*pulse*(0.45 + b.q*0.12);
+    const gr = ctx.createLinearGradient(g0.sx, g0.sy, g1.sx, g1.sy);
+    gr.addColorStop(0, fpRgba(b.col, a)); gr.addColorStop(0.6, fpRgba(b.col, a*0.5)); gr.addColorStop(1, fpRgba(b.col, 0));
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.moveTo(g0.sx-w, g0.sy); ctx.lineTo(g1.sx-w*0.4, g1.sy); ctx.lineTo(g1.sx+w*0.4, g1.sy); ctx.lineTo(g0.sx+w, g0.sy); ctx.closePath(); ctx.fill();
+    const gg = ctx.createRadialGradient(g0.sx, g0.sy, 0, g0.sx, g0.sy, ppu*0.55);
+    gg.addColorStop(0, fpRgba(b.col, a*0.8)); gg.addColorStop(1, fpRgba(b.col, 0));
+    ctx.fillStyle = gg; ctx.beginPath(); ctx.ellipse(g0.sx, g0.sy, ppu*0.55, ppu*0.3, 0, 0, Math.PI*2); ctx.fill();
+  }
+  ctx.restore();
+  ISO.beams = keep;
+}
 function isoDrawShots(){
   const keep = [], ppu = ISO.ppu || 40;
   for (const s of ISO.shots||[]){
@@ -22778,6 +22811,7 @@ function isoDrawOverlay(S){
   isoDrawVeins();
   isoDrawHover();
   isoDrawShots();
+  isoDrawBeams();
   for (const s of S){
     if (s.hp===null || s.hp===undefined) continue;
     const pr = isoProject(s.x, s.y, (s.lift||0) + s.h + 0.14); if (!pr.ok) continue;
@@ -23205,7 +23239,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-56';
+const GAME_VERSION = 'rs-57';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -23814,11 +23848,147 @@ function buildVault(){
 function vaultWalkAway(){ G.vault=null; setUi('playing'); }
 
 // ---- inventory ----
-function invEquip(){ equipFromInv(G.invSel); clampInvSel(); renderOverlay(); saveCurrentGame(); }
-function invUse(){ useFromInv(G.invSel); clampInvSel(); renderOverlay(); saveCurrentGame(); }
-function invSell(){ sellFromInv(G.invSel); clampInvSel(); renderOverlay(); saveCurrentGame(); }
-function invSellJunk(){ sellJunk(); clampInvSel(); renderOverlay(); saveCurrentGame(); }
+function invEquip(){ const it = G.inv[G.invSel]; if (it && it.kind==='set') setWear(G.invSel); else equipFromInv(G.invSel); clampInvSel(); packHoldFlush(); renderOverlay(); saveCurrentGame(); }
+function invUse(){ const it = G.inv[G.invSel]; if (it && it.kind==='set') setUnpack(G.invSel); else useFromInv(G.invSel); clampInvSel(); packHoldFlush(); renderOverlay(); saveCurrentGame(); }
+function invSell(){ sellFromInv(G.invSel); clampInvSel(); packHoldFlush(); renderOverlay(); saveCurrentGame(); }
+function invSellJunk(){ sellJunk(); clampInvSel(); packHoldFlush(); renderOverlay(); saveCurrentGame(); }
 function clampInvSel(){ if (G.invSel>=G.inv.length) G.invSel=G.inv.length-1; if (G.invSel<0) G.invSel=0; }
+// ---- locking: a locked item can't be sold, salvaged or swept up by any
+// bulk action or the loot filter (equipping, stashing and quests still work) ----
+function invLock(){
+  const it = G.inv[G.invSel||0]; if (!it) return;
+  it.locked = !it.locked; sfx(it.locked ? 'vault' : 'miss');
+  logMsg(it.locked ? `you lock the ${it.nm} - it can't be sold or salvaged` : `you unlock the ${it.nm}`, '');
+  renderOverlay(); saveCurrentGame();
+}
+// ---- salvage: break gear down into the material it was made from ----
+const SALV_BARS = ['bronze','ironb','steelb','mithrilb','adamantb','runeb'];
+const SALV_HIDE = ['leather','hleather','hleather','dl_g','dl_b','dl_r','dl_k'];
+function salvageYield(it){
+  if (!it || !it.used || it.consumable || it.kind==='scroll' || it.kind==='set' || it.kind==='wand') return null;
+  const t = Math.max(0, it.rsTier||0), piece = { head:1, arms:1, legs:1, chest:2, weapon:1 }[it.slot] || 1;
+  const metal = it.rsFam==='metal' || (it.slot==='weapon' && /^(Bronze|Iron|Steel|Black|Mithril|Adamant|Rune|Dragon)/.test(it.baseMat||it.nm));
+  if (metal) return { id:SALV_BARS[Math.min(t, 5)], n:piece + (t>=6 ? 1 : 0), sk:'smithing' };
+  if (it.rsFam==='hide') return { id:SALV_HIDE[Math.min(t, 6)], n:piece, sk:'crafting' };
+  if (it.rsFam==='cloth') return { id:'linen', n:piece + Math.min(3, t), sk:'crafting' };
+  if (it.slot==='ranged') return { id:'bowstring', n:1 + Math.floor(t/2), sk:'crafting' };
+  if (it.slot==='ring' || it.slot==='necklace') return { id:'silverb', n:1, sk:'crafting' };
+  return null;
+}
+function salvageText(y){ const nm = crName(y.id); return `${y.n} ${nm}${y.n>1 && !/s$/.test(nm) ? 's' : ''}`; }
+function salvageOne(idx, quiet){
+  const it = G.inv[idx]; if (!it) return false;
+  if (it.locked){ if (!quiet){ logMsg(`the ${it.nm} is locked - unlock it (L) before salvaging`, 'hit'); sfx('error'); } return false; }
+  const y = salvageYield(it);
+  if (!y){ if (!quiet) logMsg(it.kind==='set' ? 'unpack the set (U) before salvaging its pieces' : `the ${it.nm} can't be salvaged`, 'hit'); return false; }
+  skAdd(y.id, y.n); skGainXP(y.sk, 4*y.n*(1+(it.rsTier||0)));
+  invRemove(idx);
+  if (!quiet){ logMsg(`you salvage the ${it.nm} into ${salvageText(y)}`, 'loot'); sfx('hit'); }
+  return y;
+}
+function invSalvage(){ salvageOne(G.invSel||0); clampInvSel(); packHoldFlush(); renderOverlay(); saveCurrentGame(); }
+function invJunkBulk(it){ return !it.locked && it.used && !it.consumable && it.kind!=='scroll' && it.kind!=='set' && (lootArrow(it)==='down' || invIsJunk(it)); }
+function invSalvageJunk(){
+  const got = {}; let n = 0;
+  for (let i=G.inv.length-1; i>=0; i--) if (invJunkBulk(G.inv[i]) && salvageYield(G.inv[i])){ const y = salvageOne(i, true); if (y){ got[y.id] = (got[y.id]||0)+y.n; n++; } }
+  if (n){ logMsg(`you salvage ${n} junk item${n>1?'s':''} into ${Object.entries(got).map(([id,c])=>salvageText({id,n:c})).join(', ')}`, 'loot'); sfx('hit'); }
+  else logMsg('no junk to salvage', '');
+  clampInvSel(); packHoldFlush(); renderOverlay(); saveCurrentGame();
+}
+// ---- armour sets: bundle matching pieces into one item that takes one slot ----
+function setMatKey(it){ return it && it.used && ['head','chest','legs','arms'].includes(it.slot) && it.baseMat ? it.baseMat+'|'+(it.rsFam||'') : ''; }
+function mkArmourSet(parts){
+  return { used:1, rs:1, kind:'set', nm:`${parts[0].baseMat} armour set`, basis:`Armour set (${parts.length} pieces)`, baseMat:parts[0].baseMat, slot:'', consumable:0,
+    quality:Math.max(...parts.map(x=>x.quality||0)), setItems:parts, locked:parts.some(x=>x.locked), aff:[], sockets:[] };
+}
+function invBundle(){
+  const sel = G.inv[G.invSel||0], key = setMatKey(sel);
+  if (!key){ logMsg('pick a helm, body, legs or gloves piece to bundle into a set', 'hit'); return; }
+  const pick = {};
+  G.inv.forEach((it,i)=>{ if (setMatKey(it)===key && !(it.slot in pick && itemScore(G.inv[pick[it.slot]])>=itemScore(it))) pick[it.slot] = i; });
+  const idx = Object.values(pick);
+  if (idx.length<2){ logMsg(`you need ${sel.baseMat} pieces for at least two different slots to make a set`, 'hit'); return; }
+  const set = mkArmourSet(idx.map(i=>G.inv[i]));
+  idx.sort((a,b)=>b-a).forEach(i=>invRemove(i));
+  G.inv.push(set); G.invSel = G.inv.length-1;
+  logMsg(`you bundle ${set.setItems.length} pieces into the ${set.nm} - one slot instead of ${set.setItems.length}`, 'loot'); sfx('loot');
+  renderOverlay(); saveCurrentGame();
+}
+function setUnpack(idx){
+  const it = G.inv[idx], parts = it.setItems||[];
+  if (G.inv.length - 1 + parts.length > MAXINV){ logMsg(`you need ${parts.length-1} free slot${parts.length>2?'s':''} to unpack the set`, 'hit'); return false; }
+  invRemove(idx); for (const x of parts) G.inv.push(x);
+  logMsg(`you unpack the ${it.nm}`, ''); return true;
+}
+function setWear(idx){
+  const it = G.inv[idx], parts = it.setItems||[];
+  const miss = rsReqMissing(it); if (miss.length){ logMsg(`you need ${miss.join(' and ')} to wear the ${it.nm}`, 'hit'); sfx('error'); return; }
+  const worn = parts.map(x=>curEquipFor(x)).filter(x=>x && x.used);
+  if (G.inv.length - 1 + worn.length > MAXINV){ logMsg('not enough room in your pack for the armour you have on', 'hit'); return; }
+  invRemove(idx);
+  const oldParts = [];
+  for (const x of parts){ const old = equipItem(x); if (old && old.used) oldParts.push(old); }
+  // what came off goes back as a set of its own when it can, so a swap stays one slot
+  const groups = {}; oldParts.forEach(o=>{ const k = setMatKey(o); (groups[k] = groups[k]||[]).push(o); });
+  for (const k in groups){ const grp = groups[k]; if (k && grp.length>=2) G.inv.push(mkArmourSet(grp)); else for (const o of grp) G.inv.push(o); }
+  logMsg(`you put on the ${it.nm}`, 'good'); sfx('loot');
+}
+// ---- loot filter: what happens to new drops that are junk for you ----
+const LOOTF_MODES = [['off','keep everything'],['sell','auto-sell junk'],['salvage','auto-salvage junk']];
+let lootFilter = 'off';
+try { lootFilter = localStorage.getItem('depthcrawl_lootfilter') || 'off'; } catch(e){}
+function setLootFilter(v){ lootFilter = v; try { localStorage.setItem('depthcrawl_lootfilter', v); } catch(e){} logMsg(`loot filter: ${LOOTF_MODES.find(x=>x[0]===v)[1]}`, ''); renderOverlay(); }
+// junk = gear your class can never wear, or plainer than what you have on;
+// rare and better pieces are never filtered
+function lootFilterTake(item){
+  if (lootFilter==='off' || !item.used || item.consumable || item.kind==='scroll' || (item.quality||0)>=2) return false;
+  if (!(invIsJunk(item) || lootArrow(item)==='down')) return false;
+  if (lootFilter==='salvage'){ const y = salvageYield(item);
+    if (y){ skAdd(y.id, y.n); skGainXP(y.sk, 4*y.n*(1+(item.rsTier||0))); logMsg(`loot filter: salvaged ${itemNameHtml(item)} into ${salvageText(y)}`, 'loot', true); return true; } }
+  const g = sellPrice(item); G.player.gold += g;
+  logMsg(`loot filter: sold ${itemNameHtml(item)} for ${g} gold`, 'loot', true);
+  return true;
+}
+function lootBeamFor(item){
+  const at = G.dropAt; if (!at || !(G.gameMode===1 || G.gameMode===2) || typeof ISO==='undefined') return;
+  const q = item.consumable || item.kind==='scroll' ? 0 : (item.quality||0);
+  (ISO.beams = ISO.beams || []).push({ x:at.x, y:at.y, col:q ? qualityColor(q) : (item.consumable ? '#e05a5a' : '#d8d8d8'), q, t:0, life:2.5 + q*1.2, depth:G.depth, mode:G.gameMode });
+  if (q>=3) notify(`${q>=4 ? 'Unique' : 'Set'} drop: ${item.nm}`, 'good', 'achievement');
+}
+// ---- pack full: new loot waits in a holding tray instead of being lost ----
+const PACK_HOLD_MAX = 8;
+function packFullHold(item){
+  const p = G.player, h = p.lootHold || (p.lootHold = []);
+  if (h.length >= PACK_HOLD_MAX){ const g = sellPrice(item); p.gold += g; logMsg(`your pack and loot tray are both full - you sell the ${itemNameHtml(item)} for ${g} gold`, 'loot', true); return; }
+  h.push(item);
+  logMsg(`your pack is full - the ${itemNameHtml(item)} waits in your loot tray`, 'loot', true);
+  renderPackFull();
+}
+function packHoldFlush(){
+  const h = G.player && G.player.lootHold; if (!h || !h.length) return;
+  let moved = 0; while (h.length && G.inv.length < MAXINV){ G.inv.push(h.shift()); moved++; }
+  if (moved) logMsg(`${moved} item${moved>1?'s':''} from your loot tray go${moved>1?'':'es'} into your pack`, 'loot');
+}
+function packHoldAct(what){
+  const p = G.player, h = p.lootHold || [];
+  if (what==='selljunk') sellJunk();
+  else if (what==='salvjunk') invSalvageJunk();
+  else if (what==='sellheld'){ const g = h.reduce((t,x)=>t+sellPrice(x),0); p.gold += g; logMsg(`you sell ${h.length} waiting item${h.length>1?'s':''} for ${g} gold`, 'loot'); p.lootHold = []; sfx('gold'); }
+  else if (what==='drop'){ logMsg(`you leave ${h.length} item${h.length>1?'s':''} behind`, ''); p.lootHold = []; }
+  else if (what==='open'){ setUi('inventory'); }
+  packHoldFlush(); renderPackFull(); if (G.ui==='inventory') renderOverlay(); else renderGame(); saveCurrentGame();
+}
+function renderPackFull(){
+  let el = document.getElementById('packFull');
+  const h = (G.player && G.player.lootHold) || [];
+  if (!h.length || G.ui!=='playing'){ if (el) el.style.display = 'none'; return; }
+  if (!el){ el = document.createElement('div'); el.id = 'packFull'; document.body.appendChild(el); }
+  el.style.display = 'block';
+  const html = `<div class="pf-t">PACK FULL &middot; ${h.length} item${h.length>1?'s':''} waiting in your loot tray</div>
+    <div class="pf-l">${h.map(it=>`<span class="${rarityColorClass(it)}">${esc(it.nm)}</span>`).join(', ')}</div>
+    <div class="pf-b"><button onclick="packHoldAct('selljunk')">sell junk</button><button onclick="packHoldAct('salvjunk')">salvage junk</button><button onclick="packHoldAct('open')">open pack</button><button onclick="packHoldAct('sellheld')">sell these (${h.reduce((t,x)=>t+sellPrice(x),0)}g)</button><button onclick="packHoldAct('drop')">leave them</button></div>`;
+  if (el.dataset.h !== html){ el.dataset.h = html; el.innerHTML = html; }
+}
 // ---- inventory sort, filter and search: the list shows a filtered and
 // sorted VIEW of G.inv (rows keep their real index, so every action still
 // works on the right item); "tidy pack" writes the current sort order back ----
@@ -23827,7 +23997,7 @@ const INV_SORTS = [['found','Order found'],['name','Name'],['value','Value'],['r
 let invView = { q:'', f:'all', s:'found' };
 try { const v = JSON.parse(localStorage.getItem('depthcrawl_invview')||'null'); if (v){ invView.f = v.f||'all'; invView.s = v.s||'found'; } } catch(e){}
 function invSaveView(){ try { localStorage.setItem('depthcrawl_invview', JSON.stringify({f:invView.f, s:invView.s})); } catch(e){} }
-function invIsJunk(it){ return !it.consumable && it.kind!=='scroll' && !canEquip(it) && !(isWeaponLike(it) && it.kind!=='wand'); }
+function invIsJunk(it){ return it.kind!=='set' && !it.consumable && it.kind!=='scroll' && !canEquip(it) && !(isWeaponLike(it) && it.kind!=='wand'); }
 function invTypeRank(it){ return it.kind==='scroll' ? 1 : it.consumable ? 0 : (it.slot==='weapon' || it.range || it.kind==='wand') ? 2 : 3; }
 function invTypeWord(it){ return ['potion food consumable','scroll','weapon','armour armor'][invTypeRank(it)]; }
 function invPass(it){
@@ -23869,8 +24039,8 @@ function invListHtml(){
     const junk = invIsJunk(it);
     const cls = i===sel ? '' : (junk ? 'muted' : rarityColorClass(it));
     const style = i===sel ? `color:${COL.amber};` : '';
-    const junkTag = junk ? `<span style="color:${COL.red};font-size:10px;margin-right:4px;">[JUNK]</span>` : '';
-    return `<div class="invrow" style="${style}" onclick="G.invSel=${i};renderOverlay();" ${it.consumable||it.kind==='scroll'?'':`onmouseenter="showItemTooltip(event, G.inv[${i}])" onmousemove="moveItemTooltip(event)" onmouseleave="hideItemTooltip()"`}>
+    const junkTag = (it.locked ? `<span class="invlock">LOCKED</span>` : '') + (it.kind==='set' ? `<span class="invset">SET</span>` : '') + (junk && !it.locked ? `<span style="color:${COL.red};font-size:10px;margin-right:4px;">[JUNK]</span>` : '');
+    return `<div class="invrow" style="${style}" onclick="G.invSel=${i};renderOverlay();" ${it.consumable||it.kind==='scroll'||it.kind==='set'?'':`onmouseenter="showItemTooltip(event, G.inv[${i}])" onmousemove="moveItemTooltip(event)" onmouseleave="hideItemTooltip()"`}>
       ${arrowHtml}
       <span class="${cls}">${junkTag}${vi<9 ? (vi+1)+'. ' : ''}${esc(it.nm)} - ${esc(itemDesc(it))} (sell ${sellPrice(it)}g)</span>
     </div>`;
@@ -23885,7 +24055,8 @@ function invToolbarHtml(){
   </div><div class="invbar"><span class="muted" style="font-size:12px;">sort by</span>
     <select id="invSort" onchange="invView.s=this.value;invSaveView();renderOverlay();" title="sort the list (O)">${INV_SORTS.map(([id,nm])=>`<option value="${id}"${invView.s===id?' selected':''}>${nm}</option>`).join('')}</select>
     <button class="invchip" onclick="invTidy()" title="rearrange your pack into this sort order for good (T)">tidy pack</button>
-    <span class="muted" style="font-size:11px;">/ search &middot; O change sort &middot; T tidy</span>
+    <span class="muted" style="font-size:12px;margin-left:8px;">loot filter</span>
+    <select id="lootFilterSel" onchange="setLootFilter(this.value)" title="what happens to new drops that are junk for you - never rare or better items">${LOOTF_MODES.map(([id,nm])=>`<option value="${id}"${lootFilter===id?' selected':''}>${nm}</option>`).join('')}</select>
   </div>`;
 }
 function invRefreshList(){ const el = document.getElementById('invList'); if (el) el.innerHTML = invListHtml(); }
@@ -23905,7 +24076,11 @@ function buildInventory(){
   if (G.inv.length>0 && sel>=0 && sel<G.inv.length){
     const it = G.inv[sel];
     let body = '';
-    if (it.kind==='scroll'){
+    if (it.kind==='set'){
+      body += `<div class="muted" style="margin-bottom:6px;">E puts the whole set on &middot; U unpacks it into separate pieces</div>`;
+      for (const x of it.setItems||[]) body += `<div style="margin-top:6px;" class="${rarityColorClass(x)}">${esc(x.nm)}</div>${itemModListHtml(x)}`;
+      const miss = rsReqMissing(it); if (miss.length) body += `<div style="color:${COL.red};margin-top:6px;">needs ${esc(miss.join(', '))}</div>`;
+    } else if (it.kind==='scroll'){
       body += `<div style="color:${COL.green}">${esc(it.desc||'')} - single use</div>`;
     } else if (it.consumable){
       body += `<div style="color:${COL.green}">restores ${it.hd1}d${it.hd2} HP</div>`;
@@ -23926,6 +24101,9 @@ function buildInventory(){
         body += `<div class="muted" style="margin-top:8px;">replaces: (nothing worn)</div>`;
       }
     }
+    { const y = salvageYield(it); if (y) body += `<div class="muted" style="margin-top:8px;">salvages into: <span style="color:var(--ink)">${esc(salvageText(y))}</span> (V)</div>`; }
+    if (setMatKey(it) && G.inv.some(x=>setMatKey(x)===setMatKey(it) && x.slot!==it.slot)) body += `<div class="muted">B bundles your ${esc(it.baseMat)} pieces into one set</div>`;
+    if (it.locked) body += `<div style="color:${COL.amber};margin-top:4px;">locked - it can't be sold or salvaged (L to unlock)</div>`;
     detailHtml = `<div class="detailpane">
       <div class="${rarityColorClass(it)}" style="font-size:14px;margin-bottom:4px;">${esc(it.nm)}</div>
       <div class="muted" style="margin-bottom:8px;">${esc(it.basis)}</div>
@@ -23935,13 +24113,17 @@ function buildInventory(){
   const runesHtml = resSectionHtml();
   return `
     <h2 class="panel-title">INVENTORY</h2>
-    <div class="sub">Gold ${G.player.gold} &middot; click an item, then choose an action below</div>
+    <div class="sub">coin pouch ${G.player.gold.toLocaleString()} gold &middot; pack ${G.inv.length}/${MAXINV} slots${(G.player.lootHold||[]).length ? ` &middot; <span style="color:${COL.amber}">${G.player.lootHold.length} waiting in the loot tray</span>` : ''} &middot; click an item, then choose an action below</div>
     <div class="ovbody">${listHtml}${detailHtml}${runesHtml}
       <div class="btnrow">
         <button class="btn" onclick="invEquip()">E &middot; equip</button>
         <button class="btn" onclick="invUse()">U &middot; use</button>
         <button class="btn" onclick="invSell()">S &middot; sell</button>
         <button class="btn" onclick="invSellJunk()">J &middot; sell junk</button>
+        <button class="btn" onclick="invSalvage()">V &middot; salvage</button>
+        <button class="btn" onclick="invSalvageJunk()">X &middot; salvage junk</button>
+        <button class="btn" onclick="invLock()">L &middot; ${(G.inv[sel]||{}).locked ? 'unlock' : 'lock'}</button>
+        <button class="btn" onclick="invBundle()">B &middot; bundle set</button>
         <button class="btn primary" onclick="setUi('playing')">I / ESC &middot; close</button>
       </div>
     </div>
@@ -24122,7 +24304,7 @@ function statRowHtml(def, cur, prev){
 // its EQUIP button is live, so "can be equipped" means the same thing in
 // both places instead of two slightly different definitions drifting apart
 function canActuallyEquip(it){
-  if (!it || !it.used || it.consumable || it.kind==='scroll') return false;
+  if (!it || !it.used || it.consumable || it.kind==='scroll' || it.kind==='set') return false;
   if (it.slot==='ranged' && it.kind==='wand'){
     if (it.wandSpell.kind==='heal') return false;
     return WAND_CLASSES.includes(G.player.cls);
@@ -24497,6 +24679,9 @@ function buildHelpKeys(){
       ['1 - 9', 'shops and the alchemist: buy that item &middot; waypoint and teleport list: travel &middot; inventory: select an item'],
       ['1 - 3', 'quest reward: pick one of the three rewards'],
       ['E U S J', 'inventory: equip, use, sell, sell all junk'],
+      ['V X', 'inventory: salvage the item into bars, leather or cloth &middot; salvage all junk'],
+      ['L B', 'inventory: lock or unlock the item (locked items can\'t be sold or salvaged) &middot; bundle matching armour into one set'],
+      ['/ O T', 'inventory: search &middot; change the sort &middot; tidy your pack into that order'],
       ['L', 'leave a shop, tavern or the tailor'],
       ['R', 'tavern: rest the night'],
       ['R G B Y', 'sealed vault: press a colour &middot; <kbd>Backspace</kbd> undo &middot; <kbd>Enter</kbd> try the lock &middot; <kbd>Esc</kbd> walk away'],
@@ -24846,6 +25031,10 @@ function handleKeydown(e){
       else if (['u','U'].includes(k)) invUse();
       else if (['s','S'].includes(k)) invSell();
       else if (['j','J'].includes(k)) invSellJunk();
+      else if (['v','V'].includes(k)) invSalvage();
+      else if (['x','X'].includes(k)) invSalvageJunk();
+      else if (['l','L'].includes(k)) invLock();
+      else if (['b','B'].includes(k)) invBundle();
       else if (['i','I','Escape'].includes(k)) setUi('playing');
       break;
     }

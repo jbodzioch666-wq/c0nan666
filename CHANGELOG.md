@@ -1,5 +1,25 @@
 # Depthcrawl patch notes
 
+## RS-57 - Inventory management
+
+- **Lock items (L).** A locked item can't be sold or salvaged, and bulk actions and the loot filter skip it. It shows an amber LOCKED tag.
+- **Salvage (V and X).** Break gear down into the material it was made from:
+  - metal armour and weapons become bars of their tier (Dragon gives Rune bars)
+  - hide armour becomes leather or dragon leather
+  - robes become linen, bows become bowstrings, and rings and amulets become silver bars
+  - you earn a little Smithing or Crafting XP for it
+  - X salvages all your junk at once
+  - the item panel shows what an item would salvage into
+- **Loot filter.** Pick "auto-sell junk" or "auto-salvage junk" in the inventory, and new drops your class can't wear, or that are worse than what you have on, get sold or salvaged on pickup. Rare, set and unique items are never filtered.
+- **Drop beams.** When a monster drops loot, a column of light rises where it fell, coloured by rarity: white for plain, blue for magic, yellow for rare, green for set and gold for unique. Rarer drops get taller, longer-lasting beams, set and unique beams pulse, and set and unique drops also pop up a notification.
+- **Armour sets (B).** Bundle matching helm, body, legs and gloves pieces (all Steel, for example) into one set item that takes a single pack slot:
+  - E puts the whole set on
+  - U unpacks the set back into pieces
+  - when you put a set on, the armour you take off is bundled into a set too, so swapping stays one slot
+- **Loot tray instead of losing loot.** When your pack is full, new drops now wait in a loot tray of up to 8 items instead of being auto-sold or left behind. A panel offers to sell junk, salvage junk, open your pack, sell the waiting items or leave them. Items move into your pack as soon as there's room.
+- **Coin pouch.** The inventory header shows your coin pouch and how many of your 50 pack slots are used. Gold, runes, arrows and gathered resources never took up pack slots.
+- The key-bind page lists the new inventory keys.
+
 ## RS-56 - Inventory sort, filter and search
 
 - **The inventory has a search box.** Type part of a name, a stat or a type (like "plate", "ranged" or "potion") and the list narrows as you type. Press / or F to jump into it, and Enter or Esc to leave it.
