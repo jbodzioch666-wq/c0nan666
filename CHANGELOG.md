@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-40 - Prayer drain shown
+
+- **The prayer screen (N)** now shows your total drain per turn of a fight and about how many turns your points will last.
+- **Every prayer** lists its own drain and how long a full prayer bar would last with only that prayer on.
+- **Hover the N hotbar slot or the prayer orb** to see your current drain and turns left.
+
 ## RS-39 - Spell details on hover
 
 - **Hover any spell** in the spellbook (G), the spells panel or the G and R hotbar slots to see its details.
