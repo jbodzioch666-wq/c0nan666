@@ -30,6 +30,20 @@
     - More to do: locked doors and keys, levers, secret walls, visible and disarmable traps, puzzle rooms, mini-bosses guarding treasure rooms, monster packs with a purpose, shrines, a deep merchant, lore notes, hazards (lava, collapsing floors, darkness)
     - Across floors: branching safe and dangerous stairs, shortcuts or checkpoints every few floors, named set-piece floors
     - Suggested order: bigger floors and layouts first, then the content
+21. [ ] (30) Character creator - a live rotating 3D preview on the creation screen, with arrows for each part
+22. [ ] (31) Body type - masculine or feminine, and lean, average or stocky builds
+23. [ ] (32) Skin tone - a palette per race (orc greens and greys, tiefling reds and purples, natural tones for the rest)
+24. [ ] (33) Hair - 8 to 10 styles (bald, short, long, ponytail, braids, mohawk, topknot, dreadlocks) plus colour
+25. [ ] (34) Facial hair - none, stubble, goatee, full beard, long dwarf braid, plus colour
+26. [ ] (35) Face details - eye colour, scars, war paint and tattoos, tiefling horns, orc tusks, elf ear length
+27. [ ] (36) Starting clothes - pick shirt and trouser colours instead of everyone in brown rags
+28. [ ] (37) Barber and tailor make-over - pay gold in town to restyle hair and beard or re-dye clothes
+29. [ ] (38) Dyes - craft dyes from herbs and dye any armour or robe (colour changes, stats don't)
+30. [ ] (39) Cosmetic override slots - wear a look item over your real gear
+31. [ ] (40) Skill capes - reach 99 in a skill for its cape, trimmed if you have more than one 99
+32. [ ] (41) Better base model - hands with fingers, visible boots and gloves, shoulder pads matched to the armour tier
+33. [ ] (42) Gear detail per tier - rune plate trims, dragon spikes, mystic robes with stitched runes
+34. [ ] (43) Idle animations - breathing, looking around, sitting at camp
 
 ## Backlog
 
@@ -51,3 +65,9 @@
 
 ### Polish
 - (27) Music tracks per area
+
+### Character design
+- (44) Rare cosmetics from drops - party hats, masks, boss pets that follow you
+- (45) Emotes - wave, bow, dance, cheer, unlockable skill-cape emote
+- (46) Titles - "the Slayer", "Dragonbane", shown over your head and on your plate
+- (47) Aura effects for milestones (glow at total level 1000, flames at combat 100)
