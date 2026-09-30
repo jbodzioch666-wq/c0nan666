@@ -131,110 +131,108 @@
 119. [ ] (179) Utility items - light source for dark dungeons, rope, shovel, keys for locked doors and chests
 120. [ ] (180) Treasure maps and clue scroll rewards - rare cosmetics and gilded armour
 121. [ ] (181) Tomes - use once to learn a spell or perk permanently
-122. [ ] (182) Pet items - eggs and stones that hatch into pets
-123. [ ] (183) Rare drop table - any monster has a small chance of big gems, rune items, half-keys or clue scrolls
-124. [ ] (184) Item compare tooltip - green and red numbers against what you're wearing
-125. [ ] (185) Inventory sort, filter and search
-126. [ ] (186) Lock items so they can't be sold or dropped by mistake
-127. [ ] (187) Salvage - break junk gear into bars, leather or cloth
-128. [ ] (188) Loot filter - hide junk drops, highlight uniques with a beam of light
-129. [ ] (189) Storable item sets - keep a full armour set as one item
-130. [ ] (190) Glowing and animated high-tier gear - dragon weapons glint, magic staves swirl
-131. [ ] (191) Unique items get their own 3D models instead of the base shape
-132. [ ] (192) Rarity-coloured drop beams on the ground
-133. [ ] (200) RuneScape-style side panel - tabbed inventory, equipment, skills, prayer, spellbook and quests that stays open while you play
-134. [ ] (201) Draggable, resizable windows - move the log, tracker and panels; the layout is remembered
-135. [ ] (202) UI scale slider for small or huge screens
-136. [ ] (203) Compact mode - hide everything but the orbs and hotbar
-137. [ ] (204) Several windows open at once - inventory beside a shop, stash beside inventory
-138. [ ] (205) Customisable hotbar - drag spells, potions, food and prayers onto slots 1-9
-139. [ ] (206) Quick-prayer button - one click turns on your saved prayers
-140. [ ] (207) Run/walk toggle with a run energy orb
-141. [ ] (208) Cooldown and charge overlays on hotbar icons
-142. [ ] (209) Buff and debuff bar - icons with timers for poison, prayers, potion boosts, stun
-143. [ ] (210) Target info panel - a monster's stats, weaknesses and drop table on inspect
-144. [ ] (211) Examine text for any object, monster or item
-145. [ ] (212) Better tooltips - one style everywhere, icons, requirements in red or green, where each stat comes from
-146. [ ] (213) Hover highlight (outline or glow) on anything clickable in the 3D world
-147. [ ] (214) Floating name tags over NPCs and players in towns
-148. [ ] (215) Chat-style log with tabs - all, combat, loot, skills, quests - and timestamps
-149. [ ] (216) Notifications - crops ready, inventory full, low health - with sounds
-150. [ ] (217) Low health warning - red screen edges and a heartbeat under 25% life
-151. [ ] (218) Main menu redesign - animated 3D scene with your character, save slots with portrait and play time
-152. [ ] (219) Pause menu - resume, settings, key binds, save and quit, separate from help
-153. [ ] (220) Loading screens with tips and art between areas
-154. [ ] (221) Death screen redesign - cause-of-death recap, what you lost, a return-to-gravestone button
-155. [ ] (222) Stats page - kills, deaths, gold earned, play time, damage dealt, longest dungeon run
-156. [ ] (223) Themed UI skin - stone-and-wood frames, parchment for quest text
-157. [ ] (224) UI sounds - clicks, page turns, coins, level-up chime
-158. [ ] (225) Smooth UI animations - sliding panels, counting numbers, filling bars
-159. [ ] (231) Classic RuneScape monsters - hill and moss giants, lesser and greater demons, hellhounds, abyssal demons, gargoyles, dagannoths, TzHaar, black knights, dark wizards
-160. [ ] (232) Regional monsters - desert scarabs and mummies, swamp bog-beasts and leeches, tundra ice trolls and yetis, coastal sea monsters
-161. [ ] (233) Night-only monsters - werewolves, vampyres, ghosts after dark
-162. [ ] (234) Rare spawns - golden goblin, shiny variants, treasure imps with big loot
-163. [ ] (235) Mimics - chests that bite back
-164. [ ] (236) Monster families with tiers - goblin to warlord, skeleton to champion; each area has an ecosystem
-165. [ ] (237) Named RuneScape-style bosses - King Black Dragon, Kalphite Queen, Giant Mole, Barrows brothers, Dagannoth Kings, Corporeal Beast, Zulrah, each with a lair and mechanics
-166. [ ] (238) Boss pets - a rare drop from each boss that follows you
-167. [ ] (239) Boss kill counts and personal best times in the bestiary
-168. [ ] (240) Raid - a multi-room challenge with several bosses, puzzles and a big reward chest
-169. [ ] (241) Pack hunting - wolves circle and attack from several sides
-170. [ ] (242) Summoners - necromancers raise the dead, shamans call spirits
-171. [ ] (243) Monster levels in RuneScape colours - green easy, yellow even, red dangerous against your combat level
-172. [ ] (244) Better monster 3D models - more detail, unique silhouettes for big monsters
-173. [ ] (245) Monster animations - idle, walk, attack, cast, hurt and death per body type
-174. [ ] (246) Monster sounds - growls, hisses, roars, per-attack sounds
-175. [ ] (247) Size variety - tiny rats to giants and dragons filling several tiles
-176. [ ] (248) Status visuals - green when poisoned, icy when frozen, smoking when burning
-177. [ ] (249) Full bestiary entries - 3D model viewer, lore, drop table, weaknesses, where found
-178. [ ] (250) Bestiary completion rewards - bonuses per monster family, a title for finishing it
-179. [ ] (258) Music system - tracks per area (overworld, towns, sites, bosses) with crossfades; synthesized in the browser to keep the file small
-180. [ ] (259) Region themes - grassland, desert, swamp, tundra, sea, with night versions
-181. [ ] (260) Combat music that fades in when a fight starts and out when it ends
-182. [ ] (261) Boss themes - a unique track per named boss
-183. [ ] (262) Music player - unlock tracks by visiting places, replay any of them
-184. [ ] (263) Stingers - short cues for quest complete, rare drop, level 99, boss appears, new place discovered
-185. [ ] (264) Title screen theme
-186. [ ] (265) Ambient soundscapes - wind, birds, insects outdoors; waves on the coast; drips and rumbles in dungeons; market chatter in towns
-187. [ ] (266) Day and night ambience - birds by day, crickets and owls at night
-188. [ ] (267) Weather sounds - rain, thunder, storm wind
-189. [ ] (268) Room reverb - caves echo, small rooms sound dry
-190. [ ] (269) Footsteps by surface - grass, stone, wood, sand, snow, water; armour clank for plate
-191. [ ] (270) Weapon-specific sounds - sword clang, mace thud, bow twang, per-element spell sounds, arrow whistle
-192. [ ] (271) Skilling sounds - axe chops, pickaxe clinks, fishing splash and reel, cooking sizzle, anvil hammering, fire crackle
-193. [ ] (272) Environment sounds - doors, chests, stairs, portals, traps, levers
-194. [ ] (273) Pickup sounds by item type - coins jingle, gems chime, armour clanks, potions slosh
-195. [ ] (274) Volume sliders - master, music, effects, ambience, UI
-196. [ ] (280) Better lighting - soft shadows, warm sunrise and sunset, blue moonlight, light shafts through trees and dungeon cracks
-197. [ ] (281) Bloom and glow - magic, lava, torches and glowing gear bleed light
-198. [ ] (282) Colour grading per region - warm desert, murky green swamp, cold blue tundra, dark red volcanic
-199. [ ] (283) Volumetric fog and mist - low mist over swamps and graveyards, dust in mines
-200. [ ] (284) Dynamic torchlight - flickering light and moving shadows, a lantern to carry in dark dungeons
-201. [ ] (285) Better terrain - blended ground textures (grass, dirt, rock), cliffs, height detail
-202. [ ] (286) Swaying grass and plants, plus flowers, rocks and bushes
-203. [ ] (287) Better water - reflections, waves, shore foam, animated rivers and waterfalls
-204. [ ] (288) Better trees - more species shapes, falling autumn leaves, snow-covered in the north
-205. [ ] (289) Sky - moving clouds, stars and moon at night, sunrise colours
-206. [ ] (290) Richer dungeon dressing - cobwebs, bones, barrels, moss, chains, banners, rubble, per site type
-207. [ ] (291) Better wall and floor textures per site - castle stone, temple tiles, mine timbers, crypt carvings
-208. [ ] (292) Animated hazards - bubbling lava, dripping water, glowing crystals, swinging blades
-209. [ ] (293) Wall cutaway fades smoothly instead of popping
-210. [ ] (294) Better spell effects - per-element particles (fire trails, water splash, earth rocks, swirling air)
-211. [ ] (295) Graphics quality settings - low, medium, high for shadows, draw distance and effects
-212. [ ] (296) FPS counter in settings
-213. [ ] (306) Dynamic shop prices - each copy you sell to a shop pays less, recovering over time
-214. [ ] (307) Shop restocking - limited stock that refills over time; rare items sell out
-215. [ ] (308) Teleport fees - waypoint travel costs gold, cheaper at high reputation
-216. [ ] (309) Property - buy a house or a shop that earns passive gold
-217. [ ] (310) Money-making guide - good ways to earn gold at your level
-218. [ ] (311) Daily and weekly contracts - deliver 50 logs, kill 20 goblins, for bigger rewards
-219. [ ] (312) Bounty board - wanted monsters with bonus gold, refreshed daily
-220. [ ] (313) Multiple currencies - tokkul, slayer points, quest points, guild tokens, each with its own shop
-221. [ ] (314) Coin pouch - gold goes to a pouch instead of taking an inventory slot
-222. [ ] (315) Item values everywhere - shop and high-alchemy value on every tooltip
-223. [ ] (316) High and low alchemy spells - turn items into gold with Magic
-224. [ ] (317) Wealth tracker - net worth (gold plus item values) on the stats page
-225. [ ] (318) Loot value - running total of a dungeon run's loot, shown when you leave
+122. [ ] (183) Rare drop table - any monster has a small chance of big gems, rune items, half-keys or clue scrolls
+123. [ ] (184) Item compare tooltip - green and red numbers against what you're wearing
+124. [ ] (185) Inventory sort, filter and search
+125. [ ] (186) Lock items so they can't be sold or dropped by mistake
+126. [ ] (187) Salvage - break junk gear into bars, leather or cloth
+127. [ ] (188) Loot filter - hide junk drops, highlight uniques with a beam of light
+128. [ ] (189) Storable item sets - keep a full armour set as one item
+129. [ ] (190) Glowing and animated high-tier gear - dragon weapons glint, magic staves swirl
+130. [ ] (191) Unique items get their own 3D models instead of the base shape
+131. [ ] (192) Rarity-coloured drop beams on the ground
+132. [ ] (200) RuneScape-style side panel - tabbed inventory, equipment, skills, prayer, spellbook and quests that stays open while you play
+133. [ ] (201) Draggable, resizable windows - move the log, tracker and panels; the layout is remembered
+134. [ ] (202) UI scale slider for small or huge screens
+135. [ ] (203) Compact mode - hide everything but the orbs and hotbar
+136. [ ] (204) Several windows open at once - inventory beside a shop, stash beside inventory
+137. [ ] (205) Customisable hotbar - drag spells, potions, food and prayers onto slots 1-9
+138. [ ] (206) Quick-prayer button - one click turns on your saved prayers
+139. [ ] (207) Run/walk toggle with a run energy orb
+140. [ ] (208) Cooldown and charge overlays on hotbar icons
+141. [ ] (209) Buff and debuff bar - icons with timers for poison, prayers, potion boosts, stun
+142. [ ] (210) Target info panel - a monster's stats, weaknesses and drop table on inspect
+143. [ ] (211) Examine text for any object, monster or item
+144. [ ] (212) Better tooltips - one style everywhere, icons, requirements in red or green, where each stat comes from
+145. [ ] (213) Hover highlight (outline or glow) on anything clickable in the 3D world
+146. [ ] (214) Floating name tags over NPCs and players in towns
+147. [ ] (215) Chat-style log with tabs - all, combat, loot, skills, quests - and timestamps
+148. [ ] (216) Notifications - crops ready, inventory full, low health - with sounds
+149. [ ] (217) Low health warning - red screen edges and a heartbeat under 25% life
+150. [ ] (218) Main menu redesign - animated 3D scene with your character, save slots with portrait and play time
+151. [ ] (219) Pause menu - resume, settings, key binds, save and quit, separate from help
+152. [ ] (220) Loading screens with tips and art between areas
+153. [ ] (221) Death screen redesign - cause-of-death recap, what you lost, a return-to-gravestone button
+154. [ ] (222) Stats page - kills, deaths, gold earned, play time, damage dealt, longest dungeon run
+155. [ ] (223) Themed UI skin - stone-and-wood frames, parchment for quest text
+156. [ ] (224) UI sounds - clicks, page turns, coins, level-up chime
+157. [ ] (225) Smooth UI animations - sliding panels, counting numbers, filling bars
+158. [ ] (231) Classic RuneScape monsters - hill and moss giants, lesser and greater demons, hellhounds, abyssal demons, gargoyles, dagannoths, TzHaar, black knights, dark wizards
+159. [ ] (232) Regional monsters - desert scarabs and mummies, swamp bog-beasts and leeches, tundra ice trolls and yetis, coastal sea monsters
+160. [ ] (233) Night-only monsters - werewolves, vampyres, ghosts after dark
+161. [ ] (234) Rare spawns - golden goblin, shiny variants, treasure imps with big loot
+162. [ ] (235) Mimics - chests that bite back
+163. [ ] (236) Monster families with tiers - goblin to warlord, skeleton to champion; each area has an ecosystem
+164. [ ] (237) Named RuneScape-style bosses - King Black Dragon, Kalphite Queen, Giant Mole, Barrows brothers, Dagannoth Kings, Corporeal Beast, Zulrah, each with a lair and mechanics
+165. [ ] (239) Boss kill counts and personal best times in the bestiary
+166. [ ] (240) Raid - a multi-room challenge with several bosses, puzzles and a big reward chest
+167. [ ] (241) Pack hunting - wolves circle and attack from several sides
+168. [ ] (242) Summoners - necromancers raise the dead, shamans call spirits
+169. [ ] (243) Monster levels in RuneScape colours - green easy, yellow even, red dangerous against your combat level
+170. [ ] (244) Better monster 3D models - more detail, unique silhouettes for big monsters
+171. [ ] (245) Monster animations - idle, walk, attack, cast, hurt and death per body type
+172. [ ] (246) Monster sounds - growls, hisses, roars, per-attack sounds
+173. [ ] (247) Size variety - tiny rats to giants and dragons filling several tiles
+174. [ ] (248) Status visuals - green when poisoned, icy when frozen, smoking when burning
+175. [ ] (249) Full bestiary entries - 3D model viewer, lore, drop table, weaknesses, where found
+176. [ ] (250) Bestiary completion rewards - bonuses per monster family, a title for finishing it
+177. [ ] (258) Music system - tracks per area (overworld, towns, sites, bosses) with crossfades; synthesized in the browser to keep the file small
+178. [ ] (259) Region themes - grassland, desert, swamp, tundra, sea, with night versions
+179. [ ] (260) Combat music that fades in when a fight starts and out when it ends
+180. [ ] (261) Boss themes - a unique track per named boss
+181. [ ] (262) Music player - unlock tracks by visiting places, replay any of them
+182. [ ] (263) Stingers - short cues for quest complete, rare drop, level 99, boss appears, new place discovered
+183. [ ] (264) Title screen theme
+184. [ ] (265) Ambient soundscapes - wind, birds, insects outdoors; waves on the coast; drips and rumbles in dungeons; market chatter in towns
+185. [ ] (266) Day and night ambience - birds by day, crickets and owls at night
+186. [ ] (267) Weather sounds - rain, thunder, storm wind
+187. [ ] (268) Room reverb - caves echo, small rooms sound dry
+188. [ ] (269) Footsteps by surface - grass, stone, wood, sand, snow, water; armour clank for plate
+189. [ ] (270) Weapon-specific sounds - sword clang, mace thud, bow twang, per-element spell sounds, arrow whistle
+190. [ ] (271) Skilling sounds - axe chops, pickaxe clinks, fishing splash and reel, cooking sizzle, anvil hammering, fire crackle
+191. [ ] (272) Environment sounds - doors, chests, stairs, portals, traps, levers
+192. [ ] (273) Pickup sounds by item type - coins jingle, gems chime, armour clanks, potions slosh
+193. [ ] (274) Volume sliders - master, music, effects, ambience, UI
+194. [ ] (280) Better lighting - soft shadows, warm sunrise and sunset, blue moonlight, light shafts through trees and dungeon cracks
+195. [ ] (281) Bloom and glow - magic, lava, torches and glowing gear bleed light
+196. [ ] (282) Colour grading per region - warm desert, murky green swamp, cold blue tundra, dark red volcanic
+197. [ ] (283) Volumetric fog and mist - low mist over swamps and graveyards, dust in mines
+198. [ ] (284) Dynamic torchlight - flickering light and moving shadows, a lantern to carry in dark dungeons
+199. [ ] (285) Better terrain - blended ground textures (grass, dirt, rock), cliffs, height detail
+200. [ ] (286) Swaying grass and plants, plus flowers, rocks and bushes
+201. [ ] (287) Better water - reflections, waves, shore foam, animated rivers and waterfalls
+202. [ ] (288) Better trees - more species shapes, falling autumn leaves, snow-covered in the north
+203. [ ] (289) Sky - moving clouds, stars and moon at night, sunrise colours
+204. [ ] (290) Richer dungeon dressing - cobwebs, bones, barrels, moss, chains, banners, rubble, per site type
+205. [ ] (291) Better wall and floor textures per site - castle stone, temple tiles, mine timbers, crypt carvings
+206. [ ] (292) Animated hazards - bubbling lava, dripping water, glowing crystals, swinging blades
+207. [ ] (293) Wall cutaway fades smoothly instead of popping
+208. [ ] (294) Better spell effects - per-element particles (fire trails, water splash, earth rocks, swirling air)
+209. [ ] (295) Graphics quality settings - low, medium, high for shadows, draw distance and effects
+210. [ ] (296) FPS counter in settings
+211. [ ] (306) Dynamic shop prices - each copy you sell to a shop pays less, recovering over time
+212. [ ] (307) Shop restocking - limited stock that refills over time; rare items sell out
+213. [ ] (308) Teleport fees - waypoint travel costs gold, cheaper at high reputation
+214. [ ] (309) Property - buy a house or a shop that earns passive gold
+215. [ ] (310) Money-making guide - good ways to earn gold at your level
+216. [ ] (311) Daily and weekly contracts - deliver 50 logs, kill 20 goblins, for bigger rewards
+217. [ ] (312) Bounty board - wanted monsters with bonus gold, refreshed daily
+218. [ ] (313) Multiple currencies - tokkul, slayer points, quest points, guild tokens, each with its own shop
+219. [ ] (314) Coin pouch - gold goes to a pouch instead of taking an inventory slot
+220. [ ] (315) Item values everywhere - shop and high-alchemy value on every tooltip
+221. [ ] (316) High and low alchemy spells - turn items into gold with Magic
+222. [ ] (317) Wealth tracker - net worth (gold plus item values) on the stats page
+223. [ ] (318) Loot value - running total of a dungeon run's loot, shown when you leave
 
 ## Backlog
 
@@ -375,3 +373,7 @@
 - (329) Run your own shop stall and sell crafted goods over time
 - (330) Bank interest on stored gold
 - (331) Bank loans with interest
+
+### Pets (on hold)
+- (182) Pet items - eggs and stones that hatch into pets
+- (238) Boss pets - a rare drop from each boss that follows you
