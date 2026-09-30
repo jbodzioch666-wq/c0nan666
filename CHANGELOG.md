@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-46 - Tabbed message log
+
+- **The message log has tabs along its bottom: All, Combat, Loot, Skills and Quests.** Each message is sorted into one as it's written. The tab you choose is remembered.
+- **Every message shows the time** it happened.
+- **Clicking a tab doesn't walk you anywhere.** Clicks elsewhere on the log still pass through to the world behind it.
+
 ## RS-45 - Site status on map badges
 
 - **Every site badge on the world map shows its recommended combat level** underneath, such as "Lv 48". It's coloured green, yellow or red against your own combat level, so you can spot safe places at a glance.

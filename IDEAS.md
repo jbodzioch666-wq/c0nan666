@@ -21,7 +21,7 @@ _One pass over the tooltip, hover and label code_
 ### HUD feedback and log
 _The log panel, hitsplats and HUD overlays_
 
-11. [ ] (215) Chat-style log with tabs - all, combat, loot, skills, quests - and timestamps
+11. [x] (215) Chat-style log with tabs - all, combat, loot, skills, quests - and timestamps
 12. [ ] (60) Combat log filters and a kill-count tracker per monster
 13. [ ] (59) Colour-coded damage numbers - melee, ranged, magic, poison and crit
 14. [ ] (51) Crits and hit feedback - bigger hitsplats, screen shake on big hits, miss and block splashes
