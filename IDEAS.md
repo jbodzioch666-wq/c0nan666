@@ -58,6 +58,17 @@
 46. [ ] (59) Colour-coded damage numbers - melee, ranged, magic, poison and crit
 47. [ ] (60) Combat log filters and a kill-count tracker per monster
 48. [ ] (61) Death animations and ragdolls, with corpses that stay a few turns
+49. [ ] (72) Fletching as its own skill - bows, arrows and bolts split out of Crafting, with bolt tips cut from gems
+50. [ ] (73) Archaeology - dig sites on the overworld; restore relics into lore, gear and permanent perks
+51. [ ] (74) Sailing - build and upgrade your boat, chart sea routes to the islands (ties into the boats idea)
+52. [ ] (75) Necromancy - a fourth combat style that raises skeletons and ghosts to fight for you
+53. [ ] (76) Milestone perks - every skill gives a bonus at 25, 50, 75 and 99 (e.g. Woodcutting 50: sometimes a double log)
+54. [ ] (77) Tool tiers with real effects - dragon pickaxe is faster, infernal axe burns logs for Firemaking xp
+55. [ ] (78) Skill guides - a panel per skill showing items, spots and perks unlocked at each level
+56. [ ] (79) Clue scrolls - treasure trails from drops and skilling (dig, search, do tasks) with cosmetic rewards
+57. [ ] (80) Total-level gates - areas and rewards that open at total level 500, 1000 and 1500
+58. [ ] (81) Better Cooking - pies, stews and pizzas from several ingredients that heal more; burn rate drops with level
+59. [ ] (82) Better Smithing - cannonballs, nails for Construction, dart tips, upgradable gear
 
 ## Backlog
 
@@ -97,3 +108,16 @@
 - (69) Combat XP lamps and stat restore at altars and shrines
 - (70) Multi-combat and single-combat areas
 - (71) Health bars over every visible monster
+
+### Skills
+- (83) Hunter - box traps, snares, bird nets, tracking; furs, feathers and meat
+- (84) Herblore as its own skill - clean herbs, unfinished potions, secondaries, combat potions
+- (85) Summoning - pouches from monster charms; familiars that fight, carry or heal
+- (86) Divination - energy wisps turned into boosts and xp for other skills
+- (87) Dungeoneering - a randomized start-from-nothing dungeon mode with token rewards
+- (88) Skilling outfits - lumberjack, angler and prospector pieces for bonus xp, set bonus
+- (89) Skilling pets - rare pet drops while gathering
+- (90) Random skilling events - nests, bonus veins, big fish, ents
+- (91) Daily skilling tasks and challenges for bonus xp and gold
+- (92) Skill boosts - potions and foods that raise a skill for a while
+- (93) Better Firemaking - coloured fires, bonfires with a health boost, beacons
