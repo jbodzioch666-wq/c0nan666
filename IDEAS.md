@@ -168,6 +168,26 @@
 156. [ ] (223) Themed UI skin - stone-and-wood frames, parchment for quest text
 157. [ ] (224) UI sounds - clicks, page turns, coins, level-up chime
 158. [ ] (225) Smooth UI animations - sliding panels, counting numbers, filling bars
+159. [ ] (231) Classic RuneScape monsters - hill and moss giants, lesser and greater demons, hellhounds, abyssal demons, gargoyles, dagannoths, TzHaar, black knights, dark wizards
+160. [ ] (232) Regional monsters - desert scarabs and mummies, swamp bog-beasts and leeches, tundra ice trolls and yetis, coastal sea monsters
+161. [ ] (233) Night-only monsters - werewolves, vampyres, ghosts after dark
+162. [ ] (234) Rare spawns - golden goblin, shiny variants, treasure imps with big loot
+163. [ ] (235) Mimics - chests that bite back
+164. [ ] (236) Monster families with tiers - goblin to warlord, skeleton to champion; each area has an ecosystem
+165. [ ] (237) Named RuneScape-style bosses - King Black Dragon, Kalphite Queen, Giant Mole, Barrows brothers, Dagannoth Kings, Corporeal Beast, Zulrah, each with a lair and mechanics
+166. [ ] (238) Boss pets - a rare drop from each boss that follows you
+167. [ ] (239) Boss kill counts and personal best times in the bestiary
+168. [ ] (240) Raid - a multi-room challenge with several bosses, puzzles and a big reward chest
+169. [ ] (241) Pack hunting - wolves circle and attack from several sides
+170. [ ] (242) Summoners - necromancers raise the dead, shamans call spirits
+171. [ ] (243) Monster levels in RuneScape colours - green easy, yellow even, red dangerous against your combat level
+172. [ ] (244) Better monster 3D models - more detail, unique silhouettes for big monsters
+173. [ ] (245) Monster animations - idle, walk, attack, cast, hurt and death per body type
+174. [ ] (246) Monster sounds - growls, hisses, roars, per-attack sounds
+175. [ ] (247) Size variety - tiny rats to giants and dragons filling several tiles
+176. [ ] (248) Status visuals - green when poisoned, icy when frozen, smoking when burning
+177. [ ] (249) Full bestiary entries - 3D model viewer, lore, drop table, weaknesses, where found
+178. [ ] (250) Bestiary completion rewards - bonuses per monster family, a title for finishing it
 
 ## Backlog
 
@@ -268,3 +288,12 @@
 - (228) Colour-blind modes for minimap, rarity and combat-triangle colours
 - (229) Text size option and high-contrast mode
 - (230) Screen shake and flashing toggles
+
+### Monsters
+- (251) Slayer-only monsters needing special gear (banshees, cockatrices, turoths, gargoyles)
+- (252) Boss rematch altar - refight killed bosses for loot
+- (253) Monsters that interact with the world - goblins grab items, rats flee to holes, bats sleep until disturbed
+- (254) Monster infighting - undead against the living, orcs against elves
+- (255) Ambushers - hidden in sand, chests or statues
+- (256) Fleeing and calling for help - wounded monsters run to their pack
+- (257) Sleeping monsters - sneak up for a first-hit bonus
