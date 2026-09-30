@@ -23,6 +23,13 @@
 17. [ ] (25) Save export and import
 18. [ ] (26) Level-up fireworks and jingle
 19. [ ] (28) Death gravestone to return to for your items
+20. [ ] (29) Dungeon overhaul - floors are only 20x20 with 6-9 small box rooms today
+    - Bigger floors: about 48x48, sized by depth and site type. Make floor size a per-floor setting (towns stay 20x20) and only build the 3D scene near the camera
+    - Better layouts: L-shaped, cross and round rooms, pillared halls, cave caverns; loops so there's more than one route; wider halls, a grand hall and a boss arena
+    - A layout per site: castle courtyards, a keep and towers; flooded temple sections; necro tower rings; long mine tunnels with rail carts
+    - More to do: locked doors and keys, levers, secret walls, visible and disarmable traps, puzzle rooms, mini-bosses guarding treasure rooms, monster packs with a purpose, shrines, a deep merchant, lore notes, hazards (lava, collapsing floors, darkness)
+    - Across floors: branching safe and dangerous stairs, shortcuts or checkpoints every few floors, named set-piece floors
+    - Suggested order: bigger floors and layouts first, then the content
 
 ## Backlog
 
