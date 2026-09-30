@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-37 - Item values everywhere
+
+- **Every gear tooltip shows what the item is worth:** its value, what shops pay for it, and its high and low alchemy value. RuneScape's ratios apply: shops and low alchemy give 40%, high alchemy 60%.
+- **Every resource tooltip shows a value too:** ores, bars, fish, cooked food, logs, herbs, bones, runes and crafting materials. For ore and bars it also shows what the blacksmith pays.
+- The alchemy values are ready for the High and Low Alchemy spells, which are still in the ideas queue.
+
 ## RS-36 - Better tooltips
 
 - **One tooltip style everywhere.** Every hover text in the game now uses the same styled box as the item tooltips, instead of the browser's plain grey popup. That covers hotbar buttons, skill cards, spell runes, map icons and the rest. Hotkeys show as key caps.
