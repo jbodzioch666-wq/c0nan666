@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-54 - Buff and debuff bar
+
+- **New row of status icons under your player plate** shows everything affecting you right now: poison, stun, fear, rage, accuracy and armour boosts, haste, frost armour, death ward, and each active prayer.
+- **Timed effects show a badge with the turns left.** Harmful effects have a dark red backing, and prayers are round icons.
+- Hover any icon to see what it does. Poison shows its damage per turn, and prayers show their drain and your remaining prayer points.
+- The poison and stun text lines under your name are gone, since the icons now show them. The XP tracker moves down to make room.
+
 ## RS-53 - Low health warning
 
 - **When your life drops under 25%, the screen edges glow red and pulse, and you hear a heartbeat.** The lower your life, the redder the edges and the faster the heartbeat.

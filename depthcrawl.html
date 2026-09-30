@@ -511,6 +511,11 @@
   #xpTracker .xpt-g{ margin-left:auto; color:#ffd98a; }
   #xpTracker .xpt-bar{ height:4px; background:rgba(255,255,255,0.1); border-radius:2px; margin:3px 0 2px; overflow:hidden; } #xpTracker .xpt-bar i{ display:block; height:100%; }
   #xpTracker .xpt-s{ display:flex; justify-content:space-between; color:#9aa6b0; font-size:10px; }
+  #buffBar{ position:fixed; left:14px; top:110px; max-width:230px; z-index:31; display:none; flex-wrap:wrap; gap:4px; }
+  #buffBar .bf{ position:relative; width:28px; height:28px; border-radius:6px; background:rgba(14,18,24,0.88); border:1px solid var(--bc); box-shadow:inset 0 0 8px color-mix(in srgb, var(--bc) 40%, transparent); display:flex; align-items:center; justify-content:center; color:var(--bc); font-size:15px; line-height:1; cursor:default; }
+  #buffBar .bf.bad{ background:rgba(40,8,8,0.9); }
+  #buffBar .bf.pray{ border-radius:50%; }
+  #buffBar .bf i{ position:absolute; right:-3px; bottom:-4px; font:700 9px 'JetBrains Mono',monospace; font-style:normal; color:#fff; background:#111; border:1px solid var(--bc); border-radius:6px; padding:0 3px; }
   #lowHpEdge{ position:fixed; inset:0; pointer-events:none; z-index:39; opacity:0; transition:opacity .4s; box-shadow:inset 0 0 90px 30px rgba(200,0,0,0.75), inset 0 0 220px 40px rgba(120,0,0,0.45); }
   #lowHpEdge.on{ opacity:var(--lhp,0.6); animation:lhpPulse var(--lhpspd,1s) ease-in-out infinite; }
   @keyframes lhpPulse{ 0%,100%{ filter:brightness(0.75); } 15%{ filter:brightness(1.35); } 35%{ filter:brightness(0.95); } 50%{ filter:brightness(1.2); } }
@@ -8344,6 +8349,44 @@ function skGainXP(k, amount, mastery){
 // every xp gain floats up the right of the screen as "+45" beside the skill's icon, RuneScape style
 // (gains in the same moment stack into one column); the tracker panel under your plate follows the
 // skills you've trained this session - xp gained, xp an hour, and how far to the next level
+// ---- buff and debuff bar: every timed effect on the player plus active
+// prayers, as small icons under the player plate with turns left ----
+const PRAY_ICON = { def:['\u25C6','#6fa8dc'], str:['\u270A','#e06666'], att:['\u2694','#f1c232'], rng:['\u27B6','#6aa84f'], mag:['\u2726','#8e7cc3'], heal:['\u2665','#93c47d'], piety:['\u271D','#ffd966'] };
+const PROT_ICON = { magic:['\u2726','#8e7cc3'], ranged:['\u27B6','#6aa84f'], melee:['\u2694','#e06666'] };
+function buffList(){
+  const p = G.player, out = []; if (!p) return out;
+  const add = (ic, col, t, nm, tip, bad) => out.push({ic, col, t, nm, tip, bad});
+  if (p.poisonTurns>0) add('\u2620', '#7ccf4a', p.poisonTurns, 'Poisoned', `${p.poisonDmg||1} damage every turn`, true);
+  if (p.stunTurns>0) add('\u2735', '#ffd24a', p.stunTurns, 'Stunned', 'you lose your turns until it wears off', true);
+  if (p.frightenedTurns>0) add('!', '#c27ba0', p.frightenedTurns, 'Frightened', 'your attacks are less accurate', true);
+  if (p.rageTurns>0) add('\u2694', '#ff5a3c', p.rageTurns, 'Rage', 'bonus melee damage and less damage taken');
+  if (p.buffAtkTurns>0) add('\u25B2', '#f1c232', p.buffAtkTurns, 'Accuracy boost', `+${p.buffAtkAmt||0} to hit`);
+  if (p.buffACTurns>0) add('\u25C6', '#6fa8dc', p.buffACTurns, 'Armour boost', `+${p.buffACAmt||0} armour`);
+  if (p.hasteTurns>0) add('\u00BB', '#76d7ea', p.hasteTurns, 'Haste', 'one extra attack every turn');
+  if (p.agathysTurns>0) add('\u2744', '#a4d8f0', p.agathysTurns, 'Frost armour', `${p.agathysDmg||0} cold damage back to melee attackers`);
+  if (p.deathWardCharges>0) add('\u2625', '#ffe599', 0, 'Death ward', 'the next fatal hit leaves you at 1 life instead');
+  for (const id of p.prayers||[]){
+    const pr = RS_PRAYERS.find(x=>x.id===id); if (!pr) continue;
+    const [ic, col] = pr.grp==='prot' ? PROT_ICON[pr.prot] : (PRAY_ICON[pr.grp]||['\u271D','#ffd966']);
+    add(ic, col, 0, pr.nm, `Prayer: ${pr.d} (drains ${pr.drain} points a turn in a fight; ${Math.floor(p.prayPts||0)} points left)`, false);
+    out[out.length-1].pray = true;
+  }
+  return out;
+}
+function renderBuffBar(){
+  let el = document.getElementById('buffBar');
+  const list = (G.ui==='playing') ? buffList() : [];
+  if (!el){ if (!list.length) return; el = document.createElement('div'); el.id = 'buffBar'; document.body.appendChild(el); }
+  const html = list.map(b=>`<div class="bf${b.bad?' bad':''}${b.pray?' pray':''}" title="${esc(b.nm)} - ${esc(b.tip)}${b.t?` (${b.t} turn${b.t===1?'':'s'} left)`:''}" style="--bc:${b.col}"><span>${b.ic}</span>${b.t?`<i>${b.t}</i>`:''}</div>`).join('');
+  if (el.dataset.h !== html){ el.dataset.h = html; el.innerHTML = html; }
+  el.style.display = list.length ? 'flex' : 'none';
+  // sit just under the player plate, which grows with companion lines
+  const pl = document.querySelector('.dh-plate'), pr = pl && pl.getBoundingClientRect();
+  const top0 = (pr && pr.height) ? Math.round(pr.bottom) + 8 : 112;
+  el.style.top = top0 + 'px';
+  const xt = document.getElementById('xpTracker');
+  if (xt) xt.style.top = (list.length ? top0 + el.offsetHeight + 6 : top0) + 'px';
+}
 function xpSkillDef(k){ return RS_ALL_SKILLS().find(d=>d[0]===k) || [k, k, '&#9679;', '#c8b070']; }
 function xpDrop(k, n){
   let box = document.getElementById('xpDrops');
@@ -8378,6 +8421,7 @@ function renderXpTracker(){
       <div class="xpt-s"><span>${L<99 ? (hi-xp).toLocaleString()+' to level '+(L+1) : 'max level'}</span><span>${Math.round(t.gained/hrs).toLocaleString()} xp/h</span></div></div>`; }).join('');
   el.innerHTML = `<div class="xpt-t">XP TRACKER <span class="xpt-x" onclick="XPT.hidden=true; renderXpTracker();" title="hide the tracker - it comes back with your next xp">&times;</span></div>${rows}`;
   el.style.display = 'block';
+  renderBuffBar();
 }
 function skUnlockText(k, L, mastery){
   if (mastery){ if (L%20===0) return ' (+1 to hit with it)'; if (L%25===0) return ' (+1 damage with it)'; return ''; }
@@ -12727,6 +12771,7 @@ function toggleOwZoom(){
 
 function renderGame(){
   if (G.ui==='playing') checkLowHp(); else if (LOWHP.on) lowHpFx(1);
+  queueMicrotask(renderBuffBar); // after this render, so it can sit under the fresh player plate
   { const xe = document.getElementById('xpTracker'); if (xe && (xe.style.display==='none') !== (G.ui!=='playing' || XPT.hidden || !XPT.order.length)) renderXpTracker(); }
   // village mode gets the whole stage to itself (no HP/stats/spells to
   // track while browsing shops) - toggled here rather than at every
@@ -13025,8 +13070,6 @@ function renderImmersiveHud(){
   let ally = '';
   if (p.companion) ally += `<div class="dh-ally" style="color:${p.companion.col}">&#9670; ${esc(p.companion.nm)}</div>`;
   if (p.summon) ally += `<div class="dh-ally" style="color:${p.summon.col}">&#10022; ${esc(p.summon.nm)} &middot; ${p.summon.turnsLeft} turns</div>`;
-  if (p.poisonTurns>0) ally += `<div class="dh-ally" style="color:${COL.green}">poisoned &middot; ${p.poisonTurns} turns</div>`;
-  if (p.stunTurns>0) ally += `<div class="dh-ally" style="color:${COL.yellow}">stunned &middot; ${p.stunTurns} turns</div>`;
   // the monster you're fighting, right beside your own plate - while it's alive and on this map
   const fm = G.foeRef, lf = G.lastFoe;
   const showTarget = !!(fm && fm.alive && fm.hp > 0 && (G.gameMode===1 || G.gameMode===2) && (G.mon||[]).includes(fm));
@@ -23131,7 +23174,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-53';
+const GAME_VERSION = 'rs-54';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
