@@ -224,8 +224,6 @@
 - (20) Key rebinding on the Key Binds page
 - (24) Settings page (volume, camera speed, click-to-walk speed, graphics quality)
 
-### Polish
-- (27) Music tracks per area
 
 ### Character design
 - (44) Rare cosmetics from drops - party hats, masks, boss pets that follow you
