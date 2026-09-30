@@ -142,6 +142,32 @@
 130. [ ] (190) Glowing and animated high-tier gear - dragon weapons glint, magic staves swirl
 131. [ ] (191) Unique items get their own 3D models instead of the base shape
 132. [ ] (192) Rarity-coloured drop beams on the ground
+133. [ ] (200) RuneScape-style side panel - tabbed inventory, equipment, skills, prayer, spellbook and quests that stays open while you play
+134. [ ] (201) Draggable, resizable windows - move the log, tracker and panels; the layout is remembered
+135. [ ] (202) UI scale slider for small or huge screens
+136. [ ] (203) Compact mode - hide everything but the orbs and hotbar
+137. [ ] (204) Several windows open at once - inventory beside a shop, stash beside inventory
+138. [ ] (205) Customisable hotbar - drag spells, potions, food and prayers onto slots 1-9
+139. [ ] (206) Quick-prayer button - one click turns on your saved prayers
+140. [ ] (207) Run/walk toggle with a run energy orb
+141. [ ] (208) Cooldown and charge overlays on hotbar icons
+142. [ ] (209) Buff and debuff bar - icons with timers for poison, prayers, potion boosts, stun
+143. [ ] (210) Target info panel - a monster's stats, weaknesses and drop table on inspect
+144. [ ] (211) Examine text for any object, monster or item
+145. [ ] (212) Better tooltips - one style everywhere, icons, requirements in red or green, where each stat comes from
+146. [ ] (213) Hover highlight (outline or glow) on anything clickable in the 3D world
+147. [ ] (214) Floating name tags over NPCs and players in towns
+148. [ ] (215) Chat-style log with tabs - all, combat, loot, skills, quests - and timestamps
+149. [ ] (216) Notifications - crops ready, inventory full, low health - with sounds
+150. [ ] (217) Low health warning - red screen edges and a heartbeat under 25% life
+151. [ ] (218) Main menu redesign - animated 3D scene with your character, save slots with portrait and play time
+152. [ ] (219) Pause menu - resume, settings, key binds, save and quit, separate from help
+153. [ ] (220) Loading screens with tips and art between areas
+154. [ ] (221) Death screen redesign - cause-of-death recap, what you lost, a return-to-gravestone button
+155. [ ] (222) Stats page - kills, deaths, gold earned, play time, damage dealt, longest dungeon run
+156. [ ] (223) Themed UI skin - stone-and-wood frames, parchment for quest text
+157. [ ] (224) UI sounds - clicks, page turns, coins, level-up chime
+158. [ ] (225) Smooth UI animations - sliding panels, counting numbers, filling bars
 
 ## Backlog
 
@@ -235,3 +261,10 @@
 - (197) Degrading gear - barrows armour wears down and needs repairs
 - (198) Consumables - stat potions, anti-fire, stamina, teleport tablets, bombs
 - (199) Equipment presets - save melee, ranged and magic loadouts, switch in one click
+
+### UI
+- (226) Special attack orb (if special attacks are added)
+- (227) Better touch controls - tap to walk, long-press menu, pinch to zoom
+- (228) Colour-blind modes for minimap, rarity and combat-triangle colours
+- (229) Text size option and high-contrast mode
+- (230) Screen shake and flashing toggles
