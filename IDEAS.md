@@ -44,6 +44,20 @@
 32. [ ] (41) Better base model - hands with fingers, visible boots and gloves, shoulder pads matched to the armour tier
 33. [ ] (42) Gear detail per tier - rune plate trims, dragon spikes, mystic robes with stitched runes
 34. [ ] (43) Idle animations - breathing, looking around, sitting at camp
+35. [ ] (48) Weapon-type differences - daggers hit twice, spears reach 2 tiles, battleaxes and halberds hit everything around you, maces stun, scimitars bleed
+36. [ ] (49) Flanking and positioning - bonus for hitting from behind or the side, penalty when surrounded
+37. [ ] (50) Shields as a real choice - one-handed weapon and shield for defence, or a two-handed weapon for damage
+38. [ ] (51) Crits and hit feedback - bigger hitsplats, screen shake on big hits, miss and block splashes
+39. [ ] (52) Monster roles - tanks guard healers, archers keep distance, casters teleport away, swarms surround you
+40. [ ] (53) Boss phases - tactics change at 66% and 33% health: summon adds, enrage, or switch style (Jad-style prayer switch)
+41. [ ] (54) RuneScape monster abilities - drain your stats, freeze you in place, disarm, poison
+42. [ ] (55) Elite and champion modifiers - random affixes on tougher monsters (fast, vampiric, shielded, explosive)
+43. [ ] (56) Aggression levels - some monsters ignore you until provoked; low-level monsters flee from a high-level player
+44. [ ] (57) Ammo types - broad bolts, fire arrows, ruby bolt effects; thrown darts, knives and chinchompas
+45. [ ] (58) Wilderness zone - a lawless region with riskier encounters and better loot, where you drop items on death
+46. [ ] (59) Colour-coded damage numbers - melee, ranged, magic, poison and crit
+47. [ ] (60) Combat log filters and a kill-count tracker per monster
+48. [ ] (61) Death animations and ragdolls, with corpses that stay a few turns
 
 ## Backlog
 
@@ -71,3 +85,15 @@
 - (45) Emotes - wave, bow, dance, cheer, unlockable skill-cape emote
 - (46) Titles - "the Slayer", "Dragonbane", shown over your head and on your plate
 - (47) Aura effects for milestones (glow at total level 1000, flames at combat 100)
+
+### Combat
+- (62) Blocking and parrying - skip your attack to block; a shield reflects damage
+- (63) Readable enemy attacks - telegraphed tiles light up a turn before a big hit
+- (64) Ancient and lunar spellbooks - freezes, area-of-effect barrages, heal-other, teleports
+- (65) Curse and debuff spells - confuse, weaken, bind, snare
+- (66) Staves with built-in spells - trident-style staves that cast without runes
+- (67) Tick-eating and combo food - eat and attack in the same turn
+- (68) Stat-boosting potions - super attack, strength and defence; prayer and restore potions
+- (69) Combat XP lamps and stat restore at altars and shrines
+- (70) Multi-combat and single-combat areas
+- (71) Health bars over every visible monster
