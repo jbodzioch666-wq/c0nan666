@@ -21,7 +21,7 @@
 15. [ ] (22) Minimap on the overworld and in towns
 16. [ ] (23) XP drops and a skill tracker
 17. [ ] (25) Save export and import
-18. [ ] (26) Level-up fireworks and jingle
+18. [ ] (26) Level-up fireworks and jingle - a column of light and fireworks around your character
 19. [ ] (28) Death gravestone to return to for your items
 20. [ ] (29) Dungeon overhaul - floors are only 20x20 with 6-9 small box rooms today
     - Bigger floors: about 48x48, sized by depth and site type. Make floor size a per-floor setting (towns stay 20x20) and only build the 3D scene near the camera
@@ -205,6 +205,23 @@
 193. [ ] (272) Environment sounds - doors, chests, stairs, portals, traps, levers
 194. [ ] (273) Pickup sounds by item type - coins jingle, gems chime, armour clanks, potions slosh
 195. [ ] (274) Volume sliders - master, music, effects, ambience, UI
+196. [ ] (280) Better lighting - soft shadows, warm sunrise and sunset, blue moonlight, light shafts through trees and dungeon cracks
+197. [ ] (281) Bloom and glow - magic, lava, torches and glowing gear bleed light
+198. [ ] (282) Colour grading per region - warm desert, murky green swamp, cold blue tundra, dark red volcanic
+199. [ ] (283) Volumetric fog and mist - low mist over swamps and graveyards, dust in mines
+200. [ ] (284) Dynamic torchlight - flickering light and moving shadows, a lantern to carry in dark dungeons
+201. [ ] (285) Better terrain - blended ground textures (grass, dirt, rock), cliffs, height detail
+202. [ ] (286) Swaying grass and plants, plus flowers, rocks and bushes
+203. [ ] (287) Better water - reflections, waves, shore foam, animated rivers and waterfalls
+204. [ ] (288) Better trees - more species shapes, falling autumn leaves, snow-covered in the north
+205. [ ] (289) Sky - moving clouds, stars and moon at night, sunrise colours
+206. [ ] (290) Richer dungeon dressing - cobwebs, bones, barrels, moss, chains, banners, rubble, per site type
+207. [ ] (291) Better wall and floor textures per site - castle stone, temple tiles, mine timbers, crypt carvings
+208. [ ] (292) Animated hazards - bubbling lava, dripping water, glowing crystals, swinging blades
+209. [ ] (293) Wall cutaway fades smoothly instead of popping
+210. [ ] (294) Better spell effects - per-element particles (fire trails, water splash, earth rocks, swirling air)
+211. [ ] (295) Graphics quality settings - low, medium, high for shadows, draw distance and effects
+212. [ ] (296) FPS counter in settings
 
 ## Backlog
 
@@ -319,3 +336,14 @@
 - (277) Hit feedback sounds - armour, flesh, bone, shield block
 - (278) Mute when the tab isn't focused
 - (279) Recorded or sampled sounds as an option (makes the file larger)
+
+### Graphics
+- (297) Weather visuals - rain streaks, piling snow, lightning, sandstorms
+- (298) Distant view - far mountains and landmarks with haze
+- (299) Hit effects - blood or spark particles, landing dust
+- (300) Footprints and trails in snow and sand
+- (301) Portal and teleport particle effects
+- (302) Art style choice - 2007-style low-poly or smoother modern
+- (303) Outline or cel shading option
+- (304) Pixel-art filter option
+- (305) Level of detail - simpler models in the distance
