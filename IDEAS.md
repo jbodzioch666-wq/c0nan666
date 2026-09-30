@@ -188,6 +188,23 @@
 176. [ ] (248) Status visuals - green when poisoned, icy when frozen, smoking when burning
 177. [ ] (249) Full bestiary entries - 3D model viewer, lore, drop table, weaknesses, where found
 178. [ ] (250) Bestiary completion rewards - bonuses per monster family, a title for finishing it
+179. [ ] (258) Music system - tracks per area (overworld, towns, sites, bosses) with crossfades; synthesized in the browser to keep the file small
+180. [ ] (259) Region themes - grassland, desert, swamp, tundra, sea, with night versions
+181. [ ] (260) Combat music that fades in when a fight starts and out when it ends
+182. [ ] (261) Boss themes - a unique track per named boss
+183. [ ] (262) Music player - unlock tracks by visiting places, replay any of them
+184. [ ] (263) Stingers - short cues for quest complete, rare drop, level 99, boss appears, new place discovered
+185. [ ] (264) Title screen theme
+186. [ ] (265) Ambient soundscapes - wind, birds, insects outdoors; waves on the coast; drips and rumbles in dungeons; market chatter in towns
+187. [ ] (266) Day and night ambience - birds by day, crickets and owls at night
+188. [ ] (267) Weather sounds - rain, thunder, storm wind
+189. [ ] (268) Room reverb - caves echo, small rooms sound dry
+190. [ ] (269) Footsteps by surface - grass, stone, wood, sand, snow, water; armour clank for plate
+191. [ ] (270) Weapon-specific sounds - sword clang, mace thud, bow twang, per-element spell sounds, arrow whistle
+192. [ ] (271) Skilling sounds - axe chops, pickaxe clinks, fishing splash and reel, cooking sizzle, anvil hammering, fire crackle
+193. [ ] (272) Environment sounds - doors, chests, stairs, portals, traps, levers
+194. [ ] (273) Pickup sounds by item type - coins jingle, gems chime, armour clanks, potions slosh
+195. [ ] (274) Volume sliders - master, music, effects, ambience, UI
 
 ## Backlog
 
@@ -297,3 +314,10 @@
 - (255) Ambushers - hidden in sand, chests or statues
 - (256) Fleeing and calling for help - wounded monsters run to their pack
 - (257) Sleeping monsters - sneak up for a first-hit bonus
+
+### Sound and music
+- (275) Adaptive music - layers added as danger rises, tense at low health, calm at camp
+- (276) Positional sound - louder when closer, panned left and right
+- (277) Hit feedback sounds - armour, flesh, bone, shield block
+- (278) Mute when the tab isn't focused
+- (279) Recorded or sampled sounds as an option (makes the file larger)
