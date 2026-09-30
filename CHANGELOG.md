@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-41 - Examine
+
+- **Shift+click anything** in the overworld, a town or a dungeon to examine it, RuneScape style. A short description appears in the message log.
+- **Monsters** get a line about what they are, plus their level, fighting style, and what they're weak to or resist.
+- **Places and objects:** terrain and sites on the overworld, town buildings, workbenches, the waypoint, the stash and townsfolk. In dungeons it covers stairs, portals, vaults, chests, altars, ore veins, pools, traps you've spotted and other props.
+- **Item tooltips** now start with the item's examine line.
+- **The Key Binds page** lists Shift + click.
+
 ## RS-40 - Prayer drain shown
 
 - **The prayer screen (N)** now shows your total drain per turn of a fight and about how many turns your points will last.

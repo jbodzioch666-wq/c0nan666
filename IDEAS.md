@@ -12,7 +12,7 @@ _One pass over the tooltip, hover and label code_
 3. [x] (184) Item compare tooltip - green and red numbers against what you're wearing
 4. [x] (377) Spell details on hover - max hit, rune cost, accuracy against the target, element weakness
 5. [x] (442) Prayer drain shown - points per turn on the prayer screen and hotbar
-6. [ ] (211) Examine text for any object, monster or item
+6. [x] (211) Examine text for any object, monster or item
 7. [ ] (243) Monster levels in RuneScape colours - green easy, yellow even, red dangerous against your combat level
 8. [ ] (162) Quest difficulty and length shown before you accept
 9. [ ] (99) Hover details for everything - site name, history, boss, depth, loot tier, your best clear time

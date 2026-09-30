@@ -290,6 +290,8 @@
   .item-tooltip .ttrow{ display:flex; justify-content:space-between; gap:14px; }
   .item-tooltip .ttrow b{ color:var(--ink); font-weight:600; }
   [data-tipstat]{ cursor:help; }
+  .item-tooltip .examine{ font-style:italic; color:var(--ink-dim); margin:2px 0 4px; }
+  .examine, .line.cls-examine{ color:#b8c4a0; font-style:italic; }
   .item-tooltip hr{ border:none; border-top:1px solid rgba(255,255,255,0.08); margin:6px 0 4px; }
   .detailpane{ margin-top:16px; background:var(--panel); border:1px solid var(--stone-hi); border-radius:6px; padding:12px 14px; font-size:12.5px; }
   .detailpane .aff{ color:var(--teal); }
@@ -9568,6 +9570,7 @@ function itemCompareTooltipHtml(it){
   const equipped = curEquipFor(it);
   let html = `<div class="tt-head">${ttItemArt(it) ? '<canvas id="ttIcon" width="34" height="34"></canvas>' : ''}<div><div class="${rarityColorClass(it)}" style="font-weight:600;">${esc(it.nm)}</div>
     <div class="muted">${esc(it.uniqueId ? 'unique '+(it.baseMat||'')+' '+it.basis : it.basis||'')}</div></div></div>
+    <div class="examine">${esc(examineItem(it))}</div>
     ${itemModListHtml(it)}`;
   if (!canEquip(it)) html += `<div style="color:${COL.red};margin-top:4px;">you can't use this yet</div>`;
   html += valueRowsHtml(itemPrice(it), sellPrice(it));
@@ -17476,7 +17479,7 @@ function v3Pick(e){
 }
 function v3Input(cv){
   cv.addEventListener('pointermove', e=>{ if (!v3Active()) return; const a = v3Pick(e); V3.hover = a && a.kind!=='ground' ? a : null; cv.style.cursor = V3.hover ? 'pointer' : 'default'; });
-  cv.addEventListener('pointerdown', e=>{ if (!v3Active() || G.ui!=='playing' || e.button!==0 || G.portalFx) return; const a = v3Pick(e); if (a) v3WalkTo(a); });
+  cv.addEventListener('pointerdown', e=>{ if (!v3Active() || G.ui!=='playing' || e.button!==0 || G.portalFx) return; const a = v3Pick(e); if (e.shiftKey){ examineSay(examineAct(a)); return; } if (a) v3WalkTo(a); });
   cv.addEventListener('wheel', e=>{ if (!v3Active()) return; e.preventDefault(); V3.dist = clamp(V3.dist * (e.deltaY>0 ? 1.1 : 0.9), 6.5, 20); }, { passive:false });
 }
 // ---------- per-frame ----------
@@ -18424,6 +18427,7 @@ function o3Input(cv){
     cv.style.cursor = (O3.hover || n) ? 'pointer' : 'default'; });
   cv.addEventListener('pointerleave', ()=>{ if (O3.nodeTip){ hideItemTooltip(); O3.nodeTip = false; } });
   cv.addEventListener('pointerdown', e=>{ if (!o3Active() || G.ui!=='playing' || e.button!==0 || G.owPortal) return; const a = o3Pick(e);
+    if (e.shiftKey){ examineSay(examineAct(a)); return; }
     if (a && a.kind==='node' && o3GoGather(a.x, a.y)) return;
     if (a) o3WalkTo(a); });
   cv.addEventListener('wheel', e=>{ if (!o3Active()) return; e.preventDefault(); O3.dist = clamp(O3.dist * (e.deltaY>0 ? 1.1 : 0.9), 7, 28); }, { passive:false });
@@ -22622,6 +22626,7 @@ function isoClick(e){
     }
   }
   if (!mon) mon = G.mon.find(m=>m.alive && m.x===gx && m.y===gy) || null;
+  if (e.shiftKey){ examineSay(mon ? examineMonster(mon) : examineDungeonTile(gx, gy)); return; }
   const p = G.player;
   if (!mon && G.gameMode===1 && G.dungeonDeco && G.dungeonDeco[gx] && SK_CAVE_DECOS.includes(G.dungeonDeco[gx][gy])){
     ISO.fighting = null; ISO.target = null;
@@ -22907,7 +22912,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-40';
+const GAME_VERSION = 'rs-41';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -24104,6 +24109,7 @@ function buildHelpKeys(){
     ${sec('MOVING AROUND', [
       ['W A S D or &uarr; &darr; &larr; &rarr;', 'step one tile; hold to keep walking. On the overworld and in towns they go north, south, west and east; in dungeons and fights they step along the screen\'s diagonals. Walk into a monster to attack it'],
       ['Left-click', 'walk to that spot. Click a monster to walk up and fight it until it falls, a tree, fishing spot or herb patch to gather, or a vendor, door, waypoint or stash to use it'],
+      ['Shift + click', 'examine a monster, object or place - a short description goes to the message log'],
       ['Mouse&nbsp;wheel', 'zoom the camera in and out'],
       ['Z / X', 'turn the camera a quarter-turn (in dungeons and roadside fights)'],
       ['M', 'overworld: the world map. Town: 3D town &harr; flat town map. Dungeon: 3D view &harr; flat map', ic.M],
@@ -24268,6 +24274,83 @@ function buildHelp(){
     </div>
   `;
 }
+
+
+// ===================== EXAMINE =====================
+// RuneScape's examine text: a short line about anything - shown in item tooltips, and written to the
+// message log when you Shift+click a monster, object, item or place in any of the 3D views.
+const EXAMINE_MON = [
+  [/goblin|hobgoblin/, 'An ugly green creature that smells of old cabbage.'], [/kobold/, 'A small, scaly trap-maker. Cowardly alone, dangerous in packs.'],
+  [/skeleton/, 'Rattling bones held together by dark magic.'], [/zombie|ghoul|ghast/, 'Rotting flesh that refuses to lie down.'],
+  [/ghost|wraith|spectre|specter|banshee|shadow|phantom/, 'A restless spirit. The air is colder around it.'], [/lich/, 'An undead sorcerer that cheated death - for now.'],
+  [/vampire|vampyre/, 'Pale, hungry and very old.'], [/mummy/, 'Wrapped in rotting linen and old curses.'],
+  [/rat\b|rats|rat /, 'Overgrown vermin.'], [/spider/, 'Too many legs, too many eyes.'], [/bat/, 'It squeaks and swoops in the dark.'],
+  [/wolf|jackal|hound|dog/, 'A hungry hunter with sharp teeth.'], [/bear|owlbear/, 'Big, furry and very cross.'], [/boar/, 'Tusks first, questions later.'],
+  [/orc/, 'A brutish warrior who lives for battle.'], [/troll/, 'Huge, ugly and it heals faster than you can hit it.'], [/ogre|giant|ettin|cyclops/, 'Enormous. Its club alone is taller than you.'],
+  [/dragon|wyrm|drake|wyvern/, 'A mighty dragon. Its breath could melt steel.'], [/demon|devil|fiend|imp|balor|vrock/, 'A creature from the Abyss, reeking of brimstone.'],
+  [/snake|serpent|naga|basilisk/, 'Scales, fangs and a cold stare.'], [/elemental|mephit/, 'Raw elemental power given a shape.'], [/golem/, 'A made thing of stone or metal. It feels no pain.'],
+  [/slime|ooze|jelly|pudding/, 'A quivering blob that eats whatever it touches.'], [/beetle|scarab|ankheg|bug|insect/, 'A giant insect with a hard shell.'],
+  [/harpy|griffon|hawk|owl|bird|cockatrice/, 'All claws, feathers and bad temper.'], [/shark|eel|crab|octopus|fish/, 'It came up out of the water for you.'],
+  [/treant|tree|dryad/, 'A walking tree, angry about the logging.'], [/bandit|thug|brigand|raider/, 'A thief who would rather have your gold than your company.'],
+  [/cultist|necromancer|mage|wizard|warlock|sorcerer|priest/, 'A spellcaster muttering something unpleasant.'], [/knight|guard|soldier|warrior|captain/, 'A trained fighter in well-kept armour.'],
+  [/minotaur/, 'Half man, half bull, all anger.'], [/hydra/, 'Cut off one head and two more grow back.'], [/beholder|eye/, 'An eye that looks back at you.'],
+];
+function examineMonster(m){
+  const nm = (m.nm||'').toLowerCase(), e = EXAMINE_MON.find(([re])=>re.test(nm));
+  const ew = rsMonElem(m), st = rsMonStyle(m);
+  return `${e ? e[1] : 'A dangerous-looking creature.'} Level ${m.mlevel||'?'} ${m.nm}, fights with ${st}${ew.weak ? `, weak to ${ew.weak}` : ''}${ew.resist ? `, resists ${ew.resist}` : ''}.`;
+}
+const EXAMINE_WEAPON = { Dagger:'Short and sharp - good for quick stabs.', Mace:'A spiked club for cracking armour.', Shortsword:'A light, handy blade.', Scimitar:'A curved blade, deadly in skilled hands.',
+  Spear:'A long shaft with a pointed end.', Longsword:'A long, straight blade.', Warhammer:'Heavy enough to dent any helmet.', Battleaxe:'A big axe for big swings.',
+  Halberd:'An axe blade on a long pole.', Greatsword:'A huge two-handed sword.', Quarterstaff:'A sturdy wooden staff.' };
+function examineItem(it){
+  if (!it || !it.used) return '';
+  if (it.uniqueId) return 'One of a kind. Its maker is long forgotten, but its power is not.';
+  if (it.kind==='scroll') return 'A scroll inscribed with a single spell.';
+  if (it.consumable) return 'A small bottle. It might help in a tight spot.';
+  if (it.kind==='wand') return 'A relic of another age.';
+  const mat = (it.nm||'').split(' ')[0];
+  if (it.rsStaff) return it.rsElem ? `A staff humming with ${it.rsElem} magic. It never runs out of ${it.rsElem} runes.` : 'A staff for channelling magic.';
+  if (it.slot==='ranged' || it.range) return `${/^[aeiou]/i.test(mat) ? 'An' : 'A'} ${mat.toLowerCase()} bow. Arrows not included.`;
+  if (it.slot==='weapon') return EXAMINE_WEAPON[it.basis] || 'A weapon.';
+  if (it.slot==='ring') return 'A ring. It fits.';
+  if (it.slot==='necklace') return 'An amulet on a chain.';
+  if (it.rsFam==='metal') return `${mat} armour. Heavy, and it clanks.`;
+  if (it.rsFam==='hide') return 'Tough leather armour, light enough for an archer.';
+  if (it.rsFam==='cloth') return 'Robes woven with magical thread.';
+  return 'A piece of gear.';
+}
+const EXAMINE_TILE = { [T_WALL]:'Solid stone.', [T_FLOOR]:'The floor. Watch your step.', [T_STAIRSD]:'Stairs leading further down.', [T_STAIRSU]:'Stairs leading back up.',
+  [T_EXIT]:'A shimmering portal back to the surface.', [T_VAULT]:'A sealed vault with a coloured lock.', [T_CORRUPT_CHEST]:'A chest pulsing with dark energy. Tempting.',
+  [T_GOLD]:'Coins! Somebody dropped these.', [T_ITEM]:'Something shiny lies here.', [T_FLEE]:'The way out of this fight.' };
+const EXAMINE_DECO = { altar:'An old altar. Praying here restores your prayer.', throne:'A throne for someone who no longer needs it.', banner:'A tattered banner of a forgotten house.',
+  idol:'A strange idol. It seems to watch you.', rune:'Runes carved into the stone, still faintly glowing.', ore:'A vein of ore in the rock.', eelpool:'A dark pool. Something moves beneath the surface.', cavherb:'Pale herbs growing in the dark.' };
+function examineDungeonTile(x, y){
+  const m = (G.mon||[]).find(m=>m.alive && m.x===x && m.y===y); if (m) return examineMonster(m);
+  const deco = G.dungeonDeco && G.dungeonDeco[x] && G.dungeonDeco[x][y]; if (deco && EXAMINE_DECO[deco]) return EXAMINE_DECO[deco];
+  const t = tileAt(x, y);
+  if (t===T_TRAP) return G.trapSeen && G.trapSeen[x] && G.trapSeen[x][y] ? 'A pressure plate. Best not to step on it.' : EXAMINE_TILE[T_FLOOR];
+  return EXAMINE_TILE[t] || 'Nothing interesting.';
+}
+const EXAMINE_OW = { [OW_GRASS]:'Open grassland.', [OW_FOREST]:'Thick forest. Good for logs, and for ambushes.', [OW_WATER]:'Deep water. You will need a boat.', [OW_RIVER]:'A river, running down to the sea.',
+  [OW_MOUNTAIN]:'Steep, rocky mountains.', [OW_MOUNTAINPASS]:'A narrow pass through the mountains.', [OW_TUNDRA]:'Frozen tundra. Your breath steams.', [OW_DESERT]:'Hot sand as far as you can see.', [OW_SWAMP]:'Murky swamp. It smells.',
+  [OW_TOWN]:'A town. Shops, a tavern and a warm bed.', [OW_DUNGEON]:'A dark way down into a dungeon.', [OW_CASTLE]:'A fallen castle, overrun by monsters.', [OW_NECROTOWER]:"A necromancer's tower. Nothing living goes in.",
+  [OW_TEMPLE]:'A sunken temple, half under water.', [OW_GRAVEYARD]:'A graveyard. The dead do not rest easy here.', [OW_MINE]:'An old mine, rich in ore.', [OW_LAIR]:"A dragon's lair. Mind the bones." };
+function examineAct(a){
+  if (!a) return '';
+  if (a.kind==='site') return EXAMINE_OW[a.t] || 'A place worth exploring.';
+  if (a.kind==='node'){ const n = skNodeAt(a.x, a.y); return n ? `${skNodeName(n)}. ${n.k==='woodcutting' ? 'You could chop this.' : n.k==='fishing' ? 'Fish are biting here.' : 'You could pick this.'}` : 'Nothing left here.'; }
+  if (a.kind==='building') return `${a.b.name}. ${a.b.role ? 'The '+a.b.role.toLowerCase()+' works here.' : ''}`;
+  if (a.kind==='tile'){ const b = Object.values(BENCHES).find(b=>b.nm===a.label); if (b) return `${b.nm}: you can ${b.does} here.`;
+    if (a.label==='Waypoint') return 'A waypoint. It can take you to any town you have visited.'; if (a.label==='Stash') return 'Your stash chest. It holds 60 items, shared by every town.';
+    const n = (G.villageNpcs||[]).find(n=>n.name===a.label); return n ? `${n.name}, ${n.role ? 'the '+n.role.toLowerCase() : 'a local'}.` : `${a.label}.`; }
+  if (a.kind==='ground'){
+    if (G.gameMode===0 && G.ow && G.ow.map[a.x]) return EXAMINE_OW[G.ow.map[a.x][a.y]] || 'The ground.';
+    return G.gameMode===3 ? 'A well-trodden street.' : 'The ground.';
+  }
+  return '';
+}
+function examineSay(txt){ if (!txt) return; logMsg('Examine: '+txt, 'examine'); renderGame(); }
 
 // ===================== SECTION: INPUT HANDLING =====================
 function moveDir(dx,dy){
