@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## RS-56 - Inventory sort, filter and search
+
+- **The inventory has a search box.** Type part of a name, a stat or a type (like "plate", "ranged" or "potion") and the list narrows as you type. Press / or F to jump into it, and Enter or Esc to leave it.
+- **Filter chips show how many of each you're carrying:** All, Gear, Usable (potions and scrolls), Upgrades (better than what you wear and usable now) and Junk.
+- **Sort the list** by the order you found things, name, value, rarity or type. O cycles through the sorts, and your filter and sort are remembered.
+- **Tidy pack (T)** rearranges your pack into the current sort order for good.
+- Number keys 1-9 pick the rows as they appear on screen, so they still work while filtered.
+- Opening the inventory always starts with an empty search.
+
 ## RS-55 - Hotbar cooldown and charge overlays
 
 - **When you're stunned, every action slot on the hotbar darkens** and shows the turns left, so you can see at a glance why nothing works.

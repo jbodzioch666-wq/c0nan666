@@ -34,7 +34,7 @@ _The log panel, hitsplats and HUD overlays_
 ### Inventory management
 _The inventory and stash code_
 
-20. [ ] (185) Inventory sort, filter and search
+20. [x] (185) Inventory sort, filter and search
 21. [ ] (186) Lock items so they can't be sold or dropped by mistake
 22. [ ] (314) Coin pouch - gold goes to a pouch instead of taking an inventory slot
 23. [ ] (187) Salvage - break junk gear into bars, leather or cloth

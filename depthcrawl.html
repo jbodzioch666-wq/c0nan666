@@ -446,6 +446,12 @@
   .dh-slot .k{ position:absolute; left:3px; top:1px; font-size:9.5px; color:#e8d5a8; text-shadow:0 1px 2px #000; font-weight:700; }
   .dh-slot .n{ position:absolute; right:3px; bottom:1px; font-size:10px; color:#fff; text-shadow:0 1px 2px #000, 0 0 3px #000; font-weight:700; }
   .dh-slot.off{ opacity:0.45; }
+  .invbar{ display:flex; flex-wrap:wrap; gap:5px; align-items:center; margin:0 0 6px; }
+  .invbar input, .invbar select{ background:rgba(10,14,18,0.85); color:var(--ink); border:1px solid #4a5560; border-radius:5px; padding:3px 6px; font:12px 'JetBrains Mono',monospace; }
+  .invbar input{ width:120px; } .invbar select{ width:118px; min-width:0; } .invbar input:focus{ outline:none; border-color:var(--amber); }
+  .invchip{ background:rgba(44,54,64,0.92); color:#d4dce2; border:1px solid #4a5560; border-radius:12px; padding:3px 9px; font:11px 'JetBrains Mono',monospace; cursor:pointer; }
+  .invchip span{ opacity:0.65; } .invchip:hover{ border-color:var(--amber); }
+  .invchip.on{ background:var(--amber); color:#1a1208; border-color:var(--amber); } .invchip.on span{ opacity:0.8; }
   .dh-slot .cdw{ position:absolute; inset:0; border-radius:inherit; pointer-events:none; background:conic-gradient(rgba(0,0,0,0.62) calc(var(--cd,0)*1turn), transparent 0); }
   .dh-slot .cdw.run{ animation:cdSweep linear infinite; }
   @property --cd{ syntax:'<number>'; inherits:false; initial-value:0; }
@@ -23120,6 +23126,7 @@ function setUi(mode, isHelp){
   // screen prevUi used to point back to. closeHelp() would then just set
   // G.ui back to 'help' again - Escape/Enter/the ? icon all looked "stuck"
   // since nothing actually left the help screen from that point on.
+  if (mode==='inventory' && G.ui!=='inventory') invView.q = ''; // a fresh look at the pack starts unsearched
   if (isHelp){ if (G.ui!=='help') G.prevUi = G.ui; G.ui = 'help'; }
   else { G.ui = mode; }
   if (mode==='inventory') G.invSel = G.invSel||0;
@@ -23198,7 +23205,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-55';
+const GAME_VERSION = 'rs-56';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -23812,28 +23819,88 @@ function invUse(){ useFromInv(G.invSel); clampInvSel(); renderOverlay(); saveCur
 function invSell(){ sellFromInv(G.invSel); clampInvSel(); renderOverlay(); saveCurrentGame(); }
 function invSellJunk(){ sellJunk(); clampInvSel(); renderOverlay(); saveCurrentGame(); }
 function clampInvSel(){ if (G.invSel>=G.inv.length) G.invSel=G.inv.length-1; if (G.invSel<0) G.invSel=0; }
+// ---- inventory sort, filter and search: the list shows a filtered and
+// sorted VIEW of G.inv (rows keep their real index, so every action still
+// works on the right item); "tidy pack" writes the current sort order back ----
+const INV_FILTERS = [['all','All'],['gear','Gear'],['use','Usable'],['up','Upgrades'],['junk','Junk']];
+const INV_SORTS = [['found','Order found'],['name','Name'],['value','Value'],['rarity','Rarity'],['type','Type']];
+let invView = { q:'', f:'all', s:'found' };
+try { const v = JSON.parse(localStorage.getItem('depthcrawl_invview')||'null'); if (v){ invView.f = v.f||'all'; invView.s = v.s||'found'; } } catch(e){}
+function invSaveView(){ try { localStorage.setItem('depthcrawl_invview', JSON.stringify({f:invView.f, s:invView.s})); } catch(e){} }
+function invIsJunk(it){ return !it.consumable && it.kind!=='scroll' && !canEquip(it) && !(isWeaponLike(it) && it.kind!=='wand'); }
+function invTypeRank(it){ return it.kind==='scroll' ? 1 : it.consumable ? 0 : (it.slot==='weapon' || it.range || it.kind==='wand') ? 2 : 3; }
+function invTypeWord(it){ return ['potion food consumable','scroll','weapon','armour armor'][invTypeRank(it)]; }
+function invPass(it){
+  const f = invView.f;
+  if (f==='gear' && invTypeRank(it)<2) return false;
+  if (f==='use' && invTypeRank(it)>1) return false;
+  if (f==='up' && (lootArrow(it)!=='up' || invIsJunk(it))) return false;
+  if (f==='junk' && !invIsJunk(it)) return false;
+  const q = invView.q.trim().toLowerCase();
+  if (q){ const hay = (it.nm+' '+itemDesc(it)+' '+(it.basis||'')+' '+invTypeWord(it)+' '+(it.kind||'')+' '+(it.slot||'')).toLowerCase();
+    if (!q.split(/\s+/).every(w=>hay.includes(w))) return false; }
+  return true;
+}
+function invCmp(a, b){
+  switch (invView.s){
+    case 'name': return a.nm.localeCompare(b.nm);
+    case 'value': return sellPrice(b) - sellPrice(a);
+    case 'rarity': return ((b.used&&!b.consumable ? b.quality||0 : -1) - (a.used&&!a.consumable ? a.quality||0 : -1)) || sellPrice(b)-sellPrice(a);
+    case 'type': return invTypeRank(a)-invTypeRank(b) || (a.slot||'').localeCompare(b.slot||'') || sellPrice(b)-sellPrice(a);
+  }
+  return 0;
+}
+function invVisible(){
+  const idx = G.inv.map((_,i)=>i).filter(i=>invPass(G.inv[i]));
+  if (invView.s!=='found') idx.sort((x,y)=> invCmp(G.inv[x], G.inv[y]) || x-y);
+  return idx;
+}
+function invListHtml(){
+  const sel = G.invSel||0;
+  if (G.inv.length===0) return `<div class="muted">(empty)</div>`;
+  const vis = invVisible();
+  if (!vis.length) return `<div class="muted">nothing matches${invView.q ? ` "${esc(invView.q)}"` : ''} - <a href="#" onclick="invView.q='';invView.f='all';invSaveView();renderOverlay();return false;">show everything</a></div>`;
+  return vis.map((i, vi)=>{
+    const it = G.inv[i];
+    const arrow = lootArrow(it);
+    const arrowHtml = arrow==='up'?`<span style="color:${COL.green}">&uarr;</span>`:(arrow==='down'?`<span style="color:${COL.red}">&darr;</span>`:'<span></span>');
+    // gear your own class can't ever wear is only ever worth selling -
+    // flagged right in the list so it's obvious at a glance
+    const junk = invIsJunk(it);
+    const cls = i===sel ? '' : (junk ? 'muted' : rarityColorClass(it));
+    const style = i===sel ? `color:${COL.amber};` : '';
+    const junkTag = junk ? `<span style="color:${COL.red};font-size:10px;margin-right:4px;">[JUNK]</span>` : '';
+    return `<div class="invrow" style="${style}" onclick="G.invSel=${i};renderOverlay();" ${it.consumable||it.kind==='scroll'?'':`onmouseenter="showItemTooltip(event, G.inv[${i}])" onmousemove="moveItemTooltip(event)" onmouseleave="hideItemTooltip()"`}>
+      ${arrowHtml}
+      <span class="${cls}">${junkTag}${vi<9 ? (vi+1)+'. ' : ''}${esc(it.nm)} - ${esc(itemDesc(it))} (sell ${sellPrice(it)}g)</span>
+    </div>`;
+  }).join('') + (vis.length<G.inv.length ? `<div class="muted" style="margin-top:4px;font-size:11px;">showing ${vis.length} of ${G.inv.length} items</div>` : '');
+}
+function invToolbarHtml(){
+  const chip = (id, nm)=>{ const n = id==='all' ? G.inv.length : G.inv.filter(it=>{ const f = invView.f, q = invView.q; invView.f = id; invView.q = ''; const r = invPass(it); invView.f = f; invView.q = q; return r; }).length;
+    return `<button class="invchip${invView.f===id?' on':''}" onclick="invView.f='${id}';invSaveView();renderOverlay();">${nm} <span>${n}</span></button>`; };
+  return `<div class="invbar">
+    <input id="invSearch" type="text" placeholder="search (/)" value="${esc(invView.q)}" oninput="invView.q=this.value;invRefreshList();" autocomplete="off" spellcheck="false">
+    ${INV_FILTERS.map(([id,nm])=>chip(id,nm)).join('')}
+  </div><div class="invbar"><span class="muted" style="font-size:12px;">sort by</span>
+    <select id="invSort" onchange="invView.s=this.value;invSaveView();renderOverlay();" title="sort the list (O)">${INV_SORTS.map(([id,nm])=>`<option value="${id}"${invView.s===id?' selected':''}>${nm}</option>`).join('')}</select>
+    <button class="invchip" onclick="invTidy()" title="rearrange your pack into this sort order for good (T)">tidy pack</button>
+    <span class="muted" style="font-size:11px;">/ search &middot; O change sort &middot; T tidy</span>
+  </div>`;
+}
+function invRefreshList(){ const el = document.getElementById('invList'); if (el) el.innerHTML = invListHtml(); }
+function invTidy(){
+  if (invView.s==='found'){ logMsg('pick a sort order first, then tidy your pack into it', ''); return; }
+  const cur = G.inv[G.invSel||0];
+  G.inv.sort(invCmp);
+  G.invSel = Math.max(0, G.inv.indexOf(cur));
+  invView.s = 'found'; invSaveView();
+  logMsg('you tidy your pack', ''); sfx('loot');
+  renderOverlay(); saveCurrentGame();
+}
 function buildInventory(){
   const sel = G.invSel||0;
-  let listHtml;
-  if (G.inv.length===0) listHtml = `<div class="muted">(empty)</div>`;
-  else {
-    listHtml = G.inv.map((it,i)=>{
-      const arrow = lootArrow(it);
-      const arrowHtml = arrow==='up'?`<span style="color:${COL.green}">&uarr;</span>`:(arrow==='down'?`<span style="color:${COL.red}">&darr;</span>`:'<span></span>');
-      // gear your own class can't ever wear (wrong weapon/armor proficiency,
-      // a wand only a Wizard/Warlock can channel, ...) is only ever worth
-      // selling - flagged right in the list so it's obvious at a glance
-      // without having to click into every single row to find out
-      const junk = !it.consumable && it.kind!=='scroll' && !canEquip(it) && !(isWeaponLike(it) && it.kind!=='wand');
-      const cls = i===sel ? '' : (junk ? 'muted' : rarityColorClass(it));
-      const style = i===sel ? `color:${COL.amber};` : '';
-      const junkTag = junk ? `<span style="color:${COL.red};font-size:10px;margin-right:4px;">[JUNK]</span>` : '';
-      return `<div class="invrow" style="${style}" onclick="G.invSel=${i};renderOverlay();" ${it.consumable||it.kind==='scroll'?'':`onmouseenter="showItemTooltip(event, G.inv[${i}])" onmousemove="moveItemTooltip(event)" onmouseleave="hideItemTooltip()"`}>
-        ${arrowHtml}
-        <span class="${cls}">${junkTag}${i+1}. ${esc(it.nm)} - ${esc(itemDesc(it))} (sell ${sellPrice(it)}g)</span>
-      </div>`;
-    }).join('');
-  }
+  const listHtml = invToolbarHtml() + `<div id="invList">${invListHtml()}</div>`;
   let detailHtml = '';
   if (G.inv.length>0 && sel>=0 && sel<G.inv.length){
     const it = G.inv[sel];
@@ -24687,6 +24754,7 @@ function handleKeydown(e){
   const tag = (e.target && e.target.tagName) || '';
   if (tag==='INPUT' || tag==='TEXTAREA'){
     if (e.key==='Enter' && G.ui==='charcreate'){ e.preventDefault(); ccBegin(); }
+    if (e.target.id==='invSearch' && (e.key==='Escape' || e.key==='Enter')){ e.preventDefault(); if (e.key==='Escape' && !e.target.value) setUi('playing'); else e.target.blur(); }
     return;
   }
   const k = (e.key==='`') ? 'Escape' : e.key; // ` doubles as Escape (Escape can leave fullscreen)
@@ -24770,7 +24838,10 @@ function handleKeydown(e){
       break;
     }
     case 'inventory': {
-      if (k>='1' && k<='9'){ const idx=k.charCodeAt(0)-49; if (idx<G.inv.length){ G.invSel=idx; renderOverlay(); } }
+      if (k>='1' && k<='9'){ const vis = invVisible(), idx = vis[k.charCodeAt(0)-49]; if (idx!==undefined){ G.invSel=idx; renderOverlay(); } }
+      else if (k==='/' || k==='f' || k==='F'){ if (e.preventDefault) e.preventDefault(); const si = document.getElementById('invSearch'); if (si){ si.focus(); si.select(); } }
+      else if (k==='o' || k==='O'){ const i = INV_SORTS.findIndex(x=>x[0]===invView.s); invView.s = INV_SORTS[(i+1)%INV_SORTS.length][0]; invSaveView(); renderOverlay(); }
+      else if (k==='t' || k==='T') invTidy();
       else if (['e','E'].includes(k)) invEquip();
       else if (['u','U'].includes(k)) invUse();
       else if (['s','S'].includes(k)) invSell();
