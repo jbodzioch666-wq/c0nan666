@@ -244,20 +244,20 @@ _Monster AI and visuals_
 ### Monster content and bestiary
 _New monsters, bosses, drops and the bestiary_
 
-172. [ ] (236) Monster families with tiers - goblin to warlord, skeleton to champion; each area has an ecosystem
-173. [ ] (231) Classic RuneScape monsters - hill and moss giants, lesser and greater demons, hellhounds, abyssal demons, gargoyles, dagannoths, TzHaar, black knights, dark wizards
-174. [ ] (232) Regional monsters - desert scarabs and mummies, swamp bog-beasts and leeches, tundra ice trolls and yetis, coastal sea monsters
-175. [ ] (233) Night-only monsters - werewolves, vampyres, ghosts after dark
-176. [ ] (234) Rare spawns - golden goblin, shiny variants, treasure imps with big loot
-177. [ ] (235) Mimics - chests that bite back
-178. [ ] (237) Named RuneScape-style bosses - King Black Dragon, Kalphite Queen, Giant Mole, Barrows brothers, Dagannoth Kings, Corporeal Beast, Zulrah, each with a lair and mechanics
-179. [ ] (418) Godswords - Armadyl, Bandos, Saradomin, Zamorak two-handers built from boss shards
-180. [ ] (9) Boss drop tables with a collection log of every unique found per boss
-181. [ ] (183) Rare drop table - any monster has a small chance of big gems, rune items, half-keys or clue scrolls
-182. [ ] (239) Boss kill counts and personal best times in the bestiary
-183. [ ] (249) Full bestiary entries - 3D model viewer, lore, drop table, weaknesses, where found
-184. [ ] (250) Bestiary completion rewards - bonuses per monster family, a title for finishing it
-185. [ ] (210) Target info panel - a monster's stats, weaknesses and drop table on inspect
+172. [x] (236) Monster families with tiers - goblin to warlord, skeleton to champion; each area has an ecosystem
+173. [x] (231) Classic RuneScape monsters - hill and moss giants, lesser and greater demons, hellhounds, abyssal demons, gargoyles, dagannoths, TzHaar, black knights, dark wizards
+174. [x] (232) Regional monsters - desert scarabs and mummies, swamp bog-beasts and leeches, tundra ice trolls and yetis, coastal sea monsters
+175. [x] (233) Night-only monsters - werewolves, vampyres, ghosts after dark
+176. [x] (234) Rare spawns - golden goblin, shiny variants, treasure imps with big loot
+177. [x] (235) Mimics - chests that bite back
+178. [x] (237) Named RuneScape-style bosses - King Black Dragon, Kalphite Queen, Giant Mole, Barrows brothers, Dagannoth Kings, Corporeal Beast, Zulrah, each with a lair and mechanics
+179. [x] (418) Godswords - Armadyl, Bandos, Saradomin, Zamorak two-handers built from boss shards
+180. [x] (9) Boss drop tables with a collection log of every unique found per boss
+181. [x] (183) Rare drop table - any monster has a small chance of big gems, rune items, half-keys or clue scrolls
+182. [x] (239) Boss kill counts and personal best times in the bestiary
+183. [x] (249) Full bestiary entries - 3D model viewer, lore, drop table, weaknesses, where found
+184. [x] (250) Bestiary completion rewards - bonuses per monster family, a title for finishing it
+185. [x] (210) Target info panel - a monster's stats, weaknesses and drop table on inspect
 
 ### Slayer and tasks
 _Task and currency systems that share one framework_

@@ -2362,6 +2362,7 @@ const SITE_MONSTER_SKIN = {
 };
 function pickThemedMonsterEntry(targetLevel, jitter){
   const skin = SITE_MONSTER_SKIN[G.siteKind];
+  if (!skin && G.gameMode===1 && G.floorFams && G.floorFams.length && chn(0.7)){ const fe = famPickFrom(G.floorFams, targetLevel, jitter); if (fe) return fe; }
   return skin ? pickSkinnedMonsterEntry(skin, targetLevel, jitter) : pickMonsterEntry(targetLevel, jitter);
 }
 // which overworld terrain uses which roster/visual theme for a random
@@ -4568,6 +4569,7 @@ function fireWand(it){
 function useFromInv(idx){
   if (idx<0 || idx>=G.inv.length) return;
   const it = G.inv[idx];
+  if (it.clue){ clueOpen(idx); return; }
   if (it.kind==='scroll' && it.reforge){ logMsg('right-click a piece of gear and choose Reforge to use this scroll', ''); return; }
   if (it.recipeBook){ crLearn(idx); return; }
   if (it.trophy){ const r = (G.player.trophies||{})[it.trophy]; logMsg(`you admire the ${it.nm}${r ? ` - your record is ${r.w} ${r.unit}` : ''}`, ''); return; }
@@ -4688,6 +4690,7 @@ function rangedAttack(tgt){
 // ===================== SECTION: DUNGEON GENERATION =====================
 function generateLevel(d){
   setGrid(DUN_W, DUN_H);
+  G.floorFams = famForFloor(d);
   G.map = makeGrid(T_WALL);
   G.floorItem = makeItemGrid();
   G.trapSeen = makeGrid(false); // pits start hidden until noticed nearby
@@ -4827,7 +4830,7 @@ function generateLevel(d){
     m.dmg1 = entry.dmg1; m.dmg2 = roundH(entry.dmg2 * sp.dmg);
     m.xp = roundH(entry.xp * sp.xp);
     m.sym = entry.sym; m.nm = entry.nm; m.col = monsterCol(entry); m.undead = entry.undead; m.mlevel = entry.lvl;
-    m.abilities = entry.abilities.slice(); m.art = entry.art;
+    m.abilities = entry.abilities.slice(); m.art = entry.art; monEntryExtras(m, entry);
     m.corrupted = rollCorruptedFlag(); applyCorruption(m);
     G.mon.push(m);
     if (G.mon.length >= MAXMON) break;
@@ -4849,7 +4852,7 @@ function rollMonsterAt(x,y,floorLevel,sp){
   m.dmg1 = entry.dmg1; m.dmg2 = roundH(entry.dmg2 * sp.dmg);
   m.xp = roundH(entry.xp * sp.xp);
   m.sym = entry.sym; m.nm = entry.nm; m.col = monsterCol(entry); m.undead = entry.undead; m.mlevel = entry.lvl;
-  m.abilities = entry.abilities.slice(); m.art = entry.art;
+  m.abilities = entry.abilities.slice(); m.art = entry.art; monEntryExtras(m, entry);
   m.corrupted = rollCorruptedFlag(); applyCorruption(m);
   return m;
 }
@@ -5514,7 +5517,7 @@ function noteFoe(mi){
 function fxSplat(x, y, txt, kind){ if (typeof FP!=='undefined' && FP.floats) FP.floats.push({x, y, z:0.95, txt:String(txt), col:'#ffd27a', kind, crit:false, age:0}); }
 function monsterDies(mi){
   const m = G.mon[mi];
-  if (m.elite && m.elite.includes('explosive')) try{ monExplode(m); }catch(e){}
+  if (m.champ && m.champ.includes('explosive')) try{ monExplode(m); }catch(e){}
   logMsg(`the ${m.nm} falls`, 'good');
   sfx('monsterDie');
   G.player.killCount = (G.player.killCount||0)+1;
@@ -5522,7 +5525,8 @@ function monsterDies(mi){
   { const kb = G.player.killsBy = G.player.killsBy||{}, n = kb[m.nm] = (kb[m.nm]||0)+1;
     const boss = G.gameMode===1 && G.isBossFloor && G.mon.indexOf(m)===G.bossIdx;
     if (boss || [10,25,50,100,250,500,1000].includes(n)) logMsg(`Your ${m.nm} kill count is: ${n}.`, 'kc'); }
-  if (!G.player.codexSeen.includes(m.nm)){ G.player.codexSeen.push(m.nm); logMsg(`bestiary entry unlocked: ${m.nm}`, 'magic'); }
+  if (!G.player.codexSeen.includes(m.nm)){ G.player.codexSeen.push(m.nm); logMsg(`bestiary entry unlocked: ${m.nm}`, 'magic'); try{ famCheckDone(m); }catch(e){} }
+  if (monIsBoss(m)) try{ bossRecord(m); }catch(e){}
   checkAchievements();
   rsOnKill(m);
   skOnKill(m); try{ crOnKill(m); }catch(e){}
@@ -5994,6 +5998,7 @@ function meleeAfterHit(m, mi, total, atkType){
     logMsg(`${e.nm}!`, 'magic'); return;
   }
   if (atkType!=='melee') return;
+  if (W && W.gs) try{ gsSpecial(W, m, mi, total); }catch(e){}
   const tr = wTrait();
   if (W && W.guthan && chn(0.25)){ const h = Math.min(effMaxHp() - p.hp, total); if (h>0){ p.hp += h; logMsg(`Guthan's warspear drinks the blood - you heal ${h}`, 'magic'); } }
   if (W && W.torag && chn(0.25)){ m.debuffACTurns = 5; m.debuffACAmt = Math.max(m.debuffACAmt||0, 2); logMsg(`Torag's hammers crush the ${m.nm}'s armour`, 'magic'); }
@@ -8010,7 +8015,10 @@ function generateArena(){
   const terrain = (G.ow && G.ow.map[G.owPos.x]) ? G.ow.map[G.owPos.x][G.owPos.y] : null;
   G.arenaTheme = ARENA_TERRAIN_THEME[terrain] || 'forest';
   const skin = ARENA_TERRAIN_SKIN[terrain];
-  const pickEntry = skin ? (lvl,j)=>pickSkinnedMonsterEntry(skin,lvl,j) : pickMonsterEntry;
+  const pickEntry0 = skin ? (lvl,j)=>pickSkinnedMonsterEntry(skin,lvl,j) : pickMonsterEntry;
+  // the land has its own creatures (scarabs and mummies in the desert, bog beasts in the swamp, ice trolls on the tundra), and the night its own
+  const regional = { [OW_DESERT]:'desert', [OW_SWAMP]:'swamp', [OW_TUNDRA]:'tundra', [OW_MOUNTAINPASS]:'tundra' }[terrain], night = isNightTime() && terrain!==OW_WATER && terrain!==OW_RIVER;
+  const pickEntry = (lvl,j)=>(night && chn(0.35) && famPickFrom(['night'], lvl, 4)) || (regional && chn(0.45) && famPickFrom([regional], lvl, 4)) || pickEntry0(lvl,j);
   G.map = makeGrid(T_FLOOR);
   G.floorItem = makeItemGrid();
   // its own decoration grid (not G.dungeonDeco - a roadside encounter isn't
@@ -8055,7 +8063,7 @@ function generateArena(){
       m.dmg1 = entry.dmg1; m.dmg2 = entry.dmg2;
       m.xp = entry.xp;
       m.sym = entry.sym; m.nm = entry.nm; m.col = monsterCol(entry); m.undead = entry.undead; m.mlevel = entry.lvl;
-      m.abilities = entry.abilities.slice(); m.art = entry.art;
+      m.abilities = entry.abilities.slice(); m.art = entry.art; monEntryExtras(m, entry);
       G.mon.push(m);
     }
   }
@@ -8070,7 +8078,7 @@ function generateArena(){
     m.dmg1 = entry.dmg1; m.dmg2 = entry.dmg2;
     m.xp = entry.xp;
     m.sym = entry.sym; m.nm = entry.nm; m.col = monsterCol(entry); m.undead = entry.undead; m.mlevel = entry.lvl;
-    m.abilities = entry.abilities.slice(); m.art = entry.art;
+    m.abilities = entry.abilities.slice(); m.art = entry.art; monEntryExtras(m, entry);
     G.mon.push(m);
   }
 }
@@ -9218,6 +9226,7 @@ function isoContext(e){
     o.push({ html:`<b>Attack</b> ${nm}`, fn:()=>isoAct(pk, false) });
     if (rangedPick()) o.push({ html:`<b>${rangedPick()==='bow' ? 'Shoot' : 'Cast at'}</b> ${nm}`, fn:()=>{ G.foeRef = mon; ISO.fighting = mon; ISO.path = []; ISO.nextStep = performance.now() + ISO_SWING_MS; rangedAttack(mon); renderGame(); } });
     o.push({ html:`<b>Examine</b> ${nm}`, fn:()=>examineSay(examineMonster(mon)) });
+    o.push({ html:`<b>Inspect</b> ${nm} <span class="muted">(stats, weaknesses, drops)</span>`, fn:()=>bestInspect(mon) });
     ctxMenu(e.clientX, e.clientY, mon.nm, o); return; }
   const deco = G.gameMode===1 && G.dungeonDeco && G.dungeonDeco[gx] && SK_CAVE_DECOS.includes(G.dungeonDeco[gx][gy]);
   if (deco){ const lb = skCaveLabel(G.dungeonDeco[gx][gy], gx, gy); o.push({ html:`<b>Gather</b> <span class="cm-y">${esc(lb.txt)}</span>`, fn:()=>isoAct(pk, false) }); }
@@ -10140,7 +10149,7 @@ function buildSmithing(part){
       <span class="desc">${L>=b.lvl ? slots.map(s=>`<button class="btn" ${skHave(b.id)>=SK_FORGE[s][1]?'':'disabled'} onclick="cqAdd('forge','${b.id}','${s}',1)">${SK_FORGE[s][0]} (${SK_FORGE[s][1]})</button>`).join(' ') : `needs Smithing ${b.lvl}`}</span><span></span></div>`; }).join('') || `<div class="muted">no bars yet</div>`;
   const secT = `<div class="panel" style="margin-top:14px;"><h4 style="color:${COL.amber};">TOOLS</h4>${tools}${dgSuppliesHtml()}</div>`, secS = `<div class="panel" style="margin-top:14px;"><h4 style="color:${COL.amber};">SMELTING &middot; Smithing ${L}</h4>${smelt}</div>`, secF = `<div class="panel" style="margin-top:14px;"><h4 style="color:${COL.amber};">FORGING</h4><div class="muted" style="font-size:11px;margin-bottom:6px;">each metal forges its own tier of weapons and armour - steel needs coal (Mining 30). What you forge is better than any drop: <b>+${Math.min(45, 15 + Math.max(0, L - 1))}%</b> bonuses on bronze at your level (+15%, plus 1% per Smithing level past the bar's, up to +45%)</div>${forge}</div>`;
   const small = SK_BAR.filter(b=>skHave(b.id) && b.tier!==undefined).map(b=>`<div class="shoprow"><span class="muted">&times;${skHave(b.id)}</span><span>${esc(b.nm)}</span><span class="desc">${L>=b.lvl ? `<span class="cqgrp"><button class="btn" onclick="cqAdd('small','nails','${b.id}',1)">15 nails</button><button class="btn cqb" onclick="cqAdd('small','nails','${b.id}',9999)">all</button></span>${b.id==='steelb' ? ` <span class="cqgrp"><button class="btn" onclick="cqAdd('small','cannonball','${b.id}',1)">4 cannonballs</button><button class="btn cqb" onclick="cqAdd('small','cannonball','${b.id}',9999)">all</button></span>` : ''}` : `needs Smithing ${b.lvl}`}</span><span></span></div>`).join('');
-  const secX = `<div class="panel" style="margin-top:14px;"><h4 style="color:${COL.amber};">SMALL WORK &middot; nails for building, cannonballs from steel</h4>${small || '<div class="muted">no bars to work</div>'}</div>` + skUpgradeHtml();
+  const secX = gsHtml() + `<div class="panel" style="margin-top:14px;"><h4 style="color:${COL.amber};">SMALL WORK &middot; nails for building, cannonballs from steel</h4>${small || '<div class="muted">no bars to work</div>'}</div>` + skUpgradeHtml();
   return part==='tools' ? secT : part==='smelt' ? cqHtml()+secS : part==='forge' ? cqHtml()+secF+secX : cqHtml()+secT+secS+secF+secX;
 }
 // ---- alchemy (at the alchemist) ----
@@ -10348,6 +10357,7 @@ function mkRecipeBook(id){ const b = CR_BOOKS.find(x=>x.id===id), rows = [...new
 function crUnknownBooks(){ const p = G.player; return CR_BOOKS.filter(b=>!(p.books||[]).includes(b.id) && !G.inv.some(x=>x && x.recipeBook===b.id)); }
 function crGiveBook(why){ const u = crUnknownBooks(); if (!u.length || G.inv.length >= MAXINV) return false; const b = u[rn(u.length)]; addToInventory(mkRecipeBook(b.id)); logMsg(`${why}: a recipe book, ${b.nm}!`, 'magic'); sfx('achievement'); return true; }
 function crOnKill(m){
+  try{ lootSpecial(m); }catch(e){ console.error(e); }
   if (m && m.carriesKey){ m.carriesKey = 0; skAdd('dkey', 1); logMsg(`the ${m.nm} was carrying an iron key - it opens a locked door or chest on this floor`, 'loot'); }
   const boss = G.gameMode===1 && G.isBossFloor && G.mon && G.mon.indexOf(m)===G.bossIdx;
   if (chn(boss ? 0.2 : Math.min(0.02, 0.004 + (G.depth||1)*0.001))) crGiveBook(`the ${m.nm} drops something`);
@@ -10497,6 +10507,10 @@ SK_CRAFT_MATS.push(
   { id:'pot', nm:'Clay Pot' }, { id:'piedish', nm:'Pie Dish' }, { id:'bowl', nm:'Bowl' },
   { id:'torch', nm:'Torch' }, { id:'lantern', nm:'Oil Lantern' }, { id:'bullseye', nm:'Bullseye Lantern' },
   { id:'rope', nm:'Rope' }, { id:'shovel', nm:'Shovel' }, { id:'dkey', nm:'Iron Key' },
+  { id:'gsshard1', nm:'Godsword Shard 1' }, { id:'gsshard2', nm:'Godsword Shard 2' }, { id:'gsshard3', nm:'Godsword Shard 3' }, { id:'gsblade', nm:'Godsword Blade' },
+  { id:'hilt_armadyl', nm:'Armadyl Hilt' }, { id:'hilt_bandos', nm:'Bandos Hilt' }, { id:'hilt_saradomin', nm:'Saradomin Hilt' }, { id:'hilt_zamorak', nm:'Zamorak Hilt' },
+  { id:'khalf_tooth', nm:'Tooth Half of a Key' }, { id:'khalf_loop', nm:'Loop Half of a Key' }, { id:'crystalkey', nm:'Crystal Key' },
+  { id:'kbdheads', nm:'KBD Heads' }, { id:'kqhead', nm:'Kalphite Head' }, { id:'moleclaw', nm:'Mole Claw' }, { id:'babymole', nm:'Baby Mole' },
   { id:'nails', nm:'Nails' }, { id:'cannonball', nm:'Cannonball' }, { id:'venomgland', nm:'Venom Gland' });
 SK_BAR.push({ id:'goldb', nm:'Gold Bar', ore:'goldore', per:1, lvl:40, xp:22, ilvl:12, jewel:true, noForge:true });
 // gem-tipped arrows: the strongest ammo there is, fletched from gems (never dropped)
@@ -10895,7 +10909,7 @@ function monLevelColor(m){
   const f = clamp(Math.abs(d)/10, 0, 1), mix = (a, b)=>'#'+[0,1,2].map(i=>Math.round(a[i]+(b[i]-a[i])*f).toString(16).padStart(2,'0')).join('');
   return d===0 ? '#ffff00' : d<0 ? mix([255,255,0],[0,255,0]) : mix([255,255,0],[255,0,0]);
 }
-function monLevelHtml(m){ return `<span style="color:${monLevelColor(m)};font-weight:600;">level ${monCombatLevel(m)}</span>${m && m.elite ? ` <span style="color:#ffb040;font-weight:600;">champion - ${m.elite.join(', ')}</span>` : ''}${m && m._ai && m._ai.role ? ` <span class="muted">(${m._ai.role})</span>` : ''}`; }
+function monLevelHtml(m){ return `<span style="color:${monLevelColor(m)};font-weight:600;">level ${monCombatLevel(m)}</span>${m && m.champ ? ` <span style="color:#ffb040;font-weight:600;">champion - ${m.champ.join(', ')}</span>` : ''}${m && m._ai && m._ai.role ? ` <span class="muted">(${m._ai.role})</span>` : ''}`; }
 function rsTotalLevel(){ return RS_ALL_SKILLS().reduce((t,[k])=>t+rsLvl(k), 0); }
 // the rest of the game (monster scaling, roadside encounters, loot outside
 // dungeons, boss sizing) still reads G.player.level as a 1-20 power tier,
@@ -11200,7 +11214,7 @@ function rsHitXP(dmg, type){
 function rsAttackTotal(roll, m, type){
   return roll + rsFrac(rsAtkBonus(type)) + frightPenalty() + 3*rsTriangle(type, rsMonStyle(m));
 }
-function rsTriDmgMult(type, m){ const t = rsTriangle(type, rsMonStyle(m)); return t>0 ? 1.2 : t<0 ? 0.85 : 1; }
+function rsTriDmgMult(type, m){ const t = rsTriangle(type, rsMonStyle(m)); return (t>0 ? 1.2 : t<0 ? 0.85 : 1) * famBonus(m); }
 
 // ---- equipment requirements ----
 const RS_REQS = [['reqAtt','attack','Attack'],['reqStr','strength','Strength'],['reqDef','defence','Defence'],['reqRng','ranged','Ranged'],['reqMag','magic','Magic']];
@@ -11951,8 +11965,304 @@ function rsSpellNote(sp, fellBack){
   else if (!sp) logMsg(`you have no runes for any spell${sel ? ` - ${sel[1]} needs ${rsMissingRunes(sel).join(', ')}` : ''}${el && el!=='air' ? `. Your staff only supplies ${el} runes; every combat spell also needs air runes (monsters drop them, the alchemist sells them)` : ''}`, 'hit');
 }
 // ---- ranged mode: bow or magic. R switches it; clicks, auto-combat and Shoot/Cast use it ----
+// ===================== monster content and the bestiary: families, regions, night, rare spawns, mimics, named bosses, godswords, drops =====================
+// families climb in tiers (goblin to warlord, skeleton to champion); each kind of place keeps a few of them
+const MON_FAMILIES = {
+  rat:      { nm:'Rats', t:[['giant rat',1],['plague rat',3,{ab:['venomous']}],['rat king',8]], lore:'Vermin that breed in every cellar and sewer. The rat king is a knot of a dozen of them, tails fused, that thinks as one.' },
+  kobold:   { nm:'Kobolds', t:[['kobold',2],['kobold miner',4],['kobold chieftain',7]], lore:'Small, scaled tunnellers who trap their warrens cleverly and fight in packs.' },
+  goblin:   { nm:'Goblins', t:[['goblin',3],['goblin warrior',5],['goblin archer',6,{style:'ranged'}],['goblin shaman',8,{style:'magic'}],['goblin warlord',11]], lore:'Squabbling, greedy and everywhere. A goblin warlord is a goblin who has outlived the others.' },
+  zombie:   { nm:'Zombies', undead:true, t:[['zombie',3],['bog zombie',6],['zombie brute',10]], lore:'The restless dead, raised by necromancy or bad soil. Slow, but they do not stop.' },
+  skeleton: { nm:'Skeletons', undead:true, t:[['skeleton',4],['skeleton warrior',6],['skeleton archer',7,{style:'ranged'}],['skeleton mage',9,{style:'magic'}],['skeleton champion',13]], lore:'Old bones bound to a purpose they no longer remember. Crushing blows shatter them.' },
+  orc:      { nm:'Orcs', t:[['orc',5],['orc warrior',7],['orc archer',8,{style:'ranged'}],['orc shaman',10,{style:'magic'}],['orc warlord',14]], lore:'Brutal raiders who live for the charge. Their shamans call on angry, hungry gods.' },
+  spider:   { nm:'Spiders', t:[['cave spider',3,{ab:['venomous']}],['giant spider',6],['spider broodmother',12]], lore:'Patient hunters of the dark. A broodmother never fights alone for long.' },
+  giant:    { nm:'Giants', t:[['moss giant',11],['hill giant',13],['fire giant',16]], lore:'Huge, slow-witted and terribly strong. Moss giants grow lichen in their beards; fire giants forge in volcano hearts.' },
+  demon:    { nm:'Demons', t:[['imp',5],['lesser demon',12],['hellhound',14],['greater demon',16],['black demon',18],['abyssal demon',19]], lore:'Fiends from the abyss, summoned or slipped through. Water douses them; their hearts burn.' },
+  desert:   { nm:'Desert dwellers', t:[['scarab swarm',4],['kalphite worker',7],['mummy',9,{undead:true}],['giant scarab',12],['kalphite soldier',14]], lore:'The sands hide whole hives of kalphite and the tombs of kings who will not stay buried.' },
+  swamp:    { nm:'Swamp things', t:[['giant leech',4,{ab:['venomous']}],['bog beast',7],['swamp horror',11]], lore:'The bog swallows things - and some of what it swallows walks back out.' },
+  tundra:   { nm:'Frost-born', t:[['yeti',8],['ice troll',10],['ice giant',14]], lore:'The cold makes them hard, and hungry.' },
+  night:    { nm:'Creatures of the night', t:[['ghost',6,{undead:true}],['werewolf',10],['vampyre',14,{undead:true}]], lore:'They only walk after dark - and they hunt anyone foolish enough to travel then.' },
+};
+const MON_ECOSYS = { dungeon:['rat','kobold','goblin','zombie','skeleton','orc','spider','giant','demon'], lair:['demon','giant','spider','orc'] };
+const FAM_BY_NAME = {}; for (const k in MON_FAMILIES) for (const t of MON_FAMILIES[k].t) FAM_BY_NAME[t[0]] = k;
+function famEntry(k, i){
+  const F = MON_FAMILIES[k], [nm, lvl, x] = F.t[i], base = MONSTER_LEVELS[clampMLevel(lvl)-1], xo = x || {};
+  const ab = base.abilities.filter(a=>!/^(breath|legendary|frightful|spellcast)$/.test(a)).concat(xo.ab||[]);
+  if (xo.style==='magic' && !ab.includes('spellcast')) ab.push('spellcast');
+  return Object.assign({}, base, { nm, lvl:clampMLevel(lvl), undead: !!(xo.undead || F.undead), abilities: ab, family:k, forceStyle: xo.style||null });
+}
+function famPickFrom(keys, L, j){
+  const c = [], span = Math.max(3, (j===undefined ? 2 : j) + 2);
+  for (const k of keys){ const F = MON_FAMILIES[k]; if (!F) continue; F.t.forEach((t,i)=>{ const d = Math.abs(t[1]-L); if (d <= span) c.push([k, i, 1/(1+d)]); }); }
+  if (!c.length) return null;
+  let tot = c.reduce((a,x)=>a+x[2], 0), r = Math.random()*tot;
+  for (const x of c){ if (r < x[2]) return famEntry(x[0], x[1]); r -= x[2]; }
+  return famEntry(c[0][0], c[0][1]);
+}
+// each floor picks two families that live at its depth
+function famForFloor(d){
+  const L = monsterLevelForDepth(d), pool = (MON_ECOSYS[G.siteKind] || MON_ECOSYS.dungeon).filter(k=>MON_FAMILIES[k].t.some(t=>Math.abs(t[1]-L) <= 4));
+  return pool.sort(()=>Math.random()-0.5).slice(0, 2);
+}
+function monEntryExtras(m, entry){ if (entry && entry.family) m.family = entry.family; if (entry && entry.forceStyle) m.rsStyle = entry.forceStyle; }
+function famOf(m){ return (m && (m.family || FAM_BY_NAME[m.nm])) || null; }
+// the bestiary pays: a family fully studied takes 5% more damage from you; the whole book, a title and 3% more against everything
+function famBonus(m){ const p = G.player; if (!p) return 1; const k = famOf(m); return (k && p.famDone && p.famDone.includes(k) ? 1.05 : 1) * (p.title==='the Beastmaster' ? 1.03 : 1); }
+function famCheckDone(m){
+  const p = G.player, seen = p.codexSeen||[]; p.famDone = p.famDone || [];
+  for (const k in MON_FAMILIES){
+    if (p.famDone.includes(k) || !MON_FAMILIES[k].t.some(t=>t[0]===m.nm)) continue;
+    if (MON_FAMILIES[k].t.every(t=>seen.includes(t[0]))){ p.famDone.push(k); logMsg(`*** bestiary: you've studied every one of the ${MON_FAMILIES[k].nm.toLowerCase()} - you deal 5% more damage to them ***`, 'magic', true); sfx('achievement'); }
+  }
+  if (!p.title && Object.keys(MON_FAMILIES).every(k=>p.famDone.includes(k))){ p.title = 'the Beastmaster'; logMsg('*** the bestiary is complete - you are now known as the Beastmaster (3% more damage against everything) ***', 'magic', true); }
+}
+// ---- named RuneScape bosses, with their own drops and a collection log ----
+const BARROWS_BROS = [["Dharok the Wretched",'melee'],["Guthan the Infested",'melee'],["Verac the Defiled",'melee'],["Torag the Corrupted",'melee'],["Karil the Tainted",'ranged'],["Ahrim the Blighted",'magic']];
+const GS_HILTS = {
+  armadyl:   { nm:'Armadyl Godsword',   col:'#e8d070', d:'Judgement: one blow in six lands with half again its force' },
+  bandos:    { nm:'Bandos Godsword',    col:'#8a7a5a', d:"Warstrike: a blow can smash the foe's armour down by 3" },
+  saradomin: { nm:'Saradomin Godsword', col:'#f0f0ff', d:'Healing Blade: heals you a quarter of the damage and restores prayer' },
+  zamorak:   { nm:'Zamorak Godsword',   col:'#c03a3a', d:'Ice Cleave: a blow can freeze the foe where it stands' },
+};
+const NAMED_BOSSES = {
+  kbd:     { nm:'King Black Dragon', where:"dragons' lairs", lore:'The three-headed king of the black dragons, who sleeps on a hoard older than the kingdoms around it.',
+    uniques:[['Armadyl hilt', ()=>skAdd('hilt_armadyl',1), 0.2], ['KBD heads', ()=>skAdd('kbdheads',1), 0.3], ['Dragon weapon', ()=>addToInventory(crDragonWeapon()), 0.25]] },
+  kq:      { nm:'Kalphite Queen', where:'deep dungeons', lore:'Mother of a desert hive. Kill her once and she sheds her shell and rises again, angrier.',
+    uniques:[['Bandos hilt', ()=>skAdd('hilt_bandos',1), 0.2], ['Kalphite head', ()=>skAdd('kqhead',1), 0.3], ['Dragon chainbody', ()=>{ const it = rsMakeArmour('metal', 6, 'chest'); it.nm = 'Dragon Chainbody'; addToInventory(it); }, 0.2]] },
+  mole:    { nm:'Giant Mole', where:'mines and deep dungeons', lore:'A burrowing beast the size of a cart that digs away from you when hurt.',
+    uniques:[['Zamorak hilt', ()=>skAdd('hilt_zamorak',1), 0.2], ['Mole claw', ()=>skAdd('moleclaw',2), 0.5], ['Baby mole', ()=>skAdd('babymole',1), 0.06]] },
+  dks:     { nm:'Dagannoth Kings', where:'sunken temples', lore:'Rex, Prime and Supreme: three brothers of the deep, each fighting with a different style.',
+    uniques:[['Saradomin hilt', ()=>skAdd('hilt_saradomin',1), 0.2], ['Berserker ring', ()=>addToInventory(crJewel('ring','Berserker Ring',{ dmgB:10, acc:4 }, 30000)), 0.2],
+      ['Archers ring', ()=>addToInventory(crJewel('ring','Archers Ring',{ rngAcc:12 }, 30000)), 0.2], ['Seers ring', ()=>addToInventory(crJewel('ring','Seers Ring',{ magAcc:12, magDmg:1 }, 30000)), 0.2]] },
+  barrows: { nm:'Barrows brothers', where:'graveyards', lore:'Six brothers buried with the weapons they lived by. Disturb their crypt and one of them rises.',
+    uniques:[['Barrows weapon', ()=>addToInventory(crBarrows()), 0.5]] },
+};
+function namedBossApply(m){
+  const opts = { lair:['kbd'], mine:['mole'], graveyard:['barrows'], temple:['dks'], dungeon:['kq','mole'] }[G.siteKind];
+  if (!opts || !chn(0.65)) return;
+  const key = opts[rn(opts.length)], B = NAMED_BOSSES[key];
+  m.named = key;
+  if (key==='barrows'){ const b = BARROWS_BROS[rn(BARROWS_BROS.length)]; m.nm = b[0]; m.undead = true; m.rsStyle = b[1]; }
+  else if (key==='dks'){ const b = [['Dagannoth Rex','melee'],['Dagannoth Prime','magic'],['Dagannoth Supreme','ranged']][rn(3)]; m.nm = b[0]; m.rsStyle = b[1]; }
+  else m.nm = B.nm;
+  if (key==='kbd' && !m.abilities.includes('breath')) m.abilities.push('breath');
+  m.hp = m.maxHp = Math.round(m.maxHp*1.15);
+}
+function bossRecord(m){
+  const p = G.player, B = m._boss, now = p.turnCount||0;
+  p.bossKc = p.bossKc || {}; p.bossKc[m.nm] = (p.bossKc[m.nm]||0) + 1;
+  if (B && B.start){ const dur = Math.max(1, now - B.start); p.bossPB = p.bossPB || {}; const old = p.bossPB[m.nm];
+    if (!old || dur < old){ p.bossPB[m.nm] = dur; logMsg(`Fight duration: ${dur} turns (new personal best${old ? ' - was '+old : ''})`, 'kc'); }
+    else logMsg(`Fight duration: ${dur} turns. Personal best: ${old}`, 'kc'); }
+}
+function namedDrops(m){
+  const B = NAMED_BOSSES[m.named], p = G.player; if (!B) return;
+  p.clog = p.clog || {}; const L = p.clog[m.named] = p.clog[m.named] || {}, got = [];
+  for (const u of B.uniques){ if (chn(u[2])){ u[1](); L[u[0]] = (L[u[0]]||0) + 1; got.push(u[0]); } }
+  if (chn(0.2)){ const n = 1 + rn(3); skAdd('gsshard'+n, 1); L['Godsword shard '+n] = (L['Godsword shard '+n]||0) + 1; got.push('Godsword shard '+n); }
+  if (got.length){ logMsg(`*** ${B.nm} unique drop: ${got.join(', ')} - added to your collection log ***`, 'loot', true); sfx('achievement'); }
+}
+// ---- what a special kill pays ----
+function lootSpecial(m){
+  const p = G.player;
+  if (m.rare==='golden'){ const g = Math.round((400 + rn(400) + (G.depth||1)*120)*goldFindMult()); p.gold += g; logMsg(`the golden goblin bursts into coins - ${g} gold!`, 'loot', true); sfx('achievement'); }
+  if (m.rare==='imp'){ const it = genItem(lootLevel()+5+playerMF(), vaultLootSlot(), 4); addToInventory(it); logMsg(`the treasure imp drops its hoard: ${itemNameHtml(it)}`, 'loot', true); sfx('achievement'); }
+  if (m.shiny){ const it = genItem(lootLevel()+3+playerMF(), lootKind(), 4); addToInventory(it); p.gold += 100; logMsg(`the shiny ${m.nm} leaves a gleaming prize: ${itemNameHtml(it)}`, 'loot', true); }
+  if (m.mimic){ const g = Math.round((80 + rn(120) + (G.depth||1)*40)*goldFindMult()); p.gold += g; const it = genItem(lootLevel()+2+playerMF(), vaultLootSlot(), 3); addToInventory(it); logMsg(`the mimic's belly holds ${g} gold and ${itemNameHtml(it)}`, 'loot', true); }
+  if (m.named) namedDrops(m);
+  if (!monIsBoss(m) && !m.summoned && chn(Math.min(0.02, 0.006 + (G.depth||1)*0.0008))) rareDropTable(m);
+}
+// the rare drop table: any monster, now and then
+function rareDropTable(m){
+  const r = Math.random(), p = G.player; let what;
+  if (r < 0.3){ const g = chn(0.3) ? 'onyx' : 'diamond'; skAdd(g, 1); what = `an uncut ${g}`; }
+  else if (r < 0.5){ const it = rsMakeWeapon(5, rn(RS_WEAPONS.length)); addToInventory(it); what = itemNameHtml(it); }
+  else if (r < 0.7){ const h = chn(0.5) ? 'khalf_tooth' : 'khalf_loop'; skAdd(h, 1); what = `the ${skName(h).toLowerCase()}`; }
+  else if (r < 0.9){ addToInventory(mkClue()); what = 'a clue scroll'; }
+  else { const g = 1000 + rn(2000); p.gold += g; what = `${g} gold`; }
+  logMsg(`Rare drop table! the ${m.nm} drops ${what}`, 'loot', true); sfx('achievement');
+  if (skHave('khalf_tooth') && skHave('khalf_loop')){ skAdd('khalf_tooth', -1); skAdd('khalf_loop', -1); skAdd('crystalkey', 1); logMsg('you fit the two halves together - a crystal key! (it opens a locked chest, with a second treasure inside)', 'magic', true); }
+}
+function mkClue(){ const it = newItem(); Object.assign(it, { used:1, consumable:0, kind:'scroll', clue:1, nm:'Clue Scroll', desc:'a cryptic clue - read it to follow the trail to a casket', price:200 }); return it; }
+function clueOpen(idx){
+  const it = G.inv[idx]; if (!it) return; invRemove(idx);
+  const p = G.player, steps = ['dig beside the old well', 'search the crates by the smithy', 'speak to the barman about a lost ring', 'count the stones in the circle', 'wave at the gnome by the lake'];
+  const g = 300 + rn(900); p.gold += g; let extra = '';
+  if (chn(0.55)){ const it2 = genItem(lootLevel()+3+playerMF(), lootKind(), 4); addToInventory(it2); extra += ', ' + itemNameHtml(it2); }
+  if (chn(0.4)){ const r = ['nature','death','blood','law'].filter(x=>RS_RUNES.some(q=>q[0]===x))[0] || 'chaos'; skAdd('r_'+r, 30); extra += `, 30 ${rsRuneName(r).toLowerCase()}s`; }
+  logMsg(`you read the clue - "${steps[rn(steps.length)]}" - and follow the trail to a casket: ${g} gold${extra}`, 'loot', true); sfx('achievement');
+  renderGame(); saveCurrentGame();
+}
+// ---- mimics: now and then a chest bites back ----
+const MIMIC_SEEN = new WeakMap();
+function mimicCheck(x, y){
+  const t = G.map[x][y], D = G.dungeonDeco, chest = t===T_VAULT || t===T_CORRUPT_CHEST || D[x][y]==='lchest';
+  if (!chest || (G.depth||1) < 2 || G.inRaid) return false;
+  let S = MIMIC_SEEN.get(G.map); if (!S){ S = new Set(); MIMIC_SEEN.set(G.map, S); }
+  const k = x+','+y; if (S.has(k)) return false; S.add(k);
+  if (!chn(0.15)) return false;
+  G.map[x][y] = T_FLOOR; if (D[x][y]==='lchest') D[x][y] = '';
+  const m = rollMonsterAt(x, y, Math.min(20, monsterLevelForDepth(G.depth)+2), sitePower());
+  m.nm = 'mimic'; m.mimic = 1; m.undead = false; m.hp = m.maxHp = Math.round(m.maxHp*1.5); m.engaged = true; m.abilities = ['multiattack2']; m._ai = { role:null, aggro:'normal' };
+  G.mon.push(m); FPD.mapRef = null;
+  logMsg("*** the chest sprouts teeth and legs - it's a MIMIC! ***", 'hit', true); sfx('crit');
+  if (typeof FP!=='undefined') FP.shake = Math.max(FP.shake||0, 0.4);
+  return true;
+}
+// ---- godswords: three shards make a blade; a blade and a boss's hilt make the sword ----
+function gsMake(h){
+  const H = GS_HILTS[h], it = rsMakeWeapon(6, 9);
+  it.nm = H.nm; it.baseMat = H.nm; it.gs = h; it.acc = Math.round((it.acc||0)*1.35); it.dmgB = Math.round((it.dmgB||0)*1.4); it.reqAtt = 75; it.rsCol = H.col; it.quality = 4; it.price = 250000; it.famous = H.d;
+  return it;
+}
+function gsSpecial(W, m, mi, total){
+  const p = G.player;
+  if (W.gs==='armadyl' && chn(1/6)){ const x = Math.round(total*0.5); m.hp -= x; logMsg(`Judgement! the Armadyl godsword strikes for ${x} more`, 'magic'); }
+  else if (W.gs==='bandos' && chn(0.25)){ m.debuffACTurns = Math.max(m.debuffACTurns||0, 8); m.debuffACAmt = Math.max(m.debuffACAmt||0, 3); logMsg(`Warstrike! the ${m.nm}'s armour is smashed`, 'magic'); }
+  else if (W.gs==='saradomin'){ const h = Math.min(effMaxHp() - p.hp, Math.max(1, Math.round(total*0.25))); if (h > 0) p.hp += h; p.prayPts = Math.min(rsLvl('prayer'), (p.prayPts||0) + 1); }
+  else if (W.gs==='zamorak' && chn(0.2) && m.hp > 0){ m.rootTurns = Math.max(m.rootTurns||0, 3); logMsg(`Ice Cleave! the ${m.nm} is frozen in place`, 'magic'); }
+}
+function gsHtml(){
+  const sh = [1,2,3].map(n=>skHave('gsshard'+n)), blade = skHave('gsblade'), hilts = Object.keys(GS_HILTS).filter(h=>skHave('hilt_'+h));
+  if (!sh.some(Boolean) && !blade && !hilts.length) return '';
+  const L = skLvl('smithing');
+  return `<div class="panel" style="margin-top:14px;"><h4 style="color:${COL.gold};">GODSWORDS &middot; shards and hilts from the named bosses</h4>
+    <div class="muted">shards ${sh.map((n,i)=>`${i+1}: ${n}`).join(' &middot; ')} &middot; blades ${blade} &middot; hilts ${hilts.length ? hilts.map(h=>cap(h)).join(', ') : 'none'}</div>
+    <div class="btnrow" style="justify-content:flex-start;flex-wrap:wrap;margin-top:6px;">
+      <button class="btn" ${sh.every(Boolean) && L>=60 ? '' : 'disabled'} onclick="gsForge()" title="needs all three shards and Smithing 60">forge a godsword blade</button>
+      ${hilts.map(h=>`<button class="btn primary" ${blade ? '' : 'disabled'} onclick="gsAssemble('${h}')" title="${esc(GS_HILTS[h].d)}">attach the ${cap(h)} hilt</button>`).join('')}</div></div>`;
+}
+function gsForge(){ if (![1,2,3].every(n=>skHave('gsshard'+n)) || skLvl('smithing') < 60) return; for (const n of [1,2,3]) skAdd('gsshard'+n, -1); skAdd('gsblade', 1); skGainXP('smithing', 200); logMsg('you hammer the three shards together into a godsword blade', 'good'); sfx('crit'); renderOverlay(); saveCurrentGame(); }
+function gsAssemble(h){ if (!skHave('gsblade') || !skHave('hilt_'+h)) return; skAdd('gsblade', -1); skAdd('hilt_'+h, -1); const it = gsMake(h); addToInventory(it); logMsg(`you fit the hilt to the blade - ${itemNameHtml(it)}!`, 'magic', true); sfx('achievement'); renderOverlay(); saveCurrentGame(); }
+
+// ---- the bestiary: every creature, its model, lore, weaknesses, drops and where it lives; bosses and the collection log ----
+function bestEntryFor(nm){
+  const k = FAM_BY_NAME[nm]; if (k){ const i = MON_FAMILIES[k].t.findIndex(t=>t[0]===nm); return famEntry(k, i); }
+  const lists = [MONSTER_LEVELS, SEA_SKIN, UNDEAD_SKIN, HUMAN_SKIN, CULTIST_SKIN, CONSTRUCT_SKIN, BEAST_SKIN, SWAMP_SKIN, DESERT_SKIN, TUNDRA_SKIN];
+  for (const L of lists){ const i = L.findIndex(e=>e && e.nm===nm); if (i>=0) return Object.assign({}, MONSTER_LEVELS[i], L[i], { lvl:i+1 }); }
+  return null;
+}
+function bestWhere(nm){
+  const k = FAM_BY_NAME[nm];
+  if (k==='desert') return 'the desert, on the road'; if (k==='swamp') return 'the swamps, on the road'; if (k==='tundra') return 'the tundra and mountain passes';
+  if (k==='night') return 'anywhere on the road - after dark only';
+  if (k) return Object.keys(MON_ECOSYS).filter(s0=>MON_ECOSYS[s0].includes(k)).map(s0=>s0==='lair' ? "dragons' lairs" : 'dungeons').join(' and ');
+  const where = [['MONSTER_LEVELS','dungeons and grassland roads'],['SEA_SKIN','at sea'],['UNDEAD_SKIN','graveyards and necromancer towers'],['HUMAN_SKIN','castles'],['CULTIST_SKIN','sunken temples'],['CONSTRUCT_SKIN','mines'],['BEAST_SKIN','forests'],['SWAMP_SKIN','swamps'],['DESERT_SKIN','the desert'],['TUNDRA_SKIN','the tundra']];
+  const lists = { MONSTER_LEVELS, SEA_SKIN, UNDEAD_SKIN, HUMAN_SKIN, CULTIST_SKIN, CONSTRUCT_SKIN, BEAST_SKIN, SWAMP_SKIN, DESERT_SKIN, TUNDRA_SKIN };
+  const found = where.filter(([L])=>lists[L].some(e=>e && e.nm===nm)).map(w=>w[1]);
+  if (found.length) return found.join(', ');
+  for (const b in NAMED_BOSSES) if (b==='barrows' ? BARROWS_BROS.some(x=>x[0]===nm) : b==='dks' ? /Dagannoth/.test(nm) : NAMED_BOSSES[b].nm===nm) return NAMED_BOSSES[b].where + ' (as the boss)';
+  return /overlord|usurper|lich-lord|ancient/.test(nm) ? 'the last floor of a site, as its boss' : 'unknown';
+}
+function bestLore(nm, e){
+  for (const b in NAMED_BOSSES) if ((b==='barrows' && BARROWS_BROS.some(x=>x[0]===nm)) || (b==='dks' && /Dagannoth/.test(nm)) || NAMED_BOSSES[b].nm===nm) return NAMED_BOSSES[b].lore;
+  const k = FAM_BY_NAME[nm]; if (k) return MON_FAMILIES[k].lore;
+  if (nm==='mimic') return 'It looks exactly like a treasure chest. That is the point.';
+  if (nm==='golden goblin') return 'A goblin who found a pot of gold and fell in. Catch it before it runs.';
+  if (nm==='treasure imp') return 'An imp that steals and hoards. It never stays long.';
+  const ab = (e && e.abilities)||[];
+  return (e && e.undead ? 'One of the restless dead. ' : '') + (ab.includes('breath') ? 'It breathes destruction. ' : '') + (ab.includes('regen') ? 'Its wounds close as you watch - fire stops it. ' : '') + (ab.includes('spellcast') ? 'It casts spells from a distance. ' : '') + 'Adventurers who have fought it say little about it, and fewer still came back to say more.';
+}
+function bestDrops(nm, e){
+  const out = [];
+  if (!/wraith|ghost|spectre|specter|shadow|wisp|elemental|ooze|slime|jelly|swarm|spirit|mephit|banshee|phantom/.test(nm)) out.push(/dragon|wyvern|hydra|drake|wyrm/.test(nm) ? 'dragon bones (always)' : ((e && e.lvl >= 10) || /giant|ogre|troll|bear|minotaur|golem/.test(nm)) ? 'big bones (always)' : 'bones (always)');
+  out.push('runes (30%)', 'gold', 'gear now and then');
+  if (nm==='mimic') out.push("the chest's treasure");
+  if (nm==='golden goblin') out.push('a burst of gold (400+)');
+  if (nm==='treasure imp') out.push('a top-quality item');
+  for (const b in NAMED_BOSSES){ const B = NAMED_BOSSES[b]; if ((b==='barrows' && BARROWS_BROS.some(x=>x[0]===nm)) || (b==='dks' && /Dagannoth/.test(nm)) || B.nm===nm){ B.uniques.forEach(u=>out.push(`${u[0]} (${Math.round(u[2]*100)}%)`)); out.push('a godsword shard (20%)'); } }
+  out.push('the rare drop table (~1 in 100): big gems, rune weapons, key halves, clue scrolls');
+  return out;
+}
+var BEST_LIST = [];
+function bestPick(i){ G.bestSel = BEST_LIST[i]; G.bestLive = null; renderOverlay(); }
+function bestInspect(mon){ G.bestSel = mon.nm; G.bestLive = mon; G.bestTab = 'all'; setUi('bestiary'); }
+function bestHtml(){
+  const p = G.player, seen = p.codexSeen||[], tab = G.bestTab || 'all';
+  BEST_LIST = [];
+  const tabs = [['all','Creatures'],['bosses','Bosses'],['log','Collection log']].map(([k,nm])=>`<button class="btn ${tab===k ? 'primary' : ''}" onclick="G.bestTab='${k}';renderOverlay()">${nm}</button>`).join(' ');
+  const famDone = p.famDone||[], nFam = Object.keys(MON_FAMILIES).length;
+  let left = '', right = '';
+  if (tab==='all'){
+    const row = (nm, known, sub)=>{ const i = BEST_LIST.push(nm) - 1; const sel = G.bestSel===nm;
+      return `<div class="shoprow" style="cursor:pointer;${sel ? 'outline:1px solid var(--amber);' : ''}${known ? '' : 'opacity:0.45;'}" onclick="bestPick(${i})"><span>${known ? esc(nm) : '???'}</span><span class="muted">${sub||''}</span></div>`; };
+    for (const k in MON_FAMILIES){ const F = MON_FAMILIES[k], done = famDone.includes(k);
+      left += `<h4 style="margin:8px 0 4px;color:${done ? COL.gold : 'var(--ink-faint)'}">${esc(F.nm)} ${done ? '&#9733; +5% damage' : `&middot; ${F.t.filter(t=>seen.includes(t[0])).length}/${F.t.length}`}</h4>` + F.t.map(t=>row(t[0], seen.includes(t[0]), `lvl ${monCombatLevel({ mlevel:t[1] })} &middot; ${(p.killsBy||{})[t[0]]||0} kills`)).join(''); }
+    const others = seen.filter(n=>!FAM_BY_NAME[n]);
+    left += `<h4 style="margin:10px 0 4px;color:var(--ink-faint)">Everything else you've slain &middot; ${others.length}</h4>` + others.map(n=>row(n, true, `${(p.killsBy||{})[n]||0} kills`)).join('');
+    const nm = G.bestSel;
+    if (nm){
+      const known = seen.includes(nm) || (G.bestLive && G.bestLive.nm===nm), e = bestEntryFor(nm) || {}, live = G.bestLive && G.bestLive.nm===nm ? G.bestLive : null;
+      const probe = live || Object.assign({ nm, undead:e.undead, abilities:e.abilities||[] }, e);
+      const mw = monWeak(probe), el = rsMonElem(Object.assign({}, probe, { rsElem:null }));
+      const stl = live ? rsMonStyle(live) : (e.forceStyle || rsMonStyle(Object.assign({}, probe, { rsStyle:null })));
+      right = `<div id="bvSlot" style="width:220px;height:240px;margin:0 auto 6px;border-radius:8px;background:radial-gradient(circle at 50% 40%, #2a2a34, #121216);position:relative;"></div>
+        <h3 style="margin:4px 0;color:var(--amber);">${known ? esc(nm) : '???'}${live && live.champ ? ` <span style="color:#ffb040;font-size:0.8em">champion - ${live.champ.join(', ')}</span>` : ''}</h3>
+        ${known ? `<div class="muted" style="margin-bottom:6px;">${esc(bestLore(nm, e))}</div>
+        ${live ? `<div class="bvrow"><span class="muted">life</span><b>${Math.max(0, live.hp)} / ${live.maxHp}</b></div><div class="bvrow"><span class="muted">armour</span><b>${live.ac}${live.debuffACTurns>0 ? ` (-${live.debuffACAmt})` : ''}</b></div><div class="bvrow"><span class="muted">to hit</span><b>+${live.atkBonus}</b></div><div class="bvrow"><span class="muted">damage</span><b>${live.dmg1}d${live.dmg2}</b></div>${live._ai && live._ai.role ? `<div class="bvrow"><span class="muted">role</span><b>${live._ai.role}</b></div>` : ''}` :
+          (e.hd ? `<div class="bvrow"><span class="muted">combat level</span><b>${monCombatLevel({ mlevel:e.lvl })}</b></div><div class="bvrow"><span class="muted">armour / hit dice</span><b>${e.ac} / ${e.hd}HD</b></div><div class="bvrow"><span class="muted">damage</span><b>${e.dmg1}d${e.dmg2}</b></div>` : '')}
+        <div class="bvrow"><span class="muted">attack style</span><b>${stl}</b></div>
+        <div class="bvrow"><span class="muted">melee</span><b>${mw.weak ? `weak to ${mw.weak}` : 'no weak spot'}${mw.strong ? `, shrugs off ${mw.strong}` : ''}</b></div>
+        <div class="bvrow"><span class="muted">magic</span><b>${el.weak ? `weak to ${el.weak}` : 'no weak element'}${el.resist ? `, resists ${el.resist}` : ''}</b></div>
+        <div class="bvrow"><span class="muted">abilities</span><b>${esc(((live ? live.abilities : e.abilities)||[]).join(', ') || 'none')}</b></div>
+        <div class="bvrow"><span class="muted">found in</span><b>${esc(bestWhere(nm))}</b></div>
+        <div class="bvrow"><span class="muted">kills</span><b>${(p.killsBy||{})[nm]||0}${(p.bossPB||{})[nm] ? ` &middot; best ${(p.bossPB||{})[nm]} turns` : ''}</b></div>
+        <div class="muted" style="margin-top:6px;">drops: ${bestDrops(nm, e).map(esc).join(' &middot; ')}</div>` : '<div class="muted">kill one to fill in its entry</div>'}`;
+    } else right = '<div class="muted" style="padding:20px;">pick a creature on the left - or right-click a monster and choose Inspect</div>';
+  } else if (tab==='bosses'){
+    left = Object.keys(NAMED_BOSSES).map(k=>{ const B = NAMED_BOSSES[k], names = k==='barrows' ? BARROWS_BROS.map(x=>x[0]) : k==='dks' ? ['Dagannoth Rex','Dagannoth Prime','Dagannoth Supreme'] : [B.nm];
+      return `<h4 style="margin:8px 0 4px;color:var(--amber)">${esc(B.nm)} <span class="muted" style="font-weight:400">&middot; ${esc(B.where)}</span></h4>` + names.map(n=>`<div class="shoprow"><span>${esc(n)}</span><span class="muted">kc ${(p.bossKc||{})[n]||0}${(p.bossPB||{})[n] ? ` &middot; best ${(p.bossPB||{})[n]} turns` : ''}</span></div>`).join(''); }).join('');
+    const other = Object.keys(p.bossKc||{}).filter(n=>!Object.keys(NAMED_BOSSES).some(k=>NAMED_BOSSES[k].nm===n) && !BARROWS_BROS.some(x=>x[0]===n) && !/Dagannoth/.test(n));
+    right = `<h4 style="margin:4px 0;">Other bosses</h4>` + (other.length ? other.map(n=>`<div class="shoprow"><span>${esc(n)}</span><span class="muted">kc ${p.bossKc[n]}${(p.bossPB||{})[n] ? ` &middot; best ${p.bossPB[n]} turns` : ''}</span></div>`).join('') : '<div class="muted">none yet</div>');
+  } else {
+    const L = p.clog||{}; let have = 0, tot = 0;
+    left = Object.keys(NAMED_BOSSES).map(k=>{ const B = NAMED_BOSSES[k], items = B.uniques.map(u=>u[0]).concat(['Godsword shard 1','Godsword shard 2','Godsword shard 3']), got = L[k]||{};
+      return `<h4 style="margin:8px 0 4px;color:var(--amber)">${esc(B.nm)}</h4><div style="display:flex;flex-wrap:wrap;gap:4px;">` + items.map(it=>{ tot++; const n = got[it]||0; if (n) have++;
+        return `<span class="skitem" style="${n ? `border-color:${COL.gold}` : 'opacity:0.45'}">${n ? esc(it)+' &times;'+n : '???'}</span>`; }).join('') + '</div>'; }).join('');
+    right = `<div class="muted">collection log: ${have} / ${tot} uniques found</div><div class="muted" style="margin-top:8px;">godswords: forge the three shards into a blade at the smithy (Smithing 60), then fit a hilt from the King Black Dragon (Armadyl), Kalphite Queen (Bandos), Dagannoth Kings (Saradomin) or Giant Mole (Zamorak)</div>`;
+  }
+  return `<style>.bvrow{display:flex;justify-content:space-between;gap:12px;font-size:12px;padding:1px 0;border-bottom:1px solid rgba(255,255,255,0.04)}.bvrow b{text-align:right}</style><h2 class="panel-title">BESTIARY${p.title ? ` &middot; <span style="color:${COL.gold}">${esc(p.title)}</span>` : ''}</h2>
+    <div class="sub">${seen.length} creatures logged &middot; ${famDone.length}/${nFam} families complete (each +5% damage against it; all of them: the title "the Beastmaster") &middot; ${p.killCount||0} kills</div>
+    <div class="btnrow" style="justify-content:flex-start;margin-bottom:6px;">${tabs}</div>
+    <div class="ovbody" style="display:flex;gap:14px;align-items:flex-start;"><div style="flex:1 1 52%;max-height:62vh;overflow:auto;">${left}</div><div style="flex:1 1 48%;">${right}</div></div>
+    <div class="btnrow"><button class="btn" onclick="setUi('playing')">close (B / Esc)</button></div>`;
+}
+// the 3D model viewer in the bestiary: the creature's own model, turning slowly (drag to turn it)
+const BV = { r:null, scene:null, cam:null, e:null, key:'', raf:0, yaw:0.6, drag:null, hold:0 };
+function bvMount(){
+  const slot = document.getElementById('bvSlot'); if (!slot || typeof THREE==='undefined' || !G.bestSel) return;
+  const T = THREE;
+  if (!BV.r){
+    const cv = document.createElement('canvas');
+    BV.r = new T.WebGLRenderer({ canvas:cv, alpha:true, antialias:true }); BV.r.setPixelRatio(Math.min(2, window.devicePixelRatio||1)); BV.r.setSize(220, 240, false);
+    if (T.sRGBEncoding) BV.r.outputEncoding = T.sRGBEncoding; BV.r.toneMapping = T.ACESFilmicToneMapping; BV.r.setClearColor(0x000000, 0);
+    BV.scene = new T.Scene(); BV.cam = new T.PerspectiveCamera(30, 220/240, 0.1, 30); BV.cam.position.set(0, 0.8, 3.1); BV.cam.lookAt(0, 0.45, 0);
+    BV.scene.add(new T.HemisphereLight(0xdde4f0, 0x2a2018, 0.8));
+    const key = new T.DirectionalLight(0xffe0b0, 1.4); key.position.set(1.2, 2, 1.6); BV.scene.add(key);
+    const rim = new T.DirectionalLight(0x9fb4ff, 1.0); rim.position.set(-1.5, 1.4, -2); BV.scene.add(rim);
+    cv.addEventListener('pointerdown', ev=>{ BV.drag = ev.clientX; try{ cv.setPointerCapture(ev.pointerId); }catch(e){} });
+    cv.addEventListener('pointermove', ev=>{ if (BV.drag!=null){ BV.yaw += (ev.clientX - BV.drag)*0.014; BV.drag = ev.clientX; BV.hold = performance.now(); } });
+    const up = ()=>{ BV.drag = null; }; cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+  }
+  slot.innerHTML = ''; slot.appendChild(BV.r.domElement);
+  if (!BV.raf) BV.raf = requestAnimationFrame(bvFrame);
+}
+function bvFrame(){
+  BV.raf = 0;
+  const cv = BV.r && BV.r.domElement; if (!cv || !cv.isConnected || G.ui!=='bestiary') return;
+  const nm = G.bestSel, known = (G.player.codexSeen||[]).includes(nm) || (G.bestLive && G.bestLive.nm===nm);
+  if (nm + known !== BV.key){
+    BV.key = nm + known; if (BV.e){ BV.scene.remove(BV.e.holder); BV.e = null; }
+    if (known){ try{ const e0 = bestEntryFor(nm) || {}, fake = { nm, undead: G.bestLive && G.bestLive.nm===nm ? G.bestLive.undead : e0.undead }, pt = m3dPortrait(fake);
+      if (pt){ BV.e = m3dInstance(fake, pt); const sc = 1/Math.max(0.6, BV.e.H); BV.e.holder.scale.setScalar(sc); BV.scene.add(BV.e.holder); } }catch(err){ console.error(err); BV.e = null; } }
+  }
+  const t = performance.now()/1000;
+  if (BV.drag==null && performance.now() - BV.hold > 2500) BV.yaw += 0.008;
+  if (BV.e){ BV.e.holder.rotation.y = BV.yaw; const r = BV.e.rig; try{ if (BV.e.anim) BV.e.anim(r, t, 0, 0, 0, 0, BV.e); else if (BV.e.beast) m3dPoseBeast(r, t, 0, 0, 0, 0); else m3dPoseHumanoid(r, t, 0, 0, 0, 0, BV.e); }catch(e){} }
+  BV.r.render(BV.scene, BV.cam);
+  BV.raf = requestAnimationFrame(bvFrame);
+}
 // ===================== monster behaviour: aggression, roles, packs, summoners, abilities, champions, boss phases =====================
-function monIsBoss(m){ return !!m && ((G.gameMode===1 && G.isBossFloor && G.mon.indexOf(m)===G.bossIdx) || !!m.raidBoss); }
+function monIsBoss(m){ return !!m && ((G.gameMode===1 && G.isBossFloor && G.bossIdx>=0 && G.mon.indexOf(m)===G.bossIdx) || !!m.raidBoss); }
 // how big a creature stands: tiny vermin up to giants and dragons that loom over several tiles
 function monSizeK(m){
   const n = ((m && m.nm)||'').toLowerCase();
@@ -11984,12 +12294,19 @@ function monAi(m){
   if (/bandit|thief|rogue|brigand|knight|hobgoblin|duelist|pirate|gladiator/.test(n)) addAb('disarm');
   if (/spider|snake|scorpion|serpent|wyvern|naga|cobra|asp\b/.test(n)) addAb('venomous');
   // champions: a tougher monster with one or two random affixes
-  if (!boss && !m.summoned && G.gameMode===1 && chn(Math.min(0.2, 0.05 + (G.depth||1)*0.012))){
+  if (!boss && !m.summoned && !m.elite && G.gameMode===1 && chn(Math.min(0.2, 0.05 + (G.depth||1)*0.012))){
     const pool = ['fast','vampiric','shielded','explosive','regenerating'], aff = [];
     const k = chn(0.3) ? 2 : 1; while (aff.length < k){ const a = pool[rn(pool.length)]; if (!aff.includes(a)) aff.push(a); }
     const f = m.maxHp ? m.hp/m.maxHp : 1;
-    m.elite = aff; m.maxHp = Math.round((m.maxHp||10)*1.6); m.hp = Math.max(1, Math.round(m.maxHp*f)); m.atkBonus = (m.atkBonus||0) + 2; m.xp = Math.round((m.xp||5)*2.5);
+    m.champ = aff; m.maxHp = Math.round((m.maxHp||10)*1.6); m.hp = Math.max(1, Math.round(m.maxHp*f)); m.atkBonus = (m.atkBonus||0) + 2; m.xp = Math.round((m.xp||5)*2.5);
     if (aff.includes('fast')) addAb('aggressive'); if (aff.includes('shielded')) m.ac = (m.ac||10) + 4; if (aff.includes('regenerating')) addAb('regen');
+  }
+  // now and then a rare spawn: a golden goblin or a treasure imp that runs for it, or a shiny variant of anything
+  if (!boss && !m.summoned && !m.mimic && !m.champ && (G.gameMode===1 || G.gameMode===2) && chn(1/110)){
+    const r = rn(3);
+    if (r===0){ m.nm = 'golden goblin'; m.rare = 'golden'; A.role = 'thief'; A.aggro = 'normal'; m.hp = m.maxHp = Math.max(8, Math.round(m.maxHp*0.7)); m.ac = (m.ac||10) + 2; }
+    else if (r===1){ m.nm = 'treasure imp'; m.rare = 'imp'; A.role = 'thief'; A.aggro = 'normal'; m.hp = m.maxHp = Math.max(6, Math.round(m.maxHp*0.5)); }
+    else m.shiny = 1;
   }
   m._ai = A; return A;
 }
@@ -12063,6 +12380,7 @@ function isoMonShot(m, kind, col){
 // telegraphed a turn ahead, so you can swap your protection prayer in time
 function monBossTurn(m, i, dist){
   const p = G.player, B = m._boss = m._boss || { phase:0, t:0, next:null }, f = m.hp/Math.max(1, m.maxHp);
+  if (!B.start && m.hp < m.maxHp) B.start = (p.turnCount||0) || 1;
   if (!m.rsStyle) rsMonStyle(m);
   if (B.phase < 1 && f <= 0.66){ B.phase = 1; logMsg(`*** the ${m.nm} roars - it calls for help! ***`, 'new', true); monSummon(m, 2, true); if (typeof FP!=='undefined') FP.shake = Math.max(FP.shake||0, 0.4); return true; }
   if (B.phase < 2 && f <= 0.33){ B.phase = 2; m.enraged = 1; m.dmg2 = Math.round(m.dmg2*1.4); m.atkBonus += 3; logMsg(`*** the ${m.nm} flies into a rage - it hits far harder now! ***`, 'new', true); sfx('crit'); }
@@ -12084,6 +12402,12 @@ function monBossTurn(m, i, dist){
 // a monster's whole turn when it has something smarter to do than walk at you; false = the usual approach and strike
 function monAiTurn(m, i, dist){
   const A = monAi(m), p = G.player, boss = monIsBoss(m);
+  if (A.role==='thief'){
+    if (!m._thiefNote && dist<=7){ m._thiefNote = 1; logMsg(`a ${m.nm}! catch it before it gets away`, 'loot', true); }
+    m.thiefT = (m.thiefT||0) + 1;
+    if (m.thiefT > 16){ m.alive = 0; m.x = -50; m.y = -50; logMsg(`the ${m.nm} slips away with its treasure`, 'hit'); return true; }
+    m.frightenedTurns = Math.max(m.frightenedTurns||0, 1); return false;
+  }
   if (m.rootTurns > 0 || m.frightenedTurns > 0) return false;
   const seeYou = ()=>hasLineOfSight(m.x, m.y, p.x, p.y);
   if (boss) return monBossTurn(m, i, dist);
@@ -12126,7 +12450,7 @@ function monOnHit(m, mi, mdmg){
   if (hasAbility(m,'drainStat') && chn(0.25)){ p.drainTurns = 8; p.drainAmt = Math.min(4, (p.drainAmt||0) + 2); logMsg(`the ${m.nm} drains your strength - your aim and guard weaken (-${p.drainAmt})`, 'hit'); }
   if (hasAbility(m,'disarm') && chn(0.12) && G.gear.weapon && G.gear.weapon.used && !(p.disarmTurns>0)){ p.disarmTurns = 2; logMsg(`the ${m.nm} knocks your weapon aside - you fight bare-handed for 2 turns`, 'hit'); }
   if (hasAbility(m,'venomous') && chn(0.3)){ applyPoisonToPlayer(1+rn(3)); logMsg(`the ${m.nm}'s bite is venomous`, 'hit'); }
-  if (m.elite && m.elite.includes('vampiric') && mdmg > 0){ const h = Math.max(1, Math.round(mdmg*0.3)); m.hp = Math.min(m.maxHp, m.hp + h); }
+  if (m.champ && m.champ.includes('vampiric') && mdmg > 0){ const h = Math.max(1, Math.round(mdmg*0.3)); m.hp = Math.min(m.maxHp, m.hp + h); }
 }
 function monExplode(m){
   const p = G.player; try{ fpBurst(m.x+0.5, m.y+0.5, 0.5, '#ff7a2a', 30, 1.8); if (typeof FP!=='undefined') FP.shake = Math.max(FP.shake||0, 0.5); }catch(e){}
@@ -12165,7 +12489,7 @@ function isoDrawStatus(ppu){
     if (!m.alive) continue;
     if (G.dungeonSeen && G.dungeonSeen[m.x] && !G.dungeonSeen[m.x][m.y]) continue;
     const st = { poison: m.poisonTurns>0 || m.venomTurns>0, ice: m.rootTurns>0, burn: m.burnTurns>0, bleed: m.bleedTurns>0, daze: m.dazedTurns>0 || m.stunTurns>0,
-      weak: m.weakTurns>0 || m.debuffAtkTurns>0 || m.debuffACTurns>0, aura: m.elite ? (m.elite.includes('vampiric') ? '#e03050' : m.elite.includes('explosive') ? '#ff8a2a' : '#ffc040') : null, rage: !!m.enraged };
+      weak: m.weakTurns>0 || m.debuffAtkTurns>0 || m.debuffACTurns>0, aura: m.champ ? (m.champ.includes('vampiric') ? '#e03050' : m.champ.includes('explosive') ? '#ff8a2a' : '#ffc040') : (m.shiny || m.rare) ? '#fff0a0' : null, rage: !!m.enraged };
     if (!st.poison && !st.ice && !st.burn && !st.bleed && !st.daze && !st.weak && !st.aura && !st.rage) continue;
     const e = typeof M3D!=='undefined' && M3D.inst && M3D.inst.get(m), pos = e && e.holder && e.holder.parent ? e.holder.position : { x:m.x+0.5, z:m.y+0.5 };
     draw(pos.x, pos.z, e ? e.H : 0.9, st);
@@ -12328,6 +12652,7 @@ function dgLightFlames(vis){
 function dgAvoid(x, y){ const D = G.gameMode===1 && G.dungeonDeco; if (!D || !D[x]) return false; const d = D[x][y]; return d==='lava' || d==='blade' || (d==='ldoor' && !skHave('dkey')); }
 function dgBlocked(x, y){
   if (G.gameMode!==1 || !G.dungeonDeco || !G.dungeonDeco[x]) return false;
+  if (mimicCheck(x, y)) return true;
   if (G.dungeonDeco[x][y]!=='ldoor') return false;
   if (!skHave('dkey')){ logMsg('a locked iron door - something on this floor carries the key', 'hit'); sfx('error'); return true; }
   skAdd('dkey', -1); G.dungeonDeco[x][y] = ''; logMsg('you turn the iron key - the door swings open', 'good'); sfx('loot');
@@ -12350,8 +12675,10 @@ function dgStep(x, y){
     logMsg(`you dig into the loose earth and turn up ${g} gold${extra}`, 'loot', true); sfx('gold');
   }
   else if (d==='lchest'){
-    if (!skHave('dkey')){ logMsg('a locked iron chest - something on this floor carries the key', 'hit'); return false; }
-    skAdd('dkey', -1); D[x][y] = '';
+    const crys = !skHave('dkey') && skHave('crystalkey');
+    if (!skHave('dkey') && !crys){ logMsg('a locked iron chest - something on this floor carries the key', 'hit'); return false; }
+    skAdd(crys ? 'crystalkey' : 'dkey', -1); D[x][y] = '';
+    if (crys){ const it2 = genItem(lootLevel()+4+playerMF(), vaultLootSlot(), 4); addToInventory(it2); logMsg(`the crystal key sings in the lock - a second treasure: ${itemNameHtml(it2)}`, 'loot', true); }
     const g = Math.round((60 + rn(80) + G.depth*30)*goldFindMult()); p.gold += g;
     const it = genItem(lootLevel()+2+playerMF(), vaultLootSlot(), 3); addToInventory(it);
     logMsg(`the key turns - inside the chest: ${g} gold and ${itemNameHtml(it)}`, 'loot', true); sfx('achievement');
@@ -14389,6 +14716,7 @@ function spawnBoss(){
   m.xp = roundH((refEntry.xp*4 + G.dungeonMaxDepth*15 + lvl*30) * sp.xp);
   m.sym = sym; m.nm = nm; m.col = col; m.undead = undead; m.mlevel = bossLevel;
   m.abilities = abilities; m.art = art;
+  try{ namedBossApply(m); }catch(e){ console.error(e); }
   // Multiattack splits total damage across several swings rather than
   // multiplying it - divide the per-hit dice down so a Multiattack boss
   // doesn't just hit several times as hard as a single-attack one
@@ -14623,40 +14951,8 @@ function o3PortalTick(dt, pp){
   if (f.t >= 1.3){ G.owPortal = null; O3.pgrp.scale.setScalar(1); g.visible = false; waypointArrive(f.key); }
 }
 // ===================== SECTION: MONSTER CODEX (bestiary) =====================
-function buildBestiary(){
-  const seen = G.player.codexSeen||[];
-  const rows = MONSTER_LEVELS.map(m=>{
-    const known = seen.includes(m.nm);
-    if (!known){
-      return `<div class="choice-row" style="opacity:0.4">
-        <span style="min-width:34px;display:inline-block;color:${monLevelColor(m)}">${monCombatLevel(m)}</span>
-        <span style="min-width:140px;display:inline-block;">???</span>
-        <span class="muted">not yet encountered</span>
-      </div>`;
-    }
-    const abilStr = m.abilities.length ? m.abilities.join(', ') : 'none';
-    return `<div class="choice-row" style="align-items:center;">
-      <canvas id="bestiaryArt${m.lvl}" width="34" height="34" style="flex:0 0 auto;background:#00000030;border-radius:4px;margin-right:4px;"></canvas>
-      <span style="min-width:34px;display:inline-block;color:${monLevelColor(m)}" title="combat level ${monCombatLevel(m)} - green is below your level, yellow even, red above">${monCombatLevel(m)}</span>
-      <span style="min-width:140px;display:inline-block;color:${monsterCol(m)}">${m.sym} ${esc(m.nm)}${m.undead?' (undead)':''}</span>
-      <span style="min-width:74px;display:inline-block;color:var(--gold);">&times;${(G.player.killsBy||{})[m.nm]||0} kills</span>
-      <span class="muted">AC ${m.ac} &middot; ${m.hd}HD &middot; +${m.atk} to hit &middot; ${m.dmg1}d${m.dmg2} dmg &middot; ${m.xp} XP &middot; ${esc(abilStr)}</span>
-    </div>`;
-  }).join('');
-  return `
-    <h2 class="panel-title">BESTIARY</h2>
-    <div class="sub">${seen.length} / ${NMLVL} logged &middot; ${G.player.killCount||0} kills in all - defeat a monster type at least once to fill in its entry</div>
-    <div class="ovbody">${rows}
-      <div class="btnrow"><button class="btn" onclick="setUi('playing')">close (Esc)</button></div>
-    </div>
-  `;
-}
-function renderBestiaryArt(){
-  const seen = G.player.codexSeen||[];
-  for (const m of MONSTER_LEVELS){
-    if (seen.includes(m.nm)) renderMiniMonsterArt('bestiaryArt'+m.lvl, m.art, monsterCol(m), m.nm, m.undead);
-  }
-}
+function buildBestiary(){ return bestHtml(); }
+function renderBestiaryArt(){ try{ bvMount(); }catch(e){ console.error(e); } }
 
 // ===================== SECTION: SEALED VAULT MINIGAME =====================
 function vaultColorName(k){ return ['?','R','G','B','Y'][k]||'?'; }
@@ -16465,7 +16761,7 @@ function renderImmersiveHud(){
   const html = `
     <div class="dh-topl">
     <div class="dh-plate pe">
-      <div class="dh-name">${esc(p.name||p.cls)}</div>
+      <div class="dh-name">${esc(p.name||p.cls)}${p.title ? ` <span style="color:${COL.gold};font-weight:400;font-size:0.85em">${esc(p.title)}</span>` : ''}</div>
       <div class="dh-sub">${p.ngPlus>0?`<span style="color:${COL.amber}">NG+${p.ngPlus}</span> &middot; `:''}Combat ${p.combatLevel} ${esc(p.race)} &middot; total ${rsTotalLevel()}</div>
       <div class="dh-loc">${loc}</div>
       <div class="dh-stats"><span ${rsStatTipAttr('armour')}>AC <b>${playerAC()}</b></span><span>Gold <b data-cnt="gold" data-v="${p.gold}">${p.gold}</b></span>${(p.corruption||0)>0 ? `<span style="color:${COL.purple}">Corruption <b style="color:${COL.purple}">${Math.round(p.corruption)}%</b></span>` : ''}</div>
@@ -17807,6 +18103,8 @@ const UNDEAD_PORTRAITS = {
   'archlich':          {paint:udPaintLich, o:{crown:true, spikes:true, aura:0.22, noHood:true, robe:'#1c2a46', robeD:'#070c18', gem:'120,220,255', eyes:'150,230,255', auraCol:'110,190,255'}, h:1.12},
   'risen lich-lord':   {paint:udPaintLich, o:{crown:true, spikes:true, aura:0.22, noHood:true}, h:1.12},
 };
+Object.assign(UNDEAD_PORTRAITS, { 'ghost':UNDEAD_PORTRAITS['specter'], 'vampyre':UNDEAD_PORTRAITS['vampire spawn'], 'dharok':UNDEAD_PORTRAITS['death knight'], 'guthan':UNDEAD_PORTRAITS['death knight'],
+  'verac':UNDEAD_PORTRAITS['death knight'], 'torag':UNDEAD_PORTRAITS['death knight'], 'karil':UNDEAD_PORTRAITS['revenant'], 'ahrim':UNDEAD_PORTRAITS['lich acolyte'] });
 const UNDEAD_PORTRAIT_KEYS = Object.keys(UNDEAD_PORTRAITS).sort((a,b)=>b.length-a.length);
 // matches a live monster's (possibly decorated) name - "Champion ghoul",
 // "Gravemaw the wight", "zombie overlord" - back to its base undead kind
@@ -18809,6 +19107,32 @@ const MONSTER_PORTRAITS = {
   'succubus':         HUM({head:'fiend', skin:'#c87a8a', hair:'#1a0a14', longHair:true, outfit:'leather', cloth:'#3a0a1a', wings:'bat', wingCol:'#4a0a1a', tail:'spade', tailCol:'#8a2a3a'}, 0.98),
   'balor':            HUM({head:'fiend', skin:'#8a1a0a', outfit:'loin', cloth:'#1a0a0a', wings:'bat', wingCol:'#3a0a0a', weapon:'sword', bulk:1.5, eyes:'255,180,40', aura:'255,90,20', auraA:0.3}, 1.3),
 };
+Object.assign(MONSTER_PORTRAITS, {
+  'moss giant':      HUM(GIANT('#7a9a5a', { furCol:'#4a5a2a' }), 1.3),
+  'fire giant':      HUM(GIANT('#c0583a', { hair:'#ff8a3a', beard:'#ff8a3a' }), 1.38),
+  'ice giant':       HUM(GIANT('#9ab8d0', { hair:'#e0f0ff', beard:'#e0f0ff' }), 1.36),
+  'lesser demon':    HUM({head:'fiend', skin:'#a0281a', outfit:'loin', cloth:'#2a0a0a', claws:true, feet:'claw', tail:'spade', tailCol:'#7a1a10', eyes:'255,200,60'}, 1.12),
+  'greater demon':   HUM({head:'fiend', skin:'#8a1a10', outfit:'loin', cloth:'#1a0a0a', wings:'bat', wingCol:'#4a0a0a', claws:true, feet:'claw', tail:'spade', tailCol:'#5a1a10', bulk:1.3, eyes:'255,160,40'}, 1.28),
+  'black demon':     HUM({head:'fiend', skin:'#2a2a30', outfit:'loin', cloth:'#0a0a0a', wings:'bat', wingCol:'#1a1a20', claws:true, feet:'claw', bulk:1.4, eyes:'255,60,30', aura:'200,40,20', auraA:0.2}, 1.35),
+  'abyssal demon':   HUM({head:'fiend', skin:'#4a2a6a', outfit:'none', claws:true, feet:'claw', tail:'spade', tailCol:'#2a1a4a', eyes:'210,140,255', aura:'150,80,255', auraA:0.25}, 1.1),
+  'hellhound':       BST({head:'canine', fur:'#3a1a14', tall:1.1, len:1.1, eyes:'255,150,40', bristle:true, snarl:true}, 0.8),
+  'werewolf':        BST({head:'canine', fur:'#5a4a3a', tall:1.35, len:1.1, eyes:'255,220,80', bristle:true, snarl:true}, 0.92),
+  'vampyre':         HUM({outfit:'rags', cloth:'#2a0a14', cape:'#5a0a1a', skin:'#d8d0d8', eyes:'255,40,40', claws:true}, 1.02),
+  'plague rat':      MONSTER_PORTRAITS['giant rat'], 'rat king': Object.assign({}, MONSTER_PORTRAITS['giant rat'], { h:(MONSTER_PORTRAITS['giant rat'].h||1)*1.5 }),
+  'cave spider':     MONSTER_PORTRAITS['giant spider'], 'spider broodmother': Object.assign({}, MONSTER_PORTRAITS['giant spider'], { h:(MONSTER_PORTRAITS['giant spider'].h||1)*1.5 }),
+  'scarab swarm':    MONSTER_PORTRAITS['giant scorpion swarm'],
+  'giant scarab':    MP(mpArachnid,{kind:'scorpion', chitin:'#2a6a7a'},0.72),
+  'kalphite':        MP(mpArachnid,{kind:'scorpion', chitin:'#a08a40'},0.85),
+  'kalphite queen':  MP(mpArachnid,{kind:'scorpion', chitin:'#c0a050'},1.45),
+  'bog beast':       MONSTER_PORTRAITS['shambling mound'], 'swamp horror': MONSTER_PORTRAITS['vine horror'] || MONSTER_PORTRAITS['shambling mound'],
+  'ice troll':       MONSTER_PORTRAITS['frost troll'],
+  'mimic':           MP(mpArachnid,{kind:'crab', chitin:'#6a4424'},0.7),
+  'golden goblin':   HUM({head:'goblin', skin:'#e8c040', outfit:'rags', cloth:'#8a6a20', headScale:1.25, feet:'none', eyes:'255,255,200'}, 0.72),
+  'treasure imp':    HUM({head:'fiend', skin:'#d8a020', outfit:'none', wings:'bat', wingCol:'#8a6a10', tail:'spade', tailCol:'#a07a10', claws:true, feet:'claw'}, 0.55, {lift:0.15}),
+  'giant mole':      BST({head:'bear', fur:'#3a3030', tall:0.85, len:1.45, claws:true, tail:'stub'}, 1.25),
+  'king black dragon': DRG({scale:'#151a18', belly:'#3a3a30', breath:'255,120,40', eyes:'255,60,40'}, 1.55),
+  'dagannoth':       HUM({head:'fish', skin:'#4a6a5a', outfit:'scales', fin:'#2a4a3a', claws:true, feet:'claw', bulk:1.4, eyes:'255,200,80'}, 1.25),
+});
 const MONSTER_PORTRAIT_KEYS = Object.keys(MONSTER_PORTRAITS).sort((a,b)=>b.length-a.length);
 // every creature's painted figure, undead or not - the exact name first,
 // then the longest known name it contains (so "Champion dire wolf" or
@@ -27073,7 +27397,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-79';
+const GAME_VERSION = 'rs-80';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

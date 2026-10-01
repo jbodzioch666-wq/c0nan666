@@ -1,5 +1,43 @@
 # Depthcrawl patch notes
 
+## RS-80 - Monster content and the bestiary
+
+- **Monster families with tiers:** each family climbs in tiers, for example giant rat to rat king and goblin to goblin warlord. The families are rats, kobolds, goblins, zombies, skeletons, orcs, spiders, giants and demons. Their archers shoot and their shamans and mages cast. Each dungeon floor picks two families that live at its depth, so a floor has its own ecosystem.
+- **Classic RuneScape monsters:** moss, hill, fire and ice giants; lesser, greater, black and abyssal demons; hellhounds and imps.
+- **Regional monsters on the road:**
+  - the desert: scarab swarms, kalphite workers and soldiers, mummies, giant scarabs
+  - the swamp: leeches, bog beasts, swamp horrors
+  - the tundra and mountain passes: yetis, ice trolls, ice giants
+- **Night-only monsters:** after dark, ghosts, werewolves and vampyres join the roadside fights.
+- **Rare spawns** (about 1 in 110 monsters):
+  - a golden goblin or treasure imp that runs for it and escapes after a while, but bursts into gold or a top-quality item if you catch it
+  - a shiny variant of any monster, with a gleaming prize
+- **Mimics:** from depth 2 down, about one chest in seven (vaults, corrupted chests, locked iron chests) is a mimic that bites back. Kill it for the treasure it swallowed.
+- **Named bosses**, sometimes in place of the usual site boss:
+  - the King Black Dragon in dragons' lairs
+  - the Kalphite Queen or Giant Mole in dungeons
+  - the Giant Mole in mines
+  - one of the six Barrows brothers in graveyards (Karil shoots, Ahrim casts)
+  - Dagannoth Rex, Prime or Supreme in sunken temples, each fighting with a different style
+- **Godswords:** named bosses drop godsword shards (20%) and a hilt each: Armadyl from the King Black Dragon, Bandos from the Kalphite Queen, Saradomin from the Dagannoth Kings, Zamorak from the Giant Mole. Forge the three shards into a blade at the smithy (Smithing 60), then fit a hilt. Each godsword is a big two-hander with a special:
+  - Armadyl's Judgement: one blow in six hits half again as hard
+  - Bandos's Warstrike: smashes the foe's armour down
+  - Saradomin's Healing Blade: heals you and restores prayer
+  - Zamorak's Ice Cleave: freezes the foe in place
+- **Boss drop tables and a collection log:** each named boss has its own uniques (dragon weapons, the KBD heads, the Berserker, Archers and Seers rings, a Barrows weapon, a dragon chainbody, the Baby mole...). Every unique you find goes into the collection log.
+- **The rare drop table:** any monster has about a 1 in 100 chance of rolling it, for a big gem, a rune weapon, a key half or a clue scroll:
+  - Two key halves make a crystal key, which opens a locked chest with a second treasure inside.
+  - A clue scroll leads to a casket of gold, gear and runes.
+- **Boss kill counts and personal best times:** each boss fight is timed in turns from the first blow, and a new personal best is announced.
+- **A new bestiary** (B), with three tabs:
+  - **Creatures:** every family and creature, each with a turning 3D model, lore, stats, attack style, melee and magic weaknesses, abilities, where it's found, kill count and drop table.
+  - **Bosses:** kill counts and best times.
+  - **Collection log**
+- **Bestiary rewards:** study every member of a family (kill one of each) for 5% more damage against that family. Complete them all for the title "the Beastmaster", shown by your name, and 3% more damage against everything.
+- **Target info:** right-click any monster and choose Inspect to open its bestiary entry with its live life, armour, to-hit, role and champion affixes.
+- Fixed: a monster not on the current floor could be mistaken for the boss after a boss floor.
+- Fixed (from RS-79): killing an elite pack leader, or hovering one, threw an error, because champion affixes clashed with the old elite flag.
+
 ## RS-79 - Monster behaviour
 
 - **Aggression:**
