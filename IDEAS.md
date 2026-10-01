@@ -208,21 +208,21 @@ _The spell and prayer code_
 ### Dungeon overhaul
 _Bigger floors and layouts before the monsters and content that fill them_
 
-150. [ ] (29) Dungeon overhaul - floors are only 20x20 with 6-9 small box rooms today
+150. [x] (29) Dungeon overhaul - floors are only 20x20 with 6-9 small box rooms today
     - Bigger floors: about 48x48, sized by depth and site type. Make floor size a per-floor setting (towns stay 20x20) and only build the 3D scene near the camera
     - Better layouts: L-shaped, cross and round rooms, pillared halls, cave caverns; loops so there's more than one route; wider halls, a grand hall and a boss arena
     - A layout per site: castle courtyards, a keep and towers; flooded temple sections; necro tower rings; long mine tunnels with rail carts
     - More to do: locked doors and keys, levers, secret walls, visible and disarmable traps, puzzle rooms, mini-bosses guarding treasure rooms, monster packs with a purpose, shrines, a deep merchant, lore notes, hazards (lava, collapsing floors, darkness)
     - Across floors: branching safe and dangerous stairs, shortcuts or checkpoints every few floors, named set-piece floors
     - Suggested order: bigger floors and layouts first, then the content
-151. [ ] (293) Wall cutaway fades smoothly instead of popping
-152. [ ] (290) Richer dungeon dressing - cobwebs, bones, barrels, moss, chains, banners, rubble, per site type
-153. [ ] (291) Better wall and floor textures per site - castle stone, temple tiles, mine timbers, crypt carvings
-154. [ ] (292) Animated hazards - bubbling lava, dripping water, glowing crystals, swinging blades
-155. [ ] (284) Dynamic torchlight - flickering light and moving shadows, a lantern to carry in dark dungeons
-156. [ ] (179) Utility items - light source for dark dungeons, rope, shovel, keys for locked doors and chests
-157. [ ] (362) Skill-gated resource areas - mining guild, fishing platform, magic tree grove
-158. [ ] (240) Raid - a multi-room challenge with several bosses, puzzles and a big reward chest
+151. [x] (293) Wall cutaway fades smoothly instead of popping
+152. [x] (290) Richer dungeon dressing - cobwebs, bones, barrels, moss, chains, banners, rubble, per site type
+153. [x] (291) Better wall and floor textures per site - castle stone, temple tiles, mine timbers, crypt carvings
+154. [x] (292) Animated hazards - bubbling lava, dripping water, glowing crystals, swinging blades
+155. [x] (284) Dynamic torchlight - flickering light and moving shadows, a lantern to carry in dark dungeons
+156. [x] (179) Utility items - light source for dark dungeons, rope, shovel, keys for locked doors and chests
+157. [x] (362) Skill-gated resource areas - mining guild, fishing platform, magic tree grove
+158. [x] (240) Raid - a multi-room challenge with several bosses, puzzles and a big reward chest
 
 ### Monster behaviour
 _Monster AI and visuals_

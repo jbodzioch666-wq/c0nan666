@@ -841,7 +841,13 @@
    ========================================================================== */
 
 // ===================== SECTION: CONSTANTS =====================
-const COLS = 20, ROWS = 20;
+// the grid size of the current map: towns, the arena and the fixed-plan sites are 20x20,
+// an ordinary dungeon floor is bigger (DUN_W x DUN_H). setGrid() before building a map;
+// syncGrid() makes the size follow whatever map is loaded (a restored floor, a saved game)
+let COLS = 20, ROWS = 20;
+const DUN_W = 34, DUN_H = 30;
+function setGrid(w, h){ COLS = w; ROWS = h; }
+function syncGrid(){ const m = G && G.map; if (m && m.length && m[0] && (m.length!==COLS || m[0].length!==ROWS)){ COLS = m.length; ROWS = m[0].length; } }
 // map size is now player-pickable at world creation (Small/Medium/Large/
 // XLarge, see WORLD_SIZE_TIERS/setWorldSizeTier) - these start at the old
 // fixed default and get reassigned before a new game's generateOverworld()
@@ -4681,6 +4687,7 @@ function rangedAttack(tgt){
 
 // ===================== SECTION: DUNGEON GENERATION =====================
 function generateLevel(d){
+  setGrid(DUN_W, DUN_H);
   G.map = makeGrid(T_WALL);
   G.floorItem = makeItemGrid();
   G.trapSeen = makeGrid(false); // pits start hidden until noticed nearby
@@ -4692,13 +4699,17 @@ function generateLevel(d){
   // flush against) a room already placed - this is what keeps the floor
   // reading as distinct rooms linked by narrow hallways instead of one big
   // open blob, since overlapping rectangles used to merge into open space
-  const desiredRooms = 6+rn(4);
-  const roomX=[], roomY=[], roomW=[], roomH=[];
+  // a floor is now 34x30 with 10-14 rooms of several shapes: plain rooms, great pillared halls,
+  // cross-shaped chambers, round rooms and ragged caves, joined by winding corridors - with a
+  // few extra passages so the floor loops instead of being one long chain
+  const desiredRooms = 10+rn(5);
+  const roomX=[], roomY=[], roomW=[], roomH=[], roomK=[];
   const ROOM_PAD = 1; // at least one wall tile of buffer between rooms
   let placeTries = 0;
-  while (roomX.length < desiredRooms && placeTries < 400){
+  while (roomX.length < desiredRooms && placeTries < 900){
     placeTries++;
-    const w = 3+rn(4), h = 3+rn(4);
+    const hall = roomX.length > 0 && chn(0.14);
+    const w = hall ? 8+rn(4) : 4+rn(5), h = hall ? 6+rn(3) : 4+rn(4);
     const x = 1+rn(COLS-w-2), y = 1+rn(ROWS-h-2);
     let ok = true;
     for (let i=0;i<roomX.length;i++){
@@ -4706,33 +4717,49 @@ function generateLevel(d){
           y < roomY[i]+roomH[i]+ROOM_PAD && y+h+ROOM_PAD > roomY[i]){ ok=false; break; }
     }
     if (!ok) continue;
-    roomX.push(x); roomY.push(y); roomW.push(w); roomH.push(h);
+    const k = roomX.length===0 ? 'plain' : hall ? 'hall' : w>=5 && h>=5 ? pick(['plain','plain','cross','round','cave']) : 'plain';
+    roomX.push(x); roomY.push(y); roomW.push(w); roomH.push(h); roomK.push(k);
   }
   // pathological fallback (grid too crowded to fit even 2 rooms) - guarantee
   // a minimum viable dungeon so the rest of the generator always has rooms
   if (roomX.length < 2){
-    roomX.length = roomY.length = roomW.length = roomH.length = 0;
-    roomX.push(1,COLS-6); roomY.push(1,ROWS-6); roomW.push(4,4); roomH.push(4,4);
+    roomX.length = roomY.length = roomW.length = roomH.length = roomK.length = 0;
+    roomX.push(1,COLS-6); roomY.push(1,ROWS-6); roomW.push(4,4); roomH.push(4,4); roomK.push('plain','plain');
   }
+  // the way down goes in the room farthest from where you arrive
+  if (roomX.length > 2){ let far = 1, fd = -1; for (let i=1;i<roomX.length;i++){ const d2 = Math.abs(roomX[i]+roomW[i]/2-roomX[0]-roomW[0]/2) + Math.abs(roomY[i]+roomH[i]/2-roomY[0]-roomH[0]/2); if (d2 > fd){ fd = d2; far = i; } }
+    const j = roomX.length-1; for (const A of [roomX, roomY, roomW, roomH, roomK]){ const t = A[far]; A[far] = A[j]; A[j] = t; } }
+  // the last room holds the way down: keep it a plain room (or a hall) so the stairs are on open floor
+  if (roomK[roomX.length-1]!=='hall') roomK[roomX.length-1] = 'plain';
   const roomCnt = roomX.length;
   for (let i=0;i<roomCnt;i++){
-    for (let yy=roomY[i]; yy<roomY[i]+roomH[i]; yy++)
-      for (let xx=roomX[i]; xx<roomX[i]+roomW[i]; xx++)
-        G.map[xx][yy] = T_FLOOR;
+    const k = roomK[i], w = roomW[i], h = roomH[i], cx = (w-1)/2, cy = (h-1)/2;
+    for (let yy=0; yy<h; yy++) for (let xx=0; xx<w; xx++){
+      let open = true;
+      if (k==='cross'){ const cw = Math.max(1, Math.floor(w/3)), ch = Math.max(1, Math.floor(h/3)); open = !((xx<cw || xx>=w-cw) && (yy<ch || yy>=h-ch)); }
+      else if (k==='round') open = ((xx-cx)/(cx+0.5))**2 + ((yy-cy)/(cy+0.5))**2 <= 1.05;
+      else if (k==='cave') open = !((xx===0 || yy===0 || xx===w-1 || yy===h-1) && chn(0.45));
+      if (open) G.map[roomX[i]+xx][roomY[i]+yy] = T_FLOOR;
+    }
   }
-  // corridors between consecutive room centres
-  for (let i=1;i<roomCnt;i++){
-    const ax = roomX[i-1]+Math.floor(roomW[i-1]/2), ay = roomY[i-1]+Math.floor(roomH[i-1]/2);
-    const bx = roomX[i]+Math.floor(roomW[i]/2), by = roomY[i]+Math.floor(roomH[i]/2);
-    let x=ax, y=ay;
-    while (x!==bx){ G.map[x][y]=T_FLOOR; x += (x<bx)?1:-1; }
-    while (y!==by){ G.map[x][y]=T_FLOOR; y += (y<by)?1:-1; }
-  }
+  G.genRooms = roomX.map((x,i)=>({ x, y:roomY[i], w:roomW[i], h:roomH[i], k:roomK[i] }));
+  // corridors: consecutive rooms joined centre to centre, with a bend somewhere along the way;
+  // then 2-4 extra passages between random rooms so the floor has loops
+  const centre = i=>[roomX[i]+Math.floor(roomW[i]/2), roomY[i]+Math.floor(roomH[i]/2)];
+  const dig = (ax, ay, bx, by)=>{
+    let x = ax, y = ay; const xFirst = chn(0.5);
+    const mid = xFirst ? ax + Math.round((bx-ax)*(0.3 + Math.random()*0.4)) : ay + Math.round((by-ay)*(0.3 + Math.random()*0.4));
+    if (xFirst){ while (x!==mid){ G.map[x][y]=T_FLOOR; x += x<mid?1:-1; } while (y!==by){ G.map[x][y]=T_FLOOR; y += y<by?1:-1; } while (x!==bx){ G.map[x][y]=T_FLOOR; x += x<bx?1:-1; } }
+    else { while (y!==mid){ G.map[x][y]=T_FLOOR; y += y<mid?1:-1; } while (x!==bx){ G.map[x][y]=T_FLOOR; x += x<bx?1:-1; } while (y!==by){ G.map[x][y]=T_FLOOR; y += y<by?1:-1; } }
+    G.map[bx][by] = T_FLOOR;
+  };
+  for (let i=1;i<roomCnt;i++){ const [ax,ay] = centre(i-1), [bx,by] = centre(i); dig(ax, ay, bx, by); }
+  for (let e=0, n=2+rn(3); e<n && roomCnt>3; e++){ const i = rn(roomCnt), j = rn(roomCnt); if (Math.abs(i-j) < 2) continue; const [ax,ay] = centre(i), [bx,by] = centre(j); dig(ax, ay, bx, by); }
+  const roomFloor = r=>{ for (let k=0;k<60;k++){ const x = roomX[r]+rn(roomW[r]), y = roomY[r]+rn(roomH[r]); if (G.map[x][y]===T_FLOOR) return [x,y]; } return centre(r); };
   // stairs down in the last room
-  G.map[roomX[roomCnt-1]+rn(roomW[roomCnt-1])][roomY[roomCnt-1]+rn(roomH[roomCnt-1])] = T_STAIRSD;
+  { const [sx2, sy2] = roomFloor(roomCnt-1); G.map[sx2][sy2] = T_STAIRSD; }
   // start / stairs up in the first room
-  G.genStart.x = roomX[0]+rn(roomW[0]);
-  G.genStart.y = roomY[0]+rn(roomH[0]);
+  { const [gx2, gy2] = roomFloor(0); G.genStart.x = gx2; G.genStart.y = gy2; }
   if (d>1) G.map[G.genStart.x][G.genStart.y] = T_STAIRSU;
   // pillars stand in the bigger rooms - stone that blocks a shot (and a spell) like any wall,
   // so a pillar between you and an archer or a caster is cover. One free-standing pillar
@@ -4750,7 +4777,7 @@ function generateLevel(d){
   }
 
   // gold
-  const gc = 3+rn(4);
+  const gc = 5+rn(5);
   for (let i=0;i<gc;i++){
     const r = rn(roomCnt);
     const gx = roomX[r]+rn(roomW[r]), gy = roomY[r]+rn(roomH[r]);
@@ -4784,12 +4811,12 @@ function generateLevel(d){
   // sitePower's hp/dmg/xp multipliers
   const sp = sitePower();
   G.mon = [];
-  const monN = 2 + mn(10, rn(3) + Math.floor(d/1.5));
+  const monN = 4 + mn(16, rn(4) + Math.floor(d/1.2));
   const floorLevel = monsterLevelForDepth(d);
   for (let i=0;i<monN;i++){
     const r = 1+rn(roomCnt-1);
     const mx2 = roomX[r]+rn(roomW[r]), my2 = roomY[r]+rn(roomH[r]);
-    if (G.map[mx2][my2] !== T_FLOOR) continue;
+    if (G.map[mx2][my2] !== T_FLOOR || G.mon.some(o=>o.x===mx2 && o.y===my2)) continue;
     const entry = pickThemedMonsterEntry(floorLevel);
     const m = newMonster();
     m.alive=1; m.x=mx2; m.y=my2;
@@ -4833,6 +4860,7 @@ function rollMonsterAt(x,y,floorLevel,sp){
 // dungeon's scattered random rooms, so it actually reads as "a castle"
 // rather than another dungeon with a different name
 function generateCastleLevel(d){
+  setGrid(20, 20);
   G.map = makeGrid(T_WALL);
   G.floorItem = makeItemGrid();
   G.trapSeen = makeGrid(false);
@@ -4936,6 +4964,7 @@ function placeCastleContents(d, rooms){
 // entrance passage punched through the south wall - nothing like the
 // dungeon/castle's rectangular rooms
 function generateNecroTowerLevel(d){
+  setGrid(20, 20);
   G.map = makeGrid(T_WALL);
   G.floorItem = makeItemGrid();
   G.trapSeen = makeGrid(false);
@@ -5020,6 +5049,7 @@ function placeNecroContents(d){
 // the back) but themed wet-and-drowned rather than martial - a reflecting
 // pool and idol sit in the sanctum instead of a throne and banners
 function generateTempleLevel(d){
+  setGrid(20, 20);
   G.map = makeGrid(T_WALL);
   G.floorItem = makeItemGrid();
   G.trapSeen = makeGrid(false);
@@ -5073,6 +5103,7 @@ function generateTempleLevel(d){
 // your way across, with a crypt chamber tucked in the far corner holding the
 // way down
 function generateGraveyardLevel(d){
+  setGrid(20, 20);
   if (d>1) return generateCatacombLevel(d);        // below the graveyard it's all catacombs
   G.map = makeGrid(T_FLOOR);
   G.floorItem = makeItemGrid();
@@ -5182,6 +5213,7 @@ function sealUnreachableFloor(startX, startY){
 // along the shaft, and the way down sits at whichever point ended up
 // farthest from the entrance, so the whole shaft has to be walked
 function generateMineLevel(d){
+  setGrid(20, 20);
   G.map = makeGrid(T_WALL);
   G.floorItem = makeItemGrid();
   G.trapSeen = makeGrid(false);
@@ -5244,7 +5276,7 @@ function saveLevelCache(d){
 function restoreLevelCache(d){
   const c = G.dgCache[cacheKey(G.dungeonSlot,d)];
   if (!c) return;
-  G.map = c.map.map(col=>col.slice());
+  G.map = c.map.map(col=>col.slice()); syncGrid();
   G.floorItem = c.floorItem.map(col=>col.map(it=>it?copyItem(it):null));
   G.trapSeen = c.trapSeen ? c.trapSeen.map(col=>col.slice()) : makeGrid(false);
   G.dungeonSeen = c.dungeonSeen ? c.dungeonSeen.map(col=>col.slice()) : makeGrid(false);
@@ -5291,7 +5323,7 @@ function placeWallTorches(){
 }
 
 function loadLevel(d, arrivingFromBelow, fellThrough){
-  G.depth = d;
+  G.depth = d; G.inRaid = null;
   G.isBossFloor = 0;
   if (G.gameMode===1 && G.dungeonSlot && G.player){ const sd = G.player.siteDeepest = G.player.siteDeepest||{}; sd[G.dungeonSlot] = Math.max(sd[G.dungeonSlot]||0, d); }
   G.activeZones = []; // a point-placed zone's coordinates belong to the floor you cast it on, not the next one
@@ -5321,7 +5353,7 @@ function loadLevel(d, arrivingFromBelow, fellThrough){
   // wall torches: purely a fresh-generation thing - a cached floor's torches
   // (like everything else about its layout) are already baked into the
   // restored G.dungeonDeco, so placing new ones on top would double up
-  if (fresh) placeWallTorches();
+  if (fresh){ placeWallTorches(); try{ dressLevel(d); }catch(e){ console.error(e); } }
   G.player.charges = G.player.maxCharges;
   if (arrivingFromBelow){
     // retreating back up onto THIS floor should land the player on the
@@ -5367,6 +5399,7 @@ function loadLevel(d, arrivingFromBelow, fellThrough){
     setUi('bossPreview');
   }
   if (G.isBossFloor) logMsg('- the air grows heavy... the dungeon\'s master awaits -', 'new');
+  if (dgIsDark()) logMsg(lightBonus() ? `this floor is pitch dark - your ${lightName()} pushes the black back` : 'this floor is pitch dark - you can barely see; a torch or a lantern would help', 'hit');
   else logMsg(ASCEND_SITES[G.siteKind] ? `- you climb to floor ${G.depth} -` : `- you enter depth ${G.depth} -`, 'new');
   questOnFloorLoaded();
 }
@@ -6604,6 +6637,7 @@ function tickMonsters(excludeIdx){
   // this is safe to call unconditionally every turn
   if (!G.gameOver) summonMove();
   if (!G.gameOver) try{ rsThrallAct(); }catch(e){ console.error(e); }
+  if (!G.gameOver) try{ raidTick(); }catch(e){ console.error(e); }
   if (!G.gameOver) summonAttack();
   tickSummonDuration();
   // true "Legendary" Monster Manual stat blocks (adult/ancient dragons, the
@@ -6744,8 +6778,10 @@ function tryMove(dx,dy){
     logMsg("you can't break away - the fight isn't over!", 'hit');
     return;
   }
+  if (dgBlocked(nx, ny)) return;
   G.player.x=nx; G.player.y=ny;
   try{ ammoPickup(); }catch(e){ console.error(e); }
+  try{ if (dgStep(nx, ny)) return; }catch(e){ console.error(e); }
   scanForHiddenTraps();
   if (G.gameMode===3) moveVillagers();
 
@@ -6810,13 +6846,14 @@ function tryMove(dx,dy){
     }
     case T_FLEE: leavingFloor=true; G.gameMode=0; logMsg('you break off the fight and retreat', 'new'); break;
     case T_TRAP: {
-      logMsg('the floor gives way beneath you!', 'hit');
-      sfx('error');
-      const fd = 1+rn(3);
+      const rope = skHave('rope') > 0 && G.gameMode===1 && G.depth<G.dungeonMaxDepth;
+      if (rope){ skAdd('rope', -1); logMsg('the floor gives way - you catch hold, tie off your rope and climb down to the floor below', 'good'); }
+      else { logMsg('the floor gives way beneath you!', 'hit'); sfx('error'); }
+      const fd = rope ? 0 : 1+rn(3);
       G.player.hp -= fd;
       if (G.player.hp<=0 && !checkDeathWard()){ playerDies('fall'); break; }
       G.map[nx][ny] = T_FLOOR;
-      if (G.gameMode===1 && G.depth<G.dungeonMaxDepth){ leavingFloor=true; saveLevelCache(G.depth); loadLevel(G.depth+1, false, true); logMsg('you crash down onto the floor below', 'hit'); }
+      if (G.gameMode===1 && G.depth<G.dungeonMaxDepth){ leavingFloor=true; saveLevelCache(G.depth); loadLevel(G.depth+1, false, true); if (!rope) logMsg('you crash down onto the floor below', 'hit'); }
       break;
     }
   }
@@ -7945,6 +7982,7 @@ function enterDungeonConfirm(){
 
 // builds a small open-air arena and drops the player into it
 function generateArena(){
+  setGrid(20, 20);
   G.isBossFloor = 0; G.bossIdx = -1; // a roadside encounter is never a boss fight
   G.mandatoryFight = false; // a fresh encounter defaults to escapable - randomEncounter()'s caller opts into mandatory
   // cleared here (not just after a set-piece win) so a stale flag from a
@@ -8343,7 +8381,7 @@ function enterInterior(key){
   const vendor = (G.townVendors||[]).find(v=>v.key===key);
   G.townState = { map:G.map, deco:G.villageDeco, npcs:G.villageNpcs, villagers:G.villagers, floorItem:G.floorItem };
   G.interior = { key, name:b.name, out:{ x:b.door.x + (b.face==='e' ? 1 : 0), y:b.door.y + (b.face==='s' ? 1 : 0) } };
-  G.map = makeGrid(T_WALL); G.villageDeco = makeGrid('', COLS, ROWS); G.floorItem = makeItemGrid();
+  setGrid(20, 20); G.map = makeGrid(T_WALL); G.villageDeco = makeGrid('', COLS, ROWS); G.floorItem = makeItemGrid();
   for (let x=ROOM.x0; x<=ROOM.x1; x++) for (let y=ROOM.y0; y<=ROOM.y1; y++){ G.map[x][y] = T_FLOOR; G.villageDeco[x][y] = 'floor'; }
   G.map[ROOM.door.x][ROOM.door.y] = T_DOOROUT; G.villageDeco[ROOM.door.x][ROOM.door.y] = 'doorway';
   // the vendor behind a counter against the back wall
@@ -8359,7 +8397,7 @@ function enterInterior(key){
 function exitInterior(){
   if (!G.interior) return;
   const s = G.townState, out = G.interior.out;
-  G.map = s.map; G.villageDeco = s.deco; G.villageNpcs = s.npcs; G.villagers = s.villagers; G.floorItem = s.floorItem;
+  G.map = s.map; syncGrid(); G.villageDeco = s.deco; G.villageNpcs = s.npcs; G.villagers = s.villagers; G.floorItem = s.floorItem;
   G.interior = null; G.townState = null;
   G.player.x = out.x; G.player.y = out.y; G.player.facing = 2;
   renderGame();
@@ -9707,6 +9745,7 @@ function skNodeStatic(x, y){
   }
   if (n && n.k==='fishing' && n.type==='shore' && skWithin(x, y, 1, [OW_TUNDRA])) n = { k:'fishing', type:'ice', dens:0.25 };
   if (!n) n = skNodeExtra(x, y, t);
+  { const gn = guildNodeFor(x, y, t); if (gn) n = gn; }
   if (n){ n.x = x; n.y = y; skSizeQual(n); }
   SKN.st.set(key, n);
   return n;
@@ -9751,6 +9790,7 @@ function skNodeItems(n){
   return [];
 }
 function skNodeName(n){
+  if (n.guild) return n.guild;
   if (n.k==='runecrafting') return cap(n.type) + ' altar';
   const base = n.k==='woodcutting' ? SK_TREE[n.type].nm : n.k==='fishing' ? SK_SPOT[n.type].nm : n.k==='mining' ? SK_ROCK[n.type].nm : (n.glow ? 'Glowing ' : '') + skName(n.type) + ' patch';
   if (n.rich) return base;
@@ -9864,6 +9904,7 @@ function skStartOrStop(){
 }
 function skDo(o){
   if (o.k==='firemaking'){ skLightFire(); return; }
+  { const nd = o.node && skNodeAt(o.node.x, o.node.y); if (nd && nd.gate && skLvl(nd.gate.k) < nd.gate.lvl){ logMsg(`the ${nd.guild.replace(/ (rock|spot|tree)$/, '')} only lets in those with ${SK_DEFS.find(d=>d[0]===nd.gate.k)[1]} ${nd.gate.lvl}`, 'hit'); renderGame(); return; } }
   if (o.k==='runecrafting'){ const n = o.node && skNodeAt(o.node.x, o.node.y); if (n) rcCraft(n.type); return; }
   if (o.k==='cooking'){ G.cookAt = 'fire'; setUi('cook'); return; }
   const tool = { fishing:'rod', mining:'pick', woodcutting:'axe' }[o.k];
@@ -10086,7 +10127,7 @@ function buildSmithing(part){
     const slots = Object.keys(SK_FORGE).filter(s=> b.jewel ? (s==='ring' || s==='necklace') : !(s==='ring' || s==='necklace'));
     return `<div class="shoprow"><span class="muted">&times;${skHave(b.id)}</span><span>${esc(b.nm)}</span>
       <span class="desc">${L>=b.lvl ? slots.map(s=>`<button class="btn" ${skHave(b.id)>=SK_FORGE[s][1]?'':'disabled'} onclick="cqAdd('forge','${b.id}','${s}',1)">${SK_FORGE[s][0]} (${SK_FORGE[s][1]})</button>`).join(' ') : `needs Smithing ${b.lvl}`}</span><span></span></div>`; }).join('') || `<div class="muted">no bars yet</div>`;
-  const secT = `<div class="panel" style="margin-top:14px;"><h4 style="color:${COL.amber};">TOOLS</h4>${tools}</div>`, secS = `<div class="panel" style="margin-top:14px;"><h4 style="color:${COL.amber};">SMELTING &middot; Smithing ${L}</h4>${smelt}</div>`, secF = `<div class="panel" style="margin-top:14px;"><h4 style="color:${COL.amber};">FORGING</h4><div class="muted" style="font-size:11px;margin-bottom:6px;">each metal forges its own tier of weapons and armour - steel needs coal (Mining 30). What you forge is better than any drop: <b>+${Math.min(45, 15 + Math.max(0, L - 1))}%</b> bonuses on bronze at your level (+15%, plus 1% per Smithing level past the bar's, up to +45%)</div>${forge}</div>`;
+  const secT = `<div class="panel" style="margin-top:14px;"><h4 style="color:${COL.amber};">TOOLS</h4>${tools}${dgSuppliesHtml()}</div>`, secS = `<div class="panel" style="margin-top:14px;"><h4 style="color:${COL.amber};">SMELTING &middot; Smithing ${L}</h4>${smelt}</div>`, secF = `<div class="panel" style="margin-top:14px;"><h4 style="color:${COL.amber};">FORGING</h4><div class="muted" style="font-size:11px;margin-bottom:6px;">each metal forges its own tier of weapons and armour - steel needs coal (Mining 30). What you forge is better than any drop: <b>+${Math.min(45, 15 + Math.max(0, L - 1))}%</b> bonuses on bronze at your level (+15%, plus 1% per Smithing level past the bar's, up to +45%)</div>${forge}</div>`;
   const small = SK_BAR.filter(b=>skHave(b.id) && b.tier!==undefined).map(b=>`<div class="shoprow"><span class="muted">&times;${skHave(b.id)}</span><span>${esc(b.nm)}</span><span class="desc">${L>=b.lvl ? `<span class="cqgrp"><button class="btn" onclick="cqAdd('small','nails','${b.id}',1)">15 nails</button><button class="btn cqb" onclick="cqAdd('small','nails','${b.id}',9999)">all</button></span>${b.id==='steelb' ? ` <span class="cqgrp"><button class="btn" onclick="cqAdd('small','cannonball','${b.id}',1)">4 cannonballs</button><button class="btn cqb" onclick="cqAdd('small','cannonball','${b.id}',9999)">all</button></span>` : ''}` : `needs Smithing ${b.lvl}`}</span><span></span></div>`).join('');
   const secX = `<div class="panel" style="margin-top:14px;"><h4 style="color:${COL.amber};">SMALL WORK &middot; nails for building, cannonballs from steel</h4>${small || '<div class="muted">no bars to work</div>'}</div>` + skUpgradeHtml();
   return part==='tools' ? secT : part==='smelt' ? cqHtml()+secS : part==='forge' ? cqHtml()+secF+secX : cqHtml()+secT+secS+secF+secX;
@@ -10296,6 +10337,7 @@ function mkRecipeBook(id){ const b = CR_BOOKS.find(x=>x.id===id), rows = [...new
 function crUnknownBooks(){ const p = G.player; return CR_BOOKS.filter(b=>!(p.books||[]).includes(b.id) && !G.inv.some(x=>x && x.recipeBook===b.id)); }
 function crGiveBook(why){ const u = crUnknownBooks(); if (!u.length || G.inv.length >= MAXINV) return false; const b = u[rn(u.length)]; addToInventory(mkRecipeBook(b.id)); logMsg(`${why}: a recipe book, ${b.nm}!`, 'magic'); sfx('achievement'); return true; }
 function crOnKill(m){
+  if (m && m.carriesKey){ m.carriesKey = 0; skAdd('dkey', 1); logMsg(`the ${m.nm} was carrying an iron key - it opens a locked door or chest on this floor`, 'loot'); }
   const boss = G.gameMode===1 && G.isBossFloor && G.mon && G.mon.indexOf(m)===G.bossIdx;
   if (chn(boss ? 0.2 : Math.min(0.02, 0.004 + (G.depth||1)*0.001))) crGiveBook(`the ${m.nm} drops something`);
   if (!boss && chn(Math.min(0.04, 0.012 + (G.depth||1)*0.002))){ const g = crRollGem(); skAdd(g, 1); logMsg(`the ${m.nm} drops an ${skName(g).toLowerCase()}`, 'loot'); }
@@ -10443,6 +10485,7 @@ SK_CRAFT_MATS.push(
   { id:'glass', nm:'Molten Glass' }, { id:'vial', nm:'Glass Vial' }, { id:'lens', nm:'Lantern Lens' }, { id:'fishbowl', nm:'Fishbowl' },
   { id:'pot', nm:'Clay Pot' }, { id:'piedish', nm:'Pie Dish' }, { id:'bowl', nm:'Bowl' },
   { id:'torch', nm:'Torch' }, { id:'lantern', nm:'Oil Lantern' }, { id:'bullseye', nm:'Bullseye Lantern' },
+  { id:'rope', nm:'Rope' }, { id:'shovel', nm:'Shovel' }, { id:'dkey', nm:'Iron Key' },
   { id:'nails', nm:'Nails' }, { id:'cannonball', nm:'Cannonball' }, { id:'venomgland', nm:'Venom Gland' });
 SK_BAR.push({ id:'goldb', nm:'Gold Bar', ore:'goldore', per:1, lvl:40, xp:22, ilvl:12, jewel:true, noForge:true });
 // gem-tipped arrows: the strongest ammo there is, fletched from gems (never dropped)
@@ -11896,6 +11939,440 @@ function rsSpellNote(sp, fellBack){
   else if (!sp) logMsg(`you have no runes for any spell${sel ? ` - ${sel[1]} needs ${rsMissingRunes(sel).join(', ')}` : ''}${el && el!=='air' ? `. Your staff only supplies ${el} runes; every combat spell also needs air runes (monsters drop them, the alchemist sells them)` : ''}`, 'hit');
 }
 // ---- ranged mode: bow or magic. R switches it; clicks, auto-combat and Shoot/Cast use it ----
+// ===================== the dungeon overhaul: dressing, hazards, light, keys and digging, guild areas, raids =====================
+// ---- new stone for the sites: flagstones, castle inlay, temple mosaic and frieze, carved crypt walls, mine rails ----
+function fpFlagstones(o){
+  const s = o.seed||1, N = 4, cell = FP_TEX/N;
+  const ctr = (i,j)=>{ const ii = (i+N)%N, jj = (j+N)%N; return [i*cell + (0.2 + fpHash(ii,jj,s)*0.6)*cell, j*cell + (0.2 + fpHash(ii,jj,s+5)*0.6)*cell]; };
+  return (x,y)=>{
+    const ci = Math.floor(x/cell), cj = Math.floor(y/cell); let d1 = 1e9, d2 = 1e9, id = 0;
+    for (let i=-1;i<=1;i++) for (let j=-1;j<=1;j++){ const c = ctr(ci+i, cj+j), d = Math.hypot(x-c[0], y-c[1]); if (d < d1){ d2 = d1; d1 = d; id = ((ci+i+N)%N)*7 + ((cj+j+N)%N); } else if (d < d2) d2 = d; }
+    const n = fpFbm(x,y,s);
+    if (d2 - d1 < 1.6) return fpScale(o.mc, 0.6 + n*0.5);
+    let k = (0.72 + n*0.5) * (0.85 + fpHash(id, 3, s+9)*0.3); if (d2 - d1 < 2.6) k *= 0.82;
+    return fpScale(o.base, k);
+  };
+}
+function fpInlay(o){
+  const s = o.seed||1, T2 = FP_TEX/2;
+  return (x,y)=>{
+    const lx = x % T2, ly = y % T2, n = fpFbm(x,y,s), m = 1.5;
+    if (lx < m || ly < m) return fpScale(o.mc, 0.6 + n*0.5);
+    const cx = Math.abs(lx - T2/2), cy = Math.abs(ly - T2/2), dia = cx + cy;
+    if (dia < T2*0.32 && dia > T2*0.32 - 2.2) return fpScale(o.mc, 0.8 + n*0.4);            // the inlay's rim
+    if (dia < T2*0.3) return fpScale(o.inlay, 0.75 + n*0.5);                                  // the coloured diamond
+    let k = 0.78 + n*0.45; if (lx < m+1 || ly < m+1) k *= 1.15;
+    return fpScale(o.base, k);
+  };
+}
+function fpMosaic(o){
+  const s = o.seed||1, Tn = 8, ts = FP_TEX/Tn;
+  return (x,y)=>{
+    const i = Math.floor(x/ts), j = Math.floor(y/ts), lx = x - i*ts, ly = y - j*ts, n = fpFbm(x,y,s);
+    if (lx < 0.9 || ly < 0.9) return fpScale(o.mc, 0.6 + n*0.4);
+    const ring = Math.max(Math.abs(i - 3.5), Math.abs(j - 3.5));
+    const pi = ring > 3 ? 0 : ring > 2 ? 2 : (fpHash(i, j, s) < 0.7 ? 1 : 3);              // a border, a band, and a scattered field
+    const c = fpScale(o.pal[pi], 0.78 + n*0.35 + (fpHash(i,j,s+2)-0.5)*0.2);
+    return fpHash(x,y,s+4) > 0.97 ? fpScale(c, 1.2) : c;
+  };
+}
+function fpFrieze(base, col){
+  return (x,y)=>{
+    const c = base(x,y), band = y > FP_TEX*0.36 && y < FP_TEX*0.6;
+    if (!band) return c;
+    const ly = y - FP_TEX*0.36, h = FP_TEX*0.24, u = (x % 16)/16;
+    // a carved meander running round the room
+    const on = (ly > h*0.15 && ly < h*0.3) || (ly > h*0.7 && ly < h*0.85) || (u < 0.15 && ly > h*0.15 && ly < h*0.7) || (u > 0.5 && u < 0.65 && ly > h*0.3 && ly < h*0.85);
+    return on ? fpScale(col, 0.75 + fpFbm(x,y,77)*0.4) : fpScale(c, 0.92);
+  };
+}
+function fpCarved(o){
+  const br = fpBricks({base:o.base, mc:o.mc, rows:5, cols:2, seed:o.seed, jitter:0.3, moss:0.1});
+  return (x,y)=>{
+    const c = br(x,y), cx = FP_TEX/2, cy = FP_TEX*0.45, dx = (x-cx)/9, dy = (y-cy)/10, r = Math.hypot(dx, dy);
+    // a skull carved in relief in the middle of the stone: lit from above, shaded below, hollow eyes and nose
+    if (r < 1){
+      const eye = Math.hypot((x - (cx-3.6))/2.2, (y - (cy-0.5))/2.4) < 1 || Math.hypot((x - (cx+3.6))/2.2, (y - (cy-0.5))/2.4) < 1;
+      const nose = Math.abs(x-cx) < 1.1 && y > cy+2 && y < cy+4.5;
+      if (eye || nose) return fpScale(o.mc, 0.5);
+      return fpScale(c, 1.05 + (dy < 0 ? 0.18 : -0.12)*(1-r));
+    }
+    if (y > cy+9 && y < cy+12 && Math.abs(x-cx) < 6) return fpScale(c, (Math.floor(x)%3===0) ? 0.6 : 1.12);   // the jaw's teeth
+    return c;
+  };
+}
+function fpRails(base){
+  return (x,y)=>{
+    const ly = y % 16;
+    if (ly < 3) return fpScale([96,70,44], 0.75 + fpFbm(x,y,91)*0.5);                                      // a sleeper
+    if ((x > 14 && x < 17.5) || (x > 46 && x < 49.5)) return fpScale([120,116,112], x%32 < 16 ? 1.15 : 0.9);  // the rails
+    return base(x,y);
+  };
+}
+
+// ---- dressing: what lies about a floor, by the kind of site ----
+const DRESS_DECOS = ['barrel','crate','rubble','cobweb','chains','moss','skulls','banner2','brazier','lava','puddle','crystal','blade','dig','lchest','ldoor','raidgate','raidexit','plate0','plate1','plate2','plate3','raidchest'];
+const DRESS_KITS = {
+  dungeon:['barrel','crate','rubble','cobweb','chains','skulls','moss'], castle:['barrel','crate','banner2','brazier','chains','barrel'],
+  necro:['skulls','chains','cobweb','brazier','crystal'], temple:['moss','rubble','brazier','puddle','cobweb','moss'],
+  mine:['crate','barrel','rubble','crystal','crate'], lair:['skulls','rubble','brazier','skulls'], graveyard:['skulls','cobweb','rubble','chains'],
+};
+function dgIsDark(){ return G.gameMode===1 && G.dungeonDeco && G.dungeonDeco[0] && G.dungeonDeco[0][0]==='dark'; }
+function dgDarkPenalty(){ return dgIsDark() ? (lightBonus() ? 0 : 2) : 0; }
+function dressLevel(d){
+  if (G.gameMode!==1 || !G.dungeonDeco) return;
+  const D = G.dungeonDeco, k = G.siteKind==='graveyard' && d>1 ? 'graveyard' : (DRESS_KITS[G.siteKind] ? G.siteKind : 'dungeon'), kit = DRESS_KITS[k];
+  const W = (x,y)=>x<0 || y<0 || x>=COLS || y>=ROWS || G.map[x][y]===T_WALL;
+  const busy = (x,y)=>D[x][y] || (x===G.genStart.x && y===G.genStart.y) || G.mon.some(m=>m.alive && m.x===x && m.y===y) || G.floorItem[x][y];
+  const open = (x,y)=>x>0 && y>0 && x<COLS-1 && y<ROWS-1 && G.map[x][y]===T_FLOOR && !busy(x,y);
+  const corridor = (x,y)=>(W(x-1,y) && W(x+1,y)) || (W(x,y-1) && W(x,y+1));
+  const inner = (x,y)=>{ for (let i=-1;i<=1;i++) for (let j=-1;j<=1;j++) if (G.map[x+i][y+j]!==T_FLOOR) return false; return true; };
+  const spots = []; for (let x=1;x<COLS-1;x++) for (let y=1;y<ROWS-1;y++) if (open(x,y)) spots.push([x,y]);
+  const take = (test)=>{ const c = spots.filter(([x,y])=>!D[x][y] && open(x,y) && test(x,y)); return c.length ? c[rn(c.length)] : null; };
+  // against the walls (never plugging a corridor): barrels, crates, rubble, bones, chains; cobwebs in the corners
+  for (const [x,y] of spots){
+    if (D[x][y] || !open(x,y)) continue;
+    const w = W(x-1,y) + W(x+1,y) + W(x,y-1) + W(x,y+1);
+    if (w < 1 || w > 2 || corridor(x,y) || !chn(w===2 ? 0.16 : 0.06)) continue;
+    let pick0 = kit[rn(kit.length)]; if (pick0==='cobweb' && w!==2) pick0 = 'rubble';
+    D[x][y] = pick0;
+  }
+  // hazards: bubbling lava in a dragon's lair or deep down, puddles under dripping ceilings, glowing crystals, blades swinging in the corridors
+  const lavaN = k==='lair' ? 2 + rn(3) : d >= 5 && chn(0.35) ? 1 + rn(2) : 0;
+  for (let i=0;i<lavaN;i++){ const t = take(inner); if (t) D[t[0]][t[1]] = 'lava'; }
+  const wetN = (k==='temple' || k==='dungeon' || k==='graveyard') ? rn(3) : 0;
+  for (let i=0;i<wetN;i++){ const t = take((x,y)=>!corridor(x,y)); if (t) D[t[0]][t[1]] = 'puddle'; }
+  const crysN = (k==='mine' || k==='necro' || d >= 4) && chn(0.5) ? 1 + rn(3) : 0;
+  for (let i=0;i<crysN;i++){ const t = take((x,y)=>{ const w = W(x-1,y) + W(x+1,y) + W(x,y-1) + W(x,y+1); return w>=1 && !corridor(x,y); }); if (t) D[t[0]][t[1]] = 'crystal'; }
+  const bladeN = d >= 2 && chn(0.45) ? 1 + rn(2) : 0;
+  for (let i=0;i<bladeN;i++){ const t = take(corridor); if (t) D[t[0]][t[1]] = 'blade'; }
+  // somewhere the earth is loose: dig it with a shovel
+  if (chn(0.55)){ const t = take((x,y)=>!corridor(x,y)); if (t) D[t[0]][t[1]] = 'dig'; }
+  // a locked iron chest, or a locked closet off a room - one monster on the floor carries the key
+  let locked = false;
+  if (G.genRooms && chn(0.4)) locked = dgCarveCloset();
+  if (!locked && chn(0.3)){ const t = take((x,y)=>{ const w = W(x-1,y) + W(x+1,y) + W(x,y-1) + W(x,y+1); return w===2 && !corridor(x,y); }); if (t){ D[t[0]][t[1]] = 'lchest'; locked = true; } }
+  if (locked){ const ms = G.mon.filter(m=>m.alive); if (ms.length) ms[rn(ms.length)].carriesKey = 1; else skAdd('dkey', 1); }
+  // some floors are pitch dark: no torches burn, and you see little without a light of your own
+  if (d >= 3 && chn(0.2) && G.siteKind!=='graveyard'){ D[0][0] = 'dark'; for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++) if (D[x][y]==='torch') D[x][y] = ''; }
+  // deep in a big site, now and then, a raid gate
+  if (d >= 3 && G.dungeonMaxDepth >= 3 && chn(0.22)){ const t = take(inner); if (t) D[t[0]][t[1]] = 'raidgate'; }
+}
+// a 3x3 closet behind a locked door off one of the rooms (only where solid rock leaves room for it)
+function dgCarveCloset(){
+  const R = G.genRooms; if (!R || R.length < 3) return false;
+  for (let tries=0; tries<30; tries++){
+    const r = R[1 + rn(R.length-2)], side = rn(4);
+    let dx = 0, dy = 0, doorX, doorY;
+    if (side===0){ dx = 1; doorX = r.x + r.w; doorY = r.y + 1 + rn(Math.max(1, r.h-2)); }
+    else if (side===1){ dx = -1; doorX = r.x - 1; doorY = r.y + 1 + rn(Math.max(1, r.h-2)); }
+    else if (side===2){ dy = 1; doorY = r.y + r.h; doorX = r.x + 1 + rn(Math.max(1, r.w-2)); }
+    else { dy = -1; doorY = r.y - 1; doorX = r.x + 1 + rn(Math.max(1, r.w-2)); }
+    if (G.map[doorX-dx] === undefined || G.map[doorX-dx][doorY-dy]!==T_FLOOR) continue;
+    const cx = doorX + dx*2, cy = doorY + dy*2;                              // the closet's middle
+    let ok = true;
+    for (let i=-2;i<=2 && ok;i++) for (let j=-2;j<=2;j++){ const x = cx+i, y = cy+j; if (x<1 || y<1 || x>=COLS-1 || y>=ROWS-1 || G.map[x][y]!==T_WALL){ ok = false; break; } }
+    if (!ok || G.map[doorX][doorY]!==T_WALL) continue;
+    // the tiles beside the door must stay rock, so the door is the only way in
+    for (let i=-1;i<=1;i++) for (let j=-1;j<=1;j++) G.map[cx+i][cy+j] = T_FLOOR;
+    G.map[doorX][doorY] = T_FLOOR; G.dungeonDeco[doorX][doorY] = 'ldoor';
+    G.map[cx][cy] = T_VAULT; G.map[cx-dy][cy-dx] = T_GOLD; G.map[cx+dy][cy+dx] = T_GOLD;
+    return true;
+  }
+  return false;
+}
+// the torch lights also light braziers, lava and crystals
+function dgLightFlames(vis){
+  if (G.gameMode!==1 || !G.dungeonDeco) return;
+  for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
+    const d = G.dungeonDeco[x][y]; if (d!=='brazier' && d!=='lava' && d!=='crystal') continue;
+    if (!((G.dungeonSeen && G.dungeonSeen[x][y]) || (vis && vis.has(x+','+y)))) continue;
+    FP.flames.push({ x:x+0.5, y:y+0.5, dx:0, dy:0, seed:fpHash(x,y,11), h: d==='lava' ? 0.3 : d==='crystal' ? 0.5 : 0.85, k: d==='crystal' ? 0.7 : 1, col: d==='crystal' ? 0x6ad8ff : d==='lava' ? 0xff5a1a : null });
+  }
+}
+// ---- stepping onto things ----
+function dgAvoid(x, y){ const D = G.gameMode===1 && G.dungeonDeco; if (!D || !D[x]) return false; const d = D[x][y]; return d==='lava' || d==='blade' || (d==='ldoor' && !skHave('dkey')); }
+function dgBlocked(x, y){
+  if (G.gameMode!==1 || !G.dungeonDeco || !G.dungeonDeco[x]) return false;
+  if (G.dungeonDeco[x][y]!=='ldoor') return false;
+  if (!skHave('dkey')){ logMsg('a locked iron door - something on this floor carries the key', 'hit'); sfx('error'); return true; }
+  skAdd('dkey', -1); G.dungeonDeco[x][y] = ''; logMsg('you turn the iron key - the door swings open', 'good'); sfx('loot');
+  return false;
+}
+// true when the step took you somewhere else entirely (into or out of a raid)
+function dgStep(x, y){
+  if (G.gameMode!==1 || !G.dungeonDeco) return false;
+  const D = G.dungeonDeco, d = D[x][y], p = G.player; if (!d) return false;
+  const hurt = (dmg, why)=>{ p.hp -= dmg; try{ fxSplat(x+0.5, y+0.5, dmg, 'taken'); }catch(e){} sfx('playerHurt'); if (p.hp<=0 && !checkDeathWard()) playerDies(why); };
+  if (d==='lava'){ const dmg = 3 + Math.round(G.depth*1.5); logMsg(`the lava sears you for ${dmg}!`, 'hit'); hurt(dmg, 'lava'); }
+  else if (d==='blade'){
+    if (((p.turnCount||0) + x + y) % 2===0){ const dmg = rollDice(2,6) + G.depth; logMsg(`a swinging blade catches you for ${dmg}!`, 'hit'); hurt(dmg, 'a swinging blade'); }
+    else logMsg('you duck under the swinging blade', '');
+  }
+  else if (d==='dig'){
+    if (!skHave('shovel')){ if (p._digNote!==G.depth){ p._digNote = G.depth; logMsg('the earth here is loose - a shovel would turn something up (the smithy sells them)', ''); } return false; }
+    D[x][y] = ''; const g = Math.round((20 + rn(40) + G.depth*15)*goldFindMult()); p.gold += g;
+    let extra = ''; if (chn(0.35)){ const gm = crRollGem(); skAdd(gm, 1); extra = ` and an ${skName(gm).toLowerCase()}`; } else if (chn(0.25)){ const it = genItem(lootLevel()+1, lootKind()); addToInventory(it); extra = ` and ${itemNameHtml(it)}`; }
+    logMsg(`you dig into the loose earth and turn up ${g} gold${extra}`, 'loot', true); sfx('gold');
+  }
+  else if (d==='lchest'){
+    if (!skHave('dkey')){ logMsg('a locked iron chest - something on this floor carries the key', 'hit'); return false; }
+    skAdd('dkey', -1); D[x][y] = '';
+    const g = Math.round((60 + rn(80) + G.depth*30)*goldFindMult()); p.gold += g;
+    const it = genItem(lootLevel()+2+playerMF(), vaultLootSlot(), 3); addToInventory(it);
+    logMsg(`the key turns - inside the chest: ${g} gold and ${itemNameHtml(it)}`, 'loot', true); sfx('achievement');
+  }
+  else if (d==='raidgate'){ D[x][y] = ''; dgEnterRaid(x, y); return true; }
+  else if (d==='raidexit'){ dgLeaveRaid(); return true; }
+  else if (/^plate\d$/.test(d) || d==='raidchest') raidStep(x, y, d);
+  return false;
+}
+function dgSuppliesHtml(){
+  const row = (id, nm, d, price)=>`<div class="shoprow"><span class="muted">&times;${skHave(id)}</span><span>${nm}</span><span class="desc">${d}</span><span><button class="btn" onclick="dgBuySupply('${id}', ${price})">${repPrice(price)}g</button></span></div>`;
+  return `<h4 style="color:${COL.amber};margin-top:10px;">DUNGEON SUPPLIES</h4>` + row('rope', 'Rope', 'if the floor gives way, you climb down unhurt (used up)', 40) + row('shovel', 'Shovel', 'dig up the loose earth you find on dungeon floors (keeps)', 120) + row('torch', 'Torch', 'light for dark floors - burns out after a floor', 15);
+}
+function dgBuySupply(id, price){
+  price = repPrice(price);
+  if (id==='shovel' && skHave('shovel')){ logMsg('you already have a shovel', ''); renderOverlay(); return; }
+  if (G.player.gold < price){ logMsg("you can't afford that", 'hit'); renderOverlay(); return; }
+  G.player.gold -= price; skAdd(id, 1); logMsg(`you buy a ${skName(id).toLowerCase()}`, 'loot'); sfx('gold'); renderOverlay(); saveCurrentGame();
+}
+// ---- the models for all of it ----
+function dgPropModel(p, g, add, M, mats, h){
+  const T = THREE, d = p.d, { wood, dwood, stone, iron, gold } = mats;
+  const glowSpr = (col, sc, y, op)=>{ const sp = new T.Sprite(new T.SpriteMaterial({ map:v3Blob(col), blending:T.AdditiveBlending, transparent:true, depthWrite:false, opacity:op||0.6 })); sp.scale.set(sc, sc, 1); sp.position.y = y; g.add(sp); return sp; };
+  if (d==='barrel'){
+    const b = add(new T.CylinderGeometry(0.2, 0.2, 0.52, 14), wood, 0, 0.26, 0); b.scale.set(1, 1, 1);
+    add(new T.CylinderGeometry(0.235, 0.235, 0.46, 14, 1, true), wood, 0, 0.26, 0).scale.set(0.95, 1, 0.95);
+    for (const y of [0.08, 0.44]) add(new T.TorusGeometry(0.218, 0.014, 6, 18), iron, 0, y, 0).rotation.x = Math.PI/2;
+    add(new T.CircleGeometry(0.2, 14), dwood, 0, 0.521, 0).rotation.x = -Math.PI/2;
+    g.position.x += (h(1)-0.5)*0.3; g.position.z += (h(2)-0.5)*0.3;
+  } else if (d==='crate'){
+    const n = 1 + Math.floor(h(3)*2);
+    for (let i=0;i<n;i++){ const s0 = 0.36 - i*0.06, c = add(new T.BoxGeometry(s0, s0, s0), wood, (h(4+i)-0.5)*0.15, s0/2 + (i ? 0.36 : 0), (h(6+i)-0.5)*0.15); c.rotation.y = h(8+i)*1.2;
+      for (const sx of [-1,1]) add(new T.BoxGeometry(0.03, s0+0.005, s0+0.005), dwood, c.position.x + sx*s0*0.45, c.position.y, c.position.z).rotation.y = c.rotation.y; }
+  } else if (d==='rubble'){
+    const rk = M('rubble', '#6a665e', { roughness:1, flatShading:true });
+    for (let i=0;i<7;i++){ const r = 0.05 + h(i)*0.09, st = add(new T.DodecahedronGeometry(r, 0), rk, (h(i+10)-0.5)*0.6, r*0.6, (h(i+20)-0.5)*0.6); st.rotation.set(h(i+30)*3, h(i+40)*3, 0); st.scale.y = 0.7; }
+  } else if (d==='cobweb'){
+    if (!ISO.webTex){ const c = v3Canvas(64,64), x = c.getContext('2d'); x.strokeStyle = 'rgba(235,235,240,0.75)'; x.lineWidth = 0.8;
+      for (let a=0;a<7;a++){ x.beginPath(); x.moveTo(0,0); x.lineTo(Math.cos(a*0.25)*64, Math.sin(a*0.25)*64); x.stroke(); }
+      for (let r=10;r<64;r+=9){ x.beginPath(); for (let a=0;a<=6;a++){ const px = Math.cos(a*0.25)*r, py = Math.sin(a*0.25)*r; if (a) x.quadraticCurveTo(Math.cos((a-0.5)*0.25)*r*0.9, Math.sin((a-0.5)*0.25)*r*0.9, px, py); else x.moveTo(px, py); } x.stroke(); }
+      ISO.webTex = new T.CanvasTexture(c); }
+    const web = new T.Mesh(new T.PlaneGeometry(0.8, 0.8), new T.MeshBasicMaterial({ map:ISO.webTex, transparent:true, depthWrite:false, side:T.DoubleSide }));
+    web.position.set(0, 0.95, 0); web.rotation.set(-0.5, p.rot + Math.PI/4, 0); g.add(web);
+  } else if (d==='chains'){
+    for (let i=0;i<9;i++){ const l = add(new T.TorusGeometry(0.035, 0.009, 5, 10), iron, -0.25 + i*0.06, 0.02, (h(i)-0.5)*0.06); l.rotation.set(Math.PI/2, i%2 ? Math.PI/2 : 0, 0); }
+    add(new T.TorusGeometry(0.07, 0.016, 6, 14), iron, 0.32, 0.02, 0).rotation.x = Math.PI/2;
+    add(new T.CylinderGeometry(0.05, 0.06, 0.12, 8), iron, -0.3, 0.06, 0);
+  } else if (d==='moss'){
+    const mm = M('moss', '#3e5a2a', { roughness:1 });
+    for (let i=0;i<4;i++){ const c = add(new T.CircleGeometry(0.12 + h(i)*0.15, 9), mm, (h(i+5)-0.5)*0.5, 0.006 + i*0.001, (h(i+9)-0.5)*0.5); c.rotation.x = -Math.PI/2; c.castShadow = false; }
+  } else if (d==='skulls'){
+    const bone = M('bone', '#d8d0bc', { roughness:0.8 });
+    for (let i=0;i<3;i++){ const x0 = (h(i)-0.5)*0.5, z0 = (h(i+3)-0.5)*0.5; add(new T.SphereGeometry(0.07, 10, 8), bone, x0, 0.065, z0).scale.set(1, 0.92, 1.1);
+      for (const s0 of [-1,1]) add(new T.SphereGeometry(0.016, 6, 5), M('sock', '#1a1612'), x0 + s0*0.025, 0.08, z0 + 0.06); }
+    for (let i=0;i<4;i++){ const b = add(new T.CylinderGeometry(0.014, 0.014, 0.3, 6), bone, (h(i+7)-0.5)*0.5, 0.016, (h(i+11)-0.5)*0.5); b.rotation.set(Math.PI/2, 0, h(i+13)*3); }
+  } else if (d==='brazier'){
+    for (let i=0;i<3;i++){ const a = i*2.09, l = add(new T.CylinderGeometry(0.015, 0.015, 0.62, 6), iron, Math.cos(a)*0.12, 0.31, Math.sin(a)*0.12); l.rotation.set(Math.sin(a)*0.25, 0, -Math.cos(a)*0.25); }
+    add(new T.CylinderGeometry(0.2, 0.12, 0.12, 12, 1, true), iron, 0, 0.66, 0);
+    add(new T.CircleGeometry(0.18, 12), M('coal', '#2a1a10', { emissive:new T.Color('#ff4a10').convertSRGBToLinear(), emissiveIntensity:0.6 }), 0, 0.68, 0).rotation.x = -Math.PI/2;
+    const fl = add(new T.ConeGeometry(0.11, 0.3, 7), isoGlowMat('bflame', '#ffa030'), 0, 0.84, 0); fl.castShadow = false;
+    const gl = glowSpr('rgba(255,150,60,1)', 1.1, 0.85, 0.55);
+    g.userData.anim = (t, ph)=>{ fl.scale.set(0.9 + 0.15*Math.sin(t*13+ph), 0.85 + 0.3*Math.sin(t*9.7+ph*2) + 0.1*Math.sin(t*23+ph), 0.9 + 0.15*Math.cos(t*11+ph)); fl.rotation.y = t*2; gl.material.opacity = 0.45 + 0.12*Math.sin(t*15+ph); };
+  } else if (d==='lava'){
+    const lm = new T.MeshBasicMaterial({ color:new T.Color('#ff5a1a').convertSRGBToLinear() });
+    const pool = add(new T.CircleGeometry(0.46, 20), lm, 0, 0.012, 0); pool.rotation.x = -Math.PI/2; pool.castShadow = false;
+    const crust = add(new T.RingGeometry(0.44, 0.52, 20), M('crust', '#2a1a14', { roughness:1 }), 0, 0.014, 0); crust.rotation.x = -Math.PI/2;
+    const bubbles = []; for (let i=0;i<5;i++){ const b = add(new T.SphereGeometry(0.04, 8, 6), isoGlowMat('lavab', '#ffb040'), 0, 0, 0); b.castShadow = false; b.userData.o = [h(i)*6.28, h(i+5)*0.3, h(i+9)]; bubbles.push(b); }
+    const gl = glowSpr('rgba(255,100,30,1)', 1.4, 0.12, 0.6);
+    g.userData.anim = (t, ph)=>{ lm.color.setRGB(1, 0.32 + 0.08*Math.sin(t*2+ph), 0.08); gl.material.opacity = 0.5 + 0.1*Math.sin(t*3+ph);
+      for (const b of bubbles){ const [a, r, o] = b.userData.o, k = (t*0.6 + o) % 1; b.position.set(Math.cos(a)*r, 0.01 + k*0.05, Math.sin(a)*r); b.scale.setScalar(k < 0.85 ? 0.4 + k : (1-k)*8); } };
+  } else if (d==='puddle'){
+    const pm = M('puddle', '#1a2430', { roughness:0.05, metalness:0.3, transparent:true, opacity:0.85 });
+    const pd = add(new T.CircleGeometry(0.3, 18), pm, 0, 0.008, 0); pd.rotation.x = -Math.PI/2; pd.scale.set(1, 0.7, 1); pd.castShadow = false;
+    const drop = add(new T.SphereGeometry(0.018, 6, 5), M('drop', '#9ac8f0', { transparent:true, opacity:0.8 }), 0, 1, 0); drop.castShadow = false;
+    const ring = add(new T.RingGeometry(0.03, 0.045, 16), new T.MeshBasicMaterial({ color:0xb8d8ff, transparent:true, opacity:0.6, depthWrite:false }), 0, 0.012, 0); ring.rotation.x = -Math.PI/2;
+    g.userData.anim = (t, ph)=>{ const k = (t*0.7 + ph*0.1) % 1; if (k < 0.6){ drop.visible = true; drop.position.y = 1.5 - (k/0.6)**2*1.5; ring.visible = false; } else { drop.visible = false; ring.visible = true; const r = (k-0.6)/0.4; ring.scale.setScalar(1 + r*5); ring.material.opacity = 0.6*(1-r); } };
+  } else if (d==='crystal'){
+    const cm = isoGlowMat('crys', '#6ad8ff', { transparent:true, opacity:0.9 }), cs = [];
+    for (let i=0;i<5;i++){ const c = add(new T.OctahedronGeometry(0.08 + h(i)*0.06, 0), cm, (h(i+3)-0.5)*0.3, 0.12 + h(i+6)*0.1, (h(i+8)-0.5)*0.3); c.scale.y = 2.2; c.rotation.set((h(i+10)-0.5)*0.6, h(i)*3, (h(i+12)-0.5)*0.6); c.castShadow = false; cs.push(c); }
+    const gl = glowSpr('rgba(110,220,255,1)', 1.2, 0.3, 0.5);
+    g.userData.anim = (t, ph)=>{ const k = 0.75 + 0.25*Math.sin(t*1.8 + ph); cm.emissiveIntensity = 0.8 + k; gl.material.opacity = 0.35 + 0.2*k; };
+  } else if (d==='blade'){
+    const arm = new T.Group(); arm.position.y = 1.55; g.add(arm);
+    const rod = new T.Mesh(new T.CylinderGeometry(0.015, 0.015, 1.2, 6), iron); rod.position.y = -0.6; arm.add(rod);
+    const bl = new T.Mesh(new T.CylinderGeometry(0.32, 0.32, 0.02, 20, 1, false, 0, Math.PI), M('blade', '#c8ccd2', { metalness:0.85, roughness:0.25 })); bl.rotation.set(Math.PI/2, 0, 0); bl.position.y = -1.2; arm.add(bl);
+    bl.castShadow = true; arm.rotation.y = p.rot;
+    add(new T.BoxGeometry(0.9, 0.05, 0.08), dwood, 0, 1.56, 0).rotation.y = p.rot + Math.PI/2;
+    g.userData.anim = (t, ph)=>{ arm.rotation.z = Math.sin(t*2.6 + ph)*0.95; };
+  } else if (d==='dig'){
+    const dirt = M('dirt', '#5a4430', { roughness:1 });
+    add(new T.SphereGeometry(0.3, 12, 6, 0, 6.283, 0, 1.3), dirt, 0, -0.18, 0).scale.set(1, 0.6, 0.8);
+    for (const r of [0.78, -0.78]){ const x = add(new T.BoxGeometry(0.42, 0.012, 0.06), M('xmark', '#d8c0a0'), 0, 0.03, 0); x.rotation.y = r; x.castShadow = false; }
+  } else if (d==='lchest'){
+    const body = M('ichest', '#3a3430', { metalness:0.4, roughness:0.6 });
+    add(new T.BoxGeometry(0.56, 0.32, 0.38), body, 0, 0.16, 0);
+    const lid = add(new T.CylinderGeometry(0.19, 0.19, 0.56, 14, 1, false, 0, Math.PI), body, 0, 0.32, 0); lid.rotation.z = Math.PI/2;
+    for (const dx of [-0.2, 0, 0.2]) add(new T.BoxGeometry(0.04, 0.33, 0.39), iron, dx, 0.165, 0);
+    add(new T.BoxGeometry(0.09, 0.1, 0.04), gold, 0, 0.24, 0.2); add(new T.TorusGeometry(0.035, 0.01, 6, 12, Math.PI), gold, 0, 0.3, 0.2);
+    g.rotation.y = p.rot;
+  } else if (d==='ldoor'){
+    const fr = M('dframe', '#4a4640', { roughness:0.9, flatShading:true });
+    const dg0 = new T.Group(); dg0.rotation.y = p.rot; g.add(dg0);
+    const a2 = (geo, mat, x, y, z)=>{ const m = new T.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = m.receiveShadow = true; dg0.add(m); return m; };
+    for (const s0 of [-1,1]) a2(new T.BoxGeometry(0.12, 1.2, 0.2), fr, s0*0.47, 0.6, 0);
+    a2(new T.BoxGeometry(1.06, 0.14, 0.2), fr, 0, 1.2, 0);
+    a2(new T.BoxGeometry(0.82, 1.12, 0.08), wood, 0, 0.56, 0);
+    for (const y of [0.25, 0.85]) a2(new T.BoxGeometry(0.84, 0.06, 0.1), iron, 0, y, 0);
+    a2(new T.BoxGeometry(0.1, 0.14, 0.12), gold, 0.28, 0.58, 0);
+  } else if (d==='raidgate' || d==='raidexit'){
+    const col = d==='raidgate' ? '#b060ff' : '#60c8ff';
+    for (const s0 of [-1,1]){ add(new T.BoxGeometry(0.16, 1.3, 0.2), stone, s0*0.42, 0.65, 0); add(new T.BoxGeometry(0.2, 0.08, 0.24), stone, s0*0.42, 1.32, 0); }
+    add(new T.BoxGeometry(1.04, 0.16, 0.22), stone, 0, 1.42, 0);
+    const disc = add(new T.CircleGeometry(0.36, 24), new T.MeshBasicMaterial({ color:new T.Color(col).convertSRGBToLinear(), transparent:true, opacity:0.7, side:T.DoubleSide, depthWrite:false }), 0, 0.68, 0); disc.scale.y = 1.6; disc.castShadow = false;
+    const gl = glowSpr(d==='raidgate' ? 'rgba(180,100,255,1)' : 'rgba(100,200,255,1)', 1.6, 0.7, 0.55);
+    g.rotation.y = p.rot;
+    g.userData.anim = (t, ph)=>{ disc.rotation.z = t*1.5; disc.material.opacity = 0.55 + 0.2*Math.sin(t*3+ph); gl.material.opacity = 0.4 + 0.15*Math.sin(t*2.2+ph); };
+  } else if (/^plate\d$/.test(d)){
+    const col = RAID_PLATES[+d[5]][1];
+    add(new T.BoxGeometry(0.7, 0.05, 0.7), stone, 0, 0.025, 0);
+    const rn0 = add(new T.RingGeometry(0.18, 0.26, 20), isoGlowMat('plate'+d, col), 0, 0.055, 0); rn0.rotation.x = -Math.PI/2; rn0.castShadow = false;
+    const gl = glowSpr(col, 0.9, 0.1, 0.45);
+    g.userData.anim = (t, ph)=>{ gl.material.opacity = 0.3 + 0.2*Math.sin(t*2 + ph); };
+  } else if (d==='raidchest'){
+    add(new T.BoxGeometry(0.8, 0.42, 0.5), gold, 0, 0.21, 0);
+    const lid = add(new T.CylinderGeometry(0.25, 0.25, 0.8, 16, 1, false, 0, Math.PI), gold, 0, 0.42, 0); lid.rotation.z = Math.PI/2;
+    for (const dx of [-0.28, 0.28]) add(new T.BoxGeometry(0.06, 0.43, 0.51), M('rband', '#6a2a8a', { metalness:0.5 }), dx, 0.215, 0);
+    const gl = glowSpr('rgba(255,210,90,1)', 2, 0.5, 0.6);
+    g.userData.anim = (t, ph)=>{ gl.material.opacity = 0.45 + 0.2*Math.sin(t*2.5); };
+  }
+}
+// ---- 157: skill-gated resource areas beside some towns ----
+SK_ROCK.guild = { nm:'Guild ore rock', items:['coal','mithril','adamant','runite'], col:'#7a9ab8', n:10 };
+SK_SPOT.platform = { nm:'Fishing Platform', fish:['lobster','swordfish','shark'], col:'#c8e0ff', n:9 };
+RES_SPOT_WHERE.platform = 'off the fishing platform beside some coastal towns (Fishing 68)';
+RES_ROCK_WHERE.guild = 'in the Mining Guild beside some towns (Mining 60)';
+function guildZoneAt(x, y){
+  let town = null;
+  for (let r=0;r<=5 && !town;r++) for (let i=-r;i<=r && !town;i++) for (let j=-r;j<=r;j++){ if (Math.max(Math.abs(i),Math.abs(j))!==r) continue; if (skOwTile(x+i, y+j)===OW_TOWN){ town = [x+i, y+j]; break; } }
+  if (!town) return null;
+  const [tx, ty] = town, hh = skNH(tx, ty, 951);
+  const kind = hh < 0.34 ? 'mining' : hh < 0.6 ? 'fishing' : hh < 0.85 ? 'grove' : null; if (!kind) return null;
+  let c = null;
+  if (kind==='fishing'){ for (let r=2;r<=4 && !c;r++) for (let i=-r;i<=r && !c;i++) for (let j=-r;j<=r;j++){ if (Math.max(Math.abs(i),Math.abs(j))!==r) continue; if (skOwTile(tx+i, ty+j)===OW_WATER){ c = [tx+i, ty+j]; break; } } if (!c) return null; }
+  else { const dirs = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]], dd = dirs[Math.floor(skNH(tx, ty, 952)*8)%8]; c = [tx + dd[0]*3, ty + dd[1]*3]; }
+  if (Math.max(Math.abs(x-c[0]), Math.abs(y-c[1])) > 1) return null;
+  return { kind, town:[tx, ty] };
+}
+function guildNodeFor(x, y, t){
+  const z = guildZoneAt(x, y); if (!z) return null;
+  const land = t===OW_GRASS || t===OW_FOREST || t===OW_DESERT || t===OW_TUNDRA;
+  if (z.kind==='mining' && land) return { k:'mining', type:'guild', gate:{ k:'mining', lvl:60 }, guild:'Mining Guild rock' };
+  if (z.kind==='fishing' && t===OW_WATER) return { k:'fishing', type:'platform', dens:1, gate:{ k:'fishing', lvl:68 }, guild:'Fishing Platform spot' };
+  if (z.kind==='grove' && land){ const magic = skNH(x, y, 953) < 0.5; return { k:'woodcutting', type: magic ? 'magic' : 'yew', gate:{ k:'woodcutting', lvl: magic ? 75 : 60 }, guild:`Woodcutting Grove ${magic ? 'magic tree' : 'yew'}` }; }
+  return null;
+}
+// ---- 158: raids - a sealed run of chambers with three bosses, a puzzle and a great chest ----
+const RAID_PLATES = [['red','#ff4a3a'],['blue','#4a8aff'],['green','#4ae070'],['gold','#ffd040']];
+const RAID_BOSSES = ['Tekton the Unbroken','Vasa the Crystal-Eater','Vespula the Swarm Queen','the Great Olm','Xarpus the Rot-Bloated','Verzik the Last','the Maiden of Blood','Muttadile the Twice-Born'];
+function dgEnterRaid(gx, gy){
+  const p = G.player;
+  saveLevelCache(G.depth);
+  G.inRaid = { ret:{ depth:G.depth, x:gx, y:gy }, stage:0, prog:0, seq:[0,1,2,3].sort(()=>Math.random()-0.5) };
+  generateRaidLevel();
+  p.x = G.genStart.x; p.y = G.genStart.y;
+  try{ placeCompanionNearPlayer(); placeSummonNearPlayer(); }catch(e){}
+  FPD.mapRef = null;
+  logMsg('*** you step through the raid gate - the way shuts behind you. Three masters guard the chambers ahead; the gate back stands by the entrance ***', 'new', true); sfx('spell');
+}
+function dgLeaveRaid(){
+  const r = G.inRaid; if (!r) return;
+  loadLevel(r.ret.depth, false);
+  G.player.x = r.ret.x; G.player.y = r.ret.y;
+  logMsg(r.done ? 'you step back out of the raid, laden with its treasure' : 'you flee the raid back to the dungeon', r.done ? 'good' : '');
+}
+function generateRaidLevel(){
+  setGrid(DUN_W, DUN_H);
+  G.map = makeGrid(T_WALL); G.floorItem = makeItemGrid(); G.trapSeen = makeGrid(false); G.dungeonSeen = makeGrid(false);
+  G.dungeonDeco = makeGrid('', COLS, ROWS); G.mon = []; G.isBossFloor = 0; G.bossIdx = -1; G.genRooms = null;
+  const rooms = [{x:2,y:11,w:6,h:7}, {x:10,y:7,w:9,h:15}, {x:21,y:10,w:5,h:9}, {x:28,y:5,w:5,h:19}];
+  for (const r of rooms) for (let x=r.x;x<r.x+r.w;x++) for (let y=r.y;y<r.y+r.h;y++) G.map[x][y] = T_FLOOR;
+  for (let x=8;x<=9;x++) G.map[x][14] = T_FLOOR;              // entry -> the first master's hall (open)
+  G.map[19][14] = T_FLOOR;                                     // hall -> puzzle chamber: sealed at 20,14
+  G.map[26][14] = T_FLOOR;                                     // puzzle -> the last hall: sealed at 27,14
+  G.inRaid.doors = [[20,14],[27,14]];
+  G.genStart = { x:3, y:14 };
+  G.dungeonDeco[2][13] = 'raidexit';
+  [[22,11],[24,11],[22,17],[24,17]].forEach(([x,y],i)=>{ G.dungeonDeco[x][y] = 'plate'+i; });
+  for (const [x,y] of [[5,12],[5,16],[14,8],[14,20],[30,6],[30,22]]) G.dungeonDeco[x][y] = 'brazier';
+  const sp = sitePower(), lvl = Math.min(20, monsterLevelForDepth((G.dungeonMaxDepth||5) + 2) + 1), names = RAID_BOSSES.slice().sort(()=>Math.random()-0.5);
+  const guard = (x,y)=>{ const m = rollMonsterAt(x, y, lvl, sp); m.hp = m.maxHp = Math.round(m.maxHp*1.6); G.mon.push(m); return m; };
+  const boss = (x,y,i,mult)=>{ const m = rollMonsterAt(x, y, lvl, sp); m.nm = `${names[i]}, ${m.nm}`; m.hp = m.maxHp = Math.round(m.maxHp*mult); m.dmg2 = Math.round(m.dmg2*1.35); m.atkBonus += 3; m.ac += 2; m.xp = Math.round((m.xp||10)*6); m.raidBoss = 1; m.mlevel = Math.min(20, (m.mlevel||10) + 3); G.mon.push(m); return m; };
+  guard(6, 12); guard(6, 16);
+  G.inRaid.b1 = boss(16, 14, 0, 7);
+  G.inRaid.b2 = boss(31, 9, 1, 5.5); G.inRaid.b3 = boss(31, 19, 2, 5.5);
+  for (const m of G.mon) m.engaged = false;
+}
+function raidOpen(i){
+  const [x, y] = G.inRaid.doors[i]; G.map[x][y] = T_FLOOR; FPD.mapRef = null;
+  try{ fpBurst(x+0.5, y+0.5, 0.6, '#ffd27a', 24, 1.2); }catch(e){}
+  sfx('levelUp');
+}
+function raidTick(){
+  const R = G.inRaid; if (!R || G.gameMode!==1) return;
+  if (R.stage===0 && R.b1 && !R.b1.alive){
+    R.stage = 1; raidOpen(0);
+    logMsg(`*** the first master falls - the sealed door grinds open. Four rune plates wait beyond: step on them in this order - ${R.seq.map(i=>RAID_PLATES[i][0]).join(', ')} ***`, 'new', true);
+  }
+  if (R.stage===2 && R.b2 && R.b3 && !R.b2.alive && !R.b3.alive){
+    R.stage = 3; G.dungeonDeco[30][14] = 'raidchest';
+    logMsg('*** the last masters fall - a great chest rises from the floor of the final hall ***', 'new', true); sfx('achievement');
+  }
+}
+function raidStep(x, y, d){
+  const R = G.inRaid, p = G.player; if (!R) return;
+  if (d==='raidchest'){
+    if (R.stage!==3) return;
+    G.dungeonDeco[x][y] = ''; R.stage = 4; R.done = true; p.raidsDone = (p.raidsDone||0) + 1;
+    const g = Math.round((800 + rn(600) + (G.dungeonMaxDepth||5)*150)*goldFindMult()); p.gold += g;
+    const got = [];
+    for (let i=0;i<3;i++){ const it = genBossLoot(vaultLootSlot()); addToInventory(it); got.push(itemNameHtml(it)); }
+    if (chn(0.35)){ const it = rsMakeFamousBow(pick(['dark','crystal','seercull','twisted'])); addToInventory(it); got.push(itemNameHtml(it)); }
+    if (chn(0.3)){ const it = crDragonWeapon(); addToInventory(it); got.push(itemNameHtml(it)); }
+    try{ crBossMats({ nm:'raid' }); }catch(e){}
+    logMsg(`*** the raid's great chest: ${g} gold, ${got.join(', ')} ***`, 'loot', true); sfx('achievement');
+    G.dungeonDeco[3][14] = 'raidexit';
+    return;
+  }
+  if (R.stage!==1) return;
+  const idx = +d[5];
+  if (R.seq[R.prog]===idx){
+    R.prog++; logMsg(`the ${RAID_PLATES[idx][0]} plate hums (${R.prog}/4)`, 'magic'); sfx('click');
+    try{ fpBurst(x+0.5, y+0.5, 0.2, RAID_PLATES[idx][1], 12, 0.8); }catch(e){}
+    if (R.prog===4){ R.stage = 2; raidOpen(1); logMsg('*** the plates blaze together - the last door opens. Two masters wait in the final hall ***', 'new', true); }
+  } else {
+    R.prog = 0; const dmg = 5 + rn(6); p.hp -= dmg; try{ fxSplat(x+0.5, y+0.5, dmg, 'taken'); }catch(e){}
+    logMsg(`wrong plate - the runes go dark and a jolt runs through you for ${dmg}. Start again: ${R.seq.map(i=>RAID_PLATES[i][0]).join(', ')}`, 'hit');
+    if (p.hp<=0 && !checkDeathWard()) playerDies('a raid ward');
+  }
+}
+// ---- 151: the cutaway - walls between the camera and you dissolve smoothly, wherever you walk ----
+function fpdCutify(m){
+  const T = THREE;
+  FPD.cutU = FPD.cutU || { uCutF:{ value:new T.Vector3(0, 0, 0) }, uCutD:{ value:new T.Vector2(0.7, 0.7) } };
+  m.onBeforeCompile = (sh)=>{
+    sh.uniforms.uCutF = FPD.cutU.uCutF; sh.uniforms.uCutD = FPD.cutU.uCutD;
+    sh.vertexShader = 'varying vec3 vCutW;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n  vCutW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = 'uniform vec3 uCutF;\nuniform vec2 uCutD;\nvarying vec3 vCutW;\n' + sh.fragmentShader.replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
+  { vec2 cv = vCutW.xz - uCutF.xy; float al = dot(cv, uCutD); float la = abs(cv.x*uCutD.y - cv.y*uCutD.x);
+    float cutA = smoothstep(0.2, 1.2, al) * (1.0 - smoothstep(1.2, 2.7, la)) * smoothstep(0.32, 0.6, vCutW.y) * uCutF.z;
+    vec2 q = mod(floor(gl_FragCoord.xy), 4.0);
+    float th = (mod(q.x*2.0 + q.y*3.0, 4.0)*4.0 + mod(q.x + q.y*2.0, 4.0) + 0.5)/16.0;
+    if (cutA > th) discard; }`);
+  };
+  m.customProgramCacheKey = ()=>'fpdcut';
+}
 // ===================== magic and prayer: more spells, four spellbooks, alchemy, combination runes, thralls, curses =====================
 // [id, name, Magic level, max hit, runes, xp, element, { book, k: cc|self|alch, aoe, fx, god, demon, d }]
 RS_SPELLS.push(
@@ -12855,6 +13332,7 @@ const VILLAGE_NPC_NAMES = {
 };
 function villageSeed(){ return ((G.owPos.x*73856093) ^ (G.owPos.y*19349663)) >>> 0; }
 function generateVillage(){
+  setGrid(20, 20);
   G.map = makeGrid(T_FLOOR);
   G.floorItem = makeItemGrid();
   G.villageDeco = makeGrid('grass', COLS, ROWS);
@@ -14244,7 +14722,7 @@ const VOID_COL = '#05070a';
 function computeDungeonVisible(){
   const vis = new Set();
   const race = raceRow();
-  const px = G.player.x, py = G.player.y, R = DUNGEON_VISION_RADIUS + (race ? (race[6]||0) : 0) + lightBonus(); // darkvision - see RACES' visionBonus field
+  const px = G.player.x, py = G.player.y, R = DUNGEON_VISION_RADIUS + (race ? (race[6]||0) : 0) + lightBonus() - dgDarkPenalty(); // darkvision - see RACES' visionBonus field
   for (let y=mx(0,py-R); y<=mn(ROWS-1,py+R); y++){
     for (let x=mx(0,px-R); x<=mn(COLS-1,px+R); x++){
       if (Math.hypot(x-px,y-py)<=R && hasLineOfSight(px,py,x,y)) vis.add(x+','+y);
@@ -15416,6 +15894,7 @@ function toggleOwZoom(){
 }
 
 function renderGame(){
+  syncGrid();
   if (G.ui==='playing') checkLowHp(); else if (LOWHP.on) lowHpFx(1);
   queueMicrotask(renderBuffBar); // after this render, so it can sit under the fresh player plate
   queueMicrotask(hudLayout);
@@ -16264,13 +16743,13 @@ const FP_THEME_SPECS = {
     wall: fpBricks({base:[132,128,124], mc:[46,44,44], rows:4, cols:2, seed:11, jitter:0.35}),
     wall2: fpBricks({base:[124,124,118], mc:[42,42,40], rows:4, cols:2, seed:17, jitter:0.4, moss:0.3}),
     floor: fpBricks({base:[108,100,94], mc:[38,35,32], rows:2, cols:2, seed:12, mortar:3, stagger:false}),
-    floor2: fpRock({base:[98,94,90], seed:14}),
+    floor2: fpFlagstones({base:[104,98,92], mc:[34,32,30], seed:14}),
     ceil: fpRock({base:[70,68,70], seed:13}),
   },
   castle: {
     wall: fpBricks({base:[172,150,118], mc:[72,62,50], rows:3, cols:2, seed:21, jitter:0.22}),
     wall2: fpBricks({base:[160,140,112], mc:[66,56,46], rows:3, cols:2, seed:27, jitter:0.3, moss:0.18}),
-    floor: fpBricks({base:[138,122,106], mc:[60,52,44], rows:4, cols:4, seed:22, stagger:false}),
+    floor: fpInlay({base:[146,130,112], inlay:[96,62,52], mc:[60,52,44], seed:22}),
     floor2: fpBricks({base:[120,62,58], mc:[60,40,34], rows:4, cols:4, seed:24, stagger:false, jitter:0.15}),
     ceil: fpBeams(fpBricks({base:[112,78,50], mc:[40,26,16], rows:1, cols:4, seed:23, stagger:false})),
   },
@@ -16283,8 +16762,8 @@ const FP_THEME_SPECS = {
   },
   temple: {
     wall: fpBricks({base:[112,142,128], mc:[36,48,44], rows:3, cols:2, seed:41, moss:0.35}),
-    wall2: fpBricks({base:[104,136,122], mc:[34,46,42], rows:3, cols:2, seed:47, moss:0.6}),
-    floor: fpBricks({base:[96,116,110], mc:[30,40,38], rows:2, cols:2, seed:42, stagger:false, moss:0.25}),
+    wall2: fpFrieze(fpBricks({base:[104,136,122], mc:[34,46,42], rows:3, cols:2, seed:47, moss:0.4}), [70,96,86]),
+    floor: fpMosaic({pal:[[96,126,118],[128,146,120],[150,132,96],[84,108,120]], mc:[30,40,38], seed:42}),
     floor2: fpWater({seed:44}),
     ceil: fpRock({base:[60,74,70], seed:43}),
   },
@@ -16301,7 +16780,7 @@ const FP_THEME_SPECS = {
   },
   catacomb: {
     wall: fpNicheWall({base:[150,140,118], seed:151}),
-    wall2: fpBricks({base:[146,136,114], mc:[60,54,44], rows:5, cols:2, seed:153, jitter:0.3, moss:0.1}),
+    wall2: fpCarved({base:[146,136,114], mc:[60,54,44], seed:153}),
     floor: fpBricks({base:[112,104,90], mc:[46,42,36], rows:2, cols:2, seed:152, stagger:false, mortar:3}),
     floor2: fpDirt({base:[104,92,74], seed:154}),
     ceil: fpRock({base:[82,76,66], seed:155}),
@@ -16310,7 +16789,7 @@ const FP_THEME_SPECS = {
     wall: fpBeams(fpRock({base:[136,104,78], seed:61})),
     wall2: fpRock({base:[128,98,74], seed:67, ore:true}),
     floor: fpDirt({base:[108,90,66], seed:62}),
-    floor2: fpRock({base:[100,84,64], seed:64}),
+    floor2: fpRails(fpDirt({base:[100,84,64], seed:64})),
     ceil: fpRock({base:[78,64,54], seed:63}),
   },
   lair: {
@@ -21594,7 +22073,7 @@ function fpPrepareLights(vis){
       if ((G.dungeonSeen && G.dungeonSeen[x][y]) || vis.has(x+','+y)) torches.push({x,y});
     }
   }
-  const key = torches.map(t=>t.x+','+t.y).join(';');
+  const key = COLS+'x'+ROWS+'|'+torches.map(t=>t.x+','+t.y).join(';');
   if (key!==FP.lightKey){
     FP.lightKey = key; FP.torches = torches;
     FP.torchW = torches.map(t=>{
@@ -21613,9 +22092,10 @@ function fpPrepareLights(vis){
       if (tileAt(t.x+dx,t.y+dy)===T_WALL) continue;
       FP.flames.push({x:t.x+0.5+dx*0.53, y:t.y+0.5+dy*0.53, dx, dy, seed:fpHash(t.x,t.y,dx*3+dy)});
     }
+    try{ dgLightFlames(vis); }catch(e){}
   }
   const n = COLS*ROWS;
-  if (!FP.Lr){ FP.Lr = new Float32Array(n); FP.Lg = new Float32Array(n); FP.Lb = new Float32Array(n); }
+  if (!FP.Lr || FP.Lr.length!==n){ FP.Lr = new Float32Array(n); FP.Lg = new Float32Array(n); FP.Lb = new Float32Array(n); }
   FP.Lr.fill(0); FP.Lg.fill(0); FP.Lb.fill(0);
   for (let j=0;j<FP.torches.length;j++){
     const f = 0.84 + 0.1*Math.sin(FP.t*8.3+j*1.7) + 0.06*Math.sin(FP.t*21.1+j*4.3);
@@ -21623,7 +22103,7 @@ function fpPrepareLights(vis){
     for (let i=0;i<n;i++){ const v = w[i]; if (v){ FP.Lr[i]+=v*f; FP.Lg[i]+=v*f*0.6; FP.Lb[i]+=v*f*0.28; } }
   }
   const LW = COLS*FP_LS, LH = ROWS*FP_LS;
-  if (!FP.L4r){ FP.L4r = new Float32Array(LW*LH); FP.L4g = new Float32Array(LW*LH); FP.L4b = new Float32Array(LW*LH); }
+  if (!FP.L4r || FP.L4r.length!==LW*LH){ FP.L4r = new Float32Array(LW*LH); FP.L4g = new Float32Array(LW*LH); FP.L4b = new Float32Array(LW*LH); }
   for (let sy=0; sy<LH; sy++){
     const gy = (sy+0.5)/FP_LS - 0.5, y0 = clamp(Math.floor(gy),0,ROWS-1), y1 = mn(ROWS-1,y0+1), ty = clamp(gy-y0,0,1);
     for (let sx=0; sx<LW; sx++){
@@ -21644,7 +22124,7 @@ function fpLightIdx(wx,wy){
 // ambient + carried-lantern settings for the current place and time
 function fpEnv(){
   const race = raceRow();
-  const R = DUNGEON_VISION_RADIUS + (race ? (race[6]||0) : 0) + lightBonus() + 0.5;
+  const R = DUNGEON_VISION_RADIUS + (race ? (race[6]||0) : 0) + lightBonus() - dgDarkPenalty() + 0.5;
   if (G.gameMode!==2){
     const T = fpTheme();
     // an open-air site (the graveyard) is always a misty moonlit night
@@ -21710,7 +22190,7 @@ function fpEnsureBuffer(){
 }
 function fpFloorSlots(T){
   const n = COLS*ROWS;
-  if (!FP.ftile) FP.ftile = new Uint8Array(n);
+  if (!FP.ftile || FP.ftile.length!==n) FP.ftile = new Uint8Array(n);
   const f = FP.ftile;
   for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
     const t = G.map[x][y];
@@ -22056,6 +22536,7 @@ function fpdMaterial(key, fn, o){
   const m = new T.MeshPhongMaterial({ map, normalMap:nmap, vertexColors:o.vc!==false, shininess: 6 + (1-sh)*80, specular: new T.Color().setScalar(0.02 + (1-sh)*0.35) });
   if (holes){ m.alphaTest = 0.5; m.side = T.DoubleSide; }
   if (ec){ ec.getContext('2d').putImageData(eid,0,0); const em = new T.CanvasTexture(ec); em.encoding = T.sRGBEncoding; em.wrapS = em.wrapT = T.RepeatWrapping; m.emissiveMap = em; m.emissive = new T.Color(0xffffff); m.emissiveIntensity = o.glow || 1.4; }
+  if (o.cut) fpdCutify(m);
   FPD.mats[key] = m;
   return m;
 }
@@ -22464,11 +22945,11 @@ function fpdBuild(T){
   // rough-hewn rock varies a lot in brightness, so it takes a much gentler bump than laid stone
   const bw = /mine|lair/.test(key) ? 5 : 11;
   const matFor = (k)=>{
-    if (k==='wall') return fpdMaterial(key+':wall', spec.wall, { bump:bw });
+    if (k==='wall') return fpdMaterial(key+':wall', spec.wall, { bump:bw, cut:true });
     if (k==='fence') return fpdMaterial(key+':fence', spec.fence, { bump:6, rough:0.5 });
     if (k==='tomb') return fpdMaterial('tomb', fpdTombGen([158,154,142], 161), { vc:false, bump:9 });
     if (k==='tomb2') return fpdMaterial('tomb2', fpdTombGen([140,136,128], 163), { vc:false, bump:9 });
-    if (k==='cryptStone') return fpdMaterial('cryptStone', fpdTombGen([150,146,134], 165), { bump:9 });
+    if (k==='cryptStone') return fpdMaterial('cryptStone', fpdTombGen([150,146,134], 165), { bump:9, cut:true });
     if (k==='stairStone') return yard ? matFor('cryptFloor') : fpdMaterial(key+':stair', slotFns[0], { rough:0.55, bump:bw*0.8 });
     if (k==='cryptFloor') return fpdMaterial('cryptFloor', fpBricks({base:[118,112,102], mc:[48,44,40], rows:2, cols:2, seed:169, stagger:false, mortar:3}), { bump:9, rough:0.6 });
     if (k==='cryptCeil') return fpdMaterial('cryptCeil', fpRock({base:[80,76,70], seed:167}), { bump:5 });
@@ -22486,8 +22967,8 @@ function fpdBuild(T){
       if (edge && ((x<6&&y<6) || (x>=58&&y<6) || (x<6&&y>=58) || (x>=58&&y>=58))) return fpScale([70,68,66], 0.8+fpFbm(x,y,53)*0.4);
       return fpScale([128,90,52], k2);
     }, { vc:false, bump:10 });
-    if (k==='wall2') return fpdMaterial(key+':wall2', spec.wall2||spec.wall, { bump:bw });
-    if (k==='wallTorch') return fpdMaterial(key+':wallT', fpSconce(key==='catacomb' ? spec.wall2 : spec.wall), { bump:bw });   // (the catacomb's painted niches are only for the classic renderer)
+    if (k==='wall2') return fpdMaterial(key+':wall2', spec.wall2||spec.wall, { bump:bw, cut:true });
+    if (k==='wallTorch') return fpdMaterial(key+':wallT', fpSconce(key==='catacomb' ? spec.wall2 : spec.wall), { bump:bw, cut:true });   // (the catacomb's painted niches are only for the classic renderer)
     if (k==='ceil') return fpdMaterial(key+':ceil', spec.ceil, { bump:6 });
     if (k==='trim') return fpdMaterial(key+':trim', key==='mine' ? spec.ceil : (key==='lair' || key==='catacomb') ? spec.wall2 : spec.wall, { bump:bw });
     if (k==='wood') return fpdMaterial(field ? 'woodF' : 'wood', (x,y)=>{
@@ -22714,7 +23195,8 @@ function fpdRender(env, T, camZ){
   if (FPD.cv.width!==w || FPD.cv.height!==h){ FPD.r.setPixelRatio(1); FPD.r.setSize(w, h, false); }
   const c = FP.cam, cam = FPD.cam;
   if (ISO.on) isoCamera(cam, w/h);
-  else {
+  if (FPD.cutU){ const f = ISO.focus, on = ISO.on && f && f.map===G.map; FPD.cutU.uCutF.value.set(on ? f.x : 0, on ? f.y : 0, on ? 1 : 0); FPD.cutU.uCutD.value.set(Math.sin(ISO.yawNow||0), Math.cos(ISO.yawNow||0)); }
+  if (!ISO.on){
     cam.near = 0.03; cam.aspect = w/h; cam.fov = 2*Math.atan(FP_PLANE/cam.aspect)*180/Math.PI; cam.updateProjectionMatrix();
     cam.position.set(c.x, camZ, c.y); cam.lookAt(c.x+Math.cos(c.a), camZ, c.y+Math.sin(c.a));
   }
@@ -22724,6 +23206,10 @@ function fpdRender(env, T, camZ){
   FPD.lan.color.setRGB(lan[0], lan[1]*0.74, lan[2]*0.5); FPD.lan.intensity = env.lanK*0.75; FPD.lan.distance = env.R*1.35;
   FPD.lan.position.set(c.x - Math.cos(c.a)*0.15, camZ+0.12, c.y - Math.sin(c.a)*0.15);
   if (ISO.on){ FPD.lan.position.set(G.player.x+0.5, 1.15, G.player.y+0.5); FPD.lan.distance = env.R*1.8; FPD.lan.intensity = env.lanK*1.1; }
+  // a carried torch or lantern sways in your hand and flickers (a lantern steadier than a torch)
+  if (G.gameMode===1 && lightBonus()){ const lb = lightBonus(), fk = lb===1 ? 0.12 : 0.05;
+    FPD.lan.intensity *= 1 + lb*0.12 + fk*Math.sin(FP.t*9.7) + fk*0.6*Math.sin(FP.t*23.3);
+    FPD.lan.position.x += 0.06*Math.sin(FP.t*1.9); FPD.lan.position.z += 0.05*Math.cos(FP.t*1.6); FPD.lan.distance *= 1 + lb*0.15; }
   const a = env.amb, am = Math.max(a[0],a[1],a[2],1e-3);
   FPD.amb.color.setRGB(a[0]/am, a[1]/am, a[2]/am); FPD.amb.intensity = T.outdoor ? 0 : am*2;
   const out = T.outdoor, fog = FPD.scene.fog;
@@ -22774,7 +23260,13 @@ function fpdRender(env, T, camZ){
   // the stone never moves, so shadows are only redrawn for a few frames after the lit set changes
   if (FPD.shadowFrames > 0){ FPD.shadowFrames--; FPD.r.shadowMap.needsUpdate = true; }
   FPD.torches.forEach((L,j)=>{ const o = fl[j]; if (!o) return; const s = o.f.seed*40;
-    L.intensity = 1.5*(0.84 + 0.1*Math.sin(FP.t*8.3+s) + 0.06*Math.sin(FP.t*21.1+s*2.3)); });
+    const fk = 0.84 + 0.1*Math.sin(FP.t*8.3+s) + 0.06*Math.sin(FP.t*21.1+s*2.3) + 0.04*Math.sin(FP.t*37.7+s*3.1);
+    L.intensity = 1.5*fk*(o.f.k||1);
+    if (o.f.col && !L.userData.col){ L.color.set(o.f.col); L.userData.col = o.f.col; } else if (!o.f.col && L.userData.col){ L.color.setHex(0xff8a36); L.userData.col = null; }
+    // the flame dances, so its light (and the shadows it throws) sway with it
+    const bx = o.f.x + (o.f.dx||0)*0.14, by = o.f.y + (o.f.dy||0)*0.14;
+    L.position.set(bx + 0.025*Math.sin(FP.t*5.1+s), (o.f.h||0.62) + 0.02*Math.sin(FP.t*7.3+s*1.3), by + 0.025*Math.cos(FP.t*4.3+s)); });
+  if (SET.gfx!=='low' && fl.length && G.gameMode===1){ FPD.flickN = (FPD.flickN||0) + 1; if (FPD.flickN % 4 === 0) FPD.r.shadowMap.needsUpdate = true; }
   // dust: a loose cloud kept centered on you
   const dp = FPD.dust.geometry.attributes.position, sd = FPD.dustSeed, n = dp.count;
   for (let i=0;i<n;i++){
@@ -24433,7 +24925,8 @@ function fpCollectSprites(vis){
     }
     if (t===T_FLOOR && G.gameMode===1 && G.dungeonDeco){
       const deco = G.dungeonDeco[x][y], oe = deco && deco!=='rune' && deco!=='pool' && deco!=='torch' && !(deco==='grave' && FPD.ok) && !(deco==='ore' && FPD.ok && ISO.on) && obDecoEntry(deco, x, y);   // (headstones are modelled when the GPU renderer is up)
-      if (oe && isoM && ['throne','banner','altar','idol'].includes(deco)) prop({ kind:deco, necro:G.siteKind==='necro' });
+      if (isoM && DRESS_DECOS.includes(deco)) prop(deco==='banner2' ? { kind:'banner', necro:G.siteKind==='necro' } : { kind:'dress', d:deco, rot:(G.map[x-1] && G.map[x-1][y]===T_WALL) ? 0 : Math.PI/2 });
+      else if (oe && isoM && ['throne','banner','altar','idol'].includes(deco)) prop({ kind:deco, necro:G.siteKind==='necro' });
       else if (oe){
         const h = {throne:0.9, banner:0.86, altar:0.5, idol:0.7, grave:0.5, ore:0.46}[deco] || 0.6;
         addP(oe, h, 0, {shadow:true, glow: deco==='idol' ? COL.cyan : deco==='altar' ? COL.purple : deco==='ore' ? '#ffd76b' : null, shine: deco==='ore', bright: deco==='ore'});
@@ -25298,6 +25791,7 @@ function isoPropModel(p){
       for (const s of [-1,1]){ add(new T.BoxGeometry(0.07, 0.2, 0.44), dwood, s*0.27, 0.56, 0.02); add(new T.SphereGeometry(0.05, 10, 8), gold, s*0.25, 1.33, -0.2); }
       add(new T.ConeGeometry(0.06, 0.16, 8), gold, 0, 1.36, -0.2);
       break; }
+    case 'dress': { dgPropModel(p, g, add, M, { wood, dwood, stone, iron, gold }, h); break; }
     case 'banner': {
       const cl = p.necro ? '#4a2a70' : '#a01e28';
       add(new T.CylinderGeometry(0.025, 0.03, 1.6, 7), dwood, 0, 0.8, -0.1); add(new T.CylinderGeometry(0.015, 0.015, 0.56, 6), dwood, 0, 1.5, -0.1).rotation.z = Math.PI/2;
@@ -25337,7 +25831,7 @@ function isoSyncProps(S){
   const seen = new Set();
   for (const s of S){
     if (!s.prop) continue;
-    const p = s.prop, key = p.kind + ':' + s.x + ',' + s.y + ':' + (p.it ? (p.it.nm + (p.it.quality|0)) : '') + (p.corrupt ? 'c' : '') + (p.sealed ? 's' : '') + (p.necro ? 'n' : '');
+    const p = s.prop, key = p.kind + ':' + s.x + ',' + s.y + ':' + (p.it ? (p.it.nm + (p.it.quality|0)) : '') + (p.corrupt ? 'c' : '') + (p.sealed ? 's' : '') + (p.necro ? 'n' : '') + (p.d||'');
     seen.add(key);
     let o = ISO.props.get(key);
     if (!o || o.map !== G.map){ if (o && o.g.parent) o.g.parent.remove(o.g); o = { g:isoPropModel(Object.assign({ x:s.x*7, y:s.y*13 }, p)), map:G.map }; o.g.position.set(s.x, 0, s.y); ISO.propG.add(o.g); ISO.props.set(key, o); }
@@ -25345,6 +25839,7 @@ function isoSyncProps(S){
     const g = o.g, ph = s.x*1.7 + s.y*0.9;
     if (g.userData.bob){ g.children.forEach(c=>{ if (c!==g.userData.qring) c.position.y = (c.userData.y0!==undefined ? c.userData.y0 : (c.userData.y0 = c.position.y)) + 0.03 + Math.sin(FP.t*2.4 + ph)*0.025; }); g.rotation.y = FP.t*0.6 + ph; }
     if (g.userData.flame){ const f = g.userData.flame, k = s.fl || 1; g.position.y = 0.5; f.outer.scale.set(0.9+0.2*Math.sin(FP.t*17+ph), k*(0.9+0.25*Math.sin(FP.t*11+ph*2)), 0.9+0.2*Math.sin(FP.t*13+ph)); f.inner.scale.set(1, k, 1); f.outer.rotation.y = FP.t*3; f.gl.material.opacity = 0.4 + 0.2*k; }
+    if (g.userData.anim) g.userData.anim(FP.t, ph);
     if (g.userData.cloth){ const c = g.userData.cloth; c.rotation.y = Math.sin(FP.t*1.3 + ph)*0.12; c.rotation.x = Math.sin(FP.t*1.9 + ph)*0.05; }
   }
   for (const [k, o] of ISO.props){ if (!seen.has(k)){ if (o.map !== G.map){ if (o.g.parent) o.g.parent.remove(o.g); ISO.props.delete(k); } else o.g.visible = false; } }
@@ -25952,7 +26447,7 @@ function isoHandleKey(k){
 function isoPassable(x, y){ const t = tileAt(x, y); return t!==undefined && t!==null && t!==T_WALL && x>=0 && y>=0 && x<COLS && y<ROWS; }
 // a walked path only crosses plain ground: stairs, portals, traps and vaults are only ever its end
 const ISO_STOP_TILES = [T_STAIRSD, T_STAIRSU, T_EXIT, T_FLEE, T_TRAP, T_VAULT, T_CORRUPT_CHEST];
-function isoCrossable(x, y){ return isoPassable(x, y) && !ISO_STOP_TILES.includes(tileAt(x, y)); }
+function isoCrossable(x, y){ return isoPassable(x, y) && !ISO_STOP_TILES.includes(tileAt(x, y)) && !dgAvoid(x, y); }
 // breadth-first path to (tx,ty), or to a tile beside it when it's a monster
 function isoFindPath(tx, ty, toAdjacent){
   const p = G.player, key = (x,y)=>y*COLS+x, prev = new Map(), q = [[p.x, p.y]];
@@ -26323,7 +26818,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-77';
+const GAME_VERSION = 'rs-78';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -28705,6 +29200,7 @@ function bindTouch(){
 // ===================== SECTION: GAME LOOP / BOOT =====================
 let lastAutosaveTs = 0;
 function frameLoop(ts){
+  syncGrid();
   if (G.player && G.gather) skGatherTick(performance.now());
   try{ skGatherBar(performance.now()); cqTick(performance.now()); }catch(e){ console.error(e); }
   if (G.player && G.ui==='playing' && (G.player.turnCount||0)!==frameLoop.rt){ frameLoop.rt = G.player.turnCount||0; try{ seasonTick(); richTick(); }catch(e){ console.error(e); } }

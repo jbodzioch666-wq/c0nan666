@@ -1,5 +1,49 @@
 # Depthcrawl patch notes
 
+## RS-78 - Dungeon overhaul
+
+- **Bigger dungeon floors:** an ordinary dungeon floor is now 34x30 (was 20x20) with 10-14 rooms instead of 6-9:
+  - room shapes: plain rooms, great halls, cross-shaped chambers, round rooms and ragged caves
+  - winding corridors with a bend, and 2-4 extra passages so floors loop
+  - the way down is always in the room farthest from where you arrive
+  - more monsters and more gold to match
+  - Castles, towers, temples, mines and the graveyard plot keep their fixed 20x20 plans.
+- **Smooth cutaway:** walls standing between the camera and you now dissolve in a soft dithered fade that follows you as you walk, instead of hiding you.
+- **Dungeon dressing, by site:**
+  - against the walls: barrels, crates, rubble, chains, bones and skulls, moss, and cobwebs in the corners
+  - castles get banners and braziers; necromancer towers get crystals and braziers
+  - Dressing never blocks a corridor.
+- **Wall and floor textures for each site:**
+  - irregular flagstones in dungeons
+  - inlaid tiles in castles
+  - a mosaic floor and a carved meander frieze in temples
+  - carved skulls in the crypt walls under the graveyard
+  - cart rails in the mines
+- **Animated hazards:**
+  - bubbling lava (in dragons' lairs and deep down) burns you if you step in it
+  - water drips from the ceiling into puddles
+  - crystals pulse and light the room
+  - blades swing in the corridors and catch you on every other step
+  - Paths you click avoid hazards.
+- **Light:**
+  - Torch flames now sway as well as flicker, and the shadows they throw move with them.
+  - Braziers, lava and crystals are real lights too: crystals blue, lava red.
+  - The torch or lantern you carry sways and flickers (a lantern steadier than a torch).
+  - Some deeper floors are pitch dark: no torches burn and you see two tiles less, unless you carry a light.
+- **Utility items** (rope, shovel and torches at the smithy's tool counter):
+  - **Rope:** if the floor gives way, you climb down unhurt.
+  - **Shovel:** dig up the loose earth (an X in the dirt) for gold, gems or an item.
+  - **Iron keys:** some floors have a locked iron chest, or a locked closet behind an iron door with a vault and gold inside. One monster on that floor carries the key.
+- **Skill-gated areas beside some towns:**
+  - the **Mining Guild** (Mining 60): rocks of coal, mithril, adamantite and runite
+  - the **Fishing Platform** (Fishing 68): lobster, swordfish and shark
+  - a **Woodcutting Grove**: yews at 60, magic trees at 75
+- **Raids:** deep in a big site you may find a raid gate:
+  - It leads to a sealed run of chambers: guards, then a first master (a boss with seven times the life).
+  - Then a puzzle: four rune plates that must be stepped on in the order shown. A wrong plate shocks you.
+  - Then a final hall with two more masters.
+  - The great chest pays out gold, three boss-quality items, and a chance of a famous bow, a dragon weapon and relics. The gate back stands by the entrance.
+
 ## RS-77 - Magic and prayer
 
 - **Four spellbooks**, swapped at an altar (a dungeon altar, or a runecrafting altar out in the wild):
