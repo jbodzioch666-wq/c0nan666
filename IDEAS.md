@@ -99,27 +99,27 @@ _The gear slots, paper doll and stat code_
 ### Player model and looks
 _The player 3D model and character creator, including every animation_
 
-69. [ ] (41) Better base model - hands with fingers, visible boots and gloves, shoulder pads matched to the armour tier
-70. [ ] (30) Character creator - a live rotating 3D preview on the creation screen, with arrows for each part
-71. [ ] (31) Body type - masculine or feminine, and lean, average or stocky builds
-72. [ ] (32) Skin tone - a palette per race (orc greens and greys, tiefling reds and purples, natural tones for the rest)
-73. [ ] (33) Hair - 8 to 10 styles (bald, short, long, ponytail, braids, mohawk, topknot, dreadlocks) plus colour
-74. [ ] (34) Facial hair - none, stubble, goatee, full beard, long dwarf braid, plus colour
-75. [ ] (35) Face details - eye colour, scars, war paint and tattoos, tiefling horns, orc tusks, elf ear length
-76. [ ] (36) Starting clothes - pick shirt and trouser colours instead of everyone in brown rags
-77. [ ] (42) Gear detail per tier - rune plate trims, dragon spikes, mystic robes with stitched runes
-78. [ ] (190) Glowing and animated high-tier gear - dragon weapons glint, magic staves swirl
-79. [ ] (191) Unique items get their own 3D models instead of the base shape
-80. [ ] (43) Idle animations - breathing, looking around, sitting at camp
-81. [ ] (422) Swing animations per weapon type - stab, slash, overhead crush, halberd spin
-82. [ ] (403) Bow draw animation - pull, aim, release; arrows stick in monsters briefly
-83. [ ] (381) Casting animations - raise the staff, gather energy, release
-84. [ ] (444) Bone burying animation with a small effect
-85. [ ] (443) Overhead prayer icons - the active protection prayer glows over your head, plus a light aura for boosts
-86. [ ] (37) Barber and tailor make-over - pay gold in town to restyle hair and beard or re-dye clothes
-87. [ ] (38) Dyes - craft dyes from herbs and dye any armour or robe (colour changes, stats don't)
-88. [ ] (40) Skill capes - reach 99 in a skill for its cape, trimmed if you have more than one 99
-89. [ ] (26) Level-up fireworks and jingle - a column of light and fireworks around your character
+69. [x] (41) Better base model - hands with fingers, visible boots and gloves, shoulder pads matched to the armour tier
+70. [x] (30) Character creator - a live rotating 3D preview on the creation screen, with arrows for each part
+71. [x] (31) Body type - masculine or feminine, and lean, average or stocky builds
+72. [x] (32) Skin tone - a palette per race (orc greens and greys, tiefling reds and purples, natural tones for the rest)
+73. [x] (33) Hair - 8 to 10 styles (bald, short, long, ponytail, braids, mohawk, topknot, dreadlocks) plus colour
+74. [x] (34) Facial hair - none, stubble, goatee, full beard, long dwarf braid, plus colour
+75. [x] (35) Face details - eye colour, scars, war paint and tattoos, tiefling horns, orc tusks, elf ear length
+76. [x] (36) Starting clothes - pick shirt and trouser colours instead of everyone in brown rags
+77. [x] (42) Gear detail per tier - rune plate trims, dragon spikes, mystic robes with stitched runes
+78. [x] (190) Glowing and animated high-tier gear - dragon weapons glint, magic staves swirl
+79. [x] (191) Unique items get their own 3D models instead of the base shape
+80. [x] (43) Idle animations - breathing, looking around, sitting at camp
+81. [x] (422) Swing animations per weapon type - stab, slash, overhead crush, halberd spin
+82. [x] (403) Bow draw animation - pull, aim, release; arrows stick in monsters briefly
+83. [x] (381) Casting animations - raise the staff, gather energy, release
+84. [x] (444) Bone burying animation with a small effect
+85. [x] (443) Overhead prayer icons - the active protection prayer glows over your head, plus a light aura for boosts
+86. [x] (37) Barber and tailor make-over - pay gold in town to restyle hair and beard or re-dye clothes
+87. [x] (38) Dyes - craft dyes from herbs and dye any armour or robe (colour changes, stats don't)
+88. [x] (40) Skill capes - reach 99 in a skill for its cape, trimmed if you have more than one 99
+89. [x] (26) Level-up fireworks and jingle - a column of light and fireworks around your character
 
 ### Skills framework
 _Shared skill code: guides, perks, tools, progress and crafting window_

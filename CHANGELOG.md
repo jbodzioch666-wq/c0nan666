@@ -1,5 +1,34 @@
 # Depthcrawl patch notes
 
+## RS-68 - Your character, your look
+
+- **Character creator with a live 3D preview.** A new Appearance section on the creation screen shows your character turning slowly. Drag it to turn it yourself. Each part has arrows, and a "random look" button rolls the whole lot.
+- **Body:** masculine or feminine, and a lean, average or stocky build.
+- **Skin tone:** each race has its own palette. Half-orcs get greens and greys, tieflings reds and purples, dragonborn scale colours, and everyone else natural tones.
+- **Hair:** ten styles (bald, short, long, ponytail, braids, mohawk, topknot, dreadlocks, curly, swept) in ten colours. Long hair, ponytails, braids and dreadlocks still show under a helmet.
+- **Facial hair:** none, stubble, goatee, full beard, or a long dwarf braid with gold beads, in its own colour.
+- **Face:** eye colour, scars, war paint (red stripes, blue woad, black jaw paint, tattooed dots, clan tattoo), and a race feature: tiefling horns (four shapes), half-orc tusks (including one broken), elf and half-elf ear length, or a dragonborn crest.
+- **Starting clothes:** pick your shirt and trouser colours. Bare clothing is now a belted tunic instead of brown rags.
+- **Better base model:** gloves and gauntlets cover your hands and forearms, boots show in their own colour and metal, and shoulder pads grow with the armour tier.
+- **Finer armour looks finer:**
+  - rune plate has gilt trim on the shoulders, collar, belt and chest
+  - dragon armour has spikes on the shoulders and down the back
+  - studded leather is studded, and dragonhide is edged
+  - mystic, infinity and Ahrim's robes have glowing stitched runes round the hem
+  - metal helms change shape with the tier, and cloth hats are wizard hats
+- **Glowing gear:** dragon weapons glint every few seconds, and motes of light circle a magic staff's head.
+- **Unique weapons get their own model.** Glowing runes run down the blade, with a gem at the hilt, a light at the tip, and barbs, a floating ring or a burning pommel. The design comes from the item's name, so a given unique always looks the same.
+- **Animations:**
+  - **Idle:** stand still a few seconds and you shift your weight, look about and now and then stretch. You sit after making camp and beside your lit campfire.
+  - **Swings by weapon:** daggers, spears and swords stab; scimitars, longswords and greatswords slash; maces, hammers and axes come down overhead; a halberd swings the whole body round.
+  - **Bow:** turn side-on, draw to the cheek, loose. Arrows that land stick in the monster for a moment.
+  - **Casting:** raise the staff, gather light in the off hand, then thrust it out.
+  - **Burying bones:** kneel and dig, and a small light rises from the grave.
+- **Prayer icons:** your protection prayer (melee, missiles or magic) glows over your head, and boosting prayers ring your feet with light. This works in dungeons, towns and the overworld.
+- **Level-up fireworks:** gaining a level raises a column of light round you with three bursts of fireworks, and a longer jingle ending in a chord.
+- **Barber's chair:** at any tailor you can restyle hair, beard and war paint (30g a change) or re-dye your shirt and trousers (20g each), with the same live preview.
+- **Dyes:** brew nine dyes from herbs at the loom (red, yellow, blue, white, orange, green, purple, black and gilding). Dye any armour, robe, cape or shield at the dye works. You can open the dye works from the tailor, from the barber's chair, or by right-clicking an item and choosing "Dye". Dye changes only the colour, never the stats, and washes out for free.
+
 ## RS-67 - R switches between bow and magic
 
 - **R now switches your ranged mode between bow and magic** instead of firing. A note shows which mode you're in, plus your bow and arrow count or your selected spell.
