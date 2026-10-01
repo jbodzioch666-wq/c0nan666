@@ -1,11 +1,23 @@
 # Depthcrawl patch notes
 
+## RS-64 - Arrows are made, not bought
+
+- **The peddler no longer sells arrows.** You fletch them at the crafting bench, find them as monster drops, or start with them as an Archer.
+- **Every metal has its own arrows:** a log and a bar of that metal make 15 arrows. They go straight into your quiver.
+  - Bronze: logs and a bronze bar, Crafting 1.
+  - Iron: logs and an iron bar, Crafting 10.
+  - Steel: oak and a steel bar, Crafting 25.
+  - Mithril: willow and a mithril bar, Crafting 40.
+  - Adamant: maple and an adamant bar, Crafting 55.
+  - Rune: yew and a rune bar, Crafting 70.
+  - Dragon arrows only drop from monsters.
+- The old logs-only arrow recipes are gone.
+
 ## RS-63 - Arrows in the ammo slot
 
 - **Your arrows now fill the ammo slot.** Arrows you already had, from the Archer kit, the peddler or fletching, load as Bronze Arrows.
 - **Each arrow type keeps its own count in your quiver.** The inventory tab (F1) has a new QUIVER section with every type you own; click one to load it. The loaded type shows "ON", and the equipment tab shows how many are loaded.
 - **When the loaded type runs out,** the best type left in your quiver loads by itself.
-- **The peddler sells better arrows** (Iron, Steel, Mithril...) as your Ranged level allows, straight into your quiver.
 
 ## RS-62 - Equipment slots
 
