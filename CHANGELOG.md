@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## RS-59 - Interface size fixes
+
+- **HUD windows no longer overlap at larger interface sizes:**
+  - The XP tracker always sits below the player plate and buff bar.
+  - If the XP tracker would run into the message log, it moves to the right column under the quest tracker, or the log gets shorter to make room.
+- **The hotbar and orbs never grow wider than the screen,** and the buttons above it and the message log move up with it.
+- **Menu windows only grow as far as the screen has room for,** so the character sheet, inventory and others no longer overflow on smaller screens.
+- The target plate and quest tracker can no longer grow off-screen.
+
 ## RS-58 - Settings, menus, stats and gravestones
 
 - **Pause menu (Esc).** Esc now pauses the game:
