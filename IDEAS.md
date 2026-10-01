@@ -148,18 +148,18 @@ _Resource nodes, done before the crafts that use them_
 ### Production skills
 _New crafts and skills on top of the framework and resources_
 
-106. [ ] (72) Fletching as its own skill - bows, arrows and bolts split out of Crafting, with bolt tips cut from gems
-107. [ ] (332) Gem cutting - uncut gems from mining, nests and monsters cut with a chisel (sapphire to onyx)
-108. [ ] (333) Jewellery - gold or silver bars plus gems at a furnace with moulds: rings, necklaces, amulets, bracelets
-109. [ ] (334) Pottery - clay on a potter's wheel, fired in a kiln: pots, bowls, pie dishes for Cooking and Herblore
-110. [ ] (335) Glassblowing - sand and seaweed into molten glass: vials, orbs, lantern lenses, fishbowls
-111. [ ] (336) Holy and unholy symbols - silver cast into Prayer-boosting amulets
-112. [ ] (337) Battlestaves for every element, plus mystic staves
-113. [ ] (338) Crafted lanterns and torches for dark dungeons
-114. [ ] (81) Better Cooking - pies, stews and pizzas from several ingredients that heal more; burn rate drops with level
-115. [ ] (82) Better Smithing - cannonballs, nails for Construction, dart tips, upgradable gear
-116. [ ] (343) Rare boss materials - dragon hide, abyssal parts, zenyte shards for top-tier crafts
-117. [ ] (5) Runecrafting - make your own runes at altars (settles whether the Alchemist should stop selling runes)
+106. [x] (72) Fletching as its own skill - bows, arrows and bolts split out of Crafting, with bolt tips cut from gems
+107. [x] (332) Gem cutting - uncut gems from mining, nests and monsters cut with a chisel (sapphire to onyx)
+108. [x] (333) Jewellery - gold or silver bars plus gems at a furnace with moulds: rings, necklaces, amulets, bracelets
+109. [x] (334) Pottery - clay on a potter's wheel, fired in a kiln: pots, bowls, pie dishes for Cooking and Herblore
+110. [x] (335) Glassblowing - sand and seaweed into molten glass: vials, orbs, lantern lenses, fishbowls
+111. [x] (336) Holy and unholy symbols - silver cast into Prayer-boosting amulets
+112. [x] (337) Battlestaves for every element, plus mystic staves
+113. [x] (338) Crafted lanterns and torches for dark dungeons
+114. [x] (81) Better Cooking - pies, stews and pizzas from several ingredients that heal more; burn rate drops with level
+115. [x] (82) Better Smithing - cannonballs, nails for Construction, dart tips, upgradable gear
+116. [x] (343) Rare boss materials - dragon hide, abyssal parts, zenyte shards for top-tier crafts
+117. [x] (5) Runecrafting - make your own runes at altars (settles whether the Alchemist should stop selling runes)
 
 ### Melee
 _The melee combat code_

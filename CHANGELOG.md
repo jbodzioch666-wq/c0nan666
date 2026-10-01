@@ -1,5 +1,43 @@
 # Depthcrawl patch notes
 
+## RS-74 - Production skills
+
+- **Fletching is its own skill now.** Bows, arrows, gem arrowtips and gem-tipped arrows train Fletching instead of Crafting. Your Fletching level starts where your Crafting level was, so you can still make everything you could before. The fletching bench shows both levels. Fletching perks: material saving, and +5 arrows a batch at 50 and again at 99.
+- **New workbenches:**
+  - **Smithy:** a jeweller's bench and a gem-cutting table.
+  - **Tailor's workshop:** a potter's wheel.
+  - **Orb kiln:** now also does glass and lights.
+- **Gem cutting:** cut sapphires, emeralds, rubies, diamonds and onyx at the gem-cutting table. Zenyte is cut from a zenyte shard and a cut onyx (Crafting 89).
+  - Uncut gems now come from gem rocks, bird's nests and the occasional monster. Onyx comes from bosses.
+  - Cut gems also become arrowtips for gem-tipped arrows (Fletching 56-74), the strongest arrows there are.
+- **Jewellery:** gold rocks in the desert beside mountains and on mountain passes give gold ore. Smelt it into gold bars, then cast rings, amulets and bracelets (the bracelets go in the trinket slot) at the jeweller's bench. They come plain gold or set with sapphire, emerald, ruby, diamond, onyx and zenyte, ending in the Zenyte Amulet.
+- **Holy and unholy symbols:** cast from a silver bar (Crafting 16 and 17). They boost prayer.
+- **Pottery:** clay pots, pie dishes and bowls from clay at the potter's wheel.
+- **Glassblowing:** sand and seaweed melt into molten glass, which blows into vials, fishbowls, lantern lenses and unpowered orbs. A glass vial in your bag is used up when you brew and makes a stronger potion.
+- **Lanterns and torches:** a torch (logs and flax), an oil lantern (glass and an iron bar) or a bullseye lantern (lens and a steel bar) lets you see 1, 2 or 3 tiles further in the dungeons. A torch burns out after one floor; lanterns last.
+- **Combination staves:** battlestaves (Crafting 54) and mystic staves (Crafting 66) of two elements at once: Mist, Dust, Smoke, Mud, Steam and Lava. They supply both their runes. The four single-element staves were already in the game.
+- **Better Cooking:** dishes from several ingredients, cooked at a hearth or campfire. They heal far more than a single fish:
+  - meat pie and hearty stew
+  - fish pie and seafood stew
+  - Kraken pizza and the Dragon Feast Pie (70% of your life)
+- **Better Smithing:**
+  - Nails from any metal bar (for building later) and cannonballs from steel.
+  - **Upgrades:** rework any metal gear up to +5 at the anvil with bars of its own metal, each step +6% to its bonuses.
+  - Dart tips are left out for now, as there are no thrown weapons yet.
+- **Boss relics:** bosses now leave relics. Dragon scales come from dragon lairs and abyssal shards from towers, graveyards and temples, often with onyx and sometimes a zenyte shard. The jeweller's bench turns them into the Abyssal Whip (Crafting 80) and the Dragonfire Shield (Crafting 90).
+- **Runecrafting:** a new skill.
+  - Mine rune essence, find the ruins of the old altars out in the wild, and bind it into runes there. Each rune has its own ruins:
+    - air: mountain passes and the foothills
+    - mind: near towns
+    - water: by the sea
+    - earth: in forests
+    - fire: in the desert
+    - chaos: in swamps
+    - death: beside graveyards
+    - blood: beside necromancer towers
+  - Higher levels give several runes per essence.
+- **The alchemist now sells only the basic runes** (air, water, earth, fire and mind). Chaos, death and blood runes come from monsters or from Runecrafting.
+
 ## RS-73 - Resources and gathering
 
 - **More to gather (needs a pickaxe for the rocks):**
