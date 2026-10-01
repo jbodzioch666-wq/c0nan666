@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-69 - A barber's chair in the tailor's workshop
+
+- **The tailor's workshop in every town now has a real barber's chair**, with a striped pole and a mirror. Walk into it or click it to restyle your hair, beard and war paint, or re-dye your shirt and trousers. Before, the make-over was only a button on the tailor's sale screen and was easy to miss.
+- **There's also a dye vat beside the counter.** Walk into it to dye your armour, robes, capes and shields with the dyes you brew at the loom.
+
 ## RS-68 - Your character, your look
 
 - **Character creator with a live 3D preview.** A new Appearance section on the creation screen shows your character turning slowly. Drag it to turn it yourself. Each part has arrows, and a "random look" button rolls the whole lot.
