@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-72 - Dyes are made at the dye vat
+
+- **Dyes are now brewed at the dye vat**, not the loom. Walk into the vat in any tailor's workshop to brew the nine dyes from herbs, with the usual make 1, x5, x10 or all queue. A "dye your gear" button on the same screen opens the dye works to apply them.
+- **Fixed:** the Crafting 99 superior dragonhide recipes weren't on any bench, so they couldn't be made. They're on the loom now.
+
 ## RS-71 - Salvage removed
 
 - **Salvaging is gone.** You can no longer break gear down into bars, leather or cloth, so crafting materials come only from gathering.
