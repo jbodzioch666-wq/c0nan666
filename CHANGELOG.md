@@ -1,5 +1,15 @@
 # Depthcrawl patch notes
 
+## RS-61 - Window fixes
+
+- **Tooltips always show on top.** Item tooltips no longer hide behind the side panel, quest tracker or other windows.
+- **Resizing works.** The log, side panel and quest tracker each have a resize grip in their bottom-right corner, and the XP tracker can be made wider.
+  - Resizing follows the mouse at any interface size.
+  - It can't push a window off the screen.
+  - New sizes are remembered.
+- **Close the quest tracker** with its new x. Bring it back from the quests tab (F6) with "show the quest tracker".
+- Windows you've moved or resized are nudged back inside the screen if they would hang off an edge, and the quick bar steers around a moved log.
+
 ## RS-60 - UI overhaul
 
 - **Side panel (F1-F6),** RuneScape-style:
