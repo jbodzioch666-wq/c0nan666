@@ -4588,8 +4588,20 @@ function usePotionSlot(){
 // singlePlayerAttack a melee bump uses (real to-hit roll, arrow spent),
 // just aimed at a monster found by range instead of by adjacency. A wasted
 // attempt (nothing in range) costs nothing, same as a wasted spell cast.
-function rangedAttack(){
+// can you hit this monster from where you stand? (a staff's spell reaches 8 tiles, a bow its own range)
+function rangedReachIdx(m){
+  if (!m || !m.alive) return -1;
+  const mi = G.mon.indexOf(m); if (mi<0) return -1;
+  const p = G.player, d = Math.abs(m.x-p.x) + Math.abs(m.y-p.y), w = G.gear.ranged;
+  let range = 0;
+  if (staffSpell()) range = 8;
+  else if (w && w.used && w.range && w.kind!=='wand' && ((p.arrows||0) > 0 || quiverList().length)) range = w.range;
+  else if (!(w && w.used) && G.player.rsSpell && rsCastableSpell()) range = 8;
+  return range && d <= range && hasLineOfSight(p.x, p.y, m.x, m.y) ? mi : -1;
+}
+function rangedAttack(tgt){
   if (G.gameOver) return;
+  const tIdx = tgt ? rangedReachIdx(tgt) : -1;
   if (G.player.stunTurns>0){ consumeStunnedTurn(); return; }
   const w = G.gear.ranged;
   // a magic staff in your hand casts first; the bow takes over only once you're out of runes
@@ -4601,7 +4613,7 @@ function rangedAttack(){
     const sp = rsCastableSpell();
     if (!sp){ G.player.rsNoteAt = 0; rsSpellNote(null); return; }
     if (sp[0]!==G.player.rsSpell){ G.player.rsNoteAt = 0; rsSpellNote(sp, true); }
-    if (!rsCastAt(-1, sp[0])) return;
+    if (!rsCastAt(tIdx, sp[0])) return;
     if (!G.gameOver) tickMonsters();
     saveCurrentGame();
     return;
@@ -4613,7 +4625,7 @@ function rangedAttack(){
     if (!fireWand(w)) return;
   } else if (w.range){
     if ((G.player.arrows||0)<=0 && !ammoAutoLoad()){ logMsg('you have no arrows left', 'hit'); return; }
-    const t = nearestMonsterInRange(w.range);
+    const t = tIdx >= 0 ? tIdx : nearestMonsterInRange(w.range);
     if (t===-1){ logMsg(`no target in range for your ${w.nm}`, ''); return; }
     noteFoe(t);
     isoShot(G.mon[t], 'arrow');
@@ -8995,7 +9007,7 @@ function isoContext(e){
   const { mon, gx, gy } = pk, o = [];
   if (mon){ const nm = `<span class="cm-y">${esc(mon.nm)}</span> <span style="color:${monLevelColor(mon)}">(level ${monCombatLevel(mon)})</span>`;
     o.push({ html:`<b>Attack</b> ${nm}`, fn:()=>isoAct(pk, false) });
-    if (G.gear.ranged && G.gear.ranged.used && G.gear.ranged.range || rsCastableSpell()) o.push({ html:`<b>${G.gear.ranged && G.gear.ranged.used && G.gear.ranged.range ? 'Shoot' : 'Cast at'}</b> ${nm}`, fn:()=>{ G.foeRef = mon; ISO.fighting = mon; rangedAttack(); renderGame(); } });
+    if (G.gear.ranged && G.gear.ranged.used && G.gear.ranged.range || rsCastableSpell()) o.push({ html:`<b>${G.gear.ranged && G.gear.ranged.used && G.gear.ranged.range ? 'Shoot' : 'Cast at'}</b> ${nm}`, fn:()=>{ G.foeRef = mon; ISO.fighting = mon; ISO.path = []; ISO.nextStep = performance.now() + ISO_SWING_MS; rangedAttack(mon); renderGame(); } });
     o.push({ html:`<b>Examine</b> ${nm}`, fn:()=>examineSay(examineMonster(mon)) });
     ctxMenu(e.clientX, e.clientY, mon.nm, o); return; }
   const deco = G.gameMode===1 && G.dungeonDeco && G.dungeonDeco[gx] && SK_CAVE_DECOS.includes(G.dungeonDeco[gx][gy]);
@@ -24101,7 +24113,7 @@ function isoAct(pk, shift){
     const dx = mon.x-p.x, dy = mon.y-p.y;
     ISO.fighting = mon;
     if (Math.abs(dx)+Math.abs(dy)===1){ ISO.path = []; ISO.nextStep = performance.now() + ISO_SWING_MS; isoStep(FACING_VECT.findIndex(v=>v[0]===dx && v[1]===dy)); return; }
-    if (Math.abs(dx)+Math.abs(dy)>1 && (G.gear.ranged && G.gear.ranged.used && G.gear.ranged.range || rsAutocastOn())){ ISO.path = []; rangedAttack(); renderGame(); return; }
+    if (Math.abs(dx)+Math.abs(dy)>1 && rangedReachIdx(mon) >= 0){ ISO.path = []; ISO.nextStep = performance.now() + ISO_SWING_MS; rangedAttack(mon); renderGame(); return; }
     const path = isoFindPath(mon.x, mon.y, true);
     ISO.path = path || []; ISO.target = mon; ISO.nextStep = 0;
     return;
@@ -24147,6 +24159,11 @@ function isoTickFight(now){
   if (p.hp < effMaxHp()*0.2){ ISO.fighting = null; logMsg('you break off the fight - you are badly hurt', 'hit'); renderGame(); return; }
   const dx = m.x-p.x, dy = m.y-p.y;
   if (Math.abs(dx)+Math.abs(dy)===1){ ISO.nextStep = now + ISO_SWING_MS; isoStep(FACING_VECT.findIndex(v=>v[0]===dx && v[1]===dy)); return; }
+  if (rangedReachIdx(m) >= 0){   // a ranged fighter holds their ground and keeps shooting
+    ISO.path = []; ISO.nextStep = now + ISO_SWING_MS;
+    const v = FACING_VECT.findIndex(f=>f[0]===Math.sign(dx) && f[1]===Math.sign(dy)); if (v>=0) p.facing = v;
+    rangedAttack(m); renderGame(); return;
+  }
   const path = isoFindPath(m.x, m.y, true);
   if (!path || path.length > 8){ ISO.fighting = null; return; }
   ISO.path = path; ISO.target = m; ISO.nextStep = now;
@@ -24389,7 +24406,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-65';
+const GAME_VERSION = 'rs-66';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -26305,7 +26322,7 @@ function handlePlayingKey(k){
     case 'g': case 'G': setUi('rsmagic'); break;
     case 'n': case 'N': setUi('prayer'); break;
     case 'q': case 'Q': if (G.gameMode!==0){ usePotionSlot(); renderGame(); } break;
-    case 'r': case 'R': if (G.gameMode!==0){ rangedAttack(); renderGame(); } break;
+    case 'r': case 'R': if (G.gameMode!==0){ rangedAttack(G.foeRef && G.foeRef.alive ? G.foeRef : null); renderGame(); } break;
     case 'i': case 'I': setUi('inventory'); break;
     case 'p': case 'P': G.charSheetInvSel = -1; setUi('charsheet'); break;
     case 'm': case 'M': if (G.gameMode===3) v3Toggle(); else toggleOwZoom(); break;

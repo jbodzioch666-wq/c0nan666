@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-66 - Ranged fighters hold their ground
+
+- **Click a monster with a bow (and arrows) or a magic staff (and runes) and you stand still and keep shooting or casting** for as long as it's in range and in sight. Bows reach their own range, spells 8 tiles. You only walk in when you can't reach it: out of range, out of sight, or out of arrows and runes.
+- **Your shots go at the monster you clicked,** not whichever one is nearest. R and the right-click Shoot/Cast option aim at your current target too.
+
 ## RS-65 - Staff before bow
 
 - **Wielding a magic staff, R casts your spell even with a bow equipped.** It only switches to the bow once you run out of runes for any spell you can cast, and says so once. As soon as you have runes again, R goes back to casting.
