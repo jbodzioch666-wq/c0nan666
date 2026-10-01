@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-65 - Staff before bow
+
+- **Wielding a magic staff, R casts your spell even with a bow equipped.** It only switches to the bow once you run out of runes for any spell you can cast, and says so once. As soon as you have runes again, R goes back to casting.
+- The R slot on the hotbar shows whichever one it will use.
+
 ## RS-64 - Arrows are made, not bought
 
 - **The peddler no longer sells arrows.** You fletch them at the crafting bench, find them as monster drops, or start with them as an Archer.
