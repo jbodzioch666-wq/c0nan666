@@ -83,18 +83,18 @@ _The HUD layout rebuilt once, before more windows are added_
 ### Equipment slots
 _The gear slots, paper doll and stat code_
 
-57. [ ] (172) Boots and gloves slots - split from arms, with their own tiers (climbing boots, dragon boots, barrows gloves)
-58. [ ] (173) Cape slot - obsidian cape, fire cape, Ava's attractor (saves arrows), skill capes
-59. [ ] (174) Ammo slot - arrows, bolts and runes equipped as real items with stats
-60. [ ] (175) Second ring slot or a trinket slot for charms and totems
-61. [ ] (50) Shields as a real choice - one-handed weapon and shield for defence, or a two-handed weapon for damage
-62. [ ] (178) Two-handed and dual wield - off-hand daggers for double hits, two-handers for big single hits
-63. [ ] (379) Mage off-hand - a book or tome for magic accuracy and damage
-64. [ ] (401) Quiver - holds more ammo with a small bonus
-65. [ ] (39) Cosmetic override slots - wear a look item over your real gear
-66. [ ] (10) Set bonuses - full Barrows-style sets do something special
-67. [ ] (441) Prayer bonus on gear - holy items, god robes and blessings slow prayer drain
-68. [ ] (176) Rerolling - spend gold or a rare scroll to reroll one stat on a piece of gear
+57. [x] (172) Boots and gloves slots - split from arms, with their own tiers (climbing boots, dragon boots, barrows gloves)
+58. [x] (173) Cape slot - obsidian cape, fire cape, Ava's attractor (saves arrows), skill capes
+59. [x] (174) Ammo slot - arrows, bolts and runes equipped as real items with stats (arrows as ammo items with ranged strength; bolts come with crossbows, runes stay in the rune pouch)
+60. [x] (175) Second ring slot or a trinket slot for charms and totems
+61. [x] (50) Shields as a real choice - one-handed weapon and shield for defence, or a two-handed weapon for damage
+62. [x] (178) Two-handed and dual wield - off-hand daggers for double hits, two-handers for big single hits
+63. [x] (379) Mage off-hand - a book or tome for magic accuracy and damage
+64. [x] (401) Quiver - holds more ammo with a small bonus
+65. [x] (39) Cosmetic override slots - wear a look item over your real gear
+66. [x] (10) Set bonuses - full Barrows-style sets do something special
+67. [x] (441) Prayer bonus on gear - holy items, god robes and blessings slow prayer drain
+68. [x] (176) Rerolling - spend gold or a rare scroll to reroll one stat on a piece of gear
 
 ### Player model and looks
 _The player 3D model and character creator, including every animation_

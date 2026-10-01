@@ -1,5 +1,30 @@
 # Depthcrawl patch notes
 
+## RS-62 - Equipment slots
+
+- **Five new equipment slots:** feet, cape, off-hand, ammo and trinket. The paper doll and the side panel's equipment tab are laid out RuneScape-style, and every slot drops as loot.
+- **Boots and gloves.** Boots now come in every metal and also as leather, dragonhide and wizard-to-Ahrim's boots, and can be forged at the anvil (1 bar) or crafted. The old arms slot is now Hands.
+- **Capes:**
+  - Red, blue, green and black capes.
+  - The Obsidian cape and the Legends cape.
+  - Saradomin, Guthix and Zamorak god capes: magic and prayer.
+  - Ava's Attractor and Accumulator: save 40% or 60% of your arrows.
+  - The **Fire Cape**: a rare boss drop.
+  - **Skill capes:** reach 99 in any skill and you're given its cape. They become trimmed once you have two 99s.
+- **Ammo.** Arrows are real items now, Bronze to Dragon, with ranged strength. Equipping a bundle adds its arrows to your quiver and loads that arrowhead, so your shots hit harder with better arrows.
+- **Trinkets:** charms and totems with one focused bonus, such as the Rabbit's Foot (gold), Wolf Totem (strength), Hawk Feather, Owl Totem, Bear Claw, Holy Relic (prayer), Lucky Clover (loot), Troll Heart (regeneration), Sage Charm (xp) and Phoenix Feather (life).
+- **Shields or two hands.**
+  - Kiteshields add solid defence alongside a one-handed weapon.
+  - Two-handed weapons (2h swords and halberds) hit 15% harder but leave no room for a shield.
+  - Equipping one takes the other off into your pack.
+- **Dual wield.** Off-hand daggers, swords and scimitars add half their bonuses and give each attack a 30% chance of a second strike.
+- **Mage off-hand.** Tomes from Wizard to Ahrim's add magic accuracy and spell damage %.
+- **Quivers.** The Leather Quiver and Dizana's Quiver, worn in the cape slot, add ranged accuracy and catch some of your arrows.
+- **Cosmetic looks.** Right-click a piece of gear and choose "Wear as a look": your character shows it over your real gear, which still does the work. Remove looks from the equipment tab. Capes and shields now show on your character too.
+- **Set bonuses.** A matching helm, body and legs gives a bonus by tier (defence, ranged or magic), doubled when hands and feet match too. Dragon adds +10% melee damage, Rune +6 attack, Ahrim's +15% spell damage, Black d'hide saves 20% of arrows, and Infinity +6 prayer. The active set shows in the equipment tab.
+- **Prayer bonus.** Holy and Unholy symbols, Monk's robes, Holy Vestments, god capes, skill capes and the Holy Relic carry prayer bonus. Each point makes your prayer points last about 3% longer. Standing at a dungeon altar, right-click an amulet, cape, robe or trinket to **bless** it (+2 prayer).
+- **Reforging.** At the blacksmith, right-click gear and choose Reforge to reroll one of its bonuses between 80% and 130% of the original (costs 15% of its value). The rare **Scroll of Reforging**, a monster drop, does it anywhere for free.
+
 ## RS-61 - Window fixes
 
 - **Tooltips always show on top.** Item tooltips no longer hide behind the side panel, quest tracker or other windows.
