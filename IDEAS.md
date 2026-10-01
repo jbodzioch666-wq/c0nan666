@@ -48,21 +48,21 @@ _The inventory and stash code_
 ### Settings, saves and menus
 _Title, pause, death and settings screens in one go_
 
-30. [ ] (25) Save export and import
-31. [ ] (274) Volume sliders - master, music, effects, ambience, UI
-32. [ ] (295) Graphics quality settings - low, medium, high for shadows, draw distance and effects
-33. [ ] (296) FPS counter in settings
-34. [ ] (202) UI scale slider for small or huge screens
-35. [ ] (203) Compact mode - hide everything but the orbs and hotbar
-36. [ ] (219) Pause menu - resume, settings, key binds, save and quit, separate from help
-37. [ ] (218) Main menu redesign - animated 3D scene with your character, save slots with portrait and play time
-38. [ ] (220) Loading screens with tips and art between areas
-39. [ ] (222) Stats page - kills, deaths, gold earned, play time, damage dealt, longest dungeon run
-40. [ ] (317) Wealth tracker - net worth (gold plus item values) on the stats page
-41. [ ] (318) Loot value - running total of a dungeon run's loot, shown when you leave
-42. [ ] (221) Death screen redesign - cause-of-death recap, what you lost, a return-to-gravestone button
-43. [ ] (28) Death gravestone to return to for your items
-44. [ ] (438) Protect Item prayer - keep one extra item on death
+30. [x] (25) Save export and import
+31. [x] (274) Volume sliders - master, music, effects, ambience, UI (master, effects and interface now; music and ambience sliders come with the music system)
+32. [x] (295) Graphics quality settings - low, medium, high for shadows, draw distance and effects
+33. [x] (296) FPS counter in settings
+34. [x] (202) UI scale slider for small or huge screens
+35. [x] (203) Compact mode - hide everything but the orbs and hotbar
+36. [x] (219) Pause menu - resume, settings, key binds, save and quit, separate from help
+37. [x] (218) Main menu redesign - animated 3D scene with your character, save slots with portrait and play time
+38. [x] (220) Loading screens with tips and art between areas
+39. [x] (222) Stats page - kills, deaths, gold earned, play time, damage dealt, longest dungeon run
+40. [x] (317) Wealth tracker - net worth (gold plus item values) on the stats page
+41. [x] (318) Loot value - running total of a dungeon run's loot, shown when you leave
+42. [x] (221) Death screen redesign - cause-of-death recap, what you lost, a return-to-gravestone button
+43. [x] (28) Death gravestone to return to for your items
+44. [x] (438) Protect Item prayer - keep one extra item on death
 
 ### UI overhaul
 _The HUD layout rebuilt once, before more windows are added_

@@ -1,5 +1,39 @@
 # Depthcrawl patch notes
 
+## RS-58 - Settings, menus, stats and gravestones
+
+- **Pause menu (Esc).** Esc now pauses the game:
+  - Esc: resume
+  - S: settings
+  - L: your stats
+  - H: key binds and legend
+  - X: export your save to a file
+  - Q: save and quit to the title
+- **Settings** are kept in your browser for every adventurer. Open them from the pause menu or the title screen:
+  - **Sound:** on/off, plus master, effects and interface volume sliders.
+  - **Graphics quality:** low (lower resolution, no shadows, fewer particles), medium, or high.
+  - **Frame-rate counter.**
+  - **Loading cards** between places, on or off.
+  - **Interface size:** 70-150%, where every HUD block scales from its own corner.
+  - **Compact mode:** hides everything but the orbs and the hotbar. Press Y to toggle it anywhere.
+- **Save export and import.** Export a save to a .json file from the pause menu or any title-screen slot, and import one from the title screen. An import never overwrites an existing save; it comes in as a copy.
+- **New title screen.** A moving night scene of mountains, a lit keep, stars and rising embers sits behind the menu. Each save slot is a card with a painted portrait in your race's look and the colours of your armour, helm and weapon. Cards also show your combat and total level, gold, where you are, play time and a Hardcore badge.
+- **Loading cards** appear when you enter a dungeon floor, a town or the wilds. Each shows the place's badge, name and floor, plus a gameplay tip.
+- **Stats page (L).**
+  - Combat: kills, deaths, damage dealt and taken, kills per death, most-killed monsters.
+  - Adventure: play time, deepest floor, dungeon runs, longest and best run, items looted and their value, gold earned, towns visited, achievements.
+  - Wealth: coin pouch, worn gear, pack, stash, resources and gravestone, adding up to your **net worth**.
+- **Run summary.** Leaving a dungeon shows the run's floors, time, items found with their value, gold picked up and total loot value, and marks a new best run.
+- **Death redesign - gravestones.** In Standard mode, dying now works like RuneScape:
+  - You keep your worn gear and your 3 most valuable pack items.
+  - The rest of your pack, your loot tray and half your gold go into a gravestone where you fell.
+  - You wake in the nearest town you've visited.
+  - The gravestone shows on the 3D overworld (a headstone under a pale beam), on the world map, and in the quest tracker with a direction arrow and distance.
+  - Walk back to it to take everything back.
+  - Dying again before you reclaim it crumbles the old grave.
+- **New death screen.** It names what killed you and where, lists what you keep and what's in the gravestone (with values), and shows your final moments. G wakes you and walks you straight to your grave on the 3D overworld.
+- **Protect Item prayer (Prayer 25).** While it's active, you keep a 4th item when you die.
+
 ## RS-57 - Inventory management
 
 - **Lock items (L).** A locked item can't be sold or salvaged, and bulk actions and the loot filter skip it. It shows an amber LOCKED tag.
