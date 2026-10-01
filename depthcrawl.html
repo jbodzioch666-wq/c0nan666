@@ -4342,7 +4342,7 @@ function continueAfterDeath(walkToGrave){
   renderGame();
   saveCurrentGame();
 }
-function deathKeepCount(){ return 3 + ((G.player.prayers||[]).includes('protitem') ? 1 : 0); }
+function deathKeepCount(){ return 3 + ((G.player.prayers||[]).some(x=>x==='protitem' || x==='cprotitem') ? 1 : 0); }
 function deathSplit(){
   const p = G.player, n = deathKeepCount();
   const pack = G.inv.concat(p.lootHold||[]).map(it=>({ it, v:itemPrice(it) })).sort((a,b)=>b.v-a.v);
@@ -5709,13 +5709,14 @@ function singleAttackRoll(mi, missVerb, hitVerb){
   // attack bonus makes it swing worse while it's active
   const debuffedAtk = m.atkBonus - ((m.debuffAtkTurns>0) ? (m.debuffAtkAmt||0) : 0);
   const mstyle = rsMonStyle(m);
-  const mtotal = mroll + debuffedAtk + 2*rsTriangle(mstyle, rsArmourStyle());
+  const mtotal = mroll + debuffedAtk + 2*rsTriangle(mstyle, rsArmourStyle()) - rsSapPenalty(mstyle);
   const ac = rsFrac(playerACExact());
   if (mroll===1 || mtotal < ac){
     logMsg(`the ${m.nm} ${missVerb} but misses (${mtotal} vs AC ${ac})`, ''); fxSplat(G.player.x+0.5, G.player.y+0.5, '0', 'block');
     return false;
   }
   let mdmg = mx(1, rollDice(m.dmg1,m.dmg2));
+  if (m.weakTurns>0) mdmg = mx(1, Math.round(mdmg*(m.weakAmt||0.75)));
   let tag = '';
   if (hasAbility(m,'surpriseAttack') && !m.usedSurprise){
     m.usedSurprise = true;
@@ -5727,14 +5728,15 @@ function singleAttackRoll(mi, missVerb, hitVerb){
     tag += ' (fighting alongside an ally)';
   }
   mdmg = mitigate(mdmg);
-  const prot = { melee:'pmel', ranged:'prng', magic:'pmag' }[mstyle];
-  if (rsPrayOn(prot)){ mdmg = Math.floor(mdmg*0.4); tag += ' (your prayer shields you)'; }
+  const prot = rsProtFor(mstyle), raw0 = mdmg;
+  if (prot){ mdmg = Math.floor(mdmg*0.4); tag += prot.reflect ? ' (deflected)' : ' (your prayer shields you)'; }
   // Barbarian Rage: half damage taken from most attacks while raging
   if (G.player.rageTurns>0){ mdmg = mx(1, Math.floor(mdmg/2)); tag += ' (raging - damage halved)'; }
   G.player.hp -= mdmg;
   fxSplat(G.player.x+0.5, G.player.y+0.5, mdmg, 'taken');
   logMsg(`the ${m.nm} ${hitVerb} you for ${mdmg}${tag}`, 'hit');
   sfx('playerHurt');
+  if (rsAfterHurt(m, mi, mdmg, prot && prot.reflect ? Math.max(1, Math.round(raw0*prot.reflect)) : 0)){ if (G.player.hp<=0 && !checkDeathWard()) playerDies(m.nm); return true; }
   if (hasAbility(m,'poison')){
     applyPoisonToPlayer(1+rn(4));
     logMsg(`the ${m.nm}'s sting leaves poison burning in your veins`, 'hit');
@@ -6477,6 +6479,7 @@ function tickMonsters(excludeIdx){
     // monster's own turn, exactly like the player's status effects above
     if (m.debuffACTurns>0) m.debuffACTurns--;
     if (m.debuffAtkTurns>0) m.debuffAtkTurns--;
+    if (m.weakTurns>0) m.weakTurns--;
     if (m.frightenedTurns>0) m.frightenedTurns--; // Fear - it flees rather than closing in, see the movement block below
     if (m.silencedTurns>0) m.silencedTurns--; // Silence - blocks its spellcast ability while active
     if (m.polymorphTurns>0){
@@ -6568,6 +6571,8 @@ function tickMonsters(excludeIdx){
       }
     }
 
+    // held by Bind, Snare, Entangle, a grasp or ice: it can't step, but still strikes if you're beside it
+    if (m.rootTurns>0){ m.rootTurns--; if (dist===1) monsterAttacks(i); continue; }
     const fleeing = (hasAbility(m,'nimbleEscape') && m.hp < m.maxHp*0.25) || (m.frightenedTurns>0); // Fear - it runs from you rather than closing in
     let dx=0, dy=0;
     if (dist<=5){
@@ -6598,6 +6603,7 @@ function tickMonsters(excludeIdx){
   // tickSummonDuration runs even if there's no summon out (a no-op), so
   // this is safe to call unconditionally every turn
   if (!G.gameOver) summonMove();
+  if (!G.gameOver) try{ rsThrallAct(); }catch(e){ console.error(e); }
   if (!G.gameOver) summonAttack();
   tickSummonDuration();
   // true "Legendary" Monster Manual stat blocks (adult/ancient dragons, the
@@ -8875,7 +8881,9 @@ function skGainXP(k, amount, mastery){
 // skills you've trained this session - xp gained, xp an hour, and how far to the next level
 // ---- buff and debuff bar: every timed effect on the player plus active
 // prayers, as small icons under the player plate with turns left ----
-const PRAY_ICON = { def:['\u25C6','#6fa8dc'], str:['\u270A','#e06666'], att:['\u2694','#f1c232'], rng:['\u27B6','#6aa84f'], mag:['\u2726','#8e7cc3'], heal:['\u2665','#93c47d'], item:['\u2756','#e8d8a0'], piety:['\u271D','#ffd966'], rigour:['\u27B9','#9fe08a'] };
+const PRAY_ICON = { def:['\u25C6','#6fa8dc'], str:['\u270A','#e06666'], att:['\u2694','#f1c232'], rng:['\u27B6','#6aa84f'], mag:['\u2726','#8e7cc3'], heal:['\u2665','#93c47d'], item:['\u2756','#e8d8a0'], piety:['\u271D','#ffd966'], rigour:['\u27B9','#9fe08a'], augury:['\u2735','#b8a0ff'], redemp:['\u2764','#ff9a9a'],
+  sapw:['\u2694','#a070c0'], sapr:['\u27B6','#a070c0'], sapm:['\u2726','#a070c0'], latt:['\u2694','#c05050'], lrng:['\u27B6','#c05050'], lmag:['\u2726','#c05050'], ldef:['\u25C6','#c05050'], lstr:['\u270A','#c05050'],
+  soul:['\u2742','#e04a8a'], turmoil:['\u2620','#e05030'] };
 const PROT_ICON = { magic:['\u2726','#8e7cc3'], ranged:['\u27B6','#6aa84f'], melee:['\u2694','#e06666'] };
 function buffList(){
   const p = G.player, out = []; if (!p) return out;
@@ -8890,7 +8898,7 @@ function buffList(){
   if (p.agathysTurns>0) add('\u2744', '#a4d8f0', p.agathysTurns, 'Frost armour', `${p.agathysDmg||0} cold damage back to melee attackers`);
   if (p.deathWardCharges>0) add('\u2625', '#ffe599', 0, 'Death ward', 'the next fatal hit leaves you at 1 life instead');
   for (const id of p.prayers||[]){
-    const pr = RS_PRAYERS.find(x=>x.id===id); if (!pr) continue;
+    const pr = RS_ALLPRAY().find(x=>x.id===id); if (!pr) continue;
     const [ic, col] = pr.grp==='prot' ? PROT_ICON[pr.prot] : (PRAY_ICON[pr.grp]||['\u271D','#ffd966']);
     add(ic, col, 0, pr.nm, `Prayer: ${pr.d} (drains ${pr.drain} points a turn in a fight; ${Math.floor(p.prayPts||0)} points left)`, false);
     out[out.length-1].pray = true;
@@ -8952,7 +8960,7 @@ function spBody(tab){
   }
   if (tab==='prayer'){
     const L = rsLvl('prayer'), qp = p.quickPrayers||[];
-    const cells = RS_PRAYERS.map(pr=>{ const g = prayerGlyph(pr), on = (p.prayers||[]).includes(pr.id), ok = L >= pr.lvl, q = qp.includes(pr.id);
+    const cells = prayList().map(pr=>{ const g = prayerGlyph(pr), on = (p.prayers||[]).includes(pr.id), ok = L >= pr.lvl, q = qp.includes(pr.id);
       return `<div class="sp-pr${on ? ' on' : ''}${ok ? '' : ' locked'}${SP.qpSetup && q ? ' qp' : ''}" data-sp-pray="${pr.id}" draggable="${ok}" title="${esc(pr.nm)} (Prayer ${pr.lvl}) - ${esc(pr.d)}" style="--pc:${g.col}"><span>${g.ic}</span></div>`; }).join('');
     return `<div class="sp-bar"><i data-bar="sp-pray" style="width:${L ? (p.prayPts||0)/L*100 : 0}%"></i><span>${Math.ceil(p.prayPts||0)} / ${L} prayer points</span></div>
       <div class="sp-note">${SP.qpSetup ? '<b style="color:#ffd24a">choosing quick prayers</b> - click prayers to add or remove them' : 'click to pray &middot; the prayer orb turns on your quick prayers'}</div>
@@ -8961,9 +8969,9 @@ function spBody(tab){
   }
   if (tab==='spells'){
     const L = rsLvl('magic');
-    const cells = RS_SPELLS.map(sp=>{ const ok = L >= sp[2], sel = p.rsSpell===sp[0], c = rsCastsLeft(sp);
-      return `<div class="sp-spl${sel ? ' on' : ''}${ok ? '' : ' locked'}" data-sp-spell="${sp[0]}" draggable="${ok}" data-tipspell="${sp[0]}">${hbIcon('spell', { col:ISO_ELEM_COL[sp[6]] })}${ok ? `<b class="${c<=5 ? 'low' : ''}">${c===Infinity ? '&infin;' : c}</b>` : `<b>${sp[2]}</b>`}</div>`; }).join('');
-    return `<div class="sp-note">click to pick the spell R casts &middot; ${rsAutocastOn() ? 'autocast on' : 'autocast off'} (spellbook, G)</div><div class="sp-spg">${cells}</div>`;
+    const cells = rsBookSpells().map(sp=>{ const ok = L >= sp[2], sel = p.rsSpell===sp[0], c = rsCastsLeft(sp);
+      return `<div class="sp-spl${sel ? ' on' : ''}${ok ? '' : ' locked'}" data-sp-spell="${sp[0]}" draggable="${ok}" data-tipspell="${sp[0]}">${hbIcon('spell', { col:rsSpellCol(sp) })}${ok ? `<b class="${c<=5 ? 'low' : ''}">${c===Infinity ? '&infin;' : c}</b>` : `<b>${sp[2]}</b>`}</div>`; }).join('');
+    return `<div class="sp-note">${RS_BOOKS[rsBook()].nm} &middot; click to pick the spell R casts &middot; right-click to put it on the quick bar (keys 1-9) &middot; ${rsAutocastOn() ? 'autocast on' : 'autocast off'}</div><div class="sp-spg">${cells}</div>`;
   }
   if (tab==='quests'){
     const qs = p.quests||[], tq = trackedQuest();
@@ -9010,8 +9018,8 @@ function spBindEvents(el){
     if (t.dataset.spFood){ eatFood(t.dataset.spFood); renderGame(); return; }
     if (t.dataset.spAmmo!==undefined){ loadAmmo(+t.dataset.spAmmo); hudLayout(); return; }
     if (t.dataset.spPray){ const id = t.dataset.spPray;
-      if (SP.qpSetup){ const q = G.player.quickPrayers || (G.player.quickPrayers = []); const pr = RS_PRAYERS.find(x=>x.id===id);
-        if (q.includes(id)) G.player.quickPrayers = q.filter(x=>x!==id); else if (rsLvl('prayer') >= pr.lvl){ G.player.quickPrayers = q.filter(x=>{ const o = RS_PRAYERS.find(y=>y.id===x); return o && !rsPrayClash(o.grp, pr.grp); }); G.player.quickPrayers.push(id); }
+      if (SP.qpSetup){ const q = G.player.quickPrayers || (G.player.quickPrayers = []); const pr = RS_ALLPRAY().find(x=>x.id===id);
+        if (q.includes(id)) G.player.quickPrayers = q.filter(x=>x!==id); else if (rsLvl('prayer') >= pr.lvl){ G.player.quickPrayers = q.filter(x=>{ const o = RS_ALLPRAY().find(y=>y.id===x); return o && !rsPrayClash(o.grp, pr.grp); }); G.player.quickPrayers.push(id); }
         sfx('click'); saveCurrentGame(); }
       else rsTogglePrayer(id);
       hudLayout(); renderGame(); return; }
@@ -9023,9 +9031,9 @@ function spBindEvents(el){
     const t = e.target.closest('[data-sp-inv],[data-sp-pray],[data-sp-spell],[data-sp-food]'); if (!t) return;
     e.preventDefault(); hideItemTooltip();
     if (t.dataset.spInv!==undefined) invContext(e, +t.dataset.spInv);
-    else if (t.dataset.spPray){ const pr = RS_PRAYERS.find(x=>x.id===t.dataset.spPray), q = G.player.quickPrayers||[];
+    else if (t.dataset.spPray){ const pr = RS_ALLPRAY().find(x=>x.id===t.dataset.spPray), q = G.player.quickPrayers||[];
       ctxMenu(e.clientX, e.clientY, pr.nm, [{ html:`<b>${(G.player.prayers||[]).includes(pr.id) ? 'Deactivate' : 'Activate'}</b> <span class="cm-y">${esc(pr.nm)}</span>`, fn:()=>{ rsTogglePrayer(pr.id); renderGame(); } },
-        { html:`<b>${q.includes(pr.id) ? 'Remove from' : 'Add to'}</b> quick prayers`, fn:()=>{ G.player.quickPrayers = q.includes(pr.id) ? q.filter(x=>x!==pr.id) : q.filter(x=>{ const o = RS_PRAYERS.find(y=>y.id===x); return o && !rsPrayClash(o.grp, pr.grp); }).concat([pr.id]); saveCurrentGame(); hudLayout(); } },
+        { html:`<b>${q.includes(pr.id) ? 'Remove from' : 'Add to'}</b> quick prayers`, fn:()=>{ G.player.quickPrayers = q.includes(pr.id) ? q.filter(x=>x!==pr.id) : q.filter(x=>{ const o = RS_ALLPRAY().find(y=>y.id===x); return o && !rsPrayClash(o.grp, pr.grp); }).concat([pr.id]); saveCurrentGame(); hudLayout(); } },
         { html:`<b>Put on</b> the quick bar`, fn:()=>qbAdd({ t:'prayer', id:pr.id }) }]); }
     else if (t.dataset.spSpell){ const sp = rsSpell(t.dataset.spSpell);
       ctxMenu(e.clientX, e.clientY, sp[1], [{ html:`<b>Cast</b> <span class="cm-y">${esc(sp[1])}</span>`, fn:()=>rsCastFromBook(sp[0]) }, { html:`<b>Select</b> for R`, fn:()=>{ G.player.rsSpell = sp[0]; hudLayout(); } }, { html:`<b>Put on</b> the quick bar`, fn:()=>qbAdd({ t:'spell', id:sp[0] }) }]); }
@@ -9055,6 +9063,7 @@ function invContext(e, i){
   else if (it.consumable || it.kind==='scroll') o.push({ html:`<b>${it.trophy ? 'Admire' : it.lamp ? 'Rub' : it.kind==='scroll' ? 'Read' : 'Drink'}</b> ${nm}`, fn:()=>{ spUseItem(i); renderGame(); hudLayout(); } }, { html:`<b>Put on</b> the quick bar`, fn:()=>qbAdd({ t:'item', nm:it.nm, kind:it.kind||'' }) });
   else o.push({ html:`<b>Wear</b> ${nm}`, fn:sel(invEquip) });
   if (!it.locked) o.push({ html:`<b>Sell</b> ${nm} <span class="muted">(${sellPrice(it)}g)</span>`, fn:sel(invSell) });
+  for (const hi of [true, false]){ const sp = rsSpell(hi ? 'highalch' : 'lowalch'); if (!it.locked && sp && rsBook()==='standard' && rsLvl('magic') >= sp[2]) o.push({ html:`<b>Cast ${sp[1]}</b> on ${nm} <span class="muted">(${rsAlchValue(it, hi)}g)</span>`, fn:()=>{ rsAlch(i, hi); hudLayout(); } }); }
   if (setMatKey(it)) o.push({ html:`<b>Bundle</b> matching ${esc(it.baseMat)} pieces`, fn:sel(invBundle) });
   if (COSMETIC_SLOTS.includes(cosSlot(it))) o.push({ html:`<b>Wear as a look</b> ${nm} <span class="muted">(cosmetic, no stats)</span>`, fn:()=>{ cosmeticWear(i); hudLayout(); } });
   if (dyeable(it) && DYES.some(d=>skHave('dye_'+d[0]) > 0)) o.push({ html:`<b>Dye</b> ${nm}`, fn:()=>openDyeWorks() });
@@ -9070,7 +9079,7 @@ function invContext(e, i){
 // ---- the quick bar: slots 1-9 for spells, prayers, potions, scrolls and food ----
 function qbSlots(){ const p = G.player; if (!p.quickBar || p.quickBar.length!==9) p.quickBar = Array.from({ length:9 }, (_, i)=>(p.quickBar||[])[i]||null); return p.quickBar; }
 function qbAdd(o){ const q = qbSlots(); let i = q.findIndex(x=>!x); if (i<0) i = 8; q[i] = o; notify(`Quick bar slot ${i+1}: ${qbName(o)}`, 'good', 'click'); saveCurrentGame(); hudLayout(); }
-function qbName(o){ if (!o) return ''; if (o.t==='spell'){ const sp = rsSpell(o.id); return sp ? sp[1] : o.id; } if (o.t==='prayer'){ const pr = RS_PRAYERS.find(x=>x.id===o.id); return pr ? pr.nm : o.id; } if (o.t==='food') return crName(o.id); return o.nm; }
+function qbName(o){ if (!o) return ''; if (o.t==='spell'){ const sp = rsSpell(o.id); return sp ? sp[1] : o.id; } if (o.t==='prayer'){ const pr = RS_ALLPRAY().find(x=>x.id===o.id); return pr ? pr.nm : o.id; } if (o.t==='food') return crName(o.id); return o.nm; }
 function qbUse(i){
   const o = qbSlots()[i]; if (!o || G.gameOver) return;
   if (o.t==='spell'){ rsCastFromBook(o.id); return; }
@@ -9080,8 +9089,8 @@ function qbUse(i){
 }
 function qbIcon(o){
   try {
-    if (o.t==='spell'){ const sp = rsSpell(o.id); return hbIcon('spell', { col:ISO_ELEM_COL[sp[6]] }); }
-    if (o.t==='prayer'){ const g = prayerGlyph(RS_PRAYERS.find(x=>x.id===o.id)); return `<span class="ico" style="color:${g.col}">${g.ic}</span>`; }
+    if (o.t==='spell'){ const sp = rsSpell(o.id); return hbIcon('spell', { col:rsSpellCol(sp) }); }
+    if (o.t==='prayer'){ const g = prayerGlyph(RS_ALLPRAY().find(x=>x.id===o.id)); return `<span class="ico" style="color:${g.col}">${g.ic}</span>`; }
     if (o.t==='food') return `<img alt="" src="${dhIcon(obEntry('potion',{col:'#c8843a'}))}">`;
     const it = G.inv.find(x=>x.nm===o.nm) || { consumable:o.kind!=='scroll', kind:o.kind, nm:o.nm };
     return `<img alt="" src="${dhIcon(obItemEntry(it))}">`;
@@ -9130,7 +9139,7 @@ function toggleRun(){ const p = G.player; if (!p || G.gameOver) return; if (!p.r
 function quickPrayerToggle(){
   const p = G.player; if (!p || G.gameOver) return;
   if ((p.prayers||[]).length){ p.prayers = []; logMsg('you stop praying', ''); sfx('miss'); renderGame(); saveCurrentGame(); return; }
-  const q = (p.quickPrayers||[]).filter(id=>{ const pr = RS_PRAYERS.find(x=>x.id===id); return pr && rsLvl('prayer') >= pr.lvl; });
+  const q = (p.quickPrayers||[]).filter(id=>{ const pr = RS_ALLPRAY().find(x=>x.id===id); return pr && rsLvl('prayer') >= pr.lvl; });
   if (!q.length){ SP.open = true; SP.tab = 'prayer'; SP.qpSetup = true; spSave(); notify('Pick your quick prayers in the side panel', 'good', 'click'); hudLayout(); return; }
   if ((p.prayPts||0) <= 0){ logMsg('you have no prayer points left - pray at an altar or rest', 'hit'); sfx('error'); return; }
   for (const id of q) if (!p.prayers.includes(id)) rsTogglePrayer(id);
@@ -9433,7 +9442,7 @@ function skUnlockText(k, L, mastery){
   if (k==='crafting' || k==='fletching'){ const r = crRecipes().filter(r=>r.lvl===L && (r.skill||'crafting')===k); return r.length ? ` - you can now ${k==='fletching' ? 'fletch' : 'craft'} ${[...new Set(r.map(r=>r.row.toLowerCase()))].join(', ')}` : ''; }
   if (k==='runecrafting'){ const t = Object.keys(RC_ALTARS).find(t=>RC_ALTARS[t].lvl===L); return t ? ` - you can now bind ${rsRuneName(t).toLowerCase()}s` : ''; }
   if (k==='magic'){ const sp = RS_SPELLS.find(s=>s[2]===L); return sp ? ` - you can now cast ${sp[1]}` : ''; }
-  if (k==='prayer'){ const pr = RS_PRAYERS.find(s=>s.lvl===L); return pr ? ` - you can now use ${pr.nm}` : ''; }
+  if (k==='prayer'){ const pr = RS_ALLPRAY().find(s=>s.lvl===L); return pr ? ` - you can now use ${pr.nm}` : ''; }
   if (k==='attack'){ const m = RS_METALS.find(s=>s[1]===L); return m ? ` - you can now wield ${m[0].toLowerCase()} weapons` : ''; }
   if (k==='defence'){ const m = RS_METALS.find(s=>s[1]===L); return m ? ` - you can now wear ${m[0].toLowerCase()} armour` : ''; }
   if (k==='ranged'){ const b = RS_BOWS.find(s=>s[1]===L && s[0]); return b ? ` - you can now use ${b[0].toLowerCase()} bows` : ''; }
@@ -9531,7 +9540,7 @@ function skGuideRows(k){
   if (k==='runecrafting') for (const t in RC_ALTARS) add(RC_ALTARS[t].lvl, `${rsRuneName(t)}s at the ${t} altar - ruins ${RC_WHERE[t]}`);
   if (k==='crafting' || k==='fletching'){ const by = {}; for (const r of crRecipes()) if ((r.skill||'crafting')===k) (by[r.lvl] = by[r.lvl] || new Set()).add(r.row + (r.book ? ' (needs a recipe book)' : ''));
     Object.keys(by).forEach(l=>add(+l, [...by[l]].join(', '))); }
-  if (k==='magic') RS_SPELLS.forEach(sp=>add(sp[2], `cast ${sp[1]}`));
+  if (k==='magic') RS_SPELLS.forEach(sp=>add(sp[2], `cast ${sp[1]}${sp[7] && sp[7].book ? ' ('+RS_BOOKS[sp[7].book].nm+')' : ''}`));
   if (k==='prayer') RS_PRAYERS.forEach(pr=>add(pr.lvl, `${pr.nm}: ${pr.d}`));
   if (k==='attack') RS_METALS.forEach(m=>add(m[1], `wield ${m[0].toLowerCase()} weapons`));
   if (k==='defence') RS_METALS.forEach(m=>add(m[1], `wear ${m[0].toLowerCase()} armour`));
@@ -10297,6 +10306,7 @@ function crOnKill(m){
     if (chn(boss ? 0.08 : /dragon|wyvern|drake/.test(nm) ? 0.03 : deep>=6 ? 0.004 : 0)) lootRareWeapon(crDragonWeapon(), `the ${m.nm} drops a dragon weapon`);
     if (/demon|fiend|abyss/.test(nm) && chn(boss ? 0.05 : 0.006)) lootRareWeapon(crWhip(), `the ${m.nm} drops an abyssal whip`);
     { const fb = famousBowDrop(m, nm, boss, deep); if (fb) lootRareWeapon(rsMakeFamousBow(fb), `the ${m.nm} drops a famous bow`); }
+    rsTabletDrop(m, boss, deep);
     if (/serpent|snake|hydra|naga|wyvern/.test(nm) && chn(0.06)){ skAdd('venomgland', 1); logMsg(`you cut a venom gland from the ${m.nm}`, 'loot'); } }
 }
 function crLearn(idx){
@@ -10490,6 +10500,7 @@ function rcCraft(type){
   const L = skLvl('runecrafting'), n = skHave('essence');
   if (L < a.lvl){ logMsg(`you need Runecrafting level ${a.lvl} to bind ${rsRuneName(type).toLowerCase()}s`, 'hit'); renderGame(); return; }
   if (!n){ logMsg('you have no rune essence - mine it from essence rocks out in the wild', 'hit'); renderGame(); return; }
+  if (G.player.rcCombo && rcComboCraft(type)) return;
   let made = n*rcPer(type); for (let i=0;i<n;i++) if (chn(skPerk('runecrafting', 'xtra'))) made++;
   skAdd('essence', -n); skAdd('r_'+type, made); skGainXP('runecrafting', a.xp*n);
   logMsg(`you bind ${n} rune essence at the ${type} altar - ${made} ${rsRuneName(type).toLowerCase()}s`, 'good'); sfx('spell');
@@ -10895,7 +10906,7 @@ function rsGearSum(f){
   return t;
 }
 function rsPrayOn(id){ return !!(G.player && G.player.prayers && G.player.prayers.includes(id)); }
-function rsPrayBonus(f){ let t = 0; if (!G.player || !G.player.prayers) return 0; for (const id of G.player.prayers){ const pr = RS_PRAYERS.find(p=>p.id===id); if (pr && pr[f]) t += pr[f]; } return t; }
+function rsPrayBonus(f){ let t = 0; if (!G.player || !G.player.prayers) return 0; for (const id of G.player.prayers){ const pr = RS_ALLPRAY().find(p=>p.id===id); if (pr && pr[f]) t += pr[f]; } return t; }
 
 // ---- the numbers that feed the dice ----
 // Gear carries RuneScape-style bonuses (a bronze scimitar is attack +7 and
@@ -11060,7 +11071,8 @@ function alchBuyExtra(what){
 function alchExtrasHtml(){
   return `<div class="panel" style="margin-top:14px;"><h4 style="color:${COL.green};">POISONS AND CURES</h4>
     <div class="shoprow"><span></span><span>Antipoison</span><span class="desc">cures poison and wards it off for a while</span><span><button class="btn" onclick="alchBuyExtra('anti')">${repPrice(60)}g</button></span></div>
-    <div class="shoprow"><span></span><span>Weapon Poison</span><span class="desc">coat a stabbing or slashing weapon (stronger ones you brew yourself)</span><span><button class="btn" onclick="alchBuyExtra('wp')">${repPrice(150)}g</button></span></div></div>`;
+    <div class="shoprow"><span></span><span>Weapon Poison</span><span class="desc">coat a stabbing or slashing weapon (stronger ones you brew yourself)</span><span><button class="btn" onclick="alchBuyExtra('wp')">${repPrice(150)}g</button></span></div></div>
+    ${rsGodStaffShopHtml()}`;
 }
 // enchanted arrows: gem-tipped arrows with a gem's power woken in them by a spell
 const ARROW_ENCH = [
@@ -11119,6 +11131,7 @@ function playerAC(){ return Math.round(playerACExact()); }
 // xp for a hit that landed: the style's skill gets 4 per damage, Hitpoints 1.33
 function rsHitXP(dmg, type){
   if (!G.player || dmg<=0) return;
+  if (rsPrayOn('soul')){ const h = Math.min(effMaxHp() - G.player.hp, Math.max(1, Math.round(dmg/5))); if (h > 0) G.player.hp += h; }
   G.player.rsLastType = type;
   const st = rsStyle().id;
   const xp = dmg*RS_XP_PER_DMG;
@@ -11780,7 +11793,12 @@ function rsApplyKit(ki){
 const RS_RUNES = [
   ['air','Air Rune','#d8e0e8',4],['water','Water Rune','#4a8ae0',4],['earth','Earth Rune','#8a6a3a',4],['fire','Fire Rune','#e05a2a',4],
   ['mind','Mind Rune','#e0a040',3],['chaos','Chaos Rune','#e0c040',40],['death','Death Rune','#a0a0a0',90],['blood','Blood Rune','#c02a2a',180],
+  ['nature','Nature Rune','#3ac050',60],['astral','Astral Rune','#e8d8f0',80],['soul','Soul Rune','#b8a8e0',220],
+  ['mist','Mist Rune','#b8d0f0',30],['dust','Dust Rune','#c8b890',30],['mud','Mud Rune','#7a6040',30],['smoke','Smoke Rune','#a09890',30],['steam','Steam Rune','#d0e0f0',30],['lava','Lava Rune','#e0682a',30],
 ];
+// combination runes stand in for one of each of their two elements
+const RS_COMBO = { mist:['air','water'], dust:['air','earth'], mud:['water','earth'], smoke:['air','fire'], steam:['water','fire'], lava:['earth','fire'] };
+const RS_COMBO_LV = { mist:6, dust:10, mud:13, smoke:15, steam:19, lava:23 };
 function rsRuneName(r){ const e = RS_RUNES.find(x=>x[0]===r); return e ? e[1] : r; }
 // id, name, Magic level, max hit (RuneScape's), runes, base xp, element
 const RS_SPELLS = [
@@ -11808,18 +11826,39 @@ const RS_SPELLS = [
 function rsSpell(id){ return RS_SPELLS.find(s=>s[0]===id); }
 function rsStaffElem(){ const w = G.gear.weapon; return w && w.used && w.rsElem; }
 function rsStaffElems(){ const w = G.gear.weapon; return w && w.used ? [w.rsElem, w.rsElem2].filter(Boolean) : []; }
-function rsRunesOk(sp){ const els = rsStaffElems(); for (const r in sp[4]) if (!els.includes(r) && skHave('r_'+r) < sp[4][r]) return false; return true; }
-function rsSpendRunes(sp){ const els = rsStaffElems(); for (const r in sp[4]) if (!els.includes(r)) skAdd('r_'+r, -sp[4][r]); }
-function rsSpellMax(sp){ return Math.round((Math.round(sp[3]*1.5) + Math.floor(rsEff('magic')/10) + rsGearSum('magDmg')) * (1 + rsGearSum('magDmgPct')/100)); }
-function rsCastsLeft(sp){ const els = rsStaffElems(); let c = Infinity; for (const r in sp[4]) if (!els.includes(r)) c = Math.min(c, Math.floor(skHave('r_'+r)/sp[4][r])); return c; }
-function rsSpellCastable(sp){ return rsLvl('magic') >= sp[2] && rsRunesOk(sp); }
+// which runes a cast (or `mult` casts) would use: pure runes first, then combination runes,
+// each of which covers one of both its elements. null = not enough
+function rsRunePlan(sp, mult){
+  mult = mult || 1; const els = rsStaffElems(), need = {}, spend = {};
+  for (const r in sp[4]) if (!els.includes(r)) need[r] = sp[4][r]*mult;
+  for (const r in need){ const u = Math.min(need[r], skHave('r_'+r)); if (u > 0){ spend[r] = u; need[r] -= u; } }
+  for (const pass of [0, 1]) for (const c in RS_COMBO){
+    const [a, b] = RS_COMBO[c], na = need[a]||0, nb = need[b]||0, h = skHave('r_'+c) - (spend[c]||0);
+    if (h <= 0 || (!na && !nb)) continue;
+    const u = pass===0 ? (na && nb ? Math.min(h, na, nb) : 0) : Math.min(h, Math.max(na, nb)); if (u <= 0) continue;
+    spend[c] = (spend[c]||0) + u; if (a in need) need[a] = Math.max(0, na - u); if (b in need) need[b] = Math.max(0, nb - u);
+  }
+  for (const r in need) if (need[r] > 0) return null;
+  return spend;
+}
+function rsRunesOk(sp){ return !!rsRunePlan(sp); }
+function rsSpendRunes(sp){ const pl = rsRunePlan(sp); if (pl) for (const r in pl) skAdd('r_'+r, -pl[r]); }
+function rsSpellMax(sp){ return Math.round((Math.round(sp[3]*1.5) + Math.floor(rsEff('magic')/10) + rsGearSum('magDmg') + rsGodBonus(sp)) * (1 + rsGearSum('magDmgPct')/100)); }
+function rsCastsLeft(sp){
+  const els = rsStaffElems(); if (!Object.keys(sp[4]).some(r=>!els.includes(r))) return Infinity;
+  if (!rsRunePlan(sp, 1)) return 0;
+  let lo = 1, hi = 2; while (hi < 20000 && rsRunePlan(sp, hi)){ lo = hi; hi *= 2; }
+  while (hi - lo > 1){ const mid = (lo + hi) >> 1; if (rsRunePlan(sp, mid)) lo = mid; else hi = mid; }
+  return lo;
+}
+function rsSpellCastable(sp){ return rsLvl('magic') >= sp[2] && !rsSpellBlock(sp) && rsRunesOk(sp); }
 // the spell a cast actually uses: the one you picked, or - when you're out of a rune it needs -
 // the strongest spell you can still cast (a Staff of Fire covers fire runes, but every combat
 // spell also costs air, as in RuneScape). null when nothing can be cast at all
 function rsCastableSpell(){
   const p = G.player, sel = rsSpell(p.rsSpell);
   if (sel && rsSpellCastable(sel)) return sel;
-  let best = null; for (const sp of RS_SPELLS) if (rsSpellCastable(sp)) best = sp;
+  let best = null; for (const sp of RS_SPELLS) if (rsSpellCombat(sp) && rsSpellCastable(sp)) best = sp;
   return best;
 }
 // why a spell can't be cast right now, in words
@@ -11857,6 +11896,277 @@ function rsSpellNote(sp, fellBack){
   else if (!sp) logMsg(`you have no runes for any spell${sel ? ` - ${sel[1]} needs ${rsMissingRunes(sel).join(', ')}` : ''}${el && el!=='air' ? `. Your staff only supplies ${el} runes; every combat spell also needs air runes (monsters drop them, the alchemist sells them)` : ''}`, 'hit');
 }
 // ---- ranged mode: bow or magic. R switches it; clicks, auto-combat and Shoot/Cast use it ----
+// ===================== magic and prayer: more spells, four spellbooks, alchemy, combination runes, thralls, curses =====================
+// [id, name, Magic level, max hit, runes, xp, element, { book, k: cc|self|alch, aoe, fx, god, demon, d }]
+RS_SPELLS.push(
+  // crowd control (standard)
+  ['confuse','Confuse',          3, 0, {water:3, earth:2, mind:1},       13, 'water', { k:'cc', cc:'acc', turns:6, d:'its aim falls by 2 for 6 turns' }],
+  ['weaken','Weaken',            11, 0, {water:3, earth:2, mind:1},      21, 'earth', { k:'cc', cc:'weak', turns:6, d:'it hits a quarter softer for 6 turns' }],
+  ['curse','Curse',              19, 0, {water:2, earth:3, mind:1},      29, 'earth', { k:'cc', cc:'def', turns:6, amt:2, d:'its armour falls by 2 for 6 turns' }],
+  ['bind','Bind',                20, 0, {earth:3, water:3, nature:2},    30, 'nature', { k:'cc', cc:'root', turns:3, d:'roots it in place for 3 turns (it still strikes if you stand beside it)' }],
+  ['lowalch','Low Level Alchemy',21, 0, {fire:3, nature:1},              31, 'fire', { k:'alch', d:'turns an item into 40% of its worth in gold, anywhere' }],
+  ['snare','Snare',              50, 2, {earth:4, water:4, nature:3},    60, 'nature', { k:'cc', cc:'root', turns:5, d:'roots it for 5 turns and hurts it a little' }],
+  ['highalch','High Level Alchemy',55, 0, {fire:5, nature:1},            65, 'fire', { k:'alch', d:'turns an item into 60% of its worth in gold' }],
+  ['sarastrike','Saradomin Strike',60, 20, {air:4, fire:2, blood:2},     61, 'sara', { god:'sara', d:'a pillar of holy light that saps the foe\'s aim - needs the Saradomin staff' }],
+  ['guthclaws','Claws of Guthix',60, 20, {air:4, fire:1, blood:2},       61, 'guthix', { god:'guthix', d:'great claws that tear its armour away - needs the Guthix staff' }],
+  ['zamflames','Flames of Zamorak',60, 20, {air:1, fire:4, blood:2},     61, 'zammy', { god:'zammy', d:'hellfire that keeps burning - needs the Zamorak staff' }],
+  ['vulner','Vulnerability',     66, 0, {earth:5, water:5, soul:1},      76, 'earth', { k:'cc', cc:'def', turns:8, amt:4, d:'its armour falls by 4 for 8 turns' }],
+  ['enfeeble','Enfeeble',        73, 0, {earth:8, water:8, soul:1},      83, 'earth', { k:'cc', cc:'weak', turns:8, amt:0.6, d:'it hits 40% softer for 8 turns' }],
+  ['entangle','Entangle',        79, 5, {earth:5, water:5, nature:4},    89, 'nature', { k:'cc', cc:'root', turns:8, d:'roots it for 8 turns' }],
+  ['stun','Stun',                80, 0, {earth:12, water:12, soul:1},    90, 'water', { k:'cc', cc:'stun', turns:2, d:'it reels and loses 2 turns, its aim shaken after' }],
+  // Ancient Magicks: rushes hit one, bursts and barrages a whole group (for more runes)
+  ['smokerush','Smoke Rush',     50, 13, {fire:1, air:1, chaos:2, death:2}, 30, 'smoke', { book:'ancient', fx:'poison' }],
+  ['shadowrush','Shadow Rush',   52, 14, {air:1, chaos:2, death:2, soul:1}, 31, 'shadow', { book:'ancient', fx:'acc' }],
+  ['bloodrush','Blood Rush',     56, 15, {blood:1, chaos:2, death:2},    33, 'blood', { book:'ancient', fx:'heal' }],
+  ['icerush','Ice Rush',         58, 16, {water:2, chaos:2, death:2},    34, 'ice', { book:'ancient', fx:'freeze', root:3 }],
+  ['smokeburst','Smoke Burst',   62, 17, {fire:2, air:2, chaos:4, death:2}, 36, 'smoke', { book:'ancient', aoe:1, fx:'poison' }],
+  ['shadowburst','Shadow Burst', 64, 18, {air:1, chaos:4, death:2, soul:2}, 37, 'shadow', { book:'ancient', aoe:1, fx:'acc' }],
+  ['bloodburst','Blood Burst',   68, 21, {blood:2, chaos:4, death:2},    39, 'blood', { book:'ancient', aoe:1, fx:'heal' }],
+  ['iceburst','Ice Burst',       70, 22, {water:4, chaos:4, death:2},    40, 'ice', { book:'ancient', aoe:1, fx:'freeze', root:4 }],
+  ['smokeblitz','Smoke Blitz',   74, 23, {fire:2, air:2, death:2, blood:2}, 42, 'smoke', { book:'ancient', fx:'poison' }],
+  ['shadowblitz','Shadow Blitz', 76, 24, {air:2, death:2, blood:2, soul:2}, 43, 'shadow', { book:'ancient', fx:'acc' }],
+  ['bloodblitz','Blood Blitz',   80, 25, {blood:4, death:2},             45, 'blood', { book:'ancient', fx:'heal' }],
+  ['iceblitz','Ice Blitz',       82, 26, {water:3, death:2, blood:2},    46, 'ice', { book:'ancient', fx:'freeze', root:5 }],
+  ['smokebarrage','Smoke Barrage',86, 27, {fire:4, air:4, death:4, blood:2}, 48, 'smoke', { book:'ancient', aoe:1, fx:'poison' }],
+  ['shadowbarrage','Shadow Barrage',88, 28, {air:4, death:4, blood:2, soul:3}, 48, 'shadow', { book:'ancient', aoe:1, fx:'acc' }],
+  ['bloodbarrage','Blood Barrage',92, 29, {death:4, blood:4, soul:1},   51, 'blood', { book:'ancient', aoe:1, fx:'heal' }],
+  ['icebarrage','Ice Barrage',   94, 30, {water:6, death:4, blood:2},    52, 'ice', { book:'ancient', aoe:1, fx:'freeze', root:6 }],
+  // Lunar: healing and support
+  ['cureme','Cure Me',           30, 0, {astral:1, earth:2},             35, 'astral', { book:'lunar', k:'self', fx:'cure', d:'cures poison' }],
+  ['healself','Heal Self',       40, 0, {astral:2, water:4, earth:4},    50, 'astral', { book:'lunar', k:'self', fx:'heal', d:'heals a quarter of your life' }],
+  ['statrestore','Stat Restore', 50, 0, {astral:2, water:3, earth:3},    60, 'astral', { book:'lunar', k:'self', fx:'restore', d:'shakes off fear and slows, and gives back 10 prayer points' }],
+  ['vengeance','Vengeance',      85, 0, {astral:4, death:2, earth:10},   112, 'astral', { book:'lunar', k:'self', fx:'veng', d:'the next blow you take, three quarters of it goes back to whoever struck it' }],
+  // Arceuus: grasps, demonbane and thralls
+  ['ghostgrasp','Ghostly Grasp', 35, 12, {air:4, chaos:1},               22, 'arceuus', { book:'arceuus', fx:'root', root:2 }],
+  ['infdemonbane','Inferior Demonbane',44, 16, {fire:4, chaos:1},        27, 'fire', { book:'arceuus', demon:1, d:'only harms demons - and harms them a quarter more' }],
+  ['lesserthrall','Resurrect Lesser Thrall',38, 0, {air:10, mind:10},     55, 'arceuus', { book:'arceuus', k:'self', fx:'thrall', power:3, d:'a ghostly thrall fights beside you for 25 turns (up to 3 a hit)' }],
+  ['skelgrasp','Skeletal Grasp', 56, 17, {earth:8, death:1},             33, 'arceuus', { book:'arceuus', fx:'root', root:3 }],
+  ['supthrall','Resurrect Superior Thrall',57, 0, {air:10, chaos:5, soul:1}, 70, 'arceuus', { book:'arceuus', k:'self', fx:'thrall', power:6, d:'a skeletal thrall fights beside you for 25 turns (up to 6 a hit)' }],
+  ['supdemonbane','Superior Demonbane',62, 23, {fire:8, soul:1},         36, 'fire', { book:'arceuus', demon:1, d:'only harms demons - and harms them a quarter more' }],
+  ['grthrall','Resurrect Greater Thrall',76, 0, {fire:10, blood:1, soul:1}, 88, 'arceuus', { book:'arceuus', k:'self', fx:'thrall', power:10, d:'a zombie thrall fights beside you for 25 turns (up to 10 a hit)' }],
+  ['undgrasp','Undead Grasp',    79, 24, {fire:12, blood:1},             46, 'arceuus', { book:'arceuus', fx:'root', root:4 }],
+  ['darkdemonbane','Dark Demonbane',82, 30, {fire:12, soul:2},           43, 'fire', { book:'arceuus', demon:1, d:'only harms demons - and harms them a quarter more' }]
+);
+const RS_BOOKS = {
+  standard: { nm:'Standard Spellbook', d:'strikes to surges, crowd control, god spells and alchemy' },
+  ancient:  { nm:'Ancient Magicks', d:'smoke, shadow, blood and ice: rushes, bursts, blitzes and barrages', need:()=>G.player.ancientKnown && rsLvl('magic')>=50, how:'find an ancient tablet (the bosses of crypts, graveyards and necromancer towers carry them) and reach Magic 50' },
+  lunar:    { nm:'Lunar Spellbook', d:'healing and support: Cure Me, Heal Self, Stat Restore, Vengeance', need:()=>rsLvl('magic')>=65 && rsLvl('defence')>=40, how:'Magic 65 and Defence 40' },
+  arceuus:  { nm:'Arceuus Spellbook', d:'grasps that root, demonbane, and thralls that fight beside you', need:()=>rsLvl('magic')>=30, how:'Magic 30' },
+};
+function rsBook(){ const b = G.player && G.player.spellbook; return RS_BOOKS[b] ? b : 'standard'; }
+function rsSpellBook(sp){ return (sp[7] && sp[7].book) || 'standard'; }
+function rsBookSpells(){ const b = rsBook(); return RS_SPELLS.filter(sp=>rsSpellBook(sp)===b); }
+function rsSpellCombat(sp){ const k = sp[7] && sp[7].k; return !k; }
+function rsSpellBlock(sp){
+  const meta = sp[7] || {}, b = rsSpellBook(sp);
+  if (b!==rsBook()) return `${sp[1]} is in the ${RS_BOOKS[b].nm} - switch books at an altar`;
+  if (meta.god){ const w = G.gear.weapon; if (!(w && w.used && w.godStaff===meta.god)) return `${sp[1]} needs the ${RS_GODS[meta.god].nm} staff in your hand`; }
+  return '';
+}
+function rsSpellCol(sp){ return ISO_ELEM_COL[sp[6]] || '#c8b8ff'; }
+// how grand a spell looks: strikes to surges, rushes to barrages
+function rsSpellTier(sp){
+  const n = sp[1];
+  if (/Surge|Barrage/.test(n)) return 4; if (/Wave|Blitz|Saradomin|Guthix|Zamorak|Dark Demonbane|Undead/.test(n)) return 3;
+  if (/Blast|Burst|Superior|Skeletal/.test(n)) return 2; if (/Bolt|Rush|Ghostly|Inferior/.test(n)) return 1; return 0;
+}
+function rsIsDemon(m){ return /demon|fiend|devil|imp\b|abyss|balor|vrock|hellhound|nechry|bloodveld/i.test((m && m.nm)||''); }
+function rsApplyCC(m, meta, sp){
+  const t = meta.turns || 4;
+  if (meta.cc==='acc'){ m.debuffAtkTurns = Math.max(m.debuffAtkTurns||0, t); m.debuffAtkAmt = Math.max(m.debuffAtkAmt||0, 2); logMsg(`the ${m.nm} is confused - its aim falls`, 'magic'); }
+  else if (meta.cc==='weak'){ m.weakTurns = Math.max(m.weakTurns||0, t); m.weakAmt = Math.min(m.weakAmt||1, meta.amt||0.75); logMsg(`the ${m.nm} is weakened`, 'magic'); }
+  else if (meta.cc==='def'){ m.debuffACTurns = Math.max(m.debuffACTurns||0, t); m.debuffACAmt = Math.max(m.debuffACAmt||0, meta.amt||2); logMsg(`the ${m.nm} is cursed - its armour falls by ${meta.amt||2}`, 'magic'); }
+  else if (meta.cc==='root'){ m.rootTurns = Math.max(m.rootTurns||0, t); logMsg(`the ${m.nm} is rooted to the spot (${t} turns)`, 'magic'); }
+  else if (meta.cc==='stun'){ monDaze(m, t); m.debuffAtkTurns = Math.max(m.debuffAtkTurns||0, t+3); m.debuffAtkAmt = Math.max(m.debuffAtkAmt||0, 3); logMsg(`the ${m.nm} is stunned`, 'magic'); }
+}
+// spells you cast on yourself (Lunar) and thralls (Arceuus)
+function rsCastSelf(sp){
+  const p = G.player, meta = sp[7] || {};
+  if (meta.fx==='cure' && !(p.poisonTurns>0)){ logMsg('you are not poisoned', ''); return false; }
+  if (meta.fx==='heal' && p.hp >= effMaxHp()){ logMsg('you are already at full life', ''); return false; }
+  rsSpendRunes(sp); sfx('spell'); FP.cast = 1;
+  if (meta.fx==='cure'){ p.poisonTurns = 0; p.poisonDmg = 0; logMsg('you cast Cure Me - the poison leaves you', 'good'); }
+  else if (meta.fx==='heal'){ const h = Math.min(effMaxHp() - p.hp, Math.round(effMaxHp()/4)); p.hp += h; logMsg(`you cast Heal Self and recover ${h} life`, 'good'); }
+  else if (meta.fx==='restore'){ p.frightenedTurns = 0; p.slowTurns = 0; p.prayPts = Math.min(rsLvl('prayer'), (p.prayPts||0) + 10); logMsg('you cast Stat Restore - your head clears and your prayer returns', 'good'); }
+  else if (meta.fx==='veng'){ p.vengeance = 1; logMsg('you cast Vengeance - the next blow you take will be repaid', 'magic'); }
+  else if (meta.fx==='thrall'){ p.thrall = { nm:sp[1].replace('Resurrect ', ''), power:meta.power||3, turns:25 }; logMsg(`you raise a ${p.thrall.nm.toLowerCase()} - it fights beside you for 25 turns`, 'magic'); }
+  try{ fpBurst(p.x+0.5, p.y+0.5, 0.6, rsSpellCol(sp), 16, 0.9); }catch(e){}
+  skGainXP('magic', sp[5]); rsSync();
+  return true;
+}
+// a thrall strikes the nearest foe it can see each turn
+function rsThrallAct(){
+  const p = G.player, t = p && p.thrall; if (!t) return;
+  if (G.gameMode!==1 && G.gameMode!==2){ return; }
+  t.turns--;
+  const mi = nearestMonsterInRange(6);
+  if (mi >= 0){ const m = G.mon[mi], d = 1 + rn(t.power); m.hp -= d; m.hitKind = 'magic'; m.hitCrit = false; noteFoe(mi); try{ fxSplat(m.x+0.5, m.y+0.5, d, 'hit'); }catch(e){}
+    logMsg(`your ${t.nm.toLowerCase()} strikes the ${m.nm} for ${d}`, 'magic'); if (m.hp<=0) monsterDies(mi); }
+  if (t.turns <= 0){ p.thrall = null; logMsg('your thrall crumbles back to dust', ''); }
+}
+// after a monster's blow lands: Vengeance and Deflect hit back, Redemption saves you. true = it died of it
+function rsAfterHurt(m, mi, dmg, reflect){
+  const p = G.player; let back = reflect || 0;
+  if (p.vengeance && dmg > 0){ p.vengeance = 0; const v = Math.max(1, Math.round(dmg*0.75)); back += v; logMsg(`Taste vengeance! ${v} damage goes back to the ${m.nm}`, 'magic'); }
+  else if (reflect) logMsg(`your curse throws ${reflect} back at the ${m.nm}`, 'magic');
+  if (p.hp > 0 && p.hp < effMaxHp()*0.1 && rsPrayOn('redemp')){
+    const h = Math.round(effMaxHp()/4); p.hp = Math.min(effMaxHp(), p.hp + h); p.prayPts = 0; p.prayers = [];
+    logMsg(`Redemption! your prayer saves you - you heal ${h}, and your prayer is spent`, 'magic', true); sfx('levelUp');
+  }
+  if (back > 0 && m.alive){ m.hp -= back; G.lastFoe.hp = m.hp; try{ fxSplat(m.x+0.5, m.y+0.5, back, 'hit'); }catch(e){} if (m.hp<=0){ monsterDies(mi); return true; } }
+  return false;
+}
+function rsProtFor(style){ for (const id of (G.player.prayers||[])){ const pr = RS_ALLPRAY().find(x=>x.id===id); if (pr && pr.prot===style) return pr; } return null; }
+function rsSapPenalty(style){ return rsPrayOn({ melee:'sapw', ranged:'sapr', magic:'sapm' }[style]) ? 2 : 0; }
+// ---- alchemy ----
+function rsAlchValue(it, high){ return Math.max(1, Math.round(itemPrice(it)*(high ? 0.6 : 0.4))); }
+function rsAlch(idx, high){
+  const sp = rsSpell(high ? 'highalch' : 'lowalch'), it = G.inv[idx]; if (!it || !sp) return;
+  if (rsLvl('magic') < sp[2]){ logMsg(`you need Magic ${sp[2]} for ${sp[1]}`, 'hit'); return; }
+  const why = rsSpellBlock(sp); if (why){ logMsg(why, 'hit'); return; }
+  if (!rsRunesOk(sp)){ logMsg(`${sp[1]} takes ${Object.keys(sp[4]).map(r=>sp[4][r]+' '+r).join(' and ')} runes`, 'hit'); renderOverlay(); return; }
+  if (it.locked){ logMsg(`the ${it.nm} is locked - unlock it first`, 'hit'); return; }
+  const g = rsAlchValue(it, high);
+  rsSpendRunes(sp); invRemove(idx); G.player.gold += g; skGainXP('magic', sp[5]); rsSync();
+  logMsg(`you cast ${sp[1]} - the ${it.nm} melts into ${g} gold`, 'gold'); sfx('gold');
+  try{ fpBurst(G.player.x+0.5, G.player.y+0.5, 0.8, '#ffd24a', 18, 0.8); }catch(e){}
+  renderOverlay(); renderGame(); saveCurrentGame();
+}
+function rsAlchHtml(){
+  if (rsBook()!=='standard') return '';
+  const L = rsLvl('magic'), hi = L >= 55, sp = rsSpell(hi ? 'highalch' : 'lowalch');
+  if (L < 21) return '';
+  const items = G.inv.map((it,i)=>({ it, i })).filter(x=>x.it && x.it.used && !x.it.locked);
+  return `<h4 style="color:${COL.amber};margin:12px 0 6px;">${sp[1].toUpperCase()} &middot; <span class="muted" style="font-weight:400;">${rsRunesOk(sp) ? 'click an item to turn it to gold' : 'needs '+Object.keys(sp[4]).map(r=>sp[4][r]+' '+r).join(' and ')+' runes'}</span></h4>
+    <div class="btnrow" style="justify-content:flex-start;flex-wrap:wrap;gap:4px;">${items.length ? items.map(x=>`<button class="btn" ${rsRunesOk(sp) ? '' : 'disabled'} onclick="rsAlch(${x.i}, ${hi})" title="sells for ${sellPrice(x.it)}g at a shop">${esc(x.it.nm)} &middot; ${rsAlchValue(x.it, hi)}g</button>`).join('') : '<span class="muted">nothing in your pack to alch</span>'}</div>`;
+}
+// ---- the four spellbooks, swapped at an altar ----
+function rsNearAnyAltar(){
+  if (rsNearAltar()) return true;
+  if (G.gameMode===0 && G.owPos && typeof skNodeAt==='function'){ for (let dx=-1;dx<=1;dx++) for (let dy=-1;dy<=1;dy++){ const n = skNodeAt(G.owPos.x+dx, G.owPos.y+dy); if (n && n.k==='runecrafting') return true; } }
+  return false;
+}
+function rsSwitchBook(b){
+  const B = RS_BOOKS[b]; if (!B) return;
+  if (!rsNearAnyAltar()){ logMsg('you can only change spellbooks at an altar - a dungeon altar or a runecrafting altar in the wild', 'hit'); renderOverlay(); return; }
+  if (B.need && !B.need()){ logMsg(`the ${B.nm} needs ${B.how}`, 'hit'); renderOverlay(); return; }
+  G.player.spellbook = b; G.player.rsSpell = null; G.player.rsAutocast = false;
+  logMsg(`you pray at the altar - your mind fills with the ${B.nm}`, 'magic'); sfx('spell');
+  renderOverlay(); renderGame(); saveCurrentGame();
+}
+function rsBookSwitchHtml(){
+  const near = rsNearAnyAltar(), cur = rsBook();
+  return `<div class="muted" style="margin:0 0 8px;font-size:12px;">${RS_BOOKS[cur].d}. ${near ? 'You stand at an altar - change books:' : 'Change spellbooks at an altar (a dungeon altar or a runecrafting altar in the wild).'}</div>
+    ${near ? `<div class="btnrow" style="justify-content:flex-start;margin:0 0 8px;flex-wrap:wrap;">${Object.keys(RS_BOOKS).map(b=>{ const B = RS_BOOKS[b], ok = !B.need || B.need();
+      return `<button class="btn ${b===cur ? 'primary' : ''}" ${ok ? '' : 'disabled'} title="${esc(B.d)}${ok ? '' : ' - needs '+esc(B.how)}" onclick="rsSwitchBook('${b}')">${esc(B.nm)}</button>`; }).join('')}</div>` : ''}`;
+}
+function rsPrayBookHtml(){
+  const p = G.player; if (!p.cursesKnown) return '';
+  const near = rsNearAltar() || rsNearAnyAltar(), cur = p.prayBook==='curses';
+  return `<div class="muted" style="margin:0 0 8px;">You know the Ancient Curses. ${near ? `<button class="btn" onclick="rsSwitchPrayBook()">${cur ? 'return to the normal prayers' : 'take up the Ancient Curses'}</button>` : 'Swap prayer books at an altar.'}</div>`;
+}
+function rsSwitchPrayBook(){
+  const p = G.player; if (!p.cursesKnown || !rsNearAnyAltar()) return;
+  if (p.prayBook!=='curses' && rsLvl('prayer') < 50){ logMsg('the curses need Prayer 50', 'hit'); renderOverlay(); return; }
+  p.prayBook = p.prayBook==='curses' ? 'normal' : 'curses'; p.prayers = []; p.quickPrayers = [];
+  logMsg(p.prayBook==='curses' ? 'you turn to the Ancient Curses - dark power answers' : 'you return to the old prayers', 'magic'); sfx('spell');
+  renderOverlay(); renderGame(); saveCurrentGame();
+}
+// the ancient tablet (Ancient Magicks) and the curse tablet (Ancient Curses) are carried by the bosses of the dead
+function rsTabletDrop(m, boss, deep){
+  const p = G.player, k = G.siteKind; if (!boss) return;
+  const deadSite = k==='necro' || k==='graveyard' || k==='temple' || k==='crypt';
+  if (!p.ancientKnown && (deadSite || deep >= 6) && chn(deadSite ? 0.35 : 0.12)){ p.ancientKnown = 1; logMsg(`the ${m.nm} carried an ancient tablet - you read it and learn the Ancient Magicks (switch books at an altar, Magic 50)`, 'magic', true); sfx('achievement'); }
+  else if (!p.cursesKnown && (deadSite || deep >= 8) && chn(deadSite ? 0.25 : 0.08)){ p.cursesKnown = 1; logMsg(`the ${m.nm} carried a cracked curse tablet - you learn the Ancient Curses (swap prayer books at an altar, Prayer 50)`, 'magic', true); sfx('achievement'); }
+}
+// ---- god spells: the three god staves, and a god cape after 100 casts ----
+const RS_GODS = { sara:{ nm:'Saradomin', col:'#3a5ac8', trim:'#f0e0a0' }, guthix:{ nm:'Guthix', col:'#3a8a4a', trim:'#e0e0d0' }, zammy:{ nm:'Zamorak', col:'#a02a2a', trim:'#1a1a1a' } };
+function rsMakeGodStaff(g){
+  const G0 = RS_GODS[g], it = rsItem('weapon');
+  it.nm = `${G0.nm} Staff`; it.basis = 'Quarterstaff'; it.baseMat = 'Staff'; it.d1 = 1; it.d2 = 6; it.bonus = 0; it.rsStaff = 1; it.godStaff = g;
+  it.reqMag = 60; it.magAcc = 40; it.magDmg = 1; it.acc = 6; it.dmgB = 6; it.rsCol = G0.col; it.price = 8000;
+  return it;
+}
+function rsMakeGodCape(g){
+  const G0 = RS_GODS[g], it = rsItem('cape');
+  it.nm = `${G0.nm} Cape`; it.basis = 'Cape'; it.baseMat = G0.nm; it.godCape = g; it.magAcc = 10; it.ac = 3; it.prayB = 2; it.rsCol = G0.col; it.capeCol = G0.col; it.price = 20000;
+  return it;
+}
+function rsGodBonus(sp){ const g = sp && sp[7] && sp[7].god, c = G.gear && G.gear.cape; return g && c && c.used && c.godCape===g ? 6 : 0; }
+function rsGodCast(g){
+  const p = G.player; p.godCasts = p.godCasts || {}; p.godCasts[g] = (p.godCasts[g]||0) + 1;
+  const m = G.foeRef && G.foeRef.alive ? G.foeRef : null;
+  if (p.godCasts[g]===100){ const c = rsMakeGodCape(g); addToInventory(c); logMsg(`a hundred casts in ${RS_GODS[g].nm}'s name - you are given the ${c.nm} (god spells hit 6 harder while you wear it)`, 'magic', true); sfx('achievement'); }
+  return m;
+}
+function rsGodStaffShopHtml(){
+  if (rsLvl('magic') < 60) return `<div class="panel" style="margin-top:14px;"><h4 style="color:${COL.cyan};">GOD STAVES</h4><div class="muted">come back at Magic 60 - the alchemist keeps the three god staves for those who can cast the god spells</div></div>`;
+  return `<div class="panel" style="margin-top:14px;"><h4 style="color:${COL.cyan};">GOD STAVES</h4>${Object.keys(RS_GODS).map(g=>`<div class="shoprow"><span></span><span style="color:${RS_GODS[g].col}">${RS_GODS[g].nm} Staff</span><span class="desc">casts ${rsSpell(g==='sara' ? 'sarastrike' : g==='guthix' ? 'guthclaws' : 'zamflames')[1]}; 100 casts earns the god's cape</span><span><button class="btn" onclick="rsBuyGodStaff('${g}')">${repPrice(8000)}g</button></span></div>`).join('')}</div>`;
+}
+function rsBuyGodStaff(g){
+  const it = rsMakeGodStaff(g), price = repPrice(it.price);
+  if (G.player.gold < price){ logMsg("you can't afford that", 'hit'); renderOverlay(); return; }
+  if (G.inv.length >= MAXINV){ logMsg('your pack is full', 'hit'); renderOverlay(); return; }
+  G.player.gold -= price; addToInventory(it); logMsg(`you buy the ${it.nm}`, 'loot'); sfx('gold'); renderOverlay(); saveCurrentGame();
+}
+// ---- combination runes: bind them at an elemental altar from essence and runes of the other element ----
+function rcComboCraft(type){
+  if (!['air','water','earth','fire'].includes(type)) return false;
+  const L = skLvl('runecrafting');
+  for (const c in RS_COMBO){
+    const [a, b] = RS_COMBO[c]; if (a!==type && b!==type) continue;
+    const other = a===type ? b : a, n = Math.min(skHave('essence'), skHave('r_'+other));
+    if (L < RS_COMBO_LV[c] || n <= 0) continue;
+    skAdd('essence', -n); skAdd('r_'+other, -n); skAdd('r_'+c, n); skGainXP('runecrafting', Math.round(RC_ALTARS[type].xp*1.3*n));
+    logMsg(`you bind ${n} essence with ${n} ${rsRuneName(other).toLowerCase()}s at the ${type} altar - ${n} ${rsRuneName(c).toLowerCase()}s`, 'good'); sfx('spell');
+    renderGame(); saveCurrentGame(); return true;
+  }
+  return false;
+}
+function rsComboToggleHtml(){
+  if (skLvl('runecrafting') < 6) return '';
+  return `<div class="muted" style="margin:10px 0 0;">Combination runes (mist, dust, mud, smoke, steam, lava) each count as one of both their elements. <button class="btn ${G.player.rcCombo ? 'primary' : ''}" onclick="G.player.rcCombo=!G.player.rcCombo; renderOverlay(); saveCurrentGame();">bind them at elemental altars: ${G.player.rcCombo ? 'ON' : 'off'}</button></div>`;
+}
+// ---- spell looks: each element's own particles, and a flash for the greatest spells ----
+function isoSpellParticles(s, a, ppu, big){
+  const e = s.elem || '', t = FP.t, r = ppu*0.12*big;
+  ctx.save();
+  if (e==='fire' || e==='zammy' || e==='lava'){
+    for (let i=0;i<5;i++){ const ph = (t*3 + i*0.37) % 1; ctx.fillStyle = `rgba(255,${140+i*20},40,${0.8*(1-ph)})`; ctx.beginPath(); ctx.arc(a.sx + Math.sin(i*2.1 + t*9)*r*0.6, a.sy + ph*r*1.6, Math.max(1, ppu*0.018*(1-ph)*big), 0, Math.PI*2); ctx.fill(); }
+  } else if (e==='water' || e==='ice'){
+    ctx.globalCompositeOperation = 'source-over';
+    for (let i=0;i<4;i++){ const ang = t*7 + i*Math.PI/2, rr = r*(0.8 + 0.2*Math.sin(t*11 + i));
+      if (e==='ice'){ ctx.strokeStyle = 'rgba(220,250,255,0.9)'; ctx.lineWidth = Math.max(1, ppu*0.012); ctx.beginPath(); ctx.moveTo(a.sx, a.sy); ctx.lineTo(a.sx + Math.cos(ang)*rr, a.sy + Math.sin(ang)*rr); ctx.stroke(); }
+      else { ctx.fillStyle = 'rgba(150,200,255,0.85)'; ctx.beginPath(); ctx.arc(a.sx + Math.cos(ang)*rr, a.sy + Math.sin(ang)*rr*0.6 + i*2, Math.max(1, ppu*0.016), 0, Math.PI*2); ctx.fill(); } }
+  } else if (e==='earth' || e==='nature'){
+    ctx.globalCompositeOperation = 'source-over';
+    for (let i=0;i<3;i++){ const ang = t*5 + i*2.1, x = a.sx + Math.cos(ang)*r, y = a.sy + Math.sin(ang)*r*0.5, sz = ppu*0.03*big;
+      ctx.save(); ctx.translate(x, y); ctx.rotate(t*6 + i); ctx.fillStyle = e==='nature' ? '#4ac060' : '#8a6a3a'; ctx.fillRect(-sz/2, -sz/2, sz, sz); ctx.restore(); }
+  } else if (e==='air' || e==='sara' || e==='astral'){
+    ctx.strokeStyle = e==='sara' ? 'rgba(255,240,180,0.8)' : 'rgba(240,248,255,0.75)'; ctx.lineWidth = Math.max(1, ppu*0.014);
+    for (let i=0;i<3;i++){ const a0 = t*10 + i*2.09; ctx.beginPath(); ctx.arc(a.sx, a.sy, r*(0.7 + i*0.2), a0, a0 + 1.4); ctx.stroke(); }
+  } else {
+    // smoke, shadow, blood, guthix, arceuus: puffs in the spell's colour
+    for (let i=0;i<4;i++){ const ph = (t*2 + i*0.25) % 1, x = a.sx - (s.x1 - s.x0)*ph*ppu*0.08, y = a.sy - (s.y1 - s.y0)*ph*ppu*0.04;
+      const g = ctx.createRadialGradient(x, y, 0, x, y, r*(0.5 + ph)); g.addColorStop(0, fpRgba(s.col, 0.5*(1-ph))); g.addColorStop(1, fpRgba(s.col, 0));
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r*(0.5 + ph), 0, Math.PI*2); ctx.fill(); }
+  }
+  ctx.restore();
+}
+function isoDrawFlashThrall(ppu){
+  if (ISO.flash){ const f = ISO.flash; f.t += FP.dt; if (f.t > 0.4) ISO.flash = null; else {
+    const W = ctx.canvas.width, H = ctx.canvas.height, g = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, Math.max(W, H)*0.7);
+    g.addColorStop(0, fpRgba(f.col, 0.28*(1 - f.t/0.4))); g.addColorStop(1, fpRgba(f.col, 0.05*(1 - f.t/0.4)));
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); ctx.restore(); } }
+  const p = G.player, th = p && p.thrall;
+  if (th && (G.gameMode===1 || G.gameMode===2)){
+    const c = isoProject(p.x + 0.5 + 0.55*Math.cos(FP.t*1.3), p.y + 0.5 + 0.55*Math.sin(FP.t*1.3), 0.7 + 0.08*Math.sin(FP.t*3)); if (!c.ok) return;
+    const r = ppu*0.16, g = ctx.createRadialGradient(c.sx, c.sy, 0, c.sx, c.sy, r);
+    g.addColorStop(0, 'rgba(200,255,230,0.85)'); g.addColorStop(0.5, 'rgba(120,240,190,0.35)'); g.addColorStop(1, 'rgba(120,240,190,0)');
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = g; ctx.beginPath(); ctx.arc(c.sx, c.sy, r, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = 'rgba(20,40,30,0.9)'; ctx.beginPath(); ctx.arc(c.sx - r*0.25, c.sy - r*0.1, r*0.1, 0, Math.PI*2); ctx.arc(c.sx + r*0.25, c.sy - r*0.1, r*0.1, 0, Math.PI*2); ctx.fill(); ctx.restore();
+  }
+}
 // ===================== ranged: reach, bow kinds, crossbows and bolts, thrown weapons, famous bows, ammo recovery =====================
 // more ammo: bolts for crossbows (bronze to dragon), broad bolts, enchanted gem bolts and fire arrows.
 // a row's [6] is what fires it ('bolt' or arrows), [7] the metal it's coloured by
@@ -12076,7 +12386,7 @@ function isoDrawMissile(s, ppu){
 // where a shot lands: sparks, a puff, or a chinchompa's blast
 function isoShotLand(s){
   const k = s.kind;
-  if (k==='spell') fpBurst(s.x1, s.y1, 0.5, s.col, 14, 1.3);
+  if (k==='spell'){ const T = s.tier||0; fpBurst(s.x1, s.y1, 0.5, s.col, 12 + T*7, 1.1 + T*0.25); if (T>=3) fpBurst(s.x1, s.y1, 0.3, '#ffffff', 6 + T*3, 0.8); if (T>=4){ ISO.flash = { col:s.col, t:0 }; if (typeof FP!=='undefined') FP.shake = Math.max(FP.shake||0, 0.3); } }
   else if (k==='bolt'){ fpBurst(s.x1, s.y1, 0.5, '#ffd27a', 10, 1.1); fpBurst(s.x1, s.y1, 0.5, s.col, 4, 0.6); }
   else if (k==='chin'){ fpBurst(s.x1, s.y1, 0.4, '#ff8a2a', 26, 1.8); fpBurst(s.x1, s.y1, 0.4, '#ffe08a', 14, 1.2); fpBurst(s.x1, s.y1, 0.3, '#5a5048', 10, 0.8); if (typeof FP!=='undefined') FP.shake = Math.max(FP.shake||0, 0.35); }
   else if (k==='crystal') fpBurst(s.x1, s.y1, 0.5, '#bff8ff', 12, 1.2);
@@ -12103,24 +12413,50 @@ function rsAutocastOn(){ const w = G.gear.weapon, p = G.player; return !!(p && p
 function rsCastAt(mi, id){
   const p = G.player, sp = rsSpell(id || p.rsSpell);
   if (!sp){ logMsg('choose a spell first - open the spellbook (G)', ''); return false; }
+  const meta = sp[7] || {};
   if (rsLvl('magic') < sp[2]){ logMsg(`you need Magic ${sp[2]} to cast ${sp[1]}`, 'hit'); return false; }
+  const why = rsSpellBlock(sp); if (why){ logMsg(why, 'hit'); return false; }
   if (!rsRunesOk(sp)){ logMsg(`you don't have the runes to cast ${sp[1]} (${Object.keys(sp[4]).map(r=>sp[4][r]+' '+r).join(', ')})`, 'hit'); return false; }
+  if (meta.k==='self') return rsCastSelf(sp);
+  if (meta.k==='alch'){ logMsg(`${sp[1]} is cast on an item - right-click it in your pack, or pick it in the spellbook`, ''); return false; }
   if (mi===undefined || mi<0) mi = nearestMonsterInRange(8);
   if (mi===-1 || !G.mon[mi] || !G.mon[mi].alive){ logMsg('there is nothing in sight to cast at', ''); return false; }
   const m = G.mon[mi];
+  if (meta.demon && !rsIsDemon(m)){ logMsg(`${sp[1]} only works on demons - the ${m.nm} is no demon`, 'hit'); return false; }
   noteFoe(mi);
   rsSpendRunes(sp);
-  isoShot(m, 'spell', ISO_ELEM_COL[sp[6]]);
+  isoShot(m, 'spell', rsSpellCol(sp), 0, { tier:rsSpellTier(sp), elem:sp[6] });
   const stEl = rsStaffElem();
   if (stEl && sp[4][stEl] && !G.player.rsStaffTip){ G.player.rsStaffTip = 1; logMsg(`your staff supplies the ${stEl} runes for ${sp[1]} - you only spend the others`, 'magic'); }
+  sfx('spell');
+  const cx = m.x, cy = m.y;
+  rsSpellHit(mi, sp);
+  if (meta.aoe){
+    let n = 0;
+    for (let j=0;j<G.mon.length;j++){ const o = G.mon[j]; if (j===mi || !o.alive || Math.max(Math.abs(o.x-cx), Math.abs(o.y-cy)) > 1) continue; n++; rsSpellHit(j, sp); }
+    if (n) logMsg(`the ${sp[1].toLowerCase()} engulfs ${n} more`, 'magic');
+  }
+  if (meta.god) rsGodCast(meta.god);
+  skGainXP('magic', sp[5]); rsSync();
+  return true;
+}
+// one target's share of a spell: the hit roll, then damage and whatever the spell does besides
+function rsSpellHit(mi, sp){
+  const m = G.mon[mi], meta = sp[7] || {}, p = G.player; if (!m || !m.alive) return false;
   const roll = rollDie(20);
   const onStaff = rsStaffElem()===sp[6];                   // an elemental staff focuses its own element: +2 to hit, +20% damage
-  const tot = rsAttackTotal(roll, m, 'magic') + (onStaff ? 2 : 0);
+  const tot = rsAttackTotal(roll, m, 'magic') + (onStaff ? 2 : 0) + (meta.k==='cc' ? 2 : 0);
   const ac = m.ac - ((m.debuffACTurns>0) ? (m.debuffACAmt||0) : 0);
-  sfx('spell');
   if (roll===1 || (roll<20 && tot < ac)){
     logMsg(`your ${sp[1]} splashes harmlessly on the ${m.nm} (${tot} vs ${ac})`, ''); fxSplat(m.x+0.5, m.y+0.5, '0', 'block');
-    skGainXP('magic', sp[5]); rsSync();
+    return false;
+  }
+  if (meta.k==='cc'){
+    rsApplyCC(m, meta, sp);
+    if (!sp[3]){ m.hitKind = 'magic'; return true; }
+    const d = 1 + rn(sp[3]); m.hp -= d; m.hitKind = 'magic'; m.hitElem = sp[6]; G.lastFoe.hp = m.hp; rsHitXP(d, 'magic');
+    logMsg(`your ${sp[1]} also hurts it for ${d}`, 'magic');
+    if (m.hp<=0) monsterDies(mi);
     return true;
   }
   const mxh = rsSpellMax(sp);
@@ -12131,17 +12467,28 @@ function rsCastAt(mi, id){
   const ew = rsMonElem(m);
   if (ew.weak===sp[6]){ dmg = Math.round(dmg*1.5); tag = ` (weak to ${sp[6]}!)`; }
   else if (ew.resist===sp[6]){ dmg = Math.max(1, Math.round(dmg*0.5)); tag = ` (it shrugs off ${sp[6]})`; }
+  if (meta.demon){ dmg = Math.round(dmg*1.25); tag += ' (the demon burns)'; }
   if (sp[6]==='fire' && hasAbility(m,'regen')) m.tookFireLastHit = true;
   m.hp -= dmg; m.hitKind = 'magic'; m.hitElem = sp[6]; m.hitCrit = false;
   G.lastFoe.hp = m.hp;
   logMsg(`your ${sp[1]} hits the ${m.nm} for ${dmg}${tag}`, 'magic');
-  skGainXP('magic', sp[5]);
   rsHitXP(dmg, 'magic');
+  // what the spell does besides its damage
+  if (meta.fx==='poison' && chn(0.5)){ monPoison(m, 2); logMsg(`the smoke poisons the ${m.nm}`, 'magic'); }
+  else if (meta.fx==='acc'){ m.debuffAtkTurns = Math.max(m.debuffAtkTurns||0, 5); m.debuffAtkAmt = Math.max(m.debuffAtkAmt||0, 2); }
+  else if (meta.fx==='heal'){ const h = Math.min(effMaxHp() - p.hp, Math.max(1, Math.round(dmg*0.25))); if (h > 0){ p.hp += h; logMsg(`the blood heals you for ${h}`, 'magic'); } }
+  else if (meta.fx==='freeze' || meta.fx==='root'){ if (m.hp > 0){ m.rootTurns = Math.max(m.rootTurns||0, meta.root||3); logMsg(`the ${m.nm} is ${meta.fx==='freeze' ? 'frozen to the spot' : 'held fast by grasping hands'} (${meta.root||3} turns)`, 'magic'); } }
+  if (meta.god==='sara'){ m.debuffAtkTurns = Math.max(m.debuffAtkTurns||0, 5); m.debuffAtkAmt = Math.max(m.debuffAtkAmt||0, 2); }
+  else if (meta.god==='guthix'){ m.debuffACTurns = Math.max(m.debuffACTurns||0, 5); m.debuffACAmt = Math.max(m.debuffACAmt||0, 3); logMsg(`the claws tear the ${m.nm}'s armour away`, 'magic'); }
+  else if (meta.god==='zammy' && m.hp>0){ monBleed(m, 3 + rn(4)); logMsg(`hellfire clings to the ${m.nm}`, 'magic'); }
   if (m.hp<=0) monsterDies(mi);
   return true;
 }
 function rsCastFromBook(id){
-  const p = G.player; p.rsSpell = id;
+  const p = G.player, sp0 = rsSpell(id), meta0 = (sp0 && sp0[7]) || {};
+  if (meta0.k==='self'){ setUi('playing'); if (p.stunTurns>0){ consumeStunnedTurn(); return; } if (rsCastAt(-1, id) && !G.gameOver && (G.gameMode===1 || G.gameMode===2)) tickMonsters(); renderGame(); saveCurrentGame(); return; }
+  if (meta0.k==='alch'){ setUi('rsmagic'); return; }
+  p.rsSpell = id;
   if (G.gameMode===0){ setUi('playing'); logMsg(`${rsSpell(id)[1]} is ready - cast it in a fight with R`, ''); return; }
   setUi('playing');
   if (p.stunTurns>0){ consumeStunnedTurn(); return; }
@@ -12187,31 +12534,35 @@ function rsSpellTipHtml(id){
       + (t.hit!=null ? row('chance to hit', Math.round(t.hit*100)+'%') : '')
       + row('weak to', ew.weak || 'nothing', ew.weak===sp[6] ? COL.green : null) + (ew.resist ? row('resists', ew.resist, ew.resist===sp[6] ? COL.red : null) : '');
   }
+  if (sp[7] && sp[7].d) h += `<div style="margin-top:4px;">${esc(sp[7].d)}</div>`;
   if (G.player.rsSpell===sp[0]) h += `<div class="muted" style="margin-top:4px;">selected${rsAutocastOn() ? ' &middot; autocasting' : ' &middot; R casts it'}</div>`;
   return h;
 }
 function buildRsMagic(){
   const p = G.player, L = rsLvl('magic'), el = rsStaffElem();
   const foe = G.lastFoe && G.lastFoe.hp > 0 && (G.gameMode===1 || G.gameMode===2) ? G.lastFoe : null;
-  const rows = RS_SPELLS.map(sp=>{
-    const lvlOk = L >= sp[2], runesOk = rsRunesOk(sp), sel = p.rsSpell===sp[0];
+  const rows = rsBookSpells().map(sp=>{
+    const lvlOk = L >= sp[2], runesOk = rsRunesOk(sp) && !rsSpellBlock(sp), sel = p.rsSpell===sp[0], meta = sp[7] || {};
     const runes = Object.keys(sp[4]).map(r=>`<span style="color:${r===el ? COL.cyan : skHave('r_'+r)>=sp[4][r] ? COL.text : COL.red}" title="${r===el ? 'free - your staff supplies it' : 'you have '+skHave('r_'+r)}">${sp[4][r]} ${r}${r===el ? ' (staff)' : ''}</span>`).join(' ');
     return `<div class="shoprow ${sel ? 'sel' : ''}" data-tipspell="${sp[0]}" style="${lvlOk ? '' : 'opacity:0.45;'}${sel ? 'outline:1px solid var(--amber);' : ''}">
-      <span class="muted">${sp[2]}</span><span style="min-width:108px;display:inline-block;"><span style="color:${ISO_ELEM_COL[sp[6]]};">&#9670;</span> ${esc(sp[1])}</span>
-      <span class="desc">${(()=>{ const d = rsSpellDamage(sp), t = foe ? rsSpellDamage(sp, foe) : null;
+      <span class="muted">${sp[2]}</span><span style="min-width:108px;display:inline-block;"><span style="color:${rsSpellCol(sp)};">&#9670;</span> ${esc(sp[1])}</span>
+      <span class="desc">${meta.d ? `<b style="color:var(--ink);">${esc(meta.d)}</b>${rsSpellBlock(sp) ? `<br><span style="color:${COL.red}">${esc(rsSpellBlock(sp))}</span>` : ''}<br>${runes} &middot; ${sp[5]} xp` : ''}${meta.d ? '' : (()=>{ const d = rsSpellDamage(sp), t = foe ? rsSpellDamage(sp, foe) : null;
         return `<b style="color:var(--ink);">${d.lo}&ndash;${d.hi} damage</b>${d.onStaff ? ' <span style="color:'+COL.cyan+'">(staff +20%)</span>' : ''} &middot; ${sp[5]} xp`
           + (t ? `<br><span style="color:${t.note.startsWith('weak') ? COL.green : t.note ? COL.red : 'var(--ink-faint)'}">vs ${esc(foe.nm)}: ${t.lo}&ndash;${t.hi}, ${Math.round(t.hit*100)}% to hit${t.note ? ' &middot; '+t.note : ''}</span>` : '')
           + `<br>${runes}`; })()}</span>
-      <span>${lvlOk ? `<button class="btn" onclick="rsSelectSpell('${sp[0]}')">${sel ? 'selected' : 'select'}</button>${runesOk && G.gameMode!==0 ? ` <button class="btn primary" onclick="rsCastFromBook('${sp[0]}')">cast</button>` : ''}${!runesOk ? ` <span style="color:${COL.red};font-size:11px;">need ${rsMissingRunes(sp).join(', ')}</span>` : ''}` : `needs Magic ${sp[2]}`}</span></div>`;
+      <span>${lvlOk ? `${meta.k==='self' || meta.k==='alch' ? '' : `<button class="btn" onclick="rsSelectSpell('${sp[0]}')">${sel ? 'selected' : 'select'}</button>`}${runesOk && meta.k!=='alch' && (G.gameMode!==0 || meta.k==='self') ? ` <button class="btn primary" onclick="rsCastFromBook('${sp[0]}')">cast</button>` : ''} <button class="btn" title="put it on the quick bar - keys 1-9 cast it" onclick="qbAdd({ t:'spell', id:'${sp[0]}' })">&#9733;</button>${!runesOk ? ` <span style="color:${COL.red};font-size:11px;">need ${rsMissingRunes(sp).join(', ')}</span>` : ''}` : `needs Magic ${sp[2]}`}</span></div>`;
   }).join('');
-  const pouch = RS_RUNES.map(r=>`<span class="skitem" style="border-color:${r[2]}"><b style="color:${r[2]}">${r[1]}</b> ${rsStaffElems().includes(r[0]) ? '&infin; (staff)' : '&times;'+skHave('r_'+r[0])}</span>`).join('');
+  const pouch = RS_RUNES.filter(r=>!RS_COMBO[r[0]] || skHave('r_'+r[0])).map(r=>`<span class="skitem" style="border-color:${r[2]}"><b style="color:${r[2]}">${r[1]}</b> ${rsStaffElems().includes(r[0]) ? '&infin; (staff)' : '&times;'+skHave('r_'+r[0])}</span>`).join('');
   const w = G.gear.weapon, staff = w && w.used && w.rsStaff;
-  return `<h2 class="panel-title">STANDARD SPELLBOOK</h2>
-    <div class="sub">Magic level ${L}. <kbd>R</kbd> casts your selected spell at the nearest foe you can see${staff ? `; <b>autocast</b> casts it with every melee bump` : ' (wield a staff to autocast)'}. Every combat spell also costs air runes; an elemental staff supplies its own element${el ? ` - yours gives endless ${el} and makes ${el} spells hit 20% harder` : ''}. Out of a rune, the strongest spell you can afford is cast instead. A monster's weak element does +50% (hover it to see); its own does half.</div>
+  return `<h2 class="panel-title">${RS_BOOKS[rsBook()].nm.toUpperCase()}</h2>
+    <div class="sub">Magic level ${L}. <kbd>R</kbd> casts your selected spell at the nearest foe you can see${staff ? `; <b>autocast</b> casts it with every melee bump` : ' (wield a staff to autocast)'}. ${rsBook()==='standard' ? 'Every combat spell also costs air runes; combination runes count as both their elements. ' : 'Combination runes count as both their elements. '}An elemental staff supplies its own element${el ? ` - yours gives endless ${el} and makes ${el} spells hit 20% harder` : ''}. Out of a rune, the strongest spell you can afford is cast instead. A monster's weak element does +50% (hover it to see); its own does half.</div>
     <div class="ovbody">
       <div class="btnrow" style="justify-content:flex-start;margin:0 0 8px;">${staff ? `<button class="btn ${p.rsAutocast ? 'primary' : ''}" onclick="rsToggleAutocast()">autocast: ${p.rsAutocast ? 'ON' : 'off'}</button>` : ''}</div>
+      ${rsBookSwitchHtml()}
       ${rows}
+      ${rsAlchHtml()}
       ${enchantHtml()}
+      ${rsComboToggleHtml()}
       <h4 style="color:var(--ink-faint);margin:12px 0 6px;">RUNE POUCH</h4><div class="skbag">${pouch}</div>
       <div class="muted" style="font-size:11px;margin-top:6px;">monsters drop runes, the alchemist sells the basic ones, and you can craft them at the altars in the wild</div>
       <div class="btnrow" style="margin-top:12px;"><button class="btn primary" onclick="setUi('playing')">G / ESC &middot; close</button></div>
@@ -12264,29 +12615,50 @@ const RS_PRAYERS = [
   { id:'might', nm:'Mystic Might',        lvl:45, drain:0.33, grp:'mag', mag:3, mdmg:0.15, d:'+3 magic accuracy, +15% spell damage' },
   { id:'piety', nm:'Piety',               lvl:70, drain:0.66, grp:'piety', att:4, str:0.23, def:4, d:'+4 melee accuracy, +23% melee damage, +4 armour' },
   { id:'rigour', nm:'Rigour',             lvl:74, drain:0.66, grp:'rigour', rng:4, rdmg:0.23, def:4, d:'+4 ranged accuracy, +23% ranged damage, +4 armour' },
+  { id:'redemp', nm:'Redemption',         lvl:49, drain:0.16, grp:'redemp', d:'if a blow leaves you under 10% life, you heal a quarter of your life - and your prayer points are spent' },
+  { id:'augury', nm:'Augury',             lvl:77, drain:0.66, grp:'augury', mag:4, mdmg:0.15, def:4, d:'+4 magic accuracy, +15% spell damage, +4 armour' },
 ];
+// the Ancient Curses: a second prayer book, swapped at an altar once you've found the curse tablet
+const RS_CURSES = [
+  { id:'cprotitem', nm:'Protect Item',   lvl:50, drain:0.05, grp:'item', d:'keep one extra item if you die (4 instead of 3)' },
+  { id:'sapw',  nm:'Sap Warrior',        lvl:50, drain:0.14, grp:'sapw', def:1, d:'foes strike at you in melee 2 worse; +1 armour' },
+  { id:'sapr',  nm:'Sap Ranger',         lvl:52, drain:0.14, grp:'sapr', def:1, d:'foes shoot at you 2 worse; +1 armour' },
+  { id:'sapm',  nm:'Sap Mage',           lvl:54, drain:0.14, grp:'sapm', def:1, d:'foes cast at you 2 worse; +1 armour' },
+  { id:'dmag',  nm:'Deflect Magic',      lvl:65, drain:0.33, grp:'prot', prot:'magic',  reflect:0.1, d:'block 60% of magic damage and throw a tenth back' },
+  { id:'drng',  nm:'Deflect Missiles',   lvl:68, drain:0.33, grp:'prot', prot:'ranged', reflect:0.1, d:'block 60% of ranged damage and throw a tenth back' },
+  { id:'dmel',  nm:'Deflect Melee',      lvl:71, drain:0.33, grp:'prot', prot:'melee',  reflect:0.1, d:'block 60% of melee damage and throw a tenth back' },
+  { id:'latt',  nm:'Leech Attack',       lvl:74, drain:0.2, grp:'latt', att:3, d:'+3 melee accuracy' },
+  { id:'lrng',  nm:'Leech Ranged',       lvl:76, drain:0.2, grp:'lrng', rng:3, rdmg:0.12, d:'+3 ranged accuracy, +12% ranged damage' },
+  { id:'lmag',  nm:'Leech Magic',        lvl:78, drain:0.2, grp:'lmag', mag:3, mdmg:0.12, d:'+3 magic accuracy, +12% spell damage' },
+  { id:'ldef',  nm:'Leech Defence',      lvl:80, drain:0.2, grp:'ldef', def:3, d:'+3 armour' },
+  { id:'lstr',  nm:'Leech Strength',     lvl:82, drain:0.2, grp:'lstr', str:0.15, d:'+15% melee damage' },
+  { id:'soul',  nm:'Soul Split',         lvl:92, drain:0.4, grp:'soul', d:'heal a fifth of the damage you deal' },
+  { id:'turmoil', nm:'Turmoil',          lvl:95, drain:0.66, grp:'turmoil', att:5, str:0.28, def:5, d:'+5 melee accuracy, +28% melee damage, +5 armour' },
+];
+function RS_ALLPRAY(){ return RS_PRAYERS.concat(RS_CURSES); }
+function prayList(){ return G.player && G.player.prayBook==='curses' ? RS_CURSES : RS_PRAYERS; }
 function rsPrayClash(a, b){
   if (a===b) return true;
   const s = new Set([a,b]);
-  const big = g=>g==='piety' || g==='rigour';
-  if ((big(a) || big(b)) && ['att','str','def','rng','mag','piety','rigour'].includes(big(a) ? b : a)) return true;
+  const big = g=>g==='piety' || g==='rigour' || g==='augury' || g==='turmoil';
+  if ((big(a) || big(b)) && ['att','str','def','rng','mag','piety','rigour','augury','turmoil','latt','lrng','lmag','ldef','lstr'].includes(big(a) ? b : a)) return true;
   if ((s.has('rng') || s.has('mag')) && (s.has('att') || s.has('str') || s.has('rng') || s.has('mag'))) return true;
   return false;
 }
 function rsTogglePrayer(id){
-  const p = G.player, pr = RS_PRAYERS.find(x=>x.id===id); if (!pr) return;
+  const p = G.player, pr = RS_ALLPRAY().find(x=>x.id===id); if (!pr) return;
   rsSync();
   if (p.prayers.includes(id)){ p.prayers = p.prayers.filter(x=>x!==id); sfx('miss'); }
   else {
     if (rsLvl('prayer') < pr.lvl){ logMsg(`you need Prayer ${pr.lvl} for ${pr.nm}`, 'hit'); renderOverlay(); return; }
     if (p.prayPts < 1){ logMsg('you have run out of prayer points - recharge at an altar, or rest', 'hit'); renderOverlay(); return; }
-    p.prayers = p.prayers.filter(x=>{ const o = RS_PRAYERS.find(q=>q.id===x); return o && !rsPrayClash(o.grp, pr.grp); });
+    p.prayers = p.prayers.filter(x=>{ const o = RS_ALLPRAY().find(q=>q.id===x); return o && !rsPrayClash(o.grp, pr.grp); });
     p.prayers.push(id); sfx('spell');
   }
   renderOverlay(); renderGame(); saveCurrentGame();
 }
 // prayer points drained per turn of a fight by the prayers that are on, and how long they'll last
-function rsPrayDrain(){ const p = G.player; let d = 0; for (const id of (p && p.prayers)||[]){ const pr = RS_PRAYERS.find(x=>x.id===id); if (pr) d += pr.drain; } return d * prayDrainMult(); }
+function rsPrayDrain(){ const p = G.player; let d = 0; for (const id of (p && p.prayers)||[]){ const pr = RS_ALLPRAY().find(x=>x.id===id); if (pr) d += pr.drain; } return d * prayDrainMult(); }
 function rsPrayTurnsLeft(){ const d = rsPrayDrain(); return d>0 ? Math.floor((G.player.prayPts||0)/d) : Infinity; }
 function rsPrayDrainText(){
   const d = rsPrayDrain(); if (!d) return 'no prayers on - nothing draining';
@@ -12297,7 +12669,7 @@ function rsPrayersOff(){ if (G.player) G.player.prayers = []; }
 function rsPrayerTick(){
   const p = G.player; if (!p || !p.prayers || !p.prayers.length) return;
   let drain = 0;
-  for (const id of p.prayers){ const pr = RS_PRAYERS.find(x=>x.id===id); if (pr) drain += pr.drain; }
+  for (const id of p.prayers){ const pr = RS_ALLPRAY().find(x=>x.id===id); if (pr) drain += pr.drain; }
   drain *= prayDrainMult();
   p.prayPts = Math.max(0, (p.prayPts||0) - drain);
   if (rsPrayOn('heal')){ p.rsHealTick = (p.rsHealTick||0) + 1; if (p.rsHealTick>=3 && p.hp < effMaxHp()){ p.rsHealTick = 0; p.hp++; } }
@@ -12325,17 +12697,18 @@ function rsBury(id){
 function buildPrayer(){
   const p = G.player; rsSync();
   const L = rsLvl('prayer'), f = L ? p.prayPts/L : 0;
-  const rows = RS_PRAYERS.map(pr=>{ const on = p.prayers.includes(pr.id), ok = L >= pr.lvl;
+  const rows = prayList().map(pr=>{ const on = p.prayers.includes(pr.id), ok = L >= pr.lvl;
     return `<div class="shoprow" style="${ok ? '' : 'opacity:0.45;'}${on ? 'outline:1px solid #e0d070;background:rgba(224,208,112,0.08);' : ''}">
       <span class="muted">${pr.lvl}</span><span style="color:${on ? '#f0e090' : ''}">${esc(pr.nm)}</span><span class="desc">${esc(pr.d)}<br><span class="muted">drains ${pr.drain} a turn &middot; ${pr.drain ? Math.floor(L/pr.drain) : '&infin;'} turns on a full bar</span></span>
       <span>${ok ? `<button class="btn ${on ? 'primary' : ''}" onclick="rsTogglePrayer('${pr.id}')">${on ? 'on' : 'off'}</button>` : `needs Prayer ${pr.lvl}`}</span></div>`; }).join('');
   const bones = RS_BONES.filter(b=>skHave(b[0])).map(b=>`<button class="btn" onclick="rsBury('${b[0]}')">bury ${skHave(b[0])} ${b[1].toLowerCase()} (+${b[2]*skHave(b[0])} xp)</button>`).join(' ');
-  return `<h2 class="panel-title">PRAYER</h2>
+  return `<h2 class="panel-title">${p.prayBook==='curses' ? 'ANCIENT CURSES' : 'PRAYER'}</h2>
     <div class="sub">Prayer level ${L}. Prayers drain points each turn of a fight. Pray at a dungeon altar, rest at an inn or make camp to restore them. Bury the bones your kills drop to train Prayer.</div>
     <div class="ovbody">
       <div class="skbar" style="height:12px;margin-bottom:6px;"><i style="width:${f*100}%;background:#e0d070"></i></div>
       <div class="muted" style="margin-bottom:4px;color:${rsPrayDrain() ? '#e0d070' : ''}">${rsPrayDrainText()}</div>
       <div class="muted" style="margin-bottom:10px;">${Math.ceil(p.prayPts)} / ${L} prayer points${rsNearAltar() ? ` &middot; <button class="btn" onclick="rsRechargePrayer()">pray at the altar</button>` : ''}${p.prayers.length ? ` &middot; <button class="btn" onclick="rsPrayersOff(); renderOverlay(); renderGame();">all off</button>` : ''}</div>
+      ${rsPrayBookHtml()}
       ${rows}
       <div class="btnrow" style="margin-top:12px;">${bones}<button class="btn primary" onclick="setUi('playing')">N / ESC &middot; close</button></div>
     </div>`;
@@ -12352,7 +12725,8 @@ function rsOnKill(m){
   if (chn(0.3)){
     const pool = ['air','air','air','mind','mind','water','earth','fire'];   // (every combat spell needs air, so it's the commonest)
     if (L>=5) pool.push('chaos','chaos'); if (L>=10) pool.push('death'); if (L>=14) pool.push('blood');
-    const r = pick(pool), q = r==='blood' || r==='death' ? 1+rn(3) : r==='chaos' ? 2+rn(5) : 4+rn(10);
+    if (L>=4) pool.push('nature'); if (L>=8) pool.push('astral', pick(Object.keys(RS_COMBO))); if (L>=12) pool.push('soul');
+    const r = pick(pool), q = r==='blood' || r==='death' || r==='soul' || r==='astral' ? 1+rn(3) : r==='chaos' || r==='nature' || RS_COMBO[r] ? 2+rn(5) : 4+rn(10);
     skAdd('r_'+r, q); logMsg(`it drops ${q} ${rsRuneName(r).toLowerCase()}s`, 'loot');
   }
 }
@@ -15400,7 +15774,7 @@ function renderImmersiveHud(){
       </div>
       <div class="dh-orb l pe ${hpF<0.3 && p.hp>0 ? 'low' : ''}" title="health"><div class="fill" data-bar="hp" style="height:${hpF*100}%"></div><div class="gloss"></div><div class="txt">${mx(0,p.hp)}/${maxHp}<small>LIFE</small></div></div>
       <div class="dh-run pe${p.runOn ? ' on' : ''}" data-act="run" title="${p.runOn ? 'running' : 'walking'} - ${Math.floor(runEnergy())}% run energy (0 to toggle). Running, every other step costs no turn"><div class="fill" data-bar="run" style="height:${runEnergy()}%"></div><span>${p.runOn ? '&#187;' : '&#8250;'}</span><b>${Math.floor(runEnergy())}</b></div>
-      <div class="dh-orb r pe prayer${(p.prayers||[]).length ? ' praying' : ''}" data-act="qpray" title="Prayer points - ${Math.ceil(p.prayPts||0)} of ${prL}\n${rsPrayDrainText()}\nclick: quick prayers ${(p.quickPrayers||[]).length ? '('+(p.quickPrayers||[]).map(id=>(RS_PRAYERS.find(x=>x.id===id)||{}).nm).filter(Boolean).join(', ')+')' : '(set them in the side panel, F4)'} &middot; N: prayer book"><div class="fill" data-bar="pray" style="height:${resF*100}%"></div><div class="gloss"></div><div class="txt">${resTxt}<small>${resLbl}</small></div></div>
+      <div class="dh-orb r pe prayer${(p.prayers||[]).length ? ' praying' : ''}" data-act="qpray" title="Prayer points - ${Math.ceil(p.prayPts||0)} of ${prL}\n${rsPrayDrainText()}\nclick: quick prayers ${(p.quickPrayers||[]).length ? '('+(p.quickPrayers||[]).map(id=>(RS_ALLPRAY().find(x=>x.id===id)||{}).nm).filter(Boolean).join(', ')+')' : '(set them in the side panel, F4)'} &middot; N: prayer book"><div class="fill" data-bar="pray" style="height:${resF*100}%"></div><div class="gloss"></div><div class="txt">${resTxt}<small>${resLbl}</small></div></div>
     </div>`;
   if (el.__lastHtml === html) return;
   el.innerHTML = html; el.__lastHtml = html;
@@ -15427,8 +15801,8 @@ applyLayoutClass();
 // the spell column for RuneScape magic: every spell you can cast, its damage and how many casts your runes allow
 function rsSpellColHtml(){
   const p = G.player, L = rsLvl('magic'), el = rsStaffElem();
-  const casts = sp=>{ let n = Infinity; for (const r in sp[4]) if (r!==el) n = Math.min(n, Math.floor(skHave('r_'+r)/sp[4][r])); return n; };
-  const list = RS_SPELLS.filter(sp=>sp[2] <= L), next = RS_SPELLS.find(sp=>sp[2] > L);
+  const casts = sp=>rsCastsLeft(sp);
+  const list = rsBookSpells().filter(sp=>sp[2] <= L && rsSpellCombat(sp)), next = rsBookSpells().find(sp=>sp[2] > L);
   const rows = list.map(sp=>{ const d = rsSpellDamage(sp), n = casts(sp), sel = p.rsSpell===sp[0];
     return `<div class="spellrow" style="cursor:pointer;${sel ? 'color:var(--amber);' : ''}" onclick="rsSelectSpell('${sp[0]}'); renderGame();" data-tipspell="${sp[0]}">
       <span style="color:${ISO_ELEM_COL[sp[6]]||'inherit'}">&#9670;</span> ${esc(sp[1])} <span class="muted">${d.lo}&ndash;${d.hi}</span>
@@ -25249,12 +25623,12 @@ function rsPlayerFx(e, t, moving, iso){
     e._cast.visible = true; e._cast.scale.setScalar(0.04 + Math.sin(Math.min(1, u/0.6)*Math.PI/2)*(1-rel*0.8)*0.16); e._cast.position.set(0, -0.06, 0.03);
   } else if (e._cast) e._cast.visible = false;
   // prayers: the protection prayer you have up glows over your head; boosting prayers ring your feet in light
-  const pr = p.prayers || [], prot = pr.map(id=>(RS_PRAYERS.find(x=>x.id===id)||{}).prot).find(Boolean);
+  const pr = p.prayers || [], prot = pr.map(id=>(RS_ALLPRAY().find(x=>x.id===id)||{}).prot).find(Boolean);
   if (prot){
     if (!e._pi || e._pi.userData.k!==prot){ if (e._pi) e.holder.remove(e._pi); e._pi = new T.Sprite(new T.SpriteMaterial({ map:rsPrayIconTex(prot), transparent:true, depthWrite:false, depthTest:false })); e._pi.renderOrder = 20; e._pi.userData.k = prot; e.holder.add(e._pi); }
     e._pi.visible = true; e._pi.position.set(0, H*1.22 + Math.sin(now*2)*0.012*S, 0); e._pi.scale.setScalar(0.3*S); e._pi.material.opacity = 0.85 + Math.sin(now*4)*0.15;
   } else if (e._pi) e._pi.visible = false;
-  const boost = pr.some(id=>{ const q = RS_PRAYERS.find(x=>x.id===id); return q && !q.prot && q.grp!=='item'; });
+  const boost = pr.some(id=>{ const q = RS_ALLPRAY().find(x=>x.id===id); return q && !q.prot && q.grp!=='item'; });
   if (boost){
     if (!e._aura){ const m = new T.Mesh(new T.RingGeometry(0.26, 0.4, 36), new T.MeshBasicMaterial({ color:0xffe08a, transparent:true, opacity:0.4, blending:T.AdditiveBlending, depthWrite:false, side:T.DoubleSide })); m.rotation.x = -Math.PI/2; e._aura = m; e.holder.add(m); }
     e._aura.visible = true; e._aura.position.y = 0.012*S; e._aura.scale.setScalar(S*(1 + Math.sin(now*3)*0.06)); e._aura.material.opacity = 0.3 + Math.sin(now*3)*0.12;
@@ -25290,11 +25664,12 @@ function m3dStickArrow(m){
   e.holder.add(g); setTimeout(()=>{ if (g.parent) g.parent.remove(g); }, 1600);
 }
 // ---- arrows and spells in flight ----
-const ISO_ELEM_COL = { air:'#e8f0ff', water:'#5aa0ff', earth:'#b08a4a', fire:'#ff7a2a' };
-function isoShot(m, kind, col, delay){
+const ISO_ELEM_COL = { air:'#e8f0ff', water:'#5aa0ff', earth:'#b08a4a', fire:'#ff7a2a',
+  smoke:'#a0a0a0', shadow:'#8a5ac0', blood:'#e02a3a', ice:'#a8e8ff', sara:'#fff0b0', guthix:'#5ae07a', zammy:'#ff5a2a', arceuus:'#7af0c0', astral:'#e8d8f0', nature:'#3ac050' };
+function isoShot(m, kind, col, delay, extra){
   if (!ISO.on || !FPD.ok || !m) return;
   const p = G.player, d = Math.hypot(m.x-p.x, m.y-p.y), dur = (kind==='chin' ? 0.2 : kind==='bolt' ? 0.08 : 0.12) + d*(kind==='bolt' ? 0.035 : kind==='chin' ? 0.06 : 0.045);
-  (ISO.shots = ISO.shots || []).push({ x0:p.x+0.5, y0:p.y+0.5, x1:m.x+0.5, y1:m.y+0.5, t:-(delay||0), dur, kind, col:col||'#fff', m });
+  (ISO.shots = ISO.shots || []).push(Object.assign({ x0:p.x+0.5, y0:p.y+0.5, x1:m.x+0.5, y1:m.y+0.5, t:-(delay||0), dur, kind, col:col||'#fff', m }, extra||{}));
   FP.cast = kind==='spell' ? 1 : FP.cast;
 }
 // how long until a shot already flying at this spot lands (so its hitsplat waits for it)
@@ -25322,7 +25697,7 @@ function isoDrawBeams(){
 }
 function isoDrawShots(){
   const keep = [], ppu = ISO.ppu || 40;
-  try{ isoDrawAmmoDrops(); }catch(e){}
+  try{ isoDrawAmmoDrops(); isoDrawFlashThrall(ppu); }catch(e){}
   for (const s of ISO.shots||[]){
     s.t += FP.dt; if (s.t < 0){ keep.push(s); continue; }
     if (s.t > s.dur){ isoShotLand(s); continue; }
@@ -25342,9 +25717,12 @@ function isoDrawShots(){
       ctx.fillStyle = s.col && s.col!=='#fff' ? s.col : '#9aa3a8'; ctx.beginPath(); ctx.arc(a.sx, a.sy, Math.max(1.5, ppu*0.032), 0, Math.PI*2); ctx.fill();
     } else {
       ctx.globalCompositeOperation = 'lighter';
-      for (let i=4;i>=0;i--){ const q = at(Math.max(0, k-i*0.06)); const r = ppu*(0.14 - i*0.02);
+      const big = 1 + (s.tier||0)*0.35;
+      for (let i=4;i>=0;i--){ const q = at(Math.max(0, k-i*0.06)); const r = ppu*(0.14 - i*0.02)*big;
         const g = ctx.createRadialGradient(q.sx, q.sy, 0, q.sx, q.sy, Math.max(2, r*2)); g.addColorStop(0, s.col); g.addColorStop(1, 'rgba(0,0,0,0)');
         ctx.globalAlpha = 1 - i*0.18; ctx.fillStyle = g; ctx.beginPath(); ctx.arc(q.sx, q.sy, Math.max(2, r*2), 0, Math.PI*2); ctx.fill(); }
+      ctx.globalAlpha = 1;
+      try{ isoSpellParticles(s, a, ppu, big); }catch(e){}
     }
     ctx.restore();
   }
@@ -25945,7 +26323,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-76';
+const GAME_VERSION = 'rs-77';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

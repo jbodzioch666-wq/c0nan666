@@ -192,18 +192,18 @@ _The ranged combat code_
 ### Magic and prayer
 _The spell and prayer code_
 
-138. [ ] (371) Crowd control spells - Bind, Snare, Entangle root a monster; Confuse, Weaken, Curse lower its stats
-139. [ ] (372) Area spells - fire burst, ice barrage hitting a group for extra runes
-140. [ ] (374) Healing and support spells - Heal Self, Cure Poison, Stat Restore, Vengeance
-141. [ ] (373) God spells - Saradomin Strike, Claws of Guthix, Flames of Zamorak, with god capes and staves
-142. [ ] (375) Multiple spellbooks switched at an altar - Standard, Ancient, Lunar, Arceuus
-143. [ ] (376) Spell hotbar - favourite spells on number keys
-144. [ ] (378) Combination runes - mist, dust, mud, lava, steam, smoke count as two elements
-145. [ ] (380) Spell animations per tier - small strike bolts up to huge surges with a screen effect
-146. [ ] (294) Better spell effects - per-element particles (fire trails, water splash, earth rocks, swirling air)
-147. [ ] (316) High and low alchemy spells - turn items into gold with Magic
-148. [ ] (437) Redemption prayer - heals you when you drop below 10% health
-149. [ ] (439) Ancient Curses - a second prayer book from a quest: soul split, deflect, leech, Turmoil
+138. [x] (371) Crowd control spells - Bind, Snare, Entangle root a monster; Confuse, Weaken, Curse lower its stats
+139. [x] (372) Area spells - fire burst, ice barrage hitting a group for extra runes
+140. [x] (374) Healing and support spells - Heal Self, Cure Poison, Stat Restore, Vengeance
+141. [x] (373) God spells - Saradomin Strike, Claws of Guthix, Flames of Zamorak, with god capes and staves
+142. [x] (375) Multiple spellbooks switched at an altar - Standard, Ancient, Lunar, Arceuus
+143. [x] (376) Spell hotbar - favourite spells on number keys
+144. [x] (378) Combination runes - mist, dust, mud, lava, steam, smoke count as two elements
+145. [x] (380) Spell animations per tier - small strike bolts up to huge surges with a screen effect
+146. [x] (294) Better spell effects - per-element particles (fire trails, water splash, earth rocks, swirling air)
+147. [x] (316) High and low alchemy spells - turn items into gold with Magic
+148. [x] (437) Redemption prayer - heals you when you drop below 10% health
+149. [x] (439) Ancient Curses - a second prayer book from a quest: soul split, deflect, leech, Turmoil
 
 ### Dungeon overhaul
 _Bigger floors and layouts before the monsters and content that fill them_

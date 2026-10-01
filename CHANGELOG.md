@@ -1,5 +1,39 @@
 # Depthcrawl patch notes
 
+## RS-77 - Magic and prayer
+
+- **Four spellbooks**, swapped at an altar (a dungeon altar, or a runecrafting altar out in the wild):
+  - **Standard:** strikes to surges, plus crowd control, god spells and alchemy.
+  - **Ancient Magicks** (Magic 50, unlocked by an ancient tablet the bosses of crypts, graveyards and necromancer towers carry): smoke, shadow, blood and ice spells as rushes, bursts, blitzes and barrages. Smoke poisons, shadow ruins the foe's aim, blood heals you and ice freezes the foe in place.
+  - **Lunar** (Magic 65, Defence 40): Cure Me, Heal Self, Stat Restore and Vengeance.
+  - **Arceuus** (Magic 30): Ghostly, Skeletal and Undead Grasp (damage and a root); Inferior, Superior and Dark Demonbane (demons only, +25%); and Lesser, Superior and Greater thralls that fight beside you for 25 turns.
+- **Crowd control:**
+  - Bind, Snare and Entangle root a monster: it can't step, but still strikes if you stand next to it.
+  - Confuse lowers its aim, Weaken and Enfeeble its damage, and Curse and Vulnerability its armour.
+  - Stun makes it lose two turns.
+- **Area spells:** bursts and barrages hit the target and everything next to it, each rolled separately. They cost more runes.
+- **Healing and support:** Cure Me, Heal Self (a quarter of your life), Stat Restore (shakes off fear, +10 prayer) and Vengeance (75% of the next blow you take goes back to whoever struck it).
+- **God spells** (Magic 60): Saradomin Strike lowers the foe's aim, Claws of Guthix tear away its armour, and Flames of Zamorak keep burning. Each needs its god's staff, which the alchemist sells once you reach Magic 60. 100 casts earns that god's cape, and wearing it makes the god's spell hit 6 harder.
+- **Spells on the quick bar:** the star button in the spellbook, or a right-click in the side panel, puts any spell on the quick bar so keys 1-9 cast it. The side panel only shows your current book's spells.
+- **Combination runes:** mist, dust, mud, smoke, steam and lava each count as one of both their elements. Pure runes are spent first. Bind them at an elemental altar from essence plus runes of the other element (turn it on in the spellbook), or find them on monsters.
+- **New runes:** nature, astral and soul runes drop from monsters.
+- **Spell size by tier:** strikes are small, and each tier up (bolt, blast, wave, surge; rush to barrage) is bigger with a bigger burst. Surges and barrages flash the screen and shake it.
+- **Element effects:**
+  - fire throws embers
+  - water drips and ice throws shards
+  - earth spins rocks
+  - air swirls
+  - smoke, shadow and blood leave a trail of puffs
+- **Alchemy:** Low Level Alchemy (Magic 21) turns an item into 40% of its worth in gold, anywhere, and High Level Alchemy (Magic 55) into 60%. Each costs fire and nature runes. Right-click an item in your pack, or pick one in the spellbook.
+- **Redemption** (Prayer 49): if a blow leaves you under 10% life, you heal a quarter of your life and your prayer points are spent. **Augury** (Prayer 77) is the magic version of Piety.
+- **Ancient Curses:** a second prayer book, learned from a curse tablet some bosses of the dead carry and swapped at an altar (Prayer 50):
+  - Protect Item
+  - Sap Warrior, Ranger and Mage (that style of attack aims 2 worse at you)
+  - Deflect Melee, Missiles and Magic (protection that throws a tenth of the blow back)
+  - the Leech prayers
+  - Soul Split (heal a fifth of the damage you deal)
+  - Turmoil (+5 melee accuracy, +28% melee damage, +5 armour)
+
 ## RS-76 - Ranged
 
 - **Longrange style:** F now cycles through five styles. Longrange gives bows and thrown weapons +2 reach and you +2 armour, and shares ranged xp with Defence (in melee it fights as Defensive). **Rapid** (Aggressive with a bow) is now real: it gives a chance of a second shot each turn.
