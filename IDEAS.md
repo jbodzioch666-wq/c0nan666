@@ -164,16 +164,16 @@ _New crafts and skills on top of the framework and resources_
 ### Melee
 _The melee combat code_
 
-118. [ ] (415) Stab, slash and crush damage types - monsters and armour have weak spots per type (skeletons weak to crush)
-119. [ ] (48) Weapon-type differences - daggers hit twice, spears reach 2 tiles, battleaxes and halberds hit everything around you, maces stun, scimitars bleed
-120. [ ] (420) Cleave - big axes and swords also hit monsters beside the target
-121. [ ] (49) Flanking and positioning - bonus for hitting from behind or the side, penalty when surrounded
-122. [ ] (421) Weapon mastery - using a weapon type unlocks small permanent bonuses and moves
-123. [ ] (416) Abyssal whip - fast, accurate mid-level upgrade
-124. [ ] (417) Dragon scimitar, dragon longsword and dragon dagger as sought-after drops
-125. [ ] (419) Barrows weapons - Dharok's greataxe, Guthan's spear (heals), Verac's flail (ignores armour), Torag's hammers
-126. [ ] (8) Poison and venom weapons, plus antipoison potions
-127. [ ] (177) Weapon poison and enchant - apply poison or bolt enchantments to weapons
+118. [x] (415) Stab, slash and crush damage types - monsters and armour have weak spots per type (skeletons weak to crush)
+119. [x] (48) Weapon-type differences - daggers hit twice, spears reach 2 tiles, battleaxes and halberds hit everything around you, maces stun, scimitars bleed
+120. [x] (420) Cleave - big axes and swords also hit monsters beside the target
+121. [x] (49) Flanking and positioning - bonus for hitting from behind or the side, penalty when surrounded
+122. [x] (421) Weapon mastery - using a weapon type unlocks small permanent bonuses and moves
+123. [x] (416) Abyssal whip - fast, accurate mid-level upgrade
+124. [x] (417) Dragon scimitar, dragon longsword and dragon dagger as sought-after drops
+125. [x] (419) Barrows weapons - Dharok's greataxe, Guthan's spear (heals), Verac's flail (ignores armour), Torag's hammers
+126. [x] (8) Poison and venom weapons, plus antipoison potions
+127. [x] (177) Weapon poison and enchant - apply poison or bolt enchantments to weapons
 
 ### Ranged
 _The ranged combat code_

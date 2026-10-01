@@ -1,5 +1,45 @@
 # Depthcrawl patch notes
 
+## RS-75 - Melee
+
+- **Stab, slash and crush:** every melee weapon now deals one of three damage types, shown on its tooltip. Most monsters have a weak spot (+25%) and something they shrug off (-20%), and your hit message tells you which:
+  - skeletons and the undead: weak to crush, resist stab
+  - slimes: weak to slash, resist crush
+  - armoured things (golems, knights, beetles, crabs): weak to crush, resist slash
+  - dragons: weak to stab, resist slash
+  - demons: weak to stab, resist crush
+  - beasts: weak to slash
+  - orcs, goblins, trolls and the like: weak to stab
+- **Every weapon type fights differently:**
+  - **Daggers** stab twice a turn; the second, quicker stab lands at 60%.
+  - **Spears and halberds** reach a foe two tiles away in a straight line (click it, or let auto-combat hold it off). A foe struck from out of its reach can't hit back that turn.
+  - **Battleaxes and halberds** sweep, hitting everything around you for half damage.
+  - **Greatswords** cleave into foes beside your target.
+  - **Maces (20%) and warhammers (25%)** can daze, so the foe loses its next action.
+  - **Scimitars** can make foes bleed for three turns.
+- **Flanking and positioning:**
+  - Hitting a foe that hasn't fought you yet, or one that's fleeing or dazed, catches it off guard: +2 to hit and +20% damage.
+  - Your companion standing beside your target flanks it for +2 to hit.
+  - With three or more foes around you, you're surrounded: -2 to hit.
+- **Weapon mastery moves:** each weapon mastery (swords, axes, maces, spears, daggers, staves, unarmed) unlocks a move at levels 30, 60 and 90, such as Lunge, Execute, Shatter, Skewer, Assassinate, Whirlwind and Earthshaker. They're listed on the Skills screen and announced when you reach them.
+- **The abyssal whip** is now fast: a quarter of the time it lashes twice. Demons sometimes drop one, as well as it being craftable from boss relics.
+- **Dragon weapons are rare drops now.** The dragon scimitar, longsword and dagger no longer come in ordinary loot. They drop from bosses, from dragons and wyverns, and now and then deep in the dungeons. A dragon dagger sometimes comes already poisoned.
+- **Barrows weapons:** graveyard bosses (and, very rarely, wights) carry Barrows weapons:
+  - **Dharok's greataxe** hits harder the lower your life is, up to double. It's two-handed.
+  - **Guthan's warspear** heals you for the damage dealt on a quarter of hits.
+  - **Verac's flail** strikes through armour on a quarter of swings.
+  - **Torag's hammers** crush the foe's armour.
+- **Poison and venom:**
+  - Brew weapon poison, poison+ and poison++ at the cauldron, and weapon venom from a venom gland cut from serpents and hydras.
+  - Coat a stabbing or slashing weapon with one, and a quarter of its hits poison the foe. Venom gets worse every turn.
+  - Brew antipoison too, or buy it and weapon poison at the alchemist. Antipoison cures you and keeps poison off you for a while.
+- **Enchanted arrows:** in the spellbook, enchant your gem-tipped arrows with runes. 15% of hits then trigger:
+  - sapphire: restore prayer
+  - emerald: poison
+  - ruby: take a fifth of the target's life, at a cost to yours
+  - diamond: armour-piercing damage
+  - onyx: life leech
+
 ## RS-74 - Production skills
 
 - **Fletching is its own skill now.** Bows, arrows, gem arrowtips and gem-tipped arrows train Fletching instead of Crafting. Your Fletching level starts where your Crafting level was, so you can still make everything you could before. The fletching bench shows both levels. Fletching perks: material saving, and +5 arrows a batch at 50 and again at 99.

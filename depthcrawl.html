@@ -4573,6 +4573,8 @@ function useFromInv(idx){
     return;
   }
   if (it.kind==='wand'){ fireWand(it); return; }
+  if (it.kind==='antipoison'){ drinkAntipoison(idx); return; }
+  if (it.kind==='wpoison'){ applyWeaponPoison(idx); return; }
   if (!it.consumable) return;
   const heal = rollDice(it.hd1, it.hd2);
   const before = G.player.hp;
@@ -5668,6 +5670,7 @@ function anotherAllyAdjacentToPlayer(exceptIdx){
   return false;
 }
 function applyPoisonToPlayer(dmgDie){
+  if ((G.player.antiPoisonUntil||0) > (G.player.turnCount||0)){ logMsg('your antipoison keeps the poison out', 'good'); return; }
   G.player.poisonTurns = mx(G.player.poisonTurns||0, 3);
   G.player.poisonDmg = mx(G.player.poisonDmg||0, dmgDie);
 }
@@ -5770,6 +5773,7 @@ function singleAttackRoll(mi, missVerb, hitVerb){
 // resolves a monster's whole turn against the player, including Multiattack
 // and Rampage's bonus swing when it applies
 function monsterStrikesPlayer(mi, missVerb, hitVerb){
+  if (G.mon[mi]) G.mon[mi].engaged = true;
   const hits = multiattackCount(G.mon[mi]);
   let anyHit = false;
   for (let a=0; a<hits; a++){
@@ -5809,9 +5813,12 @@ function singlePlayerAttack(mi){
     }
     if (chn(arrowSaveChance())){ if (!G.player._saveNote){ logMsg('your arrow is caught and saved', ''); G.player._saveNote = 1; } } else G.player.arrows--;
   }
-  const atkType = rsAttackType();
+  const atkType = rsAttackType(), mel = atkType==='melee', W = G.gear.weapon, tr = mel ? wTrait() : {};
+  const fl = mel ? flankInfo(m) : { hit:0, dmg:0, off:false, tag:'' }; m.engaged = true;
+  const extraHit = mel ? fl.hit + mastMove('acc') + mastMove('pierce') : 0;
+  const verac = !!(mel && W && W.verac && chn(0.25));
   let roll = rollDie(20);
-  let atkTotal = rsAttackTotal(roll, m, atkType);
+  let atkTotal = rsAttackTotal(roll, m, atkType) + extraHit;
   const sneak = (G.player.cls==='Rogue') && G.player.sneakPrimed;
   // real D&D: attacks against a paralyzed/incapacitated creature auto-hit
   // and are automatic critical hits - a control-kind spell (Sleep, Hold
@@ -5823,14 +5830,14 @@ function singlePlayerAttack(mi){
   // this monster's AC makes it easier to hit while it's active
   const effAC = m.ac - ((m.debuffACTurns>0) ? (m.debuffACAmt||0) : 0);
 
-  if (!sneak && !incapacitated && (roll===1 || atkTotal < effAC)){
+  if (!sneak && !incapacitated && !verac && (roll===1 || atkTotal < effAC)){
     // the Lucky feat: banks real reroll charges (refilled on a full rest,
     // see fullyRestPlayer) rather than a flat passive number, so a miss
     // spends one automatically before it's locked in as a miss
     if (hasFeat('lucky') && (G.player.luckyCharges||0)>0){
       G.player.luckyCharges--;
       roll = rollDie(20);
-      atkTotal = rsAttackTotal(roll, m, atkType);
+      atkTotal = rsAttackTotal(roll, m, atkType) + extraHit;
       logMsg('a lucky reroll turns your swing around!', 'magic');
     }
     if (!sneak && (roll===1 || atkTotal < effAC)){
@@ -5839,9 +5846,19 @@ function singlePlayerAttack(mi){
       return false;
     }
   }
-  const raw = (atkType==='ranged' ? rsRangedDamage() : rsMeleeDamage()) * rsTriDmgMult(atkType, m);
-  let dmg = mx(1, roundH(raw));
+  let raw = (atkType==='ranged' ? rsRangedDamage() : rsMeleeDamage()) * rsTriDmgMult(atkType, m);
   let tag = '';
+  if (mel){
+    const mt = meleeType(), tm = meleeTypeMult(m, mt);
+    raw *= tm * (1 + fl.dmg + mastMove('dmg')) * (G._quickStrike ? 0.6 : 1); raw += mastMove('flat');
+    if (tm>1) tag += ` (weak to ${mt}!)`; else if (tm<1) tag += ` (shrugs off ${mt})`;
+    tag += fl.tag;
+    if (fl.off && mastMove('ambush')){ raw *= 2; tag += ' - ASSASSINATE!'; }
+    if (mastMove('exec') && m.hp < m.maxHp*0.25){ raw *= 1 + mastMove('exec'); tag += ' - execute!'; }
+    if (W && W.dharok){ const miss = 1 - G.player.hp/Math.max(1, effMaxHp()); raw *= 1 + miss; if (miss > 0.3) tag += " (Dharok's fury)"; }
+    if (verac) tag += ' (through its armour)';
+  }
+  let dmg = mx(1, roundH(raw));
   const isCrit = incapacitated || (roll >= weaponCritThreshold());
   const isDeadly = chn(gearStatF('deadly'));
   if (sneak){ dmg*=2; tag=' - SNEAK ATTACK!'; G.player.sneakPrimed=0; }
@@ -5901,8 +5918,39 @@ function singlePlayerAttack(mi){
     if (heal>0){ G.player.hp = mn(effMaxHp(), G.player.hp+heal); logMsg(`you drain ${heal} HP`, 'magic'); }
   }
   applyUniqueProcs(m, total);
-  if (m.hp<=0){ monsterDies(mi); return true; }
+  try{ meleeAfterHit(m, mi, total, atkType); }catch(e){ console.error(e); }
+  if (m.hp<=0){ if (m.alive) monsterDies(mi); return true; }
   return false;
+}
+// everything a landed hit can set off besides its damage
+function meleeAfterHit(m, mi, total, atkType){
+  const W = G.gear.weapon, p = G.player;
+  if (atkType==='ranged'){
+    const t = ammoType(), a = RS_AMMO[t]; if (!a || a[5]===undefined || !chn(a[5]===3 ? 0.1 : 0.15)) return;
+    const e = ARROW_ENCH[a[5]];
+    if (e.gem==='sapphire'){ p.prayPts = Math.min(rsLvl('prayer'), (p.prayPts||0) + 2); }
+    else if (e.gem==='emerald') monPoison(m, 2);
+    else if (e.gem==='ruby'){ const d = Math.min(80, Math.round(Math.max(0, m.hp)*0.2)); m.hp -= d; p.hp = Math.max(1, p.hp - Math.round(p.hp*0.1)); }
+    else if (e.gem==='diamond'){ m.hp -= Math.round(total*0.25); }
+    else if (e.gem==='onyx'){ p.hp = Math.min(effMaxHp(), p.hp + Math.round(total*0.25)); }
+    logMsg(`${e.nm}!`, 'magic'); return;
+  }
+  if (atkType!=='melee') return;
+  const tr = wTrait();
+  if (W && W.guthan && chn(0.25)){ const h = Math.min(effMaxHp() - p.hp, total); if (h>0){ p.hp += h; logMsg(`Guthan's warspear drinks the blood - you heal ${h}`, 'magic'); } }
+  if (W && W.torag && chn(0.25)){ m.debuffACTurns = 5; m.debuffACAmt = Math.max(m.debuffACAmt||0, 2); logMsg(`Torag's hammers crush the ${m.nm}'s armour`, 'magic'); }
+  if (m.hp > 0){
+    if (chn(tr.daze + mastMove('daze'))){ monDaze(m, 1); logMsg(`the ${m.nm} is dazed`, 'magic'); }
+    if (chn(tr.bleed + mastMove('bleed'))){ monBleed(m, total*0.25); logMsg(`the ${m.nm} is bleeding`, 'hit'); }
+    if (W && W.poisoned && chn(0.25)){ monPoison(m, W.poisoned); logMsg(`the ${m.nm} is ${W.poisoned>=4 ? 'envenomed' : 'poisoned'}`, 'hit'); }
+    else if (chn(mastMove('poison'))){ monPoison(m, 1); logMsg(`the ${m.nm} is poisoned`, 'hit'); }
+    if (chn(mastMove('again'))){ const d = Math.max(1, Math.round(total*0.5)); m.hp -= d; logMsg(`you strike again for ${d}`, 'hit'); }
+  }
+  if (tr.sweep) meleeSplash(mi, 0.5, 'sweep', total);
+  else if (tr.cleave) meleeSplash(mi, 0.5, 'cleave', total);
+  if (!tr.sweep && chn(mastMove('whirl'))){ logMsg('Whirlwind!', 'magic'); meleeSplash(mi, 0.6, 'sweep', total); }
+  if (mastMove('skewer')) meleeSplash(mi, 0.5, 'skewer', total);
+  if (chn(mastMove('quake'))){ logMsg('Earthshaker!', 'magic'); for (const o of G.mon) if (o.alive && Math.max(Math.abs(o.x-p.x), Math.abs(o.y-p.y))<=1) monDaze(o, 1); }
 }
 function fight(mi){
   noteFoe(mi);
@@ -5916,8 +5964,11 @@ function fight(mi){
     monsterStrikesPlayer(mi, 'attacks', 'hits');
     return;
   }
-  const attacks = playerAttackCount();
+  let attacks = playerAttackCount();
+  let quick = -1;
+  { const tr = rsAttackType()==='melee' ? wTrait() : {}; if (tr.dagger){ attacks += 1; quick = attacks-1; } if (tr.whip && chn(0.25)){ attacks += 1; logMsg('your whip lashes twice', ''); } }
   for (let a=0; a<attacks; a++){
+    G._quickStrike = a===quick;          // (a dagger's second, quicker stab lands at 60%)
     if (G.gameOver) return;
     const m = G.mon[mi];
     if (!m || !m.alive) break; // it already died to an earlier swing this turn
@@ -5927,6 +5978,9 @@ function fight(mi){
   // monster counterattack (Multiattack and this creature's Monster-Manual
   // abilities apply exactly as they would to an independent attack) - this
   // happens once per player TURN, not once per swing, same as real D&D
+  { const mm = G.mon[mi];
+    if (mm && mm.alive && Math.max(Math.abs(mm.x-G.player.x), Math.abs(mm.y-G.player.y)) > 1) return;      // (struck from out of its reach)
+    if (mm && mm.dazedTurns>0){ mm.dazedTurns--; logMsg(`the ${mm.nm} reels and can't strike back`, ''); return; } }
   monsterStrikesPlayer(mi, 'attacks', 'hits');
 }
 function monsterAttacks(mi){
@@ -6425,6 +6479,8 @@ function tickMonsters(excludeIdx){
       logMsg(`the ${m.nm} takes ${dd} lingering damage`, 'magic');
       if (m.hp<=0){ logMsg(`the ${m.nm} is destroyed`, 'good'); monsterDies(i); continue; }
     }
+    if (monStatusTick(m, i)) continue;
+    if (m.dazedTurns>0){ m.dazedTurns--; continue; }   // dazed by a blow - it loses this turn
     if (m.banishedTurns>0){ m.banishedTurns--; continue; } // banish - it isn't even on this plane, so it can't act
     if (m.stunTurns>0){ m.stunTurns--; continue; } // a control spell (Sleep, Hold Person, ...) - it loses this turn entirely
 
@@ -9349,7 +9405,7 @@ function renderXpTracker(){
   renderBuffBar();
 }
 function skUnlockText(k, L, mastery){
-  if (mastery){ if (L%20===0) return ' (+1 to hit with it)'; if (L%25===0) return ' (+1 damage with it)'; return ''; }
+  if (mastery){ const mv = (MASTERY_MOVES[k]||[]).find(x=>x[0]===L); if (mv) return ` - new move: ${mv[1]} (${mv[2]})`; if (L%20===0) return ' (+1 to hit with it)'; if (L%25===0) return ' (+1 damage with it)'; return ''; }
   const hit = (list, f)=>{ const e = list.find(e=>(f ? e[f] : e.lvl)===L); return e ? ` - you can now ${k==='smithing' ? 'work' : k==='cooking' ? 'cook' : k==='alchemy' ? 'brew with' : k==='firemaking' ? 'burn' : 'gather'} ${e.nm}` : ''; };
   if (k==='fishing') return hit(SK_FISH); if (k==='mining') return hit(SK_ORE); if (k==='woodcutting') return hit(SK_LOG);
   if (k==='foraging') return hit(SK_HERB); if (k==='smithing') return hit(SK_BAR); if (k==='firemaking') return hit(SK_LOG, 'flvl');
@@ -10027,7 +10083,7 @@ function buildBrewing(){
   const rows = SK_HERB.map((h,i)=>skHave(h.id) ? `<div class="shoprow"><span class="muted">&times;${skHave(h.id)}</span><span>${esc(h.nm)} &rarr; ${esc(POTIONS[Math.min(i, POTIONS.length-1)][0])}</span>
     <span class="desc">${L>=h.lvl ? `2 herbs per potion &middot; ${h.axp} xp` : `needs Alchemy ${h.lvl}`}</span>
     <span>${L>=h.lvl ? `<button class="btn" onclick="cqAdd('brew','${h.id}','',1)">brew 1</button>${cqMore('brew', h.id)}` : ''}</span></div>` : '').join('') || `<div class="muted">no herbs - forage for them out in the wilds (E)</div>`;
-  return `${cqHtml()}<div class="panel" style="margin-top:14px;"><h4 style="color:${COL.purple};">BREWING &middot; Alchemy ${L}</h4>${rows}</div>`;
+  return `${cqHtml()}<div class="panel" style="margin-top:14px;"><h4 style="color:${COL.purple};">BREWING &middot; Alchemy ${L}</h4>${rows}${brew2Html()}</div>`;
 }
 // ---- the Skills screen (J) ----
 function buildSkills(){
@@ -10044,7 +10100,7 @@ function buildSkills(){
     <div class="ovbody">
       ${buildRsCombatSkills()}
       <div class="skgrid">${skills}</div>
-      <h4 style="color:var(--ink-faint);margin:12px 0 6px;">TOTAL LEVEL ${rsTotalLevel()}</h4>${totalGatesHtml()}${trophiesHtml()}
+      <h4 style="color:var(--ink-faint);margin:12px 0 6px;">TOTAL LEVEL ${rsTotalLevel()}</h4>${totalGatesHtml()}${masteryHtml()}${trophiesHtml()}
       <h4 style="color:var(--ink-faint);margin:12px 0 6px;">BAG</h4><div class="skbag">${bag}</div>
       <div class="btnrow" style="margin-top:12px;">${opts}${foods.length ? `<button class="btn" onclick="eatFood(); renderOverlay();">U &middot; eat (${foods.reduce((a,f)=>a+f.n,0)} food)</button>` : ''}
         <button class="btn primary" onclick="setUi('playing')">J / ESC &middot; close</button></div>
@@ -10183,7 +10239,7 @@ function crRecipes(){
 }
 const CR_COMBOS = [['air','water'],['air','earth'],['air','fire'],['water','earth'],['water','fire'],['earth','fire']];
 const CR_COMBO_NM = { 'air+water':'Mist', 'air+earth':'Dust', 'air+fire':'Smoke', 'water+earth':'Mud', 'water+fire':'Steam', 'earth+fire':'Lava' };
-function crWhip(){ const it = rsMakeWeapon(6, 3); it.nm = 'Abyssal Whip'; it.baseMat = 'Abyssal'; it.acc = 90; it.dmgB = 82; it.reqAtt = 70; it.rsCol = '#5a2a6a'; it.relic = 1; it.price = 60000; return it; }
+function crWhip(){ const it = rsMakeWeapon(6, 3); it.nm = 'Abyssal Whip'; it.baseMat = 'Abyssal'; it.acc = 90; it.dmgB = 82; it.reqAtt = 70; it.rsCol = '#5a2a6a'; it.relic = 1; it.whip = 1; it.price = 60000; return it; }
 function crDfs(){ const it = rsMakeArmour('metal', 6, 'offhand'); it.nm = 'Dragonfire Shield'; it.baseMat = 'Dragonfire'; it.ac = Math.round((it.ac||60)*1.35); it.dmgB = 7; it.rsCol = '#e05a20'; it.relic = 1; it.price = 80000; return it; }
 // ---- recipe books: the finest recipes aren't known by level alone - they're learned from books that drop or are given as quest rewards ----
 const CR_BOOKS = [
@@ -10206,6 +10262,12 @@ function crOnKill(m){
   if (chn(boss ? 0.2 : Math.min(0.02, 0.004 + (G.depth||1)*0.001))) crGiveBook(`the ${m.nm} drops something`);
   if (!boss && chn(Math.min(0.04, 0.012 + (G.depth||1)*0.002))){ const g = crRollGem(); skAdd(g, 1); logMsg(`the ${m.nm} drops an ${skName(g).toLowerCase()}`, 'loot'); }
   if (boss) crBossMats(m);
+  { const nm = (m.nm||'').toLowerCase(), deep = G.depth||1;
+    if (boss && G.siteKind==='graveyard' && chn(0.3)) lootRareWeapon(crBarrows(), `the ${m.nm} guarded a Barrows weapon`);
+    else if (!boss && /wight|wraith|spectre|barrow|crypt/.test(nm) && chn(0.004)) lootRareWeapon(crBarrows(), `the ${m.nm} drops a Barrows weapon`);
+    if (chn(boss ? 0.08 : /dragon|wyvern|drake/.test(nm) ? 0.03 : deep>=6 ? 0.004 : 0)) lootRareWeapon(crDragonWeapon(), `the ${m.nm} drops a dragon weapon`);
+    if (/demon|fiend|abyss/.test(nm) && chn(boss ? 0.05 : 0.006)) lootRareWeapon(crWhip(), `the ${m.nm} drops an abyssal whip`);
+    if (/serpent|snake|hydra|naga|wyvern/.test(nm) && chn(0.06)){ skAdd('venomgland', 1); logMsg(`you cut a venom gland from the ${m.nm}`, 'loot'); } }
 }
 function crLearn(idx){
   const it = G.inv[idx], p = G.player; if (!it || !it.recipeBook) return;
@@ -10245,6 +10307,7 @@ function cqLabel(kind, a, b){
   if (kind==='cook'){ const f = SK_FISH.concat(SK_MEAT).find(f=>f.id===a); return f ? 'cooked ' + f.nm.replace(/^Raw /, '').toLowerCase() : 'food'; }
   if (kind==='dish'){ const d = SK_DISHES.find(d=>d.id===a); return d ? d.nm + 's' : 'dishes'; }
   if (kind==='small') return a==='nails' ? 'batches of nails' : 'cannonballs';
+  if (kind==='brew2'){ const r = SK_BREW2.find(x=>x.id===a); return r ? r.nm + 's' : 'brews'; }
   return 'items';
 }
 function cqAdd(kind, a, b, n){
@@ -10253,7 +10316,7 @@ function cqAdd(kind, a, b, n){
   renderOverlay();
 }
 function cqStop(){ const c = CQ.list[0]; CQ.list = []; if (c && c.done) logMsg(`you stop after ${c.done} ${c.label.toLowerCase()}`, ''); renderOverlay(); }
-function cqUnit(c){ if (c.kind==='craft') return crCraft(c.a); if (c.kind==='smelt') return skSmelt(c.a); if (c.kind==='forge') return skForge(c.a, c.b); if (c.kind==='brew') return skBrew(c.a); if (c.kind==='cook') return skCook(c.a); if (c.kind==='dish') return skCookDish(c.a); if (c.kind==='small') return skSmithSmall(c.b, c.a); return 0; }
+function cqUnit(c){ if (c.kind==='craft') return crCraft(c.a); if (c.kind==='smelt') return skSmelt(c.a); if (c.kind==='forge') return skForge(c.a, c.b); if (c.kind==='brew') return skBrew(c.a); if (c.kind==='cook') return skCook(c.a); if (c.kind==='dish') return skCookDish(c.a); if (c.kind==='small') return skSmithSmall(c.b, c.a); if (c.kind==='brew2') return skBrew2(c.a); return 0; }
 function cqTick(now){
   const c = CQ.list[0]; if (!c) return;
   if (G.ui!==c.ui){ CQ.list = []; if (c.done) logMsg(`you stop working - ${c.done} ${c.label.toLowerCase()} made`, ''); return; }
@@ -10340,7 +10403,7 @@ SK_CRAFT_MATS.push(
   { id:'glass', nm:'Molten Glass' }, { id:'vial', nm:'Glass Vial' }, { id:'lens', nm:'Lantern Lens' }, { id:'fishbowl', nm:'Fishbowl' },
   { id:'pot', nm:'Clay Pot' }, { id:'piedish', nm:'Pie Dish' }, { id:'bowl', nm:'Bowl' },
   { id:'torch', nm:'Torch' }, { id:'lantern', nm:'Oil Lantern' }, { id:'bullseye', nm:'Bullseye Lantern' },
-  { id:'nails', nm:'Nails' }, { id:'cannonball', nm:'Cannonball' });
+  { id:'nails', nm:'Nails' }, { id:'cannonball', nm:'Cannonball' }, { id:'venomgland', nm:'Venom Gland' });
 SK_BAR.push({ id:'goldb', nm:'Gold Bar', ore:'goldore', per:1, lvl:40, xp:22, ilvl:12, jewel:true, noForge:true });
 // gem-tipped arrows: the strongest ammo there is, fletched from gems (never dropped)
 const CR_GEMS = [['sapphire',20,50,'#4a6ae0'], ['emerald',27,68,'#3ab06a'], ['ruby',34,85,'#e03a3a'], ['diamond',43,108,'#e8f0ff'], ['onyx',67,168,'#3a3036']];
@@ -10820,6 +10883,179 @@ function rsAtkBonus(type){
   if (st==='accurate') b += 2; else if (st==='controlled') b += 1;
   return b;
 }
+// ===================== melee: damage types, weapon traits, positioning, mastery moves, poison =====================
+// every melee weapon stabs, slashes or crushes; most monsters have a weak spot and something they shrug off
+const MELEE_TYPE = { Dagger:'stab', Shortsword:'stab', Spear:'stab', Scimitar:'slash', Longsword:'slash', Greatsword:'slash', Battleaxe:'slash', Halberd:'slash', Mace:'crush', Warhammer:'crush', Quarterstaff:'crush' };
+function meleeType(w){ w = w || G.gear.weapon; if (!w || !w.used) return 'crush'; if (w.meleeType) return w.meleeType; return MELEE_TYPE[w.basis] || 'slash'; }
+function monWeak(m){
+  const n = ((m && m.nm)||'').toLowerCase();
+  if (/skelet|bone|lich|mummy|zombie|ghoul|wight|barrow/.test(n)) return { weak:'crush', strong:'stab' };
+  if (/slime|ooze|jelly|pudding|cube/.test(n)) return { weak:'slash', strong:'crush' };
+  if (/golem|knight|guard|construct|gargoyle|xorn|armou?r|crab|beetle|scarab|turtle|kalphite/.test(n)) return { weak:'crush', strong:'slash' };
+  if (/dragon|wyvern|wyrm|drake|hydra/.test(n)) return { weak:'stab', strong:'slash' };
+  if (/demon|fiend|devil|imp\b/.test(n)) return { weak:'stab', strong:'crush' };
+  if (/wolf|bear|boar|cat\b|rat\b|bat\b|spider|elk|owl|hound|hyena|serpent|snake|worm|treant|leech/.test(n)) return { weak:'slash', strong:null };
+  if (/troll|ogre|giant|orc|goblin|kobold|gnoll|bandit|cultist|brigand|thug/.test(n)) return { weak:'stab', strong:null };
+  return { weak:null, strong:null };
+}
+function meleeTypeMult(m, t){ const w = monWeak(m); return w.weak===t ? 1.25 : w.strong===t ? 0.8 : 1; }
+// what the weapon in your hand does besides hit
+function wTrait(){
+  const w = G.gear.weapon, ok = w && w.used && !w.range, b = ok ? w.basis : '';
+  return { dagger:b==='Dagger', reach:!!(ok && (b==='Spear' || b==='Halberd' || w.guthan)), sweep:b==='Battleaxe' || b==='Halberd', cleave:b==='Greatsword' || !!(ok && w.dharok),
+    daze:b==='Mace' ? 0.2 : b==='Warhammer' ? 0.25 : 0, bleed:b==='Scimitar' ? 0.25 : 0, whip:!!(ok && w.whip) };
+}
+// positioning: catching a foe off guard (it hasn't fought you yet, or it's fleeing or reeling), or with your companion beside it, helps; being surrounded hurts
+function flankInfo(m){
+  const p = G.player; let adj = 0;
+  for (const o of G.mon) if (o.alive && Math.max(Math.abs(o.x-p.x), Math.abs(o.y-p.y))<=1) adj++;
+  const off = !m.engaged || m.frightenedTurns>0 || m.dazedTurns>0;
+  const c = p.companion, comp = !!(c && c.x!==undefined && Math.max(Math.abs(c.x-m.x), Math.abs(c.y-m.y))<=1);
+  return { hit:(off ? 2 : 0) + (comp ? 2 : 0) - (adj>=3 ? 2 : 0), dmg:off ? 0.2 : 0, off, tag:off ? ' (caught off guard)' : comp ? ' (flanked)' : adj>=3 ? ' (surrounded)' : '' };
+}
+// weapon mastery moves, unlocked at mastery 30, 60 and 90
+const MASTERY_MOVES = {
+  sword:   [[30,'Lunge','10% chance to strike again for half damage',{again:0.1}], [60,'Keen Edge','+1 to hit',{acc:1}], [90,'Whirlwind','10% chance to also hit everything around you',{whirl:0.1}]],
+  axe:     [[30,'Hack','10% chance to make the foe bleed',{bleed:0.1}], [60,'Heavy Chop','+10% damage',{dmg:0.1}], [90,'Execute','+50% damage against foes below a quarter of their life',{exec:0.5}]],
+  blunt:   [[30,'Concuss','10% more chance to daze',{daze:0.1}], [60,'Shatter','ignores 2 armour',{pierce:2}], [90,'Earthshaker','10% chance to daze everything around you',{quake:0.1}]],
+  polearm: [[30,'Impale','10% chance to make the foe bleed',{bleed:0.1}], [60,'Long Thrust','+10% damage',{dmg:0.1}], [90,'Skewer','also hits the foe standing behind your target',{skewer:1}]],
+  dagger:  [[30,'Quick Hands','+1 to hit',{acc:1}], [60,'Puncture','10% chance to poison',{poison:0.1}], [90,'Assassinate','double damage when you catch a foe off guard',{ambush:1}]],
+  unarmed: [[30,'Jab','10% chance to strike again for half damage',{again:0.1}], [60,'Iron Fist','+2 damage',{flat:2}], [90,'Pressure Point','10% chance to daze',{daze:0.1}]],
+  staff:   [[30,'Staff Spin','+1 to hit',{acc:1}], [60,'Crack','10% chance to daze',{daze:0.1}], [90,'Arcane Strike','+20% damage',{dmg:0.2}]],
+};
+function mastMove(f){ const k = skWeaponKind(), L = skMastLvl(k); let t = 0; for (const mv of (MASTERY_MOVES[k]||[])) if (L>=mv[0] && mv[3][f]) t += mv[3][f]; return t; }
+function masteryHtml(){
+  return `<h4 style="color:var(--ink-faint);margin:12px 0 6px;">WEAPON MASTERY &middot; moves at 30, 60 and 90</h4><div class="tgates">${SK_MASTERY.filter(([k])=>MASTERY_MOVES[k]).map(([k,nm])=>{ const L = skMastLvl(k);
+    return `<div class="tgate ${L>=30 ? 'open' : ''}"><b>${L}</b><span><b>${esc(nm)}</b> &middot; ${MASTERY_MOVES[k].map(mv=>`<span style="${L>=mv[0] ? 'color:var(--amber)' : 'opacity:0.55'}" title="${esc(mv[2])}">${mv[0]} ${esc(mv[1])}</span>`).join(' &middot; ')}</span></div>`; }).join('')}</div>`;
+}
+// status on monsters: dazed (loses its next action), bleeding, poisoned, envenomed
+function monDaze(m, turns){ if (!m.alive) return; m.dazedTurns = Math.max(m.dazedTurns||0, turns||1); }
+function monBleed(m, d){ m.bleedTurns = 3; m.bleedDmg = Math.max(m.bleedDmg||0, Math.max(1, Math.round(d))); }
+function monPoison(m, lv){ const t = ((G.gear.weapon && G.gear.weapon.rsTier)||0);
+  if (lv>=4){ m.venomTurns = 8; m.venomDmg = Math.max(m.venomDmg||0, 4); return; }
+  m.poisonTurns = 4; m.poisonDmg = Math.max(m.poisonDmg||0, 1 + lv*2 + t); }
+function monStatusTick(m, i){
+  const hurt = (d, msg, kind)=>{ m.hp -= d; m.hitKind = kind; m.hitCrit = false; try{ fxSplat(m.x+0.5, m.y+0.5, d, kind); }catch(e){} logMsg(msg, 'hit'); if (m.hp<=0){ monsterDies(i); return true; } return false; };
+  if (m.bleedTurns>0){ m.bleedTurns--; if (hurt(m.bleedDmg||1, `the ${m.nm} bleeds for ${m.bleedDmg||1}`, 'bleed')) return true; if (m.bleedTurns<=0) m.bleedDmg = 0; }
+  if (m.poisonTurns>0){ m.poisonTurns--; if (hurt(m.poisonDmg||2, `poison eats at the ${m.nm} for ${m.poisonDmg||2}`, 'poison')) return true; if (m.poisonTurns<=0) m.poisonDmg = 0; }
+  if (m.venomTurns>0){ m.venomTurns--; const d = m.venomDmg||4; m.venomDmg = Math.min(20, d + 2); if (hurt(d, `venom burns through the ${m.nm} for ${d}`, 'poison')) return true; if (m.venomTurns<=0) m.venomDmg = 0; }
+  return false;
+}
+// a hit that spills onto other foes: everything around you (a sweep), or beside the target (a cleave), or behind it (a skewer)
+function meleeSplash(mi, frac, mode, base){
+  const p = G.player, t = G.mon[mi]; if (!t) return;
+  const bx = t.x - p.x, by = t.y - p.y;
+  for (let j=0;j<G.mon.length;j++){
+    if (j===mi) continue; const o = G.mon[j]; if (!o.alive) continue;
+    const nearMe = Math.max(Math.abs(o.x-p.x), Math.abs(o.y-p.y))<=1, nearIt = Math.max(Math.abs(o.x-t.x), Math.abs(o.y-t.y))<=1;
+    const ok = mode==='sweep' ? nearMe : mode==='cleave' ? (nearMe && nearIt) : (o.x===t.x+Math.sign(bx) && o.y===t.y+Math.sign(by));
+    if (!ok) continue;
+    const d = Math.max(1, Math.round(base*frac)); o.hp -= d; o.hitKind = 'melee'; o.hitCrit = false; noteFoe(j);
+    try{ fxSplat(o.x+0.5, o.y+0.5, d, 'hit'); }catch(e){}
+    logMsg(`your ${mode==='sweep' ? 'swing carries on into' : mode==='cleave' ? 'blow cleaves into' : 'thrust runs on into'} the ${o.nm} for ${d}`, 'hit');
+    if (o.hp<=0) monsterDies(j);
+  }
+}
+// a spear or halberd reaches a foe two tiles away in a straight line
+function spearReach(m){
+  if (!m || !m.alive || rsAttackType()!=='melee' || !wTrait().reach) return false;
+  const p = G.player, dx = m.x - p.x, dy = m.y - p.y, ax = Math.abs(dx), ay = Math.abs(dy);
+  if (!((ax===2 && ay===0) || (ay===2 && ax===0) || (ax===2 && ay===2))) return false;
+  const mx2 = p.x + dx/2, my2 = p.y + dy/2;
+  if (tileAt(mx2, my2)===T_WALL || G.mon.some(o=>o.alive && o.x===mx2 && o.y===my2)) return false;
+  return true;
+}
+function reachAttack(m){
+  const mi = G.mon.indexOf(m); if (mi<0) return;
+  const v = FACING_VECT.findIndex(f=>f[0]===Math.sign(m.x-G.player.x) && f[1]===Math.sign(m.y-G.player.y)); if (v>=0) G.player.facing = v;
+  fight(mi); if (!G.gameOver) tickMonsters(); renderGame();
+}
+// the sought-after weapons: dragon blades, Barrows gear and the whip
+const BARROWS = [
+  ["Dharok's Greataxe", 7, { dharok:1 }, 'the lower your life, the harder it hits (up to double)'],
+  ["Guthan's Warspear", 4, { guthan:1 }, 'a quarter of your hits heal you for the damage dealt'],
+  ["Verac's Flail",     1, { verac:1 },  'a quarter of your swings strike through armour and cannot miss'],
+  ["Torag's Hammers",   6, { torag:1 },  "a quarter of your hits crush the foe's armour for a while"],
+];
+function crBarrows(i){
+  const b = BARROWS[i===undefined ? rn(BARROWS.length) : i], it = rsMakeWeapon(6, b[1]);
+  it.nm = b[0]; it.baseMat = b[0].split("'")[0]; Object.assign(it, b[2]); it.acc = Math.round(it.acc*1.1); it.dmgB = Math.round(it.dmgB*1.15);
+  it.reqAtt = 70; it.rsCol = '#7a8478'; it.quality = 4; it.barrows = b[3]; it.price = 45000; return it;
+}
+function crDragonWeapon(){ const it = rsMakeWeapon(6, [3, 5, 0][rn(3)]); if (it.basis==='Dagger' && chn(0.5)){ it.poisoned = 3; it.nm += ' (p++)'; } return it; }
+function lootRareWeapon(it, why){ addToInventory(it); logMsg(`${why}: ${itemNameHtml(it)}!`, 'magic', true); sfx('achievement'); }
+// poison and its cure
+function mkAntipoison(){ const it = newItem(); Object.assign(it, { used:1, consumable:1, kind:'antipoison', nm:'Antipoison', desc:'cures poison, and keeps it off you for a while', price:60 }); return it; }
+const WPOISON = ['Weapon Poison', 'Weapon Poison+', 'Weapon Poison++', 'Weapon Venom'], WP_TAG = ['(p)', '(p+)', '(p++)', '(v)'];
+function mkWPoison(lv){ const it = newItem(); Object.assign(it, { used:1, consumable:1, kind:'wpoison', wpLv:lv, nm:WPOISON[lv-1], desc:`coat a stabbing or slashing weapon: a quarter of its hits ${lv>=4 ? 'envenom (venom grows worse every turn)' : 'poison'}`, price:[150, 400, 900, 2400][lv-1] }); return it; }
+function applyWeaponPoison(idx){
+  const it = G.inv[idx], w = G.gear.weapon;
+  if (!w || !w.used || w.range || w.rsStaff){ logMsg('wield a stabbing or slashing weapon to coat it', 'hit'); return; }
+  if (meleeType(w)==='crush'){ logMsg(`poison won't stay on a ${w.basis.toLowerCase()} - it needs an edge or a point`, 'hit'); return; }
+  w.poisoned = it.wpLv; w.nm = w.nm.replace(/ \((p\+*|v)\)$/, '') + ' ' + WP_TAG[it.wpLv-1];
+  invRemove(idx); logMsg(`you coat your ${w.nm.replace(/ \((p\+*|v)\)$/, '')} with ${it.nm.toLowerCase()}`, 'good'); sfx('potion'); renderGame(); saveCurrentGame();
+}
+function drinkAntipoison(idx){
+  const p = G.player; invRemove(idx); p.poisonTurns = 0; p.poisonDmg = 0; p.antiPoisonUntil = (p.turnCount||0) + 150;
+  logMsg('you drink the antipoison - you feel clean, and safe from poison for a while', 'good'); sfx('potion'); renderGame(); saveCurrentGame();
+}
+const SK_BREW2 = [
+  { id:'antipoison', nm:'Antipoison', lvl:5, xp:38, need:{ silverleaf:1, bloodmoss:1 }, make:()=>mkAntipoison() },
+  { id:'wp1', nm:'Weapon Poison', lvl:15, xp:60, need:{ bloodmoss:2 }, make:()=>mkWPoison(1) },
+  { id:'wp2', nm:'Weapon Poison+', lvl:40, xp:110, need:{ ghostcap:2, bloodmoss:1 }, make:()=>mkWPoison(2) },
+  { id:'wp3', nm:'Weapon Poison++', lvl:60, xp:160, need:{ dragontongue:2 }, make:()=>mkWPoison(3) },
+  { id:'venom', nm:'Weapon Venom', lvl:75, xp:240, need:{ venomgland:1, dragontongue:1 }, make:()=>mkWPoison(4) },
+];
+function skBrew2(id){
+  const r = SK_BREW2.find(x=>x.id===id); if (!r) return 0;
+  if (skLvl('alchemy') < r.lvl){ logMsg(`you need Alchemy level ${r.lvl}`, 'hit'); renderOverlay(); return 0; }
+  for (const k in r.need) if (skHave(k) < r.need[k]){ logMsg(`${r.nm} takes ${Object.keys(r.need).map(k=>r.need[k]+' '+skName(k).toLowerCase()).join(' + ')}`, 'hit'); renderOverlay(); return 0; }
+  if (G.inv.length >= MAXINV){ logMsg('your pack is full', 'hit'); renderOverlay(); return 0; }
+  for (const k in r.need) skAdd(k, -r.need[k]); invPush(r.make()); skGainXP('alchemy', r.xp);
+  logMsg(`you brew ${r.nm}`, 'good'); sfx('potion'); renderOverlay(); saveCurrentGame(); return 1;
+}
+function brew2Html(){
+  const L = skLvl('alchemy');
+  return `<h4 style="color:${COL.purple};margin:12px 0 6px;">POISONS AND CURES</h4>` + SK_BREW2.map(r=>{ const has = Object.keys(r.need).every(k=>skHave(k) >= r.need[k]);
+    return `<div class="shoprow" style="${L>=r.lvl ? '' : 'opacity:0.5'}"><span class="muted">${r.lvl}</span><span>${esc(r.nm)}</span><span class="desc">${Object.keys(r.need).map(k=>r.need[k]+' '+esc(skName(k).toLowerCase())).join(' + ')} &middot; ${r.xp} xp</span>
+      <span>${L>=r.lvl && has ? `<button class="btn" onclick="cqAdd('brew2','${r.id}','',1)">brew 1</button>${cqMore('brew2', r.id)}` : L>=r.lvl ? '<span class="muted">missing herbs</span>' : `needs Alchemy ${r.lvl}`}</span></div>`; }).join('');
+}
+function alchBuyExtra(what){
+  const it = what==='anti' ? mkAntipoison() : mkWPoison(1), price = repPrice(it.price);
+  if (G.player.gold < price){ logMsg("you can't afford that", 'hit'); renderOverlay(); return; }
+  if (G.inv.length >= MAXINV){ logMsg('your pack is full', 'hit'); renderOverlay(); return; }
+  G.player.gold -= price; addToInventory(it); logMsg(`you buy ${it.nm} for ${price} gold`, 'loot'); sfx('gold'); renderOverlay(); saveCurrentGame();
+}
+function alchExtrasHtml(){
+  return `<div class="panel" style="margin-top:14px;"><h4 style="color:${COL.green};">POISONS AND CURES</h4>
+    <div class="shoprow"><span></span><span>Antipoison</span><span class="desc">cures poison and wards it off for a while</span><span><button class="btn" onclick="alchBuyExtra('anti')">${repPrice(60)}g</button></span></div>
+    <div class="shoprow"><span></span><span>Weapon Poison</span><span class="desc">coat a stabbing or slashing weapon (stronger ones you brew yourself)</span><span><button class="btn" onclick="alchBuyExtra('wp')">${repPrice(150)}g</button></span></div></div>`;
+}
+// enchanted arrows: gem-tipped arrows with a gem's power woken in them by a spell
+const ARROW_ENCH = [
+  { gem:'sapphire', lvl:7,  runes:{ water:2, chaos:1 }, nm:'Clear Mind', d:'restores 2 prayer points' },
+  { gem:'emerald',  lvl:27, runes:{ earth:2, chaos:1 }, nm:'Magical Poison', d:'poisons the target' },
+  { gem:'ruby',     lvl:49, runes:{ fire:3, chaos:1 }, nm:'Blood Forfeit', d:"takes a fifth of the target's life, at a cost of a tenth of yours" },
+  { gem:'diamond',  lvl:57, runes:{ earth:4, death:1 }, nm:'Armour Piercing', d:'+25% damage that ignores armour' },
+  { gem:'onyx',     lvl:87, runes:{ fire:5, death:1, blood:1 }, nm:'Life Leech', d:'heals you for a quarter of the damage' },
+];
+function arrowCount(t){ const p = G.player; return (ammoType()===t ? (p.arrows||0) : 0) + ((p.ammoStacks||{})[t]||0); }
+function arrowTake(t, n){ const p = G.player; let left = n; if (ammoType()===t){ const k = Math.min(left, p.arrows||0); p.arrows -= k; left -= k; } if (left>0 && p.ammoStacks && p.ammoStacks[t]) p.ammoStacks[t] = Math.max(0, p.ammoStacks[t] - left); }
+function enchantArrows(i){
+  const e = ARROW_ENCH[i], from = 7+i, to = 12+i, n = Math.min(15, arrowCount(from));
+  if (rsLvl('magic') < e.lvl){ logMsg(`you need Magic ${e.lvl} to enchant ${e.gem}-tipped arrows`, 'hit'); renderOverlay(); return; }
+  if (!n){ logMsg(`you have no ${e.gem}-tipped arrows to enchant`, 'hit'); renderOverlay(); return; }
+  for (const r in e.runes) if (skHave('r_'+r) < e.runes[r] && !rsStaffElems().includes(r)){ logMsg(`enchanting takes ${Object.keys(e.runes).map(r=>e.runes[r]+' '+rsRuneName(r).toLowerCase()).join(', ')}`, 'hit'); renderOverlay(); return; }
+  for (const r in e.runes) if (!rsStaffElems().includes(r)) skAdd('r_'+r, -e.runes[r]);
+  arrowTake(from, n); addArrows(n, to); skGainXP('magic', 30 + e.lvl*2);
+  logMsg(`you enchant ${n} ${e.gem}-tipped arrows - ${e.nm}: ${e.d}`, 'magic'); sfx('spell'); renderOverlay(); saveCurrentGame();
+}
+function enchantHtml(){
+  const L = rsLvl('magic'), rows = ARROW_ENCH.map((e,i)=>{ const n = arrowCount(7+i);
+    return `<div class="shoprow" style="${L>=e.lvl ? '' : 'opacity:0.5'}"><span class="muted">${e.lvl}</span><span>${esc(cap(e.gem))}: ${esc(e.nm)}</span><span class="desc">${esc(e.d)} (15% of hits) &middot; ${Object.keys(e.runes).map(r=>e.runes[r]+' '+esc(rsRuneName(r).toLowerCase())).join(', ')} per 15 &middot; you have ${n}</span>
+      <span>${L>=e.lvl && n ? `<button class="btn" onclick="enchantArrows(${i})">enchant</button>` : ''}</span></div>`; }).join('');
+  return `<h4 style="color:var(--ink-faint);margin:12px 0 6px;">ENCHANT ARROWS &middot; gem-tipped arrows from the fletching bench</h4>${rows}`;
+}
 function rsMeleeDamage(){
   const w = G.gear.weapon, st = rsStyle().id;
   const has = w && w.used;
@@ -10916,7 +11152,7 @@ function equipFromInv(idx){
 const ALL_SLOTS = ['weapon','offhand','head','cape','chest','legs','arms','feet','necklace','ring1','ring2','trinket','ammo','ranged'];
 const LOOT_KINDS = ['weapon','weapon','weapon','head','head','chest','chest','legs','legs','arms','arms','feet','feet','offhand','offhand','necklace','ring','cape','trinket','ammo','ammo'];
 function lootKind(){ return LOOT_KINDS[rn(LOOT_KINDS.length)]; }
-function is2H(it){ return !!(it && it.used && it.slot==='weapon' && /Greatsword|Halberd/.test(it.basis||'')); }
+function is2H(it){ return !!(it && it.used && it.slot==='weapon' && (/Greatsword|Halberd/.test(it.basis||'') || it.dharok)); }
 // ---- off-hands: kiteshields (in RS_ARMOUR), tomes (cloth) and off-hand weapons for dual wielding ----
 function rsMakeOffhand(d, forMe){
   const r = Math.random();
@@ -10969,6 +11205,7 @@ function rsMakeTrinket(d){
 // ---- ammo: arrowheads by metal; the slot sets your arrows' strength, the count stays one stack ----
 const RS_AMMO = [['Bronze Arrows',1,1,7],['Iron Arrows',1,3,10],['Steel Arrows',5,5,16],['Mithril Arrows',20,8,22],['Adamant Arrows',30,11,31],['Rune Arrows',40,14,49],['Dragon Arrows',60,18,60]];
 RS_AMMO.push(['Sapphire-tipped Arrows',50,99,56,'#4a6ae0'], ['Emerald-tipped Arrows',55,99,60,'#3ab06a'], ['Ruby-tipped Arrows',60,99,66,'#e03a3a'], ['Diamond-tipped Arrows',65,99,72,'#e8f0ff'], ['Onyx-tipped Arrows',75,99,82,'#3a3036']);
+RS_AMMO.push(['Enchanted Sapphire Arrows',50,99,58,'#8aa8ff',0], ['Enchanted Emerald Arrows',55,99,62,'#6ae09a',1], ['Enchanted Ruby Arrows',60,99,68,'#ff6a5a',2], ['Enchanted Diamond Arrows',65,99,74,'#ffffff',3], ['Enchanted Onyx Arrows',75,99,84,'#8a7a9a',4]);
 function rsMakeAmmo(t){
   const a = RS_AMMO[t], it = rsItem('ammo');
   it.nm = a[0]; it.basis = 'Arrows'; it.baseMat = a[0].split(' ')[0]; it.rsTier = t; it.rsCol = a[4] || RS_METALS[Math.min(t, RS_METALS.length-1)][5]; it.ammoStr = a[3]; it.reqRng = a[1];
@@ -11265,7 +11502,7 @@ function rsFillBase(it, d, kind, forMe, meleeOnly){
     const r = meleeOnly ? 1 : Math.random();
     if (kind==='ranged' || r < 0.15){ const t = rsPickTier(RS_BOWS, d, forMe && (i=>RS_BOWS[i][1]<=rsLvl('ranged'))); made = rsMakeBow(t, chn(0.4)); }
     else if (r < 0.28){ const si = rsPickTier(RS_STAVES, d, forMe && (i=>RS_STAVES[i][1]<=rsLvl('magic'))); made = rsMakeStaff(si); }
-    else { const t = rsPickTier(RS_METALS, d, forMe && (i=>RS_METALS[i][1]<=rsLvl('attack'))); made = rsMakeWeapon(t, rn(RS_WEAPONS.length)); }
+    else { const t = Math.min(5, rsPickTier(RS_METALS, d, forMe && (i=>RS_METALS[i][1]<=rsLvl('attack')))); made = rsMakeWeapon(t, rn(RS_WEAPONS.length)); }   // (dragon weapons are rare drops - see crOnKill)
   } else if (kind==='offhand' || kind==='cape' || kind==='trinket' || kind==='ammo'){
     made = kind==='offhand' ? rsMakeOffhand(d, forMe) : kind==='cape' ? rsMakeCape(d) : kind==='trinket' ? rsMakeTrinket(d) : rsMakeAmmo(rsPickTier(RS_AMMO, d, forMe && (i=>RS_AMMO[i][1]<=rsLvl('ranged'))));
   } else if (kind==='necklace' || kind==='ring'){
@@ -11362,6 +11599,10 @@ function rsBonusLines(it){
   if (it.magDmgPct) out.push(`spell damage +${it.magDmgPct}%`);
   if (it.forgedPct) out.push(`${it.crafted ? 'crafted' : 'forged'} by ${esc(it.forgedBy||'you')}: +${it.forgedPct}% bonuses`);
   if (it.rsElem) out.push(`an endless supply of ${it.rsElem}${it.rsElem2 ? ' and '+it.rsElem2 : ''} runes`);
+  if (it.barrows) out.push(it.barrows);
+  if (it.whip) out.push('fast: a quarter of the time it lashes twice');
+  if (it.poisoned) out.push(`${it.poisoned>=4 ? 'envenomed' : 'poisoned'}: a quarter of its hits ${it.poisoned>=4 ? 'envenom' : 'poison'}`);
+  if (it.slot==='weapon' && !it.range && !it.rsStaff && it.basis && MELEE_TYPE[it.basis]){ const T = { Dagger:'hits twice a turn', Spear:'reaches two tiles', Halberd:'reaches two tiles and sweeps everything around you', Battleaxe:'sweeps everything around you', Greatsword:'cleaves into foes beside the target', Mace:'can daze', Warhammer:'can daze', Scimitar:'can make foes bleed' }[it.basis]; out.push(`${MELEE_TYPE[it.basis]} damage${T ? ' - '+T : ''}`); }
   if (it.ammoStr) out.push(`ranged strength ${fmtMod(it.ammoStr)}${G.gear && it===G.gear.ammo ? ` &middot; ${G.player.arrows||0} loaded` : it.qty ? ` &middot; ${it.qty} arrows` : ''}`);
   if (it.prayB) out.push(`prayer ${fmtMod(it.prayB)}`);
   if (it.saveArrows) out.push(`${Math.round(it.saveArrows*100)}% of arrows saved`);
@@ -11708,6 +11949,7 @@ function buildRsMagic(){
     <div class="ovbody">
       <div class="btnrow" style="justify-content:flex-start;margin:0 0 8px;">${staff ? `<button class="btn ${p.rsAutocast ? 'primary' : ''}" onclick="rsToggleAutocast()">autocast: ${p.rsAutocast ? 'ON' : 'off'}</button>` : ''}</div>
       ${rows}
+      ${enchantHtml()}
       <h4 style="color:var(--ink-faint);margin:12px 0 6px;">RUNE POUCH</h4><div class="skbag">${pouch}</div>
       <div class="muted" style="font-size:11px;margin-top:6px;">monsters drop runes, the alchemist sells the basic ones, and you can craft them at the altars in the wild</div>
       <div class="btnrow" style="margin-top:12px;"><button class="btn primary" onclick="setUi('playing')">G / ESC &middot; close</button></div>
@@ -25126,6 +25368,7 @@ function isoAct(pk, shift){
     const dx = mon.x-p.x, dy = mon.y-p.y;
     ISO.fighting = mon;
     if (Math.abs(dx)+Math.abs(dy)===1){ ISO.path = []; ISO.nextStep = performance.now() + ISO_SWING_MS; isoStep(FACING_VECT.findIndex(v=>v[0]===dx && v[1]===dy)); return; }
+    if (spearReach(mon)){ ISO.path = []; ISO.nextStep = performance.now() + ISO_SWING_MS; reachAttack(mon); return; }
     if (Math.abs(dx)+Math.abs(dy)>1 && rangedReachIdx(mon) >= 0){ ISO.path = []; ISO.nextStep = performance.now() + ISO_SWING_MS; rangedAttack(mon); renderGame(); return; }
     const path = isoFindPath(mon.x, mon.y, true);
     ISO.path = path || []; ISO.target = mon; ISO.nextStep = 0;
@@ -25172,6 +25415,7 @@ function isoTickFight(now){
   if (p.hp < effMaxHp()*0.2){ ISO.fighting = null; logMsg('you break off the fight - you are badly hurt', 'hit'); renderGame(); return; }
   const dx = m.x-p.x, dy = m.y-p.y;
   if (Math.abs(dx)+Math.abs(dy)===1){ ISO.nextStep = now + ISO_SWING_MS; isoStep(FACING_VECT.findIndex(v=>v[0]===dx && v[1]===dy)); return; }
+  if (spearReach(m)){ ISO.path = []; ISO.nextStep = now + ISO_SWING_MS; reachAttack(m); return; }   // a spear or halberd keeps the foe at arm's length
   if (rangedReachIdx(m) >= 0){   // a ranged fighter holds their ground and keeps shooting
     ISO.path = []; ISO.nextStep = now + ISO_SWING_MS;
     const v = FACING_VECT.findIndex(f=>f[0]===Math.sign(dx) && f[1]===Math.sign(dy)); if (v>=0) p.facing = v;
@@ -25427,7 +25671,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-74';
+const GAME_VERSION = 'rs-75';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -26286,7 +26530,7 @@ function buildAlchemist(){
   return `
     <h2 class="panel-title">THE ALCHEMIST</h2>
     <div class="sub">You have ${G.player.gold} gold. Click a potion to buy, or press its number.</div>
-    <div class="ovbody">${rows}${buildRuneShop()}<div class="muted" style="margin-top:10px;">brew your herbs into potions at the cauldrons here in the shop</div>
+    <div class="ovbody">${rows}${alchExtrasHtml()}${buildRuneShop()}<div class="muted" style="margin-top:10px;">brew your herbs into potions at the cauldrons here in the shop</div>
       <div class="btnrow"><button class="btn primary" onclick="setUi('playing')">L / ESC &middot; leave</button></div>
     </div>
   `;
