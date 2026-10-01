@@ -4608,7 +4608,7 @@ function rangedAttack(){
     // nothing to spend if it didn't actually resolve
     if (!fireWand(w)) return;
   } else if (w.range){
-    if ((G.player.arrows||0)<=0){ logMsg('you have no arrows left', 'hit'); return; }
+    if ((G.player.arrows||0)<=0 && !ammoAutoLoad()){ logMsg('you have no arrows left', 'hit'); return; }
     const t = nearestMonsterInRange(w.range);
     if (t===-1){ logMsg(`no target in range for your ${w.nm}`, ''); return; }
     noteFoe(t);
@@ -8766,11 +8766,12 @@ function spBody(tab){
     const foods = skFoods();
     return `<div class="sp-note">${dock}</div><div class="sp-grid">${cells}${empties}</div>
       <div class="sp-foot"><span>${G.inv.length}/${MAXINV}</span><span style="color:#ffd24a">${p.gold.toLocaleString()} gold</span></div>
+      ${quiverList().length ? `<div class="sp-sub">QUIVER &middot; click a type to load it</div><div class="sp-grid">${quiverList().map(q=>`<div class="sp-cell${q.loaded ? ' sel' : ''}" data-sp-ammo="${q.t}" title="${RS_AMMO[q.t][0]} x${q.n} - ranged strength +${RS_AMMO[q.t][3]}${q.loaded ? ' (loaded)' : ' - click to load'}" style="--qc:${RS_METALS[q.t][5]}"><img alt="" src="${dhIcon(obEntry('armor',{kind:'ammo', metal:RS_METALS[q.t][5]}))}"><b>${q.n}</b>${q.loaded ? '<i class="lk">ON</i>' : ''}</div>`).join('')}</div>` : ''}
       ${foods.length ? `<div class="sp-sub">FOOD &middot; drag to the quick bar</div><div class="sp-grid">${foods.map(f=>`<div class="sp-cell food" data-sp-food="${f.id}" draggable="true" title="${esc(f.nm)} x${f.n} - heals ${skFoodHeal(f)}"><img alt="" src="${dhIcon(obEntry('potion',{col:'#c8843a'}))}"><b>${f.n}</b></div>`).join('')}</div>` : ''}`;
   }
   if (tab==='equip'){
     const rows = PAPERDOLL_SLOTS.map(sl=>{ const it = G.gear[sl.key], on = it && it.used;
-      return `<div class="sp-eq" data-sp-eq="${sl.key}"${on ? '' : ' title="empty"'}><span class="sp-eqi" style="--qc:${on ? rarityColorCss(it) : '#3a3a3a'}">${on ? `<img alt="" src="${dhIcon(obItemEntry(it))}">` : ''}</span><span class="sp-eqn"><span class="muted">${sl.label}</span><br>${on ? `<span class="${rarityColorClass(it)}">${esc(it.nm)}</span>` : '<span class="muted">-</span>'}</span></div>`; }).join('');
+      return `<div class="sp-eq" data-sp-eq="${sl.key}"${on ? '' : ' title="empty"'}><span class="sp-eqi" style="--qc:${on ? rarityColorCss(it) : '#3a3a3a'}">${on ? `<img alt="" src="${dhIcon(obItemEntry(it))}">` : ''}</span><span class="sp-eqn"><span class="muted">${sl.label}</span><br>${on ? `<span class="${rarityColorClass(it)}">${esc(it.nm)}${sl.key==='ammo' ? ` (${p.arrows||0})` : ''}</span>` : '<span class="muted">-</span>'}</span></div>`; }).join('');
     const sb = rsSetBonus(), cos = Object.entries(p.cosmetic||{}).filter(([k,v])=>v && v.used);
     return `<div class="sp-eqs">${rows}</div>
       ${sb.name ? `<div class="sp-set"><b>${esc(sb.name)}</b><span>${esc(sb.text)}</span></div>` : ''}
@@ -8835,11 +8836,12 @@ function spUseItem(i){
 }
 function spBindEvents(el){
   el.addEventListener('click', e=>{
-    const t = e.target.closest('[data-sp-tab],[data-sp-close],[data-sp-inv],[data-sp-food],[data-sp-pray],[data-sp-spell],[data-sp-quest],[data-sp-eq]'); if (!t) return;
+    const t = e.target.closest('[data-sp-tab],[data-sp-close],[data-sp-inv],[data-sp-food],[data-sp-ammo],[data-sp-pray],[data-sp-spell],[data-sp-quest],[data-sp-eq]'); if (!t) return;
     if (t.dataset.spTab){ SP.tab = t.dataset.spTab; SP.qpSetup = false; spSave(); sfx('click'); hudLayout(); return; }
     if (t.dataset.spClose){ SP.open = false; spSave(); hudLayout(); renderOverlay(); return; }
     if (t.dataset.spInv!==undefined){ hideItemTooltip(); spInvClick(+t.dataset.spInv); hudLayout(); return; }
     if (t.dataset.spFood){ eatFood(t.dataset.spFood); renderGame(); return; }
+    if (t.dataset.spAmmo!==undefined){ loadAmmo(+t.dataset.spAmmo); hudLayout(); return; }
     if (t.dataset.spPray){ const id = t.dataset.spPray;
       if (SP.qpSetup){ const q = G.player.quickPrayers || (G.player.quickPrayers = []); const pr = RS_PRAYERS.find(x=>x.id===id);
         if (q.includes(id)) G.player.quickPrayers = q.filter(x=>x!==id); else if (rsLvl('prayer') >= pr.lvl){ G.player.quickPrayers = q.filter(x=>{ const o = RS_PRAYERS.find(y=>y.id===x); return o && !rsPrayClash(o.grp, pr.grp); }); G.player.quickPrayers.push(id); }
@@ -9853,7 +9855,7 @@ function crCraft(id, all){
     for (const m in r.need) skAdd(m, -r.need[m]);
     if (r.gold) G.player.gold -= r.gold;
     if (r.bag) skAdd(r.bag, 1);
-    else if (r.arrows) G.player.arrows = (G.player.arrows||0) + r.arrows;
+    else if (r.arrows) addArrows(r.arrows, 0);
     else { const it = rsCraftQuality(r.make(), L, r.lvl); addToInventory(it); logMsg(`you craft ${itemNameHtml(it)}`, 'loot', true); }
     skGainXP('crafting', r.xp); n++;
   }
@@ -10074,6 +10076,7 @@ function rsSync(){
   p.prayPts = Math.min(p.prayPts, rsLvl('prayer'));
   if (!p.prayers) p.prayers = [];
   if (p.rsStyle===undefined) p.rsStyle = 0;
+  ensureAmmo();
 }
 // quest rewards and other lump sums of "experience" become a lamp: the xp
 // goes to whichever skill your current style trains, plus Hitpoints
@@ -10212,9 +10215,10 @@ function equipFromInv(idx){
   const miss = rsReqMissing(item);
   if (miss.length){ logMsg(`you need ${miss.join(' and ')} to use the ${item.nm}`, 'hit'); sfx('error'); return; }
   if (item.slot==='ammo'){
-    const n = item.qty||0; G.player.arrows = (G.player.arrows||0) + n; item.qty = 0;
-    invRemove(idx); G.gear.ammo = item;
-    logMsg(`you load ${item.nm}${n ? ` - ${n} arrows join your quiver (${G.player.arrows} in all)` : ''}`, 'loot'); return;
+    const n = item.qty||0, t = item.rsTier||0; invRemove(idx);
+    if (ammoType()!==t) loadAmmo(t, true);
+    G.player.arrows = (G.player.arrows||0) + n; item.qty = 0; G.gear.ammo = item;
+    logMsg(`you put ${n} ${item.nm.toLowerCase()} in your quiver and load them (${G.player.arrows} ready)`, 'loot'); return;
   }
   // a two-hander and an off-hand can't be held together: whichever you put on, the other comes off
   const bump = item.slot==='weapon' && is2H(item) && G.gear.offhand && G.gear.offhand.used ? 'offhand' : item.slot==='offhand' && is2H(G.gear.weapon) ? 'weapon' : null;
@@ -10290,6 +10294,37 @@ function rsMakeAmmo(t){
   it.nm = a[0]; it.basis = 'Arrows'; it.baseMat = a[0].split(' ')[0]; it.rsTier = t; it.rsCol = RS_METALS[t][5]; it.ammoStr = a[3]; it.reqRng = a[1];
   it.qty = 15 + rn(26); it.price = 4 + t*t*6;
   return it;
+}
+
+// ---- the quiver: each arrowhead type keeps its own count; the ammo slot is the type you shoot.
+// G.player.arrows is the loaded type's count, the rest wait in G.player.ammoStacks ----
+function ammoType(){ const a = G.gear && G.gear.ammo; return a && a.used ? (a.rsTier||0) : -1; }
+function ensureAmmo(){
+  const p = G.player; if (!p || !G.gear) return;
+  if (ammoType() < 0 && (p.arrows||0) > 0){ const it = rsMakeAmmo(0); it.qty = 0; G.gear.ammo = it; }
+}
+function addArrows(n, t){
+  const p = G.player; t = t||0; ensureAmmo();
+  if (ammoType()===t || ammoType()<0){ if (ammoType()<0){ const it = rsMakeAmmo(t); it.qty = 0; G.gear.ammo = it; } p.arrows = (p.arrows||0) + n; }
+  else { p.ammoStacks = p.ammoStacks || {}; p.ammoStacks[t] = (p.ammoStacks[t]||0) + n; }
+}
+function loadAmmo(t, quiet){
+  const p = G.player, cur = ammoType(); if (cur===t) return;
+  p.ammoStacks = p.ammoStacks || {};
+  if (cur >= 0 && (p.arrows||0) > 0) p.ammoStacks[cur] = (p.ammoStacks[cur]||0) + p.arrows;
+  p.arrows = p.ammoStacks[t]||0; delete p.ammoStacks[t];
+  const it = rsMakeAmmo(t); it.qty = 0; G.gear.ammo = it;
+  if (!quiet){ logMsg(`you load ${RS_AMMO[t][0].toLowerCase()} (${p.arrows})`, ''); sfx('click'); renderGame(); saveCurrentGame(); }
+}
+function ammoAutoLoad(){
+  const q = quiverList().filter(x=>!x.loaded); if (!q.length) return false;
+  const best = q.sort((a,b)=>b.t-a.t)[0]; loadAmmo(best.t, true); logMsg(`out of that ammo - you load ${RS_AMMO[best.t][0].toLowerCase()} (${G.player.arrows})`, ''); return true;
+}
+function quiverList(){
+  const p = G.player, out = []; if (!p) return out;
+  const cur = ammoType(); if (cur >= 0 && (p.arrows||0) > 0) out.push({ t:cur, n:p.arrows, loaded:true });
+  for (const k in (p.ammoStacks||{})) if (p.ammoStacks[k] > 0) out.push({ t:+k, n:p.ammoStacks[k], loaded:false });
+  return out.sort((a,b)=>a.t-b.t);
 }
 function arrowSaveChance(){ let c = 0; for (const k of ['cape']){ const it = G.gear[k]; if (it && it.used) c += it.saveArrows||0; } return Math.min(0.8, c + (rsSetBonus().saveArrows||0)); }
 // ---- holy robes: priestly gear that slows prayer drain ----
@@ -10647,7 +10682,7 @@ function rsBonusLines(it){
   if (it.magDmgPct) out.push(`spell damage +${it.magDmgPct}%`);
   if (it.forgedPct) out.push(`${it.crafted ? 'crafted' : 'forged'} by ${esc(it.forgedBy||'you')}: +${it.forgedPct}% bonuses`);
   if (it.rsElem) out.push(`an endless supply of ${it.rsElem} runes`);
-  if (it.ammoStr) out.push(`ranged strength ${fmtMod(it.ammoStr)}${it.qty ? ` &middot; ${it.qty} arrows` : ''}`);
+  if (it.ammoStr) out.push(`ranged strength ${fmtMod(it.ammoStr)}${G.gear && it===G.gear.ammo ? ` &middot; ${G.player.arrows||0} loaded` : it.qty ? ` &middot; ${it.qty} arrows` : ''}`);
   if (it.prayB) out.push(`prayer ${fmtMod(it.prayB)}`);
   if (it.saveArrows) out.push(`${Math.round(it.saveArrows*100)}% of arrows saved`);
   if (it.offWeapon) out.push('off-hand: a 30% chance of a second strike');
@@ -24347,7 +24382,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-62';
+const GAME_VERSION = 'rs-63';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -24747,23 +24782,27 @@ function boatRowHtml(){
     <span class="price">${BOAT_PRICE}g</span>
   </div>`;
 }
-function buyArrows(){
-  if (G.player.gold < ARROW_PRICE){ logMsg("you can't afford arrows yet", 'hit'); renderOverlay(); return; }
-  G.player.gold -= ARROW_PRICE;
-  G.player.arrows = (G.player.arrows||0) + ARROW_BUNDLE;
-  logMsg(`you buy a bundle of ${ARROW_BUNDLE} arrows`, 'good');
+function arrowPrice(t){ return ARROW_PRICE * (1 + t*t); }
+function buyArrows(t){
+  t = t||0; const pr = repPrice(arrowPrice(t));
+  if (G.player.gold < pr){ logMsg("you can't afford those arrows yet", 'hit'); renderOverlay(); return; }
+  G.player.gold -= pr;
+  addArrows(ARROW_BUNDLE, t);
+  logMsg(`you buy a bundle of ${ARROW_BUNDLE} ${RS_AMMO[t][0].toLowerCase()} - they go straight into your quiver`, 'good');
   renderOverlay();
   saveCurrentGame();
 }
 // only a Ranger or Rogue can ever equip a bow (see WEAPONS' ranged rows),
 // so arrows are simply pointless clutter in the shop for anyone else
 function arrowRowHtml(){
-  return `<div class="shoprow" onclick="buyArrows()" style="cursor:pointer;">
+  const q = quiverList();
+  return RS_AMMO.map((a,t)=>t).filter(t=>t===0 || RS_AMMO[t][1] <= rsLvl('ranged')).slice(0,4).map(t=>{ const have = (q.find(x=>x.t===t)||{}).n||0;
+    return `<div class="shoprow" onclick="buyArrows(${t})" style="cursor:pointer;">
     <span class="muted">arrows</span>
-    <span style="color:${COL.text}">you have ${G.player.arrows||0}</span>
-    <span class="desc">bundle of ${ARROW_BUNDLE} - ammo for a bow</span>
-    <span class="price">${ARROW_PRICE}g</span>
-  </div>`;
+    <span style="color:${RS_AMMO[t] && RS_METALS[t] ? RS_METALS[t][5] : COL.text}">${RS_AMMO[t][0]} &middot; you have ${have}</span>
+    <span class="desc">bundle of ${ARROW_BUNDLE} - ranged strength +${RS_AMMO[t][3]}${RS_AMMO[t][1]>1 ? `, needs Ranged ${RS_AMMO[t][1]}` : ''}</span>
+    <span class="price">${repPrice(arrowPrice(t))}g</span>
+  </div>`; }).join('');
 }
 // full mod list for one item, reused for both the shop tooltip and the
 // "vs equipped" half of it below

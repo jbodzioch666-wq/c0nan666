@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-63 - Arrows in the ammo slot
+
+- **Your arrows now fill the ammo slot.** Arrows you already had, from the Archer kit, the peddler or fletching, load as Bronze Arrows.
+- **Each arrow type keeps its own count in your quiver.** The inventory tab (F1) has a new QUIVER section with every type you own; click one to load it. The loaded type shows "ON", and the equipment tab shows how many are loaded.
+- **When the loaded type runs out,** the best type left in your quiver loads by itself.
+- **The peddler sells better arrows** (Iron, Steel, Mithril...) as your Ranged level allows, straight into your quiver.
+
 ## RS-62 - Equipment slots
 
 - **Five new equipment slots:** feet, cape, off-hand, ammo and trinket. The paper doll and the side panel's equipment tab are laid out RuneScape-style, and every slot drops as loot.
