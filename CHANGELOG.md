@@ -1,5 +1,32 @@
 # Depthcrawl patch notes
 
+## RS-70 - Skills framework
+
+- **Skill guides:** click any skill on the Skills screen (J) to see every level of it. That covers what you can gather, cook, smelt, brew, craft, cast, wear or wield, where it's found, each tool tier, the milestone perks, and the skill cape. What you have is green and the next unlock is highlighted. Use the arrows or Left/Right to flip through the skills.
+- **Milestone perks at 25, 50, 75 and 99 in every skill**, stacking as you go:
+  - **Gathering** (fishing, mining, woodcutting, foraging): +5% success per swing, a 10% chance of a double log, catch, ore or herb, +15% xp, then more doubles and no ambushes while you work.
+  - **Cooking:** less burning, food that heals 10% more, and at 99 you never burn food.
+  - **Smithing:** a chance to keep the coal, better forged bonuses, and a chance to save a bar.
+  - **Firemaking:** fires burn longer, logs are sometimes spared, and camping by your own fire is always safe at 75.
+  - **Alchemy:** saved herbs, a chance of a second potion, and +15% xp.
+  - **Crafting:** a chance of using no materials, doubled masterwork chance, +15% xp, and the 99 recipes.
+  - **Combat skills:** a little more attack, strength, defence, ranged, magic, prayer or max life at each milestone.
+- **Tool tiers with real effects:** better tools now swing faster as well as more surely.
+  - **Dragon tools** (level 61) are much quicker.
+  - **Infernal tools** (level 85, sold only at total level 1000) are quicker still. A third of the time an infernal axe burns the log for Firemaking xp, an infernal pickaxe smelts the ore into a bar, and an infernal rod cooks the fish.
+- **Total-level gates:** the Skills screen shows your total level and three gates.
+  - **500, Journeyman:** gathering is 10% quicker everywhere.
+  - **1000, Expert:** adamantite and runite turn up in hill rocks, and infernal tools go on sale.
+  - **1500, Master:** the Cape of Accomplishment, which counts as every skill cape.
+  - Each gate also gives Lamps of Knowledge. Rub one for about half a level of xp in any skill you pick.
+- **Gathering bar over your head:** while you work, a bar shows the next swing coming round and your chance per swing (from your level, tool and perks). It works in the dungeons and on the overworld.
+- **Continuous gathering:** when a tree falls, a patch is picked clean, a shoal moves on or a vein is worked out, you walk to the nearest one of the same kind (within a few tiles) that you're skilled enough for and keep going.
+- **Crafting window with a queue:** every crafting bench, the furnace, the anvil, the brewing cauldron and the cooking fire now offer make 1, x5, x10 or all. Orders queue one after another with a progress bar and a stop button, and per-item messages are folded into one summary. Walking away stops the work.
+- **Recipe discovery:** the finest recipes are now learned from recipe books (Infinity and Ahrim's robes, black dragonhide, master staves, magic bows, rune arrows, gilding dye). Monsters drop the books, more often deeper and much more often from bosses, and quests sometimes give one as a gift. Read a book from your pack to learn it.
+- **Masterwork crafts:** anything you craft or forge has a small chance, better the more you outlevel the recipe, of coming out a masterwork with an extra bonus. Crafting's perk doubles the chance.
+  - The old "Masterwork" quality prefix on crafted and forged items is now "Exceptional".
+- **Crafting 99:** superior Ahrim's robes and superior black dragonhide, a quarter better on every bonus than the normal pieces. The Crafting cape saves 15% of materials while worn, and the Smithing cape saves bars the same way.
+
 ## RS-69 - A barber's chair in the tailor's workshop
 
 - **The tailor's workshop in every town now has a real barber's chair**, with a striped pole and a mirror. Walk into it or click it to restyle your hair, beard and war paint, or re-dye your shirt and trousers. Before, the make-over was only a button on the tailor's sale screen and was easy to miss.

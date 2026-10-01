@@ -124,16 +124,16 @@ _The player 3D model and character creator, including every animation_
 ### Skills framework
 _Shared skill code: guides, perks, tools, progress and crafting window_
 
-90. [ ] (78) Skill guides - a panel per skill showing items, spots and perks unlocked at each level
-91. [ ] (76) Milestone perks - every skill gives a bonus at 25, 50, 75 and 99 (e.g. Woodcutting 50: sometimes a double log)
-92. [ ] (77) Tool tiers with real effects - dragon pickaxe is faster, infernal axe burns logs for Firemaking xp
-93. [ ] (80) Total-level gates - areas and rewards that open at total level 500, 1000 and 1500
-94. [ ] (359) Gathering progress bar over your head with the chance per swing from level and tool
-95. [ ] (360) Continuous gathering - keep working nearby nodes until the inventory is full
-96. [ ] (340) Crafting interface - recipe window with make 1, 5, 10 or all, a queue and a progress bar
-97. [ ] (341) Recipe discovery - recipes unlock by level or are learned from books, drops and quests
-98. [ ] (342) Masterwork chance - a rare critical craft with an extra stat or special effect
-99. [ ] (344) Crafting milestones - level 99 unlocks the best armours and a material-saving cape perk
+90. [x] (78) Skill guides - a panel per skill showing items, spots and perks unlocked at each level
+91. [x] (76) Milestone perks - every skill gives a bonus at 25, 50, 75 and 99 (e.g. Woodcutting 50: sometimes a double log)
+92. [x] (77) Tool tiers with real effects - dragon pickaxe is faster, infernal axe burns logs for Firemaking xp
+93. [x] (80) Total-level gates - areas and rewards that open at total level 500, 1000 and 1500
+94. [x] (359) Gathering progress bar over your head with the chance per swing from level and tool
+95. [x] (360) Continuous gathering - keep working nearby nodes until the inventory is full
+96. [x] (340) Crafting interface - recipe window with make 1, 5, 10 or all, a queue and a progress bar
+97. [x] (341) Recipe discovery - recipes unlock by level or are learned from books, drops and quests
+98. [x] (342) Masterwork chance - a rare critical craft with an extra stat or special effect
+99. [x] (344) Crafting milestones - level 99 unlocks the best armours and a material-saving cape perk
 
 ### Resources and gathering
 _Resource nodes, done before the crafts that use them_
