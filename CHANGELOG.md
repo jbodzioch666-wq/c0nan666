@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-71 - Salvage removed
+
+- **Salvaging is gone.** You can no longer break gear down into bars, leather or cloth, so crafting materials come only from gathering.
+- Removed from the right-click menu, the inventory buttons and the V and X keys.
+- Removed the "salvage junk" button on the pack-full loot tray.
+- The loot filter no longer has an auto-salvage mode. If you had it set to auto-salvage, it now auto-sells junk instead.
+- Tips, help and the lock messages no longer mention salvaging.
+
 ## RS-70 - Skills framework
 
 - **Skill guides:** click any skill on the Skills screen (J) to see every level of it. That covers what you can gather, cook, smelt, brew, craft, cast, wear or wield, where it's found, each tool tier, the milestone perks, and the skill cape. What you have is green and the next unlock is highlighted. Use the arrows or Left/Right to flip through the skills.
