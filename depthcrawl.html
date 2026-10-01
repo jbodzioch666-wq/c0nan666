@@ -5394,6 +5394,7 @@ function loadLevel(d, arrivingFromBelow, fellThrough){
   placeSummonNearPlayer(); // same treatment for an active temporary summon, if one's still out
 
   if (G.gameMode===1 && fresh) skPlaceCaveNodes();
+  if (G.gameMode===1 && fresh) for (const m of G.mon) try{ monAi(m); }catch(e){}
   if (G.gameMode===1 && d===G.dungeonMaxDepth && fresh){
     spawnBoss();
     setUi('bossPreview');
@@ -5513,6 +5514,7 @@ function noteFoe(mi){
 function fxSplat(x, y, txt, kind){ if (typeof FP!=='undefined' && FP.floats) FP.floats.push({x, y, z:0.95, txt:String(txt), col:'#ffd27a', kind, crit:false, age:0}); }
 function monsterDies(mi){
   const m = G.mon[mi];
+  if (m.elite && m.elite.includes('explosive')) try{ monExplode(m); }catch(e){}
   logMsg(`the ${m.nm} falls`, 'good');
   sfx('monsterDie');
   G.player.killCount = (G.player.killCount||0)+1;
@@ -5742,7 +5744,7 @@ function singleAttackRoll(mi, missVerb, hitVerb){
   // attack bonus makes it swing worse while it's active
   const debuffedAtk = m.atkBonus - ((m.debuffAtkTurns>0) ? (m.debuffAtkAmt||0) : 0);
   const mstyle = rsMonStyle(m);
-  const mtotal = mroll + debuffedAtk + 2*rsTriangle(mstyle, rsArmourStyle()) - rsSapPenalty(mstyle);
+  const mtotal = mroll + debuffedAtk + 2*rsTriangle(mstyle, rsArmourStyle()) - rsSapPenalty(mstyle) + monPackBonus(m);
   const ac = rsFrac(playerACExact());
   if (mroll===1 || mtotal < ac){
     logMsg(`the ${m.nm} ${missVerb} but misses (${mtotal} vs AC ${ac})`, ''); fxSplat(G.player.x+0.5, G.player.y+0.5, '0', 'block');
@@ -5763,6 +5765,7 @@ function singleAttackRoll(mi, missVerb, hitVerb){
   mdmg = mitigate(mdmg);
   const prot = rsProtFor(mstyle), raw0 = mdmg;
   if (prot){ mdmg = Math.floor(mdmg*0.4); tag += prot.reflect ? ' (deflected)' : ' (your prayer shields you)'; }
+  else if (monIsBoss(m)){ mdmg = Math.round(mdmg*1.25); tag += ` (unprotected ${mstyle}!)`; }
   // Barbarian Rage: half damage taken from most attacks while raging
   if (G.player.rageTurns>0){ mdmg = mx(1, Math.floor(mdmg/2)); tag += ' (raging - damage halved)'; }
   G.player.hp -= mdmg;
@@ -5770,6 +5773,7 @@ function singleAttackRoll(mi, missVerb, hitVerb){
   logMsg(`the ${m.nm} ${hitVerb} you for ${mdmg}${tag}`, 'hit');
   sfx('playerHurt');
   if (rsAfterHurt(m, mi, mdmg, prot && prot.reflect ? Math.max(1, Math.round(raw0*prot.reflect)) : 0)){ if (G.player.hp<=0 && !checkDeathWard()) playerDies(m.nm); return true; }
+  try{ monOnHit(m, mi, mdmg); }catch(e){ console.error(e); }
   if (hasAbility(m,'poison')){
     applyPoisonToPlayer(1+rn(4));
     logMsg(`the ${m.nm}'s sting leaves poison burning in your veins`, 'hit');
@@ -6498,6 +6502,9 @@ function tickMonsters(excludeIdx){
   if (G.player.buffAtkTurns>0) G.player.buffAtkTurns--; // a buffSelf spell (Bless, Magic Weapon, ...) wearing off
   if (G.player.hasteTurns>0) G.player.hasteTurns--; // Haste/Swift Quiver's extra attack wearing off
   if (G.player.agathysTurns>0){ G.player.agathysTurns--; if (G.player.agathysTurns<=0) G.player.agathysDmg = 0; } // Armor of Agathys wearing off
+  if (G.player.frozenTurns>0) G.player.frozenTurns--;
+  if (G.player.drainTurns>0){ G.player.drainTurns--; if (G.player.drainTurns<=0) G.player.drainAmt = 0; }
+  if (G.player.disarmTurns>0) G.player.disarmTurns--;
   if (!G.gameOver) tickActiveZones();
   if (G.gameOver) return; // a zone tick (Hunger of Hadar, Spirit Guardians, ...) can itself be fatal
 
@@ -6545,8 +6552,11 @@ function tickMonsters(excludeIdx){
       m.hp = mn(m.maxHp, m.hp + 2+rn(9));
     }
     m.tookFireLastHit = false;
+    if (m.burnTurns>0) m.burnTurns--;
 
     const dist = Math.abs(m.x-G.player.x)+Math.abs(m.y-G.player.y);
+    // aggression, roles, packs, summoners and the bosses' phases and style switches (see monAiTurn)
+    try{ if (monAiTurn(m, i, dist)) continue; }catch(e){ console.error(e); }
 
     // a lich (or anything else with 'spellcast') can strike you with a
     // spell from range, no need to close to melee first - but not through
@@ -6766,6 +6776,7 @@ function tryMove(dx,dy){
     return;
   }
   if (tileAt(nx,ny)===T_WALL) return; // bumping a wall isn't an action - no turn spent
+  if (G.player.frozenTurns>0 && G.gameMode!==0){ logMsg('you are frozen in place - you strain against the ice (you can still fight what stands beside you)', 'hit'); tickMonsters(); return; }
   { const ht = tileAt(nx,ny);
     if (ht===T_WAYPOINT || ht===T_STASH || ht===T_QUESTGIVER || ht===T_VENDOR){ villageInteract(nx,ny); return; }
     if (ht===T_COUNTER){ const n = (G.villageNpcs||[])[0]; if (n) setUi(n.service); return; }
@@ -10884,7 +10895,7 @@ function monLevelColor(m){
   const f = clamp(Math.abs(d)/10, 0, 1), mix = (a, b)=>'#'+[0,1,2].map(i=>Math.round(a[i]+(b[i]-a[i])*f).toString(16).padStart(2,'0')).join('');
   return d===0 ? '#ffff00' : d<0 ? mix([255,255,0],[0,255,0]) : mix([255,255,0],[255,0,0]);
 }
-function monLevelHtml(m){ return `<span style="color:${monLevelColor(m)};font-weight:600;">level ${monCombatLevel(m)}</span>`; }
+function monLevelHtml(m){ return `<span style="color:${monLevelColor(m)};font-weight:600;">level ${monCombatLevel(m)}</span>${m && m.elite ? ` <span style="color:#ffb040;font-weight:600;">champion - ${m.elite.join(', ')}</span>` : ''}${m && m._ai && m._ai.role ? ` <span class="muted">(${m._ai.role})</span>` : ''}`; }
 function rsTotalLevel(){ return RS_ALL_SKILLS().reduce((t,[k])=>t+rsLvl(k), 0); }
 // the rest of the game (monster scaling, roadside encounters, loot outside
 // dungeons, boss sizing) still reads G.player.level as a 1-20 power tier,
@@ -10966,6 +10977,7 @@ function rsAtkBonus(type){
   else if (type==='magic') b += Math.floor(rsEff('magic')/8) + rsGearSum('magAcc')/RS_ATK_PER_HIT + rsPrayBonus('mag');
   else b += Math.floor(rsEff('attack')/8) + rsGearSum('acc')/RS_ATK_PER_HIT + rsPrayBonus('att');
   if (st==='accurate') b += 2; else if (st==='controlled') b += 1;
+  if (G.player.drainTurns>0) b -= G.player.drainAmt||0;
   return b;
 }
 // ===================== melee: damage types, weapon traits, positioning, mastery moves, poison =====================
@@ -11144,7 +11156,7 @@ function enchantHtml(){
 }
 function rsMeleeDamage(){
   const w = G.gear.weapon, st = rsStyle().id;
-  const has = w && w.used;
+  const has = w && w.used && !(G.player.disarmTurns>0);
   let d = has ? rollDice(w.d1, w.d2) + (w.bonus||0) : 1 + rn(3);
   d += Math.floor(rsEff('strength')/5) + rsFrac((rsGearSum('dmgB') + skPerkAll('mdmg'))/RS_STR_PER_DMG) + gearFlatDmg();
   if (st==='aggressive') d += 2; else if (st==='controlled') d += 1;
@@ -11168,7 +11180,7 @@ function playerACExact(){
   const ed = gearStatI('edef'), st = rsStyle().id;
   const spellBuff = (G.player.buffACTurns>0) ? (G.player.buffACAmt||0) : 0;
   return 10 + Math.floor(rsEff('defence')/20) + def*(1+ed/100)/RS_DEF_PER_AC + gearStatI('flatac') + rsPrayBonus('def')
-    + (st==='defensive' || st==='longrange' ? 2 : st==='controlled' ? 1 : 0) + spellBuff;
+    + (st==='defensive' || st==='longrange' ? 2 : st==='controlled' ? 1 : 0) + spellBuff - (G.player.drainTurns>0 ? G.player.drainAmt||0 : 0);
 }
 function playerAC(){ return Math.round(playerACExact()); }
 // xp for a hit that landed: the style's skill gets 4 per damage, Hitpoints 1.33
@@ -11939,6 +11951,228 @@ function rsSpellNote(sp, fellBack){
   else if (!sp) logMsg(`you have no runes for any spell${sel ? ` - ${sel[1]} needs ${rsMissingRunes(sel).join(', ')}` : ''}${el && el!=='air' ? `. Your staff only supplies ${el} runes; every combat spell also needs air runes (monsters drop them, the alchemist sells them)` : ''}`, 'hit');
 }
 // ---- ranged mode: bow or magic. R switches it; clicks, auto-combat and Shoot/Cast use it ----
+// ===================== monster behaviour: aggression, roles, packs, summoners, abilities, champions, boss phases =====================
+function monIsBoss(m){ return !!m && ((G.gameMode===1 && G.isBossFloor && G.mon.indexOf(m)===G.bossIdx) || !!m.raidBoss); }
+// how big a creature stands: tiny vermin up to giants and dragons that loom over several tiles
+function monSizeK(m){
+  const n = ((m && m.nm)||'').toLowerCase();
+  if (/giant (rat|bat|spider|frog|crab)/.test(n)) return 0.95;
+  if (/dragon|wyrm|hydra|kraken|behemoth|colossus|titan|balor|olm/.test(n)) return 2.1;
+  if (/giant|ettin|cyclops|treant|mammoth|purple worm|roc\b/.test(n)) return 1.75;
+  if (/ogre|troll|minotaur|golem|bear|owlbear|manticore|wyvern|elemental|gargoyle|horror|abomination/.test(n)) return 1.3;
+  if (/\brat\b|\bbat\b|imp\b|pixie|sprite|frog|toad|crab\b|beetle|scarab|cat\b/.test(n)) return 0.6;
+  if (/goblin|kobold|gnome|halfling|spider\b/.test(n)) return 0.85;
+  return 1;
+}
+// what kind of fighter it is, how keen it is to fight, the RuneScape-style tricks it has, and whether it's a champion
+function monAi(m){
+  if (m._ai) return m._ai;
+  const n = (m.nm||'').toLowerCase(), A = { role:null, aggro:'normal' }, boss = monIsBoss(m);
+  if (/\brat\b|\bbat\b|deer|rabbit|hare|chicken|cow\b|sheep|goat|frog|toad|elk|owl\b|crab\b/.test(n) && !boss) A.aggro = 'passive';
+  if (/necromancer|lich|shaman|witch|summoner|death knight|cult leader/.test(n)) A.role = 'summoner';
+  else if (/priest|cleric|healer|druid|acolyte|oracle|prophet/.test(n)) A.role = 'healer';
+  else if (rsMonStyle(m)==='ranged') A.role = 'archer';
+  else if (rsMonStyle(m)==='magic') A.role = 'caster';
+  else if (/wolf|hound|jackal|hyena|warg|\bdog\b|coyote/.test(n)) A.role = 'pack';
+  else if (/\brat\b|\bbat\b|spider|kobold|goblin|imp\b|swarm|beetle|scarab|piranha|stirge/.test(n)) A.role = 'swarm';
+  else if (/golem|knight|guard|ogre|troll|giant|minotaur|construct|gargoyle|ettin|paladin|warden|sentinel/.test(n)) A.role = 'tank';
+  if (A.role==='tank') m.ac = (m.ac||10) + 2;
+  m.abilities = m.abilities || [];
+  const addAb = k=>{ if (!m.abilities.includes(k)) m.abilities.push(k); };
+  if (/\bice\b|frost|snow|yeti|winter|glacial|water elemental|white dragon/.test(n)) addAb('freeze');
+  if (/wraith|spectre|specter|shadow|vampire|ghost|wight|banshee|lich/.test(n)) addAb('drainStat');
+  if (/bandit|thief|rogue|brigand|knight|hobgoblin|duelist|pirate|gladiator/.test(n)) addAb('disarm');
+  if (/spider|snake|scorpion|serpent|wyvern|naga|cobra|asp\b/.test(n)) addAb('venomous');
+  // champions: a tougher monster with one or two random affixes
+  if (!boss && !m.summoned && G.gameMode===1 && chn(Math.min(0.2, 0.05 + (G.depth||1)*0.012))){
+    const pool = ['fast','vampiric','shielded','explosive','regenerating'], aff = [];
+    const k = chn(0.3) ? 2 : 1; while (aff.length < k){ const a = pool[rn(pool.length)]; if (!aff.includes(a)) aff.push(a); }
+    const f = m.maxHp ? m.hp/m.maxHp : 1;
+    m.elite = aff; m.maxHp = Math.round((m.maxHp||10)*1.6); m.hp = Math.max(1, Math.round(m.maxHp*f)); m.atkBonus = (m.atkBonus||0) + 2; m.xp = Math.round((m.xp||5)*2.5);
+    if (aff.includes('fast')) addAb('aggressive'); if (aff.includes('shielded')) m.ac = (m.ac||10) + 4; if (aff.includes('regenerating')) addAb('regen');
+  }
+  m._ai = A; return A;
+}
+function monStep(m, i, dx, dy){
+  const nx = m.x+dx, ny = m.y+dy, p = G.player;
+  if (!dx && !dy) return false;
+  if ((nx===p.x && ny===p.y) || tileAt(nx,ny)===T_WALL || occupiedBy(nx,ny,i)) return false;
+  m.x = nx; m.y = ny; return true;
+}
+function monStepToward(m, i, tx, ty){
+  const dx = Math.sign(tx-m.x), dy = Math.sign(ty-m.y), xFirst = Math.abs(tx-m.x) >= Math.abs(ty-m.y);
+  const steps = hasAbility(m,'aggressive') ? 2 : 1; let moved = false;
+  for (let s0=0; s0<steps; s0++){
+    const ddx = Math.sign(tx-m.x), ddy = Math.sign(ty-m.y); if (!ddx && !ddy) break;
+    if (xFirst ? (monStep(m, i, ddx, 0) || monStep(m, i, 0, ddy)) : (monStep(m, i, 0, ddy) || monStep(m, i, ddx, 0))) moved = true; else break;
+  }
+  return moved;
+}
+function monStepAway(m, i){ const p = G.player, dx = -Math.sign(p.x-m.x), dy = -Math.sign(p.y-m.y); return monStep(m, i, dx, 0) || monStep(m, i, 0, dy) || monStep(m, i, dy, dx) || monStep(m, i, -dy, -dx); }
+// a caster caught in melee blinks away to somewhere it can still see you
+function monBlink(m, i){
+  const p = G.player, opts = [];
+  for (let x=Math.max(1,p.x-5); x<=Math.min(COLS-2,p.x+5); x++) for (let y=Math.max(1,p.y-5); y<=Math.min(ROWS-2,p.y+5); y++){
+    const d = Math.abs(x-p.x)+Math.abs(y-p.y); if (d<3 || d>5 || G.map[x][y]!==T_FLOOR || occupiedBy(x,y,i)) continue;
+    if (hasLineOfSight(x, y, p.x, p.y)) opts.push([x,y]);
+  }
+  if (!opts.length) return false;
+  const [x, y] = opts[rn(opts.length)];
+  try{ fpBurst(m.x+0.5, m.y+0.5, 0.6, '#b070ff', 16, 1); fpBurst(x+0.5, y+0.5, 0.6, '#b070ff', 16, 1); }catch(e){}
+  m.x = x; m.y = y; m._castT = FP.t; logMsg(`the ${m.nm} blinks away in a flash of light`, 'hit');
+  return true;
+}
+// wolves and swarms close in from the sides you aren't already beset on
+function monFlankTile(m){
+  const p = G.player, others = G.mon.filter(o=>o!==m && o.alive && Math.max(Math.abs(o.x-p.x), Math.abs(o.y-p.y))<=1);
+  let best = null, bs = -1e9;
+  for (const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){
+    const x = p.x+dx, y = p.y+dy; if (tileAt(x,y)===T_WALL || G.mon.some(o=>o!==m && o.alive && o.x===x && o.y===y)) continue;
+    const spread = others.length ? Math.min(...others.map(o=>Math.abs(o.x-x)+Math.abs(o.y-y))) : 2;
+    const sc = spread*3 - (Math.abs(m.x-x)+Math.abs(m.y-y));
+    if (sc > bs){ bs = sc; best = [x,y]; }
+  }
+  return best;
+}
+function monPackBonus(m){
+  if (!m || !m._ai || m._ai.role!=='pack') return 0;
+  const p = G.player; return Math.min(3, G.mon.filter(o=>o!==m && o.alive && o._ai && o._ai.role==='pack' && Math.max(Math.abs(o.x-p.x), Math.abs(o.y-p.y))<=1).length);
+}
+// a summoner (or a boss calling for help) brings new foes onto the floor beside it
+function monSummon(m, n, adds){
+  const nm0 = (m.nm||'').toLowerCase(), undead = /necromancer|lich|death knight|cult|wight/.test(nm0), spirit = /shaman|druid|witch/.test(nm0);
+  let made = 0; const sp = sitePower(), lvl = Math.max(1, (m.mlevel||5) - 3);
+  for (const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]]){
+    if (made >= n || G.mon.length >= MAXMON) break;
+    const x = m.x+dx, y = m.y+dy; if (tileAt(x,y)!==T_FLOOR || occupiedBy(x,y,-1) || (x===G.player.x && y===G.player.y)) continue;
+    const s0 = rollMonsterAt(x, y, lvl, sp);
+    if (!adds){ s0.nm = undead ? 'risen skeleton' : spirit ? 'spirit wolf' : 'summoned imp'; s0.undead = undead; s0.hp = s0.maxHp = Math.max(4, Math.round(s0.maxHp*0.6)); s0.xp = Math.max(1, Math.round((s0.xp||4)*0.3)); }
+    s0.summoned = 1; s0.summoner = m; s0.rise = true; s0.engaged = true; G.mon.push(s0); made++;
+    try{ fpBurst(x+0.5, y+0.5, 0.2, undead ? '#9aff9a' : '#9ad8ff', 18, 0.9); }catch(e){}
+  }
+  if (made){ m._castT = FP.t; logMsg(adds ? `the ${m.nm} calls ${made} servants to its side!` : `the ${m.nm} ${undead ? 'raises the dead' : 'calls up a spirit'} - ${made===1 ? 'a' : made} ${undead ? 'risen skeleton' : 'spirit wolf'}${made>1 ? 's' : ''} ${made>1 ? 'answer' : 'answers'}`, 'hit'); sfx('spell'); }
+  return made;
+}
+// a shot from a monster to you, drawn like your own
+function isoMonShot(m, kind, col){
+  if (!ISO.on || !FPD.ok) return;
+  const p = G.player, d = Math.hypot(m.x-p.x, m.y-p.y);
+  (ISO.shots = ISO.shots || []).push({ x0:m.x+0.5, y0:m.y+0.5, x1:p.x+0.5, y1:p.y+0.5, t:0, dur:0.12 + d*0.045, kind, col:col||'#fff', m:null, tier:1, elem: kind==='spell' ? 'shadow' : '' });
+}
+// a boss: calls for help at two-thirds health, enrages at one third, and switches attack styles -
+// telegraphed a turn ahead, so you can swap your protection prayer in time
+function monBossTurn(m, i, dist){
+  const p = G.player, B = m._boss = m._boss || { phase:0, t:0, next:null }, f = m.hp/Math.max(1, m.maxHp);
+  if (!m.rsStyle) rsMonStyle(m);
+  if (B.phase < 1 && f <= 0.66){ B.phase = 1; logMsg(`*** the ${m.nm} roars - it calls for help! ***`, 'new', true); monSummon(m, 2, true); if (typeof FP!=='undefined') FP.shake = Math.max(FP.shake||0, 0.4); return true; }
+  if (B.phase < 2 && f <= 0.33){ B.phase = 2; m.enraged = 1; m.dmg2 = Math.round(m.dmg2*1.4); m.atkBonus += 3; logMsg(`*** the ${m.nm} flies into a rage - it hits far harder now! ***`, 'new', true); sfx('crit'); }
+  B.t++;
+  if (B.next){ m.rsStyle = B.next; B.next = null; logMsg(`the ${m.nm} attacks with ${m.rsStyle}!`, 'hit'); }
+  else if (B.t % 4===0){
+    const opts = ['melee','ranged','magic'].filter(x=>x!==m.rsStyle); B.next = opts[rn(opts.length)];
+    logMsg(`the ${m.nm} ${B.next==='magic' ? 'gathers crackling magic' : B.next==='ranged' ? 'readies a volley' : 'lowers itself to charge'} - pray against ${B.next.toUpperCase()}!`, 'hit', true);
+    m._castT = B.next==='magic' ? FP.t : m._castT;
+  }
+  const st = m.rsStyle;
+  if ((st==='ranged' || st==='magic') && dist <= 7 && hasLineOfSight(m.x, m.y, p.x, p.y)){
+    noteFoe(i); isoMonShot(m, st==='ranged' ? 'arrow' : 'spell', st==='ranged' ? '#d8c8a0' : '#c070ff'); if (st==='magic') m._castT = FP.t;
+    monsterStrikesPlayer(i, st==='ranged' ? 'fires at you' : 'hurls magic at you', st==='ranged' ? 'shoots' : 'blasts');
+    return true;
+  }
+  return false;
+}
+// a monster's whole turn when it has something smarter to do than walk at you; false = the usual approach and strike
+function monAiTurn(m, i, dist){
+  const A = monAi(m), p = G.player, boss = monIsBoss(m);
+  if (m.rootTurns > 0 || m.frightenedTurns > 0) return false;
+  const seeYou = ()=>hasLineOfSight(m.x, m.y, p.x, p.y);
+  if (boss) return monBossTurn(m, i, dist);
+  // passive things and anything far beneath you leave you alone until you start it
+  const tooWeak = monCombatLevel(m) + 30 <= (p.combatLevel||3) && !m.raidBoss;
+  if ((A.aggro==='passive' || tooWeak) && !m.engaged && m.hp >= m.maxHp){
+    if (tooWeak && dist<=4 && !m._ignoreNote){ m._ignoreNote = 1; logMsg(`the ${m.nm} wants no part of a fight with you`, ''); }
+    if (chn(0.4)){ const d = [[1,0],[-1,0],[0,1],[0,-1]][rn(4)]; monStep(m, i, d[0], d[1]); }
+    return true;
+  }
+  if (A.role==='summoner' && dist<=6 && seeYou()){
+    m.sumCd = (m.sumCd||0) - 1;
+    if (m.sumCd <= 0 && G.mon.filter(o=>o.alive && o.summoner===m).length < 2 && monSummon(m, 1)){ m.sumCd = 5; return true; }
+  }
+  if (A.role==='healer'){
+    m.healCd = (m.healCd||0) - 1;
+    const hurt = G.mon.filter(o=>o!==m && o.alive && o.hp < o.maxHp*0.6 && Math.abs(o.x-m.x)+Math.abs(o.y-m.y)<=5).sort((a,b)=>a.hp/a.maxHp - b.hp/b.maxHp)[0];
+    if (hurt && m.healCd <= 0){ const h = Math.max(2, Math.round(hurt.maxHp*0.18)); hurt.hp = Math.min(hurt.maxHp, hurt.hp + h); m.healCd = 3; m._castT = FP.t;
+      logMsg(`the ${m.nm} heals the ${hurt.nm} for ${h}`, 'hit'); try{ fpBurst(hurt.x+0.5, hurt.y+0.5, 0.6, '#7aff8a', 14, 0.8); }catch(e){} return true; }
+  }
+  if (A.role==='archer' || A.role==='caster'){
+    if (dist===1 && chn(A.role==='caster' ? 0.3 : 0.45)){ if (A.role==='caster' ? monBlink(m, i) : monStepAway(m, i)) return true; }
+    if (dist>=2 && dist<=(A.role==='archer' ? 6 : 5) && !(m.silencedTurns>0) && !hasAbility(m,'spellcast') && seeYou()){
+      noteFoe(i); isoMonShot(m, A.role==='archer' ? 'arrow' : 'spell', A.role==='archer' ? '#d8c8a0' : '#b070ff'); if (A.role==='caster') m._castT = FP.t;
+      monsterStrikesPlayer(i, A.role==='archer' ? 'shoots at you' : 'casts at you', A.role==='archer' ? 'shoots' : 'blasts');
+      return true;
+    }
+  }
+  if (A.role==='tank' && dist > 2){
+    const ward = G.mon.find(o=>o.alive && o!==m && o._ai && ['healer','caster','summoner','archer'].includes(o._ai.role) && Math.abs(o.x-m.x)+Math.abs(o.y-m.y)<=6);
+    if (ward && Math.abs(ward.x-m.x)+Math.abs(ward.y-m.y) > 1){ monStepToward(m, i, ward.x, ward.y); return true; }
+  }
+  if ((A.role==='pack' || A.role==='swarm') && dist>1 && dist<=6){ const t = monFlankTile(m); if (t && monStepToward(m, i, t[0], t[1])) return true; }
+  return false;
+}
+// what a monster's blow can do besides its damage
+function monOnHit(m, mi, mdmg){
+  const p = G.player; monAi(m);
+  if (hasAbility(m,'freeze') && chn(0.25) && !(p.frozenTurns>0)){ p.frozenTurns = 2; logMsg(`the ${m.nm}'s icy blow freezes you in place!`, 'hit'); }
+  if (hasAbility(m,'drainStat') && chn(0.25)){ p.drainTurns = 8; p.drainAmt = Math.min(4, (p.drainAmt||0) + 2); logMsg(`the ${m.nm} drains your strength - your aim and guard weaken (-${p.drainAmt})`, 'hit'); }
+  if (hasAbility(m,'disarm') && chn(0.12) && G.gear.weapon && G.gear.weapon.used && !(p.disarmTurns>0)){ p.disarmTurns = 2; logMsg(`the ${m.nm} knocks your weapon aside - you fight bare-handed for 2 turns`, 'hit'); }
+  if (hasAbility(m,'venomous') && chn(0.3)){ applyPoisonToPlayer(1+rn(3)); logMsg(`the ${m.nm}'s bite is venomous`, 'hit'); }
+  if (m.elite && m.elite.includes('vampiric') && mdmg > 0){ const h = Math.max(1, Math.round(mdmg*0.3)); m.hp = Math.min(m.maxHp, m.hp + h); }
+}
+function monExplode(m){
+  const p = G.player; try{ fpBurst(m.x+0.5, m.y+0.5, 0.5, '#ff7a2a', 30, 1.8); if (typeof FP!=='undefined') FP.shake = Math.max(FP.shake||0, 0.5); }catch(e){}
+  if (Math.max(Math.abs(m.x-p.x), Math.abs(m.y-p.y)) > 1){ logMsg(`the ${m.nm} bursts apart in a ball of fire`, 'hit'); return; }
+  const d = Math.round(effMaxHp()*0.12) + rn(6); p.hp -= d; try{ fxSplat(p.x+0.5, p.y+0.5, d, 'taken'); }catch(e){}
+  logMsg(`the ${m.nm} explodes as it dies - you're caught in the blast for ${d}!`, 'hit');
+  if (p.hp<=0 && !checkDeathWard()) playerDies(m.nm);
+}
+// ---- status at a glance: poison bubbles, ice, flames and smoke, circling stars, a champion's aura ----
+function isoDrawStatus(ppu){
+  if (G.gameMode!==1 && G.gameMode!==2) return;
+  const t = FP.t;
+  const draw = (wx, wy, H, st)=>{
+    const foot = isoProject(wx, wy, 0.02), head = isoProject(wx, wy, H + 0.15); if (!foot.ok) return;
+    const r = ppu*0.4;
+    ctx.save();
+    if (st.aura){ ctx.globalCompositeOperation = 'lighter'; const g = ctx.createRadialGradient(foot.sx, foot.sy, r*0.3, foot.sx, foot.sy, r*1.1); g.addColorStop(0, fpRgba(st.aura, 0)); g.addColorStop(0.7, fpRgba(st.aura, 0.35 + 0.15*Math.sin(t*4))); g.addColorStop(1, fpRgba(st.aura, 0));
+      ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(foot.sx, foot.sy, r*1.1, r*0.55, 0, 0, Math.PI*2); ctx.fill(); ctx.globalCompositeOperation = 'source-over'; }
+    if (st.poison){ for (let i=0;i<5;i++){ const ph = (t*0.8 + i*0.21) % 1, x = foot.sx + Math.sin(i*2.3 + t)*r*0.5, y = foot.sy - ph*(foot.sy-head.sy);
+      ctx.fillStyle = `rgba(110,230,90,${0.75*(1-ph)})`; ctx.beginPath(); ctx.arc(x, y, Math.max(1.5, ppu*0.03*(1-ph*0.5)), 0, Math.PI*2); ctx.fill(); } }
+    if (st.ice){ ctx.strokeStyle = 'rgba(200,240,255,0.9)'; ctx.lineWidth = Math.max(1, ppu*0.02);
+      for (let i=0;i<6;i++){ const a = i/6*Math.PI*2 + 0.3, x = foot.sx + Math.cos(a)*r*0.6, y = foot.sy + Math.sin(a)*r*0.3, h = ppu*(0.12 + (i%3)*0.05);
+        ctx.fillStyle = 'rgba(170,225,255,0.55)'; ctx.beginPath(); ctx.moveTo(x-3, y); ctx.lineTo(x, y-h); ctx.lineTo(x+3, y); ctx.closePath(); ctx.fill(); ctx.stroke(); } }
+    if (st.burn){ for (let i=0;i<6;i++){ const ph = (t*1.4 + i*0.17) % 1, x = foot.sx + Math.sin(i*1.9 + t*3)*r*0.4, y = foot.sy - ph*(foot.sy-head.sy)*1.1;
+        if (i%2){ ctx.fillStyle = `rgba(255,${150+i*15},40,${0.85*(1-ph)})`; ctx.beginPath(); ctx.arc(x, y, Math.max(1, ppu*0.022), 0, Math.PI*2); ctx.fill(); }
+        else { ctx.fillStyle = `rgba(90,90,90,${0.35*(1-ph)})`; ctx.beginPath(); ctx.arc(x, y - ppu*0.1, ppu*(0.04 + ph*0.1), 0, Math.PI*2); ctx.fill(); } } }
+    if (st.bleed){ for (let i=0;i<3;i++){ const ph = (t*1.2 + i*0.33) % 1; ctx.fillStyle = `rgba(200,20,30,${0.8*(1-ph)})`; ctx.beginPath(); ctx.arc(foot.sx + (i-1)*r*0.25, head.sy + (foot.sy-head.sy)*(0.4 + ph*0.6), Math.max(1.2, ppu*0.02), 0, Math.PI*2); ctx.fill(); } }
+    if (st.daze){ for (let i=0;i<3;i++){ const a = t*4 + i*2.09, x = head.sx + Math.cos(a)*r*0.45, y = head.sy + Math.sin(a)*r*0.15;
+        ctx.fillStyle = '#ffe85a'; ctx.beginPath(); for (let k=0;k<10;k++){ const rr = k%2 ? ppu*0.018 : ppu*0.045, aa = k/10*Math.PI*2 + t; ctx.lineTo(x + Math.cos(aa)*rr, y + Math.sin(aa)*rr); } ctx.closePath(); ctx.fill(); } }
+    if (st.weak){ ctx.fillStyle = 'rgba(190,120,255,0.85)'; for (let i=0;i<2;i++){ const ph = (t*0.9 + i*0.5) % 1, x = head.sx + (i ? 1 : -1)*r*0.35, y = head.sy + ph*ppu*0.3;
+        ctx.beginPath(); ctx.moveTo(x - ppu*0.035, y); ctx.lineTo(x + ppu*0.035, y); ctx.lineTo(x, y + ppu*0.06); ctx.closePath(); ctx.fill(); } }
+    if (st.rage){ ctx.globalCompositeOperation = 'lighter'; const g = ctx.createRadialGradient(head.sx, (head.sy+foot.sy)/2, 0, head.sx, (head.sy+foot.sy)/2, r*1.6); g.addColorStop(0, `rgba(255,40,20,${0.18 + 0.08*Math.sin(t*6)})`); g.addColorStop(1, 'rgba(255,40,20,0)'); ctx.fillStyle = g; ctx.fillRect(head.sx - r*1.6, head.sy - r, r*3.2, foot.sy - head.sy + r*2); }
+    ctx.restore();
+  };
+  for (const m of G.mon){
+    if (!m.alive) continue;
+    if (G.dungeonSeen && G.dungeonSeen[m.x] && !G.dungeonSeen[m.x][m.y]) continue;
+    const st = { poison: m.poisonTurns>0 || m.venomTurns>0, ice: m.rootTurns>0, burn: m.burnTurns>0, bleed: m.bleedTurns>0, daze: m.dazedTurns>0 || m.stunTurns>0,
+      weak: m.weakTurns>0 || m.debuffAtkTurns>0 || m.debuffACTurns>0, aura: m.elite ? (m.elite.includes('vampiric') ? '#e03050' : m.elite.includes('explosive') ? '#ff8a2a' : '#ffc040') : null, rage: !!m.enraged };
+    if (!st.poison && !st.ice && !st.burn && !st.bleed && !st.daze && !st.weak && !st.aura && !st.rage) continue;
+    const e = typeof M3D!=='undefined' && M3D.inst && M3D.inst.get(m), pos = e && e.holder && e.holder.parent ? e.holder.position : { x:m.x+0.5, z:m.y+0.5 };
+    draw(pos.x, pos.z, e ? e.H : 0.9, st);
+  }
+  const p = G.player, ps = { poison: p.poisonTurns>0, ice: p.frozenTurns>0, weak: p.drainTurns>0, daze: p.stunTurns>0 };
+  if (ps.poison || ps.ice || ps.weak || ps.daze){ const pp = ISO.player && ISO.player.pos && ISO.player.map===G.map ? ISO.player.pos : { x:p.x+0.5, y:p.y+0.5 }; draw(pp.x, pp.y, 0.95, ps); }
+}
 // ===================== the dungeon overhaul: dressing, hazards, light, keys and digging, guild areas, raids =====================
 // ---- new stone for the sites: flagstones, castle inlay, temple mosaic and frieze, carved crypt walls, mine rails ----
 function fpFlagstones(o){
@@ -12773,7 +13007,7 @@ function rangedAfterHit(m, mi, total){
   }
   if (ammoInUse(W) && ammoFx(ammoType())==='fire' && m.alive){
     let d = rollDie(4) + 1; if (hasAbility(m,'vulnFire')) d *= 2;
-    m.hp -= d; if (hasAbility(m,'regen')) m.tookFireLastHit = true;
+    m.hp -= d; if (hasAbility(m,'regen')) m.tookFireLastHit = true; m.burnTurns = Math.max(m.burnTurns||0, 2);
     logMsg(`the fire arrow burns it for ${d} more`, 'hit');
   }
 }
@@ -12946,6 +13180,7 @@ function rsSpellHit(mi, sp){
   else if (ew.resist===sp[6]){ dmg = Math.max(1, Math.round(dmg*0.5)); tag = ` (it shrugs off ${sp[6]})`; }
   if (meta.demon){ dmg = Math.round(dmg*1.25); tag += ' (the demon burns)'; }
   if (sp[6]==='fire' && hasAbility(m,'regen')) m.tookFireLastHit = true;
+  if (sp[6]==='fire' || sp[6]==='zammy') m.burnTurns = Math.max(m.burnTurns||0, 2);
   m.hp -= dmg; m.hitKind = 'magic'; m.hitElem = sp[6]; m.hitCrit = false;
   G.lastFoe.hp = m.hp;
   logMsg(`your ${sp[1]} hits the ${m.nm} for ${dmg}${tag}`, 'magic');
@@ -24536,12 +24771,13 @@ function m3dInstance(m, pt){
     const n = {}; for (const k in v) n[k] = typeof v[k]==='function' ? v[k] : remap(v[k]); return n;
   };
   const rig = remap(meta.rig);
-  const H = Math.min(0.98, 0.74*(pt.h||1)*(G.gameMode===1 && G.isBossFloor && G.mon && G.mon.indexOf(m)===G.bossIdx ? 1.2 : 1));
+  // tiny rats to towering giants and dragons: the big ones stand well over a tile and spill across their neighbours
+  const szK = monSizeK(m), H = Math.min(szK > 1 ? 2.4 : 0.98, 0.74*(pt.h||1)*(G.gameMode===1 && G.isBossFloor && G.mon && G.mon.indexOf(m)===G.bossIdx ? 1.2 : 1)*szK);
   const s = H / meta.height;
   const holder = new T.Group(); holder.add(root); root.scale.setScalar(s);
-  const sh = new T.Mesh(new T.PlaneGeometry(1,1), m3dShadowMat()); sh.rotation.x = -Math.PI/2; sh.position.y = 0.004; sh.scale.setScalar(meta.beast ? 0.55*s/0.6 : 0.42); holder.add(sh);
+  const sh = new T.Mesh(new T.PlaneGeometry(1,1), m3dShadowMat()); sh.rotation.x = -Math.PI/2; sh.position.y = 0.004; sh.scale.setScalar((meta.beast ? 0.55*s/0.6 : 0.42)*(szK > 1 ? Math.sqrt(szK) : 1)); holder.add(sh);
   const mats = [...mmap.values()].filter(x=>x.emissive);
-  return { holder, root, rig, mats, H, beast:!!meta.beast, anim:meta.anim||null, seed:Math.random()*10, atk:0, pHp:G.player ? G.player.hp : 0, hurt:0, lift:pt.lift||meta.lift||0, dying:-1, stamp:0 };
+  return { holder, root, rig, mats, H, beast:!!meta.beast, anim:meta.anim||null, seed:Math.random()*10, atk:0, pHp:G.player ? G.player.hp : 0, hurt:0, lift:pt.lift||meta.lift||0, dying:-1, stamp:0, rise: m.rise ? 0 : 1 };
 }
 // pose one creature for this frame
 function m3dPose(e, pos, m, moving, flash){
@@ -24560,10 +24796,23 @@ function m3dPose(e, pos, m, moving, flash){
   if (flash > 0.5 && e.hurt < 0.2) e.hurt = 1; e.hurt = Math.max(0, e.hurt - FP.dt*3);
   const a = e.atk, wind = a>0 ? (a<0.4 ? a/0.4 : Math.max(0, 1-(a-0.4)/0.25)) : 0, strike = a>0.4 && a<0.8 ? Math.sin((a-0.4)/0.4*Math.PI) : 0;
   const breath = Math.sin(t*2.2), walk = t*9, sw = Math.sin(walk)*moving;
-  for (const mt of e.mats) mt.emissive.setScalar(flash*0.55);
-  if (e.anim){ e.anim(r, t, moving, wind, strike, e.hurt, e); return; }
-  if (e.beast){ m3dPoseBeast(r, t, moving, wind, strike, e.hurt); return; }
+  for (const mt of e.mats){ mt.emissive.setScalar(flash*0.55); if (m.enraged) mt.emissive.r = Math.max(mt.emissive.r, 0.25 + 0.15*Math.sin(t*6)); }
+  // a summoned creature claws its way up out of the floor
+  if (e.rise < 1){ e.rise = Math.min(1, e.rise + FP.dt*1.2); e.holder.position.y -= (1 - e.rise)*e.H; }
+  if (e.anim){ e.anim(r, t, moving, wind, strike, e.hurt, e); m3dPoseExtra(e, r, m, t); return; }
+  if (e.beast){ m3dPoseBeast(r, t, moving, wind, strike, e.hurt); m3dPoseExtra(e, r, m, t); return; }
   m3dPoseHumanoid(r, t, moving, wind, strike, e.hurt, e);
+  m3dPoseExtra(e, r, m, t);
+}
+// casting (arms raised, or a beast's head thrown back) and an idle shift of weight now and then
+function m3dPoseExtra(e, r, m, t){
+  const ct = m._castT ? FP.t - m._castT : 9;
+  if (ct < 0.9){
+    const k = Math.sin(Math.min(1, ct/0.9)*Math.PI);
+    if (r.arms && r.arms.length >= 2){ const [R, Lf] = r.arms; R.sh.rotation.x += (-2.5 - R.sh.rotation.x)*k; Lf.sh.rotation.x += (-2.5 - Lf.sh.rotation.x)*k; R.sh.rotation.z -= 0.4*k; Lf.sh.rotation.z += 0.4*k; R.el.rotation.x *= 1 - k*0.8; Lf.el.rotation.x *= 1 - k*0.8; }
+    else if (r.neck) r.neck.rotation.x -= 0.6*k;
+  }
+  if (r.torso && !e.atk){ const f = Math.max(0, Math.sin(t*0.37) - 0.92)*12; r.torso.rotation.z = (r.torso.rotation.z||0)*0.5 + f*0.06; }
 }
 function m3dPoseBeast(r, t, moving, wind, strike, hurt){
   const breath = Math.sin(t*2.2), walk = t*9;
@@ -24634,14 +24883,19 @@ function m3dUpdate(m, pos, flash){
   return e.H + (e.lift||0);
 }
 // a creature that just died keeps its model long enough to topple over
-function m3dKill(m){ const e = M3D.inst.get(m); if (e && e.holder.parent){ e.dying = 0; e.stamp = M3D.stamp; M3D.live.add(e); } }
+function m3dKill(m){ const e = M3D.inst.get(m); if (e && e.holder.parent){ e.dying = 0; e.stamp = M3D.stamp; e.deathTurn = (G.player && G.player.turnCount)||0; e.map = G.map; e.fx = chn(0.5) ? 1 : -1; e.fz = (Math.random()-0.5)*1.2; M3D.live.add(e); } }
 function m3dFrame(){ M3D.stamp++; }
 function m3dSweep(){
   for (const e of M3D.live){
     if (e.dying >= 0){
-      e.dying += FP.dt*1.6; const k = Math.min(1, e.dying);
-      e.root.rotation.x = -k*k*1.45; e.root.position.y = -k*0.02; e.holder.position.y = -Math.max(0, e.dying-1.2)*0.4;
-      if (e.dying > 2.2){ e.holder.parent && e.holder.parent.remove(e.holder); M3D.live.delete(e); }
+      // it topples (whichever way the blow sent it), bounces once and lies there a few turns before it sinks away
+      e.dying += FP.dt*1.6; const k = Math.min(1, e.dying), ease = k*k, after = Math.max(0, e.dying - 1);
+      const bounce = after > 0 ? Math.abs(Math.sin(after*9))*0.05*Math.exp(-after*5) : 0;
+      e.root.rotation.x = -ease*1.45*(e.fx||1); e.root.rotation.z = ease*(e.fz||0); e.root.position.y = -k*0.02 + bounce;
+      const lie = e.map===G.map && ((G.player && G.player.turnCount)||0) - (e.deathTurn||0) < 4;
+      if (lie && e.dying > 1.4) e.dying = 1.4;                   // (a corpse stays until a few turns have passed)
+      e.holder.position.y = -Math.max(0, e.dying-1.4)*0.4;
+      if (e.dying > 2.4 || e.map!==G.map){ e.holder.parent && e.holder.parent.remove(e.holder); M3D.live.delete(e); }
       continue;
     }
     if (e.stamp !== M3D.stamp){ if (e.holder.parent) e.holder.parent.remove(e.holder); M3D.live.delete(e); }
@@ -26193,6 +26447,7 @@ function isoDrawBeams(){
 function isoDrawShots(){
   const keep = [], ppu = ISO.ppu || 40;
   try{ isoDrawAmmoDrops(); isoDrawFlashThrall(ppu); }catch(e){}
+  try{ isoDrawStatus(ppu); }catch(e){}
   for (const s of ISO.shots||[]){
     s.t += FP.dt; if (s.t < 0){ keep.push(s); continue; }
     if (s.t > s.dur){ isoShotLand(s); continue; }
@@ -26818,7 +27073,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-78';
+const GAME_VERSION = 'rs-79';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

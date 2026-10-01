@@ -1,5 +1,43 @@
 # Depthcrawl patch notes
 
+## RS-79 - Monster behaviour
+
+- **Aggression:**
+  - Rats, bats, deer and other harmless creatures wander and ignore you until you attack them.
+  - Anything 30+ combat levels below you won't start a fight either (it tells you so). It fights back if you hit it.
+- **Monster roles** (shown beside a monster's level when you inspect it):
+  - **Archers** shoot from up to 6 tiles away and step back when you close in.
+  - **Casters** blast you from range and blink away when you corner them.
+  - **Healers** mend their most wounded ally.
+  - **Tanks** have more armour and guard the healers and casters.
+  - **Swarms** spread out round you.
+- **Pack hunting:** wolves, hounds and jackals circle round to attack from different sides. Each other wolf beside you makes their bites land more often (+1 each, up to +3).
+- **Summoners:** necromancers and liches raise skeletons that claw up out of the floor; shamans and witches call spirit wolves. Each keeps up to two.
+- **RuneScape-style monster abilities:**
+  - icy monsters can **freeze** you in place for 2 turns (you can still fight what's beside you)
+  - wraiths, ghosts and vampires **drain** your accuracy and armour
+  - bandits, rogues and knights can **knock your weapon aside**, so you fight bare-handed for 2 turns
+  - spiders and snakes have a **venomous** bite
+- **Champions:** 5-20% of monsters (more the deeper you go) are champions with 1.6x life and one or two affixes:
+  - **fast** (moves 2 tiles a turn)
+  - **vampiric** (heals off the damage it deals)
+  - **shielded** (+4 armour)
+  - **explosive** (bursts when it dies)
+  - **regenerating**
+  - Each wears a coloured aura.
+- **Boss phases:** at two-thirds health a boss calls two servants; at one-third it enrages, hitting harder and glowing red. Raid bosses do the same.
+- **Boss prayer checks:** bosses switch between melee, ranged and magic, shooting and casting from range. They warn you a turn ahead ("pray against MAGIC!"). An unprotected style hits 25% harder; the right protection prayer blocks most of it.
+- **Status at a glance:**
+  - green bubbles when poisoned
+  - ice shards when frozen or rooted (on you too)
+  - embers and smoke when burning
+  - red drips when bleeding
+  - circling stars when dazed
+  - purple arrows when weakened, cursed or confused
+- **Deaths and corpses:** a slain monster topples whichever way the blow sent it, bounces once, and lies there for a few turns before it sinks away.
+- **Size variety:** rats and bats are small; ogres, trolls, bears and golems stand a head taller; giants are nearly twice your height; dragons, hydras and the like tower over several tiles.
+- **Animation:** casters raise their arms to cast, beasts throw their heads back, summoned creatures rise from the ground, and idle monsters shift their weight now and then. Enraged bosses glow.
+
 ## RS-78 - Dungeon overhaul
 
 - **Bigger dungeon floors:** an ordinary dungeon floor is now 34x30 (was 20x20) with 10-14 rooms instead of 6-9:

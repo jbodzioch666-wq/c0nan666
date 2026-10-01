@@ -227,19 +227,19 @@ _Bigger floors and layouts before the monsters and content that fill them_
 ### Monster behaviour
 _Monster AI and visuals_
 
-159. [ ] (56) Aggression levels - some monsters ignore you until provoked; low-level monsters flee from a high-level player
-160. [ ] (52) Monster roles - tanks guard healers, archers keep distance, casters teleport away, swarms surround you
-161. [ ] (241) Pack hunting - wolves circle and attack from several sides
-162. [ ] (242) Summoners - necromancers raise the dead, shamans call spirits
-163. [ ] (54) RuneScape monster abilities - drain your stats, freeze you in place, disarm, poison
-164. [ ] (55) Elite and champion modifiers - random affixes on tougher monsters (fast, vampiric, shielded, explosive)
-165. [ ] (53) Boss phases - tactics change at 66% and 33% health: summon adds, enrage, or switch style (Jad-style prayer switch)
-166. [ ] (440) Boss prayer checks - bosses switch attack styles so you must swap protection prayers in time
-167. [ ] (248) Status visuals - green when poisoned, icy when frozen, smoking when burning
-168. [ ] (61) Death animations and ragdolls, with corpses that stay a few turns
-169. [ ] (247) Size variety - tiny rats to giants and dragons filling several tiles
-170. [ ] (245) Monster animations - idle, walk, attack, cast, hurt and death per body type
-171. [ ] (244) Better monster 3D models - more detail, unique silhouettes for big monsters
+159. [x] (56) Aggression levels - some monsters ignore you until provoked; low-level monsters flee from a high-level player
+160. [x] (52) Monster roles - tanks guard healers, archers keep distance, casters teleport away, swarms surround you
+161. [x] (241) Pack hunting - wolves circle and attack from several sides
+162. [x] (242) Summoners - necromancers raise the dead, shamans call spirits
+163. [x] (54) RuneScape monster abilities - drain your stats, freeze you in place, disarm, poison
+164. [x] (55) Elite and champion modifiers - random affixes on tougher monsters (fast, vampiric, shielded, explosive)
+165. [x] (53) Boss phases - tactics change at 66% and 33% health: summon adds, enrage, or switch style (Jad-style prayer switch)
+166. [x] (440) Boss prayer checks - bosses switch attack styles so you must swap protection prayers in time
+167. [x] (248) Status visuals - green when poisoned, icy when frozen, smoking when burning
+168. [x] (61) Death animations and ragdolls, with corpses that stay a few turns
+169. [x] (247) Size variety - tiny rats to giants and dragons filling several tiles
+170. [x] (245) Monster animations - idle, walk, attack, cast, hurt and death per body type
+171. [x] (244) Better monster 3D models - more detail, unique silhouettes for big monsters
 
 ### Monster content and bestiary
 _New monsters, bosses, drops and the bestiary_
