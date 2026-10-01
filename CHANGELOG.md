@@ -1,5 +1,34 @@
 # Depthcrawl patch notes
 
+## RS-73 - Resources and gathering
+
+- **More to gather (needs a pickaxe for the rocks):**
+  - **clay pits** by rivers, lakes and swamps
+  - **sand banks** on desert beaches and in the dunes
+  - **seaweed** washed up beside the sea
+  - **essence rocks** near graveyards, temples and towers, and beside mountains (rune essence)
+  - **gem rocks** beside mountains: uncut sapphires, emeralds, rubies and the odd diamond (Mining 40)
+
+  These are the raw materials for crafts still to come. Each has its own look in the 3D overworld and shows in the skill guides.
+- **Biome finds:**
+  - **Desert:** cactus spines and scarab shells.
+  - **Tundra:** frost lilies, and ice holes off the coast with ice fish (Fishing 45).
+  - **Swamp:** bog iron (iron ore, Mining 15) and leeches.
+- **Rich and rare spots:**
+  - Every so often word reaches you of a sparkling gold vein, an ancient oak or a legendary fishing spot somewhere nearby.
+  - It's marked with a gold star and its name on your world map, a bigger dot on the flat map, and a column of light in 3D. It lasts only a few hundred turns.
+  - Rich spots give triple yield and better trophy odds. The gold vein also sheds gold coins with every lump.
+- **Node size and quality:**
+  - Every tree, patch, rock and fishing spot is now small, medium or large, which sets how much it holds before it runs out.
+  - The further from any town, the finer it is: fine nodes give +25% xp and pristine nodes +50%, both with more doubles and trophies. Pristine ones sparkle, and names read like "Large pristine maple".
+- **Seasons and time of day:**
+  - The year now turns: spring, summer, autumn and winter, six days each. The season shows beside the time of day.
+  - Springbells bloom only in spring and amber caps come up only in autumn.
+  - Ice fish bite in every river in winter, and dawn trout rise in rivers only at dawn (Fishing 25).
+- **Trophies and records:**
+  - Now and then a fish or a lump of ore is a record-breaker, with a weight in lb or kg. It's an item you can admire or sell to a collector for a good price.
+  - Your biggest of each kind is kept on the Skills screen under Trophy records. Better spots give better odds.
+
 ## RS-72 - Dyes are made at the dye vat
 
 - **Dyes are now brewed at the dye vat**, not the loom. Walk into the vat in any tailor's workshop to brew the nine dyes from herbs, with the usual make 1, x5, x10 or all queue. A "dye your gear" button on the same screen opens the dye works to apply them.

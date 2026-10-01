@@ -138,12 +138,12 @@ _Shared skill code: guides, perks, tools, progress and crafting window_
 ### Resources and gathering
 _Resource nodes, done before the crafts that use them_
 
-100. [ ] (353) More resource variety - clay, sand, seaweed, gems and essence rocks as sources for the new crafts
-101. [ ] (354) Rich and rare nodes - sparkling gold vein, ancient oak, legendary fishing spot with triple yield, marked on the map while they last
-102. [ ] (355) Node size and quality - small, medium and large nodes; better quality deeper in the wild
-103. [ ] (356) Biome-specific resources - desert cacti and scarab shells, tundra frost lilies and ice fish, swamp bog iron and leeches
-104. [ ] (357) Seasonal and time-of-day resources - dawn-only fish, spring-only herbs
-105. [ ] (363) Trophy fish and record ore - size and quality variants you can mount in your house
+100. [x] (353) More resource variety - clay, sand, seaweed, gems and essence rocks as sources for the new crafts
+101. [x] (354) Rich and rare nodes - sparkling gold vein, ancient oak, legendary fishing spot with triple yield, marked on the map while they last
+102. [x] (355) Node size and quality - small, medium and large nodes; better quality deeper in the wild
+103. [x] (356) Biome-specific resources - desert cacti and scarab shells, tundra frost lilies and ice fish, swamp bog iron and leeches
+104. [x] (357) Seasonal and time-of-day resources - dawn-only fish, spring-only herbs
+105. [x] (363) Trophy fish and record ore - size and quality variants you can mount in your house
 
 ### Production skills
 _New crafts and skills on top of the framework and resources_
