@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-67 - R switches between bow and magic
+
+- **R now switches your ranged mode between bow and magic** instead of firing. A note shows which mode you're in, plus your bow and arrow count or your selected spell.
+- **Clicking a monster, auto-combat and the right-click Shoot / Cast at option all use the mode you picked.** The R hotbar slot shows the current mode.
+- **If the chosen mode runs dry it falls back to the other one**, so you shoot when you're out of runes and cast when you're out of arrows. A log line tells you once when that happens.
+- **A magic staff no longer overrides your bow.** Holding a staff only makes magic the starting mode until you press R.
+
 ## RS-66 - Ranged fighters hold their ground
 
 - **Click a monster with a bow (and arrows) or a magic staff (and runes) and you stand still and keep shooting or casting** for as long as it's in range and in sight. Bows reach their own range, spells 8 tiles. You only walk in when you can't reach it: out of range, out of sight, or out of arrows and runes.
