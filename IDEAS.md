@@ -178,16 +178,16 @@ _The melee combat code_
 ### Ranged
 _The ranged combat code_
 
-128. [ ] (396) Ranged attack styles - Accurate, Rapid, Longrange (more distance, Defence xp)
-129. [ ] (397) Range per weapon - each bow has its own reach
-130. [ ] (398) Line of sight - walls and pillars block shots, so cover matters
-131. [ ] (394) Shortbows and longbows - shortbows fire faster, longbows shoot further and hit harder
-132. [ ] (393) Crossbows - a slower, harder-hitting weapon line using bolts, bronze to dragon
-133. [ ] (57) Ammo types - broad bolts, fire arrows, ruby bolt effects; thrown darts, knives and chinchompas
-134. [ ] (395) Famous bows - dark bow (two arrows), crystal bow (no ammo, degrades), twisted bow, seercull
-135. [ ] (399) Ammo recovery - some arrows land on the ground to pick up after a fight
-136. [ ] (400) Ranged prayers - Sharp Eye, Hawk Eye, Eagle Eye, Rigour
-137. [ ] (402) Better projectiles - arrow trails, bolt sparks, spinning knives
+128. [x] (396) Ranged attack styles - Accurate, Rapid, Longrange (more distance, Defence xp)
+129. [x] (397) Range per weapon - each bow has its own reach
+130. [x] (398) Line of sight - walls and pillars block shots, so cover matters
+131. [x] (394) Shortbows and longbows - shortbows fire faster, longbows shoot further and hit harder
+132. [x] (393) Crossbows - a slower, harder-hitting weapon line using bolts, bronze to dragon
+133. [x] (57) Ammo types - broad bolts, fire arrows, ruby bolt effects; thrown darts, knives and chinchompas
+134. [x] (395) Famous bows - dark bow (two arrows), crystal bow (no ammo, degrades), twisted bow, seercull
+135. [x] (399) Ammo recovery - some arrows land on the ground to pick up after a fight
+136. [x] (400) Ranged prayers - Sharp Eye, Hawk Eye, Eagle Eye, Rigour
+137. [x] (402) Better projectiles - arrow trails, bolt sparks, spinning knives
 
 ### Magic and prayer
 _The spell and prayer code_

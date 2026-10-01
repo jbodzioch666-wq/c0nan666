@@ -4631,7 +4631,7 @@ function rangedReachIdx(m){
   if (!m || !m.alive) return -1;
   const mi = G.mon.indexOf(m); if (mi<0) return -1;
   const p = G.player, d = Math.abs(m.x-p.x) + Math.abs(m.y-p.y), w = G.gear.ranged;
-  const mode = rangedPick(), range = mode==='magic' ? 8 : mode==='bow' ? w.range : 0;
+  const mode = rangedPick(), range = mode==='magic' ? 8 : mode==='bow' ? rangedRange(w) : 0;
   return range && d <= range && hasLineOfSight(p.x, p.y, m.x, m.y) ? mi : -1;
 }
 function rangedAttack(tgt){
@@ -4658,19 +4658,18 @@ function rangedAttack(tgt){
     // nothing to spend if it didn't actually resolve
     if (!fireWand(w)) return;
   } else if (w.range){
-    if ((G.player.arrows||0)<=0 && !ammoAutoLoad()){ logMsg('you have no arrows left', 'hit'); return; }
-    const t = tIdx >= 0 ? tIdx : nearestMonsterInRange(w.range);
+    const rk = rngKind(w);
+    if (rk==='thrown' && (w.qty||0)<=0){ logMsg(`you have no ${w.basis.toLowerCase()} left`, 'hit'); return; }
+    if (rk==='none' && (w.charges||0)<=0){ logMsg(`your ${w.nm} has no charges left`, 'hit'); return; }
+    if ((rk==='arrow' || rk==='bolt') && rangedAmmoN(w)<=0 && !ammoAutoLoad()){ logMsg(`you have no ${ammoWord(w)} for your ${w.nm.toLowerCase()}`, 'hit'); return; }
+    const t = tIdx >= 0 ? tIdx : nearestMonsterInRange(rangedRange(w));
     if (t===-1){ logMsg(`no target in range for your ${w.nm}`, ''); return; }
     noteFoe(t);
-    isoShot(G.mon[t], 'arrow');
     // singlePlayerAttack always reads G.gear.weapon directly (it's the
     // melee-attack function, reused here for the exact same to-hit roll,
-    // crit, Sneak Attack and Hunter's Mark logic) - swap the bow in for
-    // the duration of this one shot, then restore the real weapon after
-    const savedWeapon = G.gear.weapon;
-    G.gear.weapon = w;
-    singlePlayerAttack(t);
-    G.gear.weapon = savedWeapon;
+    // crit, Sneak Attack and Hunter's Mark logic) - rangedVolley swaps the
+    // bow in for its shots, then restores the real weapon after
+    rangedVolley(t, w);
   } else {
     logMsg('your ranged slot has nothing that can fire - equip a wand or bow', '');
     return;
@@ -4735,6 +4734,20 @@ function generateLevel(d){
   G.genStart.x = roomX[0]+rn(roomW[0]);
   G.genStart.y = roomY[0]+rn(roomH[0]);
   if (d>1) G.map[G.genStart.x][G.genStart.y] = T_STAIRSU;
+  // pillars stand in the bigger rooms - stone that blocks a shot (and a spell) like any wall,
+  // so a pillar between you and an archer or a caster is cover. One free-standing pillar
+  // with open floor all round it can never cut a room or a corridor off
+  for (let r=0;r<roomCnt;r++){
+    if (roomW[r] < 5 || roomH[r] < 5) continue;
+    const want = roomW[r]*roomH[r] >= 48 ? 2 : 1;
+    for (let k=0, put=0; k<12 && put<want; k++){
+      const px = roomX[r]+1+rn(roomW[r]-2), py = roomY[r]+1+rn(roomH[r]-2);
+      if (G.map[px][py]!==T_FLOOR || (Math.abs(px-G.genStart.x)<=1 && Math.abs(py-G.genStart.y)<=1)) continue;
+      let open = true; for (let ax=-1; ax<=1 && open; ax++) for (let ay=-1; ay<=1; ay++) if ((ax||ay) && G.map[px+ax][py+ay]===T_WALL){ open = false; break; }
+      if (!open) continue;
+      G.map[px][py] = T_WALL; put++;
+    }
+  }
 
   // gold
   const gc = 3+rn(4);
@@ -5801,7 +5814,10 @@ function singlePlayerAttack(mi){
   // needs an arrow to fire at all. Spends one per attempt, hit or miss
   // (matching real D&D's "ammunition is expended" rule); an empty quiver
   // falls back to a weak unarmed strike, same as a spent wand.
-  if (G.gear.weapon && G.gear.weapon.range){
+  const RW = G.gear.weapon && G.gear.weapon.range ? G.gear.weapon : null, rk = RW ? rngKind(RW) : null;
+  if (RW && rk==='thrown'){ RW.qty = Math.max(0, (RW.qty||0) - 1); ammoDropMaybe(m, rk, RW); }
+  else if (RW && rk==='none'){ RW.charges = Math.max(0, (RW.charges||0) - 1); }
+  else if (RW){
     if ((G.player.arrows||0)<=0){
       const dmg = mx(1, rollDie(4)+meleeStatMod());
       m.hp -= dmg;
@@ -5811,12 +5827,13 @@ function singlePlayerAttack(mi){
       if (m.hp<=0){ monsterDies(mi); return true; }
       return false;
     }
-    if (chn(arrowSaveChance())){ if (!G.player._saveNote){ logMsg('your arrow is caught and saved', ''); G.player._saveNote = 1; } } else G.player.arrows--;
+    if (chn(arrowSaveChance())){ if (!G.player._saveNote){ logMsg('your arrow is caught and saved', ''); G.player._saveNote = 1; } } else { G.player.arrows--; ammoDropMaybe(m, rk, RW, ammoType()); }
   }
   const atkType = rsAttackType(), mel = atkType==='melee', W = G.gear.weapon, tr = mel ? wTrait() : {};
   const fl = mel ? flankInfo(m) : { hit:0, dmg:0, off:false, tag:'' }; m.engaged = true;
   const extraHit = mel ? fl.hit + mastMove('acc') + mastMove('pierce') : 0;
   const verac = !!(mel && W && W.verac && chn(0.25));
+  const sure = !!(atkType==='ranged' && W && W.seercull && chn(0.25));
   let roll = rollDie(20);
   let atkTotal = rsAttackTotal(roll, m, atkType) + extraHit;
   const sneak = (G.player.cls==='Rogue') && G.player.sneakPrimed;
@@ -5830,7 +5847,7 @@ function singlePlayerAttack(mi){
   // this monster's AC makes it easier to hit while it's active
   const effAC = m.ac - ((m.debuffACTurns>0) ? (m.debuffACAmt||0) : 0);
 
-  if (!sneak && !incapacitated && !verac && (roll===1 || atkTotal < effAC)){
+  if (!sneak && !incapacitated && !verac && !sure && (roll===1 || atkTotal < effAC)){
     // the Lucky feat: banks real reroll charges (refilled on a full rest,
     // see fullyRestPlayer) rather than a flat passive number, so a miss
     // spends one automatically before it's locked in as a miss
@@ -5841,7 +5858,7 @@ function singlePlayerAttack(mi){
       logMsg('a lucky reroll turns your swing around!', 'magic');
     }
     if (!sneak && (roll===1 || atkTotal < effAC)){
-      logMsg(`you swing at the ${m.nm} and miss (${atkTotal} vs AC ${effAC})`, '');
+      logMsg(`you ${atkType==='ranged' ? (W && W.thrown ? 'throw at' : 'shoot at') : 'swing at'} the ${m.nm} and miss (${atkTotal} vs AC ${effAC})`, '');
       sfx('miss'); fxSplat(m.x+0.5, m.y+0.5, '0', 'block');
       return false;
     }
@@ -5857,7 +5874,7 @@ function singlePlayerAttack(mi){
     if (mastMove('exec') && m.hp < m.maxHp*0.25){ raw *= 1 + mastMove('exec'); tag += ' - execute!'; }
     if (W && W.dharok){ const miss = 1 - G.player.hp/Math.max(1, effMaxHp()); raw *= 1 + miss; if (miss > 0.3) tag += " (Dharok's fury)"; }
     if (verac) tag += ' (through its armour)';
-  }
+  } else if (atkType==='ranged'){ const rm = rangedDmgMult(m, W); raw *= rm.mult; tag += rm.tag; if (sure) tag += ' (the seercull never misses)'; }
   let dmg = mx(1, roundH(raw));
   const isCrit = incapacitated || (roll >= weaponCritThreshold());
   const isDeadly = chn(gearStatF('deadly'));
@@ -5926,7 +5943,9 @@ function singlePlayerAttack(mi){
 function meleeAfterHit(m, mi, total, atkType){
   const W = G.gear.weapon, p = G.player;
   if (atkType==='ranged'){
-    const t = ammoType(), a = RS_AMMO[t]; if (!a || a[5]===undefined || !chn(a[5]===3 ? 0.1 : 0.15)) return;
+    rangedAfterHit(m, mi, total);
+    if (!ammoInUse(W)) return;
+    const t = ammoType(), a = RS_AMMO[t]; if (!a || a[5]===undefined || a[5]===null || !chn(a[5]===3 ? 0.1 : 0.15)) return;
     const e = ARROW_ENCH[a[5]];
     if (e.gem==='sapphire'){ p.prayPts = Math.min(rsLvl('prayer'), (p.prayPts||0) + 2); }
     else if (e.gem==='emerald') monPoison(m, 2);
@@ -6720,6 +6739,7 @@ function tryMove(dx,dy){
     return;
   }
   G.player.x=nx; G.player.y=ny;
+  try{ ammoPickup(); }catch(e){ console.error(e); }
   scanForHiddenTraps();
   if (G.gameMode===3) moveVillagers();
 
@@ -8855,7 +8875,7 @@ function skGainXP(k, amount, mastery){
 // skills you've trained this session - xp gained, xp an hour, and how far to the next level
 // ---- buff and debuff bar: every timed effect on the player plus active
 // prayers, as small icons under the player plate with turns left ----
-const PRAY_ICON = { def:['\u25C6','#6fa8dc'], str:['\u270A','#e06666'], att:['\u2694','#f1c232'], rng:['\u27B6','#6aa84f'], mag:['\u2726','#8e7cc3'], heal:['\u2665','#93c47d'], item:['\u2756','#e8d8a0'], piety:['\u271D','#ffd966'] };
+const PRAY_ICON = { def:['\u25C6','#6fa8dc'], str:['\u270A','#e06666'], att:['\u2694','#f1c232'], rng:['\u27B6','#6aa84f'], mag:['\u2726','#8e7cc3'], heal:['\u2665','#93c47d'], item:['\u2756','#e8d8a0'], piety:['\u271D','#ffd966'], rigour:['\u27B9','#9fe08a'] };
 const PROT_ICON = { magic:['\u2726','#8e7cc3'], ranged:['\u27B6','#6aa84f'], melee:['\u2694','#e06666'] };
 function buffList(){
   const p = G.player, out = []; if (!p) return out;
@@ -8913,7 +8933,7 @@ function spBody(tab){
     const foods = skFoods();
     return `<div class="sp-note">${dock}</div><div class="sp-grid">${cells}${empties}</div>
       <div class="sp-foot"><span>${G.inv.length}/${MAXINV}</span><span style="color:#ffd24a">${p.gold.toLocaleString()} gold</span></div>
-      ${quiverList().length ? `<div class="sp-sub">QUIVER &middot; click a type to load it</div><div class="sp-grid">${quiverList().map(q=>`<div class="sp-cell${q.loaded ? ' sel' : ''}" data-sp-ammo="${q.t}" title="${RS_AMMO[q.t][0]} x${q.n} - ranged strength +${RS_AMMO[q.t][3]}${q.loaded ? ' (loaded)' : ' - click to load'}" style="--qc:${RS_METALS[q.t][5]}"><img alt="" src="${dhIcon(obEntry('armor',{kind:'ammo', metal:RS_METALS[q.t][5]}))}"><b>${q.n}</b>${q.loaded ? '<i class="lk">ON</i>' : ''}</div>`).join('')}</div>` : ''}
+      ${quiverList().length ? `<div class="sp-sub">QUIVER &middot; click a type to load it</div><div class="sp-grid">${quiverList().map(q=>`<div class="sp-cell${q.loaded ? ' sel' : ''}" data-sp-ammo="${q.t}" title="${RS_AMMO[q.t][0]} x${q.n} - ranged strength +${RS_AMMO[q.t][3]}${q.loaded ? ' (loaded)' : ' - click to load'}" style="--qc:${ammoCol(q.t)}"><img alt="" src="${dhIcon(obEntry('armor',{kind:'ammo', metal:ammoCol(q.t)}))}"><b>${q.n}</b>${q.loaded ? '<i class="lk">ON</i>' : ''}</div>`).join('')}</div>` : ''}
       ${foods.length ? `<div class="sp-sub">FOOD &middot; drag to the quick bar</div><div class="sp-grid">${foods.map(f=>`<div class="sp-cell food" data-sp-food="${f.id}" draggable="true" title="${esc(f.nm)} x${f.n} - heals ${skFoodHeal(f)}"><img alt="" src="${dhIcon(obEntry('potion',{col:'#c8843a'}))}"><b>${f.n}</b></div>`).join('')}</div>` : ''}`;
   }
   if (tab==='equip'){
@@ -10197,6 +10217,15 @@ function crRecipes(){
   // arrows: shafts carved from a log, tipped with heads smithed from one bar of that metal
   [['logs','bronze',1],['logs','ironb',10],['oak','steelb',25],['willow','mithrilb',40],['maple','adamantb',55],['yew','runeb',70]].forEach(([lg,bar,l],t)=>
     add({ sec:'ranged', row:'Arrows', nm:`15 ${RS_AMMO[t][0].toLowerCase()}`, lvl:l, xp:15+t*14, need:{ [lg]:1, [bar]:1 }, arrows:15, arrowT:t, all:true }));
+  // crossbows (a stock, a metal limb and a string), bolts, darts and throwing knives
+  [['logs','bronze',9],['oak','ironb',24],['willow','steelb',39],['maple','mithrilb',46],['maple','adamantb',54],['yew','runeb',61]].forEach(([lg,bar,l],t)=>{
+    add({ sec:'ranged', row:'Crossbows', nm:`${RS_METALS[t][0]} crossbow`, lvl:l, xp:30+t*32, need:{ [lg]:1, [bar]:1, bowstring:1 }, make:()=>rsMakeCrossbow(t) });
+    add({ sec:'ranged', row:'Bolts', nm:`12 ${RS_METALS[t][0].toLowerCase()} bolts`, lvl:l, xp:14+t*13, need:{ [bar]:1 }, arrows:12, arrowT:RS_BOLT0+t, all:true });
+    add({ sec:'ranged', row:'Thrown', nm:`15 ${RS_METALS[t][0].toLowerCase()} darts`, lvl:Math.max(1, l-5), xp:12+t*12, need:{ [bar]:1 }, make:()=>rsMakeThrown('dart', t, 15) });
+    add({ sec:'ranged', row:'Thrown', nm:`8 ${RS_METALS[t][0].toLowerCase()} knives`, lvl:l+2, xp:14+t*13, need:{ [bar]:1 }, make:()=>rsMakeThrown('knife', t, 8) });
+  });
+  add({ sec:'ranged', row:'Special ammo', nm:'12 broad bolts', lvl:55, xp:90, need:{ steelb:1, oak:1 }, arrows:12, arrowT:RS_BOLT0+7, all:true });
+  add({ sec:'ranged', row:'Special ammo', nm:'15 fire arrows', lvl:15, xp:30, need:{ logs:1, ironb:1, coal:1 }, arrows:15, arrowT:RS_BOLT0+10, all:true });
   // gems: cut them (Crafting), and cut them into arrowtips for gem-tipped arrows (Fletching)
   const tipL = [56, 58, 63, 65, 73];
   CR_GEMS.forEach(([g,l,xp],i)=>{
@@ -10234,7 +10263,7 @@ function crRecipes(){
   ['head','arms','feet','legs','chest'].forEach(sl=>{ const n = CR_PIECE[sl];
     add({ sec:'magic', row:'Superior robes', nm:cloth.names[sl], lvl:99, xp:900*n, need:{ linen:n*2, dragontongue:n, starlily:n, r_death:10 }, make:()=>crSuperior(rsMakeArmour('cloth', 4, sl)) });
     add({ sec:'ranged', row:'Superior dragonhide', nm:hide.names[sl], lvl:99, xp:800*n, need:{ dl_k:n*2, starlily:n }, make:()=>crSuperior(rsMakeArmour('hide', 6, sl)) }); });
-  for (const r of R){ const b = CR_BOOKS.find(b=>b.test(r)); if (b) r.book = b.id; if (/bows$|^Arrows$|^Gem arrows$|^Gem tips$/.test(r.row)) r.skill = 'fletching'; }
+  for (const r of R){ const b = CR_BOOKS.find(b=>b.test(r)); if (b) r.book = b.id; if (/bows$|^Arrows$|^Gem arrows$|^Gem tips$|^Bolts$|^Thrown$|^Special ammo$/.test(r.row)) r.skill = 'fletching'; }
   return (crRecipes.list = R);
 }
 const CR_COMBOS = [['air','water'],['air','earth'],['air','fire'],['water','earth'],['water','fire'],['earth','fire']];
@@ -10267,6 +10296,7 @@ function crOnKill(m){
     else if (!boss && /wight|wraith|spectre|barrow|crypt/.test(nm) && chn(0.004)) lootRareWeapon(crBarrows(), `the ${m.nm} drops a Barrows weapon`);
     if (chn(boss ? 0.08 : /dragon|wyvern|drake/.test(nm) ? 0.03 : deep>=6 ? 0.004 : 0)) lootRareWeapon(crDragonWeapon(), `the ${m.nm} drops a dragon weapon`);
     if (/demon|fiend|abyss/.test(nm) && chn(boss ? 0.05 : 0.006)) lootRareWeapon(crWhip(), `the ${m.nm} drops an abyssal whip`);
+    { const fb = famousBowDrop(m, nm, boss, deep); if (fb) lootRareWeapon(rsMakeFamousBow(fb), `the ${m.nm} drops a famous bow`); }
     if (/serpent|snake|hydra|naga|wyvern/.test(nm) && chn(0.06)){ skAdd('venomgland', 1); logMsg(`you cut a venom gland from the ${m.nm}`, 'loot'); } }
 }
 function crLearn(idx){
@@ -10764,9 +10794,10 @@ const RS_HP_XP_PER_DMG = 1;
 // ---- attack styles: F cycles them ----
 const RS_STYLES = [
   { id:'accurate',   nm:'Accurate',   hint:'+2 to hit. Melee trains Attack; bows and spells train Ranged/Magic' },
-  { id:'aggressive', nm:'Aggressive', hint:'+2 damage. Melee trains Strength; a bow fires Rapid' },
+  { id:'aggressive', nm:'Aggressive', hint:'+2 damage. Melee trains Strength; a bow fires Rapid (a chance of a second shot)' },
   { id:'defensive',  nm:'Defensive',  hint:'+2 armour. Trains Defence (shared with Ranged/Magic for bows and spells)' },
   { id:'controlled', nm:'Controlled', hint:'+1 to hit, damage and armour. Melee xp is shared across Attack, Strength and Defence' },
+  { id:'longrange',  nm:'Longrange',  hint:'+2 reach for bows and thrown weapons and +2 armour; ranged xp is shared with Defence. Melee fights as Defensive' },
 ];
 function rsStyle(){ return RS_STYLES[(G.player && G.player.rsStyle)||0]; }
 function rsCycleStyle(){
@@ -10832,9 +10863,9 @@ function gainXP(amount){
 function rsAttackType(){ const w = G.gear.weapon; return (w && w.used && w.range) ? 'ranged' : 'melee'; }
 function rsStyleSkill(type){
   const st = rsStyle().id;
-  if (type==='ranged') return st==='defensive' ? 'defence' : 'ranged';
-  if (type==='magic') return st==='defensive' ? 'defence' : 'magic';
-  return st==='aggressive' ? 'strength' : st==='defensive' ? 'defence' : 'attack';
+  if (type==='ranged') return st==='defensive' || st==='longrange' ? 'defence' : 'ranged';
+  if (type==='magic') return st==='defensive' || st==='longrange' ? 'defence' : 'magic';
+  return st==='aggressive' ? 'strength' : st==='defensive' || st==='longrange' ? 'defence' : 'attack';
 }
 function rsMonStyle(m){
   if (!m) return 'melee';
@@ -11066,7 +11097,7 @@ function rsMeleeDamage(){
 }
 function rsRangedDamage(){
   const w = G.gear.weapon, st = rsStyle().id;
-  const am = G.gear.ammo && G.gear.ammo.used ? (G.gear.ammo.ammoStr||0) : 0;
+  const am = w && w.thrown ? (w.thrownStr||0) : w && w.noAmmo ? (w.bowStr||0) : ammoInUse(w) ? (G.gear.ammo.ammoStr||0) : 0;
   let d = rollDice(w.d1, w.d2) + (w.bonus||0) + Math.floor(rsEff('ranged')/5) + rsFrac((rsGearSum('dmgB') + am)/RS_STR_PER_DMG) + gearFlatDmg();
   if (st==='aggressive') d += 1;
   return d * (1 + rsPrayBonus('rdmg')) * gearDmgMult();
@@ -11082,7 +11113,7 @@ function playerACExact(){
   const ed = gearStatI('edef'), st = rsStyle().id;
   const spellBuff = (G.player.buffACTurns>0) ? (G.player.buffACAmt||0) : 0;
   return 10 + Math.floor(rsEff('defence')/20) + def*(1+ed/100)/RS_DEF_PER_AC + gearStatI('flatac') + rsPrayBonus('def')
-    + (st==='defensive' ? 2 : st==='controlled' ? 1 : 0) + spellBuff;
+    + (st==='defensive' || st==='longrange' ? 2 : st==='controlled' ? 1 : 0) + spellBuff;
 }
 function playerAC(){ return Math.round(playerACExact()); }
 // xp for a hit that landed: the style's skill gets 4 per damage, Hitpoints 1.33
@@ -11092,7 +11123,7 @@ function rsHitXP(dmg, type){
   const st = rsStyle().id;
   const xp = dmg*RS_XP_PER_DMG;
   if (type==='melee' && st==='controlled'){ skGainXP('attack', xp/3); skGainXP('strength', xp/3); skGainXP('defence', xp/3); }
-  else if (type!=='melee' && st==='defensive'){ skGainXP(type==='ranged' ? 'ranged' : 'magic', xp/2); skGainXP('defence', xp/2); }
+  else if (type!=='melee' && (st==='defensive' || st==='longrange')){ skGainXP(type==='ranged' ? 'ranged' : 'magic', xp/2); skGainXP('defence', xp/2); }
   else skGainXP(rsStyleSkill(type), xp);
   skGainXP('hitpoints', dmg*RS_HP_XP_PER_DMG);
   rsSync();
@@ -11135,6 +11166,7 @@ function equipFromInv(idx){
     G.player.arrows = (G.player.arrows||0) + n; item.qty = 0; G.gear.ammo = item;
     logMsg(`you put ${n} ${item.nm.toLowerCase()} in your quiver and load them (${G.player.arrows} ready)`, 'loot'); return;
   }
+  { const R = G.gear.ranged; if (item.thrown && R && R.used && R.thrown && R.nm===item.nm){ R.qty = (R.qty||0) + (item.qty||0); invRemove(idx); logMsg(`you add ${item.qty||0} to your ${item.nm.toLowerCase()} (${R.qty})`, 'loot'); return; } }
   // a two-hander and an off-hand can't be held together: whichever you put on, the other comes off
   const bump = item.slot==='weapon' && is2H(item) && G.gear.offhand && G.gear.offhand.used ? 'offhand' : item.slot==='offhand' && is2H(G.gear.weapon) ? 'weapon' : null;
   const old0 = curEquipFor(item);
@@ -11208,7 +11240,7 @@ RS_AMMO.push(['Sapphire-tipped Arrows',50,99,56,'#4a6ae0'], ['Emerald-tipped Arr
 RS_AMMO.push(['Enchanted Sapphire Arrows',50,99,58,'#8aa8ff',0], ['Enchanted Emerald Arrows',55,99,62,'#6ae09a',1], ['Enchanted Ruby Arrows',60,99,68,'#ff6a5a',2], ['Enchanted Diamond Arrows',65,99,74,'#ffffff',3], ['Enchanted Onyx Arrows',75,99,84,'#8a7a9a',4]);
 function rsMakeAmmo(t){
   const a = RS_AMMO[t], it = rsItem('ammo');
-  it.nm = a[0]; it.basis = 'Arrows'; it.baseMat = a[0].split(' ')[0]; it.rsTier = t; it.rsCol = a[4] || RS_METALS[Math.min(t, RS_METALS.length-1)][5]; it.ammoStr = a[3]; it.reqRng = a[1];
+  it.nm = a[0]; it.basis = ammoKind(t)==='bolt' ? 'Bolts' : 'Arrows'; it.baseMat = a[0].split(' ')[0]; it.rsTier = t; it.rsCol = ammoCol(t); it.ammoStr = a[3]; it.reqRng = a[1];
   it.qty = 15 + rn(26); it.price = 4 + t*t*6;
   return it;
 }
@@ -11234,8 +11266,8 @@ function loadAmmo(t, quiet){
   if (!quiet){ logMsg(`you load ${RS_AMMO[t][0].toLowerCase()} (${p.arrows})`, ''); sfx('click'); renderGame(); saveCurrentGame(); }
 }
 function ammoAutoLoad(){
-  const q = quiverList().filter(x=>!x.loaded); if (!q.length) return false;
-  const best = q.sort((a,b)=>b.t-a.t)[0]; loadAmmo(best.t, true); logMsg(`out of that ammo - you load ${RS_AMMO[best.t][0].toLowerCase()} (${G.player.arrows})`, ''); return true;
+  const w = G.gear.ranged, q = quiverList().filter(x=>!x.loaded && (!w || !w.used || !w.range || ammoFits(x.t, w))); if (!q.length) return false;
+  const best = q.sort((a,b)=>RS_AMMO[b.t][3]-RS_AMMO[a.t][3])[0]; loadAmmo(best.t, true); logMsg(`out of that ammo - you load ${RS_AMMO[best.t][0].toLowerCase()} (${G.player.arrows})`, ''); return true;
 }
 function quiverList(){
   const p = G.player, out = []; if (!p) return out;
@@ -11443,7 +11475,7 @@ function rsMakeArmour(fam, t, slot){
 function rsMakeBow(t, long){
   const b = RS_BOWS[t], it = rsItem('ranged');
   it.nm = `${b[0] ? b[0]+' ' : ''}${long ? 'Longbow' : 'Shortbow'}`; it.basis = long ? 'Longbow' : 'Shortbow'; it.rsTier = t;
-  it.d1 = 1; it.d2 = long ? 8 : 6; it.bonus = b[3]; it.acc = b[4] + (long ? 0 : 4); it.range = long ? 10 : 8; it.reqRng = b[1];
+  it.d1 = 1; it.d2 = long ? 8 : 6; it.bonus = b[3]; it.acc = b[4] + (long ? 0 : 4); it.range = (long ? 9 : 7) + Math.floor(t/2); it.reqRng = b[1];
   it.price = RS_TIER_PRICE[Math.min(6, t+ (t>3?1:0))];
   return it;
 }
@@ -11500,7 +11532,7 @@ function rsFillBase(it, d, kind, forMe, meleeOnly){
   let made;
   if (kind==='weapon' || kind==='ranged'){
     const r = meleeOnly ? 1 : Math.random();
-    if (kind==='ranged' || r < 0.15){ const t = rsPickTier(RS_BOWS, d, forMe && (i=>RS_BOWS[i][1]<=rsLvl('ranged'))); made = rsMakeBow(t, chn(0.4)); }
+    if (kind==='ranged' || r < 0.15){ const q = Math.random(); if (q < 0.2) made = rsMakeCrossbow(rsPickTier(RS_METALS, d, forMe && (i=>RS_XBOW_LV[i]<=rsLvl('ranged')))); else if (q < 0.32) made = rsRandomThrown(d, forMe); else { const t = rsPickTier(RS_BOWS, d, forMe && (i=>RS_BOWS[i][1]<=rsLvl('ranged'))); made = rsMakeBow(t, chn(0.4)); } }
     else if (r < 0.28){ const si = rsPickTier(RS_STAVES, d, forMe && (i=>RS_STAVES[i][1]<=rsLvl('magic'))); made = rsMakeStaff(si); }
     else { const t = Math.min(5, rsPickTier(RS_METALS, d, forMe && (i=>RS_METALS[i][1]<=rsLvl('attack')))); made = rsMakeWeapon(t, rn(RS_WEAPONS.length)); }   // (dragon weapons are rare drops - see crOnKill)
   } else if (kind==='offhand' || kind==='cape' || kind==='trinket' || kind==='ammo'){
@@ -11529,7 +11561,7 @@ function rsQualityOf(it){
 // it) come out as a named piece of the right metal
 // one piece of the peddler's stock, of a tier you can already use
 function rsPeddlerWare(d, kind){
-  if (kind==='bow') return rsMakeBow(rsPickTier(RS_BOWS, d, i=>RS_BOWS[i][1]<=rsLvl('ranged')), chn(0.4));
+  if (kind==='bow'){ const q = Math.random(); if (q < 0.2) return rsMakeCrossbow(rsPickTier(RS_METALS, d, i=>RS_XBOW_LV[i]<=rsLvl('ranged'))); if (q < 0.35) return rsRandomThrown(d, true); return rsMakeBow(rsPickTier(RS_BOWS, d, i=>RS_BOWS[i][1]<=rsLvl('ranged')), chn(0.4)); }
   if (kind==='staff') return rsMakeStaff(rsPickTier(RS_STAVES, d, i=>RS_STAVES[i][1]<=rsLvl('magic')));
   if (kind==='hide' || kind==='cloth'){
     const F = RS_ARMOUR[kind], sk = kind==='hide' ? 'ranged' : 'magic';
@@ -11825,7 +11857,237 @@ function rsSpellNote(sp, fellBack){
   else if (!sp) logMsg(`you have no runes for any spell${sel ? ` - ${sel[1]} needs ${rsMissingRunes(sel).join(', ')}` : ''}${el && el!=='air' ? `. Your staff only supplies ${el} runes; every combat spell also needs air runes (monsters drop them, the alchemist sells them)` : ''}`, 'hit');
 }
 // ---- ranged mode: bow or magic. R switches it; clicks, auto-combat and Shoot/Cast use it ----
-function bowReady(){ const w = G.gear.ranged; return !!(w && w.used && w.range && w.kind!=='wand' && ((G.player.arrows||0) > 0 || quiverList().length)); }
+// ===================== ranged: reach, bow kinds, crossbows and bolts, thrown weapons, famous bows, ammo recovery =====================
+// more ammo: bolts for crossbows (bronze to dragon), broad bolts, enchanted gem bolts and fire arrows.
+// a row's [6] is what fires it ('bolt' or arrows), [7] the metal it's coloured by
+const RS_BOLT0 = RS_AMMO.length;
+RS_AMMO.push(['Bronze Bolts',1,2,10,null,null,'bolt',0], ['Iron Bolts',13,4,14,null,null,'bolt',1], ['Steel Bolts',26,6,20,null,null,'bolt',2], ['Mithril Bolts',39,9,28,null,null,'bolt',3],
+  ['Adamant Bolts',46,12,38,null,null,'bolt',4], ['Rune Bolts',61,15,52,null,null,'bolt',5], ['Dragon Bolts',64,19,64,null,null,'bolt',6],
+  ['Broad Bolts',55,10,40,'#8a8a6a',null,'bolt',2], ['Enchanted Ruby Bolts',64,17,62,'#ff4a3a',2,'bolt',5], ['Enchanted Diamond Bolts',65,18,64,'#f0f8ff',3,'bolt',5],
+  ['Fire Arrows',15,6,20,'#ff8a2a',null,'arrow',1]);
+function ammoKind(t){ const a = RS_AMMO[t]; return (a && a[6]) || 'arrow'; }
+function ammoFx(t){ return t===RS_BOLT0+7 ? 'broad' : t===RS_BOLT0+10 ? 'fire' : ''; }
+function ammoCol(t){ const a = RS_AMMO[t]; if (!a) return '#9aa3a8'; if (a[4]) return a[4]; const mi = (a[7]!==undefined && a[7]!==null) ? a[7] : t; return RS_METALS[Math.min(mi, RS_METALS.length-1)][5]; }
+// what a ranged weapon fires: arrows, bolts, itself (thrown), or nothing at all (the crystal bow)
+function rngKind(w){ w = w===undefined ? G.gear.ranged : w; return !w || !w.used || !w.range ? null : w.thrown ? 'thrown' : w.noAmmo ? 'none' : w.xbow ? 'bolt' : 'arrow'; }
+function ammoFits(t, w){ const k = rngKind(w); return (k==='bolt' || k==='arrow') && ammoKind(t)===k; }
+function ammoWord(w){ return rngKind(w)==='bolt' ? 'bolts' : 'arrows'; }
+function ammoInUse(w){ w = w || G.gear.weapon; const t = ammoType(); return !!(w && w.range && t>=0 && ammoFits(t, w)); }
+function rangedAmmoN(w){ w = w || G.gear.ranged; const k = rngKind(w); if (k==='thrown') return w.qty||0; if (k==='none') return w.charges||0; return ammoInUse(w) ? (G.player.arrows||0) : 0; }
+// how far you can shoot: the weapon's own reach, +2 in the Longrange style
+function rangedRange(w){ w = w || G.gear.ranged; return ((w && w.range)||0) + (rsStyle().id==='longrange' ? 2 : 0); }
+
+// crossbows: slower and harder-hitting than a bow - never a second shot, but a heavy bolt
+const RS_XBOW_LV = [1, 13, 26, 39, 46, 61, 64];
+function rsMakeCrossbow(t){
+  t = Math.max(0, Math.min(6, t|0));
+  const m = RS_METALS[t], it = rsItem('ranged');
+  it.nm = `${m[0]} Crossbow`; it.basis = 'Crossbow'; it.baseMat = m[0]; it.rsTier = t; it.rsCol = m[5]; it.xbow = 1;
+  it.d1 = 1; it.d2 = 10; it.bonus = [1,2,3,4,5,7,9][t]; it.acc = [10,16,24,34,46,62,80][t]; it.range = 7 + Math.floor(t/3); it.reqRng = RS_XBOW_LV[t];
+  it.price = Math.round(RS_TIER_PRICE[Math.min(6, t)]*1.2);
+  return it;
+}
+// thrown weapons: darts and knives by metal, chinchompas that burst on everything round the target.
+// They live in the ranged slot as a stack - each throw spends one
+const RS_CHINS = [['Chinchompas',45,'#9a9a8a',30],['Red Chinchompas',55,'#c84a3a',45],['Black Chinchompas',65,'#3a3036',60]];
+function rsMakeThrown(kind, t, n){
+  const it = rsItem('ranged');
+  if (kind==='chin'){
+    t = Math.max(0, Math.min(2, t|0)); const C = RS_CHINS[t];
+    it.nm = C[0]; it.basis = 'Chinchompas'; it.baseMat = C[0]; it.rsCol = C[2]; it.reqRng = C[1]; it.thrownStr = C[3]; it.rsTier = 4 + t;
+    it.d1 = 1; it.d2 = 6; it.bonus = 2 + t*2; it.acc = 30 + t*20; it.range = 7; it.qty = n || (6 + rn(8)); it.price = (60 + t*50)*it.qty;
+  } else {
+    t = Math.max(0, Math.min(6, t|0)); const m = RS_METALS[t], dart = kind==='dart';
+    it.nm = `${m[0]} ${dart ? 'Darts' : 'Throwing Knives'}`; it.basis = dart ? 'Darts' : 'Throwing Knives'; it.baseMat = m[0]; it.rsTier = t; it.rsCol = m[5];
+    it.reqRng = m[1]; it.thrownStr = Math.round(m[3]*(dart ? 0.5 : 0.7)); it.d1 = 1; it.d2 = dart ? 3 : 4; it.bonus = Math.floor(t/2);
+    it.acc = (dart ? 6 : 4) + t*7; it.range = dart ? 5 : 6; it.qty = n || (15 + rn(16)); it.price = Math.round((2 + t*t*2)*it.qty);
+  }
+  it.thrown = 1; it.thrownKind = kind;
+  return it;
+}
+function rsRandomThrown(d, forMe){
+  const L = rsLvl('ranged');
+  if (d >= 10 && chn(0.3)){ const c = [0,1,2].filter(i=>!forMe || RS_CHINS[i][1]<=L); if (c.length) return rsMakeThrown('chin', c[Math.min(c.length-1, rn(c.length))]); }
+  return rsMakeThrown(chn(0.5) ? 'dart' : 'knife', rsPickTier(RS_METALS, d, forMe && (i=>RS_METALS[i][1]<=L)));
+}
+// famous bows: rare drops, each with its own trick
+function rsMakeFamousBow(k){
+  const it = rsItem('ranged'), F = {
+    dark:     { nm:'Dark Bow',    basis:'Longbow',  d2:8, bonus:5, acc:95,  range:9,  reqRng:60, col:'#3a3036', price:90000,  darkBow:1, desc:'fires two arrows with every shot' },
+    crystal:  { nm:'Crystal Bow', basis:'Shortbow', d2:7, bonus:4, acc:100, range:10, reqRng:70, col:'#9ae8ff', price:120000, noAmmo:1, charges:300, bowStr:70, desc:'needs no arrows - it sings its own, and fades after 300 shots' },
+    twisted:  { nm:'Twisted Bow', basis:'Longbow',  d2:8, bonus:6, acc:110, range:10, reqRng:75, col:'#5a4a8a', price:400000, tbow:1, desc:'hits harder the mightier its target' },
+    seercull: { nm:'Seercull',    basis:'Shortbow', d2:6, bonus:3, acc:80,  range:8,  reqRng:50, col:'#c8a85a', price:60000,  seercull:1, desc:'one shot in four cannot miss' },
+  }[k] || null;
+  if (!F) return rsMakeBow(0, false);
+  it.nm = F.nm; it.basis = F.basis; it.baseMat = F.nm; it.rsTier = 6; it.rsCol = F.col; it.d1 = 1; it.d2 = F.d2; it.bonus = F.bonus; it.acc = F.acc;
+  it.range = F.range; it.reqRng = F.reqRng; it.price = F.price; it.famous = F.desc; it.quality = 2;
+  for (const f of ['darkBow','noAmmo','charges','bowStr','tbow','seercull']) if (F[f]) it[f] = F[f];
+  return it;
+}
+function famousBowDrop(m, nm, boss, deep){
+  if (boss){ if (deep >= 8 && chn(0.03)) return 'twisted'; if (chn(0.1)) return pick(['dark','crystal','seercull']); return null; }
+  if (/demon|fiend|shade|shadow/.test(nm) && chn(0.003)) return 'dark';
+  if (/elf|crystal/.test(nm) && chn(0.006)) return 'crystal';
+  if (/dagannoth|archer|ranger|bowman/.test(nm) && chn(0.005)) return 'seercull';
+  return null;
+}
+// a shortbow, darts and the Rapid style can loose a second shot in the same turn; a dark bow always does
+function rangedExtraShots(w){
+  if (w.darkBow) return 1;
+  if (w.xbow) return 0;
+  const rapid = rsStyle().id==='aggressive';
+  let ch = w.basis==='Shortbow' ? 0.2 : w.thrownKind==='dart' ? 0.3 : w.thrownKind==='knife' ? 0.15 : 0;
+  if (rapid) ch += w.basis==='Longbow' || w.thrownKind==='chin' ? 0.1 : 0.15;
+  return chn(ch) ? 1 : 0;
+}
+function shotKind(w){ return w.thrown ? w.thrownKind : w.noAmmo ? 'crystal' : w.xbow ? 'bolt' : 'arrow'; }
+function shotCol(w){ return w.thrown ? (w.rsCol || '#c0c4ca') : w.noAmmo ? '#8af0ff' : ammoType()>=0 ? ammoCol(ammoType()) : '#9aa3a8'; }
+// one turn's shooting: the first shot, then any extra (each spends its own ammo)
+function rangedVolley(t, w){
+  const shots = 1 + rangedExtraShots(w), savedWeapon = G.gear.weapon;
+  G.gear.weapon = w;
+  try {
+    for (let i=0;i<shots;i++){
+      let ti = t;
+      if (i>0){
+        if (!G.mon[ti] || !G.mon[ti].alive){ ti = nearestMonsterInRange(rangedRange(w)); if (ti<0) break; }
+        const k = rngKind(w);
+        if (k==='thrown' && (w.qty||0)<=0) break;
+        if (k==='none' && (w.charges||0)<=0) break;
+        if ((k==='arrow' || k==='bolt') && rangedAmmoN(w)<=0 && !ammoAutoLoad()) break;
+        logMsg(w.darkBow ? 'the dark bow looses its second arrow' : w.thrown ? 'you throw again' : 'you loose a second shot', '');
+      }
+      isoShot(G.mon[ti], shotKind(w), shotCol(w), i*0.09);
+      singlePlayerAttack(ti);
+      if (G.gameOver) break;
+    }
+  } finally { G.gear.weapon = savedWeapon; }
+  if (w.thrown && (w.qty||0)<=0 && G.gear.ranged===w){ G.gear.ranged = newItem(); logMsg(`you throw the last of your ${w.basis.toLowerCase()}`, 'hit'); }
+  if (w.noAmmo && (w.charges||0)<=0 && w.range){ w.range = 0; w.nm = 'Crystal Seed'; w.basis = 'Crystal Seed'; w.famous = 'a crystal bow sung back to a seed - an elf would pay well for it'; logMsg('your crystal bow dims and shrinks back into a seed', 'hit'); }
+  else if (w.noAmmo && w.charges===50) logMsg('your crystal bow is fading - 50 shots left in it', 'hit');
+}
+// what a ranged hit does beyond its damage: twisted-bow scaling, broad bolts on big things
+function rangedDmgMult(m, W){
+  let mult = 1, tag = '';
+  if (W && W.tbow){ const f = 0.7 + 0.8*Math.min(1, monCombatLevel(m)/120); mult *= f; if (f > 1.15) tag += ' (the twisted bow bites deep)'; }
+  if (ammoInUse(W) && ammoFx(ammoType())==='broad' && /dragon|wyvern|wyrm|drake|giant|troll|demon|gargoyle|golem|ogre|hydra|kurask|turoth/i.test(m.nm||'')){ mult *= 1.25; tag += ' (broad bolt)'; }
+  return { mult, tag };
+}
+function rangedAfterHit(m, mi, total){
+  const W = G.gear.weapon; if (!W) return;
+  if (W.thrownKind==='chin'){
+    let n = 0;
+    for (let i=0;i<G.mon.length;i++){
+      const o = G.mon[i]; if (i===mi || !o.alive || Math.max(Math.abs(o.x-m.x), Math.abs(o.y-m.y)) > 1) continue;
+      const d = Math.max(1, Math.round(total*0.75)); o.hp -= d; o.hitKind = 'ranged'; o.engaged = true; n++; rsHitXP(d, 'ranged');
+      if (o.hp<=0 && o.alive) monsterDies(i);
+    }
+    if (n) logMsg(`the chinchompa bursts - ${n} more caught in the blast`, 'hit');
+  }
+  if (ammoInUse(W) && ammoFx(ammoType())==='fire' && m.alive){
+    let d = rollDie(4) + 1; if (hasAbility(m,'vulnFire')) d *= 2;
+    m.hp -= d; if (hasAbility(m,'regen')) m.tookFireLastHit = true;
+    logMsg(`the fire arrow burns it for ${d} more`, 'hit');
+  }
+}
+// ammo recovery: some of what you shoot lands on the floor where the target stood - walk over it to pick it up
+var AMMO_DROPS = [];
+function ammoDropMaybe(m, rk, RW, t){
+  if (!m || !G.map || G.gameMode===0) return;
+  const ch = rk==='thrown' ? (RW.thrownKind==='chin' ? 0 : 0.5) : 0.3; if (!chn(ch)) return;
+  AMMO_DROPS = AMMO_DROPS.filter(d=>d.map===G.map);
+  let d = AMMO_DROPS.find(d=>d.x===m.x && d.y===m.y && (rk==='thrown' ? d.nm===RW.nm : d.t===t));
+  if (!d){ d = { map:G.map, x:m.x, y:m.y, n:0, col: rk==='thrown' ? (RW.rsCol||'#c0c4ca') : ammoCol(t), bolt: rk==='bolt' }; if (rk==='thrown'){ d.nm = RW.nm; d.proto = JSON.parse(JSON.stringify(RW)); } else d.t = t; AMMO_DROPS.push(d); }
+  d.n++;
+  if (AMMO_DROPS.length > 80) AMMO_DROPS.shift();
+}
+function ammoPickup(){
+  const p = G.player; if (!p || !AMMO_DROPS.length) return;
+  AMMO_DROPS = AMMO_DROPS.filter(d=>d.map===G.map);
+  const here = AMMO_DROPS.filter(d=>d.x===p.x && d.y===p.y); if (!here.length) return;
+  for (const d of here){
+    if (d.t!==undefined){ addArrows(d.n, d.t); logMsg(`you pick up ${d.n} ${RS_AMMO[d.t][0].toLowerCase()} from the floor`, 'loot'); }
+    else {
+      const R = G.gear.ranged;
+      if (R && R.used && R.thrown && R.nm===d.nm) R.qty = (R.qty||0) + d.n;
+      else { const it = d.proto; it.qty = d.n; addToInventory(it); }
+      logMsg(`you pick up ${d.n} ${d.nm.toLowerCase()} from the floor`, 'loot');
+    }
+  }
+  sfx('loot');
+  AMMO_DROPS = AMMO_DROPS.filter(d=>!here.includes(d));
+}
+// in the iso view: spent arrows and bolts stuck in the floor, knives lying flat
+function isoDrawAmmoDrops(){
+  if (!AMMO_DROPS.length || G.gameMode===0) return;
+  const ppu = ISO.ppu || 40;
+  ctx.save(); ctx.lineCap = 'round';
+  for (const d of AMMO_DROPS){
+    if (d.map!==G.map) continue;
+    if (G.dungeonSeen && G.dungeonSeen[d.x] && !G.dungeonSeen[d.x][d.y]) continue;
+    const n = Math.min(4, d.n);
+    for (let i=0;i<n;i++){
+      const ox = 0.3 + ((i*37 + d.x*13) % 40)/100, oy = 0.3 + ((i*53 + d.y*17) % 40)/100;
+      const g0 = isoProject(d.x+ox, d.y+oy, 0), g1 = isoProject(d.x+ox+(i%2 ? 0.06 : -0.06), d.y+oy-0.04, d.proto ? 0.03 : (d.bolt ? 0.16 : 0.24));
+      if (!g0.ok) continue;
+      ctx.strokeStyle = d.proto ? d.col : '#c8b088'; ctx.lineWidth = Math.max(1, ppu*0.025);
+      ctx.beginPath(); ctx.moveTo(g0.sx, g0.sy); ctx.lineTo(g1.sx + (d.proto ? ppu*0.12 : 0), g1.sy); ctx.stroke();
+      ctx.fillStyle = d.proto ? d.col : '#f0ece0'; ctx.beginPath(); ctx.arc(g1.sx, g1.sy, Math.max(1, ppu*0.022), 0, Math.PI*2); ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+// bolts, darts, knives, chinchompas and the crystal bow's light in flight
+function isoDrawMissile(s, ppu){
+  const k = s.t/s.dur, lob = s.kind==='chin' ? 0.7 : s.kind==='bolt' ? 0.12 : s.kind==='crystal' ? 0.2 : 0.25;
+  const at = (kk)=>isoProject(s.x0+(s.x1-s.x0)*kk, s.y0+(s.y1-s.y0)*kk, 0.55 + Math.sin(kk*Math.PI)*lob);
+  const a = at(k), b = at(Math.max(0, k-0.08)); if (!a.ok) return;
+  ctx.save(); ctx.lineCap = 'round';
+  if (s.kind==='bolt'){
+    // a short, heavy bolt that leaves sparks
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i=1;i<=4;i++){ const q = at(Math.max(0, k-i*0.05)); ctx.fillStyle = `rgba(255,${200-i*25},90,${0.5-i*0.1})`; ctx.beginPath(); ctx.arc(q.sx + Math.sin(FP.t*90+i)*ppu*0.02, q.sy + Math.cos(FP.t*70+i)*ppu*0.02, Math.max(1, ppu*0.02), 0, Math.PI*2); ctx.fill(); }
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.strokeStyle = '#6a5030'; ctx.lineWidth = Math.max(2, ppu*0.05); ctx.beginPath(); ctx.moveTo(b.sx, b.sy); ctx.lineTo(a.sx, a.sy); ctx.stroke();
+    ctx.fillStyle = s.col; ctx.beginPath(); ctx.arc(a.sx, a.sy, Math.max(1.6, ppu*0.038), 0, Math.PI*2); ctx.fill();
+  } else if (s.kind==='dart' || s.kind==='knife'){
+    // spinning end over end
+    const ang = s.t*(s.kind==='dart' ? 30 : 22), r = ppu*(s.kind==='dart' ? 0.07 : 0.1);
+    ctx.strokeStyle = s.col; ctx.lineWidth = Math.max(1.5, ppu*0.03);
+    ctx.beginPath(); ctx.moveTo(a.sx - Math.cos(ang)*r, a.sy - Math.sin(ang)*r); ctx.lineTo(a.sx + Math.cos(ang)*r, a.sy + Math.sin(ang)*r); ctx.stroke();
+    ctx.strokeStyle = '#3a2a1a'; ctx.lineWidth = Math.max(1.5, ppu*0.035);
+    ctx.beginPath(); ctx.moveTo(a.sx - Math.cos(ang)*r, a.sy - Math.sin(ang)*r); ctx.lineTo(a.sx - Math.cos(ang)*r*0.4, a.sy - Math.sin(ang)*r*0.4); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(a.sx, a.sy, r, 0, Math.PI*2); ctx.stroke();
+  } else if (s.kind==='chin'){
+    // a lobbed, wriggling ball of fur
+    const r = ppu*0.07;
+    ctx.fillStyle = s.col; ctx.beginPath(); ctx.ellipse(a.sx, a.sy, r*1.15, r*(0.85 + 0.15*Math.sin(s.t*40)), s.t*8, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#ffe0a0'; ctx.beginPath(); ctx.arc(a.sx + r*0.4, a.sy - r*0.3, r*0.25, 0, Math.PI*2); ctx.fill();
+  } else {
+    // the crystal bow: a shard of light with a glowing wake
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i=5;i>=0;i--){ const q = at(Math.max(0, k-i*0.04)), rr = Math.max(2, ppu*(0.09 - i*0.012));
+      const g = ctx.createRadialGradient(q.sx, q.sy, 0, q.sx, q.sy, rr); g.addColorStop(0, s.col); g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.globalAlpha = 1 - i*0.15; ctx.fillStyle = g; ctx.beginPath(); ctx.arc(q.sx, q.sy, rr, 0, Math.PI*2); ctx.fill(); }
+    ctx.globalAlpha = 1; ctx.strokeStyle = '#e8ffff'; ctx.lineWidth = Math.max(1.5, ppu*0.03); ctx.beginPath(); ctx.moveTo(b.sx, b.sy); ctx.lineTo(a.sx, a.sy); ctx.stroke();
+  }
+  ctx.restore();
+}
+// where a shot lands: sparks, a puff, or a chinchompa's blast
+function isoShotLand(s){
+  const k = s.kind;
+  if (k==='spell') fpBurst(s.x1, s.y1, 0.5, s.col, 14, 1.3);
+  else if (k==='bolt'){ fpBurst(s.x1, s.y1, 0.5, '#ffd27a', 10, 1.1); fpBurst(s.x1, s.y1, 0.5, s.col, 4, 0.6); }
+  else if (k==='chin'){ fpBurst(s.x1, s.y1, 0.4, '#ff8a2a', 26, 1.8); fpBurst(s.x1, s.y1, 0.4, '#ffe08a', 14, 1.2); fpBurst(s.x1, s.y1, 0.3, '#5a5048', 10, 0.8); if (typeof FP!=='undefined') FP.shake = Math.max(FP.shake||0, 0.35); }
+  else if (k==='crystal') fpBurst(s.x1, s.y1, 0.5, '#bff8ff', 12, 1.2);
+  else fpBurst(s.x1, s.y1, 0.5, s.col, 5, 0.7);
+  if (k==='arrow' || k==='bolt') try{ m3dStickArrow(s.m); }catch(err){}
+}
+function bowReady(){
+  const w = G.gear.ranged; if (!(w && w.used && w.range && w.kind!=='wand')) return false;
+  const k = rngKind(w); if (k==='thrown') return (w.qty||0) > 0; if (k==='none') return (w.charges||0) > 0;
+  return rangedAmmoN(w) > 0 || quiverList().some(q=>ammoFits(q.t, w));
+}
 function rangedPref(){ const p = G.player; if (p.rangedMode) return p.rangedMode; const w = G.gear.weapon; return w && w.used && w.rsStaff ? 'magic' : (G.gear.ranged && G.gear.ranged.used && G.gear.ranged.range ? 'bow' : 'magic'); }
 function rangedPick(){ const ok = { magic:!!rsCastableSpell(), bow:bowReady() }, pref = rangedPref(); if (ok[pref]) return pref; const o = pref==='magic' ? 'bow' : 'magic'; return ok[o] ? o : null; }
 function toggleRangedMode(){
@@ -12001,11 +12263,13 @@ const RS_PRAYERS = [
   { id:'eagle', nm:'Eagle Eye',           lvl:44, drain:0.33, grp:'rng', rng:3, rdmg:0.15, d:'+3 ranged accuracy, +15% ranged damage' },
   { id:'might', nm:'Mystic Might',        lvl:45, drain:0.33, grp:'mag', mag:3, mdmg:0.15, d:'+3 magic accuracy, +15% spell damage' },
   { id:'piety', nm:'Piety',               lvl:70, drain:0.66, grp:'piety', att:4, str:0.23, def:4, d:'+4 melee accuracy, +23% melee damage, +4 armour' },
+  { id:'rigour', nm:'Rigour',             lvl:74, drain:0.66, grp:'rigour', rng:4, rdmg:0.23, def:4, d:'+4 ranged accuracy, +23% ranged damage, +4 armour' },
 ];
 function rsPrayClash(a, b){
   if (a===b) return true;
   const s = new Set([a,b]);
-  if (s.has('piety') && (s.has('att') || s.has('str') || s.has('def') || s.has('rng') || s.has('mag'))) return true;
+  const big = g=>g==='piety' || g==='rigour';
+  if ((big(a) || big(b)) && ['att','str','def','rng','mag','piety','rigour'].includes(big(a) ? b : a)) return true;
   if ((s.has('rng') || s.has('mag')) && (s.has('att') || s.has('str') || s.has('rng') || s.has('mag'))) return true;
   return false;
 }
@@ -12114,7 +12378,7 @@ function rsStatSources(which){
     const ed = gearStatI('edef');
     add('base', 10); add(`Defence level ${rsEff('defence')} (1 per 20)`, Math.floor(rsEff('defence')/20));
     add(`gear defence +${def}${ed ? ` (+${ed}%)` : ''} (1 per ${RS_DEF_PER_AC})`, def*(1+ed/100)/RS_DEF_PER_AC);
-    add('prayers', rsPrayBonus('def')); add(`${rsStyle().nm} style`, st==='defensive' ? 2 : st==='controlled' ? 1 : 0);
+    add('prayers', rsPrayBonus('def')); add(`${rsStyle().nm} style`, st==='defensive' || st==='longrange' ? 2 : st==='controlled' ? 1 : 0);
     add('spell buff', G.player.buffACTurns>0 ? (G.player.buffACAmt||0) : 0); other(gearStatI('flatac'));
     return { title:'Armour', total:playerACExact(), parts };
   }
@@ -13403,6 +13667,9 @@ function hbIcon(kind, o){
       <path d="M16 6 L16 26 M8.5 13 L23.5 13" stroke="#d8b050" stroke-width="2"/><path d="M9 8 Q16 5 23 8" stroke="#ffffff" stroke-width="0.8" fill="none" opacity="0.6"/>`);
     case 'controlled': return svg(`<path d="M16 5 L16 27 M9 27 L23 27" stroke="#c8a040" stroke-width="2" stroke-linecap="round"/><path d="M5 10 L27 10" stroke="#c8a040" stroke-width="1.8" stroke-linecap="round"/><circle cx="16" cy="5" r="2" fill="#e8c860"/>
       <path d="M5 10 L2 18 L8 18 Z M27 10 L24 18 L30 18 Z" fill="none" stroke="#a88838" stroke-width="1"/><path d="M1.5 18 q3.5 3.5 7 0 z M23.5 18 q3.5 3.5 7 0 z" fill="#d8b050" stroke="#6a5018" stroke-width="0.6"/>`);
+    case 'longrange': return svg(`<path d="M7 4 Q17 16 7 28" stroke="#7a5228" stroke-width="2.4" fill="none" stroke-linecap="round"/><path d="M7 4 L7 28" stroke="#e8e0d0" stroke-width="0.8"/>
+      <path d="M7 16 L28 16" stroke="#5a3a1e" stroke-width="1.6"/><path d="M28 16 l-4 -2.5 l0 5 z" fill="#c0c4ca"/><path d="M8 16 l-2.5 -2.5 M8 16 l-2.5 2.5" stroke="#e8e0d0" stroke-width="1.2"/>
+      <path d="M12 22 L29 22" stroke="#d8b050" stroke-width="1.2" stroke-dasharray="2 2"/>`);
     case 'map': return svg(`<path d="M4 7 L11 4 L21 7 L28 4 L28 25 L21 28 L11 25 L4 28 Z" fill="url(#hbP)" stroke="#6a4a24" stroke-width="1"/><path d="M11 4 L11 25 M21 7 L21 28" stroke="#a8844c" stroke-width="0.8"/>
       <path d="M7 22 q4 -2 6 -6 t6 -4 t4 -4" stroke="#7a5a30" stroke-width="1.1" fill="none" stroke-dasharray="2 1.6"/><path d="M21 6.5 l3 3 M24 6.5 l-3 3" stroke="#c02a1a" stroke-width="1.8" stroke-linecap="round"/>
       <circle cx="8" cy="10" r="2.6" fill="none" stroke="#6a4a24" stroke-width="0.7"/><path d="M8 7.8 L8.8 10 L8 12.2 L7.2 10 Z" fill="#c02a1a"/>`);
@@ -15076,7 +15343,7 @@ function renderImmersiveHud(){
     slot('G', im(obEntry('scroll')), spl ? 'spellbook - '+spl[1]+(rsAutocastOn() ? ' (autocast)' : '') : 'spellbook', rsAutocastOn() ? 'A' : '', '', spl ? spl[0] : ''),
     slot('N', `<span class="ico" style="color:#e0d070">&#10013;</span>`, 'prayers - '+rsPrayDrainText()+' - '+Math.floor(p.prayPts||0)+'/'+rsLvl('prayer')+' prayer points', p.prayers.length||'', '', '', { fill:[prayF, prayF<0.25 ? '#e0503c' : '#5fc8e8'] }),
     slot('Q', im(obEntry('potion',{col:'#d63a4a'})), nPot ? G.inv[firstPotionIdx()].nm : 'no potions', nPot||'', (!inWorld || !nPot) ? 'off' : ''),
-    slot('R', bow || !spl ? im(obEntry('weapon',{kind:'bow'})) : hbIcon('spell', { col:ISO_ELEM_COL[spl[6]] }), (bow ? `ranged: bow - ${wand.nm} (${p.arrows||0} arrows)` : spl ? 'ranged: magic - '+spl[1] : 'no bow or spell') + ' - R switches between bow and magic', bow ? (p.arrows||0) : spl ? (castsLeft===Infinity ? '&infin;' : castsLeft) : '', (!inWorld || (!bow && !spl)) ? 'off' : '', !bow && spl ? spl[0] : '', { low: bow ? (p.arrows||0)<=10 : !!spl && castsLeft<=5 }),
+    slot('R', bow || !spl ? im(obEntry('weapon',{kind:'bow'})) : hbIcon('spell', { col:ISO_ELEM_COL[spl[6]] }), (bow ? `ranged: ${wand.nm} (${rangedAmmoN(wand)} ${rngKind(wand)==='thrown' ? 'left' : rngKind(wand)==='none' ? 'charges' : ammoWord(wand)})` : spl ? 'ranged: magic - '+spl[1] : 'no bow or spell') + ' - R switches between bow and magic', bow ? rangedAmmoN(wand) : spl ? (castsLeft===Infinity ? '&infin;' : castsLeft) : '', (!inWorld || (!bow && !spl)) ? 'off' : '', !bow && spl ? spl[0] : '', { low: bow ? rangedAmmoN(wand)<=10 : !!spl && castsLeft<=5 }),
     slot('I', im(obEntry('chest',{gold:true})), 'inventory', G.inv.length||'', 'sep'),
     slot('P', im(obEntry('armor',{kind:'chest', metal:'#9aa3a8'})), 'character sheet', ''),
     slot('B', im(monsterPortraitFor('skeleton', true)), 'bestiary', '', 'minor'),
@@ -17965,7 +18232,7 @@ function obEntry(kind, o){
 const OB_WEAPON_KIND = [['greatsword','greatsword'],['greataxe','greataxe'],['maul','hammer'],['warhammer','hammer'],['hammer','hammer'],
   ['halberd','spear'],['spear','spear'],['pike','spear'],['trident','trident'],['quarterstaff','staff'],['staff','staff'],['axe','axe'],['pick','axe'],
   ['scimitar','scimitar'],['sickle','scimitar'],['dagger','dagger'],['club','club'],['mace','mace'],['morningstar','mace'],['flail','mace'],
-  ['bow','bow'],['crossbow','bow'],['sling','club'],['dart','dagger'],['javelin','spear']];
+  ['bow','bow'],['crossbow','bow'],['sling','club'],['dart','dagger'],['javelin','spear'],['knives','dagger'],['chinchompa','club']];
 const OB_GEMS = ['#d63a4a','#3aa0d6','#3ac070','#b060e0','#e8c040','#e87a30'];
 // the painted icon for a floor item, by what kind of thing it is
 function obItemEntry(fi){
@@ -25024,10 +25291,10 @@ function m3dStickArrow(m){
 }
 // ---- arrows and spells in flight ----
 const ISO_ELEM_COL = { air:'#e8f0ff', water:'#5aa0ff', earth:'#b08a4a', fire:'#ff7a2a' };
-function isoShot(m, kind, col){
+function isoShot(m, kind, col, delay){
   if (!ISO.on || !FPD.ok || !m) return;
-  const p = G.player, d = Math.hypot(m.x-p.x, m.y-p.y), dur = 0.12 + d*0.045;
-  (ISO.shots = ISO.shots || []).push({ x0:p.x+0.5, y0:p.y+0.5, x1:m.x+0.5, y1:m.y+0.5, t:0, dur, kind, col:col||'#fff', m });
+  const p = G.player, d = Math.hypot(m.x-p.x, m.y-p.y), dur = (kind==='chin' ? 0.2 : kind==='bolt' ? 0.08 : 0.12) + d*(kind==='bolt' ? 0.035 : kind==='chin' ? 0.06 : 0.045);
+  (ISO.shots = ISO.shots || []).push({ x0:p.x+0.5, y0:p.y+0.5, x1:m.x+0.5, y1:m.y+0.5, t:-(delay||0), dur, kind, col:col||'#fff', m });
   FP.cast = kind==='spell' ? 1 : FP.cast;
 }
 // how long until a shot already flying at this spot lands (so its hitsplat waits for it)
@@ -25055,17 +25322,24 @@ function isoDrawBeams(){
 }
 function isoDrawShots(){
   const keep = [], ppu = ISO.ppu || 40;
+  try{ isoDrawAmmoDrops(); }catch(e){}
   for (const s of ISO.shots||[]){
-    s.t += FP.dt; if (s.t > s.dur){ fpBurst(s.x1, s.y1, 0.5, s.col, s.kind==='spell' ? 14 : 5, s.kind==='spell' ? 1.3 : 0.7); if (s.kind==='arrow') try{ m3dStickArrow(s.m); }catch(err){} continue; }
+    s.t += FP.dt; if (s.t < 0){ keep.push(s); continue; }
+    if (s.t > s.dur){ isoShotLand(s); continue; }
     keep.push(s);
+    if (s.kind!=='arrow' && s.kind!=='spell'){ isoDrawMissile(s, ppu); continue; }
     const k = s.t/s.dur, arc = s.kind==='arrow' ? Math.sin(k*Math.PI)*0.35 : 0.08*Math.sin(k*Math.PI);
     const at = (kk)=>isoProject(s.x0+(s.x1-s.x0)*kk, s.y0+(s.y1-s.y0)*kk, 0.55 + (s.kind==='arrow' ? Math.sin(kk*Math.PI)*0.35 : arc));
     const a = at(k), b = at(Math.max(0, k-0.12));
     if (!a.ok) continue;
     ctx.save();
     if (s.kind==='arrow'){
+      // a fading trail of air behind it, then the shaft, fletching and a head in the arrow's own colour
+      ctx.lineCap = 'round';
+      for (let i=1;i<=5;i++){ const q0 = at(Math.max(0, k-0.12-i*0.05)), q1 = at(Math.max(0, k-0.12-(i-1)*0.05)); ctx.strokeStyle = `rgba(255,250,235,${0.32 - i*0.055})`; ctx.lineWidth = Math.max(1, ppu*(0.03 - i*0.004)); ctx.beginPath(); ctx.moveTo(q0.sx, q0.sy); ctx.lineTo(q1.sx, q1.sy); ctx.stroke(); }
       ctx.strokeStyle = '#d8c8a0'; ctx.lineWidth = Math.max(1.5, ppu*0.035); ctx.beginPath(); ctx.moveTo(b.sx, b.sy); ctx.lineTo(a.sx, a.sy); ctx.stroke();
-      ctx.fillStyle = '#9aa3a8'; ctx.beginPath(); ctx.arc(a.sx, a.sy, Math.max(1.5, ppu*0.03), 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#f0ece0'; ctx.beginPath(); ctx.arc(b.sx, b.sy, Math.max(1.2, ppu*0.025), 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = s.col && s.col!=='#fff' ? s.col : '#9aa3a8'; ctx.beginPath(); ctx.arc(a.sx, a.sy, Math.max(1.5, ppu*0.032), 0, Math.PI*2); ctx.fill();
     } else {
       ctx.globalCompositeOperation = 'lighter';
       for (let i=4;i>=0;i--){ const q = at(Math.max(0, k-i*0.06)); const r = ppu*(0.14 - i*0.02);
@@ -25671,7 +25945,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-75';
+const GAME_VERSION = 'rs-76';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

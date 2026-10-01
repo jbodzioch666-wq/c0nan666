@@ -1,5 +1,34 @@
 # Depthcrawl patch notes
 
+## RS-76 - Ranged
+
+- **Longrange style:** F now cycles through five styles. Longrange gives bows and thrown weapons +2 reach and you +2 armour, and shares ranged xp with Defence (in melee it fights as Defensive). **Rapid** (Aggressive with a bow) is now real: it gives a chance of a second shot each turn.
+- **Range per weapon:** each bow has its own reach. Plain and oak shortbows reach 7 tiles; magic longbows reach 11. Crossbows reach 7-9, darts 5, knives 6 and chinchompas 7.
+- **Cover:** bigger dungeon rooms now have free-standing stone pillars. They block arrows and spells like any wall, so a pillar between you and a caster or archer is cover. A pillar never cuts off a room or corridor.
+- **Shortbows and longbows:** shortbows have a 20% chance of a second shot each turn and are more accurate. Longbows shoot further and hit harder.
+- **Crossbows and bolts:** a new weapon line from bronze to dragon that fires bolts instead of arrows. Crossbows are slower (never a second shot) but hit harder. Fletch crossbows (log + bar + bowstring) and bolts (one bar makes 12) at the fletching bench. Crossbows and thrown weapons also turn up as loot and in the peddler's stock.
+- **More ammo:**
+  - broad bolts (+25% against dragons, giants, trolls, demons and golems)
+  - fire arrows (they burn for extra damage, double on frost creatures, and stop a troll regenerating)
+  - enchanted ruby and diamond bolts (the same effects as enchanted arrows), found deep in dungeons
+  - thrown darts and throwing knives by metal (darts throw twice often); they live in the ranged slot as a stack
+  - chinchompas (grey, red and black) that burst on everything next to the target
+  - Your quiver only loads ammo that fits the weapon you're holding.
+- **Famous bows** (rare drops from bosses and some monsters):
+  - the dark bow fires two arrows with every shot
+  - the crystal bow needs no arrows and fades back into a seed after 300 shots
+  - the twisted bow hits harder the higher the target's level
+  - the seercull lands one shot in four whatever the target's armour
+- **Ammo recovery:** about a third of the arrows and bolts you fire, and half the darts and knives, land where the target stood. Walk over them to pick them up. They show on the floor as spent shafts.
+- **Rigour** (Prayer 74): +4 ranged accuracy, +23% ranged damage and +4 armour. It's the ranged Piety and doesn't stack with the eye prayers or Piety.
+- **Better projectiles:**
+  - arrows leave a trail and carry a head in their own colour
+  - bolts fly flat and fast, throwing sparks
+  - darts and knives spin end over end
+  - chinchompas are lobbed and explode with a shake
+  - the crystal bow fires a shard of light
+- Fixed: the quiver panel could break on gem-tipped and enchanted arrows (it looked up a metal colour that doesn't exist).
+
 ## RS-75 - Melee
 
 - **Stab, slash and crush:** every melee weapon now deals one of three damage types, shown on its tooltip. Most monsters have a weak spot (+25%) and something they shrug off (-20%), and your hit message tells you which:
