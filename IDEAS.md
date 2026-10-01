@@ -67,18 +67,18 @@ _Title, pause, death and settings screens in one go_
 ### UI overhaul
 _The HUD layout rebuilt once, before more windows are added_
 
-45. [ ] (200) RuneScape-style side panel - tabbed inventory, equipment, skills, prayer, spellbook and quests that stays open while you play
-46. [ ] (201) Draggable, resizable windows - move the log, tracker and panels; the layout is remembered
-47. [ ] (204) Several windows open at once - inventory beside a shop, stash beside inventory
-48. [ ] (205) Customisable hotbar - drag spells, potions, food and prayers onto slots 1-9
-49. [ ] (206) Quick-prayer button - one click turns on your saved prayers
-50. [ ] (207) Run/walk toggle with a run energy orb
-51. [ ] (21) Right-click menus (Attack, Examine, Walk here, Use)
-52. [ ] (213) Hover highlight (outline or glow) on anything clickable in the 3D world
-53. [ ] (214) Floating name tags over NPCs and players in towns
-54. [ ] (22) Minimap on the overworld and in towns
-55. [ ] (223) Themed UI skin - stone-and-wood frames, parchment for quest text
-56. [ ] (225) Smooth UI animations - sliding panels, counting numbers, filling bars
+45. [x] (200) RuneScape-style side panel - tabbed inventory, equipment, skills, prayer, spellbook and quests that stays open while you play
+46. [x] (201) Draggable, resizable windows - move the log, tracker and panels; the layout is remembered
+47. [x] (204) Several windows open at once - inventory beside a shop, stash beside inventory
+48. [x] (205) Customisable hotbar - drag spells, potions, food and prayers onto slots 1-9
+49. [x] (206) Quick-prayer button - one click turns on your saved prayers
+50. [x] (207) Run/walk toggle with a run energy orb
+51. [x] (21) Right-click menus (Attack, Examine, Walk here, Use)
+52. [x] (213) Hover highlight (outline or glow) on anything clickable in the 3D world
+53. [x] (214) Floating name tags over NPCs and players in towns
+54. [x] (22) Minimap on the overworld and in towns
+55. [x] (223) Themed UI skin - stone-and-wood frames, parchment for quest text
+56. [x] (225) Smooth UI animations - sliding panels, counting numbers, filling bars
 
 ### Equipment slots
 _The gear slots, paper doll and stat code_

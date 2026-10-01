@@ -1,5 +1,34 @@
 # Depthcrawl patch notes
 
+## RS-60 - UI overhaul
+
+- **Side panel (F1-F6),** RuneScape-style:
+  - Tabs:
+    - F1 Inventory: an icon grid with rarity borders, lock, set and upgrade badges, and your food.
+    - F2 Equipment.
+    - F3 Skills: levels at a glance, hover for xp.
+    - F4 Prayer: click to pray.
+    - F5 Spellbook: casts left on each spell.
+    - F6 Quests: on parchment, click to track.
+  - Pressing the open tab's key closes it, and the button at the top right toggles it.
+  - Click an item to use or wear it, or right-click for every option.
+- **Several windows at once.** The side panel stays open beside shops and the stash, so you can sell or deposit with a click while the shop window moves aside.
+- **Draggable, resizable windows.** Drag the log, quest tracker, XP tracker, side panel and quick bar by their headers. The log and side panel resize from their corner. Positions and sizes are remembered, and Settings has a reset.
+- **Quick bar (1-9).** Drag spells, prayers, potions, scrolls and food onto nine slots above the hotbar, then press 1-9 to use them. Slots show counts and casts left. Right-click a slot to clear it, and drag between slots to rearrange.
+- **Quick prayers.** Click the prayer orb to switch your chosen prayers on or off. Set them in the prayer tab, or right-click a prayer.
+- **Run and walk (0, or the small orb).** Running, every other step costs no turn, so monsters and overworld roamers act half as often, and click-walking moves faster. Running drains run energy, which comes back as you walk or rest.
+- **Right-click menus** everywhere, RuneScape style:
+  - Dungeon: Attack, Shoot or Cast at, Gather, Walk here, Examine.
+  - Overworld: Gather, Walk to or Travel to, Walk here, Examine.
+  - Town: Talk-to or Use, Walk to, Walk here, Examine.
+  - Items: Wear, Drink or Read, Sell, Salvage, Bundle, Lock, Examine, Put on the quick bar.
+- **Hover highlights.** A pulsing ring under whatever you point at in the 3D overworld and towns, and a glow under the hovered tile or monster in dungeons.
+- **Name tags in towns** over you and every wandering townsperson, not just the vendors.
+- **Minimap** on the overworld and in towns. It's round and north is up. It shows terrain you've explored, sites, roaming threats, quest pins and your gravestone, or the town's streets, buildings and people. Click it to walk there.
+- **Themed skin.** Stone-and-wood window frames and wooden headers, with quest text on parchment.
+- **Smooth UI.** Windows slide in, orbs and xp bars glide to their new value, and your gold counts up instead of jumping.
+- In dungeons, the top-right buttons now sit beside the minimap, leaving the bottom right free for the side panel.
+
 ## RS-59 - Interface size fixes
 
 - **HUD windows no longer overlap at larger interface sizes:**
