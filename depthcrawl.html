@@ -2694,7 +2694,7 @@ function weaponAvg(it){
 }
 // itemDesc(): replaced by the RuneScape rules - see SECTION: RUNESCAPE RULES
 // itemPrice(): replaced by the RuneScape rules - see SECTION: RUNESCAPE RULES
-function sellPrice(it){ return mx(1, roundH(itemPrice(it)*0.4)); }
+function sellPrice(it){ return mx(1, roundH(itemPrice(it)*0.4*ecoSellMul(it))); }   // (a town pays less for what it has plenty of: see SECTION: ECONOMY)
 // ---- what things are worth ----
 // Every item and resource has a value (what a shop would ask). Shops pay 40% of it for gear;
 // high alchemy turns an item into 60% of its value and low alchemy 40%, RuneScape's own ratios -
@@ -4626,7 +4626,7 @@ function sellFromInv(idx){
   if (idx<0 || idx>=G.inv.length) return;
   if (G.inv[idx].locked){ logMsg(`the ${G.inv[idx].nm} is locked - unlock it (L) before selling`, 'hit'); sfx('error'); return; }
   const price = sellPrice(G.inv[idx]);
-  G.player.gold += price;
+  G.player.gold += price; ecoNoteSale(G.inv[idx]);
   logMsg(`you sell the ${G.inv[idx].nm} for ${price} gold`, 'loot');
   invRemove(idx);
 }
@@ -4634,8 +4634,8 @@ function sellJunk(){
   let total=0, cnt=0;
   for (let i=G.inv.length-1;i>=0;i--){
     if (lootArrow(G.inv[i])==='down' && !G.inv[i].locked){
-      total += sellPrice(G.inv[i]); cnt++;
-      G.player.gold += sellPrice(G.inv[i]);
+      const sp = sellPrice(G.inv[i]); total += sp; cnt++;
+      G.player.gold += sp; ecoNoteSale(G.inv[i]);
       invRemove(i);
     }
   }
@@ -7409,6 +7409,7 @@ function fastTravelTo(key){
   if (!G.owZoomedOut) return;
   const [x,y] = key.split(',').map(Number);
   if (!G.ow.visitedTowns || !G.ow.visitedTowns.includes(key)) return;
+  if (!ecoPayTravel(key)) return;
   G.owPos.x = x; G.owPos.y = y;
   G.owZoomedOut = false;
   logMsg('you make your way back to a town you remember', 'new');
@@ -8696,10 +8697,10 @@ function buildWaypoint(){
     const [x,y] = key.split(',').map(Number), f = townFlavorAt(x,y), here = (x===G.owPos.x && y===G.owPos.y);
     return `<div class="choice-row ${here?'sel':''}" ${here?'':`onclick="waypointTravel('${key}')"`} style="cursor:${here?'default':'pointer'};">
       <span class="key">${i+1}</span><span>${f ? esc(f.name) : 'a town'}${here ? ' <span class="muted">(you are here)</span>' : ''}</span>
-      <span class="muted">${f ? esc(f.adj) : ''}</span></div>`;
+      <span class="muted">${here ? '' : (ecoTravelFee(key) ? ecoTravelFee(key)+' gold' : 'free')}</span></div>`;
   }).join('');
   return `<h2 class="panel-title" style="color:#8fe6ff;">WAYPOINT</h2>
-    <div class="sub">the old stone hums under your hand - step through to any town whose waypoint you have touched</div>
+    <div class="sub">the old stone hums under your hand - step through to any town whose waypoint you have touched. The keeper charges by distance, less where you're liked, and nothing where you're a Champion. You have ${G.player.gold} gold.</div>
     <div class="ovbody">${rows || '<div class="muted">no other waypoints attuned yet</div>'}
       <div class="btnrow"><button class="btn primary" onclick="setUi('playing')">ESC &middot; step away</button></div></div>`;
 }
@@ -8710,6 +8711,7 @@ function waypointTravel(key){
   if (!(G.ow.visitedTowns||[]).includes(key)) return;
   if (x===G.owPos.x && y===G.owPos.y){ setUi('playing'); return; }
   setUi('playing');
+  if (!ecoPayTravel(key)) return;   // the waypoint keeper's fee
   if (!v3Active() || G.interior){ waypointArrive(key); return; }
   const p = G.player, wx = TOWN_CX, wy = 12;
   let best = null, bd = -1;
@@ -8775,6 +8777,7 @@ function v3PortalTick(dt){
 // ---- stash: storage that stays in town, shared by every town's chest ----
 const MAXSTASH = 60;
 function buildStash(){
+  return buildBank();   // the stash is the bank now (see SECTION: ECONOMY)
   const st = G.player.stash || (G.player.stash = []);
   const row = (it, i, act, arrow)=> `<div class="invrow" onclick="${act}(${i})"><span class="arrow-up">${arrow}</span><span>${itemNameHtml(it)}</span></div>`;
   const inv = G.inv.map((it,i)=> row(it,i,'stashDeposit','&rarr;')).join('') || '<div class="muted">your pack is empty</div>';
@@ -14061,7 +14064,6 @@ function generateVillage(){
   W(6,3,'forge'); W(6,4,'anvil'); W(6,11,'stall');
   // hub fixtures
   G.map[cx][12] = T_WAYPOINT;  G.villageDeco[cx][12] = 'waypoint';
-  G.map[13][10] = T_STASH;     G.villageDeco[13][10] = 'stash';
   W(15,8,'board');
   G.map[14][9] = T_QUESTGIVER; G.villageDeco[14][9] = 'questgiver';
   // vendors out front of their shops
@@ -14073,6 +14075,7 @@ function generateVillage(){
   G.villageNpcs.push({ x:14, y:9, name:nm(5), role:'Captain of the Watch', service:'questgiver', key:'quest' });
   // the Slayer Master and a TzHaar trader keep to the plaza too (see SECTION: SLAYER AND TASKS)
   G.villageNpcs.push({ x:8, y:12, name:SLAYER_MASTERS[seed % SLAYER_MASTERS.length], role:'Slayer Master', service:'slayer', key:'slayer' });
+  G.villageNpcs.push({ x:13, y:10, name:nm(6), role:'Banker', service:'bank', key:'bank' });   // the bank (see SECTION: ECONOMY)
   G.villageNpcs.push({ x:12, y:14, name:'TzHaar-Hur-'+['Tel','Lek','Rin','Zal'][(seed>>>3) % 4], role:'TzHaar trader', service:'tzhaar', key:'tzhaar' });
   for (const n of G.villageNpcs) if (n.service!=='questgiver'){ G.map[n.x][n.y] = T_VENDOR; G.villageDeco[n.x][n.y] = 'npc'; }
   townBuildDistrict();   // the temple, guild hall, arena, range and harbour (see SECTION: TOWNS)
@@ -19672,6 +19675,7 @@ function buildEstate(){
         <div class="btnrow" style="justify-content:flex-start;"><button class="btn primary" onclick="enterHouse()">go home</button></div>`
       : `<div class="qrep">A house of your own: <b>${HOUSE_PRICE.toLocaleString()} gold</b>. Build furniture in it with logs, iron bars and essence to train Construction.</div>
         <div class="btnrow" style="justify-content:flex-start;"><button class="btn primary" ${p.gold >= HOUSE_PRICE ? '' : 'disabled'} onclick="houseBuy()">buy the house</button></div>`}
+      ${ecoPropHtml()}
       <div class="btnrow"><button class="btn" onclick="setUi('playing')">close (Esc)</button></div></div>`;
 }
 function houseBuy(){ const p = G.player; if (houseP() || p.gold < HOUSE_PRICE) return; p.gold -= HOUSE_PRICE; p.house = { built:{} }; logMsg('you sign the deed - the house is yours. Its door opens from every town square', 'magic', true); sfx('gold'); renderOverlay(); saveCurrentGame(); }
@@ -20076,7 +20080,7 @@ function townAfterGen(){
   pets.forEach((k, i)=>{ for (let tries=0; tries<40; tries++){ const x = 2 + Math.floor(o3Hash(seed, i*31+tries, 5)*(COLS-4)), y = 6 + Math.floor(o3Hash(seed, i*17+tries, 6)*(ROWS-8));
     if (!free(x, y)) continue; G.villagers.push({ x, y, animal:k, nm:k==='dog' ? ['Rex','Patch','Bramble','Scout'][seed%4] : k==='cat' ? ['Tibbs','Soot','Marmalade','Whisker'][(seed>>2)%4] : 'a chicken', role:k, look:i }); break; } });
   // a market upgrade: three more pieces at the Peddler, a tier better
-  if (info.rec.up.market && G.shopStock){ const d = mx(1, G.player.level); for (let i=0;i<3;i++) G.shopStock.push(rsPeddlerWare(d+3, pick(['bow','staff','hide','cloth','jewel']))); }
+  ecoShopStock(info);   // the town's own shelf, kept between visits (and the bigger market's extra pieces)
 }
 // a step toward somewhere, round whatever's in the way
 function townFree(x, y, v){ return x>0 && y>0 && x<COLS-1 && y<ROWS-1 && G.map[x][y]===T_FLOOR && !(x===G.player.x && y===G.player.y) && !(G.villagers||[]).some(o=>o!==v && !o.indoors && o.x===x && o.y===y); }
@@ -20235,6 +20239,7 @@ function townWelcome(info){
 // on entering a town (enterVillage): the mayor on the square, the banner
 function townAfterEnter(){
   townLooks();
+  try{ ecoAccrue(); }catch(e){ console.error(e); }
   const info = townInfo();
   const spot = [[9,9],[13,13],[8,14],[11,13]].find(([x,y])=>G.map[x][y]===T_FLOOR && !(G.player.x===x && G.player.y===y) && !G.villageNpcs.some(n=>n.x===x && n.y===y) && !(G.villagers||[]).some(v=>v.x===x && v.y===y));
   if (spot) townNpc(spot[0], spot[1], 'mayor', null, ['Reeve', 'Mayor', 'Lord Mayor'][info.tier]);
@@ -20542,6 +20547,7 @@ ACHIEVEMENTS.push(
 );
 // what the new townsfolk look like (V3_LOOK is declared further down, so this runs on entering a town)
 function townLooks(){ if (V3_LOOK.mayor) return; Object.assign(V3_LOOK, {
+  bank:    ()=>HUM({ outfit:'robe', cloth:'#1a3a2a', trim:'#d8b050', hair:'#2a1a10', beard:'#2a1a10' }),
   mayor:   ()=>HUM({ outfit:'robe', cloth:'#7a1a2a', trim:'#e0c060', hair:'#aaa090', beard:'#aaa090', cape:'#4a0a1a' }),
   range:   ()=>HUM({ outfit:'leather', cloth:'#3a5a2a', weapon:'bow', hair:'#6a4a2a', cape:'#2a4a2a' }),
   arena:   ()=>HUM({ outfit:'chain', cloth:'#5a3a2a', weapon:'sword', bulk:1.2, hair:'#1a1210', beard:'#1a1210' }),
@@ -20724,6 +20730,154 @@ function townDraw2DFolk(raceTheme){
     if (v.animal){ drawGlyph(v.x, v.y, v.animal==='dog' ? 'd' : v.animal==='cat' ? 'c' : ',', v.animal==='chicken' ? '#f0ece0' : '#c8a070'); continue; }
     drawMonsterArt(v.x*cellPx+cellPx/2, v.y*cellPx+cellPx/2+cellPx*0.1, cellPx*(v.sit ? 0.7 : 0.8), VILLAGER_ART, v.guard ? '#6a8ad8' : raceTheme.color); }
 }
+
+// ===================== SECTION: ECONOMY AND BANKING =====================
+// shops remember what you've sold them: each copy of the same kind of thing
+// you sell in a town pays less, and the price recovers as the town's stock
+// moves on. The Peddler's shelf is the town's own - buy it out and it
+// refills a piece at a time. Waypoints charge a fee (less where you're
+// liked, nothing where you're a Champion). The stash chest is now a bank
+// with a banker, tabs, a search box and a vault for your gold that death
+// can't touch. And Hollis sells property in every town that pays into your
+// bank every day.
+const ECO_RECOVER = 40;          // turns for a shop to forget one sale
+const ECO_RESTOCK = 60;          // turns for the Peddler to put out one more piece
+function ecoSellKey(it){ return it ? String(it.basis || it.nm || '').replace(/\s*\(.*\)$/, '') + '|' + (it.slot || it.kind || '') : ''; }
+function ecoSales(){ const k = curTownKey(); if (!k) return null; const r = townRec(k); r.sold = r.sold || {}; return r.sold; }
+function ecoSoldN(it){ const s = ecoSales(); if (!s) return 0; const e = s[ecoSellKey(it)]; return e ? Math.max(0, e.n - (wevTurn() - e.t)/ECO_RECOVER) : 0; }
+function ecoSellMul(it){ return G.gameMode===3 ? Math.max(0.35, 1/(1 + 0.18*ecoSoldN(it))) : 1; }
+function ecoNoteSale(it){
+  const s = ecoSales(); if (!s || !it) return; const k = ecoSellKey(it), n = ecoSoldN(it); s[k] = { n:n + 1, t:wevTurn() };
+  for (const q in s) if (s[q].n - (wevTurn() - s[q].t)/ECO_RECOVER <= 0) delete s[q];
+  if (n >= 2 && !ecoNoteSale.told){ ecoNoteSale.told = 1; logMsg('the shopkeeper has plenty of those now - the price is down until they sell on', ''); }
+}
+// the Peddler's shelf, kept between visits
+function ecoShopStock(info){
+  const k = curTownKey(); if (!k || !G.shopStock) return; const r = townRec(k), turn = wevTurn(), fresh = G.shopStock;
+  if (info && info.rec.up.market){ const d = mx(1, G.player.level); for (let i=0;i<3;i++) fresh.push(rsPeddlerWare(d+3, pick(['bow','staff','hide','cloth','jewel']))); }
+  if (!r.shop || Math.abs((r.shop.lv||0) - G.player.level) >= 3 || turn - r.shop.full > DAY_LENGTH*2 || r.shop.cap !== fresh.length){ r.shop = { items:fresh.slice(), at:turn, full:turn, lv:G.player.level, cap:fresh.length }; }
+  else {
+    const n = Math.floor((turn - r.shop.at)/ECO_RESTOCK);
+    for (let i=0; i<n && r.shop.items.length < r.shop.cap; i++) r.shop.items.push(fresh[(r.shop.items.length + i) % fresh.length]);
+    r.shop.at = r.shop.items.length >= r.shop.cap ? turn : r.shop.at + n*ECO_RESTOCK;
+  }
+  G.shopStock = r.shop.items;
+}
+// the restock clock starts when a full shelf loses its first piece
+function ecoNoteBuy(){ const k = curTownKey(); if (!k) return; const r = townRec(k).shop; if (r && r.items.length >= r.cap) r.at = wevTurn(); }
+function ecoShopNote(){
+  const k = curTownKey(); if (!k) return ''; const r = townRec(k).shop; if (!r) return '';
+  if (r.items.length >= r.cap) return '<div class="muted" style="font-size:12px;margin:6px 0;">The shelves are full. Whatever you buy is gone until the Peddler restocks - a piece every ' + ECO_RESTOCK + ' turns.</div>';
+  return `<div class="muted" style="font-size:12px;margin:6px 0;">${r.cap - r.items.length} gap${r.cap - r.items.length===1 ? '' : 's'} on the shelves - the next piece goes out in about ${Math.max(1, ECO_RESTOCK - (wevTurn() - r.at))} turns.</div>`;
+}
+// waypoint fees
+function ecoTravelFee(key){
+  const [x,y] = key.split(',').map(Number), d = Math.hypot(x - G.owPos.x, y - G.owPos.y), t = repTier(repAt(key));
+  if (t.name==='Champion') return 0;
+  return Math.max(5, Math.round((6 + d*0.7) * t.disc));
+}
+function ecoPayTravel(key){
+  const fee = ecoTravelFee(key), p = G.player; if (!fee) return true;
+  if (p.gold < fee){ logMsg(`the waypoint keeper wants ${fee} gold to send you there - you have ${p.gold}`, 'hit'); sfx('error'); renderGame(); return false; }
+  p.gold -= fee; logMsg(`you pay the waypoint keeper ${fee} gold`, ''); return true;
+}
+// ---- the bank ----
+const MAXBANK = 240;
+const BANK_TABS = [['all','All'], ['weapons','Weapons'], ['armour','Armour'], ['jewels','Jewellery'], ['use','Potions & scrolls'], ['other','Other']];
+function bankTab(it){
+  if (!it) return 'other';
+  if (it.consumable || it.kind==='scroll' || it.kind==='wand' || it.kind==='potion') return 'use';
+  const s = it.slot || '';
+  if (s==='weapon' || s==='ranged' || s==='offhand' || s==='ammo') return 'weapons';
+  if (/^(ring|neck|necklace|amulet)/.test(s) || /ring|amulet|necklace|bracelet/i.test(it.basis||'')) return 'jewels';
+  if (['head','chest','legs','arms','feet','cape','hands','shield','body','boots','gloves','belt'].includes(s)) return 'armour';
+  return 'other';
+}
+function bankP(){ const p = G.player; p.stash = p.stash || []; p.bankGold = p.bankGold || 0; return p; }
+function bankShown(){
+  const p = bankP(), tab = G.bankTab || 'all', q = (G.bankQ || '').trim().toLowerCase();
+  return p.stash.map((it,i)=>({ it, i })).filter(({it})=>(tab==='all' || bankTab(it)===tab) && (!q || (it.nm||'').toLowerCase().includes(q) || itemDesc(it).toLowerCase().includes(q)));
+}
+function bankListHtml(){
+  const rows = bankShown().map(({it, i})=>`<div class="invrow" onclick="bankWithdraw(${i})" onmouseenter="showItemTooltip(event, G.player.stash[${i}])" onmousemove="moveItemTooltip(event)" onmouseleave="hideItemTooltip()"><span class="arrow-up">&larr;</span><span>${itemNameHtml(it)}</span></div>`).join('');
+  return rows || `<div class="muted">${(G.bankQ||'').trim() ? 'nothing in the bank matches that' : 'nothing here'}</div>`;
+}
+function bankList(){ const el = document.getElementById('bankListBox'); if (el) el.innerHTML = bankListHtml(); }
+function buildBank(){
+  const p = bankP(); ecoAccrue();
+  const tabs = BANK_TABS.map(([k,nm])=>{ const n = k==='all' ? p.stash.length : p.stash.filter(it=>bankTab(it)===k).length;
+    return `<button class="btn ${ (G.bankTab||'all')===k ? 'primary' : ''}" onclick="G.bankTab='${k}';renderOverlay()">${nm} <span class="muted">${n}</span></button>`; }).join(' ');
+  const inv = G.inv.map((it,i)=>`<div class="invrow" onclick="bankDeposit(${i})" onmouseenter="showItemTooltip(event, G.inv[${i}])" onmousemove="moveItemTooltip(event)" onmouseleave="hideItemTooltip()"><span class="arrow-up">&rarr;</span><span>${itemNameHtml(it)}</span></div>`).join('') || '<div class="muted">your pack is empty</div>';
+  const gbtn = (lbl, fn, ok)=>`<button class="btn" ${ok ? '' : 'disabled'} onclick="${fn}">${lbl}</button>`;
+  const banker = villageNpcFor('bank');
+  return `<h2 class="panel-title">THE BANK</h2>
+    <div class="sub">${banker ? esc(banker.name)+' &middot; Banker &middot; ' : ''}"What's in our vaults is waiting for you in every town's bank - and death itself can't touch the gold you keep with us."</div>
+    <div class="ovbody" style="max-width:900px;">
+      <div class="qrep">Gold in your purse <b>${p.gold.toLocaleString()}</b> &middot; in the vault <b style="color:${COL.gold}">${p.bankGold.toLocaleString()}</b>
+        <div class="btnrow" style="justify-content:flex-start;margin-top:6px;">deposit ${gbtn('100', 'bankGold(100)', p.gold >= 100)} ${gbtn('1,000', 'bankGold(1000)', p.gold >= 1000)} ${gbtn('all', 'bankGold(G.player.gold)', p.gold > 0)}
+          &nbsp; withdraw ${gbtn('100', 'bankGold(-100)', p.bankGold >= 100)} ${gbtn('1,000', 'bankGold(-1000)', p.bankGold >= 1000)} ${gbtn('all', 'bankGold(-G.player.bankGold)', p.bankGold > 0)}</div></div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;">
+        <div class="panel" style="flex:1 1 300px;"><h4>Pack &middot; ${G.inv.length}/${MAXINV} <button class="btn" style="float:right;padding:2px 8px;" onclick="bankDepositAll()">deposit all</button></h4><div class="invlist" style="max-height:48vh;">${inv}</div></div>
+        <div class="panel" style="flex:1 1 360px;"><h4>Bank &middot; ${p.stash.length}/${MAXBANK}</h4>
+          <div class="btnrow" style="justify-content:flex-start;flex-wrap:wrap;gap:4px;margin:4px 0;">${tabs}</div>
+          <input id="bankQ" type="text" placeholder="search the bank..." value="${esc(G.bankQ||'')}" oninput="G.bankQ=this.value;bankList()" style="width:100%;box-sizing:border-box;margin:4px 0 6px;padding:5px 8px;background:#14110d;color:var(--ink);border:1px solid #5a4a30;border-radius:6px;">
+          <div class="invlist" id="bankListBox" style="max-height:40vh;">${bankListHtml()}</div></div>
+      </div>
+      ${ecoPropSummary()}
+      <div class="btnrow"><button class="btn primary" onclick="setUi('playing')">ESC &middot; close</button></div></div>`;
+}
+function bankDeposit(i){ const p = bankP(); if (p.stash.length >= MAXBANK){ logMsg('your bank is full', 'hit'); return; } const it = G.inv[i]; if (!it) return; hideItemTooltip(); invRemove(i); p.stash.push(it); renderOverlay(); saveCurrentGame(); }
+function bankDepositAll(){ const p = bankP(); let n = 0; for (let i=G.inv.length-1; i>=0 && p.stash.length < MAXBANK; i--){ const it = G.inv[i]; if (!it || it.locked) continue; invRemove(i); p.stash.push(it); n++; } if (n) logMsg(`you bank ${n} item${n===1 ? '' : 's'}`, ''); hideItemTooltip(); renderOverlay(); saveCurrentGame(); }
+function bankWithdraw(i){ const p = bankP(); if (G.inv.length >= MAXINV){ logMsg('your pack is full', 'hit'); return; } const it = p.stash[i]; if (!it) return; hideItemTooltip(); p.stash.splice(i, 1); G.inv.push(it); renderOverlay(); saveCurrentGame(); }
+function bankGold(n){
+  const p = bankP(); n = Math.floor(n); if (!n) return;
+  if (n > 0){ n = Math.min(n, p.gold); p.gold -= n; p.bankGold += n; logMsg(`you deposit ${n.toLocaleString()} gold`, ''); }
+  else { n = Math.min(-n, p.bankGold); p.bankGold -= n; p.gold += n; logMsg(`you withdraw ${n.toLocaleString()} gold`, ''); }
+  sfx('coins'); checkAchievements(); renderOverlay(); saveCurrentGame();
+}
+// ---- property: buy into a town's trade, and it pays into your bank every day ----
+const ECO_PROPS = [
+  { id:'stall', nm:'A market stall',              price:1200, inc:14,  d:'a stall on the square, let to a fruit-seller' },
+  { id:'rooms', nm:'Rooms over the tavern',        price:3500, inc:40,  d:'the innkeeper lets them to travellers and splits the takings' },
+  { id:'share', nm:'A share in the Peddler',      price:6000, inc:70,  d:'a cut of everything sold in the town\'s shop' },
+  { id:'wharf', nm:'A warehouse on the wharf',     price:9000, inc:115, d:'cargo in, cargo out - only in a port', port:true },
+];
+function ecoProps(key){ const r = townRec(key); r.prop = r.prop || {}; return r.prop; }
+function ecoIncome(key){ const pr = ecoProps(key); let inc = 0; for (const pp of ECO_PROPS) if (pr[pp.id]) inc += pp.inc; return Math.round(inc * (1 + 0.1*REP_TIERS.indexOf(repTier(repAt(key))))); }
+// pay out what every property has earned since you last heard (up to 20 days' worth)
+function ecoAccrue(){
+  if (!G.ow || !G.ow.wg || !G.ow.wg.towns) return 0;
+  const p = bankP(), today = townDay(); let total = 0;
+  for (const key in G.ow.wg.towns){ const r = G.ow.wg.towns[key]; if (!r.prop || !Object.keys(r.prop).length) continue;
+    if (r.propDay===undefined){ r.propDay = today; continue; }
+    const days = Math.min(20, today - r.propDay); if (days <= 0) continue;
+    const g = ecoIncome(key) * days; r.propDay = today; total += g; }
+  if (total){ p.bankGold += total; p.propEarned = (p.propEarned||0) + total; logMsg(`your properties have earned ${total.toLocaleString()} gold - it's waiting in your bank`, 'loot'); checkAchievements(); }
+  return total;
+}
+function ecoPropCount(){ let n = 0; const t = (G.ow && G.ow.wg && G.ow.wg.towns) || {}; for (const k in t) n += Object.keys(t[k].prop||{}).length; return n; }
+function ecoPropSummary(){
+  const n = ecoPropCount(); if (!n) return '<div class="muted" style="font-size:12px;margin-top:8px;">Hollis the estate agent sells property in every town - it pays into this bank every day.</div>';
+  let inc = 0; const t = G.ow.wg.towns; for (const k in t) if (t[k].prop && Object.keys(t[k].prop).length) inc += ecoIncome(k);
+  return `<div class="muted" style="font-size:12px;margin-top:8px;">You own ${n} propert${n===1 ? 'y' : 'ies'}, earning ${inc.toLocaleString()} gold a day into this bank (${(G.player.propEarned||0).toLocaleString()} so far).</div>`;
+}
+function ecoPropHtml(){
+  const info = townInfo(), pr = ecoProps(info.key), p = G.player;
+  const rows = ECO_PROPS.filter(pp=>!pp.port || info.port).map(pp=>`<div class="shoprow"><span><b>${esc(pp.nm)}</b></span><span class="desc">${esc(pp.d)} &middot; ${pp.inc} gold a day</span>
+    <span>${pr[pp.id] ? '<span style="color:'+COL.green+'">yours</span>' : `<button class="btn" ${p.gold >= pp.price ? '' : 'disabled'} onclick="ecoBuyProp('${pp.id}')">buy (${pp.price.toLocaleString()} gold)</button>`}</span></div>`).join('');
+  return `<h4 style="color:var(--ink-faint);margin:12px 0 6px;">PROPERTY IN ${esc(info.name.toUpperCase())}</h4>${rows}
+    <div class="muted" style="font-size:12px;">Income goes into your bank every day (more where the town counts you a friend). ${ecoPropCount() ? `Your properties here earn ${ecoIncome(info.key)} gold a day.` : ''}</div>`;
+}
+function ecoBuyProp(id){
+  const info = townInfo(), pp = ECO_PROPS.find(x=>x.id===id), pr = ecoProps(info.key), p = G.player;
+  if (!pp || pr[id] || p.gold < pp.price || (pp.port && !info.port)) return;
+  ecoAccrue(); p.gold -= pp.price; pr[id] = 1; if (info.rec.propDay===undefined) info.rec.propDay = townDay();
+  logMsg(`you buy ${pp.nm.toLowerCase()} in ${info.name} - it will pay ${pp.inc} gold a day into your bank`, 'magic', true); sfx('coins'); checkAchievements(); renderOverlay(); saveCurrentGame();
+}
+ACHIEVEMENTS.push(
+  { id:'landlord', name:'Landlord', desc:'own three properties', check:p=>ecoPropCount() >= 3, bonus:{goldfind:0.05} },
+  { id:'banker', name:'Old Money', desc:'keep 50,000 gold in the bank', check:p=>(p.bankGold||0) >= 50000, bonus:{magicfind:3} },
+);
 
 function renderGame(){
   syncGrid();
@@ -25591,13 +25745,13 @@ function v3BuildScene(){
     V3.motes = { p:[x,0.4,z] };
     const hb = new T.Mesh(new T.CylinderGeometry(1.1,1.1,2,8), new T.MeshBasicMaterial({ visible:false })); hb.position.set(x,1,z); hb.userData.act = { kind:'tile', x:TOWN_CX, y:12, label:'Waypoint' }; grp.add(hb); V3.hits.push(hb);
   }
-  // stash chest
-  { const x = 13.5, z = 10.5;
-    grp.add(v3Box(0.8,0.45,0.5,mats.planks,x,0.23,z));
-    const lid = new T.Mesh(new T.CylinderGeometry(0.25,0.25,0.8,12,1,false,0,Math.PI), mats.planks); lid.rotation.z = Math.PI/2; lid.position.set(x,0.45,z); lid.castShadow = true; grp.add(lid);
-    for (const dx of [-0.28,0.28]) grp.add(v3Box(0.06,0.5,0.52,mats.gold,x+dx,0.25,z));
-    grp.add(v3Box(0.12,0.14,0.04,mats.gold,x,0.4,z+0.26));
-    const hb = new T.Mesh(new T.BoxGeometry(0.9,0.9,0.9), new T.MeshBasicMaterial({ visible:false })); hb.position.set(x,0.45,z); hb.userData.act = { kind:'tile', x:13, y:10, label:'Stash' }; grp.add(hb); V3.hits.push(hb);
+  // the bank: the banker's desk under a green awning, a strongbox and coin stacks
+  { const x = 13.5, z = 10.5, gm = new T.MeshStandardMaterial({ color:0x2a5a3a, roughness:0.8 });
+    grp.add(v3Box(1.0,0.8,0.32,mats.planks,x,0.4,z+0.42)); grp.add(v3Box(1.08,0.06,0.4,mats.wood,x,0.82,z+0.42));
+    for (const [dx,dz] of [[-0.48,-0.4],[0.48,-0.4],[-0.48,0.6],[0.48,0.6]]) grp.add(v3Cyl(0.035,0.035,1.9,6,mats.wood,x+dx,0.95,z+dz));
+    const aw = v3Box(1.2,0.05,1.2,gm,x,1.92,z+0.1); aw.rotation.x = 0.18; grp.add(aw);
+    grp.add(v3Box(0.36,0.24,0.24,mats.iron,x-0.3,0.97,z+0.42)); grp.add(v3Box(0.36,0.04,0.25,mats.gold,x-0.3,1.1,z+0.42));
+    for (let i=0;i<3;i++) grp.add(v3Cyl(0.05,0.05,0.05+i*0.04,10,mats.gold,x+0.15+i*0.12,0.87+(0.05+i*0.04)/2,z+0.4));
   }
   // notice board
   { const x = 15.5, z = 8.5;
@@ -25655,7 +25809,7 @@ function v3BuildPeople(grp, mats){
     const el = document.createElement('div'); el.className = 'v3plate folk'; el.innerHTML = `<b>${esc(p.v.nm || NAME_POOL[h])}</b><span>${esc(p.v.role || role)}</span>`; V3.labels.appendChild(el); V3.plates.push({ el, obj:p.g, y:1.15, near:9 }); });
   if (G.interior) for (const [k,x,y] of ROOM_LAYOUT[G.interior.key].benches){ const el = document.createElement('div'); el.className = 'v3plate small'; el.innerHTML = `<b>${esc(BENCHES[k].nm)}</b>`; V3.labels.appendChild(el); V3.plates.push({ el, pos:new T.Vector3(x+0.5, 1.45, y+0.5) }); }
   if (G.interior){ const el = document.createElement('div'); el.className = 'v3plate small'; el.innerHTML = '<b>Door</b>'; V3.labels.appendChild(el); V3.plates.push({ el, pos:new T.Vector3(ROOM.door.x+0.5, 1.9, ROOM.door.y+0.2) }); }
-  if (!G.interior) for (const [txt, x, y, z] of [['Waypoint', TOWN_CX+0.5, 1.95, 12.5], ['Stash', 13.5, 0.95, 10.5]]){
+  if (!G.interior) for (const [txt, x, y, z] of [['Waypoint', TOWN_CX+0.5, 1.95, 12.5]]){
     const el = document.createElement('div'); el.className = 'v3plate small'; el.innerHTML = `<b>${txt}</b>`; V3.labels.appendChild(el);
     V3.plates.push({ el, pos:new T.Vector3(x,y,z) });
   }
@@ -31672,7 +31826,7 @@ function backOut(){
     case 'blacksmith': setUi('playing'); break;
     case 'alchemist': setUi('playing'); break;
     case 'tavern': setUi('playing'); break;
-    case 'waypoint': case 'stash': case 'questgiver': setUi('playing'); break;
+    case 'waypoint': case 'stash': case 'bank': case 'questgiver': setUi('playing'); break;
     case 'inventory': setUi('playing'); break;
     case 'charsheet': setUi('playing'); break;
     case 'skills': case 'rsmagic': case 'prayer': setUi('playing'); break;
@@ -31713,6 +31867,7 @@ function renderOverlay(){
     case 'tavern': el.innerHTML = buildTavern(); break;
     case 'waypoint': el.innerHTML = buildWaypoint(); break;
     case 'stash': el.innerHTML = buildStash(); break;
+    case 'bank': el.innerHTML = buildBank(); break;
     case 'questgiver': el.innerHTML = buildQuestGiver(); break;
     case 'questReward': el.innerHTML = buildQuestReward(); break;
     case 'vault': el.innerHTML = buildVault(); break;
@@ -31764,7 +31919,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-87';
+const GAME_VERSION = 'rs-88';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -32274,6 +32429,7 @@ function shopBuy(i){
     G.player.gold -= price;
     const bought = G.shopStock[i];
     addToInventory(bought);
+    ecoNoteBuy();
     G.shopStock.splice(i,1);
   }
   renderOverlay();
@@ -32432,6 +32588,7 @@ function buildShop(){
   if (!G.shopStock || G.shopStock.length===0){
     return `<h2 class="panel-title">THE PEDDLER</h2><div class="sub">You have ${G.player.gold} gold.</div><div class="ovbody">
       <div class="muted" style="text-align:center;margin-bottom:10px;">sold out for now</div>
+      ${ecoShopNote()}
       ${boatRowHtml()}
       ${arrowRowHtml()}
       ${wgCampRowsHtml()}
@@ -32452,6 +32609,7 @@ function buildShop(){
     <h2 class="panel-title">THE PEDDLER</h2>
     <div class="sub">You have ${G.player.gold} gold. Bows, leather and dragonhide, robes, staves and jewellery - for metal, see the blacksmith. Click an item to buy, or press its number.</div>
     <div class="ovbody">${rows}
+      ${ecoShopNote()}
       ${boatRowHtml()}
       ${arrowRowHtml()}
       ${wgCampRowsHtml()}
@@ -33661,7 +33819,7 @@ function buildHelp(){
       <div>most encounters are an ordinary fight, but not all of them: a wandering merchant sometimes hails you with a one-time stock instead of a fight; a pack occasionally has a tougher named champion leading it, worth real bonus loot; and the desert, swamp and tundra each hide their own unique set-piece encounter (a buried tomb, a bog ambush, a frozen cache) with a guaranteed bonus reward on top of the fight itself.</div>
       <div>open water blocks the way until you own a boat (buy one from the Peddler in any town) &mdash; once you have one you can sail freely, though the open sea has its own dangers</div>
       <div><b>Skills &amp; trades</b> (<kbd>J</kbd>): fishing, mining, woodcutting and foraging, and the trades that use what you gather - cooking, smithing, alchemy and firemaking - each level from 1 to 99 alongside your combat skills. Gather at the spots you see on the land: marked trees, bubbling fishing spots and flowering herb patches (hover one to see what it gives and the level it needs, click it to walk over and start), rock beside mountains, and ore veins, cave pools and cave herbs in the dungeons. Each spot gives a few items and then is felled, fished out or picked clean, and grows back or moves on in time. <kbd>E</kbd> works the nearest spot beside you (press it again or move to stop), light a campfire from your logs, or cook at your fire. Buy a fishing rod, pickaxe and hatchet (and better ones as you level) at the blacksmith, who also smelts your ore into bars and forges them into gear; brew herbs into potions at the alchemist; cook at the tavern hearth. Press <kbd>U</kbd> to eat the best-fitting cooked food (in a fight it takes your turn). Visit the Tailor in any town to craft: spin flax, tan hides, and make robes, staves, leather armour, bows and arrows at the workbenches inside.</div>
-      <div><b>Your house, Archaeology and Necromancy</b>: Hollis the estate agent on every town square sells you a house (2,500 gold) whose door opens from any town. Build its furniture from logs, iron bars and essence to train Construction: a bed, hearth, furnace, anvil and the other benches, an altar that takes bones for three times the Prayer xp, a trophy wall, and a portal to your towns, islands, dig sites and landmarks. Five dig sites lie out in the wild: excavate the hotspots round each (with a pickaxe) and restore what you find at its dig camp; finish a site's collection for a relic power for good. Towns now come as hamlets, villages and cities: a village adds a temple (prayer, blessings, a crusade against the undead) and an archery range; a city adds a guild hall, an arena and stone walls; a town by the sea has a harbour with ships to the other ports and your charted islands. Talk to the townsfolk you bump into for gossip and hints, play darts, gamble and enter the cook-off at the tavern, read the notice board's news, and pay the mayor to build walls, a bigger market or a bigger town. Shops shut at night (knock if you must). In a fight, press <kbd>-</kbd> (or the Raise button) to crush a bone and raise the dead to fight beside you; their hits train Necromancy, a fourth combat style.</div>
+      <div><b>Your house, Archaeology and Necromancy</b>: Hollis the estate agent on every town square sells you a house (2,500 gold) whose door opens from any town. Build its furniture from logs, iron bars and essence to train Construction: a bed, hearth, furnace, anvil and the other benches, an altar that takes bones for three times the Prayer xp, a trophy wall, and a portal to your towns, islands, dig sites and landmarks. Five dig sites lie out in the wild: excavate the hotspots round each (with a pickaxe) and restore what you find at its dig camp; finish a site's collection for a relic power for good. Towns now come as hamlets, villages and cities: a village adds a temple (prayer, blessings, a crusade against the undead) and an archery range; a city adds a guild hall, an arena and stone walls; a town by the sea has a harbour with ships to the other ports and your charted islands. Talk to the townsfolk you bump into for gossip and hints, play darts, gamble and enter the cook-off at the tavern, read the notice board's news, and pay the mayor to build walls, a bigger market or a bigger town. Shops shut at night (knock if you must). Shops pay less for things you keep selling them, and the Peddler's shelf only refills slowly. Waypoints charge a fee. The banker on every square keeps your items (with tabs and a search box) and your gold, which death can't touch; Hollis sells property that pays into your bank every day. In a fight, press <kbd>-</kbd> (or the Raise button) to crush a bone and raise the dead to fight beside you; their hits train Necromancy, a fourth combat style.</div>
       <div>press <kbd>C</kbd> to make camp wherever you're standing &mdash; usually a free heal that also refills your ability charges, spell slots and wand charges, same as a village rest, but sleeping in the open risks a night-time ambush that interrupts the rest entirely (no healing, straight into a fight, and every exit is sealed until the last monster drops). Safer on grass, riskier in forest/swamp, and impossible while zoomed out. You can also camp inside any dungeon-type site once you've cleared every monster off the current floor &mdash; nothing left down there to ambush you, so it's just as safe as a village rest.</div>
       <div>press <kbd>M</kbd> to open the world map of the whole continent &mdash; press again to go back. Click a village you've visited on the map, or press <kbd>T</kbd> on the overworld or in a town, to teleport there through a portal. The map's tool bar lets you <b>drop pins</b> with a note, <b>plan a route</b> and walk it, and switch <b>layers</b> (place names, landmarks, sites, danger, resources and more) on and off; the mouse wheel zooms in far enough to see every tree, rock and house. Land you've seen is pencilled in and land you've walked is painted; every forest, range, sea and river has a name, and three great landmarks (a volcano, a giant tree and a wizard's tower) can be seen from far off. The <b>travel log</b> counts the regions, towns, sites and landmarks you've found.</div>
       <div><b>The land:</b> when you start you pick the world's size and shape (an archipelago, one landmass or several continents), and every world has a <b>world code</b> - give it to a friend and they can play the same world. <b>Roads</b> join the towns: walking a road is quicker (every other step is free) and safer, and the route planner and the teleport list (T, "walk") follow them. Off the road, wading a river costs time; roads cross on <b>bridges</b> and fords, and a broken bridge can be mended. <b>Ferries</b> cross the water between landmasses. Every part of the land has a recommended combat level, shown when you enter it and on the map. Watch for <b>volcanic land, jungles, haunted woods, snowy highlands and crystal wastes</b> with their own creatures, and for <b>hamlets</b> (jobs, food and a safe barn), <b>lookouts</b> that reveal the map, <b>caves, grottos and ruins</b> to delve, <b>standing stones</b>, <b>abandoned camps</b>, <b>wishing wells</b> and <b>hermits</b>. Deer, rabbits, boars and birds roam the 3D land - click one to hunt it. Rain makes the fish bite, fog shortens your sight and storms make the sea dangerous. Buy a <b>tent, ward lantern, bedroll and cooking spit</b> from the Peddler for safer camping. Beyond the red ditch lies <b>the Wilderness</b>: tougher monsters, richer pickings, and if you die there your dropped items are gone for good.</div>
@@ -33900,7 +34058,7 @@ function handleKeydown(e){
       else if (k==='Escape') setUi('playing');
       break;
     }
-    case 'stash': case 'questgiver': { if (k==='Escape') setUi('playing'); break; }
+    case 'stash': case 'bank': case 'questgiver': { if (k==='Escape') setUi('playing'); break; }
     case 'vault': {
       const v = G.vault;
       if (v.solved || v.attempt>=v.maxAttempts){

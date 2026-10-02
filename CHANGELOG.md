@@ -1,5 +1,24 @@
 # Depthcrawl patch notes
 
+## RS-88 - Economy and banking
+
+- **Shops remember what you sell (191):** each copy of the same kind of thing you sell in a town pays less than the last, down to about a third of the price. The price recovers as the town's stock moves on, so sell your duplicates in different towns. The loot filter and selling out on the road are unaffected.
+- **Shop restocking (192):** the Peddler's shelf belongs to the town and is kept between visits. Leaving and coming back no longer conjures new stock: buy something and it's gone until the Peddler puts out another piece, one every 60 turns. The shop says how long that will be. A fresh shelf arrives after two days away, or once you've grown three levels.
+- **Teleport fees (193):** the waypoint keeper charges by distance, and the fee is shown beside each town. Towns that like you charge less, and Champions travel free. The same fee applies to travelling to a town from the world map.
+- **The bank (194):** the stash chest on every square is now a bank, with a banker at a desk under a green awning.
+  - It holds 240 items, up from 60.
+  - It has a vault for gold: deposit or withdraw 100, 1,000 or all of it.
+  - Gold in the vault is safe when you die, so only the gold in your purse is lost.
+  - Everything you had in the stash is still there.
+- **Bank tabs and search (195):** the bank sorts what it holds into Weapons, Armour, Jewellery, Potions & scrolls and Other, with counts on each tab, and has a search box. **Deposit all** empties your pack in one click and leaves locked items behind.
+- **Property (196):** Hollis the estate agent now also sells property in every town. Each pays a daily income straight into your bank:
+  - a market stall (1,200 gold, 14 a day)
+  - rooms over the tavern (3,500, 40 a day)
+  - a share in the Peddler (6,000, 70 a day)
+  - a warehouse on the wharf, in port towns only (9,000, 115 a day)
+  - Income is 10% higher for each level of standing you have in that town, and banks up to 20 days while you're away.
+- New honours: Landlord (own three properties) and Old Money (50,000 gold in the bank).
+
 ## RS-87 - Towns
 
 - **Town sizes (230):** every town is now a hamlet, a village or a city. The town you start in is always a village, and every world has at least one city.

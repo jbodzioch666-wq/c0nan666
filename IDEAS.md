@@ -271,12 +271,12 @@ _Task and currency systems that share one framework_
 ### Economy and banking
 _Shops and the bank_
 
-191. [ ] (306) Dynamic shop prices - each copy you sell to a shop pays less, recovering over time
-192. [ ] (307) Shop restocking - limited stock that refills over time; rare items sell out
-193. [ ] (308) Teleport fees - waypoint travel costs gold, cheaper at high reputation
-194. [ ] (124) Bank building with a banker, replacing the stash chest
-195. [ ] (18) Bank tabs and search for the stash
-196. [ ] (309) Property - buy a house or a shop that earns passive gold
+191. [x] (306) Dynamic shop prices - each copy you sell to a shop pays less, recovering over time
+192. [x] (307) Shop restocking - limited stock that refills over time; rare items sell out
+193. [x] (308) Teleport fees - waypoint travel costs gold, cheaper at high reputation
+194. [x] (124) Bank building with a banker, replacing the stash chest
+195. [x] (18) Bank tabs and search for the stash
+196. [x] (309) Property - buy a house or a shop that earns passive gold
 
 ### World generation and overworld
 _World generation and overworld content_
