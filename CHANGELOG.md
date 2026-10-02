@@ -1,5 +1,57 @@
 # Depthcrawl patch notes
 
+## RS-84 - World generation and the overworld
+
+- **World size and shape (197, 199):**
+  - The world preview still offers Small, Medium, Large and XLarge, and now also picks the world's shape: an **Archipelago** (the old kind), **One landmass**, or several **Continents** divided by open sea.
+  - Older saves stay archipelagos.
+- **World codes (198):** every world has a code, such as `MC-1A2B3C`, made of its size, shape and seed.
+  - It's shown on the preview screen (with a copy button) and in the travel log.
+  - Type a friend's code into the preview screen to play exactly the same world: the same towns, sites, roads and secrets.
+  - Rerolling now always starts clean, so the same code always rebuilds the same world.
+- **Five rarer biomes (200):** volcanic land, jungle, haunted forest, snowy highlands and crystal wastes are painted over the land.
+  - Each has its own colours on the maps and its own 3D scenery: charred trees and lava pools, palms, dead trees, snow pines, and glowing crystals.
+  - Each has its own creatures and its own region name on the world map.
+- **Level-banded regions (201):** every part of the land has a recommended combat level.
+  - A town's lands get harder the farther it lies from where you started; the rare biomes and the Wilderness have their own levels.
+  - Entering an area shows its name and level (in amber if it's above you), and the world map shows the level of whatever is under the mouse.
+  - Roadside fights now meet you halfway between your level and the land's.
+- **Roads (202):** roads join the towns. They're drawn on the chart with their names (the King's Road, the Salt Road, ...), on the flat map, and in 3D as dirt tracks.
+  - On a road every other step is free and roamers keep off it, so roads are quicker and safer.
+  - Off the road, wading a river costs an extra turn.
+- **Bridges, fords and ferries (203):**
+  - Where a road meets a river there's a bridge or a ford.
+  - Some bridges have fallen in. Walk onto one to mend it yourself (10 logs and 150 gold, plus Crafting xp) or pay the carpenters (600 gold). Either way the nearest town is grateful.
+  - **Ferries** link the landmasses that have towns, from landing to landing, for a fare.
+- **Weather that matters (204):**
+  - Rain and storms make the fish bite (better gathering odds).
+  - Fog shortens how far you see.
+  - Storms make the open sea dangerous: waves hurt and the wind pushes the boat off course.
+- **Wildlife (205):** deer, rabbits, boars and flocks of birds roam the 3D land, grazing, wandering and fleeing when you come close. Click one to hunt it (from further away with a bow):
+  - deer give meat and a hide, and rabbits give meat
+  - a boar fights back, and gives a prime cut and hides
+- **Hamlets (206):** farms along the roads, each with a farmhouse, windmill and fields. The farmer has a job each day (deliver logs, ore, fish, meat or hides for gold and town standing), sells baskets of food, and lets you sleep safely in the hay barn.
+- **Lookouts (207):** climb one to reveal the map for 32 leagues around, with a combat-xp bonus the first time.
+- **Caves and grottos (208), and ruins (209):** small walk-in mini-dungeons. Each has a passage and a back room, its own foes and a guardian, and a chest with gold and an item when you clear it. Ruins also hold a scrap of lore, which the travel log keeps.
+- **Points of interest (210):**
+  - **standing stones:** restore life, prayer and run energy once a day, with Prayer xp the first time
+  - **abandoned camps** to search
+  - **wishing wells:** toss in a coin, and sometimes they give back
+  - **hermits**, who point you to something you haven't found and give you a lamp
+- **Better camps (211):** every general store sells camping gear:
+  - a tent in three grades, each making ambushes less likely
+  - a ward lantern, which means far fewer night ambushes
+  - a bedroll, so you wake with full run energy and prayer
+  - a cooking spit, so your camp leaves a fire you can cook at
+  - The tent and spit appear by your fire in 3D. Camping in the Wilderness is riskier, and in lands you've secured it's safer.
+- **Auto-walk by road (212):** the route planner now follows the roads ("By road", on by default). The teleport list (T) has a **walk** button for every town, which walks you there along the roads.
+- **The Wilderness (213):** a lawless band along the edge of the world farthest from where you began, behind a red ditch on the map.
+  - Its level climbs to 30 the deeper you go, and is shown on screen while you're in it. You're warned the first time you enter.
+  - More monsters roam there, more of them are champions, and they're always at least as strong as the land. Every fight won pays extra gold and sometimes an item.
+  - If you die there, everything but your 3 most valuable items is **lost for good**: there's no gravestone to go back to.
+- Six new honours: Roadwarden, Spelunker, Farmhand, Hunter, Lookout and Deep Wilderness.
+- The world map has a new **Points of interest** layer, and the travel log has a section on the land: where you are and its level, the world code, roads, bridges, ferries, the places you've found, and the lore you've read.
+
 ## RS-83 - World events
 
 - **The world keeps its own time.** Everything below runs on the game clock, is saved with your world, and shows its timer on the world map (a new **World events** layer). The travel log lists what's going on right now.

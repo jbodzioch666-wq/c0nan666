@@ -802,6 +802,7 @@
   .lm-edge i{ display:inline-block; width:0; height:0; border-top:5px solid transparent; border-bottom:5px solid transparent; border-left:9px solid #ffc860; margin-right:6px; vertical-align:middle; }
   .lm-edge span{ color:#c8b088; font-weight:400; font-size:11px; } .lm-edge.near{ background:rgba(26,20,14,0.5); border-color:transparent; }
   table.tl-sites{ border-collapse:collapse; font-size:13px; } table.tl-sites td, table.tl-sites th{ padding:2px 14px 2px 0; text-align:left; } table.tl-sites th{ color:var(--ink-faint); font-weight:400; }
+  #wildHud{ position:fixed; left:50%; top:70px; transform:translateX(-50%); z-index:14; display:none; pointer-events:none; font:700 14px Cinzel, Georgia, serif; color:#ffd0c0; background:linear-gradient(180deg, rgba(90,14,8,0.9), rgba(50,8,4,0.9)); border:1px solid #c0402a; border-radius:6px; padding:4px 14px; text-shadow:0 1px 2px #000; letter-spacing:0.05em; }
 </style>
 
 <div class="frame" id="frame">
@@ -4318,6 +4319,7 @@ function checkDeathWard(){
 }
 function playerDies(cause){
   G.gameOver = 1; G.deathCause = cause;
+  G.deathWild = (()=>{ try{ return wgDeathIsWild(); }catch(e){ return false; } })();   // the Wilderness keeps what you drop
   const st = pStats(); st.deaths++;
   if (G.player && !G.player.hardcore) G.deathSplit = deathSplit();
   questOnDeath();
@@ -4353,6 +4355,8 @@ function continueAfterDeath(walkToGrave){
   p.gold -= ds.goldLost; pStats()._g = p.gold;
   G.inv = ds.keep.slice(); p.lootHold = []; G.invSel = 0;
   p.grave = (ds.lose.length || ds.goldLost) ? { x:G.owPos.x, y:G.owPos.y, items:ds.lose, gold:ds.goldLost, place:ds.place, cause:G.deathCause||'', when:Date.now() } : null;
+  if (G.deathWild && p.grave){ p.grave = null; logMsg('you fell in the Wilderness - whatever you dropped there is gone for good', 'hit'); }
+  G.deathWild = false;
   G.deathSplit = null;
   p.hp = Math.max(1, Math.ceil(effMaxHp()*0.5));
   G.gameMode = 0;
@@ -6933,7 +6937,7 @@ function serializeGame(){
     player: G.player, gear: G.gear, inv: G.inv,
     owSeed: G.ow.seed, owOverrides: G.ow.overrides||{}, owSiteMoves: G.ow.siteMoves||{},
     owTownPositions: G.ow.townPositions||{}, owPos: {x:G.owPos.x,y:G.owPos.y},
-    owVisitedTowns: G.ow.visitedTowns||[], weather: G.weather||'clear', owSeen: owSeenEncode(), owWalked: maskEncode(owWalkArr()), owEvents: G.ow.ev||null,
+    owVisitedTowns: G.ow.visitedTowns||[], weather: G.weather||'clear', owSeen: owSeenEncode(), owWalked: maskEncode(owWalkArr()), owEvents: G.ow.ev||null, owWg: G.ow.wg||null, owContinent: wgContinent(),
     // the map's own dimensions have to be restored BEFORE generateOverworld(owSeed)
     // re-runs on load (see loadGame) - the same seed at a different size
     // produces a different map entirely, since every placement roll is a
@@ -7067,6 +7071,7 @@ function loadGame(id){
   G.worldSizeTier = data.worldSizeTier || 'medium';
   OW_COLS = data.owCols || 160; OW_ROWS = data.owRows || 160;
   recomputeWorldSizeConstants();
+  G.ow.continent = data.owContinent || 'archipelago';   // (older worlds were all archipelagos)
   generateOverworld(data.owSeed);
   applyOverworldOverrides();
   G.ow.visitedTowns = data.owVisitedTowns||[];
@@ -7085,7 +7090,8 @@ function loadGame(id){
     owWalk(G.owPos.x, G.owPos.y, 7);
   }
   G.ow.walkVer = (G.ow.walkVer||0) + 1;
-  G.ow.ev = data.owEvents || null; wevAfterLoad();   // the world's events (see SECTION: WORLD EVENTS)
+  G.ow.ev = data.owEvents || null; wevAfterLoad();
+  G.ow.wg = data.owWg || null;   // the world's events (see SECTION: WORLD EVENTS)
   G.gameMode = data.gameMode||0;
   G.depth = data.depth||1;
   G.dungeonMaxDepth = data.dungeonMaxDepth||1;
@@ -7223,6 +7229,7 @@ function startGame(name){
   G.worldSizeTier = 'medium';
   OW_COLS = 160; OW_ROWS = 160;
   recomputeWorldSizeConstants();
+  G.ow.continent = 'archipelago';
   generateOverworld(Math.floor(Math.random()*4294967295));
   applyOverworldOverrides();
   // the character and a first-draft world both exist now, but nothing is
@@ -7235,9 +7242,7 @@ function startGame(name){
 // anything else startGame already set up - the character themselves is
 // never rerolled here, only the continent they're about to set out into
 function rerollWorldPreview(){
-  generateOverworld(Math.floor(Math.random()*4294967295));
-  applyOverworldOverrides();
-  renderOverlay();
+  wgRegenerate(Math.floor(Math.random()*4294967295));   // (a clean slate, so a world code always rebuilds the same world)
 }
 // the actual "begin the adventure" moment - everything startGame used to
 // do after generating the overworld, now deferred until the player
@@ -7264,6 +7269,7 @@ function buildWorldPreview(){
     <div class="ovbody" style="text-align:center;">
       <div class="muted" style="margin-bottom:6px;font-size:11px;">WORLD SIZE (changing this rerolls the map)</div>
       <div class="btnrow" style="justify-content:center;margin-bottom:12px;">${sizeRow}</div>
+      ${wgPreviewHtml()}
       <canvas id="worldPreviewCanvas" width="480" height="480" style="background:${COL.wall};border-radius:6px;max-width:100%;height:auto;"></canvas>
       <div class="muted" style="margin-top:8px;font-size:11px;">
         <span style="color:${COL.white}">&#9679;</span> your spawn &middot;
@@ -7325,6 +7331,7 @@ function renderWorldPreviewMap(){
   }
   // the spawn point itself, marked distinctly so it's obvious where the
   // adventure actually begins
+  wgPreviewMapExtras(c, cellPx);
   dot(G.ow.spawnPos.x, G.ow.spawnPos.y, COL.white, mx(2.2,cellPx*0.7));
   c.lineWidth = 1.5;
   c.strokeStyle = COL.wall;
@@ -7361,9 +7368,9 @@ function rerollWeatherIfDue(){
 }
 function weatherFlavorMsg(w){
   switch(w){
-    case 'rain': return 'rain begins to fall';
-    case 'storm': return 'a storm rolls in - visibility drops and the roads grow dangerous';
-    case 'fog': return 'a heavy fog rolls across the land';
+    case 'rain': return 'rain begins to fall - the fish bite better in the rain';
+    case 'storm': return 'a storm rolls in - visibility drops, the roads grow dangerous and the sea is no place for a boat';
+    case 'fog': return 'a heavy fog rolls across the land - you can barely see past your own feet';
     default: return 'the sky clears';
   }
 }
@@ -7471,7 +7478,8 @@ function ensureSpawnEscape(){
 function generateOverworld(seed){
   G.ow.seed = seed;
   G.ow.seen = null; G.ow.seenVer = (G.ow.seenVer||0) + 1;   // a fresh world starts unexplored
-  G.ow.walked = null; G.ow.walkVer = (G.ow.walkVer||0) + 1; G.ow.geo = null; G.ow.ev = null;
+  G.ow.walked = null; G.ow.walkVer = (G.ow.walkVer||0) + 1; G.ow.geo = null; G.ow.ev = null; G.ow.wg = null;
+  G.ow.road = null; G.ow.bio = null; G.ow.pois = []; G.ow.roads = []; G.ow.bridges = []; G.ow.ferries = []; G.ow.wild = null;
   G.ow.map = makeGrid(OW_GRASS, OW_COLS, OW_ROWS);
   G.ow.dungeonMax = makeGrid(0, OW_COLS, OW_ROWS);
   G.ow.dungeonIdx = makeGrid(0, OW_COLS, OW_ROWS);
@@ -7501,10 +7509,11 @@ function generateOverworld(seed){
   // substantial (not just single-tile-speck) landmasses rather than one
   // supercontinent with noise flecked around its coast.
   const edgeBand = Math.max(6, Math.round(Math.min(OW_COLS,OW_ROWS)*0.05));
+  const shape = wgShaper(seed);   // the chosen shape of the world (see SECTION: WORLD GENERATION EXTRAS)
   for (let x=0;x<OW_COLS;x++){
     for (let y=0;y<OW_ROWS;y++){
       let e = fbm2D(x,y,seed,5,1/20,0.55);
-      e = clamp(0.5 + (e-0.5)*1.3, 0, 1);
+      e = clamp(shape(x, y, clamp(0.5 + (e-0.5)*1.3, 0, 1)), 0, 1);
       const margin = Math.min(x, y, OW_COLS-1-x, OW_ROWS-1-y);
       if (margin < edgeBand) e *= margin/edgeBand;
       elev[x][y] = clamp(e, 0, 1);
@@ -7651,6 +7660,7 @@ function generateOverworld(seed){
         for (let tries=0; tries<400; tries++){
           const x=rint2(OW_COLS), y=rint2(OW_ROWS);
           if (!isLand(G.ow.map[x][y]) || !preferTest(x,y)) continue;
+          if (G.ow.road && G.ow.road[y*OW_COLS+x]) continue;
           if (Math.hypot(x-startX,y-startY) < 5) continue;
           let ok=true;
           for (const p of placed){ if (Math.hypot(x-p.x,y-p.y) < relax){ ok=false; break; } }
@@ -7663,6 +7673,7 @@ function generateOverworld(seed){
       for (let tries=0; tries<400; tries++){
         const x=rint2(OW_COLS), y=rint2(OW_ROWS);
         if (!isLand(G.ow.map[x][y])) continue;
+        if (G.ow.road && G.ow.road[y*OW_COLS+x]) continue;
         if (Math.hypot(x-startX,y-startY) < 5) continue;
         let ok=true;
         for (const p of placed){ if (Math.hypot(x-p.x,y-p.y) < relax){ ok=false; break; } }
@@ -7887,6 +7898,10 @@ function generateOverworld(seed){
       }
     }
   }
+  // the roads, rarer biomes, points of interest and the Wilderness, laid down once the towns are in;
+  // the sites below keep clear of them
+  wgGenerate(seed, elev);
+  for (const p of G.ow.pois) placed.push({x:p.x, y:p.y});
   // dungeons deliberately keep no terrain preference - they're the
   // catch-all site kind, meant to feel at home anywhere, unlike the
   // thematically-anchored kinds below
@@ -7958,6 +7973,7 @@ function findFreeSitePosition(avoidX, avoidY){
     for (let y=0;y<OW_ROWS;y++){
       if (!isLand(G.ow.map[x][y])) continue;
       if (x===avoidX && y===avoidY) continue;
+      if (wgRoadAt(x,y) || wgPoiAt(x,y)) continue;   // never on a road or a point of interest
       any.push({x,y});
       if (Math.hypot(x-avoidX,y-avoidY) >= 10) far.push({x,y});
     }
@@ -7985,8 +8001,9 @@ function tryMoveOverworld(dx,dy){
   if (t===OW_MOUNTAIN) return;
   if (t===OW_WATER && !G.player.hasBoat) return;
   G.owPos.x=nx; G.owPos.y=ny;
-  owReveal(nx, ny, 12);
-  G.player.turnCount = (G.player.turnCount||0)+1;
+  owReveal(nx, ny, wgSight());
+  const stepCost = G.ow.road ? wgStepCost(nx, ny) : 1;   // roads are quicker; wading a river is slower
+  G.player.turnCount = (G.player.turnCount||0) + stepCost;
   rerollWeatherIfDue();
   if (t===OW_TOWN){
     trackVisitedTown(nx,ny);
@@ -7998,12 +8015,12 @@ function tryMoveOverworld(dx,dy){
     // moveOverworldEncounters/checkOverworldEncounterTrigger below) instead
     // of an invisible chance rolled on every step - they take their own
     // step first, then we check whether the player just walked onto one
-    if (!runStepFree()) moveOverworldEncounters();
+    if (!runStepFree() && stepCost > 0) moveOverworldEncounters();
     // a mythic beast's fixed lair could in theory be crossed by a roaming
     // wandering encounter too - check the mythic trigger first and skip the
     // ordinary one if it fired, so the two can never stomp on each other's
     // arena/gameMode setup on the same step
-    if (!questOverworldTurn() && !checkMythicBeastTrigger() && !wevStep()) checkOverworldEncounterTrigger();   // (wevStep: the giant, a camp, or someone on the road)
+    if (!questOverworldTurn() && !checkMythicBeastTrigger() && !wgStep() && !wevStep()) checkOverworldEncounterTrigger();   // (wevStep: the giant, a camp, or someone on the road)
   }
 }
 
@@ -8048,7 +8065,8 @@ function generateArena(){
   const pickEntry0 = skin ? (lvl,j)=>pickSkinnedMonsterEntry(skin,lvl,j) : pickMonsterEntry;
   // the land has its own creatures (scarabs and mummies in the desert, bog beasts in the swamp, ice trolls on the tundra), and the night its own
   const regional = { [OW_DESERT]:'desert', [OW_SWAMP]:'swamp', [OW_TUNDRA]:'tundra', [OW_MOUNTAINPASS]:'tundra' }[terrain], night = isNightTime() && terrain!==OW_WATER && terrain!==OW_RIVER;
-  const pickEntry = (lvl,j)=>(night && chn(0.35) && famPickFrom(['night'], lvl, 4)) || (regional && chn(0.45) && famPickFrom([regional], lvl, 4)) || pickEntry0(lvl,j);
+  const bvar = G.ow && G.ow.bio && G.owPos ? wgBioAt(G.owPos.x, G.owPos.y) : 0;   // the rarer biomes have their own creatures
+  const pickEntry = (lvl,j)=>(bvar && chn(0.6) && famPickFrom(BIO[bvar].fams, lvl, 4)) || (night && chn(0.35) && famPickFrom(['night'], lvl, 4)) || (regional && chn(0.45) && famPickFrom([regional], lvl, 4)) || pickEntry0(lvl,j);
   G.map = makeGrid(T_FLOOR);
   G.floorItem = makeItemGrid();
   // its own decoration grid (not G.dungeonDeco - a roadside encounter isn't
@@ -8078,7 +8096,7 @@ function generateArena(){
   // single monster's numbers
   G.mon = [];
   const monN = 1+rn(3);
-  const targetLevel = clampMLevel(G.player.level);
+  const targetLevel = wgArenaLevel();   // halfway to the land's own level (see wgBand)
   for (let i=0;i<monN;i++){
     let tries=0, mxp,myp;
     do { mxp=2+rn(COLS-4); myp=1+rn(6); tries++; } while (G.map[mxp][myp]!==T_FLOOR && tries<60);
@@ -8155,6 +8173,7 @@ function spawnOneEncounter(avoidX, avoidY, minDist){
     if (!encounterEligible(G.ow.map[x][y])) continue;
     if (avoidX!==undefined && Math.hypot(x-avoidX,y-avoidY) < minDist) continue;
     if (G.ow.ev && tries < 150 && chn(0.65) && wevSecuredAt(x,y)) continue;   // lands you've secured see far fewer roamers
+    if (G.ow.road && tries < 150 && wgRoadAt(x,y) && chn(0.85)) continue;   // and the roads are kept clear
     return {x,y};
   }
   return null;
@@ -8193,6 +8212,7 @@ function moveOverworldEncounters(){
     const nx=e.x+dx, ny=e.y+dy;
     if (nx<0||ny<0||nx>=OW_COLS||ny>=OW_ROWS) continue;
     if (!encounterEligible(G.ow.map[nx][ny])) continue;
+    if (G.ow.road && wgRoadAt(nx,ny) && !(dist>0 && dist<=noticeR) && chn(0.8)) continue;   // roamers mostly keep off the roads
     e.x=nx; e.y=ny;
   }
   // the population drifts back toward its target size over ordinary
@@ -8202,6 +8222,9 @@ function moveOverworldEncounters(){
   // per-turn chance rather than checkOverworldEncounterTrigger's old
   // right-after-a-kill-only roll, which could never refill at all if the
   // player simply stopped triggering encounters for a while
+  if (G.ow.wild && G.ow.encounters.length < OW_ENCOUNTER_TARGET*1.4 && chn(0.12)){   // the Wilderness teems
+    for (let t=0;t<40;t++){ const x = rn(OW_COLS), y = rn(OW_ROWS); if (wgWildLevel(x,y) && encounterEligible(G.ow.map[x][y]) && Math.hypot(x-G.owPos.x, y-G.owPos.y) > 6){ G.ow.encounters.push({x,y}); break; } }
+  }
   if (G.ow.encounters.length < OW_ENCOUNTER_TARGET && chn(0.15)){
     const p = spawnOneEncounter(G.owPos.x, G.owPos.y, 10);
     if (p) G.ow.encounters.push(p);
@@ -8221,7 +8244,7 @@ function resolveOverworldEncounter(terrain){
   const r = Math.random(), mc = G.ow.ev && wevSecuredAt(G.owPos.x, G.owPos.y) ? 0.3 : 0.12;   // in lands you've secured, more of the people you meet are friendly
   if (r < mc) merchantEncounter();
   else if (r < mc+0.03) namedEliteEncounter(); // a rare 3% jackpot, carved out ahead of the ordinary champion band below
-  else if (r < mc+0.15) eliteEncounter();
+  else if (r < mc+0.15 + (G.ow.wild && wgWildLevel(G.owPos.x, G.owPos.y) ? 0.15 : 0)) eliteEncounter();
   else if (SET_PIECE_TERRAINS.includes(terrain) && r < mc+0.25) terrainSetPieceEncounter(terrain);
   else randomEncounter();
 }
@@ -8798,7 +8821,7 @@ function campAmbushChance(){
   };
   const base = (t in table) ? table[t] : 0.13;
   if (skFireHere() && skPerk('firemaking', 'safecamp')) return 0;
-  return skFireHere() ? base*0.4 : base;              // (sleeping beside your own campfire is much safer)
+  return (skFireHere() ? base*0.4 : base) * wgCampMult();   // (sleeping beside your own campfire is much safer; a tent and a ward lantern help too)
 }
 // resting outside a village: usually a free heal-and-recover like
 // villageRest, but camping in the open risks a night-time ambush that
@@ -8833,6 +8856,7 @@ function campOutside(){
   if (fullyRestPlayer()) logMsg(skFireHere() ? 'you sleep by your campfire and wake fully healed and refreshed' : 'you make camp for the night and wake fully healed and refreshed', 'good');
   else logMsg('you make camp - the night passes quietly, though you were already at full strength', '');
   G.player.campCount = (G.player.campCount||0)+1; PFX.camp = performance.now()/1000;
+  wgAfterCamp();
   checkAchievements();
   renderGame();
   saveCurrentGame();
@@ -10050,7 +10074,7 @@ function skGatherTick(now){
   const ok = list.filter(e=>e.lvl<=L); if (!ok.length){ skStop('nothing here you are skilled enough to gather'); return; }
   let pick = ok[ok.length-1]; if (ok.length>1 && chn(0.45)) pick = ok[rn(ok.length-1)];
   if (node && node.type==='gem'){ const wt = { sapphire:50, emerald:30, ruby:15, diamond:5 }; let tot = 0; for (const e of ok) tot += wt[e.id]||1; let r = Math.random()*tot; for (const e of ok){ r -= wt[e.id]||1; if (r <= 0){ pick = e; break; } } }
-  const chance = clamp(0.3 + (L - pick.lvl)*0.012 + tier*0.06 + (G.gameMode===1 ? 0.1 : 0) + skPerk(k, 'gch'), 0.12, 0.95);
+  const chance = clamp(0.3 + (L - pick.lvl)*0.012 + tier*0.06 + (G.gameMode===1 ? 0.1 : 0) + skPerk(k, 'gch') + (k==='fishing' && G.gameMode===0 && (G.weather==='rain' || G.weather==='storm') ? 0.1 : 0), 0.12, 0.95);   // (fish bite in the rain)
   g.ch = chance; g.label = pick.nm;
   if (!chn(chance)){ renderGame(); return; }
   let amt = node && node.glow ? 2 : 1;
@@ -14876,6 +14900,13 @@ const ACHIEVEMENTS = [
   {id:'peacekeeper', name:'Peacekeeper', desc:'secure the lands of 3 towns', check:p=>p.wev && (p.wev.secured||[]).length>=3, bonus:{regen:1}},
   {id:'defender', name:'Defender of the Realm', desc:'break a siege or repel a raid', check:p=>p.wev && p.wev.defended>=1, bonus:{resist:2}},
   {id:'samaritan', name:'Good Samaritan', desc:'help 5 travellers on the road', check:p=>p.wev && p.wev.road>=5, bonus:{life:5}},
+  // the land
+  {id:'roadwarden', name:'Roadwarden', desc:'mend 2 broken bridges', check:p=>p.wgStat && p.wgStat.bridges>=2, bonus:{resist:1}},
+  {id:'spelunker', name:'Spelunker', desc:'clear 3 caves, grottos or ruins', check:p=>p.wgStat && p.wgStat.delves>=3, bonus:{magicfind:3}},
+  {id:'farmhand', name:'Farmhand', desc:'do 5 jobs for the hamlets', check:p=>p.wgStat && p.wgStat.jobs>=5, bonus:{goldfind:0.03}},
+  {id:'hunter', name:'Hunter', desc:'hunt 10 animals', check:p=>p.wgStat && p.wgStat.hunts>=10, bonus:{healkill:1}},
+  {id:'lookout', name:'Lookout', desc:'climb 3 lookouts', check:p=>p.wgStat && p.wgStat.views>=3, bonus:{xpfind:0.02}},
+  {id:'wild_one', name:'Deep Wilderness', desc:'reach Wilderness level 20', check:p=>p.wgStat && p.wgStat.maxWild>=20, bonus:{crit:1}},
   {id:'sightseer', name:'Sightseer', desc:'stand at the foot of every great landmark', check:p=>{ const L = owGeo().landmarks; return L.length>0 && p.travel && L.every(l=>(p.travel.lmVisit||[]).includes(l.id)); }, bonus:{life:5}},
 ];
 function achievementBonusI(k){
@@ -14959,6 +14990,7 @@ function buildFastTravel(){
     return `<div class="choice-row ${here?'sel':''}" ${here ? '' : `onclick="worldTeleport('${key}')"`} style="cursor:${here?'default':'pointer'};">
       <span class="key">${i<9 ? i+1 : ''}</span><span><b>${esc(o3TownName(x,y))}</b>${here ? ' <span class="muted">(you are here)</span>' : ''}</span>
       <span class="muted">${f ? esc(f.adj)+' &middot; ' : ''}${here ? '' : d+' leagues '+dirWord(x-G.owPos.x, y-G.owPos.y)}</span>
+      ${G.gameMode===0 && !here ? `<button class="btn" style="padding:2px 10px;margin-left:8px;" title="walk there along the roads" onclick="event.stopPropagation();wgWalkTo(${x},${y})">walk</button>` : ''}
     </div>`;
   }).join('');
   return `
@@ -16271,6 +16303,7 @@ const OW_BIOME_BG = {
 // just never gets queried again once it reverts to plain grass, so nothing
 // needs to actively invalidate a stale entry.
 function owBaseColor(t,x,y){
+  if (t!==OW_WATER && t!==OW_RIVER && !OW_SITE_TILES.includes(t)){ const bv = wgBioAt(x, y); if (bv) return BIO[bv].col; }
   if (!OW_SITE_TILES.includes(t)) return OW_BIOME_BG[t] || 'rgb(24,42,26)';
   const cache = G.ow.siteBiomeCache || (G.ow.siteBiomeCache = {});
   const key = x+','+y;
@@ -16446,7 +16479,7 @@ function drawSummonIcon(x,y,color){
 const OW_MAIN_ZOOM_STEP = 1.25, OW_MAIN_ZOOM_MIN = 0.5, OW_MAIN_ZOOM_MAX = 3;
 function owMainZoomScale(){ return G.owMainZoomScale || 1; }
 function renderOverworldMap(){
-  owReveal(G.owPos.x, G.owPos.y, 12); pmPrebuild();
+  owReveal(G.owPos.x, G.owPos.y, wgSight()); pmPrebuild();
   const savedCellPx = cellPx;
   cellPx = savedCellPx * owMainZoomScale();
   const viewCols = Math.ceil(canvas.width/cellPx), viewRows = Math.ceil(canvas.height/cellPx);
@@ -16508,6 +16541,7 @@ function renderOverworldMap(){
     const vx = t.x-camX, vy = t.y-camY; if (vx<0||vy<0||vx>=viewCols||vy>=viewRows) continue;
     drawGlyph(vx, vy, t.turnIn ? '?' : '!', t.turnIn ? '#8ae0ff' : COL.gold, 900);
   }
+  wgFlatOverlay(camX, camY, viewCols, viewRows);   // roads and points of interest
   // the landmarks, your pins and your planned route
   { const R = Math.max(6*dpr, cellPx*0.9), C = (x)=> (x-camX)*cellPx + cellPx/2, Cy = (y)=> (y-camY)*cellPx + cellPx/2, now = performance.now()/1000;
     const r = mapF('route') ? routeInfo() : null;
@@ -16617,7 +16651,7 @@ const PM_TINT = { [OW_GRASS]:[214,200,150], [OW_FOREST]:[160,172,112], [OW_TUNDR
 function pmMapKey(){
   let h = 0; const m = G.ow.map;
   for (let x=0;x<OW_COLS;x++){ const col = m[x]; for (let y=0;y<OW_ROWS;y++) h = (h*31 + col[y]*(y+7)) | 0; }
-  return OW_COLS+'x'+OW_ROWS+':'+h;
+  return OW_COLS+'x'+OW_ROWS+':'+h+'|'+(G.ow.wg && G.ow.wg.fixed ? Object.keys(G.ow.wg.fixed).length : 0);   // (a mended bridge redraws the chart)
 }
 function pmBuild(){
   const P = PM.P = Math.max(5, Math.min(9, Math.round(1150/Math.max(OW_COLS,OW_ROWS))));
@@ -16632,7 +16666,7 @@ function pmBuild(){
   for (let tx=-1; tx<=OW_COLS; tx++) for (let ty=-1; ty<=OW_ROWS; ty++){
     const t = tileAt(tx,ty), k = K(tx,ty);
     land[k] = isWater(t) ? 0 : 1;
-    const g = OW_SITE_TILES.includes(t) ? OW_GRASS : t, c3 = PM_TINT[g] || PM_TINT[OW_GRASS];
+    const g = OW_SITE_TILES.includes(t) ? OW_GRASS : t, bv = t!==OW_WATER && t!==OW_RIVER ? wgBioAt(tx, ty) : 0, c3 = bv ? BIO[bv].chart : (PM_TINT[g] || PM_TINT[OW_GRASS]);
     tint[k*3] = c3[0]; tint[k*3+1] = c3[1]; tint[k*3+2] = c3[2];
   }
   const samp = (arr, fx, fy, ch, stride)=>{
@@ -16674,6 +16708,7 @@ function pmBuild(){
     const cx = (tx+0.5)*P, cy = (ty+0.5)*P;
     for (const [dx,dy] of [[1,0],[0,1],[1,1],[1,-1]]){ const u = tileAt(tx+dx,ty+dy); if (u===OW_RIVER || (u===OW_WATER && (dx===0||dy===0))){ x.beginPath(); x.moveTo(cx,cy); x.quadraticCurveTo(cx+dx*P*0.5+(hsh(tx,ty,1)-0.5)*P*0.5, cy+dy*P*0.5+(hsh(tx,ty,2)-0.5)*P*0.5, cx+dx*P, cy+dy*P); x.stroke(); } }
   }
+  pmWorldInk(x, P);   // roads, bridges, ferries and the Wilderness (see SECTION: WORLD GENERATION EXTRAS)
   // glyphs, drawn back to front so nearer ones overlap farther ones
   const glyphs = [];
   for (let tx=0; tx<OW_COLS; tx++) for (let ty=0; ty<OW_ROWS; ty++) pmTileGlyphs(tx, ty, m[tx][ty], P, 0, 0, glyphs);
@@ -16687,7 +16722,7 @@ function pmBuild(){
 // the little drawings on one tile of the chart (a peak, a tree or two, a tuft, a dune...), at P pixels a tile,
 // placed by hash so the painted chart and the crisp close-in redraw put them in the same spots
 function pmTileGlyphs(tx, ty, t, P, ox, oy, out){
-  const h = (s)=> o3Hash(tx,ty,s+77);
+  const h = (s)=> o3Hash(tx,ty,s+77), n0 = out.length, bv = wgBioAt(tx, ty);
   const gx = (tx+0.2+h(1)*0.6)*P - ox, gy = (ty+0.3+h(2)*0.5)*P - oy;
   if (t===OW_MOUNTAIN){ if (h(3) < 0.62) out.push(['mtn', gx, gy, P*(0.9+h(4)*0.7)]); }
   else if (t===OW_FOREST){ if (h(3) < 0.75) out.push(['tree', gx, gy, P*(0.55+h(4)*0.3), h(5)]); if (h(6) < 0.35) out.push(['tree', (tx+h(7))*P - ox, (ty+h(8))*P - oy, P*(0.5+h(9)*0.25), h(10)]); }
@@ -16695,6 +16730,13 @@ function pmTileGlyphs(tx, ty, t, P, ox, oy, out){
   else if (t===OW_DESERT){ if (h(3) < 0.3) out.push(['dune', gx, gy, P*0.8]); }
   else if (t===OW_TUNDRA){ if (h(3) < 0.18) out.push(['snow', gx, gy, P*0.35]); }
   else if (t===OW_GRASS){ if (h(3) < 0.05) out.push(['grass', gx, gy, P*0.4]); }
+  if (bv){   // the rarer biomes draw their own: dead trees in the haunted woods, palms in the jungle, crystals, lava, snow
+    for (let i=n0;i<out.length;i++) if (out[i][0]==='tree') out[i][0] = bv===3 || bv===1 ? 'dtree' : bv===2 && h(12+i) < 0.5 ? 'palm' : 'tree';
+    if (bv===5 && h(13) < 0.4) out.push(['crystal', gx, gy, P*0.55]);
+    else if (bv===1 && t!==OW_MOUNTAIN && h(13) < 0.3) out.push(['lava', gx, gy, P*0.6]);
+    else if (bv===4 && h(13) < 0.3) out.push(['snow', gx, gy, P*0.35]);
+    else if (bv===3 && t!==OW_FOREST && h(13) < 0.15) out.push(['dtree', gx, gy, P*0.6]);
+  }
 }
 function pmGlyph(x, g, P, mono){
   const [k, gx, gy, s, v] = g, inkC = 'rgba(58,40,24,0.9)', L = Math.min(P, 16*dpr);   // (line weights stop growing once you're zoomed well in)
@@ -16729,6 +16771,20 @@ function pmGlyph(x, g, P, mono){
   } else if (k==='grass'){
     x.lineWidth = Math.max(0.6, L*0.06); x.strokeStyle = 'rgba(90,96,50,0.6)';
     for (const a of [-0.4, 0.1, 0.5]){ x.beginPath(); x.moveTo(gx+a*s, gy+s*0.4); x.lineTo(gx+a*s*1.4, gy-s*0.3); x.stroke(); }
+  } else if (k==='dtree'){
+    x.lineWidth = Math.max(0.8, L*0.1); x.strokeStyle = 'rgba(40,34,30,0.9)';
+    x.beginPath(); x.moveTo(gx, gy+s*0.9); x.lineTo(gx, gy-s*0.5); x.moveTo(gx, gy-s*0.1); x.lineTo(gx-s*0.4, gy-s*0.55); x.moveTo(gx, gy+s*0.15); x.lineTo(gx+s*0.38, gy-s*0.3); x.moveTo(gx-s*0.2, gy-s*0.35); x.lineTo(gx-s*0.15, gy-s*0.7); x.stroke();
+  } else if (k==='palm'){
+    x.lineWidth = Math.max(0.8, L*0.1);
+    x.beginPath(); x.moveTo(gx, gy+s*0.9); x.quadraticCurveTo(gx+s*0.2, gy+s*0.2, gx+s*0.05, gy-s*0.4); x.stroke();
+    x.fillStyle = mono ? 'rgba(200,184,146,0.95)' : 'rgba(80,140,60,0.95)';
+    for (const a of [-2.6, -1.9, -1.2, -0.5]){ x.beginPath(); x.ellipse(gx+s*0.05+Math.cos(a)*s*0.35, gy-s*0.4+Math.sin(a)*s*0.2, s*0.38, s*0.1, a, 0, Math.PI*2); x.fill(); x.stroke(); }
+  } else if (k==='crystal'){
+    x.lineWidth = Math.max(0.7, L*0.08); x.strokeStyle = 'rgba(40,50,80,0.9)'; x.fillStyle = mono ? 'rgba(210,214,226,0.95)' : 'rgba(160,210,250,0.95)';
+    for (const [ox, hh] of [[-0.3, 0.7], [0, 1], [0.3, 0.6]]){ x.beginPath(); x.moveTo(gx+ox*s-s*0.12, gy+s*0.5); x.lineTo(gx+ox*s, gy+s*0.5-hh*s); x.lineTo(gx+ox*s+s*0.12, gy+s*0.5); x.closePath(); x.fill(); x.stroke(); }
+  } else if (k==='lava'){
+    x.lineWidth = Math.max(0.8, L*0.1); x.strokeStyle = mono ? 'rgba(120,90,70,0.8)' : 'rgba(220,90,30,0.9)';
+    x.beginPath(); x.moveTo(gx-s*0.6, gy); x.lineTo(gx-s*0.2, gy+s*0.15); x.lineTo(gx+s*0.1, gy-s*0.1); x.lineTo(gx+s*0.55, gy+s*0.1); x.moveTo(gx+s*0.1, gy-s*0.1); x.lineTo(gx+s*0.2, gy-s*0.4); x.stroke();
   }
 }
 // the fog: an unexplored-tiles mask, softened by scaling up, filled with drifting cloud texture
@@ -16799,7 +16855,7 @@ function renderOverworldMapZoomed(){
   const zCamX = Math.floor(clamp(center.x - Math.floor(viewCols/2), 0, mx(0, OW_COLS-viewCols)));
   const zCamY = Math.floor(clamp(center.y - Math.floor(viewRows/2), 0, mx(0, OW_ROWS-viewRows)));
   owZoomLastCam = { x:zCamX, y:zCamY };
-  owReveal(G.owPos.x, G.owPos.y, 12);
+  owReveal(G.owPos.x, G.owPos.y, wgSight());
   if (!PM.cv || PM.key !== pmMapKey()) pmBuild();
   const P = PM.P, cw = canvas.width, ch = canvas.height, now = performance.now()/1000, geo = owGeo();
   const TX = (x)=> (x-zCamX)*cellPx + cellPx/2, TY = (y)=> (y-zCamY)*cellPx + cellPx/2;
@@ -16844,6 +16900,7 @@ function renderOverworldMapZoomed(){
   // the great landmarks
   if (mapF('landmarks')){ const R = clamp(cellPx*1.5, 14*dpr, 30*dpr);
     for (const lm of geo.landmarks) if (inView(lm.x, lm.y, 3) && owSeen(lm.x, lm.y)) pmLandmark(ctx, TX(lm.x), TY(lm.y), R, lm, now); }
+  pmWorldExtras(zCamX, zCamY, viewCols, viewRows, lod, now);   // points of interest and road names
   // sites, in coloured ink on a paper halo - only where you've explored
   const iconR = clamp(cellPx*1.2, 11*dpr, 22*dpr), danger = mapF('danger');
   const names = [], smokes = [];
@@ -17001,8 +17058,8 @@ const PLACE_FMT = {
 };
 const GEO_MIN = { forest:14, mountain:10, desert:14, swamp:10, tundra:14, river:8, lake:5, sea:60 };
 const GEO_KINDS = [null,'forest','mountain','desert','swamp','tundra','water','river'];
-const PLACE_INK = { forest:'#2a4a1a', mountain:'#5a3418', desert:'#7a5014', swamp:'#3a4a22', tundra:'#34485c', sea:'#1a4468', lake:'#1a4468', river:'#20507a' };
-const PLACE_WORD = { forest:'forests', mountain:'mountain ranges', desert:'deserts', swamp:'marshes', tundra:'snowfields', sea:'seas', lake:'lakes', river:'rivers' };
+const PLACE_INK = { volcanic:'#7a1a0a', jungle:'#1a5a1a', haunted:'#3a3a4a', highland:'#3a4a6a', crystal:'#4a3a8a', forest:'#2a4a1a', mountain:'#5a3418', desert:'#7a5014', swamp:'#3a4a22', tundra:'#34485c', sea:'#1a4468', lake:'#1a4468', river:'#20507a' };
+const PLACE_WORD = { volcanic:'volcanic lands', jungle:'jungles', haunted:'haunted woods', highland:'highlands', crystal:'crystal wastes', forest:'forests', mountain:'mountain ranges', desert:'deserts', swamp:'marshes', tundra:'snowfields', sea:'seas', lake:'lakes', river:'rivers' };
 // the land's regions, their names and the landmarks: worked out from the map once and kept until it changes
 function owGeo(){
   const g0 = G.ow.geo, turn = (G.player && G.player.turnCount)||0;
@@ -17069,6 +17126,19 @@ function geoBuild(key){
     places.push({ id, kind, n, name:nameFor(kind, rg.root), lx:labels[0][0], ly:labels[0][1], labels, root:rg.root, tiles:rg.tiles });
     for (const j of rg.tiles) placeAt[j] = id;
   }
+  // the rarer biomes are regions of their own, named over whatever ground they cover
+  if (G.ow.bio){ const bio = G.ow.bio, seenB = new Uint8Array(N);
+    for (let i=0;i<N;i++){ const v = bio[i]; if (!v || seenB[i]) continue;
+      const tiles = [], st = [i]; seenB[i] = 1; let sx = 0, sy = 0;
+      while (st.length){ const j = st.pop(), x = j%W, y = (j/W)|0; tiles.push(j); sx += x; sy += y;
+        for (const k of [x>0 ? j-1 : -1, x<W-1 ? j+1 : -1, y>0 ? j-W : -1, y<H-1 ? j+W : -1]) if (k>=0 && !seenB[k] && bio[k]===v){ seenB[k] = 1; st.push(k); } }
+      if (tiles.length < 8) continue;
+      const cx = sx/tiles.length, cy = sy/tiles.length; let best = tiles[0], bd = 1e9; for (const j of tiles){ const d = Math.hypot(j%W-cx, ((j/W)|0)-cy); if (d < bd){ bd = d; best = j; } }
+      const r = nameRng(i*7 + v + 5000); let nm = '';
+      for (let tries=0; tries<12 && (!nm || used.has(nm)); tries++){ const f = BIO[v].names[Math.floor(r()*BIO[v].names.length)]; nm = f.replace('{pn}', pnOf(r)).replace('{adj}', PLACE_ADJ[Math.floor(r()*PLACE_ADJ.length)]); }
+      used.add(nm);
+      const id = places.length; places.push({ id, kind:BIO[v].id, n:tiles.length, name:nm, lx:best%W, ly:(best/W)|0, labels:[[best%W, (best/W)|0]], root:i, tiles });
+      for (const j of tiles) placeAt[j] = id; } }
   // the coast, for the waves that lap it
   const coast = [];
   for (let y=1;y<H-1;y++) for (let x=1;x<W-1;x++){ const i = y*W+x; if (kindAt[i]===6) continue;
@@ -17168,8 +17238,8 @@ function pmWalkMask(){
 }
 // ---- layers you can switch on and off ----
 const MAP_LAYERS = [['places','Place names'],['landmarks','Landmarks'],['towns','Towns'],['sites','Sites'],['quests','Quests'],['resources','Resources'],
-  ['events','World events'],['danger','Danger'],['pins','Pins'],['route','Route'],['legend','Legend']];
-const MAP_DEF = { places:1, landmarks:1, towns:1, sites:'all', quests:1, resources:1, events:1, danger:0, pins:1, route:1, legend:1 };
+  ['poi','Points of interest'],['events','World events'],['danger','Danger'],['pins','Pins'],['route','Route'],['legend','Legend']];
+const MAP_DEF = { places:1, landmarks:1, towns:1, sites:'all', quests:1, resources:1, poi:1, events:1, danger:0, pins:1, route:1, legend:1 };
 const SITE_MODE_NAME = { all:'all', new:'unexplored', done:'explored', off:'off' };
 function mapF(k){ const f = G.player && G.player.mapFilters; return f && (k in f) ? f[k] : MAP_DEF[k]; }
 function mapToggle(k){
@@ -17275,10 +17345,11 @@ function owBfs(sx, sy, tx, ty){
 function routeP(){ const p = G.player; if (!p.route || !Array.isArray(p.route.pts)) p.route = { pts:[] }; return p.route; }
 function routeInfo(){
   const rt = G.player && G.player.route; if (!rt || !rt.pts || !rt.pts.length || !G.ow || !G.ow.map) return null;
-  const key = G.owPos.x+','+G.owPos.y+'|'+rt.pts.map(p=>p[0]+','+p[1]).join(';')+'|'+(G.player.hasBoat ? 1 : 0);
+  const key = G.owPos.x+','+G.owPos.y+'|'+rt.pts.map(p=>p[0]+','+p[1]).join(';')+'|'+(G.player.hasBoat ? 1 : 0)+'|'+(G.player.routeRoads !== false ? 'r' : '')+Object.keys(wgState().fixed).length;
   const c0 = routeInfo.c; if (c0 && c0.key===key && c0.ref===G.ow.map) return c0;
   const tiles = []; let cx = G.owPos.x, cy = G.owPos.y, bad = -1;
-  for (let i=0;i<rt.pts.length;i++){ const [tx,ty] = rt.pts[i], path = owBfs(cx, cy, tx, ty); if (!path){ bad = i; break; } for (const j of path) tiles.push(j); cx = tx; cy = ty; }
+  const byRoad = G.player.routeRoads !== false && G.ow.road;
+  for (let i=0;i<rt.pts.length;i++){ const [tx,ty] = rt.pts[i], path = byRoad ? wgRoutePath(cx, cy, tx, ty) : owBfs(cx, cy, tx, ty); if (!path){ bad = i; break; } for (const j of path) tiles.push(j); cx = tx; cy = ty; }
   return routeInfo.c = { key, ref:G.ow.map, pts:rt.pts, tiles, bad, steps:tiles.length, sig:key+'#'+bad };
 }
 function routeAdd(x, y){
@@ -17308,7 +17379,7 @@ function routeWalkTick(now){
   if (now < w.next) return;
   const [dx,dy] = w.steps.shift(), ex = G.owPos.x+dx, ey = G.owPos.y+dy;
   moveDir(dx, dy);
-  if (G.owPos.x!==ex || G.owPos.y!==ey || G.gameMode!==0 || !w.steps.length) G.routeWalk = null; else w.next = now + 300*runMul();
+  if (G.owPos.x!==ex || G.owPos.y!==ey || G.gameMode!==0 || !w.steps.length) G.routeWalk = null; else w.next = now + 300*runMul()*wgRoadMul();
 }
 // ---- the map's tool bar: what a click does, the layers, the travel log ----
 function mapSetMode(m){ G.mapMode = m; pinClose(); mapToolsSync(true); renderGame(); }
@@ -17318,7 +17389,7 @@ function mapToolsHtml(r){
   const hint = mode==='pin' ? 'click the map to drop a pin, or click a pin to change it'
     : mode==='route' ? (r ? `${r.pts.length} stop${r.pts.length===1 ? '' : 's'} &middot; ${r.steps} steps${r.bad>=0 ? ` &middot; <b style="color:#ffa080">stop ${r.bad+1} can't be reached on foot</b>` : ''} &middot; click a stop to remove it` : 'click the map to add stops - the path keeps to land you can walk')
     : 'drag to pan &middot; wheel to zoom &middot; click a town you know to teleport, or a pin to change it';
-  const routeBtns = (mode==='route' || r) ? `<button class="mt-b" onclick="routeGo()" ${r && r.steps ? '' : 'disabled'}>Walk route</button><button class="mt-b" onclick="routeUndo()" ${r ? '' : 'disabled'}>Undo</button><button class="mt-b" onclick="routeClear()" ${r ? '' : 'disabled'}>Clear</button><span class="mt-sep"></span>` : '';
+  const routeBtns = (mode==='route' || r) ? `<button class="mt-b ${G.player.routeRoads !== false ? 'on' : ''}" title="prefer the roads (quicker and safer)" onclick="G.player.routeRoads=(G.player.routeRoads===false);routeInfo.c=null;mapToolsSync(true);renderGame()">By road</button><button class="mt-b" onclick="routeGo()" ${r && r.steps ? '' : 'disabled'}>Walk route</button><button class="mt-b" onclick="routeUndo()" ${r ? '' : 'disabled'}>Undo</button><button class="mt-b" onclick="routeClear()" ${r ? '' : 'disabled'}>Clear</button><span class="mt-sep"></span>` : '';
   const layers = G.mapLayersOpen ? `<div class="mt-bar mt-layers" onmousedown="event.preventDefault()">${MAP_LAYERS.map(([k,nm])=>{ const v = mapF(k), on = k==='sites' ? v!=='off' : !!v;
     return `<button class="mt-b ${on ? 'on' : ''}" onclick="mapToggle('${k}')">${k==='sites' ? 'Sites: '+SITE_MODE_NAME[v] : nm}</button>`; }).join('')}</div>` : '';
   return `<div class="mt-bar" onmousedown="event.preventDefault()">${b('look','Look','look around; click a town you know to teleport')}${b('pin','Pin','drop your own pins with a note')}${b('route','Route','plan a route and walk it')}<span class="mt-sep"></span>
@@ -17330,7 +17401,7 @@ function mapToolsSync(force){
   let el = document.getElementById('mapTools');
   if (!on){ if (el && el.style.display!=='none') el.style.display = 'none'; if (G.pinEdit) pinClose(); return; }
   if (!el){ el = document.createElement('div'); el.id = 'mapTools'; document.body.appendChild(el); }
-  const r = routeInfo(), sig = [G.mapMode||'look', G.mapLayersOpen ? 1 : 0, JSON.stringify(G.player.mapFilters||{}), r ? r.sig : ''].join('|');
+  const r = routeInfo(), sig = [G.mapMode||'look', G.mapLayersOpen ? 1 : 0, JSON.stringify(G.player.mapFilters||{}), r ? r.sig : '', G.player.routeRoads !== false ? 1 : 0].join('|');
   if (el.style.display !== 'flex') el.style.display = 'flex';
   if (!force && el.dataset.sig === sig) return;
   el.dataset.sig = sig; el.innerHTML = mapToolsHtml(r);
@@ -17602,6 +17673,7 @@ function buildTravelLog(){
       ${stat('Steps on the road', tv.steps.toLocaleString(), null)}
       ${stat('Pins on your map', pinsP().length, null)}
       ${wevLogHtml()}
+      ${wgLogHtml()}
       <h4 style="color:var(--ink-faint);margin:12px 0 6px;">LANDMARKS</h4>${lmRows || '<div class="muted">this world has no great landmarks</div>'}
       <h4 style="color:var(--ink-faint);margin:12px 0 6px;">REGIONS</h4>${regionRows}
       <h4 style="color:var(--ink-faint);margin:12px 0 6px;">SITES</h4>
@@ -17779,6 +17851,7 @@ function wevCampOk(x, y){
   for (let i=-3;i<=3;i++) for (let j=-3;j<=3;j++){ const u = G.ow.map[x+i] && G.ow.map[x+i][y+j]; if (u!==undefined && OW_SITE_TILES.includes(u)) return false; }
   const e = G.ow.ev; if (e && e.camps.some(c=>Math.abs(c.x-x) < 10 && Math.abs(c.y-y) < 10)) return false;
   if (G.owPos && Math.abs(G.owPos.x-x) < 4 && Math.abs(G.owPos.y-y) < 4) return false;
+  if (wgRoadAt(x,y) || (G.ow.pois||[]).some(p=>Math.abs(p.x-x) < 4 && Math.abs(p.y-y) < 4)) return false;
   return true;
 }
 function wevNewCamp(quiet){
@@ -17975,6 +18048,7 @@ function wevFrame(){
 function wevArenaWon(){
   const f = G.wevFight; if (!f) return false;
   G.wevFight = null;
+  if (f.kind==='delve' || f.kind==='hunt') return wgArenaWon(f);
   const e = wevP(), p = G.player, st = wevStats(), L = p.level;
   if (f.kind==='camp'){
     const c = e.camps.find(c=>c.id===f.id); if (!c) return false;
@@ -18354,9 +18428,901 @@ function wevAfterLoad(){
   for (const d of e.dyn) if (d.kind==='meteor' && !richAt(d.x, d.y) && wevTurn() < d.until){ const r = { x:d.x, y:d.y, type:'meteor', k:'mining', until:d.until }; r.left = richMax(r); G.ow.rich = G.ow.rich || []; G.ow.rich.push(r); }
 }
 
+// ===================== SECTION: WORLD GENERATION EXTRAS =====================
+// what the generator lays over the land once the terrain, towns and sites
+// are in: the shape of the world (archipelago, one landmass, or several
+// continents), five rarer biomes painted over the base ground (volcanic
+// land, jungle, haunted forest, snowy highlands, a crystal wasteland), roads
+// between the towns with bridges and fords where they cross rivers (some
+// bridges broken until you mend them) and ferries between landmasses,
+// farms and hamlets along the roads, lookouts, caves and grottos, ruins,
+// standing stones, abandoned camps, wishing wells and hermits, a level for
+// every part of the land, and the Wilderness: a lawless band along the far
+// edge. All of it comes from the world's seed, so a world code (size,
+// shape and seed) rebuilds the same world for a friend; only what you've
+// done to it (mended bridges, looted ruins, hunted game) is saved.
+const CONTINENT_TYPES = [
+  { id:'archipelago', label:'Archipelago', code:'A', d:'a scatter of islands and a couple of larger landmasses' },
+  { id:'pangaea',     label:'One landmass', code:'P', d:'a single great continent ringed by sea' },
+  { id:'continents',  label:'Continents',  code:'C', d:'two to four continents divided by open water' },
+];
+const WORLD_SIZE_CODE = { small:'S', medium:'M', large:'L', xlarge:'X' };
+function wgContinent(){ return (G.ow && G.ow.continent) || 'archipelago'; }
+// shapes the raw elevation noise into the chosen kind of world
+function wgShaper(seed){
+  const kind = wgContinent(), cx = OW_COLS/2, cy = OW_ROWS/2;
+  // one landmass: a rounded-square continent filling most of the map, rising to a range in the middle
+  if (kind==='pangaea') return (x,y,e)=>{ const ax = Math.abs(x-cx)/cx, ay = Math.abs(y-cy)/cy, d = Math.max(ax, ay)*0.55 + Math.hypot(ax, ay)*0.45; return e*0.55 + (1 - d)*0.52 + 0.09; };
+  // continents: two to four big landmasses round the middle, with open sea between them
+  if (kind==='continents'){
+    const r = mulberry32((seed ^ 0x2f6b1d3) >>> 0), n = 2 + Math.floor(r()*3), C = [], a0 = r()*Math.PI*2, R = Math.min(OW_COLS, OW_ROWS)*(n===2 ? 0.23 : n===3 ? 0.195 : 0.165);
+    for (let i=0;i<n;i++){ const a = a0 + i/n*Math.PI*2 + (r()-0.5)*0.4; C.push([cx + Math.cos(a)*cx*0.6, cy + Math.sin(a)*cy*0.6, R*(0.9 + r()*0.2)]); }
+    return (x,y,e)=>{ let b = 0; for (const [px,py,RR] of C){ const d = Math.hypot(x-px, y-py)/RR; b = Math.max(b, Math.exp(-d*d)); } return e*0.45 + b*0.66; };
+  }
+  return (x,y,e)=>e;
+}
+// a world code: size, shape and seed - "MC-1A2B3C"
+function worldCode(){ return `${WORLD_SIZE_CODE[G.worldSizeTier||'medium']||'M'}${(CONTINENT_TYPES.find(c=>c.id===wgContinent())||CONTINENT_TYPES[0]).code}-${((G.ow.seed>>>0)).toString(36).toUpperCase()}`; }
+function worldCodeParse(code){
+  const m = /^\s*([SMLX])([APC])-([0-9A-Z]{1,8})\s*$/i.exec(String(code||'')); if (!m) return null;
+  const size = Object.keys(WORLD_SIZE_CODE).find(k=>WORLD_SIZE_CODE[k]===m[1].toUpperCase()), cont = CONTINENT_TYPES.find(c=>c.code===m[2].toUpperCase());
+  const seed = parseInt(m[3], 36); if (!size || !cont || !isFinite(seed) || seed < 0 || seed > 4294967295) return null;
+  return { size, cont:cont.id, seed };
+}
+// a fresh world from a given seed on the preview screen (nothing is committed yet)
+function wgRegenerate(seed){
+  G.ow.townPositions = {}; G.ow.townFlavor = {}; G.ow.siteMoves = {}; G.ow.mythicSlain = {};
+  generateOverworld(seed >>> 0); applyOverworldOverrides(); renderOverlay();
+}
+function setContinentType(id){ if (!CONTINENT_TYPES.some(c=>c.id===id)) return; G.ow.continent = id; wgRegenerate(Math.floor(Math.random()*4294967295)); }
+function useWorldCode(){
+  const el = document.getElementById('worldCodeIn'), w = worldCodeParse(el && el.value);
+  if (!w){ notify('That is not a world code - it looks like MC-1A2B3C', 'warn'); return; }
+  G.worldSizeTier = w.size; const t = WORLD_SIZE_TIERS.find(t=>t.id===w.size); OW_COLS = t.cols; OW_ROWS = t.rows; recomputeWorldSizeConstants();
+  G.ow.continent = w.cont; wgRegenerate(w.seed);
+  notify('World ' + worldCode() + ' loaded', 'good');
+}
+function copyWorldCode(){ const c = worldCode(); try{ navigator.clipboard.writeText(c).then(()=>notify('World code copied: ' + c, 'good'), ()=>notify('World code: ' + c, 'good')); }catch(e){ notify('World code: ' + c, 'good'); } }
+// ---- the rarer biomes, painted over the base ground ----
+const BIO = [null,
+  { id:'volcanic', nm:'volcanic land', col:'rgb(70,48,40)',  rgb:[96,70,60],   chart:[150,118,100], fams:['demon','giant'],        band:16, names:['the {adj} Ashlands','the Burning Wastes of {pn}','the {pn} Cinderlands'] },
+  { id:'jungle',   nm:'jungle',        col:'rgb(22,74,30)',  rgb:[40,100,40],   chart:[110,156,84],  fams:['spider','swamp'],       band:9,  names:['the {pn} Jungle','the {adj} Jungle','the Green Hell of {pn}'] },
+  { id:'haunted',  nm:'haunted forest',col:'rgb(40,46,52)',  rgb:[58,66,64],    chart:[122,128,124], fams:['zombie','skeleton','night'], band:11, names:['the Haunted Wood of {pn}','the {adj} Gloom','the Shrouded Forest of {pn}'] },
+  { id:'highland', nm:'snowy highlands',col:'rgb(150,160,172)',rgb:[190,198,210], chart:[214,220,228], fams:['tundra','giant'],       band:13, names:['the {pn} Highlands','the {adj} Fells','the High Moors of {pn}'] },
+  { id:'crystal',  nm:'crystal wasteland',col:'rgb(120,130,160)',rgb:[150,160,196], chart:[196,200,226], fams:['kobold','desert'],     band:14, names:['the Crystal Waste of {pn}','the {adj} Glitterlands','the Shardfields of {pn}'] },
+];
+function wgBioAt(x, y){ const b = G.ow && G.ow.bio; return b && x>=0 && y>=0 && x<OW_COLS && y<OW_ROWS ? b[y*OW_COLS+x] : 0; }
+// ---- the Wilderness: a lawless band along the edge farthest from where you began ----
+function wgWildLevel(x, y){
+  const w = G.ow && G.ow.wild; if (!w) return 0;
+  const d = w.side==='north' ? y : w.side==='south' ? OW_ROWS-1-y : w.side==='west' ? x : OW_COLS-1-x;
+  return d >= w.depth ? 0 : 1 + Math.floor((w.depth-1-d) / w.depth * 30);
+}
+// ---- roads ----
+function wgRoadAt(x, y){ const r = G.ow && G.ow.road; return r && x>=0 && y>=0 && x<OW_COLS && y<OW_ROWS ? r[y*OW_COLS+x] : 0; }
+// 1 road, 2 bridge, 3 broken bridge, 4 ford - a mended broken bridge reads as a bridge
+function wgRoadKind(x, y){ const v = wgRoadAt(x, y); if (v!==3) return v; const b = wgBridgeAt(x, y); return b && wgState().fixed[b.id] ? 2 : 3; }
+function wgBridgeAt(x, y){ return (G.ow.bridges||[]).find(b=>b.tiles.some(([bx,by])=>bx===x && by===y)) || null; }
+function wgRoadName(x, y){ const i = G.ow.roadNm ? G.ow.roadNm[y*OW_COLS+x] : -1; return i>=0 && G.ow.roads[i] ? G.ow.roads[i].name : null; }
+// a priority queue for the road builder's pathfinding
+function wgHeap(){ const a = []; return { a,
+  push(k, p){ a.push([p,k]); let i = a.length-1; while (i>0){ const j = (i-1)>>1; if (a[j][0] <= a[i][0]) break; [a[i],a[j]] = [a[j],a[i]]; i = j; } },
+  pop(){ const top = a[0], last = a.pop(); if (a.length){ a[0] = last; let i = 0; for(;;){ const l = i*2+1, r = l+1; let s = i; if (l<a.length && a[l][0]<a[s][0]) s = l; if (r<a.length && a[r][0]<a[s][0]) s = r; if (s===i) break; [a[i],a[s]] = [a[s],a[i]]; i = s; } } return top; },
+  get size(){ return a.length; } }; }
+// cheapest paths from src over a per-tile cost (Infinity = blocked); stops early once every target is reached
+function wgDijkstra(src, cost, targets){
+  const W = OW_COLS, N = W*OW_ROWS, dist = new Float64Array(N).fill(Infinity), prev = new Int32Array(N).fill(-1), h = wgHeap();
+  let left = targets ? targets.size : -1;
+  dist[src] = 0; h.push(src, 0);
+  while (h.size){
+    const [d, j] = h.pop(); if (d > dist[j]) continue;
+    if (targets && targets.has(j) && j!==src){ if (--left <= 0) break; }
+    const x = j%W, y = (j/W)|0;
+    for (let k=0;k<4;k++){
+      const nx = x + (k===0 ? 1 : k===1 ? -1 : 0), ny = y + (k===2 ? 1 : k===3 ? -1 : 0);
+      if (nx<0 || ny<0 || nx>=W || ny>=OW_ROWS) continue;
+      const n = ny*W+nx, c = cost(nx, ny, n); if (c===Infinity) continue;
+      const nd = d + c; if (nd < dist[n]){ dist[n] = nd; prev[n] = j; h.push(n, nd); }
+    }
+  }
+  return { dist, prev };
+}
+function wgTrace(prev, src, dst){ const out = []; for (let c = dst; c!==-1 && c!==src; c = prev[c]) out.push(c); if (!out.length && src!==dst) return null; out.push(src); return out.reverse(); }
+const WG_ROAD_NAMES = ["the King's Road","the Old Road","the Salt Road","the Pilgrims' Way","the Drovers' Road","the Low Road","the High Road","the Merchants' Way","the River Road","the Iron Road","the Miller's Lane","the Long Road","the Queen's Highway","the Wool Road","the Coast Road","the Shepherds' Track"];
+// ---- the generator itself: called at the end of generateOverworld ----
+function wgGenerate(seed, elev){
+  const W = OW_COLS, H = OW_ROWS, N = W*H, m = G.ow.map, sp = G.ow.spawnPos, rng = mulberry32((seed ^ 0x5bd1e995) >>> 0);
+  const land = t=> t!==OW_WATER && t!==OW_MOUNTAIN;
+  const site = t=> OW_SITE_TILES.includes(t);
+  const near = (x, y, tt, r)=>{ for (let i=-r;i<=r;i++) for (let j=-r;j<=r;j++){ const u = m[x+i] && m[x+i][y+j]; if (u===tt) return true; } return false; };
+  const towns = []; for (let x=0;x<W;x++) for (let y=0;y<H;y++) if (m[x][y]===OW_TOWN) towns.push([x,y]);
+  const townDist = (x, y)=>{ let d = 1e9; for (const [tx,ty] of towns) d = Math.min(d, Math.hypot(tx-x, ty-y)); return d; };
+  // the Wilderness: along whichever edge lies farthest from the start
+  { const sides = [['north', sp.y], ['south', H-1-sp.y], ['west', sp.x], ['east', W-1-sp.x]].sort((a,b)=>b[1]-a[1]);
+    G.ow.wild = { side:sides[0][0], depth:Math.max(10, Math.round(Math.min(W,H)*0.17)) }; }
+  // the rarer biomes: a few noisy patches each, never right by the start
+  const bio = G.ow.bio = new Uint8Array(N);
+  const warm = y=> 1 - Math.abs(y - H/2)/(H/2);
+  const PREF = {
+    1: { ok:t=>[OW_GRASS,OW_DESERT,OW_MOUNTAIN,OW_MOUNTAINPASS,OW_FOREST].includes(t), score:(x,y)=> (near(x,y,OW_MOUNTAIN,3) ? 1.5 : 0) + warm(y) },
+    2: { ok:t=>[OW_FOREST,OW_GRASS,OW_SWAMP].includes(t), score:(x,y)=> (m[x][y]===OW_FOREST ? 1 : 0) + warm(y)*1.6 },
+    3: { ok:t=>[OW_FOREST,OW_SWAMP,OW_GRASS].includes(t), score:(x,y)=> (m[x][y]===OW_FOREST || m[x][y]===OW_SWAMP ? 1.2 : 0) + Math.min(1, townDist(x,y)/30) },
+    4: { ok:t=>[OW_TUNDRA,OW_GRASS,OW_FOREST,OW_MOUNTAINPASS,OW_MOUNTAIN].includes(t), score:(x,y)=> (near(x,y,OW_MOUNTAIN,3) ? 1 : 0) + (1-warm(y))*1.6 + (m[x][y]===OW_TUNDRA ? 0.6 : 0) },
+    5: { ok:t=>[OW_DESERT,OW_GRASS,OW_TUNDRA].includes(t), score:(x,y)=> (m[x][y]===OW_DESERT ? 1.4 : 0) + Math.min(1, townDist(x,y)/30) },
+  };
+  const centres = [], per = Math.max(1, Math.round(OW_RARE_SCALE*0.75));
+  for (let v=1; v<BIO.length; v++) for (let k=0;k<per;k++){
+    let best = null, bs = -1;
+    for (let tries=0; tries<500; tries++){
+      const x = 6 + Math.floor(rng()*(W-12)), y = 6 + Math.floor(rng()*(H-12)), t = m[x][y];
+      if (!PREF[v].ok(t) || bio[y*W+x] || Math.hypot(x-sp.x, y-sp.y) < 28 || centres.some(([cx,cy])=>Math.hypot(cx-x, cy-y) < 26)) continue;
+      const sc = PREF[v].score(x,y) + rng()*0.6; if (sc > bs){ bs = sc; best = [x,y]; }
+    }
+    if (!best) continue;
+    centres.push(best);
+    const R = (6 + rng()*5) * Math.max(1, Math.sqrt(OW_RARE_SCALE)*0.8), [cx,cy] = best;
+    for (let x=Math.max(1, Math.floor(cx-R*1.4)); x<Math.min(W-1, cx+R*1.4); x++) for (let y=Math.max(1, Math.floor(cy-R*1.4)); y<Math.min(H-1, cy+R*1.4); y++){
+      const d = Math.hypot(x-cx, y-cy), nz = fbm2D(x, y, seed + 77 + v, 3, 1/6, 0.5);
+      if (d < R*(0.65 + nz*0.7) && PREF[v].ok(m[x][y]) && Math.hypot(x-sp.x, y-sp.y) > 14){ bio[y*W+x] = v; if (v===2 && m[x][y]===OW_GRASS && nz > 0.45) m[x][y] = OW_FOREST; }
+    }
+  }
+  // land masses: what you can walk between
+  const comp = new Int32Array(N).fill(-1); let nc = 0;
+  for (let i=0;i<N;i++){ const x0 = i%W, y0 = (i/W)|0; if (comp[i]>=0 || !land(m[x0][y0])) continue;
+    const st = [i]; comp[i] = nc;
+    while (st.length){ const j = st.pop(), x = j%W, y = (j/W)|0;
+      for (const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){ const nx = x+dx, ny = y+dy; if (nx<0||ny<0||nx>=W||ny>=H) continue; const k = ny*W+nx; if (comp[k]>=0 || !land(m[nx][ny])) continue; comp[k] = nc; st.push(k); } }
+    nc++; }
+  G.ow.comp = comp;
+  // roads: the cheapest walking routes between towns, preferring roads already built
+  const road = G.ow.road = new Uint8Array(N), roadNm = G.ow.roadNm = new Int16Array(N).fill(-1);
+  G.ow.roads = []; G.ow.bridges = []; G.ow.ferries = [];
+  const cost = (x, y, n)=>{
+    const t = m[x][y]; if (t===OW_WATER || t===OW_MOUNTAIN) return Infinity;
+    if (site(t)) return t===OW_TOWN ? 30 : Infinity;
+    let c = t===OW_GRASS ? 1 : t===OW_FOREST ? 1.8 : t===OW_SWAMP ? 2.6 : t===OW_RIVER ? 3.2 : t===OW_MOUNTAINPASS ? 2 : 1.6;
+    if (bio[n]===1 || bio[n]===3) c += 1.2; if (wgWildLevel(x, y)) c += 2.5;
+    return road[n] ? Math.min(c, 1)*0.35 : c;
+  };
+  const tIdx = towns.map(([x,y])=>y*W+x), tSet = new Set(tIdx);
+  const pairs = [];
+  towns.forEach(([x,y], i)=>{ const { dist } = wgDijkstra(tIdx[i], cost, tSet); towns.forEach((u, j)=>{ if (j > i && isFinite(dist[tIdx[j]])) pairs.push([dist[tIdx[j]], i, j]); }); });
+  pairs.sort((a,b)=>a[0]-b[0]);
+  const par = towns.map((_, i)=>i), find = i=> par[i]===i ? i : (par[i] = find(par[i]));
+  const edges = [], extra = [];
+  for (const p of pairs){ const a = find(p[1]), b = find(p[2]); if (a!==b){ par[a] = b; edges.push(p); } else extra.push(p); }
+  const nExtra = Math.max(1, Math.round(towns.length*0.2));
+  for (const p of extra.slice(0, nExtra*3)) if (edges.length < towns.length - 1 + nExtra && p[0] < 140) edges.push(p);
+  const usedNames = new Set(), nameRoad = ()=>{ for (let k=0;k<20;k++){ const nm = WG_ROAD_NAMES[Math.floor(rng()*WG_ROAD_NAMES.length)]; if (!usedNames.has(nm)){ usedNames.add(nm); return nm; } } return `the ${PLACE_ROOT[Math.floor(rng()*PLACE_ROOT.length)]}${PLACE_END[Math.floor(rng()*PLACE_END.length)]} Road`; };
+  const layRoad = (path, ri)=>{
+    let run = []; const flush = ()=>{ if (!run.length) return; const ford = rng() < 0.3; for (const j of run) road[j] = ford ? 4 : 2; if (!ford) G.ow.bridges.push({ id:G.ow.bridges.length, tiles:run.map(j=>[j%W, (j/W)|0]), x:run[0]%W, y:(run[0]/W)|0 }); run = []; };
+    for (const j of path){ const x = j%W, y = (j/W)|0, t = m[x][y]; if (t===OW_TOWN) { flush(); continue; }
+      if (t===OW_RIVER){ if (!road[j]) run.push(j); else flush(); continue; } flush(); if (!road[j]) road[j] = 1; if (roadNm[j] < 0) roadNm[j] = ri; }
+    flush();
+  };
+  for (const [, i, j] of edges.sort((a,b)=>a[0]-b[0])){
+    const { prev } = wgDijkstra(tIdx[i], cost, new Set([tIdx[j]])), path = wgTrace(prev, tIdx[i], tIdx[j]); if (!path) continue;
+    const ri = G.ow.roads.length, mid = path[path.length>>1];
+    G.ow.roads.push({ name:nameRoad(), n:path.length, lx:mid%W, ly:(mid/W)|0, a:towns[i], b:towns[j] });
+    layRoad(path, ri);
+  }
+  // some bridges have fallen in, until someone mends them
+  const nBroken = Math.max(1, Math.round(G.ow.bridges.length*0.25));
+  G.ow.bridges.filter(b=>Math.hypot(b.x-sp.x, b.y-sp.y) > 18).sort((a,b)=>o3Hash(a.x,a.y,seed%991)-o3Hash(b.x,b.y,seed%991)).slice(0, nBroken).forEach(b=>{ b.broken = true; for (const [x,y] of b.tiles) road[y*W+x] = 3; });
+  // ferries: link every landmass that has a town to the start's, coast to coast
+  const coastOf = c=>{ const out = []; for (let i=0;i<N;i++){ if (comp[i]!==c) continue; const x = i%W, y = (i/W)|0, t = m[x][y]; if (site(t) || t===OW_RIVER) continue;
+    if ([[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dy])=>m[x+dx] && m[x+dx][y+dy]===OW_WATER)) out.push(i); } return out; };
+  const tComps = [...new Set(tIdx.map(i=>comp[i]).filter(c=>c>=0))], linked = new Set([comp[sp.y*W+sp.x]]);
+  let guard = 0;
+  while (tComps.some(c=>!linked.has(c)) && guard++ < 20){
+    let best = null;
+    for (const c of tComps){ if (linked.has(c)) continue; const cb = coastOf(c).filter((_, k)=>k%3===0);
+      for (const l of linked){ const ca = coastOf(l).filter((_, k)=>k%3===0);
+        for (const a of ca) for (const b of cb){ const d = Math.hypot(a%W-b%W, ((a/W)|0)-((b/W)|0)); if (!best || d < best.d) best = { d, a, b, c }; } } }
+    if (!best) break;
+    linked.add(best.c);
+    const fa = [best.a%W, (best.a/W)|0], fb = [best.b%W, (best.b/W)|0];
+    G.ow.ferries.push({ id:G.ow.ferries.length, a:fa, b:fb, d:Math.round(best.d) });
+    for (const pier of [best.a, best.b]){   // a road from each pier to the nearest road or town
+      const tg = new Set(); for (let i=0;i<N;i++) if ((road[i] || tSet.has(i)) && comp[i]===comp[pier]) tg.add(i);
+      if (!tg.size) continue;
+      const { dist, prev } = wgDijkstra(pier, cost, null); let bj = -1, bd = Infinity; for (const t of tg) if (dist[t] < bd){ bd = dist[t]; bj = t; }
+      if (bj >= 0){ const path = wgTrace(prev, pier, bj); if (path){ const ri = G.ow.roads.length; G.ow.roads.push({ name:nameRoad(), n:path.length, lx:path[path.length>>1]%W, ly:(path[path.length>>1]/W)|0 }); layRoad(path, ri); } }
+    }
+  }
+  // points of interest
+  const pois = G.ow.pois = [];
+  const taken = (x, y, r)=> pois.some(p=>Math.abs(p.x-x) < r && Math.abs(p.y-y) < r) || G.ow.ferries.some(f=>[f.a,f.b].some(([px,py])=>Math.abs(px-x) < 3 && Math.abs(py-y) < 3));
+  const nearSite = (x, y, r)=>{ for (let i=-r;i<=r;i++) for (let j=-r;j<=r;j++){ const u = m[x+i] && m[x+i][y+j]; if (u!==undefined && site(u)) return true; } return false; };
+  const place = (k, n, ok, score)=>{
+    for (let c=0;c<n;c++){
+      let best = null, bs = -Infinity;
+      for (let tries=0; tries<700; tries++){
+        const x = 3 + Math.floor(rng()*(W-6)), y = 3 + Math.floor(rng()*(H-6)), t = m[x][y], i = y*W+x;
+        if (!land(t) || site(t) || t===OW_RIVER || road[i] || Math.hypot(x-sp.x, y-sp.y) < 7 || taken(x, y, 7) || nearSite(x, y, 2) || !ok(x, y, t, i)) continue;
+        const sc = (score ? score(x, y, t, i) : 0) + rng(); if (sc > bs){ bs = sc; best = [x,y]; }
+      }
+      if (best) pois.push({ id:k+c, k, x:best[0], y:best[1] });
+    }
+  };
+  const nearRoad = (x, y, r)=>{ for (let i=-r;i<=r;i++) for (let j=-r;j<=r;j++){ const xx = x+i, yy = y+j; if (xx>=0 && yy>=0 && xx<W && yy<H && road[yy*W+xx]===1) return true; } return false; };
+  const S = OW_AREA_SCALE;
+  place('hamlet', Math.max(2, Math.round(towns.length*0.6)), (x,y,t)=> (t===OW_GRASS || t===OW_FOREST) && nearRoad(x,y,1) && townDist(x,y) >= 10 && !wgWildLevel(x,y), (x,y)=> Math.min(townDist(x,y), 25)/25);
+  place('view', Math.max(2, Math.round(2*S)), (x,y,t)=> near(x,y,OW_MOUNTAIN,2) && elev[x][y] > 0.6, (x,y)=> elev[x][y]*3);
+  place('cave', Math.max(2, Math.round(1.3*S)), (x,y,t)=> [[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dy])=>m[x+dx][y+dy]===OW_MOUNTAIN), (x,y)=> [[1,0],[-1,0],[0,1],[0,-1]].filter(([dx,dy])=>m[x+dx][y+dy]===OW_MOUNTAIN).length);
+  place('grotto', Math.max(1, Math.round(0.7*S)), (x,y,t)=> near(x,y,OW_RIVER,1) && near(x,y,OW_MOUNTAIN,2));
+  place('ruin', Math.max(2, Math.round(1.5*S)), (x,y,t)=> t!==OW_SWAMP, (x,y)=> Math.min(townDist(x,y), 30)/15);
+  place('stones', Math.max(1, Math.round(0.8*S)), (x,y,t)=> t===OW_GRASS || t===OW_TUNDRA);
+  place('oldcamp', Math.max(2, Math.round(1.2*S)), (x,y,t)=> t===OW_FOREST || t===OW_GRASS);
+  place('well', Math.max(1, Math.round(0.8*S)), (x,y,t)=> t===OW_GRASS && nearRoad(x,y,3));
+  place('hermit', Math.max(1, Math.round(0.6*S)), (x,y,t)=> (t===OW_FOREST || t===OW_SWAMP || t===OW_TUNDRA) && townDist(x,y) >= 15);
+  for (const f of G.ow.ferries) for (const [k, [x,y]] of [['a', f.a], ['b', f.b]]) pois.push({ id:'ferry'+f.id+k, k:'ferry', x, y, ferry:f.id, end:k });
+  // names, made once from the seed
+  const nr = mulberry32((seed ^ 0x1ab3) >>> 0), pn = ()=> PLACE_ROOT[Math.floor(nr()*PLACE_ROOT.length)] + PLACE_END[Math.floor(nr()*PLACE_END.length)];
+  for (const p of pois){
+    if (p.k==='hamlet') p.name = [`${pn()} Farm`, `${pn()} Mill`, `the ${pn()} Steading`, `${pn()} Hamlet`][Math.floor(nr()*4)];
+    else if (p.k==='view') p.name = [`${pn()} Lookout`, `the ${pn()} Watchtower`, `${pn()} Rise`][Math.floor(nr()*3)];
+    else if (p.k==='cave') p.name = `the ${pn()} Cave`;
+    else if (p.k==='grotto') p.name = `the Grotto of ${pn()}`;
+    else if (p.k==='ruin') p.name = [`the ruins of ${pn()}`, `old ${pn()} Keep`, `the broken shrine of ${pn()}`][Math.floor(nr()*3)];
+    else if (p.k==='stones') p.name = `the ${pn()} Stones`;
+    else if (p.k==='oldcamp') p.name = 'an abandoned camp';
+    else if (p.k==='well') p.name = 'a wishing well';
+    else if (p.k==='hermit') p.name = `${pn()} the hermit`;
+    else if (p.k==='ferry') p.name = 'a ferry landing';
+    p.seed = Math.floor(nr()*1e9);
+  }
+}
+// what you've done to the world: mended bridges, looted ruins, hunted game, jobs taken - saved with the game
+function wgState(){
+  if (!G.ow.wg || typeof G.ow.wg!=='object') G.ow.wg = {};
+  const s = G.ow.wg; s.fixed = s.fixed||{}; s.done = s.done||{}; s.cd = s.cd||{}; s.jobs = s.jobs||{}; s.hunted = s.hunted||{}; s.lore = s.lore||[]; s.found = s.found||[];
+  return s;
+}
+function wgPoiAt(x, y){ return (G.ow.pois||[]).find(p=>p.x===x && p.y===y) || null; }
+const POI_TITLE = { hamlet:'Hamlet', view:'Lookout', cave:'Cave', grotto:'Grotto', ruin:'Ruins', stones:'Standing stones', oldcamp:'Abandoned camp', well:'Wishing well', hermit:'Hermit', ferry:'Ferry landing' };
+// ---- how dangerous each part of the land is: a monster level for every tile ----
+function wgTerrBand(ti){ const t = wevTowns()[ti], sp = G.ow.spawnPos; if (!t || !sp) return 1; const maxD = Math.hypot(OW_COLS, OW_ROWS)/2; return clampMLevel(1 + Math.round(Math.hypot(t[0]-sp.x, t[1]-sp.y)/maxD*14)); }
+function wgBand(x, y){
+  const wl = wgWildLevel(x, y); if (wl) return clampMLevel(9 + Math.round(wl*0.38));
+  const b = wgBioAt(x, y); if (b) return BIO[b].band;
+  const ti = wevTerrAt(x, y); return ti < 0 ? 1 : wgTerrBand(ti);
+}
+function wgBandText(band){ const lo = monCombatLevel({mlevel:Math.max(1, band-1)}), hi = monCombatLevel({mlevel:Math.min(NMLVL, band+1)}); return `combat ${lo}-${hi}`; }
+// the area you're in: the Wilderness, a named rare biome, or a town's lands
+function wgArea(x, y){
+  const wl = wgWildLevel(x, y); if (wl) return { key:'wild', name:'the Wilderness', band:wgBand(x, y), wild:wl };
+  const b = wgBioAt(x, y); if (b){ const pl = owPlaceAt(x, y); return { key:'bio:'+(pl ? pl.name : b), name:pl ? pl.name : BIO[b].nm, band:BIO[b].band, bio:b }; }
+  const ti = wevTerrAt(x, y); return { key:'terr:'+ti, name:wevTerrName(ti), band:wgBand(x, y) };
+}
+// arena fights: halfway between your own level and the land's, and never easier than the land in the Wilderness
+function wgArenaLevel(){
+  const pl = clampMLevel(G.player.level); if (!G.ow || !G.ow.map || !G.owPos || !G.ow.bio) return pl;
+  const b = wgBand(G.owPos.x, G.owPos.y);
+  return wgWildLevel(G.owPos.x, G.owPos.y) ? clampMLevel(Math.max(pl, b)) : clampMLevel(Math.round((pl + b)/2));
+}
+// ---- walking the land: roads, rivers, the Wilderness, the area you're in ----
+// on a road every other step costs no turn (like running); wading a river off the road costs an extra one
+function wgStepCost(x, y){
+  const p = G.player, rk = wgRoadKind(x, y), t = G.ow.map[x][y];
+  if (rk===1 || rk===2 || rk===4){ p._roadHalf = !p._roadHalf; return p._roadHalf ? 0 : 1; }
+  if (t===OW_RIVER){ if (rk===3 && !p._brokeSaid){ p._brokeSaid = 1; } return 2; }
+  return 1;
+}
+function wgRoadMul(){ const k = G.ow && G.owPos ? wgRoadKind(G.owPos.x, G.owPos.y) : 0; return k===1 || k===2 || k===4 ? 0.75 : 1; }
+function wgSight(){ return G.weather==='fog' ? 7 : G.weather==='storm' ? 9 : 12; }
+// called once per overworld step (see frameLoop): the area banner, the Wilderness warning, storms at sea
+function wgOnStep(prevKey){
+  const p = G.player, pos = G.owPos; if (!p || !G.ow.bio) return;
+  const a = wgArea(pos.x, pos.y), turn = p.turnCount||0;
+  if (a.key !== p._areaKey){
+    const first = !(p.areasSeen||[]).includes(a.key); p._areaKey = a.key; (p.areasSeen = p.areasSeen||[]).push(a.key); if (p.areasSeen.length > 400) p.areasSeen.splice(0, 100);
+    if (a.wild){ (p.wgStat = p.wgStat||{}).maxWild = Math.max((p.wgStat.maxWild||0), a.wild); }
+    if (a.wild){ notify(`Wilderness level ${a.wild} - ${wgBandText(a.band)}`, 'warn');
+      if (!p.wildWarned){ p.wildWarned = 1; wevDialog('The Wilderness', `You are about to enter <b>the Wilderness</b>, a lawless land along the edge of the world. The monsters here are strong and the pickings rich - but <b>if you die here you lose everything but your 3 most valuable items for good</b>; there is no gravestone to go back to. The deeper you go, the higher the Wilderness level.`, [['Go on', ()=>{}], ['Turn back', ()=>{ if (prevKey){ const [px,py] = prevKey.split('|')[0].split(',').map(Number); G.owPos.x = px; G.owPos.y = py; } }]]); } }
+    else if (first || turn - (p._areaT||0) > 30) notify(`${cap(a.name)} - ${wgBandText(a.band)}`, a.band > clampMLevel(p.level)+2 ? 'warn' : 'info');
+    p._areaT = turn;
+    logMsg(`you enter ${a.name} (recommended ${wgBandText(a.band)})`, a.wild ? 'hit' : '');
+  }
+  // a broken bridge: offer to mend it
+  const rk = wgRoadKind(pos.x, pos.y);
+  if (rk===3){ const b = wgBridgeAt(pos.x, pos.y); if (b && G.ui==='playing' && turn - (wgState().cd['br'+b.id]||-999) > 40){ wgState().cd['br'+b.id] = turn; wgBridgeDialog(b); } }
+  else if (G.ow.map[pos.x][pos.y]===OW_RIVER && !rk && chn(0.15)) logMsg('you wade across the river - it slows you down (a road would have a bridge or a ford)', '');
+  // storms at sea
+  if (G.ow.map[pos.x][pos.y]===OW_WATER && G.weather==='storm'){
+    if (chn(0.12)){ const dmg = Math.max(1, Math.round(effMaxHp()*0.06)); p.hp = Math.max(1, p.hp - dmg); logMsg(`a wave crashes over the boat (-${dmg} life) - the sea is no place to be in a storm`, 'hit'); }
+    else if (chn(0.07)){ const d = [[1,0],[-1,0],[0,1],[0,-1]][rn(4)], nx = pos.x+d[0], ny = pos.y+d[1]; if (G.ow.map[nx] && G.ow.map[nx][ny]===OW_WATER){ pos.x = nx; pos.y = ny; logMsg('the wind drives the boat off course', 'hit'); } }
+  }
+  const poi = wgPoiAt(pos.x, pos.y); if (poi && !wgState().found.includes(poi.id)){ wgState().found.push(poi.id); checkAchievements(); }
+}
+// ---- stepping onto a point of interest ----
+function wgStep(){
+  const poi = wgPoiAt(G.owPos.x, G.owPos.y); if (!poi || G.ui!=='playing') return false;
+  (WG_POI[poi.k] || (()=>{}))(poi); return G.ui!=='playing' || G.gameMode!==0;
+}
+const WG_LORE = [
+  'Carved over the door: "Here the Kings of the old road kept their tolls. Let no traveller pass unwatched."',
+  'A cracked tablet: "In the year the river turned, the dead walked from the marsh, and we sealed the lower halls."',
+  'Scratched into the wall: "Three of us came for the gold. One of us is writing this."',
+  'A faded mural shows a giant asleep beneath the hills, and men tiptoeing past with sacks of grain.',
+  'An inscription: "The stars fell like rain, and where they struck, iron grew from the earth."',
+  'A dusty ledger lists the price of salt, wool and ale - and, at the bottom, "one dragon egg (returned)".',
+  'A brass plaque: "To the brave who held the ford against the orc host. The river remembers."',
+  'Someone has chalked a map on the floor: a road, a well, and an X beside the well.',
+  'A worn carving of a wizard\'s tower, with a single word beneath it: "Ask."',
+  'A note pinned with a dagger: "If you are reading this, the hermit was right."',
+];
+function wgLore(poi){ const s = wgState(), t = WG_LORE[poi.seed % WG_LORE.length]; if (!s.lore.includes(t)) s.lore.push(t); return t; }
+// the mini-dungeons: a cave, a grotto behind a waterfall, or a ruin - one or two rooms, a few foes, a chest
+function wgDelve(poi){
+  const kind = poi.k, nm = poi.name;
+  wevFightStart('delve', poi.id, L=>{
+    const lvl = clampMLevel(Math.max(L, wgBand(poi.x, poi.y)));
+    // two rooms joined by a passage, walls everywhere else; the way out is behind you
+    for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++){ G.map[x][y] = T_WALL; if (G.arenaDeco) G.arenaDeco[x][y] = 'rock'; }
+    const carve = (x0,y0,x1,y1)=>{ for (let x=x0;x<=x1;x++) for (let y=y0;y<=y1;y++){ G.map[x][y] = T_FLOOR; if (G.arenaDeco) G.arenaDeco[x][y] = ''; } };
+    carve(6, 12, 13, 17); carve(9, 8, 10, 12); carve(4, 2, 15, 8);
+    if (o3Hash(poi.x, poi.y, 5) < 0.5){ for (const [x,y] of [[6,4],[13,4],[6,6],[13,6]]){ G.map[x][y] = T_WALL; if (G.arenaDeco) G.arenaDeco[x][y] = 'obstacle'; } }
+    G.map[10][18] = T_FLEE; G.player.x = 10; G.player.y = 16;
+    const fams = kind==='cave' ? ['spider','kobold','giant'] : kind==='grotto' ? ['swamp','spider'] : ['skeleton','zombie'];
+    const n = 2 + (o3Hash(poi.x, poi.y, 7) < 0.5 ? 1 : 0) + (lvl > 8 ? 1 : 0);
+    for (let i=0;i<n;i++){ const e = kind==='grotto' && chn(0.5) ? pickSkinnedMonsterEntry(SEA_SKIN, lvl) : (famPickFrom(fams, lvl, 3) || pickMonsterEntry(lvl)); const m = wevMon(e, lvl); m.y = 3 + rn(4); m.x = 5 + rn(10); if (G.map[m.x][m.y]!==T_FLOOR){ m.x = 9; m.y = 4 + i; } }
+    upgradeToElite(G.mon[0]); G.mon[0].nm = G.mon[0].nm.replace(/^Champion /, kind==='ruin' ? 'Warden ' : 'Old ');
+  });
+  wevSay(`you ${kind==='cave' ? 'squeeze into' : kind==='grotto' ? 'slip behind the waterfall into' : 'climb down into'} ${nm} - something stirs in the dark!`, 'new');
+}
+function wgDelveWon(f){
+  const poi = (G.ow.pois||[]).find(p=>p.id===f.id); if (!poi) return;
+  const s = wgState(); s.done[poi.id] = 1;
+  const p = G.player, gold = roundH((40 + wgBand(poi.x, poi.y)*14 + p.level*4)*goldFindMult()); p.gold += gold;
+  const it = genItem(mn(NMLVL, lootLevel()+1)+playerMF(), lootKind(), 3, chn(0.5)); addToInventory(it);
+  wevSay(`the last foe falls. In the back of ${poi.name} you find a chest: ${gold} gold and ${itemNameHtml(it)}`, 'loot', `${cap(poi.name)} cleared`);
+  logMsg(wgLore(poi), 'magic');
+  (p.wgStat = p.wgStat||{}).delves = ((p.wgStat||{}).delves||0) + 1; checkAchievements();
+}
+function wgBridgeDialog(b){
+  const p = G.player, logs = SK_LOG.reduce((a,l)=>a+skHave(l.id), 0), near = wevNearestTown(false), town = near ? o3TownName(near[0], near[1]) : 'the nearest town';
+  wevDialog('A broken bridge', `The bridge here has fallen in - you have to wade across, and it costs you time. With <b>10 logs and 150 gold</b> for nails and rope you could mend it yourself, or pay <b>600 gold</b> to have ${esc(town)}'s carpenters do it. (You have ${logs} logs.)`,
+    [[`Mend it (10 logs, 150 gold)`, ()=>{ const have = SK_LOG.reduce((a,l)=>a+skHave(l.id), 0); if (have < 10 || p.gold < 150){ notify(have < 10 ? 'You need 10 logs' : 'You need 150 gold', 'warn'); return; } let need = 10; for (const l of SK_LOG){ const h = Math.min(need, skHave(l.id)); if (h){ skAdd(l.id, -h); need -= h; } } p.gold -= 150; wgFixBridge(b, true); }],
+     [`Pay the carpenters (600 gold)`, ()=>{ if (p.gold < 600){ notify('You need 600 gold', 'warn'); return; } p.gold -= 600; wgFixBridge(b, false); }],
+     ['Leave it', ()=>{}]], 'on the road');
+}
+function wgFixBridge(b, own){
+  wgState().fixed[b.id] = 1; const near = wevNearestTown(false), key = near ? near[0]+','+near[1] : null;
+  if (key){ const p = G.player; p.rep = p.rep||{}; p.rep[key] = repAt(key) + 2; }
+  if (own) skGainXP('crafting', 120);
+  (G.player.wgStat = G.player.wgStat||{}).bridges = ((G.player.wgStat||{}).bridges||0) + 1;
+  wevSay(`${own ? 'you mend' : 'the carpenters mend'} the bridge - the road is whole again${key ? ` and ${o3TownName(near[0], near[1])} is grateful (+2 standing)` : ''}`, 'magic', 'Bridge repaired');
+  if (typeof O3!=='undefined') O3.wgKey = null; checkAchievements();
+}
+const WG_POI = {
+  hamlet(poi){
+    const s = wgState(), turn = wevTurn(), day = Math.floor(turn/DAY_LENGTH), near = wevNearestTown(false), key = near ? near[0]+','+near[1] : null;
+    let job = s.jobs[poi.id];
+    if (!job || job.day !== day){ const r = mulberry32((poi.seed + day*7919) >>> 0), opts = [['logs','Logs',10],['oak','Oak Logs',8],['trout','Raw Trout',6],['shrimp','Raw Shrimp',8],['copper','Copper Ore',8],['iron','Iron Ore',6],['meat','Raw Meat',4],['cowhide','Cowhide',3]];
+      const o = opts[Math.floor(r()*opts.length)]; job = s.jobs[poi.id] = { day, id:o[0], nm:o[1], n:o[2], done:0 }; }
+    const have = skHave(job.id), p = G.player;
+    wevDialog(poi.name, `A farmer leans on the fence of ${esc(poi.name)}. A windmill creaks over the fields and hens scratch in the yard. ${job.done ? '"That\'s all I need today - come back tomorrow."' : `"I could use <b>${job.n} ${esc(job.nm.toLowerCase())}</b>, if you've got them - I'll pay fair." (you have ${have})`}`,
+      [[job.done ? 'Nothing more today' : `Hand over ${job.n} ${job.nm.toLowerCase()}`, ()=>{ if (job.done) return; if (skHave(job.id) < job.n){ notify(`You need ${job.n} ${job.nm.toLowerCase()}`, 'warn'); return; }
+          skAdd(job.id, -job.n); job.done = 1; const gold = roundH((60 + job.n*12 + p.level*5)*goldFindMult()); p.gold += gold; if (key){ p.rep = p.rep||{}; p.rep[key] = repAt(key) + 1; }
+          (p.wgStat = p.wgStat||{}).jobs = ((p.wgStat||{}).jobs||0) + 1; wevSay(`the farmer pays you ${gold} gold${key ? ` (+1 standing with ${o3TownName(near[0], near[1])})` : ''}`, 'good'); checkAchievements(); }],
+       ['Buy a basket of food (5 cooked meat, 60 gold)', ()=>{ if (p.gold < 60){ notify('You need 60 gold', 'warn'); return; } p.gold -= 60; skAdd('c_meat', 5); logMsg('you buy a basket of cooked meat for the road', 'good'); }],
+       ['Sleep in the hay barn (a safe rest)', ()=>{ if (fullyRestPlayer()) logMsg('you sleep soundly in the hay and wake refreshed', 'good'); else logMsg('you rest a while in the hay', ''); p.runEnergy = 100; }],
+       ['Walk on', ()=>{}]], 'a hamlet');
+  },
+  view(poi){
+    const s = wgState(), first = !s.done[poi.id];
+    owReveal(poi.x, poi.y, 32);
+    if (first){ s.done[poi.id] = 1; gainXP(40 + G.player.level*8); (G.player.wgStat = G.player.wgStat||{}).views = ((G.player.wgStat||{}).views||0) + 1; checkAchievements(); }
+    wevSay(`you climb ${poi.name}. The land spreads out below you for leagues - it's all on your map now${first ? ', and the climb did you good' : ''}`, 'magic', first ? 'Lookout reached - the map is revealed' : null);
+  },
+  cave(poi){ if (wgState().done[poi.id]){ logMsg(`${cap(poi.name)} is empty now - only bones and old torches`, ''); return; } wevDialog(cap(poi.name), `A dark opening in the cliff. Cold air breathes out of it, and you hear something moving deep inside.`, [['Go in', ()=>wgDelve(poi)], ['Not now', ()=>{}]], 'a cave in the cliffs'); },
+  grotto(poi){ if (wgState().done[poi.id]){ logMsg(`the grotto behind the falls is quiet now`, ''); return; } wevDialog(cap(poi.name), `A waterfall spills over the rocks - and behind the curtain of water there's a hollow in the cliff, glittering with spray.`, [['Slip behind the falls', ()=>wgDelve(poi)], ['Not now', ()=>{}]], 'behind a waterfall'); },
+  ruin(poi){ if (wgState().done[poi.id]){ logMsg(`${cap(poi.name)}: ${wgLore(poi)}`, ''); return; } wevDialog(cap(poi.name), `Tumbled walls and a broken arch. Steps lead down into a cellar that hasn't seen light in an age. ${wgLore(poi)}`, [['Go down', ()=>wgDelve(poi)], ['Not now', ()=>{}]], 'ruins'); },
+  stones(poi){
+    const s = wgState(), turn = wevTurn(), p = G.player;
+    if (turn - (s.cd[poi.id]||-9999) < DAY_LENGTH){ logMsg('the stones are cold and silent - come back another day', ''); return; }
+    s.cd[poi.id] = turn; p.hp = effMaxHp(); p.prayPts = rsLvl('prayer'); p.runEnergy = 100;
+    const first = !s.done[poi.id]; if (first){ s.done[poi.id] = 1; skGainXP('prayer', 200); }
+    wevSay(`you lay a hand on ${poi.name}. They hum, and warmth runs through you - life, prayer and energy restored${first ? ' (+200 Prayer xp)' : ''}`, 'magic', 'The stones bless you');
+  },
+  oldcamp(poi){
+    const s = wgState(); if (s.done[poi.id]){ logMsg('the abandoned camp has nothing more to give', ''); return; } s.done[poi.id] = 1;
+    const p = G.player, r = poi.seed % 4, gold = roundH((20 + p.level*6)*goldFindMult()); p.gold += gold;
+    const what = r===0 ? (skAdd('c_trout', 3), 'three cooked trout') : r===1 ? (addArrows(25, 0), 'a bundle of 25 arrows') : r===2 ? (addToInventory(genPotion(lootLevel())), 'a potion') : (skAdd('logs', 6), 'a stack of dry logs');
+    wevSay(`you search the abandoned camp: a torn tent, a cold fire pit... and ${what} and ${gold} gold left behind in a hurry`, 'loot');
+  },
+  well(poi){
+    const p = G.player, s = wgState(), turn = wevTurn();
+    wevDialog('A wishing well', `An old stone well, its bucket long gone. Coins glint far below. Make a wish?`,
+      [['Toss in 10 gold', ()=>wgWish(poi, 10)], ['Toss in 100 gold', ()=>wgWish(poi, 100)], ['Walk on', ()=>{}]], 'a wishing well');
+  },
+  hermit(poi){
+    const s = wgState(), p = G.player;
+    const hidden = (G.ow.pois||[]).filter(o=>o.k!=='ferry' && !s.found.includes(o.id) && !owSeen(o.x, o.y)).sort((a,b)=>Math.hypot(a.x-poi.x, a.y-poi.y) - Math.hypot(b.x-poi.x, b.y-poi.y))[0];
+    const tip = hidden ? `"There's ${hidden.k==='cave' || hidden.k==='grotto' || hidden.k==='ruin' ? 'something worth finding' : esc(hidden.name)} ${wevWhere(hidden.x, hidden.y)} - I've marked it on your map."` : '"I\'ve told you all I know. Go well."';
+    wevDialog(cap(poi.name), `An old hermit peers out of a hut of sticks and turf. "Visitors! It's been years." ${tip}`,
+      [['Thank the hermit', ()=>{ if (hidden) owReveal(hidden.x, hidden.y, 3); if (!s.done[poi.id]){ s.done[poi.id] = 1; addToInventory(mkLamp()); logMsg('the hermit presses an old brass lamp into your hands - "for the road"', 'good'); } }], ['Leave', ()=>{}]], 'a hermit');
+  },
+  ferry(poi){
+    const f = G.ow.ferries[poi.ferry]; if (!f) return; const to = poi.end==='a' ? f.b : f.a, cost = 15 + f.d*2, near = (()=>{ let b = null, bd = 1e9; for (const [tx,ty] of wevTowns()){ const d = Math.hypot(tx-to[0], ty-to[1]); if (d < bd){ bd = d; b = [tx,ty]; } } return b; })();
+    wevDialog('A ferry landing', `A ferryman dozes beside a flat-bottomed boat. "Across the water? That's ${f.d} leagues, to the landing near ${esc(near ? o3TownName(near[0], near[1]) : 'the far shore')}. ${cost} gold."`,
+      [[`Take the ferry (${cost} gold)`, ()=>{ const p = G.player; if (p.gold < cost){ notify(`You need ${cost} gold`, 'warn'); return; } p.gold -= cost; G.owPos.x = to[0]; G.owPos.y = to[1]; p.turnCount = (p.turnCount||0) + Math.ceil(f.d/2); owReveal(to[0], to[1], 10); if (typeof O3!=='undefined') O3.path = []; wevSay(`the ferry carries you across the water to the far landing`, 'new'); }], ['Not today', ()=>{}]], 'a ferry');
+  },
+};
+function wgWish(poi, amt){
+  const p = G.player; if (p.gold < amt){ notify(`You need ${amt} gold`, 'warn'); return; }
+  p.gold -= amt; const r = Math.random(), luck = amt >= 100 ? 0.25 : 0.04;
+  if (r < luck*0.4){ addToInventory(mkLamp()); wevSay('the well glows - a Lamp of Knowledge floats up to your hand!', 'magic'); }
+  else if (r < luck){ const g = amt*3; p.gold += g; wevSay(`a voice from the well: "Generous!" - ${g} gold glints at your feet`, 'good'); }
+  else logMsg('plink. You hear the coin land far below. Nothing happens - this time.', '');
+}
+// ---- camping gear, sold at every general store ----
+const WG_CAMP_GEAR = [
+  { id:'tent', nm:'Tent', lvls:[300, 900, 2500], d:'each grade makes a night ambush less likely' },
+  { id:'ward', nm:'Ward lantern', lvls:[1200], d:'keeps the dark at bay - far fewer ambushes at night' },
+  { id:'bedroll', nm:'Bedroll', lvls:[400], d:'wake with full run energy and prayer' },
+  { id:'spit', nm:'Cooking spit', lvls:[250], d:'your camp leaves a fire you can cook at' },
+];
+function wgCamp(){ const p = G.player; if (!p.campKit || typeof p.campKit!=='object') p.campKit = {}; return p.campKit; }
+function wgCampRowsHtml(){
+  const k = wgCamp(), p = G.player;
+  return `<div class="muted" style="margin:12px 0 4px;font-size:11px;letter-spacing:0.08em;">CAMPING GEAR</div>` + WG_CAMP_GEAR.map(g=>{ const lv = k[g.id]||0, next = g.lvls[lv];
+    return `<div class="shoprow"><span></span><span>${g.nm}${g.lvls.length > 1 ? ` <span class="muted">(${lv}/${g.lvls.length})</span>` : ''}</span><span class="desc">${g.d}</span><span>${next===undefined ? '<span class="qtag done">owned</span>' : `<button class="btn" ${p.gold >= repPrice(next) ? '' : 'disabled'} onclick="wgBuyCamp('${g.id}')">${repPrice(next)}g</button>`}</span></div>`; }).join('');
+}
+function wgBuyCamp(id){
+  const g = WG_CAMP_GEAR.find(x=>x.id===id), k = wgCamp(), p = G.player; if (!g) return; const lv = k[id]||0, price = g.lvls[lv]; if (price===undefined) return;
+  const cost = repPrice(price); if (p.gold < cost) return; p.gold -= cost; k[id] = lv+1;
+  logMsg(`you buy ${lv ? 'a better ' : 'a '}${g.nm.toLowerCase()} for your camp kit`, 'loot', true); sfx('gold'); renderOverlay(); saveCurrentGame();
+}
+function wgCampMult(){
+  const k = wgCamp(); let m = 1 - 0.18*(k.tent||0);
+  if (k.ward && isNightTime()) m *= 0.55;
+  if (G.owPos && wgWildLevel(G.owPos.x, G.owPos.y)) m *= 1.6;
+  if (G.owPos && wevSecuredAt && G.ow.ev && wevSecuredAt(G.owPos.x, G.owPos.y)) m *= 0.6;
+  return Math.max(0.05, m);
+}
+function wgAfterCamp(){
+  const k = wgCamp(), p = G.player, turn = p.turnCount||0;
+  if (k.bedroll){ p.runEnergy = 100; p.prayPts = rsLvl('prayer'); }
+  if (k.spit && !skFireHere()) skP().fire = { x:G.owPos.x, y:G.owPos.y, until: turn + 80 };
+  p.campPitch = { x:G.owPos.x, y:G.owPos.y, until: turn + 80, tent:k.tent||0, spit:k.spit||0 };
+}
+// ---- the Wilderness takes what you drop ----
+function wgDeathIsWild(){ return !!(G.ow && G.owPos && (G.gameMode===0 || G.gameMode===2) && wgWildLevel(G.owPos.x, G.owPos.y)); }
+// ---- fights won in the wilds' own places ----
+function wgArenaWon(f){
+  if (f.kind==='delve'){ wgDelveWon(f); return false; }
+  if (f.kind==='hunt'){ const p = G.player; skAdd('prime', 1); skAdd('cowhide', 2); (p.wgStat = p.wgStat||{}).hunts = ((p.wgStat||{}).hunts||0) + 1; wevSay('the boar is down - a prime cut and two hides', 'loot'); checkAchievements(); return false; }
+  return false;
+}
+// ---- hunting the wildlife you see in 3D ----
+function wgHunt(a){
+  const w = a.w; if (!w || !w.alive) return;
+  const p = G.player, pp = O3.ppos, d = Math.hypot(w.x - pp.x, w.z - pp.z), ranged = !!(G.gear.weapon && /bow/i.test(G.gear.weapon.basis||'')), reach = ranged ? 7 : 3.2;
+  if (w.k==='bird'){ logMsg('the birds wheel away overhead - you can\'t catch those', ''); return; }
+  if (d > reach){ logMsg(`the ${WG_WILD[w.k].nm} is too far off - get closer${ranged ? '' : ' (a bow lets you hunt from further away)'}`, ''); o3WalkTo({ x:Math.floor(w.x), y:Math.floor(w.z) }); return; }
+  if (w.k==='boar'){ w.alive = false; w.gone = 1; wgState().hunted[w.key] = wevTurn();
+    wevFightStart('hunt', 0, L=>{ const e = Object.assign({}, MONSTER_LEVELS[clampMLevel(L)-1], { nm:'giant boar', sym:'p', rgb:[120,90,80], abilities:[], art:MONSTER_LEVELS[0].art }); wevMon(e, L); });
+    wevSay('the boar squeals and charges!', 'new'); return; }
+  const ch = (ranged ? 0.8 : 0.5) * (w.k==='rabbit' ? 1.1 : 1);
+  if (!chn(ch)){ w.flee = 2.5; logMsg(`you ${ranged ? 'loose an arrow' : 'lunge'} at the ${WG_WILD[w.k].nm} - and miss. It bolts!`, 'miss'); return; }
+  w.alive = false; w.dead = 0; wgState().hunted[w.key] = wevTurn();
+  if (w.k==='deer'){ skAdd('meat', 2); skAdd('cowhide', 1); } else skAdd('meat', 1);
+  (p.wgStat = p.wgStat||{}).hunts = ((p.wgStat||{}).hunts||0) + 1;
+  gainXP(w.k==='deer' ? 25 : 10);
+  logMsg(`you bring down the ${WG_WILD[w.k].nm}: ${w.k==='deer' ? 'two raw meat and a hide' : 'a raw meat'}`, 'loot', true); sfx('gold'); checkAchievements();
+}
+const WG_WILD = {
+  deer:   { nm:'deer',   o:{ head:'elk', fur:'#9a6a42', legs:'long', hoof:true, tail:'stub', tall:1.15, len:1.0, belly:'#d8c0a0' }, h:0.62, flee:4.2, run:3.6 },
+  rabbit: { nm:'rabbit', o:{ head:'rat', fur:'#a89070', legs:'short', tail:'stub', len:0.55, tall:0.75 }, h:0.18, flee:3.0, run:3.4 },
+  boar:   { nm:'boar',   o:{ head:'boar', fur:'#5a4030', legs:'short', hoof:true, tail:'stub', bristle:true }, h:0.42, flee:1.6, run:2.4 },
+  bird:   { nm:'birds',  h:0, flee:3.5, run:5 },
+};
+// ---- drawing: the chart and the maps ----
+// the roads, bridges, ferry routes and the Wilderness, inked into the painted chart (see pmBuild)
+function pmWorldInk(x, P){
+  const W = OW_COLS, H = OW_ROWS, road = G.ow.road; if (!road) return;
+  const isR = (tx, ty)=> tx>=0 && ty>=0 && tx<W && ty<H && (road[ty*W+tx] || G.ow.map[tx][ty]===OW_TOWN);
+  x.save(); x.lineCap = 'round'; x.lineJoin = 'round';
+  // a pale track with an inked dashed centre
+  const segs = [];
+  for (let ty=0; ty<H; ty++) for (let tx=0; tx<W; tx++){ if (!road[ty*W+tx]) continue;
+    for (const [dx,dy] of [[1,0],[0,1],[-1,0],[0,-1]]) if (isR(tx+dx, ty+dy) && (dx>0 || dy>0 || G.ow.map[tx+dx][ty+dy]===OW_TOWN)) segs.push([tx, ty, tx+dx, ty+dy]); }
+  x.strokeStyle = 'rgba(214,190,140,0.95)'; x.lineWidth = Math.max(2, P*0.55); x.beginPath();
+  for (const [a,b,c,d] of segs){ x.moveTo((a+0.5)*P, (b+0.5)*P); x.lineTo((c+0.5)*P, (d+0.5)*P); } x.stroke();
+  x.strokeStyle = 'rgba(96,64,34,0.85)'; x.lineWidth = Math.max(1, P*0.14); x.setLineDash([P*0.5, P*0.35]); x.beginPath();
+  for (const [a,b,c,d] of segs){ x.moveTo((a+0.5)*P, (b+0.5)*P); x.lineTo((c+0.5)*P, (d+0.5)*P); } x.stroke(); x.setLineDash([]);
+  // bridges as little plank spans, fords as stepping stones
+  for (let ty=0; ty<H; ty++) for (let tx=0; tx<W; tx++){ const v = road[ty*W+tx]; if (v<2) continue;
+    const cx = (tx+0.5)*P, cy = (ty+0.5)*P;
+    if (v===4){ x.fillStyle = 'rgba(120,110,96,0.95)'; for (let i=-1;i<=1;i++){ x.beginPath(); x.arc(cx + i*P*0.28, cy + (i%2)*P*0.1, P*0.12, 0, Math.PI*2); x.fill(); } continue; }
+    const horiz = isR(tx-1, ty) || isR(tx+1, ty);
+    x.fillStyle = 'rgba(122,82,44,0.95)'; x.strokeStyle = 'rgba(58,40,24,0.95)'; x.lineWidth = Math.max(1, P*0.08);
+    if (horiz){ x.fillRect(cx - P*0.62, cy - P*0.2, P*1.24, P*0.4); x.strokeRect(cx - P*0.62, cy - P*0.2, P*1.24, P*0.4); } else { x.fillRect(cx - P*0.2, cy - P*0.62, P*0.4, P*1.24); x.strokeRect(cx - P*0.2, cy - P*0.62, P*0.4, P*1.24); }
+    if (v===3){ x.strokeStyle = 'rgba(160,30,20,0.95)'; x.lineWidth = Math.max(1.2, P*0.12); x.beginPath(); x.moveTo(cx - P*0.25, cy - P*0.25); x.lineTo(cx + P*0.25, cy + P*0.25); x.moveTo(cx + P*0.25, cy - P*0.25); x.lineTo(cx - P*0.25, cy + P*0.25); x.stroke(); }
+  }
+  // ferry routes: a dotted line over the water
+  x.strokeStyle = 'rgba(40,60,90,0.75)'; x.lineWidth = Math.max(1, P*0.16); x.setLineDash([P*0.25, P*0.5]);
+  for (const f of G.ow.ferries||[]){ x.beginPath(); x.moveTo((f.a[0]+0.5)*P, (f.a[1]+0.5)*P); x.quadraticCurveTo(((f.a[0]+f.b[0])/2+0.5)*P + P*2, ((f.a[1]+f.b[1])/2+0.5)*P - P*2, (f.b[0]+0.5)*P, (f.b[1]+0.5)*P); x.stroke(); }
+  x.setLineDash([]);
+  // the Wilderness: a dark red wash, a ditch along its edge, and its name
+  const w = G.ow.wild;
+  if (w){ const D = w.depth*P, Wp = W*P, Hp = H*P;
+    const rect = w.side==='north' ? [0,0,Wp,D] : w.side==='south' ? [0,Hp-D,Wp,D] : w.side==='west' ? [0,0,D,Hp] : [Wp-D,0,D,Hp];
+    const g = w.side==='north' ? x.createLinearGradient(0,0,0,D) : w.side==='south' ? x.createLinearGradient(0,Hp,0,Hp-D) : w.side==='west' ? x.createLinearGradient(0,0,D,0) : x.createLinearGradient(Wp,0,Wp-D,0);
+    g.addColorStop(0, 'rgba(110,20,14,0.32)'); g.addColorStop(1, 'rgba(110,20,14,0.10)'); x.fillStyle = g; x.fillRect(...rect);
+    x.strokeStyle = 'rgba(120,20,14,0.85)'; x.lineWidth = Math.max(1.5, P*0.25); x.setLineDash([P*0.9, P*0.5]); x.beginPath();
+    if (w.side==='north'){ x.moveTo(0, D); x.lineTo(Wp, D); } else if (w.side==='south'){ x.moveTo(0, Hp-D); x.lineTo(Wp, Hp-D); } else if (w.side==='west'){ x.moveTo(D, 0); x.lineTo(D, Hp); } else { x.moveTo(Wp-D, 0); x.lineTo(Wp-D, Hp); }
+    x.stroke(); x.setLineDash([]);
+    x.save(); x.fillStyle = 'rgba(120,20,14,0.55)'; x.font = `700 ${Math.round(P*3.2)}px Cinzel, Georgia, serif`; x.textAlign = 'center'; x.textBaseline = 'middle';
+    if ('letterSpacing' in x) x.letterSpacing = Math.round(P*1.2)+'px';
+    if (w.side==='north' || w.side==='south'){ x.fillText('THE WILDERNESS', Wp/2, w.side==='north' ? D*0.45 : Hp - D*0.45); }
+    else { x.translate(w.side==='west' ? D*0.45 : Wp - D*0.45, Hp/2); x.rotate(-Math.PI/2); x.fillText('THE WILDERNESS', 0, 0); }
+    x.restore();
+  }
+  x.restore();
+}
+// a point of interest on the map
+function pmPoiIcon(c, px, py, R, poi, now){
+  const done = wgState().done[poi.id] && ['cave','grotto','ruin','oldcamp'].includes(poi.k), s = R*0.8;
+  c.save(); c.lineJoin = 'round'; c.lineCap = 'round'; c.lineWidth = Math.max(1, s*0.12); c.strokeStyle = '#2a1a0c';
+  c.fillStyle = 'rgba(240,226,190,0.7)'; c.beginPath(); c.ellipse(px, py + s*0.45, s*1.1, s*0.42, 0, 0, Math.PI*2); c.fill();
+  if (done) c.globalAlpha = 0.55;
+  const k = poi.k;
+  if (k==='hamlet'){
+    c.fillStyle = '#e0d0a8'; c.fillRect(px - s*0.95, py - s*0.15, s*0.8, s*0.6); c.strokeRect(px - s*0.95, py - s*0.15, s*0.8, s*0.6);
+    c.fillStyle = '#9a3a24'; c.beginPath(); c.moveTo(px - s*1.05, py - s*0.12); c.lineTo(px - s*0.55, py - s*0.55); c.lineTo(px - s*0.05, py - s*0.12); c.closePath(); c.fill(); c.stroke();
+    c.fillStyle = '#c8b890'; c.beginPath(); c.moveTo(px + s*0.25, py + s*0.45); c.lineTo(px + s*0.4, py - s*0.6); c.lineTo(px + s*0.65, py - s*0.6); c.lineTo(px + s*0.8, py + s*0.45); c.closePath(); c.fill(); c.stroke();
+    const a0 = now*1.2; c.strokeStyle = '#5a3a1a'; c.lineWidth = Math.max(1.2, s*0.16);
+    for (let i=0;i<4;i++){ const a = a0 + i*Math.PI/2; c.beginPath(); c.moveTo(px + s*0.52, py - s*0.6); c.lineTo(px + s*0.52 + Math.cos(a)*s*0.7, py - s*0.6 + Math.sin(a)*s*0.7); c.stroke(); }
+  } else if (k==='view'){
+    c.strokeStyle = '#5a3a1a'; c.lineWidth = Math.max(1.2, s*0.14);
+    c.beginPath(); c.moveTo(px - s*0.4, py + s*0.45); c.lineTo(px - s*0.25, py - s*0.6); c.moveTo(px + s*0.4, py + s*0.45); c.lineTo(px + s*0.25, py - s*0.6); c.moveTo(px - s*0.35, py); c.lineTo(px + s*0.35, py - s*0.3); c.stroke();
+    c.fillStyle = '#8a5a2a'; c.fillRect(px - s*0.42, py - s*0.72, s*0.84, s*0.16); c.strokeStyle = '#2a1a0c'; c.lineWidth = Math.max(1, s*0.1); c.strokeRect(px - s*0.42, py - s*0.72, s*0.84, s*0.16);
+    c.beginPath(); c.moveTo(px, py - s*0.72); c.lineTo(px, py - s*1.2); c.stroke(); c.fillStyle = '#c03020'; c.beginPath(); c.moveTo(px, py - s*1.2); c.lineTo(px + s*0.4, py - s*1.08); c.lineTo(px, py - s*0.96); c.closePath(); c.fill();
+  } else if (k==='cave' || k==='grotto'){
+    c.fillStyle = '#8a8478'; c.beginPath(); c.moveTo(px - s*1.0, py + s*0.45); c.quadraticCurveTo(px - s*0.9, py - s*0.8, px, py - s*0.85); c.quadraticCurveTo(px + s*0.9, py - s*0.8, px + s*1.0, py + s*0.45); c.closePath(); c.fill(); c.stroke();
+    c.fillStyle = '#120c08'; c.beginPath(); c.moveTo(px - s*0.4, py + s*0.45); c.quadraticCurveTo(px, py - s*0.45, px + s*0.4, py + s*0.45); c.closePath(); c.fill();
+    if (k==='grotto'){ c.strokeStyle = 'rgba(120,190,240,0.95)'; c.lineWidth = Math.max(1, s*0.12); for (let i=-1;i<=1;i++){ const o = ((now*0.8 + i*0.3) % 1); c.beginPath(); c.moveTo(px + i*s*0.18, py - s*0.6); c.lineTo(px + i*s*0.18, py - s*0.6 + s*(0.4 + o*0.6)); c.stroke(); } }
+  } else if (k==='ruin'){
+    c.fillStyle = '#b0a898';
+    for (const [ox, h] of [[-0.7, 0.9], [-0.25, 0.55], [0.3, 1.1], [0.75, 0.4]]){ c.fillRect(px + ox*s - s*0.13, py + s*0.45 - h*s, s*0.26, h*s); c.strokeRect(px + ox*s - s*0.13, py + s*0.45 - h*s, s*0.26, h*s); }
+    c.beginPath(); c.moveTo(px - s*0.85, py - s*0.45); c.lineTo(px - s*0.1, py - s*0.25); c.stroke();
+  } else if (k==='stones'){
+    c.fillStyle = '#9a968e';
+    for (const ox of [-0.7, 0, 0.7]){ c.fillRect(px + ox*s - s*0.15, py - s*0.55, s*0.3, s); c.strokeRect(px + ox*s - s*0.15, py - s*0.55, s*0.3, s); }
+    c.fillRect(px - s*0.85, py - s*0.72, s*0.95, s*0.18); c.strokeRect(px - s*0.85, py - s*0.72, s*0.95, s*0.18);
+  } else if (k==='oldcamp'){
+    c.fillStyle = '#9a8060'; c.beginPath(); c.moveTo(px - s*0.9, py + s*0.45); c.lineTo(px - s*0.1, py - s*0.6); c.lineTo(px + s*0.5, py + s*0.45); c.closePath(); c.fill(); c.stroke();
+    c.beginPath(); c.moveTo(px - s*0.1, py - s*0.6); c.lineTo(px + s*0.3, py - s*0.2); c.stroke();
+    c.fillStyle = '#3a3a3a'; c.beginPath(); c.arc(px + s*0.75, py + s*0.35, s*0.2, 0, Math.PI*2); c.fill();
+  } else if (k==='well'){
+    c.fillStyle = '#9a968e'; c.beginPath(); c.ellipse(px, py + s*0.2, s*0.55, s*0.25, 0, 0, Math.PI*2); c.fill(); c.stroke(); c.fillRect(px - s*0.55, py + s*0.2, s*1.1, s*0.3); c.strokeRect(px - s*0.55, py + s*0.2, s*1.1, s*0.3);
+    c.strokeStyle = '#5a3a1a'; c.beginPath(); c.moveTo(px - s*0.45, py + s*0.2); c.lineTo(px - s*0.45, py - s*0.6); c.moveTo(px + s*0.45, py + s*0.2); c.lineTo(px + s*0.45, py - s*0.6); c.stroke();
+    c.fillStyle = '#8a4a2a'; c.beginPath(); c.moveTo(px - s*0.7, py - s*0.5); c.lineTo(px, py - s*0.95); c.lineTo(px + s*0.7, py - s*0.5); c.closePath(); c.fill(); c.stroke();
+  } else if (k==='hermit'){
+    c.fillStyle = '#8a7048'; c.fillRect(px - s*0.55, py - s*0.1, s*1.1, s*0.55); c.strokeRect(px - s*0.55, py - s*0.1, s*1.1, s*0.55);
+    c.fillStyle = '#b09858'; c.beginPath(); c.moveTo(px - s*0.75, py - s*0.05); c.lineTo(px, py - s*0.75); c.lineTo(px + s*0.75, py - s*0.05); c.closePath(); c.fill(); c.stroke();
+    pmSmoke(px + s*0.3, py - s*0.8, s, now, poi.seed % 7 / 7);
+  } else if (k==='ferry'){
+    c.fillStyle = '#7a5230'; c.fillRect(px - s*0.9, py + s*0.15, s*1.4, s*0.2); c.strokeRect(px - s*0.9, py + s*0.15, s*1.4, s*0.2);
+    const bob = Math.sin(now*2 + poi.x)*s*0.06; c.fillStyle = '#6a4a2a'; c.beginPath(); c.moveTo(px + s*0.1, py - s*0.05 + bob); c.lineTo(px + s*1.0, py - s*0.05 + bob); c.lineTo(px + s*0.8, py + s*0.15 + bob); c.lineTo(px + s*0.25, py + s*0.15 + bob); c.closePath(); c.fill(); c.stroke();
+    c.beginPath(); c.moveTo(px + s*0.55, py - s*0.05 + bob); c.lineTo(px + s*0.55, py - s*0.85 + bob); c.stroke(); c.fillStyle = '#f0e6d0'; c.beginPath(); c.moveTo(px + s*0.58, py - s*0.8 + bob); c.lineTo(px + s*0.95, py - s*0.2 + bob); c.lineTo(px + s*0.58, py - s*0.2 + bob); c.closePath(); c.fill(); c.stroke();
+  }
+  c.restore();
+}
+// the close-in icons, names and the route-planner's road names on the world map
+function pmWorldExtras(zx, zy, vc, vr, lod, now){
+  const R = clamp(cellPx*1.0, 10*dpr, 20*dpr);
+  if (mapF('poi')) for (const p of G.ow.pois||[]){
+    if (p.x < zx-2 || p.y < zy-2 || p.x > zx+vc+2 || p.y > zy+vr+2 || !owSeen(p.x, p.y)) continue;
+    const px = (p.x-zx)*cellPx + cellPx/2, py = (p.y-zy)*cellPx + cellPx/2;
+    pmPoiIcon(ctx, px, py, R, p, now);
+    if (lod >= 1 && p.k!=='ferry' && p.k!=='oldcamp' && p.k!=='well'){ ctx.font = `600 italic ${Math.round(clamp(R*0.6, 10*dpr, 13*dpr))}px Georgia, serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+      const nm = cap(p.name); ctx.lineWidth = 3*dpr; ctx.strokeStyle = 'rgba(240,226,190,0.85)'; ctx.strokeText(nm, px, py + R*0.75); ctx.fillStyle = '#3a2410'; ctx.fillText(nm, px, py + R*0.75); }
+  }
+  if (mapF('places') && lod >= 1){ ctx.save(); ctx.font = `600 italic ${Math.round(clamp(cellPx*0.9, 11*dpr, 15*dpr))}px Georgia, serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (const r of G.ow.roads||[]){ if (r.lx < zx || r.ly < zy || r.lx > zx+vc || r.ly > zy+vr || !owSeen(r.lx, r.ly) || r.n < 12) continue;
+      const px = (r.lx-zx)*cellPx + cellPx/2, py = (r.ly-zy)*cellPx + cellPx/2 - cellPx*0.9;
+      ctx.lineWidth = 3*dpr; ctx.strokeStyle = 'rgba(240,226,190,0.8)'; ctx.strokeText(r.name, px, py); ctx.fillStyle = '#6a4020'; ctx.fillText(r.name, px, py); }
+    ctx.restore(); }
+}
+function owPoiAtClient(e){
+  if (!mapF('poi')) return null; const m = owMapPoint(e); if (!m) return null;
+  const R = clamp(owZoomLastCellPx*1.0, 10*dpr, 20*dpr);
+  for (const p of G.ow.pois||[]){ if (!owSeen(p.x, p.y)) continue; const px = (p.x-owZoomLastCam.x)*owZoomLastCellPx + owZoomLastCellPx/2, py = (p.y-owZoomLastCam.y)*owZoomLastCellPx + owZoomLastCellPx/2;
+    if (Math.abs(m.cx-px) < R && Math.abs(m.cy-py) < R) return p; }
+  return null;
+}
+function wgPoiTip(p){
+  const s = wgState(), done = s.done[p.id], what = { hamlet:'a farm on the road - the farmer has a job each day, food to sell and a barn to sleep in', view:'a lookout - climb it to see the land for leagues around', cave:'a cave in the cliffs - something lives inside', grotto:'a grotto behind a waterfall - something lives inside', ruin:'old ruins with a cellar - something guards it', stones:'standing stones - touch them for a blessing, once a day', oldcamp:'an abandoned camp - someone left in a hurry', well:'a wishing well - toss in a coin', hermit:'a hermit who knows the land', ferry:'a ferry across the water' }[p.k] || '';
+  const status = done ? (['cave','grotto','ruin'].includes(p.k) ? 'cleared' : p.k==='view' ? 'climbed' : p.k==='oldcamp' ? 'searched' : p.k==='hermit' ? 'visited' : '') : '';
+  return `<div style="font-weight:600;color:#e8c890">${esc(cap(p.name))}</div><div class="examine">${what}</div>${status ? `<div class="muted">${status}</div>` : ''}<div class="muted">${POI_TITLE[p.k]} &middot; ${wgBandText(wgBand(p.x, p.y))}</div>`;
+}
+// the flat overworld map: the roads and the points of interest
+function wgFlatOverlay(camX, camY, viewCols, viewRows){
+  const road = G.ow.road; if (!road) return;
+  for (let vy=0; vy<viewRows; vy++) for (let vx=0; vx<viewCols; vx++){ const x = camX+vx, y = camY+vy; if (x<0||y<0||x>=OW_COLS||y>=OW_ROWS) continue; const v = road[y*OW_COLS+x]; if (!v) continue;
+    ctx.fillStyle = v===3 ? 'rgba(170,60,40,0.75)' : v===2 ? 'rgba(140,100,60,0.9)' : 'rgba(176,146,98,0.55)';
+    const s = v===2 || v===3 ? 0.8 : 0.42; ctx.fillRect((vx+0.5-s/2)*cellPx, (vy+0.5-s/2)*cellPx, s*cellPx, s*cellPx); }
+  const now = performance.now()/1000;
+  for (const p of G.ow.pois||[]){ const vx = p.x-camX, vy = p.y-camY; if (vx<0||vy<0||vx>=viewCols||vy>=viewRows) continue; pmPoiIcon(ctx, (vx+0.5)*cellPx, (vy+0.5)*cellPx, Math.max(6*dpr, cellPx*0.45), p, now); }
+}
+// the world preview screen: shape, size and a code to share
+function wgPreviewHtml(){
+  const cur = wgContinent();
+  return `<div class="muted" style="margin:0 0 6px;font-size:11px;">SHAPE OF THE WORLD</div>
+    <div class="btnrow" style="justify-content:center;margin-bottom:10px;">${CONTINENT_TYPES.map(c=>`<button class="btn${c.id===cur ? ' primary' : ''}" title="${c.d}" onclick="setContinentType('${c.id}')">${c.label}</button>`).join('')}</div>
+    <div class="muted" style="margin:0 0 10px;font-size:12px;">world code <b style="color:var(--ink);font-family:'JetBrains Mono',monospace;letter-spacing:0.08em;">${worldCode()}</b> <button class="btn" style="padding:2px 8px;" onclick="copyWorldCode()">copy</button>
+      &nbsp; or play a friend's: <input id="worldCodeIn" placeholder="MC-1A2B3C" maxlength="12" style="width:110px;font-family:'JetBrains Mono',monospace;"> <button class="btn" style="padding:2px 8px;" onclick="useWorldCode()">use</button></div>`;
+}
+function wgPreviewMapExtras(c, cellPx){
+  const road = G.ow.road; if (!road) return;
+  c.fillStyle = 'rgba(210,180,120,0.9)';
+  for (let y=0;y<OW_ROWS;y++) for (let x=0;x<OW_COLS;x++) if (road[y*OW_COLS+x]) c.fillRect(x*cellPx + cellPx*0.25, y*cellPx + cellPx*0.25, Math.max(1, cellPx*0.5), Math.max(1, cellPx*0.5));
+  const w = G.ow.wild; if (w){ const D = w.depth*cellPx, Wp = OW_COLS*cellPx, Hp = OW_ROWS*cellPx; c.fillStyle = 'rgba(160,20,10,0.22)';
+    if (w.side==='north') c.fillRect(0,0,Wp,D); else if (w.side==='south') c.fillRect(0,Hp-D,Wp,D); else if (w.side==='west') c.fillRect(0,0,D,Hp); else c.fillRect(Wp-D,0,D,Hp); }
+}
+// the Wilderness level, shown while you're in it
+function wgHudSync(){
+  let el = document.getElementById('wildHud');
+  const wl = G.player && G.ow && G.ow.wild && G.owPos && (G.gameMode===0 || G.gameMode===2) && G.ui==='playing' && !G.owZoomedOut ? wgWildLevel(G.owPos.x, G.owPos.y) : 0;
+  if (!wl){ if (el && el.style.display!=='none') el.style.display = 'none'; return; }
+  if (!el){ el = document.createElement('div'); el.id = 'wildHud'; document.body.appendChild(el); }
+  const txt = `&#9760; Wilderness &middot; Level ${wl}`; if (el.dataset.t !== txt){ el.dataset.t = txt; el.innerHTML = txt; }
+  if (el.style.display !== 'block') el.style.display = 'block';
+}
+// ---- 3D: roads, bridges, ferry landings and the points of interest ----
+function o3WgMat(k, col, o){ O3.wgMats = O3.wgMats || {}; return O3.wgMats[k] || (O3.wgMats[k] = o3Mat(col, Object.assign({ flatShading:true }, o||{}))); }
+function o3Roads(grp, x0, y0, W){
+  const T = THREE, road = G.ow.road; if (!road) return;
+  const isR = (x, y)=> x>=0 && y>=0 && x<OW_COLS && y<OW_ROWS && (road[y*OW_COLS+x]===1 || road[y*OW_COLS+x]===4 || G.ow.map[x][y]===OW_TOWN || (G.ow.pois||[]).some(p=>p.k==='ferry' && p.x===x && p.y===y));
+  const pos = [], hw = 0.2, add = (ax, az, bx, bz)=>{
+    const dx = bx-ax, dz = bz-az, L = Math.hypot(dx, dz), nx = -dz/L*hw, nz = dx/L*hw, n = 4;
+    for (let i=0;i<n;i++){ const f0 = i/n, f1 = (i+1)/n, p0x = ax + dx*f0, p0z = az + dz*f0, p1x = ax + dx*f1, p1z = az + dz*f1;
+      const h0a = O3.heightAt(p0x+nx, p0z+nz)+0.03, h0b = O3.heightAt(p0x-nx, p0z-nz)+0.03, h1a = O3.heightAt(p1x+nx, p1z+nz)+0.03, h1b = O3.heightAt(p1x-nx, p1z-nz)+0.03;
+      pos.push(p0x+nx, h0a, p0z+nz, p0x-nx, h0b, p0z-nz, p1x+nx, h1a, p1z+nz,  p1x+nx, h1a, p1z+nz, p0x-nx, h0b, p0z-nz, p1x-nx, h1b, p1z-nz); } };
+  for (let x=Math.floor(x0); x<x0+W; x++) for (let y=Math.floor(y0); y<y0+W; y++){
+    const v = wgRoadAt(x, y); if (!(v===1 || v===4)) continue;
+    for (const [dx,dy] of [[1,0],[0,1],[-1,0],[0,-1]]){ const nx = x+dx, ny = y+dy, nv = wgRoadAt(nx, ny);
+      if ((dx>0 || dy>0) && isR(nx, ny)) add(x+0.5, y+0.5, nx+0.5, ny+0.5);
+      else if ((dx<0 || dy<0) && G.ow.map[nx] && G.ow.map[nx][ny]===OW_TOWN) add(x+0.5, y+0.5, nx+0.5, ny+0.5);
+      if (nv===2 || nv===3) add(x+0.5, y+0.5, x+0.5+dx*0.5, y+0.5+dy*0.5); }
+    // a round patch at each joint so corners don't show gaps
+    for (let i=0;i<8;i++){ const a0 = i/8*Math.PI*2, a1 = (i+1)/8*Math.PI*2, cx = x+0.5, cz = y+0.5, h = O3.heightAt(cx, cz)+0.032;
+      pos.push(cx, h, cz, cx+Math.cos(a1)*hw, O3.heightAt(cx+Math.cos(a1)*hw, cz+Math.sin(a1)*hw)+0.032, cz+Math.sin(a1)*hw, cx+Math.cos(a0)*hw, O3.heightAt(cx+Math.cos(a0)*hw, cz+Math.sin(a0)*hw)+0.032, cz+Math.sin(a0)*hw); }
+  }
+  if (!pos.length) return;
+  const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); geo.computeVertexNormals();
+  const mat = new T.MeshStandardMaterial({ color:new T.Color('#8a7252').convertSRGBToLinear(), roughness:1, side:T.DoubleSide, polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2 });
+  const mesh = new T.Mesh(geo, mat); mesh.receiveShadow = true; grp.add(mesh);
+  // bridges and fords
+  const plank = o3WgMat('plank', '#7a5634'), post = o3WgMat('post', '#4a3420'), stone = o3WgMat('ford', '#8a8478');
+  for (const b of G.ow.bridges||[]) for (const [bx, by] of b.tiles){
+    if (bx < x0 || by < y0 || bx >= x0+W || by >= y0+W) continue;
+    const broken = !!b.broken && !wgState().fixed[b.id], horiz = isR(bx-1, by) || isR(bx+1, by) || wgRoadAt(bx-1, by) || wgRoadAt(bx+1, by), g = new T.Group();
+    g.position.set(bx+0.5, 0.06, by+0.5); if (!horiz) g.rotation.y = Math.PI/2; grp.add(g);
+    if (broken){ const a = new T.Mesh(new T.BoxGeometry(0.38, 0.06, 0.42), plank); a.position.x = -0.36; g.add(a); const c = new T.Mesh(new T.BoxGeometry(0.34, 0.06, 0.42), plank); c.position.set(0.36, -0.12, 0.02); c.rotation.z = 0.35; g.add(c); }
+    else { const d = new T.Mesh(new T.BoxGeometry(1.08, 0.06, 0.42), plank); d.castShadow = true; d.receiveShadow = true; g.add(d);
+      for (const z of [-0.2, 0.2]){ const r = new T.Mesh(new T.BoxGeometry(1.08, 0.03, 0.03), post); r.position.set(0, 0.2, z); g.add(r); for (const x of [-0.5, 0, 0.5]){ const p = new T.Mesh(new T.BoxGeometry(0.04, 0.22, 0.04), post); p.position.set(x, 0.1, z); g.add(p); } } }
+    for (const x of [-0.55, 0.55]) for (const z of [-0.2, 0.2]){ const p = new T.Mesh(new T.CylinderGeometry(0.04, 0.05, 0.6, 6), post); p.position.set(x, -0.2, z); g.add(p); }
+  }
+  for (let x=Math.floor(x0); x<x0+W; x++) for (let y=Math.floor(y0); y<y0+W; y++){ if (wgRoadAt(x, y)!==4 || G.ow.map[x][y]!==OW_RIVER) continue;
+    for (let i=0;i<5;i++){ const s = new T.Mesh(new T.DodecahedronGeometry(0.09, 0), stone); s.position.set(x+0.5 + (i-2)*0.2 + (o3Hash(x,y,i)-0.5)*0.08, -0.12, y+0.5 + (o3Hash(x,y,i+9)-0.5)*0.3); s.scale.y = 0.6; grp.add(s); } }
+}
+function o3PoiModel(p){
+  const T = THREE, g = new T.Group(), M = (k, c, o)=> o3WgMat(k, c, o), anim = {};
+  const box = (w, h, d, mat, x, y, z)=>{ const m = new T.Mesh(new T.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; g.add(m); return m; };
+  const cyl = (r0, r1, h, mat, x, y, z, seg)=>{ const m = new T.Mesh(new T.CylinderGeometry(r0, r1, h, seg||8), mat); m.position.set(x, y, z); m.castShadow = true; g.add(m); return m; };
+  if (p.k==='hamlet'){
+    box(0.62, 0.36, 0.44, M('wall', '#d8c8a0'), -0.28, 0.18, 0.1); const roof = o3Gable(0.72, 0.5, 0.3, M('roofr', '#9a3a24')); roof.position.set(-0.28, 0.36, 0.1); g.add(roof);
+    cyl(0.11, 0.17, 0.85, M('mill', '#c8b890'), 0.38, 0.42, -0.18); cyl(0.0, 0.14, 0.18, M('millcap', '#7a4a2a'), 0.38, 0.93, -0.18);
+    const sails = new T.Group(); sails.position.set(0.38, 0.78, -0.02); g.add(sails); anim.sails = sails;
+    for (let i=0;i<4;i++){ const s = new T.Mesh(new T.BoxGeometry(0.06, 0.42, 0.015), M('sail', '#e8dcc0')); s.position.y = 0.21; const a = new T.Group(); a.rotation.z = i*Math.PI/2; a.add(s); sails.add(a); }
+    for (const [x, z, c] of [[0.2, 0.42, '#7a9a3a'], [-0.35, -0.38, '#c8a848']]){ const f = new T.Mesh(new T.PlaneGeometry(0.5, 0.32), M('field'+c, c)); f.rotation.x = -Math.PI/2; f.position.set(x, 0.03, z); g.add(f); }
+  } else if (p.k==='view'){
+    const wood = M('tower', '#6a4a2a');
+    for (const [x, z] of [[-0.18,-0.18],[0.18,-0.18],[-0.18,0.18],[0.18,0.18]]){ const m = cyl(0.03, 0.04, 1.4, wood, x, 0.7, z, 5); m.rotation.set(-z*0.08, 0, x*0.08); }
+    box(0.5, 0.05, 0.5, M('deck', '#8a5a2a'), 0, 1.4, 0); const r = new T.Mesh(new T.ConeGeometry(0.36, 0.32, 4), M('troof', '#5a3a1a')); r.position.y = 1.72; r.rotation.y = Math.PI/4; g.add(r);
+    const flag = new T.Mesh(new T.PlaneGeometry(0.22, 0.12), M('flag', '#c03020', { side:T.DoubleSide })); flag.position.set(0.11, 1.98, 0); g.add(flag); cyl(0.01, 0.01, 0.3, wood, 0, 1.94, 0, 4); anim.flag = flag;
+  } else if (p.k==='cave' || p.k==='grotto'){
+    const rock = new T.Mesh(new T.DodecahedronGeometry(0.55, 1), M('cliff', '#7a766e')); rock.scale.set(1.2, 0.85, 0.9); rock.position.set(0, 0.32, -0.15); rock.castShadow = true; g.add(rock);
+    const mouth = new T.Mesh(new T.CircleGeometry(0.2, 14, 0, Math.PI), new T.MeshBasicMaterial({ color:0x080604 })); mouth.position.set(0, 0.02, 0.33); g.add(mouth);
+    if (p.k==='grotto'){ const fall = new T.Mesh(new T.PlaneGeometry(0.42, 0.62), new T.MeshStandardMaterial({ color:new T.Color('#9ad0f0').convertSRGBToLinear(), transparent:true, opacity:0.65, roughness:0.1 })); fall.position.set(0, 0.32, 0.36); g.add(fall); anim.fall = fall;
+      const foam = o3Glow('rgba(230,245,255,1)', 0.5); foam.position.set(0, 0.06, 0.42); g.add(foam); }
+  } else if (p.k==='ruin'){
+    const st = M('ruin', '#a8a090');
+    for (const [x, z, h] of [[-0.35,-0.25,0.7],[-0.05,-0.3,0.35],[0.3,-0.2,0.85],[0.35,0.25,0.25]]) cyl(0.07, 0.08, h, st, x, h/2, z, 8);
+    box(0.5, 0.22, 0.1, st, -0.1, 0.11, 0.3); box(0.2, 0.12, 0.2, st, 0.05, 0.06, 0.05).rotation.y = 0.5;
+    const stairs = new T.Mesh(new T.PlaneGeometry(0.22, 0.22), new T.MeshBasicMaterial({ color:0x0a0806 })); stairs.rotation.x = -Math.PI/2; stairs.position.set(0.05, 0.03, -0.02); g.add(stairs);
+  } else if (p.k==='stones'){
+    const st = M('stone', '#8e8a82');
+    for (let i=0;i<7;i++){ const a = i/7*Math.PI*2, m = box(0.12, 0.42 + (i%3)*0.08, 0.08, st, Math.cos(a)*0.4, 0.22, Math.sin(a)*0.4); m.rotation.y = -a; }
+    box(0.34, 0.07, 0.1, st, 0.38, 0.52, 0.04).rotation.y = Math.PI/2.4;
+    const gl = o3Glow('rgba(170,220,255,1)', 0.5); gl.position.y = 0.25; g.add(gl); anim.glow = gl;
+  } else if (p.k==='oldcamp'){
+    const t = new T.Mesh(new T.ConeGeometry(0.32, 0.45, 4), M('oldtent', '#8a7458')); t.position.set(-0.1, 0.16, 0); t.rotation.set(0.3, 0.5, 0.35); t.castShadow = true; g.add(t);
+    for (let i=0;i<7;i++){ const a = i/7*Math.PI*2, s = new T.Mesh(new T.DodecahedronGeometry(0.04, 0), M('pit', '#4a4844')); s.position.set(0.3 + Math.cos(a)*0.12, 0.02, 0.2 + Math.sin(a)*0.12); g.add(s); }
+    cyl(0.07, 0.07, 0.16, M('barrel', '#6a4a2a'), 0.3, 0.08, -0.25, 8);
+  } else if (p.k==='well'){
+    const st = M('wellst', '#8e8a82'); const ring = new T.Mesh(new T.CylinderGeometry(0.2, 0.22, 0.24, 14, 1, true), st); ring.position.y = 0.12; g.add(ring);
+    const water = new T.Mesh(new T.CircleGeometry(0.19, 14), M('wellw', '#2a4a6a')); water.rotation.x = -Math.PI/2; water.position.y = 0.08; g.add(water);
+    for (const x of [-0.2, 0.2]) cyl(0.02, 0.02, 0.5, M('post', '#4a3420'), x, 0.25, 0, 5);
+    const roof = o3Gable(0.55, 0.32, 0.2, M('wroof', '#8a4a2a')); roof.position.y = 0.5; roof.rotation.y = Math.PI/2; g.add(roof);
+  } else if (p.k==='hermit'){
+    box(0.44, 0.3, 0.38, M('hut', '#7a6040'), 0, 0.15, 0); const r = new T.Mesh(new T.ConeGeometry(0.38, 0.34, 6), M('thatch', '#b09858')); r.position.y = 0.46; r.castShadow = true; g.add(r);
+    const door = new T.Mesh(new T.PlaneGeometry(0.12, 0.2), new T.MeshBasicMaterial({ color:0x1a1008 })); door.position.set(0, 0.1, 0.195); g.add(door);
+    anim.smoke = [0.12, 0.62, -0.05];
+  } else if (p.k==='ferry'){
+    // the pier runs out over the water; a little ferry bobs at its end
+    let wd = [0, 1]; for (const [dx,dy] of [[0,1],[1,0],[0,-1],[-1,0]]) if (G.ow.map[p.x+dx] && G.ow.map[p.x+dx][p.y+dy]===OW_WATER){ wd = [dx, dy]; break; }
+    const yaw = Math.atan2(wd[0], wd[1]), pier = new T.Group(); pier.rotation.y = yaw; g.add(pier);
+    const deck = new T.Mesh(new T.BoxGeometry(0.34, 0.05, 1.3), M('plank', '#7a5634')); deck.position.set(0, 0.04, 0.55); pier.add(deck);
+    for (const z of [0.2, 0.7, 1.15]) for (const x of [-0.15, 0.15]){ const m = new T.Mesh(new T.CylinderGeometry(0.03, 0.03, 0.4, 5), M('post', '#4a3420')); m.position.set(x, -0.1, z); pier.add(m); }
+    const boat = new T.Group(); boat.position.set(0.42, -0.1, 1.05); pier.add(boat); anim.boat = boat;
+    const hull = new T.Mesh(new T.BoxGeometry(0.3, 0.12, 0.7), M('hull', '#5a3a1e')); boat.add(hull);
+    const mast = new T.Mesh(new T.CylinderGeometry(0.015, 0.015, 0.6, 4), M('post', '#4a3420')); mast.position.y = 0.3; boat.add(mast);
+    const sail = new T.Mesh(new T.PlaneGeometry(0.3, 0.38), M('sailc', '#ece2cc', { side:T.DoubleSide })); sail.position.set(0, 0.36, 0.02); sail.rotation.y = Math.PI/2; boat.add(sail);
+  }
+  return { g, anim };
+}
+function o3SyncPOIs(){
+  const T = THREE; if (!O3.win || !G.ow.pois) return;
+  const key = O3.win.cx+','+O3.win.cy+'|'+Object.keys(wgState().fixed).join(',')+'|'+G.ow.seed;
+  if (!O3.wgGrp) O3.wgGrp = new T.Group();
+  if (O3.wgGrp.parent !== O3.scene) O3.scene.add(O3.wgGrp);
+  if (key !== O3.wgKey){
+    O3.wgKey = key; const g = O3.wgGrp;
+    while (g.children.length){ const c = g.children[0]; g.remove(c); c.traverse(o=>{ if (o.geometry) o.geometry.dispose(); }); }
+    if (O3.wgSm) O3.smoke = O3.smoke.filter(s=>!O3.wgSm.includes(s));
+    O3.wgSm = []; O3.wgHits = []; O3.wgAnim = [];
+    const x0 = O3.win.cx - O3_W/2, y0 = O3.win.cy - O3_W/2;
+    o3Roads(g, x0, y0, O3_W);
+    const hitM = O3.nodeHitM || (O3.nodeHitM = new T.MeshBasicMaterial({ visible:false }));
+    for (const p of G.ow.pois){
+      if (Math.abs(p.x+0.5-O3.win.cx) > O3_W/2-1 || Math.abs(p.y+0.5-O3.win.cy) > O3_W/2-1) continue;
+      const { g:pg, anim } = o3PoiModel(p), gx = p.x+0.5, gz = p.y+0.5; pg.position.set(gx, Math.max(O3.heightAt(gx, gz), -0.1), gz); pg.rotation.y = p.k==='ferry' ? 0 : o3Hash(p.x, p.y, 77)*0.6 - 0.3; g.add(pg);
+      if (anim.smoke){ const s = { p:[gx+anim.smoke[0], pg.position.y+anim.smoke[1], gz+anim.smoke[2]], t:0 }; O3.smoke.push(s); O3.wgSm.push(s); }
+      O3.wgAnim.push(anim);
+      const hb = new T.Mesh(new T.BoxGeometry(0.9, 1.2, 0.9), hitM); hb.position.set(gx, pg.position.y + 0.5, gz); hb.userData.act = { kind:'poi', id:p.id, x:p.x, y:p.y }; g.add(hb); O3.wgHits.push(hb);
+    }
+  }
+  for (const a of O3.wgAnim||[]){
+    if (a.sails) a.sails.rotation.z = O3.t*0.9;
+    if (a.flag) a.flag.rotation.y = Math.sin(O3.t*3)*0.3;
+    if (a.boat){ a.boat.position.y = -0.1 + Math.sin(O3.t*1.8)*0.025; a.boat.rotation.z = Math.sin(O3.t*1.3)*0.05; }
+    if (a.glow) a.glow.material.opacity = 0.5 + Math.sin(O3.t*1.5)*0.3;
+    if (a.fall && a.fall.material.map) a.fall.material.map.offset.y = O3.t*0.5;
+  }
+}
+// the rarer biomes' plants and stones (see o3Vegetation); true when the tile's been handled
+function wgVegVariant(put, x, y, t, bv, h){
+  if (t===OW_WATER || t===OW_RIVER || OW_SITE_TILES.includes(t) || t===OW_MOUNTAIN) return false;
+  if (bv===1){ if (h(1)<0.12) put.push(['dead', x+0.2+h(3)*0.6, y+0.2+h(4)*0.6, 0.7+h(5)*0.4, h(6)*6.28, 0.1]); else if (h(1)<0.3) put.push(['rock', x+h(3), y+h(4), 0.5+h(5)*0.7, h(6)*6.28, 0.2]); else if (h(1)<0.38) put.push(['lava', x+0.5, y+0.5, 0.8+h(5)*0.8, h(6)*6.28, 0.5]); return true; }
+  if (bv===2){ const n = t===OW_FOREST ? 3 : 1; for (let k=0;k<n;k++) if (t===OW_FOREST || h(1)<0.4) put.push([h(20+k)<0.5 ? 'palm' : 'jtree', x+0.15+h(30+k)*0.7, y+0.15+h(40+k)*0.7, 0.8+h(50+k)*0.5, h(60+k)*6.28, h(70+k)]); if (h(11)<0.6) put.push(['bush', x+h(12), y+h(13), 0.9+h(14)*0.6, h(15)*6.28, h(16)]); return true; }
+  if (bv===3){ const n = t===OW_FOREST ? 3 : t===OW_SWAMP ? 1 : (h(1)<0.2 ? 1 : 0); for (let k=0;k<n;k++) put.push([h(20+k)<0.65 ? 'dead' : 'willow', x+0.15+h(30+k)*0.7, y+0.15+h(40+k)*0.7, 0.8+h(50+k)*0.5, h(60+k)*6.28, h(70+k)*0.4]); return true; }
+  if (bv===4){ if (h(1)<0.18) put.push(['snowpine', x+0.2+h(3)*0.6, y+0.2+h(4)*0.6, 0.7+h(5)*0.4, h(6)*6.28, h(7)]); else if (h(1)<0.4) put.push(['rock', x+h(3), y+h(4), 0.5+h(5)*0.7, h(6)*6.28, h(7)]); return true; }
+  if (bv===5){ if (h(1)<0.3) put.push(['crystal', x+0.2+h(3)*0.6, y+0.2+h(4)*0.6, 0.6+h(5)*0.8, h(6)*6.28, h(7)]); else if (h(1)<0.42) put.push(['rock', x+h(3), y+h(4), 0.4+h(5)*0.5, h(6)*6.28, h(7)]); return true; }
+  return false;
+}
+function wgO3Col(px, pz, gt){ const b = wgBioAt(px, pz); if (!b || gt===OW_WATER || gt===OW_RIVER) return null; return BIO[b].rgb; }
+// ---- wildlife in 3D ----
+function o3Wildlife(dt){
+  const T = THREE, pp = O3.ppos; if (!pp || !O3.win || !G.ow.map) return;
+  const turn = wevTurn(), key = O3.win.cx+','+O3.win.cy+'|'+Math.floor(turn/DAY_LENGTH)+'|'+G.ow.seed;
+  if (!O3.wildGrp){ O3.wildGrp = new T.Group(); }
+  if (O3.wildGrp.parent !== O3.scene) O3.scene.add(O3.wildGrp);
+  if (O3.wildKey !== key){
+    O3.wildKey = key; const g = O3.wildGrp; while (g.children.length) g.remove(g.children[0]);
+    O3.wild = []; O3.wildHits = [];
+    const x0 = O3.win.cx - O3_W/2 + 2, y0 = O3.win.cy - O3_W/2 + 2, day = Math.floor(turn/DAY_LENGTH), hunted = wgState().hunted, sd = (G.ow.seed % 997) + day*13;
+    const hitM = O3.nodeHitM || (O3.nodeHitM = new T.MeshBasicMaterial({ visible:false }));
+    const cand = [];   // every tile that could hold animals, nearest first, so the ones you see are the ones around you
+    for (let x=x0; x<x0+O3_W-4; x++) for (let y=y0; y<y0+O3_W-4; y++) cand.push([x, y, Math.hypot(x-G.owPos.x, y-G.owPos.y)]);
+    cand.sort((a,b)=>a[2]-b[2]);
+    for (const [x, y] of cand){
+      if (O3.wild.length >= 28) break;
+      const t = o3Tile(x, y); if (t!==OW_FOREST && t!==OW_GRASS) continue;
+      const bv = wgBioAt(x, y); if (bv===1 || bv===5) continue; if (wgRoadAt(x, y) || wgPoiAt(x, y)) continue;
+      const h = o3Hash(x, y, sd + 901);
+      const k = t===OW_FOREST && h < 0.005 ? 'deer' : t===OW_GRASS && h < 0.006 ? 'rabbit' : t===OW_FOREST && h >= 0.005 && h < 0.0075 ? 'boar' : h >= 0.02 && h < 0.0222 ? 'bird' : null;
+      if (!k) continue;
+      const hk = x+','+y+':'+k; if (hunted[hk] !== undefined && turn - hunted[hk] < DAY_LENGTH) continue;
+      const n = k==='deer' ? 2 + Math.floor(o3Hash(x,y,903)*3) : k==='rabbit' ? 1 + Math.floor(o3Hash(x,y,904)*3) : k==='boar' ? 1 + (o3Hash(x,y,905) < 0.4 ? 1 : 0) : 1;
+      for (let i=0;i<n;i++){
+        const w = { k, key:hk, hx:x+0.5, hz:y+0.5, x:x+0.5 + (o3Hash(x,y,910+i)-0.5)*1.4, z:y+0.5 + (o3Hash(x,y,920+i)-0.5)*1.4, tx:0, tz:0, idle:Math.random()*3, alive:true, flee:0, yaw:Math.random()*6.28, ph:Math.random()*6 };
+        if (k==='bird'){
+          const fl = new T.Group(); w.birds = [];
+          for (let b=0;b<6;b++){ const bm = new T.Group(); const wingG = new T.PlaneGeometry(0.16, 0.05); const wm = o3WgMat('bird', '#2a2420', { side:T.DoubleSide });
+            const l = new T.Mesh(wingG, wm), r = new T.Mesh(wingG, wm); l.position.x = -0.08; r.position.x = 0.08; bm.add(l); bm.add(r); fl.add(bm); w.birds.push({ g:bm, l, r, a:b/6*Math.PI*2, rr:0.6 + (b%3)*0.25 }); }
+          w.e = { holder:fl }; g.add(fl); w.alt = 2.2 + Math.random();
+        } else {
+          const spec = WG_WILD[k], e = m3dInstance({ nm:spec.nm }, { paint:mpBeast, o:spec.o, h:1 });
+          e.holder.scale.multiplyScalar(spec.h / Math.max(0.05, e.H)); w.e = e; g.add(e.holder);
+          const hb = new T.Mesh(new T.BoxGeometry(0.6/ (spec.h / Math.max(0.05, e.H)), 0.8/ (spec.h / Math.max(0.05, e.H)), 0.6/ (spec.h / Math.max(0.05, e.H))), hitM); hb.position.y = 0.3 / (spec.h / Math.max(0.05, e.H));
+          hb.userData.act = { kind:'wild', w }; e.holder.add(hb); O3.wildHits.push(hb);
+        }
+        O3.wild.push(w);
+      }
+    }
+  }
+  const tt = O3.t;
+  for (const w of O3.wild||[]){
+    const e = w.e; if (!e) continue;
+    if (!w.alive){ if (w.dead===undefined) w.dead = 0; w.dead += dt; e.holder.rotation.z = Math.min(Math.PI/2, w.dead*3); if (w.dead > 2.5) e.holder.visible = false; continue; }
+    const spec = WG_WILD[w.k], d = Math.hypot(w.x-pp.x, w.z-pp.z);
+    if (w.k==='bird'){
+      if (d < spec.flee && !w.flee){ w.flee = 6; }
+      if (w.flee){ w.flee -= dt; w.alt += dt*1.5; w.x += Math.cos(w.ph)*dt*spec.run; w.z += Math.sin(w.ph)*dt*spec.run; if (w.flee <= 0){ w.flee = 0; w.x = w.hx; w.z = w.hz; w.alt = 2.4; } }
+      e.holder.position.set(w.x, Math.max(O3.heightAt(w.x, w.z), 0) + w.alt, w.z);
+      for (const b of w.birds){ const a = b.a + tt*0.6; b.g.position.set(Math.cos(a)*b.rr, Math.sin(tt*1.3 + b.a)*0.15, Math.sin(a)*b.rr); b.g.rotation.y = -a; const f = Math.sin(tt*14 + b.a*3)*0.7; b.l.rotation.z = f; b.r.rotation.z = -f; }
+      continue;
+    }
+    let speed = 0;
+    if (d < spec.flee && w.k!=='boar'){ w.flee = 2.5; }
+    if (w.flee > 0){ w.flee -= dt; const ax = w.x-pp.x, az = w.z-pp.z, L = Math.hypot(ax, az) || 1; w.tx = w.x + ax/L*3; w.tz = w.z + az/L*3; speed = spec.run; }
+    else { w.idle -= dt; if (w.idle <= 0){ w.idle = 2 + Math.random()*4; const a = Math.random()*6.28, r = Math.random()*2.5; w.tx = w.hx + Math.cos(a)*r; w.tz = w.hz + Math.sin(a)*r; } speed = Math.hypot(w.tx-w.x, w.tz-w.z) > 0.08 ? 0.55 : 0; }
+    if (speed){
+      const dx = w.tx-w.x, dz = w.tz-w.z, L = Math.hypot(dx, dz);
+      if (L > 0.05){ const st = Math.min(L, speed*dt), nx = w.x + dx/L*st, nz = w.z + dz/L*st, tl = o3Tile(Math.floor(nx), Math.floor(nz));
+        if (tl!==OW_WATER && tl!==OW_MOUNTAIN && Math.hypot(nx-w.hx, nz-w.hz) < 9){ w.x = nx; w.z = nz; } else { w.tx = w.hx; w.tz = w.hz; }
+        w.yaw = Math.atan2(dx, dz); } else speed = 0;
+    }
+    e.holder.position.set(w.x, Math.max(O3.heightAt(w.x, w.z), -0.1), w.z); e.holder.rotation.y = w.yaw;
+    const r = e.rig, gait = speed > 1 ? 12 : 6, amp = speed ? (speed > 1 ? 0.7 : 0.35) : 0;
+    if (r && r.legs) r.legs.forEach((l, i)=>{ l.hip.rotation.x = Math.sin(tt*gait + w.ph + (i%2 ? Math.PI : 0) + (l.fz>0 ? 0 : Math.PI/2))*amp; });
+    if (r && r.neck) r.neck.rotation.x = speed ? 0 : 0.5 + Math.sin(tt*0.8 + w.ph)*0.15;   // grazing
+    if (r && r.body) r.body.position.y += 0;
+  }
+}
+
+// the Wilderness pays well: extra gold (and sometimes an item) for every fight won there
+function wgWildWin(){
+  if (!G.ow || !G.ow.wild || !G.owPos) return; const wl = wgWildLevel(G.owPos.x, G.owPos.y); if (!wl) return;
+  const p = G.player, gold = roundH((10 + wl*6)*goldFindMult()); p.gold += gold; let extra = '';
+  if (chn(0.15 + wl*0.01)){ const it = genItem(mn(NMLVL, lootLevel()+2)+playerMF(), lootKind(), 3, chn(0.5)); addToInventory(it); extra = ` and ${itemNameHtml(it)}`; }
+  logMsg(`the Wilderness pays well: ${gold} extra gold${extra}`, 'loot');
+}
+// the route planner's path: along the roads where it can, round sites, never through water you can't sail
+function wgRoutePath(sx, sy, tx, ty){
+  if (sx===tx && sy===ty) return [];
+  const W = OW_COLS, goal = ty*W+tx, src = sy*W+sx;
+  const cost = (x, y, n)=>{ if (!o3Passable(x, y)) return Infinity; if (n!==goal && OW_SITE_TILES.includes(G.ow.map[x][y])) return Infinity;
+    const k = wgRoadKind(x, y); return k===1 || k===2 || k===4 ? 1 : k===3 ? 3 : G.ow.map[x][y]===OW_RIVER ? 4 : 2.2; };
+  const { prev } = wgDijkstra(src, cost, new Set([goal]));
+  if (prev[goal] < 0) return null;
+  const out = []; for (let c = goal; c!==src && c!==-1; c = prev[c]) out.push(c);
+  return out.reverse();
+}
+// walk to a town (or anywhere) along the roads
+function wgWalkTo(x, y){
+  if (G.gameMode!==0){ notify('You can only set off from the overworld', 'warn'); return; }
+  G.player.route = { pts:[[x, y]] }; setUi('playing');
+  const r = routeInfo(); if (!r || !r.steps){ G.player.route = null; notify("There's no way to walk there from here", 'warn'); return; }
+  G.owZoomedOut = true; routeGo();
+}
+// ---- the travel log's section on the land ----
+function wgLogHtml(){
+  if (!G.ow || !G.ow.pois) return '';
+  const s = wgState(), here = wgArea(G.owPos.x, G.owPos.y), found = (G.ow.pois||[]).filter(p=>p.k!=='ferry' && (s.found.includes(p.id) || owSeen(p.x, p.y)));
+  const byK = {}; for (const p of found) byK[p.k] = (byK[p.k]||0) + 1;
+  const total = {}; for (const p of G.ow.pois) if (p.k!=='ferry') total[p.k] = (total[p.k]||0) + 1;
+  const bridges = (G.ow.bridges||[]).filter(b=>b.broken), fixedN = bridges.filter(b=>s.fixed[b.id]).length;
+  return `<h4 style="color:var(--ink-faint);margin:12px 0 6px;">THE LAND</h4>
+    <div style="font-size:13px;line-height:1.7;">
+      <div>You are in <b>${esc(here.name)}</b> &middot; recommended ${wgBandText(here.band)}${here.wild ? ` &middot; <b style="color:#ff6a50">Wilderness level ${here.wild}</b>` : ''}</div>
+      <div>World code <b style="font-family:'JetBrains Mono',monospace;">${worldCode()}</b> &middot; ${esc((CONTINENT_TYPES.find(c=>c.id===wgContinent())||{}).label||'')} &middot; share it to play the same world</div>
+      <div>Roads ${(G.ow.roads||[]).length} &middot; broken bridges mended ${fixedN} / ${bridges.length} &middot; ferries ${(G.ow.ferries||[]).length}</div>
+      <div class="muted" style="font-size:12px;">${Object.keys(total).map(k=>`${POI_TITLE[k]} ${byK[k]||0}/${total[k]}`).join(' &middot; ')}</div>
+      ${s.lore.length ? `<div class="muted" style="font-size:12px;margin-top:4px;">Lore found: ${s.lore.map(l=>`<div>&ldquo;${esc(l)}&rdquo;</div>`).join('')}</div>` : ''}
+    </div>`;
+}
+
 function renderGame(){
   syncGrid();
   mapToolsSync();
+  wgHudSync();
   if (G.ui==='playing') checkLowHp(); else if (LOWHP.on) lowHpFx(1);
   queueMicrotask(renderBuffBar); // after this render, so it can sit under the fresh player plate
   queueMicrotask(hudLayout);
@@ -23669,7 +24635,7 @@ function o3Build(cx, cy){
     let h = 0, r = 0, g = 0, b = 0, mtn = 0, snowy = 0, desert = 0;
     for (const [px,pz,w] of ws){
       h += tileH(px,pz)*w;
-      const gt = o3Ground(px,pz), c = O3_COL[gt] || O3_COL[OW_GRASS];
+      const gt = o3Ground(px,pz), c = wgO3Col(px,pz,gt) || O3_COL[gt] || O3_COL[OW_GRASS];
       r += c[0]*w; g += c[1]*w; b += c[2]*w;
       if (gt===OW_MOUNTAIN) mtn += w; if (gt===OW_TUNDRA) snowy += w; if (gt===OW_DESERT) desert += w;
     }
@@ -23725,6 +24691,8 @@ function o3Vegetation(grp, x0, y0, W){
   for (let x=x0; x<x0+W; x++) for (let y=y0; y<y0+W; y++){
     const t = o3Tile(x,y), h = (s)=> o3Hash(x,y,s), nd = skNodeStatic(x,y), treeNode = !!(nd && nd.k==='woodcutting');
     if (treeNode){ if (h(11)<0.5) put.push(['bush', x+h(12), y+h(13), 0.5+h(14)*0.4, h(15)*6.28, h(16)]); continue; }
+    if (wgRoadAt(x,y) || wgPoiAt(x,y)) continue;   // (roads and points of interest stay clear)
+    { const bv = wgBioAt(x,y); if (bv && wgVegVariant(put, x, y, t, bv, h)) continue; }
     let nearSnow = false, nearSwamp = false, nearMtn = false;
     for (const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1],[2,0],[-2,0],[0,2],[0,-2]]){ const u = o3Tile(x+dx,y+dy); if (u===OW_TUNDRA) nearSnow = true; if (u===OW_SWAMP) nearSwamp = true; if (u===OW_MOUNTAIN) nearMtn = true; }
     if (t===OW_FOREST){
@@ -23762,6 +24730,10 @@ function o3Vegetation(grp, x0, y0, W){
     rock:     [['stone', new T.DodecahedronGeometry(0.28,0).scale(1,0.6,0.85).translate(0,0.08,0), '#8a8580']],
     cactus:   [['cact', new T.CylinderGeometry(0.07,0.08,0.7,8).translate(0,0.35,0), '#5a8a44'], ['arm', new T.CylinderGeometry(0.045,0.05,0.3,6).translate(0.15,0.45,0), '#5a8a44'], ['arm2', new T.CylinderGeometry(0.04,0.05,0.24,6).translate(-0.13,0.38,0), '#5a8a44']],
     reed:     [['reed', new T.ConeGeometry(0.1,0.4,5).translate(0,0.2,0), '#7a8a4a']],
+    palm:     [['trunk', new T.CylinderGeometry(0.035,0.06,1.1,6).translate(0,0.55,0), '#7a5a3a'], ['leaf', new T.ConeGeometry(0.55,0.18,7).translate(0,1.12,0), '#3a8a3a']],
+    jtree:    [['trunk', new T.CylinderGeometry(0.06,0.1,0.9,6).translate(0,0.45,0), '#4a3a24'], ['leaf', new T.IcosahedronGeometry(0.55,1).scale(1.1,0.75,1.1).translate(0,1.05,0), '#2a6a2a']],
+    crystal:  [['cryst', new T.ConeGeometry(0.12,0.75,5).translate(0,0.36,0), '#9ad8ff'], ['cryst2', new T.ConeGeometry(0.08,0.45,5).rotateZ(0.5).translate(0.13,0.2,0), '#c0a0ff']],
+    lava:     [['lava', new T.CircleGeometry(0.32, 12).rotateX(-Math.PI/2).translate(0,0.035,0), '#ff6a1a']],
   };
   const byKind = {};
   for (const p of put) (byKind[p[0]] = byKind[p[0]] || []).push(p);
@@ -23769,7 +24741,7 @@ function o3Vegetation(grp, x0, y0, W){
   for (const kind in byKind){
     const list = byKind[kind];
     for (const [, geo, colr] of PARTS[kind]){
-      const mat = new T.MeshStandardMaterial({ color:0xffffff, roughness:0.85, flatShading: kind==='rock' || kind==='oak' || kind==='bush' });
+      const glow = kind==='crystal' || kind==='lava', mat = new T.MeshStandardMaterial({ color:0xffffff, roughness: glow ? 0.3 : 0.85, flatShading: kind==='rock' || kind==='oak' || kind==='bush' || kind==='crystal', emissive: glow ? new T.Color(colr).convertSRGBToLinear() : 0x000000, emissiveIntensity: kind==='lava' ? 0.9 : glow ? 0.45 : 0 });
       const im = new T.InstancedMesh(geo, mat, list.length);
       im.castShadow = true; im.receiveShadow = true;
       im.frustumCulled = false;   // its bounds are the one tree at the origin, not the whole forest
@@ -24011,8 +24983,14 @@ function o3Campfire(T){
     gr.addColorStop(0,'rgba(255,240,180,1)'); gr.addColorStop(0.35,'rgba(255,160,50,0.9)'); gr.addColorStop(1,'rgba(255,80,10,0)'); x.fillStyle = gr; x.fillRect(0,0,64,64);
     const fl = O3.fireFlame = new T.Sprite(new T.SpriteMaterial({ map:new T.CanvasTexture(c), transparent:true, depthWrite:false, blending:T.AdditiveBlending })); fl.position.y = 0.18; fl.scale.set(0.3, 0.42, 1); g.add(fl);
     const L = O3.fireLight = new T.PointLight(0xff9a40, 1.4, 4, 2); L.position.y = 0.3; g.add(L);
+    // your camp kit: a tent beside the fire and a spit over it (see WG_CAMP_GEAR)
+    const tent = O3.campTent = new T.Mesh(new T.ConeGeometry(0.34, 0.5, 4), new T.MeshStandardMaterial({ color:new T.Color('#8a6a44').convertSRGBToLinear(), roughness:0.9, flatShading:true })); tent.position.set(0.5, 0.24, -0.35); tent.rotation.y = 0.6; tent.castShadow = true; tent.visible = false; g.add(tent);
+    const spit = O3.campSpit = new T.Group(); spit.visible = false; g.add(spit);
+    for (const x of [-0.16, 0.16]){ const p = new T.Mesh(new T.CylinderGeometry(0.012, 0.012, 0.32, 4), wood); p.position.set(x, 0.16, 0); spit.add(p); }
+    const bar = new T.Mesh(new T.CylinderGeometry(0.01, 0.01, 0.38, 4), wood); bar.rotation.z = Math.PI/2; bar.position.y = 0.3; spit.add(bar);
   }
   const g = O3.fireGrp; g.visible = true;
+  { const cp = G.player.campPitch, on = !!(cp && cp.x===f.x && cp.y===f.y && (G.player.turnCount||0) < cp.until); if (O3.campTent) O3.campTent.visible = on && cp.tent > 0; if (O3.campSpit) O3.campSpit.visible = on && cp.spit > 0; }
   g.position.set(f.x+0.5, Math.max(O3.heightAt(f.x+0.5, f.y+0.5), -0.1), f.y+0.5);
   const fl = 0.85 + Math.sin(O3.t*13)*0.1 + Math.sin(O3.t*29)*0.05;
   O3.fireFlame.scale.set(0.3*fl, 0.42*(0.9+fl*0.2), 1); O3.fireLight.intensity = 1.4*fl;
@@ -24387,7 +25365,7 @@ function o3Pick(e){
   const r = O3.cv.getBoundingClientRect(), T = THREE;
   const m = new T.Vector2(((e.clientX-r.left)/r.width)*2-1, -((e.clientY-r.top)/r.height)*2+1);
   O3.ray.setFromCamera(m, O3.cam);
-  const hits = O3.ray.intersectObjects(O3.hits.concat(O3.nodeHits||[], O3.lmHits||[], O3.evHits||[]), false);
+  const hits = O3.ray.intersectObjects(O3.hits.concat(O3.nodeHits||[], O3.lmHits||[], O3.evHits||[], O3.wgHits||[], O3.wildHits||[]), false);
   const lh = O3.land ? O3.ray.intersectObject(O3.land, false) : [];
   // a gathering spot's box stands tall over its tile, so a click far off can clip one on its way to the
   // ground behind it: a spot only counts when the ground you clicked is its own tile (or right beside it)
@@ -24408,7 +25386,8 @@ function o3Input(cv){
     const siteTip = a && a.kind==='site' && G.ui==='playing' ? (owSiteKind(G.ow.map[a.x][a.y]) ? owSiteTipHtml(a.x, a.y) : G.ow.map[a.x][a.y]===OW_TOWN ? `<div style="font-weight:600">${esc(o3TownName(a.x,a.y))}</div><div class="muted">a town - click to walk there</div>` : '') : '';
     const lmo = a && a.kind==='landmark' && G.ui==='playing' ? owLandmark(a.id) : null;
     const wo = a && a.kind==='wev' && G.ui==='playing' ? wevMapList().find(o=>o.k===a.what && o.x===a.x && o.y===a.y) : null;
-    const lmTip = lmo ? lmTipHtml(lmo) : wo ? wevTipHtml(wo) : '';
+    const po = a && a.kind==='poi' && G.ui==='playing' ? (G.ow.pois||[]).find(p=>p.id===a.id) : null, wl = a && a.kind==='wild' && G.ui==='playing' ? a.w : null;
+    const lmTip = lmo ? lmTipHtml(lmo) : wo ? wevTipHtml(wo) : po ? wgPoiTip(po) : wl && wl.alive ? `<div style="font-weight:600">${cap(WG_WILD[wl.k].nm)}</div><div class="muted">${wl.k==='bird' ? 'they take off if you come close' : wl.k==='boar' ? 'click to hunt - it will fight back' : 'click to hunt (a bow lets you shoot from further away)'}</div>` : '';
     if (n && G.ui==='playing'){ showTooltip(e, skNodeTipHtml(n)); O3.nodeTip = true; }
     else if (siteTip || lmTip){ showTooltip(e, siteTip || lmTip); O3.nodeTip = true; }
     else if (O3.nodeTip){ hideItemTooltip(); O3.nodeTip = false; }
@@ -24418,6 +25397,7 @@ function o3Input(cv){
     if (e.shiftKey){ examineSay(examineAct(a)); return; }
     if (a && a.kind==='node' && o3GoGather(a.x, a.y)) return;
     if (a && a.kind==='landmark'){ o3WalkToLandmark(a); return; }
+    if (a && a.kind==='wild'){ wgHunt(a); return; }
     if (a) o3WalkTo(a); });
   cv.addEventListener('wheel', e=>{ if (!o3Active()) return; e.preventDefault(); O3.dist = clamp(O3.dist * (e.deltaY>0 ? 1.1 : 0.9), 7, 28); }, { passive:false });
 }
@@ -24450,21 +25430,22 @@ function o3Render(){
   // click-walking, one grid step at a time through the normal move rules
   if (O3.path.length && G.ui==='playing' && !G.gameOver){
     O3.stepT -= dt;
-    if (O3.stepT <= 0 && !O3.stepping){ const [dx,dy] = O3.path.shift(); O3.stepT = O3_STEP*runMul(); O3.stepping = true; try{ moveDir(dx,dy); } finally { O3.stepping = false; } if (G.ui!=='playing' || G.gameMode!==0 || G.owPos.x!==px+dx || G.owPos.y!==py+dy){ O3.path = []; O3.gatherAt = null; }
+    if (O3.stepT <= 0 && !O3.stepping){ const [dx,dy] = O3.path.shift(); O3.stepT = O3_STEP*runMul()*wgRoadMul(); O3.stepping = true; try{ moveDir(dx,dy); } finally { O3.stepping = false; } if (G.ui!=='playing' || G.gameMode!==0 || G.owPos.x!==px+dx || G.owPos.y!==py+dy){ O3.path = []; O3.gatherAt = null; }
       else if (!O3.path.length && O3.gatherAt){ const v = O3.gatherAt; O3.gatherAt = null; o3GoGather(v.x, v.y); } }
   } else if (G.ui!=='playing') O3.path = [];
   if (G.gameMode!==0) return true;
-  owReveal(G.owPos.x, G.owPos.y, 12); pmPrebuild();
+  owReveal(G.owPos.x, G.owPos.y, wgSight()); pmPrebuild();
   o3SyncEncounters();
   o3SyncQuests();
   o3SyncNodes();
   try{ o3SyncLandmarks(dt); }catch(e){ console.error(e); }
   try{ o3SyncEvents(); o3AnimEvents(); }catch(e){ console.error(e); }
+  try{ o3SyncPOIs(); o3Wildlife(dt); }catch(e){ console.error(e); }
   // you glide between tiles; on water you ride a boat
   const sailing = G.ow.map[G.owPos.x][G.owPos.y]===OW_WATER;   // only open water needs the boat; rivers are waded
   const tx = G.owPos.x+0.5, tz = G.owPos.y+0.5, pp = O3.ppos || (O3.ppos = new T.Vector3(tx,0,tz));
   const k = 1-Math.exp(-dt*10), dxs = tx-pp.x, dzs = tz-pp.z, moving = Math.hypot(dxs,dzs) > 0.03;
-  { const d = Math.hypot(dxs,dzs), sp = dt/(O3_STEP*runMul())*1.05;             // an even walking pace, one tile per step
+  { const d = Math.hypot(dxs,dzs), sp = dt/(O3_STEP*runMul()*wgRoadMul())*1.05;             // an even walking pace, one tile per step
     if (d > 3 || d <= sp){ pp.x = tx; pp.z = tz; } else { pp.x += dxs/d*sp; pp.z += dzs/d*sp; } }
   const gy = O3.heightAt(pp.x, pp.z);
   pp.y = sailing ? -0.14 : Math.max(gy, -0.14);
@@ -29351,7 +30332,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-83';
+const GAME_VERSION = 'rs-84';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -30023,6 +31004,7 @@ function buildShop(){
       <div class="muted" style="text-align:center;margin-bottom:10px;">sold out for now</div>
       ${boatRowHtml()}
       ${arrowRowHtml()}
+      ${wgCampRowsHtml()}
       <div class="btnrow"><button class="btn primary" onclick="shopLeave()">L &middot; leave</button></div></div>`;
   }
   const rows = G.shopStock.map((it,i)=>{
@@ -30042,6 +31024,7 @@ function buildShop(){
     <div class="ovbody">${rows}
       ${boatRowHtml()}
       ${arrowRowHtml()}
+      ${wgCampRowsHtml()}
       <div class="btnrow"><button class="btn primary" onclick="shopLeave()">L / ESC &middot; leave</button></div>
     </div>
   `;
@@ -31170,6 +32153,9 @@ function buildHelpLegend(){
       [sw('#e8c050', true), 'Quest pin', 'where a tracked quest wants you to go'],
       [sw('#ffd040', true), 'Your pins', 'markers you drop with the Pin tool - click one to change it'],
       [sw('#8a1a1a', true), 'Route', 'your planned route, stop by stop - Walk route follows it'],
+      [sw('#b0925f'), 'Road', 'quicker and safer to walk; bridges, fords (stepping stones) and broken bridges (a red cross) where it meets a river'],
+      [sw('#7a5230'), 'Ferry landing', 'a boat across the water to another landmass'],
+      [sw('#6a1a10'), 'The Wilderness', 'beyond the red ditch: tough fights, rich loot, and you lose what you drop if you die'],
       [sw('#a07a4a'), 'Monster camp', 'grows if left alone (the red dots show how big); walk in to attack'],
       [sw('#ff5a3a', true), 'Giant', 'a world boss while it is awake - its timer shows when it sleeps again'],
       [sw('#9ad8ff', true), 'Fallen star', 'rich ore (up to runite) until it crumbles'],
@@ -31245,6 +32231,7 @@ function buildHelp(){
       <div><b>Skills &amp; trades</b> (<kbd>J</kbd>): fishing, mining, woodcutting and foraging, and the trades that use what you gather - cooking, smithing, alchemy and firemaking - each level from 1 to 99 alongside your combat skills. Gather at the spots you see on the land: marked trees, bubbling fishing spots and flowering herb patches (hover one to see what it gives and the level it needs, click it to walk over and start), rock beside mountains, and ore veins, cave pools and cave herbs in the dungeons. Each spot gives a few items and then is felled, fished out or picked clean, and grows back or moves on in time. <kbd>E</kbd> works the nearest spot beside you (press it again or move to stop), light a campfire from your logs, or cook at your fire. Buy a fishing rod, pickaxe and hatchet (and better ones as you level) at the blacksmith, who also smelts your ore into bars and forges them into gear; brew herbs into potions at the alchemist; cook at the tavern hearth. Press <kbd>U</kbd> to eat the best-fitting cooked food (in a fight it takes your turn). Visit the Tailor in any town to craft: spin flax, tan hides, and make robes, staves, leather armour, bows and arrows at the workbenches inside.</div>
       <div>press <kbd>C</kbd> to make camp wherever you're standing &mdash; usually a free heal that also refills your ability charges, spell slots and wand charges, same as a village rest, but sleeping in the open risks a night-time ambush that interrupts the rest entirely (no healing, straight into a fight, and every exit is sealed until the last monster drops). Safer on grass, riskier in forest/swamp, and impossible while zoomed out. You can also camp inside any dungeon-type site once you've cleared every monster off the current floor &mdash; nothing left down there to ambush you, so it's just as safe as a village rest.</div>
       <div>press <kbd>M</kbd> to open the world map of the whole continent &mdash; press again to go back. Click a village you've visited on the map, or press <kbd>T</kbd> on the overworld or in a town, to teleport there through a portal. The map's tool bar lets you <b>drop pins</b> with a note, <b>plan a route</b> and walk it, and switch <b>layers</b> (place names, landmarks, sites, danger, resources and more) on and off; the mouse wheel zooms in far enough to see every tree, rock and house. Land you've seen is pencilled in and land you've walked is painted; every forest, range, sea and river has a name, and three great landmarks (a volcano, a giant tree and a wizard's tower) can be seen from far off. The <b>travel log</b> counts the regions, towns, sites and landmarks you've found.</div>
+      <div><b>The land:</b> when you start you pick the world's size and shape (an archipelago, one landmass or several continents), and every world has a <b>world code</b> - give it to a friend and they can play the same world. <b>Roads</b> join the towns: walking a road is quicker (every other step is free) and safer, and the route planner and the teleport list (T, "walk") follow them. Off the road, wading a river costs time; roads cross on <b>bridges</b> and fords, and a broken bridge can be mended. <b>Ferries</b> cross the water between landmasses. Every part of the land has a recommended combat level, shown when you enter it and on the map. Watch for <b>volcanic land, jungles, haunted woods, snowy highlands and crystal wastes</b> with their own creatures, and for <b>hamlets</b> (jobs, food and a safe barn), <b>lookouts</b> that reveal the map, <b>caves, grottos and ruins</b> to delve, <b>standing stones</b>, <b>abandoned camps</b>, <b>wishing wells</b> and <b>hermits</b>. Deer, rabbits, boars and birds roam the 3D land - click one to hunt it. Rain makes the fish bite, fog shortens your sight and storms make the sea dangerous. Buy a <b>tent, ward lantern, bedroll and cooking spit</b> at any general store for safer camping. Beyond the red ditch lies <b>the Wilderness</b>: tougher monsters, richer pickings, and if you die there your dropped items are gone for good.</div>
       <div><b>World events:</b> the world keeps its own time. A <b>giant</b> sleeps somewhere and now and then wakes to roam (a world boss - it's marked on the map while it's awake, and its wounds last between fights). <b>Monster camps</b> grow if they're left alone, until their warband lays <b>siege</b> to the nearest town; break the siege in time or the town is sacked. Every town rules the land nearest it - break every camp in a town's lands to <b>secure</b> them, and fewer monsters roam there. <b>Stars fall</b> and leave rich ore for a while. On the road you'll meet people who need a hand (or a fight), and towns hold <b>festivals</b> (10% off and a treat), <b>market days</b> (a rare trader on the plaza) and ring the alarm when monsters <b>raid</b>. Everything with a deadline shows its timer on the world map; the travel log lists what's going on.</div>
       <div>day turns to night and back on a steady cycle, and the weather shifts between clear, rain, fog and the occasional storm &mdash; both are shown in the corner of the overworld map. Night and bad weather raise the odds of a random encounter, so an easy stretch of road can turn dangerous after dark.</div>
       <div style="margin-top:10px;color:var(--ink-faint);">QUESTS</div>
@@ -31336,6 +32323,8 @@ function examineAct(a){
   if (!a) return '';
   if (a.kind==='site') return EXAMINE_OW[a.t] || 'A place worth exploring.';
   if (a.kind==='landmark'){ const lm = owLandmark(a.id); return lm ? lm.desc : ''; }
+  if (a.kind==='poi'){ const p = (G.ow.pois||[]).find(o=>o.id===a.id); return p ? cap(p.name) + '. ' + (POI_TITLE[p.k]||'') + '.' : ''; }
+  if (a.kind==='wild') return a.w ? `A ${WG_WILD[a.w.k].nm}.` : '';
   if (a.kind==='wev') return a.what==='boss' ? 'A giant, awake and roaming. It hits terribly hard - and remembers its wounds.' : 'A monster camp. It will grow if it is left alone.';
   if (a.kind==='node'){ const n = skNodeAt(a.x, a.y); return n ? `${skNodeName(n)}. ${n.k==='woodcutting' ? 'You could chop this.' : n.k==='fishing' ? 'Fish are biting here.' : 'You could pick this.'}` : 'Nothing left here.'; }
   if (a.kind==='building') return `${a.b.name}. ${a.b.role ? 'The '+a.b.role.toLowerCase()+' works here.' : ''}`;
@@ -31684,13 +32673,15 @@ function owSiteTipHtml(x, y){
 canvas.addEventListener('mousemove', (e)=>{
   if (G.gameMode!==0 || !G.owZoomedOut || owZoomDragging || G.ui!=='playing') return;
   { const m = owMapPoint(e), pl = m ? owPlaceAt(m.x, m.y) : null, hv = document.getElementById('mtHover');   // the region under the mouse, named in the tool bar
-    if (hv) hv.textContent = pl && owSeen(m.x, m.y) ? '\u00b7 ' + cap(pl.name) : ''; }
+    if (hv){ let t = ''; if (m && owSeen(m.x, m.y) && m.x>=0 && m.y>=0 && m.x<OW_COLS && m.y<OW_ROWS){ const a = wgArea(m.x, m.y), rn2 = wgRoadName(m.x, m.y);
+      t = '\u00b7 ' + cap(pl ? pl.name : a.name) + (rn2 ? ' \u00b7 ' + rn2 : '') + ' \u00b7 ' + wgBandText(a.band) + (a.wild ? ' \u00b7 Wilderness ' + a.wild : ''); } hv.textContent = t; } }
   // your pins and the landmarks come first, then towns, sites and (close in) gathering spots
   const pi = owPinAtClient(e); owPinHover = pi;
   if (pi>=0){ const pin = pinsP()[pi], pk = PIN_KIND[pin.k] || PIN_KIND.star;
     showTooltip(e, `<div style="font-weight:600;color:${pk.col}">${esc(pk.nm)} pin</div>${pin.note ? `<div class="examine">${esc(pin.note)}</div>` : ''}<div class="muted">click to change or delete it</div>`);
     canvas.style.cursor = 'pointer'; if (owTownHover){ owTownHover = null; } return; }
   const lm = owLandmarkAtClient(e); if (lm){ showTooltip(e, lmTipHtml(lm)); canvas.style.cursor = 'help'; if (owTownHover){ owTownHover = null; } return; }
+  const po = owPoiAtClient(e); if (po){ showTooltip(e, wgPoiTip(po)); canvas.style.cursor = 'help'; if (owTownHover){ owTownHover = null; } return; }
   const ev = owEventAtClient(e); if (ev){ showTooltip(e, wevTipHtml(ev)); canvas.style.cursor = 'help'; if (owTownHover){ owTownHover = null; } return; }
   const t = owTownAtClient(e), key = t ? t.x+','+t.y : null;
   if (!t){ const st = owSiteAtClient(e); if (st){ showTooltip(e, owSiteTipHtml(st.x, st.y)); canvas.style.cursor = 'help'; if (owTownHover){ owTownHover = null; renderGame(); } return; }
@@ -31766,7 +32757,7 @@ function frameLoop(ts){
   if (G.player && G.ui==='playing' && (G.player.turnCount||0)!==frameLoop.rt){ frameLoop.rt = G.player.turnCount||0; try{ seasonTick(); richTick(); wevTick(); }catch(e){ console.error(e); } }
   // each new overworld tile: paint in the map, regions, landmarks, route stops (see travelTick)
   if (G.player && G.ui==='playing' && G.gameMode===0 && G.owPos && G.ow && G.ow.map){ const k = G.owPos.x+','+G.owPos.y+'|'+G.ow.seed;
-    if (k!==frameLoop.op){ const prev = frameLoop.op; frameLoop.op = k; try{ travelTick(prev && prev.split('|')[1]===String(G.ow.seed) ? prev : null); }catch(e){ console.error(e); } } }
+    if (k!==frameLoop.op){ const prev = frameLoop.op; frameLoop.op = k; try{ travelTick(prev && prev.split('|')[1]===String(G.ow.seed) ? prev : null); wgOnStep(prev); }catch(e){ console.error(e); } } }
   if (G.routeWalk){ try{ routeWalkTick(performance.now()); }catch(e){ console.error(e); G.routeWalk = null; } }
   if (G.player && G.gameMode===1){ try{ lightFloorTick(); }catch(e){} }
   if (G.player){
@@ -31791,6 +32782,7 @@ function frameLoop(ts){
           G.encounterSetPiece = false; G.encounterSetPieceTerrain = null;
         }
         questArenaWon();
+        try{ wgWildWin(); }catch(e){ console.error(e); }
         if (!wevArenaWon()) G.gameMode=0;   // (a broken siege or a repelled raid walks you back into the town)
       }
     }

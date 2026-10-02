@@ -281,23 +281,23 @@ _Shops and the bank_
 ### World generation and overworld
 _World generation and overworld content_
 
-197. [ ] (474) World size choice at the start - small, medium or large
-198. [ ] (475) World seed sharing - play the same world as a friend
-199. [ ] (476) Continent types - archipelago, one big landmass, several continents
-200. [ ] (462) New biomes - volcanic region, jungle, haunted forest, snowy highlands, crystal wasteland
-201. [ ] (463) Level-banded regions - each region shows its recommended combat level on entry
-202. [ ] (101) Roads between towns - faster and safer to walk, fewer encounters
-203. [ ] (464) Bridges, ferries and fords - river crossings, some broken until a quest repairs them
-204. [ ] (16) Weather that matters (rain boosts fishing, storms make sailing dangerous)
-205. [ ] (465) Wildlife - deer, rabbits, birds and boars roaming, some huntable, fleeing when you get close
-206. [ ] (466) Farms and hamlets between towns - farmer, mill, well, small jobs and trades
-207. [ ] (469) Scenic viewpoints - lookouts that reveal the map around them with a discovery bonus
-208. [ ] (470) Hidden caves and grottos in cliffs and behind waterfalls
-209. [ ] (471) Small walk-in ruins - 1-2 room mini-dungeons with a chest and lore
-210. [ ] (102) Points of interest - ruins, standing stones, abandoned camps, wishing wells, hermits, each with a small event or reward
-211. [ ] (472) Better camps - campfire, tent, cooking spit, upgradable camp kit for safer rest
-212. [ ] (473) Auto-walk along roads to a chosen destination
-213. [ ] (58) Wilderness zone - a lawless region with riskier encounters and better loot, where you drop items on death
+197. [x] (474) World size choice at the start - small, medium or large
+198. [x] (475) World seed sharing - play the same world as a friend
+199. [x] (476) Continent types - archipelago, one big landmass, several continents
+200. [x] (462) New biomes - volcanic region, jungle, haunted forest, snowy highlands, crystal wasteland
+201. [x] (463) Level-banded regions - each region shows its recommended combat level on entry
+202. [x] (101) Roads between towns - faster and safer to walk, fewer encounters
+203. [x] (464) Bridges, ferries and fords - river crossings, some broken until a quest repairs them
+204. [x] (16) Weather that matters (rain boosts fishing, storms make sailing dangerous)
+205. [x] (465) Wildlife - deer, rabbits, birds and boars roaming, some huntable, fleeing when you get close
+206. [x] (466) Farms and hamlets between towns - farmer, mill, well, small jobs and trades
+207. [x] (469) Scenic viewpoints - lookouts that reveal the map around them with a discovery bonus
+208. [x] (470) Hidden caves and grottos in cliffs and behind waterfalls
+209. [x] (471) Small walk-in ruins - 1-2 room mini-dungeons with a chest and lore
+210. [x] (102) Points of interest - ruins, standing stones, abandoned camps, wishing wells, hermits, each with a small event or reward
+211. [x] (472) Better camps - campfire, tent, cooking spit, upgradable camp kit for safer rest
+212. [x] (473) Auto-walk along roads to a chosen destination
+213. [x] (58) Wilderness zone - a lawless region with riskier encounters and better loot, where you drop items on death
 
 ### World map
 _The parchment map, after the world it draws_
