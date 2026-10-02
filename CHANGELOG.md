@@ -1,5 +1,80 @@
 # Depthcrawl patch notes
 
+## RS-91 - Quests
+
+- **The journal (250):** press **;** or **X** (or use the link on the side panel's Quests tab) for a journal with four tabs:
+  - **Quests:** in progress, ready to start, not yet open (with exactly what you still need) and done. Click a quest to read its written log of everything that happened.
+  - **Town jobs:** your Captain's quests.
+  - **Diaries.**
+  - **Clues & tomes.**
+- **Markers and a next step (251):** story quests appear on the quest tracker with their next step, on the minimap, on the world map and as markers in 3D, alongside the Captain's quests.
+- **Abandon and retry (252):** you can abandon any quest from the journal and start it again from its giver. Town jobs you abandon go to a **Failed - try again** list, and so do failed ones, so you can take them up again. Even the faction choice below can be undone by leaving a faction.
+- **Quest points (253):** every story quest pays quest points (1 to 5 each).
+  - The new **Champions' Guild** in the city guild halls opens at 20 points: a champion's purse and combat training once a day.
+  - The final chapter of the main storyline needs 12 points.
+  - Finishing every quest earns the **Quest Point Cape**.
+- **Requirements (254):** quests ask for skill levels, a combat level, quest points or earlier quests, and the journal lists what's missing.
+- **Dialogue choices (255):**
+  - Spare the young goblin in the Goblin War and it lets you into the Goblin King's hall by the back door: fewer guards, and the Goblin Crown instead of the King's Cleaver.
+  - Answer the ghost-knight kindly in the main storyline and it fights beside you against the Lich's Herald.
+  - Coax or grab the Mages' runaway salamander (grabbing burns).
+  - Joining the Thieves' Guild shuts the Royal Guard to you, and the other way round.
+- **Quest givers all over town (256):** the innkeeper has rats in the cellar, the blacksmith wants iron ore, the alchemist needs silverleaf. The priest, the Captain, the mayor and the guildmaster all have quests too. Open their screens and they make their offer. If you say "Not now", they won't ask again that day.
+- **Quests found in the world (257):**
+  - A skeleton by the road clutching a note about buried treasure.
+  - The hermit's lost book, behind a riddling door.
+  - A headless ghost weeping in a graveyard at night.
+- **Dungeon quests (258):** a trapped adventurer on the third floor of a nearby dungeon, and a stolen relic on a castle's deepest floor. What you're looking for lies on the floor, far from the stairs.
+- **Chain quests (259):** **the Goblin War** (scouts, the warband, the Goblin King) and **the Haunted Mine** (strange lights, the brazier ward, the thing in the deep), each part opening the next.
+- **Puzzle quests (260):**
+  - a riddle door, with six riddles
+  - braziers lit in the order a carved verse gives
+  - a sliding-tile lock
+  - a knight's crossing over cracked stones, moving only as a knight moves
+- **Boss quests (261):** named bosses with their own tricks:
+  - **Grukk the Goblin King** calls guards at two-thirds and one-third of his life, and goes berserk near the end.
+  - **The Stormcaller** calls lightning down on you.
+  - **Captain Vosk** calls his raiders.
+  - **The Lich's Herald** raises the dead and drains your life.
+  - **The Wakener** hides behind a shield of souls until its servants fall.
+- **Faction quests (262):** three ranks each in **the Mages' Circle**, **the Thieves' Guild** and **the Royal Guard**, with rank titles. Leave a faction from the journal.
+- **Unique rewards (263):** gear that only quests give:
+  - the Smith's Hammer
+  - the Amulet of the Weeping Ghost and the Ring of Saint Aurel
+  - the Goblin Crown or the King's Cleaver
+  - the Foreman's Lantern-Pick (+10% Mining xp while wielded)
+  - the Robe of the Magister, the Master Thief's Gloves and the Shield of the Realm
+  - the Staff of the Fallen Wakener
+- **Quest unlocks (264):**
+  - The **Ancient Magicks** spellbook, as well as the ancient tablets.
+  - A reusable **Hermitage teleport tablet**.
+  - Free beds at every inn.
+  - **The fence** in any tavern, who buys your junk for 30% more than a shop.
+  - **The Champions' Guild.**
+- **Achievement diaries (265):** **the Heartlands** and **the Wild Frontier** each have easy, medium, hard and elite task lists. Each tier you finish gives a better regional cloak or pair of boots, and a Lamp of Knowledge.
+- **Story quests (266):** 31 hand-made quests with dialogue.
+- **The main storyline (267):** **the Waking Lich**, in eight chapters, from the priest:
+  - Restless graves; a graveyard watch at night; the hermit's riddle.
+  - Three relics: bone from a crypt, iron from a castle's master, glass from a dig site.
+  - The Lich's Herald.
+  - **The Black Spire:** a six-floor dungeon of its own, behind the knight's crossing, with the Wakener at the top.
+- **Clue scrolls (268):** reading a clue now starts a real trail of 2 to 4 steps: dig at a spot, search outside a site, or do a task (slay a goblin, catch a fish, chop some wood...). Each step is marked on your map, and the trail ends in a casket.
+- **Treasure maps and casket rewards (269):** caskets can hold:
+  - gilded armour
+  - rare cosmetic capes and hats
+  - tomes
+  - treasure maps (an X to dig up for a bigger casket)
+  - more clues
+- **Tomes (270):** read one to learn something for good:
+  - Insight: +5% xp
+  - Vigour: +10 life
+  - Precision: +1 critical range
+  - Fortune: +10% gold
+  - Warding: +2 damage reduction
+  - The Ancients: the old magic
+  - Each learned tome also shows in your honours.
+- New honours: Questor, Bane of the Wakener, Diarist and Trailblazer.
+
 ## RS-90 - Graphics and lighting
 
 - **Better lighting (289):**

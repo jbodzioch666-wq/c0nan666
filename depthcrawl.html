@@ -4549,6 +4549,7 @@ function loadingCard(k){
   clearTimeout(loadingCard.tm); loadingCard.tm = setTimeout(()=> el.classList.remove('show'), 1300);
 }
 function addToInventory(item){
+  if (item && item.sqItem){ sqOnPickup(item); return; }   // a quest's object, not loot
   G._lastPick = item; if (item && item.used && !item.consumable && (item.quality||0) >= 3 && G.ui==='playing') try{ audStinger('rare'); }catch(e){}
   if (G.player && G.player.curRun && G.gameMode===1){ G.player.curRun.loot += itemPrice(item); G.player.curRun.items++; }
   { const st = pStats(); st.itemsLooted++; st.lootValue += itemPrice(item); }
@@ -4601,7 +4602,10 @@ function fireWand(it){
 function useFromInv(idx){
   if (idx<0 || idx>=G.inv.length) return;
   const it = G.inv[idx];
-  if (it.clue){ clueOpen(idx); return; }
+  if (it.clue){ sqClueRead(idx); return; }
+  if (it.tmap){ sqMapRead(idx); return; }
+  if (it.tome){ sqTomeRead(idx); return; }
+  if (it.tablet){ sqTabletUse(idx); return; }
   if (it.kind==='scroll' && it.reforge){ logMsg('right-click a piece of gear and choose Reforge to use this scroll', ''); return; }
   if (it.recipeBook){ crLearn(idx); return; }
   if (it.trophy){ const r = (G.player.trophies||{})[it.trophy]; logMsg(`you admire the ${it.nm}${r ? ` - your record is ${r.w} ${r.unit}` : ''}`, ''); return; }
@@ -5550,7 +5554,7 @@ function noteFoe(mi){
 function fxSplat(x, y, txt, kind){ if (typeof FP!=='undefined' && FP.floats) FP.floats.push({x, y, z:0.95, txt:String(txt), col:'#ffd27a', kind, crit:false, age:0}); }
 function monsterDies(mi){
   const m = G.mon[mi];
-  try{ townOnKill(m); }catch(e){}
+  try{ townOnKill(m); sqOnKill(m); sqClueTask('kill', m.nm); }catch(e){ console.error(e); }
   if (m.champ && m.champ.includes('explosive')) try{ monExplode(m); }catch(e){}
   logMsg(`the ${m.nm} falls`, 'good');
   sfx('monsterDie'); try{ audMonster(m, 'die'); }catch(e){}
@@ -6692,7 +6696,8 @@ function tickMonsters(excludeIdx){
   if (!G.gameOver) try{ raidTick(); }catch(e){ console.error(e); }
   if (!G.gameOver) summonAttack();
   tickSummonDuration();
-  if (!G.gameOver) try{ necroTick(); }catch(e){ console.error(e); }   // your raised dead (see SECTION: NECROMANCY)
+  if (!G.gameOver) try{ necroTick(); }catch(e){ console.error(e); }
+  if (!G.gameOver) try{ sqBossTurn(); }catch(e){ console.error(e); }   // a quest boss's tricks   // your raised dead (see SECTION: NECROMANCY)
   // true "Legendary" Monster Manual stat blocks (adult/ancient dragons, the
   // lich) get one extra scaled-down action once every OTHER monster has had
   // its normal turn - a deliberate simplification of real 5e's 3-per-round
@@ -8036,7 +8041,7 @@ function tryMoveOverworld(dx,dy){
     // wandering encounter too - check the mythic trigger first and skip the
     // ordinary one if it fired, so the two can never stomp on each other's
     // arena/gameMode setup on the same step
-    if (!questOverworldTurn() && !checkMythicBeastTrigger() && !wgStep() && !wevStep()) checkOverworldEncounterTrigger();   // (wevStep: the giant, a camp, or someone on the road)
+    if (!questOverworldTurn() && !checkMythicBeastTrigger() && !wgStep() && !sqWorldStep() && !wevStep()) checkOverworldEncounterTrigger();   // (wevStep: the giant, a camp, or someone on the road)
   }
 }
 
@@ -9035,7 +9040,7 @@ function skAdd(id, n){ const b = skP().bag; b[id] = (b[id]||0) + n; if (b[id]<=0
 // xp in, level-ups out (with a fanfare and a banner)
 function skGainXP(k, amount, mastery){
   const p = skP(), store = mastery ? p.mastery : p.skills, before = skLevelOf(store[k]||0);
-  const gain = Math.max(1, Math.round(amount * (mastery ? 1 : 1 + skPerk(k, 'xp'))));
+  const gain = Math.max(1, Math.round(amount * (mastery ? 1 : 1 + skPerk(k, 'xp') + sqXpBonus(k))));
   store[k] = (store[k]||0) + gain;
   const after = skLevelOf(store[k]);
   if (!mastery){ try { xpDrop(k, gain); xpTrack(k, gain); } catch(e){} try { tkOnXp(k, gain); } catch(e){ console.error(e); } }
@@ -9147,11 +9152,11 @@ function spBody(tab){
     return `<div class="sp-note">${RS_BOOKS[rsBook()].nm} &middot; click to pick the spell R casts &middot; right-click to put it on the quick bar (keys 1-9) &middot; ${rsAutocastOn() ? 'autocast on' : 'autocast off'}</div><div class="sp-spg">${cells}</div>`;
   }
   if (tab==='quests'){
-    const qs = p.quests||[], tq = trackedQuest();
+    const qs = questsShown(), tq = trackedQuest();
     const rows = qs.map(q=>`<div class="sp-q${q===tq ? ' on' : ''}" data-sp-quest="${q.id}"><b>${esc(questTitle(q))}</b><span>${esc(questObjective(q))}</span></div>`).join('');
     const tog = `<div class="sp-foot"><a href="#" onclick="${p.qtHidden ? 'questTrackerShow()' : 'questTrackerHide()'};hudLayout();return false;">${p.qtHidden ? 'show the quest tracker' : 'hide the quest tracker'}</a><span>${qs.length} active</span></div>`;
     let tk = ''; try { tk = `<div class="sp-note" style="margin-top:8px;"><b>Tasks</b></div>` + tkPanelHtml(); } catch(e){ console.error(e); }
-    return (rows || `<div class="sp-note">no quests yet - the Captain of the Watch in any town has work</div>`) + tog + tk;
+    return (rows || `<div class="sp-note">no quests yet - the Captain of the Watch in any town has work</div>`) + `<div class="sp-foot"><a href="#" onclick="setUi('journal');return false;">open the journal (; or X)</a></div>` + tog + tk;
   }
   return '';
 }
@@ -9461,7 +9466,7 @@ function renderMiniMap(){
     for (let j=0;j<=2*R;j++) for (let i=0;i<=2*R;i++){ const x = x0+i, y = y0+j; if (x<0||y<0||x>=OW_COLS||y>=OW_ROWS || !owSeen(x,y)) continue;
       const t = G.ow.map[x][y]; if (OW_SITE_TILES.includes(t)) dot((i+0.5)*cs, (j+0.5)*cs, t===OW_TOWN ? cs*1.3 : cs*0.95, PM_SITE_BRIGHT[t]||'#fff', 'rgba(0,0,0,0.7)'); }
     for (const e of (G.ow.encounters||[])){ const i = e.x-x0, j = e.y-y0; if (i>=0 && j>=0 && i<=2*R && j<=2*R && owSeen(e.x,e.y)) dot((i+0.5)*cs, (j+0.5)*cs, cs*0.6, '#ff3a3a'); }
-    for (const q of (G.player.quests||[])){ const t = questTarget(q); if (!t) continue; const i = clamp(t.x-x0, 0, 2*R), j = clamp(t.y-y0, 0, 2*R); dot((i+0.5)*cs, (j+0.5)*cs, cs*0.8, t.turnIn ? '#5ab0ff' : '#ffd24a', '#000'); }
+    for (const q of questsShown()){ const t = questTarget(q); if (!t) continue; const i = clamp(t.x-x0, 0, 2*R), j = clamp(t.y-y0, 0, 2*R); dot((i+0.5)*cs, (j+0.5)*cs, cs*0.8, t.turnIn ? '#5ab0ff' : '#ffd24a', '#000'); }
     const gv = G.player.grave; if (gv){ const i = clamp(gv.x-x0, 0, 2*R), j = clamp(gv.y-y0, 0, 2*R); dot((i+0.5)*cs, (j+0.5)*cs, cs*0.8, '#e8e8f0', '#000'); }
   } else {
     const cs = S/Math.max(COLS, ROWS), ox = (S - COLS*cs)/2, oy = (S - ROWS*cs)/2; MM.view = { x0:-ox/cs, y0:-oy/cs, c:cs };
@@ -10158,6 +10163,7 @@ function skGatherTick(now){
     if (k==='fishing' && SK_FISH.some(f=>f.id===pick.id)){ const f = SK_FISH.find(f=>f.id===pick.id); skAdd('c_'+pick.id, amt); skGainXP(k, pick.xp*amt); skGainXP('cooking', Math.round(f.cxp*0.5*amt)); logMsg(`your infernal rod cooks the ${pick.nm.toLowerCase()} as it comes out of the water`, 'good'); renderGame(); saveCurrentGame(); return; }
   }
   if (k==='fishing') try{ audSkill('reel'); }catch(e){}
+  try{ sqClueTask('gather', k); }catch(e){}
   skAdd(pick.id, amt); skGainXP(k, pick.xp * amt * (G.gameMode===1 ? 1.2 : 1) * (node ? [1, 1.25, 1.5][node.qual||0] : 1));
   if (node && node.type==='pearl' && chn(0.18)){ skAdd('pearl', 1); const st = G.player.wgStat = G.player.wgStat||{}; st.pearls = (st.pearls||0) + 1; logMsg('a pearl! it gleams in the shell', 'loot'); checkAchievements(); }
   if (node && node.type==='ice'){ const st = G.player.wgStat = G.player.wgStat||{}; st.ice = (st.ice||0) + 1; checkAchievements(); }
@@ -14369,6 +14375,7 @@ function questValidateAll(){
   }
 }
 function questIsReady(q){
+  if (q.kind==='story') return false;
   const here = curTownKey();
   switch (q.kind){
     case 'bounty': case 'hunt': return q.progress>=q.target;
@@ -14384,6 +14391,7 @@ function questIsReady(q){
 }
 // short title and the current objective line, for the tracker and the captain's list
 function questTitle(q){
+  if (q.kind==='story') return SQ[q.sq].nm;
   const word = SITE_WORD[q.siteKind]||'dungeon';
   switch (q.kind){
     case 'conquest': return q.siteX!==undefined ? `Conquer the ${cap(word)}` : `Conquest`;
@@ -14400,6 +14408,7 @@ function questTitle(q){
 }
 function cap(s){ return s ? s[0].toUpperCase()+s.slice(1) : s; }
 function questObjective(q){
+  if (q.kind==='story') return sqObjective(q.sq);
   const home = q.townName || 'the town that posted it';
   const word = SITE_WORD[q.siteKind]||'dungeon';
   if (q.kind==='escort') return q.arrived ? `Speak to the Captain in ${q.destName}` : `Lead ${q.merchant} safely to ${q.destName}`;
@@ -14420,6 +14429,7 @@ function questObjective(q){
 function questProgressText(q){ return `<b>${esc(questTitle(q))}</b> &mdash; ${esc(questObjective(q))}`; }
 // where the quest wants you to go next (null: nowhere in particular)
 function questTarget(q){
+  if (q.kind==='story') return sqTarget(q.sq);
   const home = q.townKey ? questKeyXY(q.townKey) : null;
   if (q.kind==='escort') return { x:q.destX, y:q.destY, turnIn:!!q.arrived };
   if (q.kind==='rescue') return q.freed ? (home && Object.assign(home,{turnIn:true})) : { x:q.siteX, y:q.siteY };
@@ -14431,7 +14441,7 @@ function questTarget(q){
 }
 function questIsReadyAnywhere(q){ return (q.kind==='delivery' || q.kind==='supply') && questIsReady(q); }
 function trackedQuest(){
-  const qs = G.player && G.player.quests || [];
+  const qs = G.player ? questsShown() : [];
   return qs.find(q=>q.id===G.player.trackedQuest) || qs[0] || null;
 }
 function trackQuest(id){ G.player.trackedQuest = id; renderHud && renderHud(); }
@@ -14578,6 +14588,7 @@ function questOnKill(m){
 }
 // a site's master falls - conquests, and any rescue there follows the site if it moves
 function questOnBossDefeated(oldX, oldY, newX, newY){
+  try{ sqOnBossDefeated(oldX, oldY); }catch(e){ console.error(e); }
   for (const q of (G.player.quests||[])){
     if (q.kind==='conquest' && q.progress<q.target){
       const match = q.siteX!==undefined ? (q.siteX===oldX && q.siteY===oldY) : q.siteKind===G.siteKind;
@@ -14588,6 +14599,7 @@ function questOnBossDefeated(oldX, oldY, newX, newY){
 }
 // rescues: arriving on the right floor, and freeing the captive once the floor is clear
 function questOnFloorLoaded(){
+  try{ sqOnFloor(); sqSpireBoss(); }catch(e){ console.error(e); }
   G.rescueHere = null;
   if (G.gameMode!==1) return;
   for (const q of (G.player.quests||[])){
@@ -14750,7 +14762,7 @@ window.addEventListener('resize', ()=>qtPlace());
 function renderQuestTracker(){
   let el = document.getElementById('qtrack');
   if (!el){ el = document.createElement('div'); el.id = 'qtrack'; document.body.appendChild(el); }
-  const qs = (G.player && G.player.quests) || [], gv = G.player && G.player.grave;
+  const qs = G.player ? questsShown() : [], gv = G.player && G.player.grave;
   if (!G.player || G.ui!=='playing' || G.gameOver || (!qs.length && !gv) || SET.compact || G.player.qtHidden){ el.style.display = 'none'; return; }
   el.style.display = 'block';
   qtPlace(el);
@@ -16642,7 +16654,7 @@ function renderOverworldMap(){
     if (vx<0||vy<0||vx>=viewCols||vy>=viewRows) continue;
     drawMythicBeastIcon(vx,vy,COL.mythic);
   }
-  for (const q of (G.player.quests||[])){
+  for (const q of questsShown()){
     const t = questTarget(q); if (!t) continue;
     const vx = t.x-camX, vy = t.y-camY; if (vx<0||vy<0||vx>=viewCols||vy>=viewRows) continue;
     drawGlyph(vx, vy, t.turnIn ? '?' : '!', t.turnIn ? '#8ae0ff' : COL.gold, 900);
@@ -17043,7 +17055,7 @@ function renderOverworldMapZoomed(){
       ctx.fillStyle = '#fff4d0'; ctx.font = `900 ${Math.round(R*1.5)}px Georgia, serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('!', ex, ey+R*0.08); } }
   // quest objectives: a gold ! (or a blue ? to turn in), with a dashed trail to the one you're tracking
   const tqm = trackedQuest();
-  if (mapF('quests')) for (const q of (G.player.quests||[])){
+  if (mapF('quests')) for (const q of questsShown()){
     const t = questTarget(q); if (!t) continue;
     const qx = (t.x-zCamX)*cellPx + cellPx/2, qy = (t.y-zCamY)*cellPx + cellPx/2, R = clamp(cellPx*1.1, 11*dpr, 19*dpr);
     if (q===tqm){ ctx.save(); ctx.setLineDash([7*dpr,6*dpr]); ctx.lineWidth = 2.5*dpr; ctx.strokeStyle = t.turnIn ? 'rgba(90,170,220,0.85)' : 'rgba(200,140,20,0.9)';
@@ -18159,6 +18171,7 @@ function wevArenaWon(){
   const f = G.wevFight; if (!f) return false;
   G.wevFight = null;
   if (f.kind==='townarena') return townArenaWon(f);
+  if (f.kind==='sqfight' || f.kind==='sqboss') return sqFightWon(f);
   if (f.kind==='delve' || f.kind==='hunt') return wgArenaWon(f);
   const e = wevP(), p = G.player, st = wevStats(), L = p.level;
   if (f.kind==='camp'){
@@ -18961,6 +18974,7 @@ const WG_POI = {
       [['Toss in 10 gold', ()=>wgWish(poi, 10)], ['Toss in 100 gold', ()=>wgWish(poi, 100)], ['Walk on', ()=>{}]], 'a wishing well');
   },
   hermit(poi){
+    if (sqOnTalk('hermit')) return;   // the hermit's own quest (see SECTION: STORY QUESTS)
     const s = wgState(), p = G.player;
     const hidden = (G.ow.pois||[]).filter(o=>o.k!=='ferry' && !s.found.includes(o.id) && !owSeen(o.x, o.y)).sort((a,b)=>Math.hypot(a.x-poi.x, a.y-poi.y) - Math.hypot(b.x-poi.x, b.y-poi.y))[0];
     const tip = hidden ? `"There's ${hidden.k==='cave' || hidden.k==='grotto' || hidden.k==='ruin' ? 'something worth finding' : esc(hidden.name)} ${wevWhere(hidden.x, hidden.y)} - I've marked it on your map."` : '"I\'ve told you all I know. Go well."';
@@ -20303,7 +20317,7 @@ function townBench(kind){
     rec.day[k] = today; const sk = SK_DEFS[(today + G.interior.key.length) % SK_DEFS.length], xp = 40 + skLvl(sk[0])*8, lore = WG_LORE[(today*3 + G.interior.key.length) % WG_LORE.length];
     skGainXP(sk[0], xp); logMsg(`you read a while. ${lore} (+${xp} ${sk[1]} xp from a dog-eared manual)`, 'magic'); renderGame(); return true; }
   if (kind==='innbed'){
-    const price = 15; if (p.gold < price){ logMsg('"Fifteen gold a night, love - no credit."', 'hit'); renderGame(); return true; }
+    const price = sqUnlocked('freeinn') ? 0 : 15; if (p.gold < price){ logMsg('"Fifteen gold a night, love - no credit."', 'hit'); renderGame(); return true; }
     p.gold -= price; fullyRestPlayer(); p.runEnergy = 100; logMsg(`you rent the room for ${price} gold and sleep like a log`, 'good'); renderGame(); return true; }
   if (kind==='crates'){
     const k = 'crates'; if (rec.day[k]===today){ logMsg('you\'ve already turned the crates over today', ''); renderGame(); return true; }
@@ -20327,6 +20341,7 @@ function townGuild(k){
   else if (k==='wizards') opts = [daily('Collect the guild\'s runes', ()=>{ skAdd('r_chaos', 30); const m = 35*rsLvl('magic'); skGainXP('magic', m); logMsg(`the archmage hands you 30 chaos runes and a lecture (+${m} Magic xp)`, 'magic'); })];
   else if (k==='cooks') opts = [['Cook on the guild range', ()=>{ G.cookAt = 'guild'; setUi('cook'); }]];
   else if (k==='miners') opts = [daily('Work the guild seam', ()=>{ const n = 4 + Math.floor(skLvl('mining')/15); skAdd('coal', n*2); skAdd('mithril', n); const xp = n*120; skGainXP('mining', xp); logMsg(`you work the guild seam: ${n*2} coal and ${n} mithril ore (+${xp} Mining xp)`, 'loot'); })];
+  else if (k==='champions') opts = [daily('Claim the champion\'s purse and train', ()=>{ const g = roundH((200 + G.player.level*20)*goldFindMult()); G.player.gold += g; for (const sk of ['attack','strength','defence']) skGainXP(sk, 20*rsLvl(sk)); logMsg(`the Champions pay you ${g} gold and put you through your paces`, 'good'); })];
   else opts = [['Gem-cutting table', ()=>useBench('gemcut')], ['Jeweller\'s bench', ()=>useBench('jeweller')], ['Loom', ()=>useBench('loom')], ['Potter\'s wheel', ()=>useBench('wheel')]];
   wevDialog(g.nm, `Members get to ${g.perk}.`, opts.concat([['Leave', ()=>{}]]), 'the guild hall');
 }
@@ -21553,6 +21568,688 @@ function gfxFpdBuild(T){
   const site = G.ow && G.ow.map[G.owPos.x] ? G.ow.map[G.owPos.x][G.owPos.y] : null;
   FPD.scene.traverse(o=>{ if (o.isPoints && o.material && o.material.size < 0.05){ o.material.opacity = site===OW_MINE ? 0.95 : 0.5; o.material.size = site===OW_MINE ? 0.022 : 0.014; } });
 }
+
+// ===================== SECTION: STORY QUESTS, THE JOURNAL, DIARIES, CLUES AND TOMES =====================
+// hand-made quests, each a list of steps with dialogue: talk to someone,
+// go somewhere, fight, find a thing deep in a dungeon, beat a boss with its
+// own tricks, solve a puzzle, choose. Quests have requirements (skills,
+// quest points, earlier quests), give quest points and unique rewards, and
+// some unlock things - a spellbook, teleports, a guild, a fence. Givers are
+// all over: the innkeeper, the smith, the alchemist, the priest, the
+// Captain, the mayor, a hermit, a ghost, a note on a skeleton. There are
+// chains (the Goblin War, the Haunted Mine), three factions with ranks, and
+// a main storyline - the Waking Lich - that ends in a dungeon of its own.
+// The journal keeps every quest's log; diaries set tasks for each region;
+// clue scrolls are real trails now; tomes teach something for good.
+const SQ = {
+  // ---- quest givers in town ----
+  rats:    { nm:'Rats in the Cellar', giver:'tavern', qp:1, req:{}, desc:'The innkeeper\'s cellar is overrun with giant rats.',
+    steps:[ { k:'talk', who:'tavern', say:'"Rats! Big as dogs, down in my cellar. Clear them out and the next room\'s on the house."' },
+            { k:'fight', foe:'rats', n:4, lvl:-2, say:'You lift the trapdoor and the rats come boiling up the steps!', obj:'Kill the rats in the tavern cellar (talk to the innkeeper)' },
+            { k:'talk', who:'tavern', say:'"Is it quiet down there? Bless you. Here - for your trouble."' } ],
+    reward:{ gold:120, xp:{ hitpoints:300 }, note:'free nights at any inn' }, unlock:'freeinn' },
+  ore:     { nm:'Rare Ore', giver:'blacksmith', qp:1, req:{ skills:{ mining:15 } }, desc:'The smith needs good iron ore for a commission.',
+    steps:[ { k:'talk', who:'blacksmith', say:'"I\'ve a lord\'s commission and no ore worth the name. Bring me ten iron ore and I\'ll make it worth your while."' },
+            { k:'bring', who:'blacksmith', item:'iron', n:10, obj:'Bring 10 iron ore to a blacksmith', say:'"Now that\'s ore! Take this - I forged a spare."' } ],
+    reward:{ gold:200, xp:{ smithing:900, mining:600 }, item:'smithhammer' } },
+  herbs:   { nm:'Herbs for the Healer', giver:'alchemist', qp:1, req:{ skills:{ foraging:5 } }, desc:'The alchemist is short of silverleaf for her salves.',
+    steps:[ { k:'talk', who:'alchemist', say:'"Fever in the farms and not a silverleaf left. Six would do - they grow in the woods and on the grass."' },
+            { k:'bring', who:'alchemist', item:'silverleaf', n:6, obj:'Bring 6 silverleaf to an alchemist', say:'"Fresh, too. Here, take some of what I make with them."' } ],
+    reward:{ gold:150, xp:{ foraging:700, alchemy:900 }, potions:3 } },
+  // ---- found in the world ----
+  hermit:  { nm:'The Hermit\'s Lost Book', giver:'hermit', qp:2, req:{ qp:1 }, desc:'A hermit lost his book of names in an old ruin, behind a door that asks riddles.',
+    steps:[ { k:'talk', who:'hermit', say:'"My book! I left it in the ruins when the door locked behind me. It asks a riddle - I never was good at riddles."' },
+            { k:'goto', at:'ruin', obj:'Find the hermit\'s ruin', say:'A stone door stands in the ruin, with a mouth carved in it. It speaks.' },
+            { k:'puzzle', pz:'riddle', obj:'Answer the door\'s riddle' },
+            { k:'talk', who:'hermit', say:'"You found it! Take this - I copied it out twice, and I am too old to learn anything new."' } ],
+    reward:{ xp:{ magic:1200 }, tome:'insight', tablet:'hermit' }, unlock:'hermitport' },
+  bones:   { nm:'A Note on the Bones', giver:'remains', qp:1, req:{}, desc:'A dead adventurer\'s last note points to buried treasure.',
+    steps:[ { k:'read', say:'Clutched in the skeleton\'s hand: "I buried it where the old road bends, by the three stones. Tell my brother." A rough map is drawn below.' },
+            { k:'goto', at:'wild', obj:'Dig where the note says', say:'The ground is soft here. You dig, and your spade strikes a chest.' } ],
+    reward:{ gold:400, clue:1, tmap:1 } },
+  ghost:   { nm:'The Weeping Ghost', giver:'ghost', qp:2, req:{}, desc:'A ghost in a graveyard wants its skull back from the crypt below.',
+    steps:[ { k:'talk', who:'ghost', say:'"They took my head... down below, on the second floor of the crypt. I cannot rest without it."' },
+            { k:'floor', at:'graveyard', floor:2, item:'A yellowed skull', obj:'Find the skull on floor 2 of the graveyard', say:'You find a yellowed skull in a niche, wrapped in a shroud.' },
+            { k:'goto', at:'start', obj:'Return the skull to the ghost', say:'The ghost takes the skull in both hands. "At last," it sighs, and fades into the grass - leaving something behind.' } ],
+    reward:{ xp:{ prayer:1500 }, item:'ghostamulet' } },
+  // ---- deep in the dungeons ----
+  trapped: { nm:'Trapped Below', giver:'questgiver', qp:1, req:{}, desc:'An adventurer is pinned under rubble on the third floor of a dungeon.',
+    steps:[ { k:'talk', who:'questgiver', say:'"Aldo went down into the old dungeon and never came back up. His sister says floor three. Bring back word - or bring back Aldo."' },
+            { k:'floor', at:'dungeon', floor:3, item:'Aldo\'s signet', obj:'Find Aldo on floor 3 of the dungeon', say:'Aldo is pinned under fallen stone. You heave it off him; he presses his signet on you for his sister and limps for the stairs.' },
+            { k:'talk', who:'questgiver', say:'"Alive! His sister will want to thank you herself. Take this from the Watch."' } ],
+    reward:{ gold:300, xp:{ attack:600, defence:600 } } },
+  relic:   { nm:'The Lost Relic', giver:'temple', qp:2, req:{ combat:20 }, desc:'A temple relic was carried off to the deepest floor of a castle.',
+    steps:[ { k:'talk', who:'temple', say:'"The Hand of Saint Aurel was stolen and taken to the castle\'s deepest hall. Its master keeps it by his throne."' },
+            { k:'floor', at:'castle', floor:'boss', item:'The Hand of Saint Aurel', obj:'Recover the relic from the castle\'s deepest floor', say:'Beside the throne, in a reliquary of beaten gold: the Hand of Saint Aurel.' },
+            { k:'talk', who:'temple', say:'"The Hand comes home. Wear this - it was blessed by the Hand itself, three hundred years ago."' } ],
+    reward:{ xp:{ prayer:2500 }, item:'aurelring' } },
+  // ---- the Goblin War (a chain) ----
+  gob1:    { nm:'The Goblin War I: Scouts', chain:'The Goblin War', giver:'questgiver', qp:1, req:{}, desc:'Goblin scouts are watching the roads.',
+    steps:[ { k:'talk', who:'questgiver', say:'"Goblin scouts on every road. Something\'s stirring them up. Kill a few and we\'ll see who comes looking."' },
+            { k:'kill', foe:/goblin/i, n:6, obj:'Kill 6 goblins' },
+            { k:'talk', who:'questgiver', say:'"Six of them, and every one painted with the same red hand. That\'s a warband."' } ],
+    reward:{ gold:150, xp:{ strength:800 } } },
+  gob2:    { nm:'The Goblin War II: The Warband', chain:'The Goblin War', giver:'questgiver', qp:1, req:{ quests:['gob1'] }, desc:'Break the red-hand warband.',
+    steps:[ { k:'talk', who:'questgiver', say:'"Their camp\'s out in the wilds - I\'ve marked it. Break it."' },
+            { k:'goto', at:'wild', obj:'Find the red-hand warband\'s camp', say:'Fires, drums, and a ring of red-painted goblins. They see you.' },
+            { k:'fight', foe:'goblin', n:5, elite:1, obj:'Break the warband', say:'The warband charges!' },
+            { k:'choice', say:'When it\'s over, one goblin is left alive - barely more than a child, clutching a crude key. It begs.', obj:'Decide the young goblin\'s fate',
+              opts:[ ['Spare it - let it run', 'mercy'], ['Take the key and finish it', 'nomercy'] ] },
+            { k:'talk', who:'questgiver', say:'"The warband\'s broken. But they had a king, and he\'ll want blood."' } ],
+    reward:{ gold:250, xp:{ attack:1000 } } },
+  gob3:    { nm:'The Goblin War III: The Goblin King', chain:'The Goblin War', giver:'questgiver', qp:2, req:{ quests:['gob2'], combat:15 }, desc:'Face the Goblin King in his hall.',
+    steps:[ { k:'talk', who:'questgiver', say:'"The Goblin King\'s hall is in the hills. End this."' },
+            { k:'goto', at:'wild', obj:'Find the Goblin King\'s hall', sayFlag:{ mercy:'At the hall\'s back door, the young goblin you spared is waiting. It turns its key in the lock and slips you inside, past the guards.', nomercy:'The front gate is barred and guarded. You go in the hard way.' } },
+            { k:'boss', boss:'goblinking', obj:'Defeat the Goblin King' },
+            { k:'talk', who:'questgiver', say:'"The Goblin King, dead! The roads are ours again. The town owes you, and won\'t forget it."' } ],
+    reward:{ gold:600, xp:{ attack:1500, strength:1500 }, itemFlag:{ mercy:'goblincrown', nomercy:'kingscleaver' }, rep:3 } },
+  // ---- the Haunted Mine (a chain) ----
+  mine1:   { nm:'The Haunted Mine I: Strange Lights', chain:'The Haunted Mine', giver:'mayor', qp:1, req:{ skills:{ mining:10 } }, desc:'Lights and voices in the old mine.',
+    steps:[ { k:'talk', who:'mayor', say:'"The miners won\'t go down. Green lights on the second level, and voices. Go and see."' },
+            { k:'floor', at:'mine', floor:2, item:'A glowing shard', obj:'Investigate floor 2 of the mine', say:'In a side tunnel, a shard of green crystal pulses like a heartbeat.' },
+            { k:'talk', who:'mayor', say:'"That\'s no ore I\'ve ever seen. Something is waking down there."' } ],
+    reward:{ gold:200, xp:{ mining:1000 } } },
+  mine2:   { nm:'The Haunted Mine II: The Brazier Ward', chain:'The Haunted Mine', giver:'mayor', qp:1, req:{ quests:['mine1'] }, desc:'Relight the ancient wards at the mine mouth.',
+    steps:[ { k:'talk', who:'mayor', say:'"The old dwarves kept wards at the mine mouth - braziers, lit in a sacred order. The order is carved in the stone."' },
+            { k:'goto', at:'mine', obj:'Go to the mine mouth', say:'Five braziers stand cold around the entrance, a verse carved above them.' },
+            { k:'puzzle', pz:'brazier', obj:'Light the braziers in the right order' },
+            { k:'talk', who:'mayor', say:'"The wards burn again - I can see them from here. Now, whatever is down there can\'t get out. But we need to go in."' } ],
+    reward:{ gold:250, xp:{ firemaking:1200 } } },
+  mine3:   { nm:'The Haunted Mine III: The Thing in the Deep', chain:'The Haunted Mine', giver:'mayor', qp:2, req:{ quests:['mine2'], combat:12 }, desc:'Destroy what lurks at the bottom of the mine.',
+    steps:[ { k:'talk', who:'mayor', say:'"Go down and finish it. And take this lantern - the old foreman\'s. It never goes out."' },
+            { k:'siteboss', at:'mine', obj:'Defeat the master of the mine' },
+            { k:'talk', who:'mayor', say:'"The miners are going back down singing. You\'ve given us the mine back."' } ],
+    reward:{ gold:500, xp:{ mining:2500 }, item:'lanternpick' } },
+  // ---- the factions ----
+  mage1:   { nm:'The Mages\' Circle: Initiate', faction:'mages', rank:1, giver:'guild', qp:1, req:{ skills:{ magic:15 } }, desc:'Join the Mages\' Circle.',
+    steps:[ { k:'talk', who:'guild', say:'"The Circle tests every initiate with an offering of essence. Thirty measures."' },
+            { k:'bring', who:'guild', item:'essence', n:30, obj:'Bring 30 rune essence to a guildmaster', say:'"Accepted. Welcome, Initiate."' } ],
+    reward:{ xp:{ magic:1500, runecrafting:800 } } },
+  mage2:   { nm:'The Mages\' Circle: Adept', faction:'mages', rank:2, giver:'guild', qp:1, req:{ quests:['mage1'], skills:{ magic:30 } }, desc:'Catch the Circle\'s runaway familiar.',
+    steps:[ { k:'talk', who:'guild', say:'"An Adept\'s familiar has escaped - a fire salamander. It was last seen out in the wilds. Bring it back... gently."' },
+            { k:'goto', at:'wild', obj:'Find the runaway familiar', say:'A small salamander basks on a hot stone, sizzling. It eyes you.' },
+            { k:'choice', say:'How do you catch it?', obj:'Catch the salamander', opts:[ ['Coax it with a fire spell', 'coax'], ['Grab it with your bare hands', 'grab'] ] },
+            { k:'talk', who:'guild', say:'"Back in its brazier. Well done, Adept."' } ],
+    reward:{ xp:{ magic:3000 } } },
+  mage3:   { nm:'The Mages\' Circle: Magister', faction:'mages', rank:3, giver:'guild', qp:2, req:{ quests:['mage2'], skills:{ magic:45 } }, desc:'Defeat a rogue elementalist.',
+    steps:[ { k:'talk', who:'guild', say:'"A former brother has turned to wild magic. He calls himself the Stormcaller. Stop him."' },
+            { k:'goto', at:'wild', obj:'Find the Stormcaller', say:'Lightning crawls over a ring of standing stones. In the middle, the Stormcaller laughs.' },
+            { k:'boss', boss:'stormcaller', obj:'Defeat the Stormcaller' },
+            { k:'talk', who:'guild', say:'"Magister. The Circle\'s highest honour - wear its robe."' } ],
+    reward:{ xp:{ magic:6000 }, item:'magisterrobe' } },
+  thief1:  { nm:'The Thieves\' Guild: Footpad', faction:'thieves', rank:1, giver:'tavern', qp:1, req:{ notQuests:['guard1'] }, desc:'A hooded figure in the tavern offers you work.', exclusive:'guard',
+    steps:[ { k:'talk', who:'tavern', say:'A hooded figure in the corner beckons. "Interested in easier money? Prove it. Three gems - no questions asked."' },
+            { k:'bring', who:'tavern', item:'gems3', n:3, obj:'Bring 3 cut or uncut gems to the hooded figure in a tavern', say:'"Nice. You\'re in, Footpad. And the Royal Guard won\'t have you now."' } ],
+    reward:{ gold:300 } },
+  thief2:  { nm:'The Thieves\' Guild: Cracksman', faction:'thieves', rank:2, giver:'tavern', qp:1, req:{ quests:['thief1'] }, desc:'Open a merchant\'s strongbox.',
+    steps:[ { k:'talk', who:'tavern', say:'"A merchant keeps a strongbox with a sliding lock. Open it."' },
+            { k:'puzzle', pz:'sliding', obj:'Crack the sliding lock' },
+            { k:'talk', who:'tavern', say:'"Smooth. Here\'s your cut. And the fence will buy from you now - better prices than any shop."' } ],
+    reward:{ gold:700 }, unlock:'fence' },
+  thief3:  { nm:'The Thieves\' Guild: Master Thief', faction:'thieves', rank:3, giver:'tavern', qp:2, req:{ quests:['thief2'], combat:20 }, desc:'The big score.',
+    steps:[ { k:'talk', who:'tavern', say:'"The big one: a smugglers\' hoard out in the wilds. They\'ll fight for it."' },
+            { k:'goto', at:'wild', obj:'Find the smugglers\' hoard', say:'Crates under tarpaulins - and the smugglers, reaching for their knives.' },
+            { k:'fight', foe:'human', n:4, elite:1, obj:'Take the hoard' },
+            { k:'talk', who:'tavern', say:'"Master Thief. Take the gloves - they\'ve picked a king\'s pocket."' } ],
+    reward:{ gold:2000, item:'thiefgloves' } },
+  guard1:  { nm:'The Royal Guard: Recruit', faction:'guard', rank:1, giver:'questgiver', qp:1, req:{ notQuests:['thief1'] }, desc:'Enlist in the Royal Guard.', exclusive:'thieves',
+    steps:[ { k:'talk', who:'questgiver', say:'"The Guard needs fighters. Prove yourself - fifteen kills on the roads."' },
+            { k:'kill', foe:/./, n:15, obj:'Kill 15 monsters' },
+            { k:'talk', who:'questgiver', say:'"Recruit. Keep your nose clean - no dealings with the Thieves\' Guild."' } ],
+    reward:{ gold:200, xp:{ defence:1200 } } },
+  guard2:  { nm:'The Royal Guard: Sergeant', faction:'guard', rank:2, giver:'questgiver', qp:1, req:{ quests:['guard1'] }, desc:'Carry orders to another town.',
+    steps:[ { k:'talk', who:'questgiver', say:'"Sealed orders, for the Captain in another town. Don\'t lose them."' },
+            { k:'goto', at:'town', obj:'Carry the orders to another town', say:'The Captain breaks the seal and reads. "Good. Tell your Captain we\'re ready."' },
+            { k:'talk', who:'questgiver', say:'"Sergeant. Well done."' } ],
+    reward:{ gold:400, xp:{ defence:2500 } } },
+  guard3:  { nm:'The Royal Guard: Knight', faction:'guard', rank:3, giver:'questgiver', qp:2, req:{ quests:['guard2'], combat:20 }, desc:'Bring the traitor captain to justice.',
+    steps:[ { k:'talk', who:'questgiver', say:'"One of our own sold the patrol routes to raiders. Captain Vosk. He\'s fled to the wilds."' },
+            { k:'goto', at:'wild', obj:'Find Captain Vosk', say:'Vosk turns, sword already drawn. "You should have stayed home."' },
+            { k:'boss', boss:'vosk', obj:'Defeat the traitor' },
+            { k:'talk', who:'questgiver', say:'"Kneel. Rise, Knight of the Realm - and take this shield."' } ],
+    reward:{ gold:1000, item:'knightshield' } },
+  // ---- the main storyline: the Waking Lich ----
+  lich1:   { nm:'The Waking Lich I: Restless Graves', main:1, giver:'temple', qp:1, req:{}, desc:'The dead are walking more than they should.',
+    steps:[ { k:'talk', who:'temple', say:'"The dead are restless - more of them every night. Something is calling them. Put some back in the ground, and see what they carry."' },
+            { k:'kill', foe:'undead', n:8, obj:'Slay 8 undead' },
+            { k:'talk', who:'temple', say:'"Black candles in their hands, and the same sigil on every one. A lich\'s mark. The graveyards will know more."' } ],
+    reward:{ gold:200, xp:{ prayer:1000 } } },
+  lich2:   { nm:'The Waking Lich II: The Graveyard Watch', main:2, giver:'temple', qp:1, req:{ quests:['lich1'] }, desc:'Keep watch at a graveyard by night.',
+    steps:[ { k:'talk', who:'temple', say:'"Watch a graveyard at night. The dead talk, if you know how to listen."' },
+            { k:'goto', at:'graveyard', night:1, obj:'Watch a graveyard at night', say:'At midnight a pale knight rises from a grave. "You seek the Wakener? He sleeps in the Black Spire - and wakes a little more each night."' },
+            { k:'choice', say:'The ghost-knight waits.', obj:'Answer the ghost-knight', opts:[ ['"Help me stop him."', 'ally'], ['"Back in your grave, dead thing."', 'scorn'] ] },
+            { k:'talk', who:'temple', say:'"The Black Spire... a hermit who lives in the wilds was there once, they say."' } ],
+    reward:{ xp:{ prayer:1500 } } },
+  lich3:   { nm:'The Waking Lich III: The Hermit Knows', main:3, giver:'temple', qp:1, req:{ quests:['lich2'] }, desc:'Find a hermit who has seen the Black Spire.',
+    steps:[ { k:'talk', who:'temple', say:'"Find the hermit. Be patient with him."' },
+            { k:'goto', at:'hermit', obj:'Find the hermit', say:'"The Spire? Yes. Its gate is sealed by three relics - bone, iron and glass. But first, prove you can think."' },
+            { k:'puzzle', pz:'riddle', obj:'Answer the hermit\'s riddle' },
+            { k:'talk', who:'temple', say:'"Three relics. Bone, iron and glass. Go."' } ],
+    reward:{ xp:{ magic:1500 } } },
+  lich4:   { nm:'The Waking Lich IV: The Relic of Bone', main:4, giver:'temple', qp:1, req:{ quests:['lich3'] }, desc:'The first relic lies in a crypt.',
+    steps:[ { k:'talk', who:'temple', say:'"Bone first. The crypts keep their oldest dead on the second floor."' },
+            { k:'floor', at:'graveyard', floor:2, item:'The Relic of Bone', obj:'Find the Relic of Bone on floor 2 of a graveyard', say:'A finger-bone in a silver cage, humming.' },
+            { k:'talk', who:'temple', say:'"One. Iron next - a castle\'s master guards it."' } ],
+    reward:{ xp:{ prayer:2000 } } },
+  lich5:   { nm:'The Waking Lich V: The Relic of Iron', main:5, giver:'temple', qp:1, req:{ quests:['lich4'], combat:18 }, desc:'The second relic is held by a castle\'s master.',
+    steps:[ { k:'talk', who:'temple', say:'"Iron. A castle\'s master wears it as a crown."' },
+            { k:'siteboss', at:'castle', obj:'Defeat a castle\'s master for the Relic of Iron', say:'Among the crown\'s spikes: an iron nail from the Spire\'s gate.' },
+            { k:'talk', who:'temple', say:'"Two. Glass last - the old ones buried it at a dig site."' } ],
+    reward:{ xp:{ attack:2500 } } },
+  lich6:   { nm:'The Waking Lich VI: The Relic of Glass', main:6, giver:'temple', qp:1, req:{ quests:['lich5'] }, desc:'The last relic was buried long ago.',
+    steps:[ { k:'talk', who:'temple', say:'"Glass. The scholars say it was buried at one of the old dig sites."' },
+            { k:'goto', at:'digsite', obj:'Search a dig site for the Relic of Glass', say:'Under the spoil heap, wrapped in oilcloth: a sphere of black glass with something moving inside.' },
+            { k:'talk', who:'temple', say:'"All three. The Spire\'s gate can be opened. But the Wakener has a herald - it will come for the relics."' } ],
+    reward:{ xp:{ archaeology:2500 } } },
+  lich7:   { nm:'The Waking Lich VII: The Herald', main:7, giver:'temple', qp:2, req:{ quests:['lich6'], combat:25 }, desc:'The lich\'s herald has come for the relics.',
+    steps:[ { k:'talk', who:'temple', say:'"It is coming. Meet it away from the town - out in the wilds."' },
+            { k:'goto', at:'wild', obj:'Meet the Herald in the wilds', sayFlag:{ ally:'The Herald rises out of the ground - and beside you, the ghost-knight rises too. "I keep my word."', scorn:'The Herald rises out of the ground, robed in grave-dirt.' } },
+            { k:'boss', boss:'herald', obj:'Defeat the Lich\'s Herald' },
+            { k:'talk', who:'temple', say:'"The Herald is dust. Only the Wakener remains. The Black Spire - I\'ve marked it on your map."' } ],
+    reward:{ gold:800, xp:{ prayer:4000 } } },
+  lich8:   { nm:'The Waking Lich VIII: The Black Spire', main:8, giver:'temple', qp:5, req:{ quests:['lich7'], combat:30, qp:12 }, desc:'End the Wakener in the Black Spire.',
+    steps:[ { k:'talk', who:'temple', say:'"Go. The gods go with you - or they had better."' },
+            { k:'goto', at:'spire', obj:'Go to the Black Spire', say:'The Spire\'s gate is a floor of black and white stone. Only one way across: the way a knight moves.' },
+            { k:'puzzle', pz:'knight', obj:'Cross the knight\'s floor' },
+            { k:'spire', obj:'Climb the Black Spire and destroy the Wakener', say:'The gate grinds open. Six floors up, the Wakener waits.' },
+            { k:'talk', who:'temple', say:'"It is over. The dead sleep. You have saved more lives than anyone will ever know. Take these - and the old magic is yours to learn."' } ],
+    reward:{ gold:3000, xp:{ magic:8000, prayer:8000 }, item:'wakenerstaff', tome:'ancients' }, unlock:'ancients' },
+};
+// the order they're listed in the journal
+const SQ_ORDER = ['lich1','lich2','lich3','lich4','lich5','lich6','lich7','lich8','rats','ore','herbs','trapped','relic','gob1','gob2','gob3','mine1','mine2','mine3','hermit','bones','ghost','mage1','mage2','mage3','thief1','thief2','thief3','guard1','guard2','guard3'];
+const SQ_WHO = { tavern:'an innkeeper', blacksmith:'a blacksmith', alchemist:'an alchemist', temple:'a priest (in a village or city temple)', questgiver:'a Captain of the Watch', mayor:'a mayor', guild:'a guildmaster (in a city guild hall)', hermit:'the hermit in the wilds', ghost:'a ghost in a graveyard (at night)', remains:'a skeleton out in the wilds' };
+// ---- unique rewards ----
+function sqItem(id){
+  const T = (t, slot)=>rsMakeArmour('metal', t, slot), it = (()=>{ switch(id){
+    case 'smithhammer':  { const w = rsMakeWeapon(2, 0); return Object.assign(w, { nm:'Smith\'s Hammer', basis:'Warhammer', dmgB:(w.dmgB||0)+4, acc:(w.acc||0)+4 }); }
+    case 'ghostamulet':  { const a = rsItem('necklace'); return Object.assign(a, { nm:'Amulet of the Weeping Ghost', basis:'Amulet', prayB:6, magAcc:6, ac:2 }); }
+    case 'aurelring':    { const a = rsItem('ring'); return Object.assign(a, { nm:'Ring of Saint Aurel', basis:'Ring', prayB:8, ac:3 }); }
+    case 'goblincrown':  { const h = T(3, 'head'); return Object.assign(h, { nm:'The Goblin Crown', ac:(h.ac||0)+4, prayB:3, note:'the young goblin\'s gift' }); }
+    case 'kingscleaver': { const w = rsMakeWeapon(3, 2); return Object.assign(w, { nm:'The King\'s Cleaver', dmgB:(w.dmgB||0)+8, acc:(w.acc||0)+2 }); }
+    case 'lanternpick':  { const w = rsMakeWeapon(2, 0); return Object.assign(w, { nm:'The Foreman\'s Lantern-Pick', basis:'Pickaxe', dmgB:(w.dmgB||0)+3, note:'its lantern never goes out (+10% Mining xp while worn)' }); }
+    case 'magisterrobe': { const r = rsMakeArmour('cloth', 4, 'chest'); return Object.assign(r, { nm:'Robe of the Magister', magAcc:(r.magAcc||0)+14, prayB:2 }); }
+    case 'thiefgloves':  { const g = rsMakeArmour('hide', 3, 'arms'); return Object.assign(g, { nm:'Master Thief\'s Gloves', acc:(g.acc||0)+6, rngAcc:(g.rngAcc||0)+6 }); }
+    case 'knightshield': { const s = rsItem('offhand'); return Object.assign(s, { nm:'Shield of the Realm', basis:'Kiteshield', ac:16, acc:2, prayB:2 }); }
+    case 'wakenerstaff': { const w = rsMakeWeapon(5, 0); return Object.assign(w, { nm:'Staff of the Fallen Wakener', basis:'Staff', magAcc:24, dmgB:(w.dmgB||0)+4 }); }
+    case 'questcape':    { const c = rsItem('cape'); return Object.assign(c, { nm:'Quest Point Cape', basis:'Cape', capeCol:'#2a5ab0', rsCol:'#2a5ab0', ac:9, acc:4, rngAcc:4, magAcc:4, prayB:4 }); }
+  } })();
+  if (!it) return null;
+  it.quality = Math.max(it.quality||0, 3); it.questItem = id; it.price = Math.max(it.price||0, 5000); it.used = 1; it.rs = 1;
+  return it;
+}
+function sqTablet(where){ const it = newItem(); Object.assign(it, { used:1, consumable:0, kind:'scroll', tablet:where, nm:'Hermitage teleport tablet', desc:'snap it to step through to the hermit\'s door - it reforms in your pack', price:500 }); return it; }
+// ---- state: p.sq[id] = { step, flags, log, loc, state, n, started } ----
+function sqP(){ const p = G.player; p.sq = p.sq || {}; p.sqUn = p.sqUn || {}; return p.sq; }
+function sqDone(id){ const s = sqP()[id]; return !!(s && s.state==='done'); }
+function sqActive(id){ const s = sqP()[id]; return !!(s && s.state==='active'); }
+function sqStep(id){ const s = sqP()[id]; return s && s.state==='active' ? SQ[id].steps[s.step] : null; }
+function sqUnlocked(k){ return !!(G.player && G.player.sqUn && G.player.sqUn[k]); }
+function sqLog(id, text){ const s = sqP()[id]; if (!s) return; s.log = s.log || []; s.log.push({ t:G.player.turnCount||0, text:String(text).replace(/<[^>]+>/g, '') }); }
+// can it be started? (true, or the reason not)
+function sqReqText(id){
+  const q = SQ[id], r = q.req||{}, out = [], p = G.player;
+  if (r.qp && (tkP().questPoints||0) < r.qp) out.push(`${r.qp} quest points`);
+  for (const k in (r.skills||{})) if (skLvl(k) < r.skills[k] && rsLvl(k) < r.skills[k]) out.push(`${RS_ALL_SKILLS().find(d=>d[0]===k) ? RS_ALL_SKILLS().find(d=>d[0]===k)[1] : cap(k)} ${r.skills[k]}`);
+  if (r.combat && (p.combatLevel||3) < r.combat) out.push(`combat level ${r.combat}`);
+  for (const d of (r.quests||[])) if (!sqDone(d)) out.push(`finish "${SQ[d].nm}"`);
+  for (const d of (r.notQuests||[])) if (sqDone(d) || sqActive(d)) out.push(`not be in the ${SQ[d].faction==='thieves' ? 'Thieves\' Guild' : 'Royal Guard'}`);
+  return out;
+}
+function sqCanStart(id){ const s = sqP()[id]; return !(s && (s.state==='active' || s.state==='done')) && !sqReqText(id).length; }
+// ---- where a step happens: picked when the step begins, near the town the quest came from ----
+function sqHome(id){ const s = sqP()[id]; return s && s.home ? questKeyXY(s.home) : { x:G.owPos.x, y:G.owPos.y }; }
+function sqResolve(id, step){
+  const s = sqP()[id], h = sqHome(id); s.loc = s.loc || {};
+  if (s.loc[s.step]) return s.loc[s.step];
+  let L = null;
+  const site = kinds=>{ const l = questNearbySites(h.x, h.y, 3, 60, kinds); return l.length ? { x:l[0].x, y:l[0].y } : null; };
+  if (step.at==='wild') L = questWildTile(h.x, h.y, 6, 16);
+  else if (step.at==='ruin' || step.at==='hermit'){ const k = step.at==='ruin' ? ['ruin','cave'] : ['hermit']; const ps = (G.ow.pois||[]).filter(o=>k.includes(o.k)).sort((a,b)=>Math.hypot(a.x-h.x, a.y-h.y)-Math.hypot(b.x-h.x, b.y-h.y)); L = ps[0] ? { x:ps[0].x, y:ps[0].y } : questWildTile(h.x, h.y, 6, 14); }
+  else if (step.at==='digsite'){ const ps = (G.ow.pois||[]).filter(o=>o.k==='digsite').sort((a,b)=>Math.hypot(a.x-h.x, a.y-h.y)-Math.hypot(b.x-h.x, b.y-h.y)); L = ps[0] ? { x:ps[0].x, y:ps[0].y } : questWildTile(h.x, h.y, 8, 16); }
+  else if (step.at==='graveyard') L = site(['graveyard','necro']) || site(null);
+  else if (step.at==='castle') L = site(['castle']) || site(null);
+  else if (step.at==='mine') L = site(['mine']) || site(null);
+  else if (step.at==='dungeon') L = site(['dungeon']) || site(null);
+  else if (step.at==='spire') L = sqSpire();
+  else if (step.at==='start') L = s.loc.start || { x:G.owPos.x, y:G.owPos.y };
+  else if (step.at==='town'){ const ts = townList().filter(t=>!(t.x===h.x && t.y===h.y)).sort((a,b)=>Math.hypot(a.x-h.x, a.y-h.y)-Math.hypot(b.x-h.x, b.y-h.y)); L = ts[0] ? { x:ts[0].x, y:ts[0].y } : null; }
+  if (!L) L = questWildTile(h.x, h.y, 5, 20) || { x:h.x, y:h.y };
+  s.loc[s.step] = L; owReveal(L.x, L.y, 3);
+  return L;
+}
+// the Black Spire: the necromancer's tower farthest from where you began
+function sqSpire(){
+  const s = wgState(); if (s.spire) return s.spire;
+  const sp = G.ow.spawnPos; let best = null, bd = -1;
+  for (let x=0;x<OW_COLS;x++) for (let y=0;y<OW_ROWS;y++){ const t = G.ow.map[x][y]; if (t!==OW_NECROTOWER && t!==OW_CASTLE) continue; const d = Math.hypot(x-sp.x, y-sp.y) + (t===OW_NECROTOWER ? 40 : 0); if (d > bd){ bd = d; best = { x, y }; } }
+  return (s.spire = best || { x:sp.x, y:sp.y });
+}
+// ---- starting, advancing, finishing ----
+function sqStart(id){
+  if (!sqCanStart(id)) return; const p = G.player, s = sqP();
+  s[id] = { step:0, flags:(s[id] && s[id].flags) || {}, log:[], loc:{}, state:'active', n:0, started:p.turnCount||0, home:curTownKey() || (G.owPos.x+','+G.owPos.y) };
+  s[id].loc.start = { x:G.owPos.x, y:G.owPos.y };
+  sqLog(id, `Started: ${SQ[id].desc}`); questToast('New quest: ' + SQ[id].nm, SQ[id].desc); sfx('notify');
+  if (SQ[id].faction) p.faction = p.faction || {};
+  sqAdvance(id, true);
+}
+function sqAdvance(id, first){
+  const s = sqP()[id], q = SQ[id]; if (!s) return;
+  if (!first) s.step++; s.n = 0;
+  if (s.step >= q.steps.length){ sqFinish(id); return; }
+  const st = q.steps[s.step];
+  if (st.k==='goto' || st.k==='floor' || st.k==='siteboss' || st.k==='spire') sqResolve(id, st);
+  if (!first) questToast(q.nm, sqObjective(id));
+  saveCurrentGame();
+}
+function sqFinish(id){
+  const s = sqP()[id], q = SQ[id], r = q.reward||{}, p = G.player; if (!s || s.state==='done') return;
+  s.state = 'done'; s.done = p.turnCount||0;
+  const got = [];
+  if (r.gold){ const g = roundH(r.gold*goldFindMult()); p.gold += g; got.push(`${g} gold`); }
+  for (const k in (r.xp||{})){ skGainXP(k, r.xp[k]); got.push(`${r.xp[k].toLocaleString()} ${RS_ALL_SKILLS().find(d=>d[0]===k) ? RS_ALL_SKILLS().find(d=>d[0]===k)[1] : k} xp`); }
+  const itemId = r.item || (r.itemFlag && (r.itemFlag[Object.keys(s.flags).find(f=>r.itemFlag[f])] || Object.values(r.itemFlag)[0]));
+  if (itemId){ const it = sqItem(itemId); if (it){ addToInventory(it); got.push(itemNameHtml(it)); } }
+  if (r.tome){ addToInventory(sqTome(r.tome)); got.push('a ' + TOMES[r.tome].nm); }
+  if (r.tablet){ addToInventory(sqTablet(r.tablet)); got.push('a teleport tablet'); }
+  if (r.potions) for (let i=0;i<r.potions;i++) addToInventory(genPotion(lootLevel()));
+  if (r.clue) addToInventory(mkClue());
+  if (r.tmap) addToInventory(sqTreasureMap());
+  if (r.rep){ const k = s.home; p.rep = p.rep || {}; p.rep[k] = repAt(k) + r.rep; }
+  if (q.unlock){ p.sqUn[q.unlock] = 1; if (q.unlock==='ancients') p.ancientKnown = true; }
+  if (q.faction){ p.faction = p.faction || {}; p.faction[q.faction] = Math.max(p.faction[q.faction]||0, q.rank); }
+  const tp = tkP(); tp.questPoints = (tp.questPoints||0) + (q.qp||1); p.sqQp = (p.sqQp||0) + (q.qp||1);
+  sqLog(id, `Completed. Rewards: ${got.join(', ').replace(/<[^>]+>/g, '')} and ${q.qp||1} quest point${(q.qp||1)===1 ? '' : 's'}.`);
+  logMsg(`quest complete: <b>${esc(q.nm)}</b> - ${got.join(', ')} and ${q.qp||1} quest point${(q.qp||1)===1 ? '' : 's'}`, 'magic', true);
+  try{ audStinger('quest'); }catch(e){}
+  questToast('Quest complete!', q.nm); p.questsDone = (p.questsDone||0) + 1;
+  if (SQ_ORDER.every(k=>sqDone(k)) && !p.questCape){ p.questCape = 1; const c = sqItem('questcape'); addToInventory(c); notify('Every quest done - you earn the Quest Point Cape!', 'good', 'achievement'); logMsg(`you have finished every quest in the land - the <b>Quest Point Cape</b> is yours`, 'magic', true); }
+  checkAchievements(); renderGame(); saveCurrentGame();
+}
+function sqAbandon(id){ const s = sqP()[id]; if (!s || s.state!=='active') return; s.state = 'abandoned'; s.step = 0; s.loc = {}; sqLog(id, 'Abandoned - you can start it again from its giver whenever you like.'); logMsg(`you abandon "${SQ[id].nm}" - it can be taken up again`, ''); renderOverlay(); saveCurrentGame(); }
+// ---- what to do next, and where (for the tracker and the map markers) ----
+function sqObjective(id){
+  const s = sqP()[id], st = sqStep(id); if (!st) return '';
+  if (st.k==='talk') return s.step===0 ? `Talk to ${SQ_WHO[st.who]||st.who}` : `Return to ${SQ_WHO[st.who]||st.who}`;
+  if (st.k==='kill') return `${st.obj} (${s.n||0}/${st.n})`;
+  if (st.k==='bring'){ const have = sqHave(st.item); return `${st.obj} (you have ${Math.min(have, st.n)}/${st.n})`; }
+  return st.obj || 'Carry on';
+}
+function sqTarget(id){
+  const s = sqP()[id], st = sqStep(id); if (!st || !s) return null;
+  if (st.k==='talk' || st.k==='bring'){ if (st.who==='hermit' || st.who==='ghost' || st.who==='remains') return s.loc[s.step] || (s.loc.start && { x:s.loc.start.x, y:s.loc.start.y }); const h = sqHome(id); return { x:h.x, y:h.y, turnIn:true }; }
+  if (st.k==='fight' && s.step > 0 && SQ[id].steps[s.step-1].k==='goto') return s.loc[s.step-1] || null;
+  return s.loc[s.step] || null;
+}
+function sqPseudo(){ const out = []; for (const id of SQ_ORDER){ if (!sqActive(id)) continue; out.push({ id:'sq:'+id, kind:'story', sq:id, progress:0, target:1 }); } return out; }
+function questsShown(){ return ((G.player && G.player.quests) || []).concat(G.player ? sqPseudo() : []); }
+// ---- talking to people: the step's dialogue, or an offer ----
+// (called from setUi when you open a service: true when it showed a quest dialogue instead)
+function sqOnTalk(who){
+  if (!G.player || G.ui==='wevent') return false;
+  for (const id of SQ_ORDER){ const st = sqStep(id); if (!st || st.who!==who) continue;
+    const s = sqP()[id];
+    if (st.k==='talk'){ const say = st.say; sqDialog(SQ[id].nm, say, [['Continue', ()=>{ sqLog(id, say); sqAdvance(id); if (sqStep(id) && sqStep(id).k==='fight' && sqStep(id).foe==='rats') sqFight(id); }]], who); return true; }
+    if (st.k==='bring'){ const have = sqHave(st.item);
+      if (have >= st.n){ sqDialog(SQ[id].nm, `You hand over what was asked. ${st.say||''}`, [['Hand it over', ()=>{ sqTake(st.item, st.n); sqLog(id, st.say||'Delivered.'); sqAdvance(id); }]], who); return true; }
+      return false; }
+  }
+  // an offer: the first quest this person gives that you can start
+  const seenK = who+':'+(curTownKey()||''), seen = (G.player.sqSeen = G.player.sqSeen||{});
+  const offer = G.sqDeclined===who || seen[seenK]===townDay() ? null : SQ_ORDER.find(id=>SQ[id].giver===who && sqCanStart(id));
+  if (offer && !G.sqOffered){ G.sqOffered = offer;
+    sqDialog(SQ[offer].nm, `${SQ[offer].desc}${SQ[offer].exclusive ? `<br><br><span class="muted">Joining means you can never join the ${SQ[offer].exclusive==='guard' ? 'Royal Guard' : 'Thieves\' Guild'} - unless you leave.</span>` : ''}`,
+      [['Take the quest', ()=>{ G.sqOffered = null; sqStart(offer); const st = sqStep(offer); if (st && st.k==='talk' && st.who===who) sqOnTalk(who); }], ['Not now', ()=>{ G.sqOffered = null; G.sqDeclined = who; seen[seenK] = townDay(); setUi(who==='questgiver' ? 'questgiver' : who); }]], who);
+    return true; }
+  return false;
+}
+function sqDialog(title, text, opts, sub){ wevDialog(title, text, opts, sub || 'quest'); }
+// ---- items to bring ----
+function sqHave(item){ if (item==='gems3') return ['sapphire','emerald','ruby','diamond','opal','jade','topaz'].reduce((a,g)=>a + skHave(g) + skHave('u_'+g), 0); return skHave(item); }
+function sqTake(item, n){ if (item==='gems3'){ for (const g of ['sapphire','emerald','ruby','diamond','opal','jade','topaz','u_sapphire','u_emerald','u_ruby','u_diamond','u_opal','u_jade','u_topaz']){ const h = Math.min(n, skHave(g)); if (h){ skAdd(g, -h); n -= h; } if (!n) break; } return; } skAdd(item, -n); }
+// ---- the moment-to-moment checks: arriving, kills, floors, bosses ----
+function sqFrame(){
+  if (!G.player || G.ui!=='playing' || G.gameOver) return;
+  G.sqDeclined = null;
+  for (const id of SQ_ORDER){ const st = sqStep(id); if (!st) continue; const s = sqP()[id];
+    if (st.k==='goto' && G.gameMode===0){ const L = s.loc[s.step]; if (!L || G.owPos.x!==L.x || G.owPos.y!==L.y) continue;
+      if (st.night && !isNightTime()){ if (!s.nightTold){ s.nightTold = 1; logMsg('the graveyard is still by day - come back after dark', ''); } continue; }
+      const say = st.sayFlag ? (st.sayFlag[Object.keys(s.flags).find(f=>st.sayFlag[f])] || Object.values(st.sayFlag)[0]) : st.say;
+      sqDialog(SQ[id].nm, say || 'You have arrived.', [['Go on', ()=>{ sqLog(id, say || st.obj); sqAdvance(id); const nx = sqStep(id); if (nx && (nx.k==='fight' || nx.k==='boss')) sqFight(id); else if (nx && nx.k==='puzzle') sqPuzzle(id); else if (nx && nx.k==='choice') sqChoice(id); else if (nx && nx.k==='spire') sqSpireEnter(id); }]], 'quest');
+      return; }
+  }
+}
+function sqOnKill(m){
+  if (!m) return; for (const id of SQ_ORDER){ const st = sqStep(id); if (!st || st.k!=='kill') continue; const s = sqP()[id];
+    const ok = st.foe==='undead' ? !!m.undead : st.foe instanceof RegExp ? st.foe.test(m.nm||'') : (m.nm||'').toLowerCase().includes(st.foe);
+    if (!ok) continue; s.n = (s.n||0) + 1;
+    if (s.n >= st.n){ sqLog(id, `${st.obj} - done.`); logMsg(`${SQ[id].nm}: done - ${sqObjective(id) || 'report back'}`, 'good'); sqAdvance(id); } }
+}
+// a quest's object lies on this floor (questOnFloorLoaded)
+function sqOnFloor(){
+  if (G.gameMode!==1 || !G.dungeonEntrance) return;
+  for (const id of SQ_ORDER){ const st = sqStep(id); if (!st || st.k!=='floor') continue; const s = sqP()[id], L = s.loc[s.step];
+    if (!L || L.x!==G.dungeonEntrance.x || L.y!==G.dungeonEntrance.y) continue;
+    const want = st.floor==='boss' ? G.dungeonMaxDepth : Math.min(st.floor, G.dungeonMaxDepth); if (G.depth!==want) continue;
+    let best = null, bd = -1; for (let x=1;x<COLS-1;x++) for (let y=1;y<ROWS-1;y++){ if (G.map[x][y]!==T_FLOOR) continue; const d = Math.abs(x-G.player.x) + Math.abs(y-G.player.y) + o3Hash(x, y, 77)*4; if (d > bd){ bd = d; best = [x,y]; } }
+    if (!best) continue; const it = newItem(); Object.assign(it, { used:1, consumable:0, kind:'scroll', sqItem:id, nm:st.item, desc:'something a quest needs', price:0 });
+    G.map[best[0]][best[1]] = T_ITEM; G.floorItem[best[0]][best[1]] = it;
+    logMsg(`${SQ[id].nm}: what you're looking for is somewhere on this floor`, 'new'); questToast(SQ[id].nm, 'It\'s on this floor');
+  }
+}
+function sqOnPickup(it){
+  if (!it || !it.sqItem) return false; const id = it.sqItem, st = sqStep(id); if (!st || st.k!=='floor') return true;
+  sqDialog(SQ[id].nm, st.say || `You find ${esc(it.nm)}.`, [['Take it', ()=>{ sqLog(id, st.say || it.nm); sqAdvance(id); }]], 'quest');
+  return true;
+}
+function sqOnSiteBoss(x, y){
+  for (const id of SQ_ORDER){ const st = sqStep(id); if (!st || st.k!=='siteboss') continue; const s = sqP()[id], L = s.loc[s.step];
+    if (!L || L.x!==x || L.y!==y) continue; sqLog(id, st.say || st.obj); if (st.say) logMsg(st.say, 'magic'); sqAdvance(id); }
+}
+// ---- fights and bosses with their own tricks ----
+const SQ_BOSSES = {
+  goblinking:  { nm:'Grukk the Goblin King', fam:'goblin', hp:4, dmg:1.6, adds:'goblin', tricks:'summons his guards at two-thirds and one-third of his life, and goes berserk near the end' },
+  stormcaller: { nm:'the Stormcaller', human:1, hp:4.5, dmg:1.8, adds:'kobold', magic:1, tricks:'calls lightning - every few turns a bolt strikes you wherever you stand' },
+  vosk:        { nm:'Captain Vosk the Traitor', human:1, hp:4, dmg:1.7, adds:'human', tricks:'calls his raiders, and parries hard when cornered' },
+  herald:      { nm:'the Lich\'s Herald', fam:'skeleton', hp:5, dmg:1.9, adds:'skeleton', undead:1, tricks:'raises the dead around it, and drains your life' },
+  wakener:     { nm:'the Wakener, Lich of the Black Spire', fam:'skeleton', hp:9, dmg:2.4, adds:'skeleton', undead:1, tricks:'raises the dead, drains your life, and shields itself until its servants fall' },
+};
+function sqFight(id){
+  const st = sqStep(id); if (!st) return;
+  if (st.k==='boss') return sqBossFight(id, st.boss);
+  if (G.interior){ G.interior = null; G.townState = null; }
+  wevFightStart('sqfight', id, L=>{
+    const lv = clampMLevel(L + (st.lvl||0));
+    for (let i=0;i<st.n;i++){ const e = st.foe==='rats' ? Object.assign({}, MONSTER_LEVELS[Math.max(0, lv-1)], { nm:'giant rat', sym:'r', rgb:[110,90,74], abilities:[], art:MONSTER_LEVELS[0].art }) : st.foe==='human' ? wevHumanEntry(lv) : wevCampEntry(st.foe, lv); const m = wevMon(e, lv); if (st.foe==='rats'){ m.nm = 'giant rat'; } }
+    if (st.elite) upgradeToElite(G.mon[0]);
+  });
+  if (st.say) logMsg(st.say, 'new');
+}
+function sqBossFight(id, key){
+  const B = SQ_BOSSES[key]; if (!B) return;
+  const s = sqP()[id], ally = s.flags.ally;
+  wevFightStart('sqboss', id, L=>{
+    const lv = clampMLevel(Math.max(L, 8));
+    const e = B.human ? wevHumanEntry(lv + 2) : famPickFrom([B.fam], lv + 2, 3) || famEntry(B.fam, 0);
+    const m = wevMon(e, lv); upgradeToNamedElite(m); m.nm = B.nm; m.sqBoss = key; m.undead = !!B.undead;
+    m.maxHp = m.hp = roundH(m.maxHp*B.hp); m.dmg2 = roundH(m.dmg2*B.dmg); m.xp = roundH(m.xp*6); m.x = Math.floor(COLS/2); m.y = 3; if (G.map[m.x][m.y]!==T_FLOOR) G.map[m.x][m.y] = T_FLOOR;
+    const guards = key==='goblinking' && !s.flags.mercy ? 3 : key==='goblinking' ? 1 : 1;
+    for (let i=0;i<guards;i++) wevMon(B.human ? wevHumanEntry(lv) : wevCampEntry(B.adds, lv), lv);
+  });
+  G.sqBossState = { key, id, phase:0, turn:G.player.turnCount||0, shield:key==='wakener' };
+  logMsg(`${B.nm}: ${B.tricks}`, 'new'); try{ audStinger('boss'); }catch(e){}
+  if (ally) logMsg('the ghost-knight fights at your side - its blade passes through the living, but not the dead', 'magic');
+}
+// the bosses' tricks, checked once a turn while the fight goes on
+function sqBossTurn(){
+  const b = G.sqBossState; if (!b || G.gameMode!==2) return; const B = SQ_BOSSES[b.key], m = G.mon.find(x=>x.sqBoss===b.key && x.alive); if (!m) return;
+  const f = m.hp/m.maxHp, p = G.player, L = clampMLevel(p.level);
+  if (b.phase < 1 && f < 0.67){ b.phase = 1; for (let i=0;i<2;i++) wevMon(B.human ? wevHumanEntry(L) : wevCampEntry(B.adds, L), L); logMsg(`${m.nm} calls for help - more of them pour in!`, 'new'); }
+  if (b.phase < 2 && f < 0.34){ b.phase = 2; for (let i=0;i<2;i++) wevMon(B.human ? wevHumanEntry(L) : wevCampEntry(B.adds, L), L); logMsg(`${m.nm} summons the last of its servants!`, 'new'); }
+  if (b.phase < 3 && f < 0.2){ b.phase = 3; m.dmg2 = roundH(m.dmg2*1.4); logMsg(`${m.nm} goes berserk - its blows come harder!`, 'hit'); }
+  if (b.key==='stormcaller' && ((p.turnCount||0) % 4)===0){ const d = Math.max(2, Math.round(effMaxHp()*0.08)); p.hp -= d; logMsg(`lightning cracks down on you (${d})`, 'hit'); if (p.hp <= 0 && !checkDeathWard()) playerDies(m.nm); }
+  if ((b.key==='herald' || b.key==='wakener') && ((p.turnCount||0) % 5)===0){ const d = Math.max(2, Math.round(effMaxHp()*0.05)); p.hp -= d; m.hp = Math.min(m.maxHp, m.hp + d*2); logMsg(`${m.nm} drains your life (${d})`, 'hit'); if (p.hp <= 0 && !checkDeathWard()) playerDies(m.nm); }
+  if (b.shield){ const others = G.mon.filter(x=>x.alive && x!==m).length; if (others){ m.hp = Math.max(m.hp, b.shieldHp || m.hp); b.shieldHp = m.hp; if (!b.toldShield){ b.toldShield = 1; logMsg(`${m.nm} is wrapped in a shield of souls - kill its servants to break it`, 'magic'); } } else { b.shieldHp = 0; } }
+  if (sqP()[b.id] && sqP()[b.id].flags.ally && chn(0.5)){ const t = G.mon.find(x=>x.alive && x!==m && x.undead) || (m.undead ? m : null); if (t){ const d = 4 + rn(6); t.hp -= d; logMsg(`the ghost-knight cuts the ${t.nm} (${d})`, 'magic'); if (t.hp <= 0) monsterDies(G.mon.indexOf(t)); } }
+}
+function sqFightWon(f){
+  const id = f.id, st = sqStep(id); G.sqBossState = null; if (!st) return false;
+  sqLog(id, st.k==='boss' ? `Defeated ${SQ_BOSSES[st.boss].nm}.` : `${st.obj || 'Won the fight'}.`);
+  const wasRats = st.foe==='rats';
+  sqAdvance(id);
+  if (wasRats){ enterVillage(); return true; }
+  const nx = sqStep(id); if (nx && nx.k==='choice') sqChoice(id);
+  return false;
+}
+// a choice in the story
+function sqChoice(id){
+  const st = sqStep(id); if (!st || st.k!=='choice') return; const s = sqP()[id];
+  sqDialog(SQ[id].nm, st.say, st.opts.map(([lbl, flag])=>[lbl, ()=>{ s.flags[flag] = 1; sqLog(id, `${st.say} You chose: ${lbl}`);
+    if (flag==='grab'){ const d = Math.max(1, Math.round(effMaxHp()*0.15)); G.player.hp = Math.max(1, G.player.hp - d); logMsg(`the salamander bites and scorches your hands (${d}) - but you have it`, 'hit'); }
+    if (flag==='coax') logMsg('the salamander curls up in the warmth of your spell and climbs into your hands', 'magic');
+    if (flag==='mercy') logMsg('the young goblin stares at you, then runs for the hills, clutching its key', 'new');
+    if (flag==='nomercy') logMsg('you take the crude key from the goblin\'s hand', '');
+    sqAdvance(id); }]), 'a choice');
+}
+// the Black Spire: its own dungeon, six floors, the Wakener at the top
+function sqSpireEnter(id){
+  const L = sqSpire();
+  G.pendingDungeon = { x:L.x, y:L.y }; G.ow.dungeonMax[L.x][L.y] = Math.max(G.ow.dungeonMax[L.x][L.y]||1, 6);
+  logMsg('the Black Spire\'s gate grinds open - six floors up, the Wakener waits', 'magic', true);
+  enterDungeonConfirm();
+}
+function sqSpireBoss(){
+  // on the Spire's top floor, its master is the Wakener
+  const st = sqStep('lich8'); if (!st || st.k!=='spire' || G.gameMode!==1 || !G.isBossFloor || G.depth!==G.dungeonMaxDepth) return;
+  const L = sqSpire(); if (!G.dungeonEntrance || G.dungeonEntrance.x!==L.x || G.dungeonEntrance.y!==L.y) return;
+  const b = G.mon[G.bossIdx]; if (!b || b.sqBoss) return;
+  const B = SQ_BOSSES.wakener; b.nm = B.nm; b.sqBoss = 'wakener'; b.undead = true; b.maxHp = b.hp = roundH(b.maxHp*2.2); b.dmg2 = roundH(b.dmg2*1.5);
+  logMsg(`${B.nm} rises from its throne. "So. The relics found a fool to carry them."`, 'new', true); try{ audStinger('boss'); }catch(e){}
+}
+function sqOnBossDefeated(x, y){
+  sqOnSiteBoss(x, y);
+  const id = 'lich8', st0 = sqStep(id), L = st0 && st0.k==='spire' ? sqSpire() : null;
+  if (L && x===L.x && y===L.y){ const st = st0; if (st && st.k==='spire'){ sqLog(id, 'The Wakener is destroyed. The dead sleep again.'); logMsg('the Wakener crumbles into dust and black glass - the Black Spire shudders, and is silent', 'magic', true); sqAdvance(id); } }
+}
+// ---- puzzles: a riddle door, braziers lit in order, a sliding lock, a knight's crossing ----
+const SQ_RIDDLES = [
+  ['The more you take, the more you leave behind. What am I?', ['Footsteps','Gold','Time','Shadows'], 0],
+  ['I have cities but no houses, forests but no trees, water but no fish. What am I?', ['A dream','A map','A painting','A mirror'], 1],
+  ['What has roots nobody sees, is taller than trees, up it goes, yet it never grows?', ['A mountain','A tower','A storm','A giant'], 0],
+  ['I am always hungry, I must always be fed. The finger I touch will soon turn red.', ['A wolf','A blade','Fire','A leech'], 2],
+  ['Speak my name and I am gone. What am I?', ['A secret','Silence','An echo','A ghost'], 1],
+  ['What walks on four legs at dawn, two at noon, and three at dusk?', ['A dragon','A man','A spider','A horse'], 1],
+];
+const SQ_BRAZ = [['red','#e0402a'], ['blue','#3a7ae0'], ['green','#3ab04a'], ['gold','#e0b030'], ['white','#e8e8f0']];
+function sqPuzzle(id){
+  const st = sqStep(id); if (!st || st.k!=='puzzle') return; const s = sqP()[id], r = mulberry32(audHash(id + (G.ow.seed||0)));
+  if (st.pz==='riddle'){ const q = SQ_RIDDLES[Math.floor(r()*SQ_RIDDLES.length)]; G.sqPz = { id, kind:'riddle', q }; }
+  else if (st.pz==='brazier'){ const order = [0,1,2,3,4].sort(()=>r()-0.5); G.sqPz = { id, kind:'brazier', order, lit:[] }; }
+  else if (st.pz==='sliding'){ let b = [1,2,3,4,5,6,7,8,0], e = 8; for (let i=0;i<80;i++){ const nb = [e-3, e+3, e%3 ? e-1 : -1, e%3!==2 ? e+1 : -1].filter(k=>k>=0 && k<9); const k = nb[Math.floor(r()*nb.length)]; b[e] = b[k]; b[k] = 0; e = k; } G.sqPz = { id, kind:'sliding', b, moves:0 }; }
+  else if (st.pz==='knight'){ let pz; for (let t=0;t<50;t++){ const crack = []; for (let i=0;i<25;i++) if (i!==0 && i!==24 && r() < 0.28) crack.push(i); if (sqKnightPath(0, 24, crack) >= 3){ pz = { id, kind:'knight', at:0, goal:24, crack, moves:0 }; break; } } G.sqPz = pz || { id, kind:'knight', at:0, goal:24, crack:[], moves:0 }; }
+  setUi('sqpuzzle');
+}
+function sqKnightPath(a, b, crack){ const seen = new Map([[a,0]]), q = [a]; while (q.length){ const c = q.shift(); if (c===b) return seen.get(c); for (const n of sqKnightMoves(c)) if (!seen.has(n) && !crack.includes(n)){ seen.set(n, seen.get(c)+1); q.push(n); } } return -1; }
+function sqKnightMoves(c){ const x = c%5, y = (c/5)|0, out = []; for (const [dx,dy] of [[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]]){ const nx = x+dx, ny = y+dy; if (nx>=0 && ny>=0 && nx<5 && ny<5) out.push(ny*5+nx); } return out; }
+function buildSqPuzzle(){
+  const z = G.sqPz; if (!z) return '';
+  const head = (t, sub)=>`<h2 class="panel-title">${t}</h2><div class="sub">${sub}</div>`;
+  const foot = `<div class="btnrow"><button class="btn" onclick="setUi('playing')">step back (Esc)</button></div>`;
+  if (z.kind==='riddle') return head('THE RIDDLE', 'A voice asks:') + `<div class="ovbody"><div class="qrep" style="font-size:16px;">"${esc(z.q[0])}"</div><div class="btnrow" style="flex-wrap:wrap;">${z.q[1].map((a,i)=>`<button class="btn" onclick="sqPzRiddle(${i})">${esc(a)}</button>`).join('')}</div>${z.wrong ? '<div class="muted">"No." The stone stays shut. Think again.</div>' : ''}${foot}</div>`;
+  if (z.kind==='brazier'){ const verse = z.order.map((k,i)=>['first','then','after it','fourth','last'][i] + ' the ' + SQ_BRAZ[k][0]).join(', ');
+    return head('THE BRAZIER WARD', `Carved above the braziers: <i>"${verse}."</i>`) + `<div class="ovbody"><div class="btnrow">${SQ_BRAZ.map(([nm, col], i)=>`<button class="btn" style="min-width:90px;border-color:${col};${z.lit.includes(i) ? `background:${col};color:#000;` : ''}" onclick="sqPzBrazier(${i})">${z.lit.includes(i) ? '&#9832; ' : ''}${nm}</button>`).join('')}</div>${z.wrong ? '<div class="muted">The flames gutter out - the order was wrong. They wait to be lit again.</div>' : ''}${foot}</div>`; }
+  if (z.kind==='sliding') return head('THE SLIDING LOCK', 'Slide the plates into order, 1 to 8, with the gap in the last corner.') + `<div class="ovbody"><div style="display:grid;grid-template-columns:repeat(3,64px);gap:4px;justify-content:center;margin:10px auto;">${z.b.map((v,i)=>`<button class="btn" style="width:64px;height:64px;font-size:22px;${v ? '' : 'visibility:hidden;'}" onclick="sqPzSlide(${i})">${v||''}</button>`).join('')}</div><div class="muted" style="text-align:center;">${z.moves} moves</div>${foot}</div>`;
+  if (z.kind==='knight') return head('THE KNIGHT\'S FLOOR', 'Cross from the near corner to the far one, moving only as a knight moves. The cracked stones will not hold you.') + `<div class="ovbody"><div style="display:grid;grid-template-columns:repeat(5,52px);gap:3px;justify-content:center;margin:10px auto;">${Array.from({ length:25 }, (_, i)=>{ const x = i%5, y = (i/5)|0, can = sqKnightMoves(z.at).includes(i), cr = z.crack.includes(i);
+      return `<button class="btn" style="width:52px;height:52px;padding:0;font-size:22px;background:${cr ? '#2a1a14' : (x+y)%2 ? '#3a3430' : '#d8d0c0'};color:${(x+y)%2 ? '#fff' : '#000'};${can && !cr ? 'outline:2px solid #ffd060;' : ''}" onclick="sqPzKnight(${i})">${i===z.at ? '&#9822;' : i===z.goal ? '&#9733;' : cr ? '&#10006;' : ''}</button>`; }).join('')}</div><div class="muted" style="text-align:center;">${z.moves} moves${z.wrong ? ' &middot; the cracked stone gives way - you scramble back to the start' : ''}</div>${foot}</div>`;
+  return '';
+}
+function sqPzWin(text){ const z = G.sqPz; G.sqPz = null; setUi('playing'); sqLog(z.id, text); logMsg(text, 'magic'); sfx('achievement'); sqAdvance(z.id); const nx = sqStep(z.id); if (nx && nx.k==='spire') sqSpireEnter(z.id); renderGame(); }
+// leaving a faction (so no choice locks you out for good)
+function sqLeaveFaction(f){ const p = G.player; for (const id of SQ_ORDER) if (SQ[id].faction===f){ const s = sqP()[id]; if (s) s.state = 'left'; } if (p.faction) delete p.faction[f]; logMsg(`you leave the ${f==='mages' ? 'Mages\' Circle' : f==='thieves' ? 'Thieves\' Guild' : 'Royal Guard'} - its doors are closed to you, but others may open`, ''); renderOverlay(); saveCurrentGame(); }
+function sqFactionHtml(){ const p = G.player, fs = [['mages','The Mages\' Circle',['Initiate','Adept','Magister']],['thieves','The Thieves\' Guild',['Footpad','Cracksman','Master Thief']],['guard','The Royal Guard',['Recruit','Sergeant','Knight']]];
+  return `<h4 style="color:var(--ink-faint);margin:12px 0 6px;">FACTIONS</h4>` + fs.map(([k,nm,ranks])=>{ const r = (p.faction||{})[k]||0; return `<div class="shoprow"><span><b>${nm}</b></span><span class="desc">${r ? 'rank: '+ranks[r-1] : 'not a member'}${k==='thieves' && sqUnlocked('fence') ? ' &middot; the fence buys from you in any tavern' : ''}</span><span>${r ? `<button class="btn" onclick="sqLeaveFaction('${k}')">leave</button>` : ''}</span></div>`; }).join(''); }
+function sqPzRiddle(i){ const z = G.sqPz; if (i===z.q[2]) sqPzWin(`"${z.q[1][i]}," you answer - and the stone rolls aside.`); else { z.wrong = 1; sfx('error'); renderOverlay(); } }
+function sqPzBrazier(i){ const z = G.sqPz; if (z.lit.includes(i)) return; if (z.order[z.lit.length]===i){ z.lit.push(i); z.wrong = 0; sfx('spell'); if (z.lit.length===5){ sqPzWin('The last brazier roars up, and the ward-lines on the stones blaze green.'); return; } } else { z.lit = []; z.wrong = 1; sfx('error'); } renderOverlay(); }
+function sqPzSlide(i){ const z = G.sqPz, e = z.b.indexOf(0); if (!(Math.abs(i-e)===3 || (Math.abs(i-e)===1 && ((i/3)|0)===((e/3)|0)))) return; z.b[e] = z.b[i]; z.b[i] = 0; z.moves++; sfx('click');
+  if (z.b.join(',')==='1,2,3,4,5,6,7,8,0') sqPzWin(`The last plate clicks home after ${z.moves} moves, and the strongbox swings open.`); else renderOverlay(); }
+function sqPzKnight(i){ const z = G.sqPz; if (!sqKnightMoves(z.at).includes(i)) return; z.moves++;
+  if (z.crack.includes(i)){ z.at = 0; z.wrong = 1; sfx('error'); renderOverlay(); return; } z.at = i; z.wrong = 0; sfx('click');
+  if (i===z.goal) sqPzWin(`You reach the far side in ${z.moves} leaps, and the gate stands open.`); else renderOverlay(); }
+// ---- the journal ----
+function buildJournal(){
+  const tab = G.jTab || 'story', p = G.player;
+  const tabs = [['story','Quests'], ['jobs','Town jobs'], ['diaries','Diaries'], ['clues','Clues & tomes']].map(([k,nm])=>`<button class="btn ${tab===k ? 'primary' : ''}" onclick="G.jTab='${k}';renderOverlay()">${nm}</button>`).join(' ');
+  let body = '';
+  if (tab==='story'){
+    const sec = (title, ids)=>ids.length ? `<h4 style="color:var(--ink-faint);margin:12px 0 6px;">${title}</h4>` + ids.map(id=>sqRowHtml(id)).join('') : '';
+    const act = SQ_ORDER.filter(id=>sqActive(id)), av = SQ_ORDER.filter(id=>!sqActive(id) && !sqDone(id) && sqCanStart(id)), lk = SQ_ORDER.filter(id=>!sqActive(id) && !sqDone(id) && !sqCanStart(id)), dn = SQ_ORDER.filter(id=>sqDone(id));
+    body = `<div class="qrep">Quest points <b>${tkP().questPoints||0}</b> &middot; ${dn.length} of ${SQ_ORDER.length} quests done${p.questCape ? ' &middot; <span style="color:'+COL.gold+'">Quest Point Cape earned</span>' : ' &middot; finish them all for the Quest Point Cape'}</div>`
+      + sec('IN PROGRESS', act) + sec('YOU CAN START', av) + sec('NOT YET', lk) + sec('DONE', dn) + sqFactionHtml();
+  } else if (tab==='jobs'){
+    const qs = p.quests||[];
+    body = (qs.map(q=>`<div class="shoprow"><span><b>${esc(questTitle(q))}</b></span><span class="desc">${esc(questObjective(q))}<br><span class="muted">for ${esc(q.townName||'a town')} &middot; ${q.rewardGold||0} gold</span></span><span><button class="btn" onclick="sqAbandonJob('${q.id}')">abandon</button></span></div>`).join('') || '<div class="muted">No town jobs - the Captain of the Watch in any town has work.</div>')
+      + ((p.qFailed||[]).length ? `<h4 style="color:var(--ink-faint);margin:12px 0 6px;">FAILED - TRY AGAIN</h4>` + p.qFailed.map((q,i)=>`<div class="shoprow"><span><b>${esc(questTitle(q))}</b></span><span class="desc">${esc(q.failNote||'it went wrong')}</span><span><button class="btn" ${(p.quests||[]).length < QUEST_MAX ? '' : 'disabled'} onclick="sqRetryJob(${i})">retry</button></span></div>`).join('') : '');
+  } else if (tab==='diaries') body = diaryHtml();
+  else body = sqCluesHtml();
+  return `<h2 class="panel-title">JOURNAL</h2><div class="sub">Everything you've taken on, and everything that's happened. (; or X opens it)</div>
+    <div class="ovbody" style="max-width:860px;"><div class="btnrow" style="justify-content:flex-start;">${tabs}</div>${body}
+      <div class="btnrow"><button class="btn primary" onclick="setUi('playing')">close (Esc)</button></div></div>`;
+}
+function sqRowHtml(id){
+  const q = SQ[id], s = sqP()[id], open = G.jOpen===id, act = sqActive(id), done = sqDone(id), req = sqReqText(id);
+  const status = done ? `<span style="color:${COL.green}">done</span>` : act ? `<span style="color:${COL.gold}">${esc(sqObjective(id))}</span>` : req.length ? `<span class="muted">needs ${esc(req.join(', '))}</span>` : `<span class="muted">from ${esc(SQ_WHO[q.giver]||q.giver)}</span>`;
+  const log = open && s && s.log ? `<div style="margin:6px 0 4px 12px;font-size:12px;line-height:1.6;">${s.log.map(l=>`<div>&bull; ${esc(l.text)}</div>`).join('')}</div>` : '';
+  return `<div class="shoprow" style="cursor:pointer;" onclick="G.jOpen=G.jOpen==='${id}'?null:'${id}';renderOverlay()"><span><b>${esc(q.nm)}</b>${q.main ? ' <span style="color:'+COL.purple+'">&#9733; main</span>' : q.chain ? ` <span class="muted">(${esc(q.chain)})</span>` : q.faction ? ` <span class="muted">(faction)</span>` : ''}</span>
+    <span class="desc">${esc(q.desc)}<br>${status} &middot; ${q.qp||1} QP</span><span>${act ? `<button class="btn" onclick="event.stopPropagation();sqAbandon('${id}')">abandon</button>` : ''}</span></div>${log}`;
+}
+function sqAbandonJob(id){ const p = G.player, i = (p.quests||[]).findIndex(q=>q.id===id); if (i < 0) return; const q = p.quests.splice(i, 1)[0]; q.failNote = 'abandoned'; (p.qFailed = p.qFailed||[]).push(q); logMsg(`you abandon "${questTitle(q)}" - you can take it up again from the journal`, ''); renderOverlay(); saveCurrentGame(); }
+function sqRetryJob(i){ const p = G.player, q = (p.qFailed||[])[i]; if (!q || (p.quests||[]).length >= QUEST_MAX) return; p.qFailed.splice(i, 1); q.arrived = false; q.freed = false; q.progress = 0; delete q.failNote; p.quests.push(q); logMsg(`you take up "${questTitle(q)}" again`, 'new'); renderOverlay(); saveCurrentGame(); }
+// ---- achievement diaries: four tiers of tasks for each region, and a reward at each tier ----
+const DIARIES = [
+  { id:'heart', nm:'The Heartlands', item:'cloak', tiers:[
+    [['Visit 2 towns', p=>(G.ow.visitedTowns||[]).length >= 2], ['Kill 25 monsters', p=>(p.killCount||0) >= 25], ['Reach Woodcutting 10', p=>skLvl('woodcutting') >= 10], ['Finish a town job', p=>(p.questsDone||0) >= 1]],
+    [['Visit 4 towns', p=>(G.ow.visitedTowns||[]).length >= 4], ['Buy a house', p=>!!p.house], ['Reach Cooking 30', p=>skLvl('cooking') >= 30], ['Finish "Rats in the Cellar"', p=>sqDone('rats')]],
+    [['Break the Goblin War', p=>sqDone('gob3')], ['Pay for a town upgrade', p=>(p.townsBuilt||0) >= 1], ['Reach total level 500', p=>rsTotalLevel() >= 500], ['Own 3 properties', p=>ecoPropCount() >= 3]],
+    [['Finish the Waking Lich', p=>sqDone('lich8')], ['Reach total level 1000', p=>rsTotalLevel() >= 1000], ['Earn 20 quest points', p=>(tkP().questPoints||0) >= 20], ['Build every piece of furniture', p=>p.achievements && p.achievements.includes('master_builder')]] ] },
+  { id:'wild', nm:'The Wild Frontier', item:'boots', tiers:[
+    [['Find 3 points of interest', p=>wgState().found.length >= 3], ['Light a campfire', p=>skLvl('firemaking') >= 2], ['Reach Fishing 10', p=>skLvl('fishing') >= 10], ['Buy a boat', p=>!!p.hasBoat]],
+    [['Chart an island', p=>!!(p.wgStat && p.wgStat.isles)], ['Break a monster camp', p=>!!(p.wev && p.wev.camps)], ['Restore an artefact', p=>!!(p.arch && Object.keys(p.arch.col||{}).length)], ['Reach combat level 30', p=>(p.combatLevel||3) >= 30]],
+    [['Fell a giant', p=>!!(p.wev && p.wev.boss)], ['Clear wave 10 at an arena', p=>!!(p.arena && p.arena.best >= 10)], ['Finish the Haunted Mine', p=>sqDone('mine3')], ['Complete a dig site collection', p=>!!(p.arch && (p.arch.done||[]).length)]],
+    [['Build a galleon', p=>boatTier() >= 4], ['Complete every dig site', p=>!!(p.arch && (p.arch.done||[]).length >= 5)], ['Reach combat level 90', p=>(p.combatLevel||3) >= 90], ['Rise to rank 3 in a faction', p=>Object.values(p.faction||{}).some(r=>r >= 3)]] ] },
+];
+const DIARY_TIER = ['Easy', 'Medium', 'Hard', 'Elite'];
+function diaryP(){ const p = G.player; p.diary = p.diary || {}; return p.diary; }
+function diaryReward(d, t){
+  const it = rsItem(d.item==='cloak' ? 'cape' : 'feet');
+  Object.assign(it, { nm:`${d.nm.replace(/^The /, '')} ${d.item==='cloak' ? 'cloak' : 'boots'} ${t+1}`, basis:d.item==='cloak' ? 'Cape' : 'Boots', ac:2 + t*3, acc:1 + t*2, rngAcc:1 + t*2, magAcc:1 + t*2, prayB:t, quality:Math.min(3, 1 + t), price:2000*(t+1), diary:d.id+t });
+  if (d.item==='cloak'){ it.capeCol = ['#3a7a3a','#2a6aa0','#8a3aa0','#d8b050'][t]; it.rsCol = it.capeCol; }
+  return it;
+}
+function diaryHtml(){
+  const p = G.player, dp = diaryP();
+  return DIARIES.map(d=>`<h4 style="color:var(--ink-faint);margin:12px 0 6px;">${esc(d.nm.toUpperCase())}</h4>` + d.tiers.map((tasks, t)=>{
+    const done = tasks.filter(([, f])=>{ try{ return f(p); }catch(e){ return false; } }).length, all = done===tasks.length, claimed = (dp[d.id]||0) > t;
+    return `<div class="shoprow"><span><b>${DIARY_TIER[t]}</b> <span class="muted">${done}/${tasks.length}</span></span><span class="desc">${tasks.map(([nm, f])=>{ let ok = false; try{ ok = f(p); }catch(e){} return `<span style="${ok ? 'color:'+COL.green : ''}">${ok ? '&#10003;' : '&#9675;'} ${esc(nm)}</span>`; }).join(' &nbsp; ')}</span>
+      <span>${claimed ? '<span class="muted">claimed</span>' : `<button class="btn" ${all && (dp[d.id]||0)===t ? '' : 'disabled'} onclick="diaryClaim('${d.id}',${t})">reward</button>`}</span></div>`; }).join('')).join('')
+    + '<div class="muted" style="font-size:12px;margin-top:6px;">Each tier\'s reward is a better cloak or pair of boots for that region, and a Lamp of Knowledge.</div>';
+}
+function diaryClaim(id, t){
+  const d = DIARIES.find(x=>x.id===id), dp = diaryP(), p = G.player; if (!d || (dp[id]||0)!==t) return;
+  if (!d.tiers[t].every(([, f])=>{ try{ return f(p); }catch(e){ return false; } })) return;
+  dp[id] = t + 1; addToInventory(diaryReward(d, t)); addToInventory(mkLamp());
+  logMsg(`${d.nm} diary, ${DIARY_TIER[t].toLowerCase()} tier complete - your reward: ${d.item==='cloak' ? 'a cloak' : 'boots'} and a Lamp of Knowledge`, 'magic', true); sfx('achievement'); checkAchievements(); renderOverlay(); saveCurrentGame();
+}
+// ---- clue scrolls: a real trail now - dig here, search there, do this - then the casket ----
+function sqClueNew(){
+  const sp = { x:G.owPos.x, y:G.owPos.y }, steps = [], n = 2 + rn(2);
+  for (let i=0;i<n;i++){ const r = Math.random();
+    if (r < 0.4){ const t = questWildTile(sp.x, sp.y, 5, 18); if (t) steps.push({ k:'dig', x:t.x, y:t.y, hint:`Dig ${Math.round(Math.hypot(t.x-sp.x, t.y-sp.y))} leagues ${dirWord(t.x-sp.x, t.y-sp.y)} of where you read this` }); }
+    else if (r < 0.7){ const s = questNearbySites(sp.x, sp.y, 3, 30, null)[rn(3)]; if (s) steps.push({ k:'search', x:s.x, y:s.y, hint:`Search outside the ${SITE_WORD[s.kind]||'dungeon'} ${Math.round(s.d)} leagues ${dirWord(s.x-sp.x, s.y-sp.y)}` }); }
+    else { const tasks = [['kill', 'goblin', 'Slay a goblin'], ['kill', 'skeleton', 'Put a skeleton back in its grave'], ['kill', 'wolf', 'Kill a wolf'], ['gather', 'woodcutting', 'Chop some wood'], ['gather', 'fishing', 'Catch a fish'], ['gather', 'mining', 'Mine some ore']], t = tasks[rn(tasks.length)];
+      steps.push({ k:t[0], what:t[1], hint:t[2] }); }
+  }
+  if (!steps.length) steps.push({ k:'gather', what:'foraging', hint:'Pick a herb' });
+  return { steps, i:0 };
+}
+function sqClueRead(idx){
+  const it = G.inv[idx]; if (!it) return; if (!it.trail) it.trail = sqClueNew();
+  const tr = it.trail, st = tr.steps[tr.i];
+  if (st && (st.x!==undefined) && G.gameMode===0 && Math.abs(G.owPos.x - st.x) + Math.abs(G.owPos.y - st.y) <= (st.k==='search' ? 1 : 0)){ sqClueStep(it); return; }
+  if (st && st.x!==undefined) owReveal(st.x, st.y, 2);
+  wevDialog('Clue Scroll', `Step ${tr.i+1} of ${tr.steps.length}:<br><br><i>"${esc(st.hint)}."</i>${st.x!==undefined ? '<br><br><span class="muted">(marked on your map - read the scroll again when you get there)</span>' : '<br><br><span class="muted">(it will tick off when you do it)</span>'}`, [['Fold it away', ()=>{}]], 'treasure trail');
+}
+function sqClueStep(it){
+  const tr = it.trail; tr.i++;
+  if (tr.i >= tr.steps.length){ const idx = G.inv.indexOf(it); if (idx >= 0) invRemove(idx); sqCasket('clue'); return; }
+  logMsg(`the trail goes on: "${tr.steps[tr.i].hint}"`, 'new'); sfx('notify'); renderGame();
+}
+function sqClueTask(k, what){ for (const it of G.inv){ if (!it || !it.clue || !it.trail) continue; const st = it.trail.steps[it.trail.i]; if (st && st.k===k && (k==='gather' ? st.what===what : (what||'').toLowerCase().includes(st.what))) { logMsg('that\'s it - the clue\'s riddle is answered', 'good'); sqClueStep(it); return; } } }
+// the casket: gold, and a chance of something only treasure trails give
+function sqCasket(kind){
+  const p = G.player, gold = roundH((300 + p.level*25)*goldFindMult()*(kind==='map' ? 1.5 : 1)); p.gold += gold; const got = [`${gold} gold`];
+  const r = Math.random();
+  if (r < 0.35){ const it = sqGilded(); addToInventory(it); got.push(itemNameHtml(it)); }
+  else if (r < 0.55){ const it = sqCosmetic(); addToInventory(it); got.push(itemNameHtml(it)); }
+  else if (r < 0.7){ const k = Object.keys(TOMES)[rn(Object.keys(TOMES).length - 1)]; addToInventory(sqTome(k)); got.push('a ' + TOMES[k].nm); }
+  else if (r < 0.85){ addToInventory(sqTreasureMap()); got.push('a treasure map'); }
+  else { addToInventory(mkClue()); got.push('another clue scroll'); }
+  p.caskets = (p.caskets||0) + 1;
+  logMsg(`you open the casket: ${got.join(', ')}`, 'loot', true); try{ audStinger('rare'); }catch(e){} checkAchievements(); renderGame(); saveCurrentGame();
+}
+function sqGilded(){ const sl = pick(['head','chest','legs','arms']), t = Math.min(6, 1 + Math.floor(G.player.level/12)), it = rsMakeArmour('metal', t, sl);
+  return Object.assign(it, { nm:'Gilded ' + it.nm.replace(/^\w+ /, ''), rsCol:'#e0b040', ac:(it.ac||0) + 3, price:(it.price||100)*6, quality:3, gilded:1 }); }
+function sqCosmetic(){ const k = rn(3), it = rsItem(k===2 ? 'head' : 'cape');
+  if (k===0) Object.assign(it, { nm:'Cape of the Treasure Trail', basis:'Cape', capeCol:'#c03a8a', rsCol:'#c03a8a', ac:3, prayB:1 });
+  else if (k===1) Object.assign(it, { nm:'Highwayman\'s Cape', basis:'Cape', capeCol:'#1a1a1a', rsCol:'#1a1a1a', ac:3, rngAcc:2 });
+  else Object.assign(it, { nm:'Feathered Cavalier', basis:'Hat', rsCol:'#8a2a2a', ac:2, magAcc:2 });
+  it.quality = 3; it.price = 4000; it.cosmetic = 1; return it; }
+// treasure maps: an X somewhere out there
+function sqTreasureMap(){ const it = newItem(); const t = questWildTile(G.owPos.x, G.owPos.y, 8, 26) || { x:G.owPos.x, y:G.owPos.y }; Object.assign(it, { used:1, consumable:0, kind:'scroll', tmap:1, mx:t.x, my:t.y, nm:'Treasure Map', desc:'an X marks the spot - read it to see where, and read it there to dig', price:600 }); return it; }
+function sqMapRead(idx){
+  const it = G.inv[idx]; if (!it) return;
+  if (G.gameMode===0 && G.owPos.x===it.mx && G.owPos.y===it.my){ invRemove(idx); logMsg('you dig where the X was - and hit the lid of a chest!', 'good'); sqCasket('map'); return; }
+  owReveal(it.mx, it.my, 2); const d = Math.round(Math.hypot(it.mx-G.owPos.x, it.my-G.owPos.y));
+  wevDialog('Treasure Map', `An X, ${d} leagues ${dirWord(it.mx-G.owPos.x, it.my-G.owPos.y)} of here. It's on your map now - read this again standing on the spot to dig.`, [['Fold it away', ()=>{}]], 'treasure');
+}
+// ---- tomes: read once, learn for good ----
+const TOMES = {
+  insight:  { nm:'Tome of Insight',   d:'+5% experience in everything', bonus:{ xpfind:0.05 } },
+  vigour:   { nm:'Tome of Vigour',    d:'+10 life',                     bonus:{ life:10 } },
+  precision:{ nm:'Tome of Precision', d:'+1 critical hit range',        bonus:{ crit:1 } },
+  fortune:  { nm:'Tome of Fortune',   d:'+10% gold found',              bonus:{ goldfind:0.1 } },
+  warding:  { nm:'Tome of Warding',   d:'+2 damage reduction',          bonus:{ resist:2 } },
+  ancients: { nm:'Tome of the Ancients', d:'the Ancient Magicks (with Magic 50)', bonus:{ atk:1 } },
+};
+function sqTome(k){ const it = newItem(); Object.assign(it, { used:1, consumable:0, kind:'scroll', tome:k, nm:TOMES[k].nm, desc:`read it to learn, for good: ${TOMES[k].d}`, price:3000 }); return it; }
+function sqTomeRead(idx){
+  const it = G.inv[idx], p = G.player; if (!it) return; const k = it.tome; p.tomes = p.tomes || [];
+  if (p.tomes.includes(k)){ logMsg(`you already know everything in the ${TOMES[k].nm}`, ''); renderGame(); return; }
+  p.tomes.push(k); if (k==='ancients') p.ancientKnown = true; invRemove(idx);
+  logMsg(`you read the ${TOMES[k].nm} cover to cover - you have learned it for good: ${TOMES[k].d}`, 'magic', true); sfx('levelUp'); checkAchievements(); renderGame(); saveCurrentGame();
+}
+for (const k in TOMES) ACHIEVEMENTS.push({ id:'tome_'+k, name:TOMES[k].nm, desc:'read the '+TOMES[k].nm, check:p=>(p.tomes||[]).includes(k), bonus:TOMES[k].bonus });
+// teleport tablets
+function sqTabletUse(idx){
+  const it = G.inv[idx]; if (!it) return; if (G.gameMode!==0 && G.gameMode!==3){ logMsg('the tablet won\'t work down here - use it in the open air', 'hit'); renderGame(); return; }
+  const h = (G.ow.pois||[]).filter(o=>o.k==='hermit').sort((a,b)=>Math.hypot(a.x-G.owPos.x, a.y-G.owPos.y)-Math.hypot(b.x-G.owPos.x, b.y-G.owPos.y))[0];
+  if (!h){ logMsg('the tablet hums, but finds nowhere to take you', ''); return; }
+  if (G.interior) exitInterior(); G.gameMode = 0; G.owPos = { x:h.x, y:h.y+1 }; owReveal(h.x, h.y, 6); setUi('playing'); try{ audEnv('portal'); }catch(e){}
+  logMsg('you snap the tablet - the world folds, and you stand at the hermit\'s door. The tablet reforms in your pack', 'magic'); renderGame(); saveCurrentGame();
+}
+function sqCluesHtml(){
+  const p = G.player, clues = G.inv.filter(it=>it && it.clue), maps = G.inv.filter(it=>it && it.tmap), tomes = p.tomes||[];
+  return `<h4 style="color:var(--ink-faint);margin:4px 0 6px;">CLUE SCROLLS</h4>${clues.length ? clues.map(it=>{ const tr = it.trail; return `<div class="shoprow"><span><b>Clue Scroll</b></span><span class="desc">${tr ? `step ${tr.i+1} of ${tr.steps.length}: ${esc(tr.steps[tr.i].hint)}` : 'unread - use it from your pack'}</span><span></span></div>`; }).join('') : '<div class="muted">none in your pack - monsters drop them, and so do rare bird\'s nests, gem rocks and caskets</div>'}
+    <h4 style="color:var(--ink-faint);margin:12px 0 6px;">TREASURE MAPS</h4>${maps.length ? maps.map(it=>`<div class="shoprow"><span><b>Treasure Map</b></span><span class="desc">an X ${Math.round(Math.hypot(it.mx-G.owPos.x, it.my-G.owPos.y))} leagues ${dirWord(it.mx-G.owPos.x, it.my-G.owPos.y)}</span><span></span></div>`).join('') : '<div class="muted">none</div>'}
+    <div class="muted" style="font-size:12px;margin:6px 0;">caskets opened: ${p.caskets||0} - they can hold gilded armour, rare capes and hats, tomes, maps and more clues</div>
+    <h4 style="color:var(--ink-faint);margin:12px 0 6px;">TOMES LEARNED</h4>${Object.keys(TOMES).map(k=>`<div class="shoprow"><span style="${tomes.includes(k) ? 'color:'+COL.gold : 'opacity:0.5'}">${tomes.includes(k) ? '&#10003;' : '&#9675;'} <b>${esc(TOMES[k].nm)}</b></span><span class="desc">${esc(TOMES[k].d)}</span><span></span></div>`).join('')}`;
+}
+// ---- the factions' perks: the fence, and the Champions' Guild for those with quest points ----
+function sqFenceSell(){
+  const p = G.player; let n = 0, g = 0;
+  for (let i=G.inv.length-1;i>=0;i--){ const it = G.inv[i]; if (!it || it.locked || !(lootArrow(it)==='down' || invIsJunk(it))) continue; const v = Math.round(sellPrice(it)*1.3); g += v; n++; invRemove(i); }
+  p.gold += g; logMsg(n ? `the fence takes ${n} piece${n===1 ? '' : 's'} off your hands for ${g} gold - no questions asked` : 'the fence shrugs - you\'ve nothing worth fencing', n ? 'loot' : ''); if (n) sfx('coins'); renderOverlay(); saveCurrentGame();
+}
+TOWN_GUILDS.champions = { nm:'Champions\' Guild', col:'#d8b050', req:'20 quest points', need:()=>(tkP().questPoints||0) >= 20, perk:'claim a champion\'s purse and train with the champions once a day' };
+BENCHES.g_champions = { nm:'Champions\' Guild', does:TOWN_GUILDS.champions.perk };
+ROOM_LAYOUT.guild.benches.push(['g_champions', 10, 9]);
+ACHIEVEMENTS.push(
+  { id:'questor', name:'Questor', desc:'finish 10 quests from the journal', check:p=>Object.values(p.sq||{}).filter(s=>s.state==='done').length >= 10, bonus:{life:5} },
+  { id:'wakener', name:'Bane of the Wakener', desc:'finish the Waking Lich', check:p=>!!(p.sq && p.sq.lich8 && p.sq.lich8.state==='done'), bonus:{resist:2} },
+  { id:'diarist', name:'Diarist', desc:'claim a diary reward', check:p=>Object.values(p.diary||{}).some(v=>v >= 1), bonus:{xpfind:0.02} },
+  { id:'trailblazer', name:'Trailblazer', desc:'open 5 caskets', check:p=>(p.caskets||0) >= 5, bonus:{magicfind:3} },
+);
+// quest-giving world finds: a skeleton with a note, and a ghost in the graveyard by night
+function sqWorldStep(){
+  if (G.gameMode!==0 || G.ui!=='playing') return false; const x = G.owPos.x, y = G.owPos.y;
+  if (!sqActive('bones') && !sqDone('bones') && o3Hash(x, y, 4401) < 0.004 && [OW_GRASS, OW_FOREST, OW_DESERT, OW_TUNDRA].includes(G.ow.map[x][y]) && !wgPoiAt(x, y)){
+    wevDialog('A skeleton', 'A skeleton in rusted mail lies half-buried by the path, one bony hand clutching a folded note.', [['Read the note', ()=>{ sqStartAt('bones'); }], ['Leave it be', ()=>{}]], 'out in the wilds'); return true; }
+  if (isNightTime() && !sqActive('ghost') && !sqDone('ghost')){ for (const [a,b] of [[1,0],[-1,0],[0,1],[0,-1]]){ const m = G.ow.map[x+a]; if (m && m[y+b]===OW_GRAVEYARD){
+    wevDialog('A weeping ghost', 'A pale shape drifts between the gravestones, weeping. It has no head.', [['Speak to it', ()=>{ sqStartAt('ghost'); sqOnTalk('ghost'); }], ['Walk on', ()=>{}]], 'the graveyard'); return true; } } }
+  return false;
+}
+function sqStartAt(id){ if (!sqCanStart(id)) return; sqStart(id); const s = sqP()[id]; s.loc.start = { x:G.owPos.x, y:G.owPos.y }; const st = sqStep(id); if (st && st.k==='read'){ sqLog(id, st.say); wevDialog(SQ[id].nm, st.say, [['Go and look', ()=>sqAdvance(id)]], 'a note'); } }
+// small bonuses from quest gear
+function sqXpBonus(k){ const w = G.gear && G.gear.weapon; return (k==='mining' && w && w.questItem==='lanternpick') ? 0.1 : 0; }
 
 function renderGame(){
   syncGrid();
@@ -27168,7 +27865,7 @@ function o3SyncEncounters(){
 // quest objectives on the land: a pillar of light and a floating ! (or ? to turn in),
 // a wanted foe's bounty marker, a raider camp's tents and fire
 function o3SyncQuests(){
-  const T = THREE, qs = (G.player && G.player.quests) || [], tq = trackedQuest();
+  const T = THREE, qs = G.player ? questsShown() : [], tq = trackedQuest();
   const list = [];
   for (const q of qs){ const t = questTarget(q); if (t) list.push([q.id, t.x, t.y, t.turnIn?1:0, q===tq?1:0, q.kind, q.progress>=q.target?1:0]); }
   const gv = G.player && G.player.grave;
@@ -32475,7 +33172,9 @@ sfx = function(name){
 };
 
 // ===================== SECTION: UI OVERLAY SYSTEM =====================
+const SQ_TALK = new Set(['tavern','blacksmith','alchemist','temple','questgiver','mayor','guild']);
 function setUi(mode, isHelp){
+  if (SQ_TALK.has(mode) && !G.sqBypass && G.player){ G.sqBypass = true; let took = false; try{ took = sqOnTalk(mode); }catch(e){ console.error(e); } finally { G.sqBypass = false; } if (took) return; }   // a quest's dialogue first (see SECTION: STORY QUESTS)
   if (mode!=='playing' && G.ui==='playing' && !['wevent','death','titleScreen'].includes(mode)) try{ audPage(); }catch(e){}   // a page turns
   // only capture prevUi when actually ENTERING help from something else -
   // opening it a second time while already on 'help' (e.g. the ? icon
@@ -32508,6 +33207,7 @@ function backOut(){
     case 'tavern': setUi('playing'); break;
     case 'waypoint': case 'stash': case 'bank': case 'questgiver': setUi('playing'); break;
     case 'jukebox': setUi(G.jukeBack||'playing'); break;
+    case 'journal': case 'sqpuzzle': setUi('playing'); break;
     case 'inventory': setUi('playing'); break;
     case 'charsheet': setUi('playing'); break;
     case 'skills': case 'rsmagic': case 'prayer': setUi('playing'); break;
@@ -32550,6 +33250,8 @@ function renderOverlay(){
     case 'stash': el.innerHTML = buildStash(); break;
     case 'bank': el.innerHTML = buildBank(); break;
     case 'jukebox': el.innerHTML = buildJukebox(); break;
+    case 'journal': el.innerHTML = buildJournal(); break;
+    case 'sqpuzzle': el.innerHTML = buildSqPuzzle(); break;
     case 'questgiver': el.innerHTML = buildQuestGiver(); break;
     case 'questReward': el.innerHTML = buildQuestReward(); break;
     case 'vault': el.innerHTML = buildVault(); break;
@@ -32601,7 +33303,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-90';
+const GAME_VERSION = 'rs-91';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -33498,6 +34200,7 @@ function buildTavern(){
         <button class="btn" onclick="villageRest(); renderOverlay();">R &middot; rest (full heal)</button>
         <button class="btn" onclick="G.gamesAt='tavern';setUi('games')">darts &amp; the cook-off</button>
         <button class="btn" onclick="setUi('gamble')">games of chance</button>
+        ${sqUnlocked('fence') ? '<button class="btn" onclick="sqFenceSell()">the fence (your junk, +30%)</button>' : ''}
       </div>
       <div class="panel" style="margin-bottom:14px;">
         <h4 style="color:${COL.purple};">Corruption: ${Math.round(G.player.corruption||0)}%</h4>
@@ -34504,7 +35207,7 @@ function buildHelp(){
       <div>most encounters are an ordinary fight, but not all of them: a wandering merchant sometimes hails you with a one-time stock instead of a fight; a pack occasionally has a tougher named champion leading it, worth real bonus loot; and the desert, swamp and tundra each hide their own unique set-piece encounter (a buried tomb, a bog ambush, a frozen cache) with a guaranteed bonus reward on top of the fight itself.</div>
       <div>open water blocks the way until you own a boat (buy one from the Peddler in any town) &mdash; once you have one you can sail freely, though the open sea has its own dangers</div>
       <div><b>Skills &amp; trades</b> (<kbd>J</kbd>): fishing, mining, woodcutting and foraging, and the trades that use what you gather - cooking, smithing, alchemy and firemaking - each level from 1 to 99 alongside your combat skills. Gather at the spots you see on the land: marked trees, bubbling fishing spots and flowering herb patches (hover one to see what it gives and the level it needs, click it to walk over and start), rock beside mountains, and ore veins, cave pools and cave herbs in the dungeons. Each spot gives a few items and then is felled, fished out or picked clean, and grows back or moves on in time. <kbd>E</kbd> works the nearest spot beside you (press it again or move to stop), light a campfire from your logs, or cook at your fire. Buy a fishing rod, pickaxe and hatchet (and better ones as you level) at the blacksmith, who also smelts your ore into bars and forges them into gear; brew herbs into potions at the alchemist; cook at the tavern hearth. Press <kbd>U</kbd> to eat the best-fitting cooked food (in a fight it takes your turn). Visit the Tailor in any town to craft: spin flax, tan hides, and make robes, staves, leather armour, bows and arrows at the workbenches inside.</div>
-      <div><b>Your house, Archaeology and Necromancy</b>: Hollis the estate agent on every town square sells you a house (2,500 gold) whose door opens from any town. Build its furniture from logs, iron bars and essence to train Construction: a bed, hearth, furnace, anvil and the other benches, an altar that takes bones for three times the Prayer xp, a trophy wall, and a portal to your towns, islands, dig sites and landmarks. Five dig sites lie out in the wild: excavate the hotspots round each (with a pickaxe) and restore what you find at its dig camp; finish a site's collection for a relic power for good. Towns now come as hamlets, villages and cities: a village adds a temple (prayer, blessings, a crusade against the undead) and an archery range; a city adds a guild hall, an arena and stone walls; a town by the sea has a harbour with ships to the other ports and your charted islands. Talk to the townsfolk you bump into for gossip and hints, play darts, gamble and enter the cook-off at the tavern, read the notice board's news, and pay the mayor to build walls, a bigger market or a bigger town. Shops shut at night (knock if you must). Shops pay less for things you keep selling them, and the Peddler's shelf only refills slowly. Waypoints charge a fee. Music follows where you are, by day and by night, and every tune you hear is kept in the music player (Settings). The banker on every square keeps your items (with tabs and a search box) and your gold, which death can't touch; Hollis sells property that pays into your bank every day. In a fight, press <kbd>-</kbd> (or the Raise button) to crush a bone and raise the dead to fight beside you; their hits train Necromancy, a fourth combat style.</div>
+      <div><b>Your house, Archaeology and Necromancy</b>: Hollis the estate agent on every town square sells you a house (2,500 gold) whose door opens from any town. Build its furniture from logs, iron bars and essence to train Construction: a bed, hearth, furnace, anvil and the other benches, an altar that takes bones for three times the Prayer xp, a trophy wall, and a portal to your towns, islands, dig sites and landmarks. Five dig sites lie out in the wild: excavate the hotspots round each (with a pickaxe) and restore what you find at its dig camp; finish a site's collection for a relic power for good. Towns now come as hamlets, villages and cities: a village adds a temple (prayer, blessings, a crusade against the undead) and an archery range; a city adds a guild hall, an arena and stone walls; a town by the sea has a harbour with ships to the other ports and your charted islands. Talk to the townsfolk you bump into for gossip and hints, play darts, gamble and enter the cook-off at the tavern, read the notice board's news, and pay the mayor to build walls, a bigger market or a bigger town. Shops shut at night (knock if you must). Shops pay less for things you keep selling them, and the Peddler's shelf only refills slowly. Waypoints charge a fee. The journal (; or X) holds every quest - story quests from innkeepers, smiths, alchemists, priests, Captains, mayors, guildmasters, a hermit, a ghost and a skeleton's note, with chains, three factions and the main storyline, the Waking Lich - plus region diaries, clue trails and the tomes you've learned. Music follows where you are, by day and by night, and every tune you hear is kept in the music player (Settings). The banker on every square keeps your items (with tabs and a search box) and your gold, which death can't touch; Hollis sells property that pays into your bank every day. In a fight, press <kbd>-</kbd> (or the Raise button) to crush a bone and raise the dead to fight beside you; their hits train Necromancy, a fourth combat style.</div>
       <div>press <kbd>C</kbd> to make camp wherever you're standing &mdash; usually a free heal that also refills your ability charges, spell slots and wand charges, same as a village rest, but sleeping in the open risks a night-time ambush that interrupts the rest entirely (no healing, straight into a fight, and every exit is sealed until the last monster drops). Safer on grass, riskier in forest/swamp, and impossible while zoomed out. You can also camp inside any dungeon-type site once you've cleared every monster off the current floor &mdash; nothing left down there to ambush you, so it's just as safe as a village rest.</div>
       <div>press <kbd>M</kbd> to open the world map of the whole continent &mdash; press again to go back. Click a village you've visited on the map, or press <kbd>T</kbd> on the overworld or in a town, to teleport there through a portal. The map's tool bar lets you <b>drop pins</b> with a note, <b>plan a route</b> and walk it, and switch <b>layers</b> (place names, landmarks, sites, danger, resources and more) on and off; the mouse wheel zooms in far enough to see every tree, rock and house. Land you've seen is pencilled in and land you've walked is painted; every forest, range, sea and river has a name, and three great landmarks (a volcano, a giant tree and a wizard's tower) can be seen from far off. The <b>travel log</b> counts the regions, towns, sites and landmarks you've found.</div>
       <div><b>The land:</b> when you start you pick the world's size and shape (an archipelago, one landmass or several continents), and every world has a <b>world code</b> - give it to a friend and they can play the same world. <b>Roads</b> join the towns: walking a road is quicker (every other step is free) and safer, and the route planner and the teleport list (T, "walk") follow them. Off the road, wading a river costs time; roads cross on <b>bridges</b> and fords, and a broken bridge can be mended. <b>Ferries</b> cross the water between landmasses. Every part of the land has a recommended combat level, shown when you enter it and on the map. Watch for <b>volcanic land, jungles, haunted woods, snowy highlands and crystal wastes</b> with their own creatures, and for <b>hamlets</b> (jobs, food and a safe barn), <b>lookouts</b> that reveal the map, <b>caves, grottos and ruins</b> to delve, <b>standing stones</b>, <b>abandoned camps</b>, <b>wishing wells</b> and <b>hermits</b>. Deer, rabbits, boars and birds roam the 3D land - click one to hunt it. Rain makes the fish bite, fog shortens your sight and storms make the sea dangerous. Buy a <b>tent, ward lantern, bedroll and cooking spit</b> from the Peddler for safer camping. Beyond the red ditch lies <b>the Wilderness</b>: tougher monsters, richer pickings, and if you die there your dropped items are gone for good.</div>
@@ -34661,6 +35364,7 @@ function handlePlayingKey(k){
     case 'y': case 'Y': toggleCompact(); break;
     case '0': toggleRun(); break;
     case '-': case '_': necroRaise(); break;
+    case ';': case 'x': case 'X': setUi('journal'); break;
     case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': case '9': qbUse(+k-1); break;
     case 'l': case 'L': G.statsBack = 'playing'; setUi('stats'); break;
   }
@@ -34745,6 +35449,8 @@ function handleKeydown(e){
     }
     case 'stash': case 'bank': case 'questgiver': { if (k==='Escape') setUi('playing'); break; }
     case 'jukebox': { if (k==='Escape') setUi(G.jukeBack||'playing'); break; }
+    case 'journal': { if (k==='Escape' || k===';' || k==='x' || k==='X') setUi('playing'); break; }
+    case 'sqpuzzle': { if (k==='Escape') setUi('playing'); break; }
     case 'vault': {
       const v = G.vault;
       if (v.solved || v.attempt>=v.maxAttempts){
@@ -35077,7 +35783,7 @@ function frameLoop(ts){
     // direct player keypress (rare, but cheap insurance)
     if (!G.gameOver && G.ui!=='worldPreview' && ts-lastAutosaveTs > 2000){ lastAutosaveTs = ts; saveCurrentGame(); }
   }
-  try{ audFrame(); }catch(e){ console.error(e); }   // music, ambience, footsteps (see SECTION: AUDIO)
+  try{ audFrame(); sqFrame(); }catch(e){ console.error(e); }   // music, ambience, footsteps (see SECTION: AUDIO)
   fpsTick(ts);
   requestAnimationFrame(frameLoop);
 }

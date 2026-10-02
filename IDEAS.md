@@ -354,27 +354,27 @@ _Boats, islands and sea fishing_
 ### Quests
 _The quest system first, then the quest content_
 
-250. [ ] (150) Quest journal - every quest with its status and a written log of what happened
-251. [ ] (161) Quest map markers for every step, and a 'next step' line in the tracker
-252. [ ] (163) Abandon and retry failed quests - no permanent lockouts
-253. [ ] (147) Quest points - a running total that unlocks areas, guilds and gear, with a quest cape at the end
-254. [ ] (148) Quest requirements - skill levels and earlier quests needed, so the world opens up gradually
-255. [ ] (149) Dialogue choices that change rewards, allies or how a quest ends
-256. [ ] (154) Quest givers all over town - the blacksmith wants rare ore, the alchemist needs herbs, the innkeeper has rats
-257. [ ] (155) Quests found in the world - a note on a skeleton, a hermit in the woods, a ghost in a graveyard
-258. [ ] (156) Dungeon quests - a trapped adventurer on floor 3, a lost relic on the boss floor
-259. [ ] (153) Chain quests - multi-part series (goblin war, haunted mine) where each part unlocks the next
-260. [ ] (151) Puzzle quests - brazier order, riddle doors, sliding-tile locks, chess-knight crossings
-261. [ ] (152) Boss quests - a quest built around one named boss with a unique arena and mechanics
-262. [ ] (157) Faction quests - Mages' Circle, Thieves' Guild, Royal Guard; quest lines, ranks and rewards
-263. [ ] (158) Unique quest rewards - gear, spells, prayers and shortcuts only quests give
-264. [ ] (159) Quest unlocks - new teleports, areas, shops or spellbooks
-265. [ ] (160) Achievement diaries - easy to elite task lists per region, with a reward item per tier
-266. [ ] (12) Story quests - hand-made quest chains with dialogue
-267. [ ] (146) Main storyline - a continent-wide threat (waking lich or dragon cult) over 8-10 quests, ending in a unique final dungeon
-268. [ ] (79) Clue scrolls - treasure trails from drops and skilling (dig, search, do tasks) with cosmetic rewards
-269. [ ] (180) Treasure maps and clue scroll rewards - rare cosmetics and gilded armour
-270. [ ] (181) Tomes - use once to learn a spell or perk permanently
+250. [x] (150) Quest journal - every quest with its status and a written log of what happened
+251. [x] (161) Quest map markers for every step, and a 'next step' line in the tracker
+252. [x] (163) Abandon and retry failed quests - no permanent lockouts
+253. [x] (147) Quest points - a running total that unlocks areas, guilds and gear, with a quest cape at the end
+254. [x] (148) Quest requirements - skill levels and earlier quests needed, so the world opens up gradually
+255. [x] (149) Dialogue choices that change rewards, allies or how a quest ends
+256. [x] (154) Quest givers all over town - the blacksmith wants rare ore, the alchemist needs herbs, the innkeeper has rats
+257. [x] (155) Quests found in the world - a note on a skeleton, a hermit in the woods, a ghost in a graveyard
+258. [x] (156) Dungeon quests - a trapped adventurer on floor 3, a lost relic on the boss floor
+259. [x] (153) Chain quests - multi-part series (goblin war, haunted mine) where each part unlocks the next
+260. [x] (151) Puzzle quests - brazier order, riddle doors, sliding-tile locks, chess-knight crossings
+261. [x] (152) Boss quests - a quest built around one named boss with a unique arena and mechanics
+262. [x] (157) Faction quests - Mages' Circle, Thieves' Guild, Royal Guard; quest lines, ranks and rewards
+263. [x] (158) Unique quest rewards - gear, spells, prayers and shortcuts only quests give
+264. [x] (159) Quest unlocks - new teleports, areas, shops or spellbooks
+265. [x] (160) Achievement diaries - easy to elite task lists per region, with a reward item per tier
+266. [x] (12) Story quests - hand-made quest chains with dialogue
+267. [x] (146) Main storyline - a continent-wide threat (waking lich or dragon cult) over 8-10 quests, ending in a unique final dungeon
+268. [x] (79) Clue scrolls - treasure trails from drops and skilling (dig, search, do tasks) with cosmetic rewards
+269. [x] (180) Treasure maps and clue scroll rewards - rare cosmetics and gilded armour
+270. [x] (181) Tomes - use once to learn a spell or perk permanently
 
 ### Audio
 _The whole sound system in one pass_
