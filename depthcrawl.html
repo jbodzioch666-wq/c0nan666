@@ -1124,7 +1124,7 @@ const QUEST_DELIVERY_FLAVORS = ['a token for the temple', 'proof of your mettle'
 // loot pickup, etc, so it can never be allowed to throw and break gameplay
 let _actx = null;
 // ---- player settings (Esc > Settings): volume, graphics, HUD - kept per browser ----
-const SET_DEF = { vol:{ master:1, sfx:1, ui:1, music:0.6, amb:0.8 }, gfx:'high', fps:false, uiScale:1, compact:false, loadCards:true };
+const SET_DEF = { vol:{ master:1, sfx:1, ui:1, music:0.6, amb:0.8 }, post:true, gfx:'high', fps:false, uiScale:1, compact:false, loadCards:true };
 let SET = JSON.parse(JSON.stringify(SET_DEF));
 try { const sv = JSON.parse(localStorage.getItem('depthcrawl_settings')||'null'); if (sv) SET = Object.assign(SET, sv, { vol:Object.assign({}, SET_DEF.vol, sv.vol||{}) }); } catch(e){}
 function saveSettings(){ try { localStorage.setItem('depthcrawl_settings', JSON.stringify(SET)); } catch(e){} }
@@ -21261,6 +21261,299 @@ function audFrame(force){
 // browsers only let sound start after you've clicked or pressed a key
 if (typeof document!=='undefined') for (const ev of ['pointerdown', 'keydown']) document.addEventListener(ev, ()=>{ AUD.userGo = true; const c = audInit(); if (c && c.state==='suspended' && isSoundOn()) c.resume(); }, { capture:true });
 
+// ===================== SECTION: GRAPHICS - LIGHT, BLOOM, GRADING, LAND, WATER, TREES AND SKY =====================
+// every 3D view (the land, the towns, the dungeons) now renders through a
+// small post-process: bright things bleed light (bloom), each region gets
+// its own colour grade (warm desert, murky swamp, cold north, red ashlands)
+// and the edges darken a touch. On the land: blended grass, dirt and rock
+// textures with strata on the cliffs, drifting cloud shadows, swaying grass
+// and flowers, trees that sway, turn in autumn and carry snow in winter (and
+// two new kinds, birch and cypress), water with waves, a sky reflected in
+// it, foam along the shore, flowing rivers and waterfalls, low mist over
+// the swamps and at dawn, shafts of light through the woods at sunrise and
+// sunset, blue moonlight - and in the dungeons, light falling through the
+// cracks.
+const GFX = { u:{ uT:{ value:0 }, uWind:{ value:1 }, uCloudAmt:{ value:0.5 }, uNight:{ value:0 }, uSky:{ value:null } }, grade:{}, tex:null };
+// ---- the post-process: bloom, the region's grade and a soft vignette ----
+const GFXP = new Map();
+const GFX_GRADES = {
+  neutral:  { gain:[1.0,1.0,1.0],   lift:[0,0,0],            sat:1.05, con:1.03, bloom:0.55, vig:0.22 },
+  forest:   { gain:[0.98,1.02,0.96], lift:[0,0.004,0],       sat:1.06, con:1.03, bloom:0.5,  vig:0.24 },
+  desert:   { gain:[1.08,1.0,0.86], lift:[0.012,0.006,0],    sat:1.06, con:1.05, bloom:0.65, vig:0.24 },
+  swamp:    { gain:[0.9,1.0,0.84],  lift:[0,0.014,0.002],    sat:0.78, con:0.97, bloom:0.45, vig:0.34 },
+  tundra:   { gain:[0.92,0.98,1.1], lift:[0,0.006,0.018],    sat:0.82, con:1.02, bloom:0.6,  vig:0.22 },
+  volcanic: { gain:[1.12,0.86,0.78], lift:[0.018,0,0],       sat:1.1,  con:1.1,  bloom:0.85, vig:0.38 },
+  jungle:   { gain:[0.94,1.06,0.9], lift:[0,0.008,0],        sat:1.14, con:1.04, bloom:0.5,  vig:0.26 },
+  haunted:  { gain:[0.9,0.95,1.0],  lift:[0.004,0.006,0.012], sat:0.6, con:1.04, bloom:0.55, vig:0.4 },
+  crystal:  { gain:[0.96,0.96,1.1], lift:[0.006,0,0.016],    sat:1.08, con:1.04, bloom:0.8,  vig:0.26 },
+  town:     { gain:[1.04,1.0,0.95], lift:[0.004,0.002,0],    sat:1.06, con:1.03, bloom:0.55, vig:0.2 },
+  dungeon:  { gain:[1.0,0.97,0.93], lift:[0,0,0.004],        sat:0.9,  con:1.07, bloom:0.8,  vig:0.4 },
+};
+function gfxPostOn(){ return SET.post!==false && SET.gfx!=='low' && !window.__noPost; }
+function gfxGradeKey(view){
+  if (view==='fpd') return G.gameMode===2 ? 'neutral' : 'dungeon';
+  if (view==='v3'){ const t = G.villageTheme; return t==='desert' ? 'desert' : t==='tundra' ? 'tundra' : t==='swamp' ? 'swamp' : 'town'; }
+  const x = G.owPos.x, y = G.owPos.y, b = wgBioAt(x, y), bio = b && BIO[b] ? BIO[b].id : null;
+  if (bio==='volcanic' || bio==='jungle' || bio==='haunted' || bio==='crystal') return bio;
+  if (bio==='highland') return 'tundra';
+  const t = G.ow.map[x] ? G.ow.map[x][y] : OW_GRASS;
+  return t===OW_DESERT ? 'desert' : t===OW_SWAMP ? 'swamp' : t===OW_TUNDRA ? 'tundra' : t===OW_FOREST ? 'forest' : 'neutral';
+}
+// the grade eases toward the region's over a couple of seconds
+function gfxGrade(view, dt){
+  const want = GFX_GRADES[gfxGradeKey(view)] || GFX_GRADES.neutral, g = GFX.grade[view] || (GFX.grade[view] = JSON.parse(JSON.stringify(want))), k = Math.min(1, (dt||0.016)*1.2);
+  for (const f of ['gain','lift']) for (let i=0;i<3;i++) g[f][i] += (want[f][i] - g[f][i])*k;
+  for (const f of ['sat','con','bloom','vig']) g[f] += (want[f] - g[f])*k;
+  return g;
+}
+function gfxPost(r){
+  let P = GFXP.get(r); if (P) return P; const T = THREE;
+  const mk = o=>new T.WebGLRenderTarget(4, 4, Object.assign({ type:T.HalfFloatType, minFilter:T.LinearFilter, magFilter:T.LinearFilter, depthBuffer:false }, o||{}));
+  P = { scene:mk({ depthBuffer:true }), a:mk(), b:mk(), w:0, h:0 };
+  if (r.capabilities.isWebGL2 && SET.gfx==='high') P.scene.samples = 4;
+  const vs = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }';
+  const M = (fs, u)=>new T.ShaderMaterial({ uniforms:u, vertexShader:vs, fragmentShader:fs, depthTest:false, depthWrite:false });
+  P.bright = M('uniform sampler2D t; uniform float th; varying vec2 vUv; void main(){ vec4 s = texture2D(t, vUv); vec3 c = s.rgb; float l = max(c.r, max(c.g, c.b)); gl_FragColor = vec4(c * smoothstep(th, th + 0.7, l), 1.0); }', { t:{ value:null }, th:{ value:0.8 } });
+  P.blur = M('uniform sampler2D t; uniform vec2 d; varying vec2 vUv; void main(){ vec3 c = texture2D(t, vUv).rgb*0.2270; c += (texture2D(t, vUv + d*1.3846).rgb + texture2D(t, vUv - d*1.3846).rgb)*0.3162; c += (texture2D(t, vUv + d*3.2308).rgb + texture2D(t, vUv - d*3.2308).rgb)*0.0703; gl_FragColor = vec4(c, 1.0); }', { t:{ value:null }, d:{ value:new T.Vector2() } });
+  P.comp = M(`uniform sampler2D tS, tB; uniform float bloom, expo, aces, sat, con, vig; uniform vec3 gain, lift, bg; varying vec2 vUv;
+    vec3 RRT(vec3 v){ vec3 a = v*(v + 0.0245786) - 0.000090537; vec3 b = v*(0.983729*v + 0.4329510) + 0.238081; return a/b; }
+    vec3 ACES(vec3 c){ const mat3 I = mat3(vec3(0.59719,0.07600,0.02840), vec3(0.35458,0.90834,0.13383), vec3(0.04823,0.01566,0.83777)); const mat3 O = mat3(vec3(1.60475,-0.10208,-0.00327), vec3(-0.53108,1.10813,-0.07276), vec3(-0.07367,-0.00605,1.07602));
+      c *= expo/0.6; c = I*c; c = RRT(c); c = O*c; return clamp(c, 0.0, 1.0); }
+    vec3 toS(vec3 v){ v = clamp(v, 0.0, 1.0); return mix(pow(v, vec3(0.41666))*1.055 - vec3(0.055), v*12.92, vec3(lessThanEqual(v, vec3(0.0031308)))); }
+    void main(){
+      vec4 s = texture2D(tS, vUv); vec3 b = texture2D(tB, vUv).rgb; float a = clamp(s.a, 0.0, 1.0);
+      vec3 c = a > 0.002 ? s.rgb/a : vec3(0.0);
+      c = c*gain + lift;
+      vec3 o = mix(bg*gain + lift, toS(aces > 0.5 ? ACES(c) : c), a);
+      o += toS(b*bloom)*0.55;
+      float l = dot(o, vec3(0.2126, 0.7152, 0.0722)); o = mix(vec3(l), o, sat); o = (o - 0.5)*con + 0.5;
+      o *= mix(1.0, smoothstep(0.98, 0.32, length(vUv - 0.5)), vig);
+      gl_FragColor = vec4(clamp(o, 0.0, 1.0), 1.0); }`,
+    { tS:{ value:null }, tB:{ value:null }, bloom:{ value:0.6 }, expo:{ value:1 }, aces:{ value:1 }, sat:{ value:1 }, con:{ value:1 }, vig:{ value:0.2 }, gain:{ value:new T.Vector3(1,1,1) }, lift:{ value:new T.Vector3() }, bg:{ value:new T.Vector3() } });
+  P.quad = new T.Mesh(new T.PlaneGeometry(2, 2), P.comp); P.quad.frustumCulled = false; P.qs = new T.Scene(); P.qs.add(P.quad); P.qc = new T.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  P.v2 = new T.Vector2();
+  GFXP.set(r, P); return P;
+}
+function gfxPass(r, P, mat, target){ P.quad.material = mat; r.setRenderTarget(target); r.render(P.qs, P.qc); }
+function gfxRender(r, scene, cam, view){
+  if (!gfxPostOn()){ r.render(scene, cam); return; }
+  let P; try{ P = gfxPost(r); }catch(e){ console.error(e); SET.post = false; r.render(scene, cam); return; }
+  const now = performance.now(), dt = Math.min(0.2, (now - (P.lt||now))/1000); P.lt = now;
+  r.getDrawingBufferSize(P.v2); const w = Math.max(4, P.v2.x|0), h = Math.max(4, P.v2.y|0), qw = Math.max(2, w>>2), qh = Math.max(2, h>>2);
+  if (P.w!==w || P.h!==h){ P.w = w; P.h = h; P.scene.setSize(w, h); P.a.setSize(qw, qh); P.b.setSize(qw, qh); }
+  const g = gfxGrade(view, dt), bg = scene.background && scene.background.isColor ? scene.background : null, U = P.comp.uniforms;
+  if (bg) U.bg.value.set(bg.r, bg.g, bg.b); else U.bg.value.set(0, 0, 0);
+  const oldBg = scene.background; scene.background = null;
+  const cc = r.getClearColor(new THREE.Color()), ca = r.getClearAlpha(); r.setClearColor(0x000000, 0);
+  try{
+    r.setRenderTarget(P.scene); r.clear(); r.render(scene, cam);
+  } finally { scene.background = oldBg; r.setClearColor(cc, ca); }
+  P.bright.uniforms.t.value = P.scene.texture; gfxPass(r, P, P.bright, P.a);
+  for (let i=0;i<2;i++){ P.blur.uniforms.t.value = P.a.texture; P.blur.uniforms.d.value.set(1.4/qw, 0); gfxPass(r, P, P.blur, P.b); P.blur.uniforms.t.value = P.b.texture; P.blur.uniforms.d.value.set(0, 1.4/qh); gfxPass(r, P, P.blur, P.a); }
+  U.tS.value = P.scene.texture; U.tB.value = P.a.texture; U.bloom.value = g.bloom; U.expo.value = r.toneMappingExposure; U.aces.value = r.toneMapping===THREE.ACESFilmicToneMapping ? 1 : 0;
+  U.gain.value.set(g.gain[0], g.gain[1], g.gain[2]); U.lift.value.set(g.lift[0], g.lift[1], g.lift[2]); U.sat.value = g.sat; U.con.value = g.con; U.vig.value = g.vig;
+  gfxPass(r, P, P.comp, null);
+}
+// ---- textures drawn once: grass, dirt and rock detail, and soft cloud noise ----
+function gfxTextures(){
+  if (GFX.tex) return GFX.tex; const T = THREE;
+  const can = (n, draw)=>{ const c = v3Canvas(n, n), x = c.getContext('2d'); draw(x, n); const t = new T.CanvasTexture(c); t.wrapS = t.wrapT = T.RepeatWrapping; t.anisotropy = 4; return t; };
+  const wrapDot = (x, n, px, py, r, col)=>{ for (const dx of [-n, 0, n]) for (const dy of [-n, 0, n]){ x.fillStyle = col; x.beginPath(); x.arc(px+dx, py+dy, r, 0, Math.PI*2); x.fill(); } };
+  const grass = can(128, (x, n)=>{ x.fillStyle = '#c4c4c4'; x.fillRect(0, 0, n, n); for (let i=0;i<1400;i++){ const px = Math.random()*n, py = Math.random()*n, k = 150 + Math.random()*105|0; x.strokeStyle = `rgb(${k},${k},${k})`; x.lineWidth = 1; x.beginPath(); x.moveTo(px, py); x.lineTo(px + (Math.random()-0.5)*3, py - 3 - Math.random()*5); x.stroke(); } });
+  const dirt = can(128, (x, n)=>{ x.fillStyle = '#bdbdbd'; x.fillRect(0, 0, n, n); for (let i=0;i<500;i++){ const k = 120 + Math.random()*120|0; wrapDot(x, n, Math.random()*n, Math.random()*n, 0.6 + Math.random()*2.4, `rgb(${k},${k},${k})`); } });
+  const rock = can(128, (x, n)=>{ for (let y=0;y<n;y++){ const k = 150 + Math.sin(y*0.45)*30 + Math.sin(y*1.7)*14 + (Math.random()-0.5)*20|0; x.fillStyle = `rgb(${k},${k},${k})`; x.fillRect(0, y, n, 1); }
+    for (let i=0;i<120;i++){ const k = 100 + Math.random()*60|0; x.fillStyle = `rgba(${k},${k},${k},0.6)`; x.fillRect(Math.random()*n, Math.random()*n, 2 + Math.random()*10, 1); } });
+  const cloud = can(256, (x, n)=>{ x.fillStyle = '#000'; x.fillRect(0, 0, n, n); for (let i=0;i<90;i++){ const px = Math.random()*n, py = Math.random()*n, r = 12 + Math.random()*46;
+      for (const dx of [-n, 0, n]) for (const dy of [-n, 0, n]){ const g = x.createRadialGradient(px+dx, py+dy, 0, px+dx, py+dy, r); g.addColorStop(0, 'rgba(255,255,255,0.35)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(px+dx-r, py+dy-r, r*2, r*2); } } });
+  const soft = (()=>{ const c = v3Canvas(128, 128), x = c.getContext('2d'); for (let i=0;i<14;i++){ const px = 30 + Math.random()*68, py = 30 + Math.random()*68, r = 20 + Math.random()*28, g = x.createRadialGradient(px, py, 0, px, py, r); g.addColorStop(0, 'rgba(255,255,255,0.4)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 128, 128); } return new T.CanvasTexture(c); })();
+  const beam = (()=>{ const c = v3Canvas(32, 128), x = c.getContext('2d'), g = x.createLinearGradient(0, 0, 32, 0); g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.5, 'rgba(255,255,255,1)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 32, 128);
+    x.globalCompositeOperation = 'destination-in'; const v = x.createLinearGradient(0, 0, 0, 128); v.addColorStop(0, 'rgba(0,0,0,0.9)'); v.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = v; x.fillRect(0, 0, 32, 128); return new T.CanvasTexture(c); })();
+  const fall = can(64, (x, n)=>{ x.fillStyle = 'rgba(160,200,230,0.55)'; x.fillRect(0, 0, n, n); for (let i=0;i<40;i++){ x.fillStyle = `rgba(255,255,255,${0.3 + Math.random()*0.6})`; x.fillRect(Math.random()*n, Math.random()*n, 1 + Math.random()*2, 6 + Math.random()*14); } });
+  return (GFX.tex = { grass, dirt, rock, cloud, soft, beam, fall });
+}
+// a shared bit of shader: the world position, for the land and the water
+function gfxWorldPos(shader){
+  shader.vertexShader = 'varying vec3 vGW;\n' + shader.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n  vGW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+  shader.fragmentShader = 'varying vec3 vGW;\n' + shader.fragmentShader;
+}
+// trees, bushes and grass sway in the wind
+function gfxSway(mat, amt){
+  mat.onBeforeCompile = sh=>{ sh.uniforms.uT = GFX.u.uT; sh.uniforms.uWind = GFX.u.uWind;
+    sh.vertexShader = 'uniform float uT; uniform float uWind;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+      vec4 gip = instanceMatrix*vec4(0.0,0.0,0.0,1.0); float gsw = max(0.0, position.y)*${amt.toFixed(3)}*uWind;
+      transformed.x += sin(uT*1.6 + gip.x*0.7 + gip.z*0.4)*gsw; transformed.z += cos(uT*1.25 + gip.x*0.4 - gip.z*0.6)*gsw*0.6;`); };
+  mat.customProgramCacheKey = ()=>'gfxsway'+amt;
+}
+// the new kinds of tree, and the season on them (called from o3Vegetation)
+function gfxParts(PARTS, T){
+  PARTS.birch = [['trunk', new T.CylinderGeometry(0.03,0.045,1.0,6).translate(0,0.5,0), '#e8e4dc'], ['leaf', new T.IcosahedronGeometry(0.3,1).scale(0.9,1.25,0.9).translate(0,1.12,0), '#8ab04a']];
+  PARTS.cypress = [['trunk', new T.CylinderGeometry(0.035,0.05,0.4,6).translate(0,0.2,0), '#4a3424'], ['leaf', new T.CylinderGeometry(0.06,0.24,1.3,8).translate(0,0.95,0), '#2a4a2a']];
+  if (isWinter()) for (const k of ['pine','oak','birch','bush','willow']){ if (!PARTS[k]) continue;
+    const cap = k==='pine' ? new T.ConeGeometry(0.3,0.42,8).translate(0,0.98,0) : k==='bush' ? new T.IcosahedronGeometry(0.17,1).scale(1.2,0.4,1).translate(0,0.18,0) : k==='willow' ? new T.SphereGeometry(0.42,10,6,0,6.283,0,0.9).translate(0,0.66,0) : new T.IcosahedronGeometry(0.36,1).scale(1,0.45,1).translate(0,1.18,0);
+    PARTS[k].push(['snowcap', cap, '#f2f5f8']); }
+}
+function gfxTint(c, kind, part, shade){
+  if (part!=='leaf' || !['oak','birch','bush','willow','jtree'].includes(kind)) return;
+  const s = seasonIdx();
+  if (s===2){ const pal = [0xd8742a, 0xc8402a, 0xe0b030, 0xb8601a]; c.lerp(new THREE.Color(pal[Math.floor(shade*4) % 4]).convertSRGBToLinear(), 0.75); }
+  else if (s===3 && kind!=='willow'){ c.lerp(new THREE.Color(0x6a5a48).convertSRGBToLinear(), 0.55); }
+  else if (s===0){ c.lerp(new THREE.Color(0x9ad060).convertSRGBToLinear(), 0.25); }
+}
+// ---- the land around you, after it's built (o3Build) ----
+function gfxO3Build(grp, x0, y0, W, M){
+  const T = THREE, tx = gfxTextures(), U = GFX.u; GFX.season = seasonIdx();
+  U.uSky.value = U.uSky.value || new T.Color(0x8fb4dc);
+  // the ground: grass, dirt and rock blended by slope, roads and soil; strata on the cliffs; cloud shadows
+  const land = O3.land;
+  if (land){
+    const g = land.geometry, pos = g.attributes.position, nor = g.attributes.normal, n = pos.count, bl = new Float32Array(n*3);
+    for (let i=0;i<n;i++){ const x = pos.getX(i), h = pos.getY(i), z = pos.getZ(i), slope = 1 - nor.getY(i), tx0 = Math.floor(x - 0.5), tz0 = Math.floor(z - 0.5), t = o3Tile(tx0, tz0);
+      const rock = Math.min(1, Math.max(0, (slope - 0.16)/0.3) + (h > 2.2 ? 0.35 : 0) + (t===OW_MOUNTAIN ? 0.25 : 0));
+      const dirt = Math.min(1 - rock, (wgRoadAt(tx0, tz0) ? 0.9 : 0) + (t===OW_DESERT ? 0.7 : 0) + (h < 0.03 ? 0.45 : 0) + (t===OW_MOUNTAINPASS ? 0.6 : 0));
+      bl[i*3] = Math.max(0, 1 - rock - dirt); bl[i*3+1] = dirt; bl[i*3+2] = rock; }
+    g.setAttribute('blend', new T.BufferAttribute(bl, 3));
+    const m = land.material;
+    m.onBeforeCompile = sh=>{ Object.assign(sh.uniforms, { uT:U.uT, uCloudAmt:U.uCloudAmt, uDet0:{ value:tx.grass }, uDet1:{ value:tx.dirt }, uDet2:{ value:tx.rock }, uCloud:{ value:tx.cloud } });
+      gfxWorldPos(sh);
+      sh.vertexShader = 'attribute vec3 blend; varying vec3 vBl;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vBl = blend;');
+      sh.fragmentShader = 'uniform float uT; uniform float uCloudAmt; uniform sampler2D uDet0; uniform sampler2D uDet1; uniform sampler2D uDet2; uniform sampler2D uCloud; varying vec3 vBl;\n' + sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
+        vec3 bw = vBl / max(0.001, vBl.x + vBl.y + vBl.z);
+        float dG = texture2D(uDet0, vGW.xz*0.8).r, dD = texture2D(uDet1, vGW.xz*0.6).r, dR = texture2D(uDet2, vec2(vGW.x*0.7 + vGW.z*0.7, vGW.y*1.8)*0.5).r;
+        diffuseColor.rgb *= 0.62 + (dG*bw.x + dD*bw.y + dR*bw.z)*0.62;
+        float cs = texture2D(uCloud, vGW.xz*0.016 + uT*vec2(0.006, 0.0025)).r;
+        diffuseColor.rgb *= 1.0 - uCloudAmt*smoothstep(0.32, 0.62, cs)*0.38;`); };
+    m.customProgramCacheKey = ()=>'gfxland'; m.needsUpdate = true;
+  }
+  // the water: waves, the sky in it, foam on the shore, rivers that run, stars on it at night
+  const water = O3.water;
+  if (water){
+    const N = W + 2*M, data = new Uint8Array(N*N*4), ox = x0 - M, oy = y0 - M;
+    for (let j=0;j<N;j++) for (let i=0;i<N;i++){ const x = ox + i, y = oy + j, t = o3Tile(x, y), k = (j*N + i)*4;
+      if (t===OW_WATER){ let land = 0; for (const [a,b] of [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,-1],[1,-1],[-1,1]]){ const u = o3Tile(x+a, y+b); if (u!==OW_WATER && u!==OW_RIVER) land++; } data[k] = Math.min(255, land*70); }
+      if (t===OW_RIVER) data[k+1] = 255; data[k+3] = 255; }
+    const foam = new T.DataTexture(data, N, N, T.RGBAFormat); foam.magFilter = foam.minFilter = T.LinearFilter; foam.needsUpdate = true;
+    water.geometry.dispose(); water.geometry = new T.PlaneGeometry(N, N, N, N);
+    const m = water.material;
+    m.onBeforeCompile = sh=>{ Object.assign(sh.uniforms, { uT:U.uT, uNight:U.uNight, uSky:U.uSky, uFoam:{ value:foam }, uFoamO:{ value:new T.Vector4(ox, oy, N, N) }, uCloud:{ value:tx.cloud } });
+      gfxWorldPos(sh);
+      sh.vertexShader = 'uniform float uT;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+        vec4 wp0 = modelMatrix * vec4(transformed, 1.0);
+        transformed.z += sin(wp0.x*1.3 + uT*1.4)*0.022 + sin(wp0.z*1.7 - uT*1.1)*0.018 + sin((wp0.x + wp0.z)*2.9 + uT*2.3)*0.007;`);
+      sh.fragmentShader = 'uniform float uT; uniform float uNight; uniform vec3 uSky; uniform sampler2D uFoam; uniform vec4 uFoamO; uniform sampler2D uCloud;\n' + sh.fragmentShader.replace('#include <output_fragment>', `#include <output_fragment>
+        vec3 wn = normalize(cross(dFdx(vGW), dFdy(vGW))); if (wn.y < 0.0) wn = -wn;
+        float fr = pow(1.0 - max(dot(wn, normalize(cameraPosition - vGW)), 0.0), 3.0);
+        gl_FragColor.rgb = mix(gl_FragColor.rgb, uSky, clamp(fr*0.9 + 0.1, 0.0, 0.6));
+        vec4 fo = texture2D(uFoam, (vGW.xz - uFoamO.xy)/uFoamO.zw);
+        float nz = texture2D(uCloud, vGW.xz*1.1 + vec2(uT*0.05, uT*0.03)).r;
+        float foam = fo.r*fo.r*smoothstep(0.42, 0.62, nz + 0.18*sin(uT*2.0 + vGW.x*5.0 + vGW.z*3.0));
+        float run = fo.g*smoothstep(0.5, 0.8, texture2D(uCloud, vGW.xz*0.9 + vec2(uT*0.16, uT*0.11)).r);
+        gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.9, 0.95, 1.0), clamp(foam*0.45 + run*0.3, 0.0, 0.5));
+        float st = step(0.995, fract(sin(dot(floor(vGW.xz*12.0), vec2(12.9898, 78.233)))*43758.5453))*uNight*(0.55 + 0.45*sin(uT*3.0 + vGW.x*7.0 + vGW.z*3.0));
+        gl_FragColor.rgb += vec3(st*0.7);`); };
+    m.customProgramCacheKey = ()=>'gfxwater'; m.needsUpdate = true;
+  }
+  // waterfalls where a river comes down off the mountains
+  GFX.falls = [];
+  const fm = new T.MeshBasicMaterial({ map:tx.fall, transparent:true, opacity:0.85, depthWrite:false, side:T.DoubleSide }); tx.fall.wrapS = tx.fall.wrapT = T.RepeatWrapping;
+  for (let x=x0; x<x0+W && GFX.falls.length < 14; x++) for (let y=y0; y<y0+W && GFX.falls.length < 14; y++){ if (o3Tile(x, y)!==OW_RIVER) continue;
+    for (const [a,b] of [[1,0],[-1,0],[0,1],[0,-1]]){ const u = o3Tile(x+a, y+b); if (u!==OW_MOUNTAIN && u!==OW_MOUNTAINPASS) continue;
+      const top = O3.heightAt(x + 0.5 + a*0.9, y + 0.5 + b*0.9), drop = top + 0.14; if (drop < 0.55) continue;
+      const pl = new T.Mesh(new T.PlaneGeometry(0.7, drop), fm); pl.position.set(x + 0.5 + a*0.5, -0.14 + drop/2, y + 0.5 + b*0.5); pl.rotation.y = a ? Math.PI/2 : 0; grp.add(pl);
+      const mist = new T.Sprite(new T.SpriteMaterial({ map:tx.soft, transparent:true, depthWrite:false, opacity:0.55 })); mist.scale.set(1.3, 0.8, 1); mist.position.set(x + 0.5 + a*0.3, 0.1, y + 0.5 + b*0.3); grp.add(mist);
+      GFX.falls.push({ pl, mist }); break; } }
+  // grass, flowers and pebbles near you, swaying
+  const blade = new T.BufferGeometry(); blade.setAttribute('position', new T.Float32BufferAttribute([-0.02,0,0, 0.02,0,0, 0.004,0.22,0.01], 3)); blade.setAttribute('color', new T.Float32BufferAttribute([0.45,0.45,0.45, 0.45,0.45,0.45, 1.1,1.1,1.1], 3)); blade.computeVertexNormals();
+  const gm = new T.MeshLambertMaterial({ vertexColors:true, side:T.DoubleSide }); gfxSway(gm, 0.35); gm.userData.lin = true;
+  const fmat = new T.MeshLambertMaterial({ color:0xffffff }); gfxSway(fmat, 0.3);
+  const cx = x0 + W/2, cy = y0 + W/2, R = 24, spots = [], flowers = [], pebbles = [];
+  for (let x=Math.floor(cx-R); x<cx+R; x++) for (let y=Math.floor(cy-R); y<cy+R; y++){
+    const t = o3Tile(x, y); if (wgRoadAt(x, y) || OW_SITE_TILES.includes(t)) continue;
+    const b = wgBioAt(x, y), bid = b && BIO[b] ? BIO[b].id : null;
+    const n = t===OW_GRASS ? 9 : t===OW_FOREST ? 5 : t===OW_SWAMP ? 4 : 0; if (bid==='volcanic' || bid==='crystal' || bid==='highland') continue;
+    const col = bid==='jungle' ? [0.16,0.42,0.1] : bid==='haunted' ? [0.24,0.28,0.22] : t===OW_SWAMP ? [0.28,0.32,0.12] : isWinter() ? [0.42,0.42,0.3] : seasonIdx()===2 ? [0.5,0.42,0.16] : [0.26,0.46,0.14];
+    for (let i=0;i<n;i++) spots.push([x + o3Hash(x, y, 300+i), y + o3Hash(x, y, 320+i), o3Hash(x, y, 340+i), col]);
+    if (t===OW_GRASS && !isWinter() && o3Hash(x, y, 360) < 0.3) for (let i=0;i<1 + (o3Hash(x, y, 361)*3|0); i++) flowers.push([x + o3Hash(x, y, 370+i), y + o3Hash(x, y, 380+i), [0xd84a4a, 0xf0d040, 0xf0f0f0, 0xa070e0, 0xf090b0][(o3Hash(x, y, 390+i)*5)|0]]);
+    if ((t===OW_DESERT || t===OW_MOUNTAINPASS) && o3Hash(x, y, 395) < 0.4) for (let i=0;i<3;i++) pebbles.push([x + o3Hash(x, y, 396+i), y + o3Hash(x, y, 399+i), o3Hash(x, y, 402+i)]);
+  }
+  const m4 = new T.Matrix4(), q = new T.Quaternion(), s3 = new T.Vector3(), v3 = new T.Vector3(), up = new T.Vector3(0, 1, 0), c3 = new T.Color();
+  if (spots.length){ const im = new T.InstancedMesh(blade, gm, spots.length);
+    spots.forEach(([x, z, r, col], i)=>{ q.setFromAxisAngle(up, r*40); s3.set(1 + r*0.6, 0.7 + r*0.8, 1); v3.set(x, O3.heightAt(x, z) - 0.01, z); im.setMatrixAt(i, m4.compose(v3, q, s3)); c3.setRGB(col[0]*(0.8 + r*0.4), col[1]*(0.8 + r*0.4), col[2]*(0.8 + r*0.4)); im.setColorAt(i, c3); });
+    im.frustumCulled = false; im.receiveShadow = true; grp.add(im); }
+  if (flowers.length){ const fg = new T.IcosahedronGeometry(0.035, 0).translate(0, 0.13, 0), im = new T.InstancedMesh(fg, fmat, flowers.length);
+    flowers.forEach(([x, z, col], i)=>{ v3.set(x, O3.heightAt(x, z), z); im.setMatrixAt(i, m4.compose(v3, q.identity(), s3.set(1, 1, 1))); im.setColorAt(i, c3.set(col).convertSRGBToLinear()); });
+    im.frustumCulled = false; grp.add(im); }
+  if (pebbles.length){ const pgeo = new T.DodecahedronGeometry(0.05, 0).scale(1, 0.55, 1), im = new T.InstancedMesh(pgeo, new T.MeshStandardMaterial({ color:0x8a8070, roughness:0.95, flatShading:true }), pebbles.length);
+    pebbles.forEach(([x, z, r], i)=>{ v3.set(x, O3.heightAt(x, z) + 0.01, z); q.setFromAxisAngle(up, r*6); im.setMatrixAt(i, m4.compose(v3, q, s3.setScalar(0.7 + r))); });
+    im.frustumCulled = false; im.receiveShadow = true; grp.add(im); }
+  // low mist over the swamps, the haunted woods and the graveyards, and over the water at dawn
+  GFX.mist = [];
+  const mm = new T.MeshBasicMaterial({ map:tx.soft, transparent:true, depthWrite:false, opacity:0.3, color:0xe8eef0, side:T.DoubleSide });
+  for (let x=x0; x<x0+W && GFX.mist.length < 70; x+=2) for (let y=y0; y<y0+W && GFX.mist.length < 70; y+=2){
+    const t = o3Tile(x, y), b = wgBioAt(x, y), bid = b && BIO[b] ? BIO[b].id : null, grave = t===OW_GRAVEYARD, low = t===OW_SWAMP || bid==='haunted' || grave;
+    const dawn = !low && (t===OW_RIVER || (t===OW_WATER && o3Tile(x+1, y)!==OW_WATER)) && o3Hash(x, y, 410) < 0.5;
+    if (!low && !dawn) continue;
+    const pl = new T.Mesh(new T.PlaneGeometry(2.6, 2.6), mm.clone()); pl.rotation.x = -Math.PI/2; pl.rotation.z = o3Hash(x, y, 411)*6.28;
+    pl.position.set(x + 0.5, Math.max(-0.1, O3.heightAt(x + 0.5, y + 0.5)) + 0.25 + o3Hash(x, y, 412)*0.2, y + 0.5); grp.add(pl);
+    GFX.mist.push({ pl, dawn, ph:o3Hash(x, y, 413)*6.28 });
+  }
+  // the woods, for the shafts of light
+  GFX.woods = []; for (let x=x0; x<x0+W; x++) for (let y=y0; y<y0+W; y++) if (o3Tile(x, y)===OW_FOREST) GFX.woods.push([x, y]);
+  GFX.rays = [];
+  const rm = new T.MeshBasicMaterial({ map:tx.beam, transparent:true, depthWrite:false, blending:T.AdditiveBlending, color:0xffd8a0, opacity:0, side:T.DoubleSide });
+  for (let i=0;i<8;i++){ const pl = new T.Mesh(new T.PlaneGeometry(0.7, 3.4), rm.clone()); pl.visible = false; grp.add(pl); GFX.rays.push(pl); }
+  GFX.leaves = []; GFX.raysAt = 0;
+  if (SET.gfx==='high' && O3.sun && O3.sun.shadow.mapSize.x < 4096){ O3.sun.shadow.mapSize.set(4096, 4096); if (O3.sun.shadow.map){ O3.sun.shadow.map.dispose(); O3.sun.shadow.map = null; } }
+}
+// the light of the hour: warm sunrise and sunset, blue moonlight (after o3ApplyTime)
+function gfxO3Light(){
+  const T = THREE, p = dayPhase(), sunUp = Math.sin((p - 0.25)*Math.PI*2), day = Math.max(0, Math.min(1, (sunUp + 0.15)/0.45)), dusk = Math.max(0, 1 - Math.abs(sunUp)/0.32), night = 1 - day;
+  const warm = dusk*Math.min(1, day*1.6), dawnSide = p < 0.5;
+  const tint = new T.Color(dawnSide ? 0xf0a090 : 0xf08848);
+  if (O3.scene.background && O3.scene.background.isColor) O3.scene.background.lerp(tint, warm*0.45);
+  if (O3.scene.fog) O3.scene.fog.color.copy(O3.scene.background);
+  O3.hemi.color.lerp(new T.Color(dawnSide ? 0xffc8b8 : 0xffb070), warm*0.35);
+  O3.sun.color.lerp(new T.Color(dawnSide ? 0xffa078 : 0xff7a38), warm*0.55);
+  if (night > 0.6){ O3.sun.color.set(0x6f8fe8); O3.sun.intensity = Math.max(O3.sun.intensity, 0.34*night); O3.hemi.color.lerp(new T.Color(0x34508a), 0.4); }
+  GFX.u.uNight.value = night; GFX.warm = warm; GFX.day = day;
+  const sky = GFX.u.uSky.value || (GFX.u.uSky.value = new T.Color());
+  sky.copy(O3.scene.background || new T.Color(0x8fb4dc)).convertSRGBToLinear();
+  const wx = G.weather||'clear'; GFX.u.uCloudAmt.value = (wx==='storm' ? 1 : wx==='rain' ? 0.85 : wx==='fog' ? 0.3 : 0.55)*day; GFX.u.uWind.value = wx==='storm' ? 2.6 : wx==='rain' ? 1.6 : 1;
+}
+// every frame on the land: time, waterfalls, mist, shafts of light, falling leaves
+function gfxO3Tick(dt, pp){
+  const T = THREE, U = GFX.u; U.uT.value += dt;
+  if (GFX.season!==undefined && GFX.season!==seasonIdx()) O3.win = null;   // a new season: rebuild the land in its colours
+  gfxO3Light();
+  for (const f of (GFX.falls||[])){ f.pl.material.map.offset.y = -U.uT.value*0.9; f.mist.material.opacity = 0.4 + Math.sin(U.uT.value*2 + f.pl.position.x)*0.12; }
+  const dp = dayPhase(), dawnMist = Math.max(0, 1 - Math.abs(dp - 0.27)/0.08);
+  for (const m of (GFX.mist||[])){ const o = m.dawn ? dawnMist*0.35 : 0.22 + (U.uNight.value)*0.15 + (G.weather==='fog' ? 0.15 : 0); m.pl.material.opacity = o*(0.75 + 0.25*Math.sin(U.uT.value*0.4 + m.ph)); m.pl.visible = o > 0.01; m.pl.rotation.z += dt*0.02; }
+  // shafts of light through the woods near you, low and golden at sunrise and sunset
+  const rayA = (GFX.warm||0)*0.22 + (GFX.day||0)*0.05;
+  if (GFX.rays && GFX.rays.length){
+    if (U.uT.value - GFX.raysAt > 1.2){ GFX.raysAt = U.uT.value; const near = (GFX.woods||[]).map(([x,y])=>[x, y, Math.hypot(x+0.5-pp.x, y+0.5-pp.z)]).filter(w=>w[2] < 9 && o3Hash(w[0], w[1], 420) < 0.35).sort((a,b)=>a[2]-b[2]).slice(0, GFX.rays.length);
+      GFX.rays.forEach((r, i)=>{ const w = near[i]; r.visible = !!w; if (w){ r.position.set(w[0] + 0.5, O3.heightAt(w[0]+0.5, w[1]+0.5) + 1.6, w[1] + 0.5); r.rotation.set(0, ISO_YAW, (dp < 0.5 ? -1 : 1)*0.5); r.userData.ph = o3Hash(w[0], w[1], 421)*6.28; } }); }
+    for (const r of GFX.rays) if (r.visible) r.material.opacity = rayA*(0.75 + 0.25*Math.sin(U.uT.value*0.7 + (r.userData.ph||0)));
+  }
+  // autumn leaves drift down in the woods
+  if (seasonIdx()===2 && (GFX.woods||[]).some(([x,y])=>Math.abs(x - G.owPos.x) + Math.abs(y - G.owPos.y) < 5)){
+    if (!GFX.leafMat) GFX.leafMat = [0xd8742a, 0xc8402a, 0xe0b030].map(c=>new T.SpriteMaterial({ map:v3Blob('rgba(255,255,255,1)'), color:c, transparent:true, depthWrite:false }));
+    if (GFX.leaves.length < 40 && Math.random() < dt*12){ const sp = new T.Sprite(GFX.leafMat[(Math.random()*3)|0]); sp.scale.set(0.07, 0.05, 1); sp.position.set(pp.x + (Math.random()-0.5)*9, pp.y + 2.5 + Math.random(), pp.z + (Math.random()-0.5)*9); O3.world.add(sp); GFX.leaves.push({ sp, ph:Math.random()*6, v:0.35 + Math.random()*0.25 }); }
+  }
+  for (let i=GFX.leaves.length-1; i>=0; i--){ const l = GFX.leaves[i]; l.sp.position.y -= l.v*dt; l.sp.position.x += Math.sin(U.uT.value*2 + l.ph)*dt*0.4*U.uWind.value; l.sp.position.z += Math.cos(U.uT.value*1.6 + l.ph)*dt*0.25;
+    if (l.sp.position.y < O3.heightAt(l.sp.position.x, l.sp.position.z)){ O3.world.remove(l.sp); GFX.leaves.splice(i, 1); } }
+}
+// ---- in the dungeons: light falling through the cracks, and thick dust in the mines (after fpdBuild) ----
+function gfxFpdBuild(T){
+  if (!FPD.world || T.outdoor || G.gameMode!==1) return;
+  const TH = THREE, tx = gfxTextures(), seed = (G.depth||1)*131 + (G.dungeonSlot||0)*17, floors = [];
+  for (let x=1; x<COLS-1; x++) for (let y=1; y<ROWS-1; y++) if (G.map[x][y]!==T_WALL && o3Hash(x + seed, y, 430) < 0.012) floors.push([x, y]);
+  const mat = new TH.MeshBasicMaterial({ map:tx.beam, transparent:true, depthWrite:false, blending:TH.AdditiveBlending, color:0xe8f0ff, opacity:0.28, side:TH.DoubleSide });
+  for (const [x, y] of floors.slice(0, 6)){ for (const r of [0, Math.PI/2]){ const pl = new TH.Mesh(new TH.PlaneGeometry(0.55, 2.2), mat); pl.position.set(x + 0.5, 1.1, y + 0.5); pl.rotation.set(0, r, 0.18); FPD.world.add(pl); }
+    const pool = new TH.Mesh(new TH.CircleGeometry(0.35, 16), new TH.MeshBasicMaterial({ color:0xe8f0ff, transparent:true, opacity:0.12, depthWrite:false, blending:TH.AdditiveBlending })); pool.rotation.x = -Math.PI/2; pool.position.set(x + 0.5, 0.012, y + 0.5); FPD.world.add(pool); }
+  const site = G.ow && G.ow.map[G.owPos.x] ? G.ow.map[G.owPos.x][G.owPos.y] : null;
+  FPD.scene.traverse(o=>{ if (o.isPoints && o.material && o.material.size < 0.05){ o.material.opacity = site===OW_MINE ? 0.95 : 0.5; o.material.size = site===OW_MINE ? 0.022 : 0.014; } });
+}
+
 function renderGame(){
   syncGrid();
   mapToolsSync();
@@ -26458,7 +26751,7 @@ function v3Render(){
     if (hv && hv.kind==='tile') at = [hv.x+0.5, 0.04, hv.y+0.5, 0.55];
     else if (hv && hv.kind==='building' && hv.b.door) at = [hv.b.door.x+0.5, 0.04, hv.b.door.y+0.5, 0.75];
     hoverRing(V3, at); }
-  V3.renderer.render(V3.scene, V3.cam);
+  gfxRender(V3.renderer, V3.scene, V3.cam, 'v3');
   // name plates follow their owners on screen
   const v = new T.Vector3();
   for (const pl of V3.plates){
@@ -26629,6 +26922,7 @@ function o3Build(cx, cy){
   far.rotation.x = -Math.PI/2; far.position.set(cx,-0.5,cy); grp.add(far);
   o3Vegetation(grp, x0, y0, W);
   o3Sites(grp, x0, y0, W);
+  try{ gfxO3Build(grp, x0, y0, W, M); }catch(e){ console.error(e); }
   O3.encGrp = new T.Group(); grp.add(O3.encGrp); O3.encKey = null; O3.qKey = null;
 }
 // ---------- trees, rocks and cacti (instanced) ----------
@@ -26645,11 +26939,11 @@ function o3Vegetation(grp, x0, y0, W){
     if (t===OW_FOREST){
       const n = 3 + (h(1)>0.5?1:0);
       for (let k=0;k<n;k++){
-        const kind = nearSnow ? 'snowpine' : nearSwamp ? (h(10+k)>0.5 ? 'willow' : 'dead') : (nearMtn || h(20+k)<0.3) ? 'pine' : 'oak';
+        const kind = nearSnow ? 'snowpine' : nearSwamp ? (h(10+k)>0.5 ? 'willow' : 'dead') : (nearMtn || h(20+k)<0.3) ? 'pine' : h(80+k) < 0.2 ? 'birch' : h(80+k) < 0.28 ? 'cypress' : 'oak';
         put.push([kind, x + 0.15 + h(30+k)*0.7, y + 0.15 + h(40+k)*0.7, 0.75 + h(50+k)*0.5, h(60+k)*6.28, h(70+k)]);
       }
     } else if (t===OW_GRASS){
-      if (h(1)<0.1) put.push([h(2)<0.35?'pine':'oak', x+0.2+h(3)*0.6, y+0.2+h(4)*0.6, 0.7+h(5)*0.4, h(6)*6.28, h(7)]);
+      if (h(1)<0.1) put.push([h(2)<0.3?'pine':h(2)<0.45?'birch':'oak', x+0.2+h(3)*0.6, y+0.2+h(4)*0.6, 0.7+h(5)*0.4, h(6)*6.28, h(7)]);
       else if (h(1)<0.3) put.push(['bush', x+h(3), y+h(4), 0.8+h(5)*0.8, h(6)*6.28, h(7)]);
       if (h(11)<0.5) put.push(['bush', x+h(12), y+h(13), 0.6+h(14)*0.6, h(15)*6.28, h(16)]);
       else if (h(1)<0.26) put.push(['rock', x+h(3), y+h(4), 0.35+h(5)*0.4, h(6)*6.28, h(7)]);
@@ -26682,14 +26976,16 @@ function o3Vegetation(grp, x0, y0, W){
     crystal:  [['cryst', new T.ConeGeometry(0.12,0.75,5).translate(0,0.36,0), '#9ad8ff'], ['cryst2', new T.ConeGeometry(0.08,0.45,5).rotateZ(0.5).translate(0.13,0.2,0), '#c0a0ff']],
     lava:     [['lava', new T.CircleGeometry(0.32, 12).rotateX(-Math.PI/2).translate(0,0.035,0), '#ff6a1a']],
   };
+  gfxParts(PARTS, T);   // birch, cypress and the winter snow (see SECTION: GRAPHICS)
   const byKind = {};
   for (const p of put) (byKind[p[0]] = byKind[p[0]] || []).push(p);
   const m4 = new T.Matrix4(), q = new T.Quaternion(), s = new T.Vector3(), v = new T.Vector3(), c = new T.Color(), up = new T.Vector3(0,1,0);
   for (const kind in byKind){
     const list = byKind[kind];
-    for (const [, geo, colr] of PARTS[kind]){
+    for (const [pn, geo, colr] of PARTS[kind]){
       const glow = kind==='crystal' || kind==='lava', mat = new T.MeshStandardMaterial({ color:0xffffff, roughness: glow ? 0.3 : 0.85, flatShading: kind==='rock' || kind==='oak' || kind==='bush' || kind==='crystal', emissive: glow ? new T.Color(colr).convertSRGBToLinear() : 0x000000, emissiveIntensity: kind==='lava' ? 0.9 : glow ? 0.45 : 0 });
       const im = new T.InstancedMesh(geo, mat, list.length);
+      if (/leaf|reed|snowcap/.test(pn)) gfxSway(mat, kind==='reed' ? 0.25 : 0.05);
       im.castShadow = true; im.receiveShadow = true;
       im.frustumCulled = false;   // its bounds are the one tree at the origin, not the whole forest
       const base = new T.Color(colr).convertSRGBToLinear();
@@ -26697,7 +26993,7 @@ function o3Vegetation(grp, x0, y0, W){
         const [, x, z, sc, rot, shade] = p, y = O3.heightAt(x, z);
         q.setFromAxisAngle(up, rot); s.setScalar(sc*0.62); v.set(x, y - 0.02, z);   // trees stay smaller than the landmarks
         m4.compose(v, q, s); im.setMatrixAt(i, m4);
-        c.copy(base).multiplyScalar(0.8 + shade*0.4); im.setColorAt(i, c);
+        c.copy(base).multiplyScalar(0.8 + shade*0.4); gfxTint(c, kind, pn, shade); im.setColorAt(i, c);
       });
       im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true;
       grp.add(im);
@@ -27485,7 +27781,8 @@ function o3Render(){
   if (O3.clickFx){ O3.clickFx.t += dt; if (!O3.clickRing){ O3.clickRing = new T.Mesh(new T.RingGeometry(0.18,0.26,24), new T.MeshBasicMaterial({ color:0xffd060, transparent:true, depthWrite:false })); O3.clickRing.rotation.x = -Math.PI/2; O3.scene.add(O3.clickRing); }
     O3.clickRing.visible = O3.clickFx.t < 0.5; O3.clickRing.position.set(O3.clickFx.x, O3.clickFx.y+0.04, O3.clickFx.z); O3.clickRing.scale.setScalar(1 + O3.clickFx.t*1.5); O3.clickRing.material.opacity = 1 - O3.clickFx.t*2; }
   hoverRing(O3, O3.hoverAny && G.ui==='playing' ? [O3.hoverAny.x+0.5, Math.max(O3.heightAt(O3.hoverAny.x+0.5, O3.hoverAny.y+0.5), -0.14)+0.05, O3.hoverAny.y+0.5, O3.hoverAny.kind==='site' ? 0.9 : 0.6] : null);
-  O3.renderer.render(O3.scene, O3.cam);
+  try{ gfxO3Tick(dt, pp); }catch(e){ console.error(e); }   // light, mist, falls, leaves (see SECTION: GRAPHICS)
+  gfxRender(O3.renderer, O3.scene, O3.cam, 'o3');
   // name plates: town names always, other sites when near or hovered
   const v = new T.Vector3(), hv = O3.hover;
   for (const pl of O3.plates){
@@ -28628,7 +28925,7 @@ function fpdRender(env, T, camZ){
   const ft = FP.ftile;
   let stale = FPD.mapRef!==G.map || FPD.theme!==T.key || !FPD.ftile || FPD.ftile.length!==ft.length;
   if (!stale) for (let i=0;i<ft.length;i++) if (ft[i]!==FPD.ftile[i]){ stale = true; break; }
-  if (stale){ FPD.mapRef = G.map; FPD.theme = T.key; FPD.ftile = ft.slice(); fpdBuild(T); }
+  if (stale){ FPD.mapRef = G.map; FPD.theme = T.key; FPD.ftile = ft.slice(); fpdBuild(T); try{ gfxFpdBuild(T); }catch(e){ console.error(e); } }
   // resolution adapts to keep the frame rate up on slower graphics: it steps down while frames run long, and back up when there's headroom
   FPD.dtAvg += ((FP.dt||1/60) - FPD.dtAvg)*0.08;
   if (++FPD.adj >= 30){ FPD.adj = 0;
@@ -28729,7 +29026,7 @@ function fpdRender(env, T, camZ){
   for (const pt of FPD.portals||[]){ pt.mat.uniforms.t.value = FP.t + pt.seed; const k = 0.85 + 0.15*Math.sin(FP.t*3 + pt.seed); pt.L.intensity = 0.9*k; pt.pool.material.opacity = 0.55*k; }
   // (the shadow maps only exist after their first pass, so a fresh level gets a warm-up render)
   if (FPD.warm){ FPD.warm = false; FPD.r.render(FPD.scene, cam); }
-  FPD.r.render(FPD.scene, cam);
+  gfxRender(FPD.r, FPD.scene, cam, 'fpd');
   return true;
 }
 
@@ -32304,7 +32601,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-89';
+const GAME_VERSION = 'rs-90';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -32481,6 +32778,7 @@ function buildSettings(){
       <div class="panel"><h4>GRAPHICS</h4>
         ${seg('gfx', 'quality', [['low','low'],['medium','medium'],['high','high']])}
         <div class="muted" style="font-size:11px;margin:-2px 0 6px;">low: lower resolution, no shadows, fewer particles &middot; medium: shadows on, sharper &middot; high: full resolution</div>
+        ${seg('post', 'bloom and colour grading', [[true,'on'],[false,'off']])}
         ${seg('fps', 'frame-rate counter', [[false,'off'],[true,'on']])}
         ${seg('loadCards', 'loading cards between places', [[true,'on'],[false,'off']])}
       </div>

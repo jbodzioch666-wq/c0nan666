@@ -1,5 +1,40 @@
 # Depthcrawl patch notes
 
+## RS-90 - Graphics and lighting
+
+- **Better lighting (289):**
+  - Sunrise lights the land rose and gold, and sunset a deep orange: the sky, the haze and the sunlight all take the colour.
+  - At night a blue moonlight falls across the land and casts its own shadows.
+  - At dawn and dusk, shafts of golden light slant down through the woods around you.
+  - In the dungeons, pale light falls through cracks in the ceiling onto the floor.
+  - On High quality, shadows on the land are sharper.
+- **Bloom and glow (290):** every 3D view (the land, the towns, the dungeons) now has bloom: torches, lava, magic, glowing crystals and lit windows bleed light into the air around them. There's a new **bloom and colour grading** switch in Settings. It's off automatically on Low quality.
+- **Colour grading (291):** each region has its own grade, and it eases from one to the next as you travel:
+  - deserts warm and golden
+  - swamps murky and green
+  - the tundra and the highlands cold and blue
+  - the volcanic ashlands dark red
+  - jungles lush, haunted woods drained and grey, crystal wastes cool violet
+  - towns warm, and dungeons dark at the edges
+- **Fog and mist (292):** low mist drifts over swamps, haunted woods and graveyards, thicker at night and in fog. At dawn, mist lies on the rivers and along the shore and burns off as the sun climbs. The mines are thick with dust.
+- **Better terrain (293):** the ground is a blend of grass, dirt and rock textures, chosen by slope and by what's there:
+  - roads, desert and shorelines are earthier
+  - steep slopes and mountains are bare rock, with strata running across the cliffs
+  - cloud shadows drift across the land, more of them on grey days
+- **Grass and plants (294):** grass now grows on the land around you and sways in the wind, harder in rain and storms. Flowers are dotted through it, pebbles lie on desert and mountain paths, and tree tops, bushes and reeds sway too. The grass browns in autumn and winter.
+- **Better water (295):**
+  - The sea has waves and reflects the sky, more strongly at a low angle.
+  - Surf foams along the shore.
+  - Rivers run with flowing ripples.
+  - Where a river comes down off the mountains, a waterfall pours into a cloud of spray.
+  - At night, stars glitter on the water.
+- **Better trees (296):**
+  - Two new kinds: white-barked **birch** and tall **cypress**.
+  - In autumn, oaks, birches and bushes turn orange, red and gold, and leaves drift down in the woods around you.
+  - In winter, the broad-leaved trees go bare and snow settles on the tops of the trees and bushes.
+  - In spring, leaves are a fresh bright green.
+- **Sky (297):** the overworld camera looks down on the land, so the horizon is never in view. Instead, the sky shows in the water's reflection, in the drifting cloud shadows, in the sunrise and sunset colours on the land and in the light, and as stars on the water at night.
+
 ## RS-89 - Music, ambience and sound
 
 Everything is synthesized in the browser, so the game is still one file.

@@ -401,15 +401,15 @@ _The whole sound system in one pass_
 ### Graphics and lighting
 _Renderer and world visuals_
 
-289. [ ] (280) Better lighting - soft shadows, warm sunrise and sunset, blue moonlight, light shafts through trees and dungeon cracks
-290. [ ] (281) Bloom and glow - magic, lava, torches and glowing gear bleed light
-291. [ ] (282) Colour grading per region - warm desert, murky green swamp, cold blue tundra, dark red volcanic
-292. [ ] (283) Volumetric fog and mist - low mist over swamps and graveyards, dust in mines
-293. [ ] (285) Better terrain - blended ground textures (grass, dirt, rock), cliffs, height detail
-294. [ ] (286) Swaying grass and plants, plus flowers, rocks and bushes
-295. [ ] (287) Better water - reflections, waves, shore foam, animated rivers and waterfalls
-296. [ ] (288) Better trees - more species shapes, falling autumn leaves, snow-covered in the north
-297. [ ] (289) Sky - moving clouds, stars and moon at night, sunrise colours
+289. [x] (280) Better lighting - soft shadows, warm sunrise and sunset, blue moonlight, light shafts through trees and dungeon cracks
+290. [x] (281) Bloom and glow - magic, lava, torches and glowing gear bleed light
+291. [x] (282) Colour grading per region - warm desert, murky green swamp, cold blue tundra, dark red volcanic
+292. [x] (283) Volumetric fog and mist - low mist over swamps and graveyards, dust in mines
+293. [x] (285) Better terrain - blended ground textures (grass, dirt, rock), cliffs, height detail
+294. [x] (286) Swaying grass and plants, plus flowers, rocks and bushes
+295. [x] (287) Better water - reflections, waves, shore foam, animated rivers and waterfalls
+296. [x] (288) Better trees - more species shapes, falling autumn leaves, snow-covered in the north
+297. [x] (289) Sky - moving clouds, stars and moon at night, sunrise colours
 
 ### Big standalone systems
 _Large self-contained systems, best done last_
