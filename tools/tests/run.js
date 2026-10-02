@@ -9,7 +9,7 @@
 // Screenshots land in tools/tests/shots/. Needs `npm install` in tools/tests first.
 const fs = require('fs'), path = require('path');
 const ROOT = path.resolve(__dirname, '../..'), PAGE = path.join(ROOT, 'depthcrawl.html');
-const ALL = ['boot','diag','tasks','soak','map','wev','wg','sail','big','town','eco','gfx','quest','audio'];
+const ALL = ['boot','diag','touch','tasks','soak','map','wev','wg','sail','big','town','eco','gfx','quest','audio'];
 
 function load(mod, fallbacks){ for (const p of [mod].concat(fallbacks)){ try { return require(p); } catch(e){} } return null; }
 const pw = load('playwright', ['/opt/node-tools/node_modules/playwright']);
@@ -30,7 +30,10 @@ async function runOne(name){
   if (flag('soft')) launch.push('--use-angle=swiftshader', '--enable-unsafe-swiftshader');
   if (name==='audio') launch.push('--autoplay-policy=no-user-gesture-required');
   const browser = await pw.chromium.launch({ headless:!flag('headed'), args:launch });
-  const page = await browser.newPage({ viewport:{ width:1400, height:900 } });
+  // a test that exports `mobile: true` runs on an emulated phone (touch, 390x844)
+  const mobile = !!require(file).mobile;
+  const page = mobile ? await (await browser.newContext({ viewport:{ width:390, height:844 }, deviceScaleFactor:2, isMobile:true, hasTouch:true })).newPage()
+                      : await browser.newPage({ viewport:{ width:1400, height:900 } });
   const errs = [];
   page.on('pageerror', e=>errs.push('pageerror: '+e.message+'\n'+(e.stack||'').split('\n').slice(0,4).join('\n')));
   page.on('console', m=>{ if (m.type()==='error') errs.push('console: '+m.text()); });
