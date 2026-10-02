@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-92 - No xp from town games
+
+- The archery range, the cook-off and the fishing contest no longer give any xp. Like darts and the gambling tables, they pay out only in gold, records and titles. Guild training, the town mine and temple crusades still give xp as before.
+
 ## RS-91 - Quests
 
 - **The journal (250):** press **;** or **X** (or use the link on the side panel's Quests tab) for a journal with four tabs:
