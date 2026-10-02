@@ -1,11 +1,16 @@
-// runs on an emulated phone (see run.js): real touch input through the DevTools protocol
+// runs on an emulated phone (see run.js). Taps are real browser touch input; a long press, a pinch and a
+// drag are sent as touch pointer events from inside the page (headless Chromium won't take multi-touch)
 module.exports = async page=>{
-  const cdp = await page.context().newCDPSession(page);
-  const touch = (type, pts)=>cdp.send('Input.dispatchTouchEvent', { type, touchPoints:pts.map((p, i)=>({ x:p[0], y:p[1], id:i })) });
   const wait = ms=>page.waitForTimeout(ms);
-  const tap = async (x, y)=>{ await touch('touchStart', [[x, y]]); await wait(60); await touch('touchEnd', []); await wait(150); };
-  const hold = async (x, y)=>{ await touch('touchStart', [[x, y]]); await wait(800); await touch('touchEnd', []); await wait(200); };
-  const pinch = async (cx, cy, d0, d1)=>{ await touch('touchStart', [[cx-d0, cy], [cx+d0, cy]]); for (let i=1;i<=8;i++){ const d = d0 + (d1-d0)*i/8; await touch('touchMove', [[cx-d, cy], [cx+d, cy]]); await wait(40); } await touch('touchEnd', []); await wait(200); };
+  const ptr = (type, id, x, y)=>page.evaluate(([type, id, x, y])=>{ const el = document.elementFromPoint(x, y) || document.body;
+    (type==='pointerdown' ? el : (window.__ptrEl && window.__ptrEl[id]) || el).dispatchEvent(new PointerEvent(type, { bubbles:true, cancelable:true, clientX:x, clientY:y, pointerId:id, pointerType:'touch', isPrimary:id===11, button:0 }));
+    if (type==='pointerdown'){ window.__ptrEl = window.__ptrEl || {}; window.__ptrEl[id] = el; } }, [type, id, x, y]);
+  const tap = async (x, y)=>{ await page.touchscreen.tap(x, y); await wait(150); };
+  const hold = async (x, y)=>{ await ptr('pointerdown', 11, x, y); await wait(800); await ptr('pointerup', 11, x, y); await wait(200); };
+  const pinch = async (cx, cy, d0, d1)=>{ await ptr('pointerdown', 11, cx-d0, cy); await ptr('pointerdown', 12, cx+d0, cy);
+    let d = d0; for (let i=1;i<=8;i++){ d = d0 + (d1-d0)*i/8; await ptr('pointermove', 11, cx-d, cy); await ptr('pointermove', 12, cx+d, cy); await wait(30); }
+    await ptr('pointerup', 12, cx+d, cy); await ptr('pointerup', 11, cx-d, cy); await wait(200); };
+  const drag = async (x0, y0, dx, dy)=>{ await ptr('pointerdown', 11, x0, y0); let x = x0, y = y0; for (let i=1;i<=6;i++){ x = x0 + dx*i/6; y = y0 + dy*i/6; await ptr('pointermove', 11, x, y); await wait(30); } await ptr('pointerup', 11, x, y); await wait(150); };
   const frames = n=>page.evaluate(async n=>{ for (let i=0;i<n;i++){ renderGame(); await new Promise(r=>setTimeout(r, 40)); } }, n);
   const A = (c, msg)=>{ if (!c) throw new Error('assert: '+msg); };
   const out = {};
@@ -45,7 +50,7 @@ module.exports = async page=>{
   await tap(ur[0], ur[1]); const p1 = await page.evaluate(()=>({ x:G.owPos.x, y:G.owPos.y }));
   out.pad = [p1.x-p0.x, p1.y-p0.y]; A(p1.x===p0.x+1 && p1.y===p0.y-1, 'the pad corner steps diagonally');
   // holding walks on
-  await touch('touchStart', [ur]); await wait(1100); await touch('touchEnd', []); await wait(100);
+  await ptr('pointerdown', 11, ur[0], ur[1]); await wait(1100); await ptr('pointerup', 11, ur[0], ur[1]); await wait(100);
   const p2 = await page.evaluate(()=>({ x:G.owPos.x, y:G.owPos.y })); out.held = p2.x - p1.x; A(p2.x - p1.x >= 2, 'holding the pad keeps walking');
 
   // the hotbar scrolls instead of losing slots
@@ -66,7 +71,7 @@ module.exports = async page=>{
   // the world map: a finger drags it, a pinch zooms it
   await page.evaluate(async ()=>{ toggleOwZoom(); G.owZoomScale = 3; for (let i=0;i<4;i++){ renderGame(); await new Promise(r=>setTimeout(r, 40)); } });
   const m0 = await page.evaluate(()=>{ const c = owZoomCenter(), r = canvas.getBoundingClientRect(); return { x:c.x, y:c.y, s:owZoomScale(), cx:r.left + r.width/2, cy:r.top + r.height/2 }; });
-  await touch('touchStart', [[m0.cx, m0.cy]]); for (let i=1;i<=6;i++){ await touch('touchMove', [[m0.cx - i*20, m0.cy - i*10]]); await wait(30); } await touch('touchEnd', []); await wait(150);
+  await drag(m0.cx, m0.cy, -120, -60);
   const m1 = await page.evaluate(()=>{ const c = owZoomCenter(); return { x:c.x, y:c.y, ui:G.ui }; });
   out.mapDrag = [+(m1.x-m0.x).toFixed(1), +(m1.y-m0.y).toFixed(1)]; A(m1.x > m0.x && m1.y > m0.y && m1.ui==='playing', 'the map drags (and the drag teleports nowhere)');
   await pinch(m0.cx, m0.cy, 30, 120); out.mapZoom = await page.evaluate(()=>owZoomScale()); A(out.mapZoom > m0.s, 'the map pinches');
@@ -82,6 +87,7 @@ module.exports = async page=>{
   out.dungeon = { iso:d.iso, rot:d.rot }; A(d.iso, 'the dungeon view'); A(d.rot==='flex', 'camera buttons in the dungeon');
   const rb = await page.evaluate(()=>{ const r = document.querySelector('.padx [data-rot=x]').getBoundingClientRect(); return [r.left + r.width/2, r.top + r.height/2]; });
   await tap(rb[0], rb[1]); out.rot = await page.evaluate(()=>ISO.rot); A(out.rot!==d.rot0, 'the camera turns');
+  console.log(JSON.stringify(out));
   await page.screenshot({ path:SHOTS+'/shot_touch_dungeon.png', timeout:120000 });
 };
 module.exports.mobile = true;

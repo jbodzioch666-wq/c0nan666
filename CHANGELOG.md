@@ -1,5 +1,20 @@
 # Depthcrawl patch notes
 
+## RS-95 - Phones and tablets
+
+- **Phone layout:** the page now lays out at the phone's real width, instead of a desktop page shrunk to fit.
+- **Tap to walk:** works in every view. In towns and on the overworld the walk starts when your finger lifts, so a long press or a pinch never walks you anywhere.
+- **Long-press for the menu:** a long press is the right-click menu (examine, attack, talk and every other option), on the game views and on items in the side panel and hotbar.
+- **Pinch to zoom:** works in every view and on the world map. One finger drags the world map around.
+- **The d-pad:**
+  - 8-way: the corners step diagonally.
+  - Hold a direction to keep walking.
+  - Shows on any touch screen, portrait or landscape, and hides while a menu is open.
+  - The new ✥ button beside the ? on the HUD hides or shows it.
+  - In dungeons, two round buttons beside it turn the camera.
+- **The hotbar scrolls** sideways on a narrow screen instead of cutting off its last slots.
+- **Help:** the help screen has a Touch screens section.
+
 ## RS-94 - Facing diagonals and diagonal routes
 
 - **The route planner walks diagonals:** routes you plan on the world map (M, then Route) cut corners now, by road or across country. They're shorter, and the line on the map shows the real path. They still keep to the roads where that's quicker, and never cut past a mountain's corner.
