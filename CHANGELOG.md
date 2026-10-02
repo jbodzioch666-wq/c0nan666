@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-94 - Facing diagonals
+
+- **Your character turns to face diagonals:** in the 3D dungeon and fight view, a diagonal step now turns your figure to that diagonal instead of snapping to the nearest of north, south, east or west.
+- **Even walking pace on diagonals:** in dungeons, towns and on the overworld, a diagonal step glides at the same pace as a straight one. Before, your figure lagged behind on long diagonal walks in towns and on the overworld and then jumped to catch up, and rushed diagonal steps in dungeons.
+
 ## RS-93 - Diagonal movement
 
 - **Step diagonally everywhere:** on the overworld, in towns, in dungeons and in roadside fights.
