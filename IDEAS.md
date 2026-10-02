@@ -302,15 +302,15 @@ _World generation and overworld content_
 ### World map
 _The parchment map, after the world it draws_
 
-214. [ ] (94) Place names - regions, forests, mountains, lakes and roads lettered in calligraphy on the parchment
-215. [ ] (95) Custom map markers - drop your own pins (star, skull, pick) with a note
-216. [ ] (96) Map filters - toggle layers: sites, quests, resources, cleared or uncleared, danger
-217. [ ] (98) Route planner - click to draw a dotted walking path, optionally auto-walk it
-218. [ ] (100) Travel log - discoveries, towns visited, % of the map explored, exploration achievements
-219. [ ] (106) Animated parchment - drifting clouds, coastal waves, town smoke, birds
-220. [ ] (107) Explored areas fill with colour - from rough sketch to full painting as you explore
-221. [ ] (108) Detailed zoom levels - zoomed out shows regions, zoomed in shows buildings and trees
-222. [ ] (105) Landmarks visible from afar in 3D - wizard tower, smoking volcano, giant tree
+214. [x] (94) Place names - regions, forests, mountains, lakes and roads lettered in calligraphy on the parchment
+215. [x] (95) Custom map markers - drop your own pins (star, skull, pick) with a note
+216. [x] (96) Map filters - toggle layers: sites, quests, resources, cleared or uncleared, danger
+217. [x] (98) Route planner - click to draw a dotted walking path, optionally auto-walk it
+218. [x] (100) Travel log - discoveries, towns visited, % of the map explored, exploration achievements
+219. [x] (106) Animated parchment - drifting clouds, coastal waves, town smoke, birds
+220. [x] (107) Explored areas fill with colour - from rough sketch to full painting as you explore
+221. [x] (108) Detailed zoom levels - zoomed out shows regions, zoomed in shows buildings and trees
+222. [x] (105) Landmarks visible from afar in 3D - wizard tower, smoking volcano, giant tree
 
 ### World events
 _Timed events on the overworld_

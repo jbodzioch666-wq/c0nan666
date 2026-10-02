@@ -1,5 +1,31 @@
 # Depthcrawl patch notes
 
+## RS-82 - The world map
+
+- **Place names:** every forest, mountain range, desert, marsh, snowfield, sea, lake and river big enough to matter now has a name, lettered across it in calligraphy. The big ones stay readable when you zoom right out. Names are made from the world's seed, so each world has its own.
+- **Three great landmarks** stand somewhere in every world: a smoking volcano at the edge of the largest range, a giant tree deep in the largest forest, and a lonely wizard's tower on open grass.
+  - They are drawn on the map, and in 3D they stand tall over the land. A landmark you've sighted but can't see on screen gets a small marker at the edge of the screen pointing the way, with its distance.
+  - Coming within 30 tiles of one sights it; walking up to its foot ticks it off. Hover or Shift-click one in 3D to read about it.
+- **The chart fills with colour as you explore:** land you've seen is a sepia pencil sketch, and land you've actually walked is painted in. Older saves start with the country around every town you've visited painted.
+- **The map is alive:** cloud shadows drift across it, waves lap the coast, smoke rises from the towns you know, and flocks of birds fly over.
+- **Zoom levels:** the map now zooms in twice as far (the mouse wheel).
+  - Zoomed out, it shows the big regions.
+  - Zoomed in, every tree and peak is drawn crisp, with the houses round each town, the gathering spots (hover one for what it gives), and wandering threats.
+- **A tool bar on the map:**
+  - **Look:** drag to pan, and click a town you know to teleport, as before.
+  - **Pin:** drop your own pins (star, flag, danger, ore, favourite, home, trees, fishing or mystery) with a short note. Click a pin to change or delete it. Pins also show on the flat overworld map.
+  - **Route:** click to add up to 12 stops. A dotted path is worked out over land you can walk, going round sites rather than through them, and the tool bar shows the number of steps. **Walk route** closes the map and walks it for you, in 3D or on the flat map. Any key stops the walk, and stops you reach are crossed off.
+  - **Layers:** switch place names, landmarks, towns, sites, quests, resources, danger, pins, route and the legend on and off. Sites can show all, only unexplored, or only explored ones. **Danger** rings each site in its monsters' level colour and marks the wandering threats.
+  - The name of the region under the mouse appears under the tool bar. Escape now closes the map.
+- **The travel log** (from the map's tool bar) shows:
+  - how much of the land you've seen and walked, and how many towns you've visited
+  - every region you've discovered, by kind
+  - the sites you've found, entered and cleared
+  - the landmarks, your steps on the road and your pins
+  - Entering a new region for the first time pops up its name.
+- **Six exploration honours:** Wayfarer, Pathfinder and Cartographer (see a quarter, half and nine tenths of the land), All Roads (visit every town), Well Travelled (discover 10 regions) and Sightseer (stand at the foot of every landmark).
+- The world has no roads yet, so place names cover the land and water only.
+
 ## RS-81 - Slayer, tasks and currencies
 
 - **Slayer**, a new skill (1-99). The **Slayer Master** on every town plaza gives you a task: kill a set number of one monster family, such as 20 rats or 31 orcs. Tasks are picked to suit your combat level.
