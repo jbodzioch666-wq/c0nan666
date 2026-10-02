@@ -1,5 +1,16 @@
 # Depthcrawl patch notes
 
+## RS-93 - Diagonal movement
+
+- **Step diagonally everywhere:** on the overworld, in towns, in dungeons and in roadside fights.
+  - Hold two direction keys together (W+D, or Up+Right, and so on).
+  - Or use the numpad: 7, 9, 1 and 3 (NumLock on or off), or Home, PgUp, End and PgDn.
+  - In the isometric dungeon view, where each key walks along a screen diagonal, two keys together walk straight across the screen.
+- **Click-to-walk takes the diagonal too:** paths on the overworld, in towns and in dungeons are shorter.
+- **No cutting corners:** a diagonal step needs both squares beside it to be open, so you can't slip between two mountains or round a wall's corner. No map gets a new way through.
+- **Melee stays square-on:** you can't strike a monster on the diagonal (walking into one costs no turn), and monsters can't strike you from there either.
+- **Monsters chase on the diagonal:** monsters and roamers on the overworld cut corners too, so you can't simply outrun them. Up close, a monster steps square-on to strike.
+
 ## RS-92 - No xp from town games
 
 - The archery range, the cook-off and the fishing contest no longer give any xp. Like darts and the gambling tables, they pay out only in gold, records and titles. Guild training, the town mine and temple crusades still give xp as before.

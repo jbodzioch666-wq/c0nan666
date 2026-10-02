@@ -13,7 +13,7 @@ npx playwright install chromium
 ## Running
 
 ```
-node tools/tests/run.js              # all 13 tests
+node tools/tests/run.js              # every test
 node tools/tests/run.js town eco     # just these
 node tools/tests/run.js --headed     # in a visible window: the GPU draws the 3D, fastest on a desktop
 node tools/tests/run.js --soft       # software WebGL, for machines with no GPU (slow)
@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| diag | diagonal steps: keys, numpad, corners, click paths, no diagonal strikes |
 | tasks | town NPCs: the slayer master, TzHaar and their tasks |
 | soak | ten dungeon floors of fighting at high level |
 | map | world map, zoom, map tools, 3D landmarks |

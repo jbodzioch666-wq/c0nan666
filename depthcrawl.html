@@ -6667,7 +6667,8 @@ function tickMonsters(excludeIdx){
     if (dist<=5){
       dx = sg(G.player.x-m.x); dy = sg(G.player.y-m.y);
       if (fleeing){ dx=-dx; dy=-dy; } // a bloodied goblin disengages and runs instead of fighting on
-      if (dx!==0 && dy!==0){ if (chn(0.5)) dy=0; else dx=0; }
+      const diagOk = dx!==0 && dy!==0 && (fleeing || dist>2) && diagClear(m.x, m.y, dx, dy, tileOpen) && tileAt(m.x+dx, m.y+dy)!==T_WALL && !occupiedBy(m.x+dx, m.y+dy, i);
+      if (dx!==0 && dy!==0 && !diagOk){ if (chn(0.5)) dy=0; else dx=0; }
     } else if (chn(0.5)){
       const d = dirs[rn(4)]; dx=d[0]; dy=d[1];
     }
@@ -6677,9 +6678,10 @@ function tickMonsters(excludeIdx){
     const steps = (hasAbility(m,'aggressive') && !fleeing) ? 2 : 1;
     for (let s=0; s<steps; s++){
       if (G.gameOver || !m.alive) break;
+      if (dx && dy && Math.abs(G.player.x-m.x)+Math.abs(G.player.y-m.y)<=2){ if (Math.abs(G.player.x-m.x-dx)+Math.abs(G.player.y-m.y)<=1 || chn(0.5)) dy = 0; else dx = 0; }   // a dash ends square-on
       const nx=m.x+dx, ny=m.y+dy;
       if (nx===G.player.x && ny===G.player.y){ monsterAttacks(i); break; }
-      if (tileAt(nx,ny)!==T_WALL && !occupiedBy(nx,ny,i)){ m.x=nx; m.y=ny; } else break;
+      if (tileAt(nx,ny)!==T_WALL && !occupiedBy(nx,ny,i) && diagClear(m.x, m.y, dx, dy, tileOpen)){ m.x=nx; m.y=ny; } else break;
     }
   }
   // the Ranger's beast companion / Warlock's familiar trails after the
@@ -6814,6 +6816,7 @@ function tryMove(dx,dy){
   const nx = G.player.x+dx, ny = G.player.y+dy;
   let mi=-1;
   for (let i=0;i<G.mon.length;i++) if (G.mon[i].alive && G.mon[i].x===nx && G.mon[i].y===ny){ mi=i; break; }
+  if (mi>=0 && dx && dy){ const now = performance.now(); if (!(G.diagWarnT > now - 4000)){ G.diagWarnT = now; logMsg('you can\'t strike from the corner - step beside it', ''); } return; }   // melee is square-on (no turn spent)
   if (mi>=0){
     fight(mi);
     // turn-based: your attack is your whole turn, then the monsters get
@@ -8227,7 +8230,7 @@ function moveOverworldEncounters(){
     let dx=0, dy=0;
     if (dist>0 && dist<=noticeR){
       dx = sg(G.owPos.x-e.x); dy = sg(G.owPos.y-e.y);
-      if (dx!==0 && dy!==0){ if (chn(0.5)) dy=0; else dx=0; }
+      if (dx!==0 && dy!==0 && !(encounterEligible(G.ow.map[e.x+dx][e.y]) && encounterEligible(G.ow.map[e.x][e.y+dy]))){ if (chn(0.5)) dy=0; else dx=0; }   // they cut the corner too, if the ground allows
     } else {
       const d = dirs4[rn(4)]; dx=d[0]; dy=d[1];
     }
@@ -16268,6 +16271,13 @@ function renderArenaMap(){
 // pickInitialFacing() still uses it to avoid spawning the player facing
 // straight into a wall.
 const FACING_VECT = [[0,-1],[1,0],[0,1],[-1,0]]; // N,E,S,W - clockwise
+// diagonal steps: allowed everywhere, but never across a corner - both squares beside the step must be open
+// (so a diagonal is always two cardinal steps in one, and no map gets a new way through). Melee stays square-on.
+const DIR8 = [[0,-1],[1,0],[0,1],[-1,0],[1,-1],[1,1],[-1,1],[-1,-1]];   // the four cardinals first, so paths stay straight
+function diagClear(x, y, dx, dy, open){ return !(dx && dy) || (open(x+dx, y) && open(x, y+dy)); }
+function tileOpen(x, y){ const t = tileAt(x, y); return t!==undefined && t!==null && t!==T_WALL; }
+// the facing (N/E/S/W) for a step: a diagonal keeps whichever of its two sides you already faced
+function facingFor(dx, dy, cur){ const i = FACING_VECT.findIndex(v=>v[0]===dx && v[1]===dy); if (i>=0) return i; const f = FACING_VECT[cur|0]; if (f && (f[0]===dx || f[1]===dy)) return cur|0; return FACING_VECT.findIndex(v=>v[0]===dx && v[1]===0); }
 
 // the walkable village: grass and cobbled paths instead of dungeon floor,
 // buildings drawn as solid colored blocks with their shop tile as the door,
@@ -27255,9 +27265,9 @@ function v3PathTo(tx, ty, bump){
   let end = goal(sx,sy) ? [sx,sy] : null;
   while (q.length && !end){
     const [x,y] = q.shift();
-    for (const [dx,dy] of [[0,-1],[1,0],[0,1],[-1,0]]){
+    for (const [dx,dy] of DIR8){
       const nx = x+dx, ny = y+dy, k = key(nx,ny);
-      if (prev.has(k)) continue;
+      if (prev.has(k) || !diagClear(x, y, dx, dy, v3Walkable)) continue;
       const doorOk = !bump && nx===tx && ny===ty && G.map[nx] && [T_SHOP,T_TAVERN,T_BLACKSMITH,T_ALCHEMIST,T_TAILOR].includes(G.map[nx][ny]);
       if (!v3Walkable(nx,ny) && !doorOk) continue;
       prev.set(k, [x,y]); if (goal(nx,ny)){ end = [nx,ny]; break; } q.push([nx,ny]);
@@ -28272,9 +28282,9 @@ function o3PathTo(tx, ty){
   let end = null;
   while (q.length && !end){
     const [x,y] = q.shift();
-    for (const [dx,dy] of [[0,-1],[1,0],[0,1],[-1,0]]){
+    for (const [dx,dy] of DIR8){
       const nx = x+dx, ny = y+dy, k = key(nx,ny);
-      if (prev.has(k) || Math.abs(nx-sx)>lim || Math.abs(ny-sy)>lim || !o3Passable(nx,ny)) continue;
+      if (prev.has(k) || Math.abs(nx-sx)>lim || Math.abs(ny-sy)>lim || !o3Passable(nx,ny) || !diagClear(x, y, dx, dy, o3Passable)) continue;
       // don't route THROUGH a site (stepping on one enters it) unless it's where you're going
       const t = G.ow.map[nx][ny];
       if (OW_SITE_TILES.includes(t) && !(nx===tx && ny===ty)) continue;
@@ -32858,43 +32868,44 @@ function isoDrawOverlay(S){
 }
 // ---- moving: keys step along the screen diagonals, clicks walk a path ----
 // which grid direction points most nearly toward screen direction (sx, sy)
+// the grid step (of all eight) that points most nearly toward screen direction (sx, sy)
 function isoDirFor(sx, sy){
-  const p = G.player, a = isoProject(p.x+0.5, p.y+0.5, 0);
-  let best = 0, bs = -1e9;
-  FACING_VECT.forEach((v,i)=>{ const b = isoProject(p.x+0.5+v[0], p.y+0.5+v[1], 0), s = (b.sx-a.sx)*sx + (b.sy-a.sy)*sy; if (s>bs){ bs = s; best = i; } });
+  const p = G.player, a = isoProject(p.x+0.5, p.y+0.5, 0), n = Math.hypot(sx, sy) || 1;
+  let best = DIR8[0], bs = -1e9;
+  for (const v of DIR8){ const b = isoProject(p.x+0.5+v[0], p.y+0.5+v[1], 0), ex = b.sx-a.sx, ey = b.sy-a.sy, s = (ex*sx + ey*sy)/((Math.hypot(ex, ey) || 1)*n); if (s > bs + 1e-6){ bs = s; best = v; } }
   return best;
 }
-function isoStep(fi){
-  const v = FACING_VECT[fi];
-  G.player.facing = fi;
+function isoStep(v){
+  G.player.facing = facingFor(v[0], v[1], G.player.facing);
   moveDir(v[0], v[1]);
 }
-// holding a direction keeps walking at the same even pace (the keyboard's own repeat is ignored)
-function isoHeldDir(k){ return { arrowup:[1,-1], w:[1,-1], arrowdown:[-1,1], s:[-1,1], arrowleft:[-1,-1], a:[-1,-1], arrowright:[1,1], d:[1,1] }[String(k).toLowerCase()]; }
+// holding a direction keeps walking at the same even pace (the keyboard's own repeat is ignored); two held keys walk the diagonal between
+function isoHeldDir(k){ return { arrowup:[1,-1], w:[1,-1], arrowdown:[-1,1], s:[-1,1], arrowleft:[-1,-1], a:[-1,-1], arrowright:[1,1], d:[1,1], pageup:[2,0], pagedown:[0,2], end:[-2,0], home:[0,-2] }[String(k).toLowerCase()]; }
+function isoHeldSum(){ let sx = 0, sy = 0; for (const h of ISO.held || []){ const d = isoHeldDir(h); if (d){ sx += d[0]; sy += d[1]; } } return (sx || sy) ? [sx, sy] : null; }
 function isoTickHeld(now){
-  if (!ISO.heldKey) return;
-  if (G.ui!=='playing' || G.gameOver){ ISO.heldKey = null; return; }
+  if (!ISO.held || !ISO.held.size) return;
+  if (G.ui!=='playing' || G.gameOver){ ISO.held.clear(); return; }
   if (now < ISO.heldNext) return;
-  const d = isoHeldDir(ISO.heldKey), fi = isoDirFor(d[0], d[1]);
-  ISO.heldNext = now + isoStepDelay(fi);
-  isoStep(fi);
+  const d = isoHeldSum(); if (!d) return;
+  const v = isoDirFor(d[0], d[1]);
+  ISO.heldNext = now + isoStepDelay(v);
+  isoStep(v);
 }
 // a step into a monster is a swing, which keeps the slower beat of a fight
-function isoStepDelay(fi){ const v = FACING_VECT[fi], p = G.player; return G.mon.some(m=>m.alive && m.x===p.x+v[0] && m.y===p.y+v[1]) ? ISO_SWING_MS : ISO_STEP_MS; }
-document.addEventListener('keyup', (e)=>{ if (ISO.heldKey && String(e.key).toLowerCase()===ISO.heldKey) ISO.heldKey = null; });
-window.addEventListener('blur', ()=>{ ISO.heldKey = null; });
+function isoStepDelay(v){ const p = G.player; return G.mon.some(m=>m.alive && m.x===p.x+v[0] && m.y===p.y+v[1]) ? ISO_SWING_MS : ISO_STEP_MS; }
+document.addEventListener('keyup', (e)=>{ if (ISO.held){ ISO.held.delete(String(e.key).toLowerCase()); if (NUMPAD_KEY[e.code]) ISO.held.delete(NUMPAD_KEY[e.code].toLowerCase()); } });
+window.addEventListener('blur', ()=>{ if (ISO.held) ISO.held.clear(); });
 function isoHandleKey(k){
   const hd = isoHeldDir(k);
   if (hd){
-    const kl = String(k).toLowerCase();
-    if (ISO.heldKey===kl) return true;                 // (a key-repeat while already walking)
-    ISO.heldKey = kl; ISO.heldNext = performance.now() + isoStepDelay(isoDirFor(hd[0], hd[1]));
+    const kl = String(k).toLowerCase(); ISO.held = ISO.held || new Set();
+    if (ISO.held.has(kl)) return true;                 // (a key-repeat while already walking)
+    ISO.held.add(kl);
+    const v = isoDirFor(...isoHeldSum());
+    ISO.heldNext = performance.now() + isoStepDelay(v);
+    ISO.path = []; ISO.fighting = null; isoStep(v); return true;
   }
   switch(k){
-    case 'ArrowUp': case 'w': case 'W': ISO.path = []; ISO.fighting = null; isoStep(isoDirFor(1,-1)); return true;
-    case 'ArrowDown': case 's': case 'S': ISO.path = []; ISO.fighting = null; isoStep(isoDirFor(-1,1)); return true;
-    case 'ArrowLeft': case 'a': case 'A': ISO.path = []; ISO.fighting = null; isoStep(isoDirFor(-1,-1)); return true;
-    case 'ArrowRight': case 'd': case 'D': ISO.path = []; ISO.fighting = null; isoStep(isoDirFor(1,1)); return true;
     case 'z': case 'Z': ISO.rot = (ISO.rot+3)%4; renderGame(); return true;
     case 'x': case 'X': ISO.rot = (ISO.rot+1)%4; renderGame(); return true;
   }
@@ -32913,9 +32924,9 @@ function isoFindPath(tx, ty, toAdjacent){
     const [x,y] = q.shift();
     const done = toAdjacent ? Math.abs(x-tx)+Math.abs(y-ty)===1 : (x===tx && y===ty);
     if (done){ const out = []; let c = [x,y]; while (c && !(c[0]===p.x && c[1]===p.y)){ out.unshift(c); c = prev.get(key(c[0],c[1])); } return out; }
-    for (const [dx,dy] of FACING_VECT){ const nx = x+dx, ny = y+dy, kk = key(nx,ny);
+    for (const [dx,dy] of DIR8){ const nx = x+dx, ny = y+dy, kk = key(nx,ny);
       const end = !toAdjacent && nx===tx && ny===ty;
-      if (prev.has(kk) || !(end ? isoPassable(nx,ny) : isoCrossable(nx,ny)) || occupied(nx,ny)) continue;
+      if (prev.has(kk) || !(end ? isoPassable(nx,ny) : isoCrossable(nx,ny)) || occupied(nx,ny) || !diagClear(x, y, dx, dy, isoPassable)) continue;
       prev.set(kk, [x,y]); q.push([nx,ny]); }
     if (prev.size > COLS*ROWS) break;
   }
@@ -32970,7 +32981,7 @@ function isoAct(pk, shift){
   if (mon){
     const dx = mon.x-p.x, dy = mon.y-p.y;
     ISO.fighting = mon;
-    if (Math.abs(dx)+Math.abs(dy)===1){ ISO.path = []; ISO.nextStep = performance.now() + ISO_SWING_MS; isoStep(FACING_VECT.findIndex(v=>v[0]===dx && v[1]===dy)); return; }
+    if (Math.abs(dx)+Math.abs(dy)===1){ ISO.path = []; ISO.nextStep = performance.now() + ISO_SWING_MS; isoStep([dx, dy]); return; }
     if (spearReach(mon)){ ISO.path = []; ISO.nextStep = performance.now() + ISO_SWING_MS; reachAttack(mon); return; }
     if (Math.abs(dx)+Math.abs(dy)>1 && rangedReachIdx(mon) >= 0){ ISO.path = []; ISO.nextStep = performance.now() + ISO_SWING_MS; rangedAttack(mon); renderGame(); return; }
     const path = isoFindPath(mon.x, mon.y, true);
@@ -32994,9 +33005,9 @@ function isoTickPath(now){
   if (now < ISO.nextStep) return;
   ISO.nextStep = now + ISO_STEP_MS*runMul();
   const p = G.player, [nx, ny] = ISO.path.shift(), dx = nx-p.x, dy = ny-p.y;
-  if (Math.abs(dx)+Math.abs(dy)!==1){ ISO.path = []; return; }
+  if (Math.max(Math.abs(dx), Math.abs(dy))!==1){ ISO.path = []; return; }
   const map0 = G.map, hp0 = p.hp;
-  isoStep(FACING_VECT.findIndex(v=>v[0]===dx && v[1]===dy));
+  isoStep([dx, dy]);
   if (G.map!==map0 || p.x!==nx || p.y!==ny || p.hp<hp0){ ISO.path = []; ISO.mineAt = null; return; }
   if (!ISO.path.length && ISO.mineAt){ const v = ISO.mineAt; ISO.mineAt = null; if (Math.max(Math.abs(v.x-p.x), Math.abs(v.y-p.y))<=1) isoStartMine(v.x, v.y); return; }
   const tgt = ISO.target;
@@ -33017,7 +33028,7 @@ function isoTickFight(now){
   const p = G.player;
   if (p.hp < effMaxHp()*0.2){ ISO.fighting = null; logMsg('you break off the fight - you are badly hurt', 'hit'); renderGame(); return; }
   const dx = m.x-p.x, dy = m.y-p.y;
-  if (Math.abs(dx)+Math.abs(dy)===1){ ISO.nextStep = now + ISO_SWING_MS; isoStep(FACING_VECT.findIndex(v=>v[0]===dx && v[1]===dy)); return; }
+  if (Math.abs(dx)+Math.abs(dy)===1){ ISO.nextStep = now + ISO_SWING_MS; isoStep([dx, dy]); return; }
   if (spearReach(m)){ ISO.path = []; ISO.nextStep = now + ISO_SWING_MS; reachAttack(m); return; }   // a spear or halberd keeps the foe at arm's length
   if (rangedReachIdx(m) >= 0){   // a ranged fighter holds their ground and keeps shooting
     ISO.path = []; ISO.nextStep = now + ISO_SWING_MS;
@@ -33300,7 +33311,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-92';
+const GAME_VERSION = 'rs-93';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -35046,6 +35057,7 @@ function buildHelpKeys(){
   return `
     ${sec('MOVING AROUND', [
       ['W A S D or &uarr; &darr; &larr; &rarr;', 'step one tile; hold to keep walking. On the overworld and in towns they go north, south, west and east; in dungeons and fights they step along the screen\'s diagonals. Walk into a monster to attack it'],
+      ['two together, or the numpad', 'step diagonally: hold W+D (or &uarr;+&rarr;, and so on), or use numpad 7 9 1 3 (or Home, PgUp, End, PgDn). You can\'t cut across a wall\'s corner, and you strike only what stands square beside you, never on the diagonal'],
       ['Left-click', 'walk to that spot. Click a monster to walk up and fight it until it falls, a tree, fishing spot or herb patch to gather, or a vendor, door, waypoint or stash to use it'],
       ['Shift + click', 'examine a monster, object or place - a short description goes to the message log'],
       ['Mouse&nbsp;wheel', 'zoom the camera in and out'],
@@ -35182,7 +35194,7 @@ function buildHelp(){
   const tb = (id, label)=> `<button class="htab${tab===id?' on':''}" data-tab="${id}" onclick="G.helpTab='${id}';renderOverlay()">${label}</button>`;
   const body = tab==='keys' ? buildHelpKeys() : tab==='legend' ? buildHelpLegend() : `
       <div style="margin-top:10px;color:var(--ink-faint);">AN ISOMETRIC WORLD</div>
-      <div>everything is seen from above at an isometric angle, like RuneScape &mdash; the overworld, the towns, and every dungeon, castle, tower, temple, graveyard, mine and roadside fight, with your own character standing in the scene in the gear you wear. <b>Click the ground</b> to walk there, or <b>click a monster</b> to walk up to it and fight: you keep attacking until it falls, you click elsewhere, press a key, or drop below a fifth of your life. With a bow or an autocasting staff, clicking a foe out of reach shoots it instead &mdash; you'll see the arrow or spell fly. Hover over a monster to see its name and level. <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> (or the arrows) step along the screen's diagonals &mdash; hold one to keep walking, <kbd>Z</kbd>/<kbd>X</kbd> turn the camera a quarter-turn, and the mouse wheel zooms. The walls on the camera's side of a room drop away so they never hide you, the minimap sits in the top-right corner, and <kbd>M</kbd> flips a dungeon to a flat isometric map and back.</div>
+      <div>everything is seen from above at an isometric angle, like RuneScape &mdash; the overworld, the towns, and every dungeon, castle, tower, temple, graveyard, mine and roadside fight, with your own character standing in the scene in the gear you wear. <b>Click the ground</b> to walk there, or <b>click a monster</b> to walk up to it and fight: you keep attacking until it falls, you click elsewhere, press a key, or drop below a fifth of your life. With a bow or an autocasting staff, clicking a foe out of reach shoots it instead &mdash; you'll see the arrow or spell fly. Hover over a monster to see its name and level. <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> (or the arrows) step along the screen's diagonals &mdash; hold one to keep walking, or two together to walk straight across the screen, <kbd>Z</kbd>/<kbd>X</kbd> turn the camera a quarter-turn, and the mouse wheel zooms. The walls on the camera's side of a room drop away so they never hide you, the minimap sits in the top-right corner, and <kbd>M</kbd> flips a dungeon to a flat isometric map and back.</div>
       <div>the game fills the whole window: life and prayer orbs sit either side of the skill bar, whose buttons do the same as their hotkeys. <kbd>Tab</kbd> slides out the full stats and spells panels, and the buttons in the corner go fullscreen or switch back to the classic side-by-side layout.</div>
       <div style="margin-top:10px;color:var(--ink-faint);">TOWNS</div>
       <div>towns are a 3D hub: click the ground to walk there, or click a vendor, the waypoint or the stash to walk over and use it (WASD still works, the mouse wheel zooms, <kbd>M</kbd> flips to the flat town map). The blacksmith, alchemist, peddler and innkeeper stand outside their shops; the Captain of the Watch by the notice board hands out quests (a gold <b>!</b> means new work, <b>?</b> means a quest is ready to turn in). Quests send you to real places around the town - a site to conquer, a wanted foe, a raider camp, a captive to rescue, a merchant to escort - marked with a pillar of light and a <b>!</b> on the land and a pin on the world map; the tracker on the right shows your progress and points the way (click a quest to track it). Turning one in lets you pick one of three rewards, and every town remembers the work you do for it: Friends, Allies and Champions get better prices and stock. The waypoint takes you to any town you've visited, and the stash chest holds up to 60 items, shared by every town.</div>
@@ -35321,10 +35333,27 @@ function moveDir(dx,dy){
   if (G.ui!=='playing' || G.gameOver) return;
   if (G.gameMode===0){
     if (G.owZoomedOut) return; // zoom back in (M) before moving
+    if (!diagClear(G.owPos.x, G.owPos.y, dx, dy, o3Passable)) return;
     tryMoveOverworld(dx,dy);
-  } else tryMove(dx,dy); // dungeons (gameMode 1), villages and encounters all move the same way: plain cardinal steps
+  } else {
+    if (!diagClear(G.player.x, G.player.y, dx, dy, tileOpen)) return;
+    if (dx && dy && !G.player.stunTurns) G.player.facing = facingFor(dx, dy, G.player.facing);
+    tryMove(dx,dy);
+  } // dungeons (gameMode 1), villages and encounters all move the same way: plain cardinal steps
   renderGame();
   saveCurrentGame();
+}
+// movement keys: two held together (W+D, Up+Right...) step diagonally; the numpad and Home/PgUp/End/PgDn do too
+const KEY_DIR = { arrowup:[0,-1], w:[0,-1], arrowdown:[0,1], s:[0,1], arrowleft:[-1,0], a:[-1,0], arrowright:[1,0], d:[1,0], home:[-1,-1], pageup:[1,-1], end:[-1,1], pagedown:[1,1] };
+const NUMPAD_KEY = { Numpad8:'ArrowUp', Numpad2:'ArrowDown', Numpad4:'ArrowLeft', Numpad6:'ArrowRight', Numpad7:'Home', Numpad9:'PageUp', Numpad1:'End', Numpad3:'PageDown' };
+const HELD_KEYS = new Set();
+document.addEventListener('keyup', (e)=>{ HELD_KEYS.delete(String(e.key).toLowerCase()); if (NUMPAD_KEY[e.code]) HELD_KEYS.delete(NUMPAD_KEY[e.code].toLowerCase()); });
+window.addEventListener('blur', ()=>HELD_KEYS.clear());
+function keyDir(k){
+  const kl = String(k).toLowerCase(), d = KEY_DIR[kl]; if (!d) return null;
+  if (d[0] && d[1]) return d.slice();
+  for (const h of HELD_KEYS){ const o = KEY_DIR[h]; if (h===kl || !o || (o[0] && o[1])) continue; if ((d[0]===0)!==(o[0]===0)) return [d[0]+o[0], d[1]+o[1]]; }
+  return d.slice();
 }
 function handlePlayingKey(k){
   if (G.gameMode===3 && V3.path) V3.path = [];  // any key takes over from click-walking
@@ -35332,10 +35361,8 @@ function handlePlayingKey(k){
   G.routeWalk = null;   // ...and from walking a planned route
   if (fpHandleKey(k)) return; // first-person view: relative movement, turning, and M to flip views
   switch(k){
-    case 'ArrowUp': case 'w': case 'W': moveDir(0,-1); break;
-    case 'ArrowDown': case 's': case 'S': moveDir(0,1); break;
-    case 'ArrowLeft': case 'a': case 'A': moveDir(-1,0); break;
-    case 'ArrowRight': case 'd': case 'D': moveDir(1,0); break;
+    case 'ArrowUp': case 'w': case 'W': case 'ArrowDown': case 's': case 'S': case 'ArrowLeft': case 'a': case 'A': case 'ArrowRight': case 'd': case 'D':
+    case 'Home': case 'PageUp': case 'End': case 'PageDown': { const d = keyDir(k); moveDir(d[0], d[1]); break; }
     case 'f': case 'F': rsCycleStyle(); break;
     case 'g': case 'G': setUi('rsmagic'); break;
     case 'n': case 'N': setUi('prayer'); break;
@@ -35380,10 +35407,12 @@ function handleKeydown(e){
   if (G.pinEdit && (e.key==='Escape' || e.key==='`')){ pinClose(); return; }
   { const fk = /^F([1-6])$/.exec(e.key || '');
     if (fk && G.player && !G.gameOver && (G.ui==='playing' || DOCK_UIS.has(G.ui))){ if (e.preventDefault) e.preventDefault(); spKey(SP_TABS[+fk[1]-1].id); return; } }
-  const k = (e.key==='`') ? 'Escape' : e.key; // ` doubles as Escape (Escape can leave fullscreen)
+  let k = (e.key==='`') ? 'Escape' : e.key; // ` doubles as Escape (Escape can leave fullscreen)
+  if (G.ui==='playing' && NUMPAD_KEY[e.code]) k = NUMPAD_KEY[e.code];   // the numpad walks, NumLock on or off
+  if (KEY_DIR[String(k).toLowerCase()]) HELD_KEYS.add(String(k).toLowerCase());
   if (e.key==='Escape') fsLastEsc = performance.now();
   if (k==='Tab' && immersiveUi && G.player && G.ui==='playing'){ if (e.preventDefault) e.preventDefault(); dhTogglePanels(); return; }
-  const navKeys = ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '];
+  const navKeys = ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].concat(G.ui==='playing' ? ['Home','End','PageUp','PageDown'] : []);
   if (navKeys.includes(k)) e.preventDefault();
   if (questRewardKey(k)) return;
 
