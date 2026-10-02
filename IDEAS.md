@@ -379,24 +379,24 @@ _The quest system first, then the quest content_
 ### Audio
 _The whole sound system in one pass_
 
-271. [ ] (258) Music system - tracks per area (overworld, towns, sites, bosses) with crossfades; synthesized in the browser to keep the file small
-272. [ ] (259) Region themes - grassland, desert, swamp, tundra, sea, with night versions
-273. [ ] (260) Combat music that fades in when a fight starts and out when it ends
-274. [ ] (261) Boss themes - a unique track per named boss
-275. [ ] (262) Music player - unlock tracks by visiting places, replay any of them
-276. [ ] (263) Stingers - short cues for quest complete, rare drop, level 99, boss appears, new place discovered
-277. [ ] (264) Title screen theme
-278. [ ] (265) Ambient soundscapes - wind, birds, insects outdoors; waves on the coast; drips and rumbles in dungeons; market chatter in towns
-279. [ ] (266) Day and night ambience - birds by day, crickets and owls at night
-280. [ ] (267) Weather sounds - rain, thunder, storm wind
-281. [ ] (268) Room reverb - caves echo, small rooms sound dry
-282. [ ] (269) Footsteps by surface - grass, stone, wood, sand, snow, water; armour clank for plate
-283. [ ] (270) Weapon-specific sounds - sword clang, mace thud, bow twang, per-element spell sounds, arrow whistle
-284. [ ] (271) Skilling sounds - axe chops, pickaxe clinks, fishing splash and reel, cooking sizzle, anvil hammering, fire crackle
-285. [ ] (272) Environment sounds - doors, chests, stairs, portals, traps, levers
-286. [ ] (273) Pickup sounds by item type - coins jingle, gems chime, armour clanks, potions slosh
-287. [ ] (246) Monster sounds - growls, hisses, roars, per-attack sounds
-288. [ ] (224) UI sounds - clicks, page turns, coins, level-up chime
+271. [x] (258) Music system - tracks per area (overworld, towns, sites, bosses) with crossfades; synthesized in the browser to keep the file small
+272. [x] (259) Region themes - grassland, desert, swamp, tundra, sea, with night versions
+273. [x] (260) Combat music that fades in when a fight starts and out when it ends
+274. [x] (261) Boss themes - a unique track per named boss
+275. [x] (262) Music player - unlock tracks by visiting places, replay any of them
+276. [x] (263) Stingers - short cues for quest complete, rare drop, level 99, boss appears, new place discovered
+277. [x] (264) Title screen theme
+278. [x] (265) Ambient soundscapes - wind, birds, insects outdoors; waves on the coast; drips and rumbles in dungeons; market chatter in towns
+279. [x] (266) Day and night ambience - birds by day, crickets and owls at night
+280. [x] (267) Weather sounds - rain, thunder, storm wind
+281. [x] (268) Room reverb - caves echo, small rooms sound dry
+282. [x] (269) Footsteps by surface - grass, stone, wood, sand, snow, water; armour clank for plate
+283. [x] (270) Weapon-specific sounds - sword clang, mace thud, bow twang, per-element spell sounds, arrow whistle
+284. [x] (271) Skilling sounds - axe chops, pickaxe clinks, fishing splash and reel, cooking sizzle, anvil hammering, fire crackle
+285. [x] (272) Environment sounds - doors, chests, stairs, portals, traps, levers
+286. [x] (273) Pickup sounds by item type - coins jingle, gems chime, armour clanks, potions slosh
+287. [x] (246) Monster sounds - growls, hisses, roars, per-attack sounds
+288. [x] (224) UI sounds - clicks, page turns, coins, level-up chime
 
 ### Graphics and lighting
 _Renderer and world visuals_

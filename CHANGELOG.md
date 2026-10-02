@@ -1,5 +1,43 @@
 # Depthcrawl patch notes
 
+## RS-89 - Music, ambience and sound
+
+Everything is synthesized in the browser, so the game is still one file.
+
+- **Music (271):** every area now has its own music. Each track is composed by the game from a seed: a key and scale, a tempo, a chord progression, a melody in four phrases, a bass line, pads and drums. Tracks crossfade as you move between places. There's a new **music** volume slider in Settings.
+- **Region themes (272):** grassland, forest, desert, swamp, tundra, open sea and the mountains each have their own tune, with a slower, softer night version of each. Towns, inns, your house, dungeons, and each kind of site (castles, crypts, mines, temples, lairs) have theirs too.
+- **Combat music (273):** a driving fight track fades in quickly when a fight starts, and the area music returns when it's over. The arena has its own crowd track.
+- **Boss themes (274):** every named boss, world giant and boss-floor elite gets a tune of its own, generated from its name, so the same boss always sounds the same.
+- **Music player (275):** every track you've heard is unlocked in the new **music player** (Settings, music player). Pick any track to play it anywhere, or let the music follow where you are.
+- **Stingers (276):** short cues, with the music dipping under them, for:
+  - finishing a quest
+  - a rare drop
+  - reaching level 99
+  - a boss appearing
+  - discovering a new region
+- **Title theme (277):** the title screen has its own theme.
+- **Ambient soundscapes (278):** there's a new **ambience** volume slider.
+  - Wind, stronger on the tundra, mountains and desert.
+  - Waves along the coast and in harbour towns.
+  - Gulls by the sea.
+  - The hum of the market in towns, and of the tavern inside.
+  - Drips and distant rumbles below ground.
+- **Day and night (279):** birdsong by day; crickets, insects (thickest in the swamp) and owls by night.
+- **Weather sounds (280):** rain, and in storms howling wind and thunder. Indoors you hear the rain only faintly.
+- **Room reverb (281):** caves and dungeons echo, buildings sound dry, and towns and the open land sit in between.
+- **Footsteps (282):** a step for every tile you cross, by surface:
+  - grass, dirt roads, stone and cobbles
+  - wooden bridges, piers and floors
+  - sand, snow, swamp mud, and fords
+  - the slap of water when you're in a boat
+  - Plate and mail armour clanks as you walk.
+- **Weapon sounds (283):** blades clang, maces and hammers thud, axes chop, bows and crossbows twang with an arrow's whistle, and swings that miss whoosh. Spells sound by element: fire roars, water bubbles, earth rumbles, air rushes and other magic shimmers.
+- **Skilling sounds (284):** axe chops, pickaxe clinks (also when excavating), a fishing splash and the reel when you land a catch, the rustle of foraging, cooking sizzle, anvil hammering when smelting or forging, and the crackle of a new fire.
+- **Environment sounds (285):** doors creak as you go in and out of buildings, chests click open, portals whoosh and traps snap.
+- **Pickup sounds (286):** coins jingle, gems chime, armour clanks, weapons ring, potions slosh and scrolls rustle.
+- **Monster sounds (287):** monsters have voices by kind, whenever they hit you and when they die: dragons roar, snakes and kobolds hiss, wolves and beasts growl, the undead moan, spiders chitter, slimes squelch, birds screech, golems rumble, and demons and giants bellow. Elites and bosses sound deeper.
+- **Interface sounds (288):** a page turns when you open a menu, and coins clink when you buy or sell.
+
 ## RS-88 - Economy and banking
 
 - **Shops remember what you sell (191):** each copy of the same kind of thing you sell in a town pays less than the last, down to about a third of the price. The price recovers as the town's stock moves on, so sell your duplicates in different towns. The loot filter and selling out on the road are unaffected.
