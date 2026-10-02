@@ -1,5 +1,69 @@
 # Depthcrawl patch notes
 
+## RS-87 - Towns
+
+- **Town sizes (230):** every town is now a hamlet, a village or a city. The town you start in is always a village, and every world has at least one city.
+  - **Hamlet:** the smith, the tavern and the Peddler.
+  - **Village:** adds the alchemist and the tailor, plus a new east district with a temple and an archery range.
+  - **City:** adds a guild hall, an arena and stone walls with towers and a gatehouse.
+- **Town layouts (229):**
+  - Towns by the sea have a harbour on their east side: open water, a pier and a ship at anchor.
+  - Swamp towns are built on stilts.
+  - Hill towns stand on stone terraces.
+  - Cities are walled.
+- **Town identities (231):**
+  - **Dwarven mine towns** have a mine you can work once a day for ore and Mining xp.
+  - **Elven villages** hang lanterns in their trees and have a moonwell that fully restores you once a day.
+  - **Orcish war-towns** have a war totem that gives you bloodlust (+3 to hit for 120 turns) once a day.
+  - **Desert trading posts** have a caravan selling gems, pearls and Lamps of Knowledge.
+  - Others are fishing ports, hill and stilt villages, market towns, farming hamlets or walled cities.
+- **Day and night (232):**
+  - From the second night on, the smith, alchemist, Peddler, tailor and guild hall shut after dark. You can knock until someone answers, or wait for dawn.
+  - The tavern fills with regulars in the evening.
+  - The town watch walks the square, carrying torches at night.
+- **Townsfolk (233):**
+  - Townsfolk keep a day: they work at the shops, go to the tavern in the evening and go home to sleep.
+  - Walk into one to talk. Their gossip is often a real hint, such as an unexplored dungeon, a dig site or a camp nearby, and they mark it on your map.
+- **Ambient life (234):**
+  - Chickens, a dog and cats roam the streets. The dog follows you about.
+  - You hear hammering by the forge, clucking, barking and the murmur of the square.
+- **Weather in town (235):**
+  - Puddles form on the streets and rain falls.
+  - Most townsfolk go home when it rains.
+  - In winter and in the frozen north, snow lies on the roofs.
+- **Better interiors (236):**
+  - The tavern has stairs to rooms upstairs, where you can rent a bed for 15 gold.
+  - The Peddler has a cellar whose crates you can rummage once a day.
+  - Chairs and pews let you rest a while.
+  - Bookshelves can be read once a day for a little lore and xp.
+- **Shop signs (237):** every shop flies a coloured banner on a tall pole with its sign on top, so you can tell them apart from across town.
+- **Welcome banner (238):** arriving in a town shows its name, what kind of place it is, its size, and your standing there with how far it is to the next level.
+- **Notice board news (239):** the bounty board has a new **News & rumours** tab with:
+  - unexplored sites nearby, which you can mark on your map
+  - today's wanted posters
+  - camps, giants, festivals, market days, raids in other towns, and what other towns are building
+- **The temple (240):** the priest restores your prayer and cures poison for free, and blesses holy symbols (+3 prayer bonus, 250 gold). Take up a crusade to slay undead for gold, Prayer xp and standing.
+- **Guild halls (241):** six guilds under one roof, each with its own entry requirement:
+  - **Warriors':** daily sparring.
+  - **Rangers':** daily shooting at the butts.
+  - **Wizards':** 30 chaos runes a day.
+  - **Cooks':** a range that burns far less.
+  - **Miners':** a daily shift on the guild seam for coal and mithril.
+  - **Crafting:** its benches.
+- **The arena (242):** fight waves of monsters for gold. Each wave is harder and pays more. Waves 5, 10 and 15 earn the titles Arena Fighter, Champion of the town and Grand Champion.
+- **Minigames (243):**
+  - **Archery** at the range, with the Dead-eye title for 95 points.
+  - **Darts** and a daily **cook-off** at the tavern.
+  - A daily **fishing contest** at the harbour.
+- **Tavern gambling (244):** dice, high-or-low and a wheel of fortune, with stakes from 10 to 500 gold.
+- **Town upgrades (245):** the mayor on every town square takes your gold and materials for town projects. Each one raises your standing there.
+  - Stone walls: raiders bring one fewer fighter.
+  - A bigger market: three more pieces at the Peddler, and better ones.
+  - A town watch: another guard on patrol.
+  - Growing a hamlet into a village, and a village into a city.
+- **Docks and harbour masters (246):** buy passage to any other port town or charted island. The fare is cheaper the more the town likes you.
+- New honours: Patron, Gladiator, Crusader and Showman.
+
 ## RS-86 - Big standalone systems
 
 - **A house of your own, and Construction (298):** Hollis the estate agent now stands on every town square. Buy a house from Hollis for 2,500 gold. It's the same house whichever town you enter it from.

@@ -774,6 +774,11 @@
   #necroBtn{ position:fixed; right:14px; bottom:150px; z-index:31; display:none; padding:7px 12px; border-radius:8px; border:1px solid #4a8a5a; background:rgba(14,30,20,0.88); color:#bff0c8; font:600 13px Georgia, serif; cursor:pointer; }
   #necroBtn span{ color:#7aa088; font-weight:400; font-size:11px; margin-left:4px; }
   #necroBtn:disabled{ opacity:0.55; cursor:default; }
+  #townWelcome{ position:fixed; left:50%; top:16%; transform:translate(-50%,-10px); z-index:32; pointer-events:none; text-align:center; opacity:0; transition:opacity 0.6s, transform 0.6s; background:rgba(14,12,10,0.82); border:1px solid #8a6a3a; border-radius:10px; padding:10px 22px; }
+  #townWelcome.show{ opacity:1; transform:translate(-50%,0); }
+  #townWelcome b{ display:block; font:700 24px Georgia, serif; color:#f2d48a; letter-spacing:1px; }
+  #townWelcome span{ display:block; color:#d8c8a8; font-size:13px; margin-top:2px; }
+  #townWelcome i{ display:block; color:#9ab890; font-size:12px; margin-top:4px; font-style:normal; }
   #gbar{ position:fixed; z-index:30; pointer-events:none; transform:translate(-50%,-100%); text-align:center; display:none; }
   #gbar .gbt{ font-size:10.5px; color:#f0e0b0; text-shadow:0 1px 2px #000, 0 0 4px #000; white-space:nowrap; margin-bottom:2px; }
   #gbar .gbb{ width:76px; height:6px; margin:0 auto; background:rgba(0,0,0,0.6); border:1px solid rgba(255,220,150,0.5); border-radius:3px; overflow:hidden; }
@@ -5544,6 +5549,7 @@ function noteFoe(mi){
 function fxSplat(x, y, txt, kind){ if (typeof FP!=='undefined' && FP.floats) FP.floats.push({x, y, z:0.95, txt:String(txt), col:'#ffd27a', kind, crit:false, age:0}); }
 function monsterDies(mi){
   const m = G.mon[mi];
+  try{ townOnKill(m); }catch(e){}
   if (m.champ && m.champ.includes('explosive')) try{ monExplode(m); }catch(e){}
   logMsg(`the ${m.nm} falls`, 'good');
   sfx('monsterDie');
@@ -6811,8 +6817,9 @@ function tryMove(dx,dy){
     if (!G.gameOver) tickMonsters(mi);
     return;
   }
-  if (tileAt(nx,ny)===T_WALL){ if (G.gameMode===3 && !G.interior && G.villageDeco && G.villageDeco[nx] && G.villageDeco[nx][ny]==='board') tkOpen('board'); return; } // bumping a wall isn't an action - no turn spent (the bounty board opens)
+  if (tileAt(nx,ny)===T_WALL){ if (G.gameMode===3 && !G.interior && G.villageDeco && G.villageDeco[nx] && G.villageDeco[nx][ny]==='board') tkOpen('board'); else if (G.gameMode===3 && !G.interior) townBumpWall(nx, ny); return; } // bumping a wall isn't an action - no turn spent (the bounty board opens)
   if (G.player.frozenTurns>0 && G.gameMode!==0){ logMsg('you are frozen in place - you strain against the ice (you can still fight what stands beside you)', 'hit'); tickMonsters(); return; }
+  if (G.gameMode===3 && townBumpFolk(nx, ny)) return;   // a word with the townsfolk
   { const ht = tileAt(nx,ny);
     if (ht===T_WAYPOINT || ht===T_STASH || ht===T_QUESTGIVER || ht===T_VENDOR){ villageInteract(nx,ny); return; }
     if (ht===T_COUNTER){ const n = (G.villageNpcs||[])[0]; if (n) setUi(n.service); return; }
@@ -6872,6 +6879,7 @@ function tryMove(dx,dy){
     case T_BLACKSMITH: enterInterior('smith'); break;
     case T_ALCHEMIST: enterInterior('alch'); break;
     case T_TAILOR: enterInterior('tailor'); break;
+    case T_TOWNDOOR: { const b = VILLAGE_BUILDINGS.find(b=>b.door.x===nx && b.door.y===ny); if (b) enterInterior(b.key); break; }
     // which of these two tile types actually advances you deeper into the
     // site (vs retreats you toward the entrance) flips for a castle/necro
     // tower - see advanceTile()/retreatTile()
@@ -8423,7 +8431,7 @@ function villageInteract(x,y){
   const npc = (G.villageNpcs||[]).find(n=>n.x===x && n.y===y);
   if (t===T_QUESTGIVER || (npc && npc.service==='questgiver')){ setUi('questgiver'); return; }
   if (npc && (npc.service==='slayer' || npc.service==='tzhaar')){ tkOpen(npc.service); return; }
-  if (npc) setUi(npc.service);
+  if (npc){ if (npc.service==='range'){ G.gamesAt = 'range'; setUi('games'); } else setUi(npc.service); }
 }
 function villageNpcFor(service){ return (G.villageNpcs||[]).find(n=>n.service===service) || (G.townVendors||[]).find(n=>n.service===service); }
 // ---- shop interiors: every vendor works inside their own building, behind a counter, with the
@@ -8458,6 +8466,8 @@ const ROOM_LAYOUT = {
 function buildingByKey(k){ return VILLAGE_BUILDINGS.find(b=>b.key===k); }
 function enterInterior(key){
   const b = buildingByKey(key); if (!b || G.interior) return;
+  if (townClosedCheck(key)) return;   // shut for the night
+
   const vendor = (G.townVendors||[]).find(v=>v.key===key);
   G.townState = { map:G.map, deco:G.villageDeco, npcs:G.villageNpcs, villagers:G.villagers, floorItem:G.floorItem };
   G.interior = { key, name:b.name, out:{ x:b.door.x + (b.face==='e' ? 1 : 0), y:b.door.y + (b.face==='s' ? 1 : 0) } };
@@ -8469,6 +8479,7 @@ function enterInterior(key){
   G.map[10][5] = T_VENDOR; G.villageDeco[10][5] = 'npc';
   G.villageNpcs = vendor ? [Object.assign({}, vendor, { x:10, y:5 })] : [];
   G.villagers = [];
+  if (key==='tavern') townPatrons();
   for (const [k,x,y] of ROOM_LAYOUT[key].benches){ G.map[x][y] = T_BENCH; G.villageDeco[x][y] = 'bench:'+k; }
   G.player.x = ROOM.door.x; G.player.y = ROOM.door.y - 1; G.player.facing = 0;
   logMsg(`you step into ${b.name.toLowerCase()}`, 'new');
@@ -8485,6 +8496,7 @@ function exitInterior(){
 function benchAt(x, y){ const d = G.villageDeco[x] && G.villageDeco[x][y]; return d && d.startsWith('bench:') ? d.slice(6) : null; }
 function useBench(kind){
   if (houseBench(kind)) return;
+  if (townBench(kind)) return;
   G.bench = kind;
   if (kind==='hearth'){ G.cookAt = 'hearth'; setUi('cook'); return; }
   if (kind==='barber'){ openMakeover(); return; }
@@ -8535,7 +8547,7 @@ function renderInteriorMap(){
     drawTileBg(x,y,'#5a4430');
     if (t===T_COUNTER) drawTileBg(x,y,'#7a5a38');
     if (t===T_DOOROUT) drawGlyph(x,y,'<',COL.cyan);
-    if (b) drawGlyph(x,y,b.startsWith('spot_') ? '+' : {furnace:'&',anvil:'T',cauldron:'*',hearth:'^',spinning:'@',tanning:'#',kiln:'o',loom:'=',fletching:'/',barber:'h',dyevat:'u',gemcut:'%',jeweller:'$',wheel:'O',bed:'b',carpentry:'=',trophy:'W',altar:'A',portal:'0'}[b]||'?', b.startsWith('spot_') ? '#8a7a60' : COL.amber);
+    if (b) drawGlyph(x,y,b.startsWith('spot_') ? '+' : b.startsWith('g_') ? 'G' : {furnace:'&',anvil:'T',cauldron:'*',hearth:'^',spinning:'@',tanning:'#',kiln:'o',loom:'=',fletching:'/',barber:'h',dyevat:'u',gemcut:'%',jeweller:'$',wheel:'O',bed:'b',carpentry:'=',trophy:'W',altar:'A',portal:'0',innbed:'b',stairs:'>',stairsup:'<',stairsdown:'<',cellar:'v',books:'B',chair:'h',pew:'=',shrine:'+',crates:'#',casks:'o'}[b]||'?', b.startsWith('spot_') ? '#8a7a60' : COL.amber);
   }
   for (const n of (G.villageNpcs||[])) drawMonsterArt(n.x*cellPx+cellPx/2, n.y*cellPx+cellPx/2, cellPx*0.85, VILLAGER_ART, COL.cyan);
   drawPlayerIcon(G.player.x, G.player.y);
@@ -8549,7 +8561,7 @@ function v3BuildInterior(grp, mats){
   dark.rotation.x = -Math.PI/2; dark.position.set(COLS/2, -0.02, ROWS/2); grp.add(dark); V3.ground = dark;
   const fw = ROOM.x1-ROOM.x0+1, fd = ROOM.y1-ROOM.y0+1;
   const floor = v3Box(fw, 0.06, fd+1, mats.planks, ROOM.x0+fw/2, -0.03, ROOM.y0+fd/2+0.5); grp.add(floor);
-  const wallM = key==='smith' ? mats.stone : mats.plaster, H = 2.7, low = 0.5;
+  const wallM = ['smith','temple','guild','cellar'].includes(key) ? mats.stone : mats.plaster, H = 2.7, low = 0.5;
   // back (north, west) walls full height with beams and a window; the near (south, east) walls cut low so you can see in
   grp.add(v3Box(fw+1, H, 0.3, wallM, ROOM.x0+fw/2-0.5, H/2, ROOM.y0-0.15));
   grp.add(v3Box(0.3, H, fd+1, wallM, ROOM.x0-0.15, H/2, ROOM.y0+fd/2-0.5));
@@ -8562,11 +8574,11 @@ function v3BuildInterior(grp, mats){
   { const dx = ROOM.door.x+0.5, dz = ROOM.y1+1.15; grp.add(v3Box(0.9, 0.04, 0.34, mats.planks, dx, low+0.02, dz)); for (const s of [-0.5,0.5]) grp.add(v3Box(0.12, 1.6, 0.34, mats.wood, dx+s, 0.8, dz)); grp.add(v3Box(1.1, 0.12, 0.34, mats.wood, dx, 1.62, dz));
     const mat = v3Box(0.9, 0.02, 0.8, mats.cloth || mats.awning, dx, 0.02, dz-0.55); grp.add(mat); }
   // the counter and shelves behind the vendor
-  if (key!=='house'){ grp.add(v3Box(3, 0.9, 0.7, mats.planks, 10.5, 0.45, 6.5)); grp.add(v3Box(3.1, 0.08, 0.78, mats.wood, 10.5, 0.93, 6.5)); }
+  if (!['house','tavern_up','cellar'].includes(key)){ grp.add(v3Box(3, 0.9, 0.7, mats.planks, 10.5, 0.45, 6.5)); grp.add(v3Box(3.1, 0.08, 0.78, mats.wood, 10.5, 0.93, 6.5)); }
   for (const sx of [8.2, 12.8]){ grp.add(v3Box(1.3, 1.9, 0.35, mats.wood, sx, 0.95, ROOM.y0+0.25)); for (let i=0;i<3;i++) grp.add(v3Box(1.2, 0.05, 0.36, mats.planks, sx, 0.5+i*0.55, ROOM.y0+0.27)); }
   const lin = c=>new T.Color(c).convertSRGBToLinear();
   const jar = (x,y,z,c)=>{ const m = new T.Mesh(new T.CylinderGeometry(0.06,0.07,0.18,8), new T.MeshStandardMaterial({ color:lin(c), roughness:0.3, emissive:lin(c), emissiveIntensity:0.15 })); m.position.set(x,y,z); grp.add(m); };
-  const shelfCols = { smith:['#8a8a90','#6a5a4a','#c8a060'], alch:['#50e080','#e05050','#5080e0'], tavern:['#c89040','#6a4020','#e0d0a0'], shop:['#e0a020','#c03020','#40a030'], tailor:['#6a4ab0','#b08a5a','#e0e0d0'], house:['#c89a5a','#e0d0a0','#8a5a3a'] }[key];
+  const shelfCols = { smith:['#8a8a90','#6a5a4a','#c8a060'], alch:['#50e080','#e05050','#5080e0'], tavern:['#c89040','#6a4020','#e0d0a0'], shop:['#e0a020','#c03020','#40a030'], tailor:['#6a4ab0','#b08a5a','#e0e0d0'], house:['#c89a5a','#e0d0a0','#8a5a3a'], temple:['#e8e0c0','#d8b050','#c8a0ff'], guild:['#c04030','#4a5ac8','#3a8a3a'], tavern_up:['#c89040','#6a4020','#e0d0a0'], cellar:['#6a2a3a','#4a3a2a','#8a6a4a'] }[key] || ['#c89040','#6a4020','#e0d0a0'];
   for (const sx of [8.2, 12.8]) for (let r=0;r<3;r++) for (let i=0;i<4;i++) jar(sx-0.45+i*0.3, 0.62+r*0.55, ROOM.y0+0.27, shelfCols[(i+r)%3]);
   // hanging lanterns (the room's light)
   for (const [lx,lz] of [[7.5,8.5],[12.5,8.5]]){ grp.add(v3Box(0.02, 0.5, 0.02, mats.iron, lx, 2.35, lz)); const l = new T.Mesh(new T.SphereGeometry(0.1,10,8), new T.MeshStandardMaterial({ color:0xffd28a, emissive:0xffb050, emissiveIntensity:1.2 })); l.position.set(lx, 2.05, lz); grp.add(l);
@@ -8579,11 +8591,13 @@ function v3BuildInterior(grp, mats){
   if (key==='shop'){ v3Crate(6.4,6.4,mats,grp,1.1); v3Crate(6.4,6.4,mats,grp,0.8,0.46); v3Crate(13.5,10.4,mats,grp); v3Barrel(13.4,6.0,mats,grp); v3Barrel(6.5,10.4,mats,grp); }
   if (key==='smith'){ v3Barrel(13.4,6.0,mats,grp); for (let i=0;i<4;i++) grp.add(v3Box(0.05,1.1,0.05,mats.iron,6.2+i*0.25,0.55,10.6)); }
   if (key==='alch'){ v3Crate(13.5,6.2,mats,grp); v3Barrel(6.5,10.4,mats,grp); }
+  if (['temple','guild','cellar','tavern_up'].includes(key)) townV3Interior(key, grp, mats);
   if (key==='house'){ const rug = new T.Mesh(new T.PlaneGeometry(3.2, 2.2), new T.MeshStandardMaterial({ color:lin('#7a2a24'), roughness:0.95 })); rug.rotation.x = -Math.PI/2; rug.position.set(10, 0.012, 9); grp.add(rug);
     const rb = new T.Mesh(new T.PlaneGeometry(2.8, 1.8), new T.MeshStandardMaterial({ color:lin('#c8a050'), roughness:0.95 })); rb.rotation.x = -Math.PI/2; rb.position.set(10, 0.014, 9); grp.add(rb); const ri = new T.Mesh(new T.PlaneGeometry(2.5, 1.5), new T.MeshStandardMaterial({ color:lin('#8a3028'), roughness:0.95 })); ri.rotation.x = -Math.PI/2; ri.position.set(10, 0.016, 9); grp.add(ri); }
   if (key==='tailor'){ for (let i=0;i<3;i++){ const c = new T.Mesh(new T.CylinderGeometry(0.1,0.1,0.5,10), new T.MeshStandardMaterial({ color:lin(['#6a4ab0','#b0302a','#3a7ac8'][i]), roughness:0.9 })); c.rotation.z = Math.PI/2; c.position.set(13.2, 0.3+i*0.22, 5.8); grp.add(c); } v3Crate(9.2,10.6,mats,grp); }
 }
 function v3Bench(k, x, z, mats, grp){
+  if (k==='innbed') k = 'bed';
   const T = THREE, g = new T.Group(); g.position.set(x, 0, z); grp.add(g);
   const lin = c=>new T.Color(c).convertSRGBToLinear(), M = (c,o)=>new T.MeshStandardMaterial(Object.assign({ color:lin(c), roughness:0.8 }, o||{}));
   const add = (o)=>{ o.castShadow = o.receiveShadow = true; g.add(o); return o; };
@@ -8671,6 +8685,7 @@ function v3Bench(k, x, z, mats, grp){
     // an empty space: chalk lines on the floor and a builder's peg
     const cm = M('#e8e0c8',{ transparent:true, opacity:0.6 }); for (const [w,d,px,pz] of [[0.8,0.03,0,-0.4],[0.8,0.03,0,0.4],[0.03,0.8,-0.4,0],[0.03,0.8,0.4,0]]) box(w,0.01,d,cm,px,0.01,pz);
     box(0.04,0.4,0.04,mats.wood,0.3,0.2,0.3); box(0.18,0.12,0.02,M('#d8c8a0'),0.3,0.38,0.31); }
+  else townV3Bench(k, box, cyl, add, M, mats);   // the rooms of SECTION: TOWNS
 }
 
 function villageNpcTitle(service){ const n = villageNpcFor(service); return n ? `${esc(n.name)} &middot; ${esc(n.role)}` : ''; }
@@ -8696,7 +8711,7 @@ function waypointTravel(key){
   if (x===G.owPos.x && y===G.owPos.y){ setUi('playing'); return; }
   setUi('playing');
   if (!v3Active() || G.interior){ waypointArrive(key); return; }
-  const p = G.player, wx = Math.floor(COLS/2), wy = 12;
+  const p = G.player, wx = TOWN_CX, wy = 12;
   let best = null, bd = -1;
   for (const [dx,dy] of [[0,1],[1,0],[-1,0],[0,-1]]){ const nx = p.x+dx, ny = p.y+dy; if (!v3Walkable(nx,ny)) continue; const d = Math.hypot(nx-wx, ny-wy); if (d > bd){ bd = d; best = [nx,ny]; } }
   if (!best){ waypointArrive(key); return; }
@@ -8709,7 +8724,7 @@ function waypointArrive(key){
   const [x,y] = key.split(',').map(Number);
   G.owPos.x = x; G.owPos.y = y;
   enterVillage();
-  const ax = Math.floor(COLS/2), ay = 14;
+  const ax = TOWN_CX, ay = 14;
   if (G.map[ax] && G.map[ax][ay]===T_FLOOR){ G.player.x = ax; G.player.y = ay; G.player.facing = 2; }
   logMsg('the world folds - you step out of the portal into another town', 'magic');
   if (v3Active()) G.portalFx = { phase:'in', x:G.player.x, y:G.player.y, t:0 };
@@ -10175,7 +10190,7 @@ function skLightFire(){
   renderGame(); saveCurrentGame();
 }
 // ---- cooking ----
-function skBurnChance(f){ const L = skLvl('cooking'); if (skPerk('cooking', 'noburn')) return 0; return clamp(0.42 - (L - f.cook)*0.03 + (G.cookAt==='fire' ? 0.05 : 0) - skPerk('cooking', 'burn'), 0, 0.5); }
+function skBurnChance(f){ const L = skLvl('cooking'); if (skPerk('cooking', 'noburn')) return 0; return clamp(0.42 - (L - f.cook)*0.03 + (G.cookAt==='fire' ? 0.05 : 0) - (G.cookAt==='guild' ? 0.15 : 0) - skPerk('cooking', 'burn'), 0, 0.5); }
 function skCook(id, all){
   const f = SK_FISH.concat(SK_MEAT).find(f=>f.id===id); if (!f) return 0;
   const L = skLvl('cooking');
@@ -14017,7 +14032,8 @@ const VILLAGE_NPC_NAMES = {
 };
 function villageSeed(){ return ((G.owPos.x*73856093) ^ (G.owPos.y*19349663)) >>> 0; }
 function generateVillage(){
-  setGrid(20, 20);
+  townApplyLayout(townInfo());
+  setGrid(G.townLy.cols, 20);
   G.map = makeGrid(T_FLOOR);
   G.floorItem = makeItemGrid();
   G.villageDeco = makeGrid('grass', COLS, ROWS);
@@ -14026,7 +14042,7 @@ function generateVillage(){
   // the palisade ringing the town, with the gate on the south side
   for (let x=0;x<COLS;x++){ W(x,0,'hedge'); W(x,ROWS-1,'hedge'); }
   for (let y=0;y<ROWS;y++){ W(0,y,'hedge'); W(COLS-1,y,'hedge'); }
-  const cx = Math.floor(COLS/2);
+  const cx = TOWN_CX;
   G.map[cx][ROWS-1] = T_EXIT; G.villageDeco[cx][ROWS-1] = 'gate';
   // cobbled plaza, main street to the gate, and a lane past every door
   for (let x=7;x<=14;x++) for (let y=8;y<=15;y++) G.villageDeco[x][y] = 'path';
@@ -14059,6 +14075,7 @@ function generateVillage(){
   G.villageNpcs.push({ x:8, y:12, name:SLAYER_MASTERS[seed % SLAYER_MASTERS.length], role:'Slayer Master', service:'slayer', key:'slayer' });
   G.villageNpcs.push({ x:12, y:14, name:'TzHaar-Hur-'+['Tel','Lek','Rin','Zal'][(seed>>>3) % 4], role:'TzHaar trader', service:'tzhaar', key:'tzhaar' });
   for (const n of G.villageNpcs) if (n.service!=='questgiver'){ G.map[n.x][n.y] = T_VENDOR; G.villageDeco[n.x][n.y] = 'npc'; }
+  townBuildDistrict();   // the temple, guild hall, arena, range and harbour (see SECTION: TOWNS)
   // lamp posts round the plaza and a few trees and barrels
   for (const [x,y] of [[7,8],[14,15],[7,15],[11,8]]) W(x,y,'lamp');
   for (const [x,y] of [[6,16],[13,17],[18,17],[6,8],[1+1,13]]) if (G.map[x][y]===T_FLOOR) W(x,y,'tree');
@@ -14082,12 +14099,14 @@ function generateVillage(){
       break;
     }
   }
+  townAfterGen();
 }
 // one wandering step per villager per player turn, purely cosmetic - never
 // blocks the player, never interacts, just gives the streets some life.
 // Same "not every one moves every turn" pacing moveOverworldEncounters
 // already uses so the whole population doesn't visibly lock-step.
 function moveVillagers(){
+  if (townMoveVillagers()) return;   // routines, the watch and the animals (see SECTION: TOWNS)
   const dirs = [[1,0],[-1,0],[0,1],[0,-1],[0,0]]; // [0,0] = stand still this turn
   for (const v of (G.villagers||[])){
     if (!chn(0.5)) continue;
@@ -14147,6 +14166,7 @@ function enterVillage(){
     : 'you wander into a small village', 'new', true);
   questOnEnterTown();
   estateNpcPlace();
+  townAfterEnter();
   wevOnEnterTown();
 }
 // "a" vs "an" off the first letter - elven/orcish both need "an", dwarven/
@@ -15459,7 +15479,7 @@ function tkShopRows(shop, list, here){
 }
 function buildTasks(){
   const p = tkP(), at = G.tkAt, tab = G.tkTab || 'slayer', s = p.slay;
-  const tabs = [['slayer','Slayer'],['contracts','Contracts'],['bounties','Bounties'],['currency','Currencies & shops'],['money','Money making']]
+  const tabs = [['slayer','Slayer'],['contracts','Contracts'],['bounties','Bounties'],['currency','Currencies & shops'],['money','Money making']].concat(at==='board' ? [['news','News & rumours']] : [])
     .map(([k,nm])=>`<button class="btn ${tab===k ? 'primary' : ''}" onclick="G.tkTab='${k}';renderOverlay()">${nm}</button>`).join(' ');
   const purse = TK_CURRENCIES.map(([k,nm,col])=>`<span style="margin-right:14px;"><b style="color:${col}">${tkCur(k).toLocaleString()}</b> <span class="muted">${nm.toLowerCase()}</span></span>`).join('') + `<span><b style="color:${COL.gold}">${p.gold.toLocaleString()}</b> <span class="muted">gold</span></span>`;
   const title = at==='slayer' ? `${esc(slayerMasterName()).toUpperCase()}, SLAYER MASTER` : at==='board' ? 'THE BOUNTY BOARD' : at==='tzhaar' ? `${esc((villageNpcFor('tzhaar')||{name:'TzHaar-Hur'}).name).toUpperCase()}, TZHAAR TRADER` : 'TASKS';
@@ -15489,6 +15509,8 @@ function buildTasks(){
     body += `<h4 style="color:var(--ink-faint);margin:4px 0 6px;">WANTED &middot; new posters in ${tkUntil()}</h4>` + (p.bounties.list.map((t,i)=>tkRow(t, 'bounty', i, at==='board')).join('') || '<div class="muted">nothing posted</div>');
     body += `<div class="muted" style="font-size:12px;margin-top:8px;">The first one of each you kill today earns the bounty. ${p.level < 8 ? 'Once you reach combat level 46 a boss is posted too.' : ''}</div>`;
     if (at==='board') body += `<h4 style="color:var(--ink-faint);margin:12px 0 6px;">THE GUILD STORE &middot; ${p.cur.guild} tokens</h4>${tkShopRows('guild', GUILD_SHOP, true)}`;
+  } else if (tab==='news'){
+    body += townNewsHtml();
   } else if (tab==='currency'){
     body += TK_CURRENCIES.map(([k,nm,col,how])=>`<div class="shoprow"><span><b style="color:${col}">${esc(nm)}</b></span><span class="desc">${esc(how)}</span><span><b>${tkCur(k).toLocaleString()}</b></span></div>`).join('');
     body += `<h4 style="color:var(--ink-faint);margin:12px 0 6px;">THE TZHAAR TRADER &middot; ${p.cur.tokkul.toLocaleString()} tokkul</h4>${tkShopRows('tokkul', TZHAAR_SHOP, at==='tzhaar')}`;
@@ -16268,6 +16290,8 @@ function renderVillageMap(){
           ctx.strokeStyle = 'rgba(0,0,0,0.35)';
           ctx.lineWidth = Math.max(1,dpr*0.6);
           ctx.strokeRect(x*cellPx+0.5, y*cellPx+0.5, cellPx-1, cellPx-1);
+        } else if (townDraw2DWall(x, y, deco, pal)){
+          // (the district, the harbour and the landmark: see SECTION: TOWNS)
         } else { // hedge (border) or a scattered obstacle - both theme-colored
           drawTileBg(x,y, pal.bg);
           if (deco==='hedge') drawGlyph(x,y, pal.obstacle[0], pal.hedgeColor, 700);
@@ -16275,7 +16299,7 @@ function renderVillageMap(){
         }
         continue;
       }
-      drawTileBg(x,y, deco==='path' ? '#8a7a52' : pal.ground);
+      drawTileBg(x,y, deco==='path' ? '#8a7a52' : townFloorCol(deco, pal) || pal.ground);
       switch(t){
         case T_EXIT: drawGlyph(x,y,'<',COL.cyan); break;
         case T_GOLD: drawDot(x,y,COL.gold); break;
@@ -16284,6 +16308,7 @@ function renderVillageMap(){
         case T_BLACKSMITH: drawGlyph(x,y,'&',COL.dim); break;
         case T_ALCHEMIST: drawGlyph(x,y,'*',COL.green); break;
         case T_TAILOR: drawGlyph(x,y,'T',COL.purple); break;
+        case T_TOWNDOOR: drawGlyph(x,y,'+',COL.gold); break;
         case T_WAYPOINT: drawObjIcon(x,y,obEntry('portal',{rgb:'90,220,255'}),0.9); break;
         case T_STASH: drawObjIcon(x,y,obEntry('chest',{gold:true}),0.66); break;
         case T_ITEM: {
@@ -16324,7 +16349,7 @@ function renderVillageMap(){
     ctx.fillStyle = '#f2f5f6';
     ctx.fillText(b.name, px, labelY);
   }
-  for (const v of (G.villagers||[])) drawMonsterArt(v.x*cellPx+cellPx/2, v.y*cellPx+cellPx/2+cellPx*0.1, cellPx*0.8, VILLAGER_ART, raceTheme.color);
+  townDraw2DFolk(raceTheme);
   drawPlayerIcon(G.player.x, G.player.y);
   // the village's own name and race, centered at the very top of the map -
   // drawn last so it sits on top of everything else, same stroke-outline
@@ -18097,8 +18122,9 @@ function wevBossFight(b){
   wevSay(m.hp < m.maxHp ? `${m.nm} turns on you again, still bleeding from your last fight (${m.hp}/${m.maxHp} life)` : `${m.nm} looms over you - the earth trembles with every step!`, 'new');
 }
 function wevSiegeFight(d){
+  const walled = G.gameMode===3 && curTownKey() && townRec(curTownKey()).up.walls;   // stone walls hold one of them off
   wevFightStart(d.kind==='raid' ? 'raid' : 'siege', d.id, L=>{
-    const n = 3 + rn(2);
+    const n = 3 + rn(2) - (walled ? 1 : 0);
     for (let i=0;i<n;i++) wevMon(wevCampEntry(d.camp || 'orc', L), L);
     upgradeToElite(G.mon[0]); G.mon[0].nm = G.mon[0].nm.replace(/^Champion /, 'Captain ');
   });
@@ -18122,6 +18148,7 @@ function wevFrame(){
 function wevArenaWon(){
   const f = G.wevFight; if (!f) return false;
   G.wevFight = null;
+  if (f.kind==='townarena') return townArenaWon(f);
   if (f.kind==='delve' || f.kind==='hunt') return wgArenaWon(f);
   const e = wevP(), p = G.player, st = wevStats(), L = p.level;
   if (f.kind==='camp'){
@@ -19931,6 +19958,772 @@ WG_POI.digsite = poi=>{
   if (!s.done[poi.id]){ s.done[poi.id] = 1; logMsg(`you find the dig camp at ${poi.name} - excavate the hotspots round it (Archaeology ${site ? site.lvl : 1}, with a pickaxe), then restore your finds here`, 'new', true); }
   setUi('arch');
 };
+
+// ===================== SECTION: TOWNS - TIERS, DISTRICTS, IDENTITIES AND TOWN LIFE =====================
+// every town is a hamlet, a village or a city. A hamlet is the old square
+// without its alchemist and tailor; a village adds an east district with a
+// temple and an archery range; a city adds a guild hall and an arena, and is
+// walled in stone. A town by the sea has a harbour on its east side. The
+// land shapes it too (stilts in the swamp, terraces in the hills), and so
+// does who lives there: a dwarven mine town, an elven village with its
+// moonwell, an orcish war-town with its totem, a desert trading post with
+// its caravan. Townsfolk keep a day: work, then the tavern, then home; the
+// watch walks the square with torches at night; shops shut after dark.
+const T_TOWNDOOR = 23;
+const TOWN_CX = 10;
+const VILLAGE_BUILDINGS_BASE = VILLAGE_BUILDINGS.slice(), VILLAGE_HOUSES_BASE = VILLAGE_HOUSES.slice();
+const TOWN_TIER_NM = ['hamlet', 'village', 'city'];
+const TOWN_DISTRICT = {
+  temple: { key:'temple', tile:T_TOWNDOOR, deco:'buildingTemple', x0:21, y0:2, w:4, h:4, door:{x:22,y:5}, face:'s', floors:2, name:'The Temple',     role:'Priest',      service:'temple' },
+  guild:  { key:'guild',  tile:T_TOWNDOOR, deco:'buildingGuild',  x0:26, y0:2, w:5, h:4, door:{x:28,y:5}, face:'s', floors:2, name:'The Guild Hall', role:'Guildmaster', service:'guild' },
+};
+const TOWN_NPC_ROLE = { mayor:'Mayor', range:'Range master', arena:'Arena master', harbour:'Harbour master' };
+function townKeyAt(x, y){ return x+','+y; }
+function townList(){ return Object.values((G.ow && G.ow.townPositions) || {}).filter(Boolean); }
+function townRec(key){ const s = wgState(); s.towns = s.towns || {}; const t = s.towns[key] = s.towns[key] || {}; t.up = t.up || {}; t.day = t.day || {}; return t; }
+function townDay(){ return Math.floor(((G.player && G.player.turnCount)||0) / DAY_LENGTH); }
+// the size a town was founded at: the spawn town is a village, the grandest of the rest a city
+function townBaseTier(x, y){
+  const sp = G.ow.spawnPos; if (sp && sp.x===x && sp.y===y) return 1;
+  let best = null; for (const p of townList()) if (!(sp && p.x===sp.x && p.y===sp.y) && (!best || o3Hash(p.x, p.y, 909) > o3Hash(best.x, best.y, 909))) best = p;
+  if (best && best.x===x && best.y===y) return 2;
+  const h = o3Hash(x, y, 909); return h < 0.32 ? 0 : h < 0.78 ? 1 : 2;
+}
+function townTier(x, y){ return Math.min(2, townBaseTier(x, y) + (townRec(townKeyAt(x, y)).up.grow||0)); }
+function townPort(x, y){ let w = 0; for (let i=-2;i<=2;i++) for (let j=-2;j<=2;j++){ const m = G.ow.map[x+i]; if (m && m[y+j]===OW_WATER) w++; } return w >= 3; }
+function townName(x, y){ const f = townFlavorAt(x, y); return f ? f.name : o3TownName(x, y); }
+function townInfo(x, y){
+  if (x===undefined){ x = G.owPos.x; y = G.owPos.y; }
+  const key = townKeyAt(x, y), tier = townTier(x, y), port = townPort(x, y), f = townFlavorAt(x, y) || {}, rec = townRec(key);
+  const here = G.gameMode===3 && G.owPos.x===x && G.owPos.y===y;
+  const isSpawn = G.ow.spawnPos && G.ow.spawnPos.x===x && G.ow.spawnPos.y===y;
+  const theme = here && G.villageTheme ? G.villageTheme : (VILLAGE_TERRAIN_THEME[isSpawn ? G.ow.spawnBiome : detectRegionBiome(x, y)] || 'forest');
+  const style = { walled: tier===2 || !!rec.up.walls, port, hill: theme==='mountain', stilts: theme==='swamp' };
+  let ident;
+  if (theme==='desert') ident = { k:'caravan', nm:'a desert trading post', d:'caravans rest here between the oases, and their master trades in gems and spice' };
+  else if (f.race==='dwarf') ident = { k:'mine', nm:'a dwarven mine town', d:'built over a rich seam: the town mine lets you work it once a day' };
+  else if (f.race==='elf') ident = { k:'moonwell', nm:'an elven village', d:'lanterns hang in the trees, and its moonwell restores body and spirit once a day' };
+  else if (f.race==='orc') ident = { k:'totem', nm:'an orcish war-town', d:'a war totem stands at its heart: touch it for bloodlust before a fight' };
+  else if (style.stilts) ident = { k:null, nm:'a stilt village on the marsh', d:'its houses stand on stilts above the bog' };
+  else if (style.hill) ident = { k:null, nm:'a hill village', d:'built in terraces up the slope' };
+  else if (port && tier) ident = { k:null, nm:'a fishing port', d:'boats come and go from its harbour' };
+  else if (tier===2) ident = { k:null, nm:'a walled city', d:'the greatest town for leagues around, with a temple, a guild hall and an arena' };
+  else if (tier===0) ident = { k:null, nm:'a farming hamlet', d:'a handful of houses round a crossroads' };
+  else ident = { k:null, nm:'a market town', d:'a busy crossroads town' };
+  return { key, x, y, name:townName(x, y), tier, tierNm:TOWN_TIER_NM[tier], port, style, ident, theme, rec };
+}
+// which buildings stand in this town (VILLAGE_BUILDINGS and VILLAGE_HOUSES are refilled for each town)
+function townApplyLayout(info){
+  VILLAGE_BUILDINGS.length = 0; VILLAGE_HOUSES.length = 0;
+  for (const b of VILLAGE_BUILDINGS_BASE) if (info.tier || (b.key!=='alch' && b.key!=='tailor')) VILLAGE_BUILDINGS.push(b);
+  for (const h of VILLAGE_HOUSES_BASE) if (!(info.ident.k && h===VILLAGE_HOUSES_BASE[0])) VILLAGE_HOUSES.push(h);   // a town's own landmark takes the first house's lot
+  if (!info.tier) VILLAGE_HOUSES.push({ x0:15, y0:2, w:3, h:4, floors:1 }, { x0:15, y0:13, w:3, h:3, floors:1 });
+  if (info.tier >= 1) VILLAGE_BUILDINGS.push(TOWN_DISTRICT.temple);
+  if (info.tier >= 2) VILLAGE_BUILDINGS.push(TOWN_DISTRICT.guild);
+  const D = [0, 10, 12][info.tier];
+  G.townLy = { D, W0:20 + D, cols:20 + D + (info.port ? 4 : 0), info };
+  return G.townLy;
+}
+function townNpc(x, y, service, name, role){
+  const names = VILLAGE_NPC_NAMES[G.villageRace] || VILLAGE_NPC_NAMES.human;
+  G.villageNpcs.push({ x, y, name:name || names[(villageSeed() + service.length*7 + x*3) % names.length], role:role || TOWN_NPC_ROLE[service], service, key:service });
+  G.map[x][y] = T_VENDOR; G.villageDeco[x][y] = 'npc';
+}
+// the east district: the arena, the archery range and the harbour (the temple and guild hall are buildings)
+function townBuildDistrict(){
+  const ly = G.townLy; if (!ly) return; const info = ly.info;
+  const W = (x,y,d)=>{ G.map[x][y] = T_WALL; G.villageDeco[x][y] = d; }, F = (x,y,d)=>{ G.map[x][y] = T_FLOOR; G.villageDeco[x][y] = d; };
+  for (let x=18; x<=ly.W0-2; x++) if (G.map[x][7]===T_FLOOR) G.villageDeco[x][7] = 'path';
+  if (info.tier >= 2){
+    for (let x=21;x<=26;x++) for (let y=10;y<=15;y++){ if (x===21 || x===26 || y===10 || y===15) W(x, y, 'arenawall'); else F(x, y, 'sand'); }
+    F(23, 10, 'sand'); F(24, 10, 'sand');
+    townNpc(22, 9, 'arena');
+  }
+  if (info.tier >= 1){
+    const tx = info.tier===2 ? 30 : 27;
+    for (let y=10;y<=16;y++) for (let x=tx-4;x<tx;x++) if (G.map[x][y]===T_FLOOR && G.villageDeco[x][y]==='grass') G.villageDeco[x][y] = 'range';
+    for (const y of [11, 13, 15]) W(tx, y, 'target');
+    townNpc(tx-2, 9, 'range');
+  }
+  if (info.port){
+    for (let x=ly.W0; x<ly.W0+3; x++) for (let y=1; y<ROWS-1; y++) W(x, y, 'water');
+    F(ly.W0, 12, 'pier'); F(ly.W0+1, 12, 'pier');
+    townNpc(ly.W0-1, 11, 'harbour');
+  }
+  if (info.ident.k) for (let x=2;x<=4;x++) for (let y=15;y<=17;y++) W(x, y, 'fx_'+info.ident.k);
+}
+// after the town is laid out: who lives here, and what they do all day
+const TOWN_ANIMALS = { chicken:{ nm:'chicken', h:0.24 }, dog:{ nm:'dog', h:0.36 }, cat:{ nm:'cat', h:0.24 } };
+function townFolkSpots(){
+  const work = VILLAGE_BUILDINGS.map(b=>[b.door.x + (b.face==='e' ? 1 : 0), b.door.y + (b.face==='s' ? 1 : 0)]);
+  const home = VILLAGE_HOUSES.map(h=>[h.x0 + (h.w>>1), h.y0 + h.h]).filter(([x,y])=>y < ROWS-1 && G.map[x] && G.map[x][y]===T_FLOOR);
+  const tav = VILLAGE_BUILDINGS.find(b=>b.key==='tavern');
+  return { work, home:home.length ? home : [[TOWN_CX, ROWS-3]], tavern:tav ? [tav.door.x, tav.door.y+1] : [TOWN_CX, 8] };
+}
+function townAfterGen(){
+  townLooks();
+  const ly = G.townLy; if (!ly) return; const info = ly.info, seed = villageSeed(), sp = townFolkSpots();
+  (G.villagers||[]).forEach((v, i)=>{ v.nm = NAME_POOL[(seed + i*11) % NAME_POOL.length]; v.role = FOLK_ROLES[(seed + i*7) % FOLK_ROLES.length];
+    v.home = sp.home[i % sp.home.length]; v.work = sp.work[(i*3 + seed) % sp.work.length]; });
+  const free = (x,y)=>G.map[x] && G.map[x][y]===T_FLOOR && !(G.villagers||[]).some(v=>v.x===x && v.y===y) && !(x===G.player.x && y===G.player.y);
+  // the town watch
+  const routes = [[[8,9],[13,9],[13,13],[9,14],[TOWN_CX,17]], [[TOWN_CX,17],[9,14],[13,13],[13,9],[8,9]], [[18,7],[ly.W0-2,7],[ly.W0-2,9],[18,9]]];
+  const nG = [1, 2, 3][info.tier] + (info.rec.up.watch ? 1 : 0);
+  for (let i=0;i<nG;i++){ const r = routes[i % routes.length].filter(([x,y])=>x < COLS-1); const st = r.find(([x,y])=>free(x,y)); if (!st) continue;
+    G.villagers.push({ x:st[0], y:st[1], guard:true, route:r, ri:1, nm:['Sergeant','Watchman','Watchwoman','Constable'][i%4]+' '+NAME_POOL[(seed + i*5 + 3) % NAME_POOL.length], role:'the watch', look:i }); }
+  // chickens, a dog and a cat
+  const pets = [['chicken','chicken','chicken','dog'], ['chicken','chicken','dog','cat'], ['dog','cat','cat','chicken']][info.tier];
+  pets.forEach((k, i)=>{ for (let tries=0; tries<40; tries++){ const x = 2 + Math.floor(o3Hash(seed, i*31+tries, 5)*(COLS-4)), y = 6 + Math.floor(o3Hash(seed, i*17+tries, 6)*(ROWS-8));
+    if (!free(x, y)) continue; G.villagers.push({ x, y, animal:k, nm:k==='dog' ? ['Rex','Patch','Bramble','Scout'][seed%4] : k==='cat' ? ['Tibbs','Soot','Marmalade','Whisker'][(seed>>2)%4] : 'a chicken', role:k, look:i }); break; } });
+  // a market upgrade: three more pieces at the Peddler, a tier better
+  if (info.rec.up.market && G.shopStock){ const d = mx(1, G.player.level); for (let i=0;i<3;i++) G.shopStock.push(rsPeddlerWare(d+3, pick(['bow','staff','hide','cloth','jewel']))); }
+}
+// a step toward somewhere, round whatever's in the way
+function townFree(x, y, v){ return x>0 && y>0 && x<COLS-1 && y<ROWS-1 && G.map[x][y]===T_FLOOR && !(x===G.player.x && y===G.player.y) && !(G.villagers||[]).some(o=>o!==v && !o.indoors && o.x===x && o.y===y); }
+function townStep(v, tx, ty){
+  if (v.x===tx && v.y===ty) return true;
+  const dx = sg(tx-v.x), dy = sg(ty-v.y), opts = [];
+  if (dx) opts.push([dx,0]); if (dy) opts.push([0,dy]); if (opts.length===2 && chn(0.5)) opts.reverse();
+  if ((v.stuck||0) > 2) opts.push(...[[1,0],[-1,0],[0,1],[0,-1]].sort(()=>Math.random()-0.5));
+  for (const [a,b] of opts){ if (townFree(v.x+a, v.y+b, v)){ v.x += a; v.y += b; v.stuck = 0; return v.x===tx && v.y===ty; } }
+  v.stuck = (v.stuck||0) + 1; return false;
+}
+function townWet(){ return G.weather==='rain' || G.weather==='storm'; }
+// one step for everyone, once a turn (moveVillagers)
+function townMoveVillagers(){
+  if (G.gameMode!==3) return false;
+  if (G.interior) return true;                       // (tavern regulars stay in their seats)
+  const dp = dayPhase(), when = dp < 0.25 || dp >= 0.86 ? 'home' : dp >= 0.68 ? 'tavern' : 'work';
+  for (const v of (G.villagers||[])){
+    if (v.guard){ const r = v.route; if (r && r.length){ const t = r[v.ri % r.length]; if (townStep(v, t[0], t[1]) || (v.stuck||0) > 6){ v.ri++; v.stuck = 0; } } continue; }
+    if (v.animal){
+      if (v.animal==='dog' && Math.abs(v.x-G.player.x) + Math.abs(v.y-G.player.y) < 7 && chn(0.6)){ if (Math.abs(v.x-G.player.x) + Math.abs(v.y-G.player.y) > 1) townStep(v, G.player.x, G.player.y); }
+      else if (chn(v.animal==='cat' ? 0.25 : 0.55)){ const [a,b] = [[1,0],[-1,0],[0,1],[0,-1]][rn(4)]; if (townFree(v.x+a, v.y+b, v)){ v.x += a; v.y += b; } }
+      continue;
+    }
+    const goHome = when==='home' || (townWet() && (v.look|0) % 3 !== 0);
+    const t = goHome ? v.home : when==='tavern' ? townFolkSpots().tavern : v.work;
+    if (!t){ continue; }
+    if (v.indoors){ if (!goHome){ v.indoors = false; v.x = v.home[0]; v.y = v.home[1]; } continue; }
+    if (!chn(0.75)) continue;
+    const there = townStep(v, t[0], t[1]);
+    if (there && goHome) v.indoors = true;
+    else if (there && !goHome && chn(0.3)){ const [a,b] = [[1,0],[-1,0],[0,1],[0,-1]][rn(4)]; if (townFree(v.x+a, v.y+b, v)){ v.x += a; v.y += b; } }   // mill about
+  }
+  townAmbientSound();
+  return true;
+}
+// the sounds of the town: hammering at the forge, clucking, a bark, the hum of the square
+Object.assign(SFX, {
+  clink:  ()=> playTone(1500, 0.04, 'square', 0.035),
+  cluck:  ()=> playSeq([[760,0.04,'square',0.025],[640,0.05,'square',0.02]]),
+  bark:   ()=> playSeq([[300,0.06,'sawtooth',0.04],[260,0.08,'sawtooth',0.035]]),
+  murmur: ()=> playSeq([[210,0.09,'sine',0.03],[180,0.12,'sine',0.025],[230,0.08,'sine',0.02]]),
+  coins:  ()=> playSeq([[1320,0.04,'sine',0.08],[1560,0.05,'sine',0.07],[1180,0.06,'sine',0.06]]),
+});
+function townAmbientSound(){
+  const p = G.player, d = (x,y)=>Math.abs(x-p.x) + Math.abs(y-p.y);
+  if (!isNightTime() && d(6,4) < 7 && chn(0.3)) sfx('clink');
+  const hen = (G.villagers||[]).find(v=>v.animal==='chicken' && d(v.x, v.y) < 5); if (hen && chn(0.12)) sfx('cluck');
+  const dog = (G.villagers||[]).find(v=>v.animal==='dog' && d(v.x, v.y) < 4); if (dog && chn(0.06)) sfx('bark');
+  if (!isNightTime() && !townWet() && d(TOWN_CX, 11) < 5 && chn(0.12)) sfx('murmur');
+}
+// talking to the townsfolk you bump into: gossip, and hints about the land around
+function townBumpFolk(nx, ny){
+  if (G.interior) return false;
+  const v = (G.villagers||[]).find(o=>!o.indoors && o.x===nx && o.y===ny); if (!v) return false;
+  if (v.animal){ logMsg(v.animal==='dog' ? `${v.nm} wags its tail and sniffs your boots` : v.animal==='cat' ? `${v.nm} winds round your ankles, then stalks off` : 'the chicken flaps off, squawking', ''); if (v.animal==='dog') sfx('bark'); if (v.animal==='chicken') sfx('cluck'); renderGame(); return true; }
+  const line = v.guard ? townGuardLine(v) : townGossip(v);
+  wevDialog(v.nm, `<span class="muted">${esc(v.role)}</span><br><br>"${line}"`, [['Thanks', ()=>{}]], 'townsfolk');
+  return true;
+}
+function townGuardLine(v){
+  const night = isNightTime(), info = townInfo();
+  const l = [ night ? 'Keep to the lit streets after dark, friend. The shops are shut till dawn - knock if you must.' : 'Move along, nothing to see. Unless you\'re here about the bounty board.',
+    info.rec.up.walls ? 'Since the new walls went up, the raiders think twice.' : 'If the town had stone walls, I\'d sleep easier. Talk to the mayor about it.',
+    'The arena master\'s always looking for fighters - if this town has an arena, that is.' ];
+  return l[(townDay() + (v.look|0)) % l.length];
+}
+const OW_SITE_NAME = { [OW_DUNGEON]:'a dungeon', [OW_CASTLE]:'a castle', [OW_NECROTOWER]:'a necromancer\'s tower', [OW_TEMPLE]:'a ruined temple', [OW_GRAVEYARD]:'a graveyard', [OW_MINE]:'an old mine', [OW_LAIR]:'a monster\'s lair' };
+function townRumourSites(n, R){
+  const out = [], x0 = G.owPos.x, y0 = G.owPos.y;
+  for (let i=-R;i<=R;i++) for (let j=-R;j<=R;j++){ const x = x0+i, y = y0+j, m = G.ow.map[x]; if (!m) continue; const t = m[y]; if (OW_SITE_NAME[t] && !owSeen(x, y)) out.push({ x, y, t, d:Math.hypot(i, j) }); }
+  return out.sort((a,b)=>a.d-b.d).slice(0, n);
+}
+function townGossip(v){
+  const seed = townDay()*7 + (v.look|0)*13 + (v.x|0), x0 = G.owPos.x, y0 = G.owPos.y, hints = [];
+  const site = townRumourSites(3, 30)[seed % 3];
+  if (site) hints.push(()=>{ owReveal(site.x, site.y, 2); return `They say there's ${OW_SITE_NAME[site.t]} ${Math.round(site.d)} leagues ${dirWord(site.x-x0, site.y-y0)} of here. I've marked it on your map - mind how you go.`; });
+  const dig = (G.ow.pois||[]).find(o=>o.k==='digsite' && !wgState().found.includes(o.id));
+  if (dig) hints.push(()=>{ owReveal(dig.x, dig.y, 2); return `A scholar came through asking about ${dig.name}, out ${dirWord(dig.x-x0, dig.y-y0)}. Old bones and older treasure, he said. It's on your map now.`; });
+  const isl = (G.ow.islands||[]).find(i=>!islandCharted(i.id));
+  if (isl) hints.push(()=>`Fishermen talk of ${cap(isl.name)}, ${dirWord(isl.land[0]-x0, isl.land[1]-y0)} across the water. Nobody's charted it - you'd need a boat.`);
+  const e = G.ow.ev; if (e && e.camps && e.camps.length){ const c = e.camps.slice().sort((a,b)=>Math.hypot(a.x-x0,a.y-y0)-Math.hypot(b.x-x0,b.y-y0))[0];
+    hints.push(()=>{ owReveal(c.x, c.y, 2); return `There's a ${wevCampName(c)} ${Math.round(Math.hypot(c.x-x0, c.y-y0))} leagues ${dirWord(c.x-x0, c.y-y0)}. Somebody ought to break it up.`; }); }
+  const info = townInfo();
+  hints.push(()=>`Welcome to ${info.name}! It's ${info.ident.nm} - ${info.ident.d}.`);
+  hints.push(()=>`Do some good here and folk notice. Help us out and the shops give you a better price.`);
+  if (info.tier < 2) hints.push(()=>`The mayor wants to grow the place. With enough gold and timber, we could be ${info.tier ? 'a city' : 'a proper village'} one day.`);
+  if (isNightTime()) hints.push(()=>`Shouldn't you be in bed? The tavern's still serving, mind.`);
+  if (townWet()) hints.push(()=>`Filthy weather. I'm only out because my wife sent me for bread.`);
+  return esc(hints[seed % hints.length]()).replace(/&#39;/g, "'");
+}
+// walls you can bump in town: the landmark, the archery butts, the water
+function townBumpWall(x, y){
+  const d = G.villageDeco[x] && G.villageDeco[x][y]; if (!d) return false;
+  if (d.startsWith('fx_')){ townFixture(d.slice(3)); return true; }
+  if (d==='target'){ G.gamesAt = 'range'; setUi('games'); return true; }
+  if (d==='water'){ logMsg('the harbour water slaps against the pier', ''); renderGame(); return true; }
+  return false;
+}
+function townFixture(k){
+  const info = townInfo(), rec = info.rec, today = townDay(), used = rec.day['fx']===today, p = G.player;
+  if (k==='mine'){
+    if (used){ wevDialog('The town mine', 'The foreman shakes his head: "You\'ve had your shift today. Come back tomorrow."', [['Fair enough', ()=>{}]], 'dwarven mine'); return; }
+    wevDialog('The town mine', 'A cart track runs down into the dark. The foreman will let you work the seam for a shift.', [['Work a shift', ()=>{
+      rec.day['fx'] = today; const L = skLvl('mining'), ores = SK_ORE.filter(o=>o.lvl <= L && !/gem|essence/.test(o.id)).slice(-2), n = 3 + Math.floor(L/10);
+      let xp = 0; for (const o of ores){ skAdd(o.id, n); xp += o.xp*n; } skGainXP('mining', xp);
+      logMsg(`you work a shift in the town mine: ${ores.map(o=>n+' '+o.nm.toLowerCase()).join(' and ')} (+${Math.round(xp)} Mining xp)`, 'loot'); }], ['Not now', ()=>{}]], 'dwarven mine'); return;
+  }
+  if (k==='moonwell'){
+    if (used){ logMsg('the moonwell is still - it will fill again tomorrow', ''); renderGame(); return; }
+    rec.day['fx'] = today; fullyRestPlayer(); p.prayPts = rsLvl('prayer'); logMsg('you drink from the moonwell - silver light runs through you, and you are whole again', 'magic', true); sfx('spell'); renderGame(); return;
+  }
+  if (k==='totem'){
+    if (used){ logMsg('the war totem is quiet - its spirit has given you all it will today', ''); renderGame(); return; }
+    rec.day['fx'] = today; p.buffAtkTurns = Math.max(p.buffAtkTurns||0, 120); p.buffAtkAmt = Math.max(p.buffAtkAmt||0, 3);
+    logMsg('you lay a hand on the war totem - bloodlust fills you (+3 to hit for 120 turns)', 'magic', true); sfx('crit'); renderGame(); return;
+  }
+  if (k==='caravan'){
+    const wares = [['sapphire','a sapphire',180], ['emerald','an emerald',340], ['ruby','a ruby',650], ['pearl','a pearl',220], ['lamp','a Lamp of Knowledge',1800]];
+    wevDialog('The caravan', `Camels doze in the shade while their master lays out his wares on a carpet. You have ${p.gold.toLocaleString()} gold.`,
+      wares.map(([id, nm, price])=>[`Buy ${nm} (${price} gold)`, ()=>{ if (p.gold < price){ logMsg("you can't afford that", 'hit'); return; } p.gold -= price;
+        if (id==='lamp') addToInventory(mkLamp()); else skAdd(id, 1); logMsg(`you buy ${nm} from the caravan master for ${price} gold`, 'loot'); sfx('coins'); townFixture('caravan'); }]).concat([['Done', ()=>{}]]), 'desert caravan');
+  }
+}
+// shops shut at night (from the second night on - knock and they'll grumble but serve you)
+const TOWN_NIGHT_SHUT = ['smith', 'alch', 'shop', 'tailor', 'guild'];
+function townClosedCheck(key){
+  if (G.townKnock){ G.townKnock = false; return false; }
+  if (!TOWN_NIGHT_SHUT.includes(key) || !isNightTime() || ((G.player.turnCount||0) < DAY_LENGTH)) return false;
+  const b = buildingByKey(key); if (!b) return false;
+  wevDialog(`${b.name} is shut`, `The shutters are closed and the lamp is out: ${esc(b.name.toLowerCase())} is shut for the night, and opens again at dawn.`, [
+    ['Knock until someone answers', ()=>{ G.townKnock = true; enterInterior(key); logMsg('a sleepy voice grumbles, but the bolt slides back', ''); }],
+    ['Wait for dawn', ()=>townWaitDawn()], ['Leave it', ()=>{}]], 'night in town');
+  return true;
+}
+function townWaitDawn(){
+  const p = G.player, dp = dayPhase(), add = Math.round((((0.27 - dp) % 1 + 1) % 1) * DAY_LENGTH);
+  p.turnCount = (p.turnCount||0) + add; try{ seasonTick(); }catch(e){}
+  logMsg('you wait out the night on a bench by the well - the shutters come down at dawn', 'new'); renderGame();
+}
+// a busy tavern at night: regulars on the benches
+function townPatrons(){
+  const dp = dayPhase(); if (!(dp >= 0.62 || dp < 0.1)) return;
+  const seats = [[7,10],[9,10],[11,8],[12,10],[8,8]], seed = villageSeed();
+  seats.slice(0, 3 + (seed % 3)).forEach(([x,y], i)=>{ if (G.map[x][y]===T_FLOOR) G.villagers.push({ x, y, sit:true, look:i+2, nm:NAME_POOL[(seed + i*13) % NAME_POOL.length], role:'a regular' }); });
+}
+// the welcome banner as you come through the gate
+function townWelcome(info){
+  let el = document.getElementById('townWelcome');
+  if (!el){ el = document.createElement('div'); el.id = 'townWelcome'; document.body.appendChild(el); }
+  const pts = repAt(info.key), tier = repTier(pts), nx = repNext(pts);
+  el.innerHTML = `<b>${esc(info.name)}</b><span>${esc(info.ident.nm)} &middot; ${info.tierNm}</span><i>your standing: ${tier.name} (${pts})${nx ? ` &middot; ${nx.at - pts} more to ${nx.name}` : ''}</i>`;
+  el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+  clearTimeout(townWelcome.tm); townWelcome.tm = setTimeout(()=>el.classList.remove('show'), 4500);
+}
+// on entering a town (enterVillage): the mayor on the square, the banner
+function townAfterEnter(){
+  townLooks();
+  const info = townInfo();
+  const spot = [[9,9],[13,13],[8,14],[11,13]].find(([x,y])=>G.map[x][y]===T_FLOOR && !(G.player.x===x && G.player.y===y) && !G.villageNpcs.some(n=>n.x===x && n.y===y) && !(G.villagers||[]).some(v=>v.x===x && v.y===y));
+  if (spot) townNpc(spot[0], spot[1], 'mayor', null, ['Reeve', 'Mayor', 'Lord Mayor'][info.tier]);
+  townWelcome(info);
+}
+// ---- inside: upstairs at the tavern, the Peddler's cellar, chairs, books; the temple and the guild hall ----
+Object.assign(BENCHES, {
+  stairs:{ nm:'Stairs up', does:'the rooms upstairs' }, stairsdown:{ nm:'Stairs down', does:'back to the bar' }, cellar:{ nm:'Cellar trapdoor', does:'down to the cellar' },
+  stairsup:{ nm:'Stairs up', does:'back to the shop' }, books:{ nm:'Bookshelf', does:'read a while' }, chair:{ nm:'Chair', does:'sit and rest your feet' },
+  pew:{ nm:'Pew', does:'sit and pray' }, shrine:{ nm:'Shrine', does:'pray' }, crates:{ nm:'Crates', does:'rummage' }, casks:{ nm:'Wine casks', does:'the Peddler\'s wine' },
+  innbed:{ nm:'A bed for the night', does:'rent it for a full rest' },
+});
+ROOM_LAYOUT.tavern.benches.push(['stairs',13,10], ['books',6,9], ['chair',7,10]);
+ROOM_LAYOUT.shop.benches.push(['cellar',12,10]);
+ROOM_LAYOUT.alch.benches.push(['books',12,10]);
+ROOM_LAYOUT.tavern_up = { benches:[['innbed',6,6], ['innbed',8,6], ['chair',12,7], ['books',13,6], ['stairsdown',13,10]], decor:'tavern' };
+ROOM_LAYOUT.cellar = { benches:[['crates',6,6], ['crates',7,6], ['casks',13,6], ['casks',13,7], ['stairsup',12,10]], decor:'cellar' };
+ROOM_LAYOUT.temple = { benches:[['pew',7,9], ['pew',12,9], ['pew',7,10], ['pew',12,10], ['books',13,7], ['shrine',6,7]], decor:'temple' };
+const TOWN_GUILDS = {
+  warriors: { nm:"Warriors' Guild", col:'#c04030', req:'Attack + Strength 50', need:()=>rsLvl('attack') + rsLvl('strength') >= 50, perk:'spar with the guild trainers once a day for Attack and Strength xp' },
+  rangers:  { nm:"Rangers' Guild",  col:'#3a8a3a', req:'Ranged 30',  need:()=>rsLvl('ranged') >= 30, perk:'shoot at the guild butts once a day for Ranged xp' },
+  wizards:  { nm:"Wizards' Guild",  col:'#4a5ac8', req:'Magic 33',   need:()=>rsLvl('magic') >= 33, perk:'the guild hands out 30 chaos runes and Magic xp once a day' },
+  cooks:    { nm:"Cooks' Guild",    col:'#e0e0d0', req:'Cooking 32', need:()=>skLvl('cooking') >= 32, perk:'cook on the guild range: you burn far less' },
+  miners:   { nm:"Miners' Guild",   col:'#8a8a90', req:'Mining 40',  need:()=>skLvl('mining') >= 40, perk:'work the guild seam once a day for coal and mithril' },
+  crafting: { nm:'Crafting Guild',  col:'#c89a5a', req:'Crafting 40', need:()=>skLvl('crafting') >= 40, perk:'the guild\'s gem-cutting table, jeweller\'s bench, loom and potter\'s wheel' },
+};
+for (const k in TOWN_GUILDS) BENCHES['g_'+k] = { nm:TOWN_GUILDS[k].nm, does:TOWN_GUILDS[k].perk };
+ROOM_LAYOUT.guild = { benches:[['g_warriors',6,7], ['g_rangers',6,9], ['g_wizards',13,7], ['g_cooks',13,9], ['g_miners',7,11], ['g_crafting',12,11]], decor:'guild' };
+// go up or down a floor inside the building you're in
+function townFloor(key, px, py){
+  const I = G.interior; if (!I) return;
+  const st = G.townState, out = I.out;
+  if (key==='tavern' || key==='shop'){ G.interior = null; G.townKnock = true; enterInterior(key); G.townState = st; G.interior.out = out; G.player.x = px; G.player.y = py; renderGame(); return; }
+  setGrid(20, 20); G.map = makeGrid(T_WALL); G.villageDeco = makeGrid('', COLS, ROWS); G.floorItem = makeItemGrid();
+  for (let x=ROOM.x0; x<=ROOM.x1; x++) for (let y=ROOM.y0; y<=ROOM.y1; y++){ G.map[x][y] = T_FLOOR; G.villageDeco[x][y] = 'floor'; }
+  G.villageNpcs = []; G.villagers = [];
+  for (const [k,x,y] of ROOM_LAYOUT[key].benches){ G.map[x][y] = T_BENCH; G.villageDeco[x][y] = 'bench:'+k; }
+  G.interior = { key, name:key==='cellar' ? 'The Peddler\'s cellar' : 'Upstairs at the tavern', out };
+  G.player.x = px; G.player.y = py; G.player.facing = 2;
+  logMsg(key==='cellar' ? 'you climb down into the cellar - it smells of damp and old wine' : 'you climb the stairs to the rooms over the bar', 'new'); sfx('stairs'); renderGame();
+}
+function townBench(kind){
+  if (!G.interior || !kind) return false;
+  const p = G.player, info = townInfo(), rec = info.rec, today = townDay();
+  if (kind==='stairs'){ townFloor('tavern_up', 12, 10); return true; }
+  if (kind==='stairsdown'){ townFloor('tavern', 12, 10); return true; }
+  if (kind==='cellar'){ townFloor('cellar', 11, 10); return true; }
+  if (kind==='stairsup'){ townFloor('shop', 11, 10); return true; }
+  if (kind==='chair' || kind==='pew'){ const h = Math.max(1, Math.round(effMaxHp()*0.25)); p.hp = Math.min(effMaxHp(), p.hp + h);
+    if (kind==='pew') p.prayPts = Math.min(rsLvl('prayer'), (p.prayPts||0) + 5);
+    logMsg(kind==='pew' ? 'you sit a while in the quiet of the temple (+life, +prayer)' : 'you sit and rest your feet a while', 'good'); tickMonsters(); renderGame(); return true; }
+  if (kind==='books'){
+    const k = 'books:'+G.interior.key; if (rec.day[k]===today){ logMsg('you leaf through the same books again - nothing new today', ''); renderGame(); return true; }
+    rec.day[k] = today; const sk = SK_DEFS[(today + G.interior.key.length) % SK_DEFS.length], xp = 40 + skLvl(sk[0])*8, lore = WG_LORE[(today*3 + G.interior.key.length) % WG_LORE.length];
+    skGainXP(sk[0], xp); logMsg(`you read a while. ${lore} (+${xp} ${sk[1]} xp from a dog-eared manual)`, 'magic'); renderGame(); return true; }
+  if (kind==='innbed'){
+    const price = 15; if (p.gold < price){ logMsg('"Fifteen gold a night, love - no credit."', 'hit'); renderGame(); return true; }
+    p.gold -= price; fullyRestPlayer(); p.runEnergy = 100; logMsg(`you rent the room for ${price} gold and sleep like a log`, 'good'); renderGame(); return true; }
+  if (kind==='crates'){
+    const k = 'crates'; if (rec.day[k]===today){ logMsg('you\'ve already turned the crates over today', ''); renderGame(); return true; }
+    rec.day[k] = today; const r = Math.random();
+    if (r < 0.15 && G.inv.length < MAXINV){ const it = genItem(mx(1, lootLevel()-1), lootKind(), 2); addToInventory(it); logMsg(`at the bottom of a crate, under the straw: ${itemNameHtml(it)}`, 'loot', true); }
+    else if (r < 0.6){ const g = 8 + rn(25); p.gold += g; logMsg(`you find ${g} gold that rolled behind the crates`, 'loot'); }
+    else { skAdd(SK_LOG[0].id, 3); logMsg('nothing but straw - and three logs, which the Peddler says you can keep', ''); }
+    renderGame(); return true; }
+  if (kind==='casks'){ logMsg('"Paws off the good stuff," calls the Peddler from upstairs', ''); renderGame(); return true; }
+  if (kind==='shrine'){ p.prayPts = rsLvl('prayer'); p.poisonTurns = 0; logMsg('you kneel at the shrine - your prayer is restored and the poison leaves you', 'magic'); sfx('spell'); renderGame(); return true; }
+  if (kind.startsWith('g_')){ townGuild(kind.slice(2)); return true; }
+  return false;
+}
+function townGuild(k){
+  const g = TOWN_GUILDS[k]; if (!g) return; const rec = townInfo().rec, today = townDay(), used = rec.day['g_'+k]===today;
+  if (!g.need()){ wevDialog(g.nm, `The doorkeeper bars the way: "Members only. You need <b>${g.req}</b> to join."`, [['Fair enough', ()=>{}]], 'the guild hall'); return; }
+  const daily = (label, fn)=>[used ? 'You\'ve trained here today - come back tomorrow' : label, ()=>{ if (used) return; rec.day['g_'+k] = today; fn(); checkAchievements(); }];
+  let opts;
+  if (k==='warriors') opts = [daily('Spar with the trainers', ()=>{ const a = 30*rsLvl('attack'), s = 30*rsLvl('strength'); skGainXP('attack', a); skGainXP('strength', s); logMsg(`you spar until your arms ache (+${a} Attack, +${s} Strength xp)`, 'good'); })];
+  else if (k==='rangers') opts = [daily('Shoot at the butts', ()=>{ const r = 45*rsLvl('ranged'); skGainXP('ranged', r); logMsg(`you put a hundred arrows into the butts (+${r} Ranged xp)`, 'good'); })];
+  else if (k==='wizards') opts = [daily('Collect the guild\'s runes', ()=>{ skAdd('r_chaos', 30); const m = 35*rsLvl('magic'); skGainXP('magic', m); logMsg(`the archmage hands you 30 chaos runes and a lecture (+${m} Magic xp)`, 'magic'); })];
+  else if (k==='cooks') opts = [['Cook on the guild range', ()=>{ G.cookAt = 'guild'; setUi('cook'); }]];
+  else if (k==='miners') opts = [daily('Work the guild seam', ()=>{ const n = 4 + Math.floor(skLvl('mining')/15); skAdd('coal', n*2); skAdd('mithril', n); const xp = n*120; skGainXP('mining', xp); logMsg(`you work the guild seam: ${n*2} coal and ${n} mithril ore (+${xp} Mining xp)`, 'loot'); })];
+  else opts = [['Gem-cutting table', ()=>useBench('gemcut')], ['Jeweller\'s bench', ()=>useBench('jeweller')], ['Loom', ()=>useBench('loom')], ['Potter\'s wheel', ()=>useBench('wheel')]];
+  wevDialog(g.nm, `Members get to ${g.perk}.`, opts.concat([['Leave', ()=>{}]]), 'the guild hall');
+}
+// ---- the temple: prayer, blessings, and the priest's crusade against the undead ----
+function townCrusade(){ return G.player.crusade || null; }
+function townOnKill(m){
+  const c = G.player && G.player.crusade; if (!c || !m || !m.undead || c.got >= c.need) return;
+  c.got++; if (c.got===c.need) logMsg(`that's the last of them - return to the priest at ${c.town} for your reward`, 'good');
+}
+function buildTemple(){
+  const p = G.player, info = townInfo(), c = townCrusade(), sym = townHolySymbol();
+  const crusade = c ? (c.got >= c.need && c.key===info.key ? `<button class="btn primary" onclick="townCrusadeDone()">claim the crusade's reward</button>` : `<span class="muted">Your crusade: ${c.got}/${c.need} undead slain${c.key!==info.key ? ` (for the priest at ${esc(c.town)})` : ''}</span>`)
+    : `<button class="btn" onclick="townCrusadeTake()">take up a crusade: slay ${townCrusadeNeed()} undead</button>`;
+  return `<h2 class="panel-title">THE TEMPLE</h2>
+    <div class="sub">${villageNpcTitle('temple') ? villageNpcTitle('temple')+' &middot; ' : ''}"The light keeps the dead in their graves - with a little help." You have ${p.gold.toLocaleString()} gold.</div>
+    <div class="ovbody">
+      <div class="btnrow" style="justify-content:flex-start;"><button class="btn primary" onclick="townTemplePray()">pray (restores prayer, cures poison)</button>
+        <button class="btn" ${sym && p.gold >= 250 ? '' : 'disabled'} onclick="townBless()">bless ${sym ? esc(sym.nm) : 'a holy symbol'} (250 gold)</button></div>
+      ${sym ? '' : '<div class="muted" style="font-size:12px;">bring an unblessed holy symbol (made at a jeweller\'s bench) to have it blessed: +3 prayer bonus</div>'}
+      <h4 style="color:var(--ink-faint);margin:12px 0 6px;">THE CRUSADE</h4>
+      <div class="qrep">The dead walk in the dungeons and graveyards. Put them back in the ground for the gold and the gratitude of the temple.</div>
+      <div class="btnrow" style="justify-content:flex-start;">${crusade}</div>
+      <div class="muted" style="font-size:12px;">crusades finished: ${p.crusades||0}</div>
+      <div class="btnrow"><button class="btn" onclick="setUi('playing')">close (Esc)</button></div></div>`;
+}
+function townTemplePray(){ const p = G.player; p.prayPts = rsLvl('prayer'); p.poisonTurns = 0; p.poisonDmg = 0; logMsg('the priest prays over you - your prayer is restored', 'magic'); sfx('spell'); renderOverlay(); }
+function townHolySymbol(){ return G.inv.concat(Object.values(G.gear)).find(it=>it && it.used && /symbol/i.test((it.nm||'') + ' ' + (it.basis||'')) && !it.blessed) || null; }
+function townBless(){ const p = G.player, it = townHolySymbol(); if (!it || p.gold < 250) return; p.gold -= 250; it.blessed = 1; it.prayB = (it.prayB||0) + 3; it.nm += ' (blessed)'; logMsg(`the priest blesses your ${esc(it.nm)} (+3 prayer bonus)`, 'magic', true); sfx('spell'); renderOverlay(); saveCurrentGame(); }
+function townCrusadeNeed(){ return 8 + Math.min(12, Math.floor(G.player.level/3)); }
+function townCrusadeTake(){ const info = townInfo(); G.player.crusade = { key:info.key, town:info.name, need:townCrusadeNeed(), got:0 }; logMsg(`you take up the priest's crusade: slay ${G.player.crusade.need} undead`, 'new'); renderOverlay(); }
+function townCrusadeDone(){
+  const p = G.player, c = p.crusade, info = townInfo(); if (!c || c.got < c.need || c.key!==info.key) return;
+  const gold = roundH((80 + c.need*20 + p.level*10)*goldFindMult()), xp = 60*rsLvl('prayer') + c.need*30;
+  p.gold += gold; skGainXP('prayer', xp); p.rep = p.rep || {}; p.rep[info.key] = repAt(info.key) + 2; p.crusades = (p.crusades||0) + 1; p.crusade = null;
+  logMsg(`the priest blesses you: ${gold} gold and ${xp} Prayer xp, and ${info.name} thinks better of you (+2 standing)`, 'magic', true); sfx('achievement'); checkAchievements(); renderOverlay(); saveCurrentGame();
+}
+// ---- the arena: fight waves for prizes and titles ----
+function arenaRec(){ const p = G.player; p.arena = p.arena || { best:0, titles:[], wins:0 }; return p.arena; }
+function buildArenaUi(){
+  const a = arenaRec(), info = townInfo(), run = G.arenaRun && G.arenaRun.key===info.key ? G.arenaRun.wave : 0, wave = run + 1;
+  return `<h2 class="panel-title">THE ARENA</h2>
+    <div class="sub">${villageNpcTitle('arena') ? villageNpcTitle('arena')+' &middot; ' : ''}"Waves of beasts, one after another. Last as long as you can - the crowd pays well."</div>
+    <div class="ovbody">
+      <div class="qrep">${run ? `You've cleared wave ${run}. The next is harder, and pays more.` : 'A run starts at wave 1. Win a wave to fight the next, or walk away with your winnings.'}</div>
+      <div class="btnrow" style="justify-content:flex-start;"><button class="btn primary" onclick="arenaFight()">fight wave ${wave}</button>${run ? '<button class="btn" onclick="G.arenaRun=null;renderOverlay()">end the run</button>' : ''}</div>
+      <div class="muted" style="font-size:13px;margin-top:8px;">your best: wave ${a.best} &middot; waves won: ${a.wins} &middot; titles: ${a.titles.length ? a.titles.map(esc).join(', ') : 'none yet (wave 5, 10 and 15 earn one)'}</div>
+      <div class="btnrow"><button class="btn" onclick="setUi('playing')">close (Esc)</button></div></div>`;
+}
+function arenaFight(){
+  const info = townInfo(); if (!G.arenaRun || G.arenaRun.key!==info.key) G.arenaRun = { key:info.key, wave:0 };
+  const wave = G.arenaRun.wave + 1, kinds = Object.keys(WEV_CAMP_KINDS);
+  wevFightStart('townarena', wave, L=>{
+    const n = Math.min(5, 1 + Math.floor(wave/2)), lv = clampMLevel(L + Math.floor(wave/3));
+    for (let i=0;i<n;i++) wevMon(wevCampEntry(kinds[(wave + i) % kinds.length], lv), lv);
+    if (wave % 5===0) upgradeToNamedElite(G.mon[0]); else if (wave >= 3) upgradeToElite(G.mon[0]);
+  });
+  logMsg(`the gate rattles up - wave ${wave}! The crowd roars`, 'new');
+}
+function townArenaWon(f){
+  const run = G.arenaRun, a = arenaRec(), p = G.player; if (!run) return false;
+  run.wave = f.id; a.wins++; a.best = Math.max(a.best, run.wave);
+  const gold = roundH((40 + run.wave*40 + p.level*5)*goldFindMult()); p.gold += gold;
+  const info = townInfo(), titles = { 5:'Arena Fighter', 10:'Champion of '+info.name, 15:'Grand Champion' }, t = titles[run.wave];
+  let extra = ''; if (t && !a.titles.includes(t)){ a.titles.push(t); extra = ` You are named <b>${esc(t)}</b>!`; sfx('achievement'); }
+  enterVillage(); G.player.x = 23; G.player.y = 8; if (G.map[23][8]!==T_FLOOR){ G.player.x = TOWN_CX; G.player.y = ROWS-3; }
+  wevDialog(`Wave ${run.wave} cleared!`, `The crowd throws coins: <b>${gold} gold</b>.${extra}`, [[`Fight wave ${run.wave+1}`, ()=>arenaFight()], ['Take your winnings and rest', ()=>{ G.arenaRun = null; }]], 'the arena');
+  checkAchievements(); return true;
+}
+// ---- minigames: the archery range, darts and the cook-off at the tavern, the fishing contest at the harbour ----
+function mgRec(){ const p = G.player; p.mg = p.mg || { archery:0, darts:0, cook:0, fish:0, wins:0 }; return p.mg; }
+function buildGames(){
+  const at = G.gamesAt || 'range', m = mgRec(), p = G.player, rec = townInfo().rec, today = townDay();
+  const row = (nm, d, best, btn)=>`<div class="shoprow"><span><b>${nm}</b></span><span class="desc">${d}<br><span class="muted">your best: ${best}</span></span><span>${btn}</span></div>`;
+  let rows = '';
+  if (at==='range') rows += row('Archery', 'Ten arrows at the butts (20 gold). Score 60 for your stake back and more, 80 for a fat purse, 95 for a title.', m.archery, `<button class="btn" ${p.gold >= 20 ? '' : 'disabled'} onclick="mgArchery()">shoot</button>`);
+  if (at==='tavern'){
+    rows += row('Darts', 'Three darts against a local (10 gold). Beat their score and win double.', m.darts, `<button class="btn" ${p.gold >= 10 ? '' : 'disabled'} onclick="mgDarts()">throw</button>`);
+    const dish = mgBestDish(); rows += row('The cook-off', 'Enter your best cooked dish against the town\'s cooks, once a day.', m.cook, `<button class="btn" ${dish && rec.day.cook!==today ? '' : 'disabled'} onclick="mgCook()">${dish ? 'enter your '+esc(dish.nm.toLowerCase()) : 'no cooked food'}</button>`);
+  }
+  if (at==='harbour') rows += row('The fishing contest', 'Five casts off the pier against three old salts, once a day (25 gold, you need a rod).', m.fish, `<button class="btn" ${p.gold >= 25 && skP().tools.rod && rec.day.fish!==today ? '' : 'disabled'} onclick="mgFish()">enter</button>`);
+  return `<h2 class="panel-title">${at==='range' ? 'THE ARCHERY RANGE' : at==='harbour' ? 'THE FISHING CONTEST' : 'TAVERN GAMES'}</h2>
+    <div class="sub">You have ${p.gold.toLocaleString()} gold. ${G.mgLast ? esc(G.mgLast) : ''}</div>
+    <div class="ovbody">${rows}<div class="btnrow"><button class="btn" onclick="G.mgLast='';setUi('playing')">close (Esc)</button></div></div>`;
+}
+function mgArchery(){
+  const p = G.player, m = mgRec(); if (p.gold < 20) return; p.gold -= 20;
+  const sk = rsLvl('ranged'), shots = []; for (let i=0;i<10;i++){ const aim = 4 + sk/14 + (Math.random() + Math.random() - 1)*4; shots.push(clamp(Math.round(aim), 0, 10)); }
+  const s = shots.reduce((a,b)=>a+b, 0); m.archery = Math.max(m.archery, s);
+  let prize = s >= 95 ? 400 : s >= 80 ? 150 : s >= 60 ? 30 : 0; p.gold += prize; if (prize) m.wins++;
+  skGainXP('ranged', s*3);
+  if (s >= 95){ const a = arenaRec(); if (!a.titles.includes('Dead-eye')){ a.titles.push('Dead-eye'); sfx('achievement'); } }
+  G.mgLast = `Your arrows: ${shots.join(' ')} - ${s} points${prize ? `, and the range master pays ${prize} gold` : ', and nothing to show for it'}.`;
+  logMsg(G.mgLast, prize ? 'good' : ''); sfx(prize ? 'coins' : 'miss'); checkAchievements(); renderOverlay();
+}
+function mgDarts(){
+  const p = G.player, m = mgRec(); if (p.gold < 10) return; p.gold -= 10;
+  const dart = (skill)=>{ const r = Math.random(); return r < 0.04 + skill*0.002 ? 50 : r < 0.12 + skill*0.003 ? 25 : 1 + Math.floor(Math.random()*20) * (Math.random() < 0.12 + skill/400 ? 3 : Math.random() < 0.2 ? 2 : 1); };
+  const mine = [0,0,0].map(()=>dart(rsLvl('ranged'))), theirs = [0,0,0].map(()=>dart(25)), a = mine.reduce((x,y)=>x+y,0), b = theirs.reduce((x,y)=>x+y,0);
+  m.darts = Math.max(m.darts, a); const win = a > b; if (win){ p.gold += 20; m.wins++; }
+  G.mgLast = `You throw ${mine.join(', ')} (${a}); the local throws ${theirs.join(', ')} (${b}). ${win ? 'You win 20 gold!' : a===b ? 'A draw - the house keeps the stake.' : 'They win.'}`;
+  logMsg(G.mgLast, win ? 'good' : ''); sfx(win ? 'coins' : 'miss'); renderOverlay();
+}
+function mgBestDish(){ const c = SK_FISH.concat(SK_MEAT).filter(f=>skHave('c_'+f.id) > 0).sort((a,b)=>(b.cook||0)-(a.cook||0))[0]; return c || null; }
+function mgCook(){
+  const d = mgBestDish(), p = G.player, m = mgRec(), rec = townInfo().rec, today = townDay(); if (!d || rec.day.cook===today) return;
+  rec.day.cook = today; skAdd('c_'+d.id, -1);
+  const score = Math.round((d.cook||1) + skLvl('cooking')*0.6 + Math.random()*25), rivals = [0,0,0].map(()=>Math.round(15 + Math.random()*45 + p.level*0.4));
+  const place = 1 + rivals.filter(r=>r > score).length, prize = [0, 300, 120, 40, 0][place]; p.gold += prize; m.cook = Math.max(m.cook, score); if (place===1) m.wins++;
+  skGainXP('cooking', score*6);
+  G.mgLast = `The judges taste your ${d.nm.toLowerCase()} and score it ${score} (the others: ${rivals.join(', ')}). ${['','First place!','Second place.','Third place.','No placing this time.'][place]}${prize ? ` You win ${prize} gold.` : ''}`;
+  logMsg(G.mgLast, place===1 ? 'good' : ''); sfx(place===1 ? 'achievement' : 'click'); checkAchievements(); renderOverlay();
+}
+function mgFish(){
+  const p = G.player, m = mgRec(), rec = townInfo().rec, today = townDay(); if (p.gold < 25 || !skP().tools.rod || rec.day.fish===today) return;
+  p.gold -= 25; rec.day.fish = today;
+  const L = skLvl('fishing'), cast = (sk)=>Math.random() < 0.25 + sk/200 ? +(0.5 + Math.random()*(1 + sk/12)).toFixed(1) : 0;
+  const mine = [0,0,0,0,0].map(()=>cast(L)), a = +mine.reduce((x,y)=>x+y,0).toFixed(1), rivals = [0,0,0].map(()=>+[0,0,0,0,0].map(()=>cast(35)).reduce((x,y)=>x+y,0).toFixed(1));
+  const place = 1 + rivals.filter(r=>r > a).length, prize = [0, 250, 90, 30, 0][place]; p.gold += prize; m.fish = Math.max(m.fish, a); if (place===1) m.wins++;
+  skGainXP('fishing', Math.round(a*40));
+  G.mgLast = `You land ${a} lb of fish (${mine.filter(Boolean).length} catches); the old salts land ${rivals.join(', ')} lb. ${['','You win!','Second.','Third.','Nothing this time.'][place]}${prize ? ` ${prize} gold.` : ''}`;
+  logMsg(G.mgLast, place===1 ? 'good' : ''); sfx(place===1 ? 'achievement' : 'click'); checkAchievements(); renderOverlay();
+}
+// ---- tavern gambling: dice, high-or-low, and the wheel ----
+function gbRec(){ const p = G.player; p.gamble = p.gamble || { won:0, lost:0 }; return p.gamble; }
+function buildGamble(){
+  const p = G.player, bet = G.gbBet || 10, g = gbRec(), card = G.gbCard;
+  const bets = [10, 50, 100, 500].map(b=>`<button class="btn ${bet===b ? 'primary' : ''}" onclick="G.gbBet=${b};renderOverlay()">${b}</button>`).join(' ');
+  const can = p.gold >= bet;
+  return `<h2 class="panel-title">GAMES OF CHANCE</h2>
+    <div class="sub">A corner table, a deck of cards, two dice and a painted wheel. You have ${p.gold.toLocaleString()} gold. ${G.gbLast ? esc(G.gbLast) : ''}</div>
+    <div class="ovbody">
+      <div class="btnrow" style="justify-content:flex-start;">stake: ${bets}</div>
+      <div class="shoprow"><span><b>Dice</b></span><span class="desc">You and the dealer each roll two dice. Higher wins double; the house takes a tie.</span><span><button class="btn" ${can ? '' : 'disabled'} onclick="gbDice()">roll</button></span></div>
+      <div class="shoprow"><span><b>High or low</b></span><span class="desc">${card ? `The card is <b>${gbCardNm(card)}</b>. Will the next be higher or lower? (A match loses.)` : 'Draw a card, then guess whether the next is higher or lower, for double.'}</span>
+        <span>${card ? `<button class="btn" onclick="gbHiLo(1)">higher</button> <button class="btn" onclick="gbHiLo(-1)">lower</button>` : `<button class="btn" ${can ? '' : 'disabled'} onclick="gbDraw()">draw</button>`}</span></div>
+      <div class="shoprow"><span><b>The wheel</b></span><span class="desc">Spin for nothing, your stake back, double, four times or - once in fifty - ten times your stake.</span><span><button class="btn" ${can ? '' : 'disabled'} onclick="gbWheel()">spin</button></span></div>
+      <div class="muted" style="font-size:12px;">won ${g.won.toLocaleString()} &middot; lost ${g.lost.toLocaleString()}</div>
+      <div class="btnrow"><button class="btn" onclick="G.gbCard=null;G.gbLast='';setUi('playing')">close (Esc)</button></div></div>`;
+}
+function gbSettle(stake, back, msg){ const p = G.player, g = gbRec(); p.gold += back; if (back > stake) g.won += back - stake; else g.lost += stake - back; G.gbLast = msg; logMsg(msg, back > stake ? 'good' : ''); sfx(back > stake ? 'coins' : 'click'); renderOverlay(); }
+function gbDice(){ const p = G.player, bet = G.gbBet || 10; if (p.gold < bet) return; p.gold -= bet; const a = rollDie(6) + rollDie(6), b = rollDie(6) + rollDie(6);
+  gbSettle(bet, a > b ? bet*2 : 0, `You roll ${a}, the dealer rolls ${b}: ${a > b ? `you win ${bet*2} gold` : 'the house wins'}.`); }
+function gbCardNm(c){ return ['','Ace','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten','Jack','Queen','King'][c]; }
+function gbDraw(){ const p = G.player, bet = G.gbBet || 10; if (p.gold < bet) return; p.gold -= bet; G.gbStake = bet; G.gbCard = 1 + rn(13); G.gbLast = ''; renderOverlay(); }
+function gbHiLo(dir){ const c = G.gbCard, bet = G.gbStake || 0; if (!c) return; const n = 1 + rn(13); G.gbCard = null; const win = dir > 0 ? n > c : n < c;
+  gbSettle(bet, win ? bet*2 : 0, `The next card is ${gbCardNm(n)}: ${win ? `you win ${bet*2} gold` : 'you lose'}.`); }
+function gbWheel(){ const p = G.player, bet = G.gbBet || 10; if (p.gold < bet) return; p.gold -= bet; const r = Math.random(), mul = r < 0.57 ? 0 : r < 0.77 ? 1 : r < 0.91 ? 2 : r < 0.98 ? 4 : 10;
+  gbSettle(bet, bet*mul, `The wheel clicks round and stops on ${mul ? '&times;'+mul : 'the skull'}: ${mul ? `${bet*mul} gold` : 'you lose your stake'}.`.replace('&times;', 'x')); }
+// ---- the mayor: town upgrades ----
+const TOWN_PROJECTS = [
+  { id:'walls',  nm:'Stone walls',     cost:{ gold:1500, logs:40, ironb:20 }, d:'the palisade becomes a stone wall, and raiders come at it with one fewer fighter', can:i=>!i.rec.up.walls && i.tier < 2 },
+  { id:'market', nm:'A bigger market', cost:{ gold:1000, logs:25 }, d:'the Peddler stocks three more pieces, and better ones', can:i=>!i.rec.up.market },
+  { id:'watch',  nm:'A town watch',    cost:{ gold:500 }, d:'another guard walks the streets with a torch at night', can:i=>!i.rec.up.watch },
+  { id:'grow',   nm:'Grow the town',   cost:{ gold:2500, logs:60, ironb:20 }, d:'the hamlet becomes a village, with an alchemist, a tailor, a temple and an archery range', can:i=>i.tier===0 },
+  { id:'grow2',  nm:'Raise it to a city', cost:{ gold:8000, logs:120, ironb:60 }, d:'the village becomes a walled city, with a guild hall and an arena', can:i=>i.tier===1 },
+];
+function townCostOk(c){ const rest = Object.assign({}, c); delete rest.gold; return G.player.gold >= (c.gold||0) && houseCostOk(rest); }
+function townCostText(c){ const rest = Object.assign({}, c); delete rest.gold; return `${(c.gold||0).toLocaleString()} gold${Object.keys(rest).length ? ', '+houseCostText(rest) : ''}`; }
+function buildMayor(){
+  const info = townInfo(), done = TOWN_PROJECTS.filter(pj=>info.rec.up[pj.id] || (pj.id==='grow' && (info.rec.up.grow||0) >= 1) || (pj.id==='grow2' && (info.rec.up.grow||0) >= 2));
+  const rows = TOWN_PROJECTS.filter(pj=>pj.can(info)).map(pj=>`<div class="shoprow"><span><b>${pj.nm}</b></span><span class="desc">${pj.d}<br><span class="muted">${townCostText(pj.cost)}</span></span>
+    <span><button class="btn" ${townCostOk(pj.cost) ? '' : 'disabled'} onclick="townDonate('${pj.id}')">pay for it</button></span></div>`).join('') || '<div class="muted">There\'s nothing left to build here - the town has everything it wants.</div>';
+  return `<h2 class="panel-title">${esc(villageNpcTitle('mayor').toUpperCase() || 'THE MAYOR')}</h2>
+    <div class="sub">"${esc(info.name)} is ${esc(info.ident.nm)} - ${esc(info.ident.d)}. Help us build, and the town won't forget it." Your standing: ${repTier(repAt(info.key)).name} (${repAt(info.key)}).</div>
+    <div class="ovbody">${rows}
+      ${done.length ? `<div class="muted" style="font-size:12px;margin-top:8px;">built with your help: ${done.map(pj=>esc(pj.nm.toLowerCase())).join(', ')}</div>` : ''}
+      <div class="muted" style="font-size:12px;">Every project you pay for raises your standing here.</div>
+      <div class="btnrow"><button class="btn" onclick="setUi('playing')">close (Esc)</button></div></div>`;
+}
+function townDonate(id){
+  const info = townInfo(), pj = TOWN_PROJECTS.find(x=>x.id===id), p = G.player; if (!pj || !pj.can(info) || !townCostOk(pj.cost)) return;
+  p.gold -= pj.cost.gold||0; const rest = Object.assign({}, pj.cost); delete rest.gold; for (const k in rest){ if (k==='logs'){ let need = rest[k]; for (const l of SK_LOG){ const h = Math.min(need, skHave(l.id)); if (h){ skAdd(l.id, -h); need -= h; } } } else skAdd(k, -rest[k]); }
+  if (id==='grow' || id==='grow2') info.rec.up.grow = (info.rec.up.grow||0) + 1; else info.rec.up[id] = 1;
+  const rep = Math.max(1, Math.round((pj.cost.gold||0)/700)); p.rep = p.rep || {}; p.rep[info.key] = repAt(info.key) + rep; p.townsBuilt = (p.townsBuilt||0) + 1;
+  logMsg(`you pay for ${pj.nm.toLowerCase()} in ${info.name} - the work begins at once (+${rep} standing)`, 'magic', true); sfx('achievement');
+  checkAchievements(); setUi('playing'); const at = { x:G.player.x, y:G.player.y }; enterVillage(); G.player.x = at.x; G.player.y = at.y; if (G.map[at.x][at.y]!==T_FLOOR){ G.player.x = TOWN_CX; G.player.y = ROWS-3; } renderGame(); saveCurrentGame();
+}
+// ---- the harbour: passage to the other ports and your charted islands ----
+function harbourDests(){
+  const here = G.owPos, out = [];
+  for (const t of townList()) if (!(t.x===here.x && t.y===here.y) && townPort(t.x, t.y)) out.push({ kind:'port', x:t.x, y:t.y, nm:townName(t.x, t.y) });
+  for (const i of (G.ow.islands||[])) if (islandCharted(i.id)) out.push({ kind:'island', x:i.land[0], y:i.land[1], nm:cap(i.name) });
+  for (const d of out){ d.dist = Math.round(Math.hypot(d.x-here.x, d.y-here.y)); d.fare = Math.max(20, Math.round(d.dist*3*repTier(repAt(curTownKey())).disc)); }
+  return out.sort((a,b)=>a.dist-b.dist);
+}
+function buildHarbour(){
+  const p = G.player, rows = harbourDests().map((d,i)=>`<div class="shoprow"><span><b>${esc(d.nm)}</b></span><span class="desc">${d.kind==='port' ? 'a port town' : 'a charted island'} &middot; ${d.dist} leagues</span>
+    <span><button class="btn" ${p.gold >= d.fare ? '' : 'disabled'} onclick="harbourSail(${i})">passage (${d.fare} gold)</button></span></div>`).join('') || '<div class="muted">No ships sail anywhere you know from here. Chart some islands, or find another port.</div>';
+  return `<h2 class="panel-title">THE HARBOUR</h2>
+    <div class="sub">${villageNpcTitle('harbour') ? villageNpcTitle('harbour')+' &middot; ' : ''}"Where to? I've a ship for every port on the coast, and the islands you've charted." You have ${p.gold.toLocaleString()} gold.</div>
+    <div class="ovbody">${rows}
+      <div class="btnrow"><button class="btn" onclick="G.gamesAt='harbour';setUi('games')">the fishing contest</button><button class="btn" onclick="setUi('playing')">close (Esc)</button></div></div>`;
+}
+function harbourSail(i){
+  const d = harbourDests()[i], p = G.player; if (!d || p.gold < d.fare) return;
+  p.gold -= d.fare; p.turnCount = (p.turnCount||0) + Math.round(d.dist/2); setUi('playing');
+  if (G.interior) exitInterior();
+  G.owPos = { x:d.x, y:d.y }; owReveal(d.x, d.y, 8);
+  if (d.kind==='port'){ trackVisitedTown(d.x, d.y); enterVillage(); }
+  else { G.gameMode = 0; G.owZoomedOut = false; }
+  logMsg(`you take ship for ${d.nm} - ${d.dist} leagues over the water, ${d.fare} gold`, 'new', true); sfx('stairs'); renderGame(); saveCurrentGame();
+}
+// ---- the notice board's news: rumours, posters, and what's happening across the land ----
+function townNewsHtml(){
+  const x0 = G.owPos.x, y0 = G.owPos.y, out = [], p = tkP(), e = G.ow.ev;
+  const sites = townRumourSites(4, 40);
+  out.push(`<h4 style="color:var(--ink-faint);margin:4px 0 6px;">RUMOURS</h4>` + (sites.map(s=>`<div class="shoprow"><span class="muted">rumour</span><span class="desc">${OW_SITE_NAME[s.t].replace(/^./, c=>c.toUpperCase())} ${Math.round(s.d)} leagues ${dirWord(s.x-x0, s.y-y0)}, unexplored.</span>
+    <span><button class="btn" onclick="owReveal(${s.x},${s.y},2);logMsg('you copy the rumour onto your map','');renderOverlay()">mark it</button></span></div>`).join('') || '<div class="muted">No rumours - you\'ve seen all the land round here.</div>'));
+  const posters = (p.bounties && p.bounties.list || []).map(t=>`<div class="shoprow"><span style="color:${COL.red}">WANTED</span><span class="desc">${esc(tkText(t))}</span><span></span></div>`).join('');
+  out.push(`<h4 style="color:var(--ink-faint);margin:12px 0 6px;">BOUNTY POSTERS</h4>` + (posters || '<div class="muted">no posters up today</div>'));
+  const ev = [];
+  if (e && e.camps) for (const c of e.camps.slice().sort((a,b)=>Math.hypot(a.x-x0,a.y-y0)-Math.hypot(b.x-x0,b.y-y0)).slice(0, 3)) ev.push(`A ${esc(wevCampName(c))} has been sighted ${Math.round(Math.hypot(c.x-x0, c.y-y0))} leagues ${dirWord(c.x-x0, c.y-y0)}.`);
+  if (e && e.boss && e.boss.hp > 0 && e.boss.x!==undefined) ev.push(`A giant, ${esc(wevBossName(e.boss))}, walks the land ${Math.round(Math.hypot(e.boss.x-x0, e.boss.y-y0))} leagues ${dirWord(e.boss.x-x0, e.boss.y-y0)}.`);
+  if (e && e.town) for (const k in e.town){ const t = e.town[k]; if (t && wevTurn() < t.until && k!==curTownKey()){ const [tx,ty] = k.split(',').map(Number); ev.push(`${esc(townName(tx, ty))}: ${t.kind==='festival' ? `the ${esc(t.name||'festival')} is on` : t.kind==='market' ? 'it\'s market day, with a travelling trader' : t.kind==='raid' ? 'raiders are at the gates!' : esc(t.kind)}.`); } }
+  for (const t of townList()){ const r = townRec(townKeyAt(t.x, t.y)); const ups = Object.keys(r.up).filter(k=>r.up[k]); if (ups.length && !(t.x===x0 && t.y===y0)) ev.push(`${esc(townName(t.x, t.y))} is building: ${ups.map(u=>u==='grow' ? 'a bigger town' : u).join(', ')}.`); }
+  out.push(`<h4 style="color:var(--ink-faint);margin:12px 0 6px;">NEWS FROM ACROSS THE LAND</h4>` + (ev.map(s=>`<div class="shoprow"><span class="muted">news</span><span class="desc">${s}</span><span></span></div>`).join('') || '<div class="muted">a quiet week</div>'));
+  return out.join('');
+}
+// the town's honours
+ACHIEVEMENTS.push(
+  { id:'patron', name:'Patron', desc:'pay for a town upgrade', check:p=>(p.townsBuilt||0) >= 1, bonus:{goldfind:0.05} },
+  { id:'gladiator', name:'Gladiator', desc:'clear wave 10 at an arena', check:p=>!!(p.arena && p.arena.best >= 10), bonus:{atk:2} },
+  { id:'crusader', name:'Crusader', desc:'finish a crusade for a temple', check:p=>(p.crusades||0) >= 1, bonus:{life:5} },
+  { id:'showman', name:'Showman', desc:'win 10 town games', check:p=>!!(p.mg && p.mg.wins >= 10), bonus:{magicfind:3} },
+);
+// what the new townsfolk look like (V3_LOOK is declared further down, so this runs on entering a town)
+function townLooks(){ if (V3_LOOK.mayor) return; Object.assign(V3_LOOK, {
+  mayor:   ()=>HUM({ outfit:'robe', cloth:'#7a1a2a', trim:'#e0c060', hair:'#aaa090', beard:'#aaa090', cape:'#4a0a1a' }),
+  range:   ()=>HUM({ outfit:'leather', cloth:'#3a5a2a', weapon:'bow', hair:'#6a4a2a', cape:'#2a4a2a' }),
+  arena:   ()=>HUM({ outfit:'chain', cloth:'#5a3a2a', weapon:'sword', bulk:1.2, hair:'#1a1210', beard:'#1a1210' }),
+  harbour: ()=>HUM({ outfit:'leather', cloth:'#2a3a5a', hair:'#c0b8a0', beard:'#c0b8a0', head:'hood', faceShow:true }),
+  temple:  ()=>HUM({ outfit:'robe', cloth:'#e8e0d0', trim:'#d8b050', hair:'#aaa090' }),
+  guild:   ()=>HUM({ outfit:'chain', tabard:'#6a3a8a', emblem:'#d8b050', hair:'#3a2618', beard:'#3a2618' }),
+}); }
+function townFolkLook(v, i){
+  if (v.animal==='dog') return MP(mpBeast, { head:'canine', fur:['#8a6a42','#3a3028','#c8b090'][v.look%3], tail:'stub', legs:'short', len:0.75 }, 1);
+  if (v.animal==='cat') return MP(mpBeast, { head:'cat', fur:['#d08a40','#2a2a2a','#9a9a9a'][v.look%3], tail:'cat', legs:'short', len:0.6 }, 1);
+  if (v.animal==='chicken') return MP(mpBird, { feather:['#f0ece0','#a8642a','#3a2a20'][v.look%3] }, 1);
+  if (v.guard) return HUM(Object.assign({ outfit:'chain', tabard:'#2a4a8a', emblem:'#d8b050', weapon:'spear', helm:'kettle', cape:'#2a3a6a' }, V3_RACE_LOOK[G.villageRace]||{}));
+  return v3VillagerLook(v.look||i);
+}
+function townFolkH(v){ return v.animal ? TOWN_ANIMALS[v.animal].h : v.sit ? 0.8 : 0.94; }
+// ---- the guild hall's front desk ----
+function buildGuildHall(){
+  const rows = Object.keys(TOWN_GUILDS).map(k=>{ const g = TOWN_GUILDS[k], ok = g.need();
+    return `<div class="shoprow"><span><b style="color:${g.col}">${esc(g.nm)}</b></span><span class="desc">${esc(g.perk)}<br><span class="muted">entry: ${esc(g.req)}</span></span><span style="color:${ok ? COL.green : 'var(--ink-faint)'}">${ok ? 'member' : 'not yet'}</span></div>`; }).join('');
+  return `<h2 class="panel-title">THE GUILD HALL</h2>
+    <div class="sub">${villageNpcTitle('guild') ? villageNpcTitle('guild')+' &middot; ' : ''}"Six guilds under one roof. Each takes members of a certain skill - walk up to its banner when you qualify."</div>
+    <div class="ovbody">${rows}<div class="btnrow"><button class="btn" onclick="setUi('playing')">close (Esc)</button></div></div>`;
+}
+// ---- the town in 3D: the district, the town's look, its landmark, banners, puddles ----
+const TOWN_BANNER = { smith:['#5a5a64','anvil'], tavern:['#8a3a1a','tavern'], alch:['#2a7a4a','cauldron'], shop:['#c08a20','stall'], tailor:['#6a3a9a','armor',{ metal:'#6a4ab0' }], temple:['#e8e0c0','portal',{ rgb:'255,220,120' }], guild:['#4a2a6a','chest',{ gold:true }] };
+function townV3Build(grp, mats){
+  const T = THREE, ly = G.townLy; if (!ly) return; const info = ly.info;
+  const lin = c=>new T.Color(c).convertSRGBToLinear(), M = (c,o)=>new T.MeshStandardMaterial(Object.assign({ color:lin(c), roughness:0.85 }, o||{}));
+  const deco = (x,y)=>G.villageDeco[x] && G.villageDeco[x][y];
+  const add = o=>{ o.castShadow = true; o.receiveShadow = true; grp.add(o); return o; };
+  // snow on the roofs in winter and in the frozen north
+  if (isWinter() || G.villageTheme==='tundra'){ mats.roof.color = (mats.roof.color || new T.Color(1,1,1)).clone().lerp(new T.Color(0xf2f6fb), 0.7); mats.roof.userData.lin = true; }
+  // stilts in the swamp, stone terraces in the hills
+  if (info.style.stilts || info.style.hill) for (const ob of (V3.occ||[])){
+    const g = ob.userData.grp, P = ob.geometry.parameters, cx = ob.position.x, cz = ob.position.z; if (!g || !P) continue;
+    if (info.style.stilts){ g.position.y = 0.6; for (const [sx,sz] of [[-1,-1],[1,-1],[-1,1],[1,1],[0,1]]) add(v3Cyl(0.07, 0.08, 0.7, 6, mats.wood, cx + sx*(P.width/2-0.1), 0.35, cz + sz*(P.depth/2-0.1)));
+      add(v3Box(0.6, 0.06, 0.5, mats.planks, cx, 0.3, cz + P.depth/2 + 0.25)); }
+    else { g.position.y = 0.32; add(v3Box(P.width+0.5, 0.34, P.depth+0.5, mats.stoneBig, cx, 0.17, cz)); }
+  }
+  // the arena: a ring of stone with banners, sand inside
+  if (info.tier >= 2){
+    for (let x=21;x<=26;x++) for (let y=10;y<=15;y++) if (deco(x,y)==='arenawall'){ add(v3Box(1, 1.05, 1, mats.stoneBig, x+0.5, 0.52, y+0.5)); if ((x+y)%2===0) add(v3Box(0.35, 0.25, 0.35, mats.stoneBig, x+0.5, 1.17, y+0.5)); }
+    const sand = new T.Mesh(new T.PlaneGeometry(4, 4), M('#d8b878', { roughness:1 })); sand.rotation.x = -Math.PI/2; sand.position.set(24, 0.02, 13); sand.receiveShadow = true; grp.add(sand);
+    for (const [x,z] of [[21.5,10.5],[26.5,10.5],[21.5,15.5],[26.5,15.5]]){ add(v3Cyl(0.05, 0.05, 2.6, 6, mats.wood, x, 1.3, z)); const f = new T.Mesh(new T.PlaneGeometry(0.5, 0.7), M('#a01a1a', { side:T.DoubleSide })); f.position.set(x+0.27, 2.25, z); grp.add(f); }
+    const hb = new T.Mesh(new T.BoxGeometry(6, 1.4, 6), new T.MeshBasicMaterial({ visible:false })); hb.position.set(24, 0.7, 13); hb.userData.act = { kind:'tile', x:22, y:9, label:'The arena' }; grp.add(hb); V3.hits.push(hb);
+  }
+  // the archery butts
+  for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++) if (deco(x,y)==='target'){
+    const g = new T.Group(); g.position.set(x+0.5, 0, y+0.5); g.rotation.y = -Math.PI/2; grp.add(g);
+    for (const [sx,r] of [[-0.3,0],[0.3,0]]) { const l = v3Cyl(0.04, 0.04, 1.0, 5, mats.wood, sx, 0.5, 0.1); l.rotation.x = -0.2; g.add(l); }
+    const butt = v3Cyl(0.42, 0.42, 0.25, 18, M('#c8b070'), 0, 0.75, 0); butt.rotation.x = Math.PI/2; g.add(butt);
+    [['#f0f0e8',0.36],['#202020',0.29],['#3a6ad0',0.22],['#d02a20',0.15],['#f0c020',0.07]].forEach(([c,r],i)=>{ const d = new T.Mesh(new T.CircleGeometry(r, 20), M(c)); d.position.set(0, 0.75, 0.13 + i*0.002); g.add(d); });
+    const hb = new T.Mesh(new T.BoxGeometry(1, 1.4, 1), new T.MeshBasicMaterial({ visible:false })); hb.position.set(x+0.5, 0.7, y+0.5); hb.userData.act = { kind:'tile', x, y, label:'Archery butts' }; grp.add(hb); V3.hits.push(hb);
+  }
+  // the harbour: water, a pier and a ship at anchor
+  if (info.port){
+    const wm = new T.MeshStandardMaterial({ color:lin('#2a5a80'), roughness:0.15, metalness:0.3, transparent:true, opacity:0.88 }); wm.userData.lin = true; V3.townWaterMat = wm;
+    const water = new T.Mesh(new T.PlaneGeometry(3.6, ROWS-2), wm); water.rotation.x = -Math.PI/2; water.position.set(ly.W0 + 1.6, 0.05, ROWS/2); grp.add(water);
+    for (let i=0;i<3;i++) add(v3Box(0.95, 0.08, 1.0, mats.planks, ly.W0 + 0.5 + i, 0.16, 12.5));
+    for (let i=0;i<4;i++) add(v3Cyl(0.06, 0.07, 0.9, 6, mats.wood, ly.W0 + 0.1 + i*0.9, 0.0, i%2 ? 12.05 : 12.95));
+    const ship = new T.Group(); ship.position.set(ly.W0 + 2.3, 0.1, 14.3); grp.add(ship); V3.townShip = ship;
+    const hull = v3Box(0.8, 0.35, 2.0, M('#5a3a1e'), 0, 0.12, 0); ship.add(hull); ship.add(v3Box(0.7, 0.05, 1.8, mats.planks, 0, 0.31, 0));
+    ship.add(v3Cyl(0.04, 0.05, 1.9, 6, mats.wood, 0, 1.2, 0)); const sail = new T.Mesh(new T.PlaneGeometry(1.1, 1.0), M('#ece2cc', { side:T.DoubleSide })); sail.position.set(0, 1.35, 0.03); ship.add(sail);
+    const hb = new T.Mesh(new T.BoxGeometry(1, 2, 2), new T.MeshBasicMaterial({ visible:false })); hb.position.set(ly.W0 - 0.5, 1, 11.5); hb.userData.act = { kind:'tile', x:ly.W0-1, y:11, label:'The harbour' }; grp.add(hb); V3.hits.push(hb);
+  }
+  // the town's landmark, in the first house's lot
+  const k = info.ident.k;
+  if (k){
+    const x = 3.5, z = 16.5, g = new T.Group(); g.position.set(x, 0, z); grp.add(g);
+    const gadd = o=>{ o.castShadow = true; g.add(o); return o; };
+    if (k==='mine'){ gadd(v3Box(0.5, 1.6, 0.6, mats.stoneBig, -0.85, 0.8, 0)); gadd(v3Box(0.5, 1.6, 0.6, mats.stoneBig, 0.85, 0.8, 0)); gadd(v3Box(2.3, 0.45, 0.7, mats.stoneBig, 0, 1.8, 0));
+      const dark = new T.Mesh(new T.PlaneGeometry(1.2, 1.6), M('#050403')); dark.position.set(0, 0.8, 0.02); g.add(dark); gadd(v3Box(1.3, 0.08, 0.1, mats.wood, 0, 1.55, 0.32));
+      for (const sx of [-0.25, 0.25]) gadd(v3Box(0.05, 0.03, 1.4, mats.iron, sx, 0.03, 0.9)); gadd(v3Box(0.6, 0.35, 0.45, mats.wood, 0, 0.3, 1.0)); for (let i=0;i<5;i++) gadd(v3Box(0.12, 0.1, 0.12, M('#8a6a4a'), -0.15 + (i%3)*0.15, 0.5, 0.9 + (i>2 ? 0.15 : 0)));
+      const lamp = v3Flame(0.75, 1.3, 0.4, g); V3.lamps.push({ p:[x+0.75, 1.4, z+0.4], col:0xffa040, r:4, main:true }); }
+    else if (k==='moonwell'){ gadd(v3Cyl(0.85, 0.95, 0.5, 20, mats.stoneBig, 0, 0.25, 0)); const wtr = new T.Mesh(new T.CircleGeometry(0.72, 24), M('#a0d8ff', { emissive:lin('#6ab0ff'), emissiveIntensity:0.9, roughness:0.1 })); wtr.rotation.x = -Math.PI/2; wtr.position.y = 0.48; g.add(wtr);
+      for (let i=0;i<4;i++){ const a = i/4*Math.PI*2 + 0.4; gadd(v3Cyl(0.06, 0.07, 1.5, 6, M('#d8d8c8'), Math.cos(a)*1.0, 0.75, Math.sin(a)*1.0)); }
+      V3.lamps.push({ p:[x, 0.9, z], col:0x8ac8ff, r:5, main:true, always:true }); }
+    else if (k==='totem'){ for (let i=0;i<4;i++) gadd(v3Box(0.5 - i*0.04, 0.55, 0.5 - i*0.04, M(['#6a4a2a','#8a3a1a','#5a3a20','#7a5a3a'][i]), 0, 0.28 + i*0.55, 0));
+      const skull = gadd(new T.Mesh(new T.SphereGeometry(0.2, 10, 8), M('#e8e0c8'))); skull.position.set(0, 2.5, 0.05);
+      for (const s of [-1,1]){ const h = gadd(new T.Mesh(new T.ConeGeometry(0.07, 0.45, 6), M('#e8e0c8'))); h.position.set(s*0.3, 2.65, 0); h.rotation.z = -s*0.9; const f = new T.Mesh(new T.PlaneGeometry(0.3, 0.8), M('#8a1a1a', { side:T.DoubleSide })); f.position.set(s*0.4, 1.6, 0); g.add(f); }
+      v3Flame(0, 0.1, 0.45, g); }
+    else if (k==='caravan'){ for (const [sx, c] of [[-0.6,'#c8a060'],[0.7,'#a04a2a']]){ const tent = o3Gable(0.9, 1.0, 0.75, M(c)); tent.position.set(sx, 0, -0.2); g.add(tent); }
+      const rug = new T.Mesh(new T.PlaneGeometry(1.4, 0.8), M('#8a2a3a')); rug.rotation.x = -Math.PI/2; rug.position.set(0, 0.02, 0.8); g.add(rug);
+      for (let i=0;i<3;i++) gadd(v3Box(0.25, 0.25, 0.25, mats.planks, -0.5 + i*0.4, 0.13, 0.5 + (i%2)*0.3)); for (let i=0;i<4;i++){ const gm = gadd(new T.Mesh(new T.OctahedronGeometry(0.05), M(['#4a6ae0','#3ab06a','#e03a3a','#f0f0ff'][i], { emissive:lin('#404040') }))); gm.position.set(-0.3 + i*0.2, 0.08, 0.85); } }
+    const nm = { mine:'The town mine', moonwell:'The moonwell', totem:'The war totem', caravan:'The caravan' }[k];
+    const hb = new T.Mesh(new T.BoxGeometry(2.6, 2, 2.6), new T.MeshBasicMaterial({ visible:false })); hb.position.set(x, 1, z); hb.userData.act = { kind:'tile', x:3, y:15, label:nm }; grp.add(hb); V3.hits.push(hb);
+  }
+  // elven lanterns in the trees
+  if (G.villageRace==='elf') for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++) if (deco(x,y)==='tree'){ const s = new T.Sprite(new T.SpriteMaterial({ map:v3Blob('rgba(255,236,170,1)'), blending:T.AdditiveBlending, depthWrite:false, transparent:true })); s.scale.set(0.45, 0.45, 1); s.position.set(x+0.5+0.3, 1.5, y+0.5); grp.add(s); }
+  // banners on tall poles, so you can tell the shops apart from across the town
+  for (const b of VILLAGE_BUILDINGS){ const bn = TOWN_BANNER[b.key]; if (!bn) continue;
+    const px = b.x0 + 0.2, pz = b.y0 + b.h + 0.2, H = (b.floors||1)*1.2 + 2.6, lift = info.style.stilts ? 0.6 : info.style.hill ? 0.32 : 0;
+    add(v3Cyl(0.04, 0.05, H, 6, mats.wood, px, H/2 + lift, pz));
+    const cl = new T.Mesh(new T.PlaneGeometry(0.42, 0.9), M(bn[0], { side:T.DoubleSide })); cl.position.set(px + 0.24, H - 0.45 + lift, pz); grp.add(cl);
+    let img = null; try{ img = fpUndeadSprite(obEntry(bn[1], bn[2]), false).img; }catch(e){}
+    if (img){ const s = new T.Sprite(new T.SpriteMaterial({ map:new T.CanvasTexture(img), transparent:true, alphaTest:0.2, depthWrite:false })); s.scale.set(0.7, 0.7*img.height/img.width, 1); s.position.set(px + 0.24, H + 0.35 + lift, pz); grp.add(s); }
+  }
+  // puddles on the paths (shown in the rain)
+  const pg = V3.townPuddles = new T.Group(); grp.add(pg);
+  const pm = new T.MeshStandardMaterial({ color:lin('#3a4a5a'), roughness:0.05, metalness:0.6, transparent:true, opacity:0.75 }); pm.userData.lin = true;
+  for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++) if (deco(x,y)==='path' && o3Hash(x, y, 931) < 0.16){ const d = new T.Mesh(new T.CircleGeometry(0.22 + o3Hash(x, y, 932)*0.18, 14), pm); d.rotation.x = -Math.PI/2; d.scale.x = 1.4; d.position.set(x+0.3+o3Hash(x,y,933)*0.4, 0.012, y+0.3+o3Hash(x,y,934)*0.4); pg.add(d); }
+  pg.visible = townWet();
+}
+// a city wall of stone, with towers and a gatehouse
+function townV3Walls(mats, grp){
+  const T = THREE, cx = TOWN_CX, H = 2.0, add = o=>{ o.castShadow = true; o.receiveShadow = true; grp.add(o); return o; };
+  const seg = (x0,z0,x1,z1)=>{ const L = Math.hypot(x1-x0, z1-z0), horiz = Math.abs(z1-z0) < 0.01;
+    add(v3Box(horiz ? L : 0.5, H, horiz ? 0.5 : L, mats.stoneBig, (x0+x1)/2, H/2, (z0+z1)/2));
+    const n = Math.floor(L/0.6); for (let i=0;i<n;i+=2){ const t = (i+0.5)/n; add(v3Box(0.3, 0.3, 0.3, mats.stoneBig, x0+(x1-x0)*t, H+0.15, z0+(z1-z0)*t)); } };
+  const W = COLS-0.5, S = ROWS-0.5;
+  seg(0.5, 0.5, W, 0.5); seg(0.5, 0.5, 0.5, S); seg(W, 0.5, W, S); seg(0.5, S, cx-0.7, S); seg(cx+1.7, S, W, S);
+  for (const [x,z] of [[0.5,0.5],[W,0.5],[0.5,S],[W,S]]){ add(v3Cyl(0.65, 0.7, 2.8, 10, mats.stoneBig, x, 1.4, z)); const r = new T.Mesh(new T.ConeGeometry(0.8, 0.9, 10), mats.roof); r.position.set(x, 3.25, z); r.castShadow = true; grp.add(r); }
+  for (const s of [-1,1]){ const tx = cx+0.5 + s*1.4; add(v3Box(1.0, 3.0, 1.0, mats.stoneBig, tx, 1.5, S)); const flame = v3Flame(tx - s*0.55, 1.8, S+0.55, grp); V3.lamps.push({ p:[tx - s*0.55, 1.9, S+0.55], col:0xff9a40, r:6, main:true, flame }); }
+  add(v3Box(3.8, 0.6, 1.0, mats.stoneBig, cx+0.5, 2.7, S));
+  const ban = new T.Mesh(new T.PlaneGeometry(0.8, 1.1), mats.cloth); ban.position.set(cx+0.5, 1.9, S+0.52); grp.add(ban);
+}
+// every frame in town: folk indoors or out, the watch's torches, the weather
+function townV3Tick(dt){
+  const T = THREE;
+  for (const p of (V3.villagers||[])){ const v = p.v; if (!v) continue;
+    p.g.visible = !v.indoors;
+    if (v.guard && !p.torch){ p.torch = v3Flame(0.26, 0.95, 0.14, p.g); }
+    if (p.torch) p.torch.visible = !!V3.night;
+  }
+  if (V3.townPuddles) V3.townPuddles.visible = townWet();
+  if (V3.townWaterMat) V3.townWaterMat.opacity = 0.84 + Math.sin(V3.t*1.3)*0.05;
+  if (V3.townShip){ V3.townShip.rotation.z = Math.sin(V3.t*0.9)*0.04; V3.townShip.position.y = 0.1 + Math.sin(V3.t*1.2)*0.03; }
+  if (G.interior || !V3.world) return;
+  const pp = V3.player && V3.player.g.position; if (!pp) return;
+  const wet = townWet(), snow = !wet && isWinter() && (G.weather==='fog' || G.villageTheme==='tundra');
+  if (!wet && !snow) return;
+  V3.partMatRain = V3.partMatRain || new T.SpriteMaterial({ map:v3Blob('rgba(170,190,220,0.9)'), transparent:true, depthWrite:false, opacity:0.55 });
+  V3.partMatSnow = V3.partMatSnow || new T.SpriteMaterial({ map:v3Blob('rgba(255,255,255,1)'), transparent:true, depthWrite:false, opacity:0.9 });
+  const n = Math.min(8, Math.floor(dt*(wet ? (G.weather==='storm' ? 260 : 160) : 60)) + 1);
+  for (let i=0;i<n && V3.parts.length < 500;i++){
+    const sp = new T.Sprite(wet ? V3.partMatRain : V3.partMatSnow); sp.position.set(pp.x + (Math.random()-0.5)*16, 5 + Math.random()*2, pp.z + (Math.random()-0.5)*16);
+    if (wet) sp.scale.set(0.03, 0.4, 1); else sp.scale.setScalar(0.07);
+    V3.world.add(sp); V3.parts.push({ sp, v: wet ? [-0.6, -11, 0] : [(Math.random()-0.5)*0.4, -1.1, (Math.random()-0.5)*0.4], life: wet ? 0.55 : 5, age:0, s0: wet ? 0.4 : 0.07, s1: wet ? 0.4 : 0.06, keep:true });
+  }
+}
+// furniture of the new rooms (called from v3Bench)
+function townV3Bench(k, box, cyl, add, M, mats){
+  const T = THREE;
+  if (k==='stairs' || k==='stairsup'){ for (let i=0;i<5;i++) box(0.8, 0.18*(i+1), 0.18, mats.planks, 0, 0.09*(i+1), 0.36 - i*0.18); box(0.05, 1.3, 0.9, mats.wood, 0.42, 0.65, 0); return true; }
+  if (k==='stairsdown' || k==='cellar'){ box(0.9, 0.04, 0.9, M('#1a120a'), 0, 0.02, 0); const lid = box(0.85, 0.05, 0.42, mats.planks, 0, 0.32, -0.45); lid.rotation.x = 1.2; box(0.06, 0.06, 0.06, mats.iron, 0, 0.06, 0.3); for (let i=0;i<3;i++) box(0.7, 0.03, 0.14, mats.wood, 0, 0.035, 0.25 - i*0.25); return true; }
+  if (k==='books'){ box(0.95, 1.8, 0.35, mats.wood, 0, 0.9, -0.3); for (let s=0;s<4;s++){ box(0.9, 0.04, 0.33, mats.planks, 0, 0.3 + s*0.42, -0.28);
+      for (let i=0;i<9;i++) box(0.07, 0.26 + ((i*7+s)%3)*0.04, 0.24, M(['#7a2a20','#2a4a7a','#3a6a2a','#8a6a2a','#5a2a6a'][(i+s)%5]), -0.38 + i*0.095, 0.45 + s*0.42, -0.28); } return true; }
+  if (k==='chair'){ box(0.45, 0.06, 0.45, mats.planks, 0, 0.45, 0); box(0.45, 0.5, 0.06, mats.wood, 0, 0.72, -0.2); for (const [sx,sz] of [[-0.18,-0.18],[0.18,-0.18],[-0.18,0.18],[0.18,0.18]]) box(0.05, 0.45, 0.05, mats.wood, sx, 0.22, sz); return true; }
+  if (k==='pew'){ box(0.9, 0.08, 0.4, mats.planks, 0, 0.45, 0); box(0.9, 0.45, 0.06, mats.wood, 0, 0.7, -0.18); for (const sx of [-0.4, 0.4]) box(0.06, 0.45, 0.4, mats.wood, sx, 0.22, 0); return true; }
+  if (k==='shrine'){ box(0.6, 0.9, 0.4, mats.stone, 0, 0.45, -0.1); const s = box(0.08, 0.5, 0.08, M('#d8b050', { metalness:0.7, roughness:0.3 }), 0, 1.15, -0.1); box(0.3, 0.08, 0.08, M('#d8b050', { metalness:0.7, roughness:0.3 }), 0, 1.25, -0.1);
+    for (const sx of [-0.2, 0.2]){ cyl(0.03, 0.03, 0.15, 6, M('#f4f0e0'), sx, 0.98, 0.05); } return true; }
+  if (k==='crates'){ box(0.7, 0.5, 0.6, mats.planks, 0, 0.25, 0); box(0.5, 0.4, 0.45, mats.planks, 0.05, 0.7, 0.02); box(0.72, 0.05, 0.05, mats.wood, 0, 0.5, 0.31); return true; }
+  if (k==='casks'){ const c = cyl(0.3, 0.3, 0.8, 14, mats.wood, 0, 0.35, 0); c.rotation.x = Math.PI/2; for (const z of [-0.3, 0.3]){ const r = cyl(0.31, 0.31, 0.05, 14, mats.iron, 0, 0.35, z); r.rotation.x = Math.PI/2; } box(0.8, 0.05, 0.5, mats.wood, 0, 0.03, 0); return true; }
+  if (k.startsWith('g_')){ const g = TOWN_GUILDS[k.slice(2)]; if (!g) return false;
+    cyl(0.04, 0.05, 2.0, 6, mats.wood, 0, 1.0, -0.2); box(0.6, 0.04, 0.04, mats.wood, 0, 1.9, -0.2);
+    const cl = add(new T.Mesh(new T.PlaneGeometry(0.55, 1.0), M(g.col, { side:T.DoubleSide }))); cl.position.set(0, 1.38, -0.18);
+    const em = add(new T.Mesh(new T.CircleGeometry(0.12, 16), M('#d8b050', { metalness:0.6, roughness:0.3 }))); em.position.set(0, 1.45, -0.17); return true; }
+  return false;
+}
+// a little dressing for the new rooms
+function townV3Interior(key, grp, mats){
+  const T = THREE, lin = c=>new T.Color(c).convertSRGBToLinear();
+  if (key==='temple'){ for (const wx of [ROOM.x0+2.5, ROOM.x1-1.5]){ const g = new T.Mesh(new T.PlaneGeometry(0.9, 1.4), new T.MeshStandardMaterial({ color:lin('#c8a0ff'), emissive:lin('#8a60e0'), emissiveIntensity:0.6 })); g.position.set(wx, 1.7, ROOM.y0+0.06); grp.add(g); }
+    for (const [x,z] of [[8,7.6],[12.9,7.6]]){ grp.add(v3Cyl(0.04, 0.06, 1.2, 6, mats.iron, x, 0.6, z)); const f = v3Flame(x, 1.22, z, grp); } }
+  if (key==='guild'){ for (let i=0;i<4;i++) grp.add(v3Box(0.05, 0.9, 0.05, mats.iron, 9 + i*0.3, 0.45, ROOM.y0+0.3)); grp.add(v3Box(1.4, 0.06, 0.2, mats.wood, 9.45, 0.95, ROOM.y0+0.3)); }
+  if (key==='cellar'){ for (const [x,z] of [[13.4,9],[13.4,9.7],[6.5,10.4],[7.2,10.4]]) v3Barrel(x, z, mats, grp); }
+  if (key==='tavern_up'){ const rug = new T.Mesh(new T.PlaneGeometry(2.4, 1.6), new T.MeshStandardMaterial({ color:lin('#3a5a7a'), roughness:0.95 })); rug.rotation.x = -Math.PI/2; rug.position.set(9.5, 0.012, 8.5); grp.add(rug); }
+}
+// the flat town map: the district, the harbour, the landmark, and the townsfolk
+function townDraw2DWall(x, y, deco, pal){
+  if (deco==='water'){ drawTileBg(x, y, '#2a5a80'); if ((x+y)%2) drawGlyph(x, y, '~', '#7ab0d8'); return true; }
+  if (deco==='arenawall'){ drawTileBg(x, y, '#7a7268'); return true; }
+  if (deco==='target'){ drawTileBg(x, y, pal.ground); drawDot(x, y, '#f0f0e8', cellPx*0.36); drawDot(x, y, '#d02a20', cellPx*0.22); drawDot(x, y, '#f0c020', cellPx*0.08); return true; }
+  if (deco.startsWith('fx_')){ drawTileBg(x, y, '#5a4a3a'); if (x===3 && y===16) drawGlyph(x, y, { mine:'M', moonwell:'O', totem:'!', caravan:'C' }[deco.slice(3)] || '?', COL.gold, 700); return true; }
+  return false;
+}
+function townFloorCol(deco, pal){ return deco==='sand' ? '#c8a870' : deco==='pier' ? '#7a5634' : deco==='range' ? '#6a8a4a' : null; }
+function townDraw2DFolk(raceTheme){
+  for (const v of (G.villagers||[])){ if (v.indoors) continue;
+    if (v.animal){ drawGlyph(v.x, v.y, v.animal==='dog' ? 'd' : v.animal==='cat' ? 'c' : ',', v.animal==='chicken' ? '#f0ece0' : '#c8a070'); continue; }
+    drawMonsterArt(v.x*cellPx+cellPx/2, v.y*cellPx+cellPx/2+cellPx*0.1, cellPx*(v.sit ? 0.7 : 0.8), VILLAGER_ART, v.guard ? '#6a8ad8' : raceTheme.color); }
+}
 
 function renderGame(){
   syncGrid();
@@ -24317,7 +25110,7 @@ function v3TexNotices(){
 // around the waypoint, and a dirt road out of the gate
 const V3_GROUND = { forest:[74,108,52], swamp:[70,82,50], desert:[196,168,116], tundra:[222,230,238], mountain:[112,110,100] };
 function v3GroundTexture(theme){
-  const PX = 64, M = 8, N = COLS + M*2, c = v3Canvas(N*PX, N*PX), x = c.getContext('2d');
+  const PX = COLS > 24 ? 48 : 64, M = 8, N = COLS + M*2, NH = ROWS + M*2, c = v3Canvas(N*PX, NH*PX), x = c.getContext('2d');
   const base = V3_GROUND[theme] || V3_GROUND.forest, n = v3Noise(21);
   const id = x.createImageData(c.width, c.height), d = id.data;
   for (let y=0;y<c.height;y++) for (let i=0;i<c.width;i++){
@@ -24330,11 +25123,11 @@ function v3GroundTexture(theme){
   }
   const T = (tx,ty)=> [(tx+M)*PX, (ty+M)*PX];
   const deco = (tx,ty)=> (tx>=0&&ty>=0&&tx<COLS&&ty<ROWS) ? (G.villageDeco[tx][ty]||'grass') : 'out';
-  const paved = d=> d==='path' || d==='gate' || d==='waypoint' || d==='stash' || d==='questgiver' || d==='npc' || d==='lamp';
+  const paved = d=> d==='path' || d==='pier' || d==='gate' || d==='waypoint' || d==='stash' || d==='questgiver' || d==='npc' || d==='lamp';
   // dirt road leaving the gate, and bare earth round paving and buildings
   const dirt = theme==='desert' ? [170,130,80] : theme==='tundra' ? [160,150,140] : [110,86,58];
   const blob = (px,py,r,col,a)=>{ const g = x.createRadialGradient(px,py,0,px,py,r); g.addColorStop(0, `rgba(${col[0]},${col[1]},${col[2]},${a})`); g.addColorStop(1, `rgba(${col[0]},${col[1]},${col[2]},0)`); x.fillStyle = g; x.fillRect(px-r,py-r,r*2,r*2); };
-  for (let ty=ROWS-1; ty<ROWS+M; ty++){ const [px,py] = T(Math.floor(COLS/2), ty); for (let k=0;k<6;k++) blob(px+PX/2+(Math.random()-0.5)*PX, py+Math.random()*PX, PX*0.9, dirt, 0.5); }
+  for (let ty=ROWS-1; ty<ROWS+M; ty++){ const [px,py] = T(TOWN_CX, ty); for (let k=0;k<6;k++) blob(px+PX/2+(Math.random()-0.5)*PX, py+Math.random()*PX, PX*0.9, dirt, 0.5); }
   for (let tx=0;tx<COLS;tx++) for (let ty=0;ty<ROWS;ty++){
     const dd = deco(tx,ty), [px,py] = T(tx,ty);
     if (paved(dd) || dd.indexOf('building')===0) for (let k=0;k<3;k++) blob(px+PX/2+(Math.random()-0.5)*PX*0.6, py+PX/2+(Math.random()-0.5)*PX*0.6, PX*0.95, dirt, 0.45);
@@ -24356,14 +25149,14 @@ function v3GroundTexture(theme){
     }
   }
   // flagstone ring round the waypoint
-  const wp = G.villageNpcs && T(Math.floor(COLS/2), 12);
+  const wp = G.villageNpcs && T(TOWN_CX, 12);
   if (wp){ const cxp = wp[0]+PX/2, cyp = wp[1]+PX/2;
     for (let ring=0; ring<3; ring++) for (let i=0;i<10+ring*6;i++){
       const a0 = i/(10+ring*6)*Math.PI*2, a1 = (i+0.92)/(10+ring*6)*Math.PI*2, r0 = PX*(0.3+ring*0.55), r1 = r0 + PX*0.5, k = 0.7+Math.random()*0.3;
       x.fillStyle = v3rgb([150,150,160],k); x.beginPath(); x.arc(cxp,cyp,r1,a0,a1); x.arc(cxp,cyp,r0,a1,a0,true); x.closePath(); x.fill();
     } }
   const t = v3CanvasTex(c); t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
-  return { tex:t, size:N, M };
+  return { tex:t, size:N, sizeW:N, sizeH:NH, M };
 }
 // ---------- materials per town look ----------
 const V3_RACE = {
@@ -24585,7 +25378,7 @@ function v3Grass(grp){
   const spots = [];
   const ok = (x,y)=>{
     if (x>=0 && y>=0 && x<COLS && y<ROWS) return G.map[x][y]===T_FLOOR && G.villageDeco[x][y]==='grass';
-    return !(y >= ROWS-1 && Math.abs(x+0.5 - COLS/2) < 2.5);                      // outside the walls, except the road
+    return !(y >= ROWS-1 && Math.abs(x+0.5 - (TOWN_CX+0.5)) < 2.5);                      // outside the walls, except the road
   };
   for (let y=-5;y<ROWS+5;y++) for (let x=-5;x<COLS+5;x++){
     if (!ok(x,y)) continue;
@@ -24635,7 +25428,8 @@ function v3Lamp(x,z,mats,grp){
   V3.lamps.push({ p:[x+0.26,1.72,z], col:0xffc070, r:6, main:true });
 }
 function v3Palisade(mats,grp){
-  const T = THREE, cx = Math.floor(COLS/2);
+  if (G.townLy && G.townLy.info.style.walled){ townV3Walls(mats, grp); return; }   // a city, or a town that paid for stone walls
+  const T = THREE, cx = TOWN_CX;
   const stakes = [];
   const along = (x0,z0,x1,z1)=>{ const L = Math.hypot(x1-x0,z1-z0), n = Math.round(L/0.28);
     for (let i=0;i<=n;i++){ const t = i/n, x = x0+(x1-x0)*t, z = z0+(z1-z0)*t;
@@ -24733,13 +25527,13 @@ function v3BuildScene(){
   const mats = V3.mats = v3Materials();
   if (G.interior){ v3BuildInterior(grp, mats); v3BuildPeople(grp, mats); return; }
   // ground: the painted town square plus the wide surrounding land
-  const gt = v3GroundTexture(G.villageTheme), gsz = gt.size;
-  const ground = new T.Mesh(new T.PlaneGeometry(gsz, gsz), new T.MeshStandardMaterial({ map:gt.tex, roughness:0.95 }));
+  const gt = v3GroundTexture(G.villageTheme);
+  const ground = new T.Mesh(new T.PlaneGeometry(gt.sizeW, gt.sizeH), new T.MeshStandardMaterial({ map:gt.tex, roughness:0.95 }));
   ground.rotation.x = -Math.PI/2; ground.position.set(COLS/2, 0, ROWS/2); ground.receiveShadow = true; grp.add(ground); V3.ground = ground;
   const far = new T.Mesh(new T.PlaneGeometry(200,200), new T.MeshStandardMaterial({ color: new T.Color().setRGB(...(V3_GROUND[G.villageTheme]||V3_GROUND.forest).map(v=>Math.pow(v/255,2.2)*0.8)), roughness:1 }));
   far.rotation.x = -Math.PI/2; far.position.set(COLS/2,-0.01,ROWS/2); grp.add(far);
   // buildings
-  const icon = { smith:obEntry('anvil'), tavern:obEntry('tavern'), alch:obEntry('cauldron'), shop:obEntry('stall'), tailor:obEntry('armor', { metal:'#6a4ab0' }) };
+  const icon = { smith:obEntry('anvil'), tavern:obEntry('tavern'), alch:obEntry('cauldron'), shop:obEntry('stall'), tailor:obEntry('armor', { metal:'#6a4ab0' }), temple:obEntry('portal', { rgb:'255,220,120' }), guild:obEntry('chest', { gold:true }) };
   V3.occ = []; V3.occDyn = new Set();
   const occluder = (b, g)=>{ const ob = new T.Mesh(new T.BoxGeometry(b.w, (b.floors||1)*1.2+1.9, b.h), new T.MeshBasicMaterial({ visible:false }));
     ob.position.set(b.x0+b.w/2, ((b.floors||1)*1.2+1.9)/2, b.y0+b.h/2); ob.userData.grp = g; grp.add(ob); V3.occ.push(ob); };
@@ -24764,7 +25558,7 @@ function v3BuildScene(){
     grp.add(v3Box(0.35,0.3,0.8,mats.planks,x+0.1,0.15,z+1.0));
   }
   // alchemist cauldron
-  { const x = 14.5, z = 5.4;
+  if (buildingByKey('alch')) { const x = 14.5, z = 5.4;
     const pot = new T.Mesh(new T.SphereGeometry(0.34, 16, 10, 0, Math.PI*2, Math.PI*0.35, Math.PI*0.65), mats.iron); pot.position.set(x,0.42,z); pot.castShadow = true; grp.add(pot);
     const brew = v3Cyl(0.3,0.3,0.04,16,mats.brew,x,0.56,z); grp.add(brew); V3.brew = brew;
     for (let i=0;i<3;i++){ const a = i/3*Math.PI*2; const leg = v3Cyl(0.02,0.02,0.5,5,mats.iron,x+Math.cos(a)*0.3,0.2,z+Math.sin(a)*0.3); grp.add(leg); }
@@ -24785,7 +25579,7 @@ function v3BuildScene(){
   v3Barrel(13.3,5.3,mats,grp); v3Barrel(13.7,5.7,mats,grp); v3Barrel(13.35,5.8,mats,grp,0.9); v3Barrel(13.5,6.4,mats,grp);
   grp.add(v3Box(1.2,0.06,0.35,mats.planks,8.2,0.45,7.4)); grp.add(v3Box(1.2,0.4,0.06,mats.wood,8.2,0.22,7.4));
   // waypoint: a runed stone dais with a floating crystal
-  { const x = Math.floor(COLS/2)+0.5, z = 12.5;
+  { const x = TOWN_CX+0.5, z = 12.5;
     grp.add(v3Cyl(1.15,1.25,0.22,8,mats.stoneBig,x,0.11,z));
     grp.add(v3Cyl(0.95,1.02,0.16,8,mats.stone,x,0.28,z));
     const rn = new T.Mesh(new T.CircleGeometry(0.92, 48), mats.runes); rn.rotation.x = -Math.PI/2; rn.position.set(x,0.37,z); grp.add(rn); V3.runes = rn;
@@ -24795,7 +25589,7 @@ function v3BuildScene(){
     const glow = new T.Sprite(new T.SpriteMaterial({ map:v3Blob('rgba(90,220,255,1)'), blending:T.AdditiveBlending, depthWrite:false, transparent:true, opacity:0.6 })); glow.scale.set(2.2,2.2,1); glow.position.set(x,1.3,z); grp.add(glow); V3.cglow = glow;
     V3.lamps.push({ p:[x,1.4,z], col:0x60d8ff, r:6, main:true, always:true });
     V3.motes = { p:[x,0.4,z] };
-    const hb = new T.Mesh(new T.CylinderGeometry(1.1,1.1,2,8), new T.MeshBasicMaterial({ visible:false })); hb.position.set(x,1,z); hb.userData.act = { kind:'tile', x:Math.floor(COLS/2), y:12, label:'Waypoint' }; grp.add(hb); V3.hits.push(hb);
+    const hb = new T.Mesh(new T.CylinderGeometry(1.1,1.1,2,8), new T.MeshBasicMaterial({ visible:false })); hb.position.set(x,1,z); hb.userData.act = { kind:'tile', x:TOWN_CX, y:12, label:'Waypoint' }; grp.add(hb); V3.hits.push(hb);
   }
   // stash chest
   { const x = 13.5, z = 10.5;
@@ -24819,13 +25613,14 @@ function v3BuildScene(){
     else if (dd==='tree') v3Tree(x+0.5, y+0.5, mats, grp, null, 0.9+Math.random()*0.3);
   }
   for (let i=0;i<90;i++){
-    const a = Math.random()*Math.PI*2, r = 12.5 + Math.random()*12, x = COLS/2 + Math.cos(a)*r, z = ROWS/2 + Math.sin(a)*r;
-    if (z > ROWS-1 && Math.abs(x - COLS/2) < 2.5) continue;        // keep the road clear
+    const a = Math.random()*Math.PI*2, r = 12.5 + Math.random()*12 + Math.max(0, COLS-20)*Math.abs(Math.cos(a))*0.5, x = COLS/2 + Math.cos(a)*r, z = ROWS/2 + Math.sin(a)*r;
+    if (z > ROWS-1 && Math.abs(x - (TOWN_CX+0.5)) < 2.5) continue;        // keep the road clear
     if (x>-0.5 && x<COLS+0.5 && z>-0.5 && z<ROWS+0.5) continue;
     v3Tree(x, z, mats, grp, Math.random()<0.35 ? 'pine' : null, 1.0+Math.random()*0.6);
   }
   for (let i=0;i<14;i++){ const x = 1.6+Math.random()*16.5, z = 7+Math.random()*11; if (G.map[Math.floor(x)] && G.map[Math.floor(x)][Math.floor(z)]===T_FLOOR && G.villageDeco[Math.floor(x)][Math.floor(z)]==='grass'){
     const f = new T.Mesh(new T.IcosahedronGeometry(0.16,0), mats.leaf2); f.position.set(x,0.1,z); f.scale.y = 0.6; grp.add(f); } }
+  try{ townV3Build(grp, mats); }catch(e){ console.error(e); }   // (see SECTION: TOWNS)
   v3Palisade(mats, grp);
   v3Grass(grp);
   v3BuildPeople(grp, mats);
@@ -24841,7 +25636,7 @@ function v3BuildPeople(grp, mats){
     p.sp.userData.act = { kind:'tile', x:n.x, y:G.interior ? n.y+1 : n.y, label:n.name }; V3.hits.push(p.sp);
     if (n.service==='questgiver'){ const mk = new T.Sprite(new T.SpriteMaterial({ map:v3MarkerTex('!'), transparent:true, depthTest:false })); mk.scale.set(0.42,0.63,1); mk.position.y = 1.75; p.g.add(mk); V3.marker = mk; }
     return p; });
-  V3.villagers = (G.villagers||[]).map((v,i)=>{ const p = P(v3VillagerLook(v.look||i), 0.94, v.x, v.y); p.v = v; return p; });
+  V3.villagers = (G.villagers||[]).map((v,i)=>{ const p = P(townFolkLook(v, i), townFolkH(v), v.x, v.y); p.v = v; return p; });
   // particle pool (smoke, sparks, motes, bubbles)
   V3.partMatSmoke = new T.SpriteMaterial({ map:v3Blob('rgba(150,150,150,0.9)'), transparent:true, depthWrite:false, opacity:0.5 });
   V3.partMatSpark = new T.SpriteMaterial({ map:v3Blob('rgba(255,180,80,1)'), blending:T.AdditiveBlending, transparent:true, depthWrite:false });
@@ -24857,10 +25652,10 @@ function v3BuildPeople(grp, mats){
   for (const p of V3.npcs){ const el = document.createElement('div'); el.className = 'v3plate'; el.innerHTML = `<b>${esc(p.n.name)}</b><span>${esc(p.n.role)}</span>`; V3.labels.appendChild(el); V3.plates.push({ el, obj:p.g, y:1.2 }); p.plate = el; }
   { const el = document.createElement('div'); el.className = 'v3plate me'; el.innerHTML = `<b>${esc(G.player.name||'you')}</b>`; V3.labels.appendChild(el); V3.plates.push({ el, objFn:()=>V3.player && V3.player.g, y:1.3 }); }
   (V3.villagers||[]).forEach((p,i)=>{ const h = Math.floor(o3Hash(i+1, (p.v.look|0)+3, 77)*NAME_POOL.length), role = FOLK_ROLES[(i*7+(p.v.look|0))%FOLK_ROLES.length];
-    const el = document.createElement('div'); el.className = 'v3plate folk'; el.innerHTML = `<b>${esc(NAME_POOL[h])}</b><span>${role}</span>`; V3.labels.appendChild(el); V3.plates.push({ el, obj:p.g, y:1.15, near:9 }); });
+    const el = document.createElement('div'); el.className = 'v3plate folk'; el.innerHTML = `<b>${esc(p.v.nm || NAME_POOL[h])}</b><span>${esc(p.v.role || role)}</span>`; V3.labels.appendChild(el); V3.plates.push({ el, obj:p.g, y:1.15, near:9 }); });
   if (G.interior) for (const [k,x,y] of ROOM_LAYOUT[G.interior.key].benches){ const el = document.createElement('div'); el.className = 'v3plate small'; el.innerHTML = `<b>${esc(BENCHES[k].nm)}</b>`; V3.labels.appendChild(el); V3.plates.push({ el, pos:new T.Vector3(x+0.5, 1.45, y+0.5) }); }
   if (G.interior){ const el = document.createElement('div'); el.className = 'v3plate small'; el.innerHTML = '<b>Door</b>'; V3.labels.appendChild(el); V3.plates.push({ el, pos:new T.Vector3(ROOM.door.x+0.5, 1.9, ROOM.door.y+0.2) }); }
-  if (!G.interior) for (const [txt, x, y, z] of [['Waypoint', Math.floor(COLS/2)+0.5, 1.95, 12.5], ['Stash', 13.5, 0.95, 10.5]]){
+  if (!G.interior) for (const [txt, x, y, z] of [['Waypoint', TOWN_CX+0.5, 1.95, 12.5], ['Stash', 13.5, 0.95, 10.5]]){
     const el = document.createElement('div'); el.className = 'v3plate small'; el.innerHTML = `<b>${txt}</b>`; V3.labels.appendChild(el);
     V3.plates.push({ el, pos:new T.Vector3(x,y,z) });
   }
@@ -24869,7 +25664,7 @@ function v3BuildPeople(grp, mats){
   const f = townFlavorAt(G.owPos.x, G.owPos.y);
   let bn = document.getElementById('v3banner');
   if (!bn){ bn = document.createElement('div'); bn.id = 'v3banner'; document.querySelector('.mapwrap').appendChild(bn); }
-  bn.innerHTML = G.interior ? `<b>${esc(G.interior.name)}</b><span>${esc(f ? f.name : 'the village')}</span>` : f ? `<b>${esc(f.name)}</b><span>${esc(article(f.adj))} ${esc(f.adj)} settlement</span>` : '<b>A Village</b>';
+  bn.innerHTML = G.interior ? `<b>${esc(G.interior.name)}</b><span>${esc(f ? f.name : 'the village')}</span>` : f ? `<b>${esc(f.name)}</b><span>${esc(townInfo().ident.nm)} &middot; ${townInfo().tierNm}</span>` : '<b>A Village</b>';
   bn.classList.remove('show'); void bn.offsetWidth; bn.classList.add('show');
   const seen = new Set();
   V3.world.traverse(o=>{ const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : [];
@@ -25025,6 +25820,7 @@ function v3Render(){
     if (Math.abs(sx) > 0.05) p.face = sx < 0 ? -1 : 1;
     p.walk = (p.walk||0) + (moving ? dt*12 : 0);
     const bob = moving ? Math.abs(Math.sin(p.walk))*0.05 : Math.sin(V3.t*1.6 + (p.ph||(p.ph=Math.random()*6)))*0.006;
+    if (p.v && p.v.animal){ if (moving) p.g.rotation.y = Math.atan2(dx, dz); return; }   // (the dogs, cats and chickens just turn and trot)
     if (p.e){
       // turn toward where they're walking; standing still, the townsfolk you can talk to turn to face you
       let want = p.yaw;
@@ -25056,6 +25852,7 @@ function v3Render(){
   glide(V3.player, G.player.x, G.player.y);
   V3.villagers.forEach(p=> glide(p, p.v.x, p.v.y, 6));
   V3.npcs.forEach(p=> glide(p, p.n.x, p.n.y));
+  try{ townV3Tick(dt); }catch(e){ console.error(e); }
   // camera follows you from the south-east at an angle
   const pp = V3.player.g.position, yaw = ISO_YAW, D = V3.dist;
   const want = new T.Vector3(pp.x + Math.sin(yaw)*D*0.72, D*0.92, pp.z + Math.cos(yaw)*D*0.72);
@@ -30880,7 +31677,7 @@ function backOut(){
     case 'charsheet': setUi('playing'); break;
     case 'skills': case 'rsmagic': case 'prayer': setUi('playing'); break;
     case 'skguide': setUi(G.skGuideBack||'playing'); break;
-    case 'lamp': case 'tasks': case 'travellog': case 'rareTrader': case 'seacharts': case 'estate': case 'trophies': case 'housePortal': case 'arch': setUi('playing'); break;
+    case 'lamp': case 'tasks': case 'travellog': case 'rareTrader': case 'seacharts': case 'estate': case 'trophies': case 'housePortal': case 'arch': case 'temple': case 'guild': case 'arena': case 'games': case 'gamble': case 'mayor': case 'harbour': G.gbCard = null; setUi('playing'); break;
     case 'wevent': if (G.wevDlg && !G.wevDlg.noEsc) wevChoose(G.wevDlg.opts.length-1); else if (!G.wevDlg) setUi('playing'); break;
     case 'tailor': case 'bench': setUi('playing'); break;
     case 'makeover': makeoverLeave(); break;
@@ -30954,13 +31751,20 @@ function renderOverlay(){
     case 'trophies': el.innerHTML = buildTrophies(); break;
     case 'housePortal': el.innerHTML = buildHousePortal(); break;
     case 'arch': el.innerHTML = buildArch(); break;
+    case 'temple': el.innerHTML = buildTemple(); break;
+    case 'guild': el.innerHTML = buildGuildHall(); break;
+    case 'arena': el.innerHTML = buildArenaUi(); break;
+    case 'games': el.innerHTML = buildGames(); break;
+    case 'gamble': el.innerHTML = buildGamble(); break;
+    case 'mayor': el.innerHTML = buildMayor(); break;
+    case 'harbour': el.innerHTML = buildHarbour(); break;
     default: el.innerHTML = '';
   }
 }
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-86';
+const GAME_VERSION = 'rs-87';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -31849,6 +32653,8 @@ function buildTavern(){
     <div class="ovbody">
       <div class="btnrow" style="margin-bottom:14px;">
         <button class="btn" onclick="villageRest(); renderOverlay();">R &middot; rest (full heal)</button>
+        <button class="btn" onclick="G.gamesAt='tavern';setUi('games')">darts &amp; the cook-off</button>
+        <button class="btn" onclick="setUi('gamble')">games of chance</button>
       </div>
       <div class="panel" style="margin-bottom:14px;">
         <h4 style="color:${COL.purple};">Corruption: ${Math.round(G.player.corruption||0)}%</h4>
@@ -32855,7 +33661,7 @@ function buildHelp(){
       <div>most encounters are an ordinary fight, but not all of them: a wandering merchant sometimes hails you with a one-time stock instead of a fight; a pack occasionally has a tougher named champion leading it, worth real bonus loot; and the desert, swamp and tundra each hide their own unique set-piece encounter (a buried tomb, a bog ambush, a frozen cache) with a guaranteed bonus reward on top of the fight itself.</div>
       <div>open water blocks the way until you own a boat (buy one from the Peddler in any town) &mdash; once you have one you can sail freely, though the open sea has its own dangers</div>
       <div><b>Skills &amp; trades</b> (<kbd>J</kbd>): fishing, mining, woodcutting and foraging, and the trades that use what you gather - cooking, smithing, alchemy and firemaking - each level from 1 to 99 alongside your combat skills. Gather at the spots you see on the land: marked trees, bubbling fishing spots and flowering herb patches (hover one to see what it gives and the level it needs, click it to walk over and start), rock beside mountains, and ore veins, cave pools and cave herbs in the dungeons. Each spot gives a few items and then is felled, fished out or picked clean, and grows back or moves on in time. <kbd>E</kbd> works the nearest spot beside you (press it again or move to stop), light a campfire from your logs, or cook at your fire. Buy a fishing rod, pickaxe and hatchet (and better ones as you level) at the blacksmith, who also smelts your ore into bars and forges them into gear; brew herbs into potions at the alchemist; cook at the tavern hearth. Press <kbd>U</kbd> to eat the best-fitting cooked food (in a fight it takes your turn). Visit the Tailor in any town to craft: spin flax, tan hides, and make robes, staves, leather armour, bows and arrows at the workbenches inside.</div>
-      <div><b>Your house, Archaeology and Necromancy</b>: Hollis the estate agent on every town square sells you a house (2,500 gold) whose door opens from any town. Build its furniture from logs, iron bars and essence to train Construction: a bed, hearth, furnace, anvil and the other benches, an altar that takes bones for three times the Prayer xp, a trophy wall, and a portal to your towns, islands, dig sites and landmarks. Five dig sites lie out in the wild: excavate the hotspots round each (with a pickaxe) and restore what you find at its dig camp; finish a site's collection for a relic power for good. In a fight, press <kbd>-</kbd> (or the Raise button) to crush a bone and raise the dead to fight beside you; their hits train Necromancy, a fourth combat style.</div>
+      <div><b>Your house, Archaeology and Necromancy</b>: Hollis the estate agent on every town square sells you a house (2,500 gold) whose door opens from any town. Build its furniture from logs, iron bars and essence to train Construction: a bed, hearth, furnace, anvil and the other benches, an altar that takes bones for three times the Prayer xp, a trophy wall, and a portal to your towns, islands, dig sites and landmarks. Five dig sites lie out in the wild: excavate the hotspots round each (with a pickaxe) and restore what you find at its dig camp; finish a site's collection for a relic power for good. Towns now come as hamlets, villages and cities: a village adds a temple (prayer, blessings, a crusade against the undead) and an archery range; a city adds a guild hall, an arena and stone walls; a town by the sea has a harbour with ships to the other ports and your charted islands. Talk to the townsfolk you bump into for gossip and hints, play darts, gamble and enter the cook-off at the tavern, read the notice board's news, and pay the mayor to build walls, a bigger market or a bigger town. Shops shut at night (knock if you must). In a fight, press <kbd>-</kbd> (or the Raise button) to crush a bone and raise the dead to fight beside you; their hits train Necromancy, a fourth combat style.</div>
       <div>press <kbd>C</kbd> to make camp wherever you're standing &mdash; usually a free heal that also refills your ability charges, spell slots and wand charges, same as a village rest, but sleeping in the open risks a night-time ambush that interrupts the rest entirely (no healing, straight into a fight, and every exit is sealed until the last monster drops). Safer on grass, riskier in forest/swamp, and impossible while zoomed out. You can also camp inside any dungeon-type site once you've cleared every monster off the current floor &mdash; nothing left down there to ambush you, so it's just as safe as a village rest.</div>
       <div>press <kbd>M</kbd> to open the world map of the whole continent &mdash; press again to go back. Click a village you've visited on the map, or press <kbd>T</kbd> on the overworld or in a town, to teleport there through a portal. The map's tool bar lets you <b>drop pins</b> with a note, <b>plan a route</b> and walk it, and switch <b>layers</b> (place names, landmarks, sites, danger, resources and more) on and off; the mouse wheel zooms in far enough to see every tree, rock and house. Land you've seen is pencilled in and land you've walked is painted; every forest, range, sea and river has a name, and three great landmarks (a volcano, a giant tree and a wizard's tower) can be seen from far off. The <b>travel log</b> counts the regions, towns, sites and landmarks you've found.</div>
       <div><b>The land:</b> when you start you pick the world's size and shape (an archipelago, one landmass or several continents), and every world has a <b>world code</b> - give it to a friend and they can play the same world. <b>Roads</b> join the towns: walking a road is quicker (every other step is free) and safer, and the route planner and the teleport list (T, "walk") follow them. Off the road, wading a river costs time; roads cross on <b>bridges</b> and fords, and a broken bridge can be mended. <b>Ferries</b> cross the water between landmasses. Every part of the land has a recommended combat level, shown when you enter it and on the map. Watch for <b>volcanic land, jungles, haunted woods, snowy highlands and crystal wastes</b> with their own creatures, and for <b>hamlets</b> (jobs, food and a safe barn), <b>lookouts</b> that reveal the map, <b>caves, grottos and ruins</b> to delve, <b>standing stones</b>, <b>abandoned camps</b>, <b>wishing wells</b> and <b>hermits</b>. Deer, rabbits, boars and birds roam the 3D land - click one to hunt it. Rain makes the fish bite, fog shortens your sight and storms make the sea dangerous. Buy a <b>tent, ward lantern, bedroll and cooking spit</b> from the Peddler for safer camping. Beyond the red ditch lies <b>the Wilderness</b>: tougher monsters, richer pickings, and if you die there your dropped items are gone for good.</div>
@@ -33208,7 +34014,7 @@ function handleKeydown(e){
     case 'tasks': { if (k==='Escape') setUi('playing'); break; }
     case 'travellog': { if (k==='Escape') setUi('playing'); break; }
     case 'rareTrader': { if (k==='Escape') setUi('playing'); break; }
-    case 'seacharts': case 'estate': case 'trophies': case 'housePortal': case 'arch': { if (k==='Escape') setUi('playing'); break; }
+    case 'seacharts': case 'estate': case 'trophies': case 'housePortal': case 'arch': case 'temple': case 'guild': case 'arena': case 'games': case 'gamble': case 'mayor': case 'harbour': { if (k==='Escape'){ G.gbCard = null; setUi('playing'); } break; }
     case 'wevent': { if (k>='1' && k<='9') wevChoose(+k-1); else if (k==='Escape') backOut(); break; }
     case 'cook': { if (k==='Escape') setUi(G.cookAt==='fire' || G.interior ? 'playing' : 'tavern'); break; }
     case 'playing': handlePlayingKey(k); break;

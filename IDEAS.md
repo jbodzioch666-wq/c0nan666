@@ -325,24 +325,24 @@ _Timed events on the overworld_
 ### Towns
 _Town generation and town content_
 
-229. [ ] (118) Town layouts that differ - port towns, walled cities, hill villages, swamp villages on stilts, built around the terrain
-230. [ ] (119) Town size tiers - hamlet (2 shops), village (5), city (10+ with districts)
-231. [ ] (13) More towns with their own identity (desert trading post, dwarven mine town, elven village)
-232. [ ] (120) Day and night in town - lamps light up, shops close at night, busy tavern, guards patrol with torches
-233. [ ] (121) Townsfolk routines - NPCs walk between home, work and the tavern; talk to them for gossip and hints
-234. [ ] (122) Ambient life - chickens, dogs, cats, market chatter, hammering, chimney smoke
-235. [ ] (123) Weather in town - puddles, snow on roofs, people ducking indoors
-236. [ ] (133) Better building interiors - upstairs rooms, cellars, usable furniture (sit on chairs, read books)
-237. [ ] (134) Shop signs and banners that show what each building sells from a distance
-238. [ ] (135) Town welcome banner with the town's name and your reputation level when you arrive
-239. [ ] (136) Notice board news - rumours of nearby dungeons, bounty posters, events on the map
-240. [ ] (125) Temple or chapel - restore prayer, bless holy symbols, a priest with undead-hunting quests
-241. [ ] (126) Guild halls - Warriors', Rangers', Wizards', Cooks', Miners' and Crafting guilds with skill-level entry and better benches and resources
-242. [ ] (127) Arena or duel pit - fight waves of monsters for prizes and titles
-243. [ ] (129) Minigames - fishing contest, cooking competition, archery range, darts in the tavern
-244. [ ] (130) Tavern gambling - dice, cards, a wheel of fortune
-245. [ ] (131) Town upgrades - donate gold and materials for walls, a bigger market or new buildings, unlocking better stock
-246. [ ] (128) Docks and harbour master - boat travel to other port towns and islands
+229. [x] (118) Town layouts that differ - port towns, walled cities, hill villages, swamp villages on stilts, built around the terrain
+230. [x] (119) Town size tiers - hamlet (2 shops), village (5), city (10+ with districts)
+231. [x] (13) More towns with their own identity (desert trading post, dwarven mine town, elven village)
+232. [x] (120) Day and night in town - lamps light up, shops close at night, busy tavern, guards patrol with torches
+233. [x] (121) Townsfolk routines - NPCs walk between home, work and the tavern; talk to them for gossip and hints
+234. [x] (122) Ambient life - chickens, dogs, cats, market chatter, hammering, chimney smoke
+235. [x] (123) Weather in town - puddles, snow on roofs, people ducking indoors
+236. [x] (133) Better building interiors - upstairs rooms, cellars, usable furniture (sit on chairs, read books)
+237. [x] (134) Shop signs and banners that show what each building sells from a distance
+238. [x] (135) Town welcome banner with the town's name and your reputation level when you arrive
+239. [x] (136) Notice board news - rumours of nearby dungeons, bounty posters, events on the map
+240. [x] (125) Temple or chapel - restore prayer, bless holy symbols, a priest with undead-hunting quests
+241. [x] (126) Guild halls - Warriors', Rangers', Wizards', Cooks', Miners' and Crafting guilds with skill-level entry and better benches and resources
+242. [x] (127) Arena or duel pit - fight waves of monsters for prizes and titles
+243. [x] (129) Minigames - fishing contest, cooking competition, archery range, darts in the tavern
+244. [x] (130) Tavern gambling - dice, cards, a wheel of fortune
+245. [x] (131) Town upgrades - donate gold and materials for walls, a bigger market or new buildings, unlocking better stock
+246. [x] (128) Docks and harbour master - boat travel to other port towns and islands
 
 ### Sailing and islands
 _Boats, islands and sea fishing_
