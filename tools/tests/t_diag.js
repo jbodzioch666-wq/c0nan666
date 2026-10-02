@@ -22,6 +22,9 @@ module.exports = async page=>{
     G.ow.map[f[0]+1][f[1]] = t0; G.ow.map[f[0]][f[1]+1] = t1;
     // click paths take the diagonal
     const pth = o3PathTo(f[0]+1, f[1]+1); out.o3path = pth; A(pth && pth.length===1, 'overworld path goes diagonally');
+    // the map's route planner, by road and across country
+    home(); for (const roads of [false, true]){ G.player.routeRoads = roads; G.player.route = { pts:[[f[0]+1, f[1]+1]] }; routeInfo.c = null; const ri = routeInfo(); A(ri && ri.steps===1, 'route goes diagonally (roads '+roads+')'); }
+    G.player.route = null; G.player.routeRoads = true;
     // a town
     const tn = townList()[0]; G.owPos = { x:tn.x, y:tn.y }; enterVillage(); setUi('playing');
     let g = null; for (let x=2;x<COLS-2 && !g;x++) for (let y=2;y<ROWS-2;y++){ let ok = true; for (let i=-1;i<=1;i++) for (let j=-1;j<=1;j++) if (!v3Walkable(x+i,y+j)) ok = false; if (ok){ g = [x,y]; break; } }

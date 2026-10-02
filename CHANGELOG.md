@@ -1,7 +1,8 @@
 # Depthcrawl patch notes
 
-## RS-94 - Facing diagonals
+## RS-94 - Facing diagonals and diagonal routes
 
+- **The route planner walks diagonals:** routes you plan on the world map (M, then Route) cut corners now, by road or across country. They're shorter, and the line on the map shows the real path. They still keep to the roads where that's quicker, and never cut past a mountain's corner.
 - **Your character turns to face diagonals:** in the 3D dungeon and fight view, a diagonal step now turns your figure to that diagonal instead of snapping to the nearest of north, south, east or west.
 - **Even walking pace on diagonals:** in dungeons, towns and on the overworld, a diagonal step glides at the same pace as a straight one. Before, your figure lagged behind on long diagonal walks in towns and on the overworld and then jumped to catch up, and rushed diagonal steps in dungeons.
 

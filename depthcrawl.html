@@ -17458,11 +17458,11 @@ function owBfs(sx, sy, tx, ty){
   while (qh < qt){
     const j = q[qh++]; if (j===goal) break;
     const x = j%W, y = (j/W)|0;
-    for (let d=0; d<4; d++){
-      const nx = x + (d===0 ? 1 : d===1 ? -1 : 0), ny = y + (d===2 ? 1 : d===3 ? -1 : 0);
+    for (let d=0; d<8; d++){
+      const nx = x + DIR8[d][0], ny = y + DIR8[d][1];
       if (nx<0 || ny<0 || nx>=W || ny>=OW_ROWS) continue;
       const k = ny*W+nx; if (prev[k]>=0) continue;
-      if (!o3Passable(nx,ny)) continue;
+      if (!o3Passable(nx,ny) || !diagClear(x, y, DIR8[d][0], DIR8[d][1], o3Passable)) continue;
       if (k!==goal && OW_SITE_TILES.includes(G.ow.map[nx][ny])) continue;   // stepping on a site enters it, so the path goes round
       prev[k] = j; q[qt++] = k;
     }
@@ -18644,7 +18644,9 @@ function wgHeap(){ const a = []; return { a,
   pop(){ const top = a[0], last = a.pop(); if (a.length){ a[0] = last; let i = 0; for(;;){ const l = i*2+1, r = l+1; let s = i; if (l<a.length && a[l][0]<a[s][0]) s = l; if (r<a.length && a[r][0]<a[s][0]) s = r; if (s===i) break; [a[i],a[s]] = [a[s],a[i]]; i = s; } } return top; },
   get size(){ return a.length; } }; }
 // cheapest paths from src over a per-tile cost (Infinity = blocked); stops early once every target is reached
-function wgDijkstra(src, cost, targets){
+// (the square-on four come in their original order, so a world's seed still lays exactly the same roads)
+const WG_DIJ_DIRS = [[1,0],[-1,0],[0,1],[0,-1],[1,-1],[1,1],[-1,1],[-1,-1]];
+function wgDijkstra(src, cost, targets, diag){
   const W = OW_COLS, N = W*OW_ROWS, dist = new Float64Array(N).fill(Infinity), prev = new Int32Array(N).fill(-1), h = wgHeap();
   let left = targets ? targets.size : -1;
   dist[src] = 0; h.push(src, 0);
@@ -18652,10 +18654,12 @@ function wgDijkstra(src, cost, targets){
     const [d, j] = h.pop(); if (d > dist[j]) continue;
     if (targets && targets.has(j) && j!==src){ if (--left <= 0) break; }
     const x = j%W, y = (j/W)|0;
-    for (let k=0;k<4;k++){
-      const nx = x + (k===0 ? 1 : k===1 ? -1 : 0), ny = y + (k===2 ? 1 : k===3 ? -1 : 0);
+    for (let k=0;k<(diag ? 8 : 4);k++){
+      const v = WG_DIJ_DIRS[k], nx = x + v[0], ny = y + v[1];
       if (nx<0 || ny<0 || nx>=W || ny>=OW_ROWS) continue;
-      const n = ny*W+nx, c = cost(nx, ny, n); if (c===Infinity) continue;
+      if (k>=4 && !diag(x, y, v[0], v[1])) continue;
+      const n = ny*W+nx; let c = cost(nx, ny, n); if (c===Infinity) continue;
+      if (k>=4) c += 0.001;   // a diagonal is one step like any other; the nudge just keeps straight lines straight
       const nd = d + c; if (nd < dist[n]){ dist[n] = nd; prev[n] = j; h.push(n, nd); }
     }
   }
@@ -19460,7 +19464,7 @@ function wgRoutePath(sx, sy, tx, ty){
   const W = OW_COLS, goal = ty*W+tx, src = sy*W+sx;
   const cost = (x, y, n)=>{ if (!o3Passable(x, y)) return Infinity; if (n!==goal && OW_SITE_TILES.includes(G.ow.map[x][y])) return Infinity;
     const k = wgRoadKind(x, y); return k===1 || k===2 || k===4 ? 1 : k===3 ? 3 : G.ow.map[x][y]===OW_RIVER ? 4 : 2.2; };
-  const { prev } = wgDijkstra(src, cost, new Set([goal]));
+  const { prev } = wgDijkstra(src, cost, new Set([goal]), (x, y, dx, dy)=>diagClear(x, y, dx, dy, o3Passable));
   if (prev[goal] < 0) return null;
   const out = []; for (let c = goal; c!==src && c!==-1; c = prev[c]) out.push(c);
   return out.reverse();
