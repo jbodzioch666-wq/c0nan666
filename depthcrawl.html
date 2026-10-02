@@ -6933,7 +6933,7 @@ function serializeGame(){
     player: G.player, gear: G.gear, inv: G.inv,
     owSeed: G.ow.seed, owOverrides: G.ow.overrides||{}, owSiteMoves: G.ow.siteMoves||{},
     owTownPositions: G.ow.townPositions||{}, owPos: {x:G.owPos.x,y:G.owPos.y},
-    owVisitedTowns: G.ow.visitedTowns||[], weather: G.weather||'clear', owSeen: owSeenEncode(), owWalked: maskEncode(owWalkArr()),
+    owVisitedTowns: G.ow.visitedTowns||[], weather: G.weather||'clear', owSeen: owSeenEncode(), owWalked: maskEncode(owWalkArr()), owEvents: G.ow.ev||null,
     // the map's own dimensions have to be restored BEFORE generateOverworld(owSeed)
     // re-runs on load (see loadGame) - the same seed at a different size
     // produces a different map entirely, since every placement roll is a
@@ -7085,6 +7085,7 @@ function loadGame(id){
     owWalk(G.owPos.x, G.owPos.y, 7);
   }
   G.ow.walkVer = (G.ow.walkVer||0) + 1;
+  G.ow.ev = data.owEvents || null; wevAfterLoad();   // the world's events (see SECTION: WORLD EVENTS)
   G.gameMode = data.gameMode||0;
   G.depth = data.depth||1;
   G.dungeonMaxDepth = data.dungeonMaxDepth||1;
@@ -7470,7 +7471,7 @@ function ensureSpawnEscape(){
 function generateOverworld(seed){
   G.ow.seed = seed;
   G.ow.seen = null; G.ow.seenVer = (G.ow.seenVer||0) + 1;   // a fresh world starts unexplored
-  G.ow.walked = null; G.ow.walkVer = (G.ow.walkVer||0) + 1; G.ow.geo = null;
+  G.ow.walked = null; G.ow.walkVer = (G.ow.walkVer||0) + 1; G.ow.geo = null; G.ow.ev = null;
   G.ow.map = makeGrid(OW_GRASS, OW_COLS, OW_ROWS);
   G.ow.dungeonMax = makeGrid(0, OW_COLS, OW_ROWS);
   G.ow.dungeonIdx = makeGrid(0, OW_COLS, OW_ROWS);
@@ -7989,7 +7990,7 @@ function tryMoveOverworld(dx,dy){
   rerollWeatherIfDue();
   if (t===OW_TOWN){
     trackVisitedTown(nx,ny);
-    enterVillage();
+    if (!wevTownGate(nx,ny)) enterVillage();   // a besieged town has to be relieved first
   }
   else if (t===OW_DUNGEON || t===OW_CASTLE || t===OW_NECROTOWER || t===OW_TEMPLE || t===OW_GRAVEYARD || t===OW_MINE || t===OW_LAIR) { G.pendingDungeon={x:nx,y:ny}; G.pendingDungeonModifier=null; setUi('dungeonPrompt'); }
   else {
@@ -8002,7 +8003,7 @@ function tryMoveOverworld(dx,dy){
     // wandering encounter too - check the mythic trigger first and skip the
     // ordinary one if it fired, so the two can never stomp on each other's
     // arena/gameMode setup on the same step
-    if (!questOverworldTurn() && !checkMythicBeastTrigger()) checkOverworldEncounterTrigger();
+    if (!questOverworldTurn() && !checkMythicBeastTrigger() && !wevStep()) checkOverworldEncounterTrigger();   // (wevStep: the giant, a camp, or someone on the road)
   }
 }
 
@@ -8034,7 +8035,7 @@ function generateArena(){
   // fled/abandoned set-piece can never bleed its bonus reward into some
   // later, unrelated encounter - terrainSetPieceEncounter re-sets it right
   // after calling this, once it knows THIS particular arena is the set piece
-  G.encounterSetPiece = false; G.encounterSetPieceTerrain = null; G.questCampId = null;
+  G.encounterSetPiece = false; G.encounterSetPieceTerrain = null; G.questCampId = null; G.wevFight = null;
   G.activeZones = []; // a Spirit Guardians/Hunger of Hadar zone from a previous fight has no business in a fresh one
   // the terrain you're standing on (see tryMoveOverworld) picks both the
   // Monster Manual roster and the visual theme below - G.owPos is already
@@ -8153,6 +8154,7 @@ function spawnOneEncounter(avoidX, avoidY, minDist){
     const x = rn(OW_COLS), y = rn(OW_ROWS);
     if (!encounterEligible(G.ow.map[x][y])) continue;
     if (avoidX!==undefined && Math.hypot(x-avoidX,y-avoidY) < minDist) continue;
+    if (G.ow.ev && tries < 150 && chn(0.65) && wevSecuredAt(x,y)) continue;   // lands you've secured see far fewer roamers
     return {x,y};
   }
   return null;
@@ -8216,11 +8218,11 @@ function moveOverworldEncounters(){
 // since "you meet a wandering merchant in your sleep" makes no sense.
 const SET_PIECE_TERRAINS = [OW_DESERT, OW_SWAMP, OW_TUNDRA];
 function resolveOverworldEncounter(terrain){
-  const r = Math.random();
-  if (r < 0.12) merchantEncounter();
-  else if (r < 0.15) namedEliteEncounter(); // a rare 3% jackpot, carved out ahead of the ordinary champion band below
-  else if (r < 0.27) eliteEncounter();
-  else if (SET_PIECE_TERRAINS.includes(terrain) && r < 0.37) terrainSetPieceEncounter(terrain);
+  const r = Math.random(), mc = G.ow.ev && wevSecuredAt(G.owPos.x, G.owPos.y) ? 0.3 : 0.12;   // in lands you've secured, more of the people you meet are friendly
+  if (r < mc) merchantEncounter();
+  else if (r < mc+0.03) namedEliteEncounter(); // a rare 3% jackpot, carved out ahead of the ordinary champion band below
+  else if (r < mc+0.15) eliteEncounter();
+  else if (SET_PIECE_TERRAINS.includes(terrain) && r < mc+0.25) terrainSetPieceEncounter(terrain);
   else randomEncounter();
 }
 function checkOverworldEncounterTrigger(){
@@ -14060,6 +14062,7 @@ function enterVillage(){
     ? `you wander into ${esc(flavor.name)}, ${article(flavor.adj)} ${esc(flavor.adj)} settlement &mdash; ${esc(flavor.flavorDesc)}`
     : 'you wander into a small village', 'new', true);
   questOnEnterTown();
+  wevOnEnterTown();
 }
 // "a" vs "an" off the first letter - elven/orcish both need "an", dwarven/
 // human both need "a", and this stays correct automatically if a future
@@ -14666,7 +14669,7 @@ function questTrackerShow(){ G.player.qtHidden = false; renderGame(); hudLayout(
 function repAt(key){ return (G.player && G.player.rep && G.player.rep[key]) || 0; }
 function repTier(pts){ let t = REP_TIERS[0]; for (const r of REP_TIERS) if (pts >= r.at) t = r; return t; }
 function repNext(pts){ return REP_TIERS.find(r=>r.at > pts) || null; }
-function repPrice(p){ const k = curTownKey(); return k ? mx(1, roundH(p * repTier(repAt(k)).disc)) : p; }
+function repPrice(p){ const k = curTownKey(); return k ? mx(1, roundH(p * repTier(repAt(k)).disc * wevPriceMult(k))) : p; }
 
 
 function spawnBoss(){
@@ -14867,6 +14870,12 @@ const ACHIEVEMENTS = [
   {id:'explorer_90', name:'Cartographer', desc:'see nine tenths of the land', check:p=>G.ow && G.ow.map && travelStats().seenPct>=90, bonus:{magicfind:3}},
   {id:'town_hopper', name:'All Roads', desc:'visit every town', check:p=>{ const n = Object.values(G.ow.townPositions||{}).filter(Boolean).length; return n>1 && (G.ow.visitedTowns||[]).length>=n; }, bonus:{xpfind:0.03}},
   {id:'regions_10', name:'Well Travelled', desc:'discover 10 named regions', check:p=>p.travel && (p.travel.regions||[]).length>=10, bonus:{regen:1}},
+  // world events
+  {id:'giant_slayer', name:'Giant Slayer', desc:'fell a waking giant (a world boss)', check:p=>p.wev && p.wev.boss>=1, bonus:{atk:2}},
+  {id:'camp_breaker', name:'Camp Breaker', desc:'break 10 monster camps', check:p=>p.wev && p.wev.camps>=10, bonus:{flatac:1}},
+  {id:'peacekeeper', name:'Peacekeeper', desc:'secure the lands of 3 towns', check:p=>p.wev && (p.wev.secured||[]).length>=3, bonus:{regen:1}},
+  {id:'defender', name:'Defender of the Realm', desc:'break a siege or repel a raid', check:p=>p.wev && p.wev.defended>=1, bonus:{resist:2}},
+  {id:'samaritan', name:'Good Samaritan', desc:'help 5 travellers on the road', check:p=>p.wev && p.wev.road>=5, bonus:{life:5}},
   {id:'sightseer', name:'Sightseer', desc:'stand at the foot of every great landmark', check:p=>{ const L = owGeo().landmarks; return L.length>0 && p.travel && L.every(l=>(p.travel.lmVisit||[]).includes(l.id)); }, bonus:{life:5}},
 ];
 function achievementBonusI(k){
@@ -16505,7 +16514,8 @@ function renderOverworldMap(){
     if (r){ ctx.save(); ctx.setLineDash([2*dpr, 6*dpr]); ctx.lineCap = 'round'; ctx.strokeStyle = '#ff6a50'; ctx.lineWidth = 3*dpr;
       ctx.beginPath(); ctx.moveTo(C(G.owPos.x), Cy(G.owPos.y)); for (const j of r.tiles) ctx.lineTo(C(j%OW_COLS), Cy((j/OW_COLS)|0)); ctx.stroke(); ctx.restore(); }
     if (mapF('landmarks')) for (const lm of owGeo().landmarks){ const vx = lm.x-camX, vy = lm.y-camY; if (vx<-3||vy<-3||vx>viewCols+3||vy>viewRows+3) continue; pmLandmark(ctx, C(lm.x), Cy(lm.y), R, lm, now); }
-    if (mapF('pins')) for (const p of pinsP()){ const vx = p.x-camX, vy = p.y-camY; if (vx<0||vy<0||vx>=viewCols||vy>=viewRows) continue; pmPin(ctx, C(p.x), Cy(p.y), Math.max(5*dpr, cellPx*0.4), p.k, false); } }
+    if (mapF('pins')) for (const p of pinsP()){ const vx = p.x-camX, vy = p.y-camY; if (vx<0||vy<0||vx>=viewCols||vy>=viewRows) continue; pmPin(ctx, C(p.x), Cy(p.y), Math.max(5*dpr, cellPx*0.4), p.k, false); }
+    if (mapF('events')) for (const o of wevMapList()){ const vx = o.x-camX, vy = o.y-camY; if (vx<-2||vy<-2||vx>viewCols+2||vy>viewRows+2) continue; pmEventIcon(ctx, C(o.x), Cy(o.y), Math.max(6*dpr, cellPx*0.55), o, now); } }
   applyOverworldTint();
   if (isNightTime() || G.weather!=='clear'){
     ctx.fillStyle = 'rgba(230,230,235,0.85)';
@@ -16827,6 +16837,8 @@ function renderOverworldMapZoomed(){
   const pat = pmFogPattern(fx), t = (performance.now()/1000)*6 % 1024;
   fx.save(); fx.translate(t, t*0.4); fx.fillStyle = pat; fx.fillRect(-t, -t*0.4, cw, ch); fx.restore();
   ctx.globalAlpha = 0.94; ctx.drawImage(ft, 0, 0); ctx.globalAlpha = 1;
+  // with the danger layer: which lands are secured, troubled or dangerous (see SECTION: WORLD EVENTS)
+  if (mapF('danger')) pmTerritoryWash(zCamX, zCamY, viewCols, viewRows);
   // the names of the land: forests, ranges, deserts, marshes, seas, lakes and rivers
   if (mapF('places')) pmPlaceNames(geo, lod, zCamX, zCamY, viewCols, viewRows);
   // the great landmarks
@@ -16879,6 +16891,8 @@ function renderOverworldMapZoomed(){
     ctx.fillStyle = '#fff8e0'; ctx.font = `900 ${Math.round(R*1.4)}px Georgia, serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(t.turnIn ? '?' : '!', qx, qy-R*1.55);
   }
+  // the world's events: camps, the waking giant, sieges, fallen stars, festivals, markets and raids
+  if (mapF('events')){ const R = clamp(cellPx*1.2, 11*dpr, 22*dpr); for (const o of wevMapList()) if (inView(o.x, o.y, 3) || o.k==='boss') pmEventIcon(ctx, TX(o.x), TY(o.y), R, o, now); }
   { const gv = G.player.grave;   // your gravestone: a grey headstone with a cross
     if (gv){ const gx = (gv.x-zCamX)*cellPx + cellPx/2, gy = (gv.y-zCamY)*cellPx + cellPx/2, R = clamp(cellPx*1.0, 10*dpr, 17*dpr);
       ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(gx-R*0.6+2*dpr, gy-R*1.6+3*dpr, R*1.2, R*1.6);
@@ -16887,7 +16901,7 @@ function renderOverworldMapZoomed(){
       ctx.strokeStyle = '#4a4a44'; ctx.lineWidth = 2*dpr; ctx.beginPath(); ctx.moveTo(gx, gy-R*1.45); ctx.lineTo(gx, gy-R*0.45); ctx.moveTo(gx-R*0.3, gy-R*1.1); ctx.lineTo(gx+R*0.3, gy-R*1.1); ctx.stroke();
       ctx.font = `700 ${Math.round(11*dpr)}px Cinzel, Georgia, serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
       ctx.lineWidth = 3*dpr; ctx.strokeStyle = 'rgba(240,226,190,0.9)'; ctx.strokeText('your grave', gx, gy+3*dpr); ctx.fillStyle = '#3a2a1a'; ctx.fillText('your grave', gx, gy+3*dpr); } }
-  if (mapF('resources')) for (const r of (G.ow.rich||[])){ if (!richAt(r.x, r.y)) continue;
+  if (mapF('resources')) for (const r of (G.ow.rich||[])){ if (!richAt(r.x, r.y) || r.type==='meteor') continue;
     const rx = (r.x-zCamX)*cellPx + cellPx/2, ry = (r.y-zCamY)*cellPx + cellPx/2, R = clamp(cellPx*1.0, 9*dpr, 15*dpr), col = r.k==='mining' ? '#ffd040' : r.k==='woodcutting' ? '#9ad04a' : '#ffd860';
     ctx.beginPath(); for (let i=0;i<10;i++){ const a = -Math.PI/2 + i*Math.PI/5, rr = i%2 ? R*0.45 : R; ctx.lineTo(rx + Math.cos(a)*rr, ry + Math.sin(a)*rr); } ctx.closePath();
     ctx.fillStyle = col; ctx.fill(); ctx.lineWidth = 1.6*dpr; ctx.strokeStyle = '#3a2a10'; ctx.stroke();
@@ -17154,8 +17168,8 @@ function pmWalkMask(){
 }
 // ---- layers you can switch on and off ----
 const MAP_LAYERS = [['places','Place names'],['landmarks','Landmarks'],['towns','Towns'],['sites','Sites'],['quests','Quests'],['resources','Resources'],
-  ['danger','Danger'],['pins','Pins'],['route','Route'],['legend','Legend']];
-const MAP_DEF = { places:1, landmarks:1, towns:1, sites:'all', quests:1, resources:1, danger:0, pins:1, route:1, legend:1 };
+  ['events','World events'],['danger','Danger'],['pins','Pins'],['route','Route'],['legend','Legend']];
+const MAP_DEF = { places:1, landmarks:1, towns:1, sites:'all', quests:1, resources:1, events:1, danger:0, pins:1, route:1, legend:1 };
 const SITE_MODE_NAME = { all:'all', new:'unexplored', done:'explored', off:'off' };
 function mapF(k){ const f = G.player && G.player.mapFilters; return f && (k in f) ? f[k] : MAP_DEF[k]; }
 function mapToggle(k){
@@ -17587,6 +17601,7 @@ function buildTravelLog(){
       ${stat('Regions discovered', `${tv.regions.length} / ${geo.places.length}`, tv.regions.length/Math.max(1,geo.places.length)*100, '#5ab0e0')}
       ${stat('Steps on the road', tv.steps.toLocaleString(), null)}
       ${stat('Pins on your map', pinsP().length, null)}
+      ${wevLogHtml()}
       <h4 style="color:var(--ink-faint);margin:12px 0 6px;">LANDMARKS</h4>${lmRows || '<div class="muted">this world has no great landmarks</div>'}
       <h4 style="color:var(--ink-faint);margin:12px 0 6px;">REGIONS</h4>${regionRows}
       <h4 style="color:var(--ink-faint);margin:12px 0 6px;">SITES</h4>
@@ -17685,6 +17700,658 @@ function o3LandmarkEdges(){
     el.style.display = 'block'; el.style.left = Math.round(px) + 'px'; el.style.top = Math.round(py) + 'px'; el.style.transform = 'translate(-50%,-50%)';
     el.innerHTML = `<i style="transform:rotate(${ang.toFixed(3)}rad)"></i>${esc(cap(lm.name))} <span>${Math.round(d)}</span>`;
   }
+}
+
+// ===================== SECTION: WORLD EVENTS =====================
+// the overworld keeps time of its own. A giant sleeps somewhere in the
+// world and now and then wakes to roam (a world boss, marked on the map
+// while it's awake, whose wounds last between fights). Monster camps sit in
+// the wilds and grow if left alone, until their warband marches on the
+// nearest town and lays siege to it; a new camp is raised now and then.
+// Every town rules the land nearest it, and breaking every camp in a town's
+// lands secures them: fewer monsters roam there and the travellers are
+// friendlier. Stars fall and leave rich ore for a while. On the road you
+// meet people (a lost child, a travelling wizard, the sandwich lady, a
+// genie, a highwayman, a drunken dwarf), and towns hold festivals and
+// market days with a rare trader, or ring the alarm bell when monsters
+// raid. Everything is kept in G.ow.ev and saved with the world; everything
+// with a deadline shows its timer on the world map.
+const WEV_HOUR = DAY_LENGTH/24;
+// a fallen star: a rich rock of the better ores, here until it crumbles
+SK_ROCK.meteor = { nm:'Fallen star', items:['iron','coal','mithril','adamant','runite'], col:'#7ad8ff', n:14 };
+RES_ROCK_WHERE.meteor = 'only where a star has fallen - a world event, marked on your map while it lasts';
+function wevTime(turns){ const h = Math.max(1, Math.ceil(turns / WEV_HOUR)); return h >= 24 ? `${Math.floor(h/24)}d ${h%24}h` : `${h}h`; }
+const WEV_GIANTS = [
+  { fam:'giant', i:1, nm:'Grumm', where:[OW_GRASS, OW_FOREST] },
+  { fam:'giant', i:0, nm:'Mossbeard', where:[OW_FOREST, OW_SWAMP] },
+  { fam:'tundra', i:2, nm:'Skaldur', where:[OW_TUNDRA, OW_GRASS] },
+  { fam:'giant', i:2, nm:'Vulkhar', where:[OW_DESERT, OW_GRASS] },
+];
+const WEV_CAMP_KINDS = {
+  goblin: { nm:'goblin war-camp', fam:'goblin', chief:'goblin warlord' },
+  orc:    { nm:'orc raiding camp', fam:'orc', chief:'orc warlord' },
+  kobold: { nm:'kobold warren', fam:'kobold', chief:'kobold chieftain' },
+  bandit: { nm:'bandit hideout', human:true },
+};
+function wevP(){
+  const ow = G.ow; if (!ow) return null;
+  if (!ow.ev || typeof ow.ev!=='object'){
+    const turn = (G.player && G.player.turnCount)||0;
+    ow.ev = { v:1, seq:1, camps:[], dyn:[], town:{}, sacked:{}, secured:{}, boss:null,
+      next:{ camp:turn+500, dyn:turn+180, town:turn+120, road:turn+60 } };
+    if (ow.map) for (let i=0;i<5;i++) wevNewCamp(true);
+  }
+  const e = ow.ev; e.camps = e.camps||[]; e.dyn = e.dyn||[]; e.town = e.town||{}; e.sacked = e.sacked||{}; e.secured = e.secured||{}; e.next = e.next||{};
+  return e;
+}
+function wevStats(){ const p = G.player; if (!p.wev || typeof p.wev!=='object') p.wev = {}; const s = p.wev; s.boss = s.boss||0; s.camps = s.camps||0; s.road = s.road||0; s.defended = s.defended||0; s.secured = s.secured||[]; return s; }
+function wevTurn(){ return (G.player && G.player.turnCount)||0; }
+function wevSay(text, kind, toast){ logMsg(text, kind||'new'); if (toast) try{ notify(toast, kind==='hit' ? 'warn' : 'good'); }catch(e){} }
+function wevWhere(x, y){ const dx = x - G.owPos.x, dy = y - G.owPos.y; return `${Math.round(Math.hypot(dx, dy))} leagues ${dirWord(dx, dy)}`; }
+// ---- every town rules the land nearest it ----
+function wevTowns(){ return skTowns(); }
+function wevTerr(){
+  const towns = wevTowns(), c = wevTerr.c;
+  if (c && c.ref===G.ow.map && c.n===towns.length && c.seed===G.ow.seed) return c.a;
+  const a = new Int16Array(OW_COLS*OW_ROWS).fill(-1);
+  for (let y=0;y<OW_ROWS;y++) for (let x=0;x<OW_COLS;x++){ let b = -1, bd = 1e9;
+    towns.forEach(([tx,ty], i)=>{ const d = (tx-x)*(tx-x) + (ty-y)*(ty-y); if (d < bd){ bd = d; b = i; } }); a[y*OW_COLS+x] = b; }
+  wevTerr.c = { ref:G.ow.map, n:towns.length, seed:G.ow.seed, a };
+  return a;
+}
+function wevTerrAt(x, y){ if (x<0 || y<0 || x>=OW_COLS || y>=OW_ROWS) return -1; return wevTerr()[y*OW_COLS+x]; }
+function wevTerrKey(i){ const t = wevTowns()[i]; return t ? t[0]+','+t[1] : null; }
+function wevTerrName(i){ const t = wevTowns()[i]; return t ? 'the lands of ' + o3TownName(t[0], t[1]) : 'the wilds'; }
+// secured (you broke every camp in it), troubled, dangerous (three or more camps' worth of warriors), or plain
+function wevTerrState(i){
+  const e = wevP(), key = wevTerrKey(i); if (!e || !key) return 'wild';
+  let w = 0; for (const c of e.camps) if (wevTerrAt(c.x, c.y)===i) w += c.size;
+  if (!w) return e.secured[key] ? 'secured' : 'wild';
+  return w >= 5 ? 'dangerous' : 'troubled';
+}
+function wevSecuredAt(x, y){ const i = wevTerrAt(x, y); return i>=0 && wevTerrState(i)==='secured'; }
+const WEV_TERR_COL = { secured:'rgba(80,170,70,', troubled:'rgba(220,150,40,', dangerous:'rgba(200,40,30,' };
+// ---- camps ----
+function wevCampOk(x, y){
+  if (x<2 || y<2 || x>=OW_COLS-2 || y>=OW_ROWS-2) return false;
+  const t = G.ow.map[x][y]; if (![OW_GRASS, OW_FOREST, OW_DESERT, OW_SWAMP, OW_TUNDRA].includes(t)) return false;
+  for (const [tx,ty] of wevTowns()) if (Math.abs(tx-x) <= 8 && Math.abs(ty-y) <= 8) return false;
+  for (let i=-3;i<=3;i++) for (let j=-3;j<=3;j++){ const u = G.ow.map[x+i] && G.ow.map[x+i][y+j]; if (u!==undefined && OW_SITE_TILES.includes(u)) return false; }
+  const e = G.ow.ev; if (e && e.camps.some(c=>Math.abs(c.x-x) < 10 && Math.abs(c.y-y) < 10)) return false;
+  if (G.owPos && Math.abs(G.owPos.x-x) < 4 && Math.abs(G.owPos.y-y) < 4) return false;
+  return true;
+}
+function wevNewCamp(quiet){
+  const e = G.ow.ev, turn = wevTurn();
+  for (let tries=0; tries<500; tries++){
+    const x = 2+rn(OW_COLS-4), y = 2+rn(OW_ROWS-4); if (!wevCampOk(x, y)) continue;
+    const ti = wevTerrAt(x, y), key = wevTerrKey(ti);
+    if (key && e.secured[key] && tries < 300 && chn(0.7)) continue;   // the lands you've made safe are left alone, mostly
+    const kinds = Object.keys(WEV_CAMP_KINDS), kind = G.ow.map[x][y]===OW_DESERT || G.ow.map[x][y]===OW_TUNDRA ? (chn(0.5) ? 'bandit' : 'orc') : kinds[rn(kinds.length)];
+    const c = { id:e.seq++, x, y, kind, size: quiet ? 1+rn(2) : 1, grow: turn + 260 + rn(140) };
+    e.camps.push(c);
+    if (key && e.secured[key]){ delete e.secured[key]; if (!quiet) wevSay(`${cap(wevTerrName(ti))} are no longer safe - a ${WEV_CAMP_KINDS[kind].nm} has been raised there`, 'hit', 'Your lands are threatened'); }
+    else if (!quiet) wevSay(`scouts report a new ${WEV_CAMP_KINDS[kind].nm} ${wevWhere(x, y)}, in ${wevTerrName(ti)} - it will grow if it's left alone`, 'new', 'A new camp has been raised');
+    if (!quiet) owReveal(x, y, 2);
+    return c;
+  }
+  return null;
+}
+function wevCampName(c){ return WEV_CAMP_KINDS[c.kind] ? WEV_CAMP_KINDS[c.kind].nm : 'monster camp'; }
+const WEV_SIZE_WORD = ['', 'a few tents', 'a small camp', 'a camp', 'a large camp', 'a war-camp ready to march'];
+// ---- the world boss: a giant that sleeps and wakes ----
+function wevBossDef(b){ return WEV_GIANTS[(b && b.g) || 0] || WEV_GIANTS[0]; }
+function wevBossName(b){ const d = wevBossDef(b); return `${d.nm} the ${MON_FAMILIES[d.fam].t[d.i][0]}`; }
+function wevBossEntry(b){ const d = wevBossDef(b); return famEntry(d.fam, d.i); }
+function wevBossWake(b){
+  const d = wevBossDef(b), turn = wevTurn();
+  for (let tries=0; tries<600; tries++){
+    const x = 6+rn(OW_COLS-12), y = 6+rn(OW_ROWS-12), t = G.ow.map[x][y];
+    if (!d.where.includes(t) && tries < 400) continue;
+    if (!encounterEligible(t) || t===OW_WATER || t===OW_RIVER) continue;
+    if (wevTowns().some(([tx,ty])=>Math.abs(tx-x) < 14 && Math.abs(ty-y) < 14)) continue;
+    Object.assign(b, { state:'awake', x, y, hx:x, hy:y, until: turn + 300 + rn(120) });
+    owReveal(x, y, 3);
+    wevSay(`the ground shakes - ${wevBossName(b)} has woken, ${wevWhere(x, y)}. It will roam for ${wevTime(b.until-turn)} before it sleeps again`, 'magic', `${wevBossName(b)} is awake!`);
+    return true;
+  }
+  b.until = turn + 50; return false;
+}
+function wevBossTick(e, turn){
+  if (!e.boss) e.boss = { g:rn(WEV_GIANTS.length), state:'sleep', until: turn + 160 + rn(80), hp:null };
+  const b = e.boss;
+  if (b.state==='sleep'){ if (turn >= b.until) wevBossWake(b); return; }
+  if (turn >= b.until){ b.state = 'sleep'; b.until = turn + 260 + rn(140); b.hp = null; b.maxHp = null; wevSay(`${wevBossName(b)} lies down and sleeps again - the land is quiet`, '');
+    b.g = rn(WEV_GIANTS.length); return; }
+  if (chn(0.4)){   // it lumbers about near where it woke
+    const d = [[1,0],[-1,0],[0,1],[0,-1]][rn(4)], nx = b.x+d[0], ny = b.y+d[1];
+    if (nx>0 && ny>0 && nx<OW_COLS-1 && ny<OW_ROWS-1 && Math.abs(nx-b.hx) <= 10 && Math.abs(ny-b.hy) <= 10){ const t = G.ow.map[nx][ny]; if (encounterEligible(t) && t!==OW_WATER && t!==OW_RIVER) { b.x = nx; b.y = ny; } }
+  }
+}
+// ---- the ticking world: called once a turn ----
+function wevTick(){
+  const p = G.player; if (!p || !G.ow || !G.ow.map || G.gameOver) return;
+  const e = wevP(), turn = wevTurn(), n = e.next;
+  // events that run out
+  for (const d of e.dyn.slice()){
+    if (turn < d.until) continue;
+    e.dyn.splice(e.dyn.indexOf(d), 1);
+    if (d.kind==='siege'){ e.sacked[d.key] = turn + DAY_LENGTH; wevSay(`no one came to break the siege of ${o3TownName(d.x, d.y)} - the raiders sacked it, and its shops will charge more for a day`, 'hit', `${o3TownName(d.x, d.y)} was sacked`); }
+  }
+  for (const k in e.sacked) if (turn >= e.sacked[k]) delete e.sacked[k];
+  for (const k in e.town){ const t = e.town[k]; if (turn < t.until) continue;
+    if (t.kind==='raid' && !t.done){ e.sacked[k] = turn + DAY_LENGTH/2; const [x,y] = k.split(',').map(Number); wevSay(`the raiders were driven off from ${o3TownName(x, y)}, but not before they burned the market - its shops charge more for a while`, 'hit'); }
+    delete e.town[k]; }
+  // camps grow; a full war-camp marches on the nearest town
+  for (const c of e.camps){
+    if (turn < c.grow) continue;
+    c.grow = turn + 380 + rn(160);
+    if (c.size < 5){ c.size++; if (c.size>=4 && owSeen(c.x, c.y)) wevSay(`the ${wevCampName(c)} ${wevWhere(c.x, c.y)} keeps growing - ${WEV_SIZE_WORD[c.size]} now`, 'new', c.size===5 ? 'A war-camp is ready to march' : null); continue; }
+    const ti = wevTerrAt(c.x, c.y), key = wevTerrKey(ti);
+    if (!key || turn < (n.siege||0) || e.dyn.some(d=>d.kind==='siege')) continue;   // (one siege at a time, and a breather between them)
+    n.siege = turn + DAY_LENGTH*2;
+    const [tx,ty] = key.split(',').map(Number);
+    e.dyn.push({ id:e.seq++, kind:'siege', key, x:tx, y:ty, camp:c.kind, until: turn + DAY_LENGTH });
+    c.size = 2;
+    wevSay(`the warband of the ${wevCampName(c)} has marched on ${o3TownName(tx, ty)} and laid siege to it! Break the siege within ${wevTime(DAY_LENGTH)} or the town will be sacked`, 'hit', `${o3TownName(tx, ty)} is under siege!`);
+  }
+  if (turn >= (n.camp||0)){ n.camp = turn + 450 + rn(300); if (e.camps.length < 9) wevNewCamp(false); }
+  // dynamic events: a siege out of nowhere, or a falling star
+  if (turn >= (n.dyn||0)){
+    n.dyn = turn + 320 + rn(240); e.dynN = (e.dynN||0) + 1;
+    if (e.dynN > 1 && chn(0.35) && turn >= (n.siege||0) && !e.dyn.some(d=>d.kind==='siege')){ const towns = wevTowns().filter(([x,y])=>!e.dyn.some(d=>d.kind==='siege' && d.x===x && d.y===y) && !(G.gameMode===3 && G.owPos.x===x && G.owPos.y===y));
+      if (towns.length){ const [tx,ty] = towns[rn(towns.length)], key = tx+','+ty, kinds = Object.keys(WEV_CAMP_KINDS);
+        e.dyn.push({ id:e.seq++, kind:'siege', key, x:tx, y:ty, camp:kinds[rn(kinds.length)], until: turn + DAY_LENGTH }); n.siege = turn + DAY_LENGTH*2;
+        wevSay(`a raiding host has surrounded ${o3TownName(tx, ty)}, ${wevWhere(tx, ty)}! Break the siege within ${wevTime(DAY_LENGTH)} or the town will be sacked`, 'hit', `${o3TownName(tx, ty)} is under siege!`); } }
+    else wevMeteor();
+  }
+  wevBossTick(e, turn);
+  // the towns' own events
+  if (turn >= (n.town||0)){
+    n.town = turn + 220 + rn(200);
+    const towns = wevTowns().map(([x,y])=>x+','+y).filter(k=>!e.town[k] && !(G.gameMode===3 && curTownKey()===k));
+    const known = towns.filter(k=>(G.ow.visitedTowns||[]).includes(k)), pool = known.length && chn(0.75) ? known : towns;
+    if (pool.length){
+      const key = pool[rn(pool.length)], [x,y] = key.split(',').map(Number), r = Math.random();
+      const kind = r < 0.4 ? 'festival' : r < 0.75 ? 'market' : 'raid', dur = kind==='festival' ? DAY_LENGTH : kind==='market' ? DAY_LENGTH*0.75 : DAY_LENGTH*0.6;
+      const ev = e.town[key] = { kind, id:e.seq++, until: turn + Math.round(dur) };
+      if (kind==='festival') ev.name = WEV_FESTIVALS[rn(WEV_FESTIVALS.length)];
+      const nm = o3TownName(x, y);
+      if (kind==='festival') wevSay(`${nm} is holding the ${ev.name} - its shops are cheaper and every visitor gets a treat (${wevTime(ev.until-turn)} left)`, 'new', `Festival in ${nm}`);
+      else if (kind==='market') wevSay(`it's market day in ${nm} - a travelling trader with rare goods is on the plaza for ${wevTime(ev.until-turn)}`, 'new', `Market day in ${nm}`);
+      else wevSay(`the alarm bell rings in ${nm} - monsters are raiding it! Get there within ${wevTime(ev.until-turn)} to help defend it`, 'hit', `${nm} is being raided!`);
+    }
+  }
+  // the lost child gives up waiting
+  const rt = p.roadTask; if (rt && turn >= rt.until){ p.roadTask = null; wevSay(`${rt.name} must have found the way home to ${rt.town} without you`, ''); }
+}
+const WEV_FESTIVALS = ['Harvest Festival','Midsummer Fair','Feast of Lanterns','Founders\' Day','Brewers\' Festival','Spring Revel'];
+function wevMeteor(){
+  const e = G.ow.ev, turn = wevTurn();
+  for (let tries=0; tries<400; tries++){
+    const a = Math.random()*Math.PI*2, d = 10 + Math.random()*26, x = Math.round(G.owPos.x + Math.cos(a)*d), y = Math.round(G.owPos.y + Math.sin(a)*d);
+    if (x<2 || y<2 || x>=OW_COLS-2 || y>=OW_ROWS-2) continue;
+    const t = G.ow.map[x][y]; if (![OW_GRASS, OW_DESERT, OW_TUNDRA].includes(t) || richAt(x, y) || skNodeAt(x, y)) continue;
+    const until = turn + 300 + rn(120), r = { x, y, type:'meteor', k:'mining', until }; r.left = richMax(r);
+    G.ow.rich = G.ow.rich || []; G.ow.rich.push(r);
+    e.dyn.push({ id:e.seq++, kind:'meteor', x, y, until });
+    owReveal(x, y, 2);
+    wevSay(`a star falls from the sky and strikes the ground ${wevWhere(x, y)} - its rock is rich in rare ore, and it will cool and crumble in ${wevTime(until-turn)}`, 'magic', 'A star has fallen!');
+    return true;
+  }
+  return false;
+}
+// ---- fights: the giant, a camp, a siege, a raid, a highwayman ----
+function wevMon(entry, lvlTo){
+  let x = 0, y = 0, tries = 0;
+  do { x = 2+rn(COLS-4); y = 1+rn(7); tries++; } while ((G.map[x][y]!==T_FLOOR || G.mon.some(m=>m.alive && m.x===x && m.y===y)) && tries < 120);
+  const m = newMonster();
+  m.alive = 1; m.x = x; m.y = y;
+  m.hp = rollDice(entry.hd, 8) + entry.hd; m.maxHp = m.hp; m.ac = entry.ac; m.atkBonus = entry.atk;
+  m.dmg1 = entry.dmg1; m.dmg2 = entry.dmg2; m.xp = entry.xp;
+  m.sym = entry.sym; m.nm = entry.nm; m.col = monsterCol(entry); m.undead = entry.undead; m.mlevel = entry.lvl;
+  m.abilities = entry.abilities.slice(); m.art = entry.art; monEntryExtras(m, entry);
+  if (lvlTo && entry.lvl < lvlTo){ const k = Math.min(2.4, 1 + 0.09*(lvlTo - entry.lvl)); m.hp = m.maxHp = roundH(m.hp*k); m.dmg2 = roundH(m.dmg2*Math.sqrt(k)); m.xp = roundH(m.xp*k); }
+  G.mon.push(m); return m;
+}
+function wevHumanEntry(L){ const lvl = clampMLevel(L); return Object.assign({}, MONSTER_LEVELS[lvl-1], HUMAN_SKIN[chn(0.6) ? 0 : 1], { lvl }); }
+function wevCampEntry(kind, L){
+  const K = WEV_CAMP_KINDS[kind] || WEV_CAMP_KINDS.goblin;
+  if (K.human) return wevHumanEntry(L);
+  return famPickFrom([K.fam], L, 3) || famEntry(K.fam, 0);
+}
+function wevFightStart(kind, id, build){
+  if (G.gather) skStop();
+  generateArena();
+  G.gameMode = 2; G.mandatoryFight = false; G.mon = [];
+  build(clampMLevel(G.player.level));
+  G.wevFight = { kind, id };
+  setUi('playing'); renderGame();
+}
+function wevCampFight(c){
+  wevFightStart('camp', c.id, L=>{
+    const n = Math.min(6, 1 + c.size);
+    for (let i=0;i<n;i++) wevMon(wevCampEntry(c.kind, L), L);
+    const chief = G.mon[0];
+    if (c.size >= 5) upgradeToNamedElite(chief); else if (c.size >= 3) upgradeToElite(chief);
+    chief.nm = chief.nm.replace(/^Champion /, '') ; if (c.size >= 3 && !chief.namedElite) chief.nm = 'Chieftain ' + chief.nm;
+  });
+  wevSay(`you storm the ${wevCampName(c)} - ${G.mon.length} of them rush to meet you!`, 'new');
+}
+function wevBossFight(b){
+  wevFightStart('boss', 0, L=>{
+    const m = wevMon(wevBossEntry(b), Math.max(L, 14));
+    m.elite = true; m.namedElite = true; m.worldBoss = true;
+    m.maxHp = b.maxHp || roundH(m.maxHp*7 + G.player.level*6); m.dmg2 = roundH(m.dmg2*2.1); m.xp = roundH(m.xp*8); m.ac += 2;
+    m.hp = b.hp && b.hp > 0 ? Math.min(b.hp, m.maxHp) : m.maxHp; b.hp = m.hp; b.maxHp = m.maxHp;
+    m.nm = wevBossName(b); m.x = Math.floor(COLS/2); m.y = 3; if (G.map[m.x][m.y]!==T_FLOOR) G.map[m.x][m.y] = T_FLOOR;
+  });
+  const m = G.mon[0];
+  wevSay(m.hp < m.maxHp ? `${m.nm} turns on you again, still bleeding from your last fight (${m.hp}/${m.maxHp} life)` : `${m.nm} looms over you - the earth trembles with every step!`, 'new');
+}
+function wevSiegeFight(d){
+  wevFightStart(d.kind==='raid' ? 'raid' : 'siege', d.id, L=>{
+    const n = 3 + rn(2);
+    for (let i=0;i<n;i++) wevMon(wevCampEntry(d.camp || 'orc', L), L);
+    upgradeToElite(G.mon[0]); G.mon[0].nm = G.mon[0].nm.replace(/^Champion /, 'Captain ');
+  });
+}
+function wevHighwayFight(purse){
+  wevFightStart('highway', 0, L=>{
+    const h = wevMon(wevHumanEntry(L+1), L); upgradeToElite(h); h.nm = 'the highwayman';
+    for (let i=0;i<1+rn(2);i++){ const t = wevMon(wevHumanEntry(L), L); t.nm = 'thug'; }
+  });
+  G.wevFight.purse = purse;
+  wevSay('"Your money or your life!" - you choose neither, and draw steel', 'new');
+}
+// the boss's wounds carry between fights (it's the same giant), so sync its life every frame
+function wevFrame(){
+  if (G.wevPending && G.ui==='playing' && !G.gameOver){ const d = G.wevPending; G.wevPending = null; if (G.gameMode===3) wevDialog(...d); }
+  const f = G.wevFight; if (!f) return;
+  if (G.gameMode!==2){ if (f.kind==='boss' && G.ow && G.ow.ev && G.ow.ev.boss && G.ow.ev.boss.hp > 0) wevSay(`you break off the fight - ${wevBossName(G.ow.ev.boss)} will remember its wounds`, ''); G.wevFight = null; return; }
+  if (f.kind==='boss'){ const m = G.mon.find(m=>m.worldBoss); if (m && G.ow.ev && G.ow.ev.boss) G.ow.ev.boss.hp = m.alive ? m.hp : 0; }
+}
+// a fight won (frameLoop's "the field falls quiet"); true when it puts you somewhere itself
+function wevArenaWon(){
+  const f = G.wevFight; if (!f) return false;
+  G.wevFight = null;
+  const e = wevP(), p = G.player, st = wevStats(), L = p.level;
+  if (f.kind==='camp'){
+    const c = e.camps.find(c=>c.id===f.id); if (!c) return false;
+    e.camps.splice(e.camps.indexOf(c), 1); st.camps++;
+    const gold = roundH((30 + c.size*30 + L*6)*goldFindMult()); p.gold += gold;
+    if (chn(0.3 + c.size*0.12)) addToInventory(genItem(mn(NMLVL, lootLevel()+1)+playerMF(), lootKind(), 3, chn(0.5)));
+    tkP().cur.guild += c.size >= 3 ? 2 : 1;
+    wevSay(`the ${wevCampName(c)} is broken - you burn the tents and take ${gold} gold and ${c.size >= 3 ? 2 : 1} guild token${c.size>=3 ? 's' : ''} from its spoils`, 'good', 'Camp destroyed');
+    const ti = wevTerrAt(c.x, c.y), key = wevTerrKey(ti);
+    if (key && !e.camps.some(o=>wevTerrAt(o.x, o.y)===ti)){
+      e.secured[key] = true; if (!st.secured.includes(key)) st.secured.push(key);
+      p.rep = p.rep || {}; p.rep[key] = repAt(key) + 2;
+      G.ow.encounters = (G.ow.encounters||[]).filter(r=>wevTerrAt(r.x, r.y)!==ti || chn(0.3));   // most of the roamers there scatter
+      wevSay(`${cap(wevTerrName(ti))} are safe again - fewer monsters will roam there and the travellers are friendlier. ${o3TownName(...key.split(',').map(Number))} is grateful (+2 standing)`, 'magic', `${cap(wevTerrName(ti))} secured`);
+    }
+    checkAchievements(); return false;
+  }
+  if (f.kind==='boss'){
+    const b = e.boss; st.boss++;
+    const gold = roundH((400 + L*40)*goldFindMult()); p.gold += gold;
+    addToInventory(mkLamp()); tkP().cur.guild += 5;
+    wevSay(`${wevBossName(b)} crashes to the ground and the whole land feels it! You take ${gold} gold from its hoard, a Lamp of Knowledge and 5 guild tokens`, 'magic', 'World boss defeated!');
+    Object.assign(b, { state:'sleep', until: wevTurn() + 400 + rn(200), hp:null, maxHp:null, g:rn(WEV_GIANTS.length) });
+    checkAchievements(); return false;
+  }
+  if (f.kind==='siege' || f.kind==='raid'){
+    let key = null;
+    if (f.kind==='siege'){ const d = e.dyn.find(d=>d.id===f.id); if (!d) return false; e.dyn.splice(e.dyn.indexOf(d), 1); key = d.key; }
+    else { for (const k in e.town) if (e.town[k].id===f.id){ key = k; e.town[k].done = true; e.town[k].until = wevTurn(); } }
+    if (!key) return false;
+    const [x,y] = key.split(',').map(Number), nm = o3TownName(x, y);
+    const gold = roundH((80 + L*12)*goldFindMult()); p.gold += gold; st.defended++;
+    p.rep = p.rep || {}; p.rep[key] = repAt(key) + (f.kind==='siege' ? 3 : 2);
+    wevSay(`${f.kind==='siege' ? 'the siege is broken' : 'the raiders flee'} - ${nm} cheers you through the gate! The reeve pays you ${gold} gold (+${f.kind==='siege' ? 3 : 2} standing)`, 'magic', f.kind==='siege' ? `You broke the siege of ${nm}` : `You saved ${nm}`);
+    checkAchievements();
+    if (G.owPos.x===x && G.owPos.y===y){ enterVillage(); return true; }
+    return false;
+  }
+  if (f.kind==='highway'){ const gold = roundH((f.purse||40)*2*goldFindMult()); p.gold += gold; st.road++; wevSay(`the highwayman's purse holds ${gold} gold - he won't be robbing anyone else`, 'good'); checkAchievements(); return false; }
+  return false;
+}
+// ---- stepping onto things on the overworld ----
+function wevStep(){
+  const e = wevP(); if (!e) return false;
+  const b = e.boss, x = G.owPos.x, y = G.owPos.y;
+  if (b && b.state==='awake' && b.x===x && b.y===y){ wevBossFight(b); return true; }
+  const c = e.camps.find(c=>c.x===x && c.y===y); if (c){ wevCampFight(c); return true; }
+  return wevRoadRoll();
+}
+// a besieged town: you have to break the siege to get in
+function wevTownGate(x, y){
+  const e = wevP(); if (!e) return false;
+  const d = e.dyn.find(d=>d.kind==='siege' && d.x===x && d.y===y); if (!d) return false;
+  const nm = o3TownName(x, y);
+  wevDialog(`The siege of ${nm}`, `A ${WEV_CAMP_KINDS[d.camp] ? WEV_CAMP_KINDS[d.camp].nm.replace(/ camp$| hideout$| warren$/, '') : 'raiding'} host has ${nm} surrounded. Smoke rises over the palisade and the gate is barred. If no one breaks the siege in ${wevTime(d.until - wevTurn())}, the town will be sacked.`,
+    [[`Break the siege (fight)`, ()=>{ wevSiegeFight(d); wevSay(`you charge the besiegers at the gate of ${nm}!`, 'new'); }], ['Turn back', ()=>{ logMsg('you keep your distance from the siege lines', ''); }]]);
+  return true;
+}
+// arriving in a town: the lost child's family, a festival treat, a market trader, a raid
+function wevOnEnterTown(){
+  const e = wevP(), key = curTownKey(), p = G.player; if (!e || !key) return;
+  const nm = o3TownName(G.owPos.x, G.owPos.y), turn = wevTurn();
+  const rt = p.roadTask;
+  if (rt && rt.key===key){ p.roadTask = null; const gold = roundH((50 + p.level*8)*goldFindMult()); p.gold += gold; p.rep = p.rep || {}; p.rep[key] = repAt(key) + 2; wevStats().road++;
+    wevSay(`${rt.name} spots home and runs to a tearful mother, who presses ${gold} gold on you. ${nm} won't forget this (+2 standing)`, 'magic', 'Child returned home'); checkAchievements(); }
+  if (e.sacked[key]) logMsg(`${nm} is still clearing up after the raiders - its shops charge a quarter more`, 'hit');
+  const t = e.town[key]; if (!t || turn >= t.until) return;
+  if (t.kind==='festival'){
+    logMsg(`${nm} is celebrating the ${t.name}! Bunting over the plaza, music from the tavern, and 10% off in every shop (${wevTime(t.until-turn)} left)`, 'new', true);
+    if (!t.gift){ t.gift = 1; tkP().cur.guild += 1; const f = SK_FISH[Math.min(SK_FISH.length-1, 1 + Math.floor(p.level/12))]; skAdd('c_'+f.id, 3);
+      logMsg(`a festival-goer presses three cooked ${f.nm.toLowerCase()} and a guild token on you`, 'good'); }
+  } else if (t.kind==='market'){ wevMarketNpc(t); logMsg(`it's market day - a travelling trader has set up on the plaza with rare goods (${wevTime(t.until-turn)} left)`, 'new', true); }
+  else if (t.kind==='raid' && !t.done){
+    G.wevPending = [`Raid on ${nm}!`, `The alarm bell is ringing - monsters have broken through the fields and are at the palisade. The watch is outnumbered. Will you help defend ${nm}?`,
+      [['Defend the town (fight)', ()=>{ wevSiegeFight({ kind:'raid', id:t.id, camp:['goblin','orc','kobold'][t.id%3] }); wevSay(`you run to the palisade with the watch!`, 'new'); }], ['Leave it to the watch', ()=>{ logMsg('you leave the watch to it', ''); }]]];   // shown once the town is on screen (see wevFrame)
+  }
+}
+// ---- the market-day trader ----
+function wevMarketNpc(t){
+  if (G.interior || (G.villageNpcs||[]).some(n=>n.service==='rareTrader')) return;
+  const spot = [[9,10],[10,13],[11,11],[9,14],[12,12]].find(([x,y])=>G.map[x] && G.map[x][y]===T_FLOOR && !(G.player.x===x && G.player.y===y));
+  if (!spot) return;
+  const [x,y] = spot, seed = t.id;
+  G.villageNpcs.push({ x, y, name:['Ali','Fenwick','Marisol','Old Tobin','Zahra'][seed%5]+' the Trader', role:'Travelling trader', service:'rareTrader', key:'rare' });
+  G.map[x][y] = T_VENDOR; G.villageDeco[x][y] = 'npc';
+  if (!t.stock){
+    const L = lootLevel();
+    t.stock = [ { id:'lamp', nm:'Lamp of Knowledge', price:1500 }, { id:'clue', nm:'Clue Scroll', price:900 }, { id:'ckey', nm:'Crystal Key', price:2400 }, { id:'potions', nm:'Potion Pack', price:350 } ];
+    for (let i=0;i<2;i++){ const it = genItem(mn(NMLVL, L+3), lootKind(), 3, chn(0.5)); t.stock.push({ id:'gear'+i, nm:it.nm, item:it, price:Math.max(600, roundH((it.price||300)*3)) }); }
+  }
+}
+function wevTownEvent(){ const e = G.ow && G.ow.ev, key = curTownKey(); if (!e || !key) return null; const t = e.town[key]; return t && wevTurn() < t.until ? t : null; }
+function buildRareTrader(){
+  const t = wevTownEvent(), p = G.player, n = villageNpcFor('rareTrader');
+  const rows = t && t.kind==='market' && t.stock ? t.stock.map((s,i)=>`<div class="shoprow"><span><b>${s.item ? itemNameHtml(s.item) : esc(s.nm)}</b></span><span class="desc">${s.sold ? 'sold' : s.item ? 'a rare find' : ({lamp:'rub it for experience in a skill of your choice', clue:'a trail that ends in a casket', ckey:'opens a crystal chest for a second treasure', potions:'three potions for your level'})[s.id]||''}</span>
+      <span class="muted" style="color:${COL.gold}">${s.price.toLocaleString()}g</span><span>${s.sold ? '<span class="qtag done">sold</span>' : `<button class="btn" ${p.gold >= s.price ? '' : 'disabled'} onclick="wevBuy(${i})">buy</button>`}</span></div>`).join('') : '<div class="muted">The trader has packed up and gone.</div>';
+  return `<h2 class="panel-title">${esc((n ? n.name : 'The travelling trader').toUpperCase())}</h2>
+    <div class="sub">"Rare goods from far roads - here today, gone tomorrow."${t ? ` &middot; leaves in ${wevTime(t.until - wevTurn())}` : ''} &middot; you have <b style="color:${COL.gold}">${p.gold.toLocaleString()}</b> gold</div>
+    <div class="ovbody">${rows}<div class="btnrow"><button class="btn" onclick="setUi('playing')">close (Esc)</button></div></div>`;
+}
+function wevBuy(i){
+  const t = wevTownEvent(), p = G.player; if (!t || !t.stock) return; const s = t.stock[i]; if (!s || s.sold || p.gold < s.price) return;
+  if (G.inv.length >= MAXINV && (s.item || s.id==='lamp' || s.id==='clue')){ notify('Your pack is full', 'warn'); return; }
+  p.gold -= s.price; s.sold = 1;
+  if (s.item) addToInventory(s.item); else if (s.id==='lamp') addToInventory(mkLamp()); else if (s.id==='clue') addToInventory(mkClue()); else if (s.id==='ckey') skAdd('crystalkey', 1); else if (s.id==='potions') for (let k=0;k<3;k++) addToInventory(genPotion(lootLevel()));
+  logMsg(`you buy ${s.item ? itemNameHtml(s.item) : esc(s.nm)} for ${s.price.toLocaleString()} gold`, 'loot', true); sfx('gold');
+  renderOverlay(); saveCurrentGame();
+}
+// prices: a festival takes 10% off, a sacked town charges a quarter more
+function wevPriceMult(key){ const e = G.ow && G.ow.ev; if (!e || !key) return 1; const t = e.town[key], turn = wevTurn(); return (t && t.kind==='festival' && turn < t.until ? 0.9 : 1) * (e.sacked[key] && turn < e.sacked[key] ? 1.25 : 1); }
+// ---- the road: people you meet ----
+function wevDialog(title, text, opts, sub){ G.wevDlg = { title, text, opts, sub:sub||'' }; setUi('wevent'); }
+function buildWorldEvent(){
+  const d = G.wevDlg;
+  if (!d) return `<h2 class="panel-title">ON THE ROAD</h2><div class="ovbody"><div class="muted">They've gone.</div><div class="btnrow"><button class="btn" onclick="setUi('playing')">close</button></div></div>`;
+  return `<h2 class="panel-title">${esc(d.title.toUpperCase())}</h2>${d.sub ? `<div class="sub">${d.sub}</div>` : ''}
+    <div class="ovbody"><div style="font-size:14px;line-height:1.65;margin:4px 0 14px;">${d.text}</div>
+    <div class="btnrow" style="flex-wrap:wrap;justify-content:flex-start;">${d.opts.map((o,i)=>`<button class="btn ${i===0 ? 'primary' : ''}" onclick="wevChoose(${i})">${i+1}. ${esc(o[0])}</button>`).join('')}</div></div>`;
+}
+function wevChoose(i){
+  const d = G.wevDlg; if (!d || !d.opts[i]) return;
+  G.wevDlg = null; setUi('playing');
+  try{ d.opts[i][1](); }catch(e){ console.error(e); }
+  renderGame(); saveCurrentGame();
+}
+function wevRoadRoll(){
+  const e = G.ow.ev, p = G.player, turn = wevTurn(); if (!e || G.ui!=='playing' || G.gameMode!==0) return false;
+  if (turn < (e.next.road||0) || G.ow.map[G.owPos.x][G.owPos.y]===OW_WATER) return false;
+  const safe = wevSecuredAt(G.owPos.x, G.owPos.y);
+  if (!chn(safe ? 1/70 : 1/140)) return false;
+  e.next.road = turn + 100 + rn(80);
+  const kinds = ['child','wizard','sandwich','genie','dwarf'];
+  if (!safe) kinds.push('highway', 'highway');   // no highwaymen in lands you've made safe
+  const k = kinds[rn(kinds.length)];
+  WEV_ROAD[k](); return true;
+}
+function wevNearestTown(exceptHere){
+  let best = null, bd = 1e9;
+  for (const [x,y] of wevTowns()){ const d = Math.hypot(x-G.owPos.x, y-G.owPos.y); if (d < bd && !(exceptHere && d < 1)){ bd = d; best = [x,y]; } }
+  return best;
+}
+function wevBlink(r){   // the sandwich lady's tray: you come to a few steps away
+  for (let tries=0; tries<60; tries++){ const x = G.owPos.x + rn(2*r+1) - r, y = G.owPos.y + rn(2*r+1) - r;
+    if (o3Passable(x,y) && !OW_SITE_TILES.includes(G.ow.map[x][y]) && G.ow.map[x][y]!==OW_WATER){ G.owPos.x = x; G.owPos.y = y; if (typeof O3!=='undefined') O3.path = []; return; } }
+}
+const WEV_ROAD = {
+  child(){
+    const t = wevNearestTown(true); if (!t) return;
+    const key = t[0]+','+t[1], town = o3TownName(t[0], t[1]), name = ['Pip','Wren','Tilly','Rowan','Bram','Elsie'][rn(6)];
+    wevDialog('A lost child', `A small child is sitting by the road, crying. "I'm ${name}... I went looking for frogs and now I can't find the way home to <b>${esc(town)}</b>!" It's ${wevWhere(t[0], t[1])}.`,
+      [[`Take ${name} home to ${town}`, ()=>{ G.player.roadTask = { kind:'child', key, town, name, until: wevTurn() + DAY_LENGTH*2 }; wevSay(`${name} takes your hand. Walk into ${town} to bring them home (${wevTime(DAY_LENGTH*2)})`, 'new', `Take ${name} to ${town}`); }],
+       ['Point the way and walk on', ()=>logMsg(`you point ${name} toward ${town} and hope for the best`, '')]], 'someone on the road');
+  },
+  wizard(){
+    const here = G.owPos.x+','+G.owPos.y, towns = (G.ow.visitedTowns||[]).filter(k=>k!==here), key = towns.length ? towns[rn(towns.length)] : null;
+    const town = key ? o3TownName(...key.split(',').map(Number)) : null;
+    const opts = [];
+    if (key) opts.push([`"A lift to ${town}, please"`, ()=>{ logMsg('the wizard waves a hand and the world folds around you', 'magic'); worldTeleport(key); }]);
+    opts.push(['"Some runes, if you can spare them"', ()=>{ const r = ['air','water','earth','fire','mind'], a = r[rn(r.length)]; skAdd('r_'+a, 40); skAdd('r_mind', 20); wevStats().road++; wevSay(`the wizard tips 40 ${a} runes and 20 mind runes into your bag. "Mind how you go!"`, 'good'); checkAchievements(); }]);
+    opts.push(['"No thanks"', ()=>logMsg('the wizard shrugs and vanishes with a pop', '')]);
+    wevDialog('A travelling wizard', `An old wizard in star-spangled robes is sitting on a milestone, eating an apple. "Ah, a traveller! I'm going your way - well, I'm going every way, really. Can I offer you something?"`, opts, 'someone on the road');
+  },
+  sandwich(){
+    const foods = ['baguette','triangle sandwich','square sandwich','bread roll','kebab','chocolate bar','meat pie'], want = rn(foods.length);
+    const give = ()=>{ const f = SK_FISH[Math.min(SK_FISH.length-1, 2 + Math.floor(G.player.level/10))]; skAdd('c_'+f.id, 2); wevStats().road++; wevSay(`"That's my lovely!" She tucks two cooked ${f.nm.toLowerCase()} in your bag for later`, 'good'); checkAchievements(); };
+    const wrong = ()=>{ const p = G.player, dmg = Math.max(1, Math.round(effMaxHp()*0.08)); p.hp = Math.max(1, p.hp - dmg); wevBlink(5); wevSay(`"I SAID ${foods[want].toUpperCase()}!" She whacks you with the tray (-${dmg} life) and you come to a little way down the road`, 'hit'); };
+    wevDialog('The sandwich lady', `A woman with a tray of food steps into the road. "You look famished, dearie! <b>Have a ${foods[want]}</b> - go on!"`,
+      foods.map((f,i)=>[cap(f), i===want ? give : wrong]), 'pick the one she offers');
+    G.wevDlg.noEsc = true;
+  },
+  genie(){
+    const L = G.player.level;
+    wevDialog('A genie', `A battered old lamp lies in the road. As you pick it up, a genie bursts out in a cloud of blue smoke. "Free at last! For your trouble, master, one wish - within reason."`,
+      [['"Wisdom"', ()=>{ addToInventory(mkLamp()); wevStats().road++; wevSay('the genie hands you a Lamp of Knowledge and winks out of sight', 'good'); checkAchievements(); }],
+       ['"Riches"', ()=>{ const g = roundH((120 + L*20)*goldFindMult()); G.player.gold += g; wevStats().road++; wevSay(`gold rains from the sky - ${g} coins!`, 'good'); checkAchievements(); }]], 'someone on the road');
+    G.wevDlg.noEsc = true;
+  },
+  dwarf(){
+    wevDialog('A drunken dwarf', `A dwarf is weaving down the road, singing. He throws an arm round your shoulders. "Yer me besht mate, you are! Have a kebab! Have TWO kebabs!"`,
+      [['Take the kebabs', ()=>{ const f = SK_FISH[Math.min(SK_FISH.length-1, 1 + Math.floor(G.player.level/12))]; skAdd('c_'+f.id, 2); wevStats().road++; wevSay(`they're... probably ${f.nm.toLowerCase()}. They'll do (two cooked ${f.nm.toLowerCase()})`, 'good'); checkAchievements(); }],
+       ['Help him home to bed', ()=>{ const g = roundH(30 + G.player.level*4); G.player.gold += g; wevStats().road++; wevSay(`you steer him to a hay barn. He presses ${g} gold on you before he starts snoring`, 'good'); checkAchievements(); }]], 'someone on the road');
+  },
+  highway(){
+    const purse = Math.min(G.player.gold, roundH(30 + G.player.level*6));
+    wevDialog('A highwayman', `A masked rider blocks the road and levels a crossbow at you. "Stand and deliver! ${purse} gold, and you ride on."`,
+      [[`Pay him (${purse} gold)`, ()=>{ G.player.gold -= purse; logMsg(`you hand over ${purse} gold. He tips his hat and gallops off`, 'hit'); }], ['Fight', ()=>wevHighwayFight(purse)]], 'someone on the road');
+    G.wevDlg.noEsc = true;
+  },
+};
+// ---- the map: camps, the giant, sieges, falling stars and town events ----
+function wevMapList(){
+  const e = G.ow && G.ow.ev; if (!e) return [];
+  const out = [], turn = wevTurn();
+  for (const c of e.camps) if (owSeen(c.x, c.y)) out.push({ k:'camp', x:c.x, y:c.y, c });
+  if (e.boss && e.boss.state==='awake') out.push({ k:'boss', x:e.boss.x, y:e.boss.y, left:e.boss.until-turn });
+  for (const d of e.dyn) out.push({ k:d.kind, x:d.x, y:d.y, left:d.until-turn, d });
+  for (const key in e.town){ const t = e.town[key]; if (turn >= t.until || t.done) continue; const [x,y] = key.split(',').map(Number); out.push({ k:'town_'+t.kind, x, y, left:t.until-turn, t }); }
+  const rt = G.player && G.player.roadTask; if (rt){ const [x,y] = rt.key.split(',').map(Number); out.push({ k:'child', x, y, left:rt.until-turn }); }
+  return out;
+}
+function wevTipHtml(o){
+  const row = (a, b, col)=>`<div class="ttrow"><span class="muted">${a}</span><b style="color:${col||'var(--ink)'}">${b}</b></div>`;
+  if (o.k==='camp'){ const c = o.c, ti = wevTerrAt(c.x, c.y);
+    return `<div style="font-weight:600;color:#ff9a6a">${esc(cap(wevCampName(c)))}</div><div class="examine">${esc(cap(WEV_SIZE_WORD[c.size]))}. It grows if it's left alone, and a full war-camp marches on the nearest town.</div><hr>${row('size', c.size+' / 5')}${row('in', esc(wevTerrName(ti)))}${row('grows in', wevTime(c.grow - wevTurn()))}<div class="muted">walk into it to attack</div>`; }
+  if (o.k==='boss'){ const b = G.ow.ev.boss, m = wevBossEntry(b);
+    return `<div style="font-weight:600;color:#ff5a3a">${esc(wevBossName(b))}</div><div class="examine">A world boss: a giant that sleeps for days, then wakes and roams. Its wounds last between fights.</div><hr>${row('combat level', monCombatLevel({mlevel:Math.max(m.lvl, 14)}), monLevelColor({mlevel:Math.max(m.lvl,14)}))}${row('life', b.hp && b.maxHp ? `${b.hp} / ${b.maxHp}` : 'unhurt')}${row('sleeps in', wevTime(o.left))}<div class="muted">walk into it to fight</div>`; }
+  if (o.k==='siege') return `<div style="font-weight:600;color:#ff6a50">${esc(o3TownName(o.x, o.y))} is under siege</div><div class="examine">Walk into the town to break the siege, or it will be sacked.</div>${row('time left', wevTime(o.left), '#ffb060')}`;
+  if (o.k==='meteor') return `<div style="font-weight:600;color:#9ad8ff">A fallen star</div><div class="examine">Mine it for iron, coal, mithril, adamantite and runite before it crumbles.</div>${row('crumbles in', wevTime(o.left))}`;
+  if (o.k==='town_festival') return `<div style="font-weight:600;color:#ffd060">The ${esc(o.t.name)} in ${esc(o3TownName(o.x, o.y))}</div><div class="examine">10% off in every shop and a treat for each visitor.</div>${row('ends in', wevTime(o.left))}`;
+  if (o.k==='town_market') return `<div style="font-weight:600;color:#ffd060">Market day in ${esc(o3TownName(o.x, o.y))}</div><div class="examine">A travelling trader with rare goods is on the plaza.</div>${row('leaves in', wevTime(o.left))}`;
+  if (o.k==='town_raid') return `<div style="font-weight:600;color:#ff6a50">${esc(o3TownName(o.x, o.y))} is being raided</div><div class="examine">Go and help the watch defend it.</div>${row('time left', wevTime(o.left), '#ffb060')}`;
+  if (o.k==='child'){ const rt = G.player.roadTask; return `<div style="font-weight:600;color:#ffb0c8">${esc(rt.name)}'s home</div><div class="examine">Bring the lost child home to ${esc(rt.town)}.</div>${row('time left', wevTime(o.left))}`; }
+  return '';
+}
+function pmEventIcon(c, px, py, R, o, now){
+  c.save(); c.lineJoin = 'round'; c.lineCap = 'round';
+  const label = (txt, col, dy)=>{ c.font = `700 ${Math.round(clamp(R*0.62, 10*dpr, 13*dpr))}px 'JetBrains Mono', monospace`; c.textAlign = 'center'; c.textBaseline = 'top';
+    const w = c.measureText(txt).width + 8*dpr, h = Math.round(clamp(R*0.62, 10*dpr, 13*dpr)) + 4*dpr; c.fillStyle = 'rgba(26,20,14,0.85)'; c.fillRect(px - w/2, py + dy - 1*dpr, w, h); c.fillStyle = col; c.fillText(txt, px, py + dy + 1*dpr); };
+  if (o.k==='camp'){
+    const n = o.c.size, s = R*0.85;
+    for (let i=0;i<Math.min(3, 1+Math.floor(n/2));i++){ const tx = px + (i-1)*s*0.9, ty = py + (i%2 ? -s*0.25 : 0);
+      c.fillStyle = i%2 ? '#8a6a44' : '#a07a4a'; c.strokeStyle = '#2a1a0c'; c.lineWidth = Math.max(1, s*0.12);
+      c.beginPath(); c.moveTo(tx - s*0.6, ty + s*0.45); c.lineTo(tx, ty - s*0.6); c.lineTo(tx + s*0.6, ty + s*0.45); c.closePath(); c.fill(); c.stroke();
+      c.fillStyle = '#2a1a0c'; c.beginPath(); c.moveTo(tx - s*0.12, ty + s*0.45); c.lineTo(tx, ty); c.lineTo(tx + s*0.12, ty + s*0.45); c.closePath(); c.fill(); }
+    const f = 0.8 + Math.sin(now*9 + o.x)*0.2; c.fillStyle = `rgba(255,${Math.round(140+f*60)},40,0.95)`; c.beginPath(); c.arc(px, py + s*0.6, s*0.18*f, 0, Math.PI*2); c.fill();
+    c.strokeStyle = '#3a2a1a'; c.lineWidth = Math.max(1, s*0.08); c.beginPath(); c.moveTo(px + s*0.9, py + s*0.4); c.lineTo(px + s*0.9, py - s*1.1); c.stroke();
+    c.fillStyle = '#9a1a1a'; c.beginPath(); c.moveTo(px + s*0.9, py - s*1.1); c.lineTo(px + s*1.5, py - s*0.9); c.lineTo(px + s*0.9, py - s*0.7); c.closePath(); c.fill();
+    for (let i=0;i<5;i++){ c.fillStyle = i < n ? '#ff5a3a' : 'rgba(26,20,14,0.5)'; c.beginPath(); c.arc(px + (i-2)*s*0.36, py + s*0.95, s*0.13, 0, Math.PI*2); c.fill(); }
+  } else if (o.k==='boss'){
+    const b = G.ow.ev.boss, pulse = 0.5 + Math.sin(now*3)*0.5, BR = R*1.35;
+    c.strokeStyle = `rgba(255,60,30,${(0.45+pulse*0.5).toFixed(3)})`; c.lineWidth = 3*dpr; c.beginPath(); c.arc(px, py, BR*(1.25+pulse*0.25), 0, Math.PI*2); c.stroke();
+    c.fillStyle = 'rgba(30,8,4,0.92)'; c.beginPath(); c.arc(px, py, BR, 0, Math.PI*2); c.fill(); c.lineWidth = 2.5*dpr; c.strokeStyle = '#ff5a3a'; c.stroke();
+    const m = wevBossEntry(b); drawMonsterArt(px, py + BR*0.1, BR*1.6, m.art, '#ffb090', c);
+    c.font = `700 italic ${Math.round(clamp(R*0.7, 12*dpr, 16*dpr))}px Cinzel, Georgia, serif`; c.textAlign = 'center'; c.textBaseline = 'bottom';
+    c.lineWidth = 3*dpr; c.strokeStyle = 'rgba(240,226,190,0.9)'; c.strokeText(wevBossName(b), px, py - BR*1.3); c.fillStyle = '#8a1a0a'; c.fillText(wevBossName(b), px, py - BR*1.3);
+    label('awake ' + wevTime(o.left), '#ff9a7a', BR*1.25);
+  } else if (o.k==='siege'){
+    for (let i=0;i<6;i++){ const a = i/6*Math.PI*2 + now*0.4, f = 0.7 + Math.sin(now*8 + i*2)*0.3, fx = px + Math.cos(a)*R*1.55, fy = py + Math.sin(a)*R*1.55;
+      const g = c.createRadialGradient(fx, fy, 0, fx, fy, R*0.5*f); g.addColorStop(0, 'rgba(255,230,140,1)'); g.addColorStop(0.5, 'rgba(255,110,30,0.85)'); g.addColorStop(1, 'rgba(255,60,10,0)'); c.fillStyle = g; c.beginPath(); c.arc(fx, fy, R*0.5*f, 0, Math.PI*2); c.fill(); }
+    pmSmoke(px - R*0.6, py - R*1.1, R*1.1, now, 0.2); pmSmoke(px + R*0.7, py - R*0.9, R*0.9, now*1.1, 0.6);
+    label('SIEGE ' + wevTime(o.left), '#ff8a6a', R*2.05);
+  } else if (o.k==='meteor'){
+    const f = 0.7 + Math.sin(now*4)*0.3, g = c.createRadialGradient(px, py, 0, px, py, R*1.3); g.addColorStop(0, `rgba(170,230,255,${(0.9*f).toFixed(3)})`); g.addColorStop(1, 'rgba(120,180,255,0)');
+    c.fillStyle = g; c.beginPath(); c.arc(px, py, R*1.3, 0, Math.PI*2); c.fill();
+    c.fillStyle = 'rgba(40,30,24,0.6)'; c.beginPath(); c.ellipse(px, py + R*0.25, R*0.9, R*0.35, 0, 0, Math.PI*2); c.fill();
+    c.fillStyle = '#4a5a6a'; c.strokeStyle = '#1a2028'; c.lineWidth = Math.max(1, R*0.1); c.beginPath(); for (let i=0;i<7;i++){ const a = i/7*Math.PI*2, r = R*(0.45 + o3Hash(o.x, o.y, 600+i)*0.18); c.lineTo(px + Math.cos(a)*r, py + Math.sin(a)*r*0.8); } c.closePath(); c.fill(); c.stroke();
+    c.fillStyle = '#9ae0ff'; for (let i=0;i<3;i++){ c.beginPath(); c.arc(px + (i-1)*R*0.22, py + (i%2 ? -R*0.12 : R*0.08), R*0.08, 0, Math.PI*2); c.fill(); }
+    c.strokeStyle = 'rgba(200,240,255,0.7)'; c.lineWidth = Math.max(1, R*0.1); c.beginPath(); c.moveTo(px + R*0.5, py - R*0.5); c.lineTo(px + R*1.6, py - R*1.6); c.stroke();
+    label('star ' + wevTime(o.left), '#9ad8ff', R*0.9);
+  } else if (o.k.startsWith('town_') || o.k==='child'){
+    const kind = o.k.slice(5), fx = px + R*1.15, fy = py - R*1.35, s = R*0.55;
+    c.fillStyle = 'rgba(26,20,14,0.9)'; c.beginPath(); c.arc(fx, fy, s*1.05, 0, Math.PI*2); c.fill(); c.lineWidth = 1.5*dpr;
+    if (kind==='festival'){ const cols = ['#ff5a5a','#ffd040','#5ab0ff','#7ae07a']; for (let i=0;i<4;i++){ c.fillStyle = cols[(i + Math.floor(now*2))%4]; c.beginPath(); c.moveTo(fx - s*0.8 + i*s*0.42, fy - s*0.35); c.lineTo(fx - s*0.59 + i*s*0.42, fy + s*0.45); c.lineTo(fx - s*0.38 + i*s*0.42, fy - s*0.35); c.closePath(); c.fill(); } c.strokeStyle = '#ffd040'; }
+    else if (kind==='market'){ c.fillStyle = '#ffd040'; c.beginPath(); c.arc(fx, fy, s*0.6, 0, Math.PI*2); c.fill(); c.fillStyle = '#8a6a10'; c.font = `900 ${Math.round(s)}px Georgia, serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('$', fx, fy + s*0.05); c.strokeStyle = '#ffd040'; }
+    else if (kind==='raid'){ c.strokeStyle = '#ff5a3a'; c.lineWidth = Math.max(1.5, s*0.2); c.beginPath(); c.moveTo(fx - s*0.6, fy - s*0.6); c.lineTo(fx + s*0.6, fy + s*0.6); c.moveTo(fx + s*0.6, fy - s*0.6); c.lineTo(fx - s*0.6, fy + s*0.6); c.stroke(); c.lineWidth = 1.5*dpr; }
+    else { c.fillStyle = '#ff9ab8'; c.beginPath(); c.moveTo(fx, fy + s*0.6); c.bezierCurveTo(fx - s*1.1, fy - s*0.1, fx - s*0.5, fy - s*0.95, fx, fy - s*0.35); c.bezierCurveTo(fx + s*0.5, fy - s*0.95, fx + s*1.1, fy - s*0.1, fx, fy + s*0.6); c.fill(); c.strokeStyle = '#ff9ab8'; }
+    c.beginPath(); c.arc(fx, fy, s*1.05, 0, Math.PI*2); c.stroke();
+    { c.font = `700 ${Math.round(clamp(R*0.55, 9*dpr, 12*dpr))}px 'JetBrains Mono', monospace`; c.textAlign = 'left'; c.textBaseline = 'middle';
+      const txt = wevTime(o.left), w = c.measureText(txt).width + 6*dpr; c.fillStyle = 'rgba(26,20,14,0.85)'; c.fillRect(fx + s*1.15, fy - 7*dpr, w, 14*dpr); c.fillStyle = kind==='raid' ? '#ff9a7a' : '#ffe6a0'; c.fillText(txt, fx + s*1.15 + 3*dpr, fy); }
+  }
+  c.restore();
+}
+// the lands' state as a soft wash (with the danger layer): green where you've made them safe, amber and red where camps grow
+function pmTerritoryWash(zx, zy, vc, vr){
+  const e = G.ow.ev; if (!e) return;
+  const towns = wevTowns(), states = towns.map((t,i)=>wevTerrState(i)), key = states.join(',') + '|' + G.ow.seed;
+  if (pmTerritoryWash.key !== key || !pmTerritoryWash.cv){
+    pmTerritoryWash.key = key;
+    const c = pmTerritoryWash.cv = pmTerritoryWash.cv || document.createElement('canvas'); c.width = OW_COLS; c.height = OW_ROWS;
+    const x = c.getContext('2d'), id = x.createImageData(OW_COLS, OW_ROWS), a = wevTerr();
+    const rgb = { secured:[80,170,70], troubled:[220,150,40], dangerous:[200,40,30] };
+    for (let i=0;i<a.length;i++){ const s = states[a[i]], col = rgb[s]; if (!col) continue; const o = i*4; id.data[o] = col[0]; id.data[o+1] = col[1]; id.data[o+2] = col[2]; id.data[o+3] = 255; }
+    x.putImageData(id, 0, 0);
+  }
+  ctx.save(); ctx.globalAlpha = 0.16; ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(pmTerritoryWash.cv, zx, zy, vc, vr, 0, 0, vc*cellPx, vr*cellPx);
+  ctx.restore();
+}
+function owEventAtClient(e){
+  if (!mapF('events')) return null;
+  const m = owMapPoint(e); if (!m) return null;
+  const R = clamp(owZoomLastCellPx*1.2, 11*dpr, 22*dpr);
+  let best = null, bd = 1e9;
+  for (const o of wevMapList()){
+    const px = (o.x-owZoomLastCam.x)*owZoomLastCellPx + owZoomLastCellPx/2, py = (o.y-owZoomLastCam.y)*owZoomLastCellPx + owZoomLastCellPx/2;
+    const ox = o.k.startsWith('town_') || o.k==='child' ? px + R*1.15 : px, oy = o.k.startsWith('town_') || o.k==='child' ? py - R*1.35 : py;
+    const d = Math.hypot(m.cx-ox, m.cy-oy), r = o.k.startsWith('town_') || o.k==='child' ? R*0.75 : o.k==='siege' ? R*2 : R*1.3;
+    if (d < r && d < bd){ bd = d; best = o; } }
+  return best;
+}
+// ---- 3D: camps, the giant, falling stars, sieges ----
+function o3CampModel(g, gx, y0, gz, n, flames){
+  const T = THREE, tent = new T.MeshStandardMaterial({ color:new T.Color(0x8a6a44).convertSRGBToLinear(), roughness:0.9, flatShading:true });
+  const k = Math.max(3, Math.min(6, n||3));
+  for (let i=0;i<k;i++){ const a = i/k*Math.PI*2 + 0.4, r = 0.38 + (k>3 ? 0.14 : 0), tn = new T.Mesh(new T.ConeGeometry(0.26, 0.42, 4), tent); tn.position.set(gx+Math.cos(a)*r, y0+0.2, gz+Math.sin(a)*r); tn.rotation.y = a; tn.castShadow = true; g.add(tn); }
+  const fire = o3Glow('rgba(255,150,50,1)', 0.55); fire.position.set(gx, y0+0.15, gz); g.add(fire); if (flames) flames.push(fire);
+  const pole = new T.Mesh(new T.CylinderGeometry(0.015,0.015,0.8,4), new T.MeshStandardMaterial({ color:0x3a2a1a })); pole.position.set(gx-0.3, y0+0.4, gz-0.3); g.add(pole);
+  const flag = new T.Mesh(new T.PlaneGeometry(0.28,0.16), new T.MeshStandardMaterial({ color:0x8a1a1a, side:T.DoubleSide })); flag.position.set(gx-0.16, y0+0.72, gz-0.3); g.add(flag);
+}
+function o3SyncEvents(){
+  const T = THREE, e = G.ow && G.ow.ev; if (!e || !O3.win) return;
+  const b = e.boss && e.boss.state==='awake' ? e.boss : null;
+  const key = e.camps.map(c=>c.id+':'+c.x+','+c.y+':'+c.size).join('|') + '#' + (b ? b.g+':'+b.x+','+b.y : '') + '#' + e.dyn.map(d=>d.id).join(',') + '#' + O3.win.cx+','+O3.win.cy;
+  if (!O3.evGrp){ O3.evGrp = new T.Group(); }
+  if (O3.evGrp.parent !== O3.scene) O3.scene.add(O3.evGrp);
+  if (key === O3.evKey) return;
+  O3.evKey = key;
+  const g = O3.evGrp; while (g.children.length){ const c = g.children[0]; g.remove(c); c.traverse && c.traverse(o=>{ if (o.geometry && !(o.geometry.userData && o.geometry.userData.keep)) o.geometry.dispose(); }); }
+  if (O3.evFl) O3.flames = O3.flames.filter(f=>!O3.evFl.includes(f));
+  if (O3.evSm) O3.smoke = O3.smoke.filter(s=>!O3.evSm.includes(s));
+  O3.evHits = []; O3.evAnim = []; const fl = O3.evFl = [], sm = O3.evSm = [];
+  const addFl = f=>{ O3.flames.push(f); fl.push(f); }, addSm = s=>{ O3.smoke.push(s); sm.push(s); };
+  const inWin = (x, y)=> Math.abs(x+0.5-O3.win.cx) <= O3_W/2-1 && Math.abs(y+0.5-O3.win.cy) <= O3_W/2-1;
+  const hitM = O3.nodeHitM || (O3.nodeHitM = new T.MeshBasicMaterial({ visible:false }));
+  const hit = (gx, y0, gz, w, h, act)=>{ const hb = new T.Mesh(new T.BoxGeometry(w, h, w), hitM); hb.position.set(gx, y0+h/2, gz); hb.userData.act = act; g.add(hb); O3.evHits.push(hb); };
+  for (const c of e.camps){ if (!inWin(c.x, c.y)) continue; const gx = c.x+0.5, gz = c.y+0.5, y0 = Math.max(O3.heightAt(gx,gz), -0.14);
+    o3CampModel(g, gx, y0, gz, 2 + c.size, { push:addFl }); hit(gx, y0, gz, 1, 1, { kind:'wev', what:'camp', id:c.id, x:c.x, y:c.y }); }
+  if (b && inWin(b.x, b.y)){ const gx = b.x+0.5, gz = b.y+0.5, y0 = Math.max(O3.heightAt(gx,gz), -0.14), m = wevBossEntry(b);
+    const sp = new T.Sprite(new T.SpriteMaterial({ map:o3IconTex('wboss'+b.g, m.art, '#ffb090', '#ff5a3a'), transparent:true })); sp.scale.setScalar(1.5); sp.position.set(gx, y0+1.6, gz); g.add(sp);
+    const ring = new T.Mesh(new T.RingGeometry(0.55, 0.72, 32), new T.MeshBasicMaterial({ color:0xff4a2a, transparent:true, opacity:0.8, depthWrite:false })); ring.rotation.x = -Math.PI/2; ring.position.set(gx, y0+0.04, gz); g.add(ring);
+    const beam = new T.Mesh(new T.CylinderGeometry(0.2, 0.3, 10, 16, 1, true), new T.MeshBasicMaterial({ color:0xff5a3a, transparent:true, opacity:0.22, depthWrite:false, blending:T.AdditiveBlending, side:T.DoubleSide })); beam.position.set(gx, y0+5, gz); g.add(beam);
+    O3.evAnim.push({ kind:'boss', sp, ring, base:y0+1.6 });
+    hit(gx, y0, gz, 1.2, 2.4, { kind:'wev', what:'boss', id:0, x:b.x, y:b.y }); }
+  for (const d of e.dyn){ if (!inWin(d.x, d.y)) continue; const gx = d.x+0.5, gz = d.y+0.5, y0 = Math.max(O3.heightAt(gx,gz), -0.14);
+    if (d.kind==='meteor'){
+      const crater = new T.Mesh(new T.RingGeometry(0.35, 0.95, 24), new T.MeshStandardMaterial({ color:new T.Color(0x3a3028).convertSRGBToLinear(), roughness:1, transparent:true, opacity:0.85, depthWrite:false }));
+      crater.rotation.x = -Math.PI/2; crater.position.set(gx, y0+0.02, gz); g.add(crater);
+      const gl = o3Glow('rgba(150,220,255,1)', 1.4); gl.position.set(gx, y0+0.35, gz); g.add(gl); O3.evAnim.push({ kind:'glow', o:gl, ph:d.id });
+      addSm({ p:[gx, y0+0.4, gz], t:0, dark:true });
+    } else if (d.kind==='siege'){
+      for (let i=0;i<5;i++){ const a = i/5*Math.PI*2, fx = gx + Math.cos(a)*1.6, fz = gz + Math.sin(a)*1.6, fy = Math.max(O3.heightAt(fx,fz), -0.1);
+        const f = o3Glow('rgba(255,140,40,1)', 0.7); f.position.set(fx, fy+0.25, fz); g.add(f); addFl(f); if (i%2===0) addSm({ p:[fx, fy+0.4, fz], t:i*0.1, dark:true });
+        if (i%2) o3CampModel(g, gx + Math.cos(a)*2.6, Math.max(O3.heightAt(gx + Math.cos(a)*2.6, gz + Math.sin(a)*2.6), -0.1), gz + Math.sin(a)*2.6, 3, { push:addFl }); }
+    }
+  }
+}
+function o3AnimEvents(){
+  for (const a of O3.evAnim||[]){
+    if (a.kind==='boss'){ a.sp.position.y = a.base + Math.sin(O3.t*2)*0.12; a.ring.material.opacity = 0.5 + Math.sin(O3.t*3)*0.3; a.ring.scale.setScalar(1 + Math.sin(O3.t*3)*0.08); }
+    else if (a.kind==='glow') a.o.material.opacity = 0.7 + Math.sin(O3.t*2.4 + a.ph)*0.3;
+  }
+}
+// the festival bunting strung over the town plaza in 3D
+function v3Festival(grp){
+  const t = wevTownEvent(); if (!t || t.kind!=='festival' || G.interior) return;
+  const T = THREE, cols = [0xe84a3a, 0xf0c030, 0x3a8ae8, 0x5ac05a, 0xe070c0], tri = new T.BufferGeometry();
+  tri.setAttribute('position', new T.Float32BufferAttribute([-0.09,0,0, 0.09,0,0, 0,-0.2,0], 3)); tri.computeVertexNormals();
+  const mats = cols.map(c=>new T.MeshBasicMaterial({ color:new T.Color(c).convertSRGBToLinear(), side:T.DoubleSide }));
+  const line = (x0, z0, x1, z1, h)=>{ const n = Math.max(4, Math.round(Math.hypot(x1-x0, z1-z0)/0.3));
+    for (let i=0;i<=n;i++){ const f = i/n, x = x0 + (x1-x0)*f, z = z0 + (z1-z0)*f, y = h - Math.sin(f*Math.PI)*0.45;
+      const m = new T.Mesh(tri, mats[i%mats.length]); m.position.set(x, y, z); m.rotation.y = Math.atan2(x1-x0, z1-z0) + Math.PI/2; grp.add(m); } };
+  const P = [[7.5,8.5],[14.5,8.5],[14.5,15.5],[7.5,15.5]];
+  for (let i=0;i<4;i++){ const [a,b] = [P[i], P[(i+1)%4]]; line(a[0], a[1], b[0], b[1], 2.3); }
+  line(7.5, 8.5, 14.5, 15.5, 2.5); line(14.5, 8.5, 7.5, 15.5, 2.5);
+}
+// ---- the overview in the travel log ----
+function wevLogHtml(){
+  const e = wevP(); if (!e) return '';
+  const turn = wevTurn(), st = wevStats(), items = [];
+  const b = e.boss;
+  if (b) items.push(b.state==='awake' ? `<b style="color:#ff7a5a">${esc(wevBossName(b))} is awake</b> ${wevWhere(b.x, b.y)} &middot; sleeps in ${wevTime(b.until-turn)}${b.hp ? ` &middot; wounded (${b.hp}/${b.maxHp})` : ''}` : `<span class="muted">${esc(wevBossName(b))} sleeps &middot; wakes in about ${wevTime(b.until-turn)}</span>`);
+  for (const d of e.dyn) items.push(d.kind==='siege' ? `<b style="color:#ff7a5a">${esc(o3TownName(d.x, d.y))} is under siege</b> &middot; ${wevTime(d.until-turn)} left` : `<b style="color:#9ad8ff">A fallen star</b> ${wevWhere(d.x, d.y)} &middot; crumbles in ${wevTime(d.until-turn)}`);
+  for (const k in e.town){ const t = e.town[k]; if (turn >= t.until || t.done) continue; const nm = esc(o3TownName(...k.split(',').map(Number)));
+    items.push(t.kind==='festival' ? `<b style="color:#ffd060">The ${esc(t.name)}</b> in ${nm} &middot; ${wevTime(t.until-turn)} left` : t.kind==='market' ? `<b style="color:#ffd060">Market day</b> in ${nm} &middot; ${wevTime(t.until-turn)} left` : `<b style="color:#ff7a5a">${nm} is being raided</b> &middot; ${wevTime(t.until-turn)} left`); }
+  const rt = G.player.roadTask; if (rt) items.push(`<b style="color:#ffb0c8">Bring ${esc(rt.name)} home to ${esc(rt.town)}</b> &middot; ${wevTime(rt.until-turn)} left`);
+  const camps = e.camps.filter(c=>owSeen(c.x, c.y)).map(c=>`${esc(cap(wevCampName(c)))} (${c.size}/5) ${wevWhere(c.x, c.y)}`);
+  const terr = wevTowns().map((t,i)=>[i, wevTerrState(i)]).filter(([i,s])=>s!=='wild').map(([i,s])=>`<span style="color:${s==='secured' ? '#7ad06a' : s==='troubled' ? '#e0a040' : '#ff6a50'}">${esc(cap(wevTerrName(i)))}: ${s}</span>`);
+  return `<h4 style="color:var(--ink-faint);margin:12px 0 6px;">WORLD EVENTS</h4>
+    <div style="font-size:13px;line-height:1.7;">${items.map(s=>`<div>${s}</div>`).join('') || '<div class="muted">all quiet</div>'}</div>
+    <div class="muted" style="font-size:12px;margin-top:6px;">Known camps: ${camps.join(' &middot; ') || 'none'}</div>
+    <div style="font-size:12px;margin-top:4px;">${terr.join(' &middot; ')}</div>
+    <div class="muted" style="font-size:12px;margin-top:4px;">giants felled ${st.boss} &middot; camps broken ${st.camps} &middot; lands secured ${st.secured.length} &middot; towns defended ${st.defended} &middot; travellers helped ${st.road}</div>`;
+}
+// after a load: a fallen star's ore comes back (rich spots themselves aren't saved)
+function wevAfterLoad(){
+  const e = G.ow.ev; if (!e || !Array.isArray(e.dyn)) return;
+  for (const d of e.dyn) if (d.kind==='meteor' && !richAt(d.x, d.y) && wevTurn() < d.until){ const r = { x:d.x, y:d.y, type:'meteor', k:'mining', until:d.until }; r.left = richMax(r); G.ow.rich = G.ow.rich || []; G.ow.rich.push(r); }
 }
 
 function renderGame(){
@@ -22583,6 +23250,7 @@ function v3BuildScene(){
   v3Palisade(mats, grp);
   v3Grass(grp);
   v3BuildPeople(grp, mats);
+  try{ v3Festival(grp); }catch(e){ console.error(e); }
 }
 function v3BuildPeople(grp, mats){
   const T = THREE;
@@ -23719,7 +24387,7 @@ function o3Pick(e){
   const r = O3.cv.getBoundingClientRect(), T = THREE;
   const m = new T.Vector2(((e.clientX-r.left)/r.width)*2-1, -((e.clientY-r.top)/r.height)*2+1);
   O3.ray.setFromCamera(m, O3.cam);
-  const hits = O3.ray.intersectObjects(O3.hits.concat(O3.nodeHits||[], O3.lmHits||[]), false);
+  const hits = O3.ray.intersectObjects(O3.hits.concat(O3.nodeHits||[], O3.lmHits||[], O3.evHits||[]), false);
   const lh = O3.land ? O3.ray.intersectObject(O3.land, false) : [];
   // a gathering spot's box stands tall over its tile, so a click far off can clip one on its way to the
   // ground behind it: a spot only counts when the ground you clicked is its own tile (or right beside it)
@@ -23738,7 +24406,9 @@ function o3Input(cv){
     const n = o3NodeFromHit(a);
     // a site in the 3D land gets the same details as on the world map (a town just its name)
     const siteTip = a && a.kind==='site' && G.ui==='playing' ? (owSiteKind(G.ow.map[a.x][a.y]) ? owSiteTipHtml(a.x, a.y) : G.ow.map[a.x][a.y]===OW_TOWN ? `<div style="font-weight:600">${esc(o3TownName(a.x,a.y))}</div><div class="muted">a town - click to walk there</div>` : '') : '';
-    const lmo = a && a.kind==='landmark' && G.ui==='playing' ? owLandmark(a.id) : null, lmTip = lmo ? lmTipHtml(lmo) : '';
+    const lmo = a && a.kind==='landmark' && G.ui==='playing' ? owLandmark(a.id) : null;
+    const wo = a && a.kind==='wev' && G.ui==='playing' ? wevMapList().find(o=>o.k===a.what && o.x===a.x && o.y===a.y) : null;
+    const lmTip = lmo ? lmTipHtml(lmo) : wo ? wevTipHtml(wo) : '';
     if (n && G.ui==='playing'){ showTooltip(e, skNodeTipHtml(n)); O3.nodeTip = true; }
     else if (siteTip || lmTip){ showTooltip(e, siteTip || lmTip); O3.nodeTip = true; }
     else if (O3.nodeTip){ hideItemTooltip(); O3.nodeTip = false; }
@@ -23789,6 +24459,7 @@ function o3Render(){
   o3SyncQuests();
   o3SyncNodes();
   try{ o3SyncLandmarks(dt); }catch(e){ console.error(e); }
+  try{ o3SyncEvents(); o3AnimEvents(); }catch(e){ console.error(e); }
   // you glide between tiles; on water you ride a boat
   const sailing = G.ow.map[G.owPos.x][G.owPos.y]===OW_WATER;   // only open water needs the boat; rivers are waded
   const tx = G.owPos.x+0.5, tz = G.owPos.y+0.5, pp = O3.ppos || (O3.ppos = new T.Vector3(tx,0,tz));
@@ -28605,7 +29276,8 @@ function backOut(){
     case 'charsheet': setUi('playing'); break;
     case 'skills': case 'rsmagic': case 'prayer': setUi('playing'); break;
     case 'skguide': setUi(G.skGuideBack||'playing'); break;
-    case 'lamp': case 'tasks': case 'travellog': setUi('playing'); break;
+    case 'lamp': case 'tasks': case 'travellog': case 'rareTrader': setUi('playing'); break;
+    case 'wevent': if (G.wevDlg && !G.wevDlg.noEsc) wevChoose(G.wevDlg.opts.length-1); else if (!G.wevDlg) setUi('playing'); break;
     case 'tailor': case 'bench': setUi('playing'); break;
     case 'makeover': makeoverLeave(); break;
     case 'dyeworks': dyeLeave(); break;
@@ -28671,13 +29343,15 @@ function renderOverlay(){
     case 'cook': el.innerHTML = buildCook(); break;
     case 'tasks': el.innerHTML = buildTasks(); break;
     case 'travellog': el.innerHTML = buildTravelLog(); break;
+    case 'wevent': el.innerHTML = buildWorldEvent(); break;
+    case 'rareTrader': el.innerHTML = buildRareTrader(); break;
     default: el.innerHTML = '';
   }
 }
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-82';
+const GAME_VERSION = 'rs-83';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -30496,6 +31170,9 @@ function buildHelpLegend(){
       [sw('#e8c050', true), 'Quest pin', 'where a tracked quest wants you to go'],
       [sw('#ffd040', true), 'Your pins', 'markers you drop with the Pin tool - click one to change it'],
       [sw('#8a1a1a', true), 'Route', 'your planned route, stop by stop - Walk route follows it'],
+      [sw('#a07a4a'), 'Monster camp', 'grows if left alone (the red dots show how big); walk in to attack'],
+      [sw('#ff5a3a', true), 'Giant', 'a world boss while it is awake - its timer shows when it sleeps again'],
+      [sw('#9ad8ff', true), 'Fallen star', 'rich ore (up to runite) until it crumbles'],
       [sw('#7a5a48'), 'Landmarks', 'the volcano, the giant tree and the wizard\'s tower - walk up to each'],
     ].map(r=>row(...r)).join(''))}
     ${sec('ON THE LAND', [
@@ -30568,6 +31245,7 @@ function buildHelp(){
       <div><b>Skills &amp; trades</b> (<kbd>J</kbd>): fishing, mining, woodcutting and foraging, and the trades that use what you gather - cooking, smithing, alchemy and firemaking - each level from 1 to 99 alongside your combat skills. Gather at the spots you see on the land: marked trees, bubbling fishing spots and flowering herb patches (hover one to see what it gives and the level it needs, click it to walk over and start), rock beside mountains, and ore veins, cave pools and cave herbs in the dungeons. Each spot gives a few items and then is felled, fished out or picked clean, and grows back or moves on in time. <kbd>E</kbd> works the nearest spot beside you (press it again or move to stop), light a campfire from your logs, or cook at your fire. Buy a fishing rod, pickaxe and hatchet (and better ones as you level) at the blacksmith, who also smelts your ore into bars and forges them into gear; brew herbs into potions at the alchemist; cook at the tavern hearth. Press <kbd>U</kbd> to eat the best-fitting cooked food (in a fight it takes your turn). Visit the Tailor in any town to craft: spin flax, tan hides, and make robes, staves, leather armour, bows and arrows at the workbenches inside.</div>
       <div>press <kbd>C</kbd> to make camp wherever you're standing &mdash; usually a free heal that also refills your ability charges, spell slots and wand charges, same as a village rest, but sleeping in the open risks a night-time ambush that interrupts the rest entirely (no healing, straight into a fight, and every exit is sealed until the last monster drops). Safer on grass, riskier in forest/swamp, and impossible while zoomed out. You can also camp inside any dungeon-type site once you've cleared every monster off the current floor &mdash; nothing left down there to ambush you, so it's just as safe as a village rest.</div>
       <div>press <kbd>M</kbd> to open the world map of the whole continent &mdash; press again to go back. Click a village you've visited on the map, or press <kbd>T</kbd> on the overworld or in a town, to teleport there through a portal. The map's tool bar lets you <b>drop pins</b> with a note, <b>plan a route</b> and walk it, and switch <b>layers</b> (place names, landmarks, sites, danger, resources and more) on and off; the mouse wheel zooms in far enough to see every tree, rock and house. Land you've seen is pencilled in and land you've walked is painted; every forest, range, sea and river has a name, and three great landmarks (a volcano, a giant tree and a wizard's tower) can be seen from far off. The <b>travel log</b> counts the regions, towns, sites and landmarks you've found.</div>
+      <div><b>World events:</b> the world keeps its own time. A <b>giant</b> sleeps somewhere and now and then wakes to roam (a world boss - it's marked on the map while it's awake, and its wounds last between fights). <b>Monster camps</b> grow if they're left alone, until their warband lays <b>siege</b> to the nearest town; break the siege in time or the town is sacked. Every town rules the land nearest it - break every camp in a town's lands to <b>secure</b> them, and fewer monsters roam there. <b>Stars fall</b> and leave rich ore for a while. On the road you'll meet people who need a hand (or a fight), and towns hold <b>festivals</b> (10% off and a treat), <b>market days</b> (a rare trader on the plaza) and ring the alarm when monsters <b>raid</b>. Everything with a deadline shows its timer on the world map; the travel log lists what's going on.</div>
       <div>day turns to night and back on a steady cycle, and the weather shifts between clear, rain, fog and the occasional storm &mdash; both are shown in the corner of the overworld map. Night and bad weather raise the odds of a random encounter, so an easy stretch of road can turn dangerous after dark.</div>
       <div style="margin-top:10px;color:var(--ink-faint);">QUESTS</div>
       <div>the Captain of the Watch in every town hands out work (a gold <b>!</b> over their head means new quests, <b>?</b> means one is ready to hand in). Quests send you to real places: a site to conquer, a wanted foe, a raider camp, a captive to rescue, a merchant to escort. Every completed quest pays gold and xp, and you pick one of three rewards.</div>
@@ -30658,6 +31336,7 @@ function examineAct(a){
   if (!a) return '';
   if (a.kind==='site') return EXAMINE_OW[a.t] || 'A place worth exploring.';
   if (a.kind==='landmark'){ const lm = owLandmark(a.id); return lm ? lm.desc : ''; }
+  if (a.kind==='wev') return a.what==='boss' ? 'A giant, awake and roaming. It hits terribly hard - and remembers its wounds.' : 'A monster camp. It will grow if it is left alone.';
   if (a.kind==='node'){ const n = skNodeAt(a.x, a.y); return n ? `${skNodeName(n)}. ${n.k==='woodcutting' ? 'You could chop this.' : n.k==='fishing' ? 'Fish are biting here.' : 'You could pick this.'}` : 'Nothing left here.'; }
   if (a.kind==='building') return `${a.b.name}. ${a.b.role ? 'The '+a.b.role.toLowerCase()+' works here.' : ''}`;
   if (a.kind==='tile'){ const b = Object.values(BENCHES).find(b=>b.nm===a.label); if (b) return `${b.nm}: you can ${b.does} here.`;
@@ -30910,6 +31589,8 @@ function handleKeydown(e){
     case 'lamp': { if (k==='Escape') setUi('playing'); break; }
     case 'tasks': { if (k==='Escape') setUi('playing'); break; }
     case 'travellog': { if (k==='Escape') setUi('playing'); break; }
+    case 'rareTrader': { if (k==='Escape') setUi('playing'); break; }
+    case 'wevent': { if (k>='1' && k<='9') wevChoose(+k-1); else if (k==='Escape') backOut(); break; }
     case 'cook': { if (k==='Escape') setUi(G.cookAt==='fire' || G.interior ? 'playing' : 'tavern'); break; }
     case 'playing': handlePlayingKey(k); break;
   }
@@ -31010,6 +31691,7 @@ canvas.addEventListener('mousemove', (e)=>{
     showTooltip(e, `<div style="font-weight:600;color:${pk.col}">${esc(pk.nm)} pin</div>${pin.note ? `<div class="examine">${esc(pin.note)}</div>` : ''}<div class="muted">click to change or delete it</div>`);
     canvas.style.cursor = 'pointer'; if (owTownHover){ owTownHover = null; } return; }
   const lm = owLandmarkAtClient(e); if (lm){ showTooltip(e, lmTipHtml(lm)); canvas.style.cursor = 'help'; if (owTownHover){ owTownHover = null; } return; }
+  const ev = owEventAtClient(e); if (ev){ showTooltip(e, wevTipHtml(ev)); canvas.style.cursor = 'help'; if (owTownHover){ owTownHover = null; } return; }
   const t = owTownAtClient(e), key = t ? t.x+','+t.y : null;
   if (!t){ const st = owSiteAtClient(e); if (st){ showTooltip(e, owSiteTipHtml(st.x, st.y)); canvas.style.cursor = 'help'; if (owTownHover){ owTownHover = null; renderGame(); } return; }
     const nd = owNodeAtClient(e); if (nd){ showTooltip(e, skNodeTipHtml(nd)); canvas.style.cursor = 'help'; return; } }
@@ -31081,7 +31763,7 @@ function frameLoop(ts){
   syncGrid();
   if (G.player && G.gather) skGatherTick(performance.now());
   try{ skGatherBar(performance.now()); cqTick(performance.now()); }catch(e){ console.error(e); }
-  if (G.player && G.ui==='playing' && (G.player.turnCount||0)!==frameLoop.rt){ frameLoop.rt = G.player.turnCount||0; try{ seasonTick(); richTick(); }catch(e){ console.error(e); } }
+  if (G.player && G.ui==='playing' && (G.player.turnCount||0)!==frameLoop.rt){ frameLoop.rt = G.player.turnCount||0; try{ seasonTick(); richTick(); wevTick(); }catch(e){ console.error(e); } }
   // each new overworld tile: paint in the map, regions, landmarks, route stops (see travelTick)
   if (G.player && G.ui==='playing' && G.gameMode===0 && G.owPos && G.ow && G.ow.map){ const k = G.owPos.x+','+G.owPos.y+'|'+G.ow.seed;
     if (k!==frameLoop.op){ const prev = frameLoop.op; frameLoop.op = k; try{ travelTick(prev && prev.split('|')[1]===String(G.ow.seed) ? prev : null); }catch(e){ console.error(e); } } }
@@ -31109,10 +31791,11 @@ function frameLoop(ts){
           G.encounterSetPiece = false; G.encounterSetPieceTerrain = null;
         }
         questArenaWon();
-        G.gameMode=0;
+        if (!wevArenaWon()) G.gameMode=0;   // (a broken siege or a repelled raid walks you back into the town)
       }
     }
     if (G.ui==='playing' && !G.gameOver) questFrameCheck();
+    try{ wevFrame(); }catch(e){ console.error(e); }
     statsTick(Math.min(1, (ts - (frameLoop.lt||ts))/1000)); frameLoop.lt = ts;
     cntTick();
     gfxApply();

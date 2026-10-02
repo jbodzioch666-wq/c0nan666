@@ -315,12 +315,12 @@ _The parchment map, after the world it draws_
 ### World events
 _Timed events on the overworld_
 
-223. [ ] (103) World bosses - a giant that sometimes roams the map, with a marker when it's awake
-224. [ ] (104) Dynamic events - town under siege, a new bandit camp, a meteor strike with rare ore; shown on the map with a timer
-225. [ ] (14) Random events on the road (lost child, travelling wizard, sandwich lady)
-226. [ ] (467) Growing monster camps - goblin or bandit camps expand if left alone and threaten nearby towns
-227. [ ] (468) Territory control - clear a region's camps to make it safer, with friendlier travellers
-228. [ ] (132) Town events - festivals, market days with rare traders, monster raids to defend against
+223. [x] (103) World bosses - a giant that sometimes roams the map, with a marker when it's awake
+224. [x] (104) Dynamic events - town under siege, a new bandit camp, a meteor strike with rare ore; shown on the map with a timer
+225. [x] (14) Random events on the road (lost child, travelling wizard, sandwich lady)
+226. [x] (467) Growing monster camps - goblin or bandit camps expand if left alone and threaten nearby towns
+227. [x] (468) Territory control - clear a region's camps to make it safer, with friendlier travellers
+228. [x] (132) Town events - festivals, market days with rare traders, monster raids to defend against
 
 ### Towns
 _Town generation and town content_

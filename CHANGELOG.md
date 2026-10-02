@@ -1,5 +1,32 @@
 # Depthcrawl patch notes
 
+## RS-83 - World events
+
+- **The world keeps its own time.** Everything below runs on the game clock, is saved with your world, and shows its timer on the world map (a new **World events** layer). The travel log lists what's going on right now.
+- **A world boss:** a giant (Grumm the hill giant, Mossbeard the moss giant, Skaldur the ice giant or Vulkhar the fire giant) sleeps somewhere in the world. Every day or two it wakes and roams the wilds for about a day and a half.
+  - While it's awake it's marked on the world map with a countdown, and in 3D with a red beam.
+  - It's far tougher than anything else in the open. Its wounds last between fights, so you can wear it down over several tries.
+  - Felling it pays a big hoard, a guaranteed rare drop, a Lamp of Knowledge and 5 guild tokens.
+- **Monster camps** (goblin war-camps, orc raiding camps, kobold warrens and bandit hideouts) sit in the wilds and **grow** if they're left alone, from a few tents to a full war-camp. The map shows each camp's size.
+  - Walk into a camp to attack it. Bigger camps field more warriors and a tougher chieftain, and pay more: gold, guild tokens and often an item.
+  - A full war-camp marches on the nearest town and **lays siege** to it. Now and then a new camp is raised.
+- **Sieges:** a besieged town can't be entered until you break the siege at the gate. Do it within a day for gold and +3 standing with the town. Otherwise it's sacked, and its shops charge a quarter more for a day.
+- **Territory:** every town rules the land nearest it. Break every camp in a town's lands to **secure** them. Far fewer monsters roam there, the people you meet are friendlier (more wandering merchants, more road events, no highwaymen), and the town thanks you with +2 standing.
+  - The **Danger** layer on the map washes each town's lands green (secured), amber (troubled) or red (dangerous).
+- **Falling stars:** a star sometimes falls and leaves a rich rock of iron, coal, mithril, adamantite and runite (Mining 15), until it crumbles.
+- **Random events on the road:**
+  - **a lost child** to walk home to their town
+  - **a travelling wizard** who offers a free lift to a town you know, or runes
+  - **the sandwich lady**: take the food she offers, not another, or get the tray
+  - **a genie** granting wisdom (a lamp) or riches
+  - **a drunken dwarf**
+  - **a highwayman**: pay up or fight him for his purse
+- **Town events:**
+  - **Festivals:** bunting over the plaza, 10% off in every shop, and a treat for each visitor.
+  - **Market days:** a travelling trader on the plaza sells lamps, clue scrolls, crystal keys, potion packs and two rare pieces of gear.
+  - **Monster raids:** the alarm bell rings and you can help the watch defend the town for gold and standing. Ignore one and the market burns.
+- **Five new honours:** Giant Slayer, Camp Breaker (10 camps), Peacekeeper (secure 3 towns' lands), Defender of the Realm (break a siege or repel a raid) and Good Samaritan (help 5 travellers).
+
 ## RS-82 - The world map
 
 - **Place names:** every forest, mountain range, desert, marsh, snowfield, sea, lake and river big enough to matter now has a name, lettered across it in calligraphy. The big ones stay readable when you zoom right out. Names are made from the world's seed, so each world has its own.
