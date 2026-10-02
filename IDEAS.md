@@ -414,9 +414,9 @@ _Renderer and world visuals_
 ### Big standalone systems
 _Large self-contained systems, best done last_
 
-298. [ ] (19) Player house built with Construction (workshop, trophy room, portal chamber)
-299. [ ] (73) Archaeology - dig sites on the overworld; restore relics into lore, gear and permanent perks
-300. [ ] (75) Necromancy - a fourth combat style that raises skeletons and ghosts to fight for you
+298. [x] (19) Player house built with Construction (workshop, trophy room, portal chamber)
+299. [x] (73) Archaeology - dig sites on the overworld; restore relics into lore, gear and permanent perks
+300. [x] (75) Necromancy - a fourth combat style that raises skeletons and ghosts to fight for you
 ## Backlog
 
 ### Skills and gathering

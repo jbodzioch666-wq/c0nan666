@@ -1,8 +1,52 @@
 # Depthcrawl patch notes
 
+## RS-86 - Big standalone systems
+
+- **A house of your own, and Construction (298):** Hollis the estate agent now stands on every town square. Buy a house from Hollis for 2,500 gold. It's the same house whichever town you enter it from.
+  - Inside are eleven empty spaces. Build furniture in them from logs, iron bars and rune essence to train the new **Construction** skill:
+    - a **bed** (a full rest)
+    - a **carpentry bench**: saw logs into flatpacks for Construction xp and a little gold
+    - a **hearth**, **furnace**, **anvil**, **jeweller's bench**, **brewing cauldron** and **fletching bench**, which work like the ones in town
+    - an **altar**: offer bones for three times the Prayer xp of burying them
+    - a **trophy wall** showing your record catches, boss kill counts, giants felled, relics and honours
+  - The **portal chamber** has three grades:
+    - Construction 45: your towns
+    - Construction 60: adds your charted islands
+    - Construction 75: adds the dig sites and the great landmarks
+- **Archaeology (299):** five dig sites now lie out in the wild, harder the farther they are from where you start:
+  - the Ancient Barrow (level 1)
+  - the Drowned Temple (20)
+  - the Giant's Forge (40)
+  - the Elven Spire (60)
+  - the Dragonkin Vault (80)
+  - **Excavating:** excavate the hotspots round a site with your pickaxe (**E**, like any gathering) for the site's own material and, now and then, a damaged artefact.
+  - **Restoring:** restore artefacts at the site's dig camp. Each restored artefact tells a little of its story, pays a museum reward and gives Archaeology xp. Some can be worn: a bronze mask, a trident, a giant's gauntlet, a starlit circlet and a fossil egg amulet.
+  - **Relic powers:** completing a site's collection grants a relic power for good, plus a Lamp of Knowledge:
+    - Barrow: +10 life
+    - Temple: +3 damage reduction
+    - Forge: +3 attack
+    - Spire: +5% experience
+    - Vault: +1 critical hit range
+  - Dig sites appear on the world map and in 3D with their tents and spoil heaps.
+- **Necromancy (300):** a fourth combat style. In a fight, press **-** or the new **Raise** button to crush a bone and raise the dead to fight beside you.
+  - Minions by level: skeletons first, then zombies (15), ghosts that pass through armour (30), skeleton archers that shoot from 4 tiles (45), wraiths whose hits heal you (60) and death knights (80).
+  - You start with one minion and can have up to four.
+  - Plain bones are used first. Once those run out, big bones and dragon bones raise stronger minions.
+  - Every hit your minions land trains Necromancy, which counts toward your combat level like Melee, Ranged and Magic.
+- Each new skill has perks at 25, 50, 75 and 99, and a skill cape at 99.
+- New honours:
+  - Homeowner
+  - Master Builder
+  - Archaeologist
+  - Curator
+  - Necromancer
+  - Lord of Bones
+  - one for each relic power
+- The general store is now called **the Peddler** everywhere, in the help and in these notes.
+
 ## RS-85 - Sailing and islands
 
-- **Build a better boat (248):** the general store that sells you a rowboat now also builds bigger ones from gold, logs and iron bars, with Crafting xp for the work. Each is bigger in 3D, with its own sails.
+- **Build a better boat (248):** the Peddler who sells you a rowboat now also has bigger ones built from gold, logs and iron bars, with Crafting xp for the work. Each is bigger in 3D, with its own sails.
   - **Sloop** (1,500 gold, 20 logs, 5 iron bars): every other step on the open sea costs no turn, and storms hit it less.
   - **Caravel** (5,000 gold, 40 logs, 10 iron bars): faster again, hardly troubled by storms, and its deck lets you throw a harpoon.
   - **Galleon** (15,000 gold, 80 logs, 20 iron bars): two of every three steps at sea are free, and no storm can touch it.
@@ -11,7 +55,7 @@
   - **Sunstone outcrops:** gold ore and gems.
   - **A buried cache** marked with an X on a post: dig it up for gold, a gem, pearls and often an item.
 - **Sea charts (248):** stepping ashore on an island charts it, revealing it on your map and giving combat xp. The new **Sea charts** screen (on the world map's tool bar) lists every island you've charted, with its size, distance and whether its cache has been dug up, and **set sail** steers you there.
-- **Harpoon fishing (249):** sharks, kraken and the new **marlin** (Fishing 62) can only be landed from deep water with a harpoon thrown from a caravel or bigger. The general store sells iron, mithril and dragon harpoons (Fishing 35, 55 and 75); better harpoons bite deeper.
+- **Harpoon fishing (249):** sharks, kraken and the new **marlin** (Fishing 62) can only be landed from deep water with a harpoon thrown from a caravel or bigger. The Peddler sells iron, mithril and dragon harpoons (Fishing 35, 55 and 75); better harpoons bite deeper.
 - **Ice fishing (249):** in winter the water along the tundra and the snowy highlands freezes.
   - You can walk out onto it without a boat. It's white on the maps and in 3D.
   - Ice holes in it hold trout, pike and ice fish.
@@ -57,7 +101,7 @@
   - **abandoned camps** to search
   - **wishing wells:** toss in a coin, and sometimes they give back
   - **hermits**, who point you to something you haven't found and give you a lamp
-- **Better camps (211):** every general store sells camping gear:
+- **Better camps (211):** the Peddler in every town sells camping gear:
   - a tent in three grades, each making ambushes less likely
   - a ward lantern, which means far fewer night ambushes
   - a bedroll, so you wake with full run energy and prayer
