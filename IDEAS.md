@@ -262,11 +262,11 @@ _New monsters, bosses, drops and the bestiary_
 ### Slayer and tasks
 _Task and currency systems that share one framework_
 
-186. [ ] (6) Slayer - a slayer master who assigns kill tasks, points to spend on unlocks
-187. [ ] (311) Daily and weekly contracts - deliver 50 logs, kill 20 goblins, for bigger rewards
-188. [ ] (312) Bounty board - wanted monsters with bonus gold, refreshed daily
-189. [ ] (313) Multiple currencies - tokkul, slayer points, quest points, guild tokens, each with its own shop
-190. [ ] (310) Money-making guide - good ways to earn gold at your level
+186. [x] (6) Slayer - a slayer master who assigns kill tasks, points to spend on unlocks
+187. [x] (311) Daily and weekly contracts - deliver 50 logs, kill 20 goblins, for bigger rewards
+188. [x] (312) Bounty board - wanted monsters with bonus gold, refreshed daily
+189. [x] (313) Multiple currencies - tokkul, slayer points, quest points, guild tokens, each with its own shop
+190. [x] (310) Money-making guide - good ways to earn gold at your level
 
 ### Economy and banking
 _Shops and the bank_

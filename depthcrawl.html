@@ -5528,8 +5528,10 @@ function monsterDies(mi){
   if (!G.player.codexSeen.includes(m.nm)){ G.player.codexSeen.push(m.nm); logMsg(`bestiary entry unlocked: ${m.nm}`, 'magic'); try{ famCheckDone(m); }catch(e){} }
   if (monIsBoss(m)) try{ bossRecord(m); }catch(e){}
   checkAchievements();
+  const tkDrop = tkDropMult(m);
   rsOnKill(m);
   skOnKill(m); try{ crOnKill(m); }catch(e){}
+  try{ tkOnKill(m); }catch(e){ console.error(e); }
   const dg = roundH(rn(m.xp)*goldFindMult());
   if (dg>0){ G.player.gold += dg; logMsg(`it drops ${dg} gold`, 'good'); }
   const hk = gearStatI('healkill');
@@ -5547,6 +5549,7 @@ function monsterDies(mi){
   const sp = sitePower();
   let dropChance = clamp(0.16 + (G.depth||1)*0.01 + playerMF()*0.01 + sp.lootBonus*0.04, 0.05, 0.65);
   if (m.corrupted) dropChance = mn(0.85, dropChance+0.15);
+  dropChance = mn(0.85, dropChance*tkDrop);
   if (chn(dropChance)){
     if (chn(0.22)){
       addToInventory(genPotion(lootLevel()));
@@ -6780,7 +6783,7 @@ function tryMove(dx,dy){
     if (!G.gameOver) tickMonsters(mi);
     return;
   }
-  if (tileAt(nx,ny)===T_WALL) return; // bumping a wall isn't an action - no turn spent
+  if (tileAt(nx,ny)===T_WALL){ if (G.gameMode===3 && !G.interior && G.villageDeco && G.villageDeco[nx] && G.villageDeco[nx][ny]==='board') tkOpen('board'); return; } // bumping a wall isn't an action - no turn spent (the bounty board opens)
   if (G.player.frozenTurns>0 && G.gameMode!==0){ logMsg('you are frozen in place - you strain against the ice (you can still fight what stands beside you)', 'hit'); tickMonsters(); return; }
   { const ht = tileAt(nx,ny);
     if (ht===T_WAYPOINT || ht===T_STASH || ht===T_QUESTGIVER || ht===T_VENDOR){ villageInteract(nx,ny); return; }
@@ -8362,6 +8365,7 @@ function villageInteract(x,y){
   if (t===T_STASH){ setUi('stash'); return; }
   const npc = (G.villageNpcs||[]).find(n=>n.x===x && n.y===y);
   if (t===T_QUESTGIVER || (npc && npc.service==='questgiver')){ setUi('questgiver'); return; }
+  if (npc && (npc.service==='slayer' || npc.service==='tzhaar')){ tkOpen(npc.service); return; }
   if (npc) setUi(npc.service);
 }
 function villageNpcFor(service){ return (G.villageNpcs||[]).find(n=>n.service===service) || (G.townVendors||[]).find(n=>n.service===service); }
@@ -8741,7 +8745,7 @@ function buildQuestGiver(){
       <div class="qrep"><b>${esc(town)}</b> counts you as <b class="rt">${tier.name}</b> &middot; ${esc(tier.perk)}${next ? `<div class="qrepbar"><i style="width:${Math.round((pts-tier.at)/(next.at-tier.at)*100)}%"></i></div><span class="muted">${pts}/${next.at} toward ${next.name}</span>` : ''}</div>
       <h4 style="color:var(--ink-faint);margin:10px 0 6px;">POSTED WORK</h4>${board}
       <h4 style="color:var(--ink-faint);margin:14px 0 6px;">YOUR QUESTS &middot; ${(G.player.quests||[]).length}/${QUEST_MAX}</h4>${active}
-      <div class="btnrow"><button class="btn primary" onclick="setUi('playing')">ESC &middot; leave</button></div>
+      <div class="btnrow"><button class="btn" onclick="tkOpen('captain','currency')">quest point rewards &middot; ${tkCur('qp')} QP</button><button class="btn" onclick="tkOpen('board','contracts')">the bounty board</button><button class="btn primary" onclick="setUi('playing')">ESC &middot; leave</button></div>
     </div>`;
 }
 function villageQuestMarker(){
@@ -8826,6 +8830,7 @@ const SK_DEFS = [
   ['crafting',   'Crafting',    '&#9986;',  '#d0a070', 'spin flax, tan hides, craft robes, staves and leather, cut gems, make jewellery, pottery, glass and lanterns at the workbenches in the Tailor and the Smithy'],
   ['fletching',  'Fletching',   '&#10150;', '#8ab04a', 'carve bows and fletch arrows (and gem-tipped arrows) at the fletching bench in any Tailor'],
   ['runecrafting','Runecrafting','&#10022;', '#a080e0', 'mine rune essence, then take it to the mysterious ruins out in the wild and bind it into runes'],
+  ['slayer',     'Slayer',      '&#9760;',  '#b03a3a', 'take a task from the Slayer Master in any town square and kill what you are told - every kill on task gives Slayer xp'],
 ];
 const SK_MASTERY = [['sword','Swords'],['axe','Axes'],['blunt','Maces & Hammers'],['polearm','Spears & Polearms'],['dagger','Daggers'],['staff','Staves'],['bow','Bows'],['unarmed','Unarmed']];
 // the classic curve, scaled down so a dungeon crawler's play sessions get somewhere
@@ -8922,7 +8927,7 @@ function skGainXP(k, amount, mastery){
   const gain = Math.max(1, Math.round(amount * (mastery ? 1 : 1 + skPerk(k, 'xp'))));
   store[k] = (store[k]||0) + gain;
   const after = skLevelOf(store[k]);
-  if (!mastery){ try { xpDrop(k, gain); xpTrack(k, gain); } catch(e){} }
+  if (!mastery){ try { xpDrop(k, gain); xpTrack(k, gain); } catch(e){} try { tkOnXp(k, gain); } catch(e){ console.error(e); } }
   if (!mastery && after >= 99 && before < 99){ try { giveSkillCape(k); } catch(e){ console.error(e); } }
   if (after > before){
     const nm = mastery ? (SK_MASTERY.find(m=>m[0]===k)||[k,k])[1]+' mastery' : RS_ALL_SKILLS().find(d=>d[0]===k)[1];
@@ -9034,7 +9039,8 @@ function spBody(tab){
     const qs = p.quests||[], tq = trackedQuest();
     const rows = qs.map(q=>`<div class="sp-q${q===tq ? ' on' : ''}" data-sp-quest="${q.id}"><b>${esc(questTitle(q))}</b><span>${esc(questObjective(q))}</span></div>`).join('');
     const tog = `<div class="sp-foot"><a href="#" onclick="${p.qtHidden ? 'questTrackerShow()' : 'questTrackerHide()'};hudLayout();return false;">${p.qtHidden ? 'show the quest tracker' : 'hide the quest tracker'}</a><span>${qs.length} active</span></div>`;
-    return (rows || `<div class="sp-note">no quests yet - the Captain of the Watch in any town has work</div>`) + tog;
+    let tk = ''; try { tk = `<div class="sp-note" style="margin-top:8px;"><b>Tasks</b></div>` + tkPanelHtml(); } catch(e){ console.error(e); }
+    return (rows || `<div class="sp-note">no quests yet - the Captain of the Watch in any town has work</div>`) + tog + tk;
   }
   return '';
 }
@@ -9498,6 +9504,7 @@ function skUnlockText(k, L, mastery){
   if (k==='foraging') return hit(SK_HERB); if (k==='smithing') return hit(SK_BAR); if (k==='firemaking') return hit(SK_LOG, 'flvl');
   if (k==='alchemy') return hit(SK_HERB);
   if (k==='crafting' || k==='fletching'){ const r = crRecipes().filter(r=>r.lvl===L && (r.skill||'crafting')===k); return r.length ? ` - you can now ${k==='fletching' ? 'fletch' : 'craft'} ${[...new Set(r.map(r=>r.row.toLowerCase()))].join(', ')}` : ''; }
+  if (k==='slayer'){ const f = Object.keys(SLAYER_REQ).filter(f=>SLAYER_REQ[f]===L && L>1); if (f.length) return ` - you can now be assigned ${f.map(x=>MON_FAMILIES[x].nm.toLowerCase()).join(' and ')}`; }
   if (k==='runecrafting'){ const t = Object.keys(RC_ALTARS).find(t=>RC_ALTARS[t].lvl===L); return t ? ` - you can now bind ${rsRuneName(t).toLowerCase()}s` : ''; }
   if (k==='magic'){ const sp = RS_SPELLS.find(s=>s[2]===L); return sp ? ` - you can now cast ${sp[1]}` : ''; }
   if (k==='prayer'){ const pr = RS_ALLPRAY().find(s=>s.lvl===L); return pr ? ` - you can now use ${pr.nm}` : ''; }
@@ -9532,6 +9539,7 @@ const SK_PERKS = (()=>{
     crafting:  four(['10% chance a craft uses no materials',{save:0.1}], ['masterwork crafts twice as likely',{mw:1}], ['+15% Crafting xp',{xp:0.15}], ['superior armour recipes, and 10% more material saving',{save:0.1}]),
   };
   P.fletching = four(['10% chance to fletch with no materials',{save:0.1}], ['+5 arrows a batch',{arrows:5}], ['+15% Fletching xp',{xp:0.15}], ['another 10% saving and +5 arrows',{save:0.1, arrows:5}]);
+  P.slayer = four(['+5% damage against your task',{tdmg:0.05}], ['+15% Slayer xp',{xp:0.15}], ['another +5% damage against your task',{tdmg:0.05}], ['another +5% on task, and two more points a task',{tdmg:0.05}]);
   P.runecrafting = four(['10% chance of an extra rune per essence',{xtra:0.1}], ['+15% Runecrafting xp',{xp:0.15}], ['another 10% extra runes',{xtra:0.1}], ['another 20% extra runes',{xtra:0.2}]);
   const word = { fishing:'catch', mining:'ore', woodcutting:'log', foraging:'herb' };
   for (const k of SK_GATHER) P[k] = four(['+5% success per swing',{gch:0.05}], [`10% chance of a double ${word[k]}`,{dbl:0.1}], ['+15% xp',{xp:0.15}], ['another 10% doubles, and nothing ambushes you while you work',{dbl:0.1, safe:1}]);
@@ -9595,6 +9603,7 @@ function skGuideRows(k){
   if (k==='smithing'){ SK_BAR.forEach(b=>add(b.lvl, `smelt ${b.nm}${b.tier!==undefined ? ` and forge ${RS_METALS[b.tier][0].toLowerCase()} weapons and armour` : ' and make rings and amulets'}`)); }
   if (k==='firemaking') SK_LOG.forEach(l=>add(l.flvl, `burn ${l.nm} (a longer fire)`));
   if (k==='alchemy') SK_HERB.forEach((h,i)=>add(h.lvl, `brew ${POTIONS[Math.min(i, POTIONS.length-1)][0]} from ${h.nm}`));
+  if (k==='slayer'){ for (const f in SLAYER_REQ) add(SLAYER_REQ[f], `tasks to kill ${MON_FAMILIES[f].nm.toLowerCase()}${SLAYER_UNLOCK_FAM[f] ? ` (once you unlock ${SLAYER_SHOP.find(x=>x.id===SLAYER_UNLOCK_FAM[f]).nm})` : ''}`); add(1, 'every kill on task gives Slayer xp equal to the monster\'s life; every task completed pays slayer points'); }
   if (k==='runecrafting') for (const t in RC_ALTARS) add(RC_ALTARS[t].lvl, `${rsRuneName(t)}s at the ${t} altar - ruins ${RC_WHERE[t]}`);
   if (k==='crafting' || k==='fletching'){ const by = {}; for (const r of crRecipes()) if ((r.skill||'crafting')===k) (by[r.lvl] = by[r.lvl] || new Set()).add(r.row + (r.book ? ' (needs a recipe book)' : ''));
     Object.keys(by).forEach(l=>add(+l, [...by[l]].join(', '))); }
@@ -11212,9 +11221,9 @@ function rsHitXP(dmg, type){
 }
 // the attack roll's full bonus against one monster, triangle included
 function rsAttackTotal(roll, m, type){
-  return roll + rsFrac(rsAtkBonus(type)) + frightPenalty() + 3*rsTriangle(type, rsMonStyle(m));
+  return roll + rsFrac(rsAtkBonus(type)) + frightPenalty() + 3*rsTriangle(type, rsMonStyle(m)) + tkAccBonus(m);
 }
-function rsTriDmgMult(type, m){ const t = rsTriangle(type, rsMonStyle(m)); return (t>0 ? 1.2 : t<0 ? 0.85 : 1) * famBonus(m); }
+function rsTriDmgMult(type, m){ const t = rsTriangle(type, rsMonStyle(m)); return (t>0 ? 1.2 : t<0 ? 0.85 : 1) * famBonus(m) * tkDmgMult(type, m); }
 
 // ---- equipment requirements ----
 const RS_REQS = [['reqAtt','attack','Attack'],['reqStr','strength','Strength'],['reqDef','defence','Defence'],['reqRng','ranged','Ranged'],['reqMag','magic','Magic']];
@@ -11714,6 +11723,8 @@ function rsBonusLines(it){
   if (it.forgedPct) out.push(`${it.crafted ? 'crafted' : 'forged'} by ${esc(it.forgedBy||'you')}: +${it.forgedPct}% bonuses`);
   if (it.rsElem) out.push(`an endless supply of ${it.rsElem}${it.rsElem2 ? ' and '+it.rsElem2 : ''} runes`);
   if (it.barrows) out.push(it.barrows);
+  if (it.famous) out.push(esc(it.famous));
+  if (it.note) out.push(esc(it.note));
   if (it.whip) out.push('fast: a quarter of the time it lashes twice');
   if (it.poisoned) out.push(`${it.poisoned>=4 ? 'envenomed' : 'poisoned'}: a quarter of its hits ${it.poisoned>=4 ? 'envenom' : 'poison'}`);
   if (it.slot==='weapon' && !it.range && !it.rsStaff && it.basis && MELEE_TYPE[it.basis]){ const T = { Dagger:'hits twice a turn', Spear:'reaches two tiles', Halberd:'reaches two tiles and sweeps everything around you', Battleaxe:'sweeps everything around you', Greatsword:'cleaves into foes beside the target', Mace:'can daze', Warhammer:'can daze', Scimitar:'can make foes bleed' }[it.basis]; out.push(`${MELEE_TYPE[it.basis]} damage${T ? ' - '+T : ''}`); }
@@ -13932,6 +13943,10 @@ function generateVillage(){
   G.townVendors = VILLAGE_BUILDINGS.map((b,i)=>({ name:nm(i), role:b.role, service:b.service, key:b.key }));
   G.interior = null; G.townState = null;
   G.villageNpcs.push({ x:14, y:9, name:nm(5), role:'Captain of the Watch', service:'questgiver', key:'quest' });
+  // the Slayer Master and a TzHaar trader keep to the plaza too (see SECTION: SLAYER AND TASKS)
+  G.villageNpcs.push({ x:8, y:12, name:SLAYER_MASTERS[seed % SLAYER_MASTERS.length], role:'Slayer Master', service:'slayer', key:'slayer' });
+  G.villageNpcs.push({ x:12, y:14, name:'TzHaar-Hur-'+['Tel','Lek','Rin','Zal'][(seed>>>3) % 4], role:'TzHaar trader', service:'tzhaar', key:'tzhaar' });
+  for (const n of G.villageNpcs) if (n.service!=='questgiver'){ G.map[n.x][n.y] = T_VENDOR; G.villageDeco[n.x][n.y] = 'npc'; }
   // lamp posts round the plaza and a few trees and barrels
   for (const [x,y] of [[7,8],[14,15],[7,15],[11,8]]) W(x,y,'lamp');
   for (const [x,y] of [[6,16],[13,17],[18,17],[6,8],[1+1,13]]) if (G.map[x][y]===T_FLOOR) W(x,y,'tree');
@@ -14533,6 +14548,7 @@ function chooseQuestReward(i){
   }
   G.player.quests.splice(idx,1);
   G.player.questsDone = (G.player.questsDone||0)+1;
+  try { tkQuestPoints(q); } catch(e){ console.error(e); }
   G.pendingReward = null;
   checkAchievements();
   setUi('questgiver');
@@ -14953,6 +14969,416 @@ function o3PortalTick(dt, pp){
 // ===================== SECTION: MONSTER CODEX (bestiary) =====================
 function buildBestiary(){ return bestHtml(); }
 function renderBestiaryArt(){ try{ bvMount(); }catch(e){ console.error(e); } }
+
+// ===================== SECTION: SLAYER AND TASKS =====================
+// one task framework for slayer assignments, daily and weekly contracts and the bounty board, plus the
+// currencies they pay in (slayer points, guild tokens, tokkul, quest points), a shop for each, and the
+// money-making guide. A task is { kind, need, have, claimed, ... }:
+//   fam  - kill any member of a monster family     mon - kill one kind of creature
+//   boss - kill a named boss (m.named)              bag - hand in resources from your bag
+//   xp   - gain xp in one skill
+// kills and xp reach every open task through the same two hooks (tkOnKill from monsterDies, tkOnXp from skGainXP)
+const SLAYER_REQ = { rat:1, kobold:1, goblin:1, zombie:1, skeleton:5, spider:5, orc:10, swamp:15, desert:20, tundra:25, night:30, giant:35, demon:45 };
+const SLAYER_UNLOCK_FAM = { demon:'hotstuff', night:'nightwatch' };
+const SLAYER_MASTERS = ['Turael','Mazchna','Vannaka','Chaeldar','Duradel','Nieve','Spria','Krystilia'];
+const SLAYER_SHOP = [
+  { id:'helm',       nm:'Slayer Helmet', cost:400, d:'+15% damage and +2 to hit against your slayer task, with any style' },
+  { id:'eye',        nm:"Slayer's Eye",  cost:250, d:'monsters on your task are a quarter likelier to drop something', unlock:1 },
+  { id:'longer',     nm:'Longer Tasks',  cost:150, d:'tasks are half again as long, and pay half again as many points', unlock:1 },
+  { id:'hotstuff',   nm:'Hot Stuff',     cost:100, d:'the master may give you demons (needs Slayer 45)', unlock:1 },
+  { id:'nightwatch', nm:'Night Watch',   cost:80,  d:'the master may give you creatures of the night (needs Slayer 30)', unlock:1 },
+  { id:'supplies',   nm:'Supply Pack',   cost:35,  d:'three potions and an antipoison' },
+];
+const GUILD_SHOP = [
+  { id:'potions', nm:'Potion Pack',        cost:4,  d:'three potions for your level' },
+  { id:'clue',    nm:'Clue Scroll',        cost:6,  d:'a trail that ends in a casket' },
+  { id:'lamp',    nm:'Lamp of Knowledge',  cost:8,  d:'rub it for experience in a skill of your choice' },
+  { id:'ckey',    nm:'Crystal Key',        cost:12, d:'opens the crystal chest in a locked vault for a second treasure' },
+  { id:'wealth',  nm:'Ring of Wealth',     cost:40, d:'monsters drop 20% more gold' },
+  { id:'acape',   nm:"Adventurer's Cape",  cost:60, d:'+6 defence, +3 to every attack style and 5% more xp' },
+];
+const TZHAAR_SHOP = [
+  { id:'ek',    nm:'Toktz-xil-ek',       cost:2000,  d:'an obsidian dagger (Attack 60)' },
+  { id:'ak',    nm:'Toktz-xil-ak',       cost:3000,  d:'an obsidian sword (Attack 60)' },
+  { id:'cape',  nm:'Obsidian Cape',      cost:3000,  d:'+9 defence, +3 strength' },
+  { id:'tal',   nm:'Toktz-mej-tal',      cost:3500,  d:'an obsidian battlestaff of fire (Magic 60)' },
+  { id:'ket',   nm:'Toktz-ket-xil',      cost:4000,  d:'an obsidian shield: +5 strength (Defence 60)' },
+  { id:'om',    nm:'Tzhaar-ket-om',      cost:5000,  d:'an obsidian maul, slow and crushing (Strength 60)' },
+  { id:'bneck', nm:'Berserker Necklace', cost:5000,  d:'+7 strength, and obsidian weapons hit 20% harder while you wear it' },
+  { id:'onyx',  nm:'Uncut Onyx',         cost:15000, d:'a gem the TzHaar dig from the deep - Crafting 67 to cut it' },
+];
+// quest points are not spent: each reward unlocks at a quest point total and is then bought with gold
+const QP_SHOP = [
+  { id:'glory',   nm:'Amulet of Glory',      qp:3,  gold:6000,  d:'+10 to every attack style, +8 strength, +8 defence' },
+  { id:'legends', nm:'Cape of Legends',      qp:8,  gold:4500,  d:'+7 defence, +4 to every attack style' },
+  { id:'dsq',     nm:'Dragon Sq Shield',     qp:15, gold:60000, d:'a dragon shield (Defence 60)' },
+  { id:'qpcape',  nm:'Quest Point Cape',     qp:25, gold:99000, d:'the best cape a quester can wear: +10 defence, +6 to every attack style, +4 prayer' },
+];
+const TK_CURRENCIES = [
+  ['slayer', 'Slayer points', '#c04040', 'complete slayer tasks; spend them with a Slayer Master'],
+  ['guild',  'Guild tokens',  '#d8b050', 'finish daily and weekly contracts and claim bounties; spend them at the bounty board'],
+  ['tokkul', 'Tokkul',        '#e06a2a', 'fire creatures and demons drop it, and so does anything five or more floors down; spend it with the TzHaar trader'],
+  ['qp',     'Quest points',  '#6aa8e0', 'one for every quest you complete (two for a legendary one); the Captain of the Watch rewards them'],
+];
+function tkNow(){ return G.tkClock || Date.now(); }       // (a test can set G.tkClock to move the calendar)
+function tkDayKey(t){ const d = new Date(t===undefined ? tkNow() : t); return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`; }
+function tkWeekKey(){ const d = new Date(tkNow()); d.setHours(0,0,0,0); d.setDate(d.getDate() - (d.getDay()+6)%7); return 'w'+tkDayKey(d.getTime()); }
+function tkUntil(week){
+  const d = new Date(tkNow()), e = new Date(d); e.setHours(24,0,0,0);
+  if (week) e.setDate(e.getDate() + (7 - (d.getDay()+6)%7) - 1);
+  const h = Math.max(0, Math.round((e - d)/3600000));
+  return h >= 48 ? `${Math.round(h/24)} days` : h >= 1 ? `${h}h` : 'under an hour';
+}
+function tkP(){
+  const p = G.player;
+  if (!p.slay) p.slay = { task:null, done:0, blocked:[], un:{}, last:null };
+  if (!p.cur) p.cur = { slayer:0, guild:0, tokkul:0 };
+  if (p.questPoints===undefined) p.questPoints = p.questsDone||0;      // (older saves: a point for each quest already done)
+  if (!p.contracts) p.contracts = { day:'', week:'', daily:[], weekly:[] };
+  if (!p.bounties) p.bounties = { day:'', list:[] };
+  if (p.contracts.day!==tkDayKey()){ p.contracts.day = tkDayKey(); p.contracts.daily = tkMakeContracts(false); }
+  if (p.contracts.week!==tkWeekKey()){ p.contracts.week = tkWeekKey(); p.contracts.weekly = tkMakeContracts(true); }
+  if (p.bounties.day!==tkDayKey()){ p.bounties.day = tkDayKey(); p.bounties.list = tkMakeBounties(); }
+  return p;
+}
+function tkCur(k){ const p = tkP(); return k==='qp' ? p.questPoints||0 : p.cur[k]||0; }
+function tkPlural(n, s){ if (n===1) return s; if (/(s|x|ch|sh)$/.test(s)) return s+'es'; if (/[^aeiou]y$/.test(s)) return s.slice(0,-1)+'ies'; if (/wolf$/.test(s)) return s.slice(0,-1)+'ves'; return s+'s'; }
+function tkSkillName(k){ const d = RS_ALL_SKILLS().find(d=>d[0]===k); return d ? d[1] : k; }
+function tkText(t){
+  if (t.kind==='fam') return `Kill ${t.need} ${MON_FAMILIES[t.fam].nm.toLowerCase()}`;
+  if (t.kind==='mon') return t.need===1 ? `Kill ${article(t.nm)} ${t.nm}` : `Kill ${t.need} ${tkPlural(t.need, t.nm)}`;
+  if (t.kind==='boss') return `Slay ${t.nm}`;
+  if (t.kind==='bag') return `Hand in ${t.need} ${skName(t.item)}`;
+  if (t.kind==='xp') return `Gain ${t.need.toLocaleString()} ${tkSkillName(t.skill)} xp`;
+  return '?';
+}
+function tkProg(t){ return t.kind==='bag' ? Math.min(t.need, skHave(t.item)) : Math.min(t.need, t.have||0); }
+function tkReady(t){ return !t.claimed && tkProg(t) >= t.need; }
+function tkMatch(t, m){ return t.kind==='fam' ? famOf(m)===t.fam : t.kind==='mon' ? m.nm===t.nm : t.kind==='boss' ? !!m.named && m.named===t.boss : false; }
+// where a family lives: the bestiary's answer, plus the dungeon floors whose ecosystem it joins
+function tkFamWhere(k){
+  const F = MON_FAMILIES[k], w = bestWhere(F.t[0][0]);
+  if (!/dungeons/.test(w)) return w;
+  const lv = F.t.map(t=>t[1]), a = Math.max(1, Math.ceil((Math.min(...lv)-4)/2)), b = Math.max(a, Math.floor((Math.max(...lv)+4)/2));
+  return `${w} (floors ${a}${b>a ? '-'+b : ''})`;
+}
+// families that fit you: something in it near your level, nothing that starts far above you
+function tkFamsFor(L, slayer){
+  const p = G.player, s = p.slay || { blocked:[], un:{} };
+  return Object.keys(MON_FAMILIES).filter(k=>{
+    if (slayer){ if ((SLAYER_REQ[k]||1) > skLvl('slayer') || (s.blocked||[]).includes(k)) return false; const u = SLAYER_UNLOCK_FAM[k]; if (u && !(s.un||{})[u]) return false; }
+    const lv = MON_FAMILIES[k].t.map(t=>t[1]);
+    return Math.min(...lv) <= L + 2 && Math.max(...lv) >= L - 6;
+  });
+}
+function tkPick(a){ return a[rn(a.length)]; }
+// ---- contracts: three a day and one a week, for gold and guild tokens ----
+function tkGatherables(){
+  const out = [], best = (list, k, skip)=>list.filter(e=>(e.lvl||1) <= skLvl(k) && !(skip||[]).includes(e.id)).slice(-2).forEach(e=>out.push(e.id));
+  best(SK_LOG, 'woodcutting'); best(SK_ORE, 'mining'); best(SK_HERB, 'foraging', ['starlily']);
+  best(SK_FISH.filter(f=>f.w==='r' || f.lvl < 55), 'fishing', ['eel','icefish','dawntrout']);
+  return out;
+}
+function tkMakeContracts(week){
+  const p = G.player, L = p.level||1, mul = week ? 3 : 1, out = [];
+  const fams = tkFamsFor(L, false), items = tkGatherables();
+  // xp contracts name a skill anyone can start on, or one you've already trained a little
+  const xpSkills = ['fishing','mining','woodcutting','foraging','cooking','firemaking'].concat(['smithing','crafting','fletching','alchemy','runecrafting'].filter(k=>skLvl(k) >= 10));
+  const make = kind=>{
+    let t;
+    if (kind==='fam' && fams.length){ const n = (10 + rn(11))*mul; t = { kind:'fam', fam:tkPick(fams), need:n, gold:n*(8 + L*5) }; }
+    else if (kind==='bag' && items.length){ const it = tkPick(items), n = (15 + rn(16))*mul; t = { kind:'bag', item:it, need:n, gold:Math.round(resValue(it)*n*1.6) + 40*mul }; }
+    else { const k = tkPick(xpSkills), lv = skLvl(k), n = Math.max(200, Math.round((SK_XP[Math.min(100, lv+1)] - SK_XP[lv])*0.5))*mul; t = { kind:'xp', skill:k, need:n, gold:(120 + L*20)*mul }; }
+    return Object.assign(t, { have:0, claimed:false, tokens: week ? 15 : 3 + rn(2), lamp: !!week });
+  };
+  if (week) out.push(make(tkPick(['fam','bag','xp'])));
+  else for (const k of ['fam','bag','xp'].sort(()=>Math.random()-0.5)) out.push(make(k));
+  return out;
+}
+// ---- the bounty board: three wanted creatures and, once you're seasoned, a wanted boss ----
+function tkMakeBounties(){
+  const L = (G.player && G.player.level) || 1, pool = [];
+  for (const k in MON_FAMILIES) for (const t of MON_FAMILIES[k].t) if (t[1] >= L-4 && t[1] <= L+3) pool.push([t[0], t[1], k]);
+  const out = [], used = new Set();
+  for (let i=0; i<3 && pool.length; i++){
+    let c = tkPick(pool); for (let j=0; j<8 && used.has(c[2]); j++) c = tkPick(pool);   // three different families where possible
+    used.add(c[2]);
+    out.push({ kind:'mon', nm:c[0], lvl:c[1], need:1, have:0, claimed:false, gold:Math.round(40 + c[1]*c[1]*4), tokens:1, bounty:1 });
+  }
+  if (L >= 8){ const b = tkPick(Object.keys(NAMED_BOSSES)), B = NAMED_BOSSES[b];
+    out.push({ kind:'boss', boss:b, nm:b==='barrows' ? 'one of the Barrows brothers' : b==='dks' ? 'one of the Dagannoth Kings' : 'the '+B.nm, where:B.where, need:1, have:0, claimed:false, gold:1500 + L*100, tokens:5, bounty:1, most:1 }); }
+  return out;
+}
+// ---- the hooks ----
+function tkOnKill(m){
+  if (!G.player) return;
+  const p = tkP(), T = p.slay.task;
+  if (T && tkMatch(T, m)){
+    T.have++;
+    skGainXP('slayer', Math.max(1, Math.round(m.maxHp||1)));
+    const left = T.need - T.have;
+    if (left <= 0) slayerComplete();
+    else if (left===5 || left===1 || left%10===0) logMsg(`slayer task: ${left} ${MON_FAMILIES[T.fam] ? MON_FAMILIES[T.fam].nm.toLowerCase() : ''} left`, 'kc');
+  }
+  for (const t of p.contracts.daily.concat(p.contracts.weekly, p.bounties.list)){
+    if (t.claimed || t.kind==='bag' || t.kind==='xp' || t.have >= t.need || !tkMatch(t, m)) continue;
+    t.have++;
+    if (t.have >= t.need){ logMsg(`${t.bounty ? 'bounty' : 'contract'} done: ${tkText(t)} - claim ${t.gold} gold at the bounty board in any town`, 'good'); sfx('gold'); }
+  }
+  tkTokkulDrop(m);
+}
+function tkOnXp(k, gain){
+  if (!G.player || !G.player.contracts) return;
+  for (const t of G.player.contracts.daily.concat(G.player.contracts.weekly)){
+    if (t.kind!=='xp' || t.skill!==k || t.claimed || t.have >= t.need) continue;
+    t.have = Math.min(t.need, (t.have||0) + gain);
+    if (t.have >= t.need) logMsg(`contract done: ${tkText(t)} - claim it at the bounty board in any town`, 'good');
+  }
+}
+function tkTokkulDrop(m){
+  const p = G.player, lvl = m.mlevel || 1, hot = famOf(m)==='demon' || /fire|lava|hell|magma|obsidian|infernal/i.test(m.nm);
+  let n = 0;
+  if (hot) n = lvl*2 + rn(lvl*3 + 1);
+  else if (G.gameMode===1 && (G.depth||1) >= 5 && chn(0.25)) n = (G.depth||1)*2 + rn(10);
+  if (m.named) n += 200 + rn(201);
+  if (n > 0){ p.cur.tokkul += n; logMsg(`it drops ${n} tokkul`, 'loot'); }
+}
+// damage and accuracy against what you're fighting: the slayer helmet on task, and the berserker necklace with obsidian
+function tkOnTask(m){ const T = G.player && G.player.slay && G.player.slay.task; return !!(T && m && tkMatch(T, m)); }
+function tkHelmOn(){ const h = G.gear && G.gear.head; return !!(h && h.used && h.slayHelm); }
+function tkDmgMult(type, m){
+  let k = 1;
+  if (tkOnTask(m)){ if (tkHelmOn()) k *= 1.15; k *= 1 + skPerk('slayer', 'tdmg'); }
+  const w = G.gear && G.gear.weapon, nk = G.gear && G.gear.necklace;
+  if (type==='melee' && w && w.used && w.obsidian && nk && nk.used && nk.berserker) k *= 1.2;
+  return k;
+}
+function tkAccBonus(m){ return tkOnTask(m) && tkHelmOn() ? 2 : 0; }
+function tkDropMult(m){ return tkOnTask(m) && G.player.slay.un.eye ? 1.25 : 1; }
+// ---- slayer: the master, the task, points ----
+function slayerMasterName(){ const n = villageNpcFor('slayer'); return n ? n.name : 'the Slayer Master'; }
+function slayerAssign(){
+  const p = tkP(), s = p.slay;
+  if (s.task){ logMsg(`you're still assigned to ${tkText(s.task).toLowerCase()} (${s.task.have}/${s.task.need})`, ''); return; }
+  let c = tkFamsFor(p.level||1, true);
+  if (c.length > 1 && s.last) c = c.filter(k=>k!==s.last);
+  if (!c.length) c = ['rat','goblin','kobold','zombie'].filter(k=>!s.blocked.includes(k));
+  if (!c.length) c = ['goblin'];
+  const k = tkPick(c), n = Math.round((10 + rn(16) + Math.floor(skLvl('slayer')/5)) * (s.un.longer ? 1.5 : 1));
+  s.task = { kind:'fam', fam:k, need:n, have:0 }; s.last = k;
+  logMsg(`${slayerMasterName()}: "Your new task is to kill ${n} ${MON_FAMILIES[k].nm.toLowerCase()} - you'll find them in ${tkFamWhere(k)}."`, 'new', true);
+  sfx('click'); renderOverlay(); saveCurrentGame();
+}
+function slayerComplete(){
+  const p = G.player, s = p.slay, T = s.task; s.task = null; s.done++;
+  const mult = s.done%100===0 ? 25 : s.done%50===0 ? 15 : s.done%10===0 ? 5 : 1;
+  const pts = Math.round((8 + Math.floor(skLvl('slayer')/6) + (skLvl('slayer')>=99 ? 2 : 0)) * (s.un.longer ? 1.5 : 1)) * mult;
+  p.cur.slayer += pts;
+  logMsg(`You have completed your task! That's ${s.done} task${s.done===1?'':'s'} done, and ${pts} slayer points${mult>1 ? ` (a streak bonus: x${mult})` : ''}. Return to a Slayer Master for another.`, 'magic', true);
+  sfx('achievement');
+  try { questToast('Slayer task complete', `${tkText(T)} - +${pts} points`); } catch(e){}
+}
+function slayerSkip(block){
+  const p = tkP(), s = p.slay, T = s.task, cost = block ? 100 : 30;
+  if (!T || p.cur.slayer < cost) return;
+  if (block && s.blocked.length >= 4){ logMsg('you can only block four kinds of task - unblock one first', 'hit'); return; }
+  p.cur.slayer -= cost; s.task = null;
+  if (block){ s.blocked.push(T.fam); logMsg(`you'll never be given ${MON_FAMILIES[T.fam].nm.toLowerCase()} again`, ''); }
+  slayerAssign();
+}
+function slayerUnblock(k){ const s = tkP().slay; s.blocked = s.blocked.filter(x=>x!==k); renderOverlay(); saveCurrentGame(); }
+function slayerHelmet(){
+  const it = rsMakeArmour('metal', 3, 'head');
+  Object.assign(it, { nm:'Slayer Helmet', baseMat:'Slayer', slayHelm:1, rsCol:'#3a3a32', reqDef:10, price:20000,
+    note:'+15% damage and +2 to hit against your slayer task' });
+  it.ac += 4; return it;
+}
+function tkBuy(shop, id){
+  const p = tkP(), S = { slayer:SLAYER_SHOP, guild:GUILD_SHOP, tokkul:TZHAAR_SHOP, qp:QP_SHOP }[shop], e = S && S.find(x=>x.id===id); if (!e) return;
+  if (shop==='qp'){ if (p.questPoints < e.qp || p.gold < e.gold) return; }
+  else if (p.cur[shop] < e.cost) return;
+  if (shop==='slayer' && e.unlock && p.slay.un[id]) return;
+  const give = it=>{ addToInventory(it); return itemNameHtml(it); };
+  let got = esc(e.nm);
+  if (shop==='slayer'){
+    if (e.unlock) p.slay.un[id] = 1;
+    else if (id==='helm') got = give(slayerHelmet());
+    else if (id==='supplies'){ for (let i=0;i<3;i++) addToInventory(genPotion(lootLevel())); addToInventory(mkAntipoison()); }
+  } else if (shop==='guild'){
+    if (id==='potions') for (let i=0;i<3;i++) addToInventory(genPotion(lootLevel()));
+    else if (id==='clue') got = give(mkClue());
+    else if (id==='lamp') got = give(mkLamp());
+    else if (id==='ckey') skAdd('crystalkey', 1);
+    else if (id==='wealth'){ const it = crJewel('ring', 'Ring of Wealth', {}, 25000); afAdd(it, 'goldfind', 0, 0, 0.2); it.note = 'monsters drop 20% more gold'; got = give(it); }
+    else if (id==='acape'){ const it = rsItem('cape'); Object.assign(it, { nm:"Adventurer's Cape", basis:'Cape', baseMat:'Guild', capeCol:'#d8b050', rsCol:'#d8b050', ac:6, acc:3, rngAcc:3, magAcc:3, price:30000, note:'5% more xp' }); afAdd(it, 'xpfind', 0, 0, 0.05); got = give(it); }
+  } else if (shop==='tokkul'){
+    if (id==='onyx') skAdd('onyx', 1); else got = give(tzMake(id));
+  } else if (shop==='qp'){
+    if (id==='glory') got = give(rsMakeJewel('necklace', RS_AMULETS.findIndex(a=>a[0]==='Amulet of Glory')));
+    else if (id==='legends'){ const it = rsItem('cape'); Object.assign(it, { nm:'Cape of Legends', basis:'Cape', baseMat:'Legends', capeCol:'#e8e0d0', rsCol:'#e8e0d0', ac:7, acc:4, rngAcc:4, magAcc:4, price:4500 }); got = give(it); }
+    else if (id==='dsq'){ const it = rsMakeArmour('metal', 6, 'offhand'); Object.assign(it, { nm:'Dragon Sq Shield', basis:'Kiteshield' }); got = give(it); }
+    else if (id==='qpcape'){ const it = rsItem('cape'); Object.assign(it, { nm:'Quest Point Cape', basis:'Cape', baseMat:'Quest', capeCol:'#2a4aa0', rsCol:'#2a4aa0', ac:10, acc:6, rngAcc:6, magAcc:6, prayB:4, quality:3, price:99000 }); got = give(it); }
+  }
+  if (shop==='qp') p.gold -= e.gold; else p.cur[shop] -= e.cost;
+  logMsg(`you ${e.unlock ? 'unlock' : 'get'} ${got}`, 'loot', true); sfx('gold');
+  renderOverlay(); saveCurrentGame();
+}
+// obsidian from the TzHaar: rune-strength weapons that a berserker necklace makes hit 20% harder
+function tzMake(id){
+  let it;
+  const OB = '#2a2030';
+  if (id==='cape'){ it = rsItem('cape'); Object.assign(it, { nm:'Obsidian Cape', basis:'Cape', baseMat:'Obsidian', capeCol:'#3a1a1a', rsCol:'#3a1a1a', ac:9, dmgB:3, price:30000 }); }
+  else if (id==='ket'){ it = rsMakeArmour('metal', 5, 'offhand'); Object.assign(it, { nm:'Toktz-ket-xil', baseMat:'Obsidian', rsCol:OB, dmgB:5, reqDef:60, price:40000 }); it.ac += 8; }
+  else if (id==='bneck'){ it = crJewel('necklace', 'Berserker Necklace', { dmgB:7 }, 50000); it.berserker = 1; it.note = 'obsidian weapons hit 20% harder while you wear it'; }
+  else if (id==='tal'){ it = rsMakeStaff(RS_STAVES.findIndex(s=>s[0]==='Fire Battlestaff')); Object.assign(it, { nm:'Toktz-mej-tal', baseMat:'Obsidian', reqMag:60, rsCol:OB, price:35000 }); it.magAcc += 15; it.magDmg = (it.magDmg||0) + 1; }
+  else { const wi = { ek:0, ak:2, om:6 }[id]; it = rsMakeWeapon(5, wi);
+    Object.assign(it, { nm:{ ek:'Toktz-xil-ek', ak:'Toktz-xil-ak', om:'Tzhaar-ket-om' }[id], baseMat:'Obsidian', rsCol:OB, obsidian:1, reqAtt:60, price:{ ek:20000, ak:30000, om:50000 }[id] });
+    if (id==='om'){ it.reqAtt = 0; it.reqStr = 60; it.dmgB = Math.round(it.dmgB*1.3); } else it.acc += 4; }
+  if (id!=='bneck' && id!=='cape') it.note = it.obsidian ? 'obsidian: a berserker necklace makes it hit 20% harder' : 'obsidian';
+  return it;
+}
+// the TzHaar take ore for tokkul, at half again what the smith pays in gold
+function tzSell(id, all){
+  const n = all ? skHave(id) : Math.min(1, skHave(id)); if (!n) return;
+  const each = Math.round(SMITH_BUYS[id]*1.5); skAdd(id, -n); tkP().cur.tokkul += each*n;
+  logMsg(`you trade ${n} ${skName(id)} for ${each*n} tokkul`, 'loot'); sfx('gold'); renderOverlay(); saveCurrentGame();
+}
+// ---- claiming at the board ----
+function tkClaim(list, i){
+  const p = tkP(), t = (list==='bounty' ? p.bounties.list : list==='weekly' ? p.contracts.weekly : p.contracts.daily)[i];
+  if (!t || !tkReady(t)) return;
+  if (t.kind==='bag') skAdd(t.item, -t.need);
+  t.claimed = true; p.gold += t.gold; p.cur.guild += t.tokens||0;
+  if (t.lamp) addToInventory(mkLamp());
+  p.tasksDone = (p.tasksDone||0) + 1;
+  logMsg(`${t.bounty ? 'bounty' : 'contract'} claimed: ${t.gold} gold and ${t.tokens} guild token${t.tokens===1?'':'s'}${t.lamp ? ', and a Lamp of Knowledge' : ''}`, 'good', true);
+  sfx('gold'); renderOverlay(); saveCurrentGame();
+}
+// ---- quest points ----
+function tkQuestPoints(q){
+  const p = tkP(), n = q && q.hard ? 2 : 1; p.questPoints += n;
+  logMsg(`you gain ${n} quest point${n>1?'s':''} - you now have ${p.questPoints}`, 'magic');
+  const nx = QP_SHOP.find(e=>e.qp===p.questPoints || (e.qp > p.questPoints-n && e.qp <= p.questPoints));
+  if (nx) logMsg(`the Captain of the Watch now offers you the ${nx.nm}`, 'new');
+}
+// ---- the money-making guide: real numbers from the game's own prices, sorted by gold per 100 turns ----
+function mmMethods(){
+  const p = G.player, L = p.level||1, out = [];
+  const add = (cat, nm, ok, req, each, turns, how)=>out.push({ cat, nm, ok, req, each:Math.round(each), rate:isFinite(turns) ? Math.round(each/turns*100) : null, how });
+  const e = MONSTER_LEVELS[clampMLevel(L)-1], gf = goldFindMult();
+  add('Combat', `Fighting monsters at your level (${e.nm} and its kin)`, true, '', (e.xp-1)/2*gf, 9, 'coins dropped by each kill, before any loot - deeper floors and better gold find pay more');
+  const T = p.slay && p.slay.task;
+  add('Combat', 'Slayer tasks', true, '', (e.xp-1)/2*gf, 9, `the same coins, plus slayer points and slayer xp${T ? ` - your task: ${tkText(T).toLowerCase()}` : ' - get a task from a Slayer Master'}`);
+  for (const o of SK_ORE){ if (!SMITH_BUYS[o.id]) continue; add('Gathering', `Mining ${o.nm} and selling it to the smith`, skLvl('mining') >= o.lvl, `Mining ${o.lvl}`, SMITH_BUYS[o.id], 3, `the smith pays ${SMITH_BUYS[o.id]}g each (the TzHaar give ${Math.round(SMITH_BUYS[o.id]*1.5)} tokkul)`); }
+  // nobody sells ore, so production counts the mining too: about 3 turns an ore, a turn to smelt, a turn and a half to forge
+  const oreTurns = b=>(b.per + (b.coal||0))*3 + 1;
+  for (const b of SK_BAR){ if (!SMITH_BUYS[b.id] || !SMITH_BUYS[b.ore]) continue;
+    const ok = skLvl('smithing') >= b.lvl && skLvl('mining') >= (SK_ORE.find(o=>o.id===b.ore)||{lvl:1}).lvl && (!b.coal || skLvl('mining') >= 30);
+    add('Production', `Mining and smelting ${b.nm}s`, ok, `Smithing ${b.lvl}`, SMITH_BUYS[b.id], oreTurns(b), `mine ${b.per} ore${b.coal ? ` and ${b.coal} coal` : ''} a bar, smelt it at the smithy; the smith pays ${SMITH_BUYS[b.id]}g a bar`); }
+  const nat = resValue('r_nature'), canAlch = rsLvl('magic') >= 55;
+  for (const b of SK_BAR){ if (b.tier===undefined || !SMITH_BUYS[b.id]) continue;
+    let best = null;
+    for (const k in SK_FORGE){ const [lbl, bars, wi] = SK_FORGE[k]; if (k==='ring' || k==='necklace') continue;
+      let it; try { it = typeof wi==='number' ? rsMakeWeapon(b.tier, wi) : rsMakeArmour('metal', b.tier, wi); } catch(err){ continue; }
+      const v = itemPrice(it), sell = sellPrice(it), alch = highAlch(v) - nat, g = canAlch ? Math.max(sell, alch) : sell, turns = bars*oreTurns(b) + 1.5;
+      if (!best || g/turns > best.g/best.turns) best = { g, turns, lbl, bars, it, alch: canAlch && alch > sell }; }
+    const ok = skLvl('smithing') >= b.lvl && skLvl('mining') >= (SK_ORE.find(o=>o.id===b.ore)||{lvl:1}).lvl;
+    if (best) add('Production', `Making ${RS_METALS[b.tier][0].toLowerCase()} ${best.lbl.toLowerCase()}s${best.alch ? ' and high-alching them' : ' and selling them'}`, ok, `Smithing ${b.lvl}`, best.g, best.turns,
+      `${best.bars} bar${best.bars>1?'s':''} each, from ore you mine${best.alch ? `; High Level Alchemy pays ${highAlch(itemPrice(best.it))}g (a nature rune each)` : `; a shop pays ${sellPrice(best.it)}g`} - compare selling the bars (${best.bars*SMITH_BUYS[b.id]}g)`); }
+  const tk = tkP(), open = l=>l.filter(t=>!t.claimed);
+  const dg = open(tk.contracts.daily).reduce((a,t)=>a+t.gold, 0), wg = open(tk.contracts.weekly).reduce((a,t)=>a+t.gold, 0), bg = open(tk.bounties.list).reduce((a,t)=>a+t.gold, 0);
+  add('Tasks', "Today's contracts", true, '', dg, Infinity, `${open(tk.contracts.daily).length} open, ${dg}g in all plus guild tokens - new ones in ${tkUntil()}`);
+  add('Tasks', "This week's contract", true, '', wg, Infinity, `${wg}g, 15 guild tokens and a lamp - a new one in ${tkUntil(true)}`);
+  add('Tasks', "Today's bounties", true, '', bg, Infinity, `${open(tk.bounties.list).length} wanted, ${bg}g in all`);
+  add('Tasks', 'Quests from the Captain of the Watch', true, '', 0, Infinity, 'gold, xp, a reward of your choice and quest points');
+  return out;
+}
+// ---- the task log (one screen, five tabs) and the three counters that use it ----
+// G.tkAt says where you are standing: 'slayer' (the Slayer Master), 'board' (the bounty board), 'tzhaar' or 'captain' -
+// each unlocks its own buttons; opened from the side panel it's read-only
+function tkOpen(at, tab){ G.tkAt = at || null; G.tkTab = tab || (at==='board' ? 'contracts' : at==='tzhaar' || at==='captain' ? 'currency' : at==='slayer' ? 'slayer' : (G.tkTab || 'slayer')); tkP(); setUi('tasks'); }
+function tkRow(t, list, i, here){
+  const pr = tkProg(t), rd = tkReady(t), pct = Math.round(pr/t.need*100);
+  const btn = t.claimed ? `<span class="qtag done">claimed</span>` : rd && here ? `<button class="btn primary" onclick="tkClaim('${list}',${i})">claim</button>` : rd ? `<span class="qtag done">ready</span>` : `<span class="muted">${t.kind==='xp' ? Math.floor(pr).toLocaleString() : pr}/${t.need.toLocaleString()}</span>`;
+  const where = t.kind==='fam' ? tkFamWhere(t.fam) : t.kind==='mon' ? `level ${monCombatLevel({ mlevel:t.lvl||1 })} - ${bestWhere(t.nm)}` : t.kind==='boss' ? t.where : t.kind==='bag' ? `you have ${skHave(t.item)}` : `${tkSkillName(t.skill)} level ${skLvl(t.skill)}`;
+  return `<div class="qoffer ${t.claimed ? 'idle' : rd ? 'ready' : ''}" style="${t.claimed ? 'opacity:0.5' : ''}">
+    <span class="qtag ${t.bounty ? 'bounty' : t.lamp ? 'conquest' : 'camp'}">${t.most ? 'most wanted' : t.bounty ? 'wanted' : t.lamp ? 'weekly' : 'daily'}</span>
+    <span class="desc"><b>${esc(tkText(t))}</b><br><span class="muted">${esc(where)}</span><div class="qrepbar"><i style="width:${pct}%"></i></div></span>
+    <span class="price">${t.gold}g &middot; ${t.tokens} token${t.tokens===1?'':'s'}${t.lamp ? ' &middot; lamp' : ''}<br>${btn}</span></div>`;
+}
+function tkShopRows(shop, list, here){
+  const p = tkP();
+  return list.map(e=>{
+    const owned = shop==='slayer' && e.unlock && p.slay.un[e.id];
+    const lockQ = shop==='qp' && p.questPoints < e.qp;
+    const can = here && !owned && !lockQ && (shop==='qp' ? p.gold >= e.gold : p.cur[shop] >= e.cost);
+    const price = shop==='qp' ? `${e.qp} QP &middot; ${e.gold.toLocaleString()}g` : `${e.cost.toLocaleString()} ${shop==='slayer' ? 'pts' : shop==='guild' ? 'tokens' : 'tokkul'}`;
+    return `<div class="shoprow"><span><b>${esc(e.nm)}</b></span><span class="desc">${esc(e.d)}</span><span class="muted">${price}</span>
+      <span>${owned ? '<span class="qtag done">unlocked</span>' : here ? `<button class="btn" ${can ? '' : 'disabled'} onclick="tkBuy('${shop}','${e.id}')">${e.unlock ? 'unlock' : 'buy'}</button>` : ''}</span></div>`; }).join('');
+}
+function buildTasks(){
+  const p = tkP(), at = G.tkAt, tab = G.tkTab || 'slayer', s = p.slay;
+  const tabs = [['slayer','Slayer'],['contracts','Contracts'],['bounties','Bounties'],['currency','Currencies & shops'],['money','Money making']]
+    .map(([k,nm])=>`<button class="btn ${tab===k ? 'primary' : ''}" onclick="G.tkTab='${k}';renderOverlay()">${nm}</button>`).join(' ');
+  const purse = TK_CURRENCIES.map(([k,nm,col])=>`<span style="margin-right:14px;"><b style="color:${col}">${tkCur(k).toLocaleString()}</b> <span class="muted">${nm.toLowerCase()}</span></span>`).join('') + `<span><b style="color:${COL.gold}">${p.gold.toLocaleString()}</b> <span class="muted">gold</span></span>`;
+  const title = at==='slayer' ? `${esc(slayerMasterName()).toUpperCase()}, SLAYER MASTER` : at==='board' ? 'THE BOUNTY BOARD' : at==='tzhaar' ? `${esc((villageNpcFor('tzhaar')||{name:'TzHaar-Hur'}).name).toUpperCase()}, TZHAAR TRADER` : 'TASKS';
+  const sub = at==='slayer' ? '"Kill what I tell you to, and I\'ll teach you where to strike."' : at==='board' ? 'Contracts are posted every day and every week; the wanted posters change at midnight. Finish them anywhere, claim them here.'
+    : at==='tzhaar' ? '"JalYt. TzHaar trade obsidian for tokkul. Bring tokkul, or bring ore."' : 'Your slayer task, contracts, bounties, currencies, and the best ways to make gold at your level.';
+  let body = '';
+  if (tab==='slayer'){
+    const T = s.task, sl = skLvl('slayer');
+    body += T ? `<div class="qrep"><b>Your task:</b> ${esc(tkText(T))} <span class="muted">(${T.have}/${T.need})</span><div class="qrepbar"><i style="width:${Math.round(T.have/T.need*100)}%"></i></div><span class="muted">found in ${esc(tkFamWhere(T.fam))}${tkHelmOn() ? ' &middot; your slayer helmet is on' : ''}</span></div>`
+      : `<div class="qrep">You have no slayer task. ${at==='slayer' ? '' : 'A Slayer Master stands in every town square.'}</div>`;
+    body += `<div class="muted" style="font-size:12px;margin:6px 0;">Slayer level ${sl} &middot; ${s.done} task${s.done===1?'':'s'} done &middot; ${p.cur.slayer} points &middot; every 10th task pays five times the points, every 50th fifteen times. Each kill on task gives Slayer xp equal to the monster's life.</div>`;
+    if (at==='slayer') body += `<div class="btnrow" style="justify-content:flex-start;">
+      <button class="btn primary" ${T ? 'disabled' : ''} onclick="slayerAssign()">get a task</button>
+      <button class="btn" ${T && p.cur.slayer>=30 ? '' : 'disabled'} onclick="slayerSkip(false)">skip it (30 pts)</button>
+      <button class="btn" ${T && p.cur.slayer>=100 && s.blocked.length<4 ? '' : 'disabled'} onclick="slayerSkip(true)">block it (100 pts)</button></div>`;
+    if (s.blocked.length) body += `<div class="muted" style="font-size:12px;margin:6px 0;">blocked: ${s.blocked.map(k=>`${esc(MON_FAMILIES[k].nm)}${at==='slayer' ? ` <a href="#" onclick="slayerUnblock('${k}');return false;">(unblock)</a>` : ''}`).join(', ')}</div>`;
+    body += `<h4 style="color:var(--ink-faint);margin:12px 0 6px;">WHAT YOU CAN BE ASSIGNED</h4><div class="muted" style="font-size:12px;">` + Object.keys(MON_FAMILIES).map(k=>{
+      const req = SLAYER_REQ[k]||1, u = SLAYER_UNLOCK_FAM[k], ok = req <= sl && !(u && !s.un[u]) && !s.blocked.includes(k);
+      return `<span style="${ok ? 'color:var(--ink)' : 'opacity:0.5'}">${esc(MON_FAMILIES[k].nm)} (${req}${u ? ', '+SLAYER_SHOP.find(x=>x.id===u).nm : ''})</span>`; }).join(' &middot; ') + `</div>`;
+    body += `<h4 style="color:var(--ink-faint);margin:12px 0 6px;">SLAYER REWARDS${at==='slayer' ? '' : ' (buy them from a Slayer Master)'}</h4>${tkShopRows('slayer', SLAYER_SHOP, at==='slayer')}`;
+  } else if (tab==='contracts'){
+    body += `<h4 style="color:var(--ink-faint);margin:4px 0 6px;">TODAY &middot; new contracts in ${tkUntil()}</h4>` + p.contracts.daily.map((t,i)=>tkRow(t, 'daily', i, at==='board')).join('');
+    body += `<h4 style="color:var(--ink-faint);margin:12px 0 6px;">THIS WEEK &middot; a new one in ${tkUntil(true)}</h4>` + p.contracts.weekly.map((t,i)=>tkRow(t, 'weekly', i, at==='board')).join('');
+    body += `<div class="muted" style="font-size:12px;margin-top:8px;">Kills and xp count wherever you are; hand-ins come straight out of your bag when you claim. ${at==='board' ? '' : 'Claim at the bounty board beside the Captain of the Watch in any town.'}</div>`;
+    if (at==='board') body += `<h4 style="color:var(--ink-faint);margin:12px 0 6px;">THE GUILD STORE &middot; ${p.cur.guild} tokens</h4>${tkShopRows('guild', GUILD_SHOP, true)}`;
+  } else if (tab==='bounties'){
+    body += `<h4 style="color:var(--ink-faint);margin:4px 0 6px;">WANTED &middot; new posters in ${tkUntil()}</h4>` + (p.bounties.list.map((t,i)=>tkRow(t, 'bounty', i, at==='board')).join('') || '<div class="muted">nothing posted</div>');
+    body += `<div class="muted" style="font-size:12px;margin-top:8px;">The first one of each you kill today earns the bounty. ${p.level < 8 ? 'Once you reach combat level 46 a boss is posted too.' : ''}</div>`;
+    if (at==='board') body += `<h4 style="color:var(--ink-faint);margin:12px 0 6px;">THE GUILD STORE &middot; ${p.cur.guild} tokens</h4>${tkShopRows('guild', GUILD_SHOP, true)}`;
+  } else if (tab==='currency'){
+    body += TK_CURRENCIES.map(([k,nm,col,how])=>`<div class="shoprow"><span><b style="color:${col}">${esc(nm)}</b></span><span class="desc">${esc(how)}</span><span><b>${tkCur(k).toLocaleString()}</b></span></div>`).join('');
+    body += `<h4 style="color:var(--ink-faint);margin:12px 0 6px;">THE TZHAAR TRADER &middot; ${p.cur.tokkul.toLocaleString()} tokkul</h4>${tkShopRows('tokkul', TZHAAR_SHOP, at==='tzhaar')}`;
+    if (at==='tzhaar'){ const ores = Object.keys(SMITH_BUYS).filter(id=>SK_ORE.some(o=>o.id===id) && skHave(id));
+      body += `<h4 style="color:var(--ink-faint);margin:12px 0 6px;">THE TZHAAR TAKE ORE</h4>` + (ores.map(id=>`<div class="shoprow"><span class="muted">&times;${skHave(id)}</span><span>${esc(skName(id))}</span><span class="desc">${Math.round(SMITH_BUYS[id]*1.5)} tokkul each</span>
+        <span><button class="btn" onclick="tzSell('${id}')">trade 1</button> <button class="btn" onclick="tzSell('${id}',1)">trade all</button></span></div>`).join('') || '<div class="muted">you have no ore to trade</div>'); }
+    body += `<h4 style="color:var(--ink-faint);margin:12px 0 6px;">THE CAPTAIN'S QUEST REWARDS &middot; ${p.questPoints} quest points</h4>${tkShopRows('qp', QP_SHOP, at==='captain')}`;
+    body += `<h4 style="color:var(--ink-faint);margin:12px 0 6px;">THE GUILD STORE &middot; ${p.cur.guild} tokens (at the bounty board)</h4>${tkShopRows('guild', GUILD_SHOP, at==='board')}`;
+  } else {
+    const M = mmMethods(), cats = ['Combat','Gathering','Production','Tasks'];
+    const top = M.filter(m=>m.ok && m.rate!=null && m.rate > 0).sort((a,b)=>b.rate-a.rate).slice(0, 3);
+    body += `<div class="qrep"><b>Best for you right now:</b> ${top.map(m=>`${esc(m.nm)} <span class="muted">(~${m.rate.toLocaleString()}g per 100 turns)</span>`).join('; ') || 'fight, and take contracts'}</div>`;
+    body += `<div class="muted" style="font-size:12px;margin:6px 0;">Figures come from what the game really pays: coins per kill, the smith's prices, shop prices and High Level Alchemy. Logs, fish and herbs don't sell, but contracts pay well for them.</div>`;
+    for (const c of cats){ const rows = M.filter(m=>m.cat===c).sort((a,b)=>(b.ok-a.ok) || (b.rate-a.rate)); if (!rows.length) continue;
+      body += `<h4 style="color:var(--ink-faint);margin:12px 0 6px;">${c.toUpperCase()}</h4>` + rows.map(m=>`<div class="shoprow" style="flex-wrap:wrap;row-gap:2px;${m.ok ? '' : 'opacity:0.45'}"><span style="flex:1 1 100%"><b>${esc(m.nm)}</b>${m.req ? ` <span class="muted">(${m.req})</span>` : ''}</span><span class="desc">${esc(m.how)}</span>
+        <span class="price" style="font-size:12px;text-align:right;">${m.each < 0 ? `loses ${(-m.each).toLocaleString()}g each` : m.rate!=null ? `${m.each.toLocaleString()}g each &middot; ~${m.rate.toLocaleString()}g / 100 turns` : m.each ? `${m.each.toLocaleString()}g` : 'varies'}</span></div>`).join(''); }
+  }
+  return `<h2 class="panel-title">${title}</h2><div class="sub">${sub}</div>
+    <div class="ovbody"><div style="margin-bottom:8px;">${purse}</div><div class="btnrow" style="justify-content:flex-start;margin-bottom:8px;">${tabs}</div>${body}
+    <div class="btnrow"><button class="btn primary" onclick="setUi('playing')">ESC &middot; close</button></div></div>`;
+}
+// a line for the side panel's quest tab: the task, today's work, the purse
+function tkPanelHtml(){
+  const p = tkP(), T = p.slay.task, c = p.contracts.daily.concat(p.contracts.weekly), b = p.bounties.list;
+  const ready = c.concat(b).filter(tkReady).length;
+  return `<div class="sp-q" onclick="tkOpen(null,'slayer')"><b>Slayer</b><span>${T ? `${esc(tkText(T))} - ${T.have}/${T.need}` : 'no task - see a Slayer Master'}</span></div>
+    <div class="sp-q" onclick="tkOpen(null,'contracts')"><b>Contracts</b><span>${c.filter(t=>!t.claimed && !tkReady(t)).length} open${ready ? `, ${ready} ready to claim` : ''}</span></div>
+    <div class="sp-q" onclick="tkOpen(null,'bounties')"><b>Bounties</b><span>${b.filter(t=>!t.claimed).length} wanted today</span></div>
+    <div class="sp-q" onclick="tkOpen(null,'currency')"><b>Purse</b><span>${p.cur.slayer} slayer pts &middot; ${p.cur.guild} tokens &middot; ${p.cur.tokkul} tokkul &middot; ${p.questPoints} QP</span></div>
+    <div class="sp-q" onclick="tkOpen(null,'money')"><b>Money making</b><span>the best ways to earn gold at your level</span></div>`;
+}
 
 // ===================== SECTION: SEALED VAULT MINIGAME =====================
 function vaultColorName(k){ return ['?','R','G','B','Y'][k]||'?'; }
@@ -21172,6 +21598,8 @@ const V3_LOOK = {
   shop:       ()=>HUM({ outfit:'robe', cloth:'#6a3a7a', hair:'#2a1a10', beard:'#2a1a10', trim:'#d8b050' }),
   tailor:     ()=>HUM({ outfit:'leather', cloth:'#7a5a3a', legWear:'cloth', legCol:'#4a3a8a', hair:'#b0a090', weapon:'bow', cape:'#3a2a6a' }),
   questgiver: ()=>HUM({ outfit:'chain', tabard:'#2a4a8a', emblem:'#d8b050', weapon:'spear', helm:'kettle', cape:'#2a3a6a', hair:'#5a3a20' }),
+  slayer:     ()=>HUM({ outfit:'leather', cloth:'#3a2a2a', weapon:'sword', cape:'#6a1a1a', hair:'#1a1210', beard:'#1a1210', bulk:1.1 }),
+  tzhaar:     ()=>HUM({ outfit:'rags', cloth:'#3a2018', head:'troll', skin:'#b84a1a', weapon:'hammer', bulk:1.25 }),
 };
 const V3_RACE_LOOK = { human:{}, elf:{ hair:'#e0d090', skin:'#f0d8c0' }, dwarf:{ bulk:1.22, beard:'#6a3a1a', hair:'#6a3a1a' }, orc:{ head:'orc', skin:'#6a8a4a' } };
 function rsLookKey(){ const p = G.player; return ['weapon','ranged','head','chest','legs','arms','feet','cape','offhand'].map(k=>{ const it = k==='ranged' ? G.gear.ranged : lookGear(k); return it && it.used ? it.nm + (it.dye||'') : '-'; }).join('|') + p.race + (p.rsLastType==='ranged' ? '|bow' : '') + JSON.stringify(p.look||0); }
@@ -21298,6 +21726,7 @@ function v3BuildScene(){
     for (const dx of [-0.55,0.55]) grp.add(v3Cyl(0.05,0.06,1.9,6,mats.wood,x+dx,0.95,z));
     const bd = v3Box(1.2,0.8,0.06,mats.notices,x,1.3,z); grp.add(bd);
     const rf = v3Box(1.4,0.05,0.4,mats.roof,x,1.82,z); rf.rotation.x = -0.3; grp.add(rf);
+    const hb = new T.Mesh(new T.BoxGeometry(1.3,1.9,0.5), new T.MeshBasicMaterial({ visible:false })); hb.position.set(x,0.95,z); hb.userData.act = { kind:'tile', x:15, y:8, label:'Bounty board' }; grp.add(hb); V3.hits.push(hb);
   }
   // lamps, trees, extra scenery
   for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++){
@@ -21323,7 +21752,7 @@ function v3BuildPeople(grp, mats){
   const P = (entry, h, x, y)=>{ const p = v3Person(entry, h, grp); p.g.position.set(x+0.5, 0, y+0.5); return p; };
   V3.player = P(v3PlayerLook(), 1.0, G.player.x, G.player.y); V3.player.at = [G.player.x, G.player.y];
   V3.npcs = (G.villageNpcs||[]).map(n=>{ const look = V3_LOOK[n.service] ? V3_LOOK[n.service]() : v3VillagerLook(0);
-    const p = P(Object.assign(look, { o:Object.assign({}, look.o, V3_RACE_LOOK[G.villageRace]||{}) }), 1.02, n.x, n.y); p.n = n;
+    const p = P(n.service==='tzhaar' ? look : Object.assign(look, { o:Object.assign({}, look.o, V3_RACE_LOOK[G.villageRace]||{}) }), 1.02, n.x, n.y); p.n = n;
     p.sp.userData.act = { kind:'tile', x:n.x, y:G.interior ? n.y+1 : n.y, label:n.name }; V3.hits.push(p.sp);
     if (n.service==='questgiver'){ const mk = new T.Sprite(new T.SpriteMaterial({ map:v3MarkerTex('!'), transparent:true, depthTest:false })); mk.scale.set(0.42,0.63,1); mk.position.y = 1.75; p.g.add(mk); V3.marker = mk; }
     return p; });
@@ -27327,7 +27756,7 @@ function backOut(){
     case 'charsheet': setUi('playing'); break;
     case 'skills': case 'rsmagic': case 'prayer': setUi('playing'); break;
     case 'skguide': setUi(G.skGuideBack||'playing'); break;
-    case 'lamp': setUi('playing'); break;
+    case 'lamp': case 'tasks': setUi('playing'); break;
     case 'tailor': case 'bench': setUi('playing'); break;
     case 'makeover': makeoverLeave(); break;
     case 'dyeworks': dyeLeave(); break;
@@ -27391,13 +27820,14 @@ function renderOverlay(){
     case 'rsmagic': el.innerHTML = buildRsMagic(); break;
     case 'prayer': el.innerHTML = buildPrayer(); break;
     case 'cook': el.innerHTML = buildCook(); break;
+    case 'tasks': el.innerHTML = buildTasks(); break;
     default: el.innerHTML = '';
   }
 }
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-80';
+const GAME_VERSION = 'rs-81';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -29265,6 +29695,7 @@ function buildHelp(){
       <div>the game fills the whole window: life and prayer orbs sit either side of the skill bar, whose buttons do the same as their hotkeys. <kbd>Tab</kbd> slides out the full stats and spells panels, and the buttons in the corner go fullscreen or switch back to the classic side-by-side layout.</div>
       <div style="margin-top:10px;color:var(--ink-faint);">TOWNS</div>
       <div>towns are a 3D hub: click the ground to walk there, or click a vendor, the waypoint or the stash to walk over and use it (WASD still works, the mouse wheel zooms, <kbd>M</kbd> flips to the flat town map). The blacksmith, alchemist, peddler and innkeeper stand outside their shops; the Captain of the Watch by the notice board hands out quests (a gold <b>!</b> means new work, <b>?</b> means a quest is ready to turn in). Quests send you to real places around the town - a site to conquer, a wanted foe, a raider camp, a captive to rescue, a merchant to escort - marked with a pillar of light and a <b>!</b> on the land and a pin on the world map; the tracker on the right shows your progress and points the way (click a quest to track it). Turning one in lets you pick one of three rewards, and every town remembers the work you do for it: Friends, Allies and Champions get better prices and stock. The waypoint takes you to any town you've visited, and the stash chest holds up to 60 items, shared by every town.</div>
+      <div>the <b>Slayer Master</b> on the plaza hands out slayer tasks (kill so many of one monster family) for Slayer xp and slayer points, spent on a slayer helmet and unlocks. The <b>bounty board</b> beside the Captain posts three daily contracts, a weekly one and today's wanted monsters; claim them there for gold and guild tokens. The <b>TzHaar trader</b> sells obsidian gear for tokkul, which fire creatures, demons and anything deep in a dungeon drop. Every quest also earns quest points, which unlock the Captain's rewards. Open the <b>Quests</b> tab of the side panel (<kbd>F6</kbd>) for your task, your purse and a money-making guide.</div>
       <div style="margin-top:10px;color:var(--ink-faint);">COMBAT IS TURN-BASED</div>
       <div>monsters never act on their own clock &mdash; they only ever take their turn right after you take yours (a step, an attack, a spell or a potion). Take your time; nothing moves until you do.</div>
       <div style="margin-top:12px;color:var(--ink-faint);">RUNESCAPE RULES: SKILLS, NOT CLASSES</div>
@@ -29620,6 +30051,7 @@ function handleKeydown(e){
     case 'skills': { if (['j','J','Escape'].includes(k)) setUi('playing'); else if (['u','U'].includes(k)){ eatFood(); renderOverlay(); } break; }
     case 'skguide': { if (k==='Escape') setUi(G.skGuideBack||'playing'); else if (k==='ArrowRight') skGuideStep(1); else if (k==='ArrowLeft') skGuideStep(-1); break; }
     case 'lamp': { if (k==='Escape') setUi('playing'); break; }
+    case 'tasks': { if (k==='Escape') setUi('playing'); break; }
     case 'cook': { if (k==='Escape') setUi(G.cookAt==='fire' || G.interior ? 'playing' : 'tavern'); break; }
     case 'playing': handlePlayingKey(k); break;
   }

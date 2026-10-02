@@ -1,5 +1,31 @@
 # Depthcrawl patch notes
 
+## RS-81 - Slayer, tasks and currencies
+
+- **Slayer**, a new skill (1-99). The **Slayer Master** on every town plaza gives you a task: kill a set number of one monster family, such as 20 rats or 31 orcs. Tasks are picked to suit your combat level.
+  - Every kill on task gives Slayer xp equal to the monster's life. A finished task pays slayer points; every 10th task pays five times the points, every 50th fifteen times and every 100th twenty-five times.
+  - Higher Slayer levels open tougher families: skeletons and spiders at 5, orcs at 10, swamp things at 15, desert dwellers at 20, the frost-born at 25, creatures of the night at 30, giants at 35, demons at 45.
+  - Skip a task for 30 points, or block a family for good for 100 (up to four blocks).
+  - Points buy a **Slayer Helmet** (+15% damage and +2 to hit against your task, with any style) and four unlocks: **Slayer's Eye** (task monsters drop loot a quarter more often), **Longer Tasks**, **Hot Stuff** (demon tasks) and **Night Watch** (creatures of the night). They also buy supply packs.
+  - Slayer perks: more damage on task at 25, 75 and 99, and 15% more Slayer xp at 50. Level 99 earns the Slayer cape.
+- **Contracts:** each day brings three new contracts and each week one big one. Each asks you to kill some of a monster family, hand in resources (logs, ore, fish or herbs you can gather) or gain xp in a skill.
+  - Kills and xp count wherever you are.
+  - Claim finished contracts at the bounty board for gold and guild tokens. The weekly contract adds a Lamp of Knowledge.
+- **The bounty board:** the notice board beside the Captain of the Watch is now usable. Walk into it or click it.
+  - Each day it posts three wanted creatures near your level, and from combat level 46 a most-wanted boss too. Kill one to earn its bounty.
+  - The posters change at midnight.
+- **Currencies, each with its own shop:**
+  - **Slayer points**, spent with the Slayer Master.
+  - **Guild tokens** from contracts and bounties, spent at the bounty board's guild store: potion packs, clue scrolls, Lamps of Knowledge, crystal keys, a Ring of Wealth (+20% gold) and an Adventurer's Cape.
+  - **Tokkul**, dropped by fire creatures and demons, by anything five or more floors down, and in bigger amounts by named bosses. Spend it with the new **TzHaar trader** on the plaza: obsidian dagger, sword and maul, a fire battlestaff, the Toktz-ket-xil shield, an Obsidian Cape, uncut onyx, and the Berserker Necklace (obsidian weapons hit 20% harder while you wear it). The TzHaar also take ore for tokkul.
+  - **Quest points**, one per quest and two for a legendary one. Older characters get one for every quest they've already done. Quest points aren't spent: they unlock the Captain's rewards, which you buy with gold. These are the Amulet of Glory (3 QP), Cape of Legends (8), Dragon Sq Shield (15) and Quest Point Cape (25).
+- **A money-making guide**, worked out from what the game really pays: coins per kill, the smith's prices, shop prices and High Level Alchemy.
+  - It ranks methods by gold per 100 turns at your levels and shows the best three for you.
+  - It counts the time to mine your own ore.
+  - It lists today's contracts and bounties.
+- The side panel's **Quests** tab (F6) now shows your slayer task, contracts, bounties and purse. Click any line for the full task log.
+- Item tooltips now show special notes, so the godswords' and famous bows' special effects appear there too. Before this, those effects never showed.
+
 ## RS-80 - Monster content and the bestiary
 
 - **Monster families with tiers:** each family climbs in tiers, for example giant rat to rat king and goblin to goblin warlord. The families are rats, kobolds, goblins, zombies, skeletons, orcs, spiders, giants and demons. Their archers shoot and their shamans and mages cast. Each dungeon floor picks two families that live at its depth, so a floor has its own ecosystem.
