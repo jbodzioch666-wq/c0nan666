@@ -2699,7 +2699,7 @@ function resValue(id){
   if (SMITH_BUYS[id]) return SMITH_BUYS[id]*2;
   const bone = RS_BONES.find(b=>b[0]===id); if (bone) return mx(1, Math.round(bone[2]/2));
   const cooked = id.startsWith('c_'), e = skAllItems().find(x=>x.id===(cooked ? id.slice(2) : id));
-  const MATS = { flax:2, linen:8, bowstring:10, cowhide:6, leather:12, hleather:20 };
+  const MATS = { flax:2, linen:8, bowstring:10, cowhide:6, leather:12, hleather:20, pearl:180 };
   if (MATS[id]) return MATS[id];
   const lvl = e && e.lvl ? e.lvl : 10;
   const v = Math.round(3 + lvl*lvl*0.06 + lvl*0.8);
@@ -7999,7 +7999,7 @@ function tryMoveOverworld(dx,dy){
   if (nx<0||ny<0||nx>=OW_COLS||ny>=OW_ROWS) return;
   const t = G.ow.map[nx][ny];
   if (t===OW_MOUNTAIN) return;
-  if (t===OW_WATER && !G.player.hasBoat) return;
+  if (t===OW_WATER && !G.player.hasBoat && !iceAt(nx, ny)) return;
   G.owPos.x=nx; G.owPos.y=ny;
   owReveal(nx, ny, wgSight());
   const stepCost = G.ow.road ? wgStepCost(nx, ny) : 1;   // roads are quicker; wading a river is slower
@@ -9772,7 +9772,7 @@ const SK_TREE = {
 const SK_SPOT = {
   river: { nm:'River fishing spot',     fish:['trout','salmon','pike'],             col:'#a8e0ff', n:6 },
   shore: { nm:'Shore fishing spot',     fish:['shrimp','sardine','lobster'],        col:'#f4f8ff', n:6 },
-  deep:  { nm:'Deep-sea fishing spot',  fish:['tuna','swordfish','shark','kraken'], col:'#4a8ae8', n:7 },
+  deep:  { nm:'Deep-sea fishing spot',  fish:['tuna','swordfish','shark','marlin','kraken'], col:'#4a8ae8', n:7 },
   cave:  { nm:'Cave pool',              fish:['eel'],                               col:'#5ac8b0', n:4 },
 };
 const SK_HERB_COL = { flax:'#7a9aff', silverleaf:'#e2ecf4', bloodmoss:'#c02a30', ghostcap:'#b0c0ff', sunpetal:'#ffd23a', dragontongue:'#ff6a2a', starlily:'#efe6ff' };
@@ -9825,6 +9825,10 @@ function skNodeStatic(x, y){
     else if (!skWithin(x, y, 3, [OW_GRASS, OW_FOREST, OW_DESERT, OW_TUNDRA, OW_SWAMP, OW_MOUNTAIN, OW_MOUNTAINPASS, OW_TOWN, OW_RIVER])) n = { k:'fishing', type:'deep', dens:0.035 };
   }
   if (n && n.k==='fishing' && n.type==='shore' && skWithin(x, y, 1, [OW_TUNDRA])) n = { k:'fishing', type:'ice', dens:0.25 };
+  if (G.ow.islandOf){   // the islands' own: pearl beds on their shores, sunstone in their ground
+    if (n && n.k==='fishing' && n.type==='shore' && h2 < 0.5 && islandShore(x, y)) n = { k:'fishing', type:'pearl', dens:0.3 };
+    else if ((!n || n.k==='foraging') && (t===OW_GRASS || t===OW_DESERT || t===OW_FOREST) && skNH(x, y, 744) < 0.03 && islandAt(x, y)) n = { k:'mining', type:'sunstone' };
+  }
   if (!n) n = skNodeExtra(x, y, t);
   { const gn = guildNodeFor(x, y, t); if (gn) n = gn; }
   if (n){ n.x = x; n.y = y; skSizeQual(n); }
@@ -9842,7 +9846,8 @@ function skUsed(){
 function skNodeAt(x, y){
   const rr = richAt(x, y);
   if (rr) return { k:rr.k, type:rr.type, x, y, rich:true, size:2, qual:2, max:richMax(rr), left:rr.left };
-  const s = skNodeStatic(x, y); if (!s) return null;
+  let s = skNodeStatic(x, y); if (!s) return null;
+  if (s.k==='fishing' && s.type!=='ice' && iceAt(x, y)){ if (skNH(x, y, 733) > 0.4) return null; s = Object.assign({}, s, { type:'ice' }); }   // winter: fish through holes in the ice
   if (s.k==='runecrafting') return Object.assign({}, s, { max:1, left:1 });
   const turn = (G.player && G.player.turnCount)||0;
   if (s.type==='springbell' && seasonIdx()!==0) return null;  // springbells only bloom in spring,
@@ -9864,6 +9869,7 @@ function skNodeItems(n){
   if (n.k==='woodcutting') return [SK_LOG.find(l=>l.id===SK_TREE[n.type].log)];
   if (n.k==='fishing'){ const l = SK_SPOT[n.type].fish.map(id=>SK_FISH.find(f=>f.id===id));
     if (n.type==='river'){ if (isDawn()) l.push(SK_FISH.find(f=>f.id==='dawntrout')); if (seasonIdx()===3) l.push(SK_FISH.find(f=>f.id==='icefish')); }
+    if (n.type==='deep' && !harpoonReady()) return l.filter(f=>!['shark','marlin','kraken'].includes(f.id));   // the biggest need a harpoon and a deck
     return l; }
   if (n.k==='mining') return SK_ROCK[n.type].items.map(skItem);
   if (n.k==='runecrafting') return [{ id:'r_'+n.type, nm:rsRuneName(n.type), lvl:RC_ALTARS[n.type].lvl }];
@@ -9897,6 +9903,8 @@ function skNodeTipHtml(n){
   if (n.k==='woodcutting'){ extra.push(`a bird's nest now and then (1 in 40 logs): gold, a herb or a ring`);
     if (n.type==='maple' || n.type==='yew' || n.type==='magic') extra.push('bark (about 1 in 3 logs) - for splitbark robes');
     if (n.type==='yew' || n.type==='magic') extra.push('danger: 1 in 25 chops wakes a treant'); }
+  if (n.type==='deep') extra.push(harpoonReady() ? `your ${HARPOONS[harpoonTier()].nm.toLowerCase()} can land sharks, marlin and kraken here` : 'sharks, marlin and kraken need a harpoon - and a caravel or bigger to throw it from');
+  if (n.type==='pearl') extra.push('pearls now and then (about 1 in 6 catches)');
   if (n.k==='fishing') extra.push(`danger: something big may take the line (1 in 65 casts) - a ${n.type==='deep' ? 'giant octopus or giant shark' : n.type==='river' ? 'giant eel' : 'giant crab'}`);
   if (extra.length) html += `<div class="muted" style="margin-top:3px">ALSO</div>` + extra.map(t=>`<div>- ${esc(t)}</div>`).join('');
   if (n.glow) html += `<div style="color:${COL.gold}">glowing: every herb picked here counts double</div>`;
@@ -10074,7 +10082,7 @@ function skGatherTick(now){
   const ok = list.filter(e=>e.lvl<=L); if (!ok.length){ skStop('nothing here you are skilled enough to gather'); return; }
   let pick = ok[ok.length-1]; if (ok.length>1 && chn(0.45)) pick = ok[rn(ok.length-1)];
   if (node && node.type==='gem'){ const wt = { sapphire:50, emerald:30, ruby:15, diamond:5 }; let tot = 0; for (const e of ok) tot += wt[e.id]||1; let r = Math.random()*tot; for (const e of ok){ r -= wt[e.id]||1; if (r <= 0){ pick = e; break; } } }
-  const chance = clamp(0.3 + (L - pick.lvl)*0.012 + tier*0.06 + (G.gameMode===1 ? 0.1 : 0) + skPerk(k, 'gch') + (k==='fishing' && G.gameMode===0 && (G.weather==='rain' || G.weather==='storm') ? 0.1 : 0), 0.12, 0.95);   // (fish bite in the rain)
+  const chance = clamp(0.3 + (L - pick.lvl)*0.012 + tier*0.06 + (G.gameMode===1 ? 0.1 : 0) + skPerk(k, 'gch') + (node && node.type==='deep' && harpoonReady() ? 0.04*harpoonTier() : 0) + (k==='fishing' && G.gameMode===0 && (G.weather==='rain' || G.weather==='storm') ? 0.1 : 0), 0.12, 0.95);   // (fish bite in the rain)
   g.ch = chance; g.label = pick.nm;
   if (!chn(chance)){ renderGame(); return; }
   let amt = node && node.glow ? 2 : 1;
@@ -10087,6 +10095,9 @@ function skGatherTick(now){
     if (k==='fishing' && SK_FISH.some(f=>f.id===pick.id)){ const f = SK_FISH.find(f=>f.id===pick.id); skAdd('c_'+pick.id, amt); skGainXP(k, pick.xp*amt); skGainXP('cooking', Math.round(f.cxp*0.5*amt)); logMsg(`your infernal rod cooks the ${pick.nm.toLowerCase()} as it comes out of the water`, 'good'); renderGame(); saveCurrentGame(); return; }
   }
   skAdd(pick.id, amt); skGainXP(k, pick.xp * amt * (G.gameMode===1 ? 1.2 : 1) * (node ? [1, 1.25, 1.5][node.qual||0] : 1));
+  if (node && node.type==='pearl' && chn(0.18)){ skAdd('pearl', 1); const st = G.player.wgStat = G.player.wgStat||{}; st.pearls = (st.pearls||0) + 1; logMsg('a pearl! it gleams in the shell', 'loot'); checkAchievements(); }
+  if (node && node.type==='ice'){ const st = G.player.wgStat = G.player.wgStat||{}; st.ice = (st.ice||0) + 1; checkAchievements(); }
+  if (pick.id==='marlin'){ const st = G.player.wgStat = G.player.wgStat||{}; st.marlin = (st.marlin||0) + 1; checkAchievements(); }
   if (node && node.type==='goldvein'){ const gc = 15 + rn(40); G.player.gold += gc; logMsg(`flakes of gold come away with it - ${gc} gold`, 'loot'); }
   skTrophyRoll(pick, k, node);
   logMsg(`you ${{ fishing:'catch', mining:'mine', woodcutting:'cut', foraging:'find' }[k]} ${amt>1 ? (['','','two','three','four','five','six'][amt] || amt) : /s$/.test(pick.nm) ? 'some' : /^[AEIOU]/.test(pick.nm) ? 'an' : 'a'} ${/s$/.test(pick.nm) ? pick.nm.toLowerCase() : pick.nm}${amt>1 && !/s$/.test(pick.nm) ? 's' : ''}`, 'loot'); sfx('loot');
@@ -10279,7 +10290,7 @@ function skOnKill(m){
 // logs carve into staves, bows and arrows; a silver bar blows into an orb that a stack of
 // runes charges with an element. Like forged metal, what you craft beats any drop.
 const SK_CRAFT_MATS = [
-  { id:'flax', nm:'Flax', lvl:1, xp:6 },
+  { id:'flax', nm:'Flax', lvl:1, xp:6 }, { id:'pearl', nm:'Pearl' },
   { id:'linen', nm:'Linen Cloth' }, { id:'bowstring', nm:'Bowstring' },
   { id:'cowhide', nm:'Cowhide' }, { id:'leather', nm:'Leather' }, { id:'hleather', nm:'Hard Leather' },
   { id:'dhide_g', nm:'Green Dragonhide' }, { id:'dhide_b', nm:'Blue Dragonhide' }, { id:'dhide_r', nm:'Red Dragonhide' }, { id:'dhide_k', nm:'Black Dragonhide' },
@@ -10682,9 +10693,10 @@ SK_CRAFT_MATS.push(
   { id:'sapphire', nm:'Uncut Sapphire', lvl:40, xp:65 }, { id:'emerald', nm:'Uncut Emerald', lvl:45, xp:75 }, { id:'ruby', nm:'Uncut Ruby', lvl:50, xp:85 }, { id:'diamond', nm:'Uncut Diamond', lvl:60, xp:100 },
   { id:'goldore', nm:'Gold Ore', lvl:40, xp:65 }, { id:'cactus', nm:'Cactus Spine', lvl:10, xp:20 }, { id:'scarab', nm:'Scarab Shell', lvl:30, xp:45 }, { id:'frostlily', nm:'Frost Lily', lvl:45, xp:60 },
   { id:'leech', nm:'Leech', lvl:20, xp:30 }, { id:'springbell', nm:'Springbell', lvl:20, xp:40 }, { id:'ambercap', nm:'Amber Cap', lvl:35, xp:55 });
-SK_FISH.push({ id:'icefish', nm:'Ice Fish', lvl:45, xp:85, w:'i', heal:0.22, cook:45, cxp:110 }, { id:'dawntrout', nm:'Dawn Trout', lvl:25, xp:60, w:'d', heal:0.18, cook:25, cxp:90 });
+SK_FISH.push({ id:'marlin', nm:'Marlin', lvl:62, xp:125, w:'h', heal:0.36, cook:62, cxp:190 }, { id:'icefish', nm:'Ice Fish', lvl:45, xp:85, w:'i', heal:0.22, cook:45, cxp:110 }, { id:'dawntrout', nm:'Dawn Trout', lvl:25, xp:60, w:'d', heal:0.18, cook:25, cxp:90 });
 Object.assign(SK_SPOT, {
-  ice:    { nm:'Ice hole', fish:['icefish'], col:'#d8f4ff', n:5 },
+  ice:    { nm:'Ice hole', fish:['trout','pike','icefish'], col:'#d8f4ff', n:5 },
+  pearl:  { nm:'Pearl bed', fish:['shrimp','sardine','lobster'], col:'#f4e8ff', n:6 },
   legend: { nm:'Legendary fishing spot', fish:['salmon','lobster','swordfish','shark'], col:'#ffd860', n:16 },
 });
 SK_TREE.ancient = { nm:'Ancient oak', log:'oak', n:20, canopy:'#8aa83a' };
@@ -10700,10 +10712,12 @@ const SK_ROCK = {
 Object.assign(SK_HERB_COL, { cactus:'#5aa04a', scarab:'#3a7aa0', frostlily:'#c8f0ff', leech:'#6a3a3a', seaweed:'#3a8a6a', springbell:'#9ab8ff', ambercap:'#e0902a' });
 Object.assign(RES_HERB_WHERE, { cactus:'cactus clumps in the desert', scarab:'scarab nests in the desert', frostlily:'frost lilies on the tundra', leech:'leech pools in swamps',
   seaweed:'washed up on grass and sand beside the sea', springbell:'grassland - only in spring', ambercap:'forests - only in autumn' });
-Object.assign(RES_SPOT_WHERE, { ice:'in the water along tundra coasts', legend:'only now and then - a rare spot, marked on your map while it lasts' });
+Object.assign(RES_SPOT_WHERE, { pearl:'off the shores of the islands with no town (you need a boat to reach them)', ice:'in the water along tundra coasts, and out on the ice in winter', legend:'only now and then - a rare spot, marked on your map while it lasts' });
 const RES_ROCK_WHERE = { clay:'in the grass beside rivers and swamps', sand:'on desert beaches, and here and there in the dunes', essence:'near graveyards, temples and towers, and on mountain passes',
   bogiron:'in swamps', gem:'beside mountains and on mountain passes (rare)', goldvein:'only now and then - a rare vein, marked on your map while it lasts' };
 SK_ROCK.gold = { nm:'Gold rock', items:['goldore'], col:'#e0b040', n:3 };
+SK_ROCK.sunstone = { nm:'Sunstone outcrop', items:['goldore','sapphire','emerald','ruby','diamond'], col:'#ffb040', n:6 };
+RES_ROCK_WHERE.sunstone = 'only on the islands with no town on them';
 RES_ROCK_WHERE.gold = 'in the desert beside mountains, and on mountain passes';
 function skItem(id){ return SK_ORE.find(e=>e.id===id) || SK_CRAFT_MATS.find(e=>e.id===id) || SK_HERB.find(e=>e.id===id) || SK_FISH.find(e=>e.id===id); }
 function skNodeCol(n){ if (n.k==='runecrafting'){ const r = RS_RUNES.find(x=>x[0]===n.type); return r ? r[2] : '#a080e0'; } return n.k==='woodcutting' ? SK_TREE[n.type].canopy : n.k==='fishing' ? SK_SPOT[n.type].col : n.k==='mining' ? SK_ROCK[n.type].col : (SK_HERB_COL[n.type] || '#9ad06a'); }
@@ -10757,7 +10771,8 @@ function seasonTick(){
   const p = G.player; if (!p || G.gameOver) return; const si = seasonIdx();
   if (p.season===undefined){ p.season = si; return; }
   if (p.season===si) return; p.season = si;
-  const msg = ['spring has come - springbells are blooming on the grassland', 'summer is here - long days for gathering', 'autumn has come - amber caps are pushing up in the forests', 'winter has set in - ice fish are biting in every river'][si];
+  try{ iceThawCheck(); }catch(e){}
+  const msg = ['spring has come - springbells are blooming on the grassland', 'summer is here - long days for gathering', 'autumn has come - amber caps are pushing up in the forests', 'winter has set in - ice fish are biting in every river, and the water along the tundra has frozen hard enough to walk on'][si];
   logMsg(msg, 'new'); try{ notify(cap(SEASONS[si]), 'good'); }catch(e){}
 }
 // ---- rich and rare spots: a sparkling gold vein, an ancient oak, a legendary fishing spot - here for a while, marked on your map ----
@@ -14907,6 +14922,12 @@ const ACHIEVEMENTS = [
   {id:'hunter', name:'Hunter', desc:'hunt 10 animals', check:p=>p.wgStat && p.wgStat.hunts>=10, bonus:{healkill:1}},
   {id:'lookout', name:'Lookout', desc:'climb 3 lookouts', check:p=>p.wgStat && p.wgStat.views>=3, bonus:{xpfind:0.02}},
   {id:'wild_one', name:'Deep Wilderness', desc:'reach Wilderness level 20', check:p=>p.wgStat && p.wgStat.maxWild>=20, bonus:{crit:1}},
+  // the sea
+  {id:'islander', name:'Islander', desc:'chart 5 islands', check:p=>p.wgStat && p.wgStat.isles>=5, bonus:{magicfind:3}},
+  {id:'admiral', name:'Admiral', desc:'build a galleon', check:p=>(p.boatTier||0)>=4, bonus:{resist:2}},
+  {id:'pearl_diver', name:'Pearl Diver', desc:'find 10 pearls', check:p=>p.wgStat && p.wgStat.pearls>=10, bonus:{goldfind:0.03}},
+  {id:'ice_angler', name:'Ice Angler', desc:'catch 20 fish through the ice', check:p=>p.wgStat && p.wgStat.ice>=20, bonus:{regen:1}},
+  {id:'harpooner', name:'Harpooner', desc:'land a marlin', check:p=>p.wgStat && p.wgStat.marlin>=1, bonus:{atk:1}},
   {id:'sightseer', name:'Sightseer', desc:'stand at the foot of every great landmark', check:p=>{ const L = owGeo().landmarks; return L.length>0 && p.travel && L.every(l=>(p.travel.lmVisit||[]).includes(l.id)); }, bonus:{life:5}},
 ];
 function achievementBonusI(k){
@@ -16304,6 +16325,7 @@ const OW_BIOME_BG = {
 // needs to actively invalidate a stale entry.
 function owBaseColor(t,x,y){
   if (t!==OW_WATER && t!==OW_RIVER && !OW_SITE_TILES.includes(t)){ const bv = wgBioAt(x, y); if (bv) return BIO[bv].col; }
+  if (t===OW_WATER && iceAt(x, y)) return 'rgb(196,214,226)';
   if (!OW_SITE_TILES.includes(t)) return OW_BIOME_BG[t] || 'rgb(24,42,26)';
   const cache = G.ow.siteBiomeCache || (G.ow.siteBiomeCache = {});
   const key = x+','+y;
@@ -16877,6 +16899,7 @@ function renderOverworldMapZoomed(){
     ctx.drawImage(ct, 0, 0); }
   // the chart lives: cloud shadows drift across it and waves lap the coast
   pmAnimLand(zCamX, zCamY, viewCols, viewRows, now);
+  if (isWinter()) pmIceWash(zCamX, zCamY, viewCols, viewRows);   // winter ice along the tundra
   // close in, every tree and peak is drawn crisp, with the houses round each town and the gathering spots
   if (lod===2){
     pmNearDetail(zCamX, zCamY, viewCols, viewRows, now);
@@ -17393,7 +17416,7 @@ function mapToolsHtml(r){
   const layers = G.mapLayersOpen ? `<div class="mt-bar mt-layers" onmousedown="event.preventDefault()">${MAP_LAYERS.map(([k,nm])=>{ const v = mapF(k), on = k==='sites' ? v!=='off' : !!v;
     return `<button class="mt-b ${on ? 'on' : ''}" onclick="mapToggle('${k}')">${k==='sites' ? 'Sites: '+SITE_MODE_NAME[v] : nm}</button>`; }).join('')}</div>` : '';
   return `<div class="mt-bar" onmousedown="event.preventDefault()">${b('look','Look','look around; click a town you know to teleport')}${b('pin','Pin','drop your own pins with a note')}${b('route','Route','plan a route and walk it')}<span class="mt-sep"></span>
-    ${routeBtns}<button class="mt-b ${G.mapLayersOpen ? 'on' : ''}" onclick="G.mapLayersOpen=!G.mapLayersOpen;mapToolsSync(true)">Layers</button><button class="mt-b" onclick="setUi('travellog')">Travel log</button><button class="mt-b" title="M" onclick="toggleOwZoom()">Close</button></div>
+    ${routeBtns}<button class="mt-b ${G.mapLayersOpen ? 'on' : ''}" onclick="G.mapLayersOpen=!G.mapLayersOpen;mapToolsSync(true)">Layers</button><button class="mt-b" onclick="setUi('travellog')">Travel log</button><button class="mt-b" onclick="setUi('seacharts')">Sea charts</button><button class="mt-b" title="M" onclick="toggleOwZoom()">Close</button></div>
     ${layers}<div class="mt-info"><span>${hint}</span> <b id="mtHover"></b></div>`;
 }
 function mapToolsSync(force){
@@ -18672,6 +18695,7 @@ function wgGenerate(seed, elev){
     else if (p.k==='ferry') p.name = 'a ferry landing';
     p.seed = Math.floor(nr()*1e9);
   }
+  islandsGen();   // the islands with no town, and their buried caches (see SECTION: SAILING AND ISLANDS)
 }
 // what you've done to the world: mended bridges, looted ruins, hunted game, jobs taken - saved with the game
 function wgState(){
@@ -18680,7 +18704,7 @@ function wgState(){
   return s;
 }
 function wgPoiAt(x, y){ return (G.ow.pois||[]).find(p=>p.x===x && p.y===y) || null; }
-const POI_TITLE = { hamlet:'Hamlet', view:'Lookout', cave:'Cave', grotto:'Grotto', ruin:'Ruins', stones:'Standing stones', oldcamp:'Abandoned camp', well:'Wishing well', hermit:'Hermit', ferry:'Ferry landing' };
+const POI_TITLE = { cache:'Buried cache', hamlet:'Hamlet', view:'Lookout', cave:'Cave', grotto:'Grotto', ruin:'Ruins', stones:'Standing stones', oldcamp:'Abandoned camp', well:'Wishing well', hermit:'Hermit', ferry:'Ferry landing' };
 // ---- how dangerous each part of the land is: a monster level for every tile ----
 function wgTerrBand(ti){ const t = wevTowns()[ti], sp = G.ow.spawnPos; if (!t || !sp) return 1; const maxD = Math.hypot(OW_COLS, OW_ROWS)/2; return clampMLevel(1 + Math.round(Math.hypot(t[0]-sp.x, t[1]-sp.y)/maxD*14)); }
 function wgBand(x, y){
@@ -18707,9 +18731,10 @@ function wgStepCost(x, y){
   const p = G.player, rk = wgRoadKind(x, y), t = G.ow.map[x][y];
   if (rk===1 || rk===2 || rk===4){ p._roadHalf = !p._roadHalf; return p._roadHalf ? 0 : 1; }
   if (t===OW_RIVER){ if (rk===3 && !p._brokeSaid){ p._brokeSaid = 1; } return 2; }
+  if (t===OW_WATER && !iceAt(x, y)) return sailStepCost();   // a bigger boat crosses the sea quicker
   return 1;
 }
-function wgRoadMul(){ const k = G.ow && G.owPos ? wgRoadKind(G.owPos.x, G.owPos.y) : 0; return k===1 || k===2 || k===4 ? 0.75 : 1; }
+function wgRoadMul(){ if (G.ow && G.owPos && G.ow.map[G.owPos.x][G.owPos.y]===OW_WATER && !iceAt(G.owPos.x, G.owPos.y)) return sailMul(); const k = G.ow && G.owPos ? wgRoadKind(G.owPos.x, G.owPos.y) : 0; return k===1 || k===2 || k===4 ? 0.75 : 1; }
 function wgSight(){ return G.weather==='fog' ? 7 : G.weather==='storm' ? 9 : 12; }
 // called once per overworld step (see frameLoop): the area banner, the Wilderness warning, storms at sea
 function wgOnStep(prevKey){
@@ -18729,10 +18754,11 @@ function wgOnStep(prevKey){
   if (rk===3){ const b = wgBridgeAt(pos.x, pos.y); if (b && G.ui==='playing' && turn - (wgState().cd['br'+b.id]||-999) > 40){ wgState().cd['br'+b.id] = turn; wgBridgeDialog(b); } }
   else if (G.ow.map[pos.x][pos.y]===OW_RIVER && !rk && chn(0.15)) logMsg('you wade across the river - it slows you down (a road would have a bridge or a ford)', '');
   // storms at sea
-  if (G.ow.map[pos.x][pos.y]===OW_WATER && G.weather==='storm'){
-    if (chn(0.12)){ const dmg = Math.max(1, Math.round(effMaxHp()*0.06)); p.hp = Math.max(1, p.hp - dmg); logMsg(`a wave crashes over the boat (-${dmg} life) - the sea is no place to be in a storm`, 'hit'); }
-    else if (chn(0.07)){ const d = [[1,0],[-1,0],[0,1],[0,-1]][rn(4)], nx = pos.x+d[0], ny = pos.y+d[1]; if (G.ow.map[nx] && G.ow.map[nx][ny]===OW_WATER){ pos.x = nx; pos.y = ny; logMsg('the wind drives the boat off course', 'hit'); } }
+  if (G.ow.map[pos.x][pos.y]===OW_WATER && G.weather==='storm' && !iceAt(pos.x, pos.y) && stormRisk() > 0){
+    if (chn(0.12*stormRisk())){ const dmg = Math.max(1, Math.round(effMaxHp()*0.06)); p.hp = Math.max(1, p.hp - dmg); logMsg(`a wave crashes over the boat (-${dmg} life) - the sea is no place to be in a storm`, 'hit'); }
+    else if (chn(0.07*stormRisk())){ const d = [[1,0],[-1,0],[0,1],[0,-1]][rn(4)], nx = pos.x+d[0], ny = pos.y+d[1]; if (G.ow.map[nx] && G.ow.map[nx][ny]===OW_WATER){ pos.x = nx; pos.y = ny; logMsg('the wind drives the boat off course', 'hit'); } }
   }
+  islandOnStep();
   const poi = wgPoiAt(pos.x, pos.y); if (poi && !wgState().found.includes(poi.id)){ wgState().found.push(poi.id); checkAchievements(); }
 }
 // ---- stepping onto a point of interest ----
@@ -18796,6 +18822,14 @@ function wgFixBridge(b, own){
   if (typeof O3!=='undefined') O3.wgKey = null; checkAchievements();
 }
 const WG_POI = {
+  cache(poi){
+    const s = wgState(); if (s.done[poi.id]){ logMsg('a hole where the cache was - you dug it up already', ''); return; }
+    wevDialog('A buried cache', `A weathered post marks a spot in the sand, carved with an X. Someone buried something here long ago.`, [['Dig', ()=>{
+      s.done[poi.id] = 1; const p = G.player, gold = roundH((150 + p.level*20)*goldFindMult()); p.gold += gold;
+      const gems = ['sapphire','emerald','ruby','diamond'], g = gems[Math.min(3, Math.floor(Math.random()*Math.random()*4))]; skAdd(g, 1); skAdd('pearl', 1 + rn(2));
+      let extra = ''; if (chn(0.5)){ const it = genItem(mn(NMLVL, lootLevel()+2)+playerMF(), lootKind(), 3, chn(0.5)); addToInventory(it); extra = `, ${itemNameHtml(it)}`; }
+      wevSay(`you dig up an iron-bound chest: ${gold} gold, a ${skName(g).toLowerCase()} and pearls${extra}`, 'loot', 'Treasure!'); }], ['Leave it', ()=>{}]], 'on the island');
+  },
   hamlet(poi){
     const s = wgState(), turn = wevTurn(), day = Math.floor(turn/DAY_LENGTH), near = wevNearestTown(false), key = near ? near[0]+','+near[1] : null;
     let job = s.jobs[poi.id];
@@ -18965,12 +18999,15 @@ function pmWorldInk(x, P){
 }
 // a point of interest on the map
 function pmPoiIcon(c, px, py, R, poi, now){
-  const done = wgState().done[poi.id] && ['cave','grotto','ruin','oldcamp'].includes(poi.k), s = R*0.8;
+  const done = wgState().done[poi.id] && ['cave','grotto','ruin','oldcamp','cache'].includes(poi.k), s = R*0.8;
   c.save(); c.lineJoin = 'round'; c.lineCap = 'round'; c.lineWidth = Math.max(1, s*0.12); c.strokeStyle = '#2a1a0c';
   c.fillStyle = 'rgba(240,226,190,0.7)'; c.beginPath(); c.ellipse(px, py + s*0.45, s*1.1, s*0.42, 0, 0, Math.PI*2); c.fill();
   if (done) c.globalAlpha = 0.55;
   const k = poi.k;
-  if (k==='hamlet'){
+  if (k==='cache'){
+    c.fillStyle = '#c8a870'; c.beginPath(); c.ellipse(px, py + s*0.25, s*0.75, s*0.3, 0, 0, Math.PI*2); c.fill();
+    c.strokeStyle = done ? '#5a4a3a' : '#a01a10'; c.lineWidth = Math.max(1.5, s*0.22); c.beginPath(); c.moveTo(px - s*0.4, py - s*0.35); c.lineTo(px + s*0.4, py + s*0.3); c.moveTo(px + s*0.4, py - s*0.35); c.lineTo(px - s*0.4, py + s*0.3); c.stroke();
+  } else if (k==='hamlet'){
     c.fillStyle = '#e0d0a8'; c.fillRect(px - s*0.95, py - s*0.15, s*0.8, s*0.6); c.strokeRect(px - s*0.95, py - s*0.15, s*0.8, s*0.6);
     c.fillStyle = '#9a3a24'; c.beginPath(); c.moveTo(px - s*1.05, py - s*0.12); c.lineTo(px - s*0.55, py - s*0.55); c.lineTo(px - s*0.05, py - s*0.12); c.closePath(); c.fill(); c.stroke();
     c.fillStyle = '#c8b890'; c.beginPath(); c.moveTo(px + s*0.25, py + s*0.45); c.lineTo(px + s*0.4, py - s*0.6); c.lineTo(px + s*0.65, py - s*0.6); c.lineTo(px + s*0.8, py + s*0.45); c.closePath(); c.fill(); c.stroke();
@@ -19019,9 +19056,15 @@ function pmWorldExtras(zx, zy, vc, vr, lod, now){
     if (p.x < zx-2 || p.y < zy-2 || p.x > zx+vc+2 || p.y > zy+vr+2 || !owSeen(p.x, p.y)) continue;
     const px = (p.x-zx)*cellPx + cellPx/2, py = (p.y-zy)*cellPx + cellPx/2;
     pmPoiIcon(ctx, px, py, R, p, now);
-    if (lod >= 1 && p.k!=='ferry' && p.k!=='oldcamp' && p.k!=='well'){ ctx.font = `600 italic ${Math.round(clamp(R*0.6, 10*dpr, 13*dpr))}px Georgia, serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    if (lod >= 1 && p.k!=='ferry' && p.k!=='oldcamp' && p.k!=='well' && p.k!=='cache'){ ctx.font = `600 italic ${Math.round(clamp(R*0.6, 10*dpr, 13*dpr))}px Georgia, serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
       const nm = cap(p.name); ctx.lineWidth = 3*dpr; ctx.strokeStyle = 'rgba(240,226,190,0.85)'; ctx.strokeText(nm, px, py + R*0.75); ctx.fillStyle = '#3a2410'; ctx.fillText(nm, px, py + R*0.75); }
   }
+  if (mapF('places')){ ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';   // the islands' names
+    for (const i of G.ow.islands||[]){ if (i.cx < zx-6 || i.cy < zy-3 || i.cx > zx+vc+6 || i.cy > zy+vr+3 || !owSeen(i.cx, i.cy) || (lod===0 && i.n < 30)) continue;
+      const px = (i.cx-zx)*cellPx + cellPx/2, py = (i.cy-zy)*cellPx + cellPx/2, ch = islandCharted(i.id);
+      ctx.font = `${ch ? 700 : 600} italic ${Math.round(clamp(Math.sqrt(i.n)*cellPx*0.18, 11*dpr, 20*dpr))}px Cinzel, Georgia, serif`;
+      ctx.lineWidth = 3*dpr; ctx.strokeStyle = 'rgba(240,228,196,0.8)'; ctx.strokeText(cap(i.name), px, py); ctx.fillStyle = ch ? '#1a3a5a' : '#4a5a6a'; ctx.fillText(cap(i.name), px, py); }
+    ctx.restore(); }
   if (mapF('places') && lod >= 1){ ctx.save(); ctx.font = `600 italic ${Math.round(clamp(cellPx*0.9, 11*dpr, 15*dpr))}px Georgia, serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     for (const r of G.ow.roads||[]){ if (r.lx < zx || r.ly < zy || r.lx > zx+vc || r.ly > zy+vr || !owSeen(r.lx, r.ly) || r.n < 12) continue;
       const px = (r.lx-zx)*cellPx + cellPx/2, py = (r.ly-zy)*cellPx + cellPx/2 - cellPx*0.9;
@@ -19036,8 +19079,8 @@ function owPoiAtClient(e){
   return null;
 }
 function wgPoiTip(p){
-  const s = wgState(), done = s.done[p.id], what = { hamlet:'a farm on the road - the farmer has a job each day, food to sell and a barn to sleep in', view:'a lookout - climb it to see the land for leagues around', cave:'a cave in the cliffs - something lives inside', grotto:'a grotto behind a waterfall - something lives inside', ruin:'old ruins with a cellar - something guards it', stones:'standing stones - touch them for a blessing, once a day', oldcamp:'an abandoned camp - someone left in a hurry', well:'a wishing well - toss in a coin', hermit:'a hermit who knows the land', ferry:'a ferry across the water' }[p.k] || '';
-  const status = done ? (['cave','grotto','ruin'].includes(p.k) ? 'cleared' : p.k==='view' ? 'climbed' : p.k==='oldcamp' ? 'searched' : p.k==='hermit' ? 'visited' : '') : '';
+  const s = wgState(), done = s.done[p.id], what = { cache:'an X carved on a post - something is buried here', hamlet:'a farm on the road - the farmer has a job each day, food to sell and a barn to sleep in', view:'a lookout - climb it to see the land for leagues around', cave:'a cave in the cliffs - something lives inside', grotto:'a grotto behind a waterfall - something lives inside', ruin:'old ruins with a cellar - something guards it', stones:'standing stones - touch them for a blessing, once a day', oldcamp:'an abandoned camp - someone left in a hurry', well:'a wishing well - toss in a coin', hermit:'a hermit who knows the land', ferry:'a ferry across the water' }[p.k] || '';
+  const status = done ? (p.k==='cache' ? 'dug up' : ['cave','grotto','ruin'].includes(p.k) ? 'cleared' : p.k==='view' ? 'climbed' : p.k==='oldcamp' ? 'searched' : p.k==='hermit' ? 'visited' : '') : '';
   return `<div style="font-weight:600;color:#e8c890">${esc(cap(p.name))}</div><div class="examine">${what}</div>${status ? `<div class="muted">${status}</div>` : ''}<div class="muted">${POI_TITLE[p.k]} &middot; ${wgBandText(wgBand(p.x, p.y))}</div>`;
 }
 // the flat overworld map: the roads and the points of interest
@@ -19115,7 +19158,11 @@ function o3PoiModel(p){
   const T = THREE, g = new T.Group(), M = (k, c, o)=> o3WgMat(k, c, o), anim = {};
   const box = (w, h, d, mat, x, y, z)=>{ const m = new T.Mesh(new T.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; g.add(m); return m; };
   const cyl = (r0, r1, h, mat, x, y, z, seg)=>{ const m = new T.Mesh(new T.CylinderGeometry(r0, r1, h, seg||8), mat); m.position.set(x, y, z); m.castShadow = true; g.add(m); return m; };
-  if (p.k==='hamlet'){
+  if (p.k==='cache'){
+    const mound = new T.Mesh(new T.SphereGeometry(0.22, 10, 6, 0, Math.PI*2, 0, Math.PI/2), M('sand', '#c8a870')); mound.scale.y = 0.4; g.add(mound);
+    cyl(0.025, 0.03, 0.5, M('post', '#4a3420'), 0.18, 0.25, 0, 5);
+    const x1 = new T.Mesh(new T.BoxGeometry(0.3, 0.02, 0.05), M('xmark', '#a01a10')); x1.position.y = 0.1; x1.rotation.y = 0.78; g.add(x1); const x2 = x1.clone(); x2.rotation.y = -0.78; g.add(x2);
+  } else if (p.k==='hamlet'){
     box(0.62, 0.36, 0.44, M('wall', '#d8c8a0'), -0.28, 0.18, 0.1); const roof = o3Gable(0.72, 0.5, 0.3, M('roofr', '#9a3a24')); roof.position.set(-0.28, 0.36, 0.1); g.add(roof);
     cyl(0.11, 0.17, 0.85, M('mill', '#c8b890'), 0.38, 0.42, -0.18); cyl(0.0, 0.14, 0.18, M('millcap', '#7a4a2a'), 0.38, 0.93, -0.18);
     const sails = new T.Group(); sails.position.set(0.38, 0.78, -0.02); g.add(sails); anim.sails = sails;
@@ -19313,10 +19360,167 @@ function wgLogHtml(){
     <div style="font-size:13px;line-height:1.7;">
       <div>You are in <b>${esc(here.name)}</b> &middot; recommended ${wgBandText(here.band)}${here.wild ? ` &middot; <b style="color:#ff6a50">Wilderness level ${here.wild}</b>` : ''}</div>
       <div>World code <b style="font-family:'JetBrains Mono',monospace;">${worldCode()}</b> &middot; ${esc((CONTINENT_TYPES.find(c=>c.id===wgContinent())||{}).label||'')} &middot; share it to play the same world</div>
+      <div>Islands charted ${Object.keys((s.charted)||{}).length} / ${(G.ow.islands||[]).length} &middot; you sail a ${esc(boatName().toLowerCase())}</div>
       <div>Roads ${(G.ow.roads||[]).length} &middot; broken bridges mended ${fixedN} / ${bridges.length} &middot; ferries ${(G.ow.ferries||[]).length}</div>
       <div class="muted" style="font-size:12px;">${Object.keys(total).map(k=>`${POI_TITLE[k]} ${byK[k]||0}/${total[k]}`).join(' &middot; ')}</div>
       ${s.lore.length ? `<div class="muted" style="font-size:12px;margin-top:4px;">Lore found: ${s.lore.map(l=>`<div>&ldquo;${esc(l)}&rdquo;</div>`).join('')}</div>` : ''}
     </div>`;
+}
+
+// ===================== SECTION: SAILING AND ISLANDS =====================
+// your boat grows from a rowboat to a galleon (each built with gold, logs
+// and iron bars at a general store): bigger boats sail faster and ride out
+// storms. The islands with no town on them have names, their own resources
+// (pearl beds on their shores, sunstone outcrops rich in gold and gems, a
+// buried cache) and palms; landing on one charts it, and the sea charts
+// sail you back to any island you've charted. A harpoon lands the biggest
+// fish of the deep from your deck, and in winter the water along the
+// tundra freezes hard enough to walk on, with holes cut for ice fishing.
+const BOAT_TIERS = [null,
+  { nm:'Rowboat',  d:'a sturdy little boat - the open sea is yours to cross' },
+  { nm:'Sloop',    d:'a single-masted sloop: every other stretch of open water costs no turn, and storms hit it less', gold:1500, logs:20, bars:5 },
+  { nm:'Caravel',  d:'a caravel with a deck to fish from: faster still, and hardly troubled by storms (a harpoon needs a deck)', gold:5000, logs:40, bars:10 },
+  { nm:'Galleon',  d:'a three-masted galleon: two of every three steps at sea are free, and no storm can touch it', gold:15000, logs:80, bars:20 },
+];
+const BOAT_SAIL = [null, '#ffffff', '#c8e0ff', '#ffe0a0', '#ffb0a0'];
+function boatTier(){ const p = G.player; if (!p || !p.hasBoat) return 0; return Math.max(1, Math.min(4, p.boatTier||1)); }
+function boatName(){ const t = boatTier(); return t ? BOAT_TIERS[t].nm : 'no boat'; }
+// a step on the open sea: a sloop or caravel makes every other one free, a galleon two of every three
+function sailStepCost(){
+  const t = boatTier(), p = G.player; if (t < 2) return 1;
+  p._sailN = ((p._sailN||0) + 1) % (t >= 4 ? 3 : 2);
+  return p._sailN === 0 ? 1 : 0;
+}
+function sailMul(){ const t = boatTier(); return [1, 1, 0.85, 0.72, 0.6][t]; }
+function stormRisk(){ return [1, 1, 0.65, 0.3, 0][boatTier()]; }
+function sailUpgradeHtml(){
+  const t = boatTier(); if (!t || t >= 4) return t ? `<div class="shoprow"><span class="muted">boat</span><span style="color:${COL.cyan}">your ${boatName().toLowerCase()}</span><span class="desc">the finest ship on the water</span><span></span></div>` : '';
+  const n = BOAT_TIERS[t+1], logs = SK_LOG.reduce((a,l)=>a+skHave(l.id), 0), bars = skHave('ironb'), p = G.player, ok = p.gold >= n.gold && logs >= n.logs && bars >= n.bars;
+  return `<div class="shoprow"><span class="muted">boat</span><span style="color:${COL.cyan}">build a ${n.nm.toLowerCase()} <span class="muted">(you sail a ${boatName().toLowerCase()})</span></span>
+    <span class="desc">${esc(n.d)} - needs ${n.gold.toLocaleString()} gold, ${n.logs} logs (you have ${logs}) and ${n.bars} iron bars (you have ${bars})</span>
+    <span><button class="btn" ${ok ? '' : 'disabled'} onclick="sailUpgrade()">build</button></span></div>`;
+}
+function sailUpgrade(){
+  const t = boatTier(), n = BOAT_TIERS[t+1], p = G.player; if (!t || !n) return;
+  const logs = SK_LOG.reduce((a,l)=>a+skHave(l.id), 0); if (p.gold < n.gold || logs < n.logs || skHave('ironb') < n.bars) return;
+  p.gold -= n.gold; skAdd('ironb', -n.bars); let need = n.logs; for (const l of SK_LOG){ const h = Math.min(need, skHave(l.id)); if (h){ skAdd(l.id, -h); need -= h; } }
+  p.boatTier = t + 1; skGainXP('crafting', 150*(t+1)); checkAchievements();
+  logMsg(`the shipwrights launch your new ${n.nm.toLowerCase()}! ${n.d}`, 'magic', true); notify(`Your ${n.nm} is ready`, 'good'); sfx('achievement');
+  renderOverlay(); saveCurrentGame();
+}
+// ---- harpoons: the biggest fish of the deep need one, and a deck to throw it from ----
+const HARPOONS = [null, { nm:'Iron harpoon', price:600, lvl:35 }, { nm:'Mithril harpoon', price:3000, lvl:55 }, { nm:'Dragon harpoon', price:12000, lvl:75 }];
+function harpoonTier(){ return (G.player && G.player.harpoon) || 0; }
+function harpoonReady(){ return harpoonTier() > 0 && boatTier() >= 3; }
+function harpoonRowHtml(){
+  const t = harpoonTier(), n = HARPOONS[t+1], p = G.player;
+  return `<div class="shoprow"><span class="muted">harpoon</span><span style="color:${COL.cyan}">${t ? HARPOONS[t].nm : 'no harpoon'}</span>
+    <span class="desc">${n ? `${n.nm}: lands sharks, kraken and marlin from deep water - you need a caravel's deck to throw it${t ? ', and it bites deeper than your old one' : ''} (Fishing ${n.lvl})` : 'the best harpoon there is'}</span>
+    <span>${n ? `<button class="btn" ${p.gold >= repPrice(n.price) && skLvl('fishing') >= n.lvl ? '' : 'disabled'} onclick="buyHarpoon()">${repPrice(n.price)}g</button>` : ''}</span></div>`;
+}
+function buyHarpoon(){ const t = harpoonTier(), n = HARPOONS[t+1], p = G.player; if (!n) return; const c = repPrice(n.price); if (p.gold < c || skLvl('fishing') < n.lvl) return; p.gold -= c; p.harpoon = t+1; logMsg(`you buy a ${n.nm.toLowerCase()}`, 'loot', true); sfx('gold'); renderOverlay(); saveCurrentGame(); }
+// ---- islands: the landmasses with no town ----
+function islandsGen(){
+  const W = OW_COLS, H = OW_ROWS, comp = G.ow.comp, m = G.ow.map; if (!comp) return;
+  const sizes = new Map(), hasTown = new Set();
+  for (let i=0;i<comp.length;i++){ const c = comp[i]; if (c < 0) continue; sizes.set(c, (sizes.get(c)||0) + 1); const x = i%W, y = (i/W)|0; if (m[x][y]===OW_TOWN) hasTown.add(c); }
+  const isl = G.ow.islands = [], of = G.ow.islandOf = new Int16Array(W*H).fill(-1);
+  const r = mulberry32(((G.ow.seed>>>0) ^ 0x51a7d) >>> 0), pn = ()=> PLACE_ROOT[Math.floor(r()*PLACE_ROOT.length)] + PLACE_END[Math.floor(r()*PLACE_END.length)];
+  const ids = [...sizes.keys()].filter(c=>!hasTown.has(c) && sizes.get(c) >= 6).sort((a,b)=>a-b);
+  for (const c of ids){
+    let sx = 0, sy = 0, n = 0, land = null, ld = 1e9; for (let i=0;i<comp.length;i++) if (comp[i]===c){ const x = i%W, y = (i/W)|0; sx += x; sy += y; n++; }
+    const cx = sx/n, cy = sy/n;
+    for (let i=0;i<comp.length;i++) if (comp[i]===c){ const x = i%W, y = (i/W)|0; if (OW_SITE_TILES.includes(m[x][y]) || m[x][y]===OW_RIVER) continue;
+      if ([[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dy])=>m[x+dx] && m[x+dx][y+dy]===OW_WATER)){ const d = Math.hypot(x-cx, y-cy); if (d < ld){ ld = d; land = [x,y]; } } }
+    if (!land) continue;
+    const fl = n < 30 ? ['{pn} Cay', 'the {adj} Rock', '{pn} Islet'] : n < 400 ? ['the Isle of {pn}', '{pn} Isle', '{pn} Island', 'the {adj} Isle'] : ['the {pn} Wilds', 'the Great Isle of {pn}', 'the {adj} Lands'];
+    const id = isl.length, nm = fl[Math.floor(r()*fl.length)].replace('{pn}', pn()).replace('{adj}', PLACE_ADJ[Math.floor(r()*PLACE_ADJ.length)]);
+    isl.push({ id, comp:c, n, name:nm, cx:Math.round(cx), cy:Math.round(cy), land });
+    for (let i=0;i<comp.length;i++) if (comp[i]===c) of[i] = id;
+    // a buried cache on every island, dug up once
+    if (n >= 10){ let best = null, bs = -1; for (let i=0;i<comp.length;i++) if (comp[i]===c){ const x = i%W, y = (i/W)|0, t = m[x][y]; if (t!==OW_GRASS && t!==OW_DESERT && t!==OW_FOREST) continue; if ((G.ow.pois||[]).some(p=>p.x===x && p.y===y)) continue; const s = o3Hash(x, y, 611); if (s > bs){ bs = s; best = [x,y]; } }
+      if (best) G.ow.pois.push({ id:'cache'+id, k:'cache', x:best[0], y:best[1], name:`a buried cache on ${nm}`, seed:Math.floor(r()*1e9), island:id }); }
+  }
+}
+function islandAt(x, y){ const of = G.ow && G.ow.islandOf; if (!of || x<0 || y<0 || x>=OW_COLS || y>=OW_ROWS) return null; const i = of[y*OW_COLS+x]; return i>=0 ? G.ow.islands[i] : null; }
+function islandShore(x, y){ for (const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){ const i = islandAt(x+dx, y+dy); if (i) return i; } return null; }
+function islandCharted(id){ return !!(G.ow.wg && G.ow.wg.charted && G.ow.wg.charted[id]); }
+// stepping ashore on an island charts it
+function islandOnStep(){
+  const isl = islandAt(G.owPos.x, G.owPos.y); if (!isl) return;
+  const s = wgState(); s.charted = s.charted || {};
+  if (s.charted[isl.id]) return;
+  s.charted[isl.id] = 1; owReveal(isl.cx, isl.cy, Math.min(16, 4 + Math.round(Math.sqrt(isl.n))));
+  gainXP(30 + G.player.level*6); (G.player.wgStat = G.player.wgStat||{}).isles = Object.keys(s.charted).length;
+  notify('Charted: ' + cap(isl.name), 'good'); logMsg(`you step ashore on ${isl.name} and mark it on your sea charts - look for pearl beds on its shores, sunstone in its rocks, and a buried cache`, 'magic');
+  checkAchievements();
+}
+// the sea charts: every island you've charted, and a course to it
+function buildSeaCharts(){
+  const isl = G.ow.islands||[], p = G.player, here = islandAt(G.owPos.x, G.owPos.y);
+  const charted = isl.filter(i=>islandCharted(i.id)), rows = charted.map(i=>{ const d = Math.round(Math.hypot(i.land[0]-G.owPos.x, i.land[1]-G.owPos.y)), cache = (G.ow.pois||[]).find(o=>o.k==='cache' && o.island===i.id);
+    return `<div class="choice-row" style="cursor:default;"><span><b>${esc(cap(i.name))}</b>${here && here.id===i.id ? ' <span class="muted">(you are here)</span>' : ''}</span>
+      <span class="muted">${i.n} leagues of land &middot; ${d} leagues ${dirWord(i.land[0]-G.owPos.x, i.land[1]-G.owPos.y)}${cache ? ` &middot; cache ${wgState().done[cache.id] ? 'dug up' : 'still buried'}` : ''}</span>
+      ${here && here.id===i.id ? '' : `<button class="btn" style="padding:2px 10px;margin-left:8px;" ${p.hasBoat && G.gameMode===0 ? '' : 'disabled'} onclick="setUi('playing');wgWalkTo(${i.land[0]},${i.land[1]})">set sail</button>`}</div>`; }).join('');
+  return `<h2 class="panel-title">SEA CHARTS</h2>
+    <div class="sub">You sail a ${esc(boatName().toLowerCase())}${harpoonTier() ? ` and carry a ${esc(HARPOONS[harpoonTier()].nm.toLowerCase())}` : ''}. ${charted.length} of ${isl.length} islands charted - land on an island to chart it.</div>
+    <div class="ovbody">${rows || '<div class="muted">No islands charted yet. Sail out and land on one.</div>'}
+      ${p.hasBoat ? '' : '<div class="muted" style="margin-top:8px;">You need a boat to set sail - any general store sells one.</div>'}
+      <div class="btnrow"><button class="btn" onclick="setUi('playing')">close (Esc)</button></div></div>`;
+}
+// ---- winter: the water along the tundra freezes ----
+function iceMask(){
+  const c = iceMask.c; if (c && c.ref===G.ow.map && c.seed===G.ow.seed) return c.a;
+  const W = OW_COLS, H = OW_ROWS, m = G.ow.map, a = new Uint8Array(W*H);
+  const cold = (x, y)=> x>=0 && y>=0 && x<W && y<H && (m[x][y]===OW_TUNDRA || wgBioAt(x, y)===4);
+  for (let x=0;x<W;x++) for (let y=0;y<H;y++){ if (m[x][y]!==OW_WATER) continue;
+    let ok = false; for (let i=-2;i<=2 && !ok;i++) for (let j=-2;j<=2;j++) if (cold(x+i, y+j)){ ok = true; break; } if (ok) a[y*W+x] = 1; }
+  iceMask.c = { ref:G.ow.map, seed:G.ow.seed, a };
+  return a;
+}
+function isWinter(){ return seasonIdx()===3; }
+function iceAt(x, y){ return isWinter() && G.ow && G.ow.map && x>=0 && y>=0 && x<OW_COLS && y<OW_ROWS && G.ow.map[x][y]===OW_WATER && !!iceMask()[y*OW_COLS+x]; }
+// when the thaw comes, anyone standing on the ice without a boat scrambles ashore
+function iceThawCheck(){
+  if (!G.player || G.gameMode!==0 || !G.ow || !G.ow.map) return;
+  const x = G.owPos.x, y = G.owPos.y; if (G.ow.map[x][y]!==OW_WATER || G.player.hasBoat || iceAt(x, y)) return;
+  for (let r=1;r<8;r++) for (let i=-r;i<=r;i++) for (let j=-r;j<=r;j++){ const nx = x+i, ny = y+j; if (o3Passable(nx, ny) && G.ow.map[nx][ny]!==OW_WATER && !OW_SITE_TILES.includes(G.ow.map[nx][ny])){ G.owPos.x = nx; G.owPos.y = ny; logMsg('the ice groans and cracks under you - you scramble ashore just in time', 'hit'); return; } }
+}
+// winter ice on the world map: a pale sheet over the frozen water
+function pmIceWash(zx, zy, vc, vr){
+  const a = iceMask(), key = G.ow.seed+'|'+OW_COLS;
+  if (pmIceWash.key !== key || !pmIceWash.cv){ pmIceWash.key = key; const c = pmIceWash.cv = pmIceWash.cv || document.createElement('canvas'); c.width = OW_COLS; c.height = OW_ROWS;
+    const x = c.getContext('2d'), id = x.createImageData(OW_COLS, OW_ROWS); for (let i=0;i<a.length;i++) if (a[i]){ id.data[i*4] = 236; id.data[i*4+1] = 244; id.data[i*4+2] = 250; id.data[i*4+3] = 255; } x.putImageData(id, 0, 0); }
+  ctx.save(); ctx.globalAlpha = 0.78; ctx.imageSmoothingEnabled = true; ctx.drawImage(pmIceWash.cv, zx, zy, vc, vr, 0, 0, vc*cellPx, vr*cellPx); ctx.restore();
+}
+// the ice in 3D: white sheets over the frozen water, with dark holes where the fishing is
+function o3SyncIce(){
+  const T = THREE; if (!O3.win) return;
+  const key = isWinter() ? O3.win.cx+','+O3.win.cy+'|'+G.ow.seed : 'off';
+  if (key === O3.iceKey) return; O3.iceKey = key;
+  if (O3.iceMesh){ O3.scene.remove(O3.iceMesh); O3.iceMesh.geometry.dispose(); O3.iceMesh = null; }
+  if (key==='off') return;
+  const pos = [], x0 = O3.win.cx - O3_W/2, y0 = O3.win.cy - O3_W/2, mask = iceMask();
+  for (let x=Math.floor(x0); x<x0+O3_W; x++) for (let y=Math.floor(y0); y<y0+O3_W; y++){
+    if (x<0 || y<0 || x>=OW_COLS || y>=OW_ROWS || G.ow.map[x][y]!==OW_WATER || !mask[y*OW_COLS+x]) continue;
+    const yy = -0.12; pos.push(x, yy, y, x, yy, y+1, x+1, yy, y,  x+1, yy, y, x, yy, y+1, x+1, yy, y+1);
+  }
+  if (!pos.length) return;
+  const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); g.computeVertexNormals();
+  O3.iceMesh = new T.Mesh(g, new T.MeshStandardMaterial({ color:new T.Color('#dceef8').convertSRGBToLinear(), roughness:0.25, metalness:0.05, transparent:true, opacity:0.92 }));
+  O3.iceMesh.receiveShadow = true; O3.scene.add(O3.iceMesh);
+}
+// the boat in 3D: bigger with each tier, its sail dyed, and the galleon gets a second mast
+function o3BoatTier(){
+  const t = Math.max(1, boatTier()); if (!O3.boat || O3.boatTierBuilt === t) return; O3.boatTierBuilt = t;
+  O3.boat.scale.setScalar(1 + 0.16*(t-1));
+  if (O3.sail) O3.sail.material.color.set(BOAT_SAIL[t]);
+  if (O3.boatExtra){ O3.boat.remove(O3.boatExtra); O3.boatExtra = null; }
+  if (t >= 3){ const T = THREE, g = O3.boatExtra = new T.Group(), wood = new T.MeshStandardMaterial({ color:0x3e2614, roughness:0.85 });
+    const m = new T.Mesh(new T.CylinderGeometry(0.016, 0.022, 1.0, 8), wood); m.position.set(0, 0.42, -0.36); g.add(m);
+    const s = new T.Mesh(new T.PlaneGeometry(0.6, 0.5), new T.MeshStandardMaterial({ color:new T.Color(BOAT_SAIL[t]).convertSRGBToLinear(), side:T.DoubleSide, roughness:0.9 })); s.position.set(0, 0.55, -0.33); g.add(s);
+    if (t >= 4){ const m2 = m.clone(); m2.position.z = 0.55; m2.scale.y = 0.7; g.add(m2); const s2 = s.clone(); s2.position.set(0, 0.4, 0.58); s2.scale.setScalar(0.7); g.add(s2); }
+    O3.boat.add(g); }
 }
 
 function renderGame(){
@@ -24692,7 +24896,8 @@ function o3Vegetation(grp, x0, y0, W){
     const t = o3Tile(x,y), h = (s)=> o3Hash(x,y,s), nd = skNodeStatic(x,y), treeNode = !!(nd && nd.k==='woodcutting');
     if (treeNode){ if (h(11)<0.5) put.push(['bush', x+h(12), y+h(13), 0.5+h(14)*0.4, h(15)*6.28, h(16)]); continue; }
     if (wgRoadAt(x,y) || wgPoiAt(x,y)) continue;   // (roads and points of interest stay clear)
-    { const bv = wgBioAt(x,y); if (bv && wgVegVariant(put, x, y, t, bv, h)) continue; }
+    { const bv = wgBioAt(x,y); if (bv && wgVegVariant(put, x, y, t, bv, h)) continue;
+      if (!bv && (t===OW_GRASS || t===OW_FOREST || t===OW_DESERT) && h(1) < 0.16 && islandAt(x,y)){ put.push(['palm', x+0.2+h(3)*0.6, y+0.2+h(4)*0.6, 0.8+h(5)*0.4, h(6)*6.28, h(7)]); if (h(8) < 0.5) put.push(['bush', x+h(12), y+h(13), 0.8, h(15)*6.28, h(16)]); continue; } }
     let nearSnow = false, nearSwamp = false, nearMtn = false;
     for (const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1],[2,0],[-2,0],[0,2],[0,-2]]){ const u = o3Tile(x+dx,y+dy); if (u===OW_TUNDRA) nearSnow = true; if (u===OW_SWAMP) nearSwamp = true; if (u===OW_MOUNTAIN) nearMtn = true; }
     if (t===OW_FOREST){
@@ -25322,7 +25527,7 @@ function o3GoGather(x, y){
   return true;
 }
 const O3_STEP = 0.36;                // seconds per tile when you walk the overworld
-function o3Passable(x,y){ if (x<0||y<0||x>=OW_COLS||y>=OW_ROWS) return false; const t = G.ow.map[x][y]; if (t===OW_MOUNTAIN) return false; if (t===OW_WATER && !G.player.hasBoat) return false; return true; }
+function o3Passable(x,y){ if (x<0||y<0||x>=OW_COLS||y>=OW_ROWS) return false; const t = G.ow.map[x][y]; if (t===OW_MOUNTAIN) return false; if (t===OW_WATER && !G.player.hasBoat && !iceAt(x,y)) return false; return true; }
 function o3PathTo(tx, ty){
   const sx = G.owPos.x, sy = G.owPos.y, key = (x,y)=>x+','+y, prev = new Map([[key(sx,sy), null]]), q = [[sx,sy]], lim = 60;
   let end = null;
@@ -25440,9 +25645,9 @@ function o3Render(){
   o3SyncNodes();
   try{ o3SyncLandmarks(dt); }catch(e){ console.error(e); }
   try{ o3SyncEvents(); o3AnimEvents(); }catch(e){ console.error(e); }
-  try{ o3SyncPOIs(); o3Wildlife(dt); }catch(e){ console.error(e); }
+  try{ o3SyncPOIs(); o3Wildlife(dt); o3SyncIce(); o3BoatTier(); }catch(e){ console.error(e); }
   // you glide between tiles; on water you ride a boat
-  const sailing = G.ow.map[G.owPos.x][G.owPos.y]===OW_WATER;   // only open water needs the boat; rivers are waded
+  const sailing = G.ow.map[G.owPos.x][G.owPos.y]===OW_WATER && !iceAt(G.owPos.x, G.owPos.y);   // only open water needs the boat; rivers are waded, and winter ice is walked
   const tx = G.owPos.x+0.5, tz = G.owPos.y+0.5, pp = O3.ppos || (O3.ppos = new T.Vector3(tx,0,tz));
   const k = 1-Math.exp(-dt*10), dxs = tx-pp.x, dzs = tz-pp.z, moving = Math.hypot(dxs,dzs) > 0.03;
   { const d = Math.hypot(dxs,dzs), sp = dt/(O3_STEP*runMul()*wgRoadMul())*1.05;             // an even walking pace, one tile per step
@@ -30257,7 +30462,7 @@ function backOut(){
     case 'charsheet': setUi('playing'); break;
     case 'skills': case 'rsmagic': case 'prayer': setUi('playing'); break;
     case 'skguide': setUi(G.skGuideBack||'playing'); break;
-    case 'lamp': case 'tasks': case 'travellog': case 'rareTrader': setUi('playing'); break;
+    case 'lamp': case 'tasks': case 'travellog': case 'rareTrader': case 'seacharts': setUi('playing'); break;
     case 'wevent': if (G.wevDlg && !G.wevDlg.noEsc) wevChoose(G.wevDlg.opts.length-1); else if (!G.wevDlg) setUi('playing'); break;
     case 'tailor': case 'bench': setUi('playing'); break;
     case 'makeover': makeoverLeave(); break;
@@ -30326,13 +30531,14 @@ function renderOverlay(){
     case 'travellog': el.innerHTML = buildTravelLog(); break;
     case 'wevent': el.innerHTML = buildWorldEvent(); break;
     case 'rareTrader': el.innerHTML = buildRareTrader(); break;
+    case 'seacharts': el.innerHTML = buildSeaCharts(); break;
     default: el.innerHTML = '';
   }
 }
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-84';
+const GAME_VERSION = 'rs-85';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -30851,15 +31057,13 @@ function buyBoat(){
   if (G.player.hasBoat){ renderOverlay(); return; }
   if (G.player.gold < BOAT_PRICE){ logMsg("you can't afford a boat yet", 'hit'); renderOverlay(); return; }
   G.player.gold -= BOAT_PRICE;
-  G.player.hasBoat = 1;
+  G.player.hasBoat = 1; G.player.boatTier = 1;
   logMsg('you buy a sturdy little boat - the open sea is yours to cross', 'good');
   renderOverlay();
   saveCurrentGame();
 }
 function boatRowHtml(){
-  if (G.player.hasBoat){
-    return `<div class="shoprow"><span class="muted">boat</span><span style="color:${COL.cyan}">you own a boat</span><span class="desc">sail freely onto open water</span><span></span></div>`;
-  }
+  if (G.player.hasBoat) return sailUpgradeHtml() + harpoonRowHtml();
   return `<div class="shoprow" onclick="buyBoat()" style="cursor:pointer;">
     <span class="muted">boat</span>
     <span style="color:${COL.cyan}">a sturdy little boat</span>
@@ -32232,6 +32436,7 @@ function buildHelp(){
       <div>press <kbd>C</kbd> to make camp wherever you're standing &mdash; usually a free heal that also refills your ability charges, spell slots and wand charges, same as a village rest, but sleeping in the open risks a night-time ambush that interrupts the rest entirely (no healing, straight into a fight, and every exit is sealed until the last monster drops). Safer on grass, riskier in forest/swamp, and impossible while zoomed out. You can also camp inside any dungeon-type site once you've cleared every monster off the current floor &mdash; nothing left down there to ambush you, so it's just as safe as a village rest.</div>
       <div>press <kbd>M</kbd> to open the world map of the whole continent &mdash; press again to go back. Click a village you've visited on the map, or press <kbd>T</kbd> on the overworld or in a town, to teleport there through a portal. The map's tool bar lets you <b>drop pins</b> with a note, <b>plan a route</b> and walk it, and switch <b>layers</b> (place names, landmarks, sites, danger, resources and more) on and off; the mouse wheel zooms in far enough to see every tree, rock and house. Land you've seen is pencilled in and land you've walked is painted; every forest, range, sea and river has a name, and three great landmarks (a volcano, a giant tree and a wizard's tower) can be seen from far off. The <b>travel log</b> counts the regions, towns, sites and landmarks you've found.</div>
       <div><b>The land:</b> when you start you pick the world's size and shape (an archipelago, one landmass or several continents), and every world has a <b>world code</b> - give it to a friend and they can play the same world. <b>Roads</b> join the towns: walking a road is quicker (every other step is free) and safer, and the route planner and the teleport list (T, "walk") follow them. Off the road, wading a river costs time; roads cross on <b>bridges</b> and fords, and a broken bridge can be mended. <b>Ferries</b> cross the water between landmasses. Every part of the land has a recommended combat level, shown when you enter it and on the map. Watch for <b>volcanic land, jungles, haunted woods, snowy highlands and crystal wastes</b> with their own creatures, and for <b>hamlets</b> (jobs, food and a safe barn), <b>lookouts</b> that reveal the map, <b>caves, grottos and ruins</b> to delve, <b>standing stones</b>, <b>abandoned camps</b>, <b>wishing wells</b> and <b>hermits</b>. Deer, rabbits, boars and birds roam the 3D land - click one to hunt it. Rain makes the fish bite, fog shortens your sight and storms make the sea dangerous. Buy a <b>tent, ward lantern, bedroll and cooking spit</b> at any general store for safer camping. Beyond the red ditch lies <b>the Wilderness</b>: tougher monsters, richer pickings, and if you die there your dropped items are gone for good.</div>
+      <div><b>The sea:</b> the general store that sells you a boat also builds you a better one - a <b>sloop</b>, a <b>caravel</b> and a <b>galleon</b> (gold, logs and iron bars): each crosses the sea faster and rides out storms better. The islands with no town on them have their own <b>pearl beds</b>, <b>sunstone outcrops</b> (gold and gems) and a <b>buried cache</b>; land on one to chart it, and the <b>sea charts</b> (on the world map's tool bar) set a course back to any island you've charted. A <b>harpoon</b>, thrown from a caravel's deck or bigger, lands sharks, kraken and marlin in deep water. In winter the water along the tundra freezes - walk out onto it and fish through the ice holes.</div>
       <div><b>World events:</b> the world keeps its own time. A <b>giant</b> sleeps somewhere and now and then wakes to roam (a world boss - it's marked on the map while it's awake, and its wounds last between fights). <b>Monster camps</b> grow if they're left alone, until their warband lays <b>siege</b> to the nearest town; break the siege in time or the town is sacked. Every town rules the land nearest it - break every camp in a town's lands to <b>secure</b> them, and fewer monsters roam there. <b>Stars fall</b> and leave rich ore for a while. On the road you'll meet people who need a hand (or a fight), and towns hold <b>festivals</b> (10% off and a treat), <b>market days</b> (a rare trader on the plaza) and ring the alarm when monsters <b>raid</b>. Everything with a deadline shows its timer on the world map; the travel log lists what's going on.</div>
       <div>day turns to night and back on a steady cycle, and the weather shifts between clear, rain, fog and the occasional storm &mdash; both are shown in the corner of the overworld map. Night and bad weather raise the odds of a random encounter, so an easy stretch of road can turn dangerous after dark.</div>
       <div style="margin-top:10px;color:var(--ink-faint);">QUESTS</div>
@@ -32579,6 +32784,7 @@ function handleKeydown(e){
     case 'tasks': { if (k==='Escape') setUi('playing'); break; }
     case 'travellog': { if (k==='Escape') setUi('playing'); break; }
     case 'rareTrader': { if (k==='Escape') setUi('playing'); break; }
+    case 'seacharts': { if (k==='Escape') setUi('playing'); break; }
     case 'wevent': { if (k>='1' && k<='9') wevChoose(+k-1); else if (k==='Escape') backOut(); break; }
     case 'cook': { if (k==='Escape') setUi(G.cookAt==='fire' || G.interior ? 'playing' : 'tavern'); break; }
     case 'playing': handlePlayingKey(k); break;

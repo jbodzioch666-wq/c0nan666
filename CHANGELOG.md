@@ -1,5 +1,24 @@
 # Depthcrawl patch notes
 
+## RS-85 - Sailing and islands
+
+- **Build a better boat (248):** the general store that sells you a rowboat now also builds bigger ones from gold, logs and iron bars, with Crafting xp for the work. Each is bigger in 3D, with its own sails.
+  - **Sloop** (1,500 gold, 20 logs, 5 iron bars): every other step on the open sea costs no turn, and storms hit it less.
+  - **Caravel** (5,000 gold, 40 logs, 10 iron bars): faster again, hardly troubled by storms, and its deck lets you throw a harpoon.
+  - **Galleon** (15,000 gold, 80 logs, 20 iron bars): two of every three steps at sea are free, and no storm can touch it.
+- **Islands (247):** every landmass with no town on it now has a name (a cay or rock, an isle, or a great isle by size), shown on the world map, with palms in 3D and its own resources:
+  - **Pearl beds** off its shores: shore fish, plus a pearl about 1 catch in 6. Pearls sell well.
+  - **Sunstone outcrops:** gold ore and gems.
+  - **A buried cache** marked with an X on a post: dig it up for gold, a gem, pearls and often an item.
+- **Sea charts (248):** stepping ashore on an island charts it, revealing it on your map and giving combat xp. The new **Sea charts** screen (on the world map's tool bar) lists every island you've charted, with its size, distance and whether its cache has been dug up, and **set sail** steers you there.
+- **Harpoon fishing (249):** sharks, kraken and the new **marlin** (Fishing 62) can only be landed from deep water with a harpoon thrown from a caravel or bigger. The general store sells iron, mithril and dragon harpoons (Fishing 35, 55 and 75); better harpoons bite deeper.
+- **Ice fishing (249):** in winter the water along the tundra and the snowy highlands freezes.
+  - You can walk out onto it without a boat. It's white on the maps and in 3D.
+  - Ice holes in it hold trout, pike and ice fish.
+  - When spring comes, anyone still on the ice scrambles ashore.
+- Five new honours: Islander (chart 5 islands), Admiral (build a galleon), Pearl Diver (10 pearls), Ice Angler (20 fish through the ice) and Harpooner (land a marlin).
+- The travel log shows how many islands you've charted and which boat you sail.
+
 ## RS-84 - World generation and the overworld
 
 - **World size and shape (197, 199):**

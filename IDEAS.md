@@ -347,9 +347,9 @@ _Town generation and town content_
 ### Sailing and islands
 _Boats, islands and sea fishing_
 
-247. [ ] (15) Boats between islands, with island-only resources
-248. [ ] (74) Sailing - build and upgrade your boat, chart sea routes to the islands (ties into the boats idea)
-249. [ ] (358) Harpoon fishing from a boat and ice fishing through holes
+247. [x] (15) Boats between islands, with island-only resources
+248. [x] (74) Sailing - build and upgrade your boat, chart sea routes to the islands (ties into the boats idea)
+249. [x] (358) Harpoon fishing from a boat and ice fishing through holes
 
 ### Quests
 _The quest system first, then the quest content_
