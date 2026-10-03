@@ -1,5 +1,18 @@
 # Depthcrawl patch notes
 
+## RS-99 - One way to travel, and no doubled menus
+
+- **The waypoint is the one way between towns:**
+  - The T teleport menu is gone, and so is teleporting by clicking a town on the world map. Both were free, which made the waypoint keeper's fee pointless.
+  - The waypoint stone in every town square now shows a map of the land you've seen, with only the towns whose waypoint you've touched on it.
+  - Each town on the map shows its fee. Tap one to step through, or pick it from the row of buttons under the map.
+  - The world map still shows every town you know, and hovering one tells you how to get there.
+  - The wandering wizard's free lift still works.
+- **The bounty board's guild store has its own tab.** It used to appear twice, under both Contracts and Bounties.
+- **The Captain of the Watch keeps to his own work.** His "the bounty board" button is gone, since the board stands right beside him.
+- **The classic layout's touch buttons match the keys:** F changes attack style, G opens magic, and Q drinks a potion. Before, F fired an old class ability and G opened an old spell-slot spellbook that nothing else used. That spellbook is gone.
+- **The stash is gone for good.** The bank replaced it in RS-88. The leftover stash screen, its deposit buttons, and the help and examine text that still mentioned a stash chest are removed. Your stats now call it the bank.
+
 ## RS-98 - The TzHaar trader no longer buys ore
 
 - **No more ore for tokkul:** the TzHaar trader only sells obsidian for tokkul now. Tokkul still drops from fire creatures, demons, anything five or more floors down, and named bosses. Ore goes to the smith for gold, as before.

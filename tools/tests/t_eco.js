@@ -18,7 +18,13 @@ module.exports = async page=>{
     setUi('shop'); A(document.getElementById('overlay').innerHTML.includes('gap'), 'restock note'); setUi('playing');
     // waypoint fees
     const key1 = t1.x+','+t1.y, fee = ecoTravelFee(key1); out.fee = fee; A(fee > 0, 'a fee');
-    const g0 = p.gold; setUi('waypoint'); A(document.getElementById('overlay').innerHTML.includes(fee+' gold'), 'fee shown'); waypointTravel(key1);
+    const g0 = p.gold; setUi('waypoint'); A(document.getElementById('overlay').innerHTML.includes(fee+'g'), 'fee shown');
+    // the waypoint shows a map with only the attuned towns on it, and a tap on one travels
+    A(document.getElementById('wpMap') && WP.pts.length===(G.ow.visitedTowns||[]).length && WP.pts.every(q=>G.ow.visitedTowns.includes(q.key)), 'waypoint map: attuned towns only');
+    A(townList().length > WP.pts.length, 'unvisited towns left off');
+    { const cv = document.getElementById('wpMap'), rc = cv.getBoundingClientRect(), q = WP.pts.find(q=>q.key===key1);
+      cv.onclick({ clientX:rc.left + q.px*rc.width/cv.width, clientY:rc.top + q.py*rc.height/cv.height }); }
+    out.wpPts = WP.pts.length;
     for (let i=0;i<80 && G.portalFx;i++){ renderGame(); await new Promise(r=>setTimeout(r, 30)); }
     A(p.gold===g0-fee && G.owPos.x===t1.x, 'paid and travelled');
     p.rep = p.rep || {}; p.rep[t0.x+','+t0.y] = 20; A(ecoTravelFee(t0.x+','+t0.y)===0, 'champions travel free');

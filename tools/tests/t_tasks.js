@@ -73,6 +73,14 @@ module.exports = async page=>{
     const hb = ov('board'); A(hb.includes('Contracts</button>') && !hb.includes('Slayer</button>') && !hb.includes('Currencies'), 'board: its own tabs');
     G.ui = 'questgiver'; renderOverlay(); const hq = document.getElementById('overlay').innerHTML; A(hq.includes('QUEST POINT REWARDS') && hq.includes('Amulet of Glory'), 'the captain sells his rewards himself');
     setUi('playing');
+    // the board's guild store has a tab of its own (and isn't repeated under contracts or bounties)
+    const gs = (tab)=>{ G.tkAt = 'board'; G.tkTab = tab; G.ui = 'tasks'; renderOverlay(); return document.getElementById('overlay').innerHTML; };
+    A(gs('guild').includes('THE GUILD STORE') && !gs('contracts').includes('THE GUILD STORE') && !gs('bounties').includes('THE GUILD STORE'), 'guild store: its own tab');
+    G.ui = 'questgiver'; renderOverlay(); A(!document.getElementById('overlay').innerHTML.includes('the bounty board</button>'), 'the captain has no board button');
+    // no T teleport; the classic buttons press the keys
+    setUi('playing'); handleKeydown({ key:'t', target:document.body, preventDefault(){} }); A(G.ui==='playing', 'T opens nothing');
+    const st0 = rsStyle().nm; document.getElementById('btnAbility').click(); A(rsStyle().nm!==st0, 'the F button changes attack style');
+    document.getElementById('btnAbility2').click(); A(G.ui==='rsmagic', 'the G button opens magic'); setUi('playing');
     out.money = mmMethods().filter(m=>m.ok).map(m=>m.nm+' '+m.rate).slice(0,6);
     // calendar rollover
     const d0 = p.contracts.day; G.tkClock = Date.now() + 86400000*8; tkP(); A(p.contracts.day!==d0 && p.contracts.daily.every(t=>!t.claimed), 'new day'); G.tkClock = 0;
