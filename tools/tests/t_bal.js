@@ -7,7 +7,7 @@ module.exports = async page=>{
     const p = G.player;
     // monsters: +25% accuracy and damage over their table entry
     const e = MONSTER_LEVELS[13], m = newMonster(); m.atkBonus = e.atk; m.dmg2 = e.dmg2; monEntryExtras(m, e);
-    out.troll = [m.atkBonus, m.dmg2]; A(m.atkBonus===Math.round(e.atk*1.25) && m.dmg2===Math.round(e.dmg2*1.25), 'monsters bite harder'); A(Math.abs(monBite(20)-1) < 1e-9 && monBite(14)===1.25, 'the bite eases off at the top');
+    out.troll = [m.atkBonus, m.dmg2]; A(m.atkBonus===Math.round(e.atk*1.25) + monAccBonus(14) && monAccBonus(14)===6 && monAccBonus(20)===0 && m.dmg2===Math.round(e.dmg2*1.25), 'monsters bite harder'); A(Math.abs(monBite(20)-1) < 1e-9 && monBite(14)===1.25, 'the bite eases off at the top');
     // coins: full up to tier 12, 60% from tier 15
     A(coinTrim({ mlevel:10 })===1 && coinTrim({ mlevel:12 })===1 && Math.abs(coinTrim({ mlevel:15 }) - 0.6) < 1e-9 && Math.abs(coinTrim({ mlevel:20 }) - 0.6) < 1e-9, 'coin trim');
     // the lair boss: the same strength whatever your level
