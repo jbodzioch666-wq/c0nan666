@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-107 - Smoother dungeons
+
+- **No more stutter when moving in dungeons:** to keep the frame rate up, the dungeon view adjusts its resolution. It used to re-judge every half second and nudge the size up or down a little each time. Each change rebuilt the screen's image buffers, which caused a visible hitch. On a computer whose frame rate sat near the cut-off, that happened over and over while you walked. In testing, the slowest step went from over 3 seconds to about 20 milliseconds.
+- **Steadier resolution:** it now steps between five fixed sizes and judges the frame rate over about two seconds. It ignores one-off slow frames. If a step back up has to be undone straight away, it stays where it is for a minute.
+
 ## RS-106 - Bigger mountains, kept clear
 
 These changes apply to new worlds. Worlds in existing saves keep the generator that made them.

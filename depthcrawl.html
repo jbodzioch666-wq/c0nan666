@@ -28972,7 +28972,9 @@ function fpRenderWorld(env, T, camZ, horizon, depthOnly){
 // over up-stairs, and dust drifting in the lantern light. The raycaster
 // still runs (without shading) to fill the depth buffer the sprites and
 // stairs are clipped against, and takes over if WebGL is unavailable.
-const FPD = { ok:null, MAXT:4, scale:1, dtAvg:1/60, adj:0 };
+const FPD = { ok:null, MAXT:4, scale:1, dtAvg:1/60, adj:0, lvl:0, downAt:0, upAt:0, lockUntil:0 };
+// (RS-107) the few resolutions the dungeon view steps between - each change reallocates the canvas and the post-processing buffers, a visible hitch
+const FPD_SCALES = [1, 0.85, 0.7, 0.6, 0.5];
 // graphics quality: render resolution, shadows and how many particles effects throw
 const GFX_Q = { low:{ pr:1, fpd:0.6, fx:0.35, shadows:false }, medium:{ pr:1.5, fpd:0.85, fx:0.7, shadows:true }, high:{ pr:2, fpd:1, fx:1, shadows:true } };
 function gfxQ(){ return GFX_Q[SET.gfx] || GFX_Q.high; }
@@ -29748,10 +29750,15 @@ function fpdRender(env, T, camZ){
   let stale = FPD.mapRef!==G.map || FPD.theme!==T.key || !FPD.ftile || FPD.ftile.length!==ft.length;
   if (!stale) for (let i=0;i<ft.length;i++) if (ft[i]!==FPD.ftile[i]){ stale = true; break; }
   if (stale){ FPD.mapRef = G.map; FPD.theme = T.key; FPD.ftile = ft.slice(); fpdBuild(T); try{ gfxFpdBuild(T); }catch(e){ console.error(e); } }
-  // resolution adapts to keep the frame rate up on slower graphics: it steps down while frames run long, and back up when there's headroom
-  FPD.dtAvg += ((FP.dt||1/60) - FPD.dtAvg)*0.08;
-  if (++FPD.adj >= 30){ FPD.adj = 0;
-    if (FPD.dtAvg > 1/38) FPD.scale = Math.max(0.5, FPD.scale*0.88); else if (FPD.dtAvg < 1/56) FPD.scale = Math.min(1, FPD.scale*1.06); }
+  // resolution adapts to keep the frame rate up on slower graphics. Each change reallocates buffers (a hitch), so (RS-107) it only
+  // moves between a few fixed steps, judges the frame rate over about two seconds, ignores one-off spikes, and once a step up
+  // has had to come back down it stays put for a minute rather than see-sawing
+  const fdt = Math.min(FP.dt||1/60, 0.1), nowT = performance.now();
+  FPD.dtAvg += (fdt - FPD.dtAvg)*0.03;
+  if (++FPD.adj >= 120 && nowT >= FPD.lockUntil){ FPD.adj = 0;
+    if (FPD.dtAvg > 1/40 && FPD.lvl < FPD_SCALES.length-1){ if (FPD.upAt && nowT - FPD.upAt < 15000) FPD.lockUntil = nowT + 60000; FPD.lvl++; FPD.downAt = nowT; FPD.dtAvg = 1/45; }
+    else if (FPD.dtAvg < 1/58 && FPD.lvl > 0 && nowT - FPD.downAt > 10000){ FPD.lvl--; FPD.upAt = nowT; FPD.dtAvg = 1/50; } }
+  FPD.scale = FPD_SCALES[FPD.lvl];
   const scl = window.__fpdScale || Math.min(FPD.scale, gfxQ().fpd);
   const sc = Math.min(1, 1280/cw)*scl, w = Math.max(2, Math.round(cw*sc)), h = Math.max(2, Math.round(ch*sc));
   if (FPD.cv.width!==w || FPD.cv.height!==h){ FPD.r.setPixelRatio(1); FPD.r.setSize(w, h, false); }
@@ -33426,7 +33433,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-106';
+const GAME_VERSION = 'rs-107';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
