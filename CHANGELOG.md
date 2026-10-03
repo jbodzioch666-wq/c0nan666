@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## RS-102 - Mountain ranges and a reachable world
+
+These changes apply to new worlds. Worlds in existing saves are rebuilt from their seed, so they keep the generator that made them, unchanged.
+
+- **Mountain ranges:** mountains now run in long chains along ridge lines, broken by passes, with a few lone peaks on the highest ground. They used to be every patch of land above a certain height, which made one big mass. Mountains cover about 12–20% of the land, about what they did before.
+- **The One landmass world:** the land used to rise to a single mass of mountains in the middle. Now it's a broad continent with ranges crossing it like the other world types.
+- **The start:** you begin on open ground near the middle of the world, with no mountains within four steps and plenty of land around you. On One landmass worlds, the old start was usually walled in by the central mountains.
+- **Nothing out of reach:** after a world is built, any pocket of land walled in by mountains gets a mountain pass carved to it. That covers every dungeon, town, site, point of interest and gathering spot. On average, old worlds had one or two places you could never reach, and up to seven on One landmass worlds.
+
 ## RS-101 - A tenth of RuneScape's pace, and scarcer resources
 
 Tuned with simulators that run the game's own combat and gathering code on a real world: real walking, spots that run out, and regrowth.
