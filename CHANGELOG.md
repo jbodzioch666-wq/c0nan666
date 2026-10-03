@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-97 - The Slayer Master, the TzHaar trader and the Captain each run their own business
+
+- **The Slayer Master** shows only slayer business: your task, get, skip, block or unblock a task, what you can be assigned, and the slayer rewards shop. There are no contracts, currencies or other tabs.
+- **The TzHaar trader** shows only his trade: obsidian for tokkul, and tokkul for your ore at half again what the smith pays. Before, he opened the same tabbed screen as the Slayer Master, so he looked like a copy of him.
+- **The Captain of the Watch** sells his quest point rewards on his own screen, under his posted work and your quests, instead of sending you to the shared tabbed screen.
+- **The bounty board** keeps its own tabs (contracts, bounties, news) and the guild store.
+- **The side panel's overview** (Quests tab: Slayer, Contracts, Bounties, Purse, Money making) still shows everything in one place, read-only. Each shop says who to see to buy.
+
 ## RS-96 - Menu button and the full hotbar on phones
 
 - **A menu button (⚙)** sits beside the ? on the HUD. It opens the menu with settings, save, load and quit. On the world map it closes the map first, the same as Esc. Before this, phones had no way to reach the menu once a game was running.

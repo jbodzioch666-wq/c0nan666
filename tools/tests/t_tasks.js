@@ -66,6 +66,13 @@ module.exports = async page=>{
     A(G.inv.some(x=>x && x.nm==='Quest Point Cape') && G.inv.some(x=>x && x.nm==='Amulet of Glory'), 'qp shop');
     // every tab renders, from anywhere
     for (const at of [null,'slayer','board','tzhaar','captain']) for (const tab of ['slayer','contracts','bounties','currency','money']){ G.tkAt = at; G.tkTab = tab; G.ui = 'tasks'; renderOverlay(); A(document.getElementById('overlay').innerHTML.length > 500, 'render '+at+'/'+tab); }
+    // each NPC has a screen of its own: no tabs, only its own trade
+    const ov = (at)=>{ G.tkAt = at; G.tkTab = null; G.ui = 'tasks'; renderOverlay(); return document.getElementById('overlay').innerHTML; };
+    const hs = ov('slayer'); A(hs.includes('SLAYER REWARDS') && hs.includes('get a task') && !hs.includes('Contracts</button>') && !hs.includes('TOKKUL') && !hs.includes('OBSIDIAN'), 'slayer master: slayer only');
+    const ht = ov('tzhaar'); A(ht.includes('OBSIDIAN FOR TOKKUL') && ht.includes('THE TZHAAR TAKE ORE') && !ht.includes('Slayer</button>') && !ht.includes('SLAYER REWARDS') && !ht.includes('QUEST POINT'), 'tzhaar: his trade only');
+    const hb = ov('board'); A(hb.includes('Contracts</button>') && !hb.includes('Slayer</button>') && !hb.includes('Currencies'), 'board: its own tabs');
+    G.ui = 'questgiver'; renderOverlay(); const hq = document.getElementById('overlay').innerHTML; A(hq.includes('QUEST POINT REWARDS') && hq.includes('Amulet of Glory'), 'the captain sells his rewards himself');
+    setUi('playing');
     out.money = mmMethods().filter(m=>m.ok).map(m=>m.nm+' '+m.rate).slice(0,6);
     // calendar rollover
     const d0 = p.contracts.day; G.tkClock = Date.now() + 86400000*8; tkP(); A(p.contracts.day!==d0 && p.contracts.daily.every(t=>!t.claimed), 'new day'); G.tkClock = 0;
