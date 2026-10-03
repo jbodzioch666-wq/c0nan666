@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-96 - Menu button and the full hotbar on phones
+
+- **A menu button (⚙)** sits beside the ? on the HUD. It opens the menu with settings, save, load and quit. On the world map it closes the map first, the same as Esc. Before this, phones had no way to reach the menu once a game was running.
+- **Phones keep every hotbar slot:** narrow screens used to hide the map, bestiary, camp, eat food, skills and the 3D and teleport toggles. Now they stay, and you swipe the hotbar sideways to reach them, so the world map opens from its slot in portrait too.
+
 ## RS-95 - Phones and tablets
 
 - **Phone layout:** the page now lays out at the phone's real width, instead of a desktop page shrunk to fit.

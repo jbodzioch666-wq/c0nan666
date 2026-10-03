@@ -68,6 +68,13 @@ module.exports = async page=>{
   A(out.padOff==='none', 'the pad toggles off');
   await page.evaluate(()=>{ document.querySelector('.dh-tools [data-act=pad]').click(); touchUiSync(); });
 
+  // every hotbar slot stays on a phone; the map slot opens the world map, and the menu button closes it, then opens the menu
+  out.mapSlot = await page.evaluate(()=>{ renderGame(); const b = document.querySelector('.dh-slot[data-k=M]'); return b ? getComputedStyle(b).display : 'missing'; });
+  A(out.mapSlot!=='none' && out.mapSlot!=='missing', 'the map slot shows on a phone');
+  out.menu = await page.evaluate(()=>{ document.querySelector('.dh-slot[data-k=M]').click(); const open = G.owZoomedOut; renderGame();
+    document.querySelector('.dh-tools [data-act=menu]').click(); const closed = !G.owZoomedOut && G.ui==='playing'; renderGame();
+    document.querySelector('.dh-tools [data-act=menu]').click(); const ui = G.ui; setUi('playing'); return { open, closed, ui }; });
+  A(out.menu.open && out.menu.closed && out.menu.ui==='pause', 'map slot opens the map; the menu button closes it, then opens the menu');
   // the world map: a finger drags it, a pinch zooms it
   await page.evaluate(async ()=>{ toggleOwZoom(); G.owZoomScale = 3; for (let i=0;i<4;i++){ renderGame(); await new Promise(r=>setTimeout(r, 40)); } });
   const m0 = await page.evaluate(()=>{ const c = owZoomCenter(), r = canvas.getBoundingClientRect(); return { x:c.x, y:c.y, s:owZoomScale(), cx:r.left + r.width/2, cy:r.top + r.height/2 }; });
