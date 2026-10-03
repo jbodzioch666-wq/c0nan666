@@ -1,5 +1,27 @@
 # Depthcrawl patch notes
 
+## RS-101 - A tenth of RuneScape's pace, and scarcer resources
+
+Tuned with simulators that run the game's own combat and gathering code on a real world: real walking, spots that run out, and regrowth.
+
+- **The pace:**
+  - Every skill earns 0.3× the XP it did. Maxing combat now takes about 37 hours of fighting, and a gathering skill reaches 99 in about 12–15 hours. That's roughly a tenth of Old School RuneScape's time.
+  - Saves keep their levels, since they store XP.
+- **Gathering is slower and pays more XP per item.** Each attempt takes twice as long and gives twice the XP, so you get half as many resources an hour for the same time to 99.
+- **The best resources are hard to take:**
+  - Sharks, kraken, swordfish and lobster.
+  - Magic and yew logs.
+  - Runite, adamantite and mithril ore.
+  - Starlily and dragon's tongue.
+- **Better tools add half as much to your odds** as they used to.
+- **Fishing spots give fewer catches** before the shoal moves on.
+- **Mountains stop at adamant:** reaching total level 1000 used to open runite on every mountainside. Now it opens adamant, and runite only comes from the mines.
+- **A sickle for foraging:** the toolsmith sells them in the same tiers as the axe, pick and rod. Foraging works without one, but a sickle is quicker and surer. Foraging also pays more XP, so it's no longer the slowest gathering skill by far.
+- **The Peddler buys raw goods:** logs, fish (cooked fish fetch more) and herbs, cheaply, and less as you flood him. Ore and bars still pay best at the smith.
+- **Prices:**
+  - The smith pays 600g for a rune bar (was 1,000g) and 150g for runite ore (was 250g).
+  - Dragon tools cost 25,000g (was 6,500g) and Infernal tools 60,000g (was 16,000g).
+
 ## RS-100 - Balance pass
 
 Measured with a fight simulator that drives the game's own combat code, about 1,500 fights per run.

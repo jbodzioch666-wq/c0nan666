@@ -23,6 +23,14 @@ module.exports = async page=>{
     out.costs = [c1, c2, reinfCost(G.gear.weapon)];
     const t = townList()[0]; G.owPos = { x:t.x, y:t.y }; enterVillage(); setUi('blacksmith'); A(document.getElementById('overlay').innerHTML.includes('REINFORCE YOUR GEAR'), 'the smith offers it');
     setUi('playing');
+    // RS-101: the pace, the sickle, scarce top resources, and the Peddler buying raw goods
+    A(XP_RATE===0.3, 'xp at a tenth of RuneScape pace'); const a0 = skP().skills.attack; skGainXP('attack', 100); A(skP().skills.attack - a0===30, 'xp scaled');
+    A(SK_TOOLS.some(t=>t.id==='sickle' && t.skill==='foraging'), 'a sickle for foraging');
+    A(SK_FISH.find(f=>f.id==='shark').hard > 0 && SK_ORE.find(o=>o.id==='runite').hard > 0 && SK_LOG.find(l=>l.id==='magic').hard > 0, 'the best resources are hard to take');
+    A(SMITH_BUYS.runeb===600 && SK_TIER.find(t=>t[0]==='Infernal')[2]===60000, 'prices');
+    skAdd('yew', 10); skAdd('c_lobster', 5); setUi('shop'); const ov = document.getElementById('overlay').innerHTML; A(ov.includes('THE PEDDLER BUYS RAW GOODS'), 'the Peddler buys raw goods');
+    const g0 = p.gold; shopSellRes('yew', 1); A(skHave('yew')===0 && p.gold > g0, 'sold the logs'); out.yewGold = p.gold - g0;
+    const g1 = p.gold; shopSellRes('c_lobster'); shopSellRes('c_lobster'); out.lobster = p.gold - g1; setUi('playing');
     return out;
   });
   console.log(JSON.stringify(r));
