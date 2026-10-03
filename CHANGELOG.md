@@ -18,6 +18,7 @@ Tuned with simulators that run the game's own combat and gathering code on a rea
 - **Mountains stop at adamant:** reaching total level 1000 used to open runite on every mountainside. Now it opens adamant, and runite only comes from the mines.
 - **A sickle for foraging:** the toolsmith sells them in the same tiers as the axe, pick and rod. Foraging works without one, but a sickle is quicker and surer. Foraging also pays more XP, so it's no longer the slowest gathering skill by far.
 - **The Peddler buys raw goods:** logs, fish (cooked fish fetch more) and herbs, cheaply, and less as you flood him. Ore and bars still pay best at the smith.
+- **XP contracts on the bounty board** ask for 0.3× as much XP, so a daily is still a day's work at the new pace.
 - **Prices:**
   - The smith pays 600g for a rune bar (was 1,000g) and 150g for runite ore (was 250g).
   - Dragon tools cost 25,000g (was 6,500g) and Infernal tools 60,000g (was 16,000g).

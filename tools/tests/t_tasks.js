@@ -39,7 +39,7 @@ module.exports = async page=>{
     for (const t of p.contracts.daily){
       if (t.kind==='fam') for (let i=0;i<t.need;i++) monsterDies(mk(t.fam));
       if (t.kind==='bag') skAdd(t.item, t.need);
-      if (t.kind==='xp') skGainXP(t.skill, t.need+5);
+      if (t.kind==='xp') skGainXP(t.skill, Math.ceil((t.need+5)/XP_RATE));
       A(tkReady(t), 'ready '+t.kind);
     }
     const g0 = p.gold, tok0 = p.cur.guild;
