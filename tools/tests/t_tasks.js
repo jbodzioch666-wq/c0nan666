@@ -60,7 +60,7 @@ module.exports = async page=>{
     p.cur.tokkul = 100000; for (const e of TZHAAR_SHOP) tkBuy('tokkul', e.id);
     const om = G.inv.find(x=>x && x.nm==='Tzhaar-ket-om'), bn = G.inv.find(x=>x && x.berserker); A(om && bn && skHave('onyx')>=1, 'tzhaar items');
     G.gear.weapon = om; G.gear.necklace = bn; const off = mk(Object.keys(MON_FAMILIES).find(k=>k!==G.player.slay.task.fam)); out.bers = tkDmgMult('melee', G.mon[off]); A(Math.abs(out.bers-1.2)<0.001, 'berserker '+out.bers);
-    skAdd('iron', 10); tkOpen('tzhaar'); tzSell('iron', 1); A(skHave('iron')===0, 'ore traded');
+    tkOpen('tzhaar'); A(typeof tzSell==='undefined' && !document.getElementById('overlay').innerHTML.includes('ORE'), 'the TzHaar trader takes no ore');
     // quest points
     p.questPoints = 30; p.gold = 500000; for (const e of QP_SHOP) tkBuy('qp', e.id);
     A(G.inv.some(x=>x && x.nm==='Quest Point Cape') && G.inv.some(x=>x && x.nm==='Amulet of Glory'), 'qp shop');
@@ -69,7 +69,7 @@ module.exports = async page=>{
     // each NPC has a screen of its own: no tabs, only its own trade
     const ov = (at)=>{ G.tkAt = at; G.tkTab = null; G.ui = 'tasks'; renderOverlay(); return document.getElementById('overlay').innerHTML; };
     const hs = ov('slayer'); A(hs.includes('SLAYER REWARDS') && hs.includes('get a task') && !hs.includes('Contracts</button>') && !hs.includes('TOKKUL') && !hs.includes('OBSIDIAN'), 'slayer master: slayer only');
-    const ht = ov('tzhaar'); A(ht.includes('OBSIDIAN FOR TOKKUL') && ht.includes('THE TZHAAR TAKE ORE') && !ht.includes('Slayer</button>') && !ht.includes('SLAYER REWARDS') && !ht.includes('QUEST POINT'), 'tzhaar: his trade only');
+    const ht = ov('tzhaar'); A(ht.includes('OBSIDIAN FOR TOKKUL') && !ht.includes('Slayer</button>') && !ht.includes('SLAYER REWARDS') && !ht.includes('QUEST POINT'), 'tzhaar: his trade only');
     const hb = ov('board'); A(hb.includes('Contracts</button>') && !hb.includes('Slayer</button>') && !hb.includes('Currencies'), 'board: its own tabs');
     G.ui = 'questgiver'; renderOverlay(); const hq = document.getElementById('overlay').innerHTML; A(hq.includes('QUEST POINT REWARDS') && hq.includes('Amulet of Glory'), 'the captain sells his rewards himself');
     setUi('playing');

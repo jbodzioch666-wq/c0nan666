@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-98 - The TzHaar trader no longer buys ore
+
+- **No more ore for tokkul:** the TzHaar trader only sells obsidian for tokkul now. Tokkul still drops from fire creatures, demons, anything five or more floors down, and named bosses. Ore goes to the smith for gold, as before.
+
 ## RS-97 - The Slayer Master, the TzHaar trader and the Captain each run their own business
 
 - **The Slayer Master** shows only slayer business: your task, get, skip, block or unblock a task, what you can be assigned, and the slayer rewards shop. There are no contracts, currencies or other tabs.
