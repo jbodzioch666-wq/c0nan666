@@ -1,5 +1,26 @@
 # Depthcrawl patch notes
 
+## RS-100 - Balance pass
+
+Measured with a fight simulator that drives the game's own combat code, about 1,500 fights per run.
+
+- **Monsters bite harder:**
+  - +25% accuracy and damage, plus +3 to +6 to their attack roll by tier, so armour no longer makes you untouchable.
+  - Both ease off above tier 14, so the top monsters, which were already tuned as spikes, don't outclass their own bosses.
+- **The lair boss has fixed strength:** 670 life, armour 36, attack 25, three blows a turn. It used to be built from your own damage, armour and life, so levelling never made it easier. With prayers and food it's now about one in three at combat 102, better than half at 114, and a sure thing at 126. New Game+ and dungeon modifiers still make it tougher.
+- **The world-boss giant fights two tiers above you.** Before, it was a pushover from combat 50 on. Now it takes food at any level, and it's about 60% at combat 102.
+- **Coin drops trim above tier 12**, down to 60% from tier 15. Gold had stopped mattering: about 2.7M from the climb to 99, against prices topping out near 10k.
+- **The smith reinforces your gear (a new gold sink):** the blacksmith hammers worn metal gear from +1 to +5. Each step adds 6% to a weapon's accuracy and strength, or to armour, and costs more than twice the last. A Rune scimitar starts at about 2k for +1 and runs to tens of thousands. +4 and +5 can fail, and the gold is spent either way.
+- **XP troughs smoothed:**
+  - Wraiths and other incorporeal monsters now train you for the whole blow. Before, they halved the XP along with the damage.
+  - Wyverns are a little less hardy.
+
+**Time to the top**, fighting monsters at your own level:
+- Combat 102 (attack, strength and defence at 80): about 2 hours of fighting and 1,900 kills.
+- Combat 126 (all 99): about 11½ hours and 7,900 kills.
+- Gold earned on the way to 99 is now about 1.7M. Reinforcing a full Rune set to +5 costs most of it.
+- The lair boss wants combat 110 or more, prayers, and food.
+
 ## RS-99 - One way to travel, and no doubled menus
 
 - **The waypoint is the one way between towns:**
