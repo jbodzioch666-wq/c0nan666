@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## RS-106 - Bigger mountains, kept clear
+
+These changes apply to new worlds. Worlds in existing saves keep the generator that made them.
+
+- **Bigger ranges:** mountain ranges are broader and more solid. They now cover about a quarter to a third of the land, up from 12–18%. In 3D, wider ranges also rise to taller peaks.
+- **No hidden valleys:** a patch of land walled in by mountains, with no way out to the coast, is now filled in as mountain. Before, it was kept and a pass was carved into it.
+- **Nothing in the mountains but dragons:** a dragon's lair is the only thing placed in a range. Towns, dungeons and other sites, points of interest, buried caches, mythic beasts, raider camps and ferry piers all stay out of the mountains, their passes, and the narrow valleys inside a range. So do gathering spots, which used to include herbs, gold rocks and air altars on mountain passes.
+- **The foot of a range is unchanged:** caves, lookouts, grottoes, ore and mountain herbs still sit at the edge of the mountains, where you can reach them.
+
 ## RS-105 - Water stays in the water
 
 - **No more water showing through the land:** in the 3D view, the ground beside seas, lakes, rivers and ponds sometimes dipped below the water. The water and its waves then showed through the edges of land tiles. Land ground now always sits above the tops of the waves.

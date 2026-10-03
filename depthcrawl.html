@@ -7504,17 +7504,41 @@ function ensureSpawnEscape(){
 // whole map - and where every town and dungeon mouth ended up - can be
 // reproduced exactly from just the seed on save/load.
 // ---- RS-102 world generation: mountain ranges, an open start, and nothing out of reach ----
-const OW_GEN_VER = 2;
+// (RS-106, generator 3: broader ranges, valleys walled in by them filled in as mountain, and nothing but a dragon's lair in or on them)
+const OW_GEN_VER = 3;
+const OW_RANGE_V = { 2:{ r1:0.972, r2:0.985, e2:0.56, peak:0.9, gap:0.36, lift:0.035 }, 3:{ r1:0.95, r2:0.972, e2:0.55, peak:0.86, gap:0.32, lift:0.05 } };
+const OW_POCKET_MAX = 160;   // (generator 3: walled-in land up to this many tiles becomes mountain)
 // a mountain where a ridge line runs (where a smooth noise field crosses its middle), wider on high ground, broken by passes;
 // a few lone peaks on the very highest land
-function owRangeAt(x, y, e, seed){
+function owRangeAt(x, y, e, seed, ver){
+  const V = OW_RANGE_V[ver >= 3 ? 3 : 2];
   const n = fbm2D(x+3100, y+3100, seed, 4, 1/34, 0.5), ridge = 1 - Math.abs(n - 0.5)*2;
   const n2 = fbm2D(x+5300, y+5300, seed, 3, 1/52, 0.5), ridge2 = 1 - Math.abs(n2 - 0.5)*2;
-  const lift = clamp((e - 0.52)*0.25, 0, 0.035);
+  const lift = clamp((e - 0.52)*V.lift/0.14, 0, V.lift);
   const gap = fbm2D(x+7700, y+7700, seed, 2, 1/11, 0.5);
-  if (gap < 0.36) return false;                                  // a pass through the range
-  return ridge > 0.972 - lift || (ridge2 > 0.985 - lift && e > 0.56) || e > 0.9;
+  if (gap < V.gap) return false;                                 // a pass through the range
+  return ridge > V.r1 - lift || (ridge2 > V.r2 - lift && e > V.e2) || e > V.peak;
 }
+// generator 3: any land the mountains wall off from the sea (a valley or a hollow inside a range) becomes mountain too,
+// unless it's big enough to be a country of its own - then it keeps its land and gets a pass (owEnsureReachable)
+function owFillPockets(maxSize){
+  const W = OW_COLS, H = OW_ROWS, out = new Uint8Array(W*H), st = [];
+  const open = (x, y)=> G.ow.map[x][y]!==OW_MOUNTAIN;
+  for (let x=0;x<W;x++) for (const y of [0, H-1]) if (open(x,y) && !out[y*W+x]){ out[y*W+x] = 1; st.push(y*W+x); }
+  for (let y=0;y<H;y++) for (const x of [0, W-1]) if (open(x,y) && !out[y*W+x]){ out[y*W+x] = 1; st.push(y*W+x); }
+  while (st.length){ const j = st.pop(), x = j%W, y = (j/W)|0; for (const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){ const nx = x+dx, ny = y+dy; if (nx<0||ny<0||nx>=W||ny>=H) continue; const k = ny*W+nx; if (out[k] || !open(nx, ny)) continue; out[k] = 1; st.push(k); } }
+  const seen = new Uint8Array(W*H); let filled = 0;
+  for (let y=0;y<H;y++) for (let x=0;x<W;x++){ const i = y*W+x; if (out[i] || seen[i] || !open(x, y)) continue;
+    const cells = [i]; seen[i] = 1; for (let h=0; h<cells.length; h++){ const j = cells[h], cx = j%W, cy = (j/W)|0;
+      for (const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){ const nx = cx+dx, ny = cy+dy; if (nx<0||ny<0||nx>=W||ny>=H) continue; const k = ny*W+nx; if (seen[k] || out[k] || !open(nx, ny)) continue; seen[k] = 1; cells.push(k); } }
+    if (cells.length <= maxSize){ for (const j of cells) G.ow.map[j%W][(j/W)|0] = OW_MOUNTAIN; filled += cells.length; } }
+  return filled;
+}
+// generator 3 keeps the mountains and their passes clear: only a dragon's lair goes in them
+function owMtnClear(){ return ((G.ow && G.ow.genVer)||1) >= 3; }
+// deep in the mountains: a valley or gap with mountains on most sides (11+ of the 24 tiles around it) - kept clear in generator 3
+function owAmidMtn(x, y){ if (!owMtnClear()) return false; let n = 0; const m = G.ow.map;
+  for (let i=-2;i<=2;i++) for (let j=-2;j<=2;j++){ const c = m[x+i]; if (c && c[y+j]===OW_MOUNTAIN) n++; } return n >= 11; }
 // the start: open ground nearest the middle with no mountain close by and plenty of land around it
 function owPickSpawn(){
   const cx = Math.floor(OW_COLS/2), cy = Math.floor(OW_ROWS/2), R = Math.max(OW_COLS, OW_ROWS);
@@ -7609,7 +7633,7 @@ function generateOverworld(seed){
       const t = clamp(0.22 + latitude*0.68 - e*0.28 + (fbm2D(x+900,y+900,seed,3,1/30,0.5)-0.5)*0.3, 0, 1);
       let tile;
       if (e < 0.47) tile = OW_WATER;
-      else if (ranges ? owRangeAt(x, y, e, seed) : e > 0.75) tile = OW_MOUNTAIN;
+      else if (ranges ? owRangeAt(x, y, e, seed, G.ow.genVer) : e > 0.75) tile = OW_MOUNTAIN;
       else if (t < 0.18) tile = OW_TUNDRA;
       else if (t > 0.60 && m < 0.44) tile = OW_DESERT;
       else if (m > 0.58 && e < 0.52) tile = OW_SWAMP;
@@ -7644,6 +7668,7 @@ function generateOverworld(seed){
     }
   }
 
+  if (owMtnClear()) G.ow.pocketsFilled = owFillPockets(OW_POCKET_MAX);
   // the island falloff biases high elevation toward the map's centre, so the
   // dead-centre tile itself is often mountain - search outward ring by ring
   // from there for the nearest tile that's naturally open ground, so the
@@ -7738,7 +7763,7 @@ function generateOverworld(seed){
       for (let relax=minDist; relax>=0; relax-=2){
         for (let tries=0; tries<400; tries++){
           const x=rint2(OW_COLS), y=rint2(OW_ROWS);
-          if (!isLand(G.ow.map[x][y]) || !preferTest(x,y)) continue;
+          if (!isLand(G.ow.map[x][y]) || !preferTest(x,y) || owAmidMtn(x,y)) continue;
           if (G.ow.road && G.ow.road[y*OW_COLS+x]) continue;
           if (Math.hypot(x-startX,y-startY) < 5) continue;
           let ok=true;
@@ -7751,7 +7776,7 @@ function generateOverworld(seed){
     for (let relax=minDist; relax>=0; relax-=2){
       for (let tries=0; tries<400; tries++){
         const x=rint2(OW_COLS), y=rint2(OW_ROWS);
-        if (!isLand(G.ow.map[x][y])) continue;
+        if (!isLand(G.ow.map[x][y]) || (relax > 0 && owAmidMtn(x,y))) continue;
         if (G.ow.road && G.ow.road[y*OW_COLS+x]) continue;
         if (Math.hypot(x-startX,y-startY) < 5) continue;
         let ok=true;
@@ -9923,6 +9948,7 @@ function skNodeStatic(x, y){
   if (SKN.seed !== G.ow.seed || SKN.map !== G.ow.map){ SKN.st.clear(); SKN.seed = G.ow.seed; SKN.map = G.ow.map; }
   const key = x*4096+y; if (SKN.st.has(key)) return SKN.st.get(key);
   const t = skOwTile(x, y), h = skNH(x, y, 701), h2 = skNH(x, y, 702), holy = [OW_GRAVEYARD, OW_NECROTOWER, OW_TEMPLE];
+  if (t===OW_MOUNTAINPASS && owMtnClear()){ SKN.st.set(key, null); return null; }   // (generator 3: the passes stay clear)
   let n = null;
   const tree = (type)=>({ k:'woodcutting', type }), herb = (type)=>({ k:'foraging', type, glow: skNH(x,y,703) < 0.07 });
   if (t===OW_FOREST){
@@ -10916,7 +10942,7 @@ function seasonTick(){
 }
 // ---- rich and rare spots: a sparkling gold vein, an ancient oak, a legendary fishing spot - here for a while, marked on your map ----
 const RICH_KINDS = [
-  { type:'goldvein', k:'mining', ok:(x,y,t)=>(t===OW_GRASS || t===OW_MOUNTAINPASS) && skWithin(x, y, 1, [OW_MOUNTAIN]) },
+  { type:'goldvein', k:'mining', ok:(x,y,t)=>(t===OW_GRASS || (t===OW_MOUNTAINPASS && !owMtnClear())) && skWithin(x, y, 1, [OW_MOUNTAIN]) },
   { type:'ancient', k:'woodcutting', ok:(x,y,t)=>t===OW_FOREST },
   { type:'legend', k:'fishing', ok:(x,y,t)=>t===OW_RIVER || (t===OW_WATER && skWithin(x, y, 1, [OW_GRASS, OW_FOREST, OW_DESERT, OW_TUNDRA, OW_SWAMP])) },
 ];
@@ -18052,7 +18078,7 @@ const WEV_TERR_COL = { secured:'rgba(80,170,70,', troubled:'rgba(220,150,40,', d
 // ---- camps ----
 function wevCampOk(x, y){
   if (x<2 || y<2 || x>=OW_COLS-2 || y>=OW_ROWS-2) return false;
-  const t = G.ow.map[x][y]; if (![OW_GRASS, OW_FOREST, OW_DESERT, OW_SWAMP, OW_TUNDRA].includes(t)) return false;
+  const t = G.ow.map[x][y]; if (![OW_GRASS, OW_FOREST, OW_DESERT, OW_SWAMP, OW_TUNDRA].includes(t) || owAmidMtn(x, y)) return false;
   for (const [tx,ty] of wevTowns()) if (Math.abs(tx-x) <= 8 && Math.abs(ty-y) <= 8) return false;
   for (let i=-3;i<=3;i++) for (let j=-3;j<=3;j++){ const u = G.ow.map[x+i] && G.ow.map[x+i][y+j]; if (u!==undefined && OW_SITE_TILES.includes(u)) return false; }
   const e = G.ow.ev; if (e && e.camps.some(c=>Math.abs(c.x-x) < 10 && Math.abs(c.y-y) < 10)) return false;
@@ -18826,7 +18852,9 @@ function wgGenerate(seed, elev){
   G.ow.bridges.filter(b=>Math.hypot(b.x-sp.x, b.y-sp.y) > 18).sort((a,b)=>o3Hash(a.x,a.y,seed%991)-o3Hash(b.x,b.y,seed%991)).slice(0, nBroken).forEach(b=>{ b.broken = true; for (const [x,y] of b.tiles) road[y*W+x] = 3; });
   // ferries: link every landmass that has a town to the start's, coast to coast
   const coastOf = c=>{ const out = []; for (let i=0;i<N;i++){ if (comp[i]!==c) continue; const x = i%W, y = (i/W)|0, t = m[x][y]; if (site(t) || t===OW_RIVER) continue;
-    if ([[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dy])=>m[x+dx] && m[x+dx][y+dy]===OW_WATER)) out.push(i); } return out; };
+    if ([[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dy])=>m[x+dx] && m[x+dx][y+dy]===OW_WATER)) out.push(i); }
+    // (generator 3: a pier stands on open coast, not on a pass or in a cove walled by mountains - unless the island has no other shore)
+    const open = out.filter(i=>{ const x = i%W, y = (i/W)|0; return m[x][y]!==OW_MOUNTAINPASS && !owAmidMtn(x, y); }); return open.length ? open : out; };
   const tComps = [...new Set(tIdx.map(i=>comp[i]).filter(c=>c>=0))], linked = new Set([comp[sp.y*W+sp.x]]);
   let guard = 0;
   while (tComps.some(c=>!linked.has(c)) && guard++ < 20){
@@ -18854,7 +18882,7 @@ function wgGenerate(seed, elev){
       let best = null, bs = -Infinity;
       for (let tries=0; tries<700; tries++){
         const x = 3 + Math.floor(rng()*(W-6)), y = 3 + Math.floor(rng()*(H-6)), t = m[x][y], i = y*W+x;
-        if (!land(t) || site(t) || t===OW_RIVER || road[i] || Math.hypot(x-sp.x, y-sp.y) < 7 || taken(x, y, 7) || nearSite(x, y, 2) || !ok(x, y, t, i)) continue;
+        if (!land(t) || site(t) || t===OW_RIVER || (t===OW_MOUNTAINPASS && owMtnClear()) || owAmidMtn(x, y) || road[i] || Math.hypot(x-sp.x, y-sp.y) < 7 || taken(x, y, 7) || nearSite(x, y, 2) || !ok(x, y, t, i)) continue;
         const sc = (score ? score(x, y, t, i) : 0) + rng(); if (sc > bs){ bs = sc; best = [x,y]; }
       }
       if (best) pois.push({ id:k+c, k, x:best[0], y:best[1] });
@@ -19642,7 +19670,7 @@ function islandsGen(){
     isl.push({ id, comp:c, n, name:nm, cx:Math.round(cx), cy:Math.round(cy), land });
     for (let i=0;i<comp.length;i++) if (comp[i]===c) of[i] = id;
     // a buried cache on every island, dug up once
-    if (n >= 10){ let best = null, bs = -1; for (let i=0;i<comp.length;i++) if (comp[i]===c){ const x = i%W, y = (i/W)|0, t = m[x][y]; if (t!==OW_GRASS && t!==OW_DESERT && t!==OW_FOREST) continue; if ((G.ow.pois||[]).some(p=>p.x===x && p.y===y)) continue; const s = o3Hash(x, y, 611); if (s > bs){ bs = s; best = [x,y]; } }
+    if (n >= 10){ let best = null, bs = -1; for (let i=0;i<comp.length;i++) if (comp[i]===c){ const x = i%W, y = (i/W)|0, t = m[x][y]; if ((t!==OW_GRASS && t!==OW_DESERT && t!==OW_FOREST) || owAmidMtn(x, y)) continue; if ((G.ow.pois||[]).some(p=>p.x===x && p.y===y)) continue; const s = o3Hash(x, y, 611); if (s > bs){ bs = s; best = [x,y]; } }
       if (best) G.ow.pois.push({ id:'cache'+id, k:'cache', x:best[0], y:best[1], name:`a buried cache on ${nm}`, seed:Math.floor(r()*1e9), island:id }); }
   }
 }
@@ -33398,7 +33426,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-105';
+const GAME_VERSION = 'rs-106';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
