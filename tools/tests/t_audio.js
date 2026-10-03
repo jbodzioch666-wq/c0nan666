@@ -6,10 +6,10 @@ module.exports = async page=>{
   const r = await page.evaluate(async ()=>{
     const out = {}, A = (c, msg)=>{ if (!c) throw new Error('assert: '+msg); }, frames = async n=>{ for (let i=0;i<n;i++){ renderGame(); await new Promise(r=>setTimeout(r, 40)); } };
     goToCharCreate(); ccBegin(); setUi('playing'); o3Pref = false; v3Pref = false;
-    const p = G.player; p.turnCount = 60; G.gameMode = 0; await frames(6);
+    const p = G.player; p.clock = p.turnCount = 60; G.gameMode = 0; await frames(6);
     out.land = AUD.cur.id; A(/^land:/.test(AUD.cur.id) && !AUD.cur.id.endsWith(':night'), 'region track');
-    p.turnCount = DAY_LENGTH + 5; await frames(4); out.night = AUD.cur.id; A(AUD.cur.id.endsWith(':night'), 'night version');
-    p.turnCount = DAY_LENGTH + 60;
+    p.clock = p.turnCount = DAY_LENGTH + 5; await frames(4); out.night = AUD.cur.id; A(AUD.cur.id.endsWith(':night'), 'night version');
+    p.clock = p.turnCount = DAY_LENGTH + 60;
     const t = townList()[0]; G.owPos = { x:t.x, y:t.y }; enterVillage(); setUi('playing'); await frames(4); out.town = AUD.cur.id; A(AUD.cur.id.startsWith('town'), 'town track');
     enterInterior('tavern'); await frames(3); A(AUD.cur.id==='interior', 'interior'); A(Math.abs(audReverbFor() - 0.05) < 1e-9, 'dry indoors'); exitInterior();
     G.owPos = { x:G.ow.spawnPos.x, y:G.ow.spawnPos.y }; G.gameMode = 0; randomEncounter(false); setUi('playing'); await frames(3); out.fight = AUD.cur.id; A(AUD.cur.id==='combat', 'combat music');

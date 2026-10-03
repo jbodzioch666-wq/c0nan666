@@ -30,6 +30,7 @@ Screenshots go to `tools/tests/shots/`.
 | bal | balance: monsters bite harder, the fixed-strength lair boss, coin trim, the smith's reinforcing |
 | gen | world generation: mountain ranges, an open start, nothing out of reach, old saves keep their world |
 | grave | the gravestone card: dismiss it, it stays dismissed after a reload, F6 shows it again |
+| clock | real-time day and night: 20 minutes of day, 10 of night, steps don't move it, it pauses on menus |
 | tasks | town NPCs: the slayer master, TzHaar and their tasks |
 | soak | ten dungeon floors of fighting at high level |
 | map | world map, zoom, map tools, 3D landmarks |

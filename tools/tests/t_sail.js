@@ -32,19 +32,19 @@ module.exports = async page=>{
     const far = G.ow.islands.find(i=>islandCharted(i.id)); G.player.route = null; wgWalkTo(far.land[0], far.land[1]);
     out.sailRoute = G.routeWalk ? G.routeWalk.steps.length : (O3.path||[]).length; A(out.sailRoute > 0, 'a course to the island'); G.routeWalk = null;
     // winter: the ice
-    p.turnCount = DAY_LENGTH*6*3 + 5; seasonTick(); A(isWinter(), 'winter');
+    p.clock = p.turnCount = DAY_LENGTH*6*3 + 5; seasonTick(); A(isWinter(), 'winter');
     const mask = iceMask(); let ice = -1; for (let i=0;i<mask.length;i++) if (mask[i]){ ice = i; break; }
     out.iceTiles = mask.reduce((a,v)=>a+v, 0);
     if (ice >= 0){ const ix = ice%OW_COLS, iy = (ice/OW_COLS)|0; p.hasBoat = 0; A(o3Passable(ix, iy), 'walk on the ice');
       let holes = 0; for (let i=0;i<mask.length;i++) if (mask[i]){ const n = skNodeAt(i%OW_COLS, (i/OW_COLS)|0); if (n && n.type==='ice') holes++; } out.iceHoles = holes; A(holes > 0, 'ice holes');
-      G.owPos = { x:ix, y:iy }; p.turnCount = DAY_LENGTH*6*4 + 5; seasonTick(); A(G.ow.map[G.owPos.x][G.owPos.y]!==OW_WATER, 'thaw puts you ashore'); p.hasBoat = 1; }
+      G.owPos = { x:ix, y:iy }; p.clock = p.turnCount = DAY_LENGTH*6*4 + 5; seasonTick(); A(G.ow.map[G.owPos.x][G.owPos.y]!==OW_WATER, 'thaw puts you ashore'); p.hasBoat = 1; }
     return out;
   });
   console.log(JSON.stringify(r1, null, 1));
   // the maps and 3D, in winter, on the boat
   const r2 = await page.evaluate(async ()=>{
     const A = (c, msg)=>{ if (!c) throw new Error('assert: '+msg); };
-    const p = G.player; p.turnCount = DAY_LENGTH*6*3 + 40; seasonTick(); owSeenArr().fill(1); G.ow.seenVer++;
+    const p = G.player; p.clock = p.turnCount = DAY_LENGTH*6*3 + 40; seasonTick(); owSeenArr().fill(1); G.ow.seenVer++;
     G.owZoomedOut = false; toggleOwZoom(); for (const z of [1, 2, 4]){ G.owZoomScale = z; renderGame(); } G.owZoomedOut = false;
     renderOverworldMap();
     // out on the water near an island, in 3D

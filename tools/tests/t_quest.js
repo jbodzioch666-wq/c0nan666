@@ -3,7 +3,7 @@ module.exports = async page=>{
   const r = await page.evaluate(async ()=>{
     const out = {}, A = (c, msg)=>{ if (!c) throw new Error('assert: '+msg); }, frames = async n=>{ for (let i=0;i<n;i++){ renderGame(); await new Promise(r=>setTimeout(r, 25)); } };
     goToCharCreate(); ccBegin(); setUi('playing'); o3Pref = false; v3Pref = false;
-    const p = G.player; p.gold = 50000; p.turnCount = 60; p.wildWarned = 1;
+    const p = G.player; p.gold = 50000; p.clock = p.turnCount = 60; p.wildWarned = 1;
     const sp = G.ow.spawnPos, home = townList().find(t=>t.x===sp.x && t.y===sp.y) || townList()[0];
     const goHome = ()=>{ G.gameMode = 0; G.mon = []; G.owPos = { x:home.x, y:home.y }; trackVisitedTown(home.x, home.y); enterVillage(); setUi('playing'); };
     const ok = ()=>{ A(G.ui==='wevent', 'a dialogue is open'); wevChoose(0); };
@@ -69,7 +69,7 @@ module.exports = async page=>{
     A(!G.inv.includes(clue) && (p.caskets||0) >= 1, 'the casket'); const tm = sqTreasureMap(); addToInventory(tm); G.owPos = { x:tm.mx, y:tm.my }; useFromInv(G.inv.indexOf(tm)); A((p.caskets||0) >= 2, 'treasure dug up');
     // 257: a ghost by night
     let gy = null; for (let x=1;x<OW_COLS-1 && !gy;x++) for (let y=1;y<OW_ROWS-1;y++) if (G.ow.map[x][y]===OW_GRAVEYARD && [OW_GRASS,OW_FOREST].includes(G.ow.map[x][y+1])){ gy = [x, y+1]; break; }
-    if (gy){ p.turnCount = DAY_LENGTH*7 + 5; G.owPos = { x:gy[0], y:gy[1] }; setUi('playing'); A(sqWorldStep() && /ghost/i.test(G.wevDlg.title), 'a ghost'); wevChoose(0); if (G.ui==='wevent') wevChoose(0); A(sqActive('ghost'), 'the ghost\'s quest'); }
+    if (gy){ p.clock = p.turnCount = DAY_LENGTH*7 + 5; G.owPos = { x:gy[0], y:gy[1] }; setUi('playing'); A(sqWorldStep() && /ghost/i.test(G.wevDlg.title), 'a ghost'); wevChoose(0); if (G.ui==='wevent') wevChoose(0); A(sqActive('ghost'), 'the ghost\'s quest'); }
     await frames(4);
     // save and load
     const qp = tkP().questPoints; saveCurrentGame(); const id = G.saveId || (saveIndexList()[0]||{}).id; loadGame(id); setUi('playing');

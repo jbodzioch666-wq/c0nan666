@@ -1,5 +1,15 @@
 # Depthcrawl patch notes
 
+## RS-104 - Day and night in real time
+
+- **A real-time clock:** the sun now moves on its own as you play. A full day takes 30 minutes: 20 minutes of daylight (dawn to dusk) and 10 minutes of night. Before, each step you took moved the clock forward, so the sky jumped as you walked and stood still when you did.
+- **Smooth light:** sunrise, sunset and moonlight now change gradually every frame, even when you are standing still, fishing or in a menu.
+- **Pausing:** the clock stops on the title screen, the pause screen, the Esc page, the settings and the death screen.
+- **Travel and waiting still pass time:** waiting for dawn in town skips to morning, and ferries and harbour crossings move the clock on by the length of the trip.
+- **Seasons follow the clock:** a season is still six days long, which is now three hours of play.
+- **What still goes by steps:** weather, shop restocks, world events and once-a-day town activities. Their pace is unchanged.
+- **New characters** start mid-morning instead of at midnight. Existing saves keep the hour and season they were at.
+
 ## RS-103 - Dismiss the gravestone card
 
 - **A close button on the gravestone card:** the gravestone card in the tracker now has an × that dismisses it. The grave stays where you fell, and you can still walk back to it to reclaim your things. When the card is the only thing in the tracker, the × in its header dismisses it. Before, that × hid the whole quest tracker.

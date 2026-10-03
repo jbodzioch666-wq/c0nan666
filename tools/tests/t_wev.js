@@ -9,7 +9,7 @@ module.exports = async page=>{
     out.camps0 = e.camps.map(c=>c.kind+'@'+c.x+','+c.y+' s'+c.size+' in '+wevTerrName(wevTerrAt(c.x,c.y)));
     // run the clock for three days
     const t0 = G.player.turnCount||0; const seen = { boss:0, siege:0, meteor:0, festival:0, market:0, raid:0, grew:0 };
-    for (let t=0; t<DAY_LENGTH*6; t++){ G.player.turnCount = t0 + t; wevTick();
+    for (let t=0; t<DAY_LENGTH*6; t++){ G.player.clock = G.player.turnCount = t0 + t; wevTick();
       if (e.boss && e.boss.state==='awake') seen.boss++;
       for (const d of e.dyn) seen[d.kind] = (seen[d.kind]||0) + 1;
       for (const k in e.town) seen[e.town[k].kind]++;
@@ -128,7 +128,7 @@ module.exports = async page=>{
   await page.waitForTimeout(300);
   await page.screenshot({ path: SHOTS+'/shot_wev_map.png', timeout:120000 });
   const r8 = await page.evaluate(async ()=>{
-    o3Pref = true; G.owZoomedOut = false; G.gameMode = 0; G.ui = 'playing'; G.player.turnCount = 100;
+    o3Pref = true; G.owZoomedOut = false; G.gameMode = 0; G.ui = 'playing'; G.player.clock = G.player.turnCount = 100;
     const e = wevP(), c = e.camps[0] || wevNewCamp(true); c.size = 5;
     e.boss = { g:0, state:'awake', x:c.x+3, y:c.y-1, hx:c.x, hy:c.y, until:wevTurn()+200, hp:null };
     let best = null; for (let i=-6;i<=6;i++) for (let j=2;j<=6;j++){ const x = c.x+i, y = c.y+j; if (o3Passable(x,y) && !OW_SITE_TILES.includes(G.ow.map[x][y]) && (!best || Math.abs(i)+j < best[2])) best = [x,y,Math.abs(i)+j]; }

@@ -76,7 +76,7 @@ module.exports = async page=>{
   console.log(JSON.stringify(r2, null, 1));
   // 3D: roads, a point of interest, wildlife and a hunt
   const r3 = await page.evaluate(async ()=>{
-    o3Pref = true; G.gameMode = 0; G.ui = 'playing'; G.owZoomedOut = false; G.player.turnCount = 90;
+    o3Pref = true; G.gameMode = 0; G.ui = 'playing'; G.owZoomedOut = false; G.player.clock = G.player.turnCount = 90;
     const p = G.ow.pois.find(p=>p.k==='hamlet') || G.ow.pois[0]; let best = null;
     for (let i=-5;i<=5;i++) for (let j=2;j<=5;j++){ const x = p.x+i, y = p.y+j; if (o3Passable(x,y) && !OW_SITE_TILES.includes(G.ow.map[x][y]) && G.ow.map[x][y]!==OW_WATER && (!best || Math.abs(i)+j < best[2])) best = [x,y,Math.abs(i)+j]; }
     if (best) G.owPos = { x:best[0], y:best[1] };

@@ -84,7 +84,7 @@ module.exports = async page=>{
   // 3D: the landmarks stand in the land
   const r3 = await page.evaluate(async ()=>{
     o3Pref = true; G.owZoomedOut = false; G.gameMode = 0; G.ui = 'playing';
-    const lm = owGeo().landmarks.find(l=>l.kind==='tower') || owGeo().landmarks[0]; G.player.turnCount = 120; if (lm){ let best = null; for (let i=-12;i<=12;i++) for (let j=-12;j<=12;j++){ const x = lm.x+i, y = lm.y+j; if (o3Passable(x,y) && !OW_SITE_TILES.includes(G.ow.map[x][y]) && j >= 7 && (!best || i*i+j*j < best[2])) best = [x,y,i*i+j*j]; } if (best) G.owPos = { x:best[0], y:best[1] }; }
+    const lm = owGeo().landmarks.find(l=>l.kind==='tower') || owGeo().landmarks[0]; G.player.clock = G.player.turnCount = 120; if (lm){ let best = null; for (let i=-12;i<=12;i++) for (let j=-12;j<=12;j++){ const x = lm.x+i, y = lm.y+j; if (o3Passable(x,y) && !OW_SITE_TILES.includes(G.ow.map[x][y]) && j >= 7 && (!best || i*i+j*j < best[2])) best = [x,y,i*i+j*j]; } if (best) G.owPos = { x:best[0], y:best[1] }; }
     for (let i=0;i<20;i++){ renderGame(); await new Promise(r=>setTimeout(r, 30)); }
     return { active:o3Active(), objs:(O3.lmObjs||[]).length, hits:(O3.lmHits||[]).length, edges:Object.keys(O3.lmEdge||{}).length, vis:(O3.lmObjs||[]).map(o=>o.g.visible) };
   });

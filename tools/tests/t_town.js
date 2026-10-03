@@ -3,7 +3,7 @@ module.exports = async page=>{
   const r1 = await page.evaluate(async ()=>{
     const out = {}, A = (c, msg)=>{ if (!c) throw new Error('assert: '+msg); };
     goToCharCreate(); ccBegin(); setUi('playing');
-    const p = G.player; p.gold = 1e6; p.wildWarned = 1; p.turnCount = 60;   // midday
+    const p = G.player; p.gold = 1e6; p.wildWarned = 1; p.clock = p.turnCount = 60;   // midday
     const towns = townList(); out.towns = towns.map(t=>{ const i = townInfo(t.x, t.y); return `${i.name}: ${i.tierNm}${i.port ? ' port' : ''} - ${i.ident.nm}`; });
     const go = t=>{ G.owPos = { x:t.x, y:t.y }; trackVisitedTown(t.x, t.y); setUi('playing'); enterVillage(); setUi('playing'); };
     // every town lays out and draws
@@ -52,7 +52,7 @@ module.exports = async page=>{
     // townsfolk: gossip, routines, the night
     const v = G.villagers.find(v=>!v.guard && !v.animal); A(v, 'a townsperson');
     G.player.x = TOWN_CX; G.player.y = 16; v.x = TOWN_CX; v.y = 15; v.indoors = false; moveDir(0, -1); A(G.ui==='wevent', 'gossip'); out.gossip = G.wevDlg.text.replace(/<[^>]+>/g, '').slice(0, 200); wevChoose(0);
-    p.turnCount = DAY_LENGTH*3 + 10; for (let i=0;i<80;i++) moveVillagers();
+    p.clock = p.turnCount = DAY_LENGTH*3 + 10; for (let i=0;i<80;i++) moveVillagers();
     out.night = { indoors:G.villagers.filter(v=>v.indoors).length, folk:G.villagers.filter(v=>!v.guard && !v.animal).length };
     A(out.night.indoors > 0, 'folk go home at night');
     // shops shut
@@ -64,7 +64,7 @@ module.exports = async page=>{
     townBench('stairs'); A(G.interior.key==='tavern_up', 'upstairs'); p.hp = 1; townBench('innbed'); A(p.hp===effMaxHp(), 'a night in the inn'); townBench('stairsdown'); A(G.interior.key==='tavern', 'downstairs');
     for (let i=0;i<4;i++){ renderGame(); await new Promise(r=>setTimeout(r, 25)); }
     exitInterior();
-    p.turnCount = DAY_LENGTH*4 + 60;
+    p.clock = p.turnCount = DAY_LENGTH*4 + 60;
     return out;
   });
   console.log(JSON.stringify(r1, null, 1).slice(0, 4000));

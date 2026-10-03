@@ -2,7 +2,7 @@ module.exports = async page=>{
   const r = await page.evaluate(async ()=>{
     const out = {}, A = (c, msg)=>{ if (!c) throw new Error('assert: '+msg); };
     goToCharCreate(); ccBegin(); setUi('playing'); o3Pref = false; try{ v3Pref = false; }catch(e){}
-    const p = G.player; p.gold = 100000; p.turnCount = 60;
+    const p = G.player; p.gold = 100000; p.clock = p.turnCount = 60;
     const towns = townList(), t0 = towns[0], t1 = towns[1];
     G.owPos = { x:t0.x, y:t0.y }; trackVisitedTown(t0.x, t0.y); trackVisitedTown(t1.x, t1.y); enterVillage(); setUi('playing');
     // dynamic sell prices

@@ -22,7 +22,7 @@ module.exports = async page=>{
   // onto open ground on the 3D overworld
   const g = await page.evaluate(async ()=>{
     goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing');
-    G.gameMode = 0; o3Pref = true; G.player.turnCount = 60; G.ow.encounters = []; G.player.wildWarned = 1;
+    G.gameMode = 0; o3Pref = true; G.player.clock = G.player.turnCount = 60; G.ow.encounters = []; G.player.wildWarned = 1;
     let f = null; for (let x=6;x<OW_COLS-6 && !f;x++) for (let y=6;y<OW_ROWS-6;y++){ let ok = true; for (let i=-4;i<=4 && ok;i++) for (let j=-4;j<=4;j++) if (!o3Passable(x+i,y+j) || OW_SITE_TILES.includes(G.ow.map[x+i][y+j])){ ok = false; break; } if (ok){ f = [x,y]; break; } }
     G.owPos = { x:f[0], y:f[1] }; for (let i=0;i<14;i++){ renderGame(); await new Promise(r=>setTimeout(r, 40)); }
     const r = O3.cv.getBoundingClientRect(); return { o3:o3Active(), cx:r.left + r.width/2, cy:r.top + r.height*0.45, pad:getComputedStyle(document.getElementById('touchControls')).display };
