@@ -23289,7 +23289,7 @@ const FP_THEME_SPECS = {
     floor: fpBricks({base:[134,100,66], mc:[60,40,24], rows:4, cols:1, seed:103, jitter:0.2}), floor2: fpBricks({base:[126,94,62], mc:[56,38,22], rows:4, cols:1, seed:104}), edge: fpWater({seed:105}) },
 };
 // floor texture slots: 0 floor, 1 floor variant, 2-3 unused (stairs are real
-// geometry now, see fpDrawStairs), 4 revealed pit, 5 glowing rune, 6 water pool, 7 field edge
+// geometry now), 4 revealed pit, 5 glowing rune, 6 water pool, 7 field edge
 function fpTheme(){
   const key = G.gameMode===2 ? (FP_THEME_SPECS[G.arenaTheme] ? G.arenaTheme : 'forest')
     : (G.siteKind==='graveyard' && G.depth>1) ? 'catacomb'          // under the graveyard
@@ -28745,203 +28745,6 @@ function fpFloorSlots(T){
     f[y*COLS+x] = s;
   }
 }
-function fpRenderWorld(env, T, camZ, horizon, depthOnly){
-  const W = FP.W, H = FP.H, u32 = FP.u32, zb = FP.zbuf, rowD = FP.rowD, rowL = FP.rowL;
-  const c = FP.cam, dirX = Math.cos(c.a), dirY = Math.sin(c.a);
-  const plX = -dirY*FP_PLANE, plY = dirX*FP_PLANE;
-  const proj = (W/2)/FP_PLANE;
-  const R = env.R, lanK = env.lanK;
-  const ambR = env.amb[0], ambG = env.amb[1], ambB = env.amb[2];
-  const lcR = env.lan[0], lcG = env.lan[1], lcB = env.lan[2];
-  const outdoor = T.outdoor, fog = env.fog;
-  const fogNear = env.fogNear||0, fogSpan = (env.fogFar||1)-(env.fogNear||0);
-  const L4r = FP.L4r, L4g = FP.L4g, L4b = FP.L4b, LW = COLS*FP_LS;
-  const ftile = FP.ftile, floors = T.floors, ceil = T.ceil;
-  const MASK = FP_TR-1;
-  const lanOf = d => d>=R ? 0 : Math.pow(1-d/R, 1.6)*lanK;
-  const yard = !!(T.yard && G.gameMode===1);
-  if (!FP.layers){ FP.layers = { perp:new Float32Array(8), side:new Uint8Array(8), kind:new Uint8Array(8), mx:new Int32Array(8), my:new Int32Array(8) }; }
-  const LY_perp = FP.layers.perp, LY_side = FP.layers.side, LY_kind = FP.layers.kind, LY_mx = FP.layers.mx, LY_my = FP.layers.my;
-  // wall pixels are staged per column and laid over the floor/sky afterward,
-  // since in the graveyard the background shows through gaps in them
-  if (!FP.fgBuf || FP.fgBuf.length!==H){ FP.fgBuf = new Uint32Array(H); FP.fgSet = new Uint32Array(H); FP.colStamp = 1; }
-  const fgBuf = FP.fgBuf, fgSet = FP.fgSet;
-  let colStamp = FP.colStamp;
-  // per-row floor/ceiling distance and lantern falloff
-  for (let y=0;y<H;y++){
-    const dy = y+0.5-horizon;
-    const d = dy>0 ? camZ*proj/dy : (dy<0 ? (1-camZ)*proj/(-dy) : 1e9);
-    rowD[y] = d; rowL[y] = lanOf(d);
-  }
-  // sky colors per row (outdoor only)
-  let skyRow = null;
-  if (outdoor){
-    skyRow = FP.skyRow && FP.skyRow.length===H ? FP.skyRow : (FP.skyRow = new Uint32Array(H));
-    const top = env.sky[0], hor = env.sky[1];
-    for (let y=0;y<H;y++){
-      const t = clamp(y/Math.max(1,horizon), 0, 1), tt = t*t;
-      const r = top[0]+(hor[0]-top[0])*tt, g = top[1]+(hor[1]-top[1])*tt, b = top[2]+(hor[2]-top[2])*tt;
-      skyRow[y] = (255<<24)|((b|0)<<16)|((g|0)<<8)|(r|0);
-    }
-  }
-  const starBase = Math.floor(c.a/(Math.PI*2)*W*4.8);
-  const moonY = horizon*0.32, moonR = W*0.034;
-  for (let x=0;x<W;x++){
-    const camX = 2*(x+0.5)/W - 1;
-    const rdx = dirX+plX*camX, rdy = dirY+plY*camX;
-    let mapX = Math.floor(c.x), mapY = Math.floor(c.y);
-    const ddx = rdx===0 ? 1e30 : Math.abs(1/rdx), ddy = rdy===0 ? 1e30 : Math.abs(1/rdy);
-    let stepX, stepY, sdx, sdy;
-    if (rdx<0){ stepX=-1; sdx=(c.x-mapX)*ddx; } else { stepX=1; sdx=(mapX+1-c.x)*ddx; }
-    if (rdy<0){ stepY=-1; sdy=(c.y-mapY)*ddy; } else { stepY=1; sdy=(mapY+1-c.y)*ddy; }
-    // collect what the ray passes: normally just the first solid wall, but in
-    // the open graveyard the mausoleum roofs and the iron railings have holes,
-    // so the ray keeps going and every layer it crossed is drawn far to near
-    let nL = 0, prevWall = false;
-    for (let i=0;i<80;i++){
-      let side;
-      if (sdx<sdy){ sdx+=ddx; mapX+=stepX; side=0; } else { sdy+=ddy; mapY+=stepY; side=1; }
-      if (mapX<0||mapY<0||mapX>=COLS||mapY>=ROWS){
-        if (!outdoor){ LY_perp[nL] = side===0 ? sdx-ddx : sdy-ddy; LY_side[nL] = side; LY_kind[nL] = 0; LY_mx[nL] = mapX; LY_my[nL] = mapY; nL++; }
-        break;
-      }
-      if (G.map[mapX][mapY]===T_WALL){
-        const edge = yard && (mapX===0||mapY===0||mapX===COLS-1||mapY===ROWS-1);
-        if (!prevWall || edge){
-          LY_perp[nL] = side===0 ? sdx-ddx : sdy-ddy; LY_side[nL] = side; LY_mx[nL] = mapX; LY_my[nL] = mapY;
-          LY_kind[nL] = edge ? 2 : 1; nL++;
-        }
-        if (!yard || edge || nL>=4) break;
-        prevWall = true;
-      } else prevWall = false;
-    }
-    // (when the GPU draws the stone, only the depth each column hits is needed)
-    if (depthOnly){ zb[x] = nL ? Math.max(0.02, LY_perp[0]) : 1e9; continue; }
-    let top = horizon, bot = horizon - 1, perp = 1e9;
-    for (let li0=nL-1; li0>=0; li0--){
-      const side = LY_side[li0], mX = LY_mx[li0], mY = LY_my[li0];
-      let lp = LY_perp[li0];
-      if (lp<0.02) lp = 0.02;
-      const lineH = proj/lp;
-      const ltop = horizon - (1-camZ)*lineH, lbot = horizon + camZ*lineH;
-      // texture + lighting for this wall slice
-      let tex = T.wall;
-      if (LY_kind[li0]===2) tex = T.fence;
-      else if (mX>=0 && mY>=0 && mX<COLS && mY<ROWS){
-        if (G.gameMode===1){
-          if (!yard && G.dungeonDeco && G.dungeonDeco[mX][mY]==='torch') tex = T.wallTorch;
-          else if (fpHash(mX,mY,3)>0.72) tex = T.wall2;
-        } else if (G.arenaDeco && G.arenaDeco[mX] && G.arenaDeco[mX][mY]==='rock') tex = T.wall2;
-      }
-      const hx = c.x+lp*rdx, hy = c.y+lp*rdy;
-      let wallX = side===0 ? hy : hx; wallX -= Math.floor(wallX);
-      let texX = Math.floor(wallX*FP_TR);
-      if ((side===0 && rdx>0) || (side===1 && rdy<0)) texX = FP_TR-1-texX;
-      const li = side===0 ? fpLightIdx(hx-stepX*0.45, hy) : fpLightIdx(hx, hy-stepY*0.45);
-      const shade = side===1 ? 0.8 : 1;
-      const lan = lanOf(lp);
-      const lr = (ambR + lan*lcR + (li>=0?L4r[li]:0))*shade;
-      const lg = (ambG + lan*lcG + (li>=0?L4g[li]:0))*shade;
-      const lb = (ambB + lan*lcB + (li>=0?L4b[li]:0))*shade;
-      const fogT = fog ? clamp((lp-fogNear)/fogSpan,0,1) : 0;
-      const y0 = mx(0, Math.ceil(ltop)), y1 = mn(H-1, Math.floor(lbot));
-      const span = lbot-ltop, tr = tex.r, tg = tex.g, tb = tex.b, te = tex.e, ta = tex.a;
-      for (let y=y0; y<=y1; y++){
-        const texY = clamp(Math.floor((y+0.5-ltop)/span*FP_TR), 0, MASK);
-        const ti = texY*FP_TR+texX;
-        if (ta && ta[ti]) continue;
-        const ao = ta ? 1 : FP.ao[texY];
-        let er = 0; if (te){ er = te[ti]/170; }
-        let r = tr[ti]*(lr*ao+er), g = tg[ti]*(lg*ao+er), b = tb[ti]*(lb*ao+er);
-        if (fogT){ r += (fog[0]-r)*fogT; g += (fog[1]-g)*fogT; b += (fog[2]-b)*fogT; }
-        fgBuf[y] = (255<<24) | ((b>255?255:b|0)<<16) | ((g>255?255:g|0)<<8) | (r>255?255:r|0);
-        fgSet[y] = colStamp;
-      }
-      perp = lp;
-      if (LY_kind[li0]!==2){ top = ltop; bot = lbot; }
-    }
-    colStamp++;
-    const myStamp = colStamp-1;
-    zb[x] = perp;
-    // floor below the wall slice
-    for (let y=mx(Math.floor(bot)+1, Math.ceil(horizon)); y<H; y++){
-      const d = rowD[y];
-      const fx = c.x+d*rdx, fy = c.y+d*rdy;
-      const tX = Math.floor(fx), tY = Math.floor(fy);
-      let tex = floors[0];
-      if (tX>=0 && tY>=0 && tX<COLS && tY<ROWS) tex = floors[ftile[tY*COLS+tX]];
-      const ti = (Math.floor((fy-tY)*FP_TR)&MASK)*FP_TR + (Math.floor((fx-tX)*FP_TR)&MASK);
-      const li = fpLightIdx(fx,fy), lan = rowL[y];
-      let lr = ambR + lan*lcR, lg = ambG + lan*lcG, lb = ambB + lan*lcB;
-      if (li>=0){ lr += L4r[li]; lg += L4g[li]; lb += L4b[li]; }
-      if (tex.e){ const e = tex.e[ti]/170; lr += e; lg += e; lb += e; }
-      let r = tex.r[ti]*lr, g = tex.g[ti]*lg, b = tex.b[ti]*lb;
-      if (fog){ const ft = clamp((d-fogNear)/fogSpan,0,1); r += (fog[0]-r)*ft; g += (fog[1]-g)*ft; b += (fog[2]-b)*ft; }
-      u32[y*W+x] = (255<<24) | ((b>255?255:b|0)<<16) | ((g>255?255:g|0)<<8) | (r>255?255:r|0);
-    }
-    // ceiling (or open sky) above it
-    const cEnd = yard ? Math.min(H-1, Math.floor(horizon)) : Math.min(H-1, Math.ceil(top)-1, Math.floor(horizon));
-    // a ragged line of dark trees far off beyond the graveyard railings
-    let treeTop = 1e9;
-    if (yard){
-      const az = c.a + Math.atan(camX*FP_PLANE);
-      const u = (az/(Math.PI*2))*64*9;
-      const tu = ((u%576)+576)%576;
-      const hN = fpNoise(tu%64, 7, 8, 311+Math.floor(tu/64))*0.6 + fpNoise(tu%64, 21, 32, 313+Math.floor(tu/64))*0.4;
-      treeTop = horizon - proj*(0.035 + hN*0.075);
-    }
-    let moonDx = 1e9;
-    if (outdoor && env.moon){
-      let da = c.a + Math.atan(camX*FP_PLANE) - FP_MOON_AZ;
-      while (da>Math.PI) da -= Math.PI*2; while (da<-Math.PI) da += Math.PI*2;
-      moonDx = da*proj;
-    }
-    for (let y=0; y<=cEnd && y<H; y++){
-      if (outdoor){
-        let px = skyRow[y];
-        if (env.night && fpHash(starBase+x, y, 5)>0.9965) px = 0xffe8e0d8;
-        if (moonDx < moonR*5 && moonDx > -moonR*5){
-          const md2 = Math.hypot(moonDx, y-moonY);
-          if (md2 < moonR){
-            // a pale moon, faintly cratered and lit from one side
-            const cr = 0.86 + 0.14*fpNoise((moonDx/moonR*16+32)&63, ((y-moonY)/moonR*16+32)&63, 8, 77) - Math.max(0,(moonDx/moonR))*0.12;
-            px = (255<<24) | ((236*cr|0)<<16) | ((236*cr|0)<<8) | (226*cr|0);
-          } else if (md2 < moonR*5){
-            const gl = Math.pow(1-(md2-moonR)/(moonR*4), 2)*0.35;
-            const r0 = px&255, g0 = (px>>8)&255, b0 = (px>>16)&255;
-            px = (255<<24) | ((b0+(220-b0)*gl|0)<<16) | ((g0+(215-g0)*gl|0)<<8) | (r0+(200-r0)*gl|0);
-          }
-        }
-        if (y >= treeTop){
-          const k = 0.55 + 0.25*(y-treeTop)/Math.max(1, horizon-treeTop);
-          px = (255<<24) | ((fog[2]*k|0)<<16) | ((fog[1]*k|0)<<8) | (fog[0]*k|0);
-        }
-        u32[y*W+x] = px;
-        continue;
-      }
-      const d = rowD[y];
-      const fx = c.x+d*rdx, fy = c.y+d*rdy;
-      const ti = (Math.floor(fy*FP_TR)&MASK)*FP_TR + (Math.floor(fx*FP_TR)&MASK);
-      const li = fpLightIdx(fx,fy), lan = rowL[y]*0.8;
-      let lr = ambR + lan*lcR, lg = ambG + lan*lcG, lb = ambB + lan*lcB;
-      if (li>=0){ lr += L4r[li]*0.7; lg += L4g[li]*0.7; lb += L4b[li]*0.7; }
-      let r = ceil.r[ti]*lr, g = ceil.g[ti]*lg, b = ceil.b[ti]*lb;
-      const cX = Math.floor(fx), cY = Math.floor(fy);
-      if (cX>=0 && cY>=0 && cX<COLS && cY<ROWS && G.map[cX][cY]===T_STAIRSU){
-        // the stairwell opening the steps below climb up into
-        const ex = Math.min(fx-cX, 1-(fx-cX), fy-cY, 1-(fy-cY));
-        const k2 = ex<0.08 ? 0.55 : 0.08;
-        r *= k2; g *= k2; b *= k2;
-      }
-      u32[y*W+x] = (255<<24) | ((b>255?255:b|0)<<16) | ((g>255?255:g|0)<<8) | (r>255?255:r|0);
-    }
-    for (let y=0; y<H; y++) if (fgSet[y]===myStamp) u32[y*W+x] = fgBuf[y];
-  }
-  FP.colStamp = colStamp;
-  if (!depthOnly) FP.octx.putImageData(FP.img, 0, 0);
-  return { dirX, dirY, plX, plY, proj };
-}
-
 // ---------- GPU dungeon renderer ----------
 // Indoor dungeons are drawn by three.js at full resolution rather than by the
 // software raycaster: the same procedural stone, sampled finer and given a
@@ -31232,137 +31035,6 @@ function fpStairDir(x,y){
   }
   return [0,1];
 }
-function fpCamSpace(P, wx, wy, z){
-  const c = FP.cam, rx = wx-c.x, ry = wy-c.y;
-  const inv = 1/(P.plX*P.dirY - P.dirX*P.plY);
-  return { tx: inv*(P.dirY*rx - P.dirX*ry), d: inv*(-P.plY*rx + P.plX*ry), z };
-}
-function fpClipNear(poly, near){
-  const out = [];
-  for (let i=0;i<poly.length;i++){
-    const a = poly[i], b = poly[(i+1)%poly.length];
-    const ain = a.d>=near, bin = b.d>=near;
-    if (ain) out.push(a);
-    if (ain!==bin){
-      const t = (near-a.d)/(b.d-a.d);
-      out.push({tx:a.tx+(b.tx-a.tx)*t, d:near, z:a.z+(b.z-a.z)*t});
-    }
-  }
-  return out;
-}
-function fpDrawStairs(P, env, T, camZ, horizon, k, vis){
-  const W = FP.W, zb = FP.zbuf, c = FP.cam;
-  for (let ty=0; ty<ROWS; ty++) for (let tx=0; tx<COLS; tx++){
-    const tile = G.map[tx][ty];
-    if (tile!==T_STAIRSU && tile!==T_STAIRSD) continue;
-    if (!vis.has(tx+','+ty)) continue;
-    if (tx===G.player.x && ty===G.player.y) continue; // standing on it - nothing sensible to draw from inside
-    const up = tile===T_STAIRSU;
-    const [ex,ey] = fpStairDir(tx,ty);
-    const ax = -ex, ay = -ey, bx = -ay, by = ax;            // a: away from the entry side, b: across the flight
-    const cx = tx+0.5, cy = ty+0.5;
-    const W3 = (t,s,z)=>[cx+ax*t+bx*s, cy+ay*t+by*s, z];
-    const faces = [];
-    const quad = (pts, nx, ny, nz, shade, shaft)=>faces.push({pts, nx, ny, nz, shade, shaft:!!shaft});
-    // a down-flight drops gently enough that its treads stay in view past
-    // the lip of the opening (anything steeper hides behind the near edge)
-    const H = up ? 0.92 : -0.55, n = FP_STEPS;
-    for (let i=0;i<n;i++){
-      const t0 = -0.5 + i/n, t1 = -0.5 + (i+1)/n;
-      const zPrev = H*i/n, z = H*(i+1)/n;
-      if (up){
-        quad([W3(t0,-0.5,z),W3(t1,-0.5,z),W3(t1,0.5,z),W3(t0,0.5,z)], 0,0,1, 1.0);                 // tread
-        faces[faces.length-1].nosing = [W3(t0,-0.5,z), W3(t0,0.5,z)];
-        quad([W3(t0,-0.5,zPrev),W3(t0,0.5,zPrev),W3(t0,0.5,z),W3(t0,-0.5,z)], -ax,-ay,0, 0.7);      // riser
-        quad([W3(t0,-0.5,zPrev),W3(0.5,-0.5,zPrev),W3(0.5,-0.5,z),W3(t0,-0.5,z)], -bx,-by,0, 0.55); // left side
-        quad([W3(t0,0.5,zPrev),W3(0.5,0.5,zPrev),W3(0.5,0.5,z),W3(t0,0.5,z)], bx,by,0, 0.55);       // right side
-      } else {
-        quad([W3(t0,-0.5,z),W3(t1,-0.5,z),W3(t1,0.5,z),W3(t0,0.5,z)], 0,0,1, 1.05);                 // tread
-        faces[faces.length-1].nosing = [W3(t1,-0.5,z), W3(t1,0.5,z)];
-        quad([W3(t0,-0.5,zPrev),W3(t0,0.5,zPrev),W3(t0,0.5,z),W3(t0,-0.5,z)], ax,ay,0, 0.65);       // riser (faces down the flight)
-      }
-    }
-    if (up){
-      quad([W3(0.5,-0.5,0),W3(0.5,0.5,0),W3(0.5,0.5,H),W3(0.5,-0.5,H)], ax,ay,0, 0.5);             // back
-    } else {
-      // the shaft walls around the opening, facing inward
-      const Z = -1.2;
-      quad([W3(-0.5,-0.5,0),W3(-0.5,0.5,0),W3(-0.5,0.5,Z),W3(-0.5,-0.5,Z)], ax,ay,0, 0.32, true);
-      quad([W3(0.5,-0.5,0),W3(0.5,0.5,0),W3(0.5,0.5,Z),W3(0.5,-0.5,Z)], -ax,-ay,0, 0.26, true);
-      quad([W3(-0.5,-0.5,0),W3(0.5,-0.5,0),W3(0.5,-0.5,Z),W3(-0.5,-0.5,Z)], bx,by,0, 0.28, true);
-      quad([W3(-0.5,0.5,0),W3(0.5,0.5,0),W3(0.5,0.5,Z),W3(-0.5,0.5,Z)], -bx,-by,0, 0.28, true);
-    }
-    // lighting and depth clip for this staircase as a whole
-    const pc = fpCamSpace(P, cx, cy, 0);
-    if (pc.d < 0.15) continue;
-    const li = fpLightIdx(cx - ex*0.3, cy - ey*0.3);
-    const lan = pc.d>=env.R ? 0 : Math.pow(1-pc.d/env.R,1.6)*env.lanK;
-    const L0 = [env.amb[0]+lan*env.lan[0]+(li>=0?FP.L4r[li]:0), env.amb[1]+lan*env.lan[1]+(li>=0?FP.L4g[li]:0), env.amb[2]+lan*env.lan[2]+(li>=0?FP.L4b[li]:0)];
-    const L = up ? L0 : L0.map(v=>v*1.35+0.04);
-    ctx.save();
-    // only the columns where no nearer wall covers this tile
-    ctx.beginPath();
-    let run = -1;
-    const dLimit = pc.d - 0.75;
-    for (let x=0; x<=W; x++){
-      const open = x<W && zb[x] > dLimit;
-      if (open && run<0) run = x;
-      if (!open && run>=0){ ctx.rect(run*k, 0, (x-run)*k, canvas.height); run = -1; }
-    }
-    ctx.clip();
-    const project = poly=>poly.map(v=>[ (W/2)*(1+v.tx/v.d)*k, (horizon + (camZ - v.z)*P.proj/v.d)*k ]);
-    if (!up){
-      // everything below floor level only shows through the opening itself
-      let rim = [W3(-0.5,-0.5,0),W3(0.5,-0.5,0),W3(0.5,0.5,0),W3(-0.5,0.5,0)].map(p=>fpCamSpace(P,p[0],p[1],p[2]));
-      rim = fpClipNear(rim, 0.08);
-      if (rim.length<3){ ctx.restore(); continue; }
-      const rp = project(rim);
-      ctx.beginPath(); ctx.moveTo(rp[0][0],rp[0][1]); for (let i=1;i<rp.length;i++) ctx.lineTo(rp[i][0],rp[i][1]); ctx.closePath();
-      ctx.fillStyle = 'rgb(4,4,6)'; ctx.fill();
-      ctx.clip();
-    }
-    const drawn = [];
-    for (const f of faces){
-      const p0 = f.pts[0];
-      if (f.nx*(c.x-p0[0]) + f.ny*(c.y-p0[1]) + f.nz*(camZ-p0[2]) <= 0) continue; // facing away
-      let poly = f.pts.map(p=>fpCamSpace(P,p[0],p[1],p[2]));
-      const depth = poly.reduce((a,v)=>a+v.d,0)/poly.length;
-      poly = fpClipNear(poly, 0.08);
-      if (poly.length<3) continue;
-      const zAvg = f.pts.reduce((a,p)=>a+p[2],0)/f.pts.length;
-      drawn.push({poly, depth, shade:f.shade, zAvg, shaft:f.shaft, nosing:f.nosing});
-    }
-    drawn.sort((a,b)=>(b.shaft-a.shaft) || (b.depth-a.depth));
-    let sxMin = 1e9, sxMax = -1e9;
-    for (const f of drawn){
-      // deeper into a down-shaft the steps fall away into darkness
-      const sink = f.zAvg<0 ? Math.max(0.3, 1 + f.zAvg*0.55) : 1;
-      const m = f.shade*sink;
-      const col = [0,1,2].map(i=>Math.min(255, T.stone[i]*L[i]*m)|0);
-      const pp = project(f.poly);
-      for (const q of pp){ sxMin = Math.min(sxMin, q[0]/k); sxMax = Math.max(sxMax, q[0]/k); }
-      ctx.beginPath(); ctx.moveTo(pp[0][0],pp[0][1]); for (let i=1;i<pp.length;i++) ctx.lineTo(pp[i][0],pp[i][1]); ctx.closePath();
-      ctx.fillStyle = `rgb(${col[0]},${col[1]},${col[2]})`; ctx.fill();
-      ctx.strokeStyle = `rgba(0,0,0,${0.35*Math.min(1,m+0.3)})`; ctx.lineWidth = Math.max(1, k*0.6); ctx.stroke();
-      if (f.nosing){
-        // the worn front edge of each step catches the light
-        let e = fpClipNear(f.nosing.map(p=>fpCamSpace(P,p[0],p[1],p[2])), 0.08);
-        if (e.length===2){
-          const ep = project(e);
-          ctx.beginPath(); ctx.moveTo(ep[0][0],ep[0][1]); ctx.lineTo(ep[1][0],ep[1][1]);
-          ctx.strokeStyle = `rgba(255,236,200,${0.35*Math.min(1,m)})`; ctx.lineWidth = Math.max(1.2, k*1.1); ctx.stroke();
-        }
-      }
-    }
-    ctx.restore();
-    // a rising flight is solid enough to hide what's behind it (a torch on
-    // the far wall, a monster beyond) - fold it into the wall depth buffer
-    if (up && sxMax>sxMin){
-      for (let x=Math.max(0,Math.floor(sxMin)); x<=Math.min(W-1,Math.ceil(sxMax)); x++) zb[x] = Math.min(zb[x], pc.d+0.3);
-    }
-  }
-}
-
 // ---------- sprite pass ----------
 function fpLightAt(env, wx, wy, dist){
   const li = fpLightIdx(wx,wy);
@@ -31520,88 +31192,6 @@ function fpBurst(x,y,z,col,n,spd){
       life:0.5+Math.random()*0.5, age:0, col, r:0.02+Math.random()*0.02});
   }
 }
-function fpProject(P, wx, wy){
-  const c = FP.cam, relX = wx-c.x, relY = wy-c.y;
-  const inv = 1/(P.plX*P.dirY - P.dirX*P.plY);
-  const tX = inv*(P.dirY*relX - P.dirX*relY);
-  const tY = inv*(-P.plY*relX + P.plX*relY);
-  return { sx:(FP.W/2)*(1+tX/tY), depth:tY };
-}
-function fpDrawSprites(S, P, env, camZ, horizon, k){
-  const W = FP.W, zb = FP.zbuf;
-  for (const s of S){ const pr = fpProject(P, s.x, s.y); s.sx = pr.sx; s.depth = pr.depth; }
-  S.sort((a,b)=>b.depth-a.depth);
-  for (const s of S){
-    if (s.depth<0.4) continue;
-    if (s.model){
-      const ci0 = clamp(Math.floor(s.sx),0,W-1);
-      if (s.hp!==null && s.hp!==undefined && zb[ci0]>s.depth){
-        const hPx0 = P.proj*s.h/s.depth, topY0 = horizon + camZ*P.proj/s.depth - hPx0;
-        const bw = Math.max(18, Math.min(90, hPx0*0.4))*k, bh = Math.max(3, 4*k*(s.boss?1.4:1));
-        const bx = s.sx*k - bw/2, by = topY0*k - bh - 6*k;
-        ctx.fillStyle = 'rgba(0,0,0,0.65)'; ctx.fillRect(bx-1, by-1, bw+2, bh+2);
-        ctx.fillStyle = s.hp>0.5 ? '#74bf7e' : s.hp>0.25 ? '#e8a54b' : '#d1495b';
-        ctx.fillRect(bx, by, bw*s.hp, bh);
-      }
-      continue;
-    }
-    const img = s.spr;
-    const hPx = P.proj*s.h/s.depth, wPx = hPx*img.aspect;
-    const bottom = horizon + (camZ - s.lift)*P.proj/s.depth, topY = bottom-hPx;
-    const x0 = s.sx - wPx/2, x1 = s.sx + wPx/2;
-    if (x1<0 || x0>=W) continue;
-    const dark = s.emissive ? 0 : 1 - fpLightAt(env, s.x, s.y, s.depth);
-    if (dark>0.97 && !s.glow) continue;
-    const ci = clamp(Math.floor(s.sx),0,W-1);
-    if (s.shadow && zb[ci]>s.depth){
-      const fy = horizon + camZ*P.proj/s.depth;
-      ctx.fillStyle = `rgba(0,0,0,${0.4*(1-dark)})`;
-      ctx.beginPath(); ctx.ellipse(s.sx*k, fy*k, wPx*0.42*k, wPx*0.1*k, 0, 0, Math.PI*2); ctx.fill();
-    }
-    if (s.glow && zb[ci]>s.depth-0.3){
-      const gr = (s.glowR||0.8)*P.proj/s.depth*0.5*k, gx = s.sx*k, gy = (topY+hPx*0.45)*k;
-      ctx.save(); ctx.globalCompositeOperation = 'lighter';
-      const g = ctx.createRadialGradient(gx,gy,0,gx,gy,gr);
-      g.addColorStop(0, fpRgba(s.glow, 0.34)); g.addColorStop(1, fpRgba(s.glow, 0));
-      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(gx,gy,gr,0,Math.PI*2); ctx.fill();
-      ctx.restore();
-    }
-    // column-clip against the wall depth buffer, drawing contiguous runs
-    let a = mx(0, Math.floor(x0));
-    const end = mn(W, Math.ceil(x1));
-    while (a<end){
-      while (a<end && zb[a]<=s.depth) a++;
-      let b = a;
-      while (b<end && zb[b]>s.depth) b++;
-      if (b>a){
-        const u0 = (a-x0)/wPx*img.img.width, u1 = (b-x0)/wPx*img.img.width;
-        const su = clamp(u0,0,img.img.width), sw = clamp(u1,0,img.img.width)-su;
-        if (sw>0){
-          const dx = (x0 + su/img.img.width*wPx)*k, dw = sw/img.img.width*wPx*k;
-          ctx.drawImage(img.img, su,0,sw,img.img.height, dx, topY*k, dw, hPx*k);
-          if (dark>0.02){ ctx.globalAlpha = dark; ctx.drawImage(img.shade, su,0,sw,img.img.height, dx, topY*k, dw, hPx*k); ctx.globalAlpha = 1; }
-          if (s.flash){ ctx.globalAlpha = s.flash*0.85; ctx.drawImage(img.wht, su,0,sw,img.img.height, dx, topY*k, dw, hPx*k); ctx.globalAlpha = 1; }
-        }
-      }
-      a = b;
-    }
-    if (s.shine && zb[ci]>s.depth && dark<0.8){
-      const tw = (Math.sin(FP.t*4 + s.x*7 + s.y*3)+1)/2;
-      if (tw>0.75){
-        const r = (tw-0.75)*4*Math.max(2, wPx*0.18)*k, gx = (s.sx+wPx*0.18)*k, gy = (topY+hPx*0.3)*k;
-        ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.strokeStyle='rgba(255,250,220,0.9)'; ctx.lineWidth=Math.max(1,k*0.8);
-        ctx.beginPath(); ctx.moveTo(gx-r,gy); ctx.lineTo(gx+r,gy); ctx.moveTo(gx,gy-r); ctx.lineTo(gx,gy+r); ctx.stroke(); ctx.restore();
-      }
-    }
-    if (s.hp!==null && s.hp!==undefined && zb[ci]>s.depth && dark<0.9){
-      const bw = Math.max(18, Math.min(90, wPx*0.8))*k, bh = Math.max(3, 4*k*(s.boss?1.4:1));
-      const bx = s.sx*k - bw/2, by = topY*k - bh - 6*k;
-      ctx.fillStyle = 'rgba(0,0,0,0.65)'; ctx.fillRect(bx-1, by-1, bw+2, bh+2);
-      ctx.fillStyle = s.hp>0.5 ? '#74bf7e' : s.hp>0.25 ? '#e8a54b' : '#d1495b';
-      ctx.fillRect(bx, by, bw*s.hp, bh);
-    }
-  }
-}
 function fpRgba(hex, a){
   if (hex.startsWith('rgb')) return hex;
   const h = hex.replace('#','');
@@ -31609,52 +31199,6 @@ function fpRgba(hex, a){
   const n = parseInt(f,16);
   return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`;
 }
-function fpDrawParticles(P, camZ, horizon, k){
-  const W = FP.W, zb = FP.zbuf, dt = FP.dt;
-  const keep = [];
-  for (const p of FP.parts){
-    p.age += dt;
-    if (p.age>p.life) continue;
-    p.x += p.vx*dt; p.y += p.vy*dt; p.z += p.vz*dt;
-    if (p.g) p.vz -= p.g*dt;
-    if (p.z<0.02){ p.z = 0.02; p.vz *= -0.3; p.vx *= 0.6; p.vy *= 0.6; }
-    keep.push(p);
-    const pr = fpProject(P, p.x, p.y);
-    if (pr.depth<0.2) continue;
-    const ci = Math.floor(pr.sx);
-    if (ci<0 || ci>=W || zb[ci]<=pr.depth) continue;
-    const sy = horizon + (camZ-p.z)*P.proj/pr.depth;
-    const r = Math.max(0.6, p.r*P.proj/pr.depth)*k;
-    const a = 1 - p.age/p.life;
-    ctx.globalAlpha = a;
-    if (p.add) ctx.globalCompositeOperation = 'lighter';
-    ctx.fillStyle = p.col;
-    ctx.beginPath(); ctx.arc(pr.sx*k, sy*k, r, 0, Math.PI*2); ctx.fill();
-    ctx.globalCompositeOperation = 'source-over';
-  }
-  ctx.globalAlpha = 1;
-  FP.parts = keep.length>400 ? keep.slice(-400) : keep;
-  // floating damage numbers
-  const fk = [];
-  for (const f of FP.floats){
-    f.age += dt;
-    if (f.age>1.1) continue;
-    fk.push(f);
-    const pr = fpProject(P, f.x, f.y);
-    if (pr.depth<0.2) continue;
-    const sy = horizon + (camZ-(f.z+f.age*0.45))*P.proj/pr.depth;
-    const size = clamp(0.2*P.proj/pr.depth, 11, 34)*k*(f.age<0.12 ? 0.7+f.age*2.5 : 1);
-    ctx.globalAlpha = clamp((1.1-f.age)/0.4, 0, 1);
-    ctx.font = `800 ${Math.round(size)}px 'JetBrains Mono', monospace`;
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.lineWidth = Math.max(2, size*0.16); ctx.strokeStyle = 'rgba(0,0,0,0.85)';
-    ctx.strokeText(f.txt, pr.sx*k, sy*k);
-    ctx.fillStyle = f.col; ctx.fillText(f.txt, pr.sx*k, sy*k);
-  }
-  ctx.globalAlpha = 1;
-  FP.floats = fk;
-}
-
 // ---------- first-person weapon, in 3D ----------
 // the weapon in your hand is a real model rendered with three.js over the
 // first-person view: one per weapon type (daggers to greatswords, axes,
@@ -31757,11 +31301,6 @@ function fpwAxeHead(g, y, size, mats, opts){
   else { const back = new T.Mesh(new T.BoxGeometry(0.05, 0.05, 0.04), mats.dark); back.position.set(-0.03, y, 0); g.add(back); }
   g.add(fpwCyl(0.03, 0.03, 0.1, 10, mats.dark, y-0.05));
 }
-function fpwTierMat(col){
-  FPW.tierMats = FPW.tierMats || {};
-  if (!FPW.tierMats[col]){ const m = FPW.m.steel.clone(); const c = new THREE.Color(col); m.color = c.lerp(new THREE.Color(0xffffff), 0.25).multiplyScalar(1.25); FPW.tierMats[col] = m; }
-  return FPW.tierMats[col];
-}
 function fpwBuild(kindName, w){
   const T = THREE, M = FPW.m, g = new T.Group(), b = kindName;
   const q = w ? w.quality||0 : 0, fit = q>=4 ? M.gold : q>=2 ? M.brass : M.dark;
@@ -31811,26 +31350,6 @@ function fpwBuild(kindName, w){
   }
   return { g, info };
 }
-// the gauntlet wrapped round the grip, and the forearm running off the bottom of the screen
-function fpwHand(){
-  const T = THREE, M = FPW.m, h = new T.Group();
-  const palm = new T.Mesh(new T.BoxGeometry(0.1, 0.11, 0.075), M.glove); palm.position.set(-0.035, 0, 0); h.add(palm);
-  for (let i=0;i<4;i++){ const y = 0.04 - i*0.028;
-    const f1 = new T.Mesh(new T.CapsuleGeometry(0.014, 0.04, 4, 8), M.glove); f1.rotation.z = Math.PI/2; f1.position.set(0.01, y, 0.035); h.add(f1);
-    const f2 = new T.Mesh(new T.CapsuleGeometry(0.013, 0.03, 4, 8), M.glove); f2.position.set(0.04, y, 0.012); f2.rotation.x = Math.PI/2; h.add(f2);
-    const kn = new T.Mesh(new T.BoxGeometry(0.03, 0.022, 0.02), M.plate); kn.position.set(-0.01, y, 0.042); h.add(kn); }
-  const th = new T.Mesh(new T.CapsuleGeometry(0.015, 0.045, 4, 8), M.glove); th.position.set(-0.01, 0.07, -0.02); th.rotation.set(0.3, 0, -0.9); h.add(th);
-  const back = new T.Mesh(new T.BoxGeometry(0.075, 0.1, 0.02), M.plate); back.position.set(-0.05, 0, 0.04); back.rotation.y = 0.3; h.add(back);
-  const cuff = new T.Mesh(new T.CylinderGeometry(0.058, 0.07, 0.1, 12), M.plate); cuff.position.set(-0.07, -0.1, 0); cuff.rotation.z = 0.35; h.add(cuff);
-  return h;
-}
-function fpwEnchant(w){
-  if (!w || !w.used) return null;
-  let e = null;
-  for (const a of (w.aff||[])){ if (a.kind==='fire') e = 'fire'; else if (a.kind==='cold' && e!=='fire') e = 'cold'; else if (a.kind==='pois' && !e) e = 'pois'; }
-  if (!e && (w.quality||0) >= 4) e = 'unique';
-  return e;
-}
 const FPW_ENCH = { fire:[0xff6a1a,'rgba(255,140,50,1)'], cold:[0x60c8ff,'rgba(150,220,255,1)'], pois:[0x70e040,'rgba(150,255,110,1)'], unique:[0xffa030,'rgba(255,190,90,1)'] };
 // how each kind of weapon is carried and swung in first person, following
 // the usual conventions of first-person melee games: a one-handed blade rests
@@ -31858,19 +31377,6 @@ const FPW_STYLE = {
   staff:   { hp:[0.3,-0.3,-1.1],    rot:[-0.3,0.2,0.95],   left:0.48,  atk:'sweep',  dur:0.42 },
   fists:   { hp:[0.32,-0.28,-0.95], rot:[-0.25,0.55,-0.35],  atk:'punch',  dur:0.24 },
 };
-function fpwStyleFor(w){
-  if (!w || !w.used) return 'fists';
-  const b = w.basis||'';
-  if (/Dagger/i.test(b)) return 'dagger';
-  if (/Rapier/i.test(b)) return 'rapier';
-  if (/Greatsword/i.test(b)) return 'blade2';
-  if (/Greataxe|Maul/i.test(b)) return 'head2';
-  if (/Halberd/i.test(b)) return 'polearm';
-  if (/Spear/i.test(b)) return 'spear';
-  if (/Quarterstaff/i.test(b)) return 'staff';
-  if (/axe|Pick|Club|Mace|Hammer|Morningstar|Flail/i.test(b)) return 'head1';
-  return 'blade1';
-}
 // [time, rig offset, rig rotation, wrist roll]; the rig pivots at your chest
 const FPW_ATK = {
   slash:  [[0,[0,0,0],[0,0,0],0],[0.15,[0.04,0.06,0],[0.1,0,-0.12],-0.5],[0.42,[-0.12,0.08,0],[-0.05,-0.05,0.25],0.5],[0.68,[-0.3,0.1,0],[-0.15,-0.1,0.42],1.25],[1,[0,0,0],[0,0,0],0]],
@@ -31885,212 +31391,6 @@ const FPW_ATK = {
 };
 const FPW_CONTACT = { slash:0.5, stab:0.5, lunge:0.52, chop:0.58, cleave:0.6, smash:0.6, thrust:0.55, sweep:0.58, punch:0.45 };
 const FPW_CHEST = [0.02, -0.62, -0.35];
-function fpwSetWeapon(){
-  const w = G.gear.weapon, key = w && w.used ? (w.basis+'|'+(w.quality||0)+'|'+fpwEnchant(w)+'|'+(w.rsCol||'')) : 'fists';
-  if (key===FPW.wkey) return;
-  FPW.wkey = key;
-  const T = THREE, M = FPW.m;
-  const clear = (grp)=>{ while (grp.children.length){ const c = grp.children[0]; grp.remove(c); c.traverse(o=>{ if (o.geometry) o.geometry.dispose(); }); } };
-  clear(FPW.rig); if (FPW.armGrp) clear(FPW.armGrp); else { FPW.armGrp = new T.Group(); FPW.scene.add(FPW.armGrp); }
-  const styleKey = fpwStyleFor(w), st = FPW_STYLE[styleKey];
-  FPW.style = styleKey; FPW.st = st;
-  const { g, info } = fpwBuild(w && w.basis, w);
-  // the blade takes its metal's colour: bronze, iron, steel, mithril blue, adamant green, rune cyan, dragon red
-  if (w && w.used && w.rsCol){ const tm = fpwTierMat(w.rsCol); g.traverse(o=>{ if (o.isMesh && (o.material===M.steel || o.material===M.plate)) o.material = tm; }); }
-  const held = new T.Group(); held.add(g); if (st.gy) g.position.y = st.gy;   // slide the weapon so the top hand sits by the guard
-  const right = fpwHand(); held.add(right);
-  const hands = [{ h:right, shoulder: st.up2 ? [0.75,-1.5,-0.6] : [0.46,-1.75,-0.8] }];
-  if (st.left!==undefined){                       // a second hand further along the grip or shaft
-    const left = fpwHand(); left.scale.x = -1; left.position.y = st.left; g.add(left);
-    // an upright two-hander is held like a longsword: the right hand high by the guard with its
-    // arm coming in from the right, the left just below it from the left, both sets of knuckles
-    // facing forward and the fingers wrapping round the grip toward you
-    if (st.up2){ right.scale.x = -1; right.rotation.y = -Math.PI/4; left.scale.x = 1; left.rotation.y = -Math.PI/4; }
-    hands.push({ h:left, shoulder: st.up2 ? [-0.55,-1.6,-0.6] : [-0.42,-1.75,-0.8] });
-  }
-  if (styleKey==='fists'){                          // both fists up in a guard
-    const left = fpwHand(); left.scale.x = -1; FPW.rig.add(left);
-    left.position.set(-0.3-FPW_CHEST[0], -0.17-FPW_CHEST[1], -1.0-FPW_CHEST[2]); left.rotation.set(-0.1, -0.5, 0.25); left.scale.set(-0.78,0.78,0.78);
-    hands.push({ h:left, shoulder:[-0.42,-1.75,-0.8] }); FPW.leftFist = left;
-  } else FPW.leftFist = null;
-  FPW.rig.add(held); FPW.held = held; FPW.info = info; FPW.weaponG = g;
-  held.position.set(st.hp[0]-FPW_CHEST[0], st.hp[1]-FPW_CHEST[1], st.hp[2]-FPW_CHEST[2]);
-  held.rotation.set(st.rot[0], st.rot[1], st.rot[2]); held.scale.setScalar(0.78);
-  // forearms: rebuilt every frame from each wrist back to its shoulder, off-screen, so they never flip into view
-  FPW.arms = hands.map(({h, shoulder})=>{
-    const arm = new T.Mesh(new T.CylinderGeometry(0.03, 0.04, 1, 12), FPW.sleeve || (FPW.sleeve = (()=>{ const m = M.leather.clone(); m.color = new T.Color(0x5a3e2a); return m; })()));
-    const vam = new T.Mesh(new T.CylinderGeometry(0.036, 0.042, 0.13, 12), M.plate);   // the steel cuff of the gauntlet running up the wrist
-    FPW.armGrp.add(arm); FPW.armGrp.add(vam);
-    return { h, shoulder:new T.Vector3(...shoulder), arm, vam };
-  });
-  // a flail's chain and ball hang from a pivot so they can swing
-  FPW.flailHead = null;
-  if (/Flail/i.test((w&&w.basis)||'')){
-    const pivot = new T.Group(); pivot.position.y = 0.28; g.add(pivot);
-    for (const c of g.children.slice()){ if (c!==pivot && c.position.y >= 0.29 && !c.isSprite){ g.remove(c); c.position.y -= 0.28; pivot.add(c); } }
-    FPW.flailHead = pivot;
-  }
-  const ench = fpwEnchant(w);
-  FPW.ench = ench; FPW.motes = [];
-  if (ench && !info.fists){
-    const [hex, css] = FPW_ENCH[ench];
-    const c = v3Canvas(64,64), x = c.getContext('2d'), gr = x.createRadialGradient(32,32,0,32,32,32); gr.addColorStop(0,css); gr.addColorStop(1,'rgba(0,0,0,0)'); x.fillStyle = gr; x.fillRect(0,0,64,64);
-    const tex = new T.CanvasTexture(c);
-    for (let i=0;i<14;i++){ const sp = new T.Sprite(new T.SpriteMaterial({ map:tex, transparent:true, depthWrite:false, blending:T.AdditiveBlending })); sp.scale.setScalar(0.05); g.add(sp); FPW.motes.push({ sp, t:Math.random(), s:0.3+Math.random()*0.5 }); }
-    FPW.glow.color.setHex(hex);
-    if (info.blade){ info.blade.material = info.blade.material.clone(); info.blade.material.emissive = new T.Color(hex); info.blade.material.emissiveIntensity = ench==='unique' ? 0.06 : ench==='cold' ? 0.12 : 0.07; }
-  }
-  FPW.atk = null;
-}
-function fpwDraw(){
-  if (!fpwInit()) return false;
-  const T = THREE, cw = canvas.width, chh = canvas.height, dt = Math.min(0.05, FP.dt || 0.016);
-  if (FPW.cv.width !== cw || FPW.cv.height !== chh){ FPW.r.setPixelRatio(1); FPW.r.setSize(cw, chh, false); FPW.cam.aspect = cw/chh; FPW.cam.updateProjectionMatrix(); }
-  fpwSetWeapon();
-  FPW.t += dt;
-  // light it like the spot you're standing in
-  let lit = 0.8; try{ lit = clamp(fpLightAt(FP.envNow || fpEnv(), G.player.x+0.5, G.player.y+0.5, 0.3), 0.18, 1.1); }catch(e){}
-  const env = FP.envNow, lan = env && env.lan ? env.lan : [1,0.8,0.55];
-  FPW.key.color.setRGB(clamp(lan[0],0,1), clamp(lan[1]*0.95,0,1), clamp(lan[2]*0.85,0,1));
-  FPW.key.intensity = 0.6 + lit*1.6; FPW.hemi.intensity = 0.15 + lit*0.4; FPW.rim.intensity = 0.35 + lit*0.5;
-  FPW.r.toneMappingExposure = 0.9 + lit*0.3;
-  // an attack starts whenever the game plays a swing (FP.swing jumps back up to 1)
-  const st = FPW.st, sw = FP.swing||0;
-  if (sw > (FPW.prevSwing||0) + 0.2) FPW.atk = { t:0, hold:0, landed:false, hit: FPW.lastSwing!=='miss' };
-  FPW.prevSwing = sw;
-  let p = 0;
-  if (FPW.atk){
-    const a = FPW.atk, contact = FPW_CONTACT[st.atk]||0.5;
-    if (a.hold > 0) a.hold -= dt; else a.t += dt / st.dur;
-    // a heavy blow that connects: a moment's hitstop and a jolt through the view
-    if (!a.landed && a.t >= contact){ a.landed = true; if (a.hit){ const heavy = st.atk==='smash' || st.atk==='cleave'; a.hold = heavy ? 0.07 : 0.035; if (heavy) FP.shake = Math.max(FP.shake||0, 0.45); } }
-    p = Math.min(1, a.t);
-    if (a.t >= 1) FPW.atk = null;
-  }
-  if (window.__fpwP !== undefined) p = window.__fpwP;       // (tests pin a pose)
-  const KF = FPW_ATK[st.atk] || FPW_ATK.slash;
-  let a = KF[0], b2 = KF[KF.length-1];
-  for (let i=0;i<KF.length-1;i++) if (p>=KF[i][0] && p<=KF[i+1][0]){ a = KF[i]; b2 = KF[i+1]; break; }
-  let f = (p - a[0]) / Math.max(1e-6, b2[0]-a[0]); f = f*f*(3-2*f);
-  const off = [0,1,2].map(i=> a[1][i] + (b2[1][i]-a[1][i])*f), rr = [0,1,2].map(i=> a[2][i] + (b2[2][i]-a[2][i])*f), wr = a[3] + (b2[3]-a[3])*f;
-  // breathing at rest, a figure-eight bob as you walk, and lag behind turns
-  const breath = Math.sin(FPW.t*1.6);
-  const bobX = Math.sin(FP.stepPhase||0)*0.018, bobY = Math.abs(Math.cos(FP.stepPhase||0))*0.022;
-  const yaw = FP.cam ? FP.cam.a : 0; let dA = yaw - (FPW.lastYaw===undefined ? yaw : FPW.lastYaw); FPW.lastYaw = yaw;
-  dA = Math.atan2(Math.sin(dA), Math.cos(dA));
-  FPW.sway = clamp((FPW.sway||0)*Math.exp(-dt*7) - dA*0.9, -0.35, 0.35);
-  const aspect = cw/chh, xs = Math.min(1, Math.min(aspect, 1.8)/1.78), lift = immersiveUi ? 0.1 : 0;
-  const R = FPW.rig;
-  R.position.set(FPW_CHEST[0] + (st.hp[0]*xs - st.hp[0]) + bobX + off[0] + FPW.sway*0.25, FPW_CHEST[1] + lift - bobY + breath*0.006 + off[1], FPW_CHEST[2] + off[2]);
-  R.rotation.set(rr[0] + breath*0.01, rr[1] + FPW.sway, rr[2]);
-  FPW.held.rotation.z = st.rot[2] + wr;
-  if (FPW.leftFist) FPW.leftFist.position.y = -0.17-FPW_CHEST[1] + Math.sin(FPW.t*1.6+1)*0.008;
-  // the flail's head swings on its chain, and whirls round in an attack
-  if (FPW.flailHead){ FPW.flailHead.rotation.z = Math.sin(FPW.t*2.1)*0.18 - FPW.sway*1.5 - bobX*4; FPW.flailHead.rotation.x = p>0 && p<0.8 ? -p/0.8*Math.PI*2 : Math.sin(FPW.t*1.7)*0.1; }
-  // forearms from each wrist back to its shoulder
-  FPW.scene.updateMatrixWorld(true);
-  const up = new T.Vector3(0,1,0);
-  for (const A of (FPW.arms||[])){
-    const wrist = A.h.localToWorld(new T.Vector3(-0.07,-0.1,0));
-    const sh = A.shoulder.clone().add(new T.Vector3(bobX, -bobY + lift, 0));
-    const dir = sh.clone().sub(wrist), len = Math.max(0.05, dir.length()); dir.normalize();
-    A.arm.position.copy(wrist).addScaledVector(dir, len/2); A.arm.quaternion.setFromUnitVectors(up, dir); A.arm.scale.set(1, len, 1);
-    A.vam.position.copy(wrist).addScaledVector(dir, 0.06); A.vam.quaternion.setFromUnitVectors(up, dir);
-  }
-  if (FPW.info && FPW.info.crystal){ FPW.info.crystal.rotation.y += dt*1.5; FPW.m.crystal.emissiveIntensity = 1.2 + Math.sin(FPW.t*3)*0.4 + (FP.cast||0)*2; FPW.info.halo.scale.setScalar(0.26 + Math.sin(FPW.t*3)*0.04 + (FP.cast||0)*0.3); }
-  if (FPW.info && FPW.info.rune) FPW.info.rune.material.opacity = 0.45 + Math.sin(FPW.t*2.2)*0.2;
-  // enchantment motes drifting up the weapon, and its glow on the gauntlet
-  const tipY = FPW.info ? FPW.info.tipY : 0.8;
-  for (const m of (FPW.motes||[])){ m.t += dt*m.s; if (m.t > 1) m.t -= 1;
-    const y = 0.1 + m.t*(tipY-0.1), ang = m.t*9 + m.s*20; m.sp.position.set(Math.cos(ang)*0.035, y, Math.sin(ang)*0.035 + 0.01); m.sp.material.opacity = Math.sin(m.t*Math.PI)*0.9; m.sp.scale.setScalar(0.03 + 0.04*Math.sin(m.t*Math.PI)); }
-  if (FPW.ench && !(FPW.info && FPW.info.fists)){ const wp = new T.Vector3(0, tipY*0.5, 0); FPW.weaponG.localToWorld(wp); FPW.glow.position.copy(wp); FPW.glow.intensity = 0.8 + Math.sin(FPW.t*7)*0.2; } else FPW.glow.intensity = 0;
-  FPW.r.render(FPW.scene, FPW.cam);
-  ctx.drawImage(FPW.cv, 0, 0, cw, chh);
-  return true;
-}
-
-// ---------- first-person weapon (painted 2D fallback) ----------
-function fpWeaponKind(){
-  const w = G.gear.weapon, b = (w && w.basis) || '';
-  if (/Quarterstaff/.test(b)) return 'staff';
-  if (/Spear|Halberd/.test(b)) return 'spear';
-  if (/axe|Axe|Sickle|Pick/.test(b)) return 'axe';
-  if (/Club|Mace|Hammer|Morningstar|Flail|Maul/.test(b)) return 'blunt';
-  if (/Dagger/.test(b)) return 'dagger';
-  return 'sword';
-}
-function fpDrawWeapon(k){
-  const cw = canvas.width, chh = canvas.height, S = Math.min(cw, chh);
-  const lift = immersiveUi ? 58*dpr : 0; // keep the blade clear of the skill bar
-  const kind = fpWeaponKind();
-  const u = S/100;
-  const sw = FP.swing;                                   // 1 -> 0 over the swing
-  const phase = sw>0 ? Math.sin((1-sw)*Math.PI) : 0;
-  const bobX = Math.sin(FP.t*1.3)*0.4*u + Math.sin(FP.stepPhase||0)*1.2*u;
-  const bobY = Math.abs(Math.cos(FP.stepPhase||0))*1.4*u + Math.sin(FP.t*1.9)*0.35*u;
-  const px = (immersiveUi ? cw/2 + S*0.3 : cw*0.8) + bobX - phase*24*u, py = chh + S*0.05 - lift + bobY - phase*6*u;
-  const rot = -0.42 - phase*1.05;
-  const in3D = fpwDraw();   // the real 3D weapon; the painted one below only when three.js is missing
-  if (!in3D){
-  ctx.save();
-  ctx.translate(px, py); ctx.rotate(rot);
-  const metal = ctx.createLinearGradient(-3*u,0,3*u,0);
-  metal.addColorStop(0,'#5d666d'); metal.addColorStop(0.45,'#e9eef1'); metal.addColorStop(0.55,'#b9c3c9'); metal.addColorStop(1,'#4b5359');
-  const wood = ctx.createLinearGradient(-1.6*u,0,1.6*u,0);
-  wood.addColorStop(0,'#3d2614'); wood.addColorStop(0.5,'#8a5a32'); wood.addColorStop(1,'#3a2413');
-  const brass = '#b88a3e';
-  ctx.lineJoin = 'round';
-  if (kind==='sword' || kind==='dagger'){
-    const L = (kind==='dagger' ? 22 : 38)*u, bw = (kind==='dagger' ? 2.6 : 3.2)*u;
-    ctx.fillStyle = wood; ctx.fillRect(-1.5*u, -2*u, 3*u, 10*u);
-    ctx.fillStyle = brass; ctx.fillRect(-7*u, -4*u, 14*u, 2.6*u);
-    ctx.fillStyle = metal;
-    ctx.beginPath(); ctx.moveTo(-bw,-4*u); ctx.lineTo(-bw,-4*u-L*0.86); ctx.lineTo(0,-4*u-L); ctx.lineTo(bw,-4*u-L*0.86); ctx.lineTo(bw,-4*u); ctx.closePath(); ctx.fill();
-    ctx.strokeStyle = 'rgba(40,46,52,0.6)'; ctx.lineWidth = 0.5*u;
-    ctx.beginPath(); ctx.moveTo(0,-6*u); ctx.lineTo(0,-4*u-L*0.8); ctx.stroke();
-  } else if (kind==='axe'){
-    ctx.fillStyle = wood; ctx.fillRect(-1.6*u, -40*u, 3.2*u, 50*u);
-    ctx.fillStyle = metal;
-    ctx.beginPath(); ctx.moveTo(1*u,-38*u); ctx.quadraticCurveTo(16*u,-44*u,17*u,-30*u); ctx.quadraticCurveTo(12*u,-24*u,17*u,-16*u);
-    ctx.quadraticCurveTo(10*u,-20*u,1*u,-24*u); ctx.closePath(); ctx.fill();
-  } else if (kind==='blunt'){
-    ctx.fillStyle = wood; ctx.fillRect(-1.6*u, -30*u, 3.2*u, 40*u);
-    const g = ctx.createRadialGradient(-2*u,-36*u,1*u,0,-33*u,8*u);
-    g.addColorStop(0,'#e8edf0'); g.addColorStop(1,'#444b52');
-    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0,-33*u,6.5*u,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#6a737a';
-    for (let i=0;i<6;i++){ const a=i/6*Math.PI*2; ctx.beginPath(); ctx.moveTo(Math.cos(a)*6*u, -33*u+Math.sin(a)*6*u); ctx.lineTo(Math.cos(a)*10*u, -33*u+Math.sin(a)*10*u); ctx.lineTo(Math.cos(a+0.3)*6*u, -33*u+Math.sin(a+0.3)*6*u); ctx.fill(); }
-  } else if (kind==='spear'){
-    ctx.fillStyle = wood; ctx.fillRect(-1.3*u, -52*u, 2.6*u, 64*u);
-    ctx.fillStyle = metal;
-    ctx.beginPath(); ctx.moveTo(0,-68*u); ctx.lineTo(3.4*u,-56*u); ctx.lineTo(0,-50*u); ctx.lineTo(-3.4*u,-56*u); ctx.closePath(); ctx.fill();
-  } else {
-    ctx.fillStyle = wood; ctx.fillRect(-1.6*u, -56*u, 3.2*u, 68*u);
-    const orbY = -60*u, pulse = 0.75+0.25*Math.sin(FP.t*3);
-    ctx.save(); ctx.globalCompositeOperation='lighter';
-    const g = ctx.createRadialGradient(0,orbY,0,0,orbY,12*u*pulse);
-    g.addColorStop(0,'rgba(200,170,255,0.9)'); g.addColorStop(1,'rgba(140,90,255,0)');
-    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0,orbY,12*u*pulse,0,Math.PI*2); ctx.fill(); ctx.restore();
-    ctx.fillStyle = '#e6d9ff'; ctx.beginPath(); ctx.arc(0,orbY,3*u,0,Math.PI*2); ctx.fill();
-  }
-  // gauntleted hand around the grip
-  const hand = ctx.createLinearGradient(-6*u,0,6*u,0);
-  hand.addColorStop(0,'#2a2420'); hand.addColorStop(0.5,'#6b5846'); hand.addColorStop(1,'#241e1a');
-  ctx.fillStyle = hand;
-  ctx.beginPath(); ctx.ellipse(0, 4*u, 6*u, 7.5*u, 0, 0, Math.PI*2); ctx.fill();
-  ctx.fillRect(-5.5*u, 6*u, 11*u, 18*u);
-  ctx.restore();
-  }
-  // off-hand spell glow when a spell goes off
-  if (FP.cast>0){
-    const gx = S*0.2, gy = chh - S*0.04 - lift, r = S*0.2*(0.6+FP.cast*0.5);
-    ctx.save(); ctx.globalCompositeOperation='lighter';
-    const g = ctx.createRadialGradient(gx,gy,0,gx,gy,r);
-    g.addColorStop(0,`rgba(214,190,255,${0.8*FP.cast})`); g.addColorStop(0.4,`rgba(150,100,255,${0.45*FP.cast})`); g.addColorStop(1,'rgba(120,80,255,0)');
-    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(gx,gy,r,0,Math.PI*2); ctx.fill(); ctx.restore();
-  }
-}
-
 // ---------- screen overlays: minimap, compass, target, damage feedback ----------
 function fpDrawMinimap(vis){
   if (SET.compact) return;
@@ -32130,81 +31430,6 @@ function fpDrawMinimap(vis){
   ctx.fillStyle = '#ffffff';
   ctx.beginPath(); ctx.moveTo(cp*0.7,0); ctx.lineTo(-cp*0.45,cp*0.45); ctx.lineTo(-cp*0.2,0); ctx.lineTo(-cp*0.45,-cp*0.45); ctx.closePath(); ctx.fill();
   ctx.restore();
-}
-function fpDrawCompass(){
-  const cw = canvas.width, w = Math.min(cw*0.34, canvas.height*0.5), h = 20*dpr, x0 = (cw-w)/2, y0 = (immersiveUi ? 12 : 8)*dpr;
-  ctx.save();
-  ctx.fillStyle = 'rgba(6,8,12,0.55)';
-  ctx.fillRect(x0, y0, w, h);
-  ctx.beginPath(); ctx.rect(x0, y0, w, h); ctx.clip();
-  const deg = FP.cam.a*180/Math.PI + 90;                 // 0 = north
-  const pxPerDeg = w/140;
-  ctx.textAlign='center'; ctx.textBaseline='middle';
-  for (let d=-180; d<=540; d+=15){
-    const off = ((d - deg + 540) % 360) - 180;
-    const x = x0 + w/2 + off*pxPerDeg;
-    if (x<x0-10 || x>x0+w+10) continue;
-    const card = ((d%360)+360)%360;
-    const label = {0:'N',90:'E',180:'S',270:'W'}[card];
-    if (label){ ctx.fillStyle = label==='N' ? COL.amber : COL.text; ctx.font = `700 ${Math.round(11*dpr)}px 'JetBrains Mono', monospace`; ctx.fillText(label, x, y0+h/2+0.5); }
-    else { ctx.fillStyle = 'rgba(205,214,217,0.4)'; ctx.fillRect(x-0.5*dpr, y0+h*0.35, 1*dpr, h*0.3); }
-  }
-  ctx.restore();
-  ctx.fillStyle = COL.amber;
-  ctx.beginPath(); ctx.moveTo(cw/2-4*dpr, y0+h+5*dpr); ctx.lineTo(cw/2+4*dpr, y0+h+5*dpr); ctx.lineTo(cw/2, y0+h); ctx.fill();
-}
-function fpDrawLocation(){
-  const label = G.gameMode===2 ? 'open field' : (ASCEND_SITES[G.siteKind] ? `floor ${G.depth}` : `depth ${G.depth}`) + (G.isBossFloor ? ' \u00b7 lair' : '');
-  ctx.save();
-  ctx.font = `600 ${Math.round(11*dpr)}px 'JetBrains Mono', monospace`;
-  ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-  ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillText(label, 11*dpr, 11*dpr);
-  ctx.fillStyle = 'rgba(232,165,75,0.95)'; ctx.fillText(label, 10*dpr, 10*dpr);
-  if (G.gameMode===2 && (isNightTime() || G.weather!=='clear')){
-    ctx.fillStyle = 'rgba(230,230,235,0.85)';
-    ctx.fillText(`${seasonName()} ${timeOfDayLabel()}${G.weather!=='clear' ? ' \u00b7 '+G.weather : ''}`, 10*dpr, 26*dpr);
-  }
-  ctx.restore();
-}
-// name + health of whatever stands in the tile straight ahead, and red
-// chevrons at the screen edge for anything adjacent that's out of view
-function fpDrawTargetAndThreats(){
-  const cw = canvas.width, chh = canvas.height, p = G.player, f = (p.facing|0)&3, v = FACING_VECT[f];
-  let target = null;
-  for (let s=1; s<=5 && !target; s++){
-    const tx = p.x+v[0]*s, ty = p.y+v[1]*s;
-    if (tileAt(tx,ty)===T_WALL) break;
-    for (const m of G.mon) if (m.alive && m.x===tx && m.y===ty){ target = m; break; }
-  }
-  if (target){
-    const w = Math.min(cw*0.34, chh*0.5), x0 = (cw-w)/2, y0 = (immersiveUi ? 40 : 36)*dpr;
-    ctx.save();
-    ctx.fillStyle = 'rgba(6,8,12,0.66)'; ctx.fillRect(x0, y0, w, 30*dpr);
-    ctx.fillStyle = target.corrupted ? COL.purple : (target.col||COL.text);
-    ctx.font = `700 ${Math.round(11*dpr)}px 'JetBrains Mono', monospace`; ctx.textAlign='center'; ctx.textBaseline='top';
-    ctx.fillText(`${target.nm}  ${Math.max(0,target.hp)}/${target.maxHp}`, cw/2, y0+4*dpr);
-    const hp = clamp(target.hp/target.maxHp,0,1);
-    ctx.fillStyle = '#1a222a'; ctx.fillRect(x0+8*dpr, y0+20*dpr, w-16*dpr, 5*dpr);
-    ctx.fillStyle = hp>0.5 ? '#74bf7e' : hp>0.25 ? '#e8a54b' : '#d1495b';
-    ctx.fillRect(x0+8*dpr, y0+20*dpr, (w-16*dpr)*hp, 5*dpr);
-    ctx.restore();
-  }
-  const pulse = 0.55 + 0.45*Math.sin(FP.t*6);
-  for (const m of G.mon){
-    if (!m.alive) continue;
-    const dx = m.x-p.x, dy = m.y-p.y;
-    if (Math.abs(dx)+Math.abs(dy)!==1) continue;
-    let rel = (FACING_VECT.findIndex(q=>q[0]===dx && q[1]===dy) - f + 4) % 4;
-    if (rel===0) continue;
-    ctx.save();
-    ctx.fillStyle = `rgba(255,70,70,${0.75*pulse})`;
-    const s = 14*dpr;
-    if (rel===1){ ctx.translate(cw-8*dpr, chh/2); ctx.rotate(0); }
-    else if (rel===3){ ctx.translate(8*dpr, chh/2); ctx.rotate(Math.PI); }
-    else { ctx.translate(cw/2, chh-8*dpr-(immersiveUi ? 130*dpr : 0)); ctx.rotate(Math.PI/2); }
-    ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(-s,-s*0.8); ctx.lineTo(-s*0.6,0); ctx.lineTo(-s,s*0.8); ctx.closePath(); ctx.fill();
-    ctx.restore();
-  }
 }
 function fpDrawPost(){
   const cw = canvas.width, chh = canvas.height, R = Math.max(cw, chh);
@@ -32470,9 +31695,6 @@ function isoCaveNode(deco, x, y, lin){
   }
   return g;
 }
-function isoHideSprites(){
-  if (ISO.propG && ISO.propG.parent) ISO.propG.parent.remove(ISO.propG);
-  if (ISO.veinG && ISO.veinG.parent) ISO.veinG.parent.remove(ISO.veinG); if (ISO.grp && ISO.grp.parent) ISO.grp.parent.remove(ISO.grp); if (ISO.player && ISO.player.holder.parent) ISO.player.holder.parent.remove(ISO.player.holder); }
 // ---- you, in the scene ----
 // ---- how you look: picked when you make your character, restyled later by the barber and the tailor ----
 const LOOK_CLOTH = [['Brown','#6a5a44'],['Madder red','#8a2a24'],['Woad blue','#2a4a7a'],['Moss green','#3a6a3a'],['Undyed','#d8ccb0'],['Black','#262222'],['Purple','#5a3a7a'],['Ochre','#b08a30'],['Slate','#5a6670'],['Rust','#a05a30']];
@@ -33173,39 +32395,32 @@ function renderFirstPerson(){
   const W = FP.W;
   const camZ = 0.5 + Math.sin(FP.moving*Math.PI)*0.028;
   const horizon = FP.H/2;
-  let gpu = fpdInit();
-  let P = fpRenderWorld(env, T, camZ, horizon, gpu);
+  // (RS-109: dungeons and roadside fights are isometric 3D only - the old first-person raycaster is gone)
+  if (!fpdInit()){ no3dNotice(); return; }
   m3dFrame();
   const sprites = fpCollectSprites(vis);            // (also places the 3D creatures, so they're drawn this frame)
   m3dSweep();
-  const iso = gpu && ISO.on;
-  if (iso){ isoTickPath(now); isoTickHeld(now); try{ isoSyncSprites(sprites, env); isoSyncProps(sprites); isoSyncPlayer(); isoSyncVeins(); }catch(e){ console.error(e); } }
-  else isoHideSprites();
-  if (gpu){ try{ fpdRender(env, T, camZ); }catch(e){ console.error(e); FPD.ok = false; gpu = false; P = fpRenderWorld(env, T, camZ, horizon, false); } }
-  const k = canvas.width / W;
+  isoTickPath(now); isoTickHeld(now); try{ isoSyncSprites(sprites, env); isoSyncProps(sprites); isoSyncPlayer(); isoSyncVeins(); }catch(e){ console.error(e); }
+  try{ fpdRender(env, T, camZ); }catch(e){ console.error(e); FPD.ok = false; no3dNotice(); return; }
   ctx.save();
   if (FP.shake>0){ const s = FP.shake*6*dpr; ctx.translate((Math.random()-0.5)*s, (Math.random()-0.5)*s); }
   ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(gpu ? FPD.cv : FP.off, 0, 0, canvas.width, canvas.height);
-  if (iso && gpu){
-    isoDrawOverlay(sprites);
-    if (G.gameMode===2 && (G.weather==='rain' || G.weather==='storm')) fpDrawRain();
-    ctx.restore();
-    fpDrawPost();
-    fpDrawMinimap(vis);
-    return;
-  }
-  if (G.gameMode===1 && !gpu) fpDrawStairs(P, env, T, camZ, horizon, k, vis);
-  fpDrawSprites(sprites, P, env, camZ, horizon, k);
-  fpDrawParticles(P, camZ, horizon, k);
+  ctx.drawImage(FPD.cv, 0, 0, canvas.width, canvas.height);
+  isoDrawOverlay(sprites);
   if (G.gameMode===2 && (G.weather==='rain' || G.weather==='storm')) fpDrawRain();
   ctx.restore();
-  fpDrawWeapon(k);
   fpDrawPost();
-  fpDrawTargetAndThreats();
-  fpDrawCompass();
-  if (!immersiveUi) fpDrawLocation();
   fpDrawMinimap(vis);
+}
+// shown in place of a dungeon or fight when the browser can't run 3D graphics (WebGL)
+function no3dNotice(){
+  const cw = canvas.width, ch = canvas.height;
+  ctx.save(); ctx.fillStyle = '#0d0b09'; ctx.fillRect(0, 0, cw, ch);
+  ctx.fillStyle = '#e8c880'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = `700 ${Math.round(22*dpr)}px Cinzel, Georgia, serif`; ctx.fillText('Depthcrawl needs 3D graphics', cw/2, ch/2 - 18*dpr);
+  ctx.fillStyle = '#c8b08a'; ctx.font = `${Math.round(13*dpr)}px 'JetBrains Mono', monospace`;
+  ctx.fillText('this browser could not start WebGL - try another browser, or turn on hardware acceleration', cw/2, ch/2 + 14*dpr);
+  ctx.restore();
 }
 function fpDrawRain(){
   const cw = canvas.width, n = G.weather==='storm' ? 140 : 70;
@@ -33219,43 +32434,11 @@ function fpDrawRain(){
   ctx.stroke(); ctx.restore();
 }
 
-// ---------- controls ----------
-// forward/back/strafe are relative to where you're looking; turning is free
-// (no turn spent) since it doesn't change anything the monsters care about
-function fpStep(rel){
-  const f = ((G.player.facing|0) + rel) & 3, v = FACING_VECT[f];
-  moveDir(v[0], v[1]);
-}
-function fpTurn(d){
-  if (G.ui!=='playing' || G.gameOver) return;
-  G.player.facing = ((G.player.facing|0) + d + 4) & 3;
-  renderGame();
-}
 function fpHandleKey(k){
   if (G.gameMode!==1 && G.gameMode!==2) return false;
   if (!fp3dActive()) return false;
-  if (ISO.on && FPD.ok) return isoHandleKey(k);
-  switch(k){
-    case 'ArrowUp': case 'w': case 'W': fpStep(0); return true;
-    case 'ArrowDown': case 's': case 'S': fpStep(2); return true;
-    case 'a': case 'A': fpStep(3); return true;
-    case 'd': case 'D': fpStep(1); return true;
-    case 'ArrowLeft': case 'z': case 'Z': fpTurn(-1); return true;
-    case 'ArrowRight': case 'x': case 'X': fpTurn(1); return true;
-  }
-  return false;
+  return FPD.ok ? isoHandleKey(k) : false;
 }
-// touch d-pad: up/down walk, left/right turn while in first person
-function fpDpad(dir){
-  if (fp3dActive()){
-    if (dir==='up') fpStep(0); else if (dir==='down') fpStep(2);
-    else if (dir==='left') fpTurn(-1); else if (dir==='right') fpTurn(1);
-    return;
-  }
-  if (dir==='up') moveDir(0,-1); else if (dir==='down') moveDir(0,1);
-  else if (dir==='left') moveDir(-1,0); else if (dir==='right') moveDir(1,0);
-}
-// clicking the view: left/right thirds turn, the middle steps forward
 canvas.addEventListener('wheel', (e)=>{
   if (!fp3dActive() || !ISO.on || !FPD.ok || G.ui!=='playing') return;
   e.preventDefault(); ISO.dist = clamp(ISO.dist*(e.deltaY>0 ? 1.1 : 0.9), 7, 22); renderGame();
@@ -33266,9 +32449,7 @@ canvas.addEventListener('contextmenu', (e)=>{
 });
 canvas.addEventListener('click', (e)=>{
   if (!fp3dActive() || G.ui!=='playing') return;
-  if (ISO.on && FPD.ok){ isoClick(e); return; }
-  const r = canvas.getBoundingClientRect(), fx = (e.clientX-r.left)/r.width;
-  if (fx<0.3) fpTurn(-1); else if (fx>0.7) fpTurn(1); else fpStep(0);
+  if (ISO.on && FPD.ok) isoClick(e);
 });
 // weapon swing / spell glow cues ride along on the existing sound hooks, so
 // every attack and cast path gets them without touching combat code
@@ -33411,7 +32592,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-108';
+const GAME_VERSION = 'rs-109';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -35939,7 +35120,6 @@ function padStep(dir){
   const k = PAD_KEY[dir]; if (!k) return false;
   if ((G.gameMode===1 || G.gameMode===2) && fp3dActive()){
     if (ISO.on && FPD.ok){ ISO.path = []; ISO.fighting = null; isoStep(isoDirFor(...isoHeldDir(k))); return true; }   // (the iso view walks screen directions)
-    if (dir.length===2) return false; fpDpad(dir); return true;                                                     // first person: walk and turn
   }
   handlePlayingKey(k); return true;
 }

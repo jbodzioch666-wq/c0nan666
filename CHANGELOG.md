@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-109 - The first-person view is gone
+
+- **Removed the old first-person dungeon view:** it could no longer be reached, but it still ran every frame. That covered the old wall-drawing code, the weapon held in front of the camera, its compass and its target markers. This removes about 790 lines.
+- **Less work per frame:** the old view used to redraw the whole dungeon behind the 3D view on every frame, then throw the result away. That work is gone, which also helps dungeons run smoothly.
+- **No 3D graphics:** if your browser can't start 3D (WebGL), a dungeon now shows a short notice instead of the old first-person view.
+
 ## RS-108 - Isometric everywhere
 
 - **No more flat views:** the overworld, towns and dungeons are always shown in isometric 3D. The O key no longer switches the overworld to the old flat map. M no longer switches a town or a dungeon to a flat map.

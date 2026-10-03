@@ -1,4 +1,5 @@
 // RS-108: isometric 3D everywhere - no key or saved setting switches the overworld, a town or a dungeon to a flat view
+// RS-109: the first-person renderer is gone; without WebGL a dungeon shows a notice instead
 module.exports = async page=>{
   await page.evaluate(()=>{ try { localStorage.setItem('depthcrawl_world3d','0'); localStorage.setItem('depthcrawl_town3d','0'); localStorage.setItem('depthcrawl_viewiso','0'); } catch(e){} });
   await page.reload(); await page.waitForTimeout(1500);
@@ -19,5 +20,11 @@ module.exports = async page=>{
   await ev(()=>{ let dx=-1, dy=-1; for (let x=0;x<OW_COLS && dx<0;x++) for (let y=0;y<OW_ROWS;y++) if (G.ow.map[x][y]===OW_DUNGEON){ dx=x; dy=y; break; }
     G.gameMode = 0; G.pendingDungeon = {x:dx, y:dy}; enterDungeonConfirm(); setUi('playing'); }); await page.waitForTimeout(500);
   await key('m'); A(await ev(()=>fp3dPref && fp3dActive()), 'M in a dungeon leaves the 3D view');
+  A(await ev(()=>['fpRenderWorld','fpDrawWeapon','fpDrawCompass','fpTurn','fpStep'].every(n=>typeof window[n]==='undefined')), 'the first-person code is gone');
+  // the arrow keys and a click still work in the dungeon (they walk in the isometric view)
+  const p0 = await ev(()=>[G.player.x, G.player.y]); for (const k of ['ArrowRight','ArrowDown','ArrowLeft','ArrowUp']) await key(k);
+  A(await ev(()=>G.ui==='playing' && G.gameMode===1), 'still in the dungeon after arrow keys');
+  // no WebGL: a notice, not an error
+  A(await ev(()=>{ const real = fpdInit; fpdInit = ()=>false; try { renderGame(); return true; } finally { fpdInit = real; renderGame(); } }), 'the no-3D notice draws');
   console.log('ok');
 };
