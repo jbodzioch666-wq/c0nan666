@@ -41,6 +41,7 @@ Screenshots go to `tools/tests/shots/`.
 | town | town tiers, temple, guilds, arena, games, gambling, townsfolk, upgrades, harbour |
 | eco | shop prices, bank, waypoint fees, property |
 | gfx | post-processing, colour grades, seasons, 3D land, towns and dungeons |
+| shore | 3D shorelines: land stays above the waves, water tiles stay under water |
 | quest | journal, story quests, diaries, clue trails |
 | audio | music tracks, the sequencer, stingers |
 

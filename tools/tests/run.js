@@ -9,7 +9,7 @@
 // Screenshots land in tools/tests/shots/. Needs `npm install` in tools/tests first.
 const fs = require('fs'), path = require('path');
 const ROOT = path.resolve(__dirname, '../..'), PAGE = path.join(ROOT, 'depthcrawl.html');
-const ALL = ['boot','diag','touch','bal','gen','grave','clock','tasks','soak','map','wev','wg','sail','big','town','eco','gfx','quest','audio'];
+const ALL = ['boot','diag','touch','bal','gen','grave','clock','tasks','soak','map','wev','wg','sail','big','town','eco','gfx','shore','quest','audio'];
 
 function load(mod, fallbacks){ for (const p of [mod].concat(fallbacks)){ try { return require(p); } catch(e){} } return null; }
 const pw = load('playwright', ['/opt/node-tools/node_modules/playwright']);

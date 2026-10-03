@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-105 - Water stays in the water
+
+- **No more water showing through the land:** in the 3D view, the ground beside seas, lakes, rivers and ponds sometimes dipped below the water. The water and its waves then showed through the edges of land tiles. Land ground now always sits above the tops of the waves.
+- **Cleaner shorelines:** the water now ends at the edge of the land tile. Before, it crept a little way into the tile.
+- **Deeper water:** the middles of water tiles always stay under water.
+
 ## RS-104 - Day and night in real time
 
 - **A real-time clock:** the sun now moves on its own as you play. A full day takes 30 minutes: 20 minutes of daylight (dawn to dusk) and 10 minutes of night. Before, each step you took moved the clock forward, so the sky jumped as you walked and stood still when you did.
