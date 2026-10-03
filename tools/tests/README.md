@@ -29,6 +29,7 @@ Screenshots go to `tools/tests/shots/`.
 | touch | on an emulated phone: tap to walk, long-press menu, pinch zoom, map drag, the d-pad, the hotbar |
 | bal | balance: monsters bite harder, the fixed-strength lair boss, coin trim, the smith's reinforcing |
 | gen | world generation: mountain ranges, an open start, nothing out of reach, old saves keep their world |
+| grave | the gravestone card: dismiss it, it stays dismissed after a reload, F6 shows it again |
 | tasks | town NPCs: the slayer master, TzHaar and their tasks |
 | soak | ten dungeon floors of fighting at high level |
 | map | world map, zoom, map tools, 3D landmarks |

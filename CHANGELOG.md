@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-103 - Dismiss the gravestone card
+
+- **A close button on the gravestone card:** the gravestone card in the tracker now has an × that dismisses it. The grave stays where you fell, and you can still walk back to it to reclaim your things. When the card is the only thing in the tracker, the × in its header dismisses it. Before, that × hid the whole quest tracker.
+- **Getting it back:** if you dismissed the card, the Quests tab (F6) shows a "show my gravestone again" link. Dying again shows the card again.
+- **Header fix:** a tracker showing only your gravestone is headed "Gravestone". Before, it was always headed "Quests".
+- On phones the × buttons are larger and easier to tap.
+
 ## RS-102 - Mountain ranges and a reachable world
 
 These changes apply to new worlds. Worlds in existing saves are rebuilt from their seed, so they keep the generator that made them, unchanged.
