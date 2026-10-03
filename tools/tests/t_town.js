@@ -98,9 +98,9 @@ module.exports = async page=>{
   });
   console.log(JSON.stringify(r2, null, 1));
   // the 2D town map of a city
-  await page.evaluate(()=>{ const c = townList().find(t=>townInfo(t.x, t.y).tier===2); G.owPos = { x:c.x, y:c.y }; enterVillage(); setUi('playing'); if (v3Active()) v3Toggle(); renderGame(); });
+  await page.evaluate(()=>{ const c = townList().find(t=>townInfo(t.x, t.y).tier===2); G.owPos = { x:c.x, y:c.y }; enterVillage(); setUi('playing'); v3Pref = false; renderGame(); });
   await page.waitForTimeout(300);
   await page.screenshot({ path: SHOTS+'/shot_city2d.png', timeout:120000 });
-  await page.evaluate(async ()=>{ if (!v3Active()) v3Toggle(); G.weather = 'rain'; G.player.x = 24; G.player.y = 8; for (let i=0;i<12;i++){ renderGame(); await new Promise(r=>setTimeout(r, 40)); } });
+  await page.evaluate(async ()=>{ v3Pref = true; G.weather = 'rain'; G.player.x = 24; G.player.y = 8; for (let i=0;i<12;i++){ renderGame(); await new Promise(r=>setTimeout(r, 40)); } });
   await page.screenshot({ path: SHOTS+'/shot_city_rain.png', timeout:120000 });
 };

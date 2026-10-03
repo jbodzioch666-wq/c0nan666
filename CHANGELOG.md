@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-108 - Isometric everywhere
+
+- **No more flat views:** the overworld, towns and dungeons are always shown in isometric 3D. The O key no longer switches the overworld to the old flat map. M no longer switches a town or a dungeon to a flat map.
+- **M is the world map:** on the overworld, M opens and closes the world map, as before. The world map, the minimap and the waypoint map are unchanged.
+- **Old settings cleared:** if you had switched to a flat view before, that saved choice is ignored and you'll see the 3D view.
+
 ## RS-107 - Smoother dungeons
 
 - **No more stutter when moving in dungeons:** to keep the frame rate up, the dungeon view adjusts its resolution. It used to re-judge every half second and nudge the size up or down a little each time. Each change rebuilt the screen's image buffers, which caused a visible hitch. On a computer whose frame rate sat near the cut-off, that happened over and over while you walked. In testing, the slowest step went from over 3 seconds to about 20 milliseconds.
