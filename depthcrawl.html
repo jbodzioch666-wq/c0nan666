@@ -2148,7 +2148,7 @@ const MONSTER_LEVELS = [
   {lvl:13, sym:'u', nm:'owlbear',        hd:14, ac:13, atk:10, dmg1:2, dmg2:6,  xp:380,  undead:false, rgb:[140,105,70],  abilities:['multiattack2'], art:[['e',0,10,32,22],['c',0,-22,20],['d',-7,-24,6],['d',7,-24,6],['d',-7,-24,2.4,'#1a1206'],['d',7,-24,2.4,'#1a1206'],['p',[-3,-14,0,-8,3,-14]],['p',[-13,-32,-8,-42,-4,-31]],['p',[13,-32,8,-42,4,-31]],['q',-28,10,-40,2,-36,-12,4],['q',28,10,40,2,36,-12,4],['r',-13,28,9,17],['r',5,28,9,17]]},
   {lvl:14, sym:'T', nm:'troll',          hd:16, ac:15, atk:10, dmg1:1, dmg2:10, xp:460,  undead:false, rgb:[110,150,100], abilities:['regen','multiattack3'], art:biped(0,-28,13,24,30,-6,1,12)},
   {lvl:15, sym:'m', nm:'manticore',      hd:18, ac:14, atk:11, dmg1:1, dmg2:11, xp:550,  undead:false, rgb:[190,130,90],  abilities:['multiattack3'], art:quad(0,8,26,13,32,-6,10,0,0,[-16,-4,10,20]).concat([['d',26,-8,3],['p',[-26,10,-40,20,-32,2]],['p',[-40,20,-46,32,-34,26]]])},
-  {lvl:16, sym:'y', nm:'wyvern',         hd:21, ac:13, atk:12, dmg1:2, dmg2:10, xp:650,  undead:false, rgb:[90,140,110],  abilities:['multiattack2','poison'], art:serpent(-24,14,-2,-8,22,-16,10,1,1)},
+  {lvl:16, sym:'y', nm:'wyvern',         hd:19, ac:13, atk:12, dmg1:2, dmg2:10, xp:650,  undead:false, rgb:[90,140,110],  abilities:['multiattack2','poison'], art:serpent(-24,14,-2,-8,22,-16,10,1,1)},
   {lvl:17, sym:'h', nm:'hill giant',     hd:24, ac:13, atk:13, dmg1:5, dmg2:8,  xp:760,  undead:false, rgb:[150,120,80],  abilities:[], art:biped(0,-30,15,32,32,-10,2,14)},
   {lvl:18, sym:'d', nm:'hydra',          hd:28, ac:15, atk:14, dmg1:1, dmg2:10, xp:900,  undead:false, rgb:[80,140,90],   abilities:['multiattack5'], art:[['e',0,20,30,14],['q',-14,10,-22,-10,-16,-26,8],['c',-16,-26,8],['d',-19,-28,2],['q',0,6,0,-16,0,-32,8],['c',0,-32,8],['d',-3,-34,2],['q',14,10,22,-10,16,-26,8],['c',16,-26,8],['d',13,-28,2],['r',-16,30,6,14],['r',10,30,6,14]]},
   {lvl:19, sym:'L', nm:'lich',           hd:32, ac:17, atk:15, dmg1:2, dmg2:8,  xp:1100, undead:true,  rgb:[168,126,201], abilities:['spellcast','paralyze','drain','multiattack3','legendary'], art:[['p',[-30,40,-34,0,-18,-20,0,-34,18,-20,34,0,30,40]],['p',[-22,40,-26,58,26,58,22,40]],['d',-9,-6,4],['d',9,-6,4],['l',-14,6,14,6,3],['l',34,-4,46,52,3],['c',34,-10,7]]},
@@ -5565,7 +5565,7 @@ function monsterDies(mi){
   rsOnKill(m);
   skOnKill(m); try{ crOnKill(m); }catch(e){}
   try{ tkOnKill(m); }catch(e){ console.error(e); }
-  const dg = roundH(rn(m.xp)*goldFindMult());
+  const dg = roundH(rn(m.xp)*goldFindMult()*coinTrim(m));
   if (dg>0){ G.player.gold += dg; logMsg(`it drops ${dg} gold`, 'good'); }
   const hk = gearStatI('healkill');
   if (hk>0 && G.player.hp>0 && G.player.hp<effMaxHp()){
@@ -5991,7 +5991,9 @@ function singlePlayerAttack(mi){
     extra *= 2;
     tag += ' (vulnerable to fire!)';
   }
+  let xpBlow = 0;
   if (hasAbility(m,'incorporeal') && extra<=0){
+    xpBlow = dmg;                         // (you still learn from the whole blow - the old half-xp made wraiths a trough)
     dmg = mx(1, Math.floor(dmg/2));
     tag += ' (resists non-magical damage)';
   }
@@ -6004,7 +6006,7 @@ function singlePlayerAttack(mi){
   m.hp -= total;
   m.hitKind = atkType; m.hitCrit = !!isCrit;
   if (isCrit && typeof FP!=='undefined') FP.shake = Math.max(FP.shake||0, 0.45);               // (for the hitsplat's colour)
-  rsHitXP(total, atkType);
+  rsHitXP(Math.max(total, xpBlow), atkType);
   G.lastFoe.hp = m.hp;
   logMsg(`you hit the ${m.nm} for ${total}${extraTag}${tag}`, 'hit');
   sfx((sneak||isCrit||isDeadly) ? 'crit' : 'hit');
@@ -12145,7 +12147,12 @@ function famForFloor(d){
   const L = monsterLevelForDepth(d), pool = (MON_ECOSYS[G.siteKind] || MON_ECOSYS.dungeon).filter(k=>MON_FAMILIES[k].t.some(t=>Math.abs(t[1]-L) <= 4));
   return pool.sort(()=>Math.random()-0.5).slice(0, 2);
 }
-function monEntryExtras(m, entry){ if (entry && entry.family) m.family = entry.family; if (entry && entry.forceStyle) m.rsStyle = entry.forceStyle; }
+// (balance, RS-100: a fight at your own level used to carry no risk at all - +25% accuracy and damage makes food and prayer count
+// before the endgame; it eases off above tier 14 so the top monsters, already tuned as spikes, don't outclass their own bosses)
+function monBite(t){ return t <= 14 ? 1.25 : 1.25 - 0.25*Math.min(1, (t-14)/6); }
+// coin drops fall off above tier 12 (to 60% by tier 15) - by then the smith's reinforcing is what gold is for
+function coinTrim(m){ const t = (m && m.mlevel) || 1; return t <= 12 ? 1 : 1 - 0.4*Math.min(1, (t-12)/3); }
+function monEntryExtras(m, entry){ const bite = monBite((entry && entry.lvl) || m.mlevel || 1); m.atkBonus = Math.round((m.atkBonus||0)*bite); m.dmg2 = Math.max(m.dmg2||1, Math.round((m.dmg2||1)*bite)); if (entry && entry.family) m.family = entry.family; if (entry && entry.forceStyle) m.rsStyle = entry.forceStyle; }
 function famOf(m){ return (m && (m.family || FAM_BY_NAME[m.nm])) || null; }
 // the bestiary pays: a family fully studied takes 5% more damage from you; the whole book, a title and 3% more against everything
 function famBonus(m){ const p = G.player; if (!p) return 1; const k = famOf(m); return (k && p.famDone && p.famDone.includes(k) ? 1.05 : 1) * (p.title==='the Beastmaster' ? 1.03 : 1); }
@@ -14886,9 +14893,15 @@ function spawnBoss(){
     m.dmg1 = mx(1, Math.round(m.dmg1/atkCount));
     m.dmg2 = mx(2, Math.round(m.dmg2/atkCount));
   }
+  if (G.siteKind==='lair'){                       // (balance, RS-100: beatable around combat 110 with prayers; it no longer grows with you)
+    const k = sp.bossHp/SITE_POWER.lair.bossHp, kd = sp.dmg/SITE_POWER.lair.dmg;   // (New Game+ and site modifiers still apply)
+    m.hp = m.maxHp = roundH(LAIR_BOSS.hp*k); m.ac = LAIR_BOSS.ac; m.atkBonus = LAIR_BOSS.atk;
+    m.dmg1 = LAIR_BOSS.d1; m.dmg2 = roundH(LAIR_BOSS.d2*kd);   // (per attack - it strikes three times)
+  }
   G.mon.push(m);
   G.bossIdx = G.mon.length-1;
 }
+const LAIR_BOSS = { hp:780, ac:37, atk:27, d1:1, d2:8 };
 function bossDefeated(){
   const m = G.mon[G.bossIdx];
   G.player.bossKills = G.player.bossKills || {dungeon:0, castle:0, necro:0, temple:0, graveyard:0, mine:0, lair:0};
@@ -18125,9 +18138,9 @@ function wevCampFight(c){
 }
 function wevBossFight(b){
   wevFightStart('boss', 0, L=>{
-    const m = wevMon(wevBossEntry(b), Math.max(L, 14));
+    const m = wevMon(wevBossEntry(b), Math.min(NMLVL, Math.max(L + 4, 14)));   // (balance, RS-100: it was a pushover from combat 50 on)
     m.elite = true; m.namedElite = true; m.worldBoss = true;
-    m.maxHp = b.maxHp || roundH(m.maxHp*7 + G.player.level*6); m.dmg2 = roundH(m.dmg2*2.1); m.xp = roundH(m.xp*8); m.ac += 2;
+    m.maxHp = b.maxHp || roundH(m.maxHp*7 + G.player.level*6); m.dmg2 = roundH(m.dmg2*3.15); m.xp = roundH(m.xp*8); m.ac += 2;
     m.hp = b.hp && b.hp > 0 ? Math.min(b.hp, m.maxHp) : m.maxHp; b.hp = m.hp; b.maxHp = m.maxHp;
     m.nm = wevBossName(b); m.x = Math.floor(COLS/2); m.y = 3; if (G.map[m.x][m.y]!==T_FLOOR) G.map[m.x][m.y] = T_FLOOR;
   });
@@ -33296,7 +33309,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-99';
+const GAME_VERSION = 'rs-100';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -34128,9 +34141,32 @@ function buildBlacksmith(){
       <div class="muted" style="margin-top:10px;">smelt your ore at the furnace and forge bars at the anvils here in the smithy</div>
       ${buildSmithBuysHtml()}
       <div class="panel" style="margin-top:14px;"><h4 style="color:${COL.amber};">WHAT YOU WEAR</h4>${worn || '<div class="muted">nothing</div>'}</div>
+      ${buildReinforceHtml()}
       <div class="btnrow"><button class="btn primary" onclick="setUi('playing')">L / ESC &middot; leave</button></div>
     </div>
   `;
+}
+// ---- the smith reinforces metal gear you wear: +1 to +5, each +6% accuracy and strength (weapons) or
+// armour (the rest), for gold that doubles-and-more each step; +4 and +5 can fail (the gold is gone either way) ----
+const REINF_MAX = 5, REINF_FAIL = [0, 0, 0, 0, 0.2, 0.35];
+function reinfCost(it){ const n = it.reinf||0; return Math.round(Math.max(200, it.price||0) * 0.8 * Math.pow(2.2, n)); }
+function buildReinforceHtml(){
+  const rows = GEAR_KEYS.map(k=>[k, G.gear[k]]).filter(([k,it])=>it && it.used && it.rsTier!==undefined && (k==='weapon' || it.rsFam==='metal')).map(([k,it])=>{
+    const n = it.reinf||0, cost = reinfCost(it), fail = REINF_FAIL[n+1]||0;
+    return `<div class="shoprow"><span class="muted" style="min-width:74px;">${k}</span><span>${itemNameHtml(it)}</span><span class="desc">${n >= REINF_MAX ? 'fully reinforced' : `+${n+1}: ${k==='weapon' ? 'accuracy and strength' : 'armour'} +6%${fail ? ` &middot; ${Math.round(fail*100)}% chance it fails` : ''}`}</span>
+      <span>${n >= REINF_MAX ? '' : `<button class="btn" ${G.player.gold >= cost ? '' : 'disabled'} onclick="smithReinforce('${k}')">${cost.toLocaleString()}g</button>`}</span></div>`; }).join('');
+  return `<div class="panel" style="margin-top:14px;"><h4 style="color:${COL.amber};">REINFORCE YOUR GEAR</h4><div class="muted" style="font-size:12px;margin-bottom:6px;">the smith hammers your worn metal gear up to +5 - each step costs more than twice the last, and past +3 the metal can crack (the gold is spent either way)</div>${rows || '<div class="muted">wear some metal gear to have it reinforced</div>'}</div>`;
+}
+function smithReinforce(k){
+  const it = G.gear[k]; if (!it || !it.used) return; const n = it.reinf||0; if (n >= REINF_MAX) return;
+  const cost = reinfCost(it); if (G.player.gold < cost){ logMsg("you can't afford that", 'hit'); return; }
+  G.player.gold -= cost;
+  if (chn(REINF_FAIL[n+1]||0)){ logMsg(`the smith's hammer rings wrong - the ${it.nm} won't take it (${cost} gold spent)`, 'hit'); sfx('error'); renderOverlay(); saveCurrentGame(); return; }
+  if (it.reinfBase===undefined) it.reinfBase = { acc:it.acc||0, dmgB:it.dmgB||0, ac:it.ac||0, nm:it.nm };
+  const B = it.reinfBase, f = 1 + 0.06*(n+1);
+  if (k==='weapon'){ it.acc = Math.round(B.acc*f); it.dmgB = Math.round(B.dmgB*f); } else it.ac = Math.round(B.ac*f);
+  it.reinf = n+1; it.nm = `${B.nm} +${n+1}`; it.price = Math.round((it.price||0) + cost*0.25);
+  logMsg(`the smith reinforces your ${B.nm} to +${n+1} (${cost} gold)`, 'good'); sfx('gold'); rsSync(); renderOverlay(); saveCurrentGame();
 }
 // ---- alchemist (potions) ----
 function buyAlchemistPotion(i){

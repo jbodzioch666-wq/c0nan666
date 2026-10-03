@@ -27,6 +27,7 @@ Screenshots go to `tools/tests/shots/`.
 | boot | the page loads and a character starts |
 | diag | diagonal steps: keys, numpad, corners, click paths, no diagonal strikes |
 | touch | on an emulated phone: tap to walk, long-press menu, pinch zoom, map drag, the d-pad, the hotbar |
+| bal | balance: monsters bite harder, the fixed-strength lair boss, coin trim, the smith's reinforcing |
 | tasks | town NPCs: the slayer master, TzHaar and their tasks |
 | soak | ten dungeon floors of fighting at high level |
 | map | world map, zoom, map tools, 3D landmarks |
