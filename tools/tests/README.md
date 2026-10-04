@@ -41,6 +41,7 @@ Screenshots go to `tools/tests/shots/`.
 | sail | sailing and islands |
 | big | house and Construction, Archaeology, Necromancy |
 | town | town tiers, temple, guilds, arena, games, gambling, townsfolk, upgrades, harbour |
+| folk | townsfolk step out of your way without stopping you to chat, and walk in real time |
 | eco | shop prices, bank, waypoint fees, property |
 | gfx | post-processing, colour grades, seasons, 3D land, towns and dungeons |
 | shore | 3D shorelines: land stays above the waves, water tiles stay under water |

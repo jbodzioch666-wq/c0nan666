@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-117 - Townsfolk get out of your way
+
+- **They step aside:** walking into a townsperson, a guard or an animal no longer stops you for a chat. They step out of your path, or swap places with you if there's no room, and you keep walking.
+- **They walk in real time:** townsfolk now go about their day on their own clock, at a steady walking pace, whether or not you're moving. Before, they only took a step when you did, so standing still froze the whole town.
+- **Rumours:** the gossip townsfolk used to tell you is gone. The bounty board's News & rumours tab still tells you about nearby places.
+
 ## RS-116 - Real waterfalls, and rivers that fill their banks
 
 - **Waterfalls flow down:** the water used to scroll up the cliff. Now it falls.

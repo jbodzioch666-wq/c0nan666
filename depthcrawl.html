@@ -6828,7 +6828,7 @@ function tryMove(dx,dy){
   }
   if (tileAt(nx,ny)===T_WALL){ if (G.gameMode===3 && !G.interior && G.villageDeco && G.villageDeco[nx] && G.villageDeco[nx][ny]==='board') tkOpen('board'); else if (G.gameMode===3 && !G.interior) townBumpWall(nx, ny); return; } // bumping a wall isn't an action - no turn spent (the bounty board opens)
   if (G.player.frozenTurns>0 && G.gameMode!==0){ logMsg('you are frozen in place - you strain against the ice (you can still fight what stands beside you)', 'hit'); tickMonsters(); return; }
-  if (G.gameMode===3 && townBumpFolk(nx, ny)) return;   // a word with the townsfolk
+  if (G.gameMode===3) townFolkMakeWay(nx, ny);   // (RS-117) townsfolk step aside instead of stopping you for a chat
   { const ht = tileAt(nx,ny);
     if (ht===T_WAYPOINT || ht===T_STASH || ht===T_QUESTGIVER || ht===T_VENDOR){ villageInteract(nx,ny); return; }
     if (ht===T_COUNTER){ const n = (G.villageNpcs||[])[0]; if (n) setUi(n.service); return; }
@@ -6846,7 +6846,6 @@ function tryMove(dx,dy){
   try{ ammoPickup(); }catch(e){ console.error(e); }
   try{ if (dgStep(nx, ny)) return; }catch(e){ console.error(e); }
   scanForHiddenTraps();
-  if (G.gameMode===3) moveVillagers();
 
   // stairs/exits/trapdoors hand control to a different floor or context
   // entirely, so the monsters you're leaving behind (or haven't even met
@@ -19722,45 +19721,27 @@ function townAmbientSound(){
   const dog = (G.villagers||[]).find(v=>v.animal==='dog' && d(v.x, v.y) < 4); if (dog && chn(0.06)) sfx('bark');
   if (!isNightTime() && !townWet() && d(TOWN_CX, 11) < 5 && chn(0.12)) sfx('murmur');
 }
-// talking to the townsfolk you bump into: gossip, and hints about the land around
-function townBumpFolk(nx, ny){
+// walking into a townsperson (or a chicken): they step aside - out of your path if they can, or swap places with you
+function townFolkMakeWay(nx, ny){
   if (G.interior) return false;
-  const v = (G.villagers||[]).find(o=>!o.indoors && o.x===nx && o.y===ny); if (!v) return false;
-  if (v.animal){ logMsg(v.animal==='dog' ? `${v.nm} wags its tail and sniffs your boots` : v.animal==='cat' ? `${v.nm} winds round your ankles, then stalks off` : 'the chicken flaps off, squawking', ''); if (v.animal==='dog') sfx('bark'); if (v.animal==='chicken') sfx('cluck'); renderGame(); return true; }
-  const line = v.guard ? townGuardLine(v) : townGossip(v);
-  wevDialog(v.nm, `<span class="muted">${esc(v.role)}</span><br><br>"${line}"`, [['Thanks', ()=>{}]], 'townsfolk');
-  return true;
+  const v = (G.villagers||[]).find(o=>!o.indoors && !o.sit && o.x===nx && o.y===ny); if (!v) return false;
+  const px = G.player.x, py = G.player.y, dx = nx - px, dy = ny - py;
+  const side = dx ? [[0,1],[0,-1]] : [[1,0],[-1,0]]; if (chn(0.5)) side.reverse();
+  for (const [a,b] of side.concat([[dx,dy]])){ if (townFree(nx+a, ny+b, v)){ v.x = nx+a; v.y = ny+b; v.stuck = 0; return true; } }
+  v.x = px; v.y = py; v.stuck = 0; return true;   // (no room: you pass each other)
 }
-function townGuardLine(v){
-  const night = isNightTime(), info = townInfo();
-  const l = [ night ? 'Keep to the lit streets after dark, friend. The shops are shut till dawn - knock if you must.' : 'Move along, nothing to see. Unless you\'re here about the bounty board.',
-    info.rec.up.walls ? 'Since the new walls went up, the raiders think twice.' : 'If the town had stone walls, I\'d sleep easier. Talk to the mayor about it.',
-    'The arena master\'s always looking for fighters - if this town has an arena, that is.' ];
-  return l[(townDay() + (v.look|0)) % l.length];
+// villagers walk in real time (RS-117): a step every so often, whether or not you move
+const TOWN_STEP_MS = 650;
+function townRealtimeTick(now){
+  if (!G.player || G.gameMode!==3 || G.ui!=='playing' || G.gameOver) { townRealtimeTick.at = now; return; }
+  if (now - (townRealtimeTick.at||0) < TOWN_STEP_MS) return; townRealtimeTick.at = now;
+  try{ moveVillagers(); }catch(e){ console.error(e); }
 }
 const OW_SITE_NAME = { [OW_DUNGEON]:'a dungeon', [OW_CASTLE]:'a castle', [OW_NECROTOWER]:'a necromancer\'s tower', [OW_TEMPLE]:'a ruined temple', [OW_GRAVEYARD]:'a graveyard', [OW_MINE]:'an old mine', [OW_LAIR]:'a monster\'s lair' };
 function townRumourSites(n, R){
   const out = [], x0 = G.owPos.x, y0 = G.owPos.y;
   for (let i=-R;i<=R;i++) for (let j=-R;j<=R;j++){ const x = x0+i, y = y0+j, m = G.ow.map[x]; if (!m) continue; const t = m[y]; if (OW_SITE_NAME[t] && !owSeen(x, y)) out.push({ x, y, t, d:Math.hypot(i, j) }); }
   return out.sort((a,b)=>a.d-b.d).slice(0, n);
-}
-function townGossip(v){
-  const seed = townDay()*7 + (v.look|0)*13 + (v.x|0), x0 = G.owPos.x, y0 = G.owPos.y, hints = [];
-  const site = townRumourSites(3, 30)[seed % 3];
-  if (site) hints.push(()=>{ owReveal(site.x, site.y, 2); return `They say there's ${OW_SITE_NAME[site.t]} ${Math.round(site.d)} leagues ${dirWord(site.x-x0, site.y-y0)} of here. I've marked it on your map - mind how you go.`; });
-  const dig = (G.ow.pois||[]).find(o=>o.k==='digsite' && !wgState().found.includes(o.id));
-  if (dig) hints.push(()=>{ owReveal(dig.x, dig.y, 2); return `A scholar came through asking about ${dig.name}, out ${dirWord(dig.x-x0, dig.y-y0)}. Old bones and older treasure, he said. It's on your map now.`; });
-  const isl = (G.ow.islands||[]).find(i=>!islandCharted(i.id));
-  if (isl) hints.push(()=>`Fishermen talk of ${cap(isl.name)}, ${dirWord(isl.land[0]-x0, isl.land[1]-y0)} across the water. Nobody's charted it - you'd need a boat.`);
-  const e = G.ow.ev; if (e && e.camps && e.camps.length){ const c = e.camps.slice().sort((a,b)=>Math.hypot(a.x-x0,a.y-y0)-Math.hypot(b.x-x0,b.y-y0))[0];
-    hints.push(()=>{ owReveal(c.x, c.y, 2); return `There's a ${wevCampName(c)} ${Math.round(Math.hypot(c.x-x0, c.y-y0))} leagues ${dirWord(c.x-x0, c.y-y0)}. Somebody ought to break it up.`; }); }
-  const info = townInfo();
-  hints.push(()=>`Welcome to ${info.name}! It's ${info.ident.nm} - ${info.ident.d}.`);
-  hints.push(()=>`Do some good here and folk notice. Help us out and the shops give you a better price.`);
-  if (info.tier < 2) hints.push(()=>`The mayor wants to grow the place. With enough gold and timber, we could be ${info.tier ? 'a city' : 'a proper village'} one day.`);
-  if (isNightTime()) hints.push(()=>`Shouldn't you be in bed? The tavern's still serving, mind.`);
-  if (townWet()) hints.push(()=>`Filthy weather. I'm only out because my wife sent me for bread.`);
-  return esc(hints[seed % hints.length]()).replace(/&#39;/g, "'");
 }
 // walls you can bump in town: the landmark, the archery butts, the water
 function townBumpWall(x, y){
@@ -26939,7 +26920,7 @@ function v3Render(){
     if (grp){ const np = v3Person(v3PlayerLook(), 1.0, grp); np.g.position.copy(old.g.position); np.at = old.at; np.yaw = old.yaw||0; grp.remove(old.g); V3.player = np; }
   }
   glide(V3.player, G.player.x, G.player.y);
-  V3.villagers.forEach(p=> glide(p, p.v.x, p.v.y, 6));
+  V3.villagers.forEach(p=> glide(p, p.v.x, p.v.y, 1.7));   // (a walking pace: one tile in about the time between their steps)
   V3.npcs.forEach(p=> glide(p, p.n.x, p.n.y));
   try{ townV3Tick(dt); }catch(e){ console.error(e); }
   // camera follows you from the south-east at an angle
@@ -32060,7 +32041,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-116';
+const GAME_VERSION = 'rs-117';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -34664,6 +34645,7 @@ function frameLoop(ts){
     cntTick();
     gfxApply();
     if (G.gameOver===1 && G.ui==='playing') setUi('death');
+    townRealtimeTick(performance.now());
     renderGame();
     // safety-net autosave, catches anything that changed state outside a
     // direct player keypress (rare, but cheap insurance)
