@@ -17,9 +17,9 @@ module.exports = async page=>{
     // a bow: walking up to a far monster stops as soon as it's in range
     let shots = 0; const rr = rangedReachIdx, ra = rangedAttack;
     rangedReachIdx = mm=> mm && mm.alive && Math.abs(mm.x-G.player.x)+Math.abs(mm.y-G.player.y) <= 3 ? G.mon.indexOf(mm) : -1; rangedAttack = ()=>{ shots++; };
-    let far = null; for (let x=1;x<COLS-1 && !far;x++) for (let y=1;y<ROWS-1 && !far;y++){ if (G.map[x][y]!==T_FLOOR) continue; const path = isoFindPath(x, y, true); if (path && path.length >= 7 && Math.abs(x-p.x)+Math.abs(y-p.y) >= 7) far = [x,y]; }
+    let far = null; for (let x=1;x<COLS-1 && !far;x++) for (let y=1;y<ROWS-1 && !far;y++){ if (G.map[x][y]!==T_FLOOR) continue; const path = isoFindPath(x, y, true); if (path && path.length >= 7 && path.length <= 12 && Math.abs(x-p.x)+Math.abs(y-p.y) >= 7) far = [x,y]; }   /* (far, but near enough to reach in the time the test allows) */
     A(far, 'a far floor tile');
-    m.x = far[0]; m.y = far[1]; ISO.swingAt = 0; isoAct({ mon:m, gx:m.x, gy:m.y }, false);
+    m.x = far[0]; m.y = far[1]; m.stunTurns = 999; ISO.swingAt = 0;   /* (held where it stands, so it can't charge into melee range) */ isoAct({ mon:m, gx:m.x, gy:m.y }, false);
     let t = performance.now(); for (let i=0;i<40 && !shots;i++){ t += 400; isoTickPath(t); }
     const dist = Math.abs(m.x-G.player.x)+Math.abs(m.y-G.player.y); rangedReachIdx = rr; rangedAttack = ra;
     out.ranged = { dist, shots }; A(shots > 0 && dist >= 2 && dist <= 3, 'stopped in range and shot: '+JSON.stringify(out.ranged));

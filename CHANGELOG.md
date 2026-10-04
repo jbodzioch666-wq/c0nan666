@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-130 - Clear roads
+
+- **Nothing grows on the roads:** trees, ore veins, herbs, flax, fishing spots, runestones and dig spots no longer appear on road tiles. Across a typical world, a few hundred of them used to sit right in the way.
+- **No ambushes from the roadside:** roaming monsters, Wilderness ones included, never spawn on a road now. Before, about one in seven could.
+- **Falling stars and war camps land off the road:** meteors and newly raised bandit or orc camps pick open ground beside the road instead.
+- **Towns stay where they are:** the roads still run into every town, and ferry piers still sit at the end of their roads.
+
 ## RS-129 - A tidier town
 
 - **The green stand is gone:** the banker's old outdoor desk still stood on the square after the banker moved inside the bank. It's been cleared away.
