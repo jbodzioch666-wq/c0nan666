@@ -29,7 +29,10 @@ module.exports = async page=>{
     A(p.gold===g0-fee && G.owPos.x===t1.x, 'paid and travelled');
     p.rep = p.rep || {}; p.rep[t0.x+','+t0.y] = 20; A(ecoTravelFee(t0.x+','+t0.y)===0, 'champions travel free');
     // the bank
-    const b = G.villageNpcs.find(n=>n.service==='bank'); A(b, 'banker'); villageInteract(b.x, b.y); A(G.ui==='bank', 'bank screen');
+    // (RS-122) the banker works inside the bank, behind the counter; nobody banks on the square any more
+    A(!G.villageNpcs.some(n=>n.service==='bank'), 'no banker on the square'); A(buildingByKey('bank'), 'a bank stands in town');
+    enterInterior('bank'); A(G.interior && G.interior.key==='bank', 'inside the bank'); const b = G.villageNpcs.find(n=>n.service==='bank'); A(b, 'the banker behind the counter');
+    G.player.x = 10; G.player.y = 7; tryMove(0, -1); A(G.ui==='bank', 'the counter opens the bank');
     for (let i=0;i<6;i++) G.inv.push(i%2 ? mk() : rsMakeWeapon(1, 0));
     bankDepositAll(); A(G.inv.filter(it=>!it.locked).length===0 && p.stash.length >= 6, 'deposited');
     G.bankTab = 'weapons'; A(bankShown().every(x=>bankTab(x.it)==='weapons') && bankShown().length >= 3, 'weapons tab');
