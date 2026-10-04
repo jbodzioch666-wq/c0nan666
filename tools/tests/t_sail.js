@@ -46,7 +46,7 @@ module.exports = async page=>{
     const A = (c, msg)=>{ if (!c) throw new Error('assert: '+msg); };
     const p = G.player; p.clock = p.turnCount = DAY_LENGTH*6*3 + 40; seasonTick(); owSeenArr().fill(1); G.ow.seenVer++;
     G.owZoomedOut = false; toggleOwZoom(); for (const z of [1, 2, 4]){ G.owZoomScale = z; renderGame(); } G.owZoomedOut = false;
-    renderOverworldMap();
+    renderGame();
     // out on the water near an island, in 3D
     o3Pref = true; G.gameMode = 0; G.ui = 'playing';
     const isl = G.ow.islands[0]; let w = null; for (let r=2;r<10 && !w;r++) for (let i=-r;i<=r && !w;i++) for (let j=-r;j<=r;j++){ const x = isl.land[0]+i, y = isl.land[1]+j; if (G.ow.map[x] && G.ow.map[x][y]===OW_WATER && !iceAt(x,y)){ w = [x,y]; break; } }

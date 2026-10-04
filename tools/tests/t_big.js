@@ -32,7 +32,7 @@ module.exports = async page=>{
     useBench('furnace'); A(G.ui==='bench', 'furnace bench'); setUi('playing');
     useBench('portal'); A(G.ui==='housePortal', 'portal screen'); out.dests = housePortalDests().map(d=>d.kind+':'+d.nm);
     A(housePortalDests().length >= 1, 'portal dests');
-    G.gameMode = 3; renderInteriorMap();
+    G.gameMode = 3; renderGame();   // (the house interior draws in the 3D town view)
     // out through the portal to a town
     housePortalGo(0); A(!G.interior && G.gameMode===3, 'through the portal to town');
     return out;
