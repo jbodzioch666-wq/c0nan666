@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-123 - Pictures on the banners
+
+- **Banner pictures sit on the cloth:** each shop's picture (the anvil, the cauldron, the tankard and so on) is now painted onto its banner. It no longer floats above the top of the flag pole.
+- **The bank flies a banner too:** a blue banner with a gold coin marks the bank from across town.
+- **Door signs are back:** the hanging signboards over the shop doors, removed in RS-122, are back. The bank has one with a gold coin.
+
 ## RS-122 - A bank for the banker
 
 - **The banker moved indoors:** every town now has a stone bank, built on the old barracks lot east of the square. Walk in and talk to the banker at the counter to open your bank. The banker no longer stands out on the square.
