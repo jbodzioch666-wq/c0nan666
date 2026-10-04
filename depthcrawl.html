@@ -8330,13 +8330,24 @@ function encounterEligible(t){
   return t===OW_FOREST || t===OW_SWAMP || t===OW_DESERT || t===OW_TUNDRA ||
          t===OW_WATER || t===OW_RIVER || t===OW_GRASS || t===OW_MOUNTAINPASS;
 }
+// RS-131: one thing to a tile - nothing spawns where a site, place, beast, camp, roamer, fallen star or gathering spot already is
+function owSpotTaken(x, y, me){
+  const t = G.ow.map[x] && G.ow.map[x][y]; if (t===undefined) return true;
+  if (OW_SITE_TILES.includes(t) || wgPoiAt(x, y)) return true;
+  if ((G.ow.mythicBeasts||[]).some(b=>b.x===x && b.y===y)) return true;
+  if ((G.ow.encounters||[]).some(e=>e!==me && e.x===x && e.y===y)) return true;
+  if ((G.ow.rich||[]).some(r=>r.x===x && r.y===y)) return true;
+  const ev = G.ow.ev; if (ev && (ev.camps||[]).some(c=>c.x===x && c.y===y)) return true;
+  if (G.owPos && G.owPos.x===x && G.owPos.y===y) return true;
+  return !!skNodeStatic(x, y);
+}
 function spawnOneEncounter(avoidX, avoidY, minDist){
   for (let tries=0; tries<200; tries++){
     const x = rn(OW_COLS), y = rn(OW_ROWS);
     if (!encounterEligible(G.ow.map[x][y])) continue;
     if (avoidX!==undefined && Math.hypot(x-avoidX,y-avoidY) < minDist) continue;
     if (G.ow.ev && tries < 150 && chn(0.65) && wevSecuredAt(x,y)) continue;   // lands you've secured see far fewer roamers
-    if (wgRoadAt(x,y)) continue;   // and nothing ever turns up on a road (RS-130)
+    if (wgRoadAt(x,y) || owSpotTaken(x,y)) continue;   // and nothing ever turns up on a road (RS-130), or on top of something else (RS-131)
     return {x,y};
   }
   return null;
@@ -8376,6 +8387,7 @@ function moveOverworldEncounters(){
     if (nx<0||ny<0||nx>=OW_COLS||ny>=OW_ROWS) continue;
     if (!encounterEligible(G.ow.map[nx][ny])) continue;
     if (G.ow.road && wgRoadAt(nx,ny) && !(dist>0 && dist<=noticeR) && chn(0.8)) continue;   // roamers mostly keep off the roads
+    if (G.ow.encounters.some(o=>o!==e && o.x===nx && o.y===ny) || OW_SITE_TILES.includes(G.ow.map[nx][ny]) || wgPoiAt(nx,ny) || (G.ow.rich||[]).some(r=>r.x===nx && r.y===ny) || (G.ow.ev && (G.ow.ev.camps||[]).some(c=>c.x===nx && c.y===ny)) || (G.ow.mythicBeasts||[]).some(b=>b.x===nx && b.y===ny)) continue;   // (RS-131) and never pile up on one tile (they may cross a tree or a patch of herbs)
     e.x=nx; e.y=ny;
   }
   // the population drifts back toward its target size over ordinary
@@ -8386,7 +8398,7 @@ function moveOverworldEncounters(){
   // right-after-a-kill-only roll, which could never refill at all if the
   // player simply stopped triggering encounters for a while
   if (G.ow.wild && G.ow.encounters.length < OW_ENCOUNTER_TARGET*1.4 && chn(0.12)){   // the Wilderness teems
-    for (let t=0;t<40;t++){ const x = rn(OW_COLS), y = rn(OW_ROWS); if (wgWildLevel(x,y) && encounterEligible(G.ow.map[x][y]) && !wgRoadAt(x,y) && Math.hypot(x-G.owPos.x, y-G.owPos.y) > 6){ G.ow.encounters.push({x,y}); break; } }
+    for (let t=0;t<40;t++){ const x = rn(OW_COLS), y = rn(OW_ROWS); if (wgWildLevel(x,y) && encounterEligible(G.ow.map[x][y]) && !wgRoadAt(x,y) && !owSpotTaken(x,y) && Math.hypot(x-G.owPos.x, y-G.owPos.y) > 6){ G.ow.encounters.push({x,y}); break; } }
   }
   if (G.ow.encounters.length < OW_ENCOUNTER_TARGET && chn(0.15)){
     const p = spawnOneEncounter(G.owPos.x, G.owPos.y, 10);
@@ -10068,6 +10080,7 @@ function skNodeStatic(x, y){
   if (wgRoadAt(x, y)) return null;   // (RS-130) no trees, rocks, herbs or fishing spots on the roads
   if (SKN.seed !== G.ow.seed || SKN.map !== G.ow.map){ SKN.st.clear(); SKN.seed = G.ow.seed; SKN.map = G.ow.map; }
   const key = x*4096+y; if (SKN.st.has(key)) return SKN.st.get(key);
+  if (OW_SITE_TILES.includes(skOwTile(x, y)) || wgPoiAt(x, y) || (G.ow.mythicBeasts||[]).some(b=>b.x===x && b.y===y)){ SKN.st.set(key, null); return null; }   // (RS-131) one thing to a tile
   const t = skOwTile(x, y), h = skNH(x, y, 701), h2 = skNH(x, y, 702), holy = [OW_GRAVEYARD, OW_NECROTOWER, OW_TEMPLE];
   if (t===OW_MOUNTAINPASS && owMtnClear()){ SKN.st.set(key, null); return null; }   // (generator 3: the passes stay clear)
   let n = null;
@@ -17615,7 +17628,7 @@ const WEV_TERR_COL = { secured:'rgba(80,170,70,', troubled:'rgba(220,150,40,', d
 // ---- camps ----
 function wevCampOk(x, y){
   if (x<2 || y<2 || x>=OW_COLS-2 || y>=OW_ROWS-2) return false;
-  const t = G.ow.map[x][y]; if (![OW_GRASS, OW_FOREST, OW_DESERT, OW_SWAMP, OW_TUNDRA].includes(t) || owAmidMtn(x, y) || wgRoadAt(x, y)) return false;
+  const t = G.ow.map[x][y]; if (![OW_GRASS, OW_FOREST, OW_DESERT, OW_SWAMP, OW_TUNDRA].includes(t) || owAmidMtn(x, y) || wgRoadAt(x, y) || owSpotTaken(x, y)) return false;
   for (const [tx,ty] of wevTowns()) if (Math.abs(tx-x) <= 8 && Math.abs(ty-y) <= 8) return false;
   for (let i=-3;i<=3;i++) for (let j=-3;j<=3;j++){ const u = G.ow.map[x+i] && G.ow.map[x+i][y+j]; if (u!==undefined && OW_SITE_TILES.includes(u)) return false; }
   const e = G.ow.ev; if (e && e.camps.some(c=>Math.abs(c.x-x) < 10 && Math.abs(c.y-y) < 10)) return false;
@@ -17733,7 +17746,7 @@ function wevMeteor(){
   for (let tries=0; tries<400; tries++){
     const a = Math.random()*Math.PI*2, d = 10 + Math.random()*26, x = Math.round(G.owPos.x + Math.cos(a)*d), y = Math.round(G.owPos.y + Math.sin(a)*d);
     if (x<2 || y<2 || x>=OW_COLS-2 || y>=OW_ROWS-2) continue;
-    const t = G.ow.map[x][y]; if (![OW_GRASS, OW_DESERT, OW_TUNDRA].includes(t) || wgRoadAt(x, y) || richAt(x, y) || skNodeAt(x, y)) continue;
+    const t = G.ow.map[x][y]; if (![OW_GRASS, OW_DESERT, OW_TUNDRA].includes(t) || wgRoadAt(x, y) || owSpotTaken(x, y) || skNodeAt(x, y)) continue;
     const until = turn + 300 + rn(120), r = { x, y, type:'meteor', k:'mining', until }; r.left = richMax(r);
     G.ow.rich = G.ow.rich || []; G.ow.rich.push(r);
     e.dyn.push({ id:e.seq++, kind:'meteor', x, y, until });
@@ -32438,7 +32451,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-130';
+const GAME_VERSION = 'rs-131';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-131 - One thing to a tile
+
+- **No more stacking:** nothing spawns on top of something else any more. Each tile holds one thing: a site, a named place, a mythic beast, a war camp, a fallen star, a gathering spot or a roaming monster. Before, a world that had run a while had hundreds of doubled-up tiles, mostly monsters standing on trees and herbs.
+- **Gathering spots keep their own ground:** trees, herbs, ore, fishing spots and dig spots no longer appear on dungeon entrances, temples, graveyards, places like caches and hamlets, or a mythic beast's lair.
+- **Monsters don't pile up:** roaming monsters won't walk onto each other, a fallen star, a war camp, a site or a named place. They can still cross a tree or a patch of herbs on their way past.
+
 ## RS-130 - Clear roads
 
 - **Nothing grows on the roads:** trees, ore veins, herbs, flax, fishing spots, runestones and dig spots no longer appear on road tiles. Across a typical world, a few hundred of them used to sit right in the way.

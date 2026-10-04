@@ -29,7 +29,7 @@ Screenshots go to `tools/tests/shots/`.
 | xpt | tick skills in the skills menu to choose what the XP window shows |
 | rooms | building interiors: floorboards and flagstones with depth, panelled walls, rugs, daylight through the windows |
 | door | walking through a door: swings open, camera leans in, room appears, eases out; and back out with the door shutting |
-| roads | nothing spawns on a road except the towns: no sites, places, gathering spots, roamers, meteors or war camps |
+| roads | nothing spawns on a road except the towns, and nothing spawns on top of anything else (RS-131) |
 | diag | diagonal steps: keys, numpad, corners, click paths, no diagonal strikes |
 | touch | on an emulated phone: tap to walk, long-press menu, pinch zoom, map drag, the d-pad, the hotbar |
 | bal | balance: monsters bite harder, the fixed-strength lair boss, coin trim, the smith's reinforcing |
