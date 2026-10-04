@@ -34,6 +34,7 @@ Screenshots go to `tools/tests/shots/`.
 | clock | real-time day and night: 20 minutes of day, 10 of night, steps don't move it, it pauses on menus |
 | tasks | town NPCs: the slayer master, TzHaar and their tasks |
 | soak | ten dungeon floors of fighting at high level |
+| pace | fights keep a visible beat, a bow or spell stops in range, the bestiary box shows every creature |
 | fpdres | the dungeon view's resolution steps between a few fixed sizes instead of resizing every half second |
 | map | world map, zoom, map tools, 3D landmarks |
 | wev | world events and festivals |

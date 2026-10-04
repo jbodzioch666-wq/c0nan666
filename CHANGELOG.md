@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-119 - Fights you can watch
+
+- **A slower beat:** once you engage a monster you now attack about every 1.8 seconds, closer to RuneScape's 2.4, instead of every 0.6 seconds. Each swing and each cast plays out over about half a second, so you can see it land.
+- **No click spamming:** clicking a monster again, or tapping a direction key, can't make you attack faster than the beat.
+- **Ranged fighters stop in range:** with a bow or a spell ready, clicking a monster that's out of reach walks you toward it only until it's in range and in sight. Then you stop and start shooting. Before, you walked right up to it.
+- **The bestiary shows everything:** the display box was empty for every zombie, skeleton, mummy, ghost, ghoul, wight, wraith and lich. They now stand in the box like everything else. A creature without a model of its own shows the nearest kind that has one.
+
 ## RS-118 - Roomier towns
 
 - **A bigger square:** every town's square is three tiles wider and three tiles deeper, so the Captain, the bounty board, the banker, the slayer master, the waypoint and the townsfolk have room to breathe. The streets, the hedge and the walls stretch to match, and every shop, hall, arena, range and harbour keeps its place around the square.

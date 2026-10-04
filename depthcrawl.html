@@ -12557,13 +12557,24 @@ function bvMount(){
   slot.innerHTML = ''; slot.appendChild(BV.r.domElement);
   if (!BV.raf) BV.raf = requestAnimationFrame(bvFrame);
 }
+// the model to show for a creature in the bestiary (RS-119): its own; for the undead, the undead one (the bestiary's
+// entries don't always carry the flag); and for a creature with no model, the nearest kind that has one
+const BV_UNDEAD_RE = /zombie|skeleton|mummy|ghost|ghoul|wight|wraith|lich|revenant|spectre|specter|banshee|undead|barrows/;
+function bvPortrait(fake){
+  const n = String(fake.nm||'').toLowerCase();
+  let pt = m3dPortrait(fake); if (pt) return pt;
+  if (BV_UNDEAD_RE.test(n)){ pt = m3dPortrait(Object.assign({}, fake, { undead:true })); if (pt) return pt; }
+  const near = /dragon|drake|wyrm/.test(n) ? 'ancient dragon' : /cult/.test(n) ? 'cult acolyte' : /necromancer|mage|wizard|witch|shaman|priest|sorcer|warlock/.test(n) ? 'cult priest'
+    : /knight|barrows|brother|paladin|guard/.test(n) ? 'knight' : /giant/.test(n) ? 'hill giant' : /demon|fiend|devil/.test(n) ? 'lesser demon' : /spider/.test(n) ? 'giant spider' : /wolf|hound|dog/.test(n) ? 'wolf' : 'bandit';
+  return m3dPortrait({ nm:near });
+}
 function bvFrame(){
   BV.raf = 0;
   const cv = BV.r && BV.r.domElement; if (!cv || !cv.isConnected || G.ui!=='bestiary') return;
   const nm = G.bestSel, known = (G.player.codexSeen||[]).includes(nm) || (G.bestLive && G.bestLive.nm===nm);
   if (nm + known !== BV.key){
     BV.key = nm + known; if (BV.e){ BV.scene.remove(BV.e.holder); BV.e = null; }
-    if (known){ try{ const e0 = bestEntryFor(nm) || {}, fake = { nm, undead: G.bestLive && G.bestLive.nm===nm ? G.bestLive.undead : e0.undead }, pt = m3dPortrait(fake);
+    if (known){ try{ const e0 = bestEntryFor(nm) || {}, fake = { nm, undead: G.bestLive && G.bestLive.nm===nm ? G.bestLive.undead : e0.undead }, pt = bvPortrait(fake);
       if (pt){ BV.e = m3dInstance(fake, pt); const sc = 1/Math.max(0.6, BV.e.H); BV.e.holder.scale.setScalar(sc); BV.scene.add(BV.e.holder); } }catch(err){ console.error(err); BV.e = null; } }
   }
   const t = performance.now()/1000;
@@ -30946,7 +30957,7 @@ function fpDrawPost(){
 const ISO_YAW = Math.PI/4;   // every 3D view (dungeon, town, overworld) looks in from the south-east at 45 degrees
 const ISO = { on:true, rot:0, el:0.66, dist:12, path:[], target:null, nextStep:0, focus:null, player:null, lookKey:'', sprites:[], texCache:new WeakMap(), grp:null };
 function isoYaw(){ return ISO_YAW + ISO.rot*Math.PI/2; }
-const ISO_STEP_MS = 300, ISO_SWING_MS = 620;   // a walked step, and the beat of a sustained fight
+const ISO_STEP_MS = 300, ISO_SWING_MS = 1800;   // a walked step, and the beat of a fight (RS-119: slowed from 620ms so you can see each swing)
 // moves a figure toward its tile at an even walking pace, so a walked path
 // reads as one continuous stride rather than a hop and a stop per tile;
 // pos.mv is how much it's walking (eased, so the stride doesn't flicker between steps)
@@ -31685,8 +31696,11 @@ function isoDirFor(sx, sy){
 }
 function isoStep(v){
   G.player.facing = facingFor(v[0], v[1], G.player.facing);
+  // a step into a monster is an attack, and attacks keep the fight's beat however fast you click or press (RS-119)
+  if (G.mon && G.mon.some(m=>m.alive && m.x===G.player.x+v[0] && m.y===G.player.y+v[1]) && !isoSwingReady()) return;
   moveDir(v[0], v[1]);
 }
+function isoSwingReady(){ const now = performance.now(); if (now < (ISO.swingAt||0)) return false; ISO.swingAt = now + ISO_SWING_MS - 30; return true; }
 // holding a direction keeps walking at the same even pace (the keyboard's own repeat is ignored); two held keys walk the diagonal between
 function isoHeldDir(k){ return { arrowup:[1,-1], w:[1,-1], arrowdown:[-1,1], s:[-1,1], arrowleft:[-1,-1], a:[-1,-1], arrowright:[1,1], d:[1,1], pageup:[2,0], pagedown:[0,2], end:[-2,0], home:[0,-2] }[String(k).toLowerCase()]; }
 function isoHeldSum(){ let sx = 0, sy = 0; for (const h of ISO.held || []){ const d = isoHeldDir(h); if (d){ sx += d[0]; sy += d[1]; } } return (sx || sy) ? [sx, sy] : null; }
@@ -31789,9 +31803,9 @@ function isoAct(pk, shift){
   if (mon){
     const dx = mon.x-p.x, dy = mon.y-p.y;
     ISO.fighting = mon;
-    if (Math.abs(dx)+Math.abs(dy)===1){ ISO.path = []; ISO.nextStep = performance.now() + ISO_SWING_MS; isoStep([dx, dy]); return; }
-    if (spearReach(mon)){ ISO.path = []; ISO.nextStep = performance.now() + ISO_SWING_MS; reachAttack(mon); return; }
-    if (Math.abs(dx)+Math.abs(dy)>1 && rangedReachIdx(mon) >= 0){ ISO.path = []; ISO.nextStep = performance.now() + ISO_SWING_MS; rangedAttack(mon); renderGame(); return; }
+    if (Math.abs(dx)+Math.abs(dy)===1){ ISO.path = []; if (!isoSwingReady()){ ISO.nextStep = ISO.swingAt; return; } ISO.swingAt = 0; ISO.nextStep = performance.now() + ISO_SWING_MS; isoStep([dx, dy]); return; }
+    if (spearReach(mon)){ ISO.path = []; if (!isoSwingReady()){ ISO.nextStep = ISO.swingAt; return; } ISO.nextStep = performance.now() + ISO_SWING_MS; reachAttack(mon); return; }
+    if (Math.abs(dx)+Math.abs(dy)>1 && rangedReachIdx(mon) >= 0){ ISO.path = []; if (!isoSwingReady()){ ISO.nextStep = ISO.swingAt; return; } ISO.nextStep = performance.now() + ISO_SWING_MS; rangedAttack(mon); renderGame(); return; }
     const path = isoFindPath(mon.x, mon.y, true);
     ISO.path = path || []; ISO.target = mon; ISO.nextStep = 0;
     return;
@@ -31811,6 +31825,7 @@ function isoTickPath(now){
   if (G.ui!=='playing' || G.gameOver){ ISO.path = []; ISO.fighting = null; return; }
   if (!ISO.path.length){ isoTickFight(now); return; }
   if (now < ISO.nextStep) return;
+  { const t = ISO.target || ISO.fighting; if (t && t.alive && rangedReachIdx(t) >= 0){ ISO.path = []; ISO.fighting = t; ISO.target = null; ISO.nextStep = now; isoTickFight(now); return; } }   // (in range: stand and shoot)
   ISO.nextStep = now + ISO_STEP_MS*runMul();
   const p = G.player, [nx, ny] = ISO.path.shift(), dx = nx-p.x, dy = ny-p.y;
   if (Math.max(Math.abs(dx), Math.abs(dy))!==1){ ISO.path = []; return; }
@@ -31837,9 +31852,9 @@ function isoTickFight(now){
   if (p.hp < effMaxHp()*0.2){ ISO.fighting = null; logMsg('you break off the fight - you are badly hurt', 'hit'); renderGame(); return; }
   const dx = m.x-p.x, dy = m.y-p.y;
   if (Math.abs(dx)+Math.abs(dy)===1){ ISO.nextStep = now + ISO_SWING_MS; isoStep([dx, dy]); return; }
-  if (spearReach(m)){ ISO.path = []; ISO.nextStep = now + ISO_SWING_MS; reachAttack(m); return; }   // a spear or halberd keeps the foe at arm's length
+  if (spearReach(m)){ ISO.path = []; if (!isoSwingReady()){ ISO.nextStep = ISO.swingAt; return; } ISO.nextStep = now + ISO_SWING_MS; reachAttack(m); return; }   // a spear or halberd keeps the foe at arm's length
   if (rangedReachIdx(m) >= 0){   // a ranged fighter holds their ground and keeps shooting
-    ISO.path = []; ISO.nextStep = now + ISO_SWING_MS;
+    ISO.path = []; if (!isoSwingReady()){ ISO.nextStep = ISO.swingAt; return; } ISO.nextStep = now + ISO_SWING_MS;
     const v = FACING_VECT.findIndex(f=>f[0]===Math.sign(dx) && f[1]===Math.sign(dy)); if (v>=0) p.facing = v;
     rangedAttack(m); renderGame(); return;
   }
@@ -31866,7 +31881,7 @@ function renderFirstPerson(){
   else if (FP.lastHp!==null && p.hp > FP.lastHp + 0.5) FP.heal = 1;
   FP.lastHp = p.hp;
   FP.hurt = Math.max(0, FP.hurt-dt*1.8); FP.heal = Math.max(0, FP.heal-dt*1.6); FP.glow = Math.max(0, FP.glow-dt*1.2);
-  FP.cast = Math.max(0, FP.cast-dt*2.2); FP.swing = Math.max(0, FP.swing-dt*3.6); FP.fade = Math.max(0, FP.fade-dt*2.5);
+  FP.cast = Math.max(0, FP.cast-dt*1.5); FP.swing = Math.max(0, FP.swing-dt*1.8); FP.fade = Math.max(0, FP.fade-dt*2.5);
   FP.shake = Math.max(0, FP.shake-dt*3);
   if (FP.moving>0.02) FP.stepPhase = (FP.stepPhase||0) + dt*9;
 
@@ -32075,7 +32090,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-118';
+const GAME_VERSION = 'rs-119';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
