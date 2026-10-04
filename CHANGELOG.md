@@ -3,7 +3,7 @@
 ## RS-122 - A bank for the banker
 
 - **The banker moved indoors:** every town now has a stone bank, built on the old barracks lot east of the square. Walk in and talk to the banker at the counter to open your bank. The banker no longer stands out on the square.
-- **No more picture signs:** the icon signboards over shop and house doors are gone, so buildings look like buildings. The door lanterns stay, and each building's name still shows when you hover over it.
+- **No more picture signs:** the icon signboards over shop and house doors are gone, so buildings look like buildings. The door lanterns stay.
 
 ## RS-121 - Choose what the XP window shows
 
