@@ -8689,6 +8689,38 @@ function buildTailorShop(){
     <div class="ovbody">${rows}<div class="btnrow"><button class="btn" onclick="openMakeover()">barber's chair &middot; restyle</button><button class="btn" onclick="openDyeWorks()">dye works</button><button class="btn primary" onclick="setUi('playing')">L / ESC &middot; leave</button></div></div>`;
 }
 // ---- the room in 3D ----
+// the surfaces of a room (RS-126): which floor, walls and furniture wood each kind of building has
+const INT_STONE_FLOOR = { smith:'#7a7570', temple:'#b4ac94', guild:'#7a7268', bank:'#8c8a84', cellar:'#6a6560' };
+const INT_BOARDS = { tavern:'#5a3f2c', house:'#76583e', shop:'#6c5038', tailor:'#7a6048', alch:'#5c4432', tavern_up:'#68492f' };
+function v3TexRep(t, r){ const c = t.clone(); c.repeat.set(r, r); c.needsUpdate = true; return c; }
+function v3InteriorMats(key, mats){
+  const T = THREE, race = V3_RACE[G.villageRace] || V3_RACE.human, std = o=>new T.MeshStandardMaterial(Object.assign({ roughness:0.8, metalness:0 }, o));
+  const dim = (h, k)=>'#' + v3hex(h).map(v=>Math.round(v*k).toString(16).padStart(2,'0')).join('');
+  const ck = 'mats:'+key+':'+(G.villageRace||'human'), day = !(typeof isNightTime==='function' && isNightTime());
+  const glass = std({ color:day ? 0xcfe2ff : 0x141c30, emissive:day ? 0xa8c8f0 : 0x1a2a50, emissiveIntensity:day ? 0.9 : 0.4, roughness:0.15 });
+  if (V3_INT_TEX[ck]) return Object.assign({}, mats, V3_INT_TEX[ck], { winGlass:glass });   /* made once per kind of room: the textures stay on the GPU */
+  const m = {};
+  if (INT_STONE_FLOOR[key]){ const f = v3TexFlags(INT_STONE_FLOOR[key], 5 + key.length); m.floor = std({ map:v3TexRep(f.map, 0.25), bumpMap:v3TexRep(f.bump, 0.25), bumpScale:0.035, roughness:0.88 }); }
+  else { const f = v3TexBoards(INT_BOARDS[key] || '#6c5038', { seed:7 + key.length }); m.floor = std({ map:v3TexRep(f.map, 0.25), bumpMap:v3TexRep(f.bump, 0.25), bumpScale:0.03, roughness:0.72 }); }
+  const lime = v3TexLime(dim(race.plaster, 0.86)); m.plaster = std({ map:v3TexRep(lime.map, 0.5), bumpMap:v3TexRep(lime.bump, 0.5), bumpScale:0.012, roughness:0.95 });
+  const fw = dim(race.wood, 1.25), pan = v3TexBoards(fw, { boards:8, joints:false, knots:0.25, size:512, seed:41 });
+  m.panel = std({ map:v3TexRep(pan.map, 0.5), bumpMap:v3TexRep(pan.bump, 0.5), bumpScale:0.025, roughness:0.55 });
+  const pl = v3TexBoards(dim(race.wood, 1.45), { boards:4, joints:false, knots:0.3, size:512, seed:53 }); m.planks = std({ map:v3TexRep(pl.map, 1), bumpMap:v3TexRep(pl.bump, 1), bumpScale:0.02, roughness:0.55 });
+  const wd = v3TexBoards(fw, { boards:1, joints:false, gaps:false, knots:0.15, size:256, seed:61 }); m.wood = std({ map:v3TexRep(wd.map, 2), roughness:0.6 });
+  V3_INT_TEX[ck] = m; return Object.assign({}, mats, m, { winGlass:glass });
+}
+// a rug laid flat on the floor (long side along x when w > d)
+function v3Rug(grp, x, z, w, d, tex){ const T = THREE, long = w > d, g = new T.PlaneGeometry(long ? d : w, long ? w : d), m = new T.Mesh(g, new T.MeshStandardMaterial({ map:tex.map, roughness:0.97 }));
+  m.rotation.set(-Math.PI/2, 0, long ? Math.PI/2 : 0); m.position.set(x, 0.012, z); m.receiveShadow = true; grp.add(m); return m; }
+// soft daylight falling through a window onto the floor, and a faint beam in the air
+function v3WindowLight(grp, wx, wz){
+  const T = THREE; if (!V3_INT_TEX.shaft){ const c = v3Canvas(64,128), x = c.getContext('2d'), g = x.createLinearGradient(0,0,0,128); g.addColorStop(0,'rgba(255,240,210,0.9)'); g.addColorStop(1,'rgba(255,240,210,0)'); x.fillStyle = g; x.fillRect(0,0,64,128);
+    const e = x.createLinearGradient(0,0,64,0); e.addColorStop(0,'rgba(0,0,0,1)'); e.addColorStop(0.2,'rgba(0,0,0,0)'); e.addColorStop(0.8,'rgba(0,0,0,0)'); e.addColorStop(1,'rgba(0,0,0,1)'); x.globalCompositeOperation = 'destination-out'; x.fillStyle = e; x.fillRect(0,0,64,128); V3_INT_TEX.shaft = new T.CanvasTexture(c); }
+  const mk = op=>new T.MeshBasicMaterial({ map:V3_INT_TEX.shaft, transparent:true, opacity:op, blending:T.AdditiveBlending, depthWrite:false, side:T.DoubleSide });
+  const pool = new T.Mesh(new T.PlaneGeometry(1.1, 2.2), mk(0.22)); pool.rotation.x = -Math.PI/2; pool.position.set(wx + 0.35, 0.015, wz + 1.25); grp.add(pool);
+  const beam = new T.Mesh(new T.PlaneGeometry(0.95, 2.4), mk(0.07)); beam.position.set(wx + 0.18, 1.0, wz + 0.75); beam.rotation.set(-0.95, 0, 0.15); grp.add(beam);
+  return [pool, beam];
+}
 function v3BuildInterior(grp, mats){
   const T = THREE, key = G.interior.key;
   V3.crystal = V3.runes = V3.marker = V3.motes = V3.sparks = V3.bubbles = V3.brew = V3.cglow = null; V3.grassT = null;
@@ -8696,19 +8728,36 @@ function v3BuildInterior(grp, mats){
   const dark = new T.Mesh(new T.PlaneGeometry(200,200), new T.MeshStandardMaterial({ color:0x0b0907, roughness:1 }));
   dark.rotation.x = -Math.PI/2; dark.position.set(COLS/2, -0.02, ROWS/2); grp.add(dark); V3.ground = dark;
   const fw = ROOM.x1-ROOM.x0+1, fd = ROOM.y1-ROOM.y0+1;
-  const floor = v3Box(fw, 0.06, fd+1, mats.planks, ROOM.x0+fw/2, -0.03, ROOM.y0+fd/2+0.5); grp.add(floor);
-  const wallM = ['smith','temple','guild','cellar'].includes(key) ? mats.stone : mats.plaster, H = 2.7, low = 0.5;
+  mats = v3InteriorMats(key, mats);
+  const floor = v3Box(fw, 0.06, fd+1, mats.floor, ROOM.x0+fw/2, -0.03, ROOM.y0+fd/2+0.5); floor.castShadow = false; grp.add(floor);
+  const stoneRoom = ['smith','temple','guild','cellar','bank'].includes(key), wallM = stoneRoom ? mats.stone : mats.plaster, H = 2.7, low = 0.5;
   // back (north, west) walls full height with beams and a window; the near (south, east) walls cut low so you can see in
   grp.add(v3Box(fw+1, H, 0.3, wallM, ROOM.x0+fw/2-0.5, H/2, ROOM.y0-0.15));
   grp.add(v3Box(0.3, H, fd+1, wallM, ROOM.x0-0.15, H/2, ROOM.y0+fd/2-0.5));
   for (let x=ROOM.x0; x<=ROOM.x1+1; x+=3) grp.add(v3Box(0.14, H, 0.14, mats.wood, x-0.05, H/2, ROOM.y0-0.02));
   for (let y=ROOM.y0; y<=ROOM.y1+1; y+=3) grp.add(v3Box(0.14, H, 0.14, mats.wood, ROOM.x0-0.02, H/2, y-0.05));
   grp.add(v3Box(fw+1, 0.16, 0.2, mats.wood, ROOM.x0+fw/2-0.5, H-0.1, ROOM.y0));
-  for (const wx of [ROOM.x0+2.5, ROOM.x1-1.5]){ const win = v3Box(0.9, 0.9, 0.06, mats.glass, wx, 1.7, ROOM.y0+0.02); grp.add(win); V3.windows.push(win); grp.add(v3Box(1.02, 0.08, 0.14, mats.wood, wx, 1.22, ROOM.y0+0.05)); }
+  // panelling to waist height on plastered walls, with a rail along the top; a skirting board on stone ones
+  if (!stoneRoom){ const ph = 0.95;
+    grp.add(v3Box(fw+0.7, ph, 0.04, mats.panel, ROOM.x0+fw/2-0.35, ph/2, ROOM.y0+0.02)); grp.add(v3Box(0.04, ph, fd+0.7, mats.panel, ROOM.x0+0.02, ph/2, ROOM.y0+fd/2-0.35+0.35));
+    grp.add(v3Box(fw+0.7, 0.07, 0.09, mats.wood, ROOM.x0+fw/2-0.35, ph+0.03, ROOM.y0+0.04)); grp.add(v3Box(0.09, 0.07, fd+0.7, mats.wood, ROOM.x0+0.04, ph+0.03, ROOM.y0+fd/2));
+  } else { grp.add(v3Box(fw+0.7, 0.14, 0.06, mats.wood, ROOM.x0+fw/2-0.35, 0.07, ROOM.y0+0.03)); grp.add(v3Box(0.06, 0.14, fd+0.7, mats.wood, ROOM.x0+0.03, 0.07, ROOM.y0+fd/2)); }
+  // windows: panes split by a cross of glazing bars, a deep sill, and daylight falling in
+  V3.intWin = [];
+  for (const wx of [ROOM.x0+2.5, ROOM.x1-1.5]){ const win = v3Box(0.9, 0.9, 0.06, key==='temple' ? mats.glass : mats.winGlass, wx, 1.7, ROOM.y0+0.02); grp.add(win); if (key==='temple') V3.windows.push(win);
+    grp.add(v3Box(0.06, 0.94, 0.1, mats.wood, wx, 1.7, ROOM.y0+0.06)); grp.add(v3Box(0.94, 0.06, 0.1, mats.wood, wx, 1.7, ROOM.y0+0.06));
+    for (const s of [-1,1]){ grp.add(v3Box(0.08, 1.02, 0.12, mats.wood, wx + s*0.49, 1.7, ROOM.y0+0.06)); grp.add(v3Box(1.06, 0.08, 0.12, mats.wood, wx, 1.7 + s*0.49, ROOM.y0+0.06)); }
+    grp.add(v3Box(1.16, 0.06, 0.22, mats.wood, wx, 1.2, ROOM.y0+0.1));
+    if (!(typeof isNightTime==='function' && isNightTime())) V3.intWin.push(...v3WindowLight(grp, wx, ROOM.y0)); }
   grp.add(v3Box(fw+1, low, 0.3, wallM, ROOM.x0+fw/2-0.5, low/2, ROOM.y1+1.15));
   grp.add(v3Box(0.3, low, fd+1, wallM, ROOM.x1+1.15, low/2, ROOM.y0+fd/2-0.5));
+  // a wooden cap along the cut-down near walls
+  grp.add(v3Box(fw+1.1, 0.06, 0.38, mats.wood, ROOM.x0+fw/2-0.5, low+0.03, ROOM.y1+1.15)); grp.add(v3Box(0.38, 0.06, fd+1.1, mats.wood, ROOM.x1+1.15, low+0.03, ROOM.y0+fd/2-0.5));
   { const dx = ROOM.door.x+0.5, dz = ROOM.y1+1.15; grp.add(v3Box(0.9, 0.04, 0.34, mats.planks, dx, low+0.02, dz)); for (const s of [-0.5,0.5]) grp.add(v3Box(0.12, 1.6, 0.34, mats.wood, dx+s, 0.8, dz)); grp.add(v3Box(1.1, 0.12, 0.34, mats.wood, dx, 1.62, dz));
-    const mat = v3Box(0.9, 0.02, 0.8, mats.cloth || mats.awning, dx, 0.02, dz-0.55); grp.add(mat); }
+    v3Rug(grp, dx, dz-1.05, 0.9, 1.15, v3TexRug('#7a2a24', '#2a3048', '#c8a050', 2)); }
+  // a rug in the middle of the room
+  { const RUG = { tavern:[10, 9.5, 4.4, 2.6, '#6a2a20','#2a2a38','#c89a48'], shop:[10, 9, 3.2, 2.0, '#2a4a6a','#5a2a20','#d8b060'], bank:[10, 9, 3.6, 2.2, '#2a3a5a','#1a1a24','#c8a040'], tailor:[10.5, 8.6, 2.6, 1.8, '#5a3a7a','#2a2030','#d8c890'], alch:[10, 9, 2.6, 1.8, '#2a5a3a','#3a2a1a','#c8b070'], temple:[10, 9, 2.0, 3.6, '#7a1a1a','#c8a040','#e8dcc0'], guild:[10, 9, 3.2, 2.0, '#3a2a5a','#1a1a24','#c8a040'] }[key];
+    if (RUG) v3Rug(grp, RUG[0], RUG[1], RUG[2], RUG[3], v3TexRug(RUG[4], RUG[5], RUG[6], key.length)); }
   // the counter and shelves behind the vendor
   if (!['house','tavern_up','cellar'].includes(key)){ grp.add(v3Box(3, 0.9, 0.7, mats.planks, 10.5, 0.45, 6.5)); grp.add(v3Box(3.1, 0.08, 0.78, mats.wood, 10.5, 0.93, 6.5)); }
   for (const sx of [8.2, 12.8]){ grp.add(v3Box(1.3, 1.9, 0.35, mats.wood, sx, 0.95, ROOM.y0+0.25)); for (let i=0;i<3;i++) grp.add(v3Box(1.2, 0.05, 0.36, mats.planks, sx, 0.5+i*0.55, ROOM.y0+0.27)); }
@@ -8728,8 +8777,7 @@ function v3BuildInterior(grp, mats){
   if (key==='smith'){ v3Barrel(13.4,6.0,mats,grp); for (let i=0;i<4;i++) grp.add(v3Box(0.05,1.1,0.05,mats.iron,6.2+i*0.25,0.55,10.6)); }
   if (key==='alch'){ v3Crate(13.5,6.2,mats,grp); v3Barrel(6.5,10.4,mats,grp); }
   if (['temple','guild','cellar','tavern_up'].includes(key)) townV3Interior(key, grp, mats);
-  if (key==='house'){ const rug = new T.Mesh(new T.PlaneGeometry(3.2, 2.2), new T.MeshStandardMaterial({ color:lin('#7a2a24'), roughness:0.95 })); rug.rotation.x = -Math.PI/2; rug.position.set(10, 0.012, 9); grp.add(rug);
-    const rb = new T.Mesh(new T.PlaneGeometry(2.8, 1.8), new T.MeshStandardMaterial({ color:lin('#c8a050'), roughness:0.95 })); rb.rotation.x = -Math.PI/2; rb.position.set(10, 0.014, 9); grp.add(rb); const ri = new T.Mesh(new T.PlaneGeometry(2.5, 1.5), new T.MeshStandardMaterial({ color:lin('#8a3028'), roughness:0.95 })); ri.rotation.x = -Math.PI/2; ri.position.set(10, 0.016, 9); grp.add(ri); }
+  if (key==='house') v3Rug(grp, 10, 9, 3.2, 2.2, v3TexRug('#8a3028', '#c8a050', '#2a3048', 9));
   if (key==='tailor'){ for (let i=0;i<3;i++){ const c = new T.Mesh(new T.CylinderGeometry(0.1,0.1,0.5,10), new T.MeshStandardMaterial({ color:lin(['#6a4ab0','#b0302a','#3a7ac8'][i]), roughness:0.9 })); c.rotation.z = Math.PI/2; c.position.set(13.2, 0.3+i*0.22, 5.8); grp.add(c); } v3Crate(9.2,10.6,mats,grp); }
 }
 function v3Bench(k, x, z, mats, grp){
@@ -26295,6 +26343,107 @@ function v3TexWood(col, planks){
     const o=(y*256+i)*4; id.data[o]=b[0]*k; id.data[o+1]=b[1]*k; id.data[o+2]=b[2]*k; id.data[o+3]=255; }
   x.putImageData(id,0,0); return v3CanvasTex(c);
 }
+// ---------- interior surfaces (RS-126): real floorboards, flagstones, plaster, panelling and rugs ----------
+// every one tiles seamlessly (all the patterns repeat exactly across the canvas), with a matching bump map for depth
+const V3_INT_TEX = {};
+const v3Rng = seed=>{ let s = seed % 2147483647 || 1; return ()=>(s = s*16807 % 2147483647)/2147483647; };
+const v3Wave = (x, y, S, a, b, ph)=>Math.sin(2*Math.PI*(a*x/S + b*y/S) + ph);
+// boards: o.boards across the canvas, joints where the boards butt end to end, grain running along each board, knots, gaps and worn bevels
+function v3TexBoards(col, o){
+  o = o||{}; const key = 'boards'+col+JSON.stringify(o); if (V3_INT_TEX[key]) return V3_INT_TEX[key];
+  const S = o.size||1024, NB = o.boards||16, BW = S/NB, rnd = v3Rng(o.seed||7), n = v3Noise((o.seed||7)+3), b = v3hex(col);
+  const c = v3Canvas(S,S), cb = v3Canvas(S,S), id = c.getContext('2d').createImageData(S,S), bd = cb.getContext('2d').createImageData(S,S);
+  // each column of boards: where its joints fall (wrapping round the canvas), and each board's tone, grain and knots
+  const cols = [];
+  for (let i=0;i<NB;i++){
+    const segs = [], off = rnd()*S; let y = 0;
+    while (y < S){ let len = o.joints===false ? S : S*(0.28 + rnd()*0.38); if (S - (y + len) < S*0.2) len = S - y;
+      const kn = []; if (rnd() < (o.knots==null ? 0.45 : o.knots)) kn.push([BW*(0.25 + rnd()*0.5), len*(0.15 + rnd()*0.7), 3 + rnd()*5]);
+      segs.push({ y0:y, len, tone:0.8 + rnd()*0.32, warm:rnd()*0.08 - 0.04, ph:rnd()*6.3, fr:1.2 + rnd()*1.4, sk:rnd()*0.6 - 0.3, kn }); y += len; }
+    cols.push({ off, segs });
+  }
+  for (let y=0;y<S;y++) for (let x=0;x<S;x++){
+    const bi = Math.floor(x/BW), lx = x - bi*BW, C = cols[bi], yy = ((y - C.off) % S + S) % S;
+    let g = C.segs[0]; for (const sg of C.segs) if (yy >= sg.y0) g = sg;
+    const ly = yy - g.y0, u = lx/BW;
+    // grain: long wavy lines along the board, bent round any knot
+    let warp = 0, knot = 0; for (const [kx,ky,kr] of g.kn){ const dx = lx - kx, dy = (ly - ky)*0.28, d = Math.sqrt(dx*dx + dy*dy); warp += kr*6/(d + kr)*Math.sign(dx||1); if (d < kr) knot = Math.max(knot, 1 - d/kr); }
+    const gl = Math.sin((u*g.fr*9 + g.sk*ly/BW + n(bi*7 + u*2, ly/90)*2.2 + warp*0.12)*Math.PI*2 + g.ph);
+    const fib = n(x*0.5, ly/18), fine = n(x*2, y/8);
+    let k = g.tone*(0.84 + 0.1*gl*gl*Math.sign(gl) + 0.12*(fib - 0.5) + 0.06*(fine - 0.5));
+    k *= 1 - knot*0.55;
+    // wear: lighter where feet go, in soft patches
+    k *= 0.95 + 0.06*v3Wave(x, y, S, 1, 2, 0.4)*v3Wave(x, y, S, 2, -1, 1.1);
+    // the gaps between boards, a bevel on each edge, and the butt joints (with a nail at each end)
+    const gap = o.gaps===false ? 99 : Math.min(lx, BW - 1 - lx), jg = o.joints===false ? 99 : Math.min(ly, g.len - 1 - ly);
+    let h = 0.72 + 0.08*gl + 0.06*(fib - 0.5) - knot*0.1;
+    if (gap < 1.5 || jg < 1.5){ k *= 0.18; h = 0; } else if (gap < 4 || jg < 3){ const e = Math.min(gap/4, jg/3); k *= 0.7 + 0.3*e; h *= 0.6 + 0.4*e; }
+    if (o.joints!==false && jg < 14 && jg > 5 && Math.abs(lx - BW*0.5) > BW*0.22 && Math.abs(lx - BW*0.5) < BW*0.32 && (jg - 9.5)**2 + (Math.abs(lx - BW*0.5) - BW*0.27)**2 < 5){ k *= 0.4; h = 0.5; }
+    const q = (y*S + x)*4, w = g.warm;
+    id.data[q] = Math.min(255, b[0]*k*(1 + w)); id.data[q+1] = Math.min(255, b[1]*k); id.data[q+2] = Math.min(255, b[2]*k*(1 - w)); id.data[q+3] = 255;
+    const hv = Math.max(0, Math.min(255, h*255)); bd.data[q] = bd.data[q+1] = bd.data[q+2] = hv; bd.data[q+3] = 255;
+  }
+  c.getContext('2d').putImageData(id,0,0); cb.getContext('2d').putImageData(bd,0,0);
+  const map = v3CanvasTex(c), bump = new THREE.CanvasTexture(cb); bump.wrapS = bump.wrapT = THREE.RepeatWrapping; bump.anisotropy = 8;
+  return (V3_INT_TEX[key] = { map, bump });
+}
+// flagstones: rows of cut stones of varied length, bedded in mortar
+function v3TexFlags(col, seed){
+  const key = 'flags'+col+seed; if (V3_INT_TEX[key]) return V3_INT_TEX[key];
+  const S = 1024, rnd = v3Rng(seed||5), n = v3Noise((seed||5)+1), b = v3hex(col);
+  const c = v3Canvas(S,S), cb = v3Canvas(S,S), id = c.getContext('2d').createImageData(S,S), bd = cb.getContext('2d').createImageData(S,S);
+  const rows = []; let y = 0; while (y < S){ let h = S*(0.11 + rnd()*0.08); if (S - (y + h) < S*0.08) h = S - y; const st = []; let x = 0, off = rnd()*S;
+    while (x < S){ let w = S*(0.14 + rnd()*0.16); if (S - (x + w) < S*0.08) w = S - x; st.push({ x0:x, w, tone:0.72 + rnd()*0.36, tint:rnd()*0.1 - 0.05, tilt:rnd()*0.16 - 0.08 }); x += w; }
+    rows.push({ y0:y, h, off, st }); y += h; }
+  for (let y=0;y<S;y++){ let r = rows[0]; for (const rr of rows) if (y >= rr.y0) r = rr; const ly = y - r.y0;
+    for (let x=0;x<S;x++){ const xx = ((x - r.off) % S + S) % S; let t = r.st[0]; for (const tt of r.st) if (xx >= tt.x0) t = tt; const lx = xx - t.x0;
+      const ed = Math.min(lx, t.w - 1 - lx, ly, r.h - 1 - ly), sp = n(x/4, y/4), cl = n(x/16, y/16);
+      let k = t.tone*(0.86 + 0.16*(cl - 0.5) + 0.12*(sp - 0.5)) + t.tilt*(lx/t.w - 0.5), h = 0.75 + 0.15*(cl - 0.5) + 0.1*(sp - 0.5);
+      if (ed < 3){ k = 0.32 + 0.1*sp; h = 0.1; } else if (ed < 8){ const e = (ed - 3)/5; k *= 0.75 + 0.25*e; h *= 0.5 + 0.5*e; }
+      const q = (y*S + x)*4; id.data[q] = Math.min(255, b[0]*k*(1 + t.tint)); id.data[q+1] = Math.min(255, b[1]*k); id.data[q+2] = Math.min(255, b[2]*k*(1 - t.tint)); id.data[q+3] = 255;
+      const hv = Math.max(0, Math.min(255, h*255)); bd.data[q] = bd.data[q+1] = bd.data[q+2] = hv; bd.data[q+3] = 255; } }
+  c.getContext('2d').putImageData(id,0,0); cb.getContext('2d').putImageData(bd,0,0);
+  const map = v3CanvasTex(c), bump = new THREE.CanvasTexture(cb); bump.wrapS = bump.wrapT = THREE.RepeatWrapping; bump.anisotropy = 8;
+  return (V3_INT_TEX[key] = { map, bump });
+}
+// lime plaster, hand-troweled: soft clouds of tone and a few hairline cracks
+function v3TexLime(col){
+  const key = 'lime'+col; if (V3_INT_TEX[key]) return V3_INT_TEX[key];
+  const S = 512, n = v3Noise(21), b = v3hex(col), c = v3Canvas(S,S), cb = v3Canvas(S,S), id = c.getContext('2d').createImageData(S,S), bd = cb.getContext('2d').createImageData(S,S);
+  for (let y=0;y<S;y++) for (let x=0;x<S;x++){
+    const a = n(x/8, y/8), m = n(x/2, y/2), tr = 0.5 + 0.5*v3Wave(x, y, S, 1, 1, 0)*v3Wave(x, y, S, 2, -1, 1);
+    const k = 0.84 + 0.12*(a - 0.5) + 0.05*(m - 0.5) + 0.06*(tr - 0.5), q = (y*S + x)*4;
+    id.data[q] = b[0]*k; id.data[q+1] = b[1]*k; id.data[q+2] = b[2]*k; id.data[q+3] = 255;
+    const hv = 150 + 60*(a - 0.5) + 30*(m - 0.5); bd.data[q] = bd.data[q+1] = bd.data[q+2] = hv; bd.data[q+3] = 255; }
+  const x = c.getContext('2d'); x.putImageData(id,0,0); cb.getContext('2d').putImageData(bd,0,0);
+  const rnd = v3Rng(33); x.strokeStyle = 'rgba(60,45,30,0.25)'; x.lineWidth = 1;
+  for (let i=0;i<5;i++){ let px = rnd()*S, py = rnd()*S; x.beginPath(); x.moveTo(px, py); for (let j=0;j<8;j++){ px += rnd()*14 - 7; py += 4 + rnd()*8; x.lineTo(px, py); } x.stroke(); }
+  const map = v3CanvasTex(c), bump = new THREE.CanvasTexture(cb); bump.wrapS = bump.wrapT = THREE.RepeatWrapping;
+  return (V3_INT_TEX[key] = { map, bump });
+}
+// a woven rug: a field with a medallion, borders of running pattern, and a fringe at each end
+function v3TexRug(field, border, accent, seed){
+  const key = 'rug'+field+border+accent+seed; if (V3_INT_TEX[key]) return V3_INT_TEX[key];
+  const W = 512, H = 768, c = v3Canvas(W,H), x = c.getContext('2d'), rnd = v3Rng(seed||3);
+  x.fillStyle = '#c4b490'; x.fillRect(0,0,W,H);
+  for (let i=0;i<W;i+=6){ x.fillStyle = '#b8a888'; x.fillRect(i, 0, 3, 28); x.fillRect(i, H-28, 3, 28); }   // fringe
+  x.fillStyle = border; x.fillRect(10, 28, W-20, H-56);
+  x.fillStyle = accent; for (let i=0;i<(W-60)/24;i++){ x.save(); x.translate(30 + i*24 + 12, 52); x.rotate(Math.PI/4); x.fillRect(-6,-6,12,12); x.restore(); x.save(); x.translate(30 + i*24 + 12, H-52); x.rotate(Math.PI/4); x.fillRect(-6,-6,12,12); x.restore(); }
+  for (let i=0;i<(H-120)/24;i++){ for (const bx of [32, W-32]){ x.save(); x.translate(bx, 76 + i*24 + 12); x.rotate(Math.PI/4); x.fillRect(-6,-6,12,12); x.restore(); } }
+  x.fillStyle = field; x.fillRect(56, 80, W-112, H-160);
+  x.strokeStyle = accent; x.lineWidth = 4; x.strokeRect(66, 90, W-132, H-180);
+  x.fillStyle = border; x.beginPath(); x.moveTo(W/2, H/2 - 170); x.lineTo(W/2 + 110, H/2); x.lineTo(W/2, H/2 + 170); x.lineTo(W/2 - 110, H/2); x.closePath(); x.fill();
+  x.fillStyle = accent; x.beginPath(); x.moveTo(W/2, H/2 - 110); x.lineTo(W/2 + 70, H/2); x.lineTo(W/2, H/2 + 110); x.lineTo(W/2 - 70, H/2); x.closePath(); x.fill();
+  x.fillStyle = field; x.beginPath(); x.arc(W/2, H/2, 30, 0, Math.PI*2); x.fill();
+  for (const [cx,cy] of [[90,124],[W-90,124],[90,H-124],[W-90,H-124]]){ x.fillStyle = border; x.beginPath(); x.moveTo(cx, cy-26); x.lineTo(cx+26, cy); x.lineTo(cx, cy+26); x.lineTo(cx-26, cy); x.closePath(); x.fill(); }
+  // the weave: fine rows of threads, and some wear
+  x.fillStyle = 'rgba(0,0,0,0.2)'; x.fillRect(0,0,W,H);
+  x.fillStyle = 'rgba(0,0,0,0.12)'; for (let yy=0;yy<H;yy+=3) x.fillRect(0, yy, W, 1);
+  x.fillStyle = 'rgba(0,0,0,0.06)'; for (let xx=0;xx<W;xx+=4) x.fillRect(xx, 0, 1, H);
+  for (let i=0;i<3000;i++){ x.fillStyle = rnd() < 0.5 ? 'rgba(0,0,0,0.08)' : 'rgba(255,240,220,0.05)'; x.fillRect(rnd()*W, rnd()*H, 2 + rnd()*3, 1); }
+  const map = v3CanvasTex(c); map.wrapS = map.wrapT = THREE.ClampToEdgeWrapping;
+  return (V3_INT_TEX[key] = { map });
+}
 function v3TexShingle(col, thatch){
   const c = v3Canvas(256,256), x = c.getContext('2d'), b = v3hex(col), n = v3Noise(3);
   x.fillStyle = v3rgb(b,0.4); x.fillRect(0,0,256,256);
@@ -32225,7 +32374,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-125';
+const GAME_VERSION = 'rs-126';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

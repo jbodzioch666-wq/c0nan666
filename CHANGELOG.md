@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-126 - Rooms that look like rooms
+
+- **Real floorboards:** taverns, shops, houses and workshops now have proper plank floors. Each board has its own grain and tone, with knots, butt joints, nail heads and dark gaps between boards. They also catch the lamplight with real depth. Before, one small texture was smeared across the whole room.
+- **Flagstone floors:** the smithy, temple, guild hall, bank and cellars are paved with cut stone set in mortar.
+- **Walls:** plastered walls now have wood panelling to waist height with a rail along the top. Stone rooms get a skirting board. The cut-away near walls have a wooden cap, so they no longer glare white.
+- **Windows and daylight:** windows have glazing bars and a deep sill. By day, soft light falls through them onto the floor. At night they go dark.
+- **Rugs:** woven rugs with borders, a medallion and fringes lie in the tavern, shops, bank, temple, guild and your house, and there's a runner at every door.
+
 ## RS-125 - Thunder follows the lightning
 
 - **One strike, light then sound:** every lightning flash brings its own thunder instead of the two firing at random. A near strike cracks almost at once. A distant one rumbles in up to about three seconds later, so you can count the gap like in a real storm.
