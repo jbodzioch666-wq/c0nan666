@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-111 - Old flat views removed
+
+- **Removed the leftover flat views:** the flat overworld, town, roadside-fight and dungeon maps were removed from the code. You could no longer reach them, and they're about 645 lines that no longer have to load. The world map (M), the minimap and the waypoint map still work as before.
+- **A clear message if 3D can't run:** if your browser can't start 3D graphics (WebGL), you now see a short message explaining why, instead of the old flat map. While the 3D library is still downloading, it reads "Loading the 3D view..." and switches to the game as soon as it arrives. If the download fails, it asks you to check your connection and reload.
+
 ## RS-110 - No more hitches walking past torches
 
 - **The real cause of the dungeon stutter:** as you walked, the nearest torches took over the dungeon's four torch lights. A torch light with nothing to light was switched off. Switching a light on or off forces the graphics card to rebuild the shaders for everything on screen. That caused a pause of a fraction of a second each time a torch came into or went out of range, and up to several seconds on slower graphics. Unused torch lights now just go dark instead of switching off, so nothing gets rebuilt.

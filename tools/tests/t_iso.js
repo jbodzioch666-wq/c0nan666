@@ -1,5 +1,6 @@
 // RS-108: isometric 3D everywhere - no key or saved setting switches the overworld, a town or a dungeon to a flat view
 // RS-109: the first-person renderer is gone; without WebGL a dungeon shows a notice instead
+// RS-111: the flat overworld, town, arena and dungeon renderers are gone too (the world map, M, is still flat)
 module.exports = async page=>{
   await page.evaluate(()=>{ try { localStorage.setItem('depthcrawl_world3d','0'); localStorage.setItem('depthcrawl_town3d','0'); localStorage.setItem('depthcrawl_viewiso','0'); } catch(e){} });
   await page.reload(); await page.waitForTimeout(1500);
@@ -22,9 +23,13 @@ module.exports = async page=>{
   await key('m'); A(await ev(()=>fp3dPref && fp3dActive()), 'M in a dungeon leaves the 3D view');
   A(await ev(()=>['fpRenderWorld','fpDrawWeapon','fpDrawCompass','fpTurn','fpStep'].every(n=>typeof window[n]==='undefined')), 'the first-person code is gone');
   // the arrow keys and a click still work in the dungeon (they walk in the isometric view)
-  const p0 = await ev(()=>[G.player.x, G.player.y]); for (const k of ['ArrowRight','ArrowDown','ArrowLeft','ArrowUp']) await key(k);
+  const p0 = await ev(()=>[G.player.x, G.player.y]); for (const k of ['ArrowRight','ArrowDown','ArrowRight','ArrowDown']) await key(k);   // (never back onto the entry stairs, which would leave the dungeon)
   A(await ev(()=>G.ui==='playing' && G.gameMode===1), 'still in the dungeon after arrow keys');
   // no WebGL: a notice, not an error
   A(await ev(()=>{ const real = fpdInit; fpdInit = ()=>false; try { renderGame(); return true; } finally { fpdInit = real; renderGame(); } }), 'the no-3D notice draws');
+  A(await ev(()=>['renderOverworldMap','renderVillageMap','renderArenaMap','renderDungeonMapIso','renderDungeonMapOrtho','renderInteriorMap'].every(n=>typeof window[n]==='undefined')), 'the flat renderers are gone');
+  A(await ev(()=>typeof renderOverworldMapZoomed==='function'), 'the world map is still there');
+  // no 3D in town or on the land: the notice, and the fog still lifts around you on the land
+  A(await ev(()=>{ const t = townList()[0]; G.owPos = { x:t.x, y:t.y }; enterVillage(); setUi('playing'); v3Pref = false; try { renderGame(); } finally { v3Pref = true; } G.gameMode = 0; G.interior = null; o3Pref = false; try { renderGame(); return owSeenArr()[G.owPos.y*OW_COLS + G.owPos.x] > 0; } finally { o3Pref = true; renderGame(); } }), 'the no-3D notice in town and on the land');
   console.log('ok');
 };
