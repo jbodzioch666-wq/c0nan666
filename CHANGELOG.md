@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-128 - Doors that open when you click them
+
+- **Bank, temple and guild hall:** clicking their doors did nothing, because they use a plain town door the click-to-walk didn't recognise. Clicking them now walks you in like any shop.
+- **Waypoint ring back in place:** since towns got roomier, the flagstone ring was painted three tiles away from the waypoint. It now sits right under it.
+- **Portal arrivals:** you step out of a portal beside the waypoint again, not out in the old spot.
+
 ## RS-127 - Walk right in
 
 - **No more cut at the door:** step into a doorway and the door swings open, you walk onto the threshold and the camera leans in after you. The room appears as you cross, and the camera eases back out to show it. There's no loading screen or jump.

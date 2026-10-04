@@ -21,6 +21,15 @@ module.exports = async page=>{
   const s5 = await ev(()=>{ moveDir(0, 1); return { out:!G.interior, phase:V3.door && V3.door.phase }; }); A(s5.out && s5.phase==='in', 'out through the door the same way');
   await ev(async ()=>{ for (let i=0;i<120 && V3.door;i++){ renderGame(); await new Promise(r=>setTimeout(r, 40)); } });
   const s6 = await ev(()=>({ done:!V3.door, shut:V3.doors.tavern ? Math.abs(V3.doors.tavern.rotation.y) : -1, town:V3.mapRef===G.map && !G.interior })); A(s6.done && s6.town && s6.shut < 0.05, 'back on the street with the door shut: '+JSON.stringify(s6));
+  // RS-128: clicking any building walks you to its door - the bank, temple and guild hall (plain town doors) too
+  const clicks = await ev(()=>{ const out = {}; for (const t of townList()){ G.gameMode = 0; G.owPos = { x:t.x, y:t.y }; enterVillage(); setUi('playing'); renderGame();
+      for (const b of VILLAGE_BUILDINGS){ G.player.x = TOWN_CX; G.player.y = ROWS-3; V3.path = []; v3WalkTo({ kind:'building', b }); let x = G.player.x, y = G.player.y; for (const [dx,dy] of V3.path){ x += dx; y += dy; }
+        out[b.key] = (out[b.key]||0) + (V3.path.length && x===b.door.x && y===b.door.y ? 0 : 1); } V3.path = []; } return out; });
+  A(Object.values(clicks).every(v=>v===0), 'a click on any building finds the way to its door: '+JSON.stringify(clicks));
+  A(clicks.bank===0 && clicks.temple===0, 'the bank and the temple included');
+  // RS-128: the waypoint's flagstone ring is painted round the waypoint, and you arrive by it
+  const wp = await ev(()=>{ waypointArrive(G.owPos.x+','+G.owPos.y); G.portalFx = null; setUi('playing'); return { at:[G.player.x, G.player.y], wp:[TOWN_CX, tY(12)], tile:G.map[TOWN_CX][tY(12)], T:T_WAYPOINT }; });
+  A(wp.tile===wp.T && Math.abs(wp.at[1] - wp.wp[1]) <= 3 && wp.at[0]===wp.wp[0], 'you step out of the portal beside the waypoint: '+JSON.stringify(wp));
   // without 3D the door still just works
   const s7 = await ev(()=>{ v3Pref = false; const b = buildingByKey('tavern'); G.player.x = b.door.x; G.player.y = b.door.y + 1; tryMove(0, -1); const r = !!G.interior && !V3.door; exitInterior(); v3Pref = true; return r; }); A(s7, 'and with no 3D, straight in');
 };
