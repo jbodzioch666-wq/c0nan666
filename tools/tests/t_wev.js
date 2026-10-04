@@ -82,7 +82,8 @@ module.exports = async page=>{
     e.town[key] = { kind:'raid', id:e.seq++, until:wevTurn()+100 };
     enterVillage(); return true;
   });
-  await page.waitForTimeout(150);
+  // (the raid warning opens on the next frame; a frame of the 3D town can take a while in software rendering)
+  for (let i=0; i<60 && !(await page.evaluate(()=>G.ui==='wevent')); i++) await page.waitForTimeout(250);
   const r6 = await page.evaluate(()=>{
     const A = (c, msg)=>{ if (!c) throw new Error('assert: '+msg); };
     A(G.ui==='wevent' && /Raid/.test(G.wevDlg.title), 'raid prompt'); wevChoose(0); A(G.gameMode===2 && G.wevFight.kind==='raid', 'raid fight');
