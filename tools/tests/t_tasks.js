@@ -44,7 +44,7 @@ module.exports = async page=>{
     }
     const g0 = p.gold, tok0 = p.cur.guild;
     // walk into the board
-    setUi('playing'); G.player.x = 15; G.player.y = 9; tryMove(0,-1);
+    setUi('playing'); G.player.x = tX(15); G.player.y = tY(9); tryMove(0,-1);
     A(G.ui==='tasks' && G.tkAt==='board', 'board opens');
     p.contracts.daily.forEach((t,i)=>tkClaim('daily', i));
     A(p.contracts.daily.every(t=>t.claimed), 'claimed'); A(p.gold > g0 && p.cur.guild > tok0, 'paid');

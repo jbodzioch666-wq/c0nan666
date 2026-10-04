@@ -51,7 +51,7 @@ module.exports = async page=>{
     tkOpen('board', 'news'); const ov = document.getElementById('overlay').innerHTML; A(ov.includes('RUMOURS') && ov.includes('NEWS FROM ACROSS THE LAND'), 'news tab'); setUi('playing');
     // townsfolk: they step aside, routines, the night
     const v = G.villagers.find(v=>!v.guard && !v.animal); A(v, 'a townsperson');
-    G.player.x = TOWN_CX; G.player.y = 16; v.x = TOWN_CX; v.y = 15; v.indoors = false; moveDir(0, -1); A(G.ui==='playing' && G.player.y===15 && !(v.x===TOWN_CX && v.y===15), 'townsfolk step aside (RS-117: no chat)');
+    G.player.x = TOWN_CX; G.player.y = tY(16); v.x = TOWN_CX; v.y = tY(15); v.indoors = false; moveDir(0, -1); A(G.ui==='playing' && G.player.y===tY(15) && !(v.x===TOWN_CX && v.y===tY(15)), 'townsfolk step aside (RS-117: no chat)');
     p.clock = p.turnCount = DAY_LENGTH*3 + 10; for (let i=0;i<80;i++) moveVillagers();
     out.night = { indoors:G.villagers.filter(v=>v.indoors).length, folk:G.villagers.filter(v=>!v.guard && !v.animal).length };
     A(out.night.indoors > 0, 'folk go home at night');
@@ -101,6 +101,6 @@ module.exports = async page=>{
   await page.evaluate(()=>{ const c = townList().find(t=>townInfo(t.x, t.y).tier===2); G.owPos = { x:c.x, y:c.y }; enterVillage(); setUi('playing'); v3Pref = false; renderGame(); });
   await page.waitForTimeout(300);
   await page.screenshot({ path: SHOTS+'/shot_city2d.png', timeout:120000 });
-  await page.evaluate(async ()=>{ v3Pref = true; G.weather = 'rain'; G.player.x = 24; G.player.y = 8; for (let i=0;i<12;i++){ renderGame(); await new Promise(r=>setTimeout(r, 40)); } });
+  await page.evaluate(async ()=>{ v3Pref = true; G.weather = 'rain'; G.player.x = tX(24); G.player.y = tY(8); for (let i=0;i<12;i++){ renderGame(); await new Promise(r=>setTimeout(r, 40)); } });
   await page.screenshot({ path: SHOTS+'/shot_city_rain.png', timeout:120000 });
 };
