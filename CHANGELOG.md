@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-116 - Real waterfalls, and rivers that fill their banks
+
+- **Waterfalls flow down:** the water used to scroll up the cliff. Now it falls.
+- **Waterfalls in 3D:** each waterfall used to be a flat strip pressed against the rock. Now the water rolls over the lip and arcs out from the cliff as it falls, in two layers moving at different speeds. Where it lands there's a churning foam pool, spray thrown up and out, and mist drifting off it.
+- **Waterfalls where they belong:** a waterfall now only appears where a river comes off a cliff and runs on, at least two tiles from the next one. Before, a river running along the foot of a range sprouted a row of falls out of the slope.
+- **Rivers fill their banks:** a river is one tile wide, but the raised shore added in RS-105 squeezed it into a thin strip down the middle. River banks now sit at the water line, so the river fills its tile. Sea and lake shores keep the higher edge that stops their waves washing through the land.
+
 ## RS-115 - Rivers join up on the diagonal
 
 - **No more broken rivers:** a river that turned a corner diagonally used to be drawn with a dry point where its two tiles met, so it looked chopped into pieces. Those corners now sit under the water in every world, including your current save, so the river runs through.
