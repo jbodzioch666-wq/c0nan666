@@ -28,6 +28,7 @@ Screenshots go to `tools/tests/shots/`.
 | iso | isometric 3D everywhere: no key or saved setting switches to a flat view |
 | xpt | tick skills in the skills menu to choose what the XP window shows |
 | rooms | building interiors: floorboards and flagstones with depth, panelled walls, rugs, daylight through the windows |
+| door | walking through a door: swings open, camera leans in, room appears, eases out; and back out with the door shutting |
 | diag | diagonal steps: keys, numpad, corners, click paths, no diagonal strikes |
 | touch | on an emulated phone: tap to walk, long-press menu, pinch zoom, map drag, the d-pad, the hotbar |
 | bal | balance: monsters bite harder, the fixed-strength lair boss, coin trim, the smith's reinforcing |

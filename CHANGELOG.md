@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-127 - Walk right in
+
+- **No more cut at the door:** step into a doorway and the door swings open, you walk onto the threshold and the camera leans in after you. The room appears as you cross, and the camera eases back out to show it. There's no loading screen or jump.
+- **Out the same way:** leave through the door and the camera pulls back over the street while the door swings shut behind you.
+- **Ready before you arrive:** a building's floors, walls and rugs are prepared while you walk up to its door, so crossing has nothing to wait for.
+
 ## RS-126 - Rooms that look like rooms
 
 - **Real floorboards:** taverns, shops, houses and workshops now have proper plank floors. Each board has its own grain and tone, with knots, butt joints, nail heads and dark gaps between boards. They also catch the lamplight with real depth. Before, one small texture was smeared across the whole room.
