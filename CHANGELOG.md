@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-125 - Thunder follows the lightning
+
+- **One strike, light then sound:** every lightning flash brings its own thunder instead of the two firing at random. A near strike cracks almost at once. A distant one rumbles in up to about three seconds later, so you can count the gap like in a real storm.
+- **Lightning over towns:** storms now light up the sky in towns too, not just out in the wilds.
+- **Thunder under cover:** indoors and at the top of a dungeon you still hear muffled thunder rolling outside.
+
 ## RS-124 - Real rain
 
 - **The old hiss is gone:** rain used to be a single band of static. It's now made of a soft wash that gusts with the wind, individual drops, and the odd plip into a puddle.

@@ -20307,6 +20307,7 @@ function townV3Tick(dt){
   if (V3.townPuddles) V3.townPuddles.visible = townWet();
   if (V3.townWaterMat) V3.townWaterMat.opacity = 0.84 + Math.sin(V3.t*1.3)*0.05;
   if (V3.townShip){ V3.townShip.rotation.z = Math.sin(V3.t*0.9)*0.04; V3.townShip.position.y = 0.1 + Math.sin(V3.t*1.2)*0.03; }
+  const fl = G.interior ? 0 : stormTick(dt); if (V3.hemi && V3.hemiBase!=null) V3.hemi.intensity = V3.hemiBase + fl*4;   /* lightning over the town, with its thunder */
   if (G.interior || !V3.world) return;
   const pp = V3.player && V3.player.g.position; if (!pp) return;
   const wet = townWet(), snow = !wet && isWinter() && (G.weather==='fog' || G.villageTheme==='tundra');
@@ -20796,9 +20797,22 @@ function rainMix(){
   else { L.steady = 0.6*ease; L.drizzle = 0.8*(1 - ease); }
   return L;
 }
-// rolling thunder: a crack, then a few rumbles that die away (muffled under a roof or below ground)
-function rainThunder(at, vol, muffled){
-  const ctx = AUD.ctx, A = _gains.amb; if (!muffled) audNoiseHit(A, at, 0.15, 'highpass', 2000, 0.1*vol);
+// lightning and its thunder come as one strike: the flash first, then the thunder after a delay that grows with distance
+// (called each frame by whichever outdoor view is showing; the returned value brightens the sky)
+const STORM = { flash:0, seenAt:0 };
+function stormTick(dt){
+  STORM.seenAt = performance.now();
+  if (STORM.flash > 0) STORM.flash = Math.max(0, STORM.flash - dt);
+  else if (G.weather==='storm' && Math.random() < dt*0.12) stormStrike();
+  return STORM.flash;
+}
+function stormStrike(){
+  const dist = Math.random(); STORM.flash = 0.22 + 0.18*(1 - dist); STORM.last = { dist, at:performance.now() };
+  const ctx = AUD.ctx; if (ctx && ctx.state==='running') rainThunder(ctx.currentTime + 0.12 + dist*2.6, 0.3 + 0.35*(1 - dist), false, dist < 0.4);
+}
+// rolling thunder: a crack (for a near strike), then a few rumbles that die away (muffled under a roof or below ground)
+function rainThunder(at, vol, muffled, crack){
+  const ctx = AUD.ctx, A = _gains.amb; if (!muffled && crack!==false) audNoiseHit(A, at, 0.15, 'highpass', 2000, 0.1*vol);
   if (!AUD.brown){ const d = rainNoiseArr('brown', ctx.sampleRate*6); AUD.brown = ctx.createBuffer(1, d.length, ctx.sampleRate); AUD.brown.getChannelData(0).set(d); }
   const s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain(); s.buffer = AUD.brown; f.type = 'lowpass'; f.frequency.value = muffled ? 90 : 160;
   let t = at + 0.08; g.gain.setValueAtTime(0, at); for (let i=0;i<5;i++){ t += rainR(0.15, 0.6); g.gain.linearRampToValueAtTime(vol*rainR(0.5,1), t); }
@@ -20826,7 +20840,7 @@ function audAmbTick(dt){
   if (G.gameMode===1 && roll(0.25)){ const o = ctx.createOscillator(), g = ctx.createGain(); o.type = 'sine'; o.frequency.setValueAtTime(1400 + Math.random()*500, at); o.frequency.exponentialRampToValueAtTime(500, at + 0.08); g.gain.setValueAtTime(0.05, at); g.gain.exponentialRampToValueAtTime(0.0001, at + 0.12); o.connect(g); g.connect(A); o.start(at); o.stop(at + 0.14); }
   if (G.gameMode===1 && roll(0.02)) audNoiseHit(A, at, 2.5, 'lowpass', 70, 0.18);
   if (audNearWater() && !night && roll(0.08)){ for (let i=0;i<2;i++){ const o = ctx.createOscillator(), g = ctx.createGain(); o.type = 'sawtooth'; o.frequency.setValueAtTime(1200, at + i*0.22); o.frequency.exponentialRampToValueAtTime(800, at + i*0.22 + 0.18); g.gain.setValueAtTime(0.02, at + i*0.22); g.gain.exponentialRampToValueAtTime(0.0001, at + i*0.22 + 0.2); o.connect(g); g.connect(A); o.start(at + i*0.22); o.stop(at + i*0.22 + 0.22); } }
-  if (storm && roll(0.05)){ if (out) rainThunder(at, 0.5, false); else if (G.interior || (G.gameMode===1 && (G.depth||1)===1)) rainThunder(at, 0.3, true); }
+  if (storm && roll(0.05)){ if (out){ if (performance.now() - STORM.seenAt > 1000) rainThunder(at, 0.5, false); } else if (G.interior || (G.gameMode===1 && (G.depth||1)===1)) rainThunder(at, 0.3, true); }
 }
 function audBird(t){ const ctx = AUD.ctx, A = _gains.amb, n = 2 + Math.floor(Math.random()*3), base = 2400 + Math.random()*1600;
   for (let i=0;i<n;i++){ const o = ctx.createOscillator(), g = ctx.createGain(), s = t + i*0.13; o.type = 'sine'; o.frequency.setValueAtTime(base, s); o.frequency.exponentialRampToValueAtTime(base*1.35, s + 0.06); g.gain.setValueAtTime(0.0001, s); g.gain.linearRampToValueAtTime(0.025, s + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, s + 0.09); o.connect(g); g.connect(A); o.start(s); o.stop(s + 0.1); } }
@@ -26932,6 +26946,7 @@ function v3ApplyTime(force){
     V3.sun.intensity = night ? 0.15 : 0.6; V3.sun.color.setHex(night ? 0x7a90e0 : 0xffe8c8); V3.mats.glass.emissiveIntensity = night ? 0.1 : 0.6;
     V3.plights.forEach(pl=>{ const l = pl.userData; pl.intensity = l && l.p ? 2.2 : 0; pl.distance = l && l.r ? l.r : 5; });
   }
+  V3.hemiBase = V3.hemi.intensity;
 }
 // ---------- setup ----------
 function v3Init(){
@@ -28186,9 +28201,8 @@ function o3Render(){
     O3.rainDrops.forEach((d,i)=>{ d[1] -= fall; if (d[1] < -1){ d[0] = Math.random()*30-15; d[1] = 10+Math.random()*2; d[2] = Math.random()*30-15; }
       a.setXYZ(i*2, pp.x+d[0], pp.y+d[1], pp.z+d[2]); a.setXYZ(i*2+1, pp.x+d[0]-0.04, pp.y+d[1]-len, pp.z+d[2]-0.02); });
     a.needsUpdate = true;
-    if (G.weather==='storm'){ if (!O3.flash && Math.random() < dt*0.12) O3.flash = 0.35; }
   }
-  if (O3.flash){ O3.flash -= dt; O3.hemi.intensity += Math.max(0, O3.flash)*4; if (O3.flash <= 0) O3.flash = 0; }
+  O3.hemi.intensity += stormTick(dt)*4;   /* lightning, with its thunder (RS-124) */
   // click marker
   if (O3.clickFx){ O3.clickFx.t += dt; if (!O3.clickRing){ O3.clickRing = new T.Mesh(new T.RingGeometry(0.18,0.26,24), new T.MeshBasicMaterial({ color:0xffd060, transparent:true, depthWrite:false })); O3.clickRing.rotation.x = -Math.PI/2; O3.scene.add(O3.clickRing); }
     O3.clickRing.visible = O3.clickFx.t < 0.5; O3.clickRing.position.set(O3.clickFx.x, O3.clickFx.y+0.04, O3.clickFx.z); O3.clickRing.scale.setScalar(1 + O3.clickFx.t*1.5); O3.clickRing.material.opacity = 1 - O3.clickFx.t*2; }
@@ -32211,7 +32225,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-124';
+const GAME_VERSION = 'rs-125';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

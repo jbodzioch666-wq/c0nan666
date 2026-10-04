@@ -47,6 +47,13 @@ module.exports = async page=>{
     G.weather = 'rain'; G.interior = { key:'tavern' }; A(mix()==='roof', 'rain on the roof indoors'); G.interior = null;
     G.gameMode = 1; G.depth = 1; G.siteKind = 'crypt'; A(mix()==='cave', 'rain echoing into the first floor of a dungeon');
     G.depth = 3; A(mix()==='', 'no rain heard deep down'); G.gameMode = 0; G.depth = 1;
+    // lightning and thunder come together: a strike lights the sky and schedules its own thunder, later the farther it is
+    G.weather = 'storm'; const calls = [], realT = rainThunder; rainThunder = (...a)=>calls.push(a); STORM.flash = 0; stormStrike(); rainThunder = realT;
+    A(STORM.flash > 0.2 && STORM.last, 'a strike flashes'); A(calls.length===1 && calls[0][0] > AUD.ctx.currentTime + 0.1, 'and its thunder follows: '+JSON.stringify(calls));
+    A(calls[0][0] - AUD.ctx.currentTime < 3 && (STORM.last.dist < 0.4)===calls[0][3], 'sooner and with a crack when it is near');
+    let f = STORM.flash; for (let i=0;i<10;i++) f = stormTick(0.05); A(f < STORM.flash + 1e-9 && f < 0.3, 'the flash fades');
+    for (let i=0;i<40 && STORM.flash > 0;i++) stormTick(0.05); A(STORM.flash===0, 'and is gone');
+    STORM.seenAt = performance.now(); out.strike = STORM.last;
     AUD.wetT = 0; G.weather = 'storm';
     G.weather = 'clear';
     // the music player
