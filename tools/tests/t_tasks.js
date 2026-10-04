@@ -44,7 +44,7 @@ module.exports = async page=>{
     }
     const g0 = p.gold, tok0 = p.cur.guild;
     // walk into the board
-    setUi('playing'); G.player.x = tX(15); G.player.y = tY(9); tryMove(0,-1);
+    setUi('playing'); { const [bx,by] = townBoardAt(); G.player.x = bx; G.player.y = by+1; if (G.map[bx][by+1]!==T_FLOOR){ G.player.x = bx-1; G.player.y = by; tryMove(1,0); } else tryMove(0,-1); }
     A(G.ui==='tasks' && G.tkAt==='board', 'board opens');
     p.contracts.daily.forEach((t,i)=>tkClaim('daily', i));
     A(p.contracts.daily.every(t=>t.claimed), 'claimed'); A(p.gold > g0 && p.cur.guild > tok0, 'paid');

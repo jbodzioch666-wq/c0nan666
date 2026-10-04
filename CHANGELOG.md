@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-129 - A tidier town
+
+- **The green stand is gone:** the banker's old outdoor desk still stood on the square after the banker moved inside the bank. It's been cleared away.
+- **No stall in a tree:** the Peddler's market stall stands in front of the Peddler's shop again, not inside the tree beside it.
+- **The Captain and his board move:** the Captain of the Watch and the bounty board now stand together on the wide street north of the square, well clear of the bank. The board's front is left open so you can walk up to it.
+- **Everything back on its spot:** since towns got roomier, a few things were still drawn where they used to be. The alchemist's cauldron, the barrels by the tavern, the harbour pier and the festival bunting poles now stand where they belong.
+
 ## RS-128 - Doors that open when you click them
 
 - **Bank, temple and guild hall:** clicking their doors did nothing, because they use a plain town door the click-to-walk didn't recognise. Clicking them now walks you in like any shop.
