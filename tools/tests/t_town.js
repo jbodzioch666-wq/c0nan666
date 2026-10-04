@@ -49,9 +49,9 @@ module.exports = async page=>{
     setUi('playing');
     // the news on the board
     tkOpen('board', 'news'); const ov = document.getElementById('overlay').innerHTML; A(ov.includes('RUMOURS') && ov.includes('NEWS FROM ACROSS THE LAND'), 'news tab'); setUi('playing');
-    // townsfolk: gossip, routines, the night
+    // townsfolk: they step aside, routines, the night
     const v = G.villagers.find(v=>!v.guard && !v.animal); A(v, 'a townsperson');
-    G.player.x = TOWN_CX; G.player.y = 16; v.x = TOWN_CX; v.y = 15; v.indoors = false; moveDir(0, -1); A(G.ui==='wevent', 'gossip'); out.gossip = G.wevDlg.text.replace(/<[^>]+>/g, '').slice(0, 200); wevChoose(0);
+    G.player.x = TOWN_CX; G.player.y = 16; v.x = TOWN_CX; v.y = 15; v.indoors = false; moveDir(0, -1); A(G.ui==='playing' && G.player.y===15 && !(v.x===TOWN_CX && v.y===15), 'townsfolk step aside (RS-117: no chat)');
     p.clock = p.turnCount = DAY_LENGTH*3 + 10; for (let i=0;i<80;i++) moveVillagers();
     out.night = { indoors:G.villagers.filter(v=>v.indoors).length, folk:G.villagers.filter(v=>!v.guard && !v.animal).length };
     A(out.night.indoors > 0, 'folk go home at night');
