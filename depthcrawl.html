@@ -7508,7 +7508,22 @@ function ensureSpawnEscape(){
 // ---- RS-102 world generation: mountain ranges, an open start, and nothing out of reach ----
 // (RS-106, generator 3: broader ranges, valleys walled in by them filled in as mountain, and nothing but a dragon's lair in or on them)
 // (RS-114, generator 4: a river that runs into a hollow fills it into a lake and flows on from its lowest edge)
-const OW_GEN_VER = 4;
+// (RS-115, generator 5: rivers join edge to edge - a diagonal step also fills the lower of its two side tiles)
+const OW_GEN_VER = 5;
+// any two river tiles that touch only at a corner get the lower of the two tiles beside them turned to river
+// (never a mountain, the sea or a lake); returns how many tiles it added
+function owRiverJoin(elev){
+  const m = G.ow.map, W = OW_COLS, H = OW_ROWS, riv = t=>t===OW_RIVER, wat = t=>t===OW_RIVER || t===OW_WATER;
+  const ok = (x, y)=> m[x][y]!==OW_MOUNTAIN && m[x][y]!==OW_WATER && m[x][y]!==OW_RIVER;
+  let n = 0;
+  for (let x=1;x<W-1;x++) for (let y=1;y<H-1;y++){ if (!wat(m[x][y])) continue;
+    for (const [a,b] of [[1,1],[1,-1]]){ const u = m[x+a][y+b]; if (!wat(u) || (!riv(m[x][y]) && !riv(u))) continue;
+      if (wat(m[x+a][y]) || wat(m[x][y+b])) continue;
+      const c1 = ok(x+a, y), c2 = ok(x, y+b); if (!c1 && !c2) continue;
+      const [fx, fy] = !c2 || (c1 && elev[x+a][y] <= elev[x][y+b]) ? [x+a, y] : [x, y+b];
+      m[fx][fy] = OW_RIVER; n++; } }
+  return n;
+}
 const OW_LAKE_MAX = 80;      // a hollow that would need a bigger lake than this gets a channel cut through its rim instead
 // a river stuck in a hollow at (x,y): flood the hollow from its lowest rim cell upward (priority flood) until the water would spill
 // out somewhere lower. Small enough: the hollow becomes a lake (OW_WATER, its floor levelled) and the river carries on from the
@@ -7709,6 +7724,7 @@ function generateOverworld(seed){
   }
 
   if (owMtnClear()) G.ow.pocketsFilled = owFillPockets(OW_POCKET_MAX);
+  if ((G.ow.genVer||1) >= 5){ let n = 0, k = 0; for (let pass=0; pass<6; pass++){ k = owRiverJoin(elev); n += k; if (!k) break; } G.ow.riverStats.joined = n; }   // (after the valleys are filled, which can take a tile from a river; again until settled, as a filled tile can make a new corner)
   // the island falloff biases high elevation toward the map's centre, so the
   // dead-centre tile itself is often mountain - search outward ring by ring
   // from there for the nearest tile that's naturally open ground, so the
@@ -27101,8 +27117,11 @@ function o3Build(cx, cy){
     // keep the ground clear of the water sheet (RS-105): wholly-land ground stays well above the wave tops,
     // a shore edge sits just above them, so the water ends at the tile's edge and never shows through the land
     { const xs = Number.isInteger(wx) ? [wx-1, wx] : [Math.floor(wx)], zs = Number.isInteger(wz) ? [wz-1, wz] : [Math.floor(wz)];
-      let wet = 0, dry = 0; for (const a of xs) for (const b of zs){ const t = o3Tile(a, b); if (t===OW_WATER || t===OW_RIVER) wet++; else dry++; }
-      if (!wet) h = Math.max(h, O3_WATER_Y + 0.15); else if (dry) h = Math.max(h, O3_WATER_Y + 0.05); else h = Math.min(h, O3_WATER_Y - 0.1); }
+      let wet = 0, dry = 0; const wt = (a, b)=>{ const t = o3Tile(a, b); return t===OW_WATER || t===OW_RIVER; };
+      for (const a of xs) for (const b of zs){ if (wt(a, b)) wet++; else dry++; }
+      // (RS-115) a corner where two water tiles meet diagonally stays under water, so the river runs through it
+      const diagWet = wet===2 && xs.length===2 && zs.length===2 && wt(xs[0], zs[0])===wt(xs[1], zs[1]);
+      if (!wet) h = Math.max(h, O3_WATER_Y + 0.15); else if (dry && !diagWet) h = Math.max(h, O3_WATER_Y + 0.05); else h = Math.min(h, O3_WATER_Y - 0.1); }
     const k = j*NV+i; H[k] = h;
     pos[k*3] = wx; pos[k*3+1] = h; pos[k*3+2] = wz;
     // colour: terrain blend, varied, then snow on the high peaks and rock on steep ground
@@ -32010,7 +32029,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-114';
+const GAME_VERSION = 'rs-115';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

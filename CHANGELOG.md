@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-115 - Rivers join up on the diagonal
+
+- **No more broken rivers:** a river that turned a corner diagonally used to be drawn with a dry point where its two tiles met, so it looked chopped into pieces. Those corners now sit under the water in every world, including your current save, so the river runs through.
+- **Fuller rivers in new worlds:** in a new world, a river that steps diagonally also fills in the tile beside the step. That keeps rivers joined edge to edge, so they read as a proper channel instead of a chain of diamonds.
+
 ## RS-114 - Rivers that end in lakes
 
 These changes apply to new worlds. Worlds in existing saves keep the generator that made them.

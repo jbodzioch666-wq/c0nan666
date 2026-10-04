@@ -1,4 +1,5 @@
 // RS-105: in 3D the water stays on the water - land ground stays above the wave tops, so no sea, lake or river shows through it
+// RS-115: where two water tiles meet only at a corner, the corner stays under water (rivers join on the diagonal)
 module.exports = async page=>{
   const r = await page.evaluate(async ()=>{
     const A = (c, msg)=>{ if (!c) throw new Error('assert: '+msg); };
@@ -15,7 +16,9 @@ module.exports = async page=>{
     for (let x=x0+2;x<x0+O3_W-2;x++) for (let y=y0+2;y<y0+O3_W-2;y++){
       if (wet(x,y)) continue; land++;
       // the middle and the inner half of every land tile
-      for (const [a,b] of [[0.5,0.5],[0.25,0.25],[0.75,0.25],[0.25,0.75],[0.75,0.75]]){ const h = O3.heightAt(x+a, y+b); worst = Math.min(worst, h); if (h <= crest) low++; }
+      // (the quarter of a land tile that touches a corner where two water tiles meet diagonally dips to let the water through)
+      const diagCorner = (cx, cz)=> (wet(cx-1, cz-1) && wet(cx, cz) && !wet(cx-1, cz) && !wet(cx, cz-1)) || (wet(cx, cz-1) && wet(cx-1, cz) && !wet(cx-1, cz-1) && !wet(cx, cz));
+      for (const [a,b] of [[0.5,0.5],[0.25,0.25],[0.75,0.25],[0.25,0.75],[0.75,0.75]]){ if (a!==0.5 && diagCorner(x + (a>0.5 ? 1 : 0), y + (b>0.5 ? 1 : 0))) continue; const h = O3.heightAt(x+a, y+b); worst = Math.min(worst, h); if (h <= crest) low++; }
       // its edges with water
       for (const [a,b,dx,dy] of [[0,0.5,-1,0],[1,0.5,1,0],[0.5,0,0,-1],[0.5,1,0,1]]) if (wet(x+dx, y+dy)){ edges++; if (O3.heightAt(x+a, y+b) < crest - 1e-6) lowEdge++; }
     }
@@ -25,7 +28,10 @@ module.exports = async page=>{
     // and the water is still deep in the middle of water tiles
     let deep = 0, n = 0; for (let x=x0+2;x<x0+O3_W-2;x++) for (let y=y0+2;y<y0+O3_W-2;y++) if (wet(x,y)){ n++; if (O3.heightAt(x+0.5, y+0.5) < O3_WATER_Y - 0.09) deep++; }
     A(deep===n, `water tiles are under water: ${deep}/${n}`);
-    return { at:best, land, edges, worst:+worst.toFixed(3), waterTiles:n };
+    let diag = 0, dry = 0; for (let x=x0+2;x<x0+O3_W-2;x++) for (let y=y0+2;y<y0+O3_W-2;y++) for (const [dx,dy] of [[1,1],[1,-1]]){
+      if (wet(x,y) && wet(x+dx,y+dy) && !wet(x+dx,y) && !wet(x,y+dy)){ diag++; const cx = x + (dx>0 ? 1 : 0), cz = y + (dy>0 ? 1 : 0); if (O3.heightAt(cx, cz) > O3_WATER_Y - 0.05) dry++; } }
+    A(dry===0, `diagonal water corners above the water: ${dry} of ${diag}`);
+    return { at:best, land, edges, worst:+worst.toFixed(3), waterTiles:n, diag };
   });
   console.log(JSON.stringify(r));
   await page.waitForTimeout(400); await page.screenshot({ path: SHOTS+'/shot_shore.png', timeout:120000 }).catch(()=>{});

@@ -1,6 +1,7 @@
 // RS-102 world generation: mountain ranges (not one central mass), an open start, nothing out of reach, old saves untouched
 // RS-106 (generator 3): broader ranges, and nothing in or on them but a dragon's lair
 // RS-114 (generator 4): a river that runs into a hollow fills it into a lake and flows on - no river dead-ends on dry land
+// RS-115 (generator 5): rivers join edge to edge - no two river tiles touch only at a corner
 module.exports = async page=>{
   const r = await page.evaluate(()=>{
     const out = {}, A = (c, msg)=>{ if (!c) throw new Error('assert: '+msg); };
@@ -26,6 +27,9 @@ module.exports = async page=>{
       for (const b of (G.ow.mythicBeasts||[])) if (m[b.x][b.y]===OW_MOUNTAIN || m[b.x][b.y]===OW_MOUNTAINPASS || owAmidMtn(b.x, b.y)) bad.push('beast '+b.x+','+b.y);
       A(!bad.length, `${kind}/${seed}: in the mountains: ${bad.slice(0,6).join('; ')}`);
       const rs = G.ow.riverStats; (out.lakes = out.lakes || []).push(rs.lakes); A(rs.pits===0, `${kind}/${seed}: ${rs.pits} rivers dead-end in a hollow`);
+      let corner = 0; const wt = t=>t===OW_RIVER || t===OW_WATER;
+      for (let x=1;x<W-1;x++) for (let y=1;y<H-1;y++) for (const [dx,dy] of [[1,1],[1,-1]]){ const a = m[x][y], c = m[x+dx][y+dy]; if (wt(a) && wt(c) && (a===OW_RIVER || c===OW_RIVER) && !wt(m[x+dx][y]) && !wt(m[x][y+dy]) && (m[x+dx][y]!==OW_MOUNTAIN || m[x][y+dy]!==OW_MOUNTAIN)) corner++; }
+      A(corner===0, `${kind}/${seed}: ${corner} river tiles meet only at a corner`);
       A(near===0, `${kind}/${seed}: the start is clear of mountains`);
       A(cut===0, `${kind}/${seed}: ${cut} things out of reach`);
     }
