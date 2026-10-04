@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-114 - Rivers that end in lakes
+
+These changes apply to new worlds. Worlds in existing saves keep the generator that made them.
+
+- **Lakes:** rivers run downhill from high ground. Before, a river that reached a hollow just stopped there; about two rivers in three ended mid-country. Now the river fills the hollow into a lake and flows on from the lake's lowest edge, the way real water spills over.
+- **Every river goes somewhere:** each river now reaches the sea or ends in a lake. A hollow walled in by mountains becomes a closed lake. If a hollow would need a very large lake, the river cuts a channel through its rim instead.
+- **What you'll see:** a typical world now has around a dozen to twenty small lakes, often strung along a river like beads. You can fish in them, and sail them once you have a boat.
+
 ## RS-113 - Posted work moves to the bounty board
 
 - **One place for jobs:** the town's posted work (conquests, bounties, camps, rescues, escorts and errands) is now on the bounty board, as its first tab. Contracts, wanted posters, the guild store and the news are there too. Take up to three jobs at a time; handing one in brings you back to the board.

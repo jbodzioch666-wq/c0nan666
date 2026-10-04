@@ -64,7 +64,7 @@ node tools/tests/run.js --soft grave boot   # named tests; --soft = software Web
 - The pace is about a tenth of RuneScape's (`XP_RATE = 0.3`). Gathering xp is weighted per skill by `GATHER_XP`.
 - Towns have separate NPCs for separate jobs: the Slayer master, the trader, the quest giver, the smith and the Peddler. Don't duplicate a feature across menus.
 - Day and night run on a real-time clock, `G.player.clock` (RS-104): 20 minutes of day and 10 of night, paused on menus. Read the hour through `dayPhase()` and `clockNow()`. Steps (`turnCount`) still drive weather, events, shop stock and daily limits. In tests, set the hour with `p.clock`.
-- World generation is versioned (`OW_GEN_VER`, now 3). Generator 3 keeps mountains clear (`owMtnClear()`, `owAmidMtn(x,y)`): only dragon lairs go in a range. New placement code must skip mountains, passes and `owAmidMtn` tiles.
+- World generation is versioned (`OW_GEN_VER`, now 4; generator 4 adds lakes where rivers meet a hollow, see `owLakeFill`). Generator 3 keeps mountains clear (`owMtnClear()`, `owAmidMtn(x,y)`): only dragon lairs go in a range. New placement code must skip mountains, passes and `owAmidMtn` tiles.
 - The game is isometric 3D only (RS-108 to RS-111). There is no first-person view and no flat overworld, town or dungeon view; `no3dNotice()` shows when 3D can't run. The world map (M) is still drawn flat. Tests may set `o3Pref`/`v3Pref = false` to skip the 3D land for speed; the game then draws the notice.
 - Fast travel is only through the waypoint world map, to attuned towns. There is no T teleport.
 - Touch support lives in the `TOUCH` object and `touchUiSync()`. New UI should work by tap: the × buttons have bigger hit areas under `body.touch`.

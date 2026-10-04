@@ -7507,7 +7507,40 @@ function ensureSpawnEscape(){
 // reproduced exactly from just the seed on save/load.
 // ---- RS-102 world generation: mountain ranges, an open start, and nothing out of reach ----
 // (RS-106, generator 3: broader ranges, valleys walled in by them filled in as mountain, and nothing but a dragon's lair in or on them)
-const OW_GEN_VER = 3;
+// (RS-114, generator 4: a river that runs into a hollow fills it into a lake and flows on from its lowest edge)
+const OW_GEN_VER = 4;
+const OW_LAKE_MAX = 80;      // a hollow that would need a bigger lake than this gets a channel cut through its rim instead
+// a river stuck in a hollow at (x,y): flood the hollow from its lowest rim cell upward (priority flood) until the water would spill
+// out somewhere lower. Small enough: the hollow becomes a lake (OW_WATER, its floor levelled) and the river carries on from the
+// spill. Too big: a channel is cut from the hollow to the spill, sloping downhill, and the river follows it. Returns where the
+// river goes next, or null when the hollow is walled in by mountains (it becomes a closed lake and the river ends there).
+function owLakeFill(x0, y0, elev, st){
+  const W = OW_COLS, H = OW_ROWS, m = G.ow.map, key = (x,y)=>y*W+x;
+  const inR = new Map(), seen = new Set([key(x0,y0)]), par = new Map(); inR.set(key(x0,y0), 1);
+  const heap = []; const push = (e, x, y, from)=>{ heap.push([e, x, y, from]); let i = heap.length-1; while (i > 0){ const j = (i-1)>>1; if (heap[j][0] <= heap[i][0]) break; [heap[i], heap[j]] = [heap[j], heap[i]]; i = j; } };
+  const pop = ()=>{ const top = heap[0], last = heap.pop(); if (heap.length){ heap[0] = last; let i = 0; for(;;){ const l = 2*i+1, r = l+1; let k = i; if (l < heap.length && heap[l][0] < heap[k][0]) k = l; if (r < heap.length && heap[r][0] < heap[k][0]) k = r; if (k===i) break; [heap[i], heap[k]] = [heap[k], heap[i]]; i = k; } } return top; };
+  const N8 = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
+  const around = (x, y)=>{ for (const [dx,dy] of N8){ const nx = x+dx, ny = y+dy; if (nx<1||ny<1||nx>=W-1||ny>=H-1) continue; const k = key(nx,ny); if (seen.has(k) || m[nx][ny]===OW_MOUNTAIN) continue; seen.add(k); push(elev[nx][ny], nx, ny, key(x,y)); } };
+  let level = elev[x0][y0], spill = null; around(x0, y0);
+  while (heap.length && inR.size < 2000){
+    const [e, x, y, from] = pop(); par.set(key(x,y), from);
+    if (e < level || m[x][y]===OW_WATER){ spill = [x, y]; break; }
+    inR.set(key(x,y), 1); level = Math.max(level, e); around(x, y);
+  }
+  const cells = [...inR.keys()];
+  if (!spill || cells.length <= OW_LAKE_MAX){
+    if (cells.length > OW_LAKE_MAX) return null;                 // (a basin too big to fill and no way out: the river just ends)
+    for (const k of cells){ const x = k%W, y = (k/W)|0; m[x][y] = OW_WATER; elev[x][y] = level; }
+    st.lakes++; st.lakeTiles += cells.length;
+    return spill ? { x:spill[0], y:spill[1] } : null;
+  }
+  // too big a lake: cut a channel from the hollow out to the spill point, sloping gently down to it
+  const path = []; for (let k = key(spill[0], spill[1]); k !== undefined && k !== key(x0,y0); k = par.get(k)) path.push(k);
+  path.reverse(); let e0 = elev[x0][y0], e1 = elev[spill[0]][spill[1]];
+  path.forEach((k, i)=>{ const x = k%W, y = (k/W)|0; elev[x][y] = Math.min(elev[x][y], e0 + (e1 - e0)*(i+1)/(path.length+1) - 1e-4); if (m[x][y]!==OW_WATER) m[x][y] = OW_RIVER; });
+  st.cuts++;
+  return { x:spill[0], y:spill[1] };
+}
 const OW_RANGE_V = { 2:{ r1:0.972, r2:0.985, e2:0.56, peak:0.9, gap:0.36, lift:0.035 }, 3:{ r1:0.95, r2:0.972, e2:0.55, peak:0.86, gap:0.32, lift:0.05 } };
 const OW_POCKET_MAX = 160;   // (generator 3: walled-in land up to this many tiles becomes mountain)
 // a mountain where a ridge line runs (where a smooth noise field crosses its middle), wider on high ground, broken by passes;
@@ -7647,6 +7680,7 @@ function generateOverworld(seed){
 
   // rivers: trace from a handful of high points down to the sea
   const riverN = Math.round((4+rint(3))*OW_AREA_SCALE);
+  const lakes = (G.ow.genVer||1) >= 4, rst = G.ow.riverStats = { rivers:0, pits:0, lakes:0, lakeTiles:0, cuts:0 };
   for (let i=0;i<riverN;i++){
     let sx,sy,bestE=-1;
     for (let k=0;k<40;k++){
@@ -7654,7 +7688,7 @@ function generateOverworld(seed){
       if (elev[px][py]>bestE && elev[px][py]<0.9){ bestE=elev[px][py]; sx=px; sy=py; }
     }
     if (sx===undefined) continue;
-    let x=sx,y=sy,steps=0;
+    let x=sx,y=sy,steps=0; rst.rivers++;
     const maxSteps = Math.round(260*Math.sqrt(OW_AREA_SCALE));
     while (steps<maxSteps){
       if (G.ow.map[x][y]===OW_WATER) break;
@@ -7665,7 +7699,11 @@ function generateOverworld(seed){
         if (nx<0||ny<0||nx>=OW_COLS||ny>=OW_ROWS) continue;
         if (elev[nx][ny]<bv){ bv=elev[nx][ny]; bx=nx; by=ny; }
       }
-      if (bx===x && by===y) break;
+      if (bx===x && by===y){
+        if (!lakes){ rst.pits++; break; }
+        const out = owLakeFill(x, y, elev, rst); if (!out) break;
+        x = out.x; y = out.y; steps++; continue;
+      }
       x=bx; y=by; steps++;
     }
   }
@@ -31972,7 +32010,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-113';
+const GAME_VERSION = 'rs-114';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

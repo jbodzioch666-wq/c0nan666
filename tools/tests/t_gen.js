@@ -1,5 +1,6 @@
 // RS-102 world generation: mountain ranges (not one central mass), an open start, nothing out of reach, old saves untouched
 // RS-106 (generator 3): broader ranges, and nothing in or on them but a dragon's lair
+// RS-114 (generator 4): a river that runs into a hollow fills it into a lake and flows on - no river dead-ends on dry land
 module.exports = async page=>{
   const r = await page.evaluate(()=>{
     const out = {}, A = (c, msg)=>{ if (!c) throw new Error('assert: '+msg); };
@@ -24,6 +25,7 @@ module.exports = async page=>{
       for (const p of (G.ow.pois||[])) if (m[p.x][p.y]===OW_MOUNTAINPASS || m[p.x][p.y]===OW_MOUNTAIN || owAmidMtn(p.x, p.y)) bad.push('poi '+p.k+' '+p.x+','+p.y);
       for (const b of (G.ow.mythicBeasts||[])) if (m[b.x][b.y]===OW_MOUNTAIN || m[b.x][b.y]===OW_MOUNTAINPASS || owAmidMtn(b.x, b.y)) bad.push('beast '+b.x+','+b.y);
       A(!bad.length, `${kind}/${seed}: in the mountains: ${bad.slice(0,6).join('; ')}`);
+      const rs = G.ow.riverStats; (out.lakes = out.lakes || []).push(rs.lakes); A(rs.pits===0, `${kind}/${seed}: ${rs.pits} rivers dead-end in a hollow`);
       A(near===0, `${kind}/${seed}: the start is clear of mountains`);
       A(cut===0, `${kind}/${seed}: ${cut} things out of reach`);
     }
@@ -35,6 +37,9 @@ module.exports = async page=>{
     const mtnPct = ()=>{ let l = 0, n = 0; for (let x=0;x<OW_COLS;x++) for (let y=0;y<OW_ROWS;y++){ const t = G.ow.map[x][y]; if (t!==OW_WATER && t!==OW_RIVER) l++; if (t===OW_MOUNTAIN) n++; } return n/l*100; };
     const v2 = mtnPct(); G.ow.genVer = 3; wgRegenerate(11); const v3 = mtnPct(); out.v2v3 = [+v2.toFixed(1), +v3.toFixed(1)];
     A(v3 > v2*1.4, 'generator 3 has bigger mountains: '+out.v2v3);
+    // an RS-106 world keeps its dead-end rivers (old saves rebuild exactly); the new generator makes lakes
+    let pits3 = 0, lakes4 = 0; for (const sd of [11, 2024, 777777]){ G.ow.continent = 'pangaea'; G.ow.genVer = 3; wgRegenerate(sd); pits3 += G.ow.riverStats.pits; A(G.ow.riverStats.lakes===0, 'generator 3 makes no lakes'); G.ow.genVer = 4; wgRegenerate(sd); lakes4 += G.ow.riverStats.lakes; }
+    out.pits3 = pits3; out.lakes4 = lakes4; A(pits3 > 0 && lakes4 > 0, 'old worlds keep their rivers, new worlds get lakes');
     return out;
   });
   console.log(JSON.stringify(r));
