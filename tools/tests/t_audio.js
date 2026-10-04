@@ -32,7 +32,22 @@ module.exports = async page=>{
     G.owPos = { x:G.ow.spawnPos.x, y:G.ow.spawnPos.y }; for (let i=0;i<4;i++){ AUD.stepAt = 0; audStep(); } out.surface = audSurface();
     audPage(); audCoins();
     // ambience follows the weather
-    G.weather = 'storm'; G.ui = 'playing'; await frames(20); out.rain = +(AUD.amb.rain ? AUD.amb.rain.lv : 0).toFixed(3); A(out.rain > 0.05, 'rain');
+    // RS-124: rain is six rendered loops, picked by weather, place and how long it has rained
+    G.weather = 'storm'; G.ui = 'playing'; for (let i=0;i<150 && !(AUD.amb['rain:storm'] && AUD.amb['rain:storm'].lv > 0.05);i++) await frames(1);
+    out.rain = +(AUD.amb['rain:storm'] ? AUD.amb['rain:storm'].lv : 0).toFixed(3); A(out.rain > 0.05, 'the storm is heard: '+out.rain); A(!AUD.amb.rain, 'the old hiss is gone');
+    A(AUD.rainBuf.storm.duration > 15 && AUD.rainBuf.storm.getChannelData(0).some(v=>Math.abs(v) > 0.05), 'the storm loop has sound in it');
+    const mix = ()=>{ const m = rainMix(); return Object.keys(m).filter(k=>m[k] > 0).sort().join('+'); }, top = ()=>{ const m = rainMix(); return Object.keys(m).sort((a,b)=>m[b]-m[a])[0]; };
+    const was = { t:G.ow.map[G.owPos.x][G.owPos.y] }; G.ow.map[G.owPos.x][G.owPos.y] = OW_GRASS;
+    G.weather = 'rain'; AUD.wetT = 0; out.mixStart = mix(); A(top()==='drizzle', 'drizzle as the rain sets in: '+out.mixStart);
+    AUD.wetT = 120; out.mixLater = mix(); A(out.mixLater==='steady', 'then steady rain: '+out.mixLater);
+    G.ow.map[G.owPos.x][G.owPos.y] = OW_FOREST; out.mixForest = mix(); A(top()==='leaves', 'rain on the leaves in a forest: '+out.mixForest);
+    G.weather = 'storm'; out.mixForestStorm = mix(); A(top()==='storm' && rainMix().leaves > 0, 'a downpour over the leaves: '+out.mixForestStorm);
+    G.ow.map[G.owPos.x][G.owPos.y] = was.t;
+    G.weather = 'clear'; A(mix()==='', 'no rain when it is dry');
+    G.weather = 'rain'; G.interior = { key:'tavern' }; A(mix()==='roof', 'rain on the roof indoors'); G.interior = null;
+    G.gameMode = 1; G.depth = 1; G.siteKind = 'crypt'; A(mix()==='cave', 'rain echoing into the first floor of a dungeon');
+    G.depth = 3; A(mix()==='', 'no rain heard deep down'); G.gameMode = 0; G.depth = 1;
+    AUD.wetT = 0; G.weather = 'storm';
     G.weather = 'clear';
     // the music player
     G.jukeBack = 'playing'; setUi('jukebox'); A(document.getElementById('overlay').innerHTML.includes('MUSIC PLAYER') && audUnlocked().length >= 6, 'music player'); out.unlocked = audUnlocked().map(audTrackName);

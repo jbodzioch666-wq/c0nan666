@@ -1,5 +1,16 @@
 # Depthcrawl patch notes
 
+## RS-124 - Real rain
+
+- **The old hiss is gone:** rain used to be a single band of static. It's now made of a soft wash that gusts with the wind, individual drops, and the odd plip into a puddle.
+- **Rain that fits the place:**
+  - Rain starts as a light drizzle and builds into steady rain over about a minute.
+  - Storms bring a heavy downpour.
+  - In forests and swamps, and in elven towns, you hear rain pattering on the leaves, with heavy drips falling from the branches.
+  - Indoors, the rain is muffled on the roof, with a gutter dripping at a steady beat. Castle and tower floors sound the same way.
+  - On the first floor of a dungeon, rain echoes in from the mouth, with drips plinking into pools. Deeper down you don't hear it.
+- **Rolling thunder:** storm thunder now cracks and then rolls away in several rumbles. You hear it muffled from indoors and from the top of a dungeon.
+
 ## RS-123 - Pictures on the banners
 
 - **Banner pictures sit on the cloth:** each shop's picture (the anvil, the cauldron, the tankard and so on) is now painted onto its banner. It no longer floats above the top of the flag pole.

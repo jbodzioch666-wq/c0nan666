@@ -20702,15 +20702,118 @@ function audLayer(name, ftype, freq, q, lfoHz, lfoAmt){
   return (AUD.amb[name] = { g, fl, lv:0 });
 }
 function audLayerTo(name, lv, k){ const L = AUD.amb[name]; if (!L) return; L.lv += (lv - L.lv)*(k||0.05); L.g.gain.setTargetAtTime(Math.max(0, L.lv), AUD.ctx.currentTime, 0.1); }
+// ---- rain (RS-124): six pre-rendered loops, each built once from filtered noise, drops and puddle plips ----
+// drizzle as rain sets in, steady rain, a downpour in storms, rain on the roof indoors, on the leaves in forests, and echoing from a cave mouth
+const RAIN_LEN = 16, RAIN_FADE = 2, RAIN_RATE = 32000;
+const rainR = (a,b)=>a + Math.random()*(b-a);
+// the loops are computed straight into sample arrays (fast, and the same in every browser)
+function rainBq(type, f, q, sr){ /* biquad coefficients, as Web Audio's filters use them */
+  const w = 2*Math.PI*f/sr, cs = Math.cos(w), sn = Math.sin(w), Q = type==='bandpass' ? q : Math.pow(10, (q==null ? 1 : q)/20), al = sn/(2*Q); let b0, b1, b2;
+  if (type==='lowpass'){ b0 = (1-cs)/2; b1 = 1-cs; b2 = b0; } else if (type==='highpass'){ b0 = (1+cs)/2; b1 = -(1+cs); b2 = b0; } else { b0 = al; b1 = 0; b2 = -al; }
+  const a0 = 1 + al; return { b0:b0/a0, b1:b1/a0, b2:b2/a0, a1:-2*cs/a0, a2:(1-al)/a0 };
+}
+function rainFilt(x, c){ let x1=0,x2=0,y1=0,y2=0; for (let i=0;i<x.length;i++){ const y = c.b0*x[i] + c.b1*x1 + c.b2*x2 - c.a1*y1 - c.a2*y2; x2 = x1; x1 = x[i]; y2 = y1; y1 = y; x[i] = y; } return x; }
+function rainNoiseArr(kind, n){
+  const d = new Float32Array(n); let b0=0,b1=0,b2=0,b3=0,b4=0,b5=0,b6=0,last=0;
+  for (let i=0;i<n;i++){ const w = Math.random()*2-1;
+    if (kind==='pink'){ b0=0.99886*b0+w*0.0555179; b1=0.99332*b1+w*0.0750759; b2=0.96900*b2+w*0.1538520; b3=0.86650*b3+w*0.3104856; b4=0.55000*b4+w*0.5329522; b5=-0.7616*b5-w*0.0168980; d[i]=(b0+b1+b2+b3+b4+b5+b6+w*0.5362)*0.11; b6=w*0.115926; }
+    else if (kind==='brown'){ last=(last+0.02*w)/1.02; d[i]=last*3.5; }
+    else d[i]=w; }
+  return d;
+}
+// the steady hiss of the rain, rising and falling with slow gusts
+function rainWash(out, sr, o){
+  const n = out.length, x = rainNoiseArr(o.noise||'pink', n); rainFilt(x, rainBq('highpass', o.hp||200, 1, sr)); rainFilt(x, rainBq('lowpass', o.lp||2500, 0.5, sr));
+  const pts = [o.gain]; if (o.gust){ pts.length = 0; let v = 1; for (let i=0;i<64;i++){ v = Math.max(1 - o.gust, Math.min(1 + o.gust, v + rainR(-1,1)*o.gust*0.5)); pts.push(o.gain*v); } }
+  for (let i=0;i<n;i++){ const p = i/n*(pts.length-1), k = p|0, f = p - k; out[i] += x[i]*(pts.length > 1 ? pts[k]*(1-f) + pts[Math.min(k+1, pts.length-1)]*f : pts[0]); }
+}
+const rainEnv = (t, a, d, att)=>t < att ? a*t/att : a*Math.pow(0.0001/a, (t - att)/(d - att));
+// single drops hitting things: short filtered clicks
+function rainDrops(out, sr, o){
+  const T = out.length/sr;
+  for (let t=0; t<T; t += -Math.log(1 - Math.random())/o.rate){
+    const a = o.gain*rainR(0.25,1), d = rainR(o.d0, o.d1), i0 = Math.floor(t*sr), m = Math.min(Math.floor((d + 0.02)*sr), out.length - i0); if (m <= 0) continue;
+    const x = rainNoiseArr('white', m); rainFilt(x, rainBq('bandpass', rainR(o.f0, o.f1), o.q||1.2, sr));
+    for (let j=0;j<m;j++){ const tt = j/sr; if (tt > d) break; out[i0+j] += x[j]*rainEnv(tt, a, d, 0.002); }
+  }
+}
+// drops into puddles (or a gutter, or a cave pool): a tiny chirp
+function rainPlips(out, sr, o){
+  const T = out.length/sr;
+  for (let t = o.regular ? rainR(0, o.regular) : 0; t < T; t += o.regular ? o.regular*rainR(0.85,1.15) : -Math.log(1 - Math.random())/o.rate){
+    const f = rainR(o.f0, o.f1), d = rainR(0.03, 0.07), r = o.up ? 1.6 : 0.55, a = o.gain*rainR(0.4,1), i0 = Math.floor(t*sr), m = Math.min(Math.floor(d*sr), out.length - i0); let ph = 0;
+    for (let j=0;j<m;j++){ const tt = j/sr; ph += 2*Math.PI*f*Math.pow(r, tt/d)/sr; out[i0+j] += Math.sin(ph)*rainEnv(tt, a, d, 0.003); }
+  }
+}
+// a cave's echo: a feedback delay through a soft lowpass
+function rainEcho(x, sr){
+  const D = Math.floor(0.23*sr), c = rainBq('lowpass', 1800, 1, sr), y = new Float32Array(x.length), din = new Float32Array(x.length); let x1=0,x2=0,y1=0,y2=0;
+  for (let i=0;i<x.length;i++){ const u = i >= D ? din[i-D] : 0, v = c.b0*u + c.b1*x1 + c.b2*x2 - c.a1*y1 - c.a2*y2; x2 = x1; x1 = u; y2 = y1; y1 = v; y[i] = v; din[i] = x[i] + 0.45*v; }
+  return y;
+}
+// each style, and how loud it sits (its average level, matched to the samples you picked from)
+const RAIN_STYLES = {
+  drizzle:{ rms:0.040, build(o,sr){ rainWash(o,sr,{ gain:0.22, lp:1800, hp:300, gust:0.25 }); rainDrops(o,sr,{ rate:12, f0:2500, f1:7000, d0:0.01, d1:0.025, gain:0.14 }); rainPlips(o,sr,{ rate:0.8, f0:1400, f1:2600, gain:0.035 }); } },
+  steady:{ rms:0.107, build(o,sr){ rainWash(o,sr,{ gain:0.55, lp:2600, hp:250, gust:0.35 }); rainDrops(o,sr,{ rate:45, f0:2200, f1:6500, d0:0.012, d1:0.035, gain:0.22 }); rainPlips(o,sr,{ rate:3, f0:1100, f1:2400, gain:0.05 }); } },
+  storm:{ rms:0.168, build(o,sr){ rainWash(o,sr,{ gain:0.8, lp:4200, hp:150, gust:0.5 }); rainWash(o,sr,{ noise:'brown', gain:0.5, lp:260, hp:30, gust:0.4 }); rainDrops(o,sr,{ rate:140, f0:1800, f1:7500, d0:0.01, d1:0.04, gain:0.2 }); rainPlips(o,sr,{ rate:6, f0:900, f1:2200, gain:0.05 }); } },
+  roof:{ rms:0.083, build(o,sr){ rainWash(o,sr,{ gain:0.45, lp:650, hp:80, gust:0.3 }); rainDrops(o,sr,{ rate:35, f0:500, f1:1400, q:2.5, d0:0.02, d1:0.06, gain:0.25 }); rainPlips(o,sr,{ regular:1.25, f0:700, f1:950, gain:0.09 }); } },
+  leaves:{ rms:0.064, build(o,sr){ rainWash(o,sr,{ gain:0.35, lp:3500, hp:400, gust:0.3 }); rainDrops(o,sr,{ rate:90, f0:4000, f1:9000, q:0.9, d0:0.006, d1:0.018, gain:0.18 }); rainDrops(o,sr,{ rate:1.2, f0:250, f1:500, q:1.5, d0:0.06, d1:0.12, gain:0.5 }); rainPlips(o,sr,{ rate:1.5, f0:900, f1:1600, gain:0.04 }); } },
+  cave:{ rms:0.056, build(o,sr){ rainWash(o,sr,{ gain:0.3, lp:900, hp:120, gust:0.3 }); const p = new Float32Array(o.length); rainPlips(p,sr,{ rate:0.9, f0:1300, f1:2600, gain:0.12, up:true }); const e = rainEcho(p, sr); for (let i=0;i<o.length;i++) o[i] += p[i] + e[i]; } },
+};
+// render one style into a seamless loop (the tail is folded over the start), once, the first time it is wanted
+function rainRender(key){
+  AUD.rainBuf = AUD.rainBuf || {}; if (AUD.rainBuf[key]) return AUD.rainBuf[key];
+  try{
+    const sr = RAIN_RATE, n = Math.floor(RAIN_LEN*sr), f = Math.floor(RAIN_FADE*sr), d = new Float32Array(n + f); RAIN_STYLES[key].build(d, sr);
+    const ob = AUD.ctx.createBuffer(1, n, sr), o = ob.getChannelData(0); let ss = 0;
+    for (let i=0;i<n;i++) o[i] = d[i];
+    for (let i=0;i<f;i++){ const k = i/f; o[i] = d[i]*Math.sqrt(k) + d[n+i]*Math.sqrt(1-k); }
+    for (let i=0;i<n;i++) ss += o[i]*o[i];
+    const g = RAIN_STYLES[key].rms/Math.max(1e-6, Math.sqrt(ss/n)); for (let i=0;i<n;i++){ const v = o[i]*g; o[i] = Math.abs(v) < 0.6 ? v : Math.sign(v)*(0.6 + 0.35*Math.tanh((Math.abs(v) - 0.6)/0.35)); }
+    return (AUD.rainBuf[key] = ob);
+  }catch(e){ return (AUD.rainBuf[key] = 'none'); }
+}
+// a loop playing (silently until wanted) once its sound is ready; the level glides like the other layers
+function rainLayer(key){
+  const name = 'rain:'+key; if (AUD.amb[name]) return AUD.amb[name];
+  if (!(AUD.rainBuf && AUD.rainBuf[key]) && AUD.rainMade===AUD.lt) return null;   /* at most one new loop is computed per frame */
+  AUD.rainMade = AUD.lt; const buf = rainRender(key); if (buf==='none') return null;
+  const ctx = AUD.ctx, s = ctx.createBufferSource(), g = ctx.createGain(); s.buffer = buf; s.loop = true; g.gain.value = 0; s.connect(g); g.connect(_gains.amb); s.start(0, Math.random()*RAIN_LEN);
+  return (AUD.amb[name] = { g, lv:0 });
+}
+// which rain you hear, and how loud: by weather, by where you stand, and by how long it has been raining
+function rainMix(){
+  const L = { drizzle:0, steady:0, storm:0, roof:0, leaves:0, cave:0 }, w = G.weather;
+  if (w!=='rain' && w!=='storm') return L;
+  const storm = w==='storm', ease = Math.max(0, Math.min(1, ((AUD.wetT||0) - 25)/30));
+  const t = G.gameMode===0 && G.ow && G.ow.map[G.owPos.x] ? G.ow.map[G.owPos.x][G.owPos.y] : null;
+  const leafy = (G.gameMode===0 && (t===OW_FOREST || t===OW_SWAMP)) || (G.gameMode===3 && !G.interior && G.villageRace==='elf');
+  if (G.interior) L.roof = storm ? 0.75 : 0.5;
+  else if (G.gameMode===1){ if (ASCEND_SITES[G.siteKind]) L.roof = storm ? 0.6 : 0.4; else if ((G.depth||1)===1) L.cave = storm ? 0.9 : 0.6; }
+  else if (G.gameMode===2 && G.arenaTheme==='sea') return L;
+  else if (storm){ L.storm = 0.65; if (leafy) L.leaves = 0.4; }
+  else if (leafy){ L.leaves = 0.7; L.steady = 0.25*ease; L.drizzle = 0.4*(1 - ease); }
+  else { L.steady = 0.6*ease; L.drizzle = 0.8*(1 - ease); }
+  return L;
+}
+// rolling thunder: a crack, then a few rumbles that die away (muffled under a roof or below ground)
+function rainThunder(at, vol, muffled){
+  const ctx = AUD.ctx, A = _gains.amb; if (!muffled) audNoiseHit(A, at, 0.15, 'highpass', 2000, 0.1*vol);
+  if (!AUD.brown){ const d = rainNoiseArr('brown', ctx.sampleRate*6); AUD.brown = ctx.createBuffer(1, d.length, ctx.sampleRate); AUD.brown.getChannelData(0).set(d); }
+  const s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain(); s.buffer = AUD.brown; f.type = 'lowpass'; f.frequency.value = muffled ? 90 : 160;
+  let t = at + 0.08; g.gain.setValueAtTime(0, at); for (let i=0;i<5;i++){ t += rainR(0.15, 0.6); g.gain.linearRampToValueAtTime(vol*rainR(0.5,1), t); }
+  g.gain.exponentialRampToValueAtTime(0.0001, t + rainR(3, 4.5)); s.connect(f); f.connect(g); g.connect(A); s.start(at, rainR(0,1)); s.stop(t + 5);
+}
 function audNearWater(){ if (G.gameMode!==0 || !G.ow) return false; for (let i=-3;i<=3;i++) for (let j=-3;j<=3;j++){ const m = G.ow.map[G.owPos.x+i]; if (m && m[G.owPos.y+j]===OW_WATER) return true; } return false; }
 function audAmbTick(dt){
   const ctx = AUD.ctx; if (!ctx || ctx.state!=='running') return;
-  for (const [n, ft, f, q, lh, la] of [['wind','lowpass',380,0.6,0.13,0.5], ['rain','bandpass',3200,0.4], ['waves','lowpass',600,0.7,0.16,0.85], ['crowd','bandpass',420,1.1,0.4,0.4], ['insects','bandpass',4600,9,11,0.7], ['rumble','lowpass',85,0.7,0.07,0.6]]) audLayer(n, ft, f, q, lh, la);
+  for (const [n, ft, f, q, lh, la] of [['wind','lowpass',380,0.6,0.13,0.5], ['waves','lowpass',600,0.7,0.16,0.85], ['crowd','bandpass',420,1.1,0.4,0.4], ['insects','bandpass',4600,9,11,0.7], ['rumble','lowpass',85,0.7,0.07,0.6]]) audLayer(n, ft, f, q, lh, la);
   const night = isNightTime(), out = G.gameMode===0 || (G.gameMode===3 && !G.interior) || (G.gameMode===2 && G.arenaTheme!=='sea'), wet = G.weather==='rain' || G.weather==='storm', storm = G.weather==='storm';
   const t = G.gameMode===0 && G.ow && G.ow.map[G.owPos.x] ? G.ow.map[G.owPos.x][G.owPos.y] : null;
   const windy = t===OW_TUNDRA || t===OW_MOUNTAIN || t===OW_MOUNTAINPASS || t===OW_DESERT;
   audLayerTo('wind', !out ? 0 : storm ? 0.32 : windy ? 0.16 : 0.05);
-  audLayerTo('rain', out && wet ? (storm ? 0.22 : 0.14) : (G.interior && wet ? 0.04 : 0));
+  AUD.wetT = wet ? (AUD.wetT||0) + dt : 0;
+  const rm = rainMix(); for (const k in rm){ if (rm[k] > 0 || AUD.amb['rain:'+k]) rainLayer(k); audLayerTo('rain:'+k, rm[k]); }
   audLayerTo('waves', audNearWater() || (G.gameMode===3 && !G.interior && G.townLy && G.townLy.info.port) ? 0.2 : 0);
   audLayerTo('crowd', G.gameMode===3 && !G.interior && !night && !wet ? 0.05 : (G.interior && G.interior.key==='tavern' ? 0.06 : 0));
   audLayerTo('insects', out && night && !wet && t!==OW_TUNDRA ? (t===OW_SWAMP ? 0.05 : 0.025) : 0);
@@ -20723,7 +20826,7 @@ function audAmbTick(dt){
   if (G.gameMode===1 && roll(0.25)){ const o = ctx.createOscillator(), g = ctx.createGain(); o.type = 'sine'; o.frequency.setValueAtTime(1400 + Math.random()*500, at); o.frequency.exponentialRampToValueAtTime(500, at + 0.08); g.gain.setValueAtTime(0.05, at); g.gain.exponentialRampToValueAtTime(0.0001, at + 0.12); o.connect(g); g.connect(A); o.start(at); o.stop(at + 0.14); }
   if (G.gameMode===1 && roll(0.02)) audNoiseHit(A, at, 2.5, 'lowpass', 70, 0.18);
   if (audNearWater() && !night && roll(0.08)){ for (let i=0;i<2;i++){ const o = ctx.createOscillator(), g = ctx.createGain(); o.type = 'sawtooth'; o.frequency.setValueAtTime(1200, at + i*0.22); o.frequency.exponentialRampToValueAtTime(800, at + i*0.22 + 0.18); g.gain.setValueAtTime(0.02, at + i*0.22); g.gain.exponentialRampToValueAtTime(0.0001, at + i*0.22 + 0.2); o.connect(g); g.connect(A); o.start(at + i*0.22); o.stop(at + i*0.22 + 0.22); } }
-  if (out && storm && roll(0.05)){ audNoiseHit(A, at, 0.15, 'highpass', 2000, 0.12); audNoiseHit(A, at + 0.1, 3.2, 'lowpass', 120, 0.45); }
+  if (storm && roll(0.05)){ if (out) rainThunder(at, 0.5, false); else if (G.interior || (G.gameMode===1 && (G.depth||1)===1)) rainThunder(at, 0.3, true); }
 }
 function audBird(t){ const ctx = AUD.ctx, A = _gains.amb, n = 2 + Math.floor(Math.random()*3), base = 2400 + Math.random()*1600;
   for (let i=0;i<n;i++){ const o = ctx.createOscillator(), g = ctx.createGain(), s = t + i*0.13; o.type = 'sine'; o.frequency.setValueAtTime(base, s); o.frequency.exponentialRampToValueAtTime(base*1.35, s + 0.06); g.gain.setValueAtTime(0.0001, s); g.gain.linearRampToValueAtTime(0.025, s + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, s + 0.09); o.connect(g); g.connect(A); o.start(s); o.stop(s + 0.1); } }
@@ -32108,7 +32211,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-123';
+const GAME_VERSION = 'rs-124';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
