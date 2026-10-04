@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-110 - No more hitches walking past torches
+
+- **The real cause of the dungeon stutter:** as you walked, the nearest torches took over the dungeon's four torch lights. A torch light with nothing to light was switched off. Switching a light on or off forces the graphics card to rebuild the shaders for everything on screen. That caused a pause of a fraction of a second each time a torch came into or went out of range, and up to several seconds on slower graphics. Unused torch lights now just go dark instead of switching off, so nothing gets rebuilt.
+- **Shaders built while the floor loads:** each dungeon floor now prepares its shaders while it loads, instead of on your first few steps.
+
 ## RS-109 - The first-person view is gone
 
 - **Removed the old first-person dungeon view:** it could no longer be reached, but it still ran every frame. That covered the old wall-drawing code, the weapon held in front of the camera, its compass and its target markers. This removes about 790 lines.
