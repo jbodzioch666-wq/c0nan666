@@ -1,7 +1,16 @@
 // RS-117: townsfolk step out of your way (no chat), and walk in real time whether or not you move
+// RS-118: the town is stretched roomier, and everything placed in it lands on open ground
 module.exports = async page=>{
   const ev = (f, a)=>page.evaluate(f, a), A = (c, msg)=>{ if (!c) throw new Error('assert: '+msg); };
   await ev(()=>{ goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); if (G.gameMode!==3){ const t = townList()[0]; G.owPos = { x:t.x, y:t.y }; enterVillage(); setUi('playing'); } G.interior = null; });
+  // the roomier town: wider and taller, and nothing ends up inside a wall
+  const lay = await ev(()=>{ const bad = [];
+    for (const n of G.villageNpcs) if (![T_VENDOR, T_QUESTGIVER].includes(G.map[n.x][n.y])) bad.push('npc '+n.service);
+    for (const v of G.villagers) if (!v.indoors && !v.sit && G.map[v.x][v.y]!==T_FLOOR) bad.push('folk '+v.x+','+v.y);
+    for (const b of VILLAGE_BUILDINGS) if (G.map[b.door.x][b.door.y]!==b.tile) bad.push('door '+b.key);
+    if (G.map[TOWN_CX][tY(12)]!==T_WAYPOINT) bad.push('waypoint'); if (G.villageDeco[tX(15)][tY(8)]!=='board') bad.push('board'); if (G.map[TOWN_CX][ROWS-1]!==T_EXIT) bad.push('gate');
+    return { stretched:!!G.townLy.stretched, cols:COLS, rows:ROWS, base:G.townLy.W0, bad }; });
+  A(lay.stretched && lay.rows===23, 'the town is roomier: '+JSON.stringify(lay)); A(!lay.bad.length, 'everything stands on open ground: '+lay.bad.join(', '));
   // put a villager right in front of you and walk into them
   const r = await ev(()=>{ const p = G.player, v = (G.villagers||[]).find(o=>!o.animal && !o.guard && !o.sit);
     const dirs = [[0,-1],[1,0],[-1,0],[0,1]]; let d = null;

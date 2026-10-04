@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-118 - Roomier towns
+
+- **A bigger square:** every town's square is three tiles wider and three tiles deeper, so the Captain, the bounty board, the banker, the slayer master, the waypoint and the townsfolk have room to breathe. The streets, the hedge and the walls stretch to match, and every shop, hall, arena, range and harbour keeps its place around the square.
+- **Your saves:** a town you saved inside keeps its old size until you leave and come back.
+
 ## RS-117 - Townsfolk get out of your way
 
 - **They step aside:** walking into a townsperson, a guard or an animal no longer stops you for a chat. They step out of your path, or swap places with you if there's no room, and you keep walking.

@@ -14273,6 +14273,7 @@ function generateVillage(){
     }
   }
   townAfterGen();
+  townStretch();   // (RS-118) let the square breathe
 }
 // one wandering step per villager per player turn, purely cosmetic - never
 // blocks the player, never interacts, just gives the streets some life.
@@ -19250,7 +19251,7 @@ function houseCostText(cost){ return Object.keys(cost).map(k=>`${cost[k]} ${k===
 // the estate agent on every town square
 function estateNpcPlace(){
   if (G.interior || (G.villageNpcs||[]).some(n=>n.service==='estate')) return;
-  const spot = [[12,9],[9,9],[13,13],[8,14],[11,13]].find(([x,y])=>G.map[x] && G.map[x][y]===T_FLOOR && !(G.player.x===x && G.player.y===y) && !(G.villageNpcs||[]).some(n=>n.x===x && n.y===y));
+  const spot = [[12,9],[9,9],[13,13],[8,14],[11,13]].map(([x,y])=>[tX(x), tY(y)]).find(([x,y])=>G.map[x] && G.map[x][y]===T_FLOOR && !(G.player.x===x && G.player.y===y) && !(G.villageNpcs||[]).some(n=>n.x===x && n.y===y));
   if (!spot) return; const [x,y] = spot;
   G.villageNpcs.push({ x, y, name:'Hollis the estate agent', role:'Estate agent', service:'estate', key:'estate' });
   G.map[x][y] = T_VENDOR; G.villageDeco[x][y] = 'npc';
@@ -19564,6 +19565,38 @@ WG_POI.digsite = poi=>{
 // watch walks the square with torches at night; shops shut after dark.
 const T_TOWNDOOR = 23;
 const TOWN_CX = 10;
+const TOWN_SEAM_X = 13, TOWN_SX = 3, TOWN_SEAM_Y = 8, TOWN_SY = 3;
+function tX(x){ return G.townLy && G.townLy.stretched && x >= TOWN_SEAM_X ? x + TOWN_SX : x; }
+function tY(y){ return G.townLy && G.townLy.stretched && y >= TOWN_SEAM_Y ? y + TOWN_SY : y; }
+// stretch the finished town: new columns/rows copy what's either side of the seam (a lane carries on, the hedge
+// carries on, a building wall becomes open ground), then everyone and everything placed on the old grid moves with it
+function townStretch(){
+  const ly = G.townLy; if (!ly || ly.stretched) return;
+  const W0 = COLS, H0 = ROWS, W1 = W0 + TOWN_SX, H1 = H0 + TOWN_SY;
+  const fill = (ta, da, tb, db)=> ta===tb && da===db && (ta===T_FLOOR || db==='hedge') ? [ta, da] : [T_FLOOR, (da==='path' || db==='path') ? 'path' : 'grass'];
+  // columns first
+  let map = [], deco = [], items = [];
+  for (let X=0; X<W1; X++){
+    if (X >= TOWN_SEAM_X && X < TOWN_SEAM_X + TOWN_SX){ const col = [], dcol = [], icol = [];
+      for (let y=0; y<H0; y++){ const [t, d] = fill(G.map[TOWN_SEAM_X-1][y], G.villageDeco[TOWN_SEAM_X-1][y], G.map[TOWN_SEAM_X][y], G.villageDeco[TOWN_SEAM_X][y]); col.push(t); dcol.push(d); icol.push(null); }
+      map.push(col); deco.push(dcol); items.push(icol); }
+    else { const x = X < TOWN_SEAM_X ? X : X - TOWN_SX; map.push(G.map[x].slice()); deco.push(G.villageDeco[x].slice()); items.push((G.floorItem[x]||[]).slice()); }
+  }
+  // then rows
+  for (let X=0; X<W1; X++){ const m = map[X], d = deco[X], it = items[X], nm = [], nd = [], ni = [];
+    for (let Y=0; Y<H1; Y++){
+      if (Y >= TOWN_SEAM_Y && Y < TOWN_SEAM_Y + TOWN_SY){ const [t, dd] = fill(m[TOWN_SEAM_Y-1], d[TOWN_SEAM_Y-1], m[TOWN_SEAM_Y], d[TOWN_SEAM_Y]); nm.push(t); nd.push(dd); ni.push(null); }
+      else { const y = Y < TOWN_SEAM_Y ? Y : Y - TOWN_SY; nm.push(m[y]); nd.push(d[y]); ni.push(it[y]===undefined ? null : it[y]); } }
+    map[X] = nm; deco[X] = nd; items[X] = ni; }
+  ly.stretched = true; setGrid(W1, H1); G.map = map; G.villageDeco = deco; G.floorItem = items;
+  ly.W0 += TOWN_SX; ly.cols = W1;
+  const pt = o=>{ if (o){ o.x = tX(o.x); o.y = tY(o.y); } }, pr = a=> a ? [tX(a[0]), tY(a[1])] : a;
+  for (const b of VILLAGE_BUILDINGS){ b.x0 = tX(b.x0); b.y0 = tY(b.y0); pt(b.door); pt(b.npc); }
+  for (const h of VILLAGE_HOUSES){ h.x0 = tX(h.x0); h.y0 = tY(h.y0); }
+  for (const n of (G.villageNpcs||[])) pt(n);
+  for (const v of (G.villagers||[])){ pt(v); v.home = pr(v.home); v.work = pr(v.work); if (v.route) v.route = v.route.map(pr); }
+  pt(G.player);
+}
 const VILLAGE_BUILDINGS_BASE = VILLAGE_BUILDINGS.slice(), VILLAGE_HOUSES_BASE = VILLAGE_HOUSES.slice();
 const TOWN_TIER_NM = ['hamlet', 'village', 'city'];
 const TOWN_DISTRICT = {
@@ -19608,11 +19641,12 @@ function townInfo(x, y){
 // which buildings stand in this town (VILLAGE_BUILDINGS and VILLAGE_HOUSES are refilled for each town)
 function townApplyLayout(info){
   VILLAGE_BUILDINGS.length = 0; VILLAGE_HOUSES.length = 0;
-  for (const b of VILLAGE_BUILDINGS_BASE) if (info.tier || (b.key!=='alch' && b.key!=='tailor')) VILLAGE_BUILDINGS.push(b);
-  for (const h of VILLAGE_HOUSES_BASE) if (!(info.ident.k && h===VILLAGE_HOUSES_BASE[0])) VILLAGE_HOUSES.push(h);   // a town's own landmark takes the first house's lot
+  const cp = b=> Object.assign({}, b, { door:Object.assign({}, b.door), npc:b.npc ? Object.assign({}, b.npc) : b.npc });
+  for (const b of VILLAGE_BUILDINGS_BASE) if (info.tier || (b.key!=='alch' && b.key!=='tailor')) VILLAGE_BUILDINGS.push(cp(b));
+  for (const h of VILLAGE_HOUSES_BASE) if (!(info.ident.k && h===VILLAGE_HOUSES_BASE[0])) VILLAGE_HOUSES.push(Object.assign({}, h));   // a town's own landmark takes the first house's lot
   if (!info.tier) VILLAGE_HOUSES.push({ x0:15, y0:2, w:3, h:4, floors:1 }, { x0:15, y0:13, w:3, h:3, floors:1 });
-  if (info.tier >= 1) VILLAGE_BUILDINGS.push(TOWN_DISTRICT.temple);
-  if (info.tier >= 2) VILLAGE_BUILDINGS.push(TOWN_DISTRICT.guild);
+  if (info.tier >= 1) VILLAGE_BUILDINGS.push(cp(TOWN_DISTRICT.temple));
+  if (info.tier >= 2) VILLAGE_BUILDINGS.push(cp(TOWN_DISTRICT.guild));
   const D = [0, 10, 12][info.tier];
   G.townLy = { D, W0:20 + D, cols:20 + D + (info.port ? 4 : 0), info };
   return G.townLy;
@@ -19651,7 +19685,7 @@ function townFolkSpots(){
   const work = VILLAGE_BUILDINGS.map(b=>[b.door.x + (b.face==='e' ? 1 : 0), b.door.y + (b.face==='s' ? 1 : 0)]);
   const home = VILLAGE_HOUSES.map(h=>[h.x0 + (h.w>>1), h.y0 + h.h]).filter(([x,y])=>y < ROWS-1 && G.map[x] && G.map[x][y]===T_FLOOR);
   const tav = VILLAGE_BUILDINGS.find(b=>b.key==='tavern');
-  return { work, home:home.length ? home : [[TOWN_CX, ROWS-3]], tavern:tav ? [tav.door.x, tav.door.y+1] : [TOWN_CX, 8] };
+  return { work, home:home.length ? home : [[TOWN_CX, ROWS-3]], tavern:tav ? [tav.door.x, tav.door.y+1] : [TOWN_CX, tY(8)] };
 }
 function townAfterGen(){
   townLooks();
@@ -19719,7 +19753,7 @@ function townAmbientSound(){
   if (!isNightTime() && d(6,4) < 7 && chn(0.3)) sfx('clink');
   const hen = (G.villagers||[]).find(v=>v.animal==='chicken' && d(v.x, v.y) < 5); if (hen && chn(0.12)) sfx('cluck');
   const dog = (G.villagers||[]).find(v=>v.animal==='dog' && d(v.x, v.y) < 4); if (dog && chn(0.06)) sfx('bark');
-  if (!isNightTime() && !townWet() && d(TOWN_CX, 11) < 5 && chn(0.12)) sfx('murmur');
+  if (!isNightTime() && !townWet() && d(TOWN_CX, tY(11)) < 5 && chn(0.12)) sfx('murmur');
 }
 // walking into a townsperson (or a chicken): they step aside - out of your path if they can, or swap places with you
 function townFolkMakeWay(nx, ny){
@@ -19812,7 +19846,7 @@ function townAfterEnter(){
   townLooks();
   try{ ecoAccrue(); }catch(e){ console.error(e); }
   const info = townInfo();
-  const spot = [[9,9],[13,13],[8,14],[11,13]].find(([x,y])=>G.map[x][y]===T_FLOOR && !(G.player.x===x && G.player.y===y) && !G.villageNpcs.some(n=>n.x===x && n.y===y) && !(G.villagers||[]).some(v=>v.x===x && v.y===y));
+  const spot = [[9,9],[13,13],[8,14],[11,13]].map(([x,y])=>[tX(x), tY(y)]).find(([x,y])=>G.map[x][y]===T_FLOOR && !(G.player.x===x && G.player.y===y) && !G.villageNpcs.some(n=>n.x===x && n.y===y) && !(G.villagers||[]).some(v=>v.x===x && v.y===y));
   if (spot) townNpc(spot[0], spot[1], 'mayor', null, ['Reeve', 'Mayor', 'Lord Mayor'][info.tier]);
   townWelcome(info);
 }
@@ -19956,7 +19990,7 @@ function townArenaWon(f){
   const gold = roundH((40 + run.wave*40 + p.level*5)*goldFindMult()); p.gold += gold;
   const info = townInfo(), titles = { 5:'Arena Fighter', 10:'Champion of '+info.name, 15:'Grand Champion' }, t = titles[run.wave];
   let extra = ''; if (t && !a.titles.includes(t)){ a.titles.push(t); extra = ` You are named <b>${esc(t)}</b>!`; sfx('achievement'); }
-  enterVillage(); G.player.x = 23; G.player.y = 8; if (G.map[23][8]!==T_FLOOR){ G.player.x = TOWN_CX; G.player.y = ROWS-3; }
+  enterVillage(); G.player.x = tX(23); G.player.y = tY(8); if (G.map[G.player.x][G.player.y]!==T_FLOOR){ G.player.x = TOWN_CX; G.player.y = ROWS-3; }
   wevDialog(`Wave ${run.wave} cleared!`, `The crowd throws coins: <b>${gold} gold</b>.${extra}`, [[`Fight wave ${run.wave+1}`, ()=>arenaFight()], ['Take your winnings and rest', ()=>{ G.arenaRun = null; }]], 'the arena');
   checkAchievements(); return true;
 }
@@ -20159,9 +20193,9 @@ function townV3Build(grp, mats){
   // the arena: a ring of stone with banners, sand inside
   if (info.tier >= 2){
     for (let x=21;x<=26;x++) for (let y=10;y<=15;y++) if (deco(x,y)==='arenawall'){ add(v3Box(1, 1.05, 1, mats.stoneBig, x+0.5, 0.52, y+0.5)); if ((x+y)%2===0) add(v3Box(0.35, 0.25, 0.35, mats.stoneBig, x+0.5, 1.17, y+0.5)); }
-    const sand = new T.Mesh(new T.PlaneGeometry(4, 4), M('#d8b878', { roughness:1 })); sand.rotation.x = -Math.PI/2; sand.position.set(24, 0.02, 13); sand.receiveShadow = true; grp.add(sand);
-    for (const [x,z] of [[21.5,10.5],[26.5,10.5],[21.5,15.5],[26.5,15.5]]){ add(v3Cyl(0.05, 0.05, 2.6, 6, mats.wood, x, 1.3, z)); const f = new T.Mesh(new T.PlaneGeometry(0.5, 0.7), M('#a01a1a', { side:T.DoubleSide })); f.position.set(x+0.27, 2.25, z); grp.add(f); }
-    const hb = new T.Mesh(new T.BoxGeometry(6, 1.4, 6), new T.MeshBasicMaterial({ visible:false })); hb.position.set(24, 0.7, 13); hb.userData.act = { kind:'tile', x:22, y:9, label:'The arena' }; grp.add(hb); V3.hits.push(hb);
+    const sand = new T.Mesh(new T.PlaneGeometry(4, 4), M('#d8b878', { roughness:1 })); sand.rotation.x = -Math.PI/2; sand.position.set(tX(24), 0.02, tY(13)); sand.receiveShadow = true; grp.add(sand);
+    for (const [x,z] of [[21.5,10.5],[26.5,10.5],[21.5,15.5],[26.5,15.5]].map(([a,b])=>[tX(a-0.5)+0.5, tY(b-0.5)+0.5])){ add(v3Cyl(0.05, 0.05, 2.6, 6, mats.wood, x, 1.3, z)); const f = new T.Mesh(new T.PlaneGeometry(0.5, 0.7), M('#a01a1a', { side:T.DoubleSide })); f.position.set(x+0.27, 2.25, z); grp.add(f); }
+    const hb = new T.Mesh(new T.BoxGeometry(6, 1.4, 6), new T.MeshBasicMaterial({ visible:false })); hb.position.set(tX(24), 0.7, tY(13)); hb.userData.act = { kind:'tile', x:tX(22), y:tY(9), label:'The arena' }; grp.add(hb); V3.hits.push(hb);
   }
   // the archery butts
   for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++) if (deco(x,y)==='target'){
@@ -20177,15 +20211,15 @@ function townV3Build(grp, mats){
     const water = new T.Mesh(new T.PlaneGeometry(3.6, ROWS-2), wm); water.rotation.x = -Math.PI/2; water.position.set(ly.W0 + 1.6, 0.05, ROWS/2); grp.add(water);
     for (let i=0;i<3;i++) add(v3Box(0.95, 0.08, 1.0, mats.planks, ly.W0 + 0.5 + i, 0.16, 12.5));
     for (let i=0;i<4;i++) add(v3Cyl(0.06, 0.07, 0.9, 6, mats.wood, ly.W0 + 0.1 + i*0.9, 0.0, i%2 ? 12.05 : 12.95));
-    const ship = new T.Group(); ship.position.set(ly.W0 + 2.3, 0.1, 14.3); grp.add(ship); V3.townShip = ship;
+    const ship = new T.Group(); ship.position.set(ly.W0 + 2.3, 0.1, tY(14) + 0.3); grp.add(ship); V3.townShip = ship;
     const hull = v3Box(0.8, 0.35, 2.0, M('#5a3a1e'), 0, 0.12, 0); ship.add(hull); ship.add(v3Box(0.7, 0.05, 1.8, mats.planks, 0, 0.31, 0));
     ship.add(v3Cyl(0.04, 0.05, 1.9, 6, mats.wood, 0, 1.2, 0)); const sail = new T.Mesh(new T.PlaneGeometry(1.1, 1.0), M('#ece2cc', { side:T.DoubleSide })); sail.position.set(0, 1.35, 0.03); ship.add(sail);
-    const hb = new T.Mesh(new T.BoxGeometry(1, 2, 2), new T.MeshBasicMaterial({ visible:false })); hb.position.set(ly.W0 - 0.5, 1, 11.5); hb.userData.act = { kind:'tile', x:ly.W0-1, y:11, label:'The harbour' }; grp.add(hb); V3.hits.push(hb);
+    const hb = new T.Mesh(new T.BoxGeometry(1, 2, 2), new T.MeshBasicMaterial({ visible:false })); hb.position.set(ly.W0 - 0.5, 1, tY(11) + 0.5); hb.userData.act = { kind:'tile', x:ly.W0-1, y:tY(11), label:'The harbour' }; grp.add(hb); V3.hits.push(hb);
   }
   // the town's landmark, in the first house's lot
   const k = info.ident.k;
   if (k){
-    const x = 3.5, z = 16.5, g = new T.Group(); g.position.set(x, 0, z); grp.add(g);
+    const x = 3.5, z = tY(16) + 0.5, g = new T.Group(); g.position.set(x, 0, z); grp.add(g);
     const gadd = o=>{ o.castShadow = true; g.add(o); return o; };
     if (k==='mine'){ gadd(v3Box(0.5, 1.6, 0.6, mats.stoneBig, -0.85, 0.8, 0)); gadd(v3Box(0.5, 1.6, 0.6, mats.stoneBig, 0.85, 0.8, 0)); gadd(v3Box(2.3, 0.45, 0.7, mats.stoneBig, 0, 1.8, 0));
       const dark = new T.Mesh(new T.PlaneGeometry(1.2, 1.6), M('#050403')); dark.position.set(0, 0.8, 0.02); g.add(dark); gadd(v3Box(1.3, 0.08, 0.1, mats.wood, 0, 1.55, 0.32));
@@ -20202,7 +20236,7 @@ function townV3Build(grp, mats){
       const rug = new T.Mesh(new T.PlaneGeometry(1.4, 0.8), M('#8a2a3a')); rug.rotation.x = -Math.PI/2; rug.position.set(0, 0.02, 0.8); g.add(rug);
       for (let i=0;i<3;i++) gadd(v3Box(0.25, 0.25, 0.25, mats.planks, -0.5 + i*0.4, 0.13, 0.5 + (i%2)*0.3)); for (let i=0;i<4;i++){ const gm = gadd(new T.Mesh(new T.OctahedronGeometry(0.05), M(['#4a6ae0','#3ab06a','#e03a3a','#f0f0ff'][i], { emissive:lin('#404040') }))); gm.position.set(-0.3 + i*0.2, 0.08, 0.85); } }
     const nm = { mine:'The town mine', moonwell:'The moonwell', totem:'The war totem', caravan:'The caravan' }[k];
-    const hb = new T.Mesh(new T.BoxGeometry(2.6, 2, 2.6), new T.MeshBasicMaterial({ visible:false })); hb.position.set(x, 1, z); hb.userData.act = { kind:'tile', x:3, y:15, label:nm }; grp.add(hb); V3.hits.push(hb);
+    const hb = new T.Mesh(new T.BoxGeometry(2.6, 2, 2.6), new T.MeshBasicMaterial({ visible:false })); hb.position.set(x, 1, z); hb.userData.act = { kind:'tile', x:3, y:tY(15), label:nm }; grp.add(hb); V3.hits.push(hb);
   }
   // elven lanterns in the trees
   if (G.villageRace==='elf') for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++) if (deco(x,y)==='tree'){ const s = new T.Sprite(new T.SpriteMaterial({ map:v3Blob('rgba(255,236,170,1)'), blending:T.AdditiveBlending, depthWrite:false, transparent:true })); s.scale.set(0.45, 0.45, 1); s.position.set(x+0.5+0.3, 1.5, y+0.5); grp.add(s); }
@@ -26648,7 +26682,7 @@ function v3BuildScene(){
   v3Barrel(13.3,5.3,mats,grp); v3Barrel(13.7,5.7,mats,grp); v3Barrel(13.35,5.8,mats,grp,0.9); v3Barrel(13.5,6.4,mats,grp);
   grp.add(v3Box(1.2,0.06,0.35,mats.planks,8.2,0.45,7.4)); grp.add(v3Box(1.2,0.4,0.06,mats.wood,8.2,0.22,7.4));
   // waypoint: a runed stone dais with a floating crystal
-  { const x = TOWN_CX+0.5, z = 12.5;
+  { const x = TOWN_CX+0.5, z = tY(12) + 0.5;
     grp.add(v3Cyl(1.15,1.25,0.22,8,mats.stoneBig,x,0.11,z));
     grp.add(v3Cyl(0.95,1.02,0.16,8,mats.stone,x,0.28,z));
     const rn = new T.Mesh(new T.CircleGeometry(0.92, 48), mats.runes); rn.rotation.x = -Math.PI/2; rn.position.set(x,0.37,z); grp.add(rn); V3.runes = rn;
@@ -26658,7 +26692,7 @@ function v3BuildScene(){
     const glow = new T.Sprite(new T.SpriteMaterial({ map:v3Blob('rgba(90,220,255,1)'), blending:T.AdditiveBlending, depthWrite:false, transparent:true, opacity:0.6 })); glow.scale.set(2.2,2.2,1); glow.position.set(x,1.3,z); grp.add(glow); V3.cglow = glow;
     V3.lamps.push({ p:[x,1.4,z], col:0x60d8ff, r:6, main:true, always:true });
     V3.motes = { p:[x,0.4,z] };
-    const hb = new T.Mesh(new T.CylinderGeometry(1.1,1.1,2,8), new T.MeshBasicMaterial({ visible:false })); hb.position.set(x,1,z); hb.userData.act = { kind:'tile', x:TOWN_CX, y:12, label:'Waypoint' }; grp.add(hb); V3.hits.push(hb);
+    const hb = new T.Mesh(new T.CylinderGeometry(1.1,1.1,2,8), new T.MeshBasicMaterial({ visible:false })); hb.position.set(x,1,z); hb.userData.act = { kind:'tile', x:TOWN_CX, y:tY(12), label:'Waypoint' }; grp.add(hb); V3.hits.push(hb);
   }
   // the bank: the banker's desk under a green awning, a strongbox and coin stacks
   { const x = 13.5, z = 10.5, gm = new T.MeshStandardMaterial({ color:0x2a5a3a, roughness:0.8 });
@@ -26669,11 +26703,11 @@ function v3BuildScene(){
     for (let i=0;i<3;i++) grp.add(v3Cyl(0.05,0.05,0.05+i*0.04,10,mats.gold,x+0.15+i*0.12,0.87+(0.05+i*0.04)/2,z+0.4));
   }
   // notice board
-  { const x = 15.5, z = 8.5;
+  { const x = tX(15) + 0.5, z = tY(8) + 0.5;
     for (const dx of [-0.55,0.55]) grp.add(v3Cyl(0.05,0.06,1.9,6,mats.wood,x+dx,0.95,z));
     const bd = v3Box(1.2,0.8,0.06,mats.notices,x,1.3,z); grp.add(bd);
     const rf = v3Box(1.4,0.05,0.4,mats.roof,x,1.82,z); rf.rotation.x = -0.3; grp.add(rf);
-    const hb = new T.Mesh(new T.BoxGeometry(1.3,1.9,0.5), new T.MeshBasicMaterial({ visible:false })); hb.position.set(x,0.95,z); hb.userData.act = { kind:'tile', x:15, y:8, label:'Bounty board' }; grp.add(hb); V3.hits.push(hb);
+    const hb = new T.Mesh(new T.BoxGeometry(1.3,1.9,0.5), new T.MeshBasicMaterial({ visible:false })); hb.position.set(x,0.95,z); hb.userData.act = { kind:'tile', x:tX(15), y:tY(8), label:'Bounty board' }; grp.add(hb); V3.hits.push(hb);
     const mk = new T.Sprite(new T.SpriteMaterial({ map:v3MarkerTex('!'), transparent:true, depthTest:false })); mk.scale.set(0.42,0.63,1); mk.position.set(x, 2.25, z); mk.visible = false; grp.add(mk); V3.boardMark = mk;
   }
   // lamps, trees, extra scenery
@@ -26725,7 +26759,7 @@ function v3BuildPeople(grp, mats){
     const el = document.createElement('div'); el.className = 'v3plate folk'; el.innerHTML = `<b>${esc(p.v.nm || NAME_POOL[h])}</b><span>${esc(p.v.role || role)}</span>`; V3.labels.appendChild(el); V3.plates.push({ el, obj:p.g, y:1.15, near:9 }); });
   if (G.interior) for (const [k,x,y] of ROOM_LAYOUT[G.interior.key].benches){ const el = document.createElement('div'); el.className = 'v3plate small'; el.innerHTML = `<b>${esc(BENCHES[k].nm)}</b>`; V3.labels.appendChild(el); V3.plates.push({ el, pos:new T.Vector3(x+0.5, 1.45, y+0.5) }); }
   if (G.interior){ const el = document.createElement('div'); el.className = 'v3plate small'; el.innerHTML = '<b>Door</b>'; V3.labels.appendChild(el); V3.plates.push({ el, pos:new T.Vector3(ROOM.door.x+0.5, 1.9, ROOM.door.y+0.2) }); }
-  if (!G.interior) for (const [txt, x, y, z] of [['Waypoint', TOWN_CX+0.5, 1.95, 12.5]]){
+  if (!G.interior) for (const [txt, x, y, z] of [['Waypoint', TOWN_CX+0.5, 1.95, tY(12) + 0.5]]){
     const el = document.createElement('div'); el.className = 'v3plate small'; el.innerHTML = `<b>${txt}</b>`; V3.labels.appendChild(el);
     V3.plates.push({ el, pos:new T.Vector3(x,y,z) });
   }
@@ -32041,7 +32075,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-117';
+const GAME_VERSION = 'rs-118';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
