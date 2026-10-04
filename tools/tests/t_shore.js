@@ -28,5 +28,5 @@ module.exports = async page=>{
     return { at:best, land, edges, worst:+worst.toFixed(3), waterTiles:n };
   });
   console.log(JSON.stringify(r));
-  await page.waitForTimeout(400); await page.screenshot({ path: SHOTS+'/shot_shore.png' });
+  await page.waitForTimeout(400); await page.screenshot({ path: SHOTS+'/shot_shore.png', timeout:120000 }).catch(()=>{});
 };
