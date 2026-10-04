@@ -77,6 +77,14 @@ module.exports = async page=>{
     const gs = (tab)=>{ G.tkAt = 'board'; G.tkTab = tab; G.ui = 'tasks'; renderOverlay(); return document.getElementById('overlay').innerHTML; };
     A(gs('guild').includes('THE GUILD STORE') && !gs('contracts').includes('THE GUILD STORE') && !gs('bounties').includes('THE GUILD STORE'), 'guild store: its own tab');
     G.ui = 'questgiver'; renderOverlay(); A(!document.getElementById('overlay').innerHTML.includes('the bounty board</button>'), 'the captain has no board button');
+    // RS-113: posted work lives on the bounty board (its first tab); the Captain keeps the story quests and the quest point rewards
+    const hw = ov('board'); A(hw.includes('POSTED WORK') && hw.includes('Posted work</button>') && G.tkTab==='work', 'the board opens on posted work');
+    G.ui = 'questgiver'; renderOverlay(); const hc = document.getElementById('overlay').innerHTML; A(!hc.includes('POSTED WORK') && hc.includes("THE WATCH'S QUESTS") && hc.includes('QUEST POINT REWARDS'), 'the captain: story quests and rewards, no jobs');
+    A(typeof captainQuestMarker()==='string', 'the captain has his own marker');
+    const job = G.questBoard.find(q=>q.kind!=='escort'); A(job, 'a job is posted');
+    tkOpen('board', 'work'); acceptQuest(job.id); const mine = G.player.quests.find(q=>q.id===job.id); A(mine, 'took the job at the board');
+    mine.progress = mine.target; mine.freed = true; A(questIsReady(mine) && villageQuestMarker()==='?', 'a finished job puts a ? over the board');
+    turnInQuest(job.id); A(G.ui==='questReward', 'handed in'); chooseQuestReward(0); A(G.ui==='tasks' && G.tkAt==='board' && G.tkTab==='work' && !G.player.quests.some(q=>q.id===job.id), 'back at the board after the reward');
     // no T teleport; the classic buttons press the keys
     setUi('playing'); handleKeydown({ key:'t', target:document.body, preventDefault(){} }); A(G.ui==='playing', 'T opens nothing');
     const st0 = rsStyle().nm; document.getElementById('btnAbility').click(); A(rsStyle().nm!==st0, 'the F button changes attack style');

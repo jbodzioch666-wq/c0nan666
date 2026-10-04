@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-113 - Posted work moves to the bounty board
+
+- **One place for jobs:** the town's posted work (conquests, bounties, camps, rescues, escorts and errands) is now on the bounty board, as its first tab. Contracts, wanted posters, the guild store and the news are there too. Take up to three jobs at a time; handing one in brings you back to the board.
+- **The Captain of the Watch tells the town's story:** he keeps the hand-written story quests (Trapped Below, The Goblin War and The Royal Guard), your standing with the town and the quest point rewards. His screen lists his story quests, and an "ask about" button starts one you can take.
+- **Markers in the right place:** a gold ! over the bounty board means new jobs, and ? means one is ready to hand in. The ! and ? over the Captain are now only for his story quests.
+- **Escort jobs** finish at the bounty board in the town you led the merchant to.
+
 ## RS-112 - Moving windows on phones
 
 - **Dragging windows works by touch:** on a phone, dragging a window's title bar or grip used to scroll or zoom the page instead. The handles now hold onto your finger, so the log, quest tracker, XP tracker, side panel and quick bar can all be moved by touch. The resize corners work the same way.
