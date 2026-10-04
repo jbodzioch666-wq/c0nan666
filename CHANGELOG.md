@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-121 - Choose what the XP window shows
+
+- **Tick boxes in the skills menu:** every skill in the skills menu (J), combat skills included, now has a tick box. The XP window shows exactly the skills you tick, one row each, and nothing else. Tick one skill for a single row.
+- **Untick everything** and the XP window stays hidden.
+- **Until you tick anything**, it works as before and shows the last three skills you trained. Your choice is kept with your save.
+
 ## RS-120 - Gathering at the right pace
 
 - **Gathering was running every frame:** since RS-101, picking herbs, fishing, mining, chopping trees and digging all tried for a new resource on every screen refresh, dozens of times a second, instead of every few seconds. The timer that spaced out each try was accidentally switched off. It's back: one try about every 2.8 seconds, a little quicker with a better tool, as RS-101 intended.
