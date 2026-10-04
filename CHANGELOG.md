@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-112 - Moving windows on phones
+
+- **Dragging windows works by touch:** on a phone, dragging a window's title bar or grip used to scroll or zoom the page instead. The handles now hold onto your finger, so the log, quest tracker, XP tracker, side panel and quick bar can all be moved by touch. The resize corners work the same way.
+- **No stuck windows:** if the phone interrupts a drag, for a call or a system gesture, the window now lets go instead of staying stuck to where your finger was.
+- **Bigger handles:** on touch screens the drag handles have a little more room around them, so they're easier to grab.
+
 ## RS-111 - Old flat views removed
 
 - **Removed the leftover flat views:** the flat overworld, town, roadside-fight and dungeon maps were removed from the code. You could no longer reach them, and they're about 645 lines that no longer have to load. The world map (M), the minimap and the waypoint map still work as before.

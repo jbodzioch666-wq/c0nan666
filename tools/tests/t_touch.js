@@ -94,6 +94,18 @@ module.exports = async page=>{
   out.dungeon = { iso:d.iso, rot:d.rot }; A(d.iso, 'the dungeon view'); A(d.rot==='flex', 'camera buttons in the dungeon');
   const rb = await page.evaluate(()=>{ const r = document.querySelector('.padx [data-rot=x]').getBoundingClientRect(); return [r.left + r.width/2, r.top + r.height/2]; });
   await tap(rb[0], rb[1]); out.rot = await page.evaluate(()=>ISO.rot); A(out.rot!==d.rot0, 'the camera turns');
+  // RS-112: windows can be dragged by touch - the handles claim the touch (no page pan), and a cancelled drag lets go
+  const dr = await page.evaluate(async ()=>{
+    const h = document.querySelector('[data-drag="log"]'), el = document.getElementById('logPanel'); if (!h || !el) return { none:true };
+    const ta = getComputedStyle(h).touchAction, r0 = el.getBoundingClientRect(), hb = h.getBoundingClientRect();
+    const fire = (t, x, y)=>{ const e = new PointerEvent(t, { bubbles:true, cancelable:true, clientX:x, clientY:y, pointerType:'touch', isPrimary:true, pointerId:7, button:0 }); (t==='pointerdown' ? h : window).dispatchEvent(e); };
+    const x0 = hb.left + hb.width/2, y0 = hb.top + hb.height/2;
+    fire('pointerdown', x0, y0); for (let i=1;i<=6;i++){ fire('pointermove', x0 + i*8, y0 - i*10); await new Promise(r=>setTimeout(r, 16)); } fire('pointerup', x0 + 48, y0 - 60);
+    const r1 = el.getBoundingClientRect();
+    fire('pointerdown', x0, y0); fire('pointermove', x0 + 20, y0); fire('pointercancel', x0 + 20, y0);
+    return { ta, moved:[Math.round(r1.left - r0.left), Math.round(r1.top - r0.top)], freed:DRAG===null };
+  });
+  out.drag = dr; A(!dr.none, 'the log has a drag handle'); A(dr.ta==='none', 'the handle claims the touch: '+dr.ta); A(Math.hypot(dr.moved[0], dr.moved[1]) > 30, 'the log window moved by touch: '+dr.moved);   // (it stays inside the screen, so one way may be blocked by the edge) A(dr.freed, 'a cancelled drag lets go');
   console.log(JSON.stringify(out));
   await page.screenshot({ path:SHOTS+'/shot_touch_dungeon.png', timeout:120000 });
 };
