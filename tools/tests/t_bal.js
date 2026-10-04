@@ -31,6 +31,11 @@ module.exports = async page=>{
     skAdd('yew', 10); skAdd('c_lobster', 5); setUi('shop'); const ov = document.getElementById('overlay').innerHTML; A(ov.includes('THE PEDDLER BUYS RAW GOODS'), 'the Peddler buys raw goods');
     const g0 = p.gold; shopSellRes('yew', 1); A(skHave('yew')===0 && p.gold > g0, 'sold the logs'); out.yewGold = p.gold - g0;
     const g1 = p.gold; shopSellRes('c_lobster'); shopSellRes('c_lobster'); out.lobster = p.gold - g1; setUi('playing');
+    // RS-120: gathering keeps its pace - one take every couple of seconds, not one every frame
+    { G.gameMode = 0; G.interior = null; setUi('playing'); const o = { k:'foraging', label:'Pick herbs' };
+      G.gather = { o, mode:0, pos:G.owPos.x+','+G.owPos.y, next:0, n:0 }; let t = 1e6, takes = 0; const n0 = () => G.gather ? G.gather.n : -1;
+      for (let i=0;i<600 && G.gather;i++){ t += 16.7; const before = G.gather.n; skGatherTick(t); if (G.gather && G.gather.n > before) takes++; }   // ten seconds of frames
+      G.gather = null; out.takes10s = takes; A(takes >= 2 && takes <= 5, 'gathering takes in ten seconds: '+takes); }
     return out;
   });
   console.log(JSON.stringify(r));

@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-120 - Gathering at the right pace
+
+- **Gathering was running every frame:** since RS-101, picking herbs, fishing, mining, chopping trees and digging all tried for a new resource on every screen refresh, dozens of times a second, instead of every few seconds. The timer that spaced out each try was accidentally switched off. It's back: one try about every 2.8 seconds, a little quicker with a better tool, as RS-101 intended.
+- **What this means for you:** gathering is now much slower than you've been used to, and as slow as it was meant to be. Each try still gives the xp RS-101 set, and resources stay scarce.
+
 ## RS-119 - Fights you can watch
 
 - **A slower beat:** once you engage a monster you now attack about every 1.8 seconds, closer to RuneScape's 2.4, instead of every 0.6 seconds. Each swing and each cast plays out over about half a second, so you can see it land.
