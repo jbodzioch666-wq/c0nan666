@@ -1,3 +1,4 @@
+// RS-144: menu text contrast
 // RS-137: on a phone - a saved character loads, the rooms use half-size textures (and none are built ahead), and any error shows
 // on screen with Reload and Dismiss instead of leaving a dead page
 module.exports = async page=>{
@@ -12,6 +13,12 @@ module.exports = async page=>{
   console.log(JSON.stringify(r));
   A(r.ui==='playing', 'a saved character loads after a reload');
   A(r.low && r.size===512 && r.warm===0, 'phones get half-size room textures, built only on walking in: '+JSON.stringify(r));
+  // RS-144: menu text reads clearly on the dark panels - every text shade has at least 5.5:1 contrast against the panel colour
+  const con = await ev(()=>{ const L = h=>{ const n = parseInt(h.slice(1),16), c = [n>>16&255, n>>8&255, n&255].map(v=>{ v/=255; return v<=0.03928 ? v/12.92 : Math.pow((v+0.055)/1.055, 2.4); }); return 0.2126*c[0]+0.7152*c[1]+0.0722*c[2]; };
+    const cs = getComputedStyle(document.documentElement), bg = L(cs.getPropertyValue('--panel').trim()), out = {};
+    for (const v of ['--ink','--ink-dim','--ink-faint']){ const f = L(cs.getPropertyValue(v).trim()); out[v] = +((f+0.05)/(bg+0.05)).toFixed(1); } out.dim = +((L(COL.dim)+0.05)/(bg+0.05)).toFixed(1); return out; });
+  console.log('contrast', JSON.stringify(con));
+  A(Object.values(con).every(c=>c >= 5.5), 'menu text is easy to read on the dark panels: '+JSON.stringify(con));
   await ev(()=>{ window.dispatchEvent(new ErrorEvent('error', { message:'test boom', lineno:1 })); }); await page.waitForTimeout(300);   // (an error event, as a thrown error raises one)
   const ban = await ev(()=>{ const el = document.getElementById('crashBanner'); return el ? el.textContent : ''; });
   A(/Something went wrong/.test(ban) && /test boom/.test(ban) && /Reload/.test(ban), 'an error shows on screen: '+ban);

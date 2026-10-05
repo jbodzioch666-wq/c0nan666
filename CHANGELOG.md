@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-144 - Easier to read
+
+- **Brighter menu text:** text on the dark menus is lighter now, and the backgrounds are unchanged. The faintest grey, used for descriptions, levels, hints and notes all over the menus, was barely visible. It's now clearly readable, and the regular and secondary text is brighter too.
+- **Locked and unknown entries:** the "???" creatures in the bestiary, uncollected items, and recipes you can't make yet are still dimmed, but much less, so you can read them.
+
 ## RS-143 - Turn buttons only where they belong
 
 - **Gone over menus:** the **↺ ↻** turn buttons no longer float over your inventory, skills, bestiary, character sheet or any other menu. They leave with the minimap, and come back with it when you return to the game.
