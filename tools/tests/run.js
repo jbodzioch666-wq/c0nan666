@@ -9,7 +9,7 @@
 // Screenshots land in tools/tests/shots/. Needs `npm install` in tools/tests first.
 const fs = require('fs'), path = require('path');
 const ROOT = path.resolve(__dirname, '../..'), PAGE = path.join(ROOT, 'depthcrawl.html');
-const ALL = ['boot','iso','xpt','diag','touch','bal','gen','grave','clock','rooms','door','roads','chardel','routebtn','graves','crash','wmapm','viewrot','tasks','soak','pace','fpdres','map','wev','wg','sail','big','town','folk','eco','gfx','shore','quest','audio', 'los', 'export', 'daylight'];
+const ALL = ['boot','iso','xpt','diag','touch','bal','gen','grave','clock','rooms','door','roads','chardel','routebtn','graves','crash','wmapm','viewrot','tasks','soak','pace','fpdres','map','wev','wg','sail','big','town','folk','eco','gfx','shore','quest','audio', 'los', 'export', 'daylight', 'nodetip'];
 
 function load(mod, fallbacks){ for (const p of [mod].concat(fallbacks)){ try { return require(p); } catch(e){} } return null; }
 const pw = load('playwright', ['/opt/node-tools/node_modules/playwright']);

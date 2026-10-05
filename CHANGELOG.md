@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-160 - Live resource tooltips
+
+- **Counts that keep up**: point at a tree, rock, fishing spot or herb patch while you gather, and its tooltip now counts down how many are left as you work, then switches to "felled" or "picked clean". Before, it kept the number from when you first pointed at it.
+
 ## RS-159 - Proper rain in town
 
 - **Fine rain, not blobs**: rain in towns showed up as big round drops. It now falls as thin streaks around you, like on the overworld. Storms bring heavier, more slanted rain, and it stops at the door when you go inside.
