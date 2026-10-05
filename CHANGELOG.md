@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-152 - Export works on the play link
+
+- **Export save fixed**: the "export save to a file" button in the pause menu, and the export icon on the title screen, now work on the claude.ai play link. You get a prompt asking whether to save the file. Before, the button did nothing there.
+- **Same as before elsewhere**: the itch.io build and a downloaded copy still save the file straight away, as they always did.
+
 ## RS-151 - Clock bar
 
 - **Name window removed**: the box with your name in the top-left corner is gone, so you can see more of the world.

@@ -37,6 +37,7 @@ Screenshots go to `tools/tests/shots/`.
 | wmapm | the world map on a phone: clear of other panels, one row of tools, no legend by default; tap a grave to walk to it or forget it |
 | viewrot | the towns and overworld turn like dungeons (Z/X, minimap rim buttons); keys and minimap turn with the view; rooms keep the usual view |
 | los | ranged attacks need a clear line of fire: no squeezing past a wall corner, and the same answer from either end |
+| export | exporting a save: the claude.ai save prompt when the page runs there, a plain download elsewhere |
 | diag | diagonal steps: keys, numpad, corners, click paths, no diagonal strikes |
 | touch | on an emulated phone: tap to walk, long-press menu, pinch zoom, map drag, the d-pad, the hotbar |
 | bal | balance: monsters bite harder, the fixed-strength lair boss, coin trim, the smith's reinforcing |
