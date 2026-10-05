@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-153 - Picture-grid inventory
+
+- **Inventory as a grid**: the full inventory screen (I) now shows your items as a grid of pictures, like the side panel's pack, instead of a long text list. Each picture's border shows its rarity. Green and red arrows mark upgrades and downgrades. Locked, set and junk items are marked, and junk is greyed out.
+- **Tap to inspect**: tap an item to see its stats, what it replaces and what it sells for. Then use the equip, use, sell and lock buttons below.
+- **Scrolls on phones**: the inventory screen scrolls all the way down to its buttons again. Before, the bottom was cut off.
+
 ## RS-152 - Export works on the play link
 
 - **Export save fixed**: the "export save to a file" button in the pause menu, and the export icon on the title screen, now work on the claude.ai play link. You get a prompt asking whether to save the file. Before, the button did nothing there.

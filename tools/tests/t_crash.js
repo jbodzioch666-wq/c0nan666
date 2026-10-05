@@ -60,6 +60,15 @@ module.exports = async page=>{
     return { plate:!!document.querySelector('.dh-name'), text:el ? el.textContent : '', shown:!!(r && r.width && getComputedStyle(el).display!=='none'), clearMm:!!(r && r.right <= mm.left), noon, six }; });
   console.log('clock bar', JSON.stringify(clk));
   A(!clk.plate && clk.shown && clk.clearMm && new RegExp(seasonRe()).test(clk.text) && /\d{1,2}:\d\d (am|pm)/.test(clk.text) && clk.noon==='12:00 pm' && clk.six==='6:00 pm', 'the clock bar replaces the name plate: '+JSON.stringify(clk));
+  // RS-153: the inventory screen is a grid of item pictures like the side panel; a tap picks one, and the whole screen scrolls down to the buttons
+  const inv = await ev(async ()=>{ for (let i=0;i<12;i++) G.inv.push(genItem(3, i%2 ? 'weapon' : 'armor')); G.invSel = 0; setUi('inventory'); renderOverlay(); await new Promise(r=>setTimeout(r, 150));
+    const cells = document.querySelectorAll('#overlay .invgrid .sp-cell'); cells[3].click(); await new Promise(r=>setTimeout(r, 100));
+    const ov = document.getElementById('overlay'); ov.scrollTop = 99999; await new Promise(r=>setTimeout(r, 100));
+    const btn = [...document.querySelectorAll('#overlay .btnrow .btn')].pop().getBoundingClientRect();
+    const out = { cells:cells.length, items:G.inv.length, sel:G.invSel, picked:!!document.querySelector('#overlay .invgrid .sp-cell.sel'), detail:!!document.querySelector('#overlay .detailpane'), btnOn: btn.top >= 0 && btn.bottom <= innerHeight + 1, rows:document.querySelectorAll('#overlay .invrow').length };
+    G.inv.splice(G.inv.length - 12, 12); G.invSel = 0; setUi('playing'); renderGame(); return out; });
+  console.log('inventory', JSON.stringify(inv));
+  A(inv.cells===inv.items && inv.sel===3 && inv.picked && inv.detail && inv.btnOn && inv.rows===0, 'the inventory is a picture grid and its buttons can be reached: '+JSON.stringify(inv));
   // RS-149: the full-screen menus fit a phone's width - nothing runs off the right edge
   const wide = await ev(async ()=>{ const out = {};
     for (const u of ['charsheet','stats','bestiary','journal','skills','settings','inventory']){ setUi(u); renderOverlay(); await new Promise(r=>setTimeout(r, 150));
