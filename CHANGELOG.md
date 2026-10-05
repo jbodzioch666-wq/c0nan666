@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-148 - One layout
+
+- **Classic layout removed**: the old three-column layout, and the button that switched to it, are gone. Everyone now plays in the full-window view.
+- **Old setting ignored**: if you had switched to classic before, the game now opens in the full-window view for you.
+
 ## RS-147 - Tidier buttons
 
 - **Two fewer buttons**: the fullscreen and layout buttons are gone from the tool column, since they did nothing useful on a phone.
