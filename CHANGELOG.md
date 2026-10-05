@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-133 - Bestiary models in their box
+
+- **Centred on phones:** on high-resolution screens like most phones, a creature's model in the bestiary was drawn twice the size of its box, so it hung off the bottom-right corner. It now fills its box exactly on every screen.
+- **Turns on the spot:** every model is centred on its own shape before it turns, so long beasts and lopsided figures stay in the middle of the box.
+
 ## RS-132 - Delete characters anywhere
 
 - **Tap twice to delete:** the &times; on a saved character now turns into a red **Delete?** button. Tap it again within four seconds to delete the character. Leave it and it goes back to normal.

@@ -26,7 +26,10 @@ module.exports = async page=>{
     // the bestiary box: undead and model-less creatures still get a model
     for (const nm of ['skeleton', 'zombie', 'lich', 'ghost', 'dragon', 'cultist', 'necromancer', 'giant rat']) A(bvPortrait({ nm }), 'a model for '+nm);
     G.player.codexSeen = ['skeleton']; G.bestSel = 'skeleton'; setUi('bestiary'); await new Promise(r=>setTimeout(r, 900));
-    A(BV.e && BV.e.holder, 'the skeleton stands in the bestiary box'); setUi('playing');
+    A(BV.e && BV.e.holder, 'the skeleton stands in the bestiary box');
+    { const sl = document.getElementById('bvSlot').getBoundingClientRect(), cv = BV.r.domElement.getBoundingClientRect();   // (RS-133) the model's canvas fills its box exactly, at any screen density
+      A(Math.abs(cv.width - sl.width) < 1 && Math.abs(cv.height - sl.height) < 1 && Math.abs(cv.x - sl.x) < 1, 'the model is drawn inside its box: '+JSON.stringify([sl.width, sl.height, cv.width, cv.height]));
+      A(BV.pivot && BV.pivot.children[0]===BV.e.holder, 'and centred on its own bounds'); } setUi('playing');
     return out;
   });
   console.log(JSON.stringify(r));
