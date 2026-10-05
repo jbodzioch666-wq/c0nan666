@@ -32,6 +32,7 @@ Screenshots go to `tools/tests/shots/`.
 | roads | nothing spawns on a road except the towns, and nothing spawns on top of anything else (RS-131) |
 | chardel | deleting a character on the title screen: tap once to arm, tap again to delete, no browser pop-up |
 | routebtn | the route and gravestone buttons over the hot bar: plan a route, set off, stop; walk back to your grave |
+| graves | one gravestone per death (up to ten), the nearest is the one you head for, picking one up leaves the rest |
 | diag | diagonal steps: keys, numpad, corners, click paths, no diagonal strikes |
 | touch | on an emulated phone: tap to walk, long-press menu, pinch zoom, map drag, the d-pad, the hotbar |
 | bal | balance: monsters bite harder, the fixed-strength lair boss, coin trim, the smith's reinforcing |

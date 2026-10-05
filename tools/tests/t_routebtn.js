@@ -22,6 +22,9 @@ module.exports = async page=>{
     gb().click(); out.graveGo = graveWalking() && !routeWalking(); renderGame(); out.graveLbl = gb().textContent;
     gb().click(); out.graveStop = !graveWalking() && !!G.player.grave;
     G.owPos.x = gs[0]; G.owPos.y = gs[1]; const g0 = G.player.gold; gb().click(); out.reclaimed = !G.player.grave && G.player.gold === g0 + 50;
+    // RS-136: the hot bar's slots scroll with a swipe, and a redraw doesn't throw away where you'd scrolled to
+    const so = document.querySelector('.dh-slots'), cs = so && getComputedStyle(so); out.swipe = cs && cs.touchAction + '|' + cs.pointerEvents + '|' + cs.overflowX;
+    so.scrollLeft = 40; const sx0 = so.scrollLeft; G.player.hp = Math.max(1, G.player.hp - 1); renderGame(); out.scrollKept = sx0 > 0 && document.querySelector('.dh-slots').scrollLeft === sx0; out.sx0 = sx0;
     return out; });
   console.log(JSON.stringify(r));
   A(r.shown && /ROUTE/.test(r.lbl0), 'a route button sits over the hot bar');
@@ -34,6 +37,8 @@ module.exports = async page=>{
   A(r.graveShown, 'a gravestone button once you have a grave to go back to');
   A(r.graveGo && /STOP/.test(r.graveLbl), 'tapping it walks you back to the grave (not counted as a route)');
   A(r.graveStop, 'tapping again stops, and the grave still waits');
+  A(/pan-x/.test(r.swipe) && /auto/.test(r.swipe), 'the slots take a sideways swipe: '+r.swipe);
+  A(r.sx0===0 || r.scrollKept, 'a redraw keeps the slots scrolled where you left them');
   A(r.reclaimed, 'standing on the grave, the button picks it up');
 };
 module.exports.mobile = true;

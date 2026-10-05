@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-136 - Swipe the hot bar, and a grave for every death
+
+- **The hot bar scrolls:** on a phone, swipe the slot row sideways to reach every slot. It used to jump back to the start whenever anything on the bar changed, like your health or a cooldown, and the row could ignore swipes altogether.
+- **A gravestone for every death:** dying again no longer crumbles your last gravestone. Each death leaves its own, and up to ten wait for you at once. Past ten, the oldest crumbles, and the death screen warns you first.
+- **All of them on the map:** every gravestone shows on the minimap, the world map and in the 3D land.
+- **The nearest one first:** the gravestone button and the tracker point to the nearest grave. Picking one up tells you how many still wait.
+
 ## RS-135 - A gravestone button
 
 - **Back to your grave in one tap:** while a gravestone holds your things, a grey cross button sits beside the route button over the hot bar. Tap it to walk all the way back, along the roads if you prefer them for routes, however far away it is.

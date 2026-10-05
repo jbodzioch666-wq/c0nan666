@@ -481,6 +481,9 @@
   .dh-xp .dh-cor{ position:absolute; left:0; bottom:0; height:2px; background:#c98af0; box-shadow:0 0 6px #c98af0; }
   .dh-xpl{ position:absolute; left:0; right:0; top:-15px; text-align:center; font-size:10px; color:#cfb68a; text-shadow:0 1px 2px #000; letter-spacing:0.06em; }
   .dh-slots{ position:absolute; left:10px; right:10px; top:22px; display:flex; gap:6px; justify-content:center; }
+  /* RS-136: on a touch screen the slots scroll sideways with a swipe (the row itself takes the touch, and only pans sideways) */
+  body.touch .dh-slots{ pointer-events:auto; touch-action:pan-x; overflow-x:auto; overflow-y:hidden; overscroll-behavior-x:contain; scrollbar-width:none; justify-content:flex-start; -webkit-overflow-scrolling:touch; }
+  body.touch .dh-slots::-webkit-scrollbar{ display:none; } body.touch .dh-slot{ flex:0 0 auto; touch-action:pan-x; }
   .dh-slot{ position:relative; width:46px; height:46px; flex:0 1 46px; border-radius:7px; cursor:pointer; padding:0;
     background:radial-gradient(circle at 50% 35%, #2c2620, #0d0b09 80%); border:1px solid #5e4828;
     box-shadow:inset 0 0 8px rgba(0,0,0,0.9), 0 1px 0 rgba(255,220,160,0.1); display:flex; align-items:center; justify-content:center; }
@@ -539,7 +542,7 @@
   @media (max-width: 760px){
     .dh-orb{ width:78px; height:78px; } .dh-console{ left:66px; right:66px; } .dh-slot{ width:36px; height:36px; }
     body:not(.touch) .dh-slot.minor{ display:none; } body.immersive #logPanel{ width:60vw; left:auto; right:8px; bottom:120px; height:110px; }
-    .dh-slots{ justify-content:flex-start; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; padding-bottom:4px; } .dh-slots::-webkit-scrollbar{ display:none; } .dh-slot{ flex:0 0 36px; }
+    .dh-slots{ justify-content:flex-start; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; padding-bottom:4px; pointer-events:auto; touch-action:pan-x; } .dh-slots::-webkit-scrollbar{ display:none; } .dh-slot{ flex:0 0 36px; }
     .dh-plate{ min-width:0; max-width:40vw; padding:6px 8px; } .dh-topl .dh-target{ min-width:0; max-width:46vw; } .dh-target canvas{ display:none; } .dh-name{ font-size:13px; } .dh-stats, .dh-ally{ display:none; }
     .dh-sub{ font-size:10px; } .dh-loc{ font-size:10px; }
     body.immersive #logPanel{ bottom:166px; height:92px; width:55vw; }
@@ -4367,11 +4370,13 @@ function continueAfterDeath(walkToGrave){
   const p = G.player, ds = G.deathSplit || deathSplit();
   // you keep your worn gear and your most valuable few pack items; everything
   // else (and half your gold) is left in a gravestone where you fell
-  if (p.grave && (p.grave.items.length || p.grave.gold)) logMsg('your old gravestone crumbles to dust - what it held is gone for good', 'hit');
   p.gold -= ds.goldLost; pStats()._g = p.gold;
   G.inv = ds.keep.slice(); p.lootHold = []; G.invSel = 0;
-  p.grave = (ds.lose.length || ds.goldLost) ? { x:G.owPos.x, y:G.owPos.y, items:ds.lose, gold:ds.goldLost, place:ds.place, cause:G.deathCause||'', when:Date.now() } : null;
-  if (G.deathWild && p.grave){ p.grave = null; logMsg('you fell in the Wilderness - whatever you dropped there is gone for good', 'hit'); }
+  // (RS-136) every death leaves its own gravestone; the older ones wait too, up to GRAVE_MAX, then the oldest crumbles
+  const graves = gravesP(); let fresh = (ds.lose.length || ds.goldLost) ? { id:'g'+Date.now()+'_'+rn(1e6), x:G.owPos.x, y:G.owPos.y, items:ds.lose, gold:ds.goldLost, place:ds.place, cause:G.deathCause||'', when:Date.now() } : null;
+  if (G.deathWild && fresh){ fresh = null; logMsg('you fell in the Wilderness - whatever you dropped there is gone for good', 'hit'); }
+  if (fresh){ graves.push(fresh); while (graves.length > GRAVE_MAX){ const o = graves.shift(); if (o.items.length || o.gold) logMsg(`your oldest gravestone, at ${o.place||'a far place'}, crumbles to dust - what it held is gone for good`, 'hit'); } }
+  p.grave = fresh || p.grave;
   G.deathWild = false;
   G.deathSplit = null;
   p.hp = Math.max(1, Math.ceil(effMaxHp()*0.5));
@@ -4380,11 +4385,11 @@ function continueAfterDeath(walkToGrave){
   G.mon = [];
   G.isBossFloor = 0;
   const town = nearestVisitedTown(G.owPos.x, G.owPos.y);
-  if (town && p.grave){ G.owPos.x = town.x; G.owPos.y = town.y; }
+  if (town && fresh){ G.owPos.x = town.x; G.owPos.y = town.y; }
   setUi('playing');
-  logMsg(town && p.grave ? `you wake in ${town.name}, battered but alive` : 'you wake back in the light, battered but alive', 'new');
-  if (p.grave) logMsg(`your gravestone holds ${p.grave.items.length} item${p.grave.items.length===1?'':'s'} and ${p.grave.gold} gold - walk back to it to reclaim them`, 'loot');
-  if (walkToGrave && p.grave && typeof o3Active==='function' && o3Active()) { try { o3WalkTo({ x:p.grave.x, y:p.grave.y }); } catch(e){} }
+  logMsg(town && fresh ? `you wake in ${town.name}, battered but alive` : 'you wake back in the light, battered but alive', 'new');
+  if (fresh) logMsg(`your gravestone holds ${fresh.items.length} item${fresh.items.length===1?'':'s'} and ${fresh.gold} gold - walk back to it to reclaim them${graves.length > 1 ? ` (${graves.length} gravestones wait for you now)` : ''}`, 'loot');
+  if (walkToGrave && fresh){ p.grave = fresh; try { graveButton(); } catch(e){} }
   renderGame();
   saveCurrentGame();
 }
@@ -4402,16 +4407,26 @@ function nearestVisitedTown(x, y){
   return best;
 }
 // walking back onto your gravestone's tile hands everything back
+// RS-136: gravestones - every death leaves one (up to GRAVE_MAX), p.graves holds them all, and p.grave is the one you're
+// heading for (the nearest, re-picked as you move). Older saves had just p.grave: it joins the list.
+const GRAVE_MAX = 10;
+function gravesP(){
+  const p = G.player; if (!p) return []; if (!Array.isArray(p.graves)) p.graves = [];
+  if (p.grave){ if (!p.grave.id) p.grave.id = 'g'+(p.grave.when||Date.now()); const m = p.graves.find(g=>g.id===p.grave.id); if (m) p.grave = m; else p.graves.push(p.grave); }
+  return p.graves;
+}
+function graveSync(){ const p = G.player; if (!p) return; const L = gravesP(); let best = null, bd = 1e9; for (const g of L){ const d = Math.hypot(g.x-G.owPos.x, g.y-G.owPos.y); if (d < bd){ bd = d; best = g; } } p.grave = best; }
 function graveCheck(){
-  const p = G.player, g = p && p.grave;
-  if (!g || G.gameOver || G.gameMode!==0 || G.owPos.x!==g.x || G.owPos.y!==g.y) return;
-  p.grave = null;
+  const p = G.player; if (!p || G.gameOver || G.gameMode!==0) return;
+  const L = gravesP(), gi = L.findIndex(q=>q.x===G.owPos.x && q.y===G.owPos.y);
+  if (gi < 0){ if (!G.graveOn) graveSync(); return; }
+  const g = L.splice(gi, 1)[0]; p.grave = null; graveSync();   /* (clear the pointer first, or the list would take the collected grave back) */
   let held = 0;
   for (const it of g.items){ if (G.inv.length < MAXINV) G.inv.push(it); else { (p.lootHold = p.lootHold||[]).push(it); held++; } }
   p.gold += g.gold; pStats()._g = p.gold;
   notify(`Gravestone reclaimed: ${g.items.length} item${g.items.length===1?'':'s'} and ${g.gold} gold`, 'good', 'grave');
-  logMsg(`you kneel at your gravestone and take back ${g.items.length} item${g.items.length===1?'':'s'} and ${g.gold} gold${held ? ` (${held} wait in your loot tray)` : ''}`, 'good');
-  saveCurrentGame();
+  logMsg(`you kneel at your gravestone and take back ${g.items.length} item${g.items.length===1?'':'s'} and ${g.gold} gold${held ? ` (${held} wait in your loot tray)` : ''}${L.length ? ` - ${L.length} more gravestone${L.length===1 ? '' : 's'} still wait${L.length===1 ? 's' : ''}` : ''}`, 'good');
+  G.graveOn = false; saveCurrentGame();
 }
 
 // ===================== SECTION: INVENTORY / EQUIP =====================
@@ -4516,7 +4531,7 @@ function playerWealth(){
   const worn = sumV(GEAR_KEYS.concat(['ranged']).map(k=>G.gear[k])), pack = sumV(G.inv), stash = sumV(p.stash||[]), tray = sumV(p.lootHold||[]);
   let res = 0; for (const [id, n] of Object.entries(skP().bag||{})) res += (resValue(id)||0)*n;
   res += (p.arrows||0)*resValue('arrows');
-  const grave = p.grave ? sumV(p.grave.items) + p.grave.gold : 0;
+  const grave = gravesP().reduce((t, g)=>t + sumV(g.items) + g.gold, 0);
   return { gold:p.gold, worn, pack:pack+tray, stash, res, grave, total:p.gold+worn+pack+tray+stash+res+grave };
 }
 const LOAD_TIPS = [
@@ -9688,7 +9703,7 @@ function renderMiniMap(){
       const t = G.ow.map[x][y]; if (OW_SITE_TILES.includes(t)) dot((i+0.5)*cs, (j+0.5)*cs, t===OW_TOWN ? cs*1.3 : cs*0.95, PM_SITE_BRIGHT[t]||'#fff', 'rgba(0,0,0,0.7)'); }
     for (const e of (G.ow.encounters||[])){ const i = e.x-x0, j = e.y-y0; if (i>=0 && j>=0 && i<=2*R && j<=2*R && owSeen(e.x,e.y)) dot((i+0.5)*cs, (j+0.5)*cs, cs*0.6, '#ff3a3a'); }
     for (const q of questsShown()){ const t = questTarget(q); if (!t) continue; const i = clamp(t.x-x0, 0, 2*R), j = clamp(t.y-y0, 0, 2*R); dot((i+0.5)*cs, (j+0.5)*cs, cs*0.8, t.turnIn ? '#5ab0ff' : '#ffd24a', '#000'); }
-    const gv = G.player.grave; if (gv){ const i = clamp(gv.x-x0, 0, 2*R), j = clamp(gv.y-y0, 0, 2*R); dot((i+0.5)*cs, (j+0.5)*cs, cs*0.8, '#e8e8f0', '#000'); }
+    for (const gv of gravesP()){ const i = clamp(gv.x-x0, 0, 2*R), j = clamp(gv.y-y0, 0, 2*R); dot((i+0.5)*cs, (j+0.5)*cs, cs*0.8, '#e8e8f0', '#000'); }
   } else {
     const cs = S/Math.max(COLS, ROWS), ox = (S - COLS*cs)/2, oy = (S - ROWS*cs)/2; MM.view = { x0:-ox/cs, y0:-oy/cs, c:cs };
     for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++){ const t = G.map[x][y]; c.fillStyle = t===T_WALL ? '#2a2620' : (t===T_FLOOR || t===T_EXIT) ? '#6a5e48' : '#8a7a52'; c.fillRect(ox+x*cs, oy+y*cs, cs+0.5, cs+0.5); }
@@ -16742,8 +16757,8 @@ function renderOverworldMapZoomed(){
   }
   // the world's events: camps, the waking giant, sieges, fallen stars, festivals, markets and raids
   if (mapF('events')){ const R = clamp(cellPx*1.2, 11*dpr, 22*dpr); for (const o of wevMapList()) if (inView(o.x, o.y, 3) || o.k==='boss') pmEventIcon(ctx, TX(o.x), TY(o.y), R, o, now); }
-  { const gv = G.player.grave;   // your gravestone: a grey headstone with a cross
-    if (gv){ const gx = (gv.x-zCamX)*cellPx + cellPx/2, gy = (gv.y-zCamY)*cellPx + cellPx/2, R = clamp(cellPx*1.0, 10*dpr, 17*dpr);
+  for (const gv of gravesP()){   // your gravestones: grey headstones with a cross
+    { const gx = (gv.x-zCamX)*cellPx + cellPx/2, gy = (gv.y-zCamY)*cellPx + cellPx/2, R = clamp(cellPx*1.0, 10*dpr, 17*dpr);
       ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(gx-R*0.6+2*dpr, gy-R*1.6+3*dpr, R*1.2, R*1.6);
       ctx.fillStyle = '#9a9a92'; ctx.beginPath(); ctx.moveTo(gx-R*0.6, gy); ctx.lineTo(gx-R*0.6, gy-R*1.1); ctx.arc(gx, gy-R*1.1, R*0.6, Math.PI, 0); ctx.lineTo(gx+R*0.6, gy); ctx.closePath(); ctx.fill();
       ctx.lineWidth = 1.6*dpr; ctx.strokeStyle = '#3a3a36'; ctx.stroke();
@@ -22479,7 +22494,8 @@ function renderImmersiveHud(){
       <div class="dh-orb r pe prayer${(p.prayers||[]).length ? ' praying' : ''}" data-act="qpray" title="Prayer points - ${Math.ceil(p.prayPts||0)} of ${prL}\n${rsPrayDrainText()}\nclick: quick prayers ${(p.quickPrayers||[]).length ? '('+(p.quickPrayers||[]).map(id=>(RS_ALLPRAY().find(x=>x.id===id)||{}).nm).filter(Boolean).join(', ')+')' : '(set them in the side panel, F4)'} &middot; N: prayer book"><div class="fill" data-bar="pray" style="height:${resF*100}%"></div><div class="gloss"></div><div class="txt">${resTxt}<small>${resLbl}</small></div></div>
     </div>`;
   if (el.__lastHtml === html) return;
-  el.innerHTML = html; el.__lastHtml = html;
+  { const so = el.querySelector('.dh-slots'), sx = so ? so.scrollLeft : 0;   // (RS-136) a redraw keeps where you'd scrolled the slots to
+    el.innerHTML = html; el.__lastHtml = html; const sn = el.querySelector('.dh-slots'); if (sn && sx) sn.scrollLeft = sx; }
   if (showTarget) renderMiniMonsterArt('dhFoeArt', fm.art, fm.col, fm.nm, fm.undead);
   el.querySelectorAll('[data-k]').forEach(b => b.addEventListener('click', ()=> dhPress(b.getAttribute('data-k'))));
   el.querySelectorAll('[data-act]').forEach(b => b.addEventListener('click', ()=>{
@@ -27874,14 +27890,14 @@ function o3SyncQuests(){
   const T = THREE, qs = G.player ? questsShown() : [], tq = trackedQuest();
   const list = [];
   for (const q of qs){ const t = questTarget(q); if (t) list.push([q.id, t.x, t.y, t.turnIn?1:0, q===tq?1:0, q.kind, q.progress>=q.target?1:0]); }
-  const gv = G.player && G.player.grave;
-  const key = JSON.stringify(list) + ':' + (O3.win ? O3.win.cx+','+O3.win.cy : '') + (gv ? ':g'+gv.x+','+gv.y : '');
+  const gvs = G.player ? gravesP() : [];
+  const key = JSON.stringify(list) + ':' + (O3.win ? O3.win.cx+','+O3.win.cy : '') + gvs.map(gv=>':g'+gv.x+','+gv.y).join('');
   if (key === O3.qKey) return;
   O3.qKey = key;
   if (!O3.qGrp){ O3.qGrp = new T.Group(); O3.scene.add(O3.qGrp); }
   const g = O3.qGrp; while (g.children.length){ const c = g.children[0]; g.remove(c); c.traverse && c.traverse(o=>{ if (o.geometry) o.geometry.dispose(); }); }
   O3.qMarks = [];
-  if (gv && Math.abs(gv.x+0.5-O3.win.cx) <= O3_W/2-1 && Math.abs(gv.y+0.5-O3.win.cy) <= O3_W/2-1){
+  for (const gv of gvs) if (Math.abs(gv.x+0.5-O3.win.cx) <= O3_W/2-1 && Math.abs(gv.y+0.5-O3.win.cy) <= O3_W/2-1){
     const gx = gv.x+0.5, gz = gv.y+0.5, y0 = Math.max(O3.heightAt(gx,gz), -0.14);
     const stone = new T.MeshStandardMaterial({ color:new T.Color(0x9a9a92).convertSRGBToLinear(), roughness:0.95, flatShading:true });
     const slab = new T.Mesh(new T.BoxGeometry(0.34, 0.46, 0.1), stone); slab.position.set(gx, y0+0.23, gz); slab.castShadow = true; g.add(slab);
@@ -32501,7 +32517,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-135';
+const GAME_VERSION = 'rs-136';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -34243,7 +34259,7 @@ function buildDeathStandard(){
   const p = G.player, ds = G.deathSplit || (G.deathSplit = deathSplit()), st = pStats();
   const town = nearestVisitedTown(G.owPos.x, G.owPos.y), worn = GEAR_KEYS.concat(['ranged']).filter(k=>G.gear[k] && G.gear[k].used).length;
   const lostV = ds.lose.reduce((t,it)=>t+itemPrice(it),0);
-  const old = p.grave && (p.grave.items.length || p.grave.gold);
+  const old = gravesP().length >= GRAVE_MAX;
   return `
     <h2 class="panel-title" style="color:${COL.red};">YOU HAVE FALLEN</h2>
     <div class="sub">Slain by a <b style="color:${COL.red}">${esc(G.deathCause)}</b> in ${esc(ds.place)} &middot; combat ${p.combatLevel} &middot; death ${st.deaths}</div>
@@ -34257,7 +34273,7 @@ function buildDeathStandard(){
         <div class="panel"><h4 style="color:${COL.amber};">LEFT IN YOUR GRAVESTONE</h4>
           <div class="muted" style="margin-bottom:6px;">${ds.lose.length} item${ds.lose.length===1?'':'s'} worth ${lostV} gold and ${ds.goldLost} gold, waiting where you fell - walk back to reclaim them</div>
           ${deathItemList(ds.lose.slice(0,12), 'nothing - your pack was light')}${ds.lose.length>12 ? `<div class="muted">and ${ds.lose.length-12} more</div>` : ''}
-          ${old ? `<div style="color:${COL.red};margin-top:6px;">your previous gravestone will crumble - what it held is lost</div>` : ''}
+          ${old ? `<div style="color:${COL.red};margin-top:6px;">you already have ${GRAVE_MAX} gravestones waiting - the oldest will crumble, and what it held is lost</div>` : ''}
         </div>
       </div>
       ${!ds.protect ? `<div class="muted" style="text-align:center;margin-top:6px;font-size:12px;">tip: the Protect Item prayer (Prayer 25) keeps a 4th item when you die</div>` : ''}
