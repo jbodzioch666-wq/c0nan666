@@ -35,6 +35,7 @@ Screenshots go to `tools/tests/shots/`.
 | graves | one gravestone per death (up to ten), the nearest is the one you head for, picking one up leaves the rest |
 | crash | on a phone: a saved character loads after a reload, half-size room textures, errors shown on screen |
 | wmapm | the world map on a phone: clear of other panels, one row of tools, no legend by default; tap a grave to walk to it or forget it |
+| viewrot | the towns and overworld turn like dungeons (Z/X, minimap rim buttons); keys and minimap turn with the view; rooms keep the usual view |
 | diag | diagonal steps: keys, numpad, corners, click paths, no diagonal strikes |
 | touch | on an emulated phone: tap to walk, long-press menu, pinch zoom, map drag, the d-pad, the hotbar |
 | bal | balance: monsters bite harder, the fixed-strength lair boss, coin trim, the smith's reinforcing |

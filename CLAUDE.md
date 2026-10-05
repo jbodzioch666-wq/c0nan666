@@ -68,4 +68,5 @@ node tools/tests/run.js --soft grave boot   # named tests; --soft = software Web
 - The game is isometric 3D only (RS-108 to RS-111). There is no first-person view and no flat overworld, town or dungeon view; `no3dNotice()` shows when 3D can't run. The world map (M) is still drawn flat. Tests may set `o3Pref`/`v3Pref = false` to skip the 3D land for speed; the game then draws the notice.
 - Towns are laid out on a fixed design grid, then stretched (`townStretch`, RS-118): extra columns at `TOWN_SEAM_X` and rows at `TOWN_SEAM_Y`. Any town coordinate used after generation must go through `tX(x)` / `tY(y)`.
 - Fast travel is only through the waypoint world map, to attuned towns. There is no T teleport.
+- The camera turns in quarter steps everywhere (RS-140): `ISO.rot`, saved as `G.player.viewRot`. Read the angle with `viewYaw()` / `viewYawNow()` (eased), never `ISO_YAW` directly. Walking keys in towns and the overworld go through `viewRotDir()`. Rooms inside buildings stay at `viewRot()` 0.
 - Touch support lives in the `TOUCH` object and `touchUiSync()`. New UI should work by tap: the × buttons have bigger hit areas under `body.touch`.

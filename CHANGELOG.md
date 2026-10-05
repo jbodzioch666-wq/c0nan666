@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-140 - Turn the world
+
+- **Towns and the world turn like dungeons:** press **Z** or **X**, or tap the new **↺ ↻** buttons on the minimap's rim, to turn the view a quarter turn. The camera swings round smoothly, in the overworld and in towns. Rooms inside buildings keep the usual view, since their near walls are cut low for it.
+- **Up stays up:** the walking keys and the d-pad turn with the view, so pressing up always walks up the screen. Tap-to-walk works as before.
+- **The minimap turns too:** it now matches the 3D view, with up on the minimap being up on the screen, and the **N** on its rim shows which way north lies.
+- **Kept in your save:** the view stays turned the way you left it, everywhere, including dungeons.
+- **Journal key:** the journal opens with **;**, since **X** now turns the view.
+
 ## RS-139 - A neater minimap
 
 - **Up in the corner on phones:** the minimap now sits right in the top-right corner and is smaller, so it covers less of the world. The tracker below it moves up to match.
