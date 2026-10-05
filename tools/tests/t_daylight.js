@@ -13,6 +13,12 @@ module.exports = async page=>{
     for (let k=1; k<=400; k++){ const c = at(k/400); jumpI = Math.max(jumpI, Math.abs(c.i - prev.i)); jumpH = Math.max(jumpH, Math.abs(c.h - prev.h)); jumpB = Math.max(jumpB, Math.abs(c.b - prev.b)); prev = c; }
     out.jumps = { i:+jumpI.toFixed(3), h:+jumpH.toFixed(3), b:+jumpB.toFixed(3) };
     G.villageTheme = 'desert'; out.desertNoon = at(0.5); G.villageTheme = keepTheme; at(0.5);
+    // RS-158: no round blob at anyone's feet in town; on the overworld the player casts a real shadow in a tight shadow box
+    const blobs = sc=>{ let n = 0; sc.traverse(o=>{ if (o.isMesh && o.material===m3dShadowMat()) n++; }); return n; };
+    out.townBlobs = blobs(V3.scene);
+    G.gameMode = 0; G.interior = null; setUi('playing'); for (let i=0;i<6;i++){ renderGame(); await new Promise(r=>setTimeout(r, 60)); }
+    let casters = 0; if (O3.player) O3.player.g.traverse(o=>{ if (o.isMesh && o.castShadow) casters++; });
+    out.ow = { o3:o3Active(), blobs:O3.pgrp ? blobs(O3.pgrp) : -1, casters, half:O3.sun ? O3.sun.shadow.camera.right : 0, dist:O3.dist };
     return out; });
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
@@ -21,5 +27,7 @@ module.exports = async page=>{
   A(r.midnight.blue && r.midnight.i > 0.1 && r.midnight.i < 0.4 && r.midnight.y > 0.1, 'the moon gives a dim blue light from above at night');
   A(r.jumps.i < 0.12 && r.jumps.h < 0.05 && r.jumps.b < 0.15, 'dawn, day, dusk and night blend without jumps');
   A(r.noon.lamp===null || (r.noon.lamp===0 && r.midnight.lamp > 2), 'the street lamps are off by day and lit at night');
+  A(r.townBlobs===0, 'no round blob shadows at the feet in town');
+  A(!r.ow.o3 || (r.ow.blobs===0 && r.ow.casters > 3 && r.ow.half <= Math.max(9, r.ow.dist*1.2)), 'the overworld player casts a real shadow and has no blob');
   A(r.desertNoon.i < r.noon.i*0.8 && r.desertNoon.b < r.noon.b*1.3, 'the desert sun is softer');
 };

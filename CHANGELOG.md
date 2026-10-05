@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-158 - Real shadows for people
+
+- **Your shadow on the overworld**: your character now casts a proper shadow from the sun or moon as you travel. Before, the shadow was spread so thinly over the land around you that it disappeared.
+- **No more round blobs**: the dark circle painted under the feet of your character and the townsfolk is gone. Their real shadows now do that job and follow the sun and moon.
+
 ## RS-157 - Sun and moon over the towns
 
 - **Light that follows the clock**: towns used to flip straight from day to night. Now the light changes gradually through dawn, day, dusk and night.
