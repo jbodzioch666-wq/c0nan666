@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-137 - Steadier on phones
+
+- **Lighter on memory:** on phones, the room floors, walls and rugs from RS-126 use half-size textures, about a quarter of the memory, and rooms are only built when you walk in. A phone browser that runs out of memory simply kills the page, which looks like a crash when you load a character.
+- **No more silent crashes:** if anything goes wrong, a box now says so at the top of the screen, with the error and **Reload** and **Dismiss** buttons. Tell me what it says and I can fix it.
+- **Out of graphics memory:** if the 3D view runs out of graphics memory, the game saves straight away and offers a reload.
+
 ## RS-136 - Swipe the hot bar, and a grave for every death
 
 - **The hot bar scrolls:** on a phone, swipe the slot row sideways to reach every slot. It used to jump back to the start whenever anything on the bar changed, like your health or a cooldown, and the row could ignore swipes altogether.

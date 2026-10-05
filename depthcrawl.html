@@ -910,6 +910,18 @@
 
 <script>
 'use strict';
+// RS-137: if something goes wrong, say so on screen (with the message, so it can be reported) instead of leaving a dead page
+const CRASH = { last:0, n:0 };
+function crashBanner(msg){
+  try{ const now = Date.now(); if (now - CRASH.last < 4000) return; CRASH.last = now; CRASH.n++;
+    let el = document.getElementById('crashBanner');
+    if (!el){ el = document.createElement('div'); el.id = 'crashBanner'; el.style.cssText = 'position:fixed;left:8px;right:8px;top:8px;z-index:99999;background:#2a0e0c;border:1px solid #c0392b;border-radius:10px;padding:10px 12px;color:#f3e6d0;font:13px/1.4 system-ui,sans-serif;box-shadow:0 6px 24px rgba(0,0,0,0.6);'; document.body.appendChild(el); }
+    el.innerHTML = '<b style="color:#ff8a7a">Something went wrong</b> <span style="opacity:0.7">(' + (typeof GAME_VERSION!=='undefined' ? GAME_VERSION : '') + ')</span><div style="margin:6px 0;word-break:break-word;font-family:monospace;font-size:12px;opacity:0.9">' + String(msg).replace(/[<>&]/g, c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c])).slice(0, 400) + '</div>'
+      + '<button onclick="location.reload()" style="margin-right:8px;padding:6px 12px;border-radius:6px;border:1px solid #c79a54;background:#3a2a16;color:#f3e6d0">Reload</button><button onclick="this.parentNode.remove()" style="padding:6px 12px;border-radius:6px;border:1px solid #6a5236;background:#1a1410;color:#f3e6d0">Dismiss</button>';
+  }catch(e){}
+}
+window.addEventListener('error', e=>{ if (e && e.message && !/ResizeObserver/.test(e.message)) crashBanner(e.message + (e.lineno ? ' (line ' + e.lineno + ')' : '')); });
+window.addEventListener('unhandledrejection', e=>{ const r = e && e.reason; crashBanner((r && r.message) || String(r)); });
 /* ==========================================================================
    DEPTHCRAWL - web port
    Faithful JS port of the QB64 BASIC source (Diablo-style loot, procedural
@@ -26438,12 +26450,14 @@ function v3TexWood(col, planks){
 // ---------- interior surfaces (RS-126): real floorboards, flagstones, plaster, panelling and rugs ----------
 // every one tiles seamlessly (all the patterns repeat exactly across the canvas), with a matching bump map for depth
 const V3_INT_TEX = {};
+// RS-137: phones get half-size room textures (a quarter of the memory) - a phone browser that runs out of memory kills the page
+function v3LowMem(){ try{ return document.body.classList.contains('touch') || (navigator.deviceMemory && navigator.deviceMemory <= 4) || matchMedia('(pointer:coarse)').matches; }catch(e){ return false; } }
 const v3Rng = seed=>{ let s = seed % 2147483647 || 1; return ()=>(s = s*16807 % 2147483647)/2147483647; };
 const v3Wave = (x, y, S, a, b, ph)=>Math.sin(2*Math.PI*(a*x/S + b*y/S) + ph);
 // boards: o.boards across the canvas, joints where the boards butt end to end, grain running along each board, knots, gaps and worn bevels
 function v3TexBoards(col, o){
-  o = o||{}; const key = 'boards'+col+JSON.stringify(o); if (V3_INT_TEX[key]) return V3_INT_TEX[key];
-  const S = o.size||1024, NB = o.boards||16, BW = S/NB, rnd = v3Rng(o.seed||7), n = v3Noise((o.seed||7)+3), b = v3hex(col);
+  o = o||{}; const lm = v3LowMem(), key = 'boards'+col+JSON.stringify(o)+(lm ? 'L' : ''); if (V3_INT_TEX[key]) return V3_INT_TEX[key];
+  const S = (o.size||1024)/(lm ? 2 : 1), NB = o.boards||16, BW = S/NB, rnd = v3Rng(o.seed||7), n = v3Noise((o.seed||7)+3), b = v3hex(col);
   const c = v3Canvas(S,S), cb = v3Canvas(S,S), id = c.getContext('2d').createImageData(S,S), bd = cb.getContext('2d').createImageData(S,S);
   // each column of boards: where its joints fall (wrapping round the canvas), and each board's tone, grain and knots
   const cols = [];
@@ -26481,8 +26495,8 @@ function v3TexBoards(col, o){
 }
 // flagstones: rows of cut stones of varied length, bedded in mortar
 function v3TexFlags(col, seed){
-  const key = 'flags'+col+seed; if (V3_INT_TEX[key]) return V3_INT_TEX[key];
-  const S = 1024, rnd = v3Rng(seed||5), n = v3Noise((seed||5)+1), b = v3hex(col);
+  const lm = v3LowMem(), key = 'flags'+col+seed+(lm ? 'L' : ''); if (V3_INT_TEX[key]) return V3_INT_TEX[key];
+  const S = lm ? 512 : 1024, rnd = v3Rng(seed||5), n = v3Noise((seed||5)+1), b = v3hex(col);
   const c = v3Canvas(S,S), cb = v3Canvas(S,S), id = c.getContext('2d').createImageData(S,S), bd = cb.getContext('2d').createImageData(S,S);
   const rows = []; let y = 0; while (y < S){ let h = S*(0.11 + rnd()*0.08); if (S - (y + h) < S*0.08) h = S - y; const st = []; let x = 0, off = rnd()*S;
     while (x < S){ let w = S*(0.14 + rnd()*0.16); if (S - (x + w) < S*0.08) w = S - x; st.push({ x0:x, w, tone:0.72 + rnd()*0.36, tint:rnd()*0.1 - 0.05, tilt:rnd()*0.16 - 0.08 }); x += w; }
@@ -26500,8 +26514,8 @@ function v3TexFlags(col, seed){
 }
 // lime plaster, hand-troweled: soft clouds of tone and a few hairline cracks
 function v3TexLime(col){
-  const key = 'lime'+col; if (V3_INT_TEX[key]) return V3_INT_TEX[key];
-  const S = 512, n = v3Noise(21), b = v3hex(col), c = v3Canvas(S,S), cb = v3Canvas(S,S), id = c.getContext('2d').createImageData(S,S), bd = cb.getContext('2d').createImageData(S,S);
+  const lm = v3LowMem(), key = 'lime'+col+(lm ? 'L' : ''); if (V3_INT_TEX[key]) return V3_INT_TEX[key];
+  const S = lm ? 256 : 512, n = v3Noise(21), b = v3hex(col), c = v3Canvas(S,S), cb = v3Canvas(S,S), id = c.getContext('2d').createImageData(S,S), bd = cb.getContext('2d').createImageData(S,S);
   for (let y=0;y<S;y++) for (let x=0;x<S;x++){
     const a = n(x/8, y/8), m = n(x/2, y/2), tr = 0.5 + 0.5*v3Wave(x, y, S, 1, 1, 0)*v3Wave(x, y, S, 2, -1, 1);
     const k = 0.84 + 0.12*(a - 0.5) + 0.05*(m - 0.5) + 0.06*(tr - 0.5), q = (y*S + x)*4;
@@ -27194,6 +27208,7 @@ function v3Init(){
   try{
     const T = THREE, wrap = document.querySelector('.mapwrap');
     const cv = document.createElement('canvas'); cv.id = 'villageGL'; cv.style.cssText = 'position:absolute;display:none;touch-action:none;';
+    cv.addEventListener('webglcontextlost', ()=>{ try{ saveCurrentGame(); }catch(e){} crashBanner('The 3D view ran out of graphics memory. Your game is saved: tap Reload to carry on.'); });   // (RS-137)
     wrap.appendChild(cv); V3.cv = cv;
     const lab = document.createElement('div'); lab.id = 'v3labels'; lab.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:hidden;display:none;'; wrap.appendChild(lab); V3.labels = lab;
     const R = V3.renderer = new T.WebGLRenderer({ canvas:cv, antialias:true });
@@ -27323,7 +27338,7 @@ function doorTickOut(dt){
 function doorZoom(){ const D = V3.door; if (!D || D.phase!=='out') return 1; const k = Math.min(1, D.t/DOOR_OUT), e = k*k*(3-2*k); return 0.58 + 0.42*e; }
 // build a room's surfaces ahead of time while you walk up to its door, so stepping in has nothing to wait for
 function doorPrewarm(){
-  if (G.interior || !V3.mats || !G.player) return; V3.warm = V3.warm || {};
+  if (G.interior || !V3.mats || !G.player || v3LowMem()) return;   /* (not on phones: build a room only when you walk in) */ V3.warm = V3.warm || {};
   for (const b of VILLAGE_BUILDINGS){ if (V3.warm[b.key] || Math.abs(b.door.x - G.player.x) + Math.abs(b.door.y - G.player.y) > 4) continue;
     V3.warm[b.key] = true; const key = b.key, go = ()=>{ try{ v3InteriorMats(key, V3.mats); }catch(e){} };
     if (window.requestIdleCallback) requestIdleCallback(go, { timeout:600 }); else setTimeout(go, 30); return; }
@@ -28051,6 +28066,7 @@ function o3Init(){
   try{
     const T = THREE, wrap = document.querySelector('.mapwrap');
     const cv = document.createElement('canvas'); cv.id = 'worldGL'; cv.style.cssText = 'position:absolute;display:none;touch-action:none;';
+    cv.addEventListener('webglcontextlost', ()=>{ try{ saveCurrentGame(); }catch(e){} crashBanner('The 3D view ran out of graphics memory. Your game is saved: tap Reload to carry on.'); });   // (RS-137)
     wrap.appendChild(cv); O3.cv = cv;
     const lab = document.createElement('div'); lab.id = 'o3labels'; lab.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:hidden;display:none;'; wrap.appendChild(lab); O3.labels = lab;
     const R = O3.renderer = new T.WebGLRenderer({ canvas:cv, antialias:true });
@@ -32517,7 +32533,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-136';
+const GAME_VERSION = 'rs-137';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
