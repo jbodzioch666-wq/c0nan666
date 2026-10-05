@@ -1,5 +1,6 @@
 // RS-117: townsfolk step out of your way (no chat), and walk in real time whether or not you move
 // RS-118: the town is stretched roomier, and everything placed in it lands on open ground
+// RS-142: the bank's front door faces the square
 // RS-129: the bounty board and the Captain moved clear of the bank; drifted props put back on their tiles
 // RS-123: the shop pictures are painted on the banner cloths, with nothing floating above the poles
 module.exports = async page=>{
@@ -22,6 +23,11 @@ module.exports = async page=>{
     return { board:gap(bx,by), cap:gap(cap.x,cap.y), together:Math.abs(cap.x-bx)+Math.abs(cap.y-by), stall, sd, desk, capTile:G.map[cap.x][cap.y]===T_QUESTGIVER }; });
   A(tidy.board >= 3 && tidy.cap >= 3, 'the board and the Captain stand clear of the bank: '+JSON.stringify(tidy)); A(tidy.together===1 && tidy.capTile, 'the Captain stands by his board');
   A(tidy.stall && tidy.sd && tidy.stall[0]===tidy.sd[0] && tidy.stall[1]===tidy.sd[1], 'the market stall stands on its own tile, not in a tree: '+JSON.stringify(tidy)); A(tidy.desk===0, 'the banker\'s old outdoor desk is gone');
+  // RS-142: the bank's front door faces the square (west): you walk in from the square side, and back out onto it
+  const bk = await ev(()=>{ const b = buildingByKey('bank'), o = doorOut(b); G.interior = null; G.player.x = o.x; G.player.y = o.y; const fl = G.map[o.x][o.y]; tryMove(1, 0);
+    const inside = G.interior && G.interior.key; let back = null; if (inside){ exitInterior(); back = [G.player.x, G.player.y]; } return { face:b.face, o:[o.x,o.y], fl, x0:b.x0, inside, back }; });
+  A(bk.face==='w' && bk.o[0] < bk.x0, 'the bank door faces the square: '+JSON.stringify(bk));
+  A(bk.inside==='bank' && bk.back && bk.back[0]===bk.o[0] && bk.back[1]===bk.o[1], 'in through the front door and back out onto the square');
   const fl = await ev(()=>{ renderGame(); const bs = V3.banners||[]; let floating = 0; V3.world && V3.world.traverse(o=>{ if (o.isSprite && o.material.map && o.material.map.image && o.material.map.image.tagName==='CANVAS' && o.material.alphaTest===0.2) floating++; }); return { n:bs.length, painted:bs.every(b=>!!b.material.map), floating, signs:(V3.signs||[]).length }; });
   A(fl.n >= 7 && fl.painted, 'every shop banner has its picture painted on: ' + JSON.stringify(fl));
   A(fl.floating === 0, 'no pictures float above the banner poles');

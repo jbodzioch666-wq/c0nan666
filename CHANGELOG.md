@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-142 - The bank faces the square
+
+- **Front door onto the common:** the bank's front door is now in the middle of its west wall, opening onto the town square, instead of round the side. Step in from the square, and step back out onto it when you leave.
+- **Seeing it:** from the usual camera angle the door is on the far side of the building. Turn the view with **Z**/**X** or the minimap buttons to see it head-on.
+
 ## RS-141 - Turning round you, and a square minimap
 
 - **The view turns round you:** in towns and the overworld, turning now swings the camera in an arc around your character, the same way it does in dungeons. Before, it slid sideways across the land to its new spot. You stay centred the whole way round.
