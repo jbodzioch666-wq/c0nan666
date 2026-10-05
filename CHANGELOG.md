@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-154 - Character sheet for phones
+
+- **Pack as pictures**: the character sheet's pack now uses the same picture grid as the inventory, with upgrade and downgrade arrows, instead of a long text list.
+- **Phone layout**: on a phone the sheet now runs top to bottom. First your equipment figure (now smaller), then your pack, then the piece you tapped with its Equip button, then your stats.
+- **Readable stats**: the stats now sit in a single column on a phone, so labels no longer run into their numbers.
+
 ## RS-153 - Picture-grid inventory
 
 - **Inventory as a grid**: the full inventory screen (I) now shows your items as a grid of pictures, like the side panel's pack, instead of a long text list. Each picture's border shows its rarity. Green and red arrows mark upgrades and downgrades. Locked, set and junk items are marked, and junk is greyed out.

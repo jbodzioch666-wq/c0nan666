@@ -69,6 +69,14 @@ module.exports = async page=>{
     G.inv.splice(G.inv.length - 12, 12); G.invSel = 0; setUi('playing'); renderGame(); return out; });
   console.log('inventory', JSON.stringify(inv));
   A(inv.cells===inv.items && inv.sel===3 && inv.picked && inv.detail && inv.btnOn && inv.rows===0, 'the inventory is a picture grid and its buttons can be reached: '+JSON.stringify(inv));
+  // RS-154: the character sheet on a phone - the pack is a picture grid, a tap shows the piece (with Equip), the numbers stand in one column
+  const cs = await ev(async ()=>{ for (let i=0;i<6;i++) G.inv.push(genItem(3, i%2 ? 'weapon' : 'armor')); setUi('charsheet'); renderOverlay(); await new Promise(r=>setTimeout(r, 150));
+    const cells = document.querySelectorAll('#overlay .cs-pack .sp-cell'); if (cells[0]) cells[0].click(); await new Promise(r=>setTimeout(r, 100));
+    const rows = [...document.querySelectorAll('#overlay .cs-statgrid > div')].slice(0, 2).map(e=>Math.round(e.getBoundingClientRect().left));
+    const out = { cells:cells.length, rows:document.querySelectorAll('#overlay .cs-pack .invrow').length, picked:!!document.querySelector('#overlay .cs-pack .sp-cell.sel'), equip:/EQUIP/i.test((document.querySelector('#overlay .charsheet-detail')||{}).textContent||''), oneCol:rows.length===2 && rows[0]===rows[1] };
+    G.inv.splice(G.inv.length - 6, 6); G.charSheetInvSel = null; setUi('playing'); renderGame(); return out; });
+  console.log('character sheet', JSON.stringify(cs));
+  A(cs.cells >= 1 && cs.rows===0 && cs.picked && cs.equip && cs.oneCol, 'the character sheet works on a phone: '+JSON.stringify(cs));
   // RS-149: the full-screen menus fit a phone's width - nothing runs off the right edge
   const wide = await ev(async ()=>{ const out = {};
     for (const u of ['charsheet','stats','bestiary','journal','skills','settings','inventory']){ setUi(u); renderOverlay(); await new Promise(r=>setTimeout(r, 150));
