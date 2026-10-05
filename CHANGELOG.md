@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-147 - Tidier buttons
+
+- **Two fewer buttons**: the fullscreen and layout buttons are gone from the tool column, since they did nothing useful on a phone.
+- **Panels close all the way**: closing the stats and spells panels on a phone now slides them fully off screen, so no strip is left showing on the right.
+
 ## RS-146 - Stats and spells panels that fit on a phone
 
 - **Out of the way:** on a phone, the stats and spells panels (the ☰ button) were a big slab over the tool buttons, and the spells panel sat half off the screen. They now fit between the left edge and the button column, below the minimap and above the hot bar's buttons.

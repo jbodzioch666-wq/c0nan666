@@ -32,6 +32,11 @@ module.exports = async page=>{
     const out = { hud:!!h, tools:over(h, t) || over(sp, t), mm:over(h, mm) || over(sp, mm), each:over(h, sp), onscreen: h && h.right <= innerWidth + 1 && h.left >= -1, hr: h && [h.left, h.right, innerWidth].map(Math.round), ui:G.ui, mode:G.gameMode, imm:document.body.className };
     document.body.classList.remove('dh-panels'); return out; });
   A(pan.hud && !pan.tools && !pan.mm && !pan.each && pan.onscreen, 'the stats and spells panels fit on a phone: '+JSON.stringify(pan));
+  // RS-147: closed, the panels leave nothing on screen; the fullscreen and layout buttons are gone
+  const shut = await ev(async ()=>{ renderGame(); for (let i=0;i<5;i++) await new Promise(r=>setTimeout(r, 100));
+    const gone = sel=>{ const e = document.querySelector(sel); if (!e) return true; const cs = getComputedStyle(e), r = e.getBoundingClientRect(); return cs.display==='none' || cs.visibility==='hidden' || r.left >= innerWidth; };
+    return { hud:gone('.hud'), spell:gone('.spellcol'), full:!!document.querySelector('.dh-tools [data-act="full"]'), layout:!!document.querySelector('.dh-tools [data-act="layout"]') }; });
+  A(shut.hud && shut.spell && !shut.full && !shut.layout, 'closed panels are off screen and the fullscreen and layout buttons are gone: '+JSON.stringify(shut));
   await ev(()=>{ window.dispatchEvent(new ErrorEvent('error', { message:'test boom', lineno:1 })); }); await page.waitForTimeout(300);   // (an error event, as a thrown error raises one)
   const ban = await ev(()=>{ const el = document.getElementById('crashBanner'); return el ? el.textContent : ''; });
   A(/Something went wrong/.test(ban) && /test boom/.test(ban) && /Reload/.test(ban), 'an error shows on screen: '+ban);
