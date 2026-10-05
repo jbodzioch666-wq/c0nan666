@@ -342,7 +342,11 @@
   .doll-slot:hover{ border-color:var(--amber); }
   .doll-slot.sel{ box-shadow:0 0 0 2px var(--amber); }
   .doll-icon{ width:100%; height:100%; pointer-events:none; }
+  .doll-slot{ border-color:color-mix(in srgb, var(--qc,#888) 60%, #2a2218); background:radial-gradient(circle at 50% 40%, #2e2820, #15120e); }
+  .doll-img{ width:84%; height:84%; object-fit:contain; pointer-events:none; filter:drop-shadow(0 2px 2px #000); }
   .charsheet-detail{ flex:1 1 260px; min-width:220px; }
+  .cs-delta{ font-weight:600; font-size:0.92em; white-space:nowrap; } .cs-delta.up{ color:#6ee06e; } .cs-delta.dn{ color:#ff7a62; } .cs-delta.ch{ color:#ffc864; }
+  .cs-prev{ font-size:11.5px; color:var(--ink-dim); margin:0 0 6px; }
   .socket-row{ display:flex; gap:7px; margin-top:4px; }
   .socket-pip{ display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px;
     border-radius:50%; border:1px solid rgba(255,255,255,0.25); color:var(--ink-faint); font-size:10px;
@@ -14391,29 +14395,51 @@ function rsStatTipHtml(which){
 }
 function rsStatTipAttr(which){ return `data-tipstat="${which}"`; }
 // ---- the stat block on the character sheet (P) ----
+// (RS-155) every row of the stat block as [label, shown, number or null, tooltip source]
+function fullStatRows(){
+  const p = G.player, tri = rsArmourStyle(), dmg = +(Math.floor(rsEff('strength')/5)+rsGearSum('dmgB')/RS_STR_PER_DMG).toFixed(1);
+  const def = ['head','chest','legs','arms','necklace','ring1','ring2'].reduce((t,k)=>t+((G.gear[k]&&G.gear[k].used&&G.gear[k].ac)||0),0);
+  const atk = t=>+rsAtkBonus(t).toFixed(1), ra = rsGearSum('rngAcc'), ma = rsGearSum('magAcc');
+  return [...RS_COMBAT.map(([k,nm])=>[nm, rsLvl(k), rsLvl(k)]),
+    ['Total level', rsTotalLevel(), rsTotalLevel()], ['Life', `${mx(0,p.hp)}/${effMaxHp()}`, effMaxHp()], ['Prayer', `${Math.ceil(p.prayPts||0)}/${rsLvl('prayer')}`, rsLvl('prayer')],
+    ['Armour', playerAC(), playerAC(), 'armour'], ['Style', rsStyle().nm, null],
+    ['Melee to hit', fmtMod(atk('melee')), atk('melee'), 'melee'], ['Ranged to hit', fmtMod(atk('ranged')), atk('ranged'), 'ranged'], ['Magic to hit', fmtMod(atk('magic')), atk('magic'), 'magic'],
+    ['Strength dmg', fmtMod(dmg), dmg, 'strength'], ['Attack bonus', fmtMod(rsGearSum('acc')), rsGearSum('acc')], ['Strength bonus', fmtMod(rsGearSum('dmgB')), rsGearSum('dmgB')],
+    ['Defence bonus', fmtMod(def), def], ['Ranged / magic', fmtMod(ra)+' / '+fmtMod(ma), ra + ma], ['Armour type', tri||'none', null], ['Arrows', p.arrows||0, p.arrows||0]];
+}
+// the pack item the character sheet is previewing, if it is one you could put on
+function csPreviewItem(){
+  const i = G.charSheetInvSel, it = G.charSheetActivePane==='pack' && i!=null && i>=0 ? G.inv[i] : null;
+  return it && it.used && !it.consumable && it.kind!=='set' && it.kind!=='scroll' && it.slot && it.slot!=='ammo' && canActuallyEquip(it) ? it : null;
+}
+// the stat rows as they would read wearing `it` - the gear is put back exactly as it was afterwards
+function fullStatRowsWith(it){
+  const p = G.player, saved = Object.assign({}, G.gear), hp = p.hp;
+  try {
+    const key = it.slot==='ring' ? chooseRingSlot() : it.slot;
+    if (!(key in G.gear)) return null;
+    if (key==='weapon' && is2H(it)) G.gear.offhand = newItem();
+    if (key==='offhand' && is2H(G.gear.weapon)) G.gear.weapon = newItem();
+    G.gear[key] = it;
+    return fullStatRows();
+  } catch(e){ console.error(e); return null; }
+  finally { for (const k in G.gear) if (!(k in saved)) delete G.gear[k]; Object.assign(G.gear, saved); p.hp = hp; }
+}
 function buildFullStatBlock(){
   const p = G.player; rsSync();
-  const row = (k, v, src)=>`<div class="muted" style="display:flex;justify-content:space-between;gap:8px;${src ? 'text-decoration:underline dotted rgba(255,255,255,0.25);text-underline-offset:3px;' : ''}" ${src ? rsStatTipAttr(src) : ''}><span>${k}</span><b style="color:var(--ink)">${v}</b></div>`;
-  const tri = rsArmourStyle();
+  const now = fullStatRows(), cand = csPreviewItem(), then = cand ? fullStatRowsWith(cand) : null;
+  const row = ([k, v, n, src], j)=>{
+    let ch = '';
+    if (then && then[j]){ const [, v2, n2] = then[j];
+      if (n!=null && n2!=null && Math.abs(n2 - n) > 1e-6){ const d = +(n2 - n).toFixed(1), up = d > 0; ch = ` <span class="cs-delta ${up ? 'up' : 'dn'}">${up ? '&#9650;' : '&#9660;'} ${esc(String(v2))}</span>`; }
+      else if (n==null && String(v2)!==String(v)) ch = ` <span class="cs-delta ch">&rarr; ${esc(String(v2))}</span>`; }
+    return `<div class="muted" style="display:flex;justify-content:space-between;gap:8px;${src ? 'text-decoration:underline dotted rgba(255,255,255,0.25);text-underline-offset:3px;' : ''}" ${src ? rsStatTipAttr(src) : ''}><span>${k}</span><b style="color:var(--ink)">${v}${ch}</b></div>`; };
+  const nCh = then ? now.filter((r, j)=>then[j] && String(then[j][1])!==String(r[1])).length : 0;
   return `<div class="panel" style="flex:1 1 300px;min-width:260px;max-width:360px;padding:7px 10px;">
     <h4 style="margin:0 0 4px;padding-bottom:3px;">COMBAT &middot; level ${p.combatLevel}</h4>
+    ${cand ? `<div class="cs-prev">wearing <span class="${rarityColorClass(cand)}">${esc(cand.nm)}</span>: ${nCh ? `<span class="cs-delta up">&#9650; better</span> <span class="cs-delta dn">&#9660; worse</span>` : 'no change to these numbers'}</div>` : ''}
     <div class="cs-statgrid" style="display:grid;grid-template-columns:1fr 1fr;gap:0 14px;">
-      ${RS_COMBAT.map(([k,nm])=>row(nm, rsLvl(k))).join('')}
-      ${row('Total level', rsTotalLevel())}
-      ${row('Life', `${mx(0,p.hp)}/${effMaxHp()}`)}
-      ${row('Prayer', `${Math.ceil(p.prayPts||0)}/${rsLvl('prayer')}`)}
-      ${row('Armour', playerAC(), 'armour')}
-      ${row('Style', rsStyle().nm)}
-      ${row('Melee to hit', fmtMod(+rsAtkBonus('melee').toFixed(1)), 'melee')}
-      ${row('Ranged to hit', fmtMod(+rsAtkBonus('ranged').toFixed(1)), 'ranged')}
-      ${row('Magic to hit', fmtMod(+rsAtkBonus('magic').toFixed(1)), 'magic')}
-      ${row('Strength dmg', fmtMod(+(Math.floor(rsEff('strength')/5)+rsGearSum('dmgB')/RS_STR_PER_DMG).toFixed(1)), 'strength')}
-      ${row('Attack bonus', fmtMod(rsGearSum('acc')))}
-      ${row('Strength bonus', fmtMod(rsGearSum('dmgB')))}
-      ${row('Defence bonus', fmtMod(['head','chest','legs','arms','necklace','ring1','ring2'].reduce((t,k)=>t+((G.gear[k]&&G.gear[k].used&&G.gear[k].ac)||0),0)))}
-      ${row('Ranged / magic', fmtMod(rsGearSum('rngAcc'))+' / '+fmtMod(rsGearSum('magAcc')))}
-      ${row('Armour type', tri||'none')}
-      ${row('Arrows', p.arrows||0)}
+      ${now.map(row).join('')}
     </div>
     <div class="muted" style="font-size:10.5px;margin-top:6px;">melee beats ranged, ranged beats magic, magic beats melee - for your attacks and for the armour you wear</div>
   </div>`;
@@ -32690,7 +32716,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-154';
+const GAME_VERSION = 'rs-155';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -34209,11 +34235,18 @@ function dollSlotTooltipHtml(it){
 const EMPTY_SLOT_COL = 'rgba(255,255,255,0.22)';
 function buildPaperDoll(){
   const sel = G.charSheetSel;
+  // (RS-155) with empty slots left out, close the rows nothing is worn in: each run of rows that has something
+  // in it moves up under the one before, so the figure stays one tidy block
+  const spans = PAPERDOLL_SLOTS.filter(s=>G.gear[s.key] && G.gear[s.key].used).map(s=>{ const h = PAPERDOLL_SIZE[s.key][1]*PAPERDOLL_UNIT, y = PAPERDOLL_POS[s.key][1]; return [y - h/2, y + h/2]; }).sort((a,b)=>a[0]-b[0]);
+  const runs = []; for (const [a, b] of spans){ const r = runs[runs.length-1]; if (r && a <= r[1] + 1) r[1] = Math.max(r[1], b); else runs.push([a, b]); }
+  const shiftOf = y=>{ let cur = 8, sh = 0; for (const [a, b] of runs){ sh = cur - a; if (y >= a - 1 && y <= b + 1) return sh; cur += (b - a) + 12; } return sh; };
+  G._dollH = runs.length ? runs.reduce((t, [a, b])=>t + (b - a) + 12, 4) : 60;
   const markers = PAPERDOLL_SLOTS.map(s=>{
     const it = G.gear[s.key];
     const filled = it && it.used;
+    if (!filled) return '';   /* (RS-155: an empty slot shows nothing - no ghost picture or label) */
     const isSel = sel===s.key;
-    const [x,y] = PAPERDOLL_POS[s.key];
+    const [x,y0] = PAPERDOLL_POS[s.key], y = y0 + shiftOf(y0);
     const [wu,hu] = PAPERDOLL_SIZE[s.key];
     const w = wu*PAPERDOLL_UNIT, h = hu*PAPERDOLL_UNIT;
     const hoverAttrs = filled
@@ -34230,12 +34263,12 @@ function buildPaperDoll(){
           : `<span class="socket-pip"></span>`
         ).join('')}</div>`
       : '';
-    return `<div class="doll-slot${isSel?' sel':''}" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px;margin-left:${-w/2}px;margin-top:${-h/2}px;${isSel?`border-color:${COL.amber};`:''}"
-      onclick="charSheetSelect('${s.key}')" ${hoverAttrs}><canvas id="${cvId}" class="doll-icon" width="${w*2}" height="${h*2}"></canvas>${pipsHtml}</div>`;
+    return `<div class="doll-slot${isSel?' sel':''}" style="--qc:${rarityColorCss(it)};left:${x}px;top:${y}px;width:${w}px;height:${h}px;margin-left:${-w/2}px;margin-top:${-h/2}px;${isSel?`border-color:${COL.amber};`:''}"
+      onclick="charSheetSelect('${s.key}')" ${hoverAttrs}><img id="${cvId}" class="doll-img" alt="" src="${dhIcon(obItemEntry(it))}">${pipsHtml}</div>`;
   }).join('');
   // no body silhouette any more - the slots themselves, packed into a tight
   // grid (see PAPERDOLL_POS), are the whole visual now
-  return `<div class="doll-wrap">${markers}</div>`;
+  return `<div class="doll-wrap" style="height:${G._dollH}px">${markers || '<div class="muted" style="padding:20px;text-align:center;">nothing worn yet</div>'}</div>`;
 }
 // paints each slot's icon into its own tiny canvas (see buildPaperDoll's
 // markup) - a straight-up reuse of renderMiniMonsterArt, the same helper
@@ -34245,6 +34278,7 @@ function buildPaperDoll(){
 // already established) since the canvases don't exist in the DOM until then
 function renderPaperDollIcons(){
   for (const s of PAPERDOLL_SLOTS){
+    { const el = document.getElementById('dollIcon_'+s.key); if (!el || el.tagName!=='CANVAS') continue; }   /* (RS-155: the doll shows each item's own picture now) */
     const it = G.gear[s.key];
     const filled = it && it.used;
     const art = gearIconArtFor(s.key, filled ? it : null);
@@ -34314,9 +34348,9 @@ function buildCharSheet(){
   // the gear-detail pane into a tiny scrolling box for no real reason.
   // Overridden wider here, inline, only for this screen.
   const dollScale = window.innerWidth <= 560 ? 0.56 : 0.72;   /* (RS-154: smaller on a phone) */
-  const dollW = Math.round(400*dollScale), dollH = Math.round(800*dollScale);
+  const dollHtml = buildPaperDoll(), dollW = Math.round(400*dollScale), dollH = Math.round((G._dollH||800)*dollScale);
   const dollScaled = `<div class="cs-doll" style="width:${dollW}px;height:${dollH}px;overflow:hidden;flex:0 0 auto;">
-    <div style="transform:scale(${dollScale});transform-origin:top left;">${buildPaperDoll()}</div>
+    <div style="transform:scale(${dollScale});transform-origin:top left;">${dollHtml}</div>
   </div>`;
   // PACK sits to the LEFT of the doll, the single combined detail view
   // sits stacked right under FULL STATS in the right column - both columns

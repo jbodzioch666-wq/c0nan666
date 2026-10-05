@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-155 - Gear pictures and stat previews
+
+- **Real gear on your figure**: the character sheet's figure now shows each item's own picture, the same art as the inventory, framed in its rarity colour. Before, it showed a simple line drawing.
+- **No empty placeholders**: slots with nothing in them are left out, and the figure closes up around what you're wearing.
+- **See what changes**: tap an item in your pack and the stats box shows how each number would change if you wore it. Green ▲ means better, red ▼ means worse, and amber marks a change like your armour type. Your gear isn't touched until you press Equip.
+
 ## RS-154 - Character sheet for phones
 
 - **Pack as pictures**: the character sheet's pack now uses the same picture grid as the inventory, with upgrade and downgrade arrows, instead of a long text list.
