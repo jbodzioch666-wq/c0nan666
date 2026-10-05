@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-138 - A world map made for phones, and forgetting a grave
+
+- **Tap a gravestone on the world map:** a card shows what it holds, how far away it is and what killed you. **Walk here** sets off to that grave. **Forget it** lets it go, after asking once more, since what it held is lost. The buttons and tracker then point to your next grave.
+- **The map gets the screen on phones:** the quest tracker, chat log, d-pad, side tools and name plate step aside while the map is open, and come back when you close it.
+- **One row of tools:** the map's buttons now sit in a single row along the top that scrolls sideways, instead of wrapping into three rows over the map.
+- **No legend box by default on phones:** the big legend box no longer covers the map. Turn it on under **Layers** if you want it. The compass is smaller and sits down in the corner.
+
 ## RS-137 - Steadier on phones
 
 - **Lighter on memory:** on phones, the room floors, walls and rugs from RS-126 use half-size textures, about a quarter of the memory, and rooms are only built when you walk in. A phone browser that runs out of memory simply kills the page, which looks like a crash when you load a character.

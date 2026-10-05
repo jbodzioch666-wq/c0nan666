@@ -34,6 +34,7 @@ Screenshots go to `tools/tests/shots/`.
 | routebtn | the route and gravestone buttons over the hot bar: plan a route, set off, stop; walk back to your grave |
 | graves | one gravestone per death (up to ten), the nearest is the one you head for, picking one up leaves the rest |
 | crash | on a phone: a saved character loads after a reload, half-size room textures, errors shown on screen |
+| wmapm | the world map on a phone: clear of other panels, one row of tools, no legend by default; tap a grave to walk to it or forget it |
 | diag | diagonal steps: keys, numpad, corners, click paths, no diagonal strikes |
 | touch | on an emulated phone: tap to walk, long-press menu, pinch zoom, map drag, the d-pad, the hotbar |
 | bal | balance: monsters bite harder, the fixed-strength lair boss, coin trim, the smith's reinforcing |
