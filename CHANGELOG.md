@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-134 - A route button
+
+- **Route button over the hot bar:** a new round flag button sits beside the run button.
+  - **ROUTE:** with no route planned, it opens the world map ready to plan one. Tap the map to add stops.
+  - **GO:** with a route planned, it closes the map and sets off along it.
+  - **STOP:** while you're walking your route, it stops you where you stand and keeps the rest of the route, so tapping GO carries on.
+- **In towns and dungeons:** the button just reminds you that routes are walked out in the world.
+
 ## RS-133 - Bestiary models in their box
 
 - **Centred on phones:** on high-resolution screens like most phones, a creature's model in the bestiary was drawn twice the size of its box, so it hung off the bottom-right corner. It now fills its box exactly on every screen.
