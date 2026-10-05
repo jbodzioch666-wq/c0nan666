@@ -1,3 +1,4 @@
+// RS-146: stats and spells panels on a phone
 // RS-145: the tool column
 // RS-144: menu text contrast
 // RS-137: on a phone - a saved character loads, the rooms use half-size textures (and none are built ahead), and any error shows
@@ -24,6 +25,13 @@ module.exports = async page=>{
   const col = await ev(async ()=>{ setUi('playing'); G.gameMode = 0; renderGame(); await new Promise(r=>setTimeout(r, 200)); const t = document.querySelector('.dh-tools').getBoundingClientRect(), l = document.getElementById('logPanel').getBoundingClientRect();
     return { vert: t.height > t.width*3, right: innerWidth - t.right, clear: l.right <= t.left + 1 }; });
   A(col.vert && col.right < 16 && col.clear, 'the tool buttons stand down the right edge, clear of the log: '+JSON.stringify(col));
+  // RS-146: the stats and spells panels fit on a phone: clear of the tool buttons, the minimap and each other
+  const pan = await ev(async ()=>{ document.querySelectorAll('.hud, .spellcol').forEach(e=>e.style.transition = 'none'); document.body.classList.add('dh-panels'); renderGame(); for (let i=0;i<10;i++) await new Promise(r=>setTimeout(r, 200));   // (the panels slide in)
+    const R = sel=>{ const e = document.querySelector(sel); if (!e || getComputedStyle(e).display==='none') return null; return e.getBoundingClientRect(); };
+    const h = R('.hud'), sp = R('.spellcol'), t = R('.dh-tools'), mm = R('#miniMap'), over = (a, b)=>!!(a && b && a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom);
+    const out = { hud:!!h, tools:over(h, t) || over(sp, t), mm:over(h, mm) || over(sp, mm), each:over(h, sp), onscreen: h && h.right <= innerWidth + 1 && h.left >= -1, hr: h && [h.left, h.right, innerWidth].map(Math.round), ui:G.ui, mode:G.gameMode, imm:document.body.className };
+    document.body.classList.remove('dh-panels'); return out; });
+  A(pan.hud && !pan.tools && !pan.mm && !pan.each && pan.onscreen, 'the stats and spells panels fit on a phone: '+JSON.stringify(pan));
   await ev(()=>{ window.dispatchEvent(new ErrorEvent('error', { message:'test boom', lineno:1 })); }); await page.waitForTimeout(300);   // (an error event, as a thrown error raises one)
   const ban = await ev(()=>{ const el = document.getElementById('crashBanner'); return el ? el.textContent : ''; });
   A(/Something went wrong/.test(ban) && /test boom/.test(ban) && /Reload/.test(ban), 'an error shows on screen: '+ban);

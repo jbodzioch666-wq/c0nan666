@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-146 - Stats and spells panels that fit on a phone
+
+- **Out of the way:** on a phone, the stats and spells panels (the ☰ button) were a big slab over the tool buttons, and the spells panel sat half off the screen. They now fit between the left edge and the button column, below the minimap and above the hot bar's buttons.
+- **Stacked:** stats sit on top and spells below, each scrolling on its own, with slightly smaller text. Every button stays tappable while they're open.
+
 ## RS-145 - Tool buttons down the right side
 
 - **A column on the right:** on phones and tablets, the row of tool buttons that sat beside the d-pad now stands in a column down the right edge, above the hot bar. That's the side panel, panels, fullscreen, layout, help, menu and d-pad buttons. The space beside the d-pad is clear, and the buttons are a little bigger to tap.
