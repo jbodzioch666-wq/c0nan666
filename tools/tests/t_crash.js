@@ -3,6 +3,7 @@
 // RS-144: menu text contrast
 // RS-137: on a phone - a saved character loads, the rooms use half-size textures (and none are built ahead), and any error shows
 // on screen with Reload and Dismiss instead of leaving a dead page
+const seasonRe = ()=>'spring|summer|autumn|winter';
 module.exports = async page=>{
   const ev = (f, a)=>page.evaluate(f, a), A = (c, msg)=>{ if (!c) throw new Error('assert: '+msg); };
   const id = await ev(()=>{ goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame(); return G.saveId; });
@@ -52,6 +53,13 @@ module.exports = async page=>{
   // a held finger doesn't leave the browser's title tooltip stuck: touching a button drops its title
   const tt = await ev(()=>{ const b = document.querySelector('.dh-tools [data-act="side"]'); const r = b.getBoundingClientRect(); b.dispatchEvent(new PointerEvent('pointerdown', { bubbles:true, pointerType:'touch', clientX:r.left+4, clientY:r.top+4 })); showTooltip({ clientX:50, clientY:50 }, '<div>stuck?</div>'); b.dispatchEvent(new MouseEvent('mouseover', { bubbles:true, clientX:r.left+4, clientY:r.top+4 })); return { title:b.getAttribute('title'), kept:b.dataset.ttl||'', tip:document.getElementById('itemTooltip').style.display }; });
   A(!tt.title && /side panel/.test(tt.kept) && tt.tip==='none', 'after a touch no black tooltip pops up to get stuck: '+JSON.stringify(tt));
+  // RS-151: no name plate; the clock bar at the top shows the season, the time of day and the hour, clear of the minimap
+  const clk = await ev(async ()=>{ setUi('playing'); renderGame(); await new Promise(r=>setTimeout(r, 300));
+    const el = document.getElementById('dhClock'), r = el && el.getBoundingClientRect(), mm = document.getElementById('miniMap').getBoundingClientRect();
+    const keep = G.player.clock; G.player.clock = DAY_LENGTH*0.5; const noon = clockHM(); G.player.clock = DAY_LENGTH*0.75; const six = clockHM(); G.player.clock = keep;
+    return { plate:!!document.querySelector('.dh-name'), text:el ? el.textContent : '', shown:!!(r && r.width && getComputedStyle(el).display!=='none'), clearMm:!!(r && r.right <= mm.left), noon, six }; });
+  console.log('clock bar', JSON.stringify(clk));
+  A(!clk.plate && clk.shown && clk.clearMm && new RegExp(seasonRe()).test(clk.text) && /\d{1,2}:\d\d (am|pm)/.test(clk.text) && clk.noon==='12:00 pm' && clk.six==='6:00 pm', 'the clock bar replaces the name plate: '+JSON.stringify(clk));
   // RS-149: the full-screen menus fit a phone's width - nothing runs off the right edge
   const wide = await ev(async ()=>{ const out = {};
     for (const u of ['charsheet','stats','bestiary','journal','skills','settings','inventory']){ setUi(u); renderOverlay(); await new Promise(r=>setTimeout(r, 150));

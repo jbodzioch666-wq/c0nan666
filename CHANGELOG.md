@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-151 - Clock bar
+
+- **Name window removed**: the box with your name in the top-left corner is gone, so you can see more of the world.
+- **Time of day at the top**: the bar at the top now shows the clock time next to the season, for example "spring dusk · 6:40 pm", along with the weather.
+- **Where you are**: the bar also names the town you're in, or the dungeon and floor you're on, which the old name window used to show. On a phone the place goes on the first line and the season and time on the second.
+
 ## RS-150 - No shots through walls
 
 - **Shots respect walls**: archers and casters, such as the cult acolyte, can no longer hit you by threading a shot diagonally between two walls that meet at a corner. You couldn't walk through that gap, and now nothing can shoot through it either.
