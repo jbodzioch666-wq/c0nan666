@@ -20,6 +20,9 @@ module.exports = async page=>{
     // walk here from the map
     toggleOwZoom(); toggleOwZoom(); graveOpen('gB', 100, 100); graveWalkTo('gB'); out.walk = graveWalking() && !G.owZoomedOut;
     toggleOwZoom(); toggleOwZoom(); G.owZoomedOut = false; mapToolsSync(); out.cleared = !document.body.classList.contains('wmap');
+    // RS-139: the minimap sits up in the corner on a phone, a little smaller
+    for (let i=0;i<3;i++){ renderGame(); await new Promise(r=>setTimeout(r, 60)); }
+    { const mm = document.getElementById('miniMap'), b = mm && mm.getBoundingClientRect(); out.mm = b && mm.style.display!=='none' ? [Math.round(b.top), Math.round(b.width)] : null; }
     return out; });
   console.log(JSON.stringify(r));
   A(r.wmap && r.hidden, 'on a phone the map clears the screen of the other panels');
@@ -29,5 +32,6 @@ module.exports = async page=>{
   A(r.armed && r.left==='gB' && r.target==='gB', 'forgetting asks once more, then the other grave is the one to head for');
   A(r.walk, 'walk here closes the map and walks to that grave');
   A(r.cleared, 'closing the map brings the panels back');
+  A(!r.mm || (r.mm[0] <= 10 && r.mm[1] <= 130), 'the minimap sits up in the corner, smaller: '+JSON.stringify(r.mm));
 };
 module.exports.mobile = true;

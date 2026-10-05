@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-139 - A neater minimap
+
+- **Up in the corner on phones:** the minimap now sits right in the top-right corner and is smaller, so it covers less of the world. The tracker below it moves up to match.
+- **A little smaller on computers too:** it shrinks slightly, from 176 to 160 pixels across, and stays below the tool buttons.
+
 ## RS-138 - A world map made for phones, and forgetting a grave
 
 - **Tap a gravestone on the world map:** a card shows what it holds, how far away it is and what killed you. **Walk here** sets off to that grave. **Forget it** lets it go, after asking once more, since what it held is lost. The buttons and tracker then point to your next grave.
