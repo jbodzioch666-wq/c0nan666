@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-161 - E asks what to do
+
+- **Cook on your campfire**: standing on your fire with a tree, rock or fishing spot in reach, E used to start gathering the nearest one and you couldn't cook. Now cooking at the fire is always the first choice.
+- **A choice when there's more than one**: when several things are in reach, E opens a small menu listing them all (cook, chop, mine, fish, light a fire) so you pick. With only one thing in reach, E still does it straight away.
+
 ## RS-160 - Live resource tooltips
 
 - **Counts that keep up**: point at a tree, rock, fishing spot or herb patch while you gather, and its tooltip now counts down how many are left as you work, then switches to "felled" or "picked clean". Before, it kept the number from when you first pointed at it.
