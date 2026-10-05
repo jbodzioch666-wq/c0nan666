@@ -1,3 +1,4 @@
+// RS-145: the tool column
 // RS-144: menu text contrast
 // RS-137: on a phone - a saved character loads, the rooms use half-size textures (and none are built ahead), and any error shows
 // on screen with Reload and Dismiss instead of leaving a dead page
@@ -19,6 +20,10 @@ module.exports = async page=>{
     for (const v of ['--ink','--ink-dim','--ink-faint']){ const f = L(cs.getPropertyValue(v).trim()); out[v] = +((f+0.05)/(bg+0.05)).toFixed(1); } out.dim = +((L(COL.dim)+0.05)/(bg+0.05)).toFixed(1); return out; });
   console.log('contrast', JSON.stringify(con));
   A(Object.values(con).every(c=>c >= 5.5), 'menu text is easy to read on the dark panels: '+JSON.stringify(con));
+  // RS-145: on a phone the tool buttons stand in a column down the right edge, clear of the d-pad and the chat log
+  const col = await ev(async ()=>{ setUi('playing'); G.gameMode = 0; renderGame(); await new Promise(r=>setTimeout(r, 200)); const t = document.querySelector('.dh-tools').getBoundingClientRect(), l = document.getElementById('logPanel').getBoundingClientRect();
+    return { vert: t.height > t.width*3, right: innerWidth - t.right, clear: l.right <= t.left + 1 }; });
+  A(col.vert && col.right < 16 && col.clear, 'the tool buttons stand down the right edge, clear of the log: '+JSON.stringify(col));
   await ev(()=>{ window.dispatchEvent(new ErrorEvent('error', { message:'test boom', lineno:1 })); }); await page.waitForTimeout(300);   // (an error event, as a thrown error raises one)
   const ban = await ev(()=>{ const el = document.getElementById('crashBanner'); return el ? el.textContent : ''; });
   A(/Something went wrong/.test(ban) && /test boom/.test(ban) && /Reload/.test(ban), 'an error shows on screen: '+ban);

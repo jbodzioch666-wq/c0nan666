@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-145 - Tool buttons down the right side
+
+- **A column on the right:** on phones and tablets, the row of tool buttons that sat beside the d-pad now stands in a column down the right edge, above the hot bar. That's the side panel, panels, fullscreen, layout, help, menu and d-pad buttons. The space beside the d-pad is clear, and the buttons are a little bigger to tap.
+- **Chat log moves over:** the chat log moves left to make room for the column.
+
 ## RS-144 - Easier to read
 
 - **Brighter menu text:** text on the dark menus is lighter now, and the backgrounds are unchanged. The faintest grey, used for descriptions, levels, hints and notes all over the menus, was barely visible. It's now clearly readable, and the regular and secondary text is brighter too.
