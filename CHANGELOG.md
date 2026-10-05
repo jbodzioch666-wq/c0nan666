@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-149 - Menus that fit your phone
+
+- **Side panel stays out of the way**: on a phone the inventory, equipment, skills, prayer, spells and quests panel now fills the space under the minimap, left of the button column and above the d-pad. It no longer covers any buttons, and the 1-9 quick bar no longer jumps up over the minimap turn buttons.
+- **No more stuck black tooltips**: tapping a button or item no longer leaves a black hint box stuck on the screen.
+- **Full-screen menus fit**: the character sheet, journal, bestiary, stats and key binds screens stack into one column on a phone instead of squeezing text or running off the right edge.
+
 ## RS-148 - One layout
 
 - **Classic layout removed**: the old three-column layout, and the button that switched to it, are gone. Everyone now plays in the full-window view.

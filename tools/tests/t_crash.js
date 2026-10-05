@@ -37,6 +37,29 @@ module.exports = async page=>{
     const gone = sel=>{ const e = document.querySelector(sel); if (!e) return true; const cs = getComputedStyle(e), r = e.getBoundingClientRect(); return cs.display==='none' || cs.visibility==='hidden' || r.left >= innerWidth; };
     return { hud:gone('.hud'), spell:gone('.spellcol'), full:!!document.querySelector('.dh-tools [data-act="full"]'), layout:!!document.querySelector('.dh-tools [data-act="layout"]') }; });
   A(shut.hud && shut.spell && !shut.full && !shut.layout, 'closed panels are off screen and the fullscreen and layout buttons are gone: '+JSON.stringify(shut));
+  // RS-149: on a phone the side panel (every tab) sits clear of the tool buttons, the minimap and its turn buttons, the d-pad and the route button,
+  // and the quick bar steps aside rather than jumping up over the minimap
+  const sp = await ev(async ()=>{ const out = {}; document.getElementById('sidePanel') && (document.getElementById('sidePanel').style.transition = 'none');
+    const R = e=>e && getComputedStyle(e).display!=='none' && e.offsetHeight > 0 ? e.getBoundingClientRect() : null, over = (a, b)=>!!(a && b && a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1);
+    for (const t of SP_TABS.map(x=>x.id)){ SP.open = true; SP.tab = t; hudLayout(); renderGame(); await new Promise(r=>setTimeout(r, 120)); hudLayout();
+      const s = R(document.getElementById('sidePanel')), hits = [];
+      for (const [k, e] of [['tools', document.querySelector('.dh-tools')], ['mm', document.getElementById('miniMap')], ['pad', document.querySelector('.controls .pad')], ['route', document.querySelector('.dh-route')], ...[...document.querySelectorAll('#mmRot button')].map(b=>['rot', b])]) if (over(s, R(e))) hits.push(k);
+      const qb = document.getElementById('quickBar'); if (qb && getComputedStyle(qb).visibility!=='hidden' && over(R(qb), R(document.getElementById('miniMap')))) hits.push('qbar');
+      out[t] = s ? (hits.join(',') || 'ok') + ' ' + [s.left, s.top, s.right, s.bottom].map(Math.round).join('/') : 'hidden'; }
+    SP.open = false; hudLayout(); renderGame(); return out; });
+  console.log('side panel', JSON.stringify(sp));
+  A(Object.values(sp).every(v=>/^ok /.test(v)), 'the side panel fits on a phone without covering any button: '+JSON.stringify(sp));
+  // a held finger doesn't leave the browser's title tooltip stuck: touching a button drops its title
+  const tt = await ev(()=>{ const b = document.querySelector('.dh-tools [data-act="side"]'); const r = b.getBoundingClientRect(); b.dispatchEvent(new PointerEvent('pointerdown', { bubbles:true, pointerType:'touch', clientX:r.left+4, clientY:r.top+4 })); showTooltip({ clientX:50, clientY:50 }, '<div>stuck?</div>'); b.dispatchEvent(new MouseEvent('mouseover', { bubbles:true, clientX:r.left+4, clientY:r.top+4 })); return { title:b.getAttribute('title'), kept:b.dataset.ttl||'', tip:document.getElementById('itemTooltip').style.display }; });
+  A(!tt.title && /side panel/.test(tt.kept) && tt.tip==='none', 'after a touch no black tooltip pops up to get stuck: '+JSON.stringify(tt));
+  // RS-149: the full-screen menus fit a phone's width - nothing runs off the right edge
+  const wide = await ev(async ()=>{ const out = {};
+    for (const u of ['charsheet','stats','bestiary','journal','skills','settings','inventory']){ setUi(u); renderOverlay(); await new Promise(r=>setTimeout(r, 150));
+      let worst = 0; for (const e of document.querySelectorAll('#overlay .ovbody *')){ const r = e.getBoundingClientRect(); if (r.width && r.height && getComputedStyle(e).visibility!=='hidden') worst = Math.max(worst, r.right); }
+      out[u] = Math.round(worst - innerWidth); }
+    setUi('playing'); renderGame(); return out; });
+  console.log('menus past the edge', JSON.stringify(wide));
+  A(Object.values(wide).every(v=>v <= 1), 'every menu fits the phone screen: '+JSON.stringify(wide));
   await ev(()=>{ window.dispatchEvent(new ErrorEvent('error', { message:'test boom', lineno:1 })); }); await page.waitForTimeout(300);   // (an error event, as a thrown error raises one)
   const ban = await ev(()=>{ const el = document.getElementById('crashBanner'); return el ? el.textContent : ''; });
   A(/Something went wrong/.test(ban) && /test boom/.test(ban) && /Reload/.test(ban), 'an error shows on screen: '+ban);
