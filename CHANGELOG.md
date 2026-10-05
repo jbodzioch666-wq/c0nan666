@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-141 - Turning round you, and a square minimap
+
+- **The view turns round you:** in towns and the overworld, turning now swings the camera in an arc around your character, the same way it does in dungeons. Before, it slid sideways across the land to its new spot. You stay centred the whole way round.
+- **A square minimap:** the round minimap is now a square. It still turns with the view and stays filled to the corners. The **N** sits on the edge where north lies.
+- **Turn buttons on the edge:** the **↺ ↻** buttons sit on the minimap's bottom edge, both always on screen.
+
 ## RS-140 - Turn the world
 
 - **Towns and the world turn like dungeons:** press **Z** or **X**, or tap the new **↺ ↻** buttons on the minimap's rim, to turn the view a quarter turn. The camera swings round smoothly, in the overworld and in towns. Rooms inside buildings keep the usual view, since their near walls are cut low for it.
