@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-157 - Sun and moon over the towns
+
+- **Light that follows the clock**: towns used to flip straight from day to night. Now the light changes gradually through dawn, day, dusk and night.
+- **Shadows that move**: the sun rises in the east, crosses the sky and sets in the west. Shadows are long and slanted in the morning, short at noon, and swing round by evening.
+- **Moonlight**: at night a dim blue moon crosses the sky and casts soft shadows of its own. On the overworld the night shadows now come from the moon too.
+- **Warm dawns and dusks**: the light and the sky turn gold and pink near sunrise and sunset. Windows and street lamps fade up as it gets dark.
+- **Gentler desert sun**: desert towns have a softer sun, a hazy blue sky instead of a sand-coloured one, and slightly lower brightness, so the pale sand no longer glares.
+
 ## RS-156 - Honest quest tracker
 
 - **Quests no longer show done too early**: shopkeeper quests like the smith's ore and the alchemist's herbs showed "done" in the quest tracker as soon as the next step was to go back to them, even with nothing in your pack. Now "done" only appears when you're really carrying what they asked for, or when all that's left is your final report.
