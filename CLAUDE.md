@@ -25,7 +25,7 @@ A RuneScape-flavoured roguelike in one file, `depthcrawl.html`. It uses three.js
 6. Commit with a message starting `RS-NNN: ...`, then `git push -u origin claude/depthcrawl-runescape`.
 7. Run `bash tools/build-itch.sh`. It writes `dist/depthcrawl-rs-NNN-itch.zip`.
 8. Publish `depthcrawl.html` to the existing artifact https://claude.ai/artifact/HbAcDu7KguzBDBaXMuopFz with a short label. Always use that URL; never create a new artifact.
-9. Send the user the zip and `depthcrawl.html` when done. They asked to always get the download.
+9. Post the playable link https://claude.ai/artifact/HbAcDu7KguzBDBaXMuopFz in the reply, so the user can play on their phone without downloading anything. Also send the itch zip as an attachment. Don't send `depthcrawl.html` as a download.
 
 ## Editing the game
 
