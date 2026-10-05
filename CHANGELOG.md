@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-162 - Cook beside the fire
+
+- **Next to the fire is close enough**: you can cook at your campfire from any of the eight tiles around it, not just while standing on it. E puts "Cook at the fire" first there too.
+- **Camping beside it counts**: sleeping next to your fire now gets the same safety bonus as sleeping on it, and your character sits down by it when idle.
+
 ## RS-161 - E asks what to do
 
 - **Cook on your campfire**: standing on your fire with a tree, rock or fishing spot in reach, E used to start gathering the nearest one and you couldn't cook. Now cooking at the fire is always the first choice.

@@ -14,7 +14,10 @@ module.exports = async page=>{
     const ui = G.ui; setUi('playing');
     // just the fire in reach: E goes straight to cooking
     G.owPos = { x:spot.x, y:spot.y }; const only = skOptions().filter(o=>o.k==='cooking');
-    return { opts, open:!!(menu && CTX.open !== undefined), items, ui, only:only.length };
+    // RS-162: right beside the fire counts too - the cook option is there from any of the 8 tiles round it, and gone two away
+    const besides = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,-1]].map(([dx,dy])=>{ G.owPos = { x:spot.x+dx, y:spot.y+dy }; return skOptions()[0] && skOptions()[0].k==='cooking'; });
+    G.owPos = { x:spot.x+2, y:spot.y }; const far = skOptions().some(o=>o.k==='cooking'); G.owPos = { x:spot.x, y:spot.y };
+    return { besides, far, opts, open:!!(menu && CTX.open !== undefined), items, ui, only:only.length };
   });
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
@@ -22,4 +25,5 @@ module.exports = async page=>{
   A(r.opts[0]==='cooking' && r.opts.length > 1, 'the fire you stand on is the first option, with the resources after it');
   A(r.items.some(t=>/Cook at the fire/.test(t)) && r.items.length >= 3, 'E asks what to do');
   A(r.ui==='cook', 'choosing cooking opens the cooking screen');
+  A(r.besides.every(Boolean) && !r.far, 'you can cook from right beside the fire, not from two tiles away');
 };
