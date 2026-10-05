@@ -29,6 +29,11 @@ module.exports = async page=>{
   const btn = await ev(()=>{ const w = document.getElementById('mmRot'); if (!w || w.style.display==='none') return null; const b = w.querySelector('button[data-r="1"]'), mm = document.getElementById('miniMap').getBoundingClientRect(), br = b.getBoundingClientRect(); b.click(); return { rot:ISO.rot, near: Math.hypot(br.left+br.width/2 - (mm.left+mm.width/2), br.top+br.height/2 - (mm.top+mm.height/2)) < mm.width*0.8 }; });
   const onScreen = await ev(()=>[...document.querySelectorAll('#mmRot button')].every(b=>{ const r = b.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth && r.top >= 0; }));
   A(onScreen, 'both turn buttons are fully on screen');
+  // RS-143: the turn buttons go away with the minimap when a menu opens, and come back after
+  const menus = await ev(async ()=>{ const vis = ()=>{ const w = document.getElementById('mmRot'); return !!w && w.style.display!=='none'; }, out = {};
+    for (const u of ['inventory','skills','bestiary','charsheet']){ setUi(u); renderGame(); await new Promise(r=>setTimeout(r, 60)); out[u] = vis(); }
+    setUi('playing'); renderGame(); await new Promise(r=>setTimeout(r, 60)); out.back = vis(); return out; });
+  A(!menus.inventory && !menus.skills && !menus.bestiary && !menus.charsheet && menus.back, 'no turn buttons over menus: '+JSON.stringify(menus));
   A(btn && btn.rot===2 && btn.near, 'the turn buttons sit on the minimap rim and turn the view: '+JSON.stringify(btn));
   // a town turns too; a room inside keeps the usual view
   const town = await ev(async ()=>{ const t = townList()[0]; G.owPos = { x:t.x, y:t.y }; enterVillage(); setUi('playing'); G.interior = null; for (let i=0;i<25;i++){ renderGame(); await new Promise(r=>setTimeout(r, 50)); }

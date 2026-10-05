@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-143 - Turn buttons only where they belong
+
+- **Gone over menus:** the **↺ ↻** turn buttons no longer float over your inventory, skills, bestiary, character sheet or any other menu. They leave with the minimap, and come back with it when you return to the game.
+
 ## RS-142 - The bank faces the square
 
 - **Front door onto the common:** the bank's front door is now in the middle of its west wall, opening onto the town square, instead of round the side. Step in from the square, and step back out onto it when you leave.
