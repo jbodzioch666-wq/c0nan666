@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-135 - A gravestone button
+
+- **Back to your grave in one tap:** while a gravestone holds your things, a grey cross button sits beside the route button over the hot bar. Tap it to walk all the way back, along the roads if you prefer them for routes, however far away it is.
+- **Stop and carry on:** tap it again while walking to stop. The grave keeps waiting, and the next tap sets off again.
+- **Pick it up:** standing on the grave, the button collects what it holds. Once the grave is gone, so is the button.
+
 ## RS-134 - A route button
 
 - **Route button over the hot bar:** a new round flag button sits beside the run button.
