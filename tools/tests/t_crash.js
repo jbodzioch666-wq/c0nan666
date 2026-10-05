@@ -77,17 +77,17 @@ module.exports = async page=>{
     G.inv.splice(G.inv.length - 6, 6); G.charSheetInvSel = null; setUi('playing'); renderGame(); return out; });
   console.log('character sheet', JSON.stringify(cs));
   A(cs.cells >= 1 && cs.rows===0 && cs.picked && cs.equip && cs.oneCol, 'the character sheet works on a phone: '+JSON.stringify(cs));
-  // RS-155: the figure shows each worn item's own picture and no empty slots; previewing a pack item marks what changes in the stats, and leaves your gear as it was
+  // RS-155/156: the figure shows each worn item's own picture, and an empty slot only its name; previewing a pack item marks what changes in the stats, and leaves your gear as it was
   const cs2 = await ev(async ()=>{ for (let i=0;i<8;i++) G.inv.push(genItem(3, i%2 ? 'weapon' : 'armor')); const before = Object.assign({}, G.gear);
     const worn = PAPERDOLL_SLOTS.filter(s=>G.gear[s.key] && G.gear[s.key].used).length;
     const pick = G.inv.findIndex(it=>{ G.charSheetActivePane = 'pack'; const k = G.charSheetInvSel; G.charSheetInvSel = G.inv.indexOf(it); const c = csPreviewItem(); const a = fullStatRows(), b = c ? fullStatRowsWith(c) : null; G.charSheetInvSel = k; return b && b.some((x, j)=>String(x[1])!==String(a[j][1])); });
     setUi('charsheet'); G.charSheetInvSel = pick; G.charSheetActivePane = 'pack'; renderOverlay(); await new Promise(r=>setTimeout(r, 150));
     const slots = document.querySelectorAll('#overlay .doll-slot'), imgs = document.querySelectorAll('#overlay .doll-slot img.doll-img');
-    const out = { worn, slots:slots.length, imgs:imgs.length, canvases:document.querySelectorAll('#overlay .doll-slot canvas').length, pick, deltas:document.querySelectorAll('#overlay .cs-delta').length,
+    const out = { worn, slots:slots.length, imgs:imgs.length, canvases:document.querySelectorAll('#overlay .doll-slot canvas').length, empty:document.querySelectorAll('#overlay .doll-slot .doll-empty').length, total:PAPERDOLL_SLOTS.length, pick, deltas:document.querySelectorAll('#overlay .cs-delta').length,
       same:Object.keys(before).every(k=>G.gear[k]===before[k]) && Object.keys(G.gear).length===Object.keys(before).length };
     G.inv.splice(G.inv.length - 8, 8); G.charSheetInvSel = -1; setUi('playing'); renderGame(); return out; });
-  console.log('paper doll', JSON.stringify(cs2));
-  A(cs2.worn > 0 && cs2.slots===cs2.worn && cs2.imgs===cs2.worn && cs2.canvases===0 && cs2.pick >= 0 && cs2.deltas > 0 && cs2.same, 'the paper doll and the stat preview: '+JSON.stringify(cs2));
+  console.log('paper doll', JSON.stringify(cs2)); const PAPERDOLL_N = cs2.total;
+  A(cs2.worn > 0 && cs2.slots===PAPERDOLL_N && cs2.imgs===cs2.worn && cs2.empty===PAPERDOLL_N - cs2.worn && cs2.canvases===0 && cs2.pick >= 0 && cs2.deltas > 0 && cs2.same, 'the paper doll and the stat preview: '+JSON.stringify(cs2));
   // RS-149: the full-screen menus fit a phone's width - nothing runs off the right edge
   const wide = await ev(async ()=>{ const out = {};
     for (const u of ['charsheet','stats','bestiary','journal','skills','settings','inventory']){ setUi(u); renderOverlay(); await new Promise(r=>setTimeout(r, 150));

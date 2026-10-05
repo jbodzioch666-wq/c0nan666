@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-156 - Honest quest tracker
+
+- **Quests no longer show done too early**: shopkeeper quests like the smith's ore and the alchemist's herbs showed "done" in the quest tracker as soon as the next step was to go back to them, even with nothing in your pack. Now "done" only appears when you're really carrying what they asked for, or when all that's left is your final report.
+- **Map markers agree**: the blue "?" hand-in marker now shows only once you can actually hand the quest in. Until then you get the usual "!".
+- **Every slot on the figure again**: the character sheet shows every slot you can wear. An empty one just names what goes there (Cape, Neck, Ring...) in a dashed box, with no placeholder picture.
+
 ## RS-155 - Gear pictures and stat previews
 
 - **Real gear on your figure**: the character sheet's figure now shows each item's own picture, the same art as the inventory, framed in its rarity colour. Before, it showed a simple line drawing.

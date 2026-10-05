@@ -13,7 +13,10 @@ module.exports = async page=>{
     setUi('tavern'); A(G.ui==='wevent' && /Rats/.test(G.wevDlg.title), 'the innkeeper offers a job'); wevChoose(0); ok(); winFight();
     A(sqStep('rats') && sqStep('rats').k==='talk', 'back to the innkeeper'); setUi('tavern'); ok(); A(sqDone('rats'), 'rats done'); out.qp = tkP().questPoints;
     // the smith's ore
-    skP().skills.mining = SK_XP[20]; skAdd('iron', 12); setUi('blacksmith'); ok(); ok(); A(sqStep('ore').k==='bring', 'bring the ore'); setUi('blacksmith'); ok(); A(sqDone('ore') && G.inv.some(it=>it && it.questItem==='smithhammer'), 'ore done, hammer');
+    skP().skills.mining = SK_XP[20]; skAdd('iron', 12); setUi('blacksmith'); ok(); ok(); A(sqStep('ore').k==='bring', 'bring the ore'); { /* RS-156: with no ore in the pack the quest isn't "done" in the tracker; with it, it is */ const keep = skHave('iron'); skAdd('iron', -keep); trackQuest('sq:ore'); renderGame(); await frames(2);
+      const qt = ()=>((document.getElementById('qtrack')||{}).innerHTML||''); out.oreEmpty = { ready:sqHandInReady('ore'), turnIn:!!(sqTarget('ore')||{}).turnIn, done:/qt-done/.test(qt()) };
+      A(!out.oreEmpty.ready && !out.oreEmpty.turnIn && !out.oreEmpty.done, 'a bring quest without the goods is not done: '+JSON.stringify(out.oreEmpty));
+      skAdd('iron', keep); renderGame(); await frames(2); out.oreFull = { ready:sqHandInReady('ore'), done:/qt-done/.test(qt()) }; A(out.oreFull.ready, 'with the goods it is ready to hand in'); } setUi('blacksmith'); ok(); A(sqDone('ore') && G.inv.some(it=>it && it.questItem==='smithhammer'), 'ore done, hammer');
     // 258: trapped below - a quest object deep in a dungeon
     out.pre = { ui:G.ui, offered:G.sqOffered, declined:G.sqDeclined, bypass:G.sqBypass, can:sqCanStart('trapped'), seen:G.player.sqSeen, act:SQ_ORDER.filter(sqActive) };
     setUi('questgiver'); if (!G.wevDlg){ console.log('DBG '+JSON.stringify(out.pre)+' ui='+G.ui); } A(G.wevDlg && /Trapped/.test(G.wevDlg.title), 'the Captain offers'); wevChoose(0); ok();
