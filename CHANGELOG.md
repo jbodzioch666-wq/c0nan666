@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-132 - Delete characters anywhere
+
+- **Tap twice to delete:** the &times; on a saved character now turns into a red **Delete?** button. Tap it again within four seconds to delete the character. Leave it and it goes back to normal.
+- **Works on the play link:** deleting used the browser's "Are you sure?" pop-up, which the published play page blocks and always answers "no", so nothing could be deleted there. It no longer needs the pop-up.
+
 ## RS-131 - One thing to a tile
 
 - **No more stacking:** nothing spawns on top of something else any more. Each tile holds one thing: a site, a named place, a mythic beast, a war camp, a fallen star, a gathering spot or a roaming monster. Before, a world that had run a while had hundreds of doubled-up tiles, mostly monsters standing on trees and herbs.
