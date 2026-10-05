@@ -13,6 +13,12 @@ module.exports = async page=>{
     for (let k=1; k<=400; k++){ const c = at(k/400); jumpI = Math.max(jumpI, Math.abs(c.i - prev.i)); jumpH = Math.max(jumpH, Math.abs(c.h - prev.h)); jumpB = Math.max(jumpB, Math.abs(c.b - prev.b)); prev = c; }
     out.jumps = { i:+jumpI.toFixed(3), h:+jumpH.toFixed(3), b:+jumpB.toFixed(3) };
     G.villageTheme = 'desert'; out.desertNoon = at(0.5); G.villageTheme = keepTheme; at(0.5);
+    // RS-159: town rain is thin streaks, not big round sprites
+    { const keepW = G.weather; G.weather = 'rain'; for (let i=0;i<8;i++){ renderGame(); await new Promise(r=>setTimeout(r, 60)); }
+      let sprites = 0; V3.scene.traverse(o=>{ if (o.isSprite && o.material===V3.partMatRain) sprites++; });
+      const a = V3.rain && V3.rain.geometry.attributes.position, lens = []; if (a) for (let i=0;i<20;i++) lens.push(Math.hypot(a.getX(i*2+1)-a.getX(i*2), a.getY(i*2+1)-a.getY(i*2), a.getZ(i*2+1)-a.getZ(i*2)));
+      out.rain = { streaks:!!(V3.rain && V3.rain.visible && V3.rain.isLineSegments), sprites, maxLen:+Math.max(0, ...lens).toFixed(2) };
+      G.weather = keepW; renderGame(); out.rain.offAfter = !(V3.rain && V3.rain.visible); }
     // RS-158: no round blob at anyone's feet in town; on the overworld the player casts a real shadow in a tight shadow box
     const blobs = sc=>{ let n = 0; sc.traverse(o=>{ if (o.isMesh && o.material===m3dShadowMat()) n++; }); return n; };
     out.townBlobs = blobs(V3.scene);
@@ -27,6 +33,7 @@ module.exports = async page=>{
   A(r.midnight.blue && r.midnight.i > 0.1 && r.midnight.i < 0.4 && r.midnight.y > 0.1, 'the moon gives a dim blue light from above at night');
   A(r.jumps.i < 0.12 && r.jumps.h < 0.05 && r.jumps.b < 0.15, 'dawn, day, dusk and night blend without jumps');
   A(r.noon.lamp===null || (r.noon.lamp===0 && r.midnight.lamp > 2), 'the street lamps are off by day and lit at night');
+  A(r.rain.streaks && r.rain.sprites===0 && r.rain.maxLen > 0.1 && r.rain.maxLen < 0.5 && (r.rain.offAfter || /rain|storm/.test(String(r.keepW))), 'town rain falls as thin streaks: '+JSON.stringify(r.rain));
   A(r.townBlobs===0, 'no round blob shadows at the feet in town');
   A(!r.ow.o3 || (r.ow.blobs===0 && r.ow.casters > 3 && r.ow.half <= Math.max(9, r.ow.dist*1.2)), 'the overworld player casts a real shadow and has no blob');
   A(r.desertNoon.i < r.noon.i*0.8 && r.desertNoon.b < r.noon.b*1.3, 'the desert sun is softer');

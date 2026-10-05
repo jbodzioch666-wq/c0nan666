@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-159 - Proper rain in town
+
+- **Fine rain, not blobs**: rain in towns showed up as big round drops. It now falls as thin streaks around you, like on the overworld. Storms bring heavier, more slanted rain, and it stops at the door when you go inside.
+
 ## RS-158 - Real shadows for people
 
 - **Your shadow on the overworld**: your character now casts a proper shadow from the sun or moon as you travel. Before, the shadow was spread so thinly over the land around you that it disappeared.
