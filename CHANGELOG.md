@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-150 - No shots through walls
+
+- **Shots respect walls**: archers and casters, such as the cult acolyte, can no longer hit you by threading a shot diagonally between two walls that meet at a corner. You couldn't walk through that gap, and now nothing can shoot through it either.
+- **Fair both ways**: a line of fire is only clear if it's clear from both ends, so if a monster can hit you, you can hit it back, and the other way round.
+
 ## RS-149 - Menus that fit your phone
 
 - **Side panel stays out of the way**: on a phone the inventory, equipment, skills, prayer, spells and quests panel now fills the space under the minimap, left of the button column and above the d-pad. It no longer covers any buttons, and the 1-9 quick bar no longer jumps up over the minimap turn buttons.

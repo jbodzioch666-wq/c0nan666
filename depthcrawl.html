@@ -4764,7 +4764,7 @@ function rangedReachIdx(m){
   const mi = G.mon.indexOf(m); if (mi<0) return -1;
   const p = G.player, d = Math.abs(m.x-p.x) + Math.abs(m.y-p.y), w = G.gear.ranged;
   const mode = rangedPick(), range = mode==='magic' ? 8 : mode==='bow' ? rangedRange(w) : 0;
-  return range && d <= range && hasLineOfSight(p.x, p.y, m.x, m.y) ? mi : -1;
+  return range && d <= range && shotClear(p.x, p.y, m.x, m.y) ? mi : -1;
 }
 function rangedAttack(tgt){
   if (G.gameOver) return;
@@ -5615,6 +5615,25 @@ function hasLineOfSight(x0,y0,x1,y1){
     if (tileAt(x,y)===T_WALL) return false; // a wall stands directly in the path
   }
 }
+// (RS-150) can a shot, arrow or spell get from one tile to the other? Stricter than sight: it may not slip
+// diagonally past a wall's corner (you can't walk that way either), and the line must be clear traced from
+// both ends, so whether a shot gets through never depends on who is shooting
+function shotRay(x0,y0,x1,y1){
+  let x=x0, y=y0;
+  const dx = Math.abs(x1-x0), dy = -Math.abs(y1-y0), sx = x0<x1 ? 1 : -1, sy = y0<y1 ? 1 : -1;
+  let err = dx+dy;
+  while (!(x===x1 && y===y1)){
+    const e2 = 2*err; let mx = 0, my = 0;
+    if (e2>=dy){ err+=dy; mx = sx; }
+    if (e2<=dx){ err+=dx; my = sy; }
+    if (mx && my && (tileAt(x+mx, y)===T_WALL || tileAt(x, y+my)===T_WALL)) return false;   // squeezing past a corner
+    x += mx; y += my;
+    if (x===x1 && y===y1) return true;
+    if (tileAt(x,y)===T_WALL) return false;
+  }
+  return true;
+}
+function shotClear(x0,y0,x1,y1){ return shotRay(x0,y0,x1,y1) && shotRay(x1,y1,x0,y0); }
 // picks a starting facing direction that isn't just staring into a wall -
 // used whenever the player is placed on a new dungeon floor
 function pickInitialFacing(x,y){
@@ -6191,7 +6210,7 @@ function nearestMonsterInRange(range){
     const m = G.mon[i];
     if (!m.alive || m.banishedTurns>0) continue; // a banished foe isn't on this plane to target
     const d = Math.abs(m.x-G.player.x)+Math.abs(m.y-G.player.y);
-    if (d<=range && d<bestDist && hasLineOfSight(G.player.x,G.player.y,m.x,m.y)){ bestDist=d; best=i; }
+    if (d<=range && d<bestDist && shotClear(G.player.x,G.player.y,m.x,m.y)){ bestDist=d; best=i; }
   }
   return best;
 }
@@ -6697,7 +6716,7 @@ function tickMonsters(excludeIdx){
     // a lich (or anything else with 'spellcast') can strike you with a
     // spell from range, no need to close to melee first - but not through
     // a wall it can't see you past
-    if (hasAbility(m,'spellcast') && !(m.silencedTurns>0) && dist>1 && dist<=4 && hasLineOfSight(m.x,m.y,G.player.x,G.player.y)){
+    if (hasAbility(m,'spellcast') && !(m.silencedTurns>0) && dist>1 && dist<=4 && shotClear(m.x,m.y,G.player.x,G.player.y)){
       noteFoe(i);
       monsterStrikesPlayer(i, 'gestures and casts at you', 'blasts');
       continue;
@@ -6728,7 +6747,7 @@ function tickMonsters(excludeIdx){
       // with breath ready, so that reads as charged without needing every
       // monster-spawn site to explicitly initialize the flag
       if (m.breathCharged===false) m.breathCharged = !!chn(1/3); // Recharge 5-6 on a d6 - chn() returns 0/1, not a real boolean, and 0!==false in JS
-      if (m.breathCharged!==false && dist>0 && dist<=3 && hasLineOfSight(m.x,m.y,G.player.x,G.player.y)){
+      if (m.breathCharged!==false && dist>0 && dist<=3 && shotClear(m.x,m.y,G.player.x,G.player.y)){
         noteFoe(i);
         m.breathCharged = false;
         // real dragon stat blocks use breath INSTEAD OF Multiattack on the
@@ -12853,7 +12872,7 @@ function monBlink(m, i){
   const p = G.player, opts = [];
   for (let x=Math.max(1,p.x-5); x<=Math.min(COLS-2,p.x+5); x++) for (let y=Math.max(1,p.y-5); y<=Math.min(ROWS-2,p.y+5); y++){
     const d = Math.abs(x-p.x)+Math.abs(y-p.y); if (d<3 || d>5 || G.map[x][y]!==T_FLOOR || occupiedBy(x,y,i)) continue;
-    if (hasLineOfSight(x, y, p.x, p.y)) opts.push([x,y]);
+    if (shotClear(x, y, p.x, p.y)) opts.push([x,y]);
   }
   if (!opts.length) return false;
   const [x, y] = opts[rn(opts.length)];
@@ -12914,7 +12933,7 @@ function monBossTurn(m, i, dist){
     m._castT = B.next==='magic' ? FP.t : m._castT;
   }
   const st = m.rsStyle;
-  if ((st==='ranged' || st==='magic') && dist <= 7 && hasLineOfSight(m.x, m.y, p.x, p.y)){
+  if ((st==='ranged' || st==='magic') && dist <= 7 && shotClear(m.x, m.y, p.x, p.y)){
     noteFoe(i); isoMonShot(m, st==='ranged' ? 'arrow' : 'spell', st==='ranged' ? '#d8c8a0' : '#c070ff'); if (st==='magic') m._castT = FP.t;
     monsterStrikesPlayer(i, st==='ranged' ? 'fires at you' : 'hurls magic at you', st==='ranged' ? 'shoots' : 'blasts');
     return true;
@@ -12931,7 +12950,7 @@ function monAiTurn(m, i, dist){
     m.frightenedTurns = Math.max(m.frightenedTurns||0, 1); return false;
   }
   if (m.rootTurns > 0 || m.frightenedTurns > 0) return false;
-  const seeYou = ()=>hasLineOfSight(m.x, m.y, p.x, p.y);
+  const seeYou = ()=>shotClear(m.x, m.y, p.x, p.y);
   if (boss) return monBossTurn(m, i, dist);
   // passive things and anything far beneath you leave you alone until you start it
   const tooWeak = monCombatLevel(m) + 30 <= (p.combatLevel||3) && !m.raidBoss;
@@ -32646,7 +32665,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-149';
+const GAME_VERSION = 'rs-150';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
