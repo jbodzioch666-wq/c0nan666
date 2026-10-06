@@ -43,6 +43,8 @@ Screenshots go to `tools/tests/shots/`.
 | campfire | on your campfire with resources in reach, E lists every option (cooking first) and cooking works |
 | monshadow | creatures have no round blob and cast real torch shadows; the fps meter sits centred under the clock bar |
 | models | renamed creatures (the highwayman, a mythic beast) keep their 3D model; a mythic beast stands at its lair on the map |
+| rush | a melee monster rushes you from well off and finds its way round walls |
+| lootstyle | drops lean to how you fight: staves and robes for a mage, bows and hide for an archer |
 | diag | diagonal steps: keys, numpad, corners, click paths, no diagonal strikes |
 | touch | on an emulated phone: tap to walk, long-press menu, pinch zoom, map drag, the d-pad, the hotbar |
 | bal | balance: monsters bite harder, the fixed-strength lair boss, coin trim, the smith's reinforcing |

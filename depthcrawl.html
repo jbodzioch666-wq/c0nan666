@@ -6794,7 +6794,11 @@ function tickMonsters(excludeIdx){
     if (m.rootTurns>0){ m.rootTurns--; if (dist===1) monsterAttacks(i); continue; }
     const fleeing = (hasAbility(m,'nimbleEscape') && m.hp < m.maxHp*0.25) || (m.frightenedTurns>0); // Fear - it runs from you rather than closing in
     let dx=0, dy=0;
-    if (dist<=5){
+    // (RS-169) anything that fights hand to hand rushes you - from well off, and round walls rather than stopping at them
+    const rusher = !fleeing && rsMonStyle(m)==='melee' && !['archer','caster'].includes(monAi(m).role) && (dist<=14 || m.engaged);
+    const chase = rusher ? monChaseDir(m, i) : null;
+    if (chase){ dx = chase[0]; dy = chase[1]; }
+    else if (dist<=5){
       dx = sg(G.player.x-m.x); dy = sg(G.player.y-m.y);
       if (fleeing){ dx=-dx; dy=-dy; } // a bloodied goblin disengages and runs instead of fighting on
       const diagOk = dx!==0 && dy!==0 && (fleeing || dist>2) && diagClear(m.x, m.y, dx, dy, tileOpen) && tileAt(m.x+dx, m.y+dy)!==T_WALL && !occupiedBy(m.x+dx, m.y+dy, i);
@@ -12174,10 +12178,15 @@ function rsMigrateAll(){
 }
 // fills `it` with a tiered base for loot level d. `forMe` (shop stock) keeps
 // to gear you can already use
+// (RS-169) which side of the triangle you fight on - what you last attacked with, else your starting kit
+function lootStyle(){ const p = G.player; if (!p) return 'melee'; const t = (typeof rsAutocastOn==='function' && rsAutocastOn()) ? 'magic' : p.rsLastType || (p.kit==='Archer' ? 'ranged' : p.kit==='Mage' ? 'magic' : 'melee'); return t==='magic' || t==='ranged' ? t : 'melee'; }
 function rsFillBase(it, d, kind, forMe, meleeOnly){
   let made;
+  const style = lootStyle();
   if (kind==='weapon' || kind==='ranged'){
-    const r = meleeOnly ? 1 : Math.random();
+    // drops lean to the way you fight: a mage finds staves about half the time, an archer bows (a fighter as before)
+    let r = meleeOnly ? 1 : Math.random();
+    if (!meleeOnly && kind==='weapon' && style!=='melee'){ const q = Math.random(); r = style==='magic' ? (q < 0.45 ? 0.2 : q < 0.55 ? 0.05 : 0.5 + q*0.5) : (q < 0.45 ? 0.05 : q < 0.52 ? 0.2 : 0.5 + q*0.5); }
     if (kind==='ranged' || r < 0.15){ const q = Math.random(); if (q < 0.2) made = rsMakeCrossbow(rsPickTier(RS_METALS, d, forMe && (i=>RS_XBOW_LV[i]<=rsLvl('ranged')))); else if (q < 0.32) made = rsRandomThrown(d, forMe); else { const t = rsPickTier(RS_BOWS, d, forMe && (i=>RS_BOWS[i][1]<=rsLvl('ranged'))); made = rsMakeBow(t, chn(0.4)); } }
     else if (r < 0.28){ const si = rsPickTier(RS_STAVES, d, forMe && (i=>RS_STAVES[i][1]<=rsLvl('magic'))); made = rsMakeStaff(si); }
     else { const t = Math.min(5, rsPickTier(RS_METALS, d, forMe && (i=>RS_METALS[i][1]<=rsLvl('attack')))); made = rsMakeWeapon(t, rn(RS_WEAPONS.length)); }   // (dragon weapons are rare drops - see crOnKill)
@@ -12189,7 +12198,8 @@ function rsFillBase(it, d, kind, forMe, meleeOnly){
     made = rsMakeJewel(kind, elig.length ? elig[rn(elig.length)] : 0);
   } else {
     const slot = ['head','chest','legs','arms','feet'].includes(kind) ? kind : 'chest';
-    const r = Math.random(), fam = r < 0.55 ? 'metal' : r < 0.8 ? 'hide' : 'cloth';
+    // (RS-169) robes and hats for a mage, hide for an archer, plate for a fighter - about half the time, the rest mixed
+    const r = Math.random(), fam = style==='magic' ? (r < 0.5 ? 'cloth' : r < 0.8 ? 'metal' : 'hide') : style==='ranged' ? (r < 0.5 ? 'hide' : r < 0.8 ? 'metal' : 'cloth') : (r < 0.55 ? 'metal' : r < 0.8 ? 'hide' : 'cloth');
     if ((slot==='chest' || slot==='legs') && chn(0.07)){ const it2 = rsMakeHolyRobe(slot, d); const keep2 = { aff:it.aff.concat(it2.aff), naff:it.naff+it2.naff }; Object.assign(it, it2, keep2); it.quality = rsQualityOf(it); return; }
     const F = RS_ARMOUR[fam], skill = { reqDef:'defence', reqRng:'ranged', reqMag:'magic' }[F.req];
     const t = rsPickTier(F.tiers, d, forMe && (i=>F.tiers[i][1]<=rsLvl(skill)));
@@ -12835,10 +12845,13 @@ function bvFrame(){
   BV.raf = 0;
   const cv = BV.r && BV.r.domElement; if (!cv || !cv.isConnected || G.ui!=='bestiary') return;
   const nm = G.bestSel, known = (G.player.codexSeen||[]).includes(nm) || (G.bestLive && G.bestLive.nm===nm);
+  if (BV.skWait && SK3.ok){ BV.skWait = null; BV.key = ''; }
   if (nm + known !== BV.key){
     BV.key = nm + known; if (BV.e){ BV.scene.remove(BV.pivot || BV.e.holder); BV.e = null; BV.pivot = null; }
     if (known){ try{ const e0 = bestEntryFor(nm) || {}, fake = { nm, undead: G.bestLive && G.bestLive.nm===nm ? G.bestLive.undead : e0.undead }, pt = bvPortrait(fake);
-      if (pt){ BV.e = m3dInstance(fake, pt); const sc = 1/Math.max(0.6, BV.e.H); BV.e.holder.scale.setScalar(sc);
+      /* (RS-169) a skeleton is the same sculpted skeleton you meet in the dungeons, not the generic undead figure */
+      if (sk3Wanted(fake)){ try{ BV.e = sk3Instance(fake); }catch(err){ BV.e = null; } if (!BV.e) BV.skWait = nm; }   /* (it's sculpted over a few frames: the stand-in shows till then) */
+      if (BV.e || pt){ if (!BV.e) BV.e = m3dInstance(fake, pt); const sc = 1/Math.max(0.6, BV.e.H); BV.e.holder.scale.setScalar(sc);
         /* (RS-133) centre the model on its own bounds, so a long beast or an off-centre figure turns on the spot in the middle of the box */
         const T = THREE, pv = BV.pivot = new T.Group(); pv.add(BV.e.holder); BV.e.holder.updateMatrixWorld(true);
         const bb = new T.Box3().setFromObject(BV.e.holder); if (isFinite(bb.min.x)){ const c = bb.getCenter(new T.Vector3()); BV.e.holder.position.x -= c.x; BV.e.holder.position.z -= c.z; BV.e.holder.position.y -= bb.min.y; }
@@ -12846,7 +12859,7 @@ function bvFrame(){
   }
   const t = performance.now()/1000;
   if (BV.drag==null && performance.now() - BV.hold > 2500) BV.yaw += 0.008;
-  if (BV.e){ (BV.pivot || BV.e.holder).rotation.y = BV.yaw; const r = BV.e.rig; try{ if (BV.e.anim) BV.e.anim(r, t, 0, 0, 0, 0, BV.e); else if (BV.e.beast) m3dPoseBeast(r, t, 0, 0, 0, 0); else m3dPoseHumanoid(r, t, 0, 0, 0, 0, BV.e); }catch(e){} }
+  if (BV.e){ (BV.pivot || BV.e.holder).rotation.y = BV.yaw; const r = BV.e.rig; try{ if (BV.e.sk) sk3Pose(t, 0, 0, 0, BV.e.seed, r); else if (BV.e.anim) BV.e.anim(r, t, 0, 0, 0, 0, BV.e); else if (BV.e.beast) m3dPoseBeast(r, t, 0, 0, 0, 0); else m3dPoseHumanoid(r, t, 0, 0, 0, 0, BV.e); }catch(e){} }
   BV.r.render(BV.scene, BV.cam);
   BV.raf = requestAnimationFrame(bvFrame);
 }
@@ -16363,6 +16376,23 @@ const FACING_VECT = [[0,-1],[1,0],[0,1],[-1,0]]; // N,E,S,W - clockwise
 const DIR8 = [[0,-1],[1,0],[0,1],[-1,0],[1,-1],[1,1],[-1,1],[-1,-1]];   // the four cardinals first, so paths stay straight
 function diagClear(x, y, dx, dy, open){ return !(dx && dy) || (open(x+dx, y) && open(x, y+dy)); }
 function tileOpen(x, y){ const t = tileAt(x, y); return t!==undefined && t!==null && t!==T_WALL; }
+// (RS-169) how far every open tile is from you, walking - worked out once a turn and shared by every monster that rushes you
+function monChaseMap(){
+  const p = G.player, key = p.x + ',' + p.y + '|' + (p.turnCount||0) + '|' + COLS;
+  if (monChaseMap.k === key && monChaseMap.m === G.map && monChaseMap.d) return monChaseMap.d;
+  const W = COLS, H = ROWS, d = new Int16Array(W*H).fill(-1), q = [p.x + p.y*W]; d[q[0]] = 0;
+  for (let h=0; h<q.length; h++){ const c = q[h], x = c % W, y = (c - x)/W, dc = d[c]; if (dc >= 24) continue;
+    for (const [ax, ay] of [[1,0],[-1,0],[0,1],[0,-1]]){ const nx = x+ax, ny = y+ay; if (nx<0 || ny<0 || nx>=W || ny>=H) continue; const n = nx + ny*W; if (d[n] >= 0 || !tileOpen(nx, ny)) continue; d[n] = dc + 1; q.push(n); } }
+  monChaseMap.k = key; monChaseMap.m = G.map; monChaseMap.d = d; return d;
+}
+// the step that brings this monster nearer you along the way round (null: nowhere better to stand)
+function monChaseDir(m, i){
+  const d = monChaseMap(), W = COLS, here = d[m.x + m.y*W]; if (here < 0) return null;
+  let best = null, bd = here;
+  for (const [ax, ay] of [[1,0],[-1,0],[0,1],[0,-1]]){ const nx = m.x+ax, ny = m.y+ay; if (nx<0 || ny<0 || nx>=W || ny>=ROWS) continue; const v = d[nx + ny*W];
+    if (v < 0 || v >= bd) continue; if (!(nx===G.player.x && ny===G.player.y) && occupiedBy(nx, ny, i)) continue; best = [ax, ay]; bd = v; }
+  return best;
+}
 // the facing (N/E/S/W) for a step: a diagonal keeps whichever of its two sides you already faced
 function facingFor(dx, dy, cur){ const i = FACING_VECT.findIndex(v=>v[0]===dx && v[1]===dy); if (i>=0) return i; const f = FACING_VECT[cur|0]; if (f && (f[0]===dx || f[1]===dy)) return cur|0; return FACING_VECT.findIndex(v=>v[0]===dx && v[1]===0); }
 
@@ -32831,7 +32861,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-168';
+const GAME_VERSION = 'rs-169';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

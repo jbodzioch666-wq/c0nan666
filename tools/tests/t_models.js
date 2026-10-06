@@ -11,9 +11,12 @@ module.exports = async page=>{
       G.gameMode = 0; G.mon = []; G.owPos = { x:b.x + 2, y:b.y }; setUi('playing'); for (let i=0;i<8;i++){ renderGame(); await new Promise(r=>setTimeout(r, 60)); }
       let meshes = 0, sprites = 0; if (O3.encGrp) O3.encGrp.traverse(o=>{ if (o.isMesh && !o.geometry.type.startsWith('Ring')) meshes++; if (o.isSprite) sprites++; });
       out.map = { o3:o3Active(), meshes, sprites }; }
+    // RS-169: the bestiary's skeleton is the sculpted dungeon skeleton
+    G.gameMode = 0; (G.player.codexSeen = G.player.codexSeen || []).push('skeleton'); G.bestSel = 'skeleton'; setUi('bestiary'); for (let i=0;i<40 && !(BV.e && BV.e.sk); i++) await new Promise(r=>setTimeout(r, 150)); out.bestiary = { sk:!!(BV.e && BV.e.sk), key:BV.key }; setUi('playing');
     return out; });
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
+  A(r.bestiary.sk, 'the bestiary shows the sculpted skeleton');
   A(r.highway.model, 'the highwayman fights as a 3D figure');
   A(r.kindModels, 'every mythic beast is a creature with a 3D model');
   A(!r.myth || (r.myth.model && r.myth.same), 'the mythic beast you fight is the one on the map');

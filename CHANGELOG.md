@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-169 - Wizard loot and charging monsters
+
+- **Loot that suits you**: drops now lean toward the way you fight. If you cast spells you'll find staves and wizard robes and hats about half the time; if you shoot, bows and hide armour. Fighters get plate and blades as before. Before, a staff was rare and robes made up only a fifth of armour drops.
+- **Melee monsters rush you**: any monster that fights hand to hand now comes for you from well over a dozen tiles away, and finds its way around walls instead of getting stuck behind them. Archers and casters still keep their distance and shoot.
+- **The right skeleton in the bestiary**: the bestiary now shows the same sculpted skeleton you fight in the dungeons.
+
 ## RS-168 - Highwaymen and mythic beasts in 3D
 
 - **The highwayman in 3D**: the masked rider you fight on the road now shows as a full 3D figure instead of a flat painted picture.
