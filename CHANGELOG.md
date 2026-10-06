@@ -1,5 +1,15 @@
 # Depthcrawl patch notes
 
+## RS-182 - Tidier interiors, and the Necromancy guide
+
+- **Proper front doors.** The front wall of every room now has a real doorway: an opening with its door jambs and a stone threshold, and a mat just inside. Before, a tall frame stood on top of a wall that ran straight across the way in.
+- **Floors stop at the walls.** The floor no longer runs out past the front of the building.
+- **Cabinets clear of the windows.** The tall shelf cabinets on the back wall now stand between the windows instead of in front of them.
+- **Furniture against the walls.** Bookshelves stand against the west wall, facing into the room. Hearths, beds and the temple shrine stand against the back wall, including your house's hearth and bed.
+- **Stairs that go somewhere.** The stairs up in the tavern and the cellar now climb the back corner to a door in the wall, and you arrive beside them on the other floor.
+- **No more overlapping rugs.** The doormat no longer lies on top of the big rug.
+- **What you can raise, and when.** The Necromancy skill guide now lists every minion with the level it unlocks at (skeleton at 1, zombie 15, ghost 30, skeleton archer 45, wraith 60, death knight 80), plus when you can keep more raised at once. A level-up tells you when a new one becomes yours.
+
 ## RS-181 - Wandering monsters and raised dead in 3D
 
 - **See what's coming.** A wandering monster group on the overworld now shows as the 3D figure of its strongest member, walking the land, with the crossed-swords icon still floating over its head so it's easy to spot. Walk into it and you fight exactly the group you saw.

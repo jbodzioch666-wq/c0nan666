@@ -14,6 +14,8 @@ module.exports = async page=>{
     for (let i=0;i<4;i++){ renderGame(); await new Promise(r=>setTimeout(r, 60)); }
     out.minions = (G.player.minions||[]).map(m=>{ const px = necroProxy(m), e = M3D.inst.get(px); return { k:m.k, model:!!(e && e.holder.parent===FPD.scene), sk:!!(e && e.sk), ring:!!(e && e._ring) }; });
     const b = document.getElementById('necroBtn'); out.btn = { drag:b && b.dataset.drag };
+    // RS-182: the skill guide lists which minion comes at which Necromancy level
+    const rows = skGuideRows('necromancy'); out.guide = NECRO_MINIONS.every(m=>rows.some(r=>r.l===m.lvl && r.t.includes(m.nm)));
     return out; });
   // drag the Raise box: it moves, and doesn't raise anything
   const box = await page.evaluate(()=>{ const r = document.getElementById('necroBtn').getBoundingClientRect(); return { x:r.left + r.width/2, y:r.top + r.height/2, n:(G.player.minions||[]).length }; });
@@ -25,5 +27,6 @@ module.exports = async page=>{
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
   A(r.minions.length >= 1 && r.minions.every(m=>m.model && m.ring), 'each raised minion is a 3D figure in the scene, ringed in green');
   A(r.minions.some(m=>m.k==='skeleton' && m.sk), 'a raised skeleton is the sculpted skeleton');
+  A(r.guide, 'the Necromancy skill guide lists each minion at its level');
   A(r.btn.drag==='necro' && r.drag.moved > 100 && r.drag.raised===0 && r.drag.saved, 'the Raise box drags anywhere, keeps its place, and the drag raises nothing');
 };
