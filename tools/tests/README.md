@@ -52,3 +52,5 @@ Screenshots go to `tools/tests/shots/`.
 | xpdrop | the xp numbers from any skill rise over your head on the overworld, in town and in a dungeon |
 | essvein | mines have seams of rune essence: mined at Mining 1 for rune essence and xp, shown as rock split on pale crystal |
 | qroll | the quest window rolls up to its title bar and back down when tapped, stays put when dragged, and stays rolled after a reload |
+| lairtop | a dragon's lair sits on its mountain's summit, with the pass to it climbing as a path from the foot of the range |
+| peddlertools | the gathering tools are sold by the Peddler, not the blacksmith |

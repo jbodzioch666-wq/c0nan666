@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-178 - Lairs on the peaks, tools at the Peddler
+
+- **Dragon lairs sit on the mountaintops.** A lair in the mountains now crowns its peak, a little above every summit around it. The pass carved out to it climbs as a path from the foot of the range up to the lair's mouth, so you walk up the mountain to reach the dragon.
+- **Tools are sold by the Peddler.** Fishing rods, pickaxes, hatchets and sickles (and their upgrades) have moved from the blacksmith to the Peddler. The blacksmith keeps the dungeon supplies, the metal gear, the furnace and the anvils.
+
 ## RS-177 - Essence in the mines, a quest window that rolls up
 
 - **Rune essence in the mines.** Mines now have pale seams of rune essence on their floors, glowing faintly in the rock. Mine them at Mining 1 for rune essence and Mining xp, so you can stock up for Runecrafting underground. Each seam gives more than a herb patch before it's worked out.
