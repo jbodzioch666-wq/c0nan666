@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-181 - Wandering monsters and raised dead in 3D
+
+- **See what's coming.** A wandering monster group on the overworld now shows as the 3D figure of its strongest member, walking the land, with the crossed-swords icon still floating over its head so it's easy to spot. Walk into it and you fight exactly the group you saw.
+- **Your raised dead in 3D.** Skeletons, zombies, ghosts and the rest you raise with Necromancy now stand in the dungeon as real 3D figures (a raised skeleton is the full sculpted skeleton). Each is ringed in green so you can tell it from the enemy, and it faces the foe it's fighting and swings when it strikes.
+- **Move the Raise button.** Drag the Raise box anywhere on screen, and it remembers where you put it. Dragging it doesn't raise anything, and you can still move it when you're out of bones.
+
 ## RS-180 - Altars ask first
 
 - **Altars no longer craft on their own.** Walking up to a runecrafting altar, tapping it or pressing E beside it used to bind all your essence straight away. Now the altar asks first: "Bind 10 essence → 10 air runes (45 xp)", or Cancel. Nothing is spent until you choose Bind.

@@ -57,3 +57,5 @@ Screenshots go to `tools/tests/shots/`.
 | mythmap | a mythic beast is found when you come near it: a map icon (world map and minimap), a tooltip on the map and its 3D figure, and on touch a first tap shows the tooltip |
 | rich | rich spots (gold vein, ancient oak, legendary fishing spot) never turn up on a road, a site or a point of interest |
 | altar | a runecrafting altar asks before binding your essence (Bind / Cancel), and the xp it shows is the xp you get |
+| encmodel | a wandering group shows as its strongest member's 3D figure with the crossed swords over its head, and walking into it you fight that group |
+| necro3d | raised minions are 3D figures (the sculpted skeleton, or their own model) ringed in green; the Raise box drags without raising |
