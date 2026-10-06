@@ -7106,7 +7106,7 @@ function serializeGame(){
     // produces a different map entirely, since every placement roll is a
     // function of OW_COLS/OW_ROWS too
     worldSizeTier: G.worldSizeTier||'medium', owCols: OW_COLS, owRows: OW_ROWS,
-    owMythicSlain: G.ow.mythicSlain||{}, owMythicNew: G.ow.mythicNew||[], owMythicNextAt: G.ow.mythicNextAt||0,
+    owMythicSlain: G.ow.mythicSlain||{}, owMythicNew: G.ow.mythicNew||[], owMythicNextAt: G.ow.mythicNextAt||0, owMythicPos: G.ow.mythicPos||{},
     gameMode: (G.gameMode===2 || G.gameMode===3) ? 0 : G.gameMode,
     depth: G.depth, dungeonMaxDepth: G.dungeonMaxDepth,
     dungeonEntrance: {x:G.dungeonEntrance.x,y:G.dungeonEntrance.y}, dungeonSlot: G.dungeonSlot,
@@ -7227,7 +7227,7 @@ function loadGame(id){
   G.ow.overrides = data.owOverrides||{};
   G.ow.siteMoves = data.owSiteMoves||{};
   G.ow.townPositions = data.owTownPositions||{};
-  G.ow.mythicSlain = data.owMythicSlain||{}; G.ow.mythicNew = data.owMythicNew||[]; G.ow.mythicNextAt = data.owMythicNextAt||0;
+  G.ow.mythicSlain = data.owMythicSlain||{}; G.ow.mythicNew = data.owMythicNew||[]; G.ow.mythicNextAt = data.owMythicNextAt||0; G.ow.mythicPos = data.owMythicPos||{};
   // restore the map's own size BEFORE regenerating from the saved seed - a
   // save made before world-size picking existed has no owCols/owRows, so
   // this falls back to the old fixed 160x160 default (matches what that
@@ -7364,7 +7364,7 @@ function setWorldSizeTier(tierId){
   G.ow.townPositions = {};
   G.ow.townFlavor = {};
   G.ow.siteMoves = {};
-  G.ow.mythicSlain = {}; G.ow.mythicNew = []; G.ow.mythicNextAt = 0;
+  G.ow.mythicSlain = {}; G.ow.mythicNew = []; G.ow.mythicNextAt = 0; G.ow.mythicPos = {};
   rerollWorldPreview(); // a size change needs a fresh map anyway, same as a plain reroll
 }
 function startGame(name){
@@ -7386,7 +7386,7 @@ function startGame(name){
   G.ow.siteMoves = {};
   G.ow.townPositions = {};
   G.ow.townFlavor = {};
-  G.ow.mythicSlain = {}; G.ow.mythicNew = []; G.ow.mythicNextAt = 0;
+  G.ow.mythicSlain = {}; G.ow.mythicNew = []; G.ow.mythicNextAt = 0; G.ow.mythicPos = {};
   G.ow.visitedTowns = [];
   G.weather = 'clear';
   // every new game starts at Medium (the old fixed default) regardless of
@@ -8270,6 +8270,7 @@ function generateOverworld(seed){
     placed.push(p);
   }
   for (const b of (G.ow.mythicNew||[])) G.ow.mythicBeasts.push({ i:b.i, x:b.x, y:b.y, name:b.name, slain: !!G.ow.mythicSlain[b.i] });   /* (RS-170: the ones that rose since) */
+  for (const b of G.ow.mythicBeasts){ b.hx = b.x; b.hy = b.y; const q = (G.ow.mythicPos||{})[b.i]; if (q){ b.x = q[0]; b.y = q[1]; } }   /* (RS-173: where each has wandered to, round its lair) */
   // visible wilderness roamers (see spawnOverworldEncounters) - regenerated
   // fresh every time this function runs, which includes every load (see
   // loadGame's generateOverworld(data.owSeed) call), so a roaming monster
@@ -8673,9 +8674,29 @@ function mythicBeastEncounter(beast){
 // the render pass simply skips drawing anything already marked slain
 // (RS-170) when a mythic beast falls, another rises somewhere else a while later: a fresh name, a new lair out in the wilds
 const MYTHIC_RESPAWN = 400;
+// (RS-173) a mythic beast roams the country round its lair, as a world boss does - never far, never onto a town, a site or the water
+const MYTHIC_ROAM = 8;
+function mythicCanStand(b, x, y){
+  if (x<1 || y<1 || x>=OW_COLS-1 || y>=OW_ROWS-1 || Math.abs(x - b.hx) > MYTHIC_ROAM || Math.abs(y - b.hy) > MYTHIC_ROAM) return false;
+  const t = G.ow.map[x][y];
+  if (!encounterEligible(t) || t===OW_WATER || t===OW_RIVER || t===OW_MOUNTAIN || t===OW_MOUNTAINPASS || OW_SITE_TILES.includes(t)) return false;
+  if ((typeof owAmidMtn==='function' && owAmidMtn(x, y)) || (typeof wgPoiAt==='function' && wgPoiAt(x, y))) return false;
+  if (G.owPos && G.owPos.x===x && G.owPos.y===y) return false;
+  if ((G.ow.mythicBeasts||[]).some(o=>o!==b && !o.slain && o.x===x && o.y===y)) return false;
+  const wb = G.ow.ev && G.ow.ev.boss; if (wb && wb.state==='awake' && wb.x===x && wb.y===y) return false;
+  return !(G.ow.encounters||[]).some(o=>o.x===x && o.y===y);
+}
+function mythicWander(turn){
+  if (G.ow.mythicWalkT===turn) return; G.ow.mythicWalkT = turn;
+  const pos = G.ow.mythicPos = G.ow.mythicPos || {};
+  for (const b of (G.ow.mythicBeasts||[])){ if (b.slain) continue;
+    if (b.hx==null){ b.hx = b.x; b.hy = b.y; }
+    if (chn(0.4)){ const d = [[1,0],[-1,0],[0,1],[0,-1]][rn(4)]; if (mythicCanStand(b, b.x+d[0], b.y+d[1])){ b.x += d[0]; b.y += d[1]; pos[b.i] = [b.x, b.y]; } } }
+}
 function mythicTick(){
   if (!G.player || !G.ow || !G.ow.map) return;
   const turn = G.player.turnCount||0, alive = (G.ow.mythicBeasts||[]).filter(b=>!b.slain).length;
+  try{ mythicWander(turn); }catch(e){ console.error(e); }
   if (!G.ow.mythicNextAt && !alive) G.ow.mythicNextAt = turn + MYTHIC_RESPAWN;   // (an older save where they're all dead)
   if (!G.ow.mythicNextAt || turn < G.ow.mythicNextAt || G.gameMode!==0) return;
   const px = G.owPos.x, py = G.owPos.y;
@@ -8685,7 +8706,7 @@ function mythicTick(){
     if ((typeof owAmidMtn==='function' && owAmidMtn(x, y)) || (typeof wgRoadAt==='function' && wgRoadAt(x, y)) || (typeof owSpotTaken==='function' && owSpotTaken(x, y))) continue;
     const i = 1000 + (G.ow.mythicNew||[]).length + Object.keys(G.ow.mythicSlain||{}).length;
     const name = `${NAME_POOL[rn(NAME_POOL.length)]} ${MYTHIC_EPITHETS[rn(MYTHIC_EPITHETS.length)]}`;
-    (G.ow.mythicNew = G.ow.mythicNew||[]).push({ i, x, y, name }); G.ow.mythicBeasts.push({ i, x, y, name, slain:false });
+    (G.ow.mythicNew = G.ow.mythicNew||[]).push({ i, x, y, name }); G.ow.mythicBeasts.push({ i, x, y, hx:x, hy:y, name, slain:false });
     G.ow.mythicNextAt = 0;
     const b = G.ow.mythicBeasts[G.ow.mythicBeasts.length-1];
     notify(`A new terror stirs: ${name}, ${mythicKind(b)}, has made its lair ${dirWord(x-px, y-py)} of here`, 'warn', 'notify');
@@ -18487,7 +18508,9 @@ function o3SyncEvents(){
   const hit = (gx, y0, gz, w, h, act)=>{ const hb = new T.Mesh(new T.BoxGeometry(w, h, w), hitM); hb.position.set(gx, y0+h/2, gz); hb.userData.act = act; g.add(hb); O3.evHits.push(hb); };
   for (const c of e.camps){ if (!inWin(c.x, c.y)) continue; const gx = c.x+0.5, gz = c.y+0.5, y0 = Math.max(O3.heightAt(gx,gz), -0.14);
     o3CampModel(g, gx, y0, gz, 2 + c.size, { push:addFl }); hit(gx, y0, gz, 1, 1, { kind:'wev', what:'camp', id:c.id, x:c.x, y:c.y }); }
-  if (b && inWin(b.x, b.y)){ const gx = b.x+0.5, gz = b.y+0.5, y0 = Math.max(O3.heightAt(gx,gz), -0.14), m = wevBossEntry(b);
+  if (b && inWin(b.x, b.y) && m3dPortrait(wevBossEntry(b))){ const gx = b.x+0.5, gz = b.y+0.5, y0 = Math.max(O3.heightAt(gx,gz), -0.14);   /* (RS-173: drawn as itself - see o3SyncBeasts) */
+    hit(gx, y0, gz, 1.2, 2.4, { kind:'wev', what:'boss', id:0, x:b.x, y:b.y }); }
+  else if (b && inWin(b.x, b.y)){ const gx = b.x+0.5, gz = b.y+0.5, y0 = Math.max(O3.heightAt(gx,gz), -0.14), m = wevBossEntry(b);
     const sp = new T.Sprite(new T.SpriteMaterial({ map:o3IconTex('wboss'+b.g, m.art, '#ffb090', '#ff5a3a'), transparent:true })); sp.scale.setScalar(1.5); sp.position.set(gx, y0+1.6, gz); g.add(sp);
     const ring = new T.Mesh(new T.RingGeometry(0.55, 0.72, 32), new T.MeshBasicMaterial({ color:0xff4a2a, transparent:true, opacity:0.8, depthWrite:false })); ring.rotation.x = -Math.PI/2; ring.position.set(gx, y0+0.04, gz); g.add(ring);
     const beam = new T.Mesh(new T.CylinderGeometry(0.2, 0.3, 10, 16, 1, true), new T.MeshBasicMaterial({ color:0xff5a3a, transparent:true, opacity:0.22, depthWrite:false, blending:T.AdditiveBlending, side:T.DoubleSide })); beam.position.set(gx, y0+5, gz); g.add(beam);
@@ -18505,6 +18528,40 @@ function o3SyncEvents(){
         if (i%2) o3CampModel(g, gx + Math.cos(a)*2.6, Math.max(O3.heightAt(gx + Math.cos(a)*2.6, gz + Math.sin(a)*2.6), -0.1), gz + Math.sin(a)*2.6, 3, { push:addFl }); }
     }
   }
+}
+// RS-173: the world's giants and mythic beasts stand on the land as their own 3D creatures - one figure each, kept while it's
+// near, that walks from tile to tile as it roams (with a ring at its feet, and the giant's pillar of light) instead of hopping
+function o3SyncBeasts(dt){
+  const T = THREE; if (!O3.win || !O3.scene) return;
+  if (!O3.beastGrp) O3.beastGrp = new T.Group(); if (O3.beastGrp.parent!==O3.scene) O3.scene.add(O3.beastGrp);
+  const inWin = (x, y)=> Math.abs(x+0.5-O3.win.cx) <= O3_W/2-1 && Math.abs(y+0.5-O3.win.cy) <= O3_W/2-1, want = [];
+  const ev = G.ow && G.ow.ev, b = ev && ev.boss && ev.boss.state==='awake' ? ev.boss : null;
+  if (b && inWin(b.x, b.y)){ const m = wevBossEntry(b); if (m3dPortrait(m)) want.push({ key:'boss'+b.g, ent:m, x:b.x, y:b.y, h:1.7, col:0xff4a2a, beam:true, seed:b.g }); }
+  for (const mb of (G.ow && G.ow.mythicBeasts)||[]) if (!mb.slain && inWin(mb.x, mb.y)) want.push({ key:'myth'+mb.i, ent:{ nm:mythicKind(mb) }, x:mb.x, y:mb.y, h:1.3, col:0xc070ff, seed:mb.i });
+  const F = O3.beasts = O3.beasts || new Map(), seen = new Set();
+  for (const w of want){
+    let f = F.get(w.key);
+    if (!f){ let e = null; try{ const pt = m3dPortrait(w.ent); if (pt){ e = m3dInstance(w.ent, pt); e.holder.scale.setScalar(w.h/Math.max(0.5, e.H)); } }catch(err){ console.error(err); }
+      if (!e) continue;
+      const ring = new T.Mesh(new T.RingGeometry(0.55, 0.7, 32), new T.MeshBasicMaterial({ color:w.col, transparent:true, opacity:0.7, depthWrite:false })); ring.rotation.x = -Math.PI/2;
+      const beam = w.beam ? new T.Mesh(new T.CylinderGeometry(0.2, 0.3, 10, 16, 1, true), new T.MeshBasicMaterial({ color:0xff5a3a, transparent:true, opacity:0.22, depthWrite:false, blending:T.AdditiveBlending, side:T.DoubleSide })) : null;
+      f = { e, ring, beam, x:w.x+0.5, z:w.y+0.5, yaw:((w.x*13 + w.y*7) % 8)*Math.PI/4 }; F.set(w.key, f); }
+    seen.add(w.key);
+    for (const o of [f.e.holder, f.ring, f.beam]) if (o && o.parent!==O3.beastGrp) O3.beastGrp.add(o);
+    // it lumbers toward the tile it has moved to, turning to face the way it goes
+    const tx = w.x+0.5, tz = w.y+0.5, dx = tx - f.x, dz = tz - f.z, d = Math.hypot(dx, dz);
+    if (d > 3){ f.x = tx; f.z = tz; } else if (d > 0.001){ const sp = Math.min(d, (dt||0.016)*(d > 1.2 ? 2.4 : 1.5)); f.x += dx/d*sp; f.z += dz/d*sp; }
+    const moving = d > 0.02;
+    if (moving){ const a = Math.atan2(dx, dz); let da = a - f.yaw; da = Math.atan2(Math.sin(da), Math.cos(da)); f.yaw += da*Math.min(1, (dt||0.016)*5); }
+    else f.yaw += Math.sin(O3.t*0.4 + w.seed)*0.002;
+    const y0 = Math.max(O3.heightAt(f.x, f.z), -0.14);
+    f.e.holder.position.set(f.x, y0, f.z); f.e.holder.rotation.y = f.yaw;
+    f.ring.position.set(f.x, y0 + 0.04, f.z); f.ring.material.opacity = 0.5 + Math.sin(O3.t*3 + w.seed)*0.25;
+    if (f.beam){ f.beam.position.set(f.x, y0 + 5, f.z); f.beam.material.opacity = 0.18 + Math.sin(O3.t*2)*0.06; }
+    const mv = m3dEaseMv(f.e, moving ? 1 : 0, dt), r = f.e.rig, t = O3.t + f.e.seed;
+    try{ if (f.e.anim) f.e.anim(r, t, mv, 0, 0, 0, f.e); else if (f.e.beast) m3dPoseBeast(r, t, mv, 0, 0, 0, f.e); else m3dPoseHumanoid(r, t, mv, 0, 0, 0, f.e); }catch(err){}
+  }
+  for (const [k, f] of F) if (!seen.has(k)){ for (const o of [f.e.holder, f.ring, f.beam]) if (o && o.parent) o.parent.remove(o); F.delete(k); }
 }
 function o3AnimEvents(){
   for (const a of O3.evAnim||[]){
@@ -18594,7 +18651,7 @@ function worldCodeParse(code){
 }
 // a fresh world from a given seed on the preview screen (nothing is committed yet)
 function wgRegenerate(seed){
-  G.ow.townPositions = {}; G.ow.townFlavor = {}; G.ow.siteMoves = {}; G.ow.mythicSlain = {}; G.ow.mythicNew = []; G.ow.mythicNextAt = 0;
+  G.ow.townPositions = {}; G.ow.townFlavor = {}; G.ow.siteMoves = {}; G.ow.mythicSlain = {}; G.ow.mythicNew = []; G.ow.mythicNextAt = 0; G.ow.mythicPos = {};
   generateOverworld(seed >>> 0); applyOverworldOverrides(); renderOverlay();
 }
 function setContinentType(id){ if (!CONTINENT_TYPES.some(c=>c.id===id)) return; G.ow.continent = id; wgRegenerate(Math.floor(Math.random()*4294967295)); }
@@ -26559,10 +26616,12 @@ function sk3Pose(t, walk, atk, hit, seed, rig, wph){
   // down and forward, then recovers to the guard
   const P = SKI, lerp3 = (a,b,k)=> [a[0]+(b[0]-a[0])*k, a[1]+(b[1]-a[1])*k, a[2]+(b[2]-a[2])*k];
   let A, B, k;
-  if (atk<0.3){ A = P.rest; B = P.wind; k = atk/0.3; }
-  else if (atk<0.6){ A = P.wind; B = P.cut; k = (atk-0.3)/0.3; }
-  else { A = P.cut; B = P.rest; k = (atk-0.6)/0.4; }
-  k = k*k*(3-2*k);
+  /* (RS-173) a slow wind-up, a fast cut that carries on past the blow (the follow-through), then an unhurried return to guard */
+  const over = { sh:lerp3(P.cut.sh, P.wind.sh, -0.28), el:lerp3(P.cut.el, P.wind.el, -0.28), hand:lerp3(P.cut.hand, P.wind.hand, -0.28) };
+  if (atk<0.34){ A = P.rest; B = P.wind; k = atk/0.34; k = k*k*(3-2*k); }
+  else if (atk<0.46){ A = P.wind; B = P.cut; k = (atk-0.34)/0.12; k = k*k; }
+  else if (atk<0.6){ A = P.cut; B = over; k = Math.sin((atk-0.46)/0.14*Math.PI/2); }
+  else { A = over; B = P.rest; k = (atk-0.6)/0.4; k = 1 - (1-k)*(1-k); }
   const sh = lerp3(A.sh,B.sh,k), el = lerp3(A.el,B.el,k), hd = lerp3(A.hand,B.hand,k);
   m.R.sh.rotation.set(sh[0] + br*0.03, sh[1], sh[2]);
   m.R.el.rotation.set(el[0], el[1], el[2]);
@@ -26662,16 +26721,16 @@ function sk3Update(m, pos, flash, moving){
   // it swings whenever it strikes at you, hit or miss (RS-172)
   if (m._atkT && m._atkT!==e.atkSeen){ e.atkSeen = m._atkT; if (FP.t - m._atkT < 1) e.atk = 0.18; }
   e.pHp = G.player.hp;
-  if (e.atk>0){ e.atk += FP.dt*2.2; if (e.atk>=1) e.atk = 0; }
-  if (flash > 0.5 && e.hurt < 0.2) e.hurt = 1; e.hurt = Math.max(0, e.hurt - FP.dt*3);
+  if (e.atk>0){ e.atk += FP.dt*1.9; if (e.atk>=1) e.atk = 0; }
+  e.hurt = m3dHitReact(e, m.hp, m.maxHp, FP.dt);   /* (RS-173: as hard as the blow, with a rock back and a settle) */
   const gx = m.x+0.5 - pos.x, gy = m.y+0.5 - pos.y, going = moving > 0.3 && Math.hypot(gx, gy) > 0.08 && !e.atk;
   const fa = going ? Math.atan2(gx, gy) : Math.atan2(G.player.x+0.5 - pos.x, G.player.y+0.5 - pos.y);   /* (RS-172: it looks where it walks) */
   let da = fa - (e.face===undefined ? fa : e.face); da = Math.atan2(Math.sin(da), Math.cos(da)); e.face = (e.face===undefined ? fa : e.face) + da*Math.min(1, FP.dt*8);
   const lunge = e.atk>0.25 && e.atk<0.8 ? Math.sin((e.atk-0.25)/0.55*Math.PI)*0.16 : 0;
-  const back = e.hurt*0.09 - lunge;   // knocked back a touch by your blow, stepping in as it cuts
+  const back = e.hurt*0.12 - lunge;   // knocked back by your blow, stepping in as it cuts
   e.holder.position.set(pos.x - Math.sin(e.face)*back, 0, pos.y - Math.cos(e.face)*back); e.holder.rotation.y = e.face;
   for (const mt of e.mats){ if (!mt.userData.em0) mt.userData.em0 = mt.emissive.clone(); mt.emissive.copy(mt.userData.em0).addScalar(flash*0.5); }
-  sk3Pose(FP.t, moving, e.atk, Math.max(e.hurt, flash*0.5), e.seed, e.rig, m3dStride(e, FP.t, moving));
+  sk3Pose(FP.t, moving, e.atk, e.hurt, e.seed, e.rig, m3dStride(e, FP.t, moving));
   return e.H;
 }
 
@@ -28220,7 +28279,7 @@ function o3IconTex(key, recipe, color, ring){
 function o3SyncEncounters(){
   const T = THREE, list = [];
   for (const e of (G.ow.encounters||[])) list.push(['enc', e.x, e.y]);
-  for (const b of (G.ow.mythicBeasts||[])) if (!b.slain) list.push(['myth', b.x, b.y]);
+  for (const b of (G.ow.mythicBeasts||[])) if (!b.slain && !(typeof m3dPortrait==='function' && m3dPortrait({ nm:mythicKind(b) }))) list.push(['myth', b.x, b.y]);   /* (RS-173: the 3D ones roam - see o3SyncBeasts) */
   const key = list.map(l=>l.join(':')).join('|') + '@' + (O3.win ? O3.win.cx + ',' + O3.win.cy : '');   /* (RS-172: and again when the land around you is rebuilt somewhere new) */
   if (key === O3.encKey) return;
   O3.encKey = key;
@@ -28775,7 +28834,7 @@ function o3Render(){
   o3SyncQuests();
   o3SyncNodes();
   try{ o3SyncLandmarks(dt); }catch(e){ console.error(e); }
-  try{ o3SyncEvents(); o3AnimEvents(); }catch(e){ console.error(e); }
+  try{ o3SyncEvents(); o3AnimEvents(); o3SyncBeasts(dt); }catch(e){ console.error(e); }
   try{ o3SyncPOIs(); o3Wildlife(dt); o3SyncIce(); o3BoatTier(); }catch(e){ console.error(e); }
   // you glide between tiles; on water you ride a boat
   const sailing = G.ow.map[G.owPos.x][G.owPos.y]===OW_WATER && !iceAt(G.owPos.x, G.owPos.y);   // only open water needs the boat; rivers are waded, and winter ice is walked
@@ -31190,6 +31249,27 @@ function m3dInstance(m, pt){
   const mats = [...mmap.values()].filter(x=>x.emissive);
   return { holder, root, rig, mats, H, beast:!!meta.beast, anim:meta.anim||null, seed:Math.random()*10, atk:0, pHp:G.player ? G.player.hp : 0, hurt:0, lift:pt.lift||meta.lift||0, dying:-1, stamp:0, rise: m.rise ? 0 : 1 };
 }
+// RS-173: a blow in three beats - the wind-up, a fast release, then a follow-through that carries on past the strike
+// and eases back to guard (a in 0..1; fol peaks just after the strike lands)
+function m3dAtkCurve(a){
+  if (!(a > 0)) return { wind:0, strike:0, fol:0 };
+  const sm = x=>x<=0 ? 0 : x>=1 ? 1 : x*x*(3-2*x);
+  const wind = a < 0.38 ? sm(a/0.38) : Math.max(0, 1 - (a-0.38)/0.1);
+  const strike = a < 0.4 ? 0 : a < 0.52 ? Math.sin((a-0.4)/0.12*Math.PI/2) : 1 - sm((a-0.52)/0.48);
+  const fol = a > 0.46 && a < 0.95 ? Math.sin((a-0.46)/0.49*Math.PI)*(1 - (a-0.46)/0.49*0.4) : 0;
+  return { wind, strike, fol };
+}
+// RS-173: being hit - a snap back that's as big as the blow was hard (a fraction of its life), then a damped rock that
+// settles; a heavy blow staggers it. Returns the flinch (it swings a little past zero on the rebound)
+function m3dHitReact(e, hp, maxHp, dt){
+  if (e._hp==null) e._hp = hp;
+  if (hp < e._hp - 0.001){ const fr = (e._hp - hp)/Math.max(1, maxHp||1); e.hitK = Math.min(1.5, 0.45 + fr*5); e.hitT = 0; e.hitSide = Math.random() < 0.5 ? -1 : 1; }
+  e._hp = hp;
+  if (e.hitT==null) return 0;
+  e.hitT += dt||0.016; const t = e.hitT;
+  if (t > 1.3){ e.hitT = null; return 0; }
+  return (t < 0.06 ? t/0.06 : Math.exp(-(t-0.06)*5.5)*Math.cos((t-0.06)*10))*(e.hitK||0.5);
+}
 // pose one creature for this frame
 function m3dPose(e, pos, m, moving, flash){
   const r = e.rig, t = FP.t + e.seed, T = THREE;
@@ -31199,15 +31279,16 @@ function m3dPose(e, pos, m, moving, flash){
   const gx = m.x+0.5 - pos.x, gy = m.y+0.5 - pos.y, going = moving > 0.3 && Math.hypot(gx, gy) > 0.08 && !e.atk;
   const fa = going ? Math.atan2(gx, gy) : Math.atan2(G.player.x+0.5 - pos.x, G.player.y+0.5 - pos.y) + (e.beast && !e.atk ? 0.55*Math.sin(t*0.35) + (e.seed>5 ? 0.35 : -0.35) : 0);
   let da = fa - (e.face===undefined ? fa : e.face); da = Math.atan2(Math.sin(da), Math.cos(da)); e.face = (e.face===undefined ? fa : e.face) + da*Math.min(1, FP.dt*8);
-  const lunge = e.atk>0.3 && e.atk<0.85 ? Math.sin((e.atk-0.3)/0.55*Math.PI)*0.16 : 0;
-  const back = (e.hurt||0)*0.08 - lunge;   // rocked back a touch by your blow, lunging in when it strikes
-  e.holder.position.set(pos.x - Math.sin(e.face)*back, e.lift ? e.lift + Math.sin(t*2.2)*0.03 : 0, pos.y - Math.cos(e.face)*back); e.holder.rotation.y = e.face;
-  // it struck at you (hit or miss): the swing starts just before the blow lands (RS-172 - it used to swing only when you lost life)
   if (m._atkT && m._atkT!==e.atkSeen){ e.atkSeen = m._atkT; if (FP.t - m._atkT < 1) e.atk = 0.22; }
+  if (e.atk>0){ e.atk += FP.dt*1.9; if (e.atk>=1) e.atk = 0; }
+  e.hurt = m3dHitReact(e, m.hp, m.maxHp, FP.dt);
+  const C = m3dAtkCurve(e.atk); e.fol = C.fol;
+  const lunge = Math.max(C.strike, C.fol*0.7)*0.16;
+  const back = e.hurt*0.12 - lunge;   // knocked back by your blow (as far as it was hard), lunging in and following through when it strikes
+  e.holder.position.set(pos.x - Math.sin(e.face)*back, e.lift ? e.lift + Math.sin(t*2.2)*0.03 : 0, pos.y - Math.cos(e.face)*back); e.holder.rotation.y = e.face;
+  // (it struck at you, hit or miss, so the swing started just before the blow lands - RS-172; see above)
   e.pHp = G.player.hp;
-  if (e.atk>0){ e.atk += FP.dt*2.4; if (e.atk>=1) e.atk = 0; }
-  if (flash > 0.5 && e.hurt < 0.2) e.hurt = 1; e.hurt = Math.max(0, e.hurt - FP.dt*3);
-  const a = e.atk, wind = a>0 ? (a<0.4 ? a/0.4 : Math.max(0, 1-(a-0.4)/0.25)) : 0, strike = a>0.4 && a<0.8 ? Math.sin((a-0.4)/0.4*Math.PI) : 0;
+  const wind = C.wind, strike = C.strike;
   const breath = Math.sin(t*2.2), walk = t*9, sw = Math.sin(walk)*moving;
   for (const mt of e.mats){ mt.emissive.setScalar(flash*0.55); if (m.enraged) mt.emissive.r = Math.max(mt.emissive.r, 0.25 + 0.15*Math.sin(t*6)); }
   // a summoned creature claws its way up out of the floor
@@ -31247,10 +31328,13 @@ function m3dEaseMv(e, want, dt){ if (!e) return want; const c = e.mvS||0; e.mvS 
 function m3dPoseBeast(r, t, moving, wind, strike, hurt, e){
   const breath = Math.sin(t*2.2), walk = m3dStride(e, t, moving);
   {
-    r.body.rotation.x = -hurt*0.25 + strike*0.15 - wind*0.12;
+    const fol = (e && e.fol) || 0, stag = Math.max(0, hurt - 0.55);
+    r.body.rotation.x = -hurt*0.25 + strike*0.15 - wind*0.12 + fol*0.1;
+    if (r.body.userData.y0===undefined) r.body.userData.y0 = r.body.position.y;
+    r.body.position.y = r.body.userData.y0 - stag*0.04 - fol*0.015;   /* (RS-173: it sinks into its follow-through, and a hard hit staggers it) */
     r.body.rotation.z = Math.sin(walk*0.5)*0.03*moving;
     r.legs.forEach((L,i)=>{ const ph = (L.fx*L.fz > 0 ? 0 : Math.PI); L.hip.rotation.x = Math.sin(walk+ph)*0.55*moving + (L.fz>0 ? -strike*0.6 : 0); L.knee.rotation.x = Math.max(0, -Math.sin(walk+ph+0.9))*0.7*moving + (L.fz>0 ? strike*0.5 : 0); });
-    r.neck.rotation.x = breath*0.04 - strike*0.35 + wind*0.25; r.head.rotation.x = strike*0.3;
+    r.neck.rotation.x = breath*0.04 - strike*0.35 + wind*0.25 - fol*0.2 + hurt*0.2; r.head.rotation.x = strike*0.3 + fol*0.15;
     r.tail.rotation.y = Math.sin(t*3)*0.4; r.tail.rotation.x = Math.sin(t*1.7)*0.1;
     if (r.wings) r.wings.forEach(W=>{ W.w.rotation.z = W.s*(0.4 + Math.sin(t*3)*0.25 + strike*0.5); });
     if (r.tents) r.tents.forEach(W=>{ W.g.rotation.x = Math.sin(t*2 + W.s)*0.4 - strike*0.8; W.g.rotation.z = W.s*Math.sin(t*1.3)*0.3; });
@@ -31281,6 +31365,11 @@ function m3dPoseHumanoid(r, t, moving, wind, strike, hurt, e){
   if (r.cape) r.cape.rotation.x = 0.1 + moving*0.3 + Math.sin(t*1.5)*0.04;
   if (r.swing && (wind || strike)) m3dPoseSwing(r, wind, strike);
   if (r.wk==='bow' && (wind || strike)) m3dPoseBow(r, wind, strike);
+  /* (RS-173) the follow-through: the blow carries on past the strike - arm down and across, shoulders round, weight sinking
+     onto bent knees - then eases back to guard; a hard hit taken staggers it, knees buckling and the body twisting away */
+  { const fol = (e && e.fol) || 0, stag = Math.max(0, hurt - 0.55);
+    if (fol && r.wk!=='bow'){ R.sh.rotation.x += fol*0.4; R.el.rotation.x += fol*0.25; r.torso.rotation.y -= fol*0.32; r.torso.rotation.x += fol*0.12; r.hips.position.y -= fol*0.014; r.legs.forEach(L=>{ L.knee.rotation.x += fol*0.22; L.hip.rotation.x -= fol*0.1; }); }
+    if (stag){ r.hips.position.y -= stag*0.03; r.legs.forEach(L=>{ L.knee.rotation.x += stag*0.55; L.hip.rotation.x -= stag*0.25; }); r.torso.rotation.z = (r.torso.rotation.z||0) + stag*0.25*((e && e.hitSide)||1); R.sh.rotation.z -= stag*0.35; Lf.sh.rotation.z += stag*0.35; } }
   if (r.swirl) r.swirl.children.forEach((sp, i)=>{ const a = t*3.2 + i*2.094; sp.position.set(Math.cos(a)*0.055, Math.sin(a*1.3)*0.03, Math.sin(a)*0.055); });
   if (r.glint && r.weapon){
     if (!r._gm){ r._gm = []; r.weapon.traverse(x=>{ if (x.isMesh && x.material && x.material.emissive && r._gm.indexOf(x.material)<0){ x.material.emissive.set(r.glint); r._gm.push(x.material); } }); }
@@ -32167,10 +32256,11 @@ function isoSyncPlayer(){
   const moving = e.pos.mv;
   const fd = p.faceDiag && p.faceDiag.f===p.facing ? p.faceDiag.v : null, v = fd || FACING_VECT[(p.facing|0)&3], fa = Math.atan2(v[0], v[1]);
   let da = fa - (e.face===undefined ? fa : e.face); da = Math.atan2(Math.sin(da), Math.cos(da)); e.face = (e.face===undefined ? fa : e.face) + da*Math.min(1, FP.dt*12);
-  const a = FP.swing>0 ? 1-FP.swing : 0, wind = a>0 ? (a<0.4 ? a/0.4 : Math.max(0, 1-(a-0.4)/0.25)) : 0, strike = a>0.4 && a<0.8 ? Math.sin((a-0.4)/0.4*Math.PI) : 0;
-  const lunge = strike*0.2 - FP.hurt*0.06;   // step into the blow; rock back when you're hit
+  const C = m3dAtkCurve(FP.swing>0 ? 1-FP.swing : 0), wind = C.wind, strike = C.strike; e.fol = C.fol;
+  const hurt = m3dHitReact(e, p.hp, effMaxHp(), FP.dt);   /* (RS-173: as hard as the blow) */
+  const lunge = Math.max(strike, C.fol*0.6)*0.2 - hurt*0.1;   // step into the blow and follow it through; rock back when you're hit
   e.holder.position.set(e.pos.x + Math.sin(e.face)*lunge, 0, e.pos.y + Math.cos(e.face)*lunge); e.holder.rotation.y = e.face;
-  m3dPoseHumanoid(e.rig, FP.t + e.seed, moving, wind + FP.cast*0.4, strike, FP.hurt*0.6, e);
+  m3dPoseHumanoid(e.rig, FP.t + e.seed, moving, wind + FP.cast*0.4, strike, hurt*0.8, e);
   rsPlayerFx(e, FP.t + e.seed, moving, true);
   const gw = G.gather && G.gather.mode===1 && G.gather.o.k==='mining' && G.gather.o.vein ? G.gather.o : null;
   if (gw){
@@ -32942,7 +33032,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-172';
+const GAME_VERSION = 'rs-173';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

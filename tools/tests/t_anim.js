@@ -32,12 +32,23 @@ module.exports = async page=>{
       p.hp = p.maxHp = 9999; p.ac = 999; const idx = G.mon.indexOf(m); m.x = p.x + 1; m.y = p.y;
       FP.t += 0.5; monsterStrikesPlayer(idx, 'lunges', 'lunges at'); m3dPose(me, { x:m.x + 0.5, y:m.y + 0.5, mv:0 }, m, 0, 0);
       out.swing = +me.atk.toFixed(2); FP.dt = keepDt; FPD.scene.remove(me.holder); }
+    // RS-173: a blow in three beats - a quick release, then a follow-through that eases back
+    { const c = x=>m3dAtkCurve(x); out.curve = { windGone:c(0.5).wind, peak:+c(0.52).strike.toFixed(2), late:+c(0.75).strike.toFixed(2), fol:+Math.max(...[0.55,0.6,0.65,0.7,0.75].map(x=>c(x).fol)).toFixed(2), done:c(0.99).strike + c(0.99).fol < 0.05 }; }
+    // and the follow-through shows on the figure
+    { const f = m3dInstance({}, rsPlayerLook()); f.fol = 0; m3dPoseHumanoid(f.rig, 1, 0, 0, 0.5, 0, f); const a0 = f.rig.arms[0].sh.rotation.x, t0 = f.rig.torso.rotation.y;
+      f.fol = 1; m3dPoseHumanoid(f.rig, 1, 0, 0, 0.5, 0, f); out.folPose = { arm:+(f.rig.arms[0].sh.rotation.x - a0).toFixed(2), torso:+(f.rig.torso.rotation.y - t0).toFixed(2) }; }
+    // hit reactions: as big as the blow, rocking back and settling
+    { const react = fr=>{ const h = {}; m3dHitReact(h, 100, 100, 0.016); m3dHitReact(h, 100 - fr*100, 100, 0.016); let peak = 0, low = 0, end = 0; for (let i=0;i<100;i++){ const v = m3dHitReact(h, 100 - fr*100, 100, 0.016); peak = Math.max(peak, v); low = Math.min(low, v); end = v; } return { peak:+peak.toFixed(2), low:+low.toFixed(2), end }; };
+      out.hit = { light:react(0.03), heavy:react(0.3) }; }
     return out; });
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
   A(Math.abs(r.stride.slow - r.stride.want) < 0.05*r.stride.want && Math.abs(r.stride.fast - r.stride.want) < 0.05*r.stride.want, 'the legs cycle with the ground covered, at any speed');
   A(r.treadmill > 0.1, 'a figure walking on the spot still steps');
   A(r.ease.first > 0.05 && r.ease.first < 0.4 && r.ease.second > r.ease.first && r.ease.top===1 && r.ease.stop1 > 0.7, 'the stride swells as it sets off and settles as it stops');
+  A(r.curve.windGone===0 && r.curve.peak > 0.95 && r.curve.late > 0.3 && r.curve.fol > 0.5 && r.curve.done, 'a swing winds up, releases fast, follows through and eases back');
+  A(r.folPose.arm > 0.2 && r.folPose.torso < -0.2, 'the follow-through carries the arm on and turns the shoulders');
+  A(r.hit.heavy.peak > r.hit.light.peak*1.5 && r.hit.heavy.low < 0 && r.hit.heavy.end===0 && r.hit.light.peak > 0.3, 'a hit rocks it back as hard as the blow, rebounds and settles');
   if (r.faceWalk!==undefined){
     const ang = (a, b)=>Math.abs(Math.atan2(Math.sin(a-b), Math.cos(a-b)));
     A(ang(r.faceWalk, r.wantWalk) < 0.15, 'a creature walking off looks where it goes');

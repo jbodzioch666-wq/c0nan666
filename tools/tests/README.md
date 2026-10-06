@@ -45,29 +45,5 @@ Screenshots go to `tools/tests/shots/`.
 | models | renamed creatures (the highwayman, a mythic beast) keep their 3D model; a mythic beast stands at its lair on the map |
 | rush | a melee monster rushes you from well off and finds its way round walls, and a dashing one stops beside you |
 | dwalk | walking a dungeon: even diagonal strides, the camera leads ahead, pillars dissolve in the cutaway, and on a phone you stand mid-view |
-| anim | strides follow the ground covered at any speed, ease in and out, creatures look where they walk, and a monster swings on a miss too |
-| lootstyle | drops lean to how you fight: staves and robes for a mage, bows and hide for an archer |
-| diag | diagonal steps: keys, numpad, corners, click paths, no diagonal strikes |
-| touch | on an emulated phone: tap to walk, long-press menu, pinch zoom, map drag, the d-pad, the hotbar |
-| bal | balance: monsters bite harder, the fixed-strength lair boss, coin trim, the smith's reinforcing |
-| gen | world generation: broad mountain ranges with nothing in them but lairs, an open start, nothing out of reach, old saves keep their world |
-| grave | the gravestone card: dismiss it, it stays dismissed after a reload, F6 shows it again |
-| clock | real-time day and night: 20 minutes of day, 10 of night, steps don't move it, it pauses on menus |
-| tasks | town NPCs: the slayer master, TzHaar and their tasks |
-| soak | ten dungeon floors of fighting at high level |
-| pace | fights keep a visible beat, a bow or spell stops in range, the bestiary box shows every creature |
-| fpdres | the dungeon view's resolution steps between a few fixed sizes instead of resizing every half second |
-| map | world map, zoom, map tools, 3D landmarks |
-| wev | world events and festivals |
-| wg | world generation |
-| sail | sailing and islands |
-| big | house and Construction, Archaeology, Necromancy |
-| town | town tiers, temple, guilds, arena, games, gambling, townsfolk, upgrades, harbour |
-| folk | townsfolk step out of your way without stopping you to chat, and walk in real time |
-| eco | shop prices, bank, waypoint fees, property |
-| gfx | post-processing, colour grades, seasons, 3D land, towns and dungeons |
-| shore | 3D shorelines: land stays above the waves, water tiles stay under water |
-| quest | journal, story quests, diaries, clue trails |
-| audio | music tracks, the sequencer, stingers |
-
-The worlds are random, so `wg` can fail now and then. Run it again before you start digging.
+| anim | strides follow the ground covered at any speed, ease in and out, creatures look where they walk, and a monster swings on a miss too, swings follow through, and hits rock a figure back as hard as they land |
+| beasts | the world's giant and the mythic beasts are 3D creatures on the map that walk tile to tile; mythic beasts roam round their lairs and keep their spot in the save |

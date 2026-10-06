@@ -12,7 +12,7 @@ module.exports = async page=>{
       G.gameMode = 0; G.mon = []; G.owPos = { x:b.x + 2, y:b.y }; G.player.turnCount = (G.player.turnCount||0) + MYTHIC_RESPAWN + 1; mythicTick();
       const nb = (G.ow.mythicBeasts||[]).find(o=>o.i>=1000 && !o.slain); out.newBeast = nb ? { far:Math.hypot(nb.x-G.owPos.x, nb.y-G.owPos.y) >= 20, saved:(G.ow.mythicNew||[]).some(o=>o.i===nb.i) } : null;
       const at = nb || b; G.owPos = { x:at.x + 2, y:at.y }; setUi('playing');   /* (the slain one's lair is empty now: look at the one that rose; headless frames don't always come, so draw the land directly) */ for (let i=0;i<8;i++){ renderGame(); try{ o3Render(); }catch(err){} await new Promise(r=>setTimeout(r, 60)); }
-      let meshes = 0, sprites = 0; if (O3.encGrp) O3.encGrp.traverse(o=>{ if (o.isMesh && !o.geometry.type.startsWith('Ring')) meshes++; if (o.isSprite) sprites++; });
+      let meshes = 0, sprites = 0; /* (RS-173: the beasts roam as their own figures in O3.beastGrp) */ if (O3.beastGrp) O3.beastGrp.traverse(o=>{ if (o.isMesh && !o.geometry.type.startsWith('Ring')) meshes++; }); if (O3.encGrp) O3.encGrp.traverse(o=>{ if (o.isMesh && !o.geometry.type.startsWith('Ring')) meshes++; if (o.isSprite) sprites++; });
       out.map = { o3:o3Active(), meshes, sprites }; }
     // RS-169: the bestiary's skeleton is the sculpted dungeon skeleton
     G.gameMode = 0; (G.player.codexSeen = G.player.codexSeen || []).push('skeleton'); G.bestSel = 'skeleton'; setUi('bestiary'); for (let i=0;i<100 && !(BV.e && BV.e.sk); i++) await new Promise(r=>setTimeout(r, 150)); out.skState = { ok:SK3.ok, building:SK3.building, wait:BV.skWait }; out.bestiary = { sk:!!(BV.e && BV.e.sk), key:BV.key }; setUi('playing');

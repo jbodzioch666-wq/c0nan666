@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-173 - Follow-through, hit reactions and roaming beasts
+
+- **Swings follow through.** A blow now has three beats: the wind-up, a fast release, and a follow-through that carries the arm on past the strike. The shoulders turn and the weight sinks onto bent knees, then the figure eases back to guard. This goes for you, monsters, beasts and skeletons.
+- **Hits land with weight.** A creature (or you) rocks back as hard as the blow was, then rebounds and settles. Light hits make a quick flinch; heavy ones stagger, with knees buckling and the body twisting away.
+- **World bosses in 3D.** The wandering giants are now their own 3D creatures on the overworld instead of a flat icon. They walk from tile to tile as they roam, and keep their warning ring and pillar of light.
+- **Mythic beasts roam.** Like the giants, mythic beasts now wander the country around their lair, never straying far and never onto water, towns or sites. They walk as 3D creatures too, and where they've wandered to is kept in your save.
+
 ## RS-172 - Smoother animation
 
 - **Feet plant instead of skating.** Walking legs used to tick along on a timer, however fast the figure was moving, so feet slid across the ground. Now every stride matches the distance covered: you, monsters, townsfolk, travellers and your escort.
