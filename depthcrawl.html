@@ -7038,7 +7038,9 @@ function tryMove(dx,dy){
       }
       break;
     }
-    case T_FLEE: leavingFloor=true; G.gameMode=0; logMsg('you break off the fight and retreat', 'new'); break;
+    case T_FLEE: leavingFloor=true;
+      if (G.wevFight && G.sqReturn){ G.wevFight = null; logMsg(G.cellar ? 'you climb back up out of the cellar' : 'you break off the fight and head back', 'new'); sqReturnIndoors(); break; }
+      G.cellar = false; G.gameMode=0; logMsg('you break off the fight and retreat', 'new'); break;
     case T_TRAP: {
       try{ audEnv('trap'); }catch(e){}
       const rope = skHave('rope') > 0 && G.gameMode===1 && G.depth<G.dungeonMaxDepth;
@@ -8357,7 +8359,7 @@ function generateArena(){
   // fled/abandoned set-piece can never bleed its bonus reward into some
   // later, unrelated encounter - terrainSetPieceEncounter re-sets it right
   // after calling this, once it knows THIS particular arena is the set piece
-  G.encounterSetPiece = false; G.encounterSetPieceTerrain = null; G.questCampId = null; G.wevFight = null;
+  G.encounterSetPiece = false; G.encounterSetPieceTerrain = null; G.questCampId = null; G.wevFight = null; G.cellar = false;
   G.activeZones = []; // a Spirit Guardians/Hunger of Hadar zone from a previous fight has no business in a fresh one
   // the terrain you're standing on (see tryMoveOverworld) picks both the
   // Monster Manual roster and the visual theme below - G.owPos is already
@@ -21139,6 +21141,7 @@ function rainMix(){
   if (G.interior) L.roof = storm ? 0.75 : 0.5;
   else if (G.gameMode===1){ if (ASCEND_SITES[G.siteKind]) L.roof = storm ? 0.6 : 0.4; else if ((G.depth||1)===1) L.cave = storm ? 0.9 : 0.6; }
   else if (G.gameMode===2 && G.arenaTheme==='sea') return L;
+  else if (G.cellar){ L.cave = 0.5; return L; }
   else if (storm){ L.storm = 0.65; if (leafy) L.leaves = 0.4; }
   else if (leafy){ L.leaves = 0.7; L.steady = 0.25*ease; L.drizzle = 0.4*(1 - ease); }
   else { L.steady = 0.6*ease; L.drizzle = 0.8*(1 - ease); }
@@ -21169,7 +21172,7 @@ function audNearWater(){ if (G.gameMode!==0 || !G.ow) return false; for (let i=-
 function audAmbTick(dt){
   const ctx = AUD.ctx; if (!ctx || ctx.state!=='running') return;
   for (const [n, ft, f, q, lh, la] of [['wind','lowpass',380,0.6,0.13,0.5], ['waves','lowpass',600,0.7,0.16,0.85], ['crowd','bandpass',420,1.1,0.4,0.4], ['insects','bandpass',4600,9,11,0.7], ['rumble','lowpass',85,0.7,0.07,0.6]]) audLayer(n, ft, f, q, lh, la);
-  const night = isNightTime(), out = G.gameMode===0 || (G.gameMode===3 && !G.interior) || (G.gameMode===2 && G.arenaTheme!=='sea'), wet = G.weather==='rain' || G.weather==='storm', storm = G.weather==='storm';
+  const night = isNightTime(), out = G.gameMode===0 || (G.gameMode===3 && !G.interior) || (G.gameMode===2 && G.arenaTheme!=='sea' && !G.cellar), wet = G.weather==='rain' || G.weather==='storm', storm = G.weather==='storm';
   const t = G.gameMode===0 && G.ow && G.ow.map[G.owPos.x] ? G.ow.map[G.owPos.x][G.owPos.y] : null;
   const windy = t===OW_TUNDRA || t===OW_MOUNTAIN || t===OW_MOUNTAINPASS || t===OW_DESERT;
   audLayerTo('wind', !out ? 0 : storm ? 0.32 : windy ? 0.16 : 0.05);
@@ -21201,7 +21204,7 @@ function audSurface(){
     return { [OW_DESERT]:'sand', [OW_TUNDRA]:'snow', [OW_SWAMP]:'mud', [OW_RIVER]:'water', [OW_WATER]:'snow', [OW_MOUNTAIN]:'stone', [OW_MOUNTAINPASS]:'stone', [OW_TOWN]:'stone' }[t] || 'grass'; }
   if (G.gameMode===3){ if (G.interior) return G.interior.key==='cellar' || G.interior.key==='temple' ? 'stone' : 'wood'; const d = G.villageDeco[G.player.x] && G.villageDeco[G.player.x][G.player.y];
     return d==='path' || d==='npc' ? 'stone' : d==='pier' ? 'wood' : d==='sand' ? 'sand' : G.villageTheme==='tundra' ? 'snow' : G.villageTheme==='desert' ? 'sand' : 'grass'; }
-  if (G.gameMode===2) return G.arenaTheme==='sea' ? 'wood' : 'grass';
+  if (G.gameMode===2) return G.cellar ? 'stone' : G.arenaTheme==='sea' ? 'wood' : 'grass';
   return 'stone';
 }
 function audPlate(){ const c = G.gear && G.gear.chest; return !!(c && c.used && /plate|chain|mail|metal|full|bronze|iron|steel|mithril|adamant|rune|dragon/i.test((c.nm||'') + ' ' + (c.basis||'') + ' ' + (c.baseMat||'')) && !/robe|hide|leather|cloth/i.test((c.nm||'') + ' ' + (c.basis||''))); }
@@ -22053,13 +22056,38 @@ const SQ_BOSSES = {
 function sqFight(id){
   const st = sqStep(id); if (!st) return;
   if (st.k==='boss') return sqBossFight(id, st.boss);
+  // (RS-164) a fight a townsperson sends you to brings you back in front of their counter afterwards
+  const giver = SQ[id].giver, inTown = G.gameMode===3;
+  G.sqReturn = inTown && typeof ROOM_LAYOUT!=='undefined' && ROOM_LAYOUT[giver] && buildingByKey(giver) ? { b:giver } : inTown && G.interior && ROOM_LAYOUT[G.interior.key] ? { b:G.interior.key } : null;
   if (G.interior){ G.interior = null; G.townState = null; }
+  const cellar = st.foe==='rats';
   wevFightStart('sqfight', id, L=>{
+    if (cellar) sqMakeCellar();
     const lv = clampMLevel(L + (st.lvl||0));
     for (let i=0;i<st.n;i++){ const e = st.foe==='rats' ? Object.assign({}, MONSTER_LEVELS[Math.max(0, lv-1)], { nm:'giant rat', sym:'r', rgb:[110,90,74], abilities:[], art:MONSTER_LEVELS[0].art }) : st.foe==='human' ? wevHumanEntry(lv) : wevCampEntry(st.foe, lv); const m = wevMon(e, lv); if (st.foe==='rats'){ m.nm = 'giant rat'; } }
     if (st.elite) upgradeToElite(G.mon[0]);
+    if (cellar) G.mon.forEach((m, i)=>{ m.x = 3 + (i*2)%6; m.y = 2 + (i%2); });
   });
+  if (cellar) logMsg('you go down the steps into the cellar - the smell of damp and something worse - and the rats come squealing out of the dark', 'new');
   if (st.say) logMsg(st.say, 'new');
+}
+// a small stone cellar under the inn: barrels and crates against the walls, a couple of torches, the steps up behind you
+function sqMakeCellar(){
+  // (just the room and its walls: an arena shows every tile, so a bigger grid would read as open floor beyond the walls)
+  setGrid(12, 11); G.map = makeGrid(T_WALL); G.floorItem = makeItemGrid(); G.arenaDeco = makeGrid('', COLS, ROWS);
+  for (let x=2;x<=9;x++) for (let y=2;y<=8;y++) G.map[x][y] = T_FLOOR;
+  G.dungeonDeco = makeGrid('', COLS, ROWS);
+  for (const [x,y] of [[1,4],[10,6],[4,1],[8,1]]) G.dungeonDeco[x][y] = 'torch';
+  for (const [x,y,d] of [[2,2,'barrel'],[3,2,'barrel'],[9,2,'crate'],[2,7,'crate'],[2,8,'barrel'],[9,8,'crate'],[9,7,'barrel'],[2,5,'cobweb'],[9,4,'rubble']]) G.dungeonDeco[x][y] = d;
+  G.map[6][9] = T_FLEE; G.player.x = 6; G.player.y = 8;
+  G.cellar = true; G.arenaTheme = 'cellar';
+}
+// back up the steps (or out of any town fight), standing in front of the counter of whoever sent you
+function sqReturnIndoors(){
+  const r = G.sqReturn; G.sqReturn = null; G.cellar = false;
+  enterVillage(); setUi('playing');
+  if (r && r.b && G.gameMode===3){ enterInterior(r.b); if (G.interior){ G.player.x = 10; G.player.y = 7; G.player.facing = 0; } }
+  renderGame();
 }
 function sqBossFight(id, key){
   const B = SQ_BOSSES[key]; if (!B) return;
@@ -22093,7 +22121,8 @@ function sqFightWon(f){
   sqLog(id, st.k==='boss' ? `Defeated ${SQ_BOSSES[st.boss].nm}.` : `${st.obj || 'Won the fight'}.`);
   const wasRats = st.foe==='rats';
   sqAdvance(id);
-  if (wasRats){ enterVillage(); return true; }
+  if (G.sqReturn){ sqReturnIndoors(); return true; }
+  if (wasRats){ G.cellar = false; enterVillage(); return true; }
   const nx = sqStep(id); if (nx && nx.k==='choice') sqChoice(id);
   return false;
 }
@@ -22624,6 +22653,7 @@ function renderImmersiveHud(){
   const villageFlavor = G.gameMode===3 ? townFlavorAt(G.owPos.x, G.owPos.y) : null;
   const siteWord = SITE_WORD[G.siteKind] || 'dungeon';
   const loc = G.gameMode===1 ? `${siteWord} &middot; ${ASCEND_SITES[G.siteKind] ? 'floor' : 'depth'} ${G.depth}/${G.dungeonMaxDepth}${G.isBossFloor?' &middot; lair':''}${activeDm ? ' &middot; '+esc(DUNGEON_MODIFIERS.find(d=>d.id===G.dungeonModifier).name) : ''}`
+    : G.gameMode===2 && G.cellar ? 'the cellar'
     : G.gameMode===2 ? `roadside encounter${(typeof isNightTime==='function' && isNightTime()) ? ' &middot; night' : ''}${G.weather && G.weather!=='clear' ? ' &middot; '+esc(G.weather) : ''}`
     : villageFlavor ? esc(villageFlavor.name) : 'the wilds';
   const nPot = G.inv.filter(i=>i.consumable && i.kind==='heal').length;
@@ -23267,7 +23297,7 @@ const FP_THEME_SPECS = {
 // floor texture slots: 0 floor, 1 floor variant, 2-3 unused (stairs are real
 // geometry now), 4 revealed pit, 5 glowing rune, 6 water pool, 7 field edge
 function fpTheme(){
-  const key = G.gameMode===2 ? (FP_THEME_SPECS[G.arenaTheme] ? G.arenaTheme : 'forest')
+  const key = G.gameMode===2 ? (G.cellar ? 'dungeon' : FP_THEME_SPECS[G.arenaTheme] ? G.arenaTheme : 'forest')
     : (G.siteKind==='graveyard' && G.depth>1) ? 'catacomb'          // under the graveyard
     : (FP_THEME_SPECS[G.siteKind] ? G.siteKind : 'dungeon');
   if (FP.themes[key]) return FP.themes[key];
@@ -28777,7 +28807,7 @@ function o3Render(){
 const FP_TORCH_REACH = TORCH_LIGHT_RADIUS + 1.5;
 function fpPrepareLights(vis){
   const torches = [];
-  if (G.gameMode===1 && G.dungeonDeco){
+  if ((G.gameMode===1 || G.cellar) && G.dungeonDeco){
     for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
       if (G.dungeonDeco[x][y]!=='torch') continue;
       if ((G.dungeonSeen && G.dungeonSeen[x][y]) || vis.has(x+','+y)) torches.push({x,y});
@@ -28835,7 +28865,7 @@ function fpLightIdx(wx,wy){
 function fpEnv(){
   const race = raceRow();
   const R = DUNGEON_VISION_RADIUS + (race ? (race[6]||0) : 0) + lightBonus() - dgDarkPenalty() + 0.5;
-  if (G.gameMode!==2){
+  if (G.gameMode!==2 || G.cellar){
     const T = fpTheme();
     // an open-air site (the graveyard) is always a misty moonlit night
     if (T.outdoor) return { amb:[0.13,0.16,0.27], lan:[1.0,0.86,0.66], lanK:1.3, R, sky:T.sky, fog:[22,28,44],
@@ -29251,7 +29281,7 @@ function fpdBuild(T){
   const B = {};
   const bucket = (k)=> B[k] || (B[k] = { pos:[], nor:[], uv:[], col:[], idx:[] });
   // indoors the map's edge is solid rock; out of doors it's open ground running off to the horizon
-  const out = T.outdoor, yard = !!(T.yard && G.gameMode===1), field = G.gameMode===2;
+  const out = T.outdoor, yard = !!(T.yard && G.gameMode===1), field = G.gameMode===2 && !G.cellar;   /* (RS-164: the inn's cellar has real walls) */
   const solid = (x,y)=> (x<0 || y<0 || x>=COLS || y>=ROWS) ? !out : G.map[x][y]===T_WALL;
   // a grid of vertices over one face: origin O, edge vectors U and V, samples along each
   // (uvs scales the texture to the face's real size, for the small trims)
@@ -29368,7 +29398,7 @@ function fpdBuild(T){
     } else if (yard && (G.dungeonDeco[x][y]||'').startsWith('crypt')){
       face('cryptCeil', [x,0.97,y], [1,0,0], [0,0,1], [0,-1,0], S5, S5, (u,v)=>Math.min(1, aoF(x+u, y+v)+0.1));
     }
-    const dF = (G.gameMode===1 && G.dungeonDeco && G.dungeonDeco[x]) ? G.dungeonDeco[x][y] : '';   // (a roadside field has no decorations; any grid left over is a dungeon's)
+    const dF = ((G.gameMode===1 || G.cellar) && G.dungeonDeco && G.dungeonDeco[x]) ? G.dungeonDeco[x][y] : '';   // (a roadside field has no decorations; any grid left over is a dungeon's)
     if (dF==='bones' || dF==='candles' || (yard && dF==='crypt' && G.map[x][y]===T_FLOOR && (x+y)%2)){
       // against the nearest wall: a heap of bones and a skull, or a cluster of candles
       let wdx = 0, wdy = 1; for (const [ex,ey] of FACING_VECT) if (solid(x+ex,y+ey)){ wdx = ex; wdy = ey; break; }
@@ -31339,7 +31369,7 @@ function fpCollectSprites(vis){
         break;
       }
     }
-    if (t===T_FLOOR && G.gameMode===1 && G.dungeonDeco){
+    if (t===T_FLOOR && (G.gameMode===1 || G.cellar) && G.dungeonDeco){
       const deco = G.dungeonDeco[x][y], oe = deco && deco!=='rune' && deco!=='pool' && deco!=='torch' && !(deco==='grave' && FPD.ok) && !(deco==='ore' && FPD.ok && ISO.on) && obDecoEntry(deco, x, y);   // (headstones are modelled when the GPU renderer is up)
       if (isoM && DRESS_DECOS.includes(deco)) prop(deco==='banner2' ? { kind:'banner', necro:G.siteKind==='necro' } : { kind:'dress', d:deco, rot:(G.map[x-1] && G.map[x-1][y]===T_WALL) ? 0 : Math.PI/2 });
       else if (oe && isoM && ['throne','banner','altar','idol'].includes(deco)) prop({ kind:deco, necro:G.siteKind==='necro' });
@@ -32782,7 +32812,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-163';
+const GAME_VERSION = 'rs-164';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

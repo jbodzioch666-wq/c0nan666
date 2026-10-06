@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-164 - A real cellar
+
+- **Rats in the Cellar is in the cellar**: the innkeeper's rat job used to drop you in an open field. Now you go down into a small stone cellar, with barrels and crates against the walls, torches on the walls and the steps up behind you.
+- **Back in front of the counter**: when a townsperson sends you to fight, you come back afterwards standing in front of their counter, ready to report in. This happens whether you win or flee up the steps.
+- **The top bar says where you are**: it reads "the cellar" while you're down there.
+
 ## RS-163 - Torchlit shadows
 
 - **No more round blobs under monsters**: the painted circle under every creature is gone. Monsters now cast real shadows from the torches on the walls, and from the sun and moon out in the open.

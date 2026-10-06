@@ -10,7 +10,13 @@ module.exports = async page=>{
     const winFight = ()=>{ A(G.gameMode===2, 'a fight'); for (const m of G.mon){ m.alive = 0; m.hp = 0; } wevArenaWon(); };
     goHome();
     // 256: the innkeeper's rats
-    setUi('tavern'); A(G.ui==='wevent' && /Rats/.test(G.wevDlg.title), 'the innkeeper offers a job'); wevChoose(0); ok(); winFight();
+    setUi('tavern'); A(G.ui==='wevent' && /Rats/.test(G.wevDlg.title), 'the innkeeper offers a job'); wevChoose(0); ok();
+    /* RS-164: the rats are in a real cellar - a walled stone room with torches and barrels - and winning brings you back in front of the inn's counter */
+    out.cellar = { cellar:!!G.cellar, mode:G.gameMode, walls:G.map[0][0]===T_WALL && G.map.flat().includes(T_FLEE) && COLS <= 14, torches:G.dungeonDeco ? G.dungeonDeco.flat().filter(d=>d==='torch').length : 0, props:G.dungeonDeco ? G.dungeonDeco.flat().filter(d=>d==='barrel' || d==='crate').length : 0, inRoom:G.mon.every(m=>G.map[m.x][m.y]===T_FLOOR), theme:fpTheme().key };
+    A(out.cellar.cellar && out.cellar.walls && out.cellar.torches >= 2 && out.cellar.props >= 3 && out.cellar.inRoom && out.cellar.theme==='dungeon', 'the rats wait in a cellar: '+JSON.stringify(out.cellar));
+    winFight();
+    out.back = { interior:G.interior && G.interior.key, at:[G.player.x, G.player.y], counter:G.map[10][6]===T_COUNTER, cellar:!!G.cellar };
+    A(out.back.interior==='tavern' && out.back.at[0]===10 && out.back.at[1]===7 && out.back.counter && !out.back.cellar, 'back in front of the inn counter: '+JSON.stringify(out.back));
     A(sqStep('rats') && sqStep('rats').k==='talk', 'back to the innkeeper'); setUi('tavern'); ok(); A(sqDone('rats'), 'rats done'); out.qp = tkP().questPoints;
     // the smith's ore
     skP().skills.mining = SK_XP[20]; skAdd('iron', 12); setUi('blacksmith'); ok(); ok(); A(sqStep('ore').k==='bring', 'bring the ore'); { /* RS-156: with no ore in the pack the quest isn't "done" in the tracker; with it, it is */ const keep = skHave('iron'); skAdd('iron', -keep); trackQuest('sq:ore'); renderGame(); await frames(2);
