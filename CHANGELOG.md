@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-177 - Essence in the mines, a quest window that rolls up
+
+- **Rune essence in the mines.** Mines now have pale seams of rune essence on their floors, glowing faintly in the rock. Mine them at Mining 1 for rune essence and Mining xp, so you can stock up for Runecrafting underground. Each seam gives more than a herb patch before it's worked out.
+- **The quest window rolls up.** Its title bar now rolls the window up to just a bar reading "Quests (n)", instead of closing it. Tap it again to roll it back down. You can still drag the bar to move the window, and it stays rolled up after a reload.
+- **The quest window clears the minimap.** On a big screen, the minimap's turn buttons no longer hang over the quest window's title bar.
+
 ## RS-176 - XP over your head
 
 - **XP drops rise over your head.** The xp numbers from any skill, with their skill icons, now float up from above your character instead of off to the right of the screen. They follow you on the overworld, in towns and in dungeons. While you're gathering, they rise above the work bar. On screens without your 3D figure they keep to the right as before.
