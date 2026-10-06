@@ -53,4 +53,6 @@ Screenshots go to `tools/tests/shots/`.
 | essvein | mines have seams of rune essence: mined at Mining 1 for rune essence and xp, shown as rock split on pale crystal |
 | qroll | the quest window rolls up to its title bar and back down when tapped, stays put when dragged, and stays rolled after a reload |
 | lairtop | a dragon's lair sits on its mountain's summit, with the pass to it climbing as a path from the foot of the range |
-| peddlertools | the gathering tools are sold by the Peddler, not the blacksmith |
+| peddlertools | the gathering tools are sold by the Peddler, not the blacksmith; a staff's orbs hide while you hold a tool |
+| mythmap | a mythic beast is found when you come near it: a map icon (world map and minimap), a tooltip on the map and its 3D figure, and on touch a first tap shows the tooltip |
+| rich | rich spots (gold vein, ancient oak, legendary fishing spot) never turn up on a road, a site or a point of interest |

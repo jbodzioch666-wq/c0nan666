@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-179 - Mythic beasts on the map
+
+- **Found beasts go on your map.** The first time you come within sight of a mythic beast (about 12 leagues), you're told you've found it. From then on it has an icon on the world map, with its face in a violet ring and its name over it, and a violet dot on your minimap. Both follow it as it roams.
+- **Mythic beast tooltips.** Hover over a mythic beast's 3D figure, or its map icon, to see its name, what kind of creature it is, its combat level and how far away it is.
+- **Tap to inspect on phones.** On a touch screen, the first tap on a mythic beast, the giant or a camp shows what it is, and a second tap walks you there.
+- **No more gold veins on the road.** Rare spots (a sparkling gold vein, an ancient oak, a legendary fishing spot) could turn up on a road or on top of a site. They now always appear off the road and clear of sites, points of interest, camps and beasts.
+- **Staff orbs and tools.** The three orbs circling a staff now go away with the staff when you take out a pickaxe or another tool, and come back when you put it away.
+
 ## RS-178 - Lairs on the peaks, tools at the Peddler
 
 - **Dragon lairs sit on the mountaintops.** A lair in the mountains now crowns its peak, a little above every summit around it. The pass carved out to it climbs as a path from the foot of the range up to the lair's mouth, so you walk up the mountain to reach the dragon.

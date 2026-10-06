@@ -7115,7 +7115,7 @@ function serializeGame(){
     // produces a different map entirely, since every placement roll is a
     // function of OW_COLS/OW_ROWS too
     worldSizeTier: G.worldSizeTier||'medium', owCols: OW_COLS, owRows: OW_ROWS,
-    owMythicSlain: G.ow.mythicSlain||{}, owMythicNew: G.ow.mythicNew||[], owMythicNextAt: G.ow.mythicNextAt||0, owMythicPos: G.ow.mythicPos||{},
+    owMythicSlain: G.ow.mythicSlain||{}, owMythicNew: G.ow.mythicNew||[], owMythicNextAt: G.ow.mythicNextAt||0, owMythicPos: G.ow.mythicPos||{}, owMythicFound: G.ow.mythicFound||{},
     gameMode: (G.gameMode===2 || G.gameMode===3) ? 0 : G.gameMode,
     depth: G.depth, dungeonMaxDepth: G.dungeonMaxDepth,
     dungeonEntrance: {x:G.dungeonEntrance.x,y:G.dungeonEntrance.y}, dungeonSlot: G.dungeonSlot,
@@ -7236,7 +7236,7 @@ function loadGame(id){
   G.ow.overrides = data.owOverrides||{};
   G.ow.siteMoves = data.owSiteMoves||{};
   G.ow.townPositions = data.owTownPositions||{};
-  G.ow.mythicSlain = data.owMythicSlain||{}; G.ow.mythicNew = data.owMythicNew||[]; G.ow.mythicNextAt = data.owMythicNextAt||0; G.ow.mythicPos = data.owMythicPos||{};
+  G.ow.mythicSlain = data.owMythicSlain||{}; G.ow.mythicNew = data.owMythicNew||[]; G.ow.mythicNextAt = data.owMythicNextAt||0; G.ow.mythicPos = data.owMythicPos||{}; G.ow.mythicFound = data.owMythicFound||{};
   // restore the map's own size BEFORE regenerating from the saved seed - a
   // save made before world-size picking existed has no owCols/owRows, so
   // this falls back to the old fixed 160x160 default (matches what that
@@ -7373,7 +7373,7 @@ function setWorldSizeTier(tierId){
   G.ow.townPositions = {};
   G.ow.townFlavor = {};
   G.ow.siteMoves = {};
-  G.ow.mythicSlain = {}; G.ow.mythicNew = []; G.ow.mythicNextAt = 0; G.ow.mythicPos = {};
+  G.ow.mythicSlain = {}; G.ow.mythicNew = []; G.ow.mythicNextAt = 0; G.ow.mythicPos = {}; G.ow.mythicFound = {};
   rerollWorldPreview(); // a size change needs a fresh map anyway, same as a plain reroll
 }
 function startGame(name){
@@ -7395,7 +7395,7 @@ function startGame(name){
   G.ow.siteMoves = {};
   G.ow.townPositions = {};
   G.ow.townFlavor = {};
-  G.ow.mythicSlain = {}; G.ow.mythicNew = []; G.ow.mythicNextAt = 0; G.ow.mythicPos = {};
+  G.ow.mythicSlain = {}; G.ow.mythicNew = []; G.ow.mythicNextAt = 0; G.ow.mythicPos = {}; G.ow.mythicFound = {};
   G.ow.visitedTowns = [];
   G.weather = 'clear';
   // every new game starts at Medium (the old fixed default) regardless of
@@ -8702,10 +8702,23 @@ function mythicWander(turn){
     if (b.hx==null){ b.hx = b.x; b.hy = b.y; }
     if (chn(0.4)){ const d = [[1,0],[-1,0],[0,1],[0,-1]][rn(4)]; if (mythicCanStand(b, b.x+d[0], b.y+d[1])){ b.x += d[0]; b.y += d[1]; pos[b.i] = [b.x, b.y]; } } }
 }
+// (RS-179) the first time you come within sight of a mythic beast it's found: marked on your map from then on, wherever it roams
+const MYTHIC_SPOT = 12;
+function mythicFound(b){ return !!(b && G.ow && G.ow.mythicFound && G.ow.mythicFound[b.i]); }
+function mythicSpot(){
+  if (G.gameMode!==0 || !G.owPos) return;
+  const F = G.ow.mythicFound = G.ow.mythicFound || {};
+  for (const b of (G.ow.mythicBeasts||[])){ if (b.slain || F[b.i]) continue;
+    if (Math.hypot(b.x - G.owPos.x, b.y - G.owPos.y) > MYTHIC_SPOT) continue;
+    F[b.i] = 1; notify(`You've found ${b.name}, a ${mythicKind(b)} - it's marked on your map`, 'warn', 'notify');
+    logMsg(`you sight ${b.name}, a ${mythicKind(b)} - a mythic beast, combat level ${mythicLevel()}. It roams near its lair, and is now marked on your map`, 'new', true); }
+}
+// the combat level a mythic beast fights at (see mythicBeastEncounter)
+function mythicLevel(){ const lv = Math.max(16, Math.min(NMLVL, clampMLevel((G.player.level||1) + 4))); return monCombatLevel({ mlevel:lv }); }
 function mythicTick(){
   if (!G.player || !G.ow || !G.ow.map) return;
   const turn = G.player.turnCount||0, alive = (G.ow.mythicBeasts||[]).filter(b=>!b.slain).length;
-  try{ mythicWander(turn); }catch(e){ console.error(e); }
+  try{ mythicWander(turn); mythicSpot(); }catch(e){ console.error(e); }
   if (!G.ow.mythicNextAt && !alive) G.ow.mythicNextAt = turn + MYTHIC_RESPAWN;   // (an older save where they're all dead)
   if (!G.ow.mythicNextAt || turn < G.ow.mythicNextAt || G.gameMode!==0) return;
   const px = G.owPos.x, py = G.owPos.y;
@@ -9904,6 +9917,7 @@ function renderMiniMap(){
     for (let j=-9;j<=2*R+9;j++) for (let i=-9;i<=2*R+9;i++){ const x = x0+i, y = y0+j; if (x<0||y<0||x>=OW_COLS||y>=OW_ROWS || !owSeen(x,y)) continue;
       const t = G.ow.map[x][y]; if (OW_SITE_TILES.includes(t)) dot((i+0.5)*cs, (j+0.5)*cs, t===OW_TOWN ? cs*1.3 : cs*0.95, PM_SITE_BRIGHT[t]||'#fff', 'rgba(0,0,0,0.7)'); }
     for (const e of (G.ow.encounters||[])){ const i = e.x-x0, j = e.y-y0; if (i>=-9 && j>=-9 && i<=2*R+9 && j<=2*R+9 && owSeen(e.x,e.y)) dot((i+0.5)*cs, (j+0.5)*cs, cs*0.6, '#ff3a3a'); }
+    for (const b of (G.ow.mythicBeasts||[])){ if (b.slain || !mythicFound(b)) continue; const i = b.x-x0, j = b.y-y0; if (i>=-9 && j>=-9 && i<=2*R+9 && j<=2*R+9) dot((i+0.5)*cs, (j+0.5)*cs, cs*0.95, COL.mythic, '#000'); }   /* (RS-179) */
     for (const q of questsShown()){ const t = questTarget(q); if (!t) continue; const i = clamp(t.x-x0, 0, 2*R), j = clamp(t.y-y0, 0, 2*R); dot((i+0.5)*cs, (j+0.5)*cs, cs*0.8, t.turnIn ? '#5ab0ff' : '#ffd24a', '#000'); }
     for (const gv of gravesP()){ const i = clamp(gv.x-x0, 0, 2*R), j = clamp(gv.y-y0, 0, 2*R); dot((i+0.5)*cs, (j+0.5)*cs, cs*0.8, '#e8e8f0', '#000'); }
   } else {
@@ -11377,6 +11391,13 @@ const RICH_KINDS = [
 function richName(r){ return r.k==='mining' ? SK_ROCK[r.type].nm : r.k==='woodcutting' ? SK_TREE[r.type].nm : SK_SPOT[r.type].nm; }
 function richMax(r){ return r.k==='mining' ? SK_ROCK[r.type].n : r.k==='woodcutting' ? SK_TREE[r.type].n : SK_SPOT[r.type].n; }
 function richAt(x, y){ const L = G.ow && G.ow.rich, turn = (G.player && G.player.turnCount)||0; return L ? L.find(r=>r.x===x && r.y===y && r.left>0 && turn < r.until) : null; }
+// (RS-179) a rich spot never turns up on a road, a site, a point of interest, a mythic beast or a camp
+function richBlocked(x, y){
+  if ((typeof wgRoadAt==='function' && wgRoadAt(x, y)) || OW_SITE_TILES.includes(G.ow.map[x][y])) return true;
+  if ((typeof wgPoiAt==='function' && wgPoiAt(x, y)) || (G.ow.mythicBeasts||[]).some(b=>!b.slain && b.x===x && b.y===y)) return true;
+  if ((G.ow.encounters||[]).some(e=>e.x===x && e.y===y) || (G.ow.ev && (G.ow.ev.camps||[]).some(c=>c.x===x && c.y===y))) return true;
+  return false;
+}
 function richTick(){
   const p = G.player, ow = G.ow; if (!p || !ow || G.gameMode!==0 || G.gameOver) return;
   const turn = p.turnCount||0;
@@ -11389,6 +11410,7 @@ function richTick(){
     const a = Math.random()*Math.PI*2, d = 6 + Math.random()*18, x = Math.round(G.owPos.x + Math.cos(a)*d), y = Math.round(G.owPos.y + Math.sin(a)*d);
     if (x<1 || y<1 || x>=ow.map.length-1 || y>=ow.map[0].length-1) continue;
     const t = skOwTile(x, y); if (!kind.ok(x, y, t) || richAt(x, y)) continue;
+    if (richBlocked(x, y)) continue;
     const r = { x, y, type:kind.type, k:kind.k, until:turn + 260 + rn(160) }; r.left = richMax(r); ow.rich.push(r);
     const nm = richName(r), dx = x - G.owPos.x, dy = y - G.owPos.y;
     logMsg(`word reaches you of a ${nm.toLowerCase()} ${Math.round(Math.hypot(dx, dy))} leagues ${dirWord(dx, dy)} - it is marked on your map, and it won't last`, 'new');
@@ -17070,7 +17092,7 @@ function renderOverworldMapZoomed(){
     ctx.fillText(t.turnIn ? '?' : '!', qx, qy-R*1.55);
   }
   // the world's events: camps, the waking giant, sieges, fallen stars, festivals, markets and raids
-  if (mapF('events')){ const R = clamp(cellPx*1.2, 11*dpr, 22*dpr); for (const o of wevMapList()) if (inView(o.x, o.y, 3) || o.k==='boss') pmEventIcon(ctx, TX(o.x), TY(o.y), R, o, now); }
+  if (mapF('events')){ const R = clamp(cellPx*1.2, 11*dpr, 22*dpr); for (const o of wevMapList()) if (inView(o.x, o.y, 3) || o.k==='boss' || o.k==='myth') pmEventIcon(ctx, TX(o.x), TY(o.y), R, o, now); }
   for (const gv of gravesP()){   // your gravestones: grey headstones with a cross
     { const gx = (gv.x-zCamX)*cellPx + cellPx/2, gy = (gv.y-zCamY)*cellPx + cellPx/2, R = clamp(cellPx*1.0, 10*dpr, 17*dpr);
       ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(gx-R*0.6+2*dpr, gy-R*1.6+3*dpr, R*1.2, R*1.6);
@@ -18436,15 +18458,26 @@ function wevMapList(){
   const out = [], turn = wevTurn();
   for (const c of e.camps) if (owSeen(c.x, c.y)) out.push({ k:'camp', x:c.x, y:c.y, c });
   if (e.boss && e.boss.state==='awake') out.push({ k:'boss', x:e.boss.x, y:e.boss.y, left:e.boss.until-turn });
+  for (const b of (G.ow.mythicBeasts||[])) if (!b.slain && mythicFound(b)) out.push({ k:'myth', x:b.x, y:b.y, b });   /* (RS-179) */
   for (const d of e.dyn) out.push({ k:d.kind, x:d.x, y:d.y, left:d.until-turn, d });
   for (const key in e.town){ const t = e.town[key]; if (turn >= t.until || t.done) continue; const [x,y] = key.split(',').map(Number); out.push({ k:'town_'+t.kind, x, y, left:t.until-turn, t }); }
   const rt = G.player && G.player.roadTask; if (rt){ const [x,y] = rt.key.split(',').map(Number); out.push({ k:'child', x, y, left:rt.until-turn }); }
   return out;
 }
+// RS-179: a mythic beast's tooltip - on the 3D land and on the map
+function mythicTipHtml(b){
+  if (!b) return '';
+  const row = (a, v, col)=>`<div class="ttrow"><span class="muted">${a}</span><b style="color:${col||'var(--ink)'}">${v}</b></div>`;
+  const d = G.owPos ? Math.round(Math.hypot(b.x - G.owPos.x, b.y - G.owPos.y)) : 0;
+  return `<div style="font-weight:600;color:${COL.mythic}">${esc(b.name)}</div><div class="examine">A mythic beast - ${esc(cap(mythicKind(b)))}. It roams the country round its lair, and fights as a great creature of legend. Slay it for a hoard worth the trouble; another rises somewhere else a while after.</div><hr>`
+    + row('combat level', mythicLevel(), '#ff7a5a') + row('kind', esc(cap(mythicKind(b)))) + (d ? row('distance', d + ' leagues ' + dirWord(b.x - G.owPos.x, b.y - G.owPos.y)) : '')
+    + `<div class="muted" style="margin-top:4px;">walk into it to fight</div>`;
+}
 function wevTipHtml(o){
   const row = (a, b, col)=>`<div class="ttrow"><span class="muted">${a}</span><b style="color:${col||'var(--ink)'}">${b}</b></div>`;
   if (o.k==='camp'){ const c = o.c, ti = wevTerrAt(c.x, c.y);
     return `<div style="font-weight:600;color:#ff9a6a">${esc(cap(wevCampName(c)))}</div><div class="examine">${esc(cap(WEV_SIZE_WORD[c.size]))}. It grows if it's left alone, and a full war-camp marches on the nearest town.</div><hr>${row('size', c.size+' / 5')}${row('in', esc(wevTerrName(ti)))}${row('grows in', wevTime(c.grow - wevTurn()))}<div class="muted">walk into it to attack</div>`; }
+  if (o.k==='myth') return mythicTipHtml(o.b);
   if (o.k==='boss'){ const b = G.ow.ev.boss, m = wevBossEntry(b);
     return `<div style="font-weight:600;color:#ff5a3a">${esc(wevBossName(b))}</div><div class="examine">A world boss: a giant that sleeps for days, then wakes and roams. Its wounds last between fights.</div><hr>${row('combat level', monCombatLevel({mlevel:Math.max(m.lvl, 14)}), monLevelColor({mlevel:Math.max(m.lvl,14)}))}${row('life', b.hp && b.maxHp ? `${b.hp} / ${b.maxHp}` : 'unhurt')}${row('sleeps in', wevTime(o.left))}<div class="muted">walk into it to fight</div>`; }
   if (o.k==='siege') return `<div style="font-weight:600;color:#ff6a50">${esc(o3TownName(o.x, o.y))} is under siege</div><div class="examine">Walk into the town to break the siege, or it will be sacked.</div>${row('time left', wevTime(o.left), '#ffb060')}`;
@@ -18469,6 +18502,15 @@ function pmEventIcon(c, px, py, R, o, now){
     c.strokeStyle = '#3a2a1a'; c.lineWidth = Math.max(1, s*0.08); c.beginPath(); c.moveTo(px + s*0.9, py + s*0.4); c.lineTo(px + s*0.9, py - s*1.1); c.stroke();
     c.fillStyle = '#9a1a1a'; c.beginPath(); c.moveTo(px + s*0.9, py - s*1.1); c.lineTo(px + s*1.5, py - s*0.9); c.lineTo(px + s*0.9, py - s*0.7); c.closePath(); c.fill();
     for (let i=0;i<5;i++){ c.fillStyle = i < n ? '#ff5a3a' : 'rgba(26,20,14,0.5)'; c.beginPath(); c.arc(px + (i-2)*s*0.36, py + s*0.95, s*0.13, 0, Math.PI*2); c.fill(); }
+  } else if (o.k==='myth'){
+    // (RS-179) a found mythic beast: its face in a violet ring, its name over it
+    const b = o.b, pulse = 0.5 + Math.sin(now*2.4 + b.i)*0.5, BR = R*1.15;
+    c.strokeStyle = `rgba(230,60,255,${(0.35+pulse*0.45).toFixed(3)})`; c.lineWidth = 2.5*dpr; c.beginPath(); c.arc(px, py, BR*(1.2+pulse*0.2), 0, Math.PI*2); c.stroke();
+    c.fillStyle = 'rgba(24,6,30,0.92)'; c.beginPath(); c.arc(px, py, BR, 0, Math.PI*2); c.fill(); c.lineWidth = 2*dpr; c.strokeStyle = COL.mythic; c.stroke();
+    let art = MYTHIC_ART; try{ const pt = monsterPortraitFor(mythicKind(b)); if (pt && pt.art) art = pt.art; else { const ml = MONSTER_LEVELS.find(m=>m.nm===mythicKind(b)); if (ml && ml.art) art = ml.art; } }catch(e){}
+    drawMonsterArt(px, py + BR*0.1, BR*1.5, art, '#f0b0ff', c);
+    c.font = `700 italic ${Math.round(clamp(R*0.62, 11*dpr, 15*dpr))}px Cinzel, Georgia, serif`; c.textAlign = 'center'; c.textBaseline = 'bottom';
+    c.lineWidth = 3*dpr; c.strokeStyle = 'rgba(240,226,190,0.9)'; c.strokeText(b.name, px, py - BR*1.3); c.fillStyle = '#6a1a7a'; c.fillText(b.name, px, py - BR*1.3);
   } else if (o.k==='boss'){
     const b = G.ow.ev.boss, pulse = 0.5 + Math.sin(now*3)*0.5, BR = R*1.35;
     c.strokeStyle = `rgba(255,60,30,${(0.45+pulse*0.5).toFixed(3)})`; c.lineWidth = 3*dpr; c.beginPath(); c.arc(px, py, BR*(1.25+pulse*0.25), 0, Math.PI*2); c.stroke();
@@ -18608,10 +18650,13 @@ function o3SyncBeasts(dt){
     f.e.holder.position.set(f.x, y0, f.z); f.e.holder.rotation.y = f.yaw;
     f.ring.position.set(f.x, y0 + 0.04, f.z); f.ring.material.opacity = 0.5 + Math.sin(O3.t*3 + w.seed)*0.25;
     if (f.beam){ f.beam.position.set(f.x, y0 + 5, f.z); f.beam.material.opacity = 0.18 + Math.sin(O3.t*2)*0.06; }
+    if (w.key.startsWith('myth')){ if (!f.hb){ f.hb = new T.Mesh(new T.BoxGeometry(1.1, 1.8, 1.1), O3.nodeHitM || (O3.nodeHitM = new T.MeshBasicMaterial({ visible:false }))); f.hb.userData.act = { kind:'wev', what:'myth', x:w.x, y:w.y }; }
+      if (f.hb.parent!==O3.beastGrp) O3.beastGrp.add(f.hb); f.hb.position.set(f.x, y0 + 0.9, f.z); f.hb.userData.act.x = w.x; f.hb.userData.act.y = w.y; f.hb.userData.act.i = +w.key.slice(4); f.hb.updateMatrixWorld(); }
     const mv = m3dEaseMv(f.e, moving ? 1 : 0, dt), r = f.e.rig, t = O3.t + f.e.seed;
     try{ if (f.e.anim) f.e.anim(r, t, mv, 0, 0, 0, f.e); else if (f.e.beast) m3dPoseBeast(r, t, mv, 0, 0, 0, f.e); else m3dPoseHumanoid(r, t, mv, 0, 0, 0, f.e); }catch(err){}
   }
-  for (const [k, f] of F) if (!seen.has(k)){ for (const o of [f.e.holder, f.ring, f.beam]) if (o && o.parent) o.parent.remove(o); F.delete(k); }
+  for (const [k, f] of F) if (!seen.has(k)){ for (const o of [f.e.holder, f.ring, f.beam, f.hb]) if (o && o.parent) o.parent.remove(o); F.delete(k); }
+  O3.beastHits = [...F.values()].map(f=>f.hb).filter(Boolean);
 }
 function o3AnimEvents(){
   for (const a of O3.evAnim||[]){
@@ -18701,7 +18746,7 @@ function worldCodeParse(code){
 }
 // a fresh world from a given seed on the preview screen (nothing is committed yet)
 function wgRegenerate(seed){
-  G.ow.townPositions = {}; G.ow.townFlavor = {}; G.ow.siteMoves = {}; G.ow.mythicSlain = {}; G.ow.mythicNew = []; G.ow.mythicNextAt = 0; G.ow.mythicPos = {};
+  G.ow.townPositions = {}; G.ow.townFlavor = {}; G.ow.siteMoves = {}; G.ow.mythicSlain = {}; G.ow.mythicNew = []; G.ow.mythicNextAt = 0; G.ow.mythicPos = {}; G.ow.mythicFound = {};
   generateOverworld(seed >>> 0); applyOverworldOverrides(); renderOverlay();
 }
 function setContinentType(id){ if (!CONTINENT_TYPES.some(c=>c.id===id)) return; G.ow.continent = id; wgRegenerate(Math.floor(Math.random()*4294967295)); }
@@ -28844,7 +28889,7 @@ function o3Pick(e){
   const r = O3.cv.getBoundingClientRect(), T = THREE;
   const m = new T.Vector2(((e.clientX-r.left)/r.width)*2-1, -((e.clientY-r.top)/r.height)*2+1);
   O3.ray.setFromCamera(m, O3.cam);
-  const hits = O3.ray.intersectObjects(O3.hits.concat(O3.nodeHits||[], O3.lmHits||[], O3.evHits||[], O3.wgHits||[], O3.wildHits||[]), false);
+  const hits = O3.ray.intersectObjects(O3.hits.concat(O3.nodeHits||[], O3.lmHits||[], O3.evHits||[], O3.beastHits||[], O3.wgHits||[], O3.wildHits||[]), false);
   const lh = O3.land ? O3.ray.intersectObject(O3.land, false) : [];
   // a gathering spot's box stands tall over its tile, so a click far off can clip one on its way to the
   // ground behind it: a spot only counts when the ground you clicked is its own tile (or right beside it)
@@ -28864,7 +28909,7 @@ function o3Input(cv){
     // a site in the 3D land gets the same details as on the world map (a town just its name)
     const siteTip = a && a.kind==='site' && G.ui==='playing' ? (owSiteKind(G.ow.map[a.x][a.y]) ? owSiteTipHtml(a.x, a.y) : G.ow.map[a.x][a.y]===OW_TOWN ? `<div style="font-weight:600">${esc(o3TownName(a.x,a.y))}</div><div class="muted">a town - click to walk there</div>` : '') : '';
     const lmo = a && a.kind==='landmark' && G.ui==='playing' ? owLandmark(a.id) : null;
-    const wo = a && a.kind==='wev' && G.ui==='playing' ? wevMapList().find(o=>o.k===a.what && o.x===a.x && o.y===a.y) : null;
+    const wo = a && a.kind==='wev' && G.ui==='playing' ? (a.what==='myth' ? (()=>{ const b = (G.ow.mythicBeasts||[]).find(o=>o.i===a.i && !o.slain); return b ? { k:'myth', x:b.x, y:b.y, b } : null; })() : wevMapList().find(o=>o.k===a.what && o.x===a.x && o.y===a.y)) : null;
     const po = a && a.kind==='poi' && G.ui==='playing' ? (G.ow.pois||[]).find(p=>p.id===a.id) : null, wl = a && a.kind==='wild' && G.ui==='playing' ? a.w : null;
     const lmTip = lmo ? lmTipHtml(lmo) : wo ? wevTipHtml(wo) : po ? wgPoiTip(po) : wl && wl.alive ? `<div style="font-weight:600">${cap(WG_WILD[wl.k].nm)}</div><div class="muted">${wl.k==='bird' ? 'they take off if you come close' : wl.k==='boar' ? 'click to hunt - it will fight back' : 'click to hunt (a bow lets you shoot from further away)'}</div>` : '';
     if (n && G.ui==='playing'){ ttNodeShow(e, n); O3.nodeTip = true; }
@@ -28877,6 +28922,11 @@ function o3Input(cv){
     if (a && a.kind==='node' && o3GoGather(a.x, a.y)) return;
     if (a && a.kind==='landmark'){ o3WalkToLandmark(a); return; }
     if (a && a.kind==='wild'){ wgHunt(a); return; }
+    /* (RS-179) on a touch screen, the first tap on a mythic beast, the giant or a camp shows what it is; a second tap walks you there */
+    if (a && a.kind==='wev' && e.pointerType==='touch'){ const key = a.what + ':' + (a.i!==undefined ? a.i : a.x + ',' + a.y);
+      if (O3.tapTip!==key){ const b = a.what==='myth' ? (G.ow.mythicBeasts||[]).find(o=>o.i===a.i && !o.slain) : null, wo = b ? { k:'myth', x:b.x, y:b.y, b } : wevMapList().find(o=>o.k===a.what && o.x===a.x && o.y===a.y);
+        if (wo){ O3.tapTip = key; tapTip(e, wevTipHtml(wo) + '<div class="muted" style="margin-top:3px;">tap again to walk there</div>'); return; } }
+      O3.tapTip = null; hideItemTooltip(); }
     if (a) o3WalkTo(a); });
   cv.addEventListener('wheel', e=>{ if (!o3Active()) return; e.preventDefault(); O3.dist = clamp(O3.dist * (e.deltaY>0 ? 1.1 : 0.9), 7, 28); }, { passive:false });
 }
@@ -32691,6 +32741,7 @@ function rsHoldTool(e, kind){
   e.tool = null;
   if (r.weapon) r.weapon.visible = !kind;
   if (r.shield) r.shield.visible = !kind;
+  if (r.swirl) r.swirl.visible = !kind;   /* (RS-179: a staff's three circling orbs go away with it while you hold a tool) */
   if (!kind) return;
   const t = rsToolModel(kind, tier); t.rotation.x = Math.PI/2; t.position.set(0, -0.042, 0.03); t.scale.setScalar(0.42);
   r.arms[0].hand.add(t); e.tool = t;
@@ -33170,7 +33221,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-178';
+const GAME_VERSION = 'rs-179';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -33770,6 +33821,13 @@ function showTooltip(e, html){
   el.innerHTML = html;
   el.style.display = 'block';
   moveItemTooltip(e);
+}
+// (RS-179) a tooltip for a tap: shown even on a touch screen, and gone again after a few seconds
+let TAP_TIP_T = 0;
+function tapTip(e, html, ms){
+  const el = document.getElementById('itemTooltip'); if (!el) return;
+  TT_NODE = null; el.innerHTML = html; el.style.display = 'block'; moveItemTooltip(e);
+  clearTimeout(TAP_TIP_T); TAP_TIP_T = setTimeout(()=>{ el.style.display = 'none'; if (typeof O3!=='undefined') O3.tapTip = null; }, ms||3500);
 }
 function showItemTooltip(e, it){ showTooltip(e, itemCompareTooltipHtml(it)); const a = ttItemArt(it); if (a) renderMiniMonsterArt('ttIcon', a, rarityColorCss(it)); }
 // the same little painted picture the character sheet shows for a piece of gear
@@ -35249,6 +35307,7 @@ function examineAct(a){
   if (a.kind==='landmark'){ const lm = owLandmark(a.id); return lm ? lm.desc : ''; }
   if (a.kind==='poi'){ const p = (G.ow.pois||[]).find(o=>o.id===a.id); return p ? cap(p.name) + '. ' + (POI_TITLE[p.k]||'') + '.' : ''; }
   if (a.kind==='wild') return a.w ? `A ${WG_WILD[a.w.k].nm}.` : '';
+  if (a.kind==='wev' && a.what==='myth'){ const b = (G.ow.mythicBeasts||[]).find(o=>o.i===a.i); return b ? `${b.name}, a ${mythicKind(b)}. A mythic beast, and no easy kill.` : 'A mythic beast.'; }
   if (a.kind==='wev') return a.what==='boss' ? 'A giant, awake and roaming. It hits terribly hard - and remembers its wounds.' : 'A monster camp. It will grow if it is left alone.';
   if (a.kind==='node'){ const n = skNodeAt(a.x, a.y); return n ? `${skNodeName(n)}. ${n.k==='woodcutting' ? 'You could chop this.' : n.k==='fishing' ? 'Fish are biting here.' : 'You could pick this.'}` : 'Nothing left here.'; }
   if (a.kind==='building') return `${a.b.name}. ${a.b.role ? 'The '+a.b.role.toLowerCase()+' works here.' : ''}`;
