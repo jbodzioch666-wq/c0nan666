@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-168 - Highwaymen and mythic beasts in 3D
+
+- **The highwayman in 3D**: the masked rider you fight on the road now shows as a full 3D figure instead of a flat painted picture.
+- **Mythic beasts in 3D**: each mythic beast is now a fixed great creature, such as an ancient dragon, a troll or a hill giant, and fights as that 3D model.
+- **See them on the map**: instead of a floating skull icon, the beast itself stands at its lair on the world, inside a purple ring. The one you see is the one you fight.
+- **Renamed foes keep their model**: any creature given a new name (quest bosses too) keeps the 3D model of what it really is.
+
 ## RS-167 - Steady lantern
 
 - **No more shadow flash on every step**: your lantern jumped ahead to the tile you were walking to, so for a moment on each step you were out from under it and threw a long shadow that then vanished. Now the lantern moves with you, so your shadow stays steady while you walk.
