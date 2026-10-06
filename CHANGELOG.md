@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-184 - Sitting on the seat, and a proper upstairs
+
+- **Sitting on the seat, not in it.** Seated people sank into chairs, stools and pews up to their hips. Seats are now the right height for their legs: they sit on top of the seat with their feet on the floor. The tavern tables are lower to match.
+- **No street door upstairs.** The rooms over the tavern had a doorway in the front wall leading nowhere. The wall now runs straight across. The cellar lost its street door too.
+- **A real rug upstairs.** The rug in the middle of the upstairs room was a plain blue sheet. It's now woven with a border and pattern, like the rugs downstairs.
+
 ## RS-183 - Sit down, sleep till dawn
 
 - **Beds you can lie in.** Beds are now long enough for a person, running two tiles from the wall, and lower to the floor. The inn beds and your own bed take up both tiles.

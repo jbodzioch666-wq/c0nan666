@@ -24,6 +24,8 @@ module.exports = async page=>{
     const pat = V3.villagers.find(q=>q.v.seat); out.patronHips = pat ? +(pat.e.rig.hips.position.y*pat.e.holder.scale.y).toFixed(2) : null;
     // the lowest point of the seated player stays above the floor (feet on the ground, not through it)
     { V3.player.g.updateMatrixWorld(true); let lo = 9; V3.player.e.rig.legs.forEach(L=>L.knee.traverse(o=>{ if (o.isMesh && o.geometry){ o.geometry.computeBoundingBox(); const b = o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld); lo = Math.min(lo, b.min.y); } })); out.feet = +lo.toFixed(2); }
+    /* (RS-184) the thighs rest on the seat top, not sunk into it */
+    { const L = V3.player.e.rig.legs[0]; let lo = 9; L.hip.traverse(m=>{ if (!m.isMesh) return; let k = m, under = false; while (k){ if (k===L.knee) under = true; k = k.parent; } if (under) return; m.geometry.computeBoundingBox(); const b = m.geometry.boundingBox.clone().applyMatrix4(m.matrixWorld); lo = Math.min(lo, b.min.y); }); out.thigh = +lo.toFixed(3); out.seatTop = SEAT_H; }
     // taken seats
     if (pat){ const v = pat.v, nb2 = [[0,1],[0,-1],[1,0],[-1,0]].map(([dx,dy])=>[v.x+dx, v.y+dy]).find(([x,y])=>G.map[x][y]===T_FLOOR);
       if (nb2){ p.x = nb2[0]; p.y = nb2[1]; moveDir(v.x-nb2[0], v.y-nb2[1]); out.takenSeat = G.sitAt; } }
@@ -35,6 +37,8 @@ module.exports = async page=>{
     await frames(4);
     // upstairs: long beds, a stairwell with no lid, a night's sleep till dawn
     townBench('stairs'); renderGame(); await frames(3);
+    { let rugTex = 0, plain = 0; V3.world.traverse(o=>{ if (o.isMesh && o.geometry.type==='PlaneGeometry' && Math.abs(o.position.y-0.012)<0.003){ if (o.material.map) rugTex++; else plain++; } }); out.upRug = [rugTex, plain]; }
+    out.upDoor = G.map[ROOM.door.x][ROOM.door.y]===T_DOOROUT; out.upDoorLabel = [...V3.labels.children].some(el=>el.textContent==='Door');
     out.bedFoot = ROOM_LAYOUT.tavern_up.benches.filter(b=>b[0]==='innbed').every(([k,x,y])=>benchAt(x, y)==='innbed' && benchAt(x, y+1)==='innbed');
     let lids = 0; V3.world.traverse(o=>{ if (o.isMesh && Math.abs(o.rotation.x - 1.2) < 0.01) lids++; }); out.lids = lids;
     p.gold = 100; p.clock = DAY_LENGTH*5 + DAY_LENGTH*0.6; const c0 = p.clock; townBench('innbed');
@@ -59,6 +63,9 @@ module.exports = async page=>{
   A(!r.takenSeat, 'you can\'t sit where someone already sits');
   A(r.upAfterMove===null, 'moving gets you up');
   A(r.chairSeat.length >= 1 && r.chairSeat.every(y=>y < 0.4), 'chairs sized to a person');
+  A(r.thigh >= r.seatTop - 0.015 && r.thigh < r.seatTop + 0.05, 'sat on the seat, not sunk into it');
+  A(r.upRug[0] >= 1 && r.upRug[1]===0, 'the rug upstairs is woven, not a plain sheet');
+  A(!r.upDoor && !r.upDoorLabel, 'no front door upstairs');
   A(r.bedFoot, 'the inn beds are two tiles long');
   A(r.lids===0, 'no door-like lid over the stairwell');
   A(r.slept && Math.abs(r.dawn-0.25) < 0.01 && Math.abs(r.dawnEarly[0]-0.25) < 0.01 && r.dawnEarly[1]===5, 'a bed sleeps you till the next dawn');

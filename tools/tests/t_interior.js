@@ -24,7 +24,7 @@ module.exports = async page=>{
       const cab = box(1.0, 1.9, 0.35).map(m=>m.p.x), win = box(0.9, 0.9, 0.06).map(m=>m.p.x);
       R.cabWin = Math.min(99, ...cab.flatMap(c=>win.map(w=>Math.abs(c - w))));
       // the floor (the room-wide slab) ends at the front wall
-      const fl = meshes.filter(m=>m.t==='BoxGeometry' && Math.abs(m.g.height-0.06)<0.001 && m.g.width >= 9).map(m=>m.p.z + m.g.depth/2);
+      const fl = meshes.filter(m=>m.t==='BoxGeometry' && Math.abs(m.g.height-0.06)<0.001 && m.g.width >= 9 && Math.abs(m.p.y + 0.03) < 0.01).map(m=>m.p.z + m.g.depth/2);
       R.floorEnd = fl.length ? +Math.max(...fl).toFixed(2) : null;
       // nothing walls up the doorway
       const dz = ROOM.y1+1.15, gx = ROOM.door.x+0.5;
@@ -44,7 +44,7 @@ module.exports = async page=>{
   for (const [k, R] of Object.entries(r.rooms)){
     A(R.cabWin > 1.0, k+': the cabinets stand clear of the windows');
     A(R.floorEnd!==null && R.floorEnd <= 12.2, k+': the floor stops at the front wall');
-    A(!R.doorBlocked, k+': nothing walls up the front doorway');
+    if (k==='tavern_up' || k==='cellar') A(R.doorBlocked, k+': no doorway to the street from upstairs or the cellar (RS-184)'); else A(!R.doorBlocked, k+': nothing walls up the front doorway');
     A(R.rugOverlap===0, k+': no rugs on top of each other');
   }
   A(r.rooms.tavern.stairDoor >= 1 && r.rooms.cellar.stairDoor >= 1, 'the stairs up climb to a door in the wall');
