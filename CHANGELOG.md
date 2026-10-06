@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-165 - Evenly lit dungeons
+
+- **No more hat-shaped blot**: your lantern hangs right above you, and its shadow turned your hat into a big round dark circle under you. It no longer casts shadows; the wall torches cast them instead.
+- **Torches spaced out**: torches used to be scattered at random and often bunched together, piling light on light. Now they hang evenly along the walls, on straight stretches rather than corners, at least six tiles apart, so their pools of light meet instead of overlapping.
+
 ## RS-164 - A real cellar
 
 - **Rats in the Cellar is in the cellar**: the innkeeper's rat job used to drop you in an open field. Now you go down into a small stone cellar, with barrels and crates against the walls, torches on the walls and the steps up behind you.
