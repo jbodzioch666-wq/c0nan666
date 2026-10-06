@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-174 - Proper robes
+
+- **Robe tops are tops.** A robe top no longer comes with a full-length skirt built in. It's now a tunic to the hips, with cloth sleeves, a sash and a short flared hem, so whatever you wear on your legs shows below it.
+- **Robe bottoms are robes.** A robe bottom is now a long pleated skirt to the ankles in its own colour, instead of a pair of trousers. Wear it under a robe top and the tunic's hem sits over it.
+- **A robe bottom icon.** In your inventory, character sheet and shops, a robe bottom now shows as a pleated skirt, not two trouser legs.
+
 ## RS-173 - Follow-through, hit reactions and roaming beasts
 
 - **Swings follow through.** A blow now has three beats: the wind-up, a fast release, and a follow-through that carries the arm on past the strike. The shoulders turn and the weight sinks onto bent knees, then the figure eases back to guard. This goes for you, monsters, beasts and skeletons.

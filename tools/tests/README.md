@@ -47,3 +47,4 @@ Screenshots go to `tools/tests/shots/`.
 | dwalk | walking a dungeon: even diagonal strides, the camera leads ahead, pillars dissolve in the cutaway, and on a phone you stand mid-view |
 | anim | strides follow the ground covered at any speed, ease in and out, creatures look where they walk, and a monster swings on a miss too, swings follow through, and hits rock a figure back as hard as they land |
 | beasts | the world's giant and the mythic beasts are 3D creatures on the map that walk tile to tile; mythic beasts roam round their lairs and keep their spot in the save |
+| robe | a robe top is a tunic with no skirt of its own, a robe bottom is a long skirt (not trousers), and its icon is a skirt |
