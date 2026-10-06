@@ -603,6 +603,10 @@
   #qtoast.show{ opacity:1; transform:translate(-50%,0); }
   #xpDrops{ position:fixed; right:30px; top:34%; z-index:39; pointer-events:none; display:flex; flex-direction:column; align-items:flex-end; }
   #xpDrops .xpcol{ display:flex; flex-direction:column; align-items:flex-end; gap:2px; animation:xpfloat 1.8s ease-out forwards; margin-top:-30px; }
+  /* (RS-176) over your head: the drops rise from just above it */
+  #xpDrops.overhead{ right:auto; height:0; transform:translateX(-50%); align-items:center; flex-direction:column-reverse; }
+  #xpDrops.overhead .xpcol{ position:absolute; bottom:0; left:50%; transform:translateX(-50%); align-items:center; margin-top:0; animation-name:xpfloatH; }
+  @keyframes xpfloatH{ 0%{ transform:translate(-50%,18px); opacity:0; } 12%{ opacity:1; } 75%{ opacity:1; } 100%{ transform:translate(-50%,-80px); opacity:0; } }
   @keyframes xpfloat{ 0%{ transform:translateY(40px); opacity:0; } 12%{ opacity:1; } 75%{ opacity:1; } 100%{ transform:translateY(-70px); opacity:0; } }
   .xpd{ display:flex; align-items:center; gap:5px; font:700 15px 'JetBrains Mono',monospace; color:#fff; text-shadow:0 1px 2px #000, 0 0 5px #000; }
   .xpi{ display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:4px; font-size:11px; color:#fff; box-shadow:0 1px 3px #000; }
@@ -10040,6 +10044,7 @@ function xpSkillDef(k){ return RS_ALL_SKILLS().find(d=>d[0]===k) || [k, k, '&#96
 function xpDrop(k, n){
   let box = document.getElementById('xpDrops');
   if (!box){ box = document.createElement('div'); box.id = 'xpDrops'; document.body.appendChild(box); }
+  xpDropsFollow();
   const d = xpSkillDef(k), now = performance.now();
   let col = box.lastElementChild;
   if (!col || now - (+col.dataset.t) > 250){ col = document.createElement('div'); col.className = 'xpcol'; col.dataset.t = now; box.appendChild(col);
@@ -10049,6 +10054,15 @@ function xpDrop(k, n){
   const el = document.createElement('div'); el.className = 'xpd'; el.dataset.k = k; el.dataset.n = n;
   el.innerHTML = `<span class="xpi" style="background:${d[3]}">${d[2]}</span><b>+${n}</b>`;
   col.appendChild(el);
+}
+// RS-176: the drops rise over your head, following you as the view moves (on a screen with no 3D figure they keep to the right)
+function xpDropsFollow(){
+  const box = document.getElementById('xpDrops'); if (!box) return;
+  if (!box.children.length) return;
+  const h = G.ui==='playing' ? heroHeadXY(1.2) : null;
+  if (!h){ if (box.classList.contains('overhead')){ box.classList.remove('overhead'); box.style.left = box.style.top = ''; } return; }
+  const gb = document.getElementById('gbar'), up = gb && gb.style.display==='block' ? 34 : 14;   /* (above the work bar when it's showing) */
+  box.classList.add('overhead'); box.style.left = Math.round(h.x) + 'px'; box.style.top = Math.round(h.y - up) + 'px';
 }
 let XPT = { skills:{}, order:[], hidden:false };
 // (RS-121) which skills the XP window shows, ticked in the skills menu (J). Until you tick any, it follows your
@@ -10546,6 +10560,20 @@ function skDo(o){
   renderGame();
 }
 function skStop(msg){ if (!G.gather) return; G.gather = null; if (msg) logMsg(msg, ''); renderGame(); }
+// RS-176: where the top of your head is on screen, in whichever 3D view you're in (null when there's no 3D figure)
+function heroHeadXY(lift){
+  try{
+    const mode = G.gameMode, T = THREE;
+    if ((mode===1 || mode===2) && ISO.on && ISO.player && ISO.player.pos && typeof fp3dActive==='function' && fp3dActive()){
+      const pr = isoProject(ISO.player.pos.x, ISO.player.pos.y, lift||1.2), r = canvas.getBoundingClientRect();
+      if (pr.ok) return { x:r.left + pr.sx/canvas.width*r.width, y:r.top + pr.sy/canvas.height*r.height }; }
+    const head = (fig, cam, el, up)=>{ if (!fig || !fig.g || !cam || !el) return null; const v = new T.Vector3(); fig.g.getWorldPosition(v); v.y += up; v.project(cam);
+      const r = el.getBoundingClientRect(); if (v.z >= 1 || !r.width) return null; return { x:r.left + (v.x*0.5+0.5)*r.width, y:r.top + (-v.y*0.5+0.5)*r.height }; };
+    if (mode===0 && typeof o3Active==='function' && o3Active()) return head(O3.player, O3.cam, O3.renderer && O3.renderer.domElement, (lift||1.2)*1.04);
+    if (mode===3 && V3.player && V3.cv && V3.cv.style.display!=='none') return head(V3.player, V3.cam, V3.cv, (lift||1.2)*0.95);
+  }catch(e){}
+  return null;
+}
 // the bar over your head while you work: the chance each swing lands, and the swing coming round
 function skGatherBar(now){
   let el = document.getElementById('gbar'); const g = G.gather;
@@ -33094,7 +33122,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-175';
+const GAME_VERSION = 'rs-176';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -35692,7 +35720,7 @@ function frameLoop(ts){
   syncGrid();
   touchUiSync();
   if (G.player && G.gather) skGatherTick(performance.now());
-  try{ skGatherBar(performance.now()); cqTick(performance.now()); necroHudSync(); ttNodeRefresh(); }catch(e){ console.error(e); }
+  try{ skGatherBar(performance.now()); cqTick(performance.now()); necroHudSync(); ttNodeRefresh(); xpDropsFollow(); }catch(e){ console.error(e); }
   clockTick(performance.now());
   clockBarSync();
   // the hour turns on its own now: check the season, and redraw the flat views when the light changes (dawn, day, dusk, night)

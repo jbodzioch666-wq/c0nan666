@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-176 - XP over your head
+
+- **XP drops rise over your head.** The xp numbers from any skill, with their skill icons, now float up from above your character instead of off to the right of the screen. They follow you on the overworld, in towns and in dungeons. While you're gathering, they rise above the work bar. On screens without your 3D figure they keep to the right as before.
+
 ## RS-175 - Freeze fix, town lights and robes that move
 
 - **Fixed a freeze on the overworld.** When three or more landmarks you'd seen were off the same edge of the screen, their pointer markers could bounce back and forth forever and lock up the game. They now step apart once and settle.
