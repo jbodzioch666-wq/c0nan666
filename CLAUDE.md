@@ -5,6 +5,7 @@ A RuneScape-flavoured roguelike in one file, `depthcrawl.html`. It uses three.js
 - `CHANGELOG.md`: player-facing patch notes, newest first.
 - `IDEAS.md`: the backlog.
 - `tools/build-itch.sh`: builds the itch.io zip into `dist/`, which is gitignored.
+- `tools/itch-art/make.sh`: makes the itch.io page art (cover, banner, page background, embed background) from in-game scenes into `dist/itch-art/out`. Slow: about half an hour of software rendering. Each run uses a fresh random world, so check the shots.
 - `tools/tests/`: Playwright browser tests. See `tools/tests/README.md`.
 
 ## Branches
