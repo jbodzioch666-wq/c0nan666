@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-167 - Steady lantern
+
+- **No more shadow flash on every step**: your lantern jumped ahead to the tile you were walking to, so for a moment on each step you were out from under it and threw a long shadow that then vanished. Now the lantern moves with you, so your shadow stays steady while you walk.
+
 ## RS-166 - Shadows back in the dungeons
 
 - **People and monsters cast shadows again**: in RS-165 the dungeons lost almost all their shadows. They're back, from both the wall torches and your lantern.
