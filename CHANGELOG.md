@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-171 - Smoother dungeon walking
+
+- **Even stride on diagonals.** Diagonal steps used to lag behind and then lurch to catch up. Every step, straight or diagonal, now glides at one steady pace, for you and for monsters.
+- **The camera looks ahead.** As you walk, the view drifts a little ahead of you so you see more of where you're going. It settles back over you when you stop.
+- **Centred on your phone.** On a phone the view is framed so you stand in the middle of the open screen, between the clock bar and the d-pad, instead of low down near the controls.
+- **Pillars get out of the way.** Pillars, wall posts and ceiling beams between the camera and you now dissolve like the walls do, so you're never hidden behind one.
+- **Monsters close in properly.** Dashing monsters like orcs used to run past you and back every turn. They now stop beside you and fight. Pack creatures no longer jitter on the far side of a wall trying to flank you; they come round.
+
 ## RS-170 - Mythic beasts return, clearer skies
 
 - **A new mythic beast rises.** About 400 steps after you slay one, word spreads that another has risen somewhere else in the world, far from you. It's marked on your map.

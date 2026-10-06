@@ -6817,6 +6817,10 @@ function tickMonsters(excludeIdx){
       const nx=m.x+dx, ny=m.y+dy;
       if (nx===G.player.x && ny===G.player.y){ monsterAttacks(i); break; }
       if (tileAt(nx,ny)!==T_WALL && !occupiedBy(nx,ny,i) && diagClear(m.x, m.y, dx, dy, tileOpen)){ m.x=nx; m.y=ny; } else break;
+      /* (RS-171) a dash stops once it's beside you, and a rusher picks its second step afresh - it used to run on past you and back again every turn */
+      if (fleeing) continue;
+      if (Math.abs(G.player.x-m.x)+Math.abs(G.player.y-m.y)<=1) break;
+      if (chase){ const c2 = monChaseDir(m, i); if (!c2) break; dx = c2[0]; dy = c2[1]; }
     }
   }
   // the Ranger's beast companion / Warlock's familiar trails after the
@@ -9922,6 +9926,7 @@ function cntTick(){
 // ---- HUD layout at any interface size: the hotbar never grows wider than the
 // screen, and the left column (plate, buffs, xp tracker, log) never overlaps -
 // the xp tracker moves to the right column, or the log gets shorter, when it would ----
+const HUD_GAP = { on:false, top:0, bot:0 };
 function hudLayout(){
   const root = document.documentElement, W = window.innerWidth, H = window.innerHeight, u = SET.uiScale || 1;
   const bs = Math.max(0.5, Math.min(u, W >= 1000 ? W/1000 : 1, H*0.26/124));
@@ -9938,6 +9943,12 @@ function hudLayout(){
     let bot = H - 124*bs; for (const e of document.querySelectorAll('.controls .pad, .dh-route, .dh-grave')) if (shown(e)){ const r = e.getBoundingClientRect(); if (r.top > top + 160) bot = Math.min(bot, r.top); }
     root.style.setProperty('--sptop', Math.round(top + 8) + 'px'); root.style.setProperty('--spbot', Math.round(Math.max(0, H - bot + 8)) + 'px'); }
   { const qb = document.getElementById('quickBar'); if (qb) qb.classList.toggle('sp-hid', phoneSp && spOn); }
+  /* (RS-171) the clear part of a phone screen, between the clock bar and the d-pad, for framing the 3D view */
+  { const touch = document.body.classList.contains('touch') && H > W, shown = e => e && getComputedStyle(e).display!=='none' && e.offsetHeight > 0;
+    HUD_GAP.on = false;
+    if (touch){ const ck = document.getElementById('dhClock'); let top = shown(ck) ? ck.getBoundingClientRect().bottom : 0, bot = H;
+      for (const e of document.querySelectorAll('.controls .pad')) if (shown(e)){ const r = e.getBoundingClientRect(); if (r.top > H*0.4) bot = Math.min(bot, r.top); }
+      if (bot - top > 200){ HUD_GAP.on = true; HUD_GAP.top = top; HUD_GAP.bot = bot; } } }
   if (spEl && spEl.style.display!=='none' && !phoneSp){ const r = spEl.getBoundingClientRect(); root.style.setProperty('--spw', Math.round(W - r.left + 6) + 'px'); }
   uiAnimPass();
   if (G.ui!=='playing' || !document.body.classList.contains('immersive')){ for (const k in DRAG_EL) applyMoved(k); return; }
@@ -13070,7 +13081,7 @@ function monAiTurn(m, i, dist){
     const ward = G.mon.find(o=>o.alive && o!==m && o._ai && ['healer','caster','summoner','archer'].includes(o._ai.role) && Math.abs(o.x-m.x)+Math.abs(o.y-m.y)<=6);
     if (ward && Math.abs(ward.x-m.x)+Math.abs(ward.y-m.y) > 1){ monStepToward(m, i, ward.x, ward.y); return true; }
   }
-  if ((A.role==='pack' || A.role==='swarm') && dist>1 && dist<=6){ const t = monFlankTile(m); if (t && monStepToward(m, i, t[0], t[1])) return true; }
+  if ((A.role==='pack' || A.role==='swarm') && dist>1 && dist<=6 && monChaseMap()[m.x + m.y*COLS] <= dist + 1){ const t = monFlankTile(m);   /* (RS-171: only flanks across open ground - through a wall it rushes round instead) */ if (t && monStepToward(m, i, t[0], t[1])) return true; }
   return false;
 }
 // what a monster's blow can do besides its damage
@@ -29590,11 +29601,11 @@ function fpdBuild(T){
     if (k==='wall2') return fpdMaterial(key+':wall2', spec.wall2||spec.wall, { bump:bw, cut:true });
     if (k==='wallTorch') return fpdMaterial(key+':wallT', fpSconce(key==='catacomb' ? spec.wall2 : spec.wall), { bump:bw, cut:true });   // (the catacomb's painted niches are only for the classic renderer)
     if (k==='ceil') return fpdMaterial(key+':ceil', spec.ceil, { bump:6 });
-    if (k==='trim') return fpdMaterial(key+':trim', key==='mine' ? spec.ceil : (key==='lair' || key==='catacomb') ? spec.wall2 : spec.wall, { bump:bw });
+    if (k==='trim') return fpdMaterial(key+':trim', key==='mine' ? spec.ceil : (key==='lair' || key==='catacomb') ? spec.wall2 : spec.wall, { bump:bw, cut:true });   /* (RS-171: pillars dissolve too) */
     if (k==='wood') return fpdMaterial(field ? 'woodF' : 'wood', (x,y)=>{
       const g = fpNoise(x, y*4%FP_TEX, 16, 41), k2 = 0.5 + g*0.4 + fpFbm(x,y,44)*0.25 - (fpNoise(x, y*8%FP_TEX, 32, 45)>0.8 ? 0.15 : 0);
       return fpScale([112,74,42], k2);
-    }, { bump:8, vc:!field });
+    }, { bump:8, vc:!field, cut:!field });
     const s = +k.slice(5), wet = s===6 || (key==='swamp' && s===1) || (key==='sea' && s===7);
     const fm = fpdMaterial(key+':f'+s, slotFns[s], wet ? { rough:0.15, bump:3, glow:0.6 } : { rough:0.55, glow:1.6, bump:bw*0.8 });
     if (key==='swamp' && s===1) fm.color.setRGB(0.4, 0.48, 0.3);         // marsh water is murky, not sea blue
@@ -29821,7 +29832,7 @@ function fpdRender(env, T, camZ){
   if (FPD.cv.width!==w || FPD.cv.height!==h){ FPD.r.setPixelRatio(1); FPD.r.setSize(w, h, false); }
   const c = FP.cam, cam = FPD.cam;
   if (ISO.on) isoCamera(cam, w/h);
-  if (FPD.cutU){ const f = ISO.focus, on = ISO.on && f && f.map===G.map; FPD.cutU.uCutF.value.set(on ? f.x : 0, on ? f.y : 0, on ? 1 : 0); FPD.cutU.uCutD.value.set(Math.sin(ISO.yawNow||0), Math.cos(ISO.yawNow||0)); }
+  if (FPD.cutU){ const f = ISO.player && ISO.player.pos && ISO.player.map===G.map ? Object.assign({ map:G.map }, ISO.player.pos) : ISO.focus, on = ISO.on && f && f.map===G.map;   /* (RS-171: round you, not the camera's lead) */ FPD.cutU.uCutF.value.set(on ? f.x : 0, on ? f.y : 0, on ? 1 : 0); FPD.cutU.uCutD.value.set(Math.sin(ISO.yawNow||0), Math.cos(ISO.yawNow||0)); }
   if (!ISO.on){
     cam.near = 0.03; cam.aspect = w/h; cam.fov = 2*Math.atan(FP_PLANE/cam.aspect)*180/Math.PI; cam.updateProjectionMatrix();
     cam.position.set(c.x, camZ, c.y); cam.lookAt(c.x+Math.cos(c.a), camZ, c.y+Math.sin(c.a));
@@ -31762,7 +31773,11 @@ const ISO_STEP_MS = 300, ISO_SWING_MS = 1800;   // a walked step, and the beat o
 // reads as one continuous stride rather than a hop and a stop per tile;
 // pos.mv is how much it's walking (eased, so the stride doesn't flicker between steps)
 function isoGlide(pos, tx, ty){
-  const dx = tx-pos.x, dy = ty-pos.y, d = Math.hypot(dx, dy), sp = FP.dt*(1000/(ISO_STEP_MS*runMul()))*(d>1.5 ? 1.8 : 1.05*(G.stepLen||1));
+  const dx = tx-pos.x, dy = ty-pos.y, d = Math.hypot(dx, dy);
+  /* (RS-171) each figure keeps its own stride: a new tile sets the pace for the whole step, so a diagonal lands in the same time as a straight step
+     instead of dragging behind and then lurching to catch up */
+  if (pos.tx!==tx || pos.ty!==ty){ pos.tx = tx; pos.ty = ty; pos.sl = Math.max(1, Math.min(1.6, d)); }
+  const sl = pos.sl||1, sp = FP.dt*(1000/(ISO_STEP_MS*runMul()))*1.05*sl*(d > sl + 0.6 ? 1.6 : 1);
   if (d <= sp){ pos.x = tx; pos.y = ty; } else { pos.x += dx/d*sp; pos.y += dy/d*sp; }
   const want = d>0.02 ? 1 : 0, mv = pos.mv||0;
   pos.mv = mv + (want-mv)*Math.min(1, FP.dt*(want ? 16 : 5));
@@ -31773,15 +31788,28 @@ function isoCamera(cam, aspect){
   const tx = pp ? pp.x : p.x+0.5, ty = pp ? pp.y : p.y+0.5;
   if (!ISO.focus || ISO.focus.map!==G.map || Math.hypot(ISO.focus.x-tx, ISO.focus.y-ty) > 4) ISO.focus = { x:tx, y:ty, map:G.map };
   const k = 1-Math.exp(-(FP.dt||0.016)*7);
-  ISO.focus.x += (tx-ISO.focus.x)*k; ISO.focus.y += (ty-ISO.focus.y)*k;
+  /* (RS-171) the camera looks a little ahead of you as you walk, so you see more of where you're going, and settles back when you stop */
+  { const L = ISO.lead || (ISO.lead = { x:0, y:0 }), gx = p.x+0.5 - tx, gy = p.y+0.5 - ty, gd = Math.hypot(gx, gy), mv = pp ? (pp.mv||0) : 0;
+    const wx = gd > 0.05 ? gx/gd*0.7*mv : 0, wy = gd > 0.05 ? gy/gd*0.7*mv : 0, kl = 1-Math.exp(-(FP.dt||0.016)*(gd > 0.05 ? 2.2 : 1.4));
+    L.x += (wx-L.x)*kl; L.y += (wy-L.y)*kl; ISO.focus.x += (tx + L.x - ISO.focus.x)*k; ISO.focus.y += (ty + L.y - ISO.focus.y)*k; }
   const yaw = isoYaw(), el = ISO.el, D = ISO.dist, f = ISO.focus;
   if (ISO.yawNow===undefined) ISO.yawNow = yaw;
   let dy = yaw-ISO.yawNow; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); ISO.yawNow += dy*(1-Math.exp(-(FP.dt||0.016)*9));
-  cam.aspect = aspect; cam.fov = 30; cam.near = 0.5; cam.far = D+40; cam.updateProjectionMatrix();
+  cam.aspect = aspect; cam.fov = 30; cam.near = 0.5; cam.far = D+40;
+  { const sh = isoFrameShift(); if (sh) cam.setViewOffset(canvas.width, canvas.height, 0, sh, canvas.width, canvas.height); else if (cam.view && cam.view.enabled) cam.clearViewOffset(); }
+  cam.updateProjectionMatrix();
   cam.position.set(f.x + Math.sin(ISO.yawNow)*Math.cos(el)*D, Math.sin(el)*D, f.y + Math.cos(ISO.yawNow)*Math.cos(el)*D);
   cam.lookAt(f.x, 0.35, f.y);
   if (FP.shake>0){ const sk = FP.shake*0.16; cam.position.x += (Math.random()-0.5)*sk; cam.position.y += (Math.random()-0.5)*sk; cam.position.z += (Math.random()-0.5)*sk; }
   ISO.ppu = canvas.height / (2*Math.tan(15*Math.PI/180)*D);   // screen pixels per world unit at the focus
+}
+// RS-171: on a phone the clock bar covers the top and the d-pad the bottom, so the view is lifted until you stand in the middle of
+// the clear part of the screen (in canvas pixels; hudLayout() measures the gap)
+function isoFrameShift(){
+  const g = HUD_GAP; if (!g || !g.on || !canvas) return 0;
+  const r = canvas.getBoundingClientRect(); if (!r.height) return 0;
+  const mid = (g.top + g.bot)/2 - r.top, s = (r.height/2 - mid)*canvas.height/r.height;
+  return Math.round(Math.max(0, Math.min(canvas.height*0.2, s)));
 }
 // where a world point lands on the game canvas
 function isoProject(x, y, z){
@@ -32890,7 +32918,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-170';
+const GAME_VERSION = 'rs-171';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
