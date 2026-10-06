@@ -12,20 +12,20 @@ module.exports = async page=>{
     const torches = { n:ts.length, minGap:+minGap.toFixed(1), straight };
     const live = [...M3D.live]; let blobs = 0, casters = 0, monsters = 0;
     for (const e of live){ monsters++; e.holder.traverse(o=>{ if (o.isMesh && o.material===m3dShadowMat()) blobs++; if (o.isMesh && o.castShadow) casters++; }); }
-    const lit = FPD.torches.filter(L=>L.castShadow).length, lantern = !!(FPD.lan && FPD.lan.castShadow);
+    const lit = FPD.torches.filter(L=>L.castShadow).length, lantern = !!(FPD.lan && FPD.lan.castShadow), lanNear = FPD.lan ? FPD.lan.shadow.camera.near : 0;
     // a fresh creature, whatever is about
     const gm = { nm:'goblin', sym:'g' }, gpt = (()=>{ try{ return m3dPortrait(gm); }catch(err){ return null; } })(), e = gpt ? m3dInstance(gm, gpt) : null;
     let fb = 0, fc = 0; if (e) e.holder.traverse(o=>{ if (o.isMesh && o.material===m3dShadowMat()) fb++; if (o.isMesh && o.castShadow) fc++; });
     SET.fps = true; for (let i=0;i<40;i++) await new Promise(r=>requestAnimationFrame(r));
     const fps = document.getElementById('fpsCounter'), ck = document.getElementById('dhClock'), a = fps && fps.getBoundingClientRect(), b = ck && ck.getBoundingClientRect();
     SET.fps = false;
-    return { torches, lantern, monsters, blobs, casters, lit, fresh:e ? { blobs:fb, casters:fc } : null, fps:a && b ? { under:a.top >= b.bottom - 1 && a.top <= b.bottom + 12, centre:Math.round((a.left + a.width/2) - (b.left + b.width/2)) } : null };
+    return { torches, lantern, lanNear, monsters, blobs, casters, lit, fresh:e ? { blobs:fb, casters:fc } : null, fps:a && b ? { under:a.top >= b.bottom - 1 && a.top <= b.bottom + 12, centre:Math.round((a.left + a.width/2) - (b.left + b.width/2)) } : null };
   });
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
   A(r.torches.n >= 2 && r.torches.minGap >= 6 && r.torches.straight, 'torches evenly spaced along straight walls');
   A(r.blobs===0 && (!r.fresh || r.fresh.blobs===0), 'no round blob under any creature');
   A((r.monsters===0 || r.casters > 0) && (!r.fresh || r.fresh.casters > 0), 'creatures cast real shadows');
-  A(r.lit > 0 && !r.lantern, 'the torches cast shadows, the lantern overhead does not');
+  A(r.lit > 0 && r.lantern && r.lanNear >= 0.7, 'the torches and your lantern cast shadows - but not of your own hat, right under the lantern');
   A(r.fps && r.fps.under && Math.abs(r.fps.centre) <= 2, 'the fps meter is centred under the clock bar');
 };

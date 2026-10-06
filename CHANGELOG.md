@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-166 - Shadows back in the dungeons
+
+- **People and monsters cast shadows again**: in RS-165 the dungeons lost almost all their shadows. They're back, from both the wall torches and your lantern.
+- **Torches throw clear shadows**: the torch lights now sit a little out from the wall and above head height, with sharper shadow detail and a bit more strength, so you and the monsters throw a clear shadow on the floor away from each torch.
+- **Your lantern's shadows, without the hat blot**: monsters' shadows stretch away from your light again. The lantern leaves out anything right beneath it, though, so your own hat no longer makes a big round circle at your feet. The lantern is also a touch softer, so the torch shadows show around you.
+
 ## RS-165 - Evenly lit dungeons
 
 - **No more hat-shaped blot**: your lantern hangs right above you, and its shadow turned your hat into a big round dark circle under you. It no longer casts shadows; the wall torches cast them instead.
