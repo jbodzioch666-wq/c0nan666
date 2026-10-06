@@ -1,5 +1,15 @@
 # Depthcrawl patch notes
 
+## RS-183 - Sit down, sleep till dawn
+
+- **Beds you can lie in.** Beds are now long enough for a person, running two tiles from the wall, and lower to the floor. The inn beds and your own bed take up both tiles.
+- **Sleep till morning.** Sleeping in an inn bed or your own bed now passes the night: you wake at the next dawn, fully rested.
+- **Chairs and stools to scale.** Chairs and temple pews were nearly waist high. They're now sized to the people who use them, and the pews face the shrine.
+- **Take a seat.** Walk into a chair, stool or pew and your character sits down on it. Move to get up again.
+- **Tables and stools in the tavern.** The tavern has two round tables with stools around them. In the evening the regulars sit on the stools and raise their tankards now and then. A stool someone's sitting on is taken.
+- **No more door upstairs.** The way down from the rooms over the tavern is now an open stairwell with a rail, not a lid standing up like a door.
+- **A proper trapdoor.** The Peddler's cellar trapdoor now sits in the back corner of the shop instead of the middle of the floor. It has a ladder going down and its lid lies flat beside it. You come back up next to it.
+
 ## RS-182 - Tidier interiors, and the Necromancy guide
 
 - **Proper front doors.** The front wall of every room now has a real doorway: an opening with its door jambs and a stone threshold, and a mat just inside. Before, a tall frame stood on top of a wall that ran straight across the way in.
