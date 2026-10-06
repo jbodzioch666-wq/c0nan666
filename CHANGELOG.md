@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-163 - Torchlit shadows
+
+- **No more round blobs under monsters**: the painted circle under every creature is gone. Monsters now cast real shadows from the torches on the walls, and from the sun and moon out in the open.
+- **Your lantern throws shadows**: in dungeons your own lantern casts shadows too. Monsters' shadows stretch away from your light, and yours pools at your feet. Shadows keep up as things move (redrawn every other frame on high graphics, every fourth on medium).
+- **FPS counter moved**: the frame-rate counter now sits centred just under the clock bar at the top.
+
 ## RS-162 - Cook beside the fire
 
 - **Next to the fire is close enough**: you can cook at your campfire from any of the eight tiles around it, not just while standing on it. E puts "Cook at the fire" first there too.

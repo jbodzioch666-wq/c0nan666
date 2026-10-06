@@ -41,6 +41,7 @@ Screenshots go to `tools/tests/shots/`.
 | daylight | town light follows the clock: the sun crosses the sky, the moon lights the night, no jumps between dawn, day, dusk and night, lamps fade up, softer desert sun |
 | nodetip | a resource node tooltip updates its "left" count live as you gather |
 | campfire | on your campfire with resources in reach, E lists every option (cooking first) and cooking works |
+| monshadow | creatures have no round blob and cast real torch shadows; the fps meter sits centred under the clock bar |
 | diag | diagonal steps: keys, numpad, corners, click paths, no diagonal strikes |
 | touch | on an emulated phone: tap to walk, long-press menu, pinch zoom, map drag, the d-pad, the hotbar |
 | bal | balance: monsters bite harder, the fixed-strength lair boss, coin trim, the smith's reinforcing |
