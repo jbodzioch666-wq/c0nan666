@@ -5753,6 +5753,7 @@ function monsterDies(mi){
       const b = G.ow.mythicBeasts.find(bb=>bb.i===m.mythicBeastIdx);
       if (b) b.slain = true;
       logMsg(`${m.nm} will trouble this land no longer`, 'good');
+      G.ow.mythicNextAt = (G.player.turnCount||0) + MYTHIC_RESPAWN;   /* (RS-170) but something else will come */
     }
   } else if (m.elite){
     const eliteKind = lootKind();
@@ -7101,7 +7102,7 @@ function serializeGame(){
     // produces a different map entirely, since every placement roll is a
     // function of OW_COLS/OW_ROWS too
     worldSizeTier: G.worldSizeTier||'medium', owCols: OW_COLS, owRows: OW_ROWS,
-    owMythicSlain: G.ow.mythicSlain||{},
+    owMythicSlain: G.ow.mythicSlain||{}, owMythicNew: G.ow.mythicNew||[], owMythicNextAt: G.ow.mythicNextAt||0,
     gameMode: (G.gameMode===2 || G.gameMode===3) ? 0 : G.gameMode,
     depth: G.depth, dungeonMaxDepth: G.dungeonMaxDepth,
     dungeonEntrance: {x:G.dungeonEntrance.x,y:G.dungeonEntrance.y}, dungeonSlot: G.dungeonSlot,
@@ -7222,7 +7223,7 @@ function loadGame(id){
   G.ow.overrides = data.owOverrides||{};
   G.ow.siteMoves = data.owSiteMoves||{};
   G.ow.townPositions = data.owTownPositions||{};
-  G.ow.mythicSlain = data.owMythicSlain||{};
+  G.ow.mythicSlain = data.owMythicSlain||{}; G.ow.mythicNew = data.owMythicNew||[]; G.ow.mythicNextAt = data.owMythicNextAt||0;
   // restore the map's own size BEFORE regenerating from the saved seed - a
   // save made before world-size picking existed has no owCols/owRows, so
   // this falls back to the old fixed 160x160 default (matches what that
@@ -7359,7 +7360,7 @@ function setWorldSizeTier(tierId){
   G.ow.townPositions = {};
   G.ow.townFlavor = {};
   G.ow.siteMoves = {};
-  G.ow.mythicSlain = {};
+  G.ow.mythicSlain = {}; G.ow.mythicNew = []; G.ow.mythicNextAt = 0;
   rerollWorldPreview(); // a size change needs a fresh map anyway, same as a plain reroll
 }
 function startGame(name){
@@ -7381,7 +7382,7 @@ function startGame(name){
   G.ow.siteMoves = {};
   G.ow.townPositions = {};
   G.ow.townFlavor = {};
-  G.ow.mythicSlain = {};
+  G.ow.mythicSlain = {}; G.ow.mythicNew = []; G.ow.mythicNextAt = 0;
   G.ow.visitedTowns = [];
   G.weather = 'clear';
   // every new game starts at Medium (the old fixed default) regardless of
@@ -8264,6 +8265,7 @@ function generateOverworld(seed){
     G.ow.mythicBeasts.push({i, x:p.x, y:p.y, name:`${bname} ${epithet}`, slain: !!G.ow.mythicSlain[i]});
     placed.push(p);
   }
+  for (const b of (G.ow.mythicNew||[])) G.ow.mythicBeasts.push({ i:b.i, x:b.x, y:b.y, name:b.name, slain: !!G.ow.mythicSlain[b.i] });   /* (RS-170: the ones that rose since) */
   // visible wilderness roamers (see spawnOverworldEncounters) - regenerated
   // fresh every time this function runs, which includes every load (see
   // loadGame's generateOverworld(data.owSeed) call), so a roaming monster
@@ -8652,8 +8654,11 @@ function mythicBeastEncounter(beast){
   generateArena();
   G.gameMode = 2;
   G.mandatoryFight = false;
-  const pick = rn(G.mon.length);
-  upgradeToMythicBeast(G.mon[pick], beast.name, beast.i); G.mon[pick].baseNm = mythicKind(beast);
+  // (RS-170) the beast itself, at least level 100 (monster level 16+), rising with you beyond that
+  const lv = Math.max(16, Math.min(NMLVL, clampMLevel((G.player.level||1) + 4))), kind = mythicKind(beast);
+  const bm = wevMon(Object.assign({}, MONSTER_LEVELS[lv-1], { nm:kind, lvl:lv, abilities:(MONSTER_LEVELS[lv-1].abilities||[]).slice() }), lv);
+  bm.x = Math.floor(COLS/2); bm.y = 3; if (G.map[bm.x][bm.y]!==T_FLOOR) G.map[bm.x][bm.y] = T_FLOOR;
+  upgradeToMythicBeast(bm, beast.name, beast.i); bm.baseNm = kind; bm.mlevel = lv;
   logMsg(`${beast.name} rises to meet you - this is no ordinary foe`, 'new');
 }
 // mythic beasts sit at a fixed map position (unlike a rolled wandering
@@ -8662,6 +8667,29 @@ function mythicBeastEncounter(beast){
 // instead of G.ow.encounters. Never spliced out of that array (only flagged
 // slain, see monsterDies) so the slain state is easy to look up by index -
 // the render pass simply skips drawing anything already marked slain
+// (RS-170) when a mythic beast falls, another rises somewhere else a while later: a fresh name, a new lair out in the wilds
+const MYTHIC_RESPAWN = 400;
+function mythicTick(){
+  if (!G.player || !G.ow || !G.ow.map) return;
+  const turn = G.player.turnCount||0, alive = (G.ow.mythicBeasts||[]).filter(b=>!b.slain).length;
+  if (!G.ow.mythicNextAt && !alive) G.ow.mythicNextAt = turn + MYTHIC_RESPAWN;   // (an older save where they're all dead)
+  if (!G.ow.mythicNextAt || turn < G.ow.mythicNextAt || G.gameMode!==0) return;
+  const px = G.owPos.x, py = G.owPos.y;
+  for (let tries=0; tries<1200; tries++){
+    const x = 4 + rn(OW_COLS-8), y = 4 + rn(OW_ROWS-8), t = G.ow.map[x][y];
+    if (Math.hypot(x-px, y-py) < 20 || !encounterEligible(t) || t===OW_WATER || t===OW_RIVER || t===OW_MOUNTAIN || t===OW_MOUNTAINPASS) continue;
+    if ((typeof owAmidMtn==='function' && owAmidMtn(x, y)) || (typeof wgRoadAt==='function' && wgRoadAt(x, y)) || (typeof owSpotTaken==='function' && owSpotTaken(x, y))) continue;
+    const i = 1000 + (G.ow.mythicNew||[]).length + Object.keys(G.ow.mythicSlain||{}).length;
+    const name = `${NAME_POOL[rn(NAME_POOL.length)]} ${MYTHIC_EPITHETS[rn(MYTHIC_EPITHETS.length)]}`;
+    (G.ow.mythicNew = G.ow.mythicNew||[]).push({ i, x, y, name }); G.ow.mythicBeasts.push({ i, x, y, name, slain:false });
+    G.ow.mythicNextAt = 0;
+    const b = G.ow.mythicBeasts[G.ow.mythicBeasts.length-1];
+    notify(`A new terror stirs: ${name}, ${mythicKind(b)}, has made its lair ${dirWord(x-px, y-py)} of here`, 'warn', 'notify');
+    logMsg(`travellers speak of ${name}, a ${mythicKind(b)} that has made its lair ${Math.round(Math.hypot(x-px, y-py))} leagues ${dirWord(x-px, y-py)} - a mythic beast, and no easy kill`, 'new', true);
+    try{ saveCurrentGame(); }catch(e){}
+    return;
+  }
+}
 function checkMythicBeastTrigger(){
   const beast = (G.ow.mythicBeasts||[]).find(b=>!b.slain && b.x===G.owPos.x && b.y===G.owPos.y);
   if (!beast) return false;
@@ -18555,7 +18583,7 @@ function worldCodeParse(code){
 }
 // a fresh world from a given seed on the preview screen (nothing is committed yet)
 function wgRegenerate(seed){
-  G.ow.townPositions = {}; G.ow.townFlavor = {}; G.ow.siteMoves = {}; G.ow.mythicSlain = {};
+  G.ow.townPositions = {}; G.ow.townFlavor = {}; G.ow.siteMoves = {}; G.ow.mythicSlain = {}; G.ow.mythicNew = []; G.ow.mythicNextAt = 0;
   generateOverworld(seed >>> 0); applyOverworldOverrides(); renderOverlay();
 }
 function setContinentType(id){ if (!CONTINENT_TYPES.some(c=>c.id===id)) return; G.ow.continent = id; wgRegenerate(Math.floor(Math.random()*4294967295)); }
@@ -28413,14 +28441,15 @@ function o3ApplyTime(){
   const lerpC = (a,b,k)=> new T.Color(a).lerp(new T.Color(b), k);
   const sky = lerpC(0x0b1022, 0x8fb4dc, day).lerp(new T.Color(0xe8a070), dusk*0.35*day).lerp(new T.Color(wx==='fog' ? 0xb8bcc0 : wx==='storm' ? 0x2a3038 : 0x5a6068), gloom*(0.4+0.6*day));
   O3.scene.background = sky;
-  // the haze starts beyond the camera, however far you've zoomed out, so you and the land around you stay clear
-  const cd = O3.dist*1.05;
-  const fogNear = cd + (wx==='fog' ? -1 : wx==='storm' ? 3 : 8), fogFar = cd + (wx==='fog' ? 14 : wx==='storm' ? 24 : 36);
-  O3.scene.fog = new T.Fog(sky, fogNear, fogFar);
+  // only foggy weather brings a haze; otherwise the view stays clear however far you've zoomed out (RS-170).
+  // The fog object stays in the scene, pushed out of reach, so changing weather doesn't rebuild every shader
+  const cd = O3.dist*1.05, foggy = wx==='fog';
+  const fogNear = foggy ? cd - 1 : 1e4, fogFar = foggy ? cd + 14 : 2e4;
+  if (O3.scene.fog){ O3.scene.fog.color.copy(sky); O3.scene.fog.near = fogNear; O3.scene.fog.far = fogFar; } else O3.scene.fog = new T.Fog(sky, fogNear, fogFar);
   O3.hemi.color = lerpC(0x3a4a78, 0xdde8ff, day); O3.hemi.groundColor = lerpC(0x151210, 0x5a4a30, day);
-  O3.hemi.intensity = (0.16 + day*0.55) * (1 - gloom*0.35);
+  O3.hemi.intensity = (0.16 + day*0.42) * (1 - gloom*0.35);   /* (RS-170: a softer midday) */
   O3.sun.color = lerpC(0x7a90e0, 0xfff0d8, day).lerp(new T.Color(0xffa060), dusk*0.5*day);
-  O3.sun.intensity = (0.25 + day*1.45) * (1 - gloom*0.55);
+  O3.sun.intensity = (0.25 + day*1.1) * (1 - gloom*0.55);
   // the sun (or moon) swings across the sky with the clock
   const a = (p-0.25)*Math.PI*2, pp = O3.pgrp.position;
   const am = sunUp > -0.05 ? a : a + Math.PI, up = Math.max(0.3, Math.sin(am));   /* (RS-157: the moon by night) */
@@ -32861,7 +32890,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-169';
+const GAME_VERSION = 'rs-170';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -35466,7 +35495,7 @@ function frameLoop(ts){
   if (G.player && G.ui==='playing'){ const ck = Math.floor(clockNow()), lbl = timeOfDayLabel();
     if (ck!==frameLoop.ck){ frameLoop.ck = ck; try{ seasonTick(); }catch(e){ console.error(e); } }
     if (lbl!==frameLoop.tod){ const had = frameLoop.tod; frameLoop.tod = lbl; if (had!==undefined) try{ renderGame(); }catch(e){ console.error(e); } } }
-  if (G.player && G.ui==='playing' && (G.player.turnCount||0)!==frameLoop.rt){ frameLoop.rt = G.player.turnCount||0; try{ seasonTick(); richTick(); wevTick(); }catch(e){ console.error(e); } }
+  if (G.player && G.ui==='playing' && (G.player.turnCount||0)!==frameLoop.rt){ frameLoop.rt = G.player.turnCount||0; try{ seasonTick(); richTick(); wevTick(); mythicTick(); }catch(e){ console.error(e); } }
   // each new overworld tile: paint in the map, regions, landmarks, route stops (see travelTick)
   if (G.player && G.ui==='playing' && G.gameMode===0 && G.owPos && G.ow && G.ow.map){ const k = G.owPos.x+','+G.owPos.y+'|'+G.ow.seed;
     if (k!==frameLoop.op){ const prev = frameLoop.op; frameLoop.op = k; try{ travelTick(prev && prev.split('|')[1]===String(G.ow.seed) ? prev : null); wgOnStep(prev); }catch(e){ console.error(e); } } }

@@ -25,6 +25,9 @@ module.exports = async page=>{
     G.gameMode = 0; G.interior = null; setUi('playing'); for (let i=0;i<6;i++){ renderGame(); await new Promise(r=>setTimeout(r, 60)); }
     let casters = 0; if (O3.player) O3.player.g.traverse(o=>{ if (o.isMesh && o.castShadow) casters++; });
     out.ow = { o3:o3Active(), blobs:O3.pgrp ? blobs(O3.pgrp) : -1, casters, half:O3.sun ? O3.sun.shadow.camera.right : 0, dist:O3.dist };
+    // RS-170: no haze when zoomed out on a clear day (only foggy weather brings it), and a softer midday sun
+    if (o3Active()){ const kw = G.weather; G.weather = 'clear'; p.clock = D*0.5; O3.dist = 28; o3ApplyTime(); out.ow.clearFog = O3.scene.fog ? O3.scene.fog.near : 1e9; out.ow.sun = O3.sun.intensity;
+      G.weather = 'fog'; o3ApplyTime(); out.ow.fogFog = O3.scene.fog ? O3.scene.fog.near : 1e9; G.weather = kw; o3ApplyTime(); }
     return out; });
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
@@ -36,5 +39,6 @@ module.exports = async page=>{
   A(r.rain.streaks && r.rain.sprites===0 && r.rain.maxLen > 0.1 && r.rain.maxLen < 0.5 && (r.rain.offAfter || /rain|storm/.test(String(r.keepW))), 'town rain falls as thin streaks: '+JSON.stringify(r.rain));
   A(r.townBlobs===0, 'no round blob shadows at the feet in town');
   A(!r.ow.o3 || (r.ow.blobs===0 && r.ow.casters > 3 && r.ow.half <= Math.max(9, r.ow.dist*1.2)), 'the overworld player casts a real shadow and has no blob');
+  A(!r.ow.o3 || (r.ow.clearFog > 1000 && r.ow.fogFog < 60 && r.ow.sun < 1.5), 'no zoomed-out haze on a clear overworld day, a softer sun, and fog weather still hazes');
   A(r.desertNoon.i < r.noon.i*0.8 && r.desertNoon.b < r.noon.b*1.3, 'the desert sun is softer');
 };

@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-170 - Mythic beasts return, clearer skies
+
+- **A new mythic beast rises.** About 400 steps after you slay one, word spreads that another has risen somewhere else in the world, far from you. It's marked on your map.
+- **Mythic beasts are level 100 or more.** Each one now fights as its own great creature, at least level 100 and higher as you grow.
+- **No more haze when zoomed out.** The overworld no longer fades into a pale fog at the top of the screen on clear days. Only foggy weather brings a haze. The low ground mist over swamps and water stays.
+- **Softer midday light.** The overworld sun and sky light are toned down, so daytime isn't washed out.
+
 ## RS-169 - Wizard loot and charging monsters
 
 - **Loot that suits you**: drops now lean toward the way you fight. If you cast spells you'll find staves and wizard robes and hats about half the time; if you shoot, bows and hide armour. Fighters get plate and blades as before. Before, a staff was rare and robes made up only a fifth of armour drops.
