@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## RS-172 - Smoother animation
+
+- **Feet plant instead of skating.** Walking legs used to tick along on a timer, however fast the figure was moving, so feet slid across the ground. Now every stride matches the distance covered: you, monsters, townsfolk, travellers and your escort.
+- **A fuller walk.** Hips dip and twist with each step, the shoulders turn against them, knees fold as each leg swings through, arms swing against the legs, and figures lean a little into the walk.
+- **Smooth starts and stops.** On the overworld and in towns, the stride swells as a figure sets off and settles as it stops, instead of snapping between standing and walking.
+- **Monsters look where they're going.** A creature walking somewhere faces the way it walks instead of shuffling sideways or backwards while staring at you. It turns to face you once it stops.
+- **Every attack shows a swing.** Monsters used to swing only when they hurt you, so a miss showed nothing. Now every attack, hit or miss, plays the swing, starting just before the blow lands. Skeletons too.
+- **Map markers keep up with you.** Encounter and mythic beast markers on the overworld now appear as soon as you travel into a new stretch of land. Before, they could stay missing until something else changed.
+
 ## RS-171 - Smoother dungeon walking
 
 - **Even stride on diagonals.** Diagonal steps used to lag behind and then lurch to catch up. Every step, straight or diagonal, now glides at one steady pace, for you and for monsters.

@@ -5999,7 +5999,7 @@ function singleAttackRoll(mi, missVerb, hitVerb){
 // resolves a monster's whole turn against the player, including Multiattack
 // and Rampage's bonus swing when it applies
 function monsterStrikesPlayer(mi, missVerb, hitVerb){
-  if (G.mon[mi]) G.mon[mi].engaged = true;
+  if (G.mon[mi]){ G.mon[mi].engaged = true; G.mon[mi]._atkT = (typeof FP!=='undefined' && FP.t) || 0.001; }   /* (RS-172: its model swings) */
   const hits = multiattackCount(G.mon[mi]);
   let anyHit = false;
   for (let a=0; a<hits; a++){
@@ -26536,21 +26536,21 @@ const SKI = {
   legR: [-0.4, -0.16, 1.0, -0.5],   // [hip fwd, hip out, knee bend, ankle]: sword-side knee bent, braced
   legL: [-0.15, 0.06, 0.12, 0.0],
 };
-function sk3Pose(t, walk, atk, hit, seed, rig){
-  const m = rig || SK3.m, s = Math.sin, br = s(t*1.7+seed)*0.5+0.5, W = walk;
+function sk3Pose(t, walk, atk, hit, seed, rig, wph){
+  const m = rig || SK3.m, s = Math.sin, br = s(t*1.7+seed)*0.5+0.5, W = walk, wk = wph!=null ? wph : t*9;   /* (RS-172: the stride from the ground covered) */
   m.root.rotation.y = s(t*0.6+seed)*0.1;
-  m.pelvis.position.y = 0.95 - Math.abs(s(t*9))*0.02*W;
-  m.pelvis.rotation.set(0.05, s(t*9)*0.1*W, 0);
-  m.spine.rotation.set(0.1 + hit*0.25, -s(t*9)*0.08*W, 0);
+  m.pelvis.position.y = 0.95 - Math.abs(s(wk))*0.02*W;
+  m.pelvis.rotation.set(0.05, s(wk)*0.1*W, 0);
+  m.spine.rotation.set(0.1 + hit*0.25, -s(wk)*0.08*W, 0);
   m.chest.rotation.set(0.06 + br*0.02 - atk*0.12, s(atk*Math.PI)*-0.35, 0);
   m.neck.rotation.set(-0.16 - hit*0.3, s(t*0.9+seed)*0.2, 0);
   m.head.rotation.set(-0.08 + s(t*0.5)*0.05, 0, s(t*0.7+seed)*0.06);
   m.head.userData.jaw.rotation.x = 0.06 + Math.max(0, s(t*11+seed))*0.08*(0.4+hit) + atk*0.3;
   // a braced fighting stance (walking blends toward an even stride)
   const leg = (L, ph, st)=>{
-    const sw = W*s(t*9+ph)*0.45, k = 1-W*0.6;
+    const sw = W*s(wk+ph)*0.55, k = 1-W*0.6;
     L.hip.rotation.set(st[0]*k - 0.2*(1-k) - sw, 0, st[1]*k);
-    L.kn.rotation.set(st[2]*k + 0.36*(1-k) + Math.max(0, -s(t*9+ph))*0.6*W, 0, 0);
+    L.kn.rotation.set(st[2]*k + 0.36*(1-k) + Math.max(0, -s(wk+ph))*0.75*W, 0, 0);
     L.ft.rotation.set(st[3]*k - 0.14*(1-k) + sw*0.3, 0, 0);
   };
   leg(m.RL, 0, SKI.legR); leg(m.LL, Math.PI, SKI.legL);
@@ -26659,18 +26659,19 @@ function sk3Update(m, pos, flash, moving){
   if (!e){ e = sk3Instance(m); if (!e) return 0; M3D.inst.set(m, e); }
   if (!e.holder.parent) FPD.scene.add(e.holder);
   e.stamp = M3D.stamp; M3D.live.add(e);
-  // it swings when you take a hit beside it
-  if (G.player.hp < e.pHp && Math.abs(m.x-G.player.x)+Math.abs(m.y-G.player.y)<=1 && e.atk===0) e.atk = 0.001;
+  // it swings whenever it strikes at you, hit or miss (RS-172)
+  if (m._atkT && m._atkT!==e.atkSeen){ e.atkSeen = m._atkT; if (FP.t - m._atkT < 1) e.atk = 0.18; }
   e.pHp = G.player.hp;
   if (e.atk>0){ e.atk += FP.dt*2.2; if (e.atk>=1) e.atk = 0; }
   if (flash > 0.5 && e.hurt < 0.2) e.hurt = 1; e.hurt = Math.max(0, e.hurt - FP.dt*3);
-  const fa = Math.atan2(G.player.x+0.5 - pos.x, G.player.y+0.5 - pos.y);
+  const gx = m.x+0.5 - pos.x, gy = m.y+0.5 - pos.y, going = moving > 0.3 && Math.hypot(gx, gy) > 0.08 && !e.atk;
+  const fa = going ? Math.atan2(gx, gy) : Math.atan2(G.player.x+0.5 - pos.x, G.player.y+0.5 - pos.y);   /* (RS-172: it looks where it walks) */
   let da = fa - (e.face===undefined ? fa : e.face); da = Math.atan2(Math.sin(da), Math.cos(da)); e.face = (e.face===undefined ? fa : e.face) + da*Math.min(1, FP.dt*8);
   const lunge = e.atk>0.25 && e.atk<0.8 ? Math.sin((e.atk-0.25)/0.55*Math.PI)*0.16 : 0;
   const back = e.hurt*0.09 - lunge;   // knocked back a touch by your blow, stepping in as it cuts
   e.holder.position.set(pos.x - Math.sin(e.face)*back, 0, pos.y - Math.cos(e.face)*back); e.holder.rotation.y = e.face;
   for (const mt of e.mats){ if (!mt.userData.em0) mt.userData.em0 = mt.emissive.clone(); mt.emissive.copy(mt.userData.em0).addScalar(flash*0.5); }
-  sk3Pose(FP.t, moving, e.atk, Math.max(e.hurt, flash*0.5), e.seed, e.rig);
+  sk3Pose(FP.t, moving, e.atk, Math.max(e.hurt, flash*0.5), e.seed, e.rig, m3dStride(e, FP.t, moving));
   return e.H;
 }
 
@@ -27656,7 +27657,7 @@ function doorSwing(pv, open){ if (!pv) return; pv.rotation.y = pv.userData.sgn*1
 function doorTickIn(dt){
   const D = V3.door, T = THREE; D.t += dt; const k = Math.min(1, D.t/DOOR_IN), e = k*k*(3-2*k), P = V3.player;
   if (D.from && P){ const w = Math.min(1, k*1.25); P.g.position.x = D.from.x + (D.to.x - D.from.x)*w; P.g.position.z = D.from.z + (D.to.z - D.from.z)*w;
-    if (P.e){ const want = Math.atan2(D.to.x - D.from.x, D.to.z - D.from.z); let da = want - (P.yaw||0); da = Math.atan2(Math.sin(da), Math.cos(da)); P.yaw = (P.yaw||0) + da*Math.min(1, dt*12); P.e.holder.rotation.y = P.yaw; m3dPoseHumanoid(P.e.rig, V3.t, w < 1 ? 1 : 0, 0, 0, 0, P.e); } }
+    if (P.e){ const want = Math.atan2(D.to.x - D.from.x, D.to.z - D.from.z); let da = want - (P.yaw||0); da = Math.atan2(Math.sin(da), Math.cos(da)); P.yaw = (P.yaw||0) + da*Math.min(1, dt*12); P.e.holder.rotation.y = P.yaw; m3dPoseHumanoid(P.e.rig, V3.t, m3dEaseMv(P.e, w < 1 ? 1 : 0, dt), 0, 0, 0, P.e); } }
   if (D.enter) doorSwing(D.pv, Math.min(1, k*2.4));
   const yaw = viewYawNow(), Dd = V3.dist*(1 - 0.42*e), c = D.to, want = new T.Vector3(c.x + Math.sin(yaw)*Dd*0.72, Dd*0.92, c.z + Math.cos(yaw)*Dd*0.72);
   if (!V3.camPos) V3.camPos = want.clone(); else V3.camPos.lerp(want, 1 - Math.exp(-dt*9));
@@ -27723,10 +27724,10 @@ function v3Render(){
       else if (p.n){ const q = V3.player.g.position; if (Math.hypot(q.x-g.x, q.z-g.z) < 4.5) want = Math.atan2(q.x-g.x, q.z-g.z); }
       let da = want - p.yaw; da = Math.atan2(Math.sin(da), Math.cos(da)); p.yaw += da*Math.min(1, dt*8);
       p.e.holder.rotation.y = p.yaw;
-      const tt = V3.t + (p.ph||(p.ph=Math.random()*6)), mv = moving ? 1 : 0;
+      const tt = V3.t + (p.ph||(p.ph=Math.random()*6)), mv = m3dEaseMv(p.e, moving ? 1 : 0, dt);
       m3dPoseHumanoid(p.e.rig, tt, mv, 0, 0, 0, p.e);
       // at ease in town: arms hang loose and swing with the stride (a weapon is carried pointing down)
-      const r = p.e.rig, sw = Math.sin(tt*9)*mv, br = Math.sin(tt*2.2);
+      const r = p.e.rig, sw = -Math.sin(p.e.wph!=null ? p.e.wph : tt*9)*mv, br = Math.sin(tt*2.2);   /* (RS-172: in step with the legs, each arm against its own leg) */
       if (r.arms && !r.zombie){
         const [R, L] = r.arms;
         R.sh.rotation.x = -0.08 - sw*0.45 + br*0.02; R.sh.rotation.z = -0.12; R.el.rotation.x = r.weapon ? -0.5 : -0.25;
@@ -28220,7 +28221,7 @@ function o3SyncEncounters(){
   const T = THREE, list = [];
   for (const e of (G.ow.encounters||[])) list.push(['enc', e.x, e.y]);
   for (const b of (G.ow.mythicBeasts||[])) if (!b.slain) list.push(['myth', b.x, b.y]);
-  const key = list.map(l=>l.join(':')).join('|');
+  const key = list.map(l=>l.join(':')).join('|') + '@' + (O3.win ? O3.win.cx + ',' + O3.win.cy : '');   /* (RS-172: and again when the land around you is rebuilt somewhere new) */
   if (key === O3.encKey) return;
   O3.encKey = key;
   const g = O3.encGrp; while (g.children.length) g.remove(g.children[0]);
@@ -28332,8 +28333,8 @@ function o3SyncEscort(pp, dxs, dzs, sailing){
   const moving = Math.hypot(want.x-O3.escortPos.x, want.z-O3.escortPos.z) > 0.05;
   if (E.e){
     if (moving) E.yaw = Math.atan2(want.x-O3.escortPos.x, want.z-O3.escortPos.z);
-    E.e.holder.rotation.y = E.yaw||0; m3dPoseHumanoid(E.e.rig, O3.t, moving ? 1 : 0, 0, 0, 0, E.e);
-    if (E.e.rig.arms){ const [R, L] = E.e.rig.arms, sw = Math.sin(O3.t*9)*(moving?1:0); R.sh.rotation.x = -0.08 - sw*0.45; L.sh.rotation.x = -0.08 + sw*0.45; R.el.rotation.x = L.el.rotation.x = -0.25; R.sh.rotation.z = -0.12; L.sh.rotation.z = 0.12; }
+    E.e.holder.rotation.y = E.yaw||0; m3dPoseHumanoid(E.e.rig, O3.t, m3dEaseMv(E.e, moving ? 1 : 0, 0.016), 0, 0, 0, E.e);
+    if (E.e.rig.arms){ const [R, L] = E.e.rig.arms, sw = -Math.sin(E.e.wph!=null ? E.e.wph : O3.t*9)*(E.e.mvS||0); R.sh.rotation.x = -0.08 - sw*0.45; L.sh.rotation.x = -0.08 + sw*0.45; R.el.rotation.x = L.el.rotation.x = -0.25; R.sh.rotation.z = -0.12; L.sh.rotation.z = 0.12; }
     return;
   }
   E.walk = (E.walk||0) + (moving ? 0.2 : 0); E.sp.position.y = moving ? Math.abs(Math.sin(E.walk))*0.05 : 0;
@@ -28801,8 +28802,8 @@ function o3Render(){
     let want = sailing ? (O3.boatYaw||0) : (moving ? Math.atan2(dxs, dzs) : P.yaw);
     let da = want - P.yaw; da = Math.atan2(Math.sin(da), Math.cos(da)); P.yaw += da*Math.min(1, dt*8);
     P.e.holder.rotation.y = P.yaw;
-    const mv = (moving && !sailing) ? 1 : 0, r = P.e.rig, tt = O3.t, sw = Math.sin(tt*9)*mv;
-    m3dPoseHumanoid(r, tt, mv, 0, 0, 0, P.e);
+    const mv = m3dEaseMv(P.e, (moving && !sailing) ? 1 : 0, dt), r = P.e.rig, tt = O3.t;
+    m3dPoseHumanoid(r, tt, mv, 0, 0, 0, P.e); const sw = -Math.sin(P.e.wph!=null ? P.e.wph : tt*9)*mv;
     if (r.arms){ const [R, L] = r.arms; R.sh.rotation.x = -0.08 - sw*0.45; R.sh.rotation.z = -0.12; R.el.rotation.x = r.weapon ? -0.5 : -0.25;
       L.sh.rotation.x = (r.shield ? -0.25 : -0.08) + sw*0.45; L.sh.rotation.z = 0.12; L.el.rotation.x = r.shield ? -0.9 : -0.25;
       if (r.twoHand){ R.sh.rotation.x = -0.35; R.el.rotation.x = -0.9; }
@@ -30809,12 +30810,12 @@ function m3dDragon(o){
     }
   }
   if (o.aura){ const sp = new T.Sprite(M3D.glowMat(m3dRgb(o.aura), 0.25)); sp.scale.setScalar(1.3); sp.position.y = 0.3; root.add(sp); }
-  return m3dFinish(root, rig, (r, t, mv, wind, strike, hurt)=>{
+  return m3dFinish(root, rig, (r, t, mv, wind, strike, hurt, e)=>{
     r.body.rotation.x = -hurt*0.2 + strike*0.12;
     m3dBend(r.neck, 0.12 - wind*0.25 + strike*0.35, 0, 0.05, t*1.5);
     m3dAim(r.head, strike*0.35 - wind*0.2); r.jaw.rotation.x = 0.1 + Math.max(wind, strike)*0.5 + Math.max(0, Math.sin(t*0.8))*0.08;
     m3dBend(r.tail, 0.22, 0, 0.12, t*1.8);
-    r.legs.forEach(L=>{ const ph = L.fx*L.fz>0 ? 0 : Math.PI; L.hip.rotation.x = Math.sin(t*9+ph)*0.5*mv; L.knee.rotation.x = Math.max(0,-Math.sin(t*9+ph+0.9))*0.6*mv; });
+    { const wk = m3dStride(e, t, mv); r.legs.forEach(L=>{ const ph = L.fx*L.fz>0 ? 0 : Math.PI; L.hip.rotation.x = Math.sin(wk+ph)*0.5*mv; L.knee.rotation.x = Math.max(0,-Math.sin(wk+ph+0.9))*0.6*mv; }); }
     if (r.wings) r.wings.forEach(W=>{ W.w.rotation.y = -W.s*(0.45 + Math.sin(t*2.2)*0.3 - wind*0.3 + strike*0.4); W.w.rotation.z = W.s*(0.15 + wind*0.2); });
   });
 }
@@ -31194,13 +31195,15 @@ function m3dPose(e, pos, m, moving, flash){
   const r = e.rig, t = FP.t + e.seed, T = THREE;
   // turn to face you
   // (a beast stands a little side-on, looking about, and squares up to you when it strikes)
-  const fa = Math.atan2(G.player.x+0.5 - pos.x, G.player.y+0.5 - pos.y) + (e.beast && !e.atk ? 0.55*Math.sin(t*0.35) + (e.seed>5 ? 0.35 : -0.35) : 0);
+  /* (RS-172) walking somewhere, it looks where it's going; standing, it watches you */
+  const gx = m.x+0.5 - pos.x, gy = m.y+0.5 - pos.y, going = moving > 0.3 && Math.hypot(gx, gy) > 0.08 && !e.atk;
+  const fa = going ? Math.atan2(gx, gy) : Math.atan2(G.player.x+0.5 - pos.x, G.player.y+0.5 - pos.y) + (e.beast && !e.atk ? 0.55*Math.sin(t*0.35) + (e.seed>5 ? 0.35 : -0.35) : 0);
   let da = fa - (e.face===undefined ? fa : e.face); da = Math.atan2(Math.sin(da), Math.cos(da)); e.face = (e.face===undefined ? fa : e.face) + da*Math.min(1, FP.dt*8);
   const lunge = e.atk>0.3 && e.atk<0.85 ? Math.sin((e.atk-0.3)/0.55*Math.PI)*0.16 : 0;
   const back = (e.hurt||0)*0.08 - lunge;   // rocked back a touch by your blow, lunging in when it strikes
   e.holder.position.set(pos.x - Math.sin(e.face)*back, e.lift ? e.lift + Math.sin(t*2.2)*0.03 : 0, pos.y - Math.cos(e.face)*back); e.holder.rotation.y = e.face;
-  // you just took a hit with this creature beside you: it struck
-  if (G.player.hp < e.pHp && Math.abs(m.x-G.player.x)+Math.abs(m.y-G.player.y)<=1 && e.atk===0) e.atk = 0.001;
+  // it struck at you (hit or miss): the swing starts just before the blow lands (RS-172 - it used to swing only when you lost life)
+  if (m._atkT && m._atkT!==e.atkSeen){ e.atkSeen = m._atkT; if (FP.t - m._atkT < 1) e.atk = 0.22; }
   e.pHp = G.player.hp;
   if (e.atk>0){ e.atk += FP.dt*2.4; if (e.atk>=1) e.atk = 0; }
   if (flash > 0.5 && e.hurt < 0.2) e.hurt = 1; e.hurt = Math.max(0, e.hurt - FP.dt*3);
@@ -31210,7 +31213,7 @@ function m3dPose(e, pos, m, moving, flash){
   // a summoned creature claws its way up out of the floor
   if (e.rise < 1){ e.rise = Math.min(1, e.rise + FP.dt*1.2); e.holder.position.y -= (1 - e.rise)*e.H; }
   if (e.anim){ e.anim(r, t, moving, wind, strike, e.hurt, e); m3dPoseExtra(e, r, m, t); return; }
-  if (e.beast){ m3dPoseBeast(r, t, moving, wind, strike, e.hurt); m3dPoseExtra(e, r, m, t); return; }
+  if (e.beast){ m3dPoseBeast(r, t, moving, wind, strike, e.hurt, e); m3dPoseExtra(e, r, m, t); return; }
   m3dPoseHumanoid(r, t, moving, wind, strike, e.hurt, e);
   m3dPoseExtra(e, r, m, t);
 }
@@ -31224,8 +31227,25 @@ function m3dPoseExtra(e, r, m, t){
   }
   if (r.torso && !e.atk){ const f = Math.max(0, Math.sin(t*0.37) - 0.92)*12; r.torso.rotation.z = (r.torso.rotation.z||0)*0.5 + f*0.06; }
 }
-function m3dPoseBeast(r, t, moving, wind, strike, hurt){
-  const breath = Math.sin(t*2.2), walk = t*9;
+// RS-172: the stride is driven by the ground a figure actually covers, not the clock, so its feet plant instead of skating.
+// One full cycle (two steps) per 1.3 of its own heights; a figure that's told it's walking but isn't going anywhere
+// (a preview, a treadmill) still steps on the clock. Returns the walk phase.
+function m3dStride(e, t, moving){
+  if (!e || !e.holder) return t*9;
+  const T = THREE, v = M3D._wp || (M3D._wp = new T.Vector3()), sc = M3D._ws || (M3D._ws = new T.Vector3());
+  const now = performance.now()/1000; if (e._lt!==undefined && now - e._lt < 0.002) return e.wph||0;   /* (posed twice in one frame: once is enough) */
+  e.holder.getWorldPosition(v); e.holder.getWorldScale(sc);
+  const dt = e._lt===undefined ? 0 : Math.max(0, Math.min(0.1, now - e._lt)); e._lt = now;
+  let d = e._lx===undefined ? 0 : Math.hypot(v.x - e._lx, v.z - e._lz); e._lx = v.x; e._lz = v.z;
+  const h = Math.max(0.2, (e.H||0.9)*sc.y); if (d > h*2) d = 0;   /* (a jump to a new spot isn't a stride) */
+  if (d > 1e-4) e.wph = (e.wph||0) + d/(1.3*h)*Math.PI*2;
+  else if (moving > 0.3) e.wph = (e.wph||0) + dt*9*moving;
+  return e.wph||0;
+}
+// how much a figure is walking, eased, so its stride swells as it sets off and settles as it stops instead of snapping (RS-172)
+function m3dEaseMv(e, want, dt){ if (!e) return want; const c = e.mvS||0; e.mvS = c + (want - c)*Math.min(1, (dt||0.016)*(want > c ? 12 : 7)); if (Math.abs(e.mvS - want) < 0.01) e.mvS = want; return e.mvS; }
+function m3dPoseBeast(r, t, moving, wind, strike, hurt, e){
+  const breath = Math.sin(t*2.2), walk = m3dStride(e, t, moving);
   {
     r.body.rotation.x = -hurt*0.25 + strike*0.15 - wind*0.12;
     r.body.rotation.z = Math.sin(walk*0.5)*0.03*moving;
@@ -31237,17 +31257,21 @@ function m3dPoseBeast(r, t, moving, wind, strike, hurt){
   }
 }
 function m3dPoseHumanoid(r, t, moving, wind, strike, hurt, e){
-  const breath = Math.sin(t*2.2), walk = t*9;
-  // two-legged: hips bob with the stride, the torso breathes and leans into its blows
-  r.hips.position.y = 0.47 + Math.abs(Math.sin(walk))*0.012*moving - hurt*0.01 - (r.hunch ? 0.04 : 0);
-  r.torso.rotation.x = 0.06 + breath*0.015 + strike*0.25 - wind*0.12 - hurt*0.3 + (r.hunch ? 0.45 : 0);
-  r.torso.rotation.y = wind*0.5 - strike*0.6;
-  r.legs.forEach(L=>{ L.hip.rotation.x = -Math.sin(walk + (L.s>0 ? Math.PI : 0))*0.5*moving + (L.s<0 ? -0.15 : 0.12)*(1-moving); L.knee.rotation.x = Math.max(0, Math.sin(walk + (L.s>0 ? Math.PI : 0) + 1.2))*0.8*moving + 0.08; });
+  const breath = Math.sin(t*2.2), walk = m3dStride(e, t, moving), sw = Math.sin(walk), dip = Math.cos(walk*2);
+  // two-legged: the hips dip as each foot lands and rise as the other passes, twisting with the stride while the
+  // shoulders turn against them; it leans a little into the walk, breathes, and leans into its blows
+  r.hips.position.y = 0.47 + (0.5 - 0.5*dip)*0.022*moving - 0.008*moving - hurt*0.01 - (r.hunch ? 0.04 : 0);
+  r.hips.rotation.y = sw*0.14*moving; r.hips.rotation.z = Math.cos(walk)*0.035*moving;
+  r.torso.rotation.x = 0.06 + breath*0.015 + 0.09*moving + strike*0.25 - wind*0.12 - hurt*0.3 + (r.hunch ? 0.45 : 0);
+  r.torso.rotation.y = wind*0.5 - strike*0.6 - sw*0.26*moving;
+  /* each leg swings through, its knee folding as it comes forward and straightening to land */
+  r.legs.forEach(L=>{ const ph = walk + (L.s>0 ? Math.PI : 0); L.hip.rotation.x = -Math.sin(ph)*0.72*moving + (L.s<0 ? -0.15 : 0.12)*(1-moving); L.knee.rotation.x = Math.max(0, Math.sin(ph + 1.35))*1.1*moving + 0.08; });
   const [R, Lf] = r.arms;
-  // weapon arm: held ready, drawn back over the shoulder, then brought down across
-  R.sh.rotation.x = -0.55 - wind*1.9 + strike*1.7 + Math.sin(walk)*0.2*moving + breath*0.03;
-  R.sh.rotation.z = -0.25 + wind*0.3; R.el.rotation.x = -0.9 + wind*0.3 - strike*0.2;
-  Lf.sh.rotation.x = (r.shield ? -0.9 : -0.3) - Math.sin(walk)*0.2*moving - (r.twoHand ? 0.4 + wind*1.2 - strike*1.2 : 0); Lf.sh.rotation.z = r.shield ? 0.2 : 0.2; Lf.el.rotation.x = r.shield ? -1.2 : -0.6;
+  // weapon arm: held ready, drawn back over the shoulder, then brought down across; the arms swing against the legs
+  R.sh.rotation.x = -0.55 - wind*1.9 + strike*1.7 + sw*0.3*moving + breath*0.03;
+  R.sh.rotation.z = -0.25 + wind*0.3; R.el.rotation.x = -0.9 + wind*0.3 - strike*0.2 - Math.max(0, -sw)*0.25*moving;
+  Lf.sh.rotation.x = (r.shield ? -0.9 : -0.3) - sw*(r.shield ? 0.15 : 0.45)*moving - (r.twoHand ? 0.4 + wind*1.2 - strike*1.2 : 0); Lf.sh.rotation.z = r.shield ? 0.2 : 0.2; Lf.el.rotation.x = r.shield ? -1.2 : -0.6;
+  if (!r.shield && !r.twoHand) Lf.el.rotation.x -= Math.max(0, sw)*0.35*moving;
   if (r.twoHand){ Lf.sh.rotation.z = 0.55; Lf.el.rotation.x = -1.0; }
   if (r.zombie){ R.sh.rotation.x = -1.35 + Math.sin(t*1.3)*0.08 - wind*0.3 + strike*0.4; Lf.sh.rotation.x = -1.3 + Math.sin(t*1.3+1)*0.08 - wind*0.3 + strike*0.4; R.sh.rotation.z = -0.1; Lf.sh.rotation.z = 0.1; R.el.rotation.x = -0.2; Lf.el.rotation.x = -0.25; }
   if (r.hunch) r.legs.forEach(L=>{ L.knee.rotation.x += 0.4; L.hip.rotation.x -= 0.3; });
@@ -32918,7 +32942,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-171';
+const GAME_VERSION = 'rs-172';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

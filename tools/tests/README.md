@@ -45,6 +45,7 @@ Screenshots go to `tools/tests/shots/`.
 | models | renamed creatures (the highwayman, a mythic beast) keep their 3D model; a mythic beast stands at its lair on the map |
 | rush | a melee monster rushes you from well off and finds its way round walls, and a dashing one stops beside you |
 | dwalk | walking a dungeon: even diagonal strides, the camera leads ahead, pillars dissolve in the cutaway, and on a phone you stand mid-view |
+| anim | strides follow the ground covered at any speed, ease in and out, creatures look where they walk, and a monster swings on a miss too |
 | lootstyle | drops lean to how you fight: staves and robes for a mage, bows and hide for an archer |
 | diag | diagonal steps: keys, numpad, corners, click paths, no diagonal strikes |
 | touch | on an emulated phone: tap to walk, long-press menu, pinch zoom, map drag, the d-pad, the hotbar |

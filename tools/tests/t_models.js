@@ -11,7 +11,7 @@ module.exports = async page=>{
       // on the map, near its lair
       G.gameMode = 0; G.mon = []; G.owPos = { x:b.x + 2, y:b.y }; G.player.turnCount = (G.player.turnCount||0) + MYTHIC_RESPAWN + 1; mythicTick();
       const nb = (G.ow.mythicBeasts||[]).find(o=>o.i>=1000 && !o.slain); out.newBeast = nb ? { far:Math.hypot(nb.x-G.owPos.x, nb.y-G.owPos.y) >= 20, saved:(G.ow.mythicNew||[]).some(o=>o.i===nb.i) } : null;
-      G.owPos = { x:b.x + 2, y:b.y }; setUi('playing'); for (let i=0;i<8;i++){ renderGame(); await new Promise(r=>setTimeout(r, 60)); }
+      const at = nb || b; G.owPos = { x:at.x + 2, y:at.y }; setUi('playing');   /* (the slain one's lair is empty now: look at the one that rose; headless frames don't always come, so draw the land directly) */ for (let i=0;i<8;i++){ renderGame(); try{ o3Render(); }catch(err){} await new Promise(r=>setTimeout(r, 60)); }
       let meshes = 0, sprites = 0; if (O3.encGrp) O3.encGrp.traverse(o=>{ if (o.isMesh && !o.geometry.type.startsWith('Ring')) meshes++; if (o.isSprite) sprites++; });
       out.map = { o3:o3Active(), meshes, sprites }; }
     // RS-169: the bestiary's skeleton is the sculpted dungeon skeleton
