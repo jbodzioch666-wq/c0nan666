@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-180 - Altars ask first
+
+- **Altars no longer craft on their own.** Walking up to a runecrafting altar, tapping it or pressing E beside it used to bind all your essence straight away. Now the altar asks first: "Bind 10 essence → 10 air runes (45 xp)", or Cancel. Nothing is spent until you choose Bind.
+
 ## RS-179 - Mythic beasts on the map
 
 - **Found beasts go on your map.** The first time you come within sight of a mythic beast (about 12 leagues), you're told you've found it. From then on it has an icon on the world map, with its face in a violet ring and its name over it, and a violet dot on your minimap. Both follow it as it roams.
