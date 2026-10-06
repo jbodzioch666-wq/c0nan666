@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-175 - Freeze fix, town lights and robes that move
+
+- **Fixed a freeze on the overworld.** When three or more landmarks you'd seen were off the same edge of the screen, their pointer markers could bounce back and forth forever and lock up the game. They now step apart once and settle.
+- **Town torches and street lamps light up.** A town only has a few real lights, and they used to go to whichever lamps were built first, so the gate torches, watchtower torches and street lamps never lit anything. Now the lights go to the lamps nearest you and are handed on as you walk.
+- **The old walking pace is back.** Legs step at their earlier steady beat again; the stride matched to the ground was too quick.
+- **No more hit reactions.** Figures no longer flinch, rock back or stagger when they're hit.
+- **Robes move with the legs.** A long robe now swings forward and back with each leg inside it, so legs no longer poke through the cloth as you walk.
+
 ## RS-174 - Proper robes
 
 - **Robe tops are tops.** A robe top no longer comes with a full-length skirt built in. It's now a tunic to the hips, with cloth sleeves, a sash and a short flared hem, so whatever you wear on your legs shows below it.

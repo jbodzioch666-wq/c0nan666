@@ -1,4 +1,4 @@
-// RS-172: animation - strides follow the ground covered (feet plant instead of skating), set off and settle smoothly,
+// RS-172: animation - strides set off and settle smoothly (RS-175: at the old steady pace),
 // creatures look where they walk, and a monster swings whenever it strikes at you, hit or miss
 module.exports = async page=>{
   const r = await page.evaluate(async ()=>{
@@ -11,9 +11,10 @@ module.exports = async page=>{
     const e = m3dInstance({}, rsPlayerLook()); FPD.scene.add(e.holder);
     const walk = async (dist, n)=>{ const w0 = e.wph||0; for (let i=0;i<=n;i++){ e.holder.position.set(5 + dist*i/n, 0, 5); e.holder.updateMatrixWorld(true); m3dPoseHumanoid(e.rig, FP.t, 1, 0, 0, 0, e); await wait(); } return (e.wph||0) - w0; };
     await walk(0, 1);
-    const slow = await walk(1.5, 30), fast = await walk(1.5, 10);
-    const h = e.H*e.holder.scale.y;
-    out.stride = { slow:+slow.toFixed(3), fast:+fast.toFixed(3), want:+(1.5/(1.3*h)*Math.PI*2).toFixed(3) };
+    // (RS-175) the legs keep a steady beat while walking - the old pace, about 9 radians a second, however far it goes
+    const t0 = performance.now(), slow = await walk(1.5, 30), secs = (performance.now() - t0)/1000;
+    out.stride = { rate:+(slow/secs).toFixed(2) };
+    { const w0 = e.wph; for (let i=0;i<6;i++){ m3dPoseHumanoid(e.rig, FP.t, 0, 0, 0, 0, e); await new Promise(r=>setTimeout(r, 20)); } out.stillAdv = +(e.wph - w0).toFixed(3); }
     // standing still while "walking" (a preview) still steps on the clock
     { const w0 = e.wph; for (let i=0;i<6;i++){ m3dPoseHumanoid(e.rig, FP.t, 1, 0, 0, 0, e); await new Promise(r=>setTimeout(r, 20)); } out.treadmill = +(e.wph - w0).toFixed(3); }
     FPD.scene.remove(e.holder);
@@ -43,12 +44,13 @@ module.exports = async page=>{
     return out; });
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
-  A(Math.abs(r.stride.slow - r.stride.want) < 0.05*r.stride.want && Math.abs(r.stride.fast - r.stride.want) < 0.05*r.stride.want, 'the legs cycle with the ground covered, at any speed');
+  A(r.stride.rate > 6.5 && r.stride.rate < 10, 'the legs step at the old steady pace while walking');
+  A(r.stillAdv===0, 'standing still, the legs rest');
   A(r.treadmill > 0.1, 'a figure walking on the spot still steps');
   A(r.ease.first > 0.05 && r.ease.first < 0.4 && r.ease.second > r.ease.first && r.ease.top===1 && r.ease.stop1 > 0.7, 'the stride swells as it sets off and settles as it stops');
   A(r.curve.windGone===0 && r.curve.peak > 0.95 && r.curve.late > 0.3 && r.curve.fol > 0.5 && r.curve.done, 'a swing winds up, releases fast, follows through and eases back');
   A(r.folPose.arm > 0.2 && r.folPose.torso < -0.2, 'the follow-through carries the arm on and turns the shoulders');
-  A(r.hit.heavy.peak > r.hit.light.peak*1.5 && r.hit.heavy.low < 0 && r.hit.heavy.end===0 && r.hit.light.peak > 0.3, 'a hit rocks it back as hard as the blow, rebounds and settles');
+  A(r.hit.heavy.peak===0 && r.hit.light.peak===0, 'no hit reactions (RS-175: taken out)');
   if (r.faceWalk!==undefined){
     const ang = (a, b)=>Math.abs(Math.atan2(Math.sin(a-b), Math.cos(a-b)));
     A(ang(r.faceWalk, r.wantWalk) < 0.15, 'a creature walking off looks where it goes');
