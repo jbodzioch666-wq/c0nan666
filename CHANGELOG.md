@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-201 - Weapons held the right way, and a smaller waypoint window
+
+- **Swords, axes, maces and hammers are held edge-on:** the edge leads and the flat faces the sides. They used to show their flat to the front.
+- **Bows are held properly:** upright, bowing toward the foe, with the string drawn across the tips behind the hand. They used to be held sideways, backwards, or by the string.
+- **Staves are held upright,** gripped about a third of the way up the shaft, instead of tipping off at the angle of the wrist.
+- **This covers everyone:** shamans, cultists, rangers, the skeleton archer and mage, and your own character.
+- **The waypoint window is sized to its map and the hearthstone row,** with the town still in view around it, instead of covering the whole screen.
+
 ## RS-200 - Monsters armed for their trade, and a cleaner waypoint
 
 - **Every skeleton is the sculpted 3D skeleton, dressed for its class:**
