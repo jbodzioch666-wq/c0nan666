@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-213 - Pyramids
+
+- **Pyramids rise in the desert.** A new kind of site: the stepped tomb of a god-king, with its gilded capstone, two obelisks and a dark door at the foot. A world has a couple of them, placed in the desert where there is one. Older worlds get theirs too: their sites keep their numbering, and the pyramids are added after them.
+- **Inside:** sandstone halls with painted friezes, a long gallery climbing from the way in, a chamber to either side, and the burial hall at the top with its pillars, braziers and the slab the pharaoh lay on. Three to six floors, guarded like a temple and paying like one.
+- **The tomb dwellers**, a new family for the bestiary with their own models: tomb scarabs, black tomb jackals, asps, ushabti (the blue-glazed servant statues), mummy priests, jackal-headed anubis wardens, sacred crocodiles, the sphinx, royal mummies and the tomb colossus. Study them all for the usual 5% damage bonus.
+- **The bosses, from the old lore:** the risen pharaoh in the burial hall, who holds you still and drinks your life; and, more often than not, one of the gods in his place - Apep, the serpent of chaos (its Fang, a poisoned blade, and its Scale, an amulet) or Ammit the Devourer, crocodile, lion and hippopotamus in one (the Ring of the Scales and the Devourer's Hide). Both are in the bestiary's Bosses tab and the collection log, and drop godsword shards like the others.
+- **Maps and words:** the pyramid has its own badge on the world map and the minimap, its own entry prompt, help row and examine text.
+
 ## RS-212 - No more music
 
 - **The background music is gone.** No tunes play anywhere - title screen, land, towns, dungeons or fights - and the music player is gone from the settings. The world's own sounds stay: footsteps, combat, ambience, weather.
