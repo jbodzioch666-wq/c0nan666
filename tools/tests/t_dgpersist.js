@@ -39,7 +39,7 @@ module.exports = async page=>{
     out.afterBoss = { ui:G.ui, mode:G.gameMode, slot:G.dungeonSlot, done:G.dgDone, cacheKept:Object.keys(G.dgCache).some(k=>k.startsWith(slot+'_')), entTile:G.ow.map[ent.x][ent.y]===OW_GRASS };
     P = G.player;
     let px=-1, py=-1, pd = 1e9; for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++) if (G.map[x][y]===T_EXIT){ const d = Math.hypot(x-P.x, y-P.y); if (d < pd){ pd = d; px=x; py=y; } }
-    out.portal = [px, py, +pd.toFixed(1)];
+    out.portal = [px, py, +pd.toFixed(1), !!stairWallDir(px, py)];
     victoryContinue(); out.uiBack = G.ui;
     for (let i=0;i<4;i++){ renderGame(); await new Promise(r=>setTimeout(r, 80)); }
     out.portals3d = typeof FPD!=='undefined' && FPD.portals ? FPD.portals.length : -1;
@@ -57,7 +57,7 @@ module.exports = async page=>{
   A(r.reclaimed, 'reclaimed at the stone '+JSON.stringify(r.reclaimDbg));
   A(r.boss[0]===1 && r.boss[1]>=0, 'boss floor '+JSON.stringify(r.boss));
   A(r.afterBoss.ui==='victory' && r.afterBoss.mode===1 && r.afterBoss.slot===r.slot && r.afterBoss.done===1 && r.afterBoss.cacheKept && r.afterBoss.entTile, 'after the boss you are still inside '+JSON.stringify(r.afterBoss));
-  A(r.portal[0]>=0 && r.portal[2] <= 4, 'a portal near you '+JSON.stringify(r.portal));
+  A(r.portal[0]>=0 && r.portal[2] <= 12 && r.portal[3], 'a portal near you, against a room wall '+JSON.stringify(r.portal));
   A(r.uiBack==='playing' && r.portals3d===1, 'the portal is modelled '+JSON.stringify([r.uiBack, r.portals3d]));
   A(r.left.mode===0 && r.left.slot===0 && r.left.done===0 && r.left.cache===0, 'stepping through leaves the site behind '+JSON.stringify(r.left));
   console.log('dgpersist ok '+JSON.stringify({ kb:r.savedKB, portal:r.portal }));

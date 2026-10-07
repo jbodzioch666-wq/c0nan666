@@ -5400,8 +5400,16 @@ function dgGraveSync(){
 // be), and the site stays open behind you for as long as you care to explore it - see the T_EXIT step in tryMove
 function dgOpenExit(){
   const p = G.player, free = (x,y)=> x>0 && y>0 && x<COLS-1 && y<ROWS-1 && G.map[x][y]===T_FLOOR && !(G.dungeonDeco && G.dungeonDeco[x][y]) && !G.mon.some(m=>m.alive && m.x===x && m.y===y) && !(x===p.x && y===p.y);
-  let best = null, bd = 1e9;
-  for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++){ if (!free(x,y)) continue; const d = Math.hypot(x-p.x, y-p.y) + (portalWallDir(x,y) ? 0 : 1.5); if (d < bd){ bd = d; best = [x,y]; } }
+  // (RS-206) the nearest tile you can walk to that backs onto a straight stretch of room wall with open floor round it (as
+  // the stairs do) - never out in a corridor; failing that, a wall that is not a passage, then any clear tile
+  const tiers = [(x,y)=>stairWallDir(x,y), (x,y)=>portalWallDir(x,y) && !passageAt(x,y), ()=>true];
+  let best = null;
+  for (const ok of tiers){
+    const seen = new Set([p.x+','+p.y]), q = [[p.x, p.y]];
+    while (q.length && !best){ const [x,y] = q.shift(); if (free(x,y) && ok(x,y)){ best = [x,y]; break; }
+      for (const [dx,dy] of FACING_VECT){ const nx = x+dx, ny = y+dy, k = nx+','+ny; if (seen.has(k) || nx<1 || ny<1 || nx>=COLS-1 || ny>=ROWS-1 || G.map[nx][ny]===T_WALL) continue; seen.add(k); q.push([nx,ny]); } }
+    if (best) break;
+  }
   if (!best) return;
   G.map[best[0]][best[1]] = T_EXIT; G.dgDone = 1;
   if (typeof FPD!=='undefined') FPD.mapRef = null;
@@ -31104,6 +31112,9 @@ function m3dUniqueify(wpn, name, mats){
   if (st===1){ const ring = new T.Mesh(new T.TorusGeometry(W*0.9 + Y*0.03, Y*0.008, 6, 24), gm); ring.position.set(cx, Y*0.33, 0); ring.rotation.x = Math.PI/2; wpn.add(ring); }
   if (st===2){ m3dSphere(wpn, Y*0.04, gm, cx, bx.min.y + Y*0.02, 0); const f = new T.Sprite(M3D.glowMat(col, 0.6)); f.scale.setScalar(Y*0.16); f.position.set(cx, bx.min.y, 0); wpn.add(f); }
 }
+// (RS-206) the space inside the weapon hand's curled fingers, where a handle sits: the hand is turned a quarter (RS-204),
+// so the grip runs fore and aft through the fist, toward the body side of the hand rather than out in front of it
+function m3dGrip(b){ return [0.026*b, -0.04, 0]; }
 function m3dHumanoid(o){
   const T = THREE, mats = {}, b = o.bulk||1, root = new T.Group(), rig = {}; root.userData.modelRoot = true;
   const outfit = o.outfit||'leather', skinHex = o.skin||'#c9a07c', clothHex = o.cloth||'#5a4630';
@@ -31208,7 +31219,7 @@ function m3dHumanoid(o){
     const gloveM = o.gloves ? m3dMat(mats, o.gloves.col || '#4a3420', o.gloves.kind==='metal' ? 'metal' : 'leather') : null;
     const fo = m3dLimbS(el, 'fore', b, 0.17, m3dVC(mats, rig.robe ? clothM : gloveM ? gloveM : (outfit==='plate' ? plateM : bare ? skinM : m3dMat(mats, mpTone(clothHex, -0.2), 'leather'))));
     const hand = new T.Group(); hand.position.y = -0.015; fo.end.add(hand);
-    const hs = new T.Mesh(m3dLimbGeo('hand', b), m3dVC(mats, gloveM || (outfit==='plate' ? plateM : skinM))); hs.position.y = 0.015; hs.rotation.y = -s*Math.PI/2; hand.add(hs);   /* (RS-204: the weapon hand turned a quarter anticlockwise and the other clockwise, so the fist closes round the grip) */
+    const hs = new T.Mesh(m3dLimbGeo('hand', b), m3dVC(mats, gloveM || (outfit==='plate' ? plateM : skinM))); hs.position.y = 0.015; hs.rotation.y = -s*Math.PI/2; hs.scale.x = -s; hand.add(hs);   /* (RS-206: the sculpt is a right hand - mirrored for the left) */   /* (RS-204: the weapon hand turned a quarter anticlockwise and the other clockwise, so the fist closes round the grip) */
     if (o.claws || o.weapon==='claws') for (let i=0;i<4;i++) m3dCone(hand, 0.005, 0.035, darkM, (-0.018+i*0.012)*b, -0.03, 0.05*b, Math.PI*0.6);
     rig.arms.push({ sh, el, hand, s });
   }
@@ -31218,10 +31229,10 @@ function m3dHumanoid(o){
   if (wpn){ const R = rig.arms[0]; if (o.unique) m3dUniqueify(wpn, o.unique, mats);
     wpn.scale.setScalar(0.42*(o.weaponScale||1));
     if (wk==='bow' || wk==='staff'){   /* (RS-201) upright in the fist: a bow facing the foe, a staff held a third of the way up its shaft */
-      const piv = new T.Group(); piv.position.set(0, -0.042, 0.024*b); R.hand.add(piv); m3dUpright(piv); (rig.ups = rig.ups || []).push(piv);
+      const piv = new T.Group(); piv.position.set(...m3dGrip(b)); R.hand.add(piv); m3dUpright(piv); (rig.ups = rig.ups || []).push(piv);
       if (wk==='staff'){ const bx = new T.Box3().setFromObject(wpn); wpn.position.y = -(bx.min.y + (bx.max.y - bx.min.y)*0.36); }
       piv.add(wpn); rig.weapon = wpn; rig.twoHand = wk==='staff'; rig.wk = wk; rig.glint = o.glint || null; }
-    else { wpn.rotation.set(Math.PI/2, wk==='axe' ? -Math.PI/2 : Math.PI/2, 0); wpn.position.set(0, -0.042, 0.024*b); }   /* (RS-204: a one-handed axe the other way round, its blade leading) */   /* (RS-201: turned on its own length, so the edge leads and the flat faces the sides) */
+    else { wpn.rotation.set(Math.PI/2, wk==='axe' ? -Math.PI/2 : Math.PI/2, 0); wpn.position.set(...m3dGrip(b)); }   /* (RS-204: a one-handed axe the other way round, its blade leading) */   /* (RS-201: turned on its own length, so the edge leads and the flat faces the sides) */
     if (o.swirl){ const bx = new T.Box3().setFromObject(wpn), sw = new T.Group(); sw.position.set((bx.min.x+bx.max.x)/2, (bx.min.y+bx.max.y)/2, bx.max.z - 0.01);   // (motes of light circling the staff's head)
       for (let i=0;i<3;i++){ const sp = new T.Sprite(M3D.glowMat(o.swirl, 0.85)); sp.scale.setScalar(0.035); sw.add(sp); } R.hand.add(sw); rig.swirl = sw; }
     if (!wpn.parent){ R.hand.add(wpn); rig.weapon = wpn; rig.twoHand = /greataxe|greatsword|staff|spear|trident/.test(wk); rig.wk = wk; rig.glint = o.glint || null; } }
@@ -31239,7 +31250,7 @@ function m3dHumanoid(o){
     const boss = new T.Mesh(new T.SphereGeometry(0.032, 20, 10, 0, Math.PI*2, Math.PI/2, Math.PI/2), rm); boss.position.y = -0.012; sg.add(boss);
     const flange = new T.Mesh(new T.CylinderGeometry(0.04, 0.04, 0.004, 24), rm); flange.position.y = -0.013; sg.add(flange);
     for (let i=0;i<8;i++){ const a = i/8*Math.PI*2; m3dSphere(sg, 0.0045, rm, Math.cos(a)*0.093, -0.009, Math.sin(a)*0.093, 1, 0.6, 1); }
-    sg.position.set(0.0, -0.03, 0.035); rig.arms[1].hand.add(sg); rig.shield = sg; }
+    sg.position.set(-m3dGrip(b)[0], -0.03, 0.035); rig.arms[1].hand.add(sg);   /* (RS-206: its grip in the mirrored left fist) */ rig.shield = sg; }
   // wings, tail
   if (o.wings){
     const wm = m3dMat(mats, o.wingCol || mpTone(skinHex, -0.5), 'skin'); wm.side = T.DoubleSide;
@@ -33166,7 +33177,7 @@ function rsHoldTool(e, kind){
   if (r.shield) r.shield.visible = !kind;
   if (r.swirl) r.swirl.visible = !kind;   /* (RS-179: a staff's three circling orbs go away with it while you hold a tool) */
   if (!kind) return;
-  const t = rsToolModel(kind, tier); t.rotation.x = Math.PI/2; t.position.set(0, -0.042, 0.03); t.scale.setScalar(0.42);
+  const t = rsToolModel(kind, tier); t.rotation.x = Math.PI/2; t.position.set(...m3dGrip(1)); t.scale.setScalar(0.42);
   r.arms[0].hand.add(t); e.tool = t;
 }
 // a two-handed overhead swing: heave it up over the shoulder, bring it down hard, recover.
@@ -33646,7 +33657,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-205';
+const GAME_VERSION = 'rs-206';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

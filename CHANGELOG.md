@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-206 - Proper left hands, handles in the fist
+
+- **Left hands are left hands.** Every figure had two right hands; the off hand is now mirrored, thumb on the correct side.
+- **Handles sit in the palm.** Swords, axes, maces, staves, bows and gathering tools now run through the curled fingers instead of hanging just in front of the knuckles, the way the sculpted skeletons hold theirs. Shields sit centred on the mirrored left fist.
+- **The boss's exit portal stands against a room wall.** It now opens on the nearest stretch of straight room wall you can walk to, like the stairs, never in a corridor.
+
 ## RS-205 - Dungeons keep their floors
 
 - **A site is laid out once.** Every floor you walk is kept with your save. Dying, taking the stairs or closing the game all bring you back to the same rooms, with the same loot lying about and the same foes where you left them - the one that killed you included. Floors are only remade when the site itself moves on after its master falls. The three sites you walked most recently are kept.
