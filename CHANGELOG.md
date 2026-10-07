@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-214 - Hieroglyphs
+
+- **The pyramid's walls carry real signs.** Three painted registers of hieroglyphs on the dressed sandstone - the ankh, the wedjat eye, the scarab, the ibis, the cobra, the reed, water, the sun disc, the feather of Ma'at, the djed pillar, the was sceptre, the lotus, a seated man and the owl - in lapis, ochre and malachite, worn thin into the grain. Every other wall bears a cartouche: a royal name-ring of three signs, flanked by more.
+
 ## RS-213 - Pyramids
 
 - **Pyramids rise in the desert.** A new kind of site: the stepped tomb of a god-king, with its gilded capstone, two obelisks and a dark door at the foot. A world has a couple of them, placed in the desert where there is one. Older worlds get theirs too: their sites keep their numbering, and the pyramids are added after them.
