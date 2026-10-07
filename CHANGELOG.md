@@ -1,5 +1,19 @@
 # Depthcrawl patch notes
 
+## RS-191 - Utility spells get their own autocast
+
+- **Combat and utility spells, apart.** The spellbook and the spells tab in the side panel now split each book in two. Combat spells (strikes to surges, rushes to barrages, god spells, grasps, demonbane) are in one group. Utility spells (Confuse, Weaken, Curse, Bind, Snare, Vulnerability, Enfeeble, Entangle, Stun, the alchemy spells, Lunar's Cure Me, Heal Self, Stat Restore and Vengeance, and the Arceuus thralls) are in the other.
+- **Two picks.** R and staff autocast always use your combat spell. Picking a utility spell no longer replaces it; it becomes your utility pick instead.
+- **Auto-utility.** The utility group has its own autocast toggle. When it's on, a fight opens with your utility spell whenever it's worth casting:
+  - crowd control: only on a foe that isn't already affected
+  - Heal Self: below half life
+  - Cure Me: when you're poisoned
+  - Stat Restore: when you're frightened or slowed
+  - Vengeance: whenever it isn't already up
+  - thralls: whenever you have none
+  Otherwise you attack as usual. Alchemy is never cast automatically.
+- **Old saves.** If R was set to a crowd-control spell, it moves to the utility pick.
+
 ## RS-190 - Goodbye, spell scrolls
 
 - **The old spell scrolls are gone.** Scrolls of Magic Missile, Cure Wounds, Fireball and Haste no longer drop from monsters or sit on the alchemist's and merchant's shelves. Spells come from your spellbook (G) and your runes.

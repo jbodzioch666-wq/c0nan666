@@ -6201,6 +6201,7 @@ function meleeAfterHit(m, mi, total, atkType){
 }
 function fight(mi){
   noteFoe(mi);
+  if (rsUtilAutoTry(mi)){ if (!G.gameOver && G.mon[mi] && G.mon[mi].alive) monsterStrikesPlayer(mi, 'attacks', 'hits'); return; }   /* (RS-191: auto-utility first) */
   // a staff with autocast on casts the chosen spell instead of swinging
   const acSp = rsAutocastOn() ? rsCastableSpell() : null;
   if (rsAutocastOn() && !acSp) rsSpellNote(null);
@@ -9654,9 +9655,12 @@ function spBody(tab){
   }
   if (tab==='spells'){
     const L = rsLvl('magic');
-    const cells = rsBookSpells().map(sp=>{ const ok = L >= sp[2], sel = p.rsSpell===sp[0], c = rsCastsLeft(sp);
-      return `<div class="sp-spl${sel ? ' on' : ''}${ok ? '' : ' locked'}" data-sp-spell="${sp[0]}" draggable="${ok}" data-tipspell="${sp[0]}">${hbIcon('spell', { col:rsSpellCol(sp) })}${ok ? `<b class="${c<=5 ? 'low' : ''}">${c===Infinity ? '&infin;' : c}</b>` : `<b>${sp[2]}</b>`}</div>`; }).join('');
-    return `<div class="sp-note">${RS_BOOKS[rsBook()].nm} &middot; click to pick the spell R casts &middot; right-click to put it on the quick bar (keys 1-9) &middot; ${rsAutocastOn() ? 'autocast on' : 'autocast off'}</div><div class="sp-spg">${cells}</div>`;
+    const cell = sp=>{ const ok = L >= sp[2], sel = rsSpellUtil(sp) ? p.rsUtil===sp[0] : p.rsSpell===sp[0], c = rsCastsLeft(sp);
+      return `<div class="sp-spl${sel ? ' on' : ''}${ok ? '' : ' locked'}" data-sp-spell="${sp[0]}" draggable="${ok}" data-tipspell="${sp[0]}">${hbIcon('spell', { col:rsSpellCol(sp) })}${ok ? `<b class="${c<=5 ? 'low' : ''}">${c===Infinity ? '&infin;' : c}</b>` : `<b>${sp[2]}</b>`}</div>`; };
+    const cmb = rsBookSpells().filter(sp=>!rsSpellUtil(sp)), utl = rsBookSpells().filter(rsSpellUtil), w = G.gear.weapon, staff = w && w.used && w.rsStaff;
+    return `<div class="sp-note">${RS_BOOKS[rsBook()].nm} &middot; click to pick &middot; right-click to put it on the quick bar (keys 1-9)</div>
+      <div class="sp-sub">COMBAT &middot; R casts it${staff ? ` &middot; <a href="#" data-sp-ac="1">autocast ${p.rsAutocast ? 'ON' : 'off'}</a>` : ''}</div><div class="sp-spg">${cmb.map(cell).join('')}</div>`
+      + (utl.length ? `<div class="sp-sub">UTILITY &middot; <a href="#" data-sp-uac="1">auto ${p.rsUtilAuto ? 'ON' : 'off'}</a></div><div class="sp-spg">${utl.map(cell).join('')}</div>` : '');
   }
   if (tab==='quests'){
     const qs = questsShown(), tq = trackedQuest();
@@ -9696,7 +9700,9 @@ function spUseItem(i){
 }
 function spBindEvents(el){
   el.addEventListener('click', e=>{
-    const t = e.target.closest('[data-sp-tab],[data-sp-close],[data-sp-inv],[data-sp-food],[data-sp-ammo],[data-sp-pray],[data-sp-spell],[data-sp-quest],[data-sp-eq]'); if (!t) return;
+    const t = e.target.closest('[data-sp-tab],[data-sp-close],[data-sp-inv],[data-sp-food],[data-sp-ammo],[data-sp-pray],[data-sp-spell],[data-sp-quest],[data-sp-eq],[data-sp-ac],[data-sp-uac]'); if (!t) return;
+    if (t.dataset.spAc){ e.preventDefault(); rsToggleAutocast(); hudLayout(); return; }
+    if (t.dataset.spUac){ e.preventDefault(); rsToggleUtilAuto(); hudLayout(); return; }
     if (t.dataset.spTab){ SP.tab = t.dataset.spTab; SP.qpSetup = false; spSave(); sfx('click'); hudLayout(); return; }
     if (t.dataset.spClose){ SP.open = false; spSave(); hudLayout(); renderOverlay(); return; }
     if (t.dataset.spInv!==undefined){ hideItemTooltip(); spInvClick(+t.dataset.spInv); hudLayout(); return; }
@@ -9708,7 +9714,10 @@ function spBindEvents(el){
         sfx('click'); saveCurrentGame(); }
       else rsTogglePrayer(id);
       hudLayout(); renderGame(); return; }
-    if (t.dataset.spSpell){ const sp = rsSpell(t.dataset.spSpell); if (sp && rsLvl('magic') >= sp[2]){ G.player.rsSpell = sp[0]; logMsg(`${sp[1]} selected - R casts it`, ''); sfx('click'); saveCurrentGame(); } hudLayout(); return; }
+    if (t.dataset.spSpell){ const sp = rsSpell(t.dataset.spSpell); if (sp && rsLvl('magic') >= sp[2]){
+        if (rsSpellUtil(sp)){ if ((sp[7]||{}).k==='alch'){ setUi('rsmagic'); return; } G.player.rsUtil = sp[0]; logMsg(`${sp[1]} is your utility spell${G.player.rsUtilAuto ? ' - auto-utility will cast it' : ' - turn on auto to cast it in fights, or cast it from the quick bar'}`, ''); }
+        else { G.player.rsSpell = sp[0]; logMsg(`${sp[1]} selected - R casts it`, ''); }
+        sfx('click'); saveCurrentGame(); } hudLayout(); return; }
     if (t.dataset.spQuest){ trackQuest(t.dataset.spQuest); hudLayout(); return; }
     if (t.dataset.spEq){ G.charSheetSel = t.dataset.spEq; setUi('charsheet'); return; }
   });
@@ -12424,6 +12433,7 @@ function rsMigrateAll(){
   for (const it of G.inv||[]) rsMigrateItem(it);
   for (const it of (G.player && G.player.stash)||[]) rsMigrateItem(it);
   rsPurgeSpellScrolls();
+  { const p = G.player, s0 = p && rsSpell(p.rsSpell); if (s0 && rsSpellUtil(s0)){ p.rsUtil = p.rsUtil || s0[0]; p.rsSpell = null; } }   /* (RS-191: a utility spell picked for R becomes the utility pick) */
 }
 // (RS-190) the old spell scrolls are gone from the game: any still in your pack, bank or loot tray (or on a shop shelf) are
 // taken away and you're paid what a shop would give for them; quick-bar slots that held one are cleared
@@ -12764,7 +12774,7 @@ function rsSpellCastable(sp){ return rsLvl('magic') >= sp[2] && !rsSpellBlock(sp
 // spell also costs air, as in RuneScape). null when nothing can be cast at all
 function rsCastableSpell(){
   const p = G.player, sel = rsSpell(p.rsSpell);
-  if (sel && rsSpellCastable(sel)) return sel;
+  if (sel && rsSpellCombat(sel) && rsSpellCastable(sel)) return sel;
   let best = null; for (const sp of RS_SPELLS) if (rsSpellCombat(sp) && rsSpellCastable(sp)) best = sp;
   return best;
 }
@@ -13859,6 +13869,7 @@ function rsBook(){ const b = G.player && G.player.spellbook; return RS_BOOKS[b] 
 function rsSpellBook(sp){ return (sp[7] && sp[7].book) || 'standard'; }
 function rsBookSpells(){ const b = rsBook(); return RS_SPELLS.filter(sp=>rsSpellBook(sp)===b); }
 function rsSpellCombat(sp){ const k = sp[7] && sp[7].k; return !k; }
+function rsSpellUtil(sp){ return !!(sp && sp[7] && sp[7].k); }
 function rsSpellBlock(sp){
   const meta = sp[7] || {}, b = rsSpellBook(sp);
   if (b!==rsBook()) return `${sp[1]} is in the ${RS_BOOKS[b].nm} - switch books at an altar`;
@@ -14391,15 +14402,36 @@ function rsCastFromBook(id){
   const p = G.player, sp0 = rsSpell(id), meta0 = (sp0 && sp0[7]) || {};
   if (meta0.k==='self'){ setUi('playing'); if (p.stunTurns>0){ consumeStunnedTurn(); return; } if (rsCastAt(-1, id) && !G.gameOver && (G.gameMode===1 || G.gameMode===2)) tickMonsters(); renderGame(); saveCurrentGame(); return; }
   if (meta0.k==='alch'){ setUi('rsmagic'); return; }
-  p.rsSpell = id;
+  if (meta0.k) p.rsUtil = id; else p.rsSpell = id;   /* (RS-191: a utility spell is the utility pick, not R's) */
   if (G.gameMode===0){ setUi('playing'); logMsg(`${rsSpell(id)[1]} is ready - cast it in a fight with R`, ''); return; }
   setUi('playing');
   if (p.stunTurns>0){ consumeStunnedTurn(); return; }
   if (rsCastAt(-1, id) && !G.gameOver) tickMonsters();
   renderGame(); saveCurrentGame();
 }
-function rsSelectSpell(id){ G.player.rsSpell = id; renderOverlay(); saveCurrentGame(); }
+function rsSelectSpell(id){ const sp = rsSpell(id); if (sp && rsSpellUtil(sp)) G.player.rsUtil = id; else G.player.rsSpell = id; renderOverlay(); saveCurrentGame(); }
 function rsToggleAutocast(){ G.player.rsAutocast = !G.player.rsAutocast; renderOverlay(); saveCurrentGame(); }
+// (RS-191) the utility spells - crowd control, Lunar self-spells, thralls - have their own pick and their own autocast:
+// with auto-utility on, a fight opens with your chosen utility spell whenever it's worth casting (the foe isn't already
+// confused / weakened / cursed / rooted, you're hurt or poisoned, no thrall is up...), and otherwise you fight as usual
+function rsToggleUtilAuto(){ const p = G.player; p.rsUtilAuto = !p.rsUtilAuto; if (p.rsUtilAuto && !p.rsUtil) notify('Pick a utility spell to autocast', 'warn'); renderOverlay(); hudLayout(); saveCurrentGame(); }
+function rsUtilAutoText(){ const sp = rsSpell(G.player.rsUtil); if (!sp) return 'select a utility spell below, then turn this on'; const m = sp[7] || {};
+  const when = m.k==='cc' ? `on each foe that isn't already ${{ acc:'confused', weak:'weakened', def:'cursed', root:'rooted', stun:'stunned' }[m.cc] || 'affected'}` : m.fx==='heal' ? 'when you fall below half life' : m.fx==='cure' ? 'when you are poisoned' : m.fx==='restore' ? 'when you are frightened or slowed' : m.fx==='veng' ? 'whenever it is not already up' : m.fx==='thrall' ? 'whenever you have no thrall' : 'when it helps';
+  return `casts ${sp[1]} ${when}`; }
+function rsUtilWorth(sp, m){
+  const p = G.player, meta = sp[7] || {};
+  if (meta.k==='cc'){ if (!m || !m.alive) return false;
+    return meta.cc==='acc' ? !(m.debuffAtkTurns>0) : meta.cc==='weak' ? !(m.weakTurns>0) : meta.cc==='def' ? !(m.debuffACTurns>0) : meta.cc==='root' ? !(m.rootTurns>0) : meta.cc==='stun' ? !(m.debuffAtkTurns>0) : false; }
+  if (meta.k==='self') return meta.fx==='heal' ? p.hp < effMaxHp()*0.5 : meta.fx==='cure' ? p.poisonTurns>0 : meta.fx==='restore' ? (p.frightenedTurns>0 || p.slowTurns>0) : meta.fx==='veng' ? !p.vengeance : meta.fx==='thrall' ? !p.thrall : false;
+  return false;
+}
+// true when it cast (the turn is spent)
+function rsUtilAutoTry(mi){
+  const p = G.player; if (!p || !p.rsUtilAuto || !p.rsUtil) return false;
+  const sp = rsSpell(p.rsUtil); if (!sp || !rsSpellUtil(sp) || (sp[7]||{}).k==='alch' || !rsSpellCastable(sp)) return false;
+  if (!rsUtilWorth(sp, G.mon[mi])) return false;
+  return !!rsCastAt((sp[7]||{}).k==='self' ? -1 : mi, sp[0]);
+}
 // what a spell does as you stand now: its damage range (your Magic level, gear, prayers and the
 // staff's own-element focus all counted), and against a target, that target's weakness or
 // resistance, the combat triangle and your chance to hit - the same sums rsCastAt makes
@@ -14442,10 +14474,10 @@ function rsSpellTipHtml(id){
   return h;
 }
 function buildRsMagic(){
-  const p = G.player, L = rsLvl('magic'), el = rsStaffElem();
+  const p = G.player, L = rsLvl('magic'), el = rsStaffElem(), w = G.gear.weapon, staff = w && w.used && w.rsStaff;
   const foe = G.lastFoe && G.lastFoe.hp > 0 && (G.gameMode===1 || G.gameMode===2) ? G.lastFoe : null;
-  const rows = rsBookSpells().map(sp=>{
-    const lvlOk = L >= sp[2], runesOk = rsRunesOk(sp) && !rsSpellBlock(sp), sel = p.rsSpell===sp[0], meta = sp[7] || {};
+  const row = sp=>{
+    const lvlOk = L >= sp[2], runesOk = rsRunesOk(sp) && !rsSpellBlock(sp), meta = sp[7] || {}, util = rsSpellUtil(sp), sel = util ? p.rsUtil===sp[0] : p.rsSpell===sp[0];
     const runes = Object.keys(sp[4]).map(r=>`<span style="color:${r===el ? COL.cyan : skHave('r_'+r)>=sp[4][r] ? COL.text : COL.red}" title="${r===el ? 'free - your staff supplies it' : 'you have '+skHave('r_'+r)}">${sp[4][r]} ${r}${r===el ? ' (staff)' : ''}</span>`).join(' ');
     return `<div class="shoprow ${sel ? 'sel' : ''}" data-tipspell="${sp[0]}" style="${lvlOk ? '' : 'opacity:0.45;'}${sel ? 'outline:1px solid var(--amber);' : ''}">
       <span class="muted">${sp[2]}</span><span style="min-width:108px;display:inline-block;"><span style="color:${rsSpellCol(sp)};">&#9670;</span> ${esc(sp[1])}</span>
@@ -14453,14 +14485,18 @@ function buildRsMagic(){
         return `<b style="color:var(--ink);">${d.lo}&ndash;${d.hi} damage</b>${d.onStaff ? ' <span style="color:'+COL.cyan+'">(staff +20%)</span>' : ''} &middot; ${sp[5]} xp`
           + (t ? `<br><span style="color:${t.note.startsWith('weak') ? COL.green : t.note ? COL.red : 'var(--ink-faint)'}">vs ${esc(foe.nm)}: ${t.lo}&ndash;${t.hi}, ${Math.round(t.hit*100)}% to hit${t.note ? ' &middot; '+t.note : ''}</span>` : '')
           + `<br>${runes}`; })()}</span>
-      <span>${lvlOk ? `${meta.k==='self' || meta.k==='alch' ? '' : `<button class="btn" onclick="rsSelectSpell('${sp[0]}')">${sel ? 'selected' : 'select'}</button>`}${runesOk && meta.k!=='alch' && (G.gameMode!==0 || meta.k==='self') ? ` <button class="btn primary" onclick="rsCastFromBook('${sp[0]}')">cast</button>` : ''} <button class="btn" title="put it on the quick bar - keys 1-9 cast it" onclick="qbAdd({ t:'spell', id:'${sp[0]}' })">&#9733;</button>${!runesOk ? ` <span style="color:${COL.red};font-size:11px;">need ${rsMissingRunes(sp).join(', ')}</span>` : ''}` : `needs Magic ${sp[2]}`}</span></div>`;
-  }).join('');
+      <span>${lvlOk ? `${meta.k==='alch' ? '' : `<button class="btn" onclick="rsSelectSpell('${sp[0]}')">${sel ? 'selected' : 'select'}</button>`}${runesOk && meta.k!=='alch' && (G.gameMode!==0 || meta.k==='self') ? ` <button class="btn primary" onclick="rsCastFromBook('${sp[0]}')">cast</button>` : ''} <button class="btn" title="put it on the quick bar - keys 1-9 cast it" onclick="qbAdd({ t:'spell', id:'${sp[0]}' })">&#9733;</button>${!runesOk ? ` <span style="color:${COL.red};font-size:11px;">need ${rsMissingRunes(sp).join(', ')}</span>` : ''}` : `needs Magic ${sp[2]}`}</span></div>`;
+  };
+  const combat = rsBookSpells().filter(sp=>!rsSpellUtil(sp)), util = rsBookSpells().filter(rsSpellUtil);   /* (RS-191: combat and utility apart) */
+  const rows = `<h4 style="color:var(--ink-faint);margin:6px 0 6px;">COMBAT SPELLS &middot; <span class="muted" style="font-weight:400;">R casts the one you select${staff ? ', and autocast casts it with every bump' : ''}</span></h4>${combat.map(row).join('')}`
+    + (util.length ? `<h4 style="color:var(--ink-faint);margin:14px 0 6px;">UTILITY SPELLS &middot; <span class="muted" style="font-weight:400;">${util.length} in this book</span></h4>
+      <div class="btnrow" style="justify-content:flex-start;margin:0 0 6px;"><button class="btn ${p.rsUtilAuto ? 'primary' : ''}" onclick="rsToggleUtilAuto()">auto-utility: ${p.rsUtilAuto ? 'ON' : 'off'}</button>
+        <span class="muted" style="font-size:11px;align-self:center;">${rsUtilAutoText()}</span></div>${util.map(row).join('')}` : '');
   const pouch = RS_RUNES.filter(r=>!RS_COMBO[r[0]] || skHave('r_'+r[0])).map(r=>`<span class="skitem" style="border-color:${r[2]}"><b style="color:${r[2]}">${r[1]}</b> ${rsStaffElems().includes(r[0]) ? '&infin; (staff)' : '&times;'+skHave('r_'+r[0])}</span>`).join('');
-  const w = G.gear.weapon, staff = w && w.used && w.rsStaff;
   return `<h2 class="panel-title">${RS_BOOKS[rsBook()].nm.toUpperCase()}</h2>
     <div class="sub">Magic level ${L}. <kbd>R</kbd> casts your selected spell at the nearest foe you can see${staff ? `; <b>autocast</b> casts it with every melee bump` : ' (wield a staff to autocast)'}. ${rsBook()==='standard' ? 'Every combat spell also costs air runes; combination runes count as both their elements. ' : 'Combination runes count as both their elements. '}An elemental staff supplies its own element${el ? ` - yours gives endless ${el} and makes ${el} spells hit 20% harder` : ''}. Out of a rune, the strongest spell you can afford is cast instead. A monster's weak element does +50% (hover it to see); its own does half.</div>
     <div class="ovbody">
-      <div class="btnrow" style="justify-content:flex-start;margin:0 0 8px;">${staff ? `<button class="btn ${p.rsAutocast ? 'primary' : ''}" onclick="rsToggleAutocast()">autocast: ${p.rsAutocast ? 'ON' : 'off'}</button>` : ''}</div>
+      <div class="btnrow" style="justify-content:flex-start;margin:0 0 8px;">${staff ? `<button class="btn ${p.rsAutocast ? 'primary' : ''}" onclick="rsToggleAutocast()">autocast: ${p.rsAutocast ? 'ON' : 'off'}</button>` : ''}${p.rsUtil && rsSpell(p.rsUtil) ? `<span class="muted" style="font-size:11px;align-self:center;">utility: ${esc(rsSpell(p.rsUtil)[1])}${p.rsUtilAuto ? ' (auto)' : ''}</span>` : ''}</div>
       ${rsBookSwitchHtml()}
       ${rows}
       ${rsAlchHtml()}
@@ -33457,7 +33493,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-190';
+const GAME_VERSION = 'rs-191';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
