@@ -14,6 +14,7 @@ module.exports = async page=>{
     let swings = 0; const md = moveDir; moveDir = function(a, b){ if (G.mon.some(o=>o.alive && o.x===G.player.x+a && o.y===G.player.y+b)) swings++; return md.apply(this, arguments); };
     ISO.swingAt = 0; for (let i=0;i<3;i++) isoAct({ mon:m, gx:m.x, gy:m.y }, false);
     moveDir = md; out.swings = swings; A(swings===1, 'three quick clicks make one attack, not '+swings);
+    if (typeof foeFlush==='function') foeFlush();   /* (RS-218: the monster's answer to that blow, which the test's own clock never reaches) */
     // a bow: walking up to a far monster stops as soon as it's in range
     let shots = 0; const rr = rangedReachIdx, ra = rangedAttack;
     rangedReachIdx = mm=> mm && mm.alive && Math.abs(mm.x-G.player.x)+Math.abs(mm.y-G.player.y) <= 3 ? G.mon.indexOf(mm) : -1; rangedAttack = ()=>{ shots++; };
