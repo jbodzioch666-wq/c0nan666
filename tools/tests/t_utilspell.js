@@ -6,6 +6,7 @@ module.exports = async page=>{
     goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing');
     const p = G.player, out = {};
     skGainXP('magic', 5e6); for (const rn of ['air','water','earth','mind','nature','chaos','fire']) skAdd('r_'+rn, 500);
+    out.noAlch = !rsSpell('highalch') && !rsSpell('lowalch') && typeof rsAlch==='undefined';   /* (RS-192: the alchemy spells are gone) */
     out.counts = { std:rsBookSpells().filter(rsSpellUtil).length, cmb:rsBookSpells().filter(sp=>!rsSpellUtil(sp)).length };
     // the spellbook shows two sections, with the second toggle
     setUi('rsmagic'); const html = document.body.innerHTML; out.book = /COMBAT SPELLS/.test(html) && /UTILITY SPELLS/.test(html) && /auto-utility/.test(html);
@@ -28,6 +29,7 @@ module.exports = async page=>{
     return out; });
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
+  A(r.noAlch, 'Low and High Level Alchemy are gone');
   A(r.counts.std >= 9 && r.counts.cmb >= 20, 'the standard book splits into combat and utility spells');
   A(r.book && r.panel===2, 'the spellbook and the side panel show the two groups, with an auto-utility toggle');
   A(r.pick.r==='windstrike' && r.pick.u==='confuse', 'picking a utility spell leaves R on its combat spell');

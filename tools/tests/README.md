@@ -67,3 +67,4 @@ Screenshots go to `tools/tests/shots/`.
 | foodbar | cooked dishes show in the bag; every food in the side panel has its own picture and name; U shows what it eats next |
 | noscrolls | the old spell scrolls are gone: never stocked or dropped, and old saves cash them in for gold |
 | utilspell | utility spells are apart from combat spells, with their own pick and an auto-utility toggle that opens fights with them |
+| crafthave | every crafting screen colours ingredients (green have, red short) and shows how many you can make |

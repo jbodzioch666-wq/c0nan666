@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-192 - See what you can make, and no more alchemy
+
+- **Ingredients in colour.** Every crafting screen now shows what a recipe takes in colour: green for what you have enough of, red for what you're short of, with how many you hold in brackets. That covers the crafting benches (fletching, gem-cutting, jewellery, pottery, looms, dyes and the rest), smelting, brewing, poisons and cures, the hearth's dishes, arrow enchanting, house building and the carpentry bench.
+- **How many you can make.** Each recipe now shows how many you can make from what you carry. On the benches and the forge it's a count on each button (for example "Platebody (5) ×2"); elsewhere it reads "can make 3" or "can cook 7", in red when it's zero.
+- **The alchemy spells are gone.** Low and High Level Alchemy are out of the spellbook, the right-click menu in your pack, item tooltips and the money-making guide. Sell to the shops instead. If one of them was your utility pick or on your quick bar, that slot is cleared.
+
 ## RS-191 - Utility spells get their own autocast
 
 - **Combat and utility spells, apart.** The spellbook and the spells tab in the side panel now split each book in two. Combat spells (strikes to surges, rushes to barrages, god spells, grasps, demonbane) are in one group. Utility spells (Confuse, Weaken, Curse, Bind, Snare, Vulnerability, Enfeeble, Entangle, Stun, the alchemy spells, Lunar's Cure Me, Heal Self, Stat Restore and Vengeance, and the Arceuus thralls) are in the other.
