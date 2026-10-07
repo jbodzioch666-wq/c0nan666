@@ -1,5 +1,15 @@
 # Depthcrawl patch notes
 
+## RS-204 - Hands that hold their weapons, axes the right way round, and a bestiary you can zoom
+
+- **Wrists turned to grip:** on every figure holding a weapon or staff, the weapon hand is turned a quarter anticlockwise so the fist closes round the handle. The other hand is turned a quarter clockwise, which also suits a shield grip.
+- **One-handed axes face forward:** they used to be held backwards. Greataxes were already right.
+- **Zoom in the bestiary:**
+  - Use the mouse wheel, pinch on a phone, or the new + and − buttons on the model.
+  - Zoomed in, drag up and down to look along the creature.
+  - Each creature you pick starts at the normal view.
+- **The bestiary list keeps its place:** picking a creature no longer jumps the list back to the top.
+
 ## RS-203 - The robe top stops at the waist
 
 - **A robe top is just a top:** it ends at the waist under its sash. It used to have a short flared hem of its own that poked through a robe bottom worn under it. Over plate or leather legs it now ends neatly at the belt line too.

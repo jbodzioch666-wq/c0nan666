@@ -26,6 +26,7 @@ Screenshots go to `tools/tests/shots/`.
 |---|---|
 | boot | the page loads and a character starts |
 | iso | isometric 3D everywhere: no key or saved setting switches to a flat view |
+| bvzoom | the bestiary model zooms (wheel, pinch, buttons), picking a creature keeps the list's scroll, weapon wrists turned and one-handed axes flipped |
 | crafttier | each crafted quality step (Fine, Exceptional, higher level) and each reinforce step gives better stats, even on small numbers |
 | townanim | the town's dogs, cats and chickens are animated, not frozen |
 | classgear | monsters look like their trade: each goblin, orc and kobold rank has its own figure and gear, and every skeleton is the sculpted model dressed for its class |

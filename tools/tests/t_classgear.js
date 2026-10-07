@@ -28,7 +28,7 @@ module.exports = async page=>{
     A(arch.cls==='archer' && mage.cls==='mage' && plain.cls==='plain', 'classes recorded');
     // (RS-201) the bow and the staff ride on pivots kept upright in the hand; blades are turned edge-on in a humanoid's fist
     A(arch.rig.ups && arch.rig.ups.length===1 && mage.rig.ups && mage.rig.ups.length===1 && M3D_UPS.has(arch.rig.ups[0]), 'bow and staff on upright pivots');
-    const orc = m3dInstance({ nm:'orc archer' }, monsterPortraitFor('orc archer')), sham = m3dInstance({ nm:'goblin shaman' }, monsterPortraitFor('goblin shaman')), war = m3dInstance({ nm:'orc warrior' }, monsterPortraitFor('orc warrior'));
+    const orc = m3dInstance({ nm:'orc archer' }, monsterPortraitFor('orc archer')), sham = m3dInstance({ nm:'goblin shaman' }, monsterPortraitFor('goblin shaman')), war = m3dInstance({ nm:'hobgoblin' }, monsterPortraitFor('hobgoblin'));   /* (a sword; a one-handed axe is turned the other way, RS-204) */
     A(orc.rig.ups && orc.rig.ups.length===1 && sham.rig.ups && sham.rig.ups.length===1, 'humanoid bows and staves upright too');
     A(war.rig.weapon && Math.abs(war.rig.weapon.rotation.y - Math.PI/2) < 1e-6 && !war.rig.ups, 'a blade is turned edge-on');
     // render once and check the bow really stands up: its pivot's world up matches the model's

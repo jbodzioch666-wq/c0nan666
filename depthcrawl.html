@@ -360,6 +360,7 @@
   #overlay.overlay.wpfit{ inset:auto; left:50%; top:50%; transform:translate(-50%,-50%); width:min(820px, calc(100% - 24px)); height:auto; max-height:calc(100% - 24px); padding:16px 20px 14px; border-radius:10px; box-shadow:0 10px 40px rgba(0,0,0,0.7); }
   #overlay.wpfit .sub{ margin-bottom:10px; } #overlay.wpfit .btnrow{ margin-top:8px; }
   #overlay.csfloat .cs-book{ justify-content:flex-end; align-items:flex-start; margin-left:auto; max-height:calc(100vh - 170px); flex:0 1 auto; } #overlay.csfloat .cs-page{ max-height:100%; }
+  .bvzoom{ position:absolute; right:6px; bottom:6px; display:flex; flex-direction:column; gap:4px; } .bvzoom .btn{ width:28px; height:28px; padding:0; font-size:16px; line-height:1; }
   .cs-hint{ color:#a89a80; font-size:10.5px; margin:6px 0 0; line-height:1.35; text-align:center; }
   .csdrag{ touch-action:none; cursor:grab; } .cs-lifted{ opacity:0.35; }
   .cs-book, .cs-book *{ -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; } .cs-book img{ -webkit-user-drag:none; pointer-events:none; }   /* (RS-198: dragging gear no longer highlights the page) */
@@ -13019,7 +13020,10 @@ function bestDrops(nm, e){
   return out;
 }
 var BEST_LIST = [];
-function bestPick(i){ G.bestSel = BEST_LIST[i]; G.bestLive = null; renderOverlay(); }
+function bestPick(i){ G.bestSel = BEST_LIST[i]; G.bestLive = null; keepScroll(renderOverlay); }
+// (RS-204) redraw a menu without losing your place: every scrolled box in the overlay is put back where it was
+function keepScroll(fn){ const ov = document.getElementById('overlay'), all = ()=>[ov].concat([...ov.querySelectorAll('*')]), was = [];
+  all().forEach((e, i)=>{ if (e.scrollTop) was.push([i, e.scrollTop]); }); fn(); const now = all(); for (const [i, t] of was) if (now[i]) now[i].scrollTop = t; }
 function bestInspect(mon){ G.bestSel = mon.nm; G.bestLive = mon; G.bestTab = 'all'; setUi('bestiary'); }
 function bestHtml(){
   const p = G.player, seen = p.codexSeen||[], tab = G.bestTab || 'all';
@@ -13084,11 +13088,17 @@ function bvMount(){
     BV.scene.add(new T.HemisphereLight(0xdde4f0, 0x2a2018, 0.8));
     const key = new T.DirectionalLight(0xffe0b0, 1.4); key.position.set(1.2, 2, 1.6); BV.scene.add(key);
     const rim = new T.DirectionalLight(0x9fb4ff, 1.0); rim.position.set(-1.5, 1.4, -2); BV.scene.add(rim);
-    cv.addEventListener('pointerdown', ev=>{ BV.drag = ev.clientX; try{ cv.setPointerCapture(ev.pointerId); }catch(e){} });
-    cv.addEventListener('pointermove', ev=>{ if (BV.drag!=null){ BV.yaw += (ev.clientX - BV.drag)*0.014; BV.drag = ev.clientX; BV.hold = performance.now(); } });
-    const up = ()=>{ BV.drag = null; }; cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+    /* (RS-204) drag to turn it (and, zoomed in, up and down to look along it); the wheel, a pinch or the + / - buttons zoom */
+    BV.pts = new Map();
+    cv.addEventListener('pointerdown', ev=>{ BV.pts.set(ev.pointerId, { x:ev.clientX, y:ev.clientY }); BV.drag = ev.clientX; BV.dragY = ev.clientY; BV.pinch = null; try{ cv.setPointerCapture(ev.pointerId); }catch(e){} });
+    cv.addEventListener('pointermove', ev=>{ const pt = BV.pts.get(ev.pointerId); if (!pt) return; pt.x = ev.clientX; pt.y = ev.clientY;
+      if (BV.pts.size >= 2){ const [a, b] = [...BV.pts.values()], d = Math.hypot(a.x-b.x, a.y-b.y); if (BV.pinch) bvZoom(d/BV.pinch); BV.pinch = d; BV.hold = performance.now(); return; }
+      if (BV.drag!=null){ BV.yaw += (ev.clientX - BV.drag)*0.014; BV.drag = ev.clientX; if (BV.zoom > 1.05){ BV.ty = clamp(BV.ty + (ev.clientY - BV.dragY)*0.004/BV.zoom, 0.05, 1.0); } BV.dragY = ev.clientY; BV.hold = performance.now(); } });
+    const up = ev=>{ BV.pts.delete(ev.pointerId); BV.pinch = null; if (!BV.pts.size) BV.drag = null; }; cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+    cv.addEventListener('wheel', ev=>{ ev.preventDefault(); bvZoom(Math.exp(-ev.deltaY*0.0015)); }, { passive:false });
   }
   slot.innerHTML = ''; slot.appendChild(BV.r.domElement);
+  { const z = document.createElement('div'); z.className = 'bvzoom'; z.innerHTML = '<button class="btn" title="zoom in" onclick="bvZoom(1.35)">+</button><button class="btn" title="zoom out" onclick="bvZoom(1/1.35)">&minus;</button>'; slot.appendChild(z); }
   if (!BV.raf) BV.raf = requestAnimationFrame(bvFrame);
 }
 // the model to show for a creature in the bestiary (RS-119): its own; for the undead, the undead one (the bestiary's
@@ -13102,13 +13112,15 @@ function bvPortrait(fake){
     : /knight|barrows|brother|paladin|guard/.test(n) ? 'knight' : /giant/.test(n) ? 'hill giant' : /demon|fiend|devil/.test(n) ? 'lesser demon' : /spider/.test(n) ? 'giant spider' : /wolf|hound|dog/.test(n) ? 'wolf' : 'bandit';
   return m3dPortrait({ nm:near });
 }
+function bvZoom(k){ BV.zoom = clamp((BV.zoom||1)*k, 0.7, 5); if (BV.zoom <= 1.05) BV.ty = 0.45; BV.hold = performance.now(); }
+function bvCamSync(){ const z = BV.zoom||1, ty = BV.ty==null ? 0.45 : BV.ty; BV.cam.position.set(0, ty + 0.35/z, 3.1/z); BV.cam.lookAt(0, ty, 0); }
 function bvFrame(){
   BV.raf = 0;
   const cv = BV.r && BV.r.domElement; if (!cv || !cv.isConnected || G.ui!=='bestiary') return;
   const nm = G.bestSel, known = (G.player.codexSeen||[]).includes(nm) || (G.bestLive && G.bestLive.nm===nm);
   if (BV.skWait && SK3.ok){ BV.skWait = null; BV.key = ''; }
   if (nm + known !== BV.key){
-    BV.key = nm + known; if (BV.e){ BV.scene.remove(BV.pivot || BV.e.holder); BV.e = null; BV.pivot = null; }
+    BV.key = nm + known; BV.zoom = 1; BV.ty = 0.45; if (BV.e){ BV.scene.remove(BV.pivot || BV.e.holder); BV.e = null; BV.pivot = null; }
     if (known){ try{ const e0 = bestEntryFor(nm) || {}, fake = { nm, undead: G.bestLive && G.bestLive.nm===nm ? G.bestLive.undead : e0.undead }, pt = bvPortrait(fake);
       /* (RS-169) a skeleton is the same sculpted skeleton you meet in the dungeons, not the generic undead figure */
       if (sk3Wanted(fake)){ try{ BV.e = sk3Instance(fake); }catch(err){ BV.e = null; } if (!BV.e) BV.skWait = nm; }   /* (it's sculpted over a few frames: the stand-in shows till then) */
@@ -13121,7 +13133,7 @@ function bvFrame(){
   const t = performance.now()/1000;
   if (BV.drag==null && performance.now() - BV.hold > 2500) BV.yaw += 0.008;
   if (BV.e){ (BV.pivot || BV.e.holder).rotation.y = BV.yaw; const r = BV.e.rig; try{ if (BV.e.sk) sk3Pose(t, 0, 0, 0, BV.e.seed, r); else if (BV.e.anim) BV.e.anim(r, t, 0, 0, 0, 0, BV.e); else if (BV.e.beast) m3dPoseBeast(r, t, 0, 0, 0, 0); else m3dPoseHumanoid(r, t, 0, 0, 0, 0, BV.e); }catch(e){} }
-  BV.r.render(BV.scene, BV.cam);
+  bvCamSync(); BV.r.render(BV.scene, BV.cam);
   BV.raf = requestAnimationFrame(bvFrame);
 }
 // ===================== monster behaviour: aggression, roles, packs, summoners, abilities, champions, boss phases =====================
@@ -31109,7 +31121,7 @@ function m3dHumanoid(o){
     const gloveM = o.gloves ? m3dMat(mats, o.gloves.col || '#4a3420', o.gloves.kind==='metal' ? 'metal' : 'leather') : null;
     const fo = m3dLimbS(el, 'fore', b, 0.17, m3dVC(mats, rig.robe ? clothM : gloveM ? gloveM : (outfit==='plate' ? plateM : bare ? skinM : m3dMat(mats, mpTone(clothHex, -0.2), 'leather'))));
     const hand = new T.Group(); hand.position.y = -0.015; fo.end.add(hand);
-    const hs = new T.Mesh(m3dLimbGeo('hand', b), m3dVC(mats, gloveM || (outfit==='plate' ? plateM : skinM))); hs.position.y = 0.015; hand.add(hs);
+    const hs = new T.Mesh(m3dLimbGeo('hand', b), m3dVC(mats, gloveM || (outfit==='plate' ? plateM : skinM))); hs.position.y = 0.015; hs.rotation.y = -s*Math.PI/2; hand.add(hs);   /* (RS-204: the weapon hand turned a quarter anticlockwise and the other clockwise, so the fist closes round the grip) */
     if (o.claws || o.weapon==='claws') for (let i=0;i<4;i++) m3dCone(hand, 0.005, 0.035, darkM, (-0.018+i*0.012)*b, -0.03, 0.05*b, Math.PI*0.6);
     rig.arms.push({ sh, el, hand, s });
   }
@@ -31122,7 +31134,7 @@ function m3dHumanoid(o){
       const piv = new T.Group(); piv.position.set(0, -0.042, 0.024*b); R.hand.add(piv); m3dUpright(piv); (rig.ups = rig.ups || []).push(piv);
       if (wk==='staff'){ const bx = new T.Box3().setFromObject(wpn); wpn.position.y = -(bx.min.y + (bx.max.y - bx.min.y)*0.36); }
       piv.add(wpn); rig.weapon = wpn; rig.twoHand = wk==='staff'; rig.wk = wk; rig.glint = o.glint || null; }
-    else { wpn.rotation.set(Math.PI/2, Math.PI/2, 0); wpn.position.set(0, -0.042, 0.024*b); }   /* (RS-201: turned on its own length, so the edge leads and the flat faces the sides) */
+    else { wpn.rotation.set(Math.PI/2, wk==='axe' ? -Math.PI/2 : Math.PI/2, 0); wpn.position.set(0, -0.042, 0.024*b); }   /* (RS-204: a one-handed axe the other way round, its blade leading) */   /* (RS-201: turned on its own length, so the edge leads and the flat faces the sides) */
     if (o.swirl){ const bx = new T.Box3().setFromObject(wpn), sw = new T.Group(); sw.position.set((bx.min.x+bx.max.x)/2, (bx.min.y+bx.max.y)/2, bx.max.z - 0.01);   // (motes of light circling the staff's head)
       for (let i=0;i<3;i++){ const sp = new T.Sprite(M3D.glowMat(o.swirl, 0.85)); sp.scale.setScalar(0.035); sw.add(sp); } R.hand.add(sw); rig.swirl = sw; }
     if (!wpn.parent){ R.hand.add(wpn); rig.weapon = wpn; rig.twoHand = /greataxe|greatsword|staff|spear|trident/.test(wk); rig.wk = wk; rig.glint = o.glint || null; } }
@@ -33547,7 +33559,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-203';
+const GAME_VERSION = 'rs-204';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
