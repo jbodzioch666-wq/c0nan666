@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-186 - The same tooltip above and below ground
+
+- **Mine tooltips match the overworld.** Hovering an ore rock, an essence seam, a cave pool or a cave herb now shows the same tooltip as gathering spots on the overworld. It names the rock, the level it needs, what it gives and how many lumps are left, and it follows your cursor. The floating text label over the rock is gone.
+- **Exact counts.** A vein's lump count is set as soon as the floor is made. The tooltip shows the real number from the start, and mining gives exactly that many.
+
 ## RS-185 - Tooltips underground, and portals out of the way
 
 - **Tooltips for ore in the mines.** Hover an ore vein in a mine and you get a tooltip like the gathering spots on the overworld. It shows the ore, the Mining level it needs, the xp per lump, about how many lumps are left, and whether you still need a pickaxe. Essence seams, cave pools and cave herbs get one too. On a phone, tap the vein to see it.
