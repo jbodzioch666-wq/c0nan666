@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-187 - Take your character to a new world
+
+- **A new world, the same hero.** Each character on the load screen has a new globe button. It takes that character to a newly made world. You get the usual world preview, so you can pick the size, reroll or enter a world code, and then you set out from a town in the new land.
+- **What comes with you.** Your skills and levels, gear, pack, bank, gold, house, prayers and spells, achievements and boat all come along.
+- **What starts fresh.** Anything tied to places on the old map starts fresh. That means the map you've explored and your pins, the towns and waypoints you know, your standing with towns, quests and half-done side quests, and dungeon progress. Anything left in a gravestone is moved to your bank so nothing is lost.
+- **Your old world stays.** The new world is a new save. The old one stays on the load screen exactly as you left it, so you can go back anytime. Backing out of the preview saves nothing. Saves in later worlds show their world number on the card.
+
 ## RS-186 - The same tooltip above and below ground
 
 - **Mine tooltips match the overworld.** Hovering an ore rock, an essence seam, a cave pool or a cave herb now shows the same tooltip as gathering spots on the overworld. It names the rock, the level it needs, what it gives and how many lumps are left, and it follows your cursor. The floating text label over the rock is gone.

@@ -63,3 +63,4 @@ Screenshots go to `tools/tests/shots/`.
 | seats | seats and beds: two-tile beds that sleep you till dawn, person-sized chairs and stools, the player and tavern regulars sit on them, a lid-free stairwell, the trapdoor in the shop corner |
 | cavetip | hovering (or tapping, on a phone) an ore vein in a mine shows its tooltip: level, xp, how much is left |
 | portalwall | in every kind of site the portal and the stairs back onto a wall and never block a passage |
+| newworld | the load screen takes a character to a new world: a new save keeps the character, the old save stays untouched |

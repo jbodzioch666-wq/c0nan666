@@ -7158,7 +7158,7 @@ function saveCurrentGame(){
     const p = G.player, st = pStats();
     upsertIndexEntry({id:data.id, name:data.name, race:data.race, cls:data.cls,
       level:data.level, gold:data.gold, lastPlayed:data.lastPlayed, createdAt:data.createdAt,
-      combat:p.combatLevel, total:rsTotalLevel(), playTime:Math.round(st.playTime||0), hardcore:!!p.hardcore,
+      combat:p.combatLevel, total:rsTotalLevel(), world:p.worldNo||1, playTime:Math.round(st.playTime||0), hardcore:!!p.hardcore,
       place: G.gameMode===1 ? `${SITE_TITLE[G.siteKind]||'dungeon'} ${G.depth}` : G.gameMode===3 ? ((townFlavorAt(G.owPos.x,G.owPos.y)||{}).name||'a town') : 'the wilds',
       look:{ race:p.race, chest:(G.gear.chest&&G.gear.chest.used&&G.gear.chest.rsCol)||'', head:(G.gear.head&&G.gear.head.used&&G.gear.head.rsCol)||'', wpn:!!(G.gear.weapon&&G.gear.weapon.used), staff:!!(G.gear.weapon&&/Staff/.test(G.gear.weapon.basis||'')), bow:!!(G.gear.ranged&&G.gear.ranged.used) }});
   }catch(e){ /* quota or serialization failure - progress just won't autosave this tick */ }
@@ -7453,7 +7453,8 @@ function confirmWorldPreview(){
   // the village you spawn in is already known - no need to physically step
   // off of it and back on just to unlock fast travel back to it later
   trackVisitedTown(G.ow.spawnPos.x, G.ow.spawnPos.y);
-  logMsg(`${G.player.name} the ${G.player.race} ${G.player.kit||'Adventurer'} sets out across the wilds...`, 'new');
+  if (G.newWorldFrom){ G.newWorldFrom = false; logMsg(`${G.player.name} comes ashore in a new land, a long way from the old world (world ${G.player.worldNo||2})`, 'new'); }
+  else logMsg(`${G.player.name} the ${G.player.race} ${G.player.kit||'Adventurer'} sets out across the wilds...`, 'new');
   logMsg(`combat level ${G.player.combatLevel} - train your skills by using them (J shows them all, F changes attack style, G is your spellbook, N your prayers)`, 'new');
   // every adventure begins in a village, not out in open wilderness
   enterVillage();
@@ -7485,8 +7486,9 @@ function buildWorldPreview(){
         <span style="color:${COL.bossOrange}">&#9679;</span> dragon lair
       </div>
       <div class="btnrow" style="margin-top:16px;">
+        ${G.newWorldFrom ? `<button class="btn" onclick="G.newWorldFrom=false; setUi('titleScreen')">ESC &middot; back</button>` : ''}
         <button class="btn" onclick="rerollWorldPreview()">R &middot; reroll the map</button>
-        <button class="btn primary" onclick="confirmWorldPreview()">ENTER &middot; begin the adventure</button>
+        <button class="btn primary" onclick="confirmWorldPreview()">ENTER &middot; ${G.newWorldFrom ? 'set out in the new world' : 'begin the adventure'}</button>
       </div>
     </div>
   `;
@@ -33417,7 +33419,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-186';
+const GAME_VERSION = 'rs-187';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -33429,9 +33431,10 @@ function buildTitleScreen(){
       <div class="slotinfo">
         <div><b style="color:var(--amber)">${esc(e.name||(e.race+' '+e.cls))}</b>${e.hardcore ? ` <span class="slothc">HARDCORE</span>` : ''}</div>
         <div class="muted">${e.combat ? `combat ${e.combat}` : `Lv ${e.level}`} ${esc(e.race||'')}${e.total ? ` &middot; total ${e.total}` : ''} &middot; ${(e.gold||0).toLocaleString()}g</div>
-        <div class="muted">${e.place ? esc(e.place)+' &middot; ' : ''}played ${fmtPlayTime(e.playTime)} &middot; ${when}</div>
+        <div class="muted">${e.world > 1 ? `world ${e.world} &middot; ` : ''}${e.place ? esc(e.place)+' &middot; ' : ''}played ${fmtPlayTime(e.playTime)} &middot; ${when}</div>
       </div>
       <div class="slotbtns">
+        <span class="iconbtn" title="take this adventurer to a new world (this save stays as it is)" onclick="event.stopPropagation(); titleNewWorld('${e.id}')">&#127757;</span>
         <span class="iconbtn" title="export this adventurer to a file" onclick="event.stopPropagation(); exportSave('${e.id}')">&#8681;</span>
         ${titleDelArmed(e.id) ? `<span class="iconbtn" title="tap again to delete for good" style="width:auto;padding:0 8px;background:#7a1a14;border-color:#c0392b;color:#fff;font-size:12px" onclick="event.stopPropagation(); titleDeleteConfirm('${e.id}')">Delete?</span>` : `<span class="iconbtn" title="delete this adventurer" onclick="event.stopPropagation(); titleDeleteConfirm('${e.id}')">&times;</span>`}
       </div>
@@ -33454,6 +33457,32 @@ function buildTitleScreen(){
   `;
 }
 function titleResume(id){ fsUserOff = false; fsDefault(); loadGame(id); AREA.key = null; }
+// (RS-187) take an adventurer to a newly made world. The character comes along as it is - skills, gear, pack, bank, gold,
+// house, prayers and spells, achievements - into a NEW save; everything tied to places on the old map starts afresh (map,
+// towns and waypoints, standing, quests, routes and pins, dungeon progress), and the old world's save is left untouched
+// (nothing is saved until you set out from the world preview)
+function titleNewWorld(id){
+  fsUserOff = false; fsDefault();
+  if (!loadGame(id)) return false;
+  AREA.key = null;
+  const p = G.player, b = bankP();
+  for (const g of gravesP()){ for (const it of (g.items||[])) b.stash.push(it); b.bankGold += g.gold||0; }   // (what lay in a grave goes to the bank)
+  p.graves = []; p.grave = null;
+  p.quests = []; p.trackedQuest = null; p.roadTask = null; p.crusade = null; p.route = null; p.mapPins = []; p.rep = {};
+  p.campPitch = null; p.curRun = null; p.minions = []; p.siteDeepest = {};
+  if (p.bounties) p.bounties = { day:'', list:[] };
+  if (p.sq) for (const k in p.sq) if (p.sq[k] && p.sq[k].state==='active') delete p.sq[k];   // (side quests half done in the old world; finished ones stay finished)
+  p.worldNo = (p.worldNo||1) + 1;
+  G.saveId = 'c'+Date.now().toString(36)+rn(1e6).toString(36); G.createdAt = Date.now();
+  G.log = []; G.gameOver = 0; G.isBossFloor = 0; G.owZoomedOut = false; G.interior = null; G.townState = null; G.gather = null; G.routeWalk = null;
+  G.gameMode = 0; G.siteKind = 'dungeon'; G.depth = 1; G.dungeonSlot = 0; G.dungeonModifier = null; G.dungeonEntrance = { x:0, y:0 };
+  G.questBoard = []; G.questBoards = {}; G.weather = 'clear';
+  G.ow.overrides = {}; G.ow.visitedTowns = []; G.ow.genVer = OW_GEN_VER;
+  wgRegenerate(Math.floor(Math.random()*4294967295));
+  G.newWorldFrom = true;
+  setUi('worldPreview');
+  return true;
+}
 function fmtPlayTime(sec){ sec = Math.round(sec||0); const h = Math.floor(sec/3600), m = Math.floor(sec/60)%60; return h ? `${h}h ${m}m` : `${m}m`; }
 // a little painted bust for a save slot: skin by race, armour and helm in the colours you wear
 const RACE_SKIN = { Human:'#e0b48c', Elf:'#f0cfa6', Dwarf:'#d29a78', Halfling:'#e8b890', Gnome:'#ecc4a2', 'Half-Elf':'#e6bc94', 'Half-Orc':'#8aa070', Tiefling:'#b8585a', Dragonborn:'#a8784a' };
