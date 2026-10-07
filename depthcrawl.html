@@ -6301,7 +6301,7 @@ function fight(mi){
   { const mm = G.mon[mi];
     if (mm && mm.alive && Math.max(Math.abs(mm.x-G.player.x), Math.abs(mm.y-G.player.y)) > 1) return;      // (struck from out of its reach)
     if (mm && mm.dazedTurns>0){ mm.dazedTurns--; logMsg(`the ${mm.nm} reels and can't strike back`, ''); return; } }
-  monsterStrikesPlayer(mi, 'attacks', 'hits');
+  foeAct(()=>{ if (!G.gameOver && G.mon[mi] && G.mon[mi].alive) monsterStrikesPlayer(mi, 'attacks', 'hits'); });   /* (RS-218: a beat after your blow) */
 }
 function monsterAttacks(mi){
   noteFoe(mi);
@@ -6745,7 +6745,23 @@ function tickActiveZones(){
 // excludeIdx: a monster index that already took its turn this player action
 // as a direct counterattack inside fight() - it's skipped here so a melee
 // swing doesn't let that same monster act a second time in one player turn
+// (RS-218) your blow, then theirs: in a fight you can see (the isometric 3D view), the monsters' answer to your melee attack -
+// the target's counterattack and everyone else's turn - waits FOE_DELAY_MS after your swing instead of landing in the same
+// instant, and you can't act again until it has. Anything else that would give the monsters a turn plays the queue first,
+// so the order of turns never changes; with no 3D view (tests, simulators) it all happens at once, as before.
+const FOE_DELAY_MS = 700;
+function foeDeferOn(){ try{ return (G.gameMode===1 || G.gameMode===2) && typeof fp3dActive==='function' && fp3dActive() && !G.foeInstant; }catch(e){ return false; } }
+function foePending(){ return !!(G.foeQueue && G.foeQueue.length); }
+function foeAct(fn){ if (G.deferFoe){ (G.foeQueue = G.foeQueue || []).push(fn); } else fn(); }
+function foeFlush(){
+  if (!foePending() || G.foeFlushing) return;
+  const q = G.foeQueue; G.foeQueue = []; G.foeFlushing = true;
+  try{ for (const fn of q){ if (G.gameOver) break; try{ fn(); }catch(e){ console.error(e); } } } finally { G.foeFlushing = false; }
+  try{ renderGame(); saveCurrentGame(); }catch(e){}
+}
+function foeTick(){ if (foePending() && (performance.now() >= (G.foeAt||0) || G.gameMode!==1 && G.gameMode!==2)) foeFlush(); }
 function tickMonsters(excludeIdx){
+  if (foePending() && !G.foeFlushing) foeFlush();   /* (RS-218: the last answer comes first) */
   if (G.gameOver) return;
   rsPrayerTick();
   // poison and fear tick down (or bite) once per player turn, exactly like
@@ -7042,12 +7058,17 @@ function tryMove(dx,dy){
   for (let i=0;i<G.mon.length;i++) if (G.mon[i].alive && G.mon[i].x===nx && G.mon[i].y===ny){ mi=i; break; }
   if (mi>=0 && dx && dy){ const now = performance.now(); if (!(G.diagWarnT > now - 4000)){ G.diagWarnT = now; logMsg('you can\'t strike from the corner - step beside it', ''); } return; }   // melee is square-on (no turn spent)
   if (mi>=0){
-    fight(mi);
-    // turn-based: your attack is your whole turn, then the monsters get
-    // theirs - the monster you just fought already took its turn as the
-    // counterattack inside fight() itself, so it's excluded here or it
-    // would unfairly get to act a second time in the same player turn
-    if (!G.gameOver) tickMonsters(mi);
+    foeTick(); if (foePending()) return;   /* (RS-218: their answer to your last blow hasn't come yet) */
+    G.deferFoe = foeDeferOn();
+    try{
+      fight(mi);
+      // turn-based: your attack is your whole turn, then the monsters get
+      // theirs - the monster you just fought already took its turn as the
+      // counterattack inside fight() itself, so it's excluded here or it
+      // would unfairly get to act a second time in the same player turn
+      if (!G.gameOver) foeAct(()=>{ if (!G.gameOver) tickMonsters(mi); });
+    } finally { G.deferFoe = false; }
+    if (foePending()){ G.foeAt = performance.now() + FOE_DELAY_MS; setTimeout(()=>{ try{ foeTick(); }catch(e){} }, FOE_DELAY_MS + 40); }   /* (and a timer, should the frames stall) */
     return;
   }
   if (tileAt(nx,ny)===T_WALL){ if (G.gameMode===3 && !G.interior && G.villageDeco && G.villageDeco[nx] && G.villageDeco[nx][ny]==='board') tkOpen('board'); else if (G.gameMode===3 && !G.interior) townBumpWall(nx, ny); return; } // bumping a wall isn't an action - no turn spent (the bounty board opens)
@@ -32714,7 +32735,7 @@ function viewYawNow(){ return VIEW.yaw==null ? viewYaw() : VIEW.yaw; }
 // the walking keys turn with the view, so up still walks up the screen
 function viewRotDir(d){ let x = d[0], y = d[1]; for (let i=0;i<viewRot();i++){ const t = x; x = y; y = -t; } return [x, y]; }
 function viewRotate(step){ ISO.rot = (ISO.rot + (step > 0 ? 1 : 3)) % 4; try{ if (G.player) G.player.viewRot = ISO.rot; }catch(e){} renderGame(); }
-const ISO_STEP_MS = 300, ISO_SWING_MS = 1800;   // a walked step, and the beat of a fight (RS-119: slowed from 620ms so you can see each swing)
+const ISO_STEP_MS = 300, ISO_SWING_MS = 2200;   /* (RS-218: 1800 -> 2200, room for their answer after your blow) */   // a walked step, and the beat of a fight (RS-119: slowed from 620ms so you can see each swing)
 // moves a figure toward its tile at an even walking pace, so a walked path
 // reads as one continuous stride rather than a hop and a stop per tile;
 // pos.mv is how much it's walking (eased, so the stride doesn't flicker between steps)
@@ -33681,6 +33702,7 @@ function renderFirstPerson(){
   FP.lastHp = p.hp;
   FP.hurt = Math.max(0, FP.hurt-dt*1.8); FP.heal = Math.max(0, FP.heal-dt*1.6); FP.glow = Math.max(0, FP.glow-dt*1.2);
   FP.cast = Math.max(0, FP.cast-dt*1.5); FP.swing = Math.max(0, FP.swing-dt*1.8); FP.fade = Math.max(0, FP.fade-dt*2.5);
+  try{ foeTick(); }catch(e){ console.error(e); }   /* (RS-218) */
   FP.shake = Math.max(0, FP.shake-dt*3);
   if (FP.moving>0.02) FP.stepPhase = (FP.stepPhase||0) + dt*9;
 
@@ -33889,7 +33911,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-217';
+const GAME_VERSION = 'rs-218';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -35898,6 +35920,7 @@ function moveDir(dx,dy){
   if (G.ui!=='playing' || G.gameOver) return;
   if (typeof V3!=='undefined' && V3.door && V3.door.phase==='in') return;   // (half way through a door)
   if (G.gameMode===3 && G.owZoomedOut) return;   // (RS-210: close the map, M, before walking on)
+  foeTick(); if (foePending()) return;   // (RS-218: wait for their answer to your blow)
   G.sitAt = null;   // (RS-183: moving gets you up off a seat)
   G.stepLen = dx && dy ? Math.SQRT2 : 1;   // the 3D figures glide a diagonal at the same pace, so it lands in the same time
   if (G.gameMode===0){

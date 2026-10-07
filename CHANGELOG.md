@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-218 - Your blow, then theirs
+
+- **Fights take turns on screen.** Your melee blow lands first - its number, its sound, the foe's flinch - and the monster's answer comes about 0.7 seconds later, instead of both swings starting in the same instant. Any other monster in reach acts with it.
+- **You wait for their answer.** You can't strike again until it has landed, so a held key or a quick double tap can't run two of your turns into one of theirs.
+- **A slower beat.** The pause between exchanges is up from 1.8 to 2.2 seconds, to make room for the two swings. The rules of the fight - who hits, how hard, in what order - are unchanged.
+
 ## RS-217 - No more automatic fullscreen
 
 - **The game stays in its window.** It no longer jumps to fullscreen on your first click or key, or when you start or resume a game. Fullscreen is now only ever your choice: the button in the top-right corner. If you turn it on and Esc drops you out (as it does on itch.io), your next click or key still puts you back.
