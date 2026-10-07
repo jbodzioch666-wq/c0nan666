@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-209 - The bestiary's bosses tab
+
+- **Pick a boss to see it.** Every boss on the Bosses tab can now be picked: it turns in the model viewer (drag, pinch and zoom like any creature), with its lore, where it rises, its life, attack style, weaknesses, abilities, your kill count and best time, and its drops with their chances.
+- **Site masters you've beaten are listed too**, and can be picked the same way.
+
 ## RS-208 - Staves held like weapons, a waypoint window that fits
 
 - **Staves tip forward in the hand.** A staff is now held fast in the fist like every other weapon, leaning a little forward at rest, swinging back over the shoulder on a wind-up and forward on the blow.
