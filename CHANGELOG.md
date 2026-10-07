@@ -1,5 +1,15 @@
 # Depthcrawl patch notes
 
+## RS-202 - Hearthstone portal, lively town animals, and better crafts that really are better
+
+- **The hearthstone opens a portal:** using it tears a portal open beside you, like the waypoint's, and you step through to your home town. It used to blink you there. It's still free.
+- **Town animals move:** the dogs, cats and chickens breathe, wag, peck and walk like the creatures out in the wild. They used to stand frozen and only turn.
+- **Better crafts really are better:**
+  - **The problem:** an Exceptional piece could have exactly the same stats as a Fine one. On small numbers, like a pair of split-bark boots, the percentage bonus rounded away.
+  - **Now:** Fine adds at least +1 to each bonus, Exceptional at least +2, and higher levels more again. For example, split-bark boots go 2 / 3 / 4 / 6 armour for plain, Fine, Exceptional, and crafted far above the recipe's level.
+  - **Reinforcing at the smith** adds at least one point every step too. Small pieces used to gain nothing until +5.
+  - Pieces you've already crafted keep the stats they were made with.
+
 ## RS-201 - Weapons held the right way, and a smaller waypoint window
 
 - **Swords, axes, maces and hammers are held edge-on:** the edge leads and the flat faces the sides. They used to show their flat to the front.

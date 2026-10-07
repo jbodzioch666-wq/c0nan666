@@ -16,6 +16,8 @@ module.exports = async page=>{
     setUi('playing');
     // out in the wild: T brings you home
     G.gameMode = 0; G.interior = null; G.owPos = { x:t1.x, y:t1.y+4 }; renderGame(); A(!bt().classList.contains('off'), 'lit once bound');
+    { const keep = o3Active; o3Active = ()=>true; G.owPortal = null; dhPress('T'); const opened = G.owPortal && G.owPortal.key===t0.x+','+t0.y; o3Active = keep; G.owPortal = null; p.hearthAt = undefined;
+      A(opened, 'in the open a portal home tears open beside you (RS-202)'); }
     dhPress('T'); out.home = [G.gameMode, G.owPos.x===t0.x && G.owPos.y===t0.y]; A(G.gameMode===3 && G.owPos.x===t0.x && G.owPos.y===t0.y, 'home: '+JSON.stringify(out.home));
     // cold now: from another town it refuses until the cooldown runs out
     G.owPos = { x:t1.x, y:t1.y }; enterVillage(); setUi('playing'); renderGame();

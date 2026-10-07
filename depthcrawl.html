@@ -9141,12 +9141,12 @@ function wpDrawMap(){
 }
 // waypoint travel: a portal tears open beside you, you walk into it, and you step out of
 // another one in the plaza of the town you chose
-function waypointTravel(key){
+function waypointTravel(key, free){
   const [x,y] = key.split(',').map(Number);
   if (!(G.ow.visitedTowns||[]).includes(key)) return;
   if (x===G.owPos.x && y===G.owPos.y){ setUi('playing'); return; }
   setUi('playing');
-  if (!ecoPayTravel(key)) return;   // the waypoint keeper's fee
+  if (!free && !ecoPayTravel(key)) return;   // the waypoint keeper's fee (the hearthstone pays none)
   if (!v3Active() || G.interior){ waypointArrive(key); return; }
   const p = G.player, wx = TOWN_CX, wy = tY(12);
   let best = null, bd = -1;
@@ -9174,10 +9174,9 @@ function hearthUse(){
   if (hearthLeft() > 0){ notify(`Your hearthstone is still cold - about ${hearthMins()} more minute${hearthMins()===1 ? '' : 's'}`, 'warn', 'error'); return; }
   const [x, y] = key.split(',').map(Number);
   if (G.gameMode===3 && G.owPos.x===x && G.owPos.y===y && !G.interior){ notify('You are already in '+o3TownName(x, y), 'warn', 'click'); return; }
-  p.hearthAt = clockNow(); G.gather = null;
-  if (G.interior) exitInterior();
-  G.gameMode = 0; logMsg('you clutch your hearthstone - it warms in your hand, and the world folds', 'magic'); try{ audEnv('portal'); }catch(e){}
-  waypointArrive(key); renderGame(); }
+  p.hearthAt = clockNow(); if (G.gather) skStop();
+  logMsg('you clutch your hearthstone - it warms in your hand, and a portal home tears open beside you', 'magic');
+  worldTeleport(key, true); renderGame(); }   /* (RS-202: through a portal, like the waypoint, not a blink) */
 function waypointArrive(key){
   const [x,y] = key.split(',').map(Number);
   G.owPos.x = x; G.owPos.y = y;
@@ -12380,7 +12379,7 @@ function rsMakeJewel(kind, idx){
 // Past +25% it's a Masterwork, below that Fine
 function rsForgeQuality(it, L, barLvl){
   const pct = Math.round(Math.min(45, 15 + Math.max(0, L - barLvl)));
-  for (const k of ['acc','dmgB','ac','rngAcc','magAcc']) if ((it[k]||0) > 0) it[k] = Math.max(it[k]+1, Math.round(it[k]*(1 + pct/100)));
+  for (const k of ['acc','dmgB','ac','rngAcc','magAcc','magDmgPct','prayB']) if ((it[k]||0) > 0) it[k] = it[k] + Math.max(Math.round(it[k]*pct/100), Math.floor(pct/10));   /* (RS-202: a better craft always shows - +1 on Fine, +2 on Exceptional and more as your level climbs, even on a 2-armour boot) */
   it.forgedPct = pct; it.forgedBy = G.player.name || 'you';
   if (!it.superior) it.nm = (pct >= 25 ? 'Exceptional ' : 'Fine ') + it.nm;
   it.quality = Math.min(2, (it.quality||0) + (pct >= 25 ? 2 : 1));
@@ -15806,11 +15805,11 @@ function buildAchievements(){
 
 // ===================== SECTION: FAST TRAVEL =====================
 // teleport to a remembered town from wherever you are in the open: through a portal
-function worldTeleport(key){
+function worldTeleport(key, free){
   if (!(G.ow.visitedTowns||[]).includes(key)){ logMsg("you haven't been there yet - visit a town once to teleport to it", 'hit'); renderGame(); return; }
   const [x,y] = key.split(',').map(Number);
   setUi('playing');
-  if (G.gameMode===3){ if (x===G.owPos.x && y===G.owPos.y){ logMsg("you're already here", ''); renderGame(); return; } if (G.interior) exitInterior(); waypointTravel(key); return; }
+  if (G.gameMode===3){ if (x===G.owPos.x && y===G.owPos.y){ logMsg("you're already here", ''); renderGame(); return; } if (G.interior) exitInterior(); waypointTravel(key, free); return; }
   if (G.gameMode!==0){ logMsg('you can only teleport from the overworld or a town', 'hit'); renderGame(); return; }
   if (G.gather) skStop();
   G.owZoomedOut = false;
@@ -28156,7 +28155,10 @@ function v3Render(){
     if (Math.abs(sx) > 0.05) p.face = sx < 0 ? -1 : 1;
     p.walk = (p.walk||0) + (moving ? dt*12 : 0);
     const bob = moving ? Math.abs(Math.sin(p.walk))*0.05 : Math.sin(V3.t*1.6 + (p.ph||(p.ph=Math.random()*6)))*0.006;
-    if (p.v && p.v.animal){ if (moving) p.g.rotation.y = Math.atan2(dx, dz); return; }   // (the dogs, cats and chickens just turn and trot)
+    if (p.v && p.v.animal){ if (moving) p.g.rotation.y = Math.atan2(dx, dz);   // (the dogs, cats and chickens turn to where they go...)
+      if (p.e && p.e.rig){ const tt = V3.t + (p.ph||(p.ph=Math.random()*6)), mv = m3dEaseMv(p.e, moving ? 1 : 0, dt);   /* (RS-202: ...and walk, breathe, wag and peck like the creatures out in the wild) */
+        try{ if (p.e.anim) p.e.anim(p.e.rig, tt, mv, 0, 0, 0, p.e); else if (p.e.beast) m3dPoseBeast(p.e.rig, tt, mv, 0, 0, 0, p.e); else m3dPoseHumanoid(p.e.rig, tt, mv, 0, 0, 0, p.e); }catch(err){} }
+      return; }
     if (p.e){
       // turn toward where they're walking; standing still, the townsfolk you can talk to turn to face you
       let want = p.yaw;
@@ -33544,7 +33546,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-201';
+const GAME_VERSION = 'rs-202';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -34421,7 +34423,8 @@ function smithReinforce(k){
   if (chn(REINF_FAIL[n+1]||0)){ logMsg(`the smith's hammer rings wrong - the ${it.nm} won't take it (${cost} gold spent)`, 'hit'); sfx('error'); renderOverlay(); saveCurrentGame(); return; }
   if (it.reinfBase===undefined) it.reinfBase = { acc:it.acc||0, dmgB:it.dmgB||0, ac:it.ac||0, nm:it.nm };
   const B = it.reinfBase, f = 1 + 0.06*(n+1);
-  if (k==='weapon'){ it.acc = Math.round(B.acc*f); it.dmgB = Math.round(B.dmgB*f); } else it.ac = Math.round(B.ac*f);
+  const up = v=>v > 0 ? Math.max(v + (n+1), Math.round(v*f)) : v;   /* (RS-202: every step adds at least one, even to a small number) */
+  if (k==='weapon'){ it.acc = up(B.acc); it.dmgB = up(B.dmgB); } else it.ac = up(B.ac);
   it.reinf = n+1; it.nm = `${B.nm} +${n+1}`; it.price = Math.round((it.price||0) + cost*0.25);
   logMsg(`the smith reinforces your ${B.nm} to +${n+1} (${cost} gold)`, 'good'); sfx('gold'); rsSync(); renderOverlay(); saveCurrentGame();
 }
