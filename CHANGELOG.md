@@ -1,5 +1,19 @@
 # Depthcrawl patch notes
 
+## RS-196 - The character sheet floats over the game, gear by drag and drop, and altars spread out
+
+- **No dark backdrop:** the character sheet (P) comes up over the game like the side panel. Both pages have the side panel's title bar, with a close button.
+- **Drag and drop:**
+  - Drag a piece from your bag onto the figure to wear it. The slot it fits lights up green, and red where it can't go. Dropped anywhere else on the figure, it goes to its own slot.
+  - Drag a worn piece off the figure into the bag to take it off. It lands in the slot you dropped it on.
+  - Drag within the bag to rearrange it, and from one ring slot to the other to swap hands.
+  - It works by touch on a phone.
+- **The compare window and the Equip button are gone.** Tap a piece in the bag and the stats page still marks every number it would change. Tap a worn piece with an empty socket to insert a rune.
+- **Altars spread out:**
+  - Each kind of rune altar now stands only on its own ground. Blood altars are beside necromancer towers, death altars beside graveyards, air altars by the mountains, and so on.
+  - Altars are placed once for the whole world. They stand at least 10 tiles from any other altar, and 24 from one of their own kind.
+  - They used to be rolled tile by tile, and could stand three or four together beside a tower or along a mountain pass.
+
 ## RS-195 - A two-page character sheet
 
 - **Two pages side by side:** the character sheet (P) opens like a book.

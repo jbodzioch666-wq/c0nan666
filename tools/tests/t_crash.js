@@ -69,10 +69,10 @@ module.exports = async page=>{
     G.inv.splice(G.inv.length - 12, 12); G.invSel = 0; setUi('playing'); renderGame(); return out; });
   console.log('inventory', JSON.stringify(inv));
   A(inv.cells===inv.items && inv.sel===3 && inv.picked && inv.detail && inv.btnOn && inv.rows===0, 'the inventory is a picture grid and its buttons can be reached: '+JSON.stringify(inv));
-  // RS-154: the character sheet on a phone - the pack is a picture grid, a tap shows the piece (with Equip), the numbers stand in one column
+  // RS-154: the character sheet on a phone - the pack is a picture grid, a tap picks a piece (it drags onto the figure, RS-196), the numbers stand in one column
   const cs = await ev(async ()=>{ for (let i=0;i<6;i++) G.inv.push(genItem(3, i%2 ? 'weapon' : 'armor')); setUi('charsheet'); renderOverlay(); await new Promise(r=>setTimeout(r, 150));
     const cells = document.querySelectorAll('#overlay .cs-pack .sp-cell.can'); if (cells[0]) cells[0].click(); await new Promise(r=>setTimeout(r, 100));
-    const picked = !!document.querySelector('#overlay .cs-pack .sp-cell.sel'), equip = /EQUIP/i.test((document.querySelector('#overlay .charsheet-detail')||{}).textContent||'');
+    const picked = !!document.querySelector('#overlay .cs-pack .sp-cell.sel'), equip = !!document.querySelector('#overlay .cs-pack .sp-cell.csdrag');   /* (RS-196: gear is dragged on, no equip button) */
     G.csPage = 'stats'; renderOverlay(); await new Promise(r=>setTimeout(r, 100));   /* (RS-195: on a phone the stats are their own page) */
     const rows = [...document.querySelectorAll('#overlay .cs-statgrid > div')].slice(0, 2).map(e=>Math.round(e.getBoundingClientRect().left));
     const out = { cells:cells.length, rows:document.querySelectorAll('#overlay .cs-pack .invrow').length, picked, equip, oneCol:rows.length===2 && rows[0]===rows[1] && rows[0] > 0 }; G.csPage = 'gear';
