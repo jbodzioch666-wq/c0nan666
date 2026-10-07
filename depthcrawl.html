@@ -21600,10 +21600,28 @@ function audStep(){
   const ctx = AUD.ctx; if (!ctx || ctx.state!=='running') return; const now = performance.now(); if (now - AUD.stepAt < 110) return; AUD.stepAt = now;
   const s = audSurface(), t = ctx.currentTime + 0.01, out = _gains.sfx;
   if (s==='boat'){ audNoiseHit(out, t, 0.35, 'lowpass', 500, 0.05); return; }
+  if (s==='sand'){ audSandStep(out, t); if (audPlate()) audNoiseHit(out, t + 0.03, 0.06, 'bandpass', 2200, 0.008, 3); return; }
   const P = { grass:['lowpass',900,0.06,0.07], dirt:['lowpass',700,0.08,0.06], stone:['bandpass',1800,0.07,0.035], wood:['bandpass',600,0.09,0.09], sand:['highpass',2500,0.05,0.12], snow:['bandpass',3000,0.07,0.1], mud:['lowpass',400,0.1,0.14], water:['bandpass',1200,0.07,0.2] }[s];
   audNoiseHit(out, t, P[3], P[0], P[1], P[2], s==='stone' ? 2 : 0.8);
   if (s==='wood'){ const o = ctx.createOscillator(), g = ctx.createGain(); o.type = 'triangle'; o.frequency.value = 140; g.gain.setValueAtTime(0.06, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.08); o.connect(g); g.connect(out); o.start(t); o.stop(t + 0.1); }
   if (audPlate()) for (const f of [1900, 2650]){ const o = ctx.createOscillator(), g = ctx.createGain(); o.type = 'square'; o.frequency.value = f + Math.random()*120; g.gain.setValueAtTime(0.012, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.09); o.connect(g); g.connect(out); o.start(t + 0.02); o.stop(t + 0.1); }
+}
+// (RS-188) a step in sand: no click - the foot sinks in with a soft rising hush, a dull thud under it, and a few quiet grains
+// crunching and sliding off as the weight comes down, a little different every step
+function audSandStep(out, t){
+  const ctx = AUD.ctx; if (!ctx || !AUD.noise) return;
+  const swell = (dur, ftype, freq, q, vol, rise)=>{ const src = ctx.createBufferSource(); src.buffer = AUD.noise; const fl = ctx.createBiquadFilter(), g = ctx.createGain();
+    fl.type = ftype; fl.frequency.value = freq; fl.Q.value = q;
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + rise); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(fl); fl.connect(g); g.connect(out); src.start(t, Math.random()*1.5); src.stop(t + dur + 0.05); };
+  const v = 0.85 + Math.random()*0.3;
+  swell(0.24, 'bandpass', 700 + Math.random()*250, 0.7, 0.075*v, 0.045);         // the hush of the sand giving way
+  swell(0.12, 'lowpass', 220, 0.7, 0.05*v, 0.015);                                 // the weight landing, muffled
+  for (let i=0;i<3;i++){ const at = t + 0.03 + Math.random()*0.12;                 // grains, soft and scattered
+    const src = ctx.createBufferSource(); src.buffer = AUD.noise; const fl = ctx.createBiquadFilter(), g = ctx.createGain();
+    fl.type = 'bandpass'; fl.frequency.value = 1300 + Math.random()*900; fl.Q.value = 1.2;
+    g.gain.setValueAtTime(0.0001, at); g.gain.linearRampToValueAtTime(0.012*v, at + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, at + 0.05);
+    src.connect(fl); fl.connect(g); g.connect(out); src.start(at, Math.random()*1.5); src.stop(at + 0.08); }
 }
 // ---- the moment-to-moment sound: weapons, spells, skills, doors, pickups, monsters, pages ----
 function audT(){ const c = AUD.ctx || audInit(); return c && c.state==='running' ? c.currentTime + 0.01 : null; }
@@ -33115,7 +33133,7 @@ function isoClick(e){
   if (G.ui!=='playing' || G.gameOver) return;
   const pk = isoPick(e); if (!pk) return;
   if (!pk.mon && document.body.classList.contains('touch')){ const d = G.gameMode===1 && G.dungeonDeco && G.dungeonDeco[pk.gx] && G.dungeonDeco[pk.gx][pk.gy];   /* (RS-185: a tap shows it on a phone) */
-    if (d && SK_CAVE_DECOS.includes(d)) tapTip(e, skCaveTipHtml(d, pk.gx, pk.gy)); }
+    if (d && SK_CAVE_DECOS.includes(d)){ tapTip(e, skCaveTipHtml(d, pk.gx, pk.gy)); ISO.caveTip = { d, x:pk.gx, y:pk.gy }; } }
   isoAct(pk, e.shiftKey);
 }
 function isoAct(pk, shift){
@@ -33419,7 +33437,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-187';
+const GAME_VERSION = 'rs-188';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -34035,6 +34053,12 @@ function ttTouchy(){ return typeof TOUCH!=='undefined' && TOUCH.on && performanc
 let TT_NODE = null;
 function ttNodeShow(e, n){ showTooltip(e, skNodeTipHtml(n)); if (document.getElementById('itemTooltip').style.display!=='none') TT_NODE = { x:n.x, y:n.y }; }
 function ttNodeRefresh(){
+  /* (RS-188) an ore rock's tooltip in a mine counts down as you mine it, like the overworld's (and goes when the rock is worked out) */
+  if (typeof ISO!=='undefined' && ISO.caveTip){ const c = ISO.caveTip, el = document.getElementById('itemTooltip');
+    if (!el || el.style.display==='none'){ ISO.caveTip = null; return; }
+    const d = G.gameMode===1 && G.dungeonDeco && G.dungeonDeco[c.x] && G.dungeonDeco[c.x][c.y];
+    if (!d || !SK_CAVE_DECOS.includes(d)){ hideItemTooltip(); ISO.caveTip = null; return; }
+    const h = skCaveTipHtml(d, c.x, c.y); if (el._ch !== h){ el._ch = h; el.innerHTML = h; } return; }
   if (!TT_NODE) return; const el = document.getElementById('itemTooltip'); if (!el || el.style.display==='none'){ TT_NODE = null; return; }
   const n = skNodeAt(TT_NODE.x, TT_NODE.y); if (!n){ hideItemTooltip(); return; }   /* (looked up afresh: the node is rebuilt from what's been taken) */
   const h = skNodeTipHtml(n); if (el._nh !== h){ el._nh = h; el.innerHTML = h; }

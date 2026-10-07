@@ -30,6 +30,13 @@ module.exports = async page=>{
     for (const nm of ['red dragon','giant snake','wolf','skeleton','giant spider','green slime','harpy','stone golem','demon','goblin']){ audMonster({ nm }, 'attack'); audMonster({ nm }, 'die'); }
     out.voices = ['red dragon','wolf','skeleton','goblin'].map(nm=>audMonVoiceKind({ nm }));
     G.owPos = { x:G.ow.spawnPos.x, y:G.ow.spawnPos.y }; for (let i=0;i<4;i++){ AUD.stepAt = 0; audStep(); } out.surface = audSurface();
+    /* RS-188: a step in sand is a soft hush with no click - nothing high-passed, nothing up near the old snap, and it swells in rather than starting at full */
+    { const keepS = audSurface, mk = AUD.ctx.createBiquadFilter.bind(AUD.ctx), fl = [], keepR = AudioParam.prototype.linearRampToValueAtTime; let rises = 0;
+      AUD.ctx.createBiquadFilter = ()=>{ const f = mk(); fl.push(f); return f; }; AudioParam.prototype.linearRampToValueAtTime = function(){ rises++; return keepR.apply(this, arguments); };
+      const keepC = G.gear.chest; audSurface = ()=>'sand'; G.gear.chest = newItem(); AUD.stepAt = 0; audStep(); G.gear.chest = keepC;
+      audSurface = keepS; AUD.ctx.createBiquadFilter = mk; AudioParam.prototype.linearRampToValueAtTime = keepR;
+      out.sand = { n:fl.length, high:fl.some(f=>f.type==='highpass'), top:Math.max(...fl.map(f=>f.frequency.value)), rises };
+      A(out.sand.n >= 3 && !out.sand.high && out.sand.top < 2300 && out.sand.rises >= 3, 'sand steps are a soft hush, not a snap: '+JSON.stringify(out.sand)); }
     audPage(); audCoins();
     // ambience follows the weather
     // RS-124: rain is six rendered loops, picked by weather, place and how long it has rained

@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-188 - Softer sand, and ore that counts down
+
+- **Walking in sand sounds like sand.** Footsteps on sand used to make a sharp snap. Now each step is a soft hush as your foot sinks in, with a dull thud underneath and a few quiet grains crunching. Every step sounds a little different. Plate armour adds a faint clink.
+- **Ore counts down as you mine.** In mines, a rock's tooltip now counts down lump by lump while you mine it, without moving the mouse, just like on the overworld. It closes when the rock is worked out. A tap on a phone counts down too.
+
 ## RS-187 - Take your character to a new world
 
 - **A new world, the same hero.** Each character on the load screen has a new globe button. It takes that character to a newly made world. You get the usual world preview, so you can pick the size, reroll or enter a world code, and then you set out from a town in the new land.

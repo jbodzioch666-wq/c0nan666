@@ -33,10 +33,14 @@ module.exports = async page=>{
     // mine it out: it gives exactly what the tooltip said
     G.mon = []; G.player.tools = Object.assign(G.player.tools||{}, { pick:1 }); skP().skills.mining = 2e7; setUi('playing');
     const key = G.dungeonSlot+'/'+G.depth+':'+ore[0]+','+ore[1], opt = skOptions().find(o=>o.vein && o.vein.x===ore[0] && o.vein.y===ore[1]);
+    ISO.caveTipT = 0; canvas.dispatchEvent(new MouseEvent('mousemove', { clientX:cx, clientY:cy, bubbles:true }));   /* (RS-188: hover it, then hold still and mine) */
+    const tipLeft = ()=>{ const m = document.getElementById('itemTooltip').innerHTML.match(/>(\d+) lumps? left/); return m ? +m[1] : null; };
+    out.counts = [tipLeft()];
     let n = 0;
     for (let i=0;i<400 && opt && G.dungeonDeco[ore[0]][ore[1]]==='ore';i++){ const before = G.veinLeft ? G.veinLeft[key] : undefined;
       if (!G.gather) skDo(opt); if (!G.gather) break; G.gather.next = 0; try{ skGatherTick(performance.now()); }catch(e){ out.err = e.message; break; }
-      const after = G.veinLeft ? G.veinLeft[key] : undefined; if (after!==before) n++; }
+      const after = G.veinLeft ? G.veinLeft[key] : undefined; if (after!==before){ n++; ttNodeRefresh(); out.counts.push(tipLeft()); } }
+    out.goneTip = document.getElementById('itemTooltip').style.display==='none';
     out.mined = n;
     return out; });
   console.log(JSON.stringify(r).slice(0, 1500));
@@ -47,4 +51,5 @@ module.exports = async page=>{
   A(r.away, 'moving off it hides the tooltip');
   A(r.tap.shown && /Mining/.test(r.tap.text), 'a tap on a phone shows it too');
   A(!r.err && !r.drift && r.mined===r.left0, 'mining gives as many lumps as the tooltip said');
+  A(r.counts[0]===r.left0 && r.counts.slice(1, -1).every((c, i)=>c===r.left0 - 1 - i) && r.goneTip, 'the tooltip counts down as you mine, with the mouse held still, and goes when the rock is worked out: '+JSON.stringify(r.counts));
 };
