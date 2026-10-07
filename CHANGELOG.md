@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-185 - Tooltips underground, and portals out of the way
+
+- **Tooltips for ore in the mines.** Hover an ore vein in a mine and you get a tooltip like the gathering spots on the overworld. It shows the ore, the Mining level it needs, the xp per lump, about how many lumps are left, and whether you still need a pickaxe. Essence seams, cave pools and cave herbs get one too. On a phone, tap the vein to see it.
+- **Portals against the wall.** The way out of a dungeon could stand in the middle of a tunnel and block it. On some floors a pile of gold lay on the spot where you come in, and the portal was set down there without being moved to a wall. The portal and the stairs now always back onto a wall and leave the way past them open. That includes mines, the castle and the graveyard. Floors you've already visited are fixed the next time you go in.
+
 ## RS-184 - Sitting on the seat, and a proper upstairs
 
 - **Sitting on the seat, not in it.** Seated people sank into chairs, stools and pews up to their hips. Seats are now the right height for their legs: they sit on top of the seat with their feet on the floor. The tavern tables are lower to match.

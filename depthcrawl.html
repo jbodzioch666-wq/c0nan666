@@ -5595,7 +5595,8 @@ function stairWallDir(x, y, backOnly){
   return null;
 }
 function settleStairs(){
-  if ((G.siteKind==='graveyard' && (G.depth||1)===1) || !G.map) return;   // (the graveyard's surface: its way down is inside the mausoleum - the catacombs below get the usual treatment)
+  if (!G.map) return;
+  const graveTop = G.siteKind==='graveyard' && (G.depth||1)===1;   // (the graveyard's surface: its way down is inside the mausoleum, so only the way out moves - the catacombs below get the usual treatment)
   const taken = (x,y)=> G.mon.some(m=>m.alive && m.x===x && m.y===y) || (G.dungeonDeco && G.dungeonDeco[x] && G.dungeonDeco[x][y]);
   const spot = (x0, y0, backOnly)=>{
     const seen = new Set([x0+','+y0]), q = [[x0,y0,0]];
@@ -5609,19 +5610,44 @@ function settleStairs(){
     }
     return null;
   };
+  /* (RS-185) where no straight stretch of wall is near: any tile with a wall beside it that doesn't stand in the only way through */
+  const loose = (x0, y0)=>{
+    const seen = new Set([x0+','+y0]), q = [[x0,y0]];
+    while (q.length){
+      const [x,y] = q.shift();
+      if (G.map[x][y]===T_FLOOR && !taken(x,y) && portalWallDir(x,y) && !passageAt(x,y)) return [x,y];
+      for (const [dx,dy] of FACING_VECT){ const nx = x+dx, ny = y+dy, k = nx+','+ny;
+        if (seen.has(k) || nx<1 || ny<1 || nx>=COLS-1 || ny>=ROWS-1 || G.map[nx][ny]===T_WALL) continue;
+        seen.add(k); q.push([nx,ny]); }
+    }
+    return null;
+  };
   const moves = [];
-  for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++) if (G.map[x][y]===T_STAIRSU || G.map[x][y]===T_STAIRSD) moves.push([x,y]);
+  for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++){ const t = G.map[x][y]; if (t===T_EXIT || (!graveTop && (t===T_STAIRSU || t===T_STAIRSD))) moves.push([x,y]); }
   const startHasStair = moves.some(([x,y])=>x===G.genStart.x && y===G.genStart.y);
-  if (!startHasStair && G.map[G.genStart.x] && G.map[G.genStart.x][G.genStart.y]===T_FLOOR) moves.push([G.genStart.x, G.genStart.y]);
+  if (!startHasStair && G.map[G.genStart.x] && G.map[G.genStart.x][G.genStart.y]!==undefined && G.map[G.genStart.x][G.genStart.y]!==T_WALL) moves.push([G.genStart.x, G.genStart.y]);
   for (const [x,y] of moves){
-    if (stairWallDir(x,y,true)) continue;
-    const t = G.map[x][y];
-    if (t===T_STAIRSU || t===T_STAIRSD) G.map[x][y] = T_FLOOR;       // (free the old tile before searching, so it can't be chosen back)
-    const to = spot(x, y, true) || (stairWallDir(x,y) ? [x,y] : spot(x, y, false));
-    if (!to){ G.map[x][y] = t; continue; }
-    G.map[to[0]][to[1]] = t;
+    const t = G.map[x][y], keep = !(t===T_STAIRSU || t===T_STAIRSD || t===T_EXIT || t===T_FLOOR);   /* (RS-185: the way in under a pile of gold or an item - the gold stays, the way in moves) */
+    if (!keep && stairWallDir(x,y,true)) continue;
+    if (!keep && t!==T_FLOOR) G.map[x][y] = T_FLOOR;       // (free the old tile before searching, so it can't be chosen back)
+    const to = keep ? (spot(x, y, true) || spot(x, y, false) || loose(x, y))
+      : spot(x, y, true) || (stairWallDir(x,y) ? [x,y] : spot(x, y, false)) || (portalWallDir(x,y) && !passageAt(x,y) ? [x,y] : loose(x, y));
+    if (!to){ if (!keep) G.map[x][y] = t; continue; }
+    if (!keep) G.map[to[0]][to[1]] = t;
     if (x===G.genStart.x && y===G.genStart.y){ G.genStart.x = to[0]; G.genStart.y = to[1]; }
   }
+}
+// (RS-185) a wall right beside a tile, the side a portal backs onto; and whether a tile is the only way through (a portal
+// or a stair there would block the passage): its open neighbours don't join up round it
+function portalWallDir(x, y){ for (const [dx,dy] of STAIR_WALL_ORDER) if (tileAt(x+dx, y+dy)===T_WALL) return [dx,dy]; return null; }
+function passageAt(x, y){
+  const open = (a,b)=>{ const t = tileAt(a,b); return t!==undefined && t!==null && t!==T_WALL; };
+  const ring = []; for (let i=-1;i<=1;i++) for (let j=-1;j<=1;j++) if ((i||j) && open(x+i, y+j)) ring.push(i+','+j);
+  const orth = ring.filter(k=>{ const [i,j] = k.split(',').map(Number); return !i || !j; });
+  if (orth.length <= 1) return false;                                         // (a dead end: nothing to block)
+  const seen = new Set([orth[0]]), q = [orth[0]];
+  while (q.length){ const [i,j] = q.pop().split(',').map(Number); for (const [a,b] of FACING_VECT){ const k = (i+a)+','+(j+b); if (!seen.has(k) && ring.includes(k)){ seen.add(k); q.push(k); } } }
+  return orth.some(k=>!seen.has(k));
 }
 function retreatTile(){ return ASCEND_SITES[G.siteKind] ? T_STAIRSD : T_STAIRSU; }
 // true if a straight line from (x0,y0) to (x1,y1) never crosses a wall
@@ -10616,6 +10642,25 @@ function skCaveLabel(deco, x, y){
   if (deco==='eelpool') return { txt:'Fish cave eels (Fishing 50)', col:SK_SPOT.cave.col };
   if (deco==='essvein') return { txt:'Mine rune essence (Mining 1)', col:'#a8d0ff' };
   const hb = SK_HERB.find(e=>e.id===skCaveHerb()); return { txt:`Pick ${hb.nm.toLowerCase()} (Foraging ${hb.lvl})`, col:SK_HERB_COL[hb.id] };
+}
+// (RS-185) the tooltip for something to gather in a mine or cave, like the ones on the overworld: what it is, the level it
+// needs, what it gives and for how much xp, the tool, and how much is left in it
+function skCaveTipHtml(deco, x, y){
+  const lb = skCaveLabel(deco, x, y), k = deco==='eelpool' ? 'fishing' : deco==='cavherb' ? 'foraging' : 'mining';
+  const it = deco==='ore' ? SK_ORE.find(e=>e.id===veinOre(x, y)) : deco==='essvein' ? skItem('essence') : deco==='eelpool' ? SK_FISH.find(f=>f.id==='eel') : SK_HERB.find(e=>e.id===skCaveHerb());
+  if (!it) return `<div style="font-weight:600">${esc(lb.txt)}</div>`;
+  const nm = deco==='ore' ? (it.id==='coal' ? 'Coal seam' : it.nm.replace(/ Ore$/, '') + ' vein') : deco==='essvein' ? 'Rune essence seam' : deco==='eelpool' ? 'Cave pool' : it.nm + ' (cave herb)';
+  const sk = SK_DEFS.find(d=>d[0]===k), L = skLvl(k), lvl = it.lvl || 1, tool = { mining:'pick', fishing:'rod' }[k];
+  const xp = Math.max(1, Math.round((it.xp||1) * (GATHER_XP[k]||1) * 1.2 * XP_RATE * (1 + skPerk(k, 'xp') + sqXpBonus(k))));
+  const left = G.veinLeft && G.veinLeft[G.dungeonSlot+'/'+G.depth+':'+x+','+y], unit = { mining:'lump', fishing:'eel', foraging:'pick' }[k];
+  const n = left!==undefined ? left : deco==='eelpool' ? '4' : deco==='essvein' ? '6 to 10' : deco==='cavherb' ? '2 or 3' : '3 to 5';
+  let h = `<div style="font-weight:600;color:${lb.col}">${esc(nm)}</div>`;
+  h += `<div class="muted">${sk[1]} ${lvl}${L<lvl ? ` <span style="color:${COL.red}">(you have ${L})</span>` : ''}</div>`;
+  h += `<div>${esc(it.nm)} &middot; ${xp} xp each</div>`;
+  h += `<div class="muted">${left!==undefined ? '' : 'about '}${n} ${unit}${n===1 ? '' : 's'} left</div>`;
+  if (tool && !skP().tools[tool]) h += `<div style="color:${COL.red}">you need a ${esc(SK_TOOLS.find(t=>t.id===tool).nm.toLowerCase())} - the Peddler sells them</div>`;
+  h += `<div class="muted">${document.body.classList.contains('touch') ? 'tap' : 'click'} to ${deco==='eelpool' ? 'fish' : deco==='cavherb' ? 'pick' : 'mine'} it</div>`;
+  return h;
 }
 function skRawFoods(){ const out = []; for (const f of SK_FISH.concat(SK_MEAT)) if (skHave(f.id)) out.push(f); return out; }
 // ---- gathering: repeats on its own until you move, fill up on danger, or run out ----
@@ -29979,7 +30024,7 @@ function fpdPortals(world){
   for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++){
     const t = G.map[x][y]; if (t!==T_EXIT && t!==T_FLEE) continue;
     const col = new T.Color(t===T_EXIT ? 0x4ad8ff : 0xff4a3a);
-    const w = stairWallDir(x, y), face = w ? [-w[0], -w[1]] : fpStairDir(x, y);
+    const w = stairWallDir(x, y) || portalWallDir(x, y), face = w ? [-w[0], -w[1]] : fpStairDir(x, y);   /* (RS-185: backed onto a wall wherever there is one) */
     const g = new T.Group(); g.position.set(x+0.5 - face[0]*0.22, 0, y+0.5 - face[1]*0.22); g.rotation.y = Math.atan2(face[0], face[1]);
     const box = (sx, sy, sz, px, py, pz, m)=>{ const b = new T.Mesh(new T.BoxGeometry(sx, sy, sz), m||stone); b.position.set(px, py, pz); b.castShadow = true; b.receiveShadow = true; g.add(b); return b; };
     box(1.0, 0.07, 0.42, 0, 0.035, 0);                                   // the step it stands on
@@ -32844,8 +32889,21 @@ function isoDrawHover(){
   }
   ctx.restore();
 }
-canvas.addEventListener('mousemove', (e)=>{ ISO.mouse = { x:e.clientX, y:e.clientY }; });
-canvas.addEventListener('mouseleave', ()=>{ ISO.mouse = null; });
+canvas.addEventListener('mousemove', (e)=>{ ISO.mouse = { x:e.clientX, y:e.clientY }; isoCaveTip(e); });
+canvas.addEventListener('mouseleave', ()=>{ ISO.mouse = null; if (ISO.caveTip){ hideItemTooltip(); ISO.caveTip = null; } });
+// (RS-185) hovering an ore vein, a cave pool, a cave herb or an essence seam shows its tooltip - picked the same way a click is
+function isoCaveAt(e){
+  if (G.gameMode!==1 || !G.dungeonDeco || !(ISO.on && FPD.ok) || typeof fp3dActive!=='function' || !fp3dActive()) return null;
+  const pk = isoPick(e); if (!pk || pk.mon) return null;
+  const d = G.dungeonDeco[pk.gx] && G.dungeonDeco[pk.gx][pk.gy];
+  return d && SK_CAVE_DECOS.includes(d) && G.dungeonSeen && G.dungeonSeen[pk.gx] && G.dungeonSeen[pk.gx][pk.gy] ? { d, x:pk.gx, y:pk.gy } : null;
+}
+function isoCaveTip(e){
+  const now = performance.now(); if (now - (ISO.caveTipT||0) < 70) return; ISO.caveTipT = now;   // (a raycast: not on every mouse event)
+  const c = G.ui==='playing' ? isoCaveAt(e) : null;
+  if (c){ showTooltip(e, skCaveTipHtml(c.d, c.x, c.y)); ISO.caveTip = c; }
+  else if (ISO.caveTip){ hideItemTooltip(); ISO.caveTip = null; }
+}
 // ---- working with tools: a pickaxe or a hatchet in both hands, swung at the rock or the tree ----
 const TOOL_TIER_COL = ['#b07a3c','#8c8c8c','#c0c4ca','#5064c0','#3c8a5a','#46a8c8','#c83a2a','#ff7a1a'];
 function rsToolModel(kind, tier){
@@ -33063,6 +33121,8 @@ function isoPick(e){
 function isoClick(e){
   if (G.ui!=='playing' || G.gameOver) return;
   const pk = isoPick(e); if (!pk) return;
+  if (!pk.mon && document.body.classList.contains('touch')){ const d = G.gameMode===1 && G.dungeonDeco && G.dungeonDeco[pk.gx] && G.dungeonDeco[pk.gx][pk.gy];   /* (RS-185: a tap shows it on a phone) */
+    if (d && SK_CAVE_DECOS.includes(d)) tapTip(e, skCaveTipHtml(d, pk.gx, pk.gy)); }
   isoAct(pk, e.shiftKey);
 }
 function isoAct(pk, shift){
@@ -33366,7 +33426,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-184';
+const GAME_VERSION = 'rs-185';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
