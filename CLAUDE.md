@@ -7,6 +7,7 @@ A RuneScape-flavoured roguelike in one file, `depthcrawl.html`. It uses three.js
 - `tools/build-itch.sh`: builds the itch.io zip into `dist/`, which is gitignored.
 - `tools/itch-art/make.sh`: makes the itch.io page art (cover, banner, page background, embed background) from in-game scenes into `dist/itch-art/out`. Slow: about half an hour of software rendering. Each run uses a fresh random world, so check the shots.
 - `tools/tests/`: Playwright browser tests. See `tools/tests/README.md`.
+- `tools/sim/`: balance simulators that drive the game's own code in a browser (`node tools/sim/run.js --soft combat gather produce economy`, same harness and `THREE_JS` as the tests). Run them before and after touching xp rates, drops or prices, and quote the numbers in the changelog.
 
 ## Branches
 

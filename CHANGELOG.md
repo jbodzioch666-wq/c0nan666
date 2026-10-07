@@ -1,5 +1,21 @@
 # Depthcrawl patch notes
 
+## RS-194 - Balance pass: xp, gold and the economy
+
+Measured with new simulators (`tools/sim`) that drive the game's own combat, gathering and crafting code: 120 fights at each of twelve levels, 1,500 takes on every kind of tree, spot, patch and vein, and the production tables at the craft queue's pace.
+
+- **Melee maxes in about 50 hours, not 77:** every hit now gives 5 combat xp a point of damage (was 3). Hitpoints xp is unchanged. Bows, spells and necromancy use the same rule, so they speed up too.
+- **Gold matters again:** a fighter at combat 100 was taking 100,000 coins an hour, enough to buy everything in the game every half hour. Coin drops are halved, and trimmed further above tier 3 down to a quarter at tier 12 and beyond. Fighting now pays 5,000 to 20,000 coins an hour by level, plus what the drops sell for. Every gold sink in the game together (dragon and infernal tools, every boat, harpoons, a house, property, a city, a full rune set reinforced to +5) comes to about 900,000.
+- **The smith pays less, and less again as you flood him:** mining was earning 150,000 gold an hour at the top, five times anything else. The smith's prices are trimmed (adamantite ore 50g, was 90; a rune bar 320g, was 600) and now fall as you sell him the same thing, recovering over time, exactly as the Peddler's do. His "sell all" button shows the real total. The Peddler also pays less for logs and herbs.
+- **Woodcutting and foraging keep pace:** they took 20 hours to 99 against 10 for fishing and mining. Woodcutting xp is up 60% and foraging 45%, so all four gathering skills now reach 99 in 10 to 15 hours.
+- **The slow skills catch up:**
+  - **Runecrafting:** three times the xp an essence (air 45, death 90, blood 96). 99 took some 80 hours of essence mining; now about 20.
+  - **Prayer:** bones 30 xp (was 8), big bones 100 (was 25), dragon bones 400 (was 110). An altar still offers them for three times that.
+  - **Slayer:** three times the xp a kill on task.
+  - **Alchemy:** brews give about 75% more xp, so 99 needs about as many herbs as 99 Foraging picks.
+  - **Smithing:** bars take half the coal (steel 1, mithril 2, adamant 3, rune 4), the higher bars give more xp (mithril 80, adamant 100, rune 120), and forging pays three times the bar's xp a bar, not twice. 99 by forging rune now needs about 10,000 bars and 40,000 coal, not 16,000 and 128,000.
+- **Old saves** keep every level and every coin: nothing here changes what is stored.
+
 ## RS-193 - Colour for what you buy, too
 
 - **Boat upgrades in colour.** Building a sloop, caravel or galleon now shows the logs, iron bars and gold it takes in green or red, with how much you hold.

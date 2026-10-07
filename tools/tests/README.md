@@ -26,6 +26,7 @@ Screenshots go to `tools/tests/shots/`.
 |---|---|
 | boot | the page loads and a character starts |
 | iso | isometric 3D everywhere: no key or saved setting switches to a flat view |
+| bal2 | the RS-194 balance pass: combat xp per damage, trimmed coins, the smith's falling prices, gathering and production xp rates, bones, slayer and runecrafting |
 | xpt | tick skills in the skills menu to choose what the XP window shows |
 | rooms | building interiors: floorboards and flagstones with depth, panelled walls, rugs, daylight through the windows |
 | door | walking through a door: swings open, camera leans in, room appears, eases out; and back out with the door shutting |
