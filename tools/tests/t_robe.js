@@ -35,9 +35,9 @@ module.exports = async page=>{
     return out; });
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
-  A(!r.topOverPlate.includes(0.48), 'a robe top over plate legs has no long skirt of its own');
+  A(!r.topOverPlate.includes(0.48) && !r.topOverPlate.some(h=>h < 0.3), 'a robe top over plate legs has no skirt of its own at all (RS-203)');
   A(r.bottomAlone.includes(0.48), 'a robe bottom is a long skirt, even with no top');
-  A(r.both.includes(0.48) && r.both.some(h=>h < 0.3), 'top and bottom together: the long skirt with the tunic hem over it');
+  A(r.both.includes(0.48) && !r.both.some(h=>h < 0.3), 'top and bottom together: the long skirt, and the top stops at the waist - no hem to poke through (RS-203)');
   A(!r.plateOnly.includes(0.48), 'plate legs are still legs');
   A(r.clip.follow < 0.02 && r.clip.still > r.clip.follow*3, 'mid-stride the legs stay inside the robe, which moves with them');
   A(r.kind.robe==='robelegs' && r.kind.plate==='legs', 'the robe bottom has its own icon');

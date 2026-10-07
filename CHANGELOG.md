@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-203 - The robe top stops at the waist
+
+- **A robe top is just a top:** it ends at the waist under its sash. It used to have a short flared hem of its own that poked through a robe bottom worn under it. Over plate or leather legs it now ends neatly at the belt line too.
+- **Stitched hem runes** on a full mystic set now run round the robe bottom's hem.
+
 ## RS-202 - Hearthstone portal, lively town animals, and better crafts that really are better
 
 - **The hearthstone opens a portal:** using it tears a portal open beside you, like the waypoint's, and you step through to your home town. It used to blink you there. It's still free.
