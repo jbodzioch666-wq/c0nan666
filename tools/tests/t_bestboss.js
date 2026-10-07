@@ -14,6 +14,10 @@ module.exports = async page=>{
       A(out[nm].slot && out[nm].model, nm+': the viewer shows it '+JSON.stringify(out[nm]));
       A(out[nm].style && out[nm].drops, nm+': its stats '+JSON.stringify(out[nm]));
     }
+    // (RS-216) the risen pharaoh is shown as one of the dead, not the nearest living figure
+    const ph = bvPortrait({ nm:'risen pharaoh' }); out.pharaoh = ph===m3dPortrait({ nm:'risen pharaoh', undead:true }) && ph!==m3dPortrait({ nm:'bandit' });
+    A(out.pharaoh, 'the risen pharaoh wears its own undead model in the viewer');
+    A(/god-king/.test(bestLore('risen pharaoh', {})), 'and has its lore');
     return out; });
   console.log(JSON.stringify(r));
 };

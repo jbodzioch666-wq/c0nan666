@@ -5410,17 +5410,18 @@ function invalidateDungeonCache(slot){
 // stairs or closing the game all bring you back to the same rooms, the same loot and the same foes. Grids go in as strings
 // (one character per tile) and the sparse ones as lists; the three most recently walked sites are kept.
 const DG_CACHE_SLOTS = 3;
-function monPlain(m){ return JSON.parse(JSON.stringify(m, (k, v)=> k==='summoner' || typeof v==='function' || (v && v.isObject3D) ? undefined : v)); }
+function monPlain(m){ return JSON.parse(JSON.stringify(m, (k, v)=> k==='summoner' || k==='faceAt' || typeof v==='function' || (v && v.isObject3D) ? undefined : v)); }
 function dgCacheEncode(){
   const slots = {}; for (const k of Object.keys(G.dgCache)){ const sl = k.split('_')[0], c = G.dgCache[k]; slots[sl] = Math.max(slots[sl]||0, c.at||0); }
   const keep = Object.keys(slots).sort((a,b)=>slots[b]-slots[a]).slice(0, DG_CACHE_SLOTS), out = {};
   for (const k of Object.keys(G.dgCache)){ const c = G.dgCache[k]; if (!keep.includes(k.split('_')[0]) || !c.map || !c.map.length) continue;
+    if (c._enc && c._encAt===c.at){ out[k] = c._enc; continue; }   /* (RS-216: a floor is encoded once per caching, not on every autosave) */
     try{
       const w = c.map.length, h = c.map[0].length, enc = (g, f)=>g.map(col=>col.map(f).join('')).join('|');
       const sparse = (g, f)=>{ const L = []; if (g) for (let x=0;x<w;x++) for (let y=0;y<h;y++){ const v = g[x] && g[x][y]; if (v) L.push([x, y, f ? f(v) : v]); } return L; };
       const e = { at:c.at||0, ent:c.ent||'', w, h, map:enc(c.map, t=>String.fromCharCode(48+t)), ts:c.trapSeen ? enc(c.trapSeen, v=>v?'1':'0') : null, ds:c.dungeonSeen ? enc(c.dungeonSeen, v=>v?'1':'0') : null,
         deco:sparse(c.dungeonDeco), fi:sparse(c.floorItem), gs:c.genStart, mon:(c.mon||[]).map(monPlain), shop:c.shopStock||[], bf:c.isBossFloor||0, bi:c.bossIdx==null ? -1 : c.bossIdx };
-      JSON.stringify(e); out[k] = e;
+      JSON.stringify(e); out[k] = e; c._enc = e; c._encAt = c.at;
     }catch(err){ console.error(err); }
   }
   return out;
@@ -13183,6 +13184,7 @@ function bestLore(nm, e){
   for (const b in NAMED_BOSSES) if ((b==='barrows' && BARROWS_BROS.some(x=>x[0]===nm)) || (b==='dks' && /Dagannoth/.test(nm)) || NAMED_BOSSES[b].nm===nm) return NAMED_BOSSES[b].lore;
   const k = FAM_BY_NAME[nm]; if (k) return MON_FAMILIES[k].lore;
   if (nm==='mimic') return 'It looks exactly like a treasure chest. That is the point.';
+  if (nm==='risen pharaoh') return 'The god-king a pyramid was raised over, up off the slab in gold mask and nemes. Its word holds you where you stand while it drinks what life you brought down with you.';
   if (nm==='golden goblin') return 'A goblin who found a pot of gold and fell in. Catch it before it runs.';
   if (nm==='treasure imp') return 'An imp that steals and hoards. It never stays long.';
   const ab = (e && e.abilities)||[];
@@ -13206,7 +13208,7 @@ function bestBossKey(n){ return Object.keys(NAMED_BOSSES).find(k=>bestBossNames(
 function bestBossPanel(nm){
   const p = G.player, k = bestBossKey(nm), B = k ? NAMED_BOSSES[k] : null, e = bestEntryFor(nm) || {};
   const style = k==='barrows' ? (BARROWS_BROS.find(x=>x[0]===nm)||[])[1] : k==='dks' ? { 'Dagannoth Rex':'melee', 'Dagannoth Prime':'magic', 'Dagannoth Supreme':'ranged' }[nm] : k==='kbd' ? 'melee and dragonfire' : (e.forceStyle || 'melee');
-  const probe = Object.assign({ nm, undead:k==='barrows' || e.undead, abilities:e.abilities||(k==='kbd' ? ['breath'] : []) }, e), mw = monWeak(probe), el = rsMonElem(Object.assign({}, probe, { rsElem:null }));
+  const probe = Object.assign({ nm, undead:k==='barrows' || e.undead || BV_UNDEAD_RE.test(nm.toLowerCase()), abilities:e.abilities||(k==='kbd' ? ['breath'] : nm==='risen pharaoh' ? ['spellcast','paralyze','drain','multiattack2'] : []) }, e), mw = monWeak(probe), el = rsMonElem(Object.assign({}, probe, { rsElem:null }));
   const row = (a, b)=>`<div class="bvrow"><span class="muted">${a}</span><b>${b}</b></div>`;
   return `<div id="bvSlot" style="width:220px;height:240px;margin:0 auto 6px;border-radius:8px;background:radial-gradient(circle at 50% 40%, #2a2a34, #121216);position:relative;"></div>
     <h3 style="margin:4px 0;color:var(--amber);">${esc(nm)}</h3>
@@ -13308,7 +13310,7 @@ function bvMount(){
 }
 // the model to show for a creature in the bestiary (RS-119): its own; for the undead, the undead one (the bestiary's
 // entries don't always carry the flag); and for a creature with no model, the nearest kind that has one
-const BV_UNDEAD_RE = /zombie|skeleton|mummy|ghost|ghoul|wight|wraith|lich|revenant|spectre|specter|banshee|undead|barrows/;
+const BV_UNDEAD_RE = /zombie|skeleton|mummy|pharaoh|ghost|ghoul|wight|wraith|lich|revenant|spectre|specter|banshee|undead|barrows/;   /* (RS-216: the risen pharaoh is one of the dead too) */
 function bvPortrait(fake){
   const n = String(fake.nm||'').toLowerCase();
   let pt = m3dPortrait(fake); if (pt) return pt;
@@ -33892,7 +33894,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-215';
+const GAME_VERSION = 'rs-216';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

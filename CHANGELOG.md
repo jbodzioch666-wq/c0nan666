@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-216 - Review fixes
+
+- **The risen pharaoh looks like itself in the bestiary.** On the Bosses tab it was drawn as a bandit, because the viewer only knew a creature was undead by its name. It now wears its gold mask and nemes there, its weaknesses are those of the dead, and it has its own lore line.
+- **Lighter autosaves below ground.** A floor you've walked is encoded for the save once, when it's cached, instead of on every autosave. Nothing changes in what is saved.
+
 ## RS-215 - Skeleton eyes
 
 - **Dressed skeletons keep their eye colour when 3D can't run.** In the flat fallback drawing, skeleton champions now glow gold, archers green and mages violet, as they do in 3D. Before, every one of them got the default red, because the colour was read from something that didn't exist there.

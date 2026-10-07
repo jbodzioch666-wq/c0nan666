@@ -25,6 +25,7 @@ module.exports = async page=>{
     // the save carries the floors
     saveCurrentGame(); const data = JSON.parse(localStorage.getItem(SAVE_PREFIX+G.saveId)); out.saved = Object.keys(data.dgCache||{});
     out.savedKB = Math.round(JSON.stringify(data.dgCache).length/1024);
+    { const e1 = dgCacheEncode(), e2 = dgCacheEncode(); out.memo = e1[slot+'_1']===e2[slot+'_1']; saveLevelCache(G.depth); out.fresh = dgCacheEncode()[slot+'_1']!==e1[slot+'_1']; }
     G.dgCache = {}; loadGame(G.saveId); setUi('playing'); out.sameAfterLoad = sig()===s1; out.decoAfterLoad = G.dungeonDeco[g.dg.x][g.dg.y];
     // kneel at the stone: everything back, the deco gone (the load made a new player object - find the stone again)
     const P2 = G.player, g2 = P2.graves.find(q=>q.id===g.id);
@@ -55,6 +56,7 @@ module.exports = async page=>{
   A(r.same && r.foes[0]===r.foes[1] && r.deco==='pgrave', 'back in: same floor, same foes, the stone on its tile '+JSON.stringify([r.same, r.foes, r.deco]));
   A(r.saved.includes(r.slot+'_1') && r.sameAfterLoad && r.decoAfterLoad==='pgrave' && r.savedKB < 400, 'the save carries the floor '+JSON.stringify([r.saved, r.sameAfterLoad, r.decoAfterLoad, r.savedKB]));
   A(r.reclaimed, 'reclaimed at the stone '+JSON.stringify(r.reclaimDbg));
+  A(r.memo && r.fresh, 'an unchanged floor is not re-encoded on the next save, a re-cached one is (RS-216) '+JSON.stringify([r.memo, r.fresh]));
   A(r.boss[0]===1 && r.boss[1]>=0, 'boss floor '+JSON.stringify(r.boss));
   A(r.afterBoss.ui==='victory' && r.afterBoss.mode===1 && r.afterBoss.slot===r.slot && r.afterBoss.done===1 && r.afterBoss.cacheKept && r.afterBoss.entTile, 'after the boss you are still inside '+JSON.stringify(r.afterBoss));
   A(r.portal[0]>=0 && r.portal[2] <= 12 && r.portal[3], 'a portal near you, against a room wall '+JSON.stringify(r.portal));
