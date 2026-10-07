@@ -10,7 +10,8 @@ module.exports = async page=>{
     for (const nm of ['orc shaman','goblin archer']){
       const e = m3dInstance({ nm }, monsterPortraitFor(nm));
       out[nm] = { rest:up(e, 0), wind:up(e, 1) };
-      A(out[nm].rest[1] > 0.95, nm+': upright at rest '+JSON.stringify(out[nm]));
+      if (nm==='orc shaman') A(out[nm].rest[2] > 0.2 && out[nm].rest[1] > 0.8, nm+': the staff tips forward at rest, like a blade '+JSON.stringify(out[nm]));
+      else A(out[nm].rest[1] > 0.95, nm+': upright at rest '+JSON.stringify(out[nm]));
       if (nm==='orc shaman') A(out[nm].wind[2] < -0.5, nm+': tipped back on the wind-up '+JSON.stringify(out[nm]));
       else A(out[nm].wind[1] > 0.9, nm+': a bow stays upright at full draw (the arm is held out, not overhead) '+JSON.stringify(out[nm]));
     }
@@ -29,4 +30,22 @@ module.exports = async page=>{
     A(G.gameMode===0 && Math.max(Math.abs(G.owPos.x-dx), Math.abs(G.owPos.y-dy)) >= 1 && !OW_SITE_TILES.includes(G.ow.map[G.owPos.x][G.owPos.y]), 'out beside the entrance '+JSON.stringify(out.out));
     return out; });
   console.log(JSON.stringify(r));
+};
+// RS-208: the sculpted skeletons too - a skeleton mage's staff tips back on the wind-up and forward on the cut
+const base = module.exports;
+module.exports = async page=>{
+  await base(page);
+  const r = await page.evaluate(async ()=>{
+    try{ sk3Build(); }catch(e){} for (let i=0;i<150 && !SK3.ok;i++) await new Promise(r=>setTimeout(r, 200));
+    const T = THREE, e = sk3Instance({ nm:'skeleton mage' }), sc = new T.Scene(); sc.add(e.holder);
+    const piv = e.rig.ups[0], tip = atk=>{ sk3Pose(0.3, 0, atk, 0, e.seed||0, e.rig, 0); sc.updateMatrixWorld(true); sc.onBeforeRender(); sc.updateMatrixWorld(true);
+      let root = piv; while (!(root.userData && root.userData.modelRoot)) root = root.parent;
+      const qa = new T.Quaternion(), qb = new T.Quaternion(); root.getWorldQuaternion(qa); piv.getWorldQuaternion(qb);
+      return new T.Vector3(0, 1, 0).applyQuaternion(qa.invert().multiply(qb)).toArray().map(x=>+x.toFixed(2)); };
+    return { rest:tip(0), wind:tip(0.34), cut:tip(0.55), arch:sk3Instance({ nm:'skeleton archer' }).rig.ups[0].userData.tip0 }; });
+  console.log('skeleton', JSON.stringify(r));
+  if (!(r.rest[2] > 0.2 && r.rest[1] > 0.8)) throw new Error('skeleton staff tipped forward at guard '+JSON.stringify(r));
+  if (!(r.wind[2] < -0.5)) throw new Error('skeleton staff tips back on the wind-up '+JSON.stringify(r));
+  if (!(r.cut[2] > 0.4)) throw new Error('skeleton staff leans forward on the cut '+JSON.stringify(r));
+  if (r.arch!==1.3) throw new Error('skeleton bow follows the arm too');
 };

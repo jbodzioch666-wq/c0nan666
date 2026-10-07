@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-208 - Staves held like weapons, a waypoint window that fits
+
+- **Staves tip forward in the hand.** A staff is now held fast in the fist like every other weapon, leaning a little forward at rest, swinging back over the shoulder on a wind-up and forward on the blow.
+- **Skeletons too.** A skeleton mage's staff moves with its arm the same way, tipped forward at guard and chopping forward to about level on the cut. A skeleton archer's bow tips back if its arm is ever raised past level.
+- **The waypoint window fits the screen.** No scroll bar: on a small screen the map shrinks to the room left under the text, and the hearthstone and close buttons stay in view.
+
 ## RS-207 - Weapons held like weapons
 
 - **Staves and bows move with the arm.** They still stand upright while the arm is low, but once the arm rises past level they tip back with it, so a caster's staff swings back over the shoulder on an overhead wind-up instead of floating upright beside the hand. A bow stays upright at full draw, since the arm is held out level.
