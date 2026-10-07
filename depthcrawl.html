@@ -1453,16 +1453,8 @@ const POTIONS = [
   ["Major Healing Potion",8,12,16,150],
   ["Supreme Healing Potion",12,12,20,250],
 ];
-// scrolls: single-use, castable by ANY class regardless of spell list (a
-// scroll reads itself, so no ability-score scaling - see genScroll/useFromInv).
-// name, kind (matches resolveSpellEffect's switch), d1, d2, range/radius/turns,
-// buff amount (only used by 'buffAtk'), minDepth, price
-const SCROLLS = [
-  ["Scroll of Magic Missile", 'dmg',    4, 6, 8, 0, 1, 40],
-  ["Scroll of Cure Wounds",   'heal',   6, 8, 0, 0, 1, 45],
-  ["Scroll of Fireball",      'dmgAoe', 6, 6, 3, 0, 6, 90],
-  ["Scroll of Haste",         'buffSelf', 0, 0, 5, 3, 8, 70],
-];
+// (RS-190) the old spell scrolls (Magic Missile, Cure Wounds, Fireball, Haste) are gone - spells are cast from the spellbook
+// with runes now. Any still carried are cashed in on load (see rsPurgeSpellScrolls)
 // wands: arcane devices only a Wizard, Warlock or Sorcerer knows how to
 // channel - anyone can still find/carry/sell one, but only those classes
 // can actually use it. 50 charges, spent permanently with no recharge
@@ -1483,18 +1475,6 @@ const SCROLLS = [
 // this loses essentially nothing).
 const WAND_CLASSES = ['Wizard','Warlock','Sorcerer'];
 const WAND_MAX_CHARGES = 50;
-function genScroll(d){
-  const elig=[];
-  for (let i=0;i<SCROLLS.length;i++) if (SCROLLS[i][6] <= d+1) elig.push(i);
-  if (elig.length===0) elig.push(0);
-  const k = elig[rn(elig.length)];
-  const row = SCROLLS[k];
-  const it = newItem();
-  it.used=1; it.nm=row[0]; it.consumable=1; it.kind='scroll'; it.price=row[7];
-  it.scrollSpell = { name:row[0], kind:row[1], d1:row[2], d2:row[3], range:row[4], radius:row[4], turns:row[4], amt:row[5], stat:null };
-  it.desc = scrollWandDesc(row[1], row[2], row[3], row[4], row[5]);
-  return it;
-}
 // genWand(): replaced by the RuneScape rules - see SECTION: RUNESCAPE RULES
 function scrollWandDesc(kind, d1, d2, rng, turns){
   if (kind==='dmg') return `${d1}d${d2} damage at range ${rng} (auto-hit)`;
@@ -4730,12 +4710,7 @@ function useFromInv(idx){
   if (it.recipeBook){ crLearn(idx); return; }
   if (it.trophy){ const r = (G.player.trophies||{})[it.trophy]; logMsg(`you admire the ${it.nm}${r ? ` - your record is ${r.w} ${r.unit}` : ''}`, ''); return; }
   if (it.lamp){ setUi('lamp'); return; }
-  if (it.kind==='scroll'){
-    const worked = resolveSpellEffect(it.scrollSpell);
-    if (worked){ logMsg(`you read the ${it.nm} - it crumbles to dust`, 'magic'); sfx('spell'); invRemove(idx); }
-    else logMsg(`the ${it.nm} has nothing to affect right now - it isn't spent`, '');
-    return;
-  }
+  if (it.scrollSpell){ rsPurgeSpellScrolls(); renderGame(); return; }   /* (RS-190: an old spell scroll is cashed in) */
   if (it.kind==='wand'){ fireWand(it); return; }
   if (it.kind==='antipoison'){ drinkAntipoison(idx); return; }
   if (it.kind==='wpoison'){ applyWeaponPoison(idx); return; }
@@ -5756,7 +5731,8 @@ function monsterDies(mi){
     if (chn(0.22)){
       addToInventory(genPotion(lootLevel()));
     } else if (chn(0.12)){
-      addToInventory(chn(0.08) ? mkReforgeScroll() : genScroll(lootLevel()));
+      if (chn(0.08)) addToInventory(mkReforgeScroll());   /* (RS-190: the odd Scroll of Reforging - no more spell scrolls) */
+      else addToInventory(genPotion(lootLevel()));
     } else {
       const kind = lootKind();
       // ordinary monsters can drop up to Set quality - Unique ("legendary")
@@ -12447,6 +12423,21 @@ function rsMigrateAll(){
   for (const k in G.gear) rsMigrateItem(G.gear[k]);
   for (const it of G.inv||[]) rsMigrateItem(it);
   for (const it of (G.player && G.player.stash)||[]) rsMigrateItem(it);
+  rsPurgeSpellScrolls();
+}
+// (RS-190) the old spell scrolls are gone from the game: any still in your pack, bank or loot tray (or on a shop shelf) are
+// taken away and you're paid what a shop would give for them; quick-bar slots that held one are cleared
+function rsPurgeSpellScrolls(){
+  const p = G.player; if (!p) return 0;
+  const isOld = it=>!!(it && it.scrollSpell);
+  let n = 0, gold = 0;
+  const strip = list=>{ if (!Array.isArray(list)) return list; const keep = []; for (const it of list){ if (isOld(it)){ n++; gold += Math.max(1, Math.floor((it.price||40)/2)); } else keep.push(it); } return keep; };
+  G.inv = strip(G.inv) || []; if (p.stash) p.stash = strip(p.stash); if (p.lootHold) p.lootHold = strip(p.lootHold);
+  for (const k of ['alchemistStock', 'merchantStock']) if (Array.isArray(G[k])) G[k] = G[k].filter(it=>!isOld(it));
+  if (Array.isArray(p.quickBar)) p.quickBar = p.quickBar.map(o=>o && o.t==='item' && /^Scroll of (Magic Missile|Cure Wounds|Fireball|Haste)$/.test(o.nm||'') ? null : o);
+  if (n){ p.gold = (p.gold||0) + gold; if (typeof clampInvSel==='function') try{ clampInvSel(); }catch(e){}
+    logMsg(`the old spell scrolls have faded from the world - ${n} of yours turned to ${gold} gold (cast spells from your spellbook with runes)`, 'loot'); }
+  return n;
 }
 // fills `it` with a tiered base for loot level d. `forMe` (shop stock) keeps
 // to gear you can already use
@@ -12525,7 +12516,6 @@ function guaranteedEliteDrop(level){
   return it;
 }
 // wands belong to the old rules - anything that used to stock one sells a scroll instead
-function genWand(d){ return genScroll(d); }
 function itemPrice(it){
   if (it.kind==='set') return (it.setItems||[]).reduce((t,x)=>t+itemPrice(x), 0);
   if (it.consumable || it.kind==='wand' || it.kind==='scroll') return it.price||10;
@@ -14750,14 +14740,6 @@ function generateAlchemistStock(){
   G.alchemistStock = [];
   const n = 4+rn(3);
   for (let i=0;i<n;i++) G.alchemistStock.push(genPotion(d+rn(2)));
-  // a couple of scrolls and, less often, a wand round out the shelf - any
-  // class can read a scroll (it reads itself, drawing on no one's spell
-  // slots), but a wand still takes real arcane training to channel, so it's
-  // only actually usable by a Wizard or Warlock (see WAND_CLASSES) - the
-  // shop doesn't gate what it stocks on the current character's class
-  const nScrolls = 1+rn(2);
-  for (let i=0;i<nScrolls;i++) G.alchemistStock.push(genScroll(d+rn(3)));
-  if (chn(0.5)) G.alchemistStock.push(genWand(d+rn(3)));
 }
 // four small 3x3 buildings, each mostly solid wall except for one door tile
 // the actual interactive shop/tavern/blacksmith/alchemist counter sits dead
@@ -33475,7 +33457,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-189';
+const GAME_VERSION = 'rs-190';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -34284,8 +34266,7 @@ function generateMerchantStock(){
   const aslots = ['head','chest','legs','arms'];
   G.merchantStock.push(genItem(d, aslots[rn(4)], 3));
   G.merchantStock.push(genItem(d, chn(0.5)?'necklace':'ring', 3));
-  if (chn(0.6)) G.merchantStock.push(chn(0.5) ? genPotion(d) : genScroll(d));
-  if (chn(0.35)) G.merchantStock.push(genWand(d));
+  if (chn(0.3)) G.merchantStock.push(genPotion(d));
 }
 function merchantBuy(i){
   const price = itemPrice(G.merchantStock[i]);
@@ -35511,7 +35492,7 @@ function buildHelp(){
       <div>press <kbd>P</kbd> for your Character Sheet &mdash; a paper doll of what you wear, your combat stats beside it, and your pack. Click a pack item to preview it, then EQUIP it if you meet its requirements. A bow lives in its own ranged slot beside your melee weapon, and every shot spends an arrow (the Peddler sells them).</div>
       <div>reach combat level 123 and press <kbd>K</kbd> to ascend to New Game+ &mdash; every monster from then on hits harder and pays out more.</div>
       <div style="margin-top:10px;color:var(--ink-faint);">SCROLLS</div>
-      <div>single-use, consumed the moment they take effect (a wasted cast with no target in range isn't spent) &mdash; any class can read one, no spell slots required.</div>
+      <div>a Scroll of Reforging rerolls one bonus on a piece of gear (right-click the gear); clue scrolls start a treasure trail. Spells are cast from your spellbook (G) with runes.</div>
       <div style="margin-top:10px;color:var(--ink-faint);">ACHIEVEMENTS &amp; THE BESTIARY</div>
       <div>press <kbd>H</kbd> any time to see which of the game's achievements you've unlocked, and <kbd>B</kbd> to see every monster you've ever killed, with its full Monster Manual statblock &mdash; anything you haven't beaten yet shows only as <kbd>???</kbd>.</div>
       <div style="margin-top:10px;color:var(--ink-faint);">YOUR PROGRESS</div>

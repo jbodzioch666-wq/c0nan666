@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-190 - Goodbye, spell scrolls
+
+- **The old spell scrolls are gone.** Scrolls of Magic Missile, Cure Wounds, Fireball and Haste no longer drop from monsters or sit on the alchemist's and merchant's shelves. Spells come from your spellbook (G) and your runes.
+- **Old ones become gold.** Any spell scrolls in your pack or bank are cashed in when you load, for what a shop would pay. Quick-bar slots that held one are cleared.
+- **Other scrolls stay.** The Scroll of Reforging and clue scrolls are unchanged, and the Reforging scroll still drops as rarely as before. Monsters that used to drop a spell scroll now drop a potion. The in-game help no longer mentions spell scrolls.
+
 ## RS-189 - Food you can tell apart
 
 - **Pies and stews in your bag.** Meat pies, hearty stews and the other cooked dishes now appear in the resource bag's "Fish & food" list, with how to cook them. Before, they were left off that list even though you had them.
