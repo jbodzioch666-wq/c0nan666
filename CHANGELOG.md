@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-211 - Dragons look ahead, bare-boned skeletal warriors, your staff like the barber's chair
+
+- **Dragon heads no longer droop.** A dragon's head now looks the way its body faces, a touch down, dipping for the bite. Out on the land and in the bestiary it used to fold down under its neck, and in dungeons it stared up at the camera. Hydras and serpents get the same fix.
+- **Skeletal warriors wear nothing at all** - no fur mantle, bracer, belt or boots - just bones and a sword. Other skeletons keep their kit.
+- **Your staff stands as it does in the barber's chair.** Standing in town or on the open land, where your arm hangs lower, the staff turns a little in your hand so it leans about the same 13 degrees as when you're seated.
+
 ## RS-210 - The world map in town, ! tooltips, a gentler staff
 
 - **Open the world map in towns.** M (or the world map button) now works in a town as well as on the open land. Close it again with M or Esc; you can't walk while it's up.
