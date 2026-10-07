@@ -45,7 +45,7 @@ Ordinary feature releases and small edits stay on Opus. If you are already runni
 - Never put a `//` comment in the middle of a one-line function. It comments out the rest of the line. Use `/* */` there.
 - Saves must keep loading:
   - Default any new save field when it is missing.
-  - Version world-generation changes. For example, `G.ow.genVer` / `OW_GEN_VER` keeps old saves on the old generator.
+  - World-generation changes don't need to keep existing worlds as they were: the player can make a new world and keep their character. Old saves must still load without errors, but they may regenerate on the new generator. Bump `OW_GEN_VER` when the generator changes.
 - Some useful entry points:
 
   | Area | Functions |
