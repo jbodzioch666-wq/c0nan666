@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-217 - No more automatic fullscreen
+
+- **The game stays in its window.** It no longer jumps to fullscreen on your first click or key, or when you start or resume a game. Fullscreen is now only ever your choice: the button in the top-right corner. If you turn it on and Esc drops you out (as it does on itch.io), your next click or key still puts you back.
+
 ## RS-216 - Review fixes
 
 - **The risen pharaoh looks like itself in the bestiary.** On the Bosses tab it was drawn as a bandit, because the viewer only knew a creature was undead by its name. It now wears its gold mask and nemes there, its weaknesses are those of the dead, and it has its own lore line.

@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| nofs | the game never goes fullscreen on its own (first click, game start or resume); only the corner button asks for it |
 | skeye | a dressed skeleton's eyes glow its class colour in the flat fallback drawing too, matching the 3D kits |
 | pyramid | pyramids in the desert: placed in a new world, their own floors, theme and tomb-dweller roster with 3D models, the risen pharaoh or a god of the old lore as the boss, the land model and the bestiary |
 | rs211 | dragon heads look ahead, a skeletal warrior is bare bones and a sword, and the player's staff stands as it does in the barber's chair |
