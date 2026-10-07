@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-215 - Skeleton eyes
+
+- **Dressed skeletons keep their eye colour when 3D can't run.** In the flat fallback drawing, skeleton champions now glow gold, archers green and mages violet, as they do in 3D. Before, every one of them got the default red, because the colour was read from something that didn't exist there.
+
 ## RS-214 - Hieroglyphs
 
 - **The pyramid's walls carry real signs.** Three painted registers of hieroglyphs on the dressed sandstone - the ankh, the wedjat eye, the scarab, the ibis, the cobra, the reed, water, the sun disc, the feather of Ma'at, the djed pillar, the was sceptre, the lotus, a seated man and the owl - in lapis, ochre and malachite, worn thin into the grain. Every other wall bears a cartouche: a royal name-ring of three signs, flanked by more.
