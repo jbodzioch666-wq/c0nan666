@@ -64,3 +64,4 @@ Screenshots go to `tools/tests/shots/`.
 | cavetip | hovering (or tapping, on a phone) an ore vein in a mine shows its tooltip: level, xp, how much is left |
 | portalwall | in every kind of site the portal and the stairs back onto a wall and never block a passage |
 | newworld | the load screen takes a character to a new world: a new save keeps the character, the old save stays untouched |
+| foodbar | cooked dishes show in the bag; every food in the side panel has its own picture and name; U shows what it eats next |

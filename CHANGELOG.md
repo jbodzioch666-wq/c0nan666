@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-189 - Food you can tell apart
+
+- **Pies and stews in your bag.** Meat pies, hearty stews and the other cooked dishes now appear in the resource bag's "Fish & food" list, with how to cook them. Before, they were left off that list even though you had them.
+- **Every food has its own picture.** The food row in the inventory panel used to draw every food as the same orange flask, with the name only in a hover tip. That's why your pies and stews were hard to spot on a phone. Each food now has its own picture (fish, steak, pie, a steaming bowl of stew) and its name on the tile.
+- **The U slot shows what you'll eat.** The eat-food button on the toolbar shows the food it will eat next, and its tooltip names it. It picks the smallest food that heals the damage you've taken, or your best one if nothing covers it. Food you drag to the quick bar keeps its own picture too.
+
 ## RS-188 - Softer sand, and ore that counts down
 
 - **Walking in sand sounds like sand.** Footsteps on sand used to make a sharp snap. Now each step is a soft hush as your foot sinks in, with a dull thud underneath and a few quiet grains crunching. Every step sounds a little different. Plate armour adds a faint clink.
