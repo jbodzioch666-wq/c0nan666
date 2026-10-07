@@ -1,5 +1,16 @@
 # Depthcrawl patch notes
 
+## RS-198 - Socket runes and runewords removed; dragging gear no longer highlights the page
+
+- **The old socket runes are gone.**
+  - Ash, Bone, Iron and Void runes, the sockets on gear and the runewords were left over from an earlier version. Nothing gave out those runes any more, and no new gear had sockets.
+  - Gone with them: the socket marks on the character sheet, the rune row, and the blacksmith's unused socket drill.
+- **Old saves:**
+  - Socket runes you still carry are cashed in at 250 gold each.
+  - Sockets come off your gear. A completed runeword keeps its bonuses, as ordinary bonuses.
+- **No more impossible quests:** the quest board could still ask you to "bring 2 Ash Runes", which nothing gave any more. Those quests are gone, and any you had accepted now ask for a healing potion instead.
+- **Dragging gear on the character sheet no longer highlights the page,** or drags a ghost copy of the picture.
+
 ## RS-197 - The hearthstone
 
 - **A hearthstone on the bar (T):** it takes you back to your home town in a flash, from anywhere in the open land, at sea, or from any town.

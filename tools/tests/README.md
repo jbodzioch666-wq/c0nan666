@@ -26,6 +26,7 @@ Screenshots go to `tools/tests/shots/`.
 |---|---|
 | boot | the page loads and a character starts |
 | iso | isometric 3D everywhere: no key or saved setting switches to a flat view |
+| nosockets | the old socket runes and runewords are gone: old saves' runes are cashed in, sockets come off gear, rune quests become potion quests |
 | hearth | the hearthstone: bind it at a waypoint stone, T takes you back from the open land or a town, not a dungeon; it cools down and is saved |
 | altarspace | runecrafting altars stand only on their own ground and keep their distance from each other |
 | charsheet | the character sheet: two pages side by side over the game (no dark backdrop), stats with tabs, the figure with the whole bag under it; gear moves by drag and drop |

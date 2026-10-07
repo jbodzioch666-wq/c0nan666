@@ -24,6 +24,7 @@ module.exports = async page=>{
   A(await drag('.cs-bag [data-csinv="4"]', '.doll-slot[data-slot="chest"]')==='ok', 'the chest lights up as a place to drop it');
   let st = await ev(()=>({ chest:G.gear.chest.rsTier, old:G.inv.some(it=>it.rsTier===3 && it.slot==='chest'), n:G.inv.length }));
   A(st.chest===6 && st.old && st.n===6, 'dragged on: '+JSON.stringify(st));
+  A(await ev(()=>String(window.getSelection())===''), 'dragging selects nothing on the page');   /* (RS-198) */
   // a weapon dropped on the head slot is refused
   const wi = await ev(()=>G.inv.findIndex(it=>it.rsTier===5 && it.slot==='weapon'));
   A(await drag(`.cs-bag [data-csinv="${wi}"]`, '.doll-slot[data-slot="head"]')==='no', 'a weapon is refused on the head'); A(await ev(()=>G.gear.head.rsTier===2), 'the helm stays on');
@@ -38,6 +39,7 @@ module.exports = async page=>{
   const nm0 = await ev(()=>G.inv[0].nm); await drag('.cs-bag [data-csinv="0"]', '.cs-bag [data-csinv="30"]'); A(await ev(nm=>G.inv[G.inv.length-1].nm===nm, nm0), 'moved within the bag');
   // a tap (no drag) picks a piece, and the stats page marks the change
   await ev(()=>{ G.inv.push(rsMakeArmour('metal', 6, 'head')); renderOverlay(); });
+  await page.waitForTimeout(250);
   const hi = await ev(()=>G.inv.length-1), hb = await box(`.cs-bag [data-csinv="${hi}"]`); await page.mouse.click(hb.x, hb.y); await page.waitForTimeout(150);
   out.deltas = await ev(()=>document.querySelectorAll('#overlay .cs-statspage .cs-delta').length); A(out.deltas > 0, 'a tap marks what changes');
   // the tabs
