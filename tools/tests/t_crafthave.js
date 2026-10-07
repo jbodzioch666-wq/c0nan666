@@ -20,6 +20,11 @@ module.exports = async page=>{
     out.bench = { colours:has(bh, G_) || has(bh, R_), counts:/&times;\d+<\/b><\/button>|×\d+<\/b><\/button>/.test(bh), red:bh.includes(R_.replace('#','')) || /color:\s*#d1495b|rgb\(209, 73, 91\)/.test(bh) };
     // house building: logs in colour
     out.house = houseCostText({ logs:6 }).includes(R_) || houseCostText({ logs:6 }).includes(G_);
+    /* RS-193: things you buy with materials - a boat upgrade, a town project, the smith's upgrades, tools - in colour too */
+    G.player.hasBoat = true; G.player.boatTier = 1; G.player.gold = 100; skAdd('ironb', 2);
+    const boat = sailUpgradeHtml(); out.boat = boat.includes(R_) && /iron bar/.test(boat) && /\(2\)/.test(boat) && /1,500g/.test(boat);
+    out.town = TOWN_PROJECTS.length ? townCostText(TOWN_PROJECTS[0].cost).includes('<span style="color:') : true;
+    out.tools = skToolsHtml().includes(G_) || skToolsHtml().includes(R_);
     out.helpers = { max:needMax({ copper:2 }), maxGold:needMax({}, 0) };
     return out; });
   console.log(JSON.stringify(r));
@@ -31,5 +36,7 @@ module.exports = async page=>{
   A(r.cook.raw && r.cook.pie, 'cooking: how many raw foods and dishes can be cooked');
   A(r.bench.colours && r.bench.counts, 'a crafting bench colours what it takes and counts what you can make');
   A(r.house, 'house building costs in colour');
+  A(r.boat, 'a boat upgrade colours the logs, iron bars and gold it takes, with what you hold');
+  A(r.town && r.tools, 'town projects and tools are in colour');
   A(r.helpers.max===3, 'needMax counts what you can make');
 };

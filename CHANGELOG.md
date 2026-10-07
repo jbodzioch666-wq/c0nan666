@@ -1,5 +1,18 @@
 # Depthcrawl patch notes
 
+## RS-193 - Colour for what you buy, too
+
+- **Boat upgrades in colour.** Building a sloop, caravel or galleon now shows the logs, iron bars and gold it takes in green or red, with how much you hold.
+- **Other things you pay for.** The same colours now apply to:
+  - town projects
+  - the smith's gear upgrades (bars and Smithing level)
+  - godsword shards, blades and hilts
+  - harpoons (Fishing level, the caravel you need, the price)
+  - the Peddler's tools (skill level and price)
+  - the rowboat
+  - the house, and the Construction level its furniture needs
+- **Gold shows what you hold.** Wherever a gold price is coloured, the gold you carry is shown beside it.
+
 ## RS-192 - See what you can make, and no more alchemy
 
 - **Ingredients in colour.** Every crafting screen now shows what a recipe takes in colour: green for what you have enough of, red for what you're short of, with how many you hold in brackets. That covers the crafting benches (fletching, gem-cutting, jewellery, pottery, looms, dyes and the rest), smelting, brewing, poisons and cures, the hearth's dishes, arrow enchanting, house building and the carpentry bench.
