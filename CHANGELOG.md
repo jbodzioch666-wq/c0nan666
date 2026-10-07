@@ -1,5 +1,22 @@
 # Depthcrawl patch notes
 
+## RS-200 - Monsters armed for their trade, and a cleaner waypoint
+
+- **Every skeleton is the sculpted 3D skeleton, dressed for its class:**
+  - **Archers** carry a bow and a quiver of arrows on their backs.
+  - **Mages** wear a hood and a ragged robe, and hold a staff with a glowing orb.
+  - **Warriors** wear a rusted helm and pauldrons.
+  - **Champions** wear a horned helm, a breastplate and a red cape, and stand taller.
+  - **Eye colours:** archers' eyes burn green, mages' violet and champions' gold.
+  - Archers and mages used to have no model of their own.
+- **Goblins, orcs and kobolds look like their rank:**
+  - **Archers** carry bows, and **shamans** wear robes and carry staves.
+  - **Warriors** wear mail and carry an axe and a shield.
+  - **Warlords** wear plate and a horned helm and carry a greataxe. They are still goblins and orcs, not humans.
+  - **The kobold chieftain** wears mail and a crown and carries an axe and a shield.
+  - Before, every rank looked like the plain goblin (scimitar and shield) or the plain orc (greataxe and furs).
+- **The waypoint's list of town buttons is gone:** the towns and their fees are already on the map, so tap one there. Under the map is just your hearthstone and its Bind button.
+
 ## RS-199 - Potions stack
 
 - **Matching potions share one bag slot** and show their count on the picture. That covers healing potions, antipoisons and weapon poisons. A potion brewed with a vial is a different potion from one without, so the two make separate stacks.

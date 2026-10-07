@@ -18,7 +18,7 @@ module.exports = async page=>{
     setUi('shop'); A(document.getElementById('overlay').innerHTML.includes('gap'), 'restock note'); setUi('playing');
     // waypoint fees
     const key1 = t1.x+','+t1.y, fee = ecoTravelFee(key1); out.fee = fee; A(fee > 0, 'a fee');
-    const g0 = p.gold; setUi('waypoint'); A(document.getElementById('overlay').innerHTML.includes(fee+'g'), 'fee shown');
+    const g0 = p.gold; setUi('waypoint'); A(!document.querySelector('#overlay .btnrow button[onclick^="waypointTravel"]'), 'no row of town buttons under the map (RS-200)');
     // the waypoint shows a map with only the attuned towns on it, and a tap on one travels
     A(document.getElementById('wpMap') && WP.pts.length===(G.ow.visitedTowns||[]).length && WP.pts.every(q=>G.ow.visitedTowns.includes(q.key)), 'waypoint map: attuned towns only');
     A(townList().length > WP.pts.length, 'unvisited towns left off');
