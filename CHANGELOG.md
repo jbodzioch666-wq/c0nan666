@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-210 - The world map in town, ! tooltips, a gentler staff
+
+- **Open the world map in towns.** M (or the world map button) now works in a town as well as on the open land. Close it again with M or Esc; you can't walk while it's up.
+- **The map's ! marks explain themselves.** Hover (or tap, on a phone) a gold ! to see which quest it belongs to and what to do there (a blue ? is where you hand one in), or a red ! diamond to see the wandering band it stands for and who leads it.
+- **Staves lean about 15 degrees forward**, down from about 25, for every staff-carrier and the skeleton mages.
+- **Orc champions and orc overlords look the part.** A champion of the plain orcs wears plate and a kettle helm instead of furs; an orc overlord is bigger still, with a horned helm, a dark tabard with a gold emblem and a cape.
+- **Skeletal warriors carry only a sword** - no shield.
+
 ## RS-209 - The bestiary's bosses tab
 
 - **Pick a boss to see it.** Every boss on the Bosses tab can now be picked: it turns in the model viewer (drag, pinch and zoom like any creature), with its lore, where it rises, its life, attack style, weaknesses, abilities, your kill count and best time, and its drops with their chances.

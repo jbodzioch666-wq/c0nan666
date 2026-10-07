@@ -36,6 +36,9 @@ module.exports = async page=>{
     const rr = new T.WebGLRenderer({ canvas:document.createElement('canvas') }); rr.setSize(64, 64); rr.render(sc, new T.PerspectiveCamera());
     const up = new T.Vector3(0, 1, 0).applyQuaternion(orc.rig.ups[0].getWorldQuaternion(new T.Quaternion())); out.bowUp = +up.y.toFixed(3);
     A(up.y > 0.98, 'the bow stands upright: '+up.y);   /* (RS-207: it leans a touch with the arm) */ rr.dispose();
+        /* (RS-210) a champion of the plain orcs and an orc overlord have their own plate; a skeletal warrior carries just a sword */
+    A(monsterPortraitFor('Champion orc')!==MONSTER_PORTRAITS['orc'] && monsterPortraitFor('orc overlord')===MONSTER_PORTRAITS['orc overlord'] && monsterPortraitFor('orc')===MONSTER_PORTRAITS['orc'], 'orc champion and overlord models');
+    A(sk3Class('skeletal warrior')==='blade' && sk3Kit('blade').hideShield && sk3Class('skeleton warrior')==='warrior', 'a skeletal warrior has only its sword');
     return out;
   });
   console.log(JSON.stringify(r));
