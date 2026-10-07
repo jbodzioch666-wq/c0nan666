@@ -1,5 +1,20 @@
 # Depthcrawl patch notes
 
+## RS-195 - A two-page character sheet
+
+- **Two pages side by side:** the character sheet (P) opens like a book.
+  - **Character Stats** is on the left. Your name, combat level and total level are at the top. Under them are your combat skills and vitals, then an Armour and Protections band, then tabs for Offence, Defence, Skills and Other.
+  - **Equipment** is on the right: your figure, with your bag under it.
+- **The figure is laid out like an action RPG's equipment page:**
+  - your weapon on the left and your off-hand on the right;
+  - the head, body and legs down the middle;
+  - rings, amulet, trinket and ammo in the narrow columns between them;
+  - hands, cape, ranged and feet at the sides.
+- **The whole bag is under the figure:** every one of your 50 slots shows, empty or not, so you can see at a glance how full you are.
+  - Gear you can wear shows normally. Anything you can't wear (potions, or gear you aren't high enough level for) is greyed out.
+  - Tap any piece to see it. Gear you can wear shows what it replaces and has an Equip button, and the stats page marks every number it would change.
+- **On a phone** the two pages are one at a time, with a Stats / Equipment switch at the top. The sheet opens on Equipment.
+
 ## RS-194 - Balance pass: xp, gold and the economy
 
 Measured with new simulators (`tools/sim`) that drive the game's own combat, gathering and crafting code: 120 fights at each of twelve levels, 1,500 takes on every kind of tree, spot, patch and vein, and the production tables at the craft queue's pace.
