@@ -13,13 +13,13 @@ module.exports = async page=>{
     out.afterBlow = { mon:m.hp < mhp0 || true, playerHit:!!m._atkT, pending:foePending() };
     // pressing again before their answer does nothing
     const mh1 = m.hp; tryMove(1, 0); out.blocked = m.hp===mh1 && foePending();
-    await wait(400); out.stillWaiting = foePending() && !m._atkT;
-    await wait(500); out.playerHitAfter = !!m._atkT; out.pendingAfter = foePending();
+    await wait(800); out.stillWaiting = foePending() && !m._atkT;
+    await wait(600); out.playerHitAfter = !!m._atkT; out.pendingAfter = foePending();
     // (RS-219) a bow shot: the shot is yours at once, the monsters' turn a beat later; you can't shoot again meanwhile
     { G.gear.ranged = rsMakeBow(0, false); const keep = [rangedVolley, rangedAmmoN, rangedPick]; let shots = 0;
       rangedVolley = ()=>{ shots++; }; rangedAmmoN = ()=>50; rangedPick = ()=>'bow';
       m.x = P.x + 2; m.y = P.y; if (G.map[m.x][m.y]===T_WALL) G.map[m.x][m.y] = T_FLOOR; const tc = P.turnCount||0;
-      try{ rangedAttack(m); out.bow = { shots, pending:foePending() }; rangedAttack(m); out.bow.second = shots; await wait(900); out.bow.after = foePending(); }
+      try{ rangedAttack(m); out.bow = { shots, pending:foePending() }; rangedAttack(m); out.bow.second = shots; await wait(1300); out.bow.after = foePending(); }
       finally { [rangedVolley, rangedAmmoN, rangedPick] = keep; } }
     // every spell and ability path is wrapped the same way
     out.wrapped = ['rangedAttack','reachAttack','castKnownSpell','castDivineSmite','rsCastFromBook','useAbility'].filter(n=>/foeBeat/.test(String(window[n]))).length;
@@ -32,7 +32,7 @@ module.exports = async page=>{
   if (!r.defer) throw new Error('deferral is on in a 3D fight');
   if (r.afterBlow.playerHit || !r.afterBlow.pending) throw new Error('their answer waits after your blow '+JSON.stringify(r));
   if (!r.blocked) throw new Error('you cannot strike again before it lands');
-  if (!r.stillWaiting || !r.playerHitAfter || r.pendingAfter) throw new Error('it lands about 0.7s later, not before 0.4s '+JSON.stringify(r));
+  if (!r.stillWaiting || !r.playerHitAfter || r.pendingAfter) throw new Error('it lands about 1.1s later, not before 0.8s '+JSON.stringify(r));
   if (r.instant.pending || !r.instant.hit) throw new Error('instant when deferral is off');
   if (!(r.bow && r.bow.shots===1 && r.bow.pending && r.bow.second===1 && !r.bow.after)) throw new Error('a bow shot gets the same beat '+JSON.stringify(r.bow));
   if (r.wrapped!==6) throw new Error('every ranged, spell and ability path is wrapped: '+r.wrapped);

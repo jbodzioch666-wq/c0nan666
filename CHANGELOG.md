@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-221 - A clear pause between blows
+
+- **The monster answers 1.1 seconds after your attack**, up from 0.7. Your swing is now over before its wind-up begins, so the two blows read as separate moves instead of overlapping.
+- **The beat grows to match** (2.6 seconds between your attacks, from 2.2), so fights keep the same rhythm: your blow, a pause, theirs, a pause, yours.
+
 ## RS-220 - You only swing when you strike
 
 - **Your figure no longer swings along with the monster.** Your weapon swing was set off by the sound of a blow landing - and a monster hitting you makes the same sound, so every time its answer came your own figure swung again with it. That's why it still looked as if you both struck at once. Now only your own attacks swing your weapon: your blow first, then theirs.
