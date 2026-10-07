@@ -5423,6 +5423,15 @@ function dgFinish(cacheIt){
     else if (cacheIt && !G.inRaid) saveLevelCache(G.depth);
   }
   G.dgDone = 0; G.inRaid = null; G.gameMode = 0; G.dungeonSlot = 0; G.isBossFloor = 0; G.bossIdx = -1;
+  dgStepOut();
+}
+// (RS-207) out of a site you stand on the open ground beside its entrance, not in the middle of it: the nearest land tile
+// that isn't a site, water or mountain (the front of the site first - toward the camera's side)
+function dgStepOut(){
+  const x0 = G.owPos.x, y0 = G.owPos.y, t0 = G.ow.map[x0] && G.ow.map[x0][y0];
+  if (!OW_SITE_TILES.includes(t0)) return;
+  const ok = (x,y)=> x>=0 && y>=0 && x<OW_COLS && y<OW_ROWS && o3Passable(x,y) && !OW_SITE_TILES.includes(G.ow.map[x][y]) && G.ow.map[x][y]!==OW_WATER && G.ow.map[x][y]!==OW_RIVER;
+  for (const [dx,dy] of [[0,1],[1,1],[-1,1],[1,0],[-1,0],[0,-1],[1,-1],[-1,-1],[0,2],[2,0],[-2,0],[0,-2]]) if (ok(x0+dx, y0+dy)){ G.owPos.x = x0+dx; G.owPos.y = y0+dy; return; }
 }
 
 // scatters wall-mounted torches across a freshly generated floor, stored as
@@ -30863,12 +30872,17 @@ function m3dUprightHook(){
   if (m3dUprightHook.on || typeof THREE==='undefined') return; m3dUprightHook.on = true;
   /* (each renderer carries its own render(), so the hook is the scene's onBeforeRender - called after the world matrices are
      worked out and before anything is drawn, shadows included) */
-  const P = THREE.Scene.prototype, orig = P.onBeforeRender, qa = new THREE.Quaternion(), qb = new THREE.Quaternion();
+  const P = THREE.Scene.prototype, orig = P.onBeforeRender, qa = new THREE.Quaternion(), qb = new THREE.Quaternion(), qc = new THREE.Quaternion(), qd = new THREE.Quaternion(), v = new THREE.Vector3(), X = new THREE.Vector3(1, 0, 0);
   P.onBeforeRender = function(){
     try{ if (M3D_UPS.size){ M3D_UPF++;
       for (const p of M3D_UPS){ let top = p, root = null; while (top.parent){ top = top.parent; if (!root && top.userData && top.userData.modelRoot) root = top; }
         if (top!==this || !root){ if (M3D_UPF - (p.userData.upf || M3D_UPF) > 600) M3D_UPS.delete(p); continue; }
-        p.userData.upf = M3D_UPF; root.getWorldQuaternion(qa); p.parent.getWorldQuaternion(qb); p.quaternion.copy(qb.invert().multiply(qa)); p.updateMatrixWorld(true); } } }catch(e){}
+        p.userData.upf = M3D_UPF; root.getWorldQuaternion(qa); p.parent.getWorldQuaternion(qb);
+        /* (RS-207) held, not floating: upright while the forearm is low, then once it rises past tip0 (its angle from straight down,
+           toward the front) the staff or bow tips back with it - over the shoulder on a wind-up; below that it leans a little with the arm */
+        let tilt = 0; const a0 = p.userData.tip0;
+        if (a0!=null){ qc.copy(qa).invert().multiply(qb); v.set(0, -1, 0).applyQuaternion(qc); let a = Math.atan2(v.z, -v.y); if (a < -1) a += Math.PI*2; tilt = a > a0 ? a - a0 : (a - a0)*0.3; }
+        qd.setFromAxisAngle(X, -tilt); p.quaternion.copy(qb.invert().multiply(qa).multiply(qd)); p.updateMatrixWorld(true); } } }catch(e){}
     return orig ? orig.apply(this, arguments) : undefined;
   };
 }
@@ -31229,12 +31243,13 @@ function m3dHumanoid(o){
   if (wpn){ const R = rig.arms[0]; if (o.unique) m3dUniqueify(wpn, o.unique, mats);
     wpn.scale.setScalar(0.42*(o.weaponScale||1));
     if (wk==='bow' || wk==='staff'){   /* (RS-201) upright in the fist: a bow facing the foe, a staff held a third of the way up its shaft */
-      const piv = new T.Group(); piv.position.set(...m3dGrip(b)); R.hand.add(piv); m3dUpright(piv); (rig.ups = rig.ups || []).push(piv);
-      if (wk==='staff'){ const bx = new T.Box3().setFromObject(wpn); wpn.position.y = -(bx.min.y + (bx.max.y - bx.min.y)*0.36); }
+      const piv = new T.Group(); piv.position.set(...m3dGrip(b)); piv.userData.tip0 = wk==='bow' ? 1.6 : 1.3; R.hand.add(piv); m3dUpright(piv); (rig.ups = rig.ups || []).push(piv);
+      if (wk==='staff'){ const bx = new T.Box3().setFromObject(wpn); wpn.position.y = -(bx.min.y + (bx.max.y - bx.min.y)*0.36); rig._head = [piv, (bx.min.x+bx.max.x)/2, bx.max.y + wpn.position.y - 0.02, (bx.min.z+bx.max.z)/2]; }
       piv.add(wpn); rig.weapon = wpn; rig.twoHand = wk==='staff'; rig.wk = wk; rig.glint = o.glint || null; }
     else { wpn.rotation.set(Math.PI/2, wk==='axe' ? -Math.PI/2 : Math.PI/2, 0); wpn.position.set(...m3dGrip(b)); }   /* (RS-204: a one-handed axe the other way round, its blade leading) */   /* (RS-201: turned on its own length, so the edge leads and the flat faces the sides) */
-    if (o.swirl){ const bx = new T.Box3().setFromObject(wpn), sw = new T.Group(); sw.position.set((bx.min.x+bx.max.x)/2, (bx.min.y+bx.max.y)/2, bx.max.z - 0.01);   // (motes of light circling the staff's head)
-      for (let i=0;i<3;i++){ const sp = new T.Sprite(M3D.glowMat(o.swirl, 0.85)); sp.scale.setScalar(0.035); sw.add(sp); } R.hand.add(sw); rig.swirl = sw; }
+    if (o.swirl && rig._head){ const [hp, hx, hy, hz] = rig._head, sw = new T.Group(); sw.position.set(hx, hy, hz);   // (motes of light circling the staff's head - RS-207: on the staff itself, not the hand)
+      for (let i=0;i<3;i++){ const sp = new T.Sprite(M3D.glowMat(o.swirl, 0.85)); sp.scale.setScalar(0.035); sw.add(sp); } hp.add(sw); rig.swirl = sw; }
+    delete rig._head;
     if (!wpn.parent){ R.hand.add(wpn); rig.weapon = wpn; rig.twoHand = /greataxe|greatsword|staff|spear|trident/.test(wk); rig.wk = wk; rig.glint = o.glint || null; } }
   rig.swing = o.swing || null;
   if (o.shield){
@@ -31250,7 +31265,7 @@ function m3dHumanoid(o){
     const boss = new T.Mesh(new T.SphereGeometry(0.032, 20, 10, 0, Math.PI*2, Math.PI/2, Math.PI/2), rm); boss.position.y = -0.012; sg.add(boss);
     const flange = new T.Mesh(new T.CylinderGeometry(0.04, 0.04, 0.004, 24), rm); flange.position.y = -0.013; sg.add(flange);
     for (let i=0;i<8;i++){ const a = i/8*Math.PI*2; m3dSphere(sg, 0.0045, rm, Math.cos(a)*0.093, -0.009, Math.sin(a)*0.093, 1, 0.6, 1); }
-    sg.position.set(-m3dGrip(b)[0], -0.03, 0.035); rig.arms[1].hand.add(sg);   /* (RS-206: its grip in the mirrored left fist) */ rig.shield = sg; }
+    sg.position.set(-m3dGrip(b)[0], -0.08, 0.035); rig.arms[1].hand.add(sg);   /* (RS-206: its grip in the mirrored left fist; RS-207: out past the fingertips, so the fist doesn't poke through) */ rig.shield = sg; }
   // wings, tail
   if (o.wings){
     const wm = m3dMat(mats, o.wingCol || mpTone(skinHex, -0.5), 'skin'); wm.side = T.DoubleSide;
@@ -33657,7 +33672,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-206';
+const GAME_VERSION = 'rs-207';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

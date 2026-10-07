@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-207 - Weapons held like weapons
+
+- **Staves and bows move with the arm.** They still stand upright while the arm is low, but once the arm rises past level they tip back with it, so a caster's staff swings back over the shoulder on an overhead wind-up instead of floating upright beside the hand. A bow stays upright at full draw, since the arm is held out level.
+- **A mage staff's orbs circle the staff.** The three motes of light ride on the staff's head instead of circling your hand.
+- **No more fist through the shield.** The shield sits just past the fingertips, so the hand grips it from behind.
+- **Leaving a dungeon puts you beside it.** You step out onto open ground next to the entrance instead of standing in the middle of the site.
+
 ## RS-206 - Proper left hands, handles in the fist
 
 - **Left hands are left hands.** Every figure had two right hands; the off hand is now mirrored, thumb on the correct side.
