@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-220 - You only swing when you strike
+
+- **Your figure no longer swings along with the monster.** Your weapon swing was set off by the sound of a blow landing - and a monster hitting you makes the same sound, so every time its answer came your own figure swung again with it. That's why it still looked as if you both struck at once. Now only your own attacks swing your weapon: your blow first, then theirs.
+
 ## RS-219 - The same beat for bows and spells
 
 - **Bow shots, spells and abilities take turns on screen too.** As with melee since RS-218, your shot or spell lands first, and the monsters answer about 0.7 seconds later. That covers the bow, a spear's reach attack, spells cast with R or from the spellbook, and class abilities.
