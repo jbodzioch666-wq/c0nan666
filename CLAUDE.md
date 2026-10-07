@@ -18,8 +18,6 @@ The user wants to know when a request deserves Fable 5.1 instead of the default 
 - audits of many releases before a merge to `main`.
 Ordinary feature releases and small edits stay on Opus. If you are already running as Fable on a request that doesn't need it, say that too.
 
-The user has approved switching models whenever it helps, so don't ask for permission. Claude can't run `/model` itself, so when a switch is worth making, say which model and why in one line and carry on; the user runs the command.
-
 ## Branches
 
 - Work **only** on `claude/depthcrawl-runescape`. Commit and push there, even if the session names a different branch.
