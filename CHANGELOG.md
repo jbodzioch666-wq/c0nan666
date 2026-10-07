@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-197 - The hearthstone
+
+- **A hearthstone on the bar (T):** it takes you back to your home town in a flash, from anywhere in the open land, at sea, or from any town.
+- **Bind it at a waypoint stone:** every town's waypoint now shows where your hearthstone is bound, with a button to bind it to that town. Rebind it whenever you like.
+- **It goes cold after each use** for about seven and a half minutes (a quarter of a day). The T button shows the minutes left and fills as it warms up. The paid waypoints are still the way to go anywhere else.
+- **It won't work underground or in a fight:** reach the open air first.
+
 ## RS-196 - The character sheet floats over the game, gear by drag and drop, and altars spread out
 
 - **No dark backdrop:** the character sheet (P) comes up over the game like the side panel. Both pages have the side panel's title bar, with a close button.

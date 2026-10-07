@@ -85,7 +85,7 @@ module.exports = async page=>{
     tkOpen('board', 'work'); acceptQuest(job.id); const mine = G.player.quests.find(q=>q.id===job.id); A(mine, 'took the job at the board');
     mine.progress = mine.target; mine.freed = true; A(questIsReady(mine) && villageQuestMarker()==='?', 'a finished job puts a ? over the board');
     turnInQuest(job.id); A(G.ui==='questReward', 'handed in'); chooseQuestReward(0); A(G.ui==='tasks' && G.tkAt==='board' && G.tkTab==='work' && !G.player.quests.some(q=>q.id===job.id), 'back at the board after the reward');
-    // no T teleport; the classic buttons press the keys
+    // T is the hearthstone (RS-197) - unbound, it opens nothing; the classic buttons press the keys
     setUi('playing'); handleKeydown({ key:'t', target:document.body, preventDefault(){} }); A(G.ui==='playing', 'T opens nothing');
     const st0 = rsStyle().nm; document.getElementById('btnAbility').click(); A(rsStyle().nm!==st0, 'the F button changes attack style');
     document.getElementById('btnAbility2').click(); A(G.ui==='rsmagic', 'the G button opens magic'); setUi('playing');
