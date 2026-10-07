@@ -3194,7 +3194,8 @@ const G = {
   pendingDungeonModifier: null, // UI-only selection state on the entry prompt itself, before ENTER commits it above
   isBossFloor: 0,
   bossIdx: -1,
-  dgCache: {}, // key `${slot}_${depth}` -> {map,floorItem,genStart,mon,shopStock,isBossFloor,bossIdx}
+  dgCache: {}, // key `${slot}_${depth}` -> {map,floorItem,genStart,mon,shopStock,isBossFloor,bossIdx} (RS-205: saved with the game)
+  dgDone: 0, // the site's master has fallen and its exit portal stands open (see dgOpenExit/dgFinish)
   log: [], // {msg, cls}
   chosenRace: 0, chosenClass: 0,
   preAb: [10,10,10,10,10,10],
@@ -4347,19 +4348,23 @@ function continueAfterDeath(walkToGrave){
   if (G.player.hardcore) return; // hardcore has no continuing - use descendAgain()
   G.gameOver = 0;
   const p = G.player, ds = G.deathSplit || deathSplit();
+  // (RS-205) a death below ground: the floor stays as you left it (your killer included) and the stone stands where you fell
+  const inDg = G.gameMode===1 && G.dungeonSlot>=1 && G.dungeonSlot<=MAX_SITE_SLOT;
+  const dgAt = inDg ? (G.inRaid ? { slot:G.dungeonSlot, d:G.inRaid.ret.depth, x:G.inRaid.ret.x, y:G.inRaid.ret.y } : { slot:G.dungeonSlot, d:G.depth, x:p.x, y:p.y }) : null;
+  if (inDg && !G.inRaid && !G.dgDone) saveLevelCache(G.depth);
   // you keep your worn gear and your most valuable few pack items; everything
   // else (and half your gold) is left in a gravestone where you fell
   p.gold -= ds.goldLost; pStats()._g = p.gold;
   G.inv = ds.keep.slice(); p.lootHold = []; G.invSel = 0;
   // (RS-136) every death leaves its own gravestone; the older ones wait too, up to GRAVE_MAX, then the oldest crumbles
-  const graves = gravesP(); let fresh = (ds.lose.length || ds.goldLost) ? { id:'g'+Date.now()+'_'+rn(1e6), x:G.owPos.x, y:G.owPos.y, items:ds.lose, gold:ds.goldLost, place:ds.place, cause:G.deathCause||'', when:Date.now() } : null;
+  const graves = gravesP(); let fresh = (ds.lose.length || ds.goldLost) ? { id:'g'+Date.now()+'_'+rn(1e6), x:inDg ? G.dungeonEntrance.x : G.owPos.x, y:inDg ? G.dungeonEntrance.y : G.owPos.y, dg:dgAt, items:ds.lose, gold:ds.goldLost, place:ds.place, cause:G.deathCause||'', when:Date.now() } : null;
   if (G.deathWild && fresh){ fresh = null; logMsg('you fell in the Wilderness - whatever you dropped there is gone for good', 'hit'); }
   if (fresh){ graves.push(fresh); while (graves.length > GRAVE_MAX){ const o = graves.shift(); if (o.items.length || o.gold) logMsg(`your oldest gravestone, at ${o.place||'a far place'}, crumbles to dust - what it held is gone for good`, 'hit'); } }
   p.grave = fresh || p.grave;
   G.deathWild = false;
   G.deathSplit = null;
   p.hp = Math.max(1, Math.ceil(effMaxHp()*0.5));
-  G.gameMode = 0;
+  if (inDg) dgFinish(false); else G.gameMode = 0;
   G.owZoomedOut = false;
   G.mon = [];
   G.isBossFloor = 0;
@@ -4367,7 +4372,7 @@ function continueAfterDeath(walkToGrave){
   if (town && fresh){ G.owPos.x = town.x; G.owPos.y = town.y; }
   setUi('playing');
   logMsg(town && fresh ? `you wake in ${town.name}, battered but alive` : 'you wake back in the light, battered but alive', 'new');
-  if (fresh) logMsg(`your gravestone holds ${fresh.items.length} item${fresh.items.length===1?'':'s'} and ${fresh.gold} gold - walk back to it to reclaim them${graves.length > 1 ? ` (${graves.length} gravestones wait for you now)` : ''}`, 'loot');
+  if (fresh) logMsg(`your gravestone holds ${fresh.items.length} item${fresh.items.length===1?'':'s'} and ${fresh.gold} gold - ${fresh.dg ? `it stands where you fell, ${fresh.place} - go back down for it` : 'walk back to it to reclaim them'}${graves.length > 1 ? ` (${graves.length} gravestones wait for you now)` : ''}`, 'loot');
   if (walkToGrave && fresh){ p.grave = fresh; try { graveButton(); } catch(e){} }
   renderGame();
   saveCurrentGame();
@@ -4396,10 +4401,12 @@ function gravesP(){
 }
 function graveSync(){ const p = G.player; if (!p) return; const L = gravesP(); let best = null, bd = 1e9; for (const g of L){ const d = Math.hypot(g.x-G.owPos.x, g.y-G.owPos.y); if (d < bd){ bd = d; best = g; } } p.grave = best; }
 function graveCheck(){
-  const p = G.player; if (!p || G.gameOver || G.gameMode!==0) return;
-  const L = gravesP(), gi = L.findIndex(q=>q.x===G.owPos.x && q.y===G.owPos.y);
-  if (gi < 0){ if (!G.graveOn) graveSync(); return; }
+  const p = G.player; if (!p || G.gameOver || (G.gameMode!==0 && G.gameMode!==1)) return;
+  const L = gravesP(), gi = G.gameMode===1 ? L.findIndex(q=>q.dg && q.dg.slot===G.dungeonSlot && q.dg.d===G.depth && q.dg.x===p.x && q.dg.y===p.y)   /* (RS-205: the stone where you fell, down below) */
+    : L.findIndex(q=>q.x===G.owPos.x && q.y===G.owPos.y && (!q.dg || !OW_SITE_TILES.includes(G.ow.map[q.x][q.y])));   /* (a stone down a site is not at its door - unless the site has gone) */
+  if (gi < 0){ if (!G.graveOn && G.gameMode===0) graveSync(); return; }
   const g = L.splice(gi, 1)[0]; p.grave = null; graveSync();   /* (clear the pointer first, or the list would take the collected grave back) */
+  if (g.dg && G.gameMode===1 && G.dungeonDeco && G.dungeonDeco[g.dg.x] && G.dungeonDeco[g.dg.x][g.dg.y]==='pgrave'){ G.dungeonDeco[g.dg.x][g.dg.y] = ''; if (typeof FPD!=='undefined') FPD.mapRef = null; }
   let held = 0;
   for (const it of g.items){ if (potMerge(it)) continue; if (G.inv.length < MAXINV) G.inv.push(it); else { (p.lootHold = p.lootHold||[]).push(it); held++; } }
   p.gold += g.gold; pStats()._g = p.gold;
@@ -5319,6 +5326,7 @@ function saveLevelCache(d){
     mon: G.mon.map(m=>({...m})),
     shopStock: G.shopStock.map(it=>copyItem(it)),
     isBossFloor: G.isBossFloor,
+    at: Date.now(), ent: G.dungeonEntrance ? G.dungeonEntrance.x+','+G.dungeonEntrance.y : '',   /* (RS-205: kept in the save; a moved site drops its old floors) */
     bossIdx: G.bossIdx,
   };
 }
@@ -5338,6 +5346,75 @@ function restoreLevelCache(d){
 }
 function invalidateDungeonCache(slot){
   for (const k of Object.keys(G.dgCache)) if (k.startsWith(slot+'_')) delete G.dgCache[k];
+}
+// (RS-205) the floors you have walked are kept with the save, so a site is laid out once: dying on a floor, leaving by the
+// stairs or closing the game all bring you back to the same rooms, the same loot and the same foes. Grids go in as strings
+// (one character per tile) and the sparse ones as lists; the three most recently walked sites are kept.
+const DG_CACHE_SLOTS = 3;
+function monPlain(m){ return JSON.parse(JSON.stringify(m, (k, v)=> k==='summoner' || typeof v==='function' || (v && v.isObject3D) ? undefined : v)); }
+function dgCacheEncode(){
+  const slots = {}; for (const k of Object.keys(G.dgCache)){ const sl = k.split('_')[0], c = G.dgCache[k]; slots[sl] = Math.max(slots[sl]||0, c.at||0); }
+  const keep = Object.keys(slots).sort((a,b)=>slots[b]-slots[a]).slice(0, DG_CACHE_SLOTS), out = {};
+  for (const k of Object.keys(G.dgCache)){ const c = G.dgCache[k]; if (!keep.includes(k.split('_')[0]) || !c.map || !c.map.length) continue;
+    try{
+      const w = c.map.length, h = c.map[0].length, enc = (g, f)=>g.map(col=>col.map(f).join('')).join('|');
+      const sparse = (g, f)=>{ const L = []; if (g) for (let x=0;x<w;x++) for (let y=0;y<h;y++){ const v = g[x] && g[x][y]; if (v) L.push([x, y, f ? f(v) : v]); } return L; };
+      const e = { at:c.at||0, ent:c.ent||'', w, h, map:enc(c.map, t=>String.fromCharCode(48+t)), ts:c.trapSeen ? enc(c.trapSeen, v=>v?'1':'0') : null, ds:c.dungeonSeen ? enc(c.dungeonSeen, v=>v?'1':'0') : null,
+        deco:sparse(c.dungeonDeco), fi:sparse(c.floorItem), gs:c.genStart, mon:(c.mon||[]).map(monPlain), shop:c.shopStock||[], bf:c.isBossFloor||0, bi:c.bossIdx==null ? -1 : c.bossIdx };
+      JSON.stringify(e); out[k] = e;
+    }catch(err){ console.error(err); }
+  }
+  return out;
+}
+function dgCacheDecode(d){
+  const out = {}; if (!d || typeof d!=='object') return out;
+  for (const k of Object.keys(d)){ const c = d[k]; try{
+    const dec = (str, f)=>str.split('|').map(col=>col.split('').map(f));
+    const grid = (L, z)=>{ const g = []; for (let x=0;x<c.w;x++) g.push(new Array(c.h).fill(z)); for (const [x,y,v] of L||[]) if (g[x] && y < c.h) g[x][y] = v; return g; };
+    if (!c.map || !c.gs) continue;
+    out[k] = { at:c.at||0, ent:c.ent||'', map:dec(c.map, ch=>ch.charCodeAt(0)-48), trapSeen:c.ts ? dec(c.ts, ch=>ch==='1') : null, dungeonSeen:c.ds ? dec(c.ds, ch=>ch==='1') : null,
+      dungeonDeco:grid(c.deco, ''), floorItem:grid(c.fi, null), genStart:c.gs, mon:c.mon||[], shopStock:c.shop||[], isBossFloor:c.bf||0, bossIdx:c.bi==null ? -1 : c.bi };
+  }catch(err){ console.error(err); } }
+  return out;
+}
+// on the way in: floors cached from where this site used to stand (it moves when its master falls) are dropped, and a
+// gravestone left inside the old site comes up to the open land where that entrance stood
+function dgCacheCheck(){
+  const ent = G.dungeonEntrance.x+','+G.dungeonEntrance.y;
+  for (const k of Object.keys(G.dgCache)) if (k.startsWith(G.dungeonSlot+'_')){ const c = G.dgCache[k]; if (c.ent && c.ent!==ent) delete G.dgCache[k]; }
+  for (const g of gravesP()) if (g.dg && g.dg.slot===G.dungeonSlot && (g.x!==G.dungeonEntrance.x || g.y!==G.dungeonEntrance.y)) delete g.dg;
+}
+// your gravestones on this floor (a death below ground leaves the stone where you fell, see continueAfterDeath): each gets a
+// 'pgrave' deco on its tile, moved to the nearest clear floor tile if the spot is taken
+function dgGraves(){ return G.gameMode===1 && G.dungeonSlot>=1 ? gravesP().filter(g=>g.dg && g.dg.slot===G.dungeonSlot && g.dg.d===G.depth) : []; }
+function dgGraveSync(){
+  if (!G.dungeonDeco || G.gameMode!==1) return;
+  for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++) if (G.dungeonDeco[x][y]==='pgrave') G.dungeonDeco[x][y] = '';
+  for (const g of dgGraves()){
+    const ok = (x,y)=> x>0 && y>0 && x<COLS-1 && y<ROWS-1 && G.map[x][y]===T_FLOOR && !G.dungeonDeco[x][y];
+    if (!ok(g.dg.x, g.dg.y)){ let best = null, bd = 1e9; for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++) if (ok(x,y)){ const d = Math.hypot(x-g.dg.x, y-g.dg.y); if (d < bd){ bd = d; best = [x,y]; } } if (!best) continue; g.dg.x = best[0]; g.dg.y = best[1]; }
+    G.dungeonDeco[g.dg.x][g.dg.y] = 'pgrave';
+  }
+}
+// the site's master is down: a portal to the open air opens on the nearest clear tile (backed onto a wall where it can
+// be), and the site stays open behind you for as long as you care to explore it - see the T_EXIT step in tryMove
+function dgOpenExit(){
+  const p = G.player, free = (x,y)=> x>0 && y>0 && x<COLS-1 && y<ROWS-1 && G.map[x][y]===T_FLOOR && !(G.dungeonDeco && G.dungeonDeco[x][y]) && !G.mon.some(m=>m.alive && m.x===x && m.y===y) && !(x===p.x && y===p.y);
+  let best = null, bd = 1e9;
+  for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++){ if (!free(x,y)) continue; const d = Math.hypot(x-p.x, y-p.y) + (portalWallDir(x,y) ? 0 : 1.5); if (d < bd){ bd = d; best = [x,y]; } }
+  if (!best) return;
+  G.map[best[0]][best[1]] = T_EXIT; G.dgDone = 1;
+  if (typeof FPD!=='undefined') FPD.mapRef = null;
+  logMsg('a portal to the open air tears open nearby - the way out is yours whenever you are done down here', 'magic'); try{ audEnv('portal'); }catch(e){}
+}
+// leaving a site by any road: the floor is kept for next time, unless its master has fallen, when the site is gone for good
+// (the land reclaims it and a new one rises elsewhere, see bossDefeated) and any gravestone of yours inside comes up with it
+function dgFinish(cacheIt){
+  if (G.dungeonSlot>=1 && G.dungeonSlot<=MAX_SITE_SLOT){
+    if (G.dgDone){ invalidateDungeonCache(G.dungeonSlot); for (const g of gravesP()) if (g.dg && g.dg.slot===G.dungeonSlot){ delete g.dg; logMsg('your gravestone from below is cast up with the collapse - it waits where the entrance stood', 'loot'); } }
+    else if (cacheIt && !G.inRaid) saveLevelCache(G.depth);
+  }
+  G.dgDone = 0; G.inRaid = null; G.gameMode = 0; G.dungeonSlot = 0; G.isBossFloor = 0; G.bossIdx = -1;
 }
 
 // scatters wall-mounted torches across a freshly generated floor, stored as
@@ -5434,6 +5511,7 @@ function loadLevel(d, arrivingFromBelow, fellThrough){
     if (spots.length){ const sp = spots[rn(spots.length)]; G.player.x = sp.x; G.player.y = sp.y; }
   }
   if (G.gameMode===1 && d===1) G.map[G.genStart.x][G.genStart.y] = T_EXIT;
+  try{ dgGraveSync(); }catch(e){ console.error(e); }   /* (RS-205: your gravestones on this floor) */
   // step off the staircase you came by, onto the floor in front of it
   if (!fellThrough && G.gameMode===1){ const t = G.map[G.player.x][G.player.y], w = (t===T_STAIRSU || t===T_STAIRSD || t===T_EXIT) && stairWallDir(G.player.x, G.player.y);
     if (w && G.map[G.player.x-w[0]][G.player.y-w[1]]===T_FLOOR && !G.mon.some(m=>m.alive && m.x===G.player.x-w[0] && m.y===G.player.y-w[1])){ G.player.x -= w[0]; G.player.y -= w[1]; } }
@@ -6968,9 +7046,9 @@ function tryMove(dx,dy){
       leavingFloor = true;
       if (G.gameMode===3){ G.gameMode=0; logMsg('you head back out onto the road', 'new'); }
       else {
-        saveLevelCache(G.depth); G.gameMode=0; G.dungeonSlot=0;
-        G.isBossFloor=0; G.bossIdx=-1; // leaving without finishing a boss floor shouldn't leave that flag armed
-        logMsg(G.siteKind==='dungeon' ? 'you climb back up to the surface' : 'you climb back down and outside', 'new');
+        if (G.dgDone) logMsg(`you step through the portal and out into the open air - the ${SITE_WORD[G.siteKind]||'dungeon'} falls in behind you`, 'magic');
+        else logMsg(G.siteKind==='dungeon' ? 'you climb back up to the surface' : 'you climb back down and outside', 'new');
+        dgFinish(true);   /* (the floor is kept for next time; a beaten site is let go - see dgFinish) */
       }
       break;
     }
@@ -7021,6 +7099,7 @@ function removeIndexEntry(id){
   writeSaveIndexList(saveIndexList().filter(e=>e.id!==id));
 }
 function serializeGame(){
+  if (G.gameMode===1 && G.dungeonSlot>=1 && G.dungeonSlot<=MAX_SITE_SLOT && !G.inRaid) try{ saveLevelCache(G.depth); }catch(e){ console.error(e); }   /* (RS-205: the floor you stand on, as it is now) */
   return {
     id: G.saveId, name: G.player.name, race: G.player.race, cls: G.player.cls,
     level: G.player.level, gold: G.player.gold,
@@ -7038,7 +7117,7 @@ function serializeGame(){
     gameMode: (G.gameMode===2 || G.gameMode===3) ? 0 : G.gameMode,
     depth: G.depth, dungeonMaxDepth: G.dungeonMaxDepth,
     dungeonEntrance: {x:G.dungeonEntrance.x,y:G.dungeonEntrance.y}, dungeonSlot: G.dungeonSlot,
-    siteKind: G.siteKind, dungeonModifier: G.dungeonModifier||null, questBoard: G.questBoard, questBoards: G.questBoards||{},
+    siteKind: G.siteKind, dungeonModifier: G.dungeonModifier||null, dgDone: G.dgDone||0, dgCache: dgCacheEncode(), questBoard: G.questBoard, questBoards: G.questBoards||{},
     tavernCursor: G.tavernCursor,
     log: G.log.slice(-20),
   };
@@ -7193,6 +7272,7 @@ function loadGame(id){
   G.dungeonSlot = data.dungeonSlot||0;
   G.siteKind = data.siteKind||'dungeon';
   G.dungeonModifier = data.dungeonModifier||null;
+  G.dgDone = data.dgDone||0; G.dgCache = dgCacheDecode(data.dgCache);   /* (RS-205: the floors you have walked; old saves start with none) */
   G.questBoards = data.questBoards||{};
   setTimeout(()=>{ try{ questValidateAll(); }catch(e){} }, 0);   // sites may have moved since these were posted
   G.questBoard = (G.gameMode===3 && G.questBoards[questTownKey(G.owPos.x,G.owPos.y)]) || data.questBoard||[];
@@ -7718,7 +7798,7 @@ function generateOverworld(seed){
   G.ow.dungeonMax = makeGrid(0, OW_COLS, OW_ROWS);
   G.ow.dungeonIdx = makeGrid(0, OW_COLS, OW_ROWS);
   G.ow.siteBiomeCache = {}; // see owBaseColor - stale entries from a previous map would otherwise leak through
-  G.dgCache = {};
+  G.dgCache = {}; G.dgDone = 0;
   G.dungeonSlot = 0;
 
   const rng = mulberry32(seed);
@@ -8280,6 +8360,7 @@ function enterDungeonConfirm(){
   G.dungeonSlot = G.ow.dungeonIdx[ex][ey];
   G.player.siteEnterTurn = G.player.turnCount||0;
   G.dungeonModifier = G.pendingDungeonModifier || null; // committed from the entry prompt's picker - see sitePower/dungeonModifierMult
+  G.dgDone = 0; dgCacheCheck();
   G.gameMode = 1;
   G.owZoomedOut = false;
   setUi('playing');
@@ -13444,7 +13525,7 @@ function fpRails(base){
 }
 
 // ---- dressing: what lies about a floor, by the kind of site ----
-const DRESS_DECOS = ['barrel','crate','rubble','cobweb','chains','moss','skulls','banner2','brazier','lava','puddle','crystal','blade','dig','lchest','ldoor','raidgate','raidexit','plate0','plate1','plate2','plate3','raidchest'];
+const DRESS_DECOS = ['pgrave','barrel','crate','rubble','cobweb','chains','moss','skulls','banner2','brazier','lava','puddle','crystal','blade','dig','lchest','ldoor','raidgate','raidexit','plate0','plate1','plate2','plate3','raidchest'];
 const DRESS_KITS = {
   dungeon:['barrel','crate','rubble','cobweb','chains','skulls','moss'], castle:['barrel','crate','banner2','brazier','chains','barrel'],
   necro:['skulls','chains','cobweb','brazier','crystal'], temple:['moss','rubble','brazier','puddle','cobweb','moss'],
@@ -13642,6 +13723,13 @@ function dgPropModel(p, g, add, M, mats, h){
     bl.castShadow = true; arm.rotation.y = p.rot;
     add(new T.BoxGeometry(0.9, 0.05, 0.08), dwood, 0, 1.56, 0).rotation.y = p.rot + Math.PI/2;
     g.userData.anim = (t, ph)=>{ arm.rotation.z = Math.sin(t*2.6 + ph)*0.95; };
+  } else if (d==='pgrave'){   /* (RS-205) your own gravestone, where you fell on this floor: a grey headstone in a soft column of light */
+    const st = M('gravest', '#9a9a92', { roughness:0.95, flatShading:true });
+    add(new T.BoxGeometry(0.34, 0.46, 0.1), st, 0, 0.23, 0);
+    const cap = add(new T.CylinderGeometry(0.17, 0.17, 0.1, 12, 1, false, 0, Math.PI), st, 0, 0.46, 0); cap.rotation.z = Math.PI/2; cap.rotation.y = Math.PI/2;
+    add(new T.BoxGeometry(0.5, 0.06, 0.3), st, 0, 0.03, 0.08);
+    const beam = add(new T.CylinderGeometry(0.1, 0.16, 3, 16, 1, true), new T.MeshBasicMaterial({ color:0xd8e0ff, transparent:true, opacity:0.13, depthWrite:false, blending:T.AdditiveBlending }), 0, 1.7, 0); beam.castShadow = beam.receiveShadow = false;
+    glowSpr('rgba(216,224,255,1)', 1.2, 0.5, 0.35);
   } else if (d==='dig'){
     const dirt = M('dirt', '#5a4430', { roughness:1 });
     add(new T.SphereGeometry(0.3, 12, 6, 0, 6.283, 0, 1.3), dirt, 0, -0.18, 0).scale.set(1, 0.6, 0.8);
@@ -15679,12 +15767,10 @@ function bossDefeated(){
   G.ow.siteMoves[G.dungeonSlot] = { kind:G.siteKind, x:spot.x, y:spot.y, max:newMax };
   questOnBossDefeated(oldX, oldY, spot.x, spot.y);
   logMsg(`word spreads of a new ${SITE_WORD[G.siteKind]||'dungeon'} risen elsewhere in the land`, 'new');
-  invalidateDungeonCache(G.dungeonSlot);
   G.victoryDepth = G.dungeonMaxDepth;
   G.victoryGold = G.player.gold;
+  dgOpenExit();   /* (RS-205: a portal out, taken when you are ready - the floors stay open until you step through) */
   setUi('victory');
-  G.gameMode = 0;
-  G.dungeonSlot = 0;
   saveCurrentGame();
 }
 
@@ -26063,6 +26149,7 @@ function obItemEntry(fi){
 // the painted icon for a dungeon decoration (headstones pick a shape per plot)
 function obDecoEntry(deco, x, y){
   if (deco==='grave') return obEntry('grave', {v: Math.floor(fpHash(x,y,91)*4), stone: fpHash(x,y,92)>0.5 ? '#8c8c90' : '#9a968a'});
+  if (deco==='pgrave') return obEntry('grave', {v:0, stone:'#9a9a92'});
   if (deco==='banner') return obEntry('banner', {col: G.siteKind==='necro' ? '#4a2a70' : '#a01e28'});
   if (deco==='idol') return obEntry('idol', {});
   if (OB_PAINTERS[deco]) return obEntry(deco, {});
@@ -33559,7 +33646,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-204';
+const GAME_VERSION = 'rs-205';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -35186,7 +35273,7 @@ function buildVictory(){
   ` : '';
   return `
     <h2 class="panel-title" style="color:${COL.green};">THE DUNGEON IS CONQUERED</h2>
-    <div class="sub">you defeated the dungeon's master at depth ${G.victoryDepth} and return to the surface, ${G.victoryGold} gold richer.</div>
+    <div class="sub">you defeated the dungeon's master at depth ${G.victoryDepth}, ${G.victoryGold} gold richer. A portal to the open air stands nearby - the halls are yours to pick over first, and the stairs still lead back up.</div>
     ${lootHtml}
     <div class="btnrow"><button class="btn primary" onclick="victoryContinue()">continue</button></div>
   `;

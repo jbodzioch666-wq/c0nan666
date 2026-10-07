@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-205 - Dungeons keep their floors
+
+- **A site is laid out once.** Every floor you walk is kept with your save. Dying, taking the stairs or closing the game all bring you back to the same rooms, with the same loot lying about and the same foes where you left them - the one that killed you included. Floors are only remade when the site itself moves on after its master falls. The three sites you walked most recently are kept.
+- **Your gravestone stands where you fell.** Die below ground and the stone is left on that floor, on that tile. On the land it is marked at the site's entrance, so the gravestone button still leads you to the door; then go back down for it. If the site collapses after its master falls, a stone left inside comes up to the open ground where the entrance stood.
+- **A portal out after the boss.** Felling a site's master no longer throws you out at once. A portal to the open air opens on the nearest clear tile, and the halls stay open for as long as you care to pick them over - the stairs still lead back up too. Step through the portal, or climb out, when you are done.
+
 ## RS-204 - Hands that hold their weapons, axes the right way round, and a bestiary you can zoom
 
 - **Wrists turned to grip:** on every figure holding a weapon or staff, the weapon hand is turned a quarter anticlockwise so the fist closes round the handle. The other hand is turned a quarter clockwise, which also suits a shield grip.
