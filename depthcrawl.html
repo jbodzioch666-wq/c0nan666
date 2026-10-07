@@ -4291,7 +4291,8 @@ function buildSpellPick(){
 // the spellbook (G key): cast a known spell, spending one slot of its level.
 // Paladin's Divine Smite is a special always-available entry that spends
 // ANY slot (not a known spell) - exactly like the real D&D class feature
-function castKnownSpell(knownIdx){
+function castKnownSpell(knownIdx){ if (foeBusy()) return; return foeBeat(()=>castKnownSpell0(knownIdx)); }   /* (RS-219: the monsters answer a beat after you) */
+function castKnownSpell0(knownIdx){
   if (G.gameOver) return;
   if (G.player.stunTurns>0){ consumeStunnedTurn(); setUi('playing'); return; }
   const entry = (G.player.knownSpells||[])[knownIdx];
@@ -4305,10 +4306,11 @@ function castKnownSpell(knownIdx){
   G.player.spellSlots[entry.lvl-1]--;
   sfx('spell');
   setUi('playing'); renderGame();
-  if (!G.gameOver) tickMonsters();
+  if (!G.gameOver) foeTurn();
   saveCurrentGame();
 }
-function castDivineSmite(){
+function castDivineSmite(){ if (foeBusy()) return; return foeBeat(()=>castDivineSmite0()); }   /* (RS-219: the monsters answer a beat after you) */
+function castDivineSmite0(){
   if (G.gameOver) return;
   if (G.player.stunTurns>0){ consumeStunnedTurn(); setUi('playing'); return; }
   const slots = G.player.spellSlots||[];
@@ -4320,7 +4322,7 @@ function castDivineSmite(){
   logMsg(`you channel divine power (slot level ${lvl}) - your next hit unleashes a Divine Smite`, 'magic');
   sfx('spell');
   setUi('playing'); renderGame();
-  if (!G.gameOver) tickMonsters();
+  if (!G.gameOver) foeTurn();
   saveCurrentGame();
 }
 
@@ -4714,7 +4716,8 @@ function rangedReachIdx(m){
   const mode = rangedPick(), range = mode==='magic' ? 8 : mode==='bow' ? rangedRange(w) : 0;
   return range && d <= range && shotClear(p.x, p.y, m.x, m.y) ? mi : -1;
 }
-function rangedAttack(tgt){
+function rangedAttack(tgt){ if (foeBusy()) return; return foeBeat(()=>rangedAttack0(tgt)); }   /* (RS-219: the monsters answer a beat after you) */
+function rangedAttack0(tgt){
   if (G.gameOver) return;
   const tIdx = tgt ? rangedReachIdx(tgt) : -1;
   if (G.player.stunTurns>0){ consumeStunnedTurn(); return; }
@@ -4728,7 +4731,7 @@ function rangedAttack(tgt){
     if (!sp){ G.player.rsNoteAt = 0; rsSpellNote(null); return; }
     if (sp[0]!==G.player.rsSpell){ G.player.rsNoteAt = 0; rsSpellNote(sp, true); }
     if (!rsCastAt(tIdx, sp[0])) return;
-    if (!G.gameOver) tickMonsters();
+    if (!G.gameOver) foeTurn();
     saveCurrentGame();
     return;
   }
@@ -4755,7 +4758,7 @@ function rangedAttack(tgt){
     return;
   }
   // turn-based: a ranged shot is your turn, same as a bump attack or a step
-  if (!G.gameOver) tickMonsters();
+  if (!G.gameOver) foeTurn();
   saveCurrentGame();
 }
 
@@ -6604,7 +6607,8 @@ function fireEquippedWandAbility(){
 // the F key: each class's one non-spell feature. Wizard/Warlock's charges
 // field stays unlimited (maxCharges -1 on their CLASSES row) since it's the
 // wand's OWN charge count that actually gates this now, not the player's
-function useAbility(){
+function useAbility(){ if (foeBusy()) return; return foeBeat(()=>useAbility0()); }   /* (RS-219: the monsters answer a beat after you) */
+function useAbility0(){
   if (G.gameOver) return;
   if (G.player.stunTurns>0){ consumeStunnedTurn(); return; }
   const unlimited = clsRow()[7] === -1;
@@ -6698,7 +6702,7 @@ function useAbility(){
     case 'Druid': break; // unreachable - clsRow()[7]===0 already returned above
   }
   // turn-based: using your ability is your turn, same as an attack or a step
-  if (!G.gameOver) tickMonsters();
+  if (!G.gameOver) foeTurn();
   saveCurrentGame();
 }
 
@@ -6752,6 +6756,16 @@ function tickActiveZones(){
 const FOE_DELAY_MS = 700;
 function foeDeferOn(){ try{ return (G.gameMode===1 || G.gameMode===2) && typeof fp3dActive==='function' && fp3dActive() && !G.foeInstant; }catch(e){ return false; } }
 function foePending(){ return !!(G.foeQueue && G.foeQueue.length); }
+// (RS-219) the same beat for a bow shot, a reach attack and every spell or ability: run the action with the monsters' answer
+// held back (foeTurn queues their turn instead of running it), then let it land FOE_DELAY_MS later
+function foeBusy(){ foeTick(); return foePending(); }
+function foeTurn(excl){ foeAct(()=>{ if (!G.gameOver) tickMonsters(excl); }); }
+function foeBeat(fn){
+  const was = G.deferFoe; G.deferFoe = was || foeDeferOn();
+  let r; try{ r = fn(); } finally { G.deferFoe = was; }
+  if (!was && foePending()){ G.foeAt = performance.now() + FOE_DELAY_MS; setTimeout(()=>{ try{ foeTick(); }catch(e){} }, FOE_DELAY_MS + 40); }
+  return r;
+}
 function foeAct(fn){ if (G.deferFoe){ (G.foeQueue = G.foeQueue || []).push(fn); } else fn(); }
 function foeFlush(){
   if (!foePending() || G.foeFlushing) return;
@@ -12066,10 +12080,11 @@ function spearReach(m){
   if (tileAt(mx2, my2)===T_WALL || G.mon.some(o=>o.alive && o.x===mx2 && o.y===my2)) return false;
   return true;
 }
-function reachAttack(m){
+function reachAttack(m){ if (foeBusy()) return; return foeBeat(()=>reachAttack0(m)); }   /* (RS-219: the monsters answer a beat after you) */
+function reachAttack0(m){
   const mi = G.mon.indexOf(m); if (mi<0) return;
   const v = FACING_VECT.findIndex(f=>f[0]===Math.sign(m.x-G.player.x) && f[1]===Math.sign(m.y-G.player.y)); if (v>=0) G.player.facing = v;
-  fight(mi); if (!G.gameOver) tickMonsters(); renderGame();
+  fight(mi); if (!G.gameOver) foeTurn(); renderGame();
 }
 // the sought-after weapons: dragon blades, Barrows gear and the whip
 const BARROWS = [
@@ -14612,15 +14627,16 @@ function rsSpellHit(mi, sp){
   if (m.hp<=0) monsterDies(mi);
   return true;
 }
-function rsCastFromBook(id){
+function rsCastFromBook(id){ if (foeBusy()) return; return foeBeat(()=>rsCastFromBook0(id)); }   /* (RS-219: the monsters answer a beat after you) */
+function rsCastFromBook0(id){
   const p = G.player, sp0 = rsSpell(id), meta0 = (sp0 && sp0[7]) || {};
-  if (meta0.k==='self'){ setUi('playing'); if (p.stunTurns>0){ consumeStunnedTurn(); return; } if (rsCastAt(-1, id) && !G.gameOver && (G.gameMode===1 || G.gameMode===2)) tickMonsters(); renderGame(); saveCurrentGame(); return; }
+  if (meta0.k==='self'){ setUi('playing'); if (p.stunTurns>0){ consumeStunnedTurn(); return; } if (rsCastAt(-1, id) && !G.gameOver && (G.gameMode===1 || G.gameMode===2)) foeTurn(); renderGame(); saveCurrentGame(); return; }
   if (meta0.k==='alch'){ setUi('rsmagic'); return; }
   if (meta0.k) p.rsUtil = id; else p.rsSpell = id;   /* (RS-191: a utility spell is the utility pick, not R's) */
   if (G.gameMode===0){ setUi('playing'); logMsg(`${rsSpell(id)[1]} is ready - cast it in a fight with R`, ''); return; }
   setUi('playing');
   if (p.stunTurns>0){ consumeStunnedTurn(); return; }
-  if (rsCastAt(-1, id) && !G.gameOver) tickMonsters();
+  if (rsCastAt(-1, id) && !G.gameOver) foeTurn();
   renderGame(); saveCurrentGame();
 }
 function rsSelectSpell(id){ const sp = rsSpell(id); if (sp && rsSpellUtil(sp)) G.player.rsUtil = id; else G.player.rsSpell = id; renderOverlay(); saveCurrentGame(); }
@@ -33911,7 +33927,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-218';
+const GAME_VERSION = 'rs-219';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

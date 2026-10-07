@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-219 - The same beat for bows and spells
+
+- **Bow shots, spells and abilities take turns on screen too.** As with melee since RS-218, your shot or spell lands first, and the monsters answer about 0.7 seconds later. That covers the bow, a spear's reach attack, spells cast with R or from the spellbook, and class abilities.
+- **No double turns.** You can't shoot or cast again until their answer has landed.
+
 ## RS-218 - Your blow, then theirs
 
 - **Fights take turns on screen.** Your melee blow lands first - its number, its sound, the foe's flinch - and the monster's answer comes about 0.7 seconds later, instead of both swings starting in the same instant. Any other monster in reach acts with it.
