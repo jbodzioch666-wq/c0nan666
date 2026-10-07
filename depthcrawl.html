@@ -236,6 +236,7 @@
   .gearrow .mods .aff{ color:var(--teal); }
   .invlist{ display:flex; flex-direction:column; gap:0; max-height:230px; overflow-y:auto; }
   .invgrid{ grid-template-columns:repeat(auto-fill, minmax(56px, 1fr)); gap:5px; margin-top:6px; }
+  .sp-cell b.qty{ position:absolute; right:3px; bottom:1px; font:700 11px 'JetBrains Mono',monospace; color:#fff; text-shadow:0 1px 2px #000, 0 0 3px #000; pointer-events:none; }
   .invgrid .sp-cell.sel{ outline:2px solid #ffd070; outline-offset:1px; box-shadow:0 0 8px rgba(255,200,90,0.55); }
   .invgrid .sp-cell.junk img{ opacity:0.45; filter:grayscale(0.7); }
   .sp-cell i.dn{ right:2px; bottom:1px; color:#ff6a50; font-size:11px; } .sp-cell i.jk{ left:1px; bottom:1px; background:#7a2a20; color:#ffd8d0; font-size:7.5px; }
@@ -4396,7 +4397,7 @@ function graveCheck(){
   if (gi < 0){ if (!G.graveOn) graveSync(); return; }
   const g = L.splice(gi, 1)[0]; p.grave = null; graveSync();   /* (clear the pointer first, or the list would take the collected grave back) */
   let held = 0;
-  for (const it of g.items){ if (G.inv.length < MAXINV) G.inv.push(it); else { (p.lootHold = p.lootHold||[]).push(it); held++; } }
+  for (const it of g.items){ if (potMerge(it)) continue; if (G.inv.length < MAXINV) G.inv.push(it); else { (p.lootHold = p.lootHold||[]).push(it); held++; } }
   p.gold += g.gold; pStats()._g = p.gold;
   notify(`Gravestone reclaimed: ${g.items.length} item${g.items.length===1?'':'s'} and ${g.gold} gold`, 'good', 'grave');
   logMsg(`you kneel at your gravestone and take back ${g.items.length} item${g.items.length===1?'':'s'} and ${g.gold} gold${held ? ` (${held} wait in your loot tray)` : ''}${L.length ? ` - ${L.length} more gravestone${L.length===1 ? '' : 's'} still wait${L.length===1 ? 's' : ''}` : ''}`, 'good');
@@ -4404,7 +4405,18 @@ function graveCheck(){
 }
 
 // ===================== SECTION: INVENTORY / EQUIP =====================
-function invPush(it){ if (G.inv.length>=MAXINV) return; G.inv.push(it); }
+function invPush(it){ if (potMerge(it)) return; if (G.inv.length>=MAXINV) return; G.inv.push(it); }
+// (RS-199) potions stack: a healing potion, antipoison or weapon poison joins a matching one already in the pack (it.qty), and
+// drinking, using or selling one takes one off the stack. Old saves' loose potions are merged on load (potStackAll).
+function potStacks(it){ return !!(it && it.used && it.consumable && (it.kind==='heal' || it.kind==='antipoison' || it.kind==='wpoison')); }
+function potKey(it){ return it.kind+'|'+it.nm+'|'+(it.hd1||0)+'|'+(it.hd2||0)+'|'+(it.wpLv||0); }
+function potQty(it){ return it && it.qty > 1 ? it.qty : 1; }
+function potMerge(it, list){ list = list || G.inv; if (!potStacks(it)) return false; const k = potKey(it), st = list.find(x=>x!==it && potStacks(x) && potKey(x)===k); if (!st) return false; st.qty = potQty(st) + potQty(it); return true; }
+function potRoom(it){ return G.inv.length < MAXINV || (potStacks(it) && G.inv.some(x=>potStacks(x) && potKey(x)===potKey(it))); }
+function potTake(idx){ const it = G.inv[idx]; if (!it) return; if (potStacks(it) && potQty(it) > 1) it.qty = potQty(it) - 1; else invRemove(idx); }
+function potCount(f){ return G.inv.reduce((t, it)=>t + (potStacks(it) && (!f || f(it)) ? potQty(it) : 0), 0); }
+function potStackAll(list){ if (!Array.isArray(list)) return list; const out = []; for (const it of list){ if (!potMerge(it, out)) out.push(it); } return out; }
+function potBadge(it){ return potQty(it) > 1 ? `<b class="qty">${potQty(it)}</b>` : ''; }
 function invRemove(idx){ G.inv.splice(idx,1); } // idx 0-based
 
 function getGearSlot(slot){ return G.gear[slot]; }
@@ -4553,6 +4565,7 @@ function addToInventory(item){
   { const st = pStats(); st.itemsLooted++; st.lootValue += itemPrice(item); }
   if (lootFilterTake(item)) return;
   lootBeamFor(item);
+  if (potMerge(item)){ logMsg(`you pick up the ${itemNameHtml(item)}`, 'loot', true); return; }   /* (RS-199: onto its stack) */
   if (G.inv.length >= MAXINV){ packFullHold(item); return; }
   if (item.consumable){
     invPush(item);
@@ -4618,7 +4631,7 @@ function useFromInv(idx){
   G.player.hp = mn(effMaxHp(), G.player.hp+heal);
   logMsg(`you drink the ${it.nm} and recover ${G.player.hp-before} HP`, 'good');
   sfx('potion');
-  invRemove(idx);
+  potTake(idx);
 }
 function sellFromInv(idx){
   if (idx<0 || idx>=G.inv.length) return;
@@ -4626,7 +4639,7 @@ function sellFromInv(idx){
   const price = sellPrice(G.inv[idx]);
   G.player.gold += price; ecoNoteSale(G.inv[idx]); try{ audCoins(); }catch(e){}
   logMsg(`you sell the ${G.inv[idx].nm} for ${price} gold`, 'loot');
-  invRemove(idx);
+  potTake(idx);
 }
 function sellJunk(){
   let total=0, cnt=0;
@@ -9541,7 +9554,7 @@ function spBody(tab){
     const cells = G.inv.map((it,i)=>{
       const drag = it.consumable || it.kind==='scroll';
       const tip = it.consumable || it.kind==='scroll' || it.kind==='set' ? ` title="${esc(it.nm)} - ${esc(itemDesc(it))}"` : '';
-      return `<div class="sp-cell${G.invSel===i && G.ui==='inventory' ? ' sel' : ''}" data-sp-inv="${i}" draggable="${drag}" style="--qc:${rarityColorCss(it)}"${tip}><img alt="" src="${dhIcon(obItemEntry(it))}">${it.locked ? '<i class="lk">L</i>' : ''}${it.kind==='set' ? '<i class="st">SET</i>' : ''}${lootArrow(it)==='up' && !invIsJunk(it) ? '<i class="up">&uarr;</i>' : ''}</div>`;
+      return `<div class="sp-cell${G.invSel===i && G.ui==='inventory' ? ' sel' : ''}" data-sp-inv="${i}" draggable="${drag}" style="--qc:${rarityColorCss(it)}"${tip}><img alt="" src="${dhIcon(obItemEntry(it))}">${potBadge(it)}${it.locked ? '<i class="lk">L</i>' : ''}${it.kind==='set' ? '<i class="st">SET</i>' : ''}${lootArrow(it)==='up' && !invIsJunk(it) ? '<i class="up">&uarr;</i>' : ''}</div>`;
     }).join('');
     const empties = Array.from({ length:Math.max(0, Math.min(MAXINV, Math.ceil(Math.max(G.inv.length,20)/5)*5) - G.inv.length) }, ()=>'<div class="sp-cell empty"></div>').join('');
     const foods = skFoods();
@@ -9708,7 +9721,7 @@ function qbIcon(o){
     return `<img alt="" src="${dhIcon(obItemEntry(it))}">`;
   } catch(e){ return '?'; }
 }
-function qbCount(o){ if (o.t==='food') return skHave(o.id); if (o.t==='item') return G.inv.filter(x=>x.nm===o.nm).length; if (o.t==='spell'){ const c = rsCastsLeft(rsSpell(o.id)); return c===Infinity ? '' : c; } return ''; }
+function qbCount(o){ if (o.t==='food') return skHave(o.id); if (o.t==='item') return G.inv.reduce((t, x)=>t + (x.nm===o.nm ? potQty(x) : 0), 0); if (o.t==='spell'){ const c = rsCastsLeft(rsSpell(o.id)); return c===Infinity ? '' : c; } return ''; }
 function renderQuickBar(){
   let el = document.getElementById('quickBar');
   const p = G.player, show = p && !G.gameOver && G.ui==='playing' && !SET.compact && (SP.open || (p.quickBar||[]).some(Boolean));
@@ -10879,11 +10892,12 @@ function skBrew(hid, all){
   const n = all ? Math.floor(skHave(hid)/2) : Math.min(1, Math.floor(skHave(hid)/2));
   if (!n){ logMsg(`a brew takes 2 ${h.nm}`, 'hit'); renderOverlay(); return 0; }
   let made = 0;
-  for (let k=0;k<n;k++){ if (G.inv.length >= MAXINV) break; const pt = POTIONS[Math.min(i, POTIONS.length-1)], it = newItem();
+  for (let k=0;k<n;k++){ const pt = POTIONS[Math.min(i, POTIONS.length-1)], it = newItem(), vial = skHave('vial') > 0;
     it.used=1; it.nm=pt[0]; it.consumable=1; it.kind='heal'; it.hd1=pt[1]; it.hd2=pt[2]; it.price=pt[4];
-    if (skHave('vial') > 0){ skAdd('vial', -1); it.hd1 += 1; it.nm = pt[0] + ' (vial)'; it.price = Math.round(it.price*1.3); }
+    if (vial){ it.hd1 += 1; it.nm = pt[0] + ' (vial)'; it.price = Math.round(it.price*1.3); }
+    if (!potRoom(it)) break; if (vial) skAdd('vial', -1);   /* (RS-199: a full pack still takes potions that stack) */
     skAdd(hid, chn(skPerk('alchemy', 'herb')) ? -1 : -2); invPush(it); made++; skGainXP('alchemy', h.axp);
-    if (chn(skPerk('alchemy', 'two')) && G.inv.length < MAXINV){ invPush(JSON.parse(JSON.stringify(it))); made++; } }
+    if (chn(skPerk('alchemy', 'two'))){ invPush(JSON.parse(JSON.stringify(Object.assign({}, it, { qty:1 })))); made++; } }
   logMsg(made ? `you brew ${made} ${POTIONS[Math.min(i, POTIONS.length-1)][0]}${made>1?'s':''}` : 'your pack is full', made ? 'good' : 'hit'); if (made) sfx('potion');
   renderOverlay(); saveCurrentGame();
   return made;
@@ -11885,10 +11899,10 @@ function applyWeaponPoison(idx){
   if (!w || !w.used || w.range || w.rsStaff){ logMsg('wield a stabbing or slashing weapon to coat it', 'hit'); return; }
   if (meleeType(w)==='crush'){ logMsg(`poison won't stay on a ${w.basis.toLowerCase()} - it needs an edge or a point`, 'hit'); return; }
   w.poisoned = it.wpLv; w.nm = w.nm.replace(/ \((p\+*|v)\)$/, '') + ' ' + WP_TAG[it.wpLv-1];
-  invRemove(idx); logMsg(`you coat your ${w.nm.replace(/ \((p\+*|v)\)$/, '')} with ${it.nm.toLowerCase()}`, 'good'); sfx('potion'); renderGame(); saveCurrentGame();
+  potTake(idx); logMsg(`you coat your ${w.nm.replace(/ \((p\+*|v)\)$/, '')} with ${it.nm.toLowerCase()}`, 'good'); sfx('potion'); renderGame(); saveCurrentGame();
 }
 function drinkAntipoison(idx){
-  const p = G.player; invRemove(idx); p.poisonTurns = 0; p.poisonDmg = 0; p.antiPoisonUntil = (p.turnCount||0) + 150;
+  const p = G.player; potTake(idx); p.poisonTurns = 0; p.poisonDmg = 0; p.antiPoisonUntil = (p.turnCount||0) + 150;
   logMsg('you drink the antipoison - you feel clean, and safe from poison for a while', 'good'); sfx('potion'); renderGame(); saveCurrentGame();
 }
 const SK_BREW2 = [
@@ -11902,8 +11916,8 @@ function skBrew2(id){
   const r = SK_BREW2.find(x=>x.id===id); if (!r) return 0;
   if (skLvl('alchemy') < r.lvl){ logMsg(`you need Alchemy level ${r.lvl}`, 'hit'); renderOverlay(); return 0; }
   for (const k in r.need) if (skHave(k) < r.need[k]){ logMsg(`${r.nm} takes ${Object.keys(r.need).map(k=>r.need[k]+' '+skName(k).toLowerCase()).join(' + ')}`, 'hit'); renderOverlay(); return 0; }
-  if (G.inv.length >= MAXINV){ logMsg('your pack is full', 'hit'); renderOverlay(); return 0; }
-  for (const k in r.need) skAdd(k, -r.need[k]); invPush(r.make()); skGainXP('alchemy', r.xp);
+  const made2 = r.make(); if (!potRoom(made2)){ logMsg('your pack is full', 'hit'); renderOverlay(); return 0; }
+  for (const k in r.need) skAdd(k, -r.need[k]); invPush(made2); skGainXP('alchemy', r.xp);
   logMsg(`you brew ${r.nm}`, 'good'); sfx('potion'); renderOverlay(); saveCurrentGame(); return 1;
 }
 function brew2Html(){
@@ -12390,6 +12404,7 @@ function rsMigrateAll(){
   for (const it of G.inv||[]) rsMigrateItem(it);
   for (const it of (G.player && G.player.stash)||[]) rsMigrateItem(it);
   rsPurgeSpellScrolls(); rsPurgeSocketRunes();
+  G.inv = potStackAll(G.inv) || []; if (G.player && G.player.stash) G.player.stash = potStackAll(G.player.stash);   /* (RS-199) */
   { const p = G.player, s0 = p && rsSpell(p.rsSpell); if (s0 && rsSpellUtil(s0)){ p.rsUtil = p.rsUtil || s0[0]; p.rsSpell = null; } }
   { const p = G.player; if (p){ if (p.rsSpell && !rsSpell(p.rsSpell)) p.rsSpell = null; if (p.rsUtil && !rsSpell(p.rsUtil)) p.rsUtil = null;   /* (RS-192: the alchemy spells are gone) */
     if (Array.isArray(p.quickBar)) p.quickBar = p.quickBar.map(o=>o && o.t==='spell' && !rsSpell(o.id) ? null : o); } }   /* (RS-191: a utility spell picked for R becomes the utility pick) */
@@ -15075,7 +15090,7 @@ function questIsReady(q){
     case 'escort': return !!q.arrived && here===questTownKey(q.destX,q.destY);
     case 'delivery': return G.inv.some(it=>questDeliverable(q, it));
     case 'supply':
-      if (q.itemKind==='potion') return G.inv.filter(it=>it.used && it.consumable && it.kind==='heal' && it.nm===q.potionName).length >= q.target;
+      if (q.itemKind==='potion') return potCount(it=>it.kind==='heal' && it.nm===q.potionName) >= q.target;
   }
   return false;
 }
@@ -15370,7 +15385,7 @@ function chooseQuestReward(i){
   const q = G.player.quests[idx], o = pr.options[i];
   if (q.kind==='delivery'){ const ii = G.inv.findIndex(it=>questDeliverable(q, it)); if (ii>=0) invRemove(ii); }
   else if (q.kind==='supply'){
-    { let n = q.target; for (let j=G.inv.length-1; j>=0 && n>0; j--) if (G.inv[j].used && G.inv[j].consumable && G.inv[j].kind==='heal' && G.inv[j].nm===q.potionName){ invRemove(j); n--; } }
+    { let n = q.target; for (let j=G.inv.length-1; j>=0 && n>0; j--) while (n>0 && G.inv[j] && G.inv[j].used && G.inv[j].consumable && G.inv[j].kind==='heal' && G.inv[j].nm===q.potionName){ potTake(j); n--; } }
   }
   G.player.gold += q.rewardGold;
   gainXP(q.rewardXp);
@@ -21161,7 +21176,7 @@ function buildBank(){
 }
 function bankDeposit(i){ const p = bankP(); if (p.stash.length >= MAXBANK){ logMsg('your bank is full', 'hit'); return; } const it = G.inv[i]; if (!it) return; hideItemTooltip(); invRemove(i); p.stash.push(it); renderOverlay(); saveCurrentGame(); }
 function bankDepositAll(){ const p = bankP(); let n = 0; for (let i=G.inv.length-1; i>=0 && p.stash.length < MAXBANK; i--){ const it = G.inv[i]; if (!it || it.locked) continue; invRemove(i); p.stash.push(it); n++; } if (n) logMsg(`you bank ${n} item${n===1 ? '' : 's'}`, ''); hideItemTooltip(); renderOverlay(); saveCurrentGame(); }
-function bankWithdraw(i){ const p = bankP(); if (G.inv.length >= MAXINV){ logMsg('your pack is full', 'hit'); return; } const it = p.stash[i]; if (!it) return; hideItemTooltip(); p.stash.splice(i, 1); G.inv.push(it); renderOverlay(); saveCurrentGame(); }
+function bankWithdraw(i){ const p = bankP(); if (G.inv.length >= MAXINV){ logMsg('your pack is full', 'hit'); return; } const it = p.stash[i]; if (!it) return; hideItemTooltip(); p.stash.splice(i, 1); invPush(it); renderOverlay(); saveCurrentGame(); }
 function bankGold(n){
   const p = bankP(); n = Math.floor(n); if (!n) return;
   if (n > 0){ n = Math.min(n, p.gold); p.gold -= n; p.bankGold += n; logMsg(`you deposit ${n.toLocaleString()} gold`, ''); }
@@ -22835,7 +22850,7 @@ function renderHud(){
   let potionHtml;
   if (pidx===-1) potionHtml = `<span class="muted">no potions</span>`;
   else {
-    const cnt = G.inv.filter(i=>i.consumable && i.kind==='heal').length;
+    const cnt = potCount(i=>i.kind==='heal');
     potionHtml = `<span style="color:${COL.green}">${esc(G.inv[pidx].nm)}  x${cnt}</span>`;
   }
   const clsRowData = clsRow();
@@ -23040,7 +23055,7 @@ function renderImmersiveHud(){
     : G.gameMode===2 && G.cellar ? 'the cellar'
     : G.gameMode===2 ? `roadside encounter${(typeof isNightTime==='function' && isNightTime()) ? ' &middot; night' : ''}${G.weather && G.weather!=='clear' ? ' &middot; '+esc(G.weather) : ''}`
     : villageFlavor ? esc(villageFlavor.name) : 'the wilds';
-  const nPot = G.inv.filter(i=>i.consumable && i.kind==='heal').length;
+  const nPot = potCount(i=>i.kind==='heal');
   const wand = G.gear && G.gear.ranged;
   const hasRanged = !!(wand && wand.used);
   const inWorld = G.gameMode!==0;
@@ -33417,7 +33432,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-198';
+const GAME_VERSION = 'rs-199';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -34499,7 +34514,7 @@ function packFullHold(item){
 }
 function packHoldFlush(){
   const h = G.player && G.player.lootHold; if (!h || !h.length) return;
-  let moved = 0; while (h.length && G.inv.length < MAXINV){ G.inv.push(h.shift()); moved++; }
+  let moved = 0; for (let i=h.length-1;i>=0;i--) if (potMerge(h[i])){ h.splice(i, 1); moved++; } while (h.length && G.inv.length < MAXINV){ G.inv.push(h.shift()); moved++; }
   if (moved) logMsg(`${moved} item${moved>1?'s':''} from your loot tray go${moved>1?'':'es'} into your pack`, 'loot');
 }
 function packHoldAct(what){
@@ -34566,7 +34581,7 @@ function invListHtml(){
   const cells = vis.map((i, vi)=>{
     const it = G.inv[i], arrow = lootArrow(it), junk = invIsJunk(it);
     const tags = (it.locked ? '<i class="lk">L</i>' : '') + (it.kind==='set' ? '<i class="st">SET</i>' : '') + (arrow==='up' && !junk ? '<i class="up">&uarr;</i>' : arrow==='down' && !junk ? '<i class="dn">&darr;</i>' : '') + (junk && !it.locked ? '<i class="jk">JUNK</i>' : '') + (vi<9 ? `<i class="hk">${vi+1}</i>` : '');
-    return `<div class="sp-cell inv-cell${i===sel ? ' sel' : ''}${junk ? ' junk' : ''}" data-inv="${i}" style="--qc:${rarityColorCss(it)}" onclick="G.invSel=${i};renderOverlay();" ${it.consumable||it.kind==='scroll'||it.kind==='set'?'':`onmouseenter="showItemTooltip(event, G.inv[${i}])" onmousemove="moveItemTooltip(event)" onmouseleave="hideItemTooltip()"`} title="${esc(it.nm)}"><img alt="" src="${dhIcon(obItemEntry(it))}">${tags}</div>`;
+    return `<div class="sp-cell inv-cell${i===sel ? ' sel' : ''}${junk ? ' junk' : ''}" data-inv="${i}" style="--qc:${rarityColorCss(it)}" onclick="G.invSel=${i};renderOverlay();" ${it.consumable||it.kind==='scroll'||it.kind==='set'?'':`onmouseenter="showItemTooltip(event, G.inv[${i}])" onmousemove="moveItemTooltip(event)" onmouseleave="hideItemTooltip()"`} title="${esc(it.nm)}"><img alt="" src="${dhIcon(obItemEntry(it))}">${potBadge(it)}${tags}</div>`;
   }).join('');
   return `<div class="sp-grid invgrid">${cells}</div>` + (vis.length<G.inv.length ? `<div class="muted" style="margin-top:4px;font-size:11px;">showing ${vis.length} of ${G.inv.length} items</div>` : '');
 }
@@ -34840,7 +34855,7 @@ function buildCharSheetInvList(){
   for (let i=0;i<n;i++){
     const it = G.inv[i]; if (!it){ cells.push(`<div class="cs-bagempty" data-csinv="${i}"></div>`); continue; }
     const can = canActuallyEquip(it), arrow = can ? lootArrow(it) : null, tags = (it.locked ? '<i class="lk">L</i>' : '') + (arrow==='up' ? '<i class="up">&uarr;</i>' : arrow==='down' ? '<i class="dn">&darr;</i>' : '');
-    cells.push(`<div class="sp-cell inv-cell csdrag ${can ? 'can' : 'cant'}${i===sel ? ' sel' : ''}" data-csinv="${i}" style="--qc:${rarityColorCss(it)}" onclick="charSheetInvSelect(${i});" onmouseenter="showItemTooltip(event, G.inv[${i}])" onmousemove="moveItemTooltip(event)" onmouseleave="hideItemTooltip()" title="${esc(it.nm)}"><img alt="" src="${dhIcon(obItemEntry(it))}">${tags}</div>`);
+    cells.push(`<div class="sp-cell inv-cell csdrag ${can ? 'can' : 'cant'}${i===sel ? ' sel' : ''}" data-csinv="${i}" style="--qc:${rarityColorCss(it)}" onclick="charSheetInvSelect(${i});" onmouseenter="showItemTooltip(event, G.inv[${i}])" onmousemove="moveItemTooltip(event)" onmouseleave="hideItemTooltip()" title="${esc(it.nm)}"><img alt="" src="${dhIcon(obItemEntry(it))}">${potBadge(it)}${tags}</div>`);
   }
   return `<div class="cs-bag" style="grid-template-columns:repeat(${CS_BAG_COLS}, 1fr);">${cells.join('')}</div>`;
 }

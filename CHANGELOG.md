@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-199 - Potions stack
+
+- **Matching potions share one bag slot** and show their count on the picture. That covers healing potions, antipoisons and weapon poisons. A potion brewed with a vial is a different potion from one without, so the two make separate stacks.
+- **Drinking, using or selling** takes one off the stack.
+- **A full bag still takes a potion** that has a stack to join, whether you pick it up, buy it, or brew it.
+- **Counts add up the stacks:** the Q button, quick-bar slots, and quests that ask you to bring potions.
+- **Old saves:** loose potions in your bag and your bank are merged into stacks when you load.
+
 ## RS-198 - Socket runes and runewords removed; dragging gear no longer highlights the page
 
 - **The old socket runes are gone.**
