@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-212 - No more music
+
+- **The background music is gone.** No tunes play anywhere - title screen, land, towns, dungeons or fights - and the music player is gone from the settings. The world's own sounds stay: footsteps, combat, ambience, weather.
+- **Short fanfares stay** for the big moments (a quest done, a rare drop, a boss appearing, a level 99, a discovery). Their slider in the settings is now called "fanfares"; turn it to 0 to silence them too.
+
 ## RS-211 - Dragons look ahead, bare-boned skeletal warriors, your staff like the barber's chair
 
 - **Dragon heads no longer droop.** A dragon's head now looks the way its body faces, a touch down, dipping for the bite. Out on the land and in the bestiary it used to fold down under its neck, and in dungeons it stared up at the camera. Hydras and serpents get the same fix.
