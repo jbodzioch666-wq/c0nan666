@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-231 - Oak, golden oak and cherry
+
+**Doors are real wood now.** Every town door is made of oak, golden oak or cherry, with planks and grain running down them and the odd knot. This covers the shop and house doors in the street, the round hobbit doors in halfling shires (painted before, now wood with their brass knob) and the door you leave by inside.
+
+**A building's door is the same wood inside and out.** The wood is picked from the town and the building, so if the smithy has a golden-oak door in the street, it has the same golden-oak door inside.
+
 ## RS-230 - Shut the door
 
 **The door out of each building now stands shut in its frame** instead of open into the room. It's still the round hobbit door in halfling shires and the iron-banded plank door everywhere else, so it's easy to spot.
