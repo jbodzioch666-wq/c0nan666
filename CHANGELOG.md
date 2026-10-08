@@ -1,5 +1,20 @@
 # Depthcrawl patch notes
 
+## RS-223 - A town for every race
+
+**Every race now has its own towns.** Each world deals its town races from a shuffled deck, so every playable race has at least one home. A medium world now has 9 towns, up from 8, and a small world 7, up from 3. The five new kinds of town each have their own names, buildings, townsfolk and landmark:
+- **Halfling shires** sit in open grassland. They have grass roofs and halfling townsfolk with curly hair and bare feet. Their **burrow kitchens** send you off with a basket of cooked fish once a day, and you get some Cooking xp.
+- **Gnomish tinker towns** sit in the foothills. They have blue roofs and gnome townsfolk with big noses and white beards. Once a day, the **tinkers' workshop** gives you Crafting xp and two uncut gems.
+- **Dragonborn roosts** sit in the desert or near the mountains, with red-roofed stone halls and scaled dragonborn townsfolk and guards. Step into the **great brazier** for +3 armour for 120 turns, once a day.
+- **Tiefling enclaves** sit in swamps and tundra: dark stone, violet light and horned, tailed townsfolk. The **ember altar** gives you fire and air runes once a day, plus chaos runes from Magic 35.
+- **Half-elven fair towns** sit where woods meet fields. Hear the minstrels on the **minstrels' stage** once a day and you get +10% xp in every skill for 400 steps. It shows as a buff.
+
+**The original towns' folk now match their race too.** Elves stand tall and have pointed ears, dwarves are short and broad, and orcs vary in skin tone.
+
+**A dwarven, elven or orcish town in the desert keeps its own landmark** instead of turning into a caravan post.
+
+**To see the new towns, make a new world.** Your character comes with you. Old worlds keep the towns they have, but medium and small worlds gain extra towns, which come from the race deck.
+
 ## RS-222 - Races that look and play their part
 
 **Every race now has its own body.** You can see all of this in the character creation preview:
