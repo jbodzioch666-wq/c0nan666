@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-232 - The door stays put
+
+**The door out of a building no longer fades away** when it's between you and the camera. It stays solid, so you can always see where to leave.
+
 ## RS-231 - Oak, golden oak and cherry
 
 **Doors are real wood now.** Every town door is made of oak, golden oak or cherry, with planks and grain running down them and the odd knot. This covers the shop and house doors in the street, the round hobbit doors in halfling shires (painted before, now wood with their brass knob) and the door you leave by inside.

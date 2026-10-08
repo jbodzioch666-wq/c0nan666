@@ -1,5 +1,5 @@
-// RS-229/230/231: inside a building the way out is a real door - its frame in the front wall and the door shut in it:
-// a round hobbit door in a halfling shire, a plank door anywhere else; rooms with no way to the street have none; the door is oak, golden oak or cherry, the same wood inside and out
+// RS-229/230/231/232: inside a building the way out is a real door - its frame in the front wall and the door shut in it:
+// a round hobbit door in a halfling shire, a plank door anywhere else; rooms with no way to the street have none; the door is oak, golden oak or cherry, the same wood inside and out, and it never fades out
 module.exports = async page=>{
   const ev = (f, a)=>page.evaluate(f, a), A = (c, msg)=>{ if (!c) throw new Error('assert: '+msg); };
   const R = await ev(async ()=>{
@@ -12,7 +12,7 @@ module.exports = async page=>{
       const outside = mapOf(V3.doors && V3.doors[key]);
       enterInterior(key); setUi('playing');
       for (let i=0;i<40 && !(V3.world && G.interior && V3.world.children.length > 5);i++){ renderGame(); await new Promise(r=>setTimeout(r, 200)); }
-      const kinds = []; let inside = null; V3.world.traverse(o=>{ if (o.userData && o.userData.exitDoor){ kinds.push(o.userData.exitDoor); inside = mapOf(o); } });
+      const kinds = []; let inside = null; V3.world.traverse(o=>{ if (o.userData && o.userData.exitDoor){ kinds.push(o.userData.exitDoor); inside = mapOf(o); if ((V3.occ||[]).some(ob=>ob.userData.grp===o)) kinds.push('fades'); } });
       if (kinds.length) woods.push({ key, wood:doorWoodOf(key)[0], match:!!outside && outside===inside }); return kinds; };
     return { woods, shire:await look(G.ow.spawnPos, 'shop'), other:await look(other, 'shop'), otherRace:(townFlavorAt(other.x, other.y)||{}).race, cellar:ROOM_STREET_DOOR('cellar') ? null : await look(other, 'cellar') };
   });
