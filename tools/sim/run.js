@@ -4,7 +4,7 @@
 // Options: --soft (software WebGL), --timeout=N minutes (default 30). Same harness as tools/tests/run.js.
 const fs = require('fs'), path = require('path');
 const ROOT = path.resolve(__dirname, '../..'), PAGE = path.join(ROOT, 'depthcrawl.html');
-const ALL = ['combat', 'gather', 'produce', 'economy'];
+const ALL = ['combat', 'gather', 'produce', 'economy', 'gear'];
 function load(mod, fallbacks){ for (const p of [mod].concat(fallbacks)){ try { return require(p); } catch(e){} } return null; }
 const pw = load('playwright', ['/opt/node-tools/node_modules/playwright']);
 if (!pw){ console.error('playwright not found: run `npm install` in tools/tests'); process.exit(2); }
