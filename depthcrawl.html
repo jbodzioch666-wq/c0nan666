@@ -4520,8 +4520,7 @@ function lootArrow(it){
   // equipped - so it shows the same down-arrow (and gets swept up by the
   // "sell junk" bulk action) as an ordinary stat downgrade would
   const equipped = curEquipFor(it);
-  const a = itemScore(it), b = itemScore(equipped);
-  if (a>b) return 'up'; if (a<b) return 'down'; return '';
+  const v = gearVerdict(it, equipped); return v==='style' ? '' : v;   /* (RS-239: only against gear of the style you use) */
 }
 // ---- lifetime stats: counted once a frame from what changed, so every source
 // of damage, gold and kills is caught without hooking each one ----
@@ -12824,6 +12823,35 @@ function itemScore(it){
   if (it.slot==='weapon' || it.slot==='ranged') return ((it.d1*(it.d2+1)/2) + (it.bonus||0) + st + b*0.8 + ma*0.4 + (it.magDmg||0) + affs*0.5) * (is2H(it) ? 1.15 : 1);
   return df*2 + b + ra*0.7 + ma*0.7 + st*1.5 + (it.magDmg||0)*2 + (it.magDmgPct||0)*0.3 + affs*0.5 + (it.prayB||0)*0.25 + (it.saveArrows||0)*4 + (it.offWeapon ? 2 : 0);
 }
+// RS-239: upgrade or downgrade is judged against what you fight with. A piece made for another style (plate when you wear
+// robes, a sword when you cast from a staff) is neither - just a different style - and a piece for your own style is scored
+// on what that style uses: magic accuracy and damage for a mage, ranged accuracy for an archer, attack and strength in melee
+function itemStyleOf(it){
+  if (!it || !it.used) return null;
+  if (it.slot==='weapon' || it.slot==='ranged') return it.rsStaff ? 'magic' : it.range ? 'ranged' : 'melee';
+  return it.rsFam==='cloth' ? 'magic' : it.rsFam==='hide' ? 'ranged' : it.rsFam==='metal' ? 'melee' : null;
+}
+function playerGearStyle(eq){
+  const w = G.gear && G.gear.weapon; if (w && w.used) return itemStyleOf(w);
+  return itemStyleOf(eq) || 'melee';
+}
+function itemScoreFor(it, style){
+  if (!it || !it.used) return 0;
+  if (it.kind==='wand' || it.kind==='scroll' || it.consumable) return -1;
+  if (it.slot==='weapon' || it.slot==='ranged' || it.slot==='ammo') return itemScore(it);
+  const affs = (it.aff||[]).reduce((t,a)=>t+(a.i1||0)+(a.f||0)*20, 0), pr = (it.prayB||0)*0.25 + affs*0.5;
+  const b = (it.acc||0)/RS_ATK_PER_HIT, st = (it.dmgB||0)/RS_STR_PER_DMG, df = (it.ac||0)/RS_DEF_PER_AC, ra = (it.rngAcc||0)/RS_ATK_PER_HIT, ma = (it.magAcc||0)/RS_ATK_PER_HIT;
+  if (style==='magic') return ma*1.6 + (it.magDmg||0)*2 + (it.magDmgPct||0)*0.3 + df*0.8 + pr;
+  if (style==='ranged') return ra*1.6 + st + (it.saveArrows||0)*4 + df*1.5 + pr;
+  return b + st*1.5 + df*2 + pr + (it.offWeapon ? 2 : 0);
+}
+// the verdict for a piece against what's worn: 'up', 'down', '' (the same), or 'style' (made for another way of fighting)
+function gearVerdict(it, eq){
+  const si = itemStyleOf(it), se = eq && eq.used ? itemStyleOf(eq) : null, style = playerGearStyle(eq);
+  if (si && ((se && si!==se) || (!se && si!==style))) return 'style';
+  const a = itemScoreFor(it, style), b = itemScoreFor(eq, style);
+  return a > b ? 'up' : a < b ? 'down' : '';
+}
 // the bonus lines under an item's name
 // RuneScape-style bonuses: attack/ranged/magic (10 = +1 to hit), strength (8 = +1 damage), defence (20 = +1 armour)
 function rsBonusLines(it){
@@ -12952,8 +12980,8 @@ function itemCompareTooltipHtml(it){
   html += `<hr><div class="muted">equipped: ${equipped && equipped.used ? esc(equipped.nm) : '(nothing)'}</div>`;
   html += itemDiffHtml(it, equipped);
   if (canEquip(it)){
-    const s1 = itemScore(it), s2 = itemScore(equipped);
-    const verdict = s1>s2 ? ['upgrade',COL.green] : (s1<s2 ? ['downgrade',COL.red] : ['sidegrade',COL.dim]);
+    const gv = gearVerdict(it, equipped);
+    const verdict = gv==='up' ? ['upgrade',COL.green] : gv==='down' ? ['downgrade',COL.red] : gv==='style' ? [`different style &middot; made for ${itemStyleOf(it)}, you fight with ${playerGearStyle(equipped)}`,COL.dim] : ['sidegrade',COL.dim];
     html += `<div style="margin-top:4px;color:${verdict[1]};">${verdict[0]}</div>`;
   }
   return html;
@@ -34353,7 +34381,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-238';
+const GAME_VERSION = 'rs-239';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

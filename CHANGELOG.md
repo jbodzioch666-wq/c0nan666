@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-239 - Upgrades for your style
+
+**Upgrade and downgrade now go by what you fight with.** Your style comes from your weapon: a staff means magic, a bow means ranged, anything else means melee.
+- **Gear made for another style is just a "different style",** not an upgrade or a downgrade. Plate armour no longer shows as an upgrade when you're wearing robes and casting from a staff, and robes or a staff no longer do for a fighter in plate. Hover the item and it tells you which style it's made for.
+- **Gear for your own style is compared on what that style uses:** magic accuracy and damage for a mage, ranged accuracy for an archer, attack and strength in melee, and defence for everyone.
+- **The bag's up and down arrows follow the same rule,** and so does the sell-junk button, so spare gear for another style is no longer sold as junk.
+
 ## RS-238 - Solid landmarks
 
 **Landmarks are solid now.** You can't walk through the wizard's tower, the great tree or the volcano's cone, either with the keys or by clicking to walk; the route goes round them. Wandering monster groups can't wander into them either.
