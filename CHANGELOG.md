@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-229 - A door to leave by
+
+**Inside every building, the way out is now a real door.** Before, the exit was only a gap in the low front wall. Now it has a full doorframe, and the door stands open into the room, so you can see where to leave:
+- **In a halfling shire**, a round painted door with a brass knob, in a round wooden frame.
+- **Everywhere else**, a plank door with iron bands, under a timber lintel.
+
+**It fades out like the walls** when it's between you and the camera. Rooms with no way out to the street, like the cellar, still have none.
+
 ## RS-228 - Rounder hills
 
 **Hobbit-hole hills have softer, rounder corners.** Seen from above they were close to a rounded square. Now they're closer to a soft oval, still broad enough at the front for the round door and its windows.
