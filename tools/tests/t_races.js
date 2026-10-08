@@ -9,9 +9,9 @@ module.exports = async page=>{
       return { nm:r[0], st:pt.stature, head:pt.o.head||'human', tail:pt.o.tail||'', feet:pt.o.feet||'', nose:pt.o.nose||0, hair:!!pt.o.hairStyle, meshes:tail }; });
     ccSelectRace(RACES.findIndex(r=>r[0]==='Dragonborn')); const rowsDr = [...document.querySelectorAll('#overlay .lkrow .lkn')].map(e=>e.textContent);
     return { rows, bodies, rowsDr }; });
-  A(cc.rows.length===9 && cc.rows.every(t=>/xp/.test(t)), 'every race shows its skills: '+JSON.stringify(cc.rows));
+  A(cc.rows.length===10 && cc.rows.every(t=>/xp/.test(t)), 'every race shows its skills: '+JSON.stringify(cc.rows));
   const B = Object.fromEntries(cc.bodies.map(b=>[b.nm, b]));
-  A(B.Halfling.st < B.Dwarf.st && B.Gnome.st < B.Halfling.st && B.Dwarf.st < B.Human.st && B.Human.st < B.Elf.st && B.Elf.st < B.Dragonborn.st, 'heights: '+JSON.stringify(cc.bodies.map(b=>[b.nm, b.st])));
+  A(B.Halfling.st < B.Dwarf.st && B.Gnome.st < B.Halfling.st && B.Dwarf.st < B.Human.st && B.Human.st < B['High Elf'].st && B['High Elf'].st < B.Dragonborn.st && B['Wood Elf'].st > B['High Elf'].st, 'heights: '+JSON.stringify(cc.bodies.map(b=>[b.nm, b.st])));
   A(B['Half-Orc'].head==='orc' && B.Dragonborn.head==='drake' && B.Dragonborn.tail==='dragon' && B.Tiefling.tail==='spade', 'orc face, dragon head and tail, tiefling tail');
   A(B.Halfling.feet==='bare' && B.Dragonborn.feet==='dclaw' && B.Gnome.nose>0 && !B.Dragonborn.hair, 'bare feet, claws, a gnome nose, no dragonborn hair');
   A(cc.bodies.every(b=>b.meshes > 20), 'every figure builds');
@@ -23,7 +23,7 @@ module.exports = async page=>{
     const r = { humMine:xp('Human', 'mining'), dwMine:xp('Dwarf', 'mining'), dwFish:xp('Dwarf', 'fishing') };
     mk('Human'); r.humRng = rsAtkBonus('ranged'); r.humMag = rsAtkBonus('magic'); r.humSell = sellPrice(G.inv.find(it=>it.used)||G.gear.weapon); r.humCrit = weaponCritThreshold(); r.humRes = mitigate(100);
     G.player.hp = 0; r.humDies = checkDeathWard();
-    mk('Elf'); r.elfRng = rsAtkBonus('ranged');
+    mk('Wood Elf'); r.elfRng = rsAtkBonus('ranged');
     mk('Tiefling'); r.tiefMag = rsAtkBonus('magic');
     mk('Half-Elf'); r.heSell = sellPrice(G.inv.find(it=>it.used)||G.gear.weapon);
     mk('Halfling'); r.hfCrit = weaponCritThreshold();

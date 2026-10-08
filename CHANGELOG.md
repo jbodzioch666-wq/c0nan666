@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-242 - High elves and wood elves
+
+- **Elves split in two.** **High Elves** are the magic folk: +1 magic accuracy, +10% Magic and Prayer xp, darkvision, and one spell in ten costs no runes. **Wood Elves** are the archers: +1 ranged accuracy, +10% Woodcutting and Fletching xp, darkvision.
+- **Wood elves look like the old Hobbit cartoon's.** They're tall and gaunt, stooped forward on long, thin, knobbly limbs, with pale grey-green skin and narrow faces: long pointed noses, heavy sleepy eyelids and long ears. They wear a green leaf cap with sprigs over straggly blond hair and a tan tunic cut in leaf points, with bare legs and long bare toes. A helm hides the cap and boots hide the toes, but the stoop stays.
+- **A wood elf town.** Torchlit halls deep in the forest, full of wood elves. Its landmark is the wardens' fletchery: once a day you get a bundle of the best arrows you can shoot, and some Fletching xp. The old elven towns now belong to the high elves.
+- **A new world generator (10).** A medium world has ten towns, one per race. Old saves load fine, and you can start a new world and keep your character.
+- **Old saves:** a character made as an Elf, with the old bow trait, is now a Wood Elf.
+
 ## RS-241 - Spells wait their turn
 
 - **A staff's autocast now gets the same beat as a sword.** When you autocast at a monster standing beside you, its answer lands a moment after your spell instead of at the same instant, the same as it already did for melee blows and bow shots. Auto-utility spells cast on a neighbour get the same beat.
