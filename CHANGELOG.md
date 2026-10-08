@@ -1,5 +1,18 @@
 # Depthcrawl patch notes
 
+## RS-224 - Hobbit holes
+
+**Halfling shires are now built as hobbit holes.** This is a test of giving each race its own way of building. In a halfling town:
+- **Every shop and house is a grassy hill** with a curved stone front set into it.
+- **The round door** is painted green, yellow, red, blue or teal, with a brass knob in the middle and a stone arch around it. It still swings open as you walk in, like every town door.
+- **Round windows** glow at night, with flower boxes under them.
+- **Shop signs** hang from signposts in the front garden.
+- **Chimneys** poke up through the turf and smoke.
+
+**On the land, a shire looks the part too.** Instead of the usual roofs, tower and palisade, it's a ring of little green hills with coloured round doors and lit windows, around a party tree, inside a hedge.
+
+**Inside, the rooms are unchanged.** Other towns look as before.
+
 ## RS-223 - A town for every race
 
 **Every race now has its own towns.** Each world deals its town races from a shuffled deck, so every playable race has at least one home. A medium world now has 9 towns, up from 8, and a small world 7, up from 3. The five new kinds of town each have their own names, buildings, townsfolk and landmark:
