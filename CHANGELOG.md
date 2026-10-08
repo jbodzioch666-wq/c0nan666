@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## RS-226 - Hobbit holes, take two, and skeletons on the road
+
+**Halfling shires reshaped:**
+- **No more square stone fronts.** Each hill now swells forward to the door and windows and is shaped around them, so the round door and round windows sit in the turf as if dug into the hillside.
+- **The hills are rounder squares in plan**, so the front is broad enough for the door and both windows.
+- **The common is all grass**, with curving dirt lanes from the waypoint to every door and down to the gate. It stays grass even when the shire stands in desert or tundra.
+
+**Wandering skeletons have a model.** A wandering group led by a skeleton, such as a skeleton with two kobolds, now walks the land as the sculpted skeleton from the dungeons. Before, it had no 3D model. This applies to skeleton warriors and skeleton mages too.
+
 ## RS-225 - Start among your own people
 
 **You now start in a town of your own race.** A halfling wakes up in a shire, a dwarf in a dwarven hold, a dragonborn in a roost, and so on. Every race still gets at least one town in the world, so the other eight are out there to find.
