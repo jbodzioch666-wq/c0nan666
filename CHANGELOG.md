@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-233 - A great oak and a proper stockade
+
+**A great oak stands at the heart of a shire** on the overworld, instead of a round party tree. It has a broad trunk with roots flaring into the ground, thick limbs reaching out and up that you can see, and separate masses of leaves at the ends of its branches.
+
+**The shire's fence on the overworld matches the stockade inside the town:** close-set pointed stakes of uneven height, with a rail along the inside and a gap at the gate.
+
 ## RS-232 - The door stays put
 
 **The door out of a building no longer fades away** when it's between you and the camera. It stays solid, so you can always see where to leave.
