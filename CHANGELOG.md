@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-236 - Roads give the volcano room
+
+**Roads keep a few steps clear of the volcano.** When the world's roads are laid out, the ground on and around the volcano's slopes is now nearly off-limits to them, so they route around its foot instead of hugging its edges.
+
+**Any road that still runs close, such as on an older world, stays level.** The volcano's slope stops at the road's edge instead of lifting the road up its side.
+
+**To get the re-routed roads, make a new world.** Your character comes with you.
+
 ## RS-235 - A real volcano
 
 **The volcano is part of the land now**, instead of a cone model stood on top of the terrain:

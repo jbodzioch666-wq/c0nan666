@@ -1,7 +1,14 @@
 // RS-235: the volcano is part of the land - the ground itself climbs a broad cone out of its mountain range to a rim round a
-// sunken crater, with lava runs down its flanks; the stand-in cone is only shown while its land is out of view
+// sunken crater, with lava runs down its flanks, roads a few steps clear of it (RS-236); the stand-in cone is only shown while its land is out of view
 module.exports = async page=>{
   const ev = (f, a)=>page.evaluate(f, a), A = (c, msg)=>{ if (!c) throw new Error('assert: '+msg); };
+  // RS-236: roads keep a few steps clear of its slopes, on every kind of world
+  const roads = await ev(()=>{ goToCharCreate(); ccBegin(); const out = [];
+    for (const kind of ['archipelago','pangaea','continents']) for (const seed of [11, 2024, 777777]){ G.ow.continent = kind; wgRegenerate(seed); G.ow.geo = null;
+      const lm = owLandmark('volcano'); if (!lm) continue; let near = 0;
+      for (let x=lm.x-9;x<=lm.x+9;x++) for (let y=lm.y-9;y<=lm.y+9;y++) if (x>=0 && y>=0 && x<OW_COLS && y<OW_ROWS && G.ow.road[y*OW_COLS+x] && Math.hypot(x-lm.x, y-lm.y) < VOLC.R + 1) near++;
+      out.push([kind, seed, near]); } return out; });
+  A(roads.length && roads.every(r=>r[2]===0), 'no road climbs the volcano: '+JSON.stringify(roads));
   const R = await ev(async ()=>{
     goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); G.gameMode = 0; G.interior = null;
     const lm = owLandmark('volcano'); if (!lm) return { none:true };
