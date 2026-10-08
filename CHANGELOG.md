@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-227 - The hill fits the door
+
+**Hobbit-hole hills no longer bulge out past their doors.** Each hill is a plain rounded mound again, and it swells forward only around the round door and each window, so they sit flush in the turf. Windows now keep clear of a hill's corners, where the hill curves away.
+
 ## RS-226 - Hobbit holes, take two, and skeletons on the road
 
 **Halfling shires reshaped:**
