@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-244 - A real hunch
+
+- **Wood elves have a curved spine.** Before, the whole back tilted forward in one straight line. Now the lower back stays upright and the spine curves forward above it into a rounded hump between the shoulder blades, with the neck and head carried well out in front. Shoulders, belts, armour pads, capes and the tunic's leaf points follow the curve, so armour sits right on it.
+
 ## RS-243 - Wood elves stoop in town too
 
 - **The wood elf stoop now shows in towns.** Before, it only showed on the open land and in dungeons. In town, your character and the wood elf townsfolk walked bolt upright, because the town's relaxed walking pose overwrote it. Swinging a tool and casting spells keep the stoop now too.
