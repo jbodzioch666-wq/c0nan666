@@ -1,5 +1,15 @@
 # Depthcrawl patch notes
 
+## RS-237 - The view from the tower
+
+**The wizard's tower is a lookout now.** Walk to its foot and tap it, and you can climb the stair to the open gallery under its roof.
+- **The camera rises to the gallery** and looks out toward the horizon with a wide view, turning slowly round the whole land. You can see towns, roads, rivers and lakes, mountain ranges, and the volcano smoking and the great tree standing on the skyline.
+- **A soft haze** settles over the far distance.
+- **Everything in sight goes on your world map**, about 30 tiles in every direction.
+- **Any key, click or tap climbs back down**, and so does moving.
+
+The first time you find the tower, the log tells you it can be climbed.
+
 ## RS-236 - Roads give the volcano room
 
 **Roads keep a few steps clear of the volcano.** When the world's roads are laid out, the ground on and around the volcano's slopes is now nearly off-limits to them, so they route around its foot instead of hugging its edges.
