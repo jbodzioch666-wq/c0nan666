@@ -36,5 +36,10 @@ module.exports = async page=>{
     goToCharCreate(); G.chosenRace = RACES.findIndex(r=>r[0]===nm); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing');
     const sp = G.ow.spawnPos, f = townFlavorAt(sp.x, sp.y) || G.ow.townFlavor[0] || {}; return [nm, lookRaceKey(nm), f.race, new Set(Object.values(G.ow.townFlavor).map(t=>t.race)).size]; }));
   A(st.every(([, want, got, n])=>want===got && n===9), 'each race starts in its own town, and every race still has one: '+JSON.stringify(st));
+  // RS-234: and that town stands on its race's home ground - a halfling shire in the grassland, never the desert
+  const home = await ev(()=>{ const out = []; for (const [nm, ok] of [['Halfling', [OW_GRASS]], ['Halfling', [OW_GRASS]], ['Halfling', [OW_GRASS]], ['Elf', [OW_FOREST]]]){
+    goToCharCreate(); G.chosenRace = RACES.findIndex(r=>r[0]===nm); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing');
+    const sp = G.ow.spawnPos, t = G.ow.spawnBiome; out.push([nm, t, ok.includes(t)]); } return out; });
+  A(home.every(h=>h[2]), 'each start town on its race\'s home ground: '+JSON.stringify(home));
   A(F.dragon.guard.head==='drake' && F.dragon.guard.tail==='dragon' && F.tiefling.guard.tail==='spade', 'dragonborn and tiefling guards look the part');
 };

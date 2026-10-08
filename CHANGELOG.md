@@ -1,5 +1,18 @@
 # Depthcrawl patch notes
 
+## RS-234 - Shires on the green
+
+**Your starting town now stands on your race's home ground.** Since RS-225 you start in a town of your own race, but its spot was simply the open ground nearest the middle of the map, so a halfling shire could end up in the desert. Now the start looks for:
+- **grassland** for halflings and humans;
+- **grass or forest** for half-elves;
+- **forest** for elves;
+- **swamp or tundra** for tieflings;
+- **desert** for dragonborn.
+
+Only if the world has no such spot does it fall back to the old rule. Dwarves, gnomes and half-orcs start as before. The world's other towns already preferred their race's home terrain.
+
+**This applies to new worlds.** Your character comes with you when you make one.
+
 ## RS-233 - A great oak and a proper stockade
 
 **A great oak stands at the heart of a shire** on the overworld, instead of a round party tree. It has a broad trunk with roots flaring into the ground, thick limbs reaching out and up that you can see, and separate masses of leaves at the ends of its branches.
