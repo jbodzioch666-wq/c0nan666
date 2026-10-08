@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-225 - Start among your own people
+
+**You now start in a town of your own race.** A halfling wakes up in a shire, a dwarf in a dwarven hold, a dragonborn in a roost, and so on. Every race still gets at least one town in the world, so the other eight are out there to find.
+
+**This also applies when you make a new world for an existing character:** the starting town matches their race. Worlds you already have keep the starting town they had.
+
 ## RS-224 - Hobbit holes
 
 **Halfling shires are now built as hobbit holes.** This is a test of giving each race its own way of building. In a halfling town:

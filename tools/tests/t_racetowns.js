@@ -31,5 +31,10 @@ module.exports = async page=>{
   A(F.dragon.ac===3, 'the brazier hardens your hide');
   A(F.halfelf.songGain > F.halfelf.plainGain && F.halfelf.buff, 'the minstrels\' song speeds xp: '+JSON.stringify(F.halfelf));
   A(F.halfling.folk < 0.75 && F.gnome.folk < 0.7 && F.dragon.folk > 1, 'townsfolk stand at their race\'s height');
+  // RS-225: you start in a town of your own race
+  const st = await ev(()=>['Dwarf','Halfling','Dragonborn','Half-Elf','Half-Orc','Tiefling'].map(nm=>{
+    goToCharCreate(); G.chosenRace = RACES.findIndex(r=>r[0]===nm); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing');
+    const sp = G.ow.spawnPos, f = townFlavorAt(sp.x, sp.y) || G.ow.townFlavor[0] || {}; return [nm, lookRaceKey(nm), f.race, new Set(Object.values(G.ow.townFlavor).map(t=>t.race)).size]; }));
+  A(st.every(([, want, got, n])=>want===got && n===9), 'each race starts in its own town, and every race still has one: '+JSON.stringify(st));
   A(F.dragon.guard.head==='drake' && F.dragon.guard.tail==='dragon' && F.tiefling.guard.tail==='spade', 'dragonborn and tiefling guards look the part');
 };
