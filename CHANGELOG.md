@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-228 - Rounder hills
+
+**Hobbit-hole hills have softer, rounder corners.** Seen from above they were close to a rounded square. Now they're closer to a soft oval, still broad enough at the front for the round door and its windows.
+
 ## RS-227 - The hill fits the door
 
 **Hobbit-hole hills no longer bulge out past their doors.** Each hill is a plain rounded mound again, and it swells forward only around the round door and each window, so they sit flush in the turf. Windows now keep clear of a hill's corners, where the hill curves away.
