@@ -25,7 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
-| intdoor | inside a building the way out is a real door, standing open: round in a halfling shire, plank elsewhere; none where there is no street door |
+| intdoor | inside a building the way out is a real door, shut in its frame: round in a halfling shire, plank elsewhere; none where there is no street door |
 | skroam | a wandering group led by a skeleton walks the overworld as the sculpted skeleton (it had no model) |
 | hobbit | a halfling shire is hobbit holes: every building a turfed hill shaped round its round hinged door and windows, and the overworld town is little hills round a party tree |
 | racetowns | every race has a town (a shuffled deck per world); the new towns have their landmark (kitchens, workshop, brazier, ember altar, minstrels), once a day, and townsfolk of their race at its height |

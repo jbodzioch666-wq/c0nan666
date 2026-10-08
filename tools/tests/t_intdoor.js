@@ -1,4 +1,4 @@
-// RS-229: inside a building the way out is a real door - its frame in the front wall and the door standing open into the room:
+// RS-229/230: inside a building the way out is a real door - its frame in the front wall and the door shut in it:
 // a round hobbit door in a halfling shire, a plank door anywhere else; rooms with no way to the street have none
 module.exports = async page=>{
   const ev = (f, a)=>page.evaluate(f, a), A = (c, msg)=>{ if (!c) throw new Error('assert: '+msg); };

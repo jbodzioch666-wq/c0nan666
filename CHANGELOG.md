@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-230 - Shut the door
+
+**The door out of each building now stands shut in its frame** instead of open into the room. It's still the round hobbit door in halfling shires and the iron-banded plank door everywhere else, so it's easy to spot.
+
 ## RS-229 - A door to leave by
 
 **Inside every building, the way out is now a real door.** Before, the exit was only a gap in the low front wall. Now it has a full doorframe, and the door stands open into the room, so you can see where to leave:
