@@ -2149,8 +2149,8 @@ const WANDS = HAND_WANDS.concat(
   collectRangedSpells().map(({spell,lvl})=>({ spell, lvl, minDepth: mx(1,lvl*2), price: 30+lvl*25 }))
 );
 // bestiary: a D&D Monster-Manual-flavored roster, one iconic creature per
-// character level from 1 to 20. Dungeons pick monsters from here by DEPTH
-// (see monsterLevelForDepth) rather than by scaling the hero's own level, so
+// character level from 1 to 20 (RS-240: now archetypes along the combat-level scale, 3 to 126). Dungeons pick monsters from here by DEPTH
+// (see floorCb) rather than by scaling the hero's own level, so
 // a fresh floor 1 is always rats and kobolds and the deepest floor of any
 // dungeon, castle or tower always ramps up toward giants, hydras and dragons
 // - the variety comes from which creature shows up, not from bigger numbers
@@ -2253,6 +2253,24 @@ function isUndead(m){ return !!m.undead; }
 function monsterCol(entry){ return `rgb(${entry.rgb[0]},${entry.rgb[1]},${entry.rgb[2]})`; }
 // clamp a raw "encounter level" into the 1-20 range this bestiary covers
 function clampMLevel(n){ return mx(1, mn(NMLVL, Math.round(n))); }
+// (RS-240) the hidden 1-20 power tier is gone: everything is measured in combat level, 3 to 126. The bestiary's 20 rows
+// are archetypes along that scale (each carries its own cb); a monster spawned at a level between two rows takes the
+// nearer one's kit and has its life, damage, accuracy and xp scaled to the exact level (monScaleCb)
+const CB_LO = 3, CB_HI = 126, CB_PER_TIER = (CB_HI - CB_LO)/(NMLVL - 1);
+function cbOfTier(t){ return CB_LO + (t-1)*CB_PER_TIER; }
+function tierOfCb(cb){ return 1 + (cb - CB_LO)/CB_PER_TIER; }
+function clampCb(n){ return mx(CB_LO, mn(CB_HI, Math.round(n))); }
+function archOf(cb){ return clampMLevel(tierOfCb(cb)); }
+function cbLvl(){ return (G.player && G.player.combatLevel) || CB_LO; }
+function cbT(){ return tierOfCb(cbLvl()); }   /* the old tier as a smooth number, for the reward and price curves that were tuned on it */
+for (const e of MONSTER_LEVELS) e.cb = Math.round(cbOfTier(e.lvl));
+function monAtCb(e, cb){ return Object.assign({}, e, { cb:clampCb(cb) }); }
+function monScaleCb(m, cb, from){
+  const f = from || cbOfTier(m.mlevel||1), k = clamp((cb + 10)/(f + 10), 0.5, 2.5); m.cb = clampCb(cb);
+  if (Math.abs(k-1) < 0.01) return m;
+  m.hp = m.maxHp = mx(1, roundH((m.maxHp||1)*k)); m.dmg2 = mx(1, roundH((m.dmg2||1)*Math.sqrt(k))); m.xp = mx(1, roundH((m.xp||1)*k)); m.atkBonus = Math.round((m.atkBonus||0) + (cb - f)/8);
+  return m; }
+function lootAt(plus){ return clampCb(lootLevel() + (plus||0) + playerMF()*CB_PER_TIER); }
 // how tough a floor at depth d should be, independent of the player's own
 // level AND independent of how many floors this particular dungeon happens
 // to have - depth is measured in absolute floors, so a short 2-floor
@@ -2260,30 +2278,31 @@ function clampMLevel(n){ return mx(1, mn(NMLVL, Math.round(n))); }
 // dungeon ramps all the way up to the level-20 cap. This keeps difficulty
 // consistent between dungeons of different lengths instead of every
 // dungeon (however short) independently climaxing at level 20.
-function monsterLevelForDepth(d){
-  return clampMLevel(d*2);
+function floorCb(d){
+  return clampCb(cbOfTier(d*2));
 }
 // item level for loot: the level of what you're actually fighting, on the
 // same 1-20 scale the weapon/armor/affix tables unlock on - a floor's
 // monster level in a dungeon, your own level out on the road (roadside
 // fights match you, see generateArena), your level anywhere else
 function lootLevel(){
-  if (G.gameMode===1) return monsterLevelForDepth(G.depth||1);
-  return clampMLevel(G.player ? G.player.level : 1);
+  if (G.gameMode===1) return floorCb(G.depth||1);
+  return cbLvl();
 }
 // a site boss outclasses its floors by a few levels (see its own bossLevel)
 // and its loot is rolled at that level - a real step up, not a jump to 20
 function bossLootLevel(){
-  return clampMLevel(monsterLevelForDepth(G.dungeonMaxDepth||1) + 3);
+  return clampCb(floorCb(G.dungeonMaxDepth||1) + 20);
 }
 // pick a monster table entry "around" a target level, with a little jitter
 // so a single floor isn't always exactly one creature type
-function pickedMonsterLevel(targetLevel, jitter){
-  const j = jitter===undefined ? 2 : jitter;
-  return clampMLevel(targetLevel + rn(j*2+1) - j);
+function pickedCb(targetCb, jitter){
+  const j = jitter===undefined ? 12 : jitter;
+  return clampCb(targetCb + rn(j*2+1) - j);
 }
-function pickMonsterEntry(targetLevel, jitter){
-  return MONSTER_LEVELS[pickedMonsterLevel(targetLevel,jitter)-1];
+function pickMonsterEntry(targetCb, jitter){
+  const cb = pickedCb(targetCb, jitter);
+  return monAtCb(MONSTER_LEVELS[archOf(cb)-1], cb);
 }
 // a reskin of the exact same level-for-level power curve as MONSTER_LEVELS
 // (hd/ac/atk/dmg/xp all identical at a given level) with real D&D aquatic
@@ -2502,24 +2521,24 @@ const TUNDRA_SKIN = [
 ];
 // generic reskin picker - shared by every themed roster above
 function pickSkinnedMonsterEntry(skin, targetLevel, jitter){
-  const lvl = pickedMonsterLevel(targetLevel, jitter);
-  return Object.assign({}, MONSTER_LEVELS[lvl-1], skin[lvl-1], {lvl});
+  const cb = pickedCb(targetLevel, jitter), lvl = archOf(cb);
+  return Object.assign({}, MONSTER_LEVELS[lvl-1], skin[lvl-1], {lvl, cb});
 }
 // (RS-213) the pyramid's roster, one creature per monster level, from the beetles in the sand to the royal dead: its
 // 2D sprites borrow the desert's, its 3D models are its own (see MONSTER_PORTRAITS / UNDEAD_PORTRAITS)
 const TOMB_TIERS = [
-  ['tomb scarab', 1, {rgb:[40,90,90], abilities:[]}],
-  ['tomb jackal', 3, {rgb:[50,40,32], abilities:['packTactics']}],
-  ['asp', 5, {rgb:[70,70,40], abilities:['poison']}],
-  ['ushabti', 7, {rgb:[70,140,150], abilities:[]}],
-  ['mummy priest', 9, {rgb:[190,170,120], abilities:['spellcast','poison'], undead:true, style:'magic'}],
-  ['anubis warden', 11, {rgb:[40,34,30], abilities:['multiattack2']}],
-  ['sacred crocodile', 13, {rgb:[90,110,60], abilities:['multiattack2']}],
-  ['sphinx', 15, {rgb:[200,160,90], abilities:['spellcast','frightful'], style:'magic'}],
-  ['royal mummy', 17, {rgb:[200,170,110], abilities:['paralyze','drain','multiattack2'], undead:true}],
-  ['tomb colossus', 19, {rgb:[150,120,70], abilities:['multiattack3','frightful']}],
+  ['tomb scarab', 3, {rgb:[40,90,90], abilities:[]}],
+  ['tomb jackal', 16, {rgb:[50,40,32], abilities:['packTactics']}],
+  ['asp', 29, {rgb:[70,70,40], abilities:['poison']}],
+  ['ushabti', 42, {rgb:[70,140,150], abilities:[]}],
+  ['mummy priest', 55, {rgb:[190,170,120], abilities:['spellcast','poison'], undead:true, style:'magic'}],
+  ['anubis warden', 68, {rgb:[40,34,30], abilities:['multiattack2']}],
+  ['sacred crocodile', 81, {rgb:[90,110,60], abilities:['multiattack2']}],
+  ['sphinx', 94, {rgb:[200,160,90], abilities:['spellcast','frightful'], style:'magic'}],
+  ['royal mummy', 107, {rgb:[200,170,110], abilities:['paralyze','drain','multiattack2'], undead:true}],
+  ['tomb colossus', 120, {rgb:[150,120,70], abilities:['multiattack3','frightful']}],
 ];
-const PYRAMID_SKIN = DESERT_SKIN.map((e, i)=>{ const L = i+1; let best = TOMB_TIERS[0]; for (const t of TOMB_TIERS) if (Math.abs(t[1]-L) < Math.abs(best[1]-L)) best = t;
+const PYRAMID_SKIN = DESERT_SKIN.map((e, i)=>{ const L = Math.round(cbOfTier(i+1)); let best = TOMB_TIERS[0]; for (const t of TOMB_TIERS) if (Math.abs(t[1]-L) < Math.abs(best[1]-L)) best = t;
   return { sym:best[0][0], nm:best[0], undead:!!best[2].undead, rgb:best[2].rgb, abilities:best[2].abilities.slice(), art:e.art, forceStyle:best[2].style||null }; });
 // which dungeon site kind uses which roster (G.siteKind, set before any
 // generateXLevel() call - see enterDungeonConfirm) - a plain dungeon has no
@@ -2717,17 +2736,17 @@ let afLastWord = '';
 // picks one eligible affix (matching polarity/slot/depth, not duplicating a kind
 // already rolled), rolls its magnitude, appends it, sets afLastWord.
 function rollOneAffix(it, d, scl, wantPre, usedNames){
-  afLastWord = '';
+  afLastWord = ''; const dt = tierOfCb(d);   /* (RS-240) the affix table is still laid out in the old 1-20 tiers */
   const elig = []; const wt = []; let tot = 0;
   for (let i=0;i<NAFF;i++){
     const a = AFFIXES[i];
     const [name,pre,kind,tier,lreq,slots,lo,hi,v2,flo,fhi] = a;
     if (pre !== wantPre) continue;
     if (slots.indexOf(scl) === -1) continue;
-    if (lreq > d+1) continue;
+    if (lreq > dt+1) continue;
     if (usedNames.includes(kind)) continue;
     elig.push(i);
-    wt.push(mx(1, 22 - tier*4) * (1 + 1.5*mx(0, 1 - (d-lreq)/8)));
+    wt.push(mx(1, 22 - tier*4) * (1 + 1.5*mx(0, 1 - (dt-lreq)/8)));
     tot += wt[wt.length-1];
   }
   if (elig.length===0) return;
@@ -2891,7 +2910,7 @@ function swingEV(ac){
   }
   return ev;
 }
-function typicalFoeAC(){ const e = MONSTER_LEVELS[clampMLevel(lootLevel())-1]; return e ? e.ac : 12 + (G.player.level||1)/4; }
+function typicalFoeAC(){ const e = MONSTER_LEVELS[archOf(lootLevel())-1]; return e ? e.ac : 12 + cbT()/4; }
 // damage per shot of a ranged-slot item (bow via the same to-hit/crit math, wand via its spell)
 function rangedEV(it){
   if (!it || !it.used) return 0;
@@ -2931,7 +2950,7 @@ function foeMatchup(foeAC, pHitMe, dmgRound, foeHp){
   return Math.log(effMaxHp()/net) + Math.log(mx(0.01, off)/foeHp);
 }
 function loadoutScore(){
-  const L = clampMLevel(lootLevel());
+  const L = archOf(lootLevel());
   const sp = sitePower();
   const myAC = playerAC(), myHit = playerAtkBonus() + gearStatI('atk');
   let tot = 0, wsum = 0;
@@ -2982,7 +3001,7 @@ function itemSentienceOnKill(it){
   if (next===undefined || it.kills<next) return;
   it.sentientTier = tier+1;
   const used = it.aff.map(a=>a.kind);
-  rollOneAffix(it, mx(it.ilvl||1, lootLevel()), 'w', chn(0.5)?1:0, used);
+  rollOneAffix(it, mx(it.ilvl||CB_LO, lootLevel()), 'w', chn(0.5)?1:0, used);
   if (afLastWord) logMsg(`your ${it.nm} stirs with new power - it grows ${afLastWord.toLowerCase()}`, 'magic', true);
 }
 
@@ -3051,7 +3070,7 @@ function rollSetPiece(kind){
 }
 function buildUnique(id, d, classOnly){
   const it = newItem();
-  genBaseInto(it, mn(NMLVL, d+4), UNIQUES[id-1][1], classOnly);
+  genBaseInto(it, clampCb(d+26), UNIQUES[id-1][1], classOnly);
   it.quality=4; it.uniqueId=id; it.ilvl=d; it.nm = UNIQUES[id-1][0];
   switch(id){
     case 1: afAdd(it,'edmg',45,0,0); afAdd(it,'flatdmg',3,0,0); afAdd(it,'str',2,0,0); break;
@@ -3074,7 +3093,7 @@ function buildUnique(id, d, classOnly){
   // carries a scaled-down version (40% at item level 1, full at 20) so it
   // is a great find for its level rather than the last upgrade you'll ever
   // need; its named on-hit power (UNIQUE_PROCS) is untouched
-  const k = 0.4 + 0.6*mn(1, (d||1)/NMLVL);
+  const k = 0.4 + 0.6*mn(1, (d||CB_LO)/CB_HI);
   for (const a of it.aff){
     if (a.kind==='fire' || a.kind==='cold' || a.kind==='pois' || a.kind==='crit') continue;
     if (a.i1) a.i1 = mx(1, Math.round(a.i1*k));
@@ -3118,7 +3137,7 @@ function rsUniqueify(it){
 // jewellery - when it had none)
 function rsUniqueBuff(it){
   if (!it || !it.used || (it.rsu||0) >= 2) return it;
-  const keys = ['acc','dmgB','ac','rngAcc','magAcc'], L = Math.max(1, it.ilvl||8);
+  const keys = ['acc','dmgB','ac','rngAcc','magAcc'], L = tierOfCb(Math.max(CB_LO, it.ilvl||48));
   const slotF = { weapon:1.25, ranged:1.2, chest:1.0, legs:0.8, head:0.65, arms:0.55, necklace:0.75, ring:0.55 }[it.slot] || 0.7;
   const budget = Math.round((24 + L*6)*slotF);
   const tot = keys.reduce((t,k)=>t+Math.max(0, it[k]||0), 0);
@@ -3136,7 +3155,7 @@ function rsUniqueBuff(it){
 function buildSetPiece(spid, d, classOnly){
   const it = newItem();
   const kind = SETPIECES[spid-1][2];
-  genBaseInto(it, mn(NMLVL, d+3), kind, classOnly);
+  genBaseInto(it, clampCb(d+20), kind, classOnly);
   it.quality=3; it.setId=SETPIECES[spid-1][1]; it.ilvl=d; it.nm=SETPIECES[spid-1][0];
   const scl = slotClass(kind);
   // the two fixed affixes below are what make this piece recognizably
@@ -3525,6 +3544,7 @@ const ASI_LEVELS = [4,8,12,16,19];
 // D&D characters cap out at level 20 - matches this game's monster roster,
 // which tops out at level 20 (the ancient dragon) for the exact same reason
 const MAX_CHAR_LEVEL = 20;
+const NGPLUS_CB = 123;   /* (RS-240) New Game+ opens at combat level 123 */
 
 // gainXP(): replaced by the RuneScape rules - see SECTION: RUNESCAPE RULES
 
@@ -3867,10 +3887,10 @@ function familiarEligible(){
 function familiarTiersUnlocked(){
   if (!familiarEligible()) return [];
   const tiers = FAMILIAR_CLASS_TIERS[G.player.cls];
-  return tiers.filter(t=>G.player.level>=t.atLevel);
+  return tiers.filter(t=>cbT()>=t.atLevel);
 }
 function companionDef(c){ return COMPANION_KINDS[c.kind]; }
-function companionAtkBonus(def){ return def.atkBonus + Math.floor(G.player.level/4) + (hasFeat('bondedSpirit') ? 2 : 0); }
+function companionAtkBonus(def){ return def.atkBonus + Math.floor(cbT()/4) + (hasFeat('bondedSpirit') ? 2 : 0); }
 function spawnCompanion(kind){
   const def = COMPANION_KINDS[kind];
   if (!def || G.player.companion) return;
@@ -4207,7 +4227,7 @@ function tickSummonDuration(){
 // hp/dmg/xp/gold multiplier already lives, so nothing else needs to change)
 function ngPlusMult(){ return 1 + 0.2*((G.player&&G.player.ngPlus)||0); }
 function ascendNewGamePlus(){
-  if (G.player.level < MAX_CHAR_LEVEL) return;
+  if (cbLvl() < NGPLUS_CB) return;
   const p = G.player;
   p.ngPlus = (p.ngPlus||0) + 1;
   p.level = 1; p.xp = 0; p.xpNext = 20;
@@ -4927,7 +4947,7 @@ function generateLevel(d){
   const sp = sitePower();
   G.mon = [];
   const monN = 4 + mn(16, rn(4) + Math.floor(d/1.2));
-  const floorLevel = monsterLevelForDepth(d);
+  const floorLevel = floorCb(d);
   for (let i=0;i<monN;i++){
     const r = 1+rn(roomCnt-1);
     const mx2 = roomX[r]+rn(roomW[r]), my2 = roomY[r]+rn(roomH[r]);
@@ -5063,7 +5083,7 @@ function placeCastleContents(d, rooms){
   // floor than a plain dungeon's scattered monsters (2-12 there), on top of
   // the hp/dmg/xp bump sitePower() already gives every castle monster
   const monN = 5 + mn(14, rn(4) + Math.floor(d/1.2));
-  const floorLevel = monsterLevelForDepth(d);
+  const floorLevel = floorCb(d);
   for (let i=0;i<monN;i++){
     const r = rooms[1+rn(roomCnt-1)];
     const mx2 = r.x+rn(r.w), my2 = r.y+rn(r.h);
@@ -5150,7 +5170,7 @@ function placeNecroContents(d){
   const sp = sitePower();
   G.mon = [];
   const monN = 2 + mn(10, rn(3) + Math.floor(d/1.5));
-  const floorLevel = monsterLevelForDepth(d);
+  const floorLevel = floorCb(d);
   for (let i=0;i<monN;i++){
     const p = necroRandomFloorSpot(3);
     if (!p) break;
@@ -5863,10 +5883,10 @@ function monsterDies(mi){
     // a named elite's drop replaces the ordinary champion gear roll below
     // entirely (guaranteed Unique-tier, not just "a few item-levels
     // higher") - see guaranteedEliteDrop's own comment for the cascade
-    const drop = guaranteedEliteDrop(mn(NMLVL, lootLevel()+3));
+    const drop = guaranteedEliteDrop(clampCb(lootLevel()+20));
     logMsg(`${m.nm} drops ${itemNameHtml(drop)}!`, 'loot', true);
     addToInventory(drop);
-    const bonusGold = roundH((60+rn(80)+G.player.level*10)*goldFindMult());
+    const bonusGold = roundH((60+rn(80)+cbT()*10)*goldFindMult());
     G.player.gold += bonusGold;
     logMsg(`its hoard yields ${bonusGold} extra gold`, 'good');
     // a mythic beast is a permanent, world-seeded kill, not a re-rollable
@@ -5881,8 +5901,8 @@ function monsterDies(mi){
     }
   } else if (m.elite){
     const eliteKind = lootKind();
-    addToInventory(genItem(mn(NMLVL, lootLevel()+2)+playerMF(), eliteKind, 3, chn(0.5)));
-    const bonusGold = roundH((25+rn(35)+G.player.level*5)*goldFindMult());
+    addToInventory(genItem(lootAt(13), eliteKind, 3, chn(0.5)));
+    const bonusGold = roundH((25+rn(35)+cbT()*5)*goldFindMult());
     G.player.gold += bonusGold;
     logMsg(`the champion's hoard yields ${bonusGold} extra gold`, 'good');
   }
@@ -6021,7 +6041,7 @@ function applyPoisonToPlayer(dmgDie){
   G.player.poisonDmg = mx(G.player.poisonDmg||0, dmgDie);
 }
 function applyParalysisToPlayer(){
-  G.player.stunTurns = mx(G.player.stunTurns||0, 2);
+  G.player.stunTurns = mx(G.player.stunTurns||0, 2); G.player.paraGuard = 8;
 }
 // fixed difficulty for the Constitution save a ghoul/lich's paralyze
 // ability lets you attempt - see the 'paralyze' block in singleAttackRoll
@@ -6083,7 +6103,7 @@ function singleAttackRoll(mi, missVerb, hitVerb){
   // character genuinely shrugs this off more often than a low-CON one -
   // real payoff for investing in the stat, where the old flat 40% chance
   // ignored it entirely
-  if (hasAbility(m,'paralyze')){
+  if (hasAbility(m,'paralyze') && !(G.player.stunTurns > 0) && !((G.player.paraGuard||0) > 0)){   /* (RS-240: one hold at a time, and a few turns' grace after it) */
     const dc = PARALYZE_SAVE_DC;
     const save = rollDie(20) + md(effStat('con'));
     if (save < dc){
@@ -6377,7 +6397,7 @@ function nearestMonsterInRange(range){
 // actually reads as a real, level-appropriate burst again. x1 (unchanged)
 // at level 1-2 up to x11 at level 20. The ability-score modifier stays a
 // flat add-on afterward, same as real D&D - only the dice themselves scale.
-function spellPowerMult(){ return 1 + Math.floor((G.player.level||1)/2); }
+function spellPowerMult(){ return 1 + Math.floor(cbT()/2); }
 // resolves one cast of a known spell (spell: one of the SPELLS[cls][lvl]
 // entries). Returns true if the cast actually took hold (and so should
 // consume a slot and the turn) - false means "no valid target", refunding
@@ -6654,7 +6674,7 @@ function useAbility0(){
   if (!unlimited && G.player.charges<=0){ logMsg('no charges remaining for your ability', 'hit'); return; }
   switch (G.player.cls){
     case 'Fighter': {
-      const heal = rollDie(10)+G.player.level;
+      const heal = rollDie(10)+Math.round(cbT());
       G.player.hp = mn(effMaxHp(), G.player.hp+heal);
       G.player.charges--;
       logMsg(`Second Wind! you recover ${heal} HP`, 'magic');
@@ -6675,7 +6695,7 @@ function useAbility0(){
         if (Math.abs(m.x-G.player.x)+Math.abs(m.y-G.player.y) > 4) continue;
         if (!hasLineOfSight(G.player.x,G.player.y,m.x,m.y)) continue; // divine power doesn't reach through a wall either
         hitAny = true;
-        const dmg = rollDice(2,6) + 3*G.player.level;
+        const dmg = rollDice(2,6) + Math.round(3*cbT());
         m.hp -= dmg;
         noteFoe(i);
         logMsg(`you channel divine power - the ${m.nm} recoils for ${dmg}`, 'magic');
@@ -6693,7 +6713,7 @@ function useAbility0(){
     }
     case 'Ranger': break; // unreachable - clsRow()[7]===0 already returned above
     case 'Paladin': {
-      const heal = 5*G.player.level;
+      const heal = Math.round(5*cbT());
       const before = G.player.hp;
       G.player.hp = mn(effMaxHp(), G.player.hp+heal);
       G.player.charges--;
@@ -6815,6 +6835,7 @@ function foeTick(){ if (foePending() && (performance.now() >= (G.foeAt||0) || G.
 function tickMonsters(excludeIdx){
   if (foePending() && !G.foeFlushing) foeFlush();   /* (RS-218: the last answer comes first) */
   if (G.gameOver) return;
+  if (G.player && (G.player.paraGuard||0) > 0) G.player.paraGuard--;
   rsPrayerTick();
   // poison and fear tick down (or bite) once per player turn, exactly like
   // every other turn-based effect in this game
@@ -6931,7 +6952,7 @@ function tickMonsters(excludeIdx){
         // not a separate pile of damage added to one
         const breathDice = mx(2, Math.round((m.maxHp||30)/25));
         let bdmg = rollDice(breathDice,6);
-        const dc = 8 + Math.floor((m.mlevel||10)/2);
+        const dc = 8 + Math.floor(tierOfCb(monCombatLevel(m))/2);
         const saveRoll = rollDie(20) + md(effStat('dex'));
         let dodged = false;
         if (saveRoll>=dc){ bdmg = Math.floor(bdmg/2); dodged = true; }
@@ -8867,10 +8888,10 @@ function mythicBeastEncounter(beast){
   G.gameMode = 2;
   G.mandatoryFight = false;
   // (RS-170) the beast itself, at least level 100 (monster level 16+), rising with you beyond that
-  const lv = Math.max(16, Math.min(NMLVL, clampMLevel((G.player.level||1) + 4))), kind = mythicKind(beast);
-  const bm = wevMon(Object.assign({}, MONSTER_LEVELS[lv-1], { nm:kind, lvl:lv, abilities:(MONSTER_LEVELS[lv-1].abilities||[]).slice() }), lv);
+  const lv = mythicLevel(), arch = archOf(lv), kind = mythicKind(beast);
+  const bm = wevMon(Object.assign({}, MONSTER_LEVELS[arch-1], { nm:kind, lvl:arch, cb:lv, abilities:(MONSTER_LEVELS[arch-1].abilities||[]).slice() }), lv);
   bm.x = Math.floor(COLS/2); bm.y = 3; if (G.map[bm.x][bm.y]!==T_FLOOR) G.map[bm.x][bm.y] = T_FLOOR;
-  upgradeToMythicBeast(bm, beast.name, beast.i); bm.baseNm = kind; bm.mlevel = lv;
+  upgradeToMythicBeast(bm, beast.name, beast.i); bm.baseNm = kind; bm.mlevel = arch; bm.cb = lv;
   logMsg(`${beast.name} rises to meet you - this is no ordinary foe`, 'new');
 }
 // mythic beasts sit at a fixed map position (unlike a rolled wandering
@@ -8912,7 +8933,7 @@ function mythicSpot(){
     logMsg(`you sight ${b.name}, a ${mythicKind(b)} - a mythic beast, combat level ${mythicLevel()}. It roams near its lair, and is now marked on your map`, 'new', true); }
 }
 // the combat level a mythic beast fights at (see mythicBeastEncounter)
-function mythicLevel(){ const lv = Math.max(16, Math.min(NMLVL, clampMLevel((G.player.level||1) + 4))); return monCombatLevel({ mlevel:lv }); }
+function mythicLevel(){ return clampCb(Math.max(100, cbLvl() + 26)); }
 function mythicTick(){
   if (!G.player || !G.ow || !G.ow.map) return;
   const turn = G.player.turnCount||0, alive = (G.ow.mythicBeasts||[]).filter(b=>!b.slain).length;
@@ -8969,7 +8990,7 @@ function terrainSetPieceEncounter(terrain){
 }
 
 function generateVillageShop(){
-  const d = mx(1, G.player.level);
+  const d = cbLvl();
   // legendary (Unique-quality) gear is boss-exclusive - the shop caps out at
   // Set quality (3) so a legendary can never simply be bought
   const SHOP_MAX_QUALITY = 3;
@@ -8977,10 +8998,10 @@ function generateVillageShop(){
   // with (true D&D-style shop stock) - jewelry is unrestricted, same as tabletop
   // the peddler deals in what a smith doesn't make: bows, leather and dragonhide, robes,
   // staves and jewellery (metal is the blacksmith's - and past iron, your own forge's)
-  G.shopStock = ['bow','bow','staff','hide','hide','cloth','cloth','jewel'].map(k=>rsPeddlerWare(d+1, k));
+  G.shopStock = ['bow','bow','staff','hide','hide','cloth','cloth','jewel'].map(k=>rsPeddlerWare(clampCb(d+6), k));
   // a town that counts you as an Ally or Champion keeps better pieces back for you
   const tier = G.owPos ? repTier(repAt(questTownKey(G.owPos.x, G.owPos.y))) : REP_TIERS[0];
-  for (let i=0;i<tier.extra;i++) G.shopStock.push(rsPeddlerWare(d+3, pick(['bow','staff','hide','cloth','jewel'])));
+  for (let i=0;i<tier.extra;i++) G.shopStock.push(rsPeddlerWare(clampCb(d+20), pick(['bow','staff','hide','cloth','jewel'])));
   // potions are the alchemist's business now, not the Peddler's
 }
 // heals HP, refills ability charges/spell slots and clears every timed
@@ -9521,26 +9542,26 @@ const MAXSTASH = 60;
 // (on the same combat-level scale and colours as a monster's own level) against yours, and how far it
 // sends you - tiles from town, plus floors to go down for a site
 function questSizeUp(q){
-  const me = (G.player && G.player.level) || 1, tx = G.owPos ? G.owPos.x : 0, ty = G.owPos ? G.owPos.y : 0;
-  const tier = d=> monsterLevelForDepth(d) + (q.siteKind && q.siteKind!=='dungeon' ? 2 : 0);
+  const me = cbLvl(), tx = G.owPos ? G.owPos.x : 0, ty = G.owPos ? G.owPos.y : 0;
+  const tier = d=> floorCb(d) + (q.siteKind && q.siteKind!=='dungeon' ? 13 : 0);
   let t = me, dist = 0, floors = 0;
   const at = (x, y)=>{ dist = Math.round(Math.hypot(x-tx, y-ty)); };
-  if (q.kind==='conquest'){ floors = mx(1, (G.ow.dungeonMax[q.siteX] && G.ow.dungeonMax[q.siteX][q.siteY]) || 3); t = tier(floors) + 2; at(q.siteX, q.siteY); }
+  if (q.kind==='conquest'){ floors = mx(1, (G.ow.dungeonMax[q.siteX] && G.ow.dungeonMax[q.siteX][q.siteY]) || 3); t = tier(floors) + 13; at(q.siteX, q.siteY); }
   else if (q.kind==='rescue'){ floors = q.floor||1; t = tier(floors); at(q.siteX, q.siteY); }
-  else if (q.kind==='wanted'){ t = me + 2; at(q.x, q.y); }
-  else if (q.kind==='camp'){ t = me + 1; at(q.x, q.y); }
+  else if (q.kind==='wanted'){ t = me + 13; at(q.x, q.y); }
+  else if (q.kind==='camp'){ t = me + 6; at(q.x, q.y); }
   else if (q.kind==='escort'){ t = me; at(q.destX, q.destY); }
-  else if (q.kind==='hunt'){ const e = MONSTER_LEVELS.find(e=>e.nm===q.targetName); t = e ? e.lvl : me; }
-  else t = me - 1;
-  t = clampMLevel(t);
+  else if (q.kind==='hunt'){ const e = MONSTER_LEVELS.find(e=>e.nm===q.targetName); t = e ? e.cb : me; }
+  else t = me - 6;
+  t = clampCb(t);
   const d = t - me;
-  const diff = d<=-2 ? ['Easy', COL.green] : d<=1 ? ['Moderate', '#e8d040'] : d<=3 ? ['Hard', '#f08030'] : ['Very hard', COL.red];
+  const diff = d<=-13 ? ['Easy', COL.green] : d<=6 ? ['Moderate', '#e8d040'] : d<=20 ? ['Hard', '#f08030'] : ['Very hard', COL.red];
   const work = dist + floors*12;
   const len = work<14 ? 'Short' : work<40 ? 'Medium' : 'Long';
   const parts = [];
   if (dist) parts.push(`${dist} tiles away`);
   if (floors) parts.push(`${floors} floor${floors>1 ? 's' : ''}`);
-  return { diff, len, where:parts.join(', '), foe:monCombatLevel({mlevel:t}), foeCol:monLevelColor({mlevel:t}) };
+  return { diff, len, where:parts.join(', '), foe:monCombatLevel({cb:t}), foeCol:monLevelColor({cb:t}) };
 }
 function questSizeHtml(q){
   let z; try { z = questSizeUp(q); } catch(e){ return ''; }
@@ -10848,20 +10869,20 @@ function skSpecialFoe(skin, name, msg){
   const base = skin.find(e=>e.nm===name); if (!base) return;
   G.gather = null;
   randomEncounter(false);
-  const L = clampMLevel(G.player.level + 1), entry = Object.assign({}, MONSTER_LEVELS[L-1], base, { lvl:L }), m = G.mon[0];
+  const L = clampCb(cbLvl() + 6), arch = archOf(L), entry = Object.assign({}, MONSTER_LEVELS[arch-1], base, { lvl:arch, cb:L }), m = G.mon[0];
   G.mon = [m];
   m.hp = m.maxHp = rollDice(entry.hd,8)+entry.hd; m.ac = entry.ac; m.atkBonus = entry.atk; m.dmg1 = entry.dmg1; m.dmg2 = entry.dmg2; m.xp = entry.xp;
-  m.sym = entry.sym; m.nm = entry.nm; m.baseNm = entry.nm; m.col = monsterCol(entry); m.undead = entry.undead; m.mlevel = L; m.abilities = (entry.abilities||[]).slice(); m.art = entry.art;
+  m.sym = entry.sym; m.nm = entry.nm; m.baseNm = entry.nm; m.col = monsterCol(entry); m.undead = entry.undead; m.mlevel = arch; m.cb = L; m.abilities = (entry.abilities||[]).slice(); m.art = entry.art;
   if (skin===SEA_SKIN) G.arenaTheme = 'sea';
   logMsg(msg, 'new');
   renderGame(); saveCurrentGame();
 }
 function skBirdNest(){
   const r = Math.random();
-  if (r < 0.4){ const g = 10 + rn(20) + G.player.level*2; G.player.gold += g; logMsg(`a bird's nest falls from the branches - ${g} gold glints inside`, 'loot'); }
+  if (r < 0.4){ const g = 10 + rn(20) + Math.round(cbT()*2); G.player.gold += g; logMsg(`a bird's nest falls from the branches - ${g} gold glints inside`, 'loot'); }
   else if (r < 0.75 && r >= 0.62){ const g = crRollGem(); skAdd(g, 1); logMsg(`a bird's nest falls from the branches - an ${skName(g).toLowerCase()} is caught in the twigs`, 'loot'); }
   else if (r < 0.75){ const ok = SK_HERB.filter(hb=>hb.lvl<=skLvl('foraging')+10), hb = ok[rn(ok.length)] || SK_HERB[0]; skAdd(hb.id, 1); logMsg(`a bird's nest falls from the branches - there's ${/^[AEIOU]/.test(hb.nm) ? 'an' : 'a'} ${hb.nm} tucked inside`, 'loot'); }
-  else { const it = genItem(mx(1, G.player.level), 'ring'); addToInventory(it); logMsg(`a bird's nest falls from the branches - a magpie's ring is caught in it`, 'loot'); }
+  else { const it = genItem(cbLvl(), 'ring'); addToInventory(it); logMsg(`a bird's nest falls from the branches - a magpie's ring is caught in it`, 'loot'); }
   sfx('loot');
 }
 // cave gathering in the dungeons: eel pools, and patches of cave herbs and mushrooms
@@ -11002,7 +11023,7 @@ function skGatherTick(now){
     const req = skNodeReq(node);
     if (req > L){ skStop(`you need ${SK_DEFS.find(d=>d[0]===k)[1]} level ${req} for this ${skNodeName(node).toLowerCase()}`); return; }
     if (k==='fishing' && chn(0.015)){                      // something big takes the line
-      const big = node.type==='deep' ? (G.player.level >= 30 ? 'giant shark' : 'giant octopus') : node.type==='river' ? 'giant eel' : 'giant crab';
+      const big = node.type==='deep' ? (cbLvl() >= 90 ? 'giant shark' : 'giant octopus') : node.type==='river' ? 'giant eel' : 'giant crab';
       skSpecialFoe(SEA_SKIN, big, `something huge takes your line - a ${big} surges out of the water!`); return;
     }
   }
@@ -11230,7 +11251,7 @@ function skOnKill(m){
   }
   if (id){ skAdd(id, 1); logMsg(`you carve off ${id==='meat' ? 'some raw meat' : id==='prime' ? 'a prime cut' : 'a dragon steak'}`, 'loot'); }
   if (paint===mpBeast && chn(0.45)){ skAdd('cowhide', 1); logMsg('you skin a hide from it', 'loot'); }
-  if ((paint===mpDragon || paint===mpHydra) && chn(0.8)){ const L = m.mlevel||1, c = L < 8 ? 'g' : L < 12 ? 'b' : L < 16 ? 'r' : 'k', n = 1 + rn(2);
+  if ((paint===mpDragon || paint===mpHydra) && chn(0.8)){ const L = monCombatLevel(m), c = L < 48 ? 'g' : L < 74 ? 'b' : L < 100 ? 'r' : 'k', n = 1 + rn(2);
     skAdd('dhide_'+c, n); logMsg(`you skin ${n} ${crName('dhide_'+c).toLowerCase()}${n>1?'s':''} from it`, 'loot'); }
 }
 
@@ -11986,7 +12007,7 @@ function rsCombatLevel(){
 // a monster's level on the same scale as your combat level (monsters carry a 1-20 power tier, the
 // same tier rsSync maps combat 3..126 onto), and RuneScape's colour for it: green when it's below you,
 // yellow when it's even, red when it's above you - shading further the bigger the gap (full at 10)
-function monCombatLevel(m){ const t = (m && (m.mlevel || m.lvl)) || 1; return Math.max(1, Math.round(3 + (t-1)*123/19)); }
+function monCombatLevel(m){ if (m && m.cb) return m.cb; const t = (m && (m.mlevel || m.lvl)) || 1; return Math.max(1, Math.round(cbOfTier(t))); }
 function monLevelColor(m){
   const d = monCombatLevel(m) - ((G.player && G.player.combatLevel) || 3);
   const f = clamp(Math.abs(d)/10, 0, 1), mix = (a, b)=>'#'+[0,1,2].map(i=>Math.round(a[i]+(b[i]-a[i])*f).toString(16).padStart(2,'0')).join('');
@@ -11994,9 +12015,7 @@ function monLevelColor(m){
 }
 function monLevelHtml(m){ return `<span style="color:${monLevelColor(m)};font-weight:600;">level ${monCombatLevel(m)}</span>${m && m.champ ? ` <span style="color:#ffb040;font-weight:600;">champion - ${m.champ.join(', ')}</span>` : ''}${m && m._ai && m._ai.role ? ` <span class="muted">(${m._ai.role})</span>` : ''}`; }
 function rsTotalLevel(){ return RS_ALL_SKILLS().reduce((t,[k])=>t+rsLvl(k), 0); }
-// the rest of the game (monster scaling, roadside encounters, loot outside
-// dungeons, boss sizing) still reads G.player.level as a 1-20 power tier,
-// so that tier now follows combat level: combat 3 = tier 1, combat 126 = tier 20
+// (RS-240) p.level is only kept for old saves and the character list; the game reads combat level (cbLvl)
 function rsSync(){
   const p = G.player; if (!p) return;
   skP();
@@ -12364,45 +12383,45 @@ function rsMakeOffhand(d, forMe){
 }
 // ---- capes: plain cloth, obsidian, legends, god capes (prayer), Ava's devices and quivers (save arrows), fire cape (bosses) ----
 const RS_CAPES = [
-  ['Red Cape',          1,  { ac:2 }, '#a02020'], ['Blue Cape', 1, { ac:2 }, '#2a40a0'], ['Green Cape', 1, { ac:2 }, '#2a7a3a'], ['Black Cape', 2, { ac:3 }, '#1a1a1e'],
-  ['Leather Quiver',    3,  { rngAcc:4, saveArrows:0.15, quiver:1 }, '#7a5230'],
-  ["Ava's Attractor",   6,  { rngAcc:2, ac:2, saveArrows:0.4 }, '#5a6a7a'],
-  ['Obsidian Cape',     8,  { ac:9, magAcc:1 }, '#2a1e2a'],
-  ['Saradomin Cape',   10,  { magAcc:10, ac:3, prayB:3 }, '#2a4ab0'], ['Guthix Cape', 10, { magAcc:10, ac:3, prayB:3 }, '#3a8a3a'], ['Zamorak Cape', 10, { magAcc:10, ac:3, prayB:3 }, '#a01e1e'],
-  ["Ava's Accumulator",12,  { rngAcc:4, ac:3, saveArrows:0.6 }, '#4a5a6a'],
-  ['Legends Cape',     14,  { acc:7, rngAcc:7, magAcc:7, ac:7, prayB:2 }, '#e0d8c0'],
-  ["Dizana's Quiver",  16,  { rngAcc:18, dmgB:3, ac:4, saveArrows:0.3, quiver:1 }, '#a87830'],
-  ['Fire Cape',        18,  { ac:11, dmgB:4, acc:1, rngAcc:1, magAcc:1, prayB:2 }, '#e85a1a', 'boss'],
+  ['Red Cape',          3,  { ac:2 }, '#a02020'], ['Blue Cape', 3, { ac:2 }, '#2a40a0'], ['Green Cape', 3, { ac:2 }, '#2a7a3a'], ['Black Cape', 9, { ac:3 }, '#1a1a1e'],
+  ['Leather Quiver',    16, { rngAcc:4, saveArrows:0.15, quiver:1 }, '#7a5230'],
+  ["Ava's Attractor",   35, { rngAcc:2, ac:2, saveArrows:0.4 }, '#5a6a7a'],
+  ['Obsidian Cape',     48, { ac:9, magAcc:1 }, '#2a1e2a'],
+  ['Saradomin Cape',    61, { magAcc:10, ac:3, prayB:3 }, '#2a4ab0'], ['Guthix Cape', 61, { magAcc:10, ac:3, prayB:3 }, '#3a8a3a'], ['Zamorak Cape', 61, { magAcc:10, ac:3, prayB:3 }, '#a01e1e'],
+  ["Ava's Accumulator", 74, { rngAcc:4, ac:3, saveArrows:0.6 }, '#4a5a6a'],
+  ['Legends Cape',      87, { acc:7, rngAcc:7, magAcc:7, ac:7, prayB:2 }, '#e0d8c0'],
+  ["Dizana's Quiver",   100, { rngAcc:18, dmgB:3, ac:4, saveArrows:0.3, quiver:1 }, '#a87830'],
+  ['Fire Cape',         113, { ac:11, dmgB:4, acc:1, rngAcc:1, magAcc:1, prayB:2 }, '#e85a1a', 'boss'],
 ];
 function rsMakeCape(d, name){
-  const pool = name ? RS_CAPES.filter(c=>c[0]===name) : RS_CAPES.filter(c=>c[1] <= d+1 && !c[4]);
+  const pool = name ? RS_CAPES.filter(c=>c[0]===name) : RS_CAPES.filter(c=>c[1] <= d && !c[4]);
   const c = pool.length ? pool[rn(pool.length)] : RS_CAPES[rn(4)], it = rsItem('cape');
   it.nm = c[0]; it.basis = /Quiver/.test(c[0]) ? 'Quiver' : 'Cape'; it.baseMat = c[0]; it.capeCol = c[3]; it.rsCol = c[3];
-  Object.assign(it, c[2]); it.price = 25 + c[1]*c[1]*14 + (c[4] ? 6000 : 0);
+  Object.assign(it, c[2]); it.price = 25 + Math.round(Math.pow(tierOfCb(c[1]),2)*14) + (c[4] ? 6000 : 0);
   if (c[4]) it.quality = 3;
   return it;
 }
 // ---- trinkets: charms and totems with one focused bonus ----
 const RS_TRINKETS = [
-  ["Rabbit's Foot",     1, it=>afAdd(it, 'goldfind', 0, 0, 0.15), 'more gold from kills', '#d8c8a8'],
-  ['Wolf Totem',        3, it=>{ it.dmgB = 6; }, '', '#8a8a8a'],
-  ['Hawk Feather',      3, it=>{ it.rngAcc = 10; }, '', '#b08a50'],
-  ['Owl Totem',         3, it=>{ it.magAcc = 10; }, '', '#6a5a8a'],
-  ['Bear Claw Charm',   5, it=>{ it.ac = 8; }, '', '#6a4a2a'],
-  ['Holy Relic',        6, it=>{ it.prayB = 6; }, '', '#f0e0a0'],
-  ['Lucky Clover',      7, it=>afAdd(it, 'magicfind', 2, 0, 0), 'better loot', '#4ab04a'],
-  ['Troll Heart Charm', 9, it=>afAdd(it, 'regen', 1, 0, 0), 'slow regeneration', '#5a8a3a'],
-  ['Sage Charm',       11, it=>afAdd(it, 'xpfind', 0, 0, 0.06), 'more experience', '#5aa0e0'],
-  ['Phoenix Feather',  14, it=>afAdd(it, 'life', 10, 0, 0), 'more life', '#ff7a2a'],
+  ["Rabbit's Foot",     3,  it=>afAdd(it, 'goldfind', 0, 0, 0.15), 'more gold from kills', '#d8c8a8'],
+  ['Wolf Totem',        16, it=>{ it.dmgB = 6; }, '', '#8a8a8a'],
+  ['Hawk Feather',      16, it=>{ it.rngAcc = 10; }, '', '#b08a50'],
+  ['Owl Totem',         16, it=>{ it.magAcc = 10; }, '', '#6a5a8a'],
+  ['Bear Claw Charm',   29, it=>{ it.ac = 8; }, '', '#6a4a2a'],
+  ['Holy Relic',        35, it=>{ it.prayB = 6; }, '', '#f0e0a0'],
+  ['Lucky Clover',      42, it=>afAdd(it, 'magicfind', 2, 0, 0), 'better loot', '#4ab04a'],
+  ['Troll Heart Charm', 55, it=>afAdd(it, 'regen', 1, 0, 0), 'slow regeneration', '#5a8a3a'],
+  ['Sage Charm',        68, it=>afAdd(it, 'xpfind', 0, 0, 0.06), 'more experience', '#5aa0e0'],
+  ['Phoenix Feather',   87, it=>afAdd(it, 'life', 10, 0, 0), 'more life', '#ff7a2a'],
 ];
 function rsMakeTrinket(d){
-  const pool = RS_TRINKETS.filter(t=>t[1] <= d+1), t = pool.length ? pool[rn(pool.length)] : RS_TRINKETS[0], it = rsItem('trinket');
+  const pool = RS_TRINKETS.filter(t=>t[1] <= d), t = pool.length ? pool[rn(pool.length)] : RS_TRINKETS[0], it = rsItem('trinket');
   it.nm = t[0]; it.basis = 'Trinket'; it.baseMat = t[0]; it.charmCol = t[4]; t[2](it); if (t[3]) it.trinketAff = t[3];
-  it.price = 40 + t[1]*t[1]*12;
+  it.price = 40 + Math.round(Math.pow(tierOfCb(t[1]),2)*12);
   return it;
 }
 // ---- ammo: arrowheads by metal; the slot sets your arrows' strength, the count stays one stack ----
-const RS_AMMO = [['Bronze Arrows',1,1,7],['Iron Arrows',1,3,10],['Steel Arrows',5,5,16],['Mithril Arrows',20,8,22],['Adamant Arrows',30,11,31],['Rune Arrows',40,14,49],['Dragon Arrows',60,18,60]];
+const RS_AMMO = [['Bronze Arrows',1,1,7],['Iron Arrows',1,3,10],['Steel Arrows',5,5,16],['Mithril Arrows',20,20,22],['Adamant Arrows',30,30,31],['Rune Arrows',40,40,49],['Dragon Arrows',60,60,60]];
 RS_AMMO.push(['Sapphire-tipped Arrows',50,99,56,'#4a6ae0'], ['Emerald-tipped Arrows',55,99,60,'#3ab06a'], ['Ruby-tipped Arrows',60,99,66,'#e03a3a'], ['Diamond-tipped Arrows',65,99,72,'#e8f0ff'], ['Onyx-tipped Arrows',75,99,82,'#3a3036']);
 RS_AMMO.push(['Enchanted Sapphire Arrows',50,99,58,'#8aa8ff',0], ['Enchanted Emerald Arrows',55,99,62,'#6ae09a',1], ['Enchanted Ruby Arrows',60,99,68,'#ff6a5a',2], ['Enchanted Diamond Arrows',65,99,74,'#ffffff',3], ['Enchanted Onyx Arrows',75,99,84,'#8a7a9a',4]);
 function rsMakeAmmo(t){
@@ -12445,7 +12464,7 @@ function quiverList(){
 function arrowSaveChance(){ let c = 0; for (const k of ['cape']){ const it = G.gear[k]; if (it && it.used) c += it.saveArrows||0; } return Math.min(0.8, c + (rsSetBonus().saveArrows||0)); }
 // ---- holy robes: priestly gear that slows prayer drain ----
 function rsMakeHolyRobe(slot, d){
-  const hi = d >= 10, it = rsItem(slot);
+  const hi = d >= 61, it = rsItem(slot);
   it.nm = hi ? `Holy Vestment ${slot==='chest' ? 'Top' : 'Bottom'}` : `Monk's Robe ${slot==='chest' ? 'Top' : 'Bottom'}`; it.basis = slot==='chest' ? 'Robe Top' : 'Robe Bottom';
   it.baseMat = hi ? 'Holy Vestment' : "Monk's"; it.rsFam = 'cloth'; it.rsTier = hi ? 2 : 0; it.rsCol = hi ? '#e8e0c8' : '#7a5a3a';
   it.ac = (hi ? 12 : 3) * (slot==='chest' ? 1 : 0.7) | 0; it.prayB = slot==='chest' ? (hi ? 8 : 6) : (hi ? 6 : 5); if (hi) it.magAcc = 6; it.reqMag = hi ? 20 : 1;
@@ -12524,16 +12543,16 @@ function rerollItem(i, useScroll){
 }
 
 // ---- the gear tables ----
-// metal: name, level to wield/wear, loot level it starts dropping at, attack bonus, strength bonus, colour
+// metal: name, level to wield/wear, combat level it starts dropping at (RS-240: the level it needs), attack bonus, strength bonus, colour
 // (RuneScape's own scimitar bonuses; each weapon type scales them - see RS_WEAPONS)
 const RS_METALS = [
-  ['Bronze',  1,  1, 7,  6,  '#b07a3c'],
-  ['Iron',    1,  3, 10, 9,  '#8c8c8c'],
-  ['Steel',   5,  5, 15, 14, '#c0c4ca'],
-  ['Mithril', 20, 8, 21, 20, '#5064c0'],
-  ['Adamant', 30, 11, 29, 28, '#3c8a5a'],
-  ['Rune',    40, 14, 45, 44, '#46a8c8'],
-  ['Dragon',  60, 18, 67, 66, '#c83a2a'],
+  ['Bronze',  1,  1,  7,  6,  '#b07a3c'],
+  ['Iron',    1,  3,  10, 9,  '#8c8c8c'],
+  ['Steel',   5,  5,  15, 14, '#c0c4ca'],
+  ['Mithril', 20, 20, 21, 20, '#5064c0'],
+  ['Adamant', 30, 30, 29, 28, '#3c8a5a'],
+  ['Rune',    40, 40, 45, 44, '#46a8c8'],
+  ['Dragon',  60, 60, 67, 66, '#c83a2a'],
 ];
 // melee weapons: name, basis (the 3D model and weapon kind), dice, attack and strength multipliers
 // (a dagger is quick and light, a 2h sword slow and brutal)
@@ -12557,64 +12576,64 @@ const RS_ARMOUR = {
     def: { head:[4,6,9,13,19,30,45], chest:[15,21,32,46,65,82,109], legs:[8,11,17,24,33,51,68], arms:[2,3,4,6,8,11,15], feet:[2,3,5,7,9,12,16], offhand:[9,13,19,27,38,48,64] },
     magAcc: { chest:[-20,-20,-20,-20,-20,-20,-20], legs:[-10,-10,-10,-10,-10,-10,-10], offhand:[-8,-8,-8,-8,-8,-8,-8] } },
   hide: { req:'reqRng', names:{ head:'Coif', chest:'Body', legs:'Chaps', arms:'Vambraces', feet:'Boots' },
-    tiers: [['Leather',1,1,'#8a5a30'],['Hard Leather',10,4,'#6a4424'],['Studded',20,7,'#7a5a3a'],["Green D'hide",40,10,'#3c8a3c'],["Blue D'hide",50,13,'#3c5ab0'],["Red D'hide",60,16,'#b03c3c'],["Black D'hide",70,19,'#2a2a2a']],
-    def: { head:[2,3,4,6,8,10,12], chest:[8,12,18,40,48,56,64], legs:[3,5,8,20,25,31,36], arms:[1,2,3,4,5,6,7], feet:[1,2,3,4,5,6,7] },
+    tiers: [['Leather',1,1,'#8a5a30'],['Hard Leather',10,10,'#6a4424'],['Studded',20,20,'#7a5a3a'],["Green D'hide",40,40,'#3c8a3c'],["Blue D'hide",50,50,'#3c5ab0'],["Red D'hide",60,60,'#b03c3c'],["Black D'hide",70,70,'#2a2a2a']],
+    def: { head:[3,5,8,13,16,19,22], chest:[10,18,28,52,62,72,84], legs:[5,9,14,27,32,37,43], arms:[1,2,4,6,7,8,9], feet:[1,2,4,6,7,8,9] },   /* (RS-240: about three quarters of plate at the same level) */
     rngAcc: { head:[2,3,4,5,6,7,8], chest:[4,8,10,15,20,25,30], legs:[3,5,7,8,11,14,17], arms:[4,5,6,8,9,10,11], feet:[1,2,3,4,5,6,8] } },
   cloth: { req:'reqMag', names:{ head:'Hat', chest:'Robe Top', legs:'Robe Bottom', arms:'Gloves', feet:'Boots', offhand:'Tome' },
-    tiers: [['Wizard',1,1,'#3040a0'],['Splitbark',20,6,'#6a5a3a'],['Mystic',40,10,'#4a3ab0'],['Infinity',50,14,'#3a7ac8'],["Ahrim's",70,18,'#3a3a4a']],
-    def: { head:[1,4,6,8,15], chest:[3,10,18,22,35], legs:[2,7,12,16,24], arms:[0,2,3,5,6], feet:[0,2,3,4,5], offhand:[0,1,2,3,4] },
+    tiers: [['Wizard',1,1,'#3040a0'],['Splitbark',20,20,'#6a5a3a'],['Mystic',40,40,'#4a3ab0'],['Infinity',50,50,'#3a7ac8'],["Ahrim's",70,70,'#3a3a4a']],
+    def: { head:[2,6,10,13,18], chest:[5,20,34,42,56], legs:[3,12,20,26,34], arms:[1,3,5,6,8], feet:[1,3,5,6,8], offhand:[1,3,5,7,9] },   /* (RS-240: about half of plate at the same level) */
     magAcc: { head:[2,3,4,6,8], chest:[6,10,20,22,30], legs:[4,7,15,16,22], arms:[1,4,5,5,6], feet:[1,3,4,5,6], offhand:[6,10,14,16,20] },
     magDmg: { chest:[0,0,1,1,2], legs:[0,0,0,1,1] }, magDmgPct: { offhand:[2,4,6,8,10] } },
 };
 // bows: wood, Ranged level, loot level, damage bonus, ranged bonus (a shortbow is a touch more accurate, a longbow reaches further)
-const RS_BOWS = [['',1,1,0,8],['Oak',5,3,1,14],['Willow',20,6,2,20],['Maple',30,9,3,29],['Yew',40,12,4,47],['Magic',50,15,6,69]];
+const RS_BOWS = [['',1,1,0,8],['Oak',5,5,1,14],['Willow',20,20,2,20],['Maple',30,30,3,29],['Yew',40,40,4,47],['Magic',50,50,6,69]];
 // staves: name, Magic level, loot level, element (free runes of it), magic bonus, spell damage
 const RS_STAVES = [
-  ['Staff',              1,  1, null,    10, 0],
-  ['Staff of Air',       1,  2, 'air',   20, 0],
-  ['Staff of Water',     1,  3, 'water', 20, 0],
-  ['Staff of Earth',     1,  3, 'earth', 20, 0],
-  ['Staff of Fire',      1,  4, 'fire',  20, 0],
-  ['Air Battlestaff',    30, 9, 'air',   40, 1],
-  ['Fire Battlestaff',   30, 10, 'fire', 40, 1],
-  ['Mystic Water Staff', 40, 12, 'water', 60, 2],
-  ['Mystic Fire Staff',  40, 13, 'fire', 60, 2],
-  ['Ancient Staff',      50, 16, null,   80, 3],
+  ['Staff',              1,  1,  null,    10, 0],
+  ['Staff of Air',       1,  1,  'air',   20, 0],
+  ['Staff of Water',     1,  5,  'water', 20, 0],
+  ['Staff of Earth',     1,  5,  'earth', 20, 0],
+  ['Staff of Fire',      1,  10, 'fire',  20, 0],
+  ['Air Battlestaff',    30, 30, 'air',   40, 1],
+  ['Fire Battlestaff',   30, 30, 'fire',  40, 1],
+  ['Mystic Water Staff', 40, 40, 'water', 60, 2],
+  ['Mystic Fire Staff',  40, 40, 'fire',  60, 2],
+  ['Ancient Staff',      50, 50, null,    80, 3],
 ];
-// jewellery: name, loot level, bonuses (acc = melee attack, dmgB = strength, ac = defence)
+// jewellery: name, combat level it drops from, bonuses (acc = melee attack, dmgB = strength, ac = defence)
 const RS_AMULETS = [
-  ['Amulet of Accuracy', 1,  { acc:6, rngAcc:6 }],
-  ['Amulet of Magic',    2,  { magAcc:10 }],
-  ['Amulet of Strength', 4,  { dmgB:10 }],
-  ['Amulet of Defence',  6,  { ac:10 }],
-  ['Amulet of Mysticism', 8, { magAcc:18, magDmg:1 }],
-  ['Amulet of Power',    10, { acc:6, rngAcc:6, magAcc:6, dmgB:6, ac:6 }],
-  ['Occult Necklace',    16, { magAcc:12, magDmgPct:10 }],
-  ['Amulet of Glory',    14, { acc:10, rngAcc:10, magAcc:10, dmgB:8, ac:8 }],
-  ['Amulet of Fury',     19, { acc:15, rngAcc:15, magAcc:15, dmgB:12, ac:15 }],
-  ['Holy Symbol',        5,  { prayB:8 }],
-  ['Unholy Symbol',      5,  { prayB:8, dmgB:2 }],
+  ['Amulet of Accuracy', 3,  { acc:6, rngAcc:6 }],
+  ['Amulet of Magic',    9,  { magAcc:10 }],
+  ['Amulet of Strength', 22, { dmgB:10 }],
+  ['Amulet of Defence',  35, { ac:10 }],
+  ['Amulet of Mysticism', 48, { magAcc:18, magDmg:1 }],
+  ['Amulet of Power',    61, { acc:6, rngAcc:6, magAcc:6, dmgB:6, ac:6 }],
+  ['Occult Necklace',    100, { magAcc:12, magDmgPct:10 }],
+  ['Amulet of Glory',    87, { acc:10, rngAcc:10, magAcc:10, dmgB:8, ac:8 }],
+  ['Amulet of Fury',     120, { acc:15, rngAcc:15, magAcc:15, dmgB:12, ac:15 }],
+  ['Holy Symbol',        29, { prayB:8 }],
+  ['Unholy Symbol',      29, { prayB:8, dmgB:2 }],
 ];
 const RS_RINGS = [
-  ['Sapphire Ring',  1,  { magAcc:6 }],
-  ['Emerald Ring',   3,  { acc:6 }],
-  ['Ruby Ring',      5,  { dmgB:6 }],
-  ['Diamond Ring',   8,  { ac:10 }],
-  ['Ring of Recoil', 6,  { recoil:true }],
-  ['Ring of Wealth', 9,  { wealth:true }],
-  ['Warrior Ring',   15, { acc:20 }],
-  ['Berserker Ring', 16, { dmgB:16 }],
-  ['Archers Ring',   15, { rngAcc:20 }],
-  ['Seers Ring',     15, { magAcc:20 }],
+  ['Sapphire Ring',  3,  { magAcc:6 }],
+  ['Emerald Ring',   16, { acc:6 }],
+  ['Ruby Ring',      29, { dmgB:6 }],
+  ['Diamond Ring',   48, { ac:10 }],
+  ['Ring of Recoil', 35, { recoil:true }],
+  ['Ring of Wealth', 55, { wealth:true }],
+  ['Warrior Ring',   94, { acc:20 }],
+  ['Berserker Ring', 100, { dmgB:16 }],
+  ['Archers Ring',   94, { rngAcc:20 }],
+  ['Seers Ring',     94, { magAcc:20 }],
 ];
 const RS_TIER_PRICE = [15, 40, 110, 320, 850, 2200, 6500];
-// picks the tier index from a list whose [2] is the loot level it starts at,
-// leaning towards the newest tiers unlocked, like the old loot tables did
+// picks the tier index from a list whose [2] is the combat level it starts dropping at (RS-240: the level it needs),
+// leaning towards the newest tiers unlocked
 function rsPickTier(list, d, reqOk){
   let elig = [];
-  for (let i=0;i<list.length;i++) if (list[i][2] <= d+1 && (!reqOk || reqOk(i))) elig.push(i);
+  for (let i=0;i<list.length;i++) if (list[i][2] <= d && (!reqOk || reqOk(i))) elig.push(i);
   if (!elig.length) elig = [0];
-  let tot = 0; const w = elig.map(i=>{ const x = Math.exp(-Math.max(0, d+1-list[i][2])/4); tot += x; return x; });
+  let tot = 0; const w = elig.map(i=>{ const x = Math.exp(-Math.max(0, d-list[i][2])/26); tot += x; return x; });
   let r = Math.random()*tot;
   for (let k=0;k<elig.length;k++){ if (r < w[k]) return elig[k]; r -= w[k]; }
   return elig[elig.length-1];
@@ -12651,7 +12670,7 @@ function rsMakeStaff(si){
   const s = RS_STAVES[si], it = rsItem('weapon');
   it.nm = s[0]; it.basis = 'Quarterstaff'; it.baseMat = 'Staff'; it.d1 = 1; it.d2 = 6; it.bonus = 0;
   it.reqMag = s[1]; it.rsElem = s[3]; it.magAcc = s[4]; it.magDmg = s[5]; it.rsStaff = 1; it.acc = 4; it.dmgB = 4;
-  it.price = 20 + s[2]*s[2]*12;
+  it.price = 20 + Math.round(Math.pow(tierOfCb(s[2]),2)*12);
   return it;
 }
 function rsMakeJewel(kind, idx){
@@ -12660,7 +12679,7 @@ function rsMakeJewel(kind, idx){
   Object.assign(it, j[2]);
   if (j[2].recoil) afAdd(it, 'thorns', 0, 0, 0.1);
   if (j[2].wealth) afAdd(it, 'goldfind', 0, 0, 0.2);
-  it.price = 30 + j[1]*j[1]*10;
+  it.price = 30 + Math.round(Math.pow(tierOfCb(j[1]),2)*10);
   return it;
 }
 // gear you forge yourself is better made than anything a monster drops: every bonus
@@ -12745,7 +12764,7 @@ function rsFillBase(it, d, kind, forMe, meleeOnly){
     made = kind==='offhand' ? rsMakeOffhand(d, forMe) : kind==='cape' ? rsMakeCape(d) : kind==='trinket' ? rsMakeTrinket(d) : rsMakeAmmo(rsPickTier(RS_AMMO, d, forMe && (i=>RS_AMMO[i][1]<=rsLvl('ranged'))));
   } else if (kind==='necklace' || kind==='ring'){
     const list = kind==='necklace' ? RS_AMULETS : RS_RINGS;
-    const elig = []; for (let i=0;i<list.length;i++) if (list[i][1] <= d+1) elig.push(i);
+    const elig = []; for (let i=0;i<list.length;i++) if (list[i][1] <= d) elig.push(i);
     made = rsMakeJewel(kind, elig.length ? elig[rn(elig.length)] : 0);
   } else {
     const slot = ['head','chest','legs','arms','feet'].includes(kind) ? kind : 'chest';
@@ -12779,7 +12798,7 @@ function rsPeddlerWare(d, kind){
 function genBaseInto(it, d, kind, classOnly){ rsFillBase(it, d, kind, classOnly, true); }
 function genItem(d, kind, maxQuality, classOnly){
   const cap = maxQuality===undefined ? 4 : maxQuality;
-  if (cap>=4 && chn(0.01 + (d||1)*0.001)){ const uid = rollUnique(kind); if (uid>0) return buildUnique(uid, d, classOnly); }
+  if (cap>=4 && chn(0.01 + tierOfCb(d||CB_LO)*0.001)){ const uid = rollUnique(kind); if (uid>0) return buildUnique(uid, d, classOnly); }
   const it = newItem();
   rsFillBase(it, d, kind, classOnly);
   it.ilvl = d;
@@ -12788,11 +12807,11 @@ function genItem(d, kind, maxQuality, classOnly){
 // a boss: a unique at the site's usual odds, otherwise the best tier its level allows
 function genBossLoot(kind, lvl){
   const sp = sitePower(), L = lvl || bossLootLevel();
-  if (chn(0.1) && L >= 8){ const fc = rsMakeCape(L, 'Fire Cape'); if (fc) return fc; }
+  if (chn(0.1) && L >= 48){ const fc = rsMakeCape(L, 'Fire Cape'); if (fc) return fc; }
   const uid = rollUnique(kind);
   if (uid>0 && chn(sp.bossLootGuarantee)) return buildUnique(uid, L);
   const it = newItem();
-  rsFillBase(it, L+2, kind);
+  rsFillBase(it, clampCb(L+13), kind);
   it.ilvl = L;
   return it;
 }
@@ -12800,7 +12819,7 @@ function guaranteedEliteDrop(level){
   const kind = lootKind();
   const uid = rollUnique(kind);
   if (uid>0 && chn(0.5)) return buildUnique(uid, level);
-  const it = newItem(); rsFillBase(it, level+2, kind); it.ilvl = level;
+  const it = newItem(); rsFillBase(it, clampCb(level+13), kind); it.ilvl = level;
   return it;
 }
 // wands belong to the old rules - anything that used to stock one sells a scroll instead
@@ -13123,32 +13142,32 @@ function rsSpellNote(sp, fellBack){
 // ===================== monster content and the bestiary: families, regions, night, rare spawns, mimics, named bosses, godswords, drops =====================
 // families climb in tiers (goblin to warlord, skeleton to champion); each kind of place keeps a few of them
 const MON_FAMILIES = {
-  rat:      { nm:'Rats', t:[['giant rat',1],['plague rat',3,{ab:['venomous']}],['rat king',8]], lore:'Vermin that breed in every cellar and sewer. The rat king is a knot of a dozen of them, tails fused, that thinks as one.' },
-  kobold:   { nm:'Kobolds', t:[['kobold',2],['kobold miner',4],['kobold chieftain',7]], lore:'Small, scaled tunnellers who trap their warrens cleverly and fight in packs.' },
-  goblin:   { nm:'Goblins', t:[['goblin',3],['goblin warrior',5],['goblin archer',6,{style:'ranged'}],['goblin shaman',8,{style:'magic'}],['goblin warlord',11]], lore:'Squabbling, greedy and everywhere. A goblin warlord is a goblin who has outlived the others.' },
-  zombie:   { nm:'Zombies', undead:true, t:[['zombie',3],['bog zombie',6],['zombie brute',10]], lore:'The restless dead, raised by necromancy or bad soil. Slow, but they do not stop.' },
-  skeleton: { nm:'Skeletons', undead:true, t:[['skeleton',4],['skeleton warrior',6],['skeleton archer',7,{style:'ranged'}],['skeleton mage',9,{style:'magic'}],['skeleton champion',13]], lore:'Old bones bound to a purpose they no longer remember. Crushing blows shatter them.' },
-  orc:      { nm:'Orcs', t:[['orc',5],['orc warrior',7],['orc archer',8,{style:'ranged'}],['orc shaman',10,{style:'magic'}],['orc warlord',14]], lore:'Brutal raiders who live for the charge. Their shamans call on angry, hungry gods.' },
-  spider:   { nm:'Spiders', t:[['cave spider',3,{ab:['venomous']}],['giant spider',6],['spider broodmother',12]], lore:'Patient hunters of the dark. A broodmother never fights alone for long.' },
-  giant:    { nm:'Giants', t:[['moss giant',11],['hill giant',13],['fire giant',16]], lore:'Huge, slow-witted and terribly strong. Moss giants grow lichen in their beards; fire giants forge in volcano hearts.' },
-  demon:    { nm:'Demons', t:[['imp',5],['lesser demon',12],['hellhound',14],['greater demon',16],['black demon',18],['abyssal demon',19]], lore:'Fiends from the abyss, summoned or slipped through. Water douses them; their hearts burn.' },
+  rat:      { nm:'Rats', t:[['giant rat',3],['plague rat',16,{ab:['venomous']}],['rat king',48]], lore:'Vermin that breed in every cellar and sewer. The rat king is a knot of a dozen of them, tails fused, that thinks as one.' },
+  kobold:   { nm:'Kobolds', t:[['kobold',9],['kobold miner',22],['kobold chieftain',42]], lore:'Small, scaled tunnellers who trap their warrens cleverly and fight in packs.' },
+  goblin:   { nm:'Goblins', t:[['goblin',16],['goblin warrior',29],['goblin archer',35,{style:'ranged'}],['goblin shaman',48,{style:'magic'}],['goblin warlord',68]], lore:'Squabbling, greedy and everywhere. A goblin warlord is a goblin who has outlived the others.' },
+  zombie:   { nm:'Zombies', undead:true, t:[['zombie',16],['bog zombie',35],['zombie brute',61]], lore:'The restless dead, raised by necromancy or bad soil. Slow, but they do not stop.' },
+  skeleton: { nm:'Skeletons', undead:true, t:[['skeleton',22],['skeleton warrior',35],['skeleton archer',42,{style:'ranged'}],['skeleton mage',55,{style:'magic'}],['skeleton champion',81]], lore:'Old bones bound to a purpose they no longer remember. Crushing blows shatter them.' },
+  orc:      { nm:'Orcs', t:[['orc',29],['orc warrior',42],['orc archer',48,{style:'ranged'}],['orc shaman',61,{style:'magic'}],['orc warlord',87]], lore:'Brutal raiders who live for the charge. Their shamans call on angry, hungry gods.' },
+  spider:   { nm:'Spiders', t:[['cave spider',16,{ab:['venomous']}],['giant spider',35],['spider broodmother',74]], lore:'Patient hunters of the dark. A broodmother never fights alone for long.' },
+  giant:    { nm:'Giants', t:[['moss giant',68],['hill giant',81],['fire giant',100]], lore:'Huge, slow-witted and terribly strong. Moss giants grow lichen in their beards; fire giants forge in volcano hearts.' },
+  demon:    { nm:'Demons', t:[['imp',29],['lesser demon',74],['hellhound',87],['greater demon',100],['black demon',113],['abyssal demon',120]], lore:'Fiends from the abyss, summoned or slipped through. Water douses them; their hearts burn.' },
   tomb:     { nm:'Tomb dwellers', t:TOMB_TIERS.map(t=>[t[0], t[1], Object.assign({}, t[2].undead ? {undead:true} : {}, t[2].style ? {style:t[2].style} : {})]), lore:'The pyramids were raised to keep the god-kings in and everyone else out. The beetles, jackals and serpents came on their own; the wardens, the priests and the royal dead were set there on purpose, and still keep to it.' },
-  desert:   { nm:'Desert dwellers', t:[['scarab swarm',4],['kalphite worker',7],['mummy',9,{undead:true}],['giant scarab',12],['kalphite soldier',14]], lore:'The sands hide whole hives of kalphite and the tombs of kings who will not stay buried.' },
-  swamp:    { nm:'Swamp things', t:[['giant leech',4,{ab:['venomous']}],['bog beast',7],['swamp horror',11]], lore:'The bog swallows things - and some of what it swallows walks back out.' },
-  tundra:   { nm:'Frost-born', t:[['yeti',8],['ice troll',10],['ice giant',14]], lore:'The cold makes them hard, and hungry.' },
-  night:    { nm:'Creatures of the night', t:[['ghost',6,{undead:true}],['werewolf',10],['vampyre',14,{undead:true}]], lore:'They only walk after dark - and they hunt anyone foolish enough to travel then.' },
+  desert:   { nm:'Desert dwellers', t:[['scarab swarm',22],['kalphite worker',42],['mummy',55,{undead:true}],['giant scarab',74],['kalphite soldier',87]], lore:'The sands hide whole hives of kalphite and the tombs of kings who will not stay buried.' },
+  swamp:    { nm:'Swamp things', t:[['giant leech',22,{ab:['venomous']}],['bog beast',42],['swamp horror',68]], lore:'The bog swallows things - and some of what it swallows walks back out.' },
+  tundra:   { nm:'Frost-born', t:[['yeti',48],['ice troll',61],['ice giant',87]], lore:'The cold makes them hard, and hungry.' },
+  night:    { nm:'Creatures of the night', t:[['ghost',35,{undead:true}],['werewolf',61],['vampyre',87,{undead:true}]], lore:'They only walk after dark - and they hunt anyone foolish enough to travel then.' },
 };
 const MON_ECOSYS = { dungeon:['rat','kobold','goblin','zombie','skeleton','orc','spider','giant','demon'], lair:['demon','giant','spider','orc'], pyramid:['tomb'] };
 const FAM_BY_NAME = {}; for (const k in MON_FAMILIES) for (const t of MON_FAMILIES[k].t) FAM_BY_NAME[t[0]] = k;
 function famEntry(k, i){
-  const F = MON_FAMILIES[k], [nm, lvl, x] = F.t[i], base = MONSTER_LEVELS[clampMLevel(lvl)-1], xo = x || {};
+  const F = MON_FAMILIES[k], [nm, lvl, x] = F.t[i], base = MONSTER_LEVELS[archOf(lvl)-1], xo = x || {};
   const ab = base.abilities.filter(a=>!/^(breath|legendary|frightful|spellcast)$/.test(a)).concat(xo.ab||[]);
   if (xo.style==='magic' && !ab.includes('spellcast')) ab.push('spellcast');
-  return Object.assign({}, base, { nm, lvl:clampMLevel(lvl), undead: !!(xo.undead || F.undead), abilities: ab, family:k, forceStyle: xo.style||null });
+  return Object.assign({}, base, { nm, lvl:archOf(lvl), cb:clampCb(lvl), undead: !!(xo.undead || F.undead), abilities: ab, family:k, forceStyle: xo.style||null });
 }
 function famPickFrom(keys, L, j){
-  const c = [], span = Math.max(3, (j===undefined ? 2 : j) + 2);
-  for (const k of keys){ const F = MON_FAMILIES[k]; if (!F) continue; F.t.forEach((t,i)=>{ const d = Math.abs(t[1]-L); if (d <= span) c.push([k, i, 1/(1+d)]); }); }
+  const c = [], span = Math.max(3, (j===undefined ? 2 : j) + 2)*CB_PER_TIER;
+  for (const k of keys){ const F = MON_FAMILIES[k]; if (!F) continue; F.t.forEach((t,i)=>{ const d = Math.abs(t[1]-L); if (d <= span) c.push([k, i, 1/(1+d/CB_PER_TIER)]); }); }
   if (!c.length) return null;
   let tot = c.reduce((a,x)=>a+x[2], 0), r = Math.random()*tot;
   for (const x of c){ if (r < x[2]) return famEntry(x[0], x[1]); r -= x[2]; }
@@ -13156,18 +13175,18 @@ function famPickFrom(keys, L, j){
 }
 // each floor picks two families that live at its depth
 function famForFloor(d){
-  const L = monsterLevelForDepth(d), pool = (MON_ECOSYS[G.siteKind] || MON_ECOSYS.dungeon).filter(k=>MON_FAMILIES[k].t.some(t=>Math.abs(t[1]-L) <= 4));
+  const L = floorCb(d), pool = (MON_ECOSYS[G.siteKind] || MON_ECOSYS.dungeon).filter(k=>MON_FAMILIES[k].t.some(t=>Math.abs(t[1]-L) <= 26));
   return pool.sort(()=>Math.random()-0.5).slice(0, 2);
 }
 // (balance, RS-100: a fight at your own level used to carry no risk at all - +25% accuracy and damage makes food and prayer count
 // before the endgame; it eases off above tier 14 so the top monsters, already tuned as spikes, don't outclass their own bosses)
-function monBite(t){ return t <= 14 ? 1.25 : 1.25 - 0.25*Math.min(1, (t-14)/6); }
+function monBite(t){ return t <= 14 ? 1.25 : 1.25 - 0.1*Math.min(1, (t-14)/6); }   /* (RS-240: the top of the bestiary keeps most of its bite, so dragon plate is a step up at 90+, not a wall) */
 // ...and a flat accuracy edge by tier (+3 to +6 to its roll), since a quarter more of a small number still couldn't land a blow
 // through decent armour - it fades out above tier 14 the same way
-function monAccBonus(t){ const b = Math.round(2 + 0.3*Math.min(t, 14)); return t <= 14 ? b : Math.round(b*(1 - Math.min(1, (t-14)/6))); }
+function monAccBonus(t){ return Math.round(2 + 0.3*Math.min(t, 14)); }   /* (RS-240: no longer fades away above tier 14 - a hydra could not hit rune plate at all) */
 // coin drops fall off above tier 12 (to 60% by tier 15) - by then the smith's reinforcing is what gold is for
-function coinTrim(m){ const t = (m && m.mlevel) || 1; return 0.5*(t <= 3 ? 1 : 1 - 0.75*Math.min(1, (t-3)/9)); }   /* (RS-194: half the coins, and a quarter of that from tier 12 - gold had stopped mattering) */
-function monEntryExtras(m, entry){ const bite = monBite((entry && entry.lvl) || m.mlevel || 1); const tier = (entry && entry.lvl) || m.mlevel || 1; m.atkBonus = Math.round((m.atkBonus||0)*bite) + monAccBonus(tier); m.dmg2 = Math.max(m.dmg2||1, Math.round((m.dmg2||1)*bite)); if (entry && entry.family) m.family = entry.family; if (entry && entry.forceStyle) m.rsStyle = entry.forceStyle; }
+function coinTrim(m){ const t = Math.round(tierOfCb(monCombatLevel(m))); return 0.5*(t <= 3 ? 1 : 1 - 0.75*Math.min(1, (t-3)/9)); }   /* (RS-194: half the coins, and a quarter of that from tier 12 - gold had stopped mattering) */
+function monEntryExtras(m, entry){ const lvl = (entry && entry.lvl) || m.mlevel || 1, cb0 = (entry && entry.cb) || m.cb || cbOfTier(lvl), tier = tierOfCb(cb0), bite = monBite(tier); m.atkBonus = Math.round((m.atkBonus||0)*bite) + monAccBonus(tier); m.dmg2 = Math.max(m.dmg2||1, Math.round((m.dmg2||1)*bite)); if (entry && entry.family) m.family = entry.family; if (entry && entry.forceStyle) m.rsStyle = entry.forceStyle; if (entry && entry.cb) monScaleCb(m, entry.cb, cbOfTier(lvl)); else m.cb = Math.round(cb0); }
 function famOf(m){ return (m && (m.family || FAM_BY_NAME[m.nm])) || null; }
 // the bestiary pays: a family fully studied takes 5% more damage from you; the whole book, a title and 3% more against everything
 function famBonus(m){ const p = G.player; if (!p) return 1; const k = famOf(m); return (k && p.famDone && p.famDone.includes(k) ? 1.05 : 1) * (p.title==='the Beastmaster' ? 1.03 : 1); }
@@ -13238,7 +13257,7 @@ function lootSpecial(m){
   const p = G.player;
   if (m.rare==='golden'){ const g = Math.round((400 + rn(400) + (G.depth||1)*120)*goldFindMult()); p.gold += g; logMsg(`the golden goblin bursts into coins - ${g} gold!`, 'loot', true); sfx('achievement'); }
   if (m.rare==='imp'){ const it = genItem(lootLevel()+5+playerMF(), vaultLootSlot(), 4); addToInventory(it); logMsg(`the treasure imp drops its hoard: ${itemNameHtml(it)}`, 'loot', true); sfx('achievement'); }
-  if (m.shiny){ const it = genItem(lootLevel()+3+playerMF(), lootKind(), 4); addToInventory(it); p.gold += 100; logMsg(`the shiny ${m.nm} leaves a gleaming prize: ${itemNameHtml(it)}`, 'loot', true); }
+  if (m.shiny){ const it = genItem(lootAt(20), lootKind(), 4); addToInventory(it); p.gold += 100; logMsg(`the shiny ${m.nm} leaves a gleaming prize: ${itemNameHtml(it)}`, 'loot', true); }
   if (m.mimic){ const g = Math.round((80 + rn(120) + (G.depth||1)*40)*goldFindMult()); p.gold += g; const it = genItem(lootLevel()+2+playerMF(), vaultLootSlot(), 3); addToInventory(it); logMsg(`the mimic's belly holds ${g} gold and ${itemNameHtml(it)}`, 'loot', true); }
   if (m.named) namedDrops(m);
   if (!monIsBoss(m) && !m.summoned && chn(Math.min(0.02, 0.006 + (G.depth||1)*0.0008))) rareDropTable(m);
@@ -13259,7 +13278,7 @@ function clueOpen(idx){
   const it = G.inv[idx]; if (!it) return; invRemove(idx);
   const p = G.player, steps = ['dig beside the old well', 'search the crates by the smithy', 'speak to the barman about a lost ring', 'count the stones in the circle', 'wave at the gnome by the lake'];
   const g = 300 + rn(900); p.gold += g; let extra = '';
-  if (chn(0.55)){ const it2 = genItem(lootLevel()+3+playerMF(), lootKind(), 4); addToInventory(it2); extra += ', ' + itemNameHtml(it2); }
+  if (chn(0.55)){ const it2 = genItem(lootAt(20), lootKind(), 4); addToInventory(it2); extra += ', ' + itemNameHtml(it2); }
   if (chn(0.4)){ const r = ['nature','death','blood','law'].filter(x=>RS_RUNES.some(q=>q[0]===x))[0] || 'chaos'; skAdd('r_'+r, 30); extra += `, 30 ${rsRuneName(r).toLowerCase()}s`; }
   logMsg(`you read the clue - "${steps[rn(steps.length)]}" - and follow the trail to a casket: ${g} gold${extra}`, 'loot', true); sfx('achievement');
   renderGame(); saveCurrentGame();
@@ -13273,7 +13292,7 @@ function mimicCheck(x, y){
   const k = x+','+y; if (S.has(k)) return false; S.add(k);
   if (!chn(0.15)) return false;
   G.map[x][y] = T_FLOOR; if (D[x][y]==='lchest') D[x][y] = '';
-  const m = rollMonsterAt(x, y, Math.min(20, monsterLevelForDepth(G.depth)+2), sitePower());
+  const m = rollMonsterAt(x, y, clampCb(floorCb(G.depth)+13), sitePower());
   m.nm = 'mimic'; m.mimic = 1; m.undead = false; m.hp = m.maxHp = Math.round(m.maxHp*1.5); m.engaged = true; m.abilities = ['multiattack2']; m._ai = { role:null, aggro:'normal' };
   G.mon.push(m); FPD.mapRef = null;
   logMsg("*** the chest sprouts teeth and legs - it's a MIMIC! ***", 'hit', true); sfx('crit');
@@ -13382,7 +13401,7 @@ function bestHtml(){
     const row = (nm, known, sub)=>{ const i = BEST_LIST.push(nm) - 1; const sel = G.bestSel===nm;
       return `<div class="shoprow" style="cursor:pointer;${sel ? 'outline:1px solid var(--amber);' : ''}${known ? '' : 'opacity:0.72;'}" onclick="bestPick(${i})"><span>${known ? esc(nm) : '???'}</span><span class="muted">${sub||''}</span></div>`; };
     for (const k in MON_FAMILIES){ const F = MON_FAMILIES[k], done = famDone.includes(k);
-      left += `<h4 style="margin:8px 0 4px;color:${done ? COL.gold : 'var(--ink-faint)'}">${esc(F.nm)} ${done ? '&#9733; +5% damage' : `&middot; ${F.t.filter(t=>seen.includes(t[0])).length}/${F.t.length}`}</h4>` + F.t.map(t=>row(t[0], seen.includes(t[0]), `lvl ${monCombatLevel({ mlevel:t[1] })} &middot; ${(p.killsBy||{})[t[0]]||0} kills`)).join(''); }
+      left += `<h4 style="margin:8px 0 4px;color:${done ? COL.gold : 'var(--ink-faint)'}">${esc(F.nm)} ${done ? '&#9733; +5% damage' : `&middot; ${F.t.filter(t=>seen.includes(t[0])).length}/${F.t.length}`}</h4>` + F.t.map(t=>row(t[0], seen.includes(t[0]), `lvl ${monCombatLevel({ cb:t[1] })} &middot; ${(p.killsBy||{})[t[0]]||0} kills`)).join(''); }
     const others = seen.filter(n=>!FAM_BY_NAME[n]);
     left += `<h4 style="margin:10px 0 4px;color:var(--ink-faint)">Everything else you've slain &middot; ${others.length}</h4>` + others.map(n=>row(n, true, `${(p.killsBy||{})[n]||0} kills`)).join('');
     const nm = G.bestSel;
@@ -13585,7 +13604,7 @@ function monPackBonus(m){
 // a summoner (or a boss calling for help) brings new foes onto the floor beside it
 function monSummon(m, n, adds){
   const nm0 = (m.nm||'').toLowerCase(), undead = /necromancer|lich|death knight|cult|wight/.test(nm0), spirit = /shaman|druid|witch/.test(nm0);
-  let made = 0; const sp = sitePower(), lvl = Math.max(1, (m.mlevel||5) - 3);
+  let made = 0; const sp = sitePower(), lvl = clampCb(monCombatLevel(m) - 20);
   for (const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]]){
     if (made >= n || G.mon.length >= MAXMON) break;
     const x = m.x+dx, y = m.y+dy; if (tileAt(x,y)!==T_FLOOR || occupiedBy(x,y,-1) || (x===G.player.x && y===G.player.y)) continue;
@@ -13899,7 +13918,7 @@ function dgStep(x, y){
   else if (d==='dig'){
     if (!skHave('shovel')){ if (p._digNote!==G.depth){ p._digNote = G.depth; logMsg('the earth here is loose - a shovel would turn something up (the smithy sells them)', ''); } return false; }
     D[x][y] = ''; const g = Math.round((20 + rn(40) + G.depth*15)*goldFindMult()); p.gold += g;
-    let extra = ''; if (chn(0.35)){ const gm = crRollGem(); skAdd(gm, 1); extra = ` and an ${skName(gm).toLowerCase()}`; } else if (chn(0.25)){ const it = genItem(lootLevel()+1, lootKind()); addToInventory(it); extra = ` and ${itemNameHtml(it)}`; }
+    let extra = ''; if (chn(0.35)){ const gm = crRollGem(); skAdd(gm, 1); extra = ` and an ${skName(gm).toLowerCase()}`; } else if (chn(0.25)){ const it = genItem(clampCb(lootLevel()+6), lootKind()); addToInventory(it); extra = ` and ${itemNameHtml(it)}`; }
     logMsg(`you dig into the loose earth and turn up ${g} gold${extra}`, 'loot', true); sfx('gold');
   }
   else if (d==='lchest'){
@@ -14102,9 +14121,9 @@ function generateRaidLevel(){
   G.dungeonDeco[2][13] = 'raidexit';
   [[22,11],[24,11],[22,17],[24,17]].forEach(([x,y],i)=>{ G.dungeonDeco[x][y] = 'plate'+i; });
   for (const [x,y] of [[5,12],[5,16],[14,8],[14,20],[30,6],[30,22]]) G.dungeonDeco[x][y] = 'brazier';
-  const sp = sitePower(), lvl = Math.min(20, monsterLevelForDepth((G.dungeonMaxDepth||5) + 2) + 1), names = RAID_BOSSES.slice().sort(()=>Math.random()-0.5);
+  const sp = sitePower(), lvl = clampCb(floorCb((G.dungeonMaxDepth||5) + 2) + 6), names = RAID_BOSSES.slice().sort(()=>Math.random()-0.5);
   const guard = (x,y)=>{ const m = rollMonsterAt(x, y, lvl, sp); m.hp = m.maxHp = Math.round(m.maxHp*1.6); G.mon.push(m); return m; };
-  const boss = (x,y,i,mult)=>{ const m = rollMonsterAt(x, y, lvl, sp); m.nm = `${names[i]}, ${m.nm}`; m.hp = m.maxHp = Math.round(m.maxHp*mult); m.dmg2 = Math.round(m.dmg2*1.35); m.atkBonus += 3; m.ac += 2; m.xp = Math.round((m.xp||10)*6); m.raidBoss = 1; m.mlevel = Math.min(20, (m.mlevel||10) + 3); G.mon.push(m); return m; };
+  const boss = (x,y,i,mult)=>{ const m = rollMonsterAt(x, y, lvl, sp); m.nm = `${names[i]}, ${m.nm}`; m.hp = m.maxHp = Math.round(m.maxHp*mult); m.dmg2 = Math.round(m.dmg2*1.35); m.atkBonus += 3; m.ac += 2; m.xp = Math.round((m.xp||10)*6); m.raidBoss = 1; m.cb = clampCb(monCombatLevel(m) + 20); G.mon.push(m); return m; };
   guard(6, 12); guard(6, 16);
   G.inRaid.b1 = boss(16, 14, 0, 7);
   G.inRaid.b2 = boss(31, 9, 1, 5.5); G.inRaid.b3 = boss(31, 19, 2, 5.5);
@@ -14995,10 +15014,10 @@ function buildPrayer(){
 function rsOnKill(m){
   const n = (m.nm||'').toLowerCase();
   if (!/wraith|ghost|spectre|specter|shadow|wisp|elemental|ooze|slime|jelly|swarm|spirit|mephit|banshee|phantom/.test(n)){
-    const id = /dragon|wyvern|hydra|drake|wyrm/.test(n) ? 'dbones' : ((m.mlevel||0) >= 10 || /giant|ogre|troll|owlbear|bear|minotaur|golem|ettin|behemoth|overlord/.test(n)) ? 'bigbones' : 'bones';
+    const id = /dragon|wyvern|hydra|drake|wyrm/.test(n) ? 'dbones' : (monCombatLevel(m) >= 61 || /giant|ogre|troll|owlbear|bear|minotaur|golem|ettin|behemoth|overlord/.test(n)) ? 'bigbones' : 'bones';
     skAdd(id, 1);
   }
-  const L = m.mlevel || lootLevel();
+  const L = tierOfCb(monCombatLevel(m));
   if (chn(0.3)){
     const pool = ['air','air','air','mind','mind','water','earth','fire'];   // (every combat spell needs air, so it's the commonest)
     if (L>=5) pool.push('chaos','chaos'); if (L>=10) pool.push('death'); if (L>=14) pool.push('blood');
@@ -15091,7 +15110,7 @@ function checkPendingLevelUpScreens(){}
 
 // ===================== SECTION: WALKABLE VILLAGE =====================
 function generateAlchemistStock(){
-  const d = mx(1, G.player.level);
+  const d = Math.max(1, Math.round(cbT()));
   G.alchemistStock = [];
   const n = 4+rn(3);
   for (let i=0;i<n;i++) G.alchemistStock.push(genPotion(d+rn(2)));
@@ -15336,7 +15355,7 @@ const QUEST_WANTED_CRIMES = ['burned the east farms','butchered a caravan on the
 function questReward(q, gold, xp, rep, hard){ q.rewardGold = roundH(gold); q.rewardXp = roundH(xp); q.repGain = rep; q.hard = !!hard; q.rewardQuality = hard ? 3 : 2; return q; }
 function generateQuestOffer(tx, ty){
   if (tx===undefined && G.owPos){ tx = G.owPos.x; ty = G.owPos.y; }
-  const lvl = G.player ? G.player.level : 1;
+  const lvl = cbT();   /* (RS-240) the old tier, smooth, for the reward curves; foes are picked by combat level */
   const id = 'q'+Date.now().toString(36)+rn(1e6).toString(36);
   const haveMap = G.ow && G.ow.map && tx!==undefined;
   if (!haveMap) return legacyQuestOffer(id, lvl);
@@ -15655,7 +15674,7 @@ function questArenaWon(){
   G.questCampId = null;
   if (!q || q.progress>=q.target) return;
   q.progress = q.target;
-  const gold = roundH((20+rn(30)+G.player.level*5)*goldFindMult()); G.player.gold += gold;
+  const gold = roundH((20+rn(30)+cbT()*5)*goldFindMult()); G.player.gold += gold;
   logMsg(`the camp is broken - you pick ${gold} gold from its spoils`, 'good');
   questAdvanced(q);
 }
@@ -15744,17 +15763,17 @@ function turnInQuest(id){
   const q = G.player.quests.find(q=>q.id===id);
   if (!q) return;
   if (!questIsReady(q)){ logMsg("you haven't finished that quest yet", 'hit'); renderOverlay(); return; }
-  const lvl = mx(1, G.player.level), qual = q.rewardQuality||2;
+  const lvl = cbLvl(), qual = q.rewardQuality||2;
   const armorSlot = pick(['head','chest','legs','arms','necklace','ring']);
   // a reward is never plain gear: reroll until it reaches (near) the quest's quality
   // the best of a handful of pieces you can already use - usually a step up from what you wear
-  const good = (slot, classOnly)=>{ let best = null; for (let i=0;i<24;i++){ const it = genItem(lvl+2, slot, 2, classOnly); if (!best || itemScore(it) > itemScore(best)) best = it; } return best; };
+  const good = (slot, classOnly)=>{ let best = null; for (let i=0;i<24;i++){ const it = genItem(clampCb(lvl+13), slot, 2, classOnly); if (!best || itemScore(it) > itemScore(best)) best = it; } return best; };
   const options = [
     { kind:'item', it: good('weapon', true), label:'A weapon' },
     { kind:'item', it: good(armorSlot, armorSlot!=='necklace' && armorSlot!=='ring'), label: armorSlot==='necklace'||armorSlot==='ring' ? 'A piece of jewellery' : 'A piece of armour' },
   ];
   if (q.hard) options.push({ kind:'item', it: guaranteedEliteDrop(lvl), label:'A legendary reward', special:true });
-  else { const r = pick(lvl>=10 ? ['chaos','death','blood'] : lvl>=5 ? ['chaos','death'] : ['chaos','mind']); options.push({ kind:'purse', gold: roundH(q.rewardGold*0.8), rsRune:r, runeN: r==='blood' ? 10 : r==='death' ? 15 : 30, label:'A heavy purse' }); }
+  else { const r = pick(lvl>=61 ? ['chaos','death','blood'] : lvl>=29 ? ['chaos','death'] : ['chaos','mind']); options.push({ kind:'purse', gold: roundH(q.rewardGold*0.8), rsRune:r, runeN: r==='blood' ? 10 : r==='death' ? 15 : 30, label:'A heavy purse' }); }
   G.pendingReward = { qid:id, options };
   setUi('questReward');
 }
@@ -15899,7 +15918,7 @@ function spawnBoss(){
   if (!found){ bx=G.genStart.x; by=G.genStart.y; }
 
   const sp = sitePower();
-  const lvl = G.player.level;
+  const lvl = cbT();
   let pdmg = weaponAvg(G.gear.weapon)+meleeStatMod();
   if (pdmg<4) pdmg=4;
   const pHit = playerAtkBonus()+gearStatI('atk');
@@ -15908,13 +15927,13 @@ function spawnBoss(){
   // (and how dangerous) this particular site is, exactly like its regular
   // floors - biased a few levels higher, since a boss should outclass its
   // own dungeon's rank and file
-  const bossLevel = clampMLevel(monsterLevelForDepth(G.dungeonMaxDepth) + 3);
+  const bossLevel = clampCb(floorCb(G.dungeonMaxDepth) + 20);
   // castle/necro build their boss's name/flavor by hand below regardless of
   // refEntry (a knight, a lich) - temple/graveyard/mine fall through to the
   // generic "X overlord" branch, so refEntry is themed the same way any of
   // their regular monsters would be, not always the plain dungeon roster
   const bossSiteSkin = SITE_MONSTER_SKIN[G.siteKind];
-  const refEntry = bossSiteSkin ? pickSkinnedMonsterEntry(bossSiteSkin, bossLevel, 0) : MONSTER_LEVELS[bossLevel-1];
+  const refEntry = bossSiteSkin ? pickSkinnedMonsterEntry(bossSiteSkin, bossLevel, 0) : MONSTER_LEVELS[archOf(bossLevel)-1];
 
   let nm, sym, col, undead, abilities, art;
   if (G.siteKind==='castle'){
@@ -15980,7 +15999,7 @@ function spawnBoss(){
   m.dmg2 = roundH(bd2*sp.dmg);
   m.dmg1 = mn(40, mx(2, roundH(avgHit/((bd2+1)/2)*sp.dmg)));
   m.xp = roundH((refEntry.xp*4 + G.dungeonMaxDepth*15 + lvl*30) * sp.xp);
-  m.sym = sym; m.nm = nm; m.col = col; m.undead = undead; m.mlevel = bossLevel;
+  m.sym = sym; m.nm = nm; m.col = col; m.undead = undead; m.mlevel = archOf(bossLevel); m.cb = bossLevel;
   m.abilities = abilities; m.art = art;
   try{ namedBossApply(m); }catch(e){ console.error(e); }
   // Multiattack splits total damage across several swings rather than
@@ -16075,8 +16094,8 @@ const ACHIEVEMENTS = [
   {id:'slayer', name:'Slayer', desc:'kill 250 monsters', check:p=>p.killCount>=250, bonus:{life:10}},
   {id:'into_the_dark', name:'Into the Dark', desc:'reach depth 5', check:p=>p.bestDepth>=5, bonus:{resist:2}},
   {id:'delver', name:'Delver', desc:'reach depth 10', check:p=>p.bestDepth>=10, bonus:{resist:3}},
-  {id:'level_10', name:'Seasoned', desc:'reach character level 10', check:p=>p.level>=10, bonus:{flatac:1}},
-  {id:'level_20', name:'Legend', desc:'reach character level 20', check:p=>p.level>=20, bonus:{flatac:2}},
+  {id:'level_10', name:'Seasoned', desc:'reach combat level 50', check:p=>(p.combatLevel||3)>=50, bonus:{flatac:1}},
+  {id:'level_20', name:'Legend', desc:'reach combat level 100', check:p=>(p.combatLevel||3)>=100, bonus:{flatac:2}},
   {id:'rich', name:'Rich', desc:'carry 1000 gold at once', check:p=>p.gold>=1000, bonus:{goldfind:0.05}},
   {id:'wealthy', name:'Wealthy', desc:'carry 5000 gold at once', check:p=>p.gold>=5000, bonus:{goldfind:0.1}},
   {id:'quest_runner', name:'Quest Runner', desc:'complete 5 quests', check:p=>p.questsDone>=5, bonus:{xpfind:0.05}},
@@ -16326,7 +16345,7 @@ function tkFamsFor(L, slayer){
   return Object.keys(MON_FAMILIES).filter(k=>{
     if (slayer){ if ((SLAYER_REQ[k]||1) > skLvl('slayer') || (s.blocked||[]).includes(k)) return false; const u = SLAYER_UNLOCK_FAM[k]; if (u && !(s.un||{})[u]) return false; }
     const lv = MON_FAMILIES[k].t.map(t=>t[1]);
-    return Math.min(...lv) <= L + 2 && Math.max(...lv) >= L - 6;
+    return Math.min(...lv) <= L + 13 && Math.max(...lv) >= L - 39;
   });
 }
 function tkPick(a){ return a[rn(a.length)]; }
@@ -16338,15 +16357,15 @@ function tkGatherables(){
   return out;
 }
 function tkMakeContracts(week){
-  const p = G.player, L = p.level||1, mul = week ? 3 : 1, out = [];
+  const p = G.player, L = cbLvl(), LT = cbT(), mul = week ? 3 : 1, out = [];
   const fams = tkFamsFor(L, false), items = tkGatherables();
   // xp contracts name a skill anyone can start on, or one you've already trained a little
   const xpSkills = ['fishing','mining','woodcutting','foraging','cooking','firemaking'].concat(['smithing','crafting','fletching','alchemy','runecrafting'].filter(k=>skLvl(k) >= 10));
   const make = kind=>{
     let t;
-    if (kind==='fam' && fams.length){ const n = (10 + rn(11))*mul; t = { kind:'fam', fam:tkPick(fams), need:n, gold:n*(8 + L*5) }; }
+    if (kind==='fam' && fams.length){ const n = (10 + rn(11))*mul; t = { kind:'fam', fam:tkPick(fams), need:n, gold:Math.round(n*(8 + LT*5)) }; }
     else if (kind==='bag' && items.length){ const it = tkPick(items), n = (15 + rn(16))*mul; t = { kind:'bag', item:it, need:n, gold:Math.round(resValue(it)*n*1.6) + 40*mul }; }
-    else { const k = tkPick(xpSkills), lv = skLvl(k), n = Math.max(60, Math.round((SK_XP[Math.min(100, lv+1)] - SK_XP[lv])*0.5*XP_RATE))*mul;   /* (a daily's worth at the RS-101 pace) */ t = { kind:'xp', skill:k, need:n, gold:(120 + L*20)*mul }; }
+    else { const k = tkPick(xpSkills), lv = skLvl(k), n = Math.max(60, Math.round((SK_XP[Math.min(100, lv+1)] - SK_XP[lv])*0.5*XP_RATE))*mul;   /* (a daily's worth at the RS-101 pace) */ t = { kind:'xp', skill:k, need:n, gold:Math.round((120 + LT*20)*mul) }; }
     return Object.assign(t, { have:0, claimed:false, tokens: week ? 15 : 3 + rn(2), lamp: !!week });
   };
   if (week) out.push(make(tkPick(['fam','bag','xp'])));
@@ -16355,15 +16374,15 @@ function tkMakeContracts(week){
 }
 // ---- the bounty board: three wanted creatures and, once you're seasoned, a wanted boss ----
 function tkMakeBounties(){
-  const L = (G.player && G.player.level) || 1, pool = [];
-  for (const k in MON_FAMILIES) for (const t of MON_FAMILIES[k].t) if (t[1] >= L-4 && t[1] <= L+3) pool.push([t[0], t[1], k]);
+  const L = cbLvl(), pool = [];
+  for (const k in MON_FAMILIES) for (const t of MON_FAMILIES[k].t) if (t[1] >= L-26 && t[1] <= L+20) pool.push([t[0], t[1], k]);
   const out = [], used = new Set();
   for (let i=0; i<3 && pool.length; i++){
     let c = tkPick(pool); for (let j=0; j<8 && used.has(c[2]); j++) c = tkPick(pool);   // three different families where possible
     used.add(c[2]);
-    out.push({ kind:'mon', nm:c[0], lvl:c[1], need:1, have:0, claimed:false, gold:Math.round(40 + c[1]*c[1]*4), tokens:1, bounty:1 });
+    out.push({ kind:'mon', nm:c[0], lvl:c[1], need:1, have:0, claimed:false, gold:Math.round(40 + Math.pow(tierOfCb(c[1]),2)*4), tokens:1, bounty:1 });
   }
-  if (L >= 8){ const b = tkPick(Object.keys(NAMED_BOSSES)), B = NAMED_BOSSES[b];
+  if (L >= 46){ const b = tkPick(Object.keys(NAMED_BOSSES)), B = NAMED_BOSSES[b];
     out.push({ kind:'boss', boss:b, nm:b==='barrows' ? 'one of the Barrows brothers' : b==='dks' ? 'one of the Dagannoth Kings' : 'the '+B.nm, where:B.where, need:1, have:0, claimed:false, gold:1500 + L*100, tokens:5, bounty:1, most:1 }); }
   return out;
 }
@@ -16394,7 +16413,7 @@ function tkOnXp(k, gain){
   }
 }
 function tkTokkulDrop(m){
-  const p = G.player, lvl = m.mlevel || 1, hot = famOf(m)==='demon' || /fire|lava|hell|magma|obsidian|infernal/i.test(m.nm);
+  const p = G.player, lvl = Math.round(tierOfCb(monCombatLevel(m))), hot = famOf(m)==='demon' || /fire|lava|hell|magma|obsidian|infernal/i.test(m.nm);
   let n = 0;
   if (hot) n = lvl*2 + rn(lvl*3 + 1);
   else if (G.gameMode===1 && (G.depth||1) >= 5 && chn(0.25)) n = (G.depth||1)*2 + rn(10);
@@ -16418,7 +16437,7 @@ function slayerMasterName(){ const n = villageNpcFor('slayer'); return n ? n.nam
 function slayerAssign(){
   const p = tkP(), s = p.slay;
   if (s.task){ logMsg(`you're still assigned to ${tkText(s.task).toLowerCase()} (${s.task.have}/${s.task.need})`, ''); return; }
-  let c = tkFamsFor(p.level||1, true);
+  let c = tkFamsFor(cbLvl(), true);
   if (c.length > 1 && s.last) c = c.filter(k=>k!==s.last);
   if (!c.length) c = ['rat','goblin','kobold','zombie'].filter(k=>!s.blocked.includes(k));
   if (!c.length) c = ['goblin'];
@@ -16515,9 +16534,9 @@ function tkQuestPoints(q){
 }
 // ---- the money-making guide: real numbers from the game's own prices, sorted by gold per 100 turns ----
 function mmMethods(){
-  const p = G.player, L = p.level||1, out = [];
+  const p = G.player, L = cbLvl(), out = [];
   const add = (cat, nm, ok, req, each, turns, how)=>out.push({ cat, nm, ok, req, each:Math.round(each), rate:isFinite(turns) ? Math.round(each/turns*100) : null, how });
-  const e = MONSTER_LEVELS[clampMLevel(L)-1], gf = goldFindMult();
+  const e = MONSTER_LEVELS[archOf(L)-1], gf = goldFindMult();
   add('Combat', `Fighting monsters at your level (${e.nm} and its kin)`, true, '', (e.xp-1)/2*gf*coinTrim({ mlevel:e.lvl }), 9, 'coins dropped by each kill, before any loot - deeper floors and better gold find pay more');
   const T = p.slay && p.slay.task;
   add('Combat', 'Slayer tasks', true, '', (e.xp-1)/2*gf*coinTrim({ mlevel:e.lvl }), 9, `the same coins, plus slayer points and slayer xp${T ? ` - your task: ${tkText(T).toLowerCase()}` : ' - get a task from a Slayer Master'}`);
@@ -16551,7 +16570,7 @@ function tkOpen(at, tab){ G.tkAt = at || null; G.tkTab = tab || (at==='board' ? 
 function tkRow(t, list, i, here){
   const pr = tkProg(t), rd = tkReady(t), pct = Math.round(pr/t.need*100);
   const btn = t.claimed ? `<span class="qtag done">claimed</span>` : rd && here ? `<button class="btn primary" onclick="tkClaim('${list}',${i})">claim</button>` : rd ? `<span class="qtag done">ready</span>` : `<span class="muted">${t.kind==='xp' ? Math.floor(pr).toLocaleString() : pr}/${t.need.toLocaleString()}</span>`;
-  const where = t.kind==='fam' ? tkFamWhere(t.fam) : t.kind==='mon' ? `level ${monCombatLevel({ mlevel:t.lvl||1 })} - ${bestWhere(t.nm)}` : t.kind==='boss' ? t.where : t.kind==='bag' ? `you have ${skHave(t.item)}` : `${tkSkillName(t.skill)} level ${skLvl(t.skill)}`;
+  const where = t.kind==='fam' ? tkFamWhere(t.fam) : t.kind==='mon' ? `level ${monCombatLevel({ cb:t.lvl||CB_LO })} - ${bestWhere(t.nm)}` : t.kind==='boss' ? t.where : t.kind==='bag' ? `you have ${skHave(t.item)}` : `${tkSkillName(t.skill)} level ${skLvl(t.skill)}`;
   return `<div class="qoffer ${t.claimed ? 'idle' : rd ? 'ready' : ''}" style="${t.claimed ? 'opacity:0.5' : ''}">
     <span class="qtag ${t.bounty ? 'bounty' : t.lamp ? 'conquest' : 'camp'}">${t.most ? 'most wanted' : t.bounty ? 'wanted' : t.lamp ? 'weekly' : 'daily'}</span>
     <span class="desc"><b>${esc(tkText(t))}</b><br><span class="muted">${esc(where)}</span><div class="qrepbar"><i style="width:${pct}%"></i></div></span>
@@ -16590,7 +16609,7 @@ function buildTasks(){
     body += `<div class="muted" style="font-size:12px;margin-top:8px;">Kills and xp count wherever you are; hand-ins come straight out of your bag when you claim. ${at==='board' ? '' : 'Claim at the bounty board beside the Captain of the Watch in any town.'}</div>`;
   } else if (tab==='bounties'){
     body += `<h4 style="color:var(--ink-faint);margin:4px 0 6px;">WANTED &middot; new posters in ${tkUntil()}</h4>` + (p.bounties.list.map((t,i)=>tkRow(t, 'bounty', i, at==='board')).join('') || '<div class="muted">nothing posted</div>');
-    body += `<div class="muted" style="font-size:12px;margin-top:8px;">The first one of each you kill today earns the bounty. ${p.level < 8 ? 'Once you reach combat level 46 a boss is posted too.' : ''}</div>`;
+    body += `<div class="muted" style="font-size:12px;margin-top:8px;">The first one of each you kill today earns the bounty. ${cbLvl() < 46 ? 'Once you reach combat level 46 a boss is posted too.' : ''}</div>`;
   } else if (tab==='guild'){
     body += `<h4 style="color:var(--ink-faint);margin:4px 0 6px;">THE GUILD STORE &middot; ${p.cur.guild} tokens</h4><div class="muted" style="font-size:12px;margin-bottom:6px;">guild tokens come from contracts and bounties</div>${tkShopRows('guild', GUILD_SHOP, at==='board')}`;
   } else if (tab==='news'){
@@ -17540,7 +17559,7 @@ function renderOverworldMapZoomed(){
     if (t2===OW_TOWN ? !mapF('towns') : !mapSiteShown(x, y)) continue;
     const px = vx*cellPx + cellPx/2, py = vy*cellPx + cellPx/2;
     if (danger && owSiteKind(t2)){ const e = owSiteEstimate(x, y);   // how dangerous it is: a ring in its monsters' level colour
-      ctx.save(); ctx.strokeStyle = monLevelColor({mlevel:e.deep}); ctx.globalAlpha = 0.85; ctx.lineWidth = 3*dpr; ctx.setLineDash([6*dpr, 4*dpr]);
+      ctx.save(); ctx.strokeStyle = monLevelColor({cb:e.deep}); ctx.globalAlpha = 0.85; ctx.lineWidth = 3*dpr; ctx.setLineDash([6*dpr, 4*dpr]);
       ctx.beginPath(); ctx.arc(px, py, iconR*1.75, 0, Math.PI*2); ctx.stroke(); ctx.restore(); }
     pmBadge(ctx, px, py, iconR, t2);
     if (owSiteKind(t2)) owSiteBadgeExtras(ctx, x, y, px, py, iconR);
@@ -18702,10 +18721,10 @@ function wevMon(entry, lvlTo){
   m.dmg1 = entry.dmg1; m.dmg2 = entry.dmg2; m.xp = entry.xp;
   m.sym = entry.sym; m.nm = entry.nm; m.baseNm = entry.nm; m.col = monsterCol(entry); m.undead = entry.undead; m.mlevel = entry.lvl;
   m.abilities = entry.abilities.slice(); m.art = entry.art; monEntryExtras(m, entry);
-  if (lvlTo && entry.lvl < lvlTo){ const k = Math.min(2.4, 1 + 0.09*(lvlTo - entry.lvl)); m.hp = m.maxHp = roundH(m.hp*k); m.dmg2 = roundH(m.dmg2*Math.sqrt(k)); m.xp = roundH(m.xp*k); }
+  if (lvlTo && lvlTo > (m.cb||0)) monScaleCb(m, lvlTo, m.cb || cbOfTier(entry.lvl));
   G.mon.push(m); return m;
 }
-function wevHumanEntry(L){ const lvl = clampMLevel(L); return Object.assign({}, MONSTER_LEVELS[lvl-1], HUMAN_SKIN[chn(0.6) ? 0 : 1], { lvl }); }
+function wevHumanEntry(L){ const cb = clampCb(L), lvl = archOf(cb); return Object.assign({}, MONSTER_LEVELS[lvl-1], HUMAN_SKIN[chn(0.6) ? 0 : 1], { lvl, cb }); }
 function wevCampEntry(kind, L){
   const K = WEV_CAMP_KINDS[kind] || WEV_CAMP_KINDS.goblin;
   if (K.human) return wevHumanEntry(L);
@@ -18715,7 +18734,7 @@ function wevFightStart(kind, id, build){
   if (G.gather) skStop();
   generateArena();
   G.gameMode = 2; G.mandatoryFight = false; G.mon = [];
-  build(clampMLevel(G.player.level));
+  build(cbLvl());
   G.wevFight = { kind, id };
   setUi('playing'); renderGame();
 }
@@ -18731,9 +18750,9 @@ function wevCampFight(c){
 }
 function wevBossFight(b){
   wevFightStart('boss', 0, L=>{
-    const m = wevMon(wevBossEntry(b), Math.min(NMLVL, Math.max(L + 2, 14)));   // (balance, RS-100: it was a pushover from combat 50 on - it fights two tiers up now)
+    const m = wevMon(wevBossEntry(b), clampCb(Math.max(L + 13, 87)));   // (balance, RS-100: it was a pushover from combat 50 on - it fights two tiers up now)
     m.elite = true; m.namedElite = true; m.worldBoss = true;
-    m.maxHp = b.maxHp || roundH(m.maxHp*7 + G.player.level*6); m.dmg2 = roundH(m.dmg2*2.1); m.xp = roundH(m.xp*8); m.ac += 2;
+    m.maxHp = b.maxHp || roundH(m.maxHp*7 + cbT()*6); m.dmg2 = roundH(m.dmg2*2.1); m.xp = roundH(m.xp*8); m.ac += 2;
     m.hp = b.hp && b.hp > 0 ? Math.min(b.hp, m.maxHp) : m.maxHp; b.hp = m.hp; b.maxHp = m.maxHp;
     m.nm = wevBossName(b); m.x = Math.floor(COLS/2); m.y = 3; if (G.map[m.x][m.y]!==T_FLOOR) G.map[m.x][m.y] = T_FLOOR;
   });
@@ -18750,7 +18769,7 @@ function wevSiegeFight(d){
 }
 function wevHighwayFight(purse){
   wevFightStart('highway', 0, L=>{
-    const h = wevMon(wevHumanEntry(L+1), L); upgradeToElite(h); h.nm = 'the highwayman';
+    const h = wevMon(wevHumanEntry(L+6), L); upgradeToElite(h); h.nm = 'the highwayman';
     for (let i=0;i<1+rn(2);i++){ const t = wevMon(wevHumanEntry(L), L); t.nm = 'thug'; }
   });
   G.wevFight.purse = purse;
@@ -18770,12 +18789,12 @@ function wevArenaWon(){
   if (f.kind==='townarena') return townArenaWon(f);
   if (f.kind==='sqfight' || f.kind==='sqboss') return sqFightWon(f);
   if (f.kind==='delve' || f.kind==='hunt') return wgArenaWon(f);
-  const e = wevP(), p = G.player, st = wevStats(), L = p.level;
+  const e = wevP(), p = G.player, st = wevStats(), L = cbT();
   if (f.kind==='camp'){
     const c = e.camps.find(c=>c.id===f.id); if (!c) return false;
     e.camps.splice(e.camps.indexOf(c), 1); st.camps++;
     const gold = roundH((30 + c.size*30 + L*6)*goldFindMult()); p.gold += gold;
-    if (chn(0.3 + c.size*0.12)) addToInventory(genItem(mn(NMLVL, lootLevel()+1)+playerMF(), lootKind(), 3, chn(0.5)));
+    if (chn(0.3 + c.size*0.12)) addToInventory(genItem(lootAt(6), lootKind(), 3, chn(0.5)));
     tkP().cur.guild += c.size >= 3 ? 2 : 1;
     wevSay(`the ${wevCampName(c)} is broken - you burn the tents and take ${gold} gold and ${c.size >= 3 ? 2 : 1} guild token${c.size>=3 ? 's' : ''} from its spoils`, 'good', 'Camp destroyed');
     const ti = wevTerrAt(c.x, c.y), key = wevTerrKey(ti);
@@ -18833,13 +18852,13 @@ function wevOnEnterTown(){
   const e = wevP(), key = curTownKey(), p = G.player; if (!e || !key) return;
   const nm = o3TownName(G.owPos.x, G.owPos.y), turn = wevTurn();
   const rt = p.roadTask;
-  if (rt && rt.key===key){ p.roadTask = null; const gold = roundH((50 + p.level*8)*goldFindMult()); p.gold += gold; p.rep = p.rep || {}; p.rep[key] = repAt(key) + 2; wevStats().road++;
+  if (rt && rt.key===key){ p.roadTask = null; const gold = roundH((50 + cbT()*8)*goldFindMult()); p.gold += gold; p.rep = p.rep || {}; p.rep[key] = repAt(key) + 2; wevStats().road++;
     wevSay(`${rt.name} spots home and runs to a tearful mother, who presses ${gold} gold on you. ${nm} won't forget this (+2 standing)`, 'magic', 'Child returned home'); checkAchievements(); }
   if (e.sacked[key]) logMsg(`${nm} is still clearing up after the raiders - its shops charge a quarter more`, 'hit');
   const t = e.town[key]; if (!t || turn >= t.until) return;
   if (t.kind==='festival'){
     logMsg(`${nm} is celebrating the ${t.name}! Bunting over the plaza, music from the tavern, and 10% off in every shop (${wevTime(t.until-turn)} left)`, 'new', true);
-    if (!t.gift){ t.gift = 1; tkP().cur.guild += 1; const f = SK_FISH[Math.min(SK_FISH.length-1, 1 + Math.floor(p.level/12))]; skAdd('c_'+f.id, 3);
+    if (!t.gift){ t.gift = 1; tkP().cur.guild += 1; const f = SK_FISH[Math.min(SK_FISH.length-1, 1 + Math.floor(cbT()/12))]; skAdd('c_'+f.id, 3);
       logMsg(`a festival-goer presses three cooked ${f.nm.toLowerCase()} and a guild token on you`, 'good'); }
   } else if (t.kind==='market'){ wevMarketNpc(t); logMsg(`it's market day - a travelling trader has set up on the plaza with rare goods (${wevTime(t.until-turn)} left)`, 'new', true); }
   else if (t.kind==='raid' && !t.done){
@@ -18858,7 +18877,7 @@ function wevMarketNpc(t){
   if (!t.stock){
     const L = lootLevel();
     t.stock = [ { id:'lamp', nm:'Lamp of Knowledge', price:1500 }, { id:'clue', nm:'Clue Scroll', price:900 }, { id:'ckey', nm:'Crystal Key', price:2400 }, { id:'potions', nm:'Potion Pack', price:350 } ];
-    for (let i=0;i<2;i++){ const it = genItem(mn(NMLVL, L+3), lootKind(), 3, chn(0.5)); t.stock.push({ id:'gear'+i, nm:it.nm, item:it, price:Math.max(600, roundH((it.price||300)*3)) }); }
+    for (let i=0;i<2;i++){ const it = genItem(clampCb(L+20), lootKind(), 3, chn(0.5)); t.stock.push({ id:'gear'+i, nm:it.nm, item:it, price:Math.max(600, roundH((it.price||300)*3)) }); }
   }
 }
 function wevTownEvent(){ const e = G.ow && G.ow.ev, key = curTownKey(); if (!e || !key) return null; const t = e.town[key]; return t && wevTurn() < t.until ? t : null; }
@@ -18934,14 +18953,14 @@ const WEV_ROAD = {
   },
   sandwich(){
     const foods = ['baguette','triangle sandwich','square sandwich','bread roll','kebab','chocolate bar','meat pie'], want = rn(foods.length);
-    const give = ()=>{ const f = SK_FISH[Math.min(SK_FISH.length-1, 2 + Math.floor(G.player.level/10))]; skAdd('c_'+f.id, 2); wevStats().road++; wevSay(`"That's my lovely!" She tucks two cooked ${f.nm.toLowerCase()} in your bag for later`, 'good'); checkAchievements(); };
+    const give = ()=>{ const f = SK_FISH[Math.min(SK_FISH.length-1, 2 + Math.floor(cbT()/10))]; skAdd('c_'+f.id, 2); wevStats().road++; wevSay(`"That's my lovely!" She tucks two cooked ${f.nm.toLowerCase()} in your bag for later`, 'good'); checkAchievements(); };
     const wrong = ()=>{ const p = G.player, dmg = Math.max(1, Math.round(effMaxHp()*0.08)); p.hp = Math.max(1, p.hp - dmg); wevBlink(5); wevSay(`"I SAID ${foods[want].toUpperCase()}!" She whacks you with the tray (-${dmg} life) and you come to a little way down the road`, 'hit'); };
     wevDialog('The sandwich lady', `A woman with a tray of food steps into the road. "You look famished, dearie! <b>Have a ${foods[want]}</b> - go on!"`,
       foods.map((f,i)=>[cap(f), i===want ? give : wrong]), 'pick the one she offers');
     G.wevDlg.noEsc = true;
   },
   genie(){
-    const L = G.player.level;
+    const L = cbT();
     wevDialog('A genie', `A battered old lamp lies in the road. As you pick it up, a genie bursts out in a cloud of blue smoke. "Free at last! For your trouble, master, one wish - within reason."`,
       [['"Wisdom"', ()=>{ addToInventory(mkLamp()); wevStats().road++; wevSay('the genie hands you a Lamp of Knowledge and winks out of sight', 'good'); checkAchievements(); }],
        ['"Riches"', ()=>{ const g = roundH((120 + L*20)*goldFindMult()); G.player.gold += g; wevStats().road++; wevSay(`gold rains from the sky - ${g} coins!`, 'good'); checkAchievements(); }]], 'someone on the road');
@@ -18949,11 +18968,11 @@ const WEV_ROAD = {
   },
   dwarf(){
     wevDialog('A drunken dwarf', `A dwarf is weaving down the road, singing. He throws an arm round your shoulders. "Yer me besht mate, you are! Have a kebab! Have TWO kebabs!"`,
-      [['Take the kebabs', ()=>{ const f = SK_FISH[Math.min(SK_FISH.length-1, 1 + Math.floor(G.player.level/12))]; skAdd('c_'+f.id, 2); wevStats().road++; wevSay(`they're... probably ${f.nm.toLowerCase()}. They'll do (two cooked ${f.nm.toLowerCase()})`, 'good'); checkAchievements(); }],
-       ['Help him home to bed', ()=>{ const g = roundH(30 + G.player.level*4); G.player.gold += g; wevStats().road++; wevSay(`you steer him to a hay barn. He presses ${g} gold on you before he starts snoring`, 'good'); checkAchievements(); }]], 'someone on the road');
+      [['Take the kebabs', ()=>{ const f = SK_FISH[Math.min(SK_FISH.length-1, 1 + Math.floor(cbT()/12))]; skAdd('c_'+f.id, 2); wevStats().road++; wevSay(`they're... probably ${f.nm.toLowerCase()}. They'll do (two cooked ${f.nm.toLowerCase()})`, 'good'); checkAchievements(); }],
+       ['Help him home to bed', ()=>{ const g = roundH(30 + cbT()*4); G.player.gold += g; wevStats().road++; wevSay(`you steer him to a hay barn. He presses ${g} gold on you before he starts snoring`, 'good'); checkAchievements(); }]], 'someone on the road');
   },
   highway(){
-    const purse = Math.min(G.player.gold, roundH(30 + G.player.level*6));
+    const purse = Math.min(G.player.gold, roundH(30 + cbT()*6));
     wevDialog('A highwayman', `A masked rider blocks the road and levels a crossbow at you. "Stand and deliver! ${purse} gold, and you ride on."`,
       [[`Pay him (${purse} gold)`, ()=>{ G.player.gold -= purse; logMsg(`you hand over ${purse} gold. He tips his hat and gallops off`, 'hit'); }], ['Fight', ()=>wevHighwayFight(purse)]], 'someone on the road');
     G.wevDlg.noEsc = true;
@@ -19277,11 +19296,11 @@ function useWorldCode(){
 function copyWorldCode(){ const c = worldCode(); try{ navigator.clipboard.writeText(c).then(()=>notify('World code copied: ' + c, 'good'), ()=>notify('World code: ' + c, 'good')); }catch(e){ notify('World code: ' + c, 'good'); } }
 // ---- the rarer biomes, painted over the base ground ----
 const BIO = [null,
-  { id:'volcanic', nm:'volcanic land', col:'rgb(70,48,40)',  rgb:[96,70,60],   chart:[150,118,100], fams:['demon','giant'],        band:16, names:['the {adj} Ashlands','the Burning Wastes of {pn}','the {pn} Cinderlands'] },
-  { id:'jungle',   nm:'jungle',        col:'rgb(22,74,30)',  rgb:[40,100,40],   chart:[110,156,84],  fams:['spider','swamp'],       band:9,  names:['the {pn} Jungle','the {adj} Jungle','the Green Hell of {pn}'] },
-  { id:'haunted',  nm:'haunted forest',col:'rgb(40,46,52)',  rgb:[58,66,64],    chart:[122,128,124], fams:['zombie','skeleton','night'], band:11, names:['the Haunted Wood of {pn}','the {adj} Gloom','the Shrouded Forest of {pn}'] },
-  { id:'highland', nm:'snowy highlands',col:'rgb(150,160,172)',rgb:[190,198,210], chart:[214,220,228], fams:['tundra','giant'],       band:13, names:['the {pn} Highlands','the {adj} Fells','the High Moors of {pn}'] },
-  { id:'crystal',  nm:'crystal wasteland',col:'rgb(120,130,160)',rgb:[150,160,196], chart:[196,200,226], fams:['kobold','desert'],     band:14, names:['the Crystal Waste of {pn}','the {adj} Glitterlands','the Shardfields of {pn}'] },
+  { id:'volcanic', nm:'volcanic land', col:'rgb(70,48,40)',  rgb:[96,70,60],   chart:[150,118,100], fams:['demon','giant'],        band:100, names:['the {adj} Ashlands','the Burning Wastes of {pn}','the {pn} Cinderlands'] },
+  { id:'jungle',   nm:'jungle',        col:'rgb(22,74,30)',  rgb:[40,100,40],   chart:[110,156,84],  fams:['spider','swamp'],       band:55,  names:['the {pn} Jungle','the {adj} Jungle','the Green Hell of {pn}'] },
+  { id:'haunted',  nm:'haunted forest',col:'rgb(40,46,52)',  rgb:[58,66,64],    chart:[122,128,124], fams:['zombie','skeleton','night'], band:68, names:['the Haunted Wood of {pn}','the {adj} Gloom','the Shrouded Forest of {pn}'] },
+  { id:'highland', nm:'snowy highlands',col:'rgb(150,160,172)',rgb:[190,198,210], chart:[214,220,228], fams:['tundra','giant'],       band:81, names:['the {pn} Highlands','the {adj} Fells','the High Moors of {pn}'] },
+  { id:'crystal',  nm:'crystal wasteland',col:'rgb(120,130,160)',rgb:[150,160,196], chart:[196,200,226], fams:['kobold','desert'],     band:87, names:['the Crystal Waste of {pn}','the {adj} Glitterlands','the Shardfields of {pn}'] },
 ];
 function wgBioAt(x, y){ const b = G.ow && G.ow.bio; return b && x>=0 && y>=0 && x<OW_COLS && y<OW_ROWS ? b[y*OW_COLS+x] : 0; }
 // ---- the Wilderness: a lawless band along the edge farthest from where you began ----
@@ -19486,13 +19505,13 @@ function wgState(){
 function wgPoiAt(x, y){ return (G.ow.pois||[]).find(p=>p.x===x && p.y===y) || null; }
 const POI_TITLE = { cache:'Buried cache', hamlet:'Hamlet', view:'Lookout', cave:'Cave', grotto:'Grotto', ruin:'Ruins', stones:'Standing stones', oldcamp:'Abandoned camp', well:'Wishing well', hermit:'Hermit', ferry:'Ferry landing' };
 // ---- how dangerous each part of the land is: a monster level for every tile ----
-function wgTerrBand(ti){ const t = wevTowns()[ti], sp = G.ow.spawnPos; if (!t || !sp) return 1; const maxD = Math.hypot(OW_COLS, OW_ROWS)/2; return clampMLevel(1 + Math.round(Math.hypot(t[0]-sp.x, t[1]-sp.y)/maxD*14)); }
+function wgTerrBand(ti){ const t = wevTowns()[ti], sp = G.ow.spawnPos; if (!t || !sp) return 1; const maxD = Math.hypot(OW_COLS, OW_ROWS)/2; return clampCb(cbOfTier(1 + Math.hypot(t[0]-sp.x, t[1]-sp.y)/maxD*14)); }
 function wgBand(x, y){
-  const wl = wgWildLevel(x, y); if (wl) return clampMLevel(9 + Math.round(wl*0.38));
+  const wl = wgWildLevel(x, y); if (wl) return clampCb(cbOfTier(9 + wl*0.38));
   const b = wgBioAt(x, y); if (b) return BIO[b].band;
   const ti = wevTerrAt(x, y); return ti < 0 ? 1 : wgTerrBand(ti);
 }
-function wgBandText(band){ const lo = monCombatLevel({mlevel:Math.max(1, band-1)}), hi = monCombatLevel({mlevel:Math.min(NMLVL, band+1)}); return `combat ${lo}-${hi}`; }
+function wgBandText(band){ return `combat ${clampCb(band-6)}-${clampCb(band+6)}`; }
 // the area you're in: the Wilderness, a named rare biome, or a town's lands
 function wgArea(x, y){
   const wl = wgWildLevel(x, y); if (wl) return { key:'wild', name:'the Wilderness', band:wgBand(x, y), wild:wl };
@@ -19501,9 +19520,9 @@ function wgArea(x, y){
 }
 // arena fights: halfway between your own level and the land's, and never easier than the land in the Wilderness
 function wgArenaLevel(){
-  const pl = clampMLevel(G.player.level); if (!G.ow || !G.ow.map || !G.owPos || !G.ow.bio) return pl;
+  const pl = cbLvl(); if (!G.ow || !G.ow.map || !G.owPos || !G.ow.bio) return pl;
   const b = wgBand(G.owPos.x, G.owPos.y);
-  return wgWildLevel(G.owPos.x, G.owPos.y) ? clampMLevel(Math.max(pl, b)) : clampMLevel(Math.round((pl + b)/2));
+  return wgWildLevel(G.owPos.x, G.owPos.y) ? clampCb(Math.max(pl, b)) : clampCb((pl + b)/2);
 }
 // ---- walking the land: roads, rivers, the Wilderness, the area you're in ----
 // on a road every other step costs no turn (like running); wading a river off the road costs an extra one
@@ -19525,7 +19544,7 @@ function wgOnStep(prevKey){
     if (a.wild){ (p.wgStat = p.wgStat||{}).maxWild = Math.max((p.wgStat.maxWild||0), a.wild); }
     if (a.wild){ notify(`Wilderness level ${a.wild} - ${wgBandText(a.band)}`, 'warn');
       if (!p.wildWarned){ p.wildWarned = 1; wevDialog('The Wilderness', `You are about to enter <b>the Wilderness</b>, a lawless land along the edge of the world. The monsters here are strong and the pickings rich - but <b>if you die here you lose everything but your 3 most valuable items for good</b>; there is no gravestone to go back to. The deeper you go, the higher the Wilderness level.`, [['Go on', ()=>{}], ['Turn back', ()=>{ if (prevKey){ const [px,py] = prevKey.split('|')[0].split(',').map(Number); G.owPos.x = px; G.owPos.y = py; } }]]); } }
-    else if (first || turn - (p._areaT||0) > 30) notify(`${cap(a.name)} - ${wgBandText(a.band)}`, a.band > clampMLevel(p.level)+2 ? 'warn' : 'info');
+    else if (first || turn - (p._areaT||0) > 30) notify(`${cap(a.name)} - ${wgBandText(a.band)}`, a.band > cbLvl()+13 ? 'warn' : 'info');
     p._areaT = turn;
     logMsg(`you enter ${a.name} (recommended ${wgBandText(a.band)})`, a.wild ? 'hit' : '');
   }
@@ -19563,7 +19582,7 @@ function wgLore(poi){ const s = wgState(), t = WG_LORE[poi.seed % WG_LORE.length
 function wgDelve(poi){
   const kind = poi.k, nm = poi.name;
   wevFightStart('delve', poi.id, L=>{
-    const lvl = clampMLevel(Math.max(L, wgBand(poi.x, poi.y)));
+    const lvl = clampCb(Math.max(L, wgBand(poi.x, poi.y)));
     // two rooms joined by a passage, walls everywhere else; the way out is behind you
     for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++){ G.map[x][y] = T_WALL; if (G.arenaDeco) G.arenaDeco[x][y] = 'rock'; }
     const carve = (x0,y0,x1,y1)=>{ for (let x=x0;x<=x1;x++) for (let y=y0;y<=y1;y++){ G.map[x][y] = T_FLOOR; if (G.arenaDeco) G.arenaDeco[x][y] = ''; } };
@@ -19580,8 +19599,8 @@ function wgDelve(poi){
 function wgDelveWon(f){
   const poi = (G.ow.pois||[]).find(p=>p.id===f.id); if (!poi) return;
   const s = wgState(); s.done[poi.id] = 1;
-  const p = G.player, gold = roundH((40 + wgBand(poi.x, poi.y)*14 + p.level*4)*goldFindMult()); p.gold += gold;
-  const it = genItem(mn(NMLVL, lootLevel()+1)+playerMF(), lootKind(), 3, chn(0.5)); addToInventory(it);
+  const p = G.player, gold = roundH((40 + tierOfCb(wgBand(poi.x, poi.y))*14 + cbT()*4)*goldFindMult()); p.gold += gold;
+  const it = genItem(lootAt(6), lootKind(), 3, chn(0.5)); addToInventory(it);
   wevSay(`the last foe falls. In the back of ${poi.name} you find a chest: ${gold} gold and ${itemNameHtml(it)}`, 'loot', `${cap(poi.name)} cleared`);
   logMsg(wgLore(poi), 'magic');
   (p.wgStat = p.wgStat||{}).delves = ((p.wgStat||{}).delves||0) + 1; checkAchievements();
@@ -19605,9 +19624,9 @@ const WG_POI = {
   cache(poi){
     const s = wgState(); if (s.done[poi.id]){ logMsg('a hole where the cache was - you dug it up already', ''); return; }
     wevDialog('A buried cache', `A weathered post marks a spot in the sand, carved with an X. Someone buried something here long ago.`, [['Dig', ()=>{
-      s.done[poi.id] = 1; const p = G.player, gold = roundH((150 + p.level*20)*goldFindMult()); p.gold += gold;
+      s.done[poi.id] = 1; const p = G.player, gold = roundH((150 + cbT()*20)*goldFindMult()); p.gold += gold;
       const gems = ['sapphire','emerald','ruby','diamond'], g = gems[Math.min(3, Math.floor(Math.random()*Math.random()*4))]; skAdd(g, 1); skAdd('pearl', 1 + rn(2));
-      let extra = ''; if (chn(0.5)){ const it = genItem(mn(NMLVL, lootLevel()+2)+playerMF(), lootKind(), 3, chn(0.5)); addToInventory(it); extra = `, ${itemNameHtml(it)}`; }
+      let extra = ''; if (chn(0.5)){ const it = genItem(lootAt(13), lootKind(), 3, chn(0.5)); addToInventory(it); extra = `, ${itemNameHtml(it)}`; }
       wevSay(`you dig up an iron-bound chest: ${gold} gold, a ${skName(g).toLowerCase()} and pearls${extra}`, 'loot', 'Treasure!'); }], ['Leave it', ()=>{}]], 'on the island');
   },
   hamlet(poi){
@@ -19618,7 +19637,7 @@ const WG_POI = {
     const have = skHave(job.id), p = G.player;
     wevDialog(poi.name, `A farmer leans on the fence of ${esc(poi.name)}. A windmill creaks over the fields and hens scratch in the yard. ${job.done ? '"That\'s all I need today - come back tomorrow."' : `"I could use <b>${job.n} ${esc(job.nm.toLowerCase())}</b>, if you've got them - I'll pay fair." (you have ${have})`}`,
       [[job.done ? 'Nothing more today' : `Hand over ${job.n} ${job.nm.toLowerCase()}`, ()=>{ if (job.done) return; if (skHave(job.id) < job.n){ notify(`You need ${job.n} ${job.nm.toLowerCase()}`, 'warn'); return; }
-          skAdd(job.id, -job.n); job.done = 1; const gold = roundH((60 + job.n*12 + p.level*5)*goldFindMult()); p.gold += gold; if (key){ p.rep = p.rep||{}; p.rep[key] = repAt(key) + 1; }
+          skAdd(job.id, -job.n); job.done = 1; const gold = roundH((60 + job.n*12 + cbT()*5)*goldFindMult()); p.gold += gold; if (key){ p.rep = p.rep||{}; p.rep[key] = repAt(key) + 1; }
           (p.wgStat = p.wgStat||{}).jobs = ((p.wgStat||{}).jobs||0) + 1; wevSay(`the farmer pays you ${gold} gold${key ? ` (+1 standing with ${o3TownName(near[0], near[1])})` : ''}`, 'good'); checkAchievements(); }],
        ['Buy a basket of food (5 cooked meat, 60 gold)', ()=>{ if (p.gold < 60){ notify('You need 60 gold', 'warn'); return; } p.gold -= 60; skAdd('c_meat', 5); logMsg('you buy a basket of cooked meat for the road', 'good'); }],
        ['Sleep in the hay barn (a safe rest)', ()=>{ if (fullyRestPlayer()) logMsg('you sleep soundly in the hay and wake refreshed', 'good'); else logMsg('you rest a while in the hay', ''); p.runEnergy = 100; }],
@@ -19627,7 +19646,7 @@ const WG_POI = {
   view(poi){
     const s = wgState(), first = !s.done[poi.id];
     owReveal(poi.x, poi.y, 32);
-    if (first){ s.done[poi.id] = 1; gainXP(40 + G.player.level*8); (G.player.wgStat = G.player.wgStat||{}).views = ((G.player.wgStat||{}).views||0) + 1; checkAchievements(); }
+    if (first){ s.done[poi.id] = 1; gainXP(40 + cbT()*8); (G.player.wgStat = G.player.wgStat||{}).views = ((G.player.wgStat||{}).views||0) + 1; checkAchievements(); }
     wevSay(`you climb ${poi.name}. The land spreads out below you for leagues - it's all on your map now${first ? ', and the climb did you good' : ''}`, 'magic', first ? 'Lookout reached - the map is revealed' : null);
   },
   cave(poi){ if (wgState().done[poi.id]){ logMsg(`${cap(poi.name)} is empty now - only bones and old torches`, ''); return; } wevDialog(cap(poi.name), `A dark opening in the cliff. Cold air breathes out of it, and you hear something moving deep inside.`, [['Go in', ()=>wgDelve(poi)], ['Not now', ()=>{}]], 'a cave in the cliffs'); },
@@ -19642,7 +19661,7 @@ const WG_POI = {
   },
   oldcamp(poi){
     const s = wgState(); if (s.done[poi.id]){ logMsg('the abandoned camp has nothing more to give', ''); return; } s.done[poi.id] = 1;
-    const p = G.player, r = poi.seed % 4, gold = roundH((20 + p.level*6)*goldFindMult()); p.gold += gold;
+    const p = G.player, r = poi.seed % 4, gold = roundH((20 + cbT()*6)*goldFindMult()); p.gold += gold;
     const what = r===0 ? (skAdd('c_trout', 3), 'three cooked trout') : r===1 ? (addArrows(25, 0), 'a bundle of 25 arrows') : r===2 ? (addToInventory(genPotion(lootLevel())), 'a potion') : (skAdd('logs', 6), 'a stack of dry logs');
     wevSay(`you search the abandoned camp: a torn tent, a cold fire pit... and ${what} and ${gold} gold left behind in a hurry`, 'loot');
   },
@@ -19718,7 +19737,7 @@ function wgHunt(a){
   if (w.k==='bird'){ logMsg('the birds wheel away overhead - you can\'t catch those', ''); return; }
   if (d > reach){ logMsg(`the ${WG_WILD[w.k].nm} is too far off - get closer${ranged ? '' : ' (a bow lets you hunt from further away)'}`, ''); o3WalkTo({ x:Math.floor(w.x), y:Math.floor(w.z) }); return; }
   if (w.k==='boar'){ w.alive = false; w.gone = 1; wgState().hunted[w.key] = wevTurn();
-    wevFightStart('hunt', 0, L=>{ const e = Object.assign({}, MONSTER_LEVELS[clampMLevel(L)-1], { nm:'giant boar', sym:'p', rgb:[120,90,80], abilities:[], art:MONSTER_LEVELS[0].art }); wevMon(e, L); });
+    wevFightStart('hunt', 0, L=>{ const e = Object.assign({}, MONSTER_LEVELS[archOf(L)-1], { nm:'giant boar', sym:'p', rgb:[120,90,80], abilities:[], art:MONSTER_LEVELS[0].art, cb:L }); wevMon(e, L); });
     wevSay('the boar squeals and charges!', 'new'); return; }
   const ch = (ranged ? 0.8 : 0.5) * (w.k==='rabbit' ? 1.1 : 1);
   if (!chn(ch)){ w.flee = 2.5; logMsg(`you ${ranged ? 'loose an arrow' : 'lunge'} at the ${WG_WILD[w.k].nm} - and miss. It bolts!`, 'miss'); return; }
@@ -20110,7 +20129,7 @@ function o3Wildlife(dt){
 function wgWildWin(){
   if (!G.ow || !G.ow.wild || !G.owPos) return; const wl = wgWildLevel(G.owPos.x, G.owPos.y); if (!wl) return;
   const p = G.player, gold = roundH((10 + wl*6)*goldFindMult()); p.gold += gold; let extra = '';
-  if (chn(0.15 + wl*0.01)){ const it = genItem(mn(NMLVL, lootLevel()+2)+playerMF(), lootKind(), 3, chn(0.5)); addToInventory(it); extra = ` and ${itemNameHtml(it)}`; }
+  if (chn(0.15 + wl*0.01)){ const it = genItem(lootAt(13), lootKind(), 3, chn(0.5)); addToInventory(it); extra = ` and ${itemNameHtml(it)}`; }
   logMsg(`the Wilderness pays well: ${gold} extra gold${extra}`, 'loot');
 }
 // the route planner's path: along the roads where it can, round sites, never through water you can't sail
@@ -20233,7 +20252,7 @@ function islandOnStep(){
   const s = wgState(); s.charted = s.charted || {};
   if (s.charted[isl.id]) return;
   s.charted[isl.id] = 1; owReveal(isl.cx, isl.cy, Math.min(16, 4 + Math.round(Math.sqrt(isl.n))));
-  gainXP(30 + G.player.level*6); (G.player.wgStat = G.player.wgStat||{}).isles = Object.keys(s.charted).length;
+  gainXP(30 + cbT()*6); (G.player.wgStat = G.player.wgStat||{}).isles = Object.keys(s.charted).length;
   notify('Charted: ' + cap(isl.name), 'good'); logMsg(`you step ashore on ${isl.name} and mark it on your sea charts - look for pearl beds on its shores, sunstone in its rocks, and a buried cache`, 'magic');
   checkAchievements();
 }
@@ -21085,7 +21104,7 @@ function townBench(kind){
   if (kind==='crates'){
     const k = 'crates'; if (rec.day[k]===today){ logMsg('you\'ve already turned the crates over today', ''); renderGame(); return true; }
     rec.day[k] = today; const r = Math.random();
-    if (r < 0.15 && G.inv.length < MAXINV){ const it = genItem(mx(1, lootLevel()-1), lootKind(), 2); addToInventory(it); logMsg(`at the bottom of a crate, under the straw: ${itemNameHtml(it)}`, 'loot', true); }
+    if (r < 0.15 && G.inv.length < MAXINV){ const it = genItem(clampCb(lootLevel()-6), lootKind(), 2); addToInventory(it); logMsg(`at the bottom of a crate, under the straw: ${itemNameHtml(it)}`, 'loot', true); }
     else if (r < 0.6){ const g = 8 + rn(25); p.gold += g; logMsg(`you find ${g} gold that rolled behind the crates`, 'loot'); }
     else { skAdd(SK_LOG[0].id, 3); logMsg('nothing but straw - and three logs, which the Peddler says you can keep', ''); }
     renderGame(); return true; }
@@ -21104,7 +21123,7 @@ function townGuild(k){
   else if (k==='wizards') opts = [daily('Collect the guild\'s runes', ()=>{ skAdd('r_chaos', 30); const m = 35*rsLvl('magic'); skGainXP('magic', m); logMsg(`the archmage hands you 30 chaos runes and a lecture (+${m} Magic xp)`, 'magic'); })];
   else if (k==='cooks') opts = [['Cook on the guild range', ()=>{ G.cookAt = 'guild'; setUi('cook'); }]];
   else if (k==='miners') opts = [daily('Work the guild seam', ()=>{ const n = 4 + Math.floor(skLvl('mining')/15); skAdd('coal', n*2); skAdd('mithril', n); const xp = n*120; skGainXP('mining', xp); logMsg(`you work the guild seam: ${n*2} coal and ${n} mithril ore (+${xp} Mining xp)`, 'loot'); })];
-  else if (k==='champions') opts = [daily('Claim the champion\'s purse and train', ()=>{ const g = roundH((200 + G.player.level*20)*goldFindMult()); G.player.gold += g; for (const sk of ['attack','strength','defence']) skGainXP(sk, 20*rsLvl(sk)); logMsg(`the Champions pay you ${g} gold and put you through your paces`, 'good'); })];
+  else if (k==='champions') opts = [daily('Claim the champion\'s purse and train', ()=>{ const g = roundH((200 + cbT()*20)*goldFindMult()); G.player.gold += g; for (const sk of ['attack','strength','defence']) skGainXP(sk, 20*rsLvl(sk)); logMsg(`the Champions pay you ${g} gold and put you through your paces`, 'good'); })];
   else opts = [['Gem-cutting table', ()=>useBench('gemcut')], ['Jeweller\'s bench', ()=>useBench('jeweller')], ['Loom', ()=>useBench('loom')], ['Potter\'s wheel', ()=>useBench('wheel')]];
   wevDialog(g.nm, `Members get to ${g.perk}.`, opts.concat([['Leave', ()=>{}]]), 'the guild hall');
 }
@@ -21133,11 +21152,11 @@ function buildTemple(){
 function townTemplePray(){ const p = G.player; p.prayPts = rsLvl('prayer'); p.poisonTurns = 0; p.poisonDmg = 0; logMsg('the priest prays over you - your prayer is restored', 'magic'); sfx('spell'); renderOverlay(); }
 function townHolySymbol(){ return G.inv.concat(Object.values(G.gear)).find(it=>it && it.used && /symbol/i.test((it.nm||'') + ' ' + (it.basis||'')) && !it.blessed) || null; }
 function townBless(){ const p = G.player, it = townHolySymbol(); if (!it || p.gold < 250) return; p.gold -= 250; it.blessed = 1; it.prayB = (it.prayB||0) + 3; it.nm += ' (blessed)'; logMsg(`the priest blesses your ${esc(it.nm)} (+3 prayer bonus)`, 'magic', true); sfx('spell'); renderOverlay(); saveCurrentGame(); }
-function townCrusadeNeed(){ return 8 + Math.min(12, Math.floor(G.player.level/3)); }
+function townCrusadeNeed(){ return 8 + Math.min(12, Math.floor(cbT()/3)); }
 function townCrusadeTake(){ const info = townInfo(); G.player.crusade = { key:info.key, town:info.name, need:townCrusadeNeed(), got:0 }; logMsg(`you take up the priest's crusade: slay ${G.player.crusade.need} undead`, 'new'); renderOverlay(); }
 function townCrusadeDone(){
   const p = G.player, c = p.crusade, info = townInfo(); if (!c || c.got < c.need || c.key!==info.key) return;
-  const gold = roundH((80 + c.need*20 + p.level*10)*goldFindMult()), xp = 60*rsLvl('prayer') + c.need*30;
+  const gold = roundH((80 + c.need*20 + cbT()*10)*goldFindMult()), xp = 60*rsLvl('prayer') + c.need*30;
   p.gold += gold; skGainXP('prayer', xp); p.rep = p.rep || {}; p.rep[info.key] = repAt(info.key) + 2; p.crusades = (p.crusades||0) + 1; p.crusade = null;
   logMsg(`the priest blesses you: ${gold} gold and ${xp} Prayer xp, and ${info.name} thinks better of you (+2 standing)`, 'magic', true); sfx('achievement'); checkAchievements(); renderOverlay(); saveCurrentGame();
 }
@@ -21157,7 +21176,7 @@ function arenaFight(){
   const info = townInfo(); if (!G.arenaRun || G.arenaRun.key!==info.key) G.arenaRun = { key:info.key, wave:0 };
   const wave = G.arenaRun.wave + 1, kinds = Object.keys(WEV_CAMP_KINDS);
   wevFightStart('townarena', wave, L=>{
-    const n = Math.min(5, 1 + Math.floor(wave/2)), lv = clampMLevel(L + Math.floor(wave/3));
+    const n = Math.min(5, 1 + Math.floor(wave/2)), lv = clampCb(L + Math.floor(wave/3)*CB_PER_TIER);
     for (let i=0;i<n;i++) wevMon(wevCampEntry(kinds[(wave + i) % kinds.length], lv), lv);
     if (wave % 5===0) upgradeToNamedElite(G.mon[0]); else if (wave >= 3) upgradeToElite(G.mon[0]);
   });
@@ -21166,7 +21185,7 @@ function arenaFight(){
 function townArenaWon(f){
   const run = G.arenaRun, a = arenaRec(), p = G.player; if (!run) return false;
   run.wave = f.id; a.wins++; a.best = Math.max(a.best, run.wave);
-  const gold = roundH((40 + run.wave*40 + p.level*5)*goldFindMult()); p.gold += gold;
+  const gold = roundH((40 + run.wave*40 + cbT()*5)*goldFindMult()); p.gold += gold;
   const info = townInfo(), titles = { 5:'Arena Fighter', 10:'Champion of '+info.name, 15:'Grand Champion' }, t = titles[run.wave];
   let extra = ''; if (t && !a.titles.includes(t)){ a.titles.push(t); extra = ` You are named <b>${esc(t)}</b>!`; sfx('achievement'); }
   enterVillage(); G.player.x = tX(23); G.player.y = tY(8); if (G.map[G.player.x][G.player.y]!==T_FLOOR){ G.player.x = TOWN_CX; G.player.y = ROWS-3; }
@@ -21210,7 +21229,7 @@ function mgBestDish(){ const c = SK_FISH.concat(SK_MEAT).filter(f=>skHave('c_'+f
 function mgCook(){
   const d = mgBestDish(), p = G.player, m = mgRec(), rec = townInfo().rec, today = townDay(); if (!d || rec.day.cook===today) return;
   rec.day.cook = today; skAdd('c_'+d.id, -1);
-  const score = Math.round((d.cook||1) + skLvl('cooking')*0.6 + Math.random()*25), rivals = [0,0,0].map(()=>Math.round(15 + Math.random()*45 + p.level*0.4));
+  const score = Math.round((d.cook||1) + skLvl('cooking')*0.6 + Math.random()*25), rivals = [0,0,0].map(()=>Math.round(15 + Math.random()*45 + cbT()*0.4));
   const place = 1 + rivals.filter(r=>r > score).length, prize = [0, 300, 120, 40, 0][place]; p.gold += prize; m.cook = Math.max(m.cook, score); if (place===1) m.wins++;
   G.mgLast = `The judges taste your ${d.nm.toLowerCase()} and score it ${score} (the others: ${rivals.join(', ')}). ${['','First place!','Second place.','Third place.','No placing this time.'][place]}${prize ? ` You win ${prize} gold.` : ''}`;
   logMsg(G.mgLast, place===1 ? 'good' : ''); sfx(place===1 ? 'achievement' : 'click'); checkAchievements(); renderOverlay();
@@ -21578,8 +21597,8 @@ function ecoNoteSale(it){
 // the Peddler's shelf, kept between visits
 function ecoShopStock(info){
   const k = curTownKey(); if (!k || !G.shopStock) return; const r = townRec(k), turn = wevTurn(), fresh = G.shopStock;
-  if (info && info.rec.up.market){ const d = mx(1, G.player.level); for (let i=0;i<3;i++) fresh.push(rsPeddlerWare(d+3, pick(['bow','staff','hide','cloth','jewel']))); }
-  if (!r.shop || Math.abs((r.shop.lv||0) - G.player.level) >= 3 || turn - r.shop.full > DAY_LENGTH*2 || r.shop.cap !== fresh.length){ r.shop = { items:fresh.slice(), at:turn, full:turn, lv:G.player.level, cap:fresh.length }; }
+  if (info && info.rec.up.market){ const d = cbLvl(); for (let i=0;i<3;i++) fresh.push(rsPeddlerWare(clampCb(d+20), pick(['bow','staff','hide','cloth','jewel']))); }
+  if (!r.shop || Math.abs((r.shop.lv||0) - cbLvl()) >= 20 || turn - r.shop.full > DAY_LENGTH*2 || r.shop.cap !== fresh.length){ r.shop = { items:fresh.slice(), at:turn, full:turn, lv:cbLvl(), cap:fresh.length }; }
   else {
     const n = Math.floor((turn - r.shop.at)/ECO_RESTOCK);
     for (let i=0; i<n && r.shop.items.length < r.shop.cap; i++) r.shop.items.push(fresh[(r.shop.items.length + i) % fresh.length]);
@@ -22935,8 +22954,8 @@ function sqFight(id){
   const cellar = st.foe==='rats';
   wevFightStart('sqfight', id, L=>{
     if (cellar) sqMakeCellar();
-    const lv = clampMLevel(L + (st.lvl||0));
-    for (let i=0;i<st.n;i++){ const e = st.foe==='rats' ? Object.assign({}, MONSTER_LEVELS[Math.max(0, lv-1)], { nm:'giant rat', sym:'r', rgb:[110,90,74], abilities:[], art:MONSTER_LEVELS[0].art }) : st.foe==='human' ? wevHumanEntry(lv) : wevCampEntry(st.foe, lv); const m = wevMon(e, lv); if (st.foe==='rats'){ m.nm = 'giant rat'; } }
+    const lv = clampCb(L + (st.lvl||0)*CB_PER_TIER);
+    for (let i=0;i<st.n;i++){ const e = st.foe==='rats' ? Object.assign({}, MONSTER_LEVELS[archOf(lv)-1], { nm:'giant rat', sym:'r', rgb:[110,90,74], abilities:[], art:MONSTER_LEVELS[0].art, cb:lv }) : st.foe==='human' ? wevHumanEntry(lv) : wevCampEntry(st.foe, lv); const m = wevMon(e, lv); if (st.foe==='rats'){ m.nm = 'giant rat'; } }
     if (st.elite) upgradeToElite(G.mon[0]);
     if (cellar) G.mon.forEach((m, i)=>{ m.x = 3 + (i*2)%6; m.y = 2 + (i%2); });
   });
@@ -22965,8 +22984,8 @@ function sqBossFight(id, key){
   const B = SQ_BOSSES[key]; if (!B) return;
   const s = sqP()[id], ally = s.flags.ally;
   wevFightStart('sqboss', id, L=>{
-    const lv = clampMLevel(Math.max(L, 8));
-    const e = B.human ? wevHumanEntry(lv + 2) : famPickFrom([B.fam], lv + 2, 3) || famEntry(B.fam, 0);
+    const lv = clampCb(Math.max(L, 48));
+    const e = B.human ? wevHumanEntry(lv + 13) : famPickFrom([B.fam], lv + 13, 3) || famEntry(B.fam, 0);
     const m = wevMon(e, lv); upgradeToNamedElite(m); m.nm = B.nm; m.sqBoss = key; m.undead = !!B.undead;
     m.maxHp = m.hp = roundH(m.maxHp*B.hp); m.dmg2 = roundH(m.dmg2*B.dmg); m.xp = roundH(m.xp*6); m.x = Math.floor(COLS/2); m.y = 3; if (G.map[m.x][m.y]!==T_FLOOR) G.map[m.x][m.y] = T_FLOOR;
     const guards = key==='goblinking' && !s.flags.mercy ? 3 : key==='goblinking' ? 1 : 1;
@@ -22979,7 +22998,7 @@ function sqBossFight(id, key){
 // the bosses' tricks, checked once a turn while the fight goes on
 function sqBossTurn(){
   const b = G.sqBossState; if (!b || G.gameMode!==2) return; const B = SQ_BOSSES[b.key], m = G.mon.find(x=>x.sqBoss===b.key && x.alive); if (!m) return;
-  const f = m.hp/m.maxHp, p = G.player, L = clampMLevel(p.level);
+  const f = m.hp/m.maxHp, p = G.player, L = cbLvl();
   if (b.phase < 1 && f < 0.67){ b.phase = 1; for (let i=0;i<2;i++) wevMon(B.human ? wevHumanEntry(L) : wevCampEntry(B.adds, L), L); logMsg(`${m.nm} calls for help - more of them pour in!`, 'new'); }
   if (b.phase < 2 && f < 0.34){ b.phase = 2; for (let i=0;i<2;i++) wevMon(B.human ? wevHumanEntry(L) : wevCampEntry(B.adds, L), L); logMsg(`${m.nm} summons the last of its servants!`, 'new'); }
   if (b.phase < 3 && f < 0.2){ b.phase = 3; m.dmg2 = roundH(m.dmg2*1.4); logMsg(`${m.nm} goes berserk - its blows come harder!`, 'hit'); }
@@ -23163,7 +23182,7 @@ function sqClueStep(it){
 function sqClueTask(k, what){ for (const it of G.inv){ if (!it || !it.clue || !it.trail) continue; const st = it.trail.steps[it.trail.i]; if (st && st.k===k && (k==='gather' ? st.what===what : (what||'').toLowerCase().includes(st.what))) { logMsg('that\'s it - the clue\'s riddle is answered', 'good'); sqClueStep(it); return; } } }
 // the casket: gold, and a chance of something only treasure trails give
 function sqCasket(kind){
-  const p = G.player, gold = roundH((300 + p.level*25)*goldFindMult()*(kind==='map' ? 1.5 : 1)); p.gold += gold; const got = [`${gold} gold`];
+  const p = G.player, gold = roundH((300 + cbT()*25)*goldFindMult()*(kind==='map' ? 1.5 : 1)); p.gold += gold; const got = [`${gold} gold`];
   const r = Math.random();
   if (r < 0.35){ const it = sqGilded(); addToInventory(it); got.push(itemNameHtml(it)); }
   else if (r < 0.55){ const it = sqCosmetic(); addToInventory(it); got.push(itemNameHtml(it)); }
@@ -23173,7 +23192,7 @@ function sqCasket(kind){
   p.caskets = (p.caskets||0) + 1;
   logMsg(`you open the casket: ${got.join(', ')}`, 'loot', true); try{ audStinger('rare'); }catch(e){} checkAchievements(); renderGame(); saveCurrentGame();
 }
-function sqGilded(){ const sl = pick(['head','chest','legs','arms']), t = Math.min(6, 1 + Math.floor(G.player.level/12)), it = rsMakeArmour('metal', t, sl);
+function sqGilded(){ const sl = pick(['head','chest','legs','arms']), t = Math.min(6, 1 + Math.floor(cbT()/12)), it = rsMakeArmour('metal', t, sl);
   return Object.assign(it, { nm:'Gilded ' + it.nm.replace(/^\w+ /, ''), rsCol:'#e0b040', ac:(it.ac||0) + 3, price:(it.price||100)*6, quality:3, gilded:1 }); }
 function sqCosmetic(){ const k = rn(3), it = rsItem(k===2 ? 'head' : 'cape');
   if (k===0) Object.assign(it, { nm:'Cape of the Treasure Trail', basis:'Cape', capeCol:'#c03a8a', rsCol:'#c03a8a', ac:3, prayB:1 });
@@ -23753,7 +23772,7 @@ function renderStatusChips(){
     ? `<span class="iconbtn" id="zoomIcon" title="${G.owZoomedOut?'zoom back in':'zoom out to see the whole map'}">${G.owZoomedOut?'&minus;':'+'}</span>`
     : '';
   const html = `
-    <span class="chip">Lv <b>${G.player.level}</b></span>
+    <span class="chip">Combat <b>${G.player.combatLevel}</b></span>
     <span class="chip">HP <b>${mx(0,G.player.hp)}</b>/${effMaxHp()}</span>
     <span class="chip">Gold <b>${G.player.gold}</b></span>
     ${zoomChip}
@@ -34381,7 +34400,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-239';
+const GAME_VERSION = 'rs-240';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -35143,7 +35162,7 @@ function shopLeave(){ setUi('playing'); }
 // a couple item-levels above the village Peddler's, so it's worth
 // the detour without outright replacing the village shop
 function generateMerchantStock(){
-  const d = mx(1, G.player.level) + 2;
+  const d = clampCb(cbLvl() + 13);
   G.merchantStock = [];
   G.merchantStock.push(genItem(d,'weapon', 3));
   const aslots = ['head','chest','legs','arms'];
@@ -36049,7 +36068,7 @@ function buildDeath(){
   if (G.player.hardcore){
     return `
       <h2 class="panel-title" style="color:${COL.red};">YOU HAVE FALLEN</h2>
-      <div class="sub">Slain by a ${esc(G.deathCause)} ${placeStr}, level ${G.player.level}, with ${G.player.gold} gold to your name. Hardcore mode - this character is gone for good.</div>
+      <div class="sub">Slain by a ${esc(G.deathCause)} ${placeStr}, combat level ${G.player.combatLevel}, with ${G.player.gold} gold to your name. Hardcore mode - this character is gone for good.</div>
       ${recapHtml}
       <div class="btnrow">
         <button class="btn primary" onclick="descendAgain()">ENTER &middot; descend again</button>
@@ -36449,7 +36468,7 @@ function handlePlayingKey(k){
     case 'b': case 'B': setUi('bestiary'); break;
     case 'h': case 'H': setUi('achievements'); break;
     case 'k': case 'K':
-      if (G.player.level>=MAX_CHAR_LEVEL) setUi('ngplus');
+      if (cbLvl() >= NGPLUS_CB) setUi('ngplus');
       else { logMsg('you must reach combat level 123 to ascend to New Game+', ''); renderGame(); }
       break;
     case 'v': case 'V': toggleSound(); break;
@@ -36692,8 +36711,8 @@ const SITE_TITLE = { dungeon:'Dungeon', castle:'Fallen castle', necro:"Necromanc
 function owSiteKind(t){ return t===OW_DUNGEON ? 'dungeon' : TILE_SITE_KIND[t] || null; }
 // a site's rough danger: its first floor's monsters, its deepest floor's (the recommended combat level) and its boss
 function owSiteEstimate(x, y){
-  const kind = owSiteKind(G.ow.map[x][y]), floors = G.ow.dungeonMax[x][y] || 1, bump = kind==='dungeon' ? 0 : 2;
-  const first = clampMLevel(monsterLevelForDepth(1)+bump), deep = clampMLevel(monsterLevelForDepth(floors)+bump), boss = clampMLevel(monsterLevelForDepth(floors)+bump+2);
+  const kind = owSiteKind(G.ow.map[x][y]), floors = G.ow.dungeonMax[x][y] || 1, bump = kind==='dungeon' ? 0 : 13;
+  const first = clampCb(floorCb(1)+bump), deep = clampCb(floorCb(floors)+bump), boss = clampCb(floorCb(floors)+bump+13);
   return { kind, floors, first, deep, boss, deepest:(G.player.siteDeepest||{})[G.ow.dungeonIdx[x][y]] || 0 };
 }
 // on the map: a gold arc round a site you've started, filled by how deep you've got, and its recommended level underneath
@@ -36705,11 +36724,11 @@ function owSiteBadgeExtras(c, x, y, px, py, R){
     c.strokeStyle = '#ffd24a'; c.shadowColor = '#ffb020'; c.shadowBlur = 6*dpr;
     c.beginPath(); c.arc(px, py, R*1.32, -Math.PI/2, -Math.PI/2 + Math.PI*2*clamp(e.deepest/e.floors, 0.08, 1)); c.stroke(); c.restore();
   }
-  const lv = monCombatLevel({mlevel:e.deep}), txt = (e.deepest ? `${e.deepest}/${e.floors} \u00b7 ` : '') + 'Lv ' + lv;
+  const lv = monCombatLevel({cb:e.deep}), txt = (e.deepest ? `${e.deepest}/${e.floors} \u00b7 ` : '') + 'Lv ' + lv;
   c.save(); c.font = `700 ${Math.round(clamp(R*0.62, 9*dpr, 12*dpr))}px 'JetBrains Mono', monospace`; c.textAlign = 'center'; c.textBaseline = 'top';
   const ty = py + R*1.55, w = c.measureText(txt).width + 6*dpr, h = Math.round(clamp(R*0.62, 9*dpr, 12*dpr)) + 3*dpr;
   c.fillStyle = 'rgba(26,20,14,0.82)'; c.fillRect(px - w/2, ty - 1*dpr, w, h);
-  c.fillStyle = monLevelColor({mlevel:e.deep}); c.fillText(txt, px, ty); c.restore();
+  c.fillStyle = monLevelColor({cb:e.deep}); c.fillText(txt, px, ty); c.restore();
 }
 // (RS-210) the map's ! marks: a gold ! (or blue ?) over a quest's objective, and a red ! diamond for a wandering band of foes
 function owMarkAtClient(e){
@@ -36729,22 +36748,22 @@ function owMarkTip(mk){
     let obj = ''; try{ obj = questObjective(q); }catch(err){}
     return `<div style="font-weight:600;color:${t.turnIn ? '#6ab0e0' : '#e8b830'}">${t.turnIn ? '? hand in' : '! quest objective'}</div><div>${esc(questTitle(q))}</div>${obj ? `<div class="muted">${obj}</div>` : ''}<div class="muted">${t.turnIn ? 'go back here to turn the quest in' : 'go here to work on the quest'}${trackedQuest()===q ? ' &middot; the one you are tracking' : ''}</div>`; }
   const party = encParty(mk.e), ld = encLeader(mk.e);
-  return `<div style="font-weight:600;color:#e05040">! a wandering threat</div><div>${party.length ? esc(party.map(x=>x.nm).join(', ')) : 'foes on the move'}</div>${ld ? `<div class="muted">led by a ${esc(ld.nm)}, level ${monCombatLevel({ mlevel:ld.lvl })}</div>` : ''}<div class="muted">walk into it to fight - it wanders, so it may not stay put</div>`;
+  return `<div style="font-weight:600;color:#e05040">! a wandering threat</div><div>${party.length ? esc(party.map(x=>x.nm).join(', ')) : 'foes on the move'}</div>${ld ? `<div class="muted">led by a ${esc(ld.nm)}, level ${monCombatLevel(ld)}</div>` : ''}<div class="muted">walk into it to fight - it wanders, so it may not stay put</div>`;
 }
 function owSiteTipHtml(x, y){
   const kind = owSiteKind(G.ow.map[x][y]), slot = G.ow.dungeonIdx[x][y], floors = G.ow.dungeonMax[x][y] || 1;
-  const bump = kind==='dungeon' ? 0 : 2, first = clampMLevel(monsterLevelForDepth(1)+bump), bossT = clampMLevel(monsterLevelForDepth(floors)+bump+2);
+  const bump = kind==='dungeon' ? 0 : 13, first = clampCb(floorCb(1)+bump), bossT = clampCb(floorCb(floors)+bump+13);
   const hist = G.ow.siteHistory && G.ow.siteHistory[slot];
   const deepest = (G.player.siteDeepest||{})[slot] || 0, best = (G.player.bestClear||{})[kind];
-  const metal = RS_METALS[clamp(Math.floor((bossT-1)/3), 0, RS_METALS.length-1)][0];
+  const metal = RS_METALS.filter(m=>m[2] <= bossT).pop()[0];
   const row = (k, v, col)=>`<div class="ttrow"><span class="muted">${k}</span><b style="color:${col||'var(--ink)'}">${v}</b></div>`;
   const status = deepest ? [`explored to floor ${deepest} of ${floors}`, '#e8d040'] : ['not entered yet', 'var(--ink-dim)'];
   return `<div style="font-weight:600;color:${PM_SITE_BRIGHT[G.ow.map[x][y]]||'var(--ink)'}">${SITE_TITLE[kind]||'Site'}</div>
     ${hist ? `<div class="examine">once held by ${esc(hist.title)} ${esc(hist.name)}, who ${esc(hist.event)}</div>` : `<div class="examine">${esc(EXAMINE_OW[G.ow.map[x][y]]||'')}</div>`}<hr>
     ${row(kind==='castle' || kind==='necro' ? 'floors up' : 'floors down', floors)}
-    ${row('recommended', `combat ${monCombatLevel({mlevel:owSiteEstimate(x,y).deep})}`, monLevelColor({mlevel:owSiteEstimate(x,y).deep}))}
-    ${row('monsters from', `level ${monCombatLevel({mlevel:first})}`, monLevelColor({mlevel:first}))}
-    ${row('the boss', `level ${monCombatLevel({mlevel:bossT})}`, monLevelColor({mlevel:bossT}))}
+    ${row('recommended', `combat ${monCombatLevel({cb:owSiteEstimate(x,y).deep})}`, monLevelColor({cb:owSiteEstimate(x,y).deep}))}
+    ${row('monsters from', `level ${monCombatLevel({cb:first})}`, monLevelColor({cb:first}))}
+    ${row('the boss', `level ${monCombatLevel({cb:bossT})}`, monLevelColor({cb:bossT}))}
     ${row('boss loot', `around ${metal}${kind!=='dungeon' ? ', plus a bonus item' : ''}`)}
     ${row('progress', status[0], status[1])}
     ${row(`best ${SITE_WORD[kind]||'site'} clear`, best ? best+' turns' : 'none yet')}`;
@@ -36952,10 +36971,10 @@ function frameLoop(ts){
         // instead of just another fight, so it doesn't belong in monsterDies
         if (G.encounterSetPiece){
           const f = TERRAIN_SET_PIECE_FLAVOR[G.encounterSetPieceTerrain];
-          const bonusGold = roundH((30+rn(40)+G.player.level*6)*goldFindMult());
+          const bonusGold = roundH((30+rn(40)+cbT()*6)*goldFindMult());
           G.player.gold += bonusGold;
           logMsg(`${f?f.reward:'you find a hidden cache'} - ${bonusGold} bonus gold`, 'good');
-          if (chn(0.6)) addToInventory(genItem(mx(1,G.player.level), vaultLootSlot(), 3));
+          if (chn(0.6)) addToInventory(genItem(cbLvl(), vaultLootSlot(), 3));
           G.encounterSetPiece = false; G.encounterSetPieceTerrain = null;
         }
         questArenaWon();

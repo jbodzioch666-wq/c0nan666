@@ -55,6 +55,7 @@ Ordinary feature releases and small edits stay on Opus. If you are already runni
   | Saving and loading | `saveCurrentGame()`, `loadGame(id)` |
   | Logging | `logMsg(text, kind)`, `notify(text, kind, sfx)` |
   | Skills | `skGainXP` (all xp scaled by `XP_RATE`), `skLvl`, `rsLvl` |
+  | Levels | Everything is a combat level, 3 to 126 (RS-240): `cbLvl()`, `floorCb(d)`, `lootLevel()`, `clampCb`. The 20 bestiary rows are archetypes (`e.cb`, `archOf(cb)`, `monScaleCb`); `cbT()`/`tierOfCb` give the old 1-20 tier as a smooth number for reward and price curves. `p.level` is only kept for old saves |
 
 ## Testing
 

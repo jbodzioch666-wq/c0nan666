@@ -1,5 +1,15 @@
 # Depthcrawl patch notes
 
+## RS-240 - Combat levels everywhere, and a gear balance pass
+
+- **The hidden 1-20 power tier is gone.** Monsters, dungeon floors, the land's danger bands, quests, shops and loot all run on combat level (3 to 126) now. A fight at your level is a monster at *your* level: the bestiary's twenty creatures are archetypes along the scale, and a foe spawned between two of them takes the nearer one's kit with its life, damage, accuracy and xp scaled to the exact level - no more six-level jumps.
+- **Gear drops from the level it needs.** Rune starts dropping from combat 40 (it used to wait until about 80), adamant from 30, mithril from 20, dragon from 60; dragonhide, robes, bows, staves, arrows, jewellery, capes and charms the same way. Drop odds lean towards the newest tiers you've unlocked.
+- **The land and sites in combat levels.** Area banners read "combat 44-56", and site tooltips, quest sizing (Easy to Very hard) and the bounty board are on the same scale as your own level.
+- **Dragonhide and robes defend properly.** Hide armour now has about three quarters of plate's defence at the same level and robes about half (they had a tenth to a fifth). In the sim at combat 69 a fighter in red d'hide takes 21 life a kill against 11 in rune and 5 in dragon.
+- **The top of the bestiary bites.** Monsters above tier 14 no longer lose their accuracy bonus (a hydra could not hit rune plate at all): at combat 113 a hydra now costs 35 life a kill in full dragon and 71 in rune, instead of 0 and 27, so dragon is a real step up to 99 rather than a wall. Maxing melee from 1 takes about 76 hours of fighting at the measured rates (63 before), with more food along the way.
+- **Paralysis has a grace.** A ghoul's or lich's touch can't re-hold you while you're already held, and you get eight turns' grace after it wears off - the level-40 cliff (40 to 67 deaths an hour below rune in the sim) is gone.
+- **New Game+** opens at combat level 123; the Seasoned and Legend achievements are combat 50 and 100.
+- Old saves load as before; the character list still shows its old level number.
 ## RS-239 - Upgrades for your style
 
 **Upgrade and downgrade now go by what you fight with.** Your style comes from your weapon: a staff means magic, a bow means ranged, anything else means melee.

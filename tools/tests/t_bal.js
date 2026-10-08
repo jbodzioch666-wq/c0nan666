@@ -4,10 +4,10 @@ module.exports = async page=>{
   const r = await page.evaluate(()=>{
     const out = {}, A = (c, msg)=>{ if (!c) throw new Error('assert: '+msg); };
     goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing');
-    const p = G.player;
+    const p = G.player; p.race = RACES[1][0]; p.songT = null;   // (RS-222/223: no race or song xp bonus in the way)
     // monsters: +25% accuracy and damage over their table entry
     const e = MONSTER_LEVELS[13], m = newMonster(); m.atkBonus = e.atk; m.dmg2 = e.dmg2; monEntryExtras(m, e);
-    out.troll = [m.atkBonus, m.dmg2]; A(m.atkBonus===Math.round(e.atk*1.25) + monAccBonus(14) && monAccBonus(14)===6 && monAccBonus(20)===0 && m.dmg2===Math.round(e.dmg2*1.25), 'monsters bite harder'); A(Math.abs(monBite(20)-1) < 1e-9 && monBite(14)===1.25, 'the bite eases off at the top');
+    out.troll = [m.atkBonus, m.dmg2]; A(m.atkBonus===Math.round(e.atk*1.25) + monAccBonus(14) && monAccBonus(14)===6 && monAccBonus(20)===6 && m.dmg2===Math.round(e.dmg2*1.25), 'monsters bite harder'); A(Math.abs(monBite(20)-1.15) < 1e-9 && monBite(14)===1.25, 'the bite eases off a little at the top (RS-240)');
     // coins: half of the old roll up to tier 3, falling to a quarter of that from tier 12 (RS-194)
     A(coinTrim({ mlevel:1 })===0.5 && coinTrim({ mlevel:3 })===0.5 && Math.abs(coinTrim({ mlevel:12 }) - 0.125) < 1e-9 && Math.abs(coinTrim({ mlevel:20 }) - 0.125) < 1e-9, 'coin trim');   /* (RS-194: half the coins, a quarter of that from tier 12) */
     // the lair boss: the same strength whatever your level

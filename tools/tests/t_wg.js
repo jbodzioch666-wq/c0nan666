@@ -3,7 +3,7 @@ module.exports = async page=>{
   const r1 = await page.evaluate(()=>{
     const out = {}, A = (c, msg)=>{ if (!c) throw new Error('assert: '+msg); };
     goToCharCreate(); ccBegin(); confirmWorldPreview(); setUi('playing'); o3Pref = false; G.gameMode = 0;
-    G.player.gold = 100000; G.player.level = 10;
+    G.player.gold = 100000; G.player.level = 10; G.player.combatLevel = 61;
     // roads: every other step free
     const rt = []; for (let i=0;i<OW_COLS*OW_ROWS;i++) if (G.ow.road[i]===1) rt.push(i);
     A(rt.length > 20, 'roads laid'); const j = rt[0], x = j%OW_COLS, y = (j/OW_COLS)|0;

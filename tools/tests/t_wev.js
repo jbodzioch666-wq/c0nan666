@@ -4,7 +4,7 @@ module.exports = async page=>{
   const r1 = await page.evaluate(()=>{
     const out = {}, A = (c, msg)=>{ if (!c) throw new Error('assert: '+msg); };
     goToCharCreate(); ccBegin(); setUi('playing'); o3Pref = false;
-    G.player.level = 12; G.player.gold = 50000;
+    G.player.level = 12; G.player.combatLevel = 74; G.player.gold = 50000;
     const e = wevP(); A(e && e.camps.length >= 3, 'initial camps '+(e && e.camps.length));
     out.camps0 = e.camps.map(c=>c.kind+'@'+c.x+','+c.y+' s'+c.size+' in '+wevTerrName(wevTerrAt(c.x,c.y)));
     // run the clock for three days

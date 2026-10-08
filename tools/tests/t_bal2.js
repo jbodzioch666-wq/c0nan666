@@ -5,7 +5,7 @@ module.exports = async page=>{
   const r = await page.evaluate(()=>{
     const out = {}, A = (c, msg)=>{ if (!c) throw new Error('assert: '+msg); };
     goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); o3Pref = false; try{ v3Pref = false; }catch(e){}
-    const p = G.player;
+    const p = G.player; p.race = RACES[1][0]; p.songT = null;   // (RS-222/223: no race or song xp bonus in the way)
     A(RS_XP_PER_DMG===5, 'five combat xp a point of damage');
     A(coinTrim({ mlevel:2 })===0.5 && Math.abs(coinTrim({ mlevel:7 }) - 0.5*(1 - 0.75*4/9)) < 1e-9 && Math.abs(coinTrim({ mlevel:18 }) - 0.125) < 1e-9, 'coins trimmed by tier');
     A(GATHER_XP.woodcutting===1.2 && GATHER_XP.foraging===3.8 && GATHER_XP.fishing===2.4 && GATHER_XP.mining===2.0, 'gathering xp weights');

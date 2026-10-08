@@ -9,11 +9,11 @@ module.exports = async page=>{
     G.gameMode = 2; generateArena(); G.mon = [];
     p.rsStyle = 3;
     const fight = (L, wt, at, FIGHTS, fam)=>{ fam = fam || 'metal';
-      for (const k of ['attack','strength','defence']) p.skills[k] = SK_XP[L]; p.skills.hitpoints = SK_XP[Math.max(10, L)]; p.prayers = []; rsSync();
+      for (const k of ['attack','strength','defence']) p.skills[k] = SK_XP[L]; for (const k of ['ranged','magic','necromancy','prayer']) p.skills[k] = SK_XP[1]; p.skills.hitpoints = SK_XP[Math.max(10, L)]; p.prayers = []; rsSync();
       G.gear.weapon = rsMakeWeapon(wt, 3); for (const sl of ['head','chest','legs','arms','feet','offhand']) G.gear[sl] = RS_ARMOUR[fam].names[sl] ? rsMakeArmour(fam, at, sl) : newItem();
       for (const sl of ['cape','necklace','ring1','ring2','trinket']) G.gear[sl] = newItem();
       const fish = SK_FISH.filter(f=>f.lvl <= L && !f.hard).pop() || SK_FISH[0]; p.bag = {}; skAdd('c_'+fish.id, 1e6);
-      const tier = p.level, entry = MONSTER_LEVELS[tier-1];
+      const entry = pickMonsterEntry(p.combatLevel, 0), tier = entry.lvl;
       p.hp = effMaxHp(); G.inv = []; p.gold = 0; G.gameOver = 0;
       let beats = 0, kills = 0, deaths = 0, dealt = 0, taken = 0, swings = 0, hits = 0; const food0 = skHave('c_'+fish.id);
       while (kills < FIGHTS && beats < 60000){
@@ -30,7 +30,7 @@ module.exports = async page=>{
         }
       }
       const hours = beats*ISO_SWING_MS/3600000;
-      return { L, cb:p.combatLevel, foe:entry.nm, foeLvl:entry.lvl, weapon:RS_METALS[wt][0], armour:RS_ARMOUR[fam].tiers[at][0], kph:Math.round(kills/hours), hit:+(hits/Math.max(1,swings)).toFixed(2),
+      return { L, cb:p.combatLevel, foe:entry.nm, foeLvl:entry.cb, weapon:RS_METALS[wt][0], armour:RS_ARMOUR[fam].tiers[at][0], kph:Math.round(kills/hours), hit:+(hits/Math.max(1,swings)).toFixed(2),
         dmgPerSwing:+(dealt/Math.max(1,swings)).toFixed(1), takenPerKill:+(taken/Math.max(1,kills)).toFixed(1), foodH:Math.round((food0 - skHave('c_'+fish.id))/hours), deathsH:+(deaths/hours).toFixed(1), ac:Math.round(playerAC()), maxHp:effMaxHp() };
     };
     const LEVELS = [1, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 99];
