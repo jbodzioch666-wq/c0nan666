@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| races | every race has its own figure (heights, orc face, dragonborn head, tail and claws, tiefling tail, halfling feet, gnome nose) and reworked trait: skill xp, accuracy, crits, damage taken, haggling, Relentless Endurance |
 | foebeat | in a 3D fight the monster's counterattack lands a beat (~1.1s) after your blow, you can't act until it has, and with deferral off it's instant |
 | nofs | the game never goes fullscreen on its own (first click, game start or resume); only the corner button asks for it |
 | skeye | a dressed skeleton's eyes glow its class colour in the flat fallback drawing too, matching the 3D kits |

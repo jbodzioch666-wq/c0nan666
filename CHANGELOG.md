@@ -1,5 +1,30 @@
 # Depthcrawl patch notes
 
+## RS-222 - Races that look and play their part
+
+**Every race now has its own body.** You can see all of this in the character creation preview:
+- **Dwarves** are short and broad.
+- **Halflings** and **gnomes** are small: halflings with curly hair and bare feet, gnomes with big noses (choose button, big or long), white beards and pointed ears.
+- **Elves** are tall and slender.
+- **Half-orcs** have an orc's face and stand big.
+- **Dragonborn** have a scaled dragon's head with a long snout, teeth and slit eyes, a spined tail and clawed feet. Instead of hair they choose a crest: back horns, a frill or brow spikes.
+- **Tieflings** have a spade-tipped tail.
+
+**Every racial trait is reworked for the skill game.** The old ones were left over from the dice rules. The human's xp bonus, for example, only counted for quest lamps. Now each race trains two skills 10% faster (humans: every skill 5% faster) and has one trick:
+- **Human, Adaptable:** +5% xp in every skill.
+- **Elf, Keen Eyes:** darkvision and +1 ranged accuracy. Woodcutting and Fletching.
+- **Dwarf, Stoneborn:** darkvision and 8% less damage taken. Mining and Smithing.
+- **Halfling, Lucky:** critical hits twice as often. Cooking and Foraging.
+- **Half-Orc, Relentless Endurance:** darkvision, and once every 500 steps a killing blow leaves you on 1 hitpoint instead. Strength and Slayer.
+- **Gnome, Tinker's Eye:** darkvision and +5 magic find. Crafting and Runecrafting.
+- **Dragonborn, Draconic Might:** +1 damage on melee and ranged hits (down from +2). Firemaking and Defence.
+- **Tiefling, Infernal Spark:** darkvision and +1 magic accuracy. Magic and Alchemy.
+- **Half-Elf, Silver Tongue:** darkvision, town prices 5% lower, and traders pay 10% more. Fishing and Ranged.
+
+**Where to see your trait:** the Other tab of the character sheet shows it, with how long until Relentless Endurance is ready again.
+
+**Existing characters get their race's new trait and body straight away.** On the simulator, a human's time to 99 drops by about 5%: fishing went from 10.1 to 9.3 hours, mining from 10.1 to 9.8, woodcutting from 12.6 to 11.9.
+
 ## RS-221 - A clear pause between blows
 
 - **The monster answers 1.1 seconds after your attack**, up from 0.7. Your swing is now over before its wind-up begins, so the two blows read as separate moves instead of overlapping.
