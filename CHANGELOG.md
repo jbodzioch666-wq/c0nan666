@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-241 - Spells wait their turn
+
+- **A staff's autocast now gets the same beat as a sword.** When you autocast at a monster standing beside you, its answer lands a moment after your spell instead of at the same instant, the same as it already did for melee blows and bow shots. Auto-utility spells cast on a neighbour get the same beat.
+
 ## RS-240 - Combat levels everywhere, and a gear balance pass
 
 - **The hidden 1-20 power tier is gone.** Monsters, dungeon floors, the land's danger bands, quests, shops and loot all run on combat level (3 to 126) now. A fight at your level is a monster at *your* level: the bestiary's twenty creatures are archetypes along the scale, and a foe spawned between two of them takes the nearer one's kit with its life, damage, accuracy and xp scaled to the exact level - no more six-level jumps.

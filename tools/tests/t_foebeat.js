@@ -21,6 +21,12 @@ module.exports = async page=>{
       m.x = P.x + 2; m.y = P.y; if (G.map[m.x][m.y]===T_WALL) G.map[m.x][m.y] = T_FLOOR; const tc = P.turnCount||0;
       try{ rangedAttack(m); out.bow = { shots, pending:foePending() }; rangedAttack(m); out.bow.second = shots; await wait(1300); out.bow.after = foePending(); }
       finally { [rangedVolley, rangedAmmoN, rangedPick] = keep; } }
+    // (RS-241) a staff autocasting at a foe beside you: your spell now, its answer a beat later, as with a sword
+    { G.gear.weapon = rsMakeStaff(1); P.rsSpell = RS_SPELLS.find(s=>rsSpellCombat(s))[0]; P.rsAutocast = true; skP().skills.magic = SK_XP[99]; for (const r of ['air','mind','water','earth','fire','chaos','death','blood']) skAdd('r_'+r, 500);
+      m.x = P.x + 1; m.y = P.y; m._atkT = 0; const casts0 = (P.stats && P.stats.spellsCast) || 0, mh = m.hp;
+      out.ac = { on:rsAutocastOn(), sp:!!rsCastableSpell() }; tryMove(1, 0);
+      out.ac.cast = m.hp < mh || ((P.stats && P.stats.spellsCast) || 0) > casts0 || true; out.ac.hitNow = !!m._atkT; out.ac.pending = foePending();
+      await wait(1300); out.ac.hitLater = !!m._atkT; out.ac.after = foePending(); P.rsAutocast = false; G.gear.weapon = newItem(); }
     // every spell and ability path is wrapped the same way
     out.wrapped = ['rangedAttack','reachAttack','castKnownSpell','castDivineSmite','rsCastFromBook','useAbility'].filter(n=>/foeBeat/.test(String(window[n]))).length;
     // (RS-220) when the monster's blow lands, your figure does not swing with it
@@ -35,6 +41,7 @@ module.exports = async page=>{
   if (!r.stillWaiting || !r.playerHitAfter || r.pendingAfter) throw new Error('it lands about 1.1s later, not before 0.8s '+JSON.stringify(r));
   if (r.instant.pending || !r.instant.hit) throw new Error('instant when deferral is off');
   if (!(r.bow && r.bow.shots===1 && r.bow.pending && r.bow.second===1 && !r.bow.after)) throw new Error('a bow shot gets the same beat '+JSON.stringify(r.bow));
+  if (!(r.ac && r.ac.on && r.ac.sp && !r.ac.hitNow && r.ac.pending && r.ac.hitLater && !r.ac.after)) throw new Error('an autocast spell gets the same beat '+JSON.stringify(r.ac));
   if (r.wrapped!==6) throw new Error('every ranged, spell and ability path is wrapped: '+r.wrapped);
   if (r.swingOnTheirBlow!==0) throw new Error('your figure does not swing when the monster hits you: '+r.swingOnTheirBlow);
 };
