@@ -18347,17 +18347,21 @@ function buildTravelLog(){
 }
 const TRAVEL_ACH = ['explorer_25','explorer_50','explorer_90','town_hopper','regions_10','sightseer'];
 // ---- 3D: the landmarks stand in the land, big enough to see from a way off ----
+// RS-235: the volcano is part of the land - a broad cone rising out of its mountain range to a rim round a sunken crater of
+// lava, its slopes dark with basalt and ash and scored by lava runs. This is its profile (height above its foot, by distance
+// from its heart, in tiles); the land is raised to it, and the far-off view of it uses the same shape
+const VOLC = { R:5.4, rc:1.15, H:6.2, foot:0.1, pit:1.3 };
+function volcProfile(d){ if (d >= VOLC.R) return 0; if (d < VOLC.rc) return VOLC.H - VOLC.pit*(1 - Math.pow(d/VOLC.rc, 2)); return VOLC.H*Math.pow((VOLC.R - d)/(VOLC.R - VOLC.rc), 1.55); }
 function o3LandmarkModel(lm){
   const T = THREE, g = new T.Group(), mats = [];
   const mat = (col, o)=>{ const m = new T.MeshStandardMaterial(Object.assign({ color:new T.Color(col).convertSRGBToLinear(), roughness:0.9, fog:false }, o||{})); m.userData.base = m.color.clone(); m.userData.own = true; mats.push(m); return m; };
   const basic = (col, o)=>{ const m = new T.MeshBasicMaterial(Object.assign({ color:new T.Color(col).convertSRGBToLinear(), fog:false }, o||{})); m.userData.own = true; return m; };
   const anim = { kind:lm.kind, smoke:[], glow:null, orb:null };
   if (lm.kind==='volcano'){
-    const pts = [[3.4,0],[2.8,0.9],[2.15,2.2],[1.5,3.9],[1.0,5.6],[0.75,6.6],[0.58,6.45],[0.42,6.1]].map(([r,y])=> new T.Vector2(r, y));
-    const cone = new T.Mesh(new T.LatheGeometry(pts, 28), mat('#5e4a40', { flatShading:true })); cone.castShadow = true; g.add(cone);
-    const ash = new T.Mesh(new T.LatheGeometry([[1.06,5.5],[0.76,6.58],[0.62,6.55]].map(([r,y])=>new T.Vector2(r,y)), 28), mat('#3a302c', { flatShading:true })); g.add(ash);
-    const lava = new T.Mesh(new T.CircleGeometry(0.6, 20), basic('#ff6a1a')); lava.rotation.x = -Math.PI/2; lava.position.y = 6.25; g.add(lava);
-    anim.glow = o3Glow('rgba(255,120,40,1)', 3.6); anim.glow.material.fog = false; anim.glow.material.userData.own = true; anim.glow.position.y = 7; g.add(anim.glow);
+    const pts = []; for (let i=0;i<=24;i++){ const d = VOLC.R*(1 - i/24); pts.push(new T.Vector2(Math.max(0.001, d), volcProfile(d))); }
+    anim.far = new T.Mesh(new T.LatheGeometry(pts, 32), mat('#3e3430', { flatShading:true })); anim.far.castShadow = true; g.add(anim.far);
+    const lava = new T.Mesh(new T.CircleGeometry(VOLC.rc*0.78, 24), basic('#ff6a1a')); lava.rotation.x = -Math.PI/2; lava.position.y = VOLC.H - VOLC.pit + 0.12; g.add(lava);
+    anim.glow = o3Glow('rgba(255,120,40,1)', 3.6); anim.glow.material.fog = false; anim.glow.material.userData.own = true; anim.glow.position.y = VOLC.H + 0.2; g.add(anim.glow);
     const tex = O3.tex.smoke || (O3.tex.smoke = v3Blob('rgba(200,200,200,1)'));
     for (let i=0;i<10;i++){ const sp = new T.Sprite(new T.SpriteMaterial({ map:tex, transparent:true, depthWrite:false, color:0x4a4440, opacity:0.4, fog:false })); sp.material.userData.own = true; g.add(sp); anim.smoke.push({ sp, ph:i/10 }); }
   } else if (lm.kind==='tree'){
@@ -18399,7 +18403,8 @@ function o3SyncLandmarks(dt){
     const lm = o.lm, cx = lm.x+0.5, cz = lm.y+0.5, d = Math.hypot(cx-pp.x, cz-pp.z);
     o.g.visible = d < 150; if (!o.g.visible) continue;
     const inWin = O3.win && Math.abs(lm.x - O3.win.cx) < O3_W/2 - 2 && Math.abs(lm.y - O3.win.cy) < O3_W/2 - 2;
-    o.g.position.set(cx, (inWin ? O3.heightAt(cx, cz) : 0) - (lm.kind==='volcano' ? 0.6 : 0.1), cz);
+    if (lm.kind==='volcano'){ o.g.position.set(cx, VOLC.foot, cz); if (o.anim.far) o.anim.far.visible = !(inWin && O3.volc); }   /* (RS-235: near by, the land itself is the volcano) */
+    else o.g.position.set(cx, (inWin ? O3.heightAt(cx, cz) : 0) - 0.1, cz);
     O3.lmHits.push(o.hb);
     // the farther off it stands, the more it fades into the colour of the sky
     const k = Math.max(0, Math.min(0.7, (d-22)/110));
@@ -18407,7 +18412,7 @@ function o3SyncLandmarks(dt){
     const a = o.anim, t = O3.t;
     if (a.glow) a.glow.material.opacity = 0.7 + Math.sin(t*(a.kind==='volcano' ? 2.2 : 1.4))*0.25;
     if (a.orb){ a.orb.position.y = 12.1 + Math.sin(t*1.6)*0.25; a.glow.position.y = a.orb.position.y; }
-    for (const s of a.smoke){ const f = (t*0.07 + s.ph) % 1; s.sp.position.set(Math.sin(f*5 + s.ph*9)*0.6 + f*3, 6.8 + f*9, Math.cos(f*4 + s.ph*7)*0.5); s.sp.scale.setScalar(1.2 + f*5); s.sp.material.opacity = 0.5*(1-f)*Math.min(1, f*6); }
+    for (const s of a.smoke){ const f = (t*0.07 + s.ph) % 1; s.sp.position.set(Math.sin(f*5 + s.ph*9)*0.6 + f*3, VOLC.H + 0.2 + f*9, Math.cos(f*4 + s.ph*7)*0.5); s.sp.scale.setScalar(1.2 + f*5); s.sp.material.opacity = 0.5*(1-f)*Math.min(1, f*6); }
   }
   o3LandmarkEdges();
 }
@@ -28998,6 +29003,9 @@ function o3Build(cx, cy){
     path.forEach(([px,py], i)=>{ const k = (i+1)/(path.length+1), hh = hs - (hs - 0.25)*k; const key = dk(px,py); rampH[key] = Math.max(rampH[key]||0, hh); });
   }
   O3.lairTops = lairH;
+  // RS-235: the volcano, if it stands in (or near) this window
+  let VOL = null; try{ const lm = owLandmark('volcano'); if (lm && lm.x >= x0-M-VOLC.R && lm.x <= x0+W+M+VOLC.R && lm.y >= y0-M-VOLC.R && lm.y <= y0+W+M+VOLC.R) VOL = { x:lm.x+0.5, z:lm.y+0.5 }; }catch(e){}
+  O3.volc = VOL;
   const tileH = (x,y)=>{
     const t = o3Tile(x,y);
     if (t===OW_WATER) return -0.62;
@@ -29028,6 +29036,12 @@ function o3Build(cx, cy){
     h += (n1(wx/5, wz/5)-0.5)*0.35 + (n2(wx*1.3, wz*1.3)-0.5)*0.08;
     h += mtn * ((n2(wx*0.9+20, wz*0.9)-0.5)*1.1 + (n1(wx*2.3, wz*2.3)-0.5)*0.35);
     h += desert * Math.sin(wx*1.3 + n1(wx/3,wz/3)*4)*0.12;
+    // the volcano: the land climbs its cone, ridged by old flows, down into the crater at its top
+    let volc = 0;
+    if (VOL){ const dv = Math.hypot(wx - VOL.x, wz - VOL.z);
+      if (dv < VOLC.R){ const an = Math.atan2(wz - VOL.z, wx - VOL.x), rib = dv > VOLC.rc ? (Math.sin(an*9 + n1(wx, wz)*3)*0.06 + (n2(wx*2, wz*2)-0.5)*0.12)*Math.min(1, (dv - VOLC.rc)*1.5) : 0;
+        const ch = VOLC.foot + volcProfile(dv) + rib, edge = Math.min(1, (VOLC.R - dv)/0.9);
+        volc = edge; h = dv < VOLC.rc*1.25 ? ch : Math.max(h, h + (ch - h)*edge); } }
     // a level pad under every landmark, so a lair ringed by peaks isn't buried in them
     for (let sx=tx; sx<=tx+1; sx++) for (let sz=tz; sz<=tz+1; sz++){
       if (!OW_SITE_TILES.includes(o3Tile(sx,sz))) continue;
@@ -29049,8 +29063,11 @@ function o3Build(cx, cy){
     // colour: terrain blend, varied, then snow on the high peaks and rock on steep ground
     const v = 0.82 + n1(wx*0.7+50, wz*0.7)*0.26, hue = (n2(wx/9+70, wz/9)-0.5)*0.22;
     let cr = r*v*(1+hue), cg = g*v, cb = b*v*(1-hue);
-    const snow = Math.min(1, Math.max(0, (h - 2.4)/0.6)) * mtn + snowy*0.0;
+    const snow = Math.min(1, Math.max(0, (h - 2.4)/0.6)) * mtn * (1 - volc);
     cr += (236-cr)*snow; cg += (240-cg)*snow; cb += (246-cb)*snow;
+    if (volc > 0){ const dv = Math.hypot(wx - VOL.x, wz - VOL.z), ash = n1(wx*1.7+9, wz*1.7)*0.35, rim = Math.max(0, 1 - Math.abs(dv - VOLC.rc)/0.5);
+      const vr = 58 + ash*40 + rim*40, vg = 48 + ash*30 + rim*6, vb = 44 + ash*24;   /* (basalt and ash, scorched red at the rim) */
+      cr += (vr - cr)*volc; cg += (vg - cg)*volc; cb += (vb - cb)*volc; }
     if (h < -0.2){ const wet = Math.min(1, (-0.2-h)/0.3); cr *= 1-wet*0.35; cg *= 1-wet*0.3; cb *= 1-wet*0.2; }
     else if (h < 0.02 && mtn < 0.1){ const sand = Math.min(1, (0.02-h)/0.2) * (1-snowy); cr += (196-cr)*sand*0.6; cg += (178-cg)*sand*0.6; cb += (128-cb)*sand*0.6; }
     col[k*3] = lin(cr); col[k*3+1] = lin(cg); col[k*3+2] = lin(cb);
@@ -29070,6 +29087,15 @@ function o3Build(cx, cy){
     const fi = (wx-x0)*O3_R, fj = (wz-y0)*O3_R, i = Math.max(0, Math.min(NV-2, Math.floor(fi))), j = Math.max(0, Math.min(NV-2, Math.floor(fj))), a = fi-i, b2 = fj-j;
     return H[j*NV+i]*(1-a)*(1-b2) + H[j*NV+i+1]*a*(1-b2) + H[(j+1)*NV+i]*(1-a)*b2 + H[(j+1)*NV+i+1]*a*b2;
   };
+  // RS-235: lava runs spilling over the rim and down the volcano's flanks
+  if (VOL){ const lavaM = O3.lavaM || (O3.lavaM = new T.MeshBasicMaterial({ color:new T.Color(0xff6a1a).convertSRGBToLinear() }));
+    for (let k=0;k<4;k++){ let a = o3Hash(Math.floor(VOL.x), Math.floor(VOL.z), 300 + k)*6.28 + k*1.57; const pts = [];
+      for (let d = VOLC.rc*0.95; d < VOLC.R*0.82; d += 0.18){ a += (o3Hash(k, Math.round(d*10), 77) - 0.5)*0.18; const px = VOL.x + Math.cos(a)*d, pz = VOL.z + Math.sin(a)*d; pts.push(new T.Vector3(px, O3.heightAt(px, pz) + 0.04, pz)); }
+      if (pts.length < 4) continue;
+      const tube = new T.TubeGeometry(new T.CatmullRomCurve3(pts), pts.length*3, 0.1, 5), tp = tube.attributes.position, ns = pts.length*3 + 1, rs = 6;
+      for (let i=0;i<ns;i++){ const kk = 1 - 0.75*(i/(ns-1)), c = new T.Vector3(); tube.parameters.path.getPointAt(i/(ns-1), c); for (let j=0;j<rs;j++){ const vi = i*rs + j, v = new T.Vector3().fromBufferAttribute(tp, vi).sub(c).multiplyScalar(kk).add(c); tp.setXYZ(vi, v.x, v.y, v.z); } }
+      grp.add(new T.Mesh(tube, lavaM)); }
+    const pool = o3Glow('rgba(255,110,30,1)', 2.4); pool.position.set(VOL.x, VOLC.foot + VOLC.H - VOLC.pit + 0.5, VOL.z); grp.add(pool); }
   // water: one rippling sheet at sea level
   const water = new T.Mesh(new T.PlaneGeometry(W+2*M, W+2*M), new T.MeshStandardMaterial({ color:new T.Color(0x2c6490).convertSRGBToLinear(), roughness:0.12, metalness:0.25, transparent:true, opacity:0.84, normalMap:tex.ripple, normalScale:new T.Vector2(0.55,0.55) }));
   water.rotation.x = -Math.PI/2; water.position.set(cx, O3_WATER_Y, cy); water.receiveShadow = true; grp.add(water); O3.water = water;
@@ -34281,7 +34307,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-234';
+const GAME_VERSION = 'rs-235';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

@@ -1,5 +1,15 @@
 # Depthcrawl patch notes
 
+## RS-235 - A real volcano
+
+**The volcano is part of the land now**, instead of a cone model stood on top of the terrain:
+- **The ground itself climbs it.** A broad base rises out of its mountain range, steepening to a rim about half again as high as the peaks around it, ridged by old lava flows.
+- **A crater of lava** is sunk into the top, glowing, with smoke rising from it.
+- **Its slopes are dark basalt and ash**, scorched red at the rim, and never snow-capped like the peaks beside it.
+- **Glowing lava runs** spill over the rim and wind down its flanks.
+
+**From far away** you still see it on the horizon, as a cone with the same profile. As you get close, the real land takes over.
+
 ## RS-234 - Shires on the green
 
 **Your starting town now stands on your race's home ground.** Since RS-225 you start in a town of your own race, but its spot was simply the open ground nearest the middle of the map, so a halfling shire could end up in the desert. Now the start looks for:
