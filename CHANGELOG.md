@@ -7,6 +7,8 @@
 - **The hills are rounder squares in plan**, so the front is broad enough for the door and both windows.
 - **The common is all grass**, with curving dirt lanes from the waypoint to every door and down to the gate. It stays grass even when the shire stands in desert or tundra.
 
+**On the land, a shire has the same wooden palisade as every other town**, around its little hills and party tree, instead of a hedge.
+
 **Wandering skeletons have a model.** A wandering group led by a skeleton, such as a skeleton with two kobolds, now walks the land as the sculpted skeleton from the dungeons. Before, it had no 3D model. This applies to skeleton warriors and skeleton mages too.
 
 ## RS-225 - Start among your own people
