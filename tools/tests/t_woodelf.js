@@ -28,5 +28,18 @@ module.exports = async page=>{
   A(!r.armoured.cap && !r.armoured.toes && r.armoured.stoop > 0, 'a helm hides the leaf cap, boots the toes');
   A(!r.hum.stoop && !r.he.stoop, 'nobody else stoops');
   A(r.migrated==='Wood Elf', 'an old save\'s elf loads as a wood elf');
+  // RS-243: the stoop holds in a wood elf town too, for you and the townsfolk
+  const tw = await page.evaluate(async ()=>{
+    const wait = ms=>new Promise(r=>setTimeout(r, ms));
+    goToCharCreate(); G.chosenRace = RACES.findIndex(r=>r[0]==='Wood Elf'); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); v3Pref = true;
+    const t = townList().find(q=>(townFlavorAt(q.x, q.y)||{}).race==='woodelf') || G.ow.spawnPos; G.owPos = { x:t.x, y:t.y }; enterVillage(); setUi('playing');
+    for (let i=0;i<120 && !(V3.world && V3.player && V3.player.e); i++){ renderGame(); await wait(100); }
+    for (let i=0;i<8;i++){ v3Render(); await wait(60); }
+    const lean = e=>e && e.rig && e.rig.torso ? +e.rig.torso.rotation.x.toFixed(2) : null;
+    const folk = (V3.villagers||[]).concat(V3.npcs||[]).filter(p=>p.e && p.e.rig && p.e.rig.stoop).map(p=>lean(p.e));
+    return { race:G.villageRace, me:lean(V3.player && V3.player.e), folk:folk.slice(0, 6), n:folk.length };
+  });
+  A(tw.race==='woodelf' && tw.me > 0.25, 'you stoop in a wood elf town: '+JSON.stringify(tw));
+  A(tw.n > 0 && tw.folk.every(v=>v > 0.25), 'the wood elf townsfolk stoop too: '+JSON.stringify(tw));
   console.log('woodelf ok', JSON.stringify({ free:r.free, lean:r.lean }));
 };

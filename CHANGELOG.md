@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-243 - Wood elves stoop in town too
+
+- **The wood elf stoop now shows in towns.** Before, it only showed on the open land and in dungeons. In town, your character and the wood elf townsfolk walked bolt upright, because the town's relaxed walking pose overwrote it. Swinging a tool and casting spells keep the stoop now too.
+
 ## RS-242 - High elves and wood elves
 
 - **Elves split in two.** **High Elves** are the magic folk: +1 magic accuracy, +10% Magic and Prayer xp, darkvision, and one spell in ten costs no runes. **Wood Elves** are the archers: +1 ranged accuracy, +10% Woodcutting and Fletching xp, darkvision.
