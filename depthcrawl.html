@@ -7827,7 +7827,7 @@ function ensureSpawnEscape(){
 // (RS-106, generator 3: broader ranges, valleys walled in by them filled in as mountain, and nothing but a dragon's lair in or on them)
 // (RS-114, generator 4: a river that runs into a hollow fills it into a lake and flows on from its lowest edge)
 // (RS-115, generator 5: rivers join edge to edge - a diagonal step also fills the lower of its two side tiles)
-const OW_GEN_VER = 8;   /* (6: pyramids in the desert, RS-213; 7: a town for every race, RS-223; 8: roads skirt the volcano, RS-236) */
+const OW_GEN_VER = 9;   /* (6: pyramids in the desert, RS-213; 7: a town for every race, RS-223; 8: roads skirt the volcano, RS-236; 9: landmarks on clear ground, RS-238) */
 // any two river tiles that touch only at a corner get the lower of the two tiles beside them turned to river
 // (never a mountain, the sea or a lake); returns how many tiles it added
 function owRiverJoin(elev){
@@ -8499,6 +8499,7 @@ function tryMoveOverworld(dx,dy){
   const t = G.ow.map[nx][ny];
   if (t===OW_MOUNTAIN) return;
   if (t===OW_WATER && !G.player.hasBoat && !iceAt(nx, ny)) return;
+  if (owLandmarkFoot(nx, ny)) return;   /* (RS-238: landmarks are solid) */
   G.owPos.x=nx; G.owPos.y=ny;
   owReveal(nx, ny, wgSight());
   const stepCost = G.ow.road ? wgStepCost(nx, ny) : 1;   // roads are quicker; wading a river is slower
@@ -8693,6 +8694,7 @@ function encounterEligible(t){
 function owSpotTaken(x, y, me){
   const t = G.ow.map[x] && G.ow.map[x][y]; if (t===undefined) return true;
   if (OW_SITE_TILES.includes(t) || wgPoiAt(x, y)) return true;
+  if (owLandmarkFoot(x, y)) return true;
   if ((G.ow.mythicBeasts||[]).some(b=>b.x===x && b.y===y)) return true;
   if ((G.ow.encounters||[]).some(e=>e!==me && e.x===x && e.y===y)) return true;
   if ((G.ow.rich||[]).some(r=>r.x===x && r.y===y)) return true;
@@ -8746,7 +8748,7 @@ function moveOverworldEncounters(){
     if (nx<0||ny<0||nx>=OW_COLS||ny>=OW_ROWS) continue;
     if (!encounterEligible(G.ow.map[nx][ny])) continue;
     if (G.ow.road && wgRoadAt(nx,ny) && !(dist>0 && dist<=noticeR) && chn(0.8)) continue;   // roamers mostly keep off the roads
-    if (G.ow.encounters.some(o=>o!==e && o.x===nx && o.y===ny) || OW_SITE_TILES.includes(G.ow.map[nx][ny]) || wgPoiAt(nx,ny) || (G.ow.rich||[]).some(r=>r.x===nx && r.y===ny) || (G.ow.ev && (G.ow.ev.camps||[]).some(c=>c.x===nx && c.y===ny)) || (G.ow.mythicBeasts||[]).some(b=>b.x===nx && b.y===ny)) continue;   // (RS-131) and never pile up on one tile (they may cross a tree or a patch of herbs)
+    if (G.ow.encounters.some(o=>o!==e && o.x===nx && o.y===ny) || OW_SITE_TILES.includes(G.ow.map[nx][ny]) || wgPoiAt(nx,ny) || owLandmarkFoot(nx,ny) || (G.ow.rich||[]).some(r=>r.x===nx && r.y===ny) || (G.ow.ev && (G.ow.ev.camps||[]).some(c=>c.x===nx && c.y===ny)) || (G.ow.mythicBeasts||[]).some(b=>b.x===nx && b.y===ny)) continue;   // (RS-131) and never pile up on one tile (they may cross a tree or a patch of herbs)
     e.x=nx; e.y=ny;
   }
   // the population drifts back toward its target size over ordinary
@@ -10688,6 +10690,7 @@ function skForestDepth(x, y){
 function skNodeStatic(x, y){
   if (!G.ow || !G.ow.map) return null;
   if (wgRoadAt(x, y)) return null;   // (RS-130) no trees, rocks, herbs or fishing spots on the roads
+  if (owLandmarkFoot(x, y)) return null;   // (RS-238) nor inside a landmark
   if (SKN.seed !== G.ow.seed || SKN.map !== G.ow.map){ SKN.st.clear(); SKN.seed = G.ow.seed; SKN.map = G.ow.map; }
   const key = x*4096+y; if (SKN.st.has(key)) return SKN.st.get(key);
   if (OW_SITE_TILES.includes(skOwTile(x, y)) || wgPoiAt(x, y) || (G.ow.mythicBeasts||[]).some(b=>b.x===x && b.y===y)){ SKN.st.set(key, null); return null; }   // (RS-131) one thing to a tile
@@ -17750,14 +17753,19 @@ function geoBuild(key){
     // near the edge of the largest range, where you can walk up to its foot
     let maxD = 0; for (const j of mt.tiles) maxD = Math.max(maxD, dist[j]);
     const want = Math.min(3, maxD); let best = -1, bs = -1;
-    for (const j of mt.tiles){ if (Math.abs(dist[j]-want) > 0.6) continue; const sc = o3Hash(j%W, (j/W)|0, seed%977+41); if (sc > bs){ bs = sc; best = j; } }
+    const clearV = j=>{ const x = j%W, y = (j/W)|0, R = Math.ceil(VOLC.R); for (let i=-R;i<=R;i++) for (let k=-R;k<=R;k++){ const a = x+i, b = y+k; if (a<0||b<0||a>=W||b>=H || i*i+k*k > VOLC.R*VOLC.R) continue; const t = m[a][b]; if (OW_SITE_TILES.includes(t) || t===OW_MOUNTAINPASS) return false; } return true; };   /* (RS-238: no lair or pass under its cone) */
+    for (const pass of [true, false]) if (best < 0) for (const j of mt.tiles){ if (Math.abs(dist[j]-want) > 0.6 || (pass && !clearV(j))) continue; const sc = o3Hash(j%W, (j/W)|0, seed%977+41); if (sc > bs){ bs = sc; best = j; } }
     if (best >= 0){ const pn = pnOf(lr);
-      landmarks.push({ id:'volcano', kind:'volcano', name:'Mount '+pn, x:best%W, y:(best/W)|0, r:4,
+      landmarks.push({ id:'volcano', kind:'volcano', name:'Mount '+pn, x:best%W, y:(best/W)|0, r:6,   /* (RS-238: its cone is solid, so you find it from its foot) */
         desc:`Mount ${pn}, a smoking volcano. The ash on its slopes is still warm, and on clear nights the glow at its crown lights the clouds.` }); }
   }
+  // (RS-238) a tower or tree stands on ground of its own: no site, road, river or point of interest in its footprint
+  const lmClear = (x, y)=>{ for (let i=-1;i<=1;i++) for (let k=-1;k<=1;k++){ if (Math.abs(i)+Math.abs(k) > 1) continue; const a = x+i, b = y+k; if (a<0||b<0||a>=W||b>=H) return false; const t = m[a][b];
+      if (OW_SITE_TILES.includes(t) || t===OW_RIVER || t===OW_WATER || t===OW_MOUNTAIN || (G.ow.road && G.ow.road[b*W+a]) || (G.ow.pois||[]).some(p=>p.x===a && p.y===b)) return false; } return true; };
   const fo = biggest('forest');
   if (fo && fo.n >= 20){ let best = -1, bs = -1;
-    for (const j of fo.tiles){ const sc = dist[j]*10 + o3Hash(j%W, (j/W)|0, seed%977+43); if (sc > bs){ bs = sc; best = j; } }
+    for (const j of fo.tiles){ if (!lmClear(j%W, (j/W)|0)) continue; const sc = dist[j]*10 + o3Hash(j%W, (j/W)|0, seed%977+43); if (sc > bs){ bs = sc; best = j; } }
+    if (best < 0) for (const j of fo.tiles){ const sc = dist[j]*10 + o3Hash(j%W, (j/W)|0, seed%977+43); if (sc > bs){ bs = sc; best = j; } }
     const pn = pnOf(lr);
     landmarks.push({ id:'tree', kind:'tree', name:'the '+pn+' Tree', x:best%W, y:(best/W)|0, r:2,
       desc:`The ${pn} Tree, older than any town. Its crown shades a whole glade, and its roots run under half the forest.` }); }
@@ -17768,6 +17776,7 @@ function geoBuild(key){
       const sc = o3Hash(x, y, seed%977+47); if (sc <= bs) continue;
       let ok = true; for (let i=-2;i<=2 && ok;i++) for (let j=-2;j<=2;j++){ const t = m[x+i][y+j]; if (t===OW_WATER || t===OW_MOUNTAIN){ ok = false; break; } }
       if (ok) for (const [sx2,sy2] of sites) if (Math.abs(sx2-x) <= 5 && Math.abs(sy2-y) <= 5){ ok = false; break; }
+      if (ok && !lmClear(x, y)) ok = false;
       if (ok){ bs = sc; best = [x,y]; }
     }
     if (best){ const pn = pnOf(lr);
@@ -17779,6 +17788,15 @@ function geoBuild(key){
 }
 function owPlaceAt(x, y){ if (x<0 || y<0 || x>=OW_COLS || y>=OW_ROWS) return null; const g = owGeo(), i = g.placeAt[y*OW_COLS+x]; return i>=0 ? g.places[i] : null; }
 function owLandmark(id){ return owGeo().landmarks.find(l=>l.id===id) || null; }
+// RS-238: a landmark is solid - its footprint (the tower's and the great tree's tile and the four beside it, most of the
+// volcano's cone) can't be walked through and nothing is placed in it; mountain passes stay open, so nothing is cut off
+function lmFootR(lm){ return lm.kind==='volcano' ? VOLC.R - 0.9 : 1.05; }
+function owLandmarkFoot(x, y){
+  if (!G.ow || !G.ow.map) return null; let g; try{ g = owGeo(); }catch(e){ return null; }
+  for (const lm of g.landmarks){ const R = lmFootR(lm); if (Math.abs(x - lm.x) > R || Math.abs(y - lm.y) > R) continue;
+    if (Math.hypot(x - lm.x, y - lm.y) <= R && !(lm.kind==='volcano' && G.ow.map[x] && G.ow.map[x][y]===OW_MOUNTAINPASS)) return lm; }
+  return null;
+}
 // ---- where you've walked: the chart is coloured in around your footsteps ----
 function owWalkArr(){
   if (!G.ow.walked || G.ow.walked.length !== OW_COLS*OW_ROWS) G.ow.walked = new Uint8Array(OW_COLS*OW_ROWS);
@@ -29120,7 +29138,7 @@ function o3Vegetation(grp, x0, y0, W){
   for (let x=x0; x<x0+W; x++) for (let y=y0; y<y0+W; y++){
     const t = o3Tile(x,y), h = (s)=> o3Hash(x,y,s), nd = skNodeStatic(x,y), treeNode = !!(nd && nd.k==='woodcutting');
     if (treeNode){ if (h(11)<0.5) put.push(['bush', x+h(12), y+h(13), 0.5+h(14)*0.4, h(15)*6.28, h(16)]); continue; }
-    if (wgRoadAt(x,y) || wgPoiAt(x,y)) continue;   // (roads and points of interest stay clear)
+    if (wgRoadAt(x,y) || wgPoiAt(x,y) || owLandmarkFoot(x,y)) continue;   // (roads, points of interest and landmarks stay clear)
     { const bv = wgBioAt(x,y); if (bv && wgVegVariant(put, x, y, t, bv, h)) continue;
       if (!bv && (t===OW_GRASS || t===OW_FOREST || t===OW_DESERT) && h(1) < 0.16 && islandAt(x,y)){ put.push(['palm', x+0.2+h(3)*0.6, y+0.2+h(4)*0.6, 0.8+h(5)*0.4, h(6)*6.28, h(7)]); if (h(8) < 0.5) put.push(['bush', x+h(12), y+h(13), 0.8, h(15)*6.28, h(16)]); continue; } }
     let nearSnow = false, nearSwamp = false, nearMtn = false;
@@ -29818,7 +29836,7 @@ function o3GoGather(x, y){
   return true;
 }
 const O3_STEP = 0.36;                // seconds per tile when you walk the overworld
-function o3Passable(x,y){ if (x<0||y<0||x>=OW_COLS||y>=OW_ROWS) return false; const t = G.ow.map[x][y]; if (t===OW_MOUNTAIN) return false; if (t===OW_WATER && !G.player.hasBoat && !iceAt(x,y)) return false; return true; }
+function o3Passable(x,y){ if (x<0||y<0||x>=OW_COLS||y>=OW_ROWS) return false; const t = G.ow.map[x][y]; if (t===OW_MOUNTAIN) return false; if (t===OW_WATER && !G.player.hasBoat && !iceAt(x,y)) return false; if (owLandmarkFoot(x, y)) return false; return true; }
 function o3PathTo(tx, ty){
   const sx = G.owPos.x, sy = G.owPos.y, key = (x,y)=>x+','+y, prev = new Map([[key(sx,sy), null]]), q = [[sx,sy]], lim = 60;
   let end = null;
@@ -34335,7 +34353,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-237';
+const GAME_VERSION = 'rs-238';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

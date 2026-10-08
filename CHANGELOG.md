@@ -1,5 +1,15 @@
 # Depthcrawl patch notes
 
+## RS-238 - Solid landmarks
+
+**Landmarks are solid now.** You can't walk through the wizard's tower, the great tree or the volcano's cone, either with the keys or by clicking to walk; the route goes round them. Wandering monster groups can't wander into them either.
+
+**Nothing is placed inside a landmark.** The tower and the great tree now pick a spot clear of towns and other sites, roads, rivers and points of interest. The volcano picks one with no dragon's lair or mountain pass under its cone. Gathering spots, the land's own scenery trees and anything else that spawns on open ground stay out of them too.
+
+**You can still reach them.** The tower's foot is where you climb to the lookout, and you find the volcano once you reach its foot, within 6 tiles. Mountain passes over the volcano's slopes stay open, so nothing is cut off.
+
+**This applies to new worlds.** Your character comes with you. On an older world the landmarks are solid too, but they may sit where something else already was.
+
 ## RS-237 - The view from the tower
 
 **The wizard's tower is a lookout now.** Walk to its foot and tap it, and you can climb the stair to the open gallery under its roof.

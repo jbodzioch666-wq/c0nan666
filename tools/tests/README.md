@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| solid | landmarks are solid: no walking through the tower, the great tree or the volcano, and no site, point of interest, road, gathering spot or wandering group inside them; each can still be reached |
 | lookout | the tower is a lookout: climb it from its foot, the camera stands high on the gallery with a wide, turning view, the land in sight goes on your map, a key climbs down |
 | volcano | the volcano is part of the land: a tall cone with a sunken crater, lava runs down its flanks; the stand-in cone only shows from afar |
 | intdoor | inside a building the way out is a real door, shut in its frame: round in a halfling shire, plank elsewhere, in oak, golden oak or cherry matching the street side; none where there is no street door |
