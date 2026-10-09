@@ -1,5 +1,15 @@
 # Depthcrawl patch notes
 
+## RS-280 - Faces
+
+The second part of the humanoid overhaul: faces that look like faces, after Bakshi's men.
+
+- **Eyes sit in their sockets.** Each socket is hollowed and closed over by an upper and a lower lid, leaving an almond opening; behind it a glossy eyeball with a coloured iris, a black pupil and a point of light. No more balls stuck on the cheeks.
+- **Brows and nostrils.** Men have brows in their hair colour; noses have nostrils.
+- **Hair grown as strands.** Short crops, long hair to the shoulders, swept-back hair and ponytails are locks rooted over the scalp above the hairline, combed off the face, falling with their length over a scalp dome, with the mass of long hair behind the neck. Each head of hair is one mesh, so towns full of people cost no more to draw.
+- **Beards of strands.** Full beards hang from the whole jaw line, goatees from the chin, with a moustache swept to either side of the mouth. Dwarf braids and the braided styles keep their plaits.
+- **Glowing eyes** on fiends and the like now sit in the same sockets.
+
 ## RS-279 - Clothes that are clothes
 
 The first part of the humanoid overhaul: everyone on two legs, you included, wears real garments instead of a bare muscled body painted the colour of their outfit.
