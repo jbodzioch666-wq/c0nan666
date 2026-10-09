@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-287 - Slimmer hips
+
+- **A woman's hips are slimmer,** and her skirts are cut to fit them rather than flared out to clear them: the pelvis, seat, hip joints and thighs all come in a little, and robe bottoms, one-piece robes and tunic skirts narrow to match. A tunic's own hem under the belt no longer flares wider than the skirt below it.
+
 ## RS-286 - Skirts that fit
 
 - **Robe bottoms, one-piece robes and tunic skirts are gathered at the waist and flare over the hips** before falling to the hem, instead of hanging as a plain cone from under the belt. On a woman the cone was narrower than her hips, so they pushed through the waistband; on a man they showed a little too. The hem bands and stitched runes follow the new hem.
