@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## RS-266 - Real dragons
+
+- **Every dragon is rebuilt from scratch in high detail.** A deep-chested, scaled body with a row of spines down the back and tail, pale belly plates with dark seams, a long S-curved neck and a tail that ends in a spade.
+- **A dragon's head.** A long snout with nostrils, heavy brows, slit-pupilled glowing eyes, long swept-back horns with smaller cheek horns and spikes, and a hinged jaw full of teeth and fangs. Ancient dragons have bigger horns and an extra pair, and longer spines.
+- **Real wings.** Each wing is an arm of bone with a clawed thumb and four long fingers, with a membrane stretched between them that billows and sags into scallops along its edge. Dragons raise their wings as they wind up and beat them down as they bite.
+- **Legs and claws.** Heavy forelegs and bent hind legs, each foot with four curved black claws.
+- **Each kind has its own body.** Wyverns and forest wyrms rear up on two legs with a sting or spade on the tail. The dragon turtle carries a domed shell of scutes. The plesiosaurus has a long neck and four flippers. **The King Black Dragon now has three heads**, as it should.
+- **It moves like a dragon.** The neck sways and looks about, the jaw works, the tail swishes, and on the attack it rears back, then lunges with its jaws wide.
+
 ## RS-265 - Women look like women
 
 - **A woman's face.** Female characters have their own sculpted face, with a softer, narrower jaw, a small chin, higher cheekbones, a lighter brow, larger eyes and a small nose with an upturned tip. They also have fuller, rosy lips, dark lashes and fine arched brows.

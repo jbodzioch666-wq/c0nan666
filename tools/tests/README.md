@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| dragon | RS-266: dragons rebuilt in high detail: sculpted body, horned head with a toothed jaw that bites, clawed legs, membrane wings; wyvern on two legs, turtle shell, plesiosaurus flippers, three-headed King Black Dragon |
 | women | RS-265: women look like women: feminine head sculpt (narrower jaw, fuller lips), lashes, no square jaw, slimmer arms; about two in five townsfolk are beardless women |
 | torso | RS-264: torsos sculpted finer; a woman's bust sculpted into the torso (stands out, no stuck-on balls), narrower waist, wider hips; picking Feminine clears the beard |
 | wolf | RS-263: the wolf rebuilt in high detail: sculpted body, ruff, black nose, ears, a jaw that opens on its fangs to bite, four legs on their paws, a jointed bushy tail; jackals, hellhounds and werewolves share it, a town dog doesn't |
