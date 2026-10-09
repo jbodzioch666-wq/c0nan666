@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| highelf | RS-245: the high elf after Bakshi (circlet, almond eyes, long gold-hemmed robe and mantle out of armour); ticks on the figure slots hide a worn piece on your figure while it still counts |
 | woodelf | RS-242: elves split into high elves (magic) and wood elves (bows); the wood elf is tall, gaunt and stooped on long thin limbs, with a leaf cap, leaf tunic and bare long toes; an old elf save loads as a wood elf |
 | cblvl | RS-240: the 1-20 power tier is gone - monsters are scaled to exact combat levels, floors and bands are in combat levels, gear drops from the level it needs |
 | gearcmp | upgrade/downgrade is judged against the style you fight with: plate is a different style to a mage in robes, better robes are an upgrade; and the other way round for a fighter |

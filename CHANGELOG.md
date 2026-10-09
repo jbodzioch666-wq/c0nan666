@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-245 - High elves after Bakshi, and hide what you wear
+
+- **High elves look like the elves of Bakshi's Lord of the Rings.** They're tall, slender and serene, with long straight hair under a silver circlet set with a pale stone at the brow. Their faces are fine, with high cheekbones and long almond eyes tilted up at the corners. Out of armour they wear a long robe to the ankles, hemmed and collared in gold, under a grey-green mantle. In armour, the armour shows, and a helm replaces the circlet. The townsfolk of the elven towns are dressed the same way.
+- **Tick boxes on your equipment slots.** Each slot that changes how you look (weapon, bow, head, body, legs, hands, feet, cape and off-hand) now has a small tick in its corner. Untick it and your figure stops showing that piece, but you still wear it and keep all its bonuses. Hide the helm to show off your hair or circlet, or hide plate to keep a high elf's robe. Tick it again to bring it back.
+
 ## RS-244 - A real hunch
 
 - **Wood elves have a curved spine.** Before, the whole back tilted forward in one straight line. Now the lower back stays upright and the spine curves forward above it into a rounded hump between the shoulder blades, with the neck and head carried well out in front. Shoulders, belts, armour pads, capes and the tunic's leaf points follow the curve, so armour sits right on it.
