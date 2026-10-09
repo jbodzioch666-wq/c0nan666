@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-262 - High-detail spiders and scorpions
+
+- **Spiders and scorpions get the crab's high-detail look.** Their bodies, legs, joints and tails are smooth and many-sided instead of blocky, with a glossy wet-look shell instead of the old ridged texture.
+- **Real scorpion pincers.** Each pincer now has two curved, bevelled finger blades that hook in at the tip, with a row of teeth along the inside, darkening from the shell colour to near-black at the point. They still open as the scorpion winds up and snap shut on the strike.
+- **Spiders stay hairy.** The big abdomen and long legs keep their fur, while the head, fangs, joints and spinnerets now shine.
+
 ## RS-261 - Real crab claws
 
 - **Crab claws look like crab claws.** Each is a broad, flattened palm that runs out into the fixed lower finger, with a curved top finger hinged above it. Both fingers are toothed along the inside and dark at the tips, and the claws are red with blue at the wrist.

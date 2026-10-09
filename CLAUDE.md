@@ -74,6 +74,7 @@ node tools/tests/run.js --soft grave boot   # named tests; --soft = software Web
 ## Design notes
 
 - **Art direction:** new graphics (models, faces, costumes, buildings, landscapes) take their look from Ralph Bakshi's *The Lord of the Rings* (1978) and Rankin/Bass's *The Hobbit* (1977) cartoons wherever possible: their creature and race designs, faces and proportions, costumes and painterly colours. The wood elves (RS-242, `woodElfLook`) follow the Rankin/Bass ones.
+- **Graphics quality bar (RS-260 to RS-262):** new and remade models get the effort of the high-detail crab, spider and scorpion in `m3dArachnid`: smooth many-sided parts (`sph` 32x22 spheres, 20-sided `seg` limbs), glossy or carefully chosen materials, vertex-colour gradients where colour should flow, and sculpted shapes (extruded, bevelled, curved) for distinctive parts like claws instead of plain cones. Render screenshots from several angles, check them closely, and iterate before releasing.
 - The pace is about a tenth of RuneScape's (`XP_RATE = 0.3`). Gathering xp is weighted per skill by `GATHER_XP`.
 - Towns have separate NPCs for separate jobs: the Slayer master, the trader, the quest giver, the smith and the Peddler. Don't duplicate a feature across menus.
 - Day and night run on a real-time clock, `G.player.clock` (RS-104): 20 minutes of day and 10 of night, paused on menus. Read the hour through `dayPhase()` and `clockNow()`. Steps (`turnCount`) still drive weather, events, shop stock and daily limits. In tests, set the hour with `p.clock`.

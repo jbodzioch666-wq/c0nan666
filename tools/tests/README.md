@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| hdbugs | RS-262: the spider and scorpion in high detail like the crab: glossy shells, smooth round parts of 20+ sides, the spider still furry, two sculpted finger blades on each scorpion pincer |
 | crab | RS-258/259: the crab rebuilt after the Sally Lightfoot: a colourful glossy shell wider than long, eyes on stalks, two matching red claws, four pairs of legs on the ground; scorpion and spider still build |
 | spider | RS-257: the spider rebuilt: head-and-chest and a raised abdomen, eight arched legs on the ground, it animates; frost and cave spiders too; scorpion and crab still build |
 | scorpion | RS-256: the scorpion rebuilt: plated back, eight arched legs on the ground, two pincers, a five-segment tail curling over the back to a sting; it animates; spider and crab still build |
