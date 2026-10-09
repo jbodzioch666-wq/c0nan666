@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-270 - Real oozes
+
+- **Gray oozes and ochre jellies are one smooth, glistening mound of jelly** that spreads across the floor, ripples and heaves. It rears a pseudopod forward to strike. You can see a half-digested skull, bones and drifting bubbles inside it, and the ochre jelly is digesting someone's chainmail too.
+- **The giant jellyfish swarm is three glassy jellyfish.** Each bell pulses with a ruffled rim and a glowing core, and has frilled mouth-arms and long trailing threads.
+- **The water elemental lord is a whirling column of water** rising from a ring of foam. Its surface streams and spirals, it has two arms of water that reach out to strike, and spray flies off it.
+- **The shambling mound and bog beast are a heap of rotting vegetation:** mossy and matted, hung with dripping vines and caught dead leaves. Two eyes glow in its hollow, and two long arms of weed drag on the floor and swing up at you.
+- **The will-o'-wisp** has a white-hot heart in a shimmering shell, a flickering flame tail, and motes of light circling it.
+
 ## RS-269 - Real tentacled horrors
 
 - **The octopus, the kraken and the deep-cult horrors are rebuilt from scratch in high detail.** A sculpted, warty mantle mottled in light and dark, great golden eyes with bar-shaped pupils, a siphon, and webbing between the arms.
