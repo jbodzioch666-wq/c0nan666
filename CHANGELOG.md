@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-291 - Robe bottoms on wood elves
+
+- **A skirt fits a slight figure.** A skirt's depth shrank with the whole build while the body's depth shrank more slowly, so on a slight figure like a wood elf the robe bottom ended up inside the tunic's seat at the back. The skirt's depth now scales the same way the body does.
+- **The skirt's waist turns with a stooped torso,** so a wood elf's stoop no longer swings the tunic's seat out behind the robe bottom.
+- **No leaf hem under a robe bottom.** The leaf-cut tunic's hem points poked through the long skirt at the thighs; under a robe bottom they are left off.
+- The skirt test now poses the figure and covers wood elves and half-orcs as well as humans.
+
 ## RS-290 - The wood elves' faces
 
 - **Their eyes are open again.** The wood elves' heavy, sleepy lids were still built the old way, as lumps over the eyes, and since the new eyes (RS-280) they buried the eyeballs. The lids now rest over the sculpted ones with the eyes showing beneath.
