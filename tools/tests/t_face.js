@@ -18,6 +18,9 @@ module.exports = async page=>{
     out.woman = info(HUM({ outfit:'leather', hair:'#8a6a3a', hairStyle:'short', fem:true }));
     out.tail = info(HUM({ outfit:'leather', hair:'#1a1210', hairStyle:'ponytail', beard:'#1a1210', beardStyle:2 }));
     out.glow = info(HUM({ outfit:'rags', head:'fiend', eyes:'255,80,40' }));
+    { const e = m3dInstance({}, HUM({ outfit:'rags', head:'drake', skin:'#a83020', scaly:true })), h = e.rig.head; let sculpt = 0, jaw = !!h.getObjectByName('drakeJaw'); const sk = h.getObjectByName('drakeSkull'); if (sk && sk.geometry.attributes.position.count > 8000) sculpt++; if (jaw && h.getObjectByName('drakeJaw').children[0].geometry.attributes.position.count > 3000) sculpt++;   /* (RS-292: the dragonborn's sculpted head and hinged jaw) */
+      m3dPoseHumanoid(e.rig, 0.7, 0, 0, 0, 0, e); const shut = h.getObjectByName('drakeJaw').rotation.x; m3dPoseHumanoid(e.rig, 0.7, 0, 0, 1, 0, e); out.drake = { sculpt, jaw, open:+(h.getObjectByName('drakeJaw').rotation.x - shut).toFixed(2) }; }
+    out.stubble = info(HUM({ outfit:'leather', hair:'#3a2414', hairStyle:'long', beard:'#3a2414', beardStyle:1 }));
     return out; });
   const A = (c, m)=>{ if (!c) throw new Error(m+' :: '+JSON.stringify(r)); };
   for (const k of ['m','f']){ const d = r[k]; A(d.upper > d.gap + 0.003 && d.lower > d.gap + 0.002, k+': the lids stand proud of the opening between them'); A(d.verts > 7000, k+': the head is sculpted finely'); }
@@ -28,5 +31,7 @@ module.exports = async page=>{
   A(r.man.beardVerts > 2000 && r.tail.beardVerts > 800 && r.tail.beardVerts < r.man.beardVerts, 'a full beard and a smaller goatee of strands');
   A(r.man.domeScale > 1.05, 'RS-284: the scalp dome stands clear of the skull at the crown');
   A(r.man.sideLow > -0.075, 'RS-284: long hair settles on the shoulders rather than falling through them (RS-290: its ends uneven)');
+  A(r.drake.sculpt===2 && r.drake.jaw && r.drake.open > 0.3, 'RS-292: a dragonborn has a sculpted skull and jaw, and the jaw drops as it strikes');
+  A(r.stubble.beardVerts > 300 && r.stubble.beardVerts < r.tail.beardVerts, 'RS-292: stubble is a merged mesh of short bristles');
   console.log('face ok', JSON.stringify(r));
 };

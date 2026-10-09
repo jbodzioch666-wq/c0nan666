@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-292 - The dragonborn's head, and the rest of the races checked
+
+A pass over every playable race, male and female, in a robe bottom.
+
+- **The dragonborn's head is sculpted** to the same standard as the dragons: one smooth scaled skull and snout with brow ridges, nostrils and a row of cheek spikes sweeping back, a hinged lower jaw lined with teeth that drops as you strike, slit eyes under scaled lids, and a paler throat. It was the last head still built from spheres and cylinders.
+- **Stubble is bristles.** A half-elf's stubble was a translucent shell; it is now short bristles over the jaw and lip.
+- The skirt test now runs over every race: 1800 checks, all clear. The dwarf woman's skirt was out by a hair at the side and is cut a touch wider.
+
 ## RS-291 - Robe bottoms on wood elves
 
 - **A skirt fits a slight figure.** A skirt's depth shrank with the whole build while the body's depth shrank more slowly, so on a slight figure like a wood elf the robe bottom ended up inside the tunic's seat at the back. The skirt's depth now scales the same way the body does.
