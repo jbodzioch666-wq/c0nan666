@@ -419,7 +419,6 @@ _Large self-contained systems, best done last_
 300. [x] (75) Necromancy - a fourth combat style that raises skeletons and ghosts to fight for you
 ## Backlog
 
-- **Full revamp of the female player and townsfolk models** (asked for after RS-265): the waist is still too wide; aim for the proportions of the classic Lara Croft reference (narrow waist, wider hips, long slim legs), and revisit the face, hair and torso together. Render front, side and three-quarter shots and check them before release.
 
 ### Skills and gathering
 - (1) Gathering sites - dedicated groves, fishing docks and herb gardens with richer nodes
