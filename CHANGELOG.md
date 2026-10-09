@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-282 - Cloaks and kite shields
+
+The fourth part of the humanoid overhaul.
+
+- **Cloaks hang from both shoulders.** The yoke curves round behind the neck and over the shoulders, clear of the pauldrons (which used to poke through), and the cloak falls in folds that deepen toward a flared hem at the knees. It is pinned at the throat with a cord and a brooch at each shoulder, and it sways with your stride and swings as you strike.
+- **Kite shields.** Anyone bearing an emblem - knights, guard captains, paladins - and you, with a metal kiteshield on your arm, now carry a kite shield: a curved face of painted planks, pointed below, with an iron rim, a ring of rivets and a cross in its colours. Round wooden shields stay round.
+
 ## RS-281 - Helmets
 
 The third part of the humanoid overhaul: helmets sculpted as the real things, fitted to the head.

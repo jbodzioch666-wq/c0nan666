@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| cloak | RS-282: a cloak hanging from both shoulders in folds, clear of the pauldrons, with cord and brooches, swaying with the stride; kite shields (curved, rimmed, riveted, a cross) point down for emblem bearers and metal kiteshields; round shields stay round |
 | helm | RS-281: sculpted helmets - kettle hat, great helm (visor slits, breathing holes), spangenhelm skull cap (nasal, cheek plates; horned, winged, crested), wizard's hat, hood; the hooded head wears the hood |
 | face | RS-280: eyes in sculpted sockets under lids, eyeballs with iris and pupil, brows, nostrils; hair and beards grown as strands merged into one mesh over a scalp dome |
 | wear | RS-279: sculpted garments over the body (tunic, jerkin, hauberk, breastplate and fauld, robe), matching sleeves and hose, a neck in the neckline, a belt round the body, sculpted pauldrons, a hanging tabard |
