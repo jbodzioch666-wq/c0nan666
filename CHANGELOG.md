@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-257 - A proper spider
+
+- **Spiders are rebuilt from scratch.** The old model was two balls on straight sticks. Now a spider has a head-and-chest joined by a narrow waist to a big, raised, hairy abdomen with pale chevrons, the red marking on top and spinnerets at the back.
+- **A face to fear.** Eight eyes sit in a cluster, with two big ones at the front, over a pair of fanged jaws and two short feelers.
+- **Eight long legs** rise to a high knee and come down wide to the ground. The front pairs reach forward and the back pairs back, and they step as it walks. It rears its front legs as it winds up to bite.
+- **Cave spiders and frost spiders** share the new body. The frost spider keeps its icy coat and spikes.
+
 ## RS-256 - A proper scorpion
 
 - **Scorpions are rebuilt from scratch.** The old model was a squashed blob on stick legs. Now a scorpion has a flat head shield with eyes on the crown and a back of overlapping plates. It stands on four pairs of legs that arch high at the knee and splay out to the ground. Its big pincers sit on jointed arms, with a swollen palm and two fingers that open and close.
