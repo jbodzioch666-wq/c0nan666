@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-273 - Frogs open wide
+
+- **Frogs and toads now open their mouths.** The lower jaw is hinged, so it drops open to show a pink mouth as the tongue shoots out, then snaps shut. Before, the tongue came straight out of a closed mouth. The throat sac moves with the jaw, and the mouth also gapes as it winds up and now and then while it sits.
+
 ## RS-272 - The swamp shambler
 
 - **The shambling mound and bog beast are remade as a hulking swamp shambler.** It is a great hunched mass of muck and moss, its head sunk low between huge shoulders.
