@@ -419,6 +419,7 @@ _Large self-contained systems, best done last_
 300. [x] (75) Necromancy - a fourth combat style that raises skeletons and ghosts to fight for you
 ## Backlog
 
+- **Hips inside the torso (seen after RS-288):** on a woman the hip joints and the tops of the thighs sit inside the torso sculpt, so at some angles (the side view, top off) the lighter thigh shows through the skirt and tunic. Nudging skirt and garment radii only moves the problem. Fix properly by sculpting the pelvis and the thigh roots as one piece (or carving the torso where the thighs enter it) so the layers never overlap, then re-run `skirt`, `torso` and `wear`.
 
 ### Skills and gathering
 - (1) Gathering sites - dedicated groves, fishing docks and herb gardens with richer nodes
