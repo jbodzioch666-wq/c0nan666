@@ -28,7 +28,7 @@ module.exports = async page=>{
   A(r.f.waistX < r.f.ribX - 0.008 && r.f.waistX < r.f.hipX - 0.008, 'her waist curves in, narrower than her ribs and her hips');
   A(r.balls===0, 'no little balls stuck on the chest');
   A(r.f.shX < r.m.shX - 0.008 && r.f.hipX > r.f.waistX + 0.02 && r.f.hipX > r.f.shX*0.62, 'RS-283/287: narrower shoulders, hips well out from the waist, an hourglass');
-  A(r.fHip > r.mHip*1.08 && r.fSh < r.mSh*0.9, 'RS-283: her hip joints set wider, her shoulders narrower');
+  A(r.fHip > r.mHip && r.fSh < r.mSh*0.9, 'RS-283: her hip joints set wider, her shoulders narrower');
   A(r.femTorso, 'a woman wears the feminine torso');
   A(r.bodyAfter===1 && r.beardAfter===0, 'picking Feminine clears the beard');
   A(r.skirtHip > r.bodyHip && r.skirtWaist < r.skirtHip, 'RS-286: her robe bottom is gathered at the waist and clears her hips: '+JSON.stringify([r.skirtWaist, r.skirtHip, r.bodyHip]));

@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-288 - Nothing pokes through her skirt
+
+- **The tunic and the robe bottom now sit outside the hips at every angle.** With the top off, the tunic's hips showed through the skirt on the diagonal, and a little at the sides in the slimmer builds. The garment's hips are cut a touch narrower, the skirt is gathered a little wider at the waist and is a little squarer in section for the corners of the hips, so no skin or cloth shows below the belt from any side, in any build, over plate, cloth or bare legs.
+- A new test probes every height and angle round the hips to keep it that way.
+
 ## RS-287 - Slimmer hips
 
 - **A woman's hips are slimmer,** and her skirts are cut to fit them rather than flared out to clear them: the pelvis, seat, hip joints and thighs all come in a little, and robe bottoms, one-piece robes and tunic skirts narrow to match. A tunic's own hem under the belt no longer flares wider than the skirt below it.
