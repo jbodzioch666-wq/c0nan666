@@ -25,7 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
-| frog | RS-271: frogs, toads, crocodiles rebuilt (tongue, warts, teeth, crested tail, ammit's mane, sacred collar); the shambling mound a tangle of vines; the wisp a tall flame |
+| frog | RS-271: frogs, toads, crocodiles rebuilt (tongue, warts, teeth, crested tail, ammit's mane, sacred collar); RS-272: the shambling mound a shaggy swamp shambler with a trunk; the wisp a tall flame |
 | ooze | RS-270: oozes rebuilt: a smooth heaving jelly with bones inside, three jellyfish, a whirling water column, a vine-hung shambling mound, a wisp; they move when they attack and each figure moves its own surface |
 | tentacle | RS-269: tentacled monsters rebuilt: sculpted mantle/eye-orb/roper, every arm a smooth tapering tube that writhes and lashes on the attack; right arm counts, the herald's crown |
 | serpent | RS-268: serpents rebuilt: one smooth body bent along a moving spine (snake, cobra hood, worm maw, finned eel, leech, remorhaz); it moves as it strikes; each figure bends its own body |

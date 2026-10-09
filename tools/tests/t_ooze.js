@@ -6,8 +6,8 @@ module.exports = async page=>{
     const out = {}, posOf = e=>{ const a = []; e.holder.traverse(x=>{ if (x.isMesh && x.geometry.userData.owner) a.push(x.geometry.attributes.position.array.slice()); }); return a; };
     for (const nm of ['gray ooze','ochre jelly','giant jellyfish swarm','water elemental lord','shambling mound','bog beast','will-o-wisp']){
       const e = m3dInstance({ nm }, m3dPortrait({ nm })), rig = e.rig;
-      e.anim(rig, 0.7, 0, 0, 0, 0, e); const p0 = posOf(e); e.anim(rig, 0.7, 0, 0, 1, 0, e); const p1 = posOf(e);
-      let moved = 0; p0.forEach((a, i)=>{ for (let j=0;j<a.length;j+=5) moved = Math.max(moved, Math.abs(a[j] - p1[i][j])); });
+      const armX = ()=>rig.arms && rig.arms[0] && rig.arms[0].sh ? rig.arms[0].sh.rotation.x : 0; e.anim(rig, 0.7, 0, 0, 0, 0, e); const p0 = posOf(e), a0 = armX(); e.anim(rig, 0.7, 0, 0, 1, 0, e); const p1 = posOf(e), a1 = armX();
+      let moved = Math.abs(a1 - a0)*0.1; p0.forEach((a, i)=>{ for (let j=0;j<a.length;j+=5) moved = Math.max(moved, Math.abs(a[j] - p1[i][j])); });
       const e2 = m3dInstance({ nm }, m3dPortrait({ nm })); e2.anim(e2.rig, 2.0, 0, 0, 0, 0, e2);
       let shared = false; const g1 = new Set(); e.holder.traverse(x=>{ if (x.isMesh && x.geometry.userData.owner) g1.add(x.geometry); }); e2.holder.traverse(x=>{ if (x.isMesh && g1.has(x.geometry)) shared = true; });
       let verts = 0; e.holder.traverse(x=>{ if (x.isMesh) verts += x.geometry.attributes.position.count; });

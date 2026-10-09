@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-272 - The swamp shambler
+
+- **The shambling mound and bog beast are remade as a hulking swamp shambler.** It is a great hunched mass of muck and moss, its head sunk low between huge shoulders.
+- **A face from the swamp.** A ridged brow juts over deep sockets with **glowing red eyes**, and a long ribbed trunk hangs down between two curling tendrils, all swaying as it breathes.
+- **A shaggy coat.** Hundreds of long, pale-tipped strands of moss and weed hang from its crown, shoulders, back and arms, and trail from its legs.
+- **Long, heavy arms** dangle to its knees and end in root-like fingers. It swings them up and back as it winds up, then brings them down on you.
+- **It stands in a faintly glowing puddle**, its legs breaking into roots where they meet the water.
+
 ## RS-271 - Frogs, crocodiles, a tangled mound and a living flame
 
 - **Giant frogs and toads are rebuilt in high detail.** A squat body with a long mouth line, big golden eyes with slit pupils, nostrils, dark blotches over green with a pale throat and belly, and a throat sac that puffs as it breathes. Its webbed hind legs kick out when it hops, and **its sticky pink tongue shoots out to strike you.** Toads are brown and covered in warts, with poison glands behind the eyes.
