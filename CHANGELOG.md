@@ -1,5 +1,19 @@
 # Depthcrawl patch notes
 
+## RS-294 - Monster heads, and helmets that fit a dragonborn
+
+The last heads still built from boxes and balls are sculpted, to the same standard as the dragonborn's.
+
+- **Golems** have a carved block of a head: a heavy brow over deep eye slits glowing within, a jutting jaw and flat ear plates, cracked stone or riveted iron, vines growing from a vine horror's crown.
+- **Fish-men** (sahuagin, merfolk, deep ones, dagannoth) have a broad flat skull running straight into the neck, a wide mouth full of needle teeth, big glossy eyes at the sides, gill slits, and a spiny fin crest and frills.
+- **Mind flayers** have a tall veined cranium sweeping back, blank eyes in deep sockets, and four long tentacles curling down from the mouth.
+- **The umber hulk** has a ridged carapace, great faceted eyes, and curved toothed mandibles that open as it winds up and snap shut as it strikes.
+- **Gnolls and the anubis warden** have a long muzzle with a black nose, a hinged jaw full of teeth that drops as they bite, and tall jackal ears or a hyena's round ears, spots and a bristling mane.
+- **Bugbears and yetis** have a heavy brow over small deep eyes, a bear's short muzzle or an ape's flat nose, fangs over the lip, and shaggy fur over the crown.
+- **Kobolds and lizardfolk** share the dragonborn's sculpted head: kobolds with two swept-back horns, lizardfolk with a crest of spines.
+- **Glowing eyes are still eyes:** glossy, lit from within, with a slit pupil. Dragonborn and kobold pupils now show on the front of the eye.
+- **A dragonborn's helmets fit.** Helmets, hats, crowns and masks sat where a man's skull would be, so the dragon skull pushed through them. They are now raised, set back and a size larger, to sit on his crown. His cowl opens wide enough for his snout and jaw, and his crest stays under a helmet instead of poking through it.
+
 ## RS-293 - Gnomes and halflings in robe bottoms
 
 - **A gnome's apron lies on the chest.** The bib and its straps were flat panels set at a man's chest depth, so on a woman they floated in front of her and the straps stood up past her shoulders. They now follow the chest's own surface, bust or pot belly.
