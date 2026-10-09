@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-258 - A proper crab
+
+- **Crabs are rebuilt from scratch.** The old model was a dome on six sticks. Now a crab has a broad, flat shell wider than it is long, with spikes along its front edges, a raised ridge on top, a paler underside, and eyes up on short stalks.
+- **Big claws.** The claws sit on jointed arms, each with a heavy palm and two dark-tipped fingers that open and close. The right claw is bigger, as on many real crabs.
+- **Eight walking legs** spread out to the sides on pointed tips, and it scuttles with a little sideways rock.
+
 ## RS-257 - A proper spider
 
 - **Spiders are rebuilt from scratch.** The old model was two balls on straight sticks. Now a spider has a head-and-chest joined by a narrow waist to a big, raised, hairy abdomen with pale chevrons, the red marking on top and spinnerets at the back.
