@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-271 - Frogs, crocodiles, a tangled mound and a living flame
+
+- **Giant frogs and toads are rebuilt in high detail.** A squat body with a long mouth line, big golden eyes with slit pupils, nostrils, dark blotches over green with a pale throat and belly, and a throat sac that puffs as it breathes. Its webbed hind legs kick out when it hops, and **its sticky pink tongue shoots out to strike you.** Toads are brown and covered in warts, with poison glands behind the eyes.
+- **Crocodiles are rebuilt in high detail.** Rows of armoured scutes run down the back, the hide is dark-banded above and pale and scaled below, and the long tail has a twin crest that sweeps as it walks. They stand on sprawled, clawed legs. The long snout has raised eyes and nostrils, and its interlocking teeth show along both jaws even when shut. It gapes wide before it bites.
+- **The sacred crocodile** wears a gold collar set with red and blue stones. **Ammit** has a lion's mane as well.
+- **The shambling mound and bog beast are now a real tangle:** scores of vines and roots, thick and thin, green, brown and rotten, wound round and round a dark core.
+- **The will-o'-wisp is a living flame.** A white heart sits in vivid tongues of colour that flicker and lick upward, instead of a plain white glow.
+
 ## RS-270 - Real oozes
 
 - **Gray oozes and ochre jellies are one smooth, glistening mound of jelly** that spreads across the floor, ripples and heaves. It rears a pseudopod forward to strike. You can see a half-digested skull, bones and drifting bubbles inside it, and the ochre jelly is digesting someone's chainmail too.
