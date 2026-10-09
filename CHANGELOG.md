@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-255 - Humans after the Men of Gondor and Rohan
+
+- **Humans look like the Men in Bakshi's Lord of the Rings.** They're drawn true to life, with a squarer jaw. A new human starts with long hair and a full beard.
+- **Tunic and cloak.** Out of armour, a human wears a belted tunic to mid-thigh with a gold-embroidered band at the hem and neck, under a deep red cloak with a fur collar, much like Boromir's. Armour replaces them.
+- **Human townsfolk** now include folk in embroidered tunics, some with fur-collared cloaks, alongside the workaday clothes.
+
 ## RS-254 - Half-elves as rangers
 
 - **Half-elves look like rangers**, in the spirit of Bakshi's Strider: lean, with an elf-touched face (a little slimmer, high cheekbones, short pointed ears), long dark hair, stubble and grey eyes.
