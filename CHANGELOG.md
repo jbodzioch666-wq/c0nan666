@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-290 - The wood elves' faces
+
+- **Their eyes are open again.** The wood elves' heavy, sleepy lids were still built the old way, as lumps over the eyes, and since the new eyes (RS-280) they buried the eyeballs. The lids now rest over the sculpted ones with the eyes showing beneath.
+- **A nose, not a spike.** The long pointed nose was a cone half the width of the face; it is now sized to the sculpted face.
+- **Long hair ends unevenly** at the shoulders instead of in a blunt line, on everyone.
+
 ## RS-289 - Thighs part of the pelvis, and a real short crop
 
 - **The hips are no longer inside the torso.** The roots of the thighs are now sculpted into the pelvis, on the body and on every garment over it, so the legs grow out of the hips instead of hanging from joints hidden inside them. Nothing lighter shows through a skirt from the side any more, in any build; the skirt test now probes the thighs as well as the hips.

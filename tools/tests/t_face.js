@@ -27,6 +27,6 @@ module.exports = async page=>{
   A(r.woman.hairDraws===1 && r.woman.hairVerts > 2000 && r.woman.dome===1, 'short hair too');
   A(r.man.beardVerts > 2000 && r.tail.beardVerts > 800 && r.tail.beardVerts < r.man.beardVerts, 'a full beard and a smaller goatee of strands');
   A(r.man.domeScale > 1.05, 'RS-284: the scalp dome stands clear of the skull at the crown');
-  A(r.man.sideLow > -0.05, 'RS-284: long hair settles on the shoulders rather than falling through them');
+  A(r.man.sideLow > -0.075, 'RS-284: long hair settles on the shoulders rather than falling through them (RS-290: its ends uneven)');
   console.log('face ok', JSON.stringify(r));
 };
