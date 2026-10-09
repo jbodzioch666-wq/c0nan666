@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-293 - Gnomes and halflings in robe bottoms
+
+- **A gnome's apron lies on the chest.** The bib and its straps were flat panels set at a man's chest depth, so on a woman they floated in front of her and the straps stood up past her shoulders. They now follow the chest's own surface, bust or pot belly.
+- **Skirts are closed at the top.** Seen from above and behind, the tunic showed inside the open waist of a skirt as a band under the belt; the waist is now capped and gathered closer at the front and back.
+
 ## RS-292 - The dragonborn's head, and the rest of the races checked
 
 A pass over every playable race, male and female, in a robe bottom.
