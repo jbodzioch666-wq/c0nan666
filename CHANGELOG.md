@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-254 - Half-elves as rangers
+
+- **Half-elves look like rangers**, in the spirit of Bakshi's Strider: lean, with an elf-touched face (a little slimmer, high cheekbones, short pointed ears), long dark hair, stubble and grey eyes.
+- **Dressed for the road.** Out of armour, a half-elf wears a leather jerkin with shoulder pads over linen sleeves, dark trousers in the colour you pick, and a dark green travelling cloak with the hood down and bunched at the back of the neck. Armour replaces them.
+- **Half-elven townsfolk** dress the same way, with brown, black, chestnut or fair hair worn long, tied back or swept.
+
 ## RS-253 - Tieflings in the cartoon style
 
 - **Tieflings have a new look.** There are no tieflings in Tolkien, so they're drawn after Bakshi's dark, cloaked figures with glowing eyes. They keep their horns, tail and infernal skin, and now have a narrower, angular face with high cheekbones, a pointed chin and pointed ears.
