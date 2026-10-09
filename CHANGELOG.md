@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-269 - Real tentacled horrors
+
+- **The octopus, the kraken and the deep-cult horrors are rebuilt from scratch in high detail.** A sculpted, warty mantle mottled in light and dark, great golden eyes with bar-shaped pupils, a siphon, and webbing between the arms.
+- **Real arms.** Every arm is one smooth tube tapering to a fine tip, pale underneath with two rows of sucker cups. The arms splay out across the floor, writhe, and curl at their tips, each in its own way. When it attacks, the front arms rear up and lash out at you.
+- **The drowned god's herald** wears a golden crown with a glowing gem, and has twelve arms. The kraken has ten.
+- **The floating eye horrors** (the aberration and the avatar of the depths) have one great veined eye that looks about, set in thick lids over a mouth full of teeth, with eye-stalks writhing above, each ending in its own slit-pupilled eye.
+- **The roper** is a lumpy stalagmite ringed with stone, opening one eye and a toothy red maw, with long sticky tendrils that trail on the floor and lash at you.
+
 ## RS-268 - Real serpents
 
 - **Snakes, worms, eels, leeches and the remorhaz are rebuilt from scratch in high detail.** Each body is now one smooth, scaled tube that bends as it moves, instead of a stack of stiff pipe segments.

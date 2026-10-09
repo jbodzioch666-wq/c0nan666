@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| tentacle | RS-269: tentacled monsters rebuilt: sculpted mantle/eye-orb/roper, every arm a smooth tapering tube that writhes and lashes on the attack; right arm counts, the herald's crown |
 | serpent | RS-268: serpents rebuilt: one smooth body bent along a moving spine (snake, cobra hood, worm maw, finned eel, leech, remorhaz); it moves as it strikes; each figure bends its own body |
 | breath | RS-267: a dragon's breath shows: it rears back, a cone of its element pours from its jaws onto you, and its jaws gape |
 | dragon | RS-266: dragons rebuilt in high detail: sculpted body, horned head with a toothed jaw that bites, clawed legs, membrane wings; wyvern on two legs, turtle shell, plesiosaurus flippers, three-headed King Black Dragon |
