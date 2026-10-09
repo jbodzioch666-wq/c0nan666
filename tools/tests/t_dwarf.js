@@ -11,7 +11,7 @@ module.exports = async page=>{
     const beardSig = st=>{ G.player.look = Object.assign({}, lookOf(G.player), { beard:st }); const pt = rsPlayerLook(), e = m3dInstance({}, pt); let n = 0, rings = 0; e.rig.head.traverse(x=>{ if (x.isMesh){ n++; if (x.geometry && x.geometry.type==='TorusGeometry') rings++; } }); return [n, rings]; };
     out.full = beardSig(3); out.braid = beardSig(4);
     // RS-248: more braided styles - twin braids, three braids, a braided moustache, a forked beard - each its own shape
-    out.styles = LOOK_BEARD.length; out.sigs = [3,4,5,6,7,8].map(st=>beardSig(st).join(':'));
+    out.styles = LOOK_BEARD.length; out.sigs = [3,4,5,6,7,8,9,10,11,12,13].map(st=>beardSig(st).join(':'));
     G.player.look = Object.assign({}, lookOf(G.player), { beard:0 }); out.shaven = !!rsPlayerLook().o.greatBeard;
     const f = v3RaceDress(v3VillagerLook(1), 1); G.villageRace = 'dwarf'; const f2 = v3RaceDress(v3VillagerLook(1), 1); out.folk = { beard:!!f2.o.greatBeard, broad:f2.o.broad, nose:!!f2.o.bigNose };
     return out; });
@@ -24,7 +24,7 @@ module.exports = async page=>{
   A(!r.shaven, 'a clean-shaven dwarf has no great beard');
   A(r.braid[1] - r.full[1]===3 && r.full[0]!==r.braid[0], 'a full beard and the long braid differ: the braid has its gold rings (RS-247): '+JSON.stringify([r.full, r.braid]));
   A(r.spin[0]===r.spin[1] && r.spin[2]===0, 'the preview does not turn by itself, nor its head (RS-248): '+JSON.stringify(r.spin));
-  A(r.styles===9 && new Set(r.sigs).size===6, 'six different long beards, four of them new braided styles: '+JSON.stringify(r.sigs));
+  A(r.styles===14 && new Set(r.sigs).size===11, 'eleven different long beards, nine of them braided (RS-248/249): '+JSON.stringify(r.sigs));
   A(r.folk.beard && r.folk.broad > 1.1 && r.folk.nose, 'the dwarven townsfolk look the same');
   console.log('dwarf ok');
 };

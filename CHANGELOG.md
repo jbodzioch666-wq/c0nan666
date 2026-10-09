@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-249 - Five more braided beards
+
+- **Ten braided beards now.** New this time: **Four braids** in a row across the chin, **Five braids** fanning out over the chest, **Side braids** hanging from the cheeks either side of a full beard, a **Braided goatee** (one plait from the chin, the cheeks bare) and **Beaded braids** (twin plaits threaded with silver beads). They join twin braids, three braids, the braided moustache, the forked beard and the long dwarf braid. All of them hang to the belt on a dwarf and are shorter on anyone else.
+- **Dwarven townsfolk** now wear every long beard style between them.
+
 ## RS-248 - Braided beards, and a still preview
 
 - **Four new braided beards**, for any race that grows one: **Twin braids**, **Three braids** (the middle one longest), a **Braided moustache** (two long plaits hanging from the moustache ends over a short beard) and a **Forked beard** (a full beard that parts into two thick braids). Each braid is bound in gold rings and ends in a tuft. On a dwarf they hang to the belt; on everyone else they're shorter.
