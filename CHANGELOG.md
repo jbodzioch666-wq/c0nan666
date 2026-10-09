@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-286 - Skirts that fit
+
+- **Robe bottoms, one-piece robes and tunic skirts are gathered at the waist and flare over the hips** before falling to the hem, instead of hanging as a plain cone from under the belt. On a woman the cone was narrower than her hips, so they pushed through the waistband; on a man they showed a little too. The hem bands and stitched runes follow the new hem.
+
 ## RS-285 - Her hips
 
 - **Hips that flow into the thighs.** A woman's pelvis was a wide square block over the legs with the seat stuck on as two balls. It is now wide at the crest of the hip bones and tapers down into the thighs, with a round seat set low, from the front, the side and behind.
