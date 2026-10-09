@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-260 - A high-detail crab
+
+- **The crab is smoother and sharper.** Its shell is one sculpted piece instead of stacked balls. Its colour flows smoothly from gold at the crown through orange and red to a sky-blue edge, with pale blue beneath, like a real Sally Lightfoot.
+- **Glossy, not ridged.** The shell, legs and claws have a smooth wet-look shine instead of the ridged texture other creatures use.
+- **Finer detail everywhere.** The legs, joints, claws and eyes are rounder and more detailed, with flattened leg segments and finer bristles on the gold tips.
+
 ## RS-259 - The Sally Lightfoot crab
 
 - **Crabs are colourful now**, after the Sally Lightfoot. The smooth, glossy shell is orange-gold over the top with a red rim edged in sky blue and a pale blue underside, with blue patches by the eyes. The eyes are pale lavender on blue stalks.
