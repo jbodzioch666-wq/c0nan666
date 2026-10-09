@@ -1,5 +1,15 @@
 # Depthcrawl patch notes
 
+## RS-281 - Helmets
+
+The third part of the humanoid overhaul: helmets sculpted as the real things, fitted to the head.
+
+- **Kettle hat:** a riveted crown with a knob on top under a wide, downturned brim.
+- **Great helm:** a flat-topped barrel deep enough to clear the nose, with a reinforcing band at eye level, a bar down the face, visor slits either side of it and breathing holes right through the steel. No more plain cylinder.
+- **Spangenhelm skull cap** for the horned, winged and dwarf helms: a pointed cap with bands over the crown, a rim of rivets, a nasal bar and cheek plates. The horned helm's horns now curve up from sockets at the temples, the winged helm's wings are swept plates, the dwarf helm carries a crest.
+- **Wizard's hat:** a tall cone that bends back and droops at the tip, over a wide brim with a waved edge and a band round the base.
+- **Hood:** a cowl that frames the face, peaks behind and drapes in folds to the shoulders. Hooded cultists and the like wear the same hood with their faces in shadow.
+
 ## RS-280 - Faces
 
 The second part of the humanoid overhaul: faces that look like faces, after Bakshi's men.
