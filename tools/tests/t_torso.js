@@ -3,12 +3,12 @@
 module.exports = async page=>{
   const r = await page.evaluate(()=>{
     const out = {};
-    const prof = (fem)=>{ const g = m3dTorsoGeo(1, 0, fem), p = g.attributes.position; let chestZ = -1, waistX = 0, hipX = 0;
+    const prof = (fem)=>{ const g = m3dTorsoGeo(1, 0, fem), p = g.attributes.position; let chestZ = -1, waistX = 0, hipX = 0, ribX = 0;
       for (let i=0;i<p.count;i++){ const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
         if (y > 0.17 && y < 0.22 && Math.abs(x) > 0.025 && Math.abs(x) < 0.06) chestZ = Math.max(chestZ, z);
         if (Math.abs(y - 0.11) < 0.01) waistX = Math.max(waistX, Math.abs(x));
-        if (Math.abs(y + 0.01) < 0.01) hipX = Math.max(hipX, Math.abs(x)); }
-      return { verts:p.count, chestZ:+chestZ.toFixed(4), waistX:+waistX.toFixed(4), hipX:+hipX.toFixed(4) }; };
+        if (Math.abs(y + 0.01) < 0.01) hipX = Math.max(hipX, Math.abs(x)); if (Math.abs(y - 0.2) < 0.01) ribX = Math.max(ribX, Math.abs(x)); }
+      return { verts:p.count, chestZ:+chestZ.toFixed(4), waistX:+waistX.toFixed(4), hipX:+hipX.toFixed(4), ribX:+ribX.toFixed(4) }; };
     out.m = prof(false); out.f = prof(true);
     goToCharCreate(); G.ccLookTouched = false; ccSelectRace(RACES.findIndex(r=>r[0]==='Human')); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); o3Pref = false; try{ v3Pref = false; }catch(e){}
     for (const sl of ['head','chest','legs','arms','feet','cape']) G.gear[sl] = newItem();
@@ -21,6 +21,7 @@ module.exports = async page=>{
   A(r.m.verts > 9000 && r.f.verts > 9000, 'torsos are sculpted finely');
   A(r.f.chestZ > r.m.chestZ + 0.012, 'the bust stands out from the chest');
   A(r.f.waistX < r.m.waistX - 0.006 && r.f.hipX >= r.m.hipX, 'a narrower waist and wider hips');
+  A(r.f.waistX < r.f.ribX - 0.008 && r.f.waistX < r.f.hipX - 0.008, 'her waist curves in, narrower than her ribs and her hips');
   A(r.balls===0, 'no little balls stuck on the chest');
   A(r.femTorso, 'a woman wears the feminine torso');
   A(r.bodyAfter===1 && r.beardAfter===0, 'picking Feminine clears the beard');

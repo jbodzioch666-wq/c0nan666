@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## RS-265 - Women look like women
+
+- **A woman's face.** Female characters have their own sculpted face, with a softer, narrower jaw, a small chin, higher cheekbones, a lighter brow, larger eyes and a small nose with an upturned tip. They also have fuller, rosy lips, dark lashes and fine arched brows.
+- **A woman's build.** Women have longer, slimmer legs, slimmer arms, smaller hands, a slightly smaller head and narrower shoulders.
+- **An hourglass waist.** The waist now curves in below the bust and out again to the hips instead of bulging, with a flatter stomach. The studs on studded leather sit on the armour wherever the body curves.
+- **A woman's hair** sweeps down over the forehead in a fringe instead of leaving a high bare brow.
+- **Masculine race traits are softened.** Women don't get the human square jaw, the heavy brow or bushy brows. A dwarf woman's nose is smaller, and a half-orc woman's tusks are shorter.
+- **Towns have women in them.** About two in five townsfolk of every race (except dragonborn) are now women: beardless, with long hair, braids or a ponytail.
+
 ## RS-264 - Better torsos
 
 - **A real bust on women.** The two little balls stuck on the chest are gone. The bust is now sculpted into the torso: big, round and full, sloping out from the collarbone, heavy below with a rounded underside, and with cleavage between. It shows through shirts, leather and plate alike.
