@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-261 - Real crab claws
+
+- **Crab claws look like crab claws.** Each is a broad, flattened palm that runs out into the fixed lower finger, with a curved top finger hinged above it. Both fingers are toothed along the inside and dark at the tips, and the claws are red with blue at the wrist.
+- **They pinch.** The top finger opens wide as the crab winds up and snaps shut when it strikes, and the claws open and close idly while it waits.
+
 ## RS-260 - A high-detail crab
 
 - **The crab is smoother and sharper.** Its shell is one sculpted piece instead of stacked balls. Its colour flows smoothly from gold at the crown through orange and red to a sky-blue edge, with pale blue beneath, like a real Sally Lightfoot.
