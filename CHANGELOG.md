@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-247 - Two dwarf beards, and views that hold still
+
+- **A full beard and the long braid are different now.** On a dwarf, a **full beard** is a broad, bushy spade that fans out over the chest down to the belt, with a ragged hem and no braids. The **long dwarf braid** is a shorter chin beard gathered into one thick plait that hangs to the belt, bound in three gold rings, with a tuft at the end.
+- **Figure views no longer spin by themselves.** The character preview (in character creation and the barber's chair) and the bestiary model stay where you leave them. Drag to turn them as before.
+
 ## RS-246 - Dwarves after Bakshi
 
 - **Dwarves look like the dwarves of Bakshi's Lord of the Rings.** They're short and immensely broad, with a barrel chest and wide shoulders on short, thick legs, and a bigger head. Their faces have a big bulbous nose under a heavy brow.
