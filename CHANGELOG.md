@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-259 - The Sally Lightfoot crab
+
+- **Crabs are colourful now**, after the Sally Lightfoot. The smooth, glossy shell is orange-gold over the top with a red rim edged in sky blue and a pale blue underside, with blue patches by the eyes. The eyes are pale lavender on blue stalks.
+- **Long red legs.** Eight long, flat, bright red legs arch up from blue joints to gold tips with dark bristles.
+- **Small, matching claws.** The two claws are stubby and red, with blue at the wrist and dark tips.
+
 ## RS-258 - A proper crab
 
 - **Crabs are rebuilt from scratch.** The old model was a dome on six sticks. Now a crab has a broad, flat shell wider than it is long, with spikes along its front edges, a raised ridge on top, a paler underside, and eyes up on short stalks.
