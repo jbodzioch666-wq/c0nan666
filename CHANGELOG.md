@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-285 - Her hips
+
+- **Hips that flow into the thighs.** A woman's pelvis was a wide square block over the legs with the seat stuck on as two balls. It is now wide at the crest of the hip bones and tapers down into the thighs, with a round seat set low, from the front, the side and behind.
+- **Her belt sits on her waist** instead of floating round it, and a jerkin's skirt is cut wide enough for her hips.
+
 ## RS-284 - Hair on the shoulders, no bald spot, slimmer arms
 
 Fixes from playing RS-283.
