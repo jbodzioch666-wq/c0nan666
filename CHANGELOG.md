@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-274 - A proper frog mouth
+
+- **The frog's mouth is rebuilt.** RS-273's open mouth was a thin flap that showed layers of pale and pink. Now the whole chin and throat is one solid lower jaw, hinged at the back of the head and coloured like the rest of the frog.
+- **It opens wide.** When it strikes, the jaw drops to show a deep pink mouth, and the tongue shoots out from inside it. Shut, it shows a smooth face with only a thin mouth line.
+- **The wavy stitched mouth line is gone.** Toads get the same jaw.
+
 ## RS-273 - Frogs open wide
 
 - **Frogs and toads now open their mouths.** The lower jaw is hinged, so it drops open to show a pink mouth as the tongue shoots out, then snaps shut. Before, the tongue came straight out of a closed mouth. The throat sac moves with the jaw, and the mouth also gapes as it winds up and now and then while it sits.

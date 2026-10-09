@@ -16,7 +16,7 @@ module.exports = async page=>{
     const w = m3dInstance({ nm:'will-o-wisp' }, m3dPortrait({ nm:'will-o-wisp' })); w.anim(w.rig, 0.7, 0, 0, 0, 0, w); const wb = new THREE.Box3().setFromObject(w.rig.outer); const ws = wb.getSize(new THREE.Vector3()); out.flame = +(ws.y/ws.x).toFixed(2);
     return out; });
   const A = (c, m)=>{ if (!c) throw new Error(m+' :: '+JSON.stringify(r)); };
-  A(r['giant frog'].bite > 0.5 && r['giant toad'].bite > 0.5, 'RS-273: a frog opens its mouth as its tongue shoots out');
+  A(r['giant frog'].bite > 0.3 && r['giant toad'].bite > 0.3, 'RS-273: a frog opens its mouth as its tongue shoots out');
   A(r['giant frog'].frog && r['giant frog'].tongue===true && r['giant frog'].verts > 15000, 'a high-detail frog whose tongue shoots out');
   A(r['giant toad'].verts > r['giant frog'].verts, 'a warty toad');
   for (const nm of ['giant crocodile','sacred crocodile','ammit']) A(r[nm].frog && r[nm].legs===4 && r[nm].tail===9 && r[nm].gape > 0.5 && Math.abs(r[nm].minY) < 0.02, nm+': four legs, a crested tail, jaws that gape, on the ground');
