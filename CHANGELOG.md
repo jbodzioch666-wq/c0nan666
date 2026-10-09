@@ -1,5 +1,17 @@
 # Depthcrawl patch notes
 
+## RS-277 - Bears, boars, elk and great cats
+
+The four-legged beasts are rebuilt in high detail, the way the wolf was: a sculpted body, a head with a hinged, toothed jaw that opens to bite, legs ending in clawed paws or cloven hooves, a tail to suit, and a coat painted in its own colours.
+
+- **Bears** (brown, black, dire and polar, and the giant mole) have a heavy, round body with humped shoulders, a broad skull with small round ears, a short muzzle with a glossy black nose, fangs, a shaggy ruff, and big paws with long claws.
+- **The owlbear** has a bear's body under an owl's head, with a feathered facial disc, great golden eyes, ear tufts and a hooked beak.
+- **Boars** have a barrel body with a bristled ridge down the spine, a wedge snout ending in a pink disc nose, curling tusks, small pricked ears, hooves and a tufted tail.
+- **The giant elk** has a deep chest and long legs on hooves, a long face with a soft muzzle, big ears, a dark neck with a shaggy throat, a pale rump, and great branching antlers.
+- **Great cats** are sleek and long-tailed, with a round whiskered face, slit-pupilled eyes, fangs and faint rosettes. **The panther** is near black. **The displacer beast** has its two long tentacles ending in spiked pads. **The sphinx** has a lion's mane. **The manticore** keeps its bat wings and spiked tail on the new body.
+- **Giant rats** are hunched, with a pointed snout and whiskers, buck teeth, big round pink ears, pink feet and a long naked tail.
+- **The deer, boars and rabbits of the open land and the town cats** use the new builder too.
+
 ## RS-276 - The last of the old models
 
 Every monster that was still built the old, low-detail way has now been remade.
