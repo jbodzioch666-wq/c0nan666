@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-250 - Half-orcs after Bakshi
+
+- **Half-orcs look like Bakshi's orcs, toned down a little.** They're heavy brutes with broad, slightly hunched shoulders and arms a little long for their bodies. Their faces have a rounded heavy brow over amber eyes, a broad flat nose with flared nostrils, a jutting underbite with tusks pushed forward, and small ears swept back.
+- **Dressed in dark rags.** A new half-orc has shaggy black hair and ragged black clothes with a torn hem. You can still change every colour.
+- **Duller hides.** The half-orc skin colours are now Bakshi's sallow, ashen, mud and slate greens instead of bright moss green.
+- **Orcish townsfolk** share the build and face, with long, dreadlocked, mohawked or topknotted black hair.
+- **A softer brow on dwarves too.** The heavy brow is now rounded instead of a flat ledge.
+
 ## RS-249 - Five more braided beards
 
 - **Ten braided beards now.** New this time: **Four braids** in a row across the chin, **Five braids** fanning out over the chest, **Side braids** hanging from the cheeks either side of a full beard, a **Braided goatee** (one plait from the chin, the cheeks bare) and **Beaded braids** (twin plaits threaded with silver beads). They join twin braids, three braids, the braided moustache, the forked beard and the long dwarf braid. All of them hang to the belt on a dwarf and are shorter on anyone else.
