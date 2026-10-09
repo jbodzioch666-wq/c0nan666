@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-256 - A proper scorpion
+
+- **Scorpions are rebuilt from scratch.** The old model was a squashed blob on stick legs. Now a scorpion has a flat head shield with eyes on the crown and a back of overlapping plates. It stands on four pairs of legs that arch high at the knee and splay out to the ground. Its big pincers sit on jointed arms, with a swollen palm and two fingers that open and close.
+- **A real tail.** Five bulbous segments curl up over the back to a venom bulb and a hooked sting, which draws back and lashes forward when it attacks.
+- **The same body for its kin.** The giant desert scorpion, giant scarab and kalphite share the new model in their own colours.
+
 ## RS-255 - Humans after the Men of Gondor and Rohan
 
 - **Humans look like the Men in Bakshi's Lord of the Rings.** They're drawn true to life, with a squarer jaw. A new human starts with long hair and a full beard.

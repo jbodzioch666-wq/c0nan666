@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| scorpion | RS-256: the scorpion rebuilt: plated back, eight arched legs on the ground, two pincers, a five-segment tail curling over the back to a sting; it animates; spider and crab still build |
 | human | RS-255: the human after the Men of Gondor and Rohan: squarer jaw, long hair and full beard, a belted tunic with an embroidered hem under a fur-collared red cloak; armour takes over; townsfolk wear tunics too |
 | halfelf | RS-254: the half-elf as a Strider-like ranger: elf-touched face and stubble, a leather jerkin over linen sleeves, dark trousers in the chosen colour, a green cloak with the hood down; armour takes over; townsfolk match |
 | tiefling | RS-253: the tiefling after Bakshi's dark cloaked figures: narrow angular face, pointed chin and ears, eyes glowing in their own colour, a long dark trimmed coat under a high-collared mantle; armour takes over; townsfolk match |
