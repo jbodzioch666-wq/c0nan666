@@ -22,7 +22,7 @@ module.exports = async page=>{
   A(r.tunic.waistX > r.bare.waistX && r.femTunic.waistX < r.tunic.waistX - 0.005, 'cloth stands off the body; a woman\'s tunic follows her waist');
   for (const k of ['tunic','jerkin','chain','plate']) A(r[k].verts > 8000, k+' is sculpted finely');
   A(r.bandit.wear==='jerkin' && r.knight.wear==='plate' && r.orc.wear==='chain' && r.fanatic.wear==='robe' && !r.troll.wear, 'each outfit wears its garment; a loincloth stays bare');
-  A(r.bandit.chestKey.startsWith('wear|jerkin') && r.troll.chestKey.startsWith('torso|'), 'the chest mesh is the garment, or the bare torso');
+  A(r.bandit.chestKey.startsWith('wear3|jerkin') && r.troll.chestKey.startsWith('torso3|'), 'the chest mesh is the garment, or the bare torso');
   A(r.bandit.neck===1 && r.troll.neck===0, 'a skin neck shows in the neckline');
   A(r.bandit.belt===1 && r.bandit.box===0, 'the belt is a band round the body');
   A(r.knight.pauld===2, 'sculpted pauldrons');

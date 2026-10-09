@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-283 - The female figure
+
+The revamp that was put on hold is done, now that clothes are sculpted over the body.
+
+- **An hourglass, not a man with a bust.** A woman's shoulders and ribcage are narrower, her waist curves in deeper between them, and her hips and seat are wider, with fuller thighs set on wider hip joints. The pauldrons sit smaller on her narrower shoulders.
+- **The clothes follow.** Tunics, jerkins, hauberks, breastplates and robes are sculpted over the same figure, so the shape shows through what she wears.
+
 ## RS-282 - Cloaks and kite shields
 
 The fourth part of the humanoid overhaul.
