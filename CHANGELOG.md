@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-275 - Frogs really gape
+
+- **The whole mouth opens.** As it strikes, the frog rears its head back while the jaw drops, so the outside of the mouth gapes wide and you see the pink inside, instead of a closed face with something opening underneath.
+- **The tongue comes from the mouth.** It now lies on the floor of the mouth and flicks out from there, not from up by the nose.
+- **Front legs out to the sides.** The forelegs stand wide, beside the jaw rather than tucked underneath where they poked into the open mouth.
+
 ## RS-274 - A proper frog mouth
 
 - **The frog's mouth is rebuilt.** RS-273's open mouth was a thin flap that showed layers of pale and pink. Now the whole chin and throat is one solid lower jaw, hinged at the back of the head and coloured like the rest of the frog.
