@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-246 - Dwarves after Bakshi
+
+- **Dwarves look like the dwarves of Bakshi's Lord of the Rings.** They're short and immensely broad, with a barrel chest and wide shoulders on short, thick legs, and a bigger head. Their faces have a big bulbous nose under a heavy brow.
+- **A great beard.** With a full beard or the long dwarf braid, the beard spills down over the chest to the belt in one smooth fall, ending in two braids bound in gold rings. A clean-shaven, stubbled or goateed dwarf keeps that style.
+- **Dressed for the forge.** A new dwarf starts in an earthy brown tunic and dark breeches, with dark brown hair and beard and a big gold belt buckle. You can still change every colour.
+- **Dwarven townsfolk** have the same build and beards, in black, brown, auburn and grey.
+
 ## RS-245 - High elves after Bakshi, and hide what you wear
 
 - **High elves look like the elves of Bakshi's Lord of the Rings.** They're tall, slender and serene, with long straight hair under a silver circlet set with a pale stone at the brow. Their faces are fine, with high cheekbones and long almond eyes tilted up at the corners. Out of armour they wear a long robe to the ankles, hemmed and collared in gold, under a grey-green mantle. In armour, the armour shows, and a helm replaces the circlet. The townsfolk of the elven towns are dressed the same way.
