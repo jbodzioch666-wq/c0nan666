@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-278 - Beetles, hyenas and dogs
+
+- **Scarabs are real beetles.** The giant scarab, the tomb scarab and the scarab swarm were built as scorpions or bug-headed beasts. Now each is a glossy beetle with a domed, iridescent shell split down the back and edged in gold, a toothed head shield, curved mandibles, clubbed feelers and six spined legs that walk in a tripod gait.
+- **They take wing to strike.** As a beetle winds up, its wing cases lift open over buzzing membrane wings, and its mandibles snap shut as it lunges.
+- **The rust monster** is now a rust-red, pitted beetle with long feathery feelers that reach for your armour and a twisted paddle tail that turns like a propeller.
+- **Hyenas.** The giant hyena pack is now sculpted hyenas with a sloping back, a dark bristling mane, round ears, a black muzzle and a spotted coat.
+- **Town dogs** use the sculpted wolf model with shorter legs, warm brown eyes and, on some dogs, soft drooping ears.
+
 ## RS-277 - Bears, boars, elk and great cats
 
 The four-legged beasts are rebuilt in high detail, the way the wolf was: a sculpted body, a head with a hinged, toothed jaw that opens to bite, legs ending in clawed paws or cloven hooves, a tail to suit, and a coat painted in its own colours.

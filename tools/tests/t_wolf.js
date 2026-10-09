@@ -1,6 +1,6 @@
 // RS-263: the wolf rebuilt in high detail - a sculpted body with a ruff, a head with a black nose, glowing eyes, tall ears and a jaw
 // that opens on its fangs to bite, four legs standing on their paws, and a bushy jointed tail; jackals, hellhounds and werewolves
-// share it, while a town dog (short legs) keeps the old beast model
+// share it, and since RS-278 so do the town dogs (short legs)
 module.exports = async page=>{
   const r = await page.evaluate(()=>{
     const out = {};
@@ -15,7 +15,7 @@ module.exports = async page=>{
         bites:jaw1 > jaw0 + 0.4, reach, minY:+(box.min.y/(box.max.y - box.min.y)).toFixed(3), long:(()=>{ const s = box.getSize(new THREE.Vector3()); return s.z > s.y; })() };
     }
     const dog = m3dInstance({ nm:'dog' }, MP(mpBeast, { head:'canine', fur:'#8a6a42', tail:'stub', legs:'short', len:0.75 }, 1));
-    out.dog = !dog.rig.wolf && dog.beast;
+    out.dog = !!dog.rig.wolf && dog.beast;
     return out; });
   const A = (c, m)=>{ if (!c) throw new Error(m+' :: '+JSON.stringify(r)); };
   for (const nm of ['wolf', 'dire wolf', 'winter wolf', 'winter wolf alpha', 'jackal', 'hellhound', 'werewolf']){ const w = r[nm];
@@ -26,6 +26,6 @@ module.exports = async page=>{
     A(w.bites && w.reach, nm+': it opens its jaw and reaches out with its forelegs to bite');
     A(Math.abs(w.minY) < 0.03, nm+': it stands on its paws');
     A(w.long, nm+': longer than it is tall'); }
-  A(r.dog===true, 'a town dog keeps the old beast model');
+  A(r.dog===true, 'a town dog is the sculpted wolf too');
   console.log('wolf ok', JSON.stringify(r));
 };
