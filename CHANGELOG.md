@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-264 - Better torsos
+
+- **A real bust on women.** The two little balls stuck on the chest are gone. The bust is now sculpted into the torso: big, round and full, sloping out from the collarbone, heavy below with a rounded underside, and with cleavage between. It shows through shirts, leather and plate alike.
+- **A woman's figure.** Female characters have a narrower waist and ribcage, wider hips, slimmer shoulders and a slimmer neck.
+- **Cleaner chests on men**, with broad pectorals instead of a flat front.
+- **Finer torsos for everyone.** Every torso is sculpted in more detail, so the shapes are smoother and less lumpy.
+- **No beard by default for women.** Picking Feminine in character creation clears the beard. You can still give her one.
+
 ## RS-263 - A proper wolf
 
 - **Wolves are rebuilt from scratch in high detail.** A lean, deep-chested body with a tucked belly, a shaggy ruff round the neck and shoulders, fur breeches on the hind legs and a bushy tail carried low with a black tip.
