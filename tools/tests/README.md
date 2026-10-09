@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| wolf | RS-263: the wolf rebuilt in high detail: sculpted body, ruff, black nose, ears, a jaw that opens on its fangs to bite, four legs on their paws, a jointed bushy tail; jackals, hellhounds and werewolves share it, a town dog doesn't |
 | hdbugs | RS-262: the spider and scorpion in high detail like the crab: glossy shells, smooth round parts of 20+ sides, the spider still furry, two sculpted finger blades on each scorpion pincer |
 | crab | RS-258/259: the crab rebuilt after the Sally Lightfoot: a colourful glossy shell wider than long, eyes on stalks, two matching red claws, four pairs of legs on the ground; scorpion and spider still build |
 | spider | RS-257: the spider rebuilt: head-and-chest and a raised abdomen, eight arched legs on the ground, it animates; frost and cave spiders too; scorpion and crab still build |

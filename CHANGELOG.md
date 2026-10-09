@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## RS-263 - A proper wolf
+
+- **Wolves are rebuilt from scratch in high detail.** A lean, deep-chested body with a tucked belly, a shaggy ruff round the neck and shoulders, fur breeches on the hind legs and a bushy tail carried low with a black tip.
+- **A real wolf's head.** It has a long tapering muzzle, a glossy black nose with nostrils, amber eyes ringed in black, a pale spot over each eye, tall cupped ears and black lips. Its jaw is hinged and full of teeth: fangs, incisors and cheek teeth.
+- **A wolf's coat.** A dark saddle over the back, tawny flanks and legs, and a pale mask, throat and belly, with a dark line down the front of each foreleg. Winter wolves are frost-white with a blue-grey saddle, and fierce wolves raise their hackles.
+- **Legs that stand like a wolf's.** Wolves stand on their toes, with the hind legs bent back at the hock, four-toed paws, black pads and claws.
+- **It moves like a wolf.** It trots in diagonal pairs and pants at rest, its ears twitch and its tail sways. Winding up to attack, it crouches with its ears pinned back; then it lunges with its forelegs out and its jaws wide, and snaps them shut.
+- **Jackals, hellhounds and werewolves** use the new model in their own colours. Town dogs keep theirs.
+
 ## RS-262 - High-detail spiders and scorpions
 
 - **Spiders and scorpions get the crab's high-detail look.** Their bodies, legs, joints and tails are smooth and many-sided instead of blocky, with a glossy wet-look shell instead of the old ridged texture.
