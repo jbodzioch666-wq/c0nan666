@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| lowtier | RS-276: sharks, quippers, birds (and the town hen), treants, five-headed hydras, xorn, dust devil and manticore rebuilt in high detail; they move when they attack and stand on the floor |
 | frog | RS-271: frogs, toads, crocodiles rebuilt (tongue, warts, teeth, crested tail, ammit's mane, sacred collar); RS-272: the shambling mound a shaggy swamp shambler with a trunk; the wisp a tall flame |
 | ooze | RS-270: oozes rebuilt: a smooth heaving jelly with bones inside, three jellyfish, a whirling water column, a vine-hung shambling mound, a wisp; they move when they attack and each figure moves its own surface |
 | tentacle | RS-269: tentacled monsters rebuilt: sculpted mantle/eye-orb/roper, every arm a smooth tapering tube that writhes and lashes on the attack; right arm counts, the herald's crown |

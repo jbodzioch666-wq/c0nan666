@@ -1,5 +1,19 @@
 # Depthcrawl patch notes
 
+## RS-276 - The last of the old models
+
+Every monster that was still built the old, low-detail way has now been remade.
+
+- **Sharks** have a streamlined, countershaded body, dark above and pale below, with a pointed snout, gill slits, a crescent of teeth under the snout, a swept dorsal fin, long pectoral fins and a tall crescent tail. They swim in a side-to-side wave and lunge jaws first.
+- **Quippers** are deep-bodied biters with an underbite of jutting teeth, golden eyes and a red-orange belly.
+- **The hawk, giant owl and giant vulture** have sculpted, scalloped plumage and wings of separate feathers that fan open on the downstroke. They have fanned tails, hooked beaks, and talons that thrust forward to strike. The owl has a dished facial disc, ear tufts and great golden eyes; the vulture has a bare red head and a ruff.
+- **Town hens** are proper chickens, with a red comb and wattle and a tail held high. They stroll and peck at the ground.
+- **Treants look like Ents.** A gnarled, mossy trunk grows a face: glowing eyes deep under a knotted brow, a burl of a nose, a crack of a mouth and a mossy beard. They have branch arms with twig fingers, root feet, and a full crown of leaves that sways. The elder treant flowers, and the verdant horror bristles with thorns.
+- **Hydras have five heads**, each on its own long neck with a horned, toothed head, on the dragon's body.
+- **The xorn** is a squat barrel of living rock studded with gems. Its maw is ringed with teeth, and it has three glowing eyes, three clawed arms and three stubby legs.
+- **The dust devil** is a twisting funnel of sand, wide at the top and pinched to a point, streaming round and up. Grit and stones fly around it, and two eyes burn in the swirl.
+- **The manticore** has leathery bat wings on bone fingers, a shaggy lion's mane, and a tail ending in a club of spikes.
+
 ## RS-275 - Frogs really gape
 
 - **The whole mouth opens.** As it strikes, the frog rears its head back while the jaw drops, so the outside of the mouth gapes wide and you see the pink inside, instead of a closed face with something opening underneath.
