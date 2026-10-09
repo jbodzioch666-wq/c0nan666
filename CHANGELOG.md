@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-252 - Gnomes in the cartoon style
+
+- **Gnomes have a new look.** There are no gnomes in Tolkien, so they're drawn in the same painted-cartoon spirit as the hobbits: small and round-bellied on short legs, with bushy brows, rosy cheeks and the big gnome nose.
+- **A tall felt hat.** Their pointed hat curls back and droops toward a pompom on the tip, with brass goggles pushed up on the brim. A helm replaces it.
+- **Dressed to tinker.** Out of armour, a gnome wears a leather apron with a bib and a pocket of tools over the tunic. A new gnome starts with white hair and beard and a blue tunic.
+- **Gnomish townsfolk** wear red, blue, green, plum and mustard hats, with full beards, goatees and twin braids.
+
 ## RS-251 - Halflings like the cartoon hobbits
 
 - **Halflings look like the hobbits of Bakshi's and Rankin/Bass's cartoons.** They're small and round-bellied, with a big head of curls, a round face with soft rosy cheeks, a little button nose and small pointed ears.
