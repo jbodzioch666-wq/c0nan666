@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-253 - Tieflings in the cartoon style
+
+- **Tieflings have a new look.** There are no tieflings in Tolkien, so they're drawn after Bakshi's dark, cloaked figures with glowing eyes. They keep their horns, tail and infernal skin, and now have a narrower, angular face with high cheekbones, a pointed chin and pointed ears.
+- **Eyes that glow.** A tiefling's eyes glow like embers in whatever eye colour you pick.
+- **A long dark coat.** Out of armour, a tiefling wears a long dark coat to the ankles, trimmed in dull gold, under a dark mantle with a high collar. A new tiefling starts with long black hair and amber eyes. Armour replaces the coat.
+- **Tiefling townsfolk** wear the same dark coats, with eyes glowing amber, red, violet or gold.
+
 ## RS-252 - Gnomes in the cartoon style
 
 - **Gnomes have a new look.** There are no gnomes in Tolkien, so they're drawn in the same painted-cartoon spirit as the hobbits: small and round-bellied on short legs, with bushy brows, rosy cheeks and the big gnome nose.

@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| tiefling | RS-253: the tiefling after Bakshi's dark cloaked figures: narrow angular face, pointed chin and ears, eyes glowing in their own colour, a long dark trimmed coat under a high-collared mantle; armour takes over; townsfolk match |
 | gnome | RS-252: the gnome: a tall felt hat curling back with goggles on the brim, bushy brows, rosy cheeks, round belly on short legs, a tinker's apron; a helm and armour take over; townsfolk match |
 | halfling | RS-251: the halfling after the cartoon hobbits: round belly, curls, rosy round face, button nose, big hairy bare feet, a buttoned waistcoat over shirt sleeves with knee breeches; armour takes over; townsfolk match |
 | halforc | RS-250: the half-orc after Bakshi: broad hunched shoulders and long arms, heavy brow, flat nose, underbite and tusks, swept-back ears, amber eyes, dark rags; orcish townsfolk match |
