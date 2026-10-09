@@ -14,7 +14,7 @@ module.exports = async page=>{
     for (const sl of ['head','chest','legs','arms','feet','cape']) G.gear[sl] = newItem();
     const L = G.player.look; L.body = 1; const e = m3dInstance({}, rsPlayerLook()); let balls = 0;
     e.rig.torso.children.forEach(c=>{ if (c.isMesh && c.geometry.type==='SphereGeometry' && c.position.y > 0.18 && c.position.y < 0.23 && Math.abs(c.position.x) > 0.02) balls++; });
-    out.balls = balls; out.femTorso = e.rig.torso.children.some(c=>c.isMesh && c.geometry===m3dTorsoGeo(Math.round((rsPlayerLook().o.bulk||1)*10)/10, 0, true));
+    out.balls = balls; out.femTorso = e.rig.chestMesh.geometry===m3dWearGeo(Math.round((rsPlayerLook().o.bulk||1)*10)/10, true, 'tunic');   /* (RS-279: her tunic is sculpted over the feminine figure) */
     goToCharCreate(); ccSelectRace(RACES.findIndex(r=>r[0]==='Human')); const T = lookTarget(); T.body = 0; T.beard = 3; lookStep('body', 1); out.beardAfter = T.beard; out.bodyAfter = T.body;
     return out; });
   const A = (c, m)=>{ if (!c) throw new Error(m+' :: '+JSON.stringify(r)); };

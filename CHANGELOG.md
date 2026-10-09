@@ -1,5 +1,15 @@
 # Depthcrawl patch notes
 
+## RS-279 - Clothes that are clothes
+
+The first part of the humanoid overhaul: everyone on two legs, you included, wears real garments instead of a bare muscled body painted the colour of their outfit.
+
+- **Garments are sculpted over the body.** A tunic, a leather jerkin split at the front, a mail hauberk hanging to mid-thigh with riding splits, a breastplate with a raised centre line and a fauld of three lames, and a robe are each their own shape: loose where cloth hangs, crisp where steel is shaped. The neckline opens on a bare neck.
+- **Sleeves and hose to match.** Puffed cloth sleeves gathered at the elbow, strapped leather bracers, steel rerebraces with elbow cops and vambraces flared at the cuff, loose trousers creased at the knee, cuisses with knee cops and ridged greaves.
+- **Pauldrons are shells, not balls:** a domed steel shoulder with a rolled rim and two lames stepping down the arm, or a padded leather shoulder with stitched seams.
+- **Belts go round the body** and **tabards hang round the chest** and fall free below the belt.
+- **Women's clothes follow their figure:** a softened bust under cloth, a waist that curves in, a smooth breastplate.
+
 ## RS-278 - Beetles, hyenas and dogs
 
 - **Scarabs are real beetles.** The giant scarab, the tomb scarab and the scarab swarm were built as scorpions or bug-headed beasts. Now each is a glossy beetle with a domed, iridescent shell split down the back and edged in gold, a toothed head shield, curved mandibles, clubbed feelers and six spined legs that walk in a tripod gait.

@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| wear | RS-279: sculpted garments over the body (tunic, jerkin, hauberk, breastplate and fauld, robe), matching sleeves and hose, a neck in the neckline, a belt round the body, sculpted pauldrons, a hanging tabard |
 | beetle | RS-278: giant scarab, tomb scarab, scarab swarm and rust monster rebuilt as high-detail beetles (shell opens over wings, mandibles, feelers, six legs, propeller tail); the hyena pack and town dogs on the sculpted wolf |
 | quad | RS-277: bears, owlbear, boars, elk, great cats, rats rebuilt on one sculpted builder: on their feet, jaws that bite, antlers/tusks/mane/tentacles/wings; wild animals and the town cat build |
 | lowtier | RS-276: sharks, quippers, birds (and the town hen), treants, five-headed hydras, xorn, dust devil and manticore rebuilt in high detail; they move when they attack and stand on the floor |
