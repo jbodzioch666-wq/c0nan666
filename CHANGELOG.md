@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-251 - Halflings like the cartoon hobbits
+
+- **Halflings look like the hobbits of Bakshi's and Rankin/Bass's cartoons.** They're small and round-bellied, with a big head of curls, a round face with soft rosy cheeks, a little button nose and small pointed ears.
+- **Big hairy feet.** Their bare feet are bigger now, with more hair on top.
+- **Waistcoat and breeches.** Out of armour, a halfling wears a buttoned waistcoat with brass buttons over white shirt sleeves, with the shirt front and collar showing, and breeches to the knee with bare shins. A new halfling starts with a red waistcoat and brown breeches. Armour, leg armour and boots replace them when worn.
+- **Halfling townsfolk** dress the same way, in red, green, mustard, blue and brown waistcoats.
+
 ## RS-250 - Half-orcs after Bakshi
 
 - **Half-orcs look like Bakshi's orcs, toned down a little.** They're heavy brutes with broad, slightly hunched shoulders and arms a little long for their bodies. Their faces have a rounded heavy brow over amber eyes, a broad flat nose with flared nostrils, a jutting underbite with tusks pushed forward, and small ears swept back.
