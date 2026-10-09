@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-267 - Dragon breath you can see
+
+- **Dragons now visibly breathe on you.** Before, a breath attack was only a line in the combat log. Now the dragon rears back with its wings raised, then thrusts its neck out with its jaws wide, and a cone of its element pours from its mouth onto you and bursts where it lands, shaking the screen.
+- **Each kind has its own breath.** Red and ancient dragons breathe roiling fire that burns from white-hot to orange to smoke. Blue dragons spit forked, flickering lightning. White dragons exhale a frost cloud, black dragons a green-yellow spray of acid, forest wyrms poison, and the dragon turtle scalding steam.
+- **Every head breathes.** The King Black Dragon breathes from all three heads at once.
+- **Boss dragons breathe too.** When a dragon boss switches to its magic attack, it now breathes its own element at you instead of hurling a purple orb.
+
 ## RS-266 - Real dragons
 
 - **Every dragon is rebuilt from scratch in high detail.** A deep-chested, scaled body with a row of spines down the back and tail, pale belly plates with dark seams, a long S-curved neck and a tail that ends in a spade.

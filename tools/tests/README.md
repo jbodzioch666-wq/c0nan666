@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| breath | RS-267: a dragon's breath shows: it rears back, a cone of its element pours from its jaws onto you, and its jaws gape |
 | dragon | RS-266: dragons rebuilt in high detail: sculpted body, horned head with a toothed jaw that bites, clawed legs, membrane wings; wyvern on two legs, turtle shell, plesiosaurus flippers, three-headed King Black Dragon |
 | women | RS-265: women look like women: feminine head sculpt (narrower jaw, fuller lips), lashes, no square jaw, slimmer arms; about two in five townsfolk are beardless women |
 | torso | RS-264: torsos sculpted finer; a woman's bust sculpted into the torso (stands out, no stuck-on balls), narrower waist, wider hips; picking Feminine clears the beard |

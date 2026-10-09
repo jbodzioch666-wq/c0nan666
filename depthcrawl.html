@@ -6970,6 +6970,7 @@ function tickMonsters(excludeIdx){
         bdmg = mitigate(mx(1,bdmg));
         G.player.hp -= bdmg;
         const elem = DRAGON_BREATH_ELEM[m.nm]||'fire';
+        try{ isoBreath(m, elem); }catch(e){}   /* (RS-267: it rears back and breathes at you) */
         logMsg(`the ${m.nm} unleashes a blast of ${elem} for ${bdmg}${dodged?` (DEX save vs DC ${dc} succeeded - half damage)`:` (failed the DC ${dc} DEX save)`}`, 'hit');
         if (G.player.hp<=0 && !checkDeathWard()){ playerDies(m.nm); }
         continue; // breath replaces its normal turn, exactly like the real stat block choosing one or the other
@@ -13634,6 +13635,52 @@ function monSummon(m, n, adds){
   return made;
 }
 // a shot from a monster to you, drawn like your own
+// (RS-267) a dragon's breath: it rears back, then a cone of its element pours from its jaws onto you
+const BREATH_COLS = { fire:['#fff4b0','#ffa030','#d83010','#3a2a24'], acid:['#f4ffb0','#b8f040','#5a9a10','#2a3a10'], lightning:['#ffffff','#a8d4ff','#4a80ff','#1a2a5a'],
+  cold:['#ffffff','#d0f0ff','#7ac4f0','#a0b8c8'], poison:['#eaffb0','#9ee050','#4a8a20','#2a4018'], steam:['#ffffff','#e8f0f4','#b0c4cc','#8a9aa4'] };
+function isoBreath(m, elem){
+  m._breathT = (typeof FP!=='undefined' && FP.t) || 0.001; m._atkT = 0;
+  if (typeof sfx==='function') sfx(elem==='lightning' ? 'crit' : 'spell');
+  if (!ISO.on || !FPD.ok) return;
+  const p = G.player;
+  (ISO.shots = ISO.shots || []).push({ x0:m.x+0.5, y0:m.y+0.5, x1:p.x+0.5, y1:p.y+0.5, t:-0.32, dur:1.05, kind:'breath', elem, col:(BREATH_COLS[elem]||BREATH_COLS.fire)[1], m, seed:Math.random()*100 });
+}
+function isoDrawBreath(s, ppu){
+  const cols = BREATH_COLS[s.elem] || BREATH_COLS.fire, k = s.t/s.dur, T = THREE;
+  let A = null; const e = M3D.inst && s.m ? M3D.inst.get(s.m) : null;
+  if (e && e.rig && e.rig.necks){ const v = new T.Vector3(); A = []; for (const N of e.rig.necks){ v.set(0, -0.01, 0.15); N.head.localToWorld(v); const q = isoProject(v.x, v.z, v.y); if (q.ok) A.push(q); } }
+  if (!A || !A.length) A = [isoProject(s.x0, s.y0, 0.75)];
+  const B = isoProject(s.x1, s.y1, 0.45); if (!B.ok) return;
+  ctx.save(); ctx.globalCompositeOperation = s.elem==='steam' || s.elem==='cold' ? 'screen' : 'lighter';
+  const on = Math.min(1, k*6)*Math.min(1, (1 - k)*4);
+  for (const a of A){
+    const dx = B.sx - a.sx, dy = B.sy - a.sy, L = Math.hypot(dx, dy) || 1, nx = -dy/L, ny = dx/L;
+    if (s.elem==='lightning'){
+      // forks of lightning, flickering, re-struck every few frames
+      const flick = Math.floor(s.t*24);
+      for (let f=0; f<4; f++){ ctx.strokeStyle = fpRgba(f ? cols[2] : cols[0], (f ? 0.6 : 0.95)*on); ctx.lineWidth = Math.max(1, ppu*(f ? 0.03 : 0.05)); ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(a.sx, a.sy);
+        const n = 9, sp = (f - 1.5)*0.35; for (let i=1;i<=n;i++){ const u = i/n, j = (fpHash(flick, i, f + 7)-0.5)*ppu*0.5*Math.sin(u*Math.PI), w = sp*ppu*u;
+          ctx.lineTo(a.sx + dx*u + nx*(j + w), a.sy + dy*u + ny*(j + w)); } ctx.stroke(); }
+      const g = ctx.createRadialGradient(B.sx, B.sy, 0, B.sx, B.sy, ppu*0.9); g.addColorStop(0, fpRgba(cols[1], 0.7*on)); g.addColorStop(1, fpRgba(cols[3], 0));
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(B.sx, B.sy, ppu*0.9, 0, Math.PI*2); ctx.fill();
+      continue;
+    }
+    // a gush of puffs: each leaves the jaws, swells and spreads as it flies, burning from white-hot through its colour to smoke
+    const N = 46, flow = 0.38;
+    for (let i=N-1; i>=0; i--){ const born = i/N*0.72, age = (k - born)/flow; if (age < 0 || age > 1.25) continue;
+      const u = Math.min(1, age), r1 = fpHash(i, 3, s.seed|0) - 0.5, r2 = fpHash(i, 5, s.seed|0) - 0.5;
+      const spread = u*ppu*0.75*r1*2, x = a.sx + dx*u + nx*spread + r2*ppu*0.12*u, y = a.sy + dy*u + ny*spread - (s.elem==='steam' || s.elem==='fire' ? age*age*ppu*0.25 : 0);
+      const rad = ppu*(0.08 + u*0.38 + Math.max(0, age - 1)*0.4), heat = Math.min(1, age*1.2);
+      const c0 = heat < 0.35 ? cols[0] : heat < 0.75 ? cols[1] : cols[2], al = on*(1 - Math.max(0, age - 0.9)*2.5)*(0.7 + 0.3*(1 - heat));
+      if (al <= 0) continue;
+      const g = ctx.createRadialGradient(x, y, 0, x, y, rad); g.addColorStop(0, fpRgba(c0, al)); g.addColorStop(0.55, fpRgba(cols[heat < 0.5 ? 1 : 2], al*0.5)); g.addColorStop(1, fpRgba(cols[3], 0));
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, rad, 0, Math.PI*2); ctx.fill(); }
+    // the glow at its jaws
+    const gm = ctx.createRadialGradient(a.sx, a.sy, 0, a.sx, a.sy, ppu*0.3); gm.addColorStop(0, fpRgba(cols[0], 0.9*on)); gm.addColorStop(1, fpRgba(cols[1], 0));
+    ctx.fillStyle = gm; ctx.beginPath(); ctx.arc(a.sx, a.sy, ppu*0.3, 0, Math.PI*2); ctx.fill();
+  }
+  ctx.restore();
+}
 function isoMonShot(m, kind, col){
   if (!ISO.on || !FPD.ok) return;
   const p = G.player, d = Math.hypot(m.x-p.x, m.y-p.y);
@@ -13656,8 +13703,9 @@ function monBossTurn(m, i, dist){
   }
   const st = m.rsStyle;
   if ((st==='ranged' || st==='magic') && dist <= 7 && shotClear(m.x, m.y, p.x, p.y)){
-    noteFoe(i); isoMonShot(m, st==='ranged' ? 'arrow' : 'spell', st==='ranged' ? '#d8c8a0' : '#c070ff'); if (st==='magic') m._castT = FP.t;
-    monsterStrikesPlayer(i, st==='ranged' ? 'fires at you' : 'hurls magic at you', st==='ranged' ? 'shoots' : 'blasts');
+    const brth = st==='magic' && hasAbility(m, 'breath');   /* (RS-267: a dragon boss's magic is its breath) */
+    noteFoe(i); if (brth) isoBreath(m, DRAGON_BREATH_ELEM[m.nm]||'fire'); else isoMonShot(m, st==='ranged' ? 'arrow' : 'spell', st==='ranged' ? '#d8c8a0' : '#c070ff'); if (st==='magic' && !brth) m._castT = FP.t;
+    monsterStrikesPlayer(i, st==='ranged' ? 'fires at you' : brth ? 'breathes '+(DRAGON_BREATH_ELEM[m.nm]||'fire')+' at you' : 'hurls magic at you', st==='ranged' ? 'shoots' : brth ? 'scorches' : 'blasts');
     return true;
   }
   return false;
@@ -14677,6 +14725,7 @@ function isoShotLand(s){
   else if (k==='bolt'){ fpBurst(s.x1, s.y1, 0.5, '#ffd27a', 10, 1.1); fpBurst(s.x1, s.y1, 0.5, s.col, 4, 0.6); }
   else if (k==='chin'){ fpBurst(s.x1, s.y1, 0.4, '#ff8a2a', 26, 1.8); fpBurst(s.x1, s.y1, 0.4, '#ffe08a', 14, 1.2); fpBurst(s.x1, s.y1, 0.3, '#5a5048', 10, 0.8); if (typeof FP!=='undefined') FP.shake = Math.max(FP.shake||0, 0.35); }
   else if (k==='crystal') fpBurst(s.x1, s.y1, 0.5, '#bff8ff', 12, 1.2);
+  else if (k==='breath'){ const c = BREATH_COLS[s.elem] || BREATH_COLS.fire; fpBurst(s.x1, s.y1, 0.4, c[1], 22, 1.6); fpBurst(s.x1, s.y1, 0.3, c[3], 10, 1.0); if (typeof FP!=='undefined') FP.shake = Math.max(FP.shake||0, 0.25); }
   else fpBurst(s.x1, s.y1, 0.5, s.col, 5, 0.7);
   if (k==='arrow' || k==='bolt') try{ m3dStickArrow(s.m); }catch(err){}
 }
@@ -32754,6 +32803,9 @@ function m3dDragon(o){
   rig.y0 = body.position.y; rig.tilt = wyvern ? -0.22 : 0;   /* (a wyvern rears up on its hind legs) */
   if (wyvern){ body.rotation.x = rig.tilt; root.updateMatrixWorld(true); const bx = new T.Box3(); rig.legs.forEach(Lg=>bx.expandByObject(Lg.foot)); body.position.y -= bx.min.y; rig.y0 = body.position.y; }
   return m3dFinish(root, rig, (r, t, mv, wind, strike, hurt, e)=>{
+    /* (RS-267) breathing: it rears back with its jaws parting, then thrusts its neck out, jaws wide, while the breath pours out */
+    const bk = e && e.breathK!=null ? e.breathK : 9, rear = bk < 0.3 ? Math.sin(bk/0.3*Math.PI/2) : bk < 0.45 ? 1 - (bk - 0.3)/0.15 : 0, blast = bk >= 0.3 && bk < 1.45 ? Math.min(1, (bk - 0.3)/0.1)*Math.min(1, (1.45 - bk)/0.25) : 0;
+    wind = Math.max(wind, rear); strike = Math.max(strike, blast*0.7);
     const walk = m3dStride(e, t, mv), fol = (e && e.fol) || 0, idle = 1 - Math.min(1, mv + wind + strike), br = Math.sin(t*1.6);
     r.body.position.y = r.y0 + br*0.004 - wind*0.015 + Math.abs(Math.sin(walk))*0.006*mv;
     r.body.rotation.x = r.tilt - hurt*0.2 + strike*0.1 - wind*0.1; r.body.rotation.z = Math.sin(walk)*0.02*mv;
@@ -32763,7 +32815,7 @@ function m3dDragon(o){
       else { Lg.up.rotation.x = Lg.r0[0] + sw*0.36*mv - wind*0.2 + strike*0.25; Lg.knee.rotation.x = Lg.r0[1] + lift*0.5 + wind*0.25 - strike*0.2; Lg.ank.rotation.x = Lg.r0[2] - lift*0.5 - wind*0.15 + strike*0.1; Lg.foot.rotation.x = -(Lg.up.rotation.x + Lg.knee.rotation.x + Lg.ank.rotation.x); } });
     r.necks.forEach(N=>{ N.J.forEach((j, i)=>{ const front = i >= N.J.length/2; j.rotation.x = N.rest[i] + (front ? 0.14 : -0.2)*wind + (front ? -0.12 : 0.3)*strike - fol*0.1 + Math.sin(t*1.2 + N.ph - i*0.5)*0.025;
         j.rotation.y = Math.sin(t*0.5 + N.ph - i*0.3)*0.05*idle; });
-      N.head.rotation.x = N.hRest - wind*0.25 - strike*0.2; N.jaw.rotation.x = 0.04 + idle*Math.max(0, Math.sin(t*0.7 + N.ph))*0.12 + wind*0.4 + strike*0.6 - fol*0.35; });
+      N.head.rotation.x = N.hRest - wind*0.25 - strike*0.2; N.jaw.rotation.x = 0.04 + idle*Math.max(0, Math.sin(t*0.7 + N.ph))*0.12 + wind*0.4 + strike*0.6 - fol*0.35 + blast*0.35; });
     r.tailJ.forEach((T2, i)=>{ T2.j.rotation.y = Math.sin(t*1.5 - i*0.55)*(0.08 + 0.06*mv) + (i===0 ? wind*0.2 : 0); T2.j.rotation.x = T2.x0 + Math.sin(t*1.1 - i*0.5)*0.02 - (i < 3 ? wind*0.06 : 0); });
     if (r.wings) r.wings.forEach(W=>{ const flap = 0.08*Math.sin(t*1.3) + wind*0.55 - strike*0.75 + mv*0.3*Math.sin(t*5.5) + (e && e.lift ? 0.5*Math.sin(t*6) : 0); W.w.rotation.z = W.s*flap; });
   });
@@ -33372,6 +33424,7 @@ function m3dPose(e, pos, m, moving, flash){
   for (const mt of e.mats){ mt.emissive.setScalar(flash*0.55); if (m.enraged) mt.emissive.r = Math.max(mt.emissive.r, 0.25 + 0.15*Math.sin(t*6)); }
   // a summoned creature claws its way up out of the floor
   if (e.rise < 1){ e.rise = Math.min(1, e.rise + FP.dt*1.2); e.holder.position.y -= (1 - e.rise)*e.H; }
+  e.breathK = m._breathT ? FP.t - m._breathT : 9;   /* (RS-267: how far into its breath it is) */
   if (e.anim){ e.anim(r, t, moving, wind, strike, e.hurt, e); m3dPoseExtra(e, r, m, t); return; }
   if (e.beast){ m3dPoseBeast(r, t, moving, wind, strike, e.hurt, e); m3dPoseExtra(e, r, m, t); return; }
   m3dPoseHumanoid(r, t, moving, wind, strike, e.hurt, e);
@@ -34606,6 +34659,7 @@ function isoDrawShots(){
     s.t += FP.dt; if (s.t < 0){ keep.push(s); continue; }
     if (s.t > s.dur){ isoShotLand(s); continue; }
     keep.push(s);
+    if (s.kind==='breath'){ try{ isoDrawBreath(s, ppu); }catch(e){} continue; }
     if (s.kind!=='arrow' && s.kind!=='spell'){ isoDrawMissile(s, ppu); continue; }
     const k = s.t/s.dur, arc = s.kind==='arrow' ? Math.sin(k*Math.PI)*0.35 : 0.08*Math.sin(k*Math.PI);
     const at = (kk)=>isoProject(s.x0+(s.x1-s.x0)*kk, s.y0+(s.y1-s.y0)*kk, 0.55 + (s.kind==='arrow' ? Math.sin(kk*Math.PI)*0.35 : arc));
@@ -35230,7 +35284,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-266';
+const GAME_VERSION = 'rs-267';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
