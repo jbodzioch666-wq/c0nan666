@@ -1,4 +1,4 @@
-// RS-288: a woman's skirts fit her hips - the tunic skirt and the robe bottom are gathered at the waist, a little squarer in
+// RS-288/289: a woman's skirts fit her hips, and the thighs' tops too (RS-289: the thigh roots are sculpted into the pelvis) - the tunic skirt and the robe bottom are gathered at the waist, a little squarer in
 // section for the corners of the hips, and the garment's hips are cut to sit inside them: at every height round the hips,
 // sideways, behind and on the diagonal, the skirt is outside the garment, in every build, over plate legs, cloth legs or none
 module.exports = async page=>{
@@ -10,8 +10,11 @@ module.exports = async page=>{
       const e = m3dInstance({}, rsPlayerLook()), rig = e.rig; let skirt = null; rig.hips.children.forEach(c=>{ if (c.isMesh && c.geometry.type==='CylinderGeometry' && c.geometry.parameters.height >= 0.24) skirt = c; });
       if (!skirt){ out.pokes.push([build, legs, 'no skirt']); continue; }
       const gp = rig.chestMesh.geometry.attributes.position, sp = skirt.geometry.attributes.position;
-      for (const y0 of [0.0, -0.02, -0.04, -0.06]) for (const [nm, ax, az] of [['side',1,0],['back',0,-1],['diag',0.7,-0.7],['diagF',0.7,0.7]]){
+      e.holder.updateMatrixWorld(true); const th = rig.legs.map(L=>L.hip.children[0].children[0]), inv = new THREE.Matrix4().copy(rig.hips.matrixWorld).invert(), tv = new THREE.Vector3();   // (RS-289: the thighs' tops, in the hips' frame)
+      const tp = []; th.forEach(m=>{ const q = m.geometry.attributes.position; for (let i=0;i<q.count;i++){ tv.set(q.getX(i), q.getY(i), q.getZ(i)); m.localToWorld(tv); tv.applyMatrix4(inv); if (tv.y > -0.1) tp.push([tv.x, tv.y, tv.z]); } });
+      for (const y0 of [0.0, -0.02, -0.04, -0.06, -0.08]) for (const [nm, ax, az] of [['side',1,0],['back',0,-1],['diag',0.7,-0.7],['diagF',0.7,0.7]]){
         let g = 0, s = 0; for (let i=0;i<gp.count;i++){ const y = gp.getY(i); if (Math.abs(y - y0) < 0.006){ const d = gp.getX(i)*ax + gp.getZ(i)*az; g = Math.max(g, d); } }
+        for (const [x, y, z] of tp) if (Math.abs(y - y0) < 0.006) g = Math.max(g, x*ax + z*az);
         for (let i=0;i<sp.count;i++){ const y = sp.getY(i)*skirt.scale.y + skirt.position.y; if (Math.abs(y - y0) < skirt.geometry.parameters.height/10*0.55){ const d = sp.getX(i)*skirt.scale.x*ax + sp.getZ(i)*skirt.scale.z*az; s = Math.max(s, d); } }
         out.checked++; if (s <= g) out.pokes.push([build, legs, y0, nm, +g.toFixed(4), +s.toFixed(4)]); } }
     return out; });

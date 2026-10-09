@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-289 - Thighs part of the pelvis, and a real short crop
+
+- **The hips are no longer inside the torso.** The roots of the thighs are now sculpted into the pelvis, on the body and on every garment over it, so the legs grow out of the hips instead of hanging from joints hidden inside them. Nothing lighter shows through a skirt from the side any more, in any build; the skirt test now probes the thighs as well as the hips.
+- **A real short crop.** Short hair is now a bob on a woman - parted on one side, the locks lying flat along the head and bending with it, swept over the ears to the jaw - and a neat crop on a man, instead of a thatch of straight spikes.
+
 ## RS-288 - Nothing pokes through her skirt
 
 - **The tunic and the robe bottom now sit outside the hips at every angle.** With the top off, the tunic's hips showed through the skirt on the diagonal, and a little at the sides in the slimmer builds. The garment's hips are cut a touch narrower, the skirt is gathered a little wider at the waist and is a little squarer in section for the corners of the hips, so no skin or cloth shows below the belt from any side, in any build, over plate, cloth or bare legs.
