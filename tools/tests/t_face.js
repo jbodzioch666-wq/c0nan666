@@ -11,8 +11,9 @@ module.exports = async page=>{
       h.traverse(x=>{ if (!x.isMesh) return; const g = x.geometry; if (g.type==='SphereGeometry' && (Math.abs(g.parameters.radius - 0.0116) < 0.0003 || Math.abs(g.parameters.radius - 0.0122) < 0.0003) && Math.abs(x.position.y - 0.077) < 0.001) balls++;
         if (g.type==='SphereGeometry' && Math.abs(g.parameters.radius - 0.0058) < 0.0005) iris++;
         if (g.type==='SphereGeometry' && g.parameters.thetaLength < Math.PI*0.6 && x.rotation.x < -0.5) dome++;
-        if (x.name==='hair'){ hairMesh = x; hairVerts += g.attributes.position.count; } if (x.name==='beard') beardVerts += g.attributes.position.count; });
-      return { balls, iris, dome, hairVerts, beardVerts, hairDraws:hairMesh ? 1 : 0 }; };
+        if (x.name==='hair'){ hairMesh = x; hairVerts += g.attributes.position.count; const hp = g.attributes.position; let sideLow = 1; for (let i=0;i<hp.count;i++) if (Math.abs(hp.getX(i)) > 0.055) sideLow = Math.min(sideLow, hp.getY(i)); x.userData.sideLow = sideLow; } if (x.name==='beard') beardVerts += g.attributes.position.count; });
+      let domeScale = 0; h.traverse(x=>{ if (x.isMesh && x.geometry.type==='SphereGeometry' && x.geometry.parameters.thetaLength < Math.PI*0.6 && x.rotation.x < -0.5) domeScale = x.scale.y/0.072; });
+      return { balls, iris, dome, domeScale:+domeScale.toFixed(3), hairVerts, beardVerts, hairDraws:hairMesh ? 1 : 0, sideLow:hairMesh ? +hairMesh.userData.sideLow.toFixed(3) : null }; };
     out.man = info(HUM({ outfit:'leather', hair:'#3a2618', hairStyle:'long', beard:'#4a3018', beardStyle:3 }));
     out.woman = info(HUM({ outfit:'leather', hair:'#8a6a3a', hairStyle:'short', fem:true }));
     out.tail = info(HUM({ outfit:'leather', hair:'#1a1210', hairStyle:'ponytail', beard:'#1a1210', beardStyle:2 }));
@@ -25,5 +26,7 @@ module.exports = async page=>{
   A(r.man.hairDraws===1 && r.man.hairVerts > 3000 && r.man.dome===1, 'long hair is one merged mesh of strands over a scalp dome');
   A(r.woman.hairDraws===1 && r.woman.hairVerts > 2000 && r.woman.dome===1, 'short hair too');
   A(r.man.beardVerts > 2000 && r.tail.beardVerts > 800 && r.tail.beardVerts < r.man.beardVerts, 'a full beard and a smaller goatee of strands');
+  A(r.man.domeScale > 1.05, 'RS-284: the scalp dome stands clear of the skull at the crown');
+  A(r.man.sideLow > -0.05, 'RS-284: long hair settles on the shoulders rather than falling through them');
   console.log('face ok', JSON.stringify(r));
 };

@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-284 - Hair on the shoulders, no bald spot, slimmer arms
+
+Fixes from playing RS-283.
+
+- **Long hair settles on the shoulders** and lies over the back, instead of falling straight through them. The locks bend outward as they reach the shoulders and stop there; the ones down the back reach the shoulder blades.
+- **No bald spot.** The scalp under the hair was a hair's breadth smaller than the skull at the back of the crown, so skin showed through from behind. It now stands clear all round.
+- **A woman's arms are slimmer:** four fifths of a man's, with smaller hands, instead of nine tenths.
+
 ## RS-283 - The female figure
 
 The revamp that was put on hold is done, now that clothes are sculpted over the body.

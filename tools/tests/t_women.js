@@ -22,7 +22,7 @@ module.exports = async page=>{
   A(r.f.fem && r.f.tori >= 2 && r.m.tori===0, 'a woman has lashes; a man does not');
   A(r.f.jawBox===0 && r.m.jawBox===1, 'the human square jaw is left off a woman');
   A(r.f.hipY > r.m.hipY + 0.02, 'longer legs');
-  A(r.f.arm < 0.95 && r.m.arm===1, 'slimmer arms');
+  A(r.f.arm < 0.85 && r.m.arm===1, 'slimmer arms (RS-284: four fifths of a man\'s)');
   A(r.folk.women >= 3 && r.folk.women <= 5 && r.folk.bearded===0 && r.folk.hair, 'about two in five townsfolk are women, beardless, with hair: '+JSON.stringify(r.folk));
   A(r.dwarfWomen >= 1, 'dwarf towns have women too');
   console.log('women ok', JSON.stringify(r));
