@@ -1,5 +1,15 @@
 # Depthcrawl patch notes
 
+## RS-268 - Real serpents
+
+- **Snakes, worms, eels, leeches and the remorhaz are rebuilt from scratch in high detail.** Each body is now one smooth, scaled tube that bends as it moves, instead of a stack of stiff pipe segments.
+- **Snakes** lie coiled on the ground with the front of the body reared up in an S. They sway, flick a forked tongue, draw back and then strike forward with jaws wide and long fangs out. Each has a wedge-shaped head with brow scales, heat pits and slit-pupilled eyes, and a pale, scaled belly.
+- **Each snake has its own markings.** The constrictor has dark blotched saddles, the asp yellow and black bands, and apep red and black bands with horns over its eyes. **The poison wyrm spreads a red cobra hood.**
+- **Worms** heave up out of a mound of broken ground, ringed with segments, with a lobed maw lined with three rings of teeth that slowly turns and flares as it lunges.
+- **The giant eel** swims above the floor in a sinuous wave, with a fin running along its back.
+- **The giant leech** inches along, stretching and bunching, with orange stripes and a round sucker of teeth.
+- **The remorhaz** is a great centipede, with heat-glowing back plates and spines, rows of scuttling legs, antennae and snapping mandibles, and it rears its front up to attack.
+
 ## RS-267 - Dragon breath you can see
 
 - **Dragons now visibly breathe on you.** Before, a breath attack was only a line in the combat log. Now the dragon rears back with its wings raised, then thrusts its neck out with its jaws wide, and a cone of its element pours from its mouth onto you and bursts where it lands, shaking the screen.
