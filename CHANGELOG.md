@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-248 - Braided beards, and a still preview
+
+- **Four new braided beards**, for any race that grows one: **Twin braids**, **Three braids** (the middle one longest), a **Braided moustache** (two long plaits hanging from the moustache ends over a short beard) and a **Forked beard** (a full beard that parts into two thick braids). Each braid is bound in gold rings and ends in a tuft. On a dwarf they hang to the belt; on everyone else they're shorter.
+- **Dwarven townsfolk** now wear all six long styles between them.
+- **The character preview holds still.** Character creation (and the barber's chair and bestiary) no longer turns the figure's head from side to side or shifts its weight, so nothing moves until you drag it.
+
 ## RS-247 - Two dwarf beards, and views that hold still
 
 - **A full beard and the long braid are different now.** On a dwarf, a **full beard** is a broad, bushy spade that fans out over the chest down to the belt, with a ragged hem and no braids. The **long dwarf braid** is a shorter chin beard gathered into one thick plait that hangs to the belt, bound in three gold rings, with a tuft at the end.
