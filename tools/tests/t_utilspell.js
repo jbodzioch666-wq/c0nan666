@@ -8,9 +8,8 @@ module.exports = async page=>{
     skGainXP('magic', 5e6); for (const rn of ['air','water','earth','mind','nature','chaos','fire']) skAdd('r_'+rn, 500);
     out.noAlch = !rsSpell('highalch') && !rsSpell('lowalch') && typeof rsAlch==='undefined';   /* (RS-192: the alchemy spells are gone) */
     out.counts = { std:rsBookSpells().filter(rsSpellUtil).length, cmb:rsBookSpells().filter(sp=>!rsSpellUtil(sp)).length };
-    // the spellbook shows two sections, with the second toggle
-    setUi('rsmagic'); const html = document.body.innerHTML; out.book = /COMBAT SPELLS/.test(html) && /UTILITY SPELLS/.test(html) && /auto-utility/.test(html);
-    setUi('playing');
+    // the spellbook (the side window's tab, RS-319) shows two sections, with the second toggle
+    SP.open = false; spHotKey('spells'); hudLayout(); const html = document.getElementById('sidePanel').innerHTML; out.book = /COMBAT/.test(html) && /UTILITY/.test(html) && /data-sp-uac/.test(html);
     // picking a utility spell doesn't change R's spell
     p.rsSpell = 'windstrike'; rsSelectSpell('confuse'); out.pick = { r:p.rsSpell, u:p.rsUtil };
     // the side panel: two grids

@@ -88,7 +88,7 @@ module.exports = async page=>{
     // T is the hearthstone (RS-197) - unbound, it opens nothing; the classic buttons press the keys
     setUi('playing'); handleKeydown({ key:'t', target:document.body, preventDefault(){} }); A(G.ui==='playing', 'T opens nothing');
     const st0 = rsStyle().nm; document.getElementById('btnAbility').click(); A(rsStyle().nm!==st0, 'the F button changes attack style');
-    document.getElementById('btnAbility2').click(); A(G.ui==='rsmagic', 'the G button opens magic'); setUi('playing');
+    SP.open = false; document.getElementById('btnAbility2').click(); A(SP.open && SP.tab==='spells' && G.ui==='playing', 'the G button opens the spellbook tab'); setUi('playing');
     out.money = mmMethods().filter(m=>m.ok).map(m=>m.nm+' '+m.rate).slice(0,6);
     // calendar rollover
     const d0 = p.contracts.day; G.tkClock = Date.now() + 86400000*8; tkP(); A(p.contracts.day!==d0 && p.contracts.daily.every(t=>!t.claimed), 'new day'); G.tkClock = 0;

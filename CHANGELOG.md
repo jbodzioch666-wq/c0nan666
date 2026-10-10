@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## RS-319 - One Spellbook, One Prayer Book
+
+- **G and N open the side window.** The spellbook (G) and prayer (N) buttons and keys now open the Spellbook and Prayer tabs of the side window, right beside the game, instead of a full-screen menu. Press again to close. In compact mode they bring the HUD back first.
+- **The old menus are gone.** Everything they did that the tabs didn't now lives in the tabs:
+  - **Spellbook tab:** your rune pouch (with your staff's endless element), changing spellbooks when you stand at an altar, and binding combination runes.
+  - **Prayer tab:** how fast your prayer is draining, praying at a dungeon altar, swapping to the Ancient Curses, and burying bones.
+  - Putting a spell or prayer on a quick bar is a right-click (a long press on a phone) on it in its tab, or a drag.
+- **Enchant arrows at the fletching bench.** Waking the gem in gem-tipped arrows now happens at the fletching bench where you make them. It still takes Magic and runes.
+
 ## RS-318 - Compact Mode on a Phone
 
 - **A button for Y.** Compact mode, which hides everything but the orbs and the hotbar, was keyboard-only. The hotbar now has a Y button for it, so a phone can switch it on and off. The button stays on the bar in compact mode, so the full HUD is always one tap away.

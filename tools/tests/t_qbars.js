@@ -13,9 +13,10 @@ module.exports = async page=>{
   A(out.def[0] && out.def[1] && out.def[0].slots===9 && out.def[1].slots===9, 'both bars are up by default, nine slots each: '+JSON.stringify(out.def));
   A(!out.def[0].vert && !out.def[1].vert && out.def[0].w > out.def[0].h && out.def[0].inView && out.def[1].inView && apart(out.def[0], out.def[1]), 'across, on screen, not on top of each other: '+JSON.stringify(out.def));
   await page.screenshot({ path:SHOTS+'/shot_qbars.png' });
-  // the prayer page's stars fill bar 1, then bar 2
-  out.star = await ev(()=>{ setUi('prayer'); const stars = [...document.querySelectorAll('#overlay .shoprow button')].filter(b=>b.textContent.trim()==='★'); stars.slice(0, 10).forEach(b=>b.click());
-    const q1 = G.player.quickBar.filter(Boolean).length, q2 = G.player.quickBar2.filter(Boolean).length, first2 = G.player.quickBar2[0]; setUi('playing'); return { stars:stars.length, q1, q2, first2 }; });
+  // (RS-319) the side window's Prayer tab puts prayers on the bars (right-click, or a long press: Put on the quick bar) - bar 1, then bar 2
+  out.star = await ev(()=>{ spHotKey('prayer'); hudLayout(); const cells = [...document.querySelectorAll('#sidePanel .sp-pr:not(.locked)')];
+    for (const c of cells.slice(0, 10)){ c.dispatchEvent(new MouseEvent('contextmenu', { bubbles:true, clientX:200, clientY:200 })); const o = [...document.querySelectorAll('#ctxMenu .cm-o')].find(e=>/Put on/.test(e.textContent)); if (o) o.click(); }
+    const q1 = G.player.quickBar.filter(Boolean).length, q2 = G.player.quickBar2.filter(Boolean).length, first2 = G.player.quickBar2[0]; return { stars:cells.length, q1, q2, first2 }; });
   A(out.star.stars >= 10 && out.star.q1===9 && out.star.q2===1 && out.star.first2.t==='prayer', 'the prayer stars fill bar 1 then bar 2: '+JSON.stringify(out.star));
   // shift + 1 uses bar 2's first slot: its prayer turns on, and off again
   const id2 = out.star.first2.id;
