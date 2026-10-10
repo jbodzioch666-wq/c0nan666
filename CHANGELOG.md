@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## RS-297 - Stairs You Can Click, Cloaks Over the Hump
+
+- **Clicking a staircase takes it.** A click anywhere on the drawn flight (a step, a riser, its side) now picks the stairs, from every camera angle. Before, a click on the front of the steps up often picked the floor in front of them instead.
+- **Smoother click-to-move in dungeons.** A walk you've clicked only stops when an awake creature newly steps up beside you, not on every step past one that's asleep or was already there.
+- **Cloaks drape over a hunched back.** On a wood elf or half-orc, the cloak now follows the bend of the spine, rides over the hump and hangs down from it, instead of cutting through the back.
+- **Shields in the hand.** A shield now sits against the knuckles instead of floating past the fist.
+- **A tome you hold.** The open tome now rests on your left palm whatever your build. A stooped, long-armed wood elf holds it properly, pages tipped up toward the face.
+- **Always know where you are.** On the open land, the name of the land you're in and the combat levels it suits now stay under the season and time bar. The Wilderness shows in red with its level.
+
 ## RS-296 - Blades the right way round, hilts in the fist, a tome you can read
 
 - **Blades face forward.** Swords, scimitars, daggers, maces and hammers were held with their edge facing back toward the elbow; you could see it on a scimitar, whose curve swept the wrong way. Every weapon is now turned like the axes, edge leading, in both hands.
