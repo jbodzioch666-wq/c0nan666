@@ -1,9 +1,9 @@
-// RS-195/196: the character sheet is two pages side by side - CHARACTER STATS and EQUIPMENT (the figure laid out like an action RPG's,
+// RS-195/196 (RS-298: opened with I, the bag under the figure in tabs): the character sheet is two pages side by side - CHARACTER STATS and EQUIPMENT (the figure laid out like an action RPG's,
 // the whole bag under it) - floating over the game like the side panel, with no dark backdrop. Gear moves by drag and drop:
 // bag to figure wears it, figure to bag takes it off, bag to bag moves it, ring to ring swaps. Tapping a piece marks what it changes.
 module.exports = async page=>{
   const ev = (f, a)=>page.evaluate(f, a), A = (c, msg)=>{ if (!c) throw new Error('assert: '+msg); }, out = {};
-  const open = ()=>ev(async ()=>{ setUi('charsheet'); renderOverlay(); await new Promise(r=>setTimeout(r, 150)); });
+  const open = ()=>ev(async ()=>{ setUi('inventory'); renderOverlay(); await new Promise(r=>setTimeout(r, 150)); });
   const box = sel=>ev(s=>{ const e = document.querySelector('#overlay '+s); if (!e) return null; const r = e.getBoundingClientRect(); return { x:r.left + r.width/2, y:r.top + r.height/2 }; }, sel);
   const drag = async (from, to)=>{ const a = await box(from), b = await box(to); A(a && b, 'drag ends exist: '+from+' -> '+to);
     await page.mouse.move(a.x, a.y); await page.mouse.down(); await page.mouse.move(a.x + 10, a.y + 10, { steps:3 }); await page.mouse.move(b.x, b.y, { steps:8 });
@@ -18,8 +18,8 @@ module.exports = async page=>{
       slots:document.querySelectorAll('#overlay .doll-slot').length, bag:document.querySelectorAll('#overlay .cs-bag [data-csinv]').length, close:!!q('.cs-gearpage .sp-x') }; });
   out.look = look;
   A(look.bg==='none' && /rgba\(0, 0, 0, 0\)|transparent/.test(look.bgc), 'no dark backdrop: '+look.bg+' '+look.bgc);
-  A(look.pages.every(Boolean), 'two pages side by side'); A(!look.detail && !look.equipBtn, 'no compare window and no equip button');
-  A(look.slots===14 && look.bag===Math.ceil(50/10)*10 && look.close, 'figure, the whole bag, and a close in the title bar');
+  A(look.pages.every(Boolean), 'two pages side by side'); A(!look.detail && !look.equipBtn, 'no compare window, and no equip button until a piece is picked');
+  A(look.slots===14 && look.bag===20 && look.close, 'figure, the whole bag, and a close in the title bar');
   // bag -> figure: the rune platebody goes on, the old one comes off into the bag
   A(await drag('.cs-bag [data-csinv="4"]', '.doll-slot[data-slot="chest"]')==='ok', 'the chest lights up as a place to drop it');
   let st = await ev(()=>({ chest:G.gear.chest.rsTier, old:G.inv.some(it=>it.rsTier===3 && it.slot==='chest'), n:G.inv.length }));
@@ -36,7 +36,7 @@ module.exports = async page=>{
   // ring to ring swaps
   await drag('.doll-slot[data-slot="ring1"]', '.doll-slot[data-slot="ring2"]'); A(await ev(()=>!G.gear.ring1.used && G.gear.ring2.used), 'the ring moved to the other hand');
   // bag -> an empty bag cell moves it to the end
-  const nm0 = await ev(()=>G.inv[0].nm); await drag('.cs-bag [data-csinv="0"]', '.cs-bag [data-csinv="30"]'); A(await ev(nm=>G.inv[G.inv.length-1].nm===nm, nm0), 'moved within the bag');
+  const nm0 = await ev(()=>G.inv[0].nm); await drag('.cs-bag [data-csinv="0"]', '.cs-bag [data-csinv="15"]'); A(await ev(nm=>G.inv[G.inv.length-1].nm===nm, nm0), 'moved within the bag');
   // a tap (no drag) picks a piece, and the stats page marks the change
   await ev(()=>{ G.inv.push(rsMakeArmour('metal', 6, 'head')); renderOverlay(); });
   await page.waitForTimeout(250);

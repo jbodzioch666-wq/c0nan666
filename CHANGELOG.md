@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-298 - One Page for Your Gear and Your Bag
+
+- **The inventory now lives on the equipment page.** Press I (or the chest button) to open your character stats and your equipment side by side, centred on the screen.
+- **The bag is in tabs.** Under the figure, your bag is split into All, Gear, Food, Scrolls, Resources and Junk, each with a count. Food holds your potions and cooked fish and meals. Resources holds your ores, logs, herbs, bones and runes. Tab cycles through them.
+- **Everything the old inventory did is here.** Search, sort, tidy and the loot filter sit over the bag. Tap a piece to get its buttons (equip, use, sell, lock, bundle) and its details, and the stats page beside it shows what wearing it would change. The old keys (E, U, S, J, L, B, 1-9, /, O) still work. You can still drag gear on and off the figure.
+- **P is your character stats on their own,** centred, with a link back to your equipment.
+- **On a phone,** I opens your equipment first, and the switch in the title bar flips between it and your stats.
+
 ## RS-297 - Stairs You Can Click, Cloaks Over the Hump
 
 - **Clicking a staircase takes it.** A click anywhere on the drawn flight (a step, a riser, its side) now picks the stairs, from every camera angle. Before, a click on the front of the steps up often picked the floor in front of them instead.

@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| bagtabs | RS-298: I opens the stats beside the equipment, centred; the bag under the figure in tabs (all, gear, food, scrolls, resources, junk) with the old inventory's search, sort, buttons and details; P is the stats alone |
 | drape | RS-297: a cloak drapes over a wood elf's and half-orc's hump instead of through it; a shield sits against the knuckles; a tome rests on the left palm, pages tipped up; the land is named under the clock bar |
 | stairclick | RS-297: a click anywhere on a drawn staircase (treads, risers, sides) picks the stairs from every camera turn, and walking there takes them |
 | offhand | RS-295: an off-hand blade in the left fist (held ready, drawn back with the main hand), a tome held to read, shields unchanged; hair under a helmet stays inside it |

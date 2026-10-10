@@ -13,7 +13,7 @@ module.exports = async page=>{
     // untick the helm: still worn, still counted, but not on the figure - so the circlet shows again
     const ac0 = playerAC(), key0 = rsLookKey(); lookToggle('head');
     { const o = L(); out.hidden = { helm:o.helm||null, circlet:!!o.circlet, worn:!!(G.gear.head && G.gear.head.used), ac:playerAC()===ac0, keyChanged:rsLookKey()!==key0 }; }
-    setUi('charsheet'); G.csPage = 'gear'; renderOverlay();
+    setUi('inventory'); G.csPage = 'gear'; renderOverlay();
     const tick = document.querySelector('#overlay .doll-slot[data-slot="head"] .doll-tick'), tChest = document.querySelector('#overlay .doll-slot[data-slot="chest"] .doll-tick');
     out.ticks = { head:tick ? tick.classList.contains('on') : 'none', chest:tChest ? tChest.classList.contains('on') : 'none', ring:!!document.querySelector('#overlay .doll-slot[data-slot="ring1"] .doll-tick') };
     // a click on the tick toggles it back, and doesn't start a drag

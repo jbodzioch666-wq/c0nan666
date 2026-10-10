@@ -60,17 +60,17 @@ module.exports = async page=>{
     return { plate:!!document.querySelector('.dh-name'), text:el ? el.textContent : '', shown:!!(r && r.width && getComputedStyle(el).display!=='none'), clearMm:!!(r && r.right <= mm.left), noon, six }; });
   console.log('clock bar', JSON.stringify(clk));
   A(!clk.plate && clk.shown && clk.clearMm && new RegExp(seasonRe()).test(clk.text) && /\d{1,2}:\d\d (am|pm)/.test(clk.text) && clk.noon==='12:00 pm' && clk.six==='6:00 pm', 'the clock bar replaces the name plate: '+JSON.stringify(clk));
-  // RS-153: the inventory screen is a grid of item pictures like the side panel; a tap picks one, and the whole screen scrolls down to the buttons
-  const inv = await ev(async ()=>{ for (let i=0;i<12;i++) G.inv.push(genItem(3, i%2 ? 'weapon' : 'armor')); G.invSel = 0; setUi('inventory'); renderOverlay(); await new Promise(r=>setTimeout(r, 150));
-    const cells = document.querySelectorAll('#overlay .invgrid .sp-cell'); cells[3].click(); await new Promise(r=>setTimeout(r, 100));
-    const ov = document.getElementById('overlay'); ov.scrollTop = 99999; await new Promise(r=>setTimeout(r, 100));
-    const btn = [...document.querySelectorAll('#overlay .btnrow .btn')].pop().getBoundingClientRect();
-    const out = { cells:cells.length, items:G.inv.length, sel:G.invSel, picked:!!document.querySelector('#overlay .invgrid .sp-cell.sel'), detail:!!document.querySelector('#overlay .detailpane'), btnOn: btn.top >= 0 && btn.bottom <= innerHeight + 1, rows:document.querySelectorAll('#overlay .invrow').length };
+  // RS-153 (RS-298: the bag on the equipment page): a grid of item pictures like the side panel; a tap picks one, and its buttons can be scrolled to
+  const inv = await ev(async ()=>{ for (let i=0;i<12;i++) G.inv.push(genItem(3, i%2 ? 'weapon' : 'armor')); G.invSel = 0; setUi('inventory'); csBagTab('all'); renderOverlay(); await new Promise(r=>setTimeout(r, 150));
+    let cells = document.querySelectorAll('#overlay .cs-bag .sp-cell'); cells[3].click(); await new Promise(r=>setTimeout(r, 100)); cells = document.querySelectorAll('#overlay .cs-bag .sp-cell');
+    const last = [...document.querySelectorAll('#overlay .cs-acts .btn')].pop(); if (last) last.scrollIntoView(); await new Promise(r=>setTimeout(r, 100));
+    const btn = last ? last.getBoundingClientRect() : { top:-1, bottom:1e9 };
+    const out = { cells:cells.length, items:G.inv.length, sel:G.charSheetInvSel, picked:!!document.querySelector('#overlay .cs-bag .sp-cell.sel'), detail:!!document.querySelector('#overlay .detailpane'), btnOn: btn.top >= 0 && btn.bottom <= innerHeight + 1, rows:document.querySelectorAll('#overlay .invrow').length };
     G.inv.splice(G.inv.length - 12, 12); G.invSel = 0; setUi('playing'); renderGame(); return out; });
   console.log('inventory', JSON.stringify(inv));
   A(inv.cells===inv.items && inv.sel===3 && inv.picked && inv.detail && inv.btnOn && inv.rows===0, 'the inventory is a picture grid and its buttons can be reached: '+JSON.stringify(inv));
   // RS-154: the character sheet on a phone - the pack is a picture grid, a tap picks a piece (it drags onto the figure, RS-196), the numbers stand in one column
-  const cs = await ev(async ()=>{ for (let i=0;i<6;i++) G.inv.push(genItem(3, i%2 ? 'weapon' : 'armor')); setUi('charsheet'); renderOverlay(); await new Promise(r=>setTimeout(r, 150));
+  const cs = await ev(async ()=>{ for (let i=0;i<6;i++) G.inv.push(genItem(3, i%2 ? 'weapon' : 'armor')); setUi('inventory'); renderOverlay(); await new Promise(r=>setTimeout(r, 150));
     const cells = document.querySelectorAll('#overlay .cs-pack .sp-cell.can'); if (cells[0]) cells[0].click(); await new Promise(r=>setTimeout(r, 100));
     const picked = !!document.querySelector('#overlay .cs-pack .sp-cell.sel'), equip = !!document.querySelector('#overlay .cs-pack .sp-cell.csdrag');   /* (RS-196: gear is dragged on, no equip button) */
     G.csPage = 'stats'; renderOverlay(); await new Promise(r=>setTimeout(r, 100));   /* (RS-195: on a phone the stats are their own page) */
@@ -83,7 +83,7 @@ module.exports = async page=>{
   const cs2 = await ev(async ()=>{ for (let i=0;i<8;i++) G.inv.push(genItem(3, i%2 ? 'weapon' : 'armor')); const before = Object.assign({}, G.gear);
     const worn = PAPERDOLL_SLOTS.filter(s=>G.gear[s.key] && G.gear[s.key].used).length;
     const pick = G.inv.findIndex(it=>{ G.charSheetActivePane = 'pack'; const k = G.charSheetInvSel; G.charSheetInvSel = G.inv.indexOf(it); const c = csPreviewItem(); const a = fullStatRows(), b = c ? fullStatRowsWith(c) : null; G.charSheetInvSel = k; return b && b.some((x, j)=>String(x[1])!==String(a[j][1])); });
-    setUi('charsheet'); G.charSheetInvSel = pick; G.charSheetActivePane = 'pack'; renderOverlay(); await new Promise(r=>setTimeout(r, 150));
+    setUi('inventory'); G.charSheetInvSel = pick; G.charSheetActivePane = 'pack'; renderOverlay(); await new Promise(r=>setTimeout(r, 150));
     const slots = document.querySelectorAll('#overlay .doll-slot'), imgs = document.querySelectorAll('#overlay .doll-slot img.doll-img');
     const out = { worn, slots:slots.length, imgs:imgs.length, canvases:document.querySelectorAll('#overlay .doll-slot canvas').length, empty:document.querySelectorAll('#overlay .doll-slot .doll-empty').length, total:PAPERDOLL_SLOTS.length, pick, deltas:document.querySelectorAll('#overlay .cs-delta').length,
       same:Object.keys(before).every(k=>G.gear[k]===before[k]) && Object.keys(G.gear).length===Object.keys(before).length };
