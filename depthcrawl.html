@@ -6845,6 +6845,15 @@ function foeBusy(){ foeTick(); return foePending(); }
 // (RS-312) you act and it happens: if the monsters' answer to your last move is still waiting its beat, it lands now and your
 // action follows straight after - the order of turns is kept, but no click or key is ever thrown away
 function foeHurry(){ if (foePending() && !G.foeFlushing) foeFlush(); return !G.gameOver; }
+// (RS-314) Space: stand where you are and let a turn go by - the monsters take theirs and the blades swing on
+function playerWait(){
+  if (G.gameOver || (G.gameMode!==1 && G.gameMode!==2)) return false;
+  if (!foeHurry()) return false;
+  if (G.player.stunTurns>0){ consumeStunnedTurn(); renderGame(); return true; }
+  logMsg('you wait a moment', '');
+  foeBeat(()=>foeTurn());
+  renderGame(); return true;
+}
 function foeTurn(excl){ foeAct(()=>{ if (!G.gameOver) tickMonsters(excl); }); }
 function foeBeat(fn){
   const was = G.deferFoe; G.deferFoe = was || foeDeferOn();
@@ -6863,6 +6872,7 @@ function foeTick(){ if (foePending() && (performance.now() >= (G.foeAt||0) || G.
 function tickMonsters(excludeIdx){
   if (foePending() && !G.foeFlushing) foeFlush();   /* (RS-218: the last answer comes first) */
   if (G.gameOver) return;
+  G.dgTurn = (G.dgTurn||0) + 1;   /* (RS-314) the turn count down here: the swinging blades keep time by it */
   if (G.player && (G.player.paraGuard||0) > 0) G.player.paraGuard--;
   rsPrayerTick();
   // poison and fear tick down (or bite) once per player turn, exactly like
@@ -14018,6 +14028,9 @@ function dgLightFlames(vis){
   }
 }
 // ---- stepping onto things ----
+// (RS-314) a swinging blade sweeps through its tile every other turn: true when stepping in now would meet it. Walking on
+// changes nothing (a step moves you and the turn on together); waiting a turn (Space) lets it swing past
+function bladeDown(x, y){ return ((G.dgTurn||0) + x + y) % 2===0; }
 function dgAvoid(x, y){ const D = G.gameMode===1 && G.dungeonDeco; if (!D || !D[x]) return false; const d = D[x][y]; return d==='lava' || d==='blade' || (d==='ldoor' && !skHave('dkey')); }
 function dgBlocked(x, y){
   if (G.gameMode!==1 || !G.dungeonDeco || !G.dungeonDeco[x]) return false;
@@ -14034,7 +14047,7 @@ function dgStep(x, y){
   const hurt = (dmg, why)=>{ p.hp -= dmg; try{ fxSplat(x+0.5, y+0.5, dmg, 'taken'); }catch(e){} sfx('playerHurt'); if (p.hp<=0 && !checkDeathWard()) playerDies(why); };
   if (d==='lava'){ const dmg = 3 + Math.round(G.depth*1.5); logMsg(`the lava sears you for ${dmg}!`, 'hit'); hurt(dmg, 'lava'); }
   else if (d==='blade'){
-    if (((p.turnCount||0) + x + y) % 2===0){ const dmg = rollDice(2,6) + G.depth; logMsg(`a swinging blade catches you for ${dmg}!`, 'hit'); hurt(dmg, 'a swinging blade'); }
+    if (bladeDown(x, y)){ const dmg = rollDice(2,6) + G.depth; logMsg(`a swinging blade catches you for ${dmg}!`, 'hit'); hurt(dmg, 'a swinging blade'); }
     else logMsg('you duck under the swinging blade', '');
   }
   else if (d==='dig'){
@@ -14135,7 +14148,8 @@ function dgPropModel(p, g, add, M, mats, h){
     const bl = new T.Mesh(new T.CylinderGeometry(0.32, 0.32, 0.02, 20, 1, false, 0, Math.PI), M('blade', '#c8ccd2', { metalness:0.85, roughness:0.25 })); bl.rotation.set(Math.PI/2, 0, 0); bl.position.y = -1.2; arm.add(bl);
     bl.castShadow = true; arm.rotation.y = p.rot;
     add(new T.BoxGeometry(0.9, 0.05, 0.08), dwood, 0, 1.56, 0).rotation.y = p.rot + Math.PI/2;
-    g.userData.anim = (t, ph)=>{ arm.rotation.z = Math.sin(t*2.6 + ph)*0.95; };
+    g.userData.anim = (t, ph, tx, ty)=>{ const dn = tx===undefined || bladeDown(tx, ty), want = dn ? 0 : ((G.dgTurn||0) % 2 ? 1 : -1)*1.05;   /* (RS-314) down across the tile when it would catch you, swung up to one side when it's safe */
+      arm.rotation.z += (want + Math.sin(t*3.1 + ph)*(dn ? 0.12 : 0.06) - arm.rotation.z)*0.14; };
   } else if (d==='pgrave'){   /* (RS-205) your own gravestone, where you fell on this floor: a grey headstone in a soft column of light */
     const st = M('gravest', '#9a9a92', { roughness:0.95, flatShading:true });
     add(new T.BoxGeometry(0.34, 0.46, 0.1), st, 0, 0.23, 0);
@@ -36108,7 +36122,7 @@ function isoSyncProps(S){
     const g = o.g, ph = s.x*1.7 + s.y*0.9;
     if (g.userData.bob){ g.children.forEach(c=>{ if (c!==g.userData.qring) c.position.y = (c.userData.y0!==undefined ? c.userData.y0 : (c.userData.y0 = c.position.y)) + 0.03 + Math.sin(FP.t*2.4 + ph)*0.025; }); g.rotation.y = FP.t*0.6 + ph; }
     if (g.userData.flame){ const f = g.userData.flame, k = s.fl || 1; g.position.y = 0.5; f.outer.scale.set(0.9+0.2*Math.sin(FP.t*17+ph), k*(0.9+0.25*Math.sin(FP.t*11+ph*2)), 0.9+0.2*Math.sin(FP.t*13+ph)); f.inner.scale.set(1, k, 1); f.outer.rotation.y = FP.t*3; f.gl.material.opacity = 0.4 + 0.2*k; }
-    if (g.userData.anim) g.userData.anim(FP.t, ph);
+    if (g.userData.anim) g.userData.anim(FP.t, ph, Math.floor(s.x), Math.floor(s.y));
     if (g.userData.cloth){ const c = g.userData.cloth; c.rotation.y = Math.sin(FP.t*1.3 + ph)*0.12; c.rotation.x = Math.sin(FP.t*1.9 + ph)*0.05; }
   }
   for (const [k, o] of ISO.props){ if (!seen.has(k)){ if (o.map !== G.map){ if (o.g.parent) o.g.parent.remove(o.g); ISO.props.delete(k); } else o.g.visible = false; } }
@@ -36813,6 +36827,7 @@ function isoStepDelay(v){ const p = G.player; return G.mon.some(m=>m.alive && m.
 document.addEventListener('keyup', (e)=>{ if (ISO.held){ ISO.held.delete(String(e.key).toLowerCase()); if (NUMPAD_KEY[e.code]) ISO.held.delete(NUMPAD_KEY[e.code].toLowerCase()); } });
 window.addEventListener('blur', ()=>{ if (ISO.held) ISO.held.clear(); });
 function isoHandleKey(k){
+  if (k===' '){ ISO.path = []; ISO.fighting = null; playerWait(); return true; }
   const hd = isoHeldDir(k);
   if (hd){
     const kl = String(k).toLowerCase(); ISO.held = ISO.held || new Set();
@@ -36933,6 +36948,9 @@ function isoTickPath0(now){
   if (now < ISO.nextStep) return;
   { const t = ISO.target || ISO.fighting; if (t && t.alive && rangedReachIdx(t) >= 0){ ISO.path = []; ISO.fighting = t; ISO.target = null; ISO.nextStep = now; isoTickFight(now); return; } }   // (in range: stand and shoot)
   ISO.nextStep = now + ISO_STEP_MS*runMul();
+  { const [bx, by] = ISO.path[0]; if (G.gameMode===1 && G.dungeonDeco && G.dungeonDeco[bx] && G.dungeonDeco[bx][by]==='blade' && foeHurry() && bladeDown(bx, by) && !(ISO.waitN > 3)){
+      ISO.waitN = (ISO.waitN||0) + 1; playerWait(); return; } }   /* (RS-314) the blade is down across the next tile: wait a turn for it to swing past */
+  ISO.waitN = 0;
   const p = G.player, [nx, ny] = ISO.path.shift(), dx = nx-p.x, dy = ny-p.y;
   if (Math.max(Math.abs(dx), Math.abs(dy))!==1){ ISO.path = []; return; }
   const map0 = G.map, hp0 = p.hp, near = m=>m.alive && Math.abs(m.x-p.x)+Math.abs(m.y-p.y)===1, adj0 = G.mon.filter(near);
@@ -37202,7 +37220,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-313';
+const GAME_VERSION = 'rs-314';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -38959,6 +38977,7 @@ function buildHelpKeys(){
     ${sec('FIGHTING', [
       ['F', 'change attack style: Accurate, Aggressive, Defensive, Controlled', ic.F],
       ['R', 'switch your ranged mode between bow and magic. Click a monster to shoot or cast at it; you stand and keep firing while it is in range', ic.R],
+      ['Space', 'wait a turn where you stand (dungeons and fights): the monsters take theirs, and a swinging blade swings past'],
       ['Q', 'drink a potion (dungeons and fights)', ic.Q],
       ['U', 'eat your best food (takes your turn in a fight)', ic.U],
       ['T', 'your hearthstone: back to the town you bound it to at a waypoint stone, from the open land or any town (it needs a few minutes between uses)', ic.T],
@@ -39264,6 +39283,7 @@ function handlePlayingKey(k){
     case 'Home': case 'PageUp': case 'End': case 'PageDown': { const d = (G.gameMode===0 || G.gameMode===3) ? viewRotDir(keyDir(k)) : keyDir(k); moveDir(d[0], d[1]); break; }
     case 'z': case 'Z': viewRotate(-1); break;
     case 'x': case 'X': viewRotate(1); break;
+    case ' ': playerWait(); break;
     case 'f': case 'F': rsCycleStyle(); break;
     case 'g': case 'G': setUi('rsmagic'); break;
     case 'n': case 'N': setUi('prayer'); break;

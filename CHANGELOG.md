@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-314 - Wait for It
+
+- **Space waits a turn.** In dungeons and fights, Space now lets a turn go by where you stand: the monsters take theirs, and the traps move on.
+- **Blades really swing.** A swinging blade used to catch you or miss you depending only on where it hung, so the same blade was always deadly or always safe. Now it sweeps through its tile every other turn. You can see it: hanging straight down across the tile when it would catch you, swung up to the side when it's safe to pass.
+- **Click-to-move times the blades.** Walking through a blade by clicking now waits a turn when the blade is down, then steps through behind it. Stepping in by hand while it's down still hurts.
+
 ## RS-313 - Through the Blades
 
 - **Click-to-move crosses a swinging blade when it has to.** A blade across the only corridor used to leave click-to-move with no way through. Now the path still goes round a blade (or lava) when there's another way, but takes you straight across when there isn't.
