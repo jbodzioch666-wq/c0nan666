@@ -26,7 +26,7 @@ module.exports = async page=>{
     const handMesh = arm=>arm.hand.children.find(o=>o.isMesh);
     A(Math.abs(handMesh(war.rig.arms[0]).rotation.y - Math.PI/2) < 1e-6 && Math.abs(handMesh(war.rig.arms[1]).rotation.y + Math.PI/2) < 1e-6, 'weapon wrist a quarter anticlockwise, the other clockwise');
     A(war.rig.wk==='axe' && Math.abs(war.rig.weapon.rotation.y + Math.PI/2) < 1e-6, 'a one-handed axe is turned round');
-    A(hob.rig.wk==='sword' && Math.abs(hob.rig.weapon.rotation.y - Math.PI/2) < 1e-6, 'a sword is not');
+    A(hob.rig.wk==='sword' && Math.abs(hob.rig.weapon.rotation.y + Math.PI/2) < 1e-6, 'and since RS-296 so is a sword, its edge leading');
     return out;
   });
   console.log(JSON.stringify(r));

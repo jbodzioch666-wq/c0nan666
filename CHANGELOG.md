@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-296 - Blades the right way round, hilts in the fist, a tome you can read
+
+- **Blades face forward.** Swords, scimitars, daggers, maces and hammers were held with their edge facing back toward the elbow; you could see it on a scimitar, whose curve swept the wrong way. Every weapon is now turned like the axes, edge leading, in both hands.
+- **The hand closes on the grip.** The fist sat on the crossguard with the grip and pommel hanging out below it. Weapons are slid up so the hand closes on the grip just under the guard.
+- **A tome is held to be read.** It rests open on your left hand out in front of you, larger, with its pages tipped up toward your face and its cover facing out.
+
 ## RS-295 - Off-hand weapons on your model, and hair under helmets
 
 - **Your off-hand weapon shows.** An off-hand dagger, sword or scimitar was never put on your model, so a dual-wielder looked empty-handed on one side. It is now held in your left fist: ready at guard, drawn back as your main hand winds up, and cutting in behind it.

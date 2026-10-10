@@ -8,7 +8,10 @@ module.exports = async page=>{
     start('Human'); let it; do { it = rsMakeOffhand(30); } while (!it.offWeapon); G.gear.offhand = it;
     { const pt = rsPlayerLook(), e = m3dInstance({}, pt), rig = e.rig; m3dPoseHumanoid(rig, 0.7, 0, 0, 0, 0, e); const a = rig.arms[1].sh.rotation.x; m3dPoseHumanoid(rig, 0.7, 0, 1, 0, 0, e);
       out.blade = { o:!!pt.o.offWeapon, inLeft:!!rig.offWpn && rig.arms[1].hand.children.includes(rig.offWpn), drawn:+(a - rig.arms[1].sh.rotation.x).toFixed(2) }; }
-    G.gear.offhand = rsMakeArmour('cloth', 3, 'offhand'); { const pt = rsPlayerLook(), e = m3dInstance({}, pt); out.tome = { o:!!pt.o.tome, held:!!e.rig.tome }; }
+    { const e = m3dInstance({}, rsPlayerLook()), rig = e.rig, w = rig.arms[0].hand.children.find(c=>c.type==='Group' && c!==rig.arms[0].hand.children[0]); out.edge = { main:+rig.weapon.rotation.y.toFixed(3), off:+rig.offWpn.rotation.y.toFixed(3), hilt:+rig.weapon.position.z.toFixed(3) }; }   /* (RS-296) */
+    G.gear.offhand = rsMakeArmour('cloth', 3, 'offhand'); { const pt = rsPlayerLook(), e = m3dInstance({}, pt), rig = e.rig; m3dPoseHumanoid(rig, 0.7, 0, 0, 0, 0, e); e.holder.updateMatrixWorld(true);
+      const n = new THREE.Vector3(0, 1, 0).transformDirection(rig.tome.matrixWorld), tp = rig.tome.getWorldPosition(new THREE.Vector3()), hp = rig.head.getWorldPosition(new THREE.Vector3()), hd = rig.arms[1].hand.getWorldPosition(new THREE.Vector3());
+      out.tome = { o:!!pt.o.tome, held:!!rig.tome, facesReader:+n.dot(hp.clone().add(new THREE.Vector3(0, 0.08, 0)).sub(tp).normalize()).toFixed(2), handNear:+hd.distanceTo(tp).toFixed(3) }; }
     G.gear.offhand = rsMakeArmour('metal', 2, 'offhand'); { const pt = rsPlayerLook(), e = m3dInstance({}, pt); out.shield = { shield:!!e.rig.shield, blade:!!e.rig.offWpn }; }
     for (const race of ['Wood Elf', 'Human', 'Dwarf']){ start(race); for (const tier of [1, 3, 6]){ G.gear.head = rsMakeArmour('metal', tier, 'head');
       const e = m3dInstance({}, rsPlayerLook()), h = e.rig.head; e.holder.updateMatrixWorld(true); let helm = null, cap = null;
@@ -18,7 +21,8 @@ module.exports = async page=>{
     return out; });
   const A = (c, m)=>{ if (!c) throw new Error(m+' :: '+JSON.stringify(r)); };
   A(r.blade.o && r.blade.inLeft && r.blade.drawn > 0.4, 'an off-hand blade in the left fist, drawn back as the main hand winds up');
-  A(r.tome.o && r.tome.held, 'a tome held in the off hand');
+  A(r.tome.o && r.tome.held && r.tome.facesReader > 0.7 && r.tome.handNear < 0.12, 'a tome held open on the off hand, its pages facing the reader');
+  A(Math.abs(r.edge.main + Math.PI/2) < 0.01 && Math.abs(r.edge.off + Math.PI/2) < 0.01 && r.edge.hilt > 0.02, 'RS-296: blades edge-forward in both hands, slid up so the fist is on the grip');
   A(r.shield.shield && !r.shield.blade, 'a shield is still a shield');
   for (const k of Object.keys(r)) if (r[k].inside!==undefined) A(r[k].inside, k+': the hair under the helmet stays inside it');
   console.log('offhand ok', JSON.stringify(r));
