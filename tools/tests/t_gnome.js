@@ -9,7 +9,8 @@ module.exports = async page=>{
     out.bare = { hat:o.gnomeHat, goggles:o.goggles, brows:o.bushyBrows, rosy:o.rosy, belly:o.potBelly, apron:o.apron, legs:o.legLen, nose:o.nose, cone };
     G.gear.head = rsMakeArmour('metal', 1, 'head'); G.gear.chest = rsMakeArmour('metal', 1, 'chest');
     { const a = rsPlayerLook().o; out.armoured = { hat:!!a.gnomeHat, apron:!!a.apron, helm:a.helm }; }
-    G.villageRace = 'gnome'; const f = v3RaceDress(v3VillagerLook(1), 1); out.folk = { hat:!!f.o.gnomeHat, apron:!!f.o.apron, brows:!!f.o.bushyBrows };
+    G.villageRace = 'gnome'; let f = null; for (let i=0;i<10 && !(f && !f.o.fem);i++) f = v3RaceDress(v3VillagerLook(i), i);   /* (a gnome man - the women, RS-265, have no bushy brows) */
+    out.folk = { hat:!!f.o.gnomeHat, apron:!!f.o.apron, brows:!!f.o.bushyBrows, fem:!!f.o.fem };
     return out; });
   const A = (c, m)=>{ if (!c) throw new Error(m+' :: '+JSON.stringify(r)); };
   A(r.bare.hat && r.bare.goggles && r.bare.brows && r.bare.rosy && r.bare.belly && r.bare.apron && r.bare.legs < 1 && r.bare.nose >= 1 && r.bare.cone===1, 'the gnome look, with one smooth tall hat');

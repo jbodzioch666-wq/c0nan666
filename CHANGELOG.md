@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-305 - Robes Meet at the Belt
+
+- **Robe top and robe bottom flow into one.** The robe top is now a bodice that ends in a flat hem at the belt line, with no pelvis or seat of its own. It used to carry the whole lower body, so it hung over the robe bottom's waist like a sagging bottom, with the sash half way down it. The robe bottom's waist now rises to the belt and takes the exact oval of the bodice's hem, so the two meet in one line under the sash on every race, man or woman.
+- **One sash for every robe.** A one-piece robe (the townsfolk's) and a robe top over plate legs or trousers get the same sash at the belt line, sized to the body, so a dwarf's no longer pokes out behind him.
+- **Skirts fit a broad body.** A robe skirt is now as broad and as deep as the body it hangs from, so a dwarf's meets his bodice too.
+
 ## RS-304 - Two Quick Bars, Food You Can See
 
 - **A second quick bar.** There are now two quick bars of nine slots: the first on keys 1-9, the second on Shift + 1-9. Both are up from the start, even when empty, and you can drag things between them.
