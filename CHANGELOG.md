@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-309 - A Seat by the Fire
+
+- **Sit by your campfire.** When you stand on your own campfire out in the open land, with just the fire or with your tent pitched beside it, you now sit on a little three-legged stool next to it, facing the flames and holding your hands out to the warmth. A staff stays planted in your hand and a tome rests on your knee.
+- **Seen across the fire.** The stool goes on the far side of the fire from the camera, so you see your character looking back over the flames, and it moves round the fire to stay clear of your tent.
+- **Up again when you go.** Walking off, gathering or a fight gets you up, and the stool is put away.
+
 ## RS-308 - Holding the Book Properly
 
 - **The shut tome is pressed to the palm.** Out of a fight the book now sits on the palm side of the hand, its cover flat against the palm and the fist closed round its bottom edge, leaning in along the forearm. Before, it stood in the middle of the hand, so the fingers and forearm passed through it.

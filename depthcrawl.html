@@ -29679,6 +29679,38 @@ function o3SyncQuests(){
     }
   }
 }
+// (RS-309) at your own campfire - with a tent or without - you sit on a stool by it, facing the flames: on the far side of the fire from the
+// camera, so you're seen across it, and clear of the tent. Moving, gathering or a fight gets you up again
+function o3CampSit(P, pp, busy){
+  const T = THREE, f = G.player && skP().fire, lit = f && G.gameMode===0 && (G.player.turnCount||0) < f.until && f.x===G.owPos.x && f.y===G.owPos.y;
+  const r = P.e && P.e.rig, sit = !!(lit && !busy && r && r.legs && r.hips && !G.gameOver && G.ui==='playing');
+  if (!sit){ if (O3.campStool) O3.campStool.visible = false; P.campSit = false; return; }
+  const k = (P.e.holder.scale.y || 1)*(P.e.H || 1), fx = f.x + 0.5, fz = f.y + 0.5;   /* (the figure's height, so the stool suits a gnome or an elf) */
+  // where to sit: beyond the fire from the camera, swung clear of the tent if one is pitched
+  let dx = fx - O3.cam.position.x, dz = fz - O3.cam.position.z; const dl = Math.hypot(dx, dz) || 1; dx /= dl; dz /= dl;
+  const cp = G.player.campPitch, tent = cp && cp.x===f.x && cp.y===f.y && (G.player.turnCount||0) < cp.until && cp.tent > 0, R = 0.4;
+  if (tent){ const tx = 0.5, tz = -0.35; for (const a of [0, 0.8, -0.8, 1.6, -1.6]){ const c = Math.cos(a), s2 = Math.sin(a), ax = dx*c - dz*s2, az = dx*s2 + dz*c; if (Math.hypot(ax*R - tx, az*R - tz) > 0.42){ dx = ax; dz = az; break; } } }
+  const sx = fx + dx*R, sz = fz + dz*R, gy = Math.max(O3.heightAt(sx, sz), -0.1), seat = SEAT_H*k;
+  if (!O3.campStool){ const g = O3.campStool = new T.Group(), wood = new T.MeshStandardMaterial({ color:new T.Color('#6a4a2c').convertSRGBToLinear(), roughness:0.85 });
+    const top = new T.Mesh(new T.CylinderGeometry(0.1, 0.1, 0.03, 16), wood); top.position.y = -0.015; top.castShadow = true; g.add(top);   /* (a round seat on three splayed legs, built 1 tall - scaled to the sitter) */
+    for (let i=0;i<3;i++){ const a = i/3*Math.PI*2, lg = new T.Mesh(new T.CylinderGeometry(0.012, 0.016, 1, 6), wood); lg.position.set(Math.cos(a)*0.055, -0.5, Math.sin(a)*0.055); lg.rotation.set(Math.sin(a)*0.18, 0, -Math.cos(a)*0.18); lg.castShadow = true; g.add(lg); }
+    O3.scene.add(g); }
+  const st = O3.campStool; st.visible = true; st.position.set(sx, gy + seat, sz); st.children.forEach((c, i)=>{ if (i){ c.scale.y = seat; c.position.y = -seat/2; } });
+  // the figure, on the stool, turned to the fire
+  P.g.position.set(sx - pp.x, gy - pp.y, sz - pp.z); P.yaw = Math.atan2(fx - sx, fz - sz); P.e.holder.rotation.y = P.yaw; P.campSit = true;
+  const s = P.e.holder.scale.y || 1, t = O3.t;
+  r.hips.position.y = (seat + 0.2*k)/s; r.hips.rotation.y = 0; r.hips.rotation.z = 0;   /* (as on a town stool - RS-184: the thighs on the seat, the feet on the ground) */
+  r.legs.forEach(L=>{ L.hip.rotation.x = -1.5; L.knee.rotation.x = 1.45; });
+  r.torso.rotation.x = 0.12 + Math.sin(t*2.2)*0.012 + (r.stoop||0); r.torso.rotation.y = 0;   /* (leaning a little toward the warmth) */
+  if (r.arms && !r.zombie){ const [Ra, La] = r.arms, warm = Math.sin(t*0.7)*0.05;   /* (hands held out to the fire - but a staff stays upright in the hand, and a shut tome on the knee) */
+    if (r.wk==='staff' || r.twoHand){ Ra.sh.rotation.x = -0.55; Ra.sh.rotation.z = -0.12; Ra.el.rotation.x = -0.8; if (r.weapon && r.weapon.parent) r.weapon.parent.rotation.x = M3D_STAFF_X; }
+    else { Ra.sh.rotation.x = -1.0 + warm; Ra.sh.rotation.z = 0.1; Ra.el.rotation.x = -0.5; }
+    if (r.tome || r.shield){ La.sh.rotation.x = -0.55; La.sh.rotation.z = 0.12; La.el.rotation.x = -0.8; }
+    else { La.sh.rotation.x = -1.0 - warm; La.sh.rotation.z = -0.1; La.el.rotation.x = -0.5; } }
+  if (r.cape) r.cape.rotation.x = 0.7;
+  if (r.skirt) m3dSkirtFollow(r);
+  if (r.tome) m3dTomeFollow(r, true);
+}
 // the merchant you're escorting walks at your heels
 // your campfire on the overworld: a ring of stones, crossed logs and a flickering flame with its own light
 function o3Campfire(T){
@@ -30221,6 +30253,7 @@ function o3Render(){
       }
     }
     rsPlayerFx(P.e, tt, mv, false);
+    o3CampSit(P, pp, moving || mv > 0.05 || sailing || !!G.gather);
   } else {
     P.sp.position.y = (moving && !sailing) ? Math.abs(Math.sin(P.walk))*0.05 : 0;
     P.sp.scale.x = P.sp.userData.h * P.sp.userData.asp * (P.face||1);
@@ -37084,7 +37117,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-308';
+const GAME_VERSION = 'rs-309';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

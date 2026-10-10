@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| campseat | RS-309: at your campfire, with a tent or just the fire, you sit on a stool facing the flames, beyond the fire from the camera and clear of the tent; walking off gets you up |
 | praymix | RS-306/307: which prayers go together - a ranged or magic prayer clashes only with attack and strength prayers and with each other; in the curses a Leech switches off the Saps and Turmoil both; the two books never mix |
 | beltline | RS-305: a robe top is a bodice ending flat at the belt line and the robe bottom's waist rises to meet it with the same oval, under the sash, on every race and both sexes; a one-piece robe and a robe top over plate legs too |
 | qbars | RS-304: two quick bars up by default (1-9 and shift + 1-9), each across or down, either switched off in Settings; the prayer page's stars put prayers on them |
