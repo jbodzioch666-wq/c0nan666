@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-316 - Ink on the Bounty Board
+
+- **The bounty board is readable.** The job cards are cream parchment, but their rewards, difficulty, foe level and "legendary pick" were drawn in the pale yellows meant for the dark panels, and all but vanished. They're now in dark ink: rewards in deep brown, "legendary pick" in burnt orange, and the difficulty and level colours darkened to inks of the same hue, so "Hard" is still orange-ish and "Very hard" still red, just readable. Everything on the cards now meets a 4.5:1 contrast with the paper.
+- **Progress you can see.** The progress bars on contracts and bounties have a visible track and a darker fill.
+
 ## RS-315 - The Peddler on the Road, and a Map You Can Search
 
 - **Wandering merchants look like merchants.** A roamer that will turn out to be a merchant is now a merchant from the moment it appears, not a monster that becomes one when you walk into it. It walks the land as a traveller in a wide felt hat and a green road coat, leaning on a gnarled walking stick, with a tall peddler's pack on its back: a red bedroll on top, a cooking pot and a lit lantern swinging from its sides.
