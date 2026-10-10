@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## RS-311 - Beaches
+
+- **Sandy beaches instead of walls.** Where the land meets the sea or a lake it used to stop in a low wall along the tile edges. Now a beach slopes gently down into the water: pale warm sand above the waterline, darker where the waves wet it, and grey shingle on snowy coasts.
+- **Coasts that curve.** The waterline wanders into coves and out into spits, and corners of land out in the sea are rounded off, so a coast no longer follows the square grid.
+- **Shallows.** The water is clear turquoise over the sand near the shore, so you can see the beach running under it, and deepens to blue further out.
+- **Surf.** A broken line of foam laps along the beach, and lines of foam roll in toward it. They replace the white blobs that sat on the water near the coast and looked like cloud reflections.
+- **Nothing you walk on changed.** The middle of every land tile stays dry, a pond or an inlet is still water in its middle, and rivers keep their own low banks right down to the sea.
+- **The land is finer.** The ground is built from three points per tile instead of two, so shores can curve. Rebuilding the land around you as you travel takes a little longer, about a sixth of a second instead of an eighth.
+
 ## RS-310 - Marshmallows by the Tent
 
 - **A robe that sits properly.** Sitting on a stool, at the campfire or in a tavern, the robe bottom now folds over your lap and covers your thighs, falls from your knees to the ground and gathers there. Before, your thighs came straight out through the front of the skirt and the rest of it sank into the ground. Standing up gives the skirt its own shape back.

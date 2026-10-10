@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| shore | RS-105 to 117, RS-311: water stays on the water; a sea or lake shore is a beach that slopes into the water, land corners out in the sea are rounded off, the middle of every land tile stays dry, river banks stay low; waterfalls flow |
 | sitrobe | RS-310: a robe bottom on a seated figure folds onto the lap over the thighs, falls from the knees, stays above the ground, and takes its own shape again on standing - on six race and sex combinations |
 | campseat | RS-309/310: at your campfire, with a tent or just the fire, you sit on a stool facing the flames, beyond the fire from the camera and beside the tent, the staff and book put down and a marshmallow on a stick over the fire; walking off gets you up |
 | praymix | RS-306/307: which prayers go together - a ranged or magic prayer clashes only with attack and strength prayers and with each other; in the curses a Leech switches off the Saps and Turmoil both; the two books never mix |

@@ -22539,20 +22539,30 @@ function gfxO3Build(grp, x0, y0, W, M){
     const foam = new T.DataTexture(data, N, N, T.RGBAFormat); foam.magFilter = foam.minFilter = T.LinearFilter; foam.needsUpdate = true;
     water.geometry.dispose(); water.geometry = new T.PlaneGeometry(N, N, N, N);
     const m = water.material;
-    m.onBeforeCompile = sh=>{ Object.assign(sh.uniforms, { uT:U.uT, uNight:U.uNight, uSky:U.uSky, uFoam:{ value:foam }, uFoamO:{ value:new T.Vector4(ox, oy, N, N) }, uCloud:{ value:tx.cloud } });
+    m.onBeforeCompile = sh=>{ Object.assign(sh.uniforms, { uT:U.uT, uNight:U.uNight, uSky:U.uSky, uFoam:{ value:foam }, uFoamO:{ value:new T.Vector4(ox, oy, N, N) }, uCloud:{ value:tx.cloud }, uDep:{ value:O3.depthTex }, uDepO:{ value:O3.depthO } });
       gfxWorldPos(sh);
       sh.vertexShader = 'uniform float uT;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
         vec4 wp0 = modelMatrix * vec4(transformed, 1.0);
         transformed.z += sin(wp0.x*1.3 + uT*1.4)*0.022 + sin(wp0.z*1.7 - uT*1.1)*0.018 + sin((wp0.x + wp0.z)*2.9 + uT*2.3)*0.007;`);
-      sh.fragmentShader = 'uniform float uT; uniform float uNight; uniform vec3 uSky; uniform sampler2D uFoam; uniform vec4 uFoamO; uniform sampler2D uCloud;\n' + sh.fragmentShader.replace('#include <output_fragment>', `#include <output_fragment>
+      sh.fragmentShader = 'uniform float uT; uniform float uNight; uniform vec3 uSky; uniform sampler2D uFoam; uniform vec4 uFoamO; uniform sampler2D uCloud; uniform sampler2D uDep; uniform vec4 uDepO;\n' + sh.fragmentShader.replace('#include <output_fragment>', `#include <output_fragment>
         vec3 wn = normalize(cross(dFdx(vGW), dFdy(vGW))); if (wn.y < 0.0) wn = -wn;
         float fr = pow(1.0 - max(dot(wn, normalize(cameraPosition - vGW)), 0.0), 3.0);
         gl_FragColor.rgb = mix(gl_FragColor.rgb, uSky, clamp(fr*0.9 + 0.1, 0.0, 0.6));
         vec4 fo = texture2D(uFoam, (vGW.xz - uFoamO.xy)/uFoamO.zw);
         float nz = texture2D(uCloud, vGW.xz*1.1 + vec2(uT*0.05, uT*0.03)).r;
-        float foam = fo.r*fo.r*smoothstep(0.42, 0.62, nz + 0.18*sin(uT*2.0 + vGW.x*5.0 + vGW.z*3.0));
         float run = fo.g*smoothstep(0.5, 0.8, texture2D(uCloud, vGW.xz*0.9 + vec2(uT*0.16, uT*0.11)).r);
-        gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.9, 0.95, 1.0), clamp(foam*0.45 + run*0.3, 0.0, 0.5));
+        /* (RS-311) the shallows and the surf: clear turquoise over the sand, deepening to blue; a lapping line of foam at the waterline,
+           and lines of foam rolling in to the beach */
+        float dep = texture2D(uDep, ((vGW.xz - uDepO.xy)*uDepO.z + 0.5)/uDepO.w).r*0.6;
+        float shal = 1.0 - smoothstep(0.0, 0.38, dep);
+        gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.14, 0.50, 0.47)*(0.75 + 0.25*(1.0 - uNight)), shal*0.62);
+        gl_FragColor.a = mix(gl_FragColor.a, 0.38, shal*shal);
+        float brk = smoothstep(0.25, 0.75, texture2D(uCloud, vGW.xz*2.3 + vec2(-uT*0.04, uT*0.05)).r);   /* (the surf breaks up along the beach) */
+        float lap = (1.0 - smoothstep(0.0, 0.035, dep - 0.01*sin(uT*1.7 + vGW.x*2.3 + vGW.z*1.9)))*(0.45 + 0.55*brk);
+        float roll = smoothstep(0.86, 1.0, sin(dep*44.0 + uT*2.1 + nz*3.0))*(1.0 - smoothstep(0.03, 0.22, dep))*step(0.003, dep)*brk;
+        float surf = clamp(lap*0.7 + roll*0.45, 0.0, 0.8)*(0.6 + 0.4*nz);
+        gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.92, 0.96, 1.0), clamp(surf + run*0.3, 0.0, 0.9));
+        gl_FragColor.a = max(gl_FragColor.a, surf*0.95);
         float st = step(0.995, fract(sin(dot(floor(vGW.xz*12.0), vec2(12.9898, 78.233)))*43758.5453))*uNight*(0.55 + 0.45*sin(uT*3.0 + vGW.x*7.0 + vGW.z*3.0));
         gl_FragColor.rgb += vec3(st*0.7);`); };
     m.customProgramCacheKey = ()=>'gfxwater'; m.needsUpdate = true;
@@ -29156,7 +29166,7 @@ let o3Pref = true;
 const O3 = { ok:null, win:null, path:[], stepT:0, dist:15, tex:{}, t:0, hits:[], plates:[], rain:null };
 const O3_W = 72;                    // tiles per side of the land built around you
 const O3_WATER_Y = -0.14;           // the water sheet's height (its waves rise about 0.05 above it)
-const O3_R = 2;                     // terrain vertices per tile
+const O3_R = 3;                     // terrain vertices per tile (RS-311: three, so a coast can curve)
 function o3Active(){ return o3Pref && G.gameMode===0 && !G.owZoomedOut && typeof THREE!=='undefined' && O3.ok!==false && !!(G.ow && G.ow.map && G.owPos); }
 function o3Hide(){ if (O3.cv){ O3.cv.style.display = 'none'; O3.labels.style.display = 'none'; } }
 // ---------- terrain sampling ----------
@@ -29249,7 +29259,11 @@ function o3Build(cx, cy){
   };
   // vertex grid: R per tile, heights averaged from the tiles touching each vertex, then roughened
   const NV = W*O3_R + 1, pos = new Float32Array(NV*NV*3), col = new Float32Array(NV*NV*3), uv = new Float32Array(NV*NV*2);
-  const H = new Float32Array(NV*NV);
+  const H = new Float32Array(NV*NV), beach = new Float32Array(NV*NV).fill(-1), TC = new Map();
+  const tileC = (px, pz)=>{ const k2 = px*100003 + pz; let v = TC.get(k2); if (!v){ const gt = o3Ground(px,pz); v = [tileH(px,pz), gt, wgO3Col(px,pz,gt) || O3_COL[gt] || O3_COL[OW_GRASS]]; TC.set(k2, v); } return v; };
+  const BLUR = [[0,0]].concat([0,1,2,3,4,5].map(k=>[Math.cos(k*Math.PI/3)*0.28, Math.sin(k*Math.PI/3)*0.28]));
+  const landAt = (px, pz)=>{ const fx = px - 0.5, fz = pz - 0.5, tx = Math.floor(fx), tz = Math.floor(fz), ax = fx - tx, az = fz - tz; let l = 0;   /* (RS-311: how much land is at a point - 1 in a land tile's middle, 0 in the sea's) */
+    for (const [qx, qz, w] of [[tx,tz,(1-ax)*(1-az)],[tx+1,tz,ax*(1-az)],[tx,tz+1,(1-ax)*az],[tx+1,tz+1,ax*az]]){ const t = o3Tile(qx, qz); if (t!==OW_WATER) l += w; } return l; };
   const lin = v=> Math.pow(v/255, 2.2);
   for (let j=0;j<NV;j++) for (let i=0;i<NV;i++){
     const wx = x0 + i/O3_R, wz = y0 + j/O3_R;
@@ -29258,8 +29272,8 @@ function o3Build(cx, cy){
     const ws = [[tx,tz,(1-ax)*(1-az)],[tx+1,tz,ax*(1-az)],[tx,tz+1,(1-ax)*az],[tx+1,tz+1,ax*az]];
     let h = 0, r = 0, g = 0, b = 0, mtn = 0, snowy = 0, desert = 0;
     for (const [px,pz,w] of ws){
-      h += tileH(px,pz)*w;
-      const gt = o3Ground(px,pz), c = wgO3Col(px,pz,gt) || O3_COL[gt] || O3_COL[OW_GRASS];
+      const tc = tileC(px, pz), gt = tc[1], c = tc[2];   /* (RS-311: worked out once per tile, not for every point of it) */
+      h += tc[0]*w;
       r += c[0]*w; g += c[1]*w; b += c[2]*w;
       if (gt===OW_MOUNTAIN) mtn += w; if (gt===OW_TUNDRA) snowy += w; if (gt===OW_DESERT) desert += w;
     }
@@ -29289,7 +29303,20 @@ function o3Build(cx, cy){
       const diagWet = wet===2 && xs.length===2 && zs.length===2 && wt(xs[0], zs[0])===wt(xs[1], zs[1]);
       // (RS-117) a river is one tile wide, so its banks sit just above the calm water and the river fills its tile;
       // only the sea and lakes keep the higher shore that stops their waves washing through the land
-      if (!wet) h = Math.max(h, O3_WATER_Y + 0.15); else if (dry && !diagWet) h = sea ? Math.max(h, O3_WATER_Y + 0.05) : (h < O3_WATER_Y + 0.15 ? O3_WATER_Y + 0.005 : h); else h = Math.min(h, O3_WATER_Y - 0.1); }   // (a river bank on high ground - a mountainside - keeps its height)
+      /* (RS-311) a sea or lake shore is a beach: how much land is about this point (the tiles round it, weighed by nearness) sets
+         where the waterline runs - a little out past the tiles' edge, wandering - and the sand slopes gently down through it to the
+         sea floor; the middle of every land tile stays dry, and a mountain keeps its cliff */
+      let L = 0, seaN = 0, rivN = 0; for (const [px,pz,w] of ws){ const t = o3Tile(px,pz); if (t===OW_WATER) seaN++; else if (t===OW_RIVER) rivN++; else L += w; }
+      let rivNear = rivN; if (seaN > 0 && seaN < 4 && !rivN){ const qx = Math.floor(wx), qz = Math.floor(wz); for (let a2=-1;a2<=1 && !rivNear;a2++) for (let b3=-1;b3<=1;b3++) if (o3Tile(qx+a2, qz+b3)===OW_RIVER){ rivNear = 1; break; } }
+      const beachV = seaN > 0 && seaN < 4 && !rivNear && !diagWet;   /* (not at a river's mouth - a river keeps its low banks to the sea) */
+      if (beachV && L > 0 && L < 1){
+        L = 0; for (const [ox, oz] of BLUR) L += landAt(wx + ox, wz + oz); L /= BLUR.length;   /* (the land round about, softened, so a corner is a curve) */
+        const Lc = Math.max(0.31, Math.min(0.45, 0.38 + (n1(wx*0.55 + 31, wz*0.55 - 17) - 0.5)*0.26 + (n2(wx*2.1 - 5, wz*2.1 + 3) - 0.5)*0.1));   /* (bays and spits, and a ragged edge to them) */
+        if (L >= Lc){ const pr = O3_WATER_Y + 0.18*Math.pow((L - Lc)/(1 - Lc), 0.32); h = (L > 0.5 && h > pr) ? h : pr; }   /* (rising quickly off the waterline, so a tile's inner half clears the wave tops) */
+        else h = O3_WATER_Y - Math.pow((Lc - L)/Lc, 1.5)*0.48;   /* (a shelf of shallows, then down to the sea floor) */
+        { const qx = Math.floor(wx), qz = Math.floor(wz); if (o3Tile(qx, qz)===OW_WATER){ const cd = Math.max(Math.abs(wx - qx - 0.5), Math.abs(wz - qz - 0.5)); h = Math.min(h, O3_WATER_Y - 0.16*Math.max(0, 1 - cd/0.5)); } }   /* (but a pond or a narrow inlet is still water in its middle, not a sandbank) */
+        beach[j*NV+i] = L; }
+      else if (!wet) h = Math.max(h, O3_WATER_Y + 0.15); else if (dry && !diagWet) h = sea ? Math.max(h, O3_WATER_Y + 0.05) : (h < O3_WATER_Y + 0.15 ? O3_WATER_Y + 0.005 : h); else h = Math.min(h, O3_WATER_Y - 0.1); }   // (a river bank on high ground - a mountainside - keeps its height)
     const k = j*NV+i; H[k] = h;
     pos[k*3] = wx; pos[k*3+1] = h; pos[k*3+2] = wz;
     // colour: terrain blend, varied, then snow on the high peaks and rock on steep ground
@@ -29300,8 +29327,13 @@ function o3Build(cx, cy){
     if (volc > 0){ const dv = Math.hypot(wx - VOL.x, wz - VOL.z), ash = n1(wx*1.7+9, wz*1.7)*0.35, rim = Math.max(0, 1 - Math.abs(dv - VOLC.rc)/0.5);
       const vr = 58 + ash*40 + rim*40, vg = 48 + ash*30 + rim*6, vb = 44 + ash*24;   /* (basalt and ash, scorched red at the rim) */
       cr += (vr - cr)*volc; cg += (vg - cg)*volc; cb += (vb - cb)*volc; }
+    { const bL = beach[k];   /* (RS-311) the beach: warm pale sand above the waterline, darker where the waves wet it, the sea floor sand under the water; a snowy coast is grey shingle */
+      if (bL >= 0 && mtn < 0.4){ const sh2 = n1(wx*3.1 - 4, wz*3.1 + 9)*0.08, cold = snowy, sr = 226 - cold*60, sg = 208 - cold*42, sb = 160 - cold*2;
+        const f = h >= O3_WATER_Y ? 1 - Math.min(1, Math.max(0, (bL - 0.72)/0.22)) : 1, wetS = h < O3_WATER_Y + 0.04 ? 1 - Math.max(0, (h - O3_WATER_Y)/0.04) : 0;
+        let tr = sr*(1 + sh2), tg = sg*(1 + sh2), tb = sb*(1 + sh2*0.6); if (wetS > 0){ tr -= wetS*58; tg -= wetS*56; tb -= wetS*44; }
+        cr += (tr - cr)*f; cg += (tg - cg)*f; cb += (tb - cb)*f; } }
     if (h < -0.2){ const wet = Math.min(1, (-0.2-h)/0.3); cr *= 1-wet*0.35; cg *= 1-wet*0.3; cb *= 1-wet*0.2; }
-    else if (h < 0.02 && mtn < 0.1){ const sand = Math.min(1, (0.02-h)/0.2) * (1-snowy); cr += (196-cr)*sand*0.6; cg += (178-cg)*sand*0.6; cb += (128-cb)*sand*0.6; }
+    else if (h < 0.02 && mtn < 0.1 && beach[k] < 0){ const sand = Math.min(1, (0.02-h)/0.2) * (1-snowy); cr += (196-cr)*sand*0.6; cg += (178-cg)*sand*0.6; cb += (128-cb)*sand*0.6; }
     col[k*3] = lin(cr); col[k*3+1] = lin(cg); col[k*3+2] = lin(cb);
     uv[k*2] = wx/3; uv[k*2+1] = wz/3;
   }
@@ -29315,6 +29347,8 @@ function o3Build(cx, cy){
   for (let k=0;k<NV*NV;k++){ const st = 1 - nr.getY(k); if (st > 0.25 && H[k] > 0.4){ const f = Math.min(1,(st-0.25)*2.2)*0.85, rk = lin(78); col[k*3] += (rk-col[k*3])*f; col[k*3+1] += (rk*0.97-col[k*3+1])*f; col[k*3+2] += (rk*0.94-col[k*3+2])*f; } }
   const land = new T.Mesh(geo, new T.MeshStandardMaterial({ vertexColors:true, map:tex.detail, roughness:0.95 }));
   land.receiveShadow = true; land.castShadow = true; grp.add(land); O3.land = land;
+  { const dd = new Uint8Array(NV*NV*4); for (let k=0;k<NV*NV;k++){ dd[k*4] = Math.round(Math.max(0, Math.min(1, (O3_WATER_Y - H[k])/0.6))*255); dd[k*4+3] = 255; }   /* (RS-311: how deep the water is over every point, for the shallows and the surf) */
+    if (O3.depthTex) O3.depthTex.dispose(); const dt = O3.depthTex = new T.DataTexture(dd, NV, NV, T.RGBAFormat); dt.magFilter = dt.minFilter = T.LinearFilter; dt.needsUpdate = true; O3.depthO = new T.Vector4(x0, y0, O3_R, NV); }
   O3.heightAt = (wx, wz)=>{
     const fi = (wx-x0)*O3_R, fj = (wz-y0)*O3_R, i = Math.max(0, Math.min(NV-2, Math.floor(fi))), j = Math.max(0, Math.min(NV-2, Math.floor(fj))), a = fi-i, b2 = fj-j;
     return H[j*NV+i]*(1-a)*(1-b2) + H[j*NV+i+1]*a*(1-b2) + H[(j+1)*NV+i]*(1-a)*b2 + H[(j+1)*NV+i+1]*a*b2;
@@ -37143,7 +37177,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-310';
+const GAME_VERSION = 'rs-311';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
