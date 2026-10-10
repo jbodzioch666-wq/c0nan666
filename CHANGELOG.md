@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-302 - Pages Up
+
+- **The carried tome is turned the right way.** Held at the side out of a fight, the book now sits spine-down in the hand with its page edges and clasp facing up, cover flat against the thigh.
+
 ## RS-301 - The Book, Carried Properly
 
 - **The shut tome stands in the hand.** Out of a fight the book is now held upright by its bottom edge, standing in the hanging hand with its cover flat against the thigh, the way you'd carry a book at your side, instead of dangling from its edge.
