@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-310 - Marshmallows by the Tent
+
+- **A robe that sits properly.** Sitting on a stool, at the campfire or in a tavern, the robe bottom now folds over your lap and covers your thighs, falls from your knees to the ground and gathers there. Before, your thighs came straight out through the front of the skirt and the rest of it sank into the ground. Standing up gives the skirt its own shape back.
+- **A seat beside your tent.** With a tent pitched, your stool now stands right beside it at the fire, on whichever side the camera can see you best.
+- **Toasting marshmallows.** Sitting at your campfire, you put your staff and your book down and hold a stick with a marshmallow over the flames, browning underneath, turning it now and then. Get up and your staff and book are back in hand.
+
 ## RS-309 - A Seat by the Fire
 
 - **Sit by your campfire.** When you stand on your own campfire out in the open land, with just the fire or with your tent pitched beside it, you now sit on a little three-legged stool next to it, facing the flames and holding your hands out to the warmth. A staff stays planted in your hand and a tome rests on your knee.
