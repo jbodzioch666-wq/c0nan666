@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-308 - Holding the Book Properly
+
+- **The shut tome is pressed to the palm.** Out of a fight the book now sits on the palm side of the hand, its cover flat against the palm and the fist closed round its bottom edge, leaning in along the forearm. Before, it stood in the middle of the hand, so the fingers and forearm passed through it.
+- **No more stick in the spine.** The round spine that poked out of the shut book is now flat and flush with the covers.
+- **Fits every build.** How far in the book sits follows the size of the hand, so it clears the forearm and the leg on an elf, a human, a gnome or a dwarf, standing or walking.
+
 ## RS-307 - The Curses, Checked
 
 - **Saps and Leeches don't stack.** As in RuneScape, turning on a Leech curse switches off the Sap curses, and a Sap switches off the Leeches. Turmoil now switches off the Saps as well as the Leeches. Before, all three Saps could run beside every Leech for extra armour.

@@ -24,6 +24,14 @@ module.exports = async page=>{
       const palm = ()=>{ const v = new THREE.Vector3(-(rig.gripX||0.026), -0.045, 0.004); rig.arms[1].hand.localToWorld(v); return v; }, gap0 = rig.tome.getWorldPosition(new THREE.Vector3()).distanceTo(palm());
       rig.arms[1].sh.rotation.x = 0.6; e.holder.updateMatrixWorld(true); const gap1 = rig.tome.getWorldPosition(new THREE.Vector3()).distanceTo(palm());
       out.follow = { inHand:rig.tome.parent===rig.arms[1].hand, gap0:+gap0.toFixed(4), gap1:+gap1.toFixed(4) };
+      /* (RS-308) shut, the book is pressed to the palm with the fist round its foot: nothing of the forearm or the leg passes through it, and no
+         round spine stands out of it */
+      e.fight = false; for (let i=0;i<30;i++) m3dPoseHumanoid(rig, 0.7, 0, 0, 0, 0, e); e.holder.updateMatrixWorld(true);
+      { const T = THREE, cl = rig.tome.getObjectByName('tomeClosed'), v = new T.Vector3(), bb = new T.Box3();
+        cl.traverse(o=>{ if (o.isMesh){ o.geometry.computeBoundingBox(); bb.union(o.geometry.boundingBox.clone().applyMatrix4(new T.Matrix4().compose(o.position, o.quaternion, o.scale))); } });
+        const inv = new T.Matrix4().copy(cl.matrixWorld).invert(), hand = rig.arms[1].hand;
+        const into = (root, skipHand)=>{ let n = 0; root.traverse(o=>{ if (!o.isMesh) return; let q = o; while (q && q!==rig.tome && q!==(skipHand ? hand : null)) q = q.parent; if (q) return; const p = o.geometry.attributes.position; for (let i=0;i<p.count;i+=2){ v.fromBufferAttribute(p, i); o.localToWorld(v); if (bb.containsPoint(v.applyMatrix4(inv))) n++; } }); return n; };
+        out.carry = { forearm:into(rig.arms[1].el, true), leg:into(rig.legs[1].hip, false), round:(()=>{ let c = 0; cl.traverse(o=>{ if (o.isMesh && o.geometry.type==='CylinderGeometry') c++; }); return c; })() }; }
       G.gameMode = 0; const fightOw = rsFightNow();
       out.shut = { shut, open, fightOw, defOpen:(()=>{ const e2 = m3dInstance({}, pt); m3dPoseHumanoid(e2.rig, 0.7, 0, 0, 0, 0, e2); return e2.rig.tome.getObjectByName('tomeOpen').visible; })() };
       G.gear.weapon = w0; }
@@ -38,6 +46,7 @@ module.exports = async page=>{
   A(r.blade.o && r.blade.inLeft && r.blade.drawn > 0.4, 'an off-hand blade in the left fist, drawn back as the main hand winds up');
   A(r.tome.o && r.tome.held && r.tome.facesReader > 0.7 && r.tome.handNear < 0.12, 'a tome held open on the off hand, its pages facing the reader');
   A(r.staffTome.o && r.staffTome.staff && r.staffTome.held && !r.staffTome.twoHand, 'a staff and a tome are carried together: '+JSON.stringify(r.staffTome));
+  A(r.carry.forearm===0 && r.carry.leg===0 && r.carry.round===0, 'the shut book is pressed to the palm, clear of the forearm and the leg, with a flat spine: '+JSON.stringify(r.carry));
   A(r.follow.inHand && Math.abs(r.follow.gap1 - r.follow.gap0) < 0.002, 'the tome goes where the arm goes: '+JSON.stringify(r.follow));
   A(r.shut.shut.closed && !r.shut.shut.open && r.shut.shut.arm > -0.5 && r.shut.shut.upright > 0.95 && r.shut.open.open && !r.shut.open.closed && r.shut.open.arm < -0.6 && r.shut.open.z > r.shut.shut.z + 0.05 && !r.shut.fightOw && r.shut.defOpen, 'the tome shuts and stands in the hanging hand by its bottom edge out of a fight (RS-302: its page edges up), opens out in the hand in one: '+JSON.stringify(r.shut));
   A(Math.abs(r.edge.main + Math.PI/2) < 0.01 && Math.abs(r.edge.off + Math.PI/2) < 0.01 && r.edge.hilt > 0.02, 'RS-296: blades edge-forward in both hands, slid up so the fist is on the grip');
