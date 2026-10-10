@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-315 - The Peddler on the Road, and a Map You Can Search
+
+- **Wandering merchants look like merchants.** A roamer that will turn out to be a merchant is now a merchant from the moment it appears, not a monster that becomes one when you walk into it. It walks the land as a traveller in a wide felt hat and a green road coat, leaning on a gnarled walking stick, with a tall peddler's pack on its back: a red bedroll on top, a cooking pot and a lit lantern swinging from its sides.
+- **A green purse, not crossed swords.** Over a merchant's head floats a green coin purse in place of the red crossed swords, with a green ring at its feet. On the world map it's a green coin, and a green dot on the minimap. The odds of meeting one haven't changed.
+- **Search the world map.** The map has a search box. Type a name (a town, a landmark, a forest, a lake, an island, a road, a point of interest, a mythic beast, one of your own pins) or a kind of place ("dungeon", "village", "lake") and everything you've discovered that matches is ringed in gold, with its name over it. Anything off-screen gets an arrow at the edge pointing its way.
+- **Jump to what you find.** The matches are listed under the box, nearest first, with how far away each is and in which direction. Click one, or press Enter to step through them (Shift+Enter goes back), to centre the map on it. Places you haven't discovered stay hidden.
+
 ## RS-314 - Wait for It
 
 - **Space waits a turn.** In dungeons and fights, Space now lets a turn go by where you stand: the monsters take theirs, and the traps move on.
