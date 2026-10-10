@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| bladewalk | Click-to-move crosses a swinging blade that guards the only way, and keeps walking if it catches you; goes round it when it can |
 | clicksure | A click always works in a fight (the monsters' answer is hurried, held HUD buttons are not redrawn); no water inside the boat |
 | shore | RS-105 to 117, RS-311: water stays on the water; a sea or lake shore is a beach that slopes into the water, land corners out in the sea are rounded off, the middle of every land tile stays dry, river banks stay low; waterfalls flow |
 | sitrobe | RS-310: a robe bottom on a seated figure folds onto the lap over the thighs, falls from the knees, stays above the ground, and takes its own shape again on standing - on six race and sex combinations |

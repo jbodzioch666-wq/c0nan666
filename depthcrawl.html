@@ -36833,7 +36833,10 @@ function isoPassable(x, y){ const t = tileAt(x, y); return t!==undefined && t!==
 const ISO_STOP_TILES = [T_STAIRSD, T_STAIRSU, T_EXIT, T_FLEE, T_TRAP, T_VAULT, T_CORRUPT_CHEST];
 function isoCrossable(x, y){ return isoPassable(x, y) && !ISO_STOP_TILES.includes(tileAt(x, y)) && !dgAvoid(x, y); }
 // breadth-first path to (tx,ty), or to a tile beside it when it's a monster
-function isoFindPath(tx, ty, toAdjacent){
+// (RS-313) the safe way round a blade or lava if there is one; if not - a blade across the only corridor - straight through it
+function isoFindPath(tx, ty, toAdjacent){ return isoFindPath0(tx, ty, toAdjacent, false) || isoFindPath0(tx, ty, toAdjacent, true); }
+function isoRiskOk(x, y){ return isoPassable(x, y) && !ISO_STOP_TILES.includes(tileAt(x, y)) && !(G.gameMode===1 && G.dungeonDeco && G.dungeonDeco[x] && G.dungeonDeco[x][y]==='ldoor' && !skHave('dkey')); }
+function isoFindPath0(tx, ty, toAdjacent, risky){
   const p = G.player, key = (x,y)=>y*COLS+x, prev = new Map(), q = [[p.x, p.y]];
   prev.set(key(p.x,p.y), null);
   const occupied = (x,y)=> G.mon.some(m=>m.alive && m.x===x && m.y===y);
@@ -36843,7 +36846,7 @@ function isoFindPath(tx, ty, toAdjacent){
     if (done){ const out = []; let c = [x,y]; while (c && !(c[0]===p.x && c[1]===p.y)){ out.unshift(c); c = prev.get(key(c[0],c[1])); } return out; }
     for (const [dx,dy] of DIR8){ const nx = x+dx, ny = y+dy, kk = key(nx,ny);
       const end = !toAdjacent && nx===tx && ny===ty;
-      if (prev.has(kk) || !(end ? isoPassable(nx,ny) : isoCrossable(nx,ny)) || occupied(nx,ny) || !diagClear(x, y, dx, dy, isoPassable)) continue;
+      if (prev.has(kk) || !(end ? isoPassable(nx,ny) : risky ? isoRiskOk(nx,ny) : isoCrossable(nx,ny)) || occupied(nx,ny) || !diagClear(x, y, dx, dy, isoPassable)) continue;
       prev.set(kk, [x,y]); q.push([nx,ny]); }
     if (prev.size > COLS*ROWS) break;
   }
@@ -36922,6 +36925,10 @@ function isoStartMine(x, y){
 }
 function isoTickPath(now){
   if (G.ui!=='playing' || G.gameOver){ ISO.path = []; ISO.fighting = null; return; }
+  if (ISO.inTick) return;   /* (RS-313) a frame drawn inside a step (a slow one) never starts the next step on top of it */
+  ISO.inTick = true; try{ isoTickPath0(now); } finally { ISO.inTick = false; }
+}
+function isoTickPath0(now){
   if (!ISO.path.length){ isoTickFight(now); return; }
   if (now < ISO.nextStep) return;
   { const t = ISO.target || ISO.fighting; if (t && t.alive && rangedReachIdx(t) >= 0){ ISO.path = []; ISO.fighting = t; ISO.target = null; ISO.nextStep = now; isoTickFight(now); return; } }   // (in range: stand and shoot)
@@ -36929,8 +36936,9 @@ function isoTickPath(now){
   const p = G.player, [nx, ny] = ISO.path.shift(), dx = nx-p.x, dy = ny-p.y;
   if (Math.max(Math.abs(dx), Math.abs(dy))!==1){ ISO.path = []; return; }
   const map0 = G.map, hp0 = p.hp, near = m=>m.alive && Math.abs(m.x-p.x)+Math.abs(m.y-p.y)===1, adj0 = G.mon.filter(near);
+  const trap = dgAvoid(nx, ny);
   isoStep([dx, dy]);
-  if (G.map!==map0 || p.x!==nx || p.y!==ny || p.hp<hp0){ ISO.path = []; ISO.mineAt = null; return; }
+  if (G.map!==map0 || p.x!==nx || p.y!==ny || p.hp<hp0 && !(trap && p.hp >= effMaxHp()*0.2)){   /* (RS-313: a blade you chose to cross doesn't stop you on it, unless it leaves you badly hurt) */ ISO.path = []; ISO.mineAt = null; return; }
   if (!ISO.path.length && ISO.mineAt){ const v = ISO.mineAt; ISO.mineAt = null; if (Math.max(Math.abs(v.x-p.x), Math.abs(v.y-p.y))<=1) isoStartMine(v.x, v.y); return; }
   const tgt = ISO.target;
   if (tgt && tgt.alive && Math.abs(tgt.x-p.x)+Math.abs(tgt.y-p.y)===1 && !ISO.path.length){
@@ -37194,7 +37202,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-312';
+const GAME_VERSION = 'rs-313';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-313 - Through the Blades
+
+- **Click-to-move crosses a swinging blade when it has to.** A blade across the only corridor used to leave click-to-move with no way through. Now the path still goes round a blade (or lava) when there's another way, but takes you straight across when there isn't.
+- **A blade doesn't stop you halfway.** Being caught by a blade you're crossing no longer cuts the walk short on the trap tile; you keep going, unless it leaves you badly hurt.
+- **Locked iron doors still need their key.**
+- **Steps never trip over each other.** On a slow frame, click-to-move could start a second step before the first had finished, then lose track and stop. Each step now finishes first.
+
 ## RS-312 - Every click counts
 
 - **No more dead clicks in a fight.** Attacking, casting, shooting or moving while the monsters' answer was still on its way used to do nothing. Now their answer lands at once and your action goes straight through.
