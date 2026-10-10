@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-307 - The Curses, Checked
+
+- **Saps and Leeches don't stack.** As in RuneScape, turning on a Leech curse switches off the Sap curses, and a Sap switches off the Leeches. Turmoil now switches off the Saps as well as the Leeches. Before, all three Saps could run beside every Leech for extra armour.
+- **What still goes together:** the Saps with each other, the Leeches with each other, any Deflect with Soul Split, Protect Item or Turmoil.
+- **The two books never mix.** A normal prayer left on the quick bar from before you turned to the Curses (or the other way round) no longer turns on; it tells you to change books at an altar.
+
 ## RS-306 - Mystic Will and Rock Skin Together
 
 - **Magic and ranged prayers no longer switch everything else off.** A bug meant that turning on Mystic Will, Mystic Lore, Mystic Might, Sharp Eye, Hawk Eye or Eagle Eye turned off every other prayer you had on, and turning anything on afterwards turned them off. Now they only replace the prayers they really clash with: the attack and strength prayers, and each other. You can pray Mystic Will with Rock Skin, Rapid Heal, Protect Item or a protection prayer.
