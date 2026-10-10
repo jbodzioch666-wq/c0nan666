@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| offhand | RS-295: an off-hand blade in the left fist (held ready, drawn back with the main hand), a tome held to read, shields unchanged; hair under a helmet stays inside it |
 | mhead | RS-294: sculpted monster heads (golem, fish-man, mind flayer, umber hulk with moving mandibles, gnoll and jackal with a hinged jaw, bugbear, yeti, kobold, lizardfolk); dragonborn helmets sit on the skull, the cowl opens for the snout, the crest stays under a helmet |
 | skirt | RS-288: a woman's tunic skirt and robe bottom stay outside the garment's hips at every height and angle, in every build, over plate, cloth or no legs |
 | cloak | RS-282: a cloak hanging from both shoulders in folds, clear of the pauldrons, with cord and brooches, swaying with the stride; kite shields (curved, rimmed, riveted, a cross) point down for emblem bearers and metal kiteshields; round shields stay round |

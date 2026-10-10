@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-295 - Off-hand weapons on your model, and hair under helmets
+
+- **Your off-hand weapon shows.** An off-hand dagger, sword or scimitar was never put on your model, so a dual-wielder looked empty-handed on one side. It is now held in your left fist: ready at guard, drawn back as your main hand winds up, and cutting in behind it.
+- **So does a spell tome:** held up in the off hand to read from, glowing faintly on the finer ones. Shields are unchanged, and nothing shows in the off hand while you have a bow drawn.
+- **Hair stays under a helmet.** Under a helmet your hair was a ball a little larger than the inside of the helmet, so it poked out at the back and sides; it showed most on wood elves, whose narrow heads are pinched in at the sides. It is now a cap that fits inside.
+
 ## RS-294 - Monster heads, and helmets that fit a dragonborn
 
 The last heads still built from boxes and balls are sculpted, to the same standard as the dragonborn's.
