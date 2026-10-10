@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## RS-304 - Two Quick Bars, Food You Can See
+
+- **A second quick bar.** There are now two quick bars of nine slots: the first on keys 1-9, the second on Shift + 1-9. Both are up from the start, even when empty, and you can drag things between them.
+- **Across or down.** Each bar has a small turn button at its end to run it across or down, and Settings has the same choice. A bar running down stands at the right edge under the minimap. Either bar can be switched off in Settings.
+- **Prayers on the quick bar.** The prayer page (N) has a star on every prayer, like the spellbook's, that puts it on a quick bar. Its key turns the prayer on and off.
+- **On a phone** the quick bars sit above the d-pad and its camera buttons instead of covering them.
+- **Food you can see.** The bag's Food tab shows your fish and meat as pictures with counts: cooked food to eat (tap it), raw food to cook. Cooked food now looks cooked, browned with grill marks, while raw fish looks pale and raw meat red and marbled.
+- **The Peddler's shop front.** The fruit stall has moved off the front of the Peddler's shop to the grass past its corner, so you can see the door and windows.
+
 ## RS-303 - The Tome Stays in Your Hand
 
 - **The tome follows your arm.** The book used to be placed once per frame and then left behind when the walk, an idle stretch or a swing moved the arm afterwards, so it floated where the hand had been. It's now held by the hand itself and goes wherever the arm goes, open or shut.

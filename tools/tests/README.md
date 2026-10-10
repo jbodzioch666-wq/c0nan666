@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| qbars | RS-304: two quick bars up by default (1-9 and shift + 1-9), each across or down, either switched off in Settings; the prayer page's stars put prayers on them |
 | bagtabs | RS-298: I opens the stats beside the equipment, centred; the bag under the figure in tabs (all, gear, food, scrolls, resources, junk) with the old inventory's search, sort, buttons and details; P is the stats alone |
 | drape | RS-297: a cloak drapes over a wood elf's and half-orc's hump instead of through it; a shield sits against the knuckles; a tome rests on the left palm, pages tipped up; the land is named under the clock bar |
 | stairclick | RS-297: a click anywhere on a drawn staircase (treads, risers, sides) picks the stairs from every camera turn, and walking there takes them |

@@ -93,6 +93,10 @@ module.exports = async page=>{
   });
   out.dungeon = { iso:d.iso, rot:d.rot }; A(d.iso, 'the dungeon view'); A(d.rot==='flex', 'camera buttons in the dungeon');
   const rb = await page.evaluate(()=>{ const r = document.querySelector('.padx [data-rot=x]').getBoundingClientRect(); return [r.left + r.width/2, r.top + r.height/2]; });
+  /* (RS-304) the quick bars stand above the d-pad and its camera buttons, not over them */
+  out.qbClear = await page.evaluate(()=>{ const pads = [...document.querySelectorAll('.controls .pad, .padx')].map(e=>e.getBoundingClientRect()).filter(r=>r.width);
+    return ['quickBar','quickBar2'].map(id=>document.getElementById(id)).filter(e=>e && getComputedStyle(e).display!=='none').every(e=>{ const q = e.getBoundingClientRect(); return pads.every(r=>q.bottom <= r.top + 1 || q.top >= r.bottom - 1 || q.right <= r.left + 1 || q.left >= r.right - 1); }); });
+  A(out.qbClear, 'the quick bars keep clear of the d-pad');
   await tap(rb[0], rb[1]); out.rot = await page.evaluate(()=>ISO.rot); A(out.rot!==d.rot0, 'the camera turns');
   // RS-112: windows can be dragged by touch - the handles claim the touch (no page pan), and a cancelled drag lets go
   const dr = await page.evaluate(async ()=>{
