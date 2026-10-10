@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-306 - Mystic Will and Rock Skin Together
+
+- **Magic and ranged prayers no longer switch everything else off.** A bug meant that turning on Mystic Will, Mystic Lore, Mystic Might, Sharp Eye, Hawk Eye or Eagle Eye turned off every other prayer you had on, and turning anything on afterwards turned them off. Now they only replace the prayers they really clash with: the attack and strength prayers, and each other. You can pray Mystic Will with Rock Skin, Rapid Heal, Protect Item or a protection prayer.
+
 ## RS-305 - Robes Meet at the Belt
 
 - **Robe top and robe bottom flow into one.** The robe top is now a bodice that ends in a flat hem at the belt line, with no pelvis or seat of its own. It used to carry the whole lower body, so it hung over the robe bottom's waist like a sagging bottom, with the sash half way down it. The robe bottom's waist now rises to the belt and takes the exact oval of the bodice's hem, so the two meet in one line under the sash on every race, man or woman.

@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| praymix | RS-306: which prayers go together - a ranged or magic prayer clashes only with attack and strength prayers and with each other, not with the skins, Rapid Heal, Protect Item or the protections |
 | beltline | RS-305: a robe top is a bodice ending flat at the belt line and the robe bottom's waist rises to meet it with the same oval, under the sash, on every race and both sexes; a one-piece robe and a robe top over plate legs too |
 | qbars | RS-304: two quick bars up by default (1-9 and shift + 1-9), each across or down, either switched off in Settings; the prayer page's stars put prayers on them |
 | bagtabs | RS-298: I opens the stats beside the equipment, centred; the bag under the figure in tabs (all, gear, food, scrolls, resources, junk) with the old inventory's search, sort, buttons and details; P is the stats alone |
