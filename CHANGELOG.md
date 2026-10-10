@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-317 - Steady Windows, One World Map
+
+- **Windows stay under your pointer.** Dragging the quest window used to feel floaty: it eased along behind the pointer, and once placed it was tugged toward its old spot every frame and slid back. Every window you drag now follows the pointer exactly and stays exactly where you drop it.
+- **The same world map in town.** Opening the map (M) inside a town used to give a smaller square map with the town's minimap still over it. It's now the same full-window map as outside, the minimap steps aside while it's open, and the hotbar has the map button in towns too.
+- **The quest tracker is readable.** A finished quest's name was pale green and the direction arrows glowing yellow, both on cream parchment. They're now dark green and dark rust.
+- **Search altars and dig sites.** The map search now finds runecrafting altars you've seen ("altar", "fire altar", even "alter"), and dig sites answer to "excavation" and "archaeology". Other places answer to other words too: "farm" for a hamlet, "lookout" for a view, "stone circle" for standing stones.
+- **Every colour on the bounty board passes.** The ink on the job cards is now darkened until it reads at 4.5:1 or better whatever its colour, so a green level reads as well as a red one.
+
 ## RS-316 - Ink on the Bounty Board
 
 - **The bounty board is readable.** The job cards are cream parchment, but their rewards, difficulty, foe level and "legendary pick" were drawn in the pale yellows meant for the dark panels, and all but vanished. They're now in dark ink: rewards in deep brown, "legendary pick" in burnt orange, and the difficulty and level colours darkened to inks of the same hue, so "Hard" is still orange-ish and "Very hard" still red, just readable. Everything on the cards now meets a 4.5:1 contrast with the paper.

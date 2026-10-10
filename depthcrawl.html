@@ -830,6 +830,7 @@
   @media (max-width: 760px){ #miniMap{ top:8px; width:128px; height:128px; right:8px; } }
   /* ---- dragged windows and the log's grip ---- */
   .moved{ transform-origin:top left !important; margin:0 !important; }
+  .dragging, .moved{ transition:none !important; }   /* (RS-317: a dragged window follows the pointer exactly - no easing behind it) */
   .dragging{ opacity:0.85; box-shadow:0 0 0 2px #ffd070, 0 8px 24px rgba(0,0,0,0.6) !important; }
   .rsz{ position:absolute; right:0; bottom:0; width:16px; height:16px; cursor:nwse-resize; z-index:5; touch-action:none;
     background:linear-gradient(135deg, transparent 0 45%, #a08050 45% 52%, transparent 52% 64%, #a08050 64% 71%, transparent 71% 83%, #a08050 83% 90%, transparent 90%); opacity:0.75; }
@@ -865,6 +866,7 @@
   .qoffer .qrepbar{ background:rgba(74,42,8,0.18); box-shadow:inset 0 0 0 1px rgba(74,42,8,0.25); } .qoffer .qrepbar i{ background:linear-gradient(90deg,#8a5a1a,#c08a2a); }
   #qtrack .qt-q{ background:linear-gradient(180deg, rgba(239,227,194,0.95), rgba(220,201,156,0.95)); border:1px solid #8a6a3a; color:#3a2814; }
   #qtrack .qt-q .qt-n{ color:#4a2a08; } #qtrack .qt-q .qt-o, #qtrack .qt-q .qt-d{ color:#5a4428; } #qtrack .qt-q.on{ box-shadow:0 0 0 2px #e8b040; }
+  #qtrack .qt-q.ready .qt-n{ color:#1e5a1a; } #qtrack .qt-q .qt-ar{ color:#7a3a00; filter:drop-shadow(0 0 1px rgba(255,236,190,0.9)); } #qtrack .qt-q .qt-d{ font-weight:700; }   /* (RS-317: dark ink on the parchment, not pale green and yellow) */
   #qtrack .qt-grave{ background:linear-gradient(180deg, rgba(200,204,214,0.95), rgba(160,166,178,0.95)); } #qtrack .qt-grave .qt-n{ color:#1a2030; }
   .dh-plate, #xpTracker{ background:linear-gradient(180deg, rgba(34,29,23,0.9), rgba(20,17,14,0.9)) !important; border:1px solid #6a5236 !important; }
   /* ---- smooth UI ---- */
@@ -9628,8 +9630,11 @@ function parchInk(col){
   const m = /^#([0-9a-f]{6})$/i.exec(String(col||'')); if (!m) return col;
   const n = parseInt(m[1], 16), r = (n>>16)/255, g = (n>>8&255)/255, b = (n&255)/255, mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx+mn)/2, d = mx-mn;
   let h = 0, sat = 0; if (d){ sat = d/(1 - Math.abs(2*l - 1)); h = mx===r ? ((g-b)/d) % 6 : mx===g ? (b-r)/d + 2 : (r-g)/d + 4; h *= 60; if (h < 0) h += 360; }
-  const L = h > 40 && h < 75 ? 0.22 : 0.3;   /* (yellows need to go darker still to read as ink) */
-  return `hsl(${Math.round(h)},${Math.round(Math.min(1, sat)*85)}%,${Math.round(Math.min(l, L)*100)}%)`;
+  const S = Math.min(1, sat)*0.85, lin = v=>v <= 0.03928 ? v/12.92 : Math.pow((v+0.055)/1.055, 2.4);
+  const lumOf = L=>{ const c = (1 - Math.abs(2*L - 1))*S, x = c*(1 - Math.abs((h/60) % 2 - 1)), m0 = L - c/2, k = Math.floor(h/60) % 6;
+    const [r1, g1, b1] = [[c,x,0],[x,c,0],[0,c,x],[0,x,c],[x,0,c],[c,0,x]][k]; return 0.2126*lin(r1+m0) + 0.7152*lin(g1+m0) + 0.0722*lin(b1+m0); };
+  let L = Math.min(l, 0.34); while (L > 0.08 && lumOf(L) > 0.11) L -= 0.01;   /* (dark enough for 4.5:1 or better against the cream paper, whatever the hue) */
+  return `hsl(${Math.round(h)},${Math.round(S*100)}%,${Math.round(L*100)}%)`;
 }
 function questSizeHtml(q){
   let z; try { z = questSizeUp(q); } catch(e){ return ''; }
@@ -10283,7 +10288,7 @@ window.addEventListener('pointerup', dragEnd);
 window.addEventListener('pointercancel', dragEnd);   // (RS-112)
 // ---- minimap on the overworld and in towns ----
 function mmBox(){ const phone = (()=>{ try{ return window.innerWidth < 760 || document.body.classList.contains('touch'); }catch(e){ return false; } })(); return phone ? { top:8, size:128 } : { top:56, size:160 }; }
-function miniMapOn(){ return !!(G.player && G.ui==='playing' && !G.gameOver && !SET.compact && document.body.classList.contains('immersive') && ((G.gameMode===0 && !G.owZoomedOut) || G.gameMode===3)); }
+function miniMapOn(){ return !!(G.player && G.ui==='playing' && !G.gameOver && !SET.compact && document.body.classList.contains('immersive') && ((G.gameMode===0 || G.gameMode===3) && !G.owZoomedOut)); }
 const MM = { t:0, key:'' };
 function renderMiniMap(){
   let cv = document.getElementById('miniMap');
@@ -16020,6 +16025,7 @@ function questScreenAngle(t){
 // the quest list sits under the top-right buttons, and drops below the stats drawer while it is open
 function qtPlace(el){
   el = el || document.getElementById('qtrack'); if (!el) return;
+  if (LAYOUT.quest && LAYOUT.quest.x!==undefined){ if (!el.classList.contains('dragging')) applyMoved('quest'); el.style.maxHeight = Math.max(120, window.innerHeight - el.getBoundingClientRect().top - 20) + 'px'; el.style.overflowY = 'auto'; return; }   /* (RS-317: a window you've placed stays exactly where you put it - no tug back to the default spot each frame) */
   let top = fp3dActive() ? 300 : (miniMapOn() ? mmBox().top + (mmBox().size + 6)*(SET.uiScale||1) : 58);
   const hud = document.body.classList.contains('dh-panels') && document.body.classList.contains('immersive') && document.querySelector('.hud');
   if (hud && hud.offsetHeight) top = Math.max(top, hud.offsetTop + hud.offsetHeight + 10);
@@ -16973,7 +16979,7 @@ function applyLayoutClass(){
   G._layoutKey = null;
 }
 // the layout the canvas was last sized for - re-sized whenever it changes
-function pmFullWindow(){ return G.gameMode===0 && !!G.owZoomedOut; }
+function pmFullWindow(){ return owMapOpen(); }   /* (RS-317: from a town too - the same full-window map as outside) */
 function layoutKey(){ return immersiveUi ? ('imm|'+((fp3dActive() || v3Active() || o3Active() || pmFullWindow())?'3d':'sq')+'|'+window.innerWidth+'x'+window.innerHeight) : 'classic'; }
 function setupCanvas(){
   const wrap = canvas.parentElement;
@@ -18279,6 +18285,7 @@ function mapToolsHtml(r){
 // ---- (RS-315) search the map: every named thing you've discovered - towns, sites, landmarks, points of interest, the names of the
 // land, islands, roads, your pins and rich spots - matched by name or by kind, ringed in gold on the map and listed to jump to ----
 const MAP_SITE_WORD = { [OW_DUNGEON]:'dungeon', [OW_CASTLE]:'castle', [OW_NECROTOWER]:'necro tower', [OW_TEMPLE]:'sunken temple', [OW_GRAVEYARD]:'graveyard', [OW_MINE]:'mine', [OW_LAIR]:'dragon lair', [OW_PYRAMID]:'pyramid' };   // (the legend's words)
+const MAP_POI_WORDS = { digsite:'dig site excavation archaeology', hamlet:'farm', view:'lookout tower', cave:'cavern', grotto:'cave', ruin:'ruins', stones:'stone circle', well:'wishing well', oldcamp:'camp' };   /* (RS-317: other words for each kind) */
 function mapSearchIndex(){
   const now = performance.now(), C = mapSearchIndex.c; if (C && now - C.t < 1500 && C.w===G.ow) return C.list;
   const list = [], geo = owGeo(), add = (nm, what, x, y, kw)=>{ if (nm) list.push({ nm:cap(String(nm)), what, x, y, kw:kw||'' }); };
@@ -18286,7 +18293,8 @@ function mapSearchIndex(){
     if (t===OW_TOWN) add(o3TownName(x, y), 'town', x, y, 'village'); else add(MAP_SITE_WORD[t] || String(OW_SITE_NAME[t] || owSiteKind(t) || 'site').replace(/^an? /, ''), 'site', x, y, String(OW_SITE_NAME[t]||'')); }
   for (const b of G.ow.mythicBeasts||[]) if (!b.slain && (G.ow.mythicFound||{})[b.i]) add(b.name, 'mythic ' + mythicKind(b), b.x, b.y);
   for (const lm of geo.landmarks||[]) if (owSeen(lm.x, lm.y)) add(lm.name, 'landmark', lm.x, lm.y);
-  for (const p of G.ow.pois||[]) if (owSeen(p.x, p.y)) add(p.name, (POI_TITLE[p.k]||'place').toLowerCase(), p.x, p.y);
+  for (const p of G.ow.pois||[]) if (owSeen(p.x, p.y)) add(p.name, (POI_TITLE[p.k]||'place').toLowerCase(), p.x, p.y, MAP_POI_WORDS[p.k]);
+  try{ for (const [k, type] of rcAltars()){ const x = Math.floor(k/4096), y = k % 4096; if (owSeen(x, y)) add(type + ' altar', 'runecrafting altar', x, y, 'rune altar alter runecrafting'); } }catch(e){}   /* (RS-317) */
   for (const pl of geo.places||[]){ const l = (pl.labels||[]).find(([lx, ly])=>owSeen(lx, ly)); if (l) add(pl.name, pl.kind, l[0], l[1]); }
   for (const i of G.ow.islands||[]) if (owSeen(i.cx, i.cy)) add(i.name, 'island', i.cx, i.cy);
   for (const r of G.ow.roads||[]) if (r.name && owSeen(r.lx, r.ly)) add(r.name, 'road', r.lx, r.ly);
@@ -23884,7 +23892,7 @@ function renderImmersiveHud(){
     slot('I', im(obEntry('chest',{gold:true})), 'equipment and bag', G.inv.length||'', 'sep'),
     slot('P', im(obEntry('armor',{kind:'chest', metal:'#9aa3a8'})), 'character stats', ''),
     slot('B', im(monsterPortraitFor('skeleton', true)), 'bestiary', '', 'minor'),
-    G.gameMode===0 ? slot('M', hbIcon('map'), G.owZoomedOut ? 'back to the land' : 'world map', '', 'minor') : '',
+    G.gameMode===0 || G.gameMode===3 ? slot('M', hbIcon('map'), G.owZoomedOut ? 'back to the land' : 'world map', '', 'minor') : '',
     slot('C', im(obEntry('flame')), 'camp', '', 'minor'),
     (()=>{ const o = skOptions()[0], gk = G.gather ? 'stop' : !o ? 'hand' : { mining:'pick', woodcutting:'axe', fishing:'rod', foraging:'herb', cooking:'pot', firemaking:'flame' }[o.k] || 'hand';
       return slot('E', hbIcon(gk, gk==='herb' && o && o.node ? { col:SK_HERB_COL[(skNodeAt(o.node.x,o.node.y)||{}).type] } : null), G.gather ? 'stop '+G.gather.o.label.toLowerCase() : o ? o.label : 'nothing to gather here', '', G.gather ? '' : o ? '' : 'off', '', G.gather ? { sweep:{ dur:1400, el:clamp(1400-(G.gather.next-performance.now()), 0, 1399) } } : null); })(),
@@ -37363,7 +37371,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-316';
+const GAME_VERSION = 'rs-317';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

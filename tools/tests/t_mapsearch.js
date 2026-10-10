@@ -18,6 +18,10 @@ module.exports = async page=>{
     if (unseen){ mapSearchSet(unseen.nm); out.hidden = !mapSearchHits().some(h=>h.x===unseen.x && h.y===unseen.y); }
     // by kind: 'town' finds every town you've seen and no other
     mapSearchSet('town'); const th = mapSearchHits().filter(h=>h.what==='town'); out.kind = th.length===towns.filter(t=>owSeen(t.x, t.y)).length;
+    // (RS-317) a runecrafting altar and a dig site, once seen, are found by what they are - even spelt 'alter', or called an excavation
+    { const [k] = rcAltars().keys(), ax = Math.floor(k/4096), ay = k % 4096; owReveal(ax, ay, 1); mapSearchIndex.c = null;
+      mapSearchSet('altar'); out.altar = mapSearchHits().some(h=>h.x===ax && h.y===ay); mapSearchSet('alter'); out.alter = mapSearchHits().some(h=>h.x===ax && h.y===ay); }
+    { const d = (G.ow.pois||[]).find(p=>p.k==='digsite'); if (d){ owReveal(d.x, d.y, 1); mapSearchIndex.c = null; mapSearchSet('excavation'); out.dig = mapSearchHits().some(h=>h.x===d.x && h.y===d.y); } else out.dig = 'none'; }
     // jump to one: the map centres on it
     mapSearchSet(seen.nm); mapSearchGo(0); out.jump = G.owZoomCenter.x===seen.x && G.owZoomCenter.y===seen.y;
     // typing in the box doesn't work the game's keys (M would shut the map)
@@ -38,6 +42,8 @@ module.exports = async page=>{
   if (r.have.unseen && !r.hidden) throw new Error('a town you have not discovered is not found');
   if (!r.kind) throw new Error('searching a kind finds every one you have seen');
   if (!r.siteWord) throw new Error('a site is found by the legend word for it');
+  if (!r.altar || !r.alter) throw new Error('a seen altar is found as altar or alter '+JSON.stringify(r));
+  if (!r.dig) throw new Error('a seen dig site is found as an excavation');
   if (!r.jump) throw new Error('picking a result centres the map on it');
   if (!r.stillOpen) throw new Error('typing in the search box does not work the game keys');
   if (r.merch.party!==0 || r.merch.opened!=='merchant' || !r.merch.fig || !r.merch.art) throw new Error('the wandering merchant '+JSON.stringify(r.merch));

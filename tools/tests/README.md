@@ -25,6 +25,8 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| dragfirm | A dragged window follows the pointer exactly and stays where it's dropped (no easing, no tug back) |
+| townmap | The world map opened in a town fills the window like outside, hides the town minimap, and has its hotbar slot |
 | boardink | The bounty board's parchment cards use dark ink for rewards, difficulty and level (contrast at least 4.5:1) |
 | mapsearch | The world map's search box finds discovered places by name or kind, rings and lists them, and hides undiscovered ones; a wandering merchant is a merchant from first sight |
 | bladewalk | Click-to-move crosses a swinging blade that guards the only way, waiting a turn when the blade is down; Space waits a turn; goes round when it can |
