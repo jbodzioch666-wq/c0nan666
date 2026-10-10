@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-318 - Compact Mode on a Phone
+
+- **A button for Y.** Compact mode, which hides everything but the orbs and the hotbar, was keyboard-only. The hotbar now has a Y button for it, so a phone can switch it on and off. The button stays on the bar in compact mode, so the full HUD is always one tap away.
+
 ## RS-317 - Steady Windows, One World Map
 
 - **Windows stay under your pointer.** Dragging the quest window used to feel floaty: it eased along behind the pointer, and once placed it was tugged toward its old spot every frame and slid back. Every window you drag now follows the pointer exactly and stays exactly where you drop it.

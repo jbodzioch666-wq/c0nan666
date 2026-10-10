@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| compactbtn | On a phone the hotbar has a button for Y (compact mode on and off), still there in compact mode |
 | dragfirm | A dragged window follows the pointer exactly and stays where it's dropped (no easing, no tug back) |
 | townmap | The world map opened in a town fills the window like outside, hides the town minimap, and has its hotbar slot |
 | boardink | The bounty board's parchment cards use dark ink for rewards, difficulty and level (contrast at least 4.5:1) |
