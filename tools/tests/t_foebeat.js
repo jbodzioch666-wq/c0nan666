@@ -11,11 +11,11 @@ module.exports = async page=>{
     const hp0 = P.hp, mhp0 = m.hp; m._atkT = 0;   /* (its swing time: set when it strikes, hit or miss - a strike can miss on any roll) */
     tryMove(1, 0);
     out.afterBlow = { mon:m.hp < mhp0 || true, playerHit:!!m._atkT, pending:foePending() };
-    // pressing again before their answer does nothing
-    const mh1 = m.hp; tryMove(1, 0); out.blocked = m.hp===mh1 && foePending();
-    await wait(800); out.stillWaiting = foePending() && !m._atkT;
-    await wait(600); out.playerHitAfter = !!m._atkT; out.pendingAfter = foePending();
-    // (RS-219) a bow shot: the shot is yours at once, the monsters' turn a beat later; you can't shoot again meanwhile
+    // (RS-312) pressing again before their answer is never lost: their answer lands at once, then your blow, and a new beat starts
+    tryMove(1, 0); out.hurried = { theirs:!!m._atkT, pending:foePending() }; m._atkT = 0;
+    out.beatLeft = (G.foeAt||0) - performance.now(); out.stillWaiting = foePending() && !m._atkT && out.beatLeft > 800;   /* (read off the beat itself: soft rendering can stretch a wait) */
+    while (performance.now() < (G.foeAt||0) + 300) await wait(100); out.playerHitAfter = !!m._atkT; out.pendingAfter = foePending();
+    // (RS-219) a bow shot: the shot is yours at once, the monsters' turn a beat later; shooting again brings their answer at once (RS-312)
     { G.gear.ranged = rsMakeBow(0, false); const keep = [rangedVolley, rangedAmmoN, rangedPick]; let shots = 0;
       rangedVolley = ()=>{ shots++; }; rangedAmmoN = ()=>50; rangedPick = ()=>'bow';
       m.x = P.x + 2; m.y = P.y; if (G.map[m.x][m.y]===T_WALL) G.map[m.x][m.y] = T_FLOOR; const tc = P.turnCount||0;
@@ -37,10 +37,10 @@ module.exports = async page=>{
   console.log(JSON.stringify(r));
   if (!r.defer) throw new Error('deferral is on in a 3D fight');
   if (r.afterBlow.playerHit || !r.afterBlow.pending) throw new Error('their answer waits after your blow '+JSON.stringify(r));
-  if (!r.blocked) throw new Error('you cannot strike again before it lands');
-  if (!r.stillWaiting || !r.playerHitAfter || r.pendingAfter) throw new Error('it lands about 1.1s later, not before 0.8s '+JSON.stringify(r));
+  if (!r.hurried.theirs || !r.hurried.pending) throw new Error('a second press goes through: their answer first, then a new beat '+JSON.stringify(r.hurried));
+  if (!r.stillWaiting || !r.playerHitAfter || r.pendingAfter) throw new Error('it lands about 1.1s later '+JSON.stringify(r));
   if (r.instant.pending || !r.instant.hit) throw new Error('instant when deferral is off');
-  if (!(r.bow && r.bow.shots===1 && r.bow.pending && r.bow.second===1 && !r.bow.after)) throw new Error('a bow shot gets the same beat '+JSON.stringify(r.bow));
+  if (!(r.bow && r.bow.shots===1 && r.bow.pending && r.bow.second===2 && !r.bow.after)) throw new Error('a bow shot gets the same beat '+JSON.stringify(r.bow));
   if (!(r.ac && r.ac.on && r.ac.sp && !r.ac.hitNow && r.ac.pending && r.ac.hitLater && !r.ac.after)) throw new Error('an autocast spell gets the same beat '+JSON.stringify(r.ac));
   if (r.wrapped!==6) throw new Error('every ranged, spell and ability path is wrapped: '+r.wrapped);
   if (r.swingOnTheirBlow!==0) throw new Error('your figure does not swing when the monster hits you: '+r.swingOnTheirBlow);

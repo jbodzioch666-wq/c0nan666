@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-312 - Every click counts
+
+- **No more dead clicks in a fight.** Attacking, casting, shooting or moving while the monsters' answer was still on its way used to do nothing. Now their answer lands at once and your action goes straight through.
+- **Buttons don't slip away.** The HUD, quick bars and side panel redraw constantly in a fight, which could swallow a press between finger-down and finger-up. They now hold still while you're pressing them, so every tap and click lands.
+- **A dry boat.** The boat rode so low that wave tops came up through its floor. It now floats higher, with its floor above the highest wave, and the water is masked out of the hull as a backstop.
+
 ## RS-311 - Beaches
 
 - **Sandy beaches instead of walls.** Where the land meets the sea or a lake it used to stop in a low wall along the tile edges. Now a beach slopes gently down into the water: pale warm sand above the waterline, darker where the waves wet it, and grey shingle on snowy coasts.

@@ -4364,7 +4364,7 @@ function buildSpellPick(){
 // the spellbook (G key): cast a known spell, spending one slot of its level.
 // Paladin's Divine Smite is a special always-available entry that spends
 // ANY slot (not a known spell) - exactly like the real D&D class feature
-function castKnownSpell(knownIdx){ if (foeBusy()) return; return foeBeat(()=>castKnownSpell0(knownIdx)); }   /* (RS-219: the monsters answer a beat after you) */
+function castKnownSpell(knownIdx){ if (!foeHurry()) return; return foeBeat(()=>castKnownSpell0(knownIdx)); }   /* (RS-219: the monsters answer a beat after you) */
 function castKnownSpell0(knownIdx){
   if (G.gameOver) return;
   if (G.player.stunTurns>0){ consumeStunnedTurn(); setUi('playing'); return; }
@@ -4382,7 +4382,7 @@ function castKnownSpell0(knownIdx){
   if (!G.gameOver) foeTurn();
   saveCurrentGame();
 }
-function castDivineSmite(){ if (foeBusy()) return; return foeBeat(()=>castDivineSmite0()); }   /* (RS-219: the monsters answer a beat after you) */
+function castDivineSmite(){ if (!foeHurry()) return; return foeBeat(()=>castDivineSmite0()); }   /* (RS-219: the monsters answer a beat after you) */
 function castDivineSmite0(){
   if (G.gameOver) return;
   if (G.player.stunTurns>0){ consumeStunnedTurn(); setUi('playing'); return; }
@@ -4798,7 +4798,7 @@ function rangedReachIdx(m){
   const mode = rangedPick(), range = mode==='magic' ? 8 : mode==='bow' ? rangedRange(w) : 0;
   return range && d <= range && shotClear(p.x, p.y, m.x, m.y) ? mi : -1;
 }
-function rangedAttack(tgt){ if (foeBusy()) return; return foeBeat(()=>rangedAttack0(tgt)); }   /* (RS-219: the monsters answer a beat after you) */
+function rangedAttack(tgt){ if (!foeHurry()) return; return foeBeat(()=>rangedAttack0(tgt)); }   /* (RS-219: the monsters answer a beat after you) */
 function rangedAttack0(tgt){
   if (G.gameOver) return;
   const tIdx = tgt ? rangedReachIdx(tgt) : -1;
@@ -6690,7 +6690,7 @@ function fireEquippedWandAbility(){
 // the F key: each class's one non-spell feature. Wizard/Warlock's charges
 // field stays unlimited (maxCharges -1 on their CLASSES row) since it's the
 // wand's OWN charge count that actually gates this now, not the player's
-function useAbility(){ if (foeBusy()) return; return foeBeat(()=>useAbility0()); }   /* (RS-219: the monsters answer a beat after you) */
+function useAbility(){ if (!foeHurry()) return; return foeBeat(()=>useAbility0()); }   /* (RS-219: the monsters answer a beat after you) */
 function useAbility0(){
   if (G.gameOver) return;
   if (G.player.stunTurns>0){ consumeStunnedTurn(); return; }
@@ -6842,6 +6842,9 @@ function foePending(){ return !!(G.foeQueue && G.foeQueue.length); }
 // (RS-219) the same beat for a bow shot, a reach attack and every spell or ability: run the action with the monsters' answer
 // held back (foeTurn queues their turn instead of running it), then let it land FOE_DELAY_MS later
 function foeBusy(){ foeTick(); return foePending(); }
+// (RS-312) you act and it happens: if the monsters' answer to your last move is still waiting its beat, it lands now and your
+// action follows straight after - the order of turns is kept, but no click or key is ever thrown away
+function foeHurry(){ if (foePending() && !G.foeFlushing) foeFlush(); return !G.gameOver; }
 function foeTurn(excl){ foeAct(()=>{ if (!G.gameOver) tickMonsters(excl); }); }
 function foeBeat(fn){
   const was = G.deferFoe; G.deferFoe = was || foeDeferOn();
@@ -7157,7 +7160,7 @@ function tryMove(dx,dy){
   for (let i=0;i<G.mon.length;i++) if (G.mon[i].alive && G.mon[i].x===nx && G.mon[i].y===ny){ mi=i; break; }
   if (mi>=0 && dx && dy){ const now = performance.now(); if (!(G.diagWarnT > now - 4000)){ G.diagWarnT = now; logMsg('you can\'t strike from the corner - step beside it', ''); } return; }   // melee is square-on (no turn spent)
   if (mi>=0){
-    foeTick(); if (foePending()) return;   /* (RS-218: their answer to your last blow hasn't come yet) */
+    if (!foeHurry()) return;   /* (RS-218/312: their answer to your last blow lands first) */
     G.deferFoe = foeDeferOn();
     try{
       fight(mi);
@@ -9866,6 +9869,14 @@ function buffList(){
   return out;
 }
 // ===================== SECTION: SIDE PANEL, QUICK BAR, RUN, MENUS =====================
+// (RS-312) a click needs the press and the release on the same button - so while a finger or the mouse is down on the action
+// bar, the quick bars or the side panel, they aren't rebuilt under it (in a fight they change every moment: your life, its life,
+// a cooldown); they catch up the moment the click has gone through
+const UIHOLD = { el:null, t:0 };
+function uiHeld(el){ if (UIHOLD.el && performance.now() - UIHOLD.t > 2500) UIHOLD.el = null; return !!UIHOLD.el && UIHOLD.el===el; }
+document.addEventListener('pointerdown', e=>{ const t = e.target && e.target.closest ? e.target.closest('#dhud, #quickBar, #quickBar2, #sidePanel') : null; if (t){ UIHOLD.el = t; UIHOLD.t = performance.now(); } }, true);
+const uiRelease = ()=>{ if (!UIHOLD.el) return; setTimeout(()=>{ UIHOLD.el = null; try{ if (G.player && (G.ui==='playing' || DOCK_UIS.has(G.ui))) renderGame(); }catch(e){} }, 0); };   /* (after the click has fired) */
+document.addEventListener('pointerup', uiRelease, true); document.addEventListener('pointercancel', uiRelease, true);
 // ---- the RuneScape-style side panel: F1-F6 switch tabs (press the open tab's key to close).
 // It stays open beside a shop or the stash, so you can sell or deposit straight from it ----
 const SP_TABS = [
@@ -9954,7 +9965,7 @@ function renderSidePanel(){
   const html = `<div class="sp-h" data-drag="side" title="drag to move &middot; drag the corner to resize"><span>${t.nm}</span><span class="sp-x" data-sp-close="1" title="close (${t.key})">&times;</span></div>
     <div class="sp-tabs">${SP_TABS.map(x=>`<button class="sp-tab${x.id===tab ? ' on' : ''}" data-sp-tab="${x.id}" title="${x.nm} (${x.key})">${spTabIcon(x.id)}</button>`).join('')}</div>
     <div class="sp-body">${spBody(tab)}</div><span class="rsz" data-resize="side" title="drag to resize"></span>`;
-  if (el._h !== html){ const body = el.querySelector('.sp-body'), sc = body ? body.scrollTop : 0; el.innerHTML = html; el._h = html; const nb = el.querySelector('.sp-body'); if (nb) nb.scrollTop = sc; }
+  if (el._h !== html && !uiHeld(el)){ const body = el.querySelector('.sp-body'), sc = body ? body.scrollTop : 0; el.innerHTML = html; el._h = html; const nb = el.querySelector('.sp-body'); if (nb) nb.scrollTop = sc; }
   if (el.style.display==='none' || !el.style.display){ el.style.display = 'flex'; void el.offsetWidth; el.classList.add('show'); }
 }
 function spInvClick(i){
@@ -10078,7 +10089,7 @@ function renderOneQuickBar(b){
   const html = `<span class="qb-grip" data-drag="${b ? 'qbar2' : 'qbar'}" title="quick bar ${b+1} - drag to move">&#8942;</span>` + q.map((o,i)=>{ const on = o && o.t==='prayer' && (p.prayers||[]).includes(o.id), sel = o && o.t==='spell' && p.rsSpell===o.id, c = o ? qbCount(o) : '';
     return `<div class="qb-slot${o ? '' : ' empty'}${on || sel ? ' on' : ''}${o && c===0 ? ' out' : ''}" data-qb="${i}" title="${o ? esc(qbName(o))+' ('+qbKeyName(b, i)+') - right-click to clear' : 'drag a spell, prayer, potion or food here from the side panel, or use the &#9733; on the spell and prayer pages'}">${o ? qbIcon(o) : ''}<span class="k">${kl(i)}</span>${c!=='' ? `<b>${c}</b>` : ''}</div>`; }).join('')
     + `<span class="qb-rot" data-qbrot="1" title="turn this bar ${vert ? 'across' : 'down'}">${vert ? '&#8644;' : '&#8645;'}</span>`;
-  if (el._h !== html){ el.innerHTML = html; el._h = html; }
+  if (el._h !== html && !uiHeld(el)){ el.innerHTML = html; el._h = html; }
   el.classList.toggle('qb-vert', vert);
   el.style.display = 'flex';
 }
@@ -12238,7 +12249,7 @@ function spearReach(m){
   if (tileAt(mx2, my2)===T_WALL || G.mon.some(o=>o.alive && o.x===mx2 && o.y===my2)) return false;
   return true;
 }
-function reachAttack(m){ if (foeBusy()) return; return foeBeat(()=>reachAttack0(m)); }   /* (RS-219: the monsters answer a beat after you) */
+function reachAttack(m){ if (!foeHurry()) return; return foeBeat(()=>reachAttack0(m)); }   /* (RS-219: the monsters answer a beat after you) */
 function reachAttack0(m){
   const mi = G.mon.indexOf(m); if (mi<0) return;
   const v = FACING_VECT.findIndex(f=>f[0]===Math.sign(m.x-G.player.x) && f[1]===Math.sign(m.y-G.player.y)); if (v>=0) G.player.facing = v;
@@ -14867,7 +14878,7 @@ function rsSpellHit(mi, sp){
   if (m.hp<=0) monsterDies(mi);
   return true;
 }
-function rsCastFromBook(id){ if (foeBusy()) return; return foeBeat(()=>rsCastFromBook0(id)); }   /* (RS-219: the monsters answer a beat after you) */
+function rsCastFromBook(id){ if (!foeHurry()) return; return foeBeat(()=>rsCastFromBook0(id)); }   /* (RS-219: the monsters answer a beat after you) */
 function rsCastFromBook0(id){
   const p = G.player, sp0 = rsSpell(id), meta0 = (sp0 && sp0[7]) || {};
   if (meta0.k==='self'){ setUi('playing'); if (p.stunTurns>0){ consumeStunnedTurn(); return; } if (rsCastAt(-1, id) && !G.gameOver && (G.gameMode===1 || G.gameMode===2)) foeTurn(); renderGame(); saveCurrentGame(); return; }
@@ -23769,7 +23780,7 @@ function renderImmersiveHud(){
       <div class="dh-run pe${p.runOn ? ' on' : ''}" data-act="run" title="${p.runOn ? 'running' : 'walking'} - ${Math.floor(runEnergy())}% run energy (0 to toggle). Running, every other step costs no turn"><div class="fill" data-bar="run" style="height:${runEnergy()}%"></div><span>${p.runOn ? '&#187;' : '&#8250;'}</span><b>${Math.floor(runEnergy())}</b></div>
       <div class="dh-orb r pe prayer${(p.prayers||[]).length ? ' praying' : ''}" data-act="qpray" title="Prayer points - ${Math.ceil(p.prayPts||0)} of ${prL}\n${rsPrayDrainText()}\nclick: quick prayers ${(p.quickPrayers||[]).length ? '('+(p.quickPrayers||[]).map(id=>(RS_ALLPRAY().find(x=>x.id===id)||{}).nm).filter(Boolean).join(', ')+')' : '(set them in the side panel, F4)'} &middot; N: prayer book"><div class="fill" data-bar="pray" style="height:${resF*100}%"></div><div class="gloss"></div><div class="txt">${resTxt}<small>${resLbl}</small></div></div>
     </div>`;
-  if (el.__lastHtml === html) return;
+  if (el.__lastHtml === html || uiHeld(el)) return;
   { const so = el.querySelector('.dh-slots'), sx = so ? so.scrollLeft : 0;   // (RS-136) a redraw keeps where you'd scrolled the slots to
     el.innerHTML = html; el.__lastHtml = html; const sn = el.querySelector('.dh-slots'); if (sn && sx) sn.scrollLeft = sx; }
   if (showTarget) renderMiniMonsterArt('dhFoeArt', fm.art, fm.col, fm.nm, fm.undead);
@@ -29848,7 +29859,13 @@ function o3BuildBoat(){
   for (let i=0;i<=NS;i++){ const u = i/NS*2-1; const x = half(u), z = u*L/2; if (i===0) deck.moveTo(x, z); else deck.lineTo(x, z); }
   for (let i=NS;i>=0;i--){ const u = i/NS*2-1; deck.lineTo(-half(u), u*L/2); }
   const dg = new T.ShapeGeometry(deck); dg.rotateX(Math.PI/2); v3WorldUV(dg, 3);
-  const fl = new T.Mesh(dg, new T.MeshStandardMaterial({ map:v3TexWood('#4a2e18', true), roughness:0.9, side:T.DoubleSide })); fl.position.y = yd; g.add(fl);
+  const fl = new T.Mesh(dg, new T.MeshStandardMaterial({ map:v3TexWood('#4a2e18', true), roughness:0.9, side:T.DoubleSide })); fl.position.y = yd; fl.name = 'boatFloor'; g.add(fl);
+  /* (RS-312) an unseen lid across the hull at the gunwale: it draws nothing, but it stands in front of the water, so no wave ever
+     shows inside the boat - drawn after the boat itself (which shows through it) and before the water */
+  { const lid = new T.Shape(), yl = 0.004; for (let i=0;i<=NS;i++){ const u = i/NS*2-1, st = station(u), z = u*L/2, x = st.w*0.985; if (i===0) lid.moveTo(x, z); else lid.lineTo(x, z); }
+    for (let i=NS;i>=0;i--){ const u = i/NS*2-1, st = station(u); lid.lineTo(-st.w*0.985, u*L/2); }
+    const lg = new T.ShapeGeometry(lid); lg.rotateX(Math.PI/2); const lm = new T.MeshBasicMaterial({ colorWrite:false, depthWrite:true, transparent:true, side:T.DoubleSide });
+    const lidM = new T.Mesh(lg, lm); lidM.position.y = yl; lidM.renderOrder = -2; lidM.name = 'waterLid'; g.add(lidM); }
   // mast, yard and a bellied, striped sail
   const mz = L*0.18, mast = new T.Mesh(new T.CylinderGeometry(0.02, 0.028, 1.35, 8), darkW); mast.position.set(0, 0.55, mz); g.add(mast);
   const yard = new T.Mesh(new T.CylinderGeometry(0.014, 0.014, 0.9, 6), darkW); yard.rotation.z = Math.PI/2; yard.position.set(0, 1.12, mz+0.03); g.add(yard);
@@ -29868,7 +29885,7 @@ function o3BuildBoat(){
   foam.rotation.x = -Math.PI/2; foam.position.y = 0.01; O3.foam = foam;
   g.traverse(o=>{ if (o.isMesh){ o.castShadow = true; o.receiveShadow = true; } });
   // float so the waterline sits a third of the way up the hull; the foam lies on the water itself
-  const inner = new T.Group(); inner.add(g); inner.add(foam); g.position.y = -yd + 0.03;   // the floor rides just above the water; the hull still sits in it
+  const inner = new T.Group(); inner.add(g); inner.add(foam); g.position.y = -yd + 0.1;   // (RS-312) the floor rides above the wave tops, bob and roll included; the hull still sits in it
   return inner;
 }
 // ---------- setup ----------
@@ -30276,7 +30293,7 @@ function o3Render(){
   }
   const P = O3.player; P.g.visible = true; O3.boat.visible = sailing;
   P.sh.visible = !sailing;                                  // no ground shadow on the water; you stand in the boat instead
-  P.g.position.set(0, sailing ? 0.1 : 0, sailing ? -0.18 : 0);
+  P.g.position.set(0, sailing ? 0.17 : 0, sailing ? -0.18 : 0);
   const sx = dxs - dzs; if (Math.abs(sx) > 0.05) P.face = sx < 0 ? -1 : 1;
   P.walk = (P.walk||0) + (moving ? dt*12 : 0);
   if (P.e){
@@ -30309,7 +30326,7 @@ function o3Render(){
   if (sailing){
     if (moving) O3.boatYaw = Math.atan2(dxs, dzs);           // turn to the way you're sailing, and keep that heading when you stop
     O3.boat.rotation.set(Math.sin(O3.t*1.3)*0.03, O3.boatYaw||0, Math.sin(O3.t*1.6)*0.05);
-    O3.boat.position.y = Math.sin(O3.t*2)*0.025;
+    O3.boat.position.y = Math.sin(O3.t*2)*0.02;
     P.g.position.x = -Math.sin(O3.boatYaw||0)*0.2; P.g.position.z = -Math.cos(O3.boatYaw||0)*0.2;   // behind the mast
     if (O3.pennant) O3.pennant.rotation.x = Math.sin(O3.t*6)*0.25;
     if (O3.foam){ O3.foam.material.opacity = moving ? 0.9 : 0.45; }
@@ -37177,7 +37194,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-311';
+const GAME_VERSION = 'rs-312';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -39200,7 +39217,7 @@ function moveDir(dx,dy){
   if (G.ui!=='playing' || G.gameOver) return;
   if (typeof V3!=='undefined' && V3.door && V3.door.phase==='in') return;   // (half way through a door)
   if (G.gameMode===3 && G.owZoomedOut) return;   // (RS-210: close the map, M, before walking on)
-  foeTick(); if (foePending()) return;   // (RS-218: wait for their answer to your blow)
+  if (!foeHurry()) return;   // (RS-218/312: their answer to your blow lands first, then you move)
   G.sitAt = null;   // (RS-183: moving gets you up off a seat)
   G.stepLen = dx && dy ? Math.SQRT2 : 1;   // the 3D figures glide a diagonal at the same pace, so it lands in the same time
   if (G.gameMode===0){
