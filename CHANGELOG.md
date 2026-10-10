@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-300 - The Book Shuts
+
+- **The tome closes when you're not fighting.** Out of a fight your mage shuts the book and carries it at the side, arm hanging. When a creature is near or you start swinging, the book opens in the hand again, pages up to read from. The change eases over a few frames rather than snapping.
+
 ## RS-299 - The Tome Shows Up
 
 - **Your tome now shows with a staff.** A staff counted as a two-handed weapon, and the off hand only showed its tome when the weapon left it free, so a mage with a staff never saw the tome at all. Now the staff is carried in the right hand alone and the tome lies open on the left, pages up to your face.
