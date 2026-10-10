@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-299 - The Tome Shows Up
+
+- **Your tome now shows with a staff.** A staff counted as a two-handed weapon, and the off hand only showed its tome when the weapon left it free, so a mage with a staff never saw the tome at all. Now the staff is carried in the right hand alone and the tome lies open on the left, pages up to your face.
+
 ## RS-298 - One Page for Your Gear and Your Bag
 
 - **The inventory now lives on the equipment page.** Press I (or the chest button) to open your character stats and your equipment side by side, centred on the screen.
