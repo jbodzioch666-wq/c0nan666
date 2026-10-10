@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-301 - The Book, Carried Properly
+
+- **The shut tome stands in the hand.** Out of a fight the book is now held upright by its bottom edge, standing in the hanging hand with its cover flat against the thigh, the way you'd carry a book at your side, instead of dangling from its edge.
+
 ## RS-300 - The Book Shuts
 
 - **The tome closes when you're not fighting.** Out of a fight your mage shuts the book and carries it at the side, arm hanging. When a creature is near or you start swinging, the book opens in the hand again, pages up to read from. The change eases over a few frames rather than snapping.
