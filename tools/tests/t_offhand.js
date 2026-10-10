@@ -1,4 +1,4 @@
-// RS-295 (RS-299: a staff and a tome go together; RS-300/301: the tome shuts and stands in the hanging hand out of a fight): what's in your off hand shows on your model - an off-hand blade in the left fist, held ready and swung behind the main hand, or a spell
+// RS-295 (RS-299: a staff and a tome go together; RS-300 to 303: the tome shuts and stands in the hanging hand out of a fight, and goes where the arm goes): what's in your off hand shows on your model - an off-hand blade in the left fist, held ready and swung behind the main hand, or a spell
 // tome held up to read - and under a helmet the hair is a cap that fits inside it, so it doesn't poke out at the back (it did on wood elves)
 module.exports = async page=>{
   const r = await page.evaluate(()=>{
@@ -15,9 +15,15 @@ module.exports = async page=>{
     { const w0 = G.gear.weapon; G.gear.weapon = rsMakeStaff(1); const pt = rsPlayerLook(), e = m3dInstance({}, pt), rig = e.rig; m3dPoseHumanoid(rig, 0.7, 0, 0, 0, 0, e);   /* (RS-299: a mage's staff and tome together - the staff in the right hand alone) */
       out.staffTome = { o:!!pt.o.tome, staff:rig.wk==='staff', held:!!rig.tome, twoHand:!!rig.twoHand };
       /* (RS-300) out of a fight the book is shut and carried at the side; in one it's open to read; the open one is the default for anyone but the player */
-      const vis = ()=>({ open:rig.tome.getObjectByName('tomeOpen').visible, closed:rig.tome.getObjectByName('tomeClosed').visible, arm:+rig.arms[1].el.rotation.x.toFixed(2), z:+rig.tome.position.z.toFixed(3), upright:+Math.abs(Math.sin(rig.tome.rotation.z)).toFixed(2) });
+      const vis = ()=>({ open:rig.tome.getObjectByName('tomeOpen').visible, closed:rig.tome.getObjectByName('tomeClosed').visible, arm:+rig.arms[1].el.rotation.x.toFixed(2), z:+(()=>{ e.holder.updateMatrixWorld(true); const w = rig.tome.getWorldPosition(new THREE.Vector3()); return rig.torso.worldToLocal(w).z; })().toFixed(3),
+        upright:+Math.abs(new THREE.Vector3(1, 0, 0).transformDirection(rig.tome.matrixWorld).dot(new THREE.Vector3(0, 1, 0).transformDirection(rig.torso.matrixWorld))).toFixed(2) });
       e.fight = false; for (let i=0;i<30;i++) m3dPoseHumanoid(rig, 0.7, 0, 0, 0, 0, e); const shut = vis();
       e.fight = true; for (let i=0;i<30;i++) m3dPoseHumanoid(rig, 0.7, 0, 0, 0, 0, e); const open = vis();
+      /* (RS-303) the book is held by the hand, so an arm moved after the pose - a walk's swing, an idle stretch - carries it along */
+      e.fight = false; for (let i=0;i<30;i++) m3dPoseHumanoid(rig, 0.7, 0, 0, 0, 0, e); e.holder.updateMatrixWorld(true);
+      const palm = ()=>{ const v = new THREE.Vector3(-(rig.gripX||0.026), -0.045, 0.004); rig.arms[1].hand.localToWorld(v); return v; }, gap0 = rig.tome.getWorldPosition(new THREE.Vector3()).distanceTo(palm());
+      rig.arms[1].sh.rotation.x = 0.6; e.holder.updateMatrixWorld(true); const gap1 = rig.tome.getWorldPosition(new THREE.Vector3()).distanceTo(palm());
+      out.follow = { inHand:rig.tome.parent===rig.arms[1].hand, gap0:+gap0.toFixed(4), gap1:+gap1.toFixed(4) };
       G.gameMode = 0; const fightOw = rsFightNow();
       out.shut = { shut, open, fightOw, defOpen:(()=>{ const e2 = m3dInstance({}, pt); m3dPoseHumanoid(e2.rig, 0.7, 0, 0, 0, 0, e2); return e2.rig.tome.getObjectByName('tomeOpen').visible; })() };
       G.gear.weapon = w0; }
@@ -32,6 +38,7 @@ module.exports = async page=>{
   A(r.blade.o && r.blade.inLeft && r.blade.drawn > 0.4, 'an off-hand blade in the left fist, drawn back as the main hand winds up');
   A(r.tome.o && r.tome.held && r.tome.facesReader > 0.7 && r.tome.handNear < 0.12, 'a tome held open on the off hand, its pages facing the reader');
   A(r.staffTome.o && r.staffTome.staff && r.staffTome.held && !r.staffTome.twoHand, 'a staff and a tome are carried together: '+JSON.stringify(r.staffTome));
+  A(r.follow.inHand && Math.abs(r.follow.gap1 - r.follow.gap0) < 0.002, 'the tome goes where the arm goes: '+JSON.stringify(r.follow));
   A(r.shut.shut.closed && !r.shut.shut.open && r.shut.shut.arm > -0.5 && r.shut.shut.upright > 0.95 && r.shut.open.open && !r.shut.open.closed && r.shut.open.arm < -0.6 && r.shut.open.z > r.shut.shut.z + 0.05 && !r.shut.fightOw && r.shut.defOpen, 'the tome shuts and stands in the hanging hand by its bottom edge out of a fight (RS-302: its page edges up), opens out in the hand in one: '+JSON.stringify(r.shut));
   A(Math.abs(r.edge.main + Math.PI/2) < 0.01 && Math.abs(r.edge.off + Math.PI/2) < 0.01 && r.edge.hilt > 0.02, 'RS-296: blades edge-forward in both hands, slid up so the fist is on the grip');
   A(r.shield.shield && !r.shield.blade, 'a shield is still a shield');

@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-303 - The Tome Stays in Your Hand
+
+- **The tome follows your arm.** The book used to be placed once per frame and then left behind when the walk, an idle stretch or a swing moved the arm afterwards, so it floated where the hand had been. It's now held by the hand itself and goes wherever the arm goes, open or shut.
+- **Clear of a robe.** Carrying the shut book, the arm hangs a little further from the body, so it no longer sinks into a wide robe on a gnome or a wood elf.
+
 ## RS-302 - Pages Up
 
 - **The carried tome is turned the right way.** Held at the side out of a fight, the book now sits spine-down in the hand with its page edges and clasp facing up, cover flat against the thigh.
