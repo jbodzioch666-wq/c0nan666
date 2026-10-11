@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-339 - The Gods, Named
+
+- **God spells have their own section.** In the Spells tab (G), Saradomin Strike, Claws of Guthix and Flames of Zamorak now sit under **God spells**, each named, edged in its god's colour, and saying what it needs: Magic 60 and that god's staff in hand. Before, they were unmarked squares among the standard spells.
+- **God staves name their spell.** A god staff's description now says which spell it casts and where to pick it.
+
 ## RS-338 - Smooth Walking
 
 - **No more stutter walking the open land.** Every tree, rock and herb patch around you was rebuilt at every step (since RS-333, merged too), which cost a hitch per tile. They're now built in small chunks that stay put: a step builds only the few chunks coming into view, spread over frames, and picking a patch rebuilds only its chunk. A step now takes under a millisecond of this work, down from about 50.
