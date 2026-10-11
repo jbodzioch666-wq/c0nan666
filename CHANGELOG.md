@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-331 - Quests Underground
+
+- **Your dungeon quest, at the top of the screen.** When a quest of yours is in the dungeon you're in (a rescue, a dungeon master to beat, a story quest's lair), its name and what's left to do show in gold under the info bar. A rescue also says which floor you're on.
+- **Journal and Tasks on the quest tracker.** The quest window on screen has Journal and Tasks buttons, even when rolled up. They open those tabs in the side window.
+- **The blade trap faces the right way.** The curved cutting edge now leads the swing down; before, the flat back came first.
+
 ## RS-330 - Journal and Tasks in the Side Window
 
 - **The quests tab has three tabs now.** **Active** shows what you're doing right now, with the tracker toggles. **Journal** lists every story quest under In progress, You can start, Not yet and Done; tap one to see its log or what it's about. **Tasks** shows your Slayer task and every contract and bounty with its progress and reward.

@@ -22,7 +22,7 @@ module.exports = async page=>{
   console.log(JSON.stringify(out));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(out)); };
   A(out.open.shown && !out.open.rolled && out.open.cards===2, 'the quest window starts open');
-  A(out.rolled.shown && out.rolled.rolled && out.rolled.cards===0 && /\(2\)/.test(out.rolled.h) && out.rolled.height < 50, 'tapping the title bar rolls it up to just the bar (with the count) - it does not close');
+  A(out.rolled.shown && out.rolled.rolled && out.rolled.cards===0 && /\(2\)/.test(out.rolled.h) && out.rolled.height < 70, 'tapping the title bar rolls it up to just the bar (with the count, and RS-331 its Journal and Tasks buttons) - it does not close');
   A(out.dragged.rolled, 'dragging the bar moves it without rolling it down');
   A(out.reload.rolled && out.reload.flag, 'it stays rolled up after a reload');
   A(out.down.shown && !out.down.rolled && out.down.cards===2, 'tapping again rolls it back down');
