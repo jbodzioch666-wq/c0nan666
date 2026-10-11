@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| waitbtn | On a phone the d-pad's middle hourglass waits a turn in dungeons and fights (dimmed on the land) |
 | sidebooks | G and N open the side window's Spellbook and Prayer tabs (rune pouch, books, bones there; the old menus are gone); arrows are enchanted at the fletching bench |
 | compactbtn | On a phone the hotbar has a button for Y (compact mode on and off), still there in compact mode |
 | dragfirm | A dragged window follows the pointer exactly and stays where it's dropped (no easing, no tug back) |

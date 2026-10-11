@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-320 - Wait on a Phone
+
+- **The hourglass waits a turn.** The empty middle of the phone d-pad is now an hourglass button that does what Space does: stand where you are and let a turn go by, so the monsters take theirs and a swinging blade swings past. It's lit in dungeons and fights and dimmed out on the land, where there's nothing to wait for.
+
 ## RS-319 - One Spellbook, One Prayer Book
 
 - **G and N open the side window.** The spellbook (G) and prayer (N) buttons and keys now open the Spellbook and Prayer tabs of the side window, right beside the game, instead of a full-screen menu. Press again to close. In compact mode they bring the HUD back first.
