@@ -1,5 +1,15 @@
 # Depthcrawl patch notes
 
+## RS-334 - Quests That Wait For You
+
+- **Run from the Stormcaller and the quest keeps its marker.** Before, leaving a boss fight before the kill left the quest with nowhere to point and no way to restart. Now the marker stays on the spot, and walking back there asks whether you want to fight again. The same goes for every fight, boss, puzzle and choice a quest sends you somewhere for (twelve steps across the story quests).
+- **The Cracksman's sliding lock opens.** In The Thieves' Guild: Cracksman, nothing ever opened the strongbox. Now the lock opens as soon as the hooded figure sets you the job. If you step back from it, talk to them again to have another go, and the quest marker points to their tavern. Slide the numbered plates into order, 1 to 8, with the gap in the bottom-right corner.
+- **Bronze and Iron Arrows by name.** The bag's resources showed a single "Arrows" entry that only counted the loaded type. Every arrow and bolt type you carry is now listed by name, with its own count, colour and icon.
+- **City gates stop flickering.** The stone lintel over the gate shared its faces with the towers on either side, so its top corners flickered. It now sits just inside them.
+- **Race banners on the gates.** The banner over a city gate is a swallowtail in the race's colours with its emblem in gold: a crown for humans, a star for high elves, a leaf for wood elves, an anvil for dwarves, crossed axes for orcs, a round door for halflings, a cog for gnomes, a flame for dragonborn, horns for tieflings, and a moon and star for half-elves.
+- **World map bars at the top.** The map's toolbar and search box now sit at the top of the screen.
+- **The fps meter moves.** It now sits on the right, beside the buttons in the top corner, and you can drag it wherever you like. It remembers where you put it.
+
 ## RS-333 - Training Dummies, Torches and a Faster Forest
 
 - **The archery range is now a training range.** The butts look the same but are training dummies. **Walk into one** to test your melee; **click one from a distance** to test your bow or your current spell (R switches between them). A damage number pops off the dummy, and the log keeps a running tally: hits, average per try and best hit.

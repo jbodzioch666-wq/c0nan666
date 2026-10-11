@@ -1,4 +1,4 @@
-// RS-163: monsters have no round blob - they cast real shadows from the torches; the fps meter sits centred under the clock bar
+// RS-163: monsters have no round blob - they cast real shadows from the torches; the fps meter sits on the right (RS-334: beside the top-right buttons, and it can be dragged)
 module.exports = async page=>{
   const r = await page.evaluate(async ()=>{
     goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing');
@@ -22,7 +22,7 @@ module.exports = async page=>{
     SET.fps = true; for (let i=0;i<40;i++) await new Promise(r=>requestAnimationFrame(r));
     const fps = document.getElementById('fpsCounter'), ck = document.getElementById('dhClock'), a = fps && fps.getBoundingClientRect(), b = ck && ck.getBoundingClientRect();
     SET.fps = false;
-    return { step, torches, lantern, lanNear, monsters, blobs, casters, lit, fresh:e ? { blobs:fb, casters:fc } : null, fps:a && b ? { under:a.top >= b.bottom - 1 && a.top <= b.bottom + 12, centre:Math.round((a.left + a.width/2) - (b.left + b.width/2)) } : null };
+    return { step, torches, lantern, lanNear, monsters, blobs, casters, lit, fresh:e ? { blobs:fb, casters:fc } : null, fps:a ? { right:a.left > innerWidth/2, top:a.top < 80 } : null };
   });
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
@@ -31,5 +31,5 @@ module.exports = async page=>{
   A(r.blobs===0 && (!r.fresh || r.fresh.blobs===0), 'no round blob under any creature');
   A((r.monsters===0 || r.casters > 0) && (!r.fresh || r.fresh.casters > 0), 'creatures cast real shadows');
   A(r.lit > 0 && r.lantern && r.lanNear >= 0.7, 'the torches and your lantern cast shadows - but not of your own hat, right under the lantern');
-  A(r.fps && r.fps.under && Math.abs(r.fps.centre) <= 2, 'the fps meter is centred under the clock bar');
+  A(r.fps && r.fps.right && r.fps.top, 'the fps meter is on the right, up top');
 };

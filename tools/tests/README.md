@@ -25,6 +25,8 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs334 | arrow types by name with icons in the bag, world map bars at the top, a draggable fps meter on the right, race banners on city gates |
+| sqreturn | a fight, boss, puzzle or choice after a "go to" keeps its quest marker when left unfinished, and is offered again on coming back |
 | perfwild | gathering spots are baked into one mesh per material, and the land's deer, rabbits and boar are sculpted coarse |
 | dummy | the archery butts are training dummies: walk in for melee, click from range for bow or magic; tallied by style against chosen armour, nothing spent |
 | dgquest | a quest in the dungeon you're in shows under the top bar; the quest bar has its own Quests, Journal and Tasks tabs |
