@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-330 - Journal and Tasks in the Side Window
+
+- **The quests tab has three tabs now.** **Active** shows what you're doing right now, with the tracker toggles. **Journal** lists every story quest under In progress, You can start, Not yet and Done; tap one to see its log or what it's about. **Tasks** shows your Slayer task and every contract and bounty with its progress and reward.
+- **The full screens are still there.** A link at the bottom opens the full journal (diaries, clues, town jobs) or the task log.
+
 ## RS-329 - A Proper Trap
 
 - **The swinging blade is a real trap now.** Before, it rocked back and forth in plain sight and was dangerous every other turn. Now it hangs cocked up under the ceiling, still, until you step onto its tile.

@@ -784,6 +784,7 @@
   .sp-bar i{ position:absolute; left:0; top:0; bottom:0; background:linear-gradient(90deg, #8a7020, #e0c050); }
   .sp-bar span{ position:relative; display:block; text-align:center; font-size:10.5px; line-height:16px; color:#fff; text-shadow:0 1px 2px #000; }
   .sp-prg{ display:grid; grid-template-columns:repeat(5, 1fr); gap:3px; }
+  .sp-qtabs{ margin-bottom:6px; } .sp-qtabs .sp-b{ flex:1; } .sp-qlog{ margin-top:4px; font-size:11px; line-height:1.5; color:#4a3826; font-style:italic; white-space:normal; }
   .sp-pr{ aspect-ratio:1; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; background:radial-gradient(circle, #2a241c, #14100c); border:1px solid #4a3a26; color:var(--pc); font-size:17px; }
   .sp-pr.on{ background:radial-gradient(circle, color-mix(in srgb, var(--pc) 45%, #1a1410), #14100c); border-color:var(--pc); box-shadow:0 0 8px var(--pc); }
   .sp-pr.locked{ opacity:0.3; cursor:default; } .sp-pr.qp{ outline:2px dashed #ffd24a; outline-offset:1px; }
@@ -10045,8 +10046,11 @@ function spBody(tab){
     const qs = questsShown(), tq = trackedQuest();
     const rows = qs.map(q=>`<div class="sp-q${q===tq ? ' on' : ''}" data-sp-quest="${q.id}"><b>${esc(questTitle(q))}</b><span>${esc(questObjective(q))}</span></div>`).join('');
     const tog = `<div class="sp-foot"><a href="#" onclick="${p.qtHidden ? 'questTrackerShow()' : 'questTrackerHide()'};hudLayout();return false;">${p.qtHidden ? 'show the quest tracker' : 'hide the quest tracker'}</a><span>${qs.length} active</span></div>` + (p.grave && p.grave.hidden ? `<div class="sp-foot"><a href="#" onclick="graveTrackerShow();return false;">show my gravestone again</a></div>` : '');
-    let tk = ''; try { tk = `<div class="sp-note" style="margin-top:8px;"><b>Tasks</b></div>` + tkPanelHtml(); } catch(e){ console.error(e); }
-    return (rows || `<div class="sp-note">no quests yet - the bounty board in any town square has work</div>`) + `<div class="sp-foot"><a href="#" onclick="setUi('journal');return false;">open the journal (;)</a></div>` + tog + tk;
+    /* (RS-330) three tabs: what you're doing now, the journal (the story quests) and your tasks (Slayer, contracts, bounties) */
+    const qt = SP.qTab || 'now', sub = `<div class="sp-btns sp-qtabs">${[['now','Active'], ['journal','Journal'], ['tasks','Tasks']].map(([k, nm])=>`<button class="sp-b${qt===k ? ' on' : ''}" data-sp-qtab="${k}" onclick="SP.qTab='${k}';hudLayout()">${nm}</button>`).join('')}</div>`;
+    if (qt==='journal') return sub + spJournalHtml();
+    if (qt==='tasks'){ let tk = ''; try { tk = spTasksHtml(); } catch(e){ console.error(e); } return sub + tk; }
+    return sub + (rows || `<div class="sp-note">no quests yet - the bounty board in any town square has work</div>`) + tog;
   }
   return '';
 }
@@ -16907,6 +16911,28 @@ function buildTzhaar(){
     <div class="btnrow"><button class="btn primary" onclick="setUi('playing')">ESC &middot; close</button></div></div>`;
 }
 // a line for the side panel's quest tab: the task, today's work, the purse
+// (RS-330) the journal tab in the side window: the story quests by state; click one for its log
+function spJournalHtml(){
+  const sec = (title, ids)=>ids.length ? `<div class="sp-sub">${title}</div>` + ids.map(id=>{ const q = SQ[id], s = sqP()[id], act = sqActive(id), done = sqDone(id), req = sqReqText(id), open = SP.jOpen===id;
+      const st = done ? `<span style="color:${COL.green}">done</span>` : act ? esc(sqObjective(id)) : req.length ? `needs ${esc(req.join(', '))}` : `from ${esc(SQ_WHO[q.giver]||q.giver||'someone')}`;
+      const log = open && s && s.log ? `<div class="sp-qlog">${s.log.map(l=>`<div>&bull; ${esc(l.text)}</div>`).join('')}</div>` : open ? `<div class="sp-qlog">${esc(q.desc)}</div>` : '';
+      return `<div class="sp-q${act ? ' on' : ''}" data-sp-jq="${id}" onclick="SP.jOpen=SP.jOpen==='${id}'?null:'${id}';hudLayout()"><b>${esc(q.nm)}${q.main ? ' <span style="color:'+COL.purple+'">&#9733;</span>' : ''}</b><span>${st} &middot; ${q.qp||1} QP</span>${log}</div>`; }).join('') : '';
+  const act = SQ_ORDER.filter(id=>sqActive(id)), av = SQ_ORDER.filter(id=>!sqActive(id) && !sqDone(id) && sqCanStart(id)), lk = SQ_ORDER.filter(id=>!sqActive(id) && !sqDone(id) && !sqCanStart(id)), dn = SQ_ORDER.filter(id=>sqDone(id));
+  return `<div class="sp-note">Quest points <b>${tkP().questPoints||0}</b> &middot; ${dn.length} of ${SQ_ORDER.length} done</div>`
+    + sec('IN PROGRESS', act) + sec('YOU CAN START', av) + sec('NOT YET', lk) + sec('DONE', dn)
+    + `<div class="sp-foot"><a href="#" onclick="setUi('journal');return false;">open the full journal (;)</a><span>diaries, clues, town jobs</span></div>`;
+}
+// (RS-330) the tasks tab in the side window: your Slayer task, each contract and bounty with its progress, and the purse
+function spTasksHtml(){
+  const p = tkP(), T = p.slay.task, row = (t, tag)=>{ const pr = tkProg(t), rd = tkReady(t);
+    return `<div class="sp-q${rd && !t.claimed ? ' on' : ''}" style="${t.claimed ? 'opacity:0.5' : ''}" onclick="tkOpen(null,'${tag}')"><b>${esc(tkText(t))}</b><span>${t.claimed ? 'claimed' : rd ? `<span style="color:${COL.green}">ready to claim</span>` : `${t.kind==='xp' ? Math.floor(pr).toLocaleString() : pr} / ${t.need.toLocaleString()}`} &middot; ${t.gold}g</span></div>`; };
+  const c = p.contracts.daily.concat(p.contracts.weekly), b = p.bounties.list;
+  return `<div class="sp-sub">SLAYER</div><div class="sp-q" onclick="tkOpen(null,'slayer')"><b>${T ? esc(tkText(T)) : 'No task'}</b><span>${T ? `${T.have} / ${T.need}` : 'see a Slayer Master in town'} &middot; ${p.cur.slayer} pts</span></div>`
+    + `<div class="sp-sub">CONTRACTS</div>` + (c.length ? c.map(t=>row(t, 'contracts')).join('') : `<div class="sp-note">none yet - the bounty board has them</div>`)
+    + `<div class="sp-sub">BOUNTIES</div>` + (b.length ? b.map(t=>row(t, 'bounties')).join('') : `<div class="sp-note">no one wanted today</div>`)
+    + `<div class="sp-note">${p.cur.guild} tokens &middot; ${p.cur.tokkul} tokkul &middot; ${p.questPoints} QP</div>`
+    + `<div class="sp-foot"><a href="#" onclick="tkOpen(null,'slayer');return false;">open the task log</a><a href="#" onclick="tkOpen(null,'money');return false;">money making</a></div>`;
+}
 function tkPanelHtml(){
   const p = tkP(), T = p.slay.task, c = p.contracts.daily.concat(p.contracts.weekly), b = p.bounties.list;
   const ready = c.concat(b).filter(tkReady).length;
@@ -37610,7 +37636,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-329';
+const GAME_VERSION = 'rs-330';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
