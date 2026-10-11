@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-343 - Audit Fixes
+
+- **Altars promise the xp they give.** The runecrafting altar's "Bind" prompt left out your race's xp bonus and the minstrels' song, so the xp it showed could be a little under what you got. Your house altar's "Offer bones" line showed the raw figure, about three times what it gave. Both now show the real gain.
+- **Test fixes (no gameplay change).** A full audit of the 171 tests on `main` turned up four stale or fragile ones: the shield check still expected its RS-207 position (it moved into the fist in RS-297), the skeleton staff check sat on a rounding knife-edge, the bestiary zoom and the save export gave the software renderer too little time, and the newer Playwright needs downloads switched on. All pass now.
+
 ## RS-342 - The Lair Lords
 
 - **Dragon lair masters are level 126.** A lair's master now fights at the top level, with stats raised to match (about a quarter tougher than the old combat-110 fight). The map's lair estimate shows 126 too.

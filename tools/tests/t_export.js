@@ -1,9 +1,11 @@
 // RS-152: exporting a save works on the claude.ai page (through the viewer's save prompt) and everywhere else (a plain download)
 module.exports = async page=>{
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m); };
-  await page.evaluate(()=>{ goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame(); });
+  await page.evaluate(()=>{ goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame();
+    window.__raf = window.requestAnimationFrame; window.requestAnimationFrame = ()=>0; });   /* (the frame loop paused: under software GL its frames starve the download of the main thread for longer than any sane timeout) */
+  await page.waitForTimeout(500);
   // a plain page: the browser download
-  const [dl] = await Promise.all([ page.waitForEvent('download', { timeout:10000 }), page.evaluate(()=>exportSave()) ]);
+  const [dl] = await Promise.all([ page.waitForEvent('download', { timeout:30000 }), page.evaluate(()=>exportSave()) ]);
   A(/^depthcrawl-.*\.json$/.test(dl.suggestedFilename()), 'a plain download: '+dl.suggestedFilename());
   // on the claude.ai page: the downloads capability's save prompt gets the file
   const r = await page.evaluate(async ()=>{

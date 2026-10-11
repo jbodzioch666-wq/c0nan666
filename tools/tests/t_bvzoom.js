@@ -10,7 +10,8 @@ module.exports = async page=>{
     // zoom: the buttons, then the wheel
     const z0 = BV.zoom||1; document.querySelector('#bvSlot .bvzoom .btn').click(); A(BV.zoom > z0, 'the + button zooms in');
     const cv = document.querySelector('#bvSlot canvas'); cv.dispatchEvent(new WheelEvent('wheel', { deltaY:-300, bubbles:true, cancelable:true })); A(BV.zoom > z0*1.35, 'the wheel zooms in');
-    await wait(200); out.camZ = +BV.cam.position.z.toFixed(2); A(BV.cam.position.z < 3.1/1.3, 'the camera moved in: '+out.camZ);
+    for (let i=0;i<60 && !(BV.cam.position.z < 3.1/1.3);i++) await wait(100);   /* (the camera follows on the next frame - a software-rendered one can take a while) */
+    out.camZ = +BV.cam.position.z.toFixed(2); A(BV.cam.position.z < 3.1/1.3, 'the camera moved in: '+out.camZ);
     document.querySelectorAll('#bvSlot .bvzoom .btn')[1].click(); for (let i=0;i<10;i++) bvZoom(1/1.5); A(BV.zoom===0.7, 'zoom has a floor');
     // picking a creature keeps the list's scroll
     const boxes = [...document.querySelectorAll('#overlay *')].filter(e=>e.scrollHeight > e.clientHeight + 20 && getComputedStyle(e).overflowY!=='visible');

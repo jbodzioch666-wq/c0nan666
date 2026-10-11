@@ -32,8 +32,9 @@ async function runOne(name){
   const browser = await pw.chromium.launch({ headless:!flag('headed'), args:launch });
   // a test that exports `mobile: true` runs on an emulated phone (touch, 390x844)
   const mobile = !!require(file).mobile;
-  const page = mobile ? await (await browser.newContext({ viewport:{ width:390, height:844 }, deviceScaleFactor:2, isMobile:true, hasTouch:true })).newPage()
-                      : await browser.newPage({ viewport:{ width:1400, height:900 } });
+  // (acceptDownloads: the newer headless shell delivers no download event without it - t_export)
+  const page = mobile ? await (await browser.newContext({ viewport:{ width:390, height:844 }, deviceScaleFactor:2, isMobile:true, hasTouch:true, acceptDownloads:true })).newPage()
+                      : await browser.newPage({ viewport:{ width:1400, height:900 }, acceptDownloads:true });
   const errs = [];
   page.on('pageerror', e=>errs.push('pageerror: '+e.message+'\n'+(e.stack||'').split('\n').slice(0,4).join('\n')));
   page.on('console', m=>{ if (m.type()==='error') errs.push('console: '+m.text()); });
