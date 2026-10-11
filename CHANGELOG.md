@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-335 - Trees on the Map
+
+- **Search the world map for trees and rocks.** Type "yew", "magic tree", "willow", "logs" or "coal" and the map finds them nearest first, alongside the herb patches and places. When a search finds a whole forest, the nearest 60 are ringed.
+- **No more beams across dungeon corridors.** The stone ribs and timber frames spanning every other corridor tile at ceiling height looked like bars across the way from above, so they're gone.
+- **The hooded figure can be clicked.** Clicking them used to walk you to the empty floor in front of them, as if they stood behind a counter, and nothing happened. Now you walk up to them and they talk.
+
 ## RS-334 - Quests That Wait For You
 
 - **Run from the Stormcaller and the quest keeps its marker.** Before, leaving a boss fight before the kill left the quest with nowhere to point and no way to restart. Now the marker stays on the spot, and walking back there asks whether you want to fight again. The same goes for every fight, boss, puzzle and choice a quest sends you somewhere for (twelve steps across the story quests).

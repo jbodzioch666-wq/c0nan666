@@ -9197,7 +9197,7 @@ function enterInterior(key){
   G.villageNpcs = vendor ? [Object.assign({}, vendor, { x:10, y:5 })] : [];
   G.villagers = [];
   if (key==='tavern') townPatrons();
-  if (key==='tavern'){ const hx = 14, hy = 7; G.map[hx][hy] = T_VENDOR; G.villageDeco[hx][hy] = 'npc'; G.villageNpcs.push({ x:hx, y:hy, name:'a hooded figure', role:'Hooded figure', service:'hooded', key:'hooded' }); }   /* (RS-325) the Thieves' Guild's go-between, in the corner */
+  if (key==='tavern'){ const hx = 14, hy = 7; G.map[hx][hy] = T_VENDOR; G.villageDeco[hx][hy] = 'npc'; G.villageNpcs.push({ x:hx, y:hy, name:'a hooded figure', role:'Hooded figure', service:'hooded', key:'hooded', free:1 }); }   /* (RS-325) the Thieves' Guild's go-between, in the corner */
   for (const [k,x,y] of ROOM_LAYOUT[key].benches) roomBenchMark(k, x, y);
   G.sitAt = null; G.player.x = ROOM.door.x; G.player.y = ROOM.door.y - 1; G.player.facing = 0;
   logMsg(`you step into ${b.name.toLowerCase()}`, 'new'); try{ audEnv('door'); }catch(e){}
@@ -18432,8 +18432,11 @@ const MAP_POI_WORDS = { digsite:'dig site excavation archaeology', hamlet:'farm'
 function mapForageIndex(){
   const now = performance.now(), C = mapForageIndex.c; if (C && now - C.t < 8000 && C.w===G.ow) return C.list;
   const list = [];
-  for (let x=0;x<OW_COLS;x++) for (let y=0;y<OW_ROWS;y++){ if (!owSeen(x, y)) continue; let n = null; try{ n = skNodeStatic(x, y); }catch(e){} if (!n || n.k!=='foraging') continue;
-    list.push({ nm:cap(skName(n.type)), what:'forage', x, y, kw:'foraging forage herb gather' }); }
+  for (let x=0;x<OW_COLS;x++) for (let y=0;y<OW_ROWS;y++){ if (!owSeen(x, y)) continue; let n = null; try{ n = skNodeStatic(x, y); }catch(e){} if (!n) continue;
+    if (n.k==='foraging') list.push({ nm:cap(skName(n.type)), what:'forage', x, y, kw:'foraging forage herb gather' });
+    /* (RS-335) trees and rocks too: search "yew", "magic tree", "logs" or "coal" */
+    else if (n.k==='woodcutting'){ const t = SK_TREE[n.type]; if (t) list.push({ nm:t.nm, what:'tree', x, y, kw:'tree trees woodcutting chop logs ' + skName(t.log) }); }
+    else if (n.k==='mining'){ const r = n.rock || SK_ROCK[n.type]; if (r) list.push({ nm:r.nm, what:'rock', x, y, kw:'rock rocks mining mine ore ' + n.type }); } }
   mapForageIndex.c = { t:now, w:G.ow, list }; return list;
 }
 function mapSearchIndex(){
@@ -18457,10 +18460,14 @@ function mapSearchIndex(){
 }
 function mapSearchHits(){
   const q = String(G.mapQuery||'').trim().toLowerCase(); if (q.length < 2 || !G.ow) return [];
-  const hits = mapSearchIndex().filter(h=>h.nm.toLowerCase().includes(q) || h.what.toLowerCase().includes(q) || h.kw.toLowerCase().includes(q));
+  /* (RS-335) remembered for a moment - it's asked every frame, and a search for trees can match thousands */
+  const ix = mapSearchIndex(), ck = q + '|' + G.owPos.x + ',' + G.owPos.y, C = mapSearchHits.c, now = performance.now();
+  if (C && C.k===ck && C.ix===ix && now - C.t < 1000) return C.hits;
+  const hits = ix.filter(h=>h.nm.toLowerCase().includes(q) || h.what.toLowerCase().includes(q) || h.kw.toLowerCase().includes(q));
   /* (RS-325) named places first, then sites where a searched herb grows on their floors, then forage patches, then the rest - nearest first in each */
-  const rank = h=>h.what==='forage' ? 2 : h.nm.toLowerCase().startsWith(q) ? 0 : h.what==='site' && /cave herbs/.test(h.kw) && h.kw.toLowerCase().includes(q) ? 1 : 3;
-  const p = G.owPos; return hits.sort((a, b)=>rank(a) - rank(b) || Math.hypot(a.x-p.x, a.y-p.y) - Math.hypot(b.x-p.x, b.y-p.y));
+  const rank = h=>h.what==='forage' || h.what==='tree' || h.what==='rock' ? 2 : h.nm.toLowerCase().startsWith(q) ? 0 : h.what==='site' && /cave herbs/.test(h.kw) && h.kw.toLowerCase().includes(q) ? 1 : 3;
+  const p = G.owPos; hits.sort((a, b)=>rank(a) - rank(b) || Math.hypot(a.x-p.x, a.y-p.y) - Math.hypot(b.x-p.x, b.y-p.y));
+  mapSearchHits.c = { k:ck, ix, t:now, hits }; return hits;
 }
 function mapSearchSet(v){ G.mapQuery = v; G.mapSearchI = -1; mapSearchListSync(); renderGame(); }
 function mapSearchListSync(){
@@ -18477,7 +18484,7 @@ function pmSearchMarks(zx, zy, vc, vr){
   const hits = mapSearchHits(); if (!hits.length) return;
   const t = performance.now()/1000, R = clamp(cellPx*1.6, 16*dpr, 30*dpr), cw = canvas.width, ch = canvas.height, sel = hits[G.mapSearchI];
   ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-  for (const h of hits){
+  for (const h of hits.length > 60 ? hits.slice(0, 60).concat(sel && hits.indexOf(sel) >= 60 ? [sel] : []) : hits){   /* (RS-335: the nearest 60 ringed, when a search finds a forest) */
     const px = (h.x-zx)*cellPx + cellPx/2, py = (h.y-zy)*cellPx + cellPx/2, on = h===sel, pulse = 0.5 + 0.5*Math.sin(t*4 + h.x*0.7);
     if (px < -R || py < -R || px > cw+R || py > ch+R){   // off the edge: an arrow on the border, pointing at it
       const cx = cw/2, cy = ch/2, a = Math.atan2(py-cy, px-cx), m = 26*dpr, k = Math.min((cw/2-m)/Math.max(1e-6, Math.abs(Math.cos(a))), (ch/2-m)/Math.max(1e-6, Math.abs(Math.sin(a))));
@@ -29287,7 +29294,7 @@ function v3BuildPeople(grp, mats){
   V3.player = P(v3PlayerLook(), 1.0, G.player.x, G.player.y); V3.player.at = [G.player.x, G.player.y];
   V3.npcs = (G.villageNpcs||[]).map(n=>{ const look = V3_LOOK[n.service] ? V3_LOOK[n.service]() : v3VillagerLook(0);
     const p = P(n.service==='tzhaar' ? look : v3RaceDress(look, n.x + n.y), 1.02, n.x, n.y); p.n = n;
-    p.sp.userData.act = { kind:'tile', x:n.x, y:G.interior ? n.y+1 : n.y, label:n.name }; V3.hits.push(p.sp);
+    p.sp.userData.act = { kind:'tile', x:n.x, y:G.interior && !n.free ? n.y+1 : n.y, label:n.name }; V3.hits.push(p.sp);   /* (RS-335: someone not behind a counter - the hooded figure - is clicked where they stand) */
     if (n.service==='questgiver'){ const mk = new T.Sprite(new T.SpriteMaterial({ map:v3MarkerTex('!'), transparent:true, depthTest:false })); mk.scale.set(0.42,0.63,1); mk.position.y = 1.75; p.g.add(mk); V3.marker = mk; }
     return p; });
   V3.villagers = (G.villagers||[]).map((v,i)=>{ const p = P(townFolkLook(v, i), townFolkH(v), v.x, v.y); p.v = v; return p; });
@@ -31637,22 +31644,7 @@ function fpdBuild(T){
     box('trim', x-r-0.025, 0, y-r-0.025, x+r+0.025, 0.1, y+r+0.025, 0.55);   // its footing
     box('trim', x-r-0.02, 0.92, y-r-0.02, x+r+0.02, 0.97, y+r+0.02, 0.8);   // and a capital under the ceiling
   }
-  // corridors get a rib across the ceiling every other tile: dressed stone in
-  // most places, a timber frame (two posts and a crossbeam) in mines and keeps
-  const timber = /mine|castle/.test(key), ribK = timber ? 'wood' : 'trim';
-  if (!out) for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
-    if (solid(x,y) || G.map[x][y]===T_STAIRSU || ((x+y)&1)) continue;
-    const ns = solid(x,y-1) && solid(x,y+1), ew = solid(x-1,y) && solid(x+1,y);
-    if (ns===ew) continue;                                 // not a straight corridor
-    const t = 0.06, dz = 0.07;
-    if (ns){                                               // corridor runs east-west, so the rib spans north-south
-      box(ribK, x+0.5-t, 1-dz, y, x+0.5+t, 1, y+1, 0.75);
-      if (timber){ box(ribK, x+0.5-t, 0, y, x+0.5+t, 1-dz, y+0.09, 0.6); box(ribK, x+0.5-t, 0, y+0.91, x+0.5+t, 1-dz, y+1, 0.6); }
-    } else {
-      box(ribK, x, 1-dz, y+0.5-t, x+1, 1, y+0.5+t, 0.75);
-      if (timber){ box(ribK, x, 0, y+0.5-t, x+0.09, 1-dz, y+0.5+t, 0.6); box(ribK, x+0.91, 0, y+0.5-t, x+1, 1-dz, y+0.5+t, 0.6); }
-    }
-  }
+  /* (RS-335) no more ribs and timber frames across the corridor ceilings: seen from above they were bars across the way */
   const slotFns = [spec.floor, spec.floor2||spec.floor, spec.floor, spec.floor, fpPit(spec.floor), fpRuneFloor(spec.floor), fpWater(), spec.edge||spec.floor];
   // rough-hewn rock varies a lot in brightness, so it takes a much gentler bump than laid stone
   const bw = /mine|lair/.test(key) ? 5 : 11;
@@ -37855,7 +37847,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-334';
+const GAME_VERSION = 'rs-335';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
