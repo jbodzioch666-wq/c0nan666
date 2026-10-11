@@ -22997,6 +22997,17 @@ function gfxPass(r, P, mat, target){ P.quad.material = mat; r.setRenderTarget(ta
 function gfxTarget(r){ if (!gfxPostOn()) return null; try{ return gfxPost(r).scene; }catch(e){ return null; } }
 function gfxCompile(r, scene, cam){ const rt = r.getRenderTarget(), t = gfxTarget(r); if (t) r.setRenderTarget(t); try{ r.compile(scene, cam); } finally { r.setRenderTarget(rt); } }
 function gfxWarmRender(r, scene, cam){ const rt = r.getRenderTarget(), t = gfxTarget(r); if (t) r.setRenderTarget(t); try{ r.render(scene, cam); } finally { r.setRenderTarget(rt); } }
+// (RS-345) the open land and towns compile their whole scene right after it's built - what's placed but off screen
+// too - and, once per renderer, a group of stand-ins for what only spawns later: the animals, a gathering spot of
+// every kind, a camp, the markers. The stand-ins are kept, so their materials' programs stay built
+function gfxCompileScene(V, r, scene, cam, warm){
+  if (!V.compileDue || !r || !scene) return; V.compileDue = false;
+  let grp = null;
+  if (warm && V.warmFor!==r){ V.warmFor = r; try{ grp = V.warmGrp = warm(); }catch(e){ console.error(e); grp = null; } }
+  if (grp){ grp.traverse(o=>{ o.frustumCulled = false; }); grp.position.y -= 80; scene.add(grp); }   /* (drawn wherever they are: below the land, clipped away) */
+  try{ gfxCompile(r, scene, cam); }catch(e){ console.error(e); }
+  if (grp){ try{ gfxWarmRender(r, scene, cam); }catch(e){ console.error(e); } scene.remove(grp); }   /* (a draw, not just a compile: the driver builds its pipelines at the first draw of each state) */
+}
 function gfxRender(r, scene, cam, view){
   if (!gfxPostOn()){ r.render(scene, cam); return; }
   let P; try{ P = gfxPost(r); }catch(e){ console.error(e); SET.post = false; r.render(scene, cam); return; }
@@ -29579,6 +29590,17 @@ function doorWalk(enter, key, dx, dy){
   if (enter) enterInterior(key); else exitInterior();
   if (enter ? !G.interior : !!G.interior){ V3.door = null; doorFade(0); }   // (the door stayed shut - closed for the night)
 }
+// (RS-345) stand-ins for what a town only makes as you go: the click and hover rings, and every building material as it
+// goes see-through when you walk behind it
+function v3Warm(){
+  const T = THREE, g = new T.Group(), safe = f=>{ try{ f(); }catch(e){ console.error(e); } };
+  safe(()=>{ g.add(new T.Mesh(new T.RingGeometry(0.18, 0.26, 24), new T.MeshBasicMaterial({ color:0xffd060, transparent:true, depthWrite:false })));
+    g.add(new T.Mesh(new T.RingGeometry(0.78, 1, 40), new T.MeshBasicMaterial({ color:0xffe08a, transparent:true, opacity:0.75, depthWrite:false, blending:T.AdditiveBlending, side:T.DoubleSide }))); });
+  safe(()=>{ const seen = new Set(), box = new T.BoxGeometry(0.1, 0.1, 0.1), tops = new Set((V3.occ||[]).map(o=>o.userData.grp).filter(Boolean));
+    for (const top of tops) top.traverse(o=>{ if (!o.isMesh || !o.material || !o.geometry) return; const mats = [].concat(o.material);
+      for (const m of mats){ if (seen.has(m) || m.transparent) continue; seen.add(m); const c = Object.assign(m.clone(), { transparent:true, depthWrite:false }); const mesh = new T.Mesh(o.geometry.attributes.color && o.geometry.attributes.uv ? o.geometry : box, c); mesh.castShadow = true; g.add(mesh); } }); });
+  return g;
+}
 function doorFade(a){
   if (!V3.fadeEl){ const el = V3.fadeEl = document.createElement('div'); el.style.cssText = 'position:absolute;pointer-events:none;opacity:0;background:radial-gradient(ellipse at center, rgba(24,14,8,0.9) 0%, rgba(4,2,1,1) 70%);'; V3.cv.parentNode.insertBefore(el, V3.labels); }
   const el = V3.fadeEl, cv = V3.cv; el.style.left = cv.style.left; el.style.top = cv.style.top; el.style.width = cv.style.width; el.style.height = cv.style.height; el.style.display = a > 0.001 ? 'block' : 'none'; el.style.opacity = a.toFixed(3);
@@ -29619,7 +29641,7 @@ function v3Render(){
   const T = THREE, now = performance.now(), dt = V3.last ? Math.min(0.1, (now-V3.last)/1000) : 0.016; V3.last = now; V3.t = (V3.t||0) + dt;
   if (V3.door && (V3.door.t > 4 || G.gameMode!==3)){ V3.door = null; doorFade(0); V3.labels.style.opacity = '1'; }   /* (never left half way through a door) */
   if (V3.door && V3.door.phase==='in' && doorTickIn(dt)) return true;
-  if (V3.mapRef !== G.map){ V3.mapRef = G.map; v3BuildScene(); V3.path = []; V3.camPos = null; if (V3.door) V3.door.t = 0; }
+  if (V3.mapRef !== G.map){ V3.mapRef = G.map; v3BuildScene(); V3.path = []; V3.camPos = null; if (V3.door) V3.door.t = 0; V3.compileDue = true; }
   // match the game canvas' box
   const mc = canvas, cv = V3.cv;
   cv.style.display = 'block'; V3.labels.style.display = 'block';
@@ -29757,6 +29779,7 @@ function v3Render(){
     if (hv && hv.kind==='tile') at = [hv.x+0.5, 0.04, hv.y+0.5, 0.55];
     else if (hv && hv.kind==='building' && hv.b.door) at = [hv.b.door.x+0.5, 0.04, hv.b.door.y+0.5, 0.75];
     hoverRing(V3, at); }
+  gfxCompileScene(V3, V3.renderer, V3.scene, V3.cam, v3Warm);   /* (RS-345) */
   gfxRender(V3.renderer, V3.scene, V3.cam, 'v3');
   // name plates follow their owners on screen
   const v = new T.Vector3();
@@ -29999,6 +30022,28 @@ function o3Build(cx, cy){
   o3Sites(grp, x0, y0, W);
   try{ gfxO3Build(grp, x0, y0, W, M); }catch(e){ console.error(e); }
   O3.encGrp = new T.Group(); grp.add(O3.encGrp); O3.encKey = null; O3.qKey = null;
+  O3.compileDue = true;   /* (RS-345) */
+}
+// (RS-345) stand-ins for what the land only makes once you walk up to it, so their shaders are built now
+function o3Warm(){
+  const T = THREE, g = new T.Group(), safe = f=>{ try{ f(); }catch(e){ console.error(e); } };
+  const cx = O3.win ? O3.win.cx : G.owPos.x, cy = O3.win ? O3.win.cy : G.owPos.y; g.position.set(cx+0.5, 0, cy+0.5);
+  for (const k of ['deer', 'rabbit', 'boar']) safe(()=>{ const spec = WG_WILD[k]; let e; M3D_COARSE = 2.6; try{ e = m3dInstance({ nm:spec.nm }, { paint:mpBeast, o:spec.o, h:1 }); } finally { M3D_COARSE = 1; } g.add(e.holder); });
+  safe(()=>{ g.add(new T.Mesh(new T.PlaneGeometry(0.16, 0.05), o3WgMat('bird', '#2a2420', { side:T.DoubleSide }))); });
+  safe(()=>{   // one gathering spot of each kind on the map, and each worked out
+    const seen = new Map(), W = G.ow.map.length, H = G.ow.map[0].length;
+    for (let x=0;x<W;x+=2) for (let y=0;y<H;y+=2){ const n = skNodeAt(x, y); if (!n) continue; const k = n.k+'|'+n.type+(n.rich ? 'R' : ''); if (!seen.has(k)) seen.set(k, n); }
+    const list = []; for (const n of seen.values()){ list.push(Object.assign({}, n, { x:cx, y:cy })); list.push(Object.assign({}, n, { x:cx, y:cy, gone:true, left:0 })); }
+    const H0 = O3.nodeHits, A0 = O3.nodeAnim; O3.nodeHits = []; O3.nodeAnim = []; const ng = new T.Group(); ng.position.set(-cx-0.5, 0, -cy-0.5); g.add(ng);
+    try{ o3BuildNodeChunk(list, ng); } finally { O3.nodeHits = H0; O3.nodeAnim = A0; } });
+  safe(()=>{ o3CampModel(g, 0, 0, 0, 3, { push:()=>{} }); });
+  safe(()=>{ const e = o3MerchantFig(); g.add(e.holder); });
+  safe(()=>{ g.add(o3Glow('rgba(255,140,40,1)', 0.7)); g.add(o3Glow('rgba(150,220,255,1)', 1.4)); });
+  safe(()=>{ g.add(new T.Mesh(new T.RingGeometry(0.55, 0.7, 32), new T.MeshBasicMaterial({ color:0xff4a2a, transparent:true, opacity:0.7, depthWrite:false })));
+    g.add(new T.Mesh(new T.CylinderGeometry(0.2, 0.3, 10, 16, 1, true), new T.MeshBasicMaterial({ color:0xff5a3a, transparent:true, opacity:0.22, depthWrite:false, blending:T.AdditiveBlending, side:T.DoubleSide })));
+    g.add(new T.Mesh(new T.RingGeometry(0.78, 1, 40), new T.MeshBasicMaterial({ color:0xffe08a, transparent:true, opacity:0.75, depthWrite:false, blending:T.AdditiveBlending, side:T.DoubleSide })));
+    const sp = new T.Sprite(new T.SpriteMaterial({ map:o3IconTex('enc', ENCOUNTER_ART, COL.encounter, '#ff5a3a'), transparent:true })); g.add(sp); });
+  return g;
 }
 // ---------- trees, rocks and cacti (instanced) ----------
 function o3Vegetation(grp, x0, y0, W){
@@ -31060,6 +31105,7 @@ function o3Render(){
     O3.clickRing.visible = O3.clickFx.t < 0.5; O3.clickRing.position.set(O3.clickFx.x, O3.clickFx.y+0.04, O3.clickFx.z); O3.clickRing.scale.setScalar(1 + O3.clickFx.t*1.5); O3.clickRing.material.opacity = 1 - O3.clickFx.t*2; }
   hoverRing(O3, O3.hoverAny && G.ui==='playing' ? [O3.hoverAny.x+0.5, Math.max(O3.heightAt(O3.hoverAny.x+0.5, O3.hoverAny.y+0.5), -0.14)+0.05, O3.hoverAny.y+0.5, O3.hoverAny.kind==='site' ? 0.9 : 0.6] : null);
   try{ gfxO3Tick(dt, pp); }catch(e){ console.error(e); }   // light, mist, falls, leaves (see SECTION: GRAPHICS)
+  gfxCompileScene(O3, O3.renderer, O3.scene, O3.cam, o3Warm);   /* (RS-345) */
   gfxRender(O3.renderer, O3.scene, O3.cam, 'o3');
   // name plates: town names always, other sites when near or hovered
   const v = new T.Vector3(), hv = O3.hover;
@@ -32108,6 +32154,7 @@ function fpdRender(env, T, camZ){
   for (const pt of FPD.portals||[]){ pt.mat.uniforms.t.value = FP.t + pt.seed; const k = 0.85 + 0.15*Math.sin(FP.t*3 + pt.seed); pt.L.intensity = 0.9*k; pt.pool.material.opacity = 0.55*k; }
   // (the shadow maps only exist after their first pass, so a fresh level gets a warm-up render)
   if (FPD.warm){ FPD.warm = false; gfxWarmRender(FPD.r, FPD.scene, cam); }   /* (RS-344: into the post target, so it builds the programs the real frames use) */
+  if (FPD.warmGrp) fpdWarmDone();   /* (RS-345: the stand-ins have been drawn once) */
   gfxRender(FPD.r, FPD.scene, cam, 'fpd');
   return true;
 }
@@ -36767,16 +36814,28 @@ function fpdWarm(){
       if (DRESS_DECOS.includes(d)) add('d:'+d, d==='banner2' ? { kind:'banner', necro } : { kind:'dress', d, rot:0 });
       else if (['throne','banner','altar','idol'].includes(d)) add('k:'+d, { kind:d, necro }); } }
   for (const p of kinds.values()){ try{ grp.add(isoPropModel(Object.assign({ x:0, y:0 }, p))); }catch(e){ console.error(e); } }
+  try{   // (RS-345) a billboard, as the painted creatures and the skeletons' sprites are drawn, and a mirrored see-through part
+    const c = v3Canvas(8, 8), sp = new T.Sprite(new T.SpriteMaterial({ transparent:true, alphaTest:0.2, map:new T.CanvasTexture(c) })); sp.center.set(0.5, 0); grp.add(sp);
+    const mr = new T.Mesh(new T.BoxGeometry(0.1, 0.1, 0.1), new T.MeshBasicMaterial({ transparent:true, opacity:0.5 })); mr.scale.x = -1; grp.add(mr); }catch(e){ console.error(e); }
   const mons = [];
   for (const m of G.mon||[]){ if (!m.alive || M3D.inst.get(m)) continue;
-    try{ if (typeof sk3Wanted==='function' && sk3Wanted(m)) continue; const pt = m3dPortrait(m); if (!pt) continue;
+    try{ if (typeof sk3Wanted==='function' && sk3Wanted(m)){ const e = sk3Instance(m); if (e){ M3D.inst.set(m, e); grp.add(e.holder); mons.push(e); } continue; }   /* (RS-345: the skeletons' rigs too) */
+      const pt = m3dPortrait(m); if (!pt) continue;
       const e = m3dInstance(m, pt); e.pt = pt; M3D.inst.set(m, e); grp.add(e.holder); mons.push(e); }catch(e){ console.error(e); } }
+  const fc = new Map(); grp.traverse(o=>{ fc.set(o, o.frustumCulled); o.frustumCulled = false; }); grp.position.y = -80;   /* (RS-345: drawn by the warm frame too, below the floor, clipped away) */
   FPD.scene.add(grp);
   try{ gfxCompile(FPD.r, FPD.scene, FPD.cam); }catch(e){ console.error(e); }
-  FPD.scene.remove(grp);
-  for (const e of mons) grp.remove(e.holder);   /* (the monsters' models are kept, as they would be once seen: the sprite pass adds them to the scene when they come into view) */
-  grp.traverse(o=>{ if (o.geometry) o.geometry.dispose(); });   /* (the stand-in props go; their materials are the shared, keyed ones, and stay compiled) */
+  if (FPD.warmGrp) fpdWarmDone();
+  FPD.warmGrp = { grp, mons, fc };
   FPD.warmN = kinds.size + mons.length;
+}
+// (RS-345) after the warm frame has drawn the stand-ins: the props go, the monsters' models are kept for the sprite pass
+function fpdWarmDone(){
+  const w = FPD.warmGrp; if (!w) return; FPD.warmGrp = null; const grp = w.grp;
+  if (grp.parent) grp.parent.remove(grp);
+  for (const [o, v] of w.fc) o.frustumCulled = v;
+  for (const e of w.mons) grp.remove(e.holder);   /* (the monsters' models are kept, as they would be once seen: the sprite pass adds them to the scene when they come into view) */
+  grp.traverse(o=>{ if (o.geometry) o.geometry.dispose(); });   /* (the stand-in props go; their materials are the shared, keyed ones, and stay compiled) */
 }
 function isoPropMat(key, col, o){
   ISO.pm = ISO.pm || {};
@@ -37991,7 +38050,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-344';
+const GAME_VERSION = 'rs-345';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

@@ -11,19 +11,24 @@ module.exports = async page=>{
     place(T_VAULT); place(T_GOLD); place(T_ITEM, (x, y)=>{ G.floorItem[x][y] = genItem(10, 'weapon'); }); place(T_ITEM, (x, y)=>{ G.floorItem[x][y] = mkAntipoison(); });
     FPD.mapRef = null; renderGame(); await new Promise(r=>setTimeout(r, 300));
     const out = { warmN:FPD.warmN, mons:G.mon.filter(m=>m.alive).length, decos:[...new Set([].concat(...G.dungeonDeco.map(c=>c.filter(Boolean))))].length };
-    const n0 = FPD.r.info.programs.length;
+    const n0 = FPD.r.info.programs.length, keys0 = new Set(FPD.r.info.programs.map(p=>p.cacheKey));
     // every tile seen and lit at once: everything the floor has is drawn in one frame
     for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++) G.dungeonSeen[x][y] = true;
     const cs0 = fpCollectSprites; fpCollectSprites = vis=>cs0({ has:()=>true, size:vis&&vis.size });
     for (let i=0;i<3;i++){ renderGame(); await new Promise(r=>setTimeout(r, 100)); }
     out.afterSeen = FPD.r.info.programs.length - n0; fpCollectSprites = cs0;
-    // and a walk across it
+    // and a walk across it: plain floor only, with the monsters standing still (a fight, a summoner's skeletons or a
+    // mimic waking are new things, not a warm-up gap)
+    tickMonsters = ()=>{};
+    const sigOf = (o)=>[].concat(o.material).map(m=>{ let ch = [], q = o; while (q && ch.length < 5){ ch.push(q.name||q.type); q = q.parent; } return ch.join('<')+' '+m.type+(m.map?'/map':'')+(m.normalMap?'/nrm':'')+(m.vertexColors?'/vc':'')+(m.transparent?'/tr':'')+'/s'+m.side+(m.flatShading?'/fs':'')+'/'+(m.customProgramCacheKey?m.customProgramCacheKey():'')+(o.scale.x<0||o.scale.y<0||o.scale.z<0?'/mirrored':''); });
+    const sigs = ()=>{ const S = new Set(); FPD.scene.traverse(o=>{ if (o.material) for (const x of sigOf(o)) S.add(x); }); return S; };
+    const sig0 = sigs();
     let maxStep = 0; const dirs = [[1,0],[0,1],[-1,0],[0,-1]];
     for (let i=0;i<16;i++){ G.player.hp = effMaxHp(); G.ui = 'playing'; if (G.gameMode!==1) break;
       const m0 = G.map;
-      for (const [a,b] of dirs){ const x0 = G.player.x, y0 = G.player.y, t0 = performance.now(); moveDir(a,b); const t = performance.now()-t0; if (G.player.x!==x0 || G.player.y!==y0){ if (G.map===m0) maxStep = Math.max(maxStep, t); break; } }
+      for (const [a,b] of dirs){ const x0 = G.player.x, y0 = G.player.y, nx = x0+a, ny = y0+b; if (!G.map[nx] || G.map[nx][ny]!==T_FLOOR || G.mon.some(m=>m.alive && m.x===nx && m.y===ny)) continue; const t0 = performance.now(); moveDir(a,b); const t = performance.now()-t0; if (G.player.x!==x0 || G.player.y!==y0){ if (G.map===m0) maxStep = Math.max(maxStep, t); break; } }
       if (G.map!==m0) break; await new Promise(r=>setTimeout(r, 80)); }
-    out.afterWalk = FPD.r.info.programs.length - n0; out.maxStep = +maxStep.toFixed(0); out.progs = n0;
+    out.afterWalk = FPD.r.info.programs.length - n0; out.newKeys = FPD.r.info.programs.filter(p=>!keys0.has(p.cacheKey)).map(p=>p.name+' :: '+p.cacheKey); out.newMats = [...sigs()].filter(x=>!sig0.has(x)); out.maxStep = +maxStep.toFixed(0); out.progs = n0;
     return out; });
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };

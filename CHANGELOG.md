@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-345 - No Hitch on the Land or in Town
+
+- **The open land builds its shaders when it loads.** The same stall RS-344 fixed in dungeons happened on the land: the first deer, rabbit or boar to wander into view, the first gathering spot of a new kind, a camp, a marker, each froze a step while its shader compiled (the deer alone cost one probe nine seconds in software rendering). The land now compiles its whole scene right after it's built, off-screen parts included, and once per session a set of stand-ins for what only spawns later: the three animals and the birds, one gathering spot of every kind on the map (worked out too), a camp, a merchant, the glows, the rings and the crossed-swords icon.
+- **Towns too.** A town compiled a shader the first time you walked behind a building (its walls go see-through), on the first click ring, and on the first animal that came into view. A town now compiles its whole scene as it's built, plus a see-through copy of each building material and the rings.
+- **Dungeons: skeletons and billboards too.** The RS-344 floor warm-up skipped the skeletons' rigs and the billboard the painted creatures are drawn on. Both are built with the floor now.
+- **Drawn once, not just compiled.** All three views now draw their stand-ins once in the warm-up frame, below the ground where they're clipped away, as well as compiling them: graphics drivers build the rest of their pipeline at the first draw of each shader and vertex layout, so a compile alone leaves a smaller stall for that first draw.
+- **Test.** `viewwarm` walks the land and then a town, turns the camera and brings on night, and checks that nothing compiles after the build (a shadow-pass depth program is allowed: it's cheap and keyed on the caster, not its material).
+
 ## RS-344 - No More Dungeon Hitch
 
 - **The freeze on a dungeon step is gone.** Walking a dungeon could stall for a moment when a chest, a pile of gold, an item or a monster first came into view, as the renderer built that model's shader on the spot. A floor now builds every shader it will need while it loads: one stand-in of each prop on the floor, and the model of every monster on it.
