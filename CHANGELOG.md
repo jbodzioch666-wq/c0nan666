@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-340 - Here Be Dragons
+
+- **Mythic beasts are level 126.** Every mythic beast now fights at the top combat level. Before, they started at 100 and only rose with you, so they went down far too easily.
+- **Dragons are big.** A creature's size used to be read from its name, so a mythic beast with a name of its own (say "Vorath the Ashbound") was sized like a person. Size now comes from what it is. Dragons, wyrms and hydras are also bigger all round, mythic beasts a quarter bigger again, and the beast standing at its lair on the map is larger too.
+- **Many heads, no tangles.** The necks of hydras and the King Black Dragon were turned the wrong way, crossing in over the middle neck, and each swayed on its own so heads swung into each other. Now they fan out and lean apart, and the necks sway together. A new test checks the gap through the whole idle, wind-up and strike.
+
 ## RS-339 - The Gods, Named
 
 - **God spells have their own section.** In the Spells tab (G), Saradomin Strike, Claws of Guthix and Flames of Zamorak now sit under **God spells**, each named, edged in its god's colour, and saying what it needs: Magic 60 and that god's staff in hand. Before, they were unmarked squares among the standard spells.

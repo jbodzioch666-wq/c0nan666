@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| heads | many-headed creatures (hydras, King Black Dragon) keep their necks and heads apart through the whole animation |
 | godspells | the god spells have their own labelled rows in the Spells tab, and a god staff names its spell |
 | rs337 | the carpentry bench saws logs your Construction level can work; resources A to Z; story quests follow a site that moves when its master falls |
 | cutclick | a click on floor seen through a wall the cutaway has dissolved goes to that floor, not the wall |
