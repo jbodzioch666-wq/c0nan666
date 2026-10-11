@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-341 - Giants Wake
+
+- **World bosses are level 126.** The waking giants used to fight at your level plus 13 (at least 87). Now they're always level 126, like the mythic beasts, and their map tip says so.
+- **World bosses are huge.** A waking giant now stands taller than any giant you'll meet elsewhere, half again the size of an ordinary one, and it's bigger on the map while it roams.
+
 ## RS-340 - Here Be Dragons
 
 - **Mythic beasts are level 126.** Every mythic beast now fights at the top combat level. Before, they started at 100 and only rose with you, so they went down far too easily.
