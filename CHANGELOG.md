@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-329 - A Proper Trap
+
+- **The swinging blade is a real trap now.** Before, it rocked back and forth in plain sight and was dangerous every other turn. Now it hangs cocked up under the ceiling, still, until you step onto its tile.
+- **Then it drops.** It sweeps through your tile, swings back and forth a few times, and is hauled back up to wait for the next victim. Most of the time it catches you, but now and then you throw yourself flat and it sweeps over you. Click-to-move still goes round it when there is another way.
+- **Quick-bar tooltips.** Hover over a quick-bar slot to see what it holds: a prayer's effect, level and drain; a spell's damage and runes; an item's stats; plus its key.
+- **Protection prayers look different.** Protect from Magic, Missiles and Melee (and the Deflect curses) now show a shield round their mark, so they no longer look just like the magic accuracy prayers, on the bar or in the prayer tab.
+
 ## RS-328 - The Minimap Turns Underground
 
 - **The dungeon and fight minimap now turns with the camera.** Before, it stayed fixed while Z and X turned the view. Now up on the minimap is up on the screen, as on the overworld and in towns.

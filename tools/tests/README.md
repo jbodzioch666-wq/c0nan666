@@ -25,6 +25,8 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| bladewalk | the swinging blade is a trap: cocked and still until you step under it, then it drops and sweeps; paths go round it when they can |
+| qbtip | hovering a quick-bar slot shows what it holds; protection prayers wear a shield round their mark |
 | dgminimap | the minimap in dungeons and roadside fights turns with the camera, like the overworld's |
 | starlily | starlily patches show by day (closed, not pickable) on the map and land, and open at night |
 | mimic | the mimic has its own chest model with a toothy lid, tongue and six legs; the lid gapes and snaps |
@@ -41,7 +43,6 @@ Screenshots go to `tools/tests/shots/`.
 | townmap | The world map opened in a town fills the window like outside, hides the town minimap, and has its hotbar slot |
 | boardink | The bounty board's parchment cards use dark ink for rewards, difficulty and level (contrast at least 4.5:1) |
 | mapsearch | The world map's search box finds discovered places by name or kind, rings and lists them, and hides undiscovered ones; a wandering merchant is a merchant from first sight |
-| bladewalk | Click-to-move crosses a swinging blade that guards the only way, waiting a turn when the blade is down; Space waits a turn; goes round when it can |
 | clicksure | A click always works in a fight (the monsters' answer is hurried, held HUD buttons are not redrawn); no water inside the boat |
 | shore | RS-105 to 117, RS-311: water stays on the water; a sea or lake shore is a beach that slopes into the water, land corners out in the sea are rounded off, the middle of every land tile stays dry, river banks stay low; waterfalls flow |
 | sitrobe | RS-310: a robe bottom on a seated figure folds onto the lap over the thighs, falls from the knees, stays above the ground, and takes its own shape again on standing - on six race and sex combinations |
