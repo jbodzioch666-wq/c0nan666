@@ -9,7 +9,7 @@ module.exports = async page=>{
     const P = G.player; P.hp = P.maxHp = 9999; G.mon = G.mon.filter((m,i)=>i===0); const m = G.mon[0]; m.hp = m.maxHp = 9999; m.atkBonus = 99; m.dmg1 = 1; m.dmg2 = 1;
     m.x = P.x + 1; m.y = P.y; if (G.map[m.x][m.y]===T_WALL) G.map[m.x][m.y] = T_FLOOR;
     for (let i=0;i<4;i++){ renderGame(); await new Promise(r=>setTimeout(r, 60)); }
-    window.__used = 0; qbUse = ()=>{ window.__used++; };
+    window.__used = 0; qbUse = ()=>{ window.__used++; }; qbSlots(0)[0] = { t:'prayer', id:'thick' };   /* (RS-321: an empty slot opens the picker instead - give it something to use) */
     SET.qb1 = true; renderGame(); });
   const r0 = await page.evaluate(()=>{ tryMove(1, 0); return { pending:foePending() }; });
   if (!r0.pending) throw new Error('a blow leaves the monsters\' answer pending');

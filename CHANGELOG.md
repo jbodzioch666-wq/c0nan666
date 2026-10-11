@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-336 - Gates Worth Guarding
+
+- **Bigger gates with real doors.** Every town gate, whether a timber palisade gate or a city's stone gatehouse, is taller and wider, with two iron-banded oak doors standing open inside it.
+- **Race banners on every gate.** The race's banner, its emblem in gold, now hangs on the face of the tower on each side of the gate, in villages and towns as well as cities.
+- **Click through the walls that fade away.** When walls between the camera and you dissolve, a click on the floor you can see through them now goes to that floor. Before, the click stopped on the invisible wall and walked you to the wrong tile. Stairs still count wherever you click on them.
+
 ## RS-335 - Trees on the Map
 
 - **Search the world map for trees and rocks.** Type "yew", "magic tree", "willow", "logs" or "coal" and the map finds them nearest first, alongside the herb patches and places. When a search finds a whole forest, the nearest 60 are ringed.
