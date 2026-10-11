@@ -30590,17 +30590,44 @@ function o3NodeTree(type){
   return g;
 }
 // the spots you can see: rebuilt when the set of them (or their state) changes
+// (RS-338) the gathering spots are built in chunks of 6 by 6 tiles, each kept until something in it changes (a tree felled, a
+// patch picked, a starlily opening) or it falls out of range - walking only builds the chunks coming into view. They used to
+// be built afresh, all of them, at every step, and since RS-333 merged too: a hitch each step on the open land
+const O3_NCH = 6, O3_NCR = 3;
+function o3NodeKeyOf(n){ return n.x+','+n.y+n.type.slice(0,2)+(n.gone?'g':'')+(n.shut?'s':'')+(n.glow?'*':'')+(n.rich?'R':''); }
+function o3FreeNodeChunk(c){
+  if (c.g.parent) c.g.parent.remove(c.g);
+  c.g.traverse(o=>{ if (o.geometry && !o.geometry.userData.keep) o.geometry.dispose(); if (o.material && o.material.userData && o.material.userData.own){ if (o.material.map) o.material.map.dispose(); o.material.dispose(); } });
+}
 function o3SyncNodes(){
-  const T = THREE, px = G.owPos.x, py = G.owPos.y, R = 20, turn = G.player.turnCount||0;
-  const list = [];
-  for (let i=-R;i<=R;i++) for (let j=-R;j<=R;j++){ const n = skNodeAt(px+i, py+j); if (n) list.push(n); }
-  const key = list.map(n=>n.x+','+n.y+n.type.slice(0,2)+(n.gone?'g':'')+(n.shut?'s':'')+(n.glow?'*':'')+(n.rich?'R':'')).join('|') + '@' + (O3.win ? O3.win.cx+','+O3.win.cy : '');
-  if (key === O3.nodeKey && O3.nodeGrp && O3.nodeGrp.parent) return;
-  O3.nodeKey = key;
+  const T = THREE, px = G.owPos.x, py = G.owPos.y;
   if (!O3.nodeGrp){ O3.nodeGrp = new T.Group(); }
   if (O3.nodeGrp.parent !== O3.scene) O3.scene.add(O3.nodeGrp);
-  const g = O3.nodeGrp; while (g.children.length){ const c = g.children[0]; g.remove(c); c.traverse && c.traverse(o=>{ if (o.geometry && !o.geometry.userData.keep) o.geometry.dispose(); if (o.material && o.material.userData && o.material.userData.own) o.material.dispose(); }); }
-  O3.nodeHits = []; O3.nodeAnim = [];
+  const C = O3.nodeChunks || (O3.nodeChunks = new Map());
+  const winK = O3.win ? O3.win.cx+','+O3.win.cy : '';
+  if (O3.nodeWinK !== winK){ for (const c of C.values()) o3FreeNodeChunk(c); C.clear(); O3.nodeWinK = winK; O3.nodeTick = null; }   /* (the land was rebuilt: its heights with it) */
+  const tk = px+','+py+'|'+(G.player.turnCount||0)+'|'+Math.floor(performance.now()/400)+'|'+seasonIdx()+(isNightTime() ? 'n' : 'd');
+  if (O3.nodeTick === tk) return; O3.nodeTick = tk;
+  const cx0 = Math.floor(px/O3_NCH), cy0 = Math.floor(py/O3_NCH), want = new Set(), t0 = performance.now(); let changed = false, built = 0;
+  const order = []; for (let i=-O3_NCR;i<=O3_NCR;i++) for (let j=-O3_NCR;j<=O3_NCR;j++) order.push([i, j]); order.sort((a, b)=>(a[0]*a[0]+a[1]*a[1]) - (b[0]*b[0]+b[1]*b[1]));
+  for (const [i, j] of order){
+    const cx = cx0+i, cy = cy0+j, ck = cx+','+cy; want.add(ck);
+    if (built && performance.now() - t0 > 4){ O3.nodeTick = null; continue; }   /* (a few milliseconds a frame, nearest first - the rest next frame) */
+    const list = []; for (let x=cx*O3_NCH; x<cx*O3_NCH+O3_NCH; x++) for (let y=cy*O3_NCH; y<cy*O3_NCH+O3_NCH; y++){ const n = skNodeAt(x, y); if (n) list.push(n); }
+    const key = list.map(o3NodeKeyOf).join('|'); let c = C.get(ck);
+    if (c && c.key===key) continue;
+    if (c) o3FreeNodeChunk(c);
+    c = { key, g:new T.Group(), hits:[], anim:[] }; O3.nodeGrp.add(c.g); C.set(ck, c);
+    const H0 = O3.nodeHits, A0 = O3.nodeAnim; O3.nodeHits = c.hits; O3.nodeAnim = c.anim;
+    try{ o3BuildNodeChunk(list, c.g); }catch(e){ console.error(e); } finally { O3.nodeHits = H0; O3.nodeAnim = A0; }
+    changed = true; built++;
+  }
+  for (const [ck, c] of C) if (!want.has(ck)){ o3FreeNodeChunk(c); C.delete(ck); changed = true; }
+  if (changed || !O3.nodeHits){ O3.nodeHits = []; O3.nodeAnim = []; for (const c of C.values()){ for (const h of c.hits) O3.nodeHits.push(h); for (const a of c.anim) O3.nodeAnim.push(a); } }
+}
+// one chunk's spots, built into g (O3.nodeHits and O3.nodeAnim are the chunk's own lists while it builds)
+function o3BuildNodeChunk(list, g){
+  const T = THREE;
   const G3 = o3NodeGeo(), hitM = O3.nodeHitM || (O3.nodeHitM = new T.MeshBasicMaterial({ visible:false }));
   const hitG = O3.nodeHitG || (O3.nodeHitG = new T.BoxGeometry(0.9, 1.3, 0.9).translate(0, 0.55, 0));
   for (const n of list){
@@ -37580,6 +37607,7 @@ function isoPick(e){
       const P = hit.point, n = hit.face ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld) : null;
       const sx = Math.floor(P.x - (n ? n.x : 0)*0.02), sy = Math.floor(P.z - (n ? n.z : 0)*0.02), stT = tileAt(sx, sy);
       if (stT===T_STAIRSU || stT===T_STAIRSD || stT===T_EXIT || stT===T_FLEE){ gx = sx; gy = sy; }   /* (RS-297: any face of a flight of stairs - a riser, a side, a tread high up - is the stairs) */
+      else if (isoPassable(gx, gy)){}   /* (RS-338) the floor tile under the cursor - the one the highlight marks - when you can stand on it, wall or no wall in front of it */
       else if (n && n.y > 0.6 && P.y < 0.35){ gx = Math.floor(P.x); gy = Math.floor(P.z); }
       else if (n && Math.abs(n.y) < 0.5){ gx = Math.floor(P.x + n.x*0.45); gy = Math.floor(P.z + n.z*0.45); }
       else { gx = Math.floor(P.x); gy = Math.floor(P.z); }
@@ -37909,7 +37937,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-337';
+const GAME_VERSION = 'rs-338';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

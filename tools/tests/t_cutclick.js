@@ -1,5 +1,6 @@
 // RS-336: a click on floor you can see through a wall the cutaway has dissolved (a wall between the camera and you) goes to
-// that floor - the click used to stop on the invisible wall and send you to the tile in front of it
+// that floor - the click used to stop on the invisible wall and send you to the tile in front of it. RS-338: whatever tile
+// the hover highlights, the click goes to - with the cutaway on or off
 module.exports = async page=>{
   const r = await page.evaluate(async ()=>{
     goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{};
@@ -17,12 +18,13 @@ module.exports = async page=>{
       G.map[wx][wy] = T_WALL; G.map[wx+sx] && (G.map[wx+sx][wy] = T_WALL); G.map[wx][wy+sy] = T_WALL;
       FPD.mapRef = null; await frames(6);
       const on = pick(fx, fy); const z0 = FPD.cutU.uCutF.value.z; FPD.cutU.uCutF.value.z = 0; const off = pick(fx, fy); FPD.cutU.uCutF.value.z = z0;
-      out.tries.push({ f:[fx-P.x, fy-P.y], on:on && [on.gx-P.x, on.gy-P.y], off:off && [off.gx-P.x, off.gy-P.y] });
+      const v = new THREE.Vector3(fx+0.5, 0.02, fy+0.5).project(FPD.cam), rc = canvas.getBoundingClientRect(); ISO.mouse = { x:rc.left + (v.x+1)/2*rc.width, y:rc.top + (1-v.y)/2*rc.height }; const hv = isoHoverTile();
+      out.tries.push({ f:[fx-P.x, fy-P.y], on:on && [on.gx-P.x, on.gy-P.y], off:off && [off.gx-P.x, off.gy-P.y], hover:hv && [hv[0]-P.x, hv[1]-P.y] });
     }
     return out; });
   const A = (c, m)=>{ if (!c) throw new Error(m+' :: '+JSON.stringify(r)); };
-  const real = r.tries.filter(t=>t.off && (t.off[0]!==t.f[0] || t.off[1]!==t.f[1]));   /* (the cases where the wall really stood in the way) */
-  A(real.length >= 1, 'at least one floor tile is hidden behind a wall toward the camera');
-  A(real.every(t=>t.on && t.on[0]===t.f[0] && t.on[1]===t.f[1]), 'with the wall dissolved, the click goes to the floor behind it');
+  const same = (a, b)=>a && b && a[0]===b[0] && a[1]===b[1];
+  A(r.tries.every(t=>same(t.hover, t.f)), 'the hover highlights the floor tile behind the wall');
+  A(r.tries.every(t=>same(t.on, t.f) && same(t.off, t.f)), 'and the click goes to that highlighted tile, through the wall');
   console.log('cutclick ok', JSON.stringify(r));
 };

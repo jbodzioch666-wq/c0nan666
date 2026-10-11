@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-338 - Smooth Walking
+
+- **No more stutter walking the open land.** Every tree, rock and herb patch around you was rebuilt at every step (since RS-333, merged too), which cost a hitch per tile. They're now built in small chunks that stay put: a step builds only the few chunks coming into view, spread over frames, and picking a patch rebuilds only its chunk. A step now takes under a millisecond of this work, down from about 50.
+- **Click the tile that lights up.** In dungeons, the tile highlighted under your cursor is now always where a click takes you, even with a wall standing between it and the camera. Monsters and stairs still come first.
+
 ## RS-337 - The Bench, the Bag and the Bone
 
 - **The carpentry bench uses logs you can work.** It used to pick the best logs in your pack (maple, say) and tell you that you needed Construction 45, even with plain logs right there. Now it saws the best logs your Construction level can handle. If you only have logs above your level, it tells you which ones you can use.

@@ -12,11 +12,15 @@ module.exports = async page=>{
     const spec = WG_WILD.deer; out.fine = tris(m3dInstance({ nm:spec.nm }, { paint:mpBeast, o:spec.o, h:1 }));
     M3D_COARSE = 2.6; try{ out.coarse = tris(m3dInstance({ nm:spec.nm }, { paint:mpBeast, o:spec.o, h:1 })); } finally { M3D_COARSE = 1; }
     out.wild = (O3.wild||[]).filter(w=>w.e && w.e.holder && w.k!=='bird').map(w=>tris(w.e));
+    // (RS-338) a step keeps the chunks already built - only the new edge gets built
+    const before = new Map(O3.nodeChunks); G.owPos.x++; for (let i=0;i<6;i++){ O3.nodeTick = null; o3SyncNodes(); }
+    let kept = 0, fresh = 0; for (const [k, c] of O3.nodeChunks){ if (before.get(k)===c) kept++; else fresh++; } out.kept = kept; out.fresh = fresh; G.owPos.x--;
     return out; });
   const A = (c, m)=>{ if (!c) throw new Error(m+' :: '+JSON.stringify(r)); };
   A(r.nodes > 20 && r.merged > 0, 'the gathering spots are baked together');
-  A(r.drawn < r.nodes*2.5, 'about two draws a spot or fewer, not nine: '+r.drawn+' for '+r.nodes);
+  A(r.drawn < r.nodes*3.5, 'about three draws a spot or fewer (RS-338: merged chunk by chunk), not nine: '+r.drawn+' for '+r.nodes);
   A(r.coarse < r.fine/4, 'a coarse deer is a quarter of the triangles or fewer');
   A(r.wild.every(t=>t < 60000), 'the animals on the land are the coarse ones');
+  A(r.kept >= r.fresh*3 && r.fresh <= 7, 'a step keeps the built chunks and builds only the new edge: '+r.kept+' kept, '+r.fresh+' new');
   console.log('perfwild ok', JSON.stringify(r));
 };
