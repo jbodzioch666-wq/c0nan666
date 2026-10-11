@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-327 - Starlilies by Day
+
+- **Starlily patches no longer vanish in daylight.** The map search could find a patch that the map and the land didn't show, because by day the patch disappeared. Now it's always there.
+- **Closed until nightfall.** By day the patch shows as pale, shut buds with no glow, and its map icon is dimmed. Hovering over it says "closed for the day - the buds open at nightfall", and it can't be picked until night.
+
 ## RS-326 - A Chest With Teeth
 
 - **Mimics have their own model.** Before, a mimic borrowed another monster's body. Now it is an iron-banded treasure chest with gold corners, a lock on its lid and rows of fangs along both rims.

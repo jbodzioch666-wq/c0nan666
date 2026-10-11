@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| starlily | starlily patches show by day (closed, not pickable) on the map and land, and open at night |
 | mimic | the mimic has its own chest model with a toothy lid, tongue and six legs; the lid gapes and snaps |
 | hooded | The Thieves' Guild quests come from a hooded figure in the tavern's corner, not the tavernkeeper |
 | bagmats | Herbs, forage, ores and materials show in the side window's bag and under the All tab |
