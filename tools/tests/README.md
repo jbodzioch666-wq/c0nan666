@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs342 | dragon lair masters are level 126 and big; god staves, capes and relics are Unique and never sold by the loot filter or junk sellers |
 | bigbosses | mythic beasts and world bosses are level 126 and sized by what they are, bigger than the run of their kind |
 | heads | many-headed creatures (hydras, King Black Dragon) keep their necks and heads apart through the whole animation |
 | godspells | the god spells have their own labelled rows in the Spells tab, and a god staff names its spell |

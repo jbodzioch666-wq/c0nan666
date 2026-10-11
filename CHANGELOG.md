@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-342 - The Lair Lords
+
+- **Dragon lair masters are level 126.** A lair's master now fights at the top level, with stats raised to match (about a quarter tougher than the old combat-110 fight). The map's lair estimate shows 126 too.
+- **And they're big.** A lair master stands as big as a mythic beast, whatever its name.
+- **God staves can't be sold by accident.** God staves, god capes and the relics (Abyssal Whip, Dragonfire Shield) are now Unique (gold). The loot filter and the "sell junk" buttons never sell them, or superior crafted gear, or quest rewards, even when they look like a downgrade for you. God staves you already own are protected too.
+
 ## RS-341 - Giants Wake
 
 - **World bosses are level 126.** The waking giants used to fight at your level plus 13 (at least 87). Now they're always level 126, like the mythic beasts, and their map tip says so.
