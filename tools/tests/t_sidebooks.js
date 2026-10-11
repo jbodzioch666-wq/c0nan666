@@ -12,7 +12,10 @@ module.exports = async page=>{
     skGainXP('magic', 2e5); hudLayout(); await frames(1); const btn = nm=>[...sp().querySelectorAll('.sp-b')].find(b=>b.textContent===nm);
     out.books = { altar:rsNearAnyAltar(), arceuus:!!btn('Arceuus Spellbook') && !btn('Arceuus Spellbook').disabled, lunarLocked:!!btn('Lunar Spellbook') && btn('Lunar Spellbook').disabled };
     if (out.books.arceuus) btn('Arceuus Spellbook').click(); await frames(1); out.books.now = rsBook();
-    rsSwitchBook('lunar'); out.books.stillArc = rsBook()==='arceuus'; rsSwitchBook('standard'); out.books.back = rsBook()==='standard';
+    rsSwitchBook('lunar'); out.books.stillArc = rsBook()==='arceuus';
+    // (RS-323) the standard spells come with every book, and a standard spell you'd picked stays picked
+    out.std = { listed:rsBookSpells().some(sp=>sp[0]==='windstrike'), ok:!rsSpellBlock(rsSpell('windstrike')), own:rsBookSpells()[0] && rsSpellBook(rsBookSpells()[0])==='arceuus', panel:/STANDARD &middot; COMBAT|STANDARD · COMBAT/.test(sp().innerHTML) || (hudLayout(), /STANDARD/.test(sp().innerHTML)) };
+    rsSwitchBook('standard'); G.player.rsSpell = 'windstrike'; rsSwitchBook('arceuus'); out.std.kept = G.player.rsSpell==='windstrike'; rsSwitchBook('standard'); out.books.back = rsBook()==='standard';
     key('g'); await frames(1); out.gClose = !SP.open;
     key('n'); await frames(2); out.n = { open:SP.open, tab:SP.tab, ui:G.ui, bury:[...sp().querySelectorAll('.sp-b')].some(b=>/bury 3 bones/.test(b.textContent)) };
     const xp0 = skP().skills.prayer||0; [...sp().querySelectorAll('.sp-b')].find(b=>/bury/.test(b.textContent)).click(); out.buried = skHave('bones')===0 && (skP().skills.prayer||0) > xp0;
@@ -35,6 +38,7 @@ module.exports = async page=>{
   if (!(r.g.open && r.g.tab==='spells' && r.g.ui==='playing' && r.g.shown)) throw new Error('G opens the Spellbook tab '+JSON.stringify(r.g));
   if (!r.g.pouch) throw new Error('the Spellbook tab shows the rune pouch');
   if (r.books.altar || !r.books.arceuus || r.books.now!=='arceuus' || !r.books.lunarLocked || !r.books.stillArc || !r.books.back) throw new Error('spellbooks change any time from the tab, locked ones stay locked '+JSON.stringify(r.books));
+  if (!(r.std && r.std.listed && r.std.ok && r.std.own && r.std.panel && r.std.kept)) throw new Error('standard spells come with every book '+JSON.stringify(r.std));
   if (!r.gClose) throw new Error('G again closes it');
   if (!(r.n.open && r.n.tab==='prayer' && r.n.ui==='playing')) throw new Error('N opens the Prayer tab '+JSON.stringify(r.n));
   if (!r.n.bury || !r.buried) throw new Error('bones are buried from the Prayer tab');

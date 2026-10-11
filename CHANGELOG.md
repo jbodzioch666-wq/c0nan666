@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-323 - Darker Halls, Swinging Blades
+
+- **The standard spells come with every book.** Switch to the Ancient, Lunar or Arceuus spellbook and you keep all the standard spells too, listed after the book's own. A standard spell you had picked stays picked when you switch.
+- **Light carries half as far in the dungeons.** Your lantern, the wall torches, every crystal, brazier and lava glow, and the fog all close in to about half their old reach, and the dim light that filled whole rooms is softer. The shafts of daylight through the cracks are narrower, with smaller pools. Pools of light now stand out against the dark.
+- **Blades swing in real time.** A swinging blade trap never stops moving. When it would catch you, it sweeps in a full arc through its tile; when it's safe to pass, it rocks in a small arc held up to one side.
+- **Your materials are in your bag.** Herbs and other forage, ores, logs, crafting materials and bones now show in the side window's bag (F1) and under the equipment page's All tab, not only on its Resources tab. Hover one to see where it comes from and what it's for.
+
 ## RS-322 - The Ferry Sails
 
 - **Ferries cross the water.** Taking a ferry used to drop you on the far shore in an instant. Now the ferryman casts off and your boat sails out from the landing, along a course over open water, to the far landing. It goes about three times your walking pace, with the camera following and the coast revealed as you pass.
