@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-326 - A Chest With Teeth
+
+- **Mimics have their own model.** Before, a mimic borrowed another monster's body. Now it is an iron-banded treasure chest with gold corners, a lock on its lid and rows of fangs along both rims.
+- **It's alive.** Glowing slit eyes watch you from the gap under the lid, a long tongue lolls out over the teeth, and six jointed legs carry the chest along at a scuttle.
+- **Watch the lid.** It breathes slightly ajar, gapes wide as the mimic winds up, and snaps shut when it bites.
+
 ## RS-325 - A Smooth World Map, and a Stranger in the Corner
 
 - **The world map no longer chokes when you zoom in.** Around the fifth zoom click, where the map starts drawing every tree and peak, the frame rate used to fall to about 14. That detail was redrawn from scratch every frame over the widest view it ever covers. Now it's drawn once and reused until you zoom or pan off it, with a margin so dragging the map stays smooth. On a test copy of your save, a frame there went from about 30 ms to about 10.
