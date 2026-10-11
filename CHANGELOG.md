@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-344 - No More Dungeon Hitch
+
+- **The freeze on a dungeon step is gone.** Walking a dungeon could stall for a moment when a chest, a pile of gold, an item or a monster first came into view, as the renderer built that model's shader on the spot. A floor now builds every shader it will need while it loads: one stand-in of each prop on the floor, and the model of every monster on it.
+- **The load-time shader build now actually counts.** Since RS-110 a new floor compiled its shaders as it loaded, but with the post-processing look on (the default) the game draws into an off-screen buffer, and three.js keys its programs by that buffer, so the load-time build made a second set that was never used and every shader compiled again on the first frame that needed it. Floors now compile against the buffer they're drawn into, so a floor builds about 23 programs once instead of 36 split across the load and your first steps.
+- **Test.** `dgwarm` loads a dungeon floor with a chest, gold, items and its monsters, reveals the whole floor at once, then walks it, and checks that no shader is compiled after the load.
+
 ## RS-343 - Audit Fixes
 
 - **Altars promise the xp they give.** The runecrafting altar's "Bind" prompt left out your race's xp bonus and the minstrels' song, so the xp it showed could be a little under what you got. Your house altar's "Offer bones" line showed the raw figure, about three times what it gave. Both now show the real gain.

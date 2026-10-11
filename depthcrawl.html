@@ -22991,6 +22991,12 @@ function gfxPost(r){
   GFXP.set(r, P); return P;
 }
 function gfxPass(r, P, mat, target){ P.quad.material = mat; r.setRenderTarget(target); r.render(P.qs, P.qc); }
+// (RS-344) compile or warm-draw a scene the way it's really drawn. With post-processing on, the scene goes into a render
+// target, and three.js keys its shader programs by the target's encoding: a compile against the screen builds programs
+// that are never used, and the real ones still compile on the first frame that needs them - the hitch on a dungeon step
+function gfxTarget(r){ if (!gfxPostOn()) return null; try{ return gfxPost(r).scene; }catch(e){ return null; } }
+function gfxCompile(r, scene, cam){ const rt = r.getRenderTarget(), t = gfxTarget(r); if (t) r.setRenderTarget(t); try{ r.compile(scene, cam); } finally { r.setRenderTarget(rt); } }
+function gfxWarmRender(r, scene, cam){ const rt = r.getRenderTarget(), t = gfxTarget(r); if (t) r.setRenderTarget(t); try{ r.render(scene, cam); } finally { r.setRenderTarget(rt); } }
 function gfxRender(r, scene, cam, view){
   if (!gfxPostOn()){ r.render(scene, cam); return; }
   let P; try{ P = gfxPost(r); }catch(e){ console.error(e); SET.post = false; r.render(scene, cam); return; }
@@ -31989,7 +31995,7 @@ function fpdRender(env, T, camZ){
   let stale = FPD.mapRef!==G.map || FPD.theme!==T.key || !FPD.ftile || FPD.ftile.length!==ft.length;
   if (!stale) for (let i=0;i<ft.length;i++) if (ft[i]!==FPD.ftile[i]){ stale = true; break; }
   if (stale){ FPD.mapRef = G.map; FPD.theme = T.key; FPD.ftile = ft.slice(); fpdBuild(T); try{ gfxFpdBuild(T); }catch(e){ console.error(e); }
-    try{ FPD.r.compile(FPD.scene, FPD.cam); }catch(e){} }   // (RS-110) build every shader the floor needs now, while it loads, not on your first steps
+    try{ fpdWarm(); }catch(e){ console.error(e); try{ gfxCompile(FPD.r, FPD.scene, FPD.cam); }catch(e2){} } }   // (RS-110) build every shader the floor needs now, while it loads, not on your first steps; (RS-344) its props and monsters too
   // resolution adapts to keep the frame rate up on slower graphics. Each change reallocates buffers (a hitch), so (RS-107) it only
   // moves between a few fixed steps, judges the frame rate over about two seconds, ignores one-off spikes, and once a step up
   // has had to come back down it stays put for a minute rather than see-sawing
@@ -32101,7 +32107,7 @@ function fpdRender(env, T, camZ){
   }
   for (const pt of FPD.portals||[]){ pt.mat.uniforms.t.value = FP.t + pt.seed; const k = 0.85 + 0.15*Math.sin(FP.t*3 + pt.seed); pt.L.intensity = 0.9*k; pt.pool.material.opacity = 0.55*k; }
   // (the shadow maps only exist after their first pass, so a fresh level gets a warm-up render)
-  if (FPD.warm){ FPD.warm = false; FPD.r.render(FPD.scene, cam); }
+  if (FPD.warm){ FPD.warm = false; gfxWarmRender(FPD.r, FPD.scene, cam); }   /* (RS-344: into the post target, so it builds the programs the real frames use) */
   gfxRender(FPD.r, FPD.scene, cam, 'fpd');
   return true;
 }
@@ -36742,6 +36748,36 @@ function isoSyncSprites(S, env){
   for (let i=n;i<ISO.sprites.length;i++) ISO.sprites[i].visible = false;
 }
 // ---- the dungeon's props as real 3D models: gold, chests, floor items, signposts, thrones, banners, altars and idols ----
+// (RS-344) everything a floor can show but hasn't yet - one of each kind of prop on it (chests, gold, items, the dressing,
+// thrones and altars, the torch flames) and every monster on it - built into a group for a moment and compiled with the
+// scene. Each of those used to compile its shaders the first time it came into view: a hitch of a few frames on a phone,
+// seconds on a software renderer, on some step through the floor
+function fpdWarm(){
+  const T = THREE; if (!FPD.scene || !FPD.r || typeof isoOn!=='function' || !isoOn()) return;
+  const grp = new T.Group(), kinds = new Map(), add = (k, p)=>{ if (!kinds.has(k)) kinds.set(k, p); };
+  add('flame', { kind:'flame' });
+  const D = G.dungeonDeco, necro = G.siteKind==='necro';
+  for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){ const t = G.map[x][y];
+    if (t===T_GOLD) add('gold', { kind:'gold' });
+    else if (t===T_VAULT) add('chest', { kind:'chest' });
+    else if (t===T_CORRUPT_CHEST) add('chestc', { kind:'chest', corrupt:true });
+    else if (t===T_FLEE && G.gameMode===2){ add('sign', { kind:'sign', sealed:false }); add('signs', { kind:'sign', sealed:true }); }
+    else if (t===T_ITEM && G.floorItem && G.floorItem[x] && G.floorItem[x][y]){ const it = G.floorItem[x][y]; add('item:'+(it.kind||'')+'|'+(it.slot||'')+'|'+(it.quality|0)+'|'+(it.consumable ? 1 : 0), { kind:'item', it }); }
+    if (t===T_FLOOR && D && D[x] && D[x][y]){ const d = D[x][y];
+      if (DRESS_DECOS.includes(d)) add('d:'+d, d==='banner2' ? { kind:'banner', necro } : { kind:'dress', d, rot:0 });
+      else if (['throne','banner','altar','idol'].includes(d)) add('k:'+d, { kind:d, necro }); } }
+  for (const p of kinds.values()){ try{ grp.add(isoPropModel(Object.assign({ x:0, y:0 }, p))); }catch(e){ console.error(e); } }
+  const mons = [];
+  for (const m of G.mon||[]){ if (!m.alive || M3D.inst.get(m)) continue;
+    try{ if (typeof sk3Wanted==='function' && sk3Wanted(m)) continue; const pt = m3dPortrait(m); if (!pt) continue;
+      const e = m3dInstance(m, pt); e.pt = pt; M3D.inst.set(m, e); grp.add(e.holder); mons.push(e); }catch(e){ console.error(e); } }
+  FPD.scene.add(grp);
+  try{ gfxCompile(FPD.r, FPD.scene, FPD.cam); }catch(e){ console.error(e); }
+  FPD.scene.remove(grp);
+  for (const e of mons) grp.remove(e.holder);   /* (the monsters' models are kept, as they would be once seen: the sprite pass adds them to the scene when they come into view) */
+  grp.traverse(o=>{ if (o.geometry) o.geometry.dispose(); });   /* (the stand-in props go; their materials are the shared, keyed ones, and stay compiled) */
+  FPD.warmN = kinds.size + mons.length;
+}
 function isoPropMat(key, col, o){
   ISO.pm = ISO.pm || {};
   return ISO.pm[key] || (ISO.pm[key] = new THREE.MeshStandardMaterial(Object.assign({ color:new THREE.Color(col).convertSRGBToLinear(), roughness:0.75 }, o||{})));
@@ -37955,7 +37991,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-343';
+const GAME_VERSION = 'rs-344';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

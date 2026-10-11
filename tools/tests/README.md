@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| dgwarm | a floor's props and monsters are compiled with it at load, so no shader builds mid-walk (the dungeon hitch) |
 | rs342 | dragon lair masters are level 126 and big; god staves, capes and relics are Unique and never sold by the loot filter or junk sellers |
 | bigbosses | mythic beasts and world bosses are level 126 and sized by what they are, bigger than the run of their kind |
 | heads | many-headed creatures (hydras, King Black Dragon) keep their necks and heads apart through the whole animation |
