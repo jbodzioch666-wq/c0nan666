@@ -1,5 +1,15 @@
 # Depthcrawl patch notes
 
+## RS-346 - Every Creature Moves
+
+- **Every creature walks, fights and dies.** All 223 creatures in the bestiary were checked: each has a 3D model, moves when it walks, moves when it winds up and strikes, and topples over when it's killed. Most already did. These didn't, and now do:
+- **Snakes, worms, eels and leeches slither.** They used to glide along with the same idle sway as when lying still. Now a wave runs down the body as they move, quietest at the head so it still watches you.
+- **Oozes heave, floaters drift, crawlers roll.** Gray oozes, ochre jellies and shambling mounds lurch and heave as they go. The will-o-wisp, the water elemental lord, the jellyfish swarm and the dust devil lean into their drift and bob. The roper, the aberration and the avatar of the depths roll side to side on their tentacles.
+- **Birds fly harder when they're going somewhere.** Hawks, owls and vultures lean in and beat their wings wider in flight.
+- **Crocodiles lunge.** The giant crocodile, the sacred crocodile and Ammit draw back, then lunge in and twist their heads into the bite, with a whip of the tail. Before, only the jaws moved.
+- **The lich always has its model.** A lich met on the open land before you'd been in any dungeon could fail to build its 3D model, because its skull used a dungeon texture that didn't exist yet. It now builds anywhere.
+- **Test.** `mobanim` builds every creature and checks it walks, fights and dies.
+
 ## RS-345 - No Hitch on the Land or in Town
 
 - **The open land builds its shaders when it loads.** The same stall RS-344 fixed in dungeons happened on the land: the first deer, rabbit or boar to wander into view, the first gathering spot of a new kind, a camp, a marker, each froze a step while its shader compiled (the deer alone cost one probe nine seconds in software rendering). The land now compiles its whole scene right after it's built, off-screen parts included, and once per session a set of stand-ins for what only spawns later: the three animals and the birds, one gathering spot of every kind on the map (worked out too), a camp, a merchant, the glows, the rings and the crossed-swords icon.

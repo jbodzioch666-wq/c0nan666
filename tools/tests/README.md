@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| mobanim | every bestiary creature has a 3D model that moves when it walks, when it winds up or strikes, and topples when it dies (serpents slither, oozes heave, floaters lean, crocodiles lunge) |
 | viewwarm | the open land and a town compile their shaders at build (whole scene plus stand-ins for animals, spot kinds, camps, markers, see-through buildings), so a walk, a turn and nightfall compile nothing new |
 | dgwarm | a floor's props and monsters are compiled with it at load, so no shader builds mid-walk (the dungeon hitch) |
 | rs342 | dragon lair masters are level 126 and big; god staves, capes and relics are Unique and never sold by the loot filter or junk sellers |
