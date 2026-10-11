@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-347 - The Relic of Bone Lies Deeper
+
+- **The Waking Lich IV always sends you to a graveyard.** It could point at a necromancer's tower, or any site at all, when no graveyard lay within 60 tiles of the temple that gave the quest. It now picks the nearest graveyard wherever it is on the map. A save already pointed at a tower is moved to a graveyard the next time the quest looks for its target.
+- **The Relic of Bone is on floor 6.** It lay on the second floor. The temple now sends you six floors down into the catacombs, and the graveyard it picks is made at least six floors deep so the floor is there.
+- **Test.** `lich4` starts the chain, checks the target is a graveyard six floors deep, and checks a save aimed at a tower is moved.
+
 ## RS-346 - Every Creature Moves
 
 - **Every creature walks, fights and dies.** All 223 creatures in the bestiary were checked: each has a 3D model, moves when it walks, moves when it winds up and strikes, and topples over when it's killed. Most already did. These didn't, and now do:

@@ -23424,8 +23424,8 @@ const SQ = {
             { k:'talk', who:'temple', say:'"Three relics. Bone, iron and glass. Go."' } ],
     reward:{ xp:{ magic:1500 } } },
   lich4:   { nm:'The Waking Lich IV: The Relic of Bone', main:4, giver:'temple', qp:1, req:{ quests:['lich3'] }, desc:'The first relic lies in a crypt.',
-    steps:[ { k:'talk', who:'temple', say:'"Bone first. The crypts keep their oldest dead on the second floor."' },
-            { k:'floor', at:'graveyard', floor:2, item:'The Relic of Bone', obj:'Find the Relic of Bone on floor 2 of a graveyard', say:'A finger-bone in a silver cage, humming.' },
+    steps:[ { k:'talk', who:'temple', say:'"Bone first. The catacombs keep their oldest dead six floors down."' },
+            { k:'floor', at:'graveyard', floor:6, item:'The Relic of Bone', obj:'Find the Relic of Bone on floor 6 of a graveyard', say:'A finger-bone in a silver cage, humming.' },
             { k:'talk', who:'temple', say:'"One. Iron next - a castle\'s master guards it."' } ],
     reward:{ xp:{ prayer:2000 } } },
   lich5:   { nm:'The Waking Lich V: The Relic of Iron', main:5, giver:'temple', qp:1, req:{ quests:['lich4'], combat:18 }, desc:'The second relic is held by a castle\'s master.',
@@ -23503,7 +23503,7 @@ function sqResolve(id, step){
   if (step.at==='wild') L = questWildTile(h.x, h.y, 6, 16);
   else if (step.at==='ruin' || step.at==='hermit'){ const k = step.at==='ruin' ? ['ruin','cave'] : ['hermit']; const ps = (G.ow.pois||[]).filter(o=>k.includes(o.k)).sort((a,b)=>Math.hypot(a.x-h.x, a.y-h.y)-Math.hypot(b.x-h.x, b.y-h.y)); L = ps[0] ? { x:ps[0].x, y:ps[0].y } : questWildTile(h.x, h.y, 6, 14); }
   else if (step.at==='digsite'){ const ps = (G.ow.pois||[]).filter(o=>o.k==='digsite').sort((a,b)=>Math.hypot(a.x-h.x, a.y-h.y)-Math.hypot(b.x-h.x, b.y-h.y)); L = ps[0] ? { x:ps[0].x, y:ps[0].y } : questWildTile(h.x, h.y, 8, 16); }
-  else if (step.at==='graveyard') L = site(['graveyard','necro']) || site(null);
+  else if (step.at==='graveyard') L = site(['graveyard']) || sqAnySite(['graveyard']) || site(null);   /* (RS-347: a graveyard, however far - never a tower) */
   else if (step.at==='castle') L = site(['castle']) || site(null);
   else if (step.at==='mine') L = site(['mine']) || site(null);
   else if (step.at==='dungeon') L = site(['dungeon']) || site(null);
@@ -23512,8 +23512,17 @@ function sqResolve(id, step){
   else if (step.at==='town'){ const ts = townList().filter(t=>!(t.x===h.x && t.y===h.y)).sort((a,b)=>Math.hypot(a.x-h.x, a.y-h.y)-Math.hypot(b.x-h.x, b.y-h.y)); L = ts[0] ? { x:ts[0].x, y:ts[0].y } : null; }
   if (!L) L = questWildTile(h.x, h.y, 5, 20) || { x:h.x, y:h.y };
   s.loc[s.step] = L; owReveal(L.x, L.y, 3);
+  sqDeepEnough(step, L);
   return L;
 }
+// (RS-347) the site of a floor step has at least that many floors: a relic on floor 6 needs a sixth floor
+function sqDeepEnough(step, L){
+  if (!step || step.k!=='floor' || typeof step.floor!=='number' || !L || !G.ow || !G.ow.dungeonMax || !G.ow.dungeonMax[L.x]) return;
+  if (!OW_SITE_TILES.includes(G.ow.map[L.x][L.y])) return;
+  if ((G.ow.dungeonMax[L.x][L.y]||1) < step.floor){ G.ow.dungeonMax[L.x][L.y] = step.floor; if (G.dungeonEntrance && G.dungeonEntrance.x===L.x && G.dungeonEntrance.y===L.y) G.dungeonMaxDepth = Math.max(G.dungeonMaxDepth||1, step.floor); }
+}
+// the nearest site of those kinds anywhere on the map
+function sqAnySite(kinds){ const h = { x:G.owPos.x, y:G.owPos.y }, l = questNearbySites(h.x, h.y, 0, Math.max(OW_COLS, OW_ROWS), kinds); return l.length ? { x:l[0].x, y:l[0].y } : null; }
 // the Black Spire: the necromancer's tower farthest from where you began
 function sqSpire(){
   const s = wgState(); if (s.spire) return s.spire;
@@ -23682,7 +23691,9 @@ function sqTakeLeftRelic(){
 function sqSiteCheck(id){
   const s = sqP()[id], st = sqStep(id); if (!s || !st || !s.loc || !['floor','siteboss'].includes(st.k)) return;
   const L = s.loc[s.step]; if (!L || !G.ow || !G.ow.map[L.x]) return;
-  if (!OW_SITE_TILES.includes(G.ow.map[L.x][L.y])){ delete s.loc[s.step]; sqResolve(id, st); }
+  const wrongKind = st.at==='graveyard' && G.ow.map[L.x][L.y]!==OW_GRAVEYARD;   /* (RS-347: a save that was sent to a tower goes to a graveyard) */
+  if (!OW_SITE_TILES.includes(G.ow.map[L.x][L.y]) || wrongKind){ delete s.loc[s.step]; sqResolve(id, st); }
+  else sqDeepEnough(st, L);
 }
 function sqOnSiteBoss(x, y){
   for (const id of SQ_ORDER){ const st = sqStep(id); if (!st || st.k!=='siteboss') continue; const s = sqP()[id], L = s.loc[s.step];
@@ -38065,7 +38076,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-346';
+const GAME_VERSION = 'rs-347';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
