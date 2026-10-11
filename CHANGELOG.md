@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-332 - The Quest Bar's Own Tabs
+
+- **Journal and Tasks live in the quest bar now.** It has three tabs built in: **Quests** (what you're tracking), **Journal** (every story quest by state; tap one for its log) and **Tasks** (your Slayer task, contracts and bounties with their progress). They show right there in the bar instead of opening the side window.
+- **They stay on the rolled-up bar.** Tap one and the bar rolls down on that tab.
+
 ## RS-331 - Quests Underground
 
 - **Your dungeon quest, at the top of the screen.** When a quest of yours is in the dungeon you're in (a rescue, a dungeon master to beat, a story quest's lair), its name and what's left to do show in gold under the info bar. A rescue also says which floor you're on.

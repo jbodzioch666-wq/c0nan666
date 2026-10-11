@@ -25,7 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
-| dgquest | a quest in the dungeon you're in shows under the top bar; the quest tracker has Journal and Tasks buttons |
+| dgquest | a quest in the dungeon you're in shows under the top bar; the quest bar has its own Quests, Journal and Tasks tabs |
 | questtabs | the side window's quests tab has Active, Journal (story quests, click for the log) and Tasks (Slayer, contracts, bounties) tabs |
 | bladewalk | the swinging blade is a trap: cocked and still until you step under it, then it drops and sweeps; paths go round it when they can |
 | qbtip | hovering a quick-bar slot shows what it holds; protection prayers wear a shield round their mark |
