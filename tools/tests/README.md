@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| hooded | The Thieves' Guild quests come from a hooded figure in the tavern's corner, not the tavernkeeper |
 | bagmats | Herbs, forage, ores and materials show in the side window's bag and under the All tab |
 | dglight | Light carries half as far in dungeons (lantern, torches, fog, glows, narrower shafts); a blade swings in real time |
 | ferry | Taking a ferry sails you across the water in your boat to the far landing (no jump), unsteerable, same time cost |

@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-325 - A Smooth World Map, and a Stranger in the Corner
+
+- **The world map no longer chokes when you zoom in.** Around the fifth zoom click, where the map starts drawing every tree and peak, the frame rate used to fall to about 14. That detail was redrawn from scratch every frame over the widest view it ever covers. Now it's drawn once and reused until you zoom or pan off it, with a margin so dragging the map stays smooth. On a test copy of your save, a frame there went from about 30 ms to about 10.
+- **The Thieves' Guild has its own contact.** Its work now comes from a hooded figure lurking in the corner of every tavern, not the tavernkeeper. Talk to them to join and to hand in each job. If you've sided with the Royal Guard, they won't deal with you.
+- **Dungeons first in a forage search.** Searching a cave herb now lists the dungeons and other sites where it grows ahead of the patches out on the land, so they don't drop off the end of the list.
+
 ## RS-324 - Zoom in Town, Search for Forage
 
 - **The world map zooms in towns.** The mouse wheel and a pinch now zoom the world map when you open it in a town, the same as out on the land.
