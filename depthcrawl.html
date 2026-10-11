@@ -7493,6 +7493,7 @@ function loadGame(id){
   }
   G.ow.walkVer = (G.ow.walkVer||0) + 1;
   G.ow.ev = data.owEvents || null; wevAfterLoad();
+  if (G.player && Array.isArray(G.player.ferryTo)){ G.owPos.x = G.player.ferryTo[0]; G.owPos.y = G.player.ferryTo[1]; delete G.player.ferryTo; }   /* (RS-322: saved under sail - you come ashore at the far landing) */
   try{ ISO.rot = ((G.player && G.player.viewRot)|0) % 4; VIEW.yaw = null; }catch(e){}   // (RS-140) the camera turn you left it at
   G.ow.wg = data.owWg || null;   // the world's events (see SECTION: WORLD EVENTS)
   G.gameMode = data.gameMode||0;
@@ -8577,6 +8578,7 @@ function applyOverworldOverrides(){
 function tryMoveOverworld(dx,dy){
   if (G.gameOver) return;
   if (G.owPortal){ if (!o3Active()){ const f = G.owPortal; G.owPortal = null; waypointArrive(f.key); } return; }
+  if (G.owFerry){ if (!o3Active()) ferryLand(G.owFerry.to, G.owFerry.turns); return; }   /* (RS-322: under sail, the ferry steers) */
   const nx=G.owPos.x+dx, ny=G.owPos.y+dy;
   if (nx<0||ny<0||nx>=OW_COLS||ny>=OW_ROWS) return;
   const t = G.ow.map[nx][ny];
@@ -19987,9 +19989,45 @@ const WG_POI = {
   ferry(poi){
     const f = G.ow.ferries[poi.ferry]; if (!f) return; const to = poi.end==='a' ? f.b : f.a, cost = 15 + f.d*2, near = (()=>{ let b = null, bd = 1e9; for (const [tx,ty] of wevTowns()){ const d = Math.hypot(tx-to[0], ty-to[1]); if (d < bd){ bd = d; b = [tx,ty]; } } return b; })();
     wevDialog('A ferry landing', `A ferryman dozes beside a flat-bottomed boat. "Across the water? That's ${f.d} leagues, to the landing near ${esc(near ? o3TownName(near[0], near[1]) : 'the far shore')}. ${cost} gold."`,
-      [[`Take the ferry (${cost} gold)`, ()=>{ const p = G.player; if (p.gold < cost){ notify(`You need ${cost} gold`, 'warn'); return; } p.gold -= cost; G.owPos.x = to[0]; G.owPos.y = to[1]; p.turnCount = (p.turnCount||0) + Math.ceil(f.d/2); clockSkip(Math.ceil(f.d/2)); owReveal(to[0], to[1], 10); if (typeof O3!=='undefined') O3.path = []; wevSay(`the ferry carries you across the water to the far landing`, 'new'); }], ['Not today', ()=>{}]], 'a ferry');
+      [[`Take the ferry (${cost} gold)`, ()=>{ const p = G.player; if (p.gold < cost){ notify(`You need ${cost} gold`, 'warn'); return; } p.gold -= cost; ferrySail(poi, to, f); }], ['Not today', ()=>{}]], 'a ferry');
   },
 };
+// (RS-322) the ferry sails you across: out from the landing over open water to the far one, your boat under you and the
+// camera following, at a few tiles a second. Nothing stops it on the way; it costs the same time as before, paid on landing.
+// Without the 3D land it's the old jump across.
+function ferryRoute(from, to){
+  const W = OW_COLS, key = (x, y)=>y*W + x, water = (x, y)=>x>=0 && y>=0 && x<OW_COLS && y<OW_ROWS && G.ow.map[x][y]===OW_WATER;
+  const D8 = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]], prev = new Map(), q = [];
+  for (const [dx, dy] of D8){ const x = from[0]+dx, y = from[1]+dy; if (water(x, y) && !prev.has(key(x, y))){ prev.set(key(x, y), -1); q.push([x, y]); } }
+  const goal = new Set(); for (const [dx, dy] of D8){ const x = to[0]+dx, y = to[1]+dy; if (water(x, y)) goal.add(key(x, y)); }
+  for (let h=0; h<q.length && h<60000; h++){ const [x, y] = q[h];
+    if (goal.has(key(x, y))){ const out = [[x, y]]; let k = prev.get(key(x, y)); while (k!==-1){ out.unshift([k % W, Math.floor(k/W)]); k = prev.get(k); } out.push([to[0], to[1]]); return out; }
+    for (const [dx, dy] of D8){ const nx = x+dx, ny = y+dy; if (!water(nx, ny) || prev.has(key(nx, ny))) continue; if (dx && dy && !(water(x+dx, y) || water(x, y+dy))) continue; prev.set(key(nx, ny), key(x, y)); q.push([nx, ny]); } }
+  // (no open water joins them: a straight line across)
+  const n = Math.max(1, Math.round(Math.hypot(to[0]-from[0], to[1]-from[1]))), out = [];
+  for (let i=1;i<=n;i++) out.push([Math.round(from[0] + (to[0]-from[0])*i/n), Math.round(from[1] + (to[1]-from[1])*i/n)]);
+  return out;
+}
+function ferrySail(poi, to, f){
+  const p = G.player, turns = Math.ceil(f.d/2);
+  if (typeof O3!=='undefined') O3.path = [];
+  if (!(typeof o3Active==='function' && o3Active())){ ferryLand(to, turns); return; }
+  G.owFerry = { route:ferryRoute([G.owPos.x, G.owPos.y], to), i:0, acc:0, to, turns }; p.ferryTo = [to[0], to[1]];
+  wevSay('the ferryman casts off - the boat slides out from the landing', 'new'); sfx && sfx('click');
+}
+function ferryLand(to, turns){
+  const p = G.player; G.owFerry = null; G.stepLen = 1; delete p.ferryTo;
+  G.owPos.x = to[0]; G.owPos.y = to[1]; p.turnCount = (p.turnCount||0) + turns; clockSkip(turns); owReveal(to[0], to[1], 10);
+  wevSay('the ferry carries you across the water to the far landing', 'new'); try{ saveCurrentGame(); }catch(e){} renderGame();
+}
+const FERRY_STEP = 0.11;   // seconds a tile under sail - about three times your walking pace
+function o3FerryTick(dt, pp){
+  const F = G.owFerry; if (!F) return;
+  G.stepLen = O3_STEP/FERRY_STEP*1.45;   /* (the figure glides at the boat's pace, diagonals and all) */
+  F.acc += dt;
+  while (F.acc >= FERRY_STEP && F.i < F.route.length - 1){ F.acc -= FERRY_STEP; const [x, y] = F.route[F.i++]; G.owPos.x = x; G.owPos.y = y; owReveal(x, y, wgSight()); }
+  if (F.i >= F.route.length - 1 && F.acc >= FERRY_STEP && Math.hypot(pp.x - (G.owPos.x+0.5), pp.z - (G.owPos.y+0.5)) < 0.08) ferryLand(F.to, F.turns);
+}
 function wgWish(poi, amt){
   const p = G.player; if (p.gold < amt){ notify(`You need ${amt} gold`, 'warn'); return; }
   p.gold -= amt; const r = Math.random(), luck = amt >= 100 ? 0.25 : 0.04;
@@ -30398,7 +30436,7 @@ function o3Input(cv){
     else if (O3.nodeTip){ hideItemTooltip(); O3.nodeTip = false; }
     cv.style.cursor = (O3.hover || n) ? 'pointer' : 'default'; });
   cv.addEventListener('pointerleave', ()=>{ if (O3.nodeTip){ hideItemTooltip(); O3.nodeTip = false; } });
-  cv.addEventListener('pointerdown', e=>{ if (O3.lookout && G.ui==='playing'){ o3LookoutEnd(); return; } if (!o3Active() || G.ui!=='playing' || e.button!==0 || G.owPortal) return; const a = o3Pick(e);
+  cv.addEventListener('pointerdown', e=>{ if (O3.lookout && G.ui==='playing'){ o3LookoutEnd(); return; } if (!o3Active() || G.ui!=='playing' || e.button!==0 || G.owPortal || G.owFerry) return; const a = o3Pick(e);
     if (e.shiftKey){ examineSay(examineAct(a)); return; }
     if (a && a.kind==='node' && o3GoGather(a.x, a.y)) return;
     if (a && a.kind==='landmark'){ if (a.id==='tower' && o3LookoutNear()){ o3LookoutAsk(o3LookoutNear()); return; } o3WalkToLandmark(a); return; }
@@ -30461,6 +30499,7 @@ function o3Render(){
   pp.y = sailing ? -0.14 : Math.max(gy, -0.14);
   O3.pgrp.position.copy(pp);
   o3PortalTick(dt, pp);
+  try{ o3FerryTick(dt, pp); }catch(e){ console.error(e); G.owFerry && ferryLand(G.owFerry.to, G.owFerry.turns); }
   if (O3.lookKey !== rsLookKey()){                          // (you changed your gear: dress the figure again)
     const old = O3.player; O3.lookKey = rsLookKey();
     if (old && old.g.parent) old.g.parent.remove(old.g);
@@ -37386,7 +37425,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-321';
+const GAME_VERSION = 'rs-322';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -37440,7 +37479,7 @@ function titleNewWorld(id){
   if (p.sq) for (const k in p.sq) if (p.sq[k] && p.sq[k].state==='active') delete p.sq[k];   // (side quests half done in the old world; finished ones stay finished)
   p.worldNo = (p.worldNo||1) + 1;
   G.saveId = 'c'+Date.now().toString(36)+rn(1e6).toString(36); G.createdAt = Date.now();
-  G.log = []; G.gameOver = 0; G.isBossFloor = 0; G.owZoomedOut = false; G.interior = null; G.townState = null; G.gather = null; G.routeWalk = null;
+  G.log = []; G.gameOver = 0; G.isBossFloor = 0; G.owZoomedOut = false; G.owFerry = null; G.interior = null; G.townState = null; G.gather = null; G.routeWalk = null;
   G.gameMode = 0; G.siteKind = 'dungeon'; G.depth = 1; G.dungeonSlot = 0; G.dungeonModifier = null; G.dungeonEntrance = { x:0, y:0 };
   G.questBoard = []; G.questBoards = {}; G.weather = 'clear';
   G.ow.overrides = {}; G.ow.visitedTowns = []; G.ow.genVer = OW_GEN_VER;

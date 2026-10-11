@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| ferry | Taking a ferry sails you across the water in your boat to the far landing (no jump), unsteerable, same time cost |
 | qbpick | Clicking an empty quick-bar slot opens the bag in the side window showing only what can go on the bar; tapping one fills the slot |
 | thrall | A resurrected thrall stands beside you as a 3D ghost, skeleton or zombie and swings at the foe it strikes |
 | waitbtn | On a phone the d-pad's middle hourglass waits a turn in dungeons and fights (dimmed on the land) |

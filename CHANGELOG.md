@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-322 - The Ferry Sails
+
+- **Ferries cross the water.** Taking a ferry used to drop you on the far shore in an instant. Now the ferryman casts off and your boat sails out from the landing, along a course over open water, to the far landing. It goes about three times your walking pace, with the camera following and the coast revealed as you pass.
+- **Sit back and enjoy it.** Nothing you press steers the boat, and no roamers interrupt. The crossing costs the same time it always did, paid when you land, and if the game saves mid-voyage you come ashore at the far side when you load.
+
 ## RS-321 - Books Any Time, Thralls You Can See, Easier Quick Bars
 
 - **Change spellbooks any time.** You no longer need an altar to switch between the Standard, Ancient, Lunar and Arceuus spellbooks. The buttons are always in the Spellbook tab (G); a book you haven't earned yet stays greyed out and tells you what it takes.
