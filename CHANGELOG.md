@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-333 - Training Dummies, Torches and a Faster Forest
+
+- **The archery range is now a training range.** The butts look the same but are training dummies. **Walk into one** to test your melee; **click one from a distance** to test your bow or your current spell (R switches between them). A damage number pops off the dummy, and the log keeps a running tally: hits, average per try and best hit.
+- **Nothing is spent and no xp is given.** Arrows and runes only have to be in your pack. The range master (or right-clicking a dummy) shows the tally for melee, bow and magic side by side, lets you set the dummy's armour (light, medium or heavy) to see how your hit chance changes, and resets the tally.
+- **Faster in dense forests.** Low frame rates next to big forests had two causes. Every tree and herb patch was drawn piece by piece (a herb patch was 21 separate draws, the spots in view about 3,000); their still parts are now baked together, so the overworld draws about half as many meshes. And each deer, rabbit and boar on the land was a full close-up model of up to 176,000 triangles, with up to 28 at once in a forest; they're now built coarser for the open land (about 30,000 each), cutting the scene from about 4.4 million triangles to about 1 million in the forest from your save. Close-ups still use the full models.
+- **The watch carries real torches.** Watchmen and watchwomen hold a wooden torch with an iron-bound head of rags, unlit by day and burning at night, instead of a flame floating beside them.
+- **Fewer candles in crypts.** Graveyard crypts had a candle cluster on every other floor tile; now it's one here and there. Catacombs have fewer candles too, along the walls and in the burial niches.
+
 ## RS-332 - The Quest Bar's Own Tabs
 
 - **Journal and Tasks live in the quest bar now.** It has three tabs built in: **Quests** (what you're tracking), **Journal** (every story quest by state; tap one for its log) and **Tasks** (your Slayer task, contracts and bounties with their progress). They show right there in the bar instead of opening the side window.

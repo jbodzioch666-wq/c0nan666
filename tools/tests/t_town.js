@@ -42,7 +42,7 @@ module.exports = async page=>{
     for (const m of G.mon){ m.alive = 0; m.hp = 0; } A(wevArenaWon(), 'arena won'); A(G.gameMode===3 && G.ui==='wevent', 'back in town with a dialog');
     out.arena = G.wevDlg.title; wevChoose(1); A(!G.arenaRun && arenaRec().best===1, 'arena record');
     // games and gambling
-    G.gamesAt = 'range'; setUi('games'); mgArchery(); A(mgRec().archery > 0, 'archery'); out.archery = G.mgLast;
+    G.gamesAt = 'range'; setUi('games'); A(/TRAINING RANGE/.test(document.getElementById('overlay').innerHTML), 'the range is a training range (RS-333)'); out.archery = 'training range';
     G.gamesAt = 'tavern'; mgDarts(); out.darts = G.mgLast; skAdd('c_shrimp', 2); mgCook(); out.cook = G.mgLast; A(mgRec().cook > 0, 'cook-off');
     skP().tools.rod = 1; G.gamesAt = 'harbour'; mgFish(); out.fish = G.mgLast; renderOverlay();
     setUi('gamble'); const gg = p.gold; G.gbBet = 100; gbDice(); gbDraw(); A(G.gbCard, 'card drawn'); renderOverlay(); gbHiLo(1); gbWheel(); A(p.gold!==gg || gbRec().lost + gbRec().won > 0, 'gambled'); out.gamble = gbRec();

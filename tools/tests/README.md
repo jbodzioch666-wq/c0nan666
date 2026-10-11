@@ -25,6 +25,8 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| perfwild | gathering spots are baked into one mesh per material, and the land's deer, rabbits and boar are sculpted coarse |
+| dummy | the archery butts are training dummies: walk in for melee, click from range for bow or magic; tallied by style against chosen armour, nothing spent |
 | dgquest | a quest in the dungeon you're in shows under the top bar; the quest bar has its own Quests, Journal and Tasks tabs |
 | questtabs | the side window's quests tab has Active, Journal (story quests, click for the log) and Tasks (Slayer, contracts, bounties) tabs |
 | bladewalk | the swinging blade is a trap: cocked and still until you step under it, then it drops and sweeps; paths go round it when they can |
