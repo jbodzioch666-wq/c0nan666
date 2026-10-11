@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## RS-348 - Faster Towns
+
+- **A town draws half as much.** A town frame was about 2,500 draws and 4.8 million triangles, and every one of them drawn twice for the shadows. It's now about 1,200 draws and 1.9 million triangles, measured on the same town.
+- **Buildings, trees and fences are baked.** Each building's still parts - walls, roof, beams, steps, trim, glass - bake into one mesh per material when the town is built, and so do each tree and the palisade. A building or tree still goes see-through on its own when it stands between you and the camera. Doors, sign boards, flames, smoke, banners, the ship and the waypoint crystal stay their own parts, since they move or glow.
+- **The townsfolk are sculpted coarse.** Each townsperson was up to 270,000 triangles, as finely sculpted as your own figure, and a town has twenty of them. They're now sculpted on a coarser grid, about a third of the triangles, like the deer and boar on the open land since RS-333. Your own figure keeps its full detail. At the town camera's distance the difference doesn't show.
+- **Far folk cast no shadow.** The shadow pass drew every one of a townsperson's forty-odd parts each frame. Folk more than nine tiles from you now cast none; the ones near you still do.
+- **A phone's share.** On a phone the fill-rate costs come down too: the sun's shadow map is half the size with plain filtering (in towns and on the open land), the post-processing buffer isn't multisampled, four lamps light at night instead of eight, and the game draws at most one and a half pixels per screen pixel. On a desktop nothing changes.
+- **Test.** `townperf` builds a town and checks the bake, the coarse folk, the fade, the shadows and the draw and triangle caps.
+
 ## RS-347 - The Relic of Bone Lies Deeper
 
 - **The Waking Lich IV always sends you to a graveyard.** It could point at a necromancer's tower, or any site at all, when no graveyard lay within 60 tiles of the temple that gave the quest. It now picks the nearest graveyard wherever it is on the map. A save already pointed at a tower is moved to a graveyard the next time the quest looks for its target.

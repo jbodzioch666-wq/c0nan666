@@ -22966,7 +22966,7 @@ function gfxPost(r){
   let P = GFXP.get(r); if (P) return P; const T = THREE;
   const mk = o=>new T.WebGLRenderTarget(4, 4, Object.assign({ type:T.HalfFloatType, minFilter:T.LinearFilter, magFilter:T.LinearFilter, depthBuffer:false }, o||{}));
   P = { scene:mk({ depthBuffer:true }), a:mk(), b:mk(), w:0, h:0 };
-  if (r.capabilities.isWebGL2 && SET.gfx==='high') P.scene.samples = 4;
+  if (r.capabilities.isWebGL2 && SET.gfx==='high' && !gfxPhone()) P.scene.samples = 4;   /* (RS-348) */
   const vs = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }';
   const M = (fs, u)=>new T.ShaderMaterial({ uniforms:u, vertexShader:vs, fragmentShader:fs, depthTest:false, depthWrite:false });
   P.bright = M('uniform sampler2D t; uniform float th; varying vec2 vUv; void main(){ vec4 s = texture2D(t, vUv); vec3 c = s.rgb; float l = max(c.r, max(c.g, c.b)); gl_FragColor = vec4(c * smoothstep(th, th + 0.7, l), 1.0); }', { t:{ value:null }, th:{ value:0.8 } });
@@ -23187,7 +23187,7 @@ function gfxO3Build(grp, x0, y0, W, M){
   const rm = new T.MeshBasicMaterial({ map:tx.beam, transparent:true, depthWrite:false, blending:T.AdditiveBlending, color:0xffd8a0, opacity:0, side:T.DoubleSide });
   for (let i=0;i<8;i++){ const pl = new T.Mesh(new T.PlaneGeometry(0.7, 3.4), rm.clone()); pl.visible = false; grp.add(pl); GFX.rays.push(pl); }
   GFX.leaves = []; GFX.raysAt = 0;
-  if (SET.gfx==='high' && O3.sun && O3.sun.shadow.mapSize.x < 4096){ O3.sun.shadow.mapSize.set(4096, 4096); if (O3.sun.shadow.map){ O3.sun.shadow.map.dispose(); O3.sun.shadow.map = null; } }
+  if (SET.gfx==='high' && !gfxPhone() && O3.sun && O3.sun.shadow.mapSize.x < 4096){ O3.sun.shadow.mapSize.set(4096, 4096); if (O3.sun.shadow.map){ O3.sun.shadow.map.dispose(); O3.sun.shadow.map = null; } }
 }
 // the light of the hour: warm sunrise and sunset, blue moonlight (after o3ApplyTime)
 function gfxO3Light(){
@@ -29270,6 +29270,28 @@ function v3MarkerTex(ch){
   return (V3.tex[k] = new THREE.CanvasTexture(c));
 }
 // ---------- build the whole town ----------
+// (RS-348) the town's still parts - walls, roofs, beams, steps, trees, the palisade - bake into one mesh per material
+// inside each top-level thing, so a building or a tree still fades on its own when it's in the way. A town was some 2,500
+// draws a frame, twice over with their shadows. Anything that moves or glows stays its own mesh: the people and animals,
+// the doors, sign boards, flames, smoke, the ship, the waypoint crystal - whatever a V3 list holds, or carries a flag
+// (RS-348) a townsperson far from you casts no shadow: the shadow pass drew every one of their forty-odd parts each frame
+function v3FolkShadow(p){
+  if (!p || !p.e || !p.g) return; const d = Math.hypot(p.g.position.x - (G.player.x + 0.5), p.g.position.z - (G.player.y + 0.5)), on = d < 9;
+  if (p.shOn===on) return; p.shOn = on;
+  if (!p.shMeshes){ p.shMeshes = []; p.e.holder.traverse(o=>{ if (o.isMesh && o.castShadow) p.shMeshes.push(o); }); }
+  for (const o of p.shMeshes) o.castShadow = on;
+}
+function v3MergeWorld(){
+  if (typeof o3MergeStatic!=='function' || !V3.world) return;
+  const skip = new Set(), keep = o=>{ if (o && o.isObject3D && o!==V3.world && o!==V3.scene) o.traverse(c=>skip.add(c)); };
+  const seen = new Set(), walk = (v, d)=>{ if (!v || typeof v!=='object' || seen.has(v) || d > 3) return; seen.add(v); if (v.isObject3D){ keep(v); return; } if (v.isMaterial || v.isBufferGeometry || v.isTexture || v.nodeType) return; const vals = Array.isArray(v) ? v : Object.values(v); for (const x of vals) walk(x, d+1); };
+  for (const k in V3){ if (['scene','world','renderer','cam','mats','warmGrp','labels','cv','ray','leafGeo'].includes(k)) continue; try{ walk(V3[k], 0); }catch(e){} }
+  for (const p of [V3.player, ...(V3.npcs||[]), ...(V3.villagers||[])]) if (p) keep(p.g);
+  V3.world.traverse(o=>{ const u = o.userData; if (u && Object.keys(u).some(k=>k!=='lin' && k!=='merged')) keep(o); });
+  let n0 = 0, n1 = 0; V3.world.traverse(o=>{ if (o.isMesh) n0++; });
+  for (const top of V3.world.children){ if (!top.isGroup || skip.has(top)) continue; try{ o3MergeStatic(top, skip); }catch(e){ console.error(e); } }
+  V3.world.traverse(o=>{ if (o.isMesh) n1++; }); V3.mergedFrom = n0; V3.mergedTo = n1;
+}
 function v3BuildScene(){
   const T = THREE, sc = V3.scene;
   if (V3.world){ sc.remove(V3.world); V3.world.traverse(o=>{ if (o.geometry) o.geometry.dispose(); }); }
@@ -29369,6 +29391,7 @@ function v3BuildScene(){
   v3Grass(grp);
   v3BuildPeople(grp, mats);
   try{ v3Festival(grp); }catch(e){ console.error(e); }
+  v3MergeWorld();   /* (RS-348) */
 }
 // (RS-183) sat on a chair, stool or pew: hips down on the seat, thighs level, shins hanging, hands in the lap, turned the way the
 // seat faces - the regulars lift their tankards now and then
@@ -29392,12 +29415,15 @@ function v3BuildPeople(grp, mats){
   // people
   const P = (entry, h, x, y)=>{ const p = v3Person(entry, h, grp); p.g.position.set(x+0.5, 0, y+0.5); return p; };
   V3.player = P(v3PlayerLook(), 1.0, G.player.x, G.player.y); V3.player.at = [G.player.x, G.player.y];
+  M3D_COARSE = V3_FOLK_COARSE;   /* (RS-348: the townsfolk are sculpted on a coarser grid - each was up to 270,000 triangles, and a town has twenty) */
+  try{
   V3.npcs = (G.villageNpcs||[]).map(n=>{ const look = V3_LOOK[n.service] ? V3_LOOK[n.service]() : v3VillagerLook(0);
     const p = P(n.service==='tzhaar' ? look : v3RaceDress(look, n.x + n.y), 1.02, n.x, n.y); p.n = n;
     p.sp.userData.act = { kind:'tile', x:n.x, y:G.interior && !n.free ? n.y+1 : n.y, label:n.name }; V3.hits.push(p.sp);   /* (RS-335: someone not behind a counter - the hooded figure - is clicked where they stand) */
     if (n.service==='questgiver'){ const mk = new T.Sprite(new T.SpriteMaterial({ map:v3MarkerTex('!'), transparent:true, depthTest:false })); mk.scale.set(0.42,0.63,1); mk.position.y = 1.75; p.g.add(mk); V3.marker = mk; }
     return p; });
   V3.villagers = (G.villagers||[]).map((v,i)=>{ const p = P(townFolkLook(v, i), townFolkH(v), v.x, v.y); p.v = v; return p; });
+  } finally { M3D_COARSE = 1; }
   // particle pool (smoke, sparks, motes, bubbles)
   V3.partMatSmoke = new T.SpriteMaterial({ map:v3Blob('rgba(150,150,150,0.9)'), transparent:true, depthWrite:false, opacity:0.5 });
   V3.partMatSpark = new T.SpriteMaterial({ map:v3Blob('rgba(255,180,80,1)'), blending:T.AdditiveBlending, transparent:true, depthWrite:false });
@@ -29504,16 +29530,16 @@ function v3Init(){
     wrap.appendChild(cv); V3.cv = cv;
     const lab = document.createElement('div'); lab.id = 'v3labels'; lab.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:hidden;display:none;'; wrap.appendChild(lab); V3.labels = lab;
     const R = V3.renderer = new T.WebGLRenderer({ canvas:cv, antialias:true });
-    R.shadowMap.enabled = true; R.shadowMap.type = T.PCFSoftShadowMap;
+    R.shadowMap.enabled = true; R.shadowMap.type = gfxPhone() ? T.PCFShadowMap : T.PCFSoftShadowMap;   /* (RS-348) */
     if (T.sRGBEncoding) R.outputEncoding = T.sRGBEncoding;
     R.toneMapping = T.ACESFilmicToneMapping;
     V3.scene = new T.Scene();
     V3.cam = new T.PerspectiveCamera(32, 1, 0.5, 120);
     V3.hemi = new T.HemisphereLight(0xdde8ff, 0x5a4a30, 0.85); V3.scene.add(V3.hemi);
     const sun = V3.sun = new T.DirectionalLight(0xfff0d8, 1.8); sun.castShadow = true;
-    sun.shadow.mapSize.set(2048,2048); const s = sun.shadow.camera; s.left = -18; s.right = 18; s.top = 18; s.bottom = -18; s.near = 1; s.far = 80; sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.02;
+    { const ms = gfxPhone() ? 1024 : 2048; sun.shadow.mapSize.set(ms, ms); } const s = sun.shadow.camera; s.left = -18; s.right = 18; s.top = 18; s.bottom = -18; s.near = 1; s.far = 80; sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.02;
     sun.target.position.set(COLS/2, 0, ROWS/2); V3.scene.add(sun); V3.scene.add(sun.target);
-    V3.plights = []; for (let i=0;i<8;i++){ const pl = new T.PointLight(0xffb060, 0, 5, 2); V3.scene.add(pl); V3.plights.push(pl); }
+    V3.plights = []; for (let i=0;i<(gfxPhone() ? 4 : 8);i++){ const pl = new T.PointLight(0xffb060, 0, 5, 2); V3.scene.add(pl); V3.plights.push(pl); }   /* (RS-348: four lamps lit on a phone) */
     V3.ray = new T.Raycaster(); V3.plane = new T.Plane(new T.Vector3(0,1,0), 0);
     v3Input(cv);
     V3.ok = true;
@@ -29713,8 +29739,8 @@ function v3Render(){
     if (grp){ const np = v3Person(v3PlayerLook(), 1.0, grp); np.g.position.copy(old.g.position); np.at = old.at; np.yaw = old.yaw||0; grp.remove(old.g); V3.player = np; }
   }
   { const st = G.interior && G.sitAt; if (st){ glide(V3.player, st.x - Math.sin(st.yaw)*0.06, st.y - Math.cos(st.yaw)*0.06); v3SeatPose(V3.player, st); } else glide(V3.player, G.player.x, G.player.y); }
-  V3.villagers.forEach(p=>{ const st = p.v.seat; if (st){ glide(p, st.x - Math.sin(st.yaw)*0.06, st.y - Math.cos(st.yaw)*0.06, 6); v3SeatPose(p, st); } else glide(p, p.v.x, p.v.y, 1.7); });   // (a walking pace: one tile in about the time between their steps)
-  V3.npcs.forEach(p=> glide(p, p.n.x, p.n.y));
+  V3.villagers.forEach(p=>{ const st = p.v.seat; if (st){ glide(p, st.x - Math.sin(st.yaw)*0.06, st.y - Math.cos(st.yaw)*0.06, 6); v3SeatPose(p, st); } else glide(p, p.v.x, p.v.y, 1.7); v3FolkShadow(p); });   // (a walking pace: one tile in about the time between their steps)
+  V3.npcs.forEach(p=>{ glide(p, p.n.x, p.n.y); v3FolkShadow(p); });
   try{ townV3Tick(dt); }catch(e){ console.error(e); }
   // camera follows you from the south-east at an angle
   const pp = V3.player.g.position, yaw = viewYawSmooth(dt), D = V3.dist*doorZoom();
@@ -30571,14 +30597,14 @@ function o3Init(){
     wrap.appendChild(cv); O3.cv = cv;
     const lab = document.createElement('div'); lab.id = 'o3labels'; lab.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:hidden;display:none;'; wrap.appendChild(lab); O3.labels = lab;
     const R = O3.renderer = new T.WebGLRenderer({ canvas:cv, antialias:true });
-    R.shadowMap.enabled = true; R.shadowMap.type = T.PCFSoftShadowMap;
+    R.shadowMap.enabled = true; R.shadowMap.type = gfxPhone() ? T.PCFShadowMap : T.PCFSoftShadowMap;   /* (RS-348) */
     if (T.sRGBEncoding) R.outputEncoding = T.sRGBEncoding;
     R.toneMapping = T.ACESFilmicToneMapping;
     O3.scene = new T.Scene();
     O3.cam = new T.PerspectiveCamera(34, 1, 0.5, 160);
     O3.hemi = new T.HemisphereLight(0xdde8ff, 0x4a4030, 0.8); O3.scene.add(O3.hemi);
     const sun = O3.sun = new T.DirectionalLight(0xfff0d8, 1.8); sun.castShadow = true;
-    sun.shadow.mapSize.set(2048,2048); const s = sun.shadow.camera; s.left = -22; s.right = 22; s.top = 22; s.bottom = -22; s.near = 1; s.far = 80; sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.015;
+    { const ms = gfxPhone() ? 1024 : 2048; sun.shadow.mapSize.set(ms, ms); } const s = sun.shadow.camera; s.left = -22; s.right = 22; s.top = 22; s.bottom = -22; s.near = 1; s.far = 80; sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.015;
     O3.scene.add(sun); O3.scene.add(sun.target);
     O3.lantern = new T.PointLight(0xffc070, 0, 6, 2); O3.scene.add(O3.lantern);
     O3.ray = new T.Raycaster();
@@ -31292,7 +31318,10 @@ const FPD_SCALES = [1, 0.85, 0.7, 0.6, 0.5];
 // graphics quality: render resolution, shadows and how many particles effects throw
 const GFX_Q = { low:{ pr:1, fpd:0.6, fx:0.35, shadows:false }, medium:{ pr:1.5, fpd:0.85, fx:0.7, shadows:true }, high:{ pr:2, fpd:1, fx:1, shadows:true } };
 function gfxQ(){ return GFX_Q[SET.gfx] || GFX_Q.high; }
-function gfxPR(){ return Math.min(gfxQ().pr, window.devicePixelRatio||1); }
+// (RS-348) a phone's share: shadow maps half the size with plain filtering, four lamp lights instead of eight, no
+// multisampling on the post buffer, and at most 1.5 pixels per CSS pixel - the fill-rate costs that made a town a slideshow
+function gfxPhone(){ return typeof v3LowMem==='function' && v3LowMem(); }
+function gfxPR(){ return Math.min(gfxQ().pr, gfxPhone() ? 1.5 : 9, window.devicePixelRatio||1); }
 function gfxApply(){
   const q = gfxQ(), list = [[typeof V3!=='undefined' && V3.renderer, typeof V3!=='undefined' && V3.scene], [typeof O3!=='undefined' && O3.renderer, typeof O3!=='undefined' && O3.scene], [FPD.r, FPD.scene]];
   const key = SET.gfx + list.map(l=>l[0] ? 1 : 0).join('');
@@ -32269,6 +32298,7 @@ function m3dUV(geo, rep){
 /* (RS-333) M3D_COARSE > 1 sculpts on a coarser grid (about 1/k^2 the triangles): for creatures only ever seen small and
    many at a time, like the deer, rabbits and boar on the open land */
 let M3D_COARSE = 1;
+const V3_FOLK_COARSE = 1.6;   /* (RS-348) the townsfolk's sculpt grid */
 function m3dSculpt(key, bounds, h, build){
   M3D.sculpt = M3D.sculpt || new Map();
   if (M3D_COARSE !== 1){ key += '|c' + M3D_COARSE; h *= M3D_COARSE; }
@@ -38076,7 +38106,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-347';
+const GAME_VERSION = 'rs-348';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

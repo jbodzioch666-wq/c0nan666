@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| townperf | a town's still parts bake into one mesh per material per building or tree, the townsfolk are sculpted coarse, far folk cast no shadow, fades still work; draw and triangle counts stay under their caps |
 | lich4 | The Waking Lich IV points at a graveyard (never a tower), its relic on floor 6, and the graveyard is made six floors deep; an old save aimed at a tower is moved |
 | mobanim | every bestiary creature has a 3D model that moves when it walks, when it winds up or strikes, and topples when it dies (serpents slither, oozes heave, floaters lean, crocodiles lunge) |
 | viewwarm | the open land and a town compile their shaders at build (whole scene plus stand-ins for animals, spot kinds, camps, markers, see-through buildings), so a walk, a turn and nightfall compile nothing new |
