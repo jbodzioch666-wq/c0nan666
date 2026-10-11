@@ -25,6 +25,8 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| qbpick | Clicking an empty quick-bar slot opens the bag in the side window showing only what can go on the bar; tapping one fills the slot |
+| thrall | A resurrected thrall stands beside you as a 3D ghost, skeleton or zombie and swings at the foe it strikes |
 | waitbtn | On a phone the d-pad's middle hourglass waits a turn in dungeons and fights (dimmed on the land) |
 | sidebooks | G and N open the side window's Spellbook and Prayer tabs (rune pouch, books, bones there; the old menus are gone); arrows are enchanted at the fletching bench |
 | compactbtn | On a phone the hotbar has a button for Y (compact mode on and off), still there in compact mode |

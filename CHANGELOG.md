@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-321 - Books Any Time, Thralls You Can See, Easier Quick Bars
+
+- **Change spellbooks any time.** You no longer need an altar to switch between the Standard, Ancient, Lunar and Arceuus spellbooks. The buttons are always in the Spellbook tab (G); a book you haven't earned yet stays greyed out and tells you what it takes.
+- **Your thrall stands beside you.** Resurrect Thrall used to raise nothing you could see but a faint glowing dot. Now a real figure rises on a free tile next to you, ringed in green like the raised dead: a pale **ghost** for the Lesser Thrall, a **skeleton** for the Superior, a **zombie** for the Greater. It keeps beside you as you walk, turns to the foe it strikes, and swings at it. Cast out on the land, it rises in your next fight.
+- **Fill a quick bar slot with a click.** Click (or tap) an empty quick bar slot and the side window opens on your bag, showing only what can go on the bar: potions, scrolls and food. The slot glows while you choose; tap one and it's in. Click the slot again, or cancel, to stop. Spells and prayers still go on from their own tabs.
+
 ## RS-320 - Wait on a Phone
 
 - **The hourglass waits a turn.** The empty middle of the phone d-pad is now an hourglass button that does what Space does: stand where you are and let a turn go by, so the monsters take theirs and a swinging blade swings past. It's lit in dungeons and fights and dimmed out on the land, where there's nothing to wait for.
