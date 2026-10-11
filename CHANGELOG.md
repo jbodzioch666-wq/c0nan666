@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-328 - The Minimap Turns Underground
+
+- **The dungeon and fight minimap now turns with the camera.** Before, it stayed fixed while Z and X turned the view. Now up on the minimap is up on the screen, as on the overworld and in towns.
+- **The whole floor still fits.** The map is drawn a little smaller, so nothing is cut off at any angle.
+
 ## RS-327 - Starlilies by Day
 
 - **Starlily patches no longer vanish in daylight.** The map search could find a patch that the map and the land didn't show, because by day the patch disappeared. Now it's always there.
