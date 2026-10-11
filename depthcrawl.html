@@ -5594,6 +5594,7 @@ function dgOpenExit(){
 // leaving a site by any road: the floor is kept for next time, unless its master has fallen, when the site is gone for good
 // (the land reclaims it and a new one rises elsewhere, see bossDefeated) and any gravestone of yours inside comes up with it
 function dgFinish(cacheIt){
+  if (G.dgDone) try{ sqTakeLeftRelic(); }catch(e){ console.error(e); }   /* (RS-337: a quest relic left lying in a beaten site comes with you) */
   if (G.dungeonSlot>=1 && G.dungeonSlot<=MAX_SITE_SLOT){
     if (G.dgDone){ invalidateDungeonCache(G.dungeonSlot); for (const g of gravesP()) if (g.dg && g.dg.slot===G.dungeonSlot){ delete g.dg; logMsg('your gravestone from below is cast up with the collapse - it waits where the entrance stood', 'loot'); } }
     else if (cacheIt && !G.inRaid) saveLevelCache(G.depth);
@@ -10078,7 +10079,7 @@ function spBody(tab){
 // (RS-323) what you've gathered and found - ores, logs, herbs and forage, crafting materials, bones - in the bag too, not only
 // on the equipment page's Resources tab (raw and cooked food has its own row above; runes are in the spellbook's pouch)
 function spMatsHtml(){
-  const ids = resCats().filter(([nm])=>nm!=='Fish & food' && nm!=='Runes & ammunition').reduce((a, [nm, l])=>a.concat(l), []).filter(id=>resCount(id) > 0);
+  const ids = resCats().filter(([nm])=>nm!=='Fish & food' && nm!=='Runes & ammunition').reduce((a, [nm, l])=>a.concat(l), []).filter(id=>resCount(id) > 0).sort((a, b)=>resName(a).localeCompare(resName(b)));   /* (RS-337: A to Z) */
   return ids.length ? `<div class="sp-sub">MATERIALS &middot; hover one to see what it's for</div><div class="skbag sp-mats">${ids.map(resChip).join('')}</div>` : '';
 }
 function spSpellExtras(){
@@ -12078,7 +12079,13 @@ function trophiesHtml(){
   const t = (G.player && G.player.trophies) || {}, ks = Object.keys(t); if (!ks.length) return '';
   return `<h4 style="color:var(--ink-faint);margin:12px 0 6px;">TROPHY RECORDS</h4><div class="skbag">${ks.map(k=>`<span class="skitem">${esc(t[k].nm)} <b>${t[k].w} ${t[k].unit}</b></span>`).join('')}</div>`;
 }
+/* (RS-337) in alphabetical order: the groups, and everything in each - worked out once */
 function resCats(){
+  if (resCats.c) return resCats.c;
+  const by = (a, b)=>resName(a).localeCompare(resName(b));
+  return (resCats.c = resCatsRaw().map(([nm, ids])=>[nm, ids.slice().sort(by)]).sort((a, b)=>a[0].localeCompare(b[0])));
+}
+function resCatsRaw(){
   return [
     ['Ores & bars', SK_ORE.map(e=>e.id).concat(SK_BAR.map(e=>e.id))],
     ['Logs', SK_LOG.map(e=>e.id).concat(['bark'])],
@@ -16360,6 +16367,7 @@ function bossDefeated(){
   G.ow.dungeonIdx[spot.x][spot.y] = G.dungeonSlot;
   G.ow.siteMoves[G.dungeonSlot] = { kind:G.siteKind, x:spot.x, y:spot.y, max:newMax };
   questOnBossDefeated(oldX, oldY, spot.x, spot.y);
+  sqSiteMoved(oldX, oldY, spot.x, spot.y);   /* (RS-337: the story quests follow it too) */
   logMsg(`word spreads of a new ${SITE_WORD[G.siteKind]||'dungeon'} risen elsewhere in the land`, 'new');
   G.victoryDepth = G.dungeonMaxDepth;
   G.victoryGold = G.player.gold;
@@ -20952,8 +20960,12 @@ function houseBuildDialog(s){
       logMsg(`you ${t ? 'upgrade' : 'build'} the ${s.nm.toLowerCase()}`, 'magic'); sfx('achievement'); houseLayout(); checkAchievements(); }], ['Not now', ()=>{}]], 'your house');
 }
 function houseCarpentry(){
-  const best = SK_LOG.slice().reverse().find(l=>skHave(l.id) >= 4), L = skLvl('construction');
-  if (!best){ wevDialog('Carpentry bench', 'You need 4 logs of one kind to saw into a flatpack.', [['Close', ()=>{}]], 'your house'); return; }
+  /* (RS-337) the best logs you hold that your Construction level can work - it used to pick your best logs of all (maple, say)
+     and tell you that you needed Construction 45, with plain logs right there in your pack */
+  const L = skLvl('construction'), held = SK_LOG.slice().reverse().filter(l=>skHave(l.id) >= 4), best = held.find(l=>l.lvl <= L);
+  if (!held.length){ wevDialog('Carpentry bench', 'You need 4 logs of one kind to saw into a flatpack.', [['Close', ()=>{}]], 'your house'); return; }
+  if (!best){ const can = SK_LOG.filter(l=>l.lvl <= L).map(l=>l.nm.toLowerCase());
+    wevDialog('Carpentry bench', `Your ${held[held.length-1].nm.toLowerCase()} need Construction ${held[held.length-1].lvl} to work (you have ${L}). At your level you can saw ${can.join(' or ')} - bring 4 of them.`, [['Close', ()=>{}]], 'your house'); return; }
   const lvlReq = Math.max(1, best.lvl), xp = Math.round(30 + best.xp*1.6), gold = Math.round((10 + best.lvl*2) * (skPerk('construction','flat') ? 2 : 1));
   wevDialog('Carpentry bench', `Saw ${needHtml({ [best.id]:4 })} into a flatpack of furniture (${xp} Construction xp; the furniture dealer pays ${gold} gold for it). ${canMakeHtml(Math.floor(skHave(best.id)/4), 'You can make')}.`,
     [[L >= lvlReq ? 'Make a flatpack' : `You need Construction ${lvlReq}`, ()=>{ if (L < lvlReq || skHave(best.id) < 4) return; if (!chn(skPerk('construction','save'))) skAdd(best.id, -4); skGainXP('construction', xp); G.player.gold += gold; logMsg(`you make a flatpack from ${best.nm.toLowerCase()} and sell it for ${gold} gold`, 'good'); houseCarpentry(); }],
@@ -23535,6 +23547,7 @@ function sqHandInReady(id){
 }
 function sqTarget(id){
   const s = sqP()[id], st = sqStep(id); if (!st || !s) return null;
+  sqSiteCheck(id);
   if (st.k==='talk' || st.k==='bring'){ if (st.who==='hermit' || st.who==='ghost' || st.who==='remains') return s.loc[s.step] || (s.loc.start && { x:s.loc.start.x, y:s.loc.start.y }); const h = sqHome(id); return { x:h.x, y:h.y, turnIn:sqHandInReady(id) }; }
   if (sqHereStep(id)) return s.loc[s.step-1] || null;
   if (st.k==='puzzle' && s.step > 0 && SQ[id].steps[s.step-1].k==='talk'){ const h = sqHome(id); return { x:h.x, y:h.y }; }   /* (RS-334: back to whoever set it) */   /* (RS-334: a boss, puzzle or choice left unfinished keeps its marker too, not just a fight) */
@@ -23616,6 +23629,25 @@ function sqOnPickup(it){
   if (!it || !it.sqItem) return false; const id = it.sqItem, st = sqStep(id); if (!st || st.k!=='floor') return true;
   sqDialog(SQ[id].nm, st.say || `You find ${esc(it.nm)}.`, [['Take it', ()=>{ sqLog(id, st.say || it.nm); sqAdvance(id); }]], 'quest');
   return true;
+}
+// (RS-337) a site whose master falls moves elsewhere: any story quest still pointed at it goes with it (it used to point at
+// the empty ground where it stood, and the quest could never be finished - the Relic of Bone in a necromancer's tower)
+function sqSiteMoved(ox, oy, nx, ny){
+  for (const id of SQ_ORDER){ const s = sqP()[id]; if (!s || !s.loc || !sqActive(id)) continue;
+    for (const k in s.loc){ const L = s.loc[k]; if (L && L.x===ox && L.y===oy && k!=='start'){ L.x = nx; L.y = ny; } } }
+}
+// (RS-337) leaving a beaten site with a quest's relic still lying on the floor: you pick it up on the way out
+function sqTakeLeftRelic(){
+  if (G.gameMode!==1 || !G.floorItem) return;
+  for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++){ const it = G.floorItem[x] && G.floorItem[x][y]; if (!it || !it.sqItem) continue; const id = it.sqItem, st = sqStep(id);
+    G.floorItem[x][y] = null; if (G.map[x][y]===T_ITEM) G.map[x][y] = T_FLOOR;
+    if (st && st.k==='floor'){ sqLog(id, st.say || it.nm); logMsg(`${SQ[id].nm}: you snatch up ${it.nm} on your way out`, 'magic'); sqAdvance(id); } }
+}
+// (RS-337) a quest pointed at a site that's no longer there (a save from before the fix above) looks for another
+function sqSiteCheck(id){
+  const s = sqP()[id], st = sqStep(id); if (!s || !st || !s.loc || !['floor','siteboss'].includes(st.k)) return;
+  const L = s.loc[s.step]; if (!L || !G.ow || !G.ow.map[L.x]) return;
+  if (!OW_SITE_TILES.includes(G.ow.map[L.x][L.y])){ delete s.loc[s.step]; sqResolve(id, st); }
 }
 function sqOnSiteBoss(x, y){
   for (const id of SQ_ORDER){ const st = sqStep(id); if (!st || st.k!=='siteboss') continue; const s = sqP()[id], L = s.loc[s.step];
@@ -37877,7 +37909,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-336';
+const GAME_VERSION = 'rs-337';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

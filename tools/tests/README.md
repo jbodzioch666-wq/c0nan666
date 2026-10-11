@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs337 | the carpentry bench saws logs your Construction level can work; resources A to Z; story quests follow a site that moves when its master falls |
 | cutclick | a click on floor seen through a wall the cutaway has dissolved goes to that floor, not the wall |
 | gates | every town gate is bigger, with two oak doors standing open and the race's banner on each side |
 | rs335 | the hooded figure can be clicked; trees and rocks can be searched for on the world map |

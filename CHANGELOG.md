@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-337 - The Bench, the Bag and the Bone
+
+- **The carpentry bench uses logs you can work.** It used to pick the best logs in your pack (maple, say) and tell you that you needed Construction 45, even with plain logs right there. Now it saws the best logs your Construction level can handle. If you only have logs above your level, it tells you which ones you can use.
+- **Resources A to Z.** The bag's resources, and the materials in the side window, are now in alphabetical order, both the groups and everything in them.
+- **The Relic of Bone can't be lost.** When a site's master falls, the site moves elsewhere in the land. A story quest pointing at it now goes with it; before, it pointed at the empty ground left behind and could never be finished. If you leave a beaten site with a quest relic still lying on the floor, you snatch it up on your way out. A quest already stuck pointing at vanished ground finds a new site.
+
 ## RS-336 - Gates Worth Guarding
 
 - **Bigger gates with real doors.** Every town gate, whether a timber palisade gate or a city's stone gatehouse, is taller and wider, with two iron-banded oak doors standing open inside it.
