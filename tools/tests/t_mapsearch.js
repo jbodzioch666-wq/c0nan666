@@ -22,6 +22,11 @@ module.exports = async page=>{
     { const [k] = rcAltars().keys(), ax = Math.floor(k/4096), ay = k % 4096; owReveal(ax, ay, 1); mapSearchIndex.c = null;
       mapSearchSet('altar'); out.altar = mapSearchHits().some(h=>h.x===ax && h.y===ay); mapSearchSet('alter'); out.alter = mapSearchHits().some(h=>h.x===ax && h.y===ay); }
     { const d = (G.ow.pois||[]).find(p=>p.k==='digsite'); if (d){ owReveal(d.x, d.y, 1); mapSearchIndex.c = null; mapSearchSet('excavation'); out.dig = mapSearchHits().some(h=>h.x===d.x && h.y===d.y); } else out.dig = 'none'; }
+    // (RS-324) foraging: a forage spot you've seen is found by what grows there, or as 'foraging'; a site shows for the cave herb on its floors
+    { mapForageIndex.c = null; mapSearchIndex.c = null; let fx = null; for (let x=0;x<OW_COLS && !fx;x++) for (let y=0;y<OW_ROWS;y++){ const n = skNodeStatic(x, y); if (n && n.k==='foraging'){ fx = { x, y, nm:skName(n.type) }; break; } }
+      if (fx){ owReveal(fx.x, fx.y, 1); mapForageIndex.c = null; mapSearchIndex.c = null; mapSearchSet(fx.nm); out.forage = mapSearchHits().some(h=>h.x===fx.x && h.y===fx.y && h.what==='forage'); mapSearchSet('foraging'); out.forageWord = mapSearchHits().some(h=>h.x===fx.x && h.y===fx.y); } else out.forage = out.forageWord = 'none';
+      let sx = null; for (let x=0;x<OW_COLS && !sx;x++) for (let y=0;y<OW_ROWS;y++) if (G.ow.map[x][y]===OW_DUNGEON){ sx = { x, y }; break; }
+      owReveal(sx.x, sx.y, 1); mapSearchIndex.c = null; mapSearchSet('bloodmoss'); out.caveHerb = mapSearchHits().some(h=>h.x===sx.x && h.y===sx.y && h.what==='site'); out.caveNote = /grows on its floors/.test(document.getElementById('mapSearchList').textContent); }
     // jump to one: the map centres on it
     mapSearchSet(seen.nm); mapSearchGo(0); out.jump = G.owZoomCenter.x===seen.x && G.owZoomCenter.y===seen.y;
     // typing in the box doesn't work the game's keys (M would shut the map)
@@ -44,6 +49,8 @@ module.exports = async page=>{
   if (!r.siteWord) throw new Error('a site is found by the legend word for it');
   if (!r.altar || !r.alter) throw new Error('a seen altar is found as altar or alter '+JSON.stringify(r));
   if (!r.dig) throw new Error('a seen dig site is found as an excavation');
+  if (!r.forage || !r.forageWord) throw new Error('a seen forage spot is found by its herb and as foraging '+JSON.stringify({ f:r.forage, w:r.forageWord }));
+  if (!r.caveHerb || !r.caveNote) throw new Error('a dungeon shows for the cave herb on its floors');
   if (!r.jump) throw new Error('picking a result centres the map on it');
   if (!r.stillOpen) throw new Error('typing in the search box does not work the game keys');
   if (r.merch.party!==0 || r.merch.opened!=='merchant' || !r.merch.fig || !r.merch.art) throw new Error('the wandering merchant '+JSON.stringify(r.merch));

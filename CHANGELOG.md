@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-324 - Zoom in Town, Search for Forage
+
+- **The world map zooms in towns.** The mouse wheel and a pinch now zoom the world map when you open it in a town, the same as out on the land.
+- **Search the map for forage.** Type a herb or other forage ("silverleaf", "flax", "seaweed") and every patch of it you've seen on the land is ringed; "foraging" or "herb" finds them all. Cave herbs show the dungeons and other sites deep enough to grow them: bloodmoss on any site, ghostcap on those with three floors or more, dragontongue on six or more. Those results read "grows on its floors".
+
 ## RS-323 - Darker Halls, Swinging Blades
 
 - **The standard spells come with every book.** Switch to the Ancient, Lunar or Arceuus spellbook and you keep all the standard spells too, listed after the book's own. A standard spell you had picked stays picked when you switch.
