@@ -13,7 +13,7 @@ module.exports = async page=>{
     const pt = p=>{ let n = 0; p.e.holder.traverse(o=>{ if (o.isMesh) n += tri(o); }); return n|0; };
     const out = { calls, tris, merged, mergedTris:mergedTris|0, mergedFrom:V3.mergedFrom, mergedTo:V3.mergedTo, player:pt(V3.player), folk:V3.villagers.length ? Math.max(...V3.villagers.map(pt)) : 0, npc:V3.npcs.length ? Math.max(...V3.npcs.map(pt)) : 0 };
     // the people are their own meshes, never merged
-    out.peopleMerged = [V3.player, ...V3.npcs, ...V3.villagers].some(p=>{ let m = false; p.g.traverse(o=>{ if (o.userData.merged) m = true; }); return m; });
+    out.peopleMerged = (()=>{ let m = false; V3.player.g.traverse(o=>{ if (o.userData.merged) m = true; }); return m; })();   /* (RS-352: the townsfolk merge within their joints; you don't) */
     // a building still fades on its own: its merged walls go see-through
     const bg = (V3.occ||[]).map(o=>o.userData.grp).find(g=>g && g.children.some(c=>c.userData.merged));
     if (bg){ bg.userData.fade = 1; bg.userData.faded = false; renderGame(); const mm = bg.children.find(c=>c.userData.merged); out.fadeSeeThrough = !!(mm.userData.matF && mm.material===mm.userData.matF && mm.material.transparent);
@@ -31,7 +31,7 @@ module.exports = async page=>{
   A(r.calls < 1600, 'a town frame is under 1,600 draws, shadows included');
   A(r.tris < 2600000, 'a town frame is under 2.6 million triangles');
   A(r.player > 150000 && r.folk < 120000 && r.npc < 120000, 'the townsfolk are sculpted coarse, you are not');
-  A(!r.peopleMerged, 'the people keep their own jointed parts');
+  A(!r.peopleMerged, 'your own figure keeps its own parts');
   A(r.fadeSeeThrough && r.otherSolid, 'a building in the way goes see-through on its own, merged walls and all');
   A(!r.hasFar || r.farCast===0, 'folk far from you cast no shadow');
   A(!r.hasNear || r.nearCast > 0.5, 'folk near you cast shadows');

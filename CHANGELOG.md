@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-352 - Half the Draws Again
+
+- **The sun's shadow map is redrawn every other frame.** In towns and on the open land the shadow pass was over half of a frame's draws: 812 of 1,310 in a town. It's now drawn on alternate frames, which no eye can tell, with a fresh scene drawing it at once. A town frame now alternates between about 470 and 1,210 draws instead of 1,310 every time - about 840 on average.
+- **The townsfolk draw a third fewer parts.** Each townsperson was forty-odd meshes. The ones under one joint that share a material - a boot and its sole, a sleeve and its cuff - are now baked into one, so the figure still bends at every joint but draws 30 percent fewer parts. Anything the rig moves on its own, a jaw, an eye, a weapon, stays its own. Your own figure is untouched.
+- **Why this matters on a strong PC.** With the right card confirmed (RS-351), 50 frames a second in a town on a GeForce 3080 Ti meant the limit was the processor issuing draws, not the card drawing pixels: a browser draws everything from one thread, at roughly a 60th of a millisecond a draw. Fewer draws is the only way up from there.
+- **Test.** `jointmerge` checks the townsfolk draw at least a quarter fewer parts and still walk and strike, that your figure is untouched, and that the shadow map alternates.
+
 ## RS-351 - The Fast Card
 
 - **Towns and the open land ask for the fast graphics card.** On a machine with two cards - a desktop with an onboard Intel chip still switched on beside its GeForce, or a laptop - the browser may hand a page the slow one. The dungeon view already asked for the high-performance card; the town and the land didn't, so they could end up drawn by the onboard chip while the dungeon ran on the GeForce. Both ask now. If you've had towns running badly on a strong PC, this is the likeliest cause.

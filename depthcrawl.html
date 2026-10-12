@@ -23000,8 +23000,16 @@ function gfxWarmRender(r, scene, cam){ const rt = r.getRenderTarget(), t = gfxTa
 // (RS-345) the open land and towns compile their whole scene right after it's built - what's placed but off screen
 // too - and, once per renderer, a group of stand-ins for what only spawns later: the animals, a gathering spot of
 // every kind, a camp, the markers. The stand-ins are kept, so their materials' programs stay built
+// (RS-352) the sun's shadow map is redrawn every other frame in towns and on the land: the shadow pass was over half of
+// a town frame's draws, and a shadow a frame behind can't be seen. A fresh scene, or one just compiled, redraws it at once
+function gfxShadowEveryOther(V, r){
+  if (!r || !r.shadowMap.enabled){ return; }
+  if (r.shadowMap.autoUpdate){ r.shadowMap.autoUpdate = false; V.shadowN = 0; V.shadowFresh = 3; }
+  V.shadowN = (V.shadowN||0) + 1;
+  if (V.shadowFresh > 0){ V.shadowFresh--; r.shadowMap.needsUpdate = true; } else r.shadowMap.needsUpdate = (V.shadowN % 2)===0;
+}
 function gfxCompileScene(V, r, scene, cam, warm){
-  if (!V.compileDue || !r || !scene) return; V.compileDue = false;
+  if (!V.compileDue || !r || !scene) return; V.compileDue = false; V.shadowFresh = 3;   /* (RS-352: a fresh scene redraws its shadow map at once) */
   let grp = null;
   if (warm && V.warmFor!==r){ V.warmFor = r; try{ grp = V.warmGrp = warm(); }catch(e){ console.error(e); grp = null; } }
   if (grp){ grp.traverse(o=>{ o.frustumCulled = false; }); grp.position.y -= 80; scene.add(grp); }   /* (drawn wherever they are: below the land, clipped away) */
@@ -29424,6 +29432,7 @@ function v3BuildPeople(grp, mats){
     return p; });
   V3.villagers = (G.villagers||[]).map((v,i)=>{ const p = P(townFolkLook(v, i), townFolkH(v), v.x, v.y); p.v = v; return p; });
   } finally { M3D_COARSE = 1; }
+  for (const p of [...V3.npcs, ...V3.villagers]) try{ if (p.e) m3dMergeJoints(p.e); }catch(e){ console.error(e); }   /* (RS-352) */
   // particle pool (smoke, sparks, motes, bubbles)
   V3.partMatSmoke = new T.SpriteMaterial({ map:v3Blob('rgba(150,150,150,0.9)'), transparent:true, depthWrite:false, opacity:0.5 });
   V3.partMatSpark = new T.SpriteMaterial({ map:v3Blob('rgba(255,180,80,1)'), blending:T.AdditiveBlending, transparent:true, depthWrite:false });
@@ -29817,6 +29826,7 @@ function v3Render(){
     else if (hv && hv.kind==='building' && hv.b.door) at = [hv.b.door.x+0.5, 0.04, hv.b.door.y+0.5, 0.75];
     hoverRing(V3, at); }
   gfxCompileScene(V3, V3.renderer, V3.scene, V3.cam, v3Warm);   /* (RS-345) */
+  gfxShadowEveryOther(V3, V3.renderer);   /* (RS-352) */
   gfxRender(V3.renderer, V3.scene, V3.cam, 'v3');
   // name plates follow their owners on screen
   const v = new T.Vector3();
@@ -30875,6 +30885,37 @@ function o3BuildNodeChunk(list, g){
 }
 /* (RS-333) bake every still, solid mesh under root that shares a material into one: the gathering spots in view were some
    3,000 separate draws (a herb patch alone was 21), and each draw costs the phone far more than its few triangles */
+// (RS-352) a townsperson's forty-odd parts, merged where they can be: the meshes under one joint that share a material
+// bake into one, so the figure still bends at every joint but draws about a third fewer parts. Anything the rig points
+// at (a jaw, an eye, a hand's weapon) stays its own mesh
+function m3dMergeJoints(e){
+  if (!e || !e.holder) return 0; const T = THREE, skip = new Set(), seen = new Set();
+  const walk = (v, d)=>{ if (!v || typeof v!=='object' || seen.has(v) || d > 6) return; seen.add(v); if (v.isObject3D){ skip.add(v); return; } if (v.isMaterial || v.isBufferGeometry || v.isColor || v.isVector3) return; const vals = Array.isArray(v) ? v : Object.values(v); for (const x of vals) walk(x, d+1); };
+  walk(e.rig, 0);
+  let before = 0, after = 0; const parents = []; e.holder.traverse(o=>{ if (o.isMesh) before++; if (o.children.some(c=>c.isMesh)) parents.push(o); });
+  for (const par of parents){
+    const groups = new Map();
+    for (const o of par.children){ if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh || skip.has(o) || !o.visible) continue; const m = o.material; if (!m || Array.isArray(m) || m.transparent || m.visible===false) continue;
+      if (Object.keys(o.userData).length) continue; const ga = o.geometry && o.geometry.attributes; if (!ga || !ga.position || !ga.normal || o.geometry.morphAttributes && Object.keys(o.geometry.morphAttributes).length) continue;
+      const k = m.uuid + '|' + (o.castShadow ? 1 : 0) + (o.receiveShadow ? 1 : 0) + '|' + Object.keys(ga).sort().join(','); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(o); }
+    for (const list of groups.values()){ if (list.length < 2) continue;
+      const names = Object.keys(list[0].geometry.attributes); let nv = 0, ni = 0;
+      for (const o of list){ const g = o.geometry; nv += g.attributes.position.count; ni += g.index ? g.index.count : g.attributes.position.count; }
+      const out = {}; for (const nm of names) out[nm] = new Float32Array(nv*list[0].geometry.attributes[nm].itemSize);
+      const idx = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni); let vo = 0, io = 0; const N = new T.Matrix3(), v = new T.Vector3();
+      for (const o of list){ const g = o.geometry, c = g.attributes.position.count; o.updateMatrix(); const M = o.matrix; N.getNormalMatrix(M);
+        for (const nm of names){ const a = g.attributes[nm], is = a.itemSize, dst = out[nm];
+          for (let i=0;i<c;i++){
+            if (nm==='position'){ v.fromBufferAttribute(a, i).applyMatrix4(M); dst[(vo+i)*3] = v.x; dst[(vo+i)*3+1] = v.y; dst[(vo+i)*3+2] = v.z; }
+            else if (nm==='normal'){ v.fromBufferAttribute(a, i).applyMatrix3(N).normalize(); dst[(vo+i)*3] = v.x; dst[(vo+i)*3+1] = v.y; dst[(vo+i)*3+2] = v.z; }
+            else for (let k=0;k<is;k++) dst[(vo+i)*is+k] = a.array[i*is+k]; } }
+        if (g.index){ const ia = g.index.array; for (let i=0;i<ia.length;i++) idx[io++] = ia[i] + vo; } else for (let i=0;i<c;i++) idx[io++] = vo + i;
+        vo += c; }
+      const mg = new T.BufferGeometry(); for (const nm of names) mg.setAttribute(nm, new T.BufferAttribute(out[nm], list[0].geometry.attributes[nm].itemSize)); mg.setIndex(new T.BufferAttribute(idx, 1)); mg.computeBoundingSphere();
+      const mesh = new T.Mesh(mg, list[0].material); mesh.castShadow = list[0].castShadow; mesh.receiveShadow = list[0].receiveShadow; mesh.userData.merged = list.length; par.add(mesh);
+      for (const o of list) par.remove(o); } }
+  e.holder.traverse(o=>{ if (o.isMesh) after++; }); e.mergedParts = before - after; return before - after;
+}
 function o3MergeStatic(root, skip){
   const T = THREE; root.updateMatrixWorld(true);
   const inv = new T.Matrix4().copy(root.matrixWorld).invert(), groups = new Map();
@@ -31218,6 +31259,7 @@ function o3Render(){
   hoverRing(O3, O3.hoverAny && G.ui==='playing' ? [O3.hoverAny.x+0.5, Math.max(O3.heightAt(O3.hoverAny.x+0.5, O3.hoverAny.y+0.5), -0.14)+0.05, O3.hoverAny.y+0.5, O3.hoverAny.kind==='site' ? 0.9 : 0.6] : null);
   try{ gfxO3Tick(dt, pp); }catch(e){ console.error(e); }   // light, mist, falls, leaves (see SECTION: GRAPHICS)
   gfxCompileScene(O3, O3.renderer, O3.scene, O3.cam, o3Warm);   /* (RS-345) */
+  gfxShadowEveryOther(O3, O3.renderer);   /* (RS-352) */
   gfxRender(O3.renderer, O3.scene, O3.cam, 'o3');
   // name plates: town names always, other sites when near or hovered
   const v = new T.Vector3(), hv = O3.hover;
@@ -38181,7 +38223,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-351';
+const GAME_VERSION = 'rs-352';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

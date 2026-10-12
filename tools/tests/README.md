@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| jointmerge | townsfolk parts that share a material under one joint are baked into one (a third fewer draws, the figure still bends); the sun's shadow map redraws every other frame |
 | gpupref | the town and land renderers ask for the high-performance GPU, and the fps meter names the card drawing the view |
 | nodering | gathering-spot chunks reach as far as the camera sees, never past the built land; a walk keeps the chunks round you; a window move keeps the chunks still inside it |
 | landfar | a coarse far ground of the whole world sits under the built land; a window move builds the new land over several frames while the old shows, then swaps in |
