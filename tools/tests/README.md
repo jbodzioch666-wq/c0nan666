@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| snakesize | RS-361: serpents sized by footprint - a snake about a tile, a giant two, a mythic three |
 | spire | RS-360: the Black Spire landmark: sealed before the quest, the gate and knight's floor on it, eight floors of the dead after |
 | spiregate | RS-359: arriving at a quest site takes the quest's dialog, not the dungeon prompt (the Black Spire's knight's floor) |
 | cull | in towns, whole things the camera can't see are skipped; dungeon lights' shadows refresh on their own clocks; a desktop dungeon never drops below render scale 0.7 |

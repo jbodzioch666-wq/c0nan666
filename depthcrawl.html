@@ -32433,10 +32433,13 @@ function fpdRender(env, T, camZ){
     const wall = o.f.h==null, off = wall ? 0.32 : 0.14, bx = o.f.x + (o.f.dx||0)*off, by = o.f.y + (o.f.dy||0)*off;
     L.position.set(bx + 0.025*Math.sin(FP.t*5.1+s), (wall ? 1.35 : o.f.h) + 0.02*Math.sin(FP.t*7.3+s*1.3), by + 0.025*Math.cos(FP.t*4.3+s)); });
   if (SET.gfx!=='low' && (G.gameMode===1 || G.gameMode===2)){ FPD.flickN = (FPD.flickN||0) + 1; const n = FPD.flickN, hi = SET.gfx==='high';
+    /* (RS-361) the clocks run at the pace the machine affords: at a healthy frame rate the lantern's shadow is drawn every
+       frame and each torch's every other, since the staggered clocks read as a stutter in the shadows at 60 fps */
+    const dtA = FPD.dtAvg = (FPD.dtAvg||0.016)*0.9 + Math.min(0.1, FP.dt||0.016)*0.1, quick = dtA < 1/45, lanEvery = quick ? 1 : (hi ? 2 : 4), torchEvery = quick ? 2 : (hi ? 6 : 8);
     /* (RS-163: monsters cast torch shadows now, so they're redrawn as they move. RS-355: each light on its own clock - the lantern
        every second frame, each torch every sixth, staggered - since a point light's shadow is six faces of the whole floor each time) */
-    let any = FPD.shadowFrames > 0; if (FPD.lan && FPD.lan.shadow){ FPD.lan.shadow.autoUpdate = false; if (n % (hi ? 2 : 4) === 0 || FPD.shadowFrames > 0){ FPD.lan.shadow.needsUpdate = true; any = true; } }
-    (FPD.torches||[]).forEach((L, i)=>{ if (!L.shadow) return; L.shadow.autoUpdate = false; if ((n + i) % (hi ? 6 : 8) === 0 || FPD.shadowFrames > 0){ L.shadow.needsUpdate = true; any = true; } });
+    let any = FPD.shadowFrames > 0; if (FPD.lan && FPD.lan.shadow){ FPD.lan.shadow.autoUpdate = false; if (n % lanEvery === 0 || FPD.shadowFrames > 0){ FPD.lan.shadow.needsUpdate = true; any = true; } }
+    (FPD.torches||[]).forEach((L, i)=>{ if (!L.shadow) return; L.shadow.autoUpdate = false; if ((n + i) % torchEvery === 0 || FPD.shadowFrames > 0){ L.shadow.needsUpdate = true; any = true; } });
     if (any) FPD.r.shadowMap.needsUpdate = true; }
   // dust: a loose cloud kept centered on you
   const dp = FPD.dust.geometry.attributes.position, sd = FPD.dustSeed, n = dp.count;
@@ -34577,7 +34580,7 @@ function m3dSpecialMat(mats, hex, kind){
   if (kind==='ghost') return sp(new T.MeshStandardMaterial({ color:m3dCol(hex), roughness:0.6, transparent:true, opacity:0.55, depthWrite:false, emissive:m3dCol(hex), emissiveIntensity:0.35, side:T.DoubleSide }));
   return m3dMat(mats, hex, kind);
 }
-function m3dFinish(root, rig, anim, extra){ const box = new THREE.Box3().setFromObject(root), sz = box.getSize(new THREE.Vector3()); M3D.meta.set(root, Object.assign({ rig, anim, height: Math.max(0.05, box.max.y, Math.max(sz.x, sz.z)*0.62) }, extra||{})); return root; }
+function m3dFinish(root, rig, anim, extra){ const box = new THREE.Box3().setFromObject(root), sz = box.getSize(new THREE.Vector3()); M3D.meta.set(root, Object.assign({ rig, anim, height: Math.max(0.05, box.max.y, Math.max(sz.x, sz.z)*0.62), foot: Math.max(0.05, sz.x, sz.z) }, extra||{})); return root; }
 // a reptile head: snout, lower jaw on a hinge, horns, eyes, and fire in the throat
 function m3dReptileHead(parent, o, mats, scaleM, bellyM, s){
   const T = THREE, h = new T.Group(); parent.add(h); h.scale.setScalar(s||1);
@@ -35032,8 +35035,10 @@ function m3dSerpent(o){
       if (r.hood) m3dOnSpine(r.hood, pts, F, 0.955); };
   }
   rig.spine = spine; rig.rad = rad; rig.finish = finish;
-  const pose = (r, t, mv, wind, strike)=>{ const pts = r.spine(t, mv, wind, strike);
-    if (mv > 0.01){ const n = pts.length - 1; pts.forEach((p, i)=>{ const s = i/n; p.x += Math.sin(t*7 - s*10)*0.05*mv*(1 - s*0.75); });   /* (RS-346) it slithers: a wave runs down its body as it moves, quietest at the head */ }
+  const pose = (r, t, mv, wind, strike)=>{ let pts = r.spine(t, mv, wind, strike);
+    /* (RS-346) it slithers: a wave runs down its body as it moves, quietest at the head. (RS-361: on a copy of the points - the
+       coil's points are kept between frames, and adding the wave to them in place let the coil drift and stretch across the room) */
+    if (mv > 0.01){ const n = pts.length - 1; pts = pts.map((p, i)=>{ const s = i/n; return new T.Vector3(p.x + Math.sin(t*7 - s*10)*0.05*mv*(1 - s*0.75), p.y, p.z); }); }
     const F = m3dSpineFrames(pts, r.up0); m3dTubeSet(r.tube, pts, F, r.rad); m3dOnSpine(r.head, pts, F, 1);
     if (r.finish) r.finish(r, t, mv, wind, strike, pts, F); };
   pose(rig, 0.7, 0, 0, 0);
@@ -36288,7 +36293,10 @@ function m3dInstance(m, pt){
   if (rig && rig.ups) for (const p of rig.ups) M3D_UPS.add(p);   /* (RS-201: its bow or staff stays upright from the first frame) */
   // tiny rats to towering giants and dragons: the big ones stand well over a tile and spill across their neighbours
   const szK = monSizeK(m), H = Math.min(szK >= 2.5 ? 4.2 : szK > 1 ? 2.4 : 0.98, 0.74*(pt.h||1)*(G.gameMode===1 && G.isBossFloor && G.mon && G.mon.indexOf(m)===G.bossIdx ? 1.2 : 1)*szK);
-  const s = H / meta.height;
+  let s = H / meta.height;
+  /* (RS-361) a serpent is long and low: sized to a tall creature's height, a giant snake's coil came out stretched right
+     across the room. Its footprint is capped instead - about a tile for a snake, two for a giant one, three for a mythic */
+  if (meta.rig && meta.rig.serpent && meta.foot){ const F = (szK >= 2.5 ? 3.2 : szK > 1 ? 1.9 : 1.1)*Math.min(1.6, pt.w||1); s = Math.min(s, F/meta.foot); }
   const holder = new T.Group(); holder.add(root); root.scale.setScalar(s);
   /* (RS-163: no round blob under a creature - it casts a real shadow from the torches, or the sun and moon) */
   root.traverse(o=>{ if (o.isMesh && !(o.material && o.material.transparent)) o.castShadow = true; });
@@ -38369,7 +38377,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-360';
+const GAME_VERSION = 'rs-361';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

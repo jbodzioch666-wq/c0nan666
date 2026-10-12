@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-361 - Snakes keep their shape, shadows keep up
+
+- **Fixed snakes stretching across the room.** Since RS-346 a serpent's slither added its wave to the coil's points in place every frame it moved, and those points are kept between frames, so a snake that kept moving had its coil pulled out longer and longer, until the tube ran right across a pyramid's hall and through your feet. The wave now goes on a copy. A test slithers a snake for four hundred frames and checks it stays where it was.
+- **Serpents sized by footprint.** A snake is long and low, so sizing it to a tall creature's height could blow a giant one up; a snake now covers about a tile, a giant one two, a mythic serpent three.
+- **Dungeon shadows at full rate when the machine can.** RS-355 put each light's shadow on its own clock (the lantern every second frame, each torch every sixth), which read as a stutter in the shadows at 60 fps. The clocks now follow the frame rate: at a healthy rate the lantern's shadow is drawn every frame and each torch's every other; when the frame rate drops, the slower clocks come back.
+
 ## RS-360 - The Black Spire stands
 
 - **The Black Spire is a landmark of its own.** A tower of black glass, eighteen tiles high, eight-sided and ribbed, with knife-edged buttresses at its foot, violet slit windows, a sealed gate and a cold violet flame at its crown trailing black smoke. It stands on clear ground as far from where you began as the land allows, clear of the Wilderness, and shows on the world map with its own glyph and name. Existing worlds get it too: no new world needed.
