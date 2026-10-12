@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-360 - The Black Spire stands
+
+- **The Black Spire is a landmark of its own.** A tower of black glass, eighteen tiles high, eight-sided and ribbed, with knife-edged buttresses at its foot, violet slit windows, a sealed gate and a cold violet flame at its crown trailing black smoke. It stands on clear ground as far from where you began as the land allows, clear of the Wilderness, and shows on the world map with its own glyph and name. Existing worlds get it too: no new world needed.
+- **Only the quest opens it.** Walk into it or tap it. Before the Waking Lich quests reach it, the gate is sealed and the Spire only tells you something inside is dreaming. On "Go to the Black Spire" the gate dialog, the knight's floor and the six-floor climb to the Wakener follow in order; mid-quest it offers the climb again. The Spire is a necro tower in its own right, with its own floors remembered between visits.
+- **Afterwards it's yours.** Once the Wakener is dust, tap the Spire whenever you like: eight floors of the dead keep rising on its stairs, and every kill in there counts twice toward a Slayer task.
+- **A quest that was already pointed at an old tower** (from before this release) is pointed at the Spire when you load.
+
 ## RS-359 - The Black Spire's gate
 
 - **The Waking Lich VIII can be finished.** Stepping onto the Black Spire's tile opened the necro tower's plain "descend" prompt, which swallowed the quest's arrival: the knight's floor never showed, and the tower you entered was an ordinary one. Now any quest that led you to a site speaks first when you arrive. At the Spire that means the gate dialog, the knight's floor, and then the six-floor climb to the Wakener.

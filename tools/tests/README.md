@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| spire | RS-360: the Black Spire landmark: sealed before the quest, the gate and knight's floor on it, eight floors of the dead after |
 | spiregate | RS-359: arriving at a quest site takes the quest's dialog, not the dungeon prompt (the Black Spire's knight's floor) |
 | cull | in towns, whole things the camera can't see are skipped; dungeon lights' shadows refresh on their own clocks; a desktop dungeon never drops below render scale 0.7 |
 | diag | double-clicking the fps meter switches sprites, grass, lamps, soft shadows, shadows, multisampling, people and the ground off in turn and reads the card time each saves; each is undone after |
