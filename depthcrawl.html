@@ -38292,7 +38292,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-356';
+const GAME_VERSION = 'rs-357';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -40939,7 +40939,7 @@ function gfxGpuStop(){ const P = PROF.gpu; if (P.cur){ try{ P.gl.endQuery(P.ext.
 // (RS-355) the diagnosis: double-click the fps meter and it switches one thing off at a time for a second each - the
 // sprites, the grass and other instanced growth, the lamps, the soft shadow filtering, the shadows, the multisampled post
 // buffer, the people, the ground - and reads how many of the card's milliseconds each one costs, measured on this machine
-const DIAG = { on:false, i:-1, n:0, sum:0, res:{}, undo:null, skip:0 };
+const DIAG = { on:false, k:-1, n:0, sum:0, res:{}, acc:{}, base:undefined, cyc:0, undo:null, skip:0 };
 const DIAG_STEPS = [
   ['base', ()=>null],
   ['sprites', (sc)=>{ const h = []; sc.traverse(o=>{ if (o.isSprite && o.visible){ o.visible = false; h.push(o); } }); return ()=>h.forEach(o=>o.visible = true); }],
@@ -40954,29 +40954,35 @@ const DIAG_STEPS = [
 ];
 function diagMats(sc){ sc.traverse(o=>{ if (o.material) [].concat(o.material).forEach(m=>{ m.needsUpdate = true; }); }); }
 function diagScene(){ if (G.gameMode===3 && typeof V3!=='undefined' && V3.scene) return V3.scene; if (G.gameMode===0 && typeof O3!=='undefined' && O3.scene) return O3.scene; return FPD.scene || null; }
-function diagToggle(){ DIAG.on = !DIAG.on; if (DIAG.undo){ try{ DIAG.undo(); }catch(e){} DIAG.undo = null; } DIAG.i = -1; DIAG.n = 0; DIAG.sum = 0; DIAG.res = {}; DIAG.skip = 0; }
-// called with each frame's measured card time; steps on every 40 frames, skipping the first 6 after a switch
+function diagToggle(){ DIAG.on = !DIAG.on; if (DIAG.undo){ try{ DIAG.undo(); }catch(e){} DIAG.undo = null; } DIAG.k = -1; DIAG.n = 0; DIAG.sum = 0; DIAG.res = {}; DIAG.acc = {}; DIAG.base = undefined; DIAG.cyc = 0; DIAG.skip = 0; }
+// called with each frame's measured card time; steps on every 40 frames, skipping the first 6 after a switch.
+// RS-357: a fresh base is read before every step (base, sprites, base, grass, ...), each saving is against the base
+// just before it, and the savings are averaged over as many cycles as the meter stays up: the card's clocks and the
+// scene drift, and a single base at the start made the later steps read nonsense
 function diagFrame(gpuMs){
   if (!DIAG.on) return; const sc = diagScene(), r = gfxViewRenderer(); if (!sc || !r) return;
-  if (DIAG.i < 0){ DIAG.i = 0; DIAG.skip = 6; DIAG.n = 0; DIAG.sum = 0; }
+  const L = 2*(DIAG_STEPS.length - 1);
+  if (DIAG.k < 0){ DIAG.k = 0; DIAG.skip = 6; DIAG.n = 0; DIAG.sum = 0; }
   if (DIAG.skip > 0){ DIAG.skip--; return; }
   if (gpuMs!==undefined){ DIAG.n++; DIAG.sum += gpuMs; }
   if (DIAG.n < 40) return;
-  const [name] = DIAG_STEPS[DIAG.i]; DIAG.res[name] = DIAG.sum/DIAG.n;
+  const v = DIAG.sum/DIAG.n, step = DIAG.k % 2 ? DIAG_STEPS[(DIAG.k+1)/2] : null;
+  if (!step){ DIAG.base = v; DIAG.res.base = v; }
+  else if (DIAG.base!==undefined){ const a = DIAG.acc[step[0]] || (DIAG.acc[step[0]] = { s:0, n:0 }); a.s += DIAG.base - v; a.n++; DIAG.res[step[0]] = a.s/a.n; }
   if (DIAG.undo){ try{ DIAG.undo(); }catch(e){} DIAG.undo = null; }
-  DIAG.i = (DIAG.i + 1) % DIAG_STEPS.length; DIAG.n = 0; DIAG.sum = 0; DIAG.skip = 6;
-  if (DIAG.i > 0){ try{ DIAG.undo = DIAG_STEPS[DIAG.i][1](sc, r); }catch(e){ console.error(e); DIAG.undo = null; } if (!DIAG.undo) DIAG.res[DIAG_STEPS[DIAG.i][0]] = null; }
+  DIAG.k = (DIAG.k + 1) % L; if (DIAG.k===0) DIAG.cyc++; DIAG.n = 0; DIAG.sum = 0; DIAG.skip = 6;
+  if (DIAG.k % 2){ const st = DIAG_STEPS[(DIAG.k+1)/2]; try{ DIAG.undo = st[1](sc, r); }catch(e){ console.error(e); DIAG.undo = null; } if (!DIAG.undo){ DIAG.res[st[0]] = null; DIAG.k = (DIAG.k + 1) % L; if (DIAG.k===0) DIAG.cyc++; } }   /* (a step with nothing to switch: straight on to the next base) */
 }
 function diagText(){
   if (!DIAG.on) return ''; const b = DIAG.res.base; const parts = [];
-  for (const [name] of DIAG_STEPS){ if (name==='base') continue; const v = DIAG.res[name]; if (v===undefined) continue; parts.push(v===null ? `-${name} n/a` : `-${name} ${b===undefined ? '?' : (Math.round((b - v)*10)/10).toFixed(1)}`); }
-  const cur = DIAG.i >= 0 ? DIAG_STEPS[DIAG.i][0] : ''; return `\ndiag${b!==undefined ? ' base '+(Math.round(b*10)/10).toFixed(1) : ''}${parts.length ? ' ' + parts.join(' ') : ''}${cur ? ' [' + cur + ']' : ''}`;
+  for (const [name] of DIAG_STEPS){ if (name==='base') continue; const v = DIAG.res[name]; if (v===undefined) continue; parts.push(v===null ? `-${name} n/a` : `-${name} ${(Math.round(v*10)/10).toFixed(1)}`); }
+  const cur = DIAG.k < 0 ? '' : DIAG.k % 2 ? DIAG_STEPS[(DIAG.k+1)/2][0] : 'base'; return `\ndiag${b!==undefined ? ' base '+(Math.round(b*10)/10).toFixed(1) : ''}${DIAG.cyc > 0 ? ' x' + (DIAG.cyc + 1) : ''}${parts.length ? ' ' + parts.join(' ') : ''}${cur ? ' [' + cur + ']' : ''}`;
 }
 function profText(n){
   const t = PROF.t, ms = (v)=>v===undefined ? '-' : (Math.round(v*10)/10).toFixed(1); if (!n) return '';
   const d3 = (t['3d']||0)/n, game = (t.game||0)/n, loop = (t.loop||0)/n, gN = PROF.gpuN, gpu = gN ? (t.gpu||0)/gN : undefined;
   const split = gN ? ` (sh ${ms((t.g_shadow||0)/gN)} sc ${ms((t.g_scene||0)/gN)} post ${ms((t.g_post||0)/gN)})` : '';
-  let px = ''; try{ const r = gfxViewRenderer(); if (r){ const v = r.getDrawingBufferSize(new THREE.Vector2()); px = ` @${v.x}x${v.y}`; } }catch(e){}
+  let px = ''; try{ const r = gfxViewRenderer(); if (r){ const v = r.getDrawingBufferSize(new THREE.Vector2()); px = ` @${v.x}x${v.y} sh:${r.shadowMap.enabled ? (r.shadowMap.type===THREE.PCFShadowMap ? 'pcf' : 'soft') : 'off'}`; } }catch(e){}   /* (RS-357: whether the view draws shadows at all, and how) */
   const out = `\n3d ${ms(d3)} hud ${ms(Math.max(0, game - d3))} loop ${ms(Math.max(0, loop - game))} gpu ${ms(gpu)}${split} ms${px}` + diagText();   /* (a second line under the fps and the card) */
   PROF.t = {}; PROF.gpuN = 0; return out;
 }

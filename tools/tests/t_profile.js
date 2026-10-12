@@ -16,5 +16,5 @@ module.exports = async page=>{
   A(r.wrapped, 'the view and game renders are timed');
   A(r.offCost===0, 'nothing is measured while the meter is off');
   A(r.d3 > 0 && r.game >= r.d3 && r.loop >= r.game, 'the 3D view sits inside the game render inside the loop');
-  A(/\d+ fps \u00b7 [^\n]+\n3d \d+\.\d hud \d+\.\d loop \d+\.\d gpu (\d+\.\d \(sh \d+\.\d sc \d+\.\d post \d+\.\d\)|-) ms @\d+x\d+$/.test(r.meter), 'the meter reads the split on its second line: '+r.meter);
+  A(/\d+ fps \u00b7 [^\n]+\n3d \d+\.\d hud \d+\.\d loop \d+\.\d gpu (\d+\.\d \(sh \d+\.\d sc \d+\.\d post \d+\.\d\)|-) ms @\d+x\d+ sh:(off|pcf|soft)$/.test(r.meter), 'the meter reads the split on its second line: '+r.meter);
 };

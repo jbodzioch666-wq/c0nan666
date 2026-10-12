@@ -13,24 +13,26 @@ module.exports = async page=>{
     const R = V3.renderer, P = GFXP.get(R); out.samples0 = P ? P.scene.samples : -1; out.shadowType0 = R.shadowMap.type;
     diagToggle(); out.on = DIAG.on;
     const feed = (ms, n)=>{ for (let i=0;i<n;i++) diagFrame(ms); };
-    feed(10, 46); out.base = DIAG.res.base; out.stepAfterBase = DIAG_STEPS[DIAG.i][0]; out.spritesHidden = sprites();
-    feed(9.6, 46); out.spritesBack = sprites(); out.resSprites = DIAG.res.sprites; out.stepNow = DIAG_STEPS[DIAG.i][0];
-    feed(7, 46); feed(8.8, 46);   // grass, lamps
-    out.stepSoft = DIAG_STEPS[DIAG.i][0]; out.softType = R.shadowMap.type; feed(8, 46); out.softBack = R.shadowMap.type;
-    out.stepShadows = DIAG_STEPS[DIAG.i][0]; out.shadowsOff = R.shadowMap.enabled; feed(6, 46); out.shadowsBack = R.shadowMap.enabled;
-    out.stepMsaa = DIAG_STEPS[DIAG.i][0]; out.msaaSamples = P ? P.scene.samples : -1; feed(9, 46); out.msaaBack = P ? P.scene.samples : -1;
-    out.stepPeople = DIAG_STEPS[DIAG.i][0]; out.peopleHidden = !V3.player.g.visible; feed(8, 46); out.peopleBack = V3.player.g.visible;
+    const at = ()=>DIAG.k % 2 ? DIAG_STEPS[(DIAG.k+1)/2][0] : 'base';
+    feed(10, 46); out.base = DIAG.res.base; out.stepAfterBase = at(); out.spritesHidden = sprites();
+    feed(9.6, 46); out.spritesBack = sprites(); out.resSprites = DIAG.res.sprites; out.stepNow = at();
+    feed(10, 46); feed(7, 46); feed(10, 46); feed(8.8, 46);   // base, grass, base, lamps (RS-357: a fresh base before every step)
+    feed(10, 46); out.stepSoft = at(); out.softType = R.shadowMap.type; feed(8, 46); out.softBack = R.shadowMap.type;
+    feed(10, 46); out.stepShadows = at(); out.shadowsOff = R.shadowMap.enabled; feed(6, 46); out.shadowsBack = R.shadowMap.enabled;
+    feed(10, 46); out.stepMsaa = at(); out.msaaSamples = P ? P.scene.samples : -1; feed(9, 46); out.msaaBack = P ? P.scene.samples : -1;
+    feed(12, 46); out.stepPeople = at(); out.peopleHidden = !V3.player.g.visible; feed(10, 46); out.peopleBack = V3.player.g.visible; out.stepAfterPeople = at();
     renderGame(); FPSC.n = 40; FPSC.t0 = ts; ts += 600; fpsTick(ts); out.meter = document.getElementById('fpsCounter').textContent;
     diagToggle(); out.off = DIAG.on; out.spritesAfterOff = sprites(); SET.fps = false; fpsTick(ts + 1000); out.diagOffWithMeter = DIAG.on;
     return out; });
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
   A(r.on && r.base===10 && r.stepAfterBase==='sprites' && r.spritesHidden[0] > 0 && r.spritesHidden[1]===0, 'after the base, the sprites are switched off');
-  A(r.spritesBack[1]===r.spritesBack[0] && Math.abs(r.resSprites - 9.6) < 0.01, 'the sprites come back and their cost is kept');
+  A(r.spritesBack[1]===r.spritesBack[0] && Math.abs(r.resSprites - 0.4) < 0.01, 'the sprites come back and their saving is kept');
   A(r.stepSoft==='softshadow' && r.softType===1 && r.softBack===r.shadowType0, 'the soft shadow filtering is swapped and restored');
   A(r.stepShadows==='shadows' && r.shadowsOff===false && r.shadowsBack===true, 'the shadows go off and come back');
   A(r.stepMsaa==='msaa' && (r.samples0===0 ? r.msaaSamples===0 : r.msaaSamples===0 && r.msaaBack===r.samples0), 'the multisampling goes off and comes back');
   A(r.stepPeople==='people' && r.peopleHidden && r.peopleBack, 'the people go and come back');
-  A(/diag base 10\.0 -sprites 0\.4 -grass 3\.0 -lamps 1\.2 -softshadow 2\.0 -shadows 4\.0 -msaa (1\.0|n\/a) -people 2\.0/.test(r.meter), 'the meter reads each saving: '+r.meter);
+  A(r.stepNow==='base' && r.stepAfterPeople==='base', 'a fresh base is read between the steps');
+  A(/diag base 12\.0 -sprites 0\.4 -grass 3\.0 -lamps 1\.2 -softshadow 2\.0 -shadows 4\.0 -msaa (1\.0|n\/a) -people 2\.0/.test(r.meter), 'the meter reads each saving against the base just before it: '+r.meter);
   A(!r.off && r.spritesAfterOff[1]===r.spritesAfterOff[0] && !r.diagOffWithMeter, 'switching off undoes everything, and the meter going off does too');
 };

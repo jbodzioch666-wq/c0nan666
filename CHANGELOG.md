@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-357 - A diag you can trust
+
+- **The fps diag reads a fresh base before every step.** It now goes base, sprites, base, grass, base, lamps and so on, and each saving is measured against the base read just before it. The old single base at the start drifted as the card's clocks and the scene changed, so later steps read nonsense (two steps that switch nothing off claimed to save 6 ms).
+- **It keeps averaging while the meter is up.** Leave it running through two or three cycles and the readings settle; the line shows `x2`, `x3` for the number of cycles so far.
+- **The meter's second line says whether shadows are on**: `sh:off`, `sh:pcf` or `sh:soft` after the buffer size, so a reading can be matched to the graphics setting it was taken on.
+
 ## RS-356 - Townsfolk as skinned meshes
 
 - **Each townsperson is now a handful of draws instead of about thirty.** Villagers and town NPCs are rebuilt into GPU-skinned meshes: every part of the same make (same material, texture, shininess and shadow setting) is sewn into one mesh whose vertices follow the existing joints. A person who was 28 to 40 separate parts is now 8 to 11, and in a full city the people draw about a third as many meshes as before.
