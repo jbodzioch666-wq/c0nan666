@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| phonetier | RS-365: the phone tier as a setting on a computer, switched on and off live |
 | lootfilter | RS-362/364: the loot filter menu - tiers and gear bonuses to salvage; no junk tag |
 | snakesize | RS-361: serpents sized by footprint - a snake about a tile, a giant two, a mythic three |
 | spire | RS-360: the Black Spire landmark: sealed before the quest, the gate and knight's floor on it, eight floors of the dead after |

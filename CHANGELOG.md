@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-365 - Phone Tier on a Computer
+
+- **New setting: Settings, Graphics, phone tier.** It gives a computer the lighter graphics a phone gets: four town lamps lighting the scene instead of eight, plain shadow edges, smaller shadow maps (the sun's 1024 instead of 2048, each dungeon light's 256 instead of 512), no anti-aliasing, and at most 1.5x pixels. It switches there and then, with no reload, and switching it off brings everything back.
+- **Why:** a phone in town can outrun a desktop, partly because it runs this tier and partly because a recent phone chip is quicker on a single core, which is where the game's JavaScript runs. This lets you see how much of the difference is the graphics.
+- On a phone or tablet the tier is always on, as before.
+
 ## RS-364 - Loot Filter Bonuses
 
 - **The loot filter picks by the bonuses gear really has:** melee attack, strength, defence, ranged, magic, spell damage and prayer. RS-362 listed the old affixes (strength, dexterity, wisdom, life...), which no drop carries any more, so the stat picks did nothing. Now "keep pieces with ranged and magic" salvages the melee-only gear, and "salvage pieces with melee attack" takes swords and staves but not bows (a bow's accuracy counts as ranged).

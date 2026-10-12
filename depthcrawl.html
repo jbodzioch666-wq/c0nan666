@@ -1388,7 +1388,7 @@ const QUEST_DELIVERY_FLAVORS = ['a token for the temple', 'proof of your mettle'
 // loot pickup, etc, so it can never be allowed to throw and break gameplay
 let _actx = null;
 // ---- player settings (Esc > Settings): volume, graphics, HUD - kept per browser ----
-const SET_DEF = { vol:{ master:1, sfx:1, ui:1, music:0.6, amb:0.8 }, post:true, gfx:'high', fps:false, uiScale:1, compact:false, loadCards:true, qb1:true, qb2:true, qbVert1:false, qbVert2:false };   /* (RS-304: two quick bars, on by default, either way up) */
+const SET_DEF = { vol:{ master:1, sfx:1, ui:1, music:0.6, amb:0.8 }, post:true, gfx:'high', phoneTier:false, fps:false, uiScale:1, compact:false, loadCards:true, qb1:true, qb2:true, qbVert1:false, qbVert2:false };   /* (RS-304: two quick bars, on by default, either way up) */
 let SET = JSON.parse(JSON.stringify(SET_DEF));
 try { const sv = JSON.parse(localStorage.getItem('depthcrawl_settings')||'null'); if (sv) SET = Object.assign(SET, sv, { vol:Object.assign({}, SET_DEF.vol, sv.vol||{}) }); } catch(e){}
 function saveSettings(){ try { localStorage.setItem('depthcrawl_settings', JSON.stringify(SET)); } catch(e){} }
@@ -31590,8 +31590,26 @@ const GFX_Q = { low:{ pr:1, fpd:0.6, fx:0.35, shadows:false }, medium:{ pr:1.5, 
 function gfxQ(){ return GFX_Q[SET.gfx] || GFX_Q.high; }
 // (RS-348) a phone's share: shadow maps half the size with plain filtering, four lamp lights instead of eight, no
 // multisampling on the post buffer, and at most 1.5 pixels per CSS pixel - the fill-rate costs that made a town a slideshow
-function gfxPhone(){ return typeof v3LowMem==='function' && v3LowMem(); }
+function gfxPhone(){ return !!(SET && SET.phoneTier) || (typeof v3LowMem==='function' && v3LowMem()); }   /* (RS-365: or chosen in the settings on a computer) */
 function gfxPR(){ return Math.min(gfxQ().pr, gfxPhone() ? 1.5 : 9, window.devicePixelRatio||1); }
+// (RS-365) the phone tier switched on or off from the settings, there and then: plain or soft shadow edges, the shadow maps'
+// size, anti-aliasing, and four town lamps or eight. The pixel ratio and the dungeon's scale floor read gfxPhone each frame
+function gfxTierApply(){
+  const T = THREE, ph = gfxPhone(); if (typeof T==='undefined') return;
+  const size = (L, n)=>{ if (!L || !L.shadow) return; L.shadow.mapSize.set(n, n); if (L.shadow.map){ L.shadow.map.dispose(); L.shadow.map = null; } };
+  const views = [[typeof V3!=='undefined' && V3.renderer, typeof V3!=='undefined' && V3.scene, false], [typeof O3!=='undefined' && O3.renderer, typeof O3!=='undefined' && O3.scene, false], [FPD.r, FPD.scene, true]];
+  for (const [r, sc, dg] of views){ if (!r) continue;
+    if (!dg) r.shadowMap.type = ph ? T.PCFShadowMap : T.PCFSoftShadowMap;
+    const P = GFXP.get(r); if (P){ const want = r.capabilities.isWebGL2 && SET.gfx==='high' && !ph ? 4 : 0; if ((P.scene.samples||0)!==want){ P.scene.samples = want; P.scene.dispose(); } }
+    if (sc) sc.traverse(o=>{ if (o.material) [].concat(o.material).forEach(m=>{ m.needsUpdate = true; }); }); r.shadowMap.needsUpdate = true; }
+  if (typeof V3!=='undefined'){ if (V3.sun) size(V3.sun, ph ? 1024 : 2048);
+    if (V3.plights && V3.scene){ if (ph && V3.plights.length > 4){ V3.plightsOff = V3.plights.splice(4); for (const l of V3.plightsOff){ l.intensity = 0; V3.scene.remove(l); } }
+      else if (!ph){ if (V3.plightsOff){ for (const l of V3.plightsOff) V3.scene.add(l); V3.plights.push(...V3.plightsOff); V3.plightsOff = null; }
+        while (V3.plights.length < 8){ const pl = new T.PointLight(0xffb060, 0, 5, 2); V3.scene.add(pl); V3.plights.push(pl); } }
+      V3.lightAt = null; } }
+  if (typeof O3!=='undefined' && O3.sun) size(O3.sun, ph ? 1024 : SET.gfx==='high' ? 4096 : 2048);
+  if (FPD.lan) size(FPD.lan, ph ? 256 : 512); for (const L of FPD.torches||[]) size(L, ph ? 256 : 512);
+}
 function gfxApply(){
   const q = gfxQ(), list = [[typeof V3!=='undefined' && V3.renderer, typeof V3!=='undefined' && V3.scene], [typeof O3!=='undefined' && O3.renderer, typeof O3!=='undefined' && O3.scene], [FPD.r, FPD.scene]];
   const key = SET.gfx + list.map(l=>l[0] ? 1 : 0).join('');
@@ -31618,12 +31636,12 @@ function fpdInit(){
     const amb = new T.AmbientLight(0xffffff, 0.1), lan = new T.PointLight(0xffdca8, 1, 8, 1.4);
     // (RS-166) your lantern throws shadows - creatures' shadows stretch away from your light - but its shadow camera starts
     // 0.8 out from it, so your own hat and body, right under it, are left out: no big round blot of your hat (RS-165)
-    lan.castShadow = true; { const ms = (typeof v3LowMem==='function' && v3LowMem()) ? 256 : 512; lan.shadow.mapSize.set(ms, ms); } lan.shadow.bias = -0.006; lan.shadow.normalBias = 0.02; lan.shadow.camera.near = 0.8; lan.shadow.camera.far = 10;
+    lan.castShadow = true; { const ms = gfxPhone() ? 256 : 512; lan.shadow.mapSize.set(ms, ms); } lan.shadow.bias = -0.006; lan.shadow.normalBias = 0.02; lan.shadow.camera.near = 0.8; lan.shadow.camera.far = 10;
     scene.add(amb, lan);
     const torches = [];
     for (let i=0;i<FPD.MAXT;i++){
       const L = new T.PointLight(0xff8a36, 0, 6.5*DG_LIGHT, 1.4);
-      L.castShadow = true; { const ms = (typeof v3LowMem==='function' && v3LowMem()) ? 256 : 512; L.shadow.mapSize.set(ms, ms); } L.shadow.bias = -0.004; L.shadow.normalBias = 0.02;
+      L.castShadow = true; { const ms = gfxPhone() ? 256 : 512; L.shadow.mapSize.set(ms, ms); } L.shadow.bias = -0.004; L.shadow.normalBias = 0.02;
       L.shadow.camera.near = 0.05; L.shadow.camera.far = 8;
       scene.add(L); torches.push(L);
     }
@@ -38383,7 +38401,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-364';
+const GAME_VERSION = 'rs-365';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -38576,7 +38594,7 @@ function setSetting(path, v){
   if (path.startsWith('vol.')){ SET.vol[path.slice(4)] = +v; applyVolumes(); if (G.ui==='settings') sfx(path==='vol.ui' ? 'notify' : 'hit'); }
   else SET[path] = v;
   if (/^qbVert/.test(path)){ delete LAYOUT['qbar' + (path==='qbVert2' ? '2' : '')]; saveLayout(); }   /* (a bar turned the other way goes back to its own place) */
-  saveSettings(); applyUiPrefs(); gfxApply(); renderOverlay();
+  saveSettings(); applyUiPrefs(); gfxApply(); if (path==='phoneTier' || path==='gfx') try{ gfxTierApply(); }catch(e){ console.error(e); } renderOverlay();
 }
 function applyUiPrefs(){
   document.documentElement.style.setProperty('--uis', SET.uiScale||1);
@@ -38603,6 +38621,8 @@ function buildSettings(){
       <div class="panel"><h4>GRAPHICS</h4>
         ${seg('gfx', 'quality', [['low','low'],['medium','medium'],['high','high']])}
         <div class="muted" style="font-size:11px;margin:-2px 0 6px;">low: lower resolution, no shadows, fewer particles &middot; medium: shadows on, sharper &middot; high: full resolution</div>
+        ${seg('phoneTier', 'phone tier', [[false,'off'],[true,'on']])}
+        <div class="muted" style="font-size:11px;margin:-2px 0 6px;">${typeof v3LowMem==='function' && v3LowMem() ? 'always on for this device' : 'the lighter graphics a phone gets: four town lamps instead of eight, plain shadow edges, smaller shadow maps, no anti-aliasing, at most 1.5&times; pixels'}</div>
         ${seg('post', 'bloom and colour grading', [[true,'on'],[false,'off']])}
         ${seg('fps', 'frame-rate counter', [[false,'off'],[true,'on']])}
         ${seg('loadCards', 'loading cards between places', [[true,'on'],[false,'off']])}
