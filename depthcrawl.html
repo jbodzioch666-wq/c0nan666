@@ -29293,11 +29293,7 @@ function v3MergeWorld(){
   V3.world.traverse(o=>{ const u = o.userData; if (u && Object.keys(u).some(k=>k!=='lin' && k!=='merged')) keep(o); });
   let n0 = 0, n1 = 0; V3.world.traverse(o=>{ if (o.isMesh) n0++; });
   for (const top of V3.world.children){ if (!top.isGroup || skip.has(top)) continue; try{ o3MergeStatic(top, skip); }catch(e){ console.error(e); } }
-  /* (RS-359: the posts, barrels, rails and such that sit straight under the world, one mesh each, bake together by material too) */
-  const loose = V3.world.children.filter(o=>o.isMesh && !skip.has(o) && !o.userData.merged); if (loose.length > 1){ const g = new THREE.Group(), bb = new THREE.Box3(), tall = new Set(skip); g.userData.loose = 1; for (const o of loose){ V3.world.remove(o); g.add(o); bb.setFromObject(o); if (bb.max.y > 1) tall.add(o); } V3.world.add(g); try{ o3MergeStatic(g, tall); }catch(e){ console.error(e); } }   /* (a post or pole taller than a tile stays its own mesh, so it can still go see-through alone when it stands in the camera's way) */
   V3.world.traverse(o=>{ if (o.isMesh) n1++; }); V3.mergedFrom = n0; V3.mergedTo = n1;
-  gfxProxyDrop(V3.renderer, V3.scene); const pskip = new Set(skip); for (const w of (V3.windows||[])) if (w && w.isObject3D) pskip.delete(w);   /* (window panes only change material by night: still, so their depth joins the proxy) */
-  let px = 0; for (const top of V3.world.children){ if (!top.isGroup) continue; try{ if (gfxShadowProxyStatic(V3.renderer, top, pskip)) px++; }catch(e){ console.error(e); } } V3.proxies = px;
   v3CullPrep();
 }
 // (RS-355) a thing the camera can't see is skipped whole - its building, tree or person and every part under it - instead of
@@ -29441,7 +29437,7 @@ function v3BuildPeople(grp, mats){
   const T = THREE;
   // people
   const P = (entry, h, x, y)=>{ const p = v3Person(entry, h, grp); p.g.position.set(x+0.5, 0, y+0.5); return p; };
-  V3.player = P(v3PlayerLook(), 1.0, G.player.x, G.player.y); V3.player.at = [G.player.x, G.player.y]; try{ if (V3.player.e) m3dShadowProxy(V3.renderer, V3.player.e); }catch(e){ console.error(e); }   /* (RS-359: your figure isn't skinned, but its forty parts cast as one, each part a bone of its own) */
+  V3.player = P(v3PlayerLook(), 1.0, G.player.x, G.player.y); V3.player.at = [G.player.x, G.player.y];
   M3D_COARSE = V3_FOLK_COARSE;   /* (RS-348: the townsfolk are sculpted on a coarser grid - each was up to 270,000 triangles, and a town has twenty) */
   try{
   V3.npcs = (G.villageNpcs||[]).map(n=>{ const look = V3_LOOK[n.service] ? V3_LOOK[n.service]() : v3VillagerLook(0);
@@ -29451,7 +29447,7 @@ function v3BuildPeople(grp, mats){
     return p; });
   V3.villagers = (G.villagers||[]).map((v,i)=>{ const p = P(townFolkLook(v, i), townFolkH(v), v.x, v.y); p.v = v; return p; });
   } finally { M3D_COARSE = 1; }
-  for (const p of [...V3.npcs, ...V3.villagers]) try{ if (p.e){ m3dSkinFigure(p.e); if (p.e.skinned) m3dShadowProxy(V3.renderer, p.e); } }catch(e){ console.error(e); }   /* (RS-352 merged within joints; RS-356 skins the whole figure; RS-359 one shadow proxy each) */
+  for (const p of [...V3.npcs, ...V3.villagers]) try{ if (p.e) m3dSkinFigure(p.e); }catch(e){ console.error(e); }   /* (RS-352 merged within joints; RS-356 skins the whole figure) */
   // particle pool (smoke, sparks, motes, bubbles)
   V3.partMatSmoke = new T.SpriteMaterial({ map:v3Blob('rgba(150,150,150,0.9)'), transparent:true, depthWrite:false, opacity:0.5 });
   V3.partMatSpark = new T.SpriteMaterial({ map:v3Blob('rgba(255,180,80,1)'), blending:T.AdditiveBlending, transparent:true, depthWrite:false });
@@ -29545,23 +29541,7 @@ function v3SunFollow(){
   if (!V3.sun || !V3.sunDir || G.interior) return;
   const g = V3.player && V3.player.g ? V3.player.g.position : null, tx = g ? g.x : COLS/2, tz = g ? g.z : ROWS/2;
   V3.sun.target.position.set(tx, 0, tz); V3.sun.position.set(tx + V3.sunDir.x*30, V3.sunDir.y*30, tz + V3.sunDir.z*30);
-  V3.sun.target.updateMatrixWorld(); v3SunFit();
-}
-// RS-359: the shadow box is drawn only as wide as the view. The camera's corner rays are dropped onto the ground and onto
-// a roof-high plane, those eight points go into the sun's own space, and the box is the rectangle round them (snapped
-// to whole units so it doesn't creep every frame, capped at the old 36-unit box). Zoomed in, the shadow pass then draws
-// the casters you can see instead of the whole town, and the map's texels go on a smaller patch, so shadows sharpen
-const V3_SUN_BOX = 18, V3_SUN_TOP = 9;
-function v3SunFit(){
-  const T = THREE, sun = V3.sun, cam = V3.cam; if (!sun || !cam || V3.sunFitOff) return;
-  const sc = sun.shadow.camera; sun.updateMatrixWorld(); sc.position.setFromMatrixPosition(sun.matrixWorld); sc.lookAt(sun.target.position); sc.updateMatrixWorld(true);
-  cam.updateMatrixWorld(); const inv = sc.matrixWorldInverse, o = V3.sunFitO || (V3.sunFitO = { a:new T.Vector3(), b:new T.Vector3(), d:new T.Vector3(), p:new T.Vector3() });
-  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity; const take = (p)=>{ p.applyMatrix4(inv); if (p.x < x0) x0 = p.x; if (p.x > x1) x1 = p.x; if (p.y < y0) y0 = p.y; if (p.y > y1) y1 = p.y; };
-  for (const nx of [-1, 1]) for (const ny of [-1, 1]){ o.a.set(nx, ny, -1).unproject(cam); o.b.set(nx, ny, 1).unproject(cam); o.d.copy(o.b).sub(o.a).normalize();
-    for (const h of [0, V3_SUN_TOP]){ const t = Math.abs(o.d.y) < 1e-4 ? -1 : (h - o.a.y)/o.d.y; o.p.copy(o.a).addScaledVector(o.d, t > 0 && t < 60 ? t : 60); take(o.p); } }
-  o.p.copy(sun.target.position); take(o.p);   /* (the player's own patch is always in) */
-  const B = V3_SUN_BOX, q = v=>Math.max(-B, Math.min(B, v)), l = Math.floor(q(x0 - 1)), r = Math.ceil(q(x1 + 1)), b = Math.floor(q(y0 - 1)), t = Math.ceil(q(y1 + 1));
-  if (sc.left!==l || sc.right!==r || sc.bottom!==b || sc.top!==t){ sc.left = l; sc.right = r; sc.bottom = b; sc.top = t; sc.updateProjectionMatrix(); }
+  V3.sun.target.updateMatrixWorld();
 }
 // ---------- setup ----------
 function v3Init(){
@@ -29780,7 +29760,7 @@ function v3Render(){
   };
   if (V3.player && V3.lookKey !== rsLookKey()){            // (you changed your gear: dress the figure again)
     const old = V3.player, grp = old.g.parent; V3.lookKey = rsLookKey();
-    if (grp){ const np = v3Person(v3PlayerLook(), 1.0, grp); np.g.position.copy(old.g.position); np.at = old.at; np.yaw = old.yaw||0; grp.remove(old.g); V3.player = np; try{ if (np.e) m3dShadowProxy(V3.renderer, np.e); }catch(e){ console.error(e); } }
+    if (grp){ const np = v3Person(v3PlayerLook(), 1.0, grp); np.g.position.copy(old.g.position); np.at = old.at; np.yaw = old.yaw||0; grp.remove(old.g); V3.player = np; }
   }
   { const st = G.interior && G.sitAt; if (st){ glide(V3.player, st.x - Math.sin(st.yaw)*0.06, st.y - Math.cos(st.yaw)*0.06); v3SeatPose(V3.player, st); } else glide(V3.player, G.player.x, G.player.y); }
   V3.villagers.forEach(p=>{ const st = p.v.seat; if (st){ glide(p, st.x - Math.sin(st.yaw)*0.06, st.y - Math.cos(st.yaw)*0.06, 6); v3SeatPose(p, st); } else glide(p, p.v.x, p.v.y, 1.7); v3FolkShadow(p); });   // (a walking pace: one tile in about the time between their steps)
@@ -29836,8 +29816,8 @@ function v3Render(){
       V3.ray.set(V3.cam.position, dir); V3.ray.far = len - 0.25;
       for (const h of V3.ray.intersectObjects(cands, true)){
         if (h.point.y < 0.35 || !h.object.visible || (h.object.material && h.object.material.visible===false)) continue;
-        let top = h.object; while (top.parent && top.parent!==V3.world && !top.parent.userData.loose) top = top.parent;   /* (RS-359: a loose prop fades alone, not the whole loose group) */
-        if ((top.parent===V3.world || top.parent.userData.loose) && !people.has(top) && !top.userData.loose && !top.userData.merged){ faded.add(top); V3.occDyn.add(top); }
+        let top = h.object; while (top.parent && top.parent!==V3.world) top = top.parent;
+        if (top.parent===V3.world && !people.has(top)){ faded.add(top); V3.occDyn.add(top); }
       }
     }
     V3.ray.far = Infinity;
@@ -30936,48 +30916,6 @@ function o3BuildNodeChunk(list, g){
 // (RS-356) a figure as one skinned mesh per material: every part's vertices are bound to the joint they hang from, so the
 // joints the pose code already turns move the vertices on the card, and a person draws eight or so times instead of
 // thirty. Anything the rig points at (a jaw, an eye, a weapon) stays its own mesh under its joint, as do see-through parts
-/* (RS-359) shadow proxies. The shadow pass used to draw every caster again, one draw per material: a building was ten
-   draws of depth, a person eight. A proxy is one depth-only mesh of all a thing's casters, shown only while the shadow
-   map is drawn (the pass runs after the camera's list is built, so toggling it there keeps it out of the colour pass),
-   and the parts themselves stop casting. three.js tests the camera's layers in the shadow pass too, so layers can't do it */
-const GFX_PROXY = new Map(); let GFX_PROXY_MAT = null; function gfxProxyMat(){ return GFX_PROXY_MAT || (GFX_PROXY_MAT = new THREE.MeshBasicMaterial({ color:0x000000 })); }
-function gfxProxyList(r){ let L = GFX_PROXY.get(r); if (!L){ L = []; GFX_PROXY.set(r, L); const sm = r.shadowMap, f = sm.render.bind(sm); sm.render = function(...a){ const P = GFX_PROXY.get(r); for (let i=P.length-1;i>=0;i--){ let q = P[i], ok = false; while (q){ if (q.isScene){ ok = true; break; } q = q.parent; } if (ok) P[i].visible = true; else P.splice(i, 1); } try{ f(...a); } finally { for (const p of P) p.visible = false; } }; } return L; }   /* (a proxy whose thing left the scene drops off the list) */
-function gfxProxyDrop(r, scene){ const L = GFX_PROXY.get(r); if (!L) return; for (let i=L.length-1;i>=0;i--){ let q = L[i], ok = false; while (q){ if (q===scene){ ok = true; break; } q = q.parent; } if (!ok) L.splice(i, 1); } }   /* (a town torn down takes its proxies off the list) */
-// one still proxy for the casters under top (a building, a tree, the loose props): their triangles baked into top's space
-function gfxShadowProxyStatic(r, top, skip){
-  const T = THREE, list = []; top.updateMatrixWorld(true);
-  const shown = o=>{ for (let q = o; q && q!==top; q = q.parent) if (!q.visible) return false; return true; };
-  top.traverse(o=>{ if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh || !o.castShadow || o.userData.proxy || (skip && skip.has(o)) || !shown(o)) return; const m = o.material; if (!m || [].concat(m).some(q=>q.transparent || q.visible===false || q.alphaTest)) return; const ga = o.geometry && o.geometry.attributes; if (!ga || !ga.position) return; list.push(o); });
-  if (list.length < 2) return null;
-  let nv = 0, ni = 0; for (const o of list){ const g = o.geometry; nv += g.attributes.position.count; ni += g.index ? g.index.count : g.attributes.position.count; }
-  const pos = new Float32Array(nv*3), idx = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni), inv = new T.Matrix4().copy(top.matrixWorld).invert(), M = new T.Matrix4(), v = new T.Vector3(); let vo = 0, io = 0;
-  for (const o of list){ const g = o.geometry, a = g.attributes.position, c = a.count; M.multiplyMatrices(inv, o.matrixWorld);
-    for (let i=0;i<c;i++){ v.fromBufferAttribute(a, i).applyMatrix4(M); pos[(vo+i)*3] = v.x; pos[(vo+i)*3+1] = v.y; pos[(vo+i)*3+2] = v.z; }
-    if (g.index){ const ia = g.index.array; for (let i=0;i<ia.length;i++) idx[io++] = ia[i] + vo; } else for (let i=0;i<c;i++) idx[io++] = vo + i;
-    vo += c; o.castShadow = false; }
-  const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setIndex(new T.BufferAttribute(idx, 1)); geo.computeBoundingSphere();
-  const px = new T.Mesh(geo, gfxProxyMat()); px.castShadow = true; px.receiveShadow = false; px.visible = false; px.userData.proxy = list.length; top.add(px); gfxProxyList(r).push(px); return px;
-}
-// one skinned proxy for a figure: its skinned meshes' triangles on the same bones, and its loose caster parts (a held
-// weapon, a hand the rig moves itself) each on their own node as a bone, so the shadow follows every animation
-function m3dShadowProxy(r, e){
-  if (!e || !e.root || e.shadowProxy) return null; const T = THREE, root = e.root; root.updateMatrixWorld(true);
-  const bones = (e.skinBones||[]).slice(), sk = [], loose = [], rootInv = new T.Matrix4().copy(root.matrixWorld).invert();
-  root.traverse(o=>{ if (o.userData.proxy || !o.castShadow || !o.visible) return; for (let q = o.parent; q && q!==root; q = q.parent) if (!q.visible) return;
-    if (o.isSkinnedMesh){ if (o.geometry.attributes.skinIndex) sk.push(o); return; }
-    if (!o.isMesh || o.isInstancedMesh) return; const m = o.material; if (!m || Array.isArray(m) || m.transparent || m.visible===false || m.alphaTest) return; if (o.geometry && o.geometry.attributes.position) loose.push(o); });
-  if (!sk.length && loose.length < 2) return null;
-  let nv = 0, ni = 0; for (const o of [...sk, ...loose]){ const g = o.geometry; nv += g.attributes.position.count; ni += g.index ? g.index.count : g.attributes.position.count; }
-  const pos = new Float32Array(nv*3), si = new Uint16Array(nv*4), sw = new Float32Array(nv*4), idx = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni), M = new T.Matrix4(), v = new T.Vector3(); let vo = 0, io = 0;
-  const put = (g, c)=>{ if (g.index){ const ia = g.index.array; for (let i=0;i<ia.length;i++) idx[io++] = ia[i] + vo; } else for (let i=0;i<c;i++) idx[io++] = vo + i; vo += c; };
-  for (const o of sk){ const g = o.geometry, a = g.attributes.position, c = a.count, I = g.attributes.skinIndex, W = g.attributes.skinWeight;
-    pos.set(a.array.subarray(0, c*3), vo*3); for (let i=0;i<c*4;i++){ si[vo*4+i] = I.array[i]; sw[vo*4+i] = W.array[i]; } put(g, c); o.castShadow = false; }
-  for (const o of loose){ const g = o.geometry, a = g.attributes.position, c = a.count, b = bones.length; bones.push(o); M.multiplyMatrices(rootInv, o.matrixWorld);
-    for (let i=0;i<c;i++){ v.fromBufferAttribute(a, i).applyMatrix4(M); pos[(vo+i)*3] = v.x; pos[(vo+i)*3+1] = v.y; pos[(vo+i)*3+2] = v.z; si[(vo+i)*4] = b; sw[(vo+i)*4] = 1; } put(g, c); o.castShadow = false; }
-  const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setAttribute('skinIndex', new T.BufferAttribute(si, 4)); geo.setAttribute('skinWeight', new T.BufferAttribute(sw, 4)); geo.setIndex(new T.BufferAttribute(idx, 1)); geo.computeBoundingSphere();
-  const px = new T.SkinnedMesh(geo, gfxProxyMat()); px.castShadow = true; px.receiveShadow = false; px.visible = false; px.frustumCulled = false; px.userData.proxy = sk.length + loose.length;
-  root.add(px); px.updateMatrixWorld(true); px.bind(new T.Skeleton(bones)); e.shadowProxy = px; gfxProxyList(r).push(px); return px;
-}
 function m3dSkinFigure(e){
   if (!e || !e.root || e.skinned) return 0; const T = THREE, root = e.root, skip = new Set(), seen = new Set();
   const walk = (v, d)=>{ if (!v || typeof v!=='object' || seen.has(v) || d > 6) return; seen.add(v); if (v.isObject3D){ skip.add(v); return; } if (v.isMaterial || v.isBufferGeometry || v.isColor || v.isVector3) return; const vals = Array.isArray(v) ? v : Object.values(v); for (const x of vals) walk(x, d+1); };
@@ -31012,7 +30950,7 @@ function m3dSkinFigure(e){
     const sm = new T.SkinnedMesh(mg, mat); sm.castShadow = list[0].castShadow; sm.receiveShadow = list[0].receiveShadow; sm.userData.skinned = list.length; sm.frustumCulled = false;
     root.add(sm); sm.updateMatrixWorld(true); sm.bind(new T.Skeleton(bones)); made++;
     for (const o of list){ o.parent.remove(o); gone++; } }
-  e.skinned = made; e.skinnedParts = gone; e.skinBones = bones;
+  e.skinned = made; e.skinnedParts = gone;
   if (e.mats && gone){ const live = new Set(); root.traverse(o=>{ if (o.isMesh && o.material) for (const m of [].concat(o.material)) live.add(m); }); e.mats = e.mats.filter(m=>live.has(m)); }   /* (RS-356: the flash list drops the parts that were skinned away) */ return gone;
 }
 function m3dMergeJoints(e){
@@ -38354,7 +38292,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-359';
+const GAME_VERSION = 'rs-358';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

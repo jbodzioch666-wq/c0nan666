@@ -9,11 +9,11 @@ module.exports = async page=>{
     const t = townList()[0]; G.gameMode = 0; G.owPos = { x:t.x, y:t.y }; enterVillage(); setUi('playing'); G.player.clock = DAY_LENGTH*0.5;
     const fr = async n=>{ for (let i=0;i<n;i++){ renderGame(); await new Promise(r=>setTimeout(r, 20)); } }; await fr(8);
     const out = {}, R = V3.renderer, folk = [...V3.npcs, ...V3.villagers];
-    const meshes = p=>{ let n = 0, sk = 0; p.e.holder.traverse(o=>{ if (o.isMesh && !o.userData.proxy){ n++; if (o.isSkinnedMesh) sk++; } }); return [n, sk]; };   /* (RS-359: the shadow proxy is not a drawn part) */
+    const meshes = p=>{ let n = 0, sk = 0; p.e.holder.traverse(o=>{ if (o.isMesh){ n++; if (o.isSkinnedMesh) sk++; } }); return [n, sk]; };
     out.parts = folk.reduce((a, p)=>a + (p.e.skinnedParts||0), 0); out.now = folk.reduce((a, p)=>a + meshes(p)[0], 0); out.before = out.parts + out.now - folk.reduce((a, p)=>a + meshes(p)[1], 0);
-    out.playerSkinned = 0; V3.player.e.holder.traverse(o=>{ if (o.isSkinnedMesh && !o.userData.proxy) out.playerSkinned++; });
+    out.playerSkinned = 0; V3.player.e.holder.traverse(o=>{ if (o.isSkinnedMesh) out.playerSkinned++; });
     // a skinned villager still walks and strikes: its vertices, read through the bones, move
-    const p = folk.find(q=>(q.e.skinnedParts||0) > 10 && !q.e.beast && !q.e.anim) || folk[0], e = p.e, sm = []; e.holder.traverse(o=>{ if (o.isSkinnedMesh && !o.userData.proxy) sm.push(o); });
+    const p = folk.find(q=>(q.e.skinnedParts||0) > 10 && !q.e.beast && !q.e.anim) || folk[0], e = p.e, sm = []; e.holder.traverse(o=>{ if (o.isSkinnedMesh) sm.push(o); });
     const sample = ()=>{ e.holder.updateMatrixWorld(true); const a = [], v = new THREE.Vector3(); for (const m of sm){ const P = m.geometry.attributes.position, st = Math.max(1, Math.floor(P.count/40)); for (let i=0;i<P.count;i+=st){ v.fromBufferAttribute(P, i); m.boneTransform(i, v); v.applyMatrix4(m.matrixWorld); a.push(v.x, v.y, v.z); } } return a; };
     const pose = (mv, strike)=>{ e.fol = 0; e.wph = 9; if (e.anim) e.anim(e.rig, 1, mv, 0, strike, 0, e); else if (e.beast) m3dPoseBeast(e.rig, 1, mv, 0, strike, 0, e); else m3dPoseHumanoid(e.rig, 1, mv, 0, strike, 0, e); return sample(); };
     const diff = (a, b)=>{ let d = 0; for (let i=0;i<Math.min(a.length, b.length);i++) d = Math.max(d, Math.abs(a[i]-b[i])); return d; };

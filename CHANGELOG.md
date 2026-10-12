@@ -1,12 +1,5 @@
 # Depthcrawl patch notes
 
-## RS-359 - The shadow pass drawn once per thing
-
-- **Shadow proxies.** The sun's shadow map used to draw every caster in town again, one draw per material: a building was ten draws of depth, a person eight, you forty. Now each building, tree, person and the loose props cast through one depth-only proxy mesh that exists only while the shadow map is drawn. A person's proxy is skinned on the same joints, with a held weapon or hand on its own node, so the shadow follows every animation; window panes join their building's proxy, doors keep swinging on their own. In the test city the shadow pass fell from about 430 draws to about 70.
-- **The shadow box fits the view.** The sun's shadow box was a fixed 36-tile square round you. It is now the rectangle round what the camera sees, snapped to whole tiles, so zoomed in the shadow pass skips the rest of town and the map's texels land on a smaller patch: sharper shadows for less work.
-- **Loose props bake together.** Barrels, stones, rails and other low props that sat straight under the world, one mesh each, now merge by material like the buildings do. Posts and poles taller than a tile stay separate, so one can still go see-through on its own when it stands between you and the camera.
-- **Why:** your High readings in the city showed the CPU spending 19 ms a frame handing draws to the card, and the shadow pass was more than half of those draws. A test city went from 738 draws a frame to about 400.
-
 ## RS-358 - Diag crash fix
 
 - **Fixed a crash when the fps diag ran on a real graphics card** ("Cannot create property 'sprites' on number"). The new per-step store in RS-357 shared a name with the card timer's running total, which only exists where there is a hardware timer, so the tests in the software renderer never hit it.
