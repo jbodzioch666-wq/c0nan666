@@ -31570,6 +31570,21 @@ function fpFloorSlots(T){
 const FPD = { ok:null, MAXT:4, scale:1, dtAvg:1/60, adj:0, lvl:0, downAt:0, upAt:0, lockUntil:0 };
 // (RS-107) the few resolutions the dungeon view steps between - each change reallocates the canvas and the post-processing buffers, a visible hitch
 const FPD_SCALES = [1, 0.85, 0.7, 0.6, 0.5];
+/* (RS-163: monsters cast torch shadows, so they're redrawn as they move. RS-355: each light on its own clock, since a point
+   light's shadow is six faces of the whole floor each time.) RS-363: how often, by the frame rate. Above 45 fps the lantern's
+   shadow and each torch's are drawn every second frame, the torches staggered so half go on each frame - RS-347's cost,
+   spread evenly instead of in one burst. Below 45 fps the slow clocks: on High the lantern every second frame and each torch
+   every sixth; on Medium every fourth and eighth. The frame time is its own average: RS-361 kept it in the render scaler's,
+   which then moved twice a frame and lost its resets */
+function dgShadowClock(hi, avg){ return avg < 1/45 ? [2, 2] : hi ? [2, 6] : [4, 8]; }
+function dgShadowTick(){
+  FPD.flickN = (FPD.flickN||0) + 1; const n = FPD.flickN, hi = SET.gfx==='high';
+  FPD.shAvg = (FPD.shAvg||0.016)*0.9 + Math.min(0.1, FP.dt||0.016)*0.1;
+  const [lanEvery, torchEvery] = dgShadowClock(hi, FPD.shAvg);
+  let any = FPD.shadowFrames > 0; if (FPD.lan && FPD.lan.shadow){ FPD.lan.shadow.autoUpdate = false; if (n % lanEvery === 0 || FPD.shadowFrames > 0){ FPD.lan.shadow.needsUpdate = true; any = true; } }
+  (FPD.torches||[]).forEach((L, i)=>{ if (!L.shadow) return; L.shadow.autoUpdate = false; if ((n + i) % torchEvery === 0 || FPD.shadowFrames > 0){ L.shadow.needsUpdate = true; any = true; } });
+  if (any) FPD.r.shadowMap.needsUpdate = true;
+}
 // graphics quality: render resolution, shadows and how many particles effects throw
 const GFX_Q = { low:{ pr:1, fpd:0.6, fx:0.35, shadows:false }, medium:{ pr:1.5, fpd:0.85, fx:0.7, shadows:true }, high:{ pr:2, fpd:1, fx:1, shadows:true } };
 function gfxQ(){ return GFX_Q[SET.gfx] || GFX_Q.high; }
@@ -32343,7 +32358,7 @@ function fpdRender(env, T, camZ){
   const fdt = Math.min(FP.dt||1/60, 0.1), nowT = performance.now();
   FPD.dtAvg += (fdt - FPD.dtAvg)*0.03;
   if (++FPD.adj >= 120 && nowT >= FPD.lockUntil){ FPD.adj = 0;
-    if (FPD.dtAvg > 1/40 && FPD.lvl < (gfxPhone() ? FPD_SCALES.length-1 : 2)){   /* (RS-355: a desktop keeps at least 0.7 - a slow frame there is rarely the pixels) */ if (FPD.upAt && nowT - FPD.upAt < 15000) FPD.lockUntil = nowT + 60000; FPD.lvl++; FPD.downAt = nowT; FPD.dtAvg = 1/45; }
+    if (FPD.dtAvg > 1/40 && FPD.lvl < (gfxPhone() ? FPD_SCALES.length-1 : 3)){   /* (RS-355: a desktop keeps at least 0.7. RS-363: 0.6 - under a heavy fight the pixels do count) */ if (FPD.upAt && nowT - FPD.upAt < 15000) FPD.lockUntil = nowT + 60000; FPD.lvl++; FPD.downAt = nowT; FPD.dtAvg = 1/45; }
     else if (FPD.dtAvg < 1/58 && FPD.lvl > 0 && nowT - FPD.downAt > 10000){ FPD.lvl--; FPD.upAt = nowT; FPD.dtAvg = 1/50; } }
   FPD.scale = FPD_SCALES[FPD.lvl];
   const scl = window.__fpdScale || Math.min(FPD.scale, gfxQ().fpd);
@@ -32429,15 +32444,7 @@ function fpdRender(env, T, camZ){
     // onto the floor away from the torch, instead of a faint one stretched flat along the ground
     const wall = o.f.h==null, off = wall ? 0.32 : 0.14, bx = o.f.x + (o.f.dx||0)*off, by = o.f.y + (o.f.dy||0)*off;
     L.position.set(bx + 0.025*Math.sin(FP.t*5.1+s), (wall ? 1.35 : o.f.h) + 0.02*Math.sin(FP.t*7.3+s*1.3), by + 0.025*Math.cos(FP.t*4.3+s)); });
-  if (SET.gfx!=='low' && (G.gameMode===1 || G.gameMode===2)){ FPD.flickN = (FPD.flickN||0) + 1; const n = FPD.flickN, hi = SET.gfx==='high';
-    /* (RS-361) the clocks run at the pace the machine affords: at a healthy frame rate the lantern's shadow is drawn every
-       frame and each torch's every other, since the staggered clocks read as a stutter in the shadows at 60 fps */
-    const dtA = FPD.dtAvg = (FPD.dtAvg||0.016)*0.9 + Math.min(0.1, FP.dt||0.016)*0.1, quick = dtA < 1/45, lanEvery = quick ? 1 : (hi ? 2 : 4), torchEvery = quick ? 2 : (hi ? 6 : 8);
-    /* (RS-163: monsters cast torch shadows now, so they're redrawn as they move. RS-355: each light on its own clock - the lantern
-       every second frame, each torch every sixth, staggered - since a point light's shadow is six faces of the whole floor each time) */
-    let any = FPD.shadowFrames > 0; if (FPD.lan && FPD.lan.shadow){ FPD.lan.shadow.autoUpdate = false; if (n % lanEvery === 0 || FPD.shadowFrames > 0){ FPD.lan.shadow.needsUpdate = true; any = true; } }
-    (FPD.torches||[]).forEach((L, i)=>{ if (!L.shadow) return; L.shadow.autoUpdate = false; if ((n + i) % torchEvery === 0 || FPD.shadowFrames > 0){ L.shadow.needsUpdate = true; any = true; } });
-    if (any) FPD.r.shadowMap.needsUpdate = true; }
+  if (SET.gfx!=='low' && (G.gameMode===1 || G.gameMode===2)) dgShadowTick();
   // dust: a loose cloud kept centered on you
   const dp = FPD.dust.geometry.attributes.position, sd = FPD.dustSeed, n = dp.count;
   for (let i=0;i<n;i++){
@@ -38376,7 +38383,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-362';
+const GAME_VERSION = 'rs-363';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

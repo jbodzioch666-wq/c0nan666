@@ -22,7 +22,7 @@ module.exports = async page=>{
     SET.fps = true; for (let i=0;i<40;i++) await new Promise(r=>requestAnimationFrame(r));
     const fps = document.getElementById('fpsCounter'), ck = document.getElementById('dhClock'), a = fps && fps.getBoundingClientRect(), b = ck && ck.getBoundingClientRect();
     SET.fps = false;
-    return { step, torches, lantern, lanNear, monsters, blobs, casters, lit, fresh:e ? { blobs:fb, casters:fc } : null, fps:a ? { right:a.left > innerWidth/2, top:a.top < 80 } : null };
+    return { step, torches, lantern, lanNear, monsters, blobs, casters, lit, fresh:e ? { blobs:fb, casters:fc } : null, fps:a ? { right:(a.left + a.right)/2 > innerWidth/2, top:a.top < 80 } : null };   /* (RS-363: by its middle - beside the minimap, its two-line readout can reach past the screen's middle) */
   });
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };

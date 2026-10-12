@@ -1,8 +1,9 @@
 // RS-355: three things for a frame that's spent on the processor, not the card. In a town, a whole thing the camera can't
 // see - a building, a tree, a person, and every part under it - is skipped, instead of each part being tested and walked.
-// In a dungeon each light's shadow refreshes on its own clock (the lantern every second frame, each torch every sixth,
-// staggered), since a point light's shadow is six faces of the whole floor. And a desktop's dungeon never drops its render
-// scale below 0.7: a slow frame there is rarely the pixels, and the floor was going soft for nothing
+// In a dungeon each light's shadow refreshes on its own clock, since a point light's shadow is six faces of the whole floor
+// (RS-363: above 45 fps every light every second frame, the torches staggered; below it the lantern every second frame and
+// each torch every sixth, with the frame time in an average of its own). And a desktop's dungeon never drops its render
+// scale below 0.6 (0.7 in RS-355)
 module.exports = async page=>{
   const r = await page.evaluate(async ()=>{
     goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); G.player.wildWarned = 1; saveCurrentGame = ()=>{};
@@ -20,16 +21,22 @@ module.exports = async page=>{
     // which lights are due each frame: count the frames in 12 on which each is marked (the renderer clears the mark as it draws)
     // simpler: run the gate alone twelve times and read the marks before a render clears them
     let lanDue = 0; const torchDue = (FPD.torches||[]).map(()=>0);
-    for (let i=0;i<12;i++){ FPD.lan.shadow.needsUpdate = false; (FPD.torches||[]).forEach(L=>{ L.shadow.needsUpdate = false; }); FPD.flickN = (FPD.flickN||0) + 1; const n = FPD.flickN, hi = SET.gfx==='high';
-      if (n % (hi ? 2 : 4) === 0) lanDue++; (FPD.torches||[]).forEach((L, k)=>{ if ((n + k) % (hi ? 6 : 8) === 0) torchDue[k]++; }); }
-    out.lanDue = lanDue; out.torchDue = torchDue;
-    FPD.lvl = 0; FPD.dtAvg = 1; FPD.downAt = 0; FPD.lockUntil = 0; for (let i=0;i<8;i++){ FPD.dtAvg = 1; renderGame(); FPD.downAt = 0; } out.lvl = FPD.lvl; out.scale = FPD.scale; out.phone = gfxPhone();
+    const due = (dt)=>{ let lan = 0, perFrame = []; const td = (FPD.torches||[]).map(()=>0); FPD.shadowFrames = 0; FP.dt = dt; FPD.shAvg = dt;
+      for (let i=0;i<12;i++){ FPD.lan.shadow.needsUpdate = false; (FPD.torches||[]).forEach(L=>{ L.shadow.needsUpdate = false; }); dgShadowTick();
+        if (FPD.lan.shadow.needsUpdate) lan++; let f = 0; (FPD.torches||[]).forEach((L, k)=>{ if (L.shadow.needsUpdate){ td[k]++; f++; } }); perFrame.push(f); }
+      return { lan, td, perFrame }; };
+    SET.gfx = 'high'; out.fast = due(1/60); out.slow = due(1/30);
+    // the shadow clock keeps its own average: the render scaler's is left alone
+    FPD.dtAvg = 0.0123; FP.dt = 0.09; dgShadowTick(); out.scalerAvg = FPD.dtAvg;
+    FPD.lvl = 0; FPD.dtAvg = 1; FPD.downAt = 0; FPD.lockUntil = 0; for (let i=0;i<8;i++){ FPD.dtAvg = 1; FPD.adj = 200; FPD.upAt = 0; FPD.lockUntil = 0; renderGame(); FPD.downAt = 0; }   /* (the scaler judges every 120 frames: let each of these be one of those) */ out.lvl = FPD.lvl; out.scale = FPD.scale; out.phone = gfxPhone();
     return out; });
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
   A(r.list > 60 && r.dyn >= 10, 'the town has a cull list of things, the people moving');
   A(r.wrongHidden===0 && r.farHidden && r.backNear, 'nothing in view is hidden; a person far off screen is skipped and comes back');
   A(r.torches===4 && r.lanAuto===false && r.torchAuto.every(a=>a===false), 'the dungeon lights are on their own clocks');
-  A(r.lanDue===6 && r.torchDue.every(n=>n===2), 'in twelve frames the lantern is due six times and each torch twice');
-  A(!r.phone && r.lvl<=2 && r.scale >= 0.7, 'a desktop dungeon never drops below scale 0.7');
+  A(r.fast.lan===6 && r.fast.td.every(n=>n===6) && r.fast.perFrame.every(f=>f===2), 'above 45 fps: every light every second frame, two torches on each frame: '+JSON.stringify(r.fast));
+  A(r.slow.lan===6 && r.slow.td.every(n=>n===2), 'below 45 fps: the lantern six times in twelve, each torch twice: '+JSON.stringify(r.slow));
+  A(r.scalerAvg===0.0123, 'the shadow clock leaves the render scaler\'s average alone');
+  A(!r.phone && r.lvl===3 && Math.abs(r.scale - 0.6) < 0.01, 'a desktop dungeon drops as far as scale 0.6 and no further: '+r.lvl+' '+r.scale);
 };

@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-363 - Dungeons Run Like RS-347 Again
+
+Dungeons felt smoother in RS-347. Three changes since then made the difference, and this puts them back without losing the fixes in between.
+
+- **Fixed a bug from RS-361.** The new shadow timing kept its frame-time average in the same place as the dungeon's resolution scaler. That average then moved twice a frame and lost its resets, so the resolution changed more jumpily than it should. The shadows now keep their own average.
+- **Shadows back to RS-347's pace, spread evenly.** Above 45 fps every light's shadow is drawn every second frame, the same work as RS-347, with the torches staggered so half go on each frame instead of all at once. RS-361 had drawn the lantern's every frame, about a fifth more work. Below 45 fps the slower clocks still apply.
+- **The picture can drop to 60% in a heavy fight** on a desktop (70% since RS-355; RS-347 went to 50%). It comes back up when the fight eases.
+
 ## RS-362 - Pick Your Salvage
 
 - **The loot filter is a menu now.** The bag's "loot filter" button opens it. Pick the **tiers** to salvage (by the level a piece needs to wear, so tier 3 is mithril, studded leather, splitbark and willow alike), the **qualities** (normal, magic, rare) and the **stats**. For stats you choose whether a piece with them is *kept* (salvage everything else) or the only kind *salvaged*.
