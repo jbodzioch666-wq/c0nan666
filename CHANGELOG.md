@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-359 - The Black Spire's gate
+
+- **The Waking Lich VIII can be finished.** Stepping onto the Black Spire's tile opened the necro tower's plain "descend" prompt, which swallowed the quest's arrival: the knight's floor never showed, and the tower you entered was an ordinary one. Now any quest that led you to a site speaks first when you arrive. At the Spire that means the gate dialog, the knight's floor, and then the six-floor climb to the Wakener.
+- **Other quest sites too.** A graveyard watch at night, a castle, a mine or a dungeon a quest sent you to now opens the quest's own dialog on arrival instead of the dungeon prompt. By day, a night-only watch still shows the prompt as before.
+- **If you leave the Spire part way,** walking back in through the tower's prompt is fine: the tower stays six floors deep with the Wakener at the top until the quest is done.
+
 ## RS-358 - Diag crash fix
 
 - **Fixed a crash when the fps diag ran on a real graphics card** ("Cannot create property 'sprites' on number"). The new per-step store in RS-357 shared a name with the card timer's running total, which only exists where there is a hardware timer, so the tests in the software renderer never hit it.
