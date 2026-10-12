@@ -10,7 +10,7 @@ module.exports = async page=>{
     const R = V3.renderer; R.info.autoReset = false; R.info.reset(); renderGame(); const calls = R.info.render.calls, tris = R.info.render.triangles; R.info.autoReset = true;
     const tri = o=>{ const g = o.geometry; return (g.index ? g.index.count/3 : g.attributes.position.count/3); };
     let merged = 0, mergedTris = 0; V3.world.traverse(o=>{ if (o.isMesh && o.userData.merged){ merged++; mergedTris += tri(o); } });
-    const pt = p=>{ let n = 0; p.e.holder.traverse(o=>{ if (o.isMesh) n += tri(o); }); return n|0; };
+    const pt = p=>{ let n = 0; p.e.holder.traverse(o=>{ if (o.isMesh && !o.userData.proxy) n += tri(o); }); return n|0; };   /* (RS-359: the shadow proxy repeats the triangles for the shadow pass only) */
     const out = { calls, tris, merged, mergedTris:mergedTris|0, mergedFrom:V3.mergedFrom, mergedTo:V3.mergedTo, player:pt(V3.player), folk:V3.villagers.length ? Math.max(...V3.villagers.map(pt)) : 0, npc:V3.npcs.length ? Math.max(...V3.npcs.map(pt)) : 0 };
     // the people are their own meshes, never merged
     out.peopleMerged = (()=>{ let m = false; V3.player.g.traverse(o=>{ if (o.userData.merged) m = true; }); return m; })();   /* (RS-352: the townsfolk merge within their joints; you don't) */
@@ -20,7 +20,7 @@ module.exports = async page=>{
       const other = (V3.occ||[]).map(o=>o.userData.grp).find(g=>g && g!==bg && g.children.some(c=>c.userData.merged)); out.otherSolid = other ? !other.children.find(c=>c.userData.merged).material.transparent : true; bg.userData.fade = 0; }
     // folk far from you cast no shadow, near ones do
     const far = V3.villagers.find(p=>Math.hypot(p.g.position.x - G.player.x - 0.5, p.g.position.z - G.player.y - 0.5) > 10), near = V3.villagers.find(p=>Math.hypot(p.g.position.x - G.player.x - 0.5, p.g.position.z - G.player.y - 0.5) < 8);
-    const casts = p=>{ let c = 0, n = 0; p.e.holder.traverse(o=>{ if (o.isMesh){ n++; if (o.castShadow) c++; } }); return c/Math.max(1, n); };
+    const casts = p=>{ const px = p.e.shadowProxy; if (px) return px.castShadow ? 1 : 0; let c = 0, n = 0; p.e.holder.traverse(o=>{ if (o.isMesh){ n++; if (o.castShadow) c++; } }); return c/Math.max(1, n); };   /* (RS-359: a person casts through one proxy) */
     out.farCast = far ? casts(far) : 0; out.nearCast = near ? casts(near) : 1; out.hasFar = !!far; out.hasNear = !!near;
     // the phone tier reads the device: here (a desktop test) the full share applies
     out.phone = gfxPhone(); out.plights = V3.plights.length; out.shadowMap = V3.sun.shadow.mapSize.x; out.pr = gfxPR();
