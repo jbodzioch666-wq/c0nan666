@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-358 - Diag crash fix
+
+- **Fixed a crash when the fps diag ran on a real graphics card** ("Cannot create property 'sprites' on number"). The new per-step store in RS-357 shared a name with the card timer's running total, which only exists where there is a hardware timer, so the tests in the software renderer never hit it.
+
 ## RS-357 - A diag you can trust
 
 - **The fps diag reads a fresh base before every step.** It now goes base, sprites, base, grass, base, lamps and so on, and each saving is measured against the base read just before it. The old single base at the start drifted as the card's clocks and the scene changed, so later steps read nonsense (two steps that switch nothing off claimed to save 6 ms).

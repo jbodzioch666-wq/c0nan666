@@ -12,7 +12,7 @@ module.exports = async page=>{
     const sprites = ()=>{ let n = 0, v = 0; V3.scene.traverse(o=>{ if (o.isSprite){ n++; if (o.visible) v++; } }); return [n, v]; };
     const R = V3.renderer, P = GFXP.get(R); out.samples0 = P ? P.scene.samples : -1; out.shadowType0 = R.shadowMap.type;
     diagToggle(); out.on = DIAG.on;
-    const feed = (ms, n)=>{ for (let i=0;i<n;i++) diagFrame(ms); };
+    const feed = (ms, n)=>{ for (let i=0;i<n;i++){ DIAG.acc = (DIAG.acc||0) + ms; diagFrame(ms); } };   /* (RS-358: the card timer keeps its own running sum in DIAG.acc; the diag must not share it) */
     const at = ()=>DIAG.k % 2 ? DIAG_STEPS[(DIAG.k+1)/2][0] : 'base';
     feed(10, 46); out.base = DIAG.res.base; out.stepAfterBase = at(); out.spritesHidden = sprites();
     feed(9.6, 46); out.spritesBack = sprites(); out.resSprites = DIAG.res.sprites; out.stepNow = at();
