@@ -38383,7 +38383,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-363';
+const GAME_VERSION = 'rs-364';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -39452,12 +39452,17 @@ const LOOTF_TIERS = [
   [50, 59,  "blue d'hide, infinity, magic bows"],
   [60, 999, "dragon, red and black d'hide, Ahrim's"],
 ];
-const LOOTF_QUALS = [[0,'Normal'],[1,'Magic'],[2,'Rare']];
-const LOOTF_STATS = [['edmg','damage %'],['flatdmg','flat damage'],['fire','fire damage'],['cold','cold damage'],['pois','poison damage'],['atk','accuracy'],['crit','critical hits'],['deadly','deadly strike'],
-  ['lifesteal','life steal'],['edef','defence %'],['flatac','armour'],['resist','resistance'],['thorns','thorns'],['life','life'],['regen','regeneration'],['healkill','heal on kill'],
-  ['str','strength'],['dex','dexterity'],['con','constitution'],['wis','wisdom'],['int','intelligence'],['cha','charisma'],['allstat','all stats'],['goldfind','gold find'],['magicfind','magic find'],['xpfind','xp find']];
+/* (RS-364) the stats are the bonuses gear carries - the old affixes (strength, dexterity, life...) never roll on a drop now.
+   A bow's own accuracy is its ranged bonus, not a melee one */
+const LOOTF_STATS = [['acc','melee attack'],['dmgB','strength'],['ac','defence'],['rngAcc','ranged'],['magAcc','magic'],['magDmg','spell damage'],['prayB','prayer']];
+function lootfHas(it, k){
+  if (k==='acc' || k==='dmgB') return (it[k]||0) > 0 && !it.range;
+  if (k==='rngAcc') return (it.rngAcc||0) > 0 || !!it.range;
+  if (k==='magDmg') return (it.magDmg||0) > 0 || (it.magDmgPct||0) > 0;
+  return (it[k]||0) > 0;
+}
 function lootfP(){
-  const p = G.player, d = { on:false, tiers:[0,1], quals:[0], stats:[], statMode:'keep', safeUp:true };
+  const p = G.player, d = { on:false, tiers:[0,1], stats:[], statMode:'keep', safeUp:true };
   if (!p) return d; const F = p.lootf || (p.lootf = d);
   for (const k in d) if (F[k]===undefined) F[k] = Array.isArray(d[k]) ? d[k].slice() : d[k];   /* (a save from before RS-362 has none: it starts off) */
   return F;
@@ -39471,8 +39476,8 @@ function itemSpecial(it){ return !!(it && (it.godStaff || it.godCape || it.relic
 function lootfMatch(it, F){
   F = F || lootfP();
   if (!it || !it.used || it.consumable || it.kind==='scroll' || lootfProtected(it)) return false;
-  if (!F.tiers.includes(lootfTier(it)) || !F.quals.includes(it.quality||0)) return false;
-  if (F.stats.length){ const has = (it.aff||[]).some(a=>F.stats.includes(a.kind)); if (F.statMode==='keep' ? has : !has) return false; }
+  if (!F.tiers.includes(lootfTier(it))) return false;   /* (RS-364: no quality row - on a drop it is only the tier's colour) */
+  if (F.stats.length){ const has = F.stats.some(k=>lootfHas(it, k)); if (F.statMode==='keep' ? has : !has) return false; }
   if (F.safeUp && lootArrow(it)==='up') return false;
   return true;
 }
@@ -39484,22 +39489,20 @@ function lootFilterTake(item){
 }
 function lootfToggle(k, v){ const F = lootfP(), a = F[k], i = a.indexOf(v); if (i >= 0) a.splice(i, 1); else a.push(v); a.sort((x, y)=>typeof x==='number' ? x - y : 0); renderOverlay(); saveCurrentGame(); }
 function lootfSet(k, v){ const F = lootfP(); F[k] = v; if (k==='on') logMsg(`loot filter ${v ? 'on - matching drops are salvaged as they fall' : 'off - you keep every drop'}`, ''); renderOverlay(); saveCurrentGame(); }
-function lootfAll(k, on){ const F = lootfP(); F[k] = on ? (k==='tiers' ? LOOTF_TIERS.map((_, i)=>i) : k==='quals' ? LOOTF_QUALS.map(q=>q[0]) : LOOTF_STATS.map(q=>q[0])) : []; renderOverlay(); saveCurrentGame(); }
+function lootfAll(k, on){ const F = lootfP(); F[k] = on ? (k==='tiers' ? LOOTF_TIERS.map((_, i)=>i) : LOOTF_STATS.map(q=>q[0])) : []; renderOverlay(); saveCurrentGame(); }
 function lootfBagMatches(){ const F = lootfP(); let n = 0, g = 0; for (const it of G.inv) if (lootfMatch(it, F)){ n++; g += sellPrice(it); } return { n, g }; }
 function buildLootFilter(){
   const F = lootfP(), chip = (on, html, click, title)=>`<button class="btn lf-chip${on ? ' on' : ''}" onclick="${click}"${title ? ` title="${esc(title)}"` : ''}>${html}</button>`;
   const all = k=>`<button class="invchip" onclick="lootfAll('${k}', true)">all</button> <button class="invchip" onclick="lootfAll('${k}', false)">none</button>`;
   const tiers = LOOTF_TIERS.map(([a, b, who], i)=>chip(F.tiers.includes(i), `Tier ${i+1}<small>${b >= 999 ? 'level '+a+'+' : 'level '+Math.max(1, a)+'-'+b}</small>`, `lootfToggle('tiers',${i})`, who)).join('');
-  const quals = LOOTF_QUALS.map(([q, nm])=>chip(F.quals.includes(q), `<span style="color:${qualityColor(q)}">${nm}</span>`, `lootfToggle('quals',${q})`)).join('');
   const stats = LOOTF_STATS.map(([k, nm])=>chip(F.stats.includes(k), nm, `lootfToggle('stats','${k}')`)).join('');
   const m = lootfBagMatches(), keep = F.statMode==='keep';
-  const statLine = !F.stats.length ? 'No stats picked: the stats on a piece don\'t matter.' : keep ? `A piece with any of these ${F.stats.length} stats is <b>kept</b>; the rest are salvaged.` : `Only a piece with one of these ${F.stats.length} stats is salvaged.`;
+  const statLine = !F.stats.length ? 'No bonuses picked: what a piece is for doesn\'t matter.' : keep ? `A piece with any of these bonuses is <b>kept</b>; the rest are salvaged. (Keep ranged and magic, say, and melee-only gear goes.)` : `Only a piece with one of these bonuses is salvaged.`;
   return `<h2 class="panel-title">LOOT FILTER</h2><div class="sub">Pick the loot to salvage. Salvaging turns a piece into its sell price in gold. Sets, Uniques, relics, god gear, superior and quest pieces, locked pieces, potions and scrolls are never touched.</div>
   <div class="ovbody">
     <div>${chip(F.on, F.on ? 'ON &middot; salvaging matching drops as they fall' : 'OFF &middot; keeping every drop', `lootfSet('on', ${!F.on})`).replace('lf-chip', 'lf-chip lf-on')}</div>
     <div class="lf-sec">TIER &middot; the level a piece needs ${all('tiers')}</div><div class="lf-chips">${tiers}</div>
-    <div class="lf-sec">QUALITY ${all('quals')}</div><div class="lf-chips">${quals}</div>
-    <div class="lf-sec">STATS ${all('stats')}</div>
+    <div class="lf-sec">BONUSES ${all('stats')}</div>
     <div class="lf-chips" style="margin-bottom:6px;">${chip(keep, 'keep pieces with these', `lootfSet('statMode','keep')`)}${chip(!keep, 'salvage pieces with these', `lootfSet('statMode','match')`)}</div>
     <div class="lf-chips">${stats}</div>
     <div class="muted" style="margin-top:6px;">${statLine}</div>

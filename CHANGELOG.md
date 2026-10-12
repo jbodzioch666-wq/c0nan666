@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-364 - Loot Filter Bonuses
+
+- **The loot filter picks by the bonuses gear really has:** melee attack, strength, defence, ranged, magic, spell damage and prayer. RS-362 listed the old affixes (strength, dexterity, wisdom, life...), which no drop carries any more, so the stat picks did nothing. Now "keep pieces with ranged and magic" salvages the melee-only gear, and "salvage pieces with melee attack" takes swords and staves but not bows (a bow's accuracy counts as ranged).
+- **The quality row is gone.** On a drop, Normal, Magic and Rare are only the colour of its tier, so the tier row already covers it.
+
 ## RS-363 - Dungeons Run Like RS-347 Again
 
 Dungeons felt smoother in RS-347. Three changes since then made the difference, and this puts them back without losing the fixes in between.
