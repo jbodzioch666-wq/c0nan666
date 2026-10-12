@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-356 - Townsfolk as skinned meshes
+
+- **Each townsperson is now a handful of draws instead of about thirty.** Villagers and town NPCs are rebuilt into GPU-skinned meshes: every part of the same make (same material, texture, shininess and shadow setting) is sewn into one mesh whose vertices follow the existing joints. A person who was 28 to 40 separate parts is now 8 to 11, and in a full city the people draw about a third as many meshes as before.
+- **They still move exactly as before.** Walking, striking, sitting, turning the head and hit flashes all run on the same joints; only the way the GPU is handed the triangles changed. Their colours are baked into the vertices, so the figures look the same.
+- **Your own figure is untouched**, so outfit changes and equipment swaps keep working the same way.
+- **Why:** meter readings on a Windows PC with a strong card showed the frame in a city was spent issuing draws on the CPU (3d 13 ms against 4 ms of GPU work on Low), not on pixels. Fewer draws per person is the lever that moves that number.
+
 ## RS-355 - The Processor's Share
 
 - **What the readings said.** On a GeForce 3080 Ti the card's time matched the processor's time to the millisecond, in a town at 2560x1440 and in a dungeon at 640x299 alike. A card isn't slow at the same speed at both sizes: it was being fed slowly. The frame's cost is the processor walking every object in the scene and issuing its draws, not pixels. In a dungeon the biggest part was the six torch and lantern shadows, each of which is six faces of the whole floor, redrawn every other frame - and more every creature that joined the fight.
