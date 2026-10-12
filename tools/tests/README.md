@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| nodering | gathering-spot chunks reach as far as the camera sees, never past the built land; a walk keeps the chunks round you; a window move keeps the chunks still inside it |
 | landfar | a coarse far ground of the whole world sits under the built land; a window move builds the new land over several frames while the old shows, then swaps in |
 | townperf | a town's still parts bake into one mesh per material per building or tree, the townsfolk are sculpted coarse, far folk cast no shadow, fades still work; draw and triangle counts stay under their caps |
 | lich4 | The Waking Lich IV points at a graveyard (never a tower), its relic on floor 6, and the graveyard is made six floors deep; an old save aimed at a tower is moved |

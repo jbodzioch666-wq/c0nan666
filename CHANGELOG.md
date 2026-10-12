@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-350 - No More Waves of Trees
+
+- **The trees, rocks and herbs no longer pop in a wave as you walk.** The gathering spots are built in chunks of six tiles around you, three chunks out. Every six tiles the whole trailing row was thrown away and a new row built nearest you first, a few at a time, and zoomed out you could watch it: trees vanishing behind you and reappearing ahead in a wave. Now a step keeps every chunk still in reach and builds only the new edge, and the chunks reach as far as the camera sees - zoomed right out, twice as far as before - but never past the built land's edge.
+- **A land window move keeps its chunks.** When the built land moved on, every chunk was freed and rebuilt from scratch. The ground under them is the same, so the chunks still inside the new window are kept; only the new edge builds.
+- **Test.** `nodering` checks the reach grows with the zoom, nothing sits past the built land, a walk keeps the chunks round you, and a window move keeps the chunks still inside it.
+
 ## RS-349 - The Lands Run On
 
 - **The land no longer ends at the edge of what's built.** Around you the game builds 72 tiles of real land, and beyond it there was only a flat dark plane - from a lookout tower, on a hill or zoomed out, the world stopped in black. The whole map is now drawn as a coarse far ground, one vertex every two tiles: the sea flat and blue, the mountains risen and snow-capped, the forests dark. It's built once per world and sits a little under the real land, which covers it near you. Beyond the map's edge lies the sea.

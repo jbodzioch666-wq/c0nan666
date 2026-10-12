@@ -5,7 +5,7 @@ module.exports = async page=>{
   const r = await page.evaluate(async ()=>{
     goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); G.gameMode = 0; saveCurrentGame = ()=>{};
     for (let i=0;i<12;i++){ renderGame(); await new Promise(r=>requestAnimationFrame(r)); }
-    const out = {}; let n = 0; for (let i=-20;i<=20;i++) for (let j=-20;j<=20;j++) if (skNodeAt(G.owPos.x+i, G.owPos.y+j)) n++;
+    const out = {}; let n = 0; for (const k of O3.nodeChunks.keys()){ const [cx, cy] = k.split(',').map(Number); for (let x=cx*O3_NCH; x<cx*O3_NCH+O3_NCH; x++) for (let y=cy*O3_NCH; y<cy*O3_NCH+O3_NCH; y++) if (skNodeAt(x, y)) n++; }   /* (RS-350: the spots in the chunks that are built) */
     let drawn = 0, merged = 0; O3.nodeGrp.traverse(o=>{ if (o.isMesh && o.material && o.material.visible!==false){ drawn++; if (o.userData.merged) merged++; } });
     out.nodes = n; out.drawn = drawn; out.merged = merged; out.hits = O3.nodeHits.length;
     const tris = e=>{ let t = 0; e.holder.traverse(o=>{ if (o.isMesh){ const g = o.geometry; t += g.index ? g.index.count/3 : g.attributes.position.count/3; } }); return Math.round(t); };
@@ -21,6 +21,6 @@ module.exports = async page=>{
   A(r.drawn < r.nodes*3.5, 'about three draws a spot or fewer (RS-338: merged chunk by chunk), not nine: '+r.drawn+' for '+r.nodes);
   A(r.coarse < r.fine/4, 'a coarse deer is a quarter of the triangles or fewer');
   A(r.wild.every(t=>t < 60000), 'the animals on the land are the coarse ones');
-  A(r.kept >= r.fresh*3 && r.fresh <= 7, 'a step keeps the built chunks and builds only the new edge: '+r.kept+' kept, '+r.fresh+' new');
+  A(r.kept >= r.fresh*3 && r.fresh <= 13, 'a step keeps the built chunks and builds only the new edge (RS-350: a row of up to thirteen at the camera\'s reach): '+r.kept+' kept, '+r.fresh+' new');
   console.log('perfwild ok', JSON.stringify(r));
 };
