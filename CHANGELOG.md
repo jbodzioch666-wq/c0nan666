@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-349 - The Lands Run On
+
+- **The land no longer ends at the edge of what's built.** Around you the game builds 72 tiles of real land, and beyond it there was only a flat dark plane - from a lookout tower, on a hill or zoomed out, the world stopped in black. The whole map is now drawn as a coarse far ground, one vertex every two tiles: the sea flat and blue, the mountains risen and snow-capped, the forests dark. It's built once per world and sits a little under the real land, which covers it near you. Beyond the map's edge lies the sea.
+- **Crossing the window's edge no longer stalls.** When you came within sixteen tiles of the built land's edge the game rebuilt all 72 tiles at once, which froze a step. The new land is now built a few milliseconds a frame over about a dozen frames while the old land still shows, and swapped in when it's done. Only the first build of a world, or one the world's contents forced (a site rising or falling), still runs at once.
+- **Test.** `landfar` checks the far ground covers the map and lies under the real land, and that a window move builds over several frames with the old land showing, then swaps in.
+
 ## RS-348 - Faster Towns
 
 - **A town draws half as much.** A town frame was about 2,500 draws and 4.8 million triangles, and every one of them drawn twice for the shadows. It's now about 1,200 draws and 1.9 million triangles, measured on the same town.

@@ -29895,10 +29895,12 @@ function o3Textures(){
   O3.tex.ripple = new T.CanvasTexture(w); O3.tex.ripple.wrapS = O3.tex.ripple.wrapT = T.RepeatWrapping; O3.tex.ripple.repeat.set(10,10);
   return O3.tex;
 }
-function o3Build(cx, cy){
-  const T = THREE, sc = O3.scene;
-  if (O3.world){ sc.remove(O3.world); O3.world.traverse(o=>{ if (o.geometry) o.geometry.dispose(); }); }
-  const grp = O3.world = new T.Group(); sc.add(grp);
+// (RS-349) the land is built by a generator: a window move builds the new land over a few frames while the old one still
+// shows (o3BuildStart / o3BuildSlice), and the first build, or one the world's contents forced, runs it to the end at once
+function o3Build(cx, cy){ const g = o3BuildGen(cx, cy), st = o3BuildFresh(); const live = o3BuildSwapIn(st); try{ while (!g.next().done); } finally { o3BuildSwapOut(st, live); } o3BuildSwap(st); }
+function* o3BuildGen(cx, cy){
+  const T = THREE;
+  const grp = O3.world = new T.Group();   /* (added to the scene when the build is done - see o3BuildSwap) */
   O3.hits = []; O3.plates.forEach(p=>p.el.remove()); O3.plates = []; O3.flames = []; O3.glows = []; O3.smoke = []; O3.parts = []; O3.windows = [];
   const W = O3_W, x0 = cx - W/2, y0 = cy - W/2, M = 5;   // M: margin sampled around the window
   O3.win = { cx, cy, x0, y0 };
@@ -29931,6 +29933,7 @@ function o3Build(cx, cy){
     path.forEach(([px,py], i)=>{ const k = (i+1)/(path.length+1), hh = hs - (hs - 0.25)*k; const key = dk(px,py); rampH[key] = Math.max(rampH[key]||0, hh); });
   }
   O3.lairTops = lairH;
+  yield;
   // RS-235: the volcano, if it stands in (or near) this window
   let VOL = null; try{ const lm = owLandmark('volcano'); if (lm && lm.x >= x0-M-VOLC.R && lm.x <= x0+W+M+VOLC.R && lm.y >= y0-M-VOLC.R && lm.y <= y0+W+M+VOLC.R) VOL = { x:lm.x+0.5, z:lm.y+0.5 }; }catch(e){}
   O3.volc = VOL;
@@ -29952,7 +29955,7 @@ function o3Build(cx, cy){
   const landAt = (px, pz)=>{ const fx = px - 0.5, fz = pz - 0.5, tx = Math.floor(fx), tz = Math.floor(fz), ax = fx - tx, az = fz - tz; let l = 0;   /* (RS-311: how much land is at a point - 1 in a land tile's middle, 0 in the sea's) */
     for (const [qx, qz, w] of [[tx,tz,(1-ax)*(1-az)],[tx+1,tz,ax*(1-az)],[tx,tz+1,(1-ax)*az],[tx+1,tz+1,ax*az]]){ const t = o3Tile(qx, qz); if (t!==OW_WATER) l += w; } return l; };
   const lin = v=> Math.pow(v/255, 2.2);
-  for (let j=0;j<NV;j++) for (let i=0;i<NV;i++){
+  for (let j=0;j<NV;j++){ if (j % 6 === 5) yield; for (let i=0;i<NV;i++){
     const wx = x0 + i/O3_R, wz = y0 + j/O3_R;
     // the (up to 4) tiles this vertex touches
     const fx = wx - 0.5, fz = wz - 0.5, tx = Math.floor(fx), tz = Math.floor(fz), ax = fx-tx, az = fz-tz;
@@ -30023,12 +30026,14 @@ function o3Build(cx, cy){
     else if (h < 0.02 && mtn < 0.1 && beach[k] < 0){ const sand = Math.min(1, (0.02-h)/0.2) * (1-snowy); cr += (196-cr)*sand*0.6; cg += (178-cg)*sand*0.6; cb += (128-cb)*sand*0.6; }
     col[k*3] = lin(cr); col[k*3+1] = lin(cg); col[k*3+2] = lin(cb);
     uv[k*2] = wx/3; uv[k*2+1] = wz/3;
-  }
+  }}
+  yield;
   const idx = [];
   for (let j=0;j<NV-1;j++) for (let i=0;i<NV-1;i++){ const a = j*NV+i, b2 = a+1, c = a+NV, d = c+1; idx.push(a,c,b2, b2,c,d); }
   const geo = new T.BufferGeometry();
   geo.setAttribute('position', new T.BufferAttribute(pos,3)); geo.setAttribute('color', new T.BufferAttribute(col,3)); geo.setAttribute('uv', new T.BufferAttribute(uv,2));
   geo.setIndex(idx); geo.computeVertexNormals();
+  yield;
   // steep faces read as bare rock
   const nr = geo.attributes.normal;
   for (let k=0;k<NV*NV;k++){ const st = 1 - nr.getY(k); if (st > 0.25 && H[k] > 0.4){ const f = Math.min(1,(st-0.25)*2.2)*0.85, rk = lin(78); col[k*3] += (rk-col[k*3])*f; col[k*3+1] += (rk*0.97-col[k*3+1])*f; col[k*3+2] += (rk*0.94-col[k*3+2])*f; } }
@@ -30053,13 +30058,74 @@ function o3Build(cx, cy){
   const water = new T.Mesh(new T.PlaneGeometry(W+2*M, W+2*M), new T.MeshStandardMaterial({ color:new T.Color(0x2c6490).convertSRGBToLinear(), roughness:0.12, metalness:0.25, transparent:true, opacity:0.84, normalMap:tex.ripple, normalScale:new T.Vector2(0.55,0.55) }));
   water.rotation.x = -Math.PI/2; water.position.set(cx, O3_WATER_Y, cy); water.receiveShadow = true; grp.add(water); O3.water = water;
   // a big dim plane far out so the edge of the built window never shows
-  const far = new T.Mesh(new T.PlaneGeometry(600,600), new T.MeshStandardMaterial({ color:new T.Color(0x2a4a2a).convertSRGBToLinear(), roughness:1 }));
+  const far = new T.Mesh(new T.PlaneGeometry(600,600), new T.MeshStandardMaterial({ color:new T.Color(0x2c6490).convertSRGBToLinear(), roughness:0.6 }));   /* (RS-349: the sea beyond the map's edge; the far land is o3FarLand) */
   far.rotation.x = -Math.PI/2; far.position.set(cx,-0.5,cy); grp.add(far);
-  o3Vegetation(grp, x0, y0, W);
-  o3Sites(grp, x0, y0, W);
-  try{ gfxO3Build(grp, x0, y0, W, M); }catch(e){ console.error(e); }
+  yield; o3Vegetation(grp, x0, y0, W);
+  yield; o3Sites(grp, x0, y0, W);
+  yield; try{ gfxO3Build(grp, x0, y0, W, M); }catch(e){ console.error(e); }
   O3.encGrp = new T.Group(); grp.add(O3.encGrp); O3.encKey = null; O3.qKey = null;
   O3.compileDue = true;   /* (RS-345) */
+}
+// ---- (RS-349) building the land over frames ----
+// Everything the build writes to O3 is swapped out while the old land still shows, and swapped in when it's done
+const O3_BUILD_KEYS = ['win','lairTops','volc','land','heightAt','depthTex','depthO','water','hits','plates','flames','glows','smoke','parts','windows','encGrp','encKey','qKey','world'];
+function o3BuildFresh(){ const st = {}; for (const k of O3_BUILD_KEYS) st[k] = undefined; st.plates = []; st.hits = []; st.flames = []; st.glows = []; st.smoke = []; st.parts = []; st.windows = []; return st; }
+function o3BuildSwapIn(st){ const live = {}; for (const k of O3_BUILD_KEYS){ live[k] = O3[k]; O3[k] = st[k]; } return live; }
+function o3BuildSwapOut(st, live){ for (const k of O3_BUILD_KEYS){ st[k] = O3[k]; O3[k] = live[k]; } for (const p of st.plates||[]) if (!p.el.__pend){ p.el.__pend = 1; p.el.style.display = 'none'; } }
+function o3BuildSwap(st){
+  const sc = O3.scene, old = O3.world;
+  if (old && old!==st.world){ sc.remove(old); old.traverse(o=>{ if (o.geometry) o.geometry.dispose(); }); }
+  if (O3.depthTex && O3.depthTex!==st.depthTex) O3.depthTex.dispose();
+  for (const p of O3.plates||[]) if (!(st.plates||[]).includes(p)) p.el.remove();
+  for (const k of O3_BUILD_KEYS) O3[k] = st[k];
+  if (O3.world && O3.world.parent!==sc) sc.add(O3.world);
+  for (const p of O3.plates||[]){ p.el.__pend = 0; p.el.style.display = 'none'; }   /* (the plate loop shows the near ones next frame) */
+  O3.compileDue = true;
+}
+function o3BuildStart(cx, cy){ O3.pend = { gen:o3BuildGen(cx, cy), st:o3BuildFresh(), n:0, cx, cy }; }
+function o3BuildAbandon(){ const P = O3.pend; if (!P) return; O3.pend = null; for (const p of P.st.plates||[]) p.el.remove(); if (P.st.world) P.st.world.traverse(o=>{ if (o.geometry) o.geometry.dispose(); }); }
+// a few milliseconds of building a frame; the last slice swaps the new land in. Returns true when done
+function o3BuildSlice(budgetMs){
+  const P = O3.pend; if (!P) return true;
+  const live = o3BuildSwapIn(P.st), t0 = performance.now(); let done = false;
+  try{ do { done = P.gen.next().done; } while (!done && performance.now() - t0 < budgetMs); }
+  catch(e){ console.error(e); done = true; P.failed = true; }
+  finally { o3BuildSwapOut(P.st, live); }
+  P.n++;
+  if (done){ O3.pend = null; if (P.failed){ for (const p of P.st.plates||[]) p.el.remove(); } else o3BuildSwap(P.st); }
+  return done;
+}
+// (RS-349) the whole world as a coarse, far ground - one vertex every two tiles, the sea flat and blue, the mountains
+// risen, the forests dark - so the land never ends at the built window's edge: from a lookout, or zoomed out, or on a
+// hill, the lands run on to the horizon. Built once per world, a little under the real land, which covers it near you
+function o3FarLand(){
+  if (!O3.scene || !G.ow || !G.ow.map) return;
+  const key = (G.ow.seed||0) + '|' + OW_COLS + 'x' + OW_ROWS + '|' + (O3.mapKey||'');
+  if (O3.farKey===key && O3.farLand && O3.farLand.parent===O3.scene) return;
+  if (O3.farLand){ O3.scene.remove(O3.farLand); O3.farLand.geometry.dispose(); }
+  O3.farKey = key;
+  const T = THREE, S = 2, NX = Math.floor(OW_COLS/S) + 1, NZ = Math.floor(OW_ROWS/S) + 1, n1 = v3Noise(7);
+  // how far inside a range each mountain tile sits, over the whole map
+  const dep = new Uint8Array(OW_COLS*OW_ROWS);
+  for (let x=0;x<OW_COLS;x++) for (let y=0;y<OW_ROWS;y++){ if (o3Tile(x, y)!==OW_MOUNTAIN) continue; let d = 4;
+    for (let r=1;r<=3 && d===4;r++) for (let i=-r;i<=r && d===4;i++) for (let j=-r;j<=r;j++){ if (Math.max(Math.abs(i),Math.abs(j))!==r) continue; if (o3Tile(x+i,y+j)!==OW_MOUNTAIN){ d = r; break; } }
+    dep[x*OW_ROWS + y] = d; }
+  const lin = v=>Math.pow(v/255, 2.2), pos = new Float32Array(NX*NZ*3), col = new Float32Array(NX*NZ*3);
+  const tile = (x, y)=>{ const t = o3Tile(x, y);
+    let h, c; if (t===OW_WATER || t===OW_RIVER){ h = O3_WATER_Y - 0.04; c = t===OW_WATER ? [38, 86, 124] : [52, 98, 128]; }
+    else { const gt = o3Ground(x, y); c = (wgO3Col(x, y, gt) || O3_COL[gt] || O3_COL[OW_GRASS]).slice();
+      if (t===OW_MOUNTAIN){ const d = dep[x*OW_ROWS + y]||1; h = 0.75 + d*0.95 + o3Hash(x, y, 3)*0.9; if (h > 2.4){ const sn = Math.min(1, (h - 2.4)/0.6); c = [c[0] + (236 - c[0])*sn, c[1] + (240 - c[1])*sn, c[2] + (246 - c[2])*sn]; } }
+      else if (t===OW_MOUNTAINPASS) h = 0.3; else if (t===OW_SWAMP) h = -0.06; else h = 0.04;
+      if (t===OW_FOREST){ c = [c[0]*0.45 + 24, c[1]*0.55 + 34, c[2]*0.45 + 14]; } }   /* (a forest reads dark from afar: its canopy, not its floor) */
+    return [h, c]; };
+  for (let j=0;j<NZ;j++) for (let i=0;i<NX;i++){ const x = i*S, z = j*S; let h = 0, r = 0, g = 0, b = 0, n = 0;
+    for (const [dx, dz] of [[0,0],[-1,0],[0,-1],[-1,-1]]){ const [th, c] = tile(Math.min(OW_COLS-1, Math.max(0, x+dx)), Math.min(OW_ROWS-1, Math.max(0, z+dz))); h += th; r += c[0]; g += c[1]; b += c[2]; n++; }
+    h /= n; r /= n; g /= n; b /= n; if (h > O3_WATER_Y) h += (n1(x/5, z/5) - 0.5)*0.35 - 0.12;   /* (the same rolling ground as near you, a little under it) */
+    const k = j*NX + i; pos[k*3] = x; pos[k*3+1] = h; pos[k*3+2] = z; const v = 0.9; col[k*3] = lin(r*v); col[k*3+1] = lin(g*v); col[k*3+2] = lin(b*v); }
+  const idx = []; for (let j=0;j<NZ-1;j++) for (let i=0;i<NX-1;i++){ const a = j*NX + i, b2 = a + 1, c = a + NX, d = c + 1; idx.push(a, c, b2, b2, c, d); }
+  const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setAttribute('color', new T.BufferAttribute(col, 3)); geo.setIndex(idx); geo.computeVertexNormals();
+  const m = new T.Mesh(geo, O3.farMat || (O3.farMat = new T.MeshStandardMaterial({ vertexColors:true, roughness:1 }))); m.receiveShadow = false; m.castShadow = false; m.frustumCulled = false;
+  O3.farLand = m; O3.scene.add(m);
 }
 // (RS-345) stand-ins for what the land only makes once you walk up to it, so their shaders are built now
 function o3Warm(){
@@ -31015,10 +31081,14 @@ function o3Render(){
   const back = now - (O3.lastFrame||0) > 400, turn = G.player.turnCount||0;
   if (back || turn !== O3.turnSeen){ O3.turnSeen = turn; const k = pmMapKey(); if (k !== O3.mapKey){ changed = !!O3.mapKey; O3.mapKey = k; } }
   O3.lastFrame = now;
-  if (!O3.win || changed || O3.mapRef!==G.ow.map || Math.abs(px - O3.win.cx) > O3_W/2 - 16 || Math.abs(py - O3.win.cy) > O3_W/2 - 16){
-    O3.mapRef = G.ow.map; o3Build(px, py); O3.path = O3.path||[];
+  if (O3.pend && (changed || O3.mapRef!==G.ow.map)) o3BuildAbandon();   /* (RS-349: the world changed under a build in progress - start over, at once) */
+  if (!O3.pend && (!O3.win || changed || O3.mapRef!==G.ow.map || Math.abs(px - O3.win.cx) > O3_W/2 - 16 || Math.abs(py - O3.win.cy) > O3_W/2 - 16)){
+    const atOnce = !O3.win || changed || O3.mapRef!==G.ow.map; O3.mapRef = G.ow.map; O3.path = O3.path||[];
+    if (atOnce) o3Build(px, py); else o3BuildStart(px, py);   /* (RS-349: a window move builds the new land over a few frames while the old one still shows) */
     if (!O3.ppos) O3.ppos = new T.Vector3(px+0.5, 0, py+0.5);
   }
+  if (O3.pend){ const off = Math.abs(px - O3.win.cx) > O3_W/2 - 4 || Math.abs(py - O3.win.cy) > O3_W/2 - 4; o3BuildSlice(off ? 1e9 : 6); }   /* (near the old edge already: finish it now) */
+  try{ o3FarLand(); }catch(e){ console.error(e); }
   const mc = canvas, cv = O3.cv;
   cv.style.display = 'block'; O3.labels.style.display = 'block';
   cv.style.left = mc.style.left || '0px'; cv.style.top = mc.style.top || '0px';
@@ -38106,7 +38176,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-348';
+const GAME_VERSION = 'rs-349';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
