@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-353 - Read the Frame
+
+- **The flicker on your figure is gone.** RS-352 drew the sun's shadow map every other frame. A walking figure then stood in the shadow of its own last pose on alternate frames, which flickered on the figure itself. The shadow map is drawn every frame again. The townsfolk's merged parts stay.
+- **The fps meter says where a frame's time goes.** Under the fps and the card's name it now reads a second line, say "3d 4.1 hud 9.8 loop 1.2 gpu 3.0 ms": the time to submit the 3D view's draws, the HUD and interface work round it, the rest of the frame, and the card's own drawing time where the browser can report it. Nothing is measured while the meter is off. If a town runs slow on a strong machine, these four numbers say which part to cut, instead of guessing.
+- **Test.** `profile` checks the timings nest (the view inside the game render inside the loop), that nothing is measured with the meter off, and that the meter reads the split.
+
 ## RS-352 - Half the Draws Again
 
 - **The sun's shadow map is redrawn every other frame.** In towns and on the open land the shadow pass was over half of a frame's draws: 812 of 1,310 in a town. It's now drawn on alternate frames, which no eye can tell, with a fresh scene drawing it at once. A town frame now alternates between about 470 and 1,210 draws instead of 1,310 every time - about 840 on average.

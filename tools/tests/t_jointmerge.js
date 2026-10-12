@@ -1,7 +1,6 @@
 // RS-352: a town frame draws fewer parts. Each townsperson's meshes that share a material under one joint are baked into
 // one, so the figure still bends at every joint (its walk and strike still change its pose) but draws about a third fewer
-// parts; the player's figure is untouched. And the sun's shadow map is redrawn every other frame in towns and on the land,
-// with a fresh scene redrawing it at once
+// parts; the player's figure is untouched. (RS-353 took back RS-352's alternate-frame shadow map: it flickered on a walking figure)
 module.exports = async page=>{
   const r = await page.evaluate(async ()=>{
     goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{};
@@ -16,15 +15,13 @@ module.exports = async page=>{
     const p = folk.find(q=>(q.e.mergedParts||0) > 3 && !q.e.beast && !q.e.anim) || folk[0]; const e = p.e, rg = e.rig;
     const pose = (mv, wind, strike)=>{ e.fol = 0; e.wph = 9; if (e.anim) e.anim(rg, 1, mv, wind, strike, 0, e); else if (e.beast) m3dPoseBeast(rg, 1, mv, wind, strike, 0, e); else m3dPoseHumanoid(rg, 1, mv, wind, strike, 0, e); return snap(e.holder); };
     const still = pose(0, 0, 0); out.walk = +diff(pose(1, 0, 0), still).toFixed(3); out.strike = +diff(pose(0, 0, 1), still).toFixed(3); out.whoMerged = p.e.mergedParts||0;
-    // the shadow map: every other frame, after the fresh frames
-    await fr(6); out.auto = R.shadowMap.autoUpdate; const seq = []; for (let i=0;i<6;i++){ renderGame(); seq.push(V3.shadowN % 2); } out.alternates = seq.join('') === '010101' || seq.join('') === '101010';
-    R.info.autoReset = false; const counts = []; for (let i=0;i<4;i++){ R.info.reset(); renderGame(); counts.push(R.info.render.calls); } R.info.autoReset = true; out.counts = counts;
+    // (RS-353) the shadow map is drawn every frame again: an alternate-frame one flickered on a walking figure
+    await fr(2); out.auto = R.shadowMap.autoUpdate;
     return out; });
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
   A(r.merged >= r.before*0.25, 'the townsfolk draw at least a quarter fewer parts: '+r.before+' -> '+r.now);
   A(r.playerMerged===0, 'your own figure is untouched');
   A(r.whoMerged > 3 && r.walk > 0.012 && r.strike > 0.02, 'a merged townsperson still walks and strikes');
-  A(r.auto===false && r.alternates, 'the shadow map is redrawn every other frame');
-  A(Math.max(...r.counts) - Math.min(...r.counts) > 150, 'the frames without the shadow pass draw far less: '+r.counts.join(','));
+  A(r.auto===true, 'the shadow map is drawn every frame (RS-353)');
 };
