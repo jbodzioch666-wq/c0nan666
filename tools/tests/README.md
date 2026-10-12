@@ -25,7 +25,6 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
-| occray | RS-360: the see-through rays cast only when the camera-to-you line moved, every third frame; proxies on layer 1 skip the rays |
 | shadowproxy | RS-359: one depth-only shadow proxy per building and per person, shown only in the shadow pass; the parts stop casting |
 | sunfit | RS-359: the sun's shadow box is fitted to the view, snapped and capped |
 | cull | in towns, whole things the camera can't see are skipped; dungeon lights' shadows refresh on their own clocks; a desktop dungeon never drops below render scale 0.7 |

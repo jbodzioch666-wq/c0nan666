@@ -1,11 +1,5 @@
 # Depthcrawl patch notes
 
-## RS-360 - The see-through rays, only when something moved
-
-- **Found the real CPU cost in towns.** Every frame the game cast five rays from the camera to you to find what stands in the way and should go see-through. Since RS-348 merged a town's buildings into big meshes, each ray walked tens of thousands of triangles, and RS-359's shadow proxies doubled that. In the test city the rays were about three quarters of a town frame's JavaScript, which is why halving the draws (RS-356, RS-359) barely moved your 3d reading.
-- **Now they cast only when the line from the camera to you has moved**, and then every third frame; the fade eases over a few frames anyway. Standing still costs nothing. Test city, JavaScript per frame: about 20 ms down to 5 standing still, 10 while walking.
-- **The shadow proxies sit on their own layer**, so the rays never walk them.
-
 ## RS-359 - The shadow pass drawn once per thing
 
 - **Shadow proxies.** The sun's shadow map used to draw every caster in town again, one draw per material: a building was ten draws of depth, a person eight, you forty. Now each building, tree, person and the loose props cast through one depth-only proxy mesh that exists only while the shadow map is drawn. A person's proxy is skinned on the same joints, with a held weapon or hand on its own node, so the shadow follows every animation; window panes join their building's proxy, doors keep swinging on their own. In the test city the shadow pass fell from about 430 draws to about 70.
