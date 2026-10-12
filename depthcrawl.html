@@ -29578,7 +29578,7 @@ function v3Init(){
     if (T.sRGBEncoding) R.outputEncoding = T.sRGBEncoding;
     R.toneMapping = T.ACESFilmicToneMapping;
     V3.scene = new T.Scene();
-    V3.cam = new T.PerspectiveCamera(32, 1, 0.5, 120);
+    V3.cam = new T.PerspectiveCamera(32, 1, 0.5, 120); V3.cam.layers.enable(1);   /* (RS-360: the shadow pass tests the camera's layers; the proxies live on layer 1) */
     V3.hemi = new T.HemisphereLight(0xdde8ff, 0x5a4a30, 0.85); V3.scene.add(V3.hemi);
     const sun = V3.sun = new T.DirectionalLight(0xfff0d8, 1.8); sun.castShadow = true;
     { const ms = gfxPhone() ? 1024 : 2048; sun.shadow.mapSize.set(ms, ms); } const s = sun.shadow.camera; s.left = -18; s.right = 18; s.top = 18; s.bottom = -18; s.near = 1; s.far = 80; sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.02;
@@ -29819,8 +29819,13 @@ function v3Render(){
     V3.clickRing.visible = V3.clickFx.t < 0.5; V3.clickRing.position.set(V3.clickFx.x, 0.03, V3.clickFx.z); V3.clickRing.scale.setScalar(1 + V3.clickFx.t*1.5); V3.clickRing.material.opacity = 1 - V3.clickFx.t*2; }
   // see-through buildings: anything between the camera and you fades out
   if (V3.occ && V3.occ.length){
-    const faded = new Set(), tgt = new T.Vector3();
-    for (const hy of [0.15, 0.55, 0.95]){
+    /* (RS-360) the rays walk every triangle of the merged town, so they cast only when the line from the camera to you has
+       moved, and then every third frame: the fade eases over a few frames anyway. Standing still costs nothing */
+    const ck = (V3.cam.position.x*20|0) + ',' + (V3.cam.position.z*20|0) + ',' + (V3.cam.position.y*20|0) + ',' + (pp.x*20|0) + ',' + (pp.z*20|0) + ',' + V3.occ.length;
+    V3.occN = (V3.occN||0) + 1; const cast = !V3.occFaded || (ck!==V3.occKey && V3.occN % 3 === 0); if (cast) V3.occKey = ck;
+    const faded = cast ? new Set() : V3.occFaded, tgt = new T.Vector3();
+    if (cast) V3.occFaded = faded;
+    if (cast) for (const hy of [0.15, 0.55, 0.95]){
       tgt.set(pp.x, hy, pp.z); const dir = tgt.clone().sub(V3.cam.position); const len = dir.length(); dir.normalize();
       V3.ray.set(V3.cam.position, dir); V3.ray.far = len - 0.2;
       for (const h of V3.ray.intersectObjects(V3.occ, false)) faded.add(h.object.userData.grp);
@@ -29828,10 +29833,10 @@ function v3Render(){
     // anything else standing over you - a lamp's hood, a well's roof, a tree the town didn't mark -
     // fades the same way: whatever the camera's line to you passes through, above knee height
     const people = new Set([V3.player && V3.player.g, ...(V3.npcs||[]).map(p=>p.g), ...(V3.villagers||[]).map(p=>p.g)]);
-    const cands = V3.world.children.filter(o=>!people.has(o) && o!==V3.ground && !o.isInstancedMesh && !o.isPoints && !o.isSprite && o.visible!==false && !(o.isMesh && o.geometry && o.geometry.type==='PlaneGeometry'));
+    const cands = !cast ? [] : V3.world.children.filter(o=>!people.has(o) && o!==V3.ground && !o.isInstancedMesh && !o.isPoints && !o.isSprite && o.visible!==false && !(o.isMesh && o.geometry && o.geometry.type==='PlaneGeometry'));
     V3.occDyn = V3.occDyn || new Set();
     V3.ray.camera = V3.cam;                                  // (sprites in the town need it to be hit-tested)
-    for (const hy of [0.3, 0.8]){
+    if (cast) for (const hy of [0.3, 0.8]){
       tgt.set(pp.x, hy, pp.z); const dir = tgt.clone().sub(V3.cam.position); const len = dir.length(); dir.normalize();
       V3.ray.set(V3.cam.position, dir); V3.ray.far = len - 0.25;
       for (const h of V3.ray.intersectObjects(cands, true)){
@@ -30956,7 +30961,7 @@ function gfxShadowProxyStatic(r, top, skip){
     if (g.index){ const ia = g.index.array; for (let i=0;i<ia.length;i++) idx[io++] = ia[i] + vo; } else for (let i=0;i<c;i++) idx[io++] = vo + i;
     vo += c; o.castShadow = false; }
   const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setIndex(new T.BufferAttribute(idx, 1)); geo.computeBoundingSphere();
-  const px = new T.Mesh(geo, gfxProxyMat()); px.castShadow = true; px.receiveShadow = false; px.visible = false; px.userData.proxy = list.length; top.add(px); gfxProxyList(r).push(px); return px;
+  const px = new T.Mesh(geo, gfxProxyMat()); px.castShadow = true; px.receiveShadow = false; px.visible = false; px.layers.set(1); px.userData.proxy = list.length;   /* (RS-360: layer 1 keeps it out of the raycasts) */ top.add(px); gfxProxyList(r).push(px); return px;
 }
 // one skinned proxy for a figure: its skinned meshes' triangles on the same bones, and its loose caster parts (a held
 // weapon, a hand the rig moves itself) each on their own node as a bone, so the shadow follows every animation
@@ -30975,7 +30980,7 @@ function m3dShadowProxy(r, e){
   for (const o of loose){ const g = o.geometry, a = g.attributes.position, c = a.count, b = bones.length; bones.push(o); M.multiplyMatrices(rootInv, o.matrixWorld);
     for (let i=0;i<c;i++){ v.fromBufferAttribute(a, i).applyMatrix4(M); pos[(vo+i)*3] = v.x; pos[(vo+i)*3+1] = v.y; pos[(vo+i)*3+2] = v.z; si[(vo+i)*4] = b; sw[(vo+i)*4] = 1; } put(g, c); o.castShadow = false; }
   const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setAttribute('skinIndex', new T.BufferAttribute(si, 4)); geo.setAttribute('skinWeight', new T.BufferAttribute(sw, 4)); geo.setIndex(new T.BufferAttribute(idx, 1)); geo.computeBoundingSphere();
-  const px = new T.SkinnedMesh(geo, gfxProxyMat()); px.castShadow = true; px.receiveShadow = false; px.visible = false; px.frustumCulled = false; px.userData.proxy = sk.length + loose.length;
+  const px = new T.SkinnedMesh(geo, gfxProxyMat()); px.castShadow = true; px.receiveShadow = false; px.visible = false; px.frustumCulled = false; px.layers.set(1); px.userData.proxy = sk.length + loose.length;
   root.add(px); px.updateMatrixWorld(true); px.bind(new T.Skeleton(bones)); e.shadowProxy = px; gfxProxyList(r).push(px); return px;
 }
 function m3dSkinFigure(e){
@@ -38354,7 +38359,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-359';
+const GAME_VERSION = 'rs-360';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
