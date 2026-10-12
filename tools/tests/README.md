@@ -25,6 +25,8 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| cull | in towns, whole things the camera can't see are skipped; dungeon lights' shadows refresh on their own clocks; a desktop dungeon never drops below render scale 0.7 |
+| diag | double-clicking the fps meter switches sprites, grass, lamps, soft shadows, shadows, multisampling, people and the ground off in turn and reads the card time each saves; each is undone after |
 | profile | the fps meter shows where a frame's time goes (3d, hud, loop, gpu), measured only while it is on |
 | jointmerge | townsfolk parts that share a material under one joint are baked into one (a third fewer draws, the figure still bends); the sun's shadow map redraws every other frame |
 | gpupref | the town and land renderers ask for the high-performance GPU, and the fps meter names the card drawing the view |

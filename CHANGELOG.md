@@ -1,5 +1,15 @@
 # Depthcrawl patch notes
 
+## RS-355 - The Processor's Share
+
+- **What the readings said.** On a GeForce 3080 Ti the card's time matched the processor's time to the millisecond, in a town at 2560x1440 and in a dungeon at 640x299 alike. A card isn't slow at the same speed at both sizes: it was being fed slowly. The frame's cost is the processor walking every object in the scene and issuing its draws, not pixels. In a dungeon the biggest part was the six torch and lantern shadows, each of which is six faces of the whole floor, redrawn every other frame - and more every creature that joined the fight.
+- **Dungeon lights on their own clocks.** The lantern's shadow refreshes every second frame, each torch's every sixth, staggered, instead of all six every other frame: about a quarter of the shadow work.
+- **Towns skip whole things the camera can't see.** A building, a tree or a person outside the view is skipped with every part under it, instead of each of its parts being tested and walked. A generous margin keeps a tall thing just off screen casting its shadow into view.
+- **A desktop dungeon stays sharp.** The dungeon view lowers its render scale when frames run slow, an old measure that assumes the card is the limit. On a desktop it now never drops below 0.7; it was going down to half, and the floor went soft for nothing.
+- **The diagnosis, on your own machine.** Double-click the fps meter and it switches one thing off at a time for a second each - sprites, grass, lamps, soft shadows, shadows, the multisampled post buffer, people, the ground, see-through parts - and reads how many milliseconds each one costs, as a third line. Double-click again to stop; everything is put back.
+- **The far ground stays out of the real land.** RS-349's far ground poked up through the real land where its coarse mountains and sea floor stood higher than the real land's dips: white slabs on the mountainsides, a patch of water on the shore. It's now cut out entirely inside the built land, and the cut-out moves with it.
+- **Tests.** `cull` for the first three changes, `diag` for the diagnosis, `landfar` for the cut-out.
+
 ## RS-354 - Read the Card
 
 - **The fps meter splits the card's time.** The "gpu" figure now reads, say, "gpu 15.2 (sh 3.0 sc 10.1 post 2.1)": the sun's shadow pass, the scene itself, and the post-processing passes. The line ends with the size of the picture being drawn, like "@2560x1440", since a display scaled up in Windows draws more pixels than its screen has. A reading of the RS-353 meter on a GeForce 3080 Ti put 15 of a 20 millisecond frame on the card in a city, far more than its triangles explain, and this says which pass it is.

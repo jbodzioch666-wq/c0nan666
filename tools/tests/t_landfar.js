@@ -12,6 +12,8 @@ module.exports = async page=>{
       // sampled where the real land is built, the far ground lies under it
       for (let i=0;i<P.count;i++){ const x = P.getX(i), z = P.getZ(i); if (Math.abs(x - O3.win.cx) < 30 && Math.abs(z - O3.win.cy) < 30){ n++; const t = o3Tile(Math.floor(x), Math.floor(z)); if (t===OW_WATER || t===OW_MOUNTAIN || P.getY(i) <= O3.heightAt(x, z) + 0.02) under++; } }
       out.farMinY = +minY.toFixed(2); out.farMaxY = +maxY.toFixed(2); out.underFrac = n ? +(under/n).toFixed(2) : 0; }
+    // (RS-355) the far ground is cut out inside the built land, and the cut-out moves with the window
+    const win = ()=>O3.farMat.userData.win.value.toArray().map(v=>+v.toFixed(1)); out.cut0 = win(); out.cutMatches0 = win()[0]===+(O3.win.x0 + 0.5).toFixed(1) && win()[2]===+(O3.win.x0 + O3_W - 0.5).toFixed(1); out.cutKey = O3.farMat.customProgramCacheKey();
     // a window move: the build runs over frames, the old land showing meanwhile, then swaps in
     const w0 = O3.win, world0 = O3.world, cx = w0.cx, cy = w0.cy; G.owPos.x = Math.max(2, Math.min(OW_COLS-3, cx + 22)); G.owPos.y = cy;
     renderGame(); out.pendAfter1 = !!O3.pend; out.sameWinAfter1 = O3.win===w0 && O3.world===world0 && O3.world.parent===O3.scene;
@@ -19,6 +21,7 @@ module.exports = async page=>{
     out.frames = frames; out.newWin = O3.win!==w0 && O3.win.cx===G.owPos.x; out.swapped = O3.world!==world0 && O3.world.parent===O3.scene && !world0.parent && typeof O3.heightAt==='function';
     out.oldPlatesGone = !O3.plates.some(p=>p.el.__pend===1) && [...document.querySelectorAll('.plate, [class*=plate]')].length >= 0;
     out.pendPlatesHidden = true;
+    out.cutMoved = win()[0]===+(O3.win.x0 + 0.5).toFixed(1) && win()[0]!==out.cut0[0];
     // and a build the world forced still runs to the end at once
     const w1 = O3.win; O3.mapRef = null; renderGame(); out.atOnce = O3.win!==w1 && !O3.pend;
     // zoomed right out for the shot
@@ -32,4 +35,5 @@ module.exports = async page=>{
   A(r.pendAfter1 && r.sameWinAfter1, 'a window move starts a build that leaves the old land showing');
   A(r.frames > 2 && r.newWin && r.swapped, 'the build takes several frames, then the new land swaps in: '+r.frames+' frames');
   A(r.atOnce, 'a build the world forced runs at once');
+  A(r.cutMatches0 && r.cutMoved && r.cutKey==='farwin', 'the far ground is cut out inside the built land, and the cut-out follows the window');
 };

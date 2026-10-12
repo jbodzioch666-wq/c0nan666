@@ -29294,6 +29294,26 @@ function v3MergeWorld(){
   let n0 = 0, n1 = 0; V3.world.traverse(o=>{ if (o.isMesh) n0++; });
   for (const top of V3.world.children){ if (!top.isGroup || skip.has(top)) continue; try{ o3MergeStatic(top, skip); }catch(e){ console.error(e); } }
   V3.world.traverse(o=>{ if (o.isMesh) n1++; }); V3.mergedFrom = n0; V3.mergedTo = n1;
+  v3CullPrep();
+}
+// (RS-355) a thing the camera can't see is skipped whole - its building, tree or person and every part under it - instead of
+// each of its parts being tested and walked. Still things get a sphere once; the people's move with them. Kept generous,
+// so a tall thing just off screen still casts its shadow into view
+function v3CullPrep(){
+  if (!V3.world) return; const T = THREE, people = new Set([V3.player, ...(V3.npcs||[]), ...(V3.villagers||[])].filter(Boolean).map(p=>p.g));
+  V3.cullList = [];
+  for (const top of V3.world.children){ if (!top.isGroup || top.isLight) continue;
+    if (people.has(top)){ V3.cullList.push({ o:top, dyn:true, r:2.2 }); continue; }
+    const box = new T.Box3().setFromObject(top); if (box.isEmpty()) continue; const sph = box.getBoundingSphere(new T.Sphere()); if (sph.radius > 30) continue;
+    V3.cullList.push({ o:top, c:sph.center, r:sph.radius + 3 }); }
+}
+function v3CullTops(){
+  if (!V3.cullList || !V3.cam) return 0; const T = THREE; V3.cam.updateMatrixWorld();
+  const fr = V3.cullFr || (V3.cullFr = new T.Frustum()), m = V3.cullM || (V3.cullM = new T.Matrix4()), sph = V3.cullS || (V3.cullS = new T.Sphere());
+  fr.setFromProjectionMatrix(m.multiplyMatrices(V3.cam.projectionMatrix, V3.cam.matrixWorldInverse)); let hid = 0;
+  for (const e of V3.cullList){ if (e.dyn){ sph.center.copy(e.o.position); sph.center.y += 0.8; } else sph.center.copy(e.c); sph.radius = e.r;
+    const vis = fr.intersectsSphere(sph); if (e.o.visible!==vis) e.o.visible = vis; if (!vis) hid++; }
+  V3.culled = hid; return hid;
 }
 function v3BuildScene(){
   const T = THREE, sc = V3.scene;
@@ -29821,6 +29841,7 @@ function v3Render(){
     else if (hv && hv.kind==='building' && hv.b.door) at = [hv.b.door.x+0.5, 0.04, hv.b.door.y+0.5, 0.75];
     hoverRing(V3, at); }
   gfxCompileScene(V3, V3.renderer, V3.scene, V3.cam, v3Warm);   /* (RS-345) */
+  if (!V3.compileDue) v3CullTops();   /* (RS-355) */
   gfxRender(V3.renderer, V3.scene, V3.cam, 'v3');
   // name plates follow their owners on screen
   const v = new T.Vector3();
@@ -30084,7 +30105,7 @@ function o3BuildSwap(st){
   for (const k of O3_BUILD_KEYS) O3[k] = st[k];
   if (O3.world && O3.world.parent!==sc) sc.add(O3.world);
   for (const p of O3.plates||[]){ p.el.__pend = 0; p.el.style.display = 'none'; }   /* (the plate loop shows the near ones next frame) */
-  O3.compileDue = true;
+  O3.compileDue = true; try{ o3FarWin(); }catch(e){}   /* (RS-355) */
 }
 function o3BuildStart(cx, cy){ O3.pend = { gen:o3BuildGen(cx, cy), st:o3BuildFresh(), n:0, cx, cy }; }
 function o3BuildAbandon(){ const P = O3.pend; if (!P) return; O3.pend = null; for (const p of P.st.plates||[]) p.el.remove(); if (P.st.world) P.st.world.traverse(o=>{ if (o.geometry) o.geometry.dispose(); }); }
@@ -30128,9 +30149,19 @@ function o3FarLand(){
     const k = j*NX + i; pos[k*3] = x; pos[k*3+1] = h; pos[k*3+2] = z; const v = 0.9; col[k*3] = lin(r*v); col[k*3+1] = lin(g*v); col[k*3+2] = lin(b*v); }
   const idx = []; for (let j=0;j<NZ-1;j++) for (let i=0;i<NX-1;i++){ const a = j*NX + i, b2 = a + 1, c = a + NX, d = c + 1; idx.push(a, c, b2, b2, c, d); }
   const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setAttribute('color', new T.BufferAttribute(col, 3)); geo.setIndex(idx); geo.computeVertexNormals();
-  const m = new T.Mesh(geo, O3.farMat || (O3.farMat = new T.MeshStandardMaterial({ vertexColors:true, roughness:1 }))); m.receiveShadow = false; m.castShadow = false; m.frustumCulled = false;
-  O3.farLand = m; O3.scene.add(m);
+  const m = new T.Mesh(geo, O3.farMat || (O3.farMat = o3FarMat())); m.receiveShadow = false; m.castShadow = false; m.frustumCulled = false;
+  O3.farLand = m; O3.scene.add(m); o3FarWin();
 }
+// (RS-355) the far ground isn't drawn inside the built land at all: its coarse mountains and sea floor poked up through the
+// real land's dips. A cut-out in the shader, moved with the window
+function o3FarMat(){
+  const T = THREE, m = new T.MeshStandardMaterial({ vertexColors:true, roughness:1 }), u = { value:new T.Vector4(0, 0, 0, 0) };
+  m.onBeforeCompile = sh=>{ sh.uniforms.uFarWin = u;
+    sh.vertexShader = 'varying vec3 vFarPos;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vFarPos = (modelMatrix * vec4(position, 1.0)).xyz;');
+    sh.fragmentShader = 'uniform vec4 uFarWin; varying vec3 vFarPos;\n' + sh.fragmentShader.replace('#include <clipping_planes_fragment>', '  if (vFarPos.x > uFarWin.x && vFarPos.x < uFarWin.z && vFarPos.z > uFarWin.y && vFarPos.z < uFarWin.w) discard;\n#include <clipping_planes_fragment>'); };
+  m.customProgramCacheKey = ()=>'farwin'; m.userData.win = u; return m;
+}
+function o3FarWin(){ const m = O3.farMat, w = O3.win; if (!m || !w) return; m.userData.win.value.set(w.x0 + 0.5, w.y0 + 0.5, w.x0 + O3_W - 0.5, w.y0 + O3_W - 0.5); }
 // (RS-345) stand-ins for what the land only makes once you walk up to it, so their shaders are built now
 function o3Warm(){
   const T = THREE, g = new T.Group(), safe = f=>{ try{ f(); }catch(e){ console.error(e); } };
@@ -32198,7 +32229,7 @@ function fpdRender(env, T, camZ){
   const fdt = Math.min(FP.dt||1/60, 0.1), nowT = performance.now();
   FPD.dtAvg += (fdt - FPD.dtAvg)*0.03;
   if (++FPD.adj >= 120 && nowT >= FPD.lockUntil){ FPD.adj = 0;
-    if (FPD.dtAvg > 1/40 && FPD.lvl < FPD_SCALES.length-1){ if (FPD.upAt && nowT - FPD.upAt < 15000) FPD.lockUntil = nowT + 60000; FPD.lvl++; FPD.downAt = nowT; FPD.dtAvg = 1/45; }
+    if (FPD.dtAvg > 1/40 && FPD.lvl < (gfxPhone() ? FPD_SCALES.length-1 : 2)){   /* (RS-355: a desktop keeps at least 0.7 - a slow frame there is rarely the pixels) */ if (FPD.upAt && nowT - FPD.upAt < 15000) FPD.lockUntil = nowT + 60000; FPD.lvl++; FPD.downAt = nowT; FPD.dtAvg = 1/45; }
     else if (FPD.dtAvg < 1/58 && FPD.lvl > 0 && nowT - FPD.downAt > 10000){ FPD.lvl--; FPD.upAt = nowT; FPD.dtAvg = 1/50; } }
   FPD.scale = FPD_SCALES[FPD.lvl];
   const scl = window.__fpdScale || Math.min(FPD.scale, gfxQ().fpd);
@@ -32284,7 +32315,12 @@ function fpdRender(env, T, camZ){
     // onto the floor away from the torch, instead of a faint one stretched flat along the ground
     const wall = o.f.h==null, off = wall ? 0.32 : 0.14, bx = o.f.x + (o.f.dx||0)*off, by = o.f.y + (o.f.dy||0)*off;
     L.position.set(bx + 0.025*Math.sin(FP.t*5.1+s), (wall ? 1.35 : o.f.h) + 0.02*Math.sin(FP.t*7.3+s*1.3), by + 0.025*Math.cos(FP.t*4.3+s)); });
-  if (SET.gfx!=='low' && (G.gameMode===1 || G.gameMode===2)){ FPD.flickN = (FPD.flickN||0) + 1; if (FPD.flickN % (SET.gfx==='high' ? 2 : 4) === 0) FPD.r.shadowMap.needsUpdate = true; }   /* (RS-163: monsters cast torch shadows now, so they're redrawn as they move) */
+  if (SET.gfx!=='low' && (G.gameMode===1 || G.gameMode===2)){ FPD.flickN = (FPD.flickN||0) + 1; const n = FPD.flickN, hi = SET.gfx==='high';
+    /* (RS-163: monsters cast torch shadows now, so they're redrawn as they move. RS-355: each light on its own clock - the lantern
+       every second frame, each torch every sixth, staggered - since a point light's shadow is six faces of the whole floor each time) */
+    let any = FPD.shadowFrames > 0; if (FPD.lan && FPD.lan.shadow){ FPD.lan.shadow.autoUpdate = false; if (n % (hi ? 2 : 4) === 0 || FPD.shadowFrames > 0){ FPD.lan.shadow.needsUpdate = true; any = true; } }
+    (FPD.torches||[]).forEach((L, i)=>{ if (!L.shadow) return; L.shadow.autoUpdate = false; if ((n + i) % (hi ? 6 : 8) === 0 || FPD.shadowFrames > 0){ L.shadow.needsUpdate = true; any = true; } });
+    if (any) FPD.r.shadowMap.needsUpdate = true; }
   // dust: a loose cloud kept centered on you
   const dp = FPD.dust.geometry.attributes.position, sd = FPD.dustSeed, n = dp.count;
   for (let i=0;i<n;i++){
@@ -38216,7 +38252,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-354';
+const GAME_VERSION = 'rs-355';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -40850,7 +40886,7 @@ function profSetup(){ for (const [n, k] of [['v3Render','3d'], ['o3Render','3d']
 function gfxGpuPoll(){
   const P = PROF.gpu, gl = P.gl, ext = P.ext; if (!ext) return;
   for (let i=P.q.length-1;i>=0;i--){ const q = P.q[i]; let avail = false, dis = false; try{ avail = gl.getQueryParameter(q.q, gl.QUERY_RESULT_AVAILABLE); dis = gl.getParameter(ext.GPU_DISJOINT_EXT); }catch(e){ dis = true; }
-    if (avail || dis){ if (avail && !dis){ const ms = gl.getQueryParameter(q.q, gl.QUERY_RESULT)/1e6; profAdd('gpu', ms); profAdd('g_'+q.k, ms); if (q.k==='shadow') PROF.gpuN++; } try{ gl.deleteQuery(q.q); }catch(e){} P.q.splice(i, 1); } }
+    if (avail || dis){ if (avail && !dis){ const ms = gl.getQueryParameter(q.q, gl.QUERY_RESULT)/1e6; profAdd('gpu', ms); profAdd('g_'+q.k, ms); if (q.k==='shadow') PROF.gpuN++; DIAG.acc = (DIAG.acc||0) + ms; if (q.k==='post' || (q.k==='scene' && !gfxPostOn())){ diagFrame(DIAG.acc); DIAG.acc = 0; } } try{ gl.deleteQuery(q.q); }catch(e){} P.q.splice(i, 1); } }
 }
 function gfxGpuMark(r, k){
   if (!SET.fps || !r) return; const P = PROF.gpu;
@@ -40860,12 +40896,48 @@ function gfxGpuMark(r, k){
   if (P.q.length < 12){ try{ const q = P.gl.createQuery(); P.gl.beginQuery(P.ext.TIME_ELAPSED_EXT, q); P.cur = { q, k }; P.q.push(P.cur); }catch(e){ P.cur = null; } }
 }
 function gfxGpuStop(){ const P = PROF.gpu; if (P.cur){ try{ P.gl.endQuery(P.ext.TIME_ELAPSED_EXT); }catch(e){} P.cur = null; } }
+// (RS-355) the diagnosis: double-click the fps meter and it switches one thing off at a time for a second each - the
+// sprites, the grass and other instanced growth, the lamps, the soft shadow filtering, the shadows, the multisampled post
+// buffer, the people, the ground - and reads how many of the card's milliseconds each one costs, measured on this machine
+const DIAG = { on:false, i:-1, n:0, sum:0, res:{}, undo:null, skip:0 };
+const DIAG_STEPS = [
+  ['base', ()=>null],
+  ['sprites', (sc)=>{ const h = []; sc.traverse(o=>{ if (o.isSprite && o.visible){ o.visible = false; h.push(o); } }); return ()=>h.forEach(o=>o.visible = true); }],
+  ['grass', (sc)=>{ const h = []; sc.traverse(o=>{ if (o.isInstancedMesh && o.visible){ o.visible = false; h.push(o); } }); return ()=>h.forEach(o=>o.visible = true); }],
+  ['lamps', (sc)=>{ const h = []; sc.traverse(o=>{ if (o.isPointLight && o.visible){ o.visible = false; h.push(o); } }); return ()=>h.forEach(o=>o.visible = true); }],
+  ['softshadow', (sc, r)=>{ const t = r.shadowMap.type; if (t===THREE.PCFShadowMap) return null; r.shadowMap.type = THREE.PCFShadowMap; diagMats(sc); return ()=>{ r.shadowMap.type = t; diagMats(sc); }; }],
+  ['shadows', (sc, r)=>{ if (!r.shadowMap.enabled) return null; r.shadowMap.enabled = false; diagMats(sc); return ()=>{ r.shadowMap.enabled = true; diagMats(sc); }; }],
+  ['msaa', (sc, r)=>{ const P = GFXP.get(r); if (!P || !P.scene.samples) return null; const n = P.scene.samples; P.scene.samples = 0; P.scene.dispose(); return ()=>{ P.scene.samples = n; P.scene.dispose(); }; }],
+  ['people', (sc)=>{ const h = []; for (const p of [typeof V3!=='undefined' && V3.player, ...((typeof V3!=='undefined' && V3.npcs)||[]), ...((typeof V3!=='undefined' && V3.villagers)||[])]) if (p && p.g && p.g.visible){ p.g.visible = false; h.push(p.g); } return h.length ? ()=>h.forEach(o=>o.visible = true) : null; }],
+  ['ground', (sc)=>{ const h = []; sc.traverse(o=>{ if (o.isMesh && o.visible && o.geometry.type==='PlaneGeometry' && o.geometry.parameters.width > 40){ o.visible = false; h.push(o); } }); return h.length ? ()=>h.forEach(o=>o.visible = true) : null; }],
+  ['transparent', (sc)=>{ const h = []; sc.traverse(o=>{ if (o.isMesh && o.visible && [].concat(o.material).some(m=>m.transparent)){ o.visible = false; h.push(o); } }); return h.length ? ()=>h.forEach(o=>o.visible = true) : null; }],
+];
+function diagMats(sc){ sc.traverse(o=>{ if (o.material) [].concat(o.material).forEach(m=>{ m.needsUpdate = true; }); }); }
+function diagScene(){ if (G.gameMode===3 && typeof V3!=='undefined' && V3.scene) return V3.scene; if (G.gameMode===0 && typeof O3!=='undefined' && O3.scene) return O3.scene; return FPD.scene || null; }
+function diagToggle(){ DIAG.on = !DIAG.on; if (DIAG.undo){ try{ DIAG.undo(); }catch(e){} DIAG.undo = null; } DIAG.i = -1; DIAG.n = 0; DIAG.sum = 0; DIAG.res = {}; DIAG.skip = 0; }
+// called with each frame's measured card time; steps on every 40 frames, skipping the first 6 after a switch
+function diagFrame(gpuMs){
+  if (!DIAG.on) return; const sc = diagScene(), r = gfxViewRenderer(); if (!sc || !r) return;
+  if (DIAG.i < 0){ DIAG.i = 0; DIAG.skip = 6; DIAG.n = 0; DIAG.sum = 0; }
+  if (DIAG.skip > 0){ DIAG.skip--; return; }
+  if (gpuMs!==undefined){ DIAG.n++; DIAG.sum += gpuMs; }
+  if (DIAG.n < 40) return;
+  const [name] = DIAG_STEPS[DIAG.i]; DIAG.res[name] = DIAG.sum/DIAG.n;
+  if (DIAG.undo){ try{ DIAG.undo(); }catch(e){} DIAG.undo = null; }
+  DIAG.i = (DIAG.i + 1) % DIAG_STEPS.length; DIAG.n = 0; DIAG.sum = 0; DIAG.skip = 6;
+  if (DIAG.i > 0){ try{ DIAG.undo = DIAG_STEPS[DIAG.i][1](sc, r); }catch(e){ console.error(e); DIAG.undo = null; } if (!DIAG.undo) DIAG.res[DIAG_STEPS[DIAG.i][0]] = null; }
+}
+function diagText(){
+  if (!DIAG.on) return ''; const b = DIAG.res.base; const parts = [];
+  for (const [name] of DIAG_STEPS){ if (name==='base') continue; const v = DIAG.res[name]; if (v===undefined) continue; parts.push(v===null ? `-${name} n/a` : `-${name} ${b===undefined ? '?' : (Math.round((b - v)*10)/10).toFixed(1)}`); }
+  const cur = DIAG.i >= 0 ? DIAG_STEPS[DIAG.i][0] : ''; return `\ndiag${b!==undefined ? ' base '+(Math.round(b*10)/10).toFixed(1) : ''}${parts.length ? ' ' + parts.join(' ') : ''}${cur ? ' [' + cur + ']' : ''}`;
+}
 function profText(n){
   const t = PROF.t, ms = (v)=>v===undefined ? '-' : (Math.round(v*10)/10).toFixed(1); if (!n) return '';
   const d3 = (t['3d']||0)/n, game = (t.game||0)/n, loop = (t.loop||0)/n, gN = PROF.gpuN, gpu = gN ? (t.gpu||0)/gN : undefined;
   const split = gN ? ` (sh ${ms((t.g_shadow||0)/gN)} sc ${ms((t.g_scene||0)/gN)} post ${ms((t.g_post||0)/gN)})` : '';
   let px = ''; try{ const r = gfxViewRenderer(); if (r){ const v = r.getDrawingBufferSize(new THREE.Vector2()); px = ` @${v.x}x${v.y}`; } }catch(e){}
-  const out = `\n3d ${ms(d3)} hud ${ms(Math.max(0, game - d3))} loop ${ms(Math.max(0, loop - game))} gpu ${ms(gpu)}${split} ms${px}`;   /* (a second line under the fps and the card) */
+  const out = `\n3d ${ms(d3)} hud ${ms(Math.max(0, game - d3))} loop ${ms(Math.max(0, loop - game))} gpu ${ms(gpu)}${split} ms${px}` + diagText();   /* (a second line under the fps and the card) */
   PROF.t = {}; PROF.gpuN = 0; return out;
 }
 // (RS-351) which graphics card a renderer got: on a machine with two, the browser may hand a page the slow one
@@ -40882,11 +40954,11 @@ function gfxGpuParse(nm){
 }
 function gfxViewRenderer(){ if (G.gameMode===3 && typeof V3!=='undefined' && V3.renderer) return V3.renderer; if (G.gameMode===0 && typeof O3!=='undefined' && O3.renderer) return O3.renderer; return FPD.r || null; }
 function fpsTick(ts){
-  if (!SET.fps){ if (FPSC.el) FPSC.el.style.display = 'none'; FPSC.t0 = 0; return; }
+  if (!SET.fps){ if (FPSC.el) FPSC.el.style.display = 'none'; FPSC.t0 = 0; if (DIAG.on) diagToggle(); return; }
   FPSC.n++; if (!FPSC.t0){ FPSC.t0 = ts; FPSC.n = 0; return; }
   if (ts - FPSC.t0 < 500) return;
   const f = FPSC.n*1000/(ts-FPSC.t0), prof = profText(FPSC.n); FPSC.n = 0; FPSC.t0 = ts;
-  if (!FPSC.el){ FPSC.el = document.createElement('div'); FPSC.el.id = 'fpsCounter'; FPSC.el.dataset.drag = 'fps'; FPSC.el.title = 'frames a second - drag to move'; document.body.appendChild(FPSC.el); }
+  if (!FPSC.el){ FPSC.el = document.createElement('div'); FPSC.el.id = 'fpsCounter'; FPSC.el.dataset.drag = 'fps'; FPSC.el.title = 'frames a second - drag to move; double-click for the diagnosis (RS-355)'; FPSC.el.addEventListener('dblclick', e=>{ e.preventDefault(); diagToggle(); }); document.body.appendChild(FPSC.el); }
   const gpu = gfxGpuName(gfxViewRenderer()); FPSC.el.style.display = 'block'; FPSC.el.textContent = Math.round(f)+' fps' + (gpu ? ' \u00b7 ' + gpu : '') + prof;   /* (RS-351: and the card drawing this view; RS-353: and where the frame's time goes) */
   /* (RS-334) on the right, just left of the buttons in the top corner - or wherever you've dragged it */
   if (LAYOUT.fps && LAYOUT.fps.x!==undefined){ if (!FPSC.el.classList.contains('dragging')) applyMoved('fps'); }
