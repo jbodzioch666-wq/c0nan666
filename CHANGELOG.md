@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-362 - Pick Your Salvage
+
+- **The loot filter is a menu now.** The bag's "loot filter" button opens it. Pick the **tiers** to salvage (by the level a piece needs to wear, so tier 3 is mithril, studded leather, splitbark and willow alike), the **qualities** (normal, magic, rare) and the **stats**. For stats you choose whether a piece with them is *kept* (salvage everything else) or the only kind *salvaged*.
+- **Salvaging pays the sell price in gold.** Turn the filter on and a matching drop is salvaged the moment it drops. "Salvage them now" in the menu, the bag's salvage button or **J** sweeps your bag. The menu shows how many pieces in your bag match and what they'd fetch.
+- **Never touched:** sets, Uniques, relics, god staves and capes, superior and quest gear, locked pieces, potions and scrolls. "Never salvage an upgrade" (on by default) keeps anything better than what you wear.
+- **The junk tag is gone.** No more greyed-out JUNK pieces, "junk to you", Junk tab or "sell all junk". The bag's last tab is now **Salvage**, showing what your filter would take. The fence buys what your filter picks, still at +30%. The filter starts off; set it up once in the menu (it's saved with your character).
+- **Sacred crocodiles are great beasts,** about two tiles nose to tail, twice a giant crocodile. They were smaller than one.
+
 ## RS-361 - Snakes keep their shape, shadows keep up
 
 - **Fixed snakes stretching across the room.** Since RS-346 a serpent's slither added its wave to the coil's points in place every frame it moved, and those points are kept between frames, so a snake that kept moving had its coil pulled out longer and longer, until the tube ran right across a pyramid's hall and through your feet. The wave now goes on a copy. A test slithers a snake for four hundred frames and checks it stays where it was.

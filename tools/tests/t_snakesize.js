@@ -15,6 +15,7 @@ module.exports = async page=>{
     out.ogre = foot(inst({ nm:'ogre', x:5, y:5, hp:10, maxHp:10, alive:true }));
     // a snake that keeps moving keeps its shape: the slither wave must not pile up in the coil's points
     { const e = inst({ nm:'giant constrictor snake', x:5, y:5, hp:10, maxHp:10, alive:true }); const f0 = foot(e).foot; for (let i=0;i<400;i++){ e.fol = 0; e.mvS = 1; e.wph = i*0.3; e.anim(e.rig, 1 + i*0.031, 1, 0, 0, 0, e); } out.drift = { before:f0, after:foot(e).foot }; }
+    out.croc = foot(inst({ nm:'giant crocodile', x:5, y:5, hp:10, maxHp:10, alive:true })); out.sacred = foot(inst({ nm:'sacred crocodile', x:5, y:5, hp:10, maxHp:10, alive:true }));
     out.szK = { snake:monSizeK({ nm:'giant constrictor snake' }), apep:monSizeK({ nm:'Apep', baseNm:'giant constrictor snake', mythicBeastIdx:0 }) };
     return out; });
   console.log(JSON.stringify(r));
@@ -23,5 +24,6 @@ module.exports = async page=>{
   A(!r.asp || (r.asp.foot <= 1.3 && r.asp.foot > 0.5), 'an asp covers about a tile');
   A(r.apep.foot <= 3.5, 'a mythic serpent covers about three tiles, not the room');
   A(r.ogre.h > 1.2, 'a tall creature is sized by height as before');
+  A(r.sacred.foot > r.croc.foot*1.5 && r.sacred.foot >= 1.9 && r.sacred.foot <= 2.6, 'RS-362: a sacred crocodile is a great beast, bigger than a giant one: '+r.sacred.foot+' vs '+r.croc.foot);
   A(r.drift.after < r.drift.before*1.25, 'four hundred frames of slithering leave the coil where it was: '+r.drift.before+' -> '+r.drift.after);
 };

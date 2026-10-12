@@ -1,5 +1,5 @@
 // RS-298 (RS-304: food as pictures, cooked and raw apart): the inventory lives on the equipment page. I opens the character stats and the equipment side by side, centred; the bag
-// under the figure is in tabs (all, gear, food, scrolls, resources, junk); a piece picked in the bag gets the old inventory's
+// under the figure is in tabs (all, gear, food, scrolls, resources, and RS-362's salvage); a piece picked in the bag gets the old inventory's
 // buttons and details; P opens the character stats on their own, centred too
 module.exports = async page=>{
   const ev = (f, a)=>page.evaluate(f, a), A = (c, msg)=>{ if (!c) throw new Error('assert: '+msg); }, out = {};
@@ -14,7 +14,7 @@ module.exports = async page=>{
       cells:document.querySelectorAll('#overlay .cs-bag .sp-cell').length, oldInv:!!q('.invgrid') }; });
   A(out.i.ui==='inventory' && out.i.both, 'I opens the stats beside the equipment: '+JSON.stringify(out.i));
   A(Math.abs(out.i.mid) <= 30, 'the two pages are centred: '+out.i.mid);
-  A(out.i.tabs.join()==='All,Gear,Food,Scrolls,Resources,Junk', 'the bag has its tabs: '+out.i.tabs);
+  A(out.i.tabs.join()==='All,Gear,Food,Scrolls,Resources,Salvage', 'the bag has its tabs: '+out.i.tabs);
   A(out.i.cells===6 && !out.i.oldInv, 'every item in the bag, no old inventory grid');
   // the tabs show what belongs in them
   const tab = t=>ev(t=>{ csBagTab(t); return { cells:[...document.querySelectorAll('#overlay .cs-bag .sp-cell[data-csinv]')].map(e=>G.inv[+e.dataset.csinv].nm), res:document.querySelector('#overlay .cs-res') ? document.querySelector('#overlay .cs-res').textContent : '', bar:!!document.getElementById('invSearch'),
