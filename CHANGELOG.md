@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-351 - The Fast Card
+
+- **Towns and the open land ask for the fast graphics card.** On a machine with two cards - a desktop with an onboard Intel chip still switched on beside its GeForce, or a laptop - the browser may hand a page the slow one. The dungeon view already asked for the high-performance card; the town and the land didn't, so they could end up drawn by the onboard chip while the dungeon ran on the GeForce. Both ask now. If you've had towns running badly on a strong PC, this is the likeliest cause.
+- **The fps meter names the card.** Turn the fps meter on in Settings and it reads, say, "63 fps - NVIDIA GeForce RTX 3080 Ti", for whichever view you're in. If it names an Intel UHD or a Radeon Graphics chip on a machine that has a better card, Windows is giving the browser the wrong one: Settings, System, Display, Graphics, add your browser and set it to High performance.
+- **Test.** `gpupref` checks the land and town renderers ask for the high-performance card, that the meter names a card, and that the browser's renderer strings read as plain card names.
+
 ## RS-350 - No More Waves of Trees
 
 - **The trees, rocks and herbs no longer pop in a wave as you walk.** The gathering spots are built in chunks of six tiles around you, three chunks out. Every six tiles the whole trailing row was thrown away and a new row built nearest you first, a few at a time, and zoomed out you could watch it: trees vanishing behind you and reappearing ahead in a wave. Now a step keeps every chunk still in reach and builds only the new edge, and the chunks reach as far as the camera sees - zoomed right out, twice as far as before - but never past the built land's edge.

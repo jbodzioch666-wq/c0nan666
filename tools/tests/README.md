@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| gpupref | the town and land renderers ask for the high-performance GPU, and the fps meter names the card drawing the view |
 | nodering | gathering-spot chunks reach as far as the camera sees, never past the built land; a walk keeps the chunks round you; a window move keeps the chunks still inside it |
 | landfar | a coarse far ground of the whole world sits under the built land; a window move builds the new land over several frames while the old shows, then swaps in |
 | townperf | a town's still parts bake into one mesh per material per building or tree, the townsfolk are sculpted coarse, far folk cast no shadow, fades still work; draw and triangle counts stay under their caps |
