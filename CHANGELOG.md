@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-354 - Read the Card
+
+- **The fps meter splits the card's time.** The "gpu" figure now reads, say, "gpu 15.2 (sh 3.0 sc 10.1 post 2.1)": the sun's shadow pass, the scene itself, and the post-processing passes. The line ends with the size of the picture being drawn, like "@2560x1440", since a display scaled up in Windows draws more pixels than its screen has. A reading of the RS-353 meter on a GeForce 3080 Ti put 15 of a 20 millisecond frame on the card in a city, far more than its triangles explain, and this says which pass it is.
+
 ## RS-353 - Read the Frame
 
 - **The flicker on your figure is gone.** RS-352 drew the sun's shadow map every other frame. A walking figure then stood in the shadow of its own last pose on alternate frames, which flickered on the figure itself. The shadow map is drawn every frame again. The townsfolk's merged parts stay.

@@ -23009,7 +23009,7 @@ function gfxCompileScene(V, r, scene, cam, warm){
   try{ gfxCompile(r, scene, cam); }catch(e){ console.error(e); }
   if (grp){ try{ gfxWarmRender(r, scene, cam); }catch(e){ console.error(e); } scene.remove(grp); }   /* (a draw, not just a compile: the driver builds its pipelines at the first draw of each state) */
 }
-function gfxRender(r, scene, cam, view){ gfxGpuBegin(r); try{ gfxRenderInner(r, scene, cam, view); } finally { gfxGpuEnd(); } }
+function gfxRender(r, scene, cam, view){ if (SET.fps){ gfxGpuMark(r, 'shadow'); gfxGpuPoll(); } try{ gfxRenderInner(r, scene, cam, view); } finally { gfxGpuStop(); } }
 function gfxRenderInner(r, scene, cam, view){
   if (!gfxPostOn()){ r.render(scene, cam); return; }
   let P; try{ P = gfxPost(r); }catch(e){ console.error(e); SET.post = false; r.render(scene, cam); return; }
@@ -23023,6 +23023,7 @@ function gfxRenderInner(r, scene, cam, view){
   try{
     r.setRenderTarget(P.scene); r.clear(); r.render(scene, cam);
   } finally { scene.background = oldBg; r.setClearColor(cc, ca); }
+  if (SET.fps) gfxGpuMark(r, 'post');
   P.bright.uniforms.t.value = P.scene.texture; gfxPass(r, P, P.bright, P.a);
   for (let i=0;i<2;i++){ P.blur.uniforms.t.value = P.a.texture; P.blur.uniforms.d.value.set(1.4/qw, 0); gfxPass(r, P, P.blur, P.b); P.blur.uniforms.t.value = P.b.texture; P.blur.uniforms.d.value.set(0, 1.4/qh); gfxPass(r, P, P.blur, P.a); }
   U.tS.value = P.scene.texture; U.tB.value = P.a.texture; U.bloom.value = g.bloom; U.expo.value = r.toneMappingExposure; U.aces.value = r.toneMapping===THREE.ACESFilmicToneMapping ? 1 : 0;
@@ -38215,7 +38216,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-353';
+const GAME_VERSION = 'rs-354';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -40845,19 +40846,26 @@ const PROF = { t:{}, gpuN:0, gpu:{ r:null, gl:null, ext:null, q:[], cur:null } }
 function profAdd(k, ms){ PROF.t[k] = (PROF.t[k]||0) + ms; }
 function profWrap(name, key){ const f = window[name]; if (typeof f!=='function' || f.__prof) return; const w = function(...a){ if (!SET.fps) return f.apply(this, a); const t0 = performance.now(); try{ return f.apply(this, a); } finally { profAdd(key, performance.now() - t0); } }; w.__prof = 1; window[name] = w; }
 function profSetup(){ for (const [n, k] of [['v3Render','3d'], ['o3Render','3d'], ['renderFirstPerson','3d'], ['renderGame','game']]) profWrap(n, k); }
-function gfxGpuBegin(r){
-  if (!SET.fps || !r) return; const P = PROF.gpu;
-  if (P.r!==r){ P.r = r; P.ext = null; P.q = []; P.cur = null; try{ P.gl = r.getContext(); P.ext = P.gl.getExtension('EXT_disjoint_timer_query_webgl2'); }catch(e){} }
-  if (!P.ext) return; const gl = P.gl, ext = P.ext;
-  for (let i=P.q.length-1;i>=0;i--){ const q = P.q[i]; let avail = false, dis = false; try{ avail = gl.getQueryParameter(q, gl.QUERY_RESULT_AVAILABLE); dis = gl.getParameter(ext.GPU_DISJOINT_EXT); }catch(e){ dis = true; }
-    if (avail || dis){ if (avail && !dis){ profAdd('gpu', gl.getQueryParameter(q, gl.QUERY_RESULT)/1e6); PROF.gpuN++; } try{ gl.deleteQuery(q); }catch(e){} P.q.splice(i, 1); } }
-  if (P.q.length < 4 && !P.cur){ try{ const q = gl.createQuery(); gl.beginQuery(ext.TIME_ELAPSED_EXT, q); P.cur = q; P.q.push(q); }catch(e){ P.cur = null; } }
+// the card's time, split: the shadow pass, the scene pass and the post-processing passes, one timer query after another
+function gfxGpuPoll(){
+  const P = PROF.gpu, gl = P.gl, ext = P.ext; if (!ext) return;
+  for (let i=P.q.length-1;i>=0;i--){ const q = P.q[i]; let avail = false, dis = false; try{ avail = gl.getQueryParameter(q.q, gl.QUERY_RESULT_AVAILABLE); dis = gl.getParameter(ext.GPU_DISJOINT_EXT); }catch(e){ dis = true; }
+    if (avail || dis){ if (avail && !dis){ const ms = gl.getQueryParameter(q.q, gl.QUERY_RESULT)/1e6; profAdd('gpu', ms); profAdd('g_'+q.k, ms); if (q.k==='shadow') PROF.gpuN++; } try{ gl.deleteQuery(q.q); }catch(e){} P.q.splice(i, 1); } }
 }
-function gfxGpuEnd(){ const P = PROF.gpu; if (P.cur){ try{ P.gl.endQuery(P.ext.TIME_ELAPSED_EXT); }catch(e){} P.cur = null; } }
+function gfxGpuMark(r, k){
+  if (!SET.fps || !r) return; const P = PROF.gpu;
+  if (P.r!==r){ P.r = r; P.ext = null; P.q = []; P.cur = null; try{ P.gl = r.getContext(); P.ext = P.gl.getExtension('EXT_disjoint_timer_query_webgl2'); }catch(e){}
+    if (P.ext && !r.shadowMap.__prof){ const sm = r.shadowMap, f = sm.render.bind(sm); sm.render = function(...a){ f(...a); gfxGpuMark(r, 'scene'); }; sm.__prof = 1; } }   /* (the shadow pass ends inside render: mark the scene from there) */
+  if (!P.ext) return; gfxGpuStop();
+  if (P.q.length < 12){ try{ const q = P.gl.createQuery(); P.gl.beginQuery(P.ext.TIME_ELAPSED_EXT, q); P.cur = { q, k }; P.q.push(P.cur); }catch(e){ P.cur = null; } }
+}
+function gfxGpuStop(){ const P = PROF.gpu; if (P.cur){ try{ P.gl.endQuery(P.ext.TIME_ELAPSED_EXT); }catch(e){} P.cur = null; } }
 function profText(n){
   const t = PROF.t, ms = (v)=>v===undefined ? '-' : (Math.round(v*10)/10).toFixed(1); if (!n) return '';
-  const d3 = (t['3d']||0)/n, game = (t.game||0)/n, loop = (t.loop||0)/n, gpu = PROF.gpuN ? (t.gpu||0)/PROF.gpuN : undefined;
-  const out = `\n3d ${ms(d3)} hud ${ms(Math.max(0, game - d3))} loop ${ms(Math.max(0, loop - game))} gpu ${ms(gpu)} ms`;   /* (a second line under the fps and the card) */
+  const d3 = (t['3d']||0)/n, game = (t.game||0)/n, loop = (t.loop||0)/n, gN = PROF.gpuN, gpu = gN ? (t.gpu||0)/gN : undefined;
+  const split = gN ? ` (sh ${ms((t.g_shadow||0)/gN)} sc ${ms((t.g_scene||0)/gN)} post ${ms((t.g_post||0)/gN)})` : '';
+  let px = ''; try{ const r = gfxViewRenderer(); if (r){ const v = r.getDrawingBufferSize(new THREE.Vector2()); px = ` @${v.x}x${v.y}`; } }catch(e){}
+  const out = `\n3d ${ms(d3)} hud ${ms(Math.max(0, game - d3))} loop ${ms(Math.max(0, loop - game))} gpu ${ms(gpu)}${split} ms${px}`;   /* (a second line under the fps and the card) */
   PROF.t = {}; PROF.gpuN = 0; return out;
 }
 // (RS-351) which graphics card a renderer got: on a machine with two, the browser may hand a page the slow one
