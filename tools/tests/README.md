@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| ragdoll | RS-367: bugs die as rigid-body ragdolls (on their backs, legs curled, never in a wall); every corpse stays above the floor and fades |
 | landreach | RS-366: the built land is 96 tiles a side and rebuilt by the camera's reach, so its edge never shows zoomed out |
 | phonetier | RS-365: the phone tier as a setting on a computer, switched on and off live |
 | lootfilter | RS-362/364: the loot filter menu - tiers and gear bonuses to salvage; no junk tag |

@@ -36581,18 +36581,114 @@ function m3dUpdate(m, pos, flash){
   return e.H + (e.lift||0);
 }
 // a creature that just died keeps its model long enough to topple over
-function m3dKill(m){ const e = M3D.inst.get(m); if (e && e.holder.parent){ e.dying = 0; e.stamp = M3D.stamp; e.deathTurn = (G.player && G.player.turnCount)||0; e.map = G.map; e.fx = chn(0.5) ? 1 : -1; e.fz = (Math.random()-0.5)*1.2; M3D.live.add(e); } }
+function m3dKill(m){ const e = M3D.inst.get(m); if (e && e.holder.parent){ e.dying = 0; e.stamp = M3D.stamp; e.deathTurn = (G.player && G.player.turnCount)||0; e.map = G.map; e.fx = chn(0.5) ? 1 : -1; e.fz = (Math.random()-0.5)*1.2; M3D.live.add(e);
+  /* (RS-367) the way the killing blow pushed it, in the model's own frame */
+  const p = G.player, wx = p ? m.x - p.x : 0, wz = p ? m.y - p.y : 1, l = Math.hypot(wx, wz) || 1, a = -e.holder.rotation.y; e.blow = { x:(wx*Math.cos(a) + wz*Math.sin(a))/l, z:(-wx*Math.sin(a) + wz*Math.cos(a))/l };
+  try{ m3dDeathPrep(e); }catch(err){ console.error(err); e.rd = null; } } }
+// (RS-367) a death that stays above the floor. Every creature: its model's corners are known at the moment it dies, and as it
+// topples it is lifted so the lowest corner rests on the floor (it used to pivot on its feet and swing half through it), then
+// it fades away instead of sinking. Spiders, scorpions, crabs and beetles go further - a little rigid-body ragdoll: the body
+// is a box thrown by the blow, tumbling under gravity, bouncing and sliding on the floor on its corners until it settles
+// (most often on its back), while the legs go limp, curl in toward the body and twitch
+function m3dDeathPrep(e){
+  const T = THREE, root = e.root, hold = e.holder; hold.updateMatrixWorld(true);
+  const inv = new T.Matrix4().copy(hold.matrixWorld).invert(), rootInv = new T.Matrix4().copy(root.matrixWorld).invert();
+  const skip = new Set(), bug = !!(e.pt && e.pt.paint===mpArachnid && e.rig && e.rig.legs && e.rig.legs.length && e.rig.body);
+  if (bug) for (const L of e.rig.legs) if (L.hip) L.hip.traverse(o=>skip.add(o));
+  const tailRoot = bug && Array.isArray(e.rig.tail) && e.rig.tail[0] ? e.rig.tail[0].parent : null; if (tailRoot) tailRoot.traverse(o=>skip.add(o));   /* (a scorpion's tail goes limp: it isn't part of the body that lands) */
+  const boxH = new T.Box3(), boxR = new T.Box3(), v = new T.Vector3();
+  root.traverse(o=>{ if (!o.isMesh || !o.geometry || o.material && o.material.visible===false) return; const g = o.geometry; if (!g.boundingBox) g.computeBoundingBox(); const b = g.boundingBox;
+    for (let i=0;i<8;i++){ v.set(i&1 ? b.max.x : b.min.x, i&2 ? b.max.y : b.min.y, i&4 ? b.max.z : b.min.z).applyMatrix4(o.matrixWorld);
+      boxR.expandByPoint(v.clone().applyMatrix4(rootInv)); if (!skip.has(o)) boxH.expandByPoint(v.applyMatrix4(inv)); } });
+  if (boxR.isEmpty()) return;
+  e.dcorn = []; for (let i=0;i<8;i++) e.dcorn.push(new T.Vector3(i&1 ? boxR.max.x : boxR.min.x, i&2 ? boxR.max.y : boxR.min.y, i&4 ? boxR.max.z : boxR.min.z));   /* (root's own frame, for the plain topple) */
+  e.rootY0 = root.position.y;
+  if (!bug || boxH.isEmpty()) return;
+  const c0 = boxH.getCenter(new T.Vector3()), hz = boxH.getSize(new T.Vector3()).multiplyScalar(0.5); hz.x = Math.max(hz.x, 0.02); hz.y = Math.max(hz.y, 0.02); hz.z = Math.max(hz.z, 0.02);
+  const corners = []; for (let i=0;i<8;i++) corners.push(new T.Vector3(i&1 ? hz.x : -hz.x, i&2 ? hz.y : -hz.y, i&4 ? hz.z : -hz.z));
+  const I = [(hz.y*hz.y + hz.z*hz.z)/3, (hz.x*hz.x + hz.z*hz.z)/3, (hz.x*hz.x + hz.y*hz.y)/3];   /* (a box of unit mass: m(b^2+c^2)/12 with full sides 2h) */
+  const b = e.blow || { x:0, z:1 }, sz = Math.max(hz.x, hz.z), spin = 9 + Math.random()*3;
+  const axis = new T.Vector3(b.z, 0, -b.x).normalize();   /* (it rolls over the way it was knocked) */
+  const rd = { x:c0.clone(), v:new T.Vector3(b.x*1.4*(0.6 + sz*2), 2.3 + sz*2.5, b.z*1.4*(0.6 + sz*2)), q:new T.Quaternion(), w:axis.multiplyScalar(spin).add(new T.Vector3(0, (Math.random()-0.5)*4, 0)),
+    c0, P0:root.position.clone(), Q0:root.quaternion.clone(), corners, wall:G.gameMode===1 || G.gameMode===2, rot:hold.rotation.y, hx:hold.position.x, hz:hold.position.z, invI:new T.Vector3(1/I[0], 1/I[1], 1/I[2]), t:0, rest:0, g:9 + sz*30, legs:[] };
+  // the legs: the joint each kind bends, and which way folds its foot in toward the body
+  const bodyC = new T.Vector3(); e.rig.body.getWorldPosition(bodyC);
+  const tip = j=>{ let d = j, n = 0; while (d.children && d.children.length && n < 12){ d = d.children[d.children.length-1]; n++; } return d.getWorldPosition(new T.Vector3()); };
+  /* (each leg's knee and foot touch the floor too: landing on its feet, it stands on them rather than sinking them in) */
+  if (tailRoot) rd.tail = e.rig.tail.map(j=>({ j, x0:j.rotation.x, z0:j.rotation.z }));
+  for (const L of e.rig.legs){ const J = L.up || L.fe || L.me || L.kn; if (!J) continue; const a0 = J.rotation.z;
+    J.rotation.z = a0 + 0.5; J.updateMatrixWorld(true); const dp = tip(J).distanceTo(bodyC); J.rotation.z = a0 - 0.5; J.updateMatrixWorld(true); const dm = tip(J).distanceTo(bodyC); J.rotation.z = a0;
+    rd.legs.push({ J, a0, a:a0, va:0, curl:dp < dm ? 1 : -1, hip:L.hip, hy0:L.hip ? L.hip.rotation.y : 0, hy:0, vhy:0, next:Math.random()*0.15 }); }
+  e.rd = rd;
+}
+function m3dRagdollStep(e, dt){
+  const T = THREE, R = e.rd, S = m3dRagdollStep, n = S.n || (S.n = new T.Vector3(0, 1, 0)), tmp = S.t || (S.t = { r:new T.Vector3(), vp:new T.Vector3(), a:new T.Vector3(), b:new T.Vector3(), qi:new T.Quaternion(), wq:new T.Quaternion() });
+  const Iinv = (u, out)=>{ tmp.qi.copy(R.q).invert(); out.copy(u).applyQuaternion(tmp.qi); out.x *= R.invI.x; out.y *= R.invI.y; out.z *= R.invI.z; return out.applyQuaternion(R.q); };
+  const steps = Math.min(8, Math.max(1, Math.ceil(dt/(1/120)))), h = Math.min(dt, 0.066)/steps;
+  for (let k=0;k<steps;k++){
+    R.v.y -= R.g*h; const px0 = R.x.x, pz0 = R.x.z; R.x.addScaledVector(R.v, h);
+    // the walls: where its middle would cross into a wall's tile (or past a tile's reach), it stops there and loses its slide
+    if (R.wall){ const dx = R.x.x - R.c0.x, dz = R.x.z - R.c0.z, a = R.rot, wx = R.hx + dx*Math.cos(a) + dz*Math.sin(a), wz = R.hz + (-dx*Math.sin(a) + dz*Math.cos(a));
+      const t = G.map && G.map[Math.floor(wx)] ? G.map[Math.floor(wx)][Math.floor(wz)] : undefined;
+      if (t===undefined || t===T_WALL || Math.hypot(dx, dz) > 0.9){ R.x.x = px0; R.x.z = pz0; R.v.x *= -0.15; R.v.z *= -0.15; R.w.multiplyScalar(0.7); } }
+    tmp.wq.set(R.w.x*h*0.5, R.w.y*h*0.5, R.w.z*h*0.5, 0).multiply(R.q); R.q.set(R.q.x + tmp.wq.x, R.q.y + tmp.wq.y, R.q.z + tmp.wq.z, R.q.w + tmp.wq.w).normalize();
+    let minY = 0, touching = false;
+    for (let it=0;it<2;it++) for (const c of R.corners){
+      const r = tmp.r.copy(c).applyQuaternion(R.q), py = R.x.y + r.y; if (py >= 0) continue; touching = true; if (it===0) minY = Math.min(minY, py);
+      const vp = tmp.vp.copy(R.w).cross(r).add(R.v), vn = vp.y; if (vn >= 0) continue;
+      const rn = tmp.a.copy(r).cross(n), k1 = Iinv(rn, tmp.b).cross(r).dot(n), jn = -(1 + 0.22)*vn/(1 + k1);
+      R.v.addScaledVector(n, jn); R.w.add(Iinv(tmp.a.copy(r).cross(n).multiplyScalar(jn), tmp.b));
+      // friction along the floor, up to what the push allows
+      vp.copy(R.w).cross(r).add(R.v); vp.y = 0; const vt = vp.length(); if (vt > 1e-5){ const tdir = vp.multiplyScalar(1/vt), rt = tmp.a.copy(r).cross(tdir), k2 = Iinv(rt, tmp.b).cross(r).dot(tdir);
+        const jt = Math.max(-0.7*jn, -vt/(1 + k2)); R.v.addScaledVector(tdir, jt); R.w.add(Iinv(tmp.a.copy(r).cross(tdir).multiplyScalar(jt), tmp.b)); } }
+    if (minY < 0) R.x.y -= minY*0.9;
+    R.v.multiplyScalar(touching ? 0.995 : 0.9995); R.w.multiplyScalar(touching ? 0.985 : 0.998); R.touch = touching;
+  }
+  R.t += dt; if (R.v.lengthSq() + R.w.lengthSq()*0.02 < 0.02 && R.touch) R.rest += dt; else R.rest = 0;   /* (barely moving, on the floor - whichever way up it lies) */
+  /* (come to rest off its back, a last spasm rolls it over - up to twice - the way a dying beetle ends legs-up) */
+  if (R.rest > 0.2 && (R.kicks||0) < 3){ const u = tmp.a.set(0, 1, 0).applyQuaternion(R.q); if (u.y > -0.5){ const ax = tmp.b.set(u.z, 0, -u.x); if (ax.lengthSq() < 1e-4) ax.set(1, 0, 0); ax.normalize();
+      const air = 0.5, turn = Math.acos(Math.max(-1, Math.min(1, -u.y))); R.w.copy(ax.multiplyScalar(-turn/air)); R.v.y = R.g*air/2; R.v.x *= 0.2; R.v.z *= 0.2; R.rest = 0; R.kicks = (R.kicks||0) + 1; } }   /* (a hop just long enough to turn the rest of the way over) */
+  if (R.rest > 0.4){ R.v.multiplyScalar(0.8); R.w.multiplyScalar(0.8); }   /* (settling: it comes to rest instead of creeping) */
+  // the legs: springs toward a curl, flung about by the tumble, twitching as the life goes out of them
+  const fade = Math.max(0, 1 - R.t/2.2), spinK = R.w.length();
+  for (const L of R.legs){
+    const tgt = L.a0 + L.curl*Math.min(1, R.t*1.6)*1.05;
+    L.next -= dt; if (L.next <= 0 && fade > 0){ L.va += (Math.random()-0.5)*18*fade; L.vhy += (Math.random()-0.5)*6*fade; L.next = 0.08 + Math.random()*0.25*(2 - fade); }
+    L.va += ((tgt - L.a)*70 - L.va*7 + (Math.random()-0.5)*spinK*3)*dt; L.a += L.va*dt; L.J.rotation.z = L.a;
+    if (L.hip){ L.vhy += (-L.hy*50 - L.vhy*6)*dt; L.hy += L.vhy*dt; L.hip.rotation.y = L.hy0 + L.hy; } }
+  if (R.tail){ const k = Math.min(1, R.t*1.5); for (const T2 of R.tail){ T2.j.rotation.x = T2.x0*(1 - 0.9*k); T2.j.rotation.z = T2.z0*(1 - k) + Math.sin(R.t*9 + T2.x0)*0.12*fade; } }   /* (the sting sags, the tail straightening out behind it) */
+  // pose the model from the body: the box's middle where the solver has it, turned as it has turned
+  const root = e.root; root.quaternion.copy(R.q).multiply(R.Q0); root.position.copy(tmp.r.copy(R.P0).sub(R.c0).applyQuaternion(R.q)).add(R.x);
+  // the body box is what lands; the legs and tail only ride along. Whatever they do, nothing drawn goes under the floor: the
+  // model is raised by however far its lowest part dips, for the look only (the body's motion doesn't feel it, which keeps it steady)
+  e.holder.updateMatrixWorld(true); const bb = S.bb || (S.bb = new T.Box3()); bb.setFromObject(e.holder); const low = bb.min.y - e.holder.matrixWorld.elements[13];
+  const need = Math.max(0, -low); if (need > 0) root.position.y += need; R.lift = need;
+}
+// the plain topple, kept clear of the floor: its lowest corner (as the model now stands) rests on it
+function m3dToppleLift(e){
+  if (!e.dcorn) return; const root = e.root, y0 = e.rootY0||0; root.position.y = y0; root.updateMatrix(); let minY = Infinity; const v = m3dToppleLift.v || (m3dToppleLift.v = new THREE.Vector3());
+  for (const c of e.dcorn){ v.copy(c).applyMatrix4(root.matrix); if (v.y < minY) minY = v.y; }
+  if (minY < 0) root.position.y = y0 - minY;
+}
+// fading away rather than sinking through the floor
+function m3dDeathFade(e, a){
+  if (!e.fadeMats){ e.fadeMats = []; e.holder.traverse(o=>{ if (o.material) for (const m of [].concat(o.material)){ if (!e.fadeMats.includes(m)){ e.fadeMats.push(m); m.userData.op0 = m.opacity; m.userData.tr0 = m.transparent; } } }); }
+  for (const m of e.fadeMats){ if (!m.transparent){ m.transparent = true; m.needsUpdate = true; } m.opacity = (m.userData.op0==null ? 1 : m.userData.op0)*a; }
+  if (a < 0.6) e.holder.traverse(o=>{ if (o.isMesh) o.castShadow = false; });
+}
 function m3dFrame(){ M3D.stamp++; }
 function m3dSweep(){
   for (const e of M3D.live){
     if (e.dying >= 0){
-      // it topples (whichever way the blow sent it), bounces once and lies there a few turns before it sinks away
-      e.dying += FP.dt*1.6; const k = Math.min(1, e.dying), ease = k*k, after = Math.max(0, e.dying - 1);
-      const bounce = after > 0 ? Math.abs(Math.sin(after*9))*0.05*Math.exp(-after*5) : 0;
-      e.root.rotation.x = -ease*1.45*(e.fx||1); e.root.rotation.z = ease*(e.fz||0); e.root.position.y = -k*0.02 + bounce;
+      // it topples (whichever way the blow sent it), bounces once and lies there a few turns, then fades away. (RS-367: a bug
+      // tumbles as a ragdoll; anything else is kept on top of the floor as it falls)
+      const d0 = e.dying; e.dying += FP.dt*1.6; const k = Math.min(1, e.dying), ease = k*k, after = Math.max(0, e.dying - 1);
+      if (e.rd){ if (d0 < 1.4 || e.rd.rest < 0.4) m3dRagdollStep(e, Math.min(0.066, FP.dt||0.016)); }
+      else { const bounce = after > 0 ? Math.abs(Math.sin(after*9))*0.05*Math.exp(-after*5) : 0;
+        e.root.rotation.x = -ease*1.45*(e.fx||1); e.root.rotation.z = ease*(e.fz||0); m3dToppleLift(e); e.root.position.y += bounce; }
       const lie = e.map===G.map && ((G.player && G.player.turnCount)||0) - (e.deathTurn||0) < 4;
       if (lie && e.dying > 1.4) e.dying = 1.4;                   // (a corpse stays until a few turns have passed)
-      e.holder.position.y = -Math.max(0, e.dying-1.4)*0.4;
+      e.holder.position.y = 0; if (e.dying > 1.4) m3dDeathFade(e, Math.max(0, 1 - (e.dying - 1.4)));
       if (e.dying > 2.4 || e.map!==G.map){ e.holder.parent && e.holder.parent.remove(e.holder); M3D.live.delete(e); }
       continue;
     }
@@ -38406,7 +38502,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-366';
+const GAME_VERSION = 'rs-367';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

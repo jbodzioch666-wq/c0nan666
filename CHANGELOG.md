@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-367 - Bugs Die Like Bugs
+
+- **No more corpses half through the floor.** A creature toppled by pivoting on its feet, so the far side of anything wide swung under the floor, and a few turns later the body sank straight down through it. Now the model is lifted as it falls so its lowest point rests on the floor, and when it's time to go it fades away instead of sinking.
+- **Spiders, scorpions, crabs and beetles die as ragdolls.** The body is knocked away from your blow, tumbles under gravity, bounces and slides on the floor until it settles, almost always on its back. Its legs go limp, curl in and twitch as the life goes out of them, and a scorpion's tail sags out straight behind it. If it lands the wrong way up, a last spasm rolls it over. It never ends up in a wall.
+- This is the first family to get it. Tell me how it looks before it goes to the rest.
+
 ## RS-366 - No Edge When Zoomed Out
 
 - **The land around you is built 96 tiles a side** instead of 72. Zoomed all the way out, the camera sees about 26 tiles from you on a 16:9 screen (31 on an ultrawide), and the old land wasn't rebuilt until you were 20 tiles from its middle, so you could see past its edge to the coarse far ground, and then the real land popped in.
