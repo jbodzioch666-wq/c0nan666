@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-370 - An ammo tag for the loot filter
+
+- **Ammo is a loot filter tag.** It sits on the BONUSES row with the others and covers arrows, bolts and thrown weapons (darts, knives, chinchompas). Pick **keep pieces with these** to always keep the ammo you find, or **salvage pieces with these** to sell ammo drops for gold and leave everything else alone.
+
 ## RS-369 - Solid floors, opening chests, real weather, a proper quiver
 
 - **Dungeon refuse is solid.** Barrels, crates, rubble and bone piles now block you, monsters and click-to-walk. They are only ever placed where they can't cut a way off. Each one is checked against the tiles around it, so no corridor or room gets sealed.

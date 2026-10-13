@@ -48,7 +48,7 @@ module.exports = async page=>{
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
   A(/"on":false/.test(r.def), 'the filter starts off');
   A(/loot filter/.test(r.btn||'') && r.ui==='lootfilter' && /LOOT FILTER/.test(r.title||'') && !r.junkWord, 'the bag\'s button opens the menu');
-  A(!r.quality && !r.oldStats && r.bonusChips.join()==='melee attack,strength,defence,ranged,magic,spell damage,prayer', 'the bonuses gear carries, no quality row and no old stats: '+r.bonusChips);
+  A(!r.quality && !r.oldStats && r.bonusChips.join()==='melee attack,strength,defence,ranged,magic,spell damage,prayer,ammo', 'the bonuses gear carries, no quality row and no old stats: '+r.bonusChips);
   A(r.tier.join()==='0,4,1,1,0', 'tiers by the level a piece needs: '+r.tier);
   A(r.t1==='10001000', 'tier 1: the bronze helm and the staff - never a locked piece, a set or a potion');
   A(r.allTiers==='11111000', 'every tier: all but the protected');

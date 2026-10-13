@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| lootfammo | RS-370: the loot filter's ammo tag (arrows, bolts, thrown weapons) |
 | townwalk | RS-369: townsfolk walk errands all over town, go into the tavern in the evening, home at night |
 | templerunes | RS-369: the basic runes are sold at the temple, not the alchemist |
 | ammostack | RS-369: arrows and bolts stack in the quiver (never loose in the pack), darts onto the ones in hand; the bag's Quiver tab |
