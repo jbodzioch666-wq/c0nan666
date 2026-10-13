@@ -19,7 +19,7 @@ module.exports = async page=>{
   // dusk, night, a storm, autumn and winter
   await page.evaluate(()=>{ G.player.clock = G.player.turnCount = Math.round(DAY_LENGTH*0.76); });
   await frames(10); await page.screenshot({ path: SHOTS+'/shot_gfx_dusk.png', timeout:120000 });
-  await page.evaluate(()=>{ G.player.clock = G.player.turnCount = Math.round(DAY_LENGTH*1.02); G.weather = 'storm'; });
+  await page.evaluate(()=>{ weatherSync = ()=>{}; G.player.clock = G.player.turnCount = Math.round(DAY_LENGTH*1.02); G.weather = 'storm'; });
   await frames(10); await page.screenshot({ path: SHOTS+'/shot_gfx_night.png', timeout:120000 });
   const r2 = await page.evaluate(async ()=>{
     const out = {}, A = (c, msg)=>{ if (!c) throw new Error('assert: '+msg); };

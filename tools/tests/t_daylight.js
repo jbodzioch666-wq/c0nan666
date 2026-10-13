@@ -2,7 +2,7 @@
 // nothing jumps between dawn, day, dusk and night, the lamps fade up as it darkens, and the desert sun is softer
 module.exports = async page=>{
   const r = await page.evaluate(async ()=>{
-    goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing');
+    goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); weatherSync = ()=>{}; G.weather = 'clear';   /* (RS-369: the weather here is set by hand, not by the clock) */
     if (G.gameMode!==3){ const t = townList()[0]; G.owPos = { x:t.x, y:t.y }; enterVillage(); setUi('playing'); }
     for (let i=0;i<6;i++){ renderGame(); await new Promise(r=>setTimeout(r, 60)); }
     const p = G.player, D = DAY_LENGTH, keepTheme = G.villageTheme;

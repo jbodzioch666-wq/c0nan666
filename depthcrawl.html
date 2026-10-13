@@ -371,8 +371,8 @@
   .cs-acts{ display:flex; flex-wrap:wrap; gap:4px; margin:8px 0 6px; } .cs-acts .btn{ font-size:11px; padding:4px 9px; }
   .tm-ctl{ display:flex; gap:6px; align-items:center; justify-content:center; margin:0 auto 8px; flex-wrap:wrap; } .tm-ctl .btn{ min-width:38px; padding:3px 10px; } .tm-ctl .muted{ font-size:11px; }
   .tm-legend{ display:flex; gap:12px; justify-content:center; flex-wrap:wrap; font-size:11.5px; margin:0 0 8px; } .tm-legend i{ display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:5px; vertical-align:-1px; border:1px solid #0b1a22; }
-  .hp-list{ max-height:28vh; overflow:auto; }
   body.touch .tm-ctl .btn{ min-width:46px; padding:8px 12px; }
+  .cs-qrow{ display:flex; align-items:center; gap:8px; cursor:default; } .cs-qrow > span:first-child{ flex:1; display:flex; align-items:center; gap:6px; } .cs-qrow img{ width:22px; height:22px; image-rendering:pixelated; } .cs-qrow.on{ border-color:var(--amber); } .cs-qon{ color:var(--amber); font-size:11px; } .cs-qrow .btn{ font-size:10.5px; padding:2px 8px; }
   .cs-salvrow{ margin-top:5px; text-align:right; } .cs-salvrow .btn{ font-size:10.5px; padding:2px 8px; }
   .lf-sec{ margin:12px 0 4px; color:var(--ink-faint); font-size:11px; letter-spacing:0.08em; } .lf-chips{ display:flex; flex-wrap:wrap; gap:6px; }
   .lf-chip{ font-size:11.5px; padding:4px 10px; opacity:0.55; } .lf-chip.on{ opacity:1; border-color:var(--amber); box-shadow:inset 0 0 0 1px var(--amber); } .lf-chip small{ display:block; font-size:9.5px; opacity:0.8; }
@@ -3309,7 +3309,7 @@ const G = {
   genStart: {x:0,y:0},
   gameMode: 0, // 0 overworld, 1 dungeon, 2 arena, 3 village
   ow: { map:[], dungeonMax:[], dungeonIdx:[], seed:0, overrides:{}, siteMoves:{}, visitedTowns:[], spawnPos:{x:0,y:0} },
-  weather: 'clear', // 'clear'|'rain'|'fog'|'storm' - see rerollWeatherIfDue()
+  weather: 'clear', // 'clear'|'rain'|'fog'|'storm' - see weatherPlan() (RS-369: on the real-time clock)
   owPos: {x:0,y:0},
   owZoomedOut: false, // whole-continent overworld view, toggled with M
   saveId: null,
@@ -4574,6 +4574,20 @@ function potCount(f){ return G.inv.reduce((t, it)=>t + (potStacks(it) && (!f || 
 function potStackAll(list){ if (!Array.isArray(list)) return list; const out = []; for (const it of list){ if (!potMerge(it, out)) out.push(it); } return out; }
 function potBadge(it){ return potQty(it) > 1 ? `<b class="qty">${potQty(it)}</b>` : ''; }
 function invRemove(idx){ G.inv.splice(idx,1); } // idx 0-based
+// (RS-369) ammo stacks itself: arrows and bolts go straight into your quiver (onto the loaded stack, or the stack of their
+// kind waiting there), thrown weapons like the ones in your hand go onto that stack, and other thrown ones join their kind in your pack
+function ammoSame(a, b){ return a!==b && a && b && ((a.slot==='ammo' && b.slot==='ammo' && (a.rsTier||0)===(b.rsTier||0)) || (a.thrown && b.thrown && a.nm===b.nm && (a.quality|0)===(b.quality|0))); }
+function ammoStackIn(item, say){
+  const p = G.player; if (!p || !G.gear || !item || !(item.slot==='ammo' || item.thrown)) return false;
+  const n = item.qty||0; if (n <= 0) return false;
+  const R = G.gear.ranged;
+  if (item.slot==='ammo'){ const t = item.rsTier||0; addArrows(n, t); item.qty = 0; if (say) logMsg(`${n} ${item.nm.toLowerCase()} go into your quiver (${arrowCount(t)}${ammoType()===t ? ' loaded' : ''})`, 'loot', true); return true; }   /* (arrows and bolts all live in the quiver) */
+  if (item.thrown && R && R.used && R.thrown && ammoSame(R, item)){ R.qty = (R.qty||0) + n; item.qty = 0; if (say) logMsg(`you add ${n} ${item.nm.toLowerCase()} to the ones in your hand (${R.qty})`, 'loot', true); return true; }
+  const st = (G.inv||[]).find(x=>ammoSame(x, item)); if (!st) return false;
+  st.qty = (st.qty||0) + n; item.qty = 0; if (say) logMsg(`you add ${n} ${item.nm.toLowerCase()} to your pack's stack (${st.qty})`, 'loot', true); return true;
+}
+/* fold the pack's loose ammo together, and into what you wear (old saves; anything that got split) */
+function ammoStackAll(){ const keep = []; for (const it of (G.inv||[])){ G.inv = keep; if (!ammoStackIn(it, false)) keep.push(it); } G.inv = keep; }
 
 function getGearSlot(slot){ return G.gear[slot]; }
 function setGearSlot(slot, it){ G.gear[slot] = it; }
@@ -4716,6 +4730,7 @@ function addToInventory(item){
   { const st = pStats(); st.itemsLooted++; st.lootValue += itemPrice(item); }
   if (lootFilterTake(item)) return;
   lootBeamFor(item);
+  if (ammoStackIn(item, true)) return;   /* (RS-369: arrows, bolts and thrown weapons go onto the stack you wear, or the one in your pack) */
   if (potMerge(item)){ logMsg(`you pick up the ${itemNameHtml(item)}`, 'loot', true); return; }   /* (RS-199: onto its stack) */
   if (G.inv.length >= MAXINV){ packFullHold(item); return; }
   if (item.consumable){
@@ -5324,10 +5339,9 @@ function generatePyramidLevel(d){
   if (d>1) G.map[G.genStart.x][G.genStart.y] = retreatTile();
   const hall = rooms[4];
   G.map[rcx(hall)][hall.y] = advanceTile();
-  // four pillars hold up the hall; the slab in its middle, braziers at the pillars' feet, an idol in each side chamber
+  // four pillars hold up the hall; the slab in its middle, an idol in each side chamber (RS-369: no braziers)
   for (const px of [hall.x+2, hall.x+7]) for (const py of [hall.y+1, hall.y+4]) G.map[px][py] = T_WALL;
   G.dungeonDeco[rcx(hall)][hall.y+3] = 'altar';
-  G.dungeonDeco[hall.x+1][hall.y+2] = 'brazier'; G.dungeonDeco[hall.x+8][hall.y+2] = 'brazier';
   G.dungeonDeco[rcx(rooms[2])][rooms[2].y+1] = 'idol'; G.dungeonDeco[rcx(rooms[3])][rooms[3].y+1] = 'idol';
   placeCastleContents(d, rooms);
 }
@@ -5657,6 +5671,7 @@ function loadLevel(d, arrivingFromBelow, fellThrough){
   const cached = G.dgCache[cacheKey(G.dungeonSlot,d)];
   if (G.gameMode===1 && G.dungeonSlot>=1 && G.dungeonSlot<=MAX_SITE_SLOT+1 && cached){
     restoreLevelCache(d);
+    if (G.siteKind==='pyramid' && G.dungeonDeco) for (const c of G.dungeonDeco) for (let y=0;y<c.length;y++) if (c[y]==='brazier') c[y] = '';   /* (RS-369: a pyramid's braziers are gone, on a kept floor too) */
     fresh = false;
   } else if (G.siteKind==='castle'){
     generateCastleLevel(d);
@@ -7233,6 +7248,8 @@ function tryMove(dx,dy){
     logMsg("you can't break away - the fight isn't over!", 'hit');
     return;
   }
+  if (dgBumpChest(nx, ny)) return;   /* (RS-369) a chest opens where it stands */
+  if (dgSolid(nx, ny)){ const D = G.dungeonDeco, d = D && D[nx] && D[nx][ny]; if (d==='chests_v') logMsg("the vault's lock is jammed shut for good", ''); return; }   /* (barrels, crates, rubble, bones: in the way, no turn spent) */
   if (dgBlocked(nx, ny)) return;
   G.player.x=nx; G.player.y=ny;
   try{ ammoPickup(); }catch(e){ console.error(e); }
@@ -7265,16 +7282,6 @@ function tryMove(dx,dy){
     }
     case T_SHOP: doorWalk(true, 'shop', dx, dy); break;
     case T_DOOROUT: doorWalk(false, null, dx, dy); break;
-    case T_VAULT: openVault(nx,ny); break;
-    case T_CORRUPT_CHEST: {
-      G.map[nx][ny] = T_FLOOR; try{ audEnv('chest'); }catch(e){}
-      gainCorruption(5);
-      const treasure = genItem(lootLevel()+1+playerMF()+corruptionBonus(), vaultLootSlot());
-      logMsg(`you crack open a corrupted chest - dark power floods into you as ${itemNameHtml(treasure)} spills out`, 'loot', true);
-      addToInventory(treasure);
-      sfx('loot');
-      break;
-    }
     case T_TAVERN: doorWalk(true, 'tavern', dx, dy); break;
     case T_BLACKSMITH: doorWalk(true, 'smith', dx, dy); break;
     case T_ALCHEMIST: doorWalk(true, 'alch', dx, dy); break;
@@ -7784,10 +7791,28 @@ function clockTick(now){
   let ms = Math.min(1000, Math.max(0, now - last));
   // integrate across the dawn/dusk boundary in small steps so the rate switch lands where it should
   while (ms > 0){ const step = Math.min(ms, 250); p.clock += step*clockRate(); ms -= step; }
+  weatherSync();
 }
 function clockSkip(units){ const p = G.player; if (!p) return; if (p.clock===undefined) p.clock = p.turnCount||0; p.clock += Math.max(0, units); }
-const WEATHER_PERIOD = 40; // turns between weather rolls
-const WEATHER_KINDS = ['clear','clear','clear','rain','fog','storm'];
+// (RS-369) the weather runs on the real-time clock: a spell of rain (now and then a storm) comes once every three to seven
+// days and lasts a few hours of the day; some mornings start in fog; the rest of the time the sky is clear
+const WX_RAIN_GAP = [3, 7], WX_RAIN_LEN = [0.12, 0.35], WX_FOG_DAYS = 0.25;
+function weatherPlan(){
+  const p = G.player, c = clockNow(), D = DAY_LENGTH;
+  if (!(p.wxNext > 0)){ p.wxNext = c + (WX_RAIN_GAP[0] + Math.random()*(WX_RAIN_GAP[1] - WX_RAIN_GAP[0]))*D; p.wxEnd = 0; }
+  if (p.wxEnd > 0 && c >= p.wxEnd){ p.wxNext = p.wxEnd + (WX_RAIN_GAP[0] + Math.random()*(WX_RAIN_GAP[1] - WX_RAIN_GAP[0]))*D; p.wxEnd = 0; }
+  if (!(p.wxEnd > 0) && c >= p.wxNext){ p.wxEnd = p.wxNext + (WX_RAIN_LEN[0] + Math.random()*(WX_RAIN_LEN[1] - WX_RAIN_LEN[0]))*D; p.wxStorm = chn(0.3) ? 1 : 0; }
+  if (p.wxEnd > 0 && c >= p.wxNext && c < p.wxEnd) return p.wxStorm ? 'storm' : 'rain';
+  const day = Math.floor(c/D), ph = c % D / D;
+  return ph >= 0.18 && ph < 0.34 && o3Hash(day, (G.ow && G.ow.seed)|0, 77) < WX_FOG_DAYS ? 'fog' : 'clear';
+}
+/* the sky turns when the plan does (a weather set by hand stays until the next turn of it) */
+function weatherSync(){
+  if (!G.player) return; const p = G.player, k = weatherPlan(); if (k===p.wxLast) return;
+  const first = p.wxLast===undefined; p.wxLast = k; if (first){ G.weather = k; return; }
+  if (k!==G.weather){ G.weather = k; if (!first && ((G.gameMode===0 && !G.owZoomedOut) || (G.gameMode===3 && !G.interior))) logMsg(G.gameMode===3 && k==='clear' ? 'the sky clears - the puddles slowly dry up' : weatherFlavorMsg(k), ''); }
+}
+function weatherDaysToRain(){ const p = G.player; weatherPlan(); return p.wxEnd > 0 ? 0 : (p.wxNext - clockNow())/DAY_LENGTH; }
 function dayPhase(){ return clockNow() % DAY_LENGTH / DAY_LENGTH; } // 0=midnight .. 0.5=noon
 function isNightTime(){ const p=dayPhase(); return p<0.22 || p>=0.78; }
 // (RS-151) the hour of the game day as a clock face would show it: midnight is 12:00 am, noon 12:00 pm
@@ -7826,15 +7851,7 @@ function timeOfDayLabel(){
   if (p<0.78) return 'dusk';
   return 'night';
 }
-function rerollWeatherIfDue(){
-  if (!G.player) return;
-  if ((G.player.turnCount||0) % WEATHER_PERIOD !== 0) return;
-  const next = WEATHER_KINDS[rn(WEATHER_KINDS.length)];
-  if (next !== G.weather){
-    G.weather = next;
-    if (G.gameMode===0 && !G.owZoomedOut) logMsg(weatherFlavorMsg(next), '');
-  }
-}
+function rerollWeatherIfDue(){ weatherSync(); }
 function weatherFlavorMsg(w){
   switch(w){
     case 'rain': return 'rain begins to fall - the fish bite better in the rain';
@@ -8671,6 +8688,7 @@ function arenaPicker(terrain, x, y){
 function encParty(e){
   if (!e) return [];
   if (!e.id) e.id = (G.ow.encSeq = (G.ow.encSeq||0) + 1);
+  encWet(e);
   if (e.merchant===undefined) e.merchant = chn(encMerchantChance(e.x, e.y));   /* (RS-315: a wandering merchant is one from the start, and looks it) */
   if (e.merchant) return (e.party = []);
   if (e.party) return e.party;
@@ -8804,6 +8822,10 @@ function encounterEligible(t){
   return t===OW_FOREST || t===OW_SWAMP || t===OW_DESERT || t===OW_TUNDRA ||
          t===OW_WATER || t===OW_RIVER || t===OW_GRASS || t===OW_MOUNTAINPASS;
 }
+// (RS-369) a roamer is of the land or of the water, by where it first turned up, and keeps to it: sea creatures stay in the
+// sea and the rivers, and the land's own never wander out across the water
+function owWetT(t){ return t===OW_WATER || t===OW_RIVER; }
+function encWet(e){ if (e.wet===undefined){ const t = G.ow.map[e.x] ? G.ow.map[e.x][e.y] : null; e.wet = owWetT(t) ? 1 : 0; } return e.wet; }
 // RS-131: one thing to a tile - nothing spawns where a site, place, beast, camp, roamer, fallen star or gathering spot already is
 function owSpotTaken(x, y, me){
   const t = G.ow.map[x] && G.ow.map[x][y]; if (t===undefined) return true;
@@ -8861,6 +8883,7 @@ function moveOverworldEncounters(){
     const nx=e.x+dx, ny=e.y+dy;
     if (nx<0||ny<0||nx>=OW_COLS||ny>=OW_ROWS) continue;
     if (!encounterEligible(G.ow.map[nx][ny])) continue;
+    if (owWetT(G.ow.map[nx][ny]) !== !!encWet(e)) continue;   /* (RS-369) land stays on land, sea on sea */
     if (G.ow.road && wgRoadAt(nx,ny) && !(dist>0 && dist<=noticeR) && chn(0.8)) continue;   // roamers mostly keep off the roads
     if (G.ow.encounters.some(o=>o!==e && o.x===nx && o.y===ny) || OW_SITE_TILES.includes(G.ow.map[nx][ny]) || wgPoiAt(nx,ny) || owLandmarkFoot(nx,ny) || (G.ow.rich||[]).some(r=>r.x===nx && r.y===ny) || (G.ow.ev && (G.ow.ev.camps||[]).some(c=>c.x===nx && c.y===ny)) || (G.ow.mythicBeasts||[]).some(b=>b.x===nx && b.y===ny)) continue;   // (RS-131) and never pile up on one tile (they may cross a tree or a patch of herbs)
     e.x=nx; e.y=ny;
@@ -10129,7 +10152,7 @@ function spSpellExtras(){
   const books = `<div class="sp-sub">SPELLBOOKS</div><div class="sp-btns">${Object.keys(RS_BOOKS).map(b=>{ const B = RS_BOOKS[b], ok = !B.need || B.need();
     return `<button class="sp-b${b===cur ? ' on' : ''}" ${ok ? '' : 'disabled'} title="${esc(B.d)}${ok ? '' : ' - needs '+esc(B.how)}" onclick="rsSwitchBook('${b}');hudLayout()">${esc(B.nm)}</button>`; }).join('')}</div>`;
   const combo = skLvl('runecrafting') >= 6 ? `<div class="sp-foot"><a href="#" title="mist, dust, mud, smoke, steam and lava runes each count as one of both their elements" onclick="G.player.rcCombo=!G.player.rcCombo;saveCurrentGame();hudLayout();return false;">combination runes: ${p.rcCombo ? 'bound in' : 'kept apart'}</a></div>` : '';
-  return `${books}<div class="sp-sub">RUNE POUCH</div>${runes ? `<div class="sp-runes">${runes}</div>` : '<div class="sp-note">no runes - monsters drop them, the alchemist sells the basic ones, and you can craft them at the altars in the wild</div>'}${combo}
+  return `${books}<div class="sp-sub">RUNE POUCH</div>${runes ? `<div class="sp-runes">${runes}</div>` : '<div class="sp-note">no runes - monsters drop them, the temple sells the basic ones, and you can craft them at the altars in the wild</div>'}${combo}
     <div class="sp-note">enchant gem-tipped arrows at the fletching bench</div>`;
 }
 function spPrayerExtras(){
@@ -13002,6 +13025,7 @@ function rsMigrateAll(){
   for (const it of (G.player && G.player.stash)||[]) rsMigrateItem(it);
   rsPurgeSpellScrolls(); rsPurgeSocketRunes();
   G.inv = potStackAll(G.inv) || []; if (G.player && G.player.stash) G.player.stash = potStackAll(G.player.stash);   /* (RS-199) */
+  try{ ammoStackAll(); }catch(e){ console.error(e); }   /* (RS-369) */
   { const p = G.player, s0 = p && rsSpell(p.rsSpell); if (s0 && rsSpellUtil(s0)){ p.rsUtil = p.rsUtil || s0[0]; p.rsSpell = null; } }
   { const p = G.player; if (p){ if (p.rsSpell && !rsSpell(p.rsSpell)) p.rsSpell = null; if (p.rsUtil && !rsSpell(p.rsUtil)) p.rsUtil = null;   /* (RS-192: the alchemy spells are gone) */
     if (Array.isArray(p.quickBar)) p.quickBar = p.quickBar.map(o=>o && o.t==='spell' && !rsSpell(o.id) ? null : o); } }   /* (RS-191: a utility spell picked for R becomes the utility pick) */
@@ -13852,7 +13876,7 @@ function monAi(m){
 function monStep(m, i, dx, dy){
   const nx = m.x+dx, ny = m.y+dy, p = G.player;
   if (!dx && !dy) return false;
-  if ((nx===p.x && ny===p.y) || tileAt(nx,ny)===T_WALL || occupiedBy(nx,ny,i)) return false;
+  if ((nx===p.x && ny===p.y) || tileAt(nx,ny)===T_WALL || dgSolid(nx, ny) || occupiedBy(nx,ny,i)) return false;
   m.x = nx; m.y = ny; return true;
 }
 function monStepToward(m, i, tx, ty){
@@ -14155,12 +14179,12 @@ function fpRails(base){
 }
 
 // ---- dressing: what lies about a floor, by the kind of site ----
-const DRESS_DECOS = ['pgrave','barrel','crate','rubble','cobweb','chains','moss','skulls','banner2','brazier','lava','puddle','crystal','blade','dig','lchest','ldoor','raidgate','raidexit','plate0','plate1','plate2','plate3','raidchest'];
+const DRESS_DECOS = ['pgrave','barrel','crate','rubble','cobweb','chains','moss','skulls','banner2','brazier','lava','puddle','crystal','blade','dig','lchest','ldoor','raidgate','raidexit','plate0','plate1','plate2','plate3','raidchest','chesto_v','chesto_c','chesto_i','chesto_r','chests_v'];
 const DRESS_KITS = {
   dungeon:['barrel','crate','rubble','cobweb','chains','skulls','moss'], castle:['barrel','crate','banner2','brazier','chains','barrel'],
   necro:['skulls','chains','cobweb','brazier','crystal'], temple:['moss','rubble','brazier','puddle','cobweb','moss'],
   mine:['crate','barrel','rubble','crystal','crate'], lair:['skulls','rubble','brazier','skulls'], graveyard:['skulls','cobweb','rubble','chains'],
-  pyramid:['brazier','rubble','crate','cobweb','skulls','brazier'],
+  pyramid:['rubble','crate','cobweb','skulls','rubble'],   /* (RS-369: no braziers in a pyramid) */
 };
 function dgIsDark(){ return G.gameMode===1 && G.dungeonDeco && G.dungeonDeco[0] && G.dungeonDeco[0][0]==='dark'; }
 function dgDarkPenalty(){ return dgIsDark() ? (lightBonus() ? 0 : 2) : 0; }
@@ -14180,6 +14204,7 @@ function dressLevel(d){
     const w = W(x-1,y) + W(x+1,y) + W(x,y-1) + W(x,y+1);
     if (w < 1 || w > 2 || corridor(x,y) || !chn(w===2 ? 0.16 : 0.06)) continue;
     let pick0 = kit[rn(kit.length)]; if (pick0==='cobweb' && w!==2) pick0 = 'rubble';
+    if (DG_SOLID_DECOS.includes(pick0) && !dgRingOk(x, y)) continue;   /* (RS-369) refuse is solid now: never where it would cut a way off */
     D[x][y] = pick0;
   }
   // hazards: bubbling lava in a dragon's lair or deep down, puddles under dripping ceilings, glowing crystals, blades swinging in the corridors
@@ -14196,12 +14221,70 @@ function dressLevel(d){
   // a locked iron chest, or a locked closet off a room - one monster on the floor carries the key
   let locked = false;
   if (G.genRooms && chn(0.4)) locked = dgCarveCloset();
-  if (!locked && chn(0.3)){ const t = take((x,y)=>{ const w = W(x-1,y) + W(x+1,y) + W(x,y-1) + W(x,y+1); return w===2 && !corridor(x,y); }); if (t){ D[t[0]][t[1]] = 'lchest'; locked = true; } }
+  if (!locked && chn(0.3)){ const t = take((x,y)=>{ const w = W(x-1,y) + W(x+1,y) + W(x,y-1) + W(x,y+1); return w===2 && !corridor(x,y) && dgRingOk(x, y); }); if (t){ D[t[0]][t[1]] = 'lchest'; locked = true; } }
   if (locked){ const ms = G.mon.filter(m=>m.alive); if (ms.length) ms[rn(ms.length)].carriesKey = 1; else skAdd('dkey', 1); }
   // some floors are pitch dark: no torches burn, and you see little without a light of your own
   if (d >= 3 && chn(0.2) && G.siteKind!=='graveyard'){ D[0][0] = 'dark'; for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++) if (D[x][y]==='torch') D[x][y] = ''; }
   // deep in a big site, now and then, a raid gate
   if (d >= 3 && G.dungeonMaxDepth >= 3 && chn(0.22)){ const t = take(inner); if (t) D[t[0]][t[1]] = 'raidgate'; }
+  // (RS-369) chests are solid now: one dropped where it would cut a way off is carried somewhere it can't
+  for (let x=1;x<COLS-1;x++) for (let y=1;y<ROWS-1;y++){ const t0 = G.map[x][y]; if ((t0!==T_VAULT && t0!==T_CORRUPT_CHEST) || dgRingOk(x, y)) continue;
+    G.map[x][y] = T_FLOOR; const t = take((a,b)=>!corridor(a,b) && dgRingOk(a, b)); if (t) G.map[t[0]][t[1]] = t0; }
+}
+// ---- (RS-369) solid things on a dungeon floor: the refuse and the chests, shut or opened. You bump a chest to open it ----
+const DG_SOLID_DECOS = ['barrel','crate','rubble','skulls','lchest','raidchest','chesto_v','chesto_c','chesto_i','chesto_r','chests_v'];
+const CHEST_OPEN = {};
+function chestOpenedAt(x, y){ return CHEST_OPEN[G.depth+':'+x+','+y] || 0; }
+function dgChestAt(x, y){ if (G.gameMode!==1 && G.gameMode!==3 && G.gameMode!==2) return false; const t = tileAt(x, y); if (t===T_VAULT || t===T_CORRUPT_CHEST) return true; const D = G.dungeonDeco; return !!(G.gameMode===1 && D && D[x] && (D[x][y]==='lchest' || D[x][y]==='raidchest')); }
+function dgSolid(x, y){
+  if (!G.gameMode) return false; const t = tileAt(x, y); if (t===T_VAULT || t===T_CORRUPT_CHEST) return true;
+  const D = G.gameMode===1 && G.dungeonDeco; return !!(D && D[x] && DG_SOLID_DECOS.includes(D[x][y]));
+}
+/* is (x,y) walkable ground, as far as a solid thing on it goes */
+function dgFree(x, y){ return x>=0 && y>=0 && x<COLS && y<ROWS && G.map[x][y]!==T_WALL && !dgSolid(x, y); }
+/* can (x,y) be filled without cutting anything off? True when the open tiles round it all join up round its edge, so a
+   way that ran through it still runs round it (the eight neighbours walked in a ring: every open run must be one run) */
+function dgRingOk(x, y){
+  const ring = [[-1,-1],[0,-1],[1,-1],[1,0],[1,1],[0,1],[-1,1],[-1,0]], o = ring.map(([i,j])=>dgFree(x+i, y+j));
+  let runs = 0; for (let k=0;k<8;k++) if (o[k] && !o[(k+7)%8]) runs++;
+  return runs===0 ? o[0] : runs===1;   /* (no runs: all open, or all shut) */
+}
+/* what an opened chest leaves: the open chest itself, solid, unless it would stand in the way */
+function dgChestLeave(x, y, kind){
+  const D = G.gameMode===1 && G.dungeonDeco; CHEST_OPEN[G.depth+':'+x+','+y] = performance.now();
+  if (D && D[x]){ D[x][y] = ''; if (dgRingOk(x, y)) D[x][y] = kind; }
+  FPD.mapRef = null;
+}
+/* bumping a chest: it opens where it stands (you don't step into it). True when the bump was the whole move */
+function dgBumpChest(x, y){
+  if (!dgChestAt(x, y)) return false;
+  const p = G.player, t = tileAt(x, y), D = G.dungeonDeco;
+  p.facing = facingFor(Math.sign(x-p.x), Math.sign(y-p.y), p.facing);
+  if (G.gameMode===1 && D && mimicCheck(x, y)) return true;
+  if (t===T_VAULT){ openVault(x, y); return true; }
+  if (t===T_CORRUPT_CHEST){
+    G.map[x][y] = T_FLOOR; dgChestLeave(x, y, 'chesto_c'); try{ audEnv('chest'); }catch(e){}
+    gainCorruption(5);
+    const treasure = genItem(lootLevel()+1+playerMF()+corruptionBonus(), vaultLootSlot());
+    logMsg(`you crack open a corrupted chest - dark power floods into you as ${itemNameHtml(treasure)} spills out`, 'loot', true);
+    addToInventory(treasure); sfx('loot');
+    if (!G.gameOver) tickMonsters();
+    return true;
+  }
+  const d = D[x][y];
+  if (d==='lchest'){
+    const crys = !skHave('dkey') && skHave('crystalkey');
+    if (!skHave('dkey') && !crys){ logMsg('a locked iron chest - something on this floor carries the key', 'hit'); sfx('error'); return true; }
+    skAdd(crys ? 'crystalkey' : 'dkey', -1); dgChestLeave(x, y, 'chesto_i'); try{ audEnv('chest'); }catch(e){}
+    if (crys){ const it2 = genItem(lootLevel()+4+playerMF(), vaultLootSlot(), 4); addToInventory(it2); logMsg(`the crystal key sings in the lock - a second treasure: ${itemNameHtml(it2)}`, 'loot', true); }
+    const g = Math.round((60 + rn(80) + G.depth*30)*goldFindMult()); p.gold += g;
+    const it = genItem(lootLevel()+2+playerMF(), vaultLootSlot(), 3); addToInventory(it);
+    logMsg(`the key turns - inside the chest: ${g} gold and ${itemNameHtml(it)}`, 'loot', true); sfx('achievement');
+    if (!G.gameOver) tickMonsters();
+    return true;
+  }
+  if (d==='raidchest'){ const R = G.inRaid; if (!R || R.stage!==3) return true; raidStep(x, y, d); dgChestLeave(x, y, 'chesto_r'); return true; }
+  return false;
 }
 // a 3x3 closet behind a locked door off one of the rooms (only where solid rock leaves room for it)
 function dgCarveCloset(){
@@ -14275,18 +14358,9 @@ function dgStep(x, y){
     let extra = ''; if (chn(0.35)){ const gm = crRollGem(); skAdd(gm, 1); extra = ` and an ${skName(gm).toLowerCase()}`; } else if (chn(0.25)){ const it = genItem(clampCb(lootLevel()+6), lootKind()); addToInventory(it); extra = ` and ${itemNameHtml(it)}`; }
     logMsg(`you dig into the loose earth and turn up ${g} gold${extra}`, 'loot', true); sfx('gold');
   }
-  else if (d==='lchest'){
-    const crys = !skHave('dkey') && skHave('crystalkey');
-    if (!skHave('dkey') && !crys){ logMsg('a locked iron chest - something on this floor carries the key', 'hit'); return false; }
-    skAdd(crys ? 'crystalkey' : 'dkey', -1); D[x][y] = '';
-    if (crys){ const it2 = genItem(lootLevel()+4+playerMF(), vaultLootSlot(), 4); addToInventory(it2); logMsg(`the crystal key sings in the lock - a second treasure: ${itemNameHtml(it2)}`, 'loot', true); }
-    const g = Math.round((60 + rn(80) + G.depth*30)*goldFindMult()); p.gold += g;
-    const it = genItem(lootLevel()+2+playerMF(), vaultLootSlot(), 3); addToInventory(it);
-    logMsg(`the key turns - inside the chest: ${g} gold and ${itemNameHtml(it)}`, 'loot', true); sfx('achievement');
-  }
   else if (d==='raidgate'){ D[x][y] = ''; dgEnterRaid(x, y); return true; }
   else if (d==='raidexit'){ dgLeaveRaid(); return true; }
-  else if (/^plate\d$/.test(d) || d==='raidchest') raidStep(x, y, d);
+  else if (/^plate\d$/.test(d)) raidStep(x, y, d);
   return false;
 }
 function dgSuppliesHtml(){
@@ -14410,6 +14484,31 @@ function dgPropModel(p, g, add, M, mats, h){
     const rn0 = add(new T.RingGeometry(0.18, 0.26, 20), isoGlowMat('plate'+d, col), 0, 0.055, 0); rn0.rotation.x = -Math.PI/2; rn0.castShadow = false;
     const gl = glowSpr(col, 0.9, 0.1, 0.45);
     g.userData.anim = (t, ph)=>{ gl.material.opacity = 0.3 + 0.2*Math.sin(t*2 + ph); };
+  } else if (/^chest[os]_/.test(d)){   /* (RS-369) an opened chest: the lid swings up on its hinge as it opens, and stays up */
+    const k = d[7], open = d[5]==='o', big = k==='r' ? 1.4 : 1, corrupt = k==='c';
+    const body = k==='i' ? M('ichest', '#3a3430', { metalness:0.4, roughness:0.6 }) : k==='r' ? gold : corrupt ? M('cbody', '#3a2048') : wood;
+    const band = k==='r' ? M('rband', '#6a2a8a', { metalness:0.5 }) : k==='i' ? iron : corrupt ? M('cband', '#1a1a22', { metalness:0.6, roughness:0.4 }) : gold;
+    const cg = new T.Group(); cg.scale.setScalar(big); g.add(cg);
+    const a2 = (geo, mat, x, y, z, par)=>{ const m = new T.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = m.receiveShadow = true; (par||cg).add(m); return m; };
+    a2(new T.BoxGeometry(0.56, 0.3, 0.36), body, 0, 0.15, 0);
+    a2(new T.BoxGeometry(0.5, 0.01, 0.3), M('chin', '#120c08', { roughness:1 }), 0, 0.296, 0).castShadow = false;
+    for (const dx of [-0.2, 0.2]) a2(new T.BoxGeometry(0.05, 0.31, 0.37), band, dx, 0.155, 0);
+    a2(new T.BoxGeometry(0.1, 0.12, 0.03), band, 0, 0.24, 0.185);
+    const hinge = new T.Group(); hinge.position.set(0, 0.3, -0.18); cg.add(hinge);
+    const lid = a2(new T.CylinderGeometry(0.18, 0.18, 0.56, 20, 1, false, 0, Math.PI), body, 0, 0, 0.18, hinge); lid.rotation.z = Math.PI/2;
+    for (const dx of [-0.2, 0.2]){ const bl = a2(new T.CylinderGeometry(0.183, 0.183, 0.05, 20, 1, false, 0, Math.PI), band, dx, 0, 0.18, hinge); bl.rotation.z = Math.PI/2; }
+    a2(new T.CircleGeometry(0.17, 16, 0, Math.PI), M('chin', '#120c08', { roughness:1 }), 0, 0.001, 0.18, hinge).rotation.set(Math.PI/2, 0, 0);
+    let gl = null; if (open){ gl = glowSpr(corrupt ? 'rgba(180,80,255,1)' : 'rgba(255,210,90,1)', 1.3*big, 0.4*big, 0); gl.visible = false; }
+    if (k==='i') g.rotation.y = p.rot;
+    const OPEN = -1.95; g.userData.hinge = hinge;
+    g.userData.anim = (t, ph, tx, ty)=>{
+      if (!open){ hinge.rotation.x = 0; return; }
+      const at = tx===undefined ? 0 : chestOpenedAt(tx, ty), e = at ? (performance.now() - at)/1000 : 9;
+      const u = Math.max(0, Math.min(1, e/0.6)), s0 = 1 - Math.pow(1 - u, 3), bounce = e > 0.6 && e < 1.2 ? Math.sin((e - 0.6)/0.6*Math.PI*2)*Math.exp(-(e - 0.6)*5)*0.12 : 0;
+      hinge.rotation.x = OPEN*s0 + bounce*(e > 0.6 ? 1 : 0);
+      if (gl){ const f = e < 2.5 ? Math.sin(Math.min(1, e/2.5)*Math.PI) : 0; gl.visible = f > 0.01; gl.material.opacity = 0.75*f; }
+    };
+    g.userData.anim(0, 0);
   } else if (d==='raidchest'){
     add(new T.BoxGeometry(0.8, 0.42, 0.5), gold, 0, 0.21, 0);
     const lid = add(new T.CylinderGeometry(0.25, 0.25, 0.8, 16, 1, false, 0, Math.PI), gold, 0, 0.42, 0); lid.rotation.z = Math.PI/2;
@@ -15200,9 +15299,9 @@ function rsRunePouchHtml(){
   const el = rsStaffElem();
   const cells = RS_RUNES.map(r=>`<span class="skitem" style="border-color:${r[2]}"><b style="color:${r[2]}">${r[1]}</b> ${rsStaffElems().includes(r[0]) ? '&infin; <span class="muted">(your staff)</span>' : '&times;'+skHave('r_'+r[0])}</span>`).join('');
   return `<h4 style="color:var(--ink-faint);margin:12px 0 6px;">RUNE POUCH &middot; <span class="muted" style="font-weight:400;">${G.player.arrows||0} arrows</span></h4><div class="skbag">${cells}</div>
-    <div class="muted" style="font-size:11px;margin-top:4px;">monsters drop runes, the alchemist sells the basic ones and you can craft them at altars in the wild; an elemental staff (Staff of Air, Fire...) gives endless runes of its element, as in RuneScape</div>`;
+    <div class="muted" style="font-size:11px;margin-top:4px;">monsters drop runes, the temple sells the basic ones and you can craft them at altars in the wild; an elemental staff (Staff of Air, Fire...) gives endless runes of its element, as in RuneScape</div>`;
 }
-// the alchemist's rune counter
+// the temple's rune counter (RS-369: moved from the alchemist)
 function rsBuyRunes(r, n){
   const e = RS_RUNES.find(x=>x[0]===r); if (!e || e[3] > 4) return;
   const price = repPrice(e[3]*n);
@@ -15213,7 +15312,7 @@ function rsBuyRunes(r, n){
 function buildRuneShop(){
   const rows = RS_RUNES.filter(r=>r[3] <= 4).map(r=>`<div class="shoprow"><span class="muted">&times;${skHave('r_'+r[0])}</span><span style="color:${r[2]}">${r[1]}</span>
     <span class="desc">${r[3]}g each</span><span><button class="btn" onclick="rsBuyRunes('${r[0]}',10)">10 &middot; ${repPrice(r[3]*10)}g</button> <button class="btn" onclick="rsBuyRunes('${r[0]}',50)">50 &middot; ${repPrice(r[3]*50)}g</button></span></div>`).join('');
-  return `<div class="panel" style="margin-top:14px;"><h4 style="color:${COL.cyan};">RUNES</h4>${rows}<div class="muted" style="font-size:11px;margin-top:4px;">the alchemist only sells the basic runes - chaos, death and blood runes come from monsters, or you craft them yourself at the altars out in the wild (Runecrafting)</div></div>`;
+  return `<div class="panel" style="margin-top:14px;"><h4 style="color:${COL.cyan};">RUNES</h4>${rows}<div class="muted" style="font-size:11px;margin-top:4px;">the temple only sells the basic runes - chaos, death and blood runes come from monsters, or you craft them yourself at the altars out in the wild (Runecrafting)</div></div>`;
 }
 
 // ---- Prayer ----
@@ -17101,7 +17200,7 @@ function vaultSubmit(){
 function vaultFinish(){
   const v = G.vault;
   if (v.solved){
-    G.map[v.vx][v.vy] = T_FLOOR;
+    G.map[v.vx][v.vy] = T_FLOOR; dgChestLeave(v.vx, v.vy, 'chesto_v');
     const goldWon = roundH((30+rn(40)+G.depth*6)*goldFindMult());
     G.player.gold += goldWon;
     logMsg(`you crack the vault's combination and claim ${goldWon} gold!`, 'good');
@@ -17109,7 +17208,7 @@ function vaultFinish(){
     const treasure = genItem(lootLevel()+3+playerMF()+corruptionBonus(), vaultLootSlot());
     addToInventory(treasure);
   } else if (v.attempt>=v.maxAttempts){
-    G.map[v.vx][v.vy] = T_FLOOR;
+    G.map[v.vx][v.vy] = T_FLOOR; dgChestLeave(v.vx, v.vy, 'chests_v');
     logMsg("the vault's lock jams shut - it's sealed for good", 'hit');
   }
   G.vault = null;
@@ -21096,11 +21195,11 @@ function housePortalDests(){
 }
 function buildHousePortal(){
   const t = houseTier('portal'), s = HOUSE_SPOTS.find(x=>x.id==='portal'), next = s.tiers[t];
-  const rows = housePortalDests().map((d,i)=>`<div class="choice-row" onclick="housePortalGo(${i})" style="cursor:pointer;"><span><b>${esc(d.nm)}</b></span><span class="muted" style="color:${HP_KIND_COL[d.kind]||'#ccc'}">${d.kind}</span></div>`).join('');
-  return `<h2 class="panel-title">PORTAL CHAMBER</h2><div class="sub">The portal shimmers. Tap a place on the map, or pick it from the list, to step through. (portal grade ${t} of 3)</div>
+  const none = !housePortalDests().length;   /* (RS-369: the map alone, no list under it) */
+  return `<h2 class="panel-title">PORTAL CHAMBER</h2><div class="sub">The portal shimmers. Tap a place on the map to step through. (portal grade ${t} of 3)</div>
     <div class="ovbody"><canvas id="hpMap" style="width:100%;max-width:760px;display:block;margin:0 auto 4px;border:1px solid var(--stone-hi);border-radius:6px;cursor:pointer;touch-action:none;"></canvas>${tmControls('hpMap')}
       <div class="tm-legend">${Object.entries(HP_KIND_COL).map(([k, col])=>`<span><i style="background:${col}"></i>${k}</span>`).join('')}</div>
-      <div class="hp-list">${rows}</div>
+      ${none ? '<div class="muted" style="margin-top:6px;">Nowhere to go yet.</div>' : ''}
       ${next ? `<div class="muted" style="margin-top:8px;font-size:12px;">Grade ${t+1} (${t===0 ? 'opens the portal to the towns you have visited' : t===1 ? 'adds your charted islands' : 'adds the dig sites and the great landmarks'}): Construction ${next.lvl}, ${houseCostText(next.cost)}.</div>
         <div class="btnrow" style="justify-content:flex-start;"><button class="btn" ${skLvl('construction') >= next.lvl && houseCostOk(next.cost) ? '' : 'disabled'} onclick="setUi('playing');houseBuildDialog(HOUSE_SPOTS.find(x=>x.id==='portal'))">upgrade the portal</button></div>` : ''}
       <div class="btnrow"><button class="btn" onclick="setUi('playing')">close (Esc)</button></div></div>`;
@@ -21255,7 +21354,7 @@ function necroRaise(kind){
 }
 function necroPlace(m){
   for (const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]]){ const nx = G.player.x+dx, ny = G.player.y+dy;
-    if (tileAt(nx,ny)!==T_WALL && !occupiedBy(nx,ny,-1) && !necroMinions().some(o=>o!==m && o.x===nx && o.y===ny)){ m.x = nx; m.y = ny; return; } }
+    if (tileAt(nx,ny)!==T_WALL && !dgSolid(nx, ny) && !occupiedBy(nx,ny,-1) && !necroMinions().some(o=>o!==m && o.x===nx && o.y===ny)){ m.x = nx; m.y = ny; return; } }
   m.x = G.player.x; m.y = G.player.y;
 }
 // once a turn, after the monsters (see tickMonsters): each minion closes in and strikes, and the clock runs down
@@ -21269,7 +21368,7 @@ function necroTick(){
     for (let step=0; step<(bd > 3 ? 2 : 1) && target && bd > m.reach; step++){   // they hurry when the foe is far off
       const dx = sg(target.x-m.x), dy = sg(target.y-m.y);
       for (const [sx,sy] of (dx && dy ? (chn(0.5) ? [[dx,0],[0,dy]] : [[0,dy],[dx,0]]) : [[dx,dy]])){ const nx = m.x+sx, ny = m.y+sy;
-        if ((sx || sy) && tileAt(nx,ny)!==T_WALL && !occupiedBy(nx,ny,-1) && !(nx===G.player.x && ny===G.player.y) && !list.some(o=>o!==m && o.x===nx && o.y===ny)){ m.x = nx; m.y = ny; break; } }
+        if ((sx || sy) && tileAt(nx,ny)!==T_WALL && !dgSolid(nx, ny) && !occupiedBy(nx,ny,-1) && !(nx===G.player.x && ny===G.player.y) && !list.some(o=>o!==m && o.x===nx && o.y===ny)){ m.x = nx; m.y = ny; break; } }
       bd = Math.abs(target.x-m.x) + Math.abs(target.y-m.y);
     }
     if (target && bd <= m.reach){
@@ -21503,8 +21602,32 @@ function townAfterGen(){
 }
 // a step toward somewhere, round whatever's in the way
 function townFree(x, y, v){ return x>0 && y>0 && x<COLS-1 && y<ROWS-1 && G.map[x][y]===T_FLOOR && !(x===G.player.x && y===G.player.y) && !(G.villagers||[]).some(o=>o!==v && !o.indoors && o.x===x && o.y===y); }
+// (RS-369) the way to a spot from anywhere in town: a walking distance over the streets, worked out once per spot (so folk go
+// round the houses to get somewhere instead of pressing up against the nearest wall)
+const TOWN_FIELD = { map:null, f:new Map() };
+function townField(tx, ty){
+  const C = TOWN_FIELD; if (C.map!==G.map){ C.map = G.map; C.f = new Map(); C.spots = null; }
+  const k = tx*1000 + ty; let f = C.f.get(k); if (f) return f;
+  f = new Int16Array(COLS*ROWS).fill(-1); if (tx<0 || ty<0 || tx>=COLS || ty>=ROWS) return f;
+  const q = [tx*ROWS + ty]; f[q[0]] = 0;
+  for (let h=0; h<q.length; h++){ const i = q[h], x = (i/ROWS)|0, y = i%ROWS;
+    for (const [a,b] of [[1,0],[-1,0],[0,1],[0,-1]]){ const nx = x+a, ny = y+b; if (nx<1 || ny<1 || nx>=COLS-1 || ny>=ROWS-1) continue; const j = nx*ROWS + ny; if (f[j]>=0 || G.map[nx][ny]!==T_FLOOR) continue; f[j] = f[i] + 1; q.push(j); } }
+  if (C.f.size > 80) C.f.clear(); C.f.set(k, f); return f;
+}
+/* places folk go about the town on their errands: every shop and house door, the gate, and corners of the streets */
+function townErrandSpots(){
+  townField(-1, -1); const C = TOWN_FIELD; if (C.spots) return C.spots;
+  const sp = townFolkSpots(), out = sp.work.concat(sp.home), seed = villageSeed();
+  for (let i=0; i<200 && out.length < sp.work.length + sp.home.length + 14; i++){ const x = 2 + Math.floor(o3Hash(seed, i, 41)*(COLS-4)), y = 2 + Math.floor(o3Hash(seed, i, 42)*(ROWS-4)); if (G.map[x][y]===T_FLOOR) out.push([x, y]); }
+  const tf = townField(sp.tavern[0], sp.tavern[1]);
+  return (C.spots = out.filter(([x,y])=>G.map[x] && G.map[x][y]===T_FLOOR && tf[x*ROWS + y] >= 0));
+}
 function townStep(v, tx, ty){
   if (v.x===tx && v.y===ty) return true;
+  { const f = townField(tx, ty), here = f[v.x*ROWS + v.y];
+    if (here > 0){ const st = v.stuck||0, opts = [[1,0],[-1,0],[0,1],[0,-1]].map(([a,b])=>[a, b, f[(v.x+a)*ROWS + v.y+b]]).filter(o=>o[2]>=0 && (o[2] < here || (st > 1 && o[2]===here) || st > 3)).sort((p,q)=>p[2]-q[2] || Math.random()-0.5);
+      for (const [a,b] of opts){ if (townFree(v.x+a, v.y+b, v)){ v.x += a; v.y += b; v.stuck = 0; return v.x===tx && v.y===ty; } }
+      v.stuck = st + 1; return false; } }
   const dx = sg(tx-v.x), dy = sg(ty-v.y), opts = [];
   if (dx) opts.push([dx,0]); if (dy) opts.push([0,dy]); if (opts.length===2 && chn(0.5)) opts.reverse();
   if ((v.stuck||0) > 2) opts.push(...[[1,0],[-1,0],[0,1],[0,-1]].sort(()=>Math.random()-0.5));
@@ -21524,14 +21647,21 @@ function townMoveVillagers(){
       else if (chn(v.animal==='cat' ? 0.25 : 0.55)){ const [a,b] = [[1,0],[-1,0],[0,1],[0,-1]][rn(4)]; if (townFree(v.x+a, v.y+b, v)){ v.x += a; v.y += b; } }
       continue;
     }
-    const goHome = when==='home' || (townWet() && (v.look|0) % 3 !== 0);
-    const t = goHome ? v.home : when==='tavern' ? townFolkSpots().tavern : v.work;
-    if (!t){ continue; }
-    if (v.indoors){ if (!goHome){ v.indoors = false; v.x = v.home[0]; v.y = v.home[1]; } continue; }
-    if (!chn(0.75)) continue;
-    const there = townStep(v, t[0], t[1]);
-    if (there && goHome) v.indoors = true;
-    else if (there && !goHome && chn(0.3)){ const [a,b] = [[1,0],[-1,0],[0,1],[0,-1]][rn(4)]; if (townFree(v.x+a, v.y+b, v)){ v.x += a; v.y += b; } }   // mill about
+    // (RS-369) the day is a round of errands all over town - to work, to the shops, to a neighbour's door, out to the gate -
+    // lingering a little at each; in the evening most go into the tavern (not stand about its door), the rest home
+    const goHome = when==='home' || (townWet() && (v.look|0) % 3 !== 0), tav = townFolkSpots().tavern, tavGoer = ((v.look|0)*7 + (v.home ? v.home[0] : 0)) % 3 !== 0;
+    if (!v.home){ continue; }
+    if (v.indoors){
+      if (v.inTav ? (when==='tavern' || goHome) : goHome) continue;
+      const o = v.inTav ? tav : v.home; v.indoors = false; v.inTav = false; v.dest = null; v.linger = 0; v.x = o[0]; v.y = o[1]; continue;
+    }
+    if (!chn(0.8)) continue;
+    if (goHome){ v.dest = null; if (townStep(v, v.home[0], v.home[1]) || (v.stuck||0) > 12) v.indoors = true; continue; }
+    if (when==='tavern' && tavGoer){ v.dest = null; if (Math.abs(v.x-tav[0]) + Math.abs(v.y-tav[1]) <= 1 || townStep(v, tav[0], tav[1]) || (v.stuck||0) > 12){ v.indoors = true; v.inTav = true; v.stuck = 0; } continue; }
+    if (v.dest){ if (townStep(v, v.dest[0], v.dest[1]) || (v.stuck||0) > 8){ v.dest = null; v.stuck = 0; v.linger = 2 + rn(8); } continue; }
+    if ((v.linger||0) > 0){ v.linger--; if (chn(0.3)){ const [a,b] = [[1,0],[-1,0],[0,1],[0,-1]][rn(4)]; if (townFree(v.x+a, v.y+b, v)){ v.x += a; v.y += b; } } continue; }   // mill about
+    const es = townErrandSpots(), far = es.filter(([x,y])=>Math.abs(x-v.x) + Math.abs(y-v.y) >= 10);
+    v.dest = v.work && chn(0.3) ? v.work : (far.length ? far : es)[rn((far.length ? far : es).length)] || v.work;
   }
   townAmbientSound();
   return true;
@@ -21796,6 +21926,7 @@ function buildTemple(){
       <div class="qrep">The dead walk in the dungeons and graveyards. Put them back in the ground for the gold and the gratitude of the temple.</div>
       <div class="btnrow" style="justify-content:flex-start;">${crusade}</div>
       <div class="muted" style="font-size:12px;">crusades finished: ${p.crusades||0}</div>
+      ${buildRuneShop()}
       <div class="btnrow"><button class="btn" onclick="setUi('playing')">close (Esc)</button></div></div>`;
 }
 function townTemplePray(){ const p = G.player; p.prayPts = rsLvl('prayer'); p.poisonTurns = 0; p.poisonDmg = 0; logMsg('the priest prays over you - your prayer is restored', 'magic'); sfx('spell'); renderOverlay(); }
@@ -22204,8 +22335,18 @@ function townV3Build(grp, mats){
   const pg = V3.townPuddles = new T.Group(); grp.add(pg);
   const pm = new T.MeshStandardMaterial({ color:lin('#3a4a5a'), roughness:0.05, metalness:0.6, transparent:true, opacity:0.75 }); pm.userData.lin = true;
   for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++) if (deco(x,y)==='path' && o3Hash(x, y, 931) < 0.16){ const d = new T.Mesh(new T.CircleGeometry(0.22 + o3Hash(x, y, 932)*0.18, 14), pm); d.rotation.x = -Math.PI/2; d.scale.x = 1.4; d.position.set(x+0.3+o3Hash(x,y,933)*0.4, 0.012, y+0.3+o3Hash(x,y,934)*0.4); pg.add(d); }
-  pg.visible = townWet();
+  pg.userData.pm = pm; V3.wetK = townWet() ? 1 : 0; townPuddleSync(0);
 }
+// (RS-369) the puddles fill as the rain comes on, and after it stops they shrink and dry away over a minute or so
+function townPuddleSync(dt){
+  const pg = V3.townPuddles; if (!pg) return;
+  const wet = townWet(); V3.wetK = Math.max(0, Math.min(1, (V3.wetK||0) + (wet ? dt/4 : -dt/TOWN_DRY_S)));
+  const k = V3.wetK; pg.visible = k > 0.01;
+  if (!pg.visible) return;
+  const sc = 0.25 + 0.75*Math.sqrt(k); for (const d of pg.children){ d.scale.set(1.4*sc, sc, 1); }
+  if (pg.userData.pm) pg.userData.pm.opacity = 0.75*Math.min(1, k*1.6);
+}
+const TOWN_DRY_S = 60;
 // a city wall of stone, with towers and a gatehouse
 function townV3Walls(mats, grp){
   const T = THREE, cx = TOWN_CX, H = 2.0, add = o=>{ o.castShadow = true; o.receiveShadow = true; grp.add(o); return o; };
@@ -22276,7 +22417,7 @@ function townV3Tick(dt){
       const hand = p.e && p.e.rig && p.e.rig.arms && p.e.rig.arms[1] && p.e.rig.arms[1].hand;
       if (hand && p.g.visible){ p.g.updateMatrixWorld(true); const w = hand.getWorldPosition(V3._tv || (V3._tv = new T.Vector3())); p.g.worldToLocal(w); p.torch.position.copy(w); } }
   }
-  if (V3.townPuddles) V3.townPuddles.visible = townWet();
+  townPuddleSync(dt);
   if (V3.townWaterMat) V3.townWaterMat.opacity = 0.84 + Math.sin(V3.t*1.3)*0.05;
   if (V3.townShip){ V3.townShip.rotation.z = Math.sin(V3.t*0.9)*0.04; V3.townShip.position.y = 0.1 + Math.sin(V3.t*1.2)*0.03; }
   const fl = G.interior ? 0 : stormTick(dt); if (V3.hemi && V3.hemiBase!=null) V3.hemi.intensity = V3.hemiBase + fl*4;   /* lightning over the town, with its thunder */
@@ -38164,7 +38305,7 @@ function isoHandleKey(k){
   }
   return false;
 }
-function isoPassable(x, y){ const t = tileAt(x, y); return t!==undefined && t!==null && t!==T_WALL && x>=0 && y>=0 && x<COLS && y<ROWS; }
+function isoPassable(x, y){ const t = tileAt(x, y); return t!==undefined && t!==null && t!==T_WALL && x>=0 && y>=0 && x<COLS && y<ROWS && !dgSolid(x, y); }
 // a walked path only crosses plain ground: stairs, portals, traps and vaults are only ever its end
 const ISO_STOP_TILES = [T_STAIRSD, T_STAIRSU, T_EXIT, T_FLEE, T_TRAP, T_VAULT, T_CORRUPT_CHEST];
 function isoCrossable(x, y){ return isoPassable(x, y) && !ISO_STOP_TILES.includes(tileAt(x, y)) && !dgAvoid(x, y); }
@@ -38215,11 +38356,12 @@ function isoPick(e){
       const P = hit.point, n = hit.face ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld) : null;
       const sx = Math.floor(P.x - (n ? n.x : 0)*0.02), sy = Math.floor(P.z - (n ? n.z : 0)*0.02), stT = tileAt(sx, sy);
       if (stT===T_STAIRSU || stT===T_STAIRSD || stT===T_EXIT || stT===T_FLEE){ gx = sx; gy = sy; }   /* (RS-297: any face of a flight of stairs - a riser, a side, a tread high up - is the stairs) */
+      else if (dgChestAt(sx, sy)){ gx = sx; gy = sy; }   /* (RS-369: any face of a chest is the chest) */
       else if (isoPassable(gx, gy)){}   /* (RS-338) the floor tile under the cursor - the one the highlight marks - when you can stand on it, wall or no wall in front of it */
       else if (n && n.y > 0.6 && P.y < 0.35){ gx = Math.floor(P.x); gy = Math.floor(P.z); }
       else if (n && Math.abs(n.y) < 0.5){ gx = Math.floor(P.x + n.x*0.45); gy = Math.floor(P.z + n.z*0.45); }
       else { gx = Math.floor(P.x); gy = Math.floor(P.z); }
-      if (!isoPassable(gx, gy) && !G.mon.some(m=>m.alive && m.x===gx && m.y===gy) && !(G.dungeonDeco && G.dungeonDeco[gx] && SK_CAVE_DECOS.includes(G.dungeonDeco[gx][gy]))){
+      if (!isoPassable(gx, gy) && !dgChestAt(gx, gy) && !G.mon.some(m=>m.alive && m.x===gx && m.y===gy) && !(G.dungeonDeco && G.dungeonDeco[gx] && SK_CAVE_DECOS.includes(G.dungeonDeco[gx][gy]))){
         let best = null, bd = 1e9;
         for (let i=-2;i<=2;i++) for (let j=-2;j<=2;j++){ const x = gx+i, y = gy+j; if (!isoPassable(x,y)) continue; const dd = i*i+j*j + ((x-P.x)*d.x + (y-P.z)*d.z < 0 ? 0 : 0.5); if (dd < bd){ bd = dd; best = [x,y]; } }
         if (best){ gx = best[0]; gy = best[1]; }
@@ -38246,7 +38388,13 @@ function isoAct(pk, shift){
     ISO.path = isoFindPath(gx, gy, true) || []; ISO.mineAt = ISO.path.length ? { x:gx, y:gy } : null; ISO.nextStep = 0;
     return;
   }
-  ISO.mineAt = null;
+  ISO.mineAt = null; ISO.openAt = null;
+  if (!mon && dgChestAt(gx, gy)){   /* (RS-369) click a chest: walk up to it and open it */
+    ISO.fighting = null; ISO.target = null;
+    if (Math.abs(gx-p.x)+Math.abs(gy-p.y)===1){ ISO.path = []; isoStep([gx-p.x, gy-p.y]); return; }
+    ISO.path = isoFindPath(gx, gy, true) || []; ISO.openAt = ISO.path.length ? { x:gx, y:gy } : null; ISO.nextStep = 0;
+    return;
+  }
   if (mon){
     const dx = mon.x-p.x, dy = mon.y-p.y;
     ISO.fighting = mon;
@@ -38284,6 +38432,7 @@ function isoTickPath0(now){
   const trap = dgAvoid(nx, ny);
   isoStep([dx, dy]);
   if (G.map!==map0 || p.x!==nx || p.y!==ny || p.hp<hp0 && !(trap && p.hp >= effMaxHp()*0.2)){   /* (RS-313: a blade you chose to cross doesn't stop you on it, unless it leaves you badly hurt) */ ISO.path = []; ISO.mineAt = null; return; }
+  if (!ISO.path.length && ISO.openAt){ const v = ISO.openAt; ISO.openAt = null; if (Math.abs(v.x-p.x)+Math.abs(v.y-p.y)===1){ ISO.nextStep = now + ISO_STEP_MS; ISO.path = [[v.x, v.y]]; } return; }
   if (!ISO.path.length && ISO.mineAt){ const v = ISO.mineAt; ISO.mineAt = null; if (Math.max(Math.abs(v.x-p.x), Math.abs(v.y-p.y))<=1) isoStartMine(v.x, v.y); return; }
   const tgt = ISO.target;
   if (tgt && tgt.alive && Math.abs(tgt.x-p.x)+Math.abs(tgt.y-p.y)===1 && !ISO.path.length){
@@ -38547,7 +38696,7 @@ function renderOverlay(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-368';
+const GAME_VERSION = 'rs-369';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -39453,7 +39602,7 @@ function buyAlchemistPotion(i){
 }
 function buildAlchemist(){
   if (!G.alchemistStock || G.alchemistStock.length===0){
-    return `<h2 class="panel-title">THE ALCHEMIST</h2><div class="sub">You have ${G.player.gold} gold.</div><div class="ovbody"><div class="muted" style="text-align:center;">the shelves are bare for now</div>${buildRuneShop()}<div class="muted" style="margin-top:10px;">brew your herbs into potions at the cauldrons here in the shop</div>
+    return `<h2 class="panel-title">THE ALCHEMIST</h2><div class="sub">You have ${G.player.gold} gold.</div><div class="ovbody"><div class="muted" style="text-align:center;">the shelves are bare for now</div><div class="muted" style="margin-top:10px;">brew your herbs into potions at the cauldrons here in the shop</div>
       <div class="btnrow"><button class="btn primary" onclick="setUi('playing')">L &middot; leave</button></div></div>`;
   }
   const rows = G.alchemistStock.map((it,i)=>`
@@ -39466,7 +39615,7 @@ function buildAlchemist(){
   return `
     <h2 class="panel-title">THE ALCHEMIST</h2>
     <div class="sub">You have ${G.player.gold} gold. Click a potion to buy, or press its number.</div>
-    <div class="ovbody">${rows}${alchExtrasHtml()}${buildRuneShop()}<div class="muted" style="margin-top:10px;">brew your herbs into potions at the cauldrons here in the shop</div>
+    <div class="ovbody">${rows}${alchExtrasHtml()}<div class="muted" style="margin-top:10px;">brew your herbs into potions at the cauldrons here in the shop</div>
       <div class="btnrow"><button class="btn primary" onclick="setUi('playing')">L / ESC &middot; leave</button></div>
     </div>
   `;
@@ -39724,8 +39873,8 @@ const INV_SORTS = [['found','Order found'],['name','Name'],['value','Value'],['r
 let invView = { q:'', f:'all', s:'found' };
 // (RS-298) the bag on the equipment page, in tabs: everything, gear, food and potions, scrolls, resources, and (RS-362) what
 // your loot filter would salvage
-const CS_BAG_TABS = [['all','All'],['gear','Gear'],['food','Food'],['scroll','Scrolls'],['res','Resources'],['salv','Salvage']];
-try { const v = JSON.parse(localStorage.getItem('depthcrawl_invview')||'null'); if (v){ invView.f = v.f==='junk' ? 'salv' : (v.f||'all'); invView.s = v.s||'found'; } } catch(e){}
+const CS_BAG_TABS = [['all','All'],['gear','Gear'],['food','Food'],['scroll','Scrolls'],['res','Resources'],['quiver','Quiver']];   /* (RS-369: the quiver in place of salvage - the loot filter's salvage button stays) */
+try { const v = JSON.parse(localStorage.getItem('depthcrawl_invview')||'null'); if (v){ invView.f = v.f==='junk' || v.f==='salv' ? 'all' : (v.f||'all'); invView.s = v.s||'found'; } } catch(e){}
 function invSaveView(){ try { localStorage.setItem('depthcrawl_invview', JSON.stringify({f:invView.f, s:invView.s})); } catch(e){} }
 function invTypeRank(it){ return it.kind==='scroll' ? 1 : it.consumable ? 0 : (it.slot==='weapon' || it.range || it.kind==='wand') ? 2 : 3; }
 function invTypeWord(it){ return ['potion food consumable','scroll','weapon','armour armor'][invTypeRank(it)]; }
@@ -39997,9 +40146,9 @@ function csInvAct(fn, keep){ const i = csInvSel(); if (i < 0 && fn!==invSalvage)
 // can't channel, armor/rings you're not proficient with) are all real
 // inventory content, just not this screen's business; browse those from
 // the Inventory (I) screen instead, same as before this existed
-function csBagTab(t){ G.csBag = t; if (t!=='res'){ invView.f = t; invSaveView(); } G.charSheetInvSel = -1; renderOverlay(); }
+function csBagTab(t){ G.csBag = t; if (t!=='res' && t!=='quiver'){ invView.f = t; invSaveView(); } G.charSheetInvSel = -1; renderOverlay(); }
 function csBagTabNow(){ const t = G.csBag || 'all'; return CS_BAG_TABS.some(x=>x[0]===t) ? t : 'all'; }
-function csBagCount(t){ if (t==='all') return G.inv.length; if (t==='res') return resCats().reduce((a, [nm, ids])=>a + (nm==='Fish & food' ? 0 : ids.filter(id=>resCount(id)).length), 0);
+function csBagCount(t){ if (t==='all') return G.inv.length; if (t==='quiver') return quiverList().length; if (t==='res') return resCats().reduce((a, [nm, ids])=>a + (nm==='Fish & food' ? 0 : ids.filter(id=>resCount(id)).length), 0);
   const f = invView.f, q = invView.q; invView.f = t; invView.q = ''; const n = G.inv.filter(invPass).length + (t==='food' ? skFoods().length : 0); invView.f = f; invView.q = q; return n; }
 // resource chips, one block per kind (RS-298: on the bag's Resources tab, and the cooked food on its Food tab)
 function csResHtml(only){
@@ -40007,8 +40156,15 @@ function csResHtml(only){
     return `<div class="rescat"><div class="rescat-h">${esc(nm)}</div><div class="skbag">${list.map(resChip).join('')}</div></div>`; }).join('');
   return cats;
 }
+// (RS-369) the quiver: every kind of arrow and bolt you carry, how many, how hard it hits, and which is loaded
+function csQuiverHtml(){
+  const q = quiverList(), w = G.gear.ranged; if (!q.length) return '<div class="muted" style="padding:8px;">your quiver is empty - arrows and bolts you find, buy or fletch go in here</div>';
+  return `<div class="cs-quiver">${q.map(x=>{ const a = RS_AMMO[x.t], fits = !w || !w.used || !w.range || ammoFits(x.t, w);
+    return `<div class="choice-row cs-qrow${x.loaded ? ' on' : ''}"><span><img alt="" src="${dhIcon(obEntry('armor',{kind:'ammo', metal:ammoCol(x.t)}))}"><b style="color:${ammoCol(x.t)}">${esc(a[0])}</b> &times;${x.n}</span><span class="muted">ranged str +${a[3]}${fits ? '' : ' &middot; not for your ' + esc((w.nm||'weapon').toLowerCase())}</span><span>${x.loaded ? '<b class="cs-qon">loaded</b>' : `<button class="btn" onclick="loadAmmo(${x.t});renderOverlay()">load</button>`}</span></div>`; }).join('')}</div>`;
+}
 function buildCharSheetInvList(){
   const sel = G.charSheetInvSel, tab = csBagTabNow();
+  if (tab==='quiver') return csQuiverHtml();
   if (tab==='res') return `<div class="cs-res">${csResHtml() || '<div class="muted">no ores, logs, herbs or other materials yet</div>'}
     <div class="cs-resall"><a href="#" onclick="G.resShowAll=!G.resShowAll;renderOverlay();return false;">${G.resShowAll ? 'show only what I have' : 'show every resource'}</a> &middot; hover one to see where it comes from and what it's for</div></div>`;
   const cell = i=>{ const it = G.inv[i]; const can = canActuallyEquip(it), arrow = can ? lootArrow(it) : null;
@@ -40096,9 +40252,9 @@ function buildEquipPage(){
           <div class="cs-doll">${buildPaperDoll()}</div>
           <div class="cs-pack"><div class="cs-banner"><span>BAG &middot; ${G.inv.length}/${MAXINV} &middot; ${G.player.gold.toLocaleString()} gold${hold ? ` &middot; <span style="color:${COL.amber}">${hold} in the loot tray</span>` : ''}</span></div>
             <div class="cs-bagtabs">${tabs}</div>
-            ${tab!=='res' ? invToolbarHtml() : ''}
+            ${tab!=='res' && tab!=='quiver' ? invToolbarHtml() : ''}
             <div id="invList">${buildCharSheetInvList()}</div>
-            ${tab!=='res' ? (()=>{ const m = lootfBagMatches(); return m.n ? `<div class="cs-salvrow"><button class="btn" onclick="csInvAct(invSalvage)" title="salvage what your loot filter picks">J &middot; salvage ${m.n} (${m.g.toLocaleString()}g)</button></div>` : ''; })() : ''}
+            ${tab!=='res' && tab!=='quiver' ? (()=>{ const m = lootfBagMatches(); return m.n ? `<div class="cs-salvrow"><button class="btn" onclick="csInvAct(invSalvage)" title="salvage what your loot filter picks">J &middot; salvage ${m.n} (${m.g.toLocaleString()}g)</button></div>` : ''; })() : ''}
           </div>
           ${acts}
           <div class="cs-hint">drag gear onto the figure to wear it, and off it into the bag to take it off. Tap anything in the bag to see it and act on it.</div>
@@ -40504,7 +40660,7 @@ function buildHelp(){
       <div>every hit you land gives xp: 5 per point of damage to the skill your <b>attack style</b> trains, plus 1 to Hitpoints. <kbd>F</kbd> cycles the style: <b>Accurate</b> (+2 to hit, trains Attack), <b>Aggressive</b> (+2 damage, trains Strength), <b>Defensive</b> (+2 armour, trains Defence) and <b>Controlled</b> (+1 to all three, shares the xp). Bows and spells always train Ranged or Magic, split with Defence in the Defensive style.</div>
       <div><b>The combat triangle:</b> melee beats ranged, ranged beats magic, magic beats melee. Attacking with the style that beats a monster gives +3 to hit and 20% more damage; the wrong one gives -3 and 15% less. It works on defence too: plate armour (melee gear) turns arrows but lets spells through, dragonhide (ranged gear) turns spells, and robes (magic gear) turn blades. Casters are marked as magic foes, archers and scouts as ranged ones.</div>
       <div><b>Gear comes in tiers</b>: bronze, iron, steel, mithril, adamant, rune and dragon. Metal weapons need Attack (steel 5, mithril 20, adamant 30, rune 40, dragon 60), metal armour needs Defence at the same levels. Bows (oak, willow, maple, yew, magic) and leather or dragonhide need Ranged; staves and robes (wizard, splitbark, mystic, infinity, Ahrim's) need Magic. Metal armour spoils spellcasting. Monsters drop tiered gear and smiths forge it; named uniques are rare boss and champion drops. Gear you can't use yet still drops, and shows as an upgrade for when you can.</div>
-      <div><b>Magic</b> (<kbd>G</kbd>): the standard spellbook &mdash; strikes, bolts, blasts, waves and surges of wind, water, earth and fire, unlocked as your Magic level rises, each costing runes. Runes drop from monsters and the alchemist sells them; an elemental staff gives endless runes of its element. <kbd>R</kbd> casts your selected spell at the nearest foe in sight when you don't have a bow equipped, and with a staff in hand you can turn on <b>autocast</b> so every melee bump casts instead.</div>
+      <div><b>Magic</b> (<kbd>G</kbd>): the standard spellbook &mdash; strikes, bolts, blasts, waves and surges of wind, water, earth and fire, unlocked as your Magic level rises, each costing runes. Runes drop from monsters and the temple sells them; an elemental staff gives endless runes of its element. <kbd>R</kbd> casts your selected spell at the nearest foe in sight when you don't have a bow equipped, and with a staff in hand you can turn on <b>autocast</b> so every melee bump casts instead.</div>
       <div><b>Prayer</b> (<kbd>N</kbd>): bury the bones your kills leave behind for Prayer xp. Prayers boost accuracy, damage or armour, heal you, or &mdash; from level 37 &mdash; protect you from magic, missiles or melee (blocking 60% of that style's damage). Active prayers drain points every turn of a fight; pray at a dungeon altar, rest at an inn or make camp to restore them. Piety (level 70) is the best melee prayer there is.</div>
       <div style="margin-top:12px;color:var(--ink-faint);">RACES</div>
       <div>every race keeps a real trait &mdash; Elf, Gnome, Half-Orc, Tiefling and Half-Elf see further in the dark, Dwarf and Tiefling resist more damage, Halflings land more critical hits, Gnome, Human and Half-Elf find more loot and gold, and Dragonborn deal bonus damage. Each race's trait is shown on the character-creation screen.</div>
@@ -40594,7 +40750,8 @@ const EXAMINE_TILE = { [T_WALL]:'Solid stone.', [T_FLOOR]:'The floor. Watch your
   [T_EXIT]:'A shimmering portal back to the surface.', [T_VAULT]:'A sealed vault with a coloured lock.', [T_CORRUPT_CHEST]:'A chest pulsing with dark energy. Tempting.',
   [T_GOLD]:'Coins! Somebody dropped these.', [T_ITEM]:'Something shiny lies here.', [T_FLEE]:'The way out of this fight.' };
 const EXAMINE_DECO = { altar:'An old altar. Praying here restores your prayer.', throne:'A throne for someone who no longer needs it.', banner:'A tattered banner of a forgotten house.',
-  idol:'A strange idol. It seems to watch you.', rune:'Runes carved into the stone, still faintly glowing.', ore:'A vein of ore in the rock.', eelpool:'A dark pool. Something moves beneath the surface.', cavherb:'Pale herbs growing in the dark.', essvein:'A seam of pale rune essence, glowing faintly in the rock.' };
+  idol:'A strange idol. It seems to watch you.', rune:'Runes carved into the stone, still faintly glowing.', ore:'A vein of ore in the rock.', eelpool:'A dark pool. Something moves beneath the surface.', cavherb:'Pale herbs growing in the dark.', essvein:'A seam of pale rune essence, glowing faintly in the rock.',
+  chesto_v:'An opened chest. Empty now.', chesto_c:'A corrupted chest, cracked open and empty.', chesto_i:'An iron chest, unlocked and emptied.', chesto_r:"The raid's great chest, emptied.", chests_v:'A vault whose lock has jammed shut for good.', barrel:'An old barrel.', crate:'A stack of crates.', rubble:'A heap of fallen stone.', skulls:'A pile of old bones.' };
 function examineDungeonTile(x, y){
   const m = (G.mon||[]).find(m=>m.alive && m.x===x && m.y===y); if (m) return examineMonster(m);
   const deco = G.dungeonDeco && G.dungeonDeco[x] && G.dungeonDeco[x][y]; if (deco && EXAMINE_DECO[deco]) return EXAMINE_DECO[deco];

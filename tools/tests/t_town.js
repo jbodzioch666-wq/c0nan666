@@ -101,6 +101,6 @@ module.exports = async page=>{
   await page.evaluate(()=>{ const c = townList().find(t=>townInfo(t.x, t.y).tier===2); G.owPos = { x:c.x, y:c.y }; enterVillage(); setUi('playing'); v3Pref = false; renderGame(); });
   await page.waitForTimeout(300);
   await page.screenshot({ path: SHOTS+'/shot_city2d.png', timeout:120000 });
-  await page.evaluate(async ()=>{ v3Pref = true; G.weather = 'rain'; G.player.x = tX(24); G.player.y = tY(8); for (let i=0;i<12;i++){ renderGame(); await new Promise(r=>setTimeout(r, 40)); } });
+  await page.evaluate(async ()=>{ v3Pref = true; weatherSync = ()=>{}; G.weather = 'rain'; G.player.x = tX(24); G.player.y = tY(8); for (let i=0;i<12;i++){ renderGame(); await new Promise(r=>setTimeout(r, 40)); } });
   await page.screenshot({ path: SHOTS+'/shot_city_rain.png', timeout:120000 });
 };

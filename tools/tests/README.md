@@ -25,6 +25,13 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| townwalk | RS-369: townsfolk walk errands all over town, go into the tavern in the evening, home at night |
+| templerunes | RS-369: the basic runes are sold at the temple, not the alchemist |
+| ammostack | RS-369: arrows and bolts stack in the quiver (never loose in the pack), darts onto the ones in hand; the bag's Quiver tab |
+| dgsolid | RS-369: solid refuse never cuts a way off; chests are solid, bump-to-open, lid animates; no pyramid braziers |
+| roamterrain | RS-369: wandering groups keep to land or water, by where they first turned up |
+| townpuddle | RS-369: town puddles shrink and dry after the rain |
+| weatherclock | RS-369: weather on the real-time clock: rain every 3-7 days for a few hours, foggy mornings |
 | travelmap | RS-368: the waypoint and house portal maps zoom, pan and pick; the portal shows its places on the map |
 | ragdoll | RS-367: bugs die as rigid-body ragdolls (on their backs, legs curled, never in a wall); every corpse stays above the floor and fades |
 | landreach | RS-366: the built land is 96 tiles a side and rebuilt by the camera's reach, so its edge never shows zoomed out |

@@ -1,6 +1,6 @@
 // RS-368: the waypoint map and the house portal's map zoom and pan. The wheel or a pinch zooms about the pointer, a drag pans
 // (and doesn't count as a pick), + / - / fit buttons sit under the map, and a tap on a spot travels there. The portal chamber
-// shows every place it can take you on the world map, coloured by kind, with "you are here", and keeps its list below
+// shows every place it can take you on the world map, coloured by kind, with "you are here" (RS-369: no list under it)
 module.exports = async page=>{
   const r = await page.evaluate(async ()=>{
     goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{}; G.gameMode = 0;
@@ -36,6 +36,6 @@ module.exports = async page=>{
   A(r.zIn && r.wheel, 'the buttons and the wheel zoom');
   A(r.panned && r.dragNoPick, 'a drag pans the map and picks nothing');
   A(r.tapTravel, 'a tap on a town travels there');
-  A(r.hp && r.hpPts===r.hpDests + 1 && r.hpMe && r.legend===4 && r.list===r.hpDests, 'the portal chamber shows its places on the map, you are here, a legend and the list');
+  A(r.hp && r.hpPts===r.hpDests + 1 && r.hpMe && r.legend===4 && r.list===0, 'the portal chamber shows its places on the map, you are here and a legend, and no list');
   A(r.hpPick && r.hpZoom, 'a tap on the portal map steps through, and it zooms');
 };

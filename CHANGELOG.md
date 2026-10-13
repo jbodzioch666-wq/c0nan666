@@ -1,5 +1,19 @@
 # Depthcrawl patch notes
 
+## RS-369 - Solid floors, opening chests, real weather, a proper quiver
+
+- **Dungeon refuse is solid.** Barrels, crates, rubble and bone piles now block you, monsters and click-to-walk. They are only ever placed where they can't cut a way off. Each one is checked against the tiles around it, so no corridor or room gets sealed.
+- **Chests are solid and open with a lid.** You bump a chest, or click it from across the room, to open it where it stands. The lid swings up on its hinge with a little bounce and a gleam of treasure, and the opened chest stays. This covers corrupted chests, vaults, locked iron chests and the raid's great chest. A jammed vault stays shut. Mimics still spring when you bump them.
+- **No braziers in pyramids.** None are placed, and they're cleared from pyramid floors you've already visited.
+- **Wandering groups keep to their own ground.** Land creatures no longer walk out over the sea or rivers, and sea creatures no longer come ashore.
+- **Townsfolk get about.** By day they go on errands all over town: to work, the shops, a neighbour's door and the gate. They find their way round the houses instead of bunching on the common. In the evening most go *into* the tavern instead of crowding its door, and they come back out in the morning.
+- **Weather runs on the real clock.** Rain, sometimes a storm, comes once every 3 to 7 game days and lasts a few hours. Some mornings start foggy, and the rest of the time the sky is clear. Walking no longer changes the weather, and it turns in town as well.
+- **Town puddles dry up.** They fill as the rain comes on, then shrink and fade over about a minute after it stops.
+- **House portal: just the map.** The list under the portal map is gone; tap a place on the map to go.
+- **Arrows and bolts stack themselves.** Every arrow and bolt you pick up, loot or buy goes into your quiver: onto the loaded stack if it's the same kind, or onto that kind's own stack in the quiver. They no longer pile up as separate bundles in your pack, even when the pack is full. Loose ammo already in your pack moves into the quiver when you load your save. More darts or knives like the ones in your hand join that stack.
+- **A Quiver tab in your bag.** It replaces the Salvage tab and lists every kind of arrow and bolt you carry, with the count, ranged strength and which kind is loaded. Tap **load** to switch. The loot filter's salvage button is still under the bag.
+- **Runes are sold at the temple.** The alchemist no longer sells them. Temples are in every village and city, the same towns that have an alchemist.
+
 ## RS-368 - Maps You Can Zoom
 
 - **The waypoint map zooms and pans.** Use the mouse wheel or a pinch to zoom in on where you point, drag to move around, or use the +, - and fit buttons under the map. Tap or click a town to travel; a drag never counts as a pick.

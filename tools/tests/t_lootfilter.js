@@ -38,7 +38,7 @@ module.exports = async page=>{
     setUi('lootfilter'); const t2 = [...document.querySelectorAll('#overlay .lf-chip')].find(b=>/^Tier 2/.test(b.textContent)); t2.click(); out.t2on = F.tiers.includes(1);
     const rc = [...document.querySelectorAll('#overlay .lf-chip')].find(b=>b.textContent.trim()==='ranged'); rc.click(); out.rangedOn = F.stats.includes('rngAcc');
     const on = document.querySelector('#overlay .lf-on'); on.click(); out.onAfter = F.on; lootfSet('on', false);
-    // the bag: no junk tab, tag or button; a Salvage tab
+    // the bag: no junk tab, tag or button; the Quiver tab (RS-369)
     setUi('inventory'); out.tabs = [...document.querySelectorAll('#overlay .cs-bagtab')].map(e=>e.textContent.replace(/\s*\d+$/, '').trim()).join();
     out.bagJunk = /junk/i.test(document.getElementById('overlay').textContent) || !!document.querySelector('#overlay .sp-cell.junk, #overlay i.jk');
     setUi('lootfilter'); backOut(); out.esc = G.ui;
@@ -59,6 +59,6 @@ module.exports = async page=>{
   A(r.dropTaken && r.dropKept, 'a matching drop is salvaged when the filter is on, kept when it is off');
   A(/1 piece matches/.test(r.sum) && r.swept, 'the menu shows what matches in the bag and salvages it');
   A(r.t2on && r.rangedOn && r.onAfter===true, 'the chips change the settings');
-  A(r.tabs==='All,Gear,Food,Scrolls,Resources,Salvage' && !r.bagJunk, 'no junk tag, tab or button in the bag; a Salvage tab');
+  A(r.tabs==='All,Gear,Food,Scrolls,Resources,Quiver' && !r.bagJunk, 'no junk tag, tab or button in the bag; the Quiver tab where Salvage was (RS-369)');
   A(r.esc==='inventory', 'Escape goes back to the bag');
 };
