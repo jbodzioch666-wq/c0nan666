@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs375 | RS-375: menus under the top bar; boss-beaten card framed; small folk taller; the open treasure door stays drawn when you stand in it |
 | rs374 | RS-374: no white flash on the dead; bank side by side with the quiver; one row of bag tabs; citizen names on pointing; no boss menu; the treasure door swings open |
 | menupanel | RS-373: menus are centred framed panels sized to their content; title, character making, death and equipment keep the whole screen |
 | deaths | RS-371: beasts roll on their side, folk fall with limp limbs and drop their gear, skeletons fall apart, oozes puddle, ghosts dissolve; harder blows throw harder |

@@ -1,7 +1,7 @@
 // RS-374: a creature killed mid-flash doesn't stay white; the bank shows your pack and the vault side by side, with the
 // quiver's arrows and bolts in the pack list to bank; the bag's tabs stay on one row (the Quiver tab no longer wraps out of
 // sight on All or Resources); citizens have no plate over their heads - point at one to see who it is; the boss floor
-// opens with a notice, not a menu; the treasure room's door swings open on its hinges and stays open
+// opens with its card (RS-375); the treasure room's door swings open on its hinges and stays open
 module.exports = async page=>{
   const r = await page.evaluate(async ()=>{
     goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{}; G.player.wildWarned = 1;
@@ -39,7 +39,7 @@ module.exports = async page=>{
   A(r.flash < 0.01, 'a creature killed mid-flash loses the flash');
   A(r.tabs.all && r.tabs.res && r.tabs.gear, 'the Quiver tab is on the one row of tabs, whichever tab is open');
   A(r.side && r.ammoRows===2 && r.banked, 'the bank: pack and vault side by side, the quiver in the pack list, banked as a bundle');
-  A(r.bossUi==='playing' && r.bossNote, 'the boss floor opens with a notice, not a menu');
+  A(r.bossUi==='bossPreview', 'the boss floor opens with its card again (RS-375: it was the victory card that was meant)');
   A(r.door==='ldooro' && r.doorAt && r.doorPass && r.doorMid < -0.3 && r.doorMid > -1.6 && Math.abs(r.doorOpen + 1.65) < 0.02, 'the treasure door swings open and stays open, and you walk through it');
   A(r.folk > 0 && r.shown0===0, 'no plates over the citizens');
   A(r.shown1===1 && r.which, 'pointing at a citizen shows who it is');

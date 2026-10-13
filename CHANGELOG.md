@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-375 - The puddles, found; menus up top; bigger small folk
+
+- **The town puddles are really gone in dry weather.** The real cause: the town hides whatever is off-screen each frame, and while doing that it switched the puddles back on whenever they were in view. That's why they showed even in a brand-new world. They now appear only in the rain and dry about fifteen seconds after it stops.
+- **Menus sit just under the top bar** instead of in the middle of the screen.
+- **The dungeon master's card is back** when you reach the deepest floor. The **boss-beaten card** is now a framed panel like the other menus.
+- **Kobolds, goblins, gnomes, halflings and imps stand taller.** They're still smaller than you, but about a quarter bigger than before, so you can see them properly.
+- **The open treasure room door stays drawn when you stand in its doorway.** It used to vanish while you were on its tile.
+
 ## RS-374 - Fixes: puddles, the bank, the bag, the dead
 
 - **Puddles dry up for real.** They used to take a full minute to dry after the rain stopped, so they seemed to stay forever. Now they shrink and vanish in about fifteen seconds.
