@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-368 - Maps You Can Zoom
+
+- **The waypoint map zooms and pans.** Use the mouse wheel or a pinch to zoom in on where you point, drag to move around, or use the +, - and fit buttons under the map. Tap or click a town to travel; a drag never counts as a pick.
+- **The house portal shows its places on the world map.** Towns, charted islands, dig sites and great landmarks are each marked in their own colour, with a legend, plus your house ("you are here"). Tap one to step through. The list stays underneath. Same zoom and pan as the waypoints.
+- Names that would sit on top of each other are left off until you zoom in.
+- **Fixed:** the portal's upgrade line said grade 1 adds dig sites. Grade 1 opens the portal to your towns, grade 2 adds islands, grade 3 adds dig sites and landmarks.
+
 ## RS-367 - Bugs Die Like Bugs
 
 - **No more corpses half through the floor.** A creature toppled by pivoting on its feet, so the far side of anything wide swung under the floor, and a few turns later the body sank straight down through it. Now the model is lifted as it falls so its lowest point rests on the floor, and when it's time to go it fades away instead of sinking.
