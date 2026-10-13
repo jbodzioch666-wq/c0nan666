@@ -31,7 +31,7 @@ module.exports = async page=>{
     out.minLow = low.map(v=>+v.toFixed(3)); out.inWall = inWall;
     out.up = es.map(e=>e && e.rd ? +new T.Vector3(0,1,0).applyQuaternion(e.rd.q).y.toFixed(2) : null);
     out.rest = es.map(e=>e && e.rd ? e.rd.rest > 0.3 : null);
-    out.legs = es.map(e=>e && e.rd ? +Math.max(...e.rd.legs.map(L=>Math.abs(L.a - L.a0))).toFixed(2) : null);
+    out.legs = es.map(e=>e && e.rd && e.rd.legs.length ? +Math.max(...e.rd.legs.map(L=>Math.abs(L.a - L.a0))).toFixed(2) : null);
     out.held = es.map(e=>e ? e.dying===1.4 && !!e.holder.parent : null);
     // a few turns later the corpses fade away and are gone
     G.player.turnCount = (G.player.turnCount||0) + 6; for (let f=0;f<30;f++) m3dSweep();
@@ -41,10 +41,11 @@ module.exports = async page=>{
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
   A(r.n===6 && r.wallCase, 'six creatures, one against a wall');
-  A(r.names==='giant spider,giant scorpion,giant crab,tomb scarab,ogre,giant spider' && r.rd.join()==='true,true,true,true,false,true', 'the spiders, scorpion, crab and scarab die as ragdolls; the ogre does not');
+  A(r.names==='giant spider,giant scorpion,giant crab,tomb scarab,ogre,giant spider' && r.rd.join()==='true,true,true,true,true,true' && r.up[4] < 0.6, 'the spiders, scorpion, crab and scarab die as ragdolls; the ogre too now (RS-371), knocked off its feet');
   A(r.minLow.every(v=>v >= -0.03), 'nothing goes through the floor, ever: '+r.minLow);
   A(r.inWall.every(n=>n===0), 'no ragdoll ends up in a wall: '+r.inWall);
-  A(r.up.filter(u=>u!==null && u < -0.5).length >= 3 && r.up.every(u=>u===null || u < 0.5) && r.rest.filter(x=>x).length===5 && r.rest.filter(x=>x!==null).length===5, 'the bugs settle, most on their backs and none on their feet: '+r.up);
+  const bugUp = r.up.filter((u, i)=>i!==4), bugRest = r.rest.filter((x, i)=>i!==4);
+  A(bugUp.filter(u=>u!==null && u < -0.5).length >= 3 && bugUp.every(u=>u===null || u < 0.5) && bugRest.filter(x=>x).length===5 && bugRest.filter(x=>x!==null).length===5, 'the bugs settle, most on their backs and none on their feet: '+r.up);
   A(r.legs.filter(x=>x!==null).every(a=>a > 0.5), 'the legs curl in: '+r.legs);
   A(r.held.every(x=>x), 'the corpses lie there while the turns pass');
   A(r.fading.every(op=>op < 1) && r.gone.every(x=>x), 'then they fade away and are gone');

@@ -1,5 +1,5 @@
 // RS-370: the loot filter has an ammo tag (arrows, bolts and thrown weapons). Kept with it in keep mode; salvaged with it
-// in salvage mode while other gear is left alone
+// in salvage mode while other gear is left alone. (RS-371) the menu says why pieces in the bag are kept
 module.exports = async page=>{
   const r = await page.evaluate(async ()=>{
     goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{}; G.player.wildWarned = 1;
@@ -10,6 +10,8 @@ module.exports = async page=>{
     F.stats = ['ammo']; F.statMode = 'keep'; out.keep = m();
     F.statMode = 'match'; out.match = m();
     F.stats = []; out.none = m();
+    /* (RS-371) the menu says what keeps the bag's pieces back: here, an upgrade held by the safety */
+    G.inv = [sword]; sword.acc = 5; F.stats = ['acc']; F.statMode = 'match'; F.safeUp = true; lootArrow = ()=>'up'; setUi('lootfilter'); out.why = (document.querySelector('#overlay .lf-why')||{}).textContent || ''; lootArrow = ()=>''; setUi('playing');
     setUi('lootfilter'); out.html = [...document.querySelectorAll('#overlay .lf-chip')].some(b=>b.textContent.trim()==='ammo'); setUi('playing');
     return out; });
   console.log(JSON.stringify(r));
@@ -17,4 +19,5 @@ module.exports = async page=>{
   A(r.chip && r.html, 'an ammo tag in the menu');
   A(r.keep==='0001', 'keep ammo: arrows, bolts and darts kept, the sword salvaged');
   A(r.match==='1110', 'salvage ammo: only the ammo goes');
+  A(/1 upgrade/.test(r.why), 'the menu says an upgrade is being kept by the safety: '+r.why);
 };

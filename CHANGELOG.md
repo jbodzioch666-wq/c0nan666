@@ -1,5 +1,17 @@
 # Depthcrawl patch notes
 
+## RS-371 - Every creature dies its own way
+
+- **Beasts roll onto their side.** Wolves, bears, big cats, rats, elk and other four-legged creatures topple sideways in the direction the blow pushed them. Their legs kick a few times, then go limp, and the head droops.
+- **Folk on two legs are knocked off their feet.** Goblins, ogres, bandits and the like fall back away from the blow, with arms flung out, elbows and knees giving way, and the head lolling. **Their weapon and shield fly from their hands** and land on their own, bouncing and sliding across the floor.
+- **Skeletons fall apart.** The skull, ribcage, pelvis and every arm and leg bone clatter down separately into a heap.
+- **Oozes slump into a puddle**, and **ghosts rise, swell and thin away to nothing**. Ghosts leave no corpse.
+- **The throw matches the blow.** A light finishing tap topples a creature, while a big hit, a critical or overkill throws it much harder (about three times as far). Arrows and bolts knock it flatter and further, fire and lightning throw it up and off to one side, earth slams it down, and poison lets it just slump.
+- Nothing goes through the floor or into a wall, as before. Corpses still lie there a few turns, then fade.
+- **Chains and braziers on dungeon floors are solid.** Like barrels and crates, they are only placed where they don't block a way through.
+- **Opened chests have solid lids.** An open lid used to show the floor through its hollow underside; it now has a proper underside.
+- **The loot filter says why pieces are kept.** Under "In your bag now" it lists what holds the rest back: upgrades kept by the "never salvage an upgrade" safety, pieces without any picked bonus, tiers you didn't pick, and protected pieces. With that safety on, anything better than what you wear is kept, and so is anything for an empty slot.
+
 ## RS-370 - An ammo tag for the loot filter
 
 - **Ammo is a loot filter tag.** It sits on the BONUSES row with the others and covers arrows, bolts and thrown weapons (darts, knives, chinchompas). Pick **keep pieces with these** to always keep the ammo you find, or **salvage pieces with these** to sell ammo drops for gold and leave everything else alone.
