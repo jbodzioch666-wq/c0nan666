@@ -26,9 +26,9 @@ module.exports = async page=>{
     out.minLow = low.map(v=>+v.toFixed(3)); out.travel = travel && travel.map(v=>v===null ? null : +v.toFixed(3));
     const wolf = es[0], man = es[1], bones = es[2], ooze = es[3], ghost = es[4];
     out.wolfUp = wolf && wolf.rd ? +new T.Vector3(0,1,0).applyQuaternion(wolf.rd.q).y.toFixed(2) : null; out.wolfRest = !!(wolf && wolf.rd && wolf.rd.rest > 0.3);
-    out.manUp = man && man.rd ? +new T.Vector3(0,1,0).applyQuaternion(man.rd.q).y.toFixed(2) : null; out.drops = man && man.drops ? man.drops.length : 0;
+    out.manUp = man && man.chain ? +man.chain.upY.toFixed(2) : man && man.rd ? +new T.Vector3(0,1,0).applyQuaternion(man.rd.q).y.toFixed(2) : null; out.drops = man && man.drops ? man.drops.length : 0;   /* (RS-376: a chain of joints) */
     out.dropsDown = man && man.drops ? man.drops.every(R=>R.rest > 0.2 && R.x.y < 0.5) : false; out.dropsAway = man && man.drops ? man.drops.map(R=>+Math.hypot(R.x.x - R.c0.x, R.x.z - R.c0.z).toFixed(2)) : [];
-    out.limp = man && man.rd ? man.rd.limp.length : 0;
+    out.limp = man && man.chain ? man.chain.p.length : man && man.rd ? man.rd.limp.length : 0;
     out.bones = bones && bones.parts ? bones.parts.length : 0; out.bonesDown = bones && bones.parts ? bones.parts.filter(R=>R.x.y < 0.35).length : 0;
     out.ooze = ooze ? +(ooze.root.scale.y/s0[3]).toFixed(2) : null;
     out.ghostGone = ghost ? !ghost.holder.parent : null;
@@ -39,7 +39,7 @@ module.exports = async page=>{
   A(r.kind.join()==='quad,man,bones,ooze,ghost,quad,quad', 'each dies its own way: '+r.kind);
   A(r.minLow.every((v, i)=>i===4 || v >= -0.03), 'nothing goes through the floor: '+r.minLow);
   A(r.wolfRest && r.wolfUp < 0.6, 'the wolf rolls onto its side and settles');
-  A(r.manUp < 0.6 && r.limp >= 8, 'the goblin is knocked off its feet, limbs limp');
+  A(r.manUp < 0.6 && r.limp >= 8, 'the goblin is knocked off its feet, a chain of joints (RS-376)');
   A(r.drops >= 1 && r.dropsDown && r.dropsAway.every(d=>d > 0.05), 'its weapon flies from its hand and lands');
   A(r.bones >= 8 && r.bonesDown >= r.bones - 1, 'the skeleton falls apart into bones on the floor');
   A(r.ooze < 0.3, 'the ooze slumps into a puddle');

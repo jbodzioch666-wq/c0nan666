@@ -29,7 +29,7 @@ module.exports = async page=>{
     FP.dt = 1/60;
     for (let f=0;f<240;f++){ m3dSweep(); es.forEach((e,i)=>{ if (!e || !e.holder.parent) return; low[i] = Math.min(low[i], lowOf(e)); if (e.rd){ const [tx, ty] = comTile(e); if (!G.map[tx] || G.map[tx][ty]===T_WALL) inWall[i]++; } }); }
     out.minLow = low.map(v=>+v.toFixed(3)); out.inWall = inWall;
-    out.up = es.map(e=>e && e.rd ? +new T.Vector3(0,1,0).applyQuaternion(e.rd.q).y.toFixed(2) : null);
+    out.up = es.map(e=>e && e.rd ? +new T.Vector3(0,1,0).applyQuaternion(e.rd.q).y.toFixed(2) : e && e.chain ? +e.chain.upY.toFixed(2) : null);   /* (RS-376: the ogre falls as a chain of joints) */
     out.rest = es.map(e=>e && e.rd ? e.rd.rest > 0.3 : null);
     out.legs = es.map(e=>e && e.rd && e.rd.legs.length ? +Math.max(...e.rd.legs.map(L=>Math.abs(L.a - L.a0))).toFixed(2) : null);
     out.held = es.map(e=>e ? e.dying===1.4 && !!e.holder.parent : null);
@@ -41,7 +41,7 @@ module.exports = async page=>{
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
   A(r.n===6 && r.wallCase, 'six creatures, one against a wall');
-  A(r.names==='giant spider,giant scorpion,giant crab,tomb scarab,ogre,giant spider' && r.rd.join()==='true,true,true,true,true,true' && r.up[4] < 0.6, 'the spiders, scorpion, crab and scarab die as ragdolls; the ogre too now (RS-371), knocked off its feet');
+  A(r.names==='giant spider,giant scorpion,giant crab,tomb scarab,ogre,giant spider' && r.rd.join()==='true,true,true,true,false,true' && r.up[4] < 0.6, 'the spiders, scorpion, crab and scarab die as ragdolls; the ogre as a chain of joints (RS-376), knocked off its feet');
   A(r.minLow.every(v=>v >= -0.03), 'nothing goes through the floor, ever: '+r.minLow);
   A(r.inWall.every(n=>n===0), 'no ragdoll ends up in a wall: '+r.inWall);
   const bugUp = r.up.filter((u, i)=>i!==4), bugRest = r.rest.filter((x, i)=>i!==4);

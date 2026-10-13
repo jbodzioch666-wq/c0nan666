@@ -33,8 +33,9 @@ module.exports = async page=>{
         M3D.inst.set(m, e); m3dKill(m); for (let i=0;i<140;i++) m3dSweep();   /* (RS-371: a ragdoll takes a moment longer to settle than the old scripted topple) */
         /* (RS-371) fallen: on its side or back - or, for an ooze, slumped into a puddle; a ghost thinned away; a skeleton in pieces */
         const fell = e.dkind==='ooze' ? (e.s0 && e.root.scale.y < e.s0.y*0.3 ? 2 : 0) : e.dkind==='ghost' ? (!e.holder.parent ? 2 : 0) : e.dkind==='bones' ? (e.parts && e.parts.length >= 8 ? 2 : 0)
+          : e.chain ? Math.acos(Math.max(-1, Math.min(1, e.chain.upY)))   /* (RS-376: a two-legged body, a chain of joints) */
           : e.rd ? Math.acos(Math.max(-1, Math.min(1, new THREE.Vector3(0, 1, 0).applyQuaternion(e.rd.q).y))) : Math.abs(e.root.rotation.x) + Math.abs(e.root.rotation.z);
-        if (!(fell > 1)) out.noDeath.push(nm+' '+fell.toFixed(2)+' '+e.dkind+' '+(e.rd ? 'rd'+(e.rd.shoves||0)+'/'+e.rd.rest.toFixed(2)+'/'+e.dying.toFixed(2) : 'nord'));
+        if (!(fell > 1)) out.noDeath.push(nm+' '+fell.toFixed(2)+' '+e.dkind+' '+(e.chain ? 'chain/'+e.chain.rest.toFixed(2)+'/'+e.chain.upY.toFixed(2) : e.rd ? 'rd'+(e.rd.shoves||0)+'/'+e.rd.rest.toFixed(2)+'/'+e.dying.toFixed(2) : 'nord'));
         if (e.holder.parent) e.holder.parent.remove(e.holder); M3D.live.delete(e);
       }catch(err){ out.errs.push(nm+': '+String(err).slice(0, 120)); }
     }

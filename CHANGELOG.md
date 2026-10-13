@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## RS-376 - The model and animation rewrite, part one: two-legged folk
+
+The first stage of bringing every creature up to the skeleton's standard. This one is for everything that walks on two legs and isn't a skeleton: goblins, orcs, bandits, knights, kobolds, cultists, zombies, dragonborn, the townsfolk and you.
+
+- **A proper rig.** The body now bends and turns at a waist above the belt, while the hips stay with the legs: the torso is two sculpts, chest and pelvis, so a hunch, a twist or a swing no longer drags the whole trunk about as one block. Every leg has an ankle.
+- **A real walk.** The pelvis sways over the planted foot, dips as each heel lands and rises as the other leg passes under, hikes the free hip and twists with the stride; the shoulders swing against the hips and the head rides level. Knees fold through the swing and straighten to land, then take a little flex as the weight comes over. Feet lie flat through the stance, push off from the toes and lift clear through the swing. Standing, one foot rests a little ahead of the other.
+- **Deaths as a chain of joints.** A killed two-legged creature no longer tips over as one stiff box. It falls as a chain of eighteen joints, thrown by the blow that killed it: every bone keeps its length, knees fold forward and elbows back, nothing passes through the floor or into a wall, and it comes to rest where it lands, in a different heap every time. Its weapon and shield still fly from its hands.
+- Skeletons keep their own bones and their own fall. Four-legged beasts, dragons and the rest come in the next stages.
+
 ## RS-375 - The puddles, found; menus up top; bigger small folk
 
 - **The town puddles are really gone in dry weather.** The real cause: the town hides whatever is off-screen each frame, and while doing that it switched the puddles back on whenever they were in view. That's why they showed even in a brand-new world. They now appear only in the rain and dry about fifteen seconds after it stops.

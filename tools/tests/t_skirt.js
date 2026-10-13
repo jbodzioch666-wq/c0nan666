@@ -13,7 +13,7 @@ module.exports = async page=>{
         const skirt = rig.skirt || (()=>{ let sk = null; rig.hips.children.forEach(c=>{ if (c.isMesh && c.geometry.type==='CylinderGeometry' && c.geometry.parameters.height >= 0.24) sk = c; }); return sk; })();
         if (!skirt) continue;   // (an outfit with no skirt - plate legs under a tunic, a waistcoat - has nothing to check)
         const pts = mesh=>{ const p = mesh.geometry.attributes.position, a = []; for (let i=0;i<p.count;i++){ v.set(p.getX(i), p.getY(i), p.getZ(i)); mesh.localToWorld(v); v.applyMatrix4(inv); if (v.y > -0.12 && v.y < 0.03) a.push([v.x, v.y, v.z]); } return a; };
-        const body = pts(rig.chestMesh).concat(...rig.legs.map(L=>pts(L.hip.children[0].children[0]))), sk = pts(skirt);
+        const body = pts(rig.chestMesh).concat(pts(rig.pelvisMesh), ...rig.legs.map(L=>pts(L.hip.children[0].children[0]))), sk = pts(skirt);   /* (RS-376: the pelvis is its own piece) */
         for (const y0 of [0.0, -0.02, -0.04, -0.06, -0.08]) for (const [nm, ax, az] of [['side',1,0],['back',0,-1],['diag',0.7,-0.7],['diagF',0.7,0.7],['front',0,1]]){
           let g = 0, s = 0; for (const [x, y, z] of body) if (Math.abs(y - y0) < 0.006) g = Math.max(g, x*ax + z*az);
           for (const [x, y, z] of sk) if (Math.abs(y - y0) < 0.012) s = Math.max(s, x*ax + z*az);
