@@ -1,5 +1,16 @@
 # Depthcrawl patch notes
 
+## RS-374 - Fixes: puddles, the bank, the bag, the dead
+
+- **Puddles dry up for real.** They used to take a full minute to dry after the rain stopped, so they seemed to stay forever. Now they shrink and vanish in about fifteen seconds.
+- **The bank shows your pack and the vault side by side**, in a wider window. On a phone they stack.
+- **Arrows and bolts are in the bank's pack list.** Tap a kind to bank the whole stack from your quiver as one bundle. Taking it back out puts it into your quiver again.
+- **The Quiver tab is always there.** The bag's tabs now stay on one row; on the All and Resources tabs, their longer counts used to push Quiver onto a second line out of sight.
+- **No name plates over citizens.** Point at a townsperson (or tap one) to see who they are. Shopkeepers and the other service folk keep their plates.
+- **No boss menu.** Reaching a dungeon's deepest floor shows a notice naming its master instead of a menu in your way.
+- **The treasure room door swings open.** Turning the iron key swings the door open on its hinges, with a little bounce, and it stays open. It used to just disappear.
+- **No more white corpses.** A creature killed during its white hit flash used to stay white as it fell. The flash now goes with it.
+
 ## RS-373 - Framed menus, and fixes
 
 - **Menus are framed panels now.** Shops, the bank, the temple, the loot filter, the vault puzzle, quests, pause, settings and the rest open as a centred panel over the game instead of a dark sheet across the whole screen. Each panel has a gold-edged frame, sizes itself to what it holds, and scrolls if it's long. On a phone it fills the screen with a small margin. The title screen, making a character and a world, death and victory, the equipment page and the waypoint map keep their own full layouts.

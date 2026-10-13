@@ -1,5 +1,5 @@
 // RS-369: town puddles dry up. When the
-// rain stops the puddles shrink and fade away over a minute instead of staying, or vanishing all at once
+// rain stops the puddles shrink and fade away (RS-374: in about fifteen seconds) instead of staying, or vanishing all at once
 module.exports = async page=>{
   const r = await page.evaluate(async ()=>{
     goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{}; G.player.wildWarned = 1;
@@ -7,7 +7,7 @@ module.exports = async page=>{
     weatherSync = ()=>{}; G.weather = 'rain'; const t = townList()[0]; G.owPos = { x:t.x, y:t.y }; enterVillage(); setUi('playing'); await frames(6);
     const pg = V3.townPuddles, sz = ()=>pg.children.length ? +pg.children[0].scale.y.toFixed(2) : null;
     const out = { n:pg ? pg.children.length : 0, rain:{ vis:pg.visible, k:V3.wetK, sz:sz() } };
-    G.weather = 'clear'; townPuddleSync(15); out.drying = { vis:pg.visible, k:+V3.wetK.toFixed(2), sz:sz(), op:+pg.userData.pm.opacity.toFixed(2) };
+    G.weather = 'clear'; townPuddleSync(TOWN_DRY_S/4); out.drying = { vis:pg.visible, k:+V3.wetK.toFixed(2), sz:sz(), op:+pg.userData.pm.opacity.toFixed(2) };
     townPuddleSync(TOWN_DRY_S); out.dry = { vis:pg.visible, k:V3.wetK };
     G.weather = 'rain'; townPuddleSync(1); out.refill = +V3.wetK.toFixed(2);
     return out; });
