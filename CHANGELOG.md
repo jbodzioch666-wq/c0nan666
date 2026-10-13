@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-366 - No Edge When Zoomed Out
+
+- **The land around you is built 96 tiles a side** instead of 72. Zoomed all the way out, the camera sees about 26 tiles from you on a 16:9 screen (31 on an ultrawide), and the old land wasn't rebuilt until you were 20 tiles from its middle, so you could see past its edge to the coarse far ground, and then the real land popped in.
+- **The rebuild follows your zoom.** Zoomed out, it starts early enough that the edge never comes into view; zoomed in, it waits longer, so it happens less often than before. If you run toward the edge while it's building, it finishes at once.
+- **Cost:** in a test world, building the bigger land takes about a quarter longer (spread over frames as before), and a fully zoomed-out frame draws about a tenth more.
+
 ## RS-365 - Phone Tier on a Computer
 
 - **New setting: Settings, Graphics, phone tier.** It gives a computer the lighter graphics a phone gets: four town lamps lighting the scene instead of eight, plain shadow edges, smaller shadow maps (the sun's 1024 instead of 2048, each dungeon light's 256 instead of 512), no anti-aliasing, and at most 1.5x pixels. It switches there and then, with no reload, and switching it off brings everything back.

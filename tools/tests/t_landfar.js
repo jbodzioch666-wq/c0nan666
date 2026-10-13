@@ -15,7 +15,7 @@ module.exports = async page=>{
     // (RS-355) the far ground is cut out inside the built land, and the cut-out moves with the window
     const win = ()=>O3.farMat.userData.win.value.toArray().map(v=>+v.toFixed(1)); out.cut0 = win(); out.cutMatches0 = win()[0]===+(O3.win.x0 + 0.5).toFixed(1) && win()[2]===+(O3.win.x0 + O3_W - 0.5).toFixed(1); out.cutKey = O3.farMat.customProgramCacheKey();
     // a window move: the build runs over frames, the old land showing meanwhile, then swaps in
-    const w0 = O3.win, world0 = O3.world, cx = w0.cx, cy = w0.cy; G.owPos.x = Math.max(2, Math.min(OW_COLS-3, cx + 22)); G.owPos.y = cy;
+    const w0 = O3.win, world0 = O3.world, cx = w0.cx, cy = w0.cy; G.owPos.x = Math.max(2, Math.min(OW_COLS-3, cx + Math.max(6, O3_W/2 - o3Reach() - 4) + 2)); G.owPos.y = cy;   /* (RS-366: just past where a rebuild starts, short of where it is hurried) */
     renderGame(); out.pendAfter1 = !!O3.pend; out.sameWinAfter1 = O3.win===w0 && O3.world===world0 && O3.world.parent===O3.scene;
     let frames = 1; while (O3.pend && frames < 400){ renderGame(); frames++; await new Promise(r=>setTimeout(r, 5)); }
     out.frames = frames; out.newWin = O3.win!==w0 && O3.win.cx===G.owPos.x; out.swapped = O3.world!==world0 && O3.world.parent===O3.scene && !world0.parent && typeof O3.heightAt==='function';

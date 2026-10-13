@@ -18,7 +18,8 @@ module.exports = async page=>{
     out.nearKept = nearKeys.filter(k=>before.has(k) && O3.nodeChunks.get(k)===before.get(k)).length; out.nearHad = nearKeys.filter(k=>before.has(k)).length; out.freedOnWalk = freed;
     // a window move keeps the chunks still inside the new window
     const keep = new Map(O3.nodeChunks); freed = 0; const w0 = O3.win; G.owPos.x = Math.min(OW_COLS-3, w0.cx + 22); O3.mapRef = null; await fr(2); await settle();
-    out.winMoved = O3.win!==w0; let kept = 0, lost = 0; for (const [k, c] of keep){ if (inWin(k.split(',').map(Number))){ if (O3.nodeChunks.get(k)===c) kept++; else lost++; } } out.keptAcrossMove = kept; out.lostAcrossMove = lost;
+    out.winMoved = O3.win!==w0; let kept = 0, lost = 0; const NCR = Math.min(6, Math.max(O3_NCR, Math.ceil(O3.dist*1.1/O3_NCH) + 1)), pcx = Math.floor(G.owPos.x/O3_NCH), pcy = Math.floor(G.owPos.y/O3_NCH);
+    for (const [k, c] of keep){ const kk = k.split(',').map(Number); if (inWin(kk) && Math.max(Math.abs(kk[0]-pcx), Math.abs(kk[1]-pcy)) <= NCR){   /* (RS-366: the 96-tile land holds chunks past the ring's reach; those are rightly let go) */ if (O3.nodeChunks.get(k)===c) kept++; else lost++; } } out.keptAcrossMove = kept; out.lostAcrossMove = lost;
     o3FreeNodeChunk = f0; O3.dist = 12;
     return out; });
   console.log(JSON.stringify(r));
