@@ -13,7 +13,8 @@ module.exports = async page=>{
     const names = ['giant spider','giant scorpion','giant crab','tomb scarab','ogre','giant spider'], spots = [];
     // the last spider stands with a wall right behind it, the blow driving it into the wall
     let wallSpot = null; for (let r=1;r<=5 && !wallSpot;r++) for (let dx=-r;dx<=r && !wallSpot;dx++) for (let dy=-r;dy<=r;dy++){ if (Math.max(Math.abs(dx), Math.abs(dy))!==r) continue; const x = p.x+dx, y = p.y+dy; if (!G.map[x] || G.map[x][y]!==T_FLOOR) continue;
-      const ux = Math.abs(dx) >= Math.abs(dy) ? Math.sign(dx) : 0, uy = ux ? 0 : Math.sign(dy); if (G.map[x+ux] && G.map[x+ux][y+uy]===T_WALL){ wallSpot = [x, y]; break; } }   /* (a wall right behind it, the way the blow will drive it) */
+      const ux = Math.abs(dx) >= Math.abs(dy) ? Math.sign(dx) : 0, uy = ux ? 0 : Math.sign(dy); const clear = (()=>{ const n = Math.max(Math.abs(dx), Math.abs(dy)); for (let k=1;k<n;k++){ const tx = p.x + Math.round(dx*k/n), ty = p.y + Math.round(dy*k/n); if (!G.map[tx] || G.map[tx][ty]!==T_FLOOR) return false; } return true; })();   /* (and in plain sight of you, or it's never drawn: a spot round a corner left it without a model) */
+      if (clear && G.map[x+ux] && G.map[x+ux][y+uy]===T_WALL){ wallSpot = [x, y]; break; } }   /* (a wall right behind it, the way the blow will drive it) */
     const near = []; for (let dx=-3;dx<=3;dx++) for (let dy=-3;dy<=3;dy++) if (Math.max(Math.abs(dx), Math.abs(dy)) >= 2) near.push([dx, dy]); near.sort((a, b)=>Math.hypot(...a) - Math.hypot(...b));
     for (const [dx,dy] of near){ const x = p.x+dx, y = p.y+dy; if (G.map[x] && G.map[x][y]===T_FLOOR && !(wallSpot && x===wallSpot[0] && y===wallSpot[1]) && !spots.some(q=>Math.abs(q[0]-x) + Math.abs(q[1]-y) < 2)) spots.push([x,y]); if (spots.length>=5) break; }
     if (wallSpot){ while (spots.length < 5) spots.push(null); spots[5] = wallSpot; }

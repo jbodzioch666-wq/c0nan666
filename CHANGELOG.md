@@ -1,5 +1,15 @@
 # Depthcrawl patch notes
 
+## RS-378 - The model and animation rewrite, part three: dragons, serpents, birds and the rest
+
+The last stage of bringing the bestiary's deaths up to the skeleton's standard. Everything that falls now falls as a jointed body.
+
+- **Dragons, wyrmlings, wyverns, hydras, sea serpents, dragon turtles and crocodiles** die as a chain of joints: the body one rigid frame, every neck a chain of its joints out to the muzzle (five for a hydra), the tail a chain to its tip, each leg its bones down to the toe. Thrown by the blow, knocked sideways, skidding to a stop and slumping onto its side; the wings fold down as it falls; the jaws hang slack.
+- **Serpents, eels, leeches, worms and the remorhaz** die as a rope: their own spine's points strung on bones that keep their length and bend only so far, the body laid along them. The blow flings the head end; the rest falls where it lies and settles in a wavy line.
+- **Birds** tumble out of the air as ragdolls, wings sprawling, neck and legs limp, and lie where they land.
+- **A beast knocked past its side rolls back** to lie on it, and a big one propped up by its own necks or legs is turned over as a whole. Nothing goes through the floor or a wall; every bone keeps its length.
+- Spiders, scorpions, crabs and beetles keep their tumbling ragdoll of RS-367; oozes, ghosts, swarms and the stranger things keep their own ends.
+
 ## RS-377 - The model and animation rewrite, part two: the four-legged beasts
 
 Stage two of bringing every creature up to the skeleton's standard: wolves, dogs, jackals, hellhounds, bears, owlbears, boars, elk, the great cats, rats and moles, and the deer, boar and rabbits of the open land.

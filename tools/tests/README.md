@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| restrig | RS-378: dragons, hydras and crocodiles as chains of joints, serpents as a rope, birds tumbling out of the air |
 | quadrig | RS-377: the four-legged beasts: a bending chest with the forelegs and neck, wrists and hocks, the trot, the chain-of-joints death |
 | humanrig | RS-376: the two-legged figure: waist pivot, split torso, ankles, the walk cycle, the chain-of-joints death |
 | rs375 | RS-375: menus under the top bar; boss-beaten card framed; small folk taller; the open treasure door stays drawn when you stand in it |
