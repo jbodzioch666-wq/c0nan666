@@ -22,10 +22,10 @@ module.exports = async page=>{
     const s0 = es.map(e=>e && e.s0 ? e.s0.y : 1), c0 = es.map(e=>e && e.rd ? e.rd.c0.clone() : null);
     FP.dt = 1/60; let travel = null;
     for (let f=0;f<240;f++){ m3dSweep(); es.forEach((e,i)=>{ if (!e || !e.holder.parent || i===4) return; low[i] = Math.min(low[i], lowOf(e.holder)); });
-      if (f===50) travel = [5, 6].map(i=>es[i] && es[i].rd ? Math.hypot(es[i].rd.x.x - c0[i].x, es[i].rd.x.z - c0[i].z) : null); }
+      if (f===50) travel = [5, 6].map(i=>es[i] && es[i].chain ? Math.hypot(es[i].chain.p[0].x.x - es[i].chain.x0.x, es[i].chain.p[0].x.z - es[i].chain.x0.z) : es[i] && es[i].rd ? Math.hypot(es[i].rd.x.x - c0[i].x, es[i].rd.x.z - c0[i].z) : null); }
     out.minLow = low.map(v=>+v.toFixed(3)); out.travel = travel && travel.map(v=>v===null ? null : +v.toFixed(3));
     const wolf = es[0], man = es[1], bones = es[2], ooze = es[3], ghost = es[4];
-    out.wolfUp = wolf && wolf.rd ? +new T.Vector3(0,1,0).applyQuaternion(wolf.rd.q).y.toFixed(2) : null; out.wolfRest = !!(wolf && wolf.rd && wolf.rd.rest > 0.3);
+    out.wolfUp = wolf && wolf.chain ? +wolf.chain.upY.toFixed(2) : wolf && wolf.rd ? +new T.Vector3(0,1,0).applyQuaternion(wolf.rd.q).y.toFixed(2) : null; out.wolfRest = !!(wolf && ((wolf.chain && wolf.chain.rest > 0.3) || (wolf.rd && wolf.rd.rest > 0.3)));   /* (RS-377: a chain of joints) */
     out.manUp = man && man.chain ? +man.chain.upY.toFixed(2) : man && man.rd ? +new T.Vector3(0,1,0).applyQuaternion(man.rd.q).y.toFixed(2) : null; out.drops = man && man.drops ? man.drops.length : 0;   /* (RS-376: a chain of joints) */
     out.dropsDown = man && man.drops ? man.drops.every(R=>R.rest > 0.2 && R.x.y < 0.5) : false; out.dropsAway = man && man.drops ? man.drops.map(R=>+Math.hypot(R.x.x - R.c0.x, R.x.z - R.c0.z).toFixed(2)) : [];
     out.limp = man && man.chain ? man.chain.p.length : man && man.rd ? man.rd.limp.length : 0;

@@ -1,5 +1,15 @@
 # Depthcrawl patch notes
 
+## RS-377 - The model and animation rewrite, part two: the four-legged beasts
+
+Stage two of bringing every creature up to the skeleton's standard: wolves, dogs, jackals, hellhounds, bears, owlbears, boars, elk, the great cats, rats and moles, and the deer, boar and rabbits of the open land.
+
+- **A back that bends.** The forelegs and the neck now hang from a chest that bends, twists and rolls about the middle of the back, and the sculpted body bends with it, seamlessly (the mesh is bent on the graphics card to follow the chest, rather than cut in two). Every leg has a wrist or a hock, and every paw stands on the ground - a hind paw used to float a little.
+- **A real trot.** Diagonal pairs of legs swing together: a leg lifting folds at the elbow or the stifle and tucks its paw, swings forward and reaches out, lands with the paw flat and takes the weight, then drives back under the body and pushes off from its toes. The body rises as each pair drives off and settles as the next lands, the nose dipping a little as it lands; the back rounds as the legs gather and stretches as they reach; the shoulders turn toward the reaching foreleg, against the hips; the head nods against the body's rise and the tail sways with the stride. A hard hit taken makes it flinch and sink.
+- **Deaths as a chain of joints.** A killed beast no longer rolls over as one stiff box with kicking legs. It falls as a chain of twenty-seven joints - the pelvis and the chest each a rigid frame, a spine that bends a little, a neck, four legs of three bones, a tail - thrown by the blow, knocked over sideways, skidding to a stop with its feet rather than tripping over them, and slumping the rest of the way onto its side where it lands. Every bone keeps its length, elbows fold back and stifles forward, nothing goes through the floor or a wall.
+- **The two-legged chain learned from it too:** a thrown body now skids on the floor with proper friction instead of being dragged to a halt, and a knee or an elbow is bent by moving the joint, not by hauling on the hip or shoulder.
+- Dragons, serpents, birds, spiders and the rest come in the next stage.
+
 ## RS-376 - The model and animation rewrite, part one: two-legged folk
 
 The first stage of bringing every creature up to the skeleton's standard. This one is for everything that walks on two legs and isn't a skeleton: goblins, orcs, bandits, knights, kobolds, cultists, zombies, dragonborn, the townsfolk and you.
