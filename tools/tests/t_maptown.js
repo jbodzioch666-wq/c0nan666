@@ -11,7 +11,7 @@ module.exports = async page=>{
     A(out.town.open && out.town.mapOpen && out.town.tools && out.town.v3, 'the map opens in a town '+JSON.stringify(out.town));
     const px = G.player.x, py = G.player.y; moveDir(1, 0); A(G.player.x===px && G.player.y===py, 'no walking with the map open');
     // a wandering threat and a quest objective near you, close in so both show
-    G.ow.encounters = G.ow.encounters || []; const en = { x:tx+3, y:ty }; G.ow.encounters.push(en);
+    G.ow.encounters = G.ow.encounters || []; const en = { x:tx+3, y:ty, merchant:false }; G.ow.encounters.push(en);   /* (a threat, not a wandering merchant) */
     try{ owReveal(tx, ty, 8); }catch(e){}
     G.owZoomScale = OW_ZOOM_MAX; renderGame(); await wait(150);
     const cv = canvas, rc = cv.getBoundingClientRect(), k = cv.width/rc.width, C = owZoomLastCellPx, cam = owZoomLastCam;

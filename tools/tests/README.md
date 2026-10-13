@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| menupanel | RS-373: menus are centred framed panels sized to their content; title, character making, death and equipment keep the whole screen |
 | deaths | RS-371: beasts roll on their side, folk fall with limp limbs and drop their gear, skeletons fall apart, oozes puddle, ghosts dissolve; harder blows throw harder |
 | lootfammo | RS-370: the loot filter's ammo tag (arrows, bolts, thrown weapons) |
 | townwalk | RS-369: townsfolk walk errands all over town, go into the tavern in the evening, home at night |

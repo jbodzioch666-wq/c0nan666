@@ -37,6 +37,7 @@ Ordinary feature releases and small edits stay on Opus. If you are already runni
 7. Run `bash tools/build-itch.sh`. It writes `dist/depthcrawl-rs-NNN-itch.zip`.
 8. Publish `depthcrawl.html` to the existing artifact https://claude.ai/artifact/HbAcDu7KguzBDBaXMuopFz with a short label. Always use that URL; never create a new artifact. The artifact declares the `downloads` capability (RS-152, for the export-save prompt); leave `capabilities` out when publishing so it stays.
 9. Post the playable link https://claude.ai/artifact/HbAcDu7KguzBDBaXMuopFz in the reply, so the user can play on their phone without downloading anything. Also send the itch zip as an attachment. Don't send `depthcrawl.html` as a download.
+10. In the reply, always list what each new patch added: one short bullet per change, under its `RS-NNN` heading, for every release since the last reply.
 
 ## Editing the game
 

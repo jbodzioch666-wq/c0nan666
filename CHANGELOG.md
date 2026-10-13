@@ -1,5 +1,15 @@
 # Depthcrawl patch notes
 
+## RS-373 - Framed menus, and fixes
+
+- **Menus are framed panels now.** Shops, the bank, the temple, the loot filter, the vault puzzle, quests, pause, settings and the rest open as a centred panel over the game instead of a dark sheet across the whole screen. Each panel has a gold-edged frame, sizes itself to what it holds, and scrolls if it's long. On a phone it fills the screen with a small margin. The title screen, making a character and a world, death and victory, the equipment page and the waypoint map keep their own full layouts.
+- **Menus keep their scroll position.** Banking an item, salvaging or buying no longer jumps the lists back to the top.
+- **Arrows and bolts from the bank go into your quiver**, not your pack.
+- **Arrows and bolts are only on the Quiver tab.** The All and Resources tabs no longer list them.
+- **Puddles dry up.** A spell of rain now lasts two to six minutes, and puddles dry about a minute after it stops. A save that still had rain left over from the old step-driven weather clears as soon as it loads, if the clock says it's dry.
+- **Big beasts end up on their side.** Dragons, hydras, crabs and other broad creatures used to rock back upright onto their legs after the death roll. Now they slump the rest of the way over.
+- **A locked closet's door is never blocked.** A barrel or crate could stand right in front of it and seal it off; that tile is now always kept clear.
+
 ## RS-372 - See what the loot filter will sell; drag ammo from the quiver
 
 - **The loot filter shows what it will salvage.** A new WILL BE SALVAGED list in the menu shows every piece in your bag that matches your settings, with its picture, name, tier and sell price. Hover one to see it in full. Tap **keep** to lock it, and the filter will never touch it. "Salvage them now" sells exactly that list.

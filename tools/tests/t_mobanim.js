@@ -1,6 +1,6 @@
 // RS-346: every creature in the bestiary has a 3D model that walks, fights and dies. For each one: moving changes its
 // pose (sampled over a stride, so a hop or a slow beat still counts), a wind-up or a strike changes it, and when it's
-// killed it topples over. Serpents slither, oozes heave, floaters lean and bob, crawling eyes and ropers roll, and the
+// killed it topples over (RS-371: rolls onto its side or back as a ragdoll, slumps into a puddle, thins away or falls apart). Serpents slither, oozes heave, floaters lean and bob, crawling eyes and ropers roll, and the
 // crocodiles lunge into the bite.
 module.exports = async page=>{
   const r = await page.evaluate(async ()=>{
@@ -30,9 +30,11 @@ module.exports = async page=>{
         if (fight < 0.02) out.noFight.push(nm+' '+fight.toFixed(3));
         // killed: it topples
         FPD.scene && FPD.scene.add(e.holder); if (!e.holder.parent){ const g = new THREE.Group(); g.add(e.holder); }
-        M3D.inst.set(m, e); m3dKill(m); for (let i=0;i<20;i++) m3dSweep();
-        const fell = Math.abs(e.root.rotation.x) + Math.abs(e.root.rotation.z);
-        if (!(fell > 1)) out.noDeath.push(nm+' '+fell.toFixed(2));
+        M3D.inst.set(m, e); m3dKill(m); for (let i=0;i<140;i++) m3dSweep();   /* (RS-371: a ragdoll takes a moment longer to settle than the old scripted topple) */
+        /* (RS-371) fallen: on its side or back - or, for an ooze, slumped into a puddle; a ghost thinned away; a skeleton in pieces */
+        const fell = e.dkind==='ooze' ? (e.s0 && e.root.scale.y < e.s0.y*0.3 ? 2 : 0) : e.dkind==='ghost' ? (!e.holder.parent ? 2 : 0) : e.dkind==='bones' ? (e.parts && e.parts.length >= 8 ? 2 : 0)
+          : e.rd ? Math.acos(Math.max(-1, Math.min(1, new THREE.Vector3(0, 1, 0).applyQuaternion(e.rd.q).y))) : Math.abs(e.root.rotation.x) + Math.abs(e.root.rotation.z);
+        if (!(fell > 1)) out.noDeath.push(nm+' '+fell.toFixed(2)+' '+e.dkind+' '+(e.rd ? 'rd'+(e.rd.shoves||0)+'/'+e.rd.rest.toFixed(2)+'/'+e.dying.toFixed(2) : 'nord'));
         if (e.holder.parent) e.holder.parent.remove(e.holder); M3D.live.delete(e);
       }catch(err){ out.errs.push(nm+': '+String(err).slice(0, 120)); }
     }

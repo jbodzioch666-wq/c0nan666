@@ -18,6 +18,9 @@ module.exports = async page=>{
     G.gear.ranged = rsMakeBow(5, false);
     // an old save: loose bundles in the pack go into the quiver
     G.inv = [mk(1, 4), mk(5, 3), mk(1, 6), mk(5, 9), mk(1, 1)]; ammoStackAll(); out.migr = { iron:arrowCount(1), rune:arrowCount(5), inv:G.inv.length };
+    /* (RS-373) arrows taken out of the bank go into the quiver; the Resources tab doesn't list them (the Quiver tab does) */
+    { const bp = bankP(); bp.stash = [mk(5, 7)]; const n0 = arrowCount(5), inv0 = G.inv.length; bankWithdraw(0); setUi('playing'); out.bank = { quiver:arrowCount(5) - n0, inv:G.inv.length - inv0 }; }
+    out.resHasArrows = resCats().some(([nm, ids])=>ids.some(id=>/^arw_/.test(id))) && csBagCount('res')===resCats().reduce((a, [nm, ids])=>a + (nm==='Fish & food' ? 0 : ids.filter(id=>!/^arw_|^arrows$/.test(id) && resCount(id)).length), 0);
     // the Quiver tab
     setUi('inventory'); csBagTab('quiver'); await new Promise(r=>setTimeout(r, 50));
     out.tabs = [...document.querySelectorAll('#overlay .cs-bagtab')].map(e=>e.textContent.replace(/\s*\d+$/, '').trim()).join();
@@ -37,5 +40,7 @@ module.exports = async page=>{
   A(r.migr.iron===46 && r.migr.rune===12 && r.migr.inv===0, 'loose ammo in the pack goes into the quiver');
   A(r.tabs==='All,Gear,Food,Scrolls,Resources,Quiver' && r.rows===r.kinds && r.kinds===4, 'the Quiver tab shows every kind as a picture');
   A(r.loadedNow===5 && r.runeOn, 'a tap loads a kind');
+  A(r.bank.quiver===7 && r.bank.inv===0, 'arrows from the bank go into the quiver (RS-373)');
+  A(r.resHasArrows, 'the Resources tab leaves arrows and bolts to the Quiver tab');
   A(r.dropOk && r.dragged===2, 'or drag it onto the quiver slot (RS-372)');
 };
