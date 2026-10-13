@@ -26,7 +26,7 @@ module.exports = async page=>{
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
   A(r.parts >= r.before*0.5 && r.now < r.before*0.5, 'the townsfolk draw less than half as many parts: '+r.before+' -> '+r.now);
-  A(r.playerSkinned===0, 'your own figure is untouched');
+  A(r.playerSkinned > 0, 'your own figure is skinned too (RS-379)');
   A(r.whoParts > 10 && r.whoMeshes[1] <= 14 && r.walk > 0.012 && r.strike > 0.02, 'a skinned townsperson still walks and strikes');
   A(r.white && r.flashReach, 'the colour is in the vertices and the hit flash reaches the skinned materials');
   A(r.auto===true, 'the shadow map is drawn every frame (RS-353)');

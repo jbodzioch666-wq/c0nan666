@@ -14,7 +14,7 @@ module.exports = async page=>{
     G.player.sqSeen = {}; G.sqDeclined = null; villageInteract(h.x, h.y); out.offer = G.sqOffered; out.ui = G.ui;
     return out; });
   await page.evaluate(async ()=>{ G.sqOffered = null; setUi('playing'); for (let i=0;i<10;i++){ renderGame(); await new Promise(r=>setTimeout(r, 40)); } });
-  await page.screenshot({ path:'/tmp/claude-0/-home-user-c0nan666/3bb54428-39f0-502a-8d60-2c5df0a710a2/scratchpad/hooded.png' });
+  await page.screenshot({ path:'/tmp/claude-0/-home-user-c0nan666/3bb54428-39f0-502a-8d60-2c5df0a710a2/scratchpad/hooded.png', timeout:150000 });   /* (software rendering on a loaded machine can take over half a minute) */
   console.log(JSON.stringify(r));
   if (!r.there || !r.model) throw new Error('a hooded figure stands in the tavern '+JSON.stringify(r));
   if (r.givers.some(g=>g!=='hooded')) throw new Error('the thieves\' quests are the hooded figure\'s');

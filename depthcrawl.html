@@ -31210,41 +31210,125 @@ function o3BuildNodeChunk(list, g){
 // joints the pose code already turns move the vertices on the card, and a person draws eight or so times instead of
 // thirty. Anything the rig points at (a jaw, an eye, a weapon) stays its own mesh under its joint, as do see-through parts
 function m3dSkinFigure(e){
-  if (!e || !e.root || e.skinned) return 0; const T = THREE, root = e.root, skip = new Set(), seen = new Set();
+  if (!e || !e.root || e.skinned) return 0; const mats = e.mats || null, R = m3dSkinRoot(e.root, e.rig, mats);
+  e.skinned = R.made; e.skinnedParts = R.gone; e.root.traverse(o=>{ if (o.isSkinnedMesh) m3dSkinWrap(o); });
+  if (e.mats && R.gone){ const live = new Set(); e.root.traverse(o=>{ if (o.isMesh && o.material) for (const m of [].concat(o.material)) live.add(m); }); e.mats = e.mats.filter(m=>live.has(m)); }   /* (RS-356: the flash list drops the parts that were skinned away) */
+  return R.gone;
+}
+/* (RS-379) the same, done once on a creature's template, so every copy of it is skinned for nothing: a copy's skinned meshes are
+   bound to the copy's own joints in m3dInstance. Monsters, the beasts of the open land, the townsfolk and your own figure all
+   come through here. Not everything: a swarm is many little rigs, a bird's death sets its wings and legs apart from the body
+   that lands, a mimic's and an ooze's are shaders of their own, and a skeleton's bones must fall apart: those stay as they are.
+   A spider or beetle is fine: its tumbling box comes from the bind pose and its legs curl at their joints */
+function m3dSkinnable(pt, tpl){
+  const meta = M3D.meta.get(tpl), r = meta && meta.rig; if (!M3D_SKIN || !r || meta.skinned!==undefined) return false;
+  if (pt.paint===mpSwarm || pt.paint===mpMimic || pt.paint===mpBird || pt.paint===mpOoze || pt.paint===mpVortex) return false;
+  if (r.subs || r.bird || r.mimic || r.ooze || r.vortex) return false;
+  return true;
+}
+function m3dSkinRoot(root, rig, mats){
+  const T = THREE, skip = new Set(), seen = new Set(), out = { made:0, gone:0 };
   const walk = (v, d)=>{ if (!v || typeof v!=='object' || seen.has(v) || d > 6) return; seen.add(v); if (v.isObject3D){ skip.add(v); return; } if (v.isMaterial || v.isBufferGeometry || v.isColor || v.isVector3) return; const vals = Array.isArray(v) ? v : Object.values(v); for (const x of vals) walk(x, d+1); };
-  walk(e.rig, 0); root.updateMatrixWorld(true);
-  const groups = new Map(), bones = [], boneIx = new Map(), rootInv = new T.Matrix4().copy(root.matrixWorld).invert();
+  walk(rig, 0); const rigRef = new Set(skip);
+  /* a prop it can drop or swap - its weapon, shield, off-hand blade, tome - stays whole with everything under it, so it can still fly from a dead hand or be put down for a tool */
+  const props = []; for (const k of ['weapon', 'shield', 'offWpn', 'tome']) if (rig && rig[k] && rig[k].isObject3D){ props.push(rig[k]); rig[k].traverse(o=>skip.add(o)); }
+  root.updateMatrixWorld(true);
+  const groups = new Map(), bones = [], boneIx = new Map(), rootInv = new T.Matrix4().copy(root.matrixWorld).invert(), plainCompile = T.Material.prototype.onBeforeCompile;
   root.traverse(o=>{ if (!o.isMesh || o===root || o.isInstancedMesh || o.isSkinnedMesh || skip.has(o) || !o.visible) return; const m = o.material; if (!m || Array.isArray(m) || m.transparent || m.visible===false) return;
+    if (m.userData.special || m.userData.bend || (m.onBeforeCompile!==plainCompile && !m.userData.rim)) return;   /* (a shader of its own - a bending body, ice, slime, leaves - keeps its own mesh) */
     if (Object.keys(o.userData).length) return; const ga = o.geometry && o.geometry.attributes; if (!ga || !ga.position || !ga.normal || (o.geometry.morphAttributes && Object.keys(o.geometry.morphAttributes).length)) return;
     for (let q = o.parent; q && q!==root; q = q.parent) if (!q.visible) return;
     /* (parts that differ only in colour share one mesh: the colour goes into the vertices, and the mesh gets one material of that make) */
-    const k = m.type + '|' + (m.map ? m.map.uuid : '') + '|' + (m.normalMap ? m.normalMap.uuid : '') + '|' + (m.bumpMap ? m.bumpMap.uuid : '') + '|' + m.roughness + '|' + m.metalness + '|' + m.side + '|' + (m.flatShading ? 1 : 0) + '|' + (m.emissive ? m.emissive.getHex() : '') + '|' + (m.emissiveIntensity||0) + '|' + (m.userData.rim ? 'r' : '') + '|' + (m.alphaTest||0)
-      + '|' + (o.castShadow ? 1 : 0) + (o.receiveShadow ? 1 : 0) + '|' + Object.keys(ga).filter(n=>n!=='color').sort().join(','); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(o);
+    const k = m3dMergeKey(o); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(o);
     const j = o.parent; if (!boneIx.has(j)){ boneIx.set(j, bones.length); bones.push(j); } });
-  let made = 0, gone = 0; const N = new T.Matrix3(), v = new T.Vector3(), M = new T.Matrix4();
+  const N = new T.Matrix3(), v = new T.Vector3(), M = new T.Matrix4(), skel = bones.length ? new T.Skeleton(bones) : null, made = [];   /* (one skeleton for the whole figure: its joints are worked out once a frame, not once per mesh) */
+  const bo = bones.map(b=>new T.Vector3().setFromMatrixPosition(b.matrixWorld).applyMatrix4(rootInv));   /* (where each joint sits in the bind pose, for its reach) */
+  for (const list of groups.values()){ if (list.length < 2) continue; const reach = new Map();
+    const names = Object.keys(list[0].geometry.attributes).filter(n=>n!=='color'); let nv = 0, ni = 0;
+    for (const o of list){ const g = o.geometry; nv += g.attributes.position.count; ni += g.index ? g.index.count : g.attributes.position.count; }
+    const outA = {}; for (const nm of names) outA[nm] = new Float32Array(nv*list[0].geometry.attributes[nm].itemSize); const col = new Float32Array(nv*3);
+    const si = new Uint16Array(nv*4), sw = new Float32Array(nv*4), idx = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni); let vo = 0, io = 0;
+    for (const o of list){ const g = o.geometry, c = g.attributes.position.count, b = boneIx.get(o.parent); M.multiplyMatrices(rootInv, o.matrixWorld); N.getNormalMatrix(M); const flip = M.determinant() < 0;   /* (a mirrored part - a left hand, a left wing - has its triangles turned back the right way round) */
+      const mc = o.material.color, vc = o.material.vertexColors && g.attributes.color ? g.attributes.color : null;
+      for (const nm of names){ const a = g.attributes[nm], is = a.itemSize, dst = outA[nm];
+        for (let i=0;i<c;i++){
+          if (nm==='position'){ v.fromBufferAttribute(a, i).applyMatrix4(M); dst[(vo+i)*3] = v.x; dst[(vo+i)*3+1] = v.y; dst[(vo+i)*3+2] = v.z; const d = v.distanceTo(bo[b]); if (d > (reach.get(b)||0)) reach.set(b, d); }
+          else if (nm==='normal'){ v.fromBufferAttribute(a, i).applyMatrix3(N).normalize(); dst[(vo+i)*3] = v.x; dst[(vo+i)*3+1] = v.y; dst[(vo+i)*3+2] = v.z; }
+          else for (let k=0;k<is;k++) dst[(vo+i)*is+k] = a.array[i*is+k]; } }
+      for (let i=0;i<c;i++){ si[(vo+i)*4] = b; sw[(vo+i)*4] = 1; const r = vc ? vc.getX(i) : 1, gg = vc ? vc.getY(i) : 1, bb = vc ? vc.getZ(i) : 1; col[(vo+i)*3] = r*mc.r; col[(vo+i)*3+1] = gg*mc.g; col[(vo+i)*3+2] = bb*mc.b; }
+      if (g.index){ const ia = g.index.array; if (flip) for (let i=0;i+2<ia.length;i+=3){ idx[io++] = ia[i] + vo; idx[io++] = ia[i+2] + vo; idx[io++] = ia[i+1] + vo; } else for (let i=0;i<ia.length;i++) idx[io++] = ia[i] + vo; }
+      else if (flip) for (let i=0;i+2<c;i+=3){ idx[io++] = vo + i; idx[io++] = vo + i + 2; idx[io++] = vo + i + 1; } else for (let i=0;i<c;i++) idx[io++] = vo + i;
+      vo += c; }
+    const mg = new T.BufferGeometry(); for (const nm of names) mg.setAttribute(nm, new T.BufferAttribute(outA[nm], list[0].geometry.attributes[nm].itemSize));
+    mg.setAttribute('color', new T.BufferAttribute(col, 3)); mg.setAttribute('skinIndex', new T.BufferAttribute(si, 4)); mg.setAttribute('skinWeight', new T.BufferAttribute(sw, 4)); mg.setIndex(new T.BufferAttribute(idx.subarray(0, io), 1)); mg.computeBoundingSphere(); mg.computeBoundingBox();
+    mg.userData.reach = { ix:[...reach.keys()], r:[...reach.values()] };   /* (RS-379: each joint this mesh hangs from, and how far its vertices reach from it - see m3dSkinWrap) */
+    const m0 = list[0].material, mat = m0.clone(); mat.color.setRGB(1, 1, 1); mat.vertexColors = true; mat.userData = Object.assign({}, m0.userData); if (m0.userData.rim) m3dRimify(mat); if (mat.emissive && mats) mats.push(mat);
+    const sm = new T.SkinnedMesh(mg, mat); sm.castShadow = list[0].castShadow; sm.receiveShadow = list[0].receiveShadow; sm.userData.skinned = list.length;
+    root.add(sm); sm.updateMatrixWorld(true); sm.bind(skel); out.made++; made.push(sm);
+    for (const o of list){ o.parent.remove(o); out.gone++; } }
+  /* (RS-379) still culled like any other mesh - a mesh that is never culled is drawn into every torch's shadow map, six faces
+     each, whether the torch can see it or not. A copy's meshes get a sphere that follows the joints each frame (m3dSkinWrap);
+     the template keeps one round the whole standing figure, a little generous, as the fallback. A corpse thrown by the blow
+     is let off culling in m3dKill */
+  if (made.length){ const box = new T.Box3(); for (const sm of made){ box.union(sm.geometry.boundingBox); } const sph = box.getBoundingSphere(new T.Sphere()); sph.radius = sph.radius*1.25 + 0.1*(box.max.y - box.min.y); for (const sm of made) sm.geometry.boundingSphere = sph.clone(); }
+  for (const g of props){ const R = m3dMergeProp(g, rigRef); out.made += R.made; out.gone += R.gone; }
+  return out;
+}
+/* (RS-379) a copy's skinned mesh gets a geometry of its own that shares the template's buffers, so it can have a culling
+   sphere of its own: worked out each frame from where its joints are now, each joint's reach (how far its vertices lie
+   from it, measured once at the bind pose) round the joint's place. A torch's shadow camera only reaches a few tiles, so a
+   sphere round the standing pose, big enough for any pose, had every creature near a torch drawn into all six faces of its
+   shadow map whether the torch could see it or not: twice the triangles of the old part-by-part culling */
+function m3dSkinWrap(sm){
+  const T = THREE, g = sm.geometry; if (!g || g.isSkinWrap) return; const g2 = new T.BufferGeometry(); for (const k in g.attributes) g2.setAttribute(k, g.attributes[k]); if (g.index) g2.setIndex(g.index);
+  g2.boundingBox = g.boundingBox; g2.userData = g.userData; g2.name = g.name; g2.isSkinWrap = true;
+  const base = g.boundingSphere ? g.boundingSphere.clone() : new T.Sphere(new T.Vector3(), 1), cur = base.clone(), R = g.userData.reach, inv = new T.Matrix4(), p = new T.Vector3(), c = new T.Vector3(); let key = null, over = null;
+  Object.defineProperty(g2, 'boundingSphere', { configurable:true, get(){ if (over) return over; if (!R || !R.ix.length || !sm.skeleton) return base; const k = FP.t; if (k===key) return cur; key = k;
+      const bones = sm.skeleton.bones, ix = R.ix, rr = R.r, n = ix.length; inv.copy(sm.matrixWorld).invert(); let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
+      for (let i=0;i<n;i++){ p.setFromMatrixPosition(bones[ix[i]].matrixWorld).applyMatrix4(inv); if (p.x < x0) x0 = p.x; if (p.x > x1) x1 = p.x; if (p.y < y0) y0 = p.y; if (p.y > y1) y1 = p.y; if (p.z < z0) z0 = p.z; if (p.z > z1) z1 = p.z; }
+      c.set((x0 + x1)/2, (y0 + y1)/2, (z0 + z1)/2); let rad = 0; for (let i=0;i<n;i++){ p.setFromMatrixPosition(bones[ix[i]].matrixWorld).applyMatrix4(inv); const d = p.distanceTo(c) + rr[i]; if (d > rad) rad = d; }
+      cur.center.copy(c); cur.radius = rad*1.12 + base.radius*0.01; return cur; }, set(v){ over = v || null; } });
+  sm.geometry = g2;
+}
+/* (RS-379) what makes two parts drawable as one: the same kind of material, maps and finish, the same shadow flags and the
+   same vertex layout. Colour alone doesn't count - it goes into the vertices */
+function m3dMergeKey(o){
+  const m = o.material, ga = o.geometry.attributes;
+  return m.type + '|' + (m.map ? m.map.uuid : '') + '|' + (m.normalMap ? m.normalMap.uuid : '') + '|' + (m.bumpMap ? m.bumpMap.uuid : '') + '|' + m.roughness + '|' + m.metalness + '|' + m.side + '|' + (m.flatShading ? 1 : 0) + '|' + (m.emissive ? m.emissive.getHex() : '') + '|' + (m.emissiveIntensity||0) + '|' + (m.userData.rim ? 'r' : '') + '|' + (m.alphaTest||0) + '|' + (m.normalScale ? m.normalScale.x.toFixed(2) : '') + '|' + (m.bumpScale||0)
+      + '|' + (o.castShadow ? 1 : 0) + (o.receiveShadow ? 1 : 0) + '|' + Object.keys(ga).filter(n=>n!=='color').sort().join(',');
+}
+/* (RS-379) a prop - a shield of planks, rim, boss and a ring of rivets was sixty draws - baked into one mesh per material,
+   inside its own group, so it still hangs from the hand, swings with it and flies from it whole. Only its rigid parts: anything
+   the rig points at (a pivot that keeps a bow upright, a staff's swirl) and everything under it keeps its own mesh */
+function m3dMergeProp(group, rigRef){
+  const T = THREE, out = { made:0, gone:0 }, plainCompile = T.Material.prototype.onBeforeCompile, groups = new Map();
+  group.updateMatrixWorld(true); const inv = new T.Matrix4().copy(group.matrixWorld).invert();
+  group.traverse(o=>{ if (!o.isMesh || o===group || o.isInstancedMesh || o.isSkinnedMesh || rigRef.has(o) || !o.visible) return; const m = o.material; if (!m || Array.isArray(m) || m.transparent || m.visible===false) return;
+    if (m.userData.special || m.userData.bend || (m.onBeforeCompile!==plainCompile && !m.userData.rim)) return;
+    if (Object.keys(o.userData).length) return; const ga = o.geometry && o.geometry.attributes; if (!ga || !ga.position || !ga.normal || (o.geometry.morphAttributes && Object.keys(o.geometry.morphAttributes).length)) return;
+    for (let q = o.parent; q && q!==group; q = q.parent) if (!q.visible || rigRef.has(q)) return;
+    const k = m3dMergeKey(o); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(o); });
+  const N = new T.Matrix3(), v = new T.Vector3(), M = new T.Matrix4();
   for (const list of groups.values()){ if (list.length < 2) continue;
     const names = Object.keys(list[0].geometry.attributes).filter(n=>n!=='color'); let nv = 0, ni = 0;
     for (const o of list){ const g = o.geometry; nv += g.attributes.position.count; ni += g.index ? g.index.count : g.attributes.position.count; }
-    const out = {}; for (const nm of names) out[nm] = new Float32Array(nv*list[0].geometry.attributes[nm].itemSize); const col = new Float32Array(nv*3);
-    const si = new Uint16Array(nv*4), sw = new Float32Array(nv*4), idx = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni); let vo = 0, io = 0;
-    for (const o of list){ const g = o.geometry, c = g.attributes.position.count, b = boneIx.get(o.parent); M.multiplyMatrices(rootInv, o.matrixWorld); N.getNormalMatrix(M);
-      const mc = o.material.color, vc = o.material.vertexColors && g.attributes.color ? g.attributes.color : null;
-      for (const nm of names){ const a = g.attributes[nm], is = a.itemSize, dst = out[nm];
+    const outA = {}; for (const nm of names) outA[nm] = new Float32Array(nv*list[0].geometry.attributes[nm].itemSize); const col = new Float32Array(nv*3), idx = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni); let vo = 0, io = 0;
+    for (const o of list){ const g = o.geometry, c = g.attributes.position.count; M.multiplyMatrices(inv, o.matrixWorld); N.getNormalMatrix(M); const flip = M.determinant() < 0, mc = o.material.color, vc = o.material.vertexColors && g.attributes.color ? g.attributes.color : null;
+      for (const nm of names){ const a = g.attributes[nm], is = a.itemSize, dst = outA[nm];
         for (let i=0;i<c;i++){
           if (nm==='position'){ v.fromBufferAttribute(a, i).applyMatrix4(M); dst[(vo+i)*3] = v.x; dst[(vo+i)*3+1] = v.y; dst[(vo+i)*3+2] = v.z; }
           else if (nm==='normal'){ v.fromBufferAttribute(a, i).applyMatrix3(N).normalize(); dst[(vo+i)*3] = v.x; dst[(vo+i)*3+1] = v.y; dst[(vo+i)*3+2] = v.z; }
           else for (let k=0;k<is;k++) dst[(vo+i)*is+k] = a.array[i*is+k]; } }
-      for (let i=0;i<c;i++){ si[(vo+i)*4] = b; sw[(vo+i)*4] = 1; const r = vc ? vc.getX(i) : 1, gg = vc ? vc.getY(i) : 1, bb = vc ? vc.getZ(i) : 1; col[(vo+i)*3] = r*mc.r; col[(vo+i)*3+1] = gg*mc.g; col[(vo+i)*3+2] = bb*mc.b; }
-      if (g.index){ const ia = g.index.array; for (let i=0;i<ia.length;i++) idx[io++] = ia[i] + vo; } else for (let i=0;i<c;i++) idx[io++] = vo + i;
+      for (let i=0;i<c;i++){ const r = vc ? vc.getX(i) : 1, gg = vc ? vc.getY(i) : 1, bb = vc ? vc.getZ(i) : 1; col[(vo+i)*3] = r*mc.r; col[(vo+i)*3+1] = gg*mc.g; col[(vo+i)*3+2] = bb*mc.b; }
+      if (g.index){ const ia = g.index.array; if (flip) for (let i=0;i+2<ia.length;i+=3){ idx[io++] = ia[i] + vo; idx[io++] = ia[i+2] + vo; idx[io++] = ia[i+1] + vo; } else for (let i=0;i<ia.length;i++) idx[io++] = ia[i] + vo; }
+      else if (flip) for (let i=0;i+2<c;i+=3){ idx[io++] = vo + i; idx[io++] = vo + i + 2; idx[io++] = vo + i + 1; } else for (let i=0;i<c;i++) idx[io++] = vo + i;
       vo += c; }
-    const mg = new T.BufferGeometry(); for (const nm of names) mg.setAttribute(nm, new T.BufferAttribute(out[nm], list[0].geometry.attributes[nm].itemSize));
-    mg.setAttribute('color', new T.BufferAttribute(col, 3)); mg.setAttribute('skinIndex', new T.BufferAttribute(si, 4)); mg.setAttribute('skinWeight', new T.BufferAttribute(sw, 4)); mg.setIndex(new T.BufferAttribute(idx, 1)); mg.computeBoundingSphere();
-    const m0 = list[0].material, mat = m0.clone(); mat.color.setRGB(1, 1, 1); mat.vertexColors = true; mat.userData = Object.assign({}, m0.userData); if (m0.userData.rim) m3dRimify(mat); if (mat.emissive && e.mats) e.mats.push(mat);
-    const sm = new T.SkinnedMesh(mg, mat); sm.castShadow = list[0].castShadow; sm.receiveShadow = list[0].receiveShadow; sm.userData.skinned = list.length; sm.frustumCulled = false;
-    root.add(sm); sm.updateMatrixWorld(true); sm.bind(new T.Skeleton(bones)); made++;
-    for (const o of list){ o.parent.remove(o); gone++; } }
-  e.skinned = made; e.skinnedParts = gone;
-  if (e.mats && gone){ const live = new Set(); root.traverse(o=>{ if (o.isMesh && o.material) for (const m of [].concat(o.material)) live.add(m); }); e.mats = e.mats.filter(m=>live.has(m)); }   /* (RS-356: the flash list drops the parts that were skinned away) */ return gone;
+    const mg = new T.BufferGeometry(); for (const nm of names) mg.setAttribute(nm, new T.BufferAttribute(outA[nm], list[0].geometry.attributes[nm].itemSize));
+    mg.setAttribute('color', new T.BufferAttribute(col, 3)); mg.setIndex(new T.BufferAttribute(idx.subarray(0, io), 1)); mg.computeBoundingSphere(); mg.computeBoundingBox();
+    const m0 = list[0].material, mat = m0.clone(); mat.color.setRGB(1, 1, 1); mat.vertexColors = true; mat.userData = Object.assign({}, m0.userData); if (m0.userData.rim) m3dRimify(mat);
+    const mesh = new T.Mesh(mg, mat); mesh.castShadow = list[0].castShadow; mesh.receiveShadow = list[0].receiveShadow; mesh.userData.merged = list.length; group.add(mesh); out.made++;
+    for (const o of list){ o.parent.remove(o); out.gone++; } }
+  return out;
 }
 function m3dMergeJoints(e){
   if (!e || !e.holder) return 0; const T = THREE, skip = new Set(), seen = new Set();
@@ -32829,6 +32913,7 @@ function m3dUV(geo, rep){
 /* (RS-333) M3D_COARSE > 1 sculpts on a coarser grid (about 1/k^2 the triangles): for creatures only ever seen small and
    many at a time, like the deer, rabbits and boar on the open land */
 let M3D_COARSE = 1;
+let M3D_SKIN = true;   /* (RS-379: creature templates are skinned into one mesh per material; off, they are built part by part as before) */
 const V3_FOLK_COARSE = 1.6;   /* (RS-348) the townsfolk's sculpt grid */
 function m3dSculpt(key, bounds, h, build){
   M3D.sculpt = M3D.sculpt || new Map();
@@ -36554,6 +36639,7 @@ function m3dTemplate(pt){
   const key = pt.paint.name + (pt.o && pt.o.paint ? '/'+pt.o.paint.name : '') + ':' + JSON.stringify(pt.o) + (M3D_COARSE !== 1 ? '|c' + M3D_COARSE : '');   /* (RS-333: a coarse build is its own template) */
   if (M3D.tpl.has(key)) return M3D.tpl.get(key);
   const t = m3dBuilders().get(pt.paint)(pt.o||{});
+  if (m3dSkinnable(pt, t)){ const meta = M3D.meta.get(t); try{ const R = m3dSkinRoot(t, meta.rig, null); meta.skinned = R.made; meta.skinnedParts = R.gone; }catch(err){ console.error(err); meta.skinned = 0; } }   /* (RS-379: one skinned mesh per material, once per template) */
   M3D.tpl.set(key, t);
   return t;
 }
@@ -36564,6 +36650,8 @@ function m3dInstance(m, pt){
   // rebuild the rig map by walking both trees in step
   const byT = new Map(); const walk = (a, b2)=>{ byT.set(a, b2); a.children.forEach((c,i)=>walk(c, b2.children[i])); }; walk(tpl, root);
   const meta = M3D.meta.get(tpl), map = (g)=>g ? byT.get(g) : null;
+  /* (RS-379) a skinned mesh copied along keeps the template's skeleton: give it one of the copy's own joints, with the same bind */
+  const skMap = new Map(); root.traverse(o=>{ if (o.isSkinnedMesh && o.skeleton){ const sk = o.skeleton; if (!skMap.has(sk)) skMap.set(sk, new T.Skeleton(sk.bones.map(bn=>byT.get(bn) || bn), sk.boneInverses.map(mi=>mi.clone()))); o.skeleton = skMap.get(sk); m3dSkinWrap(o); } });
   // the rig can nest (chains of joints with a tip, heads with jaws, a swarm's own little rigs): copy it all across
   const remap = (v)=>{
     if (!v || typeof v!=='object') return v;
@@ -36584,7 +36672,7 @@ function m3dInstance(m, pt){
   /* (RS-163: no round blob under a creature - it casts a real shadow from the torches, or the sun and moon) */
   root.traverse(o=>{ if (o.isMesh && !(o.material && o.material.transparent)) o.castShadow = true; });
   const mats = [...mmap.values()].filter(x=>x.emissive);
-  const E = { holder, root, rig, mats, H, beast:!!meta.beast, anim:meta.anim||null, seed:Math.random()*10, atk:0, pHp:G.player ? G.player.hp : 0, hurt:0, lift:pt.lift||meta.lift||0, dying:-1, stamp:0, rise: m.rise ? 0 : 1 };
+  const E = { holder, root, rig, mats, H, beast:!!meta.beast, anim:meta.anim||null, seed:Math.random()*10, atk:0, pHp:G.player ? G.player.hp : 0, hurt:0, lift:pt.lift||meta.lift||0, dying:-1, stamp:0, rise: m.rise ? 0 : 1, skinned:meta.skinned||0, skinnedParts:meta.skinnedParts||0 };
   if (meta.loco && meta.anim){ const a0 = meta.anim, L0 = { y:root.position.y, x:root.rotation.x, z:root.rotation.z };
     E.anim = (r, t, mv, wind, strike, hurt, e2)=>{ a0(r, t, mv, wind, strike, hurt, e2); m3dLoco(E, meta.loco, L0, t, mv); }; }
   return E;
@@ -36874,7 +36962,7 @@ function m3dUpdate(m, pos, flash){
   return e.H + (e.lift||0);
 }
 // a creature that just died keeps its model long enough to topple over
-function m3dKill(m, hit){ const e = M3D.inst.get(m); if (e && e.holder.parent){ e.dying = 0; for (const mt of e.mats||[]){ if (mt.emissive){ if (mt.userData.em0) mt.emissive.copy(mt.userData.em0); else mt.emissive.setScalar(0); } }   /* (RS-374: the hit's white flash goes with it - a creature killed mid-flash stayed white as it fell) */ e.stamp = M3D.stamp; e.deathTurn = (G.player && G.player.turnCount)||0; e.map = G.map; e.fx = chn(0.5) ? 1 : -1; e.fz = (Math.random()-0.5)*1.2; M3D.live.add(e);
+function m3dKill(m, hit){ const e = M3D.inst.get(m); if (e && e.holder.parent){ e.dying = 0; if (e.skinned) e.root.traverse(o=>{ if (o.isSkinnedMesh) o.frustumCulled = false; });   /* (RS-379: thrown by the blow, it can come to rest well outside the standing figure's culling sphere) */ for (const mt of e.mats||[]){ if (mt.emissive){ if (mt.userData.em0) mt.emissive.copy(mt.userData.em0); else mt.emissive.setScalar(0); } }   /* (RS-374: the hit's white flash goes with it - a creature killed mid-flash stayed white as it fell) */ e.stamp = M3D.stamp; e.deathTurn = (G.player && G.player.turnCount)||0; e.map = G.map; e.fx = chn(0.5) ? 1 : -1; e.fz = (Math.random()-0.5)*1.2; M3D.live.add(e);
   /* (RS-367) the way the killing blow pushed it, in the model's own frame */
   const p = G.player, wx = p ? m.x - p.x : 0, wz = p ? m.y - p.y : 1, l = Math.hypot(wx, wz) || 1, a = -e.holder.rotation.y; e.blow = { x:(wx*Math.cos(a) + wz*Math.sin(a))/l, z:(-wx*Math.sin(a) + wz*Math.cos(a))/l };
   try{ m3dDeathPrep(e, m, hit); }catch(err){ console.error(err); e.rd = null; e.parts = null; e.chain = null; e.dkind = null; } } }
@@ -39161,7 +39249,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-378';
+const GAME_VERSION = 'rs-379';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

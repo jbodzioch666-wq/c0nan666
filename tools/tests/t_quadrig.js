@@ -28,7 +28,7 @@ module.exports = async page=>{
       o.trot = { bob:+rng('y').toFixed(3), peaks, flex:+rng('fx').toFixed(3), twist:+rng('fy').toFixed(3), leg:+rng('uA').toFixed(2), knee:+rng('kA').toFixed(2) };
       pose(0, 1); const st = rg.legs.filter(L=>L.ph===0), sw = rg.legs.filter(L=>L.ph!==0);   // at phase 0 the legs with no offset stand mid-stance, the others swing
       o.stance = { flat:+Math.max(...st.map(L=>Math.abs(pawDir(L)))).toFixed(3), lift:+(Math.min(...sw.map(pawY)) - Math.max(...st.map(pawY))).toFixed(3), bendSync:rg.bodyMesh.material.userData.bendA.value.x===rg.chest.rotation.x && rg.bodyMesh.material.userData.bendA.value.y===rg.chest.rotation.y };
-      pose(0, 0); const bots = rg.legs.map(L=>+(new T.Box3().setFromObject(L.paw).min.y - e.holder.position.y).toFixed(3)); o.stand = { flat:+Math.max(...rg.legs.map(L=>Math.abs(pawDir(L)))).toFixed(3), low:+Math.max(...rg.legs.map(pawY)).toFixed(3), level:+Math.abs(rg.chest.rotation.x).toFixed(3), bots, down:Math.max(...bots) - Math.min(...bots) < 0.012 };
+      pose(0, 0); const bots = rg.legs.map(L=>+(L.paw.getWorldPosition(new T.Vector3()).y - e.holder.position.y).toFixed(3));   /* (RS-379: the paw's joint, its mesh being skinned into the body) */ o.stand = { flat:+Math.max(...rg.legs.map(L=>Math.abs(pawDir(L)))).toFixed(3), low:+Math.max(...rg.legs.map(pawY)).toFixed(3), level:+Math.abs(rg.chest.rotation.x).toFixed(3), bots, down:Math.max(...bots) - Math.min(...bots) < 0.012 };
       // the chain
       m.alive = 0; m3dKill(m, { dmg:30, maxHp:20, kind:'melee', crit:true }); o.chain = !!e.chain && !e.rd; o.n = e.chain ? e.chain.p.length : 0;
       if (!e.chain) continue;

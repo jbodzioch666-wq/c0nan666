@@ -8,7 +8,7 @@ module.exports = async page=>{
     for (let i=0;i<200 && !(sk3Init() && SK3.ok);i++) await new Promise(r=>setTimeout(r, 50));
     const undead = new Map(); for (const e of MONSTER_LEVELS) if (e && e.nm) undead.set(e.nm, !!e.undead);
     const names = [...new Set([...MONSTER_PORTRAIT_KEYS, ...undead.keys()])];
-    const snap = (root)=>{ root.updateMatrixWorld(true); const a = [], v = new THREE.Vector3(); root.traverse(o=>{ if (o.isMesh && o.geometry && o.geometry.attributes.position){ const P = o.geometry.attributes.position, st = Math.max(1, Math.floor(P.count/24)); for (let i=0;i<P.count;i+=st){ v.fromBufferAttribute(P, i).applyMatrix4(o.matrixWorld); a.push(v.x, v.y, v.z); } } }); return a; };
+    const snap = (root)=>{ root.updateMatrixWorld(true); const a = [], v = new THREE.Vector3(); root.traverse(o=>{ if (o.isMesh && o.geometry && o.geometry.attributes.position){ const P = o.geometry.attributes.position, st = Math.max(1, Math.floor(P.count/24)); if (o.isSkinnedMesh) o.skeleton.update(); for (let i=0;i<P.count;i+=st){ v.fromBufferAttribute(P, i); if (o.isSkinnedMesh) o.boneTransform(i, v); v.applyMatrix4(o.matrixWorld); a.push(v.x, v.y, v.z); } } }); return a; };   /* (RS-379: a skinned mesh's vertices are moved by its joints on the card; here they're moved the same way by hand) */
     const diff = (a, b)=>{ let d = 0; for (let i=0;i<Math.min(a.length, b.length);i++) d = Math.max(d, Math.abs(a[i]-b[i])); return d; };
     const out = { n:names.length, noModel:[], noWalk:[], noFight:[], noDeath:[], errs:[], kinds:{} };
     const keepDt = FP.dt; FP.dt = 0.05;

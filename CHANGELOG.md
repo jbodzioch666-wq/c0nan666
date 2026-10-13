@@ -1,5 +1,17 @@
 # Depthcrawl patch notes
 
+## RS-379 - The GPU pass, part one: every creature as a few skinned meshes
+
+The first stage of the renderer work promised after the model rewrite: fewer draws for the same pictures.
+
+- **Every creature is skinned once, at its template.** Monsters, the beasts of the open land, the townsfolk and your own figure are each drawn as one mesh per make of material (skin, cloth, metal, glossy shell...), with every vertex bound to the joint the animation already moves. A human knight was 84 draws and is 17; a wolf 78, now 9; a bear 44, now 6; a black dragon 149, now 11; a giant spider 87, now 4; a scorpion 92, now 3; a tomb scarab 106, now 9. A copy of a creature doesn't redo the work: it only binds the meshes to its own joints.
+- **Spiders, scorpions, crabs and beetles** are skinned too. Their tumbling death takes its box from the skinned body and curls the legs at their joints as before.
+- **Weapons and shields baked whole.** A kite shield of planks, rim, boss, rivets and cross was sixty draws; it is two now, inside its own group, so it still swings with the hand and still flies from a dead one.
+- **One skeleton per figure**, not one per mesh, so a figure's joints are worked out once a frame and it needs one bone texture instead of seven.
+- **Culling kept.** A skinned mesh is still frustum-culled, by one generous sphere round the whole figure, so a creature a torch can't see isn't drawn into that torch's shadow map (six faces each). A corpse thrown by the blow is let off culling, since it can come to rest well outside the standing figure's sphere.
+- **Towns load quicker**: the townsfolk were skinned one by one on entering a town; now each kind of figure is skinned once and copied.
+- **Measured** in a dungeon room with eight creatures in view (a goblin, wolf, bear, skeleton, dragon, spider, snake and knight), the same room built both ways: 1,159 draws a frame before, 402 after, torch shadows included, for the same triangles (4.5 million to 4.3 million); with the shadows off, 656 draws to 225. A skinned mesh's culling sphere follows its joints each frame (each joint's reach, measured once, round where the joint is now), so a creature is drawn into a torch's shadow map only when the torch can really see it; a sphere round the standing figure, generous enough for any pose, had cost twice the triangles.
+
 ## RS-378 - The model and animation rewrite, part three: dragons, serpents, birds and the rest
 
 The last stage of bringing the bestiary's deaths up to the skeleton's standard. Everything that falls now falls as a jointed body.
