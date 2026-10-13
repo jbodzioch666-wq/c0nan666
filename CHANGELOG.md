@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-380 - The GPU pass, part two: towns and the open land merged by make
+
+- **Still props merge by make, not just by material.** Parts of the same kind of material (the same maps, finish, glow and shadow flags) bake into one mesh whatever their colours, which go into the vertices: a stall's painted awnings, a well's trims, a market's crates are one draw each. The town palette's own materials, which the day and night change by hand (the glass's glow), are never swapped for a copy, so the windows still light up at dusk. The chunks of gathering nodes on the open land merge the same way.
+- **Window panes merge into their buildings.** A bookkeeping list that nothing ever read kept every pane, sign and banner as its own draw: sixteen panes a building. They now bake into the building with the rest of its glass.
+- **Puddles are one instanced mesh** instead of forty-odd little circles, each still its own size and place, filling and drying as before.
+- **The sun's shadow map is drawn every other frame** in towns and on the open land (every third on a phone, or when frames come slow): it was a second drawing of every shadow-caster in sight, every frame, and nothing in it moves fast enough to show. The dungeon's torches have had their own clock since RS-323.
+- **Measured** on one town built both ways: 1,012 meshes before, 848 after. A frame that draws the shadow map takes about 730 draws and the frames between about 300, where before every frame was a shadow frame of about 750. The remaining draws are mostly the townsfolk (seven or eight meshes each), the doors that swing, the lamps and flames, and one mesh per make per building.
+
 ## RS-379 - The GPU pass, part one: every creature as a few skinned meshes
 
 The first stage of the renderer work promised after the model rewrite: fewer draws for the same pictures.

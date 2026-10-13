@@ -22357,8 +22357,11 @@ function townV3Build(grp, mats){
   // puddles on the paths (shown in the rain)
   const pg = V3.townPuddles = new T.Group(), ph = new T.Group(); ph.add(pg); grp.add(ph);   /* (RS-375: inside a holder - the culling shows and hides the town's top-level groups, and was showing the puddles in dry weather) */
   const pm = new T.MeshStandardMaterial({ color:lin('#3a4a5a'), roughness:0.05, metalness:0.6, transparent:true, opacity:0.75 }); pm.userData.lin = true;
-  for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++) if (deco(x,y)==='path' && o3Hash(x, y, 931) < 0.16){ const d = new T.Mesh(new T.CircleGeometry(0.22 + o3Hash(x, y, 932)*0.18, 14), pm); d.rotation.x = -Math.PI/2; d.scale.x = 1.4; d.position.set(x+0.3+o3Hash(x,y,933)*0.4, 0.012, y+0.3+o3Hash(x,y,934)*0.4); pg.add(d); }
-  pg.userData.pm = pm; V3.wetK = townWet() ? 1 : 0; townPuddleSync(0);
+  /* (RS-380) all of them one instanced mesh - forty-odd draws were forty-odd puddles - each its own place and size, scaled as they fill and dry in townPuddleSync */
+  const puds = []; for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++) if (deco(x,y)==='path' && o3Hash(x, y, 931) < 0.16) puds.push({ x:x+0.3+o3Hash(x,y,933)*0.4, z:y+0.3+o3Hash(x,y,934)*0.4, r:0.22 + o3Hash(x, y, 932)*0.18 });
+  if (puds.length){ const im = new T.InstancedMesh(new T.CircleGeometry(1, 14), pm, puds.length); im.frustumCulled = false; const bb = new T.Box3(); for (const q of puds) bb.expandByPoint(new T.Vector3(q.x - 1.4*q.r, 0, q.z - q.r)).expandByPoint(new T.Vector3(q.x + 1.4*q.r, 0.03, q.z + q.r));
+    im.geometry.boundingBox = bb; im.geometry.boundingSphere = bb.getBoundingSphere(new T.Sphere()); pg.add(im); pg.userData.im = im; pg.userData.puds = puds; }   /* (its bounds are the puddles' spread, for the culling of the town's top-level groups) */
+  pg.userData.pm = pm; pg.userData.sc = -1; V3.wetK = townWet() ? 1 : 0; townPuddleSync(0);
 }
 // (RS-369) the puddles fill as the rain comes on, and after it stops they shrink and dry away (RS-374: in about fifteen seconds)
 function townPuddleSync(dt){
@@ -22366,7 +22369,9 @@ function townPuddleSync(dt){
   const wet = townWet(); V3.wetK = Math.max(0, Math.min(1, (V3.wetK||0) + (wet ? dt/4 : -dt/TOWN_DRY_S)));
   const k = V3.wetK; pg.visible = k > 0.01;
   if (!pg.visible) return;
-  const sc = 0.25 + 0.75*Math.sqrt(k); for (const d of pg.children){ d.scale.set(1.4*sc, sc, 1); }
+  const sc = 0.25 + 0.75*Math.sqrt(k), im = pg.userData.im;
+  if (im && Math.abs(sc - pg.userData.sc) > 1e-4){ const T = THREE, m4 = new T.Matrix4(), q = new T.Quaternion().setFromAxisAngle(new T.Vector3(1, 0, 0), -Math.PI/2), v = new T.Vector3(), s3 = new T.Vector3();   /* (RS-380: one instanced mesh, each puddle lying flat at its own size) */
+    pg.userData.puds.forEach((p, i)=>{ m4.compose(v.set(p.x, 0.012, p.z), q, s3.set(1.4*sc*p.r, sc*p.r, 1)); im.setMatrixAt(i, m4); }); im.instanceMatrix.needsUpdate = true; pg.userData.sc = sc; }
   if (pg.userData.pm) pg.userData.pm.opacity = 0.75*Math.min(1, k*1.6);
 }
 const TOWN_DRY_S = 15;   /* (RS-374: a minute was too slow to see them go - they shrink away in a quarter of one) */
@@ -23262,7 +23267,15 @@ function gfxCompileScene(V, r, scene, cam, warm){
   try{ gfxCompile(r, scene, cam); }catch(e){ console.error(e); }
   if (grp){ try{ gfxWarmRender(r, scene, cam); }catch(e){ console.error(e); } scene.remove(grp); }   /* (a draw, not just a compile: the driver builds its pipelines at the first draw of each state) */
 }
-function gfxRender(r, scene, cam, view){ if (SET.fps){ gfxGpuMark(r, 'shadow'); gfxGpuPoll(); } try{ gfxRenderInner(r, scene, cam, view); } finally { gfxGpuStop(); } }
+function gfxRender(r, scene, cam, view){ gfxShadowTick(r, view); if (SET.fps){ gfxGpuMark(r, 'shadow'); gfxGpuPoll(); } try{ gfxRenderInner(r, scene, cam, view); } finally { gfxGpuStop(); } }
+/* (RS-380) in a town and on the open land the sun's shadow map is drawn every other frame, every third on a phone or when
+   frames come slow: it was a second drawing of every shadow-caster in sight, every frame, and nothing in it moves fast
+   enough to show. The dungeon's torches have had their own clock since RS-323 (dgShadowTick) */
+function gfxShadowTick(r, view){
+  const sun = view==='v3' ? V3.sun : view==='o3' ? O3.sun : null; if (!sun || !sun.shadow || !r.shadowMap || !r.shadowMap.enabled) return;
+  const T2 = gfxShadowTick; T2.n = (T2.n||0) + 1; const every = gfxPhone() || (FP.dt||0.016) > 1/45 ? 3 : 2;
+  r.shadowMap.autoUpdate = false; if (T2.n % every === 0 || !sun.shadow.map) r.shadowMap.needsUpdate = true;   /* (every light's map in the view, on the sun's clock; and at once while there is none yet) */
+}
 function gfxRenderInner(r, scene, cam, view){
   if (!gfxPostOn()){ r.render(scene, cam); return; }
   let P; try{ P = gfxPost(r); }catch(e){ console.error(e); SET.post = false; r.render(scene, cam); return; }
@@ -29573,11 +29586,15 @@ function v3MergeWorld(){
   if (typeof o3MergeStatic!=='function' || !V3.world) return;
   const skip = new Set(), keep = o=>{ if (o && o.isObject3D && o!==V3.world && o!==V3.scene) o.traverse(c=>skip.add(c)); };
   const seen = new Set(), walk = (v, d)=>{ if (!v || typeof v!=='object' || seen.has(v) || d > 3) return; seen.add(v); if (v.isObject3D){ keep(v); return; } if (v.isMaterial || v.isBufferGeometry || v.isTexture || v.nodeType) return; const vals = Array.isArray(v) ? v : Object.values(v); for (const x of vals) walk(x, d+1); };
-  for (const k in V3){ if (['scene','world','renderer','cam','mats','warmGrp','labels','cv','ray','leafGeo'].includes(k)) continue; try{ walk(V3[k], 0); }catch(e){} }
+  /* (RS-380) the window, sign and banner lists are only ever filled, never read: nothing moves them, so they needn't be kept apart.
+     Keeping them had left sixteen window panes a building as sixteen draws each */
+  const dead = V3_MERGE_MAKE ? ['windows', 'signs', 'banners'] : [];
+  for (const k in V3){ if (['scene','world','renderer','cam','mats','warmGrp','labels','cv','ray','leafGeo'].includes(k) || dead.includes(k)) continue; try{ walk(V3[k], 0); }catch(e){} }
   for (const p of [V3.player, ...(V3.npcs||[]), ...(V3.villagers||[])]) if (p) keep(p.g);
   V3.world.traverse(o=>{ const u = o.userData; if (u && Object.keys(u).some(k=>k!=='lin' && k!=='merged')) keep(o); });
   let n0 = 0, n1 = 0; V3.world.traverse(o=>{ if (o.isMesh) n0++; });
-  for (const top of V3.world.children){ if (!top.isGroup || skip.has(top)) continue; try{ o3MergeStatic(top, skip); }catch(e){ console.error(e); } }
+  const shared = new Set(Object.values(V3.mats||{}));   /* (the town's palette: a material the day and night change by hand, like the glass, is never swapped for a copy) */
+  for (const top of V3.world.children){ if (!top.isGroup || skip.has(top)) continue; try{ o3MergeStatic(top, skip, shared); }catch(e){ console.error(e); } }
   V3.world.traverse(o=>{ if (o.isMesh) n1++; }); V3.mergedFrom = n0; V3.mergedTo = n1;
   v3CullPrep();
 }
@@ -31199,7 +31216,7 @@ function o3BuildNodeChunk(list, g){
     }
     const hit = new T.Mesh(hitG, hitM); hit.position.set(gx, y0, gz); hit.userData.act = { kind:'node', x:n.x, y:n.y }; g.add(hit); O3.nodeHits.push(hit);
   }
-  try{ o3MergeStatic(g, new Set(O3.nodeAnim.map(a=>a.o).concat(O3.nodeHits))); }catch(e){ console.error(e); }
+  try{ o3MergeStatic(g, new Set(O3.nodeAnim.map(a=>a.o).concat(O3.nodeHits)), new Set(Object.values(O3.mats||{}))); }catch(e){ console.error(e); }
 }
 /* (RS-333) bake every still, solid mesh under root that shares a material into one: the gathering spots in view were some
    3,000 separate draws (a herb patch alone was 21), and each draw costs the phone far more than its few triangles */
@@ -31358,23 +31375,30 @@ function m3dMergeJoints(e){
       for (const o of list) par.remove(o); } }
   e.holder.traverse(o=>{ if (o.isMesh) after++; }); e.mergedParts = before - after; return before - after;
 }
-function o3MergeStatic(root, skip){
+/* (RS-380) ...and by make: still parts of the same kind of material (the same maps, finish, glow and shadow flags) bake
+   together whatever their colours, which go into the vertices, so a stall's five painted awnings or a well's trims are one
+   draw. A material from the shared palette (`shared`) only ever merges with itself and is never swapped for a copy: the day
+   and night set the glass's glow on that very object. A material with a shader of its own (swaying leaves) likewise */
+function o3MergeStatic(root, skip, shared){
   const T = THREE; root.updateMatrixWorld(true);
-  const inv = new T.Matrix4().copy(root.matrixWorld).invert(), groups = new Map();
+  const inv = new T.Matrix4().copy(root.matrixWorld).invert(), groups = new Map(), plain = T.Material.prototype.onBeforeCompile;
   const shown = o=>{ for (let q = o; q && q!==root; q = q.parent) if (!q.visible) return false; return true; };
   root.traverse(o=>{
     if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh || skip.has(o) || !shown(o)) return;
     const m = o.material; if (!m || Array.isArray(m) || m.transparent || m.visible===false) return;
     const ga = o.geometry && o.geometry.attributes; if (!ga || !ga.position || !ga.normal) return;
-    const k = m.uuid + '|' + (o.castShadow ? 1 : 0) + (o.receiveShadow ? 1 : 0) + '|' + Object.keys(ga).sort().join(',');
+    const own = V3_MERGE_MAKE && !(shared && shared.has(m)) && m.onBeforeCompile===plain && !m.userData.special && !m.userData.bend && !(o.geometry.morphAttributes && Object.keys(o.geometry.morphAttributes).length) && !Object.keys(o.userData).some(k=>k!=='lin' && k!=='merged');
+    const k = own ? 'make|' + m3dMergeKey(o) + '|' + (m.userData.lin ? 'l' : '') + '|' + (m.opacity==null ? 1 : m.opacity) + '|' + (m.depthWrite ? 1 : 0) + (m.wireframe ? 'w' : '')
+                  : m.uuid + '|' + (o.castShadow ? 1 : 0) + (o.receiveShadow ? 1 : 0) + '|' + Object.keys(ga).sort().join(',');
     if (!groups.has(k)) groups.set(k, []); groups.get(k).push(o);
   });
   const M = new T.Matrix4(), N = new T.Matrix3(), v = new T.Vector3();
   for (const list of groups.values()){
     if (list.length < 2) continue;
-    const names = Object.keys(list[0].geometry.attributes); let nv = 0, ni = 0;
+    const bake = list.some(o=>o.material!==list[0].material);   /* (parts of different materials: their colours go into the vertices and they share one copy of the make) */
+    const names = Object.keys(list[0].geometry.attributes).filter(nm=>!bake || nm!=='color'); let nv = 0, ni = 0;
     for (const o of list){ const g = o.geometry; nv += g.attributes.position.count; ni += g.index ? g.index.count : g.attributes.position.count; }
-    const out = {}; for (const nm of names) out[nm] = new Float32Array(nv*list[0].geometry.attributes[nm].itemSize);
+    const out = {}; for (const nm of names) out[nm] = new Float32Array(nv*list[0].geometry.attributes[nm].itemSize); const col = bake ? new Float32Array(nv*3) : null;
     const idx = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni); let vo = 0, io = 0;
     for (const o of list){
       const g = o.geometry, c = g.attributes.position.count; M.multiplyMatrices(inv, o.matrixWorld); N.getNormalMatrix(M);
@@ -31384,12 +31408,15 @@ function o3MergeStatic(root, skip){
           else if (nm==='normal'){ v.fromBufferAttribute(a, i).applyMatrix3(N).normalize(); dst[(vo+i)*3] = v.x; dst[(vo+i)*3+1] = v.y; dst[(vo+i)*3+2] = v.z; }
           else for (let k=0;k<is;k++) dst[(vo+i)*is+k] = a.array[i*is+k];
         } }
+      if (bake){ const mc = o.material.color, vc = o.material.vertexColors && g.attributes.color ? g.attributes.color : null; for (let i=0;i<c;i++){ const r = vc ? vc.getX(i) : 1, gg = vc ? vc.getY(i) : 1, bb = vc ? vc.getZ(i) : 1; col[(vo+i)*3] = r*mc.r; col[(vo+i)*3+1] = gg*mc.g; col[(vo+i)*3+2] = bb*mc.b; } }
       if (g.index){ const ia = g.index.array; for (let i=0;i<ia.length;i++) idx[io++] = ia[i] + vo; } else for (let i=0;i<c;i++) idx[io++] = vo + i;
       vo += c;
     }
     const mg = new T.BufferGeometry(); for (const nm of names) mg.setAttribute(nm, new T.BufferAttribute(out[nm], list[0].geometry.attributes[nm].itemSize));
+    if (bake) mg.setAttribute('color', new T.BufferAttribute(col, 3));
     mg.setIndex(new T.BufferAttribute(idx, 1)); mg.computeBoundingSphere();
-    const mesh = new T.Mesh(mg, list[0].material); mesh.castShadow = list[0].castShadow; mesh.receiveShadow = list[0].receiveShadow; mesh.userData.merged = list.length; root.add(mesh);
+    let mat = list[0].material; if (bake){ const m0 = mat; mat = m0.clone(); mat.color.setRGB(1, 1, 1); mat.vertexColors = true; mat.userData = Object.assign({}, m0.userData); if (m0.userData.rim) m3dRimify(mat); }
+    const mesh = new T.Mesh(mg, mat); mesh.castShadow = list[0].castShadow; mesh.receiveShadow = list[0].receiveShadow; mesh.userData.merged = list.length; if (bake) mesh.userData.baked = 1; root.add(mesh);
     for (const o of list) o.parent.remove(o);
   }
 }
@@ -32914,6 +32941,7 @@ function m3dUV(geo, rep){
    many at a time, like the deer, rabbits and boar on the open land */
 let M3D_COARSE = 1;
 let M3D_SKIN = true;   /* (RS-379: creature templates are skinned into one mesh per material; off, they are built part by part as before) */
+let V3_MERGE_MAKE = true;   /* (RS-380: still props of the same make are baked together across their colours, in towns and on the open land; off, only parts sharing one material are) */
 const V3_FOLK_COARSE = 1.6;   /* (RS-348) the townsfolk's sculpt grid */
 function m3dSculpt(key, bounds, h, build){
   M3D.sculpt = M3D.sculpt || new Map();
@@ -39249,7 +39277,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-379';
+const GAME_VERSION = 'rs-380';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
