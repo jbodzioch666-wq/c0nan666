@@ -21,9 +21,11 @@ module.exports = async page=>{
     // the Quiver tab
     setUi('inventory'); csBagTab('quiver'); await new Promise(r=>setTimeout(r, 50));
     out.tabs = [...document.querySelectorAll('#overlay .cs-bagtab')].map(e=>e.textContent.replace(/\s*\d+$/, '').trim()).join();
-    out.rows = document.querySelectorAll('#overlay .cs-qrow').length; out.kinds = quiverList().length;
-    const rune = [...document.querySelectorAll('#overlay .cs-qrow')].find(e=>/Rune Arrows/.test(e.textContent)); rune.querySelector('button').click();
-    out.loadedNow = ammoType(); out.runeOn = !!document.querySelector('#overlay .cs-qrow.on') && /Rune Arrows/.test(document.querySelector('#overlay .cs-qrow.on').textContent);
+    out.rows = document.querySelectorAll('#overlay .cs-quiver [data-csq]').length; out.kinds = quiverList().length;
+    document.querySelector('#overlay .cs-quiver [data-csq="5"]').click(); await new Promise(r=>setTimeout(r, 30));
+    out.loadedNow = ammoType(); out.runeOn = !!document.querySelector('#overlay .cs-quiver [data-csq="5"].sel');
+    /* (RS-372) or dragged onto the quiver slot on the figure */
+    out.dropOk = csDropOk({ from:'quiver', t:2 }, { slot:'ammo' }) && !csDropOk({ from:'quiver', t:2 }, { slot:'head' }); csDrop({ from:'quiver', t:2 }, { slot:'ammo' }); out.dragged = ammoType();
     setUi('playing');
     return out; });
   console.log(JSON.stringify(r));
@@ -33,6 +35,7 @@ module.exports = async page=>{
   A(r.fullSteel===35 && r.fullLen, 'into the quiver even with a full pack');
   A(r.darts===42 && !r.dartInv, 'more darts go onto the ones in hand');
   A(r.migr.iron===46 && r.migr.rune===12 && r.migr.inv===0, 'loose ammo in the pack goes into the quiver');
-  A(r.tabs==='All,Gear,Food,Scrolls,Resources,Quiver' && r.rows===r.kinds && r.kinds===4, 'the Quiver tab lists every kind');
+  A(r.tabs==='All,Gear,Food,Scrolls,Resources,Quiver' && r.rows===r.kinds && r.kinds===4, 'the Quiver tab shows every kind as a picture');
   A(r.loadedNow===5 && r.runeOn, 'a tap loads a kind');
+  A(r.dropOk && r.dragged===2, 'or drag it onto the quiver slot (RS-372)');
 };

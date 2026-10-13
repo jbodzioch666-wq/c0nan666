@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-372 - See what the loot filter will sell; drag ammo from the quiver
+
+- **The loot filter shows what it will salvage.** A new WILL BE SALVAGED list in the menu shows every piece in your bag that matches your settings, with its picture, name, tier and sell price. Hover one to see it in full. Tap **keep** to lock it, and the filter will never touch it. "Salvage them now" sells exactly that list.
+- **The Quiver tab works like the rest of the bag.** Each kind of arrow and bolt is a picture with its count. Drag one onto the quiver slot on the figure to load it, or tap it. Hover for its ranged strength and whether it fits your weapon.
+
 ## RS-371 - Every creature dies its own way
 
 - **Beasts roll onto their side.** Wolves, bears, big cats, rats, elk and other four-legged creatures topple sideways in the direction the blow pushed them. Their legs kick a few times, then go limp, and the head droops.
