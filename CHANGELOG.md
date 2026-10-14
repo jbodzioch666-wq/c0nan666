@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-387 - A proper cowl, and room at his table
+
+- **Hoods are cowls, not gnome hats.** A hood's slack used to stand up behind the head in a point; it now slumps softly down the back of the head. Every hooded figure gets it - the tavern's go-between, the cultists, the alchemist.
+- **You can stand in front of the hooded figure's table.** When his table was pulled in to his corner (RS-384), the tile it used to stand on stayed blocked; it's open now, so you can walk right up to him.
+
 ## RS-386 - Seats, robes, posts, the bank's arrows and where you stand
 
 - **Stools pulled in to their tables.** Every stool round a tavern table now stands right at it, so the regulars (and you) sit at the table with their knees under its edge, instead of a full pace away.

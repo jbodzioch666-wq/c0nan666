@@ -8,7 +8,7 @@ module.exports = async page=>{
     enterVillage(); setUi('playing'); enterInterior('tavern'); setUi('playing'); await frames(20);
     const h = G.villageNpcs.find(n=>n.service==='hooded'), L = ROOM_LAYOUT.tavern.benches;
     out.at = h && [h.x, h.y]; out.chair = L.some(b=>b[0]==='chair' && b[1]===5 && b[2]===11); out.books = L.some(b=>b[0]==='books' && b[1]===5 && b[2]===9);
-    out.table = L.some(b=>b[0]==='table' && b[1]===6 && b[2]===10); out.vendor = tileAt(5, 11)===T_VENDOR;
+    out.table = L.some(b=>b[0]==='table' && b[1]===6 && b[2]===10); out.vendor = tileAt(5, 11)===T_VENDOR; out.frontFree = G.map[6][10]===T_FLOOR && G.map[6][11]!==T_WALL;   /* (RS-387: the tile his table was moved off is open to stand on) */
     /* (RS-383) his back to the corner: he faces out across the room, toward the table; the corner is dim - a candle, a shadow, no lantern near */
     out.yaw = h && h.seat ? +h.seat.yaw.toFixed(2) : null;
     { let cand = 0, shade = 0; V3.world.traverse(o=>{ if (o.isPointLight && o.intensity > 0 && o.distance < 3 && Math.hypot(o.position.x - 6.5, o.position.z - 10.5) < 1) cand++; if (o.isPointLight && o.intensity < 0) shade++; }); out.candle = cand; out.shade = shade; }
@@ -27,6 +27,7 @@ module.exports = async page=>{
   A(Math.abs(r.yaw - 2.36) < 0.05, 'his back is to the corner, facing out to the north-east (RS-383)');
   A(r.candle===1 && r.lampFar, 'his corner is dimly lit: a candle, no lantern nearby (RS-383)');
   A(r.model && r.seated, 'he is drawn sat in it');
+  A(r.frontFree, 'you can stand in front of his table (RS-387)');
   A(r.talk && r.talk!=='playing', 'and you can still talk to him there');
   A(r.loadTown, 'a game saved in a town loads in the town');
   A(r.loadLand, 'a game saved on the land loads on the land');
