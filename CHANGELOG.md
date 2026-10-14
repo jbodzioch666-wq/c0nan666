@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-385 - Gathering no longer halves the frame rate
+
+- **Foraging, chopping and mining dropped the frame rate from 120 to 60.** The hotbar's "stop" slot shows a sweep that fills over each swing, and the time elapsed was written into the bar's own markup, so the whole hotbar was torn down and rebuilt every single frame while you worked. The sweep now carries the moment the swing began, which doesn't change, and the bar is only rebuilt when something really changes (once a swing).
+- **The gather bar** over your head only touches the page when a value changes, instead of writing its position, width and text every frame.
+- The sweep now lasts a whole swing instead of looping every 1.4 seconds.
+
 ## RS-384 - A seat at his table
 
 - **The hooded figure's table is pulled in to him.** It now stands right in front of his corner chair, so he sits at it properly instead of beside a table across the floor. The candle moved with it.
