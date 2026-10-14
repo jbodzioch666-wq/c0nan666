@@ -22731,15 +22731,11 @@ function townV3Tick(dt){
   if (!wet && !snow) return;
   // (RS-159) rain falls as thin streaks round you, like on the overworld - the old rain sprites got blown up into big round drops
   if (wet){
-    if (!V3.rain){ const RN = 700, geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(new Float32Array(RN*6), 3));
-      V3.rain = new T.LineSegments(geo, new T.LineBasicMaterial({ color:0xaabbd0, transparent:true, opacity:0.42, depthWrite:false })); V3.rain.frustumCulled = false;
-      V3.rainDrops = Array.from({ length:RN }, ()=>[Math.random()*20-10, Math.random()*7, Math.random()*20-10]); }
+    const storm = G.weather==='storm';
+    if (!V3.rain){ V3.rain = gfxRainLines(700, 20, 7.5, [0.26*0.04*4, 0.26, 0], 0.42); V3.rain.material.depthWrite = false; }   /* (RS-398: dropped by the card, like the land's) */
     if (V3.rain.parent !== V3.scene) V3.scene.add(V3.rain);
-    const storm = G.weather==='storm', live = storm ? V3.rainDrops.length : Math.round(V3.rainDrops.length*0.6), a = V3.rain.geometry.attributes.position, fall = dt*(storm ? 15 : 12), len = storm ? 0.32 : 0.26, slant = storm ? 0.09 : 0.04;
-    V3.rainDrops.forEach((d, i)=>{ if (i >= live){ a.setXYZ(i*2, 0, -50, 0); a.setXYZ(i*2+1, 0, -50, 0); return; }
-      d[1] -= fall; d[0] -= fall*slant; if (d[1] < 0){ d[0] = Math.random()*20-10; d[1] = 6 + Math.random()*1.5; d[2] = Math.random()*20-10; }
-      a.setXYZ(i*2, pp.x+d[0], d[1], pp.z+d[2]); a.setXYZ(i*2+1, pp.x+d[0]+len*slant*4, d[1]+len, pp.z+d[2]); });
-    a.needsUpdate = true; V3.rain.visible = true;
+    const live = storm ? 700 : 420, u = V3.rain.material.uniforms; V3.rain.geometry.setDrawRange(0, live*2);
+    u.uT.value = V3.t; u.uP.value.set(pp.x, 0, pp.z); u.uFall.value = storm ? 15 : 12; u.uSlant.value = storm ? 0.09 : 0.04; u.uLen.value = storm ? 0.32/0.26 : 1; V3.rain.visible = true;
     return;
   }
   V3.partMatRain = V3.partMatRain || new T.SpriteMaterial({ map:v3Blob('rgba(170,190,220,0.9)'), transparent:true, depthWrite:false, opacity:0.55 });
@@ -23594,6 +23590,21 @@ function gfxFpdPost(U){
   const p = G.player, lowHp = p && p.hp>0 && p.hp < p.maxHp*0.3 ? (0.25+0.2*Math.sin(FP.t*4)) : 0;
   U.vig2.value = 0.6; U.hurt.value = Math.max(FP.hurt*0.7, lowHp); U.heal.value = FP.heal*0.45; U.glow.value = FP.glow*0.5; U.fade.value = Math.max(0, Math.min(1, FP.fade||0));
   const fl = typeof ISO!=='undefined' && ISO.flash; U.flashK.value = fl ? Math.max(0, 1 - fl.t/0.4) : 0; if (fl){ const c = new THREE.Color(fl.col); U.flashC.value.set(c.r, c.g, c.b); }
+}
+/* (RS-398) rain as line segments the card drops: n streaks scattered over a span x span square, each from a random height under
+   top, with its end offset off; the shader lowers each by uFall*uT, wrapping at the bottom, drifts it by uSlant as it falls, and
+   stretches the streak by uLen. The position attribute holds every streak at rest, so its length can still be read off it */
+function gfxRainLines(n, span, top, off, opacity){
+  const T = THREE, pos = new Float32Array(n*6), base = new Float32Array(n*6);
+  for (let i=0;i<n;i++){ const x = Math.random()*span - span/2, y = Math.random()*top, z = Math.random()*span - span/2;
+    pos.set([x, y, z, x + off[0], y + off[1], z + off[2]], i*6); base.set([x, y, z, x, y, z], i*6); }
+  const g = new T.BufferGeometry(); g.setAttribute('position', new T.BufferAttribute(pos, 3)); g.setAttribute('aBase', new T.BufferAttribute(base, 3));
+  const m = new T.ShaderMaterial({ uniforms:{ uT:{ value:0 }, uP:{ value:new T.Vector3() }, uFall:{ value:14 }, uSlant:{ value:0 }, uLen:{ value:1 }, uTop:{ value:top }, uOp:{ value:opacity } }, transparent:true,
+    vertexShader:`attribute vec3 aBase; uniform float uT, uFall, uSlant, uLen, uTop; uniform vec3 uP;
+      void main(){ vec3 o = (position - aBase)*uLen; float y = mod(aBase.y - uT*uFall, uTop); vec3 p = uP + vec3(aBase.x - uSlant*(uTop - y), y, aBase.z) + o;
+        gl_Position = projectionMatrix*modelViewMatrix*vec4(p, 1.0); }`,
+    fragmentShader:`uniform float uOp; void main(){ gl_FragColor = vec4(0.667, 0.733, 0.816, uOp); }` });
+  m.opacity = opacity; const L = new T.LineSegments(g, m); L.frustumCulled = false; return L;
 }
 // ---- textures drawn once: grass, dirt and rock detail, and soft cloud noise ----
 function gfxTextures(){
@@ -31342,10 +31353,9 @@ function o3Init(){
     const boat = O3.boat = o3BuildBoat();
     O3.pgrp.add(boat);
     // rain streaks
-    const RN = 900, rp = new Float32Array(RN*6);
-    const rg = new T.BufferGeometry(); rg.setAttribute('position', new T.BufferAttribute(rp,3));
-    O3.rain = new T.LineSegments(rg, new T.LineBasicMaterial({ color:0xaabbd0, transparent:true, opacity:0.45 })); O3.rain.frustumCulled = false; O3.scene.add(O3.rain);
-    O3.rainDrops = Array.from({length:RN}, ()=>[Math.random()*30-15, Math.random()*12, Math.random()*30-15]);
+    /* (RS-398) each streak is laid out once where it starts; the card drops it with the clock and wraps it back to the top - 900
+       drops used to be moved and uploaded every frame. The geometry holds each streak at rest, its base in aBase */
+    O3.rain = gfxRainLines(900, 30, 12, [-0.04, -0.35, -0.02], 0.45); O3.scene.add(O3.rain);
     o3Input(cv);
     O3.ok = true;
   }catch(e){ O3.ok = false; }
@@ -32070,10 +32080,7 @@ function o3Render(){
   const wet = G.weather==='rain' || G.weather==='storm';
   O3.rain.visible = wet;
   if (wet){
-    const a = O3.rain.geometry.attributes.position, fall = dt*14, len = 0.35;
-    O3.rainDrops.forEach((d,i)=>{ d[1] -= fall; if (d[1] < -1){ d[0] = Math.random()*30-15; d[1] = 10+Math.random()*2; d[2] = Math.random()*30-15; }
-      a.setXYZ(i*2, pp.x+d[0], pp.y+d[1], pp.z+d[2]); a.setXYZ(i*2+1, pp.x+d[0]-0.04, pp.y+d[1]-len, pp.z+d[2]-0.02); });
-    a.needsUpdate = true;
+    const u = O3.rain.material.uniforms; u.uT.value = O3.t; u.uP.value.set(pp.x, pp.y - 1, pp.z); u.uFall.value = 14; u.uSlant.value = 0;
   }
   O3.hemi.intensity += stormTick(dt)*4;   /* lightning, with its thunder (RS-124) */
   // click marker
@@ -32321,10 +32328,21 @@ function fpdInit(){
     // dust hanging in the air, only noticeable close by in the lantern light
     const nD = 180, dp = new Float32Array(nD*3);
     for (let i=0;i<nD*3;i++) dp[i] = Math.random();
-    const dg = new T.BufferGeometry(); dg.setAttribute('position', new T.BufferAttribute(new Float32Array(nD*3), 3));
+    /* (RS-398) each mote's seed is its vertex; the drift, the wrap round you and the point size are worked out on the card - the CPU
+       used to move all 180 and upload them every frame. size and opacity stay plain properties (gfxFpdBuild sets them for a mine) */
+    const dg = new T.BufferGeometry(); dg.setAttribute('position', new T.BufferAttribute(dp, 3)); dg.setAttribute('aI', new T.BufferAttribute(new Float32Array(Array.from({ length:nD }, (_, i)=>i)), 1));
     const dc = v3Canvas(32,32), dx = dc.getContext('2d'), gr = dx.createRadialGradient(16,16,0,16,16,16);
     gr.addColorStop(0,'rgba(255,236,200,1)'); gr.addColorStop(1,'rgba(255,236,200,0)'); dx.fillStyle = gr; dx.fillRect(0,0,32,32);
-    const dust = new T.Points(dg, new T.PointsMaterial({ size:0.014, map:new T.CanvasTexture(dc), transparent:true, opacity:0.5, depthWrite:false, blending:T.AdditiveBlending, color:0xffe2b8 }));
+    const dm = new T.ShaderMaterial({ uniforms:{ uT:{ value:0 }, uC:{ value:new T.Vector2() }, uSize:{ value:0.014 }, uOp:{ value:0.5 }, uH:{ value:600 }, map:{ value:new T.CanvasTexture(dc) }, uCol:{ value:new T.Color(0xffe2b8) } },
+      transparent:true, depthWrite:false, blending:T.AdditiveBlending,
+      vertexShader:`attribute float aI; uniform float uT, uSize, uH; uniform vec2 uC;
+        void main(){ float t = uT*0.03; vec3 s = position;
+          float px = s.x*6.0 + sin(t*3.0 + aI)*0.2 + t, py = s.y + sin(t*5.0 + aI*1.7)*0.05, pz = s.z*6.0 + cos(t*2.0 + aI)*0.2;
+          vec3 p = vec3(uC.x - 3.0 + mod(px - (uC.x - 3.0), 6.0), 0.05 + fract(py)*0.9, uC.y - 3.0 + mod(pz - (uC.y - 3.0), 6.0));
+          vec4 mv = modelViewMatrix*vec4(p, 1.0); gl_Position = projectionMatrix*mv; gl_PointSize = uSize*uH*0.5/max(0.05, -mv.z); }`,
+      fragmentShader:`uniform sampler2D map; uniform float uOp; uniform vec3 uCol; void main(){ vec4 c = texture2D(map, gl_PointCoord); gl_FragColor = vec4(uCol*c.rgb, c.a*uOp); }` });
+    dm.size = 0.014; dm.opacity = 0.5;
+    const dust = new T.Points(dg, dm);
     dust.frustumCulled = false; scene.add(dust);
     // out of doors: the sun (or moon) with one shadow map over the whole field, a sky dome, the moon itself
     const sun = new T.DirectionalLight(0xfff2dc, 0); sun.castShadow = true; sun.shadow.mapSize.set(2048,2048); sun.shadow.bias = -0.0008; sun.shadow.normalBias = 0.02;
@@ -33137,13 +33155,7 @@ function fpdRender(env, T, camZ){
     L.position.set(bx + 0.025*Math.sin(FP.t*5.1+s), (wall ? 1.35 : o.f.h) + 0.02*Math.sin(FP.t*7.3+s*1.3), by + 0.025*Math.cos(FP.t*4.3+s)); });
   if (SET.gfx!=='low' && (G.gameMode===1 || G.gameMode===2)) dgShadowTick();
   // dust: a loose cloud kept centered on you
-  const dp = FPD.dust.geometry.attributes.position, sd = FPD.dustSeed, n = dp.count;
-  for (let i=0;i<n;i++){
-    const t = FP.t*0.03;
-    const px = sd[i*3]*6 + Math.sin(t*3+i)*0.2 + t, py = sd[i*3+1] + Math.sin(t*5+i*1.7)*0.05, pz = sd[i*3+2]*6 + Math.cos(t*2+i)*0.2;
-    dp.setXYZ(i, c.x-3 + (((px - (c.x-3))%6)+6)%6, 0.05 + ((py%1)+1)%1*0.9, c.y-3 + (((pz - (c.y-3))%6)+6)%6);
-  }
-  dp.needsUpdate = true;
+  { const u = FPD.dust.material.uniforms; u.uT.value = FP.t; u.uC.value.set(c.x, c.y); u.uSize.value = FPD.dust.material.size; u.uOp.value = FPD.dust.material.opacity; u.uH.value = h; }   /* (RS-398: the motes drift on the card) */
   // the mausoleum's roof lifts away (fades) while you're at or inside it, so you can see the way down
   const cr = FPD.cryptRoof;
   if (cr && G.gameMode===1){
@@ -39701,7 +39713,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-397';
+const GAME_VERSION = 'rs-398';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

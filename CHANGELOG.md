@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-398 - The GPU pass, part five: rain and dust on the card
+
+- **Rain falls in the shader.** The overworld's 900 streaks and a town's 700 were each moved by the CPU and uploaded to the card every frame. Each streak is now laid out once; the card drops it with the clock, wraps it back to the top, slants it in a storm and keeps it round you. Storms are still heavier than rain, and the streaks look the same.
+- **Dungeon dust drifts in the shader.** The 180 motes hanging in the lantern light were likewise moved and uploaded every frame. Their drift, the wrap round you and their size now come from the card; a mine's thicker dust still works.
+- **Test.** `gpurain` checks that the land rain, the town rain and the dust are shader-driven, that their geometry is never re-uploaded while they run, that the clock and your position reach them, and that a storm turns on every streak.
+
 ## RS-397 - The GPU pass, part four: the dungeon's effects in the scene
 
 - **Combat sparks as one point cloud.** Up to 400 sparks from hits, spells and torches were each a 2D circle, projected and drawn over the view every frame. They're one point cloud in the scene now; the CPU still moves them (a few sums each) and the card draws them.

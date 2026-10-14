@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| gpurain | RS-398: dungeon dust and the land and town rain move in vertex shaders, no per-frame upload |
 | dgfx | RS-397: particles, loot beams, vein glows, hover glow and arrows/spell bolts as scene objects, not 2D |
 | dgcanvas | RS-396: the dungeon view on its own canvas (no per-frame copy); vignette and hurt/heal edges in the post shader |
 | shadowwalk | RS-395: on the open land the shadow map is redrawn every frame while you walk, and snapped to its texels |
