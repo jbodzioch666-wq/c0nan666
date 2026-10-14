@@ -4,7 +4,7 @@ module.exports = async page=>{
     goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{};
     const out = {}; enterVillage(); setUi('playing'); enterInterior('tavern'); setUi('playing');
     for (let i=0;i<20;i++){ renderGame(); await new Promise(r=>setTimeout(r, 40)); }
-    const h = G.villageNpcs.find(n=>n.service==='hooded'); out.there = !!h && tileAt(h.x, h.y)===T_VENDOR && G.map[h.x][h.y+1]!==T_WALL;
+    const h = G.villageNpcs.find(n=>n.service==='hooded'); out.there = !!h && tileAt(h.x, h.y)===T_VENDOR && G.map[h.x+1][h.y-1]!==T_WALL;   /* (RS-383: back in the corner, facing out - the room is to his north-east) */
     out.model = !!(V3.npcs||[]).find(p=>p.n && p.n.service==='hooded');
     out.givers = ['thief1','thief2','thief3'].map(id=>SQ[id].giver);
     // the tavernkeeper doesn't offer it
