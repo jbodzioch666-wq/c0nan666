@@ -11,7 +11,7 @@ module.exports = async page=>{
     out.table = L.some(b=>b[0]==='table' && b[1]===6 && b[2]===10); out.vendor = tileAt(5, 11)===T_VENDOR;
     /* (RS-383) his back to the corner: he faces out across the room, toward the table; the corner is dim - a candle, a shadow, no lantern near */
     out.yaw = h && h.seat ? +h.seat.yaw.toFixed(2) : null;
-    { let cand = 0, shade = 0; V3.world.traverse(o=>{ if (o.isPointLight && o.intensity > 0 && o.distance < 3 && Math.hypot(o.position.x - 6.5, o.position.z - 10.5) < 0.3) cand++; if (o.isPointLight && o.intensity < 0) shade++; }); out.candle = cand; out.shade = shade; }
+    { let cand = 0, shade = 0; V3.world.traverse(o=>{ if (o.isPointLight && o.intensity > 0 && o.distance < 3 && Math.hypot(o.position.x - 6.5, o.position.z - 10.5) < 1) cand++; if (o.isPointLight && o.intensity < 0) shade++; }); out.candle = cand; out.shade = shade; }
     out.lampFar = V3.lamps.filter(l=>l.main).every(l=>Math.hypot(l.p[0] - 5.5, l.p[2] - 11.5) > 4.5);
     const p3 = (V3.npcs||[]).find(p=>p.n && p.n.service==='hooded'); out.model = !!p3;
     if (p3){ const hips = p3.e.rig.hips, y = hips.getWorldPosition(new THREE.Vector3()).y - p3.g.position.y; out.hipY = +y.toFixed(2); out.seated = !!p3.n.seat; }

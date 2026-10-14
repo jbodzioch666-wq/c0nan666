@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-384 - A seat at his table
+
+- **The hooded figure's table is pulled in to him.** It now stands right in front of his corner chair, so he sits at it properly instead of beside a table across the floor. The candle moved with it.
+
 ## RS-383 - The hooded figure keeps to the shadows
 
 - **His back to the corner.** The hooded figure now sits right in the tavern's corner by the bookshelf, his back to the two walls, facing out across the room, with his table in front of him.
