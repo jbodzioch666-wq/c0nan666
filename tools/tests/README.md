@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| tavgames | RS-391: the tavern's games played for real: dice poker, twenty-one, the wheel and darts at a standard board |
 | winlight | RS-390: window light follows the hour: rose at dawn, warm white by day, orange at dusk, none at night, in the shafts, the glass and the room's tint |
 | bedsleep | RS-389: renting a bed lays you in it, fades the night out, wakes you just after dawn with daylight in the windows, and gets you up |
 | rs386 | RS-386: stools pulled in to tables; bank ammo coloured and quiver rows with tooltips; seated robes drape round the seat; posts stop short of the wall top; you stand at the edge of a town's tile |

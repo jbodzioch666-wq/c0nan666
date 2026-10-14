@@ -1,5 +1,15 @@
 # Depthcrawl patch notes
 
+## RS-391 - The tavern's games, played for real
+
+The games at the tavern used to be a single button and a result. Now you play them.
+
+- **Dice poker.** Five dice each. Click the dice you want to keep, then roll the rest once - or stand. The dealer plays its own hand the same way, keeping its pairs and straights. Hands, best first: five of a kind, four of a kind, full house, high straight, low straight, three of a kind, two pairs, a pair. Win double; a draw gives your stake back.
+- **Twenty-one.** A fresh shuffled deck each hand. Hit, stand or double down on your first two cards; the dealer's second card stays face down until you're done, and the dealer draws to seventeen. Aces count one or eleven. A win pays double, twenty-one in two cards two and a half times.
+- **The wheel.** Bet red, black or the gold crown and watch the painted wheel spin and slow to a stop under the pointer. Red or black pays double, the crown thirty times.
+- **Darts at a real board.** Aim with the pointer and click to throw three darts at a standard dartboard - bull, outer bull, trebles and doubles in their rings. Your hand sways, and steadies as your Ranged level rises. Then the local throws three, aiming for the treble twenty. Beat their total for 20 gold.
+- **No walking out mid-hand.** While a stake is on the table, Escape and the close button wait until the hand is played out.
+
 ## RS-390 - Dawn and dusk through the windows
 
 - **Window light follows the hour.** Inside any building, the light through the windows is a low rose-gold at dawn, warm white through the day and a deep orange as the sun goes down at dusk, then gone at night. The shafts on the floor, the glass itself and the room's light all take the colour, and it changes as the clock runs - no need to step out and back in.

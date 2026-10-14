@@ -43,9 +43,9 @@ module.exports = async page=>{
     out.arena = G.wevDlg.title; wevChoose(1); A(!G.arenaRun && arenaRec().best===1, 'arena record');
     // games and gambling
     G.gamesAt = 'range'; setUi('games'); A(/TRAINING RANGE/.test(document.getElementById('overlay').innerHTML), 'the range is a training range (RS-333)'); out.archery = 'training range';
-    G.gamesAt = 'tavern'; mgDarts(); out.darts = G.mgLast; skAdd('c_shrimp', 2); mgCook(); out.cook = G.mgLast; A(mgRec().cook > 0, 'cook-off');
+    G.gamesAt = 'tavern'; setUi('games'); mgDarts(); for (let i=0;i<3;i++) dartsThrow(0, -0.6); while (G.darts.stage!=='done') dartsTheirs(); out.darts = G.mgLast;   /* (RS-391: a real board) */ skAdd('c_shrimp', 2); mgCook(); out.cook = G.mgLast; A(mgRec().cook > 0, 'cook-off');
     skP().tools.rod = 1; G.gamesAt = 'harbour'; mgFish(); out.fish = G.mgLast; renderOverlay();
-    setUi('gamble'); const gg = p.gold; G.gbBet = 100; gbDice(); gbDraw(); A(G.gbCard, 'card drawn'); renderOverlay(); gbHiLo(1); gbWheel(); A(p.gold!==gg || gbRec().lost + gbRec().won > 0, 'gambled'); out.gamble = gbRec();
+    setUi('gamble'); const gg = p.gold; G.gbBet = 100; gbPokerStart(); gbPokerRoll(true); gbBjStart(); if (gbS().bj.stage==='play') gbBjStand(); gbWheelSpin('red'); gbWheelLand(); A(p.gold!==gg || gbRec().lost + gbRec().won > 0, 'gambled'); out.gamble = gbRec();   /* (RS-391: dice poker, twenty-one, the wheel) */
     setUi('playing');
     // the news on the board
     tkOpen('board', 'news'); const ov = document.getElementById('overlay').innerHTML; A(ov.includes('RUMOURS') && ov.includes('NEWS FROM ACROSS THE LAND'), 'news tab'); setUi('playing');
