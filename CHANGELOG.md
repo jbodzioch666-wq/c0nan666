@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-382 - Walk off a won field; the hooded figure takes a seat; back where you left off
+
+- **A won fight on the open land stays open.** The last foe falling no longer whisks you straight back to the map: the win is paid at once, and you stay on the field to pick up what fell and leave by walking off its edge, as you would to flee. An ambush's sealed edges open as soon as the last foe is down.
+- **A portal when there is no way out.** A field you can't walk off (walls all round, an island, a closed-in ruin) opens a portal on the nearest clear tile once the fight is won; step into it to return to the open road.
+- **The hooded figure sits down.** The Thieves' Guild's go-between now sits in the tavern's corner chair by the bookshelf, with a table in front of him. Talk to him there as before.
+- **You start where you logged out.** A game saved in a town loads in that town instead of on the road outside it.
+
 ## RS-381 - The cursor no longer costs frames
 
 - **Moving the mouse dropped the frame rate from 80 to 30** on the open land, in towns and in dungeons alike. A gaming mouse reports its position hundreds of times a second, and every report ran a full pick of what was under the cursor, rebuilding the tooltip each time. A move is now only noted, and the pick runs once a frame at most.

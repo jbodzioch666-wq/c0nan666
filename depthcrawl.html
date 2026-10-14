@@ -7310,6 +7310,7 @@ function tryMove(dx,dy){
     }
     case T_EXIT: {
       leavingFloor = true;
+      if (G.gameMode===2){ fieldLeave(true); break; }   /* (RS-382: the portal off a field with no way out) */
       if (G.gameMode===3){ G.gameMode=0; logMsg('you head back out onto the road', 'new'); }
       else {
         if (G.dgDone) logMsg(`you step through the portal and out into the open air - the ${SITE_WORD[G.siteKind]||'dungeon'} falls in behind you`, 'magic');
@@ -7319,6 +7320,7 @@ function tryMove(dx,dy){
       break;
     }
     case T_FLEE: leavingFloor=true;
+      if (G.gameMode===2 && G.fieldWon){ fieldLeave(); break; }   /* (RS-382: the fight won, you walk off the field) */
       if (G.wevFight && G.sqReturn){ G.wevFight = null; logMsg(G.cellar ? 'you climb back up out of the cellar' : 'you break off the fight and head back', 'new'); sqReturnIndoors(); break; }
       G.cellar = false; G.gameMode=0; logMsg('you break off the fight and retreat', 'new'); break;
     case T_TRAP: {
@@ -7380,7 +7382,7 @@ function serializeGame(){
     // function of OW_COLS/OW_ROWS too
     worldSizeTier: G.worldSizeTier||'medium', owCols: OW_COLS, owRows: OW_ROWS,
     owMythicSlain: G.ow.mythicSlain||{}, owMythicNew: G.ow.mythicNew||[], owMythicNextAt: G.ow.mythicNextAt||0, owMythicPos: G.ow.mythicPos||{}, owMythicFound: G.ow.mythicFound||{},
-    gameMode: (G.gameMode===2 || G.gameMode===3) ? 0 : G.gameMode,
+    gameMode: (G.gameMode===2 || G.gameMode===3) ? 0 : G.gameMode, inTown: G.gameMode===3 ? 1 : 0,   /* (RS-382: saved in a town, you start in it) */
     depth: G.depth, dungeonMaxDepth: G.dungeonMaxDepth,
     dungeonEntrance: {x:G.dungeonEntrance.x,y:G.dungeonEntrance.y}, dungeonSlot: G.dungeonSlot,
     siteKind: G.siteKind, dungeonModifier: G.dungeonModifier||null, dgDone: G.dgDone||0, dgCache: dgCacheEncode(), questBoard: G.questBoard, questBoards: G.questBoards||{},
@@ -7560,6 +7562,7 @@ function loadGame(id){
   rsMigrateAll();
   rsSync();
   setUi('playing');
+  if (data.inTown && G.gameMode===0 && G.ow.map[G.owPos.x] && G.ow.map[G.owPos.x][G.owPos.y]===OW_TOWN){ try{ enterVillage(); setUi('playing'); }catch(e){ console.error(e); G.gameMode = 0; } }   /* (RS-382: you logged out in a town - you come back in it) */
   logMsg(`welcome back, ${G.player.name} the ${G.player.race} ${G.player.kit||G.player.cls} - combat level ${G.player.combatLevel}.`, 'new');
   return true;
 }
@@ -7875,6 +7878,34 @@ function weatherFlavorMsg(w){
 }
 // how much riskier the roads are right now - stacks night + weather, only
 // ever used to scale the overworld's own roadside-ambush rolls
+/* (RS-382) a fight on the open land won: you stay on the field - to pick up what fell, catch your breath, look around - and
+   leave by walking off its edge as you would to flee. An ambush's sealed edges open once the last foe is down. A field with
+   no edge you can reach (a cellar, a ruin's rooms, an island) gets a portal on the nearest clear tile */
+function fieldWonStay(){
+  if (G.gameMode!==2) return;
+  logMsg('walk off the edge of the field when you are ready to go', '');
+  if (fieldExitReachable()) return;
+  const p = G.player, ok = (x,y)=>G.map[x] && G.map[x][y]===T_FLOOR && !dgSolid(x, y) && !(x===p.x && y===p.y) && !(G.floorItem && G.floorItem[x] && G.floorItem[x][y]);
+  const seen = new Set([p.x+','+p.y]), q = [[p.x, p.y]]; let best = null;
+  while (q.length && !best){ const [x,y] = q.shift(); if (ok(x,y)){ best = [x,y]; break; }
+    for (const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){ const nx = x+dx, ny = y+dy, k = nx+','+ny; if (seen.has(k) || !isoPassable(nx, ny)) continue; seen.add(k); q.push([nx,ny]); } }
+  if (!best) best = [p.x, p.y];
+  G.map[best[0]][best[1]] = T_EXIT; G.fieldPortal = best;
+  if (typeof FPD!=='undefined') FPD.mapRef = null;
+  logMsg('there is no way off this ground - a portal to the open road shimmers open nearby', 'magic'); try{ audEnv('portal'); }catch(e){}
+}
+function fieldExitReachable(){
+  const p = G.player, seen = new Set([p.x+','+p.y]), q = [[p.x, p.y]];
+  while (q.length){ const [x,y] = q.shift();
+    for (const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){ const nx = x+dx, ny = y+dy, k = nx+','+ny; if (seen.has(k)) continue; seen.add(k); const t = tileAt(nx, ny);
+      if (t===T_FLEE || t===T_EXIT) return true; if (isoPassable(nx, ny)) q.push([nx,ny]); } }
+  return false;
+}
+function fieldLeave(portal){
+  if (G.sqReturn){ logMsg(G.cellar ? 'you climb back up out of the cellar' : 'you head back the way you came', 'new'); G.fieldWon = false; G.fieldPortal = null; sqReturnIndoors(); return; }
+  G.cellar = false; G.fieldWon = false; G.fieldPortal = null; G.gameMode = 0;
+  logMsg(portal ? 'you step through the portal and out onto the open road' : 'you leave the field behind you', 'new');
+}
 function encounterMult(){
   let m = 1;
   if (isNightTime()) m *= 1.4;
@@ -8721,7 +8752,7 @@ function generateArena(){
   // fled/abandoned set-piece can never bleed its bonus reward into some
   // later, unrelated encounter - terrainSetPieceEncounter re-sets it right
   // after calling this, once it knows THIS particular arena is the set piece
-  G.encounterSetPiece = false; G.encounterSetPieceTerrain = null; G.questCampId = null; G.wevFight = null; G.cellar = false;
+  G.encounterSetPiece = false; G.encounterSetPieceTerrain = null; G.questCampId = null; G.wevFight = null; G.cellar = false; G.fieldWon = false;
   G.activeZones = []; // a Spirit Guardians/Hunger of Hadar zone from a previous fight has no business in a fresh one
   // the terrain you're standing on (see tryMoveOverworld) picks both the
   // Monster Manual roster and the visual theme below - G.owPos is already
@@ -9237,8 +9268,9 @@ function enterInterior(key){
   G.villageNpcs = vendor ? [Object.assign({}, vendor, { x:10, y:5 })] : [];
   G.villagers = [];
   if (key==='tavern') townPatrons();
-  if (key==='tavern'){ const hx = 14, hy = 7; G.map[hx][hy] = T_VENDOR; G.villageDeco[hx][hy] = 'npc'; G.villageNpcs.push({ x:hx, y:hy, name:'a hooded figure', role:'Hooded figure', service:'hooded', key:'hooded', free:1 }); }   /* (RS-325) the Thieves' Guild's go-between, in the corner */
+  if (key==='tavern') G.villageNpcs.push({ x:6, y:10, name:'a hooded figure', role:'Hooded figure', service:'hooded', key:'hooded', free:1, seat:{ x:6, y:10, yaw:roomSeatYaw('chair', 6, 10, 'tavern') } });   /* (RS-325) the Thieves' Guild's go-between - RS-382: sat in the corner chair by the bookshelf, a table before him */
   for (const [k,x,y] of ROOM_LAYOUT[key].benches) roomBenchMark(k, x, y);
+  for (const n of G.villageNpcs) if (n.seat){ G.map[n.x][n.y] = T_VENDOR; G.villageDeco[n.x][n.y] = 'npc'; }   /* (his chair is where you talk to him) */
   G.sitAt = null; G.player.x = ROOM.door.x; G.player.y = ROOM.door.y - 1; G.player.facing = 0;
   logMsg(`you step into ${b.name.toLowerCase()}`, 'new'); try{ audEnv('door'); }catch(e){}
   renderGame();
@@ -9407,7 +9439,7 @@ function v3BuildInterior(grp, mats){
   // benches of the trade
   for (const [k,x,y] of ROOM_LAYOUT[key].benches){ v3Bench(k, x+0.5, y+0.5, mats, grp, roomBenchRot(k, x, y));
     if ((k==='stairs' || k==='stairsup') && y===ROOM.y0) v3StairDoor(grp, mats, x+0.5);
-    for (const [tx,ty] of roomBenchTiles(k, x, y)){ const hb = new T.Mesh(new T.BoxGeometry(0.95, 1.4, 0.95), new T.MeshBasicMaterial({ visible:false })); hb.position.set(tx+0.5, 0.7, ty+0.5); hb.userData.act = { kind:'tile', x:tx, y:ty, label:BENCHES[k].nm }; grp.add(hb); V3.hits.push(hb); } }
+    for (const [tx,ty] of roomBenchTiles(k, x, y)){ if ((G.villageNpcs||[]).some(n=>n.seat && n.x===tx && n.y===ty)) continue; const hb = new T.Mesh(new T.BoxGeometry(0.95, 1.4, 0.95), new T.MeshBasicMaterial({ visible:false })); hb.position.set(tx+0.5, 0.7, ty+0.5); hb.userData.act = { kind:'tile', x:tx, y:ty, label:BENCHES[k].nm }; grp.add(hb); V3.hits.push(hb); } }
   // a few things for the look of the place
   if (key==='tavern'){ v3Barrel(13.4, 10.5, mats, grp); v3Barrel(14.2, 10.5, mats, grp); }   /* (RS-182: out of the stair corner) */
   if (key==='shop'){ v3Crate(6.4,6.4,mats,grp,1.1); v3Crate(6.4,6.4,mats,grp,0.8,0.46); v3Crate(13.5,10.4,mats,grp); v3Barrel(14.4,7.6,mats,grp); v3Barrel(6.5,10.4,mats,grp); }   /* (RS-183: the trapdoor has the back corner) */
@@ -19393,7 +19425,7 @@ function wevCampEntry(kind, L){
 function wevFightStart(kind, id, build){
   if (G.gather) skStop();
   generateArena();
-  G.gameMode = 2; G.mandatoryFight = false; G.mon = [];
+  G.gameMode = 2; G.mandatoryFight = false; G.mon = []; G.fieldWon = false;
   build(cbLvl());
   G.wevFight = { kind, id };
   setUi('playing'); renderGame();
@@ -21849,7 +21881,7 @@ Object.assign(BENCHES, {
 // (RS-182) furniture that belongs against a wall stands against one: bookshelves on the west wall, beds, hearths and shrines on the
 // back wall, and the stairs in the back corner climbing to a door in the wall
 const ROOM_STAIRS = [14, 5], ROOM_STAIRS_LAND = [13, 6];
-ROOM_LAYOUT.tavern.benches.push(['stairs',ROOM_STAIRS[0],ROOM_STAIRS[1]], ['books',5,9], ['chair',6,10],
+ROOM_LAYOUT.tavern.benches.push(['stairs',ROOM_STAIRS[0],ROOM_STAIRS[1]], ['books',5,9], ['chair',6,10], ['table',6,11],
   ['table',8,9], ['stool',7,9], ['stool',9,9], ['stool',8,10], ['table',12,9], ['stool',11,9], ['stool',13,9], ['stool',12,10]);   /* (RS-183: two tables with their stools; x=10 stays clear to the bar) */
 ROOM_LAYOUT.shop.benches.push(['cellar',ROOM_STAIRS[0],ROOM_STAIRS[1]]);   /* (RS-183: the trapdoor in the back corner) */
 ROOM_LAYOUT.alch.benches.push(['books',5,9]);
@@ -29766,7 +29798,7 @@ function v3BuildPeople(grp, mats){
   { const el = document.createElement('div'); el.className = 'v3plate me'; el.innerHTML = `<b>${esc(G.player.name||'you')}</b>`; V3.labels.appendChild(el); V3.plates.push({ el, objFn:()=>V3.player && V3.player.g, y:1.3 }); }
   (V3.villagers||[]).forEach((p,i)=>{ const h = Math.floor(o3Hash(i+1, (p.v.look|0)+3, 77)*NAME_POOL.length), role = FOLK_ROLES[(i*7+(p.v.look|0))%FOLK_ROLES.length];
     const el = document.createElement('div'); el.className = 'v3plate folk'; el.innerHTML = `<b>${esc(p.v.nm || NAME_POOL[h])}</b><span>${esc(p.v.role || role)}</span>`; V3.labels.appendChild(el); V3.plates.push({ el, obj:p.g, y:1.15, near:9, hover:true }); });   /* (RS-374: no plate over a citizen's head - point at them to see who they are) */
-  if (G.interior) for (const [k,x,y] of ROOM_LAYOUT[G.interior.key].benches){ if (k==='stool' || k==='table') continue; const el = document.createElement('div'); el.className = 'v3plate small'; el.innerHTML = `<b>${esc(BENCHES[k].nm)}</b>`; V3.labels.appendChild(el); V3.plates.push({ el, pos:new T.Vector3(x+0.5, 1.45, y+0.5) }); }
+  if (G.interior) for (const [k,x,y] of ROOM_LAYOUT[G.interior.key].benches){ if (k==='stool' || k==='table') continue; if ((G.villageNpcs||[]).some(n=>n.seat && n.x===x && n.y===y)) continue;   /* (RS-382: a chair someone sits in shows their name, not its own) */ const el = document.createElement('div'); el.className = 'v3plate small'; el.innerHTML = `<b>${esc(BENCHES[k].nm)}</b>`; V3.labels.appendChild(el); V3.plates.push({ el, pos:new T.Vector3(x+0.5, 1.45, y+0.5) }); }
   if (G.interior && ROOM_STREET_DOOR(G.interior.key)){ const el = document.createElement('div'); el.className = 'v3plate small'; el.innerHTML = '<b>Door</b>'; V3.labels.appendChild(el); V3.plates.push({ el, pos:new T.Vector3(ROOM.door.x+0.5, 1.9, ROOM.door.y+0.2) }); }
   if (!G.interior) for (const [txt, x, y, z] of [['Waypoint', TOWN_CX+0.5, 1.95, tY(12) + 0.5]]){
     const el = document.createElement('div'); el.className = 'v3plate small'; el.innerHTML = `<b>${txt}</b>`; V3.labels.appendChild(el);
@@ -30073,7 +30105,7 @@ function v3Render(){
   }
   { const st = G.interior && G.sitAt; if (st){ glide(V3.player, st.x - Math.sin(st.yaw)*0.06, st.y - Math.cos(st.yaw)*0.06); v3SeatPose(V3.player, st); } else glide(V3.player, G.player.x, G.player.y); }
   V3.villagers.forEach(p=>{ const st = p.v.seat; if (st){ glide(p, st.x - Math.sin(st.yaw)*0.06, st.y - Math.cos(st.yaw)*0.06, 6); v3SeatPose(p, st); } else glide(p, p.v.x, p.v.y, 1.7); v3FolkShadow(p); });   // (a walking pace: one tile in about the time between their steps)
-  V3.npcs.forEach(p=>{ glide(p, p.n.x, p.n.y); v3FolkShadow(p); });
+  V3.npcs.forEach(p=>{ const st = p.n.seat; if (st){ glide(p, st.x - Math.sin(st.yaw)*0.06, st.y - Math.cos(st.yaw)*0.06); v3SeatPose(p, st); } else glide(p, p.n.x, p.n.y); v3FolkShadow(p); });   /* (RS-382: someone seated sits) */
   try{ townV3Tick(dt); }catch(e){ console.error(e); }
   // camera follows you from the south-east at an angle
   const pp = V3.player.g.position, yaw = viewYawSmooth(dt), D = V3.dist*doorZoom();
@@ -32550,11 +32582,11 @@ function fpdBuild(T){
 // (see fpdRender) and throws its colour on the floor around it
 function fpdPortals(world){
   const T = THREE; FPD.portals = [];
-  if (G.gameMode!==1) return;
+  if (G.gameMode!==1 && G.gameMode!==2) return;   /* (RS-382: a won field with no way out gets a portal too) */
   const stone = FPD.mats.portalStone || (FPD.mats.portalStone = new T.MeshStandardMaterial({ color:new T.Color('#6a655c').convertSRGBToLinear(), roughness:0.85 }));
   const rune = FPD.mats.portalRune || (FPD.mats.portalRune = new T.MeshBasicMaterial({ color:0xffffff }));
   for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++){
-    const t = G.map[x][y]; if (t!==T_EXIT && t!==T_FLEE) continue;
+    const t = G.map[x][y]; if (t!==T_EXIT && t!==T_FLEE) continue; if (G.gameMode===2 && t!==T_EXIT) continue;   /* (a field's edge has its signs) */
     const col = new T.Color(t===T_EXIT ? 0x4ad8ff : 0xff4a3a);
     const w = stairWallDir(x, y) || portalWallDir(x, y), face = w ? [-w[0], -w[1]] : fpStairDir(x, y);   /* (RS-185: backed onto a wall wherever there is one) */
     const g = new T.Group(); g.position.set(x+0.5 - face[0]*0.22, 0, y+0.5 - face[1]*0.22); g.rotation.y = Math.atan2(face[0], face[1]);
@@ -39308,7 +39340,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-381';
+const GAME_VERSION = 'rs-382';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -41985,7 +42017,7 @@ function frameLoop(ts){
     // so nothing happens to you while you're just standing there deciding
     if (G.ui==='playing' && !G.gameOver && G.gameMode===2){
       const allDead = G.mon.length>0 && G.mon.every(m=>!m.alive);
-      if (allDead){
+      if (allDead && !G.fieldWon){ G.fieldWon = true;   /* (RS-382: paid once; the field stays open until you walk off it) */
         logMsg("the field falls quiet - you've won the fight", 'good');
         // a terrain set-piece (see triggerOverworldEncounter/terrainSetPieceEncounter)
         // pays out once, on clearing the whole encounter, rather than per
@@ -42001,7 +42033,7 @@ function frameLoop(ts){
         }
         questArenaWon();
         try{ wgWildWin(); }catch(e){ console.error(e); }
-        if (!wevArenaWon()) G.gameMode=0;   // (a broken siege or a repelled raid walks you back into the town)
+        if (!wevArenaWon()) fieldWonStay();   // (a broken siege or a repelled raid walks you back into the town)
       }
     }
     if (G.ui==='playing' && !G.gameOver) questFrameCheck();

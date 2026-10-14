@@ -25,6 +25,8 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs382 | RS-382: the hooded figure sits in the tavern's corner chair behind a table; a game saved in a town loads in that town |
+| fieldwon | RS-382: a won overworld fight stays open until you walk off its edge (ambushes too); a field with no way out gets a portal |
 | hoverpick | RS-381: mouse moves are only noted and picked once a frame; the land is picked by its heightfield, creatures by a sphere; the tooltip follows once a frame |
 | townmerge | RS-380: town props merge by make with baked vertex colours, window panes merge into their buildings, puddles are one instanced mesh, the glass keeps its palette material |
 | skinall | RS-379: every creature template is skinned into a few meshes once, one skeleton per figure, culled by one sphere; props baked whole; spiders too; a copy binds to its own joints |

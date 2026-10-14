@@ -33,7 +33,7 @@ module.exports = async page=>{
   await frame(); await frame();
   const r3 = await page.evaluate(()=>{
     const A = (c, msg)=>{ if (!c) throw new Error('assert: '+msg); };
-    const e = wevP(); A(!e.camps.some(c=>c.id===window.__cid), 'camp removed'); A(G.gameMode===0, 'back on the overworld '+G.gameMode); A(wevStats().camps===1, 'camp count');
+    const e = wevP(); A(!e.camps.some(c=>c.id===window.__cid), 'camp removed'); A(G.gameMode===2 && G.fieldWon, 'the won field stays open (RS-382) '+G.gameMode); fieldLeave(); A(G.gameMode===0, 'back on the overworld after walking off '+G.gameMode); A(wevStats().camps===1, 'camp count');
     // clear a whole territory: secured
     const ti = wevTerrAt(e.camps.length ? e.camps[0].x : G.owPos.x, e.camps.length ? e.camps[0].y : G.owPos.y);
     const inT = e.camps.filter(c=>wevTerrAt(c.x,c.y)===ti);
