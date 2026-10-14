@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| dsconce | RS-393: dungeon wall torches are 3D iron sconces; their light is on the GPU, no CPU light map |
 | sconces | rooms are lit by torches in wall sconces, not ceiling lanterns; daylight by day, torchlight at night |
 | tavgames | RS-391: the tavern's games played for real: dice poker, twenty-one, the wheel and darts at a standard board |
 | winlight | RS-390: window light follows the hour: rose at dawn, warm white by day, orange at dusk, none at night, in the shafts, the glass and the room's tint |

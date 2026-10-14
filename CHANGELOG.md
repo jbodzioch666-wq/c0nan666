@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-393 - Dungeon sconces
+
+- **3D sconces in dungeons.** Dungeon wall torches used to be painted onto the wall. They are now the same 3D iron sconces as in town rooms: a riveted plate, a curled bracket, a cup and a tarred torch, with a flickering flame. They're scaled to dungeon walls, face out into the room, and hang on plain stone.
+- **All torchlight on the GPU.** The walls, floors and creatures were already lit by the graphics card. Leftover code from the old first-person view still rebuilt a light map of the whole floor on the CPU every frame. It covered every tile and every torch at four times the resolution, but was only used to shade the few flat sprites still drawn. That's gone: each sprite now works out its torchlight only where it stands, leaving the CPU more time for everything else.
+
 ## RS-392 - Torchlit rooms
 
 - **Wall sconces, not ceiling lanterns.** The lanterns hanging from the ceiling are gone. Every room now has torches in iron sconces on its walls: a riveted back plate, a curled bracket, and a tarred torch with a flickering flame. One hangs on the back wall between the shelves and one on the side wall, kept clear of bookcases and of the hooded figure's dim corner.
