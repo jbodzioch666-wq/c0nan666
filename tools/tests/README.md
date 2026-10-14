@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| deadcode | RS-400: the skeleton studio renderer and the raycaster frame buffer are gone; skeletons still built |
 | hudthrottle | RS-399: the game loop rebuilds the HTML HUD ten times a second; actions still rebuild at once |
 | gpurain | RS-398: dungeon dust and the land and town rain move in vertex shaders, no per-frame upload |
 | dgfx | RS-397: particles, loot beams, vein glows, hover glow and arrows/spell bolts as scene objects, not 2D |

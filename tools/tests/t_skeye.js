@@ -12,8 +12,9 @@ module.exports = async page=>{
     // the flat fallback itself: draw a champion and read the eye colour it set
     FP.cam = FP.cam || { x:0, y:0 }; FP.monFlash = FP.monFlash || new Map();
     const m = { nm:'skeleton champion', x:1, y:1, alive:1, hp:10, maxHp:10 }; G.player.x = 2; G.player.y = 1;
-    sk3Sprite(m, { x:1.5, y:1.5 }, 1, 64); out.drawn = SK3.eyeMat.color.getHex();
-    if (out.drawn!==SK3_EYE.champion) throw new Error('the fallback draws a champion with gold eyes: '+out.drawn.toString(16));
+    /* (RS-400: no flat fallback any more - the eyes are read off a built figure's own eye material) */
+    const e = sk3Instance(m); let drawn = -1; e.holder.traverse(o=>{ if (o.isMesh && o.material && o.material.color && o.material.isMeshBasicMaterial && drawn < 0 && [...o.material.color.toArray()].some(v=>v > 0.3)) drawn = o.material.color.getHex(); });
+    out.drawn = drawn; if (out.drawn!==SK3_EYE.champion) throw new Error('a champion is built with gold eyes: '+out.drawn.toString(16));
     return out; });
   console.log(JSON.stringify(r));
 };

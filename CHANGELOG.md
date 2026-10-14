@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-400 - Dead weight out
+
+- **The skeleton's studio renderer is gone.** From the first-person days, every skeleton was drawn by its own second WebGL renderer into a 900 by 1200 canvas, then copied through three more canvases a frame to make a sprite. In the isometric view skeletons have been real figures in the scene since RS-110, so that path never ran, but the renderer (with its lights and a 2048 shadow map) was still created at boot. Now only the sculpted template is built, and the figures are cloned from it as before.
+- **The raycaster's frame buffer is gone.** A half-screen pixel buffer was still allocated for the old first-person view on every resize, and the flee portal still had a painted stand-in for a 3D view that isn't running (it's a model).
+- **Test.** `deadcode` checks no studio renderer or sprite path exists, no frame buffer is made, and a skeleton still stands in a dungeon as a built figure.
+
 ## RS-399 - The HUD on its own clock
 
 - **The HUD is rebuilt ten times a second, not every frame.** The player plate, hotbar, status chips, side panel, quick bars, buff bar and the clock bar are HTML. Every frame each was rebuilt as a string and compared with the last; that was most of the "hud" time on the fps meter (RS-353). The game loop's own frames now rebuild them every tenth of a second. Anything you do (a step, a blow, a click, a key) still redraws at once, so nothing feels late; what changes on its own, like regen or the clock, shows within a tenth of a second.
