@@ -29910,6 +29910,11 @@ function v3WalkTo(act){
   V3.path = path || []; V3.stepT = 0.08;
 }
 // ---------- input ----------
+/* (RS-381) what the cursor is over, once a frame at most (see o3HoverTick) */
+function v3HoverTick(){
+  if (!V3.mDirty || !V3.mEv || !v3Active()) return; V3.mDirty = false; const e = V3.mEv, cv = V3.cv; { const rc = cv.getBoundingClientRect(); V3.mxy = { x:e.clientX - rc.left, y:e.clientY - rc.top }; }
+  const a = v3Pick(e); V3.hover = a && a.kind!=='ground' ? a : null; const cur = V3.hover ? 'pointer' : 'default'; if (cv.style.cursor!==cur) cv.style.cursor = cur;
+}
 function v3Pick(e){
   const r = V3.cv.getBoundingClientRect(), T = THREE;
   const m = new T.Vector2(((e.clientX-r.left)/r.width)*2-1, -((e.clientY-r.top)/r.height)*2+1);
@@ -29931,8 +29936,8 @@ function v3Pick(e){
 }
 function v3Input(cv){
   cv.addEventListener('contextmenu', e=>{ if (!v3Active() || G.ui!=='playing') return; e.preventDefault(); v3Context(e); });
-  cv.addEventListener('pointermove', e=>{ if (!v3Active()) return; { const rc = cv.getBoundingClientRect(); V3.mxy = { x:e.clientX - rc.left, y:e.clientY - rc.top }; } const a = v3Pick(e); V3.hover = a && a.kind!=='ground' ? a : null; cv.style.cursor = V3.hover ? 'pointer' : 'default'; });
-  cv.addEventListener('pointerleave', ()=>{ V3.mxy = null; }); cv.addEventListener('pointerdown', e=>{ const rc = cv.getBoundingClientRect(); V3.mxy = { x:e.clientX - rc.left, y:e.clientY - rc.top }; });   /* (RS-374: a citizen's name shows where you point, or tap) */
+  cv.addEventListener('pointermove', e=>{ if (!v3Active()) return; V3.mEv = { clientX:e.clientX, clientY:e.clientY }; V3.mDirty = true; });   /* (RS-381: only noted here - the pick runs once a frame, in v3HoverTick) */
+  cv.addEventListener('pointerleave', ()=>{ V3.mxy = null; V3.mDirty = false; }); cv.addEventListener('pointerdown', e=>{ const rc = cv.getBoundingClientRect(); V3.mxy = { x:e.clientX - rc.left, y:e.clientY - rc.top }; });   /* (RS-374: a citizen's name shows where you point, or tap) */
   cv.addEventListener('pointerdown', e=>{ if (!v3Active() || G.ui!=='playing' || e.button!==0 || G.portalFx) return; const a = v3Pick(e); if (e.shiftKey){ examineSay(examineAct(a)); return; } if (a && a.kind==='tile' && a.label==='Archery butts' && dummyClick(a.x, a.y)) return; if (a) v3WalkTo(a); });
   cv.addEventListener('wheel', e=>{ if (!v3Active()) return; e.preventDefault(); V3.dist = clamp(V3.dist * (e.deltaY>0 ? 1.1 : 0.9), 6.5, 20); }, { passive:false });
 }
@@ -30001,6 +30006,7 @@ function doorPrewarm(){
 }
 function v3Render(){
   if (!v3Init()) return false;
+  v3HoverTick();
   if (V3.stepping) return true;          // (a step taken from inside this frame: the frame itself will draw it)
   const T = THREE, now = performance.now(), dt = V3.last ? Math.min(0.1, (now-V3.last)/1000) : 0.016; V3.last = now; V3.t = (V3.t||0) + dt;
   if (V3.door && (V3.door.t > 4 || G.gameMode!==3)){ V3.door = null; doorFade(0); V3.labels.style.opacity = '1'; }   /* (never left half way through a door) */
@@ -30380,6 +30386,7 @@ function* o3BuildGen(cx, cy){
     const fi = (wx-x0)*O3_R, fj = (wz-y0)*O3_R, i = Math.max(0, Math.min(NV-2, Math.floor(fi))), j = Math.max(0, Math.min(NV-2, Math.floor(fj))), a = fi-i, b2 = fj-j;
     return H[j*NV+i]*(1-a)*(1-b2) + H[j*NV+i+1]*a*(1-b2) + H[(j+1)*NV+i]*(1-a)*b2 + H[(j+1)*NV+i+1]*a*b2;
   };
+  { let lo = Infinity, hi = -Infinity; for (let k=0;k<NV*NV;k++){ const h = H[k]; if (h < lo) lo = h; if (h > hi) hi = h; } O3.hMin = lo; O3.hMax = hi; O3.landBox = [x0, y0, x0 + (NV-1)/O3_R, y0 + (NV-1)/O3_R]; }   /* (RS-381: the land's reach and range, for o3GroundHit) */
   // RS-235: lava runs spilling over the rim and down the volcano's flanks
   if (VOL){ const lavaM = O3.lavaM || (O3.lavaM = new T.MeshBasicMaterial({ color:new T.Color(0xff6a1a).convertSRGBToLinear() }));
     for (let k=0;k<4;k++){ let a = o3Hash(Math.floor(VOL.x), Math.floor(VOL.z), 300 + k)*6.28 + k*1.57; const pts = [];
@@ -31537,26 +31544,40 @@ function o3WalkTo(act){
   O3.stepT = 0.05;
   if (act.fx!==undefined) O3.clickFx = { x:act.fx, y:act.fy, z:act.fz, t:0 };
 }
+/* (RS-381) where a ray meets the land: stepped down the ray a fifth of a tile at a time against O3.heightAt, then the
+   crossing narrowed by halving. A raycast against the land mesh tested every one of its triangles */
+function o3GroundHit(ray){
+  if (!O3.heightAt || !O3.landBox) return null; const o = ray.origin, d = ray.direction; if (d.y >= -1e-4) return null;
+  const B = O3.landBox, hi = (O3.hMax==null ? 12 : O3.hMax) + 0.5, lo = (O3.hMin==null ? -2 : O3.hMin) - 0.5;
+  const t0 = Math.max(0, (hi - o.y)/d.y), t1 = (lo - o.y)/d.y; if (t1 <= t0) return null;
+  const hs = Math.hypot(d.x, d.z), dt = hs > 1e-6 ? 0.2/hs : (t1 - t0)/4; let tp = t0;
+  for (let t = t0; ; t += dt){ const tt = Math.min(t, t1), x = o.x + d.x*tt, z = o.z + d.z*tt;
+    if (x < B[0] || x > B[2] || z < B[1] || z > B[3]){ if (tt >= t1) return null; tp = tt; continue; }
+    if (o.y + d.y*tt < O3.heightAt(x, z)){ let a = tp, b = tt; for (let k=0;k<10;k++){ const m = (a + b)/2; if (o.y + d.y*m < O3.heightAt(o.x + d.x*m, o.z + d.z*m)) b = m; else a = m; }
+      const tm = (a + b)/2; return new THREE.Vector3(o.x + d.x*tm, o.y + d.y*tm, o.z + d.z*tm); }
+    if (tt >= t1) return null; tp = tt; }
+}
 function o3Pick(e){
   const r = O3.cv.getBoundingClientRect(), T = THREE;
   const m = new T.Vector2(((e.clientX-r.left)/r.width)*2-1, -((e.clientY-r.top)/r.height)*2+1);
   O3.ray.setFromCamera(m, O3.cam);
   const hits = O3.ray.intersectObjects(O3.hits.concat(O3.nodeHits||[], O3.lmHits||[], O3.evHits||[], O3.beastHits||[], O3.wgHits||[], O3.wildHits||[]), false);
-  const lh = O3.land ? O3.ray.intersectObject(O3.land, false) : [];
+  const lp = O3.land ? o3GroundHit(O3.ray.ray) : null;   /* (RS-381: by marching the ray down the heightfield, not by testing the land's tens of thousands of triangles) */
   // a gathering spot's box stands tall over its tile, so a click far off can clip one on its way to the
   // ground behind it: a spot only counts when the ground you clicked is its own tile (or right beside it)
-  const lp = lh.length ? lh[0].point : null;
   for (const h of hits){
     const a = h.object.userData.act;
     if (a.kind==='node' && lp && Math.hypot(lp.x-(a.x+0.5), lp.z-(a.y+0.5)) > 0.95) continue;
     return a;
   }
-  if (lh.length){ const p = lh[0].point; return { kind:'ground', x:Math.floor(p.x), y:Math.floor(p.z), fx:p.x, fy:Math.max(p.y,-0.14), fz:p.z }; }
+  if (lp){ const p = lp; return { kind:'ground', x:Math.floor(p.x), y:Math.floor(p.z), fx:p.x, fy:Math.max(p.y,-0.14), fz:p.z }; }
   return null;
 }
-function o3Input(cv){
-  cv.addEventListener('contextmenu', e=>{ if (!o3Active() || G.ui!=='playing') return; e.preventDefault(); o3Context(e); });
-  cv.addEventListener('pointermove', e=>{ if (!o3Active()) return; const a = o3Pick(e); O3.hover = a && a.kind==='site' ? a : null; O3.hoverAny = a && a.kind!=='ground' ? a : null;
+/* (RS-381) what the cursor is over, once a frame at most: a gaming mouse reports its position hundreds of times a second,
+   and every report used to raycast the whole land and rebuild the tooltip, which took the frame rate from 80 to 30 as
+   soon as the mouse moved. The pointermove handler now only notes where the cursor is */
+function o3HoverTick(){
+  if (!O3.mDirty || !O3.mEv || !o3Active()) return; O3.mDirty = false; const e = O3.mEv, cv = O3.cv, a = o3Pick(e); O3.hover = a && a.kind==='site' ? a : null; O3.hoverAny = a && a.kind!=='ground' ? a : null;
     const n = o3NodeFromHit(a);
     // a site in the 3D land gets the same details as on the world map (a town just its name)
     const siteTip = a && a.kind==='site' && G.ui==='playing' ? (owSiteKind(G.ow.map[a.x][a.y]) ? owSiteTipHtml(a.x, a.y) : G.ow.map[a.x][a.y]===OW_TOWN ? `<div style="font-weight:600">${esc(o3TownName(a.x,a.y))}</div><div class="muted">a town - click to walk there</div>` : '') : '';
@@ -31567,8 +31588,12 @@ function o3Input(cv){
     if (n && G.ui==='playing'){ ttNodeShow(e, n); O3.nodeTip = true; }
     else if (siteTip || lmTip){ showTooltip(e, siteTip || lmTip); O3.nodeTip = true; }
     else if (O3.nodeTip){ hideItemTooltip(); O3.nodeTip = false; }
-    cv.style.cursor = (O3.hover || n) ? 'pointer' : 'default'; });
-  cv.addEventListener('pointerleave', ()=>{ if (O3.nodeTip){ hideItemTooltip(); O3.nodeTip = false; } });
+    { const cur = (O3.hover || n) ? 'pointer' : 'default'; if (cv.style.cursor!==cur) cv.style.cursor = cur; }
+}
+function o3Input(cv){
+  cv.addEventListener('contextmenu', e=>{ if (!o3Active() || G.ui!=='playing') return; e.preventDefault(); o3Context(e); });
+  cv.addEventListener('pointermove', e=>{ if (!o3Active()) return; O3.mEv = { clientX:e.clientX, clientY:e.clientY }; O3.mDirty = true; });   /* (RS-381: only noted here - the pick and the tooltip run once a frame, in o3HoverTick) */
+  cv.addEventListener('pointerleave', ()=>{ O3.mDirty = false; if (O3.nodeTip){ hideItemTooltip(); O3.nodeTip = false; } });
   cv.addEventListener('pointerdown', e=>{ if (O3.lookout && G.ui==='playing'){ o3LookoutEnd(); return; } if (!o3Active() || G.ui!=='playing' || e.button!==0 || G.owPortal || G.owFerry) return; const a = o3Pick(e);
     if (e.shiftKey){ examineSay(examineAct(a)); return; }
     if (a && a.kind==='node' && o3GoGather(a.x, a.y)) return;
@@ -31585,6 +31610,7 @@ function o3Input(cv){
 // ---------- per-frame ----------
 function o3Render(){
   if (!o3Init()) return false;
+  o3HoverTick();
   if (O3.stepping) return true;          // (a step taken from inside this frame: the frame itself will draw it)
   const T = THREE, now = performance.now(), dt = O3.last ? Math.min(0.1, (now-O3.last)/1000) : 0.016; O3.last = now; O3.t += dt;
   // (re)build the land when you get near the edge of what's built, or the world changed
@@ -38694,12 +38720,12 @@ function isoDrawHover(){
   }
   ctx.restore();
 }
-canvas.addEventListener('mousemove', (e)=>{ ISO.mouse = { x:e.clientX, y:e.clientY }; isoCaveTip(e); });
+canvas.addEventListener('mousemove', (e)=>{ ISO.mouse = { x:e.clientX, y:e.clientY }; isoCaveTip(e); });   /* (RS-381: the tip's pick is quick now - a sphere a creature, the floor plane the tile - and still asks at most fourteen times a second) */
 canvas.addEventListener('mouseleave', ()=>{ ISO.mouse = null; if (ISO.caveTip){ hideItemTooltip(); ISO.caveTip = null; } });
 // (RS-185) hovering an ore vein, a cave pool, a cave herb or an essence seam shows its tooltip - picked the same way a click is
 function isoCaveAt(e){
   if (G.gameMode!==1 || !G.dungeonDeco || !(ISO.on && FPD.ok) || typeof fp3dActive!=='function' || !fp3dActive()) return null;
-  const pk = isoPick(e); if (!pk || pk.mon) return null;
+  const pk = isoPick(e, true); if (!pk || pk.mon) return null;   /* (RS-381: the quick pick - the floor tile under the cursor, no raycast through the walls) */
   const d = G.dungeonDeco[pk.gx] && G.dungeonDeco[pk.gx][pk.gy];
   return d && SK_CAVE_DECOS.includes(d) && G.dungeonSeen && G.dungeonSeen[pk.gx] && G.dungeonSeen[pk.gx][pk.gy] ? { d, x:pk.gx, y:pk.gy } : null;
 }
@@ -38907,20 +38933,25 @@ function isoCutAt(P){
   return ss(0.2, 1.2, al) * (1 - ss(1.2, 2.7, la)) * ss(0.32, 0.6, P.y) * F.z > 0.5;
 }
 function isoStairsAt(P){ const t = tileAt(Math.floor(P.x), Math.floor(P.z)); return t===T_STAIRSU || t===T_STAIRSD || t===T_EXIT || t===T_FLEE; }
-function isoPick(e){
+function isoPick(e, quick){
   const r = canvas.getBoundingClientRect(), nx = (e.clientX-r.left)/r.width*2-1, ny = -((e.clientY-r.top)/r.height*2-1);
   const ray = ISO.ray || (ISO.ray = new THREE.Raycaster());
   ray.setFromCamera({ x:nx, y:ny }, FPD.cam);
   // a click on a creature's model or anywhere on its tile targets it
-  let mon = null;
-  const hits = ray.intersectObjects(G.mon.filter(m=>m.alive && M3D.inst.get(m) && M3D.inst.get(m).holder.parent).map(m=>M3D.inst.get(m).holder), true);
-  if (hits.length){ for (const m of G.mon){ const ins = M3D.inst.get(m); if (!m.alive || !ins) continue; let o = hits[0].object; while (o && o!==ins.holder) o = o.parent; if (o){ mon = m; break; } } }
+  /* (RS-381) a creature is picked by an upright ellipsoid round its figure (as tall as it, a little over half as wide), the
+     nearest first, not by its triangles: a skinned body answered a raycast with every one of its tens of thousands, and
+     the cursor's every move asked. A click beside the figure still finds it by its tile, below */
+  let mon = null, md = Infinity; { const o = ray.ray.origin, d = ray.ray.direction;
+    for (const m of G.mon){ const ins = m.alive && M3D.inst.get(m); if (!ins || !ins.holder.parent) continue; const H = ins.H || 1, hd = ins.holder, ex = Math.max(0.2, H*0.3), ey = Math.max(0.3, H*0.5);
+      const ox = (o.x - hd.position.x)/ex, oy = (o.y - hd.position.y - H*0.5)/ey, oz = (o.z - hd.position.z)/ex, dx = d.x/ex, dy = d.y/ey, dz = d.z/ex;
+      const A = dx*dx + dy*dy + dz*dz, B = 2*(ox*dx + oy*dy + oz*dz), C = ox*ox + oy*oy + oz*oz - 1, disc = B*B - 4*A*C;
+      if (disc >= 0){ const t = (-B - Math.sqrt(disc))/(2*A); if (t > 0 && t < md){ md = t; mon = m; } } } }
   const o = ray.ray.origin, d = ray.ray.direction; if (!mon && d.y>=0) return null;
   let t = -o.y/d.y, gx = Math.floor(o.x + d.x*t), gy = Math.floor(o.z + d.z*t);
   // what you actually see under the cursor: the first surface of the level the ray meets. Far off, that is
   // often a wall face or a wall top, and the floor plane behind it would be a tile out of reach - so a
   // wall face picks the floor tile in front of it, and anything else the nearest walkable tile to it
-  if (!mon && FPD.world){
+  if (!mon && !quick && FPD.world){
     const hit = ray.intersectObject(FPD.world, true).find(h=>h.object.isMesh && h.object.visible!==false && !(h.object.material && h.object.material.transparent && h.object.material.opacity < 0.5) && !(isoCutAt(h.point) && !isoStairsAt(h.point)));   /* (RS-336: not a wall the cutaway has dissolved - you click the floor you can see through it; stairs always count, RS-297) */
     if (hit){
       const P = hit.point, n = hit.face ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld) : null;
@@ -39277,7 +39308,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-380';
+const GAME_VERSION = 'rs-381';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -39917,13 +39948,13 @@ function showTooltip(e, html){
   if (ttTouchy()){ ttHost = null; if (el) el.style.display = 'none'; return; }
   el.innerHTML = html;
   el.style.display = 'block';
-  moveItemTooltip(e);
+  ttPlace(e);
 }
 // (RS-179) a tooltip for a tap: shown even on a touch screen, and gone again after a few seconds
 let TAP_TIP_T = 0;
 function tapTip(e, html, ms){
   const el = document.getElementById('itemTooltip'); if (!el) return;
-  TT_NODE = null; el.innerHTML = html; el.style.display = 'block'; moveItemTooltip(e);
+  TT_NODE = null; el.innerHTML = html; el.style.display = 'block'; ttPlace(e);
   clearTimeout(TAP_TIP_T); TAP_TIP_T = setTimeout(()=>{ el.style.display = 'none'; if (typeof O3!=='undefined') O3.tapTip = null; }, ms||3500);
 }
 function showItemTooltip(e, it){ showTooltip(e, itemCompareTooltipHtml(it)); const a = ttItemArt(it); if (a) renderMiniMonsterArt('ttIcon', a, rarityColorCss(it)); }
@@ -39975,7 +40006,9 @@ function setInfoHtml(setId){
   return html;
 }
 function showSetTooltip(e, setId){ showTooltip(e, setInfoHtml(setId)); }
-function moveItemTooltip(e){
+let TT_MV = null, TT_RAF = 0;
+function moveItemTooltip(e){ TT_MV = { clientX:e.clientX, clientY:e.clientY }; if (!TT_RAF) TT_RAF = requestAnimationFrame(()=>{ TT_RAF = 0; if (TT_MV) ttPlace(TT_MV); }); }   /* (RS-381: placed once a frame - every move read the tooltip's size, a layout each time) */
+function ttPlace(e){
   const el = document.getElementById('itemTooltip');
   if (el.style.display==='none') return;
   const pad = 16;

@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-381 - The cursor no longer costs frames
+
+- **Moving the mouse dropped the frame rate from 80 to 30** on the open land, in towns and in dungeons alike. A gaming mouse reports its position hundreds of times a second, and every report ran a full pick of what was under the cursor, rebuilding the tooltip each time. A move is now only noted, and the pick runs once a frame at most.
+- **The land is no longer raycast triangle by triangle.** The ground under the cursor comes from marching the ray down the heightfield.
+- **Creatures are picked by an upright ellipsoid round their figure** (as tall as the creature, a little over half as wide), nearest first, not by their triangles: since RS-379 a skinned body answered a raycast with every one of its tens of thousands. A click beside the figure still finds it by its tile.
+- **The dungeon's hover tip** (ore veins and cave mouths) reads the floor tile under the cursor without raycasting the walls, and still asks at most fourteen times a second; a click does the full pick, so wall faces and stairs pick as before.
+- **Tooltips follow the cursor once a frame** instead of once an event: each move read the tooltip's size, which forced a layout.
+
 ## RS-380 - The GPU pass, part two: towns and the open land merged by make
 
 - **Still props merge by make, not just by material.** Parts of the same kind of material (the same maps, finish, glow and shadow flags) bake into one mesh whatever their colours, which go into the vertices: a stall's painted awnings, a well's trims, a market's crates are one draw each. The town palette's own materials, which the day and night change by hand (the glass's glow), are never swapped for a copy, so the windows still light up at dusk. The chunks of gathering nodes on the open land merge the same way.
