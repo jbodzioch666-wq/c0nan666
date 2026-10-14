@@ -29,5 +29,5 @@ module.exports = async page=>{
   A(r.playerSkinned > 0, 'your own figure is skinned too (RS-379)');
   A(r.whoParts > 10 && r.whoMeshes[1] <= 14 && r.walk > 0.012 && r.strike > 0.02, 'a skinned townsperson still walks and strikes');
   A(r.white && r.flashReach, 'the colour is in the vertices and the hit flash reaches the skinned materials');
-  A(r.auto===true, 'the shadow map is drawn every frame (RS-353)');
+  A(r.auto===false, 'the shadow map is drawn on the game\'s own clock (RS-380; every frame while anyone moves, RS-395 - see shadowwalk)');
 };

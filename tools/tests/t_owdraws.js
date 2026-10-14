@@ -1,4 +1,4 @@
-// RS-401: the open land draws far less - a chunk's gathering-spot discs, ripples, bubbles and glows are batched into a few meshes
+// RS-401 (and RS-402: the wild animals): the open land draws far less - a chunk's gathering-spot discs, ripples, bubbles and glows are batched into a few meshes
 // moved by the card, the land's sites and dressing are merged like a town's, creatures off screen aren't posed and far ones throw
 // no shadow, and the gathering spots near you aren't looked over again every frame
 module.exports = async page=>{
@@ -23,6 +23,11 @@ module.exports = async page=>{
     if (w){ const h = w.e.holder, c = O3.camTgt; h.position.set(c.x + 200, 0, c.z + 200); o3AnimTick(); out.offscreenPosed = o3AnimDue(h, 0); h.position.set(c.x, 0, c.z); o3AnimTick(); out.nearPosed = o3AnimDue(h, 0) || o3AnimDue(h, 1);
       h.position.set(c.x + 30, 0, c.z); o3CreatureShadows(); let sh = 0; h.traverse(o=>{ if (o.isMesh && o.castShadow) sh++; }); out.farShadow = sh;
       h.position.set(c.x + 2, 0, c.z); o3CreatureShadows(); sh = 0; h.traverse(o=>{ if (o.isMesh && o.castShadow) sh++; }); out.nearShadow = sh; }
+    // (RS-402) a flock is one instanced mesh; a deer, boar or rabbit is a few skinned meshes, its parts' looks baked into one
+    out.flocks = (O3.wild||[]).filter(q=>q.k==='bird' && q.e).map(q=>{ let n = 0, inst = 0; q.e.holder.traverse(o=>{ if (o.isMesh) n++; if (o.isInstancedMesh) inst++; }); return [n, inst]; });
+    out.beasts = (O3.wild||[]).filter(q=>q.k!=='bird' && q.e && q.e.rig).map(q=>{ let sk = 0; q.e.holder.traverse(o=>{ if (o.isSkinnedMesh) sk++; }); return sk; });
+    // and a townsperson is still merged the careful way
+    out.looseLeft = M3D_LOOSE;
     // and in all: the draws a frame zoomed out
     const R = O3.renderer; R.info.autoReset = false; R.info.reset(); gfxShadowTick.movedAt = performance.now(); o3Render(); out.draws = R.info.render.calls; R.info.autoReset = true;
     return out;
@@ -35,5 +40,8 @@ module.exports = async page=>{
   A(r.relooks < 40, 'a frame with nothing new does not look the spots over again');
   A(r.landmarkLooks[0] > 0 && r.landmarkLooks[1]===0, 'a known tile skips the landmark test');
   if (r.offscreenPosed!==undefined){ A(r.offscreenPosed===false && r.nearPosed===true, 'a creature off screen is not posed, one in view is'); A(r.farShadow===0 && r.nearShadow > 0, 'a far creature throws no shadow, a near one does'); }
+  A(r.flocks.every(([n, i])=>n===1 && i===1), 'a flock of birds is one instanced mesh');
+  A(r.beasts.length===0 || r.beasts.every(n=>n <= 2), 'a wild beast is at most two skinned meshes');
+  A(r.looseLeft===false, 'the loose merge is only switched on while the land\'s creatures are built');
   A(r.draws < 1100, 'the open land zoomed out draws under 1,100 times a frame');
 };

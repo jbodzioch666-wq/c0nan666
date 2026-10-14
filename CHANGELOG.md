@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-402 - The wild animals
+
+The deer, boar, rabbits and birds out on the land were the biggest cost left after RS-401. Zoomed out at the same Wilderness spot, they took **128 draws** a frame; they now take **59**. The whole frame there went from 751 to about **630** draws (from 1,670 before RS-401), and at the normal zoom from 413 to about **350**.
+
+- **A flock of birds is one draw.** Each of a flock's six birds had two wing meshes of its own, twelve draws a flock. A flock's wings are now one instanced mesh, each wing placed from its bird every frame; and a flock off screen isn't flapped at all.
+- **A deer is three draws, not eight.** A wild beast's parts (coat, antlers, hooves, eyes) differed mostly in how glossy they were, so they were skinned as five separate meshes. Seen this small, the gloss doesn't show: their colours go into the vertices and they share one skinned mesh, with only a textured coat or a bending neck kept apart. The beasts that wander the land (encounters, mythic beasts) are built the same way. Townsfolk, your own figure and dungeon monsters, seen up close, keep the careful merge.
+- **Test.** `owdraws` now also checks each flock is one instanced mesh, each wild beast at most two skinned meshes, and that the looser merge is switched off again once the land's creatures are built.
+
 ## RS-401 - The open land, half the draws
 
 Measured on a player's save in the Wilderness, zoomed all the way out: the land issued about **1,670 draws a frame**, and the fps meter read "3d 22". It now issues about **750**; at the normal zoom, **880 became 410**.
