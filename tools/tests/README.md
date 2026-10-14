@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| sconces | rooms are lit by torches in wall sconces, not ceiling lanterns; daylight by day, torchlight at night |
 | tavgames | RS-391: the tavern's games played for real: dice poker, twenty-one, the wheel and darts at a standard board |
 | winlight | RS-390: window light follows the hour: rose at dawn, warm white by day, orange at dusk, none at night, in the shafts, the glass and the room's tint |
 | bedsleep | RS-389: renting a bed lays you in it, fades the night out, wakes you just after dawn with daylight in the windows, and gets you up |

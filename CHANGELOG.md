@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-392 - Torchlit rooms
+
+- **Wall sconces, not ceiling lanterns.** The lanterns hanging from the ceiling are gone. Every room now has torches in iron sconces on its walls: a riveted back plate, a curled bracket, and a tarred torch with a flickering flame. One hangs on the back wall between the shelves and one on the side wall, kept clear of bookcases and of the hooded figure's dim corner.
+- **Natural light indoors.** By day a room is lit mostly by daylight through its windows, and a little less when it rains. At night the daylight is gone and the room is lit only by its torches and fires: darker, warmer, with pools of light around each flame.
+- **Torchlight flickers.** The sconces' light now flickers with their flames. The old lanterns gave a steady light.
+
 ## RS-391 - The tavern's games, played for real
 
 The games at the tavern used to be a single button and a result. Now you play them.
