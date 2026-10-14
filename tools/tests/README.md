@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| shadowwalk | RS-395: on the open land the shadow map is redrawn every frame while you walk, and snapped to its texels |
 | dminimap | RS-394: the dungeon minimap turns with the camera, shows N, and has the turn buttons |
 | dsconce | RS-393: dungeon wall torches are 3D iron sconces; their light is on the GPU, no CPU light map |
 | sconces | rooms are lit by torches in wall sconces, not ceiling lanterns; daylight by day, torchlight at night |

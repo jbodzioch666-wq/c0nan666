@@ -23553,7 +23553,14 @@ function gfxRender(r, scene, cam, view){ gfxShadowTick(r, view); if (SET.fps){ g
 function gfxShadowTick(r, view){
   const sun = view==='v3' ? V3.sun : view==='o3' ? O3.sun : null; if (!sun || !sun.shadow || !r.shadowMap || !r.shadowMap.enabled) return;
   const T2 = gfxShadowTick; T2.n = (T2.n||0) + 1; const every = gfxPhone() || (FP.dt||0.016) > 1/45 ? 3 : 2;
-  r.shadowMap.autoUpdate = false; if (T2.n % every === 0 || !sun.shadow.map) r.shadowMap.needsUpdate = true;   /* (every light's map in the view, on the sun's clock; and at once while there is none yet) */
+  /* (RS-395) but every frame while you're on the move: your shadow was drawn from where you stood a frame or two ago, so it
+     stuttered along behind you. Standing still (and a moment after, while the step settles) it goes back to the slower clock */
+  const pg = view==='v3' ? V3.player && V3.player.g : O3.pgrp, now = performance.now();
+  if (pg){ const P = pg.position, ry = view==='v3' ? pg.rotation.y : ((O3.player && O3.player.yaw) || 0), L = T2.last && T2.last.view===view ? T2.last : null;
+    if (!L || Math.abs(P.x - L.x) + Math.abs(P.y - L.y) + Math.abs(P.z - L.z) > 1e-4 || Math.abs(ry - L.ry) > 1e-4) T2.movedAt = now;
+    T2.last = { view, x:P.x, y:P.y, z:P.z, ry }; }
+  const moving = now - (T2.movedAt||0) < 350; T2.moving = moving;
+  r.shadowMap.autoUpdate = false; if (moving || T2.n % every === 0 || !sun.shadow.map) r.shadowMap.needsUpdate = true;   /* (every light's map in the view, on the sun's clock; and at once while there is none yet) */
 }
 function gfxRenderInner(r, scene, cam, view){
   if (!gfxPostOn()){ r.render(scene, cam); return; }
@@ -31351,10 +31358,16 @@ function o3ApplyTime(){
   // the sun (or moon) swings across the sky with the clock
   const a = (p-0.25)*Math.PI*2, pp = O3.pgrp.position;
   const am = sunUp > -0.05 ? a : a + Math.PI, up = Math.max(0.3, Math.sin(am));   /* (RS-157: the moon by night) */
-  O3.sun.position.set(pp.x - Math.cos(am)*14, 6 + up*14, pp.z + 8);
-  O3.sun.target.position.copy(pp); O3.sun.target.updateMatrixWorld();
-  { const half = clamp(Math.round((O3.dist||12)*1.15), 9, 22), sc = O3.sun.shadow.camera;   /* (RS-158) */
+  const half = clamp(Math.round((O3.dist||12)*1.15), 9, 22);
+  { const sc = O3.sun.shadow.camera;   /* (RS-158) */
     if (sc.right !== half){ sc.left = -half; sc.right = half; sc.top = half; sc.bottom = -half; sc.updateProjectionMatrix(); } }
+  /* (RS-395) the shadow follows you in whole texels of its map, in the sun's own frame: slid smoothly, every shadow on the land
+     crawled and shimmered as you walked */
+  { const off = new T.Vector3(-Math.cos(am)*14, 6 + up*14, 8), fw = off.clone().negate().normalize(), rt = new T.Vector3(0, 1, 0).cross(fw).normalize(), uv = fw.clone().cross(rt);
+    const ts = 2*half/((O3.sun.shadow.mapSize && O3.sun.shadow.mapSize.x) || 1024), sn = v=>Math.round(v/ts)*ts;
+    const tg = rt.multiplyScalar(sn(pp.dot(rt))).add(uv.multiplyScalar(sn(pp.dot(uv)))).add(fw.multiplyScalar(pp.dot(fw)));
+    O3.sun.target.position.copy(tg); O3.sun.position.copy(tg).add(off); }
+  O3.sun.target.updateMatrixWorld();
   const night = 1 - day;
   O3.mats && (O3.mats.win.emissiveIntensity = 0.1 + night*1.6);
   O3.lantern.intensity = night*1.3;
@@ -39618,7 +39631,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-394';
+const GAME_VERSION = 'rs-395';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

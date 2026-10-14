@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-395 - Smooth shadows on the move
+
+- **Your shadow keeps up with you.** To save work, RS-380 redrew the sun's shadows only every second frame (every third on a phone). A walking figure's shadow was drawn from where it stood a frame or two earlier, so it stuttered along behind you on the overworld and in towns. Shadows are now redrawn every frame while you move, and go back to the cheaper rate when you stand still.
+- **Overworld shadows stop crawling.** The overworld's shadow now follows you in whole steps of its own pixel grid, so trees, rocks and buildings no longer shimmer or crawl at their edges as you walk.
+
 ## RS-394 - Dungeon minimap turns
 
 - **The dungeon minimap turns with the camera.** It used to stay at whatever angle the town or overworld camera last had, so turning the view in a dungeon left it behind. It now follows the dungeon camera, so up on the minimap is up on the screen.
