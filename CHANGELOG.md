@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-388 - No gnome hat for the hooded figure
+
+- **The hooded figure keeps his hood.** In a gnome town every townsperson is dressed as a gnome - pointed felt hat included - and the hooded figure was dressed the same way, so he wore a red gnome's hat on top of his hood. Anyone hooded now keeps their hood and their own dark robe in every race's town, taking only the race's face and skin.
+
 ## RS-387 - A proper cowl, and room at his table
 
 - **Hoods are cowls, not gnome hats.** A hood's slack used to stand up behind the head in a point; it now slumps softly down the back of the head. Every hooded figure gets it - the tavern's go-between, the cultists, the alchemist.

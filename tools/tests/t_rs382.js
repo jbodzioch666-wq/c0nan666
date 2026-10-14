@@ -20,6 +20,8 @@ module.exports = async page=>{
     G.interior = null; enterVillage(); setUi('playing'); saveCurrentGame(); const id = G.saveId || (saveIndexList()[0]||{}).id;
     loadGame(id); out.loadTown = G.gameMode===3;
     G.gameMode = 0; setUi('playing'); saveCurrentGame(); loadGame(id); out.loadLand = G.gameMode===0;
+    /* (RS-388) in every race's town he keeps his hood: no gnome's hat, no race colours on his robe */
+    out.hats = []; const keep = G.villageRace; for (const race of Object.keys(V3_RACE_LOOK).concat(['gnome','dwarf','elf','human'])){ G.villageRace = race; const lk = v3RaceDress(V3_LOOK.hooded(), 5 + 11); if (lk.o.gnomeHat || lk.o.head!=='hood' || lk.o.cloth!=='#26232a') out.hats.push(race); } G.villageRace = keep;
     return out; });
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
@@ -28,6 +30,7 @@ module.exports = async page=>{
   A(r.candle===1 && r.lampFar, 'his corner is dimly lit: a candle, no lantern nearby (RS-383)');
   A(r.model && r.seated, 'he is drawn sat in it');
   A(r.frontFree, 'you can stand in front of his table (RS-387)');
+  A(r.hats.length===0, 'in every race\'s town he keeps his hood and his robe, no gnome hat (RS-388): '+r.hats);
   A(r.talk && r.talk!=='playing', 'and you can still talk to him there');
   A(r.loadTown, 'a game saved in a town loads in the town');
   A(r.loadLand, 'a game saved on the land loads on the land');
