@@ -11136,9 +11136,9 @@ function skForestDepth(x, y){
 function skNodeStatic(x, y){
   if (!G.ow || !G.ow.map) return null;
   if (wgRoadAt(x, y)) return null;   // (RS-130) no trees, rocks, herbs or fishing spots on the roads
-  if (owLandmarkFoot(x, y)) return null;   // (RS-238) nor inside a landmark
   if (SKN.seed !== G.ow.seed || SKN.map !== G.ow.map){ SKN.st.clear(); SKN.seed = G.ow.seed; SKN.map = G.ow.map; }
-  const key = x*4096+y; if (SKN.st.has(key)) return SKN.st.get(key);
+  const key = x*4096+y; if (SKN.st.has(key)) return SKN.st.get(key);   /* (RS-401: the cache first - the landmark test below was run on every look, cached or not) */
+  if (owLandmarkFoot(x, y)){ SKN.st.set(key, null); return null; }   // (RS-238) nor inside a landmark
   if (OW_SITE_TILES.includes(skOwTile(x, y)) || wgPoiAt(x, y) || (G.ow.mythicBeasts||[]).some(b=>b.x===x && b.y===y)){ SKN.st.set(key, null); return null; }   // (RS-131) one thing to a tile
   const t = skOwTile(x, y), h = skNH(x, y, 701), h2 = skNH(x, y, 702), holy = [OW_GRAVEYARD, OW_NECROTOWER, OW_TEMPLE];
   if (t===OW_MOUNTAINPASS && owMtnClear()){ SKN.st.set(key, null); return null; }   // (generator 3: the passes stay clear)
@@ -11285,6 +11285,7 @@ function skNodeOption(n){
   return { k:n.k, label:`${verb} ${skNodeName(n).toLowerCase()}`, node:{ x:n.x, y:n.y }, at:{ x:n.x, y:n.y } };
 }
 function skNodeTake(n){
+  SKN.v = (SKN.v||0) + 1;   /* (RS-401: the spots near you are looked at again) */
   if (n.rich){ const rr = richAt(n.x, n.y); if (!rr) return true; rr.left--; if (rr.left<=0) G.ow.rich = G.ow.rich.filter(r=>r!==rr); return rr.left<=0; }
   const key = n.x+','+n.y, m = skUsed(), left = n.left - 1;
   if (n.k==='fishing'){ m[key] = { e:n.e, left }; return left<=0; }
@@ -19976,6 +19977,31 @@ function o3MerchantFig(){
   pk.traverse(o=>{ if (o.isMesh){ o.castShadow = true; } });
   return e;
 }
+/* (RS-401) a creature out on the land is posed only while the camera can see it, and one far from you only every other frame: a
+   serpent or a many-legged thing rebuilds its body's tube on the CPU each time it's posed, and zoomed out there could be
+   dozens. The pose is worked from the clock, so a skipped frame just holds it. The view is last frame's (the camera barely moves) */
+function o3AnimTick(){
+  const T = THREE, F = O3.fr || (O3.fr = new T.Frustum()), m = O3.frM || (O3.frM = new T.Matrix4());
+  O3.cam.updateMatrixWorld(); m.multiplyMatrices(O3.cam.projectionMatrix, O3.cam.matrixWorldInverse); F.setFromProjectionMatrix(m); O3.animN = (O3.animN||0) + 1;
+  if (O3.animN % 8 === 0) o3CreatureShadows();
+}
+/* (RS-401) a creature out on the land throws a shadow only within a dozen tiles of you: zoomed out, the deer, birds and beasts far
+   off were some 200 of the sun's shadow draws for shadows a few pixels long. Checked a few times a second, with a margin so it
+   doesn't flick on and off at the edge */
+function o3CreatureShadows(){
+  const c = O3.camTgt || (O3.ppos ? O3.ppos : null); if (!c) return;
+  for (const grp of [O3.wildGrp, O3.beastGrp]) if (grp) for (const h of grp.children){
+    const d = Math.hypot(h.position.x - c.x, h.position.z - c.z), was = h.userData.shOn !== false, on = was ? d < 13 : d < 11;
+    if (on===was && h.userData.shL) continue;
+    if (!h.userData.shL){ const L = []; h.traverse(o=>{ if (o.isMesh && o.castShadow) L.push(o); }); h.userData.shL = L; }
+    for (const o of h.userData.shL) o.castShadow = on; h.userData.shOn = on; }
+}
+function o3AnimDue(holder, seed){
+  if (!holder || !O3.fr) return true; const P = holder.position, S = O3.frS || (O3.frS = new THREE.Sphere());
+  S.center.set(P.x, P.y + 0.6, P.z); S.radius = 2.2*Math.max(1, holder.scale.x); if (!O3.fr.intersectsSphere(S)) return false;
+  const c = O3.camTgt, far = c ? Math.hypot(P.x - c.x, P.z - c.z) > 10 : false;
+  return !far || ((O3.animN + ((seed*7)|0)) & 1)===0;
+}
 function o3SyncBeasts(dt){
   const T = THREE; if (!O3.win || !O3.scene) return;
   if (!O3.beastGrp) O3.beastGrp = new T.Group(); if (O3.beastGrp.parent!==O3.scene) O3.scene.add(O3.beastGrp);
@@ -20015,6 +20041,7 @@ function o3SyncBeasts(dt){
     if (w.key.startsWith('myth')){ if (!f.hb){ f.hb = new T.Mesh(new T.BoxGeometry(1.1, 1.8, 1.1), O3.nodeHitM || (O3.nodeHitM = new T.MeshBasicMaterial({ visible:false }))); f.hb.userData.act = { kind:'wev', what:'myth', x:w.x, y:w.y }; }
       if (f.hb.parent!==O3.beastGrp) O3.beastGrp.add(f.hb); f.hb.position.set(f.x, y0 + 0.9, f.z); f.hb.userData.act.x = w.x; f.hb.userData.act.y = w.y; f.hb.userData.act.i = +w.key.slice(4); f.hb.updateMatrixWorld(); }
     const mv = m3dEaseMv(f.e, moving ? 1 : 0, dt), r = f.e.rig, t = O3.t + f.e.seed;
+    if (!o3AnimDue(f.e.holder, f.e.seed)) continue;   /* (RS-401: not posed while off screen; far off, every other frame) */
     try{ if (f.e.sk) sk3Pose(t, mv, 0, 0, f.e.seed, r, m3dStride(f.e, t, mv)); else if (f.e.anim) f.e.anim(r, t, mv, 0, 0, 0, f.e); else if (f.e.beast) m3dPoseBeast(r, t, mv, 0, 0, 0, f.e); else m3dPoseHumanoid(r, t, mv, 0, 0, 0, f.e); }catch(err){}
   }
   for (const [k, f] of F) if (!seen.has(k)){ for (const o of [f.e.holder, f.ring, f.beam, f.hb, f.icon]) if (o && o.parent) o.parent.remove(o); F.delete(k); }
@@ -20981,6 +21008,7 @@ function o3Wildlife(dt){
     }
     e.holder.position.set(w.x, Math.max(O3.heightAt(w.x, w.z), -0.1), w.z); e.holder.rotation.y = w.yaw;
     const r = e.rig, gait = speed > 1 ? 12 : 6, amp = speed ? (speed > 1 ? 0.7 : 0.35) : 0;
+    if (!o3AnimDue(e.holder, w.ph||0)) continue;   /* (RS-401: not posed while off screen; far off, every other frame) */
     if (e.anim && r && r.chest) e.anim(r, tt, speed ? Math.min(1, speed/2.2) : 0, 0, 0, 0, e);   /* (RS-377: the sculpted beasts trot, the gait's own) */
     else if (r && r.legs) r.legs.forEach((l, i)=>{ l.hip.rotation.x = Math.sin(tt*gait + w.ph + (i%2 ? Math.PI : 0) + (l.fz>0 ? 0 : Math.PI/2))*amp; });
     if (r && r.neck && !speed) r.neck.rotation.x = 0.5 + Math.sin(tt*0.8 + w.ph)*0.15;   // grazing
@@ -29837,6 +29865,20 @@ function v3FolkShadow(p){
   if (!p.shMeshes){ p.shMeshes = []; p.e.holder.traverse(o=>{ if (o.isMesh && o.castShadow) p.shMeshes.push(o); }); }
   for (const o of p.shMeshes) o.castShadow = on;
 }
+/* (RS-401) the open land's sites, farms, ruins and dressing are merged like a town's (RS-348/380): zoomed out, the land was
+   some 250 draws for the view and 370 for the sun's shadow, nearly all of them small parts of the same few materials. What the
+   game still moves or clicks - anything O3 or GFX holds, anything carrying userData - is kept as it was */
+function o3MergeWorld(grp){
+  if (!grp) return; const skip = new Set(), keep = o=>{ if (o && o.isObject3D && o!==grp && o!==O3.scene) o.traverse(c=>skip.add(c)); };
+  const seen = new Set(), walk = (v, d)=>{ if (!v || typeof v!=='object' || seen.has(v) || d > 3) return; seen.add(v); if (v.isObject3D){ keep(v); return; } if (v.isMaterial || v.isBufferGeometry || v.isTexture || v.nodeType) return; const vals = Array.isArray(v) ? v : Object.values(v); for (const x of vals) walk(x, d+1); };
+  for (const k in O3){ if (['scene','world','renderer','cam','mats','warmGrp','labels','cv','ray','nm','tex','land','water'].includes(k)) continue; try{ walk(O3[k], 0); }catch(e){} }
+  try{ for (const k in GFX){ if (k==='tex' || k==='u') continue; walk(GFX[k], 0); } }catch(e){}
+  grp.traverse(o=>{ const u = o.userData; if (u && Object.keys(u).some(k=>k!=='lin' && k!=='merged')) keep(o); });
+  let n0 = 0, n1 = 0; grp.traverse(o=>{ if (o.isMesh) n0++; });
+  const shared = new Set(Object.values(O3.mats||{}));
+  for (const top of grp.children){ if (!top.isGroup || skip.has(top)) continue; try{ o3MergeStatic(top, skip, shared); }catch(e){ console.error(e); } }
+  grp.traverse(o=>{ if (o.isMesh) n1++; }); O3.mergedFrom = n0; O3.mergedTo = n1;
+}
 function v3MergeWorld(){
   if (typeof o3MergeStatic!=='function' || !V3.world) return;
   const skip = new Set(), keep = o=>{ if (o && o.isObject3D && o!==V3.world && o!==V3.scene) o.traverse(c=>skip.add(c)); };
@@ -30666,6 +30708,7 @@ function* o3BuildGen(cx, cy){
   yield; o3Vegetation(grp, x0, y0, W);
   yield; o3Sites(grp, x0, y0, W);
   yield; try{ gfxO3Build(grp, x0, y0, W, M); }catch(e){ console.error(e); }
+  yield; try{ o3MergeWorld(grp); }catch(e){ console.error(e); }   /* (RS-401) */
   O3.encGrp = new T.Group(); grp.add(O3.encGrp); O3.encKey = null; O3.qKey = null;
   O3.compileDue = true;   /* (RS-345) */
 }
@@ -31383,7 +31426,7 @@ function o3NodeTree(type){
 // (RS-338) the gathering spots are built in chunks of 6 by 6 tiles, each kept until something in it changes (a tree felled, a
 // patch picked, a starlily opening) or it falls out of range - walking only builds the chunks coming into view. They used to
 // be built afresh, all of them, at every step, and since RS-333 merged too: a hitch each step on the open land
-const O3_NCH = 6, O3_NCR = 3;
+const O3_NCH = 9, O3_NCR = 2;   /* (RS-401: 9-tile chunks, not 6 - zoomed out, the gathering spots were some 260 draws, about two for each of 169 chunks) */
 function o3NodeKeyOf(n){ return n.x+','+n.y+n.type.slice(0,2)+(n.gone?'g':'')+(n.shut?'s':'')+(n.glow?'*':'')+(n.rich?'R':''); }
 function o3FreeNodeChunk(c){
   if (c.g.parent) c.g.parent.remove(c.g);
@@ -31396,9 +31439,12 @@ function o3SyncNodes(){
   const C = O3.nodeChunks || (O3.nodeChunks = new Map());
   const winK = O3.win ? O3.win.cx+','+O3.win.cy : '';
   if (O3.nodeWinK !== winK){ O3.nodeWinK = winK; O3.nodeTick = null; }   /* (RS-350: the land was rebuilt, but the chunks still inside it are kept - the ground under them is the same) */
-  const tk = px+','+py+'|'+(G.player.turnCount||0)+'|'+Math.floor(performance.now()/400)+'|'+seasonIdx()+(isNightTime() ? 'n' : 'd');
+  const tk = px+','+py+'|'+(G.player.turnCount||0)+'|'+Math.floor(performance.now()/2000)+'|'+seasonIdx()+(isNightTime() ? 'n' : 'd');   /* (RS-401: a step, a turn, the season and the night already re-check it; the clock is only a safety net, so every 2 s, not every 0.4) */
   if (O3.nodeTick === tk) return; O3.nodeTick = tk;
   const cx0 = Math.floor(px/O3_NCH), cy0 = Math.floor(py/O3_NCH), want = new Set(), t0 = performance.now(); let changed = false, built = 0;
+  /* (RS-401) what a chunk's spots hang on - not where you stand: a chunk already checked under it isn't looked at again, so a
+     frame that builds the far chunks doesn't first look over every tile near you (it was some 1,800 lookups a frame) */
+  const stK = (G.player.turnCount||0)+'|'+Math.floor(performance.now()/2000)+'|'+seasonIdx()+(isNightTime() ? 'n' : 'd')+'|'+(SKN.v||0)+'|'+((G.ow && G.ow.rich)||[]).length;
   // (RS-350) as far out as the camera sees - zoomed out, farther - but never past the built land's edge
   const NCR = Math.min(6, Math.max(O3_NCR, Math.ceil((O3.dist||12)*1.1/O3_NCH) + 1)), win = O3.win;
   const order = []; for (let i=-NCR;i<=NCR;i++) for (let j=-NCR;j<=NCR;j++) order.push([i, j]); order.sort((a, b)=>(a[0]*a[0]+a[1]*a[1]) - (b[0]*b[0]+b[1]*b[1]));
@@ -31407,12 +31453,13 @@ function o3SyncNodes(){
     if (win && (tx0 < win.x0 || ty0 < win.y0 || tx0 + O3_NCH > win.x0 + O3_W || ty0 + O3_NCH > win.y0 + O3_W)) continue;
     want.add(ck);
     let c = C.get(ck); if (c && Math.max(Math.abs(i), Math.abs(j)) > O3_NCR) continue;   /* (a far chunk is built once; only the near ones follow what's been worked) */
+    if (c && c.sk===stK) continue;
     if (built && performance.now() - t0 > 4){ O3.nodeTick = null; continue; }   /* (a few milliseconds a frame, nearest first - the rest next frame) */
     const list = []; for (let x=tx0; x<tx0+O3_NCH; x++) for (let y=ty0; y<ty0+O3_NCH; y++){ const n = skNodeAt(x, y); if (n) list.push(n); }
     const key = list.map(o3NodeKeyOf).join('|');
-    if (c && c.key===key) continue;
+    if (c && c.key===key){ c.sk = stK; continue; }
     if (c) o3FreeNodeChunk(c);
-    c = { key, g:new T.Group(), hits:[], anim:[] }; O3.nodeGrp.add(c.g); C.set(ck, c);
+    c = { key, sk:stK, g:new T.Group(), hits:[], anim:[] }; O3.nodeGrp.add(c.g); C.set(ck, c);
     const H0 = O3.nodeHits, A0 = O3.nodeAnim; O3.nodeHits = c.hits; O3.nodeAnim = c.anim;
     try{ o3BuildNodeChunk(list, c.g); }catch(e){ console.error(e); } finally { O3.nodeHits = H0; O3.nodeAnim = A0; }
     changed = true; built++;
@@ -31424,35 +31471,32 @@ function o3SyncNodes(){
 function o3BuildNodeChunk(list, g){
   const T = THREE;
   const G3 = o3NodeGeo(), hitM = O3.nodeHitM || (O3.nodeHitM = new T.MeshBasicMaterial({ visible:false }));
-  const hitG = O3.nodeHitG || (O3.nodeHitG = new T.BoxGeometry(0.9, 1.3, 0.9).translate(0, 0.55, 0));
+  const hitG = O3.nodeHitG || (O3.nodeHitG = new T.BoxGeometry(0.9, 1.3, 0.9).translate(0, 0.55, 0)), discs = [], ripples = [], bubs = [], glows = [];
   for (const n of list){
     const gx = n.x+0.5, gz = n.y+0.5, wet = n.k==='fishing', y0 = wet ? -0.13 : O3.heightAt(gx, gz);
     const grp = new T.Group(); grp.position.set(gx, y0, gz); g.add(grp);
     const col = skNodeCol(n);
     if (!wet) grp.scale.setScalar(n.rich ? 1.35 : [0.8, 1, 1.22][n.size===undefined ? 1 : n.size]);
+    const nGlow = (c, size, y, ph)=>glows.push({ x:gx, y:y0 + y*grp.scale.y, z:gz, size:size*grp.scale.x, col:c, ph });   /* (RS-401: batched - o3NodeFx) */
     if (n.rich && !n.gone){ const bm = new T.Mesh(new T.CylinderGeometry(0.12, 0.22, 7, 12, 1, true), new T.MeshBasicMaterial({ color:new T.Color(col).convertSRGBToLinear(), transparent:true, opacity:0.3, depthWrite:false, blending:T.AdditiveBlending, side:T.DoubleSide }));
       bm.material.userData.own = true; bm.position.y = 3.5; grp.add(bm); O3.nodeAnim.push({ kind:'beam', o:bm, ph:n.x }); }
-    else if (n.qual===2 && !n.gone){ const sp = o3Glow('rgba(255,250,220,1)', 0.4); sp.position.y = n.k==='woodcutting' ? 1.1 : 0.4; grp.add(sp); O3.nodeAnim.push({ kind:'glow', o:sp, ph:n.x*1.3 }); }
+    else if (n.qual===2 && !n.gone){ nGlow('rgba(255,250,220,1)', 0.4, n.k==='woodcutting' ? 1.1 : 0.4, n.x*1.3); }
     // a soft glow of the spot's own colour on the ground, so it stands out from the scenery
-    if (!n.gone){
-      const disc = new T.Mesh(G3.disc, new T.MeshBasicMaterial({ color:new T.Color(col).convertSRGBToLinear(), transparent:true, opacity:0.16, depthWrite:false, blending:T.AdditiveBlending }));
-      disc.material.userData.own = true; disc.rotation.x = -Math.PI/2; disc.position.y = 0.03; grp.add(disc); O3.nodeAnim.push({ kind:'disc', o:disc, ph:n.x*0.7+n.y*0.3 });
-    }
+    if (!n.gone) discs.push({ x:gx, y:y0 + 0.03*grp.scale.y, z:gz, s:grp.scale.x, col, ph:n.x*0.7+n.y*0.3 });   /* (RS-401: all of a chunk's discs are one mesh - o3NodeDiscs) */
     if (n.k==='woodcutting'){
       if (n.gone){ const st = new T.Mesh(G3.stump, o3NodeMat('stump', '#6a5034')); st.castShadow = true; grp.add(st); const top = new T.Mesh(new T.CircleGeometry(0.1, 10), o3NodeMat('ring', '#c8a878')); top.rotation.x = -Math.PI/2; top.position.y = 0.141; grp.add(top); }
       else { const tr = o3NodeTree(n.type); tr.rotation.y = skNH(n.x, n.y, 720)*6.28; grp.add(tr);
-        if (n.type==='magic'){ const gl = o3Glow('rgba(120,240,240,1)', 1.3); gl.position.y = 0.9; grp.add(gl); O3.nodeAnim.push({ kind:'glow', o:gl, ph:n.x }); } }
+        if (n.type==='magic'){ nGlow('rgba(120,240,240,1)', 1.3, 0.9, n.x); } }
     } else if (n.k==='fishing'){
-      for (let i=0;i<2;i++){ const r = new T.Mesh(G3.ring, new T.MeshBasicMaterial({ color:new T.Color(col).convertSRGBToLinear(), transparent:true, opacity:0.8, depthWrite:false, side:T.DoubleSide }));
-        r.material.userData.own = true; r.rotation.x = -Math.PI/2; r.position.y = 0.02; grp.add(r); O3.nodeAnim.push({ kind:'ripple', o:r, ph:i*0.5 + skNH(n.x,n.y,730) }); }
-      for (let i=0;i<4;i++){ const b = new T.Mesh(G3.bub, o3NodeMat('bub', '#ffffff', { roughness:0.2, transparent:true, opacity:0.85 })); grp.add(b); O3.nodeAnim.push({ kind:'bub', o:b, ph:i*0.25 + skNH(n.x,n.y,731), a:i*1.7 }); }
+      for (let i=0;i<2;i++) ripples.push({ x:gx, y:y0 + 0.02, z:gz, col, ph:i*0.5 + skNH(n.x,n.y,730) });   /* (RS-401: batched - o3NodeFx) */
+      for (let i=0;i<4;i++) bubs.push({ x:gx, y:y0, z:gz, ph:i*0.25 + skNH(n.x,n.y,731), a:i*1.7 });
       if (n.type==='deep'){ const f = new T.Mesh(G3.fin, o3NodeMat('fin', '#3a4a5a')); grp.add(f); O3.nodeAnim.push({ kind:'fin', o:f, ph:skNH(n.x,n.y,732)*6 }); }
     } else if (n.k==='runecrafting'){
       // the ruins of an old altar: a ring of standing stones round a slab, a light of the rune's colour hanging over it
       const sm = o3NodeMat('ruinstone', '#8a8478', { flatShading:true });
       for (let i=0;i<6;i++){ const a = i/6*Math.PI*2, h2 = 0.32 + skNH(n.x,n.y,800+i)*0.2, st = new T.Mesh(G3.stump, sm); st.scale.set(0.6, h2/0.14, 0.6); st.position.set(Math.cos(a)*0.36, 0, Math.sin(a)*0.36); st.rotation.y = a; st.castShadow = true; grp.add(st); }
       const slab = new T.Mesh(G3.stump, sm); slab.scale.set(1.4, 0.9, 1.4); grp.add(slab);
-      const c3 = new T.Color(col), gl = o3Glow(`rgba(${Math.round(c3.r*255)},${Math.round(c3.g*255)},${Math.round(c3.b*255)},1)`, 0.85); gl.position.y = 0.42; grp.add(gl); O3.nodeAnim.push({ kind:'glow', o:gl, ph:n.x+n.y });
+      nGlow(col, 0.85, 0.42, n.x+n.y);
     } else if (n.k==='mining'){
       // a rock, pit or bank: grey stone flecked with the ore's colour (gems, essence and gold glint), or a soft mound of clay or sand
       const R = SK_ROCK[n.type], soft = n.type==='clay' || n.type==='sand';
@@ -31465,7 +31509,7 @@ function o3BuildNodeChunk(list, g){
         const om = o3NodeMat('ore_'+n.type, R.col, shine ? { emissive:new T.Color(R.col).convertSRGBToLinear(), emissiveIntensity:0.55, roughness:0.3, metalness:0.3 } : { roughness:0.6 });
         for (let i=0;i<3;i++){ const r = new T.Mesh(G3.blob, rm); const sc = 0.38 + skNH(n.x,n.y,791+i)*0.18; r.scale.set(sc, sc*0.8, sc); r.position.set(Math.cos(i*2.1)*0.14, sc*0.28, Math.sin(i*2.1)*0.14); r.rotation.y = i; r.castShadow = true; grp.add(r); }
         for (let i=0;i<6;i++){ const a = i*1.05 + skNH(n.x,n.y,795), c = new T.Mesh(shine ? G3.fin : G3.bloom, om); c.position.set(Math.cos(a)*0.16, 0.13 + (i%3)*0.05, Math.sin(a)*0.16); c.rotation.set(Math.cos(a)*0.6, 0, Math.sin(a)*0.6); c.scale.setScalar(shine ? 0.9 : 1.6); grp.add(c); }
-        if (shine){ const gl = o3Glow(n.type==='goldvein' ? 'rgba(255,220,90,1)' : n.type==='gem' ? 'rgba(210,140,255,1)' : 'rgba(170,210,255,1)', 0.55); gl.position.y = 0.25; grp.add(gl); O3.nodeAnim.push({ kind:'glow', o:gl, ph:n.y }); }
+        if (shine){ nGlow(n.type==='goldvein' ? 'rgba(255,220,90,1)' : n.type==='gem' ? 'rgba(210,140,255,1)' : 'rgba(170,210,255,1)', 0.55, 0.25, n.y); }
       }
     } else if (n.k==='archaeology'){
       // a trench marked out with pegs and string, a spoil heap of the site's soil, and a trowel stuck in it
@@ -31485,11 +31529,63 @@ function o3BuildNodeChunk(list, g){
         const lf = new T.Mesh(G3.leaf, lm); lf.position.set(Math.cos(a)*r, 0.03, Math.sin(a)*r); lf.rotation.y = a; grp.add(lf);
         const bl = new T.Mesh(G3.bloom, bm); bl.position.set(Math.cos(a)*r, 0.16 + skNH(n.x,n.y,760+i)*0.05, Math.sin(a)*r); bl.scale.setScalar(n.shut ? 0.8 : n.type==='sunpetal' || n.type==='starlily' ? 1.4 : 1); if (n.shut) bl.scale.y *= 1.6; grp.add(bl);
       }
-      if (lit){ const gl = o3Glow(n.glow ? 'rgba(255,220,120,1)' : 'rgba(220,210,255,1)', 0.7); gl.position.y = 0.18; grp.add(gl); O3.nodeAnim.push({ kind:'glow', o:gl, ph:n.y }); }
+      if (lit){ nGlow(n.glow ? 'rgba(255,220,120,1)' : 'rgba(220,210,255,1)', 0.7, 0.18, n.y); }
     }
     const hit = new T.Mesh(hitG, hitM); hit.position.set(gx, y0, gz); hit.userData.act = { kind:'node', x:n.x, y:n.y }; g.add(hit); O3.nodeHits.push(hit);
   }
   try{ o3MergeStatic(g, new Set(O3.nodeAnim.map(a=>a.o).concat(O3.nodeHits)), new Set(Object.values(O3.mats||{}))); }catch(e){ console.error(e); }
+  if (discs.length) g.add(o3NodeDiscs(discs, G3.disc));
+  for (const m of o3NodeFx(ripples, bubs, glows, G3)) g.add(m);
+}
+/* (RS-401) the soft glow on the ground under every gathering spot: each was its own mesh with its own material, its opacity
+   set by hand every frame - zoomed out, some 400 draws. A chunk's discs are one mesh now, each disc's colour and phase in
+   its vertices, and the card pulses them all from one clock */
+/* (RS-401) a chunk's fishing ripples and bubbles and its glows, each kind one mesh or one point cloud moved by the card: a fishing
+   spot alone was six draws (two ripples, four bubbles), and every glow a sprite of its own */
+function o3NodeFx(rip, bub, glo, G3){
+  const T = THREE, out = [], U = O3.discT || (O3.discT = { value:0 }), PX = O3.glowPx || (O3.glowPx = { value:600 });
+  const batch = (geo, list, per)=>{ const src = geo.attributes.position, nrm = geo.attributes.normal, idx = geo.index, nv = src.count, ni = idx ? idx.count : 0, N = list.length;
+    const A = { position:new Float32Array(N*nv*3), normal:new Float32Array(N*nv*3), aC:new Float32Array(N*nv*3), aCol:new Float32Array(N*nv*3), aPh:new Float32Array(N*nv*2) }, ind = new (N*nv > 65535 ? Uint32Array : Uint16Array)(N*ni);
+    list.forEach((d, k)=>{ const c = per(d); for (let i=0;i<nv;i++){ const o = k*nv + i; A.position[o*3] = src.getX(i); A.position[o*3+1] = src.getY(i); A.position[o*3+2] = src.getZ(i);
+        if (nrm){ A.normal[o*3] = nrm.getX(i); A.normal[o*3+1] = nrm.getY(i); A.normal[o*3+2] = nrm.getZ(i); }
+        A.aC[o*3] = d.x; A.aC[o*3+1] = d.y; A.aC[o*3+2] = d.z; A.aCol[o*3] = c.r; A.aCol[o*3+1] = c.g; A.aCol[o*3+2] = c.b; A.aPh[o*2] = d.ph; A.aPh[o*2+1] = d.a||0; }
+      for (let i=0;i<ni;i++) ind[k*ni + i] = idx.getX(i) + k*nv; });
+    const g = new T.BufferGeometry(); g.setAttribute('position', new T.BufferAttribute(A.position, 3)); g.setAttribute('normal', new T.BufferAttribute(A.normal, 3)); g.setAttribute('aC', new T.BufferAttribute(A.aC, 3)); g.setAttribute('aCol', new T.BufferAttribute(A.aCol, 3)); g.setAttribute('aPh', new T.BufferAttribute(A.aPh, 2)); if (ni) g.setIndex(new T.BufferAttribute(ind, 1));
+    const bs = new T.Box3(); for (const d of list) bs.expandByPoint(new T.Vector3(d.x, d.y, d.z)); bs.expandByScalar(0.6); g.boundingSphere = bs.getBoundingSphere(new T.Sphere()); return g; };
+  const lin = c=>new T.Color(c).convertSRGBToLinear();
+  if (rip.length){ const m = O3.ripMat || (O3.ripMat = new T.ShaderMaterial({ uniforms:{ uT:U }, transparent:true, depthWrite:false, side:T.DoubleSide,
+      vertexShader:'attribute vec3 aC, aCol; attribute vec2 aPh; uniform float uT; varying vec4 vC; void main(){ float f = fract(uT*0.6 + aPh.x); vec3 p = aC + vec3(position.x, 0.0, -position.y)*(0.6 + f*1.9); vC = vec4(aCol, 0.75*(1.0 - f)); gl_Position = projectionMatrix*modelViewMatrix*vec4(p, 1.0); }',
+      fragmentShader:'varying vec4 vC; void main(){ gl_FragColor = vC; \n#include <encodings_fragment>\n}' }));
+    out.push(new T.Mesh(batch(G3.ring, rip, d=>lin(d.col)), m)); }
+  if (bub.length){ const m = O3.bubMat || (O3.bubMat = new T.ShaderMaterial({ uniforms:{ uT:U }, transparent:true,
+      vertexShader:'attribute vec3 aC; attribute vec2 aPh; uniform float uT; varying float vL; void main(){ float f = fract(uT*0.9 + aPh.x), a = aPh.y + uT*0.3; vec3 p = aC + vec3(cos(a)*0.16, f*0.12, sin(a)*0.16) + position*(1.0 - f*0.6); vL = 0.72 + 0.28*normal.y; gl_Position = projectionMatrix*modelViewMatrix*vec4(p, 1.0); }',
+      fragmentShader:'varying float vL; void main(){ gl_FragColor = vec4(vec3(vL), 0.85); \n#include <encodings_fragment>\n}' }));
+    out.push(new T.Mesh(batch(G3.bub, bub, ()=>({ r:1, g:1, b:1 })), m)); }
+  if (glo.length){
+    const N = glo.length, pos = new Float32Array(N*3), col = new Float32Array(N*3), sz = new Float32Array(N*2);
+    glo.forEach((d, k)=>{ const c = lin(d.col.startsWith('rgba') ? (()=>{ const v = d.col.match(/[\d.]+/g); return new T.Color(+v[0]/255, +v[1]/255, +v[2]/255).getHex(); })() : d.col); pos.set([d.x, d.y, d.z], k*3); col.set([c.r, c.g, c.b], k*3); sz.set([d.size, d.ph], k*2); });
+    const g = new T.BufferGeometry(); g.setAttribute('position', new T.BufferAttribute(pos, 3)); g.setAttribute('aCol', new T.BufferAttribute(col, 3)); g.setAttribute('aSz', new T.BufferAttribute(sz, 2)); g.computeBoundingSphere(); g.boundingSphere.radius += 1;
+    if (!O3.glowTex){ const c = v3Canvas(64, 64), x = c.getContext('2d'), gr = x.createRadialGradient(32,32,0,32,32,32); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.35, 'rgba(255,255,255,0.45)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = gr; x.fillRect(0,0,64,64); O3.glowTex = new T.CanvasTexture(c); }
+    const m = O3.glowPtMat || (O3.glowPtMat = new T.ShaderMaterial({ uniforms:{ uT:U, uPx:PX, map:{ value:O3.glowTex } }, transparent:true, depthWrite:false, blending:T.AdditiveBlending,
+      vertexShader:'attribute vec3 aCol; attribute vec2 aSz; uniform float uT, uPx; varying vec4 vC; void main(){ vec4 mv = modelViewMatrix*vec4(position, 1.0); gl_Position = projectionMatrix*mv; gl_PointSize = aSz.x*uPx/max(0.1, -mv.z); vC = vec4(aCol, 0.55 + 0.25*sin(uT*2.0 + aSz.y)); }',
+      fragmentShader:'uniform sampler2D map; varying vec4 vC; void main(){ vec4 t = texture2D(map, gl_PointCoord); gl_FragColor = vec4(vC.rgb*t.rgb, t.a*vC.a); \n#include <encodings_fragment>\n}' }));
+    out.push(new T.Points(g, m)); }
+  for (const o of out){ o.renderOrder = 2; }
+  return out;
+}
+function o3NodeDiscs(list, disc){
+  const T = THREE, src = disc.attributes.position, idx = disc.index, nv = src.count, ni = idx ? idx.count : 0;
+  const pos = new Float32Array(list.length*nv*3), colA = new Float32Array(list.length*nv*3), phA = new Float32Array(list.length*nv), ind = new (list.length*nv > 65535 ? Uint32Array : Uint16Array)(list.length*ni);
+  list.forEach((d, k)=>{ const c = new T.Color(d.col).convertSRGBToLinear(), r = 0.46*d.s/0.46;
+    for (let i=0;i<nv;i++){ const o = (k*nv + i); pos[o*3] = d.x + src.getX(i)*d.s; pos[o*3+1] = d.y; pos[o*3+2] = d.z - src.getY(i)*d.s; colA[o*3] = c.r; colA[o*3+1] = c.g; colA[o*3+2] = c.b; phA[o] = d.ph; }
+    for (let i=0;i<ni;i++) ind[k*ni + i] = idx.getX(i) + k*nv; });
+  const g = new T.BufferGeometry(); g.setAttribute('position', new T.BufferAttribute(pos, 3)); g.setAttribute('aCol', new T.BufferAttribute(colA, 3)); g.setAttribute('aPh', new T.BufferAttribute(phA, 1)); if (ni) g.setIndex(new T.BufferAttribute(ind, 1));
+  g.computeBoundingSphere();
+  const U = O3.discT || (O3.discT = { value:0 });
+  const m = O3.discMat || (O3.discMat = new T.ShaderMaterial({ uniforms:{ uT:U }, transparent:true, depthWrite:false, blending:T.AdditiveBlending,
+    vertexShader:'attribute vec3 aCol; attribute float aPh; uniform float uT; varying vec4 vC; void main(){ vC = vec4(aCol, 0.12 + 0.07*sin(uT*2.4 + aPh)); gl_Position = projectionMatrix*modelViewMatrix*vec4(position, 1.0); }',
+    fragmentShader:'varying vec4 vC; void main(){ gl_FragColor = vC; \n#include <encodings_fragment>\n}' }));   /* (additive with the source's alpha, like the old basic material; written out in the screen's encoding) */
+  const mesh = new T.Mesh(g, m); mesh.renderOrder = 1; return mesh;
 }
 /* (RS-333) bake every still, solid mesh under root that shares a material into one: the gathering spots in view were some
    3,000 separate draws (a herb patch alone was 21), and each draw costs the phone far more than its few triangles */
@@ -31694,10 +31790,10 @@ function o3MergeStatic(root, skip, shared){
   }
 }
 function o3AnimNodes(dt){
-  const t = O3.t;
+  const t = O3.t; if (O3.discT) O3.discT.value = t;   /* (RS-401: the ground discs, ripples, bubbles and glows move on the card) */
+  if (O3.glowPx && O3.renderer && O3.cam){ const h = O3.renderer.getDrawingBufferSize(O3.glowV || (O3.glowV = new THREE.Vector2())).y; O3.glowPx.value = h/(2*Math.tan(O3.cam.fov*Math.PI/360)); }
   for (const a of (O3.nodeAnim||[])){
-    if (a.kind==='disc') a.o.material.opacity = 0.12 + 0.07*Math.sin(t*2.4 + a.ph);
-    else if (a.kind==='ripple'){ const f = ((t*0.6 + a.ph) % 1); a.o.scale.setScalar(0.6 + f*1.9); a.o.material.opacity = 0.75*(1-f); }
+    if (a.kind==='ripple'){ const f = ((t*0.6 + a.ph) % 1); a.o.scale.setScalar(0.6 + f*1.9); a.o.material.opacity = 0.75*(1-f); }
     else if (a.kind==='bub'){ const f = ((t*0.9 + a.ph) % 1); a.o.position.set(Math.cos(a.a + t*0.3)*0.16, f*0.12, Math.sin(a.a + t*0.3)*0.16); a.o.scale.setScalar(1 - f*0.6); }
     else if (a.kind==='fin'){ const ang = t*0.9 + a.ph; a.o.position.set(Math.cos(ang)*0.34, 0.05 + Math.sin(t*3)*0.01, Math.sin(ang)*0.34); a.o.rotation.set(0, -ang, 0); }
     else if (a.kind==='glow') a.o.material.opacity = 0.55 + 0.25*Math.sin(t*2 + a.ph);
@@ -31925,7 +32021,7 @@ function o3Render(){
   o3SyncQuests();
   o3SyncNodes();
   try{ o3SyncLandmarks(dt); }catch(e){ console.error(e); }
-  try{ o3SyncEvents(); o3AnimEvents(); o3SyncBeasts(dt); }catch(e){ console.error(e); }
+  try{ o3AnimTick(); o3SyncEvents(); o3AnimEvents(); o3SyncBeasts(dt); }catch(e){ console.error(e); }
   try{ o3SyncPOIs(); o3Wildlife(dt); o3SyncIce(); o3BoatTier(); }catch(e){ console.error(e); }
   // you glide between tiles; on water you ride a boat
   const sailing = G.ow.map[G.owPos.x][G.owPos.y]===OW_WATER && !iceAt(G.owPos.x, G.owPos.y);   // only open water needs the boat; rivers are waded, and winter ice is walked
@@ -39615,7 +39711,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-400';
+const GAME_VERSION = 'rs-401';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

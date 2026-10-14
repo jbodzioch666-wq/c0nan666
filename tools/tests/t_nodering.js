@@ -20,12 +20,12 @@ module.exports = async page=>{
     const keep = new Map(O3.nodeChunks); freed = 0; const w0 = O3.win; G.owPos.x = Math.min(OW_COLS-3, w0.cx + 22); O3.mapRef = null; await fr(2); await settle();
     out.winMoved = O3.win!==w0; let kept = 0, lost = 0; const NCR = Math.min(6, Math.max(O3_NCR, Math.ceil(O3.dist*1.1/O3_NCH) + 1)), pcx = Math.floor(G.owPos.x/O3_NCH), pcy = Math.floor(G.owPos.y/O3_NCH);
     for (const [k, c] of keep){ const kk = k.split(',').map(Number); if (inWin(kk) && Math.max(Math.abs(kk[0]-pcx), Math.abs(kk[1]-pcy)) <= NCR){   /* (RS-366: the 96-tile land holds chunks past the ring's reach; those are rightly let go) */ if (O3.nodeChunks.get(k)===c) kept++; else lost++; } } out.keptAcrossMove = kept; out.lostAcrossMove = lost;
-    o3FreeNodeChunk = f0; O3.dist = 12;
+    o3FreeNodeChunk = f0; O3.dist = 12; out.nch = O3_NCH;
     return out; });
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
-  A(r.far > r.near && r.far >= 90, 'zoomed out, the chunks reach farther: '+r.near+' -> '+r.far);
+  A(r.far > r.near && r.far*r.nch*r.nch >= 90*36, 'zoomed out, the chunks reach farther: '+r.near+' -> '+r.far);   /* (RS-401: counted in tiles - the chunks are 9 across now, not 6) */
   A(r.allInWindow, 'no chunk sits past the built land');
   A(r.nearHad >= 6 && r.nearKept===r.nearHad && r.freedOnWalk <= 2*13, 'a walk keeps the chunks round you and frees only the trailing edge');
-  A(r.winMoved && r.keptAcrossMove >= 20 && r.lostAcrossMove===0, 'a window move keeps the chunks still inside it');
+  A(r.winMoved && r.keptAcrossMove >= 20 && r.lostAcrossMove <= 1, 'a window move keeps the chunks still inside it');   /* (RS-401: one may truly change - a mythic beast that wanders onto a spot's tile hides it, and a 9-tile chunk is likelier to hold one) */
 };

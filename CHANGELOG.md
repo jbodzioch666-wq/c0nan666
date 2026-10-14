@@ -1,5 +1,15 @@
 # Depthcrawl patch notes
 
+## RS-401 - The open land, half the draws
+
+Measured on a player's save in the Wilderness, zoomed all the way out: the land issued about **1,670 draws a frame**, and the fps meter read "3d 22". It now issues about **750**; at the normal zoom, **880 became 410**.
+
+- **Gathering-spot effects batched.** Every gathering spot had its own coloured glow disc on the ground; every fishing spot had two ripples and four bubbles, and every special spot its own glow sprite. Each was a separate draw with its opacity set by hand every frame. A chunk's discs, ripples, bubbles and glows are now one mesh or point cloud each, animated on the card. Chunks are 9 tiles across instead of 6, so there are fewer of them.
+- **The land is merged like a town.** Sites, farms, ruins and the land's dressing were hundreds of small separate parts; they're merged by look (RS-348, RS-380), so the land's draws went from about 250 to 45 for the view and from 370 to 70 for the sun's shadow. Anything the game still moves or clicks stays as it was.
+- **Creatures off screen aren't animated, and far ones cast no shadow.** A serpent or a many-legged creature rebuilds its body on the CPU every time it moves; these were posed even when out of view. Now only creatures the camera can see are posed, and those more than ten tiles away every other frame. Creatures more than a dozen tiles from you no longer cast shadows, which were a few pixels long but still a draw each.
+- **Gathering spots aren't looked over again and again.** The spots round you were looked up tile by tile up to every frame while far chunks were still being built (some 1,800 lookups), and every 0.4 seconds after. They're now re-checked only when something they depend on changes (a step, a turn, the season, nightfall, a spot you've worked), with a 2-second safety net, and the landmark check is skipped for tiles already known.
+- **Test.** `owdraws` checks no gathering-spot effect is its own draw, the land is merged, a frame with nothing new looks nothing up, known tiles skip the landmark check, creatures off screen aren't posed, far ones cast no shadow, and the land zoomed out stays under 1,100 draws.
+
 ## RS-400 - Dead weight out
 
 - **The skeleton's studio renderer is gone.** From the first-person days, every skeleton was drawn by its own second WebGL renderer into a 900 by 1200 canvas, then copied through three more canvases a frame to make a sprite. In the isometric view skeletons have been real figures in the scene since RS-110, so that path never ran, but the renderer (with its lights and a 2048 shadow map) was still created at boot. Now only the sculpted template is built, and the figures are cloned from it as before.
