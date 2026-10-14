@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-383 - The hooded figure keeps to the shadows
+
+- **His back to the corner.** The hooded figure now sits right in the tavern's corner by the bookshelf, his back to the two walls, facing out across the room, with his table in front of him.
+- **A dim corner.** The tavern's nearer lantern now hangs well clear of his corner, so it sits in shadow; a stub of candle guttering on his table is its only light.
+
 ## RS-382 - Walk off a won field; the hooded figure takes a seat; back where you left off
 
 - **A won fight on the open land stays open.** The last foe falling no longer whisks you straight back to the map: the win is paid at once, and you stay on the field to pick up what fell and leave by walking off its edge, as you would to flee. An ambush's sealed edges open as soon as the last foe is down.
