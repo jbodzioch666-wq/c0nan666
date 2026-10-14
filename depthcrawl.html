@@ -23508,7 +23508,7 @@ function gfxPost(r){
   const M = (fs, u)=>new T.ShaderMaterial({ uniforms:u, vertexShader:vs, fragmentShader:fs, depthTest:false, depthWrite:false });
   P.bright = M('uniform sampler2D t; uniform float th; varying vec2 vUv; void main(){ vec4 s = texture2D(t, vUv); vec3 c = s.rgb; float l = max(c.r, max(c.g, c.b)); gl_FragColor = vec4(c * smoothstep(th, th + 0.7, l), 1.0); }', { t:{ value:null }, th:{ value:0.8 } });
   P.blur = M('uniform sampler2D t; uniform vec2 d; varying vec2 vUv; void main(){ vec3 c = texture2D(t, vUv).rgb*0.2270; c += (texture2D(t, vUv + d*1.3846).rgb + texture2D(t, vUv - d*1.3846).rgb)*0.3162; c += (texture2D(t, vUv + d*3.2308).rgb + texture2D(t, vUv - d*3.2308).rgb)*0.0703; gl_FragColor = vec4(c, 1.0); }', { t:{ value:null }, d:{ value:new T.Vector2() } });
-  P.comp = M(`uniform sampler2D tS, tB; uniform float bloom, expo, aces, sat, con, vig; uniform vec3 gain, lift, bg; varying vec2 vUv;
+  P.comp = M(`uniform sampler2D tS, tB; uniform float bloom, expo, aces, sat, con, vig, vig2, hurt, heal, glow, fade; uniform vec2 res; uniform vec3 gain, lift, bg; varying vec2 vUv;
     vec3 RRT(vec3 v){ vec3 a = v*(v + 0.0245786) - 0.000090537; vec3 b = v*(0.983729*v + 0.4329510) + 0.238081; return a/b; }
     vec3 ACES(vec3 c){ const mat3 I = mat3(vec3(0.59719,0.07600,0.02840), vec3(0.35458,0.90834,0.13383), vec3(0.04823,0.01566,0.83777)); const mat3 O = mat3(vec3(1.60475,-0.10208,-0.00327), vec3(-0.53108,1.10813,-0.07276), vec3(-0.07367,-0.00605,1.07602));
       c *= expo/0.6; c = I*c; c = RRT(c); c = O*c; return clamp(c, 0.0, 1.0); }
@@ -23521,8 +23521,13 @@ function gfxPost(r){
       o += toS(b*bloom)*0.55;
       float l = dot(o, vec3(0.2126, 0.7152, 0.0722)); o = mix(vec3(l), o, sat); o = (o - 0.5)*con + 0.5;
       o *= mix(1.0, smoothstep(0.98, 0.32, length(vUv - 0.5)), vig);
+      /* (RS-396) the dungeon's own frame: a dark vignette, and red, green or gold edges when you're hurt, healed or blessed, as its 2D overlay drew them */
+      float t = length((vUv - 0.5)*res)/max(res.x, res.y), ed = clamp((t - 0.25)/0.47, 0.0, 1.0);
+      o *= 1.0 - vig2*smoothstep(0.32, 0.75, t);
+      o = mix(o, vec3(0.784, 0.078, 0.118), hurt*ed); o = mix(o, vec3(0.353, 0.863, 0.471), heal*ed); o = mix(o, vec3(0.941, 0.784, 0.353), glow*ed);
+      o = mix(o, vec3(0.0), fade);
       gl_FragColor = vec4(clamp(o, 0.0, 1.0), 1.0); }`,
-    { tS:{ value:null }, tB:{ value:null }, bloom:{ value:0.6 }, expo:{ value:1 }, aces:{ value:1 }, sat:{ value:1 }, con:{ value:1 }, vig:{ value:0.2 }, gain:{ value:new T.Vector3(1,1,1) }, lift:{ value:new T.Vector3() }, bg:{ value:new T.Vector3() } });
+    { tS:{ value:null }, tB:{ value:null }, bloom:{ value:0.6 }, expo:{ value:1 }, aces:{ value:1 }, sat:{ value:1 }, con:{ value:1 }, vig:{ value:0.2 }, vig2:{ value:0 }, hurt:{ value:0 }, heal:{ value:0 }, glow:{ value:0 }, fade:{ value:0 }, res:{ value:new T.Vector2(1,1) }, gain:{ value:new T.Vector3(1,1,1) }, lift:{ value:new T.Vector3() }, bg:{ value:new T.Vector3() } });
   P.quad = new T.Mesh(new T.PlaneGeometry(2, 2), P.comp); P.quad.frustumCulled = false; P.qs = new T.Scene(); P.qs.add(P.quad); P.qc = new T.OrthographicCamera(-1, 1, 1, -1, 0, 1);
   P.v2 = new T.Vector2();
   GFXP.set(r, P); return P;
@@ -23580,7 +23585,13 @@ function gfxRenderInner(r, scene, cam, view){
   for (let i=0;i<2;i++){ P.blur.uniforms.t.value = P.a.texture; P.blur.uniforms.d.value.set(1.4/qw, 0); gfxPass(r, P, P.blur, P.b); P.blur.uniforms.t.value = P.b.texture; P.blur.uniforms.d.value.set(0, 1.4/qh); gfxPass(r, P, P.blur, P.a); }
   U.tS.value = P.scene.texture; U.tB.value = P.a.texture; U.bloom.value = g.bloom; U.expo.value = r.toneMappingExposure; U.aces.value = r.toneMapping===THREE.ACESFilmicToneMapping ? 1 : 0;
   U.gain.value.set(g.gain[0], g.gain[1], g.gain[2]); U.lift.value.set(g.lift[0], g.lift[1], g.lift[2]); U.sat.value = g.sat; U.con.value = g.con; U.vig.value = g.vig;
+  U.res.value.set(w, h); if (view==='fpd') gfxFpdPost(U); else { U.vig2.value = U.hurt.value = U.heal.value = U.glow.value = U.fade.value = 0; }
   gfxPass(r, P, P.comp, null);
+}
+/* (RS-396) the dungeon frame's uniforms, from the same numbers fpDrawPost drew with: the pulse when your life is low counts as hurt */
+function gfxFpdPost(U){
+  const p = G.player, lowHp = p && p.hp>0 && p.hp < p.maxHp*0.3 ? (0.25+0.2*Math.sin(FP.t*4)) : 0;
+  U.vig2.value = 0.6; U.hurt.value = Math.max(FP.hurt*0.7, lowHp); U.heal.value = FP.heal*0.45; U.glow.value = FP.glow*0.5; U.fade.value = Math.max(0, Math.min(1, FP.fade||0));
 }
 // ---- textures drawn once: grass, dirt and rock detail, and soft cloud noise ----
 function gfxTextures(){
@@ -24650,6 +24661,7 @@ function renderGame(){
   else if (G.gameMode===3){ if (G.owZoomedOut){ v3Hide(); renderOverworldMapZoomed(); } else if (!(v3Active() && v3Render())){ v3Hide(); no3dNotice(); } }
   else if (fp3dActive()) renderFirstPerson(); // the isometric 3D view of a dungeon floor or roadside fight
   else no3dNotice();
+  if (!fp3dActive() && typeof fpdHide==='function') fpdHide();   /* (RS-396) */
   renderHud();
   renderStatusChips();
   if (immersiveUi) renderImmersiveHud();
@@ -32282,7 +32294,11 @@ function fpdInit(){
   if (typeof THREE==='undefined' || window.__noFpd) return false;
   try{
     const T = THREE, cv = document.createElement('canvas');
-    const r = new T.WebGLRenderer({ canvas:cv, antialias:true, preserveDrawingBuffer:true, powerPreference:'high-performance' });
+    /* (RS-396) shown on the page itself, under the 2D canvas the overlay is drawn on - it used to be copied onto that canvas
+       whole every frame (a full-screen resampled blit), and kept its drawing buffer about for the copy */
+    cv.id = 'dungeonGL'; cv.style.cssText = 'position:absolute;display:none;pointer-events:none;';
+    { const wrap = canvas.parentElement; if (wrap) wrap.insertBefore(cv, canvas); }
+    const r = new T.WebGLRenderer({ canvas:cv, antialias:true, powerPreference:'high-performance' });
     r.outputEncoding = T.sRGBEncoding; r.toneMapping = T.NoToneMapping;
     r.shadowMap.enabled = true; r.shadowMap.type = T.PCFShadowMap; r.shadowMap.autoUpdate = false;
     const scene = new T.Scene(), cam = new T.PerspectiveCamera(60, 16/9, 0.03, 40);
@@ -38227,6 +38243,9 @@ function fpDrawMinimap(vis){
 function fpMiniYaw(){ return ISO.yawNow!=null ? ISO.yawNow : isoYaw(); }
 function fpDrawPost(){
   const cw = canvas.width, chh = canvas.height, R = Math.max(cw, chh);
+  /* (RS-396) with post-processing on, the dungeon's vignette, the hurt, heal and glow edges and the fade are drawn by the
+     post shader in the same pass as the bloom and grade (see gfxFpdPost) - not as four full-screen gradient fills a frame */
+  if (gfxPostOn() && FPD.r && GFXP.has(FPD.r)) return;
   if (!FP.vig || FP.vigW!==cw+'x'+chh){
     FP.vigW = cw+'x'+chh;
     const g = ctx.createRadialGradient(cw/2,chh/2,R*0.32,cw/2,chh/2,R*0.75);
@@ -39425,11 +39444,11 @@ function renderFirstPerson(){
   const sprites = fpCollectSprites(vis);            // (also places the 3D creatures, so they're drawn this frame)
   m3dSweep();
   isoTickPath(now); isoTickHeld(now); try{ isoSyncSprites(sprites, env); isoSyncProps(sprites); isoSyncPlayer(); isoSyncVeins(); }catch(e){ console.error(e); }
-  try{ fpdRender(env, T, camZ); }catch(e){ console.error(e); FPD.ok = false; no3dNotice(); return; }
+  try{ fpdRender(env, T, camZ); }catch(e){ console.error(e); FPD.ok = false; fpdHide(); no3dNotice(); return; }
+  fpdShow();
+  ctx.clearRect(0, 0, canvas.width, canvas.height);   /* (RS-396: the 3D view shows through from its own canvas underneath; only the overlay is drawn here) */
   ctx.save();
   if (FP.shake>0){ const s = FP.shake*6*dpr; ctx.translate((Math.random()-0.5)*s, (Math.random()-0.5)*s); }
-  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(FPD.cv, 0, 0, canvas.width, canvas.height);
   isoDrawOverlay(sprites);
   if (G.gameMode===2 && (G.weather==='rain' || G.weather==='storm')) fpDrawRain();
   ctx.restore();
@@ -39437,6 +39456,16 @@ function renderFirstPerson(){
   fpDrawMinimap(vis);
 }
 // shown in place of the land, a town, a dungeon or a fight when 3D isn't running: still loading, or the browser can't run it
+/* (RS-396) the dungeon's canvas sits exactly over the 2D one, shaken with the view; it goes when the dungeon isn't drawn */
+function fpdShow(){
+  const cv = FPD.cv, mc = canvas; if (!cv) return;
+  if (cv.style.display!=='block') cv.style.display = 'block';
+  const L = mc.style.left || '0px', T = mc.style.top || '0px', W = mc.clientWidth+'px', H = mc.clientHeight+'px';
+  if (cv.style.left!==L) cv.style.left = L; if (cv.style.top!==T) cv.style.top = T; if (cv.style.width!==W) cv.style.width = W; if (cv.style.height!==H) cv.style.height = H;
+  const sh = FP.shake>0 ? `translate(${((Math.random()-0.5)*FP.shake*6).toFixed(1)}px,${((Math.random()-0.5)*FP.shake*6).toFixed(1)}px)` : '';
+  if (cv.style.transform!==sh) cv.style.transform = sh;
+}
+function fpdHide(){ if (FPD.cv && FPD.cv.style.display!=='none') FPD.cv.style.display = 'none'; }
 function no3dNotice(){
   const cw = canvas.width, ch = canvas.height, loading = typeof THREE==='undefined' && !window.__threeFail;
   ctx.save(); ctx.fillStyle = '#0d0b09'; ctx.fillRect(0, 0, cw, ch);
@@ -39631,7 +39660,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-395';
+const GAME_VERSION = 'rs-396';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

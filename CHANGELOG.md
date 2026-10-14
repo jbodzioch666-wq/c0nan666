@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-396 - The GPU pass, part three: the dungeon on its own canvas
+
+- **No more full-screen copy.** The dungeon and roadside fights were drawn into a hidden canvas, then copied onto the game's 2D canvas every frame: a whole-screen, resampled blit, and the browser had to keep the drawing buffer around for it. The 3D view now shows on its own canvas, under the 2D overlay (health bars, hitsplats, the minimap), the way towns and the open land have always worked. The screen shake moves the canvas itself.
+- **The frame goes into the post shader.** The dark vignette, the red edge when you're hurt, the green when you're healed, the gold of a blessing and the fade to black were four full-screen gradient fills on the 2D canvas every frame. They're now a few lines in the post-processing shader, drawn in the same pass as the bloom and colour grade. With post-processing off (low graphics), the 2D frame is drawn as before.
+- **Test.** `dgcanvas` checks the 3D canvas is never copied, sits under the overlay at the same size, the overlay is clear over it, the shader gets the hurt/heal/glow values, no 2D gradients are drawn for the frame, and the canvas goes away when you leave.
+
 ## RS-395 - Smooth shadows on the move
 
 - **Your shadow keeps up with you.** To save work, RS-380 redrew the sun's shadows only every second frame (every third on a phone). A walking figure's shadow was drawn from where it stood a frame or two earlier, so it stuttered along behind you on the overworld and in towns. Shadows are now redrawn every frame while you move, and go back to the cheaper rate when you stand still.
