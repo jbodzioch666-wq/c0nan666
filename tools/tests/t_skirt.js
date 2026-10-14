@@ -5,6 +5,7 @@
 module.exports = async page=>{
   const r = await page.evaluate(()=>{
     const out = { pokes:[], checked:0 }, inv = new THREE.Matrix4(), v = new THREE.Vector3();
+    M3D_SKIN = false; M3D.tpl.clear();   /* (RS-386: the fit is measured on the parts themselves - since RS-379 a figure is skinned into a few meshes) */
     for (const race of RACES.map(r=>r[0])){
       goToCharCreate(); G.ccLookTouched = false; ccSelectRace(RACES.findIndex(r=>r[0]===race)); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); o3Pref = false; try{ v3Pref = false; }catch(e){}
       for (const sl of ['head','chest','legs','arms','feet','cape','offhand','weapon']) G.gear[sl] = newItem(); G.player.look.body = 1; G.player.look.beard = 0;

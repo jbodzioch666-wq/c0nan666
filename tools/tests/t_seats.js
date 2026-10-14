@@ -2,7 +2,7 @@
 // regulars sit on them, the stairwell upstairs has no door-like lid, and the Peddler's trapdoor is in the back corner
 module.exports = async page=>{
   const r = await page.evaluate(async ()=>{
-    goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing');
+    M3D_SKIN = false; M3D.tpl.clear();   /* (RS-386: the legs are measured part by part - since RS-379 a figure is skinned into a few meshes) */ goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing');
     const t = townList()[0]; G.owPos = { x:t.x, y:t.y }; enterVillage(); setUi('playing'); townClosedCheck = ()=>false;
     const p = G.player, out = {};
     const frames = async n=>{ for (let i=0;i<n;i++){ v3Render(); await new Promise(res=>setTimeout(res, 16)); } };
@@ -54,10 +54,10 @@ module.exports = async page=>{
   console.log(JSON.stringify(r));
   await page.screenshot({ path: SHOTS+'/shot_seats.png', timeout:120000 });
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
-  A(r.tables===2 && r.stools>=6 && r.clearPath, 'two tables with stools, and the way to the bar clear');
+  A(r.tables===3 && r.stools>=6 && r.clearPath, 'two tables with stools, the hooded figure\'s (RS-382), and the way to the bar clear');
   A(r.patrons>=3 && r.patronsOnStools, 'the regulars sit on the stools');
-  A(r.sitAt && r.sitAt[0]===r.stool[0] && r.sitAt[1]===r.stool[1], 'you sit on the stool you walk into');
-  A(Math.abs(r.playerAt[0]-r.stool[0]-0.5) < 0.12 && Math.abs(r.playerAt[1]-r.stool[1]-0.5) < 0.12, 'your figure moves onto the stool');
+  A(r.sitAt && Math.abs(r.sitAt[0]-r.stool[0]) < 0.5 && Math.abs(r.sitAt[1]-r.stool[1]) < 0.5, 'you sit on the stool you walk into (RS-386: pulled in to its table)');
+  A(Math.abs(r.playerAt[0]-r.sitAt[0]-0.5) < 0.12 && Math.abs(r.playerAt[1]-r.sitAt[1]-0.5) < 0.12, 'your figure moves onto the stool');
   A(r.playerHips < 0.45 && r.patronHips!==null && r.patronHips < 0.45, 'seated low, not standing');
   A(r.feet > -0.04 && r.feet < 0.08, 'feet on the floor, not through it or dangling');
   A(!r.takenSeat, 'you can\'t sit where someone already sits');

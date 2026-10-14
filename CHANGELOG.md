@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-386 - Seats, robes, posts, the bank's arrows and where you stand
+
+- **Stools pulled in to their tables.** Every stool round a tavern table now stands right at it, so the regulars (and you) sit at the table with their knees under its edge, instead of a full pace away.
+- **Robes drape round the seat.** Sitting on a stool or chair, the robe's sides no longer have the seat poking out through them: the cloth falls over the seat's edges and hangs outside it to the floor. The fold that falls from the knees also hangs clear of the shins, which used to poke through it.
+- **Arrows and bolts in the bank.** They kept their metal's colour in your quiver but lost it once banked; now they're coloured in the bank too, with their count. And the quiver rows in the bank's pack list now have a tooltip, like everything else.
+- **No more flickering posts.** The wooden posts along the walls inside buildings were exactly as tall as the walls, so their tops fought with the wall top and flickered; they now stop just short of it, and the corner has one post instead of two overlapping. A bed's head posts sit clear of the wall's panelling, which they used to cut through.
+- **You stand outside a town's model, not in the middle of it.** On the open land, standing on a town's or a dungeon's tile puts you at the edge of it, on the side you came from, instead of inside the building.
+
 ## RS-385 - Gathering no longer halves the frame rate
 
 - **Foraging, chopping and mining dropped the frame rate from 120 to 60.** The hotbar's "stop" slot shows a sweep that fills over each swing, and the time elapsed was written into the bar's own markup, so the whole hotbar was torn down and rebuilt every single frame while you worked. The sweep now carries the moment the swing began, which doesn't change, and the bar is only rebuilt when something really changes (once a swing).

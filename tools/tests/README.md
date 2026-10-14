@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs386 | RS-386: stools pulled in to tables; bank ammo coloured and quiver rows with tooltips; seated robes drape round the seat; posts stop short of the wall top; you stand at the edge of a town's tile |
 | hbsweep | RS-385: gathering no longer rebuilds the hotbar every frame (the sweep carries its start time); the gather bar only writes what changed |
 | rs382 | RS-382/383: the hooded figure sits in the tavern's dim corner, back to the walls, behind a table; a game saved in a town loads in that town |
 | fieldwon | RS-382: a won overworld fight stays open until you walk off its edge (ambushes too); a field with no way out gets a portal |
