@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-399 - The HUD on its own clock
+
+- **The HUD is rebuilt ten times a second, not every frame.** The player plate, hotbar, status chips, side panel, quick bars, buff bar and the clock bar are HTML. Every frame each was rebuilt as a string and compared with the last; that was most of the "hud" time on the fps meter (RS-353). The game loop's own frames now rebuild them every tenth of a second. Anything you do (a step, a blow, a click, a key) still redraws at once, so nothing feels late; what changes on its own, like regen or the clock, shows within a tenth of a second.
+- **The minimap and the bar animations are untouched.** The minimap keeps its own clock and turns with the camera between rebuilds; the health and prayer bars still slide and the numbers still count.
+- **Test.** `hudthrottle` holds the clock and checks the loop's frames leave the HUD alone inside the window, that an action rebuilds it at once, and that a change on its own shows on the next frame past the window.
+
 ## RS-398 - The GPU pass, part five: rain and dust on the card
 
 - **Rain falls in the shader.** The overworld's 900 streaks and a town's 700 were each moved by the CPU and uploaded to the card every frame. Each streak is now laid out once; the card drops it with the clock, wraps it back to the top, slants it in a storm and keeps it round you. Storms are still heavier than rain, and the streaks look the same.

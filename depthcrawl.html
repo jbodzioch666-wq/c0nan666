@@ -7865,6 +7865,7 @@ function clockQuestText(){
   return qs.slice(0, 2).map(q=>{ let o = questObjective(q); if (q.kind==='rescue' && !q.freed) o = G.depth===q.floor ? `${o} - ${rescueFoesLeft()} left on this floor` : `${o} - you are on floor ${G.depth}`; return `${questTitle(q)}: ${o}`; }).join('   /   ') + (qs.length > 2 ? `   (+${qs.length - 2} more)` : '');
 }
 function clockBarSync(){
+  { const now = performance.now(); if (now - (clockBarSync.at||0) < 100) return; clockBarSync.at = now; }   /* (RS-399: its text is built ten times a second, not every frame) */
   let el = document.getElementById('dhClock');
   const on = !!(G.player && G.ui==='playing' && !G.gameOver && document.body.classList.contains('immersive') && !document.body.classList.contains('wmap'));
   if (!el){ if (!on) return; el = document.createElement('div'); el.id = 'dhClock'; document.body.appendChild(el); }
@@ -24641,16 +24642,24 @@ function sqStartAt(id){ if (!sqCanStart(id)) return; sqStart(id); const s = sqP(
 // small bonuses from quest gear
 function sqXpBonus(k){ const w = G.gear && G.gear.weapon; return (k==='mining' && w && w.questItem==='lanternpick') ? 0.1 : 0; }
 
+/* (RS-399) the HUD is HTML: the player plate, hotbar, chips, side panel, quick bars and the rest were each rebuilt as a string
+   every frame and compared with the last, which was most of the frame's "hud" time on the meter. A frame of the game loop
+   now rebuilds them ten times a second; a renderGame() after something you did (a step, a blow, a click) still rebuilds at once */
+const HUDT = { inFrame:false, at:0, ms:100 };
+function hudLazy(){ const now = performance.now(); if (HUDT.inFrame && now - HUDT.at < HUDT.ms) return true; HUDT.at = now; return false; }
 function renderGame(){
   syncGrid();
+  const lazy = hudLazy();
   mapToolsSync();
   wgHudSync();
   if (G.ui==='playing') checkLowHp(); else if (LOWHP.on) lowHpFx(1);
-  queueMicrotask(renderBuffBar); // after this render, so it can sit under the fresh player plate
-  queueMicrotask(hudLayout);
-  if (G.player && G.player.lootHold && G.player.lootHold.length && G.inv.length < MAXINV) packHoldFlush();
-  renderPackFull();
-  { const xe = document.getElementById('xpTracker'); if (xe && (xe.style.display==='none') !== (G.ui!=='playing' || XPT.hidden || !G.player || !xptList().length)) renderXpTracker(); }
+  if (!lazy){
+    queueMicrotask(renderBuffBar); // after this render, so it can sit under the fresh player plate
+    queueMicrotask(hudLayout);
+    if (G.player && G.player.lootHold && G.player.lootHold.length && G.inv.length < MAXINV) packHoldFlush();
+    renderPackFull();
+    { const xe = document.getElementById('xpTracker'); if (xe && (xe.style.display==='none') !== (G.ui!=='playing' || XPT.hidden || !G.player || !xptList().length)) renderXpTracker(); }
+  } else renderMiniMap();   /* (its own 180 ms clock; it turns with the camera between rebuilds) */
   // village mode gets the whole stage to itself (no HP/stats/spells to
   // track while browsing shops) - toggled here rather than at every
   // possible gameMode-3 entry/exit point (enterVillage, the T_EXIT handler,
@@ -24675,6 +24684,7 @@ function renderGame(){
   else if (fp3dActive()) renderFirstPerson(); // the isometric 3D view of a dungeon floor or roadside fight
   else no3dNotice();
   if (!fp3dActive() && typeof fpdHide==='function') fpdHide();   /* (RS-396) */
+  if (lazy) return;
   renderHud();
   renderStatusChips();
   if (immersiveUi) renderImmersiveHud();
@@ -39713,7 +39723,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-398';
+const GAME_VERSION = 'rs-399';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -42417,7 +42427,7 @@ function frameLoop(ts){
     gfxApply();
     if (G.gameOver===1 && G.ui==='playing') setUi('death');
     townRealtimeTick(performance.now());
-    renderGame();
+    HUDT.inFrame = true; try{ renderGame(); } finally { HUDT.inFrame = false; }   /* (RS-399: the frame's render rebuilds the HUD on its own clock) */
     // safety-net autosave, catches anything that changed state outside a
     // direct player keypress (rare, but cheap insurance)
     if (!G.gameOver && G.ui!=='worldPreview' && ts-lastAutosaveTs > 2000){ lastAutosaveTs = ts; saveCurrentGame(); }
