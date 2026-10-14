@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-390 - Dawn and dusk through the windows
+
+- **Window light follows the hour.** Inside any building, the light through the windows is a low rose-gold at dawn, warm white through the day and a deep orange as the sun goes down at dusk, then gone at night. The shafts on the floor, the glass itself and the room's light all take the colour, and it changes as the clock runs - no need to step out and back in.
+- **The low sun shows.** Dawn and dusk light is a little stronger in the shafts and the glass than before, so its colour reads against the lamplight.
+
 ## RS-389 - A night in a bed
 
 - **You get into bed and sleep.** Renting a bed at the tavern (or sleeping in your own at home) no longer skips to morning in a blink: you climb in and lie down on it, the room fades to dark, and the night passes.
