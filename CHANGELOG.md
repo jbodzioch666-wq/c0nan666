@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-394 - Dungeon minimap turns
+
+- **The dungeon minimap turns with the camera.** It used to stay at whatever angle the town or overworld camera last had, so turning the view in a dungeon left it behind. It now follows the dungeon camera, so up on the minimap is up on the screen.
+- **North is marked.** An N on the minimap's rim shows where north lies, as on the town and overworld minimap.
+- **Turn buttons.** The two turn buttons now sit on the dungeon minimap's bottom edge too, and go away with it when a menu opens.
+
 ## RS-393 - Dungeon sconces
 
 - **3D sconces in dungeons.** Dungeon wall torches used to be painted onto the wall. They are now the same 3D iron sconces as in town rooms: a riveted plate, a curled bracket, a cup and a tarred torch, with a flickering flame. They're scaled to dungeon walls, face out into the room, and hang on plain stone.
