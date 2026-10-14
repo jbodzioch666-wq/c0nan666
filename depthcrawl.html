@@ -15029,7 +15029,7 @@ function isoSpellParticles(s, a, ppu, big){
   ctx.restore();
 }
 function isoDrawFlashThrall(ppu){
-  if (ISO.flash){ const f = ISO.flash; f.t += FP.dt; if (f.t > 0.4) ISO.flash = null; else {
+  if (ISO.flash){ const f = ISO.flash; f.t += FP.dt; if (f.t > 0.4) ISO.flash = null; else if (gfxPostOn() && FPD.r && GFXP.has(FPD.r)){ /* (RS-397: in the post shader - gfxFpdPost) */ } else {
     const W = ctx.canvas.width, H = ctx.canvas.height, g = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, Math.max(W, H)*0.7);
     g.addColorStop(0, fpRgba(f.col, 0.28*(1 - f.t/0.4))); g.addColorStop(1, fpRgba(f.col, 0.05*(1 - f.t/0.4)));
     ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); ctx.restore(); } }
@@ -23508,7 +23508,7 @@ function gfxPost(r){
   const M = (fs, u)=>new T.ShaderMaterial({ uniforms:u, vertexShader:vs, fragmentShader:fs, depthTest:false, depthWrite:false });
   P.bright = M('uniform sampler2D t; uniform float th; varying vec2 vUv; void main(){ vec4 s = texture2D(t, vUv); vec3 c = s.rgb; float l = max(c.r, max(c.g, c.b)); gl_FragColor = vec4(c * smoothstep(th, th + 0.7, l), 1.0); }', { t:{ value:null }, th:{ value:0.8 } });
   P.blur = M('uniform sampler2D t; uniform vec2 d; varying vec2 vUv; void main(){ vec3 c = texture2D(t, vUv).rgb*0.2270; c += (texture2D(t, vUv + d*1.3846).rgb + texture2D(t, vUv - d*1.3846).rgb)*0.3162; c += (texture2D(t, vUv + d*3.2308).rgb + texture2D(t, vUv - d*3.2308).rgb)*0.0703; gl_FragColor = vec4(c, 1.0); }', { t:{ value:null }, d:{ value:new T.Vector2() } });
-  P.comp = M(`uniform sampler2D tS, tB; uniform float bloom, expo, aces, sat, con, vig, vig2, hurt, heal, glow, fade; uniform vec2 res; uniform vec3 gain, lift, bg; varying vec2 vUv;
+  P.comp = M(`uniform sampler2D tS, tB; uniform float bloom, expo, aces, sat, con, vig, vig2, hurt, heal, glow, fade, flashK; uniform vec2 res; uniform vec3 gain, lift, bg, flashC; varying vec2 vUv;
     vec3 RRT(vec3 v){ vec3 a = v*(v + 0.0245786) - 0.000090537; vec3 b = v*(0.983729*v + 0.4329510) + 0.238081; return a/b; }
     vec3 ACES(vec3 c){ const mat3 I = mat3(vec3(0.59719,0.07600,0.02840), vec3(0.35458,0.90834,0.13383), vec3(0.04823,0.01566,0.83777)); const mat3 O = mat3(vec3(1.60475,-0.10208,-0.00327), vec3(-0.53108,1.10813,-0.07276), vec3(-0.07367,-0.00605,1.07602));
       c *= expo/0.6; c = I*c; c = RRT(c); c = O*c; return clamp(c, 0.0, 1.0); }
@@ -23525,9 +23525,10 @@ function gfxPost(r){
       float t = length((vUv - 0.5)*res)/max(res.x, res.y), ed = clamp((t - 0.25)/0.47, 0.0, 1.0);
       o *= 1.0 - vig2*smoothstep(0.32, 0.75, t);
       o = mix(o, vec3(0.784, 0.078, 0.118), hurt*ed); o = mix(o, vec3(0.353, 0.863, 0.471), heal*ed); o = mix(o, vec3(0.941, 0.784, 0.353), glow*ed);
+      o += flashC*flashK*mix(0.28, 0.05, clamp(t/0.7, 0.0, 1.0));
       o = mix(o, vec3(0.0), fade);
       gl_FragColor = vec4(clamp(o, 0.0, 1.0), 1.0); }`,
-    { tS:{ value:null }, tB:{ value:null }, bloom:{ value:0.6 }, expo:{ value:1 }, aces:{ value:1 }, sat:{ value:1 }, con:{ value:1 }, vig:{ value:0.2 }, vig2:{ value:0 }, hurt:{ value:0 }, heal:{ value:0 }, glow:{ value:0 }, fade:{ value:0 }, res:{ value:new T.Vector2(1,1) }, gain:{ value:new T.Vector3(1,1,1) }, lift:{ value:new T.Vector3() }, bg:{ value:new T.Vector3() } });
+    { tS:{ value:null }, tB:{ value:null }, bloom:{ value:0.6 }, expo:{ value:1 }, aces:{ value:1 }, sat:{ value:1 }, con:{ value:1 }, vig:{ value:0.2 }, vig2:{ value:0 }, hurt:{ value:0 }, heal:{ value:0 }, glow:{ value:0 }, fade:{ value:0 }, flashK:{ value:0 }, flashC:{ value:new T.Vector3() }, res:{ value:new T.Vector2(1,1) }, gain:{ value:new T.Vector3(1,1,1) }, lift:{ value:new T.Vector3() }, bg:{ value:new T.Vector3() } });
   P.quad = new T.Mesh(new T.PlaneGeometry(2, 2), P.comp); P.quad.frustumCulled = false; P.qs = new T.Scene(); P.qs.add(P.quad); P.qc = new T.OrthographicCamera(-1, 1, 1, -1, 0, 1);
   P.v2 = new T.Vector2();
   GFXP.set(r, P); return P;
@@ -23585,13 +23586,14 @@ function gfxRenderInner(r, scene, cam, view){
   for (let i=0;i<2;i++){ P.blur.uniforms.t.value = P.a.texture; P.blur.uniforms.d.value.set(1.4/qw, 0); gfxPass(r, P, P.blur, P.b); P.blur.uniforms.t.value = P.b.texture; P.blur.uniforms.d.value.set(0, 1.4/qh); gfxPass(r, P, P.blur, P.a); }
   U.tS.value = P.scene.texture; U.tB.value = P.a.texture; U.bloom.value = g.bloom; U.expo.value = r.toneMappingExposure; U.aces.value = r.toneMapping===THREE.ACESFilmicToneMapping ? 1 : 0;
   U.gain.value.set(g.gain[0], g.gain[1], g.gain[2]); U.lift.value.set(g.lift[0], g.lift[1], g.lift[2]); U.sat.value = g.sat; U.con.value = g.con; U.vig.value = g.vig;
-  U.res.value.set(w, h); if (view==='fpd') gfxFpdPost(U); else { U.vig2.value = U.hurt.value = U.heal.value = U.glow.value = U.fade.value = 0; }
+  U.res.value.set(w, h); if (view==='fpd') gfxFpdPost(U); else { U.vig2.value = U.hurt.value = U.heal.value = U.glow.value = U.fade.value = U.flashK.value = 0; }
   gfxPass(r, P, P.comp, null);
 }
 /* (RS-396) the dungeon frame's uniforms, from the same numbers fpDrawPost drew with: the pulse when your life is low counts as hurt */
 function gfxFpdPost(U){
   const p = G.player, lowHp = p && p.hp>0 && p.hp < p.maxHp*0.3 ? (0.25+0.2*Math.sin(FP.t*4)) : 0;
   U.vig2.value = 0.6; U.hurt.value = Math.max(FP.hurt*0.7, lowHp); U.heal.value = FP.heal*0.45; U.glow.value = FP.glow*0.5; U.fade.value = Math.max(0, Math.min(1, FP.fade||0));
+  const fl = typeof ISO!=='undefined' && ISO.flash; U.flashK.value = fl ? Math.max(0, 1 - fl.t/0.4) : 0; if (fl){ const c = new THREE.Color(fl.col); U.flashC.value.set(c.r, c.g, c.b); }
 }
 // ---- textures drawn once: grass, dirt and rock detail, and soft cloud noise ----
 function gfxTextures(){
@@ -38543,7 +38545,7 @@ function isoSyncVeins(){
   ISO.oreM = ISO.oreM || {};
   for (const k of key.split('@')[0].split(';')){
     const [xs, ys, deco] = k.split(','), x = +xs, y = +ys;
-    if (deco!=='ore'){ ISO.veinG.add(isoCaveNode(deco, x, y, lin)); continue; }
+    if (deco!=='ore'){ const n = isoCaveNode(deco, x, y, lin); isoFxVeinGlow(n, x, y, skCaveLabel(deco, x, y).col); ISO.veinG.add(n); continue; }
     const ore = veinOre(x, y), col = ORE_COL[ore] || '#c89a4a';
     const om = ISO.oreM[ore] || (ISO.oreM[ore] = new T.MeshStandardMaterial({ color:lin(col), roughness: ore==='coal' ? 0.9 : 0.4, metalness: ore==='coal' ? 0 : 0.3,
       emissive:lin(col), emissiveIntensity: ore==='coal' ? 0 : 0.3, flatShading:true }));
@@ -38558,7 +38560,7 @@ function isoSyncVeins(){
       const n = new T.Mesh(nugG, om);
       n.position.set(Math.cos(a)*rr, up, Math.sin(a)*rr); n.scale.setScalar(sc); n.rotation.set(h(i+60)*6, h(i+61)*6, 0); g.add(n);
     }
-    ISO.veinG.add(g);
+    isoFxVeinGlow(g, x, y, col); ISO.veinG.add(g);
   }
 }
 // a cave pool with eels turning in it, or a clump of cave herbs and glowing mushrooms
@@ -38950,59 +38952,143 @@ function isoShot(m, kind, col, delay, extra){
 function isoShotDelay(x, y){ let d = 0; for (const s of ISO.shots||[]) if (Math.hypot(s.x1-x, s.y1-y) < 0.8) d = Math.max(d, s.dur - s.t); return d; }
 // a column of light where loot fell, in the item's rarity colour - brighter,
 // taller and longer-lived the rarer it is; set and unique pieces also pulse
-function isoDrawBeams(){
-  if (!ISO.beams || !ISO.beams.length) return;
-  const keep = [], ppu = ISO.ppu || 40;
-  ctx.save(); ctx.globalCompositeOperation = 'lighter';
-  for (const b of ISO.beams){
-    b.t += FP.dt; if (b.t > b.life || b.depth!==G.depth || b.mode!==G.gameMode) continue; keep.push(b);
-    const fade = Math.min(1, b.t*4) * Math.min(1, (b.life-b.t)/0.8), pulse = b.q>=3 ? 0.75+0.25*Math.sin(FP.t*5) : 1;
-    const g0 = isoProject(b.x+0.5, b.y+0.5, 0), g1 = isoProject(b.x+0.5, b.y+0.5, 1.4 + b.q*0.45); if (!g0.ok) continue;
-    const w = ppu*(0.10 + b.q*0.025), a = fade*pulse*(0.45 + b.q*0.12);
-    const gr = ctx.createLinearGradient(g0.sx, g0.sy, g1.sx, g1.sy);
-    gr.addColorStop(0, fpRgba(b.col, a)); gr.addColorStop(0.6, fpRgba(b.col, a*0.5)); gr.addColorStop(1, fpRgba(b.col, 0));
-    ctx.fillStyle = gr; ctx.beginPath(); ctx.moveTo(g0.sx-w, g0.sy); ctx.lineTo(g1.sx-w*0.4, g1.sy); ctx.lineTo(g1.sx+w*0.4, g1.sy); ctx.lineTo(g0.sx+w, g0.sy); ctx.closePath(); ctx.fill();
-    const gg = ctx.createRadialGradient(g0.sx, g0.sy, 0, g0.sx, g0.sy, ppu*0.55);
-    gg.addColorStop(0, fpRgba(b.col, a*0.8)); gg.addColorStop(1, fpRgba(b.col, 0));
-    ctx.fillStyle = gg; ctx.beginPath(); ctx.ellipse(g0.sx, g0.sy, ppu*0.55, ppu*0.3, 0, 0, Math.PI*2); ctx.fill();
+// ---- (RS-397) the overlay's effects as scene objects: combat particles, loot beams, vein glows, the hover glow and the arrows
+// and spell bolts in flight were drawn over the 3D view in 2D every frame - hundreds of arcs and a gradient built per
+// beam, vein and bolt. They're in the scene now: one point cloud for the particles, a sprite or a line for the rest.
+// Health bars, hitsplats, names, status marks, dragon breath and the thrown missiles stay in 2D (short-lived, or text)
+const ISO_FX_MAX = 400;
+function isoFxCol(c){ const T = THREE, M = isoFxCol.m || (isoFxCol.m = new Map()); let v = M.get(c); if (v) return v;
+  const col = new T.Color(); try{ const s = String(c||'#fff'); if (s.startsWith('rgb')){ const m = s.match(/[\d.]+/g); col.setRGB((+m[0])/255, (+m[1])/255, (+m[2])/255); } else col.set(s); }catch(e){ col.set(0xffffff); }
+  v = col.convertSRGBToLinear(); M.set(c, v); return v; }
+function isoFx(){
+  const T = THREE; let F = ISO.fx;
+  if (!F){
+    const mkPts = (add)=>{ const g = new T.BufferGeometry();
+      g.setAttribute('position', new T.BufferAttribute(new Float32Array(ISO_FX_MAX*3), 3)); g.setAttribute('aCol', new T.BufferAttribute(new Float32Array(ISO_FX_MAX*3), 3)); g.setAttribute('aSz', new T.BufferAttribute(new Float32Array(ISO_FX_MAX*2), 2));
+      for (const k of ['position', 'aCol', 'aSz']) g.attributes[k].setUsage(T.DynamicDrawUsage);
+      const m = new T.ShaderMaterial({ uniforms:{ uPx:{ value:800 } }, transparent:true, depthWrite:false, depthTest:false, blending:add ? T.AdditiveBlending : T.NormalBlending,
+        vertexShader:'attribute vec3 aCol; attribute vec2 aSz; uniform float uPx; varying vec4 vC; void main(){ vec4 mv = modelViewMatrix*vec4(position, 1.0); gl_Position = projectionMatrix*mv; gl_PointSize = max(1.6, aSz.x*0.5*uPx/max(0.1, -mv.z)); vC = vec4(aCol, aSz.y); }',
+        fragmentShader:'varying vec4 vC; void main(){ vec2 d = gl_PointCoord - 0.5; if (dot(d, d) > 0.25) discard; gl_FragColor = vC; }' });
+      const p = new T.Points(g, m); p.frustumCulled = false; p.renderOrder = 20; g.setDrawRange(0, 0); return p; };
+    const blob = v3Blob('rgba(255,255,255,1)'), disc = new T.PlaneGeometry(2, 2);
+    F = ISO.fx = { g:new T.Group(), add:mkPts(true), norm:mkPts(false), beams:new Map(), shots:new Map(), blob, disc, beamTex:gfxTextures().beam };
+    F.g.add(F.add, F.norm);
+    // the hover: a soft glow on the ground and the tile's outline
+    F.hoverGlow = new T.Mesh(disc, new T.MeshBasicMaterial({ map:blob, transparent:true, depthWrite:false, blending:T.AdditiveBlending })); F.hoverGlow.rotation.x = -Math.PI/2; F.hoverGlow.renderOrder = 6;
+    F.hoverLine = new T.LineLoop(new T.BufferGeometry().setFromPoints([new T.Vector3(), new T.Vector3(1, 0, 0), new T.Vector3(1, 0, 1), new T.Vector3(0, 0, 1)]), new T.LineBasicMaterial({ transparent:true, depthWrite:false })); F.hoverLine.renderOrder = 7;
+    F.hoverGlow.visible = F.hoverLine.visible = false; F.g.add(F.hoverGlow, F.hoverLine);
   }
-  ctx.restore();
+  if (F.g.parent!==FPD.scene) FPD.scene.add(F.g);
+  return F;
+}
+// the particles: moved on the CPU (a few sums each), drawn as one point cloud
+function isoFxParts(dt, F){
+  const keep = [], h = FPD.cv ? FPD.cv.height : 600, px = h/Math.tan(FPD.cam.fov*Math.PI/360);
+  F.add.material.uniforms.uPx.value = px; F.norm.material.uniforms.uPx.value = px;
+  const A = F.add.geometry.attributes, N = F.norm.geometry.attributes; let na = 0, nn = 0;
+  for (const p of FP.parts){
+    p.age += dt; if (p.age>p.life) continue;
+    p.x += p.vx*dt; p.y += p.vy*dt; p.z += p.vz*dt; if (p.g) p.vz -= p.g*dt;
+    if (p.z<0.02){ p.z = 0.02; p.vz *= -0.3; p.vx *= 0.6; p.vy *= 0.6; }
+    keep.push(p);
+    const at = p.add ? A : N, i = p.add ? na++ : nn++; if (i >= ISO_FX_MAX) continue;
+    const c = isoFxCol(p.col); at.position.setXYZ(i, p.x, p.z, p.y); at.aCol.setXYZ(i, c.r, c.g, c.b); at.aSz.setXY(i, p.r*2, 1 - p.age/p.life);
+  }
+  for (const [pts, n] of [[F.add, Math.min(na, ISO_FX_MAX)], [F.norm, Math.min(nn, ISO_FX_MAX)]]){ pts.geometry.setDrawRange(0, n); pts.visible = n > 0; if (n){ for (const k of ['position', 'aCol', 'aSz']) pts.geometry.attributes[k].needsUpdate = true; } }
+  FP.parts = keep.length>ISO_FX_MAX ? keep.slice(-ISO_FX_MAX) : keep;
+}
+// a loot beam: a shaft of light standing on the tile and a pool at its foot, pulsing when the find is good
+function isoFxBeams(dt, F){
+  const T = THREE, keep = [], live = new Set();
+  for (const b of ISO.beams||[]){
+    b.t += dt; if (b.t > b.life || b.depth!==G.depth || b.mode!==G.gameMode) continue; keep.push(b); live.add(b);
+    let o = F.beams.get(b);
+    if (!o){ const col = isoFxCol(b.col), w = 0.10 + b.q*0.025, hgt = 1.4 + b.q*0.45;
+      const sh = new T.Sprite(new T.SpriteMaterial({ map:F.beamTex, color:col, transparent:true, depthWrite:false, blending:T.AdditiveBlending })); sh.center.set(0.5, 1); sh.material.rotation = Math.PI; sh.scale.set(w*2.2, hgt, 1);   /* (the beam texture is bright at its top: turned over, hung from its top edge, it stands bright at the foot and fades up) */ sh.position.set(b.x+0.5, 0.02, b.y+0.5); sh.renderOrder = 8;
+      const pool = new T.Mesh(F.disc, new T.MeshBasicMaterial({ map:F.blob, color:col, transparent:true, depthWrite:false, blending:T.AdditiveBlending })); pool.rotation.x = -Math.PI/2; pool.scale.setScalar(0.55); pool.position.set(b.x+0.5, 0.03, b.y+0.5); pool.renderOrder = 6;
+      o = { sh, pool }; F.g.add(sh, pool); F.beams.set(b, o); }
+    const fade = Math.min(1, b.t*4) * Math.min(1, (b.life-b.t)/0.8), pulse = b.q>=3 ? 0.75+0.25*Math.sin(FP.t*5) : 1, a = fade*pulse*(0.45 + b.q*0.12);
+    o.sh.material.opacity = a; o.pool.material.opacity = a*0.8;
+  }
+  for (const [b, o] of F.beams){ if (!live.has(b)){ F.g.remove(o.sh, o.pool); o.sh.material.dispose(); o.pool.material.dispose(); F.beams.delete(b); } }
   ISO.beams = keep;
 }
+// the shots in flight: their timing (and landing) is kept here; an arrow or a spell bolt is drawn in the scene, the rest in 2D
+function isoFxShots(dt, F){
+  const T = THREE, keep = [], live = new Set();
+  for (const s of ISO.shots||[]){
+    s.t += dt; if (s.t < 0){ keep.push(s); continue; }
+    if (s.t > s.dur){ isoShotLand(s); continue; }
+    keep.push(s); if (s.kind!=='arrow' && s.kind!=='spell') continue; live.add(s);
+    const k = s.t/s.dur, at = (kk, v)=>v.set(s.x0+(s.x1-s.x0)*kk, 0.55 + (s.kind==='arrow' ? Math.sin(kk*Math.PI)*0.35 : 0.08*Math.sin(kk*Math.PI)), s.y0+(s.y1-s.y0)*kk);
+    let o = F.shots.get(s);
+    if (!o){
+      if (s.kind==='arrow'){
+        // the shaft with its head, and a fading trail of air behind it
+        const trail = new T.Line(new T.BufferGeometry().setFromPoints(Array.from({ length:6 }, ()=>new T.Vector3())), new T.LineBasicMaterial({ vertexColors:true, transparent:true, depthWrite:false, blending:T.AdditiveBlending }));
+        trail.geometry.setAttribute('color', new T.BufferAttribute(new Float32Array([0.05,0.05,0.05, 0.1,0.1,0.09, 0.15,0.15,0.14, 0.2,0.2,0.19, 0.27,0.26,0.25, 0.32,0.31,0.3].map(v=>v*0.9)), 3));
+        const shaft = new T.Line(new T.BufferGeometry().setFromPoints([new T.Vector3(), new T.Vector3()]), new T.LineBasicMaterial({ color:isoFxCol('#d8c8a0'), transparent:true, depthWrite:false }));
+        const head = new T.Sprite(new T.SpriteMaterial({ map:F.blob, color:isoFxCol(s.col && s.col!=='#fff' ? s.col : '#9aa3a8'), depthWrite:false })); head.scale.setScalar(0.09);
+        const tail = new T.Sprite(new T.SpriteMaterial({ map:F.blob, color:isoFxCol('#f0ece0'), depthWrite:false })); tail.scale.setScalar(0.07);
+        o = { arrow:true, trail, shaft, head, tail, all:[trail, shaft, head, tail] };
+      } else {
+        // a bolt of the spell's colour with a wake of fainter ones
+        const big = 1 + (s.tier||0)*0.35, col = isoFxCol(s.col), all = [];
+        for (let i=0;i<5;i++){ const sp = new T.Sprite(new T.SpriteMaterial({ map:F.blob, color:col, transparent:true, depthWrite:false, blending:T.AdditiveBlending, opacity:1 - i*0.18 })); sp.scale.setScalar((0.14 - i*0.02)*big*4); sp.renderOrder = 9; all.push(sp); }
+        o = { all };
+      }
+      for (const m of o.all){ m.frustumCulled = false; m.renderOrder = 9; } F.g.add(...o.all); F.shots.set(s, o);
+    }
+    if (o.arrow){
+      const tp = o.trail.geometry.attributes.position, v = new T.Vector3();
+      for (let i=0;i<6;i++){ at(Math.max(0, k-0.12-(5-i)*0.05), v); tp.setXYZ(i, v.x, v.y, v.z); } tp.needsUpdate = true;
+      const sp = o.shaft.geometry.attributes.position; at(Math.max(0, k-0.12), v); sp.setXYZ(0, v.x, v.y, v.z); o.tail.position.copy(v); at(k, v); sp.setXYZ(1, v.x, v.y, v.z); sp.needsUpdate = true; o.head.position.copy(v);
+    } else { const v = new T.Vector3(); o.all.forEach((sp, i)=>{ at(Math.max(0, k-i*0.06), v); sp.position.copy(v); }); }
+  }
+  for (const [s, o] of F.shots){ if (!live.has(s)){ F.g.remove(...o.all); for (const m of o.all){ m.material.dispose(); if (m.geometry && m.geometry!==F.disc) m.geometry.dispose(); } F.shots.delete(s); } }
+  ISO.shots = keep;
+}
+// the glow under a vein or a cave find, and a glint wandering over the rock (built with the veins in isoSyncVeins, animated here)
+function isoFxVeinGlow(g, x, y, col){
+  const T = THREE, F = isoFx();
+  const glow = new T.Mesh(F.disc, new T.MeshBasicMaterial({ map:F.blob, color:isoFxCol(col), transparent:true, depthWrite:false, blending:T.AdditiveBlending })); glow.rotation.x = -Math.PI/2; glow.scale.setScalar(0.6); glow.position.y = 0.025; glow.renderOrder = 6;
+  const glint = new T.Sprite(new T.SpriteMaterial({ map:F.blob, color:isoFxCol('#fffae0'), transparent:true, depthWrite:false, blending:T.AdditiveBlending })); glint.renderOrder = 9;
+  g.add(glow, glint); g.userData.vein = { glow, glint, x, y, shine:col!=='#262626' };   // (coal doesn't shine)
+}
+function isoFxVeins(){
+  if (!ISO.veinG) return; const pulse = 0.55 + 0.45*Math.sin(FP.t*3.2);
+  for (const g of ISO.veinG.children){
+    if (g.userData.pool) for (const e of g.children) if (e.userData.eel){ const q = e.userData.eel, a = FP.t*1.3 + q.ph; e.position.set(Math.cos(a)*q.r, 0.02, Math.sin(a)*q.r*0.8); e.rotation.y = -a + Math.PI/2; }
+    const v = g.userData.vein; if (!v) continue;
+    const seen = G.dungeonSeen && G.dungeonSeen[v.x] && G.dungeonSeen[v.x][v.y];
+    v.glow.visible = !!seen && v.shine; v.glint.visible = !!seen; if (!seen) continue;
+    v.glow.material.opacity = 0.22*pulse;
+    const ph = (FP.t*0.9 + v.x*0.37 + v.y*0.71) % 1, r = 0.09*Math.sin(ph*Math.PI);
+    v.glint.position.set(-0.2 + ph*0.4, 0.18 + ph*0.2, 0); v.glint.scale.setScalar(Math.max(0.01, r*2.4)); v.glint.material.opacity = 0.95;
+  }
+}
+// the tile under the mouse: a soft glow (red over a creature) and its outline; the name is still written in 2D (isoDrawHover)
+function isoFxHover(F){
+  const h = isoHoverTile(), on = h && isoPassable(h[0], h[1]) && !(G.gameMode===1 && G.dungeonDeco && G.dungeonDeco[h[0]] && SK_CAVE_DECOS.includes(G.dungeonDeco[h[0]][h[1]]) && G.dungeonSeen && G.dungeonSeen[h[0]][h[1]]);
+  F.hoverGlow.visible = F.hoverLine.visible = !!on; if (!on) return;
+  const m = G.mon.find(q=>q.alive && q.x===h[0] && q.y===h[1] && (G.gameMode===2 || (G.dungeonSeen && G.dungeonSeen[q.x] && G.dungeonSeen[q.x][q.y]))), pulse = 0.55 + 0.45*Math.sin(FP.t*5);
+  F.hoverGlow.position.set(h[0]+0.5, 0.02, h[1]+0.5); F.hoverGlow.scale.setScalar(0.7); F.hoverGlow.material.color.copy(isoFxCol(m ? '#ff4632' : '#ffdc82')); F.hoverGlow.material.opacity = (m ? 0.32 : 0.14)*pulse;
+  F.hoverLine.position.set(h[0], 0.015, h[1]); F.hoverLine.material.color.copy(isoFxCol(m ? '#ff503c' : '#ffe68c')); F.hoverLine.material.opacity = m ? 0.85 : 0.45;
+}
+function isoFxSync(dt){
+  const F = isoFx();
+  isoFxParts(dt, F); isoFxBeams(dt, F); isoFxShots(dt, F); isoFxVeins(); isoFxHover(F);
+}
 function isoDrawShots(){
-  const keep = [], ppu = ISO.ppu || 40;
+  const ppu = ISO.ppu || 40;
   try{ isoDrawAmmoDrops(); isoDrawFlashThrall(ppu); }catch(e){}
   try{ isoDrawStatus(ppu); }catch(e){}
   for (const s of ISO.shots||[]){
-    s.t += FP.dt; if (s.t < 0){ keep.push(s); continue; }
-    if (s.t > s.dur){ isoShotLand(s); continue; }
-    keep.push(s);
+    if (s.t < 0) continue;
     if (s.kind==='breath'){ try{ isoDrawBreath(s, ppu); }catch(e){} continue; }
     if (s.kind!=='arrow' && s.kind!=='spell'){ isoDrawMissile(s, ppu); continue; }
-    const k = s.t/s.dur, arc = s.kind==='arrow' ? Math.sin(k*Math.PI)*0.35 : 0.08*Math.sin(k*Math.PI);
-    const at = (kk)=>isoProject(s.x0+(s.x1-s.x0)*kk, s.y0+(s.y1-s.y0)*kk, 0.55 + (s.kind==='arrow' ? Math.sin(kk*Math.PI)*0.35 : arc));
-    const a = at(k), b = at(Math.max(0, k-0.12));
-    if (!a.ok) continue;
-    ctx.save();
-    if (s.kind==='arrow'){
-      // a fading trail of air behind it, then the shaft, fletching and a head in the arrow's own colour
-      ctx.lineCap = 'round';
-      for (let i=1;i<=5;i++){ const q0 = at(Math.max(0, k-0.12-i*0.05)), q1 = at(Math.max(0, k-0.12-(i-1)*0.05)); ctx.strokeStyle = `rgba(255,250,235,${0.32 - i*0.055})`; ctx.lineWidth = Math.max(1, ppu*(0.03 - i*0.004)); ctx.beginPath(); ctx.moveTo(q0.sx, q0.sy); ctx.lineTo(q1.sx, q1.sy); ctx.stroke(); }
-      ctx.strokeStyle = '#d8c8a0'; ctx.lineWidth = Math.max(1.5, ppu*0.035); ctx.beginPath(); ctx.moveTo(b.sx, b.sy); ctx.lineTo(a.sx, a.sy); ctx.stroke();
-      ctx.fillStyle = '#f0ece0'; ctx.beginPath(); ctx.arc(b.sx, b.sy, Math.max(1.2, ppu*0.025), 0, Math.PI*2); ctx.fill();
-      ctx.fillStyle = s.col && s.col!=='#fff' ? s.col : '#9aa3a8'; ctx.beginPath(); ctx.arc(a.sx, a.sy, Math.max(1.5, ppu*0.032), 0, Math.PI*2); ctx.fill();
-    } else {
-      ctx.globalCompositeOperation = 'lighter';
-      const big = 1 + (s.tier||0)*0.35;
-      for (let i=4;i>=0;i--){ const q = at(Math.max(0, k-i*0.06)); const r = ppu*(0.14 - i*0.02)*big;
-        const g = ctx.createRadialGradient(q.sx, q.sy, 0, q.sx, q.sy, Math.max(2, r*2)); g.addColorStop(0, s.col); g.addColorStop(1, 'rgba(0,0,0,0)');
-        ctx.globalAlpha = 1 - i*0.18; ctx.fillStyle = g; ctx.beginPath(); ctx.arc(q.sx, q.sy, Math.max(2, r*2), 0, Math.PI*2); ctx.fill(); }
-      ctx.globalAlpha = 1;
-      try{ isoSpellParticles(s, a, ppu, big); }catch(e){}
-    }
-    ctx.restore();
+    if (s.kind==='spell'){ const k = s.t/s.dur, a = isoProject(s.x0+(s.x1-s.x0)*k, s.y0+(s.y1-s.y0)*k, 0.55 + 0.08*Math.sin(k*Math.PI)); if (a.ok){ ctx.save(); ctx.globalCompositeOperation = 'lighter'; try{ isoSpellParticles(s, a, ppu, 1 + (s.tier||0)*0.35); }catch(e){} ctx.restore(); } }   /* (the bolt itself is in the scene: isoFxShots) */
   }
-  ISO.shots = keep;
 }
 // ---- what's under the mouse: the tile, and a monster's name ----
 function isoHoverTile(){
@@ -39015,30 +39101,6 @@ function isoHoverTile(){
   const t = -o.y/d.y; return [Math.floor(o.x + d.x*t), Math.floor(o.z + d.z*t)];
 }
 // ore veins in a mine: a pulsing gold ring on the ground and a glint, so they can't be missed
-function isoDrawVeins(){
-  if (G.gameMode!==1 || !G.dungeonDeco) return;
-  if (ISO.veinG) for (const g of ISO.veinG.children) if (g.userData.pool) for (const e of g.children) if (e.userData.eel){ const q = e.userData.eel, a = FP.t*1.3 + q.ph; e.position.set(Math.cos(a)*q.r, 0.02, Math.sin(a)*q.r); e.rotation.set(Math.PI/2, 0, -a, 'XZY'); }
-  const ppu = ISO.ppu || 40, pulse = 0.55 + 0.45*Math.sin(FP.t*3.2);
-  ctx.save();
-  for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++){
-    const dk = G.dungeonDeco[x][y];
-    if (!SK_CAVE_DECOS.includes(dk) || !(G.dungeonSeen && G.dungeonSeen[x][y])) continue;
-    const c = isoProject(x+0.5, y+0.5, 0.02); if (!c.ok) continue;
-    const oc = dk==='ore' ? (ORE_COL[veinOre(x, y)] || '#ffd76b') : skCaveLabel(dk, x, y).col;
-    if (oc!=='#262626'){                                  // (coal doesn't shine)
-      ctx.globalCompositeOperation = 'lighter';
-      const g = ctx.createRadialGradient(c.sx, c.sy, 0, c.sx, c.sy, ppu*0.6);
-      g.addColorStop(0, fpRgba(oc, 0.22*pulse)); g.addColorStop(1, fpRgba(oc, 0));
-      ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(c.sx, c.sy, ppu*0.6, ppu*0.34, 0, 0, Math.PI*2); ctx.fill();
-      ctx.globalCompositeOperation = 'source-over';
-    }
-    // a glint that wanders over the rock
-    const ph = (FP.t*0.9 + x*0.37 + y*0.71) % 1, gl = isoProject(x+0.3+ph*0.4, y+0.5, 0.18+ph*0.2), r = ppu*0.09*Math.sin(ph*Math.PI);
-    ctx.strokeStyle = 'rgba(255,250,220,0.95)'; ctx.lineWidth = Math.max(1, dpr);
-    ctx.beginPath(); ctx.moveTo(gl.sx-r, gl.sy); ctx.lineTo(gl.sx+r, gl.sy); ctx.moveTo(gl.sx, gl.sy-r); ctx.lineTo(gl.sx, gl.sy+r); ctx.stroke();
-  }
-  ctx.restore();
-}
 function isoDrawHover(){
   const h = isoHoverTile();
   if (h && G.gameMode===1 && G.dungeonDeco && G.dungeonDeco[h[0]] && SK_CAVE_DECOS.includes(G.dungeonDeco[h[0]][h[1]]) && G.dungeonSeen && G.dungeonSeen[h[0]][h[1]]){
@@ -39046,13 +39108,7 @@ function isoDrawHover(){
   }
   if (!h || !isoPassable(h[0], h[1])) return;
   const m = G.mon.find(q=>q.alive && q.x===h[0] && q.y===h[1] && (G.gameMode===2 || (G.dungeonSeen && G.dungeonSeen[q.x] && G.dungeonSeen[q.x][q.y])));
-  const c = [[0,0],[1,0],[1,1],[0,1]].map(([a,b])=>isoProject(h[0]+a, h[1]+b, 0.01));
-  { const pulse = 0.55 + 0.45*Math.sin(FP.t*5), cc = isoProject(h[0]+0.5, h[1]+0.5, 0.02), ppu = ISO.ppu || 40;   // a soft glow under whatever you can click
-    ctx.save(); ctx.globalCompositeOperation = 'lighter'; const gg = ctx.createRadialGradient(cc.sx, cc.sy, 0, cc.sx, cc.sy, ppu*0.7);
-    gg.addColorStop(0, m ? `rgba(255,70,50,${0.32*pulse})` : `rgba(255,220,130,${0.14*pulse})`); gg.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = gg; ctx.beginPath(); ctx.ellipse(cc.sx, cc.sy, ppu*0.7, ppu*0.4, 0, 0, Math.PI*2); ctx.fill(); ctx.restore(); }
-  ctx.save(); ctx.strokeStyle = m ? 'rgba(255,80,60,0.85)' : 'rgba(255,230,140,0.45)'; ctx.lineWidth = 1.5*dpr;
-  ctx.beginPath(); c.forEach((q,i)=> i ? ctx.lineTo(q.sx,q.sy) : ctx.moveTo(q.sx,q.sy)); ctx.closePath(); ctx.stroke();
+  ctx.save();   /* (RS-397: the glow and the outline are in the scene - isoFxHover) */
   if (m){
     const ew = rsMonElem(m), top = isoProject(m.x+0.5, m.y+0.5, 1.3);
     const parts = [[`Attack ${m.nm} `, '#ffe070'], [`(level ${monCombatLevel(m)})`, monLevelColor(m)], [ew.weak ? ' - weak to '+ew.weak : '', '#ffe070']];
@@ -39144,10 +39200,8 @@ function rsToolSwing(e, t){
 // ---- health bars, damage numbers and sparks, drawn over the scene ----
 function isoDrawOverlay(S){
   const dt = FP.dt, ppu = ISO.ppu || 40;
-  isoDrawVeins();
   isoDrawHover();
   isoDrawShots();
-  isoDrawBeams();
   for (const s of S){
     if (s.hp===null || s.hp===undefined) continue;
     const pr = isoProject(s.x, s.y, (s.lift||0) + s.h + 0.14); if (!pr.ok) continue;
@@ -39157,19 +39211,6 @@ function isoDrawOverlay(S){
     ctx.fillRect(pr.sx-bw/2, pr.sy-bh, bw*s.hp, bh);
     ctx.fillStyle = '#b8231e'; ctx.fillRect(pr.sx-bw/2+bw*s.hp, pr.sy-bh, bw*(1-s.hp), bh);
   }
-  const keep = [];
-  for (const p of FP.parts){
-    p.age += dt; if (p.age>p.life) continue;
-    p.x += p.vx*dt; p.y += p.vy*dt; p.z += p.vz*dt; if (p.g) p.vz -= p.g*dt;
-    if (p.z<0.02){ p.z = 0.02; p.vz *= -0.3; p.vx *= 0.6; p.vy *= 0.6; }
-    keep.push(p);
-    const pr = isoProject(p.x, p.y, p.z); if (!pr.ok) continue;
-    ctx.globalAlpha = 1 - p.age/p.life; if (p.add) ctx.globalCompositeOperation = 'lighter';
-    ctx.fillStyle = p.col; ctx.beginPath(); ctx.arc(pr.sx, pr.sy, Math.max(0.8*dpr, p.r*ppu), 0, Math.PI*2); ctx.fill();
-    ctx.globalCompositeOperation = 'source-over';
-  }
-  ctx.globalAlpha = 1;
-  FP.parts = keep.length>400 ? keep.slice(-400) : keep;
   const fk = [];
   for (const f of FP.floats){
     f.age += dt; if (f.age>1.1) continue; fk.push(f);
@@ -39443,7 +39484,7 @@ function renderFirstPerson(){
   m3dFrame();
   const sprites = fpCollectSprites(vis);            // (also places the 3D creatures, so they're drawn this frame)
   m3dSweep();
-  isoTickPath(now); isoTickHeld(now); try{ isoSyncSprites(sprites, env); isoSyncProps(sprites); isoSyncPlayer(); isoSyncVeins(); }catch(e){ console.error(e); }
+  isoTickPath(now); isoTickHeld(now); try{ isoSyncSprites(sprites, env); isoSyncProps(sprites); isoSyncPlayer(); isoSyncVeins(); isoFxSync(dt); }catch(e){ console.error(e); }
   try{ fpdRender(env, T, camZ); }catch(e){ console.error(e); FPD.ok = false; fpdHide(); no3dNotice(); return; }
   fpdShow();
   ctx.clearRect(0, 0, canvas.width, canvas.height);   /* (RS-396: the 3D view shows through from its own canvas underneath; only the overlay is drawn here) */
@@ -39660,7 +39701,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-396';
+const GAME_VERSION = 'rs-397';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

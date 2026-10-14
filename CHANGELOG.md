@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-397 - The GPU pass, part four: the dungeon's effects in the scene
+
+- **Combat sparks as one point cloud.** Up to 400 sparks from hits, spells and torches were each a 2D circle, projected and drawn over the view every frame. They're one point cloud in the scene now; the CPU still moves them (a few sums each) and the card draws them.
+- **Loot beams, vein glows, the hover glow.** A loot beam was two gradients built and filled every frame; it's a shaft sprite and a pool of light on the tile. The glow under every ore vein, cave pool and herb patch looped the whole floor each frame; the glow and its wandering glint are built once with the vein and only animated. The tile under the mouse gets a glowing disc and an outline in the scene; its name is still written in 2D.
+- **Arrows and spell bolts fly in the scene.** An arrow is a shaft, a head and a fading trail of air; a spell bolt is a sprite with a wake of fainter ones. Each used five gradients a frame before. The spell's element motes (fire sparks, ice shards, water drops) stay in 2D, as do dragon breath, the thrown missiles, status marks, health bars and hitsplats.
+- **The tier-4 spell flash** is in the post shader with the hurt and heal edges (RS-396), not a full-screen gradient fill.
+- **Test.** `dgfx` stages a burst, a loot beam, a spell bolt and an arrow with the mouse over a creature, and checks each is in the scene, that no 2D arcs or gradients are drawn for them, that shots land and beams end on their own clocks, and that the flash reaches the shader.
+
 ## RS-396 - The GPU pass, part three: the dungeon on its own canvas
 
 - **No more full-screen copy.** The dungeon and roadside fights were drawn into a hidden canvas, then copied onto the game's 2D canvas every frame: a whole-screen, resampled blit, and the browser had to keep the drawing buffer around for it. The 3D view now shows on its own canvas, under the 2D overlay (health bars, hitsplats, the minimap), the way towns and the open land have always worked. The screen shake moves the canvas itself.
