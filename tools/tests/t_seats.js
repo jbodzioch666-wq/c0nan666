@@ -41,9 +41,10 @@ module.exports = async page=>{
     out.upDoor = G.map[ROOM.door.x][ROOM.door.y]===T_DOOROUT; out.upDoorLabel = [...V3.labels.children].some(el=>el.textContent==='Door');
     out.bedFoot = ROOM_LAYOUT.tavern_up.benches.filter(b=>b[0]==='innbed').every(([k,x,y])=>benchAt(x, y)==='innbed' && benchAt(x, y+1)==='innbed');
     let lids = 0; V3.world.traverse(o=>{ if (o.isMesh && Math.abs(o.rotation.x - 1.2) < 0.01) lids++; }); out.lids = lids;
-    p.gold = 100; p.clock = DAY_LENGTH*5 + DAY_LENGTH*0.6; const c0 = p.clock; townBench('innbed');
+    const night = ()=>{ for (let i=0;i<100 && G.sleepFx;i++) bedSleepTick(0.1); };   /* (RS-389: the night is seen through, a few seconds of it) */
+    p.gold = 100; p.clock = DAY_LENGTH*5 + DAY_LENGTH*0.6; const c0 = p.clock; townBench('innbed'); night();
     out.dawn = +dayPhase().toFixed(3); out.slept = p.clock > c0;
-    p.clock = DAY_LENGTH*5 + DAY_LENGTH*0.1; townBench('innbed'); out.dawnEarly = [+dayPhase().toFixed(3), Math.floor(p.clock/DAY_LENGTH)];
+    p.clock = DAY_LENGTH*5 + DAY_LENGTH*0.1; townBench('innbed'); night(); out.dawnEarly = [+dayPhase().toFixed(3), Math.floor(p.clock/DAY_LENGTH)];
     // the Peddler's cellar trapdoor in the back corner, in and out
     exitInterior(); enterInterior('shop'); renderGame(); await frames(3);
     out.trap = benchAt(ROOM_STAIRS[0], ROOM_STAIRS[1]);
@@ -68,6 +69,6 @@ module.exports = async page=>{
   A(!r.upDoor && !r.upDoorLabel, 'no front door upstairs');
   A(r.bedFoot, 'the inn beds are two tiles long');
   A(r.lids===0, 'no door-like lid over the stairwell');
-  A(r.slept && Math.abs(r.dawn-0.25) < 0.01 && Math.abs(r.dawnEarly[0]-0.25) < 0.01 && r.dawnEarly[1]===5, 'a bed sleeps you till the next dawn');
+  A(r.slept && r.dawn >= 0.249 && r.dawn < 0.28 && r.dawnEarly[0] >= 0.249 && r.dawnEarly[0] < 0.28 && r.dawnEarly[1]===5, 'a bed sleeps you till the next dawn (RS-389: just after it)');
   A(r.trap==='cellar' && r.inCellar==='cellar' && r.backUp[0]==='shop' && r.backUp[3], 'the trapdoor in the back corner, there and back');
 };

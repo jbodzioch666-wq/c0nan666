@@ -21213,7 +21213,7 @@ function houseLayout(){
 function houseBench(kind){
   if (!G.interior || G.interior.key!=='house' || !kind) return false;
   if (kind.startsWith('spot_')){ houseBuildDialog(HOUSE_SPOTS.find(s=>s.id===kind.slice(5))); return true; }
-  if (kind==='bed'){ const p = G.player; fullyRestPlayer(); p.runEnergy = 100; p.prayPts = rsLvl('prayer'); sleepTillDawn(); logMsg('you sleep in your own bed and wake at dawn, fully rested', 'good'); renderGame(); return true; }
+  if (kind==='bed'){ const p = G.player; bedSleep(()=>{ fullyRestPlayer(); p.runEnergy = 100; p.prayPts = rsLvl('prayer'); }, 'you sleep in your own bed and wake at dawn, fully rested'); return true; }
   if (kind==='carpentry'){ houseCarpentry(); return true; }
   if (kind==='altar'){ houseAltar(); return true; }
   if (kind==='trophy'){ setUi('trophies'); return true; }
@@ -21932,6 +21932,30 @@ function townFloor(key, px, py){
   logMsg(key==='cellar' ? 'you climb down into the cellar - it smells of damp and old wine' : 'you climb the stairs to the rooms over the bar', 'new'); sfx('stairs'); renderGame();
 }
 // (RS-183) a night in a bed: you wake at the next dawn
+/* (RS-389) a night in a bed, seen: you climb in and lie down, the room fades to dark, the night passes, and you wake in the
+   morning light - the room rebuilt, so its windows show the day - then get up beside the bed. Without the 3D town it is
+   the old instant sleep */
+function bedSleep(rest, msg){
+  const xy = G.benchXY, L = G.interior && ROOM_LAYOUT[G.interior.key];
+  let bed = null; if (xy && L) for (const [k,x,y] of L.benches) if ((k==='bed' || k==='innbed') && roomBenchTiles(k, x, y).some(([tx,ty])=>tx===xy[0] && ty===xy[1])){ bed = [x, y]; break; }
+  if (!bed && xy) bed = xy;
+  if (!bed || !(typeof v3Active==='function' && v3Active())){ rest(); sleepTillDawn(); logMsg(msg, 'good'); renderGame(); return; }
+  G.sitAt = null; G.sleepFx = { t:0, bed, rot:roomBenchRot('bed', bed[0], bed[1]), rest, msg, done:false };
+  logMsg('you climb into bed...', ''); renderGame();
+}
+/* the night itself, a frame at a time (from v3Render): lie down, fade out, sleep, fade back in on the morning, get up */
+function bedSleepTick(dt){
+  const F = G.sleepFx, P = V3.player; if (!F || !P || !P.e){ G.sleepFx = null; return; }
+  F.t += dt; const T = THREE, t = F.t, c = Math.cos(F.rot), s = Math.sin(F.rot), lz = 0.7, ly = 0.4;
+  if (!F.done && t >= 1.9){ F.done = true; F.rest(); sleepTillDawn(); G.player.clock += DAY_LENGTH*0.02; logMsg(F.msg, 'good'); V3.mapRef = null; saveCurrentGame(); renderGame(); return; }   /* (the room is built afresh in the morning: daylight through the windows) */
+  const p = V3.player; p.g.rotation.order = 'YXZ'; p.g.rotation.set(-Math.PI/2, F.rot, 0); p.e.holder.rotation.y = 0;
+  p.g.position.set(F.bed[0] + 0.5 + s*lz, ly, F.bed[1] + 0.5 + c*lz);
+  m3dPoseHumanoid(p.e.rig, V3.t, 0, 0, 0, 0, p.e); const r = p.e.rig;
+  if (r.arms){ const [R, Lf] = r.arms; R.sh.rotation.x = 0.05; R.sh.rotation.z = -0.08; R.el.rotation.x = -0.2; Lf.sh.rotation.x = 0.05; Lf.sh.rotation.z = 0.08; Lf.el.rotation.x = -0.2; }
+  if (r.torso) r.torso.rotation.x = Math.sin(V3.t*1.1)*0.01;   /* (breathing slow) */
+  const fade = t < 0.5 ? 0 : t < 1.6 ? (t - 0.5)/1.1 : t < 2.9 ? 1 : t < 4.1 ? 1 - (t - 2.9)/1.2 : 0; doorFade(Math.max(0, Math.min(1, fade)));
+  if (t >= 5.0){ p.g.rotation.set(0, 0, 0); p.g.position.y = 0; G.sleepFx = null; doorFade(0); renderGame(); }   /* (up again, beside the bed) */
+}
 function sleepTillDawn(){ const p = G.player, c = clockNow(), day = Math.floor(c / DAY_LENGTH), ph = c / DAY_LENGTH - day;
   p.clock = (ph < 0.25 ? day : day + 1)*DAY_LENGTH + DAY_LENGTH*0.25; G.sitAt = null; }
 function townBench(kind){
@@ -21954,7 +21978,7 @@ function townBench(kind){
     skGainXP(sk[0], xp); logMsg(`you read a while. ${lore} (+${xp} ${sk[1]} xp from a dog-eared manual)`, 'magic'); renderGame(); return true; }
   if (kind==='innbed'){
     const price = sqUnlocked('freeinn') ? 0 : 15; if (p.gold < price){ logMsg('"Fifteen gold a night, love - no credit."', 'hit'); renderGame(); return true; }
-    p.gold -= price; fullyRestPlayer(); p.runEnergy = 100; sleepTillDawn(); logMsg(`you rent the room for ${price} gold and sleep like a log till dawn`, 'good'); renderGame(); return true; }
+    p.gold -= price; bedSleep(()=>{ fullyRestPlayer(); p.runEnergy = 100; }, `you rent the room for ${price} gold and sleep like a log till dawn`); return true; }
   if (kind==='crates'){
     const k = 'crates'; if (rec.day[k]===today){ logMsg('you\'ve already turned the crates over today', ''); renderGame(); return true; }
     rec.day[k] = today; const r = Math.random();
@@ -29959,6 +29983,7 @@ function v3PathTo(tx, ty, bump){
   return steps;
 }
 function v3WalkTo(act){
+  if (G.sleepFx) return;   /* (RS-389) */
   let path = null;
   if (act.kind==='building'){ const b = act.b; path = v3PathTo(b.door.x, b.door.y, false); }
   else if (act.kind==='tile') path = v3PathTo(act.x, act.y, true);
@@ -30134,7 +30159,7 @@ function v3Render(){
     const old = V3.player, grp = old.g.parent; V3.lookKey = rsLookKey();
     if (grp){ const np = v3Person(v3PlayerLook(), 1.0, grp); np.g.position.copy(old.g.position); np.at = old.at; np.yaw = old.yaw||0; grp.remove(old.g); V3.player = np; }
   }
-  { const st = G.interior && G.sitAt; if (st){ glide(V3.player, st.x - Math.sin(st.yaw)*0.06, st.y - Math.cos(st.yaw)*0.06); v3SeatPose(V3.player, st); } else glide(V3.player, G.player.x, G.player.y); }
+  if (G.sleepFx) bedSleepTick(dt); else { const st = G.interior && G.sitAt; if (st){ glide(V3.player, st.x - Math.sin(st.yaw)*0.06, st.y - Math.cos(st.yaw)*0.06); v3SeatPose(V3.player, st); } else glide(V3.player, G.player.x, G.player.y); }
   V3.villagers.forEach(p=>{ const st = p.v.seat; if (st){ glide(p, st.x - Math.sin(st.yaw)*0.06, st.y - Math.cos(st.yaw)*0.06, 6); v3SeatPose(p, st); } else glide(p, p.v.x, p.v.y, 1.7); v3FolkShadow(p); });   // (a walking pace: one tile in about the time between their steps)
   V3.npcs.forEach(p=>{ const st = p.n.seat; if (st){ glide(p, st.x - Math.sin(st.yaw)*0.06, st.y - Math.cos(st.yaw)*0.06); v3SeatPose(p, st); } else glide(p, p.n.x, p.n.y); v3FolkShadow(p); });   /* (RS-382: someone seated sits) */
   try{ townV3Tick(dt); }catch(e){ console.error(e); }
@@ -39390,7 +39415,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-388';
+const GAME_VERSION = 'rs-389';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -41506,6 +41531,7 @@ function examineSay(txt){ if (!txt) return; logMsg('Examine: '+txt, 'examine'); 
 
 // ===================== SECTION: INPUT HANDLING =====================
 function moveDir(dx,dy){
+  if (G.sleepFx) return;   /* (RS-389: asleep - the night has to pass first) */
   if (G.ui!=='playing' || G.gameOver) return;
   if (typeof V3!=='undefined' && V3.door && V3.door.phase==='in') return;   // (half way through a door)
   if (G.gameMode===3 && G.owZoomedOut) return;   // (RS-210: close the map, M, before walking on)

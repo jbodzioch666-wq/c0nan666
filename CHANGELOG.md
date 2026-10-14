@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-389 - A night in a bed
+
+- **You get into bed and sleep.** Renting a bed at the tavern (or sleeping in your own at home) no longer skips to morning in a blink: you climb in and lie down on it, the room fades to dark, and the night passes.
+- **You wake to the day.** The room is lit afresh in the morning, so the windows that were dark when you lay down glow with daylight and throw their light across the floor. Then you get up beside the bed, fully rested.
+- You can't walk off while you're asleep; the whole night takes about five seconds.
+
 ## RS-388 - No gnome hat for the hooded figure
 
 - **The hooded figure keeps his hood.** In a gnome town every townsperson is dressed as a gnome - pointed felt hat included - and the hooded figure was dressed the same way, so he wore a red gnome's hat on top of his hood. Anyone hooded now keeps their hood and their own dark robe in every race's town, taking only the race's face and skin.
