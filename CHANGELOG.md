@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-426 - The board by the tavern, minions that walk every step
+
+- **The bounty board moves.** It now stands against the tavern's right-hand wall, facing the lane, with the Captain of the Watch on its right.
+- **Minions walk every step.** When one of your raised dead is far from its foe, it hurries two squares in a turn. Its figure glided straight to the second square, sometimes cutting across a wall's corner, and when the two steps were on the slant it jumped there outright. Now it walks through each square it steps on, at double pace when it's hurrying.
+
 ## RS-425 - The waypoint in line
 
 - **A row north.** The waypoint moves one row north, still centred across the square, so it stands in line with the path that runs from the Peddler's door into the square. The benches move with it.

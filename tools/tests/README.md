@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs426 | The bounty board at the tavern's right-hand wall with the Captain to its right; a minion hurrying two squares (straight or on the slant) walks through both, without jumping |
 | rs424 | At night every town lamp keeps glowing as you walk away (a pool under it, a glow at its head, dimmer where a real light has it); a light handed on fades up; no obelisks round the waypoint, none of it by day |
 | rs423 | A shut tome is only the shut book (the open book's merged pages no longer show inside it), and open only the open one |
 | rs422 | (RS-425: the waypoint in line with the Peddler's path, no one on its steps) Food on the fire while you cook (a grill over the campfire, a skillet on the hearth, browning as the bar fills; the cook panel a corner card meanwhile); the waypoint in the middle of the square, with benches and a lamp at each corner, everything still reachable; your weapon put away out of a fight (hip or back, the shield on the back) and drawn to fight |
