@@ -28,7 +28,7 @@ module.exports = async page=>{
   A(Object.values(clicks).every(v=>v===0), 'a click on any building finds the way to its door: '+JSON.stringify(clicks));
   A(clicks.bank===0 && clicks.temple===0, 'the bank and the temple included');
   // RS-128: the waypoint's flagstone ring is painted round the waypoint, and you arrive by it
-  const wp = await ev(()=>{ waypointArrive(G.owPos.x+','+G.owPos.y); G.portalFx = null; setUi('playing'); return { at:[G.player.x, G.player.y], wp:[TOWN_CX, tY(12)], tile:G.map[TOWN_CX][tY(12)], T:T_WAYPOINT }; });
+  const wp = await ev(()=>{ waypointArrive(G.owPos.x+','+G.owPos.y); G.portalFx = null; setUi('playing'); return { at:[G.player.x, G.player.y], wp:townWpAt(), tile:G.map[townWpAt()[0]][townWpAt()[1]], T:T_WAYPOINT }; });
   A(wp.tile===wp.T && Math.abs(wp.at[1] - wp.wp[1]) <= 3 && wp.at[0]===wp.wp[0], 'you step out of the portal beside the waypoint: '+JSON.stringify(wp));
   // without 3D the door still just works
   const s7 = await ev(()=>{ v3Pref = false; const b = buildingByKey('tavern'); G.player.x = b.door.x; G.player.y = b.door.y + 1; tryMove(0, -1); const r = !!G.interior && !V3.door; exitInterior(); v3Pref = true; return r; }); A(s7, 'and with no 3D, straight in');

@@ -14,7 +14,7 @@ module.exports = async page=>{
     const gy = O3.heightAt(v.x, v.z), tentAt = O3.campTent && O3.campTent.visible ? O3.campTent.getWorldPosition(new THREE.Vector3()) : null;
     return { sit:!!P.campSit, stool:!!(st && st.visible), dist:+Math.hypot(v.x - f.x - 0.5, v.z - f.y - 0.5).toFixed(2), facing:+d.toFixed(2), beyond:camSide,
       hipUp:+(hips.y - gy).toFixed(3), seatTop:st ? +(st.position.y - gy).toFixed(3) : null, k:+((P.e.holder.scale.y||1)*(P.e.H||1)).toFixed(2), tentGap:tentAt ? +Math.hypot(v.x - tentAt.x, v.z - tentAt.z).toFixed(2) : null,
-      kitShown:!!((P.e.rig.weapon && (P.e.rig.weapon.parent && P.e.rig.weapon.parent!==P.e.rig.arms[0].hand ? P.e.rig.weapon.parent : P.e.rig.weapon).visible) || (P.e.rig.tome && P.e.rig.tome.visible)),
+      kitShown:!!((P.e.rig.weapon && (P.e.rig.sheathed ? P.e.rig.weapon : P.e.rig.weapon.parent && P.e.rig.weapon.parent!==P.e.rig.arms[0].hand ? P.e.rig.weapon.parent : P.e.rig.weapon).visible) || (P.e.rig.tome && P.e.rig.tome.visible)),
       stick:!!(O3.campStick && O3.campStick.visible), tip:O3.campStick && O3.campStick.visible ? (()=>{ const w = O3.campStick.getObjectByName('marshmallow').getWorldPosition(new THREE.Vector3()); return +Math.hypot(w.x - f.x - 0.5, w.z - f.y - 0.5).toFixed(2); })() : null }; });
   await frames(20);
   out.fire = await look();

@@ -11,7 +11,7 @@ module.exports = async page=>{
     for (const n of G.villageNpcs) if (![T_VENDOR, T_QUESTGIVER].includes(G.map[n.x][n.y])) bad.push('npc '+n.service);
     for (const v of G.villagers) if (!v.indoors && !v.sit && G.map[v.x][v.y]!==T_FLOOR) bad.push('folk '+v.x+','+v.y);
     for (const b of VILLAGE_BUILDINGS) if (G.map[b.door.x][b.door.y]!==b.tile) bad.push('door '+b.key);
-    if (G.map[TOWN_CX][tY(12)]!==T_WAYPOINT) bad.push('waypoint'); { const [bx,by] = townBoardAt(); if (G.villageDeco[bx][by]!=='board') bad.push('board'); } if (G.map[TOWN_CX][ROWS-1]!==T_EXIT) bad.push('gate');
+    { const [wx, wy] = townWpAt(); if (G.map[wx][wy]!==T_WAYPOINT) bad.push('waypoint'); }   /* (RS-422: in the middle of the square) */ { const [bx,by] = townBoardAt(); if (G.villageDeco[bx][by]!=='board') bad.push('board'); } if (G.map[TOWN_CX][ROWS-1]!==T_EXIT) bad.push('gate');
     return { stretched:!!G.townLy.stretched, cols:COLS, rows:ROWS, base:G.townLy.W0, bad }; });
   A(lay.stretched && lay.rows===23, 'the town is roomier: '+JSON.stringify(lay)); A(!lay.bad.length, 'everything stands on open ground: '+lay.bad.join(', '));
   // RS-129: the bounty board and the Captain stand together, clear of the bank; the props stand where their tiles are

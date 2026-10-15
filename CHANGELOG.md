@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-422 - Cooking on the fire, a new town square, weapons put away
+
+- **See your food cook.** At your campfire an iron grill now stands over the flames. At a hearth, a cast-iron skillet sits on a trivet in front of the fire. What you're cooking lies on it: a trout, a steak, a dragon steak veined with ember, or a bubbling stew. It browns as the bar fills, picks up grill marks and steams, and a fresh one goes on for each you cook.
+- **The cooking window steps aside.** While food is cooking, the cooking panel shrinks to a small card in the corner, so you can watch the fire. The full panel comes back when the batch is done. At your campfire you sit on your stool across the flames from the camera while you cook.
+- **A proper town square.** The waypoint now stands in the very middle of the square, on three round steps between four obelisks with crystal caps. The square is paved with rings of dressed flagstones round it, with a compass rose inlaid about the dais and a pale kerb edging it all. Four oak benches face the stone, each with a tub of flowers at either end, and there's a lamp at each corner. A portal sets you down just south of the stone.
+- **Weapons put away out of a fight.** When you aren't fighting, you put your weapon away. A one-handed weapon hangs at your left hip, and a blade goes in a leather scabbard with brass fittings. A two-handed sword (in its own scabbard), a halberd or spear, a staff or a bow goes across your back. A shield goes on your back, point down, and an off-hand blade on your right hip. When a fight starts, you reach over your shoulder or across to your hip and draw it. Your arms swing free while it's put away.
+
 ## RS-421 - Minions follow you
 
 - **Your dead keep up.** With no foe left to fight, your raised dead used to stand where the last fight ended. Now they follow you: they find the way round walls and through doorways to stay within a couple of squares of you, and they hurry when they've fallen behind.
