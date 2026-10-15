@@ -59,6 +59,10 @@ module.exports = async page=>{
   await page.screenshot({ path:`${S}/dgrooms-a.png`, timeout:150000 });
   await page.evaluate(async ()=>{ viewRotate(1); for (let i=0;i<4;i++){ renderGame(); await new Promise(r=>setTimeout(r, 40)); } });
   await page.screenshot({ path:`${S}/dgrooms-b.png`, timeout:150000 });
+  // RS-409: a doorway generated open shows its door, swung back
+  await page.evaluate(async ()=>{ const W = (x,y)=>G.map[x][y]===T_WALL; let a = null; for (let x=1;x<COLS-1 && !a;x++) for (let y=1;y<ROWS-1;y++) if (G.dungeonDeco[x][y]==='arch'){ a = { x, y, ax:W(x-1,y) ? 0 : 1, ay:W(x-1,y) ? 1 : 0 }; break; }
+    if (a){ const s = dgDoorSide(a.x, a.y, 'arch'); G.player.x = a.x + (a.ax ? s : 0); G.player.y = a.y + (a.ay ? s : 0); } for (let i=0;i<6;i++){ renderGame(); await new Promise(r=>setTimeout(r, 40)); } });
+  await page.screenshot({ path:`${S}/dgrooms-c.png`, timeout:150000 });
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
   A(r.kind==='dungeon' && r.floors===14 && r.bad.length===0, 'every floor is rooms and corridors with doorways: '+r.bad.slice(0, 8).join('; '));
   A(r.doors > 5 && r.arches > 5 && Math.min(...r.rooms) >= 5, 'doors and arches both, and plenty of rooms');
@@ -66,6 +70,6 @@ module.exports = async page=>{
   A(!r.monDoor || (r.monDoor.opened && r.monDoor.moved), 'a monster shoves a door open on its way');
   A(r.walk && r.walk.opened && r.walk.pathLeft===0 && Math.abs(r.walk.at[0])+Math.abs(r.walk.at[1])===1, 'the click-walk opened the door, went through and finished its path');
   A(r.saved, 'an opened door stays open in the save');
-  A(r.models.door >= 10 && r.models.dooro >= 10 && r.models.arch === 1, 'the doorways are modelled: frame and planked door, or an empty arch');
+  A(r.models.door >= 10 && r.models.dooro >= 10 && r.models.arch >= 10, 'the doorways are modelled: a planked door, shut or standing open');
   A(r.lairRooms >= 2 && r.lairKinds.length >= 1, 'a named site still lays out the old way');
 };

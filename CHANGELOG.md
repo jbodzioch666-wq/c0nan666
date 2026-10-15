@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-409 - Open doorways show their doors
+
+- **Open doors are doors.** A doorway generated open now shows its oak door standing open, swung back into the passage, instead of an empty stone arch. This applies to floors you've already visited too.
+
 ## RS-408 - Full-height doors, minimap walking in dungeons
 
 - **Doors as tall as the walls.** A dungeon door now fills its doorway from the floor to the top of the walls. The stone lintel is kept only over open arches.
