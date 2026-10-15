@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-410 - Smooth dusk, a real shadow, no more jumping
+
+- **Dusk and dawn without the jump.** Partway through dusk the sun turned from warm orange to blue moonlight in a single frame, and the land lost half its light at once (dawn did the reverse). The moonlight now fades in step with the clock.
+- **Your shadow in the dungeons.** Your lantern hangs over one shoulder now, so you cast a soft shadow on the floor to your other side, like the sun's shadow outside. It's redrawn every frame while you walk, so it keeps up with you.
+- **No more teleporting.** Tapping a movement key or clicking faster than you walk used to put you two or three tiles ahead of your figure, which then jumped to catch up. Each step now waits until your figure is nearly there, so you move at walking pace and never jump. This applies in dungeons, on the land and in towns.
+- **Click-walking through doors.** A click-walk that pushed open a door in a north-south passage stopped there instead of carrying on through. Fixed.
+
 ## RS-409 - Open doorways show their doors
 
 - **Open doors are doors.** A doorway generated open now shows its oak door standing open, swung back into the passage, instead of an empty stone arch. This applies to floors you've already visited too.
