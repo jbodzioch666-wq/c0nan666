@@ -5545,7 +5545,7 @@ function saveLevelCache(d){
     mon: G.mon.map(m=>({...m})),
     shopStock: G.shopStock.map(it=>copyItem(it)),
     isBossFloor: G.isBossFloor,
-    at: Date.now(), clk: clockNow(), ent: G.dungeonEntrance ? G.dungeonEntrance.x+','+G.dungeonEntrance.y : '',   /* (RS-205: kept in the save; a moved site drops its old floors) */
+    at: Date.now(), ent: G.dungeonEntrance ? G.dungeonEntrance.x+','+G.dungeonEntrance.y : '',   /* (RS-205: kept in the save; a moved site drops its old floors) */
     bossIdx: G.bossIdx,
   };
 }
@@ -5568,18 +5568,20 @@ function invalidateDungeonCache(slot){
 }
 // (RS-205) the floors you have walked are kept with the save, so a site is laid out once: dying on a floor, leaving by the
 // stairs or closing the game all bring you back to the same rooms, the same loot and the same foes. Grids go in as strings
-// (one character per tile) and the sparse ones as lists; the three most recently walked sites are kept.
+// (one character per tile) and the sparse ones as lists. (RS-406) Every site you haven't cleared is kept - it used to be only
+// the three most recently walked, so a fourth dungeon quietly reset the oldest one. A site is only laid out afresh once its
+// master falls (dgFinish). Only if the browser's storage is full does a save fall back to the three most recent (saveCurrentGame)
 const DG_CACHE_SLOTS = 3;
 function monPlain(m){ return JSON.parse(JSON.stringify(m, (k, v)=> k==='summoner' || k==='faceAt' || typeof v==='function' || (v && v.isObject3D) ? undefined : v)); }
-function dgCacheEncode(){
+function dgCacheEncode(maxSites){
   const slots = {}; for (const k of Object.keys(G.dgCache)){ const sl = k.split('_')[0], c = G.dgCache[k]; slots[sl] = Math.max(slots[sl]||0, c.at||0); }
-  const keep = Object.keys(slots).sort((a,b)=>slots[b]-slots[a]).slice(0, DG_CACHE_SLOTS), out = {};
+  const keep = Object.keys(slots).sort((a,b)=>slots[b]-slots[a]).slice(0, maxSites || Infinity), out = {};
   for (const k of Object.keys(G.dgCache)){ const c = G.dgCache[k]; if (!keep.includes(k.split('_')[0]) || !c.map || !c.map.length) continue;
     if (c._enc && c._encAt===c.at){ out[k] = c._enc; continue; }   /* (RS-216: a floor is encoded once per caching, not on every autosave) */
     try{
       const w = c.map.length, h = c.map[0].length, enc = (g, f)=>g.map(col=>col.map(f).join('')).join('|');
       const sparse = (g, f)=>{ const L = []; if (g) for (let x=0;x<w;x++) for (let y=0;y<h;y++){ const v = g[x] && g[x][y]; if (v) L.push([x, y, f ? f(v) : v]); } return L; };
-      const e = { at:c.at||0, clk:c.clk==null ? null : c.clk, ent:c.ent||'', w, h, map:enc(c.map, t=>String.fromCharCode(48+t)), ts:c.trapSeen ? enc(c.trapSeen, v=>v?'1':'0') : null, ds:c.dungeonSeen ? enc(c.dungeonSeen, v=>v?'1':'0') : null,
+      const e = { at:c.at||0, ent:c.ent||'', w, h, map:enc(c.map, t=>String.fromCharCode(48+t)), ts:c.trapSeen ? enc(c.trapSeen, v=>v?'1':'0') : null, ds:c.dungeonSeen ? enc(c.dungeonSeen, v=>v?'1':'0') : null,
         deco:sparse(c.dungeonDeco), fi:sparse(c.floorItem), gs:c.genStart, mon:(c.mon||[]).map(monPlain), shop:c.shopStock||[], bf:c.isBossFloor||0, bi:c.bossIdx==null ? -1 : c.bossIdx };
       JSON.stringify(e); out[k] = e; c._enc = e; c._encAt = c.at;
     }catch(err){ console.error(err); }
@@ -5592,22 +5594,16 @@ function dgCacheDecode(d){
     const dec = (str, f)=>str.split('|').map(col=>col.split('').map(f));
     const grid = (L, z)=>{ const g = []; for (let x=0;x<c.w;x++) g.push(new Array(c.h).fill(z)); for (const [x,y,v] of L||[]) if (g[x] && y < c.h) g[x][y] = v; return g; };
     if (!c.map || !c.gs) continue;
-    out[k] = { at:c.at||0, clk:c.clk==null ? null : c.clk, ent:c.ent||'', map:dec(c.map, ch=>ch.charCodeAt(0)-48), trapSeen:c.ts ? dec(c.ts, ch=>ch==='1') : null, dungeonSeen:c.ds ? dec(c.ds, ch=>ch==='1') : null,
+    out[k] = { at:c.at||0, ent:c.ent||'', map:dec(c.map, ch=>ch.charCodeAt(0)-48), trapSeen:c.ts ? dec(c.ts, ch=>ch==='1') : null, dungeonSeen:c.ds ? dec(c.ds, ch=>ch==='1') : null,
       dungeonDeco:grid(c.deco, ''), floorItem:grid(c.fi, null), genStart:c.gs, mon:c.mon||[], shopStock:c.shop||[], isBossFloor:c.bf||0, bossIdx:c.bi==null ? -1 : c.bi };
   }catch(err){ console.error(err); } }
   return out;
 }
 // on the way in: floors cached from where this site used to stand (it moves when its master falls) are dropped, and a
 // gravestone left inside the old site comes up to the open land where that entrance stood
-/* (RS-405) and a site you have been away from for a day of the game's clock (dgRespawnAfter - half an hour of play; the clock
-   stands still on menus and while the game is closed) is laid out afresh: new rooms, its foes and its loot back. Your
-   gravestones down there stay, moved to clear floor (dgGraveSync). Floors kept before RS-405 have no time on them and keep */
-function dgRespawnAfter(){ return DAY_LENGTH; }
 function dgCacheCheck(){
   const ent = G.dungeonEntrance.x+','+G.dungeonEntrance.y;
   for (const k of Object.keys(G.dgCache)) if (k.startsWith(G.dungeonSlot+'_')){ const c = G.dgCache[k]; if (c.ent && c.ent!==ent) delete G.dgCache[k]; }
-  { const fl = Object.keys(G.dgCache).filter(k=>k.startsWith(G.dungeonSlot+'_')), last = Math.max(-1, ...fl.map(k=>G.dgCache[k].clk==null ? -1 : G.dgCache[k].clk));
-    if (fl.length && last >= 0 && clockNow() - last >= dgRespawnAfter()){ invalidateDungeonCache(G.dungeonSlot); logMsg('a day has passed since you were last down here - the halls have shifted, and new foes and fresh loot fill them', 'magic'); } }
   for (const g of gravesP()) if (g.dg && g.dg.slot===G.dungeonSlot && (g.x!==G.dungeonEntrance.x || g.y!==G.dungeonEntrance.y)) delete g.dg;
 }
 // your gravestones on this floor (a death below ground leaves the stone where you fell, see continueAfterDeath): each gets a
@@ -7415,7 +7411,8 @@ function saveCurrentGame(){
   if (!G.saveId || !G.player || G.gameOver) return;
   try{
     const data = serializeGame();
-    localStorage.setItem(SAVE_PREFIX+G.saveId, JSON.stringify(data));
+    try{ localStorage.setItem(SAVE_PREFIX+G.saveId, JSON.stringify(data)); }
+    catch(e){ data.dgCache = dgCacheEncode(DG_CACHE_SLOTS); localStorage.setItem(SAVE_PREFIX+G.saveId, JSON.stringify(data)); console.warn('save: storage full - kept only the three most recent dungeons', e); }   /* (RS-406) */
     const p = G.player, st = pStats();
     upsertIndexEntry({id:data.id, name:data.name, race:data.race, cls:data.cls,
       level:data.level, gold:data.gold, lastPlayed:data.lastPlayed, createdAt:data.createdAt,
@@ -39820,7 +39817,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-405';
+const GAME_VERSION = 'rs-406';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

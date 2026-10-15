@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-406 - Dungeons stay as you left them until cleared
+
+- **No timed refill.** The RS-405 change that reset a dungeon after a day away is taken out. A dungeon is laid out again only once you defeat its master, as before.
+- **Every uncleared dungeon is remembered.** Saves used to keep the floors of only the three most recently visited dungeons, so entering a fourth quietly reset the oldest. That's why dungeons seemed to respawn after time away. Now every dungeon you haven't cleared keeps its rooms, foes and loot. If your browser's storage ever runs out, the save falls back to keeping the three most recent instead of failing.
+
 ## RS-405 - Locked characters, dungeons that refill
 
 - **Lock a character.** Each adventurer on the title screen has a lock button. While locked, the delete button is hidden and the character can't be deleted. Tap the lock again to unlock. The lock stays on through saving. A hardcore death still ends a locked character, as that mode's rule.
