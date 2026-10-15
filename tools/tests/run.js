@@ -8,6 +8,7 @@
 //   --timeout=N  minutes allowed per test (default 20)
 //   --jobs=N     run N tests at once, each in its own browser (default 1); their output is printed as each one finishes
 //   --size=WxH   the desktop window (default 1400x900); a smaller one draws faster with --soft
+//   --pos=X,Y    where a --headed window opens on the desktop, e.g. on another monitor (default: $DC_TEST_POS, if set)
 // Screenshots land in tools/tests/shots/. Needs `npm install` in tools/tests first.
 const fs = require('fs'), path = require('path');
 const ROOT = path.resolve(__dirname, '../..'), PAGE = path.join(ROOT, 'depthcrawl.html');
@@ -32,6 +33,8 @@ async function runOne(name){
   if (!fs.existsSync(file)) return { ok:false, why:'no such test' };
   const launch = ['--ignore-gpu-blocklist'];
   if (flag('soft')) launch.push('--use-angle=swiftshader', '--enable-unsafe-swiftshader');
+  const pos = opt('pos') || process.env.DC_TEST_POS;
+  if (pos) launch.push('--window-position=' + pos);
   if (name==='audio') launch.push('--autoplay-policy=no-user-gesture-required');
   const browser = await pw.chromium.launch({ headless:!flag('headed'), args:launch });
   // a test that exports `mobile: true` runs on an emulated phone (touch, 390x844)
