@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| dgminiwalk | A click on a seen spot of the dungeon minimap walks you there; an unseen spot does nothing; the floor under it isn't clicked |
 | dgrooms | Plain dungeons: rectangular rooms, corridors a tile wide, arches and oak doors that block sight and open on a push |
 | dgkeep | Every dungeon you haven't cleared keeps its floors through saving and loading - not just the three most recent |
 | savelock | A character can be locked on the title screen so it can't be deleted; the lock outlasts saving |

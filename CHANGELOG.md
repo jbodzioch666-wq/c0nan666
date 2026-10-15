@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-408 - Full-height doors, minimap walking in dungeons
+
+- **Doors as tall as the walls.** A dungeon door now fills its doorway from the floor to the top of the walls. The stone lintel is kept only over open arches.
+- **Click the minimap to walk.** In a dungeon, clicking a spot you've already seen on the minimap walks you there, whichever way the minimap is turned. Clicking a wall walks you up beside it. Clicking an unexplored spot does nothing, and a click on the minimap no longer reaches the floor drawn underneath it. The town and overworld minimaps already worked this way.
+
 ## RS-407 - Rooms, corridors and doors
 
 - **Plain dungeons rebuilt as rooms and corridors.** Rooms are clean rectangles with no stray pillars or ragged cave walls. Corridors are one tile wide through the rock between them, never running along a room's wall or side by side. Every room connects to the rest, with a loop or two. Named sites (castles, towers, temples, graveyards, mines, lairs, pyramids) keep their own layouts.
