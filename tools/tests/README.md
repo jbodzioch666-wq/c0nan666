@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs411 | The XP tracker's bar wraps round at a level-up; explored doorways stay drawn out of sight; a recipe's logs count plain logs only (building costs any kind); the fight minimap hides behind menus; the world map pans by the pixel |
 | dgshadow | In a dungeon the lantern over your shoulder throws your shadow on the floor, redrawn every frame as you walk |
 | nosnap | Rapid key presses never get you ahead of your figure (no jump to catch up), in the dungeon, on the land and in town; the dusk light fades without a jump |
 | dgminiwalk | A click on a seen spot of the dungeon minimap walks you there; an unseen spot does nothing; the floor under it isn't clicked |

@@ -10767,11 +10767,16 @@ function mmRotButtons(cv){
   const [b1, b2] = w.children; for (const [b, sx] of [[b1, -1], [b2, 1]]){ b.style.width = b.style.height = bs+'px'; b.style.left = Math.round(cx + sx*rr*0.6 - bs/2)+'px'; b.style.top = Math.round(r.bottom - bs*0.45)+'px'; }   /* (on the bottom edge, inside the square, RS-141) */
 }
 // ---- smooth HUD: bars slide to their new value and numbers count instead of jumping ----
-const BAR_PREV = new Map(), CNT_SHOWN = new Map(), CNT_LIVE = new Set();
+const BAR_PREV = new Map(), BAR_LVL = new Map(), CNT_SHOWN = new Map(), CNT_LIVE = new Set();
 function uiAnimPass(){
   for (const el of document.querySelectorAll('[data-bar]')){
-    const k = el.dataset.bar, prop = el.style.height ? 'height' : 'width', tgt = el.style[prop], prev = BAR_PREV.get(k);
-    BAR_PREV.set(k, tgt); if (el._anim) continue; el._anim = 1;
+    const k = el.dataset.bar, prop = el.style.height ? 'height' : 'width', tgt = el.style[prop], prev = BAR_PREV.get(k), lv = el.dataset.lvl, plv = BAR_LVL.get(k);
+    BAR_PREV.set(k, tgt); if (lv!==undefined) BAR_LVL.set(k, lv); if (el._anim) continue; el._anim = 1;
+    /* (RS-411) an xp bar that has gone up a level fills to the end, then runs up again from empty - it used to slide backwards */
+    if (prev!==undefined && lv!==undefined && plv!==undefined && +lv > +plv){
+      el.style.transition = 'none'; el.style[prop] = prev; void el.offsetWidth; el.style.transition = ''; el.style[prop] = '100%';
+      setTimeout(()=>{ if (!el.isConnected) return; el.style.transition = 'none'; el.style[prop] = '0%'; void el.offsetWidth; el.style.transition = ''; el.style[prop] = tgt; }, 460);
+      continue; }
     if (prev!==undefined && prev!==tgt){ el.style.transition = 'none'; el.style[prop] = prev; void el.offsetWidth; el.style.transition = ''; el.style[prop] = tgt; }
   }
   for (const el of document.querySelectorAll('[data-cnt]')){
@@ -10940,10 +10945,11 @@ function renderXpTracker(){
     const f = hi>lo ? clamp((xp-lo)/(hi-lo), 0, 1) : 1, hrs = Math.max(1/60, (Date.now()-t.since)/3600000);
     return `<div class="xpt-row"><div class="xpt-h"><span class="xpi" style="background:${d[3]}">${d[2]}</span><b>${esc(d[1])}</b> <span class="muted">${L}</span>
         <span class="xpt-g">+${t.gained.toLocaleString()} xp</span></div>
-      <div class="xpt-bar"><i data-bar="xpt-${k}" style="width:${f*100}%;background:${d[3]}"></i></div>
+      <div class="xpt-bar"><i data-bar="xpt-${k}" data-lvl="${L}" style="width:${f*100}%;background:${d[3]}"></i></div>
       <div class="xpt-s"><span>${L<99 ? (hi-xp).toLocaleString()+' to level '+(L+1) : 'max level'}</span><span>${Math.round(t.gained/hrs).toLocaleString()} xp/h</span></div></div>`; }).join('');
   el.innerHTML = `<div class="xpt-t" data-drag="xp" title="drag to move">XP TRACKER <span class="xpt-x" onclick="XPT.hidden=true; renderXpTracker();" title="hide the tracker - it comes back with your next xp">&times;</span></div>${rows}`;
   el.style.display = 'block';
+  uiAnimPass();   /* (RS-411: the bars slide from where they were, and wrap round at a level) */
   renderBuffBar();
 }
 function skUnlockText(k, L, mastery){
@@ -12034,10 +12040,12 @@ function crCraft(id, all){
 }
 // (RS-192) what a recipe takes, in colour - green what you have enough of, red what you're short of, each with what you
 // hold - and how many you could make from what you have; every crafting screen uses these
-function needHave(k){ return k==='gold' ? (G.player.gold||0) : k==='logs' ? SK_LOG.reduce((a,l)=>a+skHave(l.id), 0) : skHave(k); }
-function needName(k){ return k==='logs' ? 'logs' : crName(k).toLowerCase(); }
-function needHtml(need, gold){
-  const parts = Object.keys(need).map(k=>{ const h = needHave(k), ok = h >= need[k]; return `<span style="color:${ok ? COL.green : COL.red}">${need[k]} ${esc(needName(k))}</span><span class="muted"> (${h})</span>`; });
+/* (RS-411) 'logs' in a recipe is plain logs, from the level-1 trees; a building cost (a house, a boat, a town's project) takes
+   logs of any kind - anyLog says which, so the count shown is the one that's used */
+function needHave(k, anyLog){ return k==='gold' ? (G.player.gold||0) : (k==='logs' && anyLog) ? SK_LOG.reduce((a,l)=>a+skHave(l.id), 0) : skHave(k); }
+function needName(k, anyLog){ return k==='logs' ? (anyLog ? 'logs (any kind)' : 'logs') : crName(k).toLowerCase(); }
+function needHtml(need, gold, anyLog){
+  const parts = Object.keys(need).map(k=>{ const h = needHave(k, anyLog), ok = h >= need[k]; return `<span style="color:${ok ? COL.green : COL.red}">${need[k]} ${esc(needName(k, anyLog))}</span><span class="muted"> (${h})</span>`; });
   if (gold) parts.push(goldHtml(gold));
   return parts.join(' + ');
 }
@@ -18240,29 +18248,29 @@ function renderOverworldMapZoomed(){
   const zs = owZoomScale(), lod = zs < 1.6 ? 0 : zs < 3 ? 1 : 2;   // far out, middling, close in
   cellPx = Math.max(canvas.width / OW_COLS, canvas.height / OW_ROWS) * zs;
   owZoomLastCellPx = cellPx;
-  const viewCols = Math.ceil(canvas.width / cellPx), viewRows = Math.ceil(canvas.height / cellPx);
-  const center = owZoomCenter();
-  // dragging (see the mousemove listener below) moves center.x/y by
-  // fractional mouse-pixel deltas; the chart itself pans smoothly, but the
-  // camera origin is floored to a whole tile the same as before so every
-  // tile-indexed lookup (G.ow.map, the seen mask) stays an integer
-  const zCamX = Math.floor(clamp(center.x - Math.floor(viewCols/2), 0, mx(0, OW_COLS-viewCols)));
-  const zCamY = Math.floor(clamp(center.y - Math.floor(viewRows/2), 0, mx(0, OW_ROWS-viewRows)));
-  owZoomLastCam = { x:zCamX, y:zCamY };
+  const center = owZoomCenter(), vW = canvas.width / cellPx, vH = canvas.height / cellPx;
+  /* (RS-411) dragging moves center.x/y by fractions of a tile, and the chart follows by the pixel: the tile-indexed work
+     (G.ow.map, the seen mask) runs from the whole tile zCamX/zCamY, and everything is drawn shifted by the part of a tile
+     left over (offX/offY) - it used to sit still and then jump a whole tile. One more column and row cover the edge */
+  const camFX = clamp(center.x + 0.5 - vW/2, 0, mx(0, OW_COLS - vW)), camFY = clamp(center.y + 0.5 - vH/2, 0, mx(0, OW_ROWS - vH));
+  const zCamX = Math.floor(camFX), zCamY = Math.floor(camFY), offX = (camFX - zCamX)*cellPx, offY = (camFY - zCamY)*cellPx;
+  const viewCols = Math.ceil(vW) + 1, viewRows = Math.ceil(vH) + 1;
+  owZoomLastCam = { x:camFX, y:camFY };   /* (the clicks and hovers read the same fractional origin) */
   owReveal(G.owPos.x, G.owPos.y, wgSight());
   if (!PM.cv || PM.key !== pmMapKey()) pmBuild();
   const P = PM.P, cw = canvas.width, ch = canvas.height, now = performance.now()/1000, geo = owGeo();
   const TX = (x)=> (x-zCamX)*cellPx + cellPx/2, TY = (y)=> (y-zCamY)*cellPx + cellPx/2;
   const inView = (x, y, m)=> x >= zCamX-m && y >= zCamY-m && x < zCamX+viewCols+m && y < zCamY+viewRows+m;
   ctx.fillStyle = '#2a1e12'; ctx.fillRect(0,0,cw,ch);
+  ctx.save(); ctx.translate(-offX, -offY);
   ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
   const sx = zCamX*P, sy = zCamY*P, sw = viewCols*P, sh = viewRows*P, dw = viewCols*cellPx, dh = viewRows*cellPx;
   const fw = Math.min(viewCols, OW_COLS+1-zCamX), fh = Math.min(viewRows, OW_ROWS+1-zCamY), FS = 4;
   // the chart: a sepia sketch, washed with colour wherever you've walked
   ctx.drawImage(pmSketch(), sx, sy, sw, sh, 0, 0, dw, dh);
   { if (!PM.colTmp) PM.colTmp = document.createElement('canvas');
-    const ct = PM.colTmp; if (ct.width!==cw || ct.height!==ch){ ct.width = cw; ct.height = ch; }
-    const cx2 = ct.getContext('2d'); cx2.globalCompositeOperation = 'source-over'; cx2.clearRect(0,0,cw,ch);
+    const ct = PM.colTmp, tw = cw + Math.ceil(cellPx) + 1, th = ch + Math.ceil(cellPx) + 1; if (ct.width!==tw || ct.height!==th){ ct.width = tw; ct.height = th; }
+    const cx2 = ct.getContext('2d'); cx2.globalCompositeOperation = 'source-over'; cx2.clearRect(0,0,tw,th);
     cx2.imageSmoothingEnabled = true; cx2.imageSmoothingQuality = 'high';
     cx2.drawImage(pmWalkMask(), (zCamX+1)*FS, (zCamY+1)*FS, fw*FS, fh*FS, 0, 0, fw*cellPx, fh*cellPx);
     cx2.globalCompositeOperation = 'source-in';
@@ -18280,13 +18288,13 @@ function renderOverworldMapZoomed(){
   // fog over what you haven't explored
   const fog = pmFogMask();
   if (!PM.fogTmp) PM.fogTmp = document.createElement('canvas');
-  const ft = PM.fogTmp; if (ft.width!==cw || ft.height!==ch){ ft.width = cw; ft.height = ch; }
-  const fx = ft.getContext('2d'); fx.globalCompositeOperation = 'source-over'; fx.clearRect(0,0,cw,ch);
+  const ft = PM.fogTmp, fw2 = cw + Math.ceil(cellPx) + 1, fh2 = ch + Math.ceil(cellPx) + 1; if (ft.width!==fw2 || ft.height!==fh2){ ft.width = fw2; ft.height = fh2; }
+  const fx = ft.getContext('2d'); fx.globalCompositeOperation = 'source-over'; fx.clearRect(0,0,fw2,fh2);
   fx.imageSmoothingEnabled = true; fx.imageSmoothingQuality = 'high';
   fx.drawImage(PM.fogHi, (zCamX+1)*FS, (zCamY+1)*FS, fw*FS, fh*FS, 0, 0, fw*cellPx, fh*cellPx);
   fx.globalCompositeOperation = 'source-in';
   const pat = pmFogPattern(fx), t = (performance.now()/1000)*6 % 1024;
-  fx.save(); fx.translate(t, t*0.4); fx.fillStyle = pat; fx.fillRect(-t, -t*0.4, cw, ch); fx.restore();
+  fx.save(); fx.translate(t, t*0.4); fx.fillStyle = pat; fx.fillRect(-t, -t*0.4, fw2, fh2); fx.restore();
   ctx.globalAlpha = 0.94; ctx.drawImage(ft, 0, 0); ctx.globalAlpha = 1;
   // with the danger layer: which lands are secured, troubled or dangerous (see SECTION: WORLD EVENTS)
   if (mapF('danger')) pmTerritoryWash(zCamX, zCamY, viewCols, viewRows);
@@ -18385,7 +18393,7 @@ function renderOverworldMapZoomed(){
         ctx.lineWidth = 3*dpr; ctx.strokeStyle = 'rgba(240,226,190,0.9)'; ctx.strokeText(p.note, px, py+R*0.35); ctx.fillStyle = '#2a1a0c'; ctx.fillText(p.note, px, py+R*0.35); } });
     if (ed && ed.i<0) pmPin(ctx, TX(ed.x), TY(ed.y), R, ed.k, true); }
   pmBirds(zCamX, zCamY, viewCols, viewRows, now);
-  applyOverworldTint();
+  ctx.restore(); applyOverworldTint(); ctx.save(); ctx.translate(-offX, -offY);   /* (the tint covers the screen, unshifted) */
   pmSearchMarks(zCamX, zCamY, viewCols, viewRows);   /* (RS-315) what the search found */
   // you are here: a red ring and dot, gently pulsing
   const ppx = (G.owPos.x-zCamX)*cellPx + cellPx/2, ppy = (G.owPos.y-zCamY)*cellPx + cellPx/2, pr = clamp(cellPx*1.3, 14*dpr, 24*dpr), pulse = Math.sin(performance.now()/260)*0.5+0.5;
@@ -18396,6 +18404,7 @@ function renderOverworldMapZoomed(){
   drawMonsterArt(ppx, ppy+pr*0.12, pr*1.6, (G.gear.weapon && G.gear.weapon.basis==='Quarterstaff') ? PLAYER_ART_STAFF : PLAYER_ART_SWORD, '#ffffff');
   ctx.font = `700 ${Math.round(12*dpr)}px Cinzel, Georgia, serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
   ctx.lineWidth = 3*dpr; ctx.strokeStyle = 'rgba(26,20,14,0.9)'; ctx.strokeText('You', ppx, ppy - pr*1.2); ctx.fillStyle = '#ffe6a0'; ctx.fillText('You', ppx, ppy - pr*1.2);
+  ctx.restore();   /* (the compass and legend sit on the screen, not the chart) */
   const hudTop = immersiveUi ? 64*dpr : 0, hudBottom = immersiveUi ? 128*dpr : 0;   // keep clear of the overlaid HUD
   if (mapNarrow()) pmCompass(ctx, 34*dpr, canvas.height - 150*dpr, 24*dpr); else pmCompass(ctx, 62*dpr, hudTop + 110*dpr, 42*dpr);   // (RS-138: small and out of the way on a phone)
   // legend: the ink icon for each kind of place
@@ -21238,7 +21247,7 @@ function sailUpgradeHtml(){
   const t = boatTier(); if (!t || t >= 4) return t ? `<div class="shoprow"><span class="muted">boat</span><span style="color:${COL.cyan}">your ${boatName().toLowerCase()}</span><span class="desc">the finest ship on the water</span><span></span></div>` : '';
   const n = BOAT_TIERS[t+1], logs = SK_LOG.reduce((a,l)=>a+skHave(l.id), 0), bars = skHave('ironb'), p = G.player, ok = p.gold >= n.gold && logs >= n.logs && bars >= n.bars;
   return `<div class="shoprow"><span class="muted">boat</span><span style="color:${COL.cyan}">build a ${n.nm.toLowerCase()} <span class="muted">(you sail a ${boatName().toLowerCase()})</span></span>
-    <span class="desc">${esc(n.d)} - needs ${needHtml({ logs:n.logs, ironb:n.bars }, n.gold)}</span>
+    <span class="desc">${esc(n.d)} - needs ${needHtml({ logs:n.logs, ironb:n.bars }, n.gold, true)}</span>
     <span><button class="btn" ${ok ? '' : 'disabled'} onclick="sailUpgrade()">build</button></span></div>`;
 }
 function sailUpgrade(){
@@ -21406,7 +21415,7 @@ function houseTier(id){ const h = houseP(); return h && h.built ? (h.built[id]||
 function houseCostOk(cost){ for (const k in cost){ const have = k==='logs' ? SK_LOG.reduce((a,l)=>a+skHave(l.id), 0) : skHave(k); if (have < cost[k]) return false; } return true; }
 function houseCostPay(cost){ const save = chn(skPerk('construction', 'save')); if (save){ logMsg('a careful hand - you save your materials', 'good'); return; }
   for (const k in cost){ if (k==='logs'){ let need = cost[k]; for (const l of SK_LOG){ const h = Math.min(need, skHave(l.id)); if (h){ skAdd(l.id, -h); need -= h; } } } else skAdd(k, -cost[k]); } }
-function houseCostText(cost){ return needHtml(cost); }   /* (RS-192: in colour, with what you hold) */
+function houseCostText(cost){ return needHtml(cost, 0, true); }   /* (RS-192: in colour, with what you hold) */
 // the estate agent on every town square
 function estateNpcPlace(){
   if (G.interior || (G.villageNpcs||[]).some(n=>n.service==='estate')) return;
@@ -22605,7 +22614,7 @@ const TOWN_PROJECTS = [
   { id:'grow2',  nm:'Raise it to a city', cost:{ gold:8000, logs:120, ironb:60 }, d:'the village becomes a walled city, with a guild hall and an arena', can:i=>i.tier===1 },
 ];
 function townCostOk(c){ const rest = Object.assign({}, c); delete rest.gold; return G.player.gold >= (c.gold||0) && houseCostOk(rest); }
-function townCostText(c){ const rest = Object.assign({}, c); delete rest.gold; return needHtml(rest, c.gold||0); }   /* (RS-193: in colour) */
+function townCostText(c){ const rest = Object.assign({}, c); delete rest.gold; return needHtml(rest, c.gold||0, true); }   /* (RS-193: in colour) */
 function buildMayor(){
   const info = townInfo(), done = TOWN_PROJECTS.filter(pj=>info.rec.up[pj.id] || (pj.id==='grow' && (info.rec.up.grow||0) >= 1) || (pj.id==='grow2' && (info.rec.up.grow||0) >= 2));
   const rows = TOWN_PROJECTS.filter(pj=>pj.can(info)).map(pj=>`<div class="shoprow"><span><b>${pj.nm}</b></span><span class="desc">${pj.d}<br><span class="muted">${townCostText(pj.cost)}</span></span>
@@ -38100,6 +38109,8 @@ function fpLightAt(env, wx, wy, dist){
   const g = env.amb[1]+lan*env.lan[1]+L[1];
   return clamp(Math.max(r,g)*1.05, 0, 1);
 }
+const DOORWAY_DECOS = ['door','dooro','arch','ldoor','ldooro'];
+function dressProp(x, y, deco){ return { kind:'dress', d:deco, rot:(G.map[x-1] && G.map[x-1][y]===T_WALL) ? 0 : Math.PI/2, side:dgDoorSide(x, y, deco) }; }
 function fpCollectSprites(vis){
   const S = [];
   const seeTile = (x,y)=> G.gameMode===2 || vis.has(x+','+y);
@@ -38181,7 +38192,10 @@ function fpCollectSprites(vis){
   // tile contents
   const midX = Math.floor(COLS/2), midY = Math.floor(ROWS/2);
   for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
-    if (!seeTile(x,y)) continue;
+    if (!seeTile(x,y)){   /* (RS-411) a doorway is part of the walls: once explored it stays drawn, like them, out of sight too */
+      const dd = G.gameMode===1 && isoOn() && G.dungeonSeen && G.dungeonSeen[x] && G.dungeonSeen[x][y] && G.dungeonDeco && G.dungeonDeco[x] && G.dungeonDeco[x][y];
+      if (dd && DOORWAY_DECOS.includes(dd)) S.push({ x:x+0.5, y:y+0.5, model:true, prop:dressProp(x, y, dd) });
+      continue; }
     if (x===G.player.x && y===G.player.y && !(G.gameMode===1 && G.dungeonDeco && G.dungeonDeco[x] && ['ldooro','dooro','arch'].includes(G.dungeonDeco[x][y]))) continue; // whatever you're standing on is underfoot, not in view (RS-375: but an open door's frame stays up round you)
     const t = G.map[x][y], cx = x+0.5, cy = y+0.5;
     if (t===T_WALL) continue;
@@ -38215,7 +38229,7 @@ function fpCollectSprites(vis){
     }
     if (t===T_FLOOR && (G.gameMode===1 || G.cellar) && G.dungeonDeco){
       const deco = G.dungeonDeco[x][y], oe = deco && deco!=='rune' && deco!=='pool' && deco!=='torch' && !(deco==='grave' && FPD.ok) && !(deco==='ore' && FPD.ok && ISO.on) && obDecoEntry(deco, x, y);   // (headstones are modelled when the GPU renderer is up)
-      if (isoM && DRESS_DECOS.includes(deco)) prop(deco==='banner2' ? { kind:'banner', necro:G.siteKind==='necro' } : { kind:'dress', d:deco, rot:(G.map[x-1] && G.map[x-1][y]===T_WALL) ? 0 : Math.PI/2, side:dgDoorSide(x, y, deco) });
+      if (isoM && DRESS_DECOS.includes(deco)) prop(deco==='banner2' ? { kind:'banner', necro:G.siteKind==='necro' } : dressProp(x, y, deco));
       else if (oe && isoM && ['throne','banner','altar','idol'].includes(deco)) prop({ kind:deco, necro:G.siteKind==='necro' });
       else if (oe){
         const h = {throne:0.9, banner:0.86, altar:0.5, idol:0.7, grave:0.5, ore:0.46}[deco] || 0.6;
@@ -38442,7 +38456,7 @@ const FPW_CONTACT = { slash:0.5, stab:0.5, lunge:0.52, chop:0.58, cleave:0.6, sm
 const FPW_CHEST = [0.02, -0.62, -0.35];
 // ---------- screen overlays: minimap, compass, target, damage feedback ----------
 function fpDrawMinimap(vis){
-  if (SET.compact) return;
+  if (SET.compact || G.ui!=='playing') return;   /* (RS-411: not over the inventory or any other menu, like the land's) */
   const cw = canvas.width, S = Math.min(cw, canvas.height), size = S*(immersiveUi ? 0.24 : 0.25), pad = S*0.018 + (immersiveUi ? 6*dpr : 0);
   const bx = cw - size - pad, by = pad;
   ctx.save();
@@ -39975,7 +39989,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-410';
+const GAME_VERSION = 'rs-411';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

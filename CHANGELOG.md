@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-411 - Five fixes from playtesting
+
+- **XP bar wraps round at a level.** When you went up a level, the XP tracker's bar slid backwards from nearly full to the new level's share. It now fills to the end, then runs up again from empty.
+- **Open doors stay put.** Some open doors in dungeons vanished and came back as you stepped about, because a door was only drawn while its own tile was in your line of sight. A doorway you've explored now stays drawn like the walls around it.
+- **Plain logs mean plain logs.** Recipes that take logs (plain bows and staves, the first arrows and crossbow) showed every kind of log you carried in their count and their "can make" number, though only logs from the level-1 trees can be used. They now count only those. Houses, boats and town projects still take logs of any kind, and now say so.
+- **No minimap over the inventory.** In roadside fights and dungeons the minimap stayed on screen over the inventory and other menus. It now goes with the rest of the HUD, as it already did on the land.
+- **Smooth world map dragging.** The world map moved a whole map tile at a time while you dragged it, which looked choppy when zoomed in. It now follows the mouse or your finger pixel by pixel.
+
 ## RS-410 - Smooth dusk, a real shadow, no more jumping
 
 - **Dusk and dawn without the jump.** Partway through dusk the sun turned from warm orange to blue moonlight in a single frame, and the land lost half its light at once (dawn did the reverse). The moonlight now fades in step with the clock.
