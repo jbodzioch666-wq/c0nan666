@@ -34,10 +34,10 @@ for u in sorted(set(re.findall(r'url\((https://[^)]+)\)', css))):
     name = f"{fam}-{hashlib.md5(u.encode()).hexdigest()[:8]}.woff2"
     urllib.request.urlretrieve(u, os.path.join(fd, name))
     css = css.replace(u, name)
-open(os.path.join(fd, 'fonts.css'), 'w').write(css)
+open(os.path.join(fd, 'fonts.css'), 'w', newline='\n').write(css)
 os.remove(os.path.join(fd, 'google.css'))
 
-html = open(src).read()
+html = open(src, encoding='utf-8', newline='').read().replace('\r\n', '\n')   # (a Windows checkout has CRLF: the build is LF everywhere)
 cdn = f'https://cdn.jsdelivr.net/npm/three@{ver}/build/three.min.js'
 link = f'<link rel="stylesheet" href="{fonts_css}">'
 pre = '<link rel="preconnect" href="https://fonts.googleapis.com">\n'
@@ -45,7 +45,7 @@ for needle in (cdn, link, pre):
     if needle not in html: sys.exit(f'build-itch: expected to find {needle!r} in depthcrawl.html')
 html = html.replace(cdn, 'three.min.js').replace(link, '<link rel="stylesheet" href="fonts/fonts.css">').replace(pre, '')
 if re.search(r'(src|href)="https?://', html): sys.exit('build-itch: an external script/stylesheet is still referenced')
-open(os.path.join(stage, 'index.html'), 'w').write(html)
+open(os.path.join(stage, 'index.html'), 'w', encoding='utf-8', newline='\n').write(html)
 PY
 
 VER="$(grep -oE "const GAME_VERSION = '[A-Za-z0-9._-]+'" "$ROOT/depthcrawl.html" | head -1 | sed -E "s/.*'(.*)'/\1/" || true)"
@@ -53,11 +53,19 @@ ZIP="$OUT/depthcrawl${VER:+-$VER}-itch.zip"
 rm -f "$ZIP"
 if command -v zip >/dev/null; then (cd "$STAGE" && zip -qr9 "$ZIP" index.html three.min.js fonts licenses)
 else (cd "$STAGE" && "$PY" - "$ZIP" <<'PY'
-import os, sys, zipfile
-with zipfile.ZipFile(sys.argv[1], 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as z:
+# the same zip Info-ZIP makes: Unix entries (files 644, folders 755, with folder entries), fonts stored as they are
+import os, sys, time, zipfile
+def entry(name, data, mode, method):
+    i = zipfile.ZipInfo(name, time.localtime()[:6]); i.create_system = 3; i.external_attr = mode << 16
+    if name.endswith('/'): i.external_attr |= 0x10
+    i.compress_type = method; return i
+with zipfile.ZipFile(sys.argv[1], 'w') as z:
     for top in ('index.html', 'three.min.js', 'fonts', 'licenses'):
-        for d, _, fs in ([(os.path.dirname(top) or '.', [], [os.path.basename(top)])] if os.path.isfile(top) else os.walk(top)):
-            for f in sorted(fs): p = os.path.join(d, f); z.write(p, os.path.normpath(p).replace(os.sep, '/'))
+        if os.path.isfile(top): z.writestr(entry(top, None, 0o100644, zipfile.ZIP_DEFLATED), open(top, 'rb').read(), compresslevel=9); continue
+        z.writestr(entry(top + '/', None, 0o40755, zipfile.ZIP_STORED), b'')
+        for f in sorted(os.listdir(top)):
+            m = zipfile.ZIP_STORED if f.endswith('.woff2') else zipfile.ZIP_DEFLATED
+            z.writestr(entry(top + '/' + f, None, 0o100644, m), open(os.path.join(top, f), 'rb').read(), compresslevel=9)
 PY
 ); fi
 echo "built $ZIP ($(du -h "$ZIP" | cut -f1))"
