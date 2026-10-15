@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| siege | Breaking a siege is a battle: the watch beside you before the gates, three waves, then the streets with the townsfolk fighting and the warlord in the square; allies strike and are struck; won, you're back in the saved town |
 | rs416 | The watch's torch flame is sconce-sized; doorway arches spring higher in the floor's own pillar stone, the doors as tall; women's clothes lie flat across the front below the belt |
 | rs415 | Her hips no wider set than his and her tunic closer at the waist; an Egyptian pyramid; the rat king bigger and crowned; stone archways over every dungeon door, the treasure room's door studded and no taller than the walls; sconces on the gate towers; capes over the shoulders |
 | walkleak | A minute's walk over the land leaves almost nothing behind on the graphics card (animals, wandering groups, corpses, old land's foam, glows and depth maps); the water reads the depth of the land showing |

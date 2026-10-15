@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-418 - The siege battle
+
+- **Breaking a siege is a battle now.** When a host besieges a town, choose to break the siege at its gate. The gate is barred behind you, and you and the town's watch hold the field before the walls against three waves of besiegers. Their captain leads the last wave.
+- **Then into the city.** When the last wave breaks, the gate gives way and the fight pours into the streets: cobbled lanes between stone and timber-framed houses. Raiders are loose in the lanes, the watch and the townsfolk are already fighting them, and their warlord holds the town square. Whatever was left lying on the field goes into your pack on the way in.
+- **The town's people fight beside you.** Guards in the town's plate and townsfolk with whatever came to hand are real figures, ringed in blue, with their life shown over them. Each closes on the nearest raider and strikes it. The raiders turn on whoever is beside them, and a defender can fall. Each is a match for the besiegers they face, and the guards are sturdier. A town with a stronger watch or stone walls sends more guards out with you, and stone walls hold some of the attackers off. You can step past a defender by changing places with them.
+- **A bigger reward.** Win in the square and you walk into the saved town to cheers. The reeve pays well, adds a piece from the town's armoury and three guild tokens, and the town's standing with you rises by 5. You can still fall back from the field before the gate gives way; the siege then goes on.
+
 ## RS-417 - Doorways as tall as the portal
 
 - **Tall archways.** Every dungeon doorway is now as tall as the way-out portal. Its round stone arch springs from the top of the wall and stands above it the way the portal's does, with a keystone at the crown. The doors are as tall as the arch: straight up to the top of the wall, then rounded to fill it.

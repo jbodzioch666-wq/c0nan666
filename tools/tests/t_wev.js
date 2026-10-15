@@ -62,11 +62,12 @@ module.exports = async page=>{
     window.__rep0 = repAt(key); window.__key = key;
     tryMoveOverworld(from[2], from[3]);
     A(G.ui==='wevent' && G.wevDlg && /siege/i.test(G.wevDlg.title), 'siege prompt '+G.ui);
-    wevChoose(0); A(G.gameMode===2 && G.wevFight.kind==='siege', 'siege fight');
+    wevChoose(0); A(G.gameMode===2 && G.wevFight.kind==='siegewar', 'siege battle (RS-418)');
     G.mon.forEach(m=>{ m.alive = 0; });
     return true;
   });
   await frame(); await frame();
+  for (let i=0;i<4;i++){ await page.evaluate(()=>{ G.mon.forEach(m=>{ m.alive = 0; }); }); await frame(); await frame(); }   /* (RS-418: three waves at the gates, then the streets) */
   const r5 = await page.evaluate(()=>{
     const A = (c, msg)=>{ if (!c) throw new Error('assert: '+msg); };
     const e = wevP();

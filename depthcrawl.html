@@ -6000,6 +6000,7 @@ function occupiedBy(nx,ny,exceptIdx){
   for (let i=0;i<G.mon.length;i++){
     if (i!==exceptIdx && G.mon[i].alive && G.mon[i].x===nx && G.mon[i].y===ny) return true;
   }
+  if (G.allies && G.allies.length && G.allies.some(a=>a.hp > 0 && a.x===nx && a.y===ny)) return true;   /* (RS-418: the town's people stand their ground) */
   return false;
 }
 function noteFoe(mi){
@@ -7097,6 +7098,7 @@ function tickMonsters(excludeIdx){
     if (m.dazedTurns>0){ m.dazedTurns--; continue; }   // dazed by a blow - it loses this turn
     if (m.banishedTurns>0){ m.banishedTurns--; continue; } // banish - it isn't even on this plane, so it can't act
     if (m.stunTurns>0){ m.stunTurns--; continue; } // a control spell (Sleep, Hold Person, ...) - it loses this turn entirely
+    try{ if (G.allies && G.allies.length && siegeMonVsAlly(m, i)) continue; }catch(e){ console.error(e); }   /* (RS-418: it turns on the town's people beside it) */
 
     // Regeneration (troll): heals at the start of its turn, unless it was
     // burned by an elemental hit since your last turn
@@ -7214,6 +7216,7 @@ function tickMonsters(excludeIdx){
   if (!G.gameOver) summonAttack();
   tickSummonDuration();
   if (!G.gameOver) try{ necroTick(); }catch(e){ console.error(e); }
+  if (!G.gameOver) try{ siegeAllyTick(); }catch(e){ console.error(e); }   /* (RS-418: the town's people in a siege) */
   if (!G.gameOver) try{ sqBossTurn(); }catch(e){ console.error(e); }   // a quest boss's tricks   // your raised dead (see SECTION: NECROMANCY)
   // true "Legendary" Monster Manual stat blocks (adult/ancient dragons, the
   // lich) get one extra scaled-down action once every OTHER monster has had
@@ -7346,6 +7349,7 @@ function tryMove(dx,dy){
     if (foePending()){ G.foeAt = performance.now() + FOE_DELAY_MS; setTimeout(()=>{ try{ foeTick(); }catch(e){} }, FOE_DELAY_MS + 40); }   /* (and a timer, should the frames stall) */
     return;
   }
+  { const al = G.allies && G.allies.length ? siegeAllyAt(nx, ny) : null; if (al){ al.x = G.player.x; al.y = G.player.y; } }   /* (RS-418: you change places with one of the town's people) */
   if (tileAt(nx,ny)===T_WALL){ if (G.gameMode===3 && !G.interior && G.villageDeco && G.villageDeco[nx] && G.villageDeco[nx][ny]==='board') tkOpen('board'); else if (G.gameMode===3 && !G.interior) townBumpWall(nx, ny); return; } // bumping a wall isn't an action - no turn spent (the bounty board opens)
   if (G.player.frozenTurns>0 && G.gameMode!==0){ logMsg('you are frozen in place - you strain against the ice (you can still fight what stands beside you)', 'hit'); tickMonsters(); return; }
   if (G.gameMode===3) townFolkMakeWay(nx, ny);   // (RS-117) townsfolk step aside instead of stopping you for a chat
@@ -19712,7 +19716,147 @@ function wevBossFight(b){
   const m = G.mon[0];
   wevSay(m.hp < m.maxHp ? `${m.nm} turns on you again, still bleeding from your last fight (${m.hp}/${m.maxHp} life)` : `${m.nm} looms over you - the earth trembles with every step!`, 'new');
 }
+/* ===================== (RS-418) THE SIEGE BATTLE =====================
+   Breaking a siege is a battle in two parts. Before the town's gates, its watch at your side, you hold the field against the
+   besiegers coming on in waves; when the last wave breaks, the gate gives way behind you and the fight pours into the streets,
+   where the watch and the townsfolk are already fighting the raiders who got in - their warlord in the square. Win there and the
+   town is saved. Allies (G.allies) are people of the town: each has its own life, closes on the nearest foe and strikes it, and
+   can be struck and fall; the monsters turn on whoever stands beside them (see siegeMonVsAlly). It all runs as a field fight
+   (gameMode 2), the streets laid out in the same grid as the field */
+const SIEGE_WAVES = 3;
+function siegeAllyAt(x, y){ return (G.allies||[]).find(a=>a.hp > 0 && a.x===x && a.y===y) || null; }
+function siegeFree(x, y){ return x > 0 && y > 0 && x < COLS-1 && y < ROWS-1 && G.map[x][y]===T_FLOOR && !G.mon.some(m=>m.alive && m.x===x && m.y===y) && !siegeAllyAt(x, y) && !(x===G.player.x && y===G.player.y); }
+function siegeNear(x0, y0, maxR){ for (let r=0;r<=(maxR||6);r++) for (let dx=-r;dx<=r;dx++) for (let dy=-r;dy<=r;dy++){ if (Math.max(Math.abs(dx), Math.abs(dy))!==r) continue; if (siegeFree(x0+dx, y0+dy)) return [x0+dx, y0+dy]; } return null; }
+const SIEGE_NAMES = ['Aldric','Bran','Cedric','Doran','Edwyn','Garrick','Hal','Osric','Roderick','Tamsin','Wilda','Mara','Elsa','Rowan','Brynja','Hild'];
+/* each of them a match for the besiegers they face (like: one of those): a guard in the town's plate a little sturdier than one,
+   a townsman a little less - built at your own level, a new adventurer's town was defended by people who died at a touch */
+function siegeAllyMake(kind, L, x, y, like){
+  const m = like || G.mon.find(o=>o.alive && !o.elite) || G.mon[0], g = kind==='guard', nm = SIEGE_NAMES[rn(SIEGE_NAMES.length)];
+  const hp = Math.max(6, Math.round((m ? m.maxHp : 10)*(g ? 1.4 : 0.9)));
+  const a = { ally:true, kind, nm:(g ? 'guard ' : '') + nm, pnm:g ? 'castle guard' : 'man-at-arms', hp, maxHp:hp, ac:(m ? m.ac : 12) + (g ? 1 : 0), atkBonus:(m ? m.atkBonus : 3) + (g ? 1 : 0), dmg1:m ? m.dmg1 : 1, dmg2:m ? m.dmg2 : 6, x, y };
+  (G.allies = G.allies || []).push(a); return a;
+}
+function siegeSpawn(entry, L, ok){
+  let x = 0, y = 0, tries = 0; do { x = 1 + rn(COLS-2); y = 1 + rn(ROWS-2); tries++; } while ((!siegeFree(x, y) || !ok(x, y)) && tries < 400);
+  const m = wevMon(entry, L); m.x = x; m.y = y; m.engaged = true; return m;
+}
+function siegeWave(S){
+  const n = [3 + rn(2), 4 + rn(2), 3 + rn(2)][S.wave - 1] - (S.walled ? 1 : 0);
+  for (let i=0;i<n;i++) wevMon(wevCampEntry(S.camp, S.L), S.L).engaged = true;
+  if (S.wave===SIEGE_WAVES){ const c = G.mon.find(m=>m.alive); if (c){ upgradeToElite(c); c.nm = c.nm.replace(/^Champion /, 'Captain '); } }
+}
+function siegeWarStart(d){
+  const key = d.key, rec = townRec(key), walled = !!(rec && rec.up && rec.up.walls), watch = 1 + ((rec && rec.up && rec.up.watch) ? 1 : 0), nm = o3TownName(d.x, d.y);
+  G.allies = [];
+  wevFightStart('siegewar', d.id, L=>{
+    G.arenaTheme = 'siege'; const cx = Math.floor(COLS/2);
+    for (let x=0;x<COLS;x++){ G.map[x][ROWS-2] = T_WALL; G.arenaDeco[x][ROWS-2] = 'wall'; }   /* (the town's wall at your back, its gate barred) */
+    for (const tx of [cx - 3, cx + 2]) for (const ty of [ROWS-3]) { G.map[tx][ty] = T_WALL; G.arenaDeco[tx][ty] = 'wall'; }   /* (the gate towers either side) */
+    for (let x=1;x<COLS-1;x++) for (let y=ROWS-7;y<ROWS-2;y++) if (G.map[x][y]===T_WALL && y < ROWS-3){ G.map[x][y] = T_FLOOR; G.arenaDeco[x][y] = ''; }   /* (clear ground in front of the gate) */
+    G.player.x = cx; G.player.y = ROWS-4; G.map[cx][ROWS-4] = T_FLOOR;
+    for (const m of ((G.player && G.player.minions)||[])) necroPlace(m); placeCompanionNearPlayer(); placeSummonNearPlayer();
+    G.siegeWar = { id:d.id, key, x:d.x, y:d.y, camp:d.camp || 'orc', L, wave:1, phase:1, walled };
+    siegeWave(G.siegeWar);
+    for (let i=0;i<2 + watch + (walled ? 1 : 0);i++){ const at = siegeNear(cx + (i%2 ? 1 : -1)*(1 + (i>>1)), ROWS-4, 4); if (at) siegeAllyMake('guard', L, at[0], at[1]); }
+  });
+  wevSay(`the gate of ${nm} is barred behind you - you and ${G.allies.length} of the watch hold the field against the besiegers. Wave 1 of ${SIEGE_WAVES}!`, 'new', `The siege of ${nm}`);
+}
+/* the streets: a ring road and lanes round blocks of houses, a main street from the gate to the square, the square in the middle */
+function siegeWarStreets(S){
+  const L = S.L, cx = Math.floor(COLS/2), nm = o3TownName(S.x, S.y);
+  // what's lying on the field goes into your pack, or it would be lost with it
+  let took = 0; for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++){ if (G.map[x][y]===T_ITEM && G.floorItem[x][y]){ addToInventory(G.floorItem[x][y]); took++; } else if (G.map[x][y]===T_GOLD){ G.player.gold += roundH((2+rn(8))*goldFindMult()); took++; } }
+  G.map = makeGrid(T_WALL); G.floorItem = makeItemGrid(); G.arenaDeco = makeGrid('', COLS, ROWS);
+  const open = (x0, y0, x1, y1)=>{ for (let x=Math.max(1,x0);x<=Math.min(COLS-2,x1);x++) for (let y=Math.max(1,y0);y<=Math.min(ROWS-2,y1);y++) G.map[x][y] = T_FLOOR; };
+  open(cx-1, 1, cx, ROWS-2); open(1, 8, COLS-2, 9); open(6, 6, 13, 12);   // the main street, the cross street and the square
+  open(3, 2, 3, ROWS-3); open(COLS-4, 2, COLS-4, ROWS-3); open(3, 2, COLS-4, 2); open(3, ROWS-3, COLS-4, ROWS-3);   // the ring road
+  open(6, 13, 6, ROWS-3); open(13, 13, 13, ROWS-3); open(6, 2, 6, 5); open(13, 2, 13, 5);   // and lanes off it
+  for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++) if (G.map[x][y]===T_WALL) G.arenaDeco[x][y] = x===0 || y===0 || x===COLS-1 || y===ROWS-1 || fpHash(x >> 1, y >> 1, 418) >= 0.45 ? 'wall' : 'wall2';   /* (the town wall round it, and timber-framed houses among the stone ones) */
+  G.arenaTheme = 'street'; G.mandatoryFight = true; S.phase = 2;
+  G.player.x = cx; G.player.y = ROWS-2;
+  for (const m of ((G.player && G.player.minions)||[])) necroPlace(m); placeCompanionNearPlayer(); placeSummonNearPlayer();
+  G.mon = [];
+  const raiders = 5 + rn(3) - (S.walled ? 1 : 0), inTown = (x, y)=>y < ROWS-5;
+  for (let i=0;i<raiders;i++) siegeSpawn(wevCampEntry(S.camp, L), L, inTown);
+  const boss = siegeSpawn(wevCampEntry(S.camp, L + 4), L + 4, (x, y)=>x >= 7 && x <= 12 && y >= 7 && y <= 11); upgradeToNamedElite(boss); boss.nm = 'Warlord ' + boss.nm.replace(/^(Champion|Captain) /, '');
+  const left = (G.allies||[]).filter(a=>a.hp > 0); G.allies = [];
+  for (const a of left){ const at = siegeNear(cx, ROWS-3, 5); if (at){ a.x = at[0]; a.y = at[1]; G.allies.push(a); } }   /* (the watch that held the gate comes through it with you) */
+  for (let i=0;i<3 + rn(2);i++){ const m = G.mon[rn(G.mon.length)], at = m && siegeNear(m.x, m.y, 3); if (at) siegeAllyMake(i < 2 || chn(0.5) ? 'folk' : 'guard', L, at[0], at[1], G.mon.find(o=>o.alive && !o.elite)); }   /* (the townsfolk already fighting in the streets) */
+  for (const m of G.mon) m.engaged = true;
+  FPD.mapRef = null;
+  wevSay(`the gate of ${nm} gives way - the besiegers are in the streets! Fight through to the square, where their warlord holds it${took ? ' (you gather up the spoils of the field)' : ''}`, 'new', 'Into the city!');
+}
+function siegeWarWon(f){
+  const S = G.siegeWar; if (!S) return false;
+  if (S.phase===1 && S.wave < SIEGE_WAVES){ S.wave++; siegeWave(S); G.fieldWon = false; G.wevFight = f;
+    wevSay(S.wave===SIEGE_WAVES ? `they come again - their captain leads the last wave! (${S.wave} of ${SIEGE_WAVES})` : `the besiegers fall back and charge again - wave ${S.wave} of ${SIEGE_WAVES}!`, 'new'); return true; }
+  if (S.phase===1){ siegeWarStreets(S); G.fieldWon = false; G.wevFight = f; return true; }
+  // the town is saved
+  const e = wevP(), p = G.player, st = wevStats(), Lt = cbT(), d = e.dyn.find(d=>d.id===S.id); if (d) e.dyn.splice(e.dyn.indexOf(d), 1);
+  const nm = o3TownName(S.x, S.y), gold = roundH((220 + Lt*30)*goldFindMult()), saved = (G.allies||[]).filter(a=>a.hp > 0).length;
+  p.gold += gold; st.defended++; p.rep = p.rep || {}; p.rep[S.key] = repAt(S.key) + 5; tkP().cur.guild += 3;
+  addToInventory(genItem(lootAt(6), lootKind(), 3, chn(0.5)));
+  G.siegeWar = null; G.allies = [];
+  wevSay(`${nm} is saved! The townsfolk pour out to cheer you${saved ? ` and the ${saved} of the watch still standing` : ''}. The reeve pays you ${gold} gold, a piece from the town's armoury and 3 guild tokens (+5 standing)`, 'magic', `You broke the siege of ${nm}`);
+  checkAchievements();
+  if (G.owPos.x===S.x && G.owPos.y===S.y){ enterVillage(); return true; }
+  return false;
+}
+// once a turn, after the monsters: each of the town's people closes on the nearest foe and strikes it
+function siegeAllyTick(){
+  const list = G.allies; if (!list || !list.length || G.gameOver) return;
+  if (G.gameMode!==2){ G.allies = []; return; }
+  for (const a of list.slice()){ if (a.hp <= 0) continue;
+    let target = null, bd = Infinity, ti = -1;
+    G.mon.forEach((mm, i)=>{ if (!mm.alive) return; const d = Math.abs(mm.x-a.x) + Math.abs(mm.y-a.y); if (d < bd){ bd = d; target = mm; ti = i; } });
+    if (!target) continue;
+    if (bd > 1){ const dx = sg(target.x-a.x), dy = sg(target.y-a.y);
+      for (const [sx,sy] of (dx && dy ? (chn(0.5) ? [[dx,0],[0,dy]] : [[0,dy],[dx,0]]) : [[dx,dy]])){ const nx = a.x+sx, ny = a.y+sy; if ((sx || sy) && siegeFree(nx, ny)){ a.x = nx; a.y = ny; break; } }
+      bd = Math.abs(target.x-a.x) + Math.abs(target.y-a.y); }
+    if (bd===1){ a._atkT = (typeof FP!=='undefined' && FP.t) || 0.001; a.foe = target;
+      const roll = rollDie(20);
+      if (roll===1 || (roll < 20 && roll + a.atkBonus < target.ac)){ if (chn(0.3)) logMsg(`${a.nm} swings at the ${target.nm} but misses`, ''); }
+      else { const dmg = Math.max(1, rollDice(a.dmg1, a.dmg2)); target.hp -= dmg; target.hitKind = 'melee'; target.hitCrit = roll===20; noteFoe(ti); try{ fxSplat(target.x+0.5, target.y+0.5, dmg, 'hit'); }catch(e){}
+        logMsg(`${a.nm} strikes the ${target.nm} for ${dmg}`, 'hit');
+        if (target.hp <= 0) monsterDies(ti); } }
+  }
+}
+/* a monster beside one of the town's people turns on them - always, if you aren't beside it too, else as likely as not; and one
+   that has nobody near it goes for the nearest of them when they're much nearer than you. True when it has spent its turn */
+function siegeMonVsAlly(m, i){
+  const list = G.allies; if (!list || !list.length || G.gameMode!==2) return false;
+  const live = list.filter(a=>a.hp > 0); if (!live.length) return false;
+  const pd = Math.abs(m.x-G.player.x) + Math.abs(m.y-G.player.y), adj = live.filter(a=>Math.abs(a.x-m.x) + Math.abs(a.y-m.y)===1);
+  if (adj.length && (pd > 1 || chn(0.5))){ const a = adj[rn(adj.length)], roll = rollDie(20); m._atkT = (typeof FP!=='undefined' && FP.t) || 0.001; m.faceAlly = a;
+    if (roll===20 || (roll > 1 && roll + (m.atkBonus||0) >= a.ac)){ const dmg = Math.max(1, rollDice(m.dmg1||1, m.dmg2||4)); a.hp -= dmg; try{ fxSplat(a.x+0.5, a.y+0.5, dmg, 'hit'); }catch(e){}
+      if (a.hp <= 0) siegeAllyFalls(a, m); else if (chn(0.4)) logMsg(`the ${m.nm} hits ${a.nm} for ${dmg}`, ''); }
+    return true; }
+  if (pd > 3){ let best = null, bd = Infinity; for (const a of live){ const d = Math.abs(a.x-m.x) + Math.abs(a.y-m.y); if (d < bd){ bd = d; best = a; } }
+    if (best && bd < pd - 2){ const dx = sg(best.x-m.x), dy = sg(best.y-m.y);
+      for (const [sx,sy] of (dx && dy ? [[dx,0],[0,dy]] : [[dx,dy]])){ const nx = m.x+sx, ny = m.y+sy; if ((sx || sy) && tileAt(nx, ny)!==T_WALL && !occupiedBy(nx, ny, i) && !(nx===G.player.x && ny===G.player.y)){ m.x = nx; m.y = ny; return true; } } } }
+  return false;
+}
+function siegeAllyFalls(a, by){
+  a.hp = 0; G.allies = (G.allies||[]).filter(o=>o!==a);
+  logMsg(`${a.nm} falls to the ${by ? by.nm : 'enemy'}`, 'hit');
+  const px = SIEGE_PX.get(a); if (px){ px.alive = 0; try{ m3dKill(px, { dmg:4, maxHp:a.maxHp||10, kind:'melee' }); }catch(e){} }
+}
+// the 3D stand-in for one of the town's people (as necroProxy is for a minion): a guard in the town's plate, or a townsman with what came to hand
+const SIEGE_PX = new WeakMap();
+function siegeAllyProxy(a){
+  let px = SIEGE_PX.get(a);
+  if (!px){ px = { nm:a.pnm, baseNm:a.pnm, alive:1, hp:1, maxHp:1, minion:true, ally:true, _pos:{ x:a.x+0.5, y:a.y+0.5, mv:0 } }; SIEGE_PX.set(a, px); }
+  px.x = a.x; px.y = a.y; px._atkT = a._atkT; px.hp = a.hp; px.maxHp = a.maxHp;
+  px.faceAt = a.foe && a.foe.alive ? a.foe : null; if (!px.faceAt){ let best = null, bd = 1e9; for (const o of (G.mon||[])){ if (!o.alive) continue; const d = Math.abs(o.x-a.x) + Math.abs(o.y-a.y); if (d < bd){ bd = d; best = o; } } px.faceAt = best && bd <= 8 ? best : null; }
+  return px;
+}
+function siegeAllyRing(px){
+  const e = M3D.inst.get(px); if (!e || e._ring) return;
+  const T = THREE, ring = new T.Mesh(new T.RingGeometry(0.26, 0.33, 24), new T.MeshBasicMaterial({ color:0x6ab4ff, transparent:true, opacity:0.75, depthWrite:false }));
+  ring.rotation.x = -Math.PI/2; ring.position.y = 0.025; ring.scale.setScalar(1/Math.max(0.01, e.holder.scale.x)); e.holder.add(ring); e._ring = ring;
+}
 function wevSiegeFight(d){
+  if (d.kind!=='raid' && d.key) return siegeWarStart(d);   /* (RS-418: a siege is a battle) */
   const walled = G.gameMode===3 && curTownKey() && townRec(curTownKey()).up.walls;   // stone walls hold one of them off
   wevFightStart(d.kind==='raid' ? 'raid' : 'siege', d.id, L=>{
     const n = 3 + rn(2) - (walled ? 1 : 0);
@@ -19732,6 +19876,7 @@ function wevHighwayFight(purse){
 function wevFrame(){
   if (G.wevPending && G.ui==='playing' && !G.gameOver){ const d = G.wevPending; G.wevPending = null; if (G.gameMode===3) wevDialog(...d); }
   const f = G.wevFight; if (!f) return;
+  if (G.gameMode!==2 && f.kind==='siegewar'){ G.siegeWar = null; G.allies = []; }   /* (RS-418: you fell back from the field - the siege goes on) */
   if (G.gameMode!==2){ if (f.kind==='boss' && G.ow && G.ow.ev && G.ow.ev.boss && G.ow.ev.boss.hp > 0) wevSay(`you break off the fight - ${wevBossName(G.ow.ev.boss)} will remember its wounds`, ''); if (f.kind==='delve') wgStepOff((G.ow.pois||[]).find(p=>p.id===f.id)); G.wevFight = null; return; }
   if (f.kind==='boss'){ const m = G.mon.find(m=>m.worldBoss); if (m && G.ow.ev && G.ow.ev.boss) G.ow.ev.boss.hp = m.alive ? m.hp : 0; }
 }
@@ -19767,6 +19912,7 @@ function wevArenaWon(){
     Object.assign(b, { state:'sleep', until: wevTurn() + 400 + rn(200), hp:null, maxHp:null, g:rn(WEV_GIANTS.length) });
     checkAchievements(); return false;
   }
+  if (f.kind==='siegewar') return siegeWarWon(f);   /* (RS-418) */
   if (f.kind==='siege' || f.kind==='raid'){
     let key = null;
     if (f.kind==='siege'){ const d = e.dyn.find(d=>d.id===f.id); if (!d) return false; e.dyn.splice(e.dyn.indexOf(d), 1); key = d.key; }
@@ -19797,7 +19943,7 @@ function wevTownGate(x, y){
   const d = e.dyn.find(d=>d.kind==='siege' && d.x===x && d.y===y); if (!d) return false;
   const nm = o3TownName(x, y);
   wevDialog(`The siege of ${nm}`, `A ${WEV_CAMP_KINDS[d.camp] ? WEV_CAMP_KINDS[d.camp].nm.replace(/ camp$| hideout$| warren$/, '') : 'raiding'} host has ${nm} surrounded. Smoke rises over the palisade and the gate is barred. If no one breaks the siege in ${wevTime(d.until - wevTurn())}, the town will be sacked.`,
-    [[`Break the siege (fight)`, ()=>{ wevSiegeFight(d); wevSay(`you charge the besiegers at the gate of ${nm}!`, 'new'); }], ['Turn back', ()=>{ logMsg('you keep your distance from the siege lines', ''); }]]);
+    [[`Break the siege (battle at the gates, then in the streets)`, ()=>{ wevSiegeFight(d); }], ['Turn back', ()=>{ logMsg('you keep your distance from the siege lines', ''); }]]);
   return true;
 }
 // arriving in a town: the lost child's family, a festival treat, a market trader, a raid
@@ -23530,7 +23676,7 @@ function audSurface(){
     return { [OW_DESERT]:'sand', [OW_TUNDRA]:'snow', [OW_SWAMP]:'mud', [OW_RIVER]:'water', [OW_WATER]:'snow', [OW_MOUNTAIN]:'stone', [OW_MOUNTAINPASS]:'stone', [OW_TOWN]:'stone' }[t] || 'grass'; }
   if (G.gameMode===3){ if (G.interior) return G.interior.key==='cellar' || G.interior.key==='temple' ? 'stone' : 'wood'; const d = G.villageDeco[G.player.x] && G.villageDeco[G.player.x][G.player.y];
     return d==='path' || d==='npc' ? 'stone' : d==='pier' ? 'wood' : d==='sand' ? 'sand' : G.villageTheme==='tundra' ? 'snow' : G.villageTheme==='desert' ? 'sand' : 'grass'; }
-  if (G.gameMode===2) return G.cellar ? 'stone' : G.arenaTheme==='sea' ? 'wood' : 'grass';
+  if (G.gameMode===2) return G.cellar || G.arenaTheme==='street' ? 'stone' : G.arenaTheme==='sea' ? 'wood' : 'grass';
   return 'stone';
 }
 function audPlate(){ const c = G.gear && G.gear.chest; return !!(c && c.used && /plate|chain|mail|metal|full|bronze|iron|steel|mithril|adamant|rune|dragon/i.test((c.nm||'') + ' ' + (c.basis||'') + ' ' + (c.baseMat||'')) && !/robe|hide|leather|cloth/i.test((c.nm||'') + ' ' + (c.basis||''))); }
@@ -25851,6 +25997,13 @@ const FP_THEME_SPECS = {
     floor2: fpRock({base:[90,50,40], seed:84, lava:true}),
     ceil: fpRock({base:[66,42,34], seed:83}),
   },
+  // (RS-418) a siege: the trampled field before a town's walls (its walls dressed stone, its barricades rubble), and its streets
+  siege: { outdoor:true, sky:[[96,104,132],[216,176,138]],
+    wall: fpBricks({base:[156,146,128], mc:[66,60,52], rows:3, cols:2, seed:201, jitter:0.25}), wall2: fpRock({base:[118,110,98], seed:202}),
+    floor: fpGrass({base:[86,104,60], seed:203}), floor2: fpDirt({base:[112,92,66], seed:204}), edge: fpDirt({base:[104,86,62], seed:205}) },
+  street: { outdoor:true, sky:[[96,104,132],[216,176,138]],
+    wall: fpBricks({base:[200,184,156], mc:[118,102,82], rows:3, cols:2, seed:211, jitter:0.18}), wall2: fpBeams(fpBricks({base:[188,168,136], mc:[104,90,70], rows:2, cols:2, seed:213, jitter:0.2})),
+    floor: fpFlagstones({base:[134,126,114], mc:[60,56,50], seed:214}), floor2: fpBricks({base:[128,118,106], mc:[56,52,46], rows:4, cols:4, seed:215, jitter:0.2}), edge: fpFlagstones({base:[124,116,104], mc:[56,52,46], seed:216}) },
   // roadside encounters - open sky, obstacles become hedges and boulders
   forest: { outdoor:true, sky:[[70,124,194],[198,222,234]],
     wall: fpHedge({base:[62,108,58], seed:71}), wall2: fpRock({base:[128,128,124], seed:72}),
@@ -33010,15 +33163,16 @@ function fpdBuild(T){
     // walls around this open tile
     for (const [dx,dy] of FACING_VECT){
       const wx = x+dx, wy = y+dy;
-      if (!solid(wx,wy) || field) continue;                     // (a field's obstacles are bushes and boulders, built below)
-      const inb = wx>=0 && wy>=0 && wx<COLS && wy<ROWS, dW = inb && G.dungeonDeco ? G.dungeonDeco[wx][wy] : '';
+      if (!solid(wx,wy) || (field && !fpdFieldWall(wx, wy))) continue;   // (a field's obstacles are bushes and boulders, built below - but a siege's town wall and its houses are walls, RS-418)
+      const inb = wx>=0 && wy>=0 && wx<COLS && wy<ROWS, dW = inb && G.dungeonDeco && !field ? G.dungeonDeco[wx][wy] : '';
       const fenceT = yard && (wx===0 || wy===0 || wx===COLS-1 || wy===ROWS-1);
       if (yard && !fenceT && dW!=='cryptW') continue;           // (the graveyard's tombs are modelled whole - see fpdGraveyard)
       let wk = 'wall';
       if (inb){
         if (fenceT) wk = 'fence';
         else if (dW==='cryptW') wk = 'cryptStone';
-        else if (!yard && G.dungeonDeco && G.dungeonDeco[wx][wy]==='torch') wk = isoOn() ? 'wall2' : 'wallTorch';   /* (RS-393: a 3D sconce hangs on it now, not a painted one) */
+        else if (!yard && !field && G.dungeonDeco && G.dungeonDeco[wx][wy]==='torch') wk = isoOn() ? 'wall2' : 'wallTorch';   /* (RS-393: a 3D sconce hangs on it now, not a painted one) */
+        else if (field) wk = G.arenaDeco[wx][wy]==='wall2' ? 'wall2' : 'wall';   /* (RS-418: a siege's stone or timber-framed walls) */
         else if (fpHash(wx,wy,3)>0.72) wk = 'wall2';
       }
       const ux = -dy, uz = dx;                                  // along the face, so U x up points back into the room
@@ -33302,6 +33456,8 @@ function fpdHorizonTex(kind, seed){
   const t = new THREE.CanvasTexture(c); t.wrapS = THREE.RepeatWrapping; t.repeat.x = 3;
   return t;
 }
+/* (RS-418) a field tile that's a built wall - a besieged town's wall and gate towers, the houses of its streets - not a bush or a boulder */
+function fpdFieldWall(x, y){ const d = G.gameMode===2 && G.arenaDeco && G.arenaDeco[x] ? G.arenaDeco[x][y] : ''; return d==='wall' || d==='wall2'; }
 function fpdOutdoor(T, spec, world, matFor){
   const TH = THREE, key = T.key, field = G.gameMode===2;
   const add = (m, cast)=>{ m.castShadow = cast!==false; m.receiveShadow = true; world.add(m); return m; };
@@ -33321,7 +33477,7 @@ function fpdOutdoor(T, spec, world, matFor){
     const rockG = [fpdLumpy(2, 0.2, 3), fpdLumpy(2, 0.24, 9)], bushG = [fpdLumpy(2, 0.16, 5, true), fpdLumpy(2, 0.2, 12, true)];
     const boxG = new TH.BoxGeometry(1,1,1), barrelG = new TH.CylinderGeometry(0.2, 0.2, 0.5, 14);
     for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
-      if (G.map[x][y]!==T_WALL) continue;
+      if (G.map[x][y]!==T_WALL || fpdFieldWall(x, y)) continue;   /* (RS-418: a built wall, not an obstacle) */
       const deco = G.arenaDeco && G.arenaDeco[x] ? G.arenaDeco[x][y] : '', h = (i)=>fpHash(x,y,40+i);
       const kind = key==='sea' ? 'crate' : (deco==='rock' || key==='desert' || key==='tundra') ? 'rock' : 'bush';
       const px = x+0.5, pz = y+0.5;
@@ -38372,6 +38528,13 @@ function fpCollectSprites(vis){
       if (mh){ necroRing(px); S.push({x:pos.x, y:pos.y, model:true, h:mh, lift:0}); continue; } }
     const mp = monsterPortraitFor(m.pnm||'skeleton', true);
     S.push({x:m.x+0.5, y:m.y+0.5, spr: mp ? fpUndeadSprite(mp, false) : fpSprite(SUMMON_ART, m.col), h:0.62*Math.min(0.9, mp && mp.h ? mp.h : 0.8), lift:(mp && mp.lift ? mp.lift : 0) + (m.ghost ? 0.15 + bob : 0), shadow:true, glow:'#8ae0a0'}); }
+  /* (RS-418) the town's people in a siege: real figures, ringed in blue, with their life over them */
+  for (const a of (G.allies||[])) if (a.hp > 0 && a.x!==undefined && seeTile(a.x, a.y)){
+    if (ISO.on && FPD.ok){ const px = siegeAllyProxy(a), pos = px._pos;
+      if (Math.hypot(a.x+0.5-pos.x, a.y+0.5-pos.y) > 2){ pos.x = a.x+0.5; pos.y = a.y+0.5; } isoGlide(pos, a.x+0.5, a.y+0.5);
+      let mh = 0; try{ mh = m3dUpdate(px, pos, 0); }catch(err){ console.error(err); }
+      if (mh){ siegeAllyRing(px); S.push({x:pos.x, y:pos.y, model:true, h:mh, lift:0, hp: a.hp < a.maxHp ? clamp(a.hp/a.maxHp, 0, 1) : null}); continue; } }
+    const mp = monsterPortraitFor(a.pnm, false); S.push({x:a.x+0.5, y:a.y+0.5, spr: mp ? fpUndeadSprite(mp, false) : fpGlyphSprite('@', '#6ab4ff'), h:0.7, lift:0, shadow:true, glow:'#6ab4ff', hp: a.hp < a.maxHp ? clamp(a.hp/a.maxHp, 0, 1) : null}); }
   /* (RS-321) your thrall: a real figure beside you - a ghost, a skeleton or a zombie - ringed in green like the raised dead */
   { const th = G.player.thrall; if (th && (G.gameMode===1 || G.gameMode===2) && thrallSpot() && seeTile(th.x, th.y)){
       if (ISO.on && FPD.ok){ const px = thrallProxy(th), pos = px._pos;
@@ -40179,7 +40342,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-417';
+const GAME_VERSION = 'rs-418';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -42887,7 +43050,7 @@ function frameLoop(ts){
     if (G.ui==='playing' && !G.gameOver && G.gameMode===2){
       const allDead = G.mon.length>0 && G.mon.every(m=>!m.alive);
       if (allDead && !G.fieldWon){ G.fieldWon = true;   /* (RS-382: paid once; the field stays open until you walk off it) */
-        logMsg("the field falls quiet - you've won the fight", 'good');
+        if (!G.siegeWar) logMsg("the field falls quiet - you've won the fight", 'good');   /* (RS-418: a siege's waves come on until it's done) */
         // a terrain set-piece (see triggerOverworldEncounter/terrainSetPieceEncounter)
         // pays out once, on clearing the whole encounter, rather than per
         // kill - that's what actually makes it read as "you found something"
