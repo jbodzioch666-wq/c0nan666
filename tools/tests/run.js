@@ -6,6 +6,8 @@
 //   --headed     open a real window (fastest on a desktop: the GPU draws the 3D)
 //   --soft       force software WebGL (SwiftShader), for servers with no GPU
 //   --timeout=N  minutes allowed per test (default 20)
+//   --jobs=N     run N tests at once, each in its own browser (default 1); their output is printed as each one finishes
+//   --size=WxH   the desktop window (default 1400x900); a smaller one draws faster with --soft
 // Screenshots land in tools/tests/shots/. Needs `npm install` in tools/tests first.
 const fs = require('fs'), path = require('path');
 const ROOT = path.resolve(__dirname, '../..'), PAGE = path.join(ROOT, 'depthcrawl.html');
@@ -18,7 +20,9 @@ if (!pw){ console.error('playwright not found: run `npm install` in tools/tests'
 const THREE = [process.env.THREE_JS, path.join(__dirname, 'node_modules/three/build/three.min.js')].filter(Boolean).find(f=>fs.existsSync(f));
 
 const args = process.argv.slice(2), flag = k=>args.includes('--'+k);
-const minutes = +((args.find(a=>a.startsWith('--timeout='))||'').split('=')[1] || 20);
+const opt = k=>(args.find(a=>a.startsWith('--'+k+'='))||'').split('=')[1];
+const minutes = +(opt('timeout') || 20), jobs = Math.max(1, +(opt('jobs') || 1));
+const [VW, VH] = (opt('size') || '1400x900').split('x').map(Number);
 const names = args.filter(a=>!a.startsWith('--')).map(a=>a.replace(/^t_/, '').replace(/\.js$/, ''));
 const tests = names.length ? names : ALL;
 const SHOTS = path.join(__dirname, 'shots'); fs.mkdirSync(SHOTS, { recursive:true }); global.SHOTS = SHOTS;
@@ -34,7 +38,7 @@ async function runOne(name){
   const mobile = !!require(file).mobile;
   // (acceptDownloads: the newer headless shell delivers no download event without it - t_export)
   const page = mobile ? await (await browser.newContext({ viewport:{ width:390, height:844 }, deviceScaleFactor:2, isMobile:true, hasTouch:true, acceptDownloads:true })).newPage()
-                      : await browser.newPage({ viewport:{ width:1400, height:900 }, acceptDownloads:true });
+                      : await browser.newPage({ viewport:{ width:VW, height:VH }, acceptDownloads:true });
   const errs = [];
   page.on('pageerror', e=>errs.push('pageerror: '+e.message+'\n'+(e.stack||'').split('\n').slice(0,4).join('\n')));
   page.on('console', m=>{ if (m.type()==='error') errs.push('console: '+m.text()); });
@@ -58,13 +62,23 @@ async function runOne(name){
 }
 
 (async()=>{
-  const res = [];
-  for (const t of tests){
-    const t0 = Date.now(); console.log(`--- t_${t}`);
-    const r = await runOne(t), secs = Math.round((Date.now()-t0)/1000);
-    console.log(`${r.ok ? 'PASS' : 'FAIL'} t_${t} (${secs}s)${r.why ? '\n  '+r.why.replace(/\n/g, '\n  ') : ''}`);
-    res.push([t, r.ok, secs]);
-  }
+  const res = [], queue = tests.slice(), T0 = Date.now();
+  // with --jobs, a test's console lines are held and printed with its result, so tests running side by side don't interleave
+  const log0 = console.log, als = new (require('async_hooks').AsyncLocalStorage)();
+  if (jobs > 1) console.log = (...a)=>{ const st = als.getStore(); if (st) st.push(a.join(' ')); else log0(...a); };
+  const worker = async ()=>{
+    while (queue.length){
+      const t = queue.shift(), t0 = Date.now(), held = [];
+      if (jobs===1) log0(`--- t_${t}`);
+      const r = await (jobs===1 ? runOne(t) : als.run(held, ()=>runOne(t)));
+      const secs = Math.round((Date.now()-t0)/1000);
+      if (jobs > 1){ log0(`--- t_${t}`); for (const l of held) log0(l); }
+      log0(`${r.ok ? 'PASS' : 'FAIL'} t_${t} (${secs}s)${r.why ? '\n  '+r.why.replace(/\n/g, '\n  ') : ''}`);
+      res.push([t, r.ok, secs]);
+    }
+  };
+  await Promise.all(Array.from({ length:Math.min(jobs, tests.length) }, worker));
+  if (jobs > 1) log0(`\n${tests.length} tests in ${Math.round((Date.now()-T0)/1000)}s with ${jobs} at once`);
   if (res.length > 1){ console.log('\nSUMMARY'); for (const [t, ok, s] of res) console.log(`  ${ok ? 'PASS' : 'FAIL'}  t_${t}  ${s}s`); }
   process.exit(res.every(r=>r[1]) ? 0 : 1);
 })();
