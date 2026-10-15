@@ -25,7 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
-| rs420 | Minions go round walls to the foe and archers shoot only what they can see; you pick the minion and the bones; monsters (and you) step and strike on the diagonal, round no corner; the XP tracker's auto/manual switch |
+| rs420 | Minions go round walls to the foe and archers shoot only what they can see; you pick the minion and the bones; monsters (and you) step and strike on the diagonal, round no corner; the XP tracker's auto/manual switch; RS-421: idle minions follow you round walls |
 | siege | Breaking a siege is a battle: the watch beside you before the gates, three waves, then the streets with the townsfolk fighting and the warlord in the square; allies strike and are struck; won, you're back in the saved town. RS-419: high walls with towers and a gate, roofed houses; a raid is a battle in the streets |
 | rs416 | The watch's torch flame is sconce-sized; doorway arches spring higher in the floor's own pillar stone, the doors as tall; women's clothes lie flat across the front below the belt |
 | rs415 | Her hips no wider set than his and her tunic closer at the waist; an Egyptian pyramid; the rat king bigger and crowned; stone archways over every dungeon door, the treasure room's door studded and no taller than the walls; sconces on the gate towers; capes over the shoulders |

@@ -30,6 +30,10 @@ module.exports = async page=>{
     monsterStrikesPlayer = ms0;
     // and you strike on the diagonal
     room(); p.x = 4; p.y = 4; const o5 = foe(5, 5); let hits = 0; const f0 = fight; fight = (...a)=>{ hits++; }; tryMove(1, 1); fight = f0; out.you = { hits };
+    // RS-421: with nothing to fight, a minion comes back to you - round the wall
+    room(); p.x = 3; p.y = 3; p.minions = [{ k:'skeleton', nm:'your skeleton', atkBonus:4, dmg1:1, dmg2:2, turnsLeft:99, reach:1, x:11, y:3 }]; let fWall = 0;
+    for (let t=0;t<12;t++){ necroTick(); const m = p.minions[0]; if (G.map[m.x][m.y]===T_WALL) fWall++; }
+    out.follow = { at:[p.minions[0].x, p.minions[0].y], near:Math.max(Math.abs(p.minions[0].x-3), Math.abs(p.minions[0].y-3)), fWall };
     // the XP tracker's switch
     xptSetAuto(false); const man = Array.isArray(p.xpPick); xptSetAuto(true); const auto = p.xpPick===null; setUi('skills'); const btn = /XP tracker: auto/.test(document.getElementById('overlay') ? document.getElementById('overlay').innerHTML : buildSkills()) || /XP tracker: auto/.test(buildSkills());
     out.xpt = { man, auto, btn };
@@ -43,5 +47,6 @@ module.exports = async page=>{
   A(r.diag.strikes===1, 'a monster on the diagonal strikes you');
   A(r.corner.strikes===0, 'but not round a wall\'s corner');
   A(r.you.hits===1, 'you strike on the diagonal too');
+  A(r.follow.near <= 2 && r.follow.fWall===0, 'with nothing to fight, the minion follows you round the wall (RS-421)');
   A(r.xpt.man && r.xpt.auto && r.xpt.btn, 'the XP tracker switch: manual, then auto, in the skills menu');
 };

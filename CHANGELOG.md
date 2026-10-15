@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-421 - Minions follow you
+
+- **Your dead keep up.** With no foe left to fight, your raised dead used to stand where the last fight ended. Now they follow you: they find the way round walls and through doorways to stay within a couple of squares of you, and they hurry when they've fallen behind.
+
 ## RS-420 - Minions that find their way, diagonal fighting
 
 - **Minions go round walls.** Your raised dead used to head straight for the nearest foe as if walls weren't there, and got stuck pressing against them. Now they find the way round, through doorways and along passages, to the nearest foe they can actually reach. The townsfolk and guards in a siege do the same.
