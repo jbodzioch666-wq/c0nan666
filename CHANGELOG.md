@@ -1,5 +1,15 @@
 # Depthcrawl patch notes
 
+## RS-403 - The long walk, and the screen's own resolution
+
+- **No more stutter every twenty-odd tiles.** When the land ahead is built, its shaders are now compiled a few per frame before it appears, instead of the whole scene at once in the frame it swaps in.
+- **Woods and water build in slices.** The trees, grass, water and mist of the new land were each one long block of work; they now spread over several frames at walking pace.
+- **Animals stay put as the land moves.** The deer, rabbits, boars and birds still in reach are kept, and new ones are built a couple per frame, nearest first. All 28 used to be rebuilt in one frame.
+- **Creature skins are made ahead of time.** The ten surface finishes (skin, fur, scales, metal and the rest) are made a few rows per frame while the land idles, so the first creature of a kind no longer freezes the game for half a second.
+- **Full resolution everywhere.** The open land, towns and dungeons all draw at your screen's own resolution, whatever the quality setting. The dungeon is no longer held to 1,280 pixels across.
+- **Downscaling only below 60 fps.** One shared scaler drops the resolution a step only while the frame rate stays under 60, and raises it again after ten steady seconds at 60. Menus and one-off hitches don't count.
+- A creature kind you haven't met yet can still cause one short hitch the first time it appears, while its model is sculpted.
+
 ## RS-402 - The wild animals
 
 The deer, boar, rabbits and birds out on the land were the biggest cost left after RS-401. Zoomed out at the same Wilderness spot, they took **128 draws** a frame; they now take **59**. The whole frame there went from 751 to about **630** draws (from 1,670 before RS-401), and at the normal zoom from 413 to about **350**.

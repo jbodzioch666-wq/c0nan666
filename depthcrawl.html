@@ -20951,10 +20951,11 @@ function o3Wildlife(dt){
   if (!O3.wildGrp){ O3.wildGrp = new T.Group(); }
   if (O3.wildGrp.parent !== O3.scene) O3.scene.add(O3.wildGrp);
   if (O3.wildKey !== key){
-    O3.wildKey = key; const g = O3.wildGrp; while (g.children.length) g.remove(g.children[0]);
-    O3.wild = []; O3.wildHits = [];
+    /* (RS-403) when the land moves on, the animals still in reach are kept as they are, and the new ones are built a couple a frame,
+       nearest first - all twenty-eight used to be thrown away and built again in the one frame, a hitch every twenty-odd tiles */
+    O3.wildKey = key; const g = O3.wildGrp, old = new Map((O3.wild||[]).filter(w=>w.id).map(w=>[w.id, w]));
+    O3.wild = [];
     const x0 = O3.win.cx - O3_W/2 + 2, y0 = O3.win.cy - O3_W/2 + 2, day = Math.floor(turn/DAY_LENGTH), hunted = wgState().hunted, sd = (G.ow.seed % 997) + day*13;
-    const hitM = O3.nodeHitM || (O3.nodeHitM = new T.MeshBasicMaterial({ visible:false }));
     const cand = [];   // every tile that could hold animals, nearest first, so the ones you see are the ones around you
     for (let x=x0; x<x0+O3_W-4; x++) for (let y=y0; y<y0+O3_W-4; y++) cand.push([x, y, Math.hypot(x-G.owPos.x, y-G.owPos.y)]);
     cand.sort((a,b)=>a[2]-b[2]);
@@ -20968,23 +20969,29 @@ function o3Wildlife(dt){
       const hk = x+','+y+':'+k; if (hunted[hk] !== undefined && turn - hunted[hk] < DAY_LENGTH) continue;
       const n = k==='deer' ? 2 + Math.floor(o3Hash(x,y,903)*3) : k==='rabbit' ? 1 + Math.floor(o3Hash(x,y,904)*3) : k==='boar' ? 1 + (o3Hash(x,y,905) < 0.4 ? 1 : 0) : 1;
       for (let i=0;i<n;i++){
-        const w = { k, key:hk, hx:x+0.5, hz:y+0.5, x:x+0.5 + (o3Hash(x,y,910+i)-0.5)*1.4, z:y+0.5 + (o3Hash(x,y,920+i)-0.5)*1.4, tx:0, tz:0, idle:Math.random()*3, alive:true, flee:0, yaw:Math.random()*6.28, ph:Math.random()*6 };
-        if (k==='bird'){
-          /* (RS-402) a flock's twelve wings are one instanced mesh, not twelve draws: each wing's place is set from its bird's each frame */
-          const fl = new T.Group(); w.birds = []; const wingG = O3.wingG || (O3.wingG = new T.PlaneGeometry(0.16, 0.05)), wm = o3WgMat('bird', '#2a2420', { side:T.DoubleSide });
-          const im = new T.InstancedMesh(wingG, wm, 12); im.instanceMatrix.setUsage(T.DynamicDrawUsage); im.frustumCulled = false; fl.add(im); w.wings = im;
-          for (let b=0;b<6;b++) w.birds.push({ a:b/6*Math.PI*2, rr:0.6 + (b%3)*0.25 });
-          w.e = { holder:fl }; g.add(fl); w.alt = 2.2 + Math.random();
-        } else {
-          const spec = WG_WILD[k]; let e; M3D_COARSE = 2.6; M3D_LOOSE = true; try{ e = m3dInstance({ nm:spec.nm }, { paint:mpBeast, o:spec.o, h:1 }); } finally { M3D_COARSE = 1; M3D_LOOSE = false; }   /* (RS-333: sculpted coarse - up to 28 of these at once took millions of triangles) */
-          e.holder.scale.multiplyScalar(spec.h / Math.max(0.05, e.H)); w.e = e; g.add(e.holder);
-          const hb = new T.Mesh(new T.BoxGeometry(0.6/ (spec.h / Math.max(0.05, e.H)), 0.8/ (spec.h / Math.max(0.05, e.H)), 0.6/ (spec.h / Math.max(0.05, e.H))), hitM); hb.position.y = 0.3 / (spec.h / Math.max(0.05, e.H));
-          hb.userData.act = { kind:'wild', w }; e.holder.add(hb); O3.wildHits.push(hb);
-        }
+        const id = hk+'#'+i+'|'+day, ow = old.get(id); if (ow){ old.delete(id); O3.wild.push(ow); continue; }
+        const w = { id, k, key:hk, hx:x+0.5, hz:y+0.5, x:x+0.5 + (o3Hash(x,y,910+i)-0.5)*1.4, z:y+0.5 + (o3Hash(x,y,920+i)-0.5)*1.4, tx:0, tz:0, idle:Math.random()*3, alive:true, flee:0, yaw:Math.random()*6.28, ph:Math.random()*6, pend:true };
         O3.wild.push(w);
       }
     }
+    for (const w of old.values()) if (w.e && w.e.holder && w.e.holder.parent) w.e.holder.parent.remove(w.e.holder);
+    O3.wildHits = O3.wild.filter(w=>w.hb).map(w=>w.hb);
   }
+  { let made = 0; const T = THREE, g = O3.wildGrp, hitM = O3.nodeHitM || (O3.nodeHitM = new T.MeshBasicMaterial({ visible:false }));
+    for (const w of O3.wild){ if (!w.pend) continue; if (made >= 2 && w.k!=='bird') continue; w.pend = false; const k = w.k;
+            if (k==='bird'){
+              /* (RS-402) a flock's twelve wings are one instanced mesh, not twelve draws: each wing's place is set from its bird's each frame */
+              const fl = new T.Group(); w.birds = []; const wingG = O3.wingG || (O3.wingG = new T.PlaneGeometry(0.16, 0.05)), wm = o3WgMat('bird', '#2a2420', { side:T.DoubleSide });
+              const im = new T.InstancedMesh(wingG, wm, 12); im.instanceMatrix.setUsage(T.DynamicDrawUsage); im.frustumCulled = false; fl.add(im); w.wings = im;
+              for (let b=0;b<6;b++) w.birds.push({ a:b/6*Math.PI*2, rr:0.6 + (b%3)*0.25 });
+              w.e = { holder:fl }; g.add(fl); w.alt = 2.2 + Math.random();
+            } else {
+              const spec = WG_WILD[k]; let e; M3D_COARSE = 2.6; M3D_LOOSE = true; try{ e = m3dInstance({ nm:spec.nm }, { paint:mpBeast, o:spec.o, h:1 }); } finally { M3D_COARSE = 1; M3D_LOOSE = false; }   /* (RS-333: sculpted coarse - up to 28 of these at once took millions of triangles) */
+              e.holder.scale.multiplyScalar(spec.h / Math.max(0.05, e.H)); w.e = e; g.add(e.holder);
+              const hb = new T.Mesh(new T.BoxGeometry(0.6/ (spec.h / Math.max(0.05, e.H)), 0.8/ (spec.h / Math.max(0.05, e.H)), 0.6/ (spec.h / Math.max(0.05, e.H))), hitM); hb.position.y = 0.3 / (spec.h / Math.max(0.05, e.H));
+              hb.userData.act = { kind:'wild', w }; e.holder.add(hb); w.hb = hb;
+            }
+      if (w.hb) O3.wildHits.push(w.hb); if (k!=='bird') made++; } }
   const tt = O3.t;
   for (const w of O3.wild||[]){
     const e = w.e; if (!e) continue;
@@ -23688,7 +23695,8 @@ function gfxTint(c, kind, part, shade){
   else if (s===0){ c.lerp(new THREE.Color(0x9ad060).convertSRGBToLinear(), 0.25); }
 }
 // ---- the land around you, after it's built (o3Build) ----
-function gfxO3Build(grp, x0, y0, W, M){
+function gfxO3Build(grp, x0, y0, W, M){ const g = gfxO3BuildGen(grp, x0, y0, W, M); while (!g.next().done); }
+function* gfxO3BuildGen(grp, x0, y0, W, M){   /* (RS-403: a step at a time - see o3VegetationGen) */
   const T = THREE, tx = gfxTextures(), U = GFX.u; GFX.season = seasonIdx();
   U.uSky.value = U.uSky.value || new T.Color(0x8fb4dc);
   // the ground: grass, dirt and rock blended by slope, roads and soil; strata on the cliffs; cloud shadows
@@ -23712,6 +23720,7 @@ function gfxO3Build(grp, x0, y0, W, M){
         diffuseColor.rgb *= 1.0 - uCloudAmt*smoothstep(0.32, 0.62, cs)*0.38;`); };
     m.customProgramCacheKey = ()=>'gfxland'; m.needsUpdate = true;
   }
+  yield;
   // the water: waves, the sky in it, foam on the shore, rivers that run, stars on it at night
   const water = O3.water;
   if (water){
@@ -23750,6 +23759,7 @@ function gfxO3Build(grp, x0, y0, W, M){
         gl_FragColor.rgb += vec3(st*0.7);`); };
     m.customProgramCacheKey = ()=>'gfxwater'; m.needsUpdate = true;
   }
+  yield;
   // waterfalls where a river comes down off the mountains
   GFX.falls = [];
   for (let x=x0; x<x0+W && GFX.falls.length < 14; x++) for (let y=y0; y<y0+W && GFX.falls.length < 14; y++){ if (o3Tile(x, y)!==OW_RIVER) continue;
@@ -23758,6 +23768,7 @@ function gfxO3Build(grp, x0, y0, W, M){
       if (GFX.falls.some(f=>Math.abs(f.tx - x) <= 2 && Math.abs(f.ty - y) <= 2)) break;
       const top = O3.heightAt(x + 0.5 + a*0.9, y + 0.5 + b*0.9), drop = top + 0.14; if (drop < 0.55) continue;
       GFX.falls.push(Object.assign(gfxWaterfall(T, tx, grp, x + 0.5 + a*0.5, y + 0.5 + b*0.5, a, b, drop), { tx:x, ty:y })); break; } }
+  yield;
   // grass, flowers and pebbles near you, swaying
   const blade = new T.BufferGeometry(); blade.setAttribute('position', new T.Float32BufferAttribute([-0.02,0,0, 0.02,0,0, 0.004,0.22,0.01], 3)); blade.setAttribute('color', new T.Float32BufferAttribute([0.45,0.45,0.45, 0.45,0.45,0.45, 1.1,1.1,1.1], 3)); blade.computeVertexNormals();
   const gm = new T.MeshLambertMaterial({ vertexColors:true, side:T.DoubleSide }); gfxSway(gm, 0.35); gm.userData.lin = true;
@@ -23782,6 +23793,7 @@ function gfxO3Build(grp, x0, y0, W, M){
   if (pebbles.length){ const pgeo = new T.DodecahedronGeometry(0.05, 0).scale(1, 0.55, 1), im = new T.InstancedMesh(pgeo, new T.MeshStandardMaterial({ color:0x8a8070, roughness:0.95, flatShading:true }), pebbles.length);
     pebbles.forEach(([x, z, r], i)=>{ v3.set(x, O3.heightAt(x, z) + 0.01, z); q.setFromAxisAngle(up, r*6); im.setMatrixAt(i, m4.compose(v3, q, s3.setScalar(0.7 + r))); });
     im.frustumCulled = false; im.receiveShadow = true; grp.add(im); }
+  yield;
   // low mist over the swamps, the haunted woods and the graveyards, and over the water at dawn
   GFX.mist = [];
   const mm = new T.MeshBasicMaterial({ map:tx.soft, transparent:true, depthWrite:false, opacity:0.3, color:0xe8eef0, side:T.DoubleSide });
@@ -23793,6 +23805,7 @@ function gfxO3Build(grp, x0, y0, W, M){
     pl.position.set(x + 0.5, Math.max(-0.1, O3.heightAt(x + 0.5, y + 0.5)) + 0.25 + o3Hash(x, y, 412)*0.2, y + 0.5); grp.add(pl);
     GFX.mist.push({ pl, dawn, ph:o3Hash(x, y, 413)*6.28 });
   }
+  yield;
   // the woods, for the shafts of light
   GFX.woods = []; for (let x=x0; x<x0+W; x++) for (let y=y0; y<y0+W; y++) if (o3Tile(x, y)===OW_FOREST) GFX.woods.push([x, y]);
   GFX.rays = [];
@@ -30709,9 +30722,9 @@ function* o3BuildGen(cx, cy){
   // a big dim plane far out so the edge of the built window never shows
   const far = new T.Mesh(new T.PlaneGeometry(600,600), new T.MeshStandardMaterial({ color:new T.Color(0x2c6490).convertSRGBToLinear(), roughness:0.6 }));   /* (RS-349: the sea beyond the map's edge; the far land is o3FarLand) */
   far.rotation.x = -Math.PI/2; far.position.set(cx,-0.5,cy); grp.add(far);
-  yield; o3Vegetation(grp, x0, y0, W);
+  yield; yield* o3VegetationGen(grp, x0, y0, W);
   yield; o3Sites(grp, x0, y0, W);
-  yield; try{ gfxO3Build(grp, x0, y0, W, M); }catch(e){ console.error(e); }
+  yield; try{ yield* gfxO3BuildGen(grp, x0, y0, W, M); }catch(e){ console.error(e); }
   yield; try{ o3MergeWorld(grp); }catch(e){ console.error(e); }   /* (RS-401) */
   O3.encGrp = new T.Group(); grp.add(O3.encGrp); O3.encKey = null; O3.qKey = null;
   O3.compileDue = true;   /* (RS-345) */
@@ -30737,13 +30750,40 @@ function o3BuildAbandon(){ const P = O3.pend; if (!P) return; O3.pend = null; fo
 // a few milliseconds of building a frame; the last slice swaps the new land in. Returns true when done
 function o3BuildSlice(budgetMs){
   const P = O3.pend; if (!P) return true;
-  const live = o3BuildSwapIn(P.st), t0 = performance.now(); let done = false;
-  try{ do { done = P.gen.next().done; } while (!done && performance.now() - t0 < budgetMs); }
-  catch(e){ console.error(e); done = true; P.failed = true; }
-  finally { o3BuildSwapOut(P.st, live); }
-  P.n++;
-  if (done){ O3.pend = null; if (P.failed){ for (const p of P.st.plates||[]) p.el.remove(); } else o3BuildSwap(P.st); }
+  const t0 = performance.now(); let done = false;
+  if (!P.built){
+    const live = o3BuildSwapIn(P.st);
+    try{ do { done = P.gen.next().done; } while (!done && performance.now() - t0 < budgetMs); }
+    catch(e){ console.error(e); done = true; P.failed = true; }
+    finally { o3BuildSwapOut(P.st, live); }
+    P.n++;
+    if (done && !P.failed){ P.built = true; P.cq = o3CompileQueue(P.st.world); done = false; }   /* (RS-403: built - now its shaders, a few a frame) */
+  }
+  if (P.built && !done){ done = o3CompileSome(P, budgetMs - (performance.now() - t0)); }
+  if (done){ O3.pend = null; if (P.failed){ for (const p of P.st.plates||[]) p.el.remove(); } else { o3BuildSwap(P.st); if (P.built) O3.compileDue = false; } }   /* (RS-403: compiled already - no whole-scene compile at the swap) */
   return done;
+}
+/* (RS-403) the new land's shaders, compiled before it's swapped in: a few of its parts a frame, each drawn into a scratch scene that
+   has the open land's lights and fog (what a shader is built for), against the same target the real frames draw into. At the swap
+   every program it needs is built - it used to compile the whole scene in the one frame the new land appeared, the stutter every
+   twenty-odd tiles of a long walk. A part whose program is already built costs next to nothing */
+function o3CompileQueue(world){
+  const seen = new Set(), q = []; if (!world) return q;
+  world.traverse(o=>{ if (!(o.isMesh || o.isPoints || o.isLine || o.isSprite)) return; const mats = [].concat(o.material||[]); if (!mats.length || mats.some(m=>!m || m.visible===false)) return;
+    const sig = mats.map(m=>m.uuid).join(',') + '|' + o.type + '|' + Object.keys((o.geometry && o.geometry.attributes)||{}).sort().join(',');
+    if (!seen.has(sig)){ seen.add(sig); q.push(o); } });
+  return q;
+}
+function o3CompileSome(P, budget){
+  const r = O3.renderer, T = THREE; if (!r || !P.cq || !P.cq.length) return true;
+  if (!P.cs){ const cs = P.cs = new T.Scene(); cs.fog = O3.scene.fog; O3.scene.traverse(l=>{ if (l.isLight && l.visible){ const c = l.clone(); if (l.isDirectionalLight){ c.target = new T.Object3D(); cs.add(c.target); } cs.add(c); } }); }
+  const t0 = performance.now(), np0 = r.info.programs.length; let n = 0;
+  /* one part at a time, and the frame's work stops at the first that needed a new program built - that's the costly part */
+  while (P.cq.length && (n===0 || performance.now() - t0 < Math.max(2, budget))){ const o = P.cq.shift(); let c = null;
+    try{ c = o.clone(false); c.matrixAutoUpdate = false; P.cs.add(c); gfxCompile(r, P.cs, O3.cam); }catch(e){ console.error(e); } finally { if (c) P.cs.remove(c); }
+    n++; if (r.info.programs.length > np0) break; }
+  P.compiledN = (P.compiledN||0) + n;
+  return !P.cq.length;
 }
 // (RS-349) the whole world as a coarse, far ground - one vertex every two tiles, the sea flat and blue, the mountains
 // risen, the forests dark - so the land never ends at the built window's edge: from a lookout, or zoomed out, or on a
@@ -30809,9 +30849,12 @@ function o3Warm(){
   return g;
 }
 // ---------- trees, rocks and cacti (instanced) ----------
-function o3Vegetation(grp, x0, y0, W){
+/* (RS-403) built a few columns at a time, a slice of the frame each: the whole window's plants in one go was the longest single step
+   of building the land ahead, a hitch on a long walk */
+function o3Vegetation(grp, x0, y0, W){ const g = o3VegetationGen(grp, x0, y0, W); while (!g.next().done); }
+function* o3VegetationGen(grp, x0, y0, W){
   const T = THREE, put = [];   // [kind, x, z, scale, rot, shade]
-  for (let x=x0; x<x0+W; x++) for (let y=y0; y<y0+W; y++){
+  for (let x=x0; x<x0+W; x++){ if ((x - x0) % 6 === 5) yield; for (let y=y0; y<y0+W; y++){
     const t = o3Tile(x,y), h = (s)=> o3Hash(x,y,s), nd = skNodeStatic(x,y), treeNode = !!(nd && nd.k==='woodcutting');
     if (treeNode){ if (h(11)<0.5) put.push(['bush', x+h(12), y+h(13), 0.5+h(14)*0.4, h(15)*6.28, h(16)]); continue; }
     if (wgRoadAt(x,y) || wgPoiAt(x,y) || owLandmarkFoot(x,y)) continue;   // (roads, points of interest and landmarks stay clear)
@@ -30842,7 +30885,8 @@ function o3Vegetation(grp, x0, y0, W){
     } else if (t===OW_MOUNTAIN || t===OW_MOUNTAINPASS){
       if (h(1)<0.35) put.push(['rock', x+h(3), y+h(4), 0.6+h(5)*0.9, h(6)*6.28, h(7)]);
     }
-  }
+  } }
+  yield;
   // parts per kind: [geometry, material colour(s), local transform]
   const bark = '#5a4028', PARTS = {
     oak:      [['trunk', new T.CylinderGeometry(0.05,0.08,0.7,6).translate(0,0.35,0), bark], ['leaf', new T.IcosahedronGeometry(0.42,1).scale(1,0.85,1).translate(0,0.95,0), '#4a7a32']],
@@ -30864,7 +30908,7 @@ function o3Vegetation(grp, x0, y0, W){
   for (const p of put) (byKind[p[0]] = byKind[p[0]] || []).push(p);
   const m4 = new T.Matrix4(), q = new T.Quaternion(), s = new T.Vector3(), v = new T.Vector3(), c = new T.Color(), up = new T.Vector3(0,1,0);
   for (const kind in byKind){
-    const list = byKind[kind];
+    const list = byKind[kind]; yield;
     for (const [pn, geo, colr] of PARTS[kind]){
       const glow = kind==='crystal' || kind==='lava', mat = new T.MeshStandardMaterial({ color:0xffffff, roughness: glow ? 0.3 : 0.85, flatShading: kind==='rock' || kind==='oak' || kind==='bush' || kind==='crystal', emissive: glow ? new T.Color(colr).convertSRGBToLinear() : 0x000000, emissiveIntensity: kind==='lava' ? 0.9 : glow ? 0.45 : 0 });
       const im = new T.InstancedMesh(geo, mat, list.length);
@@ -32007,7 +32051,8 @@ function o3Render(){
     if (atOnce) o3Build(px, py); else o3BuildStart(px, py);   /* (RS-349: a window move builds the new land over a few frames while the old one still shows) */
     if (!O3.ppos) O3.ppos = new T.Vector3(px+0.5, 0, py+0.5);
   }
-  if (O3.pend){ const off = Math.abs(px - O3.win.cx) > hurry || Math.abs(py - O3.win.cy) > hurry; o3BuildSlice(off ? 1e9 : 6); }   /* (the old land's edge about to come into view: finish it now) */
+  if (O3.pend){ const off = Math.abs(px - O3.win.cx) > hurry || Math.abs(py - O3.win.cy) > hurry; o3BuildSlice(off ? 1e9 : 6); }
+  else if (!M3D.patDone && G.ui==='playing') M3D.patDone = m3dPatternWarm(3);   /* (RS-403: the creatures' finishes, a few rows a frame) */   /* (the old land's edge about to come into view: finish it now) */
   try{ o3FarLand(); }catch(e){ console.error(e); }
   const mc = canvas, cv = O3.cv;
   cv.style.display = 'block'; O3.labels.style.display = 'block';
@@ -32276,7 +32321,7 @@ function fpFloorSlots(T){
 // stairs are clipped against, and takes over if WebGL is unavailable.
 const FPD = { ok:null, MAXT:4, scale:1, dtAvg:1/60, adj:0, lvl:0, downAt:0, upAt:0, lockUntil:0 };
 // (RS-107) the few resolutions the dungeon view steps between - each change reallocates the canvas and the post-processing buffers, a visible hitch
-const FPD_SCALES = [1, 0.85, 0.7, 0.6, 0.5];
+const FPD_SCALES = [1, 0.85, 0.7, 0.6, 0.5];   /* (RS-403: the steps of the shared scaler, RES) */
 /* (RS-163: monsters cast torch shadows, so they're redrawn as they move. RS-355: each light on its own clock, since a point
    light's shadow is six faces of the whole floor each time.) RS-363: how often, by the frame rate. Above 45 fps the lantern's
    shadow and each torch's are drawn every second frame, the torches staggered so half go on each frame - RS-347's cost,
@@ -32298,7 +32343,21 @@ function gfxQ(){ return GFX_Q[SET.gfx] || GFX_Q.high; }
 // (RS-348) a phone's share: shadow maps half the size with plain filtering, four lamp lights instead of eight, no
 // multisampling on the post buffer, and at most 1.5 pixels per CSS pixel - the fill-rate costs that made a town a slideshow
 function gfxPhone(){ return !!(SET && SET.phoneTier) || (typeof v3LowMem==='function' && v3LowMem()); }   /* (RS-365: or chosen in the settings on a computer) */
-function gfxPR(){ return Math.min(gfxQ().pr, gfxPhone() ? 1.5 : 9, window.devicePixelRatio||1); }
+/* (RS-403) every view draws at the screen's own resolution - its device pixel ratio, whatever the quality setting - and the one
+   scaler below steps it down only when the frame rate stays under 60 */
+function gfxPR(){ return (window.devicePixelRatio||1)*resScale(); }
+const RES = { lvl:0, steps:[1, 0.85, 0.7, 0.6, 0.5], avg:1/60, n:0, upAt:0, downAt:0, lockUntil:0 };
+function resScale(){ return window.__fpdScale || RES.steps[RES.lvl]; }
+/* judged over about two seconds of play (not menus, not a hidden tab, not a one-off hitch): a step down when it runs under 57 a
+   second, a step back up after ten seconds at a full 60. A step up that has to come straight back down holds it for a minute
+   (RS-107), and each step resizes the buffers, so it only ever moves between these few */
+function resTick(dt){
+  if (!G.player || G.ui!=='playing' || document.hidden || !(dt > 0) || dt > 0.25) return;
+  RES.avg += (dt - RES.avg)*0.03; if (++RES.n < 90) return; RES.n = 0;
+  const now = performance.now();
+  if (RES.avg > 1/57 && RES.lvl < RES.steps.length - 1){ if (RES.upAt && now - RES.upAt < 15000) RES.lockUntil = now + 60000; RES.lvl++; RES.downAt = now; RES.avg = 1/60; }
+  else if (RES.avg < 1/59 && RES.lvl > 0 && now - RES.downAt > 10000 && now - RES.upAt > 5000 && now >= RES.lockUntil){ RES.lvl--; RES.upAt = now; RES.avg = 1/58; }   /* (and a few seconds between steps up, to see each one hold) */
+}
 // (RS-365) the phone tier switched on or off from the settings, there and then: plain or soft shadow edges, the shadow maps'
 // size, anti-aliasing, and four town lamps or eight. The pixel ratio and the dungeon's scale floor read gfxPhone each frame
 function gfxTierApply(){
@@ -33095,14 +33154,11 @@ function fpdRender(env, T, camZ){
   // resolution adapts to keep the frame rate up on slower graphics. Each change reallocates buffers (a hitch), so (RS-107) it only
   // moves between a few fixed steps, judges the frame rate over about two seconds, ignores one-off spikes, and once a step up
   // has had to come back down it stays put for a minute rather than see-sawing
-  const fdt = Math.min(FP.dt||1/60, 0.1), nowT = performance.now();
-  FPD.dtAvg += (fdt - FPD.dtAvg)*0.03;
-  if (++FPD.adj >= 120 && nowT >= FPD.lockUntil){ FPD.adj = 0;
-    if (FPD.dtAvg > 1/40 && FPD.lvl < (gfxPhone() ? FPD_SCALES.length-1 : 3)){   /* (RS-355: a desktop keeps at least 0.7. RS-363: 0.6 - under a heavy fight the pixels do count) */ if (FPD.upAt && nowT - FPD.upAt < 15000) FPD.lockUntil = nowT + 60000; FPD.lvl++; FPD.downAt = nowT; FPD.dtAvg = 1/45; }
-    else if (FPD.dtAvg < 1/58 && FPD.lvl > 0 && nowT - FPD.downAt > 10000){ FPD.lvl--; FPD.upAt = nowT; FPD.dtAvg = 1/50; } }
-  FPD.scale = FPD_SCALES[FPD.lvl];
-  const scl = window.__fpdScale || Math.min(FPD.scale, gfxQ().fpd);
-  const sc = Math.min(1, 1280/cw)*scl, w = Math.max(2, Math.round(cw*sc)), h = Math.max(2, Math.round(ch*sc));
+  /* (RS-403) the screen's own resolution, stepped down only while the frame rate stays under 60 - the shared scaler (resTick); the
+     dungeon used to be held to 1,280 pixels across and to step down only under 40 */
+  FPD.lvl = RES.lvl; FPD.scale = resScale();
+  const cssW = canvas.clientWidth || cw/dpr, cssH = canvas.clientHeight || ch/dpr, nat = (window.devicePixelRatio||1)*FPD.scale;
+  const w = Math.max(2, Math.round(cssW*nat)), h = Math.max(2, Math.round(cssH*nat));
   if (FPD.cv.width!==w || FPD.cv.height!==h){ FPD.r.setPixelRatio(1); FPD.r.setSize(w, h, false); }
   const c = FP.cam, cam = FPD.cam;
   if (ISO.on) isoCamera(cam, w/h);
@@ -33239,6 +33295,20 @@ function m3dGrain(){
 function m3dPattern(kind){
   M3D.pat = M3D.pat || {};
   if (M3D.pat[kind]) return M3D.pat[kind];
+  const g = (M3D.patGen && M3D.patGen[kind]) || m3dPatternGen(kind); while (!g.next().done);
+  return M3D.pat[kind];
+}
+/* (RS-403) the ten finishes, made a few rows a frame while the open land idles, so the first deer or bandit of a kind that walks into
+   view doesn't stop the game for half a second making its skin. Whatever isn't ready yet when a creature needs it is finished then */
+const M3D_PAT_KINDS = ['skin', 'cloth', 'leather', 'fur', 'scales', 'metal', 'chain', 'horn', 'stone', 'planks'];
+function m3dPatternWarm(budgetMs){
+  M3D.pat = M3D.pat || {}; M3D.patGen = M3D.patGen || {}; const t0 = performance.now();
+  for (const k of M3D_PAT_KINDS){ if (M3D.pat[k]) continue; const g = M3D.patGen[k] || (M3D.patGen[k] = m3dPatternGen(k));
+    while (performance.now() - t0 < budgetMs){ if (g.next().done) break; } if (performance.now() - t0 >= budgetMs) return false; }
+  return true;
+}
+function* m3dPatternGen(kind){
+  M3D.patGen = M3D.patGen || {};
   const N = 256, st = FP_TEX/N, h = new Float32Array(N*N), tone = new Float32Array(N*N);
   const W = (v)=>(v+N)%N;
   for (let y=0;y<N;y++) for (let x=0;x<N;x++){
@@ -33258,6 +33328,7 @@ function m3dPattern(kind){
     else if (kind==='planks'){ const pl = Math.floor(x/42), lx = x%42, g = fpNoise(X*0.3, Y*3%FP_TEX, 16, 511+pl); hv = (lx<2 ? 0.1 : 0.55) + (g-0.5)*0.3; tv = (lx<2 ? 0.35 : 0.8 + (g-0.5)*0.35) * (0.9 + fpHash(pl,1,512)*0.2); }
     else if (kind==='stone'){ const c = Math.abs(fpNoise(X,Y,8,510)*2-1); hv = 0.5 + (n-0.5)*0.5 - (c<0.05 ? 0.4 : 0); tv = 0.8 + (n-0.5)*0.4 - (c<0.05 ? 0.25 : 0); }
     h[i] = hv; tone[i] = tv;
+    if (x===N-1 && (y&7)===7) yield;
   }
   const mk = ()=>{ const c = v3Canvas(N,N); return [c, c.getContext('2d')]; };
   const [mc, mx] = mk(), [nc, nx] = mk(), md = mx.createImageData(N,N), nd = nx.createImageData(N,N);
@@ -33267,11 +33338,12 @@ function m3dPattern(kind){
     md.data[p] = md.data[p+1] = md.data[p+2] = t; md.data[p+3] = 255;
     const ax = (h[y*N+W(x-1)] - h[y*N+W(x+1)])*str, ay = (h[W(y+1)*N+x] - h[W(y-1)*N+x])*str, l = Math.hypot(ax, ay, 1);
     nd.data[p] = (ax/l*0.5+0.5)*255; nd.data[p+1] = (ay/l*0.5+0.5)*255; nd.data[p+2] = (1/l*0.5+0.5)*255; nd.data[p+3] = 255;
+    if (x===N-1 && (y&31)===31) yield;
   }
   mx.putImageData(md,0,0); nx.putImageData(nd,0,0);
   const map = new THREE.CanvasTexture(mc), nrm = new THREE.CanvasTexture(nc);
   for (const t of [map, nrm]){ t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; }
-  return (M3D.pat[kind] = { map, nrm });
+  M3D.pat[kind] = { map, nrm }; delete M3D.patGen[kind];
 }
 // a soft rim of light round every creature, so its outline reads against the dark
 M3D.rim = { value:null };                             // (made on first use: three.js may never load)
@@ -39719,7 +39791,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-402';
+const GAME_VERSION = 'rs-403';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -42430,7 +42502,7 @@ function frameLoop(ts){
   }
   try{ audFrame(); sqFrame(); }catch(e){ console.error(e); }   // music, ambience, footsteps (see SECTION: AUDIO)
   if (_pt0) profAdd('loop', performance.now() - _pt0);
-  fpsTick(ts);
+  fpsTick(ts); resTick((ts - (frameLoop.rt0||ts))/1000); frameLoop.rt0 = ts;   /* (RS-403) */
   requestAnimationFrame(frameLoop);
 }
 

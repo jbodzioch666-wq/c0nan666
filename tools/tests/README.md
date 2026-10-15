@@ -25,6 +25,8 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| walkstutter | A long walk: the new land compiles a few shaders a frame before the swap, the woods build in slices, animals in reach are kept |
+| nativeres | RS-403: every view at the screen's own resolution; one scaler steps down only under 60 fps |
 | owdraws | RS-401: the open land's draws - batched gathering-spot effects, merged land, creature culling and shadow distance |
 | deadcode | RS-400: the skeleton studio renderer and the raycaster frame buffer are gone; skeletons still built |
 | hudthrottle | RS-399: the game loop rebuilds the HTML HUD ten times a second; actions still rebuild at once |
