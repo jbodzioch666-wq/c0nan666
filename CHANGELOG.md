@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-412 - The XP tracker stays where you put it
+
+- **No more jumping tracker.** If you'd dragged the XP tracker somewhere, it leapt up to the top-left corner every time you gained xp (each herb you picked, each log, each hit) and dropped back a moment later. It now stays exactly where you put it. In its usual place under your name it no longer shifts by a couple of pixels either.
+
 ## RS-411 - Five fixes from playtesting
 
 - **XP bar wraps round at a level.** When you went up a level, the XP tracker's bar slid backwards from nearly full to the new level's share. It now fills to the end, then runs up again from empty.
