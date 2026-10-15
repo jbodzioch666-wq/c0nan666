@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-407 - Rooms, corridors and doors
+
+- **Plain dungeons rebuilt as rooms and corridors.** Rooms are clean rectangles with no stray pillars or ragged cave walls. Corridors are one tile wide through the rock between them, never running along a room's wall or side by side. Every room connects to the rest, with a loop or two. Named sites (castles, towers, temples, graveyards, mines, lairs, pyramids) keep their own layouts.
+- **Doorways.** Each room opens through a doorway set between its corner pillars: either an open stone arch, or an oak door on iron straps.
+- **Doors work.** A shut door blocks sight and arrows. Pushing it open takes a turn, and it swings back into the passage and stays open, in your save too. Monsters shove doors open on their way through. A click-to-walk path opens a door and carries on through it.
+- **The lock protects hardcore characters.** A locked hardcore adventurer now survives death like a standard one (with the usual losses) instead of being deleted. Unlock it to play by hardcore rules again.
+
 ## RS-406 - Dungeons stay as you left them until cleared
 
 - **No timed refill.** The RS-405 change that reset a dungeon after a day away is taken out. A dungeon is laid out again only once you defeat its master, as before.

@@ -4488,11 +4488,14 @@ function checkDeathWard(){
   logMsg('Death Ward flares and holds you at 1 HP!', 'good');
   return true;
 }
+/* (RS-407) a hardcore death ends the character for good - unless the adventurer is locked on the title screen (RS-405): then
+   it is survived like a standard one, with the usual losses */
+function hcFatal(){ return !!(G.player && G.player.hardcore && !(G.saveId && typeof saveLocked==='function' && saveLocked(G.saveId))); }
 function playerDies(cause){
   G.gameOver = 1; G.deathCause = cause;
   G.deathWild = (()=>{ try{ return wgDeathIsWild(); }catch(e){ return false; } })();   // the Wilderness keeps what you drop
   const st = pStats(); st.deaths++;
-  if (G.player && !G.player.hardcore) G.deathSplit = deathSplit();
+  if (G.player && !hcFatal()) G.deathSplit = deathSplit();
   questOnDeath();
   // a snapshot of the last handful of log lines, taken right here before
   // anything else can touch G.log - the death screen (buildDeath) replays
@@ -4506,7 +4509,7 @@ function playerDies(cause){
   // Hardcore characters lose the save for good; Standard characters get
   // knocked back to the overworld with a gold penalty in continueAfterDeath()
   // instead, so their save has to survive this call intact.
-  if (G.player && G.player.hardcore && G.saveId){
+  if (G.player && hcFatal() && G.saveId){
     recordMemorial(G.player, cause); // the save is about to be gone for good - this is the only place the run survives
     deleteSaveById(G.saveId);
     // clear it out, not just delete the stored record - this way ANY later
@@ -4517,8 +4520,8 @@ function playerDies(cause){
   }
 }
 function continueAfterDeath(walkToGrave){
-  if (G.player.hardcore) return; // hardcore has no continuing - use descendAgain()
-  G.gameOver = 0;
+  if (hcFatal()) return; // hardcore has no continuing - use descendAgain()
+  G.gameOver = 0; if (G.player.hardcore) logMsg('your lock on this adventurer held - a hardcore death, survived', 'magic');   /* (RS-407) */
   const p = G.player, ds = G.deathSplit || deathSplit();
   // (RS-205) a death below ground: the floor stays as you left it (your killer included) and the stone stands where you fell
   const inDg = G.gameMode===1 && G.dungeonSlot>=1 && G.dungeonSlot<=MAX_SITE_SLOT+1;
@@ -4931,6 +4934,68 @@ function generateLevel(d){
   G.dungeonDeco = makeGrid('', COLS, ROWS); // plain dungeons have no special flavor tiles - castles/necro towers do
   G.shopStock = []; // no shop or tavern in dungeons anymore - loot comes from monsters
 
+  /* (RS-407) a plain dungeon is laid out as rooms and corridors with doorways (dgLayoutRooms); the named sites that build on
+     this generator keep the old layout (dgLayoutClassic) */
+  const { roomX, roomY, roomW, roomH, roomCnt } = G.siteKind==='dungeon' ? dgLayoutRooms(d) : dgLayoutClassic(d);
+
+  // gold
+  const gc = 5+rn(5);
+  for (let i=0;i<gc;i++){
+    const r = rn(roomCnt);
+    const gx = roomX[r]+rn(roomW[r]), gy = roomY[r]+rn(roomH[r]);
+    if (G.map[gx][gy]===T_FLOOR) G.map[gx][gy] = T_GOLD;
+  }
+  // trapdoor - never on the deepest floor
+  if (chn(0.35) && d < G.dungeonMaxDepth){
+    const r = 1+rn(roomCnt-1);
+    const px = roomX[r]+rn(roomW[r]), py = roomY[r]+rn(roomH[r]);
+    if (G.map[px][py]===T_FLOOR) G.map[px][py] = T_TRAP;
+  }
+  // sealed vault
+  if (chn(0.3)){
+    const r = 1+rn(roomCnt-1);
+    const px = roomX[r]+rn(roomW[r]), py = roomY[r]+rn(roomH[r]);
+    if (G.map[px][py]===T_FLOOR) G.map[px][py] = T_VAULT;
+  }
+  // corrupted chest - a guaranteed source of corruption (see gainCorruption
+  // in tryMove's T_CORRUPT_CHEST case), unlike a monster rolling 'corrupted'
+  // which needs some corruption already banked to have any chance at all
+  if (chn(0.25)){
+    const r = 1+rn(roomCnt-1);
+    const px = roomX[r]+rn(roomW[r]), py = roomY[r]+rn(roomH[r]);
+    if (G.map[px][py]===T_FLOOR) G.map[px][py] = T_CORRUPT_CHEST;
+  }
+
+  // monsters - the Monster-Manual-style roster is picked by DUNGEON DEPTH
+  // (independent of the hero's own level), so floor 1 is always weak and the
+  // deepest floor of THIS site always ramps up toward its own level-20 cap;
+  // a castle or necromancer's tower still hits harder on top of that via
+  // sitePower's hp/dmg/xp multipliers
+  const sp = sitePower();
+  G.mon = [];
+  const monN = 4 + mn(16, rn(4) + Math.floor(d/1.2));
+  const floorLevel = floorCb(d);
+  for (let i=0;i<monN;i++){
+    const r = 1+rn(roomCnt-1);
+    const mx2 = roomX[r]+rn(roomW[r]), my2 = roomY[r]+rn(roomH[r]);
+    if (G.map[mx2][my2] !== T_FLOOR || G.mon.some(o=>o.x===mx2 && o.y===my2)) continue;
+    const entry = pickThemedMonsterEntry(floorLevel);
+    const m = newMonster();
+    m.alive=1; m.x=mx2; m.y=my2;
+    m.hp = roundH((rollDice(entry.hd,8) + entry.hd) * sp.hp);
+    m.maxHp = m.hp;
+    m.ac = entry.ac;
+    m.atkBonus = entry.atk;
+    m.dmg1 = entry.dmg1; m.dmg2 = roundH(entry.dmg2 * sp.dmg);
+    m.xp = roundH(entry.xp * sp.xp);
+    m.sym = entry.sym; m.nm = entry.nm; m.baseNm = entry.nm; m.col = monsterCol(entry); m.undead = entry.undead; m.mlevel = entry.lvl;
+    m.abilities = entry.abilities.slice(); m.art = entry.art; monEntryExtras(m, entry);
+    m.corrupted = rollCorruptedFlag(); applyCorruption(m);
+    G.mon.push(m);
+    if (G.mon.length >= MAXMON) break;
+  }
+}
+function dgLayoutClassic(d){
   // place rooms one at a time, rejecting any spot that would overlap (or sit
   // flush against) a room already placed - this is what keeps the floor
   // reading as distinct rooms linked by narrow hallways instead of one big
@@ -5011,63 +5076,82 @@ function generateLevel(d){
       G.map[px][py] = T_WALL; put++;
     }
   }
-
-  // gold
-  const gc = 5+rn(5);
-  for (let i=0;i<gc;i++){
-    const r = rn(roomCnt);
-    const gx = roomX[r]+rn(roomW[r]), gy = roomY[r]+rn(roomH[r]);
-    if (G.map[gx][gy]===T_FLOOR) G.map[gx][gy] = T_GOLD;
+  return { roomX, roomY, roomW, roomH, roomCnt };
+}
+/* (RS-407) the plain dungeons' floors: rooms are plain rectangles, each with a doorway or two in its walls - an open arch or
+   a shut oak door - and corridors a tile wide run from doorway to doorway through the rock between: never along a room's
+   wall, never side by side, never cut through a room's corner. No pillars, no ragged caves. Every room joins the rest (a
+   spanning tree of the nearest rooms, then a loop or two), so there are no dead ends but the closets dressLevel adds */
+function dgLayoutRooms(d){
+  const roomX=[], roomY=[], roomW=[], roomH=[], PAD = 3, want = 8 + rn(4);
+  for (let tries=0; roomX.length < want && tries < 1500; tries++){
+    const hall = roomX.length > 1 && chn(0.15), w = hall ? 8+rn(4) : 4+rn(5), h = hall ? 6+rn(3) : 4+rn(4);
+    const x = 2+rn(COLS-w-4), y = 2+rn(ROWS-h-4); let ok = true;
+    for (let i=0;i<roomX.length && ok;i++) if (x < roomX[i]+roomW[i]+PAD && x+w+PAD > roomX[i] && y < roomY[i]+roomH[i]+PAD && y+h+PAD > roomY[i]) ok = false;
+    if (ok){ roomX.push(x); roomY.push(y); roomW.push(w); roomH.push(h); }
   }
-  // trapdoor - never on the deepest floor
-  if (chn(0.35) && d < G.dungeonMaxDepth){
-    const r = 1+rn(roomCnt-1);
-    const px = roomX[r]+rn(roomW[r]), py = roomY[r]+rn(roomH[r]);
-    if (G.map[px][py]===T_FLOOR) G.map[px][py] = T_TRAP;
-  }
-  // sealed vault
-  if (chn(0.3)){
-    const r = 1+rn(roomCnt-1);
-    const px = roomX[r]+rn(roomW[r]), py = roomY[r]+rn(roomH[r]);
-    if (G.map[px][py]===T_FLOOR) G.map[px][py] = T_VAULT;
-  }
-  // corrupted chest - a guaranteed source of corruption (see gainCorruption
-  // in tryMove's T_CORRUPT_CHEST case), unlike a monster rolling 'corrupted'
-  // which needs some corruption already banked to have any chance at all
-  if (chn(0.25)){
-    const r = 1+rn(roomCnt-1);
-    const px = roomX[r]+rn(roomW[r]), py = roomY[r]+rn(roomH[r]);
-    if (G.map[px][py]===T_FLOOR) G.map[px][py] = T_CORRUPT_CHEST;
-  }
-
-  // monsters - the Monster-Manual-style roster is picked by DUNGEON DEPTH
-  // (independent of the hero's own level), so floor 1 is always weak and the
-  // deepest floor of THIS site always ramps up toward its own level-20 cap;
-  // a castle or necromancer's tower still hits harder on top of that via
-  // sitePower's hp/dmg/xp multipliers
-  const sp = sitePower();
-  G.mon = [];
-  const monN = 4 + mn(16, rn(4) + Math.floor(d/1.2));
-  const floorLevel = floorCb(d);
-  for (let i=0;i<monN;i++){
-    const r = 1+rn(roomCnt-1);
-    const mx2 = roomX[r]+rn(roomW[r]), my2 = roomY[r]+rn(roomH[r]);
-    if (G.map[mx2][my2] !== T_FLOOR || G.mon.some(o=>o.x===mx2 && o.y===my2)) continue;
-    const entry = pickThemedMonsterEntry(floorLevel);
-    const m = newMonster();
-    m.alive=1; m.x=mx2; m.y=my2;
-    m.hp = roundH((rollDice(entry.hd,8) + entry.hd) * sp.hp);
-    m.maxHp = m.hp;
-    m.ac = entry.ac;
-    m.atkBonus = entry.atk;
-    m.dmg1 = entry.dmg1; m.dmg2 = roundH(entry.dmg2 * sp.dmg);
-    m.xp = roundH(entry.xp * sp.xp);
-    m.sym = entry.sym; m.nm = entry.nm; m.baseNm = entry.nm; m.col = monsterCol(entry); m.undead = entry.undead; m.mlevel = entry.lvl;
-    m.abilities = entry.abilities.slice(); m.art = entry.art; monEntryExtras(m, entry);
-    m.corrupted = rollCorruptedFlag(); applyCorruption(m);
-    G.mon.push(m);
-    if (G.mon.length >= MAXMON) break;
-  }
+  if (roomX.length < 2){ roomX.length = roomY.length = roomW.length = roomH.length = 0; roomX.push(2, COLS-8); roomY.push(2, ROWS-8); roomW.push(5, 5); roomH.push(5, 5); }
+  const n = roomX.length, cx = i=>roomX[i]+roomW[i]/2, cy = i=>roomY[i]+roomH[i]/2;
+  // the way down goes in the room farthest from the first
+  { let far = 1, fd = -1; for (let i=1;i<n;i++){ const dd = Math.abs(cx(i)-cx(0)) + Math.abs(cy(i)-cy(0)); if (dd > fd){ fd = dd; far = i; } }
+    for (const A of [roomX, roomY, roomW, roomH]){ const t = A[far]; A[far] = A[n-1]; A[n-1] = t; } }
+  const room = makeGrid(-1, COLS, ROWS);
+  for (let i=0;i<n;i++) for (let yy=0;yy<roomH[i];yy++) for (let xx=0;xx<roomW[i];xx++){ G.map[roomX[i]+xx][roomY[i]+yy] = T_FLOOR; room[roomX[i]+xx][roomY[i]+yy] = i; }
+  G.genRooms = roomX.map((x,i)=>({ x, y:roomY[i], w:roomW[i], h:roomH[i], k:'plain' }));
+  // the rock a corridor may run through: inside the border, never a tile that touches a room (its ring of wall stays whole but
+  // for the doorways), never beside another corridor unless it is the one it came along - it may join one, and branch off one
+  const nearRoom = (x,y)=>{ for (let i=-1;i<=1;i++) for (let j=-1;j<=1;j++){ const X = x+i, Y = y+j; if (X>=0 && Y>=0 && X<COLS && Y<ROWS && room[X][Y] >= 0) return true; } return false; };
+  const cor = makeGrid(false, COLS, ROWS), doors = [];
+  const okStep = (x, y, px, py)=>{
+    if (x<1 || y<1 || x>=COLS-1 || y>=ROWS-1 || room[x][y] >= 0) return false;
+    if (cor[x][y]) return true;
+    if (nearRoom(x, y)) return false;
+    for (const [i,j] of [[1,0],[-1,0],[0,1],[0,-1]]){ const X = x+i, Y = y+j; if (cor[X] && cor[X][Y] && !(X===px && Y===py)) return false; }
+    return true;
+  };
+  // the doorway in room a's wall nearest room b: a doorway already there is preferred, one a tile or two from another avoided
+  const doorOf = (a, b)=>{
+    const tx = cx(b), ty = cy(b), cand = []; let best = null, bd = 1e9;
+    for (let xx=1; xx<roomW[a]-1; xx++){ cand.push([roomX[a]+xx, roomY[a]-1, 0, -1]); cand.push([roomX[a]+xx, roomY[a]+roomH[a], 0, 1]); }
+    for (let yy=1; yy<roomH[a]-1; yy++){ cand.push([roomX[a]-1, roomY[a]+yy, -1, 0]); cand.push([roomX[a]+roomW[a], roomY[a]+yy, 1, 0]); }
+    for (const [x, y, nx, ny] of cand){ const ox = x+nx, oy = y+ny; if (ox<1 || oy<1 || ox>=COLS-1 || oy>=ROWS-1 || room[ox][oy] >= 0 || nearRoom(ox, oy)) continue;
+      const have = doors.some(q=>q.x===x && q.y===y), crowd = doors.some(q=>q.r===a && !(q.x===x && q.y===y) && Math.abs(q.x-x)+Math.abs(q.y-y) < 3);
+      const dd = Math.hypot(x-tx, y-ty) + Math.random()*2 - (have ? 3 : 0) + (crowd ? 8 : 0);
+      if (dd < bd){ bd = dd; best = { x, y, r:a, nx, ny }; } }
+    return best;
+  };
+  // a corridor from one doorway's doorstep to the other's: the cheapest way through the rock, straight runs preferred to
+  // bends and corridors already dug to fresh ones (so they meet and branch instead of running in parallel)
+  const dig = (A, B)=>{
+    const sx = A.x+A.nx, sy = A.y+A.ny, gx = B.x+B.nx, gy = B.y+B.ny, DIRS = [[1,0],[0,1],[-1,0],[0,-1]];
+    const key = (x,y,dr)=>(x*ROWS+y)*4+dr, best = new Map(), from = new Map(), open = [];
+    for (let dr=0;dr<4;dr++){ best.set(key(sx,sy,dr), 0); open.push([0, sx, sy, dr]); }
+    let hit = null;
+    while (open.length){
+      let bi = 0; for (let i=1;i<open.length;i++) if (open[i][0] < open[bi][0]) bi = i;
+      const [c, x, y, dr] = open.splice(bi, 1)[0]; if (c > best.get(key(x,y,dr))) continue;
+      if (x===gx && y===gy){ hit = key(x,y,dr); break; }
+      for (let nd=0; nd<4; nd++){ const X = x+DIRS[nd][0], Y = y+DIRS[nd][1]; if (!okStep(X, Y, x, y)) continue;
+        const nc = c + (cor[X][Y] ? 0.6 : 1) + (nd!==dr ? 2 : 0), k = key(X,Y,nd);
+        if (nc < (best.has(k) ? best.get(k) : 1e9)){ best.set(k, nc); from.set(k, key(x,y,dr)); open.push([nc, X, Y, nd]); } }
+    }
+    if (hit===null) return false;
+    for (let k = hit; k!==undefined; k = from.get(k)){ const dr = k%4, y = Math.floor(k/4)%ROWS, x = Math.floor(k/4/ROWS); cor[x][y] = true; G.map[x][y] = T_FLOOR; if (x===sx && y===sy) break; }
+    for (const D of [A, B]){ G.map[D.x][D.y] = T_FLOOR; if (!doors.some(q=>q.x===D.x && q.y===D.y)){ doors.push(D); G.dungeonDeco[D.x][D.y] = chn(0.5) ? 'door' : 'arch'; } }
+    return true;
+  };
+  const link = (a, b)=>{ for (let t=0;t<4;t++){ const A = doorOf(a, b), B = doorOf(b, a); if (A && B && dig(A, B)) return true; } return false; };
+  // the nearest rooms first, until every room is on: then a loop or two between rooms that aren't far apart
+  const on = [0], off = []; for (let i=1;i<n;i++) off.push(i);
+  while (off.length){ let bi = 0, bj = 0, bd = 1e9; for (const i of on) for (let j=0;j<off.length;j++){ const dd = Math.abs(cx(i)-cx(off[j])) + Math.abs(cy(i)-cy(off[j])); if (dd < bd){ bd = dd; bi = i; bj = j; } }
+    const j = off.splice(bj, 1)[0]; if (!link(bi, j)){ const [ax, ay] = [Math.floor(cx(bi)), Math.floor(cy(bi))], [bx, by] = [Math.floor(cx(j)), Math.floor(cy(j))]; let x = ax, y = ay; while (x!==bx){ G.map[x][y] = T_FLOOR; x += x<bx?1:-1; } while (y!==by){ G.map[x][y] = T_FLOOR; y += y<by?1:-1; } }   /* (a straight cut, if the rock allows nothing better - it never happens on a floor this size) */
+    on.push(j); }
+  for (let e=0, want2=1+rn(2); e<want2 && n>3; e++){ const i = rn(n), j = rn(n); if (i===j || Math.abs(cx(i)-cx(j)) + Math.abs(cy(i)-cy(j)) > 18) continue; link(i, j); }
+  // stairs down in the last room, the way in (and the stairs up) in the first
+  { const r = n-1; G.map[roomX[r]+rn(roomW[r])][roomY[r]+rn(roomH[r])] = T_STAIRSD; }
+  G.genStart.x = roomX[0]+rn(roomW[0]); G.genStart.y = roomY[0]+rn(roomH[0]);
+  if (d>1) G.map[G.genStart.x][G.genStart.y] = T_STAIRSU;
+  return { roomX, roomY, roomW, roomH, roomCnt:n };
 }
 
 // rolls one monster onto the map at (x,y) using the same species/power-curve
@@ -5880,7 +5964,7 @@ function hasLineOfSight(x0,y0,x1,y1){
     if (e2>=dy){ err+=dy; x+=sx; }
     if (e2<=dx){ err+=dx; y+=sy; }
     if (x===x1 && y===y1) return true;
-    if (tileAt(x,y)===T_WALL) return false; // a wall stands directly in the path
+    if (tileAt(x,y)===T_WALL || dgOpaque(x, y)) return false; // a wall (or a shut door) stands directly in the path
   }
 }
 // (RS-150) can a shot, arrow or spell get from one tile to the other? Stricter than sight: it may not slip
@@ -5897,7 +5981,7 @@ function shotRay(x0,y0,x1,y1){
     if (mx && my && (tileAt(x+mx, y)===T_WALL || tileAt(x, y+my)===T_WALL)) return false;   // squeezing past a corner
     x += mx; y += my;
     if (x===x1 && y===y1) return true;
-    if (tileAt(x,y)===T_WALL) return false;
+    if (tileAt(x,y)===T_WALL || dgOpaque(x, y)) return false;
   }
   return true;
 }
@@ -7108,7 +7192,7 @@ function tickMonsters(excludeIdx){
       if (dx && dy && Math.abs(G.player.x-m.x)+Math.abs(G.player.y-m.y)<=2){ if (Math.abs(G.player.x-m.x-dx)+Math.abs(G.player.y-m.y)<=1 || chn(0.5)) dy = 0; else dx = 0; }   // a dash ends square-on
       const nx=m.x+dx, ny=m.y+dy;
       if (nx===G.player.x && ny===G.player.y){ monsterAttacks(i); break; }
-      if (tileAt(nx,ny)!==T_WALL && !occupiedBy(nx,ny,i) && diagClear(m.x, m.y, dx, dy, tileOpen)){ m.x=nx; m.y=ny; } else break;
+      if (tileAt(nx,ny)!==T_WALL && !occupiedBy(nx,ny,i) && diagClear(m.x, m.y, dx, dy, tileOpen)){ dgDoorOpen(nx, ny, true); m.x=nx; m.y=ny; } else break;
       /* (RS-171) a dash stops once it's beside you, and a rusher picks its second step afresh - it used to run on past you and back again every turn */
       if (fleeing) continue;
       if (Math.abs(G.player.x-m.x)+Math.abs(G.player.y-m.y)<=1) break;
@@ -7278,6 +7362,7 @@ function tryMove(dx,dy){
     return;
   }
   if (dgBumpChest(nx, ny)) return;   /* (RS-369) a chest opens where it stands */
+  if (dgDoorAt(nx, ny)){ dgDoorOpen(nx, ny); tickMonsters(); return; }   /* (RS-407: a shut door takes a turn to push open) */
   if (dgSolid(nx, ny)){ const D = G.dungeonDeco, d = D && D[nx] && D[nx][ny]; if (d==='chests_v') logMsg("the vault's lock is jammed shut for good", ''); return; }   /* (barrels, crates, rubble, bones: in the way, no turn spent) */
   if (dgBlocked(nx, ny)) return;
   G.player.x=nx; G.player.y=ny;
@@ -7426,7 +7511,7 @@ function deleteSaveById(id){
   removeIndexEntry(id); saveLockSet(id, false);
 }
 /* (RS-405) a locked adventurer can't be deleted from the title screen until it is unlocked again. Kept in its own key, apart
-   from the save index (which every save rewrites). A hardcore death still ends a locked character: that is the mode's rule */
+   from the save index (which every save rewrites). (RS-407) A locked hardcore character survives its deaths like a standard one (hcFatal) */
 const SAVE_LOCK_KEY = 'depthcrawl_locks';
 function saveLocks(){ try{ const v = JSON.parse(localStorage.getItem(SAVE_LOCK_KEY)||'[]'); return Array.isArray(v) ? v : []; }catch(e){ return []; } }
 function saveLocked(id){ return saveLocks().includes(id); }
@@ -14019,7 +14104,7 @@ function monStep(m, i, dx, dy){
   const nx = m.x+dx, ny = m.y+dy, p = G.player;
   if (!dx && !dy) return false;
   if ((nx===p.x && ny===p.y) || tileAt(nx,ny)===T_WALL || dgSolid(nx, ny) || occupiedBy(nx,ny,i)) return false;
-  m.x = nx; m.y = ny; return true;
+  dgDoorOpen(nx, ny, true); m.x = nx; m.y = ny; return true;   /* (RS-407: a monster shoves a shut door open on its way through) */
 }
 function monStepToward(m, i, tx, ty){
   const dx = Math.sign(tx-m.x), dy = Math.sign(ty-m.y), xFirst = Math.abs(tx-m.x) >= Math.abs(ty-m.y);
@@ -14321,7 +14406,7 @@ function fpRails(base){
 }
 
 // ---- dressing: what lies about a floor, by the kind of site ----
-const DRESS_DECOS = ['pgrave','barrel','crate','rubble','cobweb','chains','moss','skulls','banner2','brazier','lava','puddle','crystal','blade','dig','lchest','ldoor','raidgate','raidexit','plate0','plate1','plate2','plate3','raidchest','ldooro','chesto_v','chesto_c','chesto_i','chesto_r','chests_v'];
+const DRESS_DECOS = ['pgrave','barrel','crate','rubble','cobweb','chains','moss','skulls','banner2','brazier','lava','puddle','crystal','blade','dig','lchest','ldoor','door','dooro','arch','raidgate','raidexit','plate0','plate1','plate2','plate3','raidchest','ldooro','chesto_v','chesto_c','chesto_i','chesto_r','chests_v'];
 const DRESS_KITS = {
   dungeon:['barrel','crate','rubble','cobweb','chains','skulls','moss'], castle:['barrel','crate','banner2','brazier','chains','barrel'],
   necro:['skulls','chains','cobweb','brazier','crystal'], temple:['moss','rubble','brazier','puddle','cobweb','moss'],
@@ -14476,6 +14561,25 @@ function bladeAngle(fired, now, t, ph){
   const k = (tau - 2.4)/1.0, s = k*k*(3 - 2*k); return sw(2.4)*(1 - s) + C*s;   /* (hauled back up, ratchet by ratchet) */
 }
 function dgAvoid(x, y){ const D = G.gameMode===1 && G.dungeonDeco; if (!D || !D[x]) return false; const d = D[x][y]; return d==='lava' || d==='blade' || (d==='ldoor' && !skHave('dkey')); }
+/* (RS-407) the plain dungeons' doorways (dgLayoutRooms): 'arch' an open doorway, 'door' an oak door shut across it - it blocks
+   sight, and swings open ('dooro', on its hinges in dgPropModel) when you or a monster push through, which takes you a turn */
+const DG_DOOR_SHUT = ['door', 'ldoor'];
+/* (RS-407) which end of a doorway opens into its room, along the way through (+1 or -1, in the door model's own z): the end
+   whose tile has open floor on both sides. The corner pillars stand on that face, and the door hangs between them */
+function dgDoorSide(x, y, d){
+  if (d!=='door' && d!=='dooro' && d!=='arch') return 0;
+  const op = (a, b)=>a>=0 && b>=0 && a<COLS && b<ROWS && G.map[a][b]!==T_WALL, alongZ = !op(x-1, y);
+  if (alongZ) return op(x-1, y+1) && op(x+1, y+1) ? 1 : op(x-1, y-1) && op(x+1, y-1) ? -1 : 0;
+  return op(x+1, y-1) && op(x+1, y+1) ? 1 : op(x-1, y-1) && op(x-1, y+1) ? -1 : 0;
+}
+function dgDoorAt(x, y){ const D = G.gameMode===1 && G.dungeonDeco; return !!(D && D[x] && D[x][y]==='door'); }
+function dgOpaque(x, y){ const D = G.gameMode===1 && G.dungeonDeco; return !!(D && D[x] && DG_DOOR_SHUT.includes(D[x][y])); }
+function dgDoorOpen(x, y, mon){
+  if (!dgDoorAt(x, y)) return false;
+  G.dungeonDeco[x][y] = 'dooro'; CHEST_OPEN[G.depth+':'+x+','+y] = performance.now(); if (typeof FPD!=='undefined') FPD.mapRef = null;
+  try{ audEnv('door'); }catch(e){} if (!mon) logMsg('you push the door open', '');
+  return true;
+}
 function dgBlocked(x, y){
   if (G.gameMode!==1 || !G.dungeonDeco || !G.dungeonDeco[x]) return false;
   if (mimicCheck(x, y)) return true;
@@ -14617,6 +14721,24 @@ function dgPropModel(p, g, add, M, mats, h){
     a2(new T.BoxGeometry(0.1, 0.14, 0.12), gold, 0.69, 0.58, 0, hg);
     if (d==='ldooro') g.userData.anim = (t, ph, tx, ty)=>{ const at = tx===undefined ? 0 : chestOpenedAt(tx, ty), e = at ? (performance.now() - at)/1000 : 9, u = Math.max(0, Math.min(1, e/0.8)), s0 = 1 - Math.pow(1 - u, 3);
       hg.rotation.y = -1.65*s0 + (e > 0.8 && e < 1.5 ? Math.sin((e - 0.8)/0.7*Math.PI*2)*Math.exp(-(e - 0.8)*5)*0.08 : 0); };
+  } else if (d==='door' || d==='dooro' || d==='arch'){
+    /* (RS-407) the plain dungeons' doorways, set in the room's face between the two corner pillars the walls already stand there
+       (fpdBuild, at the tile's corners): a lintel across their tops, and hung from one pillar a door of oak planks on iron
+       straps with a ring to pull - shut, or swung back into the passage. An arch is the lintel alone */
+    const fr = M('dframe', '#4a4640', { roughness:0.9, flatShading:true }), oak = M('oakdoor', '#5a3a1e', { roughness:0.85 });
+    const dg0 = new T.Group(); dg0.rotation.y = p.rot; g.add(dg0);
+    const z0 = (p.side||0)*0.5, PI = 0.415, DH = 0.88;   /* (the room's face; the pillars' inner faces; the door's height, under their capitals) */
+    const a2 = (geo, mat, x, y, z, par)=>{ const m = new T.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = m.receiveShadow = true; (par||dg0).add(m); return m; };
+    a2(new T.BoxGeometry(PI*2, 0.08, 0.15), fr, 0, DH + 0.06, z0);
+    if (d!=='arch'){
+      const hg = new T.Group(); hg.position.set(-PI, 0, z0 - (p.side||0)*0.045); dg0.add(hg);
+      const pw = PI*2/5;
+      for (let i=0;i<5;i++) a2(new T.BoxGeometry(pw - 0.008, DH, 0.06), oak, pw*(i + 0.5), DH/2, 0, hg);   /* five planks, a hair apart */
+      for (const y of [0.17, DH - 0.17]){ a2(new T.BoxGeometry(PI*2 - 0.02, 0.045, 0.08), iron, PI, y, 0, hg); a2(new T.BoxGeometry(0.16, 0.07, 0.085), iron, 0.08, y, 0, hg); }
+      const ring = a2(new T.TorusGeometry(0.04, 0.011, 8, 16), iron, PI*2 - 0.12, DH*0.5, (p.side||1)*0.045, hg);
+      if (d==='dooro') g.userData.anim = (t, ph, tx, ty)=>{ const at = tx===undefined ? 0 : chestOpenedAt(tx, ty), e = at ? (performance.now() - at)/1000 : 9, u = Math.max(0, Math.min(1, e/0.7)), s0 = 1 - Math.pow(1 - u, 3);
+        hg.rotation.y = (p.side||1)*(1.55*s0 + (e > 0.7 && e < 1.4 ? Math.sin((e - 0.7)/0.7*Math.PI*2)*Math.exp(-(e - 0.7)*5)*0.07 : 0)); };   /* (back into the passage, away from the room) */
+    }
   } else if (d==='raidgate' || d==='raidexit'){
     const col = d==='raidgate' ? '#b060ff' : '#60c8ff';
     for (const s0 of [-1,1]){ add(new T.BoxGeometry(0.16, 1.3, 0.2), stone, s0*0.42, 0.65, 0); add(new T.BoxGeometry(0.2, 0.08, 0.24), stone, s0*0.42, 1.32, 0); }
@@ -38051,7 +38173,7 @@ function fpCollectSprites(vis){
   const midX = Math.floor(COLS/2), midY = Math.floor(ROWS/2);
   for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
     if (!seeTile(x,y)) continue;
-    if (x===G.player.x && y===G.player.y && !(G.gameMode===1 && G.dungeonDeco && G.dungeonDeco[x] && G.dungeonDeco[x][y]==='ldooro')) continue; // whatever you're standing on is underfoot, not in view (RS-375: but an open door's frame stays up round you)
+    if (x===G.player.x && y===G.player.y && !(G.gameMode===1 && G.dungeonDeco && G.dungeonDeco[x] && ['ldooro','dooro','arch'].includes(G.dungeonDeco[x][y]))) continue; // whatever you're standing on is underfoot, not in view (RS-375: but an open door's frame stays up round you)
     const t = G.map[x][y], cx = x+0.5, cy = y+0.5;
     if (t===T_WALL) continue;
     const addP = (entry, h, lift, extra)=> S.push(Object.assign({x:cx, y:cy, spr:fpUndeadSprite(entry,false), h, lift}, extra||{}));
@@ -38084,7 +38206,7 @@ function fpCollectSprites(vis){
     }
     if (t===T_FLOOR && (G.gameMode===1 || G.cellar) && G.dungeonDeco){
       const deco = G.dungeonDeco[x][y], oe = deco && deco!=='rune' && deco!=='pool' && deco!=='torch' && !(deco==='grave' && FPD.ok) && !(deco==='ore' && FPD.ok && ISO.on) && obDecoEntry(deco, x, y);   // (headstones are modelled when the GPU renderer is up)
-      if (isoM && DRESS_DECOS.includes(deco)) prop(deco==='banner2' ? { kind:'banner', necro:G.siteKind==='necro' } : { kind:'dress', d:deco, rot:(G.map[x-1] && G.map[x-1][y]===T_WALL) ? 0 : Math.PI/2 });
+      if (isoM && DRESS_DECOS.includes(deco)) prop(deco==='banner2' ? { kind:'banner', necro:G.siteKind==='necro' } : { kind:'dress', d:deco, rot:(G.map[x-1] && G.map[x-1][y]===T_WALL) ? 0 : Math.PI/2, side:dgDoorSide(x, y, deco) });
       else if (oe && isoM && ['throne','banner','altar','idol'].includes(deco)) prop({ kind:deco, necro:G.siteKind==='necro' });
       else if (oe){
         const h = {throne:0.9, banner:0.86, altar:0.5, idol:0.7, grave:0.5, ore:0.46}[deco] || 0.6;
@@ -38335,6 +38457,7 @@ function fpDrawMinimap(vis){
     else if (t===T_FLEE && G.gameMode===1) col = COL.red;
     else if (t===T_VAULT || t===T_GOLD) col = lit ? COL.gold : col;
     else if (t===T_ITEM && lit) col = '#b6d7e6';
+    { const dd = G.gameMode===1 && G.dungeonDeco && G.dungeonDeco[x] && G.dungeonDeco[x][y]; if (dd==='door' || dd==='ldoor') col = lit ? '#b8803c' : '#5c4020'; else if (dd==='dooro' || dd==='arch' || dd==='ldooro') col = lit ? '#7a5a32' : '#3c3020'; }   /* (RS-407: the doorways) */
     ctx.fillStyle = col;
     ctx.fillRect(x0+x*cp, y0+y*cp, Math.ceil(cp), Math.ceil(cp));
   }
@@ -38500,6 +38623,7 @@ function fpdWarm(){
     else if (t===T_ITEM && G.floorItem && G.floorItem[x] && G.floorItem[x][y]){ const it = G.floorItem[x][y]; add('item:'+(it.kind||'')+'|'+(it.slot||'')+'|'+(it.quality|0)+'|'+(it.consumable ? 1 : 0), { kind:'item', it }); }
     if (t===T_FLOOR && D && D[x] && D[x][y]){ const d = D[x][y];
       if (DRESS_DECOS.includes(d)) add('d:'+d, d==='banner2' ? { kind:'banner', necro } : { kind:'dress', d, rot:0 });
+      if (d==='door') add('d:dooro', { kind:'dress', d:'dooro', rot:0, side:1 });   /* (RS-407: the door as it stands once pushed open) */
       else if (['throne','banner','altar','idol'].includes(d)) add('k:'+d, { kind:d, necro }); } }
   for (const p of kinds.values()){ try{ grp.add(isoPropModel(Object.assign({ x:0, y:0 }, p))); }catch(e){ console.error(e); } }
   try{   // (RS-345) a billboard, as the painted creatures and the skeletons' sprites are drawn, and a mirrored see-through part
@@ -39532,8 +39656,9 @@ function isoTickPath0(now){
   const p = G.player, [nx, ny] = ISO.path.shift(), dx = nx-p.x, dy = ny-p.y;
   if (Math.max(Math.abs(dx), Math.abs(dy))!==1){ ISO.path = []; return; }
   const map0 = G.map, hp0 = p.hp, near = m=>m.alive && Math.abs(m.x-p.x)+Math.abs(m.y-p.y)===1, adj0 = G.mon.filter(near);
-  const trap = dgAvoid(nx, ny);
+  const trap = dgAvoid(nx, ny), door0 = dgDoorAt(nx, ny);
   isoStep([dx, dy]);
+  if (door0 && !dgDoorAt(nx, ny) && p.x!==nx && G.map===map0 && p.hp >= hp0){ ISO.path.unshift([nx, ny]); return; }   /* (RS-407: the door pushed open, the walk goes on through it) */
   if (G.map!==map0 || p.x!==nx || p.y!==ny || p.hp<hp0 && !(trap && p.hp >= effMaxHp()*0.2)){   /* (RS-313: a blade you chose to cross doesn't stop you on it, unless it leaves you badly hurt) */ ISO.path = []; ISO.mineAt = null; return; }
   if (!ISO.path.length && ISO.openAt){ const v = ISO.openAt; ISO.openAt = null; if (Math.abs(v.x-p.x)+Math.abs(v.y-p.y)===1){ ISO.nextStep = now + ISO_STEP_MS; ISO.path = [[v.x, v.y]]; } return; }
   if (!ISO.path.length && ISO.mineAt){ const v = ISO.mineAt; ISO.mineAt = null; if (Math.max(Math.abs(v.x-p.x), Math.abs(v.y-p.y))<=1) isoStartMine(v.x, v.y); return; }
@@ -39817,7 +39942,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-406';
+const GAME_VERSION = 'rs-407';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -41583,7 +41708,7 @@ function deathItemList(items, empty){
   return items.map(it=>`<div class="${rarityColorClass(it)}" style="font-size:12px;">${esc(it.nm)} <span class="muted">(${itemPrice(it)}g)</span></div>`).join('');
 }
 function buildDeath(){
-  if (!G.player.hardcore) return buildDeathStandard();
+  if (!hcFatal()) return buildDeathStandard();
   let placeStr;
   if (G.gameMode===1) placeStr = `at depth ${G.depth}`;
   else if (G.gameMode===2) placeStr = 'in a roadside skirmish';
@@ -42130,7 +42255,7 @@ function handleKeydown(e){
     }
     case 'bossPreview': { if (k==='Enter' || k==='Escape') bossPreviewContinue(); break; }
     case 'victory': { if (k==='Enter' || k==='Escape') victoryContinue(); break; }
-    case 'death': { if (k==='Enter'){ if (G.player.hardcore) descendAgain(); else continueAfterDeath(); } else if ((k==='g' || k==='G') && !G.player.hardcore) continueAfterDeath(true); else if (k==='Escape') quitGame(); break; }
+    case 'death': { if (k==='Enter'){ if (hcFatal()) descendAgain(); else continueAfterDeath(); } else if ((k==='g' || k==='G') && !hcFatal()) continueAfterDeath(true); else if (k==='Escape') quitGame(); break; }
     case 'help': { if (k==='Escape' || k==='Enter') closeHelp(); break; }
     case 'pause': {
       if (k==='Escape' || k==='Enter') setUi('playing');
