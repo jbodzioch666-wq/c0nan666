@@ -11,7 +11,7 @@ module.exports = async page=>{
     const out = { leader:encLeader(e).nm, has:o3HasModel(encLeader(e)) };
     for (let i=0;i<160 && SK3.ok!==true;i++){ sk3Init(); await wait(250); }   /* (the skeleton is sculpted over a few frames) */
     out.skOk = SK3.ok===true; 
-    for (let i=0;i<6;i++){ renderGame(); try{ o3Render(); }catch(err){} await wait(60); const f = O3.beasts && (O3.beasts.get('enc9901:skeleton') || null); out.keys = O3.beasts ? [...O3.beasts.keys()] : null; out.o3 = o3Active(); if (f && f.e && f.e.sk){ out.sk = true; out.h = +f.top.toFixed(2); out.inScene = !!f.e.holder.parent; break; } await wait(100); }
+    for (let i=0;i<40;i++){ renderGame(); try{ o3Render(); }catch(err){} await wait(30); const f = O3.beasts && (O3.beasts.get('enc9901:skeleton') || null); out.keys = O3.beasts ? [...O3.beasts.keys()] : null; out.o3 = o3Active(); if (f && f.e && f.e.sk){ out.sk = true; out.h = +f.top.toFixed(2); out.inScene = !!f.e.holder.parent; break; } await wait(100); }
     return out; });
   A(R.leader==='skeleton' && R.has, 'a skeleton leads, and counts as having a model: '+JSON.stringify(R));
   A(R.sk && R.inScene, 'it walks the land as the sculpted skeleton: '+JSON.stringify(R));

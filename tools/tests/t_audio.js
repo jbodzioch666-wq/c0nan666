@@ -42,6 +42,7 @@ module.exports = async page=>{
     // RS-124: rain is six rendered loops, picked by weather, place and how long it has rained
     G.weather = 'storm'; G.ui = 'playing'; for (let i=0;i<150 && !(AUD.amb['rain:storm'] && AUD.amb['rain:storm'].lv > 0.05);i++) await frames(1);
     out.rain = +(AUD.amb['rain:storm'] ? AUD.amb['rain:storm'].lv : 0).toFixed(3); A(out.rain > 0.05, 'the storm is heard: '+out.rain); A(!AUD.amb.rain, 'the old hiss is gone');
+    A(RAIN_VOL===0.15 && out.rain <= rainMix().storm*RAIN_VOL + 0.005, 'RS-404: the rain plays at 15% of its old level: '+out.rain);
     A(AUD.rainBuf.storm.duration > 15 && AUD.rainBuf.storm.getChannelData(0).some(v=>Math.abs(v) > 0.05), 'the storm loop has sound in it');
     const mix = ()=>{ const m = rainMix(); return Object.keys(m).filter(k=>m[k] > 0).sort().join('+'); }, top = ()=>{ const m = rainMix(); return Object.keys(m).sort((a,b)=>m[b]-m[a])[0]; };
     const was = { t:G.ow.map[G.owPos.x][G.owPos.y] }; G.ow.map[G.owPos.x][G.owPos.y] = OW_GRASS;

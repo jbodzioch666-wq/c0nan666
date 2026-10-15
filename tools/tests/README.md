@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| grottoexit | Out of a grotto, cave or ruin (won, fled or turned away) you stand on the next tile, not inside its model |
 | walkstutter | A long walk: the new land compiles a few shaders a frame before the swap, the woods build in slices, animals in reach are kept |
 | nativeres | RS-403: every view at the screen's own resolution; one scaler steps down only under 60 fps |
 | owdraws | RS-401: the open land's draws - batched gathering-spot effects, merged land, creature culling and shadow distance |

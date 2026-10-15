@@ -22,6 +22,6 @@ module.exports = async page=>{
   console.log(JSON.stringify(r));
   if (!(r.DG <= 0.6 && r.lan <= r.R*1.8*0.6)) throw new Error('your lantern reaches less far '+JSON.stringify(r));
   if (r.torch!==null && r.torch > 6.5*0.6) throw new Error('the torches reach less far '+r.torch);
-  if (r.shaftW!==null && r.shaftW >= 0.55) throw new Error('the shafts of light are narrower '+r.shaftW);
+  if (r.shaftW!==null) throw new Error('RS-404: no shafts of light falling in the dungeons any more '+r.shaftW);
   if (!r.arm || r.still > 0.05 || r.swing < 0.3) throw new Error('the blade hangs still until sprung, then sweeps in real time '+JSON.stringify(r));
 };

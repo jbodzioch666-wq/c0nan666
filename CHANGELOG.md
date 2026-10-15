@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-404 - New creatures without the hitch, quieter rain
+
+- **New creatures appear smoothly.** A creature kind you haven't seen yet is now sculpted a few parts per frame instead of all at once. It shows up a moment later, without the brief freeze.
+- **Rain is 85% quieter.** Every kind of rain is turned down: drizzle, downpour, rain on roofs, on leaves and in caves.
+- **Window colours hold steady.** The glass in a room's windows changed colour a few seconds after you walked in. It now keeps the colour of the hour it showed when you entered: rose at dawn, warm by day, deep orange at dusk.
+- **Out of the grotto, in front of it.** Leaving a grotto, cave or ruin (won, fled, or turned away at the mouth) now puts you on the tile in front of it, not inside its rock.
+- **No light shafts in dungeons.** The beams of light falling from the ceiling are gone. Dungeons are lit by their wall sconces alone.
+
 ## RS-403 - The long walk, and the screen's own resolution
 
 - **No more stutter every twenty-odd tiles.** When the land ahead is built, its shaders are now compiled a few per frame before it appears, instead of the whole scene at once in the frame it swaps in.

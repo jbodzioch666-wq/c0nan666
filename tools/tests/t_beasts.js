@@ -19,7 +19,7 @@ module.exports = async page=>{
     // on the map: wake the giant beside you, stand by a beast, and draw the land
     const b = alive()[0]; G.owPos = { x:b.x + 2, y:b.y };
     const ev = G.ow.ev || wevP(); ev.boss = ev.boss || { g:0, state:'sleep', until:0 }; Object.assign(ev.boss, { state:'awake', x:b.x - 2, y:b.y, hx:b.x - 2, hy:b.y, until:(G.player.turnCount||0) + 300 });
-    for (let i=0;i<6;i++){ renderGame(); try{ o3Render(); }catch(err){} await new Promise(r=>setTimeout(r, 60)); }
+    for (let i=0;i<40;i++){ renderGame(); try{ o3Render(); }catch(err){} await new Promise(r=>setTimeout(r, 30)); }   /* (RS-404: a new kind is sculpted over a few frames) */
     const F = O3.beasts || new Map(), fb = F.get('myth'+b.i), fg = F.get('boss'+ev.boss.g);
     let bossSprites = 0; const icon = O3.tex && O3.tex['wboss'+ev.boss.g]; if (O3.evGrp) O3.evGrp.traverse(o=>{ if (o.isSprite && icon && o.material.map===icon) bossSprites++; });
     out.map = { o3:o3Active(), beast:!!fb, giant:!!fg, giantMeshes:fg ? (()=>{ let n = 0; fg.e.holder.traverse(o=>{ if (o.isMesh) n++; }); return n; })() : 0, bossSprites };
