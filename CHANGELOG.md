@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-424 - Lamps that stay lit, a simpler square
+
+- **The lamps stay lit at night.** A town only has a few real lights, and they go to the lamps nearest you, so the lamps you walked away from went dark. Now every street lamp, door lantern and torch casts a soft pool of light on the ground and glows at its head all night, wherever you are. Where a real light has the lamp, its pool dims so it isn't twice as bright, and a light moving on to a new lamp fades up there instead of snapping on.
+- **The waypoint, pared back.** The four obelisks are gone, leaving the three round steps and the runes. The flagstone rings and the kerb round the square are gone too, so the old cobbles are back, with the compass rose still inlaid round the stone.
+
 ## RS-423 - The shut tome
 
 - **One book, not two.** When you carried a spell tome shut out of a fight, the open book's pages and boards still showed through the closed one, as if one book were inside the other. When a figure is put together, the small parts of what it carries are joined into one mesh to draw faster, and the open book had been joined onto the tome itself, so it no longer hid when the book shut. Each named part, like the open and the shut book, is now joined on its own, so only the book you're holding shows.

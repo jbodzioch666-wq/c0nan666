@@ -35,7 +35,7 @@ module.exports = async page=>{
     for (const b of VILLAGE_BUILDINGS) if (b.door && !near(b.door.x, b.door.y)) cut.push(b.key);
     for (const n of G.villageNpcs) if (!near(n.x, n.y)) cut.push(n.service);
     { const [bx, by] = townBoardAt(); if (!near(bx, by)) cut.push('board'); } if (!near(wx, wy)) cut.push('waypoint');
-    for (const v of G.villagers) if (!pass(v.x, v.y) && !v.indoors) cut.push('villager');
+    for (const v of G.villagers) if (!v.indoors && G.villageDeco[v.x][v.y]==='pbench') cut.push('villager on a bench ' + v.x + ',' + v.y + ' ' + G.map[v.x][v.y]);   /* (a townsperson is never left inside a bench) */
     waypointArrive(G.owPos.x + ',' + G.owPos.y); G.portalFx = null; setUi('playing');
     out.town = { wp:[wx, wy], centre:[tX(12), tY(11)], tile:G.map[wx][wy]===T_WAYPOINT, lamps, benches, cut, arrive:[G.player.x - townWpAt()[0], G.player.y - townWpAt()[1]], floor:G.map[G.player.x][G.player.y]===T_FLOOR };
     // in town your weapon is put away
