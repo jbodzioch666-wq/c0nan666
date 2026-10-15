@@ -20,7 +20,7 @@ module.exports = async page=>{
       if (tileOpen(x, y) && tileOpen(p.x+ax, p.y) && tileOpen(p.x, p.y+ay) && tileOpen(p.x+2*ax, p.y) && tileOpen(p.x, p.y+2*ay)){
         if (!hasAbility(m, 'aggressive')) m.abilities = (m.abilities||[]).concat('aggressive');
         m.x = x; m.y = y; m.engaged = true; const seen = [];
-        for (let t=0;t<4;t++){ p.turnCount = (p.turnCount||0) + 1; tickMonsters(); seen.push(Math.abs(m.x-p.x)+Math.abs(m.y-p.y)); }
+        for (let t=0;t<4;t++){ p.turnCount = (p.turnCount||0) + 1; tickMonsters(); seen.push(Math.max(Math.abs(m.x-p.x), Math.abs(m.y-p.y))); }   /* (RS-420: beside you square-on or on the diagonal - it strikes from either; it mustn't run on past) */
         dash = seen; break; } }
     return { path0, after, adj:Math.abs(m.x-p.x)+Math.abs(m.y-p.y), dash };
   });

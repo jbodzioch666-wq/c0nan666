@@ -684,6 +684,10 @@
   #xpTracker .xpt-row{ margin-top:5px; } #xpTracker .xpt-h{ display:flex; align-items:center; gap:5px; }
   #xpTracker .xpt-g{ margin-left:auto; color:#ffd98a; }
   #xpTracker .xpt-bar{ height:4px; background:rgba(255,255,255,0.1); border-radius:2px; margin:3px 0 2px; overflow:hidden; } #xpTracker .xpt-bar i{ display:block; height:100%; }
+  .necropanel{ position:fixed; z-index:60; display:none; background:linear-gradient(180deg, rgba(34,29,23,0.96), rgba(20,17,14,0.96)); border:1px solid #6a5236; border-radius:6px; padding:8px 10px; max-width:340px; font-size:12px; }
+  .necropanel .necroph{ font-size:10px; letter-spacing:1px; color:#b4c0ca; margin:2px 0 4px; display:flex; gap:6px; align-items:center; } .necropanel .necroph .xpt-x{ margin-left:auto; cursor:pointer; }
+  .necropanel .necrorow{ display:flex; flex-wrap:wrap; gap:4px; margin-bottom:6px; } .necropanel .btn{ padding:3px 7px; font-size:11px; }
+  #necroBtn .necropick{ margin-left:8px; padding:0 4px; border-left:1px solid rgba(255,255,255,0.25); cursor:pointer; }
   #xpTracker .xpt-s{ display:flex; justify-content:space-between; color:#9aa6b0; font-size:10px; }
   #buffBar{ position:fixed; left:14px; top:110px; max-width:230px; z-index:31; display:none; flex-wrap:wrap; gap:4px; }
   #buffBar .bf{ position:relative; width:28px; height:28px; border-radius:6px; background:rgba(14,18,24,0.88); border:1px solid var(--bc); box-shadow:inset 0 0 8px color-mix(in srgb, var(--bc) 40%, transparent); display:flex; align-items:center; justify-content:center; color:var(--bc); font-size:15px; line-height:1; cursor:default; }
@@ -7170,8 +7174,9 @@ function tickMonsters(excludeIdx){
     }
 
     // held by Bind, Snare, Entangle, a grasp or ice: it can't step, but still strikes if you're beside it
-    if (m.rootTurns>0){ m.rootTurns--; if (dist===1) monsterAttacks(i); continue; }
+    if (m.rootTurns>0){ m.rootTurns--; if (dist===1 || monDiagAdj(m)) monsterAttacks(i); continue; }
     const fleeing = (hasAbility(m,'nimbleEscape') && m.hp < m.maxHp*0.25) || (m.frightenedTurns>0); // Fear - it runs from you rather than closing in
+    if (!fleeing && monDiagAdj(m)){ monsterAttacks(i); continue; }   /* (RS-420: it strikes from the diagonal, as from the side) */
     let dx=0, dy=0;
     // (RS-169) anything that fights hand to hand rushes you - from well off, and round walls rather than stopping at them
     const rusher = !fleeing && rsMonStyle(m)==='melee' && !['archer','caster'].includes(monAi(m).role) && (dist<=14 || m.engaged);
@@ -7180,7 +7185,7 @@ function tickMonsters(excludeIdx){
     else if (dist<=5){
       dx = sg(G.player.x-m.x); dy = sg(G.player.y-m.y);
       if (fleeing){ dx=-dx; dy=-dy; } // a bloodied goblin disengages and runs instead of fighting on
-      const diagOk = dx!==0 && dy!==0 && (fleeing || dist>2) && diagClear(m.x, m.y, dx, dy, tileOpen) && tileAt(m.x+dx, m.y+dy)!==T_WALL && !occupiedBy(m.x+dx, m.y+dy, i);
+      const diagOk = dx!==0 && dy!==0 && diagClear(m.x, m.y, dx, dy, tileOpen) && tileAt(m.x+dx, m.y+dy)!==T_WALL && !occupiedBy(m.x+dx, m.y+dy, i);
       if (dx!==0 && dy!==0 && !diagOk){ if (chn(0.5)) dy=0; else dx=0; }
     } else if (chn(0.5)){
       const d = dirs[rn(4)]; dx=d[0]; dy=d[1];
@@ -7191,13 +7196,12 @@ function tickMonsters(excludeIdx){
     const steps = (hasAbility(m,'aggressive') && !fleeing) ? 2 : 1;
     for (let s=0; s<steps; s++){
       if (G.gameOver || !m.alive) break;
-      if (dx && dy && Math.abs(G.player.x-m.x)+Math.abs(G.player.y-m.y)<=2){ if (Math.abs(G.player.x-m.x-dx)+Math.abs(G.player.y-m.y)<=1 || chn(0.5)) dy = 0; else dx = 0; }   // a dash ends square-on
       const nx=m.x+dx, ny=m.y+dy;
       if (nx===G.player.x && ny===G.player.y){ monsterAttacks(i); break; }
       if (tileAt(nx,ny)!==T_WALL && !occupiedBy(nx,ny,i) && diagClear(m.x, m.y, dx, dy, tileOpen)){ dgDoorOpen(nx, ny, true); m.x=nx; m.y=ny; } else break;
       /* (RS-171) a dash stops once it's beside you, and a rusher picks its second step afresh - it used to run on past you and back again every turn */
       if (fleeing) continue;
-      if (Math.abs(G.player.x-m.x)+Math.abs(G.player.y-m.y)<=1) break;
+      if (Math.abs(G.player.x-m.x)+Math.abs(G.player.y-m.y)<=1 || monDiagAdj(m)) break;
       if (chase){ const c2 = monChaseDir(m, i); if (!c2) break; dx = c2[0]; dy = c2[1]; }
     }
   }
@@ -7334,7 +7338,7 @@ function tryMove(dx,dy){
   const nx = G.player.x+dx, ny = G.player.y+dy;
   let mi=-1;
   for (let i=0;i<G.mon.length;i++) if (G.mon[i].alive && G.mon[i].x===nx && G.mon[i].y===ny){ mi=i; break; }
-  if (mi>=0 && dx && dy){ const now = performance.now(); if (!(G.diagWarnT > now - 4000)){ G.diagWarnT = now; logMsg('you can\'t strike from the corner - step beside it', ''); } return; }   // melee is square-on (no turn spent)
+  if (mi>=0 && dx && dy && !diagClear(G.player.x, G.player.y, dx, dy, tileOpen)){ const now = performance.now(); if (!(G.diagWarnT > now - 4000)){ G.diagWarnT = now; logMsg('you can\'t reach it round the corner', ''); } return; }   // (RS-420: on the diagonal, as the monsters do - but not round a wall's corner; no turn spent)
   if (mi>=0){
     if (!foeHurry()) return;   /* (RS-218/312: their answer to your last blow lands first) */
     G.deferFoe = foeDeferOn();
@@ -10953,6 +10957,10 @@ function xptPicked(){ const p = G.player; return p && Array.isArray(p.xpPick) ? 
 function xptList(){ const pk = xptPicked(); return pk ? pk.slice() : XPT.order; }
 function xptBox(k){ const pk = xptPicked(), on = pk ? pk.includes(k) : XPT.order.includes(k);
   return `<label class="xptpick" title="show this skill in the XP window" onclick="event.stopPropagation()"><input type="checkbox" ${on ? 'checked' : ''} onchange="xptToggle('${k}', this.checked)"></label>`; }
+/* (RS-420) the skills menu's switch: auto, the XP window follows the skills you last trained; manual, it shows the ones you tick */
+function xptAuto(){ return !xptPicked(); }
+function xptSetAuto(on){ const p = G.player; if (!p) return; if (on) p.xpPick = null; else p.xpPick = XPT.order.slice(); XPT.hidden = false; for (const x of xptList()) XPT.skills[x] = XPT.skills[x] || { gained:0, since:Date.now() }; renderXpTracker(); saveCurrentGame(); renderOverlay(); }
+function xptAutoBtn(){ const a = xptAuto(); return `<button class="btn${a ? ' primary' : ''}" title="${a ? 'the XP window follows the skills you train - turn off to pick them yourself with the boxes' : 'the XP window shows the skills you tick - turn on to have it follow what you train'}" onclick="xptSetAuto(${!a})">XP tracker: ${a ? 'auto' : 'manual'}</button>`; }
 function xptToggle(k, on){ const p = G.player; if (!p) return;
   if (!Array.isArray(p.xpPick)) p.xpPick = XPT.order.slice();   // (the first tick starts from what the window was showing)
   p.xpPick = p.xpPick.filter(x=>x!==k); if (on) p.xpPick.push(k);
@@ -11789,6 +11797,7 @@ function buildSkills(){
   return `<h2 class="panel-title">SKILLS &amp; TRADES</h2>
     <div class="sub">Every skill goes from 1 to 99, with a perk at 25, 50, 75 and 99. Combat skills train as you fight, the rest as you work. <b>Click a skill</b> for its guide; <b>tick its box</b> to show it in the XP window. Press <kbd>E</kbd> to gather or work wherever you stand, <kbd>U</kbd> to eat.</div>
     <div class="ovbody">
+      <div class="btnrow" style="margin:0 0 8px;">${xptAutoBtn()}</div>
       ${buildRsCombatSkills()}
       <div class="skgrid">${skills}</div>
       <h4 style="color:var(--ink-faint);margin:12px 0 6px;">TOTAL LEVEL ${rsTotalLevel()}</h4>${totalGatesHtml()}${masteryHtml()}${trophiesHtml()}
@@ -17812,10 +17821,13 @@ function monChaseMap(){
 function monChaseDir(m, i){
   const d = monChaseMap(), W = COLS, here = d[m.x + m.y*W]; if (here < 0) return null;
   let best = null, bd = here;
-  for (const [ax, ay] of [[1,0],[-1,0],[0,1],[0,-1]]){ const nx = m.x+ax, ny = m.y+ay; if (nx<0 || ny<0 || nx>=W || ny>=ROWS) continue; const v = d[nx + ny*W];
-    if (v < 0 || v >= bd) continue; if (!(nx===G.player.x && ny===G.player.y) && occupiedBy(nx, ny, i)) continue; best = [ax, ay]; bd = v; }
+  /* (RS-420) the diagonals too, where the corner is clear: a step across one closes two of the map's straight steps */
+  for (const [ax, ay] of [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]]){ const nx = m.x+ax, ny = m.y+ay; if (nx<0 || ny<0 || nx>=W || ny>=ROWS) continue; const v = d[nx + ny*W];
+    if (v < 0 || v >= bd) continue; if (ax && ay && !diagClear(m.x, m.y, ax, ay, tileOpen)) continue; if (!(nx===G.player.x && ny===G.player.y) && occupiedBy(nx, ny, i)) continue; best = [ax, ay]; bd = v; }
   return best;
 }
+/* (RS-420) you're beside it on the diagonal, and no wall's corner stands between you: it can strike you there (and you it) */
+function monDiagAdj(m){ const dx = G.player.x - m.x, dy = G.player.y - m.y; return Math.abs(dx)===1 && Math.abs(dy)===1 && diagClear(m.x, m.y, dx, dy, tileOpen); }
 // the facing (N/E/S/W) for a step: a diagonal keeps whichever of its two sides you already faced
 function facingFor(dx, dy, cur){ const i = FACING_VECT.findIndex(v=>v[0]===dx && v[1]===dy); if (i>=0) return i; const f = FACING_VECT[cur|0]; if (f && (f[0]===dx || f[1]===dy)) return cur|0; return FACING_VECT.findIndex(v=>v[0]===dx && v[1]===0); }
 
@@ -19826,13 +19838,11 @@ function siegeAllyTick(){
   const list = G.allies; if (!list || !list.length || G.gameOver) return;
   if (G.gameMode!==2){ G.allies = []; return; }
   for (const a of list.slice()){ if (a.hp <= 0) continue;
-    let target = null, bd = Infinity, ti = -1;
-    G.mon.forEach((mm, i)=>{ if (!mm.alive) return; const d = Math.abs(mm.x-a.x) + Math.abs(mm.y-a.y); if (d < bd){ bd = d; target = mm; ti = i; } });
-    if (!target) continue;
-    if (bd > 1){ const dx = sg(target.x-a.x), dy = sg(target.y-a.y);
-      for (const [sx,sy] of (dx && dy ? (chn(0.5) ? [[dx,0],[0,dy]] : [[0,dy],[dx,0]]) : [[dx,dy]])){ const nx = a.x+sx, ny = a.y+sy; if ((sx || sy) && siegeFree(nx, ny)){ a.x = nx; a.y = ny; break; } }
-      bd = Math.abs(target.x-a.x) + Math.abs(target.y-a.y); }
-    if (bd===1){ a._atkT = (typeof FP!=='undefined' && FP.t) || 0.001; a.foe = target;
+    /* (RS-420) round the houses and the walls to the nearest raider it can reach */
+    let r = allySeek(a.x, a.y, 1, (x, y)=>siegeFree(x, y));
+    if (r && r.step){ a.x += r.step[0]; a.y += r.step[1]; r = allySeek(a.x, a.y, 1, (x, y)=>siegeFree(x, y)); }
+    const target = r && !r.step ? G.mon[r.ti] : null, ti = target ? r.ti : -1;
+    if (target){ a._atkT = (typeof FP!=='undefined' && FP.t) || 0.001; a.foe = target;
       const roll = rollDie(20);
       if (roll===1 || (roll < 20 && roll + a.atkBonus < target.ac)){ if (chn(0.3)) logMsg(`${a.nm} swings at the ${target.nm} but misses`, ''); }
       else { const dmg = Math.max(1, rollDice(a.dmg1, a.dmg2)); target.hp -= dmg; target.hitKind = 'melee'; target.hitCrit = roll===20; noteFoe(ti); try{ fxSplat(target.x+0.5, target.y+0.5, dmg, 'hit'); }catch(e){}
@@ -21867,13 +21877,32 @@ const NECRO_MINIONS = [
 function necroMax(){ return Math.min(4, 1 + Math.floor(skLvl('necromancy')/30) + skPerk('necromancy', 'nmax')); }
 function necroBest(){ const L = skLvl('necromancy'); return NECRO_MINIONS.filter(m=>m.lvl <= L).pop(); }
 function necroBones(){ return RS_BONES.find(b=>skHave(b[0]) > 0) || null; }
+/* (RS-420) your choice for the Raise button (G.player.necroPick = { k, bone }): which of the dead you've learned to raise, and which
+   bones to raise it from - better bones make a stronger minion. Unset, or out of those bones, it takes the best you can */
+function necroPickDef(){ const p = G.player, L = skLvl('necromancy'), k = p && p.necroPick && p.necroPick.k, d = k && NECRO_MINIONS.find(m=>m.k===k); return d && d.lvl <= L ? d : necroBest(); }
+function necroPickBone(){ const p = G.player, id = p && p.necroPick && p.necroPick.bone, b = id && RS_BONES.find(x=>x[0]===id); return b && skHave(b[0]) > 0 ? b : necroBones(); }
+function necroPickSet(field, v){ const p = G.player; if (!p) return; p.necroPick = Object.assign({}, p.necroPick || {}); if (v==null) delete p.necroPick[field]; else p.necroPick[field] = v; necroPickPanel(true); necroHudSync(); saveCurrentGame(); }
+function necroPickPanel(keep){
+  let el = document.getElementById('necroPanel'); const btn = document.getElementById('necroBtn');
+  if (!keep && el && el.style.display!=='none'){ el.style.display = 'none'; return; }
+  if (!btn) return; if (!el){ el = document.createElement('div'); el.id = 'necroPanel'; el.className = 'necropanel'; document.body.appendChild(el); }
+  const p = G.player, L = skLvl('necromancy'), pk = p.necroPick || {}, cur = necroPickDef(), bone = necroPickBone();
+  const mins = NECRO_MINIONS.map(m=>{ const ok = m.lvl <= L, on = ok && cur && cur.k===m.k;
+    return `<button class="btn${on ? ' primary' : ''}" ${ok ? '' : 'disabled'} title="${esc(m.d)}${ok ? '' : ' - needs Necromancy '+m.lvl}" onclick="necroPickSet('k', '${m.k}')">${esc(m.nm)}${ok ? '' : ` (${m.lvl})`}</button>`; }).join('');
+  const bones = RS_BONES.map((b, i)=>{ const n = skHave(b[0]), on = bone && bone[0]===b[0];
+    return `<button class="btn${on ? ' primary' : ''}" ${n ? '' : 'disabled'} title="${i ? 'raises a stronger minion' : 'the plain bones'}" onclick="necroPickSet('bone', '${b[0]}')">${esc(b[1])} &times;${n}</button>`; }).join('');
+  el.innerHTML = `<div class="necroph">RAISE <span class="muted">(${pk.k ? 'your choice' : 'the best you know'})</span> <span class="xpt-x" onclick="necroPickPanel()">&times;</span></div><div class="necrorow">${mins}</div>
+    <div class="necroph">FROM <span class="muted">(${pk.bone ? 'your choice' : 'the first you carry'})</span></div><div class="necrorow">${bones}</div>
+    <div class="necrorow"><button class="btn" onclick="G.player.necroPick = null; necroPickPanel(true); necroHudSync(); saveCurrentGame();">best available</button></div>`;
+  const r = btn.getBoundingClientRect(); el.style.display = 'block'; el.style.left = Math.max(6, Math.min(window.innerWidth - el.offsetWidth - 6, r.left)) + 'px'; el.style.top = Math.max(6, r.top - el.offsetHeight - 8) + 'px';
+}
 function necroMinions(){ const p = G.player; if (!Array.isArray(p.minions)) p.minions = []; return p.minions; }
 function necroRaise(kind){
   const p = G.player, L = skLvl('necromancy');
   if (G.gameOver || G.ui!=='playing') return;
   if (G.gameMode!==1 && G.gameMode!==2){ logMsg('the dead need a battlefield - raise them in a dungeon or a fight', 'hit'); renderGame(); return; }
-  const def = kind ? NECRO_MINIONS.find(m=>m.k===kind) : necroBest(); if (!def || def.lvl > L){ logMsg(`you need Necromancy ${def ? def.lvl : 1} for that`, 'hit'); renderGame(); return; }
-  const bone = necroBones(); if (!bone){ logMsg('you need bones to raise the dead - monsters drop them', 'hit'); renderGame(); return; }
+  const def = kind ? NECRO_MINIONS.find(m=>m.k===kind) : necroPickDef(); if (!def || def.lvl > L){ logMsg(`you need Necromancy ${def ? def.lvl : 1} for that`, 'hit'); renderGame(); return; }   /* (RS-420: the one you picked) */
+  const bone = necroPickBone(); if (!bone){ logMsg('you need bones to raise the dead - monsters drop them', 'hit'); renderGame(); return; }
   const list = necroMinions(); if (list.length >= necroMax()){ const old = list.shift(); logMsg(`${old.nm} crumbles to make room`, ''); }
   skAdd(bone[0], -1);
   const boneK = RS_BONES.indexOf(bone), dur = Math.round((20 + L/3 + (def.dur||0)) * (1 + skPerk('necromancy', 'ndur')));
@@ -21886,21 +21915,37 @@ function necroPlace(m){
     if (tileAt(nx,ny)!==T_WALL && !dgSolid(nx, ny) && !occupiedBy(nx,ny,-1) && !necroMinions().some(o=>o!==m && o.x===nx && o.y===ny)){ m.x = nx; m.y = ny; return; } }
   m.x = G.player.x; m.y = G.player.y;
 }
+/* (RS-420) the way to a foe for a minion or one of the town's people: a search out from where it stands, round walls and never
+   through them, to the nearest place it can strike from - for an archer, a foe in reach and in clear sight; for the rest, one
+   beside it, square or on the diagonal round no corner. { ti, step } (step null: strike now), or null when no foe can be reached.
+   They used to step straight at the nearest foe by its distance through walls, and an archer shot through them */
+function allySeek(x0, y0, reach, free){
+  const W = COLS, N = COLS*ROWS, prev = new Int32Array(N).fill(-2), s0 = x0 + y0*W, q = [s0]; prev[s0] = -1;
+  const strikeFrom = (x, y)=>{ let best = -1, bd = 1e9;
+    for (let i=0;i<G.mon.length;i++){ const o = G.mon[i]; if (!o.alive) continue; const dx = o.x - x, dy = o.y - y, ch = Math.max(Math.abs(dx), Math.abs(dy));
+      const ok = reach > 1 ? (ch <= reach && shotClear(x, y, o.x, o.y)) : (ch===1 && (dx===0 || dy===0 || diagClear(x, y, dx, dy, tileOpen)));
+      if (ok){ const d = Math.abs(dx) + Math.abs(dy); if (d < bd){ bd = d; best = i; } } }
+    return best; };
+  for (let h=0; h<q.length && h<1200; h++){ const c = q[h], x = c % W, y = (c/W)|0, t = strikeFrom(x, y);
+    if (t >= 0){ if (c===s0) return { ti:t, step:null }; let k = c; while (prev[k]!==s0) k = prev[k]; return { ti:t, step:[k % W - x0, ((k/W)|0) - y0] }; }
+    for (const [dx, dy] of DIR8){ const nx = x+dx, ny = y+dy; if (nx<1 || ny<1 || nx>=W-1 || ny>=ROWS-1) continue; const k = nx + ny*W; if (prev[k]!==-2) continue;
+      if (tileAt(nx, ny)===T_WALL || dgSolid(nx, ny) || (dx && dy && !diagClear(x, y, dx, dy, tileOpen)) || !free(nx, ny)) continue;
+      prev[k] = c; q.push(k); } }
+  return null;
+}
 // once a turn, after the monsters (see tickMonsters): each minion closes in and strikes, and the clock runs down
 function necroTick(){
   const list = G.player && G.player.minions; if (!list || !list.length || G.gameOver) return;
   if (G.gameMode!==1 && G.gameMode!==2){ G.player.minions = []; return; }
   for (const m of list.slice()){
     if (m.x===undefined) necroPlace(m);
-    let target = null, bd = Infinity, ti = -1;
-    G.mon.forEach((mm, i)=>{ if (!mm.alive) return; const d = Math.abs(mm.x-m.x) + Math.abs(mm.y-m.y); if (d < bd){ bd = d; target = mm; ti = i; } });
-    for (let step=0; step<(bd > 3 ? 2 : 1) && target && bd > m.reach; step++){   // they hurry when the foe is far off
-      const dx = sg(target.x-m.x), dy = sg(target.y-m.y);
-      for (const [sx,sy] of (dx && dy ? (chn(0.5) ? [[dx,0],[0,dy]] : [[0,dy],[dx,0]]) : [[dx,dy]])){ const nx = m.x+sx, ny = m.y+sy;
-        if ((sx || sy) && tileAt(nx,ny)!==T_WALL && !dgSolid(nx, ny) && !occupiedBy(nx,ny,-1) && !(nx===G.player.x && ny===G.player.y) && !list.some(o=>o!==m && o.x===nx && o.y===ny)){ m.x = nx; m.y = ny; break; } }
-      bd = Math.abs(target.x-m.x) + Math.abs(target.y-m.y);
-    }
-    if (target && bd <= m.reach){
+    /* (RS-420) round the walls to the nearest foe it can reach, hurrying when it's far off - and an archer shoots only what it can see */
+    const free = (x, y)=>!occupiedBy(x, y, -1) && !(x===G.player.x && y===G.player.y) && !list.some(o=>o!==m && o.x===x && o.y===y);
+    let r = allySeek(m.x, m.y, m.reach, free);
+    for (let step=0; step<2 && r && r.step; step++){ const nx = m.x + r.step[0], ny = m.y + r.step[1]; dgDoorOpen(nx, ny, true); m.x = nx; m.y = ny;
+      const t0 = G.mon[r.ti], far = t0 && Math.abs(t0.x-m.x) + Math.abs(t0.y-m.y) > 3; r = allySeek(m.x, m.y, m.reach, free); if (!far) break; }
+    const target = r && !r.step ? G.mon[r.ti] : null, ti = target ? r.ti : -1;
+    if (target){
       m._atkT = (typeof FP!=='undefined' && FP.t) || 0.001;   /* (RS-181: its figure swings) */
       const roll = rollDie(20);
       if (!m.ghost && (roll===1 || roll + m.atkBonus < target.ac)) logMsg(`${m.nm} swings at the ${target.nm} but misses`, '');
@@ -21935,11 +21980,12 @@ function necroDismiss(quiet){ const p = G.player; if (p && p.minions && p.minion
 function necroHudSync(){
   let el = document.getElementById('necroBtn');
   const on = !!(G.player && G.ui==='playing' && !G.gameOver && (G.gameMode===1 || G.gameMode===2) && (skLvl('necromancy') > 1 || necroBones() || (G.player.minions||[]).length));
-  if (!on){ if (el && el.style.display!=='none') el.style.display = 'none'; return; }
+  if (!on){ if (el && el.style.display!=='none') el.style.display = 'none'; const pn = document.getElementById('necroPanel'); if (pn && pn.style.display!=='none') pn.style.display = 'none'; return; }
   /* (RS-181) drag it anywhere (the click that ends a drag doesn't raise); with no bones it's dimmed rather than disabled, so it can still be moved */
   if (!el){ el = document.createElement('button'); el.id = 'necroBtn'; el.dataset.drag = 'necro'; el.title = 'raise the dead (-) - drag to move';
-    el.onclick = ()=>{ if (performance.now() - DRAG_MOVED_AT < 350 || el.classList.contains('off')) return; necroRaise(); }; document.body.appendChild(el); applyMoved('necro'); }
-  const b = necroBest(), bone = necroBones(), n = (G.player.minions||[]).length, txt = `&#9760; Raise ${b ? b.nm : 'the dead'} <span>(-) ${n}/${necroMax()}${bone ? '' : ' &middot; no bones'}</span>`;
+    el.onclick = e=>{ if (performance.now() - DRAG_MOVED_AT < 350) return; if (e.target && e.target.closest && e.target.closest('.necropick')){ necroPickPanel(); return; } if (el.classList.contains('off')) return; necroRaise(); }; document.body.appendChild(el); applyMoved('necro'); }
+  /* (RS-420) the arrow opens the picker: which of the dead to raise, from which bones */
+  const b = necroPickDef(), bone = necroPickBone(), n = (G.player.minions||[]).length, txt = `&#9760; Raise ${b ? b.nm : 'the dead'} <span>(-) ${n}/${necroMax()}${bone ? ' &middot; ' + bone[1].toLowerCase() : ' &middot; no bones'}</span><span class="necropick" title="pick which of the dead to raise, and from which bones">&#9662;</span>`;
   if (el.dataset.t !== txt){ el.dataset.t = txt; el.innerHTML = txt; el.classList.toggle('off', !bone); }
   if (el.style.display !== 'block') el.style.display = 'block';
 }
@@ -40430,7 +40476,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-419';
+const GAME_VERSION = 'rs-420';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-420 - Minions that find their way, diagonal fighting
+
+- **Minions go round walls.** Your raised dead used to head straight for the nearest foe as if walls weren't there, and got stuck pressing against them. Now they find the way round, through doorways and along passages, to the nearest foe they can actually reach. The townsfolk and guards in a siege do the same.
+- **Archers need a clear shot.** A skeleton archer could shoot through walls. Now it only shoots at foes it can see, and moves for a clear line when it has none.
+- **Choose your dead.** The Raise button has a small arrow that opens a picker. Choose which of the dead you've learned to raise and which bones to raise it from (Big Bones and Dragon Bones make a stronger minion). Your choice is kept, and "best available" goes back to the strongest you know with the first bones you carry. The button shows which bones it will use.
+- **Monsters move and strike on the diagonal.** Monsters now step diagonally when they chase you and strike you from a diagonal square, so they no longer shuffle round to face you square-on. You can strike them diagonally too. No one can strike round the corner of a wall.
+- **Auto or manual XP tracking.** The skills menu has an XP tracker switch. On auto, the XP window follows the skills you've just trained. On manual, it shows the skills you tick. Ticking a box switches it to manual.
+
 ## RS-419 - Walls, towers, a gate and roofs
 
 - **A town wall worth defending.** In a siege, the wall at your back now stands a man and a half high, capped with merlons, with two gate towers higher still standing out from it. The barred gate between them is a stone gatehouse with an arched passage, two iron-bound oak doors studded along their straps, and a beam across them.
