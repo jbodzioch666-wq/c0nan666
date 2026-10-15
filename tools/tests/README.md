@@ -25,6 +25,8 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| savelock | A character can be locked on the title screen so it can't be deleted; the lock outlasts saving |
+| dgrespawn | A dungeon left for a game day is laid out afresh on the way back in; sooner it is kept; gravestones stay |
 | grottoexit | Out of a grotto, cave or ruin (won, fled or turned away) you stand on the next tile, not inside its model |
 | walkstutter | A long walk: the new land compiles a few shaders a frame before the swap, the woods build in slices, animals in reach are kept |
 | nativeres | RS-403: every view at the screen's own resolution; one scaler steps down only under 60 fps |

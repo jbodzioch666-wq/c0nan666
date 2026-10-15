@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-405 - Locked characters, dungeons that refill
+
+- **Lock a character.** Each adventurer on the title screen has a lock button. While locked, the delete button is hidden and the character can't be deleted. Tap the lock again to unlock. The lock stays on through saving. A hardcore death still ends a locked character, as that mode's rule.
+- **Dungeons refill while you're away.** Return to a dungeon after a full day of the game's clock (about half an hour of play) and it is laid out fresh, with new rooms, foes and loot. Come back sooner and it is as you left it. Your gravestones down there stay, moved onto clear floor. Anything you dropped on the old floors is gone. Floors saved before this patch keep until you next visit.
+
 ## RS-404 - New creatures without the hitch, quieter rain
 
 - **New creatures appear smoothly.** A creature kind you haven't seen yet is now sculpted a few parts per frame instead of all at once. It shows up a moment later, without the brief freeze.
