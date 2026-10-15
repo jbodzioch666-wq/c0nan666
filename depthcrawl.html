@@ -19750,8 +19750,9 @@ function siegeWarStart(d){
   G.allies = [];
   wevFightStart('siegewar', d.id, L=>{
     G.arenaTheme = 'siege'; const cx = Math.floor(COLS/2);
-    for (let x=0;x<COLS;x++){ G.map[x][ROWS-2] = T_WALL; G.arenaDeco[x][ROWS-2] = 'wall'; }   /* (the town's wall at your back, its gate barred) */
-    for (const tx of [cx - 3, cx + 2]) for (const ty of [ROWS-3]) { G.map[tx][ty] = T_WALL; G.arenaDeco[tx][ty] = 'wall'; }   /* (the gate towers either side) */
+    for (let x=0;x<COLS;x++){ G.map[x][ROWS-2] = T_WALL; G.arenaDeco[x][ROWS-2] = 'wall'; }   /* (the town's wall at your back) */
+    for (const gx of [cx-1, cx]) G.arenaDeco[gx][ROWS-2] = 'gate';   /* (RS-419: its gate, barred) */
+    for (const tx of [cx-2, cx+1]) for (const ty of [ROWS-2, ROWS-3]){ G.map[tx][ty] = T_WALL; G.arenaDeco[tx][ty] = 'tower'; }   /* (the gate towers either side, standing out from the wall) */
     for (let x=1;x<COLS-1;x++) for (let y=ROWS-7;y<ROWS-2;y++) if (G.map[x][y]===T_WALL && y < ROWS-3){ G.map[x][y] = T_FLOOR; G.arenaDeco[x][y] = ''; }   /* (clear ground in front of the gate) */
     G.player.x = cx; G.player.y = ROWS-4; G.map[cx][ROWS-4] = T_FLOOR;
     for (const m of ((G.player && G.player.minions)||[])) necroPlace(m); placeCompanionNearPlayer(); placeSummonNearPlayer();
@@ -19760,6 +19761,15 @@ function siegeWarStart(d){
     for (let i=0;i<2 + watch + (walled ? 1 : 0);i++){ const at = siegeNear(cx + (i%2 ? 1 : -1)*(1 + (i>>1)), ROWS-4, 4); if (at) siegeAllyMake('guard', L, at[0], at[1]); }
   });
   wevSay(`the gate of ${nm} is barred behind you - you and ${G.allies.length} of the watch hold the field against the besiegers. Wave 1 of ${SIEGE_WAVES}!`, 'new', `The siege of ${nm}`);
+}
+/* (RS-419) a raid: the monsters are already over the palisade and in the streets, the watch and the townsfolk fighting them - the
+   battle starts where a siege's ends, smaller, a raid leader in the square instead of a warlord */
+function siegeRaidStart(d){
+  G.allies = [];
+  wevFightStart('siegewar', d.id, L=>{ const rec = townRec(d.key), walled = !!(rec && rec.up && rec.up.walls);
+    G.siegeWar = { id:d.id, key:d.key, x:d.x, y:d.y, camp:d.camp || 'goblin', L, wave:SIEGE_WAVES, phase:1, walled, raid:true };
+    siegeWarStreets(G.siegeWar);
+    const watch = 1 + ((rec && rec.up && rec.up.watch) ? 1 : 0); for (let i=0;i<watch;i++){ const at = siegeNear(Math.floor(COLS/2), ROWS-3, 4); if (at) siegeAllyMake('guard', L, at[0], at[1]); } });
 }
 /* the streets: a ring road and lanes round blocks of houses, a main street from the gate to the square, the square in the middle */
 function siegeWarStreets(S){
@@ -19771,20 +19781,23 @@ function siegeWarStreets(S){
   open(cx-1, 1, cx, ROWS-2); open(1, 8, COLS-2, 9); open(6, 6, 13, 12);   // the main street, the cross street and the square
   open(3, 2, 3, ROWS-3); open(COLS-4, 2, COLS-4, ROWS-3); open(3, 2, COLS-4, 2); open(3, ROWS-3, COLS-4, ROWS-3);   // the ring road
   open(6, 13, 6, ROWS-3); open(13, 13, 13, ROWS-3); open(6, 2, 6, 5); open(13, 2, 13, 5);   // and lanes off it
-  for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++) if (G.map[x][y]===T_WALL) G.arenaDeco[x][y] = x===0 || y===0 || x===COLS-1 || y===ROWS-1 || fpHash(x >> 1, y >> 1, 418) >= 0.45 ? 'wall' : 'wall2';   /* (the town wall round it, and timber-framed houses among the stone ones) */
+  for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++) if (G.map[x][y]===T_WALL) G.arenaDeco[x][y] = x===0 || y===0 || x===COLS-1 || y===ROWS-1 ? 'wall' : fpHash(x >> 1, y >> 1, 418) >= 0.45 ? 'house' : 'house2';   /* (the town wall round it, and timber-framed houses among the stone ones) */
+  for (const gx of [cx-1, cx]) G.arenaDeco[gx][ROWS-1] = 'gate'; for (const tx of [cx-2, cx+1]) G.arenaDeco[tx][ROWS-1] = 'tower';   /* (RS-419: the gate you came through, broken in, between its towers) */
   G.arenaTheme = 'street'; G.mandatoryFight = true; S.phase = 2;
   G.player.x = cx; G.player.y = ROWS-2;
   for (const m of ((G.player && G.player.minions)||[])) necroPlace(m); placeCompanionNearPlayer(); placeSummonNearPlayer();
   G.mon = [];
-  const raiders = 5 + rn(3) - (S.walled ? 1 : 0), inTown = (x, y)=>y < ROWS-5;
+  const raiders = (S.raid ? 3 + rn(2) : 5 + rn(3)) - (S.walled ? 1 : 0), inTown = (x, y)=>y < ROWS-5;
   for (let i=0;i<raiders;i++) siegeSpawn(wevCampEntry(S.camp, L), L, inTown);
-  const boss = siegeSpawn(wevCampEntry(S.camp, L + 4), L + 4, (x, y)=>x >= 7 && x <= 12 && y >= 7 && y <= 11); upgradeToNamedElite(boss); boss.nm = 'Warlord ' + boss.nm.replace(/^(Champion|Captain) /, '');
+  const boss = siegeSpawn(wevCampEntry(S.camp, L + (S.raid ? 2 : 4)), L + (S.raid ? 2 : 4), (x, y)=>x >= 7 && x <= 12 && y >= 7 && y <= 11);
+  if (S.raid){ upgradeToElite(boss); boss.nm = 'Raid leader ' + boss.nm.replace(/^(Champion|Captain) /, ''); } else { upgradeToNamedElite(boss); boss.nm = 'Warlord ' + boss.nm.replace(/^(Champion|Captain) /, ''); }
   const left = (G.allies||[]).filter(a=>a.hp > 0); G.allies = [];
   for (const a of left){ const at = siegeNear(cx, ROWS-3, 5); if (at){ a.x = at[0]; a.y = at[1]; G.allies.push(a); } }   /* (the watch that held the gate comes through it with you) */
   for (let i=0;i<3 + rn(2);i++){ const m = G.mon[rn(G.mon.length)], at = m && siegeNear(m.x, m.y, 3); if (at) siegeAllyMake(i < 2 || chn(0.5) ? 'folk' : 'guard', L, at[0], at[1], G.mon.find(o=>o.alive && !o.elite)); }   /* (the townsfolk already fighting in the streets) */
   for (const m of G.mon) m.engaged = true;
   FPD.mapRef = null;
-  wevSay(`the gate of ${nm} gives way - the besiegers are in the streets! Fight through to the square, where their warlord holds it${took ? ' (you gather up the spoils of the field)' : ''}`, 'new', 'Into the city!');
+  if (S.raid) wevSay(`the raiders are over the palisade of ${nm} and in the streets - the watch and the townsfolk are fighting them, and their leader holds the square!`, 'new', `Raid on ${nm}!`);
+  else wevSay(`the gate of ${nm} gives way - the besiegers are in the streets! Fight through to the square, where their warlord holds it${took ? ' (you gather up the spoils of the field)' : ''}`, 'new', 'Into the city!');
 }
 function siegeWarWon(f){
   const S = G.siegeWar; if (!S) return false;
@@ -19792,7 +19805,13 @@ function siegeWarWon(f){
     wevSay(S.wave===SIEGE_WAVES ? `they come again - their captain leads the last wave! (${S.wave} of ${SIEGE_WAVES})` : `the besiegers fall back and charge again - wave ${S.wave} of ${SIEGE_WAVES}!`, 'new'); return true; }
   if (S.phase===1){ siegeWarStreets(S); G.fieldWon = false; G.wevFight = f; return true; }
   // the town is saved
-  const e = wevP(), p = G.player, st = wevStats(), Lt = cbT(), d = e.dyn.find(d=>d.id===S.id); if (d) e.dyn.splice(e.dyn.indexOf(d), 1);
+  const e = wevP(), p = G.player, st = wevStats(), Lt = cbT();
+  if (S.raid){ const t = e.town[S.key]; if (t && t.id===S.id){ t.done = true; t.until = wevTurn(); }   /* (RS-419: a raid beaten off) */
+    const nm = o3TownName(S.x, S.y), gold = roundH((120 + Lt*18)*goldFindMult()); p.gold += gold; st.defended++; p.rep = p.rep || {}; p.rep[S.key] = repAt(S.key) + 3; tkP().cur.guild += 1;
+    G.siegeWar = null; G.allies = [];
+    wevSay(`the raiders flee ${nm}! The reeve pays you ${gold} gold and a guild token (+3 standing)`, 'magic', `You saved ${nm}`); checkAchievements();
+    if (G.owPos.x===S.x && G.owPos.y===S.y){ enterVillage(); return true; } return false; }
+  const d = e.dyn.find(d=>d.id===S.id); if (d) e.dyn.splice(e.dyn.indexOf(d), 1);
   const nm = o3TownName(S.x, S.y), gold = roundH((220 + Lt*30)*goldFindMult()), saved = (G.allies||[]).filter(a=>a.hp > 0).length;
   p.gold += gold; st.defended++; p.rep = p.rep || {}; p.rep[S.key] = repAt(S.key) + 5; tkP().cur.guild += 3;
   addToInventory(genItem(lootAt(6), lootKind(), 3, chn(0.5)));
@@ -19857,6 +19876,7 @@ function siegeAllyRing(px){
 }
 function wevSiegeFight(d){
   if (d.kind!=='raid' && d.key) return siegeWarStart(d);   /* (RS-418: a siege is a battle) */
+  if (d.kind==='raid'){ const k = d.key || curTownKey(); if (k){ const [x, y] = k.split(',').map(Number); return siegeRaidStart(Object.assign({}, d, { key:k, x, y })); } }   /* (RS-419: and so is a raid, in the streets) */
   const walled = G.gameMode===3 && curTownKey() && townRec(curTownKey()).up.walls;   // stone walls hold one of them off
   wevFightStart(d.kind==='raid' ? 'raid' : 'siege', d.id, L=>{
     const n = 3 + rn(2) - (walled ? 1 : 0);
@@ -33172,7 +33192,7 @@ function fpdBuild(T){
         if (fenceT) wk = 'fence';
         else if (dW==='cryptW') wk = 'cryptStone';
         else if (!yard && !field && G.dungeonDeco && G.dungeonDeco[wx][wy]==='torch') wk = isoOn() ? 'wall2' : 'wallTorch';   /* (RS-393: a 3D sconce hangs on it now, not a painted one) */
-        else if (field) wk = G.arenaDeco[wx][wy]==='wall2' ? 'wall2' : 'wall';   /* (RS-418: a siege's stone or timber-framed walls) */
+        else if (field) wk = G.arenaDeco[wx][wy]==='wall2' || G.arenaDeco[wx][wy]==='house2' ? 'wall2' : 'wall';   /* (RS-418: a siege's stone or timber-framed walls) */
         else if (fpHash(wx,wy,3)>0.72) wk = 'wall2';
       }
       const ux = -dy, uz = dx;                                  // along the face, so U x up points back into the room
@@ -33457,9 +33477,77 @@ function fpdHorizonTex(kind, seed){
   return t;
 }
 /* (RS-418) a field tile that's a built wall - a besieged town's wall and gate towers, the houses of its streets - not a bush or a boulder */
-function fpdFieldWall(x, y){ const d = G.gameMode===2 && G.arenaDeco && G.arenaDeco[x] ? G.arenaDeco[x][y] : ''; return d==='wall' || d==='wall2'; }
+function fpdFieldWall(x, y){ const d = G.gameMode===2 && G.arenaDeco && G.arenaDeco[x] ? G.arenaDeco[x][y] : ''; return d==='wall' || d==='wall2' || d==='tower' || d==='house' || d==='house2'; }
+/* (RS-419) how high each is built: the town wall a man and a half, its towers higher, the houses lower under their roofs */
+function fpdFieldWallH(x, y){ const d = G.arenaDeco[x][y]; return d==='tower' ? 2.5 : (d==='house' || d==='house2') ? 1.35 : G.arenaTheme==='street' ? 1.85 : 1.7; }
+/* (RS-419) a besieged town's works, built over the field: every wall raised to its height and capped, merlons along the town wall and
+   its towers, a gabled roof - red tile or thatch - over each block of houses, and the gate: a stone gatehouse with an arched passage
+   and two iron-bound oak doors, barred before the battle, broken in after it (one door hanging open, the other torn off and flat) */
+function fpdSiegeWorks(world, matFor){
+  if (G.gameMode!==2 || !(G.arenaTheme==='siege' || G.arenaTheme==='street') || !G.arenaDeco) return;
+  const T = THREE, deco = (x, y)=>x>=0 && y>=0 && x<COLS && y<ROWS ? G.arenaDeco[x][y] : '';
+  const B = { wall:{ p:[], n:[], u:[] }, wall2:{ p:[], n:[], u:[] } };
+  const quad = (b, o, U, V, N, uu, vv)=>{ const c = [[0,0],[1,0],[1,1],[0,1]], pt = c.map(([a,e])=>[o[0]+U[0]*a+V[0]*e, o[1]+U[1]*a+V[1]*e, o[2]+U[2]*a+V[2]*e]);
+    for (const k of [0,1,2,0,2,3]){ b.p.push(...pt[k]); b.n.push(...N); const [a,e] = c[k]; b.u.push(...uu(a, e, pt[k])); } };
+  const box = (b, x0, y0, z0, x1, y1, z1)=>{   /* (a solid block, every face out, its texture laid in world units) */
+    quad(b, [x0,y1,z1], [x1-x0,0,0], [0,0,z0-z1], [0,1,0], (a,e,q)=>[q[0], -q[2]]);
+    quad(b, [x0,y0,z1], [x1-x0,0,0], [0,y1-y0,0], [0,0,1], (a,e,q)=>[q[0], q[1]]); quad(b, [x1,y0,z0], [x0-x1,0,0], [0,y1-y0,0], [0,0,-1], (a,e,q)=>[-q[0], q[1]]);
+    quad(b, [x1,y0,z1], [0,0,z0-z1], [0,y1-y0,0], [1,0,0], (a,e,q)=>[-q[2], q[1]]); quad(b, [x0,y0,z0], [0,0,z1-z0], [0,y1-y0,0], [-1,0,0], (a,e,q)=>[q[2], q[1]]); };
+  for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++){
+    if (!fpdFieldWall(x, y)) continue; const h = fpdFieldWallH(x, y), d = deco(x, y), b = B[d==='wall2' || d==='house2' ? 'wall2' : 'wall'];
+    for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]){ const nx = x+dx, ny = y+dy, nh = fpdFieldWall(nx, ny) ? fpdFieldWallH(nx, ny) : (deco(nx, ny)==='gate' ? 2.1 : 1), lo = Math.max(1, Math.min(nh, h)); if (lo >= h) continue;
+      const ux = -dy, uz = dx, o = [x+0.5+dx*0.5-ux*0.5, lo, y+0.5+dy*0.5-uz*0.5];   /* (the face above the dungeon-height wall below it, or above a lower neighbour) */
+      quad(b, o, [ux,0,uz], [0,h-lo,0], [dx,0,dy], (a,e,q)=>[ux ? q[0]*ux : q[2]*uz, q[1]]); }
+    quad(b, [x, h, y+1], [1,0,0], [0,0,-1], [0,1,0], (a,e,q)=>[q[0], -q[2]]);   /* (its top) */
+    if (d==='wall' || d==='tower'){ const along = fpdFieldWall(x-1, y) || fpdFieldWall(x+1, y) || deco(x-1, y)==='gate' || deco(x+1, y)==='gate';   /* (merlons along its length) */
+      for (const k of [0.22, 0.72]){ const mx0 = along ? x + k - 0.11 : x + 0.3, mz0 = along ? y + 0.3 : y + k - 0.11; box(b, mx0, h, mz0, mx0 + (along ? 0.22 : 0.4), h + 0.24, mz0 + (along ? 0.4 : 0.22)); } }
+  }
+  for (const k in B){ const b = B[k]; if (!b.p.length) continue; const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(b.p, 3)); g.setAttribute('normal', new T.Float32BufferAttribute(b.n, 3)); g.setAttribute('uv', new T.Float32BufferAttribute(b.u, 2)); g.setAttribute('color', new T.Float32BufferAttribute(new Array(b.p.length).fill(0.96), 3));
+    const m = new T.Mesh(g, matFor(k)); m.castShadow = m.receiveShadow = true; world.add(m); }
+  // the roofs over the houses, one over each block
+  const roofM = k=>{ const key = 'siegeRoof'+k; if (FPD.mats[key]) return FPD.mats[key];
+    const c = v3Canvas(128, 128), x = c.getContext('2d'), thatch = k===1;
+    x.fillStyle = thatch ? '#9a8048' : '#8e3e2a'; x.fillRect(0, 0, 128, 128);
+    for (let r=0;r<8;r++) for (let i=0;i<9;i++){ const h2 = fpHash(r, i, 419); if (thatch){ x.strokeStyle = `rgba(${60 + h2*40},${44 + h2*30},20,0.55)`; x.lineWidth = 2; x.beginPath(); x.moveTo(i*16 - 8 + h2*6, r*16); x.lineTo(i*16 - 4 + h2*6, r*16 + 16); x.stroke(); }
+      else { x.fillStyle = `rgb(${130 + h2*40},${54 + h2*20},${36 + h2*14})`; x.beginPath(); x.ellipse(i*16 + (r%2)*8, r*16 + 10, 7.5, 9, 0, 0, Math.PI*2); x.fill(); x.fillStyle = 'rgba(40,14,8,0.4)'; x.fillRect(i*16 + (r%2)*8 - 8, r*16 + 15, 16, 2); } }
+    const tx = v3CanvasTex(c); tx.wrapS = tx.wrapT = T.RepeatWrapping; const m = new T.MeshStandardMaterial({ map:tx, roughness:0.9 }); fpdCutify(m); return (FPD.mats[key] = m); };
+  /* (a block of houses is cut into houses about three tiles across, each roofed on its own - one roof over a whole block hid the streets) */
+  const seen = new Set(), house = (x, y)=>{ const d = deco(x, y); return d==='house' || d==='house2'; };
+  for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++){ if (!house(x, y) || seen.has(x+','+y)) continue;
+    const cx3 = Math.floor(x/3), cy3 = Math.floor(y/3); let x0 = x, x1 = x, y0 = y, y1 = y; const q = [[x, y]]; seen.add(x+','+y);
+    while (q.length){ const [a, e] = q.pop(); x0 = Math.min(x0, a); x1 = Math.max(x1, a); y0 = Math.min(y0, e); y1 = Math.max(y1, e);
+      for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]){ const na = a+dx, ne = e+dy; if (house(na, ne) && Math.floor(na/3)===cx3 && Math.floor(ne/3)===cy3 && !seen.has(na+','+ne)){ seen.add(na+','+ne); q.push([na, ne]); } } }
+    const w = x1 - x0 + 1, dz = y1 - y0 + 1, long = w > dz, rh = Math.min(0.62, 0.3 + 0.1*Math.min(w, dz)), roof = o3Gable((long ? dz : w) + 0.16, (long ? w : dz) + 0.16, rh, roofM(fpHash(cx3, cy3, 420) < 0.4 ? 1 : 0));
+    roof.position.set(x0 + w/2, 1.35, y0 + dz/2); if (long) roof.rotation.y = Math.PI/2; world.add(roof); }
+  // the gate
+  const gt = []; for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++) if (deco(x, y)==='gate') gt.push([x, y]);
+  if (gt.length){ const gx = gt.reduce((a, c)=>a + c[0], 0)/gt.length + 0.5, gy = gt[0][1] + 0.5, broken = G.arenaTheme==='street';
+    const stone = matFor('wall'), oak = FPD.mats.siegeOak || (FPD.mats.siegeOak = new T.MeshStandardMaterial({ color:new T.Color('#5a3a1e').convertSRGBToLinear(), roughness:0.85 })), iron = FPD.mats.siegeIron || (FPD.mats.siegeIron = new T.MeshStandardMaterial({ color:new T.Color('#34322e').convertSRGBToLinear(), roughness:0.45, metalness:0.65 }));
+    const g = new T.Group(); g.position.set(gx, 0, gy); world.add(g);
+    const W = 1.0, HG = 2.1, SPR = 1.15, R = 0.82, DEP = 0.95;
+    { const sh = new T.Shape(); sh.moveTo(-W, 0); sh.lineTo(W, 0); sh.lineTo(W, HG); sh.lineTo(-W, HG); sh.lineTo(-W, 0);
+      const hole = new T.Path(); hole.moveTo(-R, 0); hole.lineTo(-R, SPR); hole.absarc(0, SPR, R, Math.PI, 0, true); hole.lineTo(R, 0); hole.lineTo(-R, 0); sh.holes.push(hole);
+      const gg = new T.ExtrudeGeometry(sh, { depth:DEP, bevelEnabled:false, curveSegments:24 }); gg.translate(0, 0, -DEP/2); gg.setAttribute('color', new T.Float32BufferAttribute(new Array(gg.attributes.position.count*3).fill(0.92), 3));
+      const gm = new T.Mesh(gg, stone); gm.castShadow = gm.receiveShadow = true; g.add(gm); }
+    for (const sx of [-1, 1]) for (const k of [0.25, 0.75]){ const mm = new T.Mesh(new T.BoxGeometry(0.24, 0.26, 0.4), stone); mm.geometry.setAttribute('color', new T.Float32BufferAttribute(new Array(mm.geometry.attributes.position.count*3).fill(0.92), 3)); mm.position.set(sx*k*W, HG + 0.13, 0); g.add(mm); }   /* (merlons over the gate) */
+    const topAt = u=>SPR + Math.sqrt(Math.max(0, R*R - u*u)) - 0.01;
+    const leaf = (s0)=>{ const hg = new T.Group(); hg.position.set(s0*R, 0, -DEP*0.15); g.add(hg); const NP = 4, pw = R/NP;   /* (hung at its jamb; planks cut to the arch) */
+      for (let i=0;i<NP;i++){ const a0 = i*pw + 0.006, a1 = (i+1)*pw - 0.006, sp = new T.Shape(); sp.moveTo(-s0*a0, 0.01); sp.lineTo(-s0*a1, 0.01);
+        for (let k=0;k<=5;k++){ const a = a1 + (a0 - a1)*k/5; sp.lineTo(-s0*a, topAt(R - a)); } const pm = new T.Mesh(new T.ExtrudeGeometry(sp, { depth:0.08, bevelEnabled:false }), oak); pm.geometry.translate(0, 0, -0.04); pm.castShadow = true; hg.add(pm); }
+      for (const y of [0.25, 0.75, SPR - 0.05]){ const st = new T.Mesh(new T.BoxGeometry(R - 0.04, 0.06, 0.1), iron); st.position.set(-s0*(R/2), y, 0); hg.add(st);
+        for (let k=0;k<4;k++){ const sd = new T.Mesh(new T.SphereGeometry(0.016, 8, 6), iron); sd.position.set(-s0*(0.1 + k*(R - 0.2)/3), y, -0.055); hg.add(sd); } }
+      return hg; };
+    const L = leaf(-1), Rt = leaf(1);
+    if (!broken){ const bar = new T.Mesh(new T.BoxGeometry(2*R - 0.1, 0.12, 0.1), oak); bar.position.set(0, 0.62, -DEP*0.15 - 0.09); g.add(bar);   /* (barred: a beam across both doors) */
+      for (const sx of [-1, 1]){ const br = new T.Mesh(new T.BoxGeometry(0.1, 0.22, 0.14), iron); br.position.set(sx*(R - 0.25), 0.62, -DEP*0.15 - 0.1); g.add(br); } }
+    else { L.rotation.y = -1.35;   /* (one door hanging open) */
+      Rt.position.set(0.25, 0.05, -DEP*0.15 - 1.1); Rt.rotation.set(-Math.PI/2 + 0.08, 0.35, 0);   /* (the other torn off its hinges and flat in the street) */
+      for (let i=0;i<6;i++){ const sp = new T.Mesh(new T.BoxGeometry(0.05, 0.03, 0.25 + fpHash(i, 1, 421)*0.2), oak); sp.position.set((fpHash(i, 2, 421) - 0.5)*1.4, 0.02, -0.9 - fpHash(i, 3, 421)*0.6); sp.rotation.y = fpHash(i, 4, 421)*3; g.add(sp); } }   /* (and its splinters) */
+  }
+}
 function fpdOutdoor(T, spec, world, matFor){
   const TH = THREE, key = T.key, field = G.gameMode===2;
+  try{ fpdSiegeWorks(world, matFor); }catch(e){ console.error(e); }   /* (RS-419) */
   const add = (m, cast)=>{ m.castShadow = cast!==false; m.receiveShadow = true; world.add(m); return m; };
   const cxm = COLS/2, czm = ROWS/2;
   // ground beyond the map's edge (the sea's is open water)
@@ -33477,7 +33565,7 @@ function fpdOutdoor(T, spec, world, matFor){
     const rockG = [fpdLumpy(2, 0.2, 3), fpdLumpy(2, 0.24, 9)], bushG = [fpdLumpy(2, 0.16, 5, true), fpdLumpy(2, 0.2, 12, true)];
     const boxG = new TH.BoxGeometry(1,1,1), barrelG = new TH.CylinderGeometry(0.2, 0.2, 0.5, 14);
     for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
-      if (G.map[x][y]!==T_WALL || fpdFieldWall(x, y)) continue;   /* (RS-418: a built wall, not an obstacle) */
+      if (G.map[x][y]!==T_WALL || fpdFieldWall(x, y) || (G.arenaDeco && G.arenaDeco[x][y]==='gate')) continue;   /* (RS-418: a built wall, not an obstacle; RS-419: or the gate) */
       const deco = G.arenaDeco && G.arenaDeco[x] ? G.arenaDeco[x][y] : '', h = (i)=>fpHash(x,y,40+i);
       const kind = key==='sea' ? 'crate' : (deco==='rock' || key==='desert' || key==='tundra') ? 'rock' : 'bush';
       const px = x+0.5, pz = y+0.5;
@@ -40342,7 +40430,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-418';
+const GAME_VERSION = 'rs-419';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

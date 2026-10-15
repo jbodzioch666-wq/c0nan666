@@ -54,4 +54,18 @@ module.exports = async page=>{
   A(waves[2].phase===2 && waves[2].theme==='street' && waves[2].warlord && waves[2].mon >= 4 && waves[2].folk >= 1, 'then into the streets, the townsfolk fighting and the warlord in the square: '+JSON.stringify(waves[2]));
   A(town.walls > 100 && town.floor > 80 && town.sq, 'the streets are a town: '+JSON.stringify(town));
   A(end.mode===3 && !end.siege && end.allies===0 && !end.dyn && end.gold > r0.gold0, 'won: back in the saved town, paid, the siege over: '+JSON.stringify(end));
+  // RS-419: the town's walls stand high with towers and a gate, its houses roofed; a raid is a battle in the streets
+  const raid = await page.evaluate(async ()=>{ const key = curTownKey() || (G.owPos.x+','+G.owPos.y), e = wevP(), id = ++e.seq; e.town[key] = { kind:'raid', id, until:wevTurn() + 100, done:false };
+    wevSiegeFight({ kind:'raid', id, camp:'goblin' }); const S = G.siegeWar;
+    const out = { mode:G.gameMode, theme:G.arenaTheme, raid:!!(S && S.raid), leader:G.mon.some(m=>m.alive && /^Raid leader /.test(m.nm)), allies:(G.allies||[]).length, gate:G.arenaDeco[Math.floor(COLS/2)][ROWS-1]==='gate', houses:G.arenaDeco.flat().filter(d=>d==='house' || d==='house2').length };
+    for (let i=0;i<4;i++){ renderGame(); await new Promise(r=>setTimeout(r, 40)); }
+    let roofs = 0, tall = 0; FPD.world && FPD.world.traverse(o=>{ if (o.isMesh && o.material && /siegeRoof/.test(Object.keys(FPD.mats).find(k=>FPD.mats[k]===o.material)||'')) roofs++; if (o.isMesh && o.geometry && o.geometry.attributes.position){ const bb = new THREE.Box3().setFromObject(o); if (bb.max.y > 1.7 && bb.max.y < 3) tall++; } });
+    out.roofs = roofs; out.tall = tall;
+    G.mon.forEach((m,i)=>{ if (m.alive){ m.hp = 0; monsterDies(i); } }); return { out, key, id }; });
+  await step(10);
+  const raidEnd = await page.evaluate(k=>({ mode:G.gameMode, done:!!(wevP().town[k] && wevP().town[k].done), siege:!!G.siegeWar }), raid.key);
+  console.log('raid', JSON.stringify(raid.out), JSON.stringify(raidEnd));
+  A(raid.out.mode===2 && raid.out.theme==='street' && raid.out.raid && raid.out.leader && raid.out.allies >= 2, 'a raid is fought in the streets, the watch and townsfolk with you, its leader in the square: '+JSON.stringify(raid.out));
+  A(raid.out.gate && raid.out.houses > 40 && raid.out.roofs >= 4 && raid.out.tall >= 2, 'the town wall stands high with its gate, the houses roofed: '+JSON.stringify(raid.out));
+  A(raidEnd.mode===3 && raidEnd.done && !raidEnd.siege, 'the raid beaten off, you\'re back in town: '+JSON.stringify(raidEnd));
 };

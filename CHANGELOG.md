@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-419 - Walls, towers, a gate and roofs
+
+- **A town wall worth defending.** In a siege, the wall at your back now stands a man and a half high, capped with merlons, with two gate towers higher still standing out from it. The barred gate between them is a stone gatehouse with an arched passage, two iron-bound oak doors studded along their straps, and a beam across them.
+- **Then through the broken gate.** In the streets, the gate you came through stands behind you, broken in: one door hangs open, the other lies torn off its hinges in the street among the splinters, between its towers in the town wall.
+- **Houses with roofs.** The streets are lined with stone and timber-framed houses with walls and gabled roofs of red tile or thatch, each house roofed on its own. Like the walls, they turn see-through when they're between you and the camera.
+- **Raids are battles too.** When monsters raid a town and you go to defend it, the fight starts in the streets. The watch and the townsfolk are already fighting the raiders, and their leader holds the square. Beat them off for a reward and the town's thanks.
+
 ## RS-418 - The siege battle
 
 - **Breaking a siege is a battle now.** When a host besieges a town, choose to break the siege at its gate. The gate is barred behind you, and you and the town's watch hold the field before the walls against three waves of besiegers. Their captain leads the last wave.

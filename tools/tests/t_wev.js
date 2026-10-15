@@ -87,7 +87,7 @@ module.exports = async page=>{
   for (let i=0; i<60 && !(await page.evaluate(()=>G.ui==='wevent')); i++) await page.waitForTimeout(250);
   const r6 = await page.evaluate(()=>{
     const A = (c, msg)=>{ if (!c) throw new Error('assert: '+msg); };
-    A(G.ui==='wevent' && /Raid/.test(G.wevDlg.title), 'raid prompt'); wevChoose(0); A(G.gameMode===2 && G.wevFight.kind==='raid', 'raid fight');
+    A(G.ui==='wevent' && /Raid/.test(G.wevDlg.title), 'raid prompt'); wevChoose(0); A(G.gameMode===2 && G.wevFight.kind==='siegewar' && G.siegeWar && G.siegeWar.raid, 'raid battle in the streets (RS-419)');
     G.mon.forEach(m=>{ m.alive = 0; }); return true;
   });
   await frame(); await frame();
