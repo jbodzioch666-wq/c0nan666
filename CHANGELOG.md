@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-416 - Taller archways, smaller torches, a flatter front
+
+- **The watch's torches burn smaller.** The flame on a watchman's torch was as big as a bonfire. It's now the size of a torch in a wall sconce.
+- **Higher archways in the walls' own stone.** Dungeon doorway arches now spring from much higher up, so the way through is tall and the arch is a low curve just under the top of the wall. They're built from each floor's own pillar stone instead of a plain grey. The doors are cut to the new arch, so they're taller too, and the treasure room door's straps and lock have moved up to suit.
+- **No more tyre round the hips.** Below the belt, women's tunics, jerkins and mail stood out round the hips like a ring. That part of the garment now lies flat across the belly and follows the seat behind, with barely any flare at the hem. The body under it is flatter in front too.
+
 ## RS-415 - Archways, a crowned rat king and a proper pyramid
 
 - **Hips that fit the waist.** Women's hips were set wider than men's and their tunics flared out from the belt like a bell, which showed most on dragonborn. Now the hips are set no wider than a man's, and the tunic is gathered closer at the waist.
