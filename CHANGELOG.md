@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-425 - The waypoint in line
+
+- **A row north.** The waypoint moves one row north, still centred across the square, so it stands in line with the path that runs from the Peddler's door into the square. The benches move with it.
+- **Off the steps.** The estate agent now stands three squares north of the stone instead of right at its steps, and a visiting rare trader no longer sets up on them either.
+
 ## RS-424 - Lamps that stay lit, a simpler square
 
 - **The lamps stay lit at night.** A town only has a few real lights, and they go to the lamps nearest you, so the lamps you walked away from went dark. Now every street lamp, door lantern and torch casts a soft pool of light on the ground and glows at its head all night, wherever you are. Where a real light has the lamp, its pool dims so it isn't twice as bright, and a light moving on to a new lamp fades up there instead of snapping on.

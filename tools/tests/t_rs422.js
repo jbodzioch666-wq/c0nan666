@@ -1,3 +1,4 @@
+// (RS-425: the waypoint a row north, in line with the Peddler's path, the estate agent off its steps)
 // RS-422: food on the fire while you cook (a grill over the campfire, a skillet on the hearth, browning as the bar fills, the cook panel
 // stepping aside to a corner card); the town square's waypoint in its middle, with paving, benches and a lamp at each corner, every
 // door and townsperson still reachable; and your weapon put away out of a fight - a one-handed one at the hip, a two-handed one, a
@@ -37,7 +38,7 @@ module.exports = async page=>{
     { const [bx, by] = townBoardAt(); if (!near(bx, by)) cut.push('board'); } if (!near(wx, wy)) cut.push('waypoint');
     for (const v of G.villagers) if (!v.indoors && G.villageDeco[v.x][v.y]==='pbench') cut.push('villager on a bench ' + v.x + ',' + v.y + ' ' + G.map[v.x][v.y]);   /* (a townsperson is never left inside a bench) */
     waypointArrive(G.owPos.x + ',' + G.owPos.y); G.portalFx = null; setUi('playing');
-    out.town = { wp:[wx, wy], centre:[tX(12), tY(11)], tile:G.map[wx][wy]===T_WAYPOINT, lamps, benches, cut, arrive:[G.player.x - townWpAt()[0], G.player.y - townWpAt()[1]], floor:G.map[G.player.x][G.player.y]===T_FLOOR };
+    out.town = { wp:[wx, wy], centre:[tX(12), tY(10)], pedRow:(()=>{ const b = VILLAGE_BUILDINGS.find(b=>b.key==='shop'); return b ? doorOut(b).y : -1; })(), onSteps:G.villageNpcs.filter(n=>Math.max(Math.abs(n.x - wx), Math.abs(n.y - wy)) <= 1).map(n=>n.service), tile:G.map[wx][wy]===T_WAYPOINT, lamps, benches, cut, arrive:[G.player.x - townWpAt()[0], G.player.y - townWpAt()[1]], floor:G.map[G.player.x][G.player.y]===T_FLOOR };
     // in town your weapon is put away
     G.gear.weapon = rsMakeWeapon(2, 5); rsSync && rsSync();
     for (let i=0;i<6;i++){ renderGame(); await new Promise(r=>setTimeout(r, 60)); }
@@ -77,6 +78,8 @@ module.exports = async page=>{
   A(r.wpn.greatsword.scab && !r.wpn.staff.scab, 'a greatsword in a scabbard on the back, a staff without');
   A(r.wpn.sword.shield==='back' && r.wpn.sword.shBack==='hand', 'the shield on the back, and on the arm to fight');
   A(r.town.tile && r.town.wp.join()===r.town.centre.join(), 'the waypoint in the middle of the square');
+  A(r.town.wp[1]===r.town.pedRow, 'in line with the path from the Peddler door (RS-425)');
+  A(!r.town.onSteps.length, 'no one stands on its steps (RS-425)');
   A(r.town.lamps===4 && r.town.benches.length===4, 'a lamp at each corner and four benches');
   A(!r.town.cut.length, 'every door, townsperson, the board and the stone can still be reached');
   A(r.town.floor && Math.abs(r.town.arrive[0]) + Math.abs(r.town.arrive[1]) <= 3, 'a portal sets you down beside the stone');
