@@ -22,7 +22,9 @@ curl -fsSL -A "$UA" "$FONTS_CSS" -o "$STAGE/fonts/google.css"
 curl -fsSL "https://raw.githubusercontent.com/google/fonts/main/ofl/cinzel/OFL.txt" -o "$STAGE/licenses/Cinzel-OFL.txt"
 curl -fsSL "https://raw.githubusercontent.com/google/fonts/main/ofl/jetbrainsmono/OFL.txt" -o "$STAGE/licenses/JetBrainsMono-OFL.txt"
 
-python3 - "$ROOT/depthcrawl.html" "$STAGE" "$THREE_VER" "$FONTS_CSS" <<'PY'
+# (on Windows, python3 can be the Store's stand-in that only prints a message: use whichever Python really runs)
+PY=python3; "$PY" -c '' 2>/dev/null || PY=python
+"$PY" - "$ROOT/depthcrawl.html" "$STAGE" "$THREE_VER" "$FONTS_CSS" <<'PY'
 import hashlib, os, re, sys, urllib.request
 src, stage, ver, fonts_css = sys.argv[1:5]
 fd = os.path.join(stage, 'fonts')
@@ -49,5 +51,13 @@ PY
 VER="$(grep -oE "const GAME_VERSION = '[A-Za-z0-9._-]+'" "$ROOT/depthcrawl.html" | head -1 | sed -E "s/.*'(.*)'/\1/" || true)"
 ZIP="$OUT/depthcrawl${VER:+-$VER}-itch.zip"
 rm -f "$ZIP"
-(cd "$STAGE" && zip -qr9 "$ZIP" index.html three.min.js fonts licenses)
+if command -v zip >/dev/null; then (cd "$STAGE" && zip -qr9 "$ZIP" index.html three.min.js fonts licenses)
+else (cd "$STAGE" && "$PY" - "$ZIP" <<'PY'
+import os, sys, zipfile
+with zipfile.ZipFile(sys.argv[1], 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as z:
+    for top in ('index.html', 'three.min.js', 'fonts', 'licenses'):
+        for d, _, fs in ([(os.path.dirname(top) or '.', [], [os.path.basename(top)])] if os.path.isfile(top) else os.walk(top)):
+            for f in sorted(fs): p = os.path.join(d, f); z.write(p, os.path.normpath(p).replace(os.sep, '/'))
+PY
+); fi
 echo "built $ZIP ($(du -h "$ZIP" | cut -f1))"
