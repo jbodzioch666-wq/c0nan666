@@ -36,7 +36,7 @@ module.exports = async page=>{
   A(r.pyramid.steps===0 && r.pyramid.faces >= 1 && r.pyramid.capstone >= 1 && r.pyramid.h > 0.85, 'the pyramid is a smooth cased one with a gilded capstone, not steps');
   A(r.rat.scale >= 1.8 && r.rat.crown >= 1 && r.rat.plain===0 && r.rat.taller < 1.3, 'the rat king is bigger, and wears a crown sitting on its head (no taller than a hand over a rat\'s own height): '+JSON.stringify(r.rat));
   A(['door', 'dooro', 'arch', 'ldoor', 'ldooro'].every(d=>r.doors[d].ext >= 9), 'every doorway has its stone arch');
-  A(r.doors.ldoor.top <= 1.03 && r.doors.ldooro.top <= 1.03, 'the treasure room door is no taller than the walls');
+  A(r.doors.ldoor.top > 1.35 && r.doors.ldoor.top < 1.55 && r.doors.door.top > 1.35 && r.doors.door.top < 1.55, 'the doorways are as tall as the way-out portal (RS-417), not the old posts of the treasure room door');
 
   A(r.cape.n > 0 && r.cape.shZ > -0.04, 'the cape lies over the shoulders');
   // the town gate's torches, in a real town

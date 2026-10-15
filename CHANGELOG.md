@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-417 - Doorways as tall as the portal
+
+- **Tall archways.** Every dungeon doorway is now as tall as the way-out portal. Its round stone arch springs from the top of the wall and stands above it the way the portal's does, with a keystone at the crown. The doors are as tall as the arch: straight up to the top of the wall, then rounded to fill it.
+- **The treasure room door too.** It stands as tall, with its jambs carried up to the arch. Its straps, lock and ring are spaced over the taller door, and the ring sits at a hand's height.
+
 ## RS-416 - Taller archways, smaller torches, a flatter front
 
 - **The watch's torches burn smaller.** The flame on a watchman's torch was as big as a bonfire. It's now the size of a torch in a wall sconce.
