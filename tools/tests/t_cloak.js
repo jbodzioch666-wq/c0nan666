@@ -25,7 +25,7 @@ module.exports = async page=>{
     return out; });
   const A = (c, m)=>{ if (!c) throw new Error(m+' :: '+JSON.stringify(r)); };
   A(r.knight.cape && r.knight.topW > 0.27 && r.knight.hemW > r.knight.topW*1.15, 'the cloak spans the shoulders and flares to the hem');
-  A(r.knight.shoulderZ !== null && r.knight.shoulderZ < -0.06, 'the yoke passes behind the pauldrons');
+  A(r.knight.shoulderZ !== null && r.knight.shoulderZ > -0.04, 'the yoke lies over the shoulders and the pauldrons (RS-415: it used to stop in a line behind them, floating off the back)');
   A(r.knight.brooch===2, 'a brooch at each shoulder');
   A(r.knight.kite && r.knight.pointY < r.knight.midY - 0.1, 'the knight carries a kite shield, point down');
   A(r.goblin.round && !r.goblin.kite, 'the goblin keeps a round shield');

@@ -1,5 +1,15 @@
 # Depthcrawl patch notes
 
+## RS-415 - Archways, a crowned rat king and a proper pyramid
+
+- **Hips that fit the waist.** Women's hips were set wider than men's and their tunics flared out from the belt like a bell, which showed most on dragonborn. Now the hips are set no wider than a man's, and the tunic is gathered closer at the waist.
+- **An Egyptian pyramid.** The desert pyramid was a stepped ziggurat. Now it has four smooth faces at the steep slope of the Great Pyramid, cased in pale limestone laid in courses, with a gilded capstone. Its doorway sits under a gabled lintel in the face, and sand drifts against its foot.
+- **The rat king wears a crown.** It's bigger now, nearly twice a giant rat's size, with a gold crown set between its ears: five points tipped with pearls, a ruby at the front and a sapphire on either side.
+- **Stone archways over every door.** Every dungeon doorway is now an arch of cut stone with a keystone, filled in with stone up to the top of the wall. The door's planks are cut to fit under the arch. Like the walls, the arch turns see-through when it's between you and the camera.
+- **A new treasure room door.** The locked door into a treasure room is now a heavy studded oak door bound in iron, with a lock plate and keyhole. It hangs in a stone archway between stone jambs. It used to stand on wooden posts taller than the walls.
+- **Real torches in town.** The flames that hung in the air beside the town gates are now torches in iron sconces on the gate towers. The fletchery and the temple have standing torches: an iron basket of tarred wood on a banded pole. The watch carry a better torch, wrapped in leather at the grip and charred at the top.
+- **Capes that sit on the shoulders.** Capes used to hang a fixed distance behind the back and float at the shoulders. Now each cape is fitted to the body it's on, armour and all. It drapes over the shoulders and lies on the back, then falls straight from the shoulder blades.
+
 ## RS-414 - Long walks stay smooth
 
 - **No more slowdown on long walks.** As you walked, the animals, wandering groups, their rings and the land you'd left behind were taken out of the view but never freed from the graphics card. A three-minute walk piled up more than 500 extra pieces of geometry and about 160 textures, and the land got slower the further you went. Now they're freed when they go: a minute's walk used to leave about 40 behind and now leaves 3.
