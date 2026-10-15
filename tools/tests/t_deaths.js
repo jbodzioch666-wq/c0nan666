@@ -18,7 +18,8 @@ module.exports = async page=>{
     const hits = [null, null, null, null, null, { dmg:2, maxHp:20, kind:'melee' }, { dmg:60, maxHp:20, kind:'melee', crit:true }];
     G.mon.forEach((m, i)=>{ m.alive = 0; m3dKill(m, hits[i]); });
     out.kind = es.map(e=>e && e.dkind);
-    const low = es.map(()=>9), lowOf = o=>{ o.updateMatrixWorld(true); const b = new T.Box3().setFromObject(o); return b.isEmpty() ? 9 : b.min.y; };
+    const __skinY = o=>{ o.updateMatrixWorld(true); const v = new THREE.Vector3(); let lo = Infinity; o.traverseVisible(m=>{ if (!m.isMesh || !m.geometry || !m.geometry.attributes.position || (m.material && m.material.visible===false)) return; const pa = m.geometry.attributes.position, st = Math.max(1, Math.floor(pa.count/300)); const at = i=>{ v.fromBufferAttribute(pa, i); if (m.isSkinnedMesh) m.boneTransform(i, v); v.applyMatrix4(m.matrixWorld); return v.y; }; let bi = 0, by = Infinity; for (let i=0;i<pa.count;i+=st){ const y = at(i); if (y < by){ by = y; bi = i; } } for (let i=Math.max(0, bi - st), n = Math.min(pa.count, bi + st); i<n; i++) by = Math.min(by, at(i)); lo = Math.min(lo, by); }); return lo; };   /* (RS-413: the skin itself - a skinned body's bounding box is its standing shape) */ 
+    const low = es.map(()=>9), lowOf = o=>{ const y = __skinY(o); return y===Infinity ? 9 : y; };
     const s0 = es.map(e=>e && e.s0 ? e.s0.y : 1), c0 = es.map(e=>e && e.rd ? e.rd.c0.clone() : null);
     FP.dt = 1/60; let travel = null;
     for (let f=0;f<240;f++){ m3dSweep(); es.forEach((e,i)=>{ if (!e || !e.holder.parent || i===4) return; low[i] = Math.min(low[i], lowOf(e.holder)); });

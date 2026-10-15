@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| deathall | Every creature dies its own way and ends on the floor: octopuses slump, sharks, frogs and treants tumble, swarms scatter; nothing floats over the floor; thighs swing back no more than about 20 degrees |
 | xptstay | The XP tracker holds still while you gain xp, in its own place and where you've dragged it |
 | rs411 | The XP tracker's bar wraps round at a level-up; explored doorways stay drawn out of sight; a recipe's logs count plain logs only (building costs any kind); the fight minimap hides behind menus; the world map pans by the pixel |
 | dgshadow | In a dungeon the lantern over your shoulder throws your shadow on the floor, redrawn every frame as you walk |

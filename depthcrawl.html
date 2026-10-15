@@ -37693,7 +37693,13 @@ function m3dDeathKind(e, m){
   if (r.bird && r.wings && r.body) return 'bird';
   if (r.frog && r.legs && r.legs.length===4 && Array.isArray(r.tail) && r.neck && r.head) return 'croc';
   if (r.legs && r.legs.length >= 4 && r.body && !r.arms && r.legs.every(L=>L && L.hip)) return 'quad';
-  return null;
+  /* (RS-413) the rest used to topple stiffly, tilted off the floor: a whirlwind blows itself out like a ghost; a swarm
+     scatters, each of its creatures tumbling on its own; an octopus and its kin slump and spread, their arms writhing
+     slower until they lie still; anything else - a shark, a frog, a treant, a xorn, a roper - is a tumbling body */
+  if (r.vortex) return 'ghost';
+  if (r.subs && r.subs.length) return 'swarm';
+  if (r.tentacled && r.head && r.arms && r.arms.length && r.pose) return 'tent';
+  return 'body';
 }
 /* the throw: how hard (from the share of its life the killing blow took, a critical, overkill) and which way (the blow's kind) */
 function m3dBlowOf(hit){
@@ -37711,9 +37717,9 @@ function m3dDeathPrep(e, m, hit){
   if (boxR.isEmpty()) return;
   e.dcorn = []; for (let i=0;i<8;i++) e.dcorn.push(new T.Vector3(i&1 ? boxR.max.x : boxR.min.x, i&2 ? boxR.max.y : boxR.min.y, i&4 ? boxR.max.z : boxR.min.z));   /* (root's own frame, for the plain topple) */
   e.rootY0 = root.position.y; e.s0 = root.scale.clone();
-  const kind = e.dkind = m3dDeathKind(e, m), B = e.blowK = m3dBlowOf(hit), b0 = e.blow || { x:0, z:1 };
+  let kind = e.dkind = m3dDeathKind(e, m); const B = e.blowK = m3dBlowOf(hit), b0 = e.blow || { x:0, z:1 };   /* (RS-413: let - a dragon whose chain can't be made falls back to 'quad' below, and a const threw there) */
   const b = { x:(b0.x - b0.z*B.side)*B.push, z:(b0.z + b0.x*B.side)*B.push };   /* (fire and lightning throw it off to one side) */
-  if (kind==='ghost'){ try{ const p = hold.position; fpBurst(p.x, p.z, 0.6, '#c8e0ff', 26, 1.4); }catch(err){} return; }
+  if (kind==='ghost'){ try{ const p = hold.position; fpBurst(p.x, p.z, 0.6, e.rig && e.rig.vortex ? '#c8b082' : '#c8e0ff', 26, 1.4); }catch(err){} return; }
   if (kind==='ooze') return;
   const tip = j=>{ let d = j, n = 0; while (d.children && d.children.length && n < 12){ d = d.children[d.children.length-1]; n++; } return d.getWorldPosition(new T.Vector3()); };
   /* which way turning a joint brings its end closer to (or further from) a point */
@@ -37728,6 +37734,18 @@ function m3dDeathPrep(e, m, hit){
       const R = m3dRbMake(box, J, hold, { v:new T.Vector3(b.x*0.8*B.k + out.x*rnd(0.2, 0.9), rnd(-0.2, 0.8)*B.up, b.z*0.8*B.k + out.z*rnd(0.2, 0.9)), w:new T.Vector3(rnd(-6, 6), rnd(-6, 6), rnd(-6, 6)), g:12, bounce:0.3, mu:0.6 });
       e.parts.push(R); }
     try{ fpBurst(base.x, base.z, 0.4, '#e8e0cc', 14, 0.9); }catch(err){}
+    return;
+  }
+  if (kind==='swarm'){   /* (RS-413) a swarm scatters: each creature in it thrown out from the middle, tumbling down on its own */
+    e.parts = [];
+    for (const S2 of e.rig.subs){ const g2 = S2.sub; if (!g2 || !g2.parent) continue; hold.attach(g2); const box = m3dRbBox([g2], hold); if (box.isEmpty()) continue;
+      const c = box.getCenter(new T.Vector3()), out = new T.Vector3(c.x, 0, c.z); if (out.lengthSq() < 1e-6) out.set(rnd(-1, 1), 0, rnd(-1, 1)); out.normalize();
+      e.parts.push(m3dRbMake(box, g2, hold, { v:new T.Vector3(b.x*0.9*B.k + out.x*rnd(0.3, 1), rnd(0.8, 1.8)*B.up, b.z*0.9*B.k + out.z*rnd(0.3, 1)), w:new T.Vector3(rnd(-7, 7), rnd(-3, 3), rnd(-7, 7)), g:11, bounce:0.25, mu:0.6 })); }
+    if (!e.parts.length) e.parts = null;
+    return;
+  }
+  if (kind==='tent'){   /* (RS-413) an octopus slumps and spreads where it lies, pushed a little by the blow, its arms slowing to stillness */
+    const K = Math.min(1.5, B.k); e.tent = { t0:FP.t + (e.seed||0), bx:b.x*0.3*K, bz:b.z*0.3*K, rx:rnd(-0.3, 0.3) };
     return;
   }
   if (!kind) return;
@@ -37747,15 +37765,17 @@ function m3dDeathPrep(e, m, hit){
       e.drops.push(m3dRbMake(box, it, hold, { v:new T.Vector3(b.x*1.2*B.k - b.z*s*rnd(0.3, 0.9), rnd(1.2, 2.2)*B.up, b.z*1.2*B.k + b.x*s*rnd(0.3, 0.9)), w:new T.Vector3(rnd(-9, 9), rnd(-4, 4), rnd(-9, 9)), g:11, bounce:0.25, mu:0.45 })); } }
   if (e.chain) return;   /* (RS-376: a two-legged body falls as a chain of joints - see m3dChainMake) */
   const boxH = m3dRbBox([root], hold, skip); if (boxH.isEmpty()) return;
-  const he = boxH.getSize(new T.Vector3()).multiplyScalar(0.5), sz = Math.max(he.x, he.z), K = B.k;
+  const he = boxH.getSize(new T.Vector3()).multiplyScalar(0.5), sz = Math.max(he.x, he.z), K = B.k, tall = kind==='body' && he.y > 1.4*sz;
   let vel, w, g = 9 + sz*30;
   if (kind==='bug'){ const spin = (9 + Math.random()*3)*(0.7 + 0.3*K), axis = new T.Vector3(b.z, 0, -b.x).normalize();   /* (it rolls over the way it was knocked) */
     vel = new T.Vector3(b.x*1.4*(0.6 + sz*2)*K, (2.3 + sz*2.5)*(0.7 + 0.3*K)*B.up, b.z*1.4*(0.6 + sz*2)*K); w = axis.multiplyScalar(spin).add(new T.Vector3(0, (Math.random()-0.5)*4, 0)); }
-  else if (kind==='quad'){ const sx = Math.abs(b.x) > 0.15 ? Math.sign(b.x) : (Math.random() < 0.5 ? -1 : 1), spin = (4 + Math.random()*1.5)*(0.6 + 0.4*K)*Math.max(1, Math.sqrt(he.x/Math.max(0.05, he.y)));   /* (a beast rolls onto its side, whichever side the blow pushed it - a broad one, a dragon or a crab, harder) */
+  else if (kind==='quad' || (kind==='body' && !tall)){ const sx = Math.abs(b.x) > 0.15 ? Math.sign(b.x) : (Math.random() < 0.5 ? -1 : 1), spin = (4 + Math.random()*1.5)*(0.6 + 0.4*K)*Math.max(1, Math.sqrt(he.x/Math.max(0.05, he.y)));   /* (a beast rolls onto its side, whichever side the blow pushed it - a broad one, a dragon or a crab, harder) */
     vel = new T.Vector3(b.x*0.9*K, (1.0 + sz*1.2)*(0.6 + 0.4*K)*B.up, b.z*0.9*K); w = new T.Vector3(b.z*0.6, (Math.random()-0.5)*1.5, -sx*spin); g = 9 + sz*20; }
   else { const axis = new T.Vector3(b.z, 0, -b.x).normalize(), spin = (2.4 + Math.random()*1.2)*(0.6 + 0.4*K);   /* (on two legs: knocked back off its feet, away from the blow) */
     vel = new T.Vector3(b.x*1.1*K, (0.9 + sz)*(0.6 + 0.4*K)*B.up, b.z*1.1*K); w = axis.multiplyScalar(spin).add(new T.Vector3(0, (Math.random()-0.5)*1.2, 0)); g = 11; }
   const rd = e.rd = m3dRbMake(boxH, root, hold, { v:vel, w, g, bounce:kind==='bug' ? 0.22 : 0.15, mu:kind==='bug' ? 0.7 : 0.8 });
+  if (kind==='body' && r.pose){ rd.poseR = r; rd.pt0 = FP.t + (e.seed||0); }   /* (a roper's tendrils, an eye's stalks: they writhe slower and slower) */
+  rd.flop = kind==='body' && !!(r.fish || r.frog);   /* (a fish or a frog flops about as it dies) */
   rd.kind = kind; rd.legs = []; rd.limp = []; rd.kicks = kind==='bug' ? 0 : 99; rd.rollAx = new T.Vector3(w.x, 0, w.z).lengthSq() > 1e-4 ? new T.Vector3(w.x, 0, w.z).normalize() : new T.Vector3(1, 0, 0);
   const bodyC = new T.Vector3();
   if (kind==='bug'){
@@ -37769,6 +37789,12 @@ function m3dDeathPrep(e, m, hit){
     for (const L of r.legs){ const sw = L.up || L.hip; rd.limp.push(limp(sw, 'x', rnd(-0.45, 0.45), 40, 5));
       if (L.knee){ rd.limp.push(limp(L.knee, 'x', signTo(L.knee, 'x', bodyC, true)*rnd(0.3, 0.8), 40, 5)); } }
     if (r.head) rd.limp.push(limp(r.head, 'x', rnd(0.2, 0.5), 30, 5));
+  } else if (kind==='body'){   /* (RS-413) whatever limbs it has go limp: a fish's tail and jaw, a frog's legs, a treant's boughs and roots, a xorn's arms */
+    const lj = (J, ax, off, k, d)=>{ if (J && J.rotation) rd.limp.push(limp(J, ax, off, k, d)); };
+    if (r.fish){ lj(r.tail, 'y', rnd(-0.6, 0.6), 30, 3); lj(r.front, 'y', rnd(-0.3, 0.3), 30, 4); lj(r.jaw, 'x', 0.2, 30, 5); }
+    if (r.frog){ for (const L of r.legs||[]){ lj(L.hip, 'x', rnd(-0.6, 0.6), 35, 5); lj(L.arm, 'x', rnd(-0.6, 0.6), 35, 5); } lj(r.jaw, 'x', 0.15, 30, 5); }
+    if (r.treant){ for (const A of r.arms||[]) lj(A.sh, 'z', (A.s||1)*rnd(0.3, 0.9), 25, 4); for (const L of r.legs||[]) lj(L.g, 'x', rnd(-0.3, 0.4), 30, 5); }
+    if (r.xorn) for (const A of r.arms||[]) lj(A, 'x', rnd(-0.6, 0.6), 30, 5);
   } else if (kind==='bird'){   /* (RS-378: it tumbles out of the air; the wings sprawl and the head lolls) */
     for (const Wg of r.wings){ if (Wg.sh) rd.limp.push(limp(Wg.sh, 'z', Wg.s*rnd(-0.4, 0.5), 25, 4), limp(Wg.sh, 'x', rnd(-0.4, 0.4), 25, 4)); if (Wg.hand) rd.limp.push(limp(Wg.hand, 'y', 0.9 - Wg.hand.rotation.y, 30, 5)); }
     if (r.neck) rd.limp.push(limp(r.neck, 'x', rnd(0.2, 0.8), 25, 4), limp(r.neck, 'z', rnd(-0.4, 0.4), 25, 4)); if (r.tail && r.tail.rotation) rd.limp.push(limp(r.tail, 'x', rnd(-0.3, 0.3), 25, 4));
@@ -37810,7 +37836,7 @@ function m3dChainMake(e, B, b){
   D(11,15, 0.35, 2.5); D(12,16, 0.3, 3); D(5,8, 0.3, 3);                                   // (the legs neither cross nor split, nor the arms)
   const H = [{ a:10, j:11, b:12, side:1, min:0.02*s }, { a:14, j:15, b:16, side:1, min:0.02*s }, { a:4, j:5, b:6, side:-1, min:0.01*s }, { a:7, j:8, b:9, side:-1, min:0.01*s }];   // knees forward, elbows back
   const K = B.k, v0 = new T.Vector3(b.x*0.9*K, 0.25*B.up*K, b.z*0.9*K);   /* (the throw: the whole body pushed, the top of it most, so it topples) */
-  return { p:P, c:C, h:H, s, h0:Math.max(0.1, pts[0].y), v0, started:false, wall:G.gameMode===1 || G.gameMode===2, rot:hold.rotation.y, hx:hold.position.x, hz:hold.position.z, g:9.5, t:0, rest:0, upY:1, lift:0, x0:pts[0].clone() };
+  return { p:P, c:C, h:H, hipLim:[{ h:10, k:11, a:12, max:0.34 }, { h:14, k:15, a:16, max:0.34 }], s, h0:Math.max(0.1, pts[0].y), v0, started:false, wall:G.gameMode===1 || G.gameMode===2, rot:hold.rotation.y, hx:hold.position.x, hz:hold.position.z, g:9.5, t:0, rest:0, upY:1, lift:0, x0:pts[0].clone() };
 }
 function m3dChainStep(e, dt){
   const T = THREE, C = e.chain, P = C.p, S = m3dChainStep, tmp = S.t || (S.t = { a:new T.Vector3(), x:new T.Vector3(), y:new T.Vector3(), f:new T.Vector3() });
@@ -37829,6 +37855,8 @@ function m3dChainStep(e, dt){
       for (const hg of C.h){ const a = P[hg.a].x, j = P[hg.j].x, bq = P[hg.b].x, mx = (a.x + bq.x)*0.5, my = (a.y + bq.y)*0.5, mz = (a.z + bq.z)*0.5;
         const d = (j.x - mx)*tmp.f.x + (j.y - my)*tmp.f.y + (j.z - mz)*tmp.f.z, want = hg.side*hg.min; if (hg.side > 0 ? d >= want : d <= want) continue;
         j.addScaledVector(tmp.f, (want - d)*0.7); bq.addScaledVector(tmp.f, -(want - d)*0.3); }   /* (the joint and its far end are moved, never its root: pushing a leg's root about turned a beast over its stretched legs) */
+      if (C.hipLim) for (const hl of C.hipLim){ const hp = P[hl.h].x, kn = P[hl.k].x; tmp.a.subVectors(kn, hp); const len = tmp.a.length() || 1e-6, d = tmp.a.dot(tmp.f), lim = -hl.max*len; if (d >= lim) continue;
+        kn.addScaledVector(tmp.f, (lim - d)*0.8); P[hl.a].x.addScaledVector(tmp.f, (lim - d)*0.4); }   /* (RS-413) a thigh swings back no more than a little past the body - the legs used to fold far back at the hips */
       for (const p of P){ if (p.x.y < p.r && !p.noFloor){ const vy = p.x.y - p.xp.y; p.x.y = p.r;
         if (vy <= 0 && p.fr===undefined){ const vx = p.x.x - p.xp.x, vz = p.x.z - p.xp.z, sp = Math.hypot(vx, vz), dv = (p.mu===undefined ? 0.6 : p.mu)*C.g*h*h;   /* (the floor's friction: sliding, it's slowed by a fixed amount each step; slowed enough, it grips. A thrown body skids to a stop with its feet instead of tripping over them) */
           if (sp <= dv){ p.xp.x = p.x.x; p.xp.z = p.x.z; } else { const k = 1 - dv/sp; p.xp.x = p.x.x - vx*k; p.xp.z = p.x.z - vz*k; } } }   /* (a body frame's points aren't dragged one by one - the frame thuds as a whole, below - or the drag on the one point down would turn it over) */   /* (the floor, and its drag - on what comes down on it, not on a foot still leaving it: a beast thrown with its feet planted tripped over them and somersaulted) */
@@ -37866,7 +37894,7 @@ function m3dChainPose(e){
     if (L.ankle){ t.v.set(1, 0, 0).applyQuaternion(qb); QZ(dir(an, to), t.v, qa); L.ankle.quaternion.copy(qb).invert().multiply(qa); } }
   /* nothing drawn goes under the floor: the whole figure is raised by however far its lowest part dips (for the look only) */
   e.holder.updateMatrixWorld(true); const bb = S.bb || (S.bb = new T.Box3()); bb.makeEmpty(); bb.expandByObject(root); const low = bb.min.y - e.holder.matrixWorld.elements[13];
-  const need = Math.max(0, -low); if (need > 0) root.position.y += need; C.lift = need;
+  const need = m3dLiftNeed(e, low); if (need > 0) root.position.y += need; C.lift = need;
   t.v.set(0, 1, 0).applyQuaternion(qCh); C.upY = t.v.y;
 }
 /* (RS-377) a four-legged body dies as a chain of joints too. The pelvis and the chest are each a rigid frame of five points - the
@@ -37934,7 +37962,7 @@ function m3dChainPoseRig(e){
   if (C.foldWings && r.wings) r.wings.forEach(Wg=>{ if (Wg.w) Wg.w.rotation.z = Wg.s*(0.3 - 0.55*Math.min(1, C.t/0.7)); });   /* (the wings fold down as it falls) */
   if (r.chest) m3dBendSync(r);
   e.holder.updateMatrixWorld(true); const bb = S.bb || (S.bb = new T.Box3()); bb.makeEmpty(); bb.expandByObject(root); const low = bb.min.y - e.holder.matrixWorld.elements[13];
-  const need = Math.max(0, -low); if (need > 0) root.position.y += need; C.lift = need;
+  const need = m3dLiftNeed(e, low); if (need > 0) root.position.y += need; C.lift = need;
   const F0 = Rg.frames[0]; t.v.subVectors(P[F0.ti].x, P[F0.ci].x).normalize(); C.upY = t.v.y;
 }
 /* (RS-378) dragons, hydras, wyverns, sea serpents, dragon turtles and crocodiles die as a chain of joints too: one rigid body
@@ -38012,7 +38040,7 @@ function m3dChainPoseSerpent(e){
   if (r.jaw && r.jaw.rotation) r.jaw.rotation.x = 0.06; if (r.tongue) r.tongue.visible = false;
   if (r.finish){ try{ r.finish(r, FP.t + e.seed, 0, 0, 0, pts, F); }catch(err){} }
   e.holder.updateMatrixWorld(true); const bb = S.bb || (S.bb = new T.Box3()); bb.makeEmpty(); bb.expandByObject(root); const low = bb.min.y - e.holder.matrixWorld.elements[13];
-  const need = Math.max(0, -low); if (need > 0) root.position.y += need; C.lift = need; C.upY = 0;
+  const need = m3dLiftNeed(e, low); if (need > 0) root.position.y += need; C.lift = need; C.upY = 0;
 }
 function m3dRagdollStep(e, dt){
   const T = THREE, R = e.rd, S = m3dRagdollStep, tmp = S.t || (S.t = { a:new T.Vector3(), b:new T.Vector3() });
@@ -38036,16 +38064,35 @@ function m3dRagdollStep(e, dt){
     if (L.hip){ L.vhy += (-L.hy*50 - L.vhy*6)*dt; L.hy += L.vhy*dt; L.hip.rotation.y = L.hy0 + L.hy; } }
   if (R.tail){ const k = Math.min(1, R.t*1.5); for (const T2 of R.tail){ T2.j.rotation.x = T2.x0*(1 - 0.9*k); T2.j.rotation.z = T2.z0*(1 - k) + Math.sin(R.t*9 + T2.x0)*0.12*fade; } }   /* (the sting sags, the tail straightening out behind it) */
   // (RS-371) limp joints: springs toward where they fall, thrown about by the tumble; a beast's legs kick a few times as it dies
-  const kickF = R.kind==='quad' ? Math.max(0, 1 - R.t/1.6) : Math.max(0, 1 - R.t/0.8);
+  const kickF = R.kind==='quad' || R.flop ? Math.max(0, 1 - R.t/1.6) : Math.max(0, 1 - R.t/0.8);
   for (const L of R.limp){
-    L.next -= dt; if (L.next <= 0 && kickF > 0){ L.va += (Math.random()-0.5)*(R.kind==='quad' ? 22 : 8)*kickF; L.next = 0.12 + Math.random()*0.3; }
+    L.next -= dt; if (L.next <= 0 && kickF > 0){ L.va += (Math.random()-0.5)*(R.kind==='quad' || R.flop ? 22 : 8)*kickF; L.next = 0.12 + Math.random()*0.3; }
     L.va += ((L.tgt - L.a)*L.k - L.va*L.d + (Math.random()-0.5)*spinK*2.5)*dt; L.a += L.va*dt; L.J.rotation[L.ax] = L.a; }
+  if (R.poseR){ try{ R.poseR.pose(R.poseR, R.pt0 + 1.2*(1 - Math.exp(-R.t*1.5)), 0, 0, 0, 0); }catch(err){} }   /* (RS-413) */
   // pose the model from the body: the box's middle where the solver has it, turned as it has turned
   const root = e.root; m3dRbPose(R);
   // the body box is what lands; the legs and tail only ride along. Whatever they do, nothing drawn goes under the floor: the
   // model is raised by however far its lowest part dips, for the look only (the body's motion doesn't feel it, which keeps it steady)
   e.holder.updateMatrixWorld(true); const bb = S.bb || (S.bb = new T.Box3()); bb.makeEmpty(); bb.expandByObject(root); const low = bb.min.y - e.holder.matrixWorld.elements[13];
-  const need = Math.max(0, -low); if (need > 0) root.position.y += need; R.lift = need;
+  const need = m3dLiftNeed(e, low, true); if (need) root.position.y += need; R.lift = need;
+}
+/* (RS-413) how far a corpse must be raised so nothing drawn goes under the floor. The bounding boxes (low) are the model's
+   standing shape - a skinned body's legs curled up under it still counted as hanging down, so a spider on its back or a
+   kalphite floated a hand's width off the floor, looking stuck. The skin itself is sampled too, and the smaller lift taken:
+   down onto the floor, never propped higher than the boxes would (a dragon's wing under it stays tucked out of sight) */
+/* (a tumbling body - down: its box is its standing shape too, its legs and all, so a beetle on its back rested on where its
+   legs had been; it is drawn lowered onto the floor, by no more than a little) */
+function m3dLiftNeed(e, low, down){
+  const box = Math.max(0, -low); if (!(box > 0) && !down) return 0;
+  const v = m3dLiftNeed.v || (m3dLiftNeed.v = new THREE.Vector3()), y0 = e.holder.matrixWorld.elements[13]; let lo = Infinity;
+  e.root.traverseVisible(o=>{ if (!o.isMesh || !o.geometry || (o.material && o.material.visible===false)) return; const pa = o.geometry.attributes.position; if (!pa) return;
+    const st = Math.max(1, Math.floor(pa.count/300)), at = i=>{ v.fromBufferAttribute(pa, i); if (o.isSkinnedMesh) o.boneTransform(i, v); v.applyMatrix4(o.matrixWorld); return v.y; };
+    let bi = -1, by = Infinity; for (let i=0;i<pa.count;i+=st){ const y = at(i); if (y < by){ by = y; bi = i; } }
+    if (st > 1 && bi >= 0) for (let i=Math.max(0, bi - st), n = Math.min(pa.count, bi + st); i<n; i++){ const y = at(i); if (y < by) by = y; }   /* (then every vertex round the lowest found: neighbours in the list are neighbours on the body) */
+    if (by < lo) lo = by; });
+  if (lo===Infinity) return box;
+  const dip = y0 - lo;   /* (how far the skin goes under the floor; less than nothing, how far above it) */
+  return down ? Math.max(-0.35, Math.min(0.6, dip)) : Math.max(0, Math.min(dip, box + 0.08));   /* (a tumbling body is drawn resting on the lowest point of its skin, up or down - its flailing legs went through the floor mid-tumble; a body of joints lifted by its skin, but no more than a little past its boxes) */
 }
 // the plain topple, kept clear of the floor: its lowest corner (as the model now stands) rests on it
 function m3dToppleLift(e){
@@ -38070,6 +38117,10 @@ function m3dSweep(){
         const g = Math.min(1, e.dying/1.3), s0 = e.s0; e.holder.position.y = g*0.8; e.root.rotation.y += dt*(3 - 2*g); if (s0) e.root.scale.set(s0.x*(1 + g*0.7), s0.y*(1 + g*0.3), s0.z*(1 + g*0.7));
         m3dDeathFade(e, Math.max(0, 1 - g)); if (g >= 1 || e.map!==G.map){ e.holder.parent && e.holder.parent.remove(e.holder); M3D.live.delete(e); } continue; }
       if (e.dkind==='ooze'){ const s = Math.min(1, e.dying/0.55), q = s*s*(3 - 2*s), s0 = e.s0; if (s0) e.root.scale.set(s0.x*(1 + 0.75*q), s0.y*(1 - 0.86*q), s0.z*(1 + 0.75*q)); e.root.position.y = (e.rootY0||0)*(1 - q); }   /* (an ooze slumps into a puddle) */
+      else if (e.tent){ const Tn = e.tent, r = e.rig, q = Math.min(1, e.dying/0.9), ez = 1 - Math.pow(1 - q, 3), s0 = e.s0;
+        try{ r.pose(r, Tn.t0 + 1.2*(1 - Math.exp(-e.dying*1.5)), 0, 0, 0, Math.max(0, 1 - e.dying*1.5)); }catch(err){}   /* (the writhing slows to a stop) */
+        if (s0) e.root.scale.set(s0.x*(1 + 0.18*ez), s0.y*(1 - 0.45*ez), s0.z*(1 + 0.18*ez));   /* (the mantle sags and the body spreads) */
+        e.root.position.x = Tn.bx*ez; e.root.position.z = Tn.bz*ez; r.head.rotation.z = Tn.rx*ez; }
       else if (e.parts){ for (const R of e.parts) if (d0 < 1.4 || R.rest < 0.4){ m3dRbStep(R, dt); m3dRbPose(R); } }   /* (a skeleton's bones, each on its own) */
       else if (e.chain){ if (d0 < 1.4 || e.chain.rest < 0.4) m3dChainStep(e, dt); }   /* (RS-376: a two-legged body, as a chain of joints) */
       else if (e.rd){ if (d0 < 1.4 || e.rd.rest < 0.4) m3dRagdollStep(e, dt); }
@@ -39991,7 +40042,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-412';
+const GAME_VERSION = 'rs-413';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

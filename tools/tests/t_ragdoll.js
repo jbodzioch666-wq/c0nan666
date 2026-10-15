@@ -25,7 +25,7 @@ module.exports = async page=>{
     for (const m of G.mon){ m.alive = 0; m3dKill(m); }
     const es = G.mon.map(m=>M3D.inst.get(m)); out.rd = es.map(e=>!!(e && e.rd));
     const low = es.map(()=>9), inWall = es.map(()=>0);
-    const lowOf = e=>{ e.holder.updateMatrixWorld(true); return new T.Box3().setFromObject(e.holder).min.y - e.holder.position.y; };
+    const __skinY = o=>{ o.updateMatrixWorld(true); const v = new THREE.Vector3(); let lo = Infinity; o.traverseVisible(m=>{ if (!m.isMesh || !m.geometry || !m.geometry.attributes.position || (m.material && m.material.visible===false)) return; const pa = m.geometry.attributes.position, st = Math.max(1, Math.floor(pa.count/300)); const at = i=>{ v.fromBufferAttribute(pa, i); if (m.isSkinnedMesh) m.boneTransform(i, v); v.applyMatrix4(m.matrixWorld); return v.y; }; let bi = 0, by = Infinity; for (let i=0;i<pa.count;i+=st){ const y = at(i); if (y < by){ by = y; bi = i; } } for (let i=Math.max(0, bi - st), n = Math.min(pa.count, bi + st); i<n; i++) by = Math.min(by, at(i)); lo = Math.min(lo, by); }); return lo; };   /* (RS-413: the skin itself - a skinned body's bounding box is its standing shape) */ const lowOf = e=>__skinY(e.holder) - e.holder.position.y;
     const comTile = e=>{ const R = e.rd, dx = R.x.x - R.c0.x, dz = R.x.z - R.c0.z, a = R.rot; return [Math.floor(R.hx + dx*Math.cos(a) + dz*Math.sin(a)), Math.floor(R.hz - dx*Math.sin(a) + dz*Math.cos(a))]; };
     FP.dt = 1/60;
     for (let f=0;f<240;f++){ m3dSweep(); es.forEach((e,i)=>{ if (!e || !e.holder.parent) return; low[i] = Math.min(low[i], lowOf(e)); if (e.rd){ const [tx, ty] = comTile(e); if (!G.map[tx] || G.map[tx][ty]===T_WALL) inWall[i]++; } }); }

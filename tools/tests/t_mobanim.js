@@ -32,7 +32,8 @@ module.exports = async page=>{
         FPD.scene && FPD.scene.add(e.holder); if (!e.holder.parent){ const g = new THREE.Group(); g.add(e.holder); }
         M3D.inst.set(m, e); m3dKill(m); for (let i=0;i<140;i++) m3dSweep();   /* (RS-371: a ragdoll takes a moment longer to settle than the old scripted topple) */
         /* (RS-371) fallen: on its side or back - or, for an ooze, slumped into a puddle; a ghost thinned away; a skeleton in pieces */
-        const fell = e.dkind==='ooze' ? (e.s0 && e.root.scale.y < e.s0.y*0.3 ? 2 : 0) : e.dkind==='ghost' ? (!e.holder.parent ? 2 : 0) : e.dkind==='bones' ? (e.parts && e.parts.length >= 8 ? 2 : 0)
+        const fell = e.dkind==='tent' ? (e.s0 && e.root.scale.y < e.s0.y*0.7 ? 2 : 0) : e.dkind==='swarm' ? (e.parts && e.parts.length && e.parts.every(R=>R.t > 0) ? 2 : 0)   /* (RS-413: an octopus slumps flat, a swarm scatters) */
+          : e.dkind==='ooze' ? (e.s0 && e.root.scale.y < e.s0.y*0.3 ? 2 : 0) : e.dkind==='ghost' ? (!e.holder.parent ? 2 : 0) : e.dkind==='bones' ? (e.parts && e.parts.length >= 8 ? 2 : 0)
           : e.chain ? Math.acos(Math.max(-1, Math.min(1, e.chain.upY)))   /* (RS-376: a two-legged body, a chain of joints) */
           : e.rd ? Math.acos(Math.max(-1, Math.min(1, new THREE.Vector3(0, 1, 0).applyQuaternion(e.rd.q).y))) : Math.abs(e.root.rotation.x) + Math.abs(e.root.rotation.z);
         if (!(fell > 1)) out.noDeath.push(nm+' '+fell.toFixed(2)+' '+e.dkind+' '+(e.chain ? 'chain/'+e.chain.rest.toFixed(2)+'/'+e.chain.upY.toFixed(2) : e.rd ? 'rd'+(e.rd.shoves||0)+'/'+e.rd.rest.toFixed(2)+'/'+e.dying.toFixed(2) : 'nord'));

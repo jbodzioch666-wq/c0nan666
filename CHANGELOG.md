@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-413 - Every creature falls properly
+
+- **Octopuses slump.** The giant octopus, the kraken and the other tentacled horrors used to tip over stiffly, their arms frozen mid-wave. Now the body sags and spreads where it lies, pushed a little by the blow, and the arms writhe slower and slower until they're still.
+- **Sharks, frogs and the rest tumble.** Sharks, frogs and toads, treants, the xorn, the roper and the floating eye are now thrown by the killing blow like the other beasts. They roll onto a side, and tall ones fall back like a tree. Their own limbs go limp, and a fish's tail or a frog's legs flop as they die.
+- **Swarms scatter.** In a quipper, hyena, scorpion or scarab swarm, each creature tumbles down on its own. A dust devil spins up and blows itself out.
+- **No more bent-back legs.** A falling two-legged body's thighs swing back no more than about 20 degrees past the body. They used to fold far behind it at the hips.
+- **Corpses lie on the floor.** Many creatures stopped short of the floor and looked frozen, propped on nothing. Scorpions, kalphites and beetles on their backs hung up to 20 cm in the air, and the giant mole, the xorn, treants and the purple worm floated too. Each corpse now rests on the lowest point of its own body, and tumbling ones no longer dip their legs through the floor mid-fall.
+
 ## RS-412 - The XP tracker stays where you put it
 
 - **No more jumping tracker.** If you'd dragged the XP tracker somewhere, it leapt up to the top-left corner every time you gained xp (each herb you picked, each log, each hit) and dropped back a moment later. It now stays exactly where you put it. In its usual place under your name it no longer shifts by a couple of pixels either.
