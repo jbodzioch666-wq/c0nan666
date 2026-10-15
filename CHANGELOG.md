@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-423 - The shut tome
+
+- **One book, not two.** When you carried a spell tome shut out of a fight, the open book's pages and boards still showed through the closed one, as if one book were inside the other. When a figure is put together, the small parts of what it carries are joined into one mesh to draw faster, and the open book had been joined onto the tome itself, so it no longer hid when the book shut. Each named part, like the open and the shut book, is now joined on its own, so only the book you're holding shows.
+
 ## RS-422 - Cooking on the fire, a new town square, weapons put away
 
 - **See your food cook.** At your campfire an iron grill now stands over the flames. At a hearth, a cast-iron skillet sits on a trivet in front of the fire. What you're cooking lies on it: a trout, a steak, a dragon steak veined with ember, or a bubbling stew. It browns as the bar fills, picks up grill marks and steams, and a fresh one goes on for each you cook.

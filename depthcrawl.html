@@ -32393,14 +32393,17 @@ function m3dMergeProp(group, rigRef){
   group.traverse(o=>{ if (!o.isMesh || o===group || o.isInstancedMesh || o.isSkinnedMesh || rigRef.has(o) || !o.visible) return; const m = o.material; if (!m || Array.isArray(m) || m.transparent || m.visible===false) return;
     if (m.userData.special || m.userData.bend || (m.onBeforeCompile!==plainCompile && !m.userData.rim)) return;
     if (Object.keys(o.userData).length) return; const ga = o.geometry && o.geometry.attributes; if (!ga || !ga.position || !ga.normal || (o.geometry.morphAttributes && Object.keys(o.geometry.morphAttributes).length)) return;
-    for (let q = o.parent; q && q!==group; q = q.parent) if (!q.visible || rigRef.has(q)) return;
-    const k = m3dMergeKey(o); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(o); });
+    let hold = group; for (let q = o.parent; q && q!==group; q = q.parent){ if (!q.visible || rigRef.has(q)) return; if (q.name && hold===group) hold = q; }
+    /* (RS-423) a named part (a tome's open and shut books) is merged within itself, so showing one and hiding the other still works -
+       merged up into the prop, the open book's pages stayed showing inside the shut one */
+    const k = hold.uuid + '|' + m3dMergeKey(o); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(o); o.userData._mh = hold; });
   const N = new T.Matrix3(), v = new T.Vector3(), M = new T.Matrix4();
-  for (const list of groups.values()){ if (list.length < 2) continue;
+  for (const list of groups.values()){ const hold = list[0].userData._mh || group; for (const o of list) delete o.userData._mh; if (list.length < 2) continue;
+    const hinv = hold===group ? inv : new T.Matrix4().copy(hold.matrixWorld).invert();
     const names = Object.keys(list[0].geometry.attributes).filter(n=>n!=='color' && list.every(o=>o.geometry.attributes[n])); let nv = 0, ni = 0;   /* (RS-402: only what every part has - a loose merge may join parts with and without texture coordinates) */
     for (const o of list){ const g = o.geometry; nv += g.attributes.position.count; ni += g.index ? g.index.count : g.attributes.position.count; }
     const outA = {}; for (const nm of names) outA[nm] = new Float32Array(nv*list[0].geometry.attributes[nm].itemSize); const col = new Float32Array(nv*3), idx = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni); let vo = 0, io = 0;
-    for (const o of list){ const g = o.geometry, c = g.attributes.position.count; M.multiplyMatrices(inv, o.matrixWorld); N.getNormalMatrix(M); const flip = M.determinant() < 0, mc = o.material.color, vc = o.material.vertexColors && g.attributes.color ? g.attributes.color : null;
+    for (const o of list){ const g = o.geometry, c = g.attributes.position.count; M.multiplyMatrices(hinv, o.matrixWorld); N.getNormalMatrix(M); const flip = M.determinant() < 0, mc = o.material.color, vc = o.material.vertexColors && g.attributes.color ? g.attributes.color : null;
       for (const nm of names){ const a = g.attributes[nm], is = a.itemSize, dst = outA[nm];
         for (let i=0;i<c;i++){
           if (nm==='position'){ v.fromBufferAttribute(a, i).applyMatrix4(M); dst[(vo+i)*3] = v.x; dst[(vo+i)*3+1] = v.y; dst[(vo+i)*3+2] = v.z; }
@@ -32413,7 +32416,7 @@ function m3dMergeProp(group, rigRef){
     const mg = new T.BufferGeometry(); for (const nm of names) mg.setAttribute(nm, new T.BufferAttribute(outA[nm], list[0].geometry.attributes[nm].itemSize));
     mg.setAttribute('color', new T.BufferAttribute(col, 3)); mg.setIndex(new T.BufferAttribute(idx.subarray(0, io), 1)); mg.computeBoundingSphere(); mg.computeBoundingBox();
     const m0 = list[0].material, mat = m0.clone(); mat.color.setRGB(1, 1, 1); mat.vertexColors = true; mat.userData = Object.assign({}, m0.userData); if (m0.userData.rim) m3dRimify(mat);
-    const mesh = new T.Mesh(mg, mat); mesh.castShadow = list[0].castShadow; mesh.receiveShadow = list[0].receiveShadow; mesh.userData.merged = list.length; group.add(mesh); out.made++;
+    const mesh = new T.Mesh(mg, mat); mesh.castShadow = list[0].castShadow; mesh.receiveShadow = list[0].receiveShadow; mesh.userData.merged = list.length; hold.add(mesh); out.made++;
     for (const o of list){ o.parent.remove(o); out.gone++; } }
   return out;
 }
@@ -40732,7 +40735,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-422';
+const GAME_VERSION = 'rs-423';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
