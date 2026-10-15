@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-414 - Long walks stay smooth
+
+- **No more slowdown on long walks.** As you walked, the animals, wandering groups, their rings and the land you'd left behind were taken out of the view but never freed from the graphics card. A three-minute walk piled up more than 500 extra pieces of geometry and about 160 textures, and the land got slower the further you went. Now they're freed when they go: a minute's walk used to leave about 40 behind and now leaves 3.
+- **Corpses are cleaned up too.** A fallen creature's model is freed once it has faded away, and so is a roadside fight's when you leave it.
+- **Shallows in the right places.** When the land around you was rebuilt, the water could keep the previous area's depth map, so the pale shallows and surf could show up in the wrong spots. The water now always uses the depth map of the land you're on.
+
 ## RS-413 - Every creature falls properly
 
 - **Octopuses slump.** The giant octopus, the kraken and the other tentacled horrors used to tip over stiffly, their arms frozen mid-wave. Now the body sags and spreads where it lies, pushed a little by the blow, and the arms writhe slower and slower until they're still.

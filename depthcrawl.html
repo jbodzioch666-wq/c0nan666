@@ -20187,7 +20187,10 @@ function o3SyncBeasts(dt){
     if (!o3AnimDue(f.e.holder, f.e.seed)) continue;   /* (RS-401: not posed while off screen; far off, every other frame) */
     try{ if (f.e.sk) sk3Pose(t, mv, 0, 0, f.e.seed, r, m3dStride(f.e, t, mv)); else if (f.e.anim) f.e.anim(r, t, mv, 0, 0, 0, f.e); else if (f.e.beast) m3dPoseBeast(r, t, mv, 0, 0, 0, f.e); else m3dPoseHumanoid(r, t, mv, 0, 0, 0, f.e); }catch(err){}
   }
-  for (const [k, f] of F) if (!seen.has(k)){ for (const o of [f.e.holder, f.ring, f.beam, f.hb, f.icon]) if (o && o.parent) o.parent.remove(o); F.delete(k); }
+  for (const [k, f] of F) if (!seen.has(k)){ for (const o of [f.e.holder, f.ring, f.beam, f.hb, f.icon]) if (o && o.parent) o.parent.remove(o);
+    /* (RS-414) and freed: the figure, and its ring's and beam's geometry */
+    m3dRelease(f.e); for (const o of [f.ring, f.beam, f.hb]) if (o && o.geometry) o.geometry.dispose();
+    F.delete(k); }
   O3.beastHits = [...F.values()].map(f=>f.hb).filter(Boolean);
 }
 function o3AnimEvents(){
@@ -21123,7 +21126,7 @@ function o3Wildlife(dt){
         O3.wild.push(w);
       }
     }
-    for (const w of old.values()) if (w.e && w.e.holder && w.e.holder.parent) w.e.holder.parent.remove(w.e.holder);
+    for (const w of old.values()) if (w.e && w.e.holder){ if (w.e.holder.parent) w.e.holder.parent.remove(w.e.holder); m3dRelease(w.e); }   /* (RS-414: and freed) */
     O3.wildHits = O3.wild.filter(w=>w.hb).map(w=>w.hb);
   }
   { let made = 0; const T = THREE, g = O3.wildGrp, hitM = O3.nodeHitM || (O3.nodeHitM = new T.MeshBasicMaterial({ visible:false }));
@@ -21137,7 +21140,7 @@ function o3Wildlife(dt){
             } else {
               const spec = WG_WILD[k]; let e; M3D_COARSE = 2.6; M3D_LOOSE = true; try{ e = m3dInstance({ nm:spec.nm }, { paint:mpBeast, o:spec.o, h:1 }); } finally { M3D_COARSE = 1; M3D_LOOSE = false; }   /* (RS-333: sculpted coarse - up to 28 of these at once took millions of triangles) */
               e.holder.scale.multiplyScalar(spec.h / Math.max(0.05, e.H)); w.e = e; g.add(e.holder);
-              const hb = new T.Mesh(new T.BoxGeometry(0.6/ (spec.h / Math.max(0.05, e.H)), 0.8/ (spec.h / Math.max(0.05, e.H)), 0.6/ (spec.h / Math.max(0.05, e.H))), hitM); hb.position.y = 0.3 / (spec.h / Math.max(0.05, e.H));
+              const hb = new T.Mesh(new T.BoxGeometry(0.6/ (spec.h / Math.max(0.05, e.H)), 0.8/ (spec.h / Math.max(0.05, e.H)), 0.6/ (spec.h / Math.max(0.05, e.H))), hitM); hb.geometry.userData.own = true; hb.position.y = 0.3 / (spec.h / Math.max(0.05, e.H));
               hb.userData.act = { kind:'wild', w }; e.holder.add(hb); w.hb = hb;
             }
       if (w.hb) O3.wildHits.push(w.hb); if (k!=='bird') made++; } }
@@ -23880,8 +23883,11 @@ function* gfxO3BuildGen(grp, x0, y0, W, M){   /* (RS-403: a step at a time - see
       if (t===OW_RIVER) data[k+1] = 255; data[k+3] = 255; }
     const foam = new T.DataTexture(data, N, N, T.RGBAFormat); foam.magFilter = foam.minFilter = T.LinearFilter; foam.needsUpdate = true;
     water.geometry.dispose(); water.geometry = new T.PlaneGeometry(N, N, N, N);
-    const m = water.material;
-    m.onBeforeCompile = sh=>{ Object.assign(sh.uniforms, { uT:U.uT, uNight:U.uNight, uSky:U.uSky, uFoam:{ value:foam }, uFoamO:{ value:new T.Vector4(ox, oy, N, N) }, uCloud:{ value:tx.cloud }, uDep:{ value:O3.depthTex }, uDepO:{ value:O3.depthO } });
+    const m = water.material; m.userData.ownTex = [foam];   /* (RS-414: freed with the land - see o3DisposeWorld) */
+    /* (RS-414) the depth of the land showing, through a uniform the swap sets: a water built over frames could compile while the old
+       land still showed, and kept the old land's depth map - its shallows in the wrong places, and the old map kept on the card */
+    const uDep = O3.uDep || (O3.uDep = { value:null }), uDepO = O3.uDepO || (O3.uDepO = { value:new T.Vector4() });
+    m.onBeforeCompile = sh=>{ Object.assign(sh.uniforms, { uT:U.uT, uNight:U.uNight, uSky:U.uSky, uFoam:{ value:foam }, uFoamO:{ value:new T.Vector4(ox, oy, N, N) }, uCloud:{ value:tx.cloud }, uDep, uDepO });
       gfxWorldPos(sh);
       sh.vertexShader = 'uniform float uT;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
         vec4 wp0 = modelMatrix * vec4(transformed, 1.0);
@@ -30884,18 +30890,30 @@ const O3_BUILD_KEYS = ['win','lairTops','volc','land','heightAt','depthTex','dep
 function o3BuildFresh(){ const st = {}; for (const k of O3_BUILD_KEYS) st[k] = undefined; st.plates = []; st.hits = []; st.flames = []; st.glows = []; st.smoke = []; st.parts = []; st.windows = []; return st; }
 function o3BuildSwapIn(st){ const live = {}; for (const k of O3_BUILD_KEYS){ live[k] = O3[k]; O3[k] = st[k]; } return live; }
 function o3BuildSwapOut(st, live){ for (const k of O3_BUILD_KEYS){ st[k] = O3[k]; O3[k] = live[k]; } for (const p of st.plates||[]) if (!p.el.__pend){ p.el.__pend = 1; p.el.style.display = 'none'; } }
+/* (RS-414) letting go of a built land: every geometry and texture in it that the land replacing it doesn't share, and that
+   isn't one of the land's kept textures (O3.tex). Only the geometry used to go, so each move of the window left the old land's
+   shore foam, its glows and their pictures on the graphics card. (Its materials are left for the renderer to forget: freeing
+   them lets go of compiled shaders the next land may want) */
+function o3DisposeWorld(old, keep){
+  if (!old) return; const keepG = new Set(), keepM = new Set(), keepT = new Set(Object.values(O3.tex||{}).filter(t=>t && t.isTexture)), texOf = m=>{ const out = []; for (const k in m){ const v = m[k]; if (v && v.isTexture) out.push(v); } if (m.uniforms) for (const k in m.uniforms){ const v = m.uniforms[k] && m.uniforms[k].value; if (v && v.isTexture) out.push(v); } for (const v of (m.userData && m.userData.ownTex)||[]) out.push(v); return out; };
+  if (keep) keep.traverse(o=>{ if (o.geometry) keepG.add(o.geometry); for (const m of [].concat(o.material||[])) if (m){ keepM.add(m); for (const t of texOf(m)) keepT.add(t); } });
+  const mats = new Set();
+  old.traverse(o=>{ const g = o.geometry; if (g && !keepG.has(g) && !(g.userData && g.userData.keep)) g.dispose(); if (o.isInstancedMesh && !keepG.has(g)) o.dispose(); for (const m of [].concat(o.material||[])) if (m && !keepM.has(m)) mats.add(m); });
+  for (const m of mats) for (const t of texOf(m)) if (!keepT.has(t)) t.dispose();
+}
 function o3BuildSwap(st){
   const sc = O3.scene, old = O3.world;
-  if (old && old!==st.world){ sc.remove(old); old.traverse(o=>{ if (o.geometry) o.geometry.dispose(); }); }
+  if (old && old!==st.world){ sc.remove(old); try{ o3DisposeWorld(old, st.world); }catch(e){ console.error(e); old.traverse(o=>{ if (o.geometry) o.geometry.dispose(); }); } }
   if (O3.depthTex && O3.depthTex!==st.depthTex) O3.depthTex.dispose();
   for (const p of O3.plates||[]) if (!(st.plates||[]).includes(p)) p.el.remove();
   for (const k of O3_BUILD_KEYS) O3[k] = st[k];
+  if (O3.uDep) O3.uDep.value = O3.depthTex || null; if (O3.uDepO && O3.depthO) O3.uDepO.value.copy(O3.depthO);   /* (RS-414) */
   if (O3.world && O3.world.parent!==sc) sc.add(O3.world);
   for (const p of O3.plates||[]){ p.el.__pend = 0; p.el.style.display = 'none'; }   /* (the plate loop shows the near ones next frame) */
   O3.compileDue = true; try{ o3FarWin(); }catch(e){}   /* (RS-355) */
 }
 function o3BuildStart(cx, cy){ O3.pend = { gen:o3BuildGen(cx, cy), st:o3BuildFresh(), n:0, cx, cy }; }
-function o3BuildAbandon(){ const P = O3.pend; if (!P) return; O3.pend = null; for (const p of P.st.plates||[]) p.el.remove(); if (P.st.world) P.st.world.traverse(o=>{ if (o.geometry) o.geometry.dispose(); }); }
+function o3BuildAbandon(){ const P = O3.pend; if (!P) return; O3.pend = null; for (const p of P.st.plates||[]) p.el.remove(); if (P.st.world){ try{ o3DisposeWorld(P.st.world, O3.world); }catch(e){ console.error(e); } } if (P.st.depthTex && P.st.depthTex!==O3.depthTex) P.st.depthTex.dispose(); }   /* (RS-414: its materials, textures and depth map too) */
 // a few milliseconds of building a frame; the last slice swaps the new land in. Returns true when done
 function o3BuildSlice(budgetMs){
   const P = O3.pend; if (!P) return true;
@@ -31856,6 +31874,20 @@ function m3dSkinRoot(root, rig, mats){
   if (made.length){ const box = new T.Box3(); for (const sm of made){ box.union(sm.geometry.boundingBox); } const sph = box.getBoundingSphere(new T.Sphere()); sph.radius = sph.radius*1.25 + 0.1*(box.max.y - box.min.y); for (const sm of made) sm.geometry.boundingSphere = sph.clone(); }
   for (const g of props){ const R = m3dMergeProp(g, rigRef); out.made += R.made; out.gone += R.gone; }
   return out;
+}
+/* (RS-414) a creature's copy let go of for good: what is its own on the graphics card - each skinned mesh's geometry (only its
+   wrapper: the buffers are the template's, shared by every copy, so they're taken off it first or they'd go too), a hit box,
+   a flock's wings - is freed. Out on the land the animals, the wandering groups and their rings were only taken out of the
+   scene as you walked on, and the card kept them all: hundreds over a long walk, and the land grew slower. (Not its materials:
+   the renderer forgets those by itself, and freeing them lets go of their compiled shaders - the next deer would compile again) */
+function m3dRelease(e){
+  if (!e || !e.holder || e.released) return; e.released = true;
+  e.holder.traverse(o=>{
+    const g = o.geometry;
+    if (o.isInstancedMesh){ o.dispose(); }
+    if (g && g.isSkinWrap){ g.attributes = {}; g.index = null; g.dispose(); }
+    else if (g && g.userData && g.userData.own) g.dispose(); });
+  if (e.owner && M3D.inst.get(e.owner)===e) M3D.inst.delete(e.owner);
 }
 /* (RS-379) a copy's skinned mesh gets a geometry of its own that shares the template's buffers, so it can have a culling
    sphere of its own: worked out each frame from where its joints are now, each joint's reach (how far its vertices lie
@@ -37298,7 +37330,7 @@ function m3dTemplate(pt){
 }
 // a copy of the template with its own rig and its own materials (so it can flash on its own)
 function m3dInstance(m, pt){
-  const T = THREE, tpl = m3dTemplate(pt), root = tpl.clone(true), mmap = new Map();
+  const T = THREE, tpl = m3dTemplate(pt), root = tpl.clone(true), mmap = new Map(), owner = m;
   root.traverse(o=>{ if (o.isMesh && o.material){ if (!mmap.has(o.material)){ const c = o.material.clone(); if (o.material.userData.rim) m3dRimify(c); if (o.material.userData.bend) m3dBendify(c, o.material.userData.bend); mmap.set(o.material, c); } o.material = mmap.get(o.material); } });   /* (RS-377: a bending body gets its own bend) */
   // rebuild the rig map by walking both trees in step
   const byT = new Map(); const walk = (a, b2)=>{ byT.set(a, b2); a.children.forEach((c,i)=>walk(c, b2.children[i])); }; walk(tpl, root);
@@ -37325,7 +37357,7 @@ function m3dInstance(m, pt){
   /* (RS-163: no round blob under a creature - it casts a real shadow from the torches, or the sun and moon) */
   root.traverse(o=>{ if (o.isMesh && !(o.material && o.material.transparent)) o.castShadow = true; });
   const mats = [...mmap.values()].filter(x=>x.emissive);
-  const E = { holder, root, rig, mats, H, beast:!!meta.beast, anim:meta.anim||null, seed:Math.random()*10, atk:0, pHp:G.player ? G.player.hp : 0, hurt:0, lift:pt.lift||meta.lift||0, dying:-1, stamp:0, rise: m.rise ? 0 : 1, skinned:meta.skinned||0, skinnedParts:meta.skinnedParts||0 };
+  const E = { owner, holder, root, rig, mats, H, beast:!!meta.beast, anim:meta.anim||null, seed:Math.random()*10, atk:0, pHp:G.player ? G.player.hp : 0, hurt:0, lift:pt.lift||meta.lift||0, dying:-1, stamp:0, rise: m.rise ? 0 : 1, skinned:meta.skinned||0, skinnedParts:meta.skinnedParts||0 };
   if (meta.loco && meta.anim){ const a0 = meta.anim, L0 = { y:root.position.y, x:root.rotation.x, z:root.rotation.z };
     E.anim = (r, t, mv, wind, strike, hurt, e2)=>{ a0(r, t, mv, wind, strike, hurt, e2); m3dLoco(E, meta.loco, L0, t, mv); }; }
   return E;
@@ -38115,7 +38147,7 @@ function m3dSweep(){
       const d0 = e.dying; e.dying += FP.dt*1.6; const k = Math.min(1, e.dying), ease = k*k, after = Math.max(0, e.dying - 1), dt = Math.min(0.066, FP.dt||0.016);
       if (e.dkind==='ghost'){   /* (RS-371) a ghost doesn't fall: it rises, swells and thins away to nothing */
         const g = Math.min(1, e.dying/1.3), s0 = e.s0; e.holder.position.y = g*0.8; e.root.rotation.y += dt*(3 - 2*g); if (s0) e.root.scale.set(s0.x*(1 + g*0.7), s0.y*(1 + g*0.3), s0.z*(1 + g*0.7));
-        m3dDeathFade(e, Math.max(0, 1 - g)); if (g >= 1 || e.map!==G.map){ e.holder.parent && e.holder.parent.remove(e.holder); M3D.live.delete(e); } continue; }
+        m3dDeathFade(e, Math.max(0, 1 - g)); if (g >= 1 || e.map!==G.map){ e.holder.parent && e.holder.parent.remove(e.holder); M3D.live.delete(e); m3dRelease(e); } continue; }
       if (e.dkind==='ooze'){ const s = Math.min(1, e.dying/0.55), q = s*s*(3 - 2*s), s0 = e.s0; if (s0) e.root.scale.set(s0.x*(1 + 0.75*q), s0.y*(1 - 0.86*q), s0.z*(1 + 0.75*q)); e.root.position.y = (e.rootY0||0)*(1 - q); }   /* (an ooze slumps into a puddle) */
       else if (e.tent){ const Tn = e.tent, r = e.rig, q = Math.min(1, e.dying/0.9), ez = 1 - Math.pow(1 - q, 3), s0 = e.s0;
         try{ r.pose(r, Tn.t0 + 1.2*(1 - Math.exp(-e.dying*1.5)), 0, 0, 0, Math.max(0, 1 - e.dying*1.5)); }catch(err){}   /* (the writhing slows to a stop) */
@@ -38130,10 +38162,11 @@ function m3dSweep(){
       if (lie && e.dying > 1.4) e.dying = 1.4;                   // (a corpse stays until a few turns have passed)
       if (e.drops) for (const R of e.drops) if (d0 < 1.4 || R.rest < 0.4){ m3dRbStep(R, dt); m3dRbPose(R); }   /* (the dropped weapon and shield) */
       e.holder.position.y = 0; if (e.dying > 1.4) m3dDeathFade(e, Math.max(0, 1 - (e.dying - 1.4)));
-      if (e.dying > 2.4 || e.map!==G.map){ e.holder.parent && e.holder.parent.remove(e.holder); M3D.live.delete(e); }
+      if (e.dying > 2.4 || e.map!==G.map){ e.holder.parent && e.holder.parent.remove(e.holder); M3D.live.delete(e); m3dRelease(e); }   /* (RS-414) */
       continue;
     }
-    if (e.stamp !== M3D.stamp){ if (e.holder.parent) e.holder.parent.remove(e.holder); M3D.live.delete(e); }
+    if (e.stamp !== M3D.stamp){ if (e.holder.parent) e.holder.parent.remove(e.holder); M3D.live.delete(e);
+      if (e.owner && !(G.mon||[]).includes(e.owner)) m3dRelease(e); }   /* (RS-414: one that's left the fight or the floor won't be back - only one still here, out of sight, is kept for when it shows again) */
   }
 }
 
@@ -40042,7 +40075,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-413';
+const GAME_VERSION = 'rs-414';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
