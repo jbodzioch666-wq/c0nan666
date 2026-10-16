@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-428 - Swinging the pickaxe, lit rooms
+
+- **The pickaxe swings again.** Since weapons started being put away out of a fight (RS-422), your arms were set to hang loose after the work pose was set, so mining and woodcutting stood still with the tool in hand. Your arms belong to the work again while you gather.
+- **Rooms lit all round.** A room only had torches on its back and west walls, so the side nearest the camera was left in shadow. Now iron torch stands also stand midway along the east side and in the two front corners, wherever nothing else stands there.
+
 ## RS-427 - Limp falls, legs that stay on, clear paths, steady lamps
 
 - **Bodies keep their legs.** A two-legged body that fell on its back could end up with its legs folded up behind it, so it looked cut off at the waist. The hip is now a proper joint: a thigh swings forward up to about 120 degrees from straight down the body, and back only about 20.
