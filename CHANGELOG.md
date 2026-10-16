@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-442 - Trinkets look like charms
+
+- **No more mistaking a trinket for a necklace.** A trinket's icon was a gem pendant on a cord, much like an amulet's, though trinkets have a slot of their own. Now it's a charm: a curved claw bound in leather to a small iron ring, with beads and a feather tied on. The binding is in the trinket's own colour.
+
 ## RS-441 - Windows that fit
 
 - **Braces clear of the windows.** On the half-timbered houses, the diagonal braces were set in a checkerboard that ignored where the windows were. On a narrow house like the Alchemist they ran straight across the glass. Now a brace only goes in a bay without a window.

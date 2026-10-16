@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs442 | A trinket's icon is a claw charm, not a pendant like an amulet |
 | rs441 | A timber house's braces never cross its windows; its shutters swing open either way, none square out from the wall |
 | rs440 | The XP tracker shows while you cook or work a batch, clear of the cooking card |
 | rs439 | Every craft takes 1.3s a piece (twice as long); at your campfire you sit further back, the marshmallow held out over the flames |
