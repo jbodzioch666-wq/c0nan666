@@ -3231,7 +3231,22 @@ function rsUniqueify(it){
   }
   it.aff = keep; it.naff = keep.length; it.rsu = 1;
   if (it.rs) it.price = Math.round((it.price||50)*2.5);
-  return rsUniqueBuff(it);
+  return rsUniqueFam(rsUniqueBuff(it));
+}
+/* (RS-456) a unique piece of armour is made of what its strongest stat says: mostly magic, it's cloth - a robe, a wizard's hat; mostly ranged,
+   hide; otherwise metal. Its stats stay as they are; what it's made of, what it looks like and the skill it asks for follow (the Visage of
+   the Sage, all magic, had come out a steel full helm). Runs on old pieces as they load too */
+function rsUniqueFam(it){
+  if (!it || !it.uniqueId || !['head','chest','legs','arms','feet'].includes(it.slot) || !RS_ARMOUR) return it;
+  const mag = (it.magAcc||0) + (it.magDmg||0)*8 + (it.magDmgPct||0)*4, rng = it.rngAcc||0, mel = Math.max(it.ac||0, (it.acc||0) + (it.dmgB||0));
+  const nmFam = /\b(sage|mage|magi|wizard|arcane|mystic|sorcer|warlock|witch)/i.test(it.nm||'') ? 'cloth' : /\b(ranger|hunter|archer|fletch)/i.test(it.nm||'') ? 'hide' : null;   /* (what its name says it is comes first) */
+  const fam = nmFam || (mag > 0 && mag >= rng && mag >= mel ? 'cloth' : rng > 0 && rng > mel ? 'hide' : 'metal');
+  if (it.rsFam===fam) return it;
+  const F = RS_ARMOUR[fam], req = Math.max(it.reqDef||0, it.reqMag||0, it.reqRng||0, 1); let t = 0;
+  F.tiers.forEach((tr, i)=>{ if (tr[1] <= req) t = i; });
+  const tr = F.tiers[t]; it.rsFam = fam; it.rsTier = t; it.basis = F.names[it.slot] || it.basis; it.baseMat = tr[0]; it.rsCol = tr[3];
+  delete it.reqDef; delete it.reqMag; delete it.reqRng; it[F.req] = req;
+  return it;
 }
 // no unique should be weaker than a good piece of its level: its RuneScape bonuses add up
 // to at least a budget set by its item level and slot, raised evenly if they fall short
@@ -13177,6 +13192,7 @@ function rsMigrateItem2(it){
 }
 function rsMigrateAll(){
   for (const k in G.gear) rsMigrateItem(G.gear[k]);
+  for (const it of [...Object.values(G.gear||{}), ...(G.inv||[]), ...((G.player && G.player.stash)||[])]) try{ rsUniqueFam(it); }catch(e){}   /* (RS-456) */
   for (const it of G.inv||[]) rsMigrateItem(it);
   for (const it of (G.player && G.player.stash)||[]) rsMigrateItem(it);
   rsPurgeSpellScrolls(); rsPurgeSocketRunes();
@@ -35006,6 +35022,23 @@ function m3dBeardStrands(h, o, mats, kind){
 // great helm with its visor slit, breathing holes and cross of reinforcing bands, a spangenhelm skull cap with a nasal bar,
 // cheek plates and a rim (worn plain, horned, winged or crested), a wizard's hat drooping back from a wide brim, and a hood
 // that drapes to the shoulders and peaks behind
+/* (RS-456) the Visage of the Sage: a deep indigo wizard's hat with a gold band round its brim, a pale blue gem glowing at the band's front, a
+   gold crescent moon on the cone and little gold stars scattered over it */
+function m3dSageHat(hg, mats, geo){
+  /* each piece set on the hat's own surface where a ray in from the front meets it, turned to lie flat on it */
+  const T = THREE, probe = new T.Mesh(geo || new T.ConeGeometry(0.08, 0.3, 12), new T.MeshBasicMaterial({ side:T.DoubleSide })), rc = new T.Raycaster(); probe.updateMatrixWorld(true);
+  const onHat = (o, x, y, a)=>{ const dir = new T.Vector3(-Math.sin(a||0), 0, -Math.cos(a||0)), org = new T.Vector3(x, y, 0).addScaledVector(dir, -0.5); rc.set(org, dir); const h = rc.intersectObject(probe, false)[0]; if (!h) return false;
+    const n = h.face ? h.face.normal.clone() : dir.clone().negate(); if (n.dot(dir) > 0) n.negate(); o.position.copy(h.point).addScaledVector(n, 0.0015); o.lookAt(o.position.clone().add(n)); hg.add(o); return true; };
+  const  gold = m3dMat(mats, '#e0b848', 'metal'), gem = new T.MeshStandardMaterial({ color:new T.Color('#9ad8ff').convertSRGBToLinear(), emissive:new T.Color('#5ab8ff').convertSRGBToLinear(), emissiveIntensity:1.4, roughness:0.15, metalness:0.1 });
+  const band = new T.Mesh(new T.TorusGeometry(0.083, 0.0075, 10, 48), gold); band.rotation.x = Math.PI/2 - 0.08; band.position.set(0, 0.128, -0.012); band.scale.set(1.04, 1.1, 1); band.castShadow = true; hg.add(band);
+  const g = new T.Mesh(new T.OctahedronGeometry(0.012, 1), gem); g.position.set(0, 0.132, 0.082); g.scale.set(1, 1.3, 0.6); hg.add(g);
+  const gl = new T.Sprite(M3D.glowMat ? M3D.glowMat('#7ac8ff', 0.6) : new T.SpriteMaterial({ color:0x7ac8ff })); gl.scale.setScalar(0.05); gl.position.copy(g.position); hg.add(gl);
+  const moon = new T.Shape(); moon.absarc(0, 0, 0.018, 0.5, Math.PI*2 - 0.5, false); moon.absarc(0.008, 0, 0.014, Math.PI*2 - 0.75, 0.75, true);
+  const mm = new T.Mesh(new T.ExtrudeGeometry(moon, { depth:0.002, bevelEnabled:true, bevelThickness:0.001, bevelSize:0.001, bevelSegments:2, curveSegments:16 }), gold); onHat(mm, 0.004, 0.205, 0); mm.rotateZ(0.6);
+  const star = s=>{ const sh = new T.Shape(); for (let i=0;i<10;i++){ const a = i/10*Math.PI*2 - Math.PI/2, r = i%2 ? s*0.42 : s; i ? sh.lineTo(Math.cos(a)*r, Math.sin(a)*r) : sh.moveTo(Math.cos(a)*r, Math.sin(a)*r); } sh.closePath();
+    return new T.Mesh(new T.ExtrudeGeometry(sh, { depth:0.0015, bevelEnabled:false }), gold); };
+  for (const [y, a, s] of [[0.17, -0.75, 0.009], [0.2, 0.85, 0.008], [0.255, -0.25, 0.007], [0.158, 0.4, 0.007], [0.23, 2.6, 0.008], [0.18, -2.4, 0.008]]) onHat(star(s), 0, y, a);
+}
 function m3dHelmGeo(kind){
   const { ell, sph, cap, flat, torus, cylE } = SDF, M = 4, cx = 0, cz = -0.009;
   const hollow = P=>P.sub(ell([cx,0.088,cz],[0.0665,0.0745,0.0785]), 0.003);                 // the head inside it
@@ -35618,7 +35651,7 @@ function m3dHumanoid(o){
   const hg = o.head==='drake' || o.head==='kobold' || o.head==='lizard' ? (()=>{ const g = new T.Group(); g.position.set(0, 0.026, -0.022); g.scale.set(1.08, 1.06, 1.1); head.add(g); return g; })() : head;
   const helm = o.helm, hm = m3dMat(mats, o.helmCol || '#8a8a90', helm==='cowl' || helm==='bandana' || helm==='wizard' ? 'cloth' : 'metal');
   const helmMesh = kind=>{ const m = new T.Mesh(m3dHelmGeo(kind), m3dVC(mats, hm)); m.scale.x = o.headWide||1; m.castShadow = true; hg.add(m); return m; };   /* (RS-281: sculpted helmets) */
-  if (helm==='wizard') helmMesh('wizard');
+  if (helm==='wizard'){ const wm = helmMesh('wizard'); if (o.sageHat) m3dSageHat(hg, mats, wm.geometry); }
   const dome = ()=>{ const d = new T.Mesh(new T.SphereGeometry(0.09, 20, 10, 0, Math.PI*2, 0, Math.PI/2), hm); d.position.set(0, 0.096, -0.012); d.scale.set(1.02*(o.headWide||1), 0.86, 1.08); d.castShadow = true; hg.add(d);
     const rim = new T.Mesh(new T.TorusGeometry(0.093, 0.007, 6, 28), hm); rim.rotation.x = Math.PI/2; rim.position.set(0, 0.097, -0.012); rim.scale.set(1.02, 1.08, 1); hg.add(rim); return d; };
   if (helm==='kettle') helmMesh('kettle');
@@ -39955,7 +39988,8 @@ function rsPlayerLook(opt){
   if (h && h.used){ const ht = h.rsTier||0;
     if (h.rsFam==='metal'){ o.helm = ht>=6 ? 'horned' : ht===5 ? 'winged' : ht>=3 ? 'dwarf' : 'kettle'; o.helmCol = dy(h); }
     else if (h.rsFam==='hide'){ o.helm = 'cowl'; o.helmCol = dy(h); }
-    else { o.helm = 'wizard'; o.helmCol = dy(h) || '#3040a0'; } }
+    else { o.helm = 'wizard'; o.helmCol = dy(h) || '#3040a0'; }
+    if (h.nm==='Visage of the Sage'){ o.helm = 'wizard'; o.helmCol = '#22245a'; o.sageHat = 1; } }   /* (RS-456: the sage's hat - see m3dSageHat) */
   // and you yourself
   const k = lookRaceKey(race), sk = lookSkins(race);
   o.skin = lookHex(sk, L.skin); o.fem = lookIdx(L.body, 2)===1;
@@ -40992,7 +41026,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-455';
+const GAME_VERSION = 'rs-456';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

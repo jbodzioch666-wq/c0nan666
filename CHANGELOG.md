@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## RS-456 - The sage's hat
+
+- **Uniques made of the right stuff.** A unique piece of armour took a random base, so the Visage of the Sage, all magic, could come out as a steel Full Helm. Now what a unique is made of follows its name and its strongest stat:
+  - a magic name like the Sage's, or mostly magic stats, makes it cloth: a robe, a wizard's hat;
+  - a ranger's name, or mostly ranged stats, makes it hide;
+  - anything else makes it metal.
+  Its stats are unchanged. What it looks like and the skill it asks for follow its material. Unique pieces you already own are put right as your save loads.
+- **The Visage of the Sage's own look.** It's a deep indigo wizard's hat with a gold band round the brim, a pale blue gem glowing at its front, a gold crescent moon on the cone and little gold stars scattered over it.
+
 ## RS-455 - One way to make an orb
 
 - **No orb from glass.** The kiln had two recipes for the same unpowered orb: one from a silver bar and one from molten glass. The glass one is gone. You make an unpowered orb from a silver bar and charge it with runes, as before.
