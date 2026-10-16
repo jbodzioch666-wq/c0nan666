@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs443 | The town's cobbles are a fine 1024px layer in irregular courses over the paved tiles, made once and reused; the compass rose over it |
 | rs442 | A trinket's icon is a claw charm, not a pendant like an amulet |
 | rs441 | A timber house's braces never cross its windows; its shutters swing open either way, none square out from the wall |
 | rs440 | The XP tracker shows while you cook or work a batch, clear of the cooking card |

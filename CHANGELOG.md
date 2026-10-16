@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-443 - Real cobblestones
+
+- **Fine cobbles in town.** The town's paving was painted into the ground at only a few pixels a tile, so the cobbles were blurry blots in the same six-by-six grid on every tile. Now the paved streets and the square are laid with a fine cobble texture of their own:
+  - stones laid in courses of different heights, each stone its own width and shape;
+  - shaded as they bulge, worn smooth on top, a crack here and there;
+  - set in dark mortar with moss in the joints.
+  The pattern runs on across the tiles and only repeats every four, so there's no grid to see. The compass rose round the waypoint is painted sharp on top of it.
+
 ## RS-442 - Trinkets look like charms
 
 - **No more mistaking a trinket for a necklace.** A trinket's icon was a gem pendant on a cord, much like an amulet's, though trinkets have a slot of their own. Now it's a charm: a curved claw bound in leather to a small iron ring, with beads and a feather tied on. The binding is in the trinket's own colour.
