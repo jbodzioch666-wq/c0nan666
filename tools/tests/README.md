@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs459 | A cloak stays calm through snap turns, lunges and fast runs, stays out of the body, and drapes over dragon and tiefling tails |
 | rs458 | A cloak is cloth: pinned at the neck and shoulders, it hangs, trails behind as you walk, settles, and stays out of the body and legs |
 | rs456 | A unique armour piece's material follows its name or strongest stat; the Visage of the Sage is a wizard's hat with its own look, old ones fixed on load |
 | rs455 | No orb-from-glass recipe; the unpowered orb comes from a silver bar |

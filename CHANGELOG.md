@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-459 - Calmer cloaks, draped over tails
+
+- **No more wild bouncing:** turning on the spot, lunging or running fast used to whip the cloak round faster than it could follow, so it bounced about and went through you. Now it follows a fast body at a cloth's pace, and comes to rest when it touches you instead of bouncing off.
+- **It stays on your back:** part of the back had no surface for the cloth to rest on, so it could fall straight through. It now rests on the whole back, with room for a stooped back.
+- **Draped over tails:** a dragonborn's or a tiefling's cloak now lies over the tail, not through it, standing or walking.
+
 ## RS-458 - Cloaks are cloth
 
 - **Real cloth physics:** a cloak is now a sheet of cloth, simulated every frame. It is pinned at the neck and shoulders, and the rest hangs under its own weight with air drag.
