@@ -6,6 +6,7 @@ module.exports = async page=>{
     // a group near you
     let e = (G.ow.encounters||[]).find(o=>Math.hypot(o.x-G.owPos.x, o.y-G.owPos.y) < 20);
     if (!e){ for (let d=3; d<8 && !e; d++) for (const [a,b] of [[d,0],[0,d],[-d,0],[0,-d]]){ const x = G.owPos.x+a, y = G.owPos.y+b; if (encounterEligible(G.ow.map[x][y]) && !wgRoadAt(x,y)){ e = { x, y }; G.ow.encounters.push(e); break; } } }
+    if (e && !e.party) e.merchant = false;   /* (a group, not a merchant - one roamer in eight or so is one, which made this fail now and then) */
     const party = encParty(e), lead = encLeader(e), out = { party:party.map(p=>p.nm+':'+p.lvl), lead:lead && lead.nm, strongest:party.every(p=>(p.lvl||0) <= (lead.lvl||0)) };
     for (let i=0;i<40;i++){ renderGame(); try{ o3Render(); }catch(err){} await new Promise(r=>setTimeout(r, 30)); }   /* (RS-404: a new kind is sculpted over a few frames) */
     const f = O3.beasts && [...O3.beasts.entries()].find(([k])=>k.startsWith('enc'+e.id+':'));

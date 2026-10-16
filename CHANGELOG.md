@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-434 - Nothing springs from nowhere
+
+- **Ambushes you can see coming.** Two kinds of fight used to start out of nowhere. One was the ambush while you camped in the open, a fight you couldn't flee. The other was the 1-in-80 chance that something crept up while you gathered. Now each is a real wandering monster. It shows up a few leagues off, and the log says what it is and which way it's coming from. Then it comes for you. You can stand and fight when it arrives, or get away.
+- **Hunters close in.** A monster hunting you heads straight for you and finds its way round trees, rocks and water. It takes a step for every step of yours and for every stroke of your work, and it stops your work when it's right on you. Outrun it by fourteen leagues or so and it loses your trail and goes back to roaming.
+- **Camping when one finds you.** You get no rest that night, but you're no longer pinned in a fight you can't leave.
+
 ## RS-433 - X marks the spot
 
 - **Treasure maps and clue scrolls are marked.** Reading a treasure map, or a clue scroll that sends you somewhere, said the spot was on your map, but all it did was lift the fog around it, with nothing to show where the spot actually was. Now there's an X: a red one in a parchment ring on the world map, one on the minimap, and on the land itself red paint on the ground with a red X turning slowly above it, so you can see it from a distance. Stand on it and read the map to dig up the casket, or read the clue to move the trail on.

@@ -9025,14 +9025,49 @@ function spawnOverworldEncounters(){
 // chance-per-step like the old system), otherwise a random step onto
 // another eligible tile. Not every roamer moves every turn (chn(0.6)) so
 // the whole population doesn't visibly lock-step across the map.
+/* (RS-434) what used to spring on you out of nowhere - while you camped, while you worked - is a real roamer now: it turns up a few
+   leagues off, out of sight, and comes for you, so you see it coming and can stand and fight, or get away. A hunter heads straight for
+   you every step (and every stroke of your work), and gives up if you outrun it */
+function owHunterName(e){ const P = encParty(e), L = P && P.length ? encLeader(e) : null; return P && P.length > 1 ? 'pack of ' + ((L && L.nm) || 'beasts') + 's' : (L && L.nm) || 'creature'; }
+function owHunterSpawn(why, minD, maxD){
+  const p = G.owPos, wet = owWetT(G.ow.map[p.x] && G.ow.map[p.x][p.y]); let at = null;
+  for (let t=0; t<160 && !at; t++){ const a = Math.random()*Math.PI*2, d = minD + Math.random()*(maxD - minD), x = Math.round(p.x + Math.cos(a)*d), y = Math.round(p.y + Math.sin(a)*d);
+    if (x<0 || y<0 || x>=OW_COLS || y>=OW_ROWS) continue; const tt = G.ow.map[x][y]; if (!encounterEligible(tt) || owWetT(tt)!==wet || owSpotTaken(x, y)) continue; at = { x, y }; }
+  if (!at) return null;
+  const e = { x:at.x, y:at.y, hunt:1, merchant:false, why }; G.ow.encounters.push(e); encParty(e);
+  const nm = owHunterName(e), dir = dirWord(e.x - p.x, e.y - p.y);
+  logMsg(why==='camp' ? `you make camp... and something moves out in the dark - a ${nm}, ${dir} of you, coming this way!` : `you look up from your work - a ${nm} is coming for you from the ${dir}!`, 'new'); sfx && sfx('notify');
+  return e;
+}
+/* a hunter's next step toward you, round whatever's in its way (a search out from you over the ground it can cross), or null */
+function owHunterNext(e){
+  const px = G.owPos.x, py = G.owPos.y, wet = !!encWet(e), key = (x, y)=>x*4096 + y, prev = new Map([[key(px, py), -1]]), q = [[px, py]];
+  const ok = (x, y)=>{ const t = G.ow.map[x] && G.ow.map[x][y]; if (t===undefined) return false; if (x===e.x && y===e.y) return true; return encounterEligible(t) && owWetT(t)===wet && !owSpotTaken(x, y, e); };
+  for (let h=0; h<q.length && h<900; h++){ const [x, y] = q[h];
+    for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]){ const nx = x + dx, ny = y + dy, k = key(nx, ny); if (prev.has(k) || Math.abs(nx - px) > 16 || Math.abs(ny - py) > 16 || !ok(nx, ny)) continue;
+      prev.set(k, key(x, y)); if (nx===e.x && ny===e.y){ const n = prev.get(k); return [Math.floor(n/4096), n % 4096]; } q.push([nx, ny]); } }
+  return null;
+}
+/* hunters close in while you stand at your work (it doesn't take a step of yours); true when one reaches you or the work is broken off */
+function owHuntersStep(){
+  const hs = (G.ow.encounters||[]).filter(e=>e.hunt); if (!hs.length || G.gameMode!==0) return false;
+  for (const e of hs){ const n = owHunterNext(e); if (n){ e.x = n[0]; e.y = n[1]; } }
+  const on = hs.find(e=>e.x===G.owPos.x && e.y===G.owPos.y);
+  if (on){ G.gather = null; logMsg(`the ${owHunterName(on)} is upon you!`, 'hit'); checkOverworldEncounterTrigger(); renderGame(); saveCurrentGame(); return true; }
+  const near = hs.find(e=>Math.max(Math.abs(e.x - G.owPos.x), Math.abs(e.y - G.owPos.y)) <= 1);
+  if (near && G.gather){ skStop(`the ${owHunterName(near)} is right on you - you stop working`); return true; }
+  return false;
+}
 function moveOverworldEncounters(){
   const noticeR = 5*encounterMult();
   const dirs4 = [[1,0],[-1,0],[0,1],[0,-1]];
   for (const e of G.ow.encounters){
-    if (!chn(0.6)) continue;
+    if (e.hunt && Math.hypot(e.x-G.owPos.x, e.y-G.owPos.y) > 14){ e.hunt = 0; logMsg(`the ${owHunterName(e)} loses your trail`, ''); }   /* (RS-434: outrun, it goes back to roaming) */
+    if (!e.hunt && !chn(0.6)) continue;
+    if (e.hunt){ const n = owHunterNext(e); if (n){ e.x = n[0]; e.y = n[1]; } continue; }   /* (a hunter takes the way round to you) */
     const dist = Math.hypot(e.x-G.owPos.x, e.y-G.owPos.y);
     let dx=0, dy=0;
-    if (dist>0 && dist<=noticeR){
+    if (dist>0 && (dist<=noticeR || e.hunt)){
       dx = sg(G.owPos.x-e.x); dy = sg(G.owPos.y-e.y);
       if (dx!==0 && dy!==0 && !(encounterEligible(G.ow.map[e.x+dx][e.y]) && encounterEligible(G.ow.map[e.x][e.y+dy]))){ if (chn(0.5)) dy=0; else dx=0; }   // they cut the corner too, if the ground allows
     } else {
@@ -10084,9 +10119,7 @@ function campOutside(){
     return;
   }
 
-  if (chn(campAmbushChance())){
-    logMsg('you make camp for the night... something finds you in the dark!', 'new');
-    randomEncounter(true); // caught resting - this fight is mandatory, no fleeing until it's won
+  if (chn(campAmbushChance()) && owHunterSpawn('camp', 2.5, 4)){   /* (RS-434: it comes out of the dark at you - no rest tonight, but you see it coming; it used to be a fight sprung from nowhere) */
     renderGame();
     saveCurrentGame();
     return;
@@ -11585,7 +11618,8 @@ function skGatherTick(now){
   // time passes, and out in the wilds something may come looking
   G.player.turnCount = (G.player.turnCount||0) + 2;
   if (G.gameMode===1){ tickMonsters(); if (G.mon.some(m=>m.alive && Math.abs(m.x-G.player.x)<=1 && Math.abs(m.y-G.player.y)<=1)){ skStop('something is upon you - you stop mining'); return; } }
-  else if (G.gameMode===0 && !skPerk(k, 'safe') && chn(0.012)){ G.gather = null; logMsg('while you work, something creeps up on you!', 'new'); randomEncounter(true); renderGame(); saveCurrentGame(); return; }
+  else if (G.gameMode===0 && owHuntersStep()) return;   /* (RS-434: what's hunting you closes in as you work) */
+  else if (G.gameMode===0 && !skPerk(k, 'safe') && chn(0.012) && !(G.ow.encounters||[]).some(e=>e.hunt)) owHunterSpawn('work', 4, 6);   /* (and now and then something comes looking - you see it coming) */
   // pick what you're working on: the best you can manage, sometimes something lesser
   let list, node = null;
   if (o.node){
@@ -40859,7 +40893,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-433';
+const GAME_VERSION = 'rs-434';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

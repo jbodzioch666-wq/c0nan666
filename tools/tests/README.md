@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs434 | Ambushes while camping or gathering are real roamers that come for you - seen first, closing in as you move or work, stopping your work, fighting when they reach you, losing your trail if outrun |
 | rs433 | A treasure map's X and a clue scroll's spot are marked on the world map, the minimap and the ground; reading there digs up the casket or moves the trail on |
 | rs432 | Frogs and birds slump belly down where they die (no tipping onto a side, no legs through the floor); a beast's legs stay outside its body as it falls |
 | rs431 | Every armour tier (plate, hide, robes) keeps the lower tier's finery and adds more; a robe's trim band and runes ride on the skirt; the mantle shows |
