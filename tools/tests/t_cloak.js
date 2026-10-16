@@ -20,7 +20,8 @@ module.exports = async page=>{
     goToCharCreate(); G.ccLookTouched = false; ccSelectRace(RACES.findIndex(r=>r[0]==='Human')); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); o3Pref = false; try{ v3Pref = false; }catch(e){}
     for (const sl of ['head','chest','legs','arms','feet','cape']) G.gear[sl] = newItem(); G.gear.offhand = rsMakeArmour('metal', 2, 'offhand'); G.gear.cape = newItem();
     out.player = info(rsPlayerLook());
-    const sway = (()=>{ const e = m3dInstance({}, m3dPortrait({ nm:'knight' })); m3dPoseHumanoid(e.rig, 0.3, 1, 0, 0, 0, e); const a = e.rig.cape.rotation.z; m3dPoseHumanoid(e.rig, 0.9, 1, 0, 0, 0, e); return Math.abs(e.rig.cape.rotation.z - a); })();
+    const sway = (()=>{ const e = m3dInstance({}, m3dPortrait({ nm:'knight' })), c = e.rig.cape, hem = ()=>{ const p = c.geometry.attributes.position; return p.getZ(p.count - 1) + p.getZ(p.count - 19); };   /* (RS-458: cloth, stepped as it walks) */
+      m3dPoseHumanoid(e.rig, 0.3, 1, 0, 0, 0, e); const a = hem(); for (let i=0;i<40;i++){ e.holder.position.z += 0.035; m3dPoseHumanoid(e.rig, 0.3 + i/60, 1, 0, 0, 0, e); e.holder.updateMatrixWorld(true); m3dCapeCloth(c, e.rig, 1/60); } return Math.abs(hem() - a); })();
     out.sway = +sway.toFixed(3);
     return out; });
   const A = (c, m)=>{ if (!c) throw new Error(m+' :: '+JSON.stringify(r)); };

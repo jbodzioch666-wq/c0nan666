@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-458 - Cloaks are cloth
+
+- **Real cloth physics:** a cloak is now a sheet of cloth, simulated every frame. It is pinned at the neck and shoulders, and the rest hangs under its own weight with air drag.
+- **It moves with you:** walk and it trails out and lifts behind you. Turn and it swings round. Stop and it settles back into its folds, with a little breeze stirring the hem.
+- **It stays outside you:** the cloth rests against your back, and your hips and striding legs push it out behind them, so it never passes through your body.
+- **Sitting still drapes it:** seated, the cloak lies over the seat as before.
+
 ## RS-457 - Cloaks pinned at the shoulders
 
 - **No more floating cloaks.** As you walked, your cloak swung out as one stiff sheet from its top edge. That lifted it off your shoulders and left it floating behind them. Now it's pinned at the neck and shoulders: its top stays laid over them, and only the part below your shoulder blades billows out, more the further down, so it bends like cloth. Sitting at your campfire it drapes the same way.
