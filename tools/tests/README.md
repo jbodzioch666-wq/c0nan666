@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs453 | Gear arrows judge base stats only; bonuses in their own box with a weapon's kills and awakening |
 | rs452 | Dungeon stairs and ways out are solid to monsters, and nothing lies in them |
 | rs451 | A giant crab is well over a tile across; giant rats and plain crabs stay small |
 | rs450 | A skeleton archer's arrows fly from it to its foe |

@@ -334,6 +334,8 @@
   .reschip{ cursor:help; } .reschip.none{ opacity:0.38; } .reschip:hover{ filter:brightness(1.25); }
   .sp-mats{ gap:4px; } .sp-mats .skitem{ font-size:10.5px; padding:2px 6px; }
   .rescat{ margin-bottom:6px; } .rescat-h{ font-size:10.5px; letter-spacing:0.1em; text-transform:uppercase; color:var(--ink-faint); margin:6px 0 3px; }
+  .affbox{ margin:5px 0 4px; padding:4px 7px 3px; border-left:2px solid #a07ae0; background:rgba(150,110,230,0.10); border-radius:3px; }
+  .affbox .aff{ color:#c8b0ff !important; } .affh{ font-size:10px; letter-spacing:1px; color:#a890e0; margin-bottom:2px; } .affk{ letter-spacing:0; color:#9a8ac0; font-size:10px; }   /* (RS-453: the bonuses, apart) */
   .affx{ color:var(--ink-faint); font-size:10.5px; font-style:italic; line-height:1.35; margin:0 0 3px 10px; }
   .charsheet-layout{ display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap; }
   .doll-wrap{ position:relative; flex:0 0 auto; margin:0 auto; }
@@ -13468,10 +13470,10 @@ function itemPrice(it){
 // one number for "is this better than what I wear" - damage for weapons,
 // armour plus accuracy for everything else. Requirements don't count here, so
 // a rune platebody you can't wear yet still shows as the upgrade it will be
-function itemScore(it){
+function itemScore(it, base){
   if (!it || !it.used) return 0;
   if (it.kind==='wand' || it.kind==='scroll' || it.consumable) return -1;
-  const affs = (it.aff||[]).reduce((t,a)=>t+(a.i1||0)+(a.f||0)*20, 0);
+  const affs = base ? 0 : (it.aff||[]).reduce((t,a)=>t+(a.i1||0)+(a.f||0)*20, 0);
   const b = (it.acc||0)/RS_ATK_PER_HIT, st = (it.dmgB||0)/RS_STR_PER_DMG, df = (it.ac||0)/RS_DEF_PER_AC, ra = (it.rngAcc||0)/RS_ATK_PER_HIT, ma = (it.magAcc||0)/RS_ATK_PER_HIT;
   if (it.slot==='ammo') return (it.ammoStr||0)/RS_STR_PER_DMG;
   if (it.slot==='weapon' || it.slot==='ranged') return ((it.d1*(it.d2+1)/2) + (it.bonus||0) + st + b*0.8 + ma*0.4 + (it.magDmg||0) + affs*0.5) * (is2H(it) ? 1.15 : 1);
@@ -13489,11 +13491,14 @@ function playerGearStyle(eq){
   const w = G.gear && G.gear.weapon; if (w && w.used) return itemStyleOf(w);
   return itemStyleOf(eq) || 'melee';
 }
+/* (RS-453) the up and down arrows judge a piece on its own stats - damage, attack, strength, defence, magic, ranged, prayer - and leave out
+   the bonuses rolled on it or grown on a weapon by its kills: one +17% damage counted for more than a whole tier of metal, so a better
+   forged weapon showed as a downgrade from an old one that had grown bonuses. The bonuses are listed apart, in their own box */
 function itemScoreFor(it, style){
   if (!it || !it.used) return 0;
   if (it.kind==='wand' || it.kind==='scroll' || it.consumable) return -1;
-  if (it.slot==='weapon' || it.slot==='ranged' || it.slot==='ammo') return itemScore(it);
-  const affs = (it.aff||[]).reduce((t,a)=>t+(a.i1||0)+(a.f||0)*20, 0), pr = (it.prayB||0)*0.25 + affs*0.5;
+  if (it.slot==='weapon' || it.slot==='ranged' || it.slot==='ammo') return itemScore(it, true);
+  const pr = (it.prayB||0)*0.25;
   const b = (it.acc||0)/RS_ATK_PER_HIT, st = (it.dmgB||0)/RS_STR_PER_DMG, df = (it.ac||0)/RS_DEF_PER_AC, ra = (it.rngAcc||0)/RS_ATK_PER_HIT, ma = (it.magAcc||0)/RS_ATK_PER_HIT;
   if (style==='magic') return ma*1.6 + (it.magDmg||0)*2 + (it.magDmgPct||0)*0.3 + df*0.8 + pr;
   if (style==='ranged') return ra*1.6 + st + (it.saveArrows||0)*4 + df*1.5 + pr;
@@ -13606,7 +13611,11 @@ function rsProcLineHtml(it){
 function itemModListHtml(it){
   if (it.kind==='wand') return `<div class="muted">a relic of another age - worth selling</div>`;
   let body = rsBonusLines(it).map(l=>`<div>${l}</div>`).join('');
-  for (let i=0;i<it.naff;i++) body += rsAffLineHtml(it, i);
+  /* (RS-453) the bonuses rolled on it, or grown by its kills, set apart in a box of their own - and how far a weapon has awakened */
+  const wpn = it.slot==='weapon', aw = wpn ? (it.sentientTier||0) : 0, nextK = wpn ? SENTIENT_KILL_THRESHOLDS[aw] : undefined;
+  const awk = wpn && (it.kills || aw) ? `<span class="affk">${(it.kills||0).toLocaleString()} kills &middot; awakened ${aw}/${SENTIENT_KILL_THRESHOLDS.length}${nextK!==undefined ? ` &middot; next at ${nextK}` : ''}</span>` : '';
+  if (it.naff || awk){ let ab = ''; for (let i=0;i<it.naff;i++) ab += rsAffLineHtml(it, i);
+    body += `<div class="affbox"><div class="affh">BONUSES${awk ? ' ' + awk : ''}</div>${ab || '<div class="muted">none yet - a weapon grows bonuses as it kills</div>'}</div>`; }
   body += rsProcLineHtml(it);
   const rq = rsReqText(it); if (rq) body += `<div>${rq}</div>`;
   return body;
@@ -41154,7 +41163,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-452';
+const GAME_VERSION = 'rs-453';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

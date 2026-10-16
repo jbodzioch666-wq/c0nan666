@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-453 - Fair upgrade arrows, bonuses on show
+
+- **Arrows judge the gear itself.** The green and red arrows counted a piece's random bonuses heavily. A single +17% damage bonus outweighed a whole tier of metal, so a better weapon you'd just forged showed as a downgrade from an old one that had grown bonuses. Now the arrows compare only a piece's own stats: damage, attack, strength, defence, magic, ranged and prayer.
+- **Bonuses in their own box.** A piece's bonuses, whether rolled when it dropped or grown on a weapon as it kills, sit in a violet box of their own under its stats, so you can see them at a glance and judge them yourself.
+- **How far a weapon has awakened.** A weapon you fight with grows a new bonus at 50, 150 and 300 kills. Its tooltip now shows its kill count, how many bonuses it has grown, and when the next one comes.
+
 ## RS-452 - Solid stairs
 
 - **Monsters keep out of the stairs.** A monster chasing you would walk straight into a flight of stairs, or the way out, and stand there in it. Stairs and ways out are now solid to monsters: they come round them to you, and any that start in one step off it.
