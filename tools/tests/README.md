@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs469 | Tower shields in every metal: more defence, worse aim, forged from four bars or found, tall in the hand |
 | rs468 | A stooped wood elf's face looks ahead like a human's, not up |
 | rs467 | A shield is strapped to the forearm and, raised, covers the body face out and point down |
 | rs466 | Metal full helms are closed great helms and kiteshields metal kites, each tier finer than the last |

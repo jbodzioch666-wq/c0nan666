@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-469 - Tower shields
+
+- **A new shield in every metal:** the Tower Shield is a tall, squared shield that curves round your body like a Roman scutum. It's strapped to your forearm like the kiteshield, with the same cross, chevron, saltire, boss and spikes as you go up the tiers.
+- **Heavy defence, at a price:** it gives half as much defence again as the kiteshield of its metal (a Dragon one gives 96 against 64). In exchange you aim worse with a blade or a bow, by 5 at bronze rising to 17 at dragon, and it costs twice the kiteshield's magic accuracy.
+- **Where to get one:** forge it at the anvil from four bars of the metal, or find one; about 3 in 10 metal shields that drop are tower shields.
+- **Balance:** the gear and economy sims give the same results as before; they kit fighters with kiteshields, so tower shields are an extra choice.
+
 ## RS-468 - Wood elves look ahead
 
 - **Head level again:** a wood elf's head was tipped about 23 degrees up toward the sky. The head was lifted to make up for the curve of its stooped back, and lifted far too much. Now its stooped back stays, and its face looks straight ahead, standing or walking, the way anyone else's does.
