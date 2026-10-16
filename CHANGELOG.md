@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-448 - The whole counter serves you
+
+- **Click anywhere on the counter.** Inside a shop, only the shopkeeper themselves could be clicked or tapped, so clicking the counter beside them just walked you to the floor nearby. Now every part of the counter opens the shop: you step up to it and are served.
+
 ## RS-447 - The rose's points close up
 
 - **No gaps round the dais.** Each point of the compass rose was cut a little narrower than its share of the circle, so slivers of cobbles showed between neighbouring points just outside the waypoint's bottom step. The points now meet edge to edge all the way round.
