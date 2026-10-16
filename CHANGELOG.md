@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-427 - Limp falls, legs that stay on, clear paths, steady lamps
+
+- **Bodies keep their legs.** A two-legged body that fell on its back could end up with its legs folded up behind it, so it looked cut off at the waist. The hip is now a proper joint: a thigh swings forward up to about 120 degrees from straight down the body, and back only about 20.
+- **Deaths go limp.** People and four-legged beasts were flung across the room head over heels when they died. Now they take a gentler shove and slump, and their limbs go slack and settle instead of flailing.
+- **No altar in the pyramid, and altars are solid.** The burial hall's altar is gone, from floors you've already visited too. Elsewhere you can no longer walk through an altar; you pray standing beside it.
+- **Chests don't block the way.** Vaults, cursed chests, locked chests and altars are never placed in a passage, in the neck between two rooms, beside the stairs or by the way out. An opened chest left beside the stairs no longer blocks the landing either.
+- **Town lamps no longer flash.** As you walked, the few real lights were handed out again every few steps, so lamps that stayed lit swapped lights and flashed. Now a light stays on its lamp, and only moves when that lamp falls out of range, fading out first.
+
 ## RS-426 - The board by the tavern, minions that walk every step
 
 - **The bounty board moves.** It now stands against the tavern's right-hand wall, facing the lane, with the Captain of the Watch on its right.

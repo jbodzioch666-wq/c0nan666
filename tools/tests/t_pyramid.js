@@ -21,7 +21,7 @@ module.exports = async page=>{
         out['glyph_'+k] = [n, blue, red]; A(n > 1000 && blue > 200 && red > 200, k+' carries painted signs '+JSON.stringify([n, blue, red]));
         const c = spec[k](20, 30); A(Array.isArray(c) && c.length >= 3, k+' still paints stone'); } }
     let adv = 0, altar = 0, idols = 0; for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++){ if (G.map[x][y]===advanceTile()) adv++; if (G.dungeonDeco[x][y]==='altar') altar++; if (G.dungeonDeco[x][y]==='idol') idols++; }
-    A(adv===1 && altar===1 && idols===2, 'the burial hall layout '+JSON.stringify([adv, altar, idols]));
+    A(adv===1 && altar===0 && idols===2, 'the burial hall layout (RS-427: no altar) '+JSON.stringify([adv, altar, idols]));
     const names = G.mon.map(m=>m.nm); out.mon = names;
     A(names.length && names.every(n=>FAM_BY_NAME[n]==='tomb'), 'every creature is a tomb dweller: '+names.join(', '));
     A(PYRAMID_SKIN.length===20 && PYRAMID_SKIN.every(e=>e.nm && e.art && e.rgb), 'a creature for every level');

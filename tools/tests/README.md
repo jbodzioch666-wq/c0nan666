@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs427 | A fallen body's thighs stay within about 20 degrees back to 120 forward of the spine; altars solid, none in a pyramid; no chest or altar blocks a way through or stands by the stairs |
 | rs426 | The bounty board at the tavern's right-hand wall with the Captain to its right; a minion hurrying two squares (straight or on the slant) walks through both, without jumping |
 | rs424 | At night every town lamp keeps glowing as you walk away (a pool under it, a glow at its head, dimmer where a real light has it); a light handed on fades up; no obelisks round the waypoint, none of it by day |
 | rs423 | A shut tome is only the shut book (the open book's merged pages no longer show inside it), and open only the open one |

@@ -28,7 +28,8 @@ module.exports = async page=>{
       FP.dt = 1/60; const hip = es.map(()=>90);
       for (let f=0;f<360;f++){ FP.t += 1/60; m3dSweep();
         es.forEach((e,i)=>{ if (!e || !e.chain || !e.chain.hipLim) return; const P = e.chain.p, x = new T.Vector3().subVectors(P[7].x, P[4].x).normalize(), y = new T.Vector3().subVectors(P[2].x, P[1].x).normalize(), fw = new T.Vector3().crossVectors(x, y).normalize();
-          for (const [h,k] of [[10,11],[14,15]]){ const t = new T.Vector3().subVectors(P[k].x, P[h].x); hip[i] = Math.min(hip[i], Math.asin(Math.max(-1, Math.min(1, t.dot(fw)/t.length())))*57.3); } }); }
+          const sp = new T.Vector3().subVectors(P[0].x, P[1].x).normalize(); fw.addScaledVector(sp, -fw.dot(sp)).normalize();   /* (RS-427: the hip's own angle, in the body's plane from straight down the spine) */
+          for (const [h,k] of [[10,11],[14,15]]){ const t = new T.Vector3().subVectors(P[k].x, P[h].x); hip[i] = Math.min(hip[i], Math.atan2(t.dot(fw), t.dot(sp))*57.3); } }); }
       es.forEach((e, i)=>{ out.push({ nm:batch[i], model:!!e, kind:e ? e.dkind || 'topple' : null, lo:e && e.holder.parent ? low(e, true) : null, lo0:lo0[i], hip:e && e.chain && e.chain.hipLim ? hip[i] : null }); });
       for (const e of es) if (e && e.holder.parent){ e.holder.parent.remove(e.holder); M3D.live.delete(e); }
     }
