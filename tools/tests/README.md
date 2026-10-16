@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs455 | No orb-from-glass recipe; the unpowered orb comes from a silver bar |
 | rs454 | The D&D ability score improvements and feats are gone; an old save with feats loads and plays without them |
 | rs453 | Gear arrows judge base stats only; bonuses in their own box with a weapon's kills and awakening |
 | rs452 | Dungeon stairs and ways out are solid to monsters, and nothing lies in them |

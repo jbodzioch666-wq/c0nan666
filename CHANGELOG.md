@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-455 - One way to make an orb
+
+- **No orb from glass.** The kiln had two recipes for the same unpowered orb: one from a silver bar and one from molten glass. The glass one is gone. You make an unpowered orb from a silver bar and charge it with runes, as before.
+
 ## RS-454 - Feats removed
 
 - **No more feats.** The old D&D ability score improvements and feats haven't been offered since your level started coming from your skills, but their code and their effects were still in the game. They're gone now: the screens, the Lucky reroll, Tough's extra life, Bonded Spirit and the rest. A character saved with feats from long ago loads and plays as normal, just without them.
