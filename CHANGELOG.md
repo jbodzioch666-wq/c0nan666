@@ -1,5 +1,16 @@
 # Depthcrawl patch notes
 
+## RS-465 - Two-handed weapons swung with both hands
+
+- **Both hands on the weapon:** greatswords, great axes, halberds, spears, tridents and quarterstaffs are now held and swung with both hands. The left hand closes on the grip below the right hand, or further down the shaft, and stays there through the guard and the whole blow. It used to dangle beside the body.
+- **A blow for each weapon:**
+  - **Greatsword:** heaved up over the right shoulder, then cleaved down and across.
+  - **Great axe and halberd:** raised straight overhead and brought down in a chop.
+  - **Spear and trident:** drawn back, then driven forward in a low thrust, the point levelling as it goes.
+  - **Quarterstaff:** swung round in a wide sweep.
+- **Still one-handed:** a wizard's staff, and a spear carried with a shield.
+- **Plain wood:** a quarterstaff no longer sparkles with a wizard's motes.
+
 ## RS-464 - Bolts, darts and knives can be made
 
 - **The missing recipes:** bolts, darts, throwing knives, broad bolts and fire arrows had recipes, but no bench showed them, so they couldn't be made anywhere. They're now at the fletching bench in the Tailor's workshop, beside the arrows. Bolts take one metal bar for 12; darts take one bar for 15 and knives one bar for 8.
