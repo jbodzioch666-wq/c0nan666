@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-467 - Shields worn on the forearm
+
+- **Strapped on like a real shield:** a shield sits on the outside of your left forearm, the arm along its back, your fist near its top edge and its point past your elbow. It used to be held out on the end of your fist like a tray.
+- **Raised in a fight:** your forearm stands upright in front of your chest, so the shield covers your body, its face to the foe and its point down.
+- **Carried at your side:** walking with it out, it rides low at your left side, point down, turned a little outward.
+- **Everyone:** knights, goblins and every other shield-bearer hold theirs the same way. It still goes on your back when you put your weapon away.
+
 ## RS-466 - Knightly helms and shields
 
 - **Closed helms:** every metal full helm is now a closed great helm like the knights wear, and it gets finer with each tier:

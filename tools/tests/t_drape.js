@@ -15,13 +15,13 @@ module.exports = async page=>{
       const e = make('knight', extra); out['cape_'+k] = +inside(e).toFixed(3);
       A(out['cape_'+k] <= 0.01, 'the cloak stays outside the '+k+' body: '+out['cape_'+k]);
     }
-    // the shield: its back within a few millimetres of the fist, and not through it
+    // the shield (RS-467): strapped to the forearm, which lies just behind it - not through its face, and not far off it
     for (const nm of ['goblin', 'knight']){
-      const e = make(nm, {}), rig = e.rig, hand = rig.arms[1].hand, inv = new T.Matrix4().copy(hand.matrixWorld).invert(), hb = new T.Box3(), sb = new T.Box3();
-      hand.traverse(o=>{ if (!o.isMesh) return; let p = o, inS = false; while (p && p!==hand){ if (p===rig.shield) inS = true; p = p.parent; }
-        const g = o.geometry.clone(); g.applyMatrix4(new T.Matrix4().multiplyMatrices(inv, o.matrixWorld)); g.computeBoundingBox(); (inS ? sb : hb).union(g.boundingBox); });
-      const gap = hb.min.y - sb.max.y; out['shieldGap_'+nm] = +gap.toFixed(4);
-      A(gap > 0 && gap < 0.006, 'the '+nm+"'s shield is against the fist, not through it: "+gap);
+      const e = make(nm, {}), rig = e.rig, L = rig.arms[1], sh = rig.shield, inv = new T.Matrix4().copy(sh.matrixWorld).invert();   /* (the forearm's line, elbow to wrist - a skinned figure's arm isn't a mesh under its joints) */
+      const el = L.el.getWorldPosition(new T.Vector3()).applyMatrix4(inv), wr = L.hand.getWorldPosition(new T.Vector3()).applyMatrix4(inv); let lo = Infinity;
+      for (let k=0;k<=10;k++){ const q = el.clone().lerp(wr, k/10); if (q.z > -0.2 && q.z < 0.16) lo = Math.min(lo, q.y); }
+      out['shieldArm_'+nm] = +lo.toFixed(4);
+      A(sh.parent===L.el && lo > 0.005 && lo < 0.06, 'the '+nm+"'s shield is on the forearm, the arm just behind it: "+lo);
     }
     // the tome: on the left palm for a plain figure and a stooped, long-armed wood elf alike, its pages tipped up
     for (const [k, look] of [['plain', null], ['elf', woodElfLook]]){

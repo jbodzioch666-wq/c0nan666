@@ -18,7 +18,7 @@ module.exports = async page=>{
       out.rig = { seen, browned:c1 < c0 - 0.03, hidden:!rg.g.visible }; }
     // weapons put away, and drawn to fight
     const fig = (w, sh, bow)=>{ G.gear.weapon = w || newItem(); G.gear.offhand = sh || newItem(); G.gear.ranged = bow ? rsMakeBow(2, true) : newItem(); const e = m3dInstance({}, rsPlayerLook()); m3dPoseHumanoid(e.rig, 1, 0, 0, 0, 0, e); return e; };
-    const where = (e, o)=>{ const r = e.rig, p = o.parent; return p===r.hips ? 'hip' : p===r.torso ? 'back' : p===r.arms[0].hand || p===r.arms[1].hand || (p && p.parent===r.arms[0].hand) || (r.wpHome && p===r.wpHome) ? 'hand' : p ? 'other' : 'none'; };
+    const where = (e, o)=>{ const r = e.rig, p = o.parent; return p===r.hips ? 'hip' : p===r.torso ? 'back' : p===r.arms[0].hand || p===r.arms[1].hand || p===r.arms[1].el || (p && p.parent===r.arms[0].hand) || (r.wpHome && p===r.wpHome) ? 'hand' : p ? 'other' : 'none'; };
     out.wpn = {};
     for (const [nm, w, sh, bow] of [['sword', rsMakeWeapon(2, 5), rsMakeArmour('metal', 2, 'offhand')], ['dagger', rsMakeWeapon(1, 0)], ['greatsword', rsMakeWeapon(4, 9)], ['staff', rsMakeStaff(1)], ['halberd', rsMakeWeapon(2, 8)], ['bow', null, null, true]]){
       const e = fig(w, sh, bow), held = where(e, e.rig.weapon); rsSheath(e, false, 1, 1, 0); const away = where(e, e.rig.weapon), shield = e.rig.shield ? where(e, e.rig.shield) : null, scab = !!(e.rig.shd.items[0] && e.rig.shd.items[0].sc);

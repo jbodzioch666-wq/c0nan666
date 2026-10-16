@@ -1,5 +1,5 @@
 // RS-207: staves and bows are held - upright with the arm low, tipped back over the shoulder on an overhead wind-up; a staff's
-// orbs circle its head, not the hand; the shield sits in the fist (RS-297); leaving a dungeon puts you beside its entrance
+// orbs circle its head, not the hand; the shield is strapped to the forearm (RS-467); leaving a dungeon puts you beside its entrance
 module.exports = async page=>{
   const r = await page.evaluate(()=>{ goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing');
     const T = THREE, A = (c, msg)=>{ if (!c) throw new Error('assert: '+msg); }, out = {};
@@ -18,7 +18,8 @@ module.exports = async page=>{
     const mg = M3D.meta.get(m3dHumanoid({ weapon:'staff', swirl:'#c0a0ff', skin:'#c89070' })).rig;
     A(mg.swirl && mg.swirl.parent===mg.weapon.parent && mg.swirl.position.y > 0.1, 'the orbs circle the staff head '+(mg.swirl && mg.swirl.position.y));
     const kc = m3dInstance({ nm:'kobold chieftain' }, monsterPortraitFor('kobold chieftain'));
-    out.shieldY = kc.rig.shield ? kc.rig.shield.position.y : null; A(out.shieldY!==null && out.shieldY <= -0.06 && out.shieldY >= -0.09, 'the shield sits in the fist, its back at the knuckles (RS-297; RS-207 had it past the fingertips) '+out.shieldY);
+    { const sh = kc.rig.shield, L = kc.rig.arms[1]; kc.holder.updateMatrixWorld(true); const fist = sh ? sh.worldToLocal(L.hand.getWorldPosition(new THREE.Vector3())) : null;   /* (RS-467: strapped to the forearm, the fist near its top edge) */
+      out.shieldArm = !!sh && sh.parent===L.el; out.fistZ = fist ? +fist.z.toFixed(3) : null; A(out.shieldArm && fist.z > 0.02 && fist.z < 0.16, 'the shield is strapped to the forearm, the fist near its top '+JSON.stringify(out)); }
     // in and out of a dungeon by its way out: beside the entrance, not on it
     let dx=-1, dy=-1; for (let x=1;x<OW_COLS-1 && dx<0;x++) for (let y=1;y<OW_ROWS-1;y++) if (G.ow.map[x][y]===OW_DUNGEON){ dx=x; dy=y; break; }
     G.gameMode = 0; G.owPos = { x:dx, y:dy }; G.pendingDungeon = { x:dx, y:dy }; enterDungeonConfirm(); setUi('playing');
