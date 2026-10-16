@@ -13,7 +13,7 @@ module.exports = async page=>{
       G.mon = []; const m = newMonster(); Object.assign(m, { alive:1, x:p.x+1, y:p.y+1, hp:20, maxHp:20, ac:5, atkBonus:1, dmg1:1, dmg2:2, xp:5, sym:'o', nm, col:'#8f8', art:null, abilities:[] }); G.mon.push(m);
       await fr(25); const e = M3D.inst.get(m); if (!e) continue; const st = low(e);
       m.alive = 0; m3dKill(m, { dmg:20, maxHp:20, kind:['melee','ranged','magic'][rep], crit:rep===0 }); FP.dt = 1/60; let inside = 0;
-      for (let f=0; f<200; f++){ FP.t += 1/60; m3dSweep(); const C = e.chain; if (C && e.dkind==='quad' && C.t > 0.1) for (const [c, o] of [[1, 6], [1, 10], [0, 14], [0, 18]]) for (const q of [o+1, o+2, o+3]) if (C.p[c].x.distanceTo(C.p[q].x) < C.p[c].r*0.95) inside++; }
+      const d0 = {}; for (let f=0; f<200; f++){ FP.t += 1/60; m3dSweep(); const C = e.chain; if (C && e.dkind==='quad') for (const [c, o] of [[1, 6], [1, 10], [0, 14], [0, 18]]) for (const q of [o+1, o+2, o+3]){ const d = C.p[c].x.distanceTo(C.p[q].x), k = c + ':' + q; if (d0[k]===undefined) d0[k] = d; if (C.t > 0.1 && d < Math.min(C.p[c].r*0.95, d0[k]*0.6)) inside++; } }   /* (RS-438: inside its body, or drawn in well past where it stood - a boar's short legs stand partly within its body's round already) */
       const R = e.rd, up = R ? new T.Vector3(0, 1, 0).applyQuaternion(R.q).y : null, dd = low(e);
       (out[nm] = out[nm] || []).push({ kind:e.dkind, up:up===null ? null : +up.toFixed(2), lo:+dd[0].toFixed(3), hi:+dd[1].toFixed(3), standHi:+st[1].toFixed(3), inside });
       if (e.holder.parent){ e.holder.parent.remove(e.holder); M3D.live.delete(e); } }
