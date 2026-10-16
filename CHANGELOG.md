@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-447 - The rose's points close up
+
+- **No gaps round the dais.** Each point of the compass rose was cut a little narrower than its share of the circle, so slivers of cobbles showed between neighbouring points just outside the waypoint's bottom step. The points now meet edge to edge all the way round.
+
 ## RS-446 - The rose without its band
 
 - **The right piece taken out.** RS-445 removed the waypoint's wide bottom step, but the part poking through was the round stone band at the foot of the compass rose, showing between its points. The step is back, so there are three round steps again, and the band is gone. The rose's points now run in under the bottom step.
