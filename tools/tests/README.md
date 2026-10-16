@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs430 | A rune robe's hem runes are a gold layer on the skirt that moves with it, not loose glowing blocks |
 | rs428 | Mining and woodcutting swing the tool again (weapon put away); a room has sconces on the back and west walls and on posts in its low east and front walls (RS-429) |
 | rs427 | A fallen body's thighs stay within about 20 degrees back to 120 forward of the spine; altars solid, none in a pyramid; no chest or altar blocks a way through or stands by the stairs |
 | rs426 | The bounty board at the tavern's right-hand wall with the Captain to its right; a minion hurrying two squares (straight or on the slant) walks through both, without jumping |

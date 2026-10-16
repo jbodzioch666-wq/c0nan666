@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-430 - Runes stitched into the robe
+
+- **No more yellow dots.** The runes round a Mystic, Infinity or Ahrim's robe's hem were little glowing blocks set round the hips. The skirt sways with your legs and the blocks didn't, so they hung loose under the hem as yellow dots. Now the runes are stitched into the skirt itself, a ring of gold glyphs between two lines of stitching just above the hem, and they fold and swing with the cloth.
+
 ## RS-429 - Sconces on posts
 
 - **Sconces instead of standing torches.** The east and front walls of a room are cut low so you can see in, which left nowhere to hang a sconce, so RS-428 lit those sides with standing torches. Now a timber post rises out of the low wall, midway along the east side and near each end of the front, with a torch in an iron sconce on its inner face, matching the ones on the back and west walls.
