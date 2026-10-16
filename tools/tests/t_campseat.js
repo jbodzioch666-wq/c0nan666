@@ -20,7 +20,7 @@ module.exports = async page=>{
   out.fire = await look();
   A(!out.fire.none, 'a 3D figure on the open land');
   A(out.fire.sit && out.fire.stool, 'with just a fire you sit on a stool');
-  A(out.fire.dist > 0.3 && out.fire.dist < 0.5 && out.fire.facing < 0.2 && out.fire.beyond, 'beside the fire, facing it, seen across it from the camera');
+  A(out.fire.dist > 0.42 && out.fire.dist < 0.66 && out.fire.facing < 0.2 && out.fire.beyond, 'beside the fire, facing it, seen across it from the camera');
   A(out.fire.hipUp > out.fire.seatTop && out.fire.hipUp < out.fire.seatTop + 0.3, 'on the seat, not floating or sunk');
   A(!out.fire.kitShown && out.fire.stick && out.fire.tip < 0.08, 'the staff and the book put down, a marshmallow on a stick held over the fire (RS-310)');
   await page.screenshot({ path:SHOTS+'/shot_campseat.png' });

@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs439 | Every craft takes 1.3s a piece (twice as long); at your campfire you sit further back, the marshmallow held out over the flames |
 | rs438 | A dead boar lies on its side, legs out, mouth shut, head in line; its jaw meets its snout |
 | rs437 | Someone on the road turns up a few leagues off and waits to be met; a skeleton with its note lies where you can see it, to be searched |
 | rs436 | A story quest's place in the wilds is drawn as a scene (the Goblin King's hall and nine others), not just a ! |

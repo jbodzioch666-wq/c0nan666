@@ -10,9 +10,9 @@ module.exports = async page=>{
     const out = {}, T = THREE, avg = a=>{ let s = 0; for (let i=0;i<a.length;i++) s += a[i]; return s/a.length; };
     // the rig: what's cooking shows, and browns with the bar
     { const rg = cookRigMake(T, {}), seen = {};
-      for (const [kind, a, k] of [['cook','trout','fish'],['cook','meat','steak'],['cook','dsteak','dsteak'],['dish','stew','stew']]){ G.ui = 'cook'; CQ.list = [{ kind, a, n:3, done:0, ui:'cook' }]; CQ.next = performance.now() + CQ_STEP; cookRigSync(rg, true, 1);
+      for (const [kind, a, k] of [['cook','trout','fish'],['cook','meat','steak'],['cook','dsteak','dsteak'],['dish','stew','stew']]){ G.ui = 'cook'; CQ.list = [{ kind, a, n:3, done:0, ui:'cook' }]; CQ.next = performance.now() + cqStepOf({ kind:'cook' }); cookRigSync(rg, true, 1);
         seen[k] = Object.keys(rg.foods).filter(n=>rg.foods[n].visible); }
-      CQ.list = [{ kind:'cook', a:'meat', n:3, done:0, ui:'cook' }]; CQ.next = performance.now() + CQ_STEP; cookRigSync(rg, true, 1); const m = rg.foods.steak.userData.meshes[0], c0 = avg(m.geometry.attributes.color.array);
+      CQ.list = [{ kind:'cook', a:'meat', n:3, done:0, ui:'cook' }]; CQ.next = performance.now() + cqStepOf({ kind:'cook' }); cookRigSync(rg, true, 1); const m = rg.foods.steak.userData.meshes[0], c0 = avg(m.geometry.attributes.color.array);
       CQ.next = performance.now() - 1; cookRigSync(rg, true, 1); const c1 = avg(m.geometry.attributes.color.array);
       G.ui = 'playing'; CQ.list = []; cookRigSync(rg, false, 1);
       out.rig = { seen, browned:c1 < c0 - 0.03, hidden:!rg.g.visible }; }

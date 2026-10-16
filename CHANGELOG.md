@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-439 - Slower crafting, a better seat by the fire
+
+- **Every craft takes twice as long.** Cooking, smelting, forging, brewing, crafting and the rest now take 1.3 seconds a piece instead of 0.65. Each piece of food has its time on the grill or in the pan, and long batches give you time to watch them.
+- **Back from the fire.** At your own campfire you sit a little further from the flames, on your stool across the fire from the camera.
+- **The marshmallow the right way up.** Your toasting stick pointed down into the fire. Now you hold it out level or a little up, with the marshmallow over the flames.
+
 ## RS-438 - The boar's death
 
 - **A boar dies like a boar.** A dead giant boar's head was wrung round on its neck and its mouth hung open in a long red trough, and its legs folded up against its belly. Now it goes down onto its side with its legs lying out, its mouth shut and its head in line with its neck. Every four-legged beast's head turns less as it falls, and their knees stay clear of their bodies too.
