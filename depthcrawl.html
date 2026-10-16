@@ -5849,6 +5849,7 @@ function loadLevel(d, arrivingFromBelow, fellThrough){
   for (const m of ((G.player && G.player.minions)||[])) necroPlace(m);   // and your raised dead
 
   if (G.gameMode===1 && fresh) skPlaceCaveNodes();
+  try{ dgStairsClear(); }catch(e){ console.error(e); }   /* (RS-452: a kept floor too) */
   if (G.gameMode===1 && fresh) for (const m of G.mon) try{ monAi(m); }catch(e){}
   if (G.gameMode===1 && d===G.dungeonMaxDepth && fresh){
     spawnBoss();
@@ -7195,7 +7196,7 @@ function tickMonsters(excludeIdx){
       if (G.gameOver || !m.alive) break;
       const nx=m.x+dx, ny=m.y+dy;
       if (nx===G.player.x && ny===G.player.y){ monsterAttacks(i); break; }
-      if (tileAt(nx,ny)!==T_WALL && !occupiedBy(nx,ny,i) && diagClear(m.x, m.y, dx, dy, tileOpen)){ dgDoorOpen(nx, ny, true); m.x=nx; m.y=ny; } else break;
+      if (tileAt(nx,ny)!==T_WALL && !stairTile(nx, ny) && !occupiedBy(nx,ny,i) && diagClear(m.x, m.y, dx, dy, tileOpen)){ dgDoorOpen(nx, ny, true); m.x=nx; m.y=ny; } else break;
       /* (RS-171) a dash stops once it's beside you, and a rusher picks its second step afresh - it used to run on past you and back again every turn */
       if (fleeing) continue;
       if (Math.abs(G.player.x-m.x)+Math.abs(G.player.y-m.y)<=1 || monDiagAdj(m)) break;
@@ -14200,7 +14201,7 @@ function monAi(m){
 function monStep(m, i, dx, dy){
   const nx = m.x+dx, ny = m.y+dy, p = G.player;
   if (!dx && !dy) return false;
-  if ((nx===p.x && ny===p.y) || tileAt(nx,ny)===T_WALL || dgSolid(nx, ny) || occupiedBy(nx,ny,i)) return false;
+  if ((nx===p.x && ny===p.y) || tileAt(nx,ny)===T_WALL || dgSolid(nx, ny) || stairTile(nx, ny) || occupiedBy(nx,ny,i)) return false;
   dgDoorOpen(nx, ny, true); m.x = nx; m.y = ny; return true;   /* (RS-407: a monster shoves a shut door open on its way through) */
 }
 function monStepToward(m, i, tx, ty){
@@ -14512,8 +14513,16 @@ const DRESS_KITS = {
 };
 function dgIsDark(){ return G.gameMode===1 && G.dungeonDeco && G.dungeonDeco[0] && G.dungeonDeco[0][0]==='dark'; }
 function dgDarkPenalty(){ return dgIsDark() ? (lightBonus() ? 0 : 2) : 0; }
+function dgStairsClear(){
+  if (G.gameMode!==1 || !G.dungeonDeco) return;
+  for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++) if (stairTile(x, y)){ if (G.dungeonDeco[x][y] && G.dungeonDeco[x][y]!=='dark') G.dungeonDeco[x][y] = ''; if (G.floorItem && G.floorItem[x] && G.floorItem[x][y]) G.floorItem[x][y] = null; }
+  for (const m of G.mon||[]) if (m.alive && stairTile(m.x, m.y)){ for (const [dx, dy] of DIR8){ const nx = m.x + dx, ny = m.y + dy; if (G.map[nx] && G.map[nx][ny]===T_FLOOR && !stairTile(nx, ny) && !occupiedBy(nx, ny, -1) && !(nx===G.player.x && ny===G.player.y)){ m.x = nx; m.y = ny; break; } } }
+}
 function dressLevel(d){
   if (G.gameMode!==1 || !G.dungeonDeco) return;
+  /* (RS-452) nothing lies in a flight of stairs or a way out - an ore vein, a cave pool or a chest that was put there before the stairs were - and no
+     monster stands in one */
+  dgStairsClear();
   /* (RS-427) the stairs go in after the altars: an altar that ended up beside them, or cutting a way off, is taken away */
   for (let x=1;x<COLS-1;x++) for (let y=1;y<ROWS-1;y++) if (G.dungeonDeco[x][y]==='altar'){ G.dungeonDeco[x][y] = ''; if (dgOpenSpot(x, y)) G.dungeonDeco[x][y] = 'altar'; }
   const D = G.dungeonDeco, k = G.siteKind==='graveyard' && d>1 ? 'graveyard' : (DRESS_KITS[G.siteKind] ? G.siteKind : 'dungeon'), kit = DRESS_KITS[k];
@@ -17877,13 +17886,15 @@ const FACING_VECT = [[0,-1],[1,0],[0,1],[-1,0]]; // N,E,S,W - clockwise
 const DIR8 = [[0,-1],[1,0],[0,1],[-1,0],[1,-1],[1,1],[-1,1],[-1,-1]];   // the four cardinals first, so paths stay straight
 function diagClear(x, y, dx, dy, open){ return !(dx && dy) || (open(x+dx, y) && open(x, y+dy)); }
 function tileOpen(x, y){ const t = tileAt(x, y); return t!==undefined && t!==null && t!==T_WALL; }
+/* (RS-452) a flight of stairs or a way out is solid to the monsters - none stands in one, and nothing grows or lies in one either */
+function stairTile(x, y){ if (G.gameMode!==1) return false; const t = tileAt(x, y); return t===T_STAIRSD || t===T_STAIRSU || t===T_EXIT || t===T_FLEE; }
 // (RS-169) how far every open tile is from you, walking - worked out once a turn and shared by every monster that rushes you
 function monChaseMap(){
   const p = G.player, key = p.x + ',' + p.y + '|' + (p.turnCount||0) + '|' + COLS;
   if (monChaseMap.k === key && monChaseMap.m === G.map && monChaseMap.d) return monChaseMap.d;
   const W = COLS, H = ROWS, d = new Int16Array(W*H).fill(-1), q = [p.x + p.y*W]; d[q[0]] = 0;
   for (let h=0; h<q.length; h++){ const c = q[h], x = c % W, y = (c - x)/W, dc = d[c]; if (dc >= 24) continue;
-    for (const [ax, ay] of [[1,0],[-1,0],[0,1],[0,-1]]){ const nx = x+ax, ny = y+ay; if (nx<0 || ny<0 || nx>=W || ny>=H) continue; const n = nx + ny*W; if (d[n] >= 0 || !tileOpen(nx, ny)) continue; d[n] = dc + 1; q.push(n); } }
+    for (const [ax, ay] of [[1,0],[-1,0],[0,1],[0,-1]]){ const nx = x+ax, ny = y+ay; if (nx<0 || ny<0 || nx>=W || ny>=H) continue; const n = nx + ny*W; if (d[n] >= 0 || !tileOpen(nx, ny) || stairTile(nx, ny)) continue; d[n] = dc + 1; q.push(n); } }
   monChaseMap.k = key; monChaseMap.m = G.map; monChaseMap.d = d; return d;
 }
 // the step that brings this monster nearer you along the way round (null: nowhere better to stand)
@@ -19936,7 +19947,7 @@ function siegeMonVsAlly(m, i){
     return true; }
   if (pd > 3){ let best = null, bd = Infinity; for (const a of live){ const d = Math.abs(a.x-m.x) + Math.abs(a.y-m.y); if (d < bd){ bd = d; best = a; } }
     if (best && bd < pd - 2){ const dx = sg(best.x-m.x), dy = sg(best.y-m.y);
-      for (const [sx,sy] of (dx && dy ? [[dx,0],[0,dy]] : [[dx,dy]])){ const nx = m.x+sx, ny = m.y+sy; if ((sx || sy) && tileAt(nx, ny)!==T_WALL && !occupiedBy(nx, ny, i) && !(nx===G.player.x && ny===G.player.y)){ m.x = nx; m.y = ny; return true; } } } }
+      for (const [sx,sy] of (dx && dy ? [[dx,0],[0,dy]] : [[dx,dy]])){ const nx = m.x+sx, ny = m.y+sy; if ((sx || sy) && tileAt(nx, ny)!==T_WALL && !stairTile(nx, ny) && !occupiedBy(nx, ny, i) && !(nx===G.player.x && ny===G.player.y)){ m.x = nx; m.y = ny; return true; } } } }
   return false;
 }
 function siegeAllyFalls(a, by){
@@ -41143,7 +41154,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-451';
+const GAME_VERSION = 'rs-452';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

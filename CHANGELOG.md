@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-452 - Solid stairs
+
+- **Monsters keep out of the stairs.** A monster chasing you would walk straight into a flight of stairs, or the way out, and stand there in it. Stairs and ways out are now solid to monsters: they come round them to you, and any that start in one step off it.
+- **Nothing lies in the stairs.** An ore vein, cave pool, herb patch or chest can no longer end up inside a flight of stairs, on a new floor or on one you've been to before.
+
 ## RS-451 - A giant crab
 
 - **Giant crabs are giant.** The giant crab was sized like a giant rat or bat, a little smaller than a person. Now it's a great armoured beast nearly twice that size, more than a tile across. King crabs are the same size. Ordinary crabs stay small.

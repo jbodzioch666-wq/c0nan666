@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs452 | Dungeon stairs and ways out are solid to monsters, and nothing lies in them |
 | rs451 | A giant crab is well over a tile across; giant rats and plain crabs stay small |
 | rs450 | A skeleton archer's arrows fly from it to its foe |
 | rs449 | Fishing a cave pool shows the line from rod tip to float; a tome shuts whenever the weapon is put away |
