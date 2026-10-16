@@ -25,7 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
-| rs444 | The compass rose is a stone step of bevelled two-tone points under the waypoint, which stands a step higher on it |
+| rs444 | (RS-445: no wide round step poking through it) The compass rose is a stone step of bevelled two-tone points under the waypoint, which stands a step higher on it |
 | rs443 | The town's cobbles are a fine 1024px layer in irregular courses over the paved tiles, made once and reused; the compass rose over it |
 | rs442 | A trinket's icon is a claw charm, not a pendant like an amulet |
 | rs441 | A timber house's braces never cross its windows; its shutters swing open either way, none square out from the wall |

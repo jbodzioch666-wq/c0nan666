@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-445 - The rose as the bottom step
+
+- **No step poking through.** The waypoint's wide bottom step stuck out through the stone compass rose. It's gone: the rose is the bottom step now, with the two round steps, the runes and the crystal standing on it.
+
 ## RS-444 - The compass rose in stone
 
 - **A rose you can stand on.** The compass rose round the waypoint was paint on the paving. Now it's cut in stone: eight bevelled points, the four quarters longer, each split down its spine into dark slate and pale stone, round a band where they meet. It's a step of its own, so the waypoint's three round steps, its runes and its floating crystal all stand one step higher on top of it.
