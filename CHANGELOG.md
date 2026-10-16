@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-461 - Cloaked towns run smoothly again
+
+- **Cloth where you can see it:** since RS-458, every cloak in a town ran the full cloth simulation. A tiefling town, where nearly everyone wears a cloak, spent about 33 ms of every frame on it and dropped to around 15 to 40 fps. Now you and anyone within a few steps of you wear real cloth. Folk further off swing their cloaks the old way, which looks the same from across a square.
+- **Lighter robes:** folk away from you refold their robes and cloaks every other frame.
+- **Faster cloth:** the cloth solver itself does less work for the same result.
+- **The numbers:** in a tiefling town from a player's save, 14 fps became 49 fps (at a sharper resolution), and a dragonborn town went from 37 to 51 fps.
+
 ## RS-460 - The Sage's hat takes a dye
 
 - **Dyeing the Visage of the Sage works:** the hat's indigo was fixed in place, so a dye was used up but never showed. Now it takes the dye's colour the moment you dye it, and keeps its band, gem, moon and stars. Washing it out brings the indigo back.

@@ -35045,6 +35045,18 @@ function m3dSageHat(hg, mats, geo){
    behind as you walk, swings as you turn and settles when you stop. It lies against the back (the line it was cut to), and the hips and
    legs push it out behind them as they stride, so it never passes through the body */
 const M3D_CLOTH = { m:null, d:null, v:null, w:null, a:null, b:null };
+/* (RS-461) who wears cloth: you always, and anyone within a few steps of you; the rest of a crowd - a tiefling town, its folk all in
+   cloaks - get the old swing, which from across a square looks the same. Every cloak in a town being cloth took 33ms a frame */
+function m3dClothHero(){ try{ return G.gameMode===3 ? V3.player && V3.player.e : G.gameMode===0 ? O3.player && O3.player.e : G.gameMode===1 ? ISO.player : null; }catch(err){ return null; } }
+function m3dClothOn(r){
+  const c = r.cape, u = c && c.userData; if (!u || !u.grid) return false; if (u.manual) return true; return m3dNearHero(r, c);
+}
+function m3dNearHero(r, obj){
+  const he = m3dClothHero(); if (!he || !he.rig || he.rig===r) return true;
+  const K = M3D_CLOTH; if (!K.hp) K.hp = new THREE.Vector3(), K.op = new THREE.Vector3(); he.holder.getWorldPosition(K.hp); obj.getWorldPosition(K.op);
+  const s = Math.max(0.3, he.holder.scale.y*(he.H || 1));   /* (in your own heights) */
+  return K.op.distanceTo(K.hp) < 3.2*s;
+}
 function m3dCapeOwn(c){
   const u = c.userData; if (u.base) return u;
   c.geometry = c.geometry.clone(); u.base = Float32Array.from(c.geometry.attributes.position.array); let lo = 0; for (let i=1;i<u.base.length;i+=3) lo = Math.min(lo, u.base[i]); u.h = -lo || 0.5; return u;
@@ -35083,8 +35095,9 @@ function m3dCapeCloth(c, r, dtIn, pre){
     const ends = r.legs.map(L=>{ const ky = L.knee.position.y || -0.23; return [loc(L.hip, 0, 0, 0), loc(L.knee, 0, 0, 0), loc(L.knee, 0, ky, 0)]; });
     caps.push([ends[0][0], ends[1][0], 0.085*bw]); for (const [h0, k0, f0] of ends){ caps.push([h0, k0, 0.062*bw]); caps.push([k0, f0, 0.05*bw]); } }
   const tl = r && r.tail && r.tail.isObject3D && r.tail.userData.caps; if (tl) for (const [a0, a1, rad] of tl) caps.push([loc(r.tail, a0.x, a0.y, a0.z), loc(r.tail, a1.x, a1.y, a1.z), rad]);   /* (RS-459: and a tail, the cloak draped over it) */
-  const n = Math.max(1, Math.ceil(dt/(1/60))), h = dt/n, h2 = h*h, drag = Math.pow(0.12, h), tt = now;
-  const ties = u.ties, len = u.len, pin = u.pin, wl = u.wl, nt = len.length, seg = K.a, cp = K.b;
+  const n = Math.min(2, Math.max(1, Math.ceil(dt/(1/60)))), h = dt/n, h2 = h*h, drag = Math.pow(0.12, h), tt = now;
+  const ties = u.ties, len = u.len, pin = u.pin, wl = u.wl, nt = len.length, nc = caps.length, CB = (K.cb && K.cb.length >= nc*8) ? K.cb : (K.cb = new Float32Array(Math.max(64, nc*8)));
+  for (let q=0;q<nc;q++){ const [c0, c1, rad] = caps[q], o = q*8, sx = c1.x - c0.x, sy = c1.y - c0.y, sz = c1.z - c0.z; CB[o] = c0.x; CB[o+1] = c0.y; CB[o+2] = c0.z; CB[o+3] = sx; CB[o+4] = sy; CB[o+5] = sz; CB[o+6] = (sx*sx + sy*sy + sz*sz) || 1e-6; CB[o+7] = (rad + 0.008)*(rad + 0.008); }
   for (let s=0;s<n;s++){
     for (let i=0;i<N;i++){ const k = i*3; if (pin[i]){ P[k] = Q[k] = R[k]; P[k+1] = Q[k+1] = R[k+1]; P[k+2] = Q[k+2] = R[k+2]; continue; }
       const dn = -R[k+1]/H, br = (Math.sin(tt*1.3 + R[k]*9 + dn*3)*0.35 + Math.sin(tt*0.7 + 1.7)*0.25)*dn;   /* (a breath of air now and then, more at the hem) */
@@ -35095,12 +35108,14 @@ function m3dCapeCloth(c, r, dtIn, pre){
       for (let q=0;q<nt;q++){ const ia = ties[q*2], ib = ties[q*2+1], a = ia*3, b2 = ib*3, dx = P[b2] - P[a], dy = P[b2+1] - P[a+1], dz = P[b2+2] - P[a+2], d = Math.sqrt(dx*dx + dy*dy + dz*dz) || 1e-6;
         const wa = pin[ia] ? 0 : 1, wb = pin[ib] ? 0 : 1, ws = wa + wb; if (!ws) continue; const f = (d - len[q])/d/ws;
         P[a] += dx*f*wa; P[a+1] += dy*f*wa; P[a+2] += dz*f*wa; P[b2] -= dx*f*wb; P[b2+1] -= dy*f*wb; P[b2+2] -= dz*f*wb; }
+      if (it%2===0 && it < 5) continue;   /* (RS-461: the body is checked every other pass, and last) */
       for (let i=0;i<N;i++){ if (pin[i]) continue; const k = i*3;
         { const jr = Math.max(0, Math.min(NY, Math.round(-P[k+1]/H*NY))), z = wl[jr*W + i%W]; if (P[k+2] > z){ Q[k+2] -= P[k+2] - z; P[k+2] = z; } }   /* (against the back, at the height it's at now; RS-459: and stopped there, not bounced off it) */
-        for (const [c0, c1, rad] of caps){   /* (out behind a hip or a leg) */
-          seg.subVectors(c1, c0); const L2 = seg.lengthSq() || 1e-6; let t = ((P[k] - c0.x)*seg.x + (P[k+1] - c0.y)*seg.y + (P[k+2] - c0.z)*seg.z)/L2; t = Math.max(0, Math.min(1, t));
-          cp.copy(c0).addScaledVector(seg, t); const dx = P[k] - cp.x, dy = P[k+1] - cp.y, R2 = (rad + 0.008)*(rad + 0.008), dz = P[k+2] - cp.z;
-          if (dx*dx + dy*dy + dz*dz < R2){ const zz = cp.z - Math.sqrt(Math.max(0, R2 - dx*dx - dy*dy)); if (P[k+2] > zz){ Q[k+2] -= P[k+2] - zz; P[k+2] = zz; } } } } } }
+        for (let q=0;q<nc;q++){   /* (out behind a hip or a leg) */
+          const o = q*8, ax = CB[o], ay = CB[o+1], az = CB[o+2], sx = CB[o+3], sy = CB[o+4], sz = CB[o+5], L2 = CB[o+6], R2 = CB[o+7], px = P[k], py = P[k+1], pz = P[k+2];
+          let t = ((px - ax)*sx + (py - ay)*sy + (pz - az)*sz)/L2; t = t < 0 ? 0 : t > 1 ? 1 : t;
+          const cx = ax + sx*t, cy = ay + sy*t, cz = az + sz*t, dx = px - cx, dy = py - cy, dz = pz - cz;
+          if (dx*dx + dy*dy + dz*dz < R2){ const zz = cz - Math.sqrt(Math.max(0, R2 - dx*dx - dy*dy)); if (pz > zz){ Q[k+2] -= pz - zz; P[k+2] = zz; } } } } } }
   A.set(P); pos.needsUpdate = true; c.geometry.computeVertexNormals(); c.geometry.computeBoundingSphere();
 }
 /* (RS-457) a cloak pinned at the neck and shoulders: it no longer swings as one stiff sheet from its top edge - that lifted its yoke off the
@@ -38322,6 +38337,7 @@ function m3dSkirtFollow(r){
   const m = r.skirt, legs = r.legs; if (!m || !legs || legs.length < 2) return;
   const sw = legs.map(L=>L.hip.rotation.x), kn = legs.map(L=>L.knee.rotation.x), tilt = r.torso ? r.torso.rotation.x : 0, sig = sw[0]*7 + sw[1]*13 + kn[0]*17 + kn[1]*19 + tilt*23 + (r.hips ? r.hips.position.y*29 : 0);   /* (RS-291: the waist turns with the torso) */
   if (m.userData.own && Math.abs(sig - (m.userData.sig||0)) < 1e-4 && (r.seatBox ? r.seatBox.key : '')===(m.userData.seatKey||'')) return;
+  if (m.userData.own && !r.seatBox && (m.userData.tick = (m.userData.tick||0) + 1) % 2 && !m3dNearHero(r, m)) return;   /* (RS-461: folk away from you refold their robes every other frame) */
   m.userData.sig = sig; m.userData.seatKey = r.seatBox ? r.seatBox.key : '';
   if (!m.userData.own){ m.geometry = m.geometry.clone(); m.userData.own = true; m.userData.base = Float32Array.from(m.geometry.attributes.position.array); for (const c of m.children) if (c.userData.hemLayer) c.geometry = m.geometry; }   /* (RS-430: the rune layer takes the same copy) */
   const p = m.geometry.attributes.position, base = m.userData.base, y0 = m.position.y, hipY = legs[0].hip.position.y, ct = Math.cos(tilt), st = Math.sin(tilt);
@@ -38493,7 +38509,7 @@ function m3dPoseHumanoid(r, t, moving, wind, strike, hurt, e){
   r.head.rotation.x = -0.05 + breath*0.02 + hurt*0.3 - (r.hunch ? 0.4 : 0) - (r.stoop||0)*0.45 - (r.headBack||0) + (r.zombie ? 0.25 + Math.sin(t*0.8)*0.1 : 0); r.head.rotation.y = Math.sin(t*0.7)*0.15; r.head.rotation.z = r.zombie ? Math.sin(t*0.6)*0.2 : 0;
   if (r.wings) r.wings.forEach(W=>{ W.w.rotation.y = W.s*(-0.5 + Math.sin(t*(e.lift ? 7 : 2.5))*0.35); });
   if (r.tail) r.tail.rotation.z = Math.sin(t*2.4)*0.3;
-  if (r.cape){ if (r.cape.userData.grid) m3dCapeCloth(r.cape, r); else m3dCapeSwing(r.cape, 0.05 + moving*0.3 + Math.sin(t*1.5)*0.04 + strike*0.15, Math.sin(m3dStride(e, t, moving))*0.06*moving + Math.sin(t*0.9)*0.02); }
+  if (r.cape){ if (m3dClothOn(r)) m3dCapeCloth(r.cape, r); else { const cu = r.cape.userData; if (cu.P){ cu.P = null; cu.ax = undefined; } if ((cu.tick = (cu.tick||0) + 1) % 2) m3dCapeSwing(r.cape, 0.05 + moving*0.3 + Math.sin(t*1.5)*0.04 + strike*0.15, Math.sin(m3dStride(e, t, moving))*0.06*moving + Math.sin(t*0.9)*0.02); } }
   if (r.swing && (wind || strike)) m3dPoseSwing(r, wind, strike);
   if (r.wk==='bow' && (wind || strike)) m3dPoseBow(r, wind, strike);
   if (r.skirt) m3dSkirtFollow(r);
@@ -41107,7 +41123,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-460';
+const GAME_VERSION = 'rs-461';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

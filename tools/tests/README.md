@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs461 | Only you and folk near you wear simulated cloth; distant folk swing their cloaks the cheap way and still move |
 | rs460 | Dyeing the Visage of the Sage recolours the hat at once; washing it out brings back its indigo |
 | rs459 | A cloak stays calm through snap turns, lunges and fast runs, stays out of the body, and drapes over dragon and tiefling tails |
 | rs458 | A cloak is cloth: pinned at the neck and shoulders, it hangs, trails behind as you walk, settles, and stays out of the body and legs |
