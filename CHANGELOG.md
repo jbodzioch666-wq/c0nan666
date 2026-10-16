@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-457 - Cloaks pinned at the shoulders
+
+- **No more floating cloaks.** As you walked, your cloak swung out as one stiff sheet from its top edge. That lifted it off your shoulders and left it floating behind them. Now it's pinned at the neck and shoulders: its top stays laid over them, and only the part below your shoulder blades billows out, more the further down, so it bends like cloth. Sitting at your campfire it drapes the same way.
+
 ## RS-456 - The sage's hat
 
 - **Uniques made of the right stuff.** A unique piece of armour took a random base, so the Visage of the Sage, all magic, could come out as a steel Full Helm. Now what a unique is made of follows its name and its strongest stat:

@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs457 | A cloak stays pinned at the neck and shoulders; only the part below the shoulder blades swings |
 | rs456 | A unique armour piece's material follows its name or strongest stat; the Visage of the Sage is a wizard's hat with its own look, old ones fixed on load |
 | rs455 | No orb-from-glass recipe; the unpowered orb comes from a silver bar |
 | rs454 | The D&D ability score improvements and feats are gone; an old save with feats loads and plays without them |
