@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-450 - Skeleton archers' arrows
+
+- **See the arrows fly.** When your skeleton archer shot, you only saw the hit land on its target. Now each arrow flies from the archer to its foe, as yours do, and sticks in what it hits.
+
 ## RS-449 - A line in the cave pool, the tome put away
 
 - **Fishing line in the caves.** Fishing a cave pool down in a dungeon, you held the rod but no line came off it. Now the line runs from the rod's tip down to the pool, sagging, with a red float bobbing on the water, as it does on the open land.

@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs450 | A skeleton archer's arrows fly from it to its foe |
 | rs449 | Fishing a cave pool shows the line from rod tip to float; a tome shuts whenever the weapon is put away |
 | rs448 | Any part of a shopkeeper's counter opens the shop when clicked |
 | rs444 | (RS-446: the round step back, no band under the rose's points; RS-447: no gaps between them) The compass rose is a stone step of bevelled two-tone points under the waypoint, which stands a step higher on it |
