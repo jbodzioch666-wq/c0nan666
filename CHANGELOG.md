@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-437 - Meetings you can see
+
+- **People on the road are there to be seen.** The lost child, the travelling wizard, the sandwich lady, the genie, the dwarf and the highwaymen used to spring on you out of nowhere as you walked. Now, when one turns up, they're a few leagues off, by the road if there's one near, and the log tells you which way. They wait there, as figures you can see with a ? over them, for you to walk up and meet them. If you don't, they move on after a while.
+- **The skeleton with the note.** The skeleton in rusted mail that starts *A Note on the Bones* now lies where you can see it, half-buried by the path with the note in its hand and its sword beside it. Walk onto it to search it.
+- **The weeping ghost.** On a night when you pass a graveyard, the ghost that starts *The Weeping Ghost* hovers at the graveyard's edge where you can see it.
+
 ## RS-436 - Quest places you can see
 
 - **Story quests mark real places.** When a story quest sent you somewhere out in the wilds, all you found there was a floating ! over empty grass. Now there's something to find:

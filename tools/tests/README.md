@@ -25,7 +25,8 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
-| rs436 | A story quest's place in the wilds is drawn as a scene (the Goblin King's hall and nine others), not just a ! |
+| rs437 | Someone on the road turns up a few leagues off and waits to be met; a skeleton with its note lies where you can see it, to be searched |
+| rs437 | A story quest's place in the wilds is drawn as a scene (the Goblin King's hall and nine others), not just a ! |
 | rs435 | The loot filter salvages Gilded armour by tier and bonus; real rare, set and locked pieces stay kept |
 | rs434 | Ambushes while camping or gathering are real roamers that come for you - seen first, closing in as you move or work, stopping your work, fighting when they reach you, losing your trail if outrun |
 | rs433 | A treasure map's X and a clue scroll's spot are marked on the world map, the minimap and the ground; reading there digs up the casket or moves the trail on |
