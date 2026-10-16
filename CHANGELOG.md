@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-464 - Bolts, darts and knives can be made
+
+- **The missing recipes:** bolts, darts, throwing knives, broad bolts and fire arrows had recipes, but no bench showed them, so they couldn't be made anywhere. They're now at the fletching bench in the Tailor's workshop, beside the arrows. Bolts take one metal bar for 12; darts take one bar for 15 and knives one bar for 8.
+- **Every recipe has a bench:** a new check makes sure no recipe is ever stranded like this again.
+
 ## RS-463 - Tooltips that tell the truth
 
 - **Runes:** no tooltip sends you to the alchemist any more; he stopped selling runes in RS-369. A rune's tooltip now lists the altar that binds it and where that altar stands, the temple's rune counter and its price (for the basic five), and the combat level monsters start dropping it.

@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs464 | Every recipe row has a bench; bolts, darts, knives and special ammo are made at the fletching bench |
 | rs463 | No resource tooltip reads undefined, sends you to the alchemist for runes or quotes an old-tier level; the skill guides match the game |
 | rs462 | No D&D ability scores: none on the sheet or in the save, none rolled on gear, old score bonuses folded into gear bonuses |
 | rs461 | Only you and folk near you wear simulated cloth; distant folk swing their cloaks the cheap way and still move |
