@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-468 - Wood elves look ahead
+
+- **Head level again:** a wood elf's head was tipped about 23 degrees up toward the sky. The head was lifted to make up for the curve of its stooped back, and lifted far too much. Now its stooped back stays, and its face looks straight ahead, standing or walking, the way anyone else's does.
+
 ## RS-467 - Shields worn on the forearm
 
 - **Strapped on like a real shield:** a shield sits on the outside of your left forearm, the arm along its back, your fist near its top edge and its point past your elbow. It used to be held out on the end of your fist like a tray.

@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs468 | A stooped wood elf's face looks ahead like a human's, not up |
 | rs467 | A shield is strapped to the forearm and, raised, covers the body face out and point down |
 | rs466 | Metal full helms are closed great helms and kiteshields metal kites, each tier finer than the last |
 | rs465 | Two-handed weapons keep the left hand on the grip through guard and blow, each with its own blow; wizard staves stay one-handed |
