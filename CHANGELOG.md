@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-460 - The Sage's hat takes a dye
+
+- **Dyeing the Visage of the Sage works:** the hat's indigo was fixed in place, so a dye was used up but never showed. Now it takes the dye's colour the moment you dye it, and keeps its band, gem, moon and stars. Washing it out brings the indigo back.
+- **The dye works shows it right:** its colour swatch shows the hat's real colour.
+
 ## RS-459 - Calmer cloaks, draped over tails
 
 - **No more wild bouncing:** turning on the spot, lunging or running fast used to whip the cloak round faster than it could follow, so it bounced about and went through you. Now it follows a fast body at a cloth's pace, and comes to rest when it touches you instead of bouncing off.
