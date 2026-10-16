@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-441 - Windows that fit
+
+- **Braces clear of the windows.** On the half-timbered houses, the diagonal braces were set in a checkerboard that ignored where the windows were. On a narrow house like the Alchemist they ran straight across the glass. Now a brace only goes in a bay without a window.
+- **Shutters that open properly.** Both shutters on a window used to angle the same way, and on a side wall they stuck straight out from it. Now they swing open either way, close against the wall. This fixes every timber house in town, not just the Alchemist.
+
 ## RS-440 - The XP tracker while you cook
 
 - **Cooking shows on the XP tracker.** The tracker only showed out in the world and hid whenever a menu was open. The cooking panel stays open while you cook, so you never saw your cooking xp climb. Now the tracker shows while you're working through a batch, whether cooking at a fire or a hearth, or smelting, forging, brewing or crafting at a bench. While you cook it sits below the small cooking card in the corner, and it goes back to its place when you're done.
