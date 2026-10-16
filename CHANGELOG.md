@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-433 - X marks the spot
+
+- **Treasure maps and clue scrolls are marked.** Reading a treasure map, or a clue scroll that sends you somewhere, said the spot was on your map, but all it did was lift the fog around it, with nothing to show where the spot actually was. Now there's an X: a red one in a parchment ring on the world map, one on the minimap, and on the land itself red paint on the ground with a red X turning slowly above it, so you can see it from a distance. Stand on it and read the map to dig up the casket, or read the clue to move the trail on.
+
 ## RS-432 - Frogs, birds and beasts fall properly
 
 - **Frogs and birds slump.** A dead frog or toad tipped over onto its side and lay there, and a bird like the giant vulture stood on its legs through the floor. Now they slump where they die, belly down: a frog's legs splay out flat, and a bird folds its legs under it, pitches onto its breast and lets its wings droop to the ground.
