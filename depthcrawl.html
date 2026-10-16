@@ -3442,7 +3442,6 @@ function buildPlayer(){
     rageTurns: 0,                 // Barbarian Rage: bonus melee dmg + damage resistance
     huntersMarkIdx: -1,           // Ranger Hunter's Mark: index of the marked monster
     smitePrimed: 0,                // Paladin Divine Smite: which slot level was spent, primed for the next hit
-    pendingASI: 0,                 // Ability Score Improvements owed (levels 4/8/12/16/19)
     buffACTurns: 0, buffACAmt: 0,   // a buffSelf spell's AC bonus (Mage Armor, Shield of Faith, ...)
     buffAtkTurns: 0, buffAtkAmt: 0, // a buffSelf spell's attack bonus (Bless, Magic Weapon, ...)
     hasteTurns: 0,                  // Haste/Swift Quiver: one extra attack per turn (see playerAttackCount)
@@ -3457,13 +3456,11 @@ function buildPlayer(){
     killCount: 0, questsDone: 0, campCount: 0, bestDepth: 0, turnCount: 0, clock: 60,   // (a new hero wakes mid-morning)
     corruption: 0,                    // risk/reward meter - see gainCorruption()/corruptionBonus()
     bossKills: {dungeon:0, castle:0, necro:0, temple:0, graveyard:0, mine:0, lair:0},
-    feats: [],                       // feat ids taken instead of a flat ASI - see FEATS
     subclass: null,                  // subclass id chosen at level 3 - see SUBCLASSES
     companion: null,                 // Ranger companion / Warlock familiar / Druid spirit object, or null
     familiarTierSeen: 0,              // how many familiar/companion tiers the player has already been offered a pick for
     summon: null,                     // a temporary ally from a Conjure-style spell - see spawnSummon()/'summon' spell kind
     ngPlus: 0,                       // New Game+ tier - see ascendNewGamePlus()
-    luckyCharges: 0,                 // rerolls banked by the Lucky feat, refilled on rest
     arrows: 0,                       // ammo for an equipped bow - see WEAPONS' ranged rows/buyArrows/rangedAttack
   };
   G.player.look = Object.assign(lookDefault(race[0]), G.ccLook || {});
@@ -3550,12 +3547,12 @@ function raceBonusF(k){
 function gearStatI(k){
   let t=0;
   for (const key of GEAR_KEYS) t += afSumI(G.gear[key], k);
-  return t + setBonusI(k) + subclassBonusI(k) + featBonusI(k) + raceBonusI(k) + achievementBonusI(k);
+  return t + setBonusI(k) + subclassBonusI(k) + raceBonusI(k) + achievementBonusI(k);
 }
 function gearStatF(k){
   let t=0;
   for (const key of GEAR_KEYS) t += afSumF(G.gear[key], k);
-  return t + setBonusF(k) + subclassBonusF(k) + featBonusF(k) + raceBonusF(k) + achievementBonusF(k);
+  return t + setBonusF(k) + subclassBonusF(k) + raceBonusF(k) + achievementBonusF(k);
 }
 function statBonus(ky){ return gearStatI(ky) + gearStatI('allstat'); }
 function effStat(ky){ return baseStat(ky) + statBonus(ky); }
@@ -3639,10 +3636,6 @@ function proficiencyBonus(level){
 // Rogue (who gets Cunning Action instead) never get this
 const EXTRA_ATTACK_CLASSES = ['Fighter','Barbarian','Ranger','Paladin'];
 // playerAttackCount(): replaced by the RuneScape rules - see SECTION: RUNESCAPE RULES
-// levels at which a D&D character gets an Ability Score Improvement: +2 to
-// one ability score, or +1 to two - queued via G.player.pendingASI and
-// resolved through the 'asi' UI screen (see checkPendingLevelUpScreens/buildASI/asiBump)
-const ASI_LEVELS = [4,8,12,16,19];
 // D&D characters cap out at level 20 - matches this game's monster roster,
 // which tops out at level 20 (the ancient dragon) for the exact same reason
 const MAX_CHAR_LEVEL = 20;
@@ -3650,77 +3643,7 @@ const NGPLUS_CB = 123;   /* (RS-240) New Game+ opens at combat level 123 */
 
 // gainXP(): replaced by the RuneScape rules - see SECTION: RUNESCAPE RULES
 
-// ===================== SECTION: ABILITY SCORE IMPROVEMENT =====================
-// a D&D character spends 2 points at each ASI level: both on one score
-// (capped at +2 per score per ASI) or split 1/1 across two scores
-const ASI_KEYS = ['str','dex','con','int','wis','cha'];
-const ASI_LABELS = {str:'STR',dex:'DEX',con:'CON',int:'INT',wis:'WIS',cha:'CHA'};
-function asiTotalPicked(){ return ASI_KEYS.reduce((t,k)=>t+((G.asiPicks&&G.asiPicks[k])||0), 0); }
-// called at the end of every player turn (see tickMonsters), and again after
-// each level-up interstitial resolves - chains ASI first, then any new
-// spells owed, so a big multi-level-up kill walks through both in order
-// before handing control back to the player
-// checkPendingLevelUpScreens(): replaced by the RuneScape rules - see SECTION: RUNESCAPE RULES
-function asiBump(k){
-  if (!G.asiPicks) G.asiPicks = {};
-  if (asiTotalPicked()>=2) return; // both points already spent this ASI
-  const cur = G.asiPicks[k]||0;
-  if (cur>=2) return; // can't put more than +2 into one score from a single ASI
-  G.asiPicks[k] = cur+1;
-  renderOverlay();
-}
-function asiReset(){ G.asiPicks = {}; renderOverlay(); }
-function asiConfirm(){
-  if (asiTotalPicked()<2) return; // must allocate both points first
-  const oldConMod = md(effStat('con'));
-  for (const k of ASI_KEYS){
-    const pts = G.asiPicks[k]||0;
-    if (pts<=0) continue;
-    if (k==='int') G.player.intel += pts; else G.player[k] += pts;
-  }
-  const newConMod = md(effStat('con'));
-  if (newConMod>oldConMod){
-    // a retroactive CON bump raises every hit die you've already rolled,
-    // exactly like a real D&D character recalculating max HP after an ASI
-    const bonus = (newConMod-oldConMod)*G.player.level;
-    G.player.maxHp += bonus;
-    G.player.hp += bonus;
-    logMsg(`your increased Constitution retroactively grants +${bonus} max HP`, 'good');
-  }
-  logMsg('Ability Score Improvement applied!', 'good');
-  G.player.pendingASI = mx(0, (G.player.pendingASI||0)-1);
-  G.asiPicks = {};
-  saveCurrentGame();
-  if (G.player.pendingASI>0) renderOverlay(); // another ASI queued (e.g. multiple level-ups from one big kill) - stay here
-  else { setUi('playing'); checkPendingLevelUpScreens(); } // chain into a spell-pick screen if one is owed too
-}
-function buildASI(){
-  if (!G.asiPicks) G.asiPicks = {};
-  const rows = ASI_KEYS.map((k,i)=>{
-    const base = effStat(k);
-    const picked = G.asiPicks[k]||0;
-    const preview = picked ? ` &rarr; <b style="color:var(--amber)">${base+picked}</b>` : '';
-    return `<div class="choice-row" onclick="asiBump('${k}')">
-      <span class="key">${i+1}</span><span style="min-width:60px;display:inline-block;">${ASI_LABELS[k]}</span>
-      <span class="muted">${base}${preview}</span>
-    </div>`;
-  }).join('');
-  const total = asiTotalPicked();
-  return `
-    <h2 class="panel-title">ABILITY SCORE IMPROVEMENT</h2>
-    <div class="sub">level ${G.player.level}: spend 2 points - both on one score, or split across two (1-6, R to reset)</div>
-    <div class="ovbody">
-      ${rows}
-      <div class="row" style="margin-top:10px;"><span class="muted">points remaining: ${2-total}</span></div>
-      <div class="btnrow">
-        <button class="btn" onclick="asiReset()">RESET</button>
-        <button class="btn primary" ${total<2?'disabled':''} onclick="asiConfirm()">CONFIRM</button>
-        ${availableFeats().length ? `<button class="btn" onclick="setUi('featpick')">TAKE A FEAT INSTEAD</button>` : ''}
-      </div>
-    </div>
-  `;
-}
-
+/* (RS-454) the D&D ability score improvements and feats are gone: nothing has offered them since levels came from the skills */
 // ===================== SECTION: SUBCLASSES =====================
 // chosen once, at character level 3, exactly like a real D&D subclass - a
 // light permanent passive rather than a whole new feature, expressed in the
@@ -3805,84 +3728,6 @@ function buildSubclass(){
     <h2 class="panel-title">CHOOSE YOUR PATH</h2>
     <div class="sub">level ${G.player.level}: a ${esc(G.player.cls)} commits to a path - this choice is permanent</div>
     <div class="ovbody">${rows}</div>
-  `;
-}
-
-// ===================== SECTION: FEATS =====================
-// a real D&D character can take a feat instead of an Ability Score
-// Improvement at any ASI level - offered as an extra button right on the
-// 'asi' screen. Most feats are a small permanent passive in the same affix
-// vocabulary subclasses use (see featBonusI/F below); Lucky is the one
-// exception, banking real reroll charges rather than a flat number
-const FEATS = [
-  { id:'tough', name:'Tough', desc:'your hit point maximum increases', bonus:{life:20} },
-  { id:'alert', name:'Alert', desc:'always ready for danger - bonus to hit', bonus:{atk:2} },
-  { id:'resilient', name:'Resilient', desc:'a well-rounded body - bonus damage reduction', bonus:{resist:6} },
-  { id:'prodigy', name:'Prodigy', desc:'a natural gift - +1 to every ability score', bonus:{allstat:1} },
-  { id:'lucky', name:'Lucky', desc:'fate favors you - banks 3 reroll charges for a missed swing, refilled on a full rest', bonus:{} },
-  // only offered to a class that can actually benefit from either half of
-  // it (see eligible below) - gated by SPELL-LIST access to a 'summon'-kind
-  // spell, not by whether the player has actually picked one, since a
-  // Ranger's Conjure Animals is available regardless of Hunter vs. Beast
-  // Master, and a subclass choice at level 3 always resolves before the
-  // earliest feat offer at level 4 anyway
-  { id:'bondedSpirit', name:'Bonded Spirit', desc:'a deeper bond with the wild and the beyond - your familiar/companion hits harder, and any summoned ally fights at your side 2 turns longer', bonus:{},
-    eligible: cls => !!FAMILIAR_CLASS_TIERS[cls] || classHasSummonSpell(cls) },
-];
-// true if this class's own spell list (SPELLS[cls], any level) contains at
-// least one 'summon'-kind entry - Ranger/Druid/Sorcerer/Warlock as of v105
-function classHasSummonSpell(cls){
-  const list = SPELLS[cls];
-  if (!list) return false;
-  return Object.values(list).some(lvlSpells => lvlSpells.some(s=>s.kind==='summon'));
-}
-function hasFeat(id){ return (G.player.feats||[]).includes(id); }
-function availableFeats(){ return FEATS.filter(f=>!hasFeat(f.id) && (!f.eligible || f.eligible(G.player.cls))); }
-function featBonusI(k){
-  let t=0;
-  for (const id of (G.player.feats||[])){
-    const f = FEATS.find(x=>x.id===id);
-    if (f && !SUBCLASS_FRACTION_KEYS[k]) t += f.bonus[k]||0;
-  }
-  return t;
-}
-function featBonusF(k){
-  let t=0;
-  for (const id of (G.player.feats||[])){
-    const f = FEATS.find(x=>x.id===id);
-    if (f && SUBCLASS_FRACTION_KEYS[k]) t += f.bonus[k]||0;
-  }
-  return t;
-}
-function featChoose(idx){
-  if ((G.player.pendingASI||0)<=0) return;
-  const feat = availableFeats()[idx];
-  if (!feat) return;
-  G.player.feats = G.player.feats||[];
-  G.player.feats.push(feat.id);
-  if (feat.id==='lucky') G.player.luckyCharges = 3;
-  G.player.pendingASI = mx(0, (G.player.pendingASI||0)-1);
-  G.asiPicks = {};
-  logMsg(`you gain the ${feat.name} feat!`, 'good');
-  saveCurrentGame();
-  if (G.player.pendingASI>0) setUi('asi'); // another ASI queued - offer the choice again
-  else { setUi('playing'); checkPendingLevelUpScreens(); }
-}
-function featPickBack(){ setUi('asi'); }
-function buildFeatPick(){
-  const feats = availableFeats();
-  const rows = feats.map((f,i)=>`
-    <div class="choice-row" onclick="featChoose(${i})">
-      <span class="key">${i+1}</span>
-      <span style="min-width:100px;display:inline-block;">${esc(f.name)}</span>
-      <span class="muted">${esc(f.desc)}</span>
-    </div>`).join('');
-  return `
-    <h2 class="panel-title">TAKE A FEAT</h2>
-    <div class="sub">level ${G.player.level}: choose a feat instead of an Ability Score Improvement</div>
-    <div class="ovbody">${rows}
-      <div class="btnrow"><button class="btn" onclick="featPickBack()">BACK &middot; take the ability score bump instead</button></div>
-    </div>
   `;
 }
 
@@ -3992,7 +3837,7 @@ function familiarTiersUnlocked(){
   return tiers.filter(t=>cbT()>=t.atLevel);
 }
 function companionDef(c){ return COMPANION_KINDS[c.kind]; }
-function companionAtkBonus(def){ return def.atkBonus + Math.floor(cbT()/4) + (hasFeat('bondedSpirit') ? 2 : 0); }
+function companionAtkBonus(def){ return def.atkBonus + Math.floor(cbT()/4); }
 function spawnCompanion(kind){
   const def = COMPANION_KINDS[kind];
   if (!def || G.player.companion) return;
@@ -4241,7 +4086,7 @@ function spawnSummon(spell){
   // the Bonded Spirit feat extends a summon's duration - applied here at
   // cast time (not baked into mkSummon itself, which runs once at script
   // load, long before any player/feat context exists)
-  const turns = spell.turns + (hasFeat('bondedSpirit') ? 2 : 0);
+  const turns = spell.turns;
   G.player.summon = { nm, sym:'*', col:COL.purple, ac:spell.ac, atkBonus:spell.atkBonus, dmg1:spell.dmg1, dmg2:spell.dmg2, turnsLeft:turns };
   placeSummonNearPlayer();
   // deliberately no conjugated verb tied to nm ("...answers"/"...answer") -
@@ -4341,7 +4186,7 @@ function ascendNewGamePlus(){
   p.familiarTierSeen = 0;
   p.summon = null;
   p.knownSpells = []; p.spellSlots = []; p._spellSlotsMax = [];
-  p.pendingSpellPicks = 0; p.pendingASI = 0;
+  p.pendingSpellPicks = 0;
   p.sneakPrimed = 0; p.huntersMarkIdx = -1; p.smitePrimed = 0;
   p.poisonTurns=0; p.poisonDmg=0; p.stunTurns=0; p.frightenedTurns=0; p.rageTurns=0;
   p.buffACTurns=0; p.buffACAmt=0; p.buffAtkTurns=0; p.buffAtkAmt=0;
@@ -4367,7 +4212,7 @@ function buildNgPlus(){
     <h2 class="panel-title">ASCEND TO NEW GAME+</h2>
     <div class="sub">you have reached level ${MAX_CHAR_LEVEL} - the pinnacle of mortal power</div>
     <div class="ovbody">
-      <div>ascending resets your level, spells, subclass, companion and gear back to the start - but you keep your ability scores, feats, gold, and everything you've unlocked</div>
+      <div>ascending resets your level, spells, subclass, companion and gear back to the start - but you keep your ability scores, gold, and everything you've unlocked</div>
       <div style="margin-top:8px;color:${COL.amber};">every monster hits harder and pays out more from here on, and it stacks with each ascension (currently New Game+ ${p.ngPlus||0} &rarr; ${(p.ngPlus||0)+1})</div>
       <div class="btnrow">
         <button class="btn primary" onclick="ascendPlusConfirm()">ENTER &middot; ascend</button>
@@ -6399,15 +6244,6 @@ function singlePlayerAttack(mi){
   const effAC = m.ac - ((m.debuffACTurns>0) ? (m.debuffACAmt||0) : 0);
 
   if (!sneak && !incapacitated && !verac && !sure && (roll===1 || atkTotal < effAC)){
-    // the Lucky feat: banks real reroll charges (refilled on a full rest,
-    // see fullyRestPlayer) rather than a flat passive number, so a miss
-    // spends one automatically before it's locked in as a miss
-    if (hasFeat('lucky') && (G.player.luckyCharges||0)>0){
-      G.player.luckyCharges--;
-      roll = rollDie(20);
-      atkTotal = rsAttackTotal(roll, m, atkType) + extraHit;
-      logMsg('a lucky reroll turns your swing around!', 'magic');
-    }
     if (!sneak && (roll===1 || atkTotal < effAC)){
       logMsg(`you ${atkType==='ranged' ? (W && W.thrown ? 'throw at' : 'shoot at') : 'swing at'} the ${m.nm} and miss (${atkTotal} vs AC ${effAC})`, '');
       sfx('miss'); fxSplat(m.x+0.5, m.y+0.5, '0', 'block');
@@ -7543,7 +7379,6 @@ function loadGame(id){
   if (G.player.rageTurns===undefined) G.player.rageTurns = 0;
   if (G.player.huntersMarkIdx===undefined) G.player.huntersMarkIdx = -1;
   if (G.player.smitePrimed===undefined) G.player.smitePrimed = 0;
-  if (G.player.pendingASI===undefined) G.player.pendingASI = 0;
   if (G.player.buffACTurns===undefined){ G.player.buffACTurns=0; G.player.buffACAmt=0; }
   if (G.player.buffAtkTurns===undefined){ G.player.buffAtkTurns=0; G.player.buffAtkAmt=0; }
   // saves from before the bespoke-spell-effects pass won't have these either
@@ -7561,12 +7396,10 @@ function loadGame(id){
   // update simply have never seen any of it yet
   if (G.player.codexSeen===undefined) G.player.codexSeen = [];
   if (G.player.achievements===undefined) G.player.achievements = [];
-  if (G.player.feats===undefined) G.player.feats = [];
   if (G.player.subclass===undefined) G.player.subclass = null;
   if (G.player.companion===undefined) G.player.companion = null;
   if (G.player.summon===undefined) G.player.summon = null;
   if (G.player.ngPlus===undefined) G.player.ngPlus = 0;
-  if (G.player.luckyCharges===undefined) G.player.luckyCharges = 0;
   if (G.player.killCount===undefined) G.player.killCount = 0;
   if (G.player.questsDone===undefined) G.player.questsDone = 0;
   if (G.player.campCount===undefined) G.player.campCount = 0;
@@ -9329,11 +9162,10 @@ function generateVillageShop(){
 function fullyRestPlayer(){
   const maxSlots = spellSlotsMaxTable(G.player.cls, G.player.level);
   const slotsFull = !isCaster(G.player.cls) || (G.player.spellSlots||[]).every((n,i)=> n>=maxSlots[i]);
-  const luckyFull = !hasFeat('lucky') || (G.player.luckyCharges||0)>=3;
   // wands are deliberately excluded here - their 50 charges are a
   // permanently-depleting resource, not a per-rest one like class charges
   // or spell slots (see useFromInv/WANDS)
-  const alreadyFull = G.player.hp>=effMaxHp() && G.player.charges>=G.player.maxCharges && slotsFull && luckyFull
+  const alreadyFull = G.player.hp>=effMaxHp() && G.player.charges>=G.player.maxCharges && slotsFull
       && G.player.poisonTurns<=0 && G.player.stunTurns<=0 && G.player.frightenedTurns<=0
       && G.player.rageTurns<=0 && G.player.huntersMarkIdx===-1 && G.player.smitePrimed<=0
       && G.player.buffACTurns<=0 && G.player.buffAtkTurns<=0
@@ -9343,7 +9175,6 @@ function fullyRestPlayer(){
   G.player.hp = effMaxHp(); G.player.charges = G.player.maxCharges;
   G.player.prayPts = rsLvl('prayer');
   if (isCaster(G.player.cls)) G.player.spellSlots = maxSlots.slice();
-  if (hasFeat('lucky')) G.player.luckyCharges = 3;
   G.player.poisonTurns = 0; G.player.poisonDmg = 0; G.player.stunTurns = 0; G.player.frightenedTurns = 0;
   G.player.rageTurns = 0; G.player.huntersMarkIdx = -1; G.player.smitePrimed = 0;
   G.player.buffACTurns = 0; G.player.buffAtkTurns = 0;
@@ -41125,10 +40956,8 @@ function renderOverlay0(){
     case 'victory': el.innerHTML = buildVictory(); break;
     case 'death': el.innerHTML = buildDeath(); break;
     case 'help': el.innerHTML = buildHelp(); helpPaintBadges(); break;
-    case 'asi': el.innerHTML = buildASI(); break;
     case 'subclass': el.innerHTML = buildSubclass(); break;
     case 'familiarpick': el.innerHTML = buildFamiliarPick(); break;
-    case 'featpick': el.innerHTML = buildFeatPick(); break;
     case 'ngplus': el.innerHTML = buildNgPlus(); break;
     case 'spellpick': el.innerHTML = buildSpellPick(); break;
     case 'achievements': el.innerHTML = buildAchievements(); break;
@@ -41163,7 +40992,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-453';
+const GAME_VERSION = 'rs-454';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -43515,12 +43344,6 @@ function handleKeydown(e){
     case 'settings': { if (k==='Escape') setUi(G.setBack||'playing'); break; }
     case 'stats': { if (k==='Escape' || k==='l' || k==='L') setUi(G.statsBack||'playing'); break; }
     case 'memorial': { if (k==='Escape' || k==='Enter') setUi('titleScreen'); break; }
-    case 'asi': {
-      if (k>='1' && k<='6') asiBump(ASI_KEYS[k.charCodeAt(0)-49]);
-      else if (['r','R'].includes(k)) asiReset();
-      else if (k==='Enter' && asiTotalPicked()>=2) asiConfirm();
-      break;
-    }
     case 'subclass': {
       if (k>='1' && k<='9') chooseSubclass(k.charCodeAt(0)-49);
       break;
@@ -43532,11 +43355,6 @@ function handleKeydown(e){
         if (t) familiarPickChoose(t.kind);
       }
       else if (k==='Escape') familiarPickBack();
-      break;
-    }
-    case 'featpick': {
-      if (k>='1' && k<='9') featChoose(k.charCodeAt(0)-49);
-      else if (k==='Escape') featPickBack();
       break;
     }
     case 'ngplus': {

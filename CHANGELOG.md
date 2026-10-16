@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-454 - Feats removed
+
+- **No more feats.** The old D&D ability score improvements and feats haven't been offered since your level started coming from your skills, but their code and their effects were still in the game. They're gone now: the screens, the Lucky reroll, Tough's extra life, Bonded Spirit and the rest. A character saved with feats from long ago loads and plays as normal, just without them.
+
 ## RS-453 - Fair upgrade arrows, bonuses on show
 
 - **Arrows judge the gear itself.** The green and red arrows counted a piece's random bonuses heavily. A single +17% damage bonus outweighed a whole tier of metal, so a better weapon you'd just forged showed as a downgrade from an old one that had grown bonuses. Now the arrows compare only a piece's own stats: damage, attack, strength, defence, magic, ranged and prayer.
