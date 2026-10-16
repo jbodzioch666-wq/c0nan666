@@ -1,5 +1,27 @@
 # Depthcrawl patch notes
 
+## RS-466 - Knightly helms and shields
+
+- **Closed helms:** every metal full helm is now a closed great helm like the knights wear, and it gets finer with each tier:
+  - **Bronze:** plain.
+  - **Iron:** polished bands round its rim and crown, and a strip down its face.
+  - **Steel:** a red plume.
+  - **Mithril:** a white plume.
+  - **Adamant:** gold bands.
+  - **Rune:** gold wings.
+  - **Dragon:** curved horns in gold sockets and a dark red crest.
+  The old kettle, dwarf, winged and horned helms are gone from players' metal helms.
+- **Real kite shields:** every metal kiteshield is now a metal-faced kite shield, finer each tier:
+  - **Bronze:** plain.
+  - **Iron:** a cross in a darker tone.
+  - **Steel:** a silver cross.
+  - **Mithril:** a gold cross and a gold rim.
+  - **Adamant:** a chevron and a domed boss.
+  - **Rune:** a saltire.
+  - **Dragon:** a chevron, a boss and spikes round its rim.
+  Bronze used to show a round shield.
+- **Dyes still work:** a dyed helm or shield keeps its new look in the dye's colour.
+
 ## RS-465 - Two-handed weapons swung with both hands
 
 - **Both hands on the weapon:** greatswords, great axes, halberds, spears, tridents and quarterstaffs are now held and swung with both hands. The left hand closes on the grip below the right hand, or further down the shaft, and stays there through the guard and the whole blow. It used to dangle beside the body.
