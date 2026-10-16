@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-449 - A line in the cave pool, the tome put away
+
+- **Fishing line in the caves.** Fishing a cave pool down in a dungeon, you held the rod but no line came off it. Now the line runs from the rod's tip down to the pool, sagging, with a red float bobbing on the water, as it does on the open land.
+- **The tome shuts with your weapon.** A spell tome only shut out of a fight, so it could stand open in your hand while your staff was on your back. Now it shuts whenever your weapon is put away, and opens again when you draw it.
+
 ## RS-448 - The whole counter serves you
 
 - **Click anywhere on the counter.** Inside a shop, only the shopkeeper themselves could be clicked or tapped, so clicking the counter beside them just walked you to the floor nearby. Now every part of the counter opens the shop: you step up to it and are served.
