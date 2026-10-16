@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-431 - Finer armour, tier by tier
+
+- **Every tier looks finer than the last.** Your body armour now builds up as you climb the tiers: each keeps everything the tier below had and adds something more.
+  - **Plate:** shoulder pads (Bronze), rivets on the breastplate (Iron), polished trim on the pads, collar and belt (Steel), a tabard down the front (Mithril), an emblem on it (Adamant), gold trim and a gold emblem (Rune), and black spikes on a dark tabard (Dragon).
+  - **Leather and dragonhide:** plain (Leather), shoulder pads (Hard), studs (Studded), trim in a lighter tone of the hide (Green), a fur collar (Blue), silver trim (Red), and spikes with a dark fur collar (Black).
+  - **Robes:** a plain robe and sash (Wizard), a trim band at the hem and collar (Splitbark), glowing blue runes (Mystic), gold trim and gold runes (Infinity), and a shoulder mantle edged in gold with green runes (Ahrim's).
+- **Trim that moves with the robe.** A robe's hem band is stitched into the skirt like its runes, so it swings with it. It used to be a stiff ring round the hips that hid inside the skirt's flare.
+
 ## RS-430 - Runes stitched into the robe
 
 - **No more yellow dots.** The runes round a Mystic, Infinity or Ahrim's robe's hem were little glowing blocks set round the hips. The skirt sways with your legs and the blocks didn't, so they hung loose under the hem as yellow dots. Now the runes are stitched into the skirt itself, a ring of gold glyphs between two lines of stitching just above the hem, and they fold and swing with the cloth.

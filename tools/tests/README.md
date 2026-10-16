@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs431 | Every armour tier (plate, hide, robes) keeps the lower tier's finery and adds more; a robe's trim band and runes ride on the skirt; the mantle shows |
 | rs430 | A rune robe's hem runes are a gold layer on the skirt that moves with it, not loose glowing blocks |
 | rs428 | Mining and woodcutting swing the tool again (weapon put away); a room has sconces on the back and west walls and on posts in its low east and front walls (RS-429) |
 | rs427 | A fallen body's thighs stay within about 20 degrees back to 120 forward of the spine; altars solid, none in a pyramid; no chest or altar blocks a way through or stands by the stairs |
