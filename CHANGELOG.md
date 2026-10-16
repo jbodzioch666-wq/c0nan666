@@ -1,5 +1,31 @@
 # Depthcrawl patch notes
 
+## RS-463 - Tooltips that tell the truth
+
+- **Runes:** no tooltip sends you to the alchemist any more; he stopped selling runes in RS-369. A rune's tooltip now lists the altar that binds it and where that altar stands, the temple's rune counter and its price (for the basic five), and the combat level monsters start dropping it.
+- **Real combat levels:** dragonhide colours, big bones and rune drops were quoted on the old 1-20 tier scale. They now give real combat levels.
+- **No more "undefined":** the Ancient oak's line, and the "heals undefined" on antipoisons and weapon poisons, now read properly. Scrolls no longer claim to hold a spell.
+- **Crafting vs Fletching:** bows, arrows and bolts now show the Fletching level they need, not a Crafting level. Arrows are made at the fletching bench, and gold bars are cast at the jeweller's bench, not forged at an anvil.
+- **Spells:** R switches your ranged mode to magic; you cast by clicking a foe. Every "R casts it" hint now says so. Lunar spells say they need the Lunar book (Magic 65, Defence 40).
+- **Skill guides:**
+  - Slayer xp is three times the monster's life.
+  - Minion counts include the level-50 perk: 2 at 30, 3 at 50, 4 at 60.
+  - The zombie lasts 10 turns longer (it isn't slow or tough), and the ghost never misses.
+  - Tuna is caught only out at sea.
+  - Runite never turns up in hill rocks.
+  - Aggressive gives +1 damage with a bow, not +2.
+- **Help and town text:**
+  - The waypoint lists every town you've visited; there's nothing to touch.
+  - The stash is now the bank (240 items).
+  - The bounty board hangs on the tavern's wall.
+  - Tools come from the Peddler.
+  - Arrows are fletched or looted.
+  - The journal is on ; only.
+  - Longrange is an attack style.
+  - Camping restores prayer, and its danger is a monster that comes for you.
+  - Each race's trait is listed correctly.
+  - The orb kiln's description, and the shore, platform and Mining Guild lines, are fixed.
+
 ## RS-462 - The D&D ability scores are gone
 
 - **No more STR to CHA:** the six ability scores, left over from the old rules, are off the character sheet and out of your save. They had been stuck at 10 for a long time; your skills are what count.
