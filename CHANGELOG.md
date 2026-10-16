@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-446 - The rose without its band
+
+- **The right piece taken out.** RS-445 removed the waypoint's wide bottom step, but the part poking through was the round stone band at the foot of the compass rose, showing between its points. The step is back, so there are three round steps again, and the band is gone. The rose's points now run in under the bottom step.
+
 ## RS-445 - The rose as the bottom step
 
 - **No step poking through.** The waypoint's wide bottom step stuck out through the stone compass rose. It's gone: the rose is the bottom step now, with the two round steps, the runes and the crystal standing on it.
