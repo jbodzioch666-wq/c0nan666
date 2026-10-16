@@ -8,7 +8,7 @@ module.exports = async page=>{
     out[key] = await page.evaluate(async (key)=>{ if (G.interior) exitInterior && exitInterior(); G.player.clock = DAY_LENGTH*5 + DAY_LENGTH*0.5; enterInterior(key); G.player.clock = DAY_LENGTH*5 + DAY_LENGTH*0.1; setUi('playing'); G.player.x = 9; G.player.y = 9; if (!G.interior || G.interior.key!==key) return { sc:-1 };
       for (let i=0;i<6;i++){ renderGame(); await new Promise(r=>setTimeout(r, 30)); }
       const sc = V3.lamps.filter(l=>l.sconce), hang = V3.lamps.filter(l=>l.p && l.p[1] > 1.9 && !l.sconce && l.col===0xffc070);
-      return { sc:sc.length, hang:hang.length, onWall:sc.every(l=>Math.abs(l.p[2]-ROOM.y0) < 0.6 || Math.abs(l.p[0]-ROOM.x0) < 0.6), lowY:sc.every(l=>l.p[1] > 1.4 && l.p[1] < 2.1) }; }, key);
+      return { sc:sc.length, hang:hang.length, onWall:sc.every(l=>Math.abs(l.p[2]-ROOM.y0) < 0.6 || Math.abs(l.p[0]-ROOM.x0) < 0.6 || Math.abs(l.p[0]-(ROOM.x1+1)) < 0.6 || Math.abs(l.p[2]-(ROOM.y1+1)) < 0.6)   /* (RS-429: or on a post in the low east or front wall) */, lowY:sc.every(l=>l.p[1] > 1.4 && l.p[1] < 2.1) }; }, key);
     if (key==='tavern' || key==='smith') await page.screenshot({ path:`${S}/s392-${key}-night.png`, timeout:150000 });
   }
   const light = {};
