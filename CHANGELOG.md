@@ -1,5 +1,20 @@
 # Depthcrawl patch notes
 
+## RS-436 - Quest places you can see
+
+- **Story quests mark real places.** When a story quest sent you somewhere out in the wilds, all you found there was a floating ! over empty grass. Now there's something to find:
+  - the Goblin King's hall, a long timber hall with a turf roof, tusks over the door and skulls on pikes;
+  - the goblins' war camp of hide tents round a fire, under a green banner;
+  - the hermit's thatched stone hut with its woodpile;
+  - a lonely grave with bones in the grass and a pale ghost over it;
+  - broken ruins with a fallen arch and toppled columns;
+  - a dig site with its pit, spoil heap and spade;
+  - a ring of standing stones round a crystal crackling with the storm, for the mages and the Stormcaller;
+  - the thieves' cave in a crag, with crates outside and a lantern;
+  - the Herald's black obelisk with green fire at its foot;
+  - and a cairn with a signpost for any other step.
+  The ! still floats above, so you can spot it from afar.
+
 ## RS-435 - Gilded armour can be salvaged
 
 - **The loot filter takes Gilded pieces.** Gilded armour from treasure trails counted as a rare find, and the loot filter never salvages anything rare or better, so a Gilded Full Helm stayed in your bag however you set the filter. It's only ordinary tier armour with gold paint and a little extra defence, so the filter now judges it by its tier and bonuses like any other piece. Genuinely rare drops, set pieces, Uniques, relics and locked items are still never salvaged.
