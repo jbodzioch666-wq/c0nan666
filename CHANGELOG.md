@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-435 - Gilded armour can be salvaged
+
+- **The loot filter takes Gilded pieces.** Gilded armour from treasure trails counted as a rare find, and the loot filter never salvages anything rare or better, so a Gilded Full Helm stayed in your bag however you set the filter. It's only ordinary tier armour with gold paint and a little extra defence, so the filter now judges it by its tier and bonuses like any other piece. Genuinely rare drops, set pieces, Uniques, relics and locked items are still never salvaged.
+
 ## RS-434 - Nothing springs from nowhere
 
 - **Ambushes you can see coming.** Two kinds of fight used to start out of nowhere. One was the ambush while you camped in the open, a fight you couldn't flee. The other was the 1-in-80 chance that something crept up while you gathered. Now each is a real wandering monster. It shows up a few leagues off, and the log says what it is and which way it's coming from. Then it comes for you. You can stand and fight when it arrives, or get away.
