@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-440 - The XP tracker while you cook
+
+- **Cooking shows on the XP tracker.** The tracker only showed out in the world and hid whenever a menu was open. The cooking panel stays open while you cook, so you never saw your cooking xp climb. Now the tracker shows while you're working through a batch, whether cooking at a fire or a hearth, or smelting, forging, brewing or crafting at a bench. While you cook it sits below the small cooking card in the corner, and it goes back to its place when you're done.
+
 ## RS-439 - Slower crafting, a better seat by the fire
 
 - **Every craft takes twice as long.** Cooking, smelting, forging, brewing, crafting and the rest now take 1.3 seconds a piece instead of 0.65. Each piece of food has its time on the grill or in the pan, and long batches give you time to watch them.
