@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-451 - A giant crab
+
+- **Giant crabs are giant.** The giant crab was sized like a giant rat or bat, a little smaller than a person. Now it's a great armoured beast nearly twice that size, more than a tile across. King crabs are the same size. Ordinary crabs stay small.
+
 ## RS-450 - Skeleton archers' arrows
 
 - **See the arrows fly.** When your skeleton archer shot, you only saw the hit land on its target. Now each arrow flies from the archer to its foe, as yours do, and sticks in what it hits.
