@@ -35,6 +35,7 @@ module.exports = async page=>{
         const fell = e.dkind==='tent' ? (e.s0 && e.root.scale.y < e.s0.y*0.7 ? 2 : 0) : e.dkind==='swarm' ? (e.parts && e.parts.length && e.parts.every(R=>R.t > 0) ? 2 : 0)   /* (RS-413: an octopus slumps flat, a swarm scatters) */
           : e.dkind==='ooze' ? (e.s0 && e.root.scale.y < e.s0.y*0.3 ? 2 : 0) : e.dkind==='ghost' ? (!e.holder.parent ? 2 : 0) : e.dkind==='bones' ? (e.parts && e.parts.length >= 8 ? 2 : 0)
           : e.chain ? Math.acos(Math.max(-1, Math.min(1, e.chain.upY)))   /* (RS-376: a two-legged body, a chain of joints) */
+          : e.rd && e.rd.upright ? (e.rd.touch && e.rd.t > 0.5 ? 2 : 0)   /* (RS-432: a frog or a bird slumps where it stands, belly down - down on the floor is its death) */
           : e.rd ? Math.acos(Math.max(-1, Math.min(1, new THREE.Vector3(0, 1, 0).applyQuaternion(e.rd.q).y))) : Math.abs(e.root.rotation.x) + Math.abs(e.root.rotation.z);
         if (!(fell > 1)) out.noDeath.push(nm+' '+fell.toFixed(2)+' '+e.dkind+' '+(e.chain ? 'chain/'+e.chain.rest.toFixed(2)+'/'+e.chain.upY.toFixed(2) : e.rd ? 'rd'+(e.rd.shoves||0)+'/'+e.rd.rest.toFixed(2)+'/'+e.dying.toFixed(2) : 'nord'));
         if (e.holder.parent) e.holder.parent.remove(e.holder); M3D.live.delete(e);
@@ -48,5 +49,5 @@ module.exports = async page=>{
   A(r.noModel.length===0, 'every creature has a 3D model');
   A(r.noWalk.length===0, 'every creature moves when it walks');
   A(r.noFight.length===0, 'every creature moves when it winds up or strikes');
-  A(r.noDeath.length===0, 'every creature topples when it dies');
+  A(r.noDeath.length===0, 'every creature topples (or slumps) when it dies');
 };

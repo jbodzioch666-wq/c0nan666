@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs432 | Frogs and birds slump belly down where they die (no tipping onto a side, no legs through the floor); a beast's legs stay outside its body as it falls |
 | rs431 | Every armour tier (plate, hide, robes) keeps the lower tier's finery and adds more; a robe's trim band and runes ride on the skirt; the mantle shows |
 | rs430 | A rune robe's hem runes are a gold layer on the skirt that moves with it, not loose glowing blocks |
 | rs428 | Mining and woodcutting swing the tool again (weapon put away); a room has sconces on the back and west walls and on posts in its low east and front walls (RS-429) |

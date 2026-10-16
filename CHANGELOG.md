@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-432 - Frogs, birds and beasts fall properly
+
+- **Frogs and birds slump.** A dead frog or toad tipped over onto its side and lay there, and a bird like the giant vulture stood on its legs through the floor. Now they slump where they die, belly down: a frog's legs splay out flat, and a bird folds its legs under it, pitches onto its breast and lets its wings droop to the ground.
+- **Beasts keep their legs out.** A giant boar's short legs folded up inside its belly as it fell, and a wolf's tucked in. Now a beast's legs stay outside its body and fold less, and it sinks onto its legs as it goes down before it rolls onto its side.
+- **Steadier hips.** The hip limit from RS-427 could slip for a moment as a body hit the floor. It now holds through the whole fall.
+
 ## RS-431 - Finer armour, tier by tier
 
 - **Every tier looks finer than the last.** Your body armour now builds up as you climb the tiers: each keeps everything the tier below had and adds something more.
