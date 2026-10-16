@@ -22,5 +22,5 @@ module.exports = async page=>{
   A(r.mining.swing > 0.6 && /pick/.test(r.mining.tool), 'mining swings the pickaxe');
   A(r.woodcutting.swing > 0.6 && /axe/.test(r.woodcutting.tool), 'woodcutting swings the axe');
   A(r.mining.away, 'the weapon stays put away while you work');
-  A(r.room.walls >= 2 && r.room.east >= 1 && r.room.front >= 1, 'torches on the back and west walls, and stands by the east and front sides');
+  A(r.room.walls >= 5 && r.room.east >= 1 && r.room.front >= 1, 'sconces on the back and west walls, and on posts in the low east and front walls (RS-429)');
 };

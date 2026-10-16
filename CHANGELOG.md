@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-429 - Sconces on posts
+
+- **Sconces instead of standing torches.** The east and front walls of a room are cut low so you can see in, which left nowhere to hang a sconce, so RS-428 lit those sides with standing torches. Now a timber post rises out of the low wall, midway along the east side and near each end of the front, with a torch in an iron sconce on its inner face, matching the ones on the back and west walls.
+
 ## RS-428 - Swinging the pickaxe, lit rooms
 
 - **The pickaxe swings again.** Since weapons started being put away out of a fight (RS-422), your arms were set to hang loose after the work pose was set, so mining and woodcutting stood still with the tool in hand. Your arms belong to the work again while you gather.
