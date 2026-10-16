@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs438 | A dead boar lies on its side, legs out, mouth shut, head in line; its jaw meets its snout |
 | rs437 | Someone on the road turns up a few leagues off and waits to be met; a skeleton with its note lies where you can see it, to be searched |
 | rs437 | A story quest's place in the wilds is drawn as a scene (the Goblin King's hall and nine others), not just a ! |
 | rs435 | The loot filter salvages Gilded armour by tier and bonus; real rare, set and locked pieces stay kept |

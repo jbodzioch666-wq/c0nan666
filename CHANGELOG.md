@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-438 - The boar's death
+
+- **A boar dies like a boar.** A dead giant boar's head was wrung round on its neck and its mouth hung open in a long red trough, and its legs folded up against its belly. Now it goes down onto its side with its legs lying out, its mouth shut and its head in line with its neck. Every four-legged beast's head turns less as it falls, and their knees stay clear of their bodies too.
+- **The boar's jaw fits.** Even alive, a boar's lower jaw was a slab hanging below its snout, with the red of its mouth showing between them from below or the side. It's raised to meet the snout now, and made as wide as the mouth it closes.
+
 ## RS-437 - Meetings you can see
 
 - **People on the road are there to be seen.** The lost child, the travelling wizard, the sandwich lady, the genie, the dwarf and the highwaymen used to spring on you out of nowhere as you walked. Now, when one turns up, they're a few leagues off, by the road if there's one near, and the log tells you which way. They wait there, as figures you can see with a ? over them, for you to walk up and meet them. If you don't, they move on after a while.
