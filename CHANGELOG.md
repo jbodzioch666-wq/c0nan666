@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-444 - The compass rose in stone
+
+- **A rose you can stand on.** The compass rose round the waypoint was paint on the paving. Now it's cut in stone: eight bevelled points, the four quarters longer, each split down its spine into dark slate and pale stone, round a band where they meet. It's a step of its own, so the waypoint's three round steps, its runes and its floating crystal all stand one step higher on top of it.
+
 ## RS-443 - Real cobblestones
 
 - **Fine cobbles in town.** The town's paving was painted into the ground at only a few pixels a tile, so the cobbles were blurry blots in the same six-by-six grid on every tile. Now the paved streets and the square are laid with a fine cobble texture of their own:

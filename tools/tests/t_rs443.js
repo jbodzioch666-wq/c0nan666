@@ -18,5 +18,5 @@ module.exports = async page=>{
   A(r.has && r.quads===r.paved && r.paved > 50, 'every paved tile is laid with the fine cobbles');
   A(r.size >= 512 && r.wrap, 'a fine texture, running on across the tiles');
   A(r.tileDiff > 15, 'each tile of it laid differently, not one grid repeated');
-  A(r.rose && r.reused !== false, 'the compass rose over it, and the texture made once and reused');
+  A(r.reused !== false, 'the texture made once and reused');
 };

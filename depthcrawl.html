@@ -29892,7 +29892,23 @@ function v3CobbleStone(x, cx, cy, w, h, stone, rnd, rgb, k){
   x.strokeStyle = 'rgba(255,255,255,0.13)'; x.lineWidth = 1.4*k; x.beginPath(); x.ellipse(cx - rx*0.08, cy - ry*0.1, rx*0.8, ry*0.72, 0, Math.PI*1.05, Math.PI*1.75); x.stroke();   /* (worn smooth on top) */
   x.restore();
 }
-/* the layer: the paved tiles' quads, the cobbles running on across them in world space; and the compass rose round the waypoint */
+/* (RS-444) the compass rose under the waypoint, in stone: returns its height, the step the dais stands on */
+function v3CompassRose(grp, mats, x, z){
+  const T = THREE, H = 0.1, lin = c=>new T.Color(c).convertSRGBToLinear();
+  const slate = new T.MeshStandardMaterial({ color:lin('#4e525c'), roughness:0.55, metalness:0.05 }), pale = new T.MeshStandardMaterial({ color:lin('#d8d2c2'), roughness:0.7 }), ring = mats.stoneBig;
+  const ext = s=>new T.ExtrudeGeometry(s, { depth:H - 0.024, bevelEnabled:true, bevelThickness:0.012, bevelSize:0.014, bevelSegments:3, curveSegments:48 });
+  const put = (geo, m)=>{ geo.rotateX(-Math.PI/2); geo.translate(x, 0.012, z); const o = new T.Mesh(geo, m); o.castShadow = o.receiveShadow = true; grp.add(o); return o; };
+  const R0 = 1.25;
+  for (let i=0;i<8;i++){ const a = i/8*Math.PI*2 - Math.PI/2, L = i%2 ? 2.15 : 2.85, hw = Math.PI/8*0.92;
+    for (const side of [-1, 1]){ const s = new T.Shape(), P = (r, an)=>[Math.cos(an)*r, -Math.sin(an)*r];   /* (the shape is drawn in x, -z: turned flat, its y becomes -z) */
+      s.moveTo(...P(R0, a)); s.lineTo(...P(L, a)); s.lineTo(...P(R0 + 0.12, a + side*hw)); s.closePath();
+      put(ext(s), side < 0 ? slate : pale); } }
+  /* a round band of stone where the points meet, under the dais */
+  const band = new T.Shape(); band.absarc(0, 0, R0 + 0.16, 0, Math.PI*2, false); const hole = new T.Path(); hole.absarc(0, 0, 0.6, 0, Math.PI*2, true); band.holes.push(hole);
+  put(ext(band), ring);
+  return H;
+}
+/* the layer: the paved tiles' quads, the cobbles running on across them in world space (RS-444: the compass rose is stone now - see v3CompassRose) */
 function v3CobbleLayer(grp, theme){
   if (G.villageRace==='halfling' || G.interior) return; const T = THREE;
   const paved = d=>d==='path' || d==='pier' || d==='gate' || d==='waypoint' || d==='stash' || d==='questgiver' || d==='npc' || d==='lamp' || d==='pbench';
@@ -29904,14 +29920,6 @@ function v3CobbleLayer(grp, theme){
   const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new T.Float32BufferAttribute(uv, 2)); geo.setIndex(idx); geo.computeVertexNormals();
   const m = new T.Mesh(geo, new T.MeshStandardMaterial({ map:v3CobbleTex(theme), roughness:0.88, metalness:0, polygonOffset:true, polygonOffsetFactor:-1, polygonOffsetUnits:-1 }));
   m.receiveShadow = true; m.name = 'cobbles'; grp.add(m); V3.cobbles = m;
-  const wp = G.villageNpcs ? townWpAt() : null; if (!wp) return;
-  const R = 3, PX2 = gfxPhone() ? 64 : 128, c = document.createElement('canvas'); c.width = c.height = (R*2 + 1)*PX2; const x = c.getContext('2d');
-  const stone = theme==='desert' ? [188,168,132] : theme==='tundra' ? [150,152,158] : [128,122,112];
-  const T2 = (tx, ty)=>[(tx - (wp[0] - R))*PX2, (ty - (wp[1] - R))*PX2], deco = (tx, ty)=>(tx>=0 && ty>=0 && tx<COLS && ty<ROWS) ? (G.villageDeco[tx][ty]||'grass') : 'out';
-  try{ v3PlazaPaving(x, T2, PX2, wp, stone, deco); }catch(err){ console.error(err); return; }
-  const tex = new T.CanvasTexture(c); tex.encoding = T.sRGBEncoding; tex.anisotropy = 8;
-  const rose = new T.Mesh(new T.PlaneGeometry(R*2 + 1, R*2 + 1), new T.MeshStandardMaterial({ map:tex, transparent:true, roughness:0.85, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2 }));
-  rose.rotation.x = -Math.PI/2; rose.position.set(wp[0] + 0.5, 0.006, wp[1] + 0.5); rose.receiveShadow = true; rose.name = 'compassRose'; grp.add(rose);
 }
 function v3GroundTexture(theme){
   const PX = COLS > 24 ? 48 : 64, M = 8, N = COLS + M*2, NH = ROWS + M*2, c = v3Canvas(N*PX, NH*PX), x = c.getContext('2d');
@@ -30635,14 +30643,17 @@ function v3BuildScene(){
   grp.add(v3Box(1.2,0.06,0.35,mats.planks,8.2,0.45,7.4)); grp.add(v3Box(1.2,0.4,0.06,mats.wood,8.2,0.22,7.4));
   // waypoint: a runed stone dais with a floating crystal
   { const [wtx, wty] = townWpAt(), x = wtx + 0.5, z = wty + 0.5;
-    /* (RS-422) three round steps up to the runes, each with a rolled edge; the waypoint now in the middle of the square (RS-424: no obelisks) */
-    for (const [r0, h, y0, m] of [[1.3, 0.1, 0, mats.stoneBig], [1.12, 0.12, 0.1, mats.stone], [0.96, 0.14, 0.22, mats.stoneBig]]){ const st = v3Cyl(r0 - 0.03, r0, h, 40, m, x, y0 + h/2, z); st.castShadow = st.receiveShadow = true; grp.add(st);
-      const lip = new T.Mesh(new T.TorusGeometry(r0 - 0.035, 0.022, 10, 64), m); lip.rotation.x = Math.PI/2; lip.position.set(x, y0 + h - 0.008, z); lip.castShadow = true; grp.add(lip); }
-    const rn = new T.Mesh(new T.CircleGeometry(0.92, 48), mats.runes); rn.rotation.x = -Math.PI/2; rn.position.set(x,0.37,z); grp.add(rn); V3.runes = rn;
-    const cr = new T.Mesh(new T.OctahedronGeometry(0.3), mats.crystal); cr.scale.y = 1.7; cr.position.set(x,1.3,z); grp.add(cr); V3.crystal = cr;
-    const glow = new T.Sprite(new T.SpriteMaterial({ map:v3Blob('rgba(90,220,255,1)'), blending:T.AdditiveBlending, depthWrite:false, transparent:true, opacity:0.6 })); glow.scale.set(2.2,2.2,1); glow.position.set(x,1.3,z); grp.add(glow); V3.cglow = glow;
-    V3.lamps.push({ p:[x,1.4,z], col:0x60d8ff, r:6, main:true, always:true });
-    V3.motes = { p:[x,0.4,z] };
+    /* (RS-422) three round steps up to the runes, each with a rolled edge; the waypoint now in the middle of the square (RS-424: no obelisks)
+       (RS-444) and under them all a compass rose cut in stone, a step of its own: eight points, the four quarters long, each point split down
+       its spine into a dark and a pale half, every edge bevelled */
+    const RISE = v3CompassRose(grp, mats, x, z);
+    for (const [r0, h, y0, m] of [[1.3, 0.1, 0, mats.stoneBig], [1.12, 0.12, 0.1, mats.stone], [0.96, 0.14, 0.22, mats.stoneBig]]){ const st = v3Cyl(r0 - 0.03, r0, h, 40, m, x, RISE + y0 + h/2, z); st.castShadow = st.receiveShadow = true; grp.add(st);
+      const lip = new T.Mesh(new T.TorusGeometry(r0 - 0.035, 0.022, 10, 64), m); lip.rotation.x = Math.PI/2; lip.position.set(x, RISE + y0 + h - 0.008, z); lip.castShadow = true; grp.add(lip); }
+    const rn = new T.Mesh(new T.CircleGeometry(0.92, 48), mats.runes); rn.rotation.x = -Math.PI/2; rn.position.set(x,RISE + 0.37,z); grp.add(rn); V3.runes = rn;
+    const cr = new T.Mesh(new T.OctahedronGeometry(0.3), mats.crystal); cr.scale.y = 1.7; cr.position.set(x,RISE + 1.3,z); grp.add(cr); V3.crystal = cr; V3.crystalY = RISE + 1.3;
+    const glow = new T.Sprite(new T.SpriteMaterial({ map:v3Blob('rgba(90,220,255,1)'), blending:T.AdditiveBlending, depthWrite:false, transparent:true, opacity:0.6 })); glow.scale.set(2.2,2.2,1); glow.position.set(x,RISE + 1.3,z); grp.add(glow); V3.cglow = glow;
+    V3.lamps.push({ p:[x,RISE + 1.4,z], col:0x60d8ff, r:6, main:true, always:true });
+    V3.motes = { p:[x,RISE + 0.4,z] };
     const hb = new T.Mesh(new T.CylinderGeometry(1.1,1.1,2,8), new T.MeshBasicMaterial({ visible:false })); hb.position.set(x,1,z); hb.userData.act = { kind:'tile', x:wtx, y:wty, label:'Waypoint' }; grp.add(hb); V3.hits.push(hb);
   }
   // notice board
@@ -31048,7 +31059,7 @@ function v3Render(){
   const tg = V3.camTgt; V3.camPos = new T.Vector3(tg.x + Math.sin(yaw)*D*0.72, D*0.92, tg.z + Math.cos(yaw)*D*0.72);
   V3.cam.position.copy(V3.camPos); V3.cam.lookAt(tg.x, 0.6, tg.z);
   // living details
-  if (V3.crystal){ V3.crystal.rotation.y += dt*0.8; V3.crystal.position.y = 1.3 + Math.sin(V3.t*1.8)*0.08; V3.cglow.material.opacity = 0.45 + Math.sin(V3.t*2.4)*0.15; }
+  if (V3.crystal){ V3.crystal.rotation.y += dt*0.8; V3.crystal.position.y = (V3.crystalY || 1.3) + Math.sin(V3.t*1.8)*0.08;   /* (RS-444: over the dais, however high it stands) */ V3.cglow.material.opacity = 0.45 + Math.sin(V3.t*2.4)*0.15; }
   if (V3.runes){ V3.runes.rotation.z += dt*0.15; V3.runes.material.opacity = 0.65 + Math.sin(V3.t*2)*0.25; }
   if (V3.marker){ const m = captainQuestMarker(); V3.marker.visible = !!m; if (m){ V3.marker.material.map = v3MarkerTex(m); V3.marker.position.y = 1.75 + Math.sin(V3.t*3)*0.07; } }
   if (V3.boardMark){ const m = villageQuestMarker(); V3.boardMark.visible = !!m; if (m){ V3.boardMark.material.map = v3MarkerTex(m); V3.boardMark.position.y = 2.25 + Math.sin(V3.t*3+1)*0.07; } }
@@ -41112,7 +41123,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-443';
+const GAME_VERSION = 'rs-444';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
