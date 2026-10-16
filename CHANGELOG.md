@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-462 - The D&D ability scores are gone
+
+- **No more STR to CHA:** the six ability scores, left over from the old rules, are off the character sheet and out of your save. They had been stuck at 10 for a long time; your skills are what count.
+- **Old gear bonuses kept in a form that works:** a score bonus on a piece you own becomes the gear bonus it was worth. Strength becomes strength, Dexterity becomes ranged and attack, Intelligence and Wisdom become magic, and Constitution becomes defence. "All attributes" becomes all five. Charisma never did anything and is simply dropped. Wisdom used to do nothing, so pieces with it now help your magic.
+- **No new score bonuses:** an awakening weapon now always rolls a bonus that does something.
+- **Old sets too:** the Vindicator's, Nightshade and Stormcaller's set bonuses give the same gear bonuses instead of scores.
+
 ## RS-461 - Cloaked towns run smoothly again
 
 - **Cloth where you can see it:** since RS-458, every cloak in a town ran the full cloth simulation. A tiefling town, where nearly everyone wears a cloak, spent about 33 ms of every frame on it and dropped to around 15 to 40 fps. Now you and anyone within a few steps of you wear real cloth. Folk further off swing their cloaks the old way, which looks the same from across a square.
