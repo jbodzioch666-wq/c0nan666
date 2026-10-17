@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-493 - Dyeable trims
+
+- **Trims take their own dye**: at the dye works, every piece with a trim now has a second row of dyes under it, for the trim alone. That covers a body's trim bands, a great helm's bands, a coif's stitching, a wizard hat's band, a cape's hem and a metal shield's rim.
+- **Colour and trim apart**: dye your plate blue with red trim, or a black cape with a gold hem. Washing a trim out is free, and it shows at once.
+- **Only where there's a trim**: plain pieces with no trim yet, such as a bronze body, a plain red cape, a quiver or chaps, don't get a trim row. Finer tiers add the trims, as before.
+
 ## RS-492 - Your own cape emblem
 
 - **Cape emblem picker**: the dye works now has a **Cape emblem** section beside the shield one. Choose any device you've learned for the back of your cape, or Plain to remove it. Left unchosen, the cape follows your shield's emblem as before.
