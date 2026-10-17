@@ -284,6 +284,8 @@
   .lkslot{ width:240px; height:293px; flex:0 0 auto; border:1px solid rgba(232,165,75,0.25); border-radius:6px; background:radial-gradient(ellipse at 50% 40%, rgba(232,165,75,0.12), rgba(0,0,0,0.35)); position:relative; }
   .lkslot canvas{ width:240px; height:293px; display:block; cursor:grab; touch-action:none; }
   .lkslot .lkhint{ position:absolute; left:0; right:0; bottom:4px; text-align:center; font-size:10px; color:var(--ink-faint); pointer-events:none; }
+  .lkslot .lpzoom{ position:absolute; top:6px; right:6px; display:flex; flex-direction:column; gap:4px; } .lkslot .lpzoom .btn{ min-width:30px; padding:2px 0; font-size:15px; line-height:1.2; }
+  body.touch .lkslot .lpzoom .btn{ min-width:40px; min-height:40px; font-size:18px; }
   .lkrows{ flex:1 1 260px; min-width:240px; }
   .lkrow{ display:flex; align-items:center; gap:6px; padding:2px 0; font-size:12px; }
   .lkrow .lkn{ width:96px; color:var(--ink-faint); }
@@ -41743,7 +41745,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-496';
+const GAME_VERSION = 'rs-497';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -42121,7 +42123,10 @@ function lookEditorHtml(L, race, mo){
   return `<div class="lkwrap"><div class="lkslot" id="lpSlot"><div class="lkhint">drag to turn</div></div>
     <div class="lkrows">${lookRowsHtml(L, race, mo)}<div class="btnrow" style="justify-content:flex-start;margin-top:6px;"><button class="btn" onclick="lookRandomize()">random look</button></div></div></div>`;
 }
-const LP = { r:null, scene:null, cam:null, e:null, key:'', raf:0, yaw:0.5, drag:null, hold:0 };
+const LP = { r:null, scene:null, cam:null, e:null, key:'', raf:0, yaw:0.5, drag:null, hold:0, zoom:1, panY:null, f:1, pts:new Map(), pinch:0 };
+/* (RS-497) zoom on the preview: the wheel, a pinch, or the + and - buttons; drag up and down to look up and down you while zoomed in */
+const LP_ZMAX = 3.2;
+function lpZoom(k){ LP.zoom = Math.max(1, Math.min(LP_ZMAX, LP.zoom*k)); if (LP.zoom <= 1.001) LP.panY = null; }
 function lpSpec(){
   if (G.ui==='charcreate'){ const race = RACES[G.chosenRace][0]; return { race, look:lookTarget(), bare:true }; }
   if (G.ui==='makeover' && G.player) return { race:G.player.race, look:G.moLook, bare:false };
@@ -42140,16 +42145,25 @@ function lpMount(){
       LP.scene.add(new T.HemisphereLight(0xdde4f0, 0x2a2018, 0.7));
       const key = new T.DirectionalLight(0xffe0b0, 1.35); key.position.set(1.2, 2, 1.6); LP.scene.add(key);
       const rim = new T.DirectionalLight(0x9fb4ff, 1.0); rim.position.set(-1.5, 1.4, -2); LP.scene.add(rim);
-      cv.addEventListener('pointerdown', ev=>{ LP.drag = ev.clientX; try{ cv.setPointerCapture(ev.pointerId); }catch(e){} });
-      cv.addEventListener('pointermove', ev=>{ if (LP.drag!=null){ LP.yaw += (ev.clientX - LP.drag)*0.014; LP.drag = ev.clientX; LP.hold = performance.now(); } });
-      const up = ()=>{ LP.drag = null; }; cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+      const pd = ()=>{ const p = [...LP.pts.values()]; return p.length >= 2 ? Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) : 0; };
+      cv.addEventListener('pointerdown', ev=>{ LP.pts.set(ev.pointerId, { x:ev.clientX, y:ev.clientY }); LP.drag = ev.clientX; LP.dragY = ev.clientY; LP.pinch = pd(); try{ cv.setPointerCapture(ev.pointerId); }catch(e){} });
+      cv.addEventListener('pointermove', ev=>{ if (LP.pts.has(ev.pointerId)) LP.pts.set(ev.pointerId, { x:ev.clientX, y:ev.clientY });
+        if (LP.pts.size >= 2){ const d = pd(); if (LP.pinch > 0 && d > 0) lpZoom(d/LP.pinch); LP.pinch = d; return; }   /* (two fingers: pinch to zoom) */
+        if (LP.drag!=null){ LP.yaw += (ev.clientX - LP.drag)*0.014; LP.drag = ev.clientX; LP.hold = performance.now();
+          if (LP.zoom > 1.001 && LP.dragY!=null){ const h = cv.clientHeight || 300; LP.panY = (LP.panY==null ? lpAimY() : LP.panY) + (ev.clientY - LP.dragY)/h*1.1*LP.f/LP.zoom; } LP.dragY = ev.clientY; } });
+      const up = ev=>{ LP.pts.delete(ev.pointerId); LP.pinch = pd(); LP.drag = LP.pts.size ? [...LP.pts.values()][0].x : null; LP.dragY = LP.pts.size ? [...LP.pts.values()][0].y : null; };
+      cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+      cv.addEventListener('wheel', ev=>{ ev.preventDefault(); lpZoom(Math.exp(-ev.deltaY*0.0015)); }, { passive:false });
     }
     { const big = slot.classList.contains('lkbig'), W = big ? 540 : 240, H = big ? 659 : 293;   /* (RS-494: bigger in the dye works - RS-496: 540 x 659, a quarter smaller than at first) */
       if (LP.size!==W){ LP.r.setPixelRatio(Math.min(big ? 1.5 : 2, window.devicePixelRatio||1)); LP.r.setSize(W, H, false); LP.size = W; } }
     slot.insertBefore(LP.r.domElement, slot.firstChild);
+    if (!slot.querySelector('.lpzoom')){ const z = document.createElement('div'); z.className = 'lpzoom';
+      z.innerHTML = '<button class="btn" title="zoom in" onclick="lpZoom(1.35)">+</button><button class="btn" title="zoom out" onclick="lpZoom(1/1.35)">&minus;</button>'; slot.appendChild(z); }
     if (!LP.raf) LP.raf = requestAnimationFrame(lpFrame);
   }catch(e){ console.error(e); }
 }
+function lpAimY(){ const f = LP.f, k = (LP.zoom - 1)/(LP_ZMAX - 1); return (0.5 + 0.32*Math.min(1, k*1.4))*f; }
 function lpFrame(){
   LP.raf = 0;
   const cv = LP.r && LP.r.domElement; if (!cv || !cv.isConnected) return;
@@ -42158,8 +42172,10 @@ function lpFrame(){
   if (key!==LP.key){
     LP.key = key; if (LP.e) LP.scene.remove(LP.e.holder);
     try{ const pt = rsPlayerLook(spec), st = pt.stature||1; LP.e = m3dInstance({}, pt); LP.e.holder.scale.setScalar(st/LP.e.H); LP.scene.add(LP.e.holder);
-      const f = 0.5 + 0.56*st; LP.cam.position.set(0, 0.6*f, 2.05*f); LP.cam.lookAt(0, 0.5*f, 0); }catch(err){ console.error(err); LP.e = null; }
+      LP.f = 0.5 + 0.56*st; }catch(err){ console.error(err); LP.e = null; }
   }
+  { const f = LP.f, z = LP.zoom, ty = LP.panY==null ? lpAimY() : (LP.panY = Math.max(0.12*f, Math.min(0.86*f, LP.panY)));   /* (RS-497: closer as you zoom, toward the face unless you've panned) */
+    LP.cam.position.set(0, ty + 0.1*f/z, 2.05*f/z); LP.cam.lookAt(0, ty, 0); }
   const t = performance.now()/1000;
   if (LP.e){ LP.e.holder.rotation.y = LP.yaw; m3dPoseHumanoid(LP.e.rig, t, 0, 0, 0, 0, LP.e); if (LP.e.rig.head) LP.e.rig.head.rotation.y = 0; if (LP.e.rig.torso) LP.e.rig.torso.rotation.z = 0; const [R, L] = LP.e.rig.arms || [];   /* (RS-248: the preview stands still - no idle turn of the head) */ if (R){ R.sh.rotation.x = -0.12 + Math.sin(t*2.2)*0.02; R.sh.rotation.z = -0.14; R.el.rotation.x = -0.3; L.sh.rotation.x = -0.1; L.sh.rotation.z = 0.14; L.el.rotation.x = -0.3; } }
   LP.r.render(LP.scene, LP.cam);
@@ -42279,7 +42295,7 @@ function buildDyeWorks(){
   const D = dyeListHtml(); try{ queueMicrotask(lpMount); }catch(e){ setTimeout(lpMount, 0); }
   return `<h2 class="panel-title">THE DYE WORKS</h2>
     <div class="sub">Brew dyes from herbs at the dye vat in the Tailor's workshop. A dye changes only the colour, never the stats, and washes out for free. ${D.have.length ? 'You have: '+D.have.map(d=>`<i class="lksw" style="background:${d[2]}"></i>${skHave('dye_'+d[0])} ${esc(d[1].toLowerCase())}`).join(', ') : '<b>You have no dyes yet.</b>'}</div>
-    <div class="dyewrap"><div class="lkslot lkbig" id="lpSlot"><div class="lkhint">drag to turn</div></div>
+    <div class="dyewrap"><div class="lkslot lkbig" id="lpSlot"><div class="lkhint">drag to turn &middot; scroll or pinch to zoom</div></div>
     <div class="ovbody" style="max-width:640px;">${D.html || '<div class="muted">nothing you have can be dyed</div>'}
       ${emblemPickerHtml()}
       <div class="btnrow"><button class="btn primary" onclick="dyeLeave()">ESC &middot; done</button></div></div></div>`;

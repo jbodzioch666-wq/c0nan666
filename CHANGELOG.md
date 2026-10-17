@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-497 - Zoom in on yourself
+
+- **Zoom**: the figure in the dye works and at the barber's chair now zooms. Use the mouse wheel, pinch with two fingers on a phone, or tap the **+** and **-** buttons in its corner.
+- **Close up on the face**: zooming moves in toward your head, so you can check a hat, a helm's bands or a coif's stitching up close. Drag up or down while zoomed to move along you, down to your boots or back up to your hat. Dragging sideways still turns you round.
+- **Right out, as before**: zoomed fully out, the whole figure is framed just as it was.
+
 ## RS-496 - A smaller dye works figure
 
 - **A quarter smaller**: your figure in the dye works is now 540 by 659 instead of 720 by 879, leaving more room for the dye rows beside it. It still turns when you drag it and updates as you dye.
