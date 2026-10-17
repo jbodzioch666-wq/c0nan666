@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-482 - Save codes: copy and paste your adventurer
+
+- **Move a character with copy and paste:** some apps (the Claude app on a phone) can't open a file picker or save a file, so exporting and importing didn't work there. Every save now has a **copy save code** button, on the title screen and in the pause menu. It turns the whole adventurer into one block of text and copies it.
+- **Paste it anywhere you play:** on the title screen, **PASTE a save code** brings the adventurer back in that app or browser. Pasting a save file's text works too.
+- **If the copy doesn't take:** the code is also shown in a box, so you can press and hold to select it and copy it by hand.
+
 ## RS-481 - Faster dungeons
 
 - **Your lantern casts no shadows:** since RS-480 it no longer cast yours, and redrawing its shadows in all six directions on every step as you walked was the heaviest part of a dungeon frame. The torches throw the shadows now.
