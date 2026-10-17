@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-490 - Crossbows shot like crossbows
+
+- **A real crossbow**: crossbows no longer show up as a plain bow. They have their own model: a carved wooden stock swelling to a butt, a prod in the crossbow's metal lashed across the nose, a stirrup, a bone nut, a long trigger lever, and a bolt with a square head and leather vanes in the groove.
+- **Shouldered and aimed**: to shoot, you bring it up with the butt in your right shoulder, the right hand on the grip with the elbow out, the left hand under the fore-end, and the body turned side-on. The bolt points straight at the monster, up or down to wherever it stands.
+- **Loose and reload**: the string snaps forward, the bolt is gone and the nose kicks up. Then the crossbow comes down, is spanned again, and a fresh bolt is laid in.
+- **On time**: the bolt flies, and its hit lands, at the moment of the release, like arrows since RS-489.
+- **Carried and stowed**: you carry it by the stock with the nose down, and it goes on your back when you put it away.
+
 ## RS-489 - An archer's draw
 
 - **A slower, steadier shot**: drawing a bow now takes about twice as long. The archer draws, holds a moment, then looses, so the whole shot runs just over a second instead of a quick snap.
