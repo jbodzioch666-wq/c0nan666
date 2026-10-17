@@ -6,7 +6,7 @@ module.exports = async page=>{
     for (const [k, mk] of [['player', ()=>m3dInstance({}, rsPlayerLook())], ['goblin', ()=>m3dInstance({}, m3dPortrait({ nm:'goblin archer' }))]]){
       const e = mk(), sc = new T.Scene(); sc.add(e.holder); const o = out[k] = {};
       const pose = (w, s)=>{ m3dPoseHumanoid(e.rig, 1, 0, w, s, 0, e); e.holder.updateMatrixWorld(true); sc.onBeforeRender(); e.holder.updateMatrixWorld(true); const bw = e.rig._bw;
-        const fing = e.rig.arms[1].hand.localToWorld(new T.Vector3(0, -0.04, 0)), cheek = e.rig.head.localToWorld(new T.Vector3(0.05, -0.03, 0.07)), sh = e.rig.arms[0].sh.getWorldPosition(new T.Vector3()), hand = e.rig.arms[0].hand.getWorldPosition(new T.Vector3());
+        const BL = e.rig.bowLeft ? 1 : 0, sd = BL ? -1 : 1, fing = e.rig.arms[1-BL].hand.localToWorld(new T.Vector3(0, -0.04, 0)), cheek = e.rig.head.localToWorld(new T.Vector3(0.05*sd, -0.03, 0.07)), sh = e.rig.arms[BL].sh.getWorldPosition(new T.Vector3()), hand = e.rig.arms[BL].hand.getWorldPosition(new T.Vector3());
         const aim = hand.clone().sub(sh).normalize(), fw = new T.Vector3(0, 0, 1).applyQuaternion(e.holder.getWorldQuaternion(new T.Quaternion()));
         return { drawn:!!(bw && bw.top.visible), straight:!!(bw && bw.str.visible), arrow:!!(bw && bw.arrow.visible), toCheek:+fing.distanceTo(cheek).toFixed(3), aimDeg:+(Math.acos(Math.min(1, aim.dot(fw)))*180/Math.PI).toFixed(1), behind:+(cheek.z - fing.z).toFixed(3) }; };
       o.rest = pose(0, 0); o.draw = pose(1, 0); o.loose = pose(0, 0.7); }

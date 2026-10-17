@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-488 - Left-handed bows, aimed at the foe
+
+- **The bow is in the left hand** now, drawn back to the right cheek with the right, the way most archers shoot (a bow with a shield on the left arm still goes in the right).
+- **The arrow rests on the thumb**: it lies on top of the bow hand beside the grip, instead of passing through the middle of the fist.
+- **Aimed at the target**: your bow arm points at the nearest monster in front of you, up at one on a ledge or down into a pit, and lifts a little more for a long shot. Archers aim the same way at you. With nothing in front, the bow points straight ahead.
+
 ## RS-487 - Shooting a bow properly
 
 - **A real archer's shot, for you and every archer you fight:**

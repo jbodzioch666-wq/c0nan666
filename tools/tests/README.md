@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs488 | The bow in the left hand, the arrow on its thumb, the bow arm raised at the foe (yours at a monster, an archer at you) |
 | rs487 | A bow drawn to the cheek with a bent string and a nocked arrow, the bow arm on the mark, then loosed |
 | rs486 | The sun moves in small steps, so the land's shadows hold still between them, yet still swing over the day |
 | rs485 | Towns on the land are built in their race's style and sized by village, town or city, with a plate saying so |
