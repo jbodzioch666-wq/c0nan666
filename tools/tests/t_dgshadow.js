@@ -23,7 +23,7 @@ module.exports = async page=>{
   console.log(JSON.stringify(r));
   await page.screenshot({ path:`${S}/dgshadow.png`, clip:{ x:Math.max(0, r.sx-250), y:Math.max(0, r.sy-200), width:500, height:400 }, timeout:150000 });
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
-  A(r.cast && r.near >= 1.6 && r.castMeshes > 0, 'the lantern still casts shadows, but not your own - the torches throw yours (RS-480)');
+  A(!r.cast && r.castMeshes > 0, 'the lantern casts no shadows - the torches throw them (RS-480/481)');
   A(r.h >= 1.4 && r.off >= 0.25 && r.camSide, 'held up over your shoulder, on the camera\'s side');
   A(r.walkUps===6, 'redrawn every frame while you walk');
 };

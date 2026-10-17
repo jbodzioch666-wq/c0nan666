@@ -22,7 +22,7 @@ module.exports = async page=>{
     // simpler: run the gate alone twelve times and read the marks before a render clears them
     let lanDue = 0; const torchDue = (FPD.torches||[]).map(()=>0);
     const due = (dt)=>{ let lan = 0, perFrame = []; const td = (FPD.torches||[]).map(()=>0); FPD.shadowFrames = 0; FP.dt = dt; FPD.shAvg = dt;
-      for (let i=0;i<12;i++){ FPD.lan.shadow.needsUpdate = false; (FPD.torches||[]).forEach(L=>{ L.shadow.needsUpdate = false; }); dgShadowTick();
+      for (let i=0;i<12;i++){ FPD.dynAt = performance.now(); FPD.lan.shadow.needsUpdate = false;   /* (RS-481: as if something were moving - in a still room the torches aren't redrawn at all) */ (FPD.torches||[]).forEach(L=>{ L.shadow.needsUpdate = false; }); dgShadowTick();
         if (FPD.lan.shadow.needsUpdate) lan++; let f = 0; (FPD.torches||[]).forEach((L, k)=>{ if (L.shadow.needsUpdate){ td[k]++; f++; } }); perFrame.push(f); }
       return { lan, td, perFrame }; };
     SET.gfx = 'high'; out.fast = due(1/60); out.slow = due(1/30);

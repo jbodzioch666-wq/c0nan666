@@ -30,6 +30,6 @@ module.exports = async page=>{
   A(!r.step || r.step.gap <= 0.12, 'the lantern stays over you mid-step');
   A(r.blobs===0 && (!r.fresh || r.fresh.blobs===0), 'no round blob under any creature');
   A((r.monsters===0 || r.casters > 0) && (!r.fresh || r.fresh.casters > 0), 'creatures cast real shadows');
-  A(r.lit > 0 && r.lantern && r.lanNear >= 0.7, 'the torches and your lantern cast shadows - but not of your own hat, right under the lantern');
+  A(r.lit > 0 && !r.lantern, 'the torches cast shadows, your lantern none (RS-481)');
   A(r.fps && r.fps.right && r.fps.top, 'the fps meter is on the right, up top');
 };

@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-481 - Faster dungeons
+
+- **Your lantern casts no shadows:** since RS-480 it no longer cast yours, and redrawing its shadows in all six directions on every step as you walked was the heaviest part of a dungeon frame. The torches throw the shadows now.
+- **Still rooms cost nothing:** the torches' shadows are redrawn only while something moves (you, a monster, an ally) and for a moment after. They used to be redrawn every other frame whatever happened.
+- **The numbers:** in a player's save, two floors down a dungeon, a frame went from 5.7 ms and 577 draw calls to 4.5 ms and 246 standing still, and from 5.7 ms and 718 calls to 4.9 ms and 444 walking.
+
 ## RS-480 - Natural shadows in the dungeon
 
 - **No more black blot beside you:** the hard, dark shadow next to your character was your own lantern's, held up over your shoulder. With the dimmer dungeon light of RS-479 it had gone nearly black. Your lantern no longer throws your shadow. It still lights you and casts the shadows of walls and props further off.

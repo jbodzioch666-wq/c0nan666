@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs481 | The lantern casts no shadows and torch shadows are only redrawn while something moves |
 | rs479 | A grade for each dungeon kind, darker fill, strike effects by material, a beat's pause, the camera easing in for fights |
 | rs478 | Leather coifs finer each tier - seam, studs, feather, scales, clasp, spines |
 | rs477 | The back gesture closes the open menu or opens pause, and never leaves the game |
