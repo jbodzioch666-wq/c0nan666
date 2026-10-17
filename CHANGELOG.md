@@ -1,5 +1,17 @@
 # Depthcrawl patch notes
 
+## RS-478 - Leather coifs finer each tier
+
+- **The coif grows grander, like the metal helms and wizard's hats:**
+  - **Leather:** plain.
+  - **Hard Leather:** a stitched seam over the crown and down the back.
+  - **Studded:** rows of rivet studs on both sides.
+  - **Green d'hide:** a feather tuft sweeping back from the side.
+  - **Blue d'hide:** overlapping dragon scales over the crown.
+  - **Red d'hide:** silver thread, and a silver clasp with a red gem at the throat.
+  - **Black d'hide:** black dragon spines along the ridge.
+  Each piece sits on the hood's own surface, in the hide's own colour.
+
 ## RS-477 - Back swipe closes menus
 
 - **The back gesture doesn't close the game any more:** on Android, the side swipe (or the Back button) now works like Escape. It closes whatever menu is open, and in play it opens the pause menu, instead of leaving the page and losing your place. A browser's Back button on a computer does the same.
