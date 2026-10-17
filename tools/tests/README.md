@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs498 | The cloth maths gone fast with the same folds: fast normals match three.js, cape bounds measured once |
 | rs497 | Zoom on the dye works and barber figure: wheel, pinch and +/- buttons, panned by dragging while zoomed |
 | rs495 | A trim dye on the whole cape perimeter and embroidery, a robe's hem runes, a tabard's device and a hat's glow |
 | rs494 | You at 540 x 659 (RS-496) on the left of the dye works, redressed as you dye, stacked on a phone |

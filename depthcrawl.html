@@ -35411,6 +35411,20 @@ function m3dCapeOwn(c){
   const u = c.userData; if (u.base) return u;
   c.geometry = c.geometry.clone(); u.base = Float32Array.from(c.geometry.attributes.position.array); let lo = 0; for (let i=1;i<u.base.length;i+=3) lo = Math.min(lo, u.base[i]); u.h = -lo || 0.5; return u;
 }
+/* (RS-498) vertex normals for cloth that bends every frame, worked straight on the typed arrays: the same area-weighted
+   normals three.js computes, without its per-vertex Vector3 reads. In a town full of folk, computeVertexNormals and the
+   attribute reads inside it were about a quarter of every frame */
+function m3dFastNormals(geo){
+  const idx = geo.index && geo.index.array; if (!idx) return geo.computeVertexNormals();
+  const pos = geo.attributes.position.array, nrm = geo.attributes.normal; if (!nrm || nrm.array.length!==pos.length) return geo.computeVertexNormals();
+  const na = nrm.array; na.fill(0);
+  for (let i=0;i<idx.length;i+=3){ const a = idx[i]*3, b = idx[i+1]*3, c2 = idx[i+2]*3;
+    const abx = pos[b] - pos[a], aby = pos[b+1] - pos[a+1], abz = pos[b+2] - pos[a+2], acx = pos[c2] - pos[a], acy = pos[c2+1] - pos[a+1], acz = pos[c2+2] - pos[a+2];
+    const cx = aby*acz - abz*acy, cy = abz*acx - abx*acz, cz = abx*acy - aby*acx;
+    na[a] += cx; na[a+1] += cy; na[a+2] += cz; na[b] += cx; na[b+1] += cy; na[b+2] += cz; na[c2] += cx; na[c2+1] += cy; na[c2+2] += cz; }
+  for (let i=0;i<na.length;i+=3){ const l = Math.sqrt(na[i]*na[i] + na[i+1]*na[i+1] + na[i+2]*na[i+2]) || 1; na[i] /= l; na[i+1] /= l; na[i+2] /= l; }
+  nrm.needsUpdate = true;
+}
 function m3dCapeCloth(c, r, dtIn, pre){
   if (!c || !c.geometry || !c.userData.grid) return; const T = THREE, K = M3D_CLOTH;
   if (!K.m){ K.m = new T.Matrix4(); K.d = new T.Matrix4(); K.v = new T.Vector3(); K.w = new T.Vector3(); K.a = new T.Vector3(); K.b = new T.Vector3(); }
@@ -35466,7 +35480,8 @@ function m3dCapeCloth(c, r, dtIn, pre){
           let t = ((px - ax)*sx + (py - ay)*sy + (pz - az)*sz)/L2; t = t < 0 ? 0 : t > 1 ? 1 : t;
           const cx = ax + sx*t, cy = ay + sy*t, cz = az + sz*t, dx = px - cx, dy = py - cy, dz = pz - cz;
           if (dx*dx + dy*dy + dz*dz < R2){ const zz = cz - Math.sqrt(Math.max(0, R2 - dx*dx - dy*dy)); if (pz > zz){ Q[k+2] -= pz - zz; P[k+2] = zz; } } } } } }
-  A.set(P); pos.needsUpdate = true; c.geometry.computeVertexNormals(); c.geometry.computeBoundingSphere();
+  A.set(P); pos.needsUpdate = true; m3dFastNormals(c.geometry);
+  if (!u.sph){ u.sph = 1; c.geometry.computeBoundingSphere(); const s = c.geometry.boundingSphere; if (s) s.radius *= 1.6; }   /* (RS-498: once, with room to billow) */
 }
 /* (RS-457) a cloak pinned at the neck and shoulders: it no longer swings as one stiff sheet from its top edge - that lifted its yoke off the
    shoulders and left it floating behind them as you walked. Its top stays laid on the shoulders and back; below the shoulder blades it
@@ -35482,7 +35497,7 @@ function m3dCapeSwing(c, ax, az){
     const w = Math.min(1, (dn - pin)/(1 - pin)), k = w*w*(3 - 2*w), th = ax*k, tz = az*k, dy = y - yp, dz = z - zp, cs = Math.cos(th), sn = Math.sin(th);
     const ny = yp + dy*cs + dz*sn, nzz = zp - dy*sn + dz*cs;   /* (swung back, about the shoulder blades) */
     a[i] = x*Math.cos(tz) - (ny - yp)*Math.sin(tz); a[i+1] = yp + x*Math.sin(tz) + (ny - yp)*Math.cos(tz); a[i+2] = nzz; }
-  p.needsUpdate = true; c.geometry.computeVertexNormals();
+  p.needsUpdate = true; m3dFastNormals(c.geometry);
 }
 function m3dHelmGeo(kind){
   const { ell, sph, cap, flat, torus, cylE } = SDF, M = 4, cx = 0, cz = -0.009;
@@ -38755,7 +38770,7 @@ function m3dSkirtFollow(r){
   if (m.userData.own && !r.seatBox && (m.userData.tick = (m.userData.tick||0) + 1) % 2 && !m3dNearHero(r, m)) return;   /* (RS-461: folk away from you refold their robes every other frame) */
   m.userData.sig = sig; m.userData.seatKey = r.seatBox ? r.seatBox.key : '';
   if (!m.userData.own){ m.geometry = m.geometry.clone(); m.userData.own = true; m.userData.base = Float32Array.from(m.geometry.attributes.position.array); for (const c of m.children) if (c.userData.hemLayer) c.geometry = m.geometry; }   /* (RS-430: the rune layer takes the same copy) */
-  const p = m.geometry.attributes.position, base = m.userData.base, y0 = m.position.y, hipY = legs[0].hip.position.y, ct = Math.cos(tilt), st = Math.sin(tilt);
+  const p = m.geometry.attributes.position, A2 = p.array, base = m.userData.base, y0 = m.position.y, hipY = legs[0].hip.position.y, ct = Math.cos(tilt), st = Math.sin(tilt);
   if (sw[0] < -1 && sw[1] < -1 && r.hips){   /* (RS-310) sitting: the front of the skirt folds over the hips onto the lap, lies along the thighs and falls
        from the knees; the back hangs from the seat; and nothing goes below the ground - the hem settles there in folds */
     const sZ = m.scale.z || 1, Lth = Math.abs(legs[0].knee.position.y) || 0.23, ground = -r.hips.position.y + 0.012;
@@ -38765,9 +38780,9 @@ function m3dSkirtFollow(r){
       const Zr = Z*0.62, dl = Math.min(d, Lth), th = Math.PI/2*Math.min(1, dl/0.08);          // (turned forward round the hips' line, over the first few centimetres)
       let fz = Zr*Math.cos(th) + dl*Math.sin(th), fy = hipY - dl*Math.cos(th) + Zr*Math.sin(th);
       if (d > Lth){ const h = d - Lth; fz = Lth + (Zr*0.55 + 0.045)*Math.min(1, h/0.05); fy = hipY + Zr - h; }   // (then down from the knee - RS-386: clear of the shins, which poked through the fold)
-      let ny = Y + (fy - Y)*front, nz = Z + (fz - Z)*front;
-      if (ny < ground){ const k2 = 1 + Math.min(0.12, (ground - ny)*0.7); nz *= k2; ny = ground + Math.min(0.012, (ground - ny)*0.08); p.setX(i, x*(1 + (k2 - 1)*0.5)); } else p.setX(i, x);   // (gathered on the ground, not spread out flat)
-      p.setY(i, ny - y0); p.setZ(i, nz/sZ); }
+      let ny = Y + (fy - Y)*front, nz = Z + (fz - Z)*front; const k3 = i*3;
+      if (ny < ground){ const k2 = 1 + Math.min(0.12, (ground - ny)*0.7); nz *= k2; ny = ground + Math.min(0.012, (ground - ny)*0.08); A2[k3] = x*(1 + (k2 - 1)*0.5); } else A2[k3] = x;   // (gathered on the ground, not spread out flat)
+      A2[k3+1] = ny - y0; A2[k3+2] = nz/sZ; }
     /* (RS-386) round the seat: cloth that would pass through the seat (or the space under it) is pushed out to the nearest of its
        edges, so it drapes over the side of a stool or chair and hangs outside it to the floor */
     const B = r.seatBox; if (B){ const T = THREE, Mw = m.matrixWorld, inv = new T.Matrix4().copy(Mw).invert(), v = new T.Vector3(), cy = Math.cos(B.yaw), sy = Math.sin(B.yaw), mg = 0.018;
@@ -38776,18 +38791,18 @@ function m3dSkirtFollow(r){
         const ex = B.hw + mg - Math.abs(lx), ez = B.hd + mg - Math.abs(lz); if (ex <= 0 || ez <= 0) continue;
         let nx = lx, nz = lz; if (ex < ez) nx = Math.sign(lx || 1)*(B.hw + mg); else if (lz < 0) nz = -(B.hd + mg); else if (Math.abs(lx) > B.hw*0.45) nx = Math.sign(lx)*(B.hw + mg); else continue;   /* (never forward off the front edge, where the lap's fold falls from the knees: that tore the cloth there; a front corner goes to the side) */
         v.x = B.x + nx*cy + nz*sy; v.z = B.z - nx*sy + nz*cy; v.applyMatrix4(inv); p.setXYZ(i, v.x, v.y, v.z); } }
-    p.needsUpdate = true; m.geometry.computeVertexNormals(); return; }
+    p.needsUpdate = true; m3dFastNormals(m.geometry); return; }
+  const s0 = Math.sin(sw[0]), s1 = Math.sin(sw[1]), sk0 = Math.sin(sw[0] + kn[0]), sk1 = Math.sin(sw[1] + kn[1]);   /* (RS-498: worked out once - they were four sines per vertex) */
   for (let i=0;i<p.count;i++){
     const x = base[i*3], y = base[i*3+1], z = base[i*3+2], d = Math.max(0, hipY - (y + y0));   // how far below the hip joints
-    const legZ = j=>d <= 0.23 ? -Math.sin(sw[j])*d : -Math.sin(sw[j])*0.23 - Math.sin(sw[j] + kn[j])*(d - 0.23);   // (thigh, then the shin from the knee)
-    const a = legZ(0), b2 = legZ(1);                                                          // where each leg has carried itself, front to back
-    const rr = Math.hypot(x, z) || 1, zn = z/rr, xn = x/rr;
+    const a = d <= 0.23 ? -s0*d : -s0*0.23 - sk0*(d - 0.23), b2 = d <= 0.23 ? -s1*d : -s1*0.23 - sk1*(d - 0.23);   // where each leg has carried itself, front to back (thigh, then the shin from the knee)
+    const rr = Math.sqrt(x*x + z*z) || 1, zn = z/rr, xn = x/rr;
     const fwd = Math.max(a, b2, 0), back = Math.min(a, b2, 0), side = (xn < 0 ? a : b2);     // (legs[0] is on the -x side)
     const dz = zn > 0 ? zn*fwd*1.12 : -zn*back*1.12;
     const Y = y + y0, w = d < 0.1 ? 1 : Math.max(0, 1 - (d - 0.1)/0.25), zz = z + dz + (1 - Math.abs(zn))*side*0.55;   // (the top of the skirt turns with the torso, fading out toward the hem)
-    p.setX(i, x); p.setZ(i, zz + (Y*st + zz*ct - zz)*w); p.setY(i, y + (Y*ct - zz*st - Y)*w);   /* (RS-310: x too, back from a seated fold) */
+    const k3 = i*3; A2[k3] = x; A2[k3+2] = zz + (Y*st + zz*ct - zz)*w; A2[k3+1] = y + (Y*ct - zz*st - Y)*w;   /* (RS-310: x too, back from a seated fold) */
   }
-  p.needsUpdate = true; m.geometry.computeVertexNormals();
+  p.needsUpdate = true; m3dFastNormals(m.geometry);
 }
 // pose one creature for this frame
 function m3dPose(e, pos, m, moving, flash){
@@ -41745,7 +41760,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-497';
+const GAME_VERSION = 'rs-498';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

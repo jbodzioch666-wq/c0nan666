@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-498 - Towns run faster: the cloth maths tightened
+
+- **The same folds, a third of the cost**: robes, skirts and cloaks fold exactly as before, but the maths behind them was rewritten to work straight on the mesh data. Recomputing the cloth's lighting normals was a quarter of every frame in a busy town; the skirt refold also recalculated four sines per vertex and the cloak re-measured its own bounds every frame.
+- **Measured on a real save** (a city full of tiefling folk, 8-second CPU profiles): 79 to 113 fps, the average frame 12.6 to 8.8 ms, the slowest 5% of frames 17.3 to 11.9 ms. The cloth's share of each frame fell from about 35% to about 17%. On a phone or a weaker PC the same work is saved.
+- **Nothing visible changed**: the new normals match the old ones to within rounding (checked edge for edge in the new test), and all the cloth tests pass unchanged.
+
 ## RS-497 - Zoom in on yourself
 
 - **Zoom**: the figure in the dye works and at the barber's chair now zooms. Use the mouse wheel, pinch with two fingers on a phone, or tap the **+** and **-** buttons in its corner.
