@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-484 - Paste a whole message
+
+- **The paste box finds the code itself:** you can paste a whole copied message, words, line breaks and all. The save code is picked out of it, so in the Claude app you can copy a chat message holding a code and paste it straight in.
+
 ## RS-483 - Import that works on phones
 
 - **The import button is a real file picker:** on a phone, tapping **IMPORT a save file** could do nothing. The picker was opened by a hidden button, which some apps ignore, and it only allowed files marked as JSON, so a downloaded save the phone hadn't labelled that way was greyed out. Now the button is a picker of its own and takes any file. A file that isn't a save is refused with a message.

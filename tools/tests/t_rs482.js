@@ -8,6 +8,7 @@ module.exports = async page=>{
     const before = saveIndexList().length; out.ok = await pasteSaveCodeGo(code); const after = saveIndexList(); out.added = after.length - before;
     const imp = after.filter(e=>e.name==='Codey' && e.id!==id)[0]; out.gold = imp ? JSON.parse(localStorage.getItem(SAVE_PREFIX + imp.id)).gold : null;
     const raw = JSON.stringify({ depthcrawlSave:1, version:GAME_VERSION, data:JSON.parse(localStorage.getItem(SAVE_PREFIX + id)) }); out.rawOk = await pasteSaveCodeGo(raw);
+    out.wrapped = await pasteSaveCodeGo('Here is your save code:\n\n' + code.slice(0, 40) + '\n' + code.slice(40) + '\n\nPaste it on the title screen.');   /* (RS-484: inside a copied message) */
     out.bad = await pasteSaveCodeGo('hello there');
     setUi('titleScreen'); out.button = /pasteSaveCode\(\)/.test(document.body.innerHTML) && /copySaveCode\(/.test(document.body.innerHTML);
     return out; });
@@ -16,6 +17,7 @@ module.exports = async page=>{
   A(/^DC[01]:/.test(r.prefix) && r.box, 'a save becomes a code, shown to copy');
   A(r.ok && r.added===1 && r.gold===4321, 'pasting the code brings the adventurer back, gold and all');
   A(r.rawOk, "a save file's text pasted works too");
+  A(r.wrapped, 'a code inside a whole copied message, line breaks and all, is found (RS-484)');
   A(r.bad===false, 'nonsense is refused');
   A(r.button, 'the title screen offers to paste a code, and each save to copy one');
 };
