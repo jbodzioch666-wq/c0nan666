@@ -23995,32 +23995,51 @@ function gfxCompileScene(V, r, scene, cam, warm){
    whole town or dungeon floor at once froze the page for 5 to 8.5 seconds in one call. Now the scene's children are set aside and
    brought back a slice at a time, compiling as they come, with a frame to the browser between slices - the loading card animates
    and the page answers - and only then does the first frame draw. Tests keep the old single compile (window.__noWarmSlice) */
+function gfxWarmSeen(r){ return r.__warmSeen || (r.__warmSeen = new WeakSet()); }   /* (RS-502: materials this renderer has already warm-drawn) */
+/* (RS-502) three.js bakes the number of lights into every shader, so a floor with one more portal or brazier than the last
+   recompiled every program from scratch - 13s a floor. Each view now pads its point lights up to the most it has ever seen
+   (dim, dark lights that add nothing), so the count - and every compiled shader - holds steady from floor to floor */
+function gfxPadLights(V, scene){
+  if (!scene) return; let n = 0; scene.traverse(o=>{ if (o.isPointLight && !o.userData.padL && o.visible) n++; });
+  V.lightCeil = Math.max(V.lightCeil||0, n);
+  const pads = V.padLights || (V.padLights = []), need = V.lightCeil - n;
+  while (pads.length < need){ const L = new THREE.PointLight(0xffffff, 0, 0.001, 2); L.userData.padL = 1; L.position.set(0, -60, 0); scene.add(L); pads.push(L); }
+  for (let i=0;i<pads.length;i++){ pads[i].visible = i < need; if (pads[i].parent!==scene) scene.add(pads[i]); }
+}
 function gfxCompileSliced(V, r, scene, cam, grp){
-  const q = [];   /* (every drawable leaf, wherever it hangs - one top group can hold the whole floor) */
-  scene.traverse(o=>{ if ((o.isMesh || o.isPoints || o.isLine || o.isSprite) && o.material) q.push([o, o.frustumCulled]); else if (o.isLight) o.layers.enable(31); });
-  const c2 = cam.clone(); c2.layers.set(31);   /* (the warm camera sees only the slice layer; the lights shine on both) */
-  V.warmWait = { r, scene, cam:c2, grp, queue:q, i:0 };
+  /* the real scene, the real camera, the real target - anything else and the driver builds different shader variants, and the
+     first real frame still pays for all of them at once. All unwarmed materials start hidden; each slice shows a few more and
+     draws the whole scene once, off screen, so only those few pay their first-draw cost in that slice */
+  const seen = gfxWarmSeen(r), mats = [], objs = [];
+  const put = m=>{ if (m && !seen.has(m) && mats.indexOf(m) < 0) mats.push(m); };
+  scene.traverse(o=>{ if ((o.isMesh || o.isPoints || o.isLine || o.isSprite) && o.material){ objs.push([o, o.frustumCulled]); o.frustumCulled = false; const m = o.material; if (Array.isArray(m)) m.forEach(put); else put(m); } });
+  if (!mats.length){ for (const [o, fc] of objs) o.frustumCulled = fc; if (grp) scene.remove(grp); return; }   /* (RS-502: the next floor down reuses the last one's shaders - no warm pause at all) */
+  for (const m of mats){ m.__warmVis = m.visible; m.visible = false; }
+  V.warmWait = { r, scene, cam, grp, mats, objs, i:0 };
   gfxWarmCard();   /* (the first slice waits for the next frame, so the build's own task ends here) */
 }
 function gfxWarmStep(V){
   const W = V.warmWait; if (!W) return false;
-  const t0 = performance.now();
-  while (W.i < W.queue.length){
-    const [o] = W.queue[W.i++]; o.layers.enable(31); o.frustumCulled = false;
-    /* a draw, not just a compile: on Windows the driver builds each shader's real pipeline at its first draw, so each slice
-       joins the warm layer and is drawn once, off screen, paying for its own new programs there */
-    try{ gfxWarmDraw(W.r, W.scene, W.cam); }catch(e){ console.error(e); }
+  const t0 = performance.now(), seen = gfxWarmSeen(W.r);
+  while (W.i < W.mats.length){
+    const m = W.mats[W.i++]; m.visible = m.__warmVis===undefined ? true : m.__warmVis; delete m.__warmVis; seen.add(m);
+    try{ gfxWarmRender(W.r, W.scene, W.cam); }catch(e){ console.error(e); }
     if (performance.now() - t0 > 120) break;
   }
-  if (W.i < W.queue.length){ gfxWarmCard(); return true; }
-  for (const [o, fc] of W.queue){ o.layers.disable(31); o.frustumCulled = fc; }
+  if (W.i < W.mats.length){ gfxWarmCard(); return true; }
+  for (const [o, fc] of W.objs) o.frustumCulled = fc;
   V.warmWait = null;
   if (W.grp) W.scene.remove(W.grp);
   return false;
 }
 function gfxWarmDraw(r, scene, cam){
-  let rt = r.__warmRT; if (!rt) rt = r.__warmRT = new THREE.WebGLRenderTarget(256, 256, { depthBuffer:true });
-  const old = r.getRenderTarget(); r.setRenderTarget(rt); try{ r.render(scene, cam); } finally { r.setRenderTarget(old); }
+  /* (RS-502) each warm draw must hit the very target the real frames use - the post pipeline's - or three builds a different
+     variant of every program (the target's encoding is part of the shader) and the real first frame still compiles them all in
+     one 9s block. Without a post target, the view's own hidden canvas is the real target; a visible one falls back to a texture */
+  let t = null; try{ t = gfxTarget(r); }catch(e){}
+  if (!t && r.domElement && r.domElement.style.display==='none') t = null;
+  else if (!t){ t = r.__warmRT || (r.__warmRT = new THREE.WebGLRenderTarget(256, 256, { depthBuffer:true })); }
+  const old = r.getRenderTarget(); r.setRenderTarget(t); try{ r.render(scene, cam); } finally { r.setRenderTarget(old); }
 }
 function gfxWarmCard(){   /* (the loading card stays up while the driver links, and the next frame tries again) */
   try{ const el = document.getElementById('loadCard'); if (el){ el.classList.add('show'); clearTimeout(loadingCard.tm); loadingCard.tm = setTimeout(()=>el.classList.remove('show'), 900); } }catch(e){}
@@ -30917,7 +30936,7 @@ function v3Render(){
   const T = THREE, now = performance.now(), dt = V3.last ? Math.min(0.1, (now-V3.last)/1000) : 0.016; V3.last = now; V3.t = (V3.t||0) + dt;
   if (V3.door && (V3.door.t > 4 || G.gameMode!==3)){ V3.door = null; doorFade(0); V3.labels.style.opacity = '1'; }   /* (never left half way through a door) */
   if (V3.door && V3.door.phase==='in' && doorTickIn(dt)) return true;
-  if (V3.mapRef !== G.map){ V3.mapRef = G.map; v3BuildScene(); V3.path = []; V3.camPos = null; if (V3.door) V3.door.t = 0; V3.compileDue = true; }
+  if (V3.mapRef !== G.map){ V3.mapRef = G.map; v3BuildScene(); V3.path = []; V3.camPos = null; if (V3.door) V3.door.t = 0; V3.compileDue = true; try{ gfxPadLights(V3, V3.scene); }catch(e){} }   /* (RS-502) */
   // match the game canvas' box
   const mc = canvas, cv = V3.cv;
   cv.style.display = 'block'; V3.labels.style.display = 'block';
@@ -34213,7 +34232,7 @@ function fpdRender(env, T, camZ){
   const ft = FP.ftile;
   let stale = FPD.mapRef!==G.map || FPD.theme!==T.key || !FPD.ftile || FPD.ftile.length!==ft.length;
   if (!stale) for (let i=0;i<ft.length;i++) if (ft[i]!==FPD.ftile[i]){ stale = true; break; }
-  if (stale){ FPD.mapRef = G.map; FPD.theme = T.key; FPD.ftile = ft.slice(); fpdBuild(T); FPD.compileDue = true; try{ gfxFpdBuild(T); }catch(e){ console.error(e); }   /* (RS-499) */
+  if (stale){ FPD.mapRef = G.map; FPD.theme = T.key; FPD.ftile = ft.slice(); fpdBuild(T); FPD.compileDue = true; try{ gfxFpdBuild(T); }catch(e){ console.error(e); } try{ gfxPadLights(FPD, FPD.scene); }catch(e){}   /* (RS-499, RS-502) */
     try{ fpdWarm(); }catch(e){ console.error(e); try{ gfxCompile(FPD.r, FPD.scene, FPD.cam); }catch(e2){} } }   // (RS-110) build every shader the floor needs now, while it loads, not on your first steps; (RS-344) its props and monsters too
   // resolution adapts to keep the frame rate up on slower graphics. Each change reallocates buffers (a hitch), so (RS-107) it only
   // moves between a few fixed steps, judges the frame rate over about two seconds, ignores one-off spikes, and once a step up
@@ -34323,9 +34342,9 @@ function fpdRender(env, T, camZ){
   }
   for (const pt of FPD.portals||[]){ pt.mat.uniforms.t.value = FP.t + pt.seed; const k = 0.85 + 0.15*Math.sin(FP.t*3 + pt.seed); pt.L.intensity = 0.9*k; pt.pool.material.opacity = 0.55*k; }
   // (the shadow maps only exist after their first pass, so a fresh level gets a warm-up render)
-  if (FPD.warm){ FPD.warm = false; gfxWarmRender(FPD.r, FPD.scene, cam); }   /* (RS-344: into the post target, so it builds the programs the real frames use) */
-  if (FPD.warmGrp) fpdWarmDone();   /* (RS-345: the stand-ins have been drawn once) */
   gfxCompileScene(FPD, FPD.r, FPD.scene, cam, null);   /* (RS-499: the dungeon compiles its floor like the towns do, then waits out the links) */
+  if (FPD.warmGrp) fpdWarmDone();   /* (RS-345: the stand-ins have been drawn once) */
+  if (FPD.warm && !FPD.warmWait){ FPD.warm = false; gfxWarmRender(FPD.r, FPD.scene, cam); }   /* (RS-344: into the post target, so it builds the programs the real frames use; RS-502: after the sliced warm-up has built them one by one - running first, this one call was the whole 9s freeze) */
   gfxRender(FPD.r, FPD.scene, cam, 'fpd');
   return true;
 }
@@ -40409,7 +40428,10 @@ function fpdWarm(){
       const e = m3dInstance(m, pt); e.pt = pt; M3D.inst.set(m, e); grp.add(e.holder); mons.push(e); }catch(e){ console.error(e); } }
   const fc = new Map(); grp.traverse(o=>{ fc.set(o, o.frustumCulled); o.frustumCulled = false; }); grp.position.y = -80;   /* (RS-345: drawn by the warm frame too, below the floor, clipped away) */
   FPD.scene.add(grp);
-  try{ gfxCompile(FPD.r, FPD.scene, FPD.cam); }catch(e){ console.error(e); }
+  /* (RS-502) this one call compiled the whole floor's shaders in one blocking sweep - asking each new program for its uniforms
+     waits out its link, 10s on the audit machine - and it ran BEFORE the sliced compile, which then found nothing left to do.
+     The floor, and this group of stand-ins with it, now goes through the sliced warm-up instead (gfxCompileScene, just after) */
+  if (window.__noWarmSlice) try{ gfxCompile(FPD.r, FPD.scene, FPD.cam); }catch(e){ console.error(e); }
   if (FPD.warmGrp) fpdWarmDone();
   FPD.warmGrp = { grp, mons, fc };
   FPD.warmN = kinds.size + mons.length;
@@ -41870,7 +41892,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-501';
+const GAME_VERSION = 'rs-502';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

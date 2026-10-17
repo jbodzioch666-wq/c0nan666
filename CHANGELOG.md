@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-502 - The dungeon freeze, actually gone
+
+- **A correction first**: RS-499 claimed dungeon entry no longer froze. It still did - the dungeon had two older warm-up paths of its own that compiled every shader in one blocking call before the new sliced compile ever ran, and the measurement mistook that block for build time. Reported from a real save (thank you): entering a dungeon froze for 12-13 seconds on the audit machine, and far longer on a slower one.
+- **Dungeon entry now**: one task of about 3.5s (building the floor itself) and the shader work spread in slices behind the loading card, none longer than the single costliest shader (~1.7s). The dead 13-second freeze is gone. First entry on the uploaded save: a 12.8s freeze before, a 3.7s worst task after.
+- **Going deeper is nearly free**: every floor used to warm all its shaders again - 13s per floor - for two reasons now fixed: the warm-up forgot what it had already drawn, and three.js bakes the number of lights into every shader, so a floor with one more portal or brazier than the last recompiled all of them. Materials are warmed once per session, and each view pads its point lights to the most it has seen with dark stand-ins, so the count holds steady. Floors below the first: 13.7s before, 0.6-1.8s after.
+- **Steadier shaders across sessions too**: with light counts padded, the same shaders are generated run after run, so the browser's own compiled-shader cache can serve them on your next session.
+
 ## RS-501 - The land out of the matrix walk
 
 - **The placed land is frozen**: every tree stump, ore vein, fishing spot and landmark had its transform matrix recomposed by the renderer every single frame, though none of them ever move. The gathering nodes and landmarks (about 2,200 objects on a busy map) are now frozen once placed and skipped by the per-frame walk entirely; their matrices stay exact (checked against a fresh compose in the new test). The wildlife, boats, light beams and fish fins keep moving as before, and a once-a-second sweep freezes whatever a chunk rebuild just added. The renderer's matrix walk on the open land fell from about 1.1 ms to 0.5 ms a frame - headroom that matters most on phones and weaker PCs.
