@@ -8,8 +8,8 @@ module.exports = async page=>{
     m3dInstance({}, rsPlayerLook()); m3dInstance({}, m3dPortrait({ nm:'goblin archer' }));
     const keys = [...M3D.sculpt.keys()], snap = {}; localStorage.setItem('t500k', JSON.stringify(keys)); for (const k of keys.slice(0, 40)){ const a = M3D.sculpt.get(k).attributes.position.array; snap[k] = [a.length, a[0], a[1], a[Math.floor(a.length/2)], a[a.length-1]]; }
     localStorage.setItem('t500', JSON.stringify(snap));
-    await new Promise(r2=>setTimeout(r2, 1600));   /* (the write-behind flushes) */
-    return { sculpts:keys.length }; });
+    let w = 0; while ((SCULPT_DB.dirty.length || sculptDbPut.tm) && w++ < 60) await new Promise(r2=>setTimeout(r2, 500));   /* (the write-behind trickles out, about a megabyte a beat since RS-503) */
+    return { sculpts:keys.length, drained:!SCULPT_DB.dirty.length }; });
   console.log('COLD', JSON.stringify(cold));
   await page.waitForTimeout(800); await page.reload(); await page.waitForTimeout(1500);
   const warm = await page.evaluate(async ()=>{

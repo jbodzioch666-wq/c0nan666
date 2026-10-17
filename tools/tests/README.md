@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs503 | Mid-play shader warms sip frames without the card; the freeze sweep skips unchanged land; cache writes in sips |
 | rs502 | Deeper floors reuse the first floor's shaders: warm-once materials and a padded, steady light count |
 | rs501 | The placed land frozen out of the per-frame matrix walk, its matrices still exact; animated pieces and beasts live |
 | rs500 | Sculpts cached in IndexedDB: a warm session rebuilds figures byte-identical with no sculpting at all |

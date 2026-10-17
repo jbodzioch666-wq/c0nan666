@@ -23984,10 +23984,11 @@ function gfxWarmRender(r, scene, cam){ const rt = r.getRenderTarget(), t = gfxTa
 // (RS-353: the RS-352 every-other-frame shadow map is gone - a walking figure shadowed by its own last pose flickered)
 function gfxCompileScene(V, r, scene, cam, warm){
   if (!V.compileDue || !r || !scene) return; V.compileDue = false;
+  const live = V.compileLive===true; V.compileLive = undefined;   /* (RS-503: set where a rebuild happens mid-play, not at a load) */
   let grp = null;
   if (warm && V.warmFor!==r){ V.warmFor = r; try{ grp = V.warmGrp = warm(); }catch(e){ console.error(e); grp = null; } }
   if (grp){ grp.traverse(o=>{ o.frustumCulled = false; }); grp.position.y -= 80; scene.add(grp); }   /* (drawn wherever they are: below the land, clipped away) */
-  if (!window.__noWarmSlice) return gfxCompileSliced(V, r, scene, cam, grp);   /* (RS-499) */
+  if (!window.__noWarmSlice) return gfxCompileSliced(V, r, scene, cam, grp, live);   /* (RS-499) */
   try{ gfxCompile(r, scene, cam); }catch(e){ console.error(e); }
   if (grp){ try{ gfxWarmRender(r, scene, cam); }catch(e){ console.error(e); } scene.remove(grp); }
 }
@@ -24006,7 +24007,8 @@ function gfxPadLights(V, scene){
   while (pads.length < need){ const L = new THREE.PointLight(0xffffff, 0, 0.001, 2); L.userData.padL = 1; L.position.set(0, -60, 0); scene.add(L); pads.push(L); }
   for (let i=0;i<pads.length;i++){ pads[i].visible = i < need; if (pads[i].parent!==scene) scene.add(pads[i]); }
 }
-function gfxCompileSliced(V, r, scene, cam, grp){
+function gfxCompileSliced(V, r, scene, cam, grp, live){
+  if (V.warmWait) gfxWarmFlush(V);   /* (a newer build arrived mid-warm: show what the old one still hid, and let it queue afresh) */
   /* the real scene, the real camera, the real target - anything else and the driver builds different shader variants, and the
      first real frame still pays for all of them at once. All unwarmed materials start hidden; each slice shows a few more and
      draws the whole scene once, off screen, so only those few pay their first-draw cost in that slice */
@@ -24015,18 +24017,24 @@ function gfxCompileSliced(V, r, scene, cam, grp){
   scene.traverse(o=>{ if ((o.isMesh || o.isPoints || o.isLine || o.isSprite) && o.material){ objs.push([o, o.frustumCulled]); o.frustumCulled = false; const m = o.material; if (Array.isArray(m)) m.forEach(put); else put(m); } });
   if (!mats.length){ for (const [o, fc] of objs) o.frustumCulled = fc; if (grp) scene.remove(grp); return; }   /* (RS-502: the next floor down reuses the last one's shaders - no warm pause at all) */
   for (const m of mats){ m.__warmVis = m.visible; m.visible = false; }
-  V.warmWait = { r, scene, cam, grp, mats, objs, i:0 };
-  gfxWarmCard();   /* (the first slice waits for the next frame, so the build's own task ends here) */
+  V.warmWait = { r, scene, cam, grp, mats, objs, i:0, live:!!live };
+  if (!live) gfxWarmCard();   /* (the first slice waits for the next frame, so the build's own task ends here) */
+}
+function gfxWarmFlush(V){
+  const W = V.warmWait; if (!W) return; V.warmWait = null;
+  for (let i = W.i; i < W.mats.length; i++){ const m = W.mats[i]; if (m.__warmVis!==undefined){ m.visible = m.__warmVis; delete m.__warmVis; } }
+  for (const [o, fc] of W.objs) o.frustumCulled = fc;
+  if (W.grp) W.scene.remove(W.grp);
 }
 function gfxWarmStep(V){
   const W = V.warmWait; if (!W) return false;
-  const t0 = performance.now(), seen = gfxWarmSeen(W.r);
+  const t0 = performance.now(), seen = gfxWarmSeen(W.r), budget = W.live ? 10 : 120;   /* (RS-503: a live warm sips - never a hitch, never the card; what it still hides pops in a few frames later, far off at the window's edge) */
   while (W.i < W.mats.length){
     const m = W.mats[W.i++]; m.visible = m.__warmVis===undefined ? true : m.__warmVis; delete m.__warmVis; seen.add(m);
     try{ gfxWarmRender(W.r, W.scene, W.cam); }catch(e){ console.error(e); }
-    if (performance.now() - t0 > 120) break;
+    if (performance.now() - t0 > budget) break;
   }
-  if (W.i < W.mats.length){ gfxWarmCard(); return true; }
+  if (W.i < W.mats.length){ if (!W.live) gfxWarmCard(); return !W.live; }
   for (const [o, fc] of W.objs) o.frustumCulled = fc;
   V.warmWait = null;
   if (W.grp) W.scene.remove(W.grp);
@@ -31369,7 +31377,7 @@ function o3BuildSwap(st){
   if (O3.uDep) O3.uDep.value = O3.depthTex || null; if (O3.uDepO && O3.depthO) O3.uDepO.value.copy(O3.depthO);   /* (RS-414) */
   if (O3.world && O3.world.parent!==sc) sc.add(O3.world);
   for (const p of O3.plates||[]){ p.el.__pend = 0; p.el.style.display = 'none'; }   /* (the plate loop shows the near ones next frame) */
-  O3.compileDue = true; try{ o3FarWin(); }catch(e){} try{ o3FreezeStatic(); }catch(e){}   /* (RS-355) */   /* (RS-501: the fresh chunks froze stale) */
+  O3.compileDue = true; O3.compileLive = true; try{ o3FarWin(); }catch(e){} try{ o3FreezeStatic(true); }catch(e){}   /* (RS-355) */   /* (RS-501: the fresh chunks froze stale; RS-503: warmed quietly - this happens mid-walk) */
 }
 function o3BuildStart(cx, cy){ O3.pend = { gen:o3BuildGen(cx, cy), st:o3BuildFresh(), n:0, cx, cy }; }
 function o3BuildAbandon(){ const P = O3.pend; if (!P) return; O3.pend = null; for (const p of P.st.plates||[]) p.el.remove(); if (P.st.world){ try{ o3DisposeWorld(P.st.world, O3.world); }catch(e){ console.error(e); } } if (P.st.depthTex && P.st.depthTex!==O3.depthTex) P.st.depthTex.dispose(); }   /* (RS-414: its materials, textures and depth map too) */
@@ -32474,7 +32482,7 @@ function o3SyncNodes(){
     changed = true; built++;
   }
   for (const [ck, c] of C) if (!want.has(ck)){ o3FreeNodeChunk(c); C.delete(ck); changed = true; }
-  if (changed || !O3.nodeHits){ O3.nodeHits = []; O3.nodeAnim = []; for (const c of C.values()){ for (const h of c.hits) O3.nodeHits.push(h); for (const a of c.anim) O3.nodeAnim.push(a); } try{ o3FreezeStatic(); }catch(e){} }
+  if (changed || !O3.nodeHits){ O3.nodeHits = []; O3.nodeAnim = []; for (const c of C.values()){ for (const h of c.hits) O3.nodeHits.push(h); for (const a of c.anim) O3.nodeAnim.push(a); } try{ o3FreezeStatic(true); }catch(e){} }
 }
 // one chunk's spots, built into g (O3.nodeHits and O3.nodeAnim are the chunk's own lists while it builds)
 function o3BuildNodeChunk(list, g){
@@ -33027,9 +33035,11 @@ function o3SiteStandOff(x, y){
    every frame - a good share of each overworld frame on a busy map. The gathering nodes and landmarks are frozen once placed
    (matrixAutoUpdate off, their roots gated); the few animated pieces (light beams, fins - O3.nodeAnim) stay live, and a
    once-a-second sweep freezes whatever a chunk rebuild just added */
-function o3FreezeStatic(){
+function o3FreezeStatic(force){
   const skip = new Set(); for (const a of (O3.nodeAnim||[])) if (a.o) skip.add(a.o);
   for (const k of ['nodeGrp', 'lmGrp']){ const g = O3[k]; if (!g) continue;   /* (not wildGrp: that's the wildlife, and it walks) */
+    const sig = g.children.length; if (!force && g.userData.frzSig===sig) continue;   /* (RS-503: the once-a-second sweep only sweeps what changed - recomposing 2,000 still matrices every second was its own little hitch) */
+    g.userData.frzSig = sig;
     g.matrixWorldAutoUpdate = true; g.updateMatrixWorld(true); g.traverse(o=>{ if (!skip.has(o)) o.matrixAutoUpdate = false; });
     g.matrixWorldAutoUpdate = false; }   /* (the whole subtree skipped per frame, not just its composes; refreshed by force on a rebuild) */
 }
@@ -34537,10 +34547,15 @@ function sculptDbPut(key, geo){
     v.bytes = v.p.byteLength + v.n.byteLength + (v.c ? v.c.byteLength : 0) + (v.u ? v.u.byteLength : 0) + v.i.byteLength;
     SCULPT_DB.dirty.push([key, v]);
     if (sculptDbPut.tm) return;   /* (never postponed: a steady stream of sculpts - the skeleton builds one bone a tick - starved a debounce for good) */
-    sculptDbPut.tm = setTimeout(()=>{ sculptDbPut.tm = 0; const list = SCULPT_DB.dirty; SCULPT_DB.dirty = [];
-      try{ const tx = SCULPT_DB.db.transaction(['g', 'm'], 'readwrite'), g2 = tx.objectStore('g'), m2 = tx.objectStore('m'), now = Date.now();
-        for (const [k, w] of list){ g2.put(w, k); m2.put({ at:now, bytes:w.bytes }, k); } }catch(e){} }, 800);
+    sculptDbPut.tm = setTimeout(sculptDbFlush, 800);
   }catch(e){}
+}
+function sculptDbFlush(){
+  sculptDbPut.tm = 0; let take = 0, bytes = 0; while (take < SCULPT_DB.dirty.length && bytes < 1.2e6){ bytes += SCULPT_DB.dirty[take][1].bytes||0; take++; }
+  const list = SCULPT_DB.dirty.splice(0, Math.max(1, take));   /* (RS-503: about a megabyte per beat - cloning many megabytes for the store mid-walk showed as a hitch) */
+  try{ const tx = SCULPT_DB.db.transaction(['g', 'm'], 'readwrite'), g2 = tx.objectStore('g'), m2 = tx.objectStore('m'), now = Date.now();
+    for (const [k, w] of list){ g2.put(w, k); m2.put({ at:now, bytes:w.bytes }, k); } }catch(e){}
+  if (SCULPT_DB.dirty.length) sculptDbPut.tm = setTimeout(sculptDbFlush, 800);
 }
 function m3dSculpt(key, bounds, h, build){
   M3D.sculpt = M3D.sculpt || new Map();
@@ -41892,7 +41907,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-502';
+const GAME_VERSION = 'rs-503';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

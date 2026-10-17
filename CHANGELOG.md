@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-503 - No more hitches while walking
+
+- **Mid-play shader warm-ups go quiet**: when a slice of land swaps in while you walk, its new shaders used to warm the way a loading screen does - holding frames and even flashing the loading card mid-stride. On a slower machine that read as massive lag spikes everywhere. A warm-up that happens mid-play now sips about 10 milliseconds a frame, never holds a frame and never shows the card; whatever it hasn't warmed yet simply appears a few frames later, far off at the window's edge. Real loads keep the card as before.
+- **The land freeze sweep only sweeps changes**: the once-a-second pass that freezes placed land out of the matrix walk recomposed two thousand matrices every time; it now skips groups that haven't changed.
+- **The sculpt cache writes in sips**: saving freshly sculpted models to the browser store copies their data, and several megabytes in one beat showed as a hitch; it now writes about a megabyte per beat.
+- Walking frame times on the audit machine, this save: dungeon median 8.3 ms (no spikes), overworld 12.6 ms, town 29 ms - all at or better than before the audit began.
+
 ## RS-502 - The dungeon freeze, actually gone
 
 - **A correction first**: RS-499 claimed dungeon entry no longer froze. It still did - the dungeon had two older warm-up paths of its own that compiled every shader in one blocking call before the new sliced compile ever ran, and the measurement mistook that block for build time. Reported from a real save (thank you): entering a dungeon froze for 12-13 seconds on the audit machine, and far longer on a slower one.
