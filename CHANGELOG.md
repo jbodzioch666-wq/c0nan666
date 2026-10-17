@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-491 - Quivers, and the bow on your back
+
+- **Archers start with a quiver**: the Archer kit now comes with a Leather Quiver in the cape slot (+4 ranged accuracy, saves 15% of your arrows).
+- **Quivers you can see**: a worn quiver now hangs on your back, slung from the left hip up to the right shoulder, with its mouth by your drawing hand. It is made of turned leather with rolled rims, two buckled straps and a sheaf of fletched arrows. Dizana's Quiver has gold rims.
+- **Monster archers carry one too**: goblin and orc archers, and others like them, now wear quivers.
+- **The bow slings properly**: a bow put away now lies flat across the middle of your back. Its hidden nocked arrow, longer than the bow itself, had been throwing it off to one side so it floated beside your hip.
+
 ## RS-490 - Crossbows shot like crossbows
 
 - **A real crossbow**: crossbows no longer show up as a plain bow. They have their own model: a carved wooden stock swelling to a butt, a prod in the crossbow's metal lashed across the nose, a stirrup, a bone nut, a long trigger lever, and a bolt with a square head and leather vanes in the groove.
