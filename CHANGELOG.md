@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-477 - Back swipe closes menus
+
+- **The back gesture doesn't close the game any more:** on Android, the side swipe (or the Back button) now works like Escape. It closes whatever menu is open, and in play it opens the pause menu, instead of leaving the page and losing your place. A browser's Back button on a computer does the same.
+- **Still a way out:** on the title screen the swipe is let through, so a second swipe there leaves as usual.
+
 ## RS-476 - Staves finer each grade
 
 - **Magic staves grow grander, in their element's colour:**

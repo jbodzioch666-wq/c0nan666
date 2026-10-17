@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs477 | The back gesture closes the open menu or opens pause, and never leaves the game |
 | rs476 | Magic staves finer each grade - orb and prongs, gold claws and spiral, horned crown and circling stones |
 | rs475 | Cloth hats finer each tier, hem runes shine at the top, tome covers inlaid with your emblem |
 | rs473 | The vampire skull emblem unlocks at Defence 60 and is painted on shields and capes |
