@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-486 - Still shadows
+
+- **No more fluttering:** out on the land and in towns, the sun turned smoothly across the sky with the clock. Every time the shadows were redrawn, every few frames, they landed a hair differently, and their edges fluttered. The sun now moves in tiny half-degree steps, about one every two and a half seconds, so between steps the shadows hold perfectly still. Over the day they still swing round as before.
+
 ## RS-485 - Towns that look like their people
 
 - **Every race builds its own way, on the land:**
