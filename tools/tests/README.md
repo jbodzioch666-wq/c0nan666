@@ -26,7 +26,6 @@ Screenshots go to `tools/tests/shots/`.
 |---|---|
 | boot | the page loads and a character starts |
 | rs502 | Deeper floors reuse the first floor's shaders: warm-once materials and a padded, steady light count |
-| rs502 | Deeper floors reuse the first floor's shaders: warm-once materials and a padded, steady light count |
 | rs501 | The placed land frozen out of the per-frame matrix walk, its matrices still exact; animated pieces and beasts live |
 | rs500 | Sculpts cached in IndexedDB: a warm session rebuilds figures byte-identical with no sculpting at all |
 | rs499 | Dungeon and town entry compile their shaders in slices under the loading card instead of one page-freezing call |
