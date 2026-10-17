@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-495 - Trim all round, and bigger cape emblems
+
+- **The whole cape perimeter**: a trim dye on a cape now runs all the way round it (sides, top and hem), not just along the bottom. A finer cape's gold edging and its embroidered band of lozenges take the dye too.
+- **Patterns take the trim dye**: a robe's stitched runes round the hem now change with its trim band, along with the device on a plate tabard and a wizard hat's glow.
+- **Front trim fixed**: the trim strip down the front of a robe or a plate or dragonhide body now follows the shape of the chest. It used to be a flat bar that a fuller chest swallowed, leaving two loose-looking stubs, one under the collar and one at the waist.
+- **Bigger cape emblems**: the emblem on the back of a cape is now about two-thirds of the cape's width, up from about half. The vampire skull fills the back without spilling over the edges.
+
 ## RS-494 - See yourself at the dye works
 
 - **You, life-size, at the dye works**: the dye works now shows your character on the left of the menu, three times the size of the barber's chair figure. You see what you're wearing as you dye it.

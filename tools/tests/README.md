@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs495 | A trim dye on the whole cape perimeter and embroidery, a robe's hem runes, a tabard's device and a hat's glow |
 | rs494 | You at three times the barber chair size on the left of the dye works, redressed as you dye, stacked on a phone |
 | rs493 | Gear trims (body bands, helm bands, coif stitching, hat band, cape hem, shield rim) dyed on their own |
 | rs492 | A cape emblem chosen and dyed on its own at the dye works, on any cape, shown at once |
