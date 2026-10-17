@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-499 - The loading freezes, mostly gone
+
+- **Entering a dungeon no longer freezes the page**. The graphics driver builds a real pipeline for every shader the first time it draws it, and the first frame of a dungeon floor asked for all of them at once: on the audit save that one call froze the game for 8.7 seconds. The floor's first compile is now sliced - a few pieces at a time, drawn once off screen, with a frame to the browser between slices - while the loading card holds. Measured on the same save: the longest freeze on dungeon entry fell from **8.7s to 0.84s**, stepping out into the overworld from **4.0s to 1.6s**, and loading into a town from **9.8s to 4.8s** (what remains of the town's is building the world itself, not shaders - that's next).
+- **No cost once you're in**: frame rates after loading are unchanged (town 115 fps, dungeon 180 fps on the audit machine, same as before within noise).
+- **Shader error checking off in release**: the renderer also no longer reads every shader's compile log, another forced stall.
+
 ## RS-498 - Towns run faster: the cloth maths tightened
 
 - **The same folds, a third of the cost**: robes, skirts and cloaks fold exactly as before, but the maths behind them was rewritten to work straight on the mesh data. Recomputing the cloth's lighting normals was a quarter of every frame in a busy town; the skirt refold also recalculated four sines per vertex and the cloak re-measured its own bounds every frame.

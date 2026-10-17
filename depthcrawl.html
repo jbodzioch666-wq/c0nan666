@@ -13954,7 +13954,7 @@ function bvMount(){
   const T = THREE;
   if (!BV.r){
     const cv = document.createElement('canvas'); cv.style.cssText = 'width:100%;height:100%;display:block;touch-action:none;';   // (RS-133: drawn at the screen's density, shown at the box's size - on a phone it used to spill out of the box)
-    BV.r = new T.WebGLRenderer({ canvas:cv, alpha:true, antialias:true }); BV.r.setPixelRatio(Math.min(2, window.devicePixelRatio||1)); BV.r.setSize(220, 240, false);
+    BV.r = new T.WebGLRenderer({ canvas:cv, alpha:true, antialias:true }); BV.r.debug.checkShaderErrors = false; BV.r.setPixelRatio(Math.min(2, window.devicePixelRatio||1)); BV.r.setSize(220, 240, false);
     if (T.sRGBEncoding) BV.r.outputEncoding = T.sRGBEncoding; BV.r.toneMapping = T.ACESFilmicToneMapping; BV.r.setClearColor(0x000000, 0);
     BV.scene = new T.Scene(); BV.cam = new T.PerspectiveCamera(30, 220/240, 0.1, 30); BV.cam.position.set(0, 0.8, 3.1); BV.cam.lookAt(0, 0.45, 0);
     BV.scene.add(new T.HemisphereLight(0xdde4f0, 0x2a2018, 0.8));
@@ -23987,10 +23987,48 @@ function gfxCompileScene(V, r, scene, cam, warm){
   let grp = null;
   if (warm && V.warmFor!==r){ V.warmFor = r; try{ grp = V.warmGrp = warm(); }catch(e){ console.error(e); grp = null; } }
   if (grp){ grp.traverse(o=>{ o.frustumCulled = false; }); grp.position.y -= 80; scene.add(grp); }   /* (drawn wherever they are: below the land, clipped away) */
+  if (!window.__noWarmSlice) return gfxCompileSliced(V, r, scene, cam, grp);   /* (RS-499) */
   try{ gfxCompile(r, scene, cam); }catch(e){ console.error(e); }
-  if (grp){ try{ gfxWarmRender(r, scene, cam); }catch(e){ console.error(e); } scene.remove(grp); }   /* (a draw, not just a compile: the driver builds its pipelines at the first draw of each state) */
+  if (grp){ try{ gfxWarmRender(r, scene, cam); }catch(e){ console.error(e); } scene.remove(grp); }
 }
-function gfxRender(r, scene, cam, view){ gfxShadowTick(r, view); if (SET.fps){ gfxGpuMark(r, 'shadow'); gfxGpuPoll(); } try{ gfxRenderInner(r, scene, cam, view); } finally { gfxGpuStop(); } }
+/* (RS-499) a scene's first compile, sliced: the driver builds a program the first time each shader is asked for, and asking for a
+   whole town or dungeon floor at once froze the page for 5 to 8.5 seconds in one call. Now the scene's children are set aside and
+   brought back a slice at a time, compiling as they come, with a frame to the browser between slices - the loading card animates
+   and the page answers - and only then does the first frame draw. Tests keep the old single compile (window.__noWarmSlice) */
+function gfxCompileSliced(V, r, scene, cam, grp){
+  const q = [];   /* (every drawable leaf, wherever it hangs - one top group can hold the whole floor) */
+  scene.traverse(o=>{ if ((o.isMesh || o.isPoints || o.isLine || o.isSprite) && o.material) q.push([o, o.frustumCulled]); else if (o.isLight) o.layers.enable(31); });
+  const c2 = cam.clone(); c2.layers.set(31);   /* (the warm camera sees only the slice layer; the lights shine on both) */
+  V.warmWait = { r, scene, cam:c2, grp, queue:q, i:0 };
+  gfxWarmCard();   /* (the first slice waits for the next frame, so the build's own task ends here) */
+}
+function gfxWarmStep(V){
+  const W = V.warmWait; if (!W) return false;
+  const t0 = performance.now();
+  while (W.i < W.queue.length){
+    const [o] = W.queue[W.i++]; o.layers.enable(31); o.frustumCulled = false;
+    /* a draw, not just a compile: on Windows the driver builds each shader's real pipeline at its first draw, so each slice
+       joins the warm layer and is drawn once, off screen, paying for its own new programs there */
+    try{ gfxWarmDraw(W.r, W.scene, W.cam); }catch(e){ console.error(e); }
+    if (performance.now() - t0 > 120) break;
+  }
+  if (W.i < W.queue.length){ gfxWarmCard(); return true; }
+  for (const [o, fc] of W.queue){ o.layers.disable(31); o.frustumCulled = fc; }
+  V.warmWait = null;
+  if (W.grp) W.scene.remove(W.grp);
+  return false;
+}
+function gfxWarmDraw(r, scene, cam){
+  let rt = r.__warmRT; if (!rt) rt = r.__warmRT = new THREE.WebGLRenderTarget(256, 256, { depthBuffer:true });
+  const old = r.getRenderTarget(); r.setRenderTarget(rt); try{ r.render(scene, cam); } finally { r.setRenderTarget(old); }
+}
+function gfxWarmCard(){   /* (the loading card stays up while the driver links, and the next frame tries again) */
+  try{ const el = document.getElementById('loadCard'); if (el){ el.classList.add('show'); clearTimeout(loadingCard.tm); loadingCard.tm = setTimeout(()=>el.classList.remove('show'), 900); } }catch(e){}
+  if (!gfxWarmCard.raf) gfxWarmCard.raf = requestAnimationFrame(()=>{ gfxWarmCard.raf = 0; try{ renderGame(); }catch(e){} });
+}
+function gfxRender(r, scene, cam, view){
+  try{ const V = view==='v3' ? V3 : view==='o3' ? O3 : view==='fpd' ? FPD : null; if (V && V.warmWait && gfxWarmStep(V)) return; }catch(e){}
+  gfxShadowTick(r, view); if (SET.fps){ gfxGpuMark(r, 'shadow'); gfxGpuPoll(); } try{ gfxRenderInner(r, scene, cam, view); } finally { gfxGpuStop(); } }
 /* (RS-380) in a town and on the open land the sun's shadow map is drawn every other frame, every third on a phone or when
    frames come slow: it was a second drawing of every shadow-caster in sight, every frame, and nothing in it moves fast
    enough to show. The dungeon's torches have had their own clock since RS-323 (dgShadowTick) */
@@ -30716,7 +30754,7 @@ function v3Init(){
     cv.addEventListener('webglcontextlost', ()=>{ try{ saveCurrentGame(); }catch(e){} crashBanner('The 3D view ran out of graphics memory. Your game is saved: tap Reload to carry on.'); });   // (RS-137)
     wrap.appendChild(cv); V3.cv = cv;
     const lab = document.createElement('div'); lab.id = 'v3labels'; lab.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:hidden;display:none;'; wrap.appendChild(lab); V3.labels = lab;
-    const R = V3.renderer = new T.WebGLRenderer({ canvas:cv, antialias:true, powerPreference:'high-performance' });   /* (RS-351: the fast card on a machine with two - the dungeon asked, the town and the land didn't) */
+    const R = V3.renderer = new T.WebGLRenderer({ canvas:cv, antialias:true, powerPreference:'high-performance' }); R.debug.checkShaderErrors = false;   /* (RS-499: checking every shader's compile log stalls the GPU queue - town entry spent 5s in it) */   /* (RS-351: the fast card on a machine with two - the dungeon asked, the town and the land didn't) */
     R.shadowMap.enabled = true; R.shadowMap.type = gfxPhone() ? T.PCFShadowMap : T.PCFSoftShadowMap;   /* (RS-348) */
     if (T.sRGBEncoding) R.outputEncoding = T.sRGBEncoding;
     R.toneMapping = T.ACESFilmicToneMapping;
@@ -32264,7 +32302,7 @@ function o3Init(){
     cv.addEventListener('webglcontextlost', ()=>{ try{ saveCurrentGame(); }catch(e){} crashBanner('The 3D view ran out of graphics memory. Your game is saved: tap Reload to carry on.'); });   // (RS-137)
     wrap.appendChild(cv); O3.cv = cv;
     const lab = document.createElement('div'); lab.id = 'o3labels'; lab.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:hidden;display:none;'; wrap.appendChild(lab); O3.labels = lab;
-    const R = O3.renderer = new T.WebGLRenderer({ canvas:cv, antialias:true, powerPreference:'high-performance' });   /* (RS-351) */
+    const R = O3.renderer = new T.WebGLRenderer({ canvas:cv, antialias:true, powerPreference:'high-performance' }); R.debug.checkShaderErrors = false;   /* (RS-499) */   /* (RS-351) */
     R.shadowMap.enabled = true; R.shadowMap.type = gfxPhone() ? T.PCFShadowMap : T.PCFSoftShadowMap;   /* (RS-348) */
     if (T.sRGBEncoding) R.outputEncoding = T.sRGBEncoding;
     R.toneMapping = T.ACESFilmicToneMapping;
@@ -33335,7 +33373,7 @@ function fpdInit(){
        whole every frame (a full-screen resampled blit), and kept its drawing buffer about for the copy */
     cv.id = 'dungeonGL'; cv.style.cssText = 'position:absolute;display:none;pointer-events:none;';
     { const wrap = canvas.parentElement; if (wrap) wrap.insertBefore(cv, canvas); }
-    const r = new T.WebGLRenderer({ canvas:cv, antialias:true, powerPreference:'high-performance' });
+    const r = new T.WebGLRenderer({ canvas:cv, antialias:true, powerPreference:'high-performance' }); r.debug.checkShaderErrors = false;   /* (RS-499: reading the compile logs froze dungeon entry for 8.5s) */
     r.outputEncoding = T.sRGBEncoding; r.toneMapping = T.NoToneMapping;
     r.shadowMap.enabled = true; r.shadowMap.type = T.PCFShadowMap; r.shadowMap.autoUpdate = false;
     const scene = new T.Scene(), cam = new T.PerspectiveCamera(60, 16/9, 0.03, 40);
@@ -34158,7 +34196,7 @@ function fpdRender(env, T, camZ){
   const ft = FP.ftile;
   let stale = FPD.mapRef!==G.map || FPD.theme!==T.key || !FPD.ftile || FPD.ftile.length!==ft.length;
   if (!stale) for (let i=0;i<ft.length;i++) if (ft[i]!==FPD.ftile[i]){ stale = true; break; }
-  if (stale){ FPD.mapRef = G.map; FPD.theme = T.key; FPD.ftile = ft.slice(); fpdBuild(T); try{ gfxFpdBuild(T); }catch(e){ console.error(e); }
+  if (stale){ FPD.mapRef = G.map; FPD.theme = T.key; FPD.ftile = ft.slice(); fpdBuild(T); FPD.compileDue = true; try{ gfxFpdBuild(T); }catch(e){ console.error(e); }   /* (RS-499) */
     try{ fpdWarm(); }catch(e){ console.error(e); try{ gfxCompile(FPD.r, FPD.scene, FPD.cam); }catch(e2){} } }   // (RS-110) build every shader the floor needs now, while it loads, not on your first steps; (RS-344) its props and monsters too
   // resolution adapts to keep the frame rate up on slower graphics. Each change reallocates buffers (a hitch), so (RS-107) it only
   // moves between a few fixed steps, judges the frame rate over about two seconds, ignores one-off spikes, and once a step up
@@ -34270,6 +34308,7 @@ function fpdRender(env, T, camZ){
   // (the shadow maps only exist after their first pass, so a fresh level gets a warm-up render)
   if (FPD.warm){ FPD.warm = false; gfxWarmRender(FPD.r, FPD.scene, cam); }   /* (RS-344: into the post target, so it builds the programs the real frames use) */
   if (FPD.warmGrp) fpdWarmDone();   /* (RS-345: the stand-ins have been drawn once) */
+  gfxCompileScene(FPD, FPD.r, FPD.scene, cam, null);   /* (RS-499: the dungeon compiles its floor like the towns do, then waits out the links) */
   gfxRender(FPD.r, FPD.scene, cam, 'fpd');
   return true;
 }
@@ -39920,7 +39959,7 @@ function fpwInit(){
   try{
     const T = THREE;
     FPW.cv = document.createElement('canvas');
-    const R = FPW.r = new T.WebGLRenderer({ canvas:FPW.cv, alpha:true, antialias:true, preserveDrawingBuffer:true });
+    const R = FPW.r = new T.WebGLRenderer({ canvas:FPW.cv, alpha:true, antialias:true, preserveDrawingBuffer:true }); R.debug.checkShaderErrors = false;   /* (RS-499) */
     if (T.sRGBEncoding) R.outputEncoding = T.sRGBEncoding;
     R.toneMapping = T.ACESFilmicToneMapping; R.setClearColor(0x000000, 0);
     FPW.scene = new T.Scene();
@@ -41760,7 +41799,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-498';
+const GAME_VERSION = 'rs-499';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -42154,7 +42193,7 @@ function lpMount(){
   try{
     if (!LP.r){
       const cv = document.createElement('canvas');
-      LP.r = new T.WebGLRenderer({ canvas:cv, alpha:true, antialias:true }); LP.r.setPixelRatio(Math.min(2, window.devicePixelRatio||1)); LP.r.setSize(240, 293, false);
+      LP.r = new T.WebGLRenderer({ canvas:cv, alpha:true, antialias:true }); LP.r.debug.checkShaderErrors = false;   /* (RS-499) */ LP.r.setPixelRatio(Math.min(2, window.devicePixelRatio||1)); LP.r.setSize(240, 293, false);
       if (T.sRGBEncoding) LP.r.outputEncoding = T.sRGBEncoding; LP.r.toneMapping = T.ACESFilmicToneMapping; LP.r.setClearColor(0x000000, 0);
       LP.scene = new T.Scene(); LP.cam = new T.PerspectiveCamera(30, 240/293, 0.1, 20); LP.cam.position.set(0, 0.6, 2.05); LP.cam.lookAt(0, 0.5, 0);
       LP.scene.add(new T.HemisphereLight(0xdde4f0, 0x2a2018, 0.7));
