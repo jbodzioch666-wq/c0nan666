@@ -6242,6 +6242,7 @@ function singlePlayerAttack(mi){
     if (!sneak && (roll===1 || atkTotal < effAC)){
       logMsg(`you ${atkType==='ranged' ? (W && W.thrown ? 'throw at' : 'shoot at') : 'swing at'} the ${m.nm} and miss (${atkTotal} vs AC ${effAC})`, '');
       sfx('miss'); fxSplat(m.x+0.5, m.y+0.5, '0', 'block');
+      try{ if (typeof fpBurst==='function') fpBurst(m.x+0.5, m.y+0.5, 0.08, '#8a8070', 9, 0.7); }catch(e){}   /* (RS-479: a puff of dust where the blow fell short) */
       return false;
     }
   }
@@ -23903,11 +23904,18 @@ const GFX_GRADES = {
   haunted:  { gain:[0.9,0.95,1.0],  lift:[0.004,0.006,0.012], sat:0.6, con:1.04, bloom:0.55, vig:0.4 },
   crystal:  { gain:[0.96,0.96,1.1], lift:[0.006,0,0.016],    sat:1.08, con:1.04, bloom:0.8,  vig:0.26 },
   town:     { gain:[1.04,1.0,0.95], lift:[0.004,0.002,0],    sat:1.06, con:1.03, bloom:0.55, vig:0.2 },
-  dungeon:  { gain:[1.0,0.97,0.93], lift:[0,0,0.004],        sat:0.9,  con:1.07, bloom:0.8,  vig:0.4 },
+  dungeon:  { gain:[0.97,0.98,1.02], lift:[0,0.002,0.008],   sat:0.86, con:1.1,  bloom:0.85, vig:0.44 },   /* (RS-479: cool grey stone) */
+  /* (RS-479) each kind of place below ground its own light */
+  mine:     { gain:[1.08,0.98,0.84], lift:[0.012,0.006,0],    sat:0.95, con:1.1,  bloom:0.9,  vig:0.44 },   // warm amber lamplight
+  crypt:    { gain:[0.9,1.0,0.9],   lift:[0.002,0.01,0.004],  sat:0.66, con:1.08, bloom:0.75, vig:0.5 },    // sickly green-grey
+  sunken:   { gain:[0.92,0.9,1.1],  lift:[0.008,0.002,0.016], sat:0.9,  con:1.08, bloom:0.95, vig:0.46 },   // cold violet
+  castle:   { gain:[1.06,1.0,0.9],  lift:[0.006,0.004,0],     sat:0.96, con:1.08, bloom:0.85, vig:0.4 },    // warm torchlit stone
+  pyramid:  { gain:[1.1,1.02,0.82], lift:[0.014,0.008,0],     sat:0.92, con:1.08, bloom:0.9,  vig:0.42 },   // dusty gold
+  lair:     { gain:[1.1,0.92,0.84], lift:[0.012,0.002,0],     sat:1.0,  con:1.1,  bloom:0.95, vig:0.46 },   // a dragon's den, red-lit
 };
 function gfxPostOn(){ return SET.post!==false && SET.gfx!=='low' && !window.__noPost; }
 function gfxGradeKey(view){
-  if (view==='fpd') return G.gameMode===2 ? 'neutral' : 'dungeon';
+  if (view==='fpd'){ if (G.gameMode===2) return 'neutral'; const k = G.siteKind; return k==='mine' ? 'mine' : k==='graveyard' || k==='necro' ? 'crypt' : k==='temple' ? 'sunken' : k==='castle' ? 'castle' : k==='pyramid' ? 'pyramid' : k==='lair' ? 'lair' : 'dungeon'; }   /* (RS-479) */
   if (view==='v3'){ const t = G.villageTheme; return t==='desert' ? 'desert' : t==='tundra' ? 'tundra' : t==='swamp' ? 'swamp' : 'town'; }
   const x = G.owPos.x, y = G.owPos.y, b = wgBioAt(x, y), bio = b && BIO[b] ? BIO[b].id : null;
   if (bio==='volcanic' || bio==='jungle' || bio==='haunted' || bio==='crystal') return bio;
@@ -34088,7 +34096,8 @@ function fpdRender(env, T, camZ){
     FPD.lan.intensity *= 1 + lb*0.12 + fk*Math.sin(FP.t*9.7) + fk*0.6*Math.sin(FP.t*23.3);
     FPD.lan.position.x += 0.06*Math.sin(FP.t*1.9); FPD.lan.position.z += 0.05*Math.cos(FP.t*1.6); FPD.lan.distance *= 1 + lb*0.15; }
   const a = env.amb, am = Math.max(a[0],a[1],a[2],1e-3);
-  FPD.amb.color.setRGB(a[0]/am, a[1]/am, a[2]/am); FPD.amb.intensity = T.outdoor ? 0 : am*2*0.75;   /* (RS-323: a dimmer fill below ground, so the pools of light show) */
+  FPD.amb.color.setRGB(a[0]/am, a[1]/am, a[2]/am); FPD.amb.intensity = T.outdoor ? 0 : am*2*0.52;   /* (RS-323: a dimmer fill below ground, so the pools of light show; RS-479: dimmer still) */
+  if (!T.outdoor) FPD.amb.color.lerp(new THREE.Color(0.62, 0.72, 1.0), 0.4);   /* (RS-479: the dark between the torches a faint cold blue, so it reads as darkness, not murk) */
   const out = T.outdoor, fog = FPD.scene.fog;
   FPD.sky.visible = out; FPD.dust.visible = !out; cam.far = out ? 90 : 40; cam.updateProjectionMatrix();
   const fogAdd = ISO.on ? ISO.dist - 1.5 : 0;   // (seen from above, the fog starts where the room does)
@@ -34142,7 +34151,7 @@ function fpdRender(env, T, camZ){
   if (FPD.shadowFrames > 0){ FPD.shadowFrames--; FPD.r.shadowMap.needsUpdate = true; }
   FPD.torches.forEach((L,j)=>{ const o = fl[j]; if (!o){ L.intensity = 0; return; } const s = o.f.seed*40;
     const fk = 0.84 + 0.1*Math.sin(FP.t*8.3+s) + 0.06*Math.sin(FP.t*21.1+s*2.3) + 0.04*Math.sin(FP.t*37.7+s*3.1);
-    L.intensity = 1.9*fk*(o.f.k||1);   /* (RS-166: a bit stronger, so its shadows read) */
+    L.intensity = 2.25*fk*(o.f.k||1);   /* (RS-166: a bit stronger, so its shadows read; RS-479: stronger again - the torches light the place now) */
     if (o.f.col && !L.userData.col){ L.color.set(o.f.col); L.userData.col = o.f.col; } else if (!o.f.col && L.userData.col){ L.color.setHex(0xff8a36); L.userData.col = null; }
     // the flame dances, so its light (and the shadows it throws) sway with it
     // (RS-166) the light sits a little out from the wall and above head height, so people and creatures throw a clear shadow
@@ -39429,11 +39438,11 @@ function fpCollectSprites(vis){
     const hit0 = { dmg:(prevHp||0) - m.hp, maxHp:m.maxHp, kind:m.hitKind||'melee', crit:!!m.hitCrit, elem:m.hitElem||'' };   /* (RS-371: what the killing blow was, for the throw) */
     if (prevHp!==undefined && m.hp<prevHp && seeTile(m.x,m.y)){
       FP.floats.push({x:pos.x, y:pos.y, z:0.95, txt:String(prevHp-Math.max(0,m.hp)), col:'#ffd27a', kind:m.hitKind||'melee', crit:!!m.hitCrit, age:-(ISO.on ? isoShotDelay(pos.x, pos.y) : 0)});
-      m.hitKind = null; m.hitCrit = false;
+      m.hitCrit0 = m.hitCrit; m.hitKind = null; m.hitCrit = false;
       FP.monFlash.set(m, 1);
-      fpBurst(pos.x, pos.y, 0.45, '#fff2c0', 6, 1.2);
+      { const mt = fxStrikeKind(m), crit = !!m.hitCrit0; fxStrike(pos.x, pos.y, mt, crit ? 1.6 : 1); if (crit) FP.hitStop = Math.max(FP.hitStop||0, 0.07); }   /* (RS-479: by what it struck) */
     }
-    if (was && !m.alive && seeTile(m.x,m.y)){ fpBurst(pos.x, pos.y, 0.35, m.col||'#999', 22, 1.6); m3dKill(m, hit0); }
+    if (was && !m.alive && seeTile(m.x,m.y)){ fpBurst(pos.x, pos.y, 0.35, m.col||'#999', 22, 1.6); fxStrike(pos.x, pos.y, fxStrikeKind(m), 2.4); FP.hitStop = Math.max(FP.hitStop||0, 0.11); m3dKill(m, hit0); }   /* (RS-479: and a kill a bigger one, with a beat's pause) */
     if (!m.alive || !seeTile(m.x,m.y)){ pos.x = m.x+0.5; pos.y = m.y+0.5; continue; }
     if (Math.hypot(m.x+0.5-pos.x, m.y+0.5-pos.y)>2){ pos.x = m.x+0.5; pos.y = m.y+0.5; }
     if (ISO.on && FPD.ok) isoGlide(pos, m.x+0.5, m.y+0.5);   // an even walking pace from tile to tile
@@ -39560,6 +39569,21 @@ function fpCollectSprites(vis){
       vx:(Math.random()-0.5)*0.08, vy:(Math.random()-0.5)*0.08, vz:0.25+Math.random()*0.2, life:1.2+Math.random(), age:0, col:'#ffb45c', add:true, r:0.012});
   }
   return S;
+}
+/* (RS-479) what a blow strikes, by the foe: bone (the undead), stone or iron (golems, constructs, armoured knights - sparks), slime, or flesh */
+function fxStrikeKind(m){ const n = (m.nm||'').toLowerCase();
+  if (/ooze|slime|jelly|pudding|mould|mold/.test(n)) return 'slime';
+  if (m.undead && !/ghost|wraith|spectre|specter|shadow|wisp|banshee|phantom/.test(n)) return 'bone';
+  if (/golem|construct|animated|armou?r|knight|gargoyle|statue|xorn|elemental/.test(n)) return 'spark';
+  if (m.undead) return 'spirit';
+  return 'flesh'; }
+function fxStrike(x, y, kind, k){
+  if (typeof fpBurst!=='function') return; k = k || 1;
+  if (kind==='spark'){ fpBurst(x, y, 0.55, '#fff0b0', Math.round(10*k), 2.4); fpBurst(x, y, 0.55, '#ff9a30', Math.round(6*k), 1.8); }
+  else if (kind==='bone'){ fpBurst(x, y, 0.5, '#e8e0c8', Math.round(8*k), 1.5); fpBurst(x, y, 0.45, '#9a8e70', Math.round(4*k), 1.1); }
+  else if (kind==='slime') fpBurst(x, y, 0.35, '#7ac04a', Math.round(10*k), 1.2);
+  else if (kind==='spirit') fpBurst(x, y, 0.6, '#c8d8ff', Math.round(9*k), 0.9);
+  else { fpBurst(x, y, 0.5, '#8a1010', Math.round(9*k), 1.4); fpBurst(x, y, 0.5, '#d83a2a', Math.round(4*k), 1.0); }
 }
 function fpBurst(x,y,z,col,n,spd){
   n = Math.max(1, Math.round(n*gfxQ().fx));
@@ -39893,7 +39917,10 @@ function isoCamera(cam, aspect){
   { const L = ISO.lead || (ISO.lead = { x:0, y:0 }), gx = p.x+0.5 - tx, gy = p.y+0.5 - ty, gd = Math.hypot(gx, gy), mv = pp ? (pp.mv||0) : 0;
     const wx = gd > 0.05 ? gx/gd*0.7*mv : 0, wy = gd > 0.05 ? gy/gd*0.7*mv : 0, kl = 1-Math.exp(-(FP.dt||0.016)*(gd > 0.05 ? 2.2 : 1.4));
     L.x += (wx-L.x)*kl; L.y += (wy-L.y)*kl; ISO.focus.x += (tx + L.x - ISO.focus.x)*k; ISO.focus.y += (ty + L.y - ISO.focus.y)*k; }
-  const yaw = isoYaw(), el = ISO.el, D = ISO.dist, f = ISO.focus;
+  /* (RS-479) in a fight the camera eases in a little, and back out when it's over */
+  { const near = G.gameMode!==3 && (G.mon||[]).some(m=>m.alive && !m.ally && Math.hypot(m.x - p.x, m.y - p.y) < 4.5 && (typeof seeTile!=='function' || seeTile(m.x, m.y))), want = near ? 0.88 : 1;
+    ISO.zf = (ISO.zf||1) + (want - (ISO.zf||1))*(1 - Math.exp(-(FP.dt||0.016)*(near ? 2.2 : 1.2))); }
+  const yaw = isoYaw(), el = ISO.el, D = ISO.dist*(ISO.zf||1), f = ISO.focus;
   if (ISO.yawNow===undefined) ISO.yawNow = yaw;
   let dy = yaw-ISO.yawNow; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); ISO.yawNow += dy*(1-Math.exp(-(FP.dt||0.016)*9));
   cam.aspect = aspect; cam.fov = 30; cam.near = 0.5; cam.far = D+40;
@@ -41156,7 +41183,7 @@ function isoTickFight(now){
 function renderFirstPerson(){
   const now = performance.now();
   const dt = FP.lastTs ? clamp((now-FP.lastTs)/1000, 0, 0.1) : 0.016;
-  FP.lastTs = now; FP.dt = dt; FP.t += dt;
+  FP.lastTs = now; FP.dt = dt; FP.t += dt*((FP.hitStop||0) > 0 ? 0.12 : 1); FP.hitStop = Math.max(0, (FP.hitStop||0) - dt);   /* (RS-479: a beat's pause on a heavy blow - no shake) */
   const vis = G.gameMode===1 ? computeDungeonVisible() : new Set();
   if (G.gameMode===1){
     if (!G.dungeonSeen) G.dungeonSeen = makeGrid(false);
@@ -41421,7 +41448,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-478';
+const GAME_VERSION = 'rs-479';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

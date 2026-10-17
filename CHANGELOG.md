@@ -1,5 +1,23 @@
 # Depthcrawl patch notes
 
+## RS-479 - Moodier, punchier dungeons
+
+- **Lit by the torches:** below ground the fill light is dimmer and a faint cold blue, and the torches are stronger. Pools of warm, flickering light now carry each room, with real darkness between them.
+- **Every kind of place its own light:**
+  - **Plain dungeons:** cool grey stone.
+  - **Mines:** warm amber.
+  - **Graveyards and necromancer towers:** sickly green-grey.
+  - **Sunken temples:** cold violet.
+  - **Castles:** warm torchlit stone.
+  - **The pyramid:** dusty gold.
+  - **Dragon lairs:** red-lit.
+- **Blows you can feel, without shaking the screen:**
+  - **Hits:** a blow throws sparks off armour, golems and stone, bone chips off skeletons, slime off oozes, a cold wisp off spirits, and blood from flesh.
+  - **Misses:** a puff of dust where the blow fell short.
+  - **Kills:** a bigger burst.
+  - **Crits and kills:** a beat's pause, where everything all but freezes for a moment.
+- **The camera leans in:** when foes are close and in sight, the camera eases in a little, and drifts back out when the fight is over.
+
 ## RS-478 - Leather coifs finer each tier
 
 - **The coif grows grander, like the metal helms and wizard's hats:**
