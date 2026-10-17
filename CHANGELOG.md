@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-489 - An archer's draw
+
+- **A slower, steadier shot**: drawing a bow now takes about twice as long. The archer draws, holds a moment, then looses, so the whole shot runs just over a second instead of a quick snap.
+- **The arrow leaves at the loose**: the arrow flies, and its hit lands, when the string is released, not before it's even drawn. The same goes for monster archers. Spells and crossbows are unchanged.
+- **Elbow back and level**: the drawing elbow now sits back along the arrow's line, level with the shoulder, the way a real archer draws, instead of hanging down by the ribs.
+- **Side-on stance**: archers turn their body further side-on to the target, with the head turned back to look along the arrow.
+
 ## RS-488 - Left-handed bows, aimed at the foe
 
 - **The bow is in the left hand** now, drawn back to the right cheek with the right, the way most archers shoot (a bow with a shield on the left arm still goes in the right).

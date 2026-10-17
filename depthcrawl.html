@@ -14167,7 +14167,8 @@ function isoDrawBreath(s, ppu){
 function isoMonShot(m, kind, col){
   if (!ISO.on || !FPD.ok) return;
   const p = G.player, d = Math.hypot(m.x-p.x, m.y-p.y);
-  (ISO.shots = ISO.shots || []).push({ x0:m.x+0.5, y0:m.y+0.5, x1:p.x+0.5, y1:p.y+0.5, t:0, dur:0.12 + d*0.045, kind, col:col||'#fff', m:null, tier:1, elem: kind==='spell' ? 'shadow' : '' });
+  const lag = kind==='arrow' && typeof M3D!=='undefined' && M3D.inst && rigIsBow(M3D.inst.get(m)) ? BOW_LOOSE : 0;   /* (RS-489: an archer's arrow at its loose) */
+  (ISO.shots = ISO.shots || []).push({ x0:m.x+0.5, y0:m.y+0.5, x1:p.x+0.5, y1:p.y+0.5, t:-lag, dur:0.12 + d*0.045, kind, col:col||'#fff', m:null, tier:1, elem: kind==='spell' ? 'shadow' : '' });
 }
 // a boss: calls for help at two-thirds health, enrages at one third, and switches attack styles -
 // telegraphed a turn ahead, so you can swap your protection prayer in time
@@ -38713,8 +38714,9 @@ function m3dPose(e, pos, m, moving, flash){
   const tg = m.faceAt || G.player;   /* (RS-181: a raised minion looks at its foe) */
   const fa = going ? Math.atan2(gx, gy) : Math.atan2(tg.x+0.5 - pos.x, tg.y+0.5 - pos.y) + (e.beast && !e.atk ? 0.55*Math.sin(t*0.35) + (e.seed>5 ? 0.35 : -0.35) : 0);
   let da = fa - (e.face===undefined ? fa : e.face); da = Math.atan2(Math.sin(da), Math.cos(da)); e.face = (e.face===undefined ? fa : e.face) + da*Math.min(1, FP.dt*8);
-  if (m._atkT && m._atkT!==e.atkSeen){ e.atkSeen = m._atkT; if (FP.t - m._atkT < 1) e.atk = 0.22; }
-  if (e.atk>0){ e.atk += FP.dt*1.9; if (e.atk>=1) e.atk = 0; }
+  const eb = rigIsBow(e);   /* (RS-489: an archer draws from the start, at a bow's pace) */
+  if (m._atkT && m._atkT!==e.atkSeen){ e.atkSeen = m._atkT; if (FP.t - m._atkT < 1) e.atk = eb ? 0.001 : 0.22; }
+  if (e.atk>0){ e.atk += FP.dt*(eb ? BOW_RATE : 1.9); if (e.atk>=1) e.atk = 0; }
   e.hurt = m3dHitReact(e, m.hp, m.maxHp, FP.dt);
   const C = m3dAtkCurve(e.atk); e.fol = C.fol;
   const lunge = Math.max(C.strike, C.fol*0.7)*0.16;
@@ -38950,21 +38952,24 @@ function m3dPoseBow(r, wind, strike){
   const T = THREE, released = strike > 0.08, BL = !!r.bowLeft, R = r.arms[BL ? 1 : 0], Lf = r.arms[BL ? 0 : 1], sd = BL ? -1 : 1, d = released ? 0 : Math.min(1, wind*1.15), hold = Math.max(d, released ? Math.min(1, strike*1.8) : 0),   /* (the bow held up and the hand back a beat after the loose, then lowered) */ m = (a, b)=>a*(1-hold) + b*hold;
   if (r.bowPiv) m3dBowParts(r);
   if (hold <= 0.001){ if (r.bowPiv) r.bowPiv.userData.drawK = 0; return; }
-  r.torso.rotation.y = 0.62*hold*sd; if (r.head) r.head.rotation.y = -0.55*hold*sd;   /* (side-on, the bow shoulder to the mark, the head turned back to it) */
-  if (r.hips) r.hips.rotation.y = (r.hips.rotation.y||0) + 0.18*hold*sd;
+  r.torso.rotation.y = 1.05*hold*sd; if (r.head) r.head.rotation.y = -0.95*hold*sd;   /* (side-on, the bow shoulder to the mark, the head turned back to it) */
+  if (r.hips) r.hips.rotation.y = (r.hips.rotation.y||0) + 0.3*hold*sd;   /* (RS-489: square side-on, as an archer stands - the drawing elbow then has room to go back along the arrow) */
   /* the bow arm straight at the mark, whatever the body's turn */
   r.torso.updateWorldMatrix(true, false); const K = m3dPoseBow.K || (m3dPoseBow.K = { v:new T.Vector3(), q:new T.Quaternion(), m:new T.Matrix4(), a:new T.Vector3(), b:new T.Vector3() });
   let root = r.torso; while (root.parent && !(root.userData && root.userData.modelRoot)) root = root.parent;
   root.getWorldQuaternion(K.q); const fw = K.v.set(0, 0.04, 1).applyQuaternion(K.q).normalize();
   /* (RS-488) at the foe itself: its chest, raised a little more the further it is, for the arrow's drop */
   { const aim = m3dAimPoint(r, root); if (aim){ R.sh.updateWorldMatrix(true, false); const sp = R.sh.getWorldPosition(new T.Vector3()), to = aim.sub(sp), dist = to.length(); if (dist > 0.2){ to.normalize(); to.y += Math.min(0.12, dist*0.012); fw.copy(to.normalize()); } } }
+  const aimW = fw.clone();
   R.sh.parent.getWorldQuaternion(K.q); fw.applyQuaternion(K.q.invert());
   const qWant = new T.Quaternion().setFromUnitVectors(K.a.set(0, -1, 0), fw); R.sh.quaternion.slerp(qWant, hold); R.el.rotation.set(-0.06*hold, 0, 0);
   /* the drawing hand: from the string at the bow back to the cheek, on past it as the string is loosed */
   const piv = r.bowPiv, bw = m3dBowParts(r);
   if (bw && r.head){ piv.updateWorldMatrix(true, true); r.head.updateWorldMatrix(true, false); const rest = bw.arc.localToWorld(K.a.copy(bw.rest)), cheek = r.head.localToWorld(K.b.set(0.05*sd, -0.03, 0.07));
     const tgt = rest.clone().lerp(cheek, d); if (released) tgt.copy(cheek).addScaledVector(cheek.clone().sub(rest).normalize(), 0.07*strike);
-    m3dReach(r, BL ? 0 : 1, tgt, hold); piv.userData.drawK = d; piv.userData.loosed = released; }
+    const DA = r.arms[BL ? 0 : 1]; DA.sh.updateWorldMatrix(true, true); const fl = DA.el.getWorldPosition(new T.Vector3()).distanceTo(DA.hand.localToWorld(new T.Vector3(0, -0.04, 0)));
+    const pole = tgt.clone().addScaledVector(aimW, -fl).sub(DA.sh.getWorldPosition(new T.Vector3())); pole.y = -0.15*Math.hypot(pole.x, pole.z);   /* (RS-489: the drawing elbow back along the arrow's line, one forearm behind the hand, and level with the shoulder) */
+    m3dReach(r, BL ? 0 : 1, tgt, hold, pole); piv.userData.drawK = d; piv.userData.loosed = released; }
 }
 /* (RS-487) any arm to a point: the elbow bent just enough for the fist to be that far from the shoulder, then the arm turned to it
    (the same reach the off hand takes on a two-handed grip); w eases it in from the arm's own pose */
@@ -38978,13 +38983,17 @@ function m3dAimPoint(r, root){
   const ph = ISO.player.holder; if (!ph || !ph.parent) return null; let top = root; while (top.parent) top = top.parent; let pt = ph; while (pt.parent) pt = pt.parent; if (top!==pt) return null;
   const v = ph.getWorldPosition(new T.Vector3()); v.y += 0.4*(ph.scale.y||1); return v;
 }
-function m3dReach(r, i, tw, w){
+function m3dReach(r, i, tw, w, pole){
   const T = THREE, A = r.arms[i], K = m3dReach.K || (m3dReach.K = { b:new T.Vector3(), q:new T.Quaternion() });
   r._reach = r._reach || {}; if (!r._reach[i]){ A.sh.updateWorldMatrix(true, true); r._reach[i] = { E:A.sh.worldToLocal(A.el.getWorldPosition(new T.Vector3())), F:A.el.worldToLocal(A.hand.localToWorld(new T.Vector3(0, -0.04, 0))) }; }
   const { E, F } = r._reach[i], P = A.sh.parent; P.updateWorldMatrix(true, false);
   const D = P.worldToLocal(tw.clone()).sub(A.sh.position), d = D.length(), hx = (ph, out)=>{ const c = Math.cos(ph), s = Math.sin(ph); return out.set(E.x + F.x, E.y + F.y*c - F.z*s, E.z + F.y*s + F.z*c); };
   let lo = -2.7, hi = 0; if (hx(0, K.b).length() <= d) lo = 0; else if (hx(-2.7, K.b).length() >= d) hi = -2.7; else for (let k=0;k<16;k++){ const mm = (lo + hi)/2; if (hx(mm, K.b).length() > d) hi = mm; else lo = mm; }
   const ph = (lo + hi)/2; hx(ph, K.b).normalize(); K.q.setFromUnitVectors(K.b, D.normalize());
+  /* (RS-489) with a pole (a world direction), the arm turned about the shoulder-to-fist line until the elbow points that way */
+  if (pole){ const ax = D, el = E.clone().applyQuaternion(K.q), pq = P.getWorldQuaternion(new T.Quaternion()).invert(), pl = pole.clone().applyQuaternion(pq);
+    el.addScaledVector(ax, -el.dot(ax)); pl.addScaledVector(ax, -pl.dot(ax));
+    if (el.lengthSq() > 1e-8 && pl.lengthSq() > 1e-8){ el.normalize(); pl.normalize(); const ang = Math.atan2(ax.dot(el.clone().cross(pl)), el.dot(pl)); K.q.premultiply(new T.Quaternion().setFromAxisAngle(ax, ang)); } }
   const ww = w==null ? 1 : w; A.el.rotation.y *= 1 - ww; A.el.rotation.z *= 1 - ww; A.sh.quaternion.slerp(K.q, ww); A.el.rotation.x = A.el.rotation.x*(1 - ww) + ph*ww;   /* (RS-488: the elbow a plain hinge - a swing pose's twist cleared, or the fist misses the mark) */
 }
 /* (RS-487) the string drawn back to the fingers, and the arrow on it, once the bow has been set upright in the hand */
@@ -40829,9 +40838,14 @@ function m3dStickArrow(m){
 // ---- arrows and spells in flight ----
 const ISO_ELEM_COL = { air:'#e8f0ff', water:'#5aa0ff', earth:'#b08a4a', fire:'#ff7a2a',
   smoke:'#a0a0a0', shadow:'#8a5ac0', blood:'#e02a3a', ice:'#a8e8ff', sara:'#fff0b0', guthix:'#5ae07a', zammy:'#ff5a2a', arceuus:'#7af0c0', astral:'#e8d8f0', nature:'#3ac050' };
+/* (RS-489) a bow's shot is drawn slowly and held before it's loosed - the swing runs at BOW_RATE, and the arrow flies (and its hit
+   lands) at the loose, BOW_LOOSE seconds in, rather than leaving the bow before the string is even drawn */
+const BOW_RATE = 0.9, BOW_LOOSE = 0.4/BOW_RATE;
+function rigIsBow(e){ return !!(e && e.rig && e.rig.wk==='bow'); }
 function isoShot(m, kind, col, delay, extra){
   if (!ISO.on || !FPD.ok || !m) return;
   const p = G.player, d = Math.hypot(m.x-p.x, m.y-p.y), dur = (kind==='chin' ? 0.2 : kind==='bolt' ? 0.08 : 0.12) + d*(kind==='bolt' ? 0.035 : kind==='chin' ? 0.06 : 0.045);
+  if ((kind==='arrow' || kind==='crystal') && !(extra && extra.minion) && rigIsBow(ISO.player)) delay = (delay||0) + BOW_LOOSE;
   (ISO.shots = ISO.shots || []).push(Object.assign({ x0:p.x+0.5, y0:p.y+0.5, x1:m.x+0.5, y1:m.y+0.5, t:-(delay||0), dur, kind, col:col||'#fff', m }, extra||{}));
   FP.cast = kind==='spell' ? 1 : FP.cast;
 }
@@ -41355,7 +41369,7 @@ function renderFirstPerson(){
   else if (FP.lastHp!==null && p.hp > FP.lastHp + 0.5) FP.heal = 1;
   FP.lastHp = p.hp;
   FP.hurt = Math.max(0, FP.hurt-dt*1.8); FP.heal = Math.max(0, FP.heal-dt*1.6); FP.glow = Math.max(0, FP.glow-dt*1.2);
-  FP.cast = Math.max(0, FP.cast-dt*1.5); FP.swing = Math.max(0, FP.swing-dt*1.8); FP.fade = Math.max(0, FP.fade-dt*2.5);
+  FP.cast = Math.max(0, FP.cast-dt*1.5); FP.swing = Math.max(0, FP.swing-dt*(typeof ISO!=='undefined' && rigIsBow(ISO.player) ? BOW_RATE : 1.8)); FP.fade = Math.max(0, FP.fade-dt*2.5);
   try{ foeTick(); }catch(e){ console.error(e); }   /* (RS-218) */
   FP.shake = Math.max(0, FP.shake-dt*3);
   if (FP.moving>0.02) FP.stepPhase = (FP.stepPhase||0) + dt*9;
@@ -41607,7 +41621,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-488';
+const GAME_VERSION = 'rs-489';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
