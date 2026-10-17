@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-473 - The vampire skull
+
+- **A reward emblem:** once you can wear dragon armour (Defence 60), the dye works offers the Vampire Skull. It's a fanged skull with its jaw dropped, set on a high crimson collar, inside a silver occult ring crossed by a hexagram.
+- **On shields and capes:** it's painted across the face of your kite or tower shield, following its curve, and large on the back of your cape. On a red shield the collar turns black so it still stands out.
+- **Dye it:** the emblem dye colours its collar.
+
 ## RS-472 - Capes finer each tier
 
 - **Capes grow grander with their level, like the shields:** a plain cape is plain cloth. The next tier adds a trimmed hem, then your shield emblem on its back, then gold edging, a fur collar, an embroidered band of lozenges, and at the top its gold thread glows. It's all painted on the cloth, so it ripples and swings with the cape.
