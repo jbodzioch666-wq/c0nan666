@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs487 | A bow drawn to the cheek with a bent string and a nocked arrow, the bow arm on the mark, then loosed |
 | rs486 | The sun moves in small steps, so the land's shadows hold still between them, yet still swing over the day |
 | rs485 | Towns on the land are built in their race's style and sized by village, town or city, with a plate saying so |
 | rs483 | The title screen's import is the page's own any-file picker; save files and save-code text files both import |

@@ -34786,7 +34786,16 @@ function m3dBow(wood, string, R, A, tube){
   const T = THREE, g = new T.Group(), arc = new T.Group();
   const limb = new T.Mesh(new T.TorusGeometry(R, tube, 8, 32, 2*A), wood); limb.rotation.z = -A; limb.position.x = -R; arc.add(limb);
   const grip = new T.Mesh(new T.CylinderGeometry(tube*1.5, tube*1.5, R*0.16, 10), string.color ? wood : wood); arc.add(grip);
-  const str = new T.Mesh(new T.CylinderGeometry(tube*0.18, tube*0.18, 2*R*Math.sin(A), 4), string); str.position.x = R*Math.cos(A) - R; arc.add(str);
+  const strG = new T.Group(); strG.name = 'bowStr'; arc.add(strG); arc.name = 'bowArc';
+  const str = new T.Mesh(new T.CylinderGeometry(tube*0.18, tube*0.18, 2*R*Math.sin(A), 4), string); str.position.x = R*Math.cos(A) - R; strG.add(str);
+  /* (RS-487) and the string in two halves, tip to nock, for when it's drawn; and the arrow nocked on it - each in its own named part,
+     so a figure's merging keeps them apart and they can be shown, hidden and moved */
+  const half = nm=>{ const hg = new T.Group(); hg.name = nm; hg.visible = false; arc.add(hg); const h = new T.Mesh(new T.CylinderGeometry(tube*0.18, tube*0.18, 1, 4), string); hg.add(h); return hg; };
+  const ar = new T.Group(); ar.name = 'bowArrow'; ar.visible = false; arc.add(ar); const AL = R*2.6;
+  { const sh = new T.Mesh(new T.CylinderGeometry(tube*0.32, tube*0.32, AL, 6), wood); sh.rotation.z = -Math.PI/2; sh.position.x = AL/2; ar.add(sh);
+    const hd = new T.Mesh(new T.ConeGeometry(tube*0.9, tube*4, 6), new T.MeshStandardMaterial({ color:0x8a8a90, metalness:0.6, roughness:0.4 })); hd.rotation.z = -Math.PI/2; hd.position.x = AL + tube*2; ar.add(hd);
+    for (let k=0;k<3;k++){ const f = new T.Mesh(new T.PlaneGeometry(tube*7, tube*2.2), new T.MeshStandardMaterial({ color:0xe8e0d0, side:T.DoubleSide, roughness:0.8 })); f.position.x = tube*5; f.rotation.x = k*Math.PI*2/3; f.position.y = 0; ar.add(f); f.translateY(tube*1.1); } }
+  half('bowTop'); half('bowBot'); g.userData.bowR = R; g.userData.bowA = A;   /* (plain numbers: a figure's copies get their userData through JSON) */
   arc.rotation.y = -Math.PI/2; g.add(arc);   /* (built bulging toward +x, turned so it bulges toward +z) */
   g.traverse(o=>{ if (o.isMesh){ o.castShadow = true; } });
   return g;
@@ -34809,7 +34818,8 @@ function m3dUprightHook(){
            toward the front) the staff or bow tips back with it - over the shoulder on a wind-up; below that it leans a little with the arm */
         let tilt = 0; const a0 = p.userData.tip0;
         if (a0!=null){ qc.copy(qa).invert().multiply(qb); v.set(0, -1, 0).applyQuaternion(qc); let a = Math.atan2(v.z, -v.y); if (a < -1) a += Math.PI*2; tilt = a > a0 ? a - a0 : (a - a0)*(p.userData.tipK==null ? 0.3 : p.userData.tipK); if (p.userData.tipMin!=null) tilt = Math.max(tilt, p.userData.tipMin); }
-        qd.setFromAxisAngle(X, -tilt); p.quaternion.copy(qb.invert().multiply(qa).multiply(qd)); p.updateMatrixWorld(true); } } }catch(e){}
+        qd.setFromAxisAngle(X, -tilt); p.quaternion.copy(qb.invert().multiply(qa).multiply(qd)); p.updateMatrixWorld(true);
+        if (p.userData.bowDraw) try{ p.userData.bowDraw(); }catch(e){} } } }catch(e){}
     return orig ? orig.apply(this, arguments) : undefined;
   };
 }
@@ -36077,7 +36087,7 @@ function m3dHumanoid(o){
     wpn.scale.setScalar(0.42*(o.weaponScale||1));
     if (wk==='bow' || wk==='staff'){   /* (RS-201) upright in the fist: a bow facing the foe, a staff held a third of the way up its shaft */
       const piv = new T.Group(); piv.position.set(...m3dGrip(b)); R.hand.add(piv);
-      if (wk==='bow'){ piv.userData.tip0 = 1.6; m3dUpright(piv); (rig.ups = rig.ups || []).push(piv); }
+      if (wk==='bow'){ piv.userData.tip0 = 1.6; m3dUpright(piv); (rig.ups = rig.ups || []).push(piv); rig.bowPiv = piv; }   /* (RS-487: its string drawn - see m3dBowParts) */
       else piv.rotation.x = M3D_STAFF_X;   /* (RS-208) a staff is held fast in the fist like the blades, along the grip and tipped a little forward (RS-209: about 15 degrees at rest) */
       if (wk==='staff'){ const bx = new T.Box3().setFromObject(wpn); wpn.position.y = -(bx.min.y + (bx.max.y - bx.min.y)*0.36); rig._head = [piv, (bx.min.x+bx.max.x)/2, bx.max.y + wpn.position.y - 0.02, (bx.min.z+bx.max.z)/2]; }
       piv.add(wpn); rig.weapon = wpn; rig.twoHand = wk==='staff' && !o.tome; rig.wk = wk; rig.glint = o.glint || null; }   /* (RS-299: with a tome in the off hand the staff is held in the right alone) */
@@ -38832,7 +38842,7 @@ function m3dPoseHumanoid(r, t, moving, wind, strike, hurt, e){
   if (r.tail) r.tail.rotation.z = Math.sin(t*2.4)*0.3;
   if (r.cape){ if (m3dClothOn(r)) m3dCapeCloth(r.cape, r); else { const cu = r.cape.userData; if (cu.P){ cu.P = null; cu.ax = undefined; } if ((cu.tick = (cu.tick||0) + 1) % 2) m3dCapeSwing(r.cape, 0.05 + moving*0.3 + Math.sin(t*1.5)*0.04 + strike*0.15, Math.sin(m3dStride(e, t, moving))*0.06*moving + Math.sin(t*0.9)*0.02); } }
   if (r.swing && (wind || strike || (r.grip2 && !r.sheathed && !(e && e.toolKey)))) m3dPoseSwing(r, wind, strike);   /* (RS-465: a two-handed weapon is held at guard in both hands between blows) */
-  if (r.wk==='bow' && (wind || strike)) m3dPoseBow(r, wind, strike);
+  if (r.wk==='bow'){ if (wind || strike) m3dPoseBow(r, wind, strike); else if (r.bowPiv){ m3dBowParts(r); r.bowPiv.userData.drawK = 0; } }
   if (r.skirt) m3dSkirtFollow(r);
   r._g2 = r.grip2 && !(e && e.toolKey);
   /* (RS-173) the follow-through: the blow carries on past the strike - arm down and across, shoulders round, weight sinking
@@ -38932,11 +38942,56 @@ function m3dGrip2(r){
   L.sh.quaternion.setFromUnitVectors(K.b, D.normalize()); r._g2d = [d, E.length() + F.length()];
 }
 // a bow: turn side-on, bow arm out straight, draw the string back to the cheek, then loose
+/* (RS-487) a shot as an archer makes it: turned side-on to the mark and looking down the arrow, the bow arm raised straight at it; the
+   drawing hand takes the string at the bow and draws it back to the cheek, an arrow nocked, holds, looses - the string snaps back and the
+   hand flies on past the cheek - then lowers. The string bends to the fingers and the arrow rides on it until it's loosed (see
+   m3dBowString, run once the bow is set upright in the hand) */
 function m3dPoseBow(r, wind, strike){
-  const [R, Lf] = r.arms, hold = Math.max(wind, strike > 0 ? 1 - strike*0.3 : 0), m = (a, b)=>a*(1-hold) + b*hold;
-  r.torso.rotation.y = 0.45*hold;
-  R.sh.rotation.x = m(R.sh.rotation.x, -1.45); R.sh.rotation.z = m(R.sh.rotation.z, -0.12); R.el.rotation.x = m(R.el.rotation.x, -0.08);
-  Lf.sh.rotation.x = m(Lf.sh.rotation.x, -1.4); Lf.sh.rotation.z = m(Lf.sh.rotation.z, 0.3); Lf.el.rotation.x = m(Lf.el.rotation.x, -(0.4 + wind*1.5) + strike*0.6);
+  const T = THREE, [R, Lf] = r.arms, released = strike > 0.08, d = released ? 0 : Math.min(1, wind*1.15), hold = Math.max(d, released ? Math.min(1, strike*1.8) : 0),   /* (the bow held up and the hand back a beat after the loose, then lowered) */ m = (a, b)=>a*(1-hold) + b*hold;
+  if (r.bowPiv) m3dBowParts(r);
+  if (hold <= 0.001){ if (r.bowPiv) r.bowPiv.userData.drawK = 0; return; }
+  r.torso.rotation.y = 0.62*hold; if (r.head) r.head.rotation.y = -0.55*hold;   /* (side-on, the head turned back to the mark) */
+  if (r.hips) r.hips.rotation.y = (r.hips.rotation.y||0) + 0.18*hold;
+  /* the bow arm straight at the mark, whatever the body's turn */
+  r.torso.updateWorldMatrix(true, false); const K = m3dPoseBow.K || (m3dPoseBow.K = { v:new T.Vector3(), q:new T.Quaternion(), m:new T.Matrix4(), a:new T.Vector3(), b:new T.Vector3() });
+  let root = r.torso; while (root.parent && !(root.userData && root.userData.modelRoot)) root = root.parent;
+  root.getWorldQuaternion(K.q); const fw = K.v.set(0, 0.04, 1).applyQuaternion(K.q).normalize();
+  R.sh.parent.getWorldQuaternion(K.q); fw.applyQuaternion(K.q.invert());
+  const qWant = new T.Quaternion().setFromUnitVectors(K.a.set(0, -1, 0), fw); R.sh.quaternion.slerp(qWant, hold); R.el.rotation.set(-0.06*hold, 0, 0);
+  /* the drawing hand: from the string at the bow back to the cheek, on past it as the string is loosed */
+  const piv = r.bowPiv, bw = m3dBowParts(r);
+  if (bw && r.head){ piv.updateWorldMatrix(true, true); const rest = bw.arc.localToWorld(K.a.copy(bw.rest)), cheek = r.head.localToWorld(K.b.set(0.05, -0.03, 0.07));
+    const tgt = rest.clone().lerp(cheek, d); if (released) tgt.copy(cheek).addScaledVector(cheek.clone().sub(rest).normalize(), 0.07*strike);
+    m3dReach(r, 1, tgt, hold); piv.userData.drawK = d; piv.userData.loosed = released; }
+}
+/* (RS-487) any arm to a point: the elbow bent just enough for the fist to be that far from the shoulder, then the arm turned to it
+   (the same reach the off hand takes on a two-handed grip); w eases it in from the arm's own pose */
+function m3dReach(r, i, tw, w){
+  const T = THREE, A = r.arms[i], K = m3dReach.K || (m3dReach.K = { b:new T.Vector3(), q:new T.Quaternion() });
+  r._reach = r._reach || {}; if (!r._reach[i]){ A.sh.updateWorldMatrix(true, true); r._reach[i] = { E:A.sh.worldToLocal(A.el.getWorldPosition(new T.Vector3())), F:A.el.worldToLocal(A.hand.localToWorld(new T.Vector3(0, -0.04, 0))) }; }
+  const { E, F } = r._reach[i], P = A.sh.parent; P.updateWorldMatrix(true, false);
+  const D = P.worldToLocal(tw.clone()).sub(A.sh.position), d = D.length(), hx = (ph, out)=>{ const c = Math.cos(ph), s = Math.sin(ph); return out.set(E.x + F.x, E.y + F.y*c - F.z*s, E.z + F.y*s + F.z*c); };
+  let lo = -2.7, hi = 0; if (hx(0, K.b).length() <= d) lo = 0; else if (hx(-2.7, K.b).length() >= d) hi = -2.7; else for (let k=0;k<16;k++){ const mm = (lo + hi)/2; if (hx(mm, K.b).length() > d) hi = mm; else lo = mm; }
+  const ph = (lo + hi)/2; hx(ph, K.b).normalize(); K.q.setFromUnitVectors(K.b, D.normalize());
+  A.sh.quaternion.slerp(K.q, w==null ? 1 : w); A.el.rotation.x = A.el.rotation.x*(1 - (w==null ? 1 : w)) + ph*(w==null ? 1 : w);
+}
+/* (RS-487) the string drawn back to the fingers, and the arrow on it, once the bow has been set upright in the hand */
+function m3dBowParts(r){
+  const piv = r.bowPiv; if (!piv) return null; if (r._bw && r._bw.piv===piv) return r._bw;
+  if (!piv.userData.bowDraw) piv.userData.bowDraw = ()=>m3dBowString(r);   /* (a copy's pivot lost its function to the JSON its userData came through) */
+  const g = piv.children[0], arc = piv.getObjectByName('bowArc'); if (!g || !arc) return null; const T = THREE, R = g.userData.bowR || 0.9, A = g.userData.bowA || 0.75, x0 = R*Math.cos(A) - R;
+  return (r._bw = { piv, arc, str:piv.getObjectByName('bowStr'), top:piv.getObjectByName('bowTop'), bot:piv.getObjectByName('bowBot'), arrow:piv.getObjectByName('bowArrow'), R, A, rest:new T.Vector3(x0, 0, 0), tipT:new T.Vector3(x0, R*Math.sin(A), 0), tipB:new T.Vector3(x0, -R*Math.sin(A), 0) });
+}
+function m3dBowString(r){
+  const piv = r.bowPiv, bw = m3dBowParts(r); if (!bw || !bw.top || !bw.arrow) return;
+  const T = THREE, d = piv.userData.drawK || 0, Y = m3dBowString.Y || (m3dBowString.Y = new T.Vector3(0, 1, 0));
+  if (d <= 0.02){ bw.str.visible = true; bw.top.visible = bw.bot.visible = false; bw.arrow.visible = false; return; }
+  const fing = r.arms[1].hand.localToWorld(new T.Vector3(0, -0.04, 0)), n = bw.arc.worldToLocal(fing);
+  const maxDraw = bw.R*1.3;   /* (a full draw: about half the bow's height behind it) */ if (n.x > bw.rest.x) n.x = bw.rest.x; if (bw.rest.x - n.x > maxDraw) n.x = bw.rest.x - maxDraw; n.y = Math.max(-bw.R*0.3, Math.min(bw.R*0.3, n.y)); n.z = Math.max(-bw.R*0.3, Math.min(bw.R*0.3, n.z));
+  for (const [h, tip] of [[bw.top, bw.tipT], [bw.bot, bw.tipB]]){ const dir = n.clone().sub(tip), L = dir.length(); h.position.copy(tip).addScaledVector(dir, 0.5); h.quaternion.setFromUnitVectors(Y, dir.normalize()); h.scale.set(1, L, 1); h.visible = true; }
+  bw.str.visible = false;
+  bw.arrow.visible = !piv.userData.loosed; if (bw.arrow.visible){ bw.arrow.position.copy(n); const toGrip = n.clone().negate(), len = toGrip.length(); bw.arrow.quaternion.setFromUnitVectors(new T.Vector3(1, 0, 0), toGrip.normalize());
+    bw.arrow.scale.set(Math.min(len + bw.R*0.28, bw.R*1.75)/(bw.R*2.6), 1, 1); }   /* (as long as the draw, its head just past the bow) */
 }
 // called per visible monster from the sprite pass; returns the model's height (or 0 when it has none)
 function m3dUpdate(m, pos, flash){
@@ -41538,7 +41593,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-486';
+const GAME_VERSION = 'rs-487';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

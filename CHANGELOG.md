@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## RS-487 - Shooting a bow properly
+
+- **A real archer's shot, for you and every archer you fight:**
+  - **Stance:** they turn side-on to the target and look down the arrow, the bow arm straight out at the mark.
+  - **The draw:** the drawing hand takes the string at the bow and draws it all the way back to the cheek.
+  - **The release:** the string snaps back straight, the arrow is gone, and the hand flies on past the cheek, a beat before the bow is lowered.
+- **The string bends:** drawn, the string runs from each tip of the bow back to the fingers, instead of staying a straight stick.
+- **An arrow on the string:** while the bow is drawn an arrow is nocked on it, from the fingers through the grip, its head just past the bow, until it's loosed and flies.
+
 ## RS-486 - Still shadows
 
 - **No more fluttering:** out on the land and in towns, the sun turned smoothly across the sky with the clock. Every time the shadows were redrawn, every few frames, they landed a hair differently, and their edges fluttered. The sun now moves in tiny half-degree steps, about one every two and a half seconds, so between steps the shadows hold perfectly still. Over the day they still swing round as before.
