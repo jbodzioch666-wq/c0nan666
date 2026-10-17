@@ -1,5 +1,17 @@
 # Depthcrawl patch notes
 
+## RS-475 - Cloth armour finer each tier
+
+- **Wizard hats grow grander:**
+  - **Wizard:** plain.
+  - **Splitbark:** a band.
+  - **Mystic:** a glowing blue gem.
+  - **Infinity:** a gold band, an amber gem and stars.
+  - **Ahrim's:** a green gem, a crescent moon, and a tall tip crooked back.
+  The Visage of the Sage keeps its own look.
+- **The hem runes shine:** on Infinity and Ahrim's robes the runes round the hem glow, Ahrim's the brightest.
+- **Tomes carry your emblem:** a tome's covers are inlaid with the emblem you chose at the dye works, in its dye. The finest tomes bear a star if you haven't chosen one; plain leaves them bare.
+
 ## RS-474 - A truer vampire skull
 
 - **Redrawn as a real skull:** the vampire skull emblem has proper anatomy now:
