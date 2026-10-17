@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-480 - Natural shadows in the dungeon
+
+- **No more black blot beside you:** the hard, dark shadow next to your character was your own lantern's, held up over your shoulder. With the dimmer dungeon light of RS-479 it had gone nearly black. Your lantern no longer throws your shadow. It still lights you and casts the shadows of walls and props further off.
+- **Torchlit shadows:** your shadows now come from the torches around you, falling away from each one and filled in by your lantern's light, the way they would by real torchlight.
+- **Softer edges:** torch and lantern shadows are blurred at the edge, as a flame's are.
+
 ## RS-479 - Moodier, punchier dungeons
 
 - **Lit by the torches:** below ground the fill light is dimmer and a faint cold blue, and the torches are stronger. Pools of warm, flickering light now carry each room, with real darkness between them.
