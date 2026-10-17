@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-483 - Import that works on phones
+
+- **The import button is a real file picker:** on a phone, tapping **IMPORT a save file** could do nothing. The picker was opened by a hidden button, which some apps ignore, and it only allowed files marked as JSON, so a downloaded save the phone hadn't labelled that way was greyed out. Now the button is a picker of its own and takes any file. A file that isn't a save is refused with a message.
+- **Save codes in a file work too:** a text file holding a save code imports the same way.
+
 ## RS-482 - Save codes: copy and paste your adventurer
 
 - **Move a character with copy and paste:** some apps (the Claude app on a phone) can't open a file picker or save a file, so exporting and importing didn't work there. Every save now has a **copy save code** button, on the title screen and in the pause menu. It turns the whole adventurer into one block of text and copies it.
