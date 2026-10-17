@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## RS-474 - A truer vampire skull
+
+- **Redrawn as a real skull:** the vampire skull emblem has proper anatomy now:
+  - **Cranium:** a high dome narrowing at sunken temples, with a crack across the crown.
+  - **Eyes:** a heavy brow ridge over deep, round, separate eye sockets, each with a red gleam inside.
+  - **Face:** hollow cheeks under the cheekbones, and a nose opening shaped like an upside-down heart.
+  - **Teeth and jaw:** an upper row of teeth with two long fangs, and a dropped lower jaw with its own teeth. The bone is shaded cream to ochre.
+- **Sharper everywhere:** the collar is shaded from its fold, the silver ring and hexagram are engraved, and the whole emblem is drawn at twice the detail on shields.
+
 ## RS-473 - The vampire skull
 
 - **A reward emblem:** once you can wear dragon armour (Defence 60), the dye works offers the Vampire Skull. It's a fanged skull with its jaw dropped, set on a high crimson collar, inside a silver occult ring crossed by a hexagram.
