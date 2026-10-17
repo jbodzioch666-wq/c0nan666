@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-472 - Capes finer each tier
+
+- **Capes grow grander with their level, like the shields:** a plain cape is plain cloth. The next tier adds a trimmed hem, then your shield emblem on its back, then gold edging, a fur collar, an embroidered band of lozenges, and at the top its gold thread glows. It's all painted on the cloth, so it ripples and swings with the cape.
+- **Your emblem on your back:** the emblem you chose for your shields (and the dye you gave it) is on your cape too. Plain leaves the cape bare. Unchosen, the cape bears a cross, a chevron, a star or a sun for its tier.
+- **The Fire Cape is fire:** molten rock with glowing lava pools and cracks, and a dark fur collar.
+- **Which tier:** plain capes are the lowest, then black capes, Ava's, Obsidian, the god and skill capes, Legends and the Quest Point Cape. The Fire Cape and the Cape of Accomplishment are the finest. Quivers stay quivers.
+
 ## RS-471 - Dye your shield's emblem
 
 - **The emblem takes a dye:** the dye works' SHIELD EMBLEM section has a colour row. Use any dye you carry to paint the emblem on all your metal shields, kite and tower, whichever emblem it is. The dye is used up; washing it out is free and brings back the tier's own colour.

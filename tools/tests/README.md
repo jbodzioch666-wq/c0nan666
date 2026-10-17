@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs472 | Capes are finer each tier - hem, emblem, gold edging, fur collar, embroidery, glow; a fire cape is molten |
 | rs471 | A dye paints the shield emblem on every metal shield; washing it out restores the tier's colour |
 | rs470 | Shield emblems chosen at the dye works, each metal learned (worn or forged) teaching another |
 | rs469 | Tower shields in every metal: more defence, worse aim, forged from four bars or found, tall in the hand |
