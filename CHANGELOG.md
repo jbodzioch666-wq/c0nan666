@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-494 - See yourself at the dye works
+
+- **You, life-size, at the dye works**: the dye works now shows your character on the left of the menu, three times the size of the barber's chair figure. You see what you're wearing as you dye it.
+- **Updates as you dye**: every dye, trim, emblem or wash-out shows on the figure at once. Drag it to turn it round and see your cape and its emblem.
+- **Fits any screen**: on a smaller window the figure shrinks to fit, and on a phone it sits above the dye rows.
+
 ## RS-493 - Dyeable trims
 
 - **Trims take their own dye**: at the dye works, every piece with a trim now has a second row of dyes under it, for the trim alone. That covers a body's trim bands, a great helm's bands, a coif's stitching, a wizard hat's band, a cape's hem and a metal shield's rim.
