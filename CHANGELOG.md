@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-501 - The land out of the matrix walk
+
+- **The placed land is frozen**: every tree stump, ore vein, fishing spot and landmark had its transform matrix recomposed by the renderer every single frame, though none of them ever move. The gathering nodes and landmarks (about 2,200 objects on a busy map) are now frozen once placed and skipped by the per-frame walk entirely; their matrices stay exact (checked against a fresh compose in the new test). The wildlife, boats, light beams and fish fins keep moving as before, and a once-a-second sweep freezes whatever a chunk rebuild just added. The renderer's matrix walk on the open land fell from about 1.1 ms to 0.5 ms a frame - headroom that matters most on phones and weaker PCs.
+- **Sprite sheets without the stall**: the painted creature and item sprites are drawn on a scratch canvas and then read back pixel by pixel; the canvas now says so up front, so the browser keeps it off the GPU and the readback doesn't stall. About half a second less of the first load.
+
 ## RS-500 - Sculpted models remembered between sessions
 
 - **Models are sculpted once, ever**: every sculpted shape - bodies, heads, gear, the graveyard skeleton's bones - is carved from a distance field and meshed, which is most of what made loading slow. The finished mesh is now kept in the browser (IndexedDB) and later sessions load it back instead of carving it again, byte for byte the same (checked in the new test).

@@ -26167,7 +26167,7 @@ const FP_FLAME_ART = [['p',[0,-44, 16,-12, 12,16, 0,30, -12,16, -16,-12]], ['e',
 function fpBuildSprite(draw, fancy, soft){
   const S = fancy ? 256 : 160;
   const raw = document.createElement('canvas'); raw.width = raw.height = S;
-  const rc = raw.getContext('2d');
+  const rc = raw.getContext('2d', { willReadFrequently:true });   /* (RS-501: it's read back once drawn - on the GPU that readback stalled) */
   draw(rc, S);
   let minX=S, minY=S, maxX=-1, maxY=-1;
   try{
@@ -31350,7 +31350,7 @@ function o3BuildSwap(st){
   if (O3.uDep) O3.uDep.value = O3.depthTex || null; if (O3.uDepO && O3.depthO) O3.uDepO.value.copy(O3.depthO);   /* (RS-414) */
   if (O3.world && O3.world.parent!==sc) sc.add(O3.world);
   for (const p of O3.plates||[]){ p.el.__pend = 0; p.el.style.display = 'none'; }   /* (the plate loop shows the near ones next frame) */
-  O3.compileDue = true; try{ o3FarWin(); }catch(e){}   /* (RS-355) */
+  O3.compileDue = true; try{ o3FarWin(); }catch(e){} try{ o3FreezeStatic(); }catch(e){}   /* (RS-355) */   /* (RS-501: the fresh chunks froze stale) */
 }
 function o3BuildStart(cx, cy){ O3.pend = { gen:o3BuildGen(cx, cy), st:o3BuildFresh(), n:0, cx, cy }; }
 function o3BuildAbandon(){ const P = O3.pend; if (!P) return; O3.pend = null; for (const p of P.st.plates||[]) p.el.remove(); if (P.st.world){ try{ o3DisposeWorld(P.st.world, O3.world); }catch(e){ console.error(e); } } if (P.st.depthTex && P.st.depthTex!==O3.depthTex) P.st.depthTex.dispose(); }   /* (RS-414: its materials, textures and depth map too) */
@@ -32455,7 +32455,7 @@ function o3SyncNodes(){
     changed = true; built++;
   }
   for (const [ck, c] of C) if (!want.has(ck)){ o3FreeNodeChunk(c); C.delete(ck); changed = true; }
-  if (changed || !O3.nodeHits){ O3.nodeHits = []; O3.nodeAnim = []; for (const c of C.values()){ for (const h of c.hits) O3.nodeHits.push(h); for (const a of c.anim) O3.nodeAnim.push(a); } }
+  if (changed || !O3.nodeHits){ O3.nodeHits = []; O3.nodeAnim = []; for (const c of C.values()){ for (const h of c.hits) O3.nodeHits.push(h); for (const a of c.anim) O3.nodeAnim.push(a); } try{ o3FreezeStatic(); }catch(e){} }
 }
 // one chunk's spots, built into g (O3.nodeHits and O3.nodeAnim are the chunk's own lists while it builds)
 function o3BuildNodeChunk(list, g){
@@ -33004,6 +33004,16 @@ function o3SiteStandOff(x, y){
   if (!dx && !dz){ for (const [ox, oz] of [[0,1],[1,1],[1,0],[-1,1],[0,-1],[-1,0],[1,-1],[-1,-1]]){ const nx = x+ox, ny = y+oz, nt = G.ow.map[nx] && G.ow.map[nx][ny]; if (nt!=null && nt!==OW_WATER && nt!==OW_MOUNTAIN && !OW_SITE_TILES.includes(nt)){ dx = ox; dz = oz; break; } } }
   if (!dx && !dz) return null; const d = Math.hypot(dx, dz); return [dx/d*0.72, dz/d*0.72];
 }
+/* (RS-501) the placed land never moves, but three.js was recomposing every tree, rock, gathering node and landmark's matrix
+   every frame - a good share of each overworld frame on a busy map. The gathering nodes and landmarks are frozen once placed
+   (matrixAutoUpdate off, their roots gated); the few animated pieces (light beams, fins - O3.nodeAnim) stay live, and a
+   once-a-second sweep freezes whatever a chunk rebuild just added */
+function o3FreezeStatic(){
+  const skip = new Set(); for (const a of (O3.nodeAnim||[])) if (a.o) skip.add(a.o);
+  for (const k of ['nodeGrp', 'lmGrp']){ const g = O3[k]; if (!g) continue;   /* (not wildGrp: that's the wildlife, and it walks) */
+    g.matrixWorldAutoUpdate = true; g.updateMatrixWorld(true); g.traverse(o=>{ if (!skip.has(o)) o.matrixAutoUpdate = false; });
+    g.matrixWorldAutoUpdate = false; }   /* (the whole subtree skipped per frame, not just its composes; refreshed by force on a rebuild) */
+}
 function o3Render(){
   if (!o3Init()) return false;
   o3HoverTick();
@@ -33153,6 +33163,7 @@ function o3Render(){
   hoverRing(O3, O3.hoverAny && G.ui==='playing' ? [O3.hoverAny.x+0.5, Math.max(O3.heightAt(O3.hoverAny.x+0.5, O3.hoverAny.y+0.5), -0.14)+0.05, O3.hoverAny.y+0.5, O3.hoverAny.kind==='site' ? 0.9 : 0.6] : null);
   try{ gfxO3Tick(dt, pp); }catch(e){ console.error(e); }   // light, mist, falls, leaves (see SECTION: GRAPHICS)
   gfxCompileScene(O3, O3.renderer, O3.scene, O3.cam, o3Warm);   /* (RS-345) */
+  { const nw = performance.now(); if (!O3.frzT || nw - O3.frzT > 1000){ O3.frzT = nw; try{ o3FreezeStatic(); }catch(e){} } }   /* (RS-501) */
   gfxRender(O3.renderer, O3.scene, O3.cam, 'o3');
   // name plates: town names always, other sites when near or hovered
   const v = new T.Vector3(), hv = O3.hover;
@@ -41859,7 +41870,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-500';
+const GAME_VERSION = 'rs-501';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
