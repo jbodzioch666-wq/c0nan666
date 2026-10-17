@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-471 - Dye your shield's emblem
+
+- **The emblem takes a dye:** the dye works' SHIELD EMBLEM section has a colour row. Use any dye you carry to paint the emblem on all your metal shields, kite and tower, whichever emblem it is. The dye is used up; washing it out is free and brings back the tier's own colour.
+- **With the shield's own dye:** dye the shield one colour and its emblem another.
+
 ## RS-470 - Choose your shield's emblem
 
 - **Your own device:** the dye works has a new SHIELD EMBLEM row. Pick the emblem painted on all your metal shields, kite and tower alike. It keeps the colour your shield's tier gives it.
