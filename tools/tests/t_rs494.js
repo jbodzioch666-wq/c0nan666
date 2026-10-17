@@ -1,5 +1,5 @@
-// RS-494: the dye works shows you, in what you're dyeing, on its left - three times the barber's chair figure (720 x 879 to its
-// 240 x 293) - turned by dragging, and dressed again as you dye; on a phone it stacks above the dyes and fits the screen
+// RS-494: the dye works shows you, in what you're dyeing, on its left - (RS-496) 540 x 659, a quarter smaller than the first 720 x 879
+// (the barber's chair figure is 240 x 293) - turned by dragging, and dressed again as you dye; on a phone it stacks above the dyes and fits the screen
 const shot = require('path').join(__dirname, 'shots', 'dye494.png');
 module.exports = async page=>{
   await page.setViewportSize({ width:1600, height:1100 });
@@ -21,8 +21,8 @@ module.exports = async page=>{
   const A = (c, msg)=>{ if (!c) throw new Error('assert: '+msg+' '+JSON.stringify(r)); };
   A(r.barber && r.barber.w===240, 'the barber chair figure is 240 wide');
   A(r.dye && r.canvas && r.figure, 'the dye works shows your figure');
-  A(r.buf && r.buf[0]===720 && r.buf[1]===879, 'drawn at three times the barber size');
-  A(Math.abs(r.dye.w - 720) <= 4 && Math.abs(r.dye.h - 879) <= 4, 'shown at three times the barber size on a big screen');
+  A(r.buf && r.buf[0]===540 && r.buf[1]===659, 'drawn at 540 x 659 (RS-496: a quarter smaller than RS-494)');
+  A(Math.abs(r.dye.w - 540) <= 4 && Math.abs(r.dye.h - 659) <= 4, 'shown at 540 x 659 on a big screen');
   A(r.body && r.dye.x < r.body.x && r.body.x >= r.dye.x + r.dye.w, 'on the left of the dyes');
   A(r.redressed, 'dressed again as you dye');
   A(m.w <= 380 && m.right <= 392 && m.stacked, 'on a phone it fits and stacks above the dyes');

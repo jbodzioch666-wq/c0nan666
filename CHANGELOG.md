@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-496 - A smaller dye works figure
+
+- **A quarter smaller**: your figure in the dye works is now 540 by 659 instead of 720 by 879, leaving more room for the dye rows beside it. It still turns when you drag it and updates as you dye.
+
 ## RS-495 - Trim all round, and bigger cape emblems
 
 - **The whole cape perimeter**: a trim dye on a cape now runs all the way round it (sides, top and hem), not just along the bottom. A finer cape's gold edging and its embroidered band of lozenges take the dye too.
