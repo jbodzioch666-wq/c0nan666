@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## RS-476 - Staves finer each grade
+
+- **Magic staves grow grander, in their element's colour:**
+  - **Plain staff:** as it was.
+  - **Battlestaff:** a glowing orb round its crystal, held in a silver cup of four prongs, with a band on the shaft.
+  - **Mystic staff:** three tall gold claws cradling a bigger orb, gold bands, and a gold spiral wound up the shaft.
+  - **Master and Ancient staves:** a dark horned crown over the orb and three rune stones circling it. The Ancient Staff glows violet.
+- **Melee quarterstaffs stay plain wood.**
+
 ## RS-475 - Cloth armour finer each tier
 
 - **Wizard hats grow grander:**
