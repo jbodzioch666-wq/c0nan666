@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs485 | Towns on the land are built in their race's style and sized by village, town or city, with a plate saying so |
 | rs483 | The title screen's import is the page's own any-file picker; save files and save-code text files both import |
 | rs482 | A save copied as a text code and pasted back brings the adventurer back; a pasted save file works too |
 | rs481 | The lantern casts no shadows and torch shadows are only redrawn while something moves |

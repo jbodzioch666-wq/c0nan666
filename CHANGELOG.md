@@ -1,5 +1,21 @@
 # Depthcrawl patch notes
 
+## RS-485 - Towns that look like their people
+
+- **Every race builds its own way, on the land:**
+  - **Humans:** plaster houses under red tiles, round a stone tower.
+  - **Half-elves:** blue slate roofs among trees, with a windmill.
+  - **High elves:** white stone towers under slender blue spires.
+  - **Wood elves:** huts round a great tree, with a platform in its boughs.
+  - **Dwarves:** stone houses with smoking chimneys, before a hall door cut into a great rock.
+  - **Orcs:** hide tents behind spiked stakes, round a skull-topped totem.
+  - **Gnomes:** round houses under spotted mushroom caps, by a clockwork tower.
+  - **Dragonborn:** terraced sandstone halls round a great brazier.
+  - **Tieflings:** dark stone houses with violet windows under an obsidian spire and its lantern.
+  - **Halflings:** keep their hobbit holes.
+- **Size you can see:** a village is a few houses behind a low fence. A town has more, behind a palisade. A city has more again, behind a stone wall with gate towers, round a grander landmark, and stands bigger on the land.
+- **The name plate says what it is:** under a town's name, for example "dwarven · city".
+
 ## RS-484 - Paste a whole message
 
 - **The paste box finds the code itself:** you can paste a whole copied message, words, line breaks and all. The save code is picked out of it, so in the Claude app you can copy a chat message holding a code and paste it straight in.
