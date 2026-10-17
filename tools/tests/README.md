@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs492 | A cape emblem chosen and dyed on its own at the dye works, on any cape, shown at once |
 | rs491 | The Archer kit's leather quiver on the back (and monster archers'), and a put-away bow across the back |
 | rs490 | A crossbow with its own model, shouldered and aimed at the foe, loosed with a kick, then spanned and reloaded |
 | rs489 | A bow drawn at an archer's pace with the arrow leaving at the loose, the drawing elbow up and back |

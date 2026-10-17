@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-492 - Your own cape emblem
+
+- **Cape emblem picker**: the dye works now has a **Cape emblem** section beside the shield one. Choose any device you've learned for the back of your cape, or Plain to remove it. Left unchosen, the cape follows your shield's emblem as before.
+- **On any cape**: a chosen emblem shows even on a plain Red, Blue or Green cape, embroidered in gold thread unless you dye it. The fire cape keeps its flames.
+- **Its own colour**: dye the cape's emblem apart from the shield's. Washing it out is free.
+- **Shows at once**: changing an emblem or its colour now redraws your character straight away. Before, it waited until you next changed some gear, so it looked as if nothing had happened.
+
 ## RS-491 - Quivers, and the bow on your back
 
 - **Archers start with a quiver**: the Archer kit now comes with a Leather Quiver in the cape slot (+4 ranged accuracy, saves 15% of your arrows).
