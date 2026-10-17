@@ -1,5 +1,17 @@
 # Depthcrawl patch notes
 
+## RS-470 - Choose your shield's emblem
+
+- **Your own device:** the dye works has a new SHIELD EMBLEM row. Pick the emblem painted on all your metal shields, kite and tower alike. It keeps the colour your shield's tier gives it.
+- **Learned with the metals:** each metal you can wear (Defence) or forge (Smithing) teaches you another emblem:
+  - **From the start:** plain, a cross and a bend (bronze and iron both need only Defence 1).
+  - **Steel:** a chevron.
+  - **Mithril:** a saltire.
+  - **Adamant:** a sun.
+  - **Rune:** an eight-pointed star.
+  - **Dragon:** a double chevron.
+- **Or leave it to the smith:** choose "the smith's own" and each shield bears its tier's usual device again.
+
 ## RS-469 - Tower shields
 
 - **A new shield in every metal:** the Tower Shield is a tall, squared shield that curves round your body like a Roman scutum. It's strapped to your forearm like the kiteshield, with the same cross, chevron, saltire, boss and spikes as you go up the tiers.
