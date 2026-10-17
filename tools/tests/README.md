@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs500 | Sculpts cached in IndexedDB: a warm session rebuilds figures byte-identical with no sculpting at all |
 | rs499 | Dungeon and town entry compile their shaders in slices under the loading card instead of one page-freezing call |
 | rs498 | The cloth maths gone fast with the same folds: fast normals match three.js, cape bounds measured once |
 | rs497 | Zoom on the dye works and barber figure: wheel, pinch and +/- buttons, panned by dragging while zoomed |

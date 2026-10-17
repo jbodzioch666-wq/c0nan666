@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-500 - Sculpted models remembered between sessions
+
+- **Models are sculpted once, ever**: every sculpted shape - bodies, heads, gear, the graveyard skeleton's bones - is carved from a distance field and meshed, which is most of what made loading slow. The finished mesh is now kept in the browser (IndexedDB) and later sessions load it back instead of carving it again, byte for byte the same (checked in the new test).
+- **Measured on the audit save**: loading into a tiefling city with a warm cache, the longest freeze fell from 4.8s to 2.3s and the load's total stalled time from 16s to 9.4s - on top of RS-499's wins. The skeleton's 15 seconds of background sculpting after every load is gone too.
+- **Self-managing**: the cache keeps at most 64 MB, dropping the least recently used sculpts, and a version stamp throws old shapes away whenever a release changes the models.
+
 ## RS-499 - The loading freezes, mostly gone
 
 - **Entering a dungeon no longer freezes the page**. The graphics driver builds a real pipeline for every shader the first time it draws it, and the first frame of a dungeon floor asked for all of them at once: on the audit save that one call froze the game for 8.7 seconds. The floor's first compile is now sliced - a few pieces at a time, drawn once off screen, with a frame to the browser between slices - while the loading card holds. Measured on the same save: the longest freeze on dungeon entry fell from **8.7s to 0.84s**, stepping out into the overworld from **4.0s to 1.6s**, and loading into a town from **9.8s to 4.8s** (what remains of the town's is building the world itself, not shaders - that's next).

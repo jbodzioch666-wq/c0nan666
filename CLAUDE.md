@@ -43,6 +43,7 @@ Ordinary feature releases and small edits stay on Opus. If you are already runni
 
 - The file is large: about 35k lines, and much of the code is dense one-line functions. Use Grep to find things, then read only nearby lines.
 - For multi-spot changes, use a Python script that replaces exact strings and asserts each match count, so a missed match fails loudly.
+- Sculpted models are cached in IndexedDB between sessions (RS-500, `M3D_SCULPT_VER` in `depthcrawl.html`). **Bump `M3D_SCULPT_VER` whenever any sculpted shape changes** (the SDF kit, `SK3_PARTS`, any `m3dSculpt` build), or players keep seeing the old shape.
 - Never put a `//` comment in the middle of a one-line function. It comments out the rest of the line. Use `/* */` there.
 - Saves must keep loading:
   - Default any new save field when it is missing.

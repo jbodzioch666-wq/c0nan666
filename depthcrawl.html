@@ -29398,6 +29398,12 @@ function sk3Build(){
   root.traverse(o=>{ if (!preKit.has(o)) o.userData.gear = 1; });
   return { root, pelvis, spine, chest, neck, head, R, L, RL, LL, sword, shield, steps };
 }
+/* (RS-500) each bone keyed by its name and arguments, so a session with the cache warm skips the whole 15s background sculpt */
+for (const k of Object.keys(SK3_PARTS)){ const f = SK3_PARTS[k]; if (typeof f!=='function') continue;
+  SK3_PARTS[k] = (...a)=>{ const key = 'sk3|' + k + '|' + a.join(',');
+    const hit = sculptDbGet(key); if (hit) return hit;
+    const g = f(...a); if (g && g.isBufferGeometry) sculptDbPut(key, g);
+    return g; }; }
 function sk3Init(){
   if (SK3.ok===true) return true;
   if (SK3.building || SK3.ok===false && SK3.started) return false;
@@ -34454,16 +34460,70 @@ let M3D_COARSE = 1, M3D_LOOSE = false;   /* (RS-402: M3D_LOOSE - see m3dMergeKey
 let M3D_SKIN = true;   /* (RS-379: creature templates are skinned into one mesh per material; off, they are built part by part as before) */
 let V3_MERGE_MAKE = true;   /* (RS-380: still props of the same make are baked together across their colours, in towns and on the open land; off, only parts sharing one material are) */
 const V3_FOLK_COARSE = 1.6;   /* (RS-348) the townsfolk's sculpt grid */
+/* (RS-500) sculpted geometry is deterministic for its key, so a finished sculpt is kept in IndexedDB and later sessions skip
+   the field fill and the meshing altogether - that was over 2s of every town load, and the skeleton kept sculpting for 15s after.
+   BUMP M3D_SCULPT_VER WHENEVER ANY SCULPTED SHAPE CHANGES (SDF code, SK3_PARTS, any m3dSculpt build), or players keep the old look */
+const M3D_SCULPT_VER = 1, SCULPT_CAP = 64*1048576;
+const SCULPT_DB = { map:new Map(), db:null, dirty:[] };
+function sculptDbOpen(){
+  if (SCULPT_DB.opened || typeof indexedDB==='undefined') return; SCULPT_DB.opened = true;
+  try{
+    const rq = indexedDB.open('dc-sculpt', 1);
+    rq.onupgradeneeded = ()=>{ const db = rq.result; db.createObjectStore('g'); db.createObjectStore('m'); };
+    rq.onerror = ()=>{};
+    rq.onsuccess = ()=>{ const db = SCULPT_DB.db = rq.result; db.onerror = ()=>{};
+      const pageIn = after=>{ try{   /* (hydrated a page per transaction, never one long task - and a cursor can't yield: its transaction closes under it) */
+        const st = db.transaction('g', 'readonly').objectStore('g'), rng = after===undefined ? undefined : IDBKeyRange.lowerBound(after, true);
+        const kq = st.getAllKeys(rng, 32), vq = st.getAll(rng, 32);
+        vq.onsuccess = ()=>{ const ks = kq.result || [], vs = vq.result;   /* (kq fired first; its result is read, not awaited) */
+          for (let i=0;i<ks.length;i++){ const v = vs[i]; if (v && v.ver===M3D_SCULPT_VER) SCULPT_DB.map.set(ks[i], v); }
+          if (ks.length===32) setTimeout(()=>pageIn(ks[31]), 0); else sculptDbPrune(); }; }catch(e){} };
+      pageIn();
+    };
+  }catch(e){}
+}
+function sculptDbPrune(){
+  try{ const db = SCULPT_DB.db; if (!db) return; const st = db.transaction('m', 'readonly').objectStore('m'), ka = st.getAllKeys(), va = st.getAll();
+    va.onsuccess = ()=>{ const rows = (ka.result || []).map((k, i)=>[k, va.result[i]||{}]); let total = 0; for (const [, v] of rows) total += v.bytes||0;
+      if (total <= SCULPT_CAP) return; rows.sort((a, b)=>(a[1].at||0) - (b[1].at||0));
+      const tx = db.transaction(['g', 'm'], 'readwrite'), g2 = tx.objectStore('g'), m2 = tx.objectStore('m');
+      for (const [k, v] of rows){ if (total <= SCULPT_CAP) break; total -= v.bytes||0; g2.delete(k); m2.delete(k); SCULPT_DB.map.delete(k); } }; }catch(e){}
+}
+function sculptDbGet(key){
+  const v = SCULPT_DB.map.get(key); if (!v) return null; SCULPT_DB.map.delete(key);   /* (turned into a geometry once; no second copy kept) */
+  try{
+    const T = THREE, geo = new T.BufferGeometry();
+    geo.setAttribute('position', new T.BufferAttribute(v.p, 3)); geo.setAttribute('normal', new T.BufferAttribute(v.n, 3));
+    if (v.c) geo.setAttribute('color', new T.BufferAttribute(v.c, 3)); if (v.u) geo.setAttribute('uv', new T.BufferAttribute(v.u, 2));
+    geo.setIndex(new T.BufferAttribute(v.i, 1));
+    try{ const db = SCULPT_DB.db; if (db) db.transaction('m', 'readwrite').objectStore('m').put({ at:Date.now(), bytes:v.bytes||0 }, key); }catch(e){}
+    return geo;
+  }catch(e){ return null; }
+}
+function sculptDbPut(key, geo){
+  if (!SCULPT_DB.db || !geo || !geo.index) return;
+  try{
+    const a = geo.attributes, v = { ver:M3D_SCULPT_VER, p:a.position.array.slice(), n:a.normal.array.slice(), c:a.color ? a.color.array.slice() : null, u:a.uv ? a.uv.array.slice() : null, i:geo.index.array.slice() };
+    v.bytes = v.p.byteLength + v.n.byteLength + (v.c ? v.c.byteLength : 0) + (v.u ? v.u.byteLength : 0) + v.i.byteLength;
+    SCULPT_DB.dirty.push([key, v]);
+    if (sculptDbPut.tm) return;   /* (never postponed: a steady stream of sculpts - the skeleton builds one bone a tick - starved a debounce for good) */
+    sculptDbPut.tm = setTimeout(()=>{ sculptDbPut.tm = 0; const list = SCULPT_DB.dirty; SCULPT_DB.dirty = [];
+      try{ const tx = SCULPT_DB.db.transaction(['g', 'm'], 'readwrite'), g2 = tx.objectStore('g'), m2 = tx.objectStore('m'), now = Date.now();
+        for (const [k, w] of list){ g2.put(w, k); m2.put({ at:now, bytes:w.bytes }, k); } }catch(e){} }, 800);
+  }catch(e){}
+}
 function m3dSculpt(key, bounds, h, build){
   M3D.sculpt = M3D.sculpt || new Map();
   if (M3D_COARSE !== 1){ key += '|c' + M3D_COARSE; h *= M3D_COARSE; }
   if (M3D.sculpt.has(key)) return M3D.sculpt.get(key);
+  const hit = sculptDbGet('m|' + key); if (hit){ M3D.sculpt.set(key, hit); return hit; }   /* (RS-500: sculpted in an earlier session) */
   if (M3D_BUDGET && M3D.sculptN++ > 0 && performance.now() > M3D_BUDGET) throw M3D_YIELD;   /* (RS-404: out of time - the rest next frame) */
   const P = SDF.part(bounds[0], bounds[1], h); build(P);
   const g = m3dUV(SDF.mesh(P));
-  M3D.sculpt.set(key, g);
+  M3D.sculpt.set(key, g); sculptDbPut('m|' + key, g);
   return g;
 }
+try{ sculptDbOpen(); }catch(e){}
 /* (RS-376) a torso sculpt in two pieces about the waist, so the chest bends above a pelvis that stays with the legs: 'top' is
    everything from a little below the waist up, 'bot' everything from a little above it down, the two overlapping inside the waist */
 function m3dHalfCut(P, half){ const { cylE } = SDF; if (half==='bot') P.sub(cylE([0, 1.065, 0], 1, 1, 1, 0), 0.004); else if (half==='top') P.sub(cylE([0, -0.965, 0], 1, 1, 1, 0), 0.004); }
@@ -41799,7 +41859,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-499';
+const GAME_VERSION = 'rs-500';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
