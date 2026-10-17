@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-504 - Lighter town frames
+
+- **The HUD stopped re-checking your skills every frame**: reading your bag or a skill first made sure every skill field existed - about thirty checks - and the HUD does hundreds of such reads a frame. The fields are now filled in once per character, which was about 6% of every town frame on the audit save. New and loaded characters still get every default (tested).
+- **Villagers' cloaks settle with four solver passes** instead of six; yours keeps all six. Their cloth still lies on the back and drapes the same to the eye, for a little less work per cloaked villager in sight.
+
 ## RS-503 - No more hitches while walking
 
 - **Mid-play shader warm-ups go quiet**: when a slice of land swaps in while you walk, its new shaders used to warm the way a loading screen does - holding frames and even flashing the loading card mid-stride. On a slower machine that read as massive lag spikes everywhere. A warm-up that happens mid-play now sips about 10 milliseconds a frame, never holds a frame and never shows the card; whatever it hasn't warmed yet simply appears a few frames later, far off at the window's edge. Real loads keep the card as before.
