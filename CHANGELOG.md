@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-511 - Trousers finer each tier
+
+- **The tier trims are back, on the trousers**: as the robe bottoms did, the trousers now grow finer with each tier - Splitbark gains a trim cuff at each ankle, Mystic adds glowing runes stitched down the outer seams, Infinity turns cuffs and runes gold, and Ahrim's adds a second cuff and green-glowing runes. Wizard trousers stay plain.
+- **Dyeable**: from Splitbark up, the trousers get a trim row at the dye works, and the cuffs and seam runes take the dye.
+- Under a full robe only the hem shows; worn with leather or plate on top, the trousers show their finery in full.
+
 ## RS-510 - A trim for every robe
 
 - **Every robe takes a trim dye**: the dye works now offers a trim row for any robe. Before, only robes from Splitbark up had a trim, so a Wizard's or a Monk's robe had no trim option at all. Dyeing a plain robe's trim gives it a trim band at the hem and down the front in that colour; washing it out takes the band away again.

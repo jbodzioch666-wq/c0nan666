@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs511 | Trousers finer each tier (cuffs, seam runes, gold, green), their trim dyeable |
 | rs510 | Every robe takes a trim dye; a plain robe gains a trim band in the dye |
 | rs509 | The robe one piece to the ankles over any legs; robe bottoms are trousers; old saves' pieces renamed |
 | rs508 | Casts-left worked out once per change of bag, staff or turn, still following the bag at once |
