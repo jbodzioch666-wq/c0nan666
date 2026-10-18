@@ -40307,16 +40307,27 @@ function m3dChainMake(e, B, b){
 function m3dChainStep(e, dt){
   const T = THREE, C = e.chain, P = C.p, S = m3dChainStep, tmp = S.t || (S.t = { a:new T.Vector3(), x:new T.Vector3(), y:new T.Vector3(), f:new T.Vector3() });
   const steps = Math.min(8, Math.max(1, Math.ceil(dt/(1/120)))), h = Math.min(dt, 0.066)/steps;
+  /* (RS-536) a guard: whatever a step does, if it leaves a point nowhere (not a number, or far past the body's reach) the body is put back
+     where it was before it, and stilled - once in a long while a corpse was flung away out of the room */
+  const snap = C.snap || (C.snap = P.map(()=>new T.Vector3())); for (let i=0;i<P.length;i++) snap[i].copy(P[i].x);
   for (let k=0;k<steps;k++){
     if (!C.started && C.sink){ for (const i2 of [0, 1, 2, 3, 24, 25, 26]) if (P[i2]) P[i2].xp.y += C.sink*h; }   /* (RS-432: the body sinks onto its legs as it goes down, before it rolls) */
     if (!C.started){ C.started = true; const K2 = C.kk || [0.4, 0.9]; for (const p of P){ const kk = Math.max(0.25, Math.min(1.6, K2[0] + (p.x.y/C.h0)*K2[1])); p.xp.copy(p.x).addScaledVector(C.v0, -kk*h); if (C.roll) p.xp.addScaledVector(C.roll, -Math.max(0, p.x.y/C.h0 - 0.35)*h); if (C.hop) p.xp.y -= C.hop*Math.max(0, 1 - p.x.y/C.h0)*h; } }   /* (the top of it thrown hardest; a roll, if it has one, turns it over; a hop lifts its feet with it) */
     const dmp = C.damp || 0.995; for (const p of P){ const vx = (p.x.x - p.xp.x)*dmp, vy = (p.x.y - p.xp.y)*dmp, vz = (p.x.z - p.xp.z)*dmp;   /* (RS-427: a body damps harder - its limbs go slack rather than flailing) */ p.xp.copy(p.x); p.x.x += vx; p.x.y += vy - (p.noFloor ? 0 : C.g*h*h); p.x.z += vz; }   /* (a point that rides inside a body frame has no weight of its own: the frame's weight sits at its centre, and nothing tips it) */
     /* (RS-377) a beast down but not yet on its side slumps the rest of the way over, the way the blow pushed it (before the bones and the floor are solved, so what's drawn is sound): its back eased
        over and its belly under, slowly, until it lies on its side (the box ragdoll's slump of RS-373, done with the joints) */
-    if (C.slump && C.thud && C.t < 4){ const up = tmp.y.subVectors(P[C.upOf[1]].x, P[C.upOf[0]].x).normalize();
-      if (Math.abs(up.y) > 0.2){ const side = up.dot(C.slump), dir = (side < -1e-3 ? -1 : 1)*(up.y > 0 ? 1 : -1), rate = 2.5*Math.max(1, Math.min(3, P.length/(3*C.thud[0].length)))*Math.max(0.3, Math.min(1, Math.abs(up.y)/0.5))*dir;   /* (harder for a body with much hanging off its frame - a hydra's five necks drag on the floor against the turn) */   /* (toward the nearer side, whichever way it leans - back again if it has rolled on past - easing as it gets there) */
-        tmp.x.set(0, 1, 0).cross(C.slump).normalize();   /* (the axis it turns on: its length, lying across the way it slumps) */
-        for (const fr of C.thud){ const c = fr[0]; if (P[c].x.y <= P[c].r + Math.max(0.05, 0.35*P[c].r) || C.t > 0.8) for (const i of fr){ if (i===c) continue; tmp.a.subVectors(P[i].x, P[c].x); tmp.a.crossVectors(tmp.x, tmp.a); P[i].x.addScaledVector(tmp.a, rate*h); } } } }   /* (the whole frame turned about its centre, at about a turn and a half a second whatever its size - a frame of many points, propped by its own necks, turned too slowly when only its back and belly were pushed; and a wide one, its hips out to either side, only when they are carried round too) */
+    if (C.slump && C.thud && C.t < (C.slumpLate ? 7 : 4)){ C.slumpLate = false;   /* (RS-536: a frame still standing when the time is up is given longer to go over) */
+      /* (RS-536) it goes over sideways, across its spine, whichever way the blow came: struck along its length (from the front or behind),
+         the turn about the blow's axis pitched it nose down onto its chest, its rump in the air, instead of rolling it onto its side */
+      if (C.fw){ const sp = tmp.f.subVectors(P[C.fw[1]].x, P[C.fw[0]].x); sp.y = 0; if (sp.lengthSq() > 1e-6){ sp.normalize(); const lat = S.lat || (S.lat = new T.Vector3()); lat.set(-sp.z, 0, sp.x); if (!C.slumpX) C.slumpX = (lat.dot(C.slump) < 0 ? -1 : 1); C.slump.copy(lat).multiplyScalar(C.slumpX); } }
+      tmp.x.set(0, 1, 0).cross(C.slump).normalize();   /* (the axis it turns on: its length, lying across the way it slumps) */
+      /* (RS-536) each frame rolls by its own way up: a beast's hips and chest each onto its side - by the hips alone, a bear's hips lay on
+         their side while its chest stayed upright on its folded forelegs, its rump hoisted in the air */
+      C.thud.forEach((fr, fi)=>{ const uo = C.upOfF && C.upOfF[fi] ? C.upOfF[fi] : C.upOf, up = tmp.y.subVectors(P[uo[1]].x, P[uo[0]].x).normalize(); if (Math.abs(up.y) <= 0.2) return;
+        const side = fi===0 || C.slumpSide===undefined ? up.dot(C.slump) : C.slumpSide; if (fi===0 && C.slumpSide===undefined && Math.abs(side) > 1e-3) C.slumpSide = side;   /* (the side it goes over to chosen once, by the hips - both frames roll the same way, not each to its own nearer side) */
+        const dir = (side < -1e-3 ? -1 : 1)*(up.y > 0 ? 1 : -1), rate = 2.5*Math.max(1, Math.min(3, P.length/(3*C.thud[0].length)))*Math.max(0.3, Math.min(1, Math.abs(up.y)/0.5))*dir;   /* (harder for a body with much hanging off its frame - a hydra's five necks drag on the floor against the turn) */   /* (toward the nearer side, whichever way it leans - back again if it has rolled on past - easing as it gets there) */
+        if (Math.abs(up.y) > 0.45) C.slumpLate = true; const c = fr[0], set = C.rollSets && C.rollSets[fi] && C.t > 1.2 && Math.abs(up.y) > 0.45 ? (C.t > 2.5 ? C.rollAll || (C.rollAll = [...new Set(C.rollSets.flat())]) : C.rollSets[fi]) : fr;   /* (and still, later: the whole body turned over with it) */   /* (still standing after a moment: turned over with its legs, as one - planted, they held it sitting up) */
+        if (P[c].x.y <= P[c].r + Math.max(0.05, 0.35*P[c].r) || C.t > 0.8) for (const i of set){ if (i===c) continue; tmp.a.subVectors(P[i].x, P[c].x); tmp.a.crossVectors(tmp.x, tmp.a); P[i].x.addScaledVector(tmp.a, rate*h); } }); }   /* (the whole frame turned about its centre, at about a turn and a half a second whatever its size) */
     if (C.fw) tmp.f.subVectors(P[C.fw[1]].x, P[C.fw[0]].x).normalize(); else { tmp.x.subVectors(P[7].x, P[4].x).normalize(); tmp.y.subVectors(P[2].x, P[1].x).normalize(); tmp.f.crossVectors(tmp.x, tmp.y).normalize(); }   /* (the body's forward, for the hinges) */
     for (let it=0, nIt = C.t < 0.12 ? 30 : 16;it<nIt;it++){   /* (more passes while the throw is still stretching it) */
       for (const hg of C.h){ const a = P[hg.a].x, j = P[hg.j].x, bq = P[hg.b].x, mx = (a.x + bq.x)*0.5, my = (a.y + bq.y)*0.5, mz = (a.z + bq.z)*0.5;
@@ -40346,6 +40357,8 @@ function m3dChainStep(e, dt){
     }
     if (C.thud) for (const fr of C.thud){ if (fr.some(i=>P[i].x.y <= P[i].r + 0.003)) for (const i of fr) P[i].xp.lerp(P[i].x, 0.06); }   /* (a body frame down on the floor thuds and lies: it loses its speed instead of rolling on over onto its back) */
   }
+  { const lim = 4*(C.reach || 1.25) + 2; let bad = false; for (const p of P){ const x = p.x; if (!(isFinite(x.x) && isFinite(x.y) && isFinite(x.z)) || Math.abs(x.x) > lim || Math.abs(x.z) > lim || x.y > lim || x.y < -lim){ bad = true; break; } }
+    if (bad) for (let i=0;i<P.length;i++){ P[i].x.copy(snap[i]); P[i].xp.copy(snap[i]); } }
   C.t += dt; let ke = 0, onF = 0; for (const p of P){ ke += p.x.distanceToSquared(p.xp); if (p.x.y <= p.r + 0.002) onF++; } ke /= h*h*P.length;
   if (ke < 0.02 && onF >= 4) C.rest += dt; else C.rest = 0;
   if (C.rest > 0.4) for (const p of P) p.xp.lerp(p.x, 0.3);   /* (settling: it comes to rest instead of creeping) */
@@ -40381,6 +40394,23 @@ function m3dChainPose(e){
    little; the neck is two bones to the muzzle; each leg three bones from its root to the toe, the elbow folding back and the
    stifle forward; the tail one. The step is the two-legged chain's; the pose turns the body to its frames and every other joint
    from its rest by however far its bone has swung */
+/* (RS-536) how far a body's own surface lies from a point inside it (in the holder's frame, unscaled by s): its skin's vertices bound
+   to the given bones - a skinned figure's, through its skeleton; a figure built part by part, the meshes under them that aren't a
+   limb - their distances taken and a low one kept (an ellipsoid's belly and back, not its length). The body balls were set from how
+   far apart the hips are, which on a bulky body - a bear, a boar, a dragon - is well inside the belly, so the legs folded up into it
+   and the folded legs propped its rump in the air */
+function m3dBodyBall(e, bones, c, s, fallback, limbs){
+  const T = THREE, hold = e.holder, v = new T.Vector3(), ds = [], set = new Set(bones.filter(Boolean)), skip = new Set((limbs||[]).filter(Boolean));
+  hold.updateMatrixWorld(true);
+  e.root.traverse(o=>{ if (!o.isMesh || !o.geometry || !o.geometry.attributes.position) return; const pa = o.geometry.attributes.position;
+    if (o.isSkinnedMesh && o.skeleton){ const si = o.geometry.attributes.skinIndex; if (!si) return; const ix = new Set(); o.skeleton.bones.forEach((bn, k)=>{ if (set.has(bn)) ix.add(k); }); if (!ix.size) return;
+      const st = Math.max(1, Math.floor(pa.count/900)); for (let i=0;i<pa.count;i+=st){ if (!ix.has(si.getX(i))) continue; v.fromBufferAttribute(pa, i); o.boneTransform(i, v); v.applyMatrix4(o.matrixWorld); hold.worldToLocal(v); ds.push(v.distanceTo(c)/s); } return; }
+    let q = o.parent, mine = false; while (q && q!==e.root){ if (skip.has(q)) return; if (set.has(q)) mine = true; q = q.parent; } if (!mine) return;
+    const st = Math.max(1, Math.floor(pa.count/600)); for (let i=0;i<pa.count;i+=st){ v.fromBufferAttribute(pa, i).applyMatrix4(o.matrixWorld); hold.worldToLocal(v); ds.push(v.distanceTo(c)/s); } });
+  if (ds.length < 20) return fallback;
+  ds.sort((a, b)=>a - b); const lo = ds[Math.floor(ds.length*0.22)];
+  return Math.max(fallback, Math.min(fallback*3, lo*0.92));
+}
 function m3dChainMakeQuad(e, B, b){
   const T = THREE, r = e.rig, hold = e.holder, root = e.root, s = root.scale.y || 1;
   if (!r.chest || !r.body || !r.neck || !r.head || !r.tail || !r.legs || r.legs.length!==4 || !r.legs.every(L=>L.up && L.knee && L.ank && L.paw)) return null;
@@ -40393,13 +40423,15 @@ function m3dChainMakeQuad(e, B, b){
   for (const L of [F[0], F[1], Hd[0], Hd[1]]) pts.push(W(L.up), W(L.knee), W(L.ank), W(L.paw, [0, -0.01, 0.045]));
   pts.push(W(r.tail), W(r.tail, [0, -0.05, -0.16]), W(r.neck), W(r.body, [pelOff.x, pelOff.y - hw, pelOff.z]), W(r.chest, [chOff.x, chOff.y - fw, chOff.z]));   /* (and the belly and the brisket, under the centres) */
   const rad = [hw*1.6, fw*1.6, 0, 0, 0.045, 0.03, 0, 0.02, 0.02, 0.012, 0, 0.02, 0.02, 0.012, 0, 0.02, 0.02, 0.012, 0, 0.02, 0.02, 0.012, 0, 0.012, 0, 0, 0];
+  { const limbs = r.legs.map(L=>L.up).concat([r.neck, r.head, r.tail]);   /* (RS-536: as big as the body really is, so the legs stay out of the belly and the bulk lies on the floor) */
+    try{ rad[0] = m3dBodyBall(e, [r.body], pts[0], s, rad[0], limbs.concat([r.chest])); rad[1] = m3dBodyBall(e, [r.chest], pts[1], s, rad[1], limbs); }catch(err){} }
   /* each frame is a rounded body: its centre's ball, and the leg roots, the back and the belly, balls inside it reaching just to its surface, so it lies as easily at any angle and the floor never turns it (the back and belly both, so its weight sits at its centre: a frame with its weight above the centre rolled on over onto its back every time); the root of the tail or the neck, outside the ball, rides inside the body and never touches the floor */
   const noFloor = new Set(); for (const [c, ix] of [[0, [2, 25, 14, 18, 22]], [1, [3, 26, 6, 10, 24]]]) for (const i of ix){ const d = pts[i].distanceTo(pts[c])/s; if (d < 0.9*rad[c]) rad[i] = rad[c] - d; else { rad[i] = 0.004; noFloor.add(i); } }
   const P = pts.map((x, i)=>({ x, xp:x.clone(), r:rad[i]*s, mu:i===4 || i===5 ? 0.5 : 0.7, noFloor:noFloor.has(i) }));   /* (paws grip a little more than a head) */ for (const i of [0, 2, 14, 18, 22, 25]) P[i].fr = 0; for (const i of [1, 3, 6, 10, 24, 26]) P[i].fr = 1;
   const C = [], D = (i, j, lo, hi)=>{ const d = P[i].x.distanceTo(P[j].x); C.push({ i, j, lo:d*(lo==null ? 1 : lo), hi:d*(hi==null ? 1 : hi) }); };
   const rigid = (...ix)=>{ for (let a=0;a<ix.length;a++) for (let c=a+1;c<ix.length;c++) D(ix[a], ix[c]); };
   rigid(0, 2, 25, 14, 18, 22); rigid(1, 3, 26, 6, 10, 24);                                   // the pelvis (with the tail's root) and the chest (with the neck's), each held in shape
-  D(0,1, 0.92, 1.0); D(2,3, 0.8, 1.1); D(0,3, 0.85, 1.1); D(1,2, 0.85, 1.1);                 // the spine: a little bend
+  D(0,1, 0.92, 1.0); D(2,3, 0.9, 1.08); D(0,3, 0.93, 1.07); D(1,2, 0.95, 1.05);                 // the spine: a little bend (RS-536: the hips kept square to it - pitched forward on it, a boar's rump stood up in the air)
   D(14,6, 0.85, 1.08); D(18,10, 0.85, 1.08); D(14,10, 0.85, 1.1); D(18,6, 0.85, 1.1);        // and a little twist
   D(24,4); D(4,5); D(3,4, 0.85, 1.1); D(1,5, 0.88, 1.1); D(3,5, 0.84, 1.12); D(24,5, 0.93, 1.04);   // the neck and the head, never folded back onto the chest (RS-438: and the head kept near in line with the neck - turned far, the skin of a boar's long snout was dragged open into a red trough)
   for (const o of [6, 10, 14, 18]){ D(o,o+1); D(o+1,o+2); D(o+2,o+3); D(o,o+2, 0.72, 1); D(o+1,o+3, 0.76, 1.05); }   // each leg: its bones, and a reach that stops it folding flat (RS-432: folding less; RS-438: a dead beast's legs lie out near straight, not tucked up under it)
@@ -40420,7 +40452,7 @@ function m3dChainMakeQuad(e, B, b){
   const K = B.k, v0 = new T.Vector3(b.x*0.45*K, 0.15*B.up*K, b.z*0.45*K), hK = Math.max(0.4, Math.min(1.4, pts[2].y/0.45));   /* (the turns it's given scale with its height, so a rat isn't spun like a top; RS-427: a softer shove - it goes down limp) */
   const roll = new T.Vector3(b.z, 0, -b.x).normalize().multiplyScalar((B.side ? Math.sign(B.side) : Math.random() < 0.5 ? -1 : 1)*0.38*K*hK);   /* (knocked over sideways - the body, not the feet - the harder the blow the further; the slump below sees it onto its side) */
   return { p:P, c:C, h:Hg, s, h0:Math.max(0.1, pts[2].y), v0, roll, slump:roll.clone().normalize(), started:false, wall:G.gameMode===1 || G.gameMode===2, rot:hold.rotation.y, hx:hold.position.x, hz:hold.position.z, g:9.5, t:0, rest:0, upY:1, lift:0, x0:pts[0].clone(),
-    fw:[0, 1], pose:m3dChainPoseRig, kk:[0.95, 0], hop:0.2*K*B.up, sink:0.9, damp:0.988, thud:[[0, 2, 25, 14, 18, 22], [1, 3, 26, 6, 10, 24]], upOf:[0, 2], slumpF:[[0, 2, 25], [1, 3, 26]],
+    fw:[0, 1], pose:m3dChainPoseRig, kk:[0.95, 0], hop:0.2*K*B.up, sink:0.9, damp:0.988, thud:[[0, 2, 25, 14, 18, 22], [1, 3, 26, 6, 10, 24]], upOf:[0, 2], upOfF:[[0, 2], [1, 3]], reach:Math.max(1.25, 1.4*Math.max(...pts.map(q=>Math.hypot(q.x, q.z)))), rollSets:[[0, 2, 25, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23], [1, 3, 26, 6, 7, 8, 9, 10, 11, 12, 13, 24, 4, 5]], slumpF:[[0, 2, 25], [1, 3, 26]],
     rig:{ frames:[{ obj:r.body, ci:0, ti:2, li:14, ri:18, par:null, off:pelOff, q0:qPel0, qB0:wq(r.body) }, { obj:r.chest, ci:1, ti:3, li:6, ri:10, par:r.body, q0:qCh0, qB0:wq(r.chest) }], J, frame } };
 }
 /* the figure posed from its joints (RS-377, generalised for RS-378): each body frame is turned to its points - the first put
@@ -40462,7 +40494,8 @@ function m3dChainMakeDragon(e, B, b){
   const hips = (r.legs||[]).map(L=>L.hip).filter(Boolean), cOff = new T.Vector3();
   if (hips.length){ hips.forEach(h=>cOff.add(h.position)); cOff.multiplyScalar(1/hips.length); } else cOff.set(0, 0, -0.03);
   const hw = hips.length ? Math.max(0.05, Math.max(...hips.map(h=>Math.abs(h.position.x - cOff.x)))) : 0.08; let rc = hw*1.5;
-  { const bm = r.body.children.find(c2=>c2.isMesh); if (bm){ const bb = new T.Box3().setFromObject(bm), cy = W(r.body, [cOff.x, cOff.y, cOff.z]).y; rc = Math.max(hw*0.5, Math.min(hw*2, (cy - (bb.min.y - hold.position.y))/s)); } }   /* (the ball as deep as the body is below its centre: a crocodile is flat and wide, and a ball as wide as its hips floated it off the ground) */
+  { const bm = r.body.children.find(c2=>c2.isMesh); if (bm){ const bb = new T.Box3().setFromObject(bm), cy = W(r.body, [cOff.x, cOff.y, cOff.z]).y; rc = Math.max(hw*0.5, Math.min(hw*2, (cy - (bb.min.y - hold.position.y))/s)); }
+    else try{ rc = Math.min(hw*2.2, m3dBodyBall(e, [r.body], W(r.body, [cOff.x, cOff.y, cOff.z]), s, rc, (r.legs||[]).map(L=>L.up).concat(necks.map(N=>N.J[0]), [tail[0]], r.wings ? r.wings.map(Wg=>Wg.w) : []))); }catch(err){} }   /* (RS-536: a skinned dragon's body mesh is merged away - measured from its skin instead) */   /* (the ball as deep as the body is below its centre: a crocodile is flat and wide, and a ball as wide as its hips floated it off the ground) */
   const c = add(W(r.body, [cOff.x, cOff.y, cOff.z]), rc, 0.3), top = add(W(r.body, [cOff.x, cOff.y + rc*0.6, cOff.z]), 0, 0.3), bot = add(W(r.body, [cOff.x, cOff.y - rc*0.6, cOff.z]), 0, 0.3);
   const F = [c, top, bot], roots = new Map();
   for (const h of hips){ const i = add(W(h), 0, 0.3); F.push(i); roots.set(h, i); }
@@ -40488,7 +40521,8 @@ function m3dChainMakeDragon(e, B, b){
   necks.forEach((N, k)=>{ const ix = chain(N.J.concat([N.head]), neckRoots[k], N.head, [0, 0, 0.12], 0.035, 0.03, 0.62); D(c, ix[ix.length - 1], 0.6, 1.3); D(top, ix[Math.min(2, ix.length - 1)], 0.7, 1.3); });   /* (the head never folded back onto the body) */
   { const last = tail[tail.length - 1], tipG = last.children.find(c2=>c2.isGroup && c2.position.z < 0); chain(tail, tailRoot, tipG || last, tipG ? null : [0, 0, -0.06], 0.03, 0.012, 0.55); }
   for (const L of legs){ const Js = [L.up, L.knee].concat(L.ank ? [L.ank] : []).concat(L.foot ? [L.foot] : []), ix = chain(Js, roots.get(L.hip), L.foot || L.ank || L.knee, L.foot ? [0, -0.006, 0.05] : [0, -0.05, 0.03], 0.025, 0.012, 0.45);
-    if (L.fz > 0 && r.dragon) Hg.push({ a:ix[0], j:ix[1], b:ix[2], side:-1, min:0.01*s }); else if (L.fz < 0 && r.dragon) Hg.push({ a:ix[0], j:ix[1], b:ix[2], side:1, min:0.01*s }); }   /* (a dragon's elbows fold back, its stifles forward) */
+    if (L.fz > 0 && r.dragon) Hg.push({ a:ix[0], j:ix[1], b:ix[2], side:-1, min:0.01*s }); else if (L.fz < 0 && r.dragon) Hg.push({ a:ix[0], j:ix[1], b:ix[2], side:1, min:0.01*s });   /* (a dragon's elbows fold back, its stifles forward) */
+    for (let k=1;k<ix.length;k++){ const q = ix[k], d = pts[c].distanceTo(pts[q]), m = (rc + rad[q] + 0.01)*s; C.push({ i:c, j:q, lo:Math.min(d*0.95, Math.max(m, d*(k===1 ? 0.72 : 0.65))), hi:d*3 }); } }   /* (RS-536: every joint below the hip kept outside the body - a dragon's legs folded up inside it) */
   const frame = (up, x)=>{ const y = up.clone().normalize(), z = new T.Vector3().crossVectors(x, y).normalize(); if (z.lengthSq() < 1e-6) z.set(0, 0, 1); const xx = new T.Vector3().crossVectors(y, z).normalize(); return new T.Quaternion().setFromRotationMatrix(new T.Matrix4().makeBasis(xx, y, z)); };
   const P = pts.map((x, i)=>({ x, xp:x.clone(), r:rad[i]*s, mu:mu[i], noFloor:nf[i] })); for (const i of F) P[i].fr = 0;
   const K = B.k, v0 = new T.Vector3(b.x*0.5*K, 0.3*B.up*K, b.z*0.5*K), hK = Math.max(0.4, Math.min(1.4, pts[top].y/0.45));   /* (a heavy body: not thrown as far as a man) */
@@ -42709,7 +42743,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-535';
+const GAME_VERSION = 'rs-536';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

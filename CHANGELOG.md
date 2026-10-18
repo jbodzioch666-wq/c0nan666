@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-536 - Beasts fall on their side
+
+- **No more rump in the air**: a beast going down rolls over sideways, but the roll followed the blow - struck along its length, from the front or behind, a bear, boar or owlbear was pitched forward onto its chest with its back end hoisted up. It now always goes over across its spine, onto its side, whichever way the blow came, its hips and chest rolling together; and the hips are kept square to the spine, so they can't tip the rump up on their own.
+- **Legs out of the body**: the body a beast's legs must stay outside was sized from how far apart its hips are - on a bulky body, well inside the belly, so the legs folded up into it (and the folded legs propped the body up). It's now measured from the creature's own skin. A dragon's legs, which had no such rule at all, now have it too.
+- **No flung corpses**: once in a long while a corpse could be thrown clean out of the room; a body that would leave the room in one step now stays where it is.
+
 ## RS-535 - Corpses that lie still, torches on the walls
 
 - **Corpses settle**: a heavy body that died the right way up - a giant vulture, slumped belly down - never quite counted as still, and the slow turn it was left with dragged it creeping round in a circle across the floor for as long as it lay there. The floor now takes that turn out of it, and it comes to rest.
