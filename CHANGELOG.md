@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-510 - A trim for every robe
+
+- **Every robe takes a trim dye**: the dye works now offers a trim row for any robe. Before, only robes from Splitbark up had a trim, so a Wizard's or a Monk's robe had no trim option at all. Dyeing a plain robe's trim gives it a trim band at the hem and down the front in that colour; washing it out takes the band away again.
+
 ## RS-509 - The full robe
 
 - **Robes reach the ankles again**: the robe is one piece from the collar to the hem - its skirt, the trim band and the glowing hem runes all its own - whatever you wear on your legs, plate and leather included. It used to be a waist-length robe top over a separate robe bottom's skirt, so a robe top over plate legs had no skirt at all.
