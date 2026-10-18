@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-506 - World changes without the freeze
+
+- **A change anywhere on the map no longer freezes the land**: when a tile changes - a cleared site reclaimed by the wild, a new one rising, a bridge mended - the open land used to rebuild all at once in a single frame, then warm every shader again. At a phone's pace that was a 1.5-second freeze, wherever you were, even if the change was 60 tiles away. It now rebuilds in the background like a walk's rebuild, and the change shows a moment later. Worst frame at a phone's pace: **1,472 ms to about 350 ms** (what's left is redrawing the map's chart, once).
+- With RS-505, these were the two big sources of stutter on long walks. Measured on the uploaded save with a warm cache at a phone's pace, the slowest 5% of walking frames are now around 140 ms, from about 400 before RS-505.
+
 ## RS-505 - Long walks on the open land, smooth
 
 - **No freeze at the end of each land rebuild**: the land is built in a 96-tile window round you, rebuilt in the background as you walk. The rebuild only started 4 tiles before the edge of the built land would come into view, and if you got there first, it finished everything in one go - a freeze of up to a second. A phone or a busy laptop always got there first, so every rebuild on a long walk ended in a stutter. It now starts 13 tiles earlier and speeds up gradually as you near the edge, finishing at once only if the edge is truly on screen. At a phone's pace: the worst rebuild frame fell from **758 ms to about 120 ms**.

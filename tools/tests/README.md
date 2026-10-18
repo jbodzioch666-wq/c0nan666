@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs506 | A tile changing far off rebuilds the land in slices, not in one 1.5s frame at a phone's pace |
 | rs505 | A long open-land walk at a phone's pace: land rebuilds start early and speed up, no loading warm-up mid-walk |
 | rs504 | skP defaults once per player (the HUD asks every frame); villager cloaks at four solver passes |
 | rs503 | Mid-play shader warms sip frames without the card; the freeze sweep skips unchanged land; cache writes in sips |
