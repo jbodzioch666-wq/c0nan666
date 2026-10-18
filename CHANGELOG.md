@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-530 - No cards stuck on the face
+
+- **The chin**: a human man's square jaw was a flat box whose corners stuck out as pale wedges either side of the chin; it's now sculpted into the jaw itself - wider at the base, a stronger chin.
+- **Scars and war paint**: they were flat strips that floated off the cheek; now each one is laid onto the face and follows its curve, so a scar is a line in the skin and paint is painted on.
+- **Moustaches**: the moustache on the braided, forked and dwarf beards was two little boxes; it's now a sweep of strands from under the nose out over the lip and down past the corners of the mouth.
+
 ## RS-529 - Shape your face
 
 - **Face sliders**: a FACE section under the build in the character creator - jaw, chin, cheeks, brow, nose length and width, mouth, lips and age. Each face is its own sculpt, in the strong-nosed, deep-eyed style of the old cartoons; at the middle of every slider (and age a young adult's) the face is the one you had.
