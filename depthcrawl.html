@@ -36106,6 +36106,22 @@ function m3dFrontZ(torso, y, fb){
   const org = torso.localToWorld(K.a.set(0, y, 0.6)), to = torso.localToWorld(K.b.set(0, y, 0)).sub(org).normalize(); K.rc.set(org, to);
   const h = K.rc.intersectObjects(meshes, false)[0]; return h ? h.point.clone().applyMatrix4(K.inv).z : fb;
 }
+/* (RS-538) the garment as it really is at a height: its half-width, and how far it reaches in front and behind - from the chest and
+   pelvis sculpts the body wears (in the hips' frame, which the chest's inner frame shares). So a belt, a robe's waist and a tabard fit
+   whatever build is inside them; they were sized for the build every figure used to have */
+function m3dRingAt(meshes, y, band, pct){
+  const xs = [], zs = []; band = band || 0.008;
+  for (const m of meshes){ if (!m || !m.geometry) continue; const p = m.geometry.attributes.position, sx = m.scale.x, sy = m.scale.y, sz = m.scale.z, oy = m.position.y, oz = m.position.z;
+    for (let i=0;i<p.count;i++){ const yy = p.getY(i)*sy + oy; if (Math.abs(yy - y) > band) continue; xs.push(Math.abs(p.getX(i)*sx)); zs.push(p.getZ(i)*sz + oz); } }
+  if (!xs.length) return null; xs.sort((a, c)=>a - c); zs.sort((a, c)=>a - c);
+  const q = pct || 1, at = (a, k)=>a[Math.min(a.length - 1, Math.max(0, Math.floor(k*(a.length - 1))))];   /* (pct: how near the very edge - 1, the furthest point; less, past the odd bump) */
+  return { x:at(xs, q), zf:at(zs, q), zb:at(zs, 1 - q) };
+}
+/* the front of the garment at (x, y): the furthest forward any of its points comes there */
+function m3dSurfZ(meshes, x, y, r){ let z = -1; r = r || 0.008;
+  for (const m of meshes){ if (!m || !m.geometry) continue; const p = m.geometry.attributes.position, sx = m.scale.x, sy = m.scale.y, sz = m.scale.z, oy = m.position.y, oz = m.position.z;
+    for (let i=0;i<p.count;i++){ if (Math.abs(p.getX(i)*sx - x) > r || Math.abs(p.getY(i)*sy + oy - y) > r) continue; const zz = p.getZ(i)*sz + oz; if (zz > z) z = zz; } }
+  return z; }
 function m3dFrontStrip(torso, mat, w, d, y0, y1, fb){
   const T = THREE, n = 10, zs = []; for (let i=0;i<=n;i++) zs.push(m3dFrontZ(torso, y0 + (y1 - y0)*i/n, fb));
   for (let i=0;i<n;i++){ const ya = y0 + (y1 - y0)*i/n, yb = y0 + (y1 - y0)*(i + 1)/n, za = zs[i], zb = zs[i + 1], L = Math.hypot(yb - ya, zb - za);
@@ -36903,12 +36919,18 @@ function m3dHumanoid(o){
   if (o.studs){ const sm = m3dMat(mats, '#b0a890', 'metal'), cp = chest.geometry.attributes.position, cs = chest.scale;   /* (RS-265: each stud sits on the leather wherever the body curves) */
     const surfZ = (x, y)=>{ let z = -1; for (let i=0;i<cp.count;i++){ const px = cp.getX(i)*cs.x, py = cp.getY(i)*cs.y; if (Math.abs(px - x) < 0.007 && Math.abs(py - y) < 0.007) z = Math.max(z, cp.getZ(i)*cs.z); } return z > 0 ? z : 0.069*Math.sqrt(b); };
     for (let i=0;i<3;i++) for (let j=0;j<3;j++){ const x = (j-1)*0.035*b, y = 0.09 + i*0.055 - (o.fem && i===2 ? 0.012 : 0); m3dSphere(torso, 0.0055, sm, x, y, surfZ(x, y) + 0.001); } }
-  if (o.tabard){ const tg = new T.PlaneGeometry(0.11*b, 0.36, 10, 12), tp = tg.attributes.position, rx = 0.1*b, rz = 0.084*Math.sqrt(b);   /* (RS-279: a tabard that hangs round the chest and falls free below the belt) */
-    for (let i=0;i<tp.count;i++){ const x = tp.getX(i), y = tp.getY(i), u = Math.min(1, Math.abs(x)/rx), zc = Math.sqrt(1 - u*u)*rz; tp.setZ(i, y > -0.12 ? zc + 0.003 : zc + 0.003 - (y + 0.12)*0.12); }
+  if (o.tabard){ const tg = new T.PlaneGeometry(0.11*b, 0.36, 10, 14), tp = tg.attributes.position, rx = 0.1*b, rz = 0.084*Math.sqrt(b);   /* (RS-279: a tabard that hangs round the chest and falls free below the belt) */
+    /* (RS-538) laid on the garment as it is - over a broad chest, round a belly - each column of it hanging straight down from where it leaves the body */
+    const cols = new Map(), meshes = [chest, pelvM]; for (let i=0;i<tp.count;i++){ const x = tp.getX(i), y = tp.getY(i) + 0.12, sz = m3dSurfZ(meshes, x, y, 0.009); const k = x.toFixed(4); if (!cols.has(k)) cols.set(k, []); cols.get(k).push([i, y, sz]); }
+    for (const list of cols.values()){ list.sort((a, c)=>c[1] - a[1]); let last = null, lastY = 0;
+      for (const [i, y, sz] of list){ const x = tp.getX(i), u = Math.min(1, Math.abs(x)/rx), zc = Math.sqrt(1 - u*u)*rz; const z = sz > 0 && !(last!==null && y < -0.03 && sz < last - 0.004) ? sz : (last!==null ? last + (lastY - y)*0.02 : zc);   /* (below the body - or where it falls away under a belly - it hangs straight, standing a touch off) */
+        tp.setZ(i, z + 0.004); last = z; lastY = y; } }
     tg.computeVertexNormals(); const tb = new T.Mesh(tg, m3dMat(mats, o.tabard, 'cloth')); tb.material.side = T.DoubleSide; tb.position.y = 0.12; tb.name = 'tabard'; torso.add(tb); if (o.emblem) m3dSphere(torso, 0.022, m3dMat(mats, o.emblem, 'metal'), 0, 0.14, 0.086*Math.sqrt(b), 1, 1, 0.3); }
-  if (outfit!=='robe' && !bare){ const belt = new T.Mesh(new T.TorusGeometry((o.fem ? 0.09 : 0.099)*b, 0.012, 10, 48), o.trim ? m3dMat(mats, o.trim, 'metal') : m3dMat(mats, '#2a1c12', 'leather')); belt.rotation.x = Math.PI/2; belt.position.y = 0.025;
-    belt.scale.set((o.broad||1)*(1 + (BD.hp - 1)*0.7), ((o.fem ? 0.076 : 0.083)*Math.sqrt(b)/((o.fem ? 0.09 : 0.099)*b))*(1 + ((o.broad||1)-1)*0.6), 1); hips.add(belt);   /* (RS-279: a belt that goes round the body; RS-376: on the hips, below the waist's bend) */
-    if (o.buckle) m3dBox(hips, 0.045, 0.038, 0.012, m3dMat(mats, o.buckle, 'metal'), 0, 0.025, 0.072*Math.sqrt(b)*(1 + ((o.broad||1)-1)*0.6)); }   /* (RS-246: a big belt buckle) */            // belt
+  if (outfit!=='robe' && !bare){ const R0 = (o.fem ? 0.09 : 0.099)*b, belt = new T.Mesh(new T.TorusGeometry(R0, 0.012, 10, 48), o.trim ? m3dMat(mats, o.trim, 'metal') : m3dMat(mats, '#2a1c12', 'leather')); belt.rotation.x = Math.PI/2; belt.position.y = 0.025;
+    belt.scale.set((o.broad||1)*(1 + (BD.hp - 1)*0.7), ((o.fem ? 0.076 : 0.083)*Math.sqrt(b)/((o.fem ? 0.09 : 0.099)*b))*(1 + ((o.broad||1)-1)*0.6), 1);
+    { const rg = m3dRingAt([chest, pelvM], 0.025, 0.004, 0.94); if (rg){ const bw = rg.x + 0.004, bd = (rg.zf - rg.zb)/2 + 0.004; belt.scale.x = Math.max(belt.scale.x, bw/R0); belt.scale.y = Math.max(belt.scale.y, bd/R0); belt.position.z = (rg.zf + rg.zb)/2; } }   /* (RS-538: round the body as it is, not the build every figure used to have) */
+    hips.add(belt);   /* (RS-279: a belt that goes round the body; RS-376: on the hips, below the waist's bend) */
+    if (o.buckle) m3dBox(hips, 0.045, 0.038, 0.012, m3dMat(mats, o.buckle, 'metal'), 0, 0.025, belt.position.z + belt.scale.y*R0 + 0.002); }   /* (RS-246: a big belt buckle) */            // belt
   if (outfit==='fur'){ const ring = new T.Mesh(new T.TorusGeometry(0.075*b, 0.035, 8, 16), furM); ring.rotation.x = Math.PI/2; ring.position.y = 0.29; ring.scale.set(1.2, 0.85, 1); torso.add(ring); }
   if (outfit==='loin' || outfit==='fur'){ m3dBox(hips, 0.1*b, 0.14, 0.01, outfit==='fur' ? furM : clothM, 0, -0.07, 0.065); m3dBox(hips, 0.1*b, 0.12, 0.01, outfit==='fur' ? furM : clothM, 0, -0.06, -0.065); }
   // (RS-174) robes worn as two pieces: a robe top is a tunic to the waist (sleeves and a sash; RS-203 took off its short hem) and the robe
@@ -36930,15 +36952,17 @@ function m3dHumanoid(o){
     sg.computeVertexNormals();                                                   // (pleats, deepening toward the hem)
     const m = new T.Mesh(sg, mat); m.material.side = T.DoubleSide; m.position.y = y; m.scale.z = skZ; m.scale.x = brd; hips.add(m); return m; };   /* (a little flatter front to back, as the hips are; RS-291: its depth scales with the body's, by the root of the build, so a slight figure's skirt still clears her seat) */
   let hemY = null, hemR = 0; const hpk = 1 + (BD.hp - 1)*0.5, skT = (o.fem ? 0.118 : 0.1)*b*hpk, skB = (o.fem ? 0.162 : 0.15)*b*hpk, skS = (o.fem ? 0.128 : 0.12)*b*hpk;   /* (RS-286: a skirt's waist clears the hips - hers are wider; RS-415: only just, so it fits her waist - it flared out like a bell) */
-  const robeWaist = outfit==='robe' ? { x:beltX, z:beltZ } : null;   /* (under a robe top the skirt starts where the bodice ends; under a tunic it keeps its own gathered waist) */
+  let bX = beltX, bZ = beltZ;
+  if (outfit==='robe'){ const rg = m3dRingAt([rig.chestMesh, rig.pelvisMesh], 0.014, 0.01); if (rg){ bX = Math.max(beltX, rg.x/(o.broad||1) + 0.004); bZ = Math.max(beltZ, Math.max(rg.zf, -rg.zb) + 0.004); } }   /* (measured as it is - its breadth already in it - and the skirt is stretched by the breadth after) */   /* (RS-538: the robe's waist as wide as the body in it - a heavy one's belly hung out over its skirt like a shelf) */
+  const robeWaist = outfit==='robe' ? { x:bX, z:bZ } : null;   /* (under a robe top the skirt starts where the bodice ends; under a tunic it keeps its own gathered waist) */
   if (robeLegs){ rig.skirt = pleatSkirt(skT, skB, 0.48, -0.224, legM.clone(), null, robeWaist); }               // the robe bottom: to the ankles (RS-305: its waist up at the belt line, under the sash)
-  else if (outfit==='robe' && !robeTop){ rig.skirt = pleatSkirt(skT, skB, 0.48, -0.224, clothM, null, robeWaist); hemY = -0.4; hemR = skB/b; rig.skirt.userData.cloth = ROBE_CLOTH[Math.min(4, o.robeTier||0)]; }   // a one-piece robe
+  else if (outfit==='robe' && !robeTop){ rig.skirt = pleatSkirt(Math.max(skT, bX*1.08), Math.max(skB, bX*1.42), 0.48, -0.224, clothM, null, robeWaist);   /* (RS-538: a heavy body's robe flares from its own waist) */ hemY = -0.4; hemR = skB/b; rig.skirt.userData.cloth = ROBE_CLOTH[Math.min(4, o.robeTier||0)]; }   // a one-piece robe
   else if ((outfit==='rags' || outfit==='shirt') && !o.waistcoat){ pleatSkirt(skT, skS, 0.24, -0.1, clothM, outfit);
     if (o.tunicTrim){ const tt = m3dMat(mats, o.tunicTrim, 'metal'), band = new T.Mesh(new T.TorusGeometry(skS*1.01, 0.007, 6, 40), tt); band.rotation.x = Math.PI/2; band.position.y = -0.205; band.scale.set(1, 0.95, 1); hips.add(band);   /* (RS-255: an embroidered band at the tunic's hem and neck) */
       const nk = new T.Mesh(new T.TorusGeometry(0.046*Math.sqrt(b), 0.006, 6, 22), tt); nk.rotation.x = Math.PI/2 + 0.22; nk.position.set(0, 0.302, 0.006); torso.add(nk); } }
   if (robeLegs){ hemY = -0.4; hemR = skB/b; }                                                                   // (runes go round the robe bottom's hem)
   if (outfit==='robe'){   /* (RS-203: the robe top stops at the waist, under its sash - no hem of its own to poke through the robe bottom; RS-305: every robe, one- or two-piece, has the sash at the belt line, where the bodice's hem and the skirt's waist meet) */
-    const sash = m3dMat(mats, o.trim || mpTone(clothHex, -0.35), o.trim ? 'metal' : 'cloth'), sx = (beltX + 0.005)*brd, sz = (beltZ + 0.005)*dpF;   /* (round the bodice's hem, standing a little proud of it) */
+    const sash = m3dMat(mats, o.trim || mpTone(clothHex, -0.35), o.trim ? 'metal' : 'cloth'), sx = (bX + 0.005)*brd, sz = (bZ + 0.005)*dpF;   /* (round the bodice's hem, standing a little proud of it) */
     const sw = new T.Mesh(new T.TorusGeometry(sx, 0.013, 8, 32), sash); sw.rotation.x = Math.PI/2; sw.position.y = 0.012; sw.scale.set(1, sz/sx, 1); hips.add(sw);
     m3dBox(hips, 0.022, 0.09, 0.008, sash, 0.03*b, -0.03, sz - 0.004); }            // (and its knotted end; RS-376: on the hips, below the waist's bend)
   if (outfit==='robe') rig.robe = true;
@@ -42822,7 +42846,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-537';
+const GAME_VERSION = 'rs-538';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

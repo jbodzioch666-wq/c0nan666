@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-538 - Armour that fits the body in it
+
+- **Belts round the body**: a belt was the size of the build everyone used to have, so on a heavy body it was buried and on a slight one it floated. It's now measured round the body wearing it.
+- **Robes that fit**: a robe's waist, sash and skirt were the same for every build, and a heavy body's belly hung out over the skirt like a shelf. The robe now meets the body at its own waist and flares from there.
+- **Tabards on the body**: a tabard was a flat card that a belly or a broad chest pushed through. It's now laid over the chest and belly as they are, and hangs straight down from where it leaves them.
+
 ## RS-537 - Hair, the modern way
 
 - **Hair cards**: hair was a bundle of solid tubes, and it looked it. It's now drawn the way today's games draw hair - cards: thin ribbons laid in combed rows from the crown down over the head, each carrying a painted clump of a hundred fine strands with gaps between them, cut out so you see through them, tapering to soft tips. Three layers - the body of it, one between, and a few loose strands lifting off the top - so no scalp shows and it doesn't sit like a helmet.
