@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-527 - The whole of you in the preview
+
+- **Head to foot**: the turning figure in the character creator, the barber's chair and the dye works is now framed to the figure as it stands - hat, horns, ears and boots included - so a tall wood elf no longer loses her feet and hat off the edges, and a gnome isn't lost in empty space. Zooming in still closes on the face.
+
 ## RS-526 - A tidier creation screen
 
 - **Races in a picker**: instead of ten rows to read through, the race is one card - its name, what it is, its gift and the skills it's good at - with arrows either side to step through them, and a dot for each race you can tap to jump straight there. The arrow keys and the number keys pick a race too.
