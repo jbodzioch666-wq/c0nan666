@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs547 | Robes fall over the hips (no bulge below the belt), meet the bodice front and back, no pinched waist, pot belly in the cloth's shade; rope dreadlocks; mohawk crest |
 | rs546 | Nothing worn but what you wear (underclothes in the world, no shirt or trouser pickers); the robe one garment - skirt in the bodice's cloth, a cord, a drape over a heavy body |
 | rs544 | Arms and sides across builds: mail sleeves on a hauberk, a jerkin skirt wide enough for heavy hips, arms hanging clear of a heavy body |
 | rs543 | Every hairstyle as cards: plaited braids, rope dreadlocks, coiled curls, a standing mohawk crest, a topknot with a wound bun; soft nape fringe |

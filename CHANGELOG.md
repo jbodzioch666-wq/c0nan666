@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-547 - Robes that hang right, ropes and a crest
+- **No bulge below the belt:** a robe's skirt now goes down over the hips, front and back, before it flares to the hem. It used to flare straight out from the belt, so on a slim body, such as a female dragonborn with the Dancer build, it stuck out in front like a pot belly. It now meets the robe's top at the waist without a lip, and the cord sits flat round it.
+- **No pinched waist:** robes no longer dip in at the waist. On a wood elf the top used to sit on a narrow stalk above the skirt.
+- **Pot bellies in the robe's cloth:** a gnome's or halfling's round belly under a robe or tunic used to show as a patch of different cloth. It now matches the garment.
+- **Dreadlocks as ropes:** fewer and thicker, twisted from three strands, and hanging clear of the face. They used to look like ringlets, and the front ones fell over the eyes.
+- **The mohawk stands up all the way back:** the crest now stands up to the back of the crown instead of lying flat down the back of the head.
+- **Robes sway:** a reminder that robe skirts already swing with the cloth motion near you (RS-516). Robes on dwarves, gnomes, halflings and wood elves are now checked to fit as well.
+
 ## RS-546 - Only what you wear, and a robe in one piece
 - **No default clothes in the world:** out of armour, your character wears the same plain underclothes as in the creator. The default shirt, trousers and boots are gone, and so is each race's costume: the human cloak and tunic, the half-elf jerkin, the tiefling coat, the high elf robe and circlet, the gnome's hat and apron, the halfling waistcoat, the wood elf leaf cap. Each piece of gear you put on shows, and nothing else. Town folk still dress as before.
 - **No shirt or trouser pickers:** there's nothing for them to colour now, so the creator no longer offers them.
