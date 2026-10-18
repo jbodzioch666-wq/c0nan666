@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-526 - A tidier creation screen
+
+- **Races in a picker**: instead of ten rows to read through, the race is one card - its name, what it is, its gift and the skills it's good at - with arrows either side to step through them, and a dot for each race you can tap to jump straight there. The arrow keys and the number keys pick a race too.
+- **No stats row**: the row of starting skill levels at the bottom (all 1s and a 10) is gone - it was the same for everyone.
+
 ## RS-525 - Build your body
 
 - **Body sliders**: the character creator has a BUILD section under your appearance - thirteen sliders for frame, weight, muscle, shoulders, chest, waist, hips, neck, head, legs, arms, height and posture. The number follows your finger as you drag; the figure is sculpted afresh the moment you let go, a few milliseconds a frame, so the screen never freezes and the figure you had stands until the new one is ready ("sculpting..." under it meanwhile).

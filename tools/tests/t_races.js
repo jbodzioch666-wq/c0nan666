@@ -4,7 +4,7 @@
 module.exports = async page=>{
   const ev = (f, a)=>page.evaluate(f, a), A = (c, msg)=>{ if (!c) throw new Error('assert: '+msg); };
   // the creation screen: every race lists its skills, and every race's figure builds
-  const cc = await ev(()=>{ goToCharCreate(); const rows = [...document.querySelectorAll('#overlay .choice-row .ccaff')].map(e=>e.textContent);
+  const cc = await ev(()=>{ goToCharCreate(); const rows = RACES.map((r, i)=>{ ccSelectRace(i); const el = document.querySelector('#overlay .racepick .ccaff'); return el ? el.textContent : ''; }); ccSelectRace(0);   /* (RS-526: one race at a time, in the picker) */
     const bodies = RACES.map(r=>{ const pt = rsPlayerLook({ race:r[0], look:lookDefault(r[0]), bare:true }); const e = m3dInstance({}, pt); let tail = 0; e.holder.traverse(o=>{ if (o.isMesh) tail++; });
       return { nm:r[0], st:pt.stature, head:pt.o.head||'human', tail:pt.o.tail||'', feet:pt.o.feet||'', nose:pt.o.nose||0, hair:!!pt.o.hairStyle, meshes:tail }; });
     ccSelectRace(RACES.findIndex(r=>r[0]==='Dragonborn')); const rowsDr = [...document.querySelectorAll('#overlay .lkrow .lkn')].map(e=>e.textContent);

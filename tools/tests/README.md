@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs526 | The creation screen's race is a picker (arrows, gift, skills, dots); the starting stats row is gone |
 | rs525 | Body sliders in the creator and at the barber's (free): presets, random build, reset; the preview sculpts the new figure over frames |
 | rs524 | Bodies sculpted to a build (weight, muscle, shoulders, chest, waist, hips, neck, head, legs, arms, height, posture); garments fit every build; old looks default |
 | rs523 | A staff with a shield is held in one hand, the shield up on the other arm (it was held like a book) |
