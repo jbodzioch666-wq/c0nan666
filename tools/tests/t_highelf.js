@@ -24,9 +24,9 @@ module.exports = async page=>{
     delete p.hideLook; out.noField = lookHidden('chest');
     return out; });
   const A = (c, m)=>{ if (!c) throw new Error(m+' :: '+JSON.stringify(r)); };
-  A(r.robe.outfit==='robe' && r.robe.trim && !r.robe.legWear && r.robe.cape && r.robe.circlet && r.robe.almond && r.robe.cheek, 'a high elf out of armour wears a long trimmed robe and mantle, a circlet, almond eyes');
+  A(r.robe.outfit==='none' && !r.robe.trim && !r.robe.cape && !r.robe.circlet && r.robe.almond && r.robe.cheek, 'a high elf out of armour is in underclothes - no default robe, mantle or circlet (RS-546); almond eyes');
   A(r.armoured.outfit==='plate' && !r.armoured.circlet && r.armoured.helm, 'in armour the robe and circlet give way');
-  A(!r.hidden.helm && r.hidden.circlet && r.hidden.worn && r.hidden.ac && r.hidden.keyChanged, 'a hidden helm is still worn and counted, but not shown');
+  A(!r.hidden.helm && !r.hidden.circlet && r.hidden.worn && r.hidden.ac && r.hidden.keyChanged, 'a hidden helm is still worn and counted, but not shown (RS-546: and no default circlet in its place)');
   A(r.ticks.head===false && r.ticks.chest===true && !r.ticks.ring, 'the figure slots carry ticks (none on rings)');
   A(!r.drag && !r.back.hidden && r.back.helm, 'the tick toggles back without starting a drag');
   A(r.noField===false, 'old saves show everything');

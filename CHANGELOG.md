@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-546 - Only what you wear, and a robe in one piece
+- **No default clothes in the world:** out of armour, your character wears the same plain underclothes as in the creator. The default shirt, trousers and boots are gone, and so is each race's costume: the human cloak and tunic, the half-elf jerkin, the tiefling coat, the high elf robe and circlet, the gnome's hat and apron, the halfling waistcoat, the wood elf leaf cap. Each piece of gear you put on shows, and nothing else. Town folk still dress as before.
+- **No shirt or trouser pickers:** there's nothing for them to colour now, so the creator no longer offers them.
+- **One robe, not two:** the robe's skirt is now the same cloth as its top, with the same fine weave and the same shade. The skirt used to have a coarser weave and a brighter colour, so it looked like a separate garment. The broad band at the waist is now a thin cord with its two ends hanging from the knot.
+- **The robe fits the body again:** on a heavy build it drapes from the chest down to the waist instead of clinging to every roll, and it meets the skirt without a ledge.
+
 ## RS-545 - Underclothes that stay on
 - **No more flaps:** in the creator, the briefs had pieces cut from the tops of the thighs. When a leg moved, those pieces swung off the hips as flat panels. The briefs now come from the hips alone and sit a touch further off the skin, and the legs move freely under the leg openings.
 

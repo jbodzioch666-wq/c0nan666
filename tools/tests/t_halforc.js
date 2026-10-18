@@ -13,7 +13,7 @@ module.exports = async page=>{
     return out; });
   const A = (c, m)=>{ if (!c) throw new Error(m+' :: '+JSON.stringify(r)); };
   A(r.ho.head==='orc' && r.ho.brow && r.ho.nose && r.ho.jaw && r.ho.ears && r.ho.tusks >= 1 && r.ho.iris==='#c8901a' && r.ho.hair, 'the half-orc face');
-  A(r.ho.outfit==='rags', 'out of armour, ragged clothes');
+  A(r.ho.outfit==='none', 'out of armour, underclothes - no default rags (RS-546)');
   A(r.ho.broad > 1.05 && r.ho.arms > r.ho.legs && r.ho.shX > r.hu.shX && r.ho.stoop > 0 && r.ho.neckZ > r.hu.neckZ, 'broad, hunched, long in the arm');
   A(r.folk.jaw && r.folk.broad > 1.05 && r.folk.outfit!=='shirt', 'the orcish townsfolk match');
   console.log('halforc ok');

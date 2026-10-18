@@ -12,7 +12,7 @@ module.exports = async page=>{
     return out; });
   const A = (c, m)=>{ if (!c) throw new Error(m+' :: '+JSON.stringify(r)); };
   A(r.bare.jaw && r.bare.hair==='long' && r.bare.beard===3, 'a squarer jaw, long hair and a full beard');
-  A(r.bare.outfit==='shirt' && r.bare.trim && r.bare.cape && r.bare.fur, 'a trimmed tunic under a fur-collared cloak');
+  A(r.bare.outfit==='none' && !r.bare.trim && !r.bare.cape && !r.bare.fur, 'out of armour, underclothes - no default tunic or cloak (RS-546)');
   A(!r.armoured.trim && !r.armoured.fur, 'armour takes over');
   A(r.folk.tunics >= 1 && r.folk.jaw, 'human townsfolk wear tunics too: '+JSON.stringify(r.folk));
   console.log('human ok');

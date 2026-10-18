@@ -23,7 +23,7 @@ module.exports = async page=>{
   A(r.we.rng===r.hum.rng+1 && r.we.mag===r.hum.mag && r.we.key==='woodelf', 'a wood elf shoots truer');
   A(r.he.mag===r.hum.mag+1 && r.he.rng===r.hum.rng && r.he.key==='elf', 'a high elf casts truer');
   A(r.free > 15 && r.free < 70, 'about one spell in ten is free for a high elf: '+r.free);
-  A(r.look.stoop > 0 && r.look.cap && r.look.toes && r.look.legs==='skin' && r.look.thin < 1 && r.look.long > 1 && r.look.nose && r.look.lids && r.look.stature > 1.05, 'the wood elf look');
+  A(r.look.stoop > 0 && !r.look.cap && r.look.toes && r.look.legs==='skin' && r.look.thin < 1 && r.look.long > 1 && r.look.nose && r.look.lids && r.look.stature > 1.05, 'the wood elf look (RS-546: no default leaf cap)');
   A(r.rig.stoop > 0 && r.rig.hipY > 0.47 && r.lean > 0.15, 'built stooped on long legs');
   A(r.rig.neckZ > 0.08 && r.rig.neckTilt > 0.5 && r.rig.headBack > 0, 'the spine curves: the neck sits well forward of the hips and tilts with the curve (RS-244): '+JSON.stringify(r.rig));
   A(!r.armoured.cap && !r.armoured.toes && r.armoured.stoop > 0, 'a helm hides the leaf cap, boots the toes');

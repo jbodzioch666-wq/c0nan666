@@ -20,7 +20,7 @@ module.exports = async page=>{
     A(q.worn.length === 0 && q.outfit === 'none' && !q.cape, k + ': nothing worn - ' + q.worn.join(','));
     A(q.pelvU === 1 && q.thighU === 0, k + ': briefs cut from the hips alone (RS-545: none cut from the thighs - they swung off as flaps)');
     A(q.chestU === (k.endsWith('1') ? 1 : 0), k + ': a band round her breasts (and none on a man)'); }
-  A(r.dressed.outfit !== 'none' && r.dressed.cape, 'out of the creator, dressed as before');
+  A(r.dressed.outfit === 'none' && !r.dressed.cape, 'in the world too, nothing but what you wear (RS-546)');
   /* the creator itself, as it draws */
   await page.waitForTimeout(2500);
   const cv = await page.$('canvas'); if (cv){ const f = require('path').join(global.SHOTS, 'rs542_creator.png'); await page.screenshot({ path:f }); }

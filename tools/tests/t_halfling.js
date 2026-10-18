@@ -12,7 +12,7 @@ module.exports = async page=>{
     G.villageRace = 'halfling'; const f = v3RaceDress(v3VillagerLook(3), 3); out.folk = { vest:!!f.o.waistcoat, legs:f.o.legWear, feet:f.o.feet, belly:!!f.o.potBelly };
     return out; });
   const A = (c, m)=>{ if (!c) throw new Error(m+' :: '+JSON.stringify(r)); };
-  A(r.bare.vest && r.bare.sleeve && r.bare.legs==='breeches' && r.bare.belly && r.bare.rosy && r.bare.nose && r.bare.feet==='bare' && r.bare.big && r.bare.hair==='curly', 'the hobbit look out of armour');
+  A(!r.bare.vest && !r.bare.sleeve && r.bare.legs==='skin' && r.bare.belly && r.bare.rosy && r.bare.nose && r.bare.feet==='bare' && r.bare.big && r.bare.hair==='curly', 'the hobbit look out of armour - no default waistcoat or breeches (RS-546)');
   A(!r.armoured.vest && r.armoured.legs==='plate' && r.armoured.feet!=='bare', 'in armour the waistcoat, breeches and bare feet give way');
   A(r.folk.vest && r.folk.legs==='breeches' && r.folk.feet==='bare' && r.folk.belly, 'the halfling townsfolk match');
   console.log('halfling ok');

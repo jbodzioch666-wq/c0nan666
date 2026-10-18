@@ -12,7 +12,7 @@ module.exports = async page=>{
     return out; });
   const A = (c, m)=>{ if (!c) throw new Error(m+' :: '+JSON.stringify(r)); };
   A(r.bare.slim && r.bare.cheek && r.bare.ears > 0.02 && r.bare.beard===1, 'an elf-touched face with stubble');
-  A(r.bare.outfit==='leather' && r.bare.sleeve && r.bare.legs==='trews' && r.bare.legCol && r.bare.cape && r.bare.hood, 'a jerkin over linen sleeves, trousers in the chosen colour, a cloak with the hood down');
+  A(r.bare.outfit==='none' && !r.bare.sleeve && r.bare.legs==='skin' && !r.bare.cape && !r.bare.hood, 'out of armour, underclothes - no default jerkin, trousers or cloak (RS-546)');
   A(r.armoured.outfit==='plate' && r.armoured.legs==='plate' && !r.armoured.hood, 'armour takes over');
   A(r.folk.outfit==='leather' && r.folk.hood && r.folk.slim, 'the half-elven townsfolk match');
   console.log('halfelf ok');

@@ -14,7 +14,7 @@ module.exports = async page=>{
   const A = (c, m)=>{ if (!c) throw new Error(m+' :: '+JSON.stringify(r)); };
   A(r.bare.horns && r.bare.tail==='spade' && r.bare.slim && r.bare.chin && r.bare.ears > 0.04, 'the tiefling face, horns and tail');
   A(/^\d+,\d+,\d+$/.test(r.bare.eyes||'') && r.violet!==r.bare.eyes, 'eyes glow in the colour you pick: '+r.bare.eyes+' / '+r.violet);
-  A(r.bare.outfit==='robe' && r.bare.trim && r.bare.cape && r.bare.collar, 'a long dark coat under a high-collared mantle');
+  A(r.bare.outfit==='none' && !r.bare.trim && !r.bare.cape && !r.bare.collar, 'out of armour, underclothes - no default coat or mantle (RS-546)');
   A(r.armoured.outfit==='plate' && !r.armoured.collar, 'armour takes over');
   A(r.folk.eyes && r.folk.chin && r.folk.outfit==='robe', 'the tiefling townsfolk match');
   console.log('tiefling ok');

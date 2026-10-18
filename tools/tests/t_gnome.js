@@ -14,7 +14,7 @@ module.exports = async page=>{
     out.folk = { hat:!!f.o.gnomeHat, apron:!!f.o.apron, brows:!!f.o.bushyBrows, fem:!!f.o.fem };
     return out; });
   const A = (c, m)=>{ if (!c) throw new Error(m+' :: '+JSON.stringify(r)); };
-  A(r.bare.hat && r.bare.goggles && r.bare.brows && r.bare.rosy && r.bare.belly && r.bare.apron && r.bare.legs < 1 && r.bare.nose >= 1 && r.bare.cone===1, 'the gnome look, with one smooth tall hat');
+  A(!r.bare.hat && !r.bare.goggles && r.bare.brows && r.bare.rosy && r.bare.belly && !r.bare.apron && r.bare.legs < 1 && r.bare.nose >= 1, 'the gnome look - no default hat or apron (RS-546)');
   A(!r.armoured.hat && !r.armoured.apron && r.armoured.helm, 'a helm takes the hat\'s place, armour the apron\'s');
   A(r.folk.hat && r.folk.apron && r.folk.brows, 'the gnomish townsfolk match');
   console.log('gnome ok');
