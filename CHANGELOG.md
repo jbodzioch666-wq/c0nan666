@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-540 - Hair that moves
+- **Long hair swings:** it trails behind as you set off, swings forward when you stop and swings out as you turn. It settles on a spring instead of being frozen in place. Ponytails and beards move too; beards move less.
+- **Wind:** on the open land, hair streams with the same wind that blows the cloaks, harder in a storm, and the ends flutter.
+- **It hangs down:** when a head tips forward or back, the hair still falls toward the ground.
+- **Everyone has their own:** each person's hair moves with them, and someone standing still isn't swayed by you walking past. The crown stays put; only the hanging part moves.
+
 ## RS-539 - Hair, finished
 - **No more flat fringe:** the scalp under the hair used to sit above the hair cards, so it showed as a flat slab on the brow and a bare dome at the crown. It now follows the hairline and lies beneath the cards.
 - **Long hair parts:** it's combed down and aside from a parting to the temples, and it covers the ears instead of letting them poke through.

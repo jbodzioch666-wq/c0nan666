@@ -32579,6 +32579,7 @@ function o3CampSit(P, pp, busy){
     La.sh.rotation.x = -0.95 - warm; La.sh.rotation.z = -0.1; La.el.rotation.x = -0.55; }
   if (r.cape){ m3dCapeSwing(r.cape, 0.7, 0); r.cape.userData.P = null; }
   if (r.skirt) m3dSkirtFollow(r);
+  m3dHairSway(r);   /* (RS-540) */
   kit(false);
   // a toasting stick from the right fist to just over the fire, a marshmallow browning on its end
   if (!O3.campStick){ const g = O3.campStick = new T.Group(), wood = new T.MeshStandardMaterial({ color:new T.Color('#7a5a36').convertSRGBToLinear(), roughness:0.85 });
@@ -35969,8 +35970,8 @@ function m3dHairTex(){
 function m3dHairCardMat(mats, soft){
   const ck = soft ? '__hairCardSoft' : '__hairCard'; if (mats[ck]) return mats[ck];
   const T = THREE, m = new T.MeshStandardMaterial({ color:0xffffff, map:m3dHairTex(), vertexColors:true, roughness:0.55, metalness:0, side:T.DoubleSide, alphaTest:soft ? 0.04 : 0.5, transparent:!!soft, depthWrite:!soft });
-  m.onBeforeCompile = sh=>{
-    sh.vertexShader = 'attribute vec3 hairTan;\nvarying vec3 vHT;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vHT = normalize(normalMatrix * hairTan);');
+  m.onBeforeCompile = function(sh){ const U = m3dHairSwU(this); if (sh.uniforms){ sh.uniforms.uHairSw = U.sw; sh.uniforms.uHairFl = U.fl; }   /* (RS-540: its own figure's sway - each figure has its own copy of the material) */
+    sh.vertexShader = 'attribute vec3 hairTan;\nattribute float hairW;\nuniform vec4 uHairSw;\nuniform float uHairFl;\nvarying vec3 vHT;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vHT = normalize(normalMatrix * hairTan);\n  { float hw = hairW*hairW*(3.0 - 2.0*min(1.0, hairW)); transformed += uHairSw.xyz*hw + vec3(sin(uHairSw.w*2.7 + position.x*55.0 + position.z*37.0 + position.y*21.0), 0.0, cos(uHairSw.w*2.3 + position.x*41.0 - position.z*29.0))*uHairFl*hw; }');
     sh.fragmentShader = 'varying vec3 vHT;\n' + sh.fragmentShader.replace('#include <output_fragment>', `
   { vec3 Vd = normalize(vViewPosition), Nn = normalize(normal), Tt = normalize(vHT), Lw = normalize((viewMatrix * vec4(0.35, 1.0, 0.55, 0.0)).xyz), Hh = normalize(Lw + Vd);
     vec3 T1 = normalize(Tt + Nn*0.12), T2 = normalize(Tt - Nn*0.18);
@@ -35982,19 +35983,43 @@ function m3dHairCardMat(mats, soft){
   m.customProgramCacheKey = ()=>'m3dhaircard' + (soft ? 's' : ''); m.userData.kind = 'hair'; m.userData.hex = '#ffffff'; m.userData.special = 'hairCard';
   return (mats[ck] = m);
 }
+/* (RS-540) a hair material's sway: how far its figure's hanging hair is carried (x, y, z, in the head's own frame) and the time (w), and how much it flutters */
+function m3dHairSwU(m){ const d = m.userData; if (!d.hsw || !d.hsw.value || !d.hsw.value.isVector4) d.hsw = { value:new THREE.Vector4() }; if (!d.hfl || typeof d.hfl.value!=='number') d.hfl = { value:0 }; return { sw:d.hsw, fl:d.hfl }; }
+/* (RS-540) hair that moves: its hanging ends trail the head on a spring - swinging back as you set off, forward as you stop, out as
+   you turn - hang down when the head tips, and stream and flutter in the wind on the open land. Worked out once a frame per
+   figure; the cards bend on the GPU, by how far below the head each part of them hangs (hairW) */
+const M3D_HAIRSW = new WeakMap();
+function m3dHairSway(r, tNow){
+  const h = r && r.head; if (!h) return; let H = M3D_HAIRSW.get(r); const T = THREE;
+  if (!H){ const ms = []; h.traverse(o=>{ if (o.isMesh && o.material && o.material.userData.special==='hairCard' && !ms.includes(o.material)) ms.push(o.material); }); H = { ms, p:null, v:new T.Vector3(), q:new T.Vector3(), d:new T.Vector3(), g:new T.Vector3(), m3:new T.Matrix3(), t:0 }; M3D_HAIRSW.set(r, H); }
+  if (!H.ms.length) return;
+  const now = tNow != null ? tNow : performance.now()/1000, dt = Math.min(1/20, now - H.t); H.t = now;
+  h.updateWorldMatrix(true, false); const E = h.matrixWorld.elements, s = Math.hypot(E[0], E[1], E[2]) || 1;
+  H.q.set(0, -0.05, -0.04).applyMatrix4(h.matrixWorld);   /* (where the hair's ends hang, in the world) */
+  if (!H.p || !(dt > 0) || H.p.distanceTo(H.q) > 0.3*s){ H.p = H.q.clone(); H.v.set(0, 0, 0); }
+  else { H.d.subVectors(H.q, H.p); H.v.addScaledVector(H.d, 75*dt).multiplyScalar(Math.max(0, 1 - 10*dt)); H.p.addScaledVector(H.v, dt); }
+  H.d.subVectors(H.p, H.q); if (H.d.length() > 0.05*s) H.d.setLength(0.05*s);
+  let wd = null; try{ wd = m3dClothWind(now); }catch(e){} const wk = wd ? Math.hypot(wd[0], wd[1]) : 0;
+  if (wd){ const gu = 0.75 + 0.25*Math.sin(now*1.7 + E[12]*3); H.d.x += wd[0]*0.014*s*gu; H.d.z += wd[1]*0.014*s*gu; }
+  H.m3.setFromMatrix4(h.matrixWorld).invert(); H.d.applyMatrix3(H.m3);   /* (into the head's own frame) */
+  H.g.set(0, -1, 0).applyMatrix3(H.m3).normalize(); H.d.x += H.g.x*0.02; H.d.z += H.g.z*0.02; H.d.y += (H.g.y + 1)*0.01;   /* (hanging down when the head tips) */
+  if (H.d.length() > 0.06) H.d.setLength(0.06);
+  const fl = 0.0012 + Math.min(1.5, wk)*0.0035 + Math.min(1, H.v.length()/s)*0.002;
+  for (const m of H.ms){ const U = m3dHairSwU(m); U.sw.value.set(H.d.x, H.d.y, H.d.z, now % 600); U.fl.value = fl; }
+}
 /* (the soft pass: the same cards again, see-through, over the solid ones - the fine fringes a hard cut-out left jagged) */
 function m3dHairCardMesh(geo, mats, name){ const T = THREE, m = new T.Mesh(geo, m3dHairCardMat(mats)); m.name = name; m.castShadow = false; const s = new T.Mesh(geo, m3dHairCardMat(mats, true)); s.name = name + 'Soft'; s.renderOrder = 2; s.castShadow = false; m.add(s); return m; }
 /* cards from locks: each { pts, w, col (t => linear colour) }, turned to face out from c (the head's middle). One geometry for all */
-function m3dHairCardsGeo(cards, c){
-  const T = THREE, pos = [], nor = [], uv = [], col = [], tan = [], idx = [], P = new T.Vector3(), Tg = new T.Vector3(), O = new T.Vector3(), S = new T.Vector3(), Cn = new T.Vector3(c[0], c[1], c[2]);
+function m3dHairCardsGeo(cards, c, piv){
+  const T = THREE, pos = [], nor = [], uv = [], col = [], tan = [], idx = [], hw = [], P = new T.Vector3(), Tg = new T.Vector3(), O = new T.Vector3(), S = new T.Vector3(), Cn = new T.Vector3(c[0], c[1], c[2]);
   cards.forEach((cd, k)=>{ const cv = new T.CatmullRomCurve3(cd.pts.map(p=>new T.Vector3(p[0], p[1], p[2]))), n = cd.seg || 8, u0 = (k*7 % 4)/4, base = pos.length/3, flip = k % 2;
     for (let i=0;i<=n;i++){ const t = i/n; cv.getPointAt(t, P); cv.getTangentAt(t, Tg); O.subVectors(P, Cn).normalize(); S.crossVectors(Tg, O); if (S.lengthSq() < 1e-8) S.set(1, 0, 0); S.normalize();
       const w = cd.w*(1 - 0.35*t), cc = cd.col(t), N2 = O.clone().addScaledVector(S, 0).normalize();
-      for (const sd of [-1, 1]){ pos.push(P.x + S.x*w*0.5*sd + O.x*0.0015, P.y + S.y*w*0.5*sd + O.y*0.0015, P.z + S.z*w*0.5*sd + O.z*0.0015); nor.push(N2.x, N2.y, N2.z); tan.push(Tg.x, Tg.y, Tg.z);
+      for (const sd of [-1, 1]){ pos.push(P.x + S.x*w*0.5*sd + O.x*0.0015, P.y + S.y*w*0.5*sd + O.y*0.0015, P.z + S.z*w*0.5*sd + O.z*0.0015); nor.push(N2.x, N2.y, N2.z); tan.push(Tg.x, Tg.y, Tg.z); hw.push(piv ? Math.max(0, Math.min(1, (piv[0] - P.y)/piv[1]))*(piv[2] || 1) : 0);
         uv.push(u0 + (flip ? (sd > 0 ? 0 : 0.25) : (sd > 0 ? 0.25 : 0)), 1 - t); col.push(cc.r, cc.g, cc.b); } }
     for (let i=0;i<n;i++){ const a = base + i*2; idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); } });
   const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new T.Float32BufferAttribute(nor, 3)); g.setAttribute('uv', new T.Float32BufferAttribute(uv, 2));
-  g.setAttribute('color', new T.Float32BufferAttribute(col, 3)); g.setAttribute('hairTan', new T.Float32BufferAttribute(tan, 3)); g.setIndex(idx); g.computeBoundingSphere(); return g;
+  g.setAttribute('color', new T.Float32BufferAttribute(col, 3)); g.setAttribute('hairTan', new T.Float32BufferAttribute(tan, 3)); g.setAttribute('hairW', new T.Float32BufferAttribute(hw, 1)); g.setIndex(idx); g.computeBoundingSphere(); return g;
 }
 /* (RS-539) where hair grows to, round the head: high on the brow, over the ears, low at the nape - one smooth line (it stepped twice) */
 function m3dHairline(az, fem){ const f = Math.cos(az), x = Math.max(0, Math.min(1, (f + 0.6)/1.4)), s = x*x*(3 - 2*x), y = 0.05 + (0.123 - (fem ? 0.008 : 0) - 0.05)*s; return Math.asin(Math.max(-0.95, Math.min(0.95, (y - 0.088)/0.072))); }
@@ -36091,8 +36116,8 @@ function m3dHairStrands(h, o, hairM, wide, mats, st, under){
       cards.push({ pts:[[x, 0.11, z],[x*1.4 + sw, 0.06, z - 0.03],[x*0.9 + sw, -0.03, z - 0.02],[x*0.6, -0.08, z + 0.01]], w:0.018, col:t=>col(0.35 + t*0.65), seg:9, c:[0, 0.09, 0] }); }   /* (RS-539: fuller, and no darker at the tie than the head - it was a black knot) */
     m3dSphere(h, 0.012, m3dMat(mats, '#3a2a1a', 'leather'), 0, 0.104, -0.096, 1.2, 0.8, 1); }
   const main = cards.filter(cd=>!cd.c), tl = cards.filter(cd=>cd.c);
-  const m = main.length ? m3dHairCardMesh(m3dHairCardsGeo(main, [cx, cy, cz]), mats, 'hair') : null; if (m) h.add(m);   /* (RS-537: cards, not tubes) */
-  if (tl.length) h.add(m3dHairCardMesh(m3dHairCardsGeo(tl, tl[0].c), mats, 'hairTail'));
+  const m = main.length ? m3dHairCardMesh(m3dHairCardsGeo(main, [cx, cy, cz], [0.075, 0.17]), mats, 'hair') : null; if (m) h.add(m);   /* (RS-537: cards, not tubes) */
+  if (tl.length) h.add(m3dHairCardMesh(m3dHairCardsGeo(tl, tl[0].c, [0.105, 0.19]), mats, 'hairTail'));
   /* (RS-539) the scalp under the cards follows the hairline and lies under them: it was a tilted dome above them, a flat fringe on the brow and a bare crown */
   if (!under){ const g = new T.SphereGeometry(1, 40, 28), p = g.attributes.position;
     for (let i=0;i<p.count;i++){ const x = p.getX(i), y = p.getY(i), z = p.getZ(i), el = Math.asin(Math.max(-1, Math.min(1, y))), k = el > m3dHairline(Math.atan2(x, z), fem) - 0.02 ? 1 : 0.9; p.setXYZ(i, x*k, y*k, z*k); }
@@ -36112,7 +36137,7 @@ function m3dBeardStrands(h, o, mats, kind){
     list.push({ pts:[[px, py, pz], [px + N3[0]*0.008, py - L*0.45, pz + N3[2]*0.008 + 0.006], [px + N3[0]*0.004 + sw, py - L, pz + N3[2]*0.002 + 0.012]], w:0.0095*(0.8 + fpHash(i, 25, 89)*0.4)*2.6, col, seg:7 }); }   /* (RS-537: a card of strands) */
   for (const s of [-1,1]) for (let i=0;i<7;i++){ const t = i/6, x0 = s*(0.003 + t*0.004), y0 = 0.052 - t*0.003;   // the moustache
     list.push({ pts:[[x0, y0, 0.079],[s*(0.016 + t*0.004), 0.049 - t*0.004, 0.077],[s*(0.03 + t*0.003), 0.041 - t*0.006, 0.068]], w:0.011, col, seg:6, stache:1 }); }
-  const m = m3dHairCardMesh(m3dHairCardsGeo(list.filter(c=>!c.stache), [0, 0.05, -0.005]), mats, 'beard'); h.add(m);
+  const m = m3dHairCardMesh(m3dHairCardsGeo(list.filter(c=>!c.stache), [0, 0.05, -0.005], [0.03, 0.09, 0.45]), mats, 'beard'); h.add(m);
   h.add(m3dHairCardMesh(m3dHairCardsGeo(list.filter(c=>c.stache), [0, 0.06, 0.05]), mats, 'stache'));
   if (full) m3dSphere(h, 0.044, bm, 0, 0.02, 0.036, 1.02*W, 0.72, 0.92);   // (a mass under the strands, so the jaw doesn't show through)
   return m;
@@ -40007,6 +40032,7 @@ function m3dPoseHumanoid(r, t, moving, wind, strike, hurt, e){
   if (r.wk==='bow'){ if (wind || strike) m3dPoseBow(r, wind, strike); else if (r.bowPiv){ m3dBowParts(r); r.bowPiv.userData.drawK = 0; } }
   else if (r.wk==='xbow') m3dPoseXbow(r, wind, strike);
   if (r.skirt) m3dSkirtFollow(r);
+  m3dHairSway(r);   /* (RS-540) */
   r._g2 = r.grip2 && !(e && e.toolKey);
   /* (RS-173) the follow-through: the blow carries on past the strike - arm down and across, shoulders round, weight sinking
      onto bent knees - then eases back to guard; a hard hit taken staggers it, knees buckling and the body twisting away */
@@ -42876,7 +42902,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-539';
+const GAME_VERSION = 'rs-540';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
