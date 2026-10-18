@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-519 - Crossbow scouts and the Archer's quiver
+
+- **Duergar scouts carry crossbows**: they held bows before; now they hold a crossbow, posed and drawn as one in the world and in the bestiary, and their shots fly as bolts, loosed when the string lets go rather than before.
+- **A quiver for older Archers**: Archers made before the kit came with a leather quiver now get one, once - worn if your cape slot is free, otherwise in your bag. Anyone who already has a quiver, and every other kit, is left alone.
+
 ## RS-518 - Tomes and the ranged button
 
 - **Tomes drawn like the rest**: a tome's icon is now a closed book in its dye with cream page edges and leather grain, finer each tier - corner caps from Splitbark, glowing runes round the border from Mystic, gold corners and a clasp with your chosen device (or a star) inlaid from Infinity, and a glowing green gem on Ahrim's.

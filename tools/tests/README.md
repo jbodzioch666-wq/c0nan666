@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs519 | Duergar scouts shoot crossbows (bolts at the loose); old Archers given the kit's quiver once |
 | rs518 | Tome icons per tier with your device; the hotbar ranged button shows your own bow or crossbow |
 | rs517 | Weapons, staves, bows, crossbows, thrown and jewellery icons drawn per kind and tier, all distinct |
 | rs516 | Robe skirts as cloth near you: trail when walking, flare on turns, settle, legs inside; far folk posed |
