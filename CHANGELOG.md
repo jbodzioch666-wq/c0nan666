@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-541 - Plate that fits the limbs in it
+- **No more doll joints:** on a slight build, the knee and elbow plates were balls wider than the leg and arm, like a jointed doll. Knee plates now cup the front of the knee, with small side wings, and elbow plates cup the back of the elbow.
+- **Greaves have a calf:** shin plates follow the shape of the leg, swelling at the calf and narrowing to the ankle. They used to be straight pipes.
+- **Sized to the build:** thigh plates, forearm plates and greaves sit just off the limb inside them. A slender fighter's forearm plates are no longer wide tubes, and a heavy fighter's armour grows with their build.
+
 ## RS-540 - Hair that moves
 - **Long hair swings:** it trails behind as you set off, swings forward when you stop and swings out as you turn. It settles on a spring instead of being frozen in place. Ponytails and beards move too; beards move less.
 - **Wind:** on the open land, hair streams with the same wind that blows the cloaks, harder in a storm, and the ends flutter.
