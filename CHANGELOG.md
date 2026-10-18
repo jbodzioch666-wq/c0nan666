@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-542 - The creator shows the body
+- **Underclothes in the creator:** while you make your character, they stand in plain linen underclothes. The cloak, collar, tunic, hat and boots are gone, including each race's own costume, so you can see the build sliders and the hair at work. Your shirt and trouser choices still apply once you're in the game.
+- **Fitted to the body:** the briefs, and a band round a woman's breasts, are cut from the body's own surface. They fit any build and follow a wood elf's stoop.
+- **Bare feet with toes:** plain bare feet are slim and have toes. They used to look like slippers with white tufts on top. Halflings keep their big hairy feet.
+
 ## RS-541 - Plate that fits the limbs in it
 - **No more doll joints:** on a slight build, the knee and elbow plates were balls wider than the leg and arm, like a jointed doll. Knee plates now cup the front of the knee, with small side wings, and elbow plates cup the back of the elbow.
 - **Greaves have a calf:** shin plates follow the shape of the leg, swelling at the calf and narrowing to the ankle. They used to be straight pipes.

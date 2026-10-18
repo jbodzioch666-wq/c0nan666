@@ -36181,6 +36181,15 @@ function m3dSurfZ(meshes, x, y, r){ let z = -1; r = r || 0.008;
   for (const m of meshes){ if (!m || !m.geometry) continue; const p = m.geometry.attributes.position, sx = m.scale.x, sy = m.scale.y, sz = m.scale.z, oy = m.position.y, oz = m.position.z;
     for (let i=0;i<p.count;i++){ if (Math.abs(p.getX(i)*sx - x) > r || Math.abs(p.getY(i)*sy + oy - y) > r) continue; const zz = p.getZ(i)*sz + oz; if (zz > z) z = zz; } }
   return z; }
+/* (RS-542) a garment cut from the body itself: the triangles of a sculpted part where keep(x, y, z) holds at all three corners,
+   stood off its surface by off - so it fits whatever build it is cut from, and moves with the part */
+function m3dShell(mesh, keep, off, mat, name){
+  const T = THREE, g = mesh.geometry, P = g.attributes.position, N = g.attributes.normal, I = g.index ? g.index.array : null, n = I ? I.length : P.count, map = new Map(), pos = [], nor = [], idx = [];
+  const ok = i=>keep(P.getX(i), P.getY(i), P.getZ(i)), vi = i=>{ let j = map.get(i); if (j===undefined){ j = pos.length/3; map.set(i, j); pos.push(P.getX(i) + N.getX(i)*off, P.getY(i) + N.getY(i)*off, P.getZ(i) + N.getZ(i)*off); nor.push(N.getX(i), N.getY(i), N.getZ(i)); } return j; };
+  for (let t=0;t<n;t+=3){ const a = I ? I[t] : t, b = I ? I[t+1] : t + 1, c = I ? I[t+2] : t + 2; if (ok(a) && ok(b) && ok(c)) idx.push(vi(a), vi(b), vi(c)); }
+  const ng = new T.BufferGeometry(); ng.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); ng.setAttribute('normal', new T.Float32BufferAttribute(nor, 3)); ng.setIndex(idx); ng.computeBoundingSphere();
+  const m = new T.Mesh(ng, mat); m.name = name; mesh.add(m); return m;
+}
 function m3dFrontStrip(torso, mat, w, d, y0, y1, fb){
   const T = THREE, n = 10, zs = []; for (let i=0;i<=n;i++) zs.push(m3dFrontZ(torso, y0 + (y1 - y0)*i/n, fb));
   for (let i=0;i<n;i++){ const ya = y0 + (y1 - y0)*i/n, yb = y0 + (y1 - y0)*(i + 1)/n, za = zs[i], zb = zs[i + 1], L = Math.hypot(yb - ya, zb - za);
@@ -36922,12 +36931,13 @@ function m3dHumanoid(o){
   /* (RS-279) what the body wears, as sculpted garments: the torso's and each limb's */
   const wear = bare ? null : { plate:'plate', chain:'chain', leather:'jerkin', robe:'robe', rags:'rags' }[outfit] || 'tunic'; rig.wear = wear;
   const wearOf = m=>m===skinM ? null : m===plateM || m===legPlateM ? 'plate' : m===chainM ? 'chain' : m.userData.kind==='leather' ? 'leather' : m.userData.kind==='metal' ? 'plate' : 'cloth';
+  const underM = o.under && !wear ? m3dMat(mats, o.under, 'cloth') : null;   /* (RS-542) */
   const hips = new T.Group(); rig.bw = b; rig.hipY = 0.47 + (LG-1)*0.46; hips.position.y = rig.hipY; root.add(hips); rig.hips = hips; if (o.stoop) rig.stoop = o.stoop;
   // legs
   rig.legs = [];
   for (const s of [-1,1]){
     const hip = new T.Group(); hip.position.set(s*0.05*b*(1 + (BD.hp - 1)*0.6), -0.02, 0); hips.add(hip);   /* (RS-524: set by the hips' width) */   /* (RS-283: her hips were set wider; RS-415: no longer - they made her hips too big for her waist) */
-    const th = LS(hip, 'thigh', 0.23, m3dVC(mats, legM), LG, wearOf(legM)); if (o.fem){ const c = th.g.children[0]; c.scale.z *= 1.02; }   /* (RS-283: fuller thighs) */
+    const th = LS(hip, 'thigh', 0.23, m3dVC(mats, legM), LG, wearOf(legM)); if (underM) m3dShell(th.g.children[0], (x, y, z)=>y > -0.05 + (x*s > 0 ? 0.012 : 0), 0.0025, underM, 'under'); if (o.fem){ const c = th.g.children[0]; c.scale.z *= 1.02; }   /* (RS-283: fuller thighs) */
     const kn = new T.Group(); th.end.add(kn);
     const shM = lwPlate ? legPlateM : lw==='cloth' || lw==='trews' ? legM : lw==='breeches' ? skinM : (legBare ? skinM : m3dMat(mats, '#3a2a1c', 'leather'));
     const sh = LS(kn, 'shin', 0.22, m3dVC(mats, shM), LG, wearOf(shM));   /* (RS-251: knee breeches, the shins bare) */
@@ -36936,6 +36946,7 @@ function m3dHumanoid(o){
       : o.feet==='paw' ? m3dSphere(new T.Group(), 0.03, skinM, 0, -0.012, 0.02, 1, 0.6, 1.3).parent
       : o.feet==='bare' || o.feet==='dclaw' ? (()=>{ const g = new T.Group(), ft = new T.Mesh(m3dLimbGeo('boot', b), m3dVC(mats, skinM)); g.add(ft);
           if (o.feet==='bare' && o.longToes){ ft.scale.set(0.82, 0.72, 1.55); for (let i=0;i<4;i++) m3dSphere(g, 0.008, skinM, (i-1.5)*0.0095, -0.022, 0.078 + (i===1 || i===2 ? 0.008 : 0), 1, 0.7, 1.9); }   /* (RS-242: long bare elf toes) */
+          else if (o.feet==='bare' && !o.footHair){ ft.scale.set(0.92, 0.7, 1.32); for (let i=0;i<5;i++) m3dSphere(g, i===0 ? 0.0085 : 0.0068 - i*0.0004, skinM, s*(0.012 - i*0.0075)*-1, -0.026, 0.078 - Math.abs(i - 0.6)*0.0045, 1, 0.75, 1.25); }   /* (RS-542: a bare foot, slim, with its toes - big toe on the inside) */
           else if (o.feet==='bare'){ const fb = o.bigFeet ? 1.4 : 1; ft.scale.set(1.25*fb, 0.9, 1.3*fb); for (let i=0;i<(o.bigFeet ? 7 : 4);i++) m3dSphere(g, 0.014*(o.bigFeet ? 1.15 : 1), m3dMat(mats, o.footHair, 'fur'), (i%4-1.5)*0.012*fb, 0.012, (0.012 + (i%2)*0.008 + (i>=4 ? 0.02 : 0))*fb, 1, 0.6, 1); }   /* (RS-251: a hobbit's big hairy feet) */
           else { ft.scale.set(1.1, 1, 1.15); for (let i=-1;i<=1;i++) m3dCone(g, 0.007, 0.035, darkM, i*0.016, -0.018, 0.075, Math.PI/2); }
           return g; })()
@@ -36950,6 +36961,11 @@ function m3dHumanoid(o){
   const prof = [[0.001,0],[0.078,0.0],[0.085,0.05],[0.08,0.12],[0.1,0.2],[0.108,0.25],[0.09,0.29],[0.04,0.315],[0.001,0.318]].map(p=>new T.Vector2(p[0], p[1]));
   const chest = new T.Mesh(wear ? m3dWearGeo(BD, wear, 'top') : m3dTorsoGeo(BD, 'top'), m3dVC(mats, torsoM)); torso.add(chest); rig.chestMesh = chest;   // (the chest from the waist up in one sculpted piece, or the garment over it)
   const pelvM = new T.Mesh(wear ? m3dWearGeo(BD, wear, 'bot') : m3dTorsoGeo(BD, 'bot'), m3dVC(mats, torsoM)); hips.add(pelvM); rig.pelvisMesh = pelvM;   /* (RS-376: and the pelvis from the waist down, with the legs) */
+  if (underM){   /* (RS-542) linen underclothes: briefs, and a band round a woman's breasts */ m3dShell(pelvM, (x, y, z)=>y < 0.032, 0.0025, underM, 'under');
+    if (o.fem){ const cp = chest.geometry.attributes.position; let by = 0.19, bz = -1, xw = 0;   /* (round the bust as this body has it: its height, and the chest's width there - not the arms' sockets) */
+      for (let i=0;i<cp.count;i++){ const x = cp.getX(i), y = cp.getY(i), z = cp.getZ(i); const ax = Math.abs(x); if (ax > 0.028 && ax < 0.062 && y > 0.13 && y < 0.25 && z > bz){ bz = z; by = y; } }   /* (beside the breastbone, below the collarbones - a stooped chest is furthest forward at the top) */
+      for (let i=0;i<cp.count;i++) if (Math.abs(cp.getY(i) - by) < 0.006 && Math.abs(cp.getZ(i)) < 0.03) xw = Math.max(xw, Math.abs(cp.getX(i)));
+      const xl = (xw || 0.12)*0.97; m3dShell(chest, (x, y, z)=>Math.abs(x) < xl && y > by - (z > 0 ? 0.062 : 0.032) && y < by + (z > 0 ? 0.058 : 0.024), 0.0025, underM, 'under'); } }
   if (wear){ const nk = new T.Mesh(new T.CapsuleGeometry(0.031*Math.sqrt(b), 0.06, 6, 20), skinM); nk.position.set(0, 0.295, -0.004); torso.add(nk); }   // (the neck shows in the neckline)
   if (o.potBelly){ m3dSphere(torso, 0.075*b, torsoM, 0, 0.1, 0.022*Math.sqrt(b), 1.0, 0.95, 0.9); }   /* (RS-251: a round belly) */
   if (o.apron){ const am = m3dMat(mats, o.apron, 'leather'), zf = 0.08*Math.sqrt(b);   /* (RS-252: a tinker's leather apron, its bib, pocket and tools) */
@@ -37295,6 +37311,9 @@ function m3dHumanoid(o){
       if (z < 0 && hump) z -= hump*Math.sin(Math.PI*clamp((y - 0.1)/0.24, 0, 1))*Math.min(1, -z/0.06);
       ps.setY(i, y - z*Math.sin(a)); ps.setZ(i, f(y) + z*Math.cos(a)); }
     chest.geometry.computeVertexNormals();
+    for (const ch of chest.children) if (ch.name==='under'){ const q = ch.geometry.attributes.position;   /* (RS-542: what's worn next to the skin bends with it) */
+      for (let i=0;i<q.count;i++){ const y = q.getY(i); let z = q.getZ(i); const a = th(y); if (z < 0 && hump) z -= hump*Math.sin(Math.PI*clamp((y - 0.1)/0.24, 0, 1))*Math.min(1, -z/0.06); q.setY(i, y - z*Math.sin(a)); q.setZ(i, f(y) + z*Math.cos(a)); }
+      ch.geometry.computeVertexNormals(); }
     const shs = rig.arms.map(A=>A.sh);
     for (const ch of torso.children) if (ch!==chest && ch!==rig.cape){ const y = ch.position.y, z = ch.position.z, a = th(y);
       ch.position.y = y - z*Math.sin(a); ch.position.z = f(y) + z*Math.cos(a);
@@ -41756,6 +41775,8 @@ function highElfLook(o){ const w = { circlet:o.helm ? null : '#dfe2ea', cheekbon
   return w; }
 function woodElfLook(o){ const w = { limbLen:1.13, limbThin:0.72, stoop:0.15, curve:0.12, hump:0.05, headNarrow:true, pointNose:true, lids:true, leafTunic:true, earLen:o.earLen || 0.085 };
   if (!o.helm) w.leafCap = '#3e5a2c'; if (!o.boots){ w.feet = 'bare'; w.longToes = true; } if (!o.legWear || o.legWear==='plain') w.legWear = 'skin'; return w; }   /* (bare legs under the tunic) */
+const RS_COSTUME_KEYS = ['cape', 'capeTier', 'capeTrimCol', 'capeEdge', 'capeEm', 'capeEmCol', 'capeFire', 'furCollar', 'hoodDown', 'highCollar', 'mantle', 'tabard', 'emblem', 'pads', 'studs', 'trim', 'spikes',
+  'robeTrim', 'robeRunes', 'robeTier', 'tunicTrim', 'sleeve', 'waistcoat', 'apron', 'gnomeHat', 'goggles', 'leafCap', 'leafTunic', 'circlet', 'buckle', 'quiver', 'gloves', 'boots', 'trouserTier', 'trouserTrim', 'trouserRunes', 'legCol', 'plate', 'tier', 'helm', 'helmCol', 'cloth'];
 function rsPlayerLook(opt){
   opt = opt || {};
   const P = G.player || {}, race = opt.race || P.race || 'Human', L = opt.look || lookOf(P), bare = !!opt.bare;
@@ -41901,6 +41922,9 @@ function rsPlayerLook(opt){
     o.openHand = !o.shield && !o.tome && !o.offWeapon && w2!=='bow' && w2!=='xbow' && !two; }
   o.bulk = (0.88 + 0.24*LB.frame)*RB[1]; o.bodyFat = LB.fat; o.bodyMus = LB.muscle; o.shoulderW = 0.85 + 0.3*LB.shoulders; o.waistW = 0.83 + 0.34*LB.waist; o.hipW = 0.85 + 0.3*LB.hips; o.chestS = LB.chest; o.neckLen = 0.85 + 0.3*LB.neck;
   o.headScale = (o.headScale||1)*(0.92 + 0.16*LB.head); o.legLen = (o.legLen || o.limbLen || 1)*(0.9 + 0.2*LB.legs); o.armLen = 0.92 + 0.16*LB.arms; o.stoop = (o.stoop||0) + LB.posture*0.3;
+  /* (RS-542) undressed, for the character creator: everything worn comes off - the race's own costume too, its cloak, collar, tunic,
+     hat and boots - down to linen underclothes cut to the body; what the body is (its feet, toes, tail, ears) stays */
+  if (opt.undress){ for (const k of RS_COSTUME_KEYS) delete o[k]; o.outfit = 'none'; o.legWear = 'skin'; o.under = '#e4d8be'; if (!o.feet) o.feet = 'bare'; }
   return HUM(o, 1, { stature:RB[0]*(0.92 + 0.16*LB.height) });
 }
 function isoSyncPlayer(){
@@ -42907,7 +42931,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-541';
+const GAME_VERSION = 'rs-542';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -43317,7 +43341,7 @@ const LP = { r:null, scene:null, cam:null, e:null, key:'', raf:0, yaw:0.5, drag:
 const LP_ZMAX = 3.2;
 function lpZoom(k){ LP.zoom = Math.max(1, Math.min(LP_ZMAX, LP.zoom*k)); if (LP.zoom <= 1.001) LP.panY = null; }
 function lpSpec(){
-  if (G.ui==='charcreate'){ const race = RACES[G.chosenRace][0]; return { race, look:lookTarget(), bare:true }; }
+  if (G.ui==='charcreate'){ const race = RACES[G.chosenRace][0]; return { race, look:lookTarget(), bare:true, undress:true }; }   /* (RS-542: in your underclothes, so the build and the hair show) */
   if (G.ui==='makeover' && G.player) return { race:G.player.race, look:G.moLook, bare:false };
   if (G.ui==='dyeworks' && G.player) return { race:G.player.race, look:lookOf(G.player), bare:false };   /* (RS-494: you in what you're dyeing) */
   return null;
