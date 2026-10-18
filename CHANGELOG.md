@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-509 - The full robe
+
+- **Robes reach the ankles again**: the robe is one piece from the collar to the hem - its skirt, the trim band and the glowing hem runes all its own - whatever you wear on your legs, plate and leather included. It used to be a waist-length robe top over a separate robe bottom's skirt, so a robe top over plate legs had no skirt at all.
+- **Robe bottoms are now trousers**: cloth trousers in the item's own colour, showing at the ankles under a robe. Same stats, new name and look - "Mystic Robe Bottom" is now "Mystic Trousers", and its icon is a pair of trousers.
+- **Your old pieces renamed**: everything you carry, wear or keep in the bank is renamed on load - "Mystic Robe Top" becomes "Mystic Robe", a "Monk's Robe Bottom" "Monk's Trousers", a Holy Vestment top simply "Holy Vestment". Stats untouched.
+- Next: real cloth physics on the robe's skirt, so it swings and trails as you walk and turn.
+
 ## RS-508 - A lighter HUD
 
 - **Spell counts worked out once**: the action bar shows how many casts your runes allow for each spell, and it worked that out every frame for every spell - a search through up to thirty rune plans each. It's now kept until your bag, your staff or the turn changes, and still updates the moment you spend or pick up runes (tested).

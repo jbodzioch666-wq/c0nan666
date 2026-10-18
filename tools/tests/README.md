@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs509 | The robe one piece to the ankles over any legs; robe bottoms are trousers; old saves' pieces renamed |
 | rs508 | Casts-left worked out once per change of bag, staff or turn, still following the bag at once |
 | rs507 | Bending tubes (tails, tentacles, serpents) take normals from the cross-section; bounds every 20th bend |
 | rs506 | A tile changing far off rebuilds the land in slices, not in one 1.5s frame at a phone's pace |

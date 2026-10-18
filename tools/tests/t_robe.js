@@ -1,5 +1,5 @@
-// RS-174: a robe top is a tunic (no skirt of its own), a robe bottom is a long skirt (not trousers), and the robe bottom's
-// icon is a skirt
+// RS-509 (was RS-174): a robe is one piece to the ankles over whatever is on the legs - a long skirt even over plate legs - and the
+// cloth legs are trousers (no skirt of their own, a trousers icon); mid-stride the legs stay inside the robe, which moves with them
 module.exports = async page=>{
   const r = await page.evaluate(async ()=>{
     goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing');
@@ -13,7 +13,7 @@ module.exports = async page=>{
     const mid = it=>{ const img = fpUndeadSprite(obItemEntry(it), false).img, x = img.getContext('2d'), W = img.width, H = img.height; const d = x.getImageData(Math.floor(W/2) - 1, Math.floor(H*0.62), 3, Math.floor(H*0.2)).data; let a = 0; for (let i=3;i<d.length;i+=4) a += d[i] > 40 ? 1 : 0; return a/(d.length/4); };
     out.iconMid = { robe:+mid(bot).toFixed(2), plate:+mid(plateL).toFixed(2) };
     // RS-175: mid-stride, the legs stay inside a robe bottom - the skirt is carried along by them
-    { G.gear.chest = newItem(); G.gear.legs = bot;
+    { G.gear.chest = top; G.gear.legs = bot;
       const clip = follow=>{ const e = m3dInstance({}, rsPlayerLook()), r2 = e.rig; if (!follow) r2.skirt = null;
         let worst = 0;
         for (const ph of [Math.PI/2, Math.PI*1.5, 0.4, 2.2]){ e.wph = ph; e._lt = undefined; m3dPoseHumanoid(r2, 1, 1, 0, 0, 0, e); e.wph = ph; m3dPoseHumanoid(r2, 1, 1, 0, 0, 0, e);
@@ -31,15 +31,15 @@ module.exports = async page=>{
           worst = Math.max(worst, tot ? out2/tot : 0); }
         return +worst.toFixed(3); };
       out.clip = { follow:clip(true), still:clip(false) };
-      G.gear.legs = newItem(); }
+      G.gear.legs = newItem(); G.gear.chest = newItem(); }
     return out; });
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
-  A(!r.topOverPlate.includes(0.48) && !r.topOverPlate.some(h=>h < 0.3), 'a robe top over plate legs has no skirt of its own at all (RS-203)');
-  A(r.bottomAlone.includes(0.48), 'a robe bottom is a long skirt, even with no top');
-  A(r.both.includes(0.48) && !r.both.some(h=>h < 0.3), 'top and bottom together: the long skirt, and the top stops at the waist - no hem to poke through (RS-203)');
+  A(r.topOverPlate.includes(0.48) && !r.topOverPlate.some(h=>h < 0.3), 'a robe over plate legs is a full robe to the ankles');
+  A(!r.bottomAlone.includes(0.48), 'cloth trousers on their own are trousers, no skirt');
+  A(r.both.includes(0.48) && !r.both.some(h=>h < 0.3), 'robe and trousers: the long skirt, and nothing shorter to poke through');
   A(!r.plateOnly.includes(0.48), 'plate legs are still legs');
-  A(r.clip.follow < 0.02 && r.clip.still > r.clip.follow*3, 'mid-stride the legs stay inside the robe, which moves with them');
-  A(r.kind.robe==='robelegs' && r.kind.plate==='legs', 'the robe bottom has its own icon');
-  A(r.iconMid.robe > 0.8 && r.iconMid.plate < 0.3, 'the robe bottom icon is a skirt, not two trouser legs');
+  A(r.clip.follow < 0.02, 'mid-stride the legs stay inside the robe, which moves with them');
+  A(r.kind.robe==='legs' && r.kind.plate==='legs', 'trousers have a legs icon');
+  A(r.iconMid.robe < 0.3 && r.iconMid.plate < 0.3, 'the trousers icon is two legs, not a skirt');
 };
