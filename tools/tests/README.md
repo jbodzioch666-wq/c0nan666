@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs524 | Bodies sculpted to a build (weight, muscle, shoulders, chest, waist, hips, neck, head, legs, arms, height, posture); garments fit every build; old looks default |
 | rs523 | A staff with a shield is held in one hand, the shield up on the other arm (it was held like a book) |
 | rs522 | Robes as heavy wool (Gandalf in Bakshi's film), finer each tier, Ahrim's billowing; the hem stirs in the wind outdoors, more in a storm |
 | rs521 | A far tile change works out the regions, far ground and land normals a little a frame - same results, worst frame at 4x well under 350ms |

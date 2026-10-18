@@ -35036,7 +35036,7 @@ const V3_FOLK_COARSE = 1.6;   /* (RS-348) the townsfolk's sculpt grid */
 /* (RS-500) sculpted geometry is deterministic for its key, so a finished sculpt is kept in IndexedDB and later sessions skip
    the field fill and the meshing altogether - that was over 2s of every town load, and the skeleton kept sculpting for 15s after.
    BUMP M3D_SCULPT_VER WHENEVER ANY SCULPTED SHAPE CHANGES (SDF code, SK3_PARTS, any m3dSculpt build), or players keep the old look */
-const M3D_SCULPT_VER = 1, SCULPT_CAP = 64*1048576;
+const M3D_SCULPT_VER = 2, SCULPT_CAP = 64*1048576;
 const SCULPT_DB = { map:new Map(), db:null, dirty:[] };
 function sculptDbOpen(){
   if (SCULPT_DB.opened || typeof indexedDB==='undefined') return; SCULPT_DB.opened = true;
@@ -35116,38 +35116,72 @@ try{ sculptDbOpen(); }catch(e){}
 /* (RS-376) a torso sculpt in two pieces about the waist, so the chest bends above a pelvis that stays with the legs: 'top' is
    everything from a little below the waist up, 'bot' everything from a little above it down, the two overlapping inside the waist */
 function m3dHalfCut(P, half){ const { cylE } = SDF; if (half==='bot') P.sub(cylE([0, 1.065, 0], 1, 1, 1, 0), 0.004); else if (half==='top') P.sub(cylE([0, -0.965, 0], 1, 1, 1, 0), 0.004); }
-function m3dTorsoGeo(b, hunch, fem, half){
-  b = Math.round(b*10)/10;                           // (near-identical builds share one sculpt)
-  const { ell, sph, cap, basis } = SDF, bs = Math.sqrt(b), M = 4, F = fem ? 1 : 0;
-  /* (RS-264: sculpted finer, with a man's chest or a woman's figure - a narrower waist and ribcage, wider hips, and a bust
-     shaped into the chest: a soft slope from the collarbone, fuller below, set a little apart and turned slightly outward) */
-  return m3dSculpt('torso3|'+b.toFixed(2)+(fem ? '|f' : '')+'|5'+(half ? '|'+half : ''), [[-0.2*b, half==='top' ? 0.015 : -0.12,-0.13*bs],[0.2*b, half==='bot' ? 0.09 : 0.37,0.17*bs]], 0.0047, P=>{
-    for (const s of [-1,1]) P.add(ell([s*(fem ? 0.05 : 0.05)*b,-0.05,0.002],[0.05*b,0.052,0.048*bs]), 0.035, M);   // (RS-289) the roots of the thighs, part of the pelvis, so the legs never poke out of the hips (RS-415: hers no wider set than his - her hips stood out too far)
-    if (!fem){ P.add(ell([0,0.0,0],[0.085*b,0.06,0.07*bs]), 0.02, M);                        // pelvis
-      for (const s of [-1,1]) P.add(ell([s*0.042*b,-0.02,-0.035*bs],[0.048*b,0.055,0.042*bs]), 0.03, M); }   // seat
-    else { P.add(ell([0,0.02,-0.012*bs],[0.083*b,0.05,0.056*bs]), 0.055, M);                  // (RS-285/287) her hips: widest at the crest of the pelvis,
-      P.add(ell([0,-0.035,-0.008*bs],[0.076*b,0.05,0.056*bs]), 0.055, M);                      // tapering down into the thighs (RS-416: flat across the front and slimmer at the crest - they stood round her like a tyre)
-      for (const s of [-1,1]) P.add(ell([s*0.041*b,-0.03,-0.036*bs],[0.046*b,0.048,0.044*bs]), 0.045, M); }   // a round seat, set low
-    P.add(ell([0,0.1 + F*0.01,0.005 - F*0.004],[(0.078 - F*0.004)*b,0.09,(0.062 - F*0.012)*bs]), 0.04, M);   // belly and waist
-    P.add(ell([0,0.2 + F*0.008,-0.005],[(0.1 - F*0.016)*b,0.1 - F*0.008,(0.07 - F*0.004)*bs]), 0.04, M);   // ribcage
-    if (!fem) for (const s of [-1,1]){ const pb = basis([s*0.18, -0.25, 1]);                // the chest: two broad pectorals with a firm lower edge
-      P.add(ell([s*0.044*b,0.222,0.042*bs],[0.05*b,0.038,0.026*bs], pb), 0.025, M); }
+/* (RS-524) the body's build, as the figure is sculpted: how heavy (fat) and how muscled (mus), the width of the shoulders (sh),
+   waist (wa) and hips (hp) against the frame, the chest or bust (ch), the neck's length (nk) - each a smooth number, rounded a
+   little so near-identical figures share one sculpt. Every humanoid is built from it (a monster's preset takes the defaults);
+   your own comes from the body sliders in the character creator (see lookBody) */
+const M3D_BODY0 = { b:1, fem:false, fat:0.3, mus:0.5, sh:1, wa:1, hp:1, ch:0.5, nk:1, key:'1.0m0.3,0.5,1,1,1,0.5,1' };
+function m3dBodySpec(o){
+  const q = (v, s)=>Math.round(v/s)*s, fem = !!o.fem, d = (k, v)=>o[k]==null ? v : +o[k];
+  const B = { b:Math.round((o.bulk||1)*10)/10, fem, fat:q(d('bodyFat', 0.3), 0.05), mus:q(d('bodyMus', fem ? 0.35 : 0.5), 0.05), sh:q(d('shoulderW', 1), 0.025), wa:q(d('waistW', 1), 0.025), hp:q(d('hipW', 1), 0.025), ch:q(d('chestS', fem ? 0.45 : 0.5), 0.05), nk:q(d('neckLen', 1), 0.05) };
+  B.key = B.b.toFixed(1) + (fem ? 'f' : 'm') + [B.fat, B.mus, B.sh, B.wa, B.hp, B.ch, B.nk].map(v=>String(+v.toFixed(3))).join(',');
+  return B;
+}
+/* the masses every torso is built from - the pelvis and seat, belly, ribcage, lats, flanks, shoulders and deltoids, trapezius, neck,
+   the chest or bust - stood off the body by L for a garment. mode: skin, cloth (a tunic, jerkin or rags), chain, plate, or robe (a
+   bodice, cut flat at the belt line). The build shapes all of it: weight fills the belly, flanks and seat, muscle the lats, traps,
+   deltoids and chest; the shoulders, waist and hips are set by their own widths */
+function m3dBodyMass(P, B, L, mode){
+  const { ell, sph, cap, flat, torus, basis } = SDF, M = 4, b = B.b, bs = Math.sqrt(b), fem = B.fem, F = fem ? 1 : 0, fat = B.fat, mus = B.mus, sh = B.sh, wa = B.wa, hp = B.hp, ch = B.ch, Lh = L*0.5;
+  const skin = mode==='skin', pl = mode==='plate', rb = mode==='robe', hpw = 1 + (hp - 1)*0.75, fd = fat - 0.3, fr = 1 + fd*0.12, bl = Math.max(0, fat - 0.35)/0.65;   /* (fd: weight about the default build, which is the shape every figure had; bl: a belly, from well-fed on) */
+  if (!rb){
+    for (const s of [-1,1]) P.add(ell([s*0.05*b*hpw,-0.05,0.002],[(skin ? 0.05 : 0.047)*b + Lh,0.052,(skin ? 0.048 : 0.046)*bs + Lh]), 0.035, M);   // the roots of the thighs, part of the pelvis, so the legs never poke out of the hips (a garment's as narrow as the body under it)
+    if (!fem){ P.add(ell([0,0.0,0],[0.085*b*hpw + L,0.06 + Lh,0.07*bs + L]), skin ? 0.02 : 0.03, M);                                       // pelvis
+      for (const s of [-1,1]) P.add(ell([s*0.042*b*hpw,-0.02,-0.035*bs],[(0.048 + bl*0.008)*b + L*0.6,0.055,(0.042 + bl*0.01)*bs + L*0.6]), skin ? 0.03 : 0.04, M); }   // seat
+    else { P.add(ell([0,0.02,-0.012*bs],[(skin ? 0.083 : 0.08)*b*hpw + L,0.05,(skin ? 0.056 : 0.055)*bs + L]), 0.055, M);                   // her hips: widest at the crest of the pelvis,
+      P.add(ell([0,-0.035,-0.008*bs],[(skin ? 0.076 : 0.073)*b*hpw + L,0.05,(skin ? 0.056 : 0.055)*bs + L]), 0.055, M);                      // tapering down into the thighs (a garment's flat in front, as the body under it)
+      for (const s of [-1,1]) P.add(ell([s*(skin ? 0.041 : 0.039)*b*hpw,-0.03,-0.036*bs],[((skin ? 0.046 : 0.043) + bl*0.008)*b + L*0.6,skin ? 0.048 : 0.046,((skin ? 0.044 : 0.041) + bl*0.012)*bs + L*0.6]), 0.045, M); } }   // a round seat, set low
+  else P.add(flat([0,0.1,0],[0,-0.004,0], (0.08 - F*0.004)*b*wa + L, (0.064 - F*0.012)*bs + L, [0,0,1], (0.082 - F*0.004)*b*hpw + L, (0.066 - F*0.012)*bs + L, true), 0.02, M);   // a bodice's flat hem at the belt line
+  P.add(ell([0,0.1 + F*0.01,0.005 - F*0.004],[(0.078 - F*0.004)*b*wa*fr + L,0.09,(0.062 - F*0.012)*bs*fr + L]), skin ? 0.04 : 0.05, M);           // belly and waist
+  P.add(ell([0,0.2 + F*0.008,-0.005],[(0.1 - F*0.016)*b*(0.92 + 0.08*sh)*fr + L,0.1 - F*0.008,(0.07 - F*0.004)*bs*(1 + fd*0.07) + L]), skin ? 0.04 : 0.05, M);   // ribcage
+  for (const s of [-1,1]) P.add(ell([s*(0.078 - F*0.012)*b*sh,0.185,-0.018*bs],[(0.028 + mus*0.012 - F*0.006)*b + L,0.07,0.046*bs + L], basis([0, 0, 1], [s*0.4, 1, 0])), 0.05, M);   // the lats: broad under the arms, tapering down and in to the waist
+  for (const s of [-1,1]) P.add(ell([s*0.07*b*wa,0.12,0.008],[(0.026 + fd*0.016)*b + L,0.07,(0.04 + fd*0.007)*bs + L]), 0.035, M);         // flanks, fuller with weight
+  if (!pl && mode!=='chain') P.sub(torus([0,0.112,0.004],(fem ? 0.098 : 0.11)*b*wa + Lh,skin || !fem ? 0.036 : 0.034,[0,1,0]), skin && fem ? 0.045 : 0.05);     // the waist, curving in between ribs and hips (hers deeper; a hauberk hangs straight)
+  if (bl > 0){ P.add(ell([0,0.075,0.012*bs],[(0.07 + bl*0.014)*b*wa + L,0.075 + bl*0.02,(0.05 + bl*0.045)*bs + L]), 0.04, M);              // a belly
+    for (const s of [-1,1]) P.add(ell([s*0.078*b*wa,0.06,-0.005*bs],[(0.028 + bl*0.018)*b + L,0.05,(0.045 + bl*0.012)*bs + L]), 0.04, M); }   // and love handles
+  for (const s of [-1,1]){ P.add(sph([s*(0.112 - F*0.016)*b*sh,0.268,0], (0.043 - F*0.007)*b*(1 + mus*0.1) + Lh), 0.035, M);                 // shoulders
+    P.add(ell([s*(0.116 - F*0.016)*b*sh,0.252,0.002],[(0.028 - F*0.004)*b + Lh,0.042,(0.028 - F*0.003)*bs + Lh], basis([0, 0, 1], [-s*0.45, 1, 0])), 0.03, M);   // the deltoid, capping the arm, sloping down and out over it
+    P.add(cap([s*0.02,0.305 + (B.nk - 1)*0.02,-0.01],[s*(0.1 - F*0.016)*b*sh,0.275,-0.005], (0.03 - F*0.006)*b*(1 + mus*0.15) + Lh, (0.024 - F*0.004)*b + Lh), 0.035, M);   // trapezius
+    P.add(ell([s*0.05*b,0.23,-0.045*bs],[0.046*b,0.055,0.026*bs + L]), skin ? 0.03 : 0.04, M); }                                            // shoulder blades
+  P.add(cap([0,0.27,-0.005],[0,0.35 + (B.nk - 1)*0.03,0.0], (0.034 - F*0.004)*bs*(1 + fd*0.1), (0.031 - F*0.004)*bs*(1 + fd*0.1)), 0.03, M);   // neck
+  if (!fem){ if (!skin) P.add(ell([0,0.21,0.02*bs],[0.088*b,0.05,0.04*bs + L]), 0.045, M);                                                  // a smooth chest under a garment
+    else for (const s of [-1,1]){ const pb = basis([s*0.18, -0.25, 1]);                                                                     // two broad pectorals with a firm lower edge
+      P.add(ell([s*0.044*b,0.222,(0.042 + ch*0.006)*bs],[0.05*b*(0.9 + ch*0.2),0.038*(0.85 + ch*0.3),0.026*bs*(0.7 + ch*0.6)], pb), 0.025, M); } }
+  else { const cb = 0.55 + ch*0.75;                                                                                                       // her bust, by its size
+    if (pl) P.add(ell([0,0.2,0.04*bs],[0.09*b,0.06,0.045*bs]), 0.04, M);                                                                   // a smooth breastplate
+    else if (!skin) for (const s of [-1,1]) P.add(ell([s*0.042*b,0.19 + (1 - cb)*0.012,(0.03 + 0.032*cb)*bs],[0.046*b*Math.pow(cb, 0.8),0.045*Math.pow(cb, 0.8),0.045*bs*cb]), 0.038, M);   // softened under cloth
     else { for (const s of [-1,1]){ const bb = basis([s*0.22, -0.1, 1]);
-        P.add(ell([s*0.04*b,0.228,0.035*bs],[0.046*b,0.034,0.024*bs]), 0.03, M);           // the upper chest
-        P.add(cap([s*0.03*b,0.252,0.032*bs],[s*0.04*b,0.2,0.08*bs], 0.02*b, 0.034*b), 0.026, M);   // a full slope down from the collarbone
-        P.add(ell([s*0.043*b,0.186,0.074*bs],[0.044*b,0.043,0.047*bs], bb), 0.016, M);      // a big round bust, heavy below
-        P.sub(cap([s*0.022*b,0.144,0.088*bs],[s*0.076*b,0.149,0.07*bs], 0.0065, 0.0065), 0.013); }   // its round underside
-      P.sub(cap([0,0.212,0.11*bs],[0,0.168,0.112*bs], 0.006, 0.004), 0.012);                // the cleavage between
-    }
-    if (!fem) for (const s of [-1,1]) P.add(ell([s*0.075*b,0.12,0.02],[0.03*b,0.08,0.04*bs]), 0.03, M);   // flanks
-    else P.sub(SDF.torus([0,0.112,0.004],0.098*b,0.036,[0,1,0]), 0.045);              // (RS-265: her waist curves in between ribs and hips; RS-283: deeper)
-    for (const s of [-1,1]) P.add(sph([s*(0.112 - F*0.016)*b,0.268,0], (0.043 - F*0.007)*b), 0.035, M);   // shoulders (RS-283: hers narrower)
-    for (const s of [-1,1]) P.add(cap([s*0.02,0.31,-0.01],[s*(0.1 - F*0.016)*b,0.275,-0.005], (0.03 - F*0.006)*b, (0.024 - F*0.004)*b), 0.035, M);   // trapezius
-    P.add(cap([0,0.27,-0.005],[0,0.35,0.0], (0.034 - F*0.004)*bs, (0.031 - F*0.004)*bs), 0.03, M);   // neck
-    for (const s of [-1,1]) P.add(ell([s*0.05*b,0.23,-0.045*bs],[0.046*b,0.055,0.026*bs]), 0.03, M);   // shoulder blades
-    P.sub(cap([0,0.05,-0.075*bs],[0,0.27,-0.075*bs], 0.007, 0.007), 0.012);                             // spine groove
-    if (!fem){ P.sub(cap([0,0.21,0.072*bs],[0,0.16,0.07*bs], 0.005, 0.005), 0.01);                      // breastbone
-      for (let i=0;i<3;i++) P.sub(cap([-0.03*b,0.13-i*0.03,0.068*bs],[0.03*b,0.13-i*0.03,0.068*bs], 0.003, 0.003), 0.012); }   // abdominal lines
+        P.add(ell([s*0.04*b,0.23,0.03*bs],[0.042*b,0.03,0.02*bs]), 0.035, M);                                                               // the upper chest
+        P.add(cap([s*0.03*b,0.252,0.032*bs],[s*0.04*b,0.2,(0.05 + 0.03*cb)*bs], 0.02*b, 0.034*b*cb), 0.026, M);                             // a soft slope down from the collarbone
+        P.add(ell([s*0.043*b*(0.96 + 0.04*cb),0.186 + (1 - cb)*0.012,(0.04 + 0.034*cb)*bs],[0.044*b*cb,0.043*cb,0.047*bs*cb], bb), 0.016, M);   // a round bust, heavier below
+        if (cb > 0.8) P.sub(cap([s*0.022*b,0.144 + (1 - cb)*0.03,0.088*bs*cb/0.89],[s*0.076*b,0.149 + (1 - cb)*0.03,0.07*bs*cb/0.89], 0.0065, 0.0065), 0.013); }   // its round underside
+      if (cb > 0.75) P.sub(cap([0,0.212,0.11*bs*cb/0.89],[0,0.168,0.112*bs*cb/0.89], 0.006, 0.004), 0.012); } }                           // the cleavage between
+}
+/* the bare torso: the masses, then what shows on the skin - collarbones and the hollows above them, the spine's groove and the
+   columns either side, the breastbone, the line down the belly and the abdominal lines (muscle deepens them, weight hides them) */
+function m3dTorsoGeo(B, half){
+  const { ell, cap } = SDF, b = B.b, bs = Math.sqrt(b), M = 4, fem = B.fem, mus = B.mus, fat = B.fat, sh = B.sh;
+  return m3dSculpt('torso4|'+B.key+(half ? '|'+half : ''), [[-0.2*b, half==='top' ? 0.015 : -0.12,-0.13*bs],[0.2*b, half==='bot' ? 0.09 : 0.4,0.17*bs]], 0.0047, P=>{
+    m3dBodyMass(P, B, 0, 'skin');
+    for (const s of [-1,1]){ P.add(cap([s*0.012,0.293,0.045*bs],[s*0.095*b*sh,0.284,0.018*bs], 0.0055, 0.005), 0.012, M);                // collarbones
+      if (mus < 0.7) P.sub(cap([s*0.03,0.303,0.03*bs],[s*0.078*b*sh,0.298,0.012*bs], 0.0045, 0.0045), 0.016); }                          // the hollow above each (a heavy trapezius fills it)
+    P.sub(cap([0,0.05,-0.075*bs],[0,0.27,-0.075*bs], 0.007, 0.007), 0.012);                                                             // spine groove
+    if (mus > 0.6) for (const s of [-1,1]) P.add(ell([s*0.022*b,0.14,-0.066*bs],[0.016*b,0.09,0.004 + (mus - 0.6)*0.014]), 0.03, M);   // the columns either side of it, on a hard back
+    if (!fem){ P.sub(cap([0,0.21,0.072*bs],[0,0.16,0.07*bs], 0.005, 0.005), 0.01);                                                      // breastbone
+      if (fat < 0.6){ const d = 0.0015 + mus*0.0025;
+        P.sub(cap([0,0.17,0.066*bs],[0,0.065,0.062*bs], d, d), 0.01);                                                                   // the line down the belly
+        for (let i=0;i<3;i++) P.sub(cap([-0.03*b,0.13-i*0.03,0.068*bs],[0.03*b,0.13-i*0.03,0.068*bs], d, d), 0.012); }                  // abdominal lines
+      if (mus > 0.5) for (const s of [-1,1]) P.add(ell([s*0.022*b,0.135,0.056*bs],[0.02*b,0.07,0.006 + (mus - 0.5)*0.016]), 0.02, M); }   // the rectus, standing out
     m3dHalfCut(P, half);
   });
 }
@@ -35155,32 +35189,15 @@ function m3dTorsoGeo(b, hunch, fem, half){
 // steel is shaped - so a tunic, a leather jerkin, a mail hauberk, a breastplate with its fauld of lames and a robe each read
 // as what they are, rather than the bare muscled torso in a different colour. The neckline opens on a skin neck, a tunic's
 // skirt falls in folds to the top of the thigh, a jerkin's splits at the front, a hauberk's at front and back
-function m3dWearGeo(b, fem, wear, half){
-  b = Math.round(b*10)/10;
-  const { ell, sph, cap, flat, torus } = SDF, bs = Math.sqrt(b), M = 4, F = fem ? 1 : 0;
-  const pl = wear==='plate', ch = wear==='chain', rb = wear==='robe', rg = wear==='rags', jk = wear==='jerkin';
+// (RS-524: built over the same masses as the body, so it fits whatever build wears it)
+function m3dWearGeo(B, wear, half){
+  const { ell, sph, cap, flat } = SDF, b = B.b, bs = Math.sqrt(b), M = 4, fem = B.fem, hpw = 1 + (B.hp - 1)*0.75;
+  const pl = wear==='plate', ch = wear==='chain', rb = wear==='robe', jk = wear==='jerkin', mode = pl ? 'plate' : ch ? 'chain' : rb ? 'robe' : 'cloth';
   const L = rb ? 0.016 : pl ? 0.012 : 0.009;                                               // how far the garment stands off the body
   const hb = ch ? -0.135 : rb ? -0.04 : jk ? -0.078 : -0.032, lo = Math.min(hb - 0.025, -0.115);   // where its skirt ends (a tunic's pleated skirt hangs from the belt on its own)
-  return m3dSculpt('wear3|'+wear+'|'+b.toFixed(2)+(fem ? '|f' : '')+(rb ? '|6b' : '|5')+(half ? '|'+half : ''), [[-0.22*b, half==='top' ? 0.015 : (rb ? -0.02 : lo),-0.16*bs],[0.22*b, half==='bot' ? 0.09 : 0.36,0.2*bs]], 0.0047, P=>{
-    if (rb){   /* (RS-305) a robe top is a bodice: it ends in a flat hem at the belt line, where the robe bottom's waist meets it under the sash - no pelvis or seat of its own to sag over the skirt */
-      P.add(flat([0,0.1,0],[0,-0.004,0], (0.08 - F*0.004)*b + L, (0.064 - F*0.012)*bs + L, [0,0,1], (0.082 - F*0.004)*b + L, (0.066 - F*0.012)*bs + L, true), 0.02, M); }
-    else {
-    for (const s of [-1,1]) P.add(ell([s*(fem ? 0.05 : 0.05)*b,-0.05,0.002],[0.047*b + L*0.5,0.052,0.046*bs + L*0.5]), 0.04, M);   // (RS-289) over the roots of the thighs (RS-415: as narrow as the body under them)
-    if (!fem){ P.add(ell([0,0.0,0],[0.085*b + L,0.06 + L*0.5,0.07*bs + L]), 0.03, M);                                       // over the pelvis
-      for (const s of [-1,1]) P.add(ell([s*0.042*b,-0.02,-0.035*bs],[0.048*b + L*0.6,0.055,0.042*bs + L*0.6]), 0.04, M); }   // the seat
-    else { P.add(ell([0,0.02,-0.012*bs],[0.08*b + L,0.05,0.055*bs + L]), 0.055, M); P.add(ell([0,-0.035,-0.008*bs],[0.073*b + L,0.05,0.055*bs + L]), 0.055, M);   // (RS-285/287/288) over her hips, tapering to the thighs (RS-416: flat in front, as the body under it)
-      for (const s of [-1,1]) P.add(ell([s*0.039*b,-0.03,-0.036*bs],[0.043*b + L*0.6,0.046,0.041*bs + L*0.6]), 0.045, M); } }
-    P.add(ell([0,0.1 + F*0.01,0.005 - F*0.004],[(0.078 - F*0.004)*b + L,0.09,(0.062 - F*0.012)*bs + L]), 0.05, M);          // belly and waist
-    P.add(ell([0,0.2 + F*0.008,-0.005],[(0.1 - F*0.016)*b + L,0.1 - F*0.008,(0.07 - F*0.004)*bs + L]), 0.05, M);            // ribcage
-    if (!fem) P.add(ell([0,0.21,0.02*bs],[0.088*b,0.05,0.04*bs + L]), 0.045, M);                                              // a smooth chest
-    else if (pl) P.add(ell([0,0.2,0.04*bs],[0.09*b,0.06,0.045*bs]), 0.04, M);                                                // a smooth breastplate
-    else for (const s of [-1,1]) P.add(ell([s*0.042*b,0.19,0.062*bs],[0.046*b,0.045,0.045*bs]), 0.038, M);                  // her bust, softened under cloth
-    if (!fem) for (const s of [-1,1]) P.add(ell([s*0.075*b,0.12,0.02],[0.03*b + L,0.08,0.04*bs + L]), 0.04, M);             // flanks
-    else if (!pl) P.sub(torus([0,0.112,0.004],0.098*b + L*0.5,0.034,[0,1,0]), 0.05);                                        // the waist, loosely
-    for (const s of [-1,1]) P.add(sph([s*(0.112 - F*0.016)*b,0.268,0], (0.043 - F*0.007)*b + L*0.5), 0.035, M);             // shoulders
-    for (const s of [-1,1]) P.add(cap([s*0.02,0.31,-0.01],[s*(0.1 - F*0.016)*b,0.275,-0.005], (0.03 - F*0.006)*b + L*0.5, (0.024 - F*0.004)*b + L*0.5), 0.035, M);   // trapezius
-    for (const s of [-1,1]) P.add(ell([s*0.05*b,0.23,-0.045*bs],[0.046*b,0.055,0.026*bs + L]), 0.04, M);                   // shoulder blades
-    const rx = (fem ? 0.084 : 0.088)*b + L, rz = (fem ? 0.056 : 0.072)*bs + L, cz = fem ? -0.012*bs : 0;   // (a skirt that fits her hips - RS-416: shallow in front and set back, so it lies flat over her belly and follows her seat behind; it stood round her like a tyre)
+  return m3dSculpt('wear4|'+wear+'|'+B.key+(half ? '|'+half : ''), [[-0.22*b, half==='top' ? 0.015 : (rb ? -0.02 : lo),-0.16*bs],[0.22*b, half==='bot' ? 0.09 : 0.4,0.2*bs]], 0.0047, P=>{
+    m3dBodyMass(P, B, L, mode);
+    const rx = (fem ? 0.084 : 0.088)*b*hpw + L, rz = (fem ? 0.056 : 0.072)*bs + L, cz = fem ? -0.012*bs : 0;   // (a skirt that fits the hips: hers shallow in front and set back, so it lies flat over her belly and follows her seat behind)
     if (!pl && !rb){   // the skirt: hanging straight from the hips to the top of the thigh (a hauberk to mid-thigh), falling in folds
       const fl = (hb < -0.05 ? 1 : 0)*(fem ? 0.3 : 1); P.add(flat([0,0.012,cz],[0,hb,cz], rx, rz, [0,0,1], rx + 0.012*fl, rz + 0.01*fl, true), 0.015, M);   // (a tunic's ends under the belt, where its pleated skirt takes over; hers barely flared at the hem)
       for (let i=0;i<12;i++){ const a = i/12*Math.PI*2 + 0.1, x = Math.sin(a)*(rx + 0.014), z = cz + Math.cos(a)*(rz + 0.012), d = 0.04 + fpHash(i, 3, 11)*0.03; if (fem && Math.cos(a) > 0.45) continue;   /* (no folds cut across her flat front: they showed through dark) */
@@ -35194,9 +35211,8 @@ function m3dWearGeo(b, fem, wear, half){
       for (let i=0;i<3;i++){ const y = 0.045 - i*0.034, g = i*0.006; P.add(flat([0,y + 0.018,0],[0,y - 0.018,0], rx + g, rz + g, [0,0,1], rx + g + 0.004, rz + g + 0.004, true), 0.006, M); }
       for (let i=1;i<3;i++){ const y = 0.045 - i*0.034 + 0.018; P.sub(flat([0,y + 0.0025,0],[0,y - 0.0025,0], rx + 0.02, rz + 0.02, [0,0,1], rx + 0.02, rz + 0.02, true), 0.002); }
     }
-    P.sub(sph([0,0.338,0.0], 0.052 + (rb ? 0.012 : 0)), 0.012);                                                             // the neckline
-    if (rb) P.sub(ell([0,-0.3,0],[0.5,0.3,0.5]), 0.002);                                                                    // (RS-305: cut flat at the belt line)
-    if (pl) P.add(torus([0,0.3,-0.004], 0.052*bs, 0.011, [0,1,0]), 0.02, M);                                                // a gorget
+    P.sub(sph([0,0.338 + (B.nk - 1)*0.02,0.0], 0.052 + (rb ? 0.012 : 0)), 0.012);                                                     // the neckline
+    if (rb) P.sub(ell([0,-0.3,0],[0.5,0.3,0.5]), 0.002);                                                                            // (RS-305: cut flat at the belt line)
     m3dHalfCut(P, half);
   });
 }
@@ -35219,61 +35235,64 @@ function m3dPauldronGeo(kind, r){
     P.sub(ell([r*0.3,-r*1.5,0],[r*2.5, r*0.75, r*2.5]), r*0.04);                                // and open underneath
   });
 }
-function m3dLimbWearGeo(kind, b, wear){
-  b = Math.round(b*10)/10;
-  const { ell, sph, cap, torus } = SDF, M = 4, k = kind+'|'+wear+'|'+b.toFixed(2), pl = wear==='plate', cl = wear==='cloth', le = wear==='leather';
+function m3dLimbWearGeo(kind, b, wear, B){
+  b = Math.round(b*10)/10; B = B || M3D_BODY0;
+  const { ell, sph, cap, torus } = SDF, M = 4, fr = 1 + (B.fat - 0.3)*0.14, k = kind+'|'+wear+'|'+b.toFixed(2)+'|'+B.fat.toFixed(2), pl = wear==='plate', cl = wear==='cloth', le = wear==='leather';   /* (RS-524: cut to fit the weight under them) */
   if (kind==='upper') return m3dSculpt(k, [[-0.065*b,-0.22,-0.065*b],[0.065*b,0.04,0.065*b]], 0.004, P=>{
-    P.add(cap([0,0,0],[0,-0.18,0], 0.036*b, 0.028*b), 0.02, M);
-    if (cl){ P.add(ell([0,-0.05,0],[0.042*b,0.06,0.04*b]), 0.03, M); P.add(torus([0,-0.165,0], 0.024*b, 0.008, [0,1,0]), 0.012, M);   // puffed, gathered above the elbow
+    P.add(cap([0,0,0],[0,-0.18,0], 0.036*b*fr, 0.028*b*fr), 0.02, M);
+    if (cl){ P.add(ell([0,-0.05,0],[0.042*b*fr,0.06,0.04*b*fr]), 0.03, M); P.add(torus([0,-0.165,0], 0.024*b, 0.008, [0,1,0]), 0.012, M);   // puffed, gathered above the elbow
       for (let i=0;i<5;i++){ const a = i/5*Math.PI*2; P.sub(cap([Math.sin(a)*0.042*b,-0.02,Math.cos(a)*0.04*b],[Math.sin(a)*0.034*b,-0.13,Math.cos(a)*0.033*b], 0.003, 0.002), 0.004); } }
     else if (pl){ P.add(sph([0,-0.18,-0.008], 0.03*b), 0.006, M); P.add(ell([0,-0.175,-0.03*b],[0.022*b,0.03,0.014]), 0.006, M);   // the elbow cop and its fan
-      P.add(torus([0,-0.02,0], 0.03*b, 0.007, [0,1,0]), 0.008, M); }                                                       // the rerebrace's upper rim
-    else { P.add(ell([0,-0.07,0],[0.034*b,0.07,0.032*b]), 0.03, M); P.add(sph([0,-0.18,-0.006], 0.026*b), 0.02, M); }
+      P.add(torus([0,-0.02,0], 0.03*b*fr, 0.007, [0,1,0]), 0.008, M); }                                                       // the rerebrace's upper rim
+    else { P.add(ell([0,-0.07,0],[0.034*b*fr,0.07,0.032*b*fr]), 0.03, M); P.add(sph([0,-0.18,-0.006], 0.026*b), 0.02, M); }
   });
   if (kind==='fore') return m3dSculpt(k, [[-0.055*b,-0.2,-0.055*b],[0.055*b,0.03,0.055*b]], 0.0035, P=>{
-    P.add(cap([0,0,0],[0,-0.17,0], 0.028*b, 0.02*b), 0.02, M);
-    if (cl){ P.add(ell([0,-0.06,0],[0.03*b,0.07,0.028*b]), 0.03, M); P.add(torus([0,-0.158,0], 0.02*b, 0.006, [0,1,0]), 0.008, M); }   // the cuff
+    P.add(cap([0,0,0],[0,-0.17,0], 0.028*b*fr, 0.02*b), 0.02, M);
+    if (cl){ P.add(ell([0,-0.06,0],[0.03*b*fr,0.07,0.028*b*fr]), 0.03, M); P.add(torus([0,-0.158,0], 0.02*b, 0.006, [0,1,0]), 0.008, M); }   // the cuff
     else if (pl){ P.add(cap([0,-0.012,0],[0,-0.16,0], 0.035*b, 0.024*b), 0.006, M); P.add(ell([0,-0.09,-0.012*b],[0.012,0.06,0.012]), 0.01, M); }   // a vambrace, flared at the elbow, ridged behind
     else if (le){ P.add(cap([0,-0.045,0],[0,-0.155,0], 0.03*b, 0.0245*b), 0.005, M);                                        // a strapped bracer
       for (const y of [-0.07,-0.1,-0.13]) P.sub(torus([0,y,0], 0.03*b, 0.0022, [0,1,0]), 0.002); }
-    else { P.add(ell([0.004,-0.05,0.004],[0.029*b,0.06,0.026*b]), 0.03, M); P.add(ell([0,-0.165,0],[0.021*b,0.012,0.015*b]), 0.015, M); }
+    else { P.add(ell([0.004,-0.05,0.004],[0.029*b*fr,0.06,0.026*b*fr]), 0.03, M); P.add(ell([0,-0.165,0],[0.021*b,0.012,0.015*b]), 0.015, M); }
   });
   if (kind==='thigh') return m3dSculpt(k, [[-0.075*b,-0.27,-0.075*b],[0.075*b,0.04,0.075*b]], 0.0045, P=>{
-    P.add(cap([0,0,0],[0,-0.23,0], 0.047*b, 0.033*b), 0.02, M);
+    P.add(cap([0,0,0],[0,-0.23,0], 0.047*b*fr, 0.033*b*fr), 0.02, M);
     if (pl){ P.add(sph([0,-0.23,0.014], 0.034*b), 0.006, M); P.add(ell([0,-0.1,0.03*b],[0.016,0.1,0.012]), 0.012, M); }   // a cuisse: its knee cop and ridge
-    else { P.add(ell([0,-0.08,0],[0.048*b,0.09,0.045*b]), 0.035, M); P.add(sph([0,-0.228,0.012], 0.03*b), 0.02, M);
+    else { P.add(ell([0,-0.08,0],[0.048*b*fr,0.09,0.045*b*fr]), 0.035, M); P.add(sph([0,-0.228,0.012], 0.03*b), 0.02, M);
       if (cl) for (let i=0;i<4;i++){ const a = i/4*Math.PI*2 + 0.5; P.sub(cap([Math.sin(a)*0.048*b,-0.03,Math.cos(a)*0.045*b],[Math.sin(a)*0.04*b,-0.18,Math.cos(a)*0.037*b], 0.003, 0.0025), 0.005); } }   // loose creases
   });
   if (kind==='shin') return m3dSculpt(k, [[-0.06*b,-0.25,-0.06*b],[0.06*b,0.03,0.06*b]], 0.004, P=>{
-    P.add(cap([0,0,0],[0,-0.22,0], 0.031*b, 0.022*b), 0.02, M);
+    P.add(cap([0,0,0],[0,-0.22,0], 0.031*b*fr, 0.022*b), 0.02, M);
     if (pl){ P.add(ell([0,-0.1,0.02*b],[0.011,0.1,0.012]), 0.012, M); P.add(cap([0,-0.03,0],[0,-0.2,0], 0.032*b, 0.025*b), 0.005, M); }   // a greave, its shin ridge
-    else { P.add(ell([0,-0.075,-0.017*b],[0.028*b,0.065,0.03*b]), 0.035, M); if (cl) P.add(torus([0,-0.2,0], 0.02*b, 0.006, [0,1,0]), 0.01, M); }
+    else { P.add(ell([0,-0.075,-0.017*b],[0.028*b*fr,0.065,0.03*b*fr]), 0.035, M); if (cl) P.add(torus([0,-0.2,0], 0.02*b, 0.006, [0,1,0]), 0.01, M); }
   });
-  return m3dLimbGeo(kind, b);
+  return m3dLimbGeo(kind, b, B);
 }
-function m3dLimbGeo(kind, b){
-  b = Math.round(b*10)/10;
-  const { ell, sph, cap } = SDF, M = 4, k = kind+'|'+b.toFixed(2);
+/* (RS-524) the limbs follow the build: weight thickens them all round, muscle swells the deltoid and biceps, the quadriceps and the
+   calf; the hand and foot stay as they are */
+function m3dLimbGeo(kind, b, B){
+  b = Math.round(b*10)/10; B = B || M3D_BODY0;
+  const { ell, sph, cap } = SDF, M = 4, fat = B.fat, mus = B.mus, fd = fat - 0.3, fr = 1 + fd*0.14, mk = 0.85 + mus*0.3, k = kind+'|'+b.toFixed(2)+(kind==='hand' || kind==='boot' ? '' : '|'+fat.toFixed(2)+','+mus.toFixed(2));
   if (kind==='upper') return m3dSculpt(k, [[-0.06*b,-0.22,-0.06*b],[0.06*b,0.04,0.06*b]], 0.004, P=>{
-    P.add(cap([0,0,0],[0,-0.18,0], 0.034*b, 0.025*b), 0.02, M);
-    P.add(ell([0,-0.075,0.014*b],[0.029*b,0.055,0.026*b]), 0.03, M);                     // biceps
-    P.add(ell([0,-0.07,-0.014*b],[0.028*b,0.06,0.025*b]), 0.03, M);                      // triceps
+    P.add(cap([0,0,0],[0,-0.18,0], 0.034*b*fr, 0.025*b*fr), 0.02, M);
+    P.add(ell([0,-0.03,0],[0.034*b*(0.9 + mus*0.3),0.05,0.032*b*(0.9 + mus*0.3)]), 0.025, M);   // the deltoid, round the top of the arm
+    P.add(ell([0,-0.075,0.014*b],[0.029*b*mk,0.055,0.026*b*mk]), 0.03, M);                     // biceps
+    P.add(ell([0,-0.07,-0.014*b],[0.028*b*mk,0.06,0.025*b*mk]), 0.03, M);                      // triceps
     P.add(sph([0,-0.18,-0.006], 0.025*b), 0.02, M);                                      // elbow
   });
   if (kind==='fore') return m3dSculpt(k, [[-0.05*b,-0.2,-0.05*b],[0.05*b,0.03,0.05*b]], 0.0035, P=>{
-    P.add(cap([0,0,0],[0,-0.17,0], 0.027*b, 0.018*b), 0.02, M);
-    P.add(ell([0.004,-0.05,0.004],[0.029*b,0.06,0.026*b]), 0.03, M);
+    P.add(cap([0,0,0],[0,-0.17,0], 0.027*b*fr, 0.018*b*(1 + fd*0.07)), 0.02, M);
+    P.add(ell([0.004,-0.05,0.004],[0.029*b*mk,0.06,0.026*b*mk]), 0.03, M);                   // the forearm's belly, by the elbow
     P.add(ell([0,-0.165,0],[0.021*b,0.012,0.015*b]), 0.015, M);                          // wrist
   });
   if (kind==='thigh') return m3dSculpt(k, [[-0.07*b,-0.27,-0.07*b],[0.07*b,0.04,0.07*b]], 0.0045, P=>{
-    P.add(cap([0,0,0],[0,-0.23,0], 0.045*b, 0.03*b), 0.02, M);
-    P.add(ell([0,-0.09,0.016*b],[0.038*b,0.085,0.032*b]), 0.035, M);                     // quadriceps
-    P.add(ell([0,-0.085,-0.016*b],[0.034*b,0.08,0.03*b]), 0.035, M);                     // hamstrings
+    P.add(cap([0,0,0],[0,-0.23,0], 0.045*b*fr, 0.03*b*(1 + fd*0.09)), 0.02, M);
+    P.add(ell([0,-0.09,0.016*b],[0.038*b*mk,0.085,0.032*b*mk]), 0.035, M);                     // quadriceps
+    P.add(ell([0,-0.085,-0.016*b],[0.034*b*mk,0.08,0.03*b*mk]), 0.035, M);                     // hamstrings
     P.add(sph([0,-0.228,0.012], 0.03*b), 0.02, M); P.add(sph([0,-0.225,0.03*b], 0.015*b), 0.012, M);   // knee and kneecap
   });
   if (kind==='shin') return m3dSculpt(k, [[-0.055*b,-0.25,-0.06*b],[0.055*b,0.03,0.055*b]], 0.004, P=>{
-    P.add(cap([0,0,0],[0,-0.22,0], 0.03*b, 0.02*b), 0.02, M);
-    P.add(ell([0,-0.075,-0.017*b],[0.028*b,0.065,0.03*b]), 0.035, M);                    // calf
+    P.add(cap([0,0,0],[0,-0.22,0], 0.03*b*fr, 0.02*b*(1 + fd*0.07)), 0.02, M);
+    P.add(ell([0,-0.075,-0.017*b],[0.028*b*mk,0.065,0.03*b*(0.85 + mus*0.4)]), 0.035, M);  // calf
     for (const s of [-1,1]) P.add(sph([s*0.017*b,-0.212,0], 0.011*b), 0.01, M);          // ankle bones
   });
   if (kind==='boot') return m3dSculpt(k, [[-0.04*b,-0.05,-0.05*b],[0.04*b,0.04,0.1*b]], 0.0035, P=>{
@@ -35628,7 +35647,7 @@ function m3dLimb(parent, len, r0, r1, mat, cap){
   return { g, end };
 }
 function m3dLimbS0(parent, geo, len, mat){ const g = new THREE.Group(); parent.add(g); g.add(new THREE.Mesh(geo, mat)); const end = new THREE.Group(); end.position.y = -len; g.add(end); return { g, end }; }
-function m3dLimbS(parent, kind, b, len, mat, wear){ const g = new THREE.Group(); parent.add(g); g.add(new THREE.Mesh(wear ? m3dLimbWearGeo(kind, b, wear) : m3dLimbGeo(kind, b), mat)); const end = new THREE.Group(); end.position.y = -len; g.add(end); return { g, end }; }
+function m3dLimbS(parent, kind, b, len, mat, wear, B){ const g = new THREE.Group(); parent.add(g); g.add(new THREE.Mesh(wear ? m3dLimbWearGeo(kind, b, wear, B) : m3dLimbGeo(kind, b, B), mat)); const end = new THREE.Group(); end.position.y = -len; g.add(end); return { g, end }; }
 function m3dSphere(parent, r, mat, x, y, z, sx, sy, sz){ const m = new THREE.Mesh(new THREE.SphereGeometry(r, 14, 10), mat); m.position.set(x||0, y||0, z||0); m.scale.set(sx||1, sy||sx||1, sz||sx||1); parent.add(m); return m; }
 function m3dCone(parent, r, h, mat, x, y, z, rx, ry, rz, seg){ const m = new THREE.Mesh(new THREE.ConeGeometry(r, h, seg||8), mat); m.position.set(x||0, y||0, z||0); m.rotation.set(rx||0, ry||0, rz||0); parent.add(m); return m; }
 function m3dBox(parent, w, h, d, mat, x, y, z){ const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x||0, y||0, z||0); parent.add(m); return m; }
@@ -36627,7 +36646,7 @@ function m3dRuneHemTex(){
   const t = new THREE.CanvasTexture(c); t.wrapS = THREE.RepeatWrapping; t.anisotropy = 4; return (M3D.runeHem = t);
 }
 function m3dHumanoid(o){
-  const T = THREE, mats = {}, b = o.bulk||1, root = new T.Group(), rig = {}; root.userData.modelRoot = true;
+  const T = THREE, mats = {}, b = o.bulk||1, root = new T.Group(), rig = {}; root.userData.modelRoot = true; const BD = m3dBodySpec(o); rig.body = BD;   /* (RS-524: the build it's sculpted to) */
   const outfit = o.outfit||'leather', skinHex = o.skin||'#c9a07c', clothHex = o.cloth||'#5a4630';
   const bodyKind = { stone:'stone', ice:'ice', sand:'stone', metal:'metal', vines:'fur' }[outfit];
   const skinM = o.wrap ? m3dSpecialMat(mats, skinHex, 'wrap') : m3dMat(mats, bodyKind==='stone' && outfit==='sand' ? '#c8a870' : skinHex, bodyKind || (outfit==='scales' || o.scaly ? 'scales' : 'skin'));
@@ -36646,7 +36665,7 @@ function m3dHumanoid(o){
   const legBare = lw==='skin' ? true : lw ? false : bare;
   const LL = o.limbLen || 1, TH = (o.limbThin || 1)*(o.fem ? 0.9 : 1);   /* (RS-242: long, thin limbs; RS-265: a woman's slimmer ones) */
   const LG = (o.legLen || LL)*(o.fem ? 1.08 : 1);   /* (and her longer legs) */   /* (RS-246: a dwarf's legs are shorter than his arms) */
-  const LS = (p, kind, len, mat, f, wear)=>{ f = f || LL; const r = m3dLimbS(p, kind, b*TH, len*f, mat, wear); if (f!==1) r.g.children[0].scale.y = f; return r; };
+  const LS = (p, kind, len, mat, f, wear)=>{ f = f || LL; const r = m3dLimbS(p, kind, b*TH, len*f, mat, wear, BD); if (f!==1) r.g.children[0].scale.y = f; return r; };
   /* (RS-279) what the body wears, as sculpted garments: the torso's and each limb's */
   const wear = bare ? null : { plate:'plate', chain:'chain', leather:'jerkin', robe:'robe', rags:'rags' }[outfit] || 'tunic'; rig.wear = wear;
   const wearOf = m=>m===skinM ? null : m===plateM || m===legPlateM ? 'plate' : m===chainM ? 'chain' : m.userData.kind==='leather' ? 'leather' : m.userData.kind==='metal' ? 'plate' : 'cloth';
@@ -36654,7 +36673,7 @@ function m3dHumanoid(o){
   // legs
   rig.legs = [];
   for (const s of [-1,1]){
-    const hip = new T.Group(); hip.position.set(s*0.05*b, -0.02, 0); hips.add(hip);   /* (RS-283: her hips were set wider; RS-415: no longer - they made her hips too big for her waist) */
+    const hip = new T.Group(); hip.position.set(s*0.05*b*(1 + (BD.hp - 1)*0.6), -0.02, 0); hips.add(hip);   /* (RS-524: set by the hips' width) */   /* (RS-283: her hips were set wider; RS-415: no longer - they made her hips too big for her waist) */
     const th = LS(hip, 'thigh', 0.23, m3dVC(mats, legM), LG, wearOf(legM)); if (o.fem){ const c = th.g.children[0]; c.scale.z *= 1.02; }   /* (RS-283: fuller thighs) */
     const kn = new T.Group(); th.end.add(kn);
     const shM = lwPlate ? legPlateM : lw==='cloth' || lw==='trews' ? legM : lw==='breeches' ? skinM : (legBare ? skinM : m3dMat(mats, '#3a2a1c', 'leather'));
@@ -36676,8 +36695,8 @@ function m3dHumanoid(o){
      the legs; the inner frame keeps the old coordinates, so everything on the body is placed as it always was */
   const waist = new T.Group(); waist.position.y = 0.07; hips.add(waist); const torso = new T.Group(); torso.position.y = -0.07; waist.add(torso); rig.torso = waist; rig.torsoIn = torso; rig.waistY = 0.07;
   const prof = [[0.001,0],[0.078,0.0],[0.085,0.05],[0.08,0.12],[0.1,0.2],[0.108,0.25],[0.09,0.29],[0.04,0.315],[0.001,0.318]].map(p=>new T.Vector2(p[0], p[1]));
-  const chest = new T.Mesh(wear ? m3dWearGeo(b, o.fem, wear, 'top') : m3dTorsoGeo(b, 0, o.fem, 'top'), m3dVC(mats, torsoM)); torso.add(chest); rig.chestMesh = chest;   // (the chest from the waist up in one sculpted piece, or the garment over it)
-  const pelvM = new T.Mesh(wear ? m3dWearGeo(b, o.fem, wear, 'bot') : m3dTorsoGeo(b, 0, o.fem, 'bot'), m3dVC(mats, torsoM)); hips.add(pelvM); rig.pelvisMesh = pelvM;   /* (RS-376: and the pelvis from the waist down, with the legs) */
+  const chest = new T.Mesh(wear ? m3dWearGeo(BD, wear, 'top') : m3dTorsoGeo(BD, 'top'), m3dVC(mats, torsoM)); torso.add(chest); rig.chestMesh = chest;   // (the chest from the waist up in one sculpted piece, or the garment over it)
+  const pelvM = new T.Mesh(wear ? m3dWearGeo(BD, wear, 'bot') : m3dTorsoGeo(BD, 'bot'), m3dVC(mats, torsoM)); hips.add(pelvM); rig.pelvisMesh = pelvM;   /* (RS-376: and the pelvis from the waist down, with the legs) */
   if (wear){ const nk = new T.Mesh(new T.CapsuleGeometry(0.031*Math.sqrt(b), 0.06, 6, 20), skinM); nk.position.set(0, 0.295, -0.004); torso.add(nk); }   // (the neck shows in the neckline)
   if (o.potBelly){ m3dSphere(torso, 0.075*b, torsoM, 0, 0.1, 0.022*Math.sqrt(b), 1.0, 0.95, 0.9); }   /* (RS-251: a round belly) */
   if (o.apron){ const am = m3dMat(mats, o.apron, 'leather'), zf = 0.08*Math.sqrt(b);   /* (RS-252: a tinker's leather apron, its bib, pocket and tools) */
@@ -36711,7 +36730,7 @@ function m3dHumanoid(o){
     for (let i=0;i<tp.count;i++){ const x = tp.getX(i), y = tp.getY(i), u = Math.min(1, Math.abs(x)/rx), zc = Math.sqrt(1 - u*u)*rz; tp.setZ(i, y > -0.12 ? zc + 0.003 : zc + 0.003 - (y + 0.12)*0.12); }
     tg.computeVertexNormals(); const tb = new T.Mesh(tg, m3dMat(mats, o.tabard, 'cloth')); tb.material.side = T.DoubleSide; tb.position.y = 0.12; tb.name = 'tabard'; torso.add(tb); if (o.emblem) m3dSphere(torso, 0.022, m3dMat(mats, o.emblem, 'metal'), 0, 0.14, 0.086*Math.sqrt(b), 1, 1, 0.3); }
   if (outfit!=='robe' && !bare){ const belt = new T.Mesh(new T.TorusGeometry((o.fem ? 0.09 : 0.099)*b, 0.012, 10, 48), o.trim ? m3dMat(mats, o.trim, 'metal') : m3dMat(mats, '#2a1c12', 'leather')); belt.rotation.x = Math.PI/2; belt.position.y = 0.025;
-    belt.scale.set((o.broad||1), ((o.fem ? 0.076 : 0.083)*Math.sqrt(b)/((o.fem ? 0.09 : 0.099)*b))*(1 + ((o.broad||1)-1)*0.6), 1); hips.add(belt);   /* (RS-279: a belt that goes round the body; RS-376: on the hips, below the waist's bend) */
+    belt.scale.set((o.broad||1)*(1 + (BD.hp - 1)*0.7), ((o.fem ? 0.076 : 0.083)*Math.sqrt(b)/((o.fem ? 0.09 : 0.099)*b))*(1 + ((o.broad||1)-1)*0.6), 1); hips.add(belt);   /* (RS-279: a belt that goes round the body; RS-376: on the hips, below the waist's bend) */
     if (o.buckle) m3dBox(hips, 0.045, 0.038, 0.012, m3dMat(mats, o.buckle, 'metal'), 0, 0.025, 0.072*Math.sqrt(b)*(1 + ((o.broad||1)-1)*0.6)); }   /* (RS-246: a big belt buckle) */            // belt
   if (outfit==='fur'){ const ring = new T.Mesh(new T.TorusGeometry(0.075*b, 0.035, 8, 16), furM); ring.rotation.x = Math.PI/2; ring.position.y = 0.29; ring.scale.set(1.2, 0.85, 1); torso.add(ring); }
   if (outfit==='loin' || outfit==='fur'){ m3dBox(hips, 0.1*b, 0.14, 0.01, outfit==='fur' ? furM : clothM, 0, -0.07, 0.065); m3dBox(hips, 0.1*b, 0.12, 0.01, outfit==='fur' ? furM : clothM, 0, -0.06, -0.065); }
@@ -36723,7 +36742,7 @@ function m3dHumanoid(o){
      top over plate legs had no skirt at all */
   const robeTop = false, robeLegs = false;
   const brd = o.broad||1, dpF = 1 + (brd-1)*0.6, skZ = 0.95/Math.sqrt(b)*dpF;   /* (RS-305: a skirt is as broad and as deep as the body it hangs from) */
-  const Fm = o.fem ? 1 : 0, beltX = (0.082 - Fm*0.004)*b + 0.016, beltZ = (0.066 - Fm*0.012)*Math.sqrt(b) + 0.016;   /* (the robe bodice's hem at the belt line - see m3dWearGeo) */
+  const Fm = o.fem ? 1 : 0, beltX = (0.082 - Fm*0.004)*b*(1 + (BD.hp - 1)*0.75) + 0.016, beltZ = (0.066 - Fm*0.012)*Math.sqrt(b) + 0.016;   /* (the robe bodice's hem at the belt line - see m3dWearGeo) */
   const pleatSkirt = (rTop, rBot, h, y, mat, shortCut, waist)=>{   /* (see m3dRuneHemTex for the uv: u round it, v up from the hem) */   /* (RS-286: gathered at the waist, it flares over the hips, then falls to the hem; RS-305: a robe skirt's waist is the very oval of the bodice's hem, so the two meet under the sash in one line) */
     const sg = new T.CylinderGeometry(rTop, rBot, h, 48, 24, false), p = sg.attributes.position, hh = h/2,   /* (RS-293: closed at the top, so nothing inside the skirt shows from above; the caps deform into fans) */ wR = (o.fem ? 0.112 : 0.1)*b, hipAt = 0.05/h, dg = o.fem ? 0.06 : 0.03;   /* (RS-415: her waist gathered in to the belt, not standing out wide of it) */   /* (a little squarer in section, for the corners of the hips) */
     const wX = waist ? waist.x : 0, wZ = waist ? waist.z/skZ : 0;
@@ -36733,7 +36752,7 @@ function m3dHumanoid(o){
     if (shortCut==='rags') for (let i=0;i<p.count;i++) if (p.getY(i) < 0) p.setY(i, p.getY(i) - fpHash(i,1,77)*0.06);
     sg.computeVertexNormals();                                                   // (pleats, deepening toward the hem)
     const m = new T.Mesh(sg, mat); m.material.side = T.DoubleSide; m.position.y = y; m.scale.z = skZ; m.scale.x = brd; hips.add(m); return m; };   /* (a little flatter front to back, as the hips are; RS-291: its depth scales with the body's, by the root of the build, so a slight figure's skirt still clears her seat) */
-  let hemY = null, hemR = 0; const skT = (o.fem ? 0.118 : 0.1)*b, skB = (o.fem ? 0.162 : 0.15)*b, skS = (o.fem ? 0.128 : 0.12)*b;   /* (RS-286: a skirt's waist clears the hips - hers are wider; RS-415: only just, so it fits her waist - it flared out like a bell) */
+  let hemY = null, hemR = 0; const hpk = 1 + (BD.hp - 1)*0.5, skT = (o.fem ? 0.118 : 0.1)*b*hpk, skB = (o.fem ? 0.162 : 0.15)*b*hpk, skS = (o.fem ? 0.128 : 0.12)*b*hpk;   /* (RS-286: a skirt's waist clears the hips - hers are wider; RS-415: only just, so it fits her waist - it flared out like a bell) */
   const robeWaist = outfit==='robe' ? { x:beltX, z:beltZ } : null;   /* (under a robe top the skirt starts where the bodice ends; under a tunic it keeps its own gathered waist) */
   if (robeLegs){ rig.skirt = pleatSkirt(skT, skB, 0.48, -0.224, legM.clone(), null, robeWaist); }               // the robe bottom: to the ankles (RS-305: its waist up at the belt line, under the sash)
   else if (outfit==='robe' && !robeTop){ rig.skirt = pleatSkirt(skT, skB, 0.48, -0.224, clothM, null, robeWaist); hemY = -0.4; hemR = skB/b; rig.skirt.userData.cloth = ROBE_CLOTH[Math.min(4, o.robeTier||0)]; }   // a one-piece robe
@@ -36793,7 +36812,7 @@ function m3dHumanoid(o){
     const cord = new T.Mesh(new T.TorusGeometry(0.085*b, 0.004, 6, 24, Math.PI), m3dMat(mats, mpTone(o.cape, -0.3), 'leather')); cord.position.set(0, 0.3, 0.04*bs2); cord.rotation.set(Math.PI/2 + 0.3, 0, Math.PI); cord.scale.set(1, 0.45, 1); torso.add(cord); }   // the cord across the throat
   if (outfit==='vines') for (let i=0;i<5;i++){ const pts = []; for (let k=0;k<6;k++) pts.push(new T.Vector3(Math.sin(k+i)*0.09*b, 0.3 - k*0.07, Math.cos(k*1.3+i)*0.07)); torso.add(new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(pts), 16, 0.008, 5), m3dMat(mats, '#3a6a2a', 'fur'))); }
   // neck and head
-  const neck = new T.Group(); neck.position.y = 0.31; torso.add(neck); rig.neck = neck;
+  const neck = new T.Group(); neck.position.y = 0.31 + (BD.nk - 1)*0.03; torso.add(neck);   /* (RS-524: a longer or shorter neck) */ rig.neck = neck;
   const head = m3dHead(o.head, o, mats, skinM, darkM); head.position.y = 0.02 + (o.headLift||0)*0.002; head.scale.setScalar((o.headScale||1)*(o.head==='hood' ? 1 : 1)*(o.fem ? 0.94 : 1)); neck.add(head); rig.head = head;
   if (o.headNarrow){ head.scale.x *= 0.86; head.scale.y *= 1.06; }
   if (o.headSlim){ head.scale.x *= 0.93; head.scale.y *= 1.03; }
@@ -36867,13 +36886,13 @@ function m3dHumanoid(o){
   // arms
   rig.arms = [];
   for (const s of [-1,1]){
-    const sh = new T.Group(); sh.position.set(s*(o.fem ? 0.099 : 0.115)*b*(o.broad||1), 0.27, 0); torso.add(sh);   /* (RS-283: narrower shoulders) */
+    const sh = new T.Group(); sh.position.set(s*(o.fem ? 0.099 : 0.115)*b*(o.broad||1)*BD.sh, 0.27, 0); torso.add(sh);   /* (RS-524: as wide as the shoulders) */   /* (RS-283: narrower shoulders) */
     const sleeveM = o.sleeve ? m3dMat(mats, o.sleeve, 'cloth') : null;
-    const upM = rig.robe ? clothM : sleeveM || limbM, up = LS(sh, 'upper', 0.18, m3dVC(mats, upM), undefined, wearOf(upM)); const AT = o.fem ? 0.8 : 1;   /* (RS-265: a woman's slimmer arms and hands; RS-284: slimmer still) */
+    const upM = rig.robe ? clothM : sleeveM || limbM, up = LS(sh, 'upper', 0.18, m3dVC(mats, upM), LL*(o.armLen||1), wearOf(upM));   /* (RS-524: the arms' own length) */ const AT = o.fem ? 0.8 : 1;   /* (RS-265: a woman's slimmer arms and hands; RS-284: slimmer still) */
     if (o.fem){ const c = up.g.children[0]; c.scale.x *= AT; c.scale.z *= AT; }
     const el = new T.Group(); up.end.add(el);
     const gloveM = o.gloves ? m3dMat(mats, o.gloves.col || '#4a3420', o.gloves.kind==='metal' ? 'metal' : 'leather') : null;
-    const foM = rig.robe ? clothM : gloveM ? gloveM : sleeveM ? sleeveM : (outfit==='plate' ? plateM : bare ? skinM : m3dMat(mats, mpTone(clothHex, -0.2), 'leather')), fo = LS(el, 'fore', 0.17, m3dVC(mats, foM), undefined, wearOf(foM));
+    const foM = rig.robe ? clothM : gloveM ? gloveM : sleeveM ? sleeveM : (outfit==='plate' ? plateM : bare ? skinM : m3dMat(mats, mpTone(clothHex, -0.2), 'leather')), fo = LS(el, 'fore', 0.17, m3dVC(mats, foM), LL*(o.armLen||1), wearOf(foM));
     if (o.fem){ const c = fo.g.children[0]; c.scale.x *= AT; c.scale.z *= AT; }
     const hand = new T.Group(); hand.position.y = -0.015; fo.end.add(hand);
     const hs = new T.Mesh(m3dLimbGeo('hand', b), m3dVC(mats, gloveM || (outfit==='plate' ? plateM : skinM))); hs.position.y = 0.015; hs.rotation.y = -s*Math.PI/2; hs.scale.x = -s; if (o.fem) hs.scale.multiplyScalar(0.84); hand.add(hs);   /* (RS-206: the sculpt is a right hand - mirrored for the left) */   /* (RS-204: the weapon hand turned a quarter anticlockwise and the other clockwise, so the fist closes round the grip) */
@@ -41360,6 +41379,14 @@ const LOOK_PARTS = [
   { k:'shirt', nm:'Shirt', opts:()=>LOOK_CLOTH.map(c=>c[0]), sw:()=>LOOK_CLOTH.map(c=>c[1]), tailor:1 },
   { k:'trousers', nm:'Trousers', opts:()=>LOOK_CLOTH.map(c=>c[0]), sw:()=>LOOK_CLOTH.map(c=>c[1]), tailor:1 },
 ];
+/* (RS-524) the body sliders: each 0 to 1, kept in the look as L.bd; what's missing takes the default (an older save's Lean, Average
+   or Stocky build sets the frame). Key, name, and the words at either end of the slider */
+const LOOK_BODY = [['frame','Frame','slight','broad'],['fat','Weight','lean','heavy'],['muscle','Muscle','soft','hard'],['shoulders','Shoulders','narrow','wide'],['chest','Chest','flat','full'],['waist','Waist','narrow','wide'],['hips','Hips','narrow','wide'],['neck','Neck','short','long'],['head','Head','small','large'],['legs','Legs','short','long'],['arms','Arms','short','long'],['height','Height','short','tall'],['posture','Posture','straight','stooped']];
+function lookBodyDefault(L){ const fem = lookIdx(L.body, 2)===1; return { frame:L.build==null ? 0.5 : [0, 0.5, 1][lookIdx(L.build, 3)], fat:0.3, muscle:fem ? 0.35 : 0.5, shoulders:0.5, chest:fem ? 0.45 : 0.5, waist:0.5, hips:0.5, neck:0.5, head:0.5, legs:0.5, arms:0.5, height:0.5, posture:0 }; }
+function lookBody(L){
+  const bd = L.bd || {}, d = lookBodyDefault(L), out = {};
+  for (const [k] of LOOK_BODY){ const v = bd[k]; out[k] = v==null || isNaN(+v) ? d[k] : Math.max(0, Math.min(1, +v)); } return out;
+}
 function lookIdx(v, n){ return n ? (((v|0)%n)+n)%n : 0; }
 function lookHex(list, v){ return list[lookIdx(v, list.length)][1]; }
 function lookDefault(race){
@@ -41538,7 +41565,6 @@ function rsPlayerLook(opt){
   const k = lookRaceKey(race), sk = lookSkins(race);
   o.skin = lookHex(sk, L.skin); o.fem = lookIdx(L.body, 2)===1;
   const RB = RACE_BODY[k] || RACE_BODY.human;
-  o.bulk = [0.9, 1, 1.12][lookIdx(L.build, 3)] * RB[1];
   o.headScale = { halfling:1.14, gnome:1.22, dwarf:1.06 }[k] || 1;
   if (!lookNoHair(race)){
     o.hairStyle = LOOK_HAIR_KEY[lookIdx(L.hair, LOOK_HAIR_KEY.length)];
@@ -41569,7 +41595,11 @@ function rsPlayerLook(opt){
     else if (k==='dragon'){ o.horns = true; o.hornStyle = 4+fi; o.hornCol = '#d8ccb0'; }
     else if (k==='gnome') o.nose = fi+1;
     else o.earLen = (k==='elf' ? [0.045, 0.07, 0.1] : k==='woodelf' ? [0.06, 0.085, 0.11] : [0.032, 0.045, 0.06])[fi]; }
-  return HUM(o, 1, { stature:RB[0] });
+  /* (RS-524) your build, from the body sliders (lookBody), over whatever the race sets */
+  const LB = lookBody(L);
+  o.bulk = (0.88 + 0.24*LB.frame)*RB[1]; o.bodyFat = LB.fat; o.bodyMus = LB.muscle; o.shoulderW = 0.85 + 0.3*LB.shoulders; o.waistW = 0.83 + 0.34*LB.waist; o.hipW = 0.85 + 0.3*LB.hips; o.chestS = LB.chest; o.neckLen = 0.85 + 0.3*LB.neck;
+  o.headScale = (o.headScale||1)*(0.92 + 0.16*LB.head); o.legLen = (o.legLen || o.limbLen || 1)*(0.9 + 0.2*LB.legs); o.armLen = 0.92 + 0.16*LB.arms; o.stoop = (o.stoop||0) + LB.posture*0.3;
+  return HUM(o, 1, { stature:RB[0]*(0.92 + 0.16*LB.height) });
 }
 function isoSyncPlayer(){
   const T = THREE, p = G.player;
@@ -42575,7 +42605,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-523';
+const GAME_VERSION = 'rs-524';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

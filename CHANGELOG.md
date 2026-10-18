@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-524 - Bodies built to a build
+
+- **Real anatomy**: every humanoid is sculpted again with the figure of Bakshi's rotoscoped film in mind - collarbones with the hollows above them, deltoids that cap the arm, lats broad under the arms tapering to a waist, a neck that is a neck, a firmer chest, a spine with its groove, and the belly, flanks and seat that fill out with weight. The default build is the shape everyone had, so your character, the townsfolk and the monsters keep their look - just better made.
+- **A build of your own**: a body is now built from twelve smooth settings - frame, weight, muscle, shoulders, chest, waist, hips, neck, head, legs, arms, height - and posture. A lean, hard-muscled narrow-waisted fighter, a heavy one with a belly and love handles, a slight woman with a small bust, a full one with wide hips: each is its own sculpt, and the garments (tunics, jerkins, hauberks, breastplates, robes) are sculpted over the same masses, so they fit every build with nothing poking through. The sliders to set them come next; an old character's Lean, Average or Stocky build carries over as the frame.
+- **The sculpt cache turns over**: shapes changed, so sculpted parts are made afresh the first time you see them (a moment longer on first sight, cached after as before).
+
 ## RS-523 - A wizard's shield, held like a shield
 
 - **Staff and shield**: carrying a shield with a staff, your off hand reached across to grip the staff as if it were two-handed, leaving the shield held at your chest like a book. The staff is now held in one hand and the shield is raised on your other arm, like any other shield. A staff on its own is still held in both hands.

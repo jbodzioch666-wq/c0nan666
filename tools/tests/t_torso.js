@@ -3,7 +3,7 @@
 module.exports = async page=>{
   const r = await page.evaluate(()=>{
     const out = {};
-    const prof = (fem)=>{ const g = m3dTorsoGeo(1, 0, fem), p = g.attributes.position; let chestZ = -1, waistX = 0, hipX = 0, ribX = 0, shX = 0;
+    const prof = (fem)=>{ const g = m3dTorsoGeo(m3dBodySpec({ bulk:1, fem })), p = g.attributes.position;   /* (RS-524: sculpted to a build) */ let chestZ = -1, waistX = 0, hipX = 0, ribX = 0, shX = 0;
       for (let i=0;i<p.count;i++){ const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
         if (y > 0.17 && y < 0.22 && Math.abs(x) > 0.025 && Math.abs(x) < 0.06) chestZ = Math.max(chestZ, z);
         if (Math.abs(y - 0.11) < 0.01) waistX = Math.max(waistX, Math.abs(x));
@@ -15,7 +15,7 @@ module.exports = async page=>{
     const L = G.player.look; L.body = 1; const e = m3dInstance({}, rsPlayerLook()); let balls = 0; out.fHip = e.rig.legs[1].hip.position.x; out.fSh = e.rig.arms[1].sh.position.x;
     L.body = 0; { const m = m3dInstance({}, rsPlayerLook()); out.mHip = m.rig.legs[1].hip.position.x; out.mSh = m.rig.arms[1].sh.position.x; } L.body = 1;
     e.rig.torso.children.forEach(c=>{ if (c.isMesh && c.geometry.type==='SphereGeometry' && c.position.y > 0.18 && c.position.y < 0.23 && Math.abs(c.position.x) > 0.02) balls++; });
-    out.balls = balls; out.femTorso = e.rig.chestMesh.geometry===m3dWearGeo(Math.round((rsPlayerLook().o.bulk||1)*10)/10, true, 'tunic', 'top');   /* (RS-376: the chest is the garment's top piece) */   /* (RS-279: her tunic is sculpted over the feminine figure) */
+    out.balls = balls; out.femTorso = e.rig.chestMesh.geometry===m3dWearGeo(m3dBodySpec(rsPlayerLook().o), 'tunic', 'top');   /* (RS-376: the chest is the garment's top piece) */   /* (RS-279: her tunic is sculpted over the feminine figure) */
     { G.gear.chest = rsMakeArmour('cloth', 2, 'chest'); G.gear.legs = rsMakeArmour('cloth', 2, 'legs'); const e2 = m3dInstance({}, rsPlayerLook()), sk = e2.rig.skirt, sp = sk.geometry.attributes.position, hp = e2.rig.pelvisMesh.geometry.attributes.position;   /* (RS-376: the hips are the pelvis piece) */   /* (RS-286: the skirt clears her hips) */
       const rAt = (p, y0, sc)=>{ let r = 0; for (let i=0;i<p.count;i++) if (Math.abs(p.getY(i) + (sc||0) - y0) < 0.012) r = Math.max(r, Math.abs(p.getX(i))); return r; };
       out.skirtHip = +rAt(sp, -0.038, sk.position.y).toFixed(4); out.bodyHip = +rAt(hp, -0.038).toFixed(4); out.skirtWaist = +rAt(sp, 0.01, sk.position.y).toFixed(4); G.gear.legs = newItem(); G.gear.chest = newItem(); }
