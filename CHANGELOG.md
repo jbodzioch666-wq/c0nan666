@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-505 - Long walks on the open land, smooth
+
+- **No freeze at the end of each land rebuild**: the land is built in a 96-tile window round you, rebuilt in the background as you walk. The rebuild only started 4 tiles before the edge of the built land would come into view, and if you got there first, it finished everything in one go - a freeze of up to a second. A phone or a busy laptop always got there first, so every rebuild on a long walk ended in a stutter. It now starts 13 tiles earlier and speeds up gradually as you near the edge, finishing at once only if the edge is truly on screen. At a phone's pace: the worst rebuild frame fell from **758 ms to about 120 ms**.
+- **No loading warm-up mid-walk**: the end of each background rebuild also set off a whole-scene shader warm-up meant for loading screens, which held frames for seconds on a slow device. A rebuild done over a walk already prepares its own shaders, so that warm-up now only follows a real load. On the uploaded save at a phone's pace, the slowest 5% of walking frames fell from **397 ms to 97 ms**.
+- **Cheaper warm-ups everywhere**: each warm-up draw now shows only the one thing it is preparing, not the whole scene again.
+- One first-time cost remains: an animal or monster seen for the very first time is sculpted then (up to a quarter of a second on a phone). The sculpt cache (RS-500) keeps it after that.
+
 ## RS-504 - Lighter town frames
 
 - **The HUD stopped re-checking your skills every frame**: reading your bag or a skill first made sure every skill field existed - about thirty checks - and the HUD does hundreds of such reads a frame. The fields are now filled in once per character, which was about 6% of every town frame on the audit save. New and loaded characters still get every default (tested).

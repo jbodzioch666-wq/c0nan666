@@ -24032,9 +24032,16 @@ function gfxWarmFlush(V){
 function gfxWarmStep(V){
   const W = V.warmWait; if (!W) return false;
   const t0 = performance.now(), seen = gfxWarmSeen(W.r), budget = W.live ? 10 : 120;   /* (RS-503: a live warm sips - never a hitch, never the card; what it still hides pops in a few frames later, far off at the window's edge) */
+  /* (RS-505) each warm draw shows only this batch: what earlier batches warmed is hidden for the draw, so a draw costs its new shaders
+     and nothing else - drawing the whole land once per material dragged a slow device's warm-up on for many seconds into your walk */
+  const doneM = W.doneM || (W.doneM = []), done0 = doneM.length;
   while (W.i < W.mats.length){
-    const m = W.mats[W.i++]; m.visible = m.__warmVis===undefined ? true : m.__warmVis; delete m.__warmVis; seen.add(m);
+    const batch = W.mats.slice(W.i, W.i + 1); W.i += batch.length;   /* (one at a time: a draw then holds at most one new shader's compile) */
+    for (const m of batch){ m.visible = m.__warmVis===undefined ? true : m.__warmVis; delete m.__warmVis; seen.add(m); }
+    const hid = []; for (const m of doneM) if (m.visible){ m.visible = false; hid.push(m); }
     try{ gfxWarmRender(W.r, W.scene, W.cam); }catch(e){ console.error(e); }
+    for (const m of hid) m.visible = true;
+    for (const m of batch) doneM.push(m);
     if (performance.now() - t0 > budget) break;
   }
   if (W.i < W.mats.length){ if (!W.live) gfxWarmCard(); return !W.live; }
@@ -31352,7 +31359,7 @@ function* o3BuildGen(cx, cy){
   yield; try{ yield* gfxO3BuildGen(grp, x0, y0, W, M); }catch(e){ console.error(e); }
   yield; try{ o3MergeWorld(grp); }catch(e){ console.error(e); }   /* (RS-401) */
   O3.encGrp = new T.Group(); grp.add(O3.encGrp); O3.encKey = null; O3.qKey = null;
-  O3.compileDue = true;   /* (RS-345) */
+  if (!O3.pend) O3.compileDue = true;   /* (RS-345; RS-505: only for a build done at once - a build sliced over a walk compiles its own shaders (RS-403), and this flag at its end set off a whole-scene loading warm-up mid-stride, holding frames for seconds on a slow device) */
 }
 // ---- (RS-349) building the land over frames ----
 // Everything the build writes to O3 is swapped out while the old land still shows, and swapped in when it's done
@@ -33061,13 +33068,17 @@ function o3Render(){
   if (back || turn !== O3.turnSeen){ O3.turnSeen = turn; const k = pmMapKey(); if (k !== O3.mapKey){ changed = !!O3.mapKey; O3.mapKey = k; } }
   O3.lastFrame = now;
   if (O3.pend && (changed || O3.mapRef!==G.ow.map)) o3BuildAbandon();   /* (RS-349: the world changed under a build in progress - start over, at once) */
-  const reach = o3Reach(), trig = Math.max(6, O3_W/2 - reach - 4), hurry = Math.max(8, O3_W/2 - reach);
+  /* (RS-505) the land rebuild starts well before the edge (13 tiles of walking to finish it, not 4) and speeds up the nearer you get,
+     rather than finishing in one frame: a slower device - a phone, a busy laptop - walked those 4 tiles before the build was done, and
+     every rebuild on a long walk ended in a one-second freeze. Only with the land's edge actually on screen does it finish at once */
+  const reach = o3Reach(), hurry = Math.max(8, O3_W/2 - reach), trig = Math.max(6, hurry - 13);
   if (!O3.pend && (!O3.win || changed || O3.mapRef!==G.ow.map || Math.abs(px - O3.win.cx) > trig || Math.abs(py - O3.win.cy) > trig)){
     const atOnce = !O3.win || changed || O3.mapRef!==G.ow.map; O3.mapRef = G.ow.map; O3.path = O3.path||[];
     if (atOnce) o3Build(px, py); else o3BuildStart(px, py);   /* (RS-349: a window move builds the new land over a few frames while the old one still shows) */
     if (!O3.ppos) O3.ppos = new T.Vector3(px+0.5, 0, py+0.5);
   }
-  if (O3.pend){ const off = Math.abs(px - O3.win.cx) > hurry || Math.abs(py - O3.win.cy) > hurry; o3BuildSlice(off ? 1e9 : 6); }
+  if (O3.pend){ const far = Math.max(Math.abs(px - O3.win.cx), Math.abs(py - O3.win.cy)), k = Math.max(0, Math.min(1, (far - trig)/Math.max(1, hurry - trig)));
+    o3BuildSlice(far > hurry + 2 ? 1e9 : 6 + 34*k*k); }   /* (6ms a frame, up to 40 at the edge; at once only past it) */
   else if (!M3D.patDone && G.ui==='playing') M3D.patDone = m3dPatternWarm(3);   /* (RS-403: the creatures' finishes, a few rows a frame) */   /* (the old land's edge about to come into view: finish it now) */
   try{ o3FarLand(); }catch(e){ console.error(e); }
   const mc = canvas, cv = O3.cv;
@@ -41911,7 +41922,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-504';
+const GAME_VERSION = 'rs-505';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
