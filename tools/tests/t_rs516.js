@@ -4,7 +4,7 @@
 module.exports = async page=>{
   const r = await page.evaluate(async ()=>{ goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{};
     G.gear.chest = rsMakeArmour('cloth', 3, 'chest'); G.gear.legs = rsMakeArmour('cloth', 3, 'legs');
-    const T = THREE, e = m3dInstance({}, rsPlayerLook()), sc = new T.Scene(); sc.add(e.holder); const rg = e.rig, sk = rg.skirt; const hero0 = m3dClothHero; m3dClothHero = ()=>e;   /* (this figure is you, for the test) */
+    const T = THREE, e = m3dInstance({}, rsPlayerLook()), sc = new T.Scene(); sc.add(e.holder); const rg = e.rig, sk = rg.skirt; const hero0 = m3dClothHero, wind0 = m3dClothWind; m3dClothHero = ()=>e; m3dClothWind = ()=>null;   /* (still air: RS-522's wind is its own test) */   /* (this figure is you, for the test) */
     const out = {}; let t = 0, worstOut = 0, ms = 0, calls = 0;
     const oc = m3dSkirtCloth; m3dSkirtCloth = function(){ const t0 = performance.now(); try{ return oc.apply(this, arguments); } finally { ms += performance.now() - t0; calls++; } };
     /* the legs inside the skirt: each leg vertex no further from the axis than the skirt reaches at its height and side */
@@ -23,7 +23,7 @@ module.exports = async page=>{
     /* far off: the plain pose */
     const e2 = m3dInstance({}, rsPlayerLook()); sc.add(e2.holder); e2.holder.position.set(40, 0, 40); e2.holder.updateMatrixWorld(true); for (let i=0;i<10;i++){ m3dPoseHumanoid(e2.rig, i/60, 1, 0, 0, 0, e2); e2.holder.updateMatrixWorld(true); }
     out.farCloth = !!(e2.rig.skirt.userData.phys && !e2.rig.skirt.userData.phys.fresh);
-    m3dSkirtCloth = oc; m3dClothHero = hero0; return out; });
+    m3dSkirtCloth = oc; m3dClothHero = hero0; m3dClothWind = wind0; return out; });
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
   A(r.trail < -0.02, 'walking, the back of the hem trails behind its pose');

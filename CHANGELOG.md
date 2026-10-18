@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-522 - Robes like Gandalf's
+
+- **Heavy wool**: robes now move like Gandalf's grey in Bakshi's *The Lord of the Rings* - they follow your walk lazily and trail further behind, the hem does the swinging while the hips stay calm, and when you stop they make one slow swing and hang still within about a second. No more bounce.
+- **Finer cloth each tier**: plain, Splitbark and Mystic robes are heavy wool; Infinity is a little lighter; Ahrim's is dark cloth that billows wider and swings on longer before it settles.
+- **Wind**: out on the land and in town streets the hem stirs in the breeze even while you stand still - a little on a clear day, more in rain, and a storm's gusts push it well out to one side. Indoors and underground the air is still.
+
 ## RS-521 - Smoother walks when the map changes
 
 - **No stall when the land changes far off**: when a tile changed somewhere on the map - a cleared site reclaimed by the wild, a new one rising, a bridge mended - the game worked out the land's regions and landmarks, the distant ground and the near land's shading each in one go, mid-walk. They're now each worked out a little a frame, with the old ones shown in the meantime, and the towns and sites in the land you're walking into are built one per step instead of all together.

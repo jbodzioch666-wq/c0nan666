@@ -36736,7 +36736,7 @@ function m3dHumanoid(o){
   let hemY = null, hemR = 0; const skT = (o.fem ? 0.118 : 0.1)*b, skB = (o.fem ? 0.162 : 0.15)*b, skS = (o.fem ? 0.128 : 0.12)*b;   /* (RS-286: a skirt's waist clears the hips - hers are wider; RS-415: only just, so it fits her waist - it flared out like a bell) */
   const robeWaist = outfit==='robe' ? { x:beltX, z:beltZ } : null;   /* (under a robe top the skirt starts where the bodice ends; under a tunic it keeps its own gathered waist) */
   if (robeLegs){ rig.skirt = pleatSkirt(skT, skB, 0.48, -0.224, legM.clone(), null, robeWaist); }               // the robe bottom: to the ankles (RS-305: its waist up at the belt line, under the sash)
-  else if (outfit==='robe' && !robeTop){ rig.skirt = pleatSkirt(skT, skB, 0.48, -0.224, clothM, null, robeWaist); hemY = -0.4; hemR = skB/b; }   // a one-piece robe
+  else if (outfit==='robe' && !robeTop){ rig.skirt = pleatSkirt(skT, skB, 0.48, -0.224, clothM, null, robeWaist); hemY = -0.4; hemR = skB/b; rig.skirt.userData.cloth = ROBE_CLOTH[Math.min(4, o.robeTier||0)]; }   // a one-piece robe
   else if ((outfit==='rags' || outfit==='shirt') && !o.waistcoat){ pleatSkirt(skT, skS, 0.24, -0.1, clothM, outfit);
     if (o.tunicTrim){ const tt = m3dMat(mats, o.tunicTrim, 'metal'), band = new T.Mesh(new T.TorusGeometry(skS*1.01, 0.007, 6, 40), tt); band.rotation.x = Math.PI/2; band.position.y = -0.205; band.scale.set(1, 0.95, 1); hips.add(band);   /* (RS-255: an embroidered band at the tunic's hem and neck) */
       const nk = new T.Mesh(new T.TorusGeometry(0.046*Math.sqrt(b), 0.006, 6, 22), tt); nk.rotation.x = Math.PI/2 + 0.22; nk.position.set(0, 0.302, 0.006); torso.add(nk); } }
@@ -39503,6 +39503,23 @@ function v3LampMove(pl, l){ pl.position.set(l.p[0], l.p[1], l.p[2]); pl.color.se
    is held, the hem swings most; and it may billow out but hardly press in, so the legs - which the pose keeps inside it - never
    push through when it trails. For you and anyone near you; folk further off keep the plain pose (and sitting, its folds) */
 const SKIRT_K = 70, SKIRT_C = 10, SKIRT_MAX = 0.075, SKIRT_IN = 0.012;
+/* (RS-522) robes hang like Gandalf's grey in Bakshi's film: heavy wool that follows the walk lazily, the hem doing the swinging,
+   one slow swing when you stop and then still. Finer each tier - Infinity a little lighter, Ahrim's billowing. k is the pull back
+   to the pose, c the drag, max how far it may trail, hem how much more the hem swings than the hips, wind how much the air takes it */
+const ROBE_CLOTH = [
+  { k:26, c:8.5, max:0.11, hem:1.6, wind:1 },     /* plain, Splitbark, Mystic: heavy wool */
+  { k:26, c:8.5, max:0.11, hem:1.6, wind:1 },
+  { k:26, c:8.5, max:0.11, hem:1.6, wind:1 },
+  { k:30, c:8, max:0.11, hem:1.45, wind:1.15 },   /* Infinity: finer */
+  { k:20, c:5.2, max:0.14, hem:1.3, wind:1.5 } ];  /* Ahrim's: dark, and billowing */
+/* the air on the open land and in town streets: a breeze that comes and goes, stronger in rain, a storm's gusts; still indoors and
+   underground. Returns a push in the world (x, z), in skirt lengths a second squared before the cloth's own weight */
+function m3dClothWind(t){
+  if (!(G.gameMode===0 || (G.gameMode===3 && !G.interior))) return null;
+  const wx = G.weather, base = wx==='storm' ? 1.4 : wx==='rain' ? 0.75 : wx==='fog' ? 0.12 : 0.3;
+  const gust = 0.55 + 0.3*Math.sin(t*0.71) + 0.2*Math.sin(t*1.93 + 1.3) + 0.15*Math.sin(t*3.7 + 0.4), a = 0.9 + 0.35*Math.sin(t*0.05);
+  const s = base*Math.max(0, gust); return [Math.cos(a)*s, Math.sin(a)*s];
+}
 function m3dSkirtCloth(m, r){
   const g = m.geometry, prm = g.parameters || {}, RSg = prm.radialSegments, HSg = prm.heightSegments; if (!RSg || !HSg) return;
   const p = g.attributes.position, A = p.array, N = p.count, W = RSg + 1, NG = W*(HSg + 1), hh = (prm.height||1)/2, hgt = prm.height||1;
@@ -39510,7 +39527,8 @@ function m3dSkirtCloth(m, r){
   let u = m.userData.phys;
   if (!u || u.N!==N){ u = m.userData.phys = { N, P:new Float32Array(N*3), V:new Float32Array(N*3), O:new Float32Array(N*3), O2:new Float32Array(NG*3), TW:new Float32Array(N*3), wt:new Float32Array(N), cap:new Int32Array(Math.max(0, N - NG)), t:now, fresh:1 };
     const base = m.userData.base;
-    for (let i=0;i<N;i++){ const y = base ? base[i*3+1] : A[i*3+1], s = Math.max(0, Math.min(1, (hh - y)/hgt)), q = Math.max(0, Math.min(1, (s - 0.12)/0.88)); u.wt[i] = Math.pow(q*q*(3 - 2*q), 1.15); }   /* (held at the waist, freest at the hem) */
+    const CL = m.userData.cloth;
+    for (let i=0;i<N;i++){ const y = base ? base[i*3+1] : A[i*3+1], s = Math.max(0, Math.min(1, (hh - y)/hgt)), q = Math.max(0, Math.min(1, (s - 0.12)/0.88)); u.wt[i] = Math.pow(q*q*(3 - 2*q), CL ? CL.hem : 1.15); }   /* (held at the waist, freest at the hem) */
     for (let j=NG;j<N;j++){ let best = 0, bd = 1e9; const bx = base ? base[j*3] : A[j*3], by = base ? base[j*3+1] : A[j*3+1], bz = base ? base[j*3+2] : A[j*3+2];
       for (let i=0;i<NG;i++){ const dx = (base ? base[i*3] : A[i*3]) - bx, dy = (base ? base[i*3+1] : A[i*3+1]) - by, dz = (base ? base[i*3+2] : A[i*3+2]) - bz, d = dx*dx + dy*dy + dz*dz; if (d < bd){ bd = d; best = i; } }
       u.cap[j - NG] = best; } }   /* (the caps ride on the ring they close) */
@@ -39520,8 +39538,12 @@ function m3dSkirtCloth(m, r){
   const sy = Math.hypot(E[4], E[5], E[6]) || 1;
   let jump = false; if (!u.fresh) for (let i=0;i<N*3;i+=93){ if (Math.abs(P[i] - TW[i]) > 0.6*sy){ jump = true; break; } }
   if (u.fresh || jump || !(dt > 0)){ P.set(TW); V.fill(0); u.fresh = 0; u.rest = false; return; }   /* (just dressed, or moved too far at once: hang as posed) */
-  /* carried with momentum toward the pose */
-  for (let k=0;k<N*3;k++){ const a = SKIRT_K*(TW[k] - P[k]) - SKIRT_C*V[k]; V[k] += a*dt; P[k] += V[k]*dt; }
+  /* carried with momentum toward the pose - and, out of doors, pushed by the air, the hem most (RS-522) */
+  const CL = m.userData.cloth, K = CL ? CL.k : SKIRT_K, C = CL ? CL.c : SKIRT_C, MAX = CL ? CL.max : SKIRT_MAX;
+  let wd = null; try{ wd = CL ? m3dClothWind(now) : null; }catch(e){}
+  if (wd){ const f = K*0.07*sy*CL.wind, wx = wd[0]*f, wz = wd[1]*f;
+    for (let i=0;i<N;i++){ const k = i*3, w = u.wt[i], fl = 1 + 0.35*Math.sin(now*4.1 + i*0.37); V[k] += wx*w*fl*dt; V[k+2] += wz*w*fl*dt; } }
+  for (let k=0;k<N*3;k++){ const a = K*(TW[k] - P[k]) - C*V[k]; V[k] += a*dt; P[k] += V[k]*dt; }
   /* the offset from the pose, into the skirt's own frame (inverse of the 3x3), weighted, kept off the legs, and capped */
   const inv = (m3dSkirtCloth.M || (m3dSkirtCloth.M = new THREE.Matrix4())).copy(m.matrixWorld).invert().elements;
   let vmax = 0, omax = 0;
@@ -39529,7 +39551,7 @@ function m3dSkirtCloth(m, r){
     let ox = (inv[0]*dx + inv[4]*dy + inv[8]*dz)*w, oy = (inv[1]*dx + inv[5]*dy + inv[9]*dz)*w*0.5, oz = (inv[2]*dx + inv[6]*dy + inv[10]*dz)*w;
     const tx = A[k], tz = A[k+2], rl = Math.hypot(tx, tz) || 1, rx = tx/rl, rz = tz/rl, d = ox*rx + oz*rz, lim = SKIRT_IN*w;
     if (d < -lim){ ox += rx*(-lim - d); oz += rz*(-lim - d); }   /* (out, freely; in, barely) */
-    const ol = Math.hypot(ox, oy, oz), cap = SKIRT_MAX; if (ol > cap){ const f = cap/ol; ox *= f; oy *= f; oz *= f; }
+    const ol = Math.hypot(ox, oy, oz), cap = MAX; if (ol > cap){ const f = cap/ol; ox *= f; oy *= f; oz *= f; }
     O[k] = ox; O[k+1] = oy; O[k+2] = oz; vmax = Math.max(vmax, Math.abs(V[k]) + Math.abs(V[k+2])); omax = Math.max(omax, ol); }
   /* neighbours share their pull: a few passes of smoothing round the ring and up and down it */
   const O2 = u.O2;
@@ -39544,7 +39566,7 @@ function m3dSkirtCloth(m, r){
   /* the cloth where it is now, and the state brought into line with what's drawn */
   for (let i=0;i<N;i++){ const k = i*3, x = A[k] + O[k], y = A[k+1] + O[k+1], z = A[k+2] + O[k+2]; A[k] = x; A[k+1] = y; A[k+2] = z;
     P[k] = E[0]*x + E[4]*y + E[8]*z + E[12]; P[k+1] = E[1]*x + E[5]*y + E[9]*z + E[13]; P[k+2] = E[2]*x + E[6]*y + E[10]*z + E[14]; }
-  u.rest = vmax < 2e-3 && omax < 1.5e-3;
+  u.rest = !wd && vmax < 2e-3 && omax < 1.5e-3;   /* (in the wind it never quite hangs still) */
   u.mw = E[12].toFixed(4) + ',' + E[14].toFixed(4) + ',' + E[0].toFixed(4) + ',' + E[2].toFixed(4);
 }
 function m3dSkirtFollow(r){
@@ -41443,7 +41465,7 @@ function rsPlayerLook(opt){
       if (tier>=5) o.trim = '#c8ccd4';
       if (tier>=6) o.spikes = '#1a1614';
       if (c.trimDye && o.trim) o.trim = c.trimDye; }
-    if (fam==='cloth'){ const cl = dy(c) || '#3040a0';
+    if (fam==='cloth'){ const cl = dy(c) || '#3040a0'; o.robeTier = tier;   /* (RS-522: the cloth it's made of - see ROBE_CLOTH) */
       if (tier>=1) o.robeTrim = mpTone(cl, 0.5);
       if (tier>=2) o.robeRunes = ['', '', '#9ab8ff', '#ffd27a', '#8aff9a'][Math.min(4, tier)];
       if (tier>=3) o.robeTrim = '#d8b050';
@@ -42553,7 +42575,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-521';
+const GAME_VERSION = 'rs-522';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
