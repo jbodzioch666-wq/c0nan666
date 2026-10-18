@@ -9,7 +9,7 @@ module.exports = async page=>{
     out.topOverPlate = skirts(top, plateL); out.bottomAlone = skirts(null, bot); out.both = skirts(top, bot); out.plateOnly = skirts(null, plateL);
     G.gear.chest = newItem(); G.gear.legs = newItem();
     // the icon: a skirt fills the middle, where a pair of trousers has a gap between the legs
-    out.kind = { robe:obItemEntry(bot).o ? obItemEntry(bot).o.kind : null, plate:obItemEntry(plateL).o ? obItemEntry(plateL).o.kind : null };
+    out.kind = { robe:obItemEntry(bot).o ? obItemEntry(bot).o.kind : null, plate:obItemEntry(plateL).o ? (obItemEntry(plateL).o.kind || ('gear:' + obItemEntry(plateL).o.slot)) : null };
     const mid = it=>{ const img = fpUndeadSprite(obItemEntry(it), false).img, x = img.getContext('2d'), W = img.width, H = img.height; const d = x.getImageData(Math.floor(W/2) - 1, Math.floor(H*0.62), 3, Math.floor(H*0.2)).data; let a = 0; for (let i=3;i<d.length;i+=4) a += d[i] > 40 ? 1 : 0; return a/(d.length/4); };
     out.iconMid = { robe:+mid(bot).toFixed(2), plate:+mid(plateL).toFixed(2) };
     // RS-175: mid-stride, the legs stay inside a robe bottom - the skirt is carried along by them
@@ -40,6 +40,6 @@ module.exports = async page=>{
   A(r.both.includes(0.48) && !r.both.some(h=>h < 0.3), 'robe and trousers: the long skirt, and nothing shorter to poke through');
   A(!r.plateOnly.includes(0.48), 'plate legs are still legs');
   A(r.clip.follow < 0.02, 'mid-stride the legs stay inside the robe, which moves with them');
-  A(r.kind.robe==='trousers' && r.kind.plate==='legs', 'trousers have their own icon (RS-512), plate legs theirs');
+  A(r.kind.robe==='trousers' && r.kind.plate==='gear:legs', 'trousers have their own icon (RS-512), plate legs theirs (RS-513)');
   A(r.iconMid.robe < 0.3 && r.iconMid.plate < 0.3, 'the trousers icon is two legs, not a skirt');
 };

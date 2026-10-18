@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## RS-513 - The paper doll, redrawn
+
+- **Every piece of gear has its own icon**: helms, bodies, legs, gloves, boots, capes and shields used one icon per slot whatever they were - a wizard's robe got the same picture as a rune platebody. Each is now drawn for what it is, plate, dragonhide or cloth, and finer each tier the way the figure wears it:
+  - **Plate**: a great helm whose bands, plumes, wings and horns follow the tiers; a platebody with pauldrons and a fauld, rivets, trim, a tabard bearing its device and dragon spikes; articulated gauntlets, sabatons, platelegs with knee cops.
+  - **Dragonhide**: a hooded coif stitched over the crown, gaining studs, a feather, scales and spines; a laced jerkin with studs, trim and a fur collar; laced chaps, bracers and tall boots.
+  - **Cloth**: a wizard's hat with its band, gem, stars, moon and - on Ahrim's - a crooked tip; the full robe with bell sleeves, a sash, its trim and hem runes and Ahrim's mantle; soft gloves and curled shoes.
+  - **Capes** with their hem band, gold edging, embroidery, fur collar and your emblem; the fire cape in lava; quivers as quivers. **Shields**, kite and tower, with their rim, your device, the boss and spikes.
+- **In your colours**: every icon shows the piece's dye and trim dye, and capes and shields show the emblem you chose.
+
 ## RS-512 - A trousers icon
 
 - **Trousers look like trousers**: cloth trousers have their own icon - a gathered waistband with its drawstring, two legs with soft folds and a gap between - in the item's own colour or dye. Like the trousers themselves it grows finer each tier: ankle cuffs from Splitbark, seam runes from Mystic, gold from Infinity, a double cuff and green runes on Ahrim's, and a dyed trim shows on it too. They borrowed the plate legs' icon before.
