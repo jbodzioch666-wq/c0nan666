@@ -5,7 +5,7 @@ module.exports = async page=>{
   const r = await page.evaluate(async ()=>{ const out = {};
     goToCharCreate(); renderOverlay(); saveCurrentGame = ()=>{};
     const heads = document.querySelectorAll('#overlay .bdhead'); out.sections = [...heads].map(h=>h.textContent.trim().split(' ')[0]);
-    out.faceSliders = [...document.querySelectorAll('#overlay .bdrow input')].filter(i=>LOOK_FACE.some(f=>f[0]===i.dataset.k) && i.getAttribute('onchange').startsWith('lookFaceSet')).length;
+    out.LN = LOOK_FACE.length; out.faceSliders = [...document.querySelectorAll('#overlay .bdrow input')].filter(i=>LOOK_FACE.some(f=>f[0]===i.dataset.k) && i.getAttribute('onchange').startsWith('lookFaceSet')).length;
     /* defaults are the face you had: no face spec, the old sculpt key */
     out.none = m3dFaceSpec(null)===null && m3dFaceSpec(lookFace({}))===null;
     const box = g=>{ g.computeBoundingBox(); return g.boundingBox; }, span = (g, ax)=>{ const p = g.attributes.position; let lo = 1, hi = -1; for (let i=0;i<p.count;i++){ if (p.getY(i) > 0.04 || p.getY(i) < 0.01 || p.getZ(i) < 0.03) continue; const v = p.getX(i); lo = Math.min(lo, v); hi = Math.max(hi, v); } return hi - lo; };   /* (across the lower face, below the ears)*/
@@ -25,7 +25,7 @@ module.exports = async page=>{
     return out; });
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
-  A(r.sections.join(',')==='BUILD,FACE' && r.faceSliders===9, 'a FACE section of nine sliders under the build');
+  A(r.sections.join(',')==='BUILD,FACE' && r.faceSliders===r.LN && r.LN >= 9, 'a FACE section of a slider each under the build');
   A(r.none && r.sameAsBefore && r.monster, 'at the defaults the face is the one you had, and monsters keep theirs');
   A(r.jaw[0] < r.jaw[1] && r.jaw[1] < r.jaw[2], 'the jaw slider widens the lower face');
   A(r.nose[0] < r.nose[1] && r.nose[1] < r.nose[2], 'the nose slider lengthens the nose');

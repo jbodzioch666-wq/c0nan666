@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-532 - Eyes of your own
+
+- **Eye sliders**: two more in the FACE section - the size of the eyes and how far apart they're set. The socket, the lids and the eyeball move together, so the eyes always sit in the face; at the middle of each slider they're where they were.
+
 ## RS-531 - Muscle that shows
 
 - **The muscle slider does its job**: it barely changed anything - a few percent on the arms. Now, from soft to hard, it fills out the chest, raises and thickens the trapezius, rounds the deltoids, broadens the lats and swells the upper arms, forearms, thighs and calves: about half as thick again in the arm from one end to the other. Hard muscle stands out under a tunic too - sleeves and hose are cut to the arms and legs inside them.
