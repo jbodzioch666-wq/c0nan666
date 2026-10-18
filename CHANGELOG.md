@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-517 - Weapons and jewellery, redrawn
+
+- **Every weapon its own icon, in its own metal**: daggers, swords, longswords, 2h swords, scimitars, maces, warhammers, battleaxes, spears and halberds each have their own shape now - the halberd no longer looks like a spear - drawn in their metal and finer each tier: polished from steel, a gilded guard from mithril, a gold-wired grip from adamant, a gem in the pommel on rune and dragon, and dragon's dark serrated spine and spiked guard.
+- **Bows by their wood**: plain to magic, with gold nocks and a wired grip on yew and glowing runes on magic; the Dark Bow, Crystal Bow, Twisted Bow and Seercull each have their own look. **Crossbows** are drawn as crossbows - stock, prod in its metal, string and bolt.
+- **Staves by grade**: a knobbed staff with its orb, a banded battlestaff, a mystic staff's twisted shaft and claw head, and a master or ancient staff gilded with runes circling a glowing orb - the orb in its element's colour.
+- **Thrown weapons**: a fan of darts, crossed throwing knives, chinchompas as chinchompas.
+- **Jewellery**: every ring shows its own gem - sapphire, emerald, ruby, diamond, dragonstone - with Fremennik rings on carved bands, and every amulet its own pendant: glory's rays, fury's gold frame and onyx, the occult necklace's glowing eye, and the holy and unholy symbols.
+
 ## RS-516 - Robes that move like cloth
 
 - **Cloth physics on robes**: a robe's skirt is now carried with momentum after the shape your legs give it. It trails behind you as you walk (about 7 cm at the hem), flares out when you turn, and swings back and settles when you stop. Neighbouring folds share the motion, so it moves in waves rather than as a stiff bell; the waist stays put and the hem swings most.
