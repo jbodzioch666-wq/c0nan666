@@ -18,7 +18,7 @@ module.exports = async page=>{
   A(r.undress, 'the creator asks for you undressed');
   for (const k of ['Human0', 'Human1', 'Wood Elf1', 'Gnome0', 'Tiefling1']){ const q = r[k];
     A(q.worn.length === 0 && q.outfit === 'none' && !q.cape, k + ': nothing worn - ' + q.worn.join(','));
-    A(q.pelvU === 1 && q.thighU === 2, k + ': briefs over the hips and the tops of the thighs');
+    A(q.pelvU === 1 && q.thighU === 0, k + ': briefs cut from the hips alone (RS-545: none cut from the thighs - they swung off as flaps)');
     A(q.chestU === (k.endsWith('1') ? 1 : 0), k + ': a band round her breasts (and none on a man)'); }
   A(r.dressed.outfit !== 'none' && r.dressed.cape, 'out of the creator, dressed as before');
   /* the creator itself, as it draws */

@@ -1,5 +1,8 @@
 # Depthcrawl patch notes
 
+## RS-545 - Underclothes that stay on
+- **No more flaps:** in the creator, the briefs had pieces cut from the tops of the thighs. When a leg moved, those pieces swung off the hips as flat panels. The briefs now come from the hips alone and sit a touch further off the skin, and the legs move freely under the leg openings.
+
 ## RS-544 - Armour on the arms, across every build
 - **Mail sleeves:** a mail hauberk now has mail sleeves to the elbow. Before, the mail stopped at the shoulders and the arms were bare cloth.
 - **Skirts fit heavy bodies:** the lower skirt of a jerkin or hauberk is cut wider for a heavy build. A heavy body's hips and thighs used to come through it, leaving a flap at the front.
