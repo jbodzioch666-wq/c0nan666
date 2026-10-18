@@ -2,6 +2,7 @@
 // that opens on its fangs to bite, four legs standing on their paws, and a bushy jointed tail; jackals, hellhounds and werewolves
 // share it, and since RS-278 so do the town dogs (short legs)
 module.exports = async page=>{
+  await page.evaluate(()=>{ M3D_SKIN = false; if (M3D.tpl) M3D.tpl.clear(); });   // (the parts as built, not merged into skinned meshes - this test looks at them one by one)
   const r = await page.evaluate(()=>{
     const out = {};
     for (const nm of ['wolf', 'dire wolf', 'winter wolf', 'winter wolf alpha', 'jackal', 'hellhound', 'werewolf']){

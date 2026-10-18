@@ -2,6 +2,7 @@
 // that clears the nose, a spangenhelm skull cap with a nasal bar and cheek plates (plain, horned, winged or crested), a
 // drooping wizard's hat, a hood draped to the shoulders; the hooded head type wears the same hood
 module.exports = async page=>{
+  await page.evaluate(()=>{ M3D_SKIN = false; if (M3D.tpl) M3D.tpl.clear(); });   // (the parts as built, not merged into skinned meshes - this test looks at them one by one)
   const r = await page.evaluate(()=>{
     const out = {};
     const prof = (g, fn)=>{ const p = g.attributes.position; let n = 0; for (let i=0;i<p.count;i++) if (fn(p.getX(i), p.getY(i), p.getZ(i))) n++; return { verts:p.count, n }; };

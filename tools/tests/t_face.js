@@ -2,6 +2,7 @@
 // cheek), a glossy eyeball with an iris, a pupil and a glint; brows; nostrils; hair grown as strands merged into one mesh
 // over a scalp dome, with a mass behind the neck when it is long; beards of strands with a moustache
 module.exports = async page=>{
+  await page.evaluate(()=>{ M3D_SKIN = false; if (M3D.tpl) M3D.tpl.clear(); });   // (the parts as built, not merged into skinned meshes - this test looks at them one by one)
   const r = await page.evaluate(()=>{
     const out = {};
     const lids = fem=>{ const g = m3dHeadGeo('human', fem), p = g.attributes.position; const prof = []; for (let i=0;i<p.count;i++){ const x = p.getX(i), y = p.getY(i), z = p.getZ(i); if (Math.abs(x - 0.026) < 0.003 && y > 0.06 && y < 0.095) prof.push([+y.toFixed(3), z]); }

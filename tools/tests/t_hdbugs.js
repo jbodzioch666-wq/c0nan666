@@ -1,6 +1,7 @@
 // RS-262: the spider and scorpion are built in high detail like the crab - smooth many-sided parts in a glossy shell
 // (the spider keeps its furry abdomen and legs), and each scorpion pincer has two curved, bevelled, toothed finger blades
 module.exports = async page=>{
+  await page.evaluate(()=>{ M3D_SKIN = false; if (M3D.tpl) M3D.tpl.clear(); });   // (the parts as built, not merged into skinned meshes - this test looks at them one by one)
   const r = await page.evaluate(()=>{
     const out = {};
     for (const nm of ['giant scorpion', 'giant desert scorpion', 'giant spider', 'frost spider', 'giant crab']){

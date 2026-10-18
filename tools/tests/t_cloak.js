@@ -3,12 +3,13 @@
 // iron rim and rivets, a cross) for anyone with an emblem - knights, and you with a metal kiteshield - point down; round
 // shields stay round
 module.exports = async page=>{
+  await page.evaluate(()=>{ M3D_SKIN = false; if (M3D.tpl) M3D.tpl.clear(); });   // (the parts as built, not merged into skinned meshes - this test looks at them one by one)
   const r = await page.evaluate(()=>{
     const out = {};
     const info = pt=>{ const e = m3dInstance({}, pt), rig = e.rig; m3dPoseHumanoid(rig, 0.7, 0, 0, 0, 0, e); e.holder.updateMatrixWorld(true);
       const c = rig.cape, cp = c && c.geometry.attributes.position; let top = [], hem = [], brooch = 0;
       if (cp) for (let i=0;i<cp.count;i++){ const y = cp.getY(i); if (y > -0.01) top.push([cp.getX(i), cp.getZ(i)]); if (y < -0.5) hem.push(cp.getX(i)); }
-      rig.torso.children.forEach(x=>{ if (x.isMesh && x.geometry.type==='SphereGeometry' && Math.abs(x.position.y - 0.3) < 0.001 && Math.abs(Math.abs(x.position.x) - 0.085*(pt.o.bulk||1)) < 0.001) brooch++; });
+      (rig.torsoIn || rig.torso).children.forEach(x=>{ if (x.isMesh && x.geometry.type==='SphereGeometry' && Math.abs(x.position.y - 0.3) < 0.001 && Math.abs(Math.abs(x.position.x) - 0.085*(pt.o.bulk||1)) < 0.001) brooch++; });
       const sg = rig.shield; let kite = false, round = false, pointY = null, midY = null;
       if (sg){ const f = sg.children[0]; kite = f.geometry.type==='ExtrudeGeometry'; round = f.geometry.type==='LatheGeometry';
         if (kite){ const p = f.geometry.attributes.position; let zmin = 1, imin = 0; for (let i=0;i<p.count;i++) if (p.getZ(i) < zmin){ zmin = p.getZ(i); imin = i; }

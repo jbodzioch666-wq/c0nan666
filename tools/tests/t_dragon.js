@@ -2,6 +2,7 @@
 // clawed legs, and wings of bone with a scalloped membrane; wyverns stand on two legs, the dragon turtle wears a shell, the
 // plesiosaurus has flippers, and the King Black Dragon has three heads
 module.exports = async page=>{
+  await page.evaluate(()=>{ M3D_SKIN = false; if (M3D.tpl) M3D.tpl.clear(); });   // (the parts as built, not merged into skinned meshes - this test looks at them one by one)
   const r = await page.evaluate(()=>{
     const out = {};
     for (const nm of ['black dragon wyrmling','blue dragon','ancient dragon','wyvern','dragon turtle','plesiosaurus','king black dragon','forest wyrm','white dragon']){

@@ -2,6 +2,7 @@
 // and fine brows, a fringe of hair, slimmer arms and smaller hands; masculine race traits (square jaw, heavy brow) are left off;
 // and about two in five townsfolk are women, without beards
 module.exports = async page=>{
+  await page.evaluate(()=>{ M3D_SKIN = false; if (M3D.tpl) M3D.tpl.clear(); });   // (the parts as built, not merged into skinned meshes - this test looks at them one by one)
   const r = await page.evaluate(()=>{
     const out = {};
     const span = (g, f)=>{ const p = g.attributes.position; let jaw = 0, lipZ = -1; for (let i=0;i<p.count;i++){ const x = p.getX(i), y = p.getY(i), z = p.getZ(i); if (Math.abs(y - 0.03) < 0.004) jaw = Math.max(jaw, Math.abs(x)); if (Math.abs(x) < 0.004 && y > 0.028 && y < 0.048) lipZ = Math.max(lipZ, z); } return { jaw:+jaw.toFixed(4), lipZ:+lipZ.toFixed(4) }; };
@@ -20,7 +21,7 @@ module.exports = async page=>{
   const A = (c, m)=>{ if (!c) throw new Error(m+' :: '+JSON.stringify(r)); };
   A(r.fh.jaw < r.mh.jaw - 0.003, 'a narrower jaw on a woman');
   A(r.f.fem && r.f.tori >= 2 && r.m.tori===0, 'a woman has lashes; a man does not');
-  A(r.f.jawBox===0 && r.m.jawBox===1, 'the human square jaw is left off a woman');
+  A(r.f.jawBox===0 && r.m.jawBox===0 && r.mh.jaw > r.fh.jaw, 'the human square jaw is sculpted (RS-530: no box), and left off a woman');
   A(r.f.hipY > r.m.hipY + 0.02, 'longer legs');
   A(r.f.arm < 0.85 && r.m.arm===1, 'slimmer arms (RS-284: four fifths of a man\'s)');
   A(r.folk.women >= 3 && r.folk.women <= 5 && r.folk.bearded===0 && r.folk.hair, 'about two in five townsfolk are women, beardless, with hair: '+JSON.stringify(r.folk));

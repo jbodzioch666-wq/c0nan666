@@ -2,6 +2,7 @@
 // whole of its idle sway, its wind-up and its strike - instead of clipping through one another (where they leave the body,
 // at the root, they may meet - they grow from one shoulder)
 module.exports = async page=>{
+  await page.evaluate(()=>{ M3D_SKIN = false; if (M3D.tpl) M3D.tpl.clear(); });   // (the parts as built, not merged into skinned meshes - this test looks at them one by one)
   const r = await page.evaluate(()=>{
     const T = THREE, out = {};
     for (const nm of ['hydra', 'hydra of the tides', 'king black dragon']){

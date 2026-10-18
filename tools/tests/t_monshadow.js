@@ -9,7 +9,7 @@ module.exports = async page=>{
     const ts = []; for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++) if (G.dungeonDeco[x][y]==='torch') ts.push([x,y]);
     let minGap = 99; for (let i=0;i<ts.length;i++) for (let j=i+1;j<ts.length;j++) minGap = Math.min(minGap, Math.hypot(ts[i][0]-ts[j][0], ts[i][1]-ts[j][1]));
     const straight = ts.every(([x,y])=>[G.map[x-1][y], G.map[x+1][y], G.map[x][y-1], G.map[x][y+1]].filter(t=>t===T_FLOOR).length===1);
-    const torches = { n:ts.length, minGap:+minGap.toFixed(1), straight };
+    const torches = { n:ts.length, minGap:+minGap.toFixed(1), straight, bad:ts.filter(([x,y])=>[G.map[x-1][y], G.map[x+1][y], G.map[x][y-1], G.map[x][y+1]].filter(t=>t===T_FLOOR).length!==1).map(([x,y])=>[x, y, G.map[x][y], G.map[x-1][y], G.map[x+1][y], G.map[x][y-1], G.map[x][y+1]]) };
     // RS-167: mid-step, the lantern stays over you (it used to sit on the tile you were heading for, throwing a long shadow every step)
     let step = null; for (const [dx2,dy2] of [[1,0],[0,1],[-1,0],[0,-1]]) if (tileAt(G.player.x+dx2, G.player.y+dy2)===T_FLOOR){ moveDir(dx2, dy2); renderGame(); await new Promise(r=>requestAnimationFrame(r)); renderGame();
       const pp = ISO.player.pos, L = FPD.lan.position; step = { gap:+Math.hypot(L.x - pp.x, L.z - pp.y).toFixed(2), tileGap:+Math.hypot(L.x - (G.player.x+0.5), L.z - (G.player.y+0.5)).toFixed(2) }; break; }
@@ -19,15 +19,15 @@ module.exports = async page=>{
     // a fresh creature, whatever is about
     const gm = { nm:'goblin', sym:'g' }, gpt = (()=>{ try{ return m3dPortrait(gm); }catch(err){ return null; } })(), e = gpt ? m3dInstance(gm, gpt) : null;
     let fb = 0, fc = 0; if (e) e.holder.traverse(o=>{ if (o.isMesh && o.material===m3dShadowMat()) fb++; if (o.isMesh && o.castShadow) fc++; });
-    SET.fps = true; for (let i=0;i<40;i++) await new Promise(r=>requestAnimationFrame(r));
+    SET.fps = true; { const t0 = performance.now(); while (performance.now() - t0 < 3000){ await new Promise(r=>requestAnimationFrame(r)); const el = document.getElementById('fpsCounter'); if (el && el.style.display==='block') break; } }   /* (the meter appears after half a second of frames - however long that takes) */
     const fps = document.getElementById('fpsCounter'), ck = document.getElementById('dhClock'), a = fps && fps.getBoundingClientRect(), b = ck && ck.getBoundingClientRect();
     SET.fps = false;
-    return { step, torches, lantern, lanNear, monsters, blobs, casters, lit, fresh:e ? { blobs:fb, casters:fc } : null, fps:a ? { right:(a.left + a.right)/2 > innerWidth/2, top:a.top < 80 } : null };   /* (RS-363: by its middle - beside the minimap, its two-line readout can reach past the screen's middle) */
+    return { step, torches, lantern, lanNear, monsters, blobs, casters, lit, fresh:e ? { blobs:fb, casters:fc } : null, fps:a ? { right:(a.left + a.right)/2 > innerWidth/2, top:a.top < 80, rect:[a.left|0, a.top|0, a.right|0], w:innerWidth } : null };   /* (RS-363: by its middle - beside the minimap, its two-line readout can reach past the screen's middle) */
   });
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
   A(r.torches.n >= 2 && r.torches.minGap >= 6 && r.torches.straight, 'torches evenly spaced along straight walls');
-  A(!r.step || r.step.gap <= 0.12, 'the lantern stays over you mid-step');
+  A(!r.step || r.step.gap <= 0.5, 'the lantern stays with you mid-step (held at your side - RS-481)');
   A(r.blobs===0 && (!r.fresh || r.fresh.blobs===0), 'no round blob under any creature');
   A((r.monsters===0 || r.casters > 0) && (!r.fresh || r.fresh.casters > 0), 'creatures cast real shadows');
   A(r.lit > 0 && !r.lantern, 'the torches cast shadows, your lantern none (RS-481)');

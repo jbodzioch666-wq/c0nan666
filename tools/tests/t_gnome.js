@@ -1,6 +1,7 @@
 // RS-252: the gnome - a tall felt hat with goggles on the brim, bushy brows, rosy cheeks, a round belly on short legs, and out
 // of armour a leather tinker's apron; a helm takes the hat's place; the gnomish townsfolk match
 module.exports = async page=>{
+  await page.evaluate(()=>{ M3D_SKIN = false; if (M3D.tpl) M3D.tpl.clear(); });   // (the parts as built, not merged into skinned meshes - this test looks at them one by one)
   const r = await page.evaluate(()=>{
     const out = {};
     goToCharCreate(); G.ccLookTouched = false; ccSelectRace(RACES.findIndex(r=>r[0]==='Gnome')); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); o3Pref = false; try{ v3Pref = false; }catch(e){}

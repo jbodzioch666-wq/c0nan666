@@ -2,6 +2,7 @@
 // bare halfling feet, a gnome's nose) and a reworked trait for the skill game: xp in two skills (every skill for humans)
 // plus one trick - accuracy, less damage taken, crits, Relentless Endurance, magic find, damage, haggling.
 module.exports = async page=>{
+  await page.evaluate(()=>{ M3D_SKIN = false; if (M3D.tpl) M3D.tpl.clear(); });   // (the parts as built, not merged into skinned meshes - this test looks at them one by one)
   const ev = (f, a)=>page.evaluate(f, a), A = (c, msg)=>{ if (!c) throw new Error('assert: '+msg); };
   // the creation screen: every race lists its skills, and every race's figure builds
   const cc = await ev(()=>{ goToCharCreate(); const rows = RACES.map((r, i)=>{ ccSelectRace(i); const el = document.querySelector('#overlay .racepick .ccaff'); return el ? el.textContent : ''; }); ccSelectRace(0);   /* (RS-526: one race at a time, in the picker) */

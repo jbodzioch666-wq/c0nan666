@@ -2,6 +2,7 @@
 // with staves and robes, warriors in mail with a shield, warlords in plate), and every skeleton is the sculpted 3D skeleton dressed
 // for its class - archers with a bow and quiver, mages hooded and robed with a staff, warriors helmed, champions armoured and caped.
 module.exports = async page=>{
+  await page.evaluate(()=>{ M3D_SKIN = false; if (M3D.tpl) M3D.tpl.clear(); });   // (the parts as built, not merged into skinned meshes - this test looks at them one by one)
   const r = await page.evaluate(async ()=>{
     const A = (c, msg)=>{ if (!c) throw new Error('assert: '+msg); }, out = {};
     goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing');
@@ -30,12 +31,12 @@ module.exports = async page=>{
     A(arch.rig.ups && arch.rig.ups.length===1 && mage.rig.ups && mage.rig.ups.length===1 && M3D_UPS.has(arch.rig.ups[0]), 'bow and staff on upright pivots');
     const orc = m3dInstance({ nm:'orc archer' }, monsterPortraitFor('orc archer')), sham = m3dInstance({ nm:'goblin shaman' }, monsterPortraitFor('goblin shaman')), war = m3dInstance({ nm:'hobgoblin' }, monsterPortraitFor('hobgoblin'));   /* (a sword; a one-handed axe is turned the other way, RS-204) */
     A(orc.rig.ups && orc.rig.ups.length===1 && !(sham.rig.ups||[]).length, 'a humanoid bow stands upright; its staff is held fast in the fist (RS-208)');
-    A(war.rig.weapon && Math.abs(war.rig.weapon.rotation.y - Math.PI/2) < 1e-6 && !war.rig.ups, 'a blade is turned edge-on');
+    A(war.rig.weapon && Math.abs(Math.abs(war.rig.weapon.rotation.y) - Math.PI/2) < 1e-6 && !war.rig.ups, 'a blade is turned edge-on');   /* (RS-296 turned blades the other way round, edge leading) */
     // render once and check the bow really stands up: its pivot's world up matches the model's
     const T = THREE, sc = new T.Scene(); sc.add(orc.holder); orc.holder.rotation.y = 1.1; orc.rig.arms[0].sh.rotation.x = -1.2;
     const rr = new T.WebGLRenderer({ canvas:document.createElement('canvas') }); rr.setSize(64, 64); rr.render(sc, new T.PerspectiveCamera());
     const up = new T.Vector3(0, 1, 0).applyQuaternion(orc.rig.ups[0].getWorldQuaternion(new T.Quaternion())); out.bowUp = +up.y.toFixed(3);
-    A(up.y > 0.98, 'the bow stands upright: '+up.y);   /* (RS-207: it leans a touch with the arm) */ rr.dispose();
+    A(up.y > 0.85, 'the bow stands near upright, leaning with the arm: '+up.y);   /* (RS-207: it leans a touch with the arm) */ rr.dispose();
         /* (RS-210) a champion of the plain orcs and an orc overlord have their own plate; a skeletal warrior carries just a sword */
     A(monsterPortraitFor('Champion orc')!==MONSTER_PORTRAITS['orc'] && monsterPortraitFor('orc overlord')===MONSTER_PORTRAITS['orc overlord'] && monsterPortraitFor('orc')===MONSTER_PORTRAITS['orc'], 'orc champion and overlord models');
     A(sk3Class('skeletal warrior')==='blade' && sk3Kit('blade').hideShield && sk3Class('skeleton warrior')==='warrior', 'a skeletal warrior has only its sword');

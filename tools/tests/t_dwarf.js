@@ -1,6 +1,7 @@
 // RS-246: the dwarf after Bakshi's - short and immensely broad on short thick legs, a big nose and heavy brow, and a great
 // beard to the belt with gold-bound braids; a clean-shaven dwarf has no great beard; the dwarven townsfolk look the same
 module.exports = async page=>{
+  await page.evaluate(()=>{ M3D_SKIN = false; if (M3D.tpl) M3D.tpl.clear(); });   // (the parts as built, not merged into skinned meshes - this test looks at them one by one)
   const r = await page.evaluate(()=>{
     const out = {};
     const mk = nm=>{ goToCharCreate(); G.ccLookTouched = false; ccSelectRace(RACES.findIndex(r=>r[0]===nm)); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); o3Pref = false; try{ v3Pref = false; }catch(e){} };

@@ -2,6 +2,7 @@
 // two small matching red claws, and four
 // pairs of jointed legs out to the sides on the ground; it animates; the scorpion and spider still build
 module.exports = async page=>{
+  await page.evaluate(()=>{ M3D_SKIN = false; if (M3D.tpl) M3D.tpl.clear(); });   // (the parts as built, not merged into skinned meshes - this test looks at them one by one)
   const r = await page.evaluate(()=>{
     const e = m3dInstance({ nm:'giant crab' }, m3dPortrait({ nm:'giant crab' })), rig = e.rig; e.anim(rig, 0.7, 1, 0, 0, 0, e); e.holder.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(e.holder), sz = box.getSize(new THREE.Vector3());

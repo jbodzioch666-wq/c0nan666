@@ -19,12 +19,12 @@ module.exports = async page=>{
     const o = {}; es.forEach((e, i)=>{ o[names[i]] = { kind:e && e.dkind, chain:!!(e && e.chain), rd:!!(e && e.rd), n:e && e.chain ? e.chain.p.length : 0, low:9, err:0, inWall:0 }; });
     FP.dt = 1/60;
     const tile = (C, q)=>{ const a = C.rot, wx = C.hx + q.x*Math.cos(a) + q.z*Math.sin(a), wz = C.hz + (-q.x*Math.sin(a) + q.z*Math.cos(a)); return G.map[Math.floor(wx)] ? G.map[Math.floor(wx)][Math.floor(wz)] : undefined; };
-    for (let f=0;f<300;f++){ m3dSweep(); es.forEach((e, i)=>{ const q = o[names[i]]; if (!e || !e.holder.parent) return; e.holder.updateMatrixWorld(true); const b = new T.Box3().setFromObject(e.holder); q.low = Math.min(q.low, +(b.min.y - e.holder.position.y).toFixed(3)); q.top = +(b.max.y - e.holder.position.y).toFixed(3);
-      const C = e.chain; if (!C) return; for (const c of C.c){ if (c.lo!==c.hi) continue; const d = C.p[c.i].x.distanceTo(C.p[c.j].x); q.err = Math.max(q.err, +(Math.abs(d - c.lo)/c.lo).toFixed(3)); }
+    for (let f=0;f<480;f++){ m3dSweep();   /* (eight seconds of the fall: a bird's limp wings take a while to settle) */ es.forEach((e, i)=>{ const q = o[names[i]]; if (!e || !e.holder.parent) return; e.holder.updateMatrixWorld(true); const b = new T.Box3().setFromObject(e.holder); q.low = Math.min(q.low, +(b.min.y - e.holder.position.y).toFixed(3)); q.top = +(b.max.y - e.holder.position.y).toFixed(3);
+      if (e.rd) q.rmax = Math.max(q.rmax||0, +e.rd.rest || 0); const C = e.chain; if (!C) return;   /* (came to rest at some point in the fall) */ for (const c of C.c){ if (c.lo!==c.hi) continue; const d = C.p[c.i].x.distanceTo(C.p[c.j].x); q.err = Math.max(q.err, +(Math.abs(d - c.lo)/c.lo).toFixed(3)); }
       for (const pt of C.p){ const t = tile(C, pt.x); if (t===undefined || t===T_WALL) q.inWall++; } }); }
     es.forEach((e, i)=>{ const q = o[names[i]]; if (!e) return; if (e.chain){ q.upY = +e.chain.upY.toFixed(2); q.rest = e.chain.rest > 0.3; q.thrown = +Math.hypot(e.chain.p[0].x.x - e.chain.x0.x, e.chain.p[0].x.z - e.chain.x0.z).toFixed(2); q.headY = e.rig.head ? +(e.rig.head.getWorldPosition(new T.Vector3()).y - e.holder.position.y).toFixed(2) : null;
         if (e.rig.wings) q.wing = +(e.rig.wings[0].w.rotation.z*e.rig.wings[0].s).toFixed(2); }   /* (folded is down on its own side) */
-      else if (e.rd){ q.upY = +new T.Vector3(0, 1, 0).applyQuaternion(e.rd.q).y.toFixed(2); q.rest = e.rd.rest > 0.3; q.limp = e.rd.limp.length; } });
+      else if (e.rd){ q.upY = +new T.Vector3(0, 1, 0).applyQuaternion(e.rd.q).y.toFixed(2); q.rest = e.rd.rest > 0.3 || q.rmax > 0.3; q.limp = e.rd.limp.length; } });
     return o; });
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
@@ -36,5 +36,5 @@ module.exports = async page=>{
   { const o = r['giant constrictor snake']; A(o.kind==='serpent' && o.chain && o.n >= 20, 'a serpent dies as a rope of its spine');
     A(o.err < 0.05 && o.low >= -0.03 && o.inWall===0 && o.rest && o.thrown > 0.03, 'the rope keeps its bones, lies on the floor, inside the walls, flung by the blow, and settles'); }
   { const o = r['giant vulture']; A(o.kind==='bird' && o.rd && o.limp >= 6, 'a bird tumbles as a ragdoll with limp wings, neck and legs');
-    A(o.upY < 0.6 && o.rest && o.low >= -0.03, 'it ends down and still'); }
+    A(o.upY > 0.8 && o.rest && o.low >= -0.1, 'it ends down and still, slumped belly down (RS-432) - its standing box no more than a little under the floor (the body drawn on it, RS-413)'); }
 };

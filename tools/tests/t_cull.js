@@ -28,7 +28,7 @@ module.exports = async page=>{
     SET.gfx = 'high'; out.fast = due(1/60); out.slow = due(1/30);
     // the shadow clock keeps its own average: the render scaler's is left alone
     FPD.dtAvg = 0.0123; FP.dt = 0.09; dgShadowTick(); out.scalerAvg = FPD.dtAvg;
-    FPD.lvl = 0; FPD.dtAvg = 1; FPD.downAt = 0; FPD.lockUntil = 0; for (let i=0;i<8;i++){ FPD.dtAvg = 1; FPD.adj = 200; FPD.upAt = 0; FPD.lockUntil = 0; renderGame(); FPD.downAt = 0; }   /* (the scaler judges every 120 frames: let each of these be one of those) */ out.lvl = FPD.lvl; out.scale = FPD.scale; out.phone = gfxPhone();
+    RES.lvl = 0; for (let i=0;i<8;i++){ RES.avg = 1; RES.n = 89; RES.upAt = 0; RES.lockUntil = 0; resTick(1/20); }   /* (RS-403: the one shared scaler - each of these a judgement of a slow stretch) */ out.lvl = RES.lvl; out.scale = resScale(); out.phone = gfxPhone(); out.steps = RES.steps.length; RES.lvl = 0;
     return out; });
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
@@ -38,5 +38,5 @@ module.exports = async page=>{
   A(r.fast.lan===6 && r.fast.td.every(n=>n===6) && r.fast.perFrame.every(f=>f===2), 'above 45 fps: every light every second frame, two torches on each frame: '+JSON.stringify(r.fast));
   A(r.slow.lan===6 && r.slow.td.every(n=>n===2), 'below 45 fps: the lantern six times in twelve, each torch twice: '+JSON.stringify(r.slow));
   A(r.scalerAvg===0.0123, 'the shadow clock leaves the render scaler\'s average alone');
-  A(!r.phone && r.lvl===3 && Math.abs(r.scale - 0.6) < 0.01, 'a desktop dungeon drops as far as scale 0.6 and no further: '+r.lvl+' '+r.scale);
+  A(!r.phone && r.lvl===r.steps - 1 && Math.abs(r.scale - 0.5) < 0.01, 'a slow dungeon steps down to the last scaler step and no further: '+r.lvl+' '+r.scale);
 };

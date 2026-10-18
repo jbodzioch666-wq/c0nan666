@@ -2,6 +2,7 @@
 // with no pelvis or seat of its own; the robe bottom's waist rises to that hem and takes its exact oval, so the two flow into
 // one line under the sash - on every race, man or woman, broad or slight, and on a one-piece robe too
 module.exports = async page=>{
+  await page.evaluate(()=>{ M3D_SKIN = false; if (M3D.tpl) M3D.tpl.clear(); });   // (the parts as built, not merged into skinned meshes - this test looks at them one by one)
   const r = await page.evaluate(()=>{
     const T = THREE, A = (c, msg)=>{ if (!c) throw new Error('assert: '+msg); }, out = {};
     const start = (race, fem)=>{ goToCharCreate(); G.ccLookTouched = false; ccSelectRace(RACES.findIndex(x=>x[0]===race)); ccBegin(); if (fem){ G.player.look.body = 1; G.ccLookTouched = true; } if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); o3Pref = false; try{ v3Pref = false; }catch(e){}
@@ -13,10 +14,10 @@ module.exports = async page=>{
       start(race, fem); const pt = rsPlayerLook(), e = m3dInstance({}, pt), rig = e.rig; m3dPoseHumanoid(rig, 0.7, 0, 0, 0, 0, e); e.holder.updateMatrixWorld(true);
       A(rig.skirt && rig.chestMesh, race+': a robe bottom and a bodice');
       // the bodice: its hem is flat at the belt line, nothing of it below
-      const bod = ring(rig.chestMesh, q=>true), hem = ring(rig.chestMesh, q=>q[1] < 0.012);
+      const bod = ring(rig.pelvisMesh || rig.chestMesh, q=>true), hem = ring(rig.pelvisMesh || rig.chestMesh, q=>q[1] < 0.012);   /* (RS-376: the bodice's hem is in its lower piece, below the waist's bend) */
       // the skirt's waist: its topmost ring, in the hips' frame
       const top = ring(rig.skirt, q=>true), waist = ring(rig.skirt, q=>q[1] > top.y - 0.004);
-      const sash = rig.torso.children.find(c=>c.isMesh && c.geometry.type==='TorusGeometry' && Math.abs(c.position.y - 0.012) < 0.002);
+      const sash = rig.hips.children.find(c=>c.isMesh && c.geometry.type==='TorusGeometry' && Math.abs(c.position.y - 0.012) < 0.002);   /* (RS-376: on the hips, below the waist's bend) */
       const k = race + (fem ? ' (f)' : ''); out[k] = { bodMin:+bod.yMin.toFixed(3), hemX:+hem.x.toFixed(3), hemZ:+hem.z.toFixed(3), waistY:+top.y.toFixed(3), waistX:+waist.x.toFixed(3), waistZ:+waist.z.toFixed(3), sash:!!sash, fem:!!pt.o.fem };
       A(!!pt.o.fem===fem, k+': the figure is '+(fem ? 'a woman' : 'a man'));
       A(bod.yMin > -0.012, k+': the bodice ends at the belt line, not below: '+bod.yMin);
@@ -26,7 +27,7 @@ module.exports = async page=>{
     // a one-piece robe (a townsperson) meets the same way, and a robe top over plate legs keeps its bodice and sash
     { const e = m3dInstance({}, m3dPortrait({ nm:'cult acolyte' })), rig = e.rig; out.onePiece = { skirt:!!rig.skirt, bod:rig.chestMesh ? +ring(rig.chestMesh, q=>true).yMin.toFixed(3) : null }; A(out.onePiece.skirt && out.onePiece.bod > -0.012, 'a one-piece robe meets at the belt line too: '+JSON.stringify(out.onePiece)); }
     start('Human', false); G.gear.legs = rsMakeArmour('metal', 2, 'legs'); { const e = m3dInstance({}, rsPlayerLook()), rig = e.rig; out.plateLegs = { skirt:!!rig.skirt, sash:!!rig.torso.children.find(c=>c.isMesh && c.geometry.type==='TorusGeometry' && Math.abs(c.position.y - 0.012) < 0.002), bod:+ring(rig.chestMesh, q=>true).yMin.toFixed(3) }; }
-    A(!out.plateLegs.skirt && out.plateLegs.sash && out.plateLegs.bod > -0.012, 'a robe top over plate legs: bodice and sash, no skirt: '+JSON.stringify(out.plateLegs));
+    A(out.plateLegs.skirt && out.plateLegs.bod > -0.012, 'a robe over plate legs is the whole robe, its skirt falling over them (RS-509): '+JSON.stringify(out.plateLegs));
     return out; });
   console.log(JSON.stringify(r));
 };

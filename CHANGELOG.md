@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-535 - Corpses that lie still, torches on the walls
+
+- **Corpses settle**: a heavy body that died the right way up - a giant vulture, slumped belly down - never quite counted as still, and the slow turn it was left with dragged it creeping round in a circle across the floor for as long as it lay there. The floor now takes that turn out of it, and it comes to rest.
+- **Torches on straight walls**: dressing a level after its torches were hung could open floor beside one, leaving a torch on a corner or a pillar. Any torch that ends up off a straight wall now comes down.
+- **Behind the scenes**: nineteen of the game's own checks had fallen out of date with the changes of the last many releases (skinned figures, the waist bend, the shared resolution scaler, bows in the left hand, one-piece robes and more). They're brought up to date, so a real breakage shows up again - and two of them found the bugs above.
+
 ## RS-534 - Open hands and made boots
 
 - **An open hand**: your off hand was always a clenched fist round nothing. When it's empty it now rests open - the palm, the fingers a little curled, the thumb alongside. It still closes on a shield, a tome, an off-hand blade, a bow, or the grip of a two-handed weapon or quarterstaff.
