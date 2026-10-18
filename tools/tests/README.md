@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs531 | Muscle shows: chest, traps, delts, lats, arms, thighs and calves swell from soft to hard; sleeves fit; default unchanged |
 | rs530 | No flat cards on the face: square jaw sculpted, scars and paint laid on the skin, moustaches of strands |
 | rs529 | Face sliders (jaw, chin, cheeks, brow, nose, nose width, mouth, lips, age) in the creator and at the barber's; defaults keep the old face |
 | rs528 | Skin shading: a warm subsurface shader for skin, and a flush in the cheeks, nose, ears and lips of flesh faces |

@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-531 - Muscle that shows
+
+- **The muscle slider does its job**: it barely changed anything - a few percent on the arms. Now, from soft to hard, it fills out the chest, raises and thickens the trapezius, rounds the deltoids, broadens the lats and swells the upper arms, forearms, thighs and calves: about half as thick again in the arm from one end to the other. Hard muscle stands out under a tunic too - sleeves and hose are cut to the arms and legs inside them.
+- The middle of the slider is the build you had, so nobody's figure changes unless you move it. Figures are re-sculpted once for the new shapes.
+
 ## RS-530 - No cards stuck on the face
 
 - **The chin**: a human man's square jaw was a flat box whose corners stuck out as pale wedges either side of the chin; it's now sculpted into the jaw itself - wider at the base, a stronger chin.
