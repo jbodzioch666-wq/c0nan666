@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-521 - Smoother walks when the map changes
+
+- **No stall when the land changes far off**: when a tile changed somewhere on the map - a cleared site reclaimed by the wild, a new one rising, a bridge mended - the game worked out the land's regions and landmarks, the distant ground and the near land's shading each in one go, mid-walk. They're now each worked out a little a frame, with the old ones shown in the meantime, and the towns and sites in the land you're walking into are built one per step instead of all together.
+- **The numbers**: at a phone's pace, the worst frame after such a change fell from about 360ms to under 100ms. Everything comes out exactly as before - the same regions, names, landmarks and light on the land.
+
 ## RS-520 - No hitch when a new creature comes into sight
 
 - **New creatures built in slices**: the first time a kind of creature came into view out on the land, building its model cost a whole frame per sculpted part - 80 to 110ms at a phone's pace, many times over for a big one - and re-ran the whole build every frame until it was done (40ms a frame for seconds, over 12s in all for a hill giant). Now each sculpted part is itself made a few milliseconds a frame, and the build runs once to see what it needs and once for real. At a phone's pace the worst frame for a new kind fell from about 100ms to 20-45ms, and a new kind turns up in under a second instead of one to twelve.

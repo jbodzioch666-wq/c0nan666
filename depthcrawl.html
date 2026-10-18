@@ -18508,23 +18508,32 @@ const GEO_KINDS = [null,'forest','mountain','desert','swamp','tundra','water','r
 const PLACE_INK = { volcanic:'#7a1a0a', jungle:'#1a5a1a', haunted:'#3a3a4a', highland:'#3a4a6a', crystal:'#4a3a8a', forest:'#2a4a1a', mountain:'#5a3418', desert:'#7a5014', swamp:'#3a4a22', tundra:'#34485c', sea:'#1a4468', lake:'#1a4468', river:'#20507a' };
 const PLACE_WORD = { volcanic:'volcanic lands', jungle:'jungles', haunted:'haunted woods', highland:'highlands', crystal:'crystal wastes', forest:'forests', mountain:'mountain ranges', desert:'deserts', swamp:'marshes', tundra:'snowfields', sea:'seas', lake:'lakes', river:'rivers' };
 // the land's regions, their names and the landmarks: worked out from the map once and kept until it changes
+/* (RS-521) a tile changing in a world already mapped (a site reclaimed, a bridge mended) works the regions out again a few ms a
+   call, the old ones answering meanwhile - the whole map in one go was a 50-120ms frame at a phone's pace, mid-walk. A new
+   world, or a map that isn't the one mapped, is still worked out at once */
 function owGeo(){
   const g0 = G.ow.geo, turn = (G.player && G.player.turnCount)||0;
   if (g0 && g0.ref===G.ow.map && g0.seed===G.ow.seed && g0.turn===turn && g0.cols===OW_COLS) return g0;
-  const key = pmMapKey();
-  if (g0 && g0.key===key && g0.seed===G.ow.seed && g0.cols===OW_COLS){ g0.ref = G.ow.map; g0.turn = turn; return g0; }
-  const g = G.ow.geo = geoBuild(key); g.turn = turn; return g;
+  const P0 = owGeo.pend, key = P0 && P0.turn===turn && P0.ref===G.ow.map ? P0.key : pmMapKey();
+  if (g0 && g0.key===key && g0.seed===G.ow.seed && g0.cols===OW_COLS){ owGeo.pend = null; g0.ref = G.ow.map; g0.turn = turn; return g0; }
+  if (g0 && g0.ref===G.ow.map && g0.seed===G.ow.seed && g0.cols===OW_COLS){
+    let P = owGeo.pend; if (!P || P.key!==key || P.ref!==G.ow.map) P = owGeo.pend = { key, ref:G.ow.map, turn, it:geoBuildGen(key) }; P.turn = turn;
+    const t0 = performance.now(); if (t0 - (P.end||0) < 10) return g0;   /* (called many times a frame: one slice a frame, not one a call) */
+    let r; while (!(r = P.it.next()).done) if (performance.now() - t0 > 3){ P.end = performance.now(); return g0; }
+    owGeo.pend = null; const g = G.ow.geo = r.value; g.turn = turn; return g; }
+  owGeo.pend = null; const g = G.ow.geo = geoBuild(key); g.turn = turn; return g;
 }
-function geoBuild(key){
+function geoBuild(key){ const it = geoBuildGen(key); let r; while (!(r = it.next()).done); return r.value; }
+function* geoBuildGen(key){
   const W = OW_COLS, H = OW_ROWS, N = W*H, m = G.ow.map, seed = (G.ow.seed>>>0)||1;
   const kindAt = new Int8Array(N), comp = new Int32Array(N).fill(-1), placeAt = new Int16Array(N).fill(-1);
-  for (let x=0;x<W;x++) for (let y=0;y<H;y++){
+  for (let x=0;x<W;x++){ if ((x & 15)===15) yield; for (let y=0;y<H;y++){
     let t = m[x][y]; if (OW_SITE_TILES.includes(t)) t = o3Ground(x,y);
     kindAt[y*W+x] = t===OW_FOREST ? 1 : (t===OW_MOUNTAIN || t===OW_MOUNTAINPASS) ? 2 : t===OW_DESERT ? 3 : t===OW_SWAMP ? 4 : t===OW_TUNDRA ? 5 : t===OW_WATER ? 6 : t===OW_RIVER ? 7 : 0;
-  }
+  } }
   // flood-fill each run of one kind of ground into a region
   const regions = [], stack = [];
-  for (let i=0;i<N;i++){
+  for (let i=0;i<N;i++){ if ((i & 4095)===4095) yield;
     if (!kindAt[i] || comp[i]>=0) continue;
     const k = kindAt[i], tiles = []; let sx = 0, sy = 0;
     comp[i] = i; stack.push(i);
@@ -18541,10 +18550,11 @@ function geoBuild(key){
   const dist = new Float32Array(N);
   for (let i=0;i<N;i++){ const c = comp[i]; if (c<0) continue; const x = i%W, y = (i/W)|0;
     dist[i] = ((x>0 && comp[i-1]!==c) || (x<W-1 && comp[i+1]!==c) || (y>0 && comp[i-W]!==c) || (y<H-1 && comp[i+W]!==c)) ? 1 : 1e6; }
-  for (let y=0;y<H;y++) for (let x=0;x<W;x++){ const i = y*W+x; if (dist[i]<=1) continue; let d = dist[i];
-    if (x>0) d = Math.min(d, dist[i-1]+1); if (y>0){ d = Math.min(d, dist[i-W]+1); if (x>0) d = Math.min(d, dist[i-W-1]+1.4); if (x<W-1) d = Math.min(d, dist[i-W+1]+1.4); } dist[i] = d; }
-  for (let y=H-1;y>=0;y--) for (let x=W-1;x>=0;x--){ const i = y*W+x; if (dist[i]<=1) continue; let d = dist[i];
-    if (x<W-1) d = Math.min(d, dist[i+1]+1); if (y<H-1){ d = Math.min(d, dist[i+W]+1); if (x<W-1) d = Math.min(d, dist[i+W+1]+1.4); if (x>0) d = Math.min(d, dist[i+W-1]+1.4); } dist[i] = d; }
+  yield;
+  for (let y=0;y<H;y++){ if ((y & 15)===15) yield; for (let x=0;x<W;x++){ const i = y*W+x; if (dist[i]<=1) continue; let d = dist[i];
+    if (x>0) d = Math.min(d, dist[i-1]+1); if (y>0){ d = Math.min(d, dist[i-W]+1); if (x>0) d = Math.min(d, dist[i-W-1]+1.4); if (x<W-1) d = Math.min(d, dist[i-W+1]+1.4); } dist[i] = d; } }
+  for (let y=H-1;y>=0;y--){ if ((y & 15)===0) yield; for (let x=W-1;x>=0;x--){ const i = y*W+x; if (dist[i]<=1) continue; let d = dist[i];
+    if (x<W-1) d = Math.min(d, dist[i+1]+1); if (y<H-1){ d = Math.min(d, dist[i+W]+1); if (x<W-1) d = Math.min(d, dist[i+W+1]+1.4); if (x>0) d = Math.min(d, dist[i+W-1]+1.4); } dist[i] = d; } }
   const used = new Set();
   const nameRng = (salt)=> mulberry32((seed ^ Math.imul(salt+1, 2654435761)) >>> 0);
   const pnOf = (r)=> PLACE_ROOT[Math.floor(r()*PLACE_ROOT.length)] + PLACE_END[Math.floor(r()*PLACE_END.length)];
@@ -18558,7 +18568,8 @@ function geoBuild(key){
     const nm = 'the ' + pnOf(r) + ' ' + cap(kind); used.add(nm); return nm;
   };
   const places = [];
-  for (const rg of regions){
+  let rgN = 0;
+  for (const rg of regions){ if ((++rgN & 7)===0) yield;
     const n = rg.tiles.length, kn = GEO_KINDS[rg.k];
     const kind = kn==='water' ? (n >= GEO_MIN.sea ? 'sea' : n >= GEO_MIN.lake ? 'lake' : null) : (n >= GEO_MIN[kn] ? kn : null);
     if (!kind) continue;
@@ -18575,7 +18586,7 @@ function geoBuild(key){
   }
   // the rarer biomes are regions of their own, named over whatever ground they cover
   if (G.ow.bio){ const bio = G.ow.bio, seenB = new Uint8Array(N);
-    for (let i=0;i<N;i++){ const v = bio[i]; if (!v || seenB[i]) continue;
+    for (let i=0;i<N;i++){ if ((i & 4095)===4095) yield; const v = bio[i]; if (!v || seenB[i]) continue;
       const tiles = [], st = [i]; seenB[i] = 1; let sx = 0, sy = 0;
       while (st.length){ const j = st.pop(), x = j%W, y = (j/W)|0; tiles.push(j); sx += x; sy += y;
         for (const k of [x>0 ? j-1 : -1, x<W-1 ? j+1 : -1, y>0 ? j-W : -1, y<H-1 ? j+W : -1]) if (k>=0 && !seenB[k] && bio[k]===v){ seenB[k] = 1; st.push(k); } }
@@ -18587,9 +18598,9 @@ function geoBuild(key){
       const id = places.length; places.push({ id, kind:BIO[v].id, n:tiles.length, name:nm, lx:best%W, ly:(best/W)|0, labels:[[best%W, (best/W)|0]], root:i, tiles });
       for (const j of tiles) placeAt[j] = id; } }
   // the coast, for the waves that lap it
-  const coast = [];
-  for (let y=1;y<H-1;y++) for (let x=1;x<W-1;x++){ const i = y*W+x; if (kindAt[i]===6) continue;
-    for (const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]) if (kindAt[i+dy*W+dx]===6){ coast.push(x, y, dx, dy); break; } }
+  const coast = []; yield;
+  for (let y=1;y<H-1;y++){ if ((y & 15)===0) yield; for (let x=1;x<W-1;x++){ const i = y*W+x; if (kindAt[i]===6) continue;
+    for (const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]) if (kindAt[i+dy*W+dx]===6){ coast.push(x, y, dx, dy); break; } } }
   // the landmarks
   const landmarks = [], lr = nameRng(seed % 9973 + 31);
   const biggest = (kind)=> places.filter(p=>p.kind===kind).sort((a,b)=>b.n-a.n)[0];
@@ -18616,7 +18627,8 @@ function geoBuild(key){
       desc:`The ${pn} Tree, older than any town. Its crown shades a whole glade, and its roots run under half the forest.` }); }
   { const sites = []; for (let x=0;x<W;x++) for (let y=0;y<H;y++) if (OW_SITE_TILES.includes(m[x][y])) sites.push([x,y]);
     let best = null, bs = -1;
-    for (let y=12;y<H-12;y++) for (let x=12;x<W-12;x++){
+    yield;
+    for (let y=12;y<H-12;y++) for (let x=12;x<W-12;x++){ if (x===12 && (y & 7)===0) yield;
       if (m[x][y]!==OW_GRASS) continue;
       const sc = o3Hash(x, y, seed%977+47); if (sc <= bs) continue;
       let ok = true; for (let i=-2;i<=2 && ok;i++) for (let j=-2;j<=2;j++){ const t = m[x+i][y+j]; if (t===OW_WATER || t===OW_MOUNTAIN){ ok = false; break; } }
@@ -18632,7 +18644,8 @@ function geoBuild(key){
      on clear ground as far from where you began as the land allows, well away from the other landmarks and every site */
   { const sp = G.ow.spawnPos || { x:W/2, y:H/2 }; let best = null, bs = -1;
     const sites = []; for (let x=0;x<W;x++) for (let y=0;y<H;y++) if (OW_SITE_TILES.includes(m[x][y])) sites.push([x,y]);
-    for (let y=6;y<H-6;y++) for (let x=6;x<W-6;x++){
+    yield;
+    for (let y=6;y<H-6;y++) for (let x=6;x<W-6;x++){ if (x===6 && (y & 7)===0) yield;
       const t = m[x][y]; if (t!==OW_GRASS && t!==OW_SWAMP && t!==OW_TUNDRA && t!==OW_DESERT) continue;
       const sc = Math.hypot(x - sp.x, y - sp.y) + o3Hash(x, y, seed%977+53)*3; if (sc <= bs) continue;
       let wild = 0; try{ if (typeof wgWildLevel==='function') for (const [i,j] of [[0,0],[4,0],[-4,0],[0,4],[0,-4]]) wild = wild || wgWildLevel(Math.max(0, Math.min(W-1, x+i)), Math.max(0, Math.min(H-1, y+j))); }catch(e){} if (wild) continue;   /* (not in or beside the Wilderness: dying on the quest there would cost too much) */
@@ -31804,7 +31817,15 @@ function* o3BuildGen(cx, cy){
   for (let j=0;j<NV-1;j++) for (let i=0;i<NV-1;i++){ const a = j*NV+i, b2 = a+1, c = a+NV, d = c+1; idx.push(a,c,b2, b2,c,d); }
   const geo = new T.BufferGeometry();
   geo.setAttribute('position', new T.BufferAttribute(pos,3)); geo.setAttribute('color', new T.BufferAttribute(col,3)); geo.setAttribute('uv', new T.BufferAttribute(uv,2));
-  geo.setIndex(idx); geo.computeVertexNormals();
+  geo.setIndex(idx);
+  /* (RS-521) the land's normals worked out a few rows at a time - computeVertexNormals over the whole window was one 70ms
+     step at a phone's pace. The same sums (each face's cross product added to its corners, then normalised), so the same light */
+  { const nrm = new Float32Array(NV*NV*3), P3 = pos, add = (v, x, y, z)=>{ nrm[v*3] += x; nrm[v*3+1] += y; nrm[v*3+2] += z; };
+    const face = (a, b2, c)=>{ const ax = P3[a*3], ay = P3[a*3+1], az = P3[a*3+2], bx = P3[b2*3], by = P3[b2*3+1], bz = P3[b2*3+2], cx = P3[c*3] - bx, cy = P3[c*3+1] - by, cz = P3[c*3+2] - bz, ex = ax - bx, ey = ay - by, ez = az - bz;
+      const nx = cy*ez - cz*ey, ny = cz*ex - cx*ez, nz = cx*ey - cy*ex; add(a, nx, ny, nz); add(b2, nx, ny, nz); add(c, nx, ny, nz); };
+    for (let j=0;j<NV-1;j++){ if (j % 24 === 23) yield; for (let i=0;i<NV-1;i++){ const a = j*NV+i, b2 = a+1, c = a+NV, d = c+1; face(a, c, b2); face(b2, c, d); } }
+    for (let k=0;k<NV*NV;k++){ const x = nrm[k*3], y = nrm[k*3+1], z = nrm[k*3+2], l = Math.sqrt(x*x + y*y + z*z); if (l > 0){ nrm[k*3] = x/l; nrm[k*3+1] = y/l; nrm[k*3+2] = z/l; } }
+    geo.setAttribute('normal', new T.BufferAttribute(nrm, 3)); }
   yield;
   // steep faces read as bare rock
   const nr = geo.attributes.normal;
@@ -31834,7 +31855,7 @@ function* o3BuildGen(cx, cy){
   const far = new T.Mesh(new T.PlaneGeometry(600,600), new T.MeshStandardMaterial({ color:new T.Color(0x2c6490).convertSRGBToLinear(), roughness:0.6 }));   /* (RS-349: the sea beyond the map's edge; the far land is o3FarLand) */
   far.rotation.x = -Math.PI/2; far.position.set(cx,-0.5,cy); grp.add(far);
   yield; yield* o3VegetationGen(grp, x0, y0, W);
-  yield; o3Sites(grp, x0, y0, W);
+  yield; yield* o3SitesGen(grp, x0, y0, W);   /* (RS-521: a site a step - a town was a 100ms step on its own with the rest) */
   yield; try{ yield* gfxO3BuildGen(grp, x0, y0, W, M); }catch(e){ console.error(e); }
   yield; try{ o3MergeWorld(grp); }catch(e){ console.error(e); }   /* (RS-401) */
   O3.encGrp = new T.Group(); grp.add(O3.encGrp); O3.encKey = null; O3.qKey = null;
@@ -31911,18 +31932,28 @@ function o3CompileSome(P, budget){
 // (RS-349) the whole world as a coarse, far ground - one vertex every two tiles, the sea flat and blue, the mountains
 // risen, the forests dark - so the land never ends at the built window's edge: from a lookout, or zoomed out, or on a
 // hill, the lands run on to the horizon. Built once per world, a little under the real land, which covers it near you
+/* (RS-521) a tile changing in the same world remakes it a few ms a frame, the old far ground shown meanwhile - remade in one go
+   it was a 40-55ms frame at a phone's pace, mid-walk. A new world, or a far ground not yet shown, is made at once */
 function o3FarLand(){
   if (!O3.scene || !G.ow || !G.ow.map) return;
-  const key = (G.ow.seed||0) + '|' + OW_COLS + 'x' + OW_ROWS + '|' + (O3.mapKey||'');
-  if (O3.farKey===key && O3.farLand && O3.farLand.parent===O3.scene) return;
+  const world = (G.ow.seed||0) + '|' + OW_COLS + 'x' + OW_ROWS + '|', key = world + (O3.mapKey||'');
+  if (O3.farKey===key && O3.farLand && O3.farLand.parent===O3.scene){ O3.farPend = null; return; }
+  const soft = O3.farLand && O3.farLand.parent===O3.scene && String(O3.farKey||'').startsWith(world);
+  let P = O3.farPend; if (!P || P.key!==key) P = O3.farPend = { key, it:o3FarLandGen() };
+  const t0 = performance.now(); let r; while (!(r = P.it.next()).done) if (soft && performance.now() - t0 > 3) return;
+  O3.farPend = null;
   if (O3.farLand){ O3.scene.remove(O3.farLand); O3.farLand.geometry.dispose(); }
   O3.farKey = key;
+  const m = new THREE.Mesh(r.value, O3.farMat || (O3.farMat = o3FarMat())); m.receiveShadow = false; m.castShadow = false; m.frustumCulled = false;
+  O3.farLand = m; O3.scene.add(m); o3FarWin();
+}
+function* o3FarLandGen(){
   const T = THREE, S = 2, NX = Math.floor(OW_COLS/S) + 1, NZ = Math.floor(OW_ROWS/S) + 1, n1 = v3Noise(7);
   // how far inside a range each mountain tile sits, over the whole map
   const dep = new Uint8Array(OW_COLS*OW_ROWS);
-  for (let x=0;x<OW_COLS;x++) for (let y=0;y<OW_ROWS;y++){ if (o3Tile(x, y)!==OW_MOUNTAIN) continue; let d = 4;
+  for (let x=0;x<OW_COLS;x++){ if ((x & 15)===15) yield; for (let y=0;y<OW_ROWS;y++){ if (o3Tile(x, y)!==OW_MOUNTAIN) continue; let d = 4;
     for (let r=1;r<=3 && d===4;r++) for (let i=-r;i<=r && d===4;i++) for (let j=-r;j<=r;j++){ if (Math.max(Math.abs(i),Math.abs(j))!==r) continue; if (o3Tile(x+i,y+j)!==OW_MOUNTAIN){ d = r; break; } }
-    dep[x*OW_ROWS + y] = d; }
+    dep[x*OW_ROWS + y] = d; } }
   const lin = v=>Math.pow(v/255, 2.2), pos = new Float32Array(NX*NZ*3), col = new Float32Array(NX*NZ*3);
   const tile = (x, y)=>{ const t = o3Tile(x, y);
     let h, c; if (t===OW_WATER || t===OW_RIVER){ h = O3_WATER_Y - 0.04; c = t===OW_WATER ? [38, 86, 124] : [52, 98, 128]; }
@@ -31931,14 +31962,13 @@ function o3FarLand(){
       else if (t===OW_MOUNTAINPASS) h = 0.3; else if (t===OW_SWAMP) h = -0.06; else h = 0.04;
       if (t===OW_FOREST){ c = [c[0]*0.45 + 24, c[1]*0.55 + 34, c[2]*0.45 + 14]; } }   /* (a forest reads dark from afar: its canopy, not its floor) */
     return [h, c]; };
-  for (let j=0;j<NZ;j++) for (let i=0;i<NX;i++){ const x = i*S, z = j*S; let h = 0, r = 0, g = 0, b = 0, n = 0;
+  for (let j=0;j<NZ;j++){ if ((j & 7)===7) yield; for (let i=0;i<NX;i++){ const x = i*S, z = j*S; let h = 0, r = 0, g = 0, b = 0, n = 0;
     for (const [dx, dz] of [[0,0],[-1,0],[0,-1],[-1,-1]]){ const [th, c] = tile(Math.min(OW_COLS-1, Math.max(0, x+dx)), Math.min(OW_ROWS-1, Math.max(0, z+dz))); h += th; r += c[0]; g += c[1]; b += c[2]; n++; }
     h /= n; r /= n; g /= n; b /= n; if (h > O3_WATER_Y) h += (n1(x/5, z/5) - 0.5)*0.35 - 0.12;   /* (the same rolling ground as near you, a little under it) */
-    const k = j*NX + i; pos[k*3] = x; pos[k*3+1] = h; pos[k*3+2] = z; const v = 0.9; col[k*3] = lin(r*v); col[k*3+1] = lin(g*v); col[k*3+2] = lin(b*v); }
-  const idx = []; for (let j=0;j<NZ-1;j++) for (let i=0;i<NX-1;i++){ const a = j*NX + i, b2 = a + 1, c = a + NX, d = c + 1; idx.push(a, c, b2, b2, c, d); }
-  const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setAttribute('color', new T.BufferAttribute(col, 3)); geo.setIndex(idx); geo.computeVertexNormals();
-  const m = new T.Mesh(geo, O3.farMat || (O3.farMat = o3FarMat())); m.receiveShadow = false; m.castShadow = false; m.frustumCulled = false;
-  O3.farLand = m; O3.scene.add(m); o3FarWin();
+    const k = j*NX + i; pos[k*3] = x; pos[k*3+1] = h; pos[k*3+2] = z; const v = 0.9; col[k*3] = lin(r*v); col[k*3+1] = lin(g*v); col[k*3+2] = lin(b*v); } }
+  yield; const idx = []; for (let j=0;j<NZ-1;j++) for (let i=0;i<NX-1;i++){ const a = j*NX + i, b2 = a + 1, c = a + NX, d = c + 1; idx.push(a, c, b2, b2, c, d); }
+  const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setAttribute('color', new T.BufferAttribute(col, 3)); geo.setIndex(idx); yield; geo.computeVertexNormals();
+  return geo;
 }
 // (RS-355) the far ground isn't drawn inside the built land at all: its coarse mountains and sea floor poked up through the
 // real land's dips. A cut-out in the shader, moved with the window
@@ -32315,11 +32345,13 @@ function o3TownName(x,y){
 }
 /* (RS-485) what a town is, under its name on the land: its people and its size - "dwarven hold - city" */
 function o3TownSub(x, y){ try{ const f = townFlavorAt(x, y) || {}, R0 = TOWN_RACES[f.race] || {}, tier = townTier(x, y); return `<br><span style="font-size:0.78em;opacity:0.82;font-weight:400">${esc(R0.adj || '')} &middot; ${['village', 'town', 'city'][tier]}</span>`; }catch(e){ return ''; } }
-function o3Sites(grp, x0, y0, W){
+function o3Sites(grp, x0, y0, W){ const it = o3SitesGen(grp, x0, y0, W); while (!it.next().done); }
+function* o3SitesGen(grp, x0, y0, W){
   const T = THREE;
   for (let x=x0; x<x0+W; x++) for (let y=y0; y<y0+W; y++){
     const t = o3Tile(x,y);
     if (!OW_SITE_TILES.includes(t)) continue;
+    yield;
     const gx = x+0.5, gz = y+0.5, g = o3Site(t, gx, gz);
     let sc = 1.3; if (t===OW_TOWN){ try{ sc *= [0.85, 1, 1.18][townTier(x, y)]; }catch(e){} }   /* (RS-485: a city stands bigger on the land than a village) */
     g.scale.setScalar(sc); g.position.set(gx, O3.heightAt(gx,gz), gz); g.rotation.y = 0.52 + (t===OW_TOWN ? 0 : (o3Hash(x,y,9)-0.5)*0.3);   // entrances face the camera
@@ -42521,7 +42553,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-520';
+const GAME_VERSION = 'rs-521';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

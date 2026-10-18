@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs521 | A far tile change works out the regions, far ground and land normals a little a frame - same results, worst frame at 4x well under 350ms |
 | rs520 | A creature kind never seen is built in slices: sculpts splatted and meshed a layer at a time, the build run as a survey, not every frame |
 | rs519 | Duergar scouts shoot crossbows (bolts at the loose); old Archers given the kit's quiver once |
 | rs518 | Tome icons per tier with your device; the hotbar ranged button shows your own bow or crossbow |
