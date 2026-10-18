@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-507 - Tails and tentacles, cheaper
+
+- **Bending tubes cost a fraction**: every tail, tentacle, serpent body and tongue is a tube bent along a moving spine each frame, and each bend recomputed every vertex's lighting normal over all the tube's triangles, then re-measured its bounds. The normals now come straight from the tube's cross-section - the same direction three.js worked out, checked in the new test - and the bounds are measured every twentieth bend. Snakes and eels look exactly as before (compared side by side).
+- **Measured on the uploaded save at a phone's pace**: walking the open land drew 22% more frames (246 against 202 over the same walk), and the slowest 5% of frames fell from 130 ms to 101 ms.
+
 ## RS-506 - World changes without the freeze
 
 - **A change anywhere on the map no longer freezes the land**: when a tile changes - a cleared site reclaimed by the wild, a new one rising, a bridge mended - the open land used to rebuild all at once in a single frame, then warm every shader again. At a phone's pace that was a 1.5-second freeze, wherever you were, even if the change was 60 tiles away. It now rebuilds in the background like a walk's rebuild, and the change shows a moment later. Worst frame at a phone's pace: **1,472 ms to about 350 ms** (what's left is redrawing the map's chart, once).

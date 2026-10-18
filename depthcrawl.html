@@ -37380,13 +37380,25 @@ function m3dTube(nR, nS, len, col){
 function m3dTubeSet(mesh, pts, F, rad){
   if (mesh.geometry.userData.owner!==mesh.uuid){ const ud = mesh.geometry.userData; mesh.geometry = mesh.geometry.clone(); mesh.geometry.userData = { nR:ud.nR, nS:ud.nS, owner:mesh.uuid }; }   /* (each figure bends its own copy) */
   const g = mesh.geometry, { nR, nS } = g.userData, p = g.attributes.position.array, n = pts.length;
+  /* (RS-507) the normals straight from the cross-section - for an ellipse of radii rw, h the outward normal runs along N*cos/rw + B*sin/h -
+     instead of recomputing them over every triangle each frame, which with the bounds re-measured each frame was a tenth of a walk's
+     frame on the open land, for every tail, tentacle and serpent in sight */
+  const nmA = g.attributes.normal && g.attributes.normal.array.length===p.length ? g.attributes.normal.array : null;
   for (let i=0;i<=nR;i++){ const s = i/nR, f = s*(n-1), i0 = Math.min(n-2, Math.floor(f)), k = f - i0;
     const P = pts[i0].clone().lerp(pts[i0+1], k), N = F.N[i0].clone().lerp(F.N[i0+1], k).normalize(), B = F.B[i0].clone().lerp(F.B[i0+1], k).normalize(), [rw, rh, fl] = rad(s);
     for (let j=0;j<=nS;j++){ const a = j/nS*Math.PI*2, ca = Math.cos(a), sa = Math.sin(a), h = sa < 0 ? rh*(fl||1) : rh, o = ((i*(nS+1)) + j)*3;
-      p[o] = P.x + N.x*ca*rw + B.x*sa*h; p[o+1] = P.y + N.y*ca*rw + B.y*sa*h; p[o+2] = P.z + N.z*ca*rw + B.z*sa*h; } }
-  g.attributes.position.needsUpdate = true; g.computeVertexNormals();
-  const nm = g.attributes.normal.array; for (let i=0;i<=nR;i++){ const a = i*(nS+1)*3, b = (i*(nS+1) + nS)*3; for (let q=0;q<3;q++){ const v = (nm[a+q] + nm[b+q])/2; nm[a+q] = nm[b+q] = v; } }
-  g.computeBoundingSphere();
+      p[o] = P.x + N.x*ca*rw + B.x*sa*h; p[o+1] = P.y + N.y*ca*rw + B.y*sa*h; p[o+2] = P.z + N.z*ca*rw + B.z*sa*h;
+      if (nmA){ const iw = ca/Math.max(1e-5, Math.abs(rw)), ih = sa/Math.max(1e-5, Math.abs(h)); let nx = N.x*iw + B.x*ih, ny = N.y*iw + B.y*ih, nz = N.z*iw + B.z*ih; const l = Math.sqrt(nx*nx + ny*ny + nz*nz) || 1; nmA[o] = nx/l; nmA[o+1] = ny/l; nmA[o+2] = nz/l; } } }
+  g.attributes.position.needsUpdate = true;
+  if (nmA){   /* (and the same way round as the triangles wind - the normal three.js would have made - worked out once per tube) */
+    if (g.userData.nSign===undefined){ let sg = 1; const ix = g.index && g.index.array;
+      if (ix && ix.length >= 3){ const a = ix[0]*3, b = ix[1]*3, c = ix[2]*3, ux = p[b]-p[a], uy = p[b+1]-p[a+1], uz = p[b+2]-p[a+2], vx = p[c]-p[a], vy = p[c+1]-p[a+1], vz = p[c+2]-p[a+2];
+        const fx = uy*vz - uz*vy, fy = uz*vx - ux*vz, fz = ux*vy - uy*vx; sg = (fx*nmA[a] + fy*nmA[a+1] + fz*nmA[a+2]) < 0 ? -1 : 1; }
+      g.userData.nSign = sg; }
+    if (g.userData.nSign < 0) for (let i=0;i<nmA.length;i++) nmA[i] = -nmA[i];
+    g.attributes.normal.needsUpdate = true; }
+  else { g.computeVertexNormals(); const nm = g.attributes.normal.array; for (let i=0;i<=nR;i++){ const a = i*(nS+1)*3, b = (i*(nS+1) + nS)*3; for (let q=0;q<3;q++){ const v = (nm[a+q] + nm[b+q])/2; nm[a+q] = nm[b+q] = v; } } }
+  if (((g.userData.sphN = (g.userData.sphN||0) + 1) % 20)===1){ g.computeBoundingSphere(); if (g.boundingSphere) g.boundingSphere.radius *= 1.5; }   /* (every twentieth bend, with room to writhe - a tongue shooting out grows between) */
 }
 // put a part on the spine at s, facing along it
 function m3dOnSpine(obj, pts, F, s){
@@ -41922,7 +41934,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-506';
+const GAME_VERSION = 'rs-507';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
