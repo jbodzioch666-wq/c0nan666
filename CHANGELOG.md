@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-512 - A trousers icon
+
+- **Trousers look like trousers**: cloth trousers have their own icon - a gathered waistband with its drawstring, two legs with soft folds and a gap between - in the item's own colour or dye. Like the trousers themselves it grows finer each tier: ankle cuffs from Splitbark, seam runes from Mystic, gold from Infinity, a double cuff and green runes on Ahrim's, and a dyed trim shows on it too. They borrowed the plate legs' icon before.
+
 ## RS-511 - Trousers finer each tier
 
 - **The tier trims are back, on the trousers**: as the robe bottoms did, the trousers now grow finer with each tier - Splitbark gains a trim cuff at each ankle, Mystic adds glowing runes stitched down the outer seams, Infinity turns cuffs and runes gold, and Ahrim's adds a second cuff and green-glowing runes. Wizard trousers stay plain.

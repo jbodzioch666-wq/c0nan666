@@ -40,6 +40,6 @@ module.exports = async page=>{
   A(r.both.includes(0.48) && !r.both.some(h=>h < 0.3), 'robe and trousers: the long skirt, and nothing shorter to poke through');
   A(!r.plateOnly.includes(0.48), 'plate legs are still legs');
   A(r.clip.follow < 0.02, 'mid-stride the legs stay inside the robe, which moves with them');
-  A(r.kind.robe==='legs' && r.kind.plate==='legs', 'trousers have a legs icon');
+  A(r.kind.robe==='trousers' && r.kind.plate==='legs', 'trousers have their own icon (RS-512), plate legs theirs');
   A(r.iconMid.robe < 0.3 && r.iconMid.plate < 0.3, 'the trousers icon is two legs, not a skirt');
 };
