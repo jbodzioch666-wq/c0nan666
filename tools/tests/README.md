@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs508 | Casts-left worked out once per change of bag, staff or turn, still following the bag at once |
 | rs507 | Bending tubes (tails, tentacles, serpents) take normals from the cross-section; bounds every 20th bend |
 | rs506 | A tile changing far off rebuilds the land in slices, not in one 1.5s frame at a phone's pace |
 | rs505 | A long open-land walk at a phone's pace: land rebuilds start early and speed up, no loading warm-up mid-walk |

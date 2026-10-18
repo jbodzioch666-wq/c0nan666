@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-508 - A lighter HUD
+
+- **Spell counts worked out once**: the action bar shows how many casts your runes allow for each spell, and it worked that out every frame for every spell - a search through up to thirty rune plans each. It's now kept until your bag, your staff or the turn changes, and still updates the moment you spend or pick up runes (tested).
+- **No forced layout every frame**: the quest tracker and the minimap's turn buttons wrote their position and then read the page's layout straight back, every frame - which forces the browser to lay the page out again mid-frame. They now settle a few times a second, and at once when the window or the view changes. Those layout reads fell by half on the walk.
+
 ## RS-507 - Tails and tentacles, cheaper
 
 - **Bending tubes cost a fraction**: every tail, tentacle, serpent body and tongue is a tube bent along a moving spine each frame, and each bend recomputed every vertex's lighting normal over all the tube's triangles, then re-measured its bounds. The normals now come straight from the tube's cross-section - the same direction three.js worked out, checked in the new test - and the bounds are measured every twentieth bend. Snakes and eels look exactly as before (compared side by side).

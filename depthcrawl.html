@@ -10088,7 +10088,8 @@ function skMastLvl(k){ return skLevelOf(skP().mastery[k]||0); }
 function skAllItems(){ return [].concat(SK_FISH, SK_MEAT, SK_ORE, SK_BAR, SK_LOG, SK_HERB, SK_CRAFT_MATS).concat(SK_FISH.map(f=>({ id:'c_'+f.id, nm:'Cooked '+f.nm })), SK_MEAT.map(f=>({ id:'c_'+f.id, nm:f.id==='meat' ? 'Cooked Meat' : f.id==='prime' ? 'Grilled Prime Cut' : 'Seared Dragon Steak' })), [{ id:'burnt', nm:'Burnt Food' }], (typeof SK_DISHES!=='undefined' ? SK_DISHES : []).map(d=>({ id:'c_'+d.id, nm:d.nm }))); }
 function skName(id){ const e = skAllItems().find(e=>e.id===id); return e ? e.nm : id; }
 function skHave(id){ return skP().bag[id]||0; }
-function skAdd(id, n){ const b = skP().bag; b[id] = (b[id]||0) + n; if (b[id]<=0) delete b[id]; }
+var BAG_VER = 0;   /* (RS-508: bumped on every change to the bag, so what's worked out from it can be kept) */
+function skAdd(id, n){ const b = skP().bag; b[id] = (b[id]||0) + n; if (b[id]<=0) delete b[id]; BAG_VER++; }
 // xp in, level-ups out (with a fanfare and a banner)
 // (balance, RS-101: the game runs at about a tenth of RuneScape's pace - a skill to 99 in some 12 to 20 hours, combat maxed in 30 to 50)
 const XP_RATE = 0.3;
@@ -10673,7 +10674,9 @@ function mmRotButtons(cv){
     w.innerHTML = '<button data-r="-1" title="turn the view (Z)">&#8634;</button><button data-r="1" title="turn the view (X)">&#8635;</button>';
     w.querySelectorAll('button').forEach(b=>b.addEventListener('click', e=>{ e.stopPropagation(); if (G.ui==='playing') viewRotate(+b.dataset.r); }));
     document.body.appendChild(w); }
-  const show = cv && cv.style.display!=='none' && !(G.gameMode===3 && G.interior); w.style.display = show ? 'block' : 'none'; if (!show) return;
+  const show = cv && cv.style.display!=='none' && !(G.gameMode===3 && G.interior); w.style.display = show ? 'block' : 'none'; if (!show){ mmRotButtons.k = null; return; }
+  { const now = performance.now(), k = window.innerWidth + 'x' + window.innerHeight + '|' + cv.width + 'x' + cv.height + '|' + (SET.uiScale||1);
+    if (mmRotButtons.k===k && now - (mmRotButtons.t||0) < 300) return; mmRotButtons.k = k; mmRotButtons.t = now; }   /* (RS-508: likewise) */
   const r = cv.getBoundingClientRect(), cx = r.left + r.width/2, cy = r.top + r.height/2, rr = r.width/2, k = 0.92, bs = document.body.classList.contains('touch') ? 34 : 28;
   const [b1, b2] = w.children; for (const [b, sx] of [[b1, -1], [b2, 1]]){ b.style.width = b.style.height = bs+'px'; b.style.left = Math.round(cx + sx*rr*0.6 - bs/2)+'px'; b.style.top = Math.round(r.bottom - bs*0.45)+'px'; }   /* (on the bottom edge, inside the square, RS-141) */
 }
@@ -13591,7 +13594,13 @@ function rsRunePlan(sp, mult){
 function rsRunesOk(sp){ return !!rsRunePlan(sp); }
 function rsSpendRunes(sp){ const pl = rsRunePlan(sp); if (!pl) return; if (chn(raceSpec('runeSave'))){ logMsg('your elven lineage carries the spell - no runes spent', 'magic'); return; } for (const r in pl) skAdd('r_'+r, -pl[r]); }   /* (RS-242: a high elf's spell is sometimes free) */
 function rsSpellMax(sp){ return Math.round((Math.round(sp[3]*1.5) + Math.floor(rsEff('magic')/10) + rsGearSum('magDmg') + rsGodBonus(sp)) * (1 + rsGearSum('magDmgPct')/100)); }
+const RS_CASTS_MEMO = new Map();   /* (RS-508: the HUD asks every frame, for every spell on its bar - a binary search of up to thirty rune plans each) */
 function rsCastsLeft(sp){
+  const w = G.gear && G.gear.weapon, key = sp[0] + '|' + BAG_VER + '|' + (w && w.used ? w.nm : '-') + '|' + G.inv.length + '|' + ((G.player && G.player.turnCount)||0) + '|' + ((G.player && G.player.name)||''), now = performance.now(), hit = RS_CASTS_MEMO.get(key);
+  if (hit && now - hit.t < 500) return hit.v;
+  const v = rsCastsLeftRaw(sp); if (RS_CASTS_MEMO.size > 64) RS_CASTS_MEMO.clear(); RS_CASTS_MEMO.set(key, { v, t:now }); return v;
+}
+function rsCastsLeftRaw(sp){
   const els = rsStaffElems(); if (!Object.keys(sp[4]).some(r=>!els.includes(r))) return Infinity;
   if (!rsRunePlan(sp, 1)) return 0;
   let lo = 1, hi = 2; while (hi < 20000 && rsRunePlan(sp, hi)){ lo = hi; hi *= 2; }
@@ -16546,6 +16555,8 @@ function questScreenAngle(t){
 // the quest list sits under the top-right buttons, and drops below the stats drawer while it is open
 function qtPlace(el){
   el = el || document.getElementById('qtrack'); if (!el) return;
+  { const now = performance.now(), k = window.innerWidth + 'x' + window.innerHeight + '|' + (SET.uiScale||1) + '|' + G.gameMode + '|' + (el.classList.contains('dragging') ? 'd' : '');
+    if (qtPlace.k===k && el===qtPlace.el && now - (qtPlace.t||0) < 300) return; qtPlace.k = k; qtPlace.el = el; qtPlace.t = now; }   /* (RS-508: it read the page's layout back every frame, just after writing to it - a forced layout each frame; now a few times a second, and at once when the window or the view changes) */
   if (LAYOUT.quest && LAYOUT.quest.x!==undefined){ if (!el.classList.contains('dragging')) applyMoved('quest'); el.style.maxHeight = Math.max(120, window.innerHeight - el.getBoundingClientRect().top - 20) + 'px'; el.style.overflowY = 'auto'; return; }   /* (RS-317: a window you've placed stays exactly where you put it - no tug back to the default spot each frame) */
   let top = fp3dActive() ? 300 : (miniMapOn() ? mmBox().top + (mmBox().size + 6)*(SET.uiScale||1) : 58);
   const hud = document.body.classList.contains('dh-panels') && document.body.classList.contains('immersive') && document.querySelector('.hud');
@@ -41934,7 +41945,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-507';
+const GAME_VERSION = 'rs-508';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
