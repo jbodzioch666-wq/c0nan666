@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-523 - A wizard's shield, held like a shield
+
+- **Staff and shield**: carrying a shield with a staff, your off hand reached across to grip the staff as if it were two-handed, leaving the shield held at your chest like a book. The staff is now held in one hand and the shield is raised on your other arm, like any other shield. A staff on its own is still held in both hands.
+
 ## RS-522 - Robes like Gandalf's
 
 - **Heavy wool**: robes now move like Gandalf's grey in Bakshi's *The Lord of the Rings* - they follow your walk lazily and trail further behind, the hem does the swinging while the hips stay calm, and when you stop they make one slow swing and hang still within about a second. No more bounce.
