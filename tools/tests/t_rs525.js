@@ -4,8 +4,8 @@
 module.exports = async page=>{
   const r = await page.evaluate(async ()=>{ const out = {};
     goToCharCreate(); renderOverlay(); saveCurrentGame = ()=>{};
-    const sl = [...document.querySelectorAll('.bdrow input[type=range]')]; out.sliders = sl.length; out.keys = sl.map(s=>s.dataset.k).join(',');
-    out.presets = document.querySelectorAll('.bdpre .btn').length; out.avgSel = !!document.querySelector('.bdpre .btn.sel') && document.querySelector('.bdpre .btn.sel').textContent==='Average';
+    const sl = [...document.querySelectorAll('.bdrow input[onchange^="lookBodySet"]')]; out.sliders = sl.length; out.keys = sl.map(s=>s.dataset.k).join(',');
+    out.presets = document.querySelector('.bdwrap').querySelectorAll('.bdpre .btn').length; out.avgSel = !!document.querySelector('.bdpre .btn.sel') && document.querySelector('.bdpre .btn.sel').textContent==='Average';
     /* a drag moves the number only; letting go sets the look */
     const fatEl = sl.find(s=>s.dataset.k==='fat'); fatEl.value = 90; lookBodyDrag(fatEl); out.dragNum = fatEl.parentElement.querySelector('.bdv').textContent; out.dragLook = lookBody(lookTarget()).fat;
     lookBodySet('fat', 0.9); out.setLook = lookBody(lookTarget()).fat; out.touched = G.ccLookTouched; out.custom = !document.querySelector('.bdpre .btn.sel');
@@ -22,7 +22,7 @@ module.exports = async page=>{
     lookBodyPreset('Giant'); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing');
     const pt = rsPlayerLook(); out.made = pt.stature > 1.07 && pt.o.bulk > 1.1 && pt.o.bodyMus===0.7; out.saved = G.player.look.bd && G.player.look.bd.height===1;
     /* at the barber's: the sliders, free */
-    openMakeover(); renderOverlay(); out.barber = document.querySelectorAll('.bdrow input[type=range]').length===LOOK_BODY.length && /for nothing/.test(document.querySelector('.bdhead').textContent);
+    openMakeover(); renderOverlay(); out.barber = document.querySelectorAll('.bdrow input[onchange^="lookBodySet"]').length===LOOK_BODY.length && /for nothing/.test(document.querySelector('.bdhead').textContent);
     const gold = G.player.gold; lookBodySet('fat', 0.2); out.moCost = makeoverCost(); makeoverConfirm(); out.moApplied = G.player.look.bd.fat===0.2 && G.player.gold===gold && G.ui!=='makeover';
     return out; });
   console.log(JSON.stringify(r));

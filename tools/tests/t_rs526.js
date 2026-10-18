@@ -10,7 +10,7 @@ module.exports = async page=>{
     handleKeydown({ key:'ArrowRight', target:document.body, preventDefault(){} }); out.key = G.chosenRace===4;
     handleKeydown({ key:'2', target:document.body, preventDefault(){} }); out.num = G.chosenRace===1;
     out.aff = /xp/.test(q('.rpaff').textContent) && q('.rpgift b').textContent===RACES[1][3];
-    out.kits = document.querySelectorAll('#overlay .choice-row[onclick*="chosenKit"]').length; out.sliders = document.querySelectorAll('#overlay .bdrow').length;
+    out.kits = document.querySelectorAll('#overlay .choice-row[onclick*="chosenKit"]').length; out.sliders = document.querySelectorAll('#overlay .bdrow input[onchange^="lookBodySet"]').length;
     return out; });
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };

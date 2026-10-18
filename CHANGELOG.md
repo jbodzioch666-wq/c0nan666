@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-529 - Shape your face
+
+- **Face sliders**: a FACE section under the build in the character creator - jaw, chin, cheeks, brow, nose length and width, mouth, lips and age. Each face is its own sculpt, in the strong-nosed, deep-eyed style of the old cartoons; at the middle of every slider (and age a young adult's) the face is the one you had.
+- **Age**: from a young adult on, lines come - across the forehead, the folds from the nose to the corners of the mouth, a little fullness under the eyes - deeper the older you set it.
+- **The preview closes in**: shaping a face zooms the turning figure in on it; **look closer** toggles the zoom, and there's a **random face** and a **reset**.
+- **At the barber's too**, for nothing, like the build.
+
 ## RS-528 - Skin that isn't plastic
 
 - **Light into skin**: skin now takes light the way real skin does - a little way in and back out warm. Where you're lit, the edges turning away glow faintly warm, and the shadowed side is lifted with a ruddy light instead of falling to grey. It's a touch less glossy too. Every face, hand and bare arm in the game, players, townsfolk and monsters alike.
