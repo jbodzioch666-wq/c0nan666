@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs518 | Tome icons per tier with your device; the hotbar ranged button shows your own bow or crossbow |
 | rs517 | Weapons, staves, bows, crossbows, thrown and jewellery icons drawn per kind and tier, all distinct |
 | rs516 | Robe skirts as cloth near you: trail when walking, flare on turns, settle, legs inside; far folk posed |
 | rs514 | A worn piece tapped on the figure is described at the bottom, with a take-off button |

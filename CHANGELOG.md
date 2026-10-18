@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-518 - Tomes and the ranged button
+
+- **Tomes drawn like the rest**: a tome's icon is now a closed book in its dye with cream page edges and leather grain, finer each tier - corner caps from Splitbark, glowing runes round the border from Mystic, gold corners and a clasp with your chosen device (or a star) inlaid from Infinity, and a glowing green gem on Ahrim's.
+- **The ranged button shows your weapon**: the hotbar's ranged button used one stock bow for everything; it now shows the very weapon you carry - your crossbow in its metal, your magic longbow, your darts or chinchompas.
+
 ## RS-517 - Weapons and jewellery, redrawn
 
 - **Every weapon its own icon, in its own metal**: daggers, swords, longswords, 2h swords, scimitars, maces, warhammers, battleaxes, spears and halberds each have their own shape now - the halberd no longer looks like a spear - drawn in their metal and finer each tier: polished from steel, a gilded guard from mithril, a gold-wired grip from adamant, a gem in the pommel on rune and dragon, and dragon's dark serrated spine and spiked guard.
