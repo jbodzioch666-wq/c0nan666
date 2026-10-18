@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-548 - The robe in one piece
+- **One cloth from hem to bust:** the robe's skirt now runs on up over the hips and waist to just under the bust, laid smoothly over the body of whatever build is wearing it. Its top edge tucks in so you can't see where it ends. Before, the top ended at the hips and the skirt began there, and the join showed as a line all the way round.
+- **Tied at the waist:** the cord is tied round the natural waist, where the body is narrowest, with its knot and two hanging ends off to one side. It used to sit low on the hips, over the join.
+- **Moves as one:** above the hips the cloth turns and bends with the body, so nothing pokes through when you swing, turn or lean. Below, it still sways and flares as you walk, and drapes over a seat as before.
+
 ## RS-547 - Robes that hang right, ropes and a crest
 - **No bulge below the belt:** a robe's skirt now goes down over the hips, front and back, before it flares to the hem. It used to flare straight out from the belt, so on a slim body, such as a female dragonborn with the Dancer build, it stuck out in front like a pot belly. It now meets the robe's top at the waist without a lip, and the cord sits flat round it.
 - **No pinched waist:** robes no longer dip in at the waist. On a wood elf the top used to sit on a narrow stalk above the skirt.

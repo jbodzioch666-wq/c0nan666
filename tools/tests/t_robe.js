@@ -35,10 +35,10 @@ module.exports = async page=>{
     return out; });
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
-  A(r.topOverPlate.includes(0.48) && !r.topOverPlate.some(h=>h < 0.3), 'a robe over plate legs is a full robe to the ankles');
-  A(!r.bottomAlone.includes(0.48), 'cloth trousers on their own are trousers, no skirt');
-  A(r.both.includes(0.48) && !r.both.some(h=>h < 0.3), 'robe and trousers: the long skirt, and nothing shorter to poke through');
-  A(!r.plateOnly.includes(0.48), 'plate legs are still legs');
+  A(r.topOverPlate.some(h=>h >= 0.48) && !r.topOverPlate.some(h=>h < 0.3), 'a robe over plate legs is a full robe to the ankles (RS-548: and on up to under the bust)');
+  A(!r.bottomAlone.some(h=>h >= 0.48), 'cloth trousers on their own are trousers, no skirt');
+  A(r.both.some(h=>h >= 0.48) && !r.both.some(h=>h < 0.3), 'robe and trousers: the long skirt, and nothing shorter to poke through');
+  A(!r.plateOnly.some(h=>h >= 0.48), 'plate legs are still legs');
   A(r.clip.follow < 0.02, 'mid-stride the legs stay inside the robe, which moves with them');
   A(r.kind.robe==='trousers' && r.kind.plate==='gear:legs', 'trousers have their own icon (RS-512), plate legs theirs (RS-513)');
   A(r.iconMid.robe < 0.3 && r.iconMid.plate < 0.3, 'the trousers icon is two legs, not a skirt');

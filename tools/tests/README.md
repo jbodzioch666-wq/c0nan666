@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs548 | The robe in one piece: its cloth from the hem up to under the bust over the bodice, no seam at the hips, the cord at the natural waist, turning with the torso |
 | rs547 | Robes fall over the hips (no bulge below the belt), meet the bodice front and back, no pinched waist, pot belly in the cloth's shade; rope dreadlocks; mohawk crest |
 | rs546 | Nothing worn but what you wear (underclothes in the world, no shirt or trouser pickers); the robe one garment - skirt in the bodice's cloth, a cord, a drape over a heavy body |
 | rs544 | Arms and sides across builds: mail sleeves on a hauberk, a jerkin skirt wide enough for heavy hips, arms hanging clear of a heavy body |

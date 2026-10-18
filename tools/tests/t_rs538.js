@@ -10,7 +10,8 @@ module.exports = async page=>{
       const rg = m3dRingAt([rig.chestMesh, rig.pelvisMesh], 0.025, 0.004, 0.94), R0 = belt.geometry.parameters.radius; out[k] = { beltX:+(R0*belt.scale.x).toFixed(4), bodyX:+rg.x.toFixed(4) }; }
     for (const [k, bd] of [['robeAvg', null], ['robeHeavy', heavy]]){ const rig = build('cloth', 3, bd), sk = rig.skirt, p = sk.geometry.attributes.position; let top = -9, wx = 0; for (let i=0;i<p.count;i++) if (p.getY(i) > top) top = p.getY(i);
       for (let i=0;i<p.count;i++) if (p.getY(i) > top - 0.01) wx = Math.max(wx, Math.abs(p.getX(i)*sk.scale.x));
-      const rg = m3dRingAt([rig.chestMesh, rig.pelvisMesh], 0.014, 0.01); out[k] = { skirtWaist:+wx.toFixed(4), body:+rg.x.toFixed(4) }; }
+      wx = 0; for (let i=0;i<p.count;i++) if (Math.abs(p.getY(i) + sk.position.y - 0.014) < 0.01) wx = Math.max(wx, Math.abs(p.getX(i)*sk.scale.x));   /* (RS-548: the robe's one cloth runs on up over the waist - measured where the hips meet the waist) */
+      const rg = m3dRingAt([rig.chestMesh.geometry.userData.from ? Object.assign(rig.chestMesh.clone(), { geometry:rig.chestMesh.geometry.userData.from }) : rig.chestMesh, rig.pelvisMesh], 0.014, 0.01); out[k] = { skirtWaist:+wx.toFixed(4), body:+rg.x.toFixed(4) }; }
     { const rig = build('metal', 5, heavy), tb = rig.torsoIn.getObjectByName('tabard'), p = tb.geometry.attributes.position; let under = 0, n = 0;
       for (let i=0;i<p.count;i++){ const x = p.getX(i), y = p.getY(i) + tb.position.y, z = p.getZ(i), sz = m3dSurfZ([rig.chestMesh, rig.pelvisMesh], x, y, 0.006); if (sz > 0){ n++; if (z < sz - 0.001) under++; } }
       out.tabard = { under, n }; }

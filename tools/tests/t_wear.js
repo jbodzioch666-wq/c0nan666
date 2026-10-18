@@ -15,7 +15,7 @@ module.exports = async page=>{
         if (c.geometry===m3dPauldronGeo('plate', c.geometry.userData.r || 0) || /pauldron/.test(c.geometry.name||'')) pauld++; });
       rig.torsoIn.children.forEach(c=>{ if (c.isMesh && [...M3D.sculpt.entries()].some(([k, g])=>g===c.geometry && k.startsWith('pauldron'))) pauld++; });
       const limbWear = [rig.arms[0].sh.children[0].children[0], rig.legs[0].hip.children[0].children[0]].map(m=>{ const k = [...M3D.sculpt.entries()].find(([k, g])=>g===m.geometry); return k ? k[0] : '?'; });
-      return { wear:rig.wear, belt, neck, pauld, tabard, box, limbWear, chestKey:[...M3D.sculpt.entries()].find(([k, g])=>g===rig.chestMesh.geometry)[0] }; };
+      return { wear:rig.wear, belt, neck, pauld, tabard, box, limbWear, chestKey:[...M3D.sculpt.entries()].find(([k, g])=>g===(rig.chestMesh.geometry.userData.from || rig.chestMesh.geometry))[0] }; };   /* (RS-548: a robe's bodice is trimmed under its cloth) */
     out.bandit = info('bandit'); out.knight = info('knight'); out.orc = info('orc warrior'); out.fanatic = info('fanatic'); out.troll = info('troll');
     return out; });
   const A = (c, m)=>{ if (!c) throw new Error(m+' :: '+JSON.stringify(r)); };

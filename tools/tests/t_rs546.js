@@ -11,7 +11,7 @@ module.exports = async page=>{
     const robe = bd=>{ const L = Object.assign(lookDefault('Human'), { body:1 }); L.bd = Object.assign(lookBodyDefault(L), bd); const pt = rsPlayerLook({ race:'Human', look:L, bare:true }); pt.o.outfit = 'robe'; pt.o.cloth = '#3040a0'; pt.o.legWear = null; pt.o.cape = null;
       const root = m3dBuilders().get(pt.paint)(pt.o), rig = M3D.meta.get(root).rig; return rig; };
     { const rig = robe({}), sk = rig.skirt.material, bo = rig.chestMesh.material; out.cloth = { rep:sk.map ? sk.map.repeat.toArray() : null, skC:sk.color.getHexString(), boC:bo.color.getHexString() };
-      let cord = 0; rig.hips.children.forEach(c=>{ if (c.geometry && c.geometry.type==='TorusGeometry' && c.geometry.parameters.tube < 0.01 && c.geometry.parameters.radius > 0.08) cord++; }); out.cord = cord; }
+      let cord = 0; rig.torsoIn.traverse(c=>{ if (c.name==='robeCord') cord++; }); out.cord = cord; }   /* (RS-548: a cord round the waist, over the robe's one cloth) */
     { const rig = robe({ frame:0.8, fat:0.8, hips:0.9 }), p = rig.chestMesh.geometry.attributes.position; const w = y=>{ let x = 0; for (let i=0;i<p.count;i++) if (Math.abs(p.getY(i) - y) < 0.005) x = Math.max(x, Math.abs(p.getX(i))); return x; };
       out.drape = { hem:+(m3dRingAt([rig.chestMesh, rig.pelvisMesh], 0.014, 0.008) || { x:0 }).x.toFixed(4), belly:+w(0.07).toFixed(4) }; }
     return out; });
