@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-515 - A cleaner worn-gear panel
+
+- **Just the description**: tapping a piece you're wearing now shows only its description - no take off or close buttons (drag it off the figure to take it off, as before), and no "replaces" comparison, which only made sense for something in your bag. Tapping a bag item still shows what it would replace.
+
 ## RS-514 - Worn gear described
 
 - **Tap a worn piece to read it**: on the equipment page, tapping a piece on your figure now describes it at the bottom - its name, stats and the rest - just as tapping something in your bag does, with a **take off** button to move it into the bag. Tapping the bag again shows that item instead; whichever you tapped last is the one described.
