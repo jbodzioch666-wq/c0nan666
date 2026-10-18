@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-525 - Build your body
+
+- **Body sliders**: the character creator has a BUILD section under your appearance - thirteen sliders for frame, weight, muscle, shoulders, chest, waist, hips, neck, head, legs, arms, height and posture. The number follows your finger as you drag; the figure is sculpted afresh the moment you let go, a few milliseconds a frame, so the screen never freezes and the figure you had stands until the new one is ready ("sculpting..." under it meanwhile).
+- **Presets**: Average, Ranger, Scholar, Brute, Dancer, Veteran, Waif and Giant, one tap each; a **random build**; and **reset**. The lit preset tells you which one you're on - none lit means it's your own.
+- **At the barber's too**: an existing character can set their build in the barber's chair, for nothing. Hair and clothes still cost what they did.
+- The old Lean / Average / Stocky row is gone; the frame slider has it. An older character's build carries over.
+
 ## RS-524 - Bodies built to a build
 
 - **Real anatomy**: every humanoid is sculpted again with the figure of Bakshi's rotoscoped film in mind - collarbones with the hollows above them, deltoids that cap the arm, lats broad under the arms tapering to a waist, a neck that is a neck, a firmer chest, a spine with its groove, and the belly, flanks and seat that fill out with weight. The default build is the shape everyone had, so your character, the townsfolk and the monsters keep their look - just better made.
