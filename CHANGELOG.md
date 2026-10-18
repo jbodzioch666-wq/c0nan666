@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-537 - Hair, the modern way
+
+- **Hair cards**: hair was a bundle of solid tubes, and it looked it. It's now drawn the way today's games draw hair - cards: thin ribbons laid in combed rows from the crown down over the head, each carrying a painted clump of a hundred fine strands with gaps between them, cut out so you see through them, tapering to soft tips. Three layers - the body of it, one between, and a few loose strands lifting off the top - so no scalp shows and it doesn't sit like a helmet.
+- **Soft edges**: every card is drawn twice - a solid core, and a see-through pass over it - so the ends and edges are fine and soft, not jagged.
+- **Hair shine**: the highlight on hair runs across the strands (the Kajiya-Kay shading games use), a bright band and a dimmer one tinted by the hair's colour, sliding over the head as the light and your view move.
+- **Every style**: a crop combed down to the hairline; long hair falling to rest on the shoulders and on down the back, the front combed aside off the face; swept hair running back from the brow; a ponytail gathered at the back. Beards and moustaches are cards too.
+
 ## RS-536 - Beasts fall on their side
 
 - **No more rump in the air**: a beast going down rolls over sideways, but the roll followed the blow - struck along its length, from the front or behind, a bear, boar or owlbear was pitched forward onto its chest with its back end hoisted up. It now always goes over across its spine, onto its side, whichever way the blow came, its hips and chest rolling together; and the hips are kept square to the spine, so they can't tip the rump up on their own.

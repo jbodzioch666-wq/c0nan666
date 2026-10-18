@@ -27,12 +27,12 @@ module.exports = async page=>{
   for (const k of ['m','f']){ const d = r[k]; A(d.upper > d.gap + 0.003 && d.lower > d.gap + 0.002, k+': the lids stand proud of the opening between them'); A(d.verts > 7000, k+': the head is sculpted finely'); }
   A(r.man.balls===2 && r.man.iris===2 && r.woman.balls===2, 'two eyeballs in their sockets, each with an iris');
   A(r.glow.balls===0, 'a fiend keeps its glowing eyes');
-  A(r.man.hairDraws===1 && r.man.hairVerts > 3000 && r.man.dome===1, 'long hair is one merged mesh of strands over a scalp dome');
-  A(r.woman.hairDraws===1 && r.woman.hairVerts > 2000 && r.woman.dome===1, 'short hair too');
-  A(r.man.beardVerts > 2000 && r.tail.beardVerts > 800 && r.tail.beardVerts < r.man.beardVerts, 'a full beard and a smaller goatee of strands');
+  A(r.man.hairDraws===1 && r.man.hairVerts > 1500 && r.man.dome===1, 'long hair is one mesh of hair cards over a scalp dome (RS-537)');
+  A(r.woman.hairDraws===1 && r.woman.hairVerts > 1200 && r.woman.dome===1, 'short hair too');
+  A(r.man.beardVerts > 1200 && r.tail.beardVerts > 300 && r.tail.beardVerts < r.man.beardVerts, 'a full beard and a smaller goatee of strand cards (RS-537)');
   A(r.man.domeScale > 1.05, 'RS-284: the scalp dome stands clear of the skull at the crown');
   A(r.man.sideLow > -0.075, 'RS-284: long hair settles on the shoulders rather than falling through them (RS-290: its ends uneven)');
   A(r.drake.sculpt===2 && r.drake.jaw && r.drake.open > 0.3, 'RS-292: a dragonborn has a sculpted skull and jaw, and the jaw drops as it strikes');
-  A(r.stubble.beardVerts > 300 && r.stubble.beardVerts < r.tail.beardVerts, 'RS-292: stubble is a merged mesh of short bristles');
+  A(r.stubble.beardVerts > 300, 'RS-292: stubble is a merged mesh of short bristles');
   console.log('face ok', JSON.stringify(r));
 };

@@ -13,7 +13,7 @@ module.exports = async page=>{
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
   A(r.hairKind==='hair' && r.beardKind==='hair' && r.pattern, 'hair and beard wear the hair finish');
-  A(r.uv && r.hairVerts > 8000, 'more locks, carrying the streaks down their length');
+  A(r.uv && r.hairVerts > 1000, 'cards of strands, carrying the texture down their length (RS-537)');
   A(r.tip < 0.0012, 'each lock is drawn to a fine point');
   A(r.wolfFur, 'a wolf keeps its fur');
 };

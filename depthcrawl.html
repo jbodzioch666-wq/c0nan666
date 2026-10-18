@@ -35948,14 +35948,88 @@ function m3dEyeballs(h, o, mats, fem, wide){
 // (RS-280) hair grown as strands: clumps rooted over the scalp above the hairline, each a tapering lock that lies along the
 // head and falls with its length - cropped short, long to the shoulders, swept back, or gathered into a ponytail;
 // braids, a mohawk, a topknot and dreads keep their own builds on top of a short crop
+/* (RS-537) hair as a modern game draws it: cards - thin ribbons following each lock's curve, laid on the head, each carrying a
+   painted clump of fine strands with gaps between them (cut out by alpha), tapering to fine tips - and a Kajiya-Kay highlight: the
+   shine of hair runs ACROSS the strands, a bright band that slides along the head as the light and your view move, with a second,
+   dimmer one tinted by the hair. The strand texture is four clumps side by side, so neighbouring cards differ */
+function m3dHairTex(){
+  if (M3D.hairTex) return M3D.hairTex;
+  const W = 512, H = 512, c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d');
+  x.clearRect(0, 0, W, H);
+  let seed = 913; const rnd = ()=>{ seed = (seed*16807) % 2147483647; return seed/2147483647; };
+  for (let col=0; col<4; col++){ const x0 = col*W/4, cw = W/4;
+    for (let i=0;i<110;i++){ const sx = x0 + 4 + rnd()*(cw - 8), end = H*(0.6 + rnd()*0.4), wv = (rnd() - 0.5)*10, lw = 0.8 + rnd()*1.4, g = Math.round(165 + rnd()*90);
+      const grad = x.createLinearGradient(0, 0, 0, end); grad.addColorStop(0, `rgba(${g},${g},${g},1)`); grad.addColorStop(0.8, `rgba(${g},${g},${g},0.95)`); grad.addColorStop(1, `rgba(${g},${g},${g},0)`);
+      x.strokeStyle = grad; x.lineWidth = lw; x.lineCap = 'round'; x.beginPath(); x.moveTo(sx, 0); x.bezierCurveTo(sx + wv*0.3, end*0.35, sx + wv, end*0.7, sx + wv*1.2, end); x.stroke(); }
+    const fill = x.createLinearGradient(0, 0, 0, H*0.5); fill.addColorStop(0, 'rgba(185,185,185,0.75)'); fill.addColorStop(1, 'rgba(185,185,185,0)'); x.fillStyle = fill; x.fillRect(x0 + 10, 0, cw - 20, H*0.42); }   /* (a denser body at the root, so the card reads as a clump) */
+  const t = new THREE.CanvasTexture(c); t.anisotropy = 4; t.wrapS = THREE.ClampToEdgeWrapping; t.wrapT = THREE.ClampToEdgeWrapping; if (THREE.sRGBEncoding) t.encoding = THREE.sRGBEncoding;
+  return (M3D.hairTex = t);
+}
+function m3dHairCardMat(mats, soft){
+  const ck = soft ? '__hairCardSoft' : '__hairCard'; if (mats[ck]) return mats[ck];
+  const T = THREE, m = new T.MeshStandardMaterial({ color:0xffffff, map:m3dHairTex(), vertexColors:true, roughness:0.55, metalness:0, side:T.DoubleSide, alphaTest:soft ? 0.04 : 0.5, transparent:!!soft, depthWrite:!soft });
+  m.onBeforeCompile = sh=>{
+    sh.vertexShader = 'attribute vec3 hairTan;\nvarying vec3 vHT;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vHT = normalize(normalMatrix * hairTan);');
+    sh.fragmentShader = 'varying vec3 vHT;\n' + sh.fragmentShader.replace('#include <output_fragment>', `
+  { vec3 Vd = normalize(vViewPosition), Nn = normalize(normal), Tt = normalize(vHT), Lw = normalize((viewMatrix * vec4(0.35, 1.0, 0.55, 0.0)).xyz), Hh = normalize(Lw + Vd);
+    vec3 T1 = normalize(Tt + Nn*0.12), T2 = normalize(Tt - Nn*0.18);
+    float d1 = dot(T1, Hh), d2 = dot(T2, Hh), s1 = pow(sqrt(max(0.0, 1.0 - d1*d1)), 90.0), s2 = pow(sqrt(max(0.0, 1.0 - d2*d2)), 22.0);
+    float lit = 0.35 + dot(totalDiffuse, vec3(0.3, 0.59, 0.11))*1.6;
+    outgoingLight += (vec3(0.36)*s1 + diffuseColor.rgb*0.55*s2)*lit; }
+#include <output_fragment>`);
+  };
+  m.customProgramCacheKey = ()=>'m3dhaircard' + (soft ? 's' : ''); m.userData.kind = 'hair'; m.userData.hex = '#ffffff'; m.userData.special = 'hairCard';
+  return (mats[ck] = m);
+}
+/* (the soft pass: the same cards again, see-through, over the solid ones - the fine fringes a hard cut-out left jagged) */
+function m3dHairCardMesh(geo, mats, name){ const T = THREE, m = new T.Mesh(geo, m3dHairCardMat(mats)); m.name = name; m.castShadow = false; const s = new T.Mesh(geo, m3dHairCardMat(mats, true)); s.name = name + 'Soft'; s.renderOrder = 2; s.castShadow = false; m.add(s); return m; }
+/* cards from locks: each { pts, w, col (t => linear colour) }, turned to face out from c (the head's middle). One geometry for all */
+function m3dHairCardsGeo(cards, c){
+  const T = THREE, pos = [], nor = [], uv = [], col = [], tan = [], idx = [], P = new T.Vector3(), Tg = new T.Vector3(), O = new T.Vector3(), S = new T.Vector3(), Cn = new T.Vector3(c[0], c[1], c[2]);
+  cards.forEach((cd, k)=>{ const cv = new T.CatmullRomCurve3(cd.pts.map(p=>new T.Vector3(p[0], p[1], p[2]))), n = cd.seg || 8, u0 = (k*7 % 4)/4, base = pos.length/3, flip = k % 2;
+    for (let i=0;i<=n;i++){ const t = i/n; cv.getPointAt(t, P); cv.getTangentAt(t, Tg); O.subVectors(P, Cn).normalize(); S.crossVectors(Tg, O); if (S.lengthSq() < 1e-8) S.set(1, 0, 0); S.normalize();
+      const w = cd.w*(1 - 0.35*t), cc = cd.col(t), N2 = O.clone().addScaledVector(S, 0).normalize();
+      for (const sd of [-1, 1]){ pos.push(P.x + S.x*w*0.5*sd + O.x*0.0015, P.y + S.y*w*0.5*sd + O.y*0.0015, P.z + S.z*w*0.5*sd + O.z*0.0015); nor.push(N2.x, N2.y, N2.z); tan.push(Tg.x, Tg.y, Tg.z);
+        uv.push(u0 + (flip ? (sd > 0 ? 0 : 0.25) : (sd > 0 ? 0.25 : 0)), 1 - t); col.push(cc.r, cc.g, cc.b); } }
+    for (let i=0;i<n;i++){ const a = base + i*2; idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); } });
+  const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new T.Float32BufferAttribute(nor, 3)); g.setAttribute('uv', new T.Float32BufferAttribute(uv, 2));
+  g.setAttribute('color', new T.Float32BufferAttribute(col, 3)); g.setAttribute('hairTan', new T.Float32BufferAttribute(tan, 3)); g.setIndex(idx); g.computeBoundingSphere(); return g;
+}
+/* (RS-537) hair cards laid as a game artist lays them: in combed rows from the crown down over the head along its meridians, to
+   the hairline (a crop) or on down past the shoulders (long hair), the front ones combed aside off the face; swept hair runs back
+   from the brow; a ponytail is the crop gathered back. Two layers, the second set between the first, so no scalp shows */
+function m3dHairMeridians(st, fem, W, col){
+  const cx = 0, cy = 0.088, cz = -0.008, rx = 0.064*W, ry = 0.072, rz = 0.076, cards = [], long = st==='long', swept = st==='swept', tail = st==='ponytail';
+  const on = (az, el, k)=>[cx + Math.cos(el)*Math.sin(az)*rx*k, cy + Math.sin(el)*ry*k, cz + Math.cos(el)*Math.cos(az)*rz*k];
+  const hairEl = az=>{ const f = Math.cos(az), y = f > 0.6 ? 0.123 - (fem ? 0.008 : 0) : f > -0.3 ? 0.08 + f*0.04 : 0.05; return Math.asin(Math.max(-0.95, Math.min(0.95, (y - cy)/ry))); };   /* (the hairline: high on the brow, over the ears, low at the nape) */
+  for (const [N, lift, a0, shrink] of [[40, 1.035, 0, 1], [34, 1.062, 0.5, 0.93], [14, 1.085, 0.25, 0.5]]){   /* (a third, few and fine: loose strands lifting off the rest, so it isn't a helmet) */
+    for (let k=0;k<N;k++){ const j = fpHash(k, N, 71) - 0.5, az = (k + a0)/N*Math.PI*2 + j*0.06, f = Math.cos(az), pts = [];
+      const elEnd = hairEl(az) - 0.05, frontLong = long && f > 0.35, sw = (fpHash(k, N, 73) - 0.5)*0.12;
+      if (swept){   /* (from the brow, back over the top to the crown and down the back of the head) */
+        const azS = Math.sin(az) >= 0 ? 0.3 + Math.abs(Math.sin(az))*1.2 : -(0.3 + Math.abs(Math.sin(az))*1.2);
+        for (let i=0;i<=6;i++){ const t = i/6, el = hairEl(0) + 0.08 + t*(Math.PI - 2*(hairEl(0) + 0.08)); const a = el > Math.PI/2 ? Math.PI - azS : azS, e2 = el > Math.PI/2 ? Math.PI - el : el; pts.push(on(a + (el > Math.PI/2 ? sw : -sw)*t, e2, lift + t*0.012)); }
+        if (f < 0) continue; }
+      else {
+        const el0 = 1.42 - (fpHash(k, N, 79))*0.08, steps = 7;
+        for (let i=0;i<=steps;i++){ const t = i/steps, el = el0 + (elEnd - el0)*t, a = frontLong ? az + Math.sign(Math.sin(az) || 1)*(1.35 - Math.abs(az > Math.PI ? az - 2*Math.PI : az))*Math.min(1, t*1.4) : az + sw*t;
+          pts.push(on(a, el, lift + t*0.01)); }
+        if (long && !frontLong){   /* (and on down, falling clear of the head and over the shoulders and back) */
+          const last = pts[pts.length - 1], side = Math.abs(Math.sin(az)) > 0.45 && f > -0.75, yEnd = side ? -0.05 - fpHash(k, N, 83)*0.018 : -0.13 - fpHash(k, N, 83)*0.03, out = 1.14 + fpHash(k, N, 87)*0.07;   /* (resting on the shoulders at the sides - not through them - and on down the back) */
+          for (let i=1;i<=4;i++){ const t = i/4; pts.push([last[0]*(1 + (out - 1)*t), last[1] + (yEnd - last[1])*t, (last[2] - cz)*(1 + (out - 1)*t*(f < 0 ? 1.15 : 1)) + cz - (f < -0.3 ? 0.02*t : 0)]); } }
+        if (tail && f < 0.2){ const last = pts[pts.length - 1], g = [0, 0.1, -0.084]; pts.push([last[0]*0.5 + g[0]*0.5, last[1]*0.5 + g[1]*0.5, last[2]*0.5 + g[2]*0.5]); pts.push(g); } }   /* (gathered to the tie at the back) */
+      const wB = (long ? 0.024 : 0.021)*W*shrink*(0.9 + fpHash(k, N, 89)*0.25);
+      cards.push({ pts, w:wB, col:t=>col(0.25 + t*0.75), seg:pts.length + 2 }); } }
+  return cards;
+}
 function m3dHairStrands(h, o, hairM, wide, mats, st){
   const T = THREE, W = wide||1, C = new T.Color(o.hair||'#3a2618'), dark = C.clone().multiplyScalar(0.7), light = C.clone().multiplyScalar(1.12), scalpM = m3dMat(mats, mpTone(o.hair||'#3a2618', -0.22), 'hair');
   const col = t=>dark.clone().lerp(light, Math.min(1, t*1.2)).convertSRGBToLinear(), mat = m3dVC(mats, hairM);
   const long = st==='long', swept = st==='swept', tail = st==='ponytail', fem = !!o.fem;
-  const cx = 0, cy = 0.088, cz = -0.008, rx = 0.064*W, ry = 0.072, rz = 0.076, list = [];
+  const cx = 0, cy = 0.088, cz = -0.008, rx = 0.064*W, ry = 0.072, rz = 0.076, list = [], cards = [];
   const crop = !long && !swept && !tail, part = crop ? (fem ? -0.016 : 0) : 0;   /* (RS-289: a short crop lies flat along the head away from a parting - a woman's on one side) */
   const N = Math.round((long ? 95 : crop ? 130 : 80)*1.6), L0 = long ? 0.14 : crop ? (fem ? 0.075 : 0.05) : 0.045;   /* (RS-533: more locks, finer) */
-  for (let i=0;i<N;i++){
+  cards.push(...m3dHairMeridians(st, fem, W, col));   /* (RS-537: combed rows of cards; the scattered locks below are no longer grown) */
+  for (let i=0;i<0;i++){
     const u = fpHash(i, 11, 97), v = fpHash(i, 12, 97), th = (u - 0.5)*Math.PI*2, ph = 0.05 + v*0.95;   // azimuth round the head (0 = front), elevation
     const nx = Math.cos(ph)*Math.sin(th), ny = Math.sin(ph), nz = Math.cos(ph)*Math.cos(th);
     const front = Math.cos(th), y = cy + ny*ry;
@@ -35983,14 +36057,18 @@ function m3dHairStrands(h, o, hairM, wide, mats, st){
       const side = Math.abs(pts[2][0]) > 0.038, yMin = (side ? -0.028 : -0.068) - fpHash(i, 17, 97)*0.03; if (pts[2][1] < yMin) pts[2][1] = yMin + sw*0.3;   /* (RS-290: the ends uneven, not a blunt line) */
       if (side) pts[2][0] += Math.sign(pts[2][0])*0.01; if (pts[2][2] < -0.03) pts[2][2] -= 0.018;
       pts[1][1] = Math.max(pts[1][1], (pts[0][1] + pts[2][1])/2); pts[1][0] = (pts[0][0] + pts[2][0])/2 + N3[0]*0.01; pts[1][2] = (pts[0][2] + pts[2][2])/2 + N3[2]*0.01; }
-    list.push(m3dTaper(pts, r, 0.0007, mat, long ? 10 : 7, 8, col));   /* (RS-533: drawn to a fine point - the tips were blunt) */
+    const cw = r*(crop ? 4.2 : 3.4), cardCol = t=>col(0.25 + t*0.75);   /* (RS-537: a card of strands; the root no darker than a quarter of the way down) */
+    cards.push({ pts, w:cw, col:cardCol, seg:long ? 10 : 7 });
+    if (i % 2===0) cards.push({ pts:pts.map(q=>[cx + (q[0] - cx)*0.975, cy + (q[1] - cy)*0.975, cz + (q[2] - cz)*0.975]), w:cw*0.8, col:t=>cardCol(t*0.85), seg:long ? 10 : 7 });   /* (and an under layer, a shade darker, so no scalp shows between) */
   }
   if (tail){ for (let i=0;i<22;i++){ const a = i/22*Math.PI*2, r0 = 0.012, x = Math.cos(a)*r0, z = -0.08 + Math.sin(a)*r0*0.6, sw = (fpHash(i, 16, 97) - 0.5)*0.015;
-      list.push(m3dTaper([[x, 0.11, z],[x*1.4 + sw, 0.06, z - 0.03],[x*0.9 + sw, -0.03, z - 0.02],[x*0.6, -0.08, z + 0.01]], 0.0085, 0.0025, mat, 8, 6, col)); }
+      cards.push({ pts:[[x, 0.11, z],[x*1.4 + sw, 0.06, z - 0.03],[x*0.9 + sw, -0.03, z - 0.02],[x*0.6, -0.08, z + 0.01]], w:0.016, col, seg:9, c:[0, 0.02, -0.07] }); }
     m3dSphere(h, 0.012, m3dMat(mats, '#3a2a1a', 'leather'), 0, 0.108, -0.082, 1.2, 0.8, 1); }
-  const m = m3dMergeMeshes(list, mat); m.name = 'hair'; h.add(m);
+  const main = cards.filter(cd=>!cd.c), tl = cards.filter(cd=>cd.c);
+  const m = m3dHairCardMesh(m3dHairCardsGeo(main, [cx, cy, cz]), mats, 'hair'); h.add(m);   /* (RS-537: cards, not tubes) */
+  if (tl.length) h.add(m3dHairCardMesh(m3dHairCardsGeo(tl, tl[0].c), mats, 'hairTail'));
   { const sc = new T.Mesh(new T.SphereGeometry(1, 28, 18, 0, Math.PI*2, 0, Math.PI*0.55), scalpM); sc.position.set(0, 0.088, -0.008); sc.scale.set(0.064*W*1.06, 0.072*1.065, 0.076*1.065); sc.rotation.x = -0.7; h.add(sc); }   /* (RS-284: a little larger, so the skull never shows through at the crown) */   // the scalp under the locks: the skull's own dome, tilted back so its rim runs along the hairline
-  if (long){ m3dSphere(h, 0.06, scalpM, 0, 0.055, -0.048, W*1.08, 1.35, 0.62); for (const s of [-1,1]) m3dSphere(h, 0.028, scalpM, s*0.062*W, 0.05, -0.016, 0.5, 1.6, 0.9); }   // the mass of it behind and beside the neck
+  /* (RS-537: long hair's solid mass behind the neck is gone - the cards fall there, and it showed through them) */
   return m;
 }
 // (RS-280) beards of strands: a full beard hangs from the whole jaw line, a goatee from the chin alone, with a moustache
@@ -36002,10 +36080,11 @@ function m3dBeardStrands(h, o, mats, kind){
   for (let i=0;i<N;i++){ const u = fpHash(i, 21, 89), v = fpHash(i, 22, 89), th = (u - 0.5)*(full ? 2.5 : 0.8), yy = 0.012 + v*(full ? 0.05 : 0.025);   // round the jaw, chin to ear
     const jx = 0.049*W, jz = 0.05, px = Math.sin(th)*jx, pz = 0.026 + Math.cos(th)*jz - Math.abs(th)*0.004, py = yy + Math.abs(th)*0.012;
     const n = [Math.sin(th), -0.3, Math.cos(th)], nl = Math.hypot(...n), N3 = n.map(a=>a/nl), L = Lf*(0.6 + fpHash(i, 23, 89)*0.6)*(1 - Math.abs(th)*0.22), sw = (fpHash(i, 24, 89) - 0.5)*0.012;
-    list.push(m3dTaper([[px, py, pz], [px + N3[0]*0.008, py - L*0.45, pz + N3[2]*0.008 + 0.006], [px + N3[0]*0.004 + sw, py - L, pz + N3[2]*0.002 + 0.012]], 0.0095*(0.8 + fpHash(i, 25, 89)*0.4)*0.82, 0.0007, mat, 7, 7, col)); }
+    list.push({ pts:[[px, py, pz], [px + N3[0]*0.008, py - L*0.45, pz + N3[2]*0.008 + 0.006], [px + N3[0]*0.004 + sw, py - L, pz + N3[2]*0.002 + 0.012]], w:0.0095*(0.8 + fpHash(i, 25, 89)*0.4)*2.6, col, seg:7 }); }   /* (RS-537: a card of strands) */
   for (const s of [-1,1]) for (let i=0;i<7;i++){ const t = i/6, x0 = s*(0.003 + t*0.004), y0 = 0.052 - t*0.003;   // the moustache
-    list.push(m3dTaper([[x0, y0, 0.079],[s*(0.016 + t*0.004), 0.049 - t*0.004, 0.077],[s*(0.03 + t*0.003), 0.041 - t*0.006, 0.068]], 0.0048, 0.0006, mat, 7, 6, col)); }
-  const m = m3dMergeMeshes(list, mat); m.name = 'beard'; h.add(m);
+    list.push({ pts:[[x0, y0, 0.079],[s*(0.016 + t*0.004), 0.049 - t*0.004, 0.077],[s*(0.03 + t*0.003), 0.041 - t*0.006, 0.068]], w:0.011, col, seg:6, stache:1 }); }
+  const m = m3dHairCardMesh(m3dHairCardsGeo(list.filter(c=>!c.stache), [0, 0.05, -0.005]), mats, 'beard'); h.add(m);
+  h.add(m3dHairCardMesh(m3dHairCardsGeo(list.filter(c=>c.stache), [0, 0.06, 0.05]), mats, 'stache'));
   if (full) m3dSphere(h, 0.044, bm, 0, 0.02, 0.036, 1.02*W, 0.72, 0.92);   // (a mass under the strands, so the jaw doesn't show through)
   return m;
 }
@@ -42743,7 +42822,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-536';
+const GAME_VERSION = 'rs-537';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

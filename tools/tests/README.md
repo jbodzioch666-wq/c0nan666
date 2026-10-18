@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs537 | Hair as cards in combed rows (alpha-cut strand clumps, soft second pass, Kajiya-Kay shine); beards too |
 | rs536 | Beasts and dragons die on their side, legs out of their bodies, hips square (no rump in the air) |
 | rs534 | An empty off hand rests open (closes on shield, tome, blade, bow, two-hand grip); shod feet wear a made boot |
 | rs533 | Hair, brows and beards in a streaked hair finish with sheen; more, finer locks drawn to points; beasts keep fur |
