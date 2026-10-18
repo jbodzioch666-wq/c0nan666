@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs534 | An empty off hand rests open (closes on shield, tome, blade, bow, two-hand grip); shod feet wear a made boot |
 | rs533 | Hair, brows and beards in a streaked hair finish with sheen; more, finer locks drawn to points; beasts keep fur |
 | rs532 | Eye sliders: size and spacing, sockets, lids and eyeballs moving together; defaults unchanged |
 | rs531 | Muscle shows: chest, traps, delts, lats, arms, thighs and calves swell from soft to hard; sleeves fit; default unchanged |

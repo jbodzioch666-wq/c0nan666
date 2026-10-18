@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-534 - Open hands and made boots
+
+- **An open hand**: your off hand was always a clenched fist round nothing. When it's empty it now rests open - the palm, the fingers a little curled, the thumb alongside. It still closes on a shield, a tome, an off-hand blade, a bow, or the grip of a two-handed weapon or quarterstaff.
+- **Boots**: shod feet were a simple rounded shape; now they're a cobbler's boot - a rounded toe box, a stitched sole standing out from the upper all round, a heel block, a folded cuff at the top and a seam down the front. Bare feet keep their own shape.
+
 ## RS-533 - Hair that looks like hair
 
 - **A finish of its own**: hair, brows and beards used the same speckled finish as an animal's fur, so a head of hair read like a knitted cap. Now they have a hair finish - fine streaks that run down each lock and back from the crown, with a soft sheen where the light catches it.
