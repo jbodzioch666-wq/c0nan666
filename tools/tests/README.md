@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs528 | Skin shading: a warm subsurface shader for skin, and a flush in the cheeks, nose, ears and lips of flesh faces |
 | rs527 | The appearance preview frames every race head to foot (hats and boots included); zoom still finds the face |
 | rs526 | The creation screen's race is a picker (arrows, gift, skills, dots); the starting stats row is gone |
 | rs525 | Body sliders in the creator and at the barber's (free): presets, random build, reset; the preview sculpts the new figure over frames |

@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-528 - Skin that isn't plastic
+
+- **Light into skin**: skin now takes light the way real skin does - a little way in and back out warm. Where you're lit, the edges turning away glow faintly warm, and the shadowed side is lifted with a ruddy light instead of falling to grey. It's a touch less glossy too. Every face, hand and bare arm in the game, players, townsfolk and monsters alike.
+- **A flush of warmth**: the cheeks, the tip of the nose, the ears and the lips are rosier than the rest of the face, as blood shows through. On humans, elves, dwarves, halflings and the other folk, orcs, goblins and hags - not on golems, skeletons and the like.
+- The faces are re-sculpted once for the new colours (a moment on first sight, cached after).
+
 ## RS-527 - The whole of you in the preview
 
 - **Head to foot**: the turning figure in the character creator, the barber's chair and the dye works is now framed to the figure as it stands - hat, horns, ears and boots included - so a tall wood elf no longer loses her feet and hat off the edges, and a gnome isn't lost in empty space. Zooming in still closes on the face.
