@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs543 | Every hairstyle as cards: plaited braids, rope dreadlocks, coiled curls, a standing mohawk crest, a topknot with a wound bun; soft nape fringe |
 | rs542 | The creator shows you in linen underclothes cut from the body (briefs; a band round a woman's breasts, bent with a stoop), bare feet; dressed again out of it |
 | rs541 | Plate fitted to the limbs at every build: poleyn and couter cup the joints (no balls), greave follows the calf, vambrace as thick as the forearm |
 | rs540 | Hair moves: hairW weights along the cards, a sway that trails the head on a spring and settles, each figure its own, compiled on the GPU |

@@ -1,5 +1,15 @@
 # Depthcrawl patch notes
 
+## RS-543 - Every hairstyle, done properly
+- **Braids** are plaited from three strands crossing over each other, with a gold bead and a tassel at the end. They were smooth tubes.
+- **Dreadlocks** are twisted ropes growing from all over the back and sides, falling to the shoulders. They were stiff cylinders.
+- **Curls** are coiled loops standing off the head all over. They were a cluster of balls.
+- **The mohawk** is a crest of hair standing up along the middle of a shaved head. It was a row of cones.
+- **The topknot** is hair combed up from all round to a bun wound at the crown, with its tie. It was a ball on a crop.
+- **Under helmets:** braids and dreadlocks fall from under a helmet, as long hair does.
+- **Ponytail sides** rise toward the tie, each lock its own way, instead of running round the head as a band.
+- **Soft hairlines:** swept hair, ponytails and topknots end in loose short strands at the nape instead of a neat line.
+
 ## RS-542 - The creator shows the body
 - **Underclothes in the creator:** while you make your character, they stand in plain linen underclothes. The cloak, collar, tunic, hat and boots are gone, including each race's own costume, so you can see the build sliders and the hair at work. Your shirt and trouser choices still apply once you're in the game.
 - **Fitted to the body:** the briefs, and a band round a woman's breasts, are cut from the body's own surface. They fit any build and follow a wood elf's stoop.
