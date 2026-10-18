@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-514 - Worn gear described
+
+- **Tap a worn piece to read it**: on the equipment page, tapping a piece on your figure now describes it at the bottom - its name, stats and the rest - just as tapping something in your bag does, with a **take off** button to move it into the bag. Tapping the bag again shows that item instead; whichever you tapped last is the one described.
+
 ## RS-513 - The paper doll, redrawn
 
 - **Every piece of gear has its own icon**: helms, bodies, legs, gloves, boots, capes and shields used one icon per slot whatever they were - a wizard's robe got the same picture as a rune platebody. Each is now drawn for what it is, plate, dragonhide or cloth, and finer each tier the way the figure wears it:
