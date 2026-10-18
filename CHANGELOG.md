@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-544 - Armour on the arms, across every build
+- **Mail sleeves:** a mail hauberk now has mail sleeves to the elbow. Before, the mail stopped at the shoulders and the arms were bare cloth.
+- **Skirts fit heavy bodies:** the lower skirt of a jerkin or hauberk is cut wider for a heavy build. A heavy body's hips and thighs used to come through it, leaving a flap at the front.
+- **Arms hang clear:** on a heavy body, wide hips or big muscles, the arms hang a little further out from the sides. They used to sink into the hips and belly.
+
 ## RS-543 - Every hairstyle, done properly
 - **Braids** are plaited from three strands crossing over each other, with a gold bead and a tassel at the end. They were smooth tubes.
 - **Dreadlocks** are twisted ropes growing from all over the back and sides, falling to the shoulders. They were stiff cylinders.

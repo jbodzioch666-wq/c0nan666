@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs544 | Arms and sides across builds: mail sleeves on a hauberk, a jerkin skirt wide enough for heavy hips, arms hanging clear of a heavy body |
 | rs543 | Every hairstyle as cards: plaited braids, rope dreadlocks, coiled curls, a standing mohawk crest, a topknot with a wound bun; soft nape fringe |
 | rs542 | The creator shows you in linen underclothes cut from the body (briefs; a band round a woman's breasts, bent with a stoop), bare feet; dressed again out of it |
 | rs541 | Plate fitted to the limbs at every build: poleyn and couter cup the joints (no balls), greave follows the calf, vambrace as thick as the forearm |
