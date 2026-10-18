@@ -39207,10 +39207,62 @@ function v3LampMove(pl, l){ pl.position.set(l.p[0], l.p[1], l.p[2]); pl.color.se
 // RS-175: a long robe moves with the legs inside it - its front is carried forward by whichever leg steps out, its back by
 // whichever swings behind, more the lower down the cloth, so the legs never poke through it (each figure gets its own copy
 // of the skirt's shape the first time it walks)
+/* (RS-516) a robe's skirt as cloth: every point of it is carried with momentum after the shape the legs give it (m3dSkirtFollow's
+   pose, worked out first) - pulled back toward it by a spring and slowed by drag, in the world, so the skirt trails behind you as
+   you walk, swings out on a turn and settles when you stop. Neighbouring points share their pull, so it moves in waves; the waist
+   is held, the hem swings most; and it may billow out but hardly press in, so the legs - which the pose keeps inside it - never
+   push through when it trails. For you and anyone near you; folk further off keep the plain pose (and sitting, its folds) */
+const SKIRT_K = 70, SKIRT_C = 10, SKIRT_MAX = 0.075, SKIRT_IN = 0.012;
+function m3dSkirtCloth(m, r){
+  const g = m.geometry, prm = g.parameters || {}, RSg = prm.radialSegments, HSg = prm.heightSegments; if (!RSg || !HSg) return;
+  const p = g.attributes.position, A = p.array, N = p.count, W = RSg + 1, NG = W*(HSg + 1), hh = (prm.height||1)/2, hgt = prm.height||1;
+  m.updateWorldMatrix(true, false); const E = m.matrixWorld.elements, now = performance.now()/1000;
+  let u = m.userData.phys;
+  if (!u || u.N!==N){ u = m.userData.phys = { N, P:new Float32Array(N*3), V:new Float32Array(N*3), O:new Float32Array(N*3), O2:new Float32Array(NG*3), TW:new Float32Array(N*3), wt:new Float32Array(N), cap:new Int32Array(Math.max(0, N - NG)), t:now, fresh:1 };
+    const base = m.userData.base;
+    for (let i=0;i<N;i++){ const y = base ? base[i*3+1] : A[i*3+1], s = Math.max(0, Math.min(1, (hh - y)/hgt)), q = Math.max(0, Math.min(1, (s - 0.12)/0.88)); u.wt[i] = Math.pow(q*q*(3 - 2*q), 1.15); }   /* (held at the waist, freest at the hem) */
+    for (let j=NG;j<N;j++){ let best = 0, bd = 1e9; const bx = base ? base[j*3] : A[j*3], by = base ? base[j*3+1] : A[j*3+1], bz = base ? base[j*3+2] : A[j*3+2];
+      for (let i=0;i<NG;i++){ const dx = (base ? base[i*3] : A[i*3]) - bx, dy = (base ? base[i*3+1] : A[i*3+1]) - by, dz = (base ? base[i*3+2] : A[i*3+2]) - bz, d = dx*dx + dy*dy + dz*dz; if (d < bd){ bd = d; best = i; } }
+      u.cap[j - NG] = best; } }   /* (the caps ride on the ring they close) */
+  const TW = u.TW, P = u.P, V = u.V, O = u.O;
+  for (let i=0;i<N;i++){ const k = i*3, x = A[k], y = A[k+1], z = A[k+2]; TW[k] = E[0]*x + E[4]*y + E[8]*z + E[12]; TW[k+1] = E[1]*x + E[5]*y + E[9]*z + E[13]; TW[k+2] = E[2]*x + E[6]*y + E[10]*z + E[14]; }
+  const dt = Math.min(1/30, now - u.t); u.t = now;
+  const sy = Math.hypot(E[4], E[5], E[6]) || 1;
+  let jump = false; if (!u.fresh) for (let i=0;i<N*3;i+=93){ if (Math.abs(P[i] - TW[i]) > 0.6*sy){ jump = true; break; } }
+  if (u.fresh || jump || !(dt > 0)){ P.set(TW); V.fill(0); u.fresh = 0; u.rest = false; return; }   /* (just dressed, or moved too far at once: hang as posed) */
+  /* carried with momentum toward the pose */
+  for (let k=0;k<N*3;k++){ const a = SKIRT_K*(TW[k] - P[k]) - SKIRT_C*V[k]; V[k] += a*dt; P[k] += V[k]*dt; }
+  /* the offset from the pose, into the skirt's own frame (inverse of the 3x3), weighted, kept off the legs, and capped */
+  const inv = (m3dSkirtCloth.M || (m3dSkirtCloth.M = new THREE.Matrix4())).copy(m.matrixWorld).invert().elements;
+  let vmax = 0, omax = 0;
+  for (let i=0;i<N;i++){ const k = i*3, dx = P[k] - TW[k], dy = P[k+1] - TW[k+1], dz = P[k+2] - TW[k+2], w = u.wt[i];
+    let ox = (inv[0]*dx + inv[4]*dy + inv[8]*dz)*w, oy = (inv[1]*dx + inv[5]*dy + inv[9]*dz)*w*0.5, oz = (inv[2]*dx + inv[6]*dy + inv[10]*dz)*w;
+    const tx = A[k], tz = A[k+2], rl = Math.hypot(tx, tz) || 1, rx = tx/rl, rz = tz/rl, d = ox*rx + oz*rz, lim = SKIRT_IN*w;
+    if (d < -lim){ ox += rx*(-lim - d); oz += rz*(-lim - d); }   /* (out, freely; in, barely) */
+    const ol = Math.hypot(ox, oy, oz), cap = SKIRT_MAX; if (ol > cap){ const f = cap/ol; ox *= f; oy *= f; oz *= f; }
+    O[k] = ox; O[k+1] = oy; O[k+2] = oz; vmax = Math.max(vmax, Math.abs(V[k]) + Math.abs(V[k+2])); omax = Math.max(omax, ol); }
+  /* neighbours share their pull: a few passes of smoothing round the ring and up and down it */
+  const O2 = u.O2;
+  for (let pass=0;pass<2;pass++){
+    for (let row=0;row<=HSg;row++) for (let col=0;col<RSg;col++){ const i = row*W + col, l = row*W + (col + RSg - 1)%RSg, rr = row*W + (col + 1)%RSg, up = row > 0 ? i - W : i, dn = row < HSg ? i + W : i;
+      for (let a=0;a<3;a++){ const c0 = O[i*3+a]; O2[i*3+a] = c0 + 0.32*((O[l*3+a] + O[rr*3+a] + O[up*3+a] + O[dn*3+a])*0.25 - c0); } }
+    for (let row=0;row<=HSg;row++){ const s0 = row*W, sN = row*W + RSg; for (let col=0;col<RSg;col++){ const i = s0 + col; O[i*3] = O2[i*3]; O[i*3+1] = O2[i*3+1]; O[i*3+2] = O2[i*3+2]; } O[sN*3] = O[s0*3]; O[sN*3+1] = O[s0*3+1]; O[sN*3+2] = O[s0*3+2]; } }   /* (the seam closed) */
+  /* (and kept off the legs once more - the smoothing shares the back's trailing with the front, which would press it in) */
+  for (let i=0;i<NG;i++){ const k = i*3, tx = A[k], tz = A[k+2], rl = Math.hypot(tx, tz) || 1, rx = tx/rl, rz = tz/rl, d = O[k]*rx + O[k+2]*rz, lim = SKIRT_IN*u.wt[i];
+    if (d < -lim){ O[k] += rx*(-lim - d); O[k+2] += rz*(-lim - d); } }
+  for (let j=NG;j<N;j++){ const s = u.cap[j - NG]; O[j*3] = O[s*3]; O[j*3+1] = O[s*3+1]; O[j*3+2] = O[s*3+2]; }
+  /* the cloth where it is now, and the state brought into line with what's drawn */
+  for (let i=0;i<N;i++){ const k = i*3, x = A[k] + O[k], y = A[k+1] + O[k+1], z = A[k+2] + O[k+2]; A[k] = x; A[k+1] = y; A[k+2] = z;
+    P[k] = E[0]*x + E[4]*y + E[8]*z + E[12]; P[k+1] = E[1]*x + E[5]*y + E[9]*z + E[13]; P[k+2] = E[2]*x + E[6]*y + E[10]*z + E[14]; }
+  u.rest = vmax < 2e-3 && omax < 1.5e-3;
+  u.mw = E[12].toFixed(4) + ',' + E[14].toFixed(4) + ',' + E[0].toFixed(4) + ',' + E[2].toFixed(4);
+}
 function m3dSkirtFollow(r){
   const m = r.skirt, legs = r.legs; if (!m || !legs || legs.length < 2) return;
   const sw = legs.map(L=>L.hip.rotation.x), kn = legs.map(L=>L.knee.rotation.x), tilt = r.torso ? r.torso.rotation.x : 0, sig = sw[0]*7 + sw[1]*13 + kn[0]*17 + kn[1]*19 + tilt*23 + (r.hips ? r.hips.position.y*29 : 0);   /* (RS-291: the waist turns with the torso) */
-  if (m.userData.own && Math.abs(sig - (m.userData.sig||0)) < 1e-4 && (r.seatBox ? r.seatBox.key : '')===(m.userData.seatKey||'')) return;
+  const ph = m.userData.phys, physOn = !r.seatBox && !(sw[0] < -1 && sw[1] < -1) && m3dNearHero(r, m);   /* (RS-516) */
+  const mwE = m.matrixWorld.elements, mwSig = mwE[12].toFixed(4) + ',' + mwE[14].toFixed(4) + ',' + mwE[0].toFixed(4) + ',' + mwE[2].toFixed(4);
+  if (m.userData.own && Math.abs(sig - (m.userData.sig||0)) < 1e-4 && (r.seatBox ? r.seatBox.key : '')===(m.userData.seatKey||'') && !(physOn && ph && (!ph.rest || ph.mw!==mwSig))) return;
   if (m.userData.own && !r.seatBox && (m.userData.tick = (m.userData.tick||0) + 1) % 2 && !m3dNearHero(r, m)) return;   /* (RS-461: folk away from you refold their robes every other frame) */
   m.userData.sig = sig; m.userData.seatKey = r.seatBox ? r.seatBox.key : '';
   if (!m.userData.own){ m.geometry = m.geometry.clone(); m.userData.own = true; m.userData.base = Float32Array.from(m.geometry.attributes.position.array); for (const c of m.children) if (c.userData.hemLayer) c.geometry = m.geometry; }   /* (RS-430: the rune layer takes the same copy) */
@@ -39235,6 +39287,7 @@ function m3dSkirtFollow(r){
         const ex = B.hw + mg - Math.abs(lx), ez = B.hd + mg - Math.abs(lz); if (ex <= 0 || ez <= 0) continue;
         let nx = lx, nz = lz; if (ex < ez) nx = Math.sign(lx || 1)*(B.hw + mg); else if (lz < 0) nz = -(B.hd + mg); else if (Math.abs(lx) > B.hw*0.45) nx = Math.sign(lx)*(B.hw + mg); else continue;   /* (never forward off the front edge, where the lap's fold falls from the knees: that tore the cloth there; a front corner goes to the side) */
         v.x = B.x + nx*cy + nz*sy; v.z = B.z - nx*sy + nz*cy; v.applyMatrix4(inv); p.setXYZ(i, v.x, v.y, v.z); } }
+    if (m.userData.phys) m.userData.phys.fresh = 1;   /* (RS-516: sitting folds it; it hangs afresh when you stand) */
     p.needsUpdate = true; m3dFastNormals(m.geometry); return; }
   const s0 = Math.sin(sw[0]), s1 = Math.sin(sw[1]), sk0 = Math.sin(sw[0] + kn[0]), sk1 = Math.sin(sw[1] + kn[1]);   /* (RS-498: worked out once - they were four sines per vertex) */
   for (let i=0;i<p.count;i++){
@@ -39246,6 +39299,7 @@ function m3dSkirtFollow(r){
     const Y = y + y0, w = d < 0.1 ? 1 : Math.max(0, 1 - (d - 0.1)/0.25), zz = z + dz + (1 - Math.abs(zn))*side*0.55;   // (the top of the skirt turns with the torso, fading out toward the hem)
     const k3 = i*3; A2[k3] = x; A2[k3+2] = zz + (Y*st + zz*ct - zz)*w; A2[k3+1] = y + (Y*ct - zz*st - Y)*w;   /* (RS-310: x too, back from a seated fold) */
   }
+  if (physOn) try{ m3dSkirtCloth(m, r); }catch(err){ console.error(err); } else if (m.userData.phys) m.userData.phys.fresh = 1;   /* (RS-516: the cloth, near you) */
   p.needsUpdate = true; m3dFastNormals(m.geometry);
 }
 // pose one creature for this frame
@@ -42209,7 +42263,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-515';
+const GAME_VERSION = 'rs-516';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

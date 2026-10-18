@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs516 | Robe skirts as cloth near you: trail when walking, flare on turns, settle, legs inside; far folk posed |
 | rs514 | A worn piece tapped on the figure is described at the bottom, with a take-off button |
 | rs513 | Paper doll icons drawn per family and tier (helms, bodies, robes, legs, gloves, boots, capes, shields), dye and emblem shown |
 | rs511 | Trousers finer each tier (cuffs, seam runes, gold, green), their trim dyeable |

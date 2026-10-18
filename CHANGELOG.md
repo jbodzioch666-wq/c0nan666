@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-516 - Robes that move like cloth
+
+- **Cloth physics on robes**: a robe's skirt is now carried with momentum after the shape your legs give it. It trails behind you as you walk (about 7 cm at the hem), flares out when you turn, and swings back and settles when you stop. Neighbouring folds share the motion, so it moves in waves rather than as a stiff bell; the waist stays put and the hem swings most.
+- **Your legs stay inside it**: the cloth may billow out but hardly presses in, so even trailing behind a long stride the legs never push through it (checked every few frames of a walk in the new test).
+- **For you and those near you**: townsfolk further off keep the plain pose, and sitting still folds the robe over the seat as before.
+- **Cheap**: about a quarter of a millisecond a frame per robe; in the tiefling city on the audit save, with six robed figures near you, the frame time didn't change (11.5 ms).
+
 ## RS-515 - A cleaner worn-gear panel
 
 - **Just the description**: tapping a piece you're wearing now shows only its description - no take off or close buttons (drag it off the figure to take it off, as before), and no "replaces" comparison, which only made sense for something in your bag. Tapping a bag item still shows what it would replace.
