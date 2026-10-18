@@ -1,5 +1,15 @@
 # Depthcrawl patch notes
 
+## RS-539 - Hair, finished
+- **No more flat fringe:** the scalp under the hair used to sit above the hair cards, so it showed as a flat slab on the brow and a bare dome at the crown. It now follows the hairline and lies beneath the cards.
+- **Long hair parts:** it's combed down and aside from a parting to the temples, and it covers the ears instead of letting them poke through.
+- **No seam at the back:** long hair leaves the head at its widest point and falls clear. It used to hug the head down to the nape and then kink outward, leaving a line across the back of the head.
+- **Swept hair is whole:** it runs back from the brow over the top in lanes and covers the back of the head. Half of it was missing.
+- **Ponytails are combed back** to the tie from all round the hairline, with a fuller tail. The front used to be a fringe and the tie a black knot.
+- **Hair under helmets:** long hair and ponytails now fall from under hats and helmets, though not from under a great helm or a hood. They used to vanish.
+- **Hair shines in the world:** characters out in the world had lost the hair highlight. They have it back.
+- **Softer roots:** the dense part near the roots now ends unevenly, not in a jagged line across the head.
+
 ## RS-538 - Armour that fits the body in it
 
 - **Belts round the body**: a belt was the size of the build everyone used to have, so on a heavy body it was buried and on a slight one it floated. It's now measured round the body wearing it.

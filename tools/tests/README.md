@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs539 | Hair finished: scalp under the cards on the hairline, long hair parted and over the ears, swept and ponytail combed back, hair from under helmets, shine kept in the world |
 | rs538 | Armour fits the build: belts round the body, robe waists and skirts as wide as the body, tabards laid on chest and belly |
 | rs537 | Hair as cards in combed rows (alpha-cut strand clumps, soft second pass, Kajiya-Kay shine); beards too |
 | rs536 | Beasts and dragons die on their side, legs out of their bodies, hips square (no rump in the air) |

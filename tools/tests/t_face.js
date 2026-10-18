@@ -11,9 +11,9 @@ module.exports = async page=>{
     const info = pt=>{ const e = m3dInstance({}, pt), h = e.rig.head; let balls = 0, iris = 0, hairMesh = null, hairVerts = 0, beardVerts = 0, dome = 0;
       h.traverse(x=>{ if (!x.isMesh) return; const g = x.geometry; if (g.type==='SphereGeometry' && (Math.abs(g.parameters.radius - 0.0116) < 0.0003 || Math.abs(g.parameters.radius - 0.0122) < 0.0003) && Math.abs(x.position.y - 0.077) < 0.001) balls++;
         if (g.type==='SphereGeometry' && Math.abs(g.parameters.radius - 0.0058) < 0.0005) iris++;
-        if (g.type==='SphereGeometry' && g.parameters.thetaLength < Math.PI*0.6 && x.rotation.x < -0.5) dome++;
+        if (x.name==='scalp') dome++;   /* (RS-539: the scalp follows the hairline, under the cards) */
         if (x.name==='hair'){ hairMesh = x; hairVerts += g.attributes.position.count; const hp = g.attributes.position; let sideLow = 1; for (let i=0;i<hp.count;i++) if (Math.abs(hp.getX(i)) > 0.055) sideLow = Math.min(sideLow, hp.getY(i)); x.userData.sideLow = sideLow; } if (x.name==='beard') beardVerts += g.attributes.position.count; });
-      let domeScale = 0; h.traverse(x=>{ if (x.isMesh && x.geometry.type==='SphereGeometry' && x.geometry.parameters.thetaLength < Math.PI*0.6 && x.rotation.x < -0.5) domeScale = x.scale.y/0.072; });
+      let domeScale = 0; h.traverse(x=>{ if (x.isMesh && x.name==='scalp') domeScale = x.scale.y/0.072; });
       return { balls, iris, dome, domeScale:+domeScale.toFixed(3), hairVerts, beardVerts, hairDraws:hairMesh ? 1 : 0, sideLow:hairMesh ? +hairMesh.userData.sideLow.toFixed(3) : null }; };
     out.man = info(HUM({ outfit:'leather', hair:'#3a2618', hairStyle:'long', beard:'#4a3018', beardStyle:3 }));
     out.woman = info(HUM({ outfit:'leather', hair:'#8a6a3a', hairStyle:'short', fem:true }));
@@ -30,7 +30,7 @@ module.exports = async page=>{
   A(r.man.hairDraws===1 && r.man.hairVerts > 1500 && r.man.dome===1, 'long hair is one mesh of hair cards over a scalp dome (RS-537)');
   A(r.woman.hairDraws===1 && r.woman.hairVerts > 1200 && r.woman.dome===1, 'short hair too');
   A(r.man.beardVerts > 1200 && r.tail.beardVerts > 300 && r.tail.beardVerts < r.man.beardVerts, 'a full beard and a smaller goatee of strand cards (RS-537)');
-  A(r.man.domeScale > 1.05, 'RS-284: the scalp dome stands clear of the skull at the crown');
+  A(r.man.domeScale > 1.02 && r.man.domeScale < 1.04, 'RS-284: the scalp stands clear of the skull at the crown (RS-539: and under the cards)');
   A(r.man.sideLow > -0.075, 'RS-284: long hair settles on the shoulders rather than falling through them (RS-290: its ends uneven)');
   A(r.drake.sculpt===2 && r.drake.jaw && r.drake.open > 0.3, 'RS-292: a dragonborn has a sculpted skull and jaw, and the jaw drops as it strikes');
   A(r.stubble.beardVerts > 300, 'RS-292: stubble is a merged mesh of short bristles');
