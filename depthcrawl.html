@@ -29126,13 +29126,14 @@ const SDF = (()=>{
     const nx = Math.ceil((max[0]-min[0])/h)+1, ny = Math.ceil((max[1]-min[1])/h)+1, nz = Math.ceil((max[2]-min[2])/h)+1;
     const g = new Float32Array(nx*ny*nz).fill(1), mt = new Uint8Array(nx*ny*nz);
     const P = { min, h, nx, ny, nz, g, mt };
-    P.op = (pr, k, m, sub)=>{
+    P.op = (pr, k, m, sub)=>{ if (P.q) P.q.push([pr, k, m, sub]); else P.run(pr, k, m, sub); };   /* (RS-520: a sliced sculpt queues its parts, to splat them a few a frame) */
+    P.run = (pr, k, m, sub, from, until)=>{   /* (RS-520: given a deadline, it stops after the layer that passes it and says where to go on from; -1 when done) */
       const pad = k + 2*h;
       const i0 = Math.max(0, Math.floor((pr.lo[0]-pad-min[0])/h)), i1 = Math.min(nx-1, Math.ceil((pr.hi[0]+pad-min[0])/h));
       const j0 = Math.max(0, Math.floor((pr.lo[1]-pad-min[1])/h)), j1 = Math.min(ny-1, Math.ceil((pr.hi[1]+pad-min[1])/h));
       const k0 = Math.max(0, Math.floor((pr.lo[2]-pad-min[2])/h)), k1 = Math.min(nz-1, Math.ceil((pr.hi[2]+pad-min[2])/h));
       const d = pr.d, ik = k>0 ? 1/k : 0;
-      for (let kk=k0; kk<=k1; kk++){ const z = min[2]+kk*h;
+      for (let kk=Math.max(k0, from||0); kk<=k1; kk++){ if (until && kk < k1 && performance.now() > until) return kk; const z = min[2]+kk*h;
         for (let jj=j0; jj<=j1; jj++){ const y = min[1]+jj*h, row = (kk*ny+jj)*nx;
           for (let ii=i0; ii<=i1; ii++){
             const x = min[0]+ii*h, idx = row+ii, cur = g[idx];
@@ -29146,6 +29147,7 @@ const SDF = (()=>{
             }
             g[idx] = nv;
           } } }
+      return -1;
     };
     P.add = (pr, k, m)=> P.op(pr, k===undefined?0.003:k, m||0, false);
     P.sub = (pr, k)=> P.op(pr, k===undefined?0.0015:k, 0, true);
@@ -29189,14 +29191,17 @@ const SDF = (()=>{
     const l = (a,b,t)=>a+(b-a)*t*t*(3-2*t);
     return l(l(l(hash3(xi,yi,zi),hash3(xi+1,yi,zi),tx), l(hash3(xi,yi+1,zi),hash3(xi+1,yi+1,zi),tx), ty),
              l(l(hash3(xi,yi,zi+1),hash3(xi+1,yi,zi+1),tx), l(hash3(xi,yi+1,zi+1),hash3(xi+1,yi+1,zi+1),tx), ty), tz); };
-  const mesh = (P)=>{
+  /* (RS-520) the mesher as a generator that pauses after each layer of cells and each run of vertices, so a sculpt can be
+     meshed over several frames; mesh() runs it straight through */
+  const mesh = (P)=>{ const it = meshGen(P); let r; while (!(r = it.next()).done); return r.value; };
+  const meshGen = function*(P){
     const { min, h, nx, ny, nz, g, mt } = P, sy = nx, sz = nx*ny;
     const vid = new Int32Array(nx*ny*nz).fill(-1);
     const pos = [], vm = [];
     const co = [0,1,sy,sy+1,sz,sz+1,sz+sy,sz+sy+1], cx = [0,1,0,1,0,1,0,1], cyv = [0,0,1,1,0,0,1,1], cz = [0,0,0,0,1,1,1,1];
     const E = [[0,1],[2,3],[4,5],[6,7],[0,2],[1,3],[4,6],[5,7],[0,4],[1,5],[2,6],[3,7]];
     let count = 0;
-    for (let k=0;k<nz-1;k++) for (let j=0;j<ny-1;j++) for (let i=0;i<nx-1;i++){
+    for (let k=0;k<nz-1;k++){ yield; for (let j=0;j<ny-1;j++) for (let i=0;i<nx-1;i++){
       const base = (k*ny+j)*nx+i;
       let neg = 0; for (let c=0;c<8;c++) if (g[base+co[c]]<0) neg++;
       if (neg===0 || neg===8) continue;
@@ -29208,7 +29213,7 @@ const SDF = (()=>{
       for (let c=0;c<8;c++){ const v = g[base+co[c]]; if (v<bv){ bv = v; bm = mt[base+co[c]]; } }
       pos.push(min[0]+(i+ax/n)*h, min[1]+(j+ay/n)*h, min[2]+(k+az/n)*h); vm.push(bm);
       vid[base] = count++;
-    }
+    } }
     const idx = [];
     // the cell order passed in winds counter-clockwise around the +axis
     // edge, so it faces +axis - flipped when the solid is on the far side
@@ -29216,14 +29221,14 @@ const SDF = (()=>{
       if (a<0||b<0||c<0||d<0) return;
       if (inside) idx.push(a,b,c, a,c,d); else idx.push(a,c,b, a,d,c);
     };
-    for (let k=0;k<nz-1;k++) for (let j=0;j<ny-1;j++) for (let i=0;i<nx-1;i++){
+    for (let k=0;k<nz-1;k++){ yield; for (let j=0;j<ny-1;j++) for (let i=0;i<nx-1;i++){
       const base = (k*ny+j)*nx+i, v0 = g[base]<0;
       if (j>0 && k>0 && (v0 !== (g[base+1]<0))) quad(vid[base], vid[base-sy], vid[base-sy-sz], vid[base-sz], 0, v0);
       if (i>0 && k>0 && (v0 !== (g[base+sy]<0))) quad(vid[base], vid[base-sz], vid[base-1-sz], vid[base-1], 1, v0);
       if (i>0 && j>0 && (v0 !== (g[base+sz]<0))) quad(vid[base], vid[base-1], vid[base-1-sy], vid[base-sy], 2, v0);
-    }
+    } }
     const N = count, nor = new Float32Array(N*3), col = new Float32Array(N*3);
-    for (let v=0; v<N; v++){
+    for (let v=0; v<N; v++){ if ((v & 127)===0) yield;
       const x = pos[v*3], y = pos[v*3+1], z = pos[v*3+2], e = h*0.9;
       let gx = sample(P,x+e,y,z)-sample(P,x-e,y,z), gy = sample(P,x,y+e,z)-sample(P,x,y-e,z), gz = sample(P,x,y,z+e)-sample(P,x,y,z-e);
       const gl = Math.hypot(gx,gy,gz)||1; gx/=gl; gy/=gl; gz/=gl;
@@ -29249,7 +29254,7 @@ const SDF = (()=>{
     return geo;
   };
   const basis = (ez, up)=>{ ez = norm(ez); let ex = norm(cross(up||[0,1,0], ez)); const ey = cross(ez, ex); return [ex, ey, ez]; };
-  return { sph, ell, shellEll, cap, flat, cylE, torus, tri, part, mesh, sample, basis, norm, cross, add3, sub3, mul3 };
+  return { sph, ell, shellEll, cap, flat, cylE, torus, tri, part, mesh, meshGen, sample, basis, norm, cross, add3, sub3, mul3 };
 })();
 // ---- the skeleton's anatomy, one sculpted part per rigid piece of the rig.
 // Each entry returns a finished BufferGeometry in its joint's local frame
@@ -33137,12 +33142,20 @@ function m3dSkinRoot(root, rig, mats){
     const si = new Uint16Array(nv*4), sw = new Float32Array(nv*4), idx = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni); let vo = 0, io = 0;
     for (const o of list){ const g = o.geometry, c = g.attributes.position.count, b = boneIx.get(o.parent); M.multiplyMatrices(rootInv, o.matrixWorld); N.getNormalMatrix(M); const flip = M.determinant() < 0;   /* (a mirrored part - a left hand, a left wing - has its triangles turned back the right way round) */
       const mc = o.material.color, vc = o.material.vertexColors && g.attributes.color ? g.attributes.color : null;
-      for (const nm of names){ const a = g.attributes[nm], is = a.itemSize, dst = outA[nm];
+      for (const nm of names){ const a = g.attributes[nm], is = a.itemSize, dst = outA[nm], A = a.array, e = M.elements, n = N.elements;
+        if ((nm==='position' || nm==='normal') && !a.isInterleavedBufferAttribute && is===3 && !a.normalized){   /* (RS-520: straight off the arrays - a Vector3 a vertex was most of a template's skinning) */
+          if (nm==='position'){ const bx = bo[b].x, by = bo[b].y, bz = bo[b].z; let rr = reach.get(b)||0;
+            for (let i=0;i<c;i++){ const x = A[i*3], y = A[i*3+1], z = A[i*3+2], w = 1/(e[3]*x + e[7]*y + e[11]*z + e[15]), px = (e[0]*x + e[4]*y + e[8]*z + e[12])*w, py = (e[1]*x + e[5]*y + e[9]*z + e[13])*w, pz = (e[2]*x + e[6]*y + e[10]*z + e[14])*w, o3 = (vo+i)*3;
+              dst[o3] = px; dst[o3+1] = py; dst[o3+2] = pz; const d = Math.sqrt((px-bx)*(px-bx) + (py-by)*(py-by) + (pz-bz)*(pz-bz)); if (d > rr) rr = d; }
+            if (rr > (reach.get(b)||0) || !reach.has(b)) reach.set(b, rr); }
+          else for (let i=0;i<c;i++){ const x = A[i*3], y = A[i*3+1], z = A[i*3+2]; let nx = n[0]*x + n[3]*y + n[6]*z, ny = n[1]*x + n[4]*y + n[7]*z, nz = n[2]*x + n[5]*y + n[8]*z; const l = Math.sqrt(nx*nx + ny*ny + nz*nz); if (l > 0){ nx /= l; ny /= l; nz /= l; } const o3 = (vo+i)*3; dst[o3] = nx; dst[o3+1] = ny; dst[o3+2] = nz; }
+          continue; }
         for (let i=0;i<c;i++){
           if (nm==='position'){ v.fromBufferAttribute(a, i).applyMatrix4(M); dst[(vo+i)*3] = v.x; dst[(vo+i)*3+1] = v.y; dst[(vo+i)*3+2] = v.z; const d = v.distanceTo(bo[b]); if (d > (reach.get(b)||0)) reach.set(b, d); }
           else if (nm==='normal'){ v.fromBufferAttribute(a, i).applyMatrix3(N).normalize(); dst[(vo+i)*3] = v.x; dst[(vo+i)*3+1] = v.y; dst[(vo+i)*3+2] = v.z; }
           else for (let k=0;k<is;k++) dst[(vo+i)*is+k] = a.array[i*is+k]; } }
-      for (let i=0;i<c;i++){ si[(vo+i)*4] = b; sw[(vo+i)*4] = 1; const r = vc ? vc.getX(i) : 1, gg = vc ? vc.getY(i) : 1, bb = vc ? vc.getZ(i) : 1; col[(vo+i)*3] = r*mc.r; col[(vo+i)*3+1] = gg*mc.g; col[(vo+i)*3+2] = bb*mc.b; }
+      const VA = vc && !vc.isInterleavedBufferAttribute && !vc.normalized && vc.itemSize===3 ? vc.array : null;
+      for (let i=0;i<c;i++){ si[(vo+i)*4] = b; sw[(vo+i)*4] = 1; const r = VA ? VA[i*3] : vc ? vc.getX(i) : 1, gg = VA ? VA[i*3+1] : vc ? vc.getY(i) : 1, bb = VA ? VA[i*3+2] : vc ? vc.getZ(i) : 1; col[(vo+i)*3] = r*mc.r; col[(vo+i)*3+1] = gg*mc.g; col[(vo+i)*3+2] = bb*mc.b; }
       if (g.index){ const ia = g.index.array; if (flip) for (let i=0;i+2<ia.length;i+=3){ idx[io++] = ia[i] + vo; idx[io++] = ia[i+2] + vo; idx[io++] = ia[i+1] + vo; } else for (let i=0;i<ia.length;i++) idx[io++] = ia[i] + vo; }
       else if (flip) for (let i=0;i+2<c;i+=3){ idx[io++] = vo + i; idx[io++] = vo + i + 2; idx[io++] = vo + i + 1; } else for (let i=0;i<c;i++) idx[io++] = vo + i;
       vo += c; }
@@ -35046,13 +35059,24 @@ function sculptDbFlush(){
   if (SCULPT_DB.dirty.length) sculptDbPut.tm = setTimeout(sculptDbFlush, 800);
 }
 function m3dSculpt(key, bounds, h, build){
-  M3D.sculpt = M3D.sculpt || new Map();
+  M3D.sculpt = M3D.sculpt || new Map(); const args = M3D_COLLECT ? [key, bounds, h, build] : null;
   if (M3D_COARSE !== 1){ key += '|c' + M3D_COARSE; h *= M3D_COARSE; }
   if (M3D.sculpt.has(key)) return M3D.sculpt.get(key);
   const hit = sculptDbGet('m|' + key); if (hit){ M3D.sculpt.set(key, hit); return hit; }   /* (RS-500: sculpted in an earlier session) */
-  if (M3D_BUDGET && M3D.sculptN++ > 0 && performance.now() > M3D_BUDGET) throw M3D_YIELD;   /* (RS-404: out of time - the rest next frame) */
-  const P = SDF.part(bounds[0], bounds[1], h); build(P);
-  const g = m3dUV(SDF.mesh(P));
+  if (M3D_COLLECT){ if (!M3D_COLLECT.some(a=>a[4]===key)) M3D_COLLECT.push(args.concat([key])); return m3dStandIn(bounds); }   /* (RS-520: a survey run - noted, a box in its place) */
+  let g;
+  if (M3D_BUDGET){   /* (RS-520) on a budget, one sculpt is itself spread over frames: its parts splatted a few at a time, then meshed a
+       layer at a time - a whole sculpt in one frame was 80-90ms at a phone's pace, the hitch when a new kind came into sight */
+    const J = M3D.sjobs || (M3D.sjobs = new Map()); let j = J.get(key);
+    if (!j){ if (M3D.sculptN++ > 0 && performance.now() > M3D_BUDGET) throw M3D_YIELD;   /* (RS-404: out of time - the rest next frame) */
+      const P = SDF.part(bounds[0], bounds[1], h); P.q = []; build(P); j = { P, i:0, it:null }; J.set(key, j);
+      if (J.size > 6) J.delete(J.keys().next().value); }   /* (one left half-made by a creature gone from sight isn't kept forever) */
+    const P = j.P, q = P.q;
+    while (j.i < q.length){ const o = q[j.i], nx = P.run(o[0], o[1], o[2], o[3], j.kk||0, M3D_BUDGET); if (nx >= 0){ j.kk = nx; throw M3D_YIELD; } j.kk = 0; j.i++; if (j.i < q.length && performance.now() > M3D_BUDGET) throw M3D_YIELD; }
+    if (!j.it) j.it = SDF.meshGen(P);
+    let r; while (!(r = j.it.next()).done) if (performance.now() > M3D_BUDGET) throw M3D_YIELD;
+    J.delete(key); g = m3dUV(r.value);
+  } else { const P = SDF.part(bounds[0], bounds[1], h); build(P); g = m3dUV(SDF.mesh(P)); }
   M3D.sculpt.set(key, g); sculptDbPut('m|' + key, g);
   return g;
 }
@@ -39296,17 +39320,34 @@ function m3dTplKey(pt){ return pt.paint.name + (pt.o && pt.o.paint ? '/'+pt.o.pa
 /* (RS-404) a creature never met before, sculpted over a few frames instead of in one: each try runs the build until the time is
    up, stopping before the next sculpt it would start (at least one a try). The sculpts already made are kept (M3D.sculpt), so
    the next frame's try runs through them at once and carries on. Null until it's done; the creature shows up when it is */
-const M3D_YIELD = { m3dYield:true }; let M3D_BUDGET = 0;
+/* (RS-520) re-running the whole build every frame until its sculpts were all made cost a phone some 40ms a frame for seconds on
+   end. Now a try goes in stages: the build runs once as a survey - every sculpt it lacks noted, a plain box standing in for it -
+   then the noted sculpts are made a slice at a time with no build at all, then the build runs for real, and the skinning is
+   left to the frame after. A kind whose sculpts are all to hand (made earlier, or kept from an earlier session) builds at once */
+const M3D_YIELD = { m3dYield:true }; let M3D_BUDGET = 0; var M3D_COLLECT = null; const M3D_TRY = new Map();
+function m3dStandIn(b){ const T = THREE, g = new T.BoxGeometry(Math.max(1e-3, b[1][0] - b[0][0]), Math.max(1e-3, b[1][1] - b[0][1]), Math.max(1e-3, b[1][2] - b[0][2]));
+  g.translate((b[0][0] + b[1][0])/2, (b[0][1] + b[1][1])/2, (b[0][2] + b[1][2])/2); g.setAttribute('color', new T.BufferAttribute(new Float32Array(g.attributes.position.count*3).fill(1), 3)); return g; }
 function m3dTemplateTry(pt, deadline){
   const key = m3dTplKey(pt); if (M3D.tpl.has(key)) return M3D.tpl.get(key);
   if (performance.now() > deadline) return null;
   M3D_BUDGET = deadline; M3D.sculptN = 0;
-  try{ return m3dTemplate(pt); } catch(e){ if (e===M3D_YIELD) return null; throw e; } finally { M3D_BUDGET = 0; }
+  let st = M3D_TRY.get(key); if (!st){ st = { jobs:null, raw:null }; M3D_TRY.set(key, st); if (M3D_TRY.size > 8) M3D_TRY.delete(M3D_TRY.keys().next().value); }
+  try{
+    if (st.raw){ const t = m3dTemplateSkin(pt, key, st.raw); M3D_TRY.delete(key); return t; }   /* (built last frame: skinned now) */
+    if (st.jobs && st.jobs.length){ while (st.jobs.length){ const a = st.jobs[0]; m3dSculpt(a[0], a[1], a[2], a[3]); st.jobs.shift(); } return null; }
+    const col = M3D_COLLECT = []; let t = null, err = null;
+    try{ t = m3dBuilders().get(pt.paint)(pt.o||{}); }catch(e){ err = e; } finally { M3D_COLLECT = null; }
+    if (col.length){ st.jobs = col; return null; }   /* (a survey: what it lacks is made over the next frames) */
+    if (err) throw err;
+    st.raw = t; return null;
+  } catch(e){ if (e===M3D_YIELD) return null; M3D_TRY.delete(key); throw e; } finally { M3D_BUDGET = 0; }
 }
 function m3dTemplate(pt){
   const key = m3dTplKey(pt);
   if (M3D.tpl.has(key)) return M3D.tpl.get(key);
-  const t = m3dBuilders().get(pt.paint)(pt.o||{});
+  return m3dTemplateSkin(pt, key, m3dBuilders().get(pt.paint)(pt.o||{}));
+}
+function m3dTemplateSkin(pt, key, t){
   if (m3dSkinnable(pt, t)){ const meta = M3D.meta.get(t); try{ const R = m3dSkinRoot(t, meta.rig, null); meta.skinned = R.made; meta.skinnedParts = R.gone; }catch(err){ console.error(err); meta.skinned = 0; } }   /* (RS-379: one skinned mesh per material, once per template) */
   M3D.tpl.set(key, t);
   return t;
@@ -42480,7 +42521,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-519';
+const GAME_VERSION = 'rs-520';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
