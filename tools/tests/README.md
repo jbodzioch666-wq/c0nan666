@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs533 | Hair, brows and beards in a streaked hair finish with sheen; more, finer locks drawn to points; beasts keep fur |
 | rs532 | Eye sliders: size and spacing, sockets, lids and eyeballs moving together; defaults unchanged |
 | rs531 | Muscle shows: chest, traps, delts, lats, arms, thighs and calves swell from soft to hard; sleeves fit; default unchanged |
 | rs530 | No flat cards on the face: square jaw sculpted, scars and paint laid on the skin, moustaches of strands |

@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-533 - Hair that looks like hair
+
+- **A finish of its own**: hair, brows and beards used the same speckled finish as an animal's fur, so a head of hair read like a knitted cap. Now they have a hair finish - fine streaks that run down each lock and back from the crown, with a soft sheen where the light catches it.
+- **Finer locks**: half as many again, slimmer, and each drawn to a fine point instead of ending blunt; beards the same.
+- Wolves, bears and other beasts keep their fur.
+
 ## RS-532 - Eyes of your own
 
 - **Eye sliders**: two more in the FACE section - the size of the eyes and how far apart they're set. The socket, the lids and the eyeball move together, so the eyes always sit in the face; at the middle of each slider they're where they were.
