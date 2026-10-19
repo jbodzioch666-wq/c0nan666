@@ -26324,6 +26324,18 @@ function fpNicheWall(o){
     return c;
   };
 }
+/* (RS-559) worn stone, laid over any generator: hairline cracks wandering across it, patches worn smooth and darker, and moss
+   creeping into the joints (the dark of the mortar) where the place is damp. The GPU renderer's walls and floors go through it */
+function fpWorn(fn, s, o){
+  o = o || {}; const mossC = o.mossCol || [58, 92, 46], damp = o.damp || 0;
+  return (x, y)=>{ let c = fn(x, y); if (!c) return c;
+    const cr = Math.abs(fpNoise(x, y, 5, s + 40) - 0.5), on = fpNoise(x, y, 3, s + 41);
+    if (cr < 0.011 && on > 0.52) c = fpScale(c, 0.48 + cr*20);                         // a crack, where the stone has split
+    const wear = fpFbm(x, y, s + 42); if (wear > 0.6) c = fpScale(c, 1 - Math.min(1, (wear - 0.6)*4)*0.18);   // worn darker in patches
+    const lum = (c[0]*0.3 + c[1]*0.55 + c[2]*0.15)/255;
+    if (damp && lum < 0.34){ const mv = fpNoise(x, y, 7, s + 43); if (mv > 1 - damp) c = fpMix(c, fpScale(mossC, 0.6 + fpFbm(x, y, s + 44)*0.5), Math.min(1, (mv - (1 - damp))/0.1)*0.8); }   // moss in the joints
+    return c; };
+}
 // per-site look. Colors are albedo; the lighting pass decides how bright
 // any of it actually ends up.
 const FP_THEME_SPECS = {
@@ -34289,14 +34301,20 @@ function fpdMaterial(key, fn, o){
     const l = Math.hypot(ax, ay, 1), p = (y*N+x)*4;
     ndd[p] = (ax/l*0.5+0.5)*255; ndd[p+1] = (ay/l*0.5+0.5)*255; ndd[p+2] = (1/l*0.5+0.5)*255; ndd[p+3] = 255;
   }
+  /* (RS-559) a specular map from the same height: the faces of the stones catch the light, the mortar and the cracks don't; on wet
+     stone (o.wet) the sheen is stronger and gathers in the low places, where water lies */
+  let smap = null; { const sc = v3Canvas(N, N), sx = sc.getContext('2d'), sd = sx.createImageData(N, N), sdd = sd.data;
+    for (let i=0;i<N*N;i++){ const hv = hs[i], v = o.wet ? Math.min(1, 0.35 + (1 - hv)*0.9) : Math.max(0, Math.min(1, (hv - 0.25)*1.6)), k = Math.round(v*255), p = i*4; sdd[p] = sdd[p+1] = sdd[p+2] = k; sdd[p+3] = 255; }
+    sx.putImageData(sd, 0, 0); smap = new T.CanvasTexture(sc); smap.wrapS = smap.wrapT = T.RepeatWrapping; }
   cx.putImageData(id,0,0); nx.putImageData(nd,0,0);
   const aniso = FPD.r ? Math.min(8, FPD.r.capabilities.getMaxAnisotropy()) : 4;   /* (RS-346: or before the dungeon renderer exists) */
   const map = new T.CanvasTexture(cc); map.encoding = T.sRGBEncoding; map.anisotropy = aniso;
   const nmap = new T.CanvasTexture(nc); nmap.anisotropy = aniso;
   map.wrapS = map.wrapT = nmap.wrapS = nmap.wrapT = T.RepeatWrapping;
   // Phong keeps the stone matte with a controllable glint (a PBR dielectric washes the whole wall in a grey sheen at lantern range)
-  const sh = o.rough!==undefined ? o.rough : 0.9;
-  const m = new T.MeshPhongMaterial({ map, normalMap:nmap, vertexColors:o.vc!==false, shininess: 6 + (1-sh)*80, specular: new T.Color().setScalar(0.02 + (1-sh)*0.35) });
+  const sh = o.wet ? Math.min(o.rough!==undefined ? o.rough : 0.9, 0.3) : (o.rough!==undefined ? o.rough : 0.9);
+  const m = new T.MeshPhongMaterial({ map, normalMap:nmap, vertexColors:o.vc!==false, shininess: 6 + (1-sh)*80, specular: new T.Color().setScalar(0.02 + (1-sh)*0.35), specularMap:smap || undefined });
+  if (o.wet){ m.specular.setScalar(0.42); m.shininess = 70; }   /* (RS-559: wet stone - a sheen where the water lies) */
   if (holes){ m.alphaTest = 0.5; m.side = T.DoubleSide; }
   if (ec){ ec.getContext('2d').putImageData(eid,0,0); const em = new T.CanvasTexture(ec); em.encoding = T.sRGBEncoding; em.wrapS = em.wrapT = T.RepeatWrapping; m.emissiveMap = em; m.emissive = new T.Color(0xffffff); m.emissiveIntensity = o.glow || 1.4; }
   if (o.cut) fpdCutify(m);
@@ -34693,8 +34711,11 @@ function fpdBuild(T){
   const slotFns = [spec.floor, spec.floor2||spec.floor, spec.floor, spec.floor, fpPit(spec.floor), fpRuneFloor(spec.floor), fpWater(), spec.edge||spec.floor];
   // rough-hewn rock varies a lot in brightness, so it takes a much gentler bump than laid stone
   const bw = /mine|lair/.test(key) ? 5 : 11;
+  /* (RS-559) the stone worn and, in the damp places, wet: moss in the joints of a crypt, a temple, a swamp or a sewer-dark dungeon,
+     a sheen on the floors of the catacombs and the sunken temples, on a mine's flooded workings */
+  const damp = { catacomb:0.32, temple:0.4, swamp:0.5, necro:0.14, dungeon:0.12, mine:0.08 }[key] || 0, wetFloor = /catacomb|temple|swamp/.test(key), worn = (fn, s, mc)=>out ? fn : fpWorn(fn, s, { damp, mossCol:mc });
   const matFor = (k)=>{
-    if (k==='wall') return fpdMaterial(key+':wall', spec.wall, { bump:bw, cut:true });
+    if (k==='wall') return fpdMaterial(key+':wall', worn(spec.wall, 11), { bump:bw, cut:true });
     if (k==='fence') return fpdMaterial(key+':fence', spec.fence, { bump:6, rough:0.5 });
     if (k==='tomb') return fpdMaterial('tomb', fpdTombGen([158,154,142], 161), { vc:false, bump:9 });
     if (k==='tomb2') return fpdMaterial('tomb2', fpdTombGen([140,136,128], 163), { vc:false, bump:9 });
@@ -34716,7 +34737,7 @@ function fpdBuild(T){
       if (edge && ((x<6&&y<6) || (x>=58&&y<6) || (x<6&&y>=58) || (x>=58&&y>=58))) return fpScale([70,68,66], 0.8+fpFbm(x,y,53)*0.4);
       return fpScale([128,90,52], k2);
     }, { vc:false, bump:10 });
-    if (k==='wall2') return fpdMaterial(key+':wall2', spec.wall2||spec.wall, { bump:bw, cut:true });
+    if (k==='wall2') return fpdMaterial(key+':wall2', worn(spec.wall2||spec.wall, 17), { bump:bw, cut:true });
     if (k==='wallTorch') return fpdMaterial(key+':wallT', fpSconce(key==='catacomb' ? spec.wall2 : spec.wall), { bump:bw, cut:true });   // (the catacomb's painted niches are only for the classic renderer)
     if (k==='ceil') return fpdMaterial(key+':ceil', spec.ceil, { bump:6 });
     if (k==='trim') return fpdMaterial(key+':trim', key==='mine' ? spec.ceil : (key==='lair' || key==='catacomb') ? spec.wall2 : spec.wall, { bump:bw, cut:true });   /* (RS-171: pillars dissolve too) */
@@ -34725,7 +34746,7 @@ function fpdBuild(T){
       return fpScale([112,74,42], k2);
     }, { bump:8, vc:!field, cut:!field });
     const s = +k.slice(5), wet = s===6 || (key==='swamp' && s===1) || (key==='sea' && s===7);
-    const fm = fpdMaterial(key+':f'+s, slotFns[s], wet ? { rough:0.15, bump:3, glow:0.6 } : { rough:0.55, glow:1.6, bump:bw*0.8 });
+    const fm = fpdMaterial(key+':f'+s, wet || s >= 4 ? slotFns[s] : worn(slotFns[s], 12 + s), wet ? { rough:0.15, bump:3, glow:0.6 } : { rough:0.55, glow:1.6, bump:bw*0.8, wet:wetFloor && s < 4 });   /* (RS-559: worn, and wet where the place is) */
     if (key==='swamp' && s===1) fm.color.setRGB(0.4, 0.48, 0.3);         // marsh water is murky, not sea blue
     return fm;
   };
@@ -43261,7 +43282,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-558';
+const GAME_VERSION = 'rs-559';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs559 | Stone materials: cracks, worn patches, moss in damp joints, specular maps from the height, wet floors in the catacombs, temples and swamps |
 | rs558 | Bloom tuned per site: each underground grade has its own threshold and glow width |
 | rs557 | Dungeon ambient occlusion: a half-size depth prepass, twelve-tap occlusion, blurred and multiplied in before the bloom; high setting only |
 | rs556 | Dungeon fog and dust: floor mist in caves and crypts, dust that burns in torchlight, a haze of light round each torch |

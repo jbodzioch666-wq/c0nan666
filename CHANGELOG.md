@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-559 - Stone that looks like stone
+The fourth step of the dungeon visual pass: the materials. No change in card time; the textures are drawn once per floor as before.
+- **Worn stone:** walls and floors below ground now carry hairline cracks wandering across the blocks and patches worn smooth and darker.
+- **Moss in the joints:** in the damp places, the catacombs, the sunken temples, the swamp lairs and the older dungeons, moss creeps into the mortar.
+- **Stone catches the light:** every stone surface now has a specular map drawn from its own relief, so the faces of the blocks glint under the torches while the mortar and the cracks stay dull.
+- **Wet floors:** the floors of the catacombs, the sunken temples and the swamps are wet, with a sheen that gathers in the low places where water lies.
+- Out of doors, nothing changes.
+
 ## RS-558 - Glow that fits the place
 The third step of the dungeon visual pass: bloom tuned per site. No change in card time; the bloom passes already ran.
 - **Only the lights glow:** each kind of underground place now sets how bright a thing must be before it bleeds light. In a dry dungeon or a castle only the flames, runes, crystals and magic glow and the lit stone stays crisp; it used to pick up bright floor as well and wash the picture out.
