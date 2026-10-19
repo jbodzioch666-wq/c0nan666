@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-552 - Water that glints
+The third step of the overworld visual pass. Card time unchanged within noise (the glints are a few arithmetic lines; the pads and reeds are instanced).
+- **Sun glints:** small points of sunlight wink on the water's ripples, each in its own time. A real reflection of the land would need a second drawing of the whole scene each frame, so the water keeps its sky reflection and gets these sparkles instead.
+- **The banks in the water:** along a shore the water takes a darker, greener cast, the trees and grass above it reflected.
+- **Lily pads:** calm water, the sheltered coves of lakes and the water beside swamps, now has lily pads, some with a pink or white flower. None on the open sea.
+- **Reeds on the banks:** clumps of reeds grow at the edge of lakes and rivers. They used to grow only in the swamps.
+
 ## RS-551 - Cloud shadows on everything
 The second step of the overworld visual pass. No measurable change in card time (the shadow is one extra texture read per pixel).
 - **Shadows on the trees too:** a cloud's shadow now falls on the trees, bushes, grass, roads and water, not only on the ground. A tree used to stand brightly lit in the middle of a shadow on the grass.

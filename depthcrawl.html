@@ -24358,7 +24358,17 @@ function* gfxO3BuildGen(grp, x0, y0, W, M){   /* (RS-403: a step at a time - see
         gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.92, 0.96, 1.0), clamp(surf + run*0.3, 0.0, 0.9));
         gl_FragColor.a = max(gl_FragColor.a, surf*0.95);
         float st = step(0.995, fract(sin(dot(floor(vGW.xz*12.0), vec2(12.9898, 78.233)))*43758.5453))*uNight*(0.55 + 0.45*sin(uT*3.0 + vGW.x*7.0 + vGW.z*3.0));
-        gl_FragColor.rgb += vec3(st*0.7);` + GFX_CLOUD_GLSL + `
+        gl_FragColor.rgb += vec3(st*0.7);
+        /* (RS-552) the banks in the water: along a shore the water carries a darker, greener cast, the trees and grass above it reflected;
+           and the sun's glints - the ripples' own normals catching the sun, broken into sparkles by a drifting noise, where the sun
+           sits between you and the water */
+        gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.1, 0.19, 0.11), fo.r*0.32*(1.0 - shal)*(1.0 - uNight*0.7));
+        #if NUM_DIR_LIGHTS > 0
+        { vec3 Vv = normalize(vViewPosition), Hn = normalize(directionalLights[0].direction + Vv); float gl = pow(max(dot(normalize(normal), Hn), 0.0), 48.0);
+          vec2 cp = vGW.xz*15.0 + vec2(uT*0.6, -uT*0.4), cell = floor(cp), cf = fract(cp) - 0.5; float h1 = fract(sin(dot(cell, vec2(12.9898, 78.233)))*43758.5453), h2 = fract(sin(dot(cell, vec2(39.3467, 11.135)))*24634.6345);
+          float tw = smoothstep(0.78, 1.0, 0.5 + 0.5*sin(uT*2.8 + h1*31.0)), sp = step(0.95, h2)*tw*smoothstep(0.2, 0.04, length(cf + (vec2(h1, h2) - 0.5)*0.4));   /* (a round point in one cell in twenty, each winking in its own time) */
+          gl_FragColor.rgb += directionalLights[0].color*gl*sp*2.6*(1.0 - uNight)*(1.0 - shal*0.5); }
+        #endif` + GFX_CLOUD_GLSL + `
         gl_FragColor.rgb *= mix(1.0, cshade, 0.75);`); };   /* (RS-551: the clouds' shadows cross the water too) */
     m.customProgramCacheKey = ()=>'gfxwaterc'; m.needsUpdate = true;
   }
@@ -24396,6 +24406,21 @@ function* gfxO3BuildGen(grp, x0, y0, W, M){   /* (RS-403: a step at a time - see
   if (pebbles.length){ const pgeo = new T.DodecahedronGeometry(0.05, 0).scale(1, 0.55, 1), im = new T.InstancedMesh(pgeo, new T.MeshStandardMaterial({ color:0x8a8070, roughness:0.95, flatShading:true }), pebbles.length);
     pebbles.forEach(([x, z, r], i)=>{ v3.set(x, O3.heightAt(x, z) + 0.01, z); q.setFromAxisAngle(up, r*6); im.setMatrixAt(i, m4.compose(v3, q, s3.setScalar(0.7 + r))); });
     im.frustumCulled = false; im.receiveShadow = true; grp.add(im); }
+  yield;
+  /* (RS-552) lily pads on calm water: the sheltered coves of lakes (water with land on three sides or more) and the water beside the
+     swamps, a few to a tile, some with a flower; none out in the open sea, where the waves would not leave them */
+  { const pads = [], R2 = 30;
+    for (let x=Math.floor(cx-R2); x<cx+R2; x++) for (let y=Math.floor(cy-R2); y<cy+R2; y++){ if (o3Tile(x, y)!==OW_WATER) continue; let land = 0, swamp = 0;
+      for (const [a,b] of [[1,0],[-1,0],[0,1],[0,-1]]){ const u = o3Tile(x+a, y+b); if (u!==OW_WATER && u!==OW_RIVER) land++; if (u===OW_SWAMP) swamp++; }
+      if (land < 3 && !swamp) continue; if (o3Hash(x, y, 430) > (swamp ? 0.8 : 0.6)) continue;
+      const n = 3 + (o3Hash(x, y, 431)*4|0); for (let i=0;i<n;i++){ const px = x + 0.1 + o3Hash(x, y, 440+i)*0.8, pz = y + 0.1 + o3Hash(x, y, 450+i)*0.8; if (O3.heightAt(px, pz) > O3_WATER_Y - 0.02) continue; pads.push([px, pz, o3Hash(x, y, 460+i), o3Hash(x, y, 470+i) < 0.3]); } }
+    if (pads.length){ const shp = new T.Shape(); shp.moveTo(0, 0); shp.absarc(0, 0, 0.085, 0.35, Math.PI*2 - 0.35, false); shp.lineTo(0, 0);
+      const pg = new T.ShapeGeometry(shp, 14).rotateX(-Math.PI/2), pm = new T.MeshLambertMaterial({ color:new T.Color(0x3e7a2c).convertSRGBToLinear(), side:T.DoubleSide }), im = new T.InstancedMesh(pg, pm, pads.length);
+      pads.forEach(([x, z, r], i)=>{ q.setFromAxisAngle(up, r*6.28); s3.setScalar(0.7 + r*0.6); v3.set(x, O3_WATER_Y + 0.064, z); im.setMatrixAt(i, m4.compose(v3, q, s3)); c3.setRGB(0.9 + r*0.25, 1, 0.85 + r*0.3);   /* (above the wave tops, which rise 0.05 over the sheet) */ im.setColorAt(i, c3); });
+      im.frustumCulled = false; im.receiveShadow = true; im.userData.lily = 1; grp.add(im);
+      const fl = pads.filter(p=>p[3]); if (fl.length){ const fg = new T.ConeGeometry(0.03, 0.05, 6).translate(0, 0.02, 0), fm = new T.MeshLambertMaterial({ color:0xffffff }), fi = new T.InstancedMesh(fg, fm, fl.length);
+        fl.forEach(([x, z, r], i)=>{ v3.set(x + (r - 0.5)*0.04, O3_WATER_Y + 0.066, z); fi.setMatrixAt(i, m4.compose(v3, q.identity(), s3.setScalar(1))); fi.setColorAt(i, c3.set(r < 0.5 ? 0xf0a0c0 : 0xfaf4e8).convertSRGBToLinear()); });
+        fi.frustumCulled = false; grp.add(fi); } } }
   yield;
   // low mist over the swamps, the haunted woods and the graveyards, and over the water at dawn
   GFX.mist = [];
@@ -32105,6 +32130,9 @@ function* o3VegetationGen(grp, x0, y0, W){
       if (!bv && (t===OW_GRASS || t===OW_FOREST || t===OW_DESERT) && h(1) < 0.16 && islandAt(x,y)){ put.push(['palm', x+0.2+h(3)*0.6, y+0.2+h(4)*0.6, 0.8+h(5)*0.4, h(6)*6.28, h(7)]); if (h(8) < 0.5) put.push(['bush', x+h(12), y+h(13), 0.8, h(15)*6.28, h(16)]); continue; } }
     let nearSnow = false, nearSwamp = false, nearMtn = false;
     for (const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1],[2,0],[-2,0],[0,2],[0,-2]]){ const u = o3Tile(x+dx,y+dy); if (u===OW_TUNDRA) nearSnow = true; if (u===OW_SWAMP) nearSwamp = true; if (u===OW_MOUNTAIN) nearMtn = true; }
+    /* (RS-552) reeds at the water's edge: on a grass or forest tile beside a lake or a river, a clump or two set in toward the water */
+    if ((t===OW_GRASS || t===OW_FOREST) && !nearSnow) for (const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){ const u = o3Tile(x+dx,y+dy); if (u!==OW_WATER && u!==OW_RIVER) continue; if (h(90 + dx*2 + dy) > 0.55) continue;
+      const n = 2 + (h(94 + dx + dy*2)*2|0); for (let k=0;k<n;k++) put.push(['reed', x + 0.5 + dx*(0.3 + h(96+k)*0.12) + (dy ? (h(100+k) - 0.5)*0.7 : 0), y + 0.5 + dy*(0.3 + h(98+k)*0.12) + (dx ? (h(102+k) - 0.5)*0.7 : 0), 0.5 + h(104+k)*0.4, h(106+k)*6.28, h(108+k)]); }
     if (t===OW_FOREST){
       const n = 3 + (h(1)>0.5?1:0);
       for (let k=0;k<n;k++){
@@ -43120,7 +43148,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-551';
+const GAME_VERSION = 'rs-552';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
