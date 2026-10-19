@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs566 | waterfalls come down the mountains in steps - pools on rock ledges, curtains over the lips - into the river; the water never climbs or sinks into the ground |
 | rs565 | Rivers run downstream: each river tile knows its flow (walked back from the sea), and the ripples stream that way |
 | rs564 | A tap on a phone leaves no hover box (the made-up mouse move no longer sets the hover spot) |
 | rs563 | The phone tier draws less: 3D pixel density capped at 1.75, your own figure sculpted on a coarser grid |
@@ -384,6 +385,7 @@ Screenshots go to `tools/tests/shots/`.
 | zdg | a site of a named kind on a fixed seed (`ZDG='[["name","kind",depth,dist],...]'`); `ZDG_GPU=1` prints GPU ms |
 | zdgroom | the dungeon camera over a room of a named purpose |
 | zow | the open land at named kinds of place, hours and weather (`ZOW='[["name","kind",clockFrac,"weather",dist],...]'`); `ZOW_GPU=1` prints GPU ms |
+| zfall | the waterfalls on the fixed seed, the camera on each from the turn that faces it, the player hidden (`ZFALL='[[x,y,rot],...]'`, `ZDIST`, `ZNOROCK=1` hides the rock) |
 | zhair | heads with each hairstyle from four sides, and under helmets |
 | zplate | plate armour on builds from slight to heavy |
 | zunder | the creator's undressed figures by race and sex |

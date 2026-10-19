@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-566 - Waterfalls down the mountains
+- **Streams come down the mountains:** a river no longer just starts at the foot of a mountain. Its stream now starts at a spring high on the slope and climbs the steepest way up from the river to get there.
+- **Falls in steps:** the stream comes down over rock ledges like a stair cut into the mountain. Each ledge holds a turquoise pool, a curtain of water spills over each lip, and the water foams white and puffs mist where each curtain lands. At the foot it plunges into the river in foam and spray. A tall mountain gives a long cascade of up to nine steps; a low ridge, one or two.
+- **Gone: the white plank:** the old waterfall was one flat sheet sticking out of the hillside.
+- **No extra cost:** each waterfall is two meshes, rock and water, and every waterfall shares the same two materials.
+
 ## RS-565 - Rivers that flow
 - **Rivers run downstream:** a river's ripples used to drift the same way everywhere, whichever way the river ran. Now each river knows its course. Its ripples are drawn as long streaks along the channel and move with the current, down to the sea or the lake it drains into. A river with no water in sight runs down from the mountains it rises in.
 - **Tavern windows test:** the check that a tavern's windows stay dark at night was out of date, since the window light is always built and only dimmed. It now counts the lit windows, and checks that daylight comes through them by day.

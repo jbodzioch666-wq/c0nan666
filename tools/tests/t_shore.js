@@ -59,11 +59,10 @@ module.exports = async page=>{
       if (!at) continue; G.owPos = { x:at[0], y:at[1] }; O3.win = null; for (let i=0;i<4;i++){ renderGame(); await new Promise(r=>setTimeout(r, 60)); }
       const F = GFX.falls||[]; if (!F.length) continue;
       for (const f of F){ const a = Math.round(-Math.sin(f.g.rotation.y)), b = Math.round(-Math.cos(f.g.rotation.y)); /* (the frame's +z points away from the cliff) */
-        A(f.sheets.length===2 && f.foam && f.spray.length && f.mist.length, 'a sheet, foam, spray and mist');
+        A(f.rock && f.water && f.steps >= 1 && f.foam && f.spray.length && f.mist.length, 'rock steps, water, foam, spray and mist');
         A([OW_RIVER, OW_WATER].includes(o3Tile(f.tx - a, f.ty - b)) && [OW_MOUNTAIN, OW_MOUNTAINPASS].includes(o3Tile(f.tx + a, f.ty + b)), 'the river leaves a cliff and runs on'); }
       for (let i=0;i<F.length;i++) for (let j=i+1;j<F.length;j++) A(Math.abs(F[i].tx-F[j].tx) > 2 || Math.abs(F[i].ty-F[j].ty) > 2, 'falls are spread out');
-      const o0 = F[0].sheets[0].material.map.offset.y; gfxWaterfallTick(F[0], 1); const o1 = F[0].sheets[0].material.map.offset.y; gfxWaterfallTick(F[0], 2); const o2 = F[0].sheets[0].material.map.offset.y;
-      A(o2 > o1, 'the water flows down (the texture moves up the sheet)');
+      gfxWaterfallTick(F[0], 1); gfxWaterfallTick(F[0], 2);   /* (RS-566: the water runs in its shader; t_rs566 checks the way it runs) */
       return { seed, falls:F.length, drops:F.map(f=>+f.drop.toFixed(2)) };
     }
     return { none:true };
