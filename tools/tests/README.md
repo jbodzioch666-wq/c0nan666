@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs569 | a sunken temple is laid out as the plain dungeons are: whole rooms and one-tile passages, no loose columns, doorways, all reachable; the sanctum keeps its drowned idol and pools |
 | rs568 | the catacombs under a graveyard are laid out as the plain dungeons are: whole burial chambers and one-tile passages, no pillars, doorways, all reachable, still niche-walled with bones and candles |
 | rs566 | waterfalls come down the mountains in steps - pools on rock ledges, curtains over the lips - into the river; the water never climbs or sinks into the ground |
 | rs565 | Rivers run downstream: each river tile knows its flow (walked back from the sea), and the ripples stream that way |

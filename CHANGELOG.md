@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-569 - Sunken temples in rooms and passages
+- **New layout:** sunken temples now use the plain dungeons' layout (RS-407) instead of their old fixed five-room plan. Each floor has whole rectangular rooms, joined by passages one tile wide through the rock, with an arched doorway or an oak door into every room. The loose columns and the corridors cut through the middle of rooms are gone, and every part of the floor can be reached.
+- **Bigger floors:** a temple floor is now the size of a plain dungeon floor, with five to eight rooms instead of five fixed ones.
+- **The sanctum stays:** the room with the way down is still the sunken sanctum, where the drowned idol broods over its two reflecting pools. The temple keeps its own flooded floors and stone.
+
 ## RS-568 - Catacombs in chambers and passages
 - **Tidier catacombs:** the floors under a graveyard now use the same layout as plain dungeons since RS-407. The burial chambers are clean rectangles, joined by passages one tile wide through the rock between them. The stray pillars and ragged extra walls are gone. Every chamber has a doorway, an open arch or an oak door, and every part of the floor can be reached.
 - **Still catacombs:** the walls are still lined with burial niches, with bone piles and guttering candles along them. The graveyard's open plot above, with its tombs and the crypt down, is unchanged.
