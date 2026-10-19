@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-568 - Catacombs in chambers and passages
+- **Tidier catacombs:** the floors under a graveyard now use the same layout as plain dungeons since RS-407. The burial chambers are clean rectangles, joined by passages one tile wide through the rock between them. The stray pillars and ragged extra walls are gone. Every chamber has a doorway, an open arch or an oak door, and every part of the floor can be reached.
+- **Still catacombs:** the walls are still lined with burial niches, with bone piles and guttering candles along them. The graveyard's open plot above, with its tombs and the crypt down, is unchanged.
+
 ## RS-567 - Sieges at the real town
 - **The real town:** a siege or a raid is now fought at the town itself, not in a made-up block town. Its streets are laid out as you walk them every day, with its own shops, houses, square, waypoint, lamps and market stalls, built as you see them in town.
 - **Before the gate:** the first part of a siege is fought on the field outside the town's own wall, a palisade or a stone city wall, with its gatehouse, banners and torches. The gate's oak doors are barred at your back.

@@ -5,6 +5,7 @@ module.exports = async page=>{
   const seed = +(process.env.ZSEED || 12345);
   await page.evaluate(seed=>{ goToCharCreate(); ccBegin(); wgRegenerate(seed); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{}; weatherSync = ()=>{}; window.__zdgGpu = !!window.__zdgGpuWant; }, seed);
   if (process.env.ZDG_GPU) await page.evaluate(()=>{ window.__zdgGpu = true; });
+  if (process.env.ZDG_WAIT) await page.evaluate(w=>{ window.__zdgWait = w; }, +process.env.ZDG_WAIT);
   for (const [nm, kind, depth, dist] of sets){
     const r = await page.evaluate(async ([kind, depth, dist])=>{ G.gameMode = 0; G.ui = 'playing';
       const want = kind==='dungeon' ? OW_DUNGEON : Object.keys(TILE_SITE_KIND).find(k=>TILE_SITE_KIND[k]===kind)|0; let dx = -1, dy = -1;
@@ -13,7 +14,7 @@ module.exports = async page=>{
       G.pendingDungeon = { x:dx, y:dy }; enterDungeonConfirm(); setUi('playing'); G.mon = [];
       if (depth && depth > 1){ loadLevel(depth, false); G.mon = []; }
       if (dist) ISO.dist = dist; G.player.clock = DAY_LENGTH*0.5;
-      for (let i=0;i<16;i++){ renderGame(); await new Promise(r=>setTimeout(r, 40)); }
+      for (let i=0;i<(+window.__zdgWait || 16);i++){ renderGame(); await new Promise(r=>setTimeout(r, 40)); }
       let gpu = null; if (window.__zdgGpu){ SET.fps = true; for (let k=0;k<3;k++){ PROF.t = {}; PROF.gpuN = 0; for (let i=0;i<80;i++){ renderGame(); gfxGpuPoll(); await new Promise(r=>setTimeout(r, 16)); } gfxGpuPoll(); if (PROF.gpuN > 10){ const n = PROF.gpuN; gpu = { gpu:+((PROF.t.gpu||0)/n).toFixed(2), sc:+((PROF.t.g_scene||0)/n).toFixed(2), post:+((PROF.t.g_post||0)/n).toFixed(2), n }; break; } } SET.fps = false; }
       return { at:[dx, dy], kind:G.siteKind, theme:fpTheme().key, depth:G.depth, gpu }; }, [kind, depth, dist]);
     console.log(nm, JSON.stringify(r));
