@@ -11201,6 +11201,7 @@ function skNodeStatic(x, y){
   if (!n) n = skNodeExtra(x, y, t);
   { const gn = guildNodeFor(x, y, t); if (gn) n = gn; }
   { const ak = archHotspot(x, y); if (ak) n = { k:'archaeology', type:ak }; }   // the excavation hotspots round a dig site
+  if (n && n.k==='woodcutting' && skWithin(x, y, 1, [OW_TOWN])) n = null;   /* (RS-570: no tree to cut grows right up against a town, over its houses) */
   if (n){ n.x = x; n.y = y; skSizeQual(n); }
   SKN.st.set(key, n);
   return n;
@@ -21351,8 +21352,9 @@ function o3Roads(grp, x0, y0, W){
   for (let x=Math.floor(x0); x<x0+W; x++) for (let y=Math.floor(y0); y<y0+W; y++){
     const v = wgRoadAt(x, y); if (!(v===1 || v===4)) continue;
     for (const [dx,dy] of [[1,0],[0,1],[-1,0],[0,-1]]){ const nx = x+dx, ny = y+dy, nv = wgRoadAt(nx, ny);
-      if ((dx>0 || dy>0) && isR(nx, ny)) add(x+0.5, y+0.5, nx+0.5, ny+0.5);
-      else if ((dx<0 || dy<0) && G.ow.map[nx] && G.ow.map[nx][ny]===OW_TOWN) add(x+0.5, y+0.5, nx+0.5, ny+0.5);
+      const town = G.ow.map[nx] && G.ow.map[nx][ny]===OW_TOWN, ex = town ? x+0.5+dx*0.62 : nx+0.5, ez = town ? y+0.5+dy*0.62 : ny+0.5;   /* (RS-570: a road comes up to a town's edge, its gate - not on through the middle of it, under its houses) */
+      if ((dx>0 || dy>0) && isR(nx, ny)) add(x+0.5, y+0.5, ex, ez);
+      else if ((dx<0 || dy<0) && town) add(x+0.5, y+0.5, ex, ez);
       if (nv===2 || nv===3) add(x+0.5, y+0.5, x+0.5+dx*0.5, y+0.5+dy*0.5); }
     // a round patch at each joint so corners don't show gaps
     for (let i=0;i<8;i++){ const a0 = i/8*Math.PI*2, a1 = (i+1)/8*Math.PI*2, cx = x+0.5, cz = y+0.5, h = O3.heightAt(cx, cz)+0.032;
@@ -23185,7 +23187,7 @@ function townV3Build(grp, mats){
   if (isWinter() || G.villageTheme==='tundra'){ mats.roof.color = (mats.roof.color || new T.Color(1,1,1)).clone().lerp(new T.Color(0xf2f6fb), 0.7); mats.roof.userData.lin = true; }
   // stilts in the swamp, stone terraces in the hills
   if (info.style.stilts || info.style.hill) for (const ob of (V3.occ||[])){
-    const g = ob.userData.grp, P = ob.geometry.parameters, cx = ob.position.x, cz = ob.position.z; if (!g || !P) continue;
+    const g = ob.userData.grp, P = ob.geometry.parameters, cx = ob.position.x, cz = ob.position.z; if (!g || !P || ob.userData.prop) continue;
     if (info.style.stilts){ g.position.y = 0.6; for (const [sx,sz] of [[-1,-1],[1,-1],[-1,1],[1,1],[0,1]]) add(v3Cyl(0.07, 0.08, 0.7, 6, mats.wood, cx + sx*(P.width/2-0.1), 0.35, cz + sz*(P.depth/2-0.1)));
       add(v3Box(0.6, 0.06, 0.5, mats.planks, cx, 0.3, cz + P.depth/2 + 0.25)); }
     else { g.position.y = 0.32; add(v3Box(P.width+0.5, 0.34, P.depth+0.5, mats.stoneBig, cx, 0.17, cz)); }
@@ -29612,7 +29614,7 @@ const SDF = (()=>{
   const part = (min, max, h)=>{
     const nx = Math.ceil((max[0]-min[0])/h)+1, ny = Math.ceil((max[1]-min[1])/h)+1, nz = Math.ceil((max[2]-min[2])/h)+1;
     const g = new Float32Array(nx*ny*nz).fill(1), mt = new Uint8Array(nx*ny*nz);
-    const P = { min, h, nx, ny, nz, g, mt };
+    const P = { min, h, nx, ny, nz, g, mt }; if (SDF_Q) P.q = [];   /* (RS-570: a survey queues every part, splatting none) */
     P.op = (pr, k, m, sub)=>{ if (P.q) P.q.push([pr, k, m, sub]); else P.run(pr, k, m, sub); };   /* (RS-520: a sliced sculpt queues its parts, to splat them a few a frame) */
     P.run = (pr, k, m, sub, from, until)=>{   /* (RS-520: given a deadline, it stops after the layer that passes it and says where to go on from; -1 when done) */
       const pad = k + 2*h;
@@ -30409,27 +30411,44 @@ function sk3Build(){
   root.traverse(o=>{ if (!preKit.has(o)) o.userData.gear = 1; });
   return { root, pelvis, spine, chest, neck, head, R, L, RL, LL, sword, shield, steps };
 }
-/* (RS-500) each bone keyed by its name and arguments, so a session with the cache warm skips the whole 15s background sculpt */
+/* (RS-500) each bone keyed by its name and arguments, so a session with the cache warm skips the whole 15s background sculpt.
+   (RS-570) With the cache cold, the bones are no longer sculpted one whole bone a tick - a thorax or a pelvis was 0.4 to 2 seconds
+   in one go, the freeze a few seconds into play (a phone had it every session the cache didn't keep). A survey run of the build
+   (SK3_SURVEY) notes every bone it needs with its primitives queued, none carved; they're then carved and meshed a few
+   milliseconds a tick (sk3SculptTick), and the real build finds them all made */
+var SDF_Q = false; let SK3_SURVEY = null; const SK3_READY = new Map();
 for (const k of Object.keys(SK3_PARTS)){ const f = SK3_PARTS[k]; if (typeof f!=='function') continue;
   SK3_PARTS[k] = (...a)=>{ const key = 'sk3|' + k + '|' + a.join(',');
-    const hit = sculptDbGet(key); if (hit) return hit;
+    const hit = SK3_READY.get(key) || sculptDbGet(key); if (hit) return hit;
+    if (SK3_SURVEY){ const m0 = SDF.mesh; let P = null; SDF_Q = true; SDF.mesh = q=>q; try{ P = f(...a); } finally { SDF.mesh = m0; SDF_Q = false; }
+      if (P && P.q && !SK3_SURVEY.some(j=>j.key===key)) SK3_SURVEY.push({ key, P, i:0, kk:0, it:null });
+      return new THREE.BoxGeometry(0.01, 0.01, 0.01); }
     const g = f(...a); if (g && g.isBufferGeometry) sculptDbPut(key, g);
     return g; }; }
+/* one bone a little further on, until the deadline: its primitives splatted a layer at a time, then meshed a layer at a time; true when made */
+function sk3SculptStep(j, deadline){
+  const P = j.P, q = P.q;
+  while (j.i < q.length){ const o = q[j.i], nx = P.run(o[0], o[1], o[2], o[3], j.kk, deadline); if (nx >= 0){ j.kk = nx; return false; } j.kk = 0; j.i++; if (performance.now() > deadline) return false; }
+  if (!j.it) j.it = SDF.meshGen(P);
+  for (let r = j.it.next(); ; r = j.it.next()){ if (r.done){ j.g = r.value; return true; } if (performance.now() > deadline) return false; }
+}
 function sk3Init(){
   if (SK3.ok===true) return true;
   if (SK3.building || SK3.ok===false && SK3.started) return false;
   if (typeof THREE==='undefined') return false;   // still loading (or offline) - painted skeleton for now
   try{
-    SK3.started = true; SK3.m = sk3Build();
-    // sculpt the bones one piece per tick so the game never stalls; the
-    // painted skeleton stands in until the model is complete
-    SK3.ok = false; SK3.building = true;
-    const steps = SK3.m.steps.slice();
-    const next = ()=>{
-      try{ const f = steps.shift(); if (f) f(); }catch(e){ SK3.building = false; return; }
-      if (steps.length) setTimeout(next, 16); else { SK3.ok = true; SK3.building = false; }
-    };
-    setTimeout(next, 0);
+    SK3.started = true; SK3.ok = false; SK3.building = true;
+    // (RS-570) the survey: which bones the model needs that no earlier session sculpted - all queued, none carved
+    const jobs = []; SK3_SURVEY = jobs; try{ const m = sk3Build(); for (const f of m.steps) f(); } finally { SK3_SURVEY = null; }
+    // then carve them a few milliseconds a tick, and build the model for real from the finished bones (the painted skeleton
+    // stands in until it's done)
+    const finish = ()=>{ try{ SK3.m = sk3Build(); const steps = SK3.m.steps.slice();
+        const next = ()=>{ try{ const f = steps.shift(); if (f) f(); }catch(e){ SK3.building = false; return; } if (steps.length) setTimeout(next, 16); else { SK3.ok = true; SK3.building = false; } };
+        next(); }catch(e){ console.error(e); SK3.building = false; } };
+    const tick = ()=>{ const deadline = performance.now() + (gfxPhone() ? 4 : 6);
+      try{ while (jobs.length && performance.now() < deadline){ const j = jobs[0]; if (sk3SculptStep(j, deadline)){ jobs.shift(); SK3_READY.set(j.key, j.g); sculptDbPut(j.key, j.g); j.P = null; } } }catch(e){ console.error(e); SK3.building = false; return; }
+      if (jobs.length) setTimeout(tick, 16); else finish(); };
+    setTimeout(tick, 0);
     return false;
   }catch(e){ SK3.ok = false; }
   return SK3.ok;
@@ -31230,7 +31249,7 @@ function v3Tree(x,z,mats,grp,kind,s){
 function v3Occluder(grp, g, x, z, w, h){
   if (!V3.occ) return;
   const ob = new THREE.Mesh(new THREE.BoxGeometry(w, h, w), new THREE.MeshBasicMaterial({ visible:false }));
-  ob.position.set(x, h/2, z); ob.userData.grp = g; grp.add(ob); V3.occ.push(ob);
+  ob.position.set(x, h/2, z); ob.userData.grp = g; ob.userData.prop = true; grp.add(ob); V3.occ.push(ob);   /* (RS-570: a tree or a prop - not a building, so no stilts or terrace under it) */
 }
 // grass: tufts of blades on every grassy tile and out round the palisade, swaying in a vertex shader, with wildflowers among them
 function v3Grass(grp){
@@ -32248,7 +32267,7 @@ function* o3BuildGen(cx, cy){
     // a level pad under every landmark, so a lair ringed by peaks isn't buried in them
     for (let sx=tx; sx<=tx+1; sx++) for (let sz=tz; sz<=tz+1; sz++){
       if (!OW_SITE_TILES.includes(o3Tile(sx,sz))) continue;
-      const d = Math.hypot(wx-(sx+0.5), wz-(sz+0.5)), f = Math.max(0, Math.min(1, (1.25-d)/0.6)), pad = (inM(sx,sz) && lairH[dk(sx,sz)]) || 0.12;   /* (RS-178: a lair's pad is its summit) */
+      const d = Math.hypot(wx-(sx+0.5), wz-(sz+0.5)), f = Math.max(0, Math.min(1, (1.25-d)/0.6)), pad = (inM(sx,sz) && lairH[dk(sx,sz)]) || Math.max(0.12, 0.04 + (n1((sx+0.5)/5, (sz+0.5)/5)-0.5)*0.35 + 0.03);   /* (RS-178: a lair's pad is its summit; RS-570: any other site's is level with the rolling ground round it - a fixed height sank a town in a pit wherever the land rose) */
       h += (pad - h)*f;
     }
     // keep the ground clear of the water sheet (RS-105): wholly-land ground stays well above the wave tops,
@@ -32525,6 +32544,10 @@ function* o3VegetationGen(grp, x0, y0, W){
       if (h(1)<0.35) put.push(['rock', x+h(3), y+h(4), 0.6+h(5)*0.9, h(6)*6.28, h(7)]);
     }
   } }
+  /* (RS-570) the ground round a town is kept clear: no tree from the forest next door stands over its houses, no bush or rock on its doorstep */
+  { const towns = []; for (let x=x0-1; x<x0+W+1; x++) for (let y=y0-1; y<y0+W+1; y++) if (o3Tile(x, y)===OW_TOWN) towns.push([x+0.5, y+0.5, 1 + (()=>{ try{ return townTier(x, y)*0.22; }catch(e){ return 0; } })()]);
+    if (towns.length) for (let i=put.length-1; i>=0; i--){ const q = put[i], big = q[0]!=='bush' && q[0]!=='rock' && q[0]!=='reed', rr = big ? 1.25 : 0.85;
+      if (towns.some(([tx, tz, k])=>Math.hypot(q[1] - tx, q[2] - tz) < rr*k)) put.splice(i, 1); } }
   yield;
   // parts per kind: [geometry, material colour(s), local transform]
   const bark = '#5a4028', PARTS = {
@@ -43566,7 +43589,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-569';
+const GAME_VERSION = 'rs-570';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

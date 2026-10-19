@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs570 | the skeleton sculpted a few ms a tick with the cache cold (no long stall); hill towns terrace only their buildings, not trees; no woodcutting trees against a town; roads stop at its edge; its pad level with the ground round it |
 | rs569 | a sunken temple is laid out as the plain dungeons are: whole rooms and one-tile passages, no loose columns, doorways, all reachable; the sanctum keeps its drowned idol and pools |
 | rs568 | the catacombs under a graveyard are laid out as the plain dungeons are: whole burial chambers and one-tile passages, no pillars, doorways, all reachable, still niche-walled with bones and candles |
 | rs566 | waterfalls come down the mountains in steps - pools on rock ledges, curtains over the lips - into the river; the water never climbs or sinks into the ground |
@@ -389,6 +390,8 @@ Screenshots go to `tools/tests/shots/`.
 | zow | the open land at named kinds of place, hours and weather (`ZOW='[["name","kind",clockFrac,"weather",dist],...]'`); `ZOW_GPU=1` prints GPU ms |
 | zfall | the waterfalls on the fixed seed, the camera on each from the turn that faces it, the player hidden (`ZFALL='[[x,y,rot],...]'`, `ZDIST`, `ZNOROCK=1` hides the rock) |
 | zsiege | a siege at the spawn town (or, with `ZCITY=1`, a stone-walled city): the field before its gate, then its streets and square; `ZRAID=1` starts a raid |
+| zdgwalk | walks every room of a dungeon floor with a save (`ZSAVE`, `ZDEPTH`) at the real frame rate: frame-time spread, the slow frames, the shaders the warm-up links and how long each took, the scene's lights, and a CPU profile of the slow frames |
+| zherb | picks the last of a cave herb patch on a dungeon floor (with `ZSAVE`, a real save): every frame, gather tick and save timed around it |
 | zhair | heads with each hairstyle from four sides, and under helmets |
 | zplate | plate armour on builds from slight to heavy |
 | zunder | the creator's undressed figures by race and sex |

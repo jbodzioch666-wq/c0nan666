@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-570 - Trees off the stones, towns out of their pits, no skeleton stall
+- **No more stall a few seconds into play:** the game sculpts its skeleton model in the background. When no earlier session had saved it, it carved each bone in one go, and a ribcage or a pelvis held the page for half a second to two seconds. That was the freeze a few seconds after you start playing, wherever you were. The bones are now carved a few milliseconds at a time, so the game keeps moving while it finishes.
+- **Trees off the stones:** in hill towns, a stone terrace was laid under every tree near the town as well as under each building, so trees stood on paving slabs. Now only the buildings stand on terraces.
+- **Towns out of their pits:** every town sat on a level pad at one fixed height, so wherever the land rose around it, the town sat in a hollow. The pad now sits level with the rolling ground around it.
+- **Roads stop at the gate:** a road used to run right into the middle of a town, under its houses. It now stops at the town's edge.
+- **No trees on top of towns:** woodcutting trees no longer grow on the tiles next to a town, where their crowns hid its houses. The ordinary scenery trees keep clear of it too.
+
 ## RS-569 - Sunken temples in rooms and passages
 - **New layout:** sunken temples now use the plain dungeons' layout (RS-407) instead of their old fixed five-room plan. Each floor has whole rectangular rooms, joined by passages one tile wide through the rock, with an arched doorway or an oak door into every room. The loose columns and the corridors cut through the middle of rooms are gone, and every part of the floor can be reached.
 - **Bigger floors:** a temple floor is now the size of a plain dungeon floor, with five to eight rooms instead of five fixed ones.
