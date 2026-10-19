@@ -156,7 +156,7 @@ Screenshots go to `tools/tests/shots/`.
 | rs423 | A shut tome is only the shut book (the open book's merged pages no longer show inside it), and open only the open one |
 | rs422 | (RS-425: the waypoint in line with the Peddler's path, no one on its steps) Food on the fire while you cook (a grill over the campfire, a skillet on the hearth, browning as the bar fills; the cook panel a corner card meanwhile); the waypoint in the middle of the square, with benches and a lamp at each corner, everything still reachable; your weapon put away out of a fight (hip or back, the shield on the back) and drawn to fight |
 | rs420 | Minions go round walls to the foe and archers shoot only what they can see; you pick the minion and the bones; monsters (and you) step and strike on the diagonal, round no corner; the XP tracker's auto/manual switch; RS-421: idle minions follow you round walls |
-| siege | Breaking a siege is a battle: the watch beside you before the gates, three waves, then the streets with the townsfolk fighting and the warlord in the square; allies strike and are struck; won, you're back in the saved town. RS-419: high walls with towers and a gate, roofed houses; a raid is a battle in the streets |
+| siege | breaking a siege, fought at the real town: the field before its barred gate (three waves, the watch beside you), then its own streets and buildings with the gate swung open, the warlord in the square; a raid in the real streets |
 | rs416 | The watch's torch flame is sconce-sized; doorway arches spring higher in the floor's own pillar stone, the doors as tall; women's clothes lie flat across the front below the belt |
 | rs415 | Her hips no wider set than his and her tunic closer at the waist; an Egyptian pyramid; the rat king bigger and crowned; stone archways over every dungeon door, the treasure room's door studded and no taller than the walls; sconces on the gate towers; capes over the shoulders |
 | walkleak | A minute's walk over the land leaves almost nothing behind on the graphics card (animals, wandering groups, corpses, old land's foam, glows and depth maps); the water reads the depth of the land showing |
@@ -386,6 +386,7 @@ Screenshots go to `tools/tests/shots/`.
 | zdgroom | the dungeon camera over a room of a named purpose |
 | zow | the open land at named kinds of place, hours and weather (`ZOW='[["name","kind",clockFrac,"weather",dist],...]'`); `ZOW_GPU=1` prints GPU ms |
 | zfall | the waterfalls on the fixed seed, the camera on each from the turn that faces it, the player hidden (`ZFALL='[[x,y,rot],...]'`, `ZDIST`, `ZNOROCK=1` hides the rock) |
+| zsiege | a siege at the spawn town (or, with `ZCITY=1`, a stone-walled city): the field before its gate, then its streets and square; `ZRAID=1` starts a raid |
 | zhair | heads with each hairstyle from four sides, and under helmets |
 | zplate | plate armour on builds from slight to heavy |
 | zunder | the creator's undressed figures by race and sex |

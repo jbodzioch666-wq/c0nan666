@@ -16110,6 +16110,17 @@ function detectRegionBiome(x,y){
   for (const k in counts){ if (counts[k]>bestN){ bestN=counts[k]; best=+k; } }
   return best;
 }
+function villagePrep(){
+  const isSpawn = G.owPos.x===G.ow.spawnPos.x && G.owPos.y===G.ow.spawnPos.y;
+  const biome = isSpawn ? G.ow.spawnBiome : detectRegionBiome(G.owPos.x, G.owPos.y);
+  G.villageTheme = VILLAGE_TERRAIN_THEME[biome] || 'forest';
+  // the village's race (see generateTownFlavor) has to be known BEFORE
+  // generateVillage() runs, since it decides both the building art/color
+  // and what race the wandering villagers themselves are
+  const flavor = townFlavorAt(G.owPos.x, G.owPos.y);
+  G.villageRace = (flavor && VILLAGE_RACE_THEME[flavor.race]) ? flavor.race : 'human';
+  return flavor;
+}
 function enterVillage(){
   G.gameMode = 3; G.interior = null;
   G.owZoomedOut = false;
@@ -16119,14 +16130,7 @@ function enterVillage(){
   // read as grass/forest no matter the real surrounding region - use the
   // biome captured before that patch was cut in instead. Every other town
   // never had its surroundings touched, so a live sample is accurate there.
-  const isSpawn = G.owPos.x===G.ow.spawnPos.x && G.owPos.y===G.ow.spawnPos.y;
-  const biome = isSpawn ? G.ow.spawnBiome : detectRegionBiome(G.owPos.x, G.owPos.y);
-  G.villageTheme = VILLAGE_TERRAIN_THEME[biome] || 'forest';
-  // the village's race (see generateTownFlavor) has to be known BEFORE
-  // generateVillage() runs, since it decides both the building art/color
-  // and what race the wandering villagers themselves are
-  const flavor = townFlavorAt(G.owPos.x, G.owPos.y);
-  G.villageRace = (flavor && VILLAGE_RACE_THEME[flavor.race]) ? flavor.race : 'human';
+  const flavor = villagePrep();
   generateVillage();
   questValidateAll();
   ensureTownQuestBoard();
@@ -19859,6 +19863,69 @@ function wevBossFight(b){
    can be struck and fall; the monsters turn on whoever stands beside them (see siegeMonVsAlly). It all runs as a field fight
    (gameMode 2), the streets laid out in the same grid as the field */
 const SIEGE_WAVES = 3;
+/* (RS-567) a siege is fought at the real town: its own layout, as you'd walk it, with a field of SIEGE_FIELD rows before its south
+   gate - and the town drawn as the town view draws it, its houses and shops, its walls and gatehouse, built into the battle's scene
+   (see fpdBuild). Before the gate, the town is shut behind its walls; when the gate gives way its doors swing open and its streets
+   are the battlefield */
+const SIEGE_FIELD = 11;
+let SIEGE_TOWN = null;   // { id, world, occ, tw, th, gx, walk } - the staged town (not saved: rebuilt from the siege if it's lost)
+function siegeTownStage(S){
+  const k = { map:G.map, item:G.floorItem, cols:COLS, rows:ROWS, px:G.player.x, py:G.player.y, pf:G.player.facing, mon:G.mon, deco:G.arenaDeco, ow:G.owPos, vl:G.villagers, vn:G.villageNpcs, tv:G.townVendors };
+  if (SIEGE_TOWN) siegeTownDrop();
+  try{
+    G.owPos = { x:S.x, y:S.y }; villagePrep(); generateVillage();
+    const tw = COLS, th = ROWS, walk = [];
+    let gx = TOWN_CX; for (let x=0;x<tw;x++) if (G.map[x][th-1]===T_EXIT) gx = x;
+    for (let x=0;x<tw;x++){ walk.push([]); for (let y=0;y<th;y++) walk[x].push(G.map[x][y]!==T_WALL); }
+    G.villagers = []; G.villageNpcs = [];   /* (the townsfolk are out fighting, or behind their doors) */
+    const sc0 = V3.scene, w0 = V3.world, bp = v3BuildPeople, holder = new THREE.Group(); let world = null, occ = [];
+    V3.scene = holder; V3.world = null; V3_GATE_SHUT = !S.raid && S.phase===1; v3BuildPeople = ()=>{};
+    try{ v3BuildScene(); world = V3.world; occ = (V3.occ||[]).slice(); }
+    finally { V3.scene = sc0; V3.world = w0 && w0.parent ? w0 : null; V3.mapRef = null; V3_GATE_SHUT = false; v3BuildPeople = bp; }
+    if (world){ holder.remove(world); world.name = 'siegeTown';
+      /* (the town view's far ground, a plain sheet, would fight the painted ground round the walls - the painted one is kept) */
+      for (const o of world.children.slice()) if (o.isMesh && o.geometry && o.geometry.parameters && o.geometry.parameters.width===200) world.remove(o); }
+    SIEGE_TOWN = world ? { id:S.id, world, occ, tw, th, gx, walk, hinges:(V3.gateHinges||[]).slice() } : null;
+  } finally {
+    G.map = k.map; G.floorItem = k.item; setGrid(k.cols, k.rows); G.player.x = k.px; G.player.y = k.py; G.player.facing = k.pf; G.mon = k.mon; G.arenaDeco = k.deco; G.owPos = k.ow; G.villagers = k.vl; G.villageNpcs = k.vn; G.townVendors = k.tv;
+  }
+  S.town = !!SIEGE_TOWN; return SIEGE_TOWN;
+}
+function siegeTownDrop(){ const Tn = SIEGE_TOWN; SIEGE_TOWN = null; if (!Tn) return; if (Tn.world.parent) Tn.world.parent.remove(Tn.world); Tn.world.traverse(o=>{ if (o.geometry) o.geometry.dispose(); }); }
+/* the battlefield: the town (shut, or open to its streets) above, the field before its gate below, a few boulders out on it */
+function siegeTownMap(S, open){
+  const Tn = SIEGE_TOWN, tw = Tn.tw, th = Tn.th; setGrid(tw, th + SIEGE_FIELD);
+  G.map = makeGrid(T_FLOOR); G.floorItem = makeItemGrid(); G.arenaDeco = makeGrid('', COLS, ROWS);
+  for (let x=0;x<tw;x++) for (let y=0;y<th;y++) G.map[x][y] = open && Tn.walk[x][y] ? T_FLOOR : T_WALL;
+  for (let i=0;i<7;i++){ const x = 1 + Math.floor(fpHash(i, S.id, 567)*(COLS - 2)), y = th + 3 + Math.floor(fpHash(S.id, i, 568)*(SIEGE_FIELD - 4)); if (Math.abs(x - Tn.gx) > 2){ G.map[x][y] = T_WALL; G.arenaDeco[x][y] = 'rock'; } }
+  for (const h of Tn.hinges) h.userData.shut = !open;
+}
+/* a free spot out on the far side of the field, where the besiegers come from */
+function siegeFieldSpot(){ const th = SIEGE_TOWN ? SIEGE_TOWN.th : 0; for (let t=0;t<200;t++){ const x = 1 + rn(COLS - 2), y = Math.max(th + 5, ROWS - 4) + rn(3); if (y < ROWS - 1 && siegeFree(x, y)) return [x, y]; } return null; }
+/* each frame of the battle: the gate's doors swing to their place, and any building between the camera and you fades, as in the town */
+function siegeTownTick(){
+  const Tn = SIEGE_TOWN; if (!Tn || Tn.world.parent!==FPD.scene) return;
+  const T = THREE, now = performance.now(), dt = Math.min(0.1, (now - (Tn.t0 || now))/1000); Tn.t0 = now;
+  for (const h of Tn.hinges){ const want = h.userData.shut ? 0 : h.userData.open; h.rotation.y += (want - h.rotation.y)*Math.min(1, dt*2.2); }
+  const pp = ISO.player && ISO.player.pos && ISO.player.map===G.map ? ISO.player.pos : { x:G.player.x + 0.5, y:G.player.y + 0.5 };
+  const cam = FPD.cam, ray = Tn.ray || (Tn.ray = new T.Raycaster()), faded = new Set(), tgt = new T.Vector3();
+  for (const hy of [0.15, 0.55, 0.95]){ tgt.set(pp.x, hy, pp.y); const dir = tgt.clone().sub(cam.position), len = dir.length(); dir.normalize(); ray.set(cam.position, dir); ray.far = len - 0.2; for (const h of ray.intersectObjects(Tn.occ, false)) faded.add(h.object.userData.grp); }
+  /* (and, as in the town, anything else over you - the gatehouse, a tower, a lamp's hood - whatever the camera's line to you passes through) */
+  const cands = Tn.cands || (Tn.cands = Tn.world.children.filter(o=>!o.isInstancedMesh && !o.isPoints && !o.isSprite && o.visible!==false && !(o.isMesh && o.geometry && o.geometry.type==='PlaneGeometry')));
+  Tn.dyn = Tn.dyn || new Set(); ray.camera = cam;
+  for (const hy of [0.3, 0.8]){ tgt.set(pp.x, hy, pp.y); const dir = tgt.clone().sub(cam.position), len = dir.length(); dir.normalize(); ray.set(cam.position, dir); ray.far = len - 0.25;
+    for (const h of ray.intersectObjects(cands, true)){ if (h.point.y < 0.35 || !h.object.visible || (h.object.material && h.object.material.visible===false)) continue;
+      let top = h.object; while (top.parent && top.parent!==Tn.world) top = top.parent; if (top.parent===Tn.world){ faded.add(top); Tn.dyn.add(top); } } }
+  ray.far = Infinity;
+  for (const g of new Set([...Tn.occ.map(o=>o.userData.grp), ...Tn.dyn])){ if (!g) continue; const want = faded.has(g);
+    g.userData.fade = (g.userData.fade||0) + ((want ? 1 : 0) - (g.userData.fade||0))*Math.min(1, dt*8); const f = g.userData.fade;
+    if (f > 0.02 || g.userData.faded){
+      g.traverse(o=>{ if (!o.isMesh) return; if (!o.userData.mat0) o.userData.mat0 = o.material;
+        if (f > 0.02){ if (!o.userData.matF){ const src = o.userData.mat0; o.userData.matF = Array.isArray(src) ? src.map(m=>Object.assign(m.clone(), { transparent:true, depthWrite:false })) : Object.assign(src.clone(), { transparent:true, depthWrite:false }); }
+          o.material = o.userData.matF; (Array.isArray(o.material) ? o.material : [o.material]).forEach(m=>{ m.opacity = 1 - f*0.8; }); }
+        else o.material = o.userData.mat0; });
+      g.userData.faded = f > 0.02; } }
+}
 function siegeAllyAt(x, y){ return (G.allies||[]).find(a=>a.hp > 0 && a.x===x && a.y===y) || null; }
 function siegeFree(x, y){ return x > 0 && y > 0 && x < COLS-1 && y < ROWS-1 && G.map[x][y]===T_FLOOR && !G.mon.some(m=>m.alive && m.x===x && m.y===y) && !siegeAllyAt(x, y) && !(x===G.player.x && y===G.player.y); }
 function siegeNear(x0, y0, maxR){ for (let r=0;r<=(maxR||6);r++) for (let dx=-r;dx<=r;dx++) for (let dy=-r;dy<=r;dy++){ if (Math.max(Math.abs(dx), Math.abs(dy))!==r) continue; if (siegeFree(x0+dx, y0+dy)) return [x0+dx, y0+dy]; } return null; }
@@ -19877,23 +19944,21 @@ function siegeSpawn(entry, L, ok){
 }
 function siegeWave(S){
   const n = [3 + rn(2), 4 + rn(2), 3 + rn(2)][S.wave - 1] - (S.walled ? 1 : 0);
-  for (let i=0;i<n;i++) wevMon(wevCampEntry(S.camp, S.L), S.L).engaged = true;
+  for (let i=0;i<n;i++){ const m = wevMon(wevCampEntry(S.camp, S.L), S.L); m.engaged = true; const at = SIEGE_TOWN && siegeFieldSpot(); if (at){ m.x = at[0]; m.y = at[1]; } }   /* (RS-567: they come on across the field) */
   if (S.wave===SIEGE_WAVES){ const c = G.mon.find(m=>m.alive); if (c){ upgradeToElite(c); c.nm = c.nm.replace(/^Champion /, 'Captain '); } }
 }
 function siegeWarStart(d){
   const key = d.key, rec = townRec(key), walled = !!(rec && rec.up && rec.up.walls), watch = 1 + ((rec && rec.up && rec.up.watch) ? 1 : 0), nm = o3TownName(d.x, d.y);
   G.allies = [];
   wevFightStart('siegewar', d.id, L=>{
-    G.arenaTheme = 'siege'; const cx = Math.floor(COLS/2);
-    for (let x=0;x<COLS;x++){ G.map[x][ROWS-2] = T_WALL; G.arenaDeco[x][ROWS-2] = 'wall'; }   /* (the town's wall at your back) */
-    for (const gx of [cx-1, cx]) G.arenaDeco[gx][ROWS-2] = 'gate';   /* (RS-419: its gate, barred) */
-    for (const tx of [cx-2, cx+1]) for (const ty of [ROWS-2, ROWS-3]){ G.map[tx][ty] = T_WALL; G.arenaDeco[tx][ty] = 'tower'; }   /* (the gate towers either side, standing out from the wall) */
-    for (let x=1;x<COLS-1;x++) for (let y=ROWS-7;y<ROWS-2;y++) if (G.map[x][y]===T_WALL && y < ROWS-3){ G.map[x][y] = T_FLOOR; G.arenaDeco[x][y] = ''; }   /* (clear ground in front of the gate) */
-    G.player.x = cx; G.player.y = ROWS-4; G.map[cx][ROWS-4] = T_FLOOR;
-    for (const m of ((G.player && G.player.minions)||[])) necroPlace(m); placeCompanionNearPlayer(); placeSummonNearPlayer();
+    G.arenaTheme = 'siege';
     G.siegeWar = { id:d.id, key, x:d.x, y:d.y, camp:d.camp || 'orc', L, wave:1, phase:1, walled };
+    siegeTownStage(G.siegeWar); siegeTownMap(G.siegeWar, false);   /* (RS-567: the real town, its gate barred at your back) */
+    const cx = SIEGE_TOWN.gx, fy = SIEGE_TOWN.th + 1;
+    G.player.x = cx; G.player.y = fy;
+    for (const m of ((G.player && G.player.minions)||[])) necroPlace(m); placeCompanionNearPlayer(); placeSummonNearPlayer();
     siegeWave(G.siegeWar);
-    for (let i=0;i<2 + watch + (walled ? 1 : 0);i++){ const at = siegeNear(cx + (i%2 ? 1 : -1)*(1 + (i>>1)), ROWS-4, 4); if (at) siegeAllyMake('guard', L, at[0], at[1]); }
+    for (let i=0;i<2 + watch + (walled ? 1 : 0);i++){ const at = siegeNear(cx + (i%2 ? 1 : -1)*(1 + (i>>1)), fy, 4); if (at) siegeAllyMake('guard', L, at[0], at[1]); }
   });
   wevSay(`the gate of ${nm} is barred behind you - you and ${G.allies.length} of the watch hold the field against the besiegers. Wave 1 of ${SIEGE_WAVES}!`, 'new', `The siege of ${nm}`);
 }
@@ -19904,30 +19969,26 @@ function siegeRaidStart(d){
   wevFightStart('siegewar', d.id, L=>{ const rec = townRec(d.key), walled = !!(rec && rec.up && rec.up.walls);
     G.siegeWar = { id:d.id, key:d.key, x:d.x, y:d.y, camp:d.camp || 'goblin', L, wave:SIEGE_WAVES, phase:1, walled, raid:true };
     siegeWarStreets(G.siegeWar);
-    const watch = 1 + ((rec && rec.up && rec.up.watch) ? 1 : 0); for (let i=0;i<watch;i++){ const at = siegeNear(Math.floor(COLS/2), ROWS-3, 4); if (at) siegeAllyMake('guard', L, at[0], at[1]); } });
+    const watch = 1 + ((rec && rec.up && rec.up.watch) ? 1 : 0); for (let i=0;i<watch;i++){ const at = siegeNear(G.player.x, G.player.y - 1, 4); if (at) siegeAllyMake('guard', L, at[0], at[1]); } });
 }
 /* the streets: a ring road and lanes round blocks of houses, a main street from the gate to the square, the square in the middle */
 function siegeWarStreets(S){
   const L = S.L, cx = Math.floor(COLS/2), nm = o3TownName(S.x, S.y);
   // what's lying on the field goes into your pack, or it would be lost with it
   let took = 0; for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++){ if (G.map[x][y]===T_ITEM && G.floorItem[x][y]){ addToInventory(G.floorItem[x][y]); took++; } else if (G.map[x][y]===T_GOLD){ G.player.gold += roundH((2+rn(8))*goldFindMult()); took++; } }
-  G.map = makeGrid(T_WALL); G.floorItem = makeItemGrid(); G.arenaDeco = makeGrid('', COLS, ROWS);
-  const open = (x0, y0, x1, y1)=>{ for (let x=Math.max(1,x0);x<=Math.min(COLS-2,x1);x++) for (let y=Math.max(1,y0);y<=Math.min(ROWS-2,y1);y++) G.map[x][y] = T_FLOOR; };
-  open(cx-1, 1, cx, ROWS-2); open(1, 8, COLS-2, 9); open(6, 6, 13, 12);   // the main street, the cross street and the square
-  open(3, 2, 3, ROWS-3); open(COLS-4, 2, COLS-4, ROWS-3); open(3, 2, COLS-4, 2); open(3, ROWS-3, COLS-4, ROWS-3);   // the ring road
-  open(6, 13, 6, ROWS-3); open(13, 13, 13, ROWS-3); open(6, 2, 6, 5); open(13, 2, 13, 5);   // and lanes off it
-  for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++) if (G.map[x][y]===T_WALL) G.arenaDeco[x][y] = x===0 || y===0 || x===COLS-1 || y===ROWS-1 ? 'wall' : fpHash(x >> 1, y >> 1, 418) >= 0.45 ? 'house' : 'house2';   /* (the town wall round it, and timber-framed houses among the stone ones) */
-  for (const gx of [cx-1, cx]) G.arenaDeco[gx][ROWS-1] = 'gate'; for (const tx of [cx-2, cx+1]) G.arenaDeco[tx][ROWS-1] = 'tower';   /* (RS-419: the gate you came through, broken in, between its towers) */
-  G.arenaTheme = 'street'; G.mandatoryFight = true; S.phase = 2;
-  G.player.x = cx; G.player.y = ROWS-2;
+  /* (RS-567) the town's own streets, as you'd walk them, its gate swung open behind you */
+  if (!SIEGE_TOWN || SIEGE_TOWN.id!==S.id) siegeTownStage(S);
+  siegeTownMap(S, true); const gx = SIEGE_TOWN.gx, th = SIEGE_TOWN.th, sq = (x, y)=>x >= tX(8) && x <= tX(13) && y >= tY(9) && y <= tY(14);
+  G.arenaTheme = 'siege'; G.mandatoryFight = true; S.phase = 2;
+  G.player.x = gx; G.player.y = th - 3;
   for (const m of ((G.player && G.player.minions)||[])) necroPlace(m); placeCompanionNearPlayer(); placeSummonNearPlayer();
   G.mon = [];
-  const raiders = (S.raid ? 3 + rn(2) : 5 + rn(3)) - (S.walled ? 1 : 0), inTown = (x, y)=>y < ROWS-5;
+  const raiders = (S.raid ? 3 + rn(2) : 5 + rn(3)) - (S.walled ? 1 : 0), inTown = (x, y)=>y < th - 5;
   for (let i=0;i<raiders;i++) siegeSpawn(wevCampEntry(S.camp, L), L, inTown);
-  const boss = siegeSpawn(wevCampEntry(S.camp, L + (S.raid ? 2 : 4)), L + (S.raid ? 2 : 4), (x, y)=>x >= 7 && x <= 12 && y >= 7 && y <= 11);
+  const boss = siegeSpawn(wevCampEntry(S.camp, L + (S.raid ? 2 : 4)), L + (S.raid ? 2 : 4), sq);
   if (S.raid){ upgradeToElite(boss); boss.nm = 'Raid leader ' + boss.nm.replace(/^(Champion|Captain) /, ''); } else { upgradeToNamedElite(boss); boss.nm = 'Warlord ' + boss.nm.replace(/^(Champion|Captain) /, ''); }
   const left = (G.allies||[]).filter(a=>a.hp > 0); G.allies = [];
-  for (const a of left){ const at = siegeNear(cx, ROWS-3, 5); if (at){ a.x = at[0]; a.y = at[1]; G.allies.push(a); } }   /* (the watch that held the gate comes through it with you) */
+  for (const a of left){ const at = siegeNear(gx, th - 4, 5); if (at){ a.x = at[0]; a.y = at[1]; G.allies.push(a); } }   /* (the watch that held the gate comes through it with you) */
   for (let i=0;i<3 + rn(2);i++){ const m = G.mon[rn(G.mon.length)], at = m && siegeNear(m.x, m.y, 3); if (at) siegeAllyMake(i < 2 || chn(0.5) ? 'folk' : 'guard', L, at[0], at[1], G.mon.find(o=>o.alive && !o.elite)); }   /* (the townsfolk already fighting in the streets) */
   for (const m of G.mon) m.engaged = true;
   FPD.mapRef = null;
@@ -19943,14 +20004,14 @@ function siegeWarWon(f){
   const e = wevP(), p = G.player, st = wevStats(), Lt = cbT();
   if (S.raid){ const t = e.town[S.key]; if (t && t.id===S.id){ t.done = true; t.until = wevTurn(); }   /* (RS-419: a raid beaten off) */
     const nm = o3TownName(S.x, S.y), gold = roundH((120 + Lt*18)*goldFindMult()); p.gold += gold; st.defended++; p.rep = p.rep || {}; p.rep[S.key] = repAt(S.key) + 3; tkP().cur.guild += 1;
-    G.siegeWar = null; G.allies = [];
+    G.siegeWar = null; G.allies = []; siegeTownDrop();
     wevSay(`the raiders flee ${nm}! The reeve pays you ${gold} gold and a guild token (+3 standing)`, 'magic', `You saved ${nm}`); checkAchievements();
     if (G.owPos.x===S.x && G.owPos.y===S.y){ enterVillage(); return true; } return false; }
   const d = e.dyn.find(d=>d.id===S.id); if (d) e.dyn.splice(e.dyn.indexOf(d), 1);
   const nm = o3TownName(S.x, S.y), gold = roundH((220 + Lt*30)*goldFindMult()), saved = (G.allies||[]).filter(a=>a.hp > 0).length;
   p.gold += gold; st.defended++; p.rep = p.rep || {}; p.rep[S.key] = repAt(S.key) + 5; tkP().cur.guild += 3;
   addToInventory(genItem(lootAt(6), lootKind(), 3, chn(0.5)));
-  G.siegeWar = null; G.allies = [];
+  G.siegeWar = null; G.allies = []; siegeTownDrop();
   wevSay(`${nm} is saved! The townsfolk pour out to cheer you${saved ? ` and the ${saved} of the watch still standing` : ''}. The reeve pays you ${gold} gold, a piece from the town's armoury and 3 guild tokens (+5 standing)`, 'magic', `You broke the siege of ${nm}`);
   checkAchievements();
   if (G.owPos.x===S.x && G.owPos.y===S.y){ enterVillage(); return true; }
@@ -20029,7 +20090,7 @@ function wevHighwayFight(purse){
 function wevFrame(){
   if (G.wevPending && G.ui==='playing' && !G.gameOver){ const d = G.wevPending; G.wevPending = null; if (G.gameMode===3) wevDialog(...d); }
   const f = G.wevFight; if (!f) return;
-  if (G.gameMode!==2 && f.kind==='siegewar'){ G.siegeWar = null; G.allies = []; }   /* (RS-418: you fell back from the field - the siege goes on) */
+  if (G.gameMode!==2 && f.kind==='siegewar'){ G.siegeWar = null; G.allies = []; siegeTownDrop(); }   /* (RS-418: you fell back from the field - the siege goes on) */
   if (G.gameMode!==2){ if (f.kind==='boss' && G.ow && G.ow.ev && G.ow.ev.boss && G.ow.ev.boss.hp > 0) wevSay(`you break off the fight - ${wevBossName(G.ow.ev.boss)} will remember its wounds`, ''); if (f.kind==='delve') wgStepOff((G.ow.pois||[]).find(p=>p.id===f.id)); G.wevFight = null; return; }
   if (f.kind==='boss'){ const m = G.mon.find(m=>m.worldBoss); if (m && G.ow.ev && G.ow.ev.boss) G.ow.ev.boss.hp = m.alive ? m.hp : 0; }
 }
@@ -23288,11 +23349,13 @@ function townV3Walls(mats, grp){
   v3GateDoors(mats, grp, cx+0.5, 1.0, S - 0.62, 2.8);
   v3GateBanners(grp, [cx+0.5 - 1.6, cx+0.5 + 1.6], 2.35, S + 0.64, 0.72, 1.05);
 }
+let V3_GATE_SHUT = false;
 // (RS-336) a gate's two oak doors, iron-banded, standing open inward against the gateway's sides
 function v3GateDoors(mats, grp, cxm, half, z, H){
   const T = THREE;
   for (const s of [-1,1]){
-    const hinge = new T.Group(); hinge.position.set(cxm + s*half, 0, z); hinge.rotation.y = -s*(Math.PI/2 - 0.14); grp.add(hinge);
+    const hinge = new T.Group(); hinge.position.set(cxm + s*half, 0, z); hinge.userData.open = -s*(Math.PI/2 - 0.14); hinge.rotation.y = V3_GATE_SHUT ? 0 : hinge.userData.open; grp.add(hinge);
+    hinge.userData.shut = V3_GATE_SHUT; (V3.gateHinges = V3.gateHinges || []).push(hinge);   /* (RS-567: barred before a siege's battle, swung open when the gate gives way) */
     const w = half - 0.04, leaf = v3Box(w, H, 0.09, mats.planks, -s*w/2, H/2, 0); leaf.castShadow = true; leaf.receiveShadow = true; hinge.add(leaf);
     for (const y of [0.35, H*0.5, H - 0.35]){ const band = v3Box(w + 0.01, 0.07, 0.11, mats.iron, -s*w/2, y, 0); hinge.add(band); }
     for (const y of [0.35, H*0.5, H - 0.35]) for (const k of [0.2, 0.5, 0.8]){ const st = v3Box(0.035, 0.035, 0.13, mats.iron, -s*w*k, y, 0); hinge.add(st); }
@@ -23922,7 +23985,7 @@ function audSurface(){
     return { [OW_DESERT]:'sand', [OW_TUNDRA]:'snow', [OW_SWAMP]:'mud', [OW_RIVER]:'water', [OW_WATER]:'snow', [OW_MOUNTAIN]:'stone', [OW_MOUNTAINPASS]:'stone', [OW_TOWN]:'stone' }[t] || 'grass'; }
   if (G.gameMode===3){ if (G.interior) return G.interior.key==='cellar' || G.interior.key==='temple' ? 'stone' : 'wood'; const d = G.villageDeco[G.player.x] && G.villageDeco[G.player.x][G.player.y];
     return d==='path' || d==='npc' ? 'stone' : d==='pier' ? 'wood' : d==='sand' ? 'sand' : G.villageTheme==='tundra' ? 'snow' : G.villageTheme==='desert' ? 'sand' : 'grass'; }
-  if (G.gameMode===2) return G.cellar || G.arenaTheme==='street' ? 'stone' : G.arenaTheme==='sea' ? 'wood' : 'grass';
+  if (G.gameMode===2) return G.cellar || G.arenaTheme==='street' || (G.siegeWar && G.siegeWar.phase===2 && SIEGE_TOWN && G.player.y < SIEGE_TOWN.th) ? 'stone' : G.arenaTheme==='sea' ? 'wood' : 'grass';
   return 'stone';
 }
 function audPlate(){ const c = G.gear && G.gear.chest; return !!(c && c.used && /plate|chain|mail|metal|full|bronze|iron|steel|mithril|adamant|rune|dragon/i.test((c.nm||'') + ' ' + (c.basis||'') + ' ' + (c.baseMat||'')) && !/robe|hide|leather|cloth/i.test((c.nm||'') + ' ' + (c.basis||''))); }
@@ -31492,7 +31555,7 @@ function v3BuildScene(){
   const T = THREE, sc = V3.scene;
   if (V3.world){ sc.remove(V3.world); V3.world.traverse(o=>{ if (o.geometry) o.geometry.dispose(); }); }
   const grp = V3.world = new T.Group(); sc.add(grp);
-  V3.windows = []; V3.lamps = []; V3.smoke = []; V3.flames = []; V3.hearthCook = []; V3.signs = []; V3.banners = []; V3.doors = {}; V3.hits = []; V3.people = []; V3.parts = [];
+  V3.gateHinges = []; V3.windows = []; V3.lamps = []; V3.smoke = []; V3.flames = []; V3.hearthCook = []; V3.signs = []; V3.banners = []; V3.doors = {}; V3.hits = []; V3.people = []; V3.parts = [];
   const mats = V3.mats = v3Materials();
   if (G.interior){ v3BuildInterior(grp, mats); v3BuildPeople(grp, mats); return; }
   // ground: the painted town square plus the wide surrounding land
@@ -34741,6 +34804,10 @@ function fpdBuild(T){
   const bucket = (k)=> B[k] || (B[k] = { pos:[], nor:[], uv:[], col:[], idx:[] });
   // indoors the map's edge is solid rock; out of doors it's open ground running off to the horizon
   const out = T.outdoor, yard = !!(T.yard && G.gameMode===1), field = G.gameMode===2 && !G.cellar;   /* (RS-164: the inn's cellar has real walls) */
+  /* (RS-567) a siege at the real town: the town's own scene is the ground, the buildings and the walls - the stone builds none */
+  const S = field && G.siegeWar; if (S && S.town && (!SIEGE_TOWN || SIEGE_TOWN.id!==S.id)) try{ siegeTownStage(S); }catch(e){ console.error(e); }
+  const town = S && SIEGE_TOWN && SIEGE_TOWN.id===S.id && COLS===SIEGE_TOWN.tw ? SIEGE_TOWN : null; FPD.town = town;
+  if (!town && SIEGE_TOWN && !(S && SIEGE_TOWN.id===S.id)) siegeTownDrop();
   const solid = (x,y)=> (x<0 || y<0 || x>=COLS || y>=ROWS) ? !out : G.map[x][y]===T_WALL;
   // a grid of vertices over one face: origin O, edge vectors U and V, samples along each
   // (uvs scales the texture to the face's real size, for the small trims)
@@ -34782,6 +34849,7 @@ function fpdBuild(T){
   const cata = key==='catacomb', stairTiles = [];
   const ramp = (t, lo)=> lo + (1-lo)*Math.min(1, t/0.14);
   for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
+    if (town) break;
     if (solid(x,y)){
       // seen from above, the ground runs on under a field's bushes and a graveyard's fences and tombs
       if (ISO.on && out) face('floor0', [x,-0.002,y+1], [1,0,0], [0,0,-1], [0,1,0], [0,1], [0,1], ()=>0.85);
@@ -34992,6 +35060,7 @@ function fpdBuild(T){
   if (props.skull.length || props.bone.length || props.candle.length || props.shroud.length) fpdCatacombProps(props, matFor, world);
   fpdPortals(world);
   gfxMatsBorn(FPD.r, world); FPD.scene.add(world); FPD.world = world;   /* (RS-562) */
+  if (town && town.world.parent!==FPD.scene){ FPD.scene.add(town.world); try{ gfxMatsBorn(FPD.r, town.world); }catch(e){} }
   FPD.shadowFrames = 3; FPD.lightKey = ''; FPD.warm = true;
   // sculpt every creature on this floor now, under the fade-in, rather than mid-fight when it first steps into view
   try{ for (const m of G.mon||[]){ const pt = m3dPortrait(m); if (pt) m3dTemplate(pt); } }catch(e){}
@@ -35157,13 +35226,13 @@ function fpdSiegeWorks(world, matFor){
 }
 function fpdOutdoor(T, spec, world, matFor){
   const TH = THREE, key = T.key, field = G.gameMode===2;
-  try{ fpdSiegeWorks(world, matFor); }catch(e){ console.error(e); }   /* (RS-419) */
+  if (!FPD.town) try{ fpdSiegeWorks(world, matFor); }catch(e){ console.error(e); }   /* (RS-419; RS-567: at the real town, its own walls stand) */
   const add = (m, cast)=>{ m.castShadow = cast!==false; m.receiveShadow = true; world.add(m); return m; };
   const cxm = COLS/2, czm = ROWS/2;
   // ground beyond the map's edge (the sea's is open water)
   // (four strips round the map rather than one sheet under it, so an opening in the floor stays open)
   const E = 80, strips = [[-E, -E, COLS+E, 0], [-E, ROWS, COLS+E, ROWS+E], [-E, 0, 0, ROWS], [COLS, 0, COLS+E, ROWS]];
-  for (const [x0, z0, x1, z1] of strips){
+  for (const [x0, z0, x1, z1] of FPD.town ? [] : strips){
     const gg = new TH.PlaneGeometry(x1-x0, z1-z0, 1, 1); gg.rotateX(-Math.PI/2); gg.translate((x0+x1)/2, -0.004, (z0+z1)/2);
     const gp = gg.attributes.position, guv = gg.attributes.uv;
     for (let i=0;i<gp.count;i++) guv.setXY(i, gp.getX(i), -gp.getZ(i));
@@ -35175,7 +35244,7 @@ function fpdOutdoor(T, spec, world, matFor){
     const rockG = [fpdLumpy(2, 0.2, 3), fpdLumpy(2, 0.24, 9)], bushG = [fpdLumpy(2, 0.16, 5, true), fpdLumpy(2, 0.2, 12, true)];
     const boxG = new TH.BoxGeometry(1,1,1), barrelG = new TH.CylinderGeometry(0.2, 0.2, 0.5, 14);
     for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
-      if (G.map[x][y]!==T_WALL || fpdFieldWall(x, y) || (G.arenaDeco && G.arenaDeco[x][y]==='gate')) continue;   /* (RS-418: a built wall, not an obstacle; RS-419: or the gate) */
+      if (G.map[x][y]!==T_WALL || fpdFieldWall(x, y) || (G.arenaDeco && G.arenaDeco[x][y]==='gate') || (FPD.town && x < FPD.town.tw && y < FPD.town.th)) continue;   /* (RS-418: a built wall, not an obstacle; RS-419: or the gate; RS-567: or the town itself) */
       const deco = G.arenaDeco && G.arenaDeco[x] ? G.arenaDeco[x][y] : '', h = (i)=>fpHash(x,y,40+i);
       const kind = key==='sea' ? 'crate' : (deco==='rock' || key==='desert' || key==='tundra') ? 'rock' : 'bush';
       const px = x+0.5, pz = y+0.5;
@@ -35263,6 +35332,7 @@ function fpdRender(env, T, camZ){
   if (FPD.cv.width!==w || FPD.cv.height!==h){ FPD.r.setPixelRatio(1); FPD.r.setSize(w, h, false); }
   const c = FP.cam, cam = FPD.cam;
   if (ISO.on) isoCamera(cam, w/h);
+  if (FPD.town) try{ siegeTownTick(); }catch(e){ console.error(e); }   /* (RS-567) */
   if (FPD.cutU){ const f = ISO.player && ISO.player.pos && ISO.player.map===G.map ? Object.assign({ map:G.map }, ISO.player.pos) : ISO.focus, on = ISO.on && f && f.map===G.map;   /* (RS-171: round you, not the camera's lead) */ FPD.cutU.uCutF.value.set(on ? f.x : 0, on ? f.y : 0, on ? 1 : 0); FPD.cutU.uCutD.value.set(Math.sin(ISO.yawNow||0), Math.cos(ISO.yawNow||0)); }
   if (!ISO.on){
     cam.near = 0.03; cam.aspect = w/h; cam.fov = 2*Math.atan(FP_PLANE/cam.aspect)*180/Math.PI; cam.updateProjectionMatrix();
@@ -43524,7 +43594,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-566';
+const GAME_VERSION = 'rs-567';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

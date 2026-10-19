@@ -1,3 +1,4 @@
+// RS-567: fought at the real town - its own layout, buildings, walls and gatehouse, the gate barred before the battle and open after.
 // RS-418: breaking a siege is a battle. Before the gate, with the town's watch at your side, you hold the field against three
 // waves of besiegers; then the gate gives way and the fight moves into the streets, where the watch and the townsfolk fight the
 // raiders and their warlord holds the square. The town's people strike the monsters and are struck by them, and can fall. Win
@@ -14,7 +15,7 @@ module.exports = async page=>{
     wevSiegeFight(d);
     const S = G.siegeWar;
     return { mode:G.gameMode, theme:G.arenaTheme, kind:G.wevFight && G.wevFight.kind, wave:S && S.wave, phase:S && S.phase, allies:(G.allies||[]).length, mon:G.mon.filter(m=>m.alive).length,
-      wall:(()=>{ let n = 0; for (let x=1;x<COLS-1;x++) if (G.map[x][ROWS-2]===T_WALL) n++; return n; })(), gold0, key }; });
+      town:!!(SIEGE_TOWN && S.town && SIEGE_TOWN.world), shut:!!(SIEGE_TOWN && G.map[SIEGE_TOWN.gx][SIEGE_TOWN.th-1]===T_WALL && SIEGE_TOWN.hinges.length && SIEGE_TOWN.hinges.every(h=>h.userData.shut)), before:!!(SIEGE_TOWN && G.player.y >= SIEGE_TOWN.th), gold0, key }; });
   console.log('start', JSON.stringify(r0));
   await step(30);
   await page.screenshot({ path: SHOTS + '/siege_gates.png' });
@@ -31,7 +32,7 @@ module.exports = async page=>{
   // clear the waves, one by one
   const waves = [];
   for (let w=0; w<3; w++){
-    await page.evaluate(()=>{ G.player.x = Math.floor(COLS/2); G.player.y = ROWS-4; G.mon.forEach((m,i)=>{ if (m.alive){ m.hp = 0; monsterDies(i); } }); });
+    await page.evaluate(()=>{ G.player.x = SIEGE_TOWN.gx; G.player.y = Math.min(ROWS-2, SIEGE_TOWN.th + 1); G.mon.forEach((m,i)=>{ if (m.alive){ m.hp = 0; monsterDies(i); } }); });
     await step(8);
     waves.push(await page.evaluate(()=>{ const S = G.siegeWar; return S ? { wave:S.wave, phase:S.phase, theme:G.arenaTheme, mon:G.mon.filter(m=>m.alive).length, warlord:G.mon.some(m=>m.alive && /^Warlord /.test(m.nm)), allies:G.allies.length, folk:G.allies.filter(a=>a.kind==='folk').length, mode:G.gameMode } : { done:true, mode:G.gameMode }; }));
   }
@@ -39,7 +40,8 @@ module.exports = async page=>{
   await step(30);
   await page.screenshot({ path: SHOTS + '/siege_streets.png' });
   // the streets: a town laid out - walls of houses, open streets and a square
-  const town = await page.evaluate(()=>{ let walls = 0, floor = 0; for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++){ if (G.map[x][y]===T_WALL) walls++; else if (G.map[x][y]===T_FLOOR) floor++; } return { walls, floor, sq:G.map[9][9]===T_FLOOR && G.map[7][7]===T_FLOOR }; });
+  const town = await page.evaluate(()=>{ let walls = 0, floor = 0; for (let x=0;x<COLS;x++) for (let y=0;y<SIEGE_TOWN.th;y++){ if (G.map[x][y]===T_WALL) walls++; else if (G.map[x][y]===T_FLOOR) floor++; }
+    const Tn = SIEGE_TOWN; return { walls, floor, sq:G.map[tX(10)][tY(11)]===T_FLOOR, inScene:Tn.world.parent===FPD.scene, open:Tn.hinges.every(h=>!h.userData.shut) && G.map[Tn.gx][Tn.th-1]===T_FLOOR, inside:G.player.y < Tn.th, buildings:Tn.occ.length }; });
   // and win it
   await page.evaluate(()=>{ G.mon.forEach((m,i)=>{ if (m.alive){ m.hp = 0; monsterDies(i); } }); });
   await step(10);
@@ -47,25 +49,24 @@ module.exports = async page=>{
   console.log('end', JSON.stringify(end), 'town', JSON.stringify(town));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m); };
   A(r0.mode===2 && r0.kind==='siegewar' && r0.theme==='siege' && r0.wave===1 && r0.phase===1, 'the battle starts at the gates: '+JSON.stringify(r0));
-  A(r0.allies >= 3 && r0.mon >= 2 && r0.wall >= 16, 'the watch stands with you before the town wall, the first wave coming on: '+JSON.stringify(r0));
+  A(r0.allies >= 3 && r0.mon >= 2 && r0.town && r0.shut && r0.before, 'the watch stands with you before the real town, its gate barred, the first wave coming on: '+JSON.stringify(r0));
   A(fight.hitFoe && fight.hurt, 'the town\'s people strike the besiegers and are struck: '+JSON.stringify(fight));
   A(waves[0].phase===1 && waves[0].wave===2 && waves[0].mon > 0, 'the second wave: '+JSON.stringify(waves[0]));
   A(waves[1].phase===1 && waves[1].wave===3 && waves[1].mon > 0, 'the third: '+JSON.stringify(waves[1]));
-  A(waves[2].phase===2 && waves[2].theme==='street' && waves[2].warlord && waves[2].mon >= 4 && waves[2].folk >= 1, 'then into the streets, the townsfolk fighting and the warlord in the square: '+JSON.stringify(waves[2]));
-  A(town.walls > 100 && town.floor > 80 && town.sq, 'the streets are a town: '+JSON.stringify(town));
+  A(waves[2].phase===2 && waves[2].warlord && waves[2].mon >= 4 && waves[2].folk >= 1, 'then into the streets, the townsfolk fighting and the warlord in the square: '+JSON.stringify(waves[2]));
+  A(town.walls > 100 && town.floor > 80 && town.sq && town.inScene && town.open && town.inside && town.buildings >= 6, 'the streets are the real town, its buildings drawn, its gate open behind you: '+JSON.stringify(town));
   A(end.mode===3 && !end.siege && end.allies===0 && !end.dyn && end.gold > r0.gold0, 'won: back in the saved town, paid, the siege over: '+JSON.stringify(end));
   // RS-419: the town's walls stand high with towers and a gate, its houses roofed; a raid is a battle in the streets
   const raid = await page.evaluate(async ()=>{ const key = curTownKey() || (G.owPos.x+','+G.owPos.y), e = wevP(), id = ++e.seq; e.town[key] = { kind:'raid', id, until:wevTurn() + 100, done:false };
     wevSiegeFight({ kind:'raid', id, camp:'goblin' }); const S = G.siegeWar;
-    const out = { mode:G.gameMode, theme:G.arenaTheme, raid:!!(S && S.raid), leader:G.mon.some(m=>m.alive && /^Raid leader /.test(m.nm)), allies:(G.allies||[]).length, gate:G.arenaDeco[Math.floor(COLS/2)][ROWS-1]==='gate', houses:G.arenaDeco.flat().filter(d=>d==='house' || d==='house2').length };
+    const out = { mode:G.gameMode, theme:G.arenaTheme, raid:!!(S && S.raid), leader:G.mon.some(m=>m.alive && /^Raid leader /.test(m.nm)), allies:(G.allies||[]).length, town:!!(SIEGE_TOWN && SIEGE_TOWN.id===S.id), inside:!!(SIEGE_TOWN && G.player.y < SIEGE_TOWN.th) };
     for (let i=0;i<4;i++){ renderGame(); await new Promise(r=>setTimeout(r, 40)); }
-    let roofs = 0, tall = 0; FPD.world && FPD.world.traverse(o=>{ if (o.isMesh && o.material && /siegeRoof/.test(Object.keys(FPD.mats).find(k=>FPD.mats[k]===o.material)||'')) roofs++; if (o.isMesh && o.geometry && o.geometry.attributes.position){ const bb = new THREE.Box3().setFromObject(o); if (bb.max.y > 1.7 && bb.max.y < 3) tall++; } });
-    out.roofs = roofs; out.tall = tall;
+    out.inScene = !!(SIEGE_TOWN && SIEGE_TOWN.world.parent===FPD.scene); out.buildings = SIEGE_TOWN ? SIEGE_TOWN.occ.length : 0; out.noBlocks = !G.arenaDeco.flat().some(d=>d==='house' || d==='house2' || d==='wall');
     G.mon.forEach((m,i)=>{ if (m.alive){ m.hp = 0; monsterDies(i); } }); return { out, key, id }; });
   await step(10);
-  const raidEnd = await page.evaluate(k=>({ mode:G.gameMode, done:!!(wevP().town[k] && wevP().town[k].done), siege:!!G.siegeWar }), raid.key);
+  const raidEnd = await page.evaluate(k=>({ mode:G.gameMode, done:!!(wevP().town[k] && wevP().town[k].done), siege:!!G.siegeWar, dropped:!SIEGE_TOWN }), raid.key);
   console.log('raid', JSON.stringify(raid.out), JSON.stringify(raidEnd));
-  A(raid.out.mode===2 && raid.out.theme==='street' && raid.out.raid && raid.out.leader && raid.out.allies >= 2, 'a raid is fought in the streets, the watch and townsfolk with you, its leader in the square: '+JSON.stringify(raid.out));
-  A(raid.out.gate && raid.out.houses > 40 && raid.out.roofs >= 4 && raid.out.tall >= 2, 'the town wall stands high with its gate, the houses roofed: '+JSON.stringify(raid.out));
-  A(raidEnd.mode===3 && raidEnd.done && !raidEnd.siege, 'the raid beaten off, you\'re back in town: '+JSON.stringify(raidEnd));
+  A(raid.out.mode===2 && raid.out.raid && raid.out.leader && raid.out.allies >= 2, 'a raid is fought in the streets, the watch and townsfolk with you, its leader in the square: '+JSON.stringify(raid.out));
+  A(raid.out.town && raid.out.inside && raid.out.inScene && raid.out.buildings >= 6 && raid.out.noBlocks, 'a raid is fought in the real town, its own buildings drawn: '+JSON.stringify(raid.out));
+  A(raidEnd.mode===3 && raidEnd.done && !raidEnd.siege && raidEnd.dropped, 'the raid beaten off, you\'re back in town: '+JSON.stringify(raidEnd));
 };

@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-567 - Sieges at the real town
+- **The real town:** a siege or a raid is now fought at the town itself, not in a made-up block town. Its streets are laid out as you walk them every day, with its own shops, houses, square, waypoint, lamps and market stalls, built as you see them in town.
+- **Before the gate:** the first part of a siege is fought on the field outside the town's own wall, a palisade or a stone city wall, with its gatehouse, banners and torches. The gate's oak doors are barred at your back.
+- **The gate gives way:** when the last wave breaks, the doors swing open and the fight carries on through the town's real streets, with the warlord holding the square. A raid starts in those streets, its leader in the square.
+- **See-through buildings:** a house or tower between the camera and you fades out, as it does in town.
+
 ## RS-566 - Waterfalls down the mountains
 - **Streams come down the mountains:** a river no longer just starts at the foot of a mountain. Its stream now starts at a spring high on the slope and climbs the steepest way up from the river to get there.
 - **Falls in steps:** the stream comes down over rock ledges like a stair cut into the mountain. Each ledge holds a turquoise pool, a curtain of water spills over each lip, and the water foams white and puffs mist where each curtain lands. At the foot it plunges into the river in foam and spray. A tall mountain gives a long cascade of up to nine steps; a low ridge, one or two.
