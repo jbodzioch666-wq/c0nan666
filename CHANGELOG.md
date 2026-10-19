@@ -1,5 +1,17 @@
 # Depthcrawl patch notes
 
+## RS-560 - Rooms with a purpose
+The fifth step of the dungeon visual pass: set dressing. No measurable card time; the new props are a handful of small meshes a floor.
+- **Rooms dressed for what they are:** on a floor laid out as rooms, a few of them are now furnished for a purpose, so they read as designed places rather than the same refuse everywhere:
+  - a **guard room** with weapon racks of spears and swords along the walls, a bench and a barrel;
+  - a **shrine** with an altar stone, an offering bowl and candles someone still lights;
+  - a **flooded hall** with water lying over the floor, reflecting the torchlight, with drips rippling it;
+  - a **collapsed passage** with a fallen column broken in two and heaps of rubble from the ceiling;
+  - a **store** of grain sacks, crates and barrels;
+  - a **root-hung room** where a tree's roots have come down through the ceiling and spread over the floor.
+- Each kind of site has its own set: castles get guard rooms and stores, temples shrines and flooded halls, mines stores and collapses, lairs collapses and roots.
+- **Solid where it should be:** racks, benches, sacks, shrines, columns and rubble heaps block the way, but are never placed where they would cut a passage off, on the stairs, or in the first and last rooms. Looking at any of them tells you what it is.
+
 ## RS-559 - Stone that looks like stone
 The fourth step of the dungeon visual pass: the materials. No change in card time; the textures are drawn once per floor as before.
 - **Worn stone:** walls and floors below ground now carry hairline cracks wandering across the blocks and patches worn smooth and darker.
