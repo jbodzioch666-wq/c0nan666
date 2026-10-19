@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs563 | The phone tier draws less: 3D pixel density capped at 1.75, your own figure sculpted on a coarser grid |
 | rs561 | Living details below ground: cobwebs that tremble, chains that swing, rats that scatter, water dripping from the ceiling |
 | rs560 | Rooms dressed by purpose: guard rooms, shrines, flooded halls, collapsed passages, stores, root-hung rooms; the solid decos block and never cut a way off |
 | rs559 | Stone materials: cracks, worn patches, moss in damp joints, specular maps from the height, wet floors in the catacombs, temples and swamps |

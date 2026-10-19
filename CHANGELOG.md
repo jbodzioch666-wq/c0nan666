@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-563 - Lighter on phones
+For the lag on phones (a Galaxy S26 here). Measured with your save on an emulated phone: the frame's triangles fall from 253,000 to 145,000, and the pixels drawn by about a quarter on the emulator. On a real S26, with its denser screen, the pixels fall by 55 to 75%.
+- **Fewer pixels:** on the phone tier the 3D views now draw at most 1.75 pixels per point. A flagship phone used to draw at its full density, 2.6 to 3.5 times, which is four million pixels and more, each one lit, shadowed and post-processed. The text, HUD and menus stay full sharpness, and the frame scaler still steps down from there if needed.
+- **A lighter you:** on the phone tier your own figure is sculpted on a coarser grid, as the townsfolk already were. At full detail it was 219,000 triangles, four fifths of everything a dungeon frame draws, and it was drawn again into each torch's shadow as you walked. It's half that now. The character creator keeps full detail.
+- Computers aren't affected.
+
 ## RS-562 - Dungeons run smooth again
 Fixes for the stutter and the loading card that came with the dungeon visual pass. Measured on the RTX 3080 Ti at 2560x1400: about 2 ms of CPU and 1 to 2 ms of card time a frame in a crypt, with the corner shadows on; opening a door no longer shows the card, and the frames after it stay under 5 ms.
 - **No loading card on doors:** opening a door rebuilds the floor, and every rebuild used to queue a shader warm-up that flashed the loading card. In the mist-filled places (crypts, mines, lairs, temples) each rebuild also made 48 fresh mist materials, so the warm-up ran 48 off-screen draws and the game stuttered for a second after every door. The mist now shares one material, props' glow sprites and rings are recognised as kinds already warmed, and the card only appears for a warm-up that really needs more than one step.
