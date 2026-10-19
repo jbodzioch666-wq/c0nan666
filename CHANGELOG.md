@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-558 - Glow that fits the place
+The third step of the dungeon visual pass: bloom tuned per site. No change in card time; the bloom passes already ran.
+- **Only the lights glow:** each kind of underground place now sets how bright a thing must be before it bleeds light. In a dry dungeon or a castle only the flames, runes, crystals and magic glow and the lit stone stays crisp; it used to pick up bright floor as well and wash the picture out.
+- **Soft where it's damp:** the glow spreads wide and soft in the catacombs, the sunken temples and a dragon's lair, and stays tight in a dungeon, a castle or a pyramid.
+- Above ground nothing changes.
+
 ## RS-557 - Shadows in the corners
 The second step of the dungeon visual pass: ambient occlusion below ground. Measured in a crypt and a dungeon on the RTX 3080 Ti at 1400x900, the whole frame stays between 1 and 2 ms of card time with it on; the pass itself is well under a millisecond.
 - **Contact shadows:** the picture now darkens where surfaces meet: the foot of every wall, the edges of the stairs and plinths, under rubble, barrels and bones, and under your own feet and every creature's. Rooms read as solid stone instead of flat painted faces.
