@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs555 | Butterflies over the flower fields by day and fireflies by night, each one instanced mesh flown on the card |
 | rs554 | Painterly grade: golden fields, blue-green woods, a sickly swamp; a painted haze on the distant land; light shafts in a foggy morning |
 | rs553 | Plants lean downwind by the gust, waves roll across the grass in the wind's direction, fallen leaves blow downwind |
 | rs552 | Water: sun glints, the banks reflected along shores, lily pads on calm water above the waves, reeds at the edge of lakes and rivers |

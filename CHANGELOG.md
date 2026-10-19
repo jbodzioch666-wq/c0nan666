@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-555 - Butterflies and fireflies
+The last step of the overworld visual pass. No measurable card time: each is one draw, flown entirely on the card.
+- **Butterflies:** by day, in fair weather, butterflies wander over the flower fields, flapping as they go, in five colours. None in winter, rain or storms.
+- **Fireflies:** by night, fireflies drift and wink over the grass, the woods and especially the swamps.
+- **No cost on the CPU:** every butterfly and firefly flies itself in the shader from its own seed and the clock, so nothing is moved frame to frame.
+- Chimney smoke in the towns and deer that bolt as you pass were already in the game, so the pass leaves them as they are.
+
 ## RS-554 - Painted light
 The fifth and sixth steps of the overworld visual pass: the colour grade and the light shafts. No change in card time; the grade and haze run in passes that already existed.
 - **Each region graded like the films:** open grassland is now a touch golden, like the sunlit fields in Bakshi's *The Lord of the Rings*; forests go cooler and blue-green; swamps are a sickly, drained yellow-green. The desert, tundra, volcano and the special biomes keep their own grades.
