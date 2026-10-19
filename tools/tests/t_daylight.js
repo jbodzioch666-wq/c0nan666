@@ -39,6 +39,6 @@ module.exports = async page=>{
   A(r.rain.streaks && r.rain.sprites===0 && r.rain.maxLen > 0.1 && r.rain.maxLen < 0.5 && (r.rain.offAfter || /rain|storm/.test(String(r.keepW))), 'town rain falls as thin streaks: '+JSON.stringify(r.rain));
   A(r.townBlobs===0, 'no round blob shadows at the feet in town');
   A(!r.ow.o3 || (r.ow.blobs===0 && r.ow.casters > 3 && r.ow.half <= Math.max(9, r.ow.dist*1.2)), 'the overworld player casts a real shadow and has no blob');
-  A(!r.ow.o3 || (r.ow.clearFog > 1000 && r.ow.fogFog < 60 && r.ow.sun < 1.5), 'no zoomed-out haze on a clear overworld day, a softer sun, and fog weather still hazes');
+  A(!r.ow.o3 || (r.ow.clearFog > 55 && r.ow.fogFog < 60 && r.ow.sun < 1.5), 'no zoomed-out haze on the land you can see on a clear overworld day (RS-554: only past it, on the far backdrop), a softer sun, and fog weather still hazes');
   A(r.desertNoon.i < r.noon.i*0.8 && r.desertNoon.b < r.noon.b*1.3, 'the desert sun is softer');
 };

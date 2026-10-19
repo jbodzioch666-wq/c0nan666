@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-554 - Painted light
+The fifth and sixth steps of the overworld visual pass: the colour grade and the light shafts. No change in card time; the grade and haze run in passes that already existed.
+- **Each region graded like the films:** open grassland is now a touch golden, like the sunlit fields in Bakshi's *The Lord of the Rings*; forests go cooler and blue-green; swamps are a sickly, drained yellow-green. The desert, tundra, volcano and the special biomes keep their own grades.
+- **A painted backdrop:** the far land, beyond what's built around you, lies under a soft lilac-blue haze by day and a deep blue by night, like the distant hills in a painted backdrop. The land you can actually see stays clear however far you zoom out (RS-170), so nothing near you goes murky.
+- **Light shafts in the mist:** shafts of light now fall through the woods on a foggy morning as well as at sunrise and sunset.
+
 ## RS-553 - Wind you can see
 The fourth step of the overworld visual pass. No change in card time: the wind is three numbers sent to shaders that already ran.
 - **Plants lean with the wind:** grass, flowers, leaves and reeds now lean the way the wind blows and bend further in the gusts. It's the same wind that pulls at cloaks, drives the cloud shadows and carries fallen leaves, so the whole land moves together. Every plant used to swing on its own fixed rhythm in no particular direction.
