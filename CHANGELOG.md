@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-551 - Cloud shadows on everything
+The second step of the overworld visual pass. No measurable change in card time (the shadow is one extra texture read per pixel).
+- **Shadows on the trees too:** a cloud's shadow now falls on the trees, bushes, grass, roads and water, not only on the ground. A tree used to stand brightly lit in the middle of a shadow on the grass.
+- **They drift with the wind:** the clouds move where the wind blows, the same wind that sways the grass and cloaks, and race across the land in a storm. They used to slide one fixed way at one fixed pace.
+- **Denser and darker in bad weather:** rain and storms bring heavier cover with deeper shadows; clear days have lighter, sparser ones.
+- **Ragged edges:** each cloud is drawn at two scales, a big soft shape with a smaller one breaking up its edge, and sized so several cross the view at once rather than one shadow covering the whole screen.
+
 ## RS-550 - Painted ground
 The first step of the overworld visual pass. Measured on an RTX 3080 Ti at 1400x900: about 6 ms of card time a frame in open grassland, within noise of the 6 to 8 ms before.
 - **Borders that wander:** where grass meets forest, sand or snow, the edge now wanders the way a painter would lay it, instead of running straight along the tile grid. The ground is painted from the tile a little way off, where the noise says.

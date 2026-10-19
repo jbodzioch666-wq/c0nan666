@@ -15,7 +15,7 @@ module.exports = async page=>{
       for (let i=0;i<p.count;i++){ const y = p.getY(i), x = Math.floor(p.getX(i) - 0.5), z = Math.floor(p.getZ(i) - 0.5), t = o3Tile(x, z); if (t!==OW_GRASS) continue; if (y < O3_WATER_Y + 0.12 && y > O3_WATER_Y){ beachSand += b.getW(i); n1++; } else if (y > 0.1){ inlandSand += b.getW(i); n2++; } }
       out.sand = { beach:+(beachSand/Math.max(1, n1)).toFixed(3), inland:+(inlandSand/Math.max(1, n2)).toFixed(3) }; }
     /* the roads: a worn track with its crown line, under its own shader */
-    let road = null; O3.scene.traverse(o=>{ if (o.isMesh && [].concat(o.material).some(mm=>mm && mm.customProgramCacheKey && mm.customProgramCacheKey()==='gfxroad')) road = o; });   /* (merged with the rest of the still land - see o3MergeWorld - but its material is its own) */
+    let road = null; O3.scene.traverse(o=>{ if (o.isMesh && [].concat(o.material).some(mm=>mm && mm.customProgramCacheKey && /^gfxroad/.test(mm.customProgramCacheKey()))) road = o; });   /* (merged with the rest of the still land - see o3MergeWorld - but its material is its own) */
     out.road = road ? { rd:!!road.geometry.getAttribute('rd'), verts:road.geometry.attributes.position.count } : null;
     /* the cost: the card's ms a frame, painted against plain */
     const cost = async ()=>{ SET.fps = true; for (let i=0;i<30;i++){ renderGame(); await new Promise(r=>setTimeout(r, 16)); } for (let k=0;k<4;k++){ PROF.t = {}; PROF.gpuN = 0; for (let i=0;i<80;i++){ renderGame(); gfxGpuPoll(); await new Promise(r=>setTimeout(r, 16)); } gfxGpuPoll(); if (PROF.gpuN > 10) return (PROF.t.gpu||0)/PROF.gpuN; } return null; };

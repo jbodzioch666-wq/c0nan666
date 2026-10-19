@@ -21223,15 +21223,16 @@ function o3Roads(grp, x0, y0, W){
   const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); geo.setAttribute('rd', new T.Float32BufferAttribute(rd, 1)); geo.computeVertexNormals();
   const mat = new T.MeshStandardMaterial({ color:new T.Color(paint ? '#7e6a4c' : '#8a7252').convertSRGBToLinear(), roughness:1, side:T.DoubleSide, polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2 });
   if (paint){ const tx = gfxTextures();   /* (RS-550) a worn track, not a tan ribbon: edges eaten ragged where the grass creeps in, two ruts, a dusty crown between, grit over all */
-    mat.onBeforeCompile = sh=>{ Object.assign(sh.uniforms, { uCloud:{ value:tx.cloud }, uDet1:{ value:tx.dirt } }); gfxWorldPos(sh);
+    mat.onBeforeCompile = sh=>{ Object.assign(sh.uniforms, { uDet1:{ value:tx.dirt } }); gfxCloudUniforms(sh); gfxWorldPos(sh);
       sh.vertexShader = 'attribute float rd; varying float vRd;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vRd = rd;');
-      sh.fragmentShader = 'uniform sampler2D uCloud; uniform sampler2D uDet1; varying float vRd;\n' + sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
+      sh.fragmentShader = GFX_CLOUD_DECL + 'uniform sampler2D uDet1; varying float vRd;\n' + sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
         float disc = step(1.0001, vRd + 2.0*step(0.0, -vRd + 0.0004)*0.0) * 0.0; disc = (vRd > 1.0001 || vRd < -0.0004) ? 1.0 : 0.0; float rdn = vRd > 1.0 ? vRd - 1.0 : (vRd < 0.0 ? 0.0 : vRd);   /* (on a disc rd runs -0.001 to 2: unfolded back to 0..1, and marked) */
         float rn = texture2D(uCloud, vGW.xz*0.7).r, rn2 = texture2D(uCloud, vGW.xz*2.3 + 2.0).r, e = rdn + (rn - 0.5)*0.34 + (rn2 - 0.5)*0.16;
         if (e > 1.0) discard;
         float rut = exp(-pow((rdn - 0.52)/0.13, 2.0))*(1.0 - disc), grit = texture2D(uDet1, vGW.xz*1.4).r;
-        diffuseColor.rgb *= (0.66 + grit*0.5)*(1.0 - rut*0.2)*(1.0 + (1.0 - smoothstep(0.0, 0.3, rdn))*0.06*(1.0 - disc))*(1.0 - smoothstep(0.8, 1.0, e)*0.2);`); };
-    mat.customProgramCacheKey = ()=>'gfxroad'; }
+        diffuseColor.rgb *= (0.66 + grit*0.5)*(1.0 - rut*0.2)*(1.0 + (1.0 - smoothstep(0.0, 0.3, rdn))*0.06*(1.0 - disc))*(1.0 - smoothstep(0.8, 1.0, e)*0.2);` + GFX_CLOUD_GLSL + `
+        diffuseColor.rgb *= cshade;`); };
+    mat.customProgramCacheKey = ()=>'gfxroadc'; }
   const mesh = new T.Mesh(geo, mat); mesh.receiveShadow = true; grp.add(mesh);
   // bridges and fords
   const plank = o3WgMat('plank', '#7a5634'), post = o3WgMat('post', '#4a3420'), stone = o3WgMat('ford', '#8a8478');
@@ -23976,7 +23977,7 @@ if (typeof document!=='undefined') for (const ev of ['pointerdown', 'keydown']) 
 // the swamps and at dawn, shafts of light through the woods at sunrise and
 // sunset, blue moonlight - and in the dungeons, light falling through the
 // cracks.
-const GFX = { u:{ uT:{ value:0 }, uWind:{ value:1 }, uCloudAmt:{ value:0.5 }, uNight:{ value:0 }, uSky:{ value:null } }, grade:{}, tex:null };
+const GFX = { u:{ uT:{ value:0 }, uWind:{ value:1 }, uCloudAmt:{ value:0.5 }, uCloudOff:{ value:null }, uCloudK:{ value:0.38 }, uNight:{ value:0 }, uSky:{ value:null } }, grade:{}, tex:null };   /* (RS-551: uCloudOff, where the clouds have drifted to on the wind; uCloudK, how dark their shadow) */
 // ---- the post-process: bloom, the region's grade and a soft vignette ----
 const GFXP = new Map();
 const GFX_GRADES = {
@@ -24227,13 +24228,35 @@ function gfxWorldPos(shader){
   shader.vertexShader = 'varying vec3 vGW;\n' + shader.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n  vGW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
   shader.fragmentShader = 'varying vec3 vGW;\n' + shader.fragmentShader;
 }
+/* (RS-551) the clouds' shadows: one term shared by the ground, the water and everything that grows (a tree used to stand lit in the
+   middle of a cloud's shadow on the ground). Two scales of cloud, the big one soft and the small one giving it a ragged edge, drifting
+   where the wind takes them (gfxCloudDrift) - they slid one fixed way at one fixed pace before. In rain and storm they are denser and
+   darker, by uCloudAmt and uCloudK from gfxO3Light. Needs the world position vGW in the fragment shader */
+const GFX_CLOUD_GLSL = `
+        vec2 cuv = vGW.xz*0.03 + uCloudOff; float cs = texture2D(uCloud, cuv).r*0.72 + texture2D(uCloud, cuv*2.7 + 0.37).r*0.38;
+        float cshade = 1.0 - uCloudAmt*smoothstep(0.3, 0.62, cs)*uCloudK;`;
+function gfxCloudUniforms(sh){ const U = GFX.u; sh.uniforms.uCloud = { value:gfxTextures().cloud }; sh.uniforms.uCloudAmt = U.uCloudAmt; sh.uniforms.uCloudOff = U.uCloudOff; sh.uniforms.uCloudK = U.uCloudK; }
+const GFX_CLOUD_DECL = 'uniform sampler2D uCloud; uniform float uCloudAmt; uniform vec2 uCloudOff; uniform float uCloudK;\n';
+/* the shadow on something that grows: a varying with the world position (the instance's own) and the shade at the end of the colour */
+function gfxCloudOnSway(sh){ gfxCloudUniforms(sh);
+  sh.vertexShader = 'varying vec3 vGW;\n' + sh.vertexShader.replace('#include <project_vertex>', `#include <project_vertex>
+      #ifdef USE_INSTANCING
+      vGW = (modelMatrix * instanceMatrix * vec4(transformed, 1.0)).xyz;
+      #else
+      vGW = (modelMatrix * vec4(transformed, 1.0)).xyz;
+      #endif`);
+  sh.fragmentShader = GFX_CLOUD_DECL + 'varying vec3 vGW;\n' + sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n' + GFX_CLOUD_GLSL + '\n        diffuseColor.rgb *= cshade;'); }
+function gfxCloudDrift(dt){ const U = GFX.u, off = U.uCloudOff.value || (U.uCloudOff.value = new THREE.Vector2(0.37, 0.11)); let w = null; try{ w = m3dClothWind(U.uT.value); }catch(e){}
+  const wx = w ? w[0] : 0.2, wz = w ? w[1] : 0.1, s = Math.hypot(wx, wz) || 1, k = 0.0022 + Math.min(1.6, s)*0.0065;   /* (a breath of drift even in a calm, racing in a storm) */
+  off.x += wx/s*k*dt; off.y += wz/s*k*dt; }
 // trees, bushes and grass sway in the wind
 function gfxSway(mat, amt){
   mat.onBeforeCompile = sh=>{ sh.uniforms.uT = GFX.u.uT; sh.uniforms.uWind = GFX.u.uWind;
     sh.vertexShader = 'uniform float uT; uniform float uWind;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
       vec4 gip = instanceMatrix*vec4(0.0,0.0,0.0,1.0); float gsw = max(0.0, position.y)*${amt.toFixed(3)}*uWind;
-      transformed.x += sin(uT*1.6 + gip.x*0.7 + gip.z*0.4)*gsw; transformed.z += cos(uT*1.25 + gip.x*0.4 - gip.z*0.6)*gsw*0.6;`); };
-  mat.customProgramCacheKey = ()=>'gfxsway'+amt;
+      transformed.x += sin(uT*1.6 + gip.x*0.7 + gip.z*0.4)*gsw; transformed.z += cos(uT*1.25 + gip.x*0.4 - gip.z*0.6)*gsw*0.6;`);
+    gfxCloudOnSway(sh); };   /* (RS-551: and the clouds' shadows fall on it) */
+  mat.customProgramCacheKey = ()=>'gfxsway'+amt+'c';
 }
 // the new kinds of tree, and the season on them (called from o3Vegetation)
 function gfxParts(PARTS, T){
@@ -24275,10 +24298,10 @@ function* gfxO3BuildGen(grp, x0, y0, W, M){   /* (RS-403: a step at a time - see
       td[k] = lin(c[0]); td[k+1] = lin(c[1]); td[k+2] = lin(c[2]); td[k+3] = a; }
     const tileTex = new T.DataTexture(td, NT, NT, T.RGBAFormat); tileTex.magFilter = tileTex.minFilter = T.LinearFilter; tileTex.needsUpdate = true;
     const m = land.material, paint = gfxPaintOn(); m.userData.ownTex = [tileTex];
-    m.onBeforeCompile = sh=>{ Object.assign(sh.uniforms, { uT:U.uT, uCloudAmt:U.uCloudAmt, uDet0:{ value:tx.grass }, uDet1:{ value:tx.dirt }, uDet2:{ value:tx.rock }, uDet3:{ value:tx.sand }, uCloud:{ value:tx.cloud }, uTile:{ value:tileTex }, uTileO:{ value:new T.Vector3(x0 - M, y0 - M, NT) } });
+    m.onBeforeCompile = sh=>{ Object.assign(sh.uniforms, { uT:U.uT, uDet0:{ value:tx.grass }, uDet1:{ value:tx.dirt }, uDet2:{ value:tx.rock }, uDet3:{ value:tx.sand }, uTile:{ value:tileTex }, uTileO:{ value:new T.Vector3(x0 - M, y0 - M, NT) } }); gfxCloudUniforms(sh);
       gfxWorldPos(sh);
       sh.vertexShader = 'attribute vec4 blend; attribute vec3 tcol; varying vec4 vBl; varying vec3 vTc;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vBl = blend; vTc = tcol;');
-      sh.fragmentShader = 'uniform float uT; uniform float uCloudAmt; uniform sampler2D uDet0; uniform sampler2D uDet1; uniform sampler2D uDet2; uniform sampler2D uDet3; uniform sampler2D uCloud; uniform sampler2D uTile; uniform vec3 uTileO; varying vec4 vBl; varying vec3 vTc;\n' + sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
+      sh.fragmentShader = GFX_CLOUD_DECL + 'uniform float uT; uniform sampler2D uDet0; uniform sampler2D uDet1; uniform sampler2D uDet2; uniform sampler2D uDet3; uniform sampler2D uTile; uniform vec3 uTileO; varying vec4 vBl; varying vec3 vTc;\n' + sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
         vec4 bw = vBl / max(0.001, vBl.x + vBl.y + vBl.z + vBl.w);
         float dG = texture2D(uDet0, vGW.xz*0.8).r, dD = texture2D(uDet1, vGW.xz*0.6).r, dR = texture2D(uDet2, vec2(vGW.x*0.7 + vGW.z*0.7, vGW.y*1.8)*0.5).r, dS = texture2D(uDet3, vGW.xz*1.1).r;
         ` + (paint ? `
@@ -24292,9 +24315,8 @@ function* gfxO3BuildGen(grp, x0, y0, W, M){   /* (RS-403: a step at a time - see
         vec3 tint = mix(vec3(0.88, 0.96, 0.96), vec3(1.1, 1.05, 0.82), mot);
         diffuseColor.rgb *= mix(vec3(1.0), tint, bw.x*0.75 + bw.y*0.3);
         dR *= 0.78 + 0.32*m2;` : '') + `
-        diffuseColor.rgb *= 0.58 + (dG*bw.x + dD*bw.y + dR*bw.z + dS*bw.w)*0.68;
-        float cs = texture2D(uCloud, vGW.xz*0.016 + uT*vec2(0.006, 0.0025)).r;
-        diffuseColor.rgb *= 1.0 - uCloudAmt*smoothstep(0.32, 0.62, cs)*0.38;`); };
+        diffuseColor.rgb *= 0.58 + (dG*bw.x + dD*bw.y + dR*bw.z + dS*bw.w)*0.68;` + GFX_CLOUD_GLSL + `
+        diffuseColor.rgb *= cshade;`); };
     m.customProgramCacheKey = ()=>'gfxland' + (paint ? 'P' : ''); m.needsUpdate = true;
   }
   yield;
@@ -24311,12 +24333,12 @@ function* gfxO3BuildGen(grp, x0, y0, W, M){   /* (RS-403: a step at a time - see
     /* (RS-414) the depth of the land showing, through a uniform the swap sets: a water built over frames could compile while the old
        land still showed, and kept the old land's depth map - its shallows in the wrong places, and the old map kept on the card */
     const uDep = O3.uDep || (O3.uDep = { value:null }), uDepO = O3.uDepO || (O3.uDepO = { value:new T.Vector4() });
-    m.onBeforeCompile = sh=>{ Object.assign(sh.uniforms, { uT:U.uT, uNight:U.uNight, uSky:U.uSky, uFoam:{ value:foam }, uFoamO:{ value:new T.Vector4(ox, oy, N, N) }, uCloud:{ value:tx.cloud }, uDep, uDepO });
+    m.onBeforeCompile = sh=>{ Object.assign(sh.uniforms, { uT:U.uT, uNight:U.uNight, uSky:U.uSky, uFoam:{ value:foam }, uFoamO:{ value:new T.Vector4(ox, oy, N, N) }, uDep, uDepO }); gfxCloudUniforms(sh);
       gfxWorldPos(sh);
       sh.vertexShader = 'uniform float uT;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
         vec4 wp0 = modelMatrix * vec4(transformed, 1.0);
         transformed.z += sin(wp0.x*1.3 + uT*1.4)*0.022 + sin(wp0.z*1.7 - uT*1.1)*0.018 + sin((wp0.x + wp0.z)*2.9 + uT*2.3)*0.007;`);
-      sh.fragmentShader = 'uniform float uT; uniform float uNight; uniform vec3 uSky; uniform sampler2D uFoam; uniform vec4 uFoamO; uniform sampler2D uCloud; uniform sampler2D uDep; uniform vec4 uDepO;\n' + sh.fragmentShader.replace('#include <output_fragment>', `#include <output_fragment>
+      sh.fragmentShader = GFX_CLOUD_DECL + 'uniform float uT; uniform float uNight; uniform vec3 uSky; uniform sampler2D uFoam; uniform vec4 uFoamO; uniform sampler2D uDep; uniform vec4 uDepO;\n' + sh.fragmentShader.replace('#include <output_fragment>', `#include <output_fragment>
         vec3 wn = normalize(cross(dFdx(vGW), dFdy(vGW))); if (wn.y < 0.0) wn = -wn;
         float fr = pow(1.0 - max(dot(wn, normalize(cameraPosition - vGW)), 0.0), 3.0);
         gl_FragColor.rgb = mix(gl_FragColor.rgb, uSky, clamp(fr*0.9 + 0.1, 0.0, 0.6));
@@ -24336,8 +24358,9 @@ function* gfxO3BuildGen(grp, x0, y0, W, M){   /* (RS-403: a step at a time - see
         gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.92, 0.96, 1.0), clamp(surf + run*0.3, 0.0, 0.9));
         gl_FragColor.a = max(gl_FragColor.a, surf*0.95);
         float st = step(0.995, fract(sin(dot(floor(vGW.xz*12.0), vec2(12.9898, 78.233)))*43758.5453))*uNight*(0.55 + 0.45*sin(uT*3.0 + vGW.x*7.0 + vGW.z*3.0));
-        gl_FragColor.rgb += vec3(st*0.7);`); };
-    m.customProgramCacheKey = ()=>'gfxwater'; m.needsUpdate = true;
+        gl_FragColor.rgb += vec3(st*0.7);` + GFX_CLOUD_GLSL + `
+        gl_FragColor.rgb *= mix(1.0, cshade, 0.75);`); };   /* (RS-551: the clouds' shadows cross the water too) */
+    m.customProgramCacheKey = ()=>'gfxwaterc'; m.needsUpdate = true;
   }
   yield;
   // waterfalls where a river comes down off the mountains
@@ -24410,7 +24433,8 @@ function gfxO3Light(){
   GFX.u.uNight.value = night; GFX.warm = warm; GFX.day = day;
   const sky = GFX.u.uSky.value || (GFX.u.uSky.value = new T.Color());
   sky.copy(O3.scene.background || new T.Color(0x8fb4dc)).convertSRGBToLinear();
-  const wx = G.weather||'clear'; GFX.u.uCloudAmt.value = (wx==='storm' ? 1 : wx==='rain' ? 0.85 : wx==='fog' ? 0.3 : 0.55)*day; GFX.u.uWind.value = wx==='storm' ? 2.6 : wx==='rain' ? 1.6 : 1;
+  const wx = G.weather||'clear'; GFX.u.uCloudAmt.value = (wx==='storm' ? 1 : wx==='rain' ? 0.9 : wx==='fog' ? 0.3 : 0.5)*day; GFX.u.uWind.value = wx==='storm' ? 2.6 : wx==='rain' ? 1.6 : 1;
+  GFX.u.uCloudK.value = wx==='storm' ? 0.55 : wx==='rain' ? 0.5 : 0.4;   /* (RS-551: an overcast sky's shadow is deeper than a fair one's) */
 }
 // one waterfall, built in its own frame: local +z points out from the cliff toward the river, y is up from the water.
 // The sheet leaves the lip level and falls away from the cliff (out by the square root of the drop, as water does),
@@ -24443,7 +24467,7 @@ function gfxWaterfallTick(f, t){
 function gfxO3Tick(dt, pp){
   const T = THREE, U = GFX.u; U.uT.value += dt;
   if (GFX.season!==undefined && GFX.season!==seasonIdx()) O3.win = null;   // a new season: rebuild the land in its colours
-  gfxO3Light();
+  gfxO3Light(); gfxCloudDrift(dt);   /* (RS-551) */
   for (const f of (GFX.falls||[])) gfxWaterfallTick(f, U.uT.value);
   const dp = dayPhase(), dawnMist = Math.max(0, 1 - Math.abs(dp - 0.27)/0.08);
   for (const m of (GFX.mist||[])){ const o = m.dawn ? dawnMist*0.35 : 0.22 + (U.uNight.value)*0.15 + (G.weather==='fog' ? 0.15 : 0); m.pl.material.opacity = o*(0.75 + 0.25*Math.sin(U.uT.value*0.4 + m.ph)); m.pl.visible = o > 0.01; m.pl.rotation.z += dt*0.02; }
@@ -43096,7 +43120,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-550';
+const GAME_VERSION = 'rs-551';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

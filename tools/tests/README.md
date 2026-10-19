@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs551 | Cloud shadows drift with the wind (faster in a storm), denser in rain, and fall on the water, roads, leaves and grass as well as the ground |
 | rs550 | Painted ground: wandering tile borders, dry and damp washes, sand on beaches and dunes, roads as worn tracks; off on low and phone; GPU cost measured |
 | rs549 | Jerkins, hauberks and tunics drape over a heavy body, a woman's hauberk clears her thighs, a tunic skirt in its top's cloth; cloaks hang outside what the body wears |
 | rs548 | The robe in one piece: its cloth from the hem up to under the bust over the bodice, no seam at the hips, the cord at the natural waist, turning with the torso |
