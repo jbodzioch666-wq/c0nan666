@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-549 - Jerkins, mail and cloaks that fit
+- **Jerkins, mail and tunics drape:** on a heavy build they fall from the chest over the belly to the belt, as the robe now does. They used to cling to every roll.
+- **No gaps in a woman's mail coat:** it now stands off her thighs at the front, where a thigh used to show through. The splits at the hem are now short notches instead of slots through to the leg.
+- **Tunic in one cloth:** a tunic's skirt now has the same weave and shade as its top.
+- **Cloaks hang outside your clothes:** a cloak now stays just outside whatever you're wearing, including a robe's cloth and cord. On a stooped wood elf, the robe used to push out through the back of the cloak.
+
 ## RS-548 - The robe in one piece
 - **One cloth from hem to bust:** the robe's skirt now runs on up over the hips and waist to just under the bust, laid smoothly over the body of whatever build is wearing it. Its top edge tucks in so you can't see where it ends. Before, the top ended at the hips and the skirt began there, and the join showed as a line all the way round.
 - **Tied at the waist:** the cord is tied round the natural waist, where the body is narrowest, with its knot and two hanging ends off to one side. It used to sit low on the hips, over the join.
