@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## RS-561 - The dungeon stirs
+The last step of the dungeon visual pass: living details. No measurable card time.
+- **Rats:** a nest or two of rats lives beside the barrels, crates and rubble on each floor. They scatter from under your feet as you come near and creep back once you've gone.
+- **Swinging chains:** where chains lie on the floor, another hangs from the ceiling above, swaying gently, and swings hard when you walk under it.
+- **Cobwebs** sway in the draught and tremble when you brush past.
+- **Dripping water:** in the catacombs, temples, mines and older dungeons, water drips from the ceiling here and there, rippling where it lands with a soft plink.
+- **Doors** already creak open, so they stay as they are.
+- **Two fixes to the previous releases:** a heap of rubble could end up blocking a passage after a treasure closet was carved beside it, and the first full view of a floor could compile a shader for the corner shadows mid-play. Both are fixed.
+
 ## RS-560 - Rooms with a purpose
 The fifth step of the dungeon visual pass: set dressing. No measurable card time; the new props are a handful of small meshes a floor.
 - **Rooms dressed for what they are:** on a floor laid out as rooms, a few of them are now furnished for a purpose, so they read as designed places rather than the same refuse everywhere:

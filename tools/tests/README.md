@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs561 | Living details below ground: cobwebs that tremble, chains that swing, rats that scatter, water dripping from the ceiling |
 | rs560 | Rooms dressed by purpose: guard rooms, shrines, flooded halls, collapsed passages, stores, root-hung rooms; the solid decos block and never cut a way off |
 | rs559 | Stone materials: cracks, worn patches, moss in damp joints, specular maps from the height, wet floors in the catacombs, temples and swamps |
 | rs558 | Bloom tuned per site: each underground grade has its own threshold and glow width |
