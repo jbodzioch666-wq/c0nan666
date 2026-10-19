@@ -4,7 +4,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0c0a08">
 <title>Depthcrawl</title>
-<script src="https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js" async onerror="window.__threeFail=1"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.159.0/build/three.min.js" async onload="try{ gfxThreeSetup(); }catch(e){}" onerror="window.__threeFail=1"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap">
 <style>
@@ -13977,8 +13977,8 @@ function bvMount(){
   const T = THREE;
   if (!BV.r){
     const cv = document.createElement('canvas'); cv.style.cssText = 'width:100%;height:100%;display:block;touch-action:none;';   // (RS-133: drawn at the screen's density, shown at the box's size - on a phone it used to spill out of the box)
-    BV.r = new T.WebGLRenderer({ canvas:cv, alpha:true, antialias:true }); BV.r.debug.checkShaderErrors = false; BV.r.setPixelRatio(Math.min(2, window.devicePixelRatio||1)); BV.r.setSize(220, 240, false);
-    if (T.sRGBEncoding) BV.r.outputEncoding = T.sRGBEncoding; BV.r.toneMapping = T.ACESFilmicToneMapping; BV.r.setClearColor(0x000000, 0);
+    BV.r = gfxThreeR(new T.WebGLRenderer({ canvas:cv, alpha:true, antialias:true })); BV.r.debug.checkShaderErrors = false; BV.r.setPixelRatio(Math.min(2, window.devicePixelRatio||1)); BV.r.setSize(220, 240, false);
+    BV.r.outputColorSpace = T.SRGBColorSpace; BV.r.toneMapping = T.ACESFilmicToneMapping; BV.r.setClearColor(0x000000, 0);
     BV.scene = new T.Scene(); BV.cam = new T.PerspectiveCamera(30, 220/240, 0.1, 30); BV.cam.position.set(0, 0.8, 3.1); BV.cam.lookAt(0, 0.45, 0);
     BV.scene.add(new T.HemisphereLight(0xdde4f0, 0x2a2018, 0.8));
     const key = new T.DirectionalLight(0xffe0b0, 1.4); key.position.set(1.2, 2, 1.6); BV.scene.add(key);
@@ -23371,7 +23371,7 @@ function v3RaceBannerMat(race){
   else if (race==='tiefling'){ for (const sg of [-1,1]){ c.beginPath(); c.moveTo(sg*8, 26); c.bezierCurveTo(sg*44, 18, sg*40, -24, sg*18, -38); c.bezierCurveTo(sg*28, -14, sg*24, 8, sg*-2, 14); c.closePath(); c.fill(); c.stroke(); } }   // horns
   else { c.beginPath(); c.arc(-4, 0, 30, Math.PI*0.35, Math.PI*1.65); c.arc(8, -2, 24, Math.PI*1.55, Math.PI*0.45, true); c.closePath(); c.fill(); c.stroke(); const q = []; for (let i=0;i<10;i++){ const a = i/10*Math.PI*2 - Math.PI/2, r = i%2 ? 5 : 12; q.push([22 + Math.cos(a)*r, -22 + Math.sin(a)*r]); } P(q); }   // a moon and a star
   c.restore();
-  const tx = new T.CanvasTexture(cv); tx.encoding = T.sRGBEncoding; tx.anisotropy = 4;
+  const tx = new T.CanvasTexture(cv); tx.colorSpace = T.SRGBColorSpace; tx.anisotropy = 4;
   const m = new T.MeshStandardMaterial({ map:tx, side:T.DoubleSide, alphaTest:0.5, transparent:false, roughness:0.9 }); m.userData.lin = true;
   return (V3._banMat[race] = m);
 }
@@ -24298,6 +24298,28 @@ function gfxPadLights(V, scene){
    cubeToUV (a long run of branches), so a floor's four shadowed torches put thirty-six of them in every shader - linking one took
    half a second. Here the spot in the shadow map is found once and five samples are taken round it in the map: the same soft edge,
    a fifth of the code (a link of 133-515ms falls to about 200ms), and fewer lookups a pixel too */
+/* (RS-574) three.js r159, set up to draw as r149 did. Its colour management is off: the game turns its own colours from sRGB to
+   linear wherever it makes them (convertSRGBToLinear), as r149 left it to; on, every colour would be turned twice. Every renderer
+   keeps the old light units (useLegacyLights, see gfxThreeR). And from r151 an instanced or skinned mesh is culled and picked by a
+   sphere round all of its instances or its posed bones, worked out once and never again as they move - the game's flocks, herds,
+   grass and swaying figures would vanish at the screen's edge, or stop answering clicks. They're culled by their geometry's own
+   sphere, as before, and an instanced mesh's sphere is worked out afresh for each pick */
+function gfxThreeSetup(){
+  if (typeof THREE==='undefined' || THREE.__dcSetup) return; THREE.__dcSetup = true;
+  try{ if (THREE.ColorManagement) THREE.ColorManagement.enabled = false; }catch(e){}
+  try{ const F = THREE.Frustum.prototype, io = F.intersectsObject, sp = new THREE.Sphere();
+    F.intersectsObject = function(o){ if (o.isInstancedMesh || o.isSkinnedMesh){ const g = o.geometry; if (g.boundingSphere===null) g.computeBoundingSphere(); sp.copy(g.boundingSphere).applyMatrix4(o.matrixWorld); return this.intersectsSphere(sp); } return io.call(this, o); }; }catch(e){}
+  /* (a skinned figure's box and sphere from its own shape at rest, as r149 had them: r151+ works them out from the bones as posed the
+     first time they're asked for, and keeps them - stale the moment the figure moves) */
+  try{ const SM = THREE.SkinnedMesh.prototype;
+    SM.computeBoundingBox = function(){ const g = this.geometry; if (g.boundingBox===null) g.computeBoundingBox(); (this.boundingBox || (this.boundingBox = new THREE.Box3())).copy(g.boundingBox); };
+    SM.computeBoundingSphere = function(){ const g = this.geometry; if (g.boundingSphere===null) g.computeBoundingSphere(); (this.boundingSphere || (this.boundingSphere = new THREE.Sphere())).copy(g.boundingSphere); }; }catch(e){}
+  try{ const IP = THREE.InstancedMesh.prototype, rc = IP.raycast; IP.raycast = function(ray, hits){ this.boundingSphere = null; return rc.call(this, ray, hits); }; }catch(e){}
+  try{ gfxCheapPointShadow(); }catch(e){}
+}
+try{ if (typeof THREE!=='undefined') gfxThreeSetup(); }catch(e){}   /* (three may have arrived before this script ran: its onload found no setup to call) */
+/* each renderer as made: the old light units (three r155 made physical ones the default, which would relight everything) */
+function gfxThreeR(r){ try{ gfxThreeSetup(); if ('useLegacyLights' in r) r.useLegacyLights = true; }catch(e){} return r; }
 function gfxCheapPointShadow(){
   const C = THREE.ShaderChunk, s = C.shadowmap_pars_fragment, a = s.indexOf('vec2 offset = vec2( - 1, 1 ) * shadowRadius * texelSize.y;'), b = s.indexOf(') * ( 1.0 / 9.0 );', a);
   if (a < 0 || b < 0 || C.__cheapPt || window.__noCheapPt) return false;
@@ -24309,39 +24331,22 @@ function gfxCheapPointShadow(){
   C.__ptOrig = s; C.__cheapPt = true; return true;
 }
 function gfxPscExt(r){ if (r.__pscExt===undefined){ let e = null; try{ e = r.getContext().getExtension('KHR_parallel_shader_compile'); }catch(err){} r.__pscExt = e; } return r.__pscExt; }
-/* (RS-572) three's compile reads each program's uniforms as it makes it, and that read waits out the link - so RS-571's start
-   "all at once" still linked them one after another, the page held for seconds. Now, while the programs are started, a program
-   whose link isn't done answers that it has no uniforms yet, so nothing waits; once the driver says they're all linked, each is
-   given its real uniforms and its materials are sent through three's program setup once more, which finds the program made */
+/* (RS-574) every program a scene needs started at once, and linked by the driver on its own threads while the frames run: three
+   r158+ makes a program without waiting on its link (r149 read its uniforms as it made it, which did wait - RS-572/573 worked round
+   that) and says when each is ready (program.isReady, from KHR_parallel_shader_compile) */
 function gfxPrelink(V, r, scene, cam){
   const ext = gfxPscExt(r); if (!ext || window.__noPrelink) return false;
   r.debug.checkShaderErrors = false;
-  const gl = r.getContext(), gp = gl.getProgramParameter, AU = gl.ACTIVE_UNIFORMS, CS = ext.COMPLETION_STATUS_KHR;
-  const before = new Set(r.info.programs), rt = r.getRenderTarget(), mats = new Set(); let t = null; try{ t = gfxTarget(r); }catch(e){}
-  scene.traverseVisible(o=>{ const m = o.material; if (Array.isArray(m)) m.forEach(x=>x && mats.add(x)); else if (m) mats.add(m); });
-  gl.getProgramParameter = function(p, n){ if (n===AU && !gp.call(gl, p, CS)) return 0; return gp.call(gl, p, n); };
-  if (t) r.setRenderTarget(t); try{ r.compile(scene, cam); }catch(e){ console.error(e); } finally { r.setRenderTarget(rt); delete gl.getProgramParameter; if (gl.getProgramParameter!==gp) gl.getProgramParameter = gp; }
+  const before = new Set(r.info.programs), rt = r.getRenderTarget(); let t = null, mats = null; try{ t = gfxTarget(r); }catch(e){}
+  if (t) r.setRenderTarget(t); try{ mats = r.compile(scene, cam); }catch(e){ console.error(e); } finally { r.setRenderTarget(rt); }
   const progs = r.info.programs.filter(p=>!before.has(p)); if (!progs.length) return false;
-  try{ gl.flush(); }catch(e){}   /* (the links only start once the commands reach the driver) */
-  V.prelink = { r, ext, progs, mats, scene, t0:performance.now() }; return true;
+  try{ r.getContext().flush(); }catch(e){}   /* (the links only start once the commands reach the driver) */
+  V.prelink = { r, progs, t0:performance.now() }; return true;
 }
 function gfxPrelinkDone(V){
-  const P = V.prelink; if (!P) return true; const r = P.r, gl = r.getContext(); try{ gl.flush(); }catch(e){}
-  let done = true; for (const p of P.progs){ if (!p.program || !gl.getProgramParameter(p.program, P.ext.COMPLETION_STATUS_KHR)){ done = false; break; } }
-  if (!done && performance.now() - P.t0 < 30000) return false;
-  V.prelink = null;
-  /* each fresh program reads its uniforms afresh (what it was handed while linking may be empty), and each material set up on one
-     goes through the setup again, to take them */
-  for (const p of P.progs){ try{ const WU = p.getUniforms().constructor, pr = p.program; let cu = null; p.getUniforms = ()=>cu || (cu = new WU(gl, pr)); }catch(e){} }
-  /* (RS-573) anything that took one of these programs while they were linking - a hover marker, a spell's sprite, another wall - got
-     the empty list too, and the materials set up in the compile weren't the only ones: those kept it, and drew with none of their
-     settings (the fog over unexplored rooms gone, glyphs strewn across the floor under the cursor). Every material in the scene still
-     holding an empty list now goes through the setup again as well. (Reading the real uniforms early instead would wait out the link
-     queue - a nine-second step) */
-  const fresh = new Set(P.progs), redo = m=>{ const mp = r.properties.get(m); if (mp && mp.currentProgram && fresh.has(mp.currentProgram) && !(mp.uniformsList && mp.uniformsList.length)){ mp.currentProgram = null; m.needsUpdate = true; } };
-  for (const m of P.mats) redo(m);
-  if (P.scene) P.scene.traverse(o=>{ const m = o.material; if (Array.isArray(m)) m.forEach(x=>x && redo(x)); else if (m) redo(m); });   /* (RS-573: and anything else in the scene still holding an empty list) */
-  return true;
+  const P = V.prelink; if (!P) return true;
+  for (const p of P.progs) if (p.isReady && !p.isReady() && performance.now() - P.t0 < 30000) return false;
+  V.prelink = null; return true;
 }
 function gfxCompileSliced(V, r, scene, cam, grp, live){
   if (V.warmWait) gfxWarmFlush(V);   /* (a newer build arrived mid-warm: show what the old one still hid, and let it queue afresh) */
@@ -24668,7 +24673,7 @@ function* gfxO3BuildGen(grp, x0, y0, W, M){   /* (RS-403: a step at a time - see
       sh.vertexShader = 'uniform float uT;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
         vec4 wp0 = modelMatrix * vec4(transformed, 1.0);
         transformed.z += sin(wp0.x*1.3 + uT*1.4)*0.022 + sin(wp0.z*1.7 - uT*1.1)*0.018 + sin((wp0.x + wp0.z)*2.9 + uT*2.3)*0.007;`);
-      sh.fragmentShader = GFX_CLOUD_DECL + 'uniform float uT; uniform float uNight; uniform vec3 uSky; uniform sampler2D uFoam; uniform vec4 uFoamO; uniform sampler2D uDep; uniform vec4 uDepO;\n' + sh.fragmentShader.replace('#include <output_fragment>', `#include <output_fragment>
+      sh.fragmentShader = GFX_CLOUD_DECL + 'uniform float uT; uniform float uNight; uniform vec3 uSky; uniform sampler2D uFoam; uniform vec4 uFoamO; uniform sampler2D uDep; uniform vec4 uDepO;\n' + sh.fragmentShader.replace('#include <opaque_fragment>', `#include <opaque_fragment>
         vec3 wn = normalize(cross(dFdx(vGW), dFdy(vGW))); if (wn.y < 0.0) wn = -wn;
         float fr = pow(1.0 - max(dot(wn, normalize(cameraPosition - vGW)), 0.0), 3.0);
         gl_FragColor.rgb = mix(gl_FragColor.rgb, uSky, clamp(fr*0.9 + 0.1, 0.0, 0.6));
@@ -30213,7 +30218,7 @@ function sk3Tex(w, h, fn){
   for (let y=0;y<h;y++) for (let i=0;i<w;i++){ const o=(y*w+i)*4, p=fn(i,y); d[o]=p[0]; d[o+1]=p[1]; d[o+2]=p[2]; d[o+3]=255; }
   x.putImageData(id,0,0);
   const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  if (THREE.sRGBEncoding) t.encoding = THREE.sRGBEncoding;
+  t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 4;
   return t;
 }
@@ -30646,7 +30651,7 @@ function v3Canvas(w,h){ const c = document.createElement('canvas'); c.width = w;
 function v3CanvasTex(c, rep){
   const t = new THREE.CanvasTexture(c);
   t.wrapS = t.wrapT = THREE.RepeatWrapping; if (rep) t.repeat.set(rep, rep);
-  if (THREE.sRGBEncoding) t.encoding = THREE.sRGBEncoding;
+  t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 8; return t;
 }
 function v3Noise(seed){
@@ -30910,7 +30915,7 @@ function v3CobbleTex(theme){
       for (const dx of [-W, 0, W]){ const px = cx + dx; if (px + w < 0 || px - w > W) continue; v3CobbleStone(x, px, cy, w, h, stone, rnd, rgb, k); }
       xx += w; }
     y += h; }
-  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8; t.encoding = THREE.sRGBEncoding;
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8; t.colorSpace = THREE.SRGBColorSpace;
   return (V3_COB[key] = t);
 }
 function v3CobbleStone(x, cx, cy, w, h, stone, rnd, rgb, k){
@@ -31377,7 +31382,7 @@ function v3LeafMats(mats){
     for (let y=0;y<N;y++) for (let x=0;x<N;x++){ const X = x/4, Y = y/4, l = fpNoise(X,Y,32,720), l2 = fpNoise(X,Y,64,721), hv = Math.pow(l*0.6+l2*0.4, 1.5); h[y*N+x] = hv; const t = (0.35 + hv*1.1)*255/1.45, p = (y*N+x)*4; md.data[p]=md.data[p+1]=md.data[p+2]=Math.min(255,t); md.data[p+3]=255; }
     for (let y=0;y<N;y++) for (let x=0;x<N;x++){ const ax = (h[y*N+W(x-1)]-h[y*N+W(x+1)])*5, ay = (h[W(y+1)*N+x]-h[W(y-1)*N+x])*5, l = Math.hypot(ax,ay,1), p = (y*N+x)*4; nd.data[p]=(ax/l*0.5+0.5)*255; nd.data[p+1]=(ay/l*0.5+0.5)*255; nd.data[p+2]=(1/l*0.5+0.5)*255; nd.data[p+3]=255; }
     mx.putImageData(md,0,0); nx.putImageData(nd,0,0);
-    const map = new THREE.CanvasTexture(mc), nrm = new THREE.CanvasTexture(nc); map.encoding = THREE.sRGBEncoding;
+    const map = new THREE.CanvasTexture(mc), nrm = new THREE.CanvasTexture(nc); map.colorSpace = THREE.SRGBColorSpace;
     for (const t of [map, nrm]){ t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(2,2); }
     V3.leafTex = { map, nrm };
   }
@@ -31539,7 +31544,7 @@ function v3Person(entry, height, grp){
     }catch(err){ console.error(err); }
   }
   let img = null; try{ img = fpUndeadSprite(entry,false).img; }catch(e){}
-  const tex = img ? new T.CanvasTexture(img) : v3Blob('rgba(200,200,200,1)'); if (T.sRGBEncoding) tex.encoding = T.sRGBEncoding;
+  const tex = img ? new T.CanvasTexture(img) : v3Blob('rgba(200,200,200,1)'); tex.colorSpace = T.SRGBColorSpace;
   const mat = new T.SpriteMaterial({ map:tex, transparent:true, alphaTest:0.3 });
   const sp = new T.Sprite(mat); const asp = img ? img.width/img.height : 0.5;
   sp.scale.set(height*asp, height, 1); sp.center.set(0.5, 0.02); sp.userData.asp = asp; sp.userData.h = height;
@@ -31864,9 +31869,9 @@ function v3Init(){
     cv.addEventListener('webglcontextlost', ()=>{ try{ saveCurrentGame(); }catch(e){} crashBanner('The 3D view ran out of graphics memory. Your game is saved: tap Reload to carry on.'); });   // (RS-137)
     wrap.appendChild(cv); V3.cv = cv;
     const lab = document.createElement('div'); lab.id = 'v3labels'; lab.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:hidden;display:none;'; wrap.appendChild(lab); V3.labels = lab;
-    const R = V3.renderer = new T.WebGLRenderer({ canvas:cv, antialias:true, powerPreference:'high-performance' }); R.debug.checkShaderErrors = false;   /* (RS-499: checking every shader's compile log stalls the GPU queue - town entry spent 5s in it) */   /* (RS-351: the fast card on a machine with two - the dungeon asked, the town and the land didn't) */
+    const R = V3.renderer = gfxThreeR(new T.WebGLRenderer({ canvas:cv, antialias:true, powerPreference:'high-performance' })); R.debug.checkShaderErrors = false;   /* (RS-499: checking every shader's compile log stalls the GPU queue - town entry spent 5s in it) */   /* (RS-351: the fast card on a machine with two - the dungeon asked, the town and the land didn't) */
     R.shadowMap.enabled = true; R.shadowMap.type = gfxPhone() ? T.PCFShadowMap : T.PCFSoftShadowMap;   /* (RS-348) */
-    if (T.sRGBEncoding) R.outputEncoding = T.sRGBEncoding;
+    R.outputColorSpace = T.SRGBColorSpace;
     R.toneMapping = T.ACESFilmicToneMapping;
     V3.scene = new T.Scene();
     V3.cam = new T.PerspectiveCamera(32, 1, 0.5, 120);
@@ -32243,7 +32248,7 @@ function o3Textures(){
     id.data[o] = id.data[o+1] = id.data[o+2] = Math.round(255*Math.min(1,k)); id.data[o+3] = 255;
   }
   x.putImageData(id,0,0);
-  O3.tex.detail = v3CanvasTex(c); O3.tex.detail.encoding = T.LinearEncoding;
+  O3.tex.detail = v3CanvasTex(c); O3.tex.detail.colorSpace = T.NoColorSpace;
   // ripple normal map for the water, scrolled every frame
   const w = v3Canvas(256,256), wx = w.getContext('2d'), wd = wx.createImageData(256,256), m = v3Noise(33);
   const hgt = (i,j)=> m(i/14,j/14)*0.6 + m(i/5+40,j/5)*0.4;
@@ -32955,7 +32960,7 @@ function o3IconTex(key, recipe, color, ring){
   x.fillStyle = 'rgba(10,8,8,0.82)'; x.beginPath(); x.arc(64,64,56,0,Math.PI*2); x.fill();
   x.lineWidth = 6; x.strokeStyle = ring; x.stroke();
   drawMonsterArt(64, 64, 84, recipe, color, x);
-  const t = new THREE.CanvasTexture(c); if (THREE.sRGBEncoding) t.encoding = THREE.sRGBEncoding;
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
   return (O3.tex[key] = t);
 }
 function o3SyncEncounters(){
@@ -33414,7 +33419,7 @@ function o3BuildBoat(){
   const sc = v3Canvas(64,64), sx = sc.getContext('2d');
   for (let i=0;i<4;i++){ sx.fillStyle = i%2 ? '#e8dcc0' : '#9a2a22'; sx.fillRect(i*16,0,16,64); }
   sx.fillStyle = 'rgba(0,0,0,0.12)'; for (let y=0;y<64;y+=8) sx.fillRect(0,y,64,1);
-  const stex = new T.CanvasTexture(sc); if (T.sRGBEncoding) stex.encoding = T.sRGBEncoding;
+  const stex = new T.CanvasTexture(sc); stex.colorSpace = T.SRGBColorSpace;
   const sg = new T.PlaneGeometry(0.84, 0.74, 10, 8), sp = sg.attributes.position;
   for (let i=0;i<sp.count;i++){ const x = sp.getX(i), y = sp.getY(i); sp.setZ(i, 0.13*(1 - Math.pow(x/0.42,2)) * (0.55 + 0.45*(0.5 - y/0.74))); }
   sg.computeVertexNormals();
@@ -33441,9 +33446,9 @@ function o3Init(){
     cv.addEventListener('webglcontextlost', ()=>{ try{ saveCurrentGame(); }catch(e){} crashBanner('The 3D view ran out of graphics memory. Your game is saved: tap Reload to carry on.'); });   // (RS-137)
     wrap.appendChild(cv); O3.cv = cv;
     const lab = document.createElement('div'); lab.id = 'o3labels'; lab.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:hidden;display:none;'; wrap.appendChild(lab); O3.labels = lab;
-    const R = O3.renderer = new T.WebGLRenderer({ canvas:cv, antialias:true, powerPreference:'high-performance' }); R.debug.checkShaderErrors = false;   /* (RS-499) */   /* (RS-351) */
+    const R = O3.renderer = gfxThreeR(new T.WebGLRenderer({ canvas:cv, antialias:true, powerPreference:'high-performance' })); R.debug.checkShaderErrors = false;   /* (RS-499) */   /* (RS-351) */
     R.shadowMap.enabled = true; R.shadowMap.type = gfxPhone() ? T.PCFShadowMap : T.PCFSoftShadowMap;   /* (RS-348) */
-    if (T.sRGBEncoding) R.outputEncoding = T.sRGBEncoding;
+    R.outputColorSpace = T.SRGBColorSpace;
     R.toneMapping = T.ACESFilmicToneMapping;
     O3.scene = new T.Scene();
     O3.cam = new T.PerspectiveCamera(34, 1, 0.5, 160);
@@ -33681,11 +33686,11 @@ function o3NodeFx(rip, bub, glo, G3){
   const lin = c=>new T.Color(c).convertSRGBToLinear();
   if (rip.length){ const m = O3.ripMat || (O3.ripMat = new T.ShaderMaterial({ uniforms:{ uT:U }, transparent:true, depthWrite:false, side:T.DoubleSide,
       vertexShader:'attribute vec3 aC, aCol; attribute vec2 aPh; uniform float uT; varying vec4 vC; void main(){ float f = fract(uT*0.6 + aPh.x); vec3 p = aC + vec3(position.x, 0.0, -position.y)*(0.6 + f*1.9); vC = vec4(aCol, 0.75*(1.0 - f)); gl_Position = projectionMatrix*modelViewMatrix*vec4(p, 1.0); }',
-      fragmentShader:'varying vec4 vC; void main(){ gl_FragColor = vC; \n#include <encodings_fragment>\n}' }));
+      fragmentShader:'varying vec4 vC; void main(){ gl_FragColor = vC; \n#include <colorspace_fragment>\n}' }));
     out.push(new T.Mesh(batch(G3.ring, rip, d=>lin(d.col)), m)); }
   if (bub.length){ const m = O3.bubMat || (O3.bubMat = new T.ShaderMaterial({ uniforms:{ uT:U }, transparent:true,
       vertexShader:'attribute vec3 aC; attribute vec2 aPh; uniform float uT; varying float vL; void main(){ float f = fract(uT*0.9 + aPh.x), a = aPh.y + uT*0.3; vec3 p = aC + vec3(cos(a)*0.16, f*0.12, sin(a)*0.16) + position*(1.0 - f*0.6); vL = 0.72 + 0.28*normal.y; gl_Position = projectionMatrix*modelViewMatrix*vec4(p, 1.0); }',
-      fragmentShader:'varying float vL; void main(){ gl_FragColor = vec4(vec3(vL), 0.85); \n#include <encodings_fragment>\n}' }));
+      fragmentShader:'varying float vL; void main(){ gl_FragColor = vec4(vec3(vL), 0.85); \n#include <colorspace_fragment>\n}' }));
     out.push(new T.Mesh(batch(G3.bub, bub, ()=>({ r:1, g:1, b:1 })), m)); }
   if (glo.length){
     const N = glo.length, pos = new Float32Array(N*3), col = new Float32Array(N*3), sz = new Float32Array(N*2);
@@ -33694,7 +33699,7 @@ function o3NodeFx(rip, bub, glo, G3){
     if (!O3.glowTex){ const c = v3Canvas(64, 64), x = c.getContext('2d'), gr = x.createRadialGradient(32,32,0,32,32,32); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.35, 'rgba(255,255,255,0.45)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = gr; x.fillRect(0,0,64,64); O3.glowTex = new T.CanvasTexture(c); }
     const m = O3.glowPtMat || (O3.glowPtMat = new T.ShaderMaterial({ uniforms:{ uT:U, uPx:PX, map:{ value:O3.glowTex } }, transparent:true, depthWrite:false, blending:T.AdditiveBlending,
       vertexShader:'attribute vec3 aCol; attribute vec2 aSz; uniform float uT, uPx; varying vec4 vC; void main(){ vec4 mv = modelViewMatrix*vec4(position, 1.0); gl_Position = projectionMatrix*mv; gl_PointSize = aSz.x*uPx/max(0.1, -mv.z); vC = vec4(aCol, 0.55 + 0.25*sin(uT*2.0 + aSz.y)); }',
-      fragmentShader:'uniform sampler2D map; varying vec4 vC; void main(){ vec4 t = texture2D(map, gl_PointCoord); gl_FragColor = vec4(vC.rgb*t.rgb, t.a*vC.a); \n#include <encodings_fragment>\n}' }));
+      fragmentShader:'uniform sampler2D map; varying vec4 vC; void main(){ vec4 t = texture2D(map, gl_PointCoord); gl_FragColor = vec4(vC.rgb*t.rgb, t.a*vC.a); \n#include <colorspace_fragment>\n}' }));
     out.push(new T.Points(g, m)); }
   for (const o of out){ o.renderOrder = 2; }
   return out;
@@ -33710,7 +33715,7 @@ function o3NodeDiscs(list, disc){
   const U = O3.discT || (O3.discT = { value:0 });
   const m = O3.discMat || (O3.discMat = new T.ShaderMaterial({ uniforms:{ uT:U }, transparent:true, depthWrite:false, blending:T.AdditiveBlending,
     vertexShader:'attribute vec3 aCol; attribute float aPh; uniform float uT; varying vec4 vC; void main(){ vC = vec4(aCol, 0.12 + 0.07*sin(uT*2.4 + aPh)); gl_Position = projectionMatrix*modelViewMatrix*vec4(position, 1.0); }',
-    fragmentShader:'varying vec4 vC; void main(){ gl_FragColor = vC; \n#include <encodings_fragment>\n}' }));   /* (additive with the source's alpha, like the old basic material; written out in the screen's encoding) */
+    fragmentShader:'varying vec4 vC; void main(){ gl_FragColor = vC; \n#include <colorspace_fragment>\n}' }));   /* (additive with the source's alpha, like the old basic material; written out in the screen's encoding) */
   const mesh = new T.Mesh(g, m); mesh.renderOrder = 1; return mesh;
 }
 /* (RS-333) bake every still, solid mesh under root that shares a material into one: the gathering spots in view were some
@@ -34546,8 +34551,8 @@ function fpdInit(){
        whole every frame (a full-screen resampled blit), and kept its drawing buffer about for the copy */
     cv.id = 'dungeonGL'; cv.style.cssText = 'position:absolute;display:none;pointer-events:none;';
     { const wrap = canvas.parentElement; if (wrap) wrap.insertBefore(cv, canvas); }
-    const r = new T.WebGLRenderer({ canvas:cv, antialias:true, powerPreference:'high-performance' }); r.debug.checkShaderErrors = false;   /* (RS-499: reading the compile logs froze dungeon entry for 8.5s) */
-    r.outputEncoding = T.sRGBEncoding; r.toneMapping = T.NoToneMapping;
+    const r = gfxThreeR(new T.WebGLRenderer({ canvas:cv, antialias:true, powerPreference:'high-performance' })); r.debug.checkShaderErrors = false;   /* (RS-499: reading the compile logs froze dungeon entry for 8.5s) */
+    r.outputColorSpace = T.SRGBColorSpace; r.toneMapping = T.NoToneMapping;
     r.shadowMap.enabled = true; r.shadowMap.type = T.PCFShadowMap; r.shadowMap.autoUpdate = false;
     const scene = new T.Scene(), cam = new T.PerspectiveCamera(60, 16/9, 0.03, 40);
     scene.background = new T.Color(0x000000);
@@ -34618,7 +34623,7 @@ function fpdInit(){
     mx2.fillStyle = mg; mx2.fillRect(0,0,128,128);
     mx2.fillStyle = '#ecece2'; mx2.beginPath(); mx2.arc(64,64,17,0,Math.PI*2); mx2.fill();
     mx2.fillStyle = 'rgba(170,170,160,0.45)'; for (const [cx2,cy2,cr] of [[58,58,4],[70,68,3],[62,72,2.5],[72,56,2]]){ mx2.beginPath(); mx2.arc(cx2,cy2,cr,0,Math.PI*2); mx2.fill(); }
-    const mt = new T.CanvasTexture(mc); mt.encoding = T.sRGBEncoding;
+    const mt = new T.CanvasTexture(mc); mt.colorSpace = T.SRGBColorSpace;
     const moon = new T.Sprite(new T.SpriteMaterial({ map:mt, transparent:true, depthWrite:false, fog:false }));
     moon.scale.setScalar(9); moon.renderOrder = -9; moon.visible = false; scene.add(moon);
     Object.assign(FPD, { r, cv, scene, cam, amb, lan, torches, torchHaze, dust, dustSeed:dp, world:null, mats:{}, lightKey:'', sun, hemi, sky, moon, grassT:{ value:0 } });
@@ -34667,7 +34672,7 @@ function fpdMaterial(key, fn, o){
     sx.putImageData(sd, 0, 0); smap = new T.CanvasTexture(sc); smap.wrapS = smap.wrapT = T.RepeatWrapping; }
   cx.putImageData(id,0,0); nx.putImageData(nd,0,0);
   const aniso = FPD.r ? Math.min(8, FPD.r.capabilities.getMaxAnisotropy()) : 4;   /* (RS-346: or before the dungeon renderer exists) */
-  const map = new T.CanvasTexture(cc); map.encoding = T.sRGBEncoding; map.anisotropy = aniso;
+  const map = new T.CanvasTexture(cc); map.colorSpace = T.SRGBColorSpace; map.anisotropy = aniso;
   const nmap = new T.CanvasTexture(nc); nmap.anisotropy = aniso;
   map.wrapS = map.wrapT = nmap.wrapS = nmap.wrapT = T.RepeatWrapping;
   // Phong keeps the stone matte with a controllable glint (a PBR dielectric washes the whole wall in a grey sheen at lantern range)
@@ -34675,7 +34680,7 @@ function fpdMaterial(key, fn, o){
   const m = new T.MeshPhongMaterial({ map, normalMap:nmap, vertexColors:o.vc!==false, shininess: 6 + (1-sh)*80, specular: new T.Color().setScalar(0.02 + (1-sh)*0.35), specularMap:smap || undefined });
   if (o.wet){ m.specular.setScalar(0.42); m.shininess = 70; }   /* (RS-559: wet stone - a sheen where the water lies) */
   if (holes){ m.alphaTest = 0.5; m.side = T.DoubleSide; }
-  if (ec){ ec.getContext('2d').putImageData(eid,0,0); const em = new T.CanvasTexture(ec); em.encoding = T.sRGBEncoding; em.wrapS = em.wrapT = T.RepeatWrapping; m.emissiveMap = em; m.emissive = new T.Color(0xffffff); m.emissiveIntensity = o.glow || 1.4; }
+  if (ec){ ec.getContext('2d').putImageData(eid,0,0); const em = new T.CanvasTexture(ec); em.colorSpace = T.SRGBColorSpace; em.wrapS = em.wrapT = T.RepeatWrapping; m.emissiveMap = em; m.emissive = new T.Color(0xffffff); m.emissiveIntensity = o.glow || 1.4; }
   if (o.cut) fpdCutify(m);
   FPD.mats[key] = m;
   return m;
@@ -35617,8 +35622,8 @@ function m3dRimify(m){
     /* (RS-528) skin isn't plastic: light goes a little way into it and comes back out warm and red - so where it's lit, the edges
        turning away from you glow warmer, and the shadowed side is lifted with a ruddy light instead of falling to grey */
     const skin = m.userData.kind==='skin' ? '  float sssF = pow(1.0 - clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0), 1.7);\n  outgoingLight += totalDiffuse * vec3(0.55, 0.13, 0.06) * sssF + reflectedLight.indirectDiffuse * vec3(0.26, 0.08, 0.05);\n' : '';
-    sh.fragmentShader = 'uniform vec3 uRim;\n' + sh.fragmentShader.replace('#include <output_fragment>',
-      'float rimF = pow(1.0 - clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0), 3.0);\n  outgoingLight += uRim * rimF;\n' + skin + '#include <output_fragment>');
+    sh.fragmentShader = 'uniform vec3 uRim;\n' + sh.fragmentShader.replace('#include <opaque_fragment>',
+      'float rimF = pow(1.0 - clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0), 3.0);\n  outgoingLight += uRim * rimF;\n' + skin + '#include <opaque_fragment>');
   };
   m.customProgramCacheKey = ()=>m.userData.kind==='skin' ? 'm3drimskin' : 'm3drim';
   m.userData.rim = true;
@@ -36578,7 +36583,7 @@ function m3dHairTex(){
       x.strokeStyle = grad; x.lineWidth = lw; x.lineCap = 'round'; x.beginPath(); x.moveTo(sx, 0); x.bezierCurveTo(sx + wv*0.3, end*0.35, sx + wv, end*0.7, sx + wv*1.2, end); x.stroke(); }
     for (let i=0;i<26;i++){ const sx = x0 + 10 + rnd()*(cw - 20), end = H*(0.25 + rnd()*0.6), g = Math.round(160 + rnd()*50), gr = x.createLinearGradient(0, 0, 0, end); gr.addColorStop(0, `rgba(${g},${g},${g},0.85)`); gr.addColorStop(0.7, `rgba(${g},${g},${g},0.6)`); gr.addColorStop(1, `rgba(${g},${g},${g},0)`);
       x.strokeStyle = gr; x.lineWidth = 3 + rnd()*4; x.beginPath(); x.moveTo(sx, 0); x.lineTo(sx + (rnd() - 0.5)*6, end); x.stroke(); } }   /* (a denser body at the root, so the card reads as a clump - RS-539: in strokes that end unevenly; a band cut a jagged line across the head) */   /* (a denser body at the root, so the card reads as a clump) */
-  const t = new THREE.CanvasTexture(c); t.anisotropy = 4; t.wrapS = THREE.ClampToEdgeWrapping; t.wrapT = THREE.ClampToEdgeWrapping; if (THREE.sRGBEncoding) t.encoding = THREE.sRGBEncoding;
+  const t = new THREE.CanvasTexture(c); t.anisotropy = 4; t.wrapS = THREE.ClampToEdgeWrapping; t.wrapT = THREE.ClampToEdgeWrapping; t.colorSpace = THREE.SRGBColorSpace;
   return (M3D.hairTex = t);
 }
 function m3dHairCardMat(mats, soft){
@@ -36586,13 +36591,13 @@ function m3dHairCardMat(mats, soft){
   const T = THREE, m = new T.MeshStandardMaterial({ color:0xffffff, map:m3dHairTex(), vertexColors:true, roughness:0.55, metalness:0, side:T.DoubleSide, alphaTest:soft ? 0.04 : 0.5, transparent:!!soft, depthWrite:!soft });
   m.onBeforeCompile = function(sh){ const U = m3dHairSwU(this); if (sh.uniforms){ sh.uniforms.uHairSw = U.sw; sh.uniforms.uHairFl = U.fl; }   /* (RS-540: its own figure's sway - each figure has its own copy of the material) */
     sh.vertexShader = 'attribute vec3 hairTan;\nattribute float hairW;\nuniform vec4 uHairSw;\nuniform float uHairFl;\nvarying vec3 vHT;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vHT = normalize(normalMatrix * hairTan);\n  { float hw = hairW*hairW*(3.0 - 2.0*min(1.0, hairW)); transformed += uHairSw.xyz*hw + vec3(sin(uHairSw.w*2.7 + position.x*55.0 + position.z*37.0 + position.y*21.0), 0.0, cos(uHairSw.w*2.3 + position.x*41.0 - position.z*29.0))*uHairFl*hw; }');
-    sh.fragmentShader = 'varying vec3 vHT;\n' + sh.fragmentShader.replace('#include <output_fragment>', `
+    sh.fragmentShader = 'varying vec3 vHT;\n' + sh.fragmentShader.replace('#include <opaque_fragment>', `
   { vec3 Vd = normalize(vViewPosition), Nn = normalize(normal), Tt = normalize(vHT), Lw = normalize((viewMatrix * vec4(0.35, 1.0, 0.55, 0.0)).xyz), Hh = normalize(Lw + Vd);
     vec3 T1 = normalize(Tt + Nn*0.12), T2 = normalize(Tt - Nn*0.18);
     float d1 = dot(T1, Hh), d2 = dot(T2, Hh), s1 = pow(sqrt(max(0.0, 1.0 - d1*d1)), 90.0), s2 = pow(sqrt(max(0.0, 1.0 - d2*d2)), 22.0);
     float lit = 0.35 + dot(totalDiffuse, vec3(0.3, 0.59, 0.11))*1.6;
     outgoingLight += (vec3(0.36)*s1 + diffuseColor.rgb*0.55*s2)*lit; }
-#include <output_fragment>`);
+#include <opaque_fragment>`);
   };
   m.customProgramCacheKey = ()=>'m3dhaircard' + (soft ? 's' : ''); m.userData.kind = 'hair'; m.userData.hex = '#ffffff'; m.userData.special = 'hairCard';
   return (mats[ck] = m);
@@ -36980,11 +36985,11 @@ function vampEmblem2d(x, s, collar){
 const M3D_VAMPTEX = {};
 function vampEmblemTex(collar){ if (M3D_VAMPTEX[collar]) return M3D_VAMPTEX[collar];
   const c = document.createElement('canvas'); c.width = c.height = 512; const x = c.getContext('2d'); x.translate(256, 256); vampEmblem2d(x, 500, collar);
-  const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; t.anisotropy = 4; return (M3D_VAMPTEX[collar] = t); }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return (M3D_VAMPTEX[collar] = t); }
 const M3D_TOMEEM = {};
 function m3dTomeEmTex(em, col){ const k = em + '|' + col; if (M3D_TOMEEM[k]) return M3D_TOMEEM[k];
   const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d'); capeEmblem2d(x, em, 64, 64, em==='vampire' ? 80 : 100, col);
-  const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; return (M3D_TOMEEM[k] = t); }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return (M3D_TOMEEM[k] = t); }
 function capeEmblem2d(x, em, cx, cy, s, col){
   if (em==='vampire'){ x.save(); x.translate(cx, cy); vampEmblem2d(x, Math.min(s*1.6, x.canvas.width*0.92), col && col!=='#d8b050' ? col : '#8a1a2e'); x.restore(); return; }
   x.save(); x.translate(cx, cy); x.fillStyle = col; x.strokeStyle = col; x.lineCap = 'round';
@@ -37014,8 +37019,8 @@ function m3dCapeTex(o){
   if (t>=5 && !o.capeFire){ x.fillStyle = o.capeEdge || gold; for (let i=0;i<9;i++){ const cx = (i + 0.5)/9*W, cy = H - 62; x.beginPath(); x.moveTo(cx, cy - 12); x.lineTo(cx + 11, cy); x.lineTo(cx, cy + 12); x.lineTo(cx - 11, cy); x.closePath(); x.fill(); } x.fillRect(0, H - 80, W, 4); x.fillRect(0, H - 46, W, 4); }   /* an embroidered band of lozenges */
   if (o.capeEm) capeEmblem2d(x, o.capeEm, W/2, H*0.4, W*0.8, o.capeEmCol || gold);   /* (RS-495: big across the back - it was half the cape's width) */
   if (t>=6 && !o.capeFire){ gx2.fillStyle = '#c89030'; gx2.fillRect(0, H - 80, W, 4); gx2.fillRect(0, H - 46, W, 4); if (o.capeEm) capeEmblem2d(gx2, o.capeEm, W/2, H*0.4, W*0.8, '#a07020'); }   /* its gold thread glowing */
-  const T = THREE, tex = new T.CanvasTexture(c); tex.encoding = T.sRGBEncoding; tex.anisotropy = 4;
-  const gt = (t>=6 || o.capeFire) ? new T.CanvasTexture(glow) : null; if (gt) gt.encoding = T.sRGBEncoding;
+  const T = THREE, tex = new T.CanvasTexture(c); tex.colorSpace = T.SRGBColorSpace; tex.anisotropy = 4;
+  const gt = (t>=6 || o.capeFire) ? new T.CanvasTexture(glow) : null; if (gt) gt.colorSpace = T.SRGBColorSpace;
   return (M3D_CAPETEX[key] = { tex, glow:gt });
 }
 function m3dCapeOwn(c){
@@ -41777,7 +41782,7 @@ function fpwTex(w, h, fn){
   const c = v3Canvas(w,h), x = c.getContext('2d'), id = x.createImageData(w,h);
   for (let y=0;y<h;y++) for (let i=0;i<w;i++){ const o = (y*w+i)*4, p = fn(i,y); id.data[o]=p[0]; id.data[o+1]=p[1]; id.data[o+2]=p[2]; id.data[o+3]=255; }
   x.putImageData(id,0,0);
-  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; if (THREE.sRGBEncoding) t.encoding = THREE.sRGBEncoding; t.anisotropy = 4; return t;
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t;
 }
 function fpwInit(){
   if (FPW.ok!==null) return FPW.ok;
@@ -41786,8 +41791,8 @@ function fpwInit(){
   try{
     const T = THREE;
     FPW.cv = document.createElement('canvas');
-    const R = FPW.r = new T.WebGLRenderer({ canvas:FPW.cv, alpha:true, antialias:true, preserveDrawingBuffer:true }); R.debug.checkShaderErrors = false;   /* (RS-499) */
-    if (T.sRGBEncoding) R.outputEncoding = T.sRGBEncoding;
+    const R = FPW.r = gfxThreeR(new T.WebGLRenderer({ canvas:FPW.cv, alpha:true, antialias:true, preserveDrawingBuffer:true })); R.debug.checkShaderErrors = false;   /* (RS-499) */
+    R.outputColorSpace = T.SRGBColorSpace;
     R.toneMapping = T.ACESFilmicToneMapping; R.setClearColor(0x000000, 0);
     FPW.scene = new T.Scene();
     FPW.cam = new T.PerspectiveCamera(42, 1, 0.05, 20);
@@ -42122,7 +42127,7 @@ function isoSyncSprites(S, env){
     if (!sp){ sp = new T.Sprite(new T.SpriteMaterial({ transparent:true, alphaTest:0.2 })); sp.center.set(0.5, 0); ISO.grp.add(sp); ISO.sprites.push(sp); }
     n++;
     let tex = ISO.texCache.get(s.spr.img);
-    if (!tex){ tex = new T.CanvasTexture(s.spr.img); tex.encoding = T.sRGBEncoding; ISO.texCache.set(s.spr.img, tex); }
+    if (!tex){ tex = new T.CanvasTexture(s.spr.img); tex.colorSpace = T.SRGBColorSpace; ISO.texCache.set(s.spr.img, tex); }
     if (s.dyn) tex.needsUpdate = true;
     const m = sp.material;
     if (m.map!==tex){ m.map = tex; m.needsUpdate = true; }
@@ -43682,7 +43687,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-573';
+const GAME_VERSION = 'rs-574';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -44103,8 +44108,8 @@ function lpMount(){
   try{
     if (!LP.r){
       const cv = document.createElement('canvas');
-      LP.r = new T.WebGLRenderer({ canvas:cv, alpha:true, antialias:true }); LP.r.debug.checkShaderErrors = false;   /* (RS-499) */ LP.r.setPixelRatio(Math.min(2, window.devicePixelRatio||1)); LP.r.setSize(240, 293, false);
-      if (T.sRGBEncoding) LP.r.outputEncoding = T.sRGBEncoding; LP.r.toneMapping = T.ACESFilmicToneMapping; LP.r.setClearColor(0x000000, 0);
+      LP.r = gfxThreeR(new T.WebGLRenderer({ canvas:cv, alpha:true, antialias:true })); LP.r.debug.checkShaderErrors = false;   /* (RS-499) */ LP.r.setPixelRatio(Math.min(2, window.devicePixelRatio||1)); LP.r.setSize(240, 293, false);
+      LP.r.outputColorSpace = T.SRGBColorSpace; LP.r.toneMapping = T.ACESFilmicToneMapping; LP.r.setClearColor(0x000000, 0);
       LP.scene = new T.Scene(); LP.cam = new T.PerspectiveCamera(30, 240/293, 0.1, 20); LP.cam.position.set(0, 0.6, 2.05); LP.cam.lookAt(0, 0.5, 0);
       LP.scene.add(new T.HemisphereLight(0xdde4f0, 0x2a2018, 0.7));
       const key = new T.DirectionalLight(0xffe0b0, 1.35); key.position.set(1.2, 2, 1.6); LP.scene.add(key);

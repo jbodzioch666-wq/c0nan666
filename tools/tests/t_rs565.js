@@ -5,7 +5,7 @@
 module.exports = async page=>{
   const r = await page.evaluate(async ()=>{ goToCharCreate(); ccBegin(); wgRegenerate(12345); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); o3Pref = true; G.gameMode = 0; weatherSync = ()=>{};
     G.owPos = { x:100, y:24 }; G.player.clock = G.player.turnCount = DAY_LENGTH/2; O3.win = null; O3.ppos = null; for (let i=0;i<12;i++){ renderGame(); await new Promise(r=>setTimeout(r, 40)); }
-    const m = O3.water.material, tex = m.userData.ownTex[0], D = tex.image.data, N = tex.image.width, sh = { uniforms:{}, vertexShader:'void main(){\n#include <begin_vertex>\n#include <project_vertex>\n}', fragmentShader:'void main(){\n#include <output_fragment>\n}' }; m.onBeforeCompile(sh);
+    const m = O3.water.material, tex = m.userData.ownTex[0], D = tex.image.data, N = tex.image.width, sh = { uniforms:{}, vertexShader:'void main(){\n#include <begin_vertex>\n#include <project_vertex>\n}', fragmentShader:'void main(){\n#include <opaque_fragment>\n}' }; m.onBeforeCompile(sh);
     const ox = O3.win.x0 - 5, oy = O3.win.y0 - 5, R8 = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]; let rivers = 0, still = 0, reach = 0, tried = 0, back = 0;
     for (let j=1;j<N-1;j++) for (let i=1;i<N-1;i++){ if (o3Tile(ox + i, oy + j)!==OW_RIVER) continue; rivers++; const k = (j*N + i)*4; if (D[k+2]===128 && D[k+3]===128){ still++; continue; }
       if (tried >= 60 || (i + j) % 3) continue; tried++; let x = i, y = j; const seen = new Set([x + ',' + y]);

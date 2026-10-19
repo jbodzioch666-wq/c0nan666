@@ -28,7 +28,7 @@ module.exports = async page=>{
       sculptDbGet = gdb; fpdPrepStep = st0; window.__noWarmSlice = 1;
       const alive = G.mon.filter(m=>m.alive && m3dPortrait(m)), built = alive.filter(m=>{ const pt = m3dPortrait(m); return M3D.tpl.has(m3dTplKey(pt)); }).length;
       for (let i=0;i<20;i++){ renderGame(); await new Promise(r=>setTimeout(r, 20)); }
-      let mats = 0, empty = 0; FPD.scene.traverse(o=>{ for (const m of [].concat(o.material||[])){ const mp = FPD.r.properties.get(m); if (!mp || !mp.currentProgram) continue; mats++; if (!mp.uniformsList || !mp.uniformsList.length) empty++; } });
+      let mats = 0, empty = 0; FPD.scene.traverse(o=>{ for (const m of [].concat(o.material||[])){ const mp = FPD.r.properties.get(m); if (!mp || !mp.currentProgram) continue; mats++; if (mp.uniformsList && !mp.uniformsList.length) empty++;   /* (three r158+ makes the list at the first draw - null till then; an empty one is the RS-573 fault) */ } });
       out.prep = { steps, worst:+worst.toFixed(0), mons:alive.length, built, secs:+((performance.now() - t0)/1000).toFixed(1), mats, empty }; G.gameMode = 0; }
     // (3) the chart, sliced and at once
     { PM.cv = null; PM.job = null; PM.sched = false; let worst = 0; const sl = []; const it = pmBuildGen(); for (;;){ const t = performance.now(), dl = t + 6; let d = false; while (performance.now() < dl){ if (it.next().done){ d = true; break; } } worst = Math.max(worst, performance.now() - t); if (d) break; await new Promise(r=>setTimeout(r, 0)); }

@@ -20,7 +20,7 @@ module.exports = async page=>{
     /* a figure in the world: its own copy of the materials, the hair shader with them */
     M3D_SKIN = true; if (M3D.tpl) M3D.tpl.clear();
     { const L = Object.assign(lookDefault('Human'), { body:0, hair:2 }), pt = rsPlayerLook({ race:'Human', look:L, bare:true }), e = m3dInstance({}, pt); let mat = null; e.root.traverse(o=>{ if (o.name==='hair') mat = o.material; });
-      const sh = { uniforms:{}, vertexShader:'void main(){\n#include <begin_vertex>\n}', fragmentShader:'void main(){\n#include <output_fragment>\n}' }; if (mat) mat.onBeforeCompile.call(mat, sh, null); out.instShine = !!mat && /hairTan/.test(sh.vertexShader) && /pow\(sqrt/.test(sh.fragmentShader); }
+      const sh = { uniforms:{}, vertexShader:'void main(){\n#include <begin_vertex>\n}', fragmentShader:'void main(){\n#include <opaque_fragment>\n}' }; if (mat) mat.onBeforeCompile.call(mat, sh, null); out.instShine = !!mat && /hairTan/.test(sh.vertexShader) && /pow\(sqrt/.test(sh.fragmentShader); }
     return out; });
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };

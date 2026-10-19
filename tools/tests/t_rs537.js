@@ -10,7 +10,7 @@ module.exports = async page=>{
       out[nm] = { cards:!!g && !!g.attributes.hairTan && !!g.attributes.uv, verts:g ? g.attributes.position.count : 0, alpha:mat && mat.alphaTest >= 0.4 && !!mat.map, soft:!!(soft && soft.material.transparent && !soft.material.depthWrite && soft.geometry===g),
         shadow:hair ? hair.castShadow : null, beard:!!(beard && beard.geometry.attributes.hairTan), tail:!!head.getObjectByName('hairTail') };
       /* a compiled card shader has the shine */
-      if (mat && nm==='crop'){ const sh = { uniforms:{}, vertexShader:'void main(){\n#include <begin_vertex>\n}', fragmentShader:'void main(){\n#include <output_fragment>\n}' }; mat.onBeforeCompile(sh); out.shine = /hairTan/.test(sh.vertexShader) && /pow\(sqrt/.test(sh.fragmentShader); } }
+      if (mat && nm==='crop'){ const sh = { uniforms:{}, vertexShader:'void main(){\n#include <begin_vertex>\n}', fragmentShader:'void main(){\n#include <opaque_fragment>\n}' }; mat.onBeforeCompile(sh); out.shine = /hairTan/.test(sh.vertexShader) && /pow\(sqrt/.test(sh.fragmentShader); } }
     return out; });
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };

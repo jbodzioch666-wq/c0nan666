@@ -4,7 +4,7 @@
 module.exports = async page=>{
   const r = await page.evaluate(()=>{ const out = { ver:M3D_SCULPT_VER };
     const mats = {}, skin = m3dMat(mats, '#c9a07c', 'skin', true), cloth = m3dMat(mats, '#c9a07c', 'cloth', true);
-    const fake = ()=>({ uniforms:{}, fragmentShader:'void main(){\n#include <output_fragment>\n}', vertexShader:'' });
+    const fake = ()=>({ uniforms:{}, fragmentShader:'void main(){\n#include <opaque_fragment>\n}', vertexShader:'' });
     const a = fake(), b = fake(); skin.onBeforeCompile(a); cloth.onBeforeCompile(b);
     out.skinSss = /sssF/.test(a.fragmentShader) && /indirectDiffuse/.test(a.fragmentShader); out.clothPlain = !/sssF/.test(b.fragmentShader);
     out.keys = [skin.customProgramCacheKey(), cloth.customProgramCacheKey()]; out.rough = skin.roughness;

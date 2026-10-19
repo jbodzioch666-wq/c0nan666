@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-574 - three.js r159
+- **Newer 3D engine:** the game now runs on three.js r159, up from r149. It's the last version that still loads the way this one-file game does, and the first that properly builds shaders in the background. It keeps track of each shader the graphics driver is building and says when it's ready, so the game never has to stop and wait. The workaround from RS-572 and RS-573 is gone, replaced by three's own way.
+- **Looks the same:** the newer three.js changed how colours, lights and some shader pieces work by default. The game is set up to draw exactly as before: the same colours and the same light strength, and every custom shader effect still in place (water, hair, skin, cloth, clouds, fog). Screenshots of the open land, towns and dungeons match the old version.
+- **Nothing vanishes at the screen's edge:** from r151, three.js decides whether a group of repeated things (grass, herds, flocks) is on screen from where they first stood, and a moving figure from its first pose. Neither was updated as they moved. The game keeps the old behaviour, so moving things don't disappear and still answer clicks.
+- **Current speed on a desktop:** about 140 frames a second in dungeons, 100 to 110 in towns and on the open land. Making it faster comes next.
+
 ## RS-573 - Fog and cursor fixed
 - **Unexplored rooms are dark again:** since RS-572, some floors showed every room, explored or not. While its shaders were still being built, a material could pick one up and be left without its settings. The floor and walls then drew without the darkness over the rooms you hadn't seen yet.
 - **No symbols under the cursor:** the same fault drew the cursor's marker as a strip of glowing symbols across the floor. It's back to its plain outline.

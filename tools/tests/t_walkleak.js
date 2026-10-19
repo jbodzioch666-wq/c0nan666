@@ -25,6 +25,7 @@ module.exports = async page=>{
   const r = await page.evaluate(()=>{ clearInterval(window.__walk);
     const used = new Set(); for (const sc of [O3.scene, typeof FPD!=='undefined' && FPD.scene, typeof V3!=='undefined' && V3.scene].filter(Boolean)) sc.traverse(o=>{ if (o.geometry) used.add(o.geometry); for (const m of [].concat(o.material||[])) for (const k in m) if (m[k] && m[k].isTexture) used.add(m[k]); });
     if (O3.pend && O3.pend.st && O3.pend.st.world) O3.pend.st.world.traverse(o=>{ if (o.geometry) used.add(o.geometry); });   /* (a land still being built isn't left behind) */
+    if (typeof SK3!=='undefined' && SK3.m && SK3.m.root) SK3.m.root.traverse(o=>{ if (o.geometry) used.add(o.geometry); });   /* (RS-574: the skeleton model, kept for every skeleton to copy - its background sculpt (RS-570) can finish inside the walk) */
     for (const v of [O3.uDep && O3.uDep.value, O3.depthTex, O3.pend && O3.pend.st && O3.pend.st.depthTex]) if (v) used.add(v);
     let lg = 0, lt = 0, mg = 0, mt = 0; for (const m of window.__made){ m.g ? mg++ : mt++; const L = m.o._listeners && m.o._listeners.dispose; if (!L || !L.length || used.has(m.o)) continue; m.g ? lg++ : lt++; }
     return { start:window.__start, end:G.owPos.x+','+G.owPos.y, swaps:window.__swaps, madeG:mg, madeT:mt, leftG:lg, leftT:lt, depthOk:!O3.uDep || O3.uDep.value===O3.depthTex }; });

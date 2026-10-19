@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs574 | three.js r159 drawing as r149 did: colour management off, old light units, custom shaders on the new chunk names, instanced/skinned meshes culled by their own geometry, shaders started at once (three compile + isReady) |
 | rs572 | a floor loads without long freezes: the parallel link returns at once and draws the same pixels, creatures sculpted a slice a frame behind the card, the chart painted a few ms a step (same picture) |
 | rs571 | shaders load faster: a point shadow takes 5 samples round one cubeToUV (was 9 cubeToUVs), every program started at once and linked off the frame (KHR_parallel_shader_compile), no sun below ground |
 | rs570 | the skeleton sculpted a few ms a tick with the cache cold (no long stall); hill towns terrace only their buildings, not trees; no woodcutting trees against a town; roads stop at its edge; its pad level with the ground round it |
@@ -402,6 +403,10 @@ Screenshots go to `tools/tests/shots/`.
 | zland | the open land from a fresh page with a save (`ZSAVE`): load to the end of its warm-up, the longest frames |
 | zpre | whether gfxPrelink returns at once: its call timed against the wait for the driver, on fresh heavy materials |
 | zviews | the open land and a town drawn through the players' warm-up path (sliced, parallel link): screenshots |
+| zparity | the same views on the fixed seed (land at three spots, the spawn town, a dungeon) as shots/zpar_<view>_<ZTAG>.png, to compare two builds |
+| zperf | frame cost while walking the land, a town and a dungeon with a save (`ZSAVE`, `ZVIEWS`, `ZSECS`): frame spread, CPU and GPU ms, a CPU profile's top functions; `THREE_JS=` the unminified build for readable names |
+| zbear | a creature (`ZMON`) killed eight times: how far its body tips each time |
+| zleak | t_walkleak, listing each geometry left behind with where it was made |
 | zhair | heads with each hairstyle from four sides, and under helmets |
 | zplate | plate armour on builds from slight to heavy |
 | zunder | the creator's undressed figures by race and sex |
