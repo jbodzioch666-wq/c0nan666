@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-564 - No wandering box on phones
+- **The yellow box stays put:** on a phone, every tap also makes the browser send a pretend mouse move to where your finger was. In the dungeon the game treated that as a mouse resting there and kept drawing the yellow hover box under that point of the screen, so as you walked and the view slid along, the box crawled across the floor. A tap no longer sets the hover spot, so no box is left behind. With a real mouse, hovering works as before.
+- The same goes for the hover highlight on the open land and in towns.
+
 ## RS-563 - Lighter on phones
 For the lag on phones (a Galaxy S26 here). Measured with your save on an emulated phone: the frame's triangles fall from 253,000 to 145,000, and the pixels drawn by about a quarter on the emulator. On a real S26, with its denser screen, the pixels fall by 55 to 75%.
 - **Fewer pixels:** on the phone tier the 3D views now draw at most 1.75 pixels per point. A flagship phone used to draw at its full density, 2.6 to 3.5 times, which is four million pixels and more, each one lit, shadowed and post-processed. The text, HUD and menus stay full sharpness, and the frame scaler still steps down from there if needed.
