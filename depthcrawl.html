@@ -21201,11 +21201,14 @@ function o3WgMat(k, col, o){ O3.wgMats = O3.wgMats || {}; return O3.wgMats[k] ||
 function o3Roads(grp, x0, y0, W){
   const T = THREE, road = G.ow.road; if (!road) return;
   const isR = (x, y)=> x>=0 && y>=0 && x<OW_COLS && y<OW_ROWS && (road[y*OW_COLS+x]===1 || road[y*OW_COLS+x]===4 || G.ow.map[x][y]===OW_TOWN || (G.ow.pois||[]).some(p=>p.k==='ferry' && p.x===x && p.y===y));
-  const pos = [], hw = 0.2, add = (ax, az, bx, bz)=>{
+  const paint = gfxPaintOn(), pos = [], rd = [], hw = paint ? 0.25 : 0.2, add = (ax, az, bx, bz)=>{   /* (RS-550: a wider strip, its edges eaten ragged by the shader) */
     const dx = bx-ax, dz = bz-az, L = Math.hypot(dx, dz), nx = -dz/L*hw, nz = dx/L*hw, n = 4;
     for (let i=0;i<n;i++){ const f0 = i/n, f1 = (i+1)/n, p0x = ax + dx*f0, p0z = az + dz*f0, p1x = ax + dx*f1, p1z = az + dz*f1;
-      const h0a = O3.heightAt(p0x+nx, p0z+nz)+0.03, h0b = O3.heightAt(p0x-nx, p0z-nz)+0.03, h1a = O3.heightAt(p1x+nx, p1z+nz)+0.03, h1b = O3.heightAt(p1x-nx, p1z-nz)+0.03;
-      pos.push(p0x+nx, h0a, p0z+nz, p0x-nx, h0b, p0z-nz, p1x+nx, h1a, p1z+nz,  p1x+nx, h1a, p1z+nz, p0x-nx, h0b, p0z-nz, p1x-nx, h1b, p1z-nz); } };
+      const h0a = O3.heightAt(p0x+nx, p0z+nz)+0.03, h0b = O3.heightAt(p0x-nx, p0z-nz)+0.03, h1a = O3.heightAt(p1x+nx, p1z+nz)+0.03, h1b = O3.heightAt(p1x-nx, p1z-nz)+0.03, h0c = O3.heightAt(p0x, p0z)+0.03, h1c = O3.heightAt(p1x, p1z)+0.03;
+      if (!paint){ pos.push(p0x+nx, h0a, p0z+nz, p0x-nx, h0b, p0z-nz, p1x+nx, h1a, p1z+nz,  p1x+nx, h1a, p1z+nz, p0x-nx, h0b, p0z-nz, p1x-nx, h1b, p1z-nz); rd.push(1, 1, 1, 1, 1, 1); continue; }
+      /* (RS-550) two halves with a crown line down the middle (rd 0), its edges rd 1 - the shader eats the edges and wears the ruts by rd */
+      for (const s of [1, -1]){ const ex0 = p0x + nx*s, ez0 = p0z + nz*s, ex1 = p1x + nx*s, ez1 = p1z + nz*s, ha = s > 0 ? h0a : h0b, hb = s > 0 ? h1a : h1b;
+        pos.push(ex0, ha, ez0, p0x, h0c, p0z, ex1, hb, ez1,  ex1, hb, ez1, p0x, h0c, p0z, p1x, h1c, p1z); rd.push(1, 0, 1, 1, 0, 0); } } };
   for (let x=Math.floor(x0); x<x0+W; x++) for (let y=Math.floor(y0); y<y0+W; y++){
     const v = wgRoadAt(x, y); if (!(v===1 || v===4)) continue;
     for (const [dx,dy] of [[1,0],[0,1],[-1,0],[0,-1]]){ const nx = x+dx, ny = y+dy, nv = wgRoadAt(nx, ny);
@@ -21214,11 +21217,21 @@ function o3Roads(grp, x0, y0, W){
       if (nv===2 || nv===3) add(x+0.5, y+0.5, x+0.5+dx*0.5, y+0.5+dy*0.5); }
     // a round patch at each joint so corners don't show gaps
     for (let i=0;i<8;i++){ const a0 = i/8*Math.PI*2, a1 = (i+1)/8*Math.PI*2, cx = x+0.5, cz = y+0.5, h = O3.heightAt(cx, cz)+0.032;
-      pos.push(cx, h, cz, cx+Math.cos(a1)*hw, O3.heightAt(cx+Math.cos(a1)*hw, cz+Math.sin(a1)*hw)+0.032, cz+Math.sin(a1)*hw, cx+Math.cos(a0)*hw, O3.heightAt(cx+Math.cos(a0)*hw, cz+Math.sin(a0)*hw)+0.032, cz+Math.sin(a0)*hw); }
+      pos.push(cx, h, cz, cx+Math.cos(a1)*hw, O3.heightAt(cx+Math.cos(a1)*hw, cz+Math.sin(a1)*hw)+0.032, cz+Math.sin(a1)*hw, cx+Math.cos(a0)*hw, O3.heightAt(cx+Math.cos(a0)*hw, cz+Math.sin(a0)*hw)+0.032, cz+Math.sin(a0)*hw); rd.push(-0.001, 1.999, 1.999); }   /* (a joint's disc: rd ending below zero and past one marks it, so no ring of rut is worn on it) */
   }
   if (!pos.length) return;
-  const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); geo.computeVertexNormals();
-  const mat = new T.MeshStandardMaterial({ color:new T.Color('#8a7252').convertSRGBToLinear(), roughness:1, side:T.DoubleSide, polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2 });
+  const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); geo.setAttribute('rd', new T.Float32BufferAttribute(rd, 1)); geo.computeVertexNormals();
+  const mat = new T.MeshStandardMaterial({ color:new T.Color(paint ? '#7e6a4c' : '#8a7252').convertSRGBToLinear(), roughness:1, side:T.DoubleSide, polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2 });
+  if (paint){ const tx = gfxTextures();   /* (RS-550) a worn track, not a tan ribbon: edges eaten ragged where the grass creeps in, two ruts, a dusty crown between, grit over all */
+    mat.onBeforeCompile = sh=>{ Object.assign(sh.uniforms, { uCloud:{ value:tx.cloud }, uDet1:{ value:tx.dirt } }); gfxWorldPos(sh);
+      sh.vertexShader = 'attribute float rd; varying float vRd;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vRd = rd;');
+      sh.fragmentShader = 'uniform sampler2D uCloud; uniform sampler2D uDet1; varying float vRd;\n' + sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
+        float disc = step(1.0001, vRd + 2.0*step(0.0, -vRd + 0.0004)*0.0) * 0.0; disc = (vRd > 1.0001 || vRd < -0.0004) ? 1.0 : 0.0; float rdn = vRd > 1.0 ? vRd - 1.0 : (vRd < 0.0 ? 0.0 : vRd);   /* (on a disc rd runs -0.001 to 2: unfolded back to 0..1, and marked) */
+        float rn = texture2D(uCloud, vGW.xz*0.7).r, rn2 = texture2D(uCloud, vGW.xz*2.3 + 2.0).r, e = rdn + (rn - 0.5)*0.34 + (rn2 - 0.5)*0.16;
+        if (e > 1.0) discard;
+        float rut = exp(-pow((rdn - 0.52)/0.13, 2.0))*(1.0 - disc), grit = texture2D(uDet1, vGW.xz*1.4).r;
+        diffuseColor.rgb *= (0.66 + grit*0.5)*(1.0 - rut*0.2)*(1.0 + (1.0 - smoothstep(0.0, 0.3, rdn))*0.06*(1.0 - disc))*(1.0 - smoothstep(0.8, 1.0, e)*0.2);`); };
+    mat.customProgramCacheKey = ()=>'gfxroad'; }
   const mesh = new T.Mesh(geo, mat); mesh.receiveShadow = true; grp.add(mesh);
   // bridges and fords
   const plank = o3WgMat('plank', '#7a5634'), post = o3WgMat('post', '#4a3420'), stone = o3WgMat('ford', '#8a8478');
@@ -23987,6 +24000,7 @@ const GFX_GRADES = {
   lair:     { gain:[1.1,0.92,0.84], lift:[0.012,0.002,0],     sat:1.0,  con:1.1,  bloom:0.95, vig:0.46 },   // a dragon's den, red-lit
 };
 function gfxPostOn(){ return SET.post!==false && SET.gfx!=='low' && !window.__noPost; }
+function gfxPaintOn(){ return SET.gfx!=='low' && !gfxPhone() && !window.__noPaint; }   /* (RS-550: the painted ground and worn roads - off on the low setting and the phone tier) */
 function gfxGradeKey(view){
   if (view==='fpd'){ if (G.gameMode===2) return 'neutral'; const k = G.siteKind; return k==='mine' ? 'mine' : k==='graveyard' || k==='necro' ? 'crypt' : k==='temple' ? 'sunken' : k==='castle' ? 'castle' : k==='pyramid' ? 'pyramid' : k==='lair' ? 'lair' : 'dungeon'; }   /* (RS-479) */
   if (view==='v3'){ const t = G.villageTheme; return t==='desert' ? 'desert' : t==='tundra' ? 'tundra' : t==='swamp' ? 'swamp' : 'town'; }
@@ -24195,6 +24209,8 @@ function gfxTextures(){
   const dirt = can(128, (x, n)=>{ x.fillStyle = '#bdbdbd'; x.fillRect(0, 0, n, n); for (let i=0;i<500;i++){ const k = 120 + Math.random()*120|0; wrapDot(x, n, Math.random()*n, Math.random()*n, 0.6 + Math.random()*2.4, `rgb(${k},${k},${k})`); } });
   const rock = can(128, (x, n)=>{ for (let y=0;y<n;y++){ const k = 150 + Math.sin(y*0.45)*30 + Math.sin(y*1.7)*14 + (Math.random()-0.5)*20|0; x.fillStyle = `rgb(${k},${k},${k})`; x.fillRect(0, y, n, 1); }
     for (let i=0;i<120;i++){ const k = 100 + Math.random()*60|0; x.fillStyle = `rgba(${k},${k},${k},0.6)`; x.fillRect(Math.random()*n, Math.random()*n, 2 + Math.random()*10, 1); } });
+  const sand = can(128, (x, n)=>{ x.fillStyle = '#c8c8c8'; x.fillRect(0, 0, n, n); for (let i=0;i<2600;i++){ const k = 150 + Math.random()*105|0; x.fillStyle = `rgb(${k},${k},${k})`; x.fillRect(Math.random()*n, Math.random()*n, 1, 1); }
+    for (let y=0;y<n;y+=1){ const k = Math.sin(y*0.5 + Math.sin(y*0.13)*2)*14; x.fillStyle = `rgba(${k > 0 ? 255 : 0},${k > 0 ? 255 : 0},${k > 0 ? 255 : 0},${Math.abs(k)/255})`; x.fillRect(0, y, n, 1); } });   /* (RS-550: fine grains, and the faint ripples the wind leaves) */
   const cloud = can(256, (x, n)=>{ x.fillStyle = '#000'; x.fillRect(0, 0, n, n); for (let i=0;i<90;i++){ const px = Math.random()*n, py = Math.random()*n, r = 12 + Math.random()*46;
       for (const dx of [-n, 0, n]) for (const dy of [-n, 0, n]){ const g = x.createRadialGradient(px+dx, py+dy, 0, px+dx, py+dy, r); g.addColorStop(0, 'rgba(255,255,255,0.35)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(px+dx-r, py+dy-r, r*2, r*2); } } });
   const soft = (()=>{ const c = v3Canvas(128, 128), x = c.getContext('2d'); for (let i=0;i<14;i++){ const px = 30 + Math.random()*68, py = 30 + Math.random()*68, r = 20 + Math.random()*28, g = x.createRadialGradient(px, py, 0, px, py, r); g.addColorStop(0, 'rgba(255,255,255,0.4)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 128, 128); } return new T.CanvasTexture(c); })();
@@ -24204,7 +24220,7 @@ function gfxTextures(){
     for (let i=0;i<90;i++){ const sx = 8 + Math.random()*(n-16), w = 1 + Math.random()*2.5, l = 20 + Math.random()*60, sy = Math.random()*n; x.fillStyle = `rgba(255,255,255,${0.35 + Math.random()*0.55})`; x.fillRect(sx, sy, w, l); if (sy + l > n) x.fillRect(sx, 0, w, sy + l - n); } });   // (streaks wrap top to bottom, so the scroll is seamless)
   const foam = (()=>{ const c = v3Canvas(128, 128), x = c.getContext('2d'), g = x.createRadialGradient(64, 64, 0, 64, 64, 64); g.addColorStop(0, 'rgba(255,255,255,0.95)'); g.addColorStop(0.45, 'rgba(240,248,255,0.7)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 128, 128);
     for (let i=0;i<70;i++){ const a = Math.random()*6.28, r = 128*(0.15 + Math.random()*0.3); x.fillStyle = 'rgba(255,255,255,0.8)'; x.beginPath(); x.arc(64 + Math.cos(a)*r, 64 + Math.sin(a)*r, 1 + Math.random()*3, 0, 6.28); x.fill(); } return new T.CanvasTexture(c); })();
-  return (GFX.tex = { grass, dirt, rock, cloud, soft, beam, fall, foam });
+  return (GFX.tex = { grass, dirt, rock, sand, cloud, soft, beam, fall, foam });
 }
 // a shared bit of shader: the world position, for the land and the water
 function gfxWorldPos(shader){
@@ -24242,23 +24258,44 @@ function* gfxO3BuildGen(grp, x0, y0, W, M){   /* (RS-403: a step at a time - see
   // the ground: grass, dirt and rock blended by slope, roads and soil; strata on the cliffs; cloud shadows
   const land = O3.land;
   if (land){
-    const g = land.geometry, pos = g.attributes.position, nor = g.attributes.normal, n = pos.count, bl = new Float32Array(n*3);
+    const g = land.geometry, pos = g.attributes.position, nor = g.attributes.normal, n = pos.count, bl = new Float32Array(n*4);
     for (let i=0;i<n;i++){ const x = pos.getX(i), h = pos.getY(i), z = pos.getZ(i), slope = 1 - nor.getY(i), tx0 = Math.floor(x - 0.5), tz0 = Math.floor(z - 0.5), t = o3Tile(tx0, tz0);
       const rock = Math.min(1, Math.max(0, (slope - 0.16)/0.3) + (h > 2.2 ? 0.35 : 0) + (t===OW_MOUNTAIN ? 0.25 : 0));
-      const dirt = Math.min(1 - rock, (wgRoadAt(tx0, tz0) ? 0.9 : 0) + (t===OW_DESERT ? 0.7 : 0) + (h < 0.03 ? 0.45 : 0) + (t===OW_MOUNTAINPASS ? 0.6 : 0));
-      bl[i*3] = Math.max(0, 1 - rock - dirt); bl[i*3+1] = dirt; bl[i*3+2] = rock; }
-    g.setAttribute('blend', new T.BufferAttribute(bl, 3));
-    const m = land.material;
-    m.onBeforeCompile = sh=>{ Object.assign(sh.uniforms, { uT:U.uT, uCloudAmt:U.uCloudAmt, uDet0:{ value:tx.grass }, uDet1:{ value:tx.dirt }, uDet2:{ value:tx.rock }, uCloud:{ value:tx.cloud } });
+      const sand = Math.min(1 - rock, (t===OW_DESERT ? 0.8 : 0) + (h < O3_WATER_Y + 0.14 && t!==OW_SWAMP && t!==OW_MOUNTAIN ? 0.85 : 0));   /* (RS-550: sand on the beaches and the dunes - they were dirt) */
+      const dirt = Math.min(1 - rock - sand, (wgRoadAt(tx0, tz0) ? 0.9 : 0) + (h < 0.03 ? 0.45 : 0) + (t===OW_MOUNTAINPASS ? 0.6 : 0));
+      bl[i*4] = Math.max(0, 1 - rock - dirt - sand); bl[i*4+1] = dirt; bl[i*4+2] = rock; bl[i*4+3] = sand; }
+    g.setAttribute('blend', new T.BufferAttribute(bl, 4));
+    /* (RS-550) the tiles of the window as a little texture, each its own ground colour (the sea its nearest shore's, and marked as sea):
+       the shader paints each point from the tile a little way off, where the noise says, so the borders between grass, wood,
+       sand and snow wander as a painter's would instead of running straight along the grid */
+    const NT = W + 2*M, td = new Uint8Array(NT*NT*4), lin = v=>Math.round(Math.pow(v/255, 2.2)*255), tcol = (x, y)=>{ const gt = o3Ground(x, y); return wgO3Col(x, y, gt) || O3_COL[gt] || O3_COL[OW_GRASS]; };
+    for (let j=0;j<NT;j++) for (let i=0;i<NT;i++){ const x = x0 - M + i, y = y0 - M + j, t = o3Tile(x, y), k = (j*NT + i)*4; let c, a = 255;
+      if (t===OW_WATER || t===OW_RIVER){ a = 0; let r = 0, g2 = 0, b = 0, nn = 0; for (let dx=-1;dx<=1;dx++) for (let dy=-1;dy<=1;dy++){ const u = o3Tile(x+dx, y+dy); if (u===OW_WATER || u===OW_RIVER) continue; const cc = tcol(x+dx, y+dy); r += cc[0]; g2 += cc[1]; b += cc[2]; nn++; } c = nn ? [r/nn, g2/nn, b/nn] : O3_COL[OW_GRASS]; }
+      else c = tcol(x, y);
+      td[k] = lin(c[0]); td[k+1] = lin(c[1]); td[k+2] = lin(c[2]); td[k+3] = a; }
+    const tileTex = new T.DataTexture(td, NT, NT, T.RGBAFormat); tileTex.magFilter = tileTex.minFilter = T.LinearFilter; tileTex.needsUpdate = true;
+    const m = land.material, paint = gfxPaintOn(); m.userData.ownTex = [tileTex];
+    m.onBeforeCompile = sh=>{ Object.assign(sh.uniforms, { uT:U.uT, uCloudAmt:U.uCloudAmt, uDet0:{ value:tx.grass }, uDet1:{ value:tx.dirt }, uDet2:{ value:tx.rock }, uDet3:{ value:tx.sand }, uCloud:{ value:tx.cloud }, uTile:{ value:tileTex }, uTileO:{ value:new T.Vector3(x0 - M, y0 - M, NT) } });
       gfxWorldPos(sh);
-      sh.vertexShader = 'attribute vec3 blend; varying vec3 vBl;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vBl = blend;');
-      sh.fragmentShader = 'uniform float uT; uniform float uCloudAmt; uniform sampler2D uDet0; uniform sampler2D uDet1; uniform sampler2D uDet2; uniform sampler2D uCloud; varying vec3 vBl;\n' + sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
-        vec3 bw = vBl / max(0.001, vBl.x + vBl.y + vBl.z);
-        float dG = texture2D(uDet0, vGW.xz*0.8).r, dD = texture2D(uDet1, vGW.xz*0.6).r, dR = texture2D(uDet2, vec2(vGW.x*0.7 + vGW.z*0.7, vGW.y*1.8)*0.5).r;
-        diffuseColor.rgb *= 0.62 + (dG*bw.x + dD*bw.y + dR*bw.z)*0.62;
+      sh.vertexShader = 'attribute vec4 blend; attribute vec3 tcol; varying vec4 vBl; varying vec3 vTc;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vBl = blend; vTc = tcol;');
+      sh.fragmentShader = 'uniform float uT; uniform float uCloudAmt; uniform sampler2D uDet0; uniform sampler2D uDet1; uniform sampler2D uDet2; uniform sampler2D uDet3; uniform sampler2D uCloud; uniform sampler2D uTile; uniform vec3 uTileO; varying vec4 vBl; varying vec3 vTc;\n' + sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
+        vec4 bw = vBl / max(0.001, vBl.x + vBl.y + vBl.z + vBl.w);
+        float dG = texture2D(uDet0, vGW.xz*0.8).r, dD = texture2D(uDet1, vGW.xz*0.6).r, dR = texture2D(uDet2, vec2(vGW.x*0.7 + vGW.z*0.7, vGW.y*1.8)*0.5).r, dS = texture2D(uDet3, vGW.xz*1.1).r;
+        ` + (paint ? `
+        /* (RS-550) painted ground: the tile a little way off takes the place of the one under this point, so the borders wander;
+           then broad patches of drier, yellower and damper, bluer ground over the grass and soil, like a wash laid over the green */
+        vec2 wv = vec2(texture2D(uCloud, vGW.xz*0.19 + 1.7).r, texture2D(uCloud, vGW.xz*0.19 - 4.2).r) - 0.45;
+        vec4 tw = texture2D(uTile, (vGW.xz - uTileO.xy + wv*1.1)/uTileO.z);
+        vec3 kr = clamp(tw.rgb/max(vTc, vec3(0.02)), 0.45, 2.2);
+        diffuseColor.rgb *= mix(vec3(1.0), kr, tw.a*(1.0 - bw.z));
+        float m1 = texture2D(uCloud, vGW.xz*0.03 + 7.3).r, m2 = texture2D(uCloud, vGW.xz*0.1 - 3.1).r, mot = clamp(0.5 + (m1 - 0.45)*1.5 + (m2 - 0.45)*0.9, 0.0, 1.0);
+        vec3 tint = mix(vec3(0.88, 0.96, 0.96), vec3(1.1, 1.05, 0.82), mot);
+        diffuseColor.rgb *= mix(vec3(1.0), tint, bw.x*0.75 + bw.y*0.3);
+        dR *= 0.78 + 0.32*m2;` : '') + `
+        diffuseColor.rgb *= 0.58 + (dG*bw.x + dD*bw.y + dR*bw.z + dS*bw.w)*0.68;
         float cs = texture2D(uCloud, vGW.xz*0.016 + uT*vec2(0.006, 0.0025)).r;
         diffuseColor.rgb *= 1.0 - uCloudAmt*smoothstep(0.32, 0.62, cs)*0.38;`); };
-    m.customProgramCacheKey = ()=>'gfxland'; m.needsUpdate = true;
+    m.customProgramCacheKey = ()=>'gfxland' + (paint ? 'P' : ''); m.needsUpdate = true;
   }
   yield;
   // the water: waves, the sky in it, foam on the shore, rivers that run, stars on it at night
@@ -31761,7 +31798,7 @@ function* o3BuildGen(cx, cy){
     return 0.04;
   };
   // vertex grid: R per tile, heights averaged from the tiles touching each vertex, then roughened
-  const NV = W*O3_R + 1, pos = new Float32Array(NV*NV*3), col = new Float32Array(NV*NV*3), uv = new Float32Array(NV*NV*2);
+  const NV = W*O3_R + 1, pos = new Float32Array(NV*NV*3), col = new Float32Array(NV*NV*3), uv = new Float32Array(NV*NV*2), tcol = new Float32Array(NV*NV*3);   /* (RS-550: tcol, the tiles' own colour blended at the point, before the light and weather on it - the ground shader swaps it for the tile a little way off, so the borders wander) */
   const H = new Float32Array(NV*NV), beach = new Float32Array(NV*NV).fill(-1), TC = new Map();
   const tileC = (px, pz)=>{ const k2 = px*100003 + pz; let v = TC.get(k2); if (!v){ const gt = o3Ground(px,pz); v = [tileH(px,pz), gt, wgO3Col(px,pz,gt) || O3_COL[gt] || O3_COL[OW_GRASS]]; TC.set(k2, v); } return v; };
   const BLUR = [[0,0]].concat([0,1,2,3,4,5].map(k=>[Math.cos(k*Math.PI/3)*0.28, Math.sin(k*Math.PI/3)*0.28]));
@@ -31838,13 +31875,14 @@ function* o3BuildGen(cx, cy){
     if (h < -0.2){ const wet = Math.min(1, (-0.2-h)/0.3); cr *= 1-wet*0.35; cg *= 1-wet*0.3; cb *= 1-wet*0.2; }
     else if (h < 0.02 && mtn < 0.1 && beach[k] < 0){ const sand = Math.min(1, (0.02-h)/0.2) * (1-snowy); cr += (196-cr)*sand*0.6; cg += (178-cg)*sand*0.6; cb += (128-cb)*sand*0.6; }
     col[k*3] = lin(cr); col[k*3+1] = lin(cg); col[k*3+2] = lin(cb);
+    tcol[k*3] = lin(r); tcol[k*3+1] = lin(g); tcol[k*3+2] = lin(b);
     uv[k*2] = wx/3; uv[k*2+1] = wz/3;
   }}
   yield;
   const idx = [];
   for (let j=0;j<NV-1;j++) for (let i=0;i<NV-1;i++){ const a = j*NV+i, b2 = a+1, c = a+NV, d = c+1; idx.push(a,c,b2, b2,c,d); }
   const geo = new T.BufferGeometry();
-  geo.setAttribute('position', new T.BufferAttribute(pos,3)); geo.setAttribute('color', new T.BufferAttribute(col,3)); geo.setAttribute('uv', new T.BufferAttribute(uv,2));
+  geo.setAttribute('position', new T.BufferAttribute(pos,3)); geo.setAttribute('color', new T.BufferAttribute(col,3)); geo.setAttribute('uv', new T.BufferAttribute(uv,2)); geo.setAttribute('tcol', new T.BufferAttribute(tcol,3));
   geo.setIndex(idx);
   /* (RS-521) the land's normals worked out a few rows at a time - computeVertexNormals over the whole window was one 70ms
      step at a phone's pace. The same sums (each face's cross product added to its corners, then normalised), so the same light */
@@ -43058,7 +43096,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-549';
+const GAME_VERSION = 'rs-550';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

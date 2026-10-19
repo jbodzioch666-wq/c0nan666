@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-550 - Painted ground
+The first step of the overworld visual pass. Measured on an RTX 3080 Ti at 1400x900: about 6 ms of card time a frame in open grassland, within noise of the 6 to 8 ms before.
+- **Borders that wander:** where grass meets forest, sand or snow, the edge now wanders the way a painter would lay it, instead of running straight along the tile grid. The ground is painted from the tile a little way off, where the noise says.
+- **Dry and damp patches:** broad washes of drier, yellower ground and damper, bluer ground drift over the grass and soil, so a field is no longer one flat green.
+- **Sand:** beaches and desert dunes are now sand, fine-grained with faint wind ripples. They used to be painted as dirt.
+- **Worn roads:** roads are tracks worn into the ground, with ragged edges where the grass creeps in, two wheel ruts and a dusty crown between them. They were a flat tan ribbon.
+- **Low and phone:** the painted ground and worn roads are off on the Low graphics setting and the phone tier, which draw the ground as before.
+
 ## RS-549 - Jerkins, mail and cloaks that fit
 - **Jerkins, mail and tunics drape:** on a heavy build they fall from the chest over the belly to the belt, as the robe now does. They used to cling to every roll.
 - **No gaps in a woman's mail coat:** it now stands off her thighs at the front, where a thigh used to show through. The splits at the hem are now short notches instead of slots through to the leg.
