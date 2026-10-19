@@ -5,6 +5,7 @@ module.exports = async page=>{
   const seed = +(process.env.ZSEED || 12345);
   await page.evaluate(seed=>{ goToCharCreate(); ccBegin(); wgRegenerate(seed); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{}; weatherSync = ()=>{}; window.__zdgGpu = !!window.__zdgGpuWant; }, seed);
   if (process.env.ZDG_GPU) await page.evaluate(()=>{ window.__zdgGpu = true; });
+  if (process.env.ZNOCHEAP) await page.evaluate(()=>{ window.__noCheapPt = true; const C = THREE.ShaderChunk; if (C.__ptOrig) C.shadowmap_pars_fragment = C.__ptOrig; });
   if (process.env.ZDG_WAIT) await page.evaluate(w=>{ window.__zdgWait = w; }, +process.env.ZDG_WAIT);
   for (const [nm, kind, depth, dist] of sets){
     const r = await page.evaluate(async ([kind, depth, dist])=>{ G.gameMode = 0; G.ui = 'playing';

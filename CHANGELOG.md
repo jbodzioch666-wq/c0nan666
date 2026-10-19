@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-571 - Shaders load faster
+- **Cheaper torch shadows:** each shader in a dungeon carries the shadows of the nearby torches, and three.js sampled each one 9 times through a long piece of code. Every shader took half a second or more to build. A torch's shadow is now found once and sampled 5 times around that spot, which gives the same soft edge and builds in about half the time.
+- **Built side by side:** where the browser allows it, every shader a floor needs is started at once and built in the background. The loading card keeps moving and the page keeps answering while it waits. Before, they were built one after another, each freezing the page.
+- **No sun underground:** below ground the sun was set to nothing but left switched on. Its shadow was still built into every dungeon shader, and its shadow map still drawn. It's now switched off below ground and on again outside.
+- **Shadow shaders built during the load:** the shaders for the torches' shadow pass used to be built the first time those shadows were drawn, in the middle of play. They're now built with the rest.
+- **The numbers:** loading a dungeon floor from cold with a well-used save took 11.3 seconds, with frames of up to 1.5 seconds, and more shaders were still to be built during play. It now takes about 8 seconds, the longest frame is about a third of a second, and more of the shaders are built during the load. The open land and towns use the same warm-up, so they gain from the parallel start too.
+
 ## RS-570 - Trees off the stones, towns out of their pits, no skeleton stall
 - **No more stall a few seconds into play:** the game sculpts its skeleton model in the background. When no earlier session had saved it, it carved each bone in one go, and a ribcage or a pelvis held the page for half a second to two seconds. That was the freeze a few seconds after you start playing, wherever you were. The bones are now carved a few milliseconds at a time, so the game keeps moving while it finishes.
 - **Trees off the stones:** in hill towns, a stone terrace was laid under every tree near the town as well as under each building, so trees stood on paving slabs. Now only the buildings stand on terraces.

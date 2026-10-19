@@ -24240,6 +24240,13 @@ function gfxPass(r, P, mat, target){ P.quad.material = mat; r.setRenderTarget(ta
 function gfxTarget(r){ if (!gfxPostOn()) return null; try{ return gfxPost(r).scene; }catch(e){ return null; } }
 function gfxCompile(r, scene, cam){ const rt = r.getRenderTarget(), t = gfxTarget(r); if (t) r.setRenderTarget(t); try{ r.compile(scene, cam); } finally { r.setRenderTarget(rt); } }
 function gfxWarmRender(r, scene, cam){ const rt = r.getRenderTarget(), t = gfxTarget(r); if (t) r.setRenderTarget(t); try{ r.render(scene, cam); gfxWarmAo(r, scene, cam); } finally { r.setRenderTarget(rt); } }
+/* (RS-571) the shadow passes build their own materials - a torch's distance material for each kind of caster (skinned, plain,
+   instanced) - and the warm draws skipped them (the shadows only redraw on their own clock), so the first real frame of a torch's
+   shadow built them mid-play. One draw with every caster's shadow due and nothing culled builds them all with the rest */
+function gfxWarmShadows(r, scene, cam){ const sm = r.shadowMap; if (!sm || !sm.enabled) return; let any = false;
+  scene.traverse(o=>{ if (o.isLight && o.castShadow && o.shadow && o.visible){ o.shadow.needsUpdate = true; any = true; } }); if (!any) return;
+  const cull = []; scene.traverse(o=>{ if (o.castShadow && (o.isMesh || o.isPoints) && o.frustumCulled){ cull.push(o); o.frustumCulled = false; } });
+  const nu = sm.needsUpdate; sm.needsUpdate = true; try{ gfxWarmRender(r, scene, cam); }catch(e){ console.error(e); } finally { sm.needsUpdate = nu; for (const o of cull) o.frustumCulled = true; } }
 /* (RS-561) the occlusion's depth prepass draws everything again with its own material, and three builds that material once per kind
    of object (skinned, instanced, plain): warmed with the rest, or the first full sight of a floor compiled it mid-play */
 function gfxWarmAo(r, scene, cam){ if (typeof FPD==='undefined' || scene!==FPD.scene || !gfxAoOn('fpd')) return; const P = GFXP.get(r); if (!P || !P.depM || P.depTex) return;
@@ -24273,6 +24280,39 @@ function gfxPadLights(V, scene){
   while (pads.length < need){ const L = new THREE.PointLight(0xffffff, 0, 0.001, 2); L.userData.padL = 1; L.position.set(0, -60, 0); scene.add(L); pads.push(L); }
   for (let i=0;i<pads.length;i++){ pads[i].visible = i < need; if (pads[i].parent!==scene) scene.add(pads[i]); }
 }
+/* (RS-571) shaders linked in parallel, off the frame. Linking a program took 0.4 to 0.9 seconds each in a dungeon (every one carries
+   the floor's torches and their shadows), and three.js waits on each link as it makes it - one after another, the page frozen.
+   With the driver's KHR_parallel_shader_compile, every program a scene needs is started at once (three's own wait on the link is
+   switched off), the driver links them on its own threads while the frames run, and only once it says they're all done do the warm
+   draws begin - which then find them made. Without the extension, the old one-at-a-time warm stands */
+/* (RS-571) a point light's soft shadow, cheaper to build: three.js takes nine samples of its shadow, each through its own copy of
+   cubeToUV (a long run of branches), so a floor's four shadowed torches put thirty-six of them in every shader - linking one took
+   half a second. Here the spot in the shadow map is found once and five samples are taken round it in the map: the same soft edge,
+   a fifth of the code (a link of 133-515ms falls to about 200ms), and fewer lookups a pixel too */
+function gfxCheapPointShadow(){
+  const C = THREE.ShaderChunk, s = C.shadowmap_pars_fragment, a = s.indexOf('vec2 offset = vec2( - 1, 1 ) * shadowRadius * texelSize.y;'), b = s.indexOf(') * ( 1.0 / 9.0 );', a);
+  if (a < 0 || b < 0 || C.__cheapPt || window.__noCheapPt) return false;
+  C.shadowmap_pars_fragment = s.slice(0, a) + `vec2 uv = cubeToUV( bd3D, texelSize.y ), o = texelSize * shadowRadius * 1.35;
+			return ( texture2DCompare( shadowMap, uv, dp ) * 2.0 +
+				texture2DCompare( shadowMap, uv + vec2( o.x, o.y*0.4 ), dp ) + texture2DCompare( shadowMap, uv - vec2( o.x, o.y*0.4 ), dp ) +
+				texture2DCompare( shadowMap, uv + vec2( -o.x*0.4, o.y ), dp ) + texture2DCompare( shadowMap, uv + vec2( o.x*0.4, -o.y ), dp )
+			` + s.slice(b).replace(') * ( 1.0 / 9.0 );', ') * ( 1.0 / 6.0 );');
+  C.__ptOrig = s; C.__cheapPt = true; return true;
+}
+function gfxPscExt(r){ if (r.__pscExt===undefined){ let e = null; try{ e = r.getContext().getExtension('KHR_parallel_shader_compile'); }catch(err){} r.__pscExt = e; } return r.__pscExt; }
+function gfxPrelink(V, r, scene, cam){
+  const ext = gfxPscExt(r); if (!ext || window.__noPrelink) return false;
+  r.debug.checkShaderErrors = false;
+  const before = new Set(r.info.programs), rt = r.getRenderTarget(); let t = null; try{ t = gfxTarget(r); }catch(e){}
+  if (t) r.setRenderTarget(t); try{ r.compile(scene, cam); }catch(e){ console.error(e); } finally { r.setRenderTarget(rt); }
+  const progs = r.info.programs.filter(p=>!before.has(p)); if (!progs.length) return false;
+  V.prelink = { r, ext, progs, t0:performance.now() }; return true;
+}
+function gfxPrelinkDone(V){
+  const P = V.prelink; if (!P) return true; const gl = P.r.getContext();
+  let done = true; for (const p of P.progs){ if (!p.program || !gl.getProgramParameter(p.program, P.ext.COMPLETION_STATUS_KHR)){ done = false; break; } }
+  if (done || performance.now() - P.t0 > 30000){ V.prelink = null; return true; } return false;
+}
 function gfxCompileSliced(V, r, scene, cam, grp, live){
   if (V.warmWait) gfxWarmFlush(V);   /* (a newer build arrived mid-warm: show what the old one still hid, and let it queue afresh) */
   /* the real scene, the real camera, the real target - anything else and the driver builds different shader variants, and the
@@ -24282,6 +24322,7 @@ function gfxCompileSliced(V, r, scene, cam, grp, live){
   const put = m=>{ if (m && !seen.has(m) && mats.indexOf(m) < 0) mats.push(m); };
   scene.traverse(o=>{ if ((o.isMesh || o.isPoints || o.isLine || o.isSprite) && o.material){ objs.push([o, o.frustumCulled]); o.frustumCulled = false; const m = o.material; if (Array.isArray(m)) m.forEach(put); else put(m); } });
   if (!mats.length){ for (const [o, fc] of objs) o.frustumCulled = fc; if (grp) scene.remove(grp); return; }   /* (RS-502: the next floor down reuses the last one's shaders - no warm pause at all) */
+  try{ gfxPrelink(V, r, scene, cam); }catch(e){ console.error(e); }   /* (RS-571: every program started at once, linked off the frame) */
   for (const m of mats){ m.__warmVis = m.visible; m.visible = false; }
   V.warmWait = { r, scene, cam, grp, mats, objs, i:0, live:!!live }; V.warmNeeded = true;
   if (!live && mats.length > 8) gfxWarmCard();   /* (the first slice waits for the next frame, so the build's own task ends here; RS-562: a handful of materials warms in one step - the card used to flash on every door opened) */
@@ -24294,6 +24335,7 @@ function gfxWarmFlush(V){
 }
 function gfxWarmStep(V){
   const W = V.warmWait; if (!W) return false;
+  if (V.prelink && !gfxPrelinkDone(V)){ if (!W.live) gfxWarmCard(); return !W.live; }   /* (RS-571: the driver is still linking - the card stays up and animates, the page answers) */
   const t0 = performance.now(), seen = gfxWarmSeen(W.r), budget = W.live ? 10 : 120;   /* (RS-503: a live warm sips - never a hitch, never the card; what it still hides pops in a few frames later, far off at the window's edge) */
   /* (RS-505) each warm draw shows only this batch: what earlier batches warmed is hidden for the draw, so a draw costs its new shaders
      and nothing else - drawing the whole land once per material dragged a slow device's warm-up on for many seconds into your walk */
@@ -24308,6 +24350,7 @@ function gfxWarmStep(V){
     if (performance.now() - t0 > budget) break;
   }
   if (W.i < W.mats.length){ if (!W.live) gfxWarmCard(); return !W.live; }
+  gfxWarmShadows(W.r, W.scene, W.cam);   /* (RS-571) */
   for (const [o, fc] of W.objs) o.frustumCulled = fc;
   V.warmWait = null;
   if (W.grp) W.scene.remove(W.grp);
@@ -31784,6 +31827,7 @@ function v3SunFollow(){
 function v3Init(){
   if (V3.ok!==null) return V3.ok;
   if (typeof THREE==='undefined') return false;
+  try{ gfxCheapPointShadow(); }catch(e){}   /* (RS-571: before any shader is built) */
   try{
     const T = THREE, wrap = document.querySelector('.mapwrap');
     const cv = document.createElement('canvas'); cv.id = 'villageGL'; cv.style.cssText = 'position:absolute;display:none;touch-action:none;';
@@ -33360,6 +33404,7 @@ function o3BuildBoat(){
 function o3Init(){
   if (O3.ok!==null) return O3.ok;
   if (typeof THREE==='undefined') return false;
+  try{ gfxCheapPointShadow(); }catch(e){}   /* (RS-571: before any shader is built) */
   try{
     const T = THREE, wrap = document.querySelector('.mapwrap');
     const cv = document.createElement('canvas'); cv.id = 'worldGL'; cv.style.cssText = 'position:absolute;display:none;touch-action:none;';
@@ -34464,6 +34509,7 @@ function fpdInit(){
   if (FPD.ok!==null) return FPD.ok;
   FPD.ok = false;
   if (typeof THREE==='undefined' || window.__noFpd) return false;
+  try{ gfxCheapPointShadow(); }catch(e){}   /* (RS-571) */
   try{
     const T = THREE, cv = document.createElement('canvas');
     /* (RS-396) shown on the page itself, under the 2D canvas the overlay is drawn on - it used to be copied onto that canvas
@@ -34799,6 +34845,7 @@ function fpdBuild(T){
   const bucket = (k)=> B[k] || (B[k] = { pos:[], nor:[], uv:[], col:[], idx:[] });
   // indoors the map's edge is solid rock; out of doors it's open ground running off to the horizon
   const out = T.outdoor, yard = !!(T.yard && G.gameMode===1), field = G.gameMode===2 && !G.cellar;   /* (RS-164: the inn's cellar has real walls) */
+  if (FPD.sun) FPD.sun.visible = !!out;   /* (RS-571: set before the warm-up, so its shaders are built for the lights the floor really has) */
   /* (RS-567) a siege at the real town: the town's own scene is the ground, the buildings and the walls - the stone builds none */
   const S = field && G.siegeWar; if (S && S.town && (!SIEGE_TOWN || SIEGE_TOWN.id!==S.id)) try{ siegeTownStage(S); }catch(e){ console.error(e); }
   const town = S && SIEGE_TOWN && SIEGE_TOWN.id===S.id && COLS===SIEGE_TOWN.tw ? SIEGE_TOWN : null; FPD.town = town;
@@ -35371,7 +35418,7 @@ function fpdRender(env, T, camZ){
     const night = !!env.night, avg = (a[0]+a[1]+a[2])/3, dim = wx==='storm' ? 0.35 : wx==='fog' ? 0.5 : wx==='rain' ? 0.6 : 1;
     const dir = night ? [Math.cos(FP_MOON_AZ), 0.55, Math.sin(FP_MOON_AZ)] : [0.55, 0.8, 0.35];
     const sc = FPD.sunCentre || [COLS/2, ROWS/2];
-    FPD.sun.position.set(sc[0] + dir[0]*40, dir[1]*40, sc[1] + dir[2]*40); FPD.sun.target.position.set(sc[0], 0, sc[1]); FPD.sun.target.updateMatrixWorld();
+    FPD.sun.visible = true; FPD.sun.position.set(sc[0] + dir[0]*40, dir[1]*40, sc[1] + dir[2]*40); FPD.sun.target.position.set(sc[0], 0, sc[1]); FPD.sun.target.updateMatrixWorld();
     FPD.sun.color.setHex(night ? 0x9fb6e6 : 0xfff0d6); FPD.sun.intensity = (night ? 0.55 : 0.95)*Math.min(1, avg*1.4)*dim + (night ? 0.08 : 0);
     FPD.hemi.color.setRGB(s0[0]/255, s0[1]/255, s0[2]/255).convertSRGBToLinear().lerp(new THREE.Color(1,1,1), 0.35);
     FPD.hemi.groundColor.setHex(night ? 0x1a1c24 : 0x5a5040); FPD.hemi.intensity = avg*(night ? 1.6 : 0.8);
@@ -35390,6 +35437,7 @@ function fpdRender(env, T, camZ){
     /* (RS-323) every other light down here - crystals, lava, braziers, glows - reaches the same share less far */
     if (FPD.world && FPD.dimFor!==FPD.world){ FPD.dimFor = FPD.world; FPD.world.traverse(o=>{ if (o.isPointLight || o.isSpotLight){ if (o.userData.d0===undefined) o.userData.d0 = o.distance; o.distance = o.userData.d0*DG_LIGHT; } }); }
     FPD.sun.intensity = 0; FPD.hemi.intensity = 0; FPD.moon.visible = false;
+    FPD.sun.visible = false;   /* (RS-571: below ground the sun is off altogether - left on at nothing, its shadow was built into every shader down here, and its map drawn) */
   }
   // the nearest torches get the real lights; the chosen set only changes as you move
   const fl = (FP.flames||[]).map((f,i)=>({ f, i, d:Math.hypot(f.x-c.x, f.y-c.y) })).filter(o=>o.d<11).sort((p,q)=>p.d-q.d).slice(0, FPD.MAXT);
@@ -41698,6 +41746,7 @@ function fpwTex(w, h, fn){
 function fpwInit(){
   if (FPW.ok!==null) return FPW.ok;
   if (typeof THREE==='undefined') return false;
+  try{ gfxCheapPointShadow(); }catch(e){}   /* (RS-571: before any shader is built) */
   try{
     const T = THREE;
     FPW.cv = document.createElement('canvas');
@@ -42083,7 +42132,7 @@ function fpdWarm(){
   /* (RS-502) this one call compiled the whole floor's shaders in one blocking sweep - asking each new program for its uniforms
      waits out its link, 10s on the audit machine - and it ran BEFORE the sliced compile, which then found nothing left to do.
      The floor, and this group of stand-ins with it, now goes through the sliced warm-up instead (gfxCompileScene, just after) */
-  if (window.__noWarmSlice) try{ gfxCompile(FPD.r, FPD.scene, FPD.cam); }catch(e){ console.error(e); }
+  if (window.__noWarmSlice) try{ gfxCompile(FPD.r, FPD.scene, FPD.cam); gfxWarmShadows(FPD.r, FPD.scene, FPD.cam); }catch(e){ console.error(e); }
   if (FPD.warmGrp) fpdWarmDone();
   FPD.warmGrp = { grp, mons, fc };
   FPD.warmN = kinds.size + mons.length;
@@ -43589,7 +43638,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-570';
+const GAME_VERSION = 'rs-571';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

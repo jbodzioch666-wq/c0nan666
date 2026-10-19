@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs571 | shaders load faster: a point shadow takes 5 samples round one cubeToUV (was 9 cubeToUVs), every program started at once and linked off the frame (KHR_parallel_shader_compile), no sun below ground |
 | rs570 | the skeleton sculpted a few ms a tick with the cache cold (no long stall); hill towns terrace only their buildings, not trees; no woodcutting trees against a town; roads stop at its edge; its pad level with the ground round it |
 | rs569 | a sunken temple is laid out as the plain dungeons are: whole rooms and one-tile passages, no loose columns, doorways, all reachable; the sanctum keeps its drowned idol and pools |
 | rs568 | the catacombs under a graveyard are laid out as the plain dungeons are: whole burial chambers and one-tile passages, no pillars, doorways, all reachable, still niche-walled with bones and candles |
@@ -392,6 +393,8 @@ Screenshots go to `tools/tests/shots/`.
 | zsiege | a siege at the spawn town (or, with `ZCITY=1`, a stone-walled city): the field before its gate, then its streets and square; `ZRAID=1` starts a raid |
 | zdgwalk | walks every room of a dungeon floor with a save (`ZSAVE`, `ZDEPTH`) at the real frame rate: frame-time spread, the slow frames, the shaders the warm-up links and how long each took, the scene's lights, and a CPU profile of the slow frames |
 | zherb | picks the last of a cave herb patch on a dungeon floor (with `ZSAVE`, a real save): every frame, gather tick and save timed around it |
+| zdgload | how long a dungeon floor takes to come up from a fresh page (with `ZSAVE`): load to the end of the shader warm-up, the longest frames, the programs built; `ZNOPRE=1` turns off the parallel link to compare |
+| zlink | how long one standard material takes to link against a set of lights (point lights, how many shadowed, the shadow filter) |
 | zhair | heads with each hairstyle from four sides, and under helmets |
 | zplate | plate armour on builds from slight to heavy |
 | zunder | the creator's undressed figures by race and sex |
