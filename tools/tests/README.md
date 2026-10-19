@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs557 | Dungeon ambient occlusion: a half-size depth prepass, twelve-tap occlusion, blurred and multiplied in before the bloom; high setting only |
 | rs556 | Dungeon fog and dust: floor mist in caves and crypts, dust that burns in torchlight, a haze of light round each torch |
 | rs555 | Butterflies over the flower fields by day and fireflies by night, each one instanced mesh flown on the card |
 | rs554 | Painterly grade: golden fields, blue-green woods, a sickly swamp; a painted haze on the distant land; light shafts in a foggy morning |

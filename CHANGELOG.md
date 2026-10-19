@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-557 - Shadows in the corners
+The second step of the dungeon visual pass: ambient occlusion below ground. Measured in a crypt and a dungeon on the RTX 3080 Ti at 1400x900, the whole frame stays between 1 and 2 ms of card time with it on; the pass itself is well under a millisecond.
+- **Contact shadows:** the picture now darkens where surfaces meet: the foot of every wall, the edges of the stairs and plinths, under rubble, barrels and bones, and under your own feet and every creature's. Rooms read as solid stone instead of flat painted faces.
+- **How:** a screen-space occlusion pass. The scene's depth is drawn again at half size (the walls cut away round you are cut away here too), each pixel is compared with twelve neighbours around it, the result is blurred and multiplied into the picture before the bloom.
+- **High setting only:** it runs in dungeons on the High graphics setting on computers. Medium, Low and the phone tier draw as before.
+
 ## RS-556 - Fog and dust below ground
 The first step of the dungeon visual pass. Card time in the catacombs about 1.5 to 1.8 ms a frame, the same as before.
 - **Mist on the floor:** a thin mist hugs the floor of the catacombs, mines, dragon lairs, sunken temples and necromancers' towers, turning slowly in the open rooms. Grey-blue in a crypt, warm dust in a mine, green in a temple. Plain dungeons and castles are dry stone and have none.
