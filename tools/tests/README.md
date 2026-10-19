@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs572 | a floor loads without long freezes: the parallel link returns at once and draws the same pixels, creatures sculpted a slice a frame behind the card, the chart painted a few ms a step (same picture) |
 | rs571 | shaders load faster: a point shadow takes 5 samples round one cubeToUV (was 9 cubeToUVs), every program started at once and linked off the frame (KHR_parallel_shader_compile), no sun below ground |
 | rs570 | the skeleton sculpted a few ms a tick with the cache cold (no long stall); hill towns terrace only their buildings, not trees; no woodcutting trees against a town; roads stop at its edge; its pad level with the ground round it |
 | rs569 | a sunken temple is laid out as the plain dungeons are: whole rooms and one-tile passages, no loose columns, doorways, all reachable; the sanctum keeps its drowned idol and pools |
@@ -382,6 +383,8 @@ Screenshots go to `tools/tests/shots/`.
 
 ## Probes (not in `ALL`)
 
+`persist.js` runs a probe in two separate browser launches that share one kept profile, to see what the browser keeps on disk between days (`node tools/tests/persist.js zdgload <profileDir>`).
+
 `t_z*.js` files are hand-run probes for screenshots and measurements. They are not part of the suite and don't assert. Run them by name, e.g. `node tools/tests/run.js --headed zow`. Shots go to `tools/tests/shots/`.
 
 | probe | what it does |
@@ -395,6 +398,10 @@ Screenshots go to `tools/tests/shots/`.
 | zherb | picks the last of a cave herb patch on a dungeon floor (with `ZSAVE`, a real save): every frame, gather tick and save timed around it |
 | zdgload | how long a dungeon floor takes to come up from a fresh page (with `ZSAVE`): load to the end of the shader warm-up, the longest frames, the programs built; `ZNOPRE=1` turns off the parallel link to compare |
 | zlink | how long one standard material takes to link against a set of lights (point lights, how many shadowed, the shadow filter) |
+| zdgcache | t_zdgload twice in one browser, the page reloaded between: what the browser's own shader cache saves a second visit |
+| zland | the open land from a fresh page with a save (`ZSAVE`): load to the end of its warm-up, the longest frames |
+| zpre | whether gfxPrelink returns at once: its call timed against the wait for the driver, on fresh heavy materials |
+| zviews | the open land and a town drawn through the players' warm-up path (sliced, parallel link): screenshots |
 | zhair | heads with each hairstyle from four sides, and under helmets |
 | zplate | plate armour on builds from slight to heavy |
 | zunder | the creator's undressed figures by race and sex |

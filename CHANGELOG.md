@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-572 - No more freeze going down
+- **Shaders really built side by side now:** RS-571 meant to start all of a floor's shaders at once and let the browser build them in the background. But three.js waited on each shader as it started it, so they were still built one after another, and on the way down from the open land that froze the game for 8 to 10 seconds in one go. That wait is now skipped. Each shader picks up its settings once the browser has finished building it, and draws exactly as before.
+- **Creatures sculpted a piece at a time:** a floor's creatures used to be sculpted all at once, holding the page still for one to two seconds. They're now sculpted a little each frame behind the loading card, which keeps moving.
+- **The world map no longer gets in the way:** the world map chart is painted in the background soon after you reach the open land, so it opens instantly. It used to be one half-second job, and it often landed right as you went down into a dungeon. It's now painted a few milliseconds at a time.
+- **The numbers:** on a fresh browser with a well-used save, going down into a dungeon from the open land took 9 to 11 seconds, most of it one frozen frame of 8 to 10 seconds. It now takes about 7 to 8 seconds, with no frame over about 1.4 seconds. Starting the game on the open land went from about 16 seconds to 11 to 12, its worst frame from 1.3 seconds to under 1.
+- **The browser keeps what it built:** on later visits the browser's own cache keeps the built shaders, so a dungeon floor comes up in about 3 seconds. The full build only happens the first time, or after an update that changes how things are drawn.
+
 ## RS-571 - Shaders load faster
 - **Cheaper torch shadows:** each shader in a dungeon carries the shadows of the nearby torches, and three.js sampled each one 9 times through a long piece of code. Every shader took half a second or more to build. A torch's shadow is now found once and sampled 5 times around that spot, which gives the same soft edge and builds in about half the time.
 - **Built side by side:** where the browser allows it, every shader a floor needs is started at once and built in the background. The loading card keeps moving and the page keeps answering while it waits. Before, they were built one after another, each freezing the page.
