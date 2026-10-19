@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-553 - Wind you can see
+The fourth step of the overworld visual pass. No change in card time: the wind is three numbers sent to shaders that already ran.
+- **Plants lean with the wind:** grass, flowers, leaves and reeds now lean the way the wind blows and bend further in the gusts. It's the same wind that pulls at cloaks, drives the cloud shadows and carries fallen leaves, so the whole land moves together. Every plant used to swing on its own fixed rhythm in no particular direction.
+- **Waves across the grass:** gusts roll across a field in the wind's direction, the way wind does over long grass.
+- **Storms:** in a storm the plants are bent hard over; in a calm they barely stir.
+- **Fallen leaves** in autumn woods are carried downwind as they fall.
+
 ## RS-552 - Water that glints
 The third step of the overworld visual pass. Card time unchanged within noise (the glints are a few arithmetic lines; the pads and reeds are instanced).
 - **Sun glints:** small points of sunlight wink on the water's ripples, each in its own time. A real reflection of the land would need a second drawing of the whole scene each frame, so the water keeps its sky reflection and gets these sparkles instead.

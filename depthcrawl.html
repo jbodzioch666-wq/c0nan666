@@ -23977,7 +23977,7 @@ if (typeof document!=='undefined') for (const ev of ['pointerdown', 'keydown']) 
 // the swamps and at dawn, shafts of light through the woods at sunrise and
 // sunset, blue moonlight - and in the dungeons, light falling through the
 // cracks.
-const GFX = { u:{ uT:{ value:0 }, uWind:{ value:1 }, uCloudAmt:{ value:0.5 }, uCloudOff:{ value:null }, uCloudK:{ value:0.38 }, uNight:{ value:0 }, uSky:{ value:null } }, grade:{}, tex:null };   /* (RS-551: uCloudOff, where the clouds have drifted to on the wind; uCloudK, how dark their shadow) */
+const GFX = { u:{ uT:{ value:0 }, uWind:{ value:1 }, uCloudAmt:{ value:0.5 }, uCloudOff:{ value:null }, uCloudK:{ value:0.38 }, uWindV:{ value:null }, uNight:{ value:0 }, uSky:{ value:null } }, grade:{}, tex:null };   /* (RS-553: uWindV, the wind as it blows - its direction and, in z, its strength with the gusts) */   /* (RS-551: uCloudOff, where the clouds have drifted to on the wind; uCloudK, how dark their shadow) */
 // ---- the post-process: bloom, the region's grade and a soft vignette ----
 const GFXP = new Map();
 const GFX_GRADES = {
@@ -24248,15 +24248,21 @@ function gfxCloudOnSway(sh){ gfxCloudUniforms(sh);
   sh.fragmentShader = GFX_CLOUD_DECL + 'varying vec3 vGW;\n' + sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n' + GFX_CLOUD_GLSL + '\n        diffuseColor.rgb *= cshade;'); }
 function gfxCloudDrift(dt){ const U = GFX.u, off = U.uCloudOff.value || (U.uCloudOff.value = new THREE.Vector2(0.37, 0.11)); let w = null; try{ w = m3dClothWind(U.uT.value); }catch(e){}
   const wx = w ? w[0] : 0.2, wz = w ? w[1] : 0.1, s = Math.hypot(wx, wz) || 1, k = 0.0022 + Math.min(1.6, s)*0.0065;   /* (a breath of drift even in a calm, racing in a storm) */
-  off.x += wx/s*k*dt; off.y += wz/s*k*dt; }
+  off.x += wx/s*k*dt; off.y += wz/s*k*dt;
+  const wv = U.uWindV.value || (U.uWindV.value = new THREE.Vector3(0.6, 0.8, 0.2)); wv.x += (wx/s - wv.x)*Math.min(1, dt*2); wv.y += (wz/s - wv.y)*Math.min(1, dt*2); wv.z += (Math.min(2.2, s) - wv.z)*Math.min(1, dt*3); }   /* (RS-553: the wind for the plants, eased so a gust swells and dies rather than snapping) */
 // trees, bushes and grass sway in the wind
+/* (RS-553) in the wind as it blows: each plant leans downwind by the gust (the same wind that takes the cloaks, the clouds and the
+   fallen leaves - m3dClothWind), with waves of it rolling across the grass in the wind's direction, and its own flutter on top.
+   Before, every plant swung on a fixed rhythm of its own, in no direction at all */
 function gfxSway(mat, amt){
-  mat.onBeforeCompile = sh=>{ sh.uniforms.uT = GFX.u.uT; sh.uniforms.uWind = GFX.u.uWind;
-    sh.vertexShader = 'uniform float uT; uniform float uWind;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
-      vec4 gip = instanceMatrix*vec4(0.0,0.0,0.0,1.0); float gsw = max(0.0, position.y)*${amt.toFixed(3)}*uWind;
-      transformed.x += sin(uT*1.6 + gip.x*0.7 + gip.z*0.4)*gsw; transformed.z += cos(uT*1.25 + gip.x*0.4 - gip.z*0.6)*gsw*0.6;`);
+  mat.onBeforeCompile = sh=>{ sh.uniforms.uT = GFX.u.uT; sh.uniforms.uWind = GFX.u.uWind; sh.uniforms.uWindV = GFX.u.uWindV;
+    sh.vertexShader = 'uniform float uT; uniform float uWind; uniform vec3 uWindV;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+      vec4 gip = instanceMatrix*vec4(0.0,0.0,0.0,1.0); float hy = max(0.0, position.y), gsw = hy*${amt.toFixed(3)}*uWind;
+      float along = dot(gip.xz, uWindV.xy), wave = 0.55 + 0.45*sin(uT*2.1 - along*1.1 + gip.x*0.13), lean = hy*${amt.toFixed(3)}*(0.35 + uWindV.z*1.9)*wave;
+      transformed.xz += uWindV.xy*lean;
+      transformed.x += sin(uT*1.6 + gip.x*0.7 + gip.z*0.4)*gsw*0.6; transformed.z += cos(uT*1.25 + gip.x*0.4 - gip.z*0.6)*gsw*0.4;`);
     gfxCloudOnSway(sh); };   /* (RS-551: and the clouds' shadows fall on it) */
-  mat.customProgramCacheKey = ()=>'gfxsway'+amt+'c';
+  mat.customProgramCacheKey = ()=>'gfxsway'+amt+'w';
 }
 // the new kinds of tree, and the season on them (called from o3Vegetation)
 function gfxParts(PARTS, T){
@@ -24508,7 +24514,7 @@ function gfxO3Tick(dt, pp){
     if (!GFX.leafMat) GFX.leafMat = [0xd8742a, 0xc8402a, 0xe0b030].map(c=>new T.SpriteMaterial({ map:v3Blob('rgba(255,255,255,1)'), color:c, transparent:true, depthWrite:false }));
     if (GFX.leaves.length < 40 && Math.random() < dt*12){ const sp = new T.Sprite(GFX.leafMat[(Math.random()*3)|0]); sp.scale.set(0.07, 0.05, 1); sp.position.set(pp.x + (Math.random()-0.5)*9, pp.y + 2.5 + Math.random(), pp.z + (Math.random()-0.5)*9); O3.world.add(sp); GFX.leaves.push({ sp, ph:Math.random()*6, v:0.35 + Math.random()*0.25 }); }
   }
-  for (let i=GFX.leaves.length-1; i>=0; i--){ const l = GFX.leaves[i]; l.sp.position.y -= l.v*dt; l.sp.position.x += Math.sin(U.uT.value*2 + l.ph)*dt*0.4*U.uWind.value; l.sp.position.z += Math.cos(U.uT.value*1.6 + l.ph)*dt*0.25;
+  for (let i=GFX.leaves.length-1; i>=0; i--){ const l = GFX.leaves[i]; l.sp.position.y -= l.v*dt; l.sp.position.x += Math.sin(U.uT.value*2 + l.ph)*dt*0.4*U.uWind.value + (U.uWindV.value ? U.uWindV.value.x*U.uWindV.value.z*dt*0.5 : 0); l.sp.position.z += Math.cos(U.uT.value*1.6 + l.ph)*dt*0.25 + (U.uWindV.value ? U.uWindV.value.y*U.uWindV.value.z*dt*0.5 : 0);   /* (RS-553: and carried downwind) */
     if (l.sp.position.y < O3.heightAt(l.sp.position.x, l.sp.position.z)){ O3.world.remove(l.sp); GFX.leaves.splice(i, 1); } }
 }
 // ---- in the dungeons: thick dust in the mines (after fpdBuild) ----
@@ -43148,7 +43154,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-552';
+const GAME_VERSION = 'rs-553';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
