@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs565 | Rivers run downstream: each river tile knows its flow (walked back from the sea), and the ripples stream that way |
 | rs564 | A tap on a phone leaves no hover box (the made-up mouse move no longer sets the hover spot) |
 | rs563 | The phone tier draws less: 3D pixel density capped at 1.75, your own figure sculpted on a coarser grid |
 | rs561 | Living details below ground: cobwebs that tremble, chains that swing, rats that scatter, water dripping from the ceiling |
@@ -373,3 +374,18 @@ Screenshots go to `tools/tests/shots/`.
 | noscrolls | the old spell scrolls are gone: never stocked or dropped, and old saves cash them in for gold |
 | utilspell | utility spells are apart from combat spells, with their own pick and an auto-utility toggle that opens fights with them |
 | crafthave | every crafting screen colours ingredients (green have, red short) and shows how many you can make |
+
+## Probes (not in `ALL`)
+
+`t_z*.js` files are hand-run probes for screenshots and measurements. They are not part of the suite and don't assert. Run them by name, e.g. `node tools/tests/run.js --headed zow`. Shots go to `tools/tests/shots/`.
+
+| probe | what it does |
+|---|---|
+| zdg | a site of a named kind on a fixed seed (`ZDG='[["name","kind",depth,dist],...]'`); `ZDG_GPU=1` prints GPU ms |
+| zdgroom | the dungeon camera over a room of a named purpose |
+| zow | the open land at named kinds of place, hours and weather (`ZOW='[["name","kind",clockFrac,"weather",dist],...]'`); `ZOW_GPU=1` prints GPU ms |
+| zhair | heads with each hairstyle from four sides, and under helmets |
+| zplate | plate armour on builds from slight to heavy |
+| zunder | the creator's undressed figures by race and sex |
+| zphone | a save (`ZSAVE=path`) on an emulated phone with the CPU slowed 4x: frame times and a CPU profile |
+| zphone2 | a save (`ZSAVE=path`) on an emulated phone: draw calls, triangles, shadow casters, GPU ms |

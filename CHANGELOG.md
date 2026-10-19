@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-565 - Rivers that flow
+- **Rivers run downstream:** a river's ripples used to drift the same way everywhere, whichever way the river ran. Now each river knows its course. Its ripples are drawn as long streaks along the channel and move with the current, down to the sea or the lake it drains into. A river with no water in sight runs down from the mountains it rises in.
+- **Tavern windows test:** the check that a tavern's windows stay dark at night was out of date, since the window light is always built and only dimmed. It now counts the lit windows, and checks that daylight comes through them by day.
+- **Tidier test folder:** the screenshot and measuring probes are listed in the tests' readme, and a leftover scratch probe is gone.
+
 ## RS-564 - No wandering box on phones
 - **The yellow box stays put:** on a phone, every tap also makes the browser send a pretend mouse move to where your finger was. In the dungeon the game treated that as a mouse resting there and kept drawing the yellow hover box under that point of the screen, so as you walked and the view slid along, the box crawled across the floor. A tap no longer sets the hover spot, so no box is left behind. With a real mouse, hovering works as before.
 - The same goes for the hover highlight on the open land and in towns.

@@ -24525,7 +24525,28 @@ function* gfxO3BuildGen(grp, x0, y0, W, M){   /* (RS-403: a step at a time - see
     const N = W + 2*M, data = new Uint8Array(N*N*4), ox = x0 - M, oy = y0 - M;
     for (let j=0;j<N;j++) for (let i=0;i<N;i++){ const x = ox + i, y = oy + j, t = o3Tile(x, y), k = (j*N + i)*4;
       if (t===OW_WATER){ let land = 0; for (const [a,b] of [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,-1],[1,-1],[-1,1]]){ const u = o3Tile(x+a, y+b); if (u!==OW_WATER && u!==OW_RIVER) land++; } data[k] = Math.min(255, land*70); }
-      if (t===OW_RIVER) data[k+1] = 255; data[k+3] = 255; }
+      if (t===OW_RIVER) data[k+1] = 255; data[k+2] = 128; data[k+3] = 128; }
+    /* (RS-565) which way each river runs: walked back from the sea and the lakes up every river, so each river tile knows the way down -
+       its next tile toward the water it drains into - and the flow is that way, kept in the foam texture's blue and alpha (128 = still).
+       A stretch with no sea or lake in reach runs down from the mountains it rises in, away from them */
+    { const dist = new Int32Array(N*N).fill(-1), q = [], at = (i, j)=>j*N + i, R8 = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];   /* (rivers join corner to corner too) */
+      for (let j=0;j<N;j++) for (let i=0;i<N;i++){ if (o3Tile(ox + i, oy + j)!==OW_WATER) continue; for (const [a, b] of R8){ const ii = i + a, jj = j + b; if (ii>=0 && jj>=0 && ii<N && jj<N && o3Tile(ox + ii, oy + jj)===OW_RIVER){ dist[at(i, j)] = 0; q.push(i, j); break; } } }
+      const walk = h0=>{ for (let h=h0; h<q.length; h+=2){ const i = q[h], j = q[h+1], d = dist[at(i, j)];
+        for (const [a, b] of R8){ const ii = i + a, jj = j + b; if (ii<0 || jj<0 || ii>=N || jj>=N || dist[at(ii, jj)] >= 0 || o3Tile(ox + ii, oy + jj)!==OW_RIVER) continue; dist[at(ii, jj)] = d + 1; q.push(ii, jj); } } };
+      walk(0);
+      /* a stretch whose sea lies beyond the land built round you drains toward the edge of it, where it runs on to that sea */
+      { const h0 = q.length; for (let j=0;j<N;j++) for (let i=0;i<N;i++){ if ((i && j && i < N-1 && j < N-1) || dist[at(i, j)] >= 0 || o3Tile(ox + i, oy + j)!==OW_RIVER) continue; dist[at(i, j)] = 0; q.push(i, j); } walk(h0); }
+      const up = new Int32Array(N*N).fill(-1), uq = [], free = (i, j)=>i>=0 && j>=0 && i<N && j<N && dist[at(i, j)] < 0 && o3Tile(ox + i, oy + j)===OW_RIVER;
+      const uwalk = h0=>{ for (let h=h0; h<uq.length; h+=2){ const i = uq[h], j = uq[h+1], d = up[at(i, j)]; for (const [a, b] of R8){ const ii = i + a, jj = j + b; if (!free(ii, jj) || up[at(ii, jj)] >= 0) continue; up[at(ii, jj)] = d + 1; uq.push(ii, jj); } } };
+      const seed = (i, j)=>{ const h0 = uq.length; up[at(i, j)] = 0; uq.push(i, j); return h0; };
+      for (let j=0;j<N;j++) for (let i=0;i<N;i++) if (free(i, j) && R8.some(([a, b])=>o3Tile(ox + i + a, oy + j + b)===OW_MOUNTAIN)){ up[at(i, j)] = 0; uq.push(i, j); }
+      uwalk(0);
+      for (const ends of [true, false]) for (let j=0;j<N;j++) for (let i=0;i<N;i++){ if (!free(i, j) || up[at(i, j)] >= 0) continue; if (ends && R8.filter(([a, b])=>free(i + a, j + b)).length > 1) continue; uwalk(seed(i, j)); }   /* (else from one end of it) */
+      for (let j=0;j<N;j++) for (let i=0;i<N;i++){ if (o3Tile(ox + i, oy + j)!==OW_RIVER) continue; const d = dist[at(i, j)]; let fx = 0, fz = 0;
+        if (d > 0){ for (const [a, b] of R8){ const ii = i + a, jj = j + b; if (ii<0 || jj<0 || ii>=N || jj>=N) continue; const t2 = o3Tile(ox + ii, oy + jj), d2 = dist[at(ii, jj)]; if ((t2===OW_RIVER || t2===OW_WATER) && d2 >= 0 && d2 < d){ fx += a; fz += b; } } }
+        else if (d < 0){ const u = up[at(i, j)]; for (const [a, b] of R8) if (free(i + a, j + b)){ const w = up[at(i + a, j + b)] - u; fx += a*w; fz += b*w; } if (!fx && !fz) fx = 1; }
+        else { for (const [a, b] of R8) if (o3Tile(ox + i + a, oy + j + b)===OW_WATER){ fx += a; fz += b; } if (!fx && !fz){ fx = i===0 ? -1 : i===N-1 ? 1 : 0; fz = !fx ? (j===0 ? -1 : 1) : 0; } }   /* (at the sea, into it; at the window's edge, out over it) */
+        const L = Math.hypot(fx, fz) || 1, k = at(i, j)*4; data[k+2] = Math.round(128 + fx/L*120); data[k+3] = Math.round(128 + fz/L*120); } }
     const foam = new T.DataTexture(data, N, N, T.RGBAFormat); foam.magFilter = foam.minFilter = T.LinearFilter; foam.needsUpdate = true;
     water.geometry.dispose(); water.geometry = new T.PlaneGeometry(N, N, N, N);
     const m = water.material; m.userData.ownTex = [foam];   /* (RS-414: freed with the land - see o3DisposeWorld) */
@@ -24543,7 +24564,10 @@ function* gfxO3BuildGen(grp, x0, y0, W, M){   /* (RS-403: a step at a time - see
         gl_FragColor.rgb = mix(gl_FragColor.rgb, uSky, clamp(fr*0.9 + 0.1, 0.0, 0.6));
         vec4 fo = texture2D(uFoam, (vGW.xz - uFoamO.xy)/uFoamO.zw);
         float nz = texture2D(uCloud, vGW.xz*1.1 + vec2(uT*0.05, uT*0.03)).r;
-        float run = fo.g*smoothstep(0.5, 0.8, texture2D(uCloud, vGW.xz*0.9 + vec2(uT*0.16, uT*0.11)).r);
+        /* (RS-565) a river's ripples stream downstream: lines drawn long along the way it runs, short across it, moving with it */
+        vec2 fl = fo.ba*2.0 - 1.0; float flL = length(fl); fl = flL > 0.05 ? fl/flL : vec2(0.6, 0.8); vec2 fp = vec2(fl.y, -fl.x);
+        float along = dot(vGW.xz, fl), across = dot(vGW.xz, fp);
+        float run = fo.g*smoothstep(0.5, 0.8, texture2D(uCloud, vec2(along*0.35 - uT*0.32, across*2.2)).r*0.75 + texture2D(uCloud, vec2(along*0.8 - uT*0.5, across*4.0 + 0.3)).r*0.35);
         /* (RS-311) the shallows and the surf: clear turquoise over the sand, deepening to blue; a lapping line of foam at the waterline,
            and lines of foam rolling in to the beach */
         float dep = texture2D(uDep, ((vGW.xz - uDepO.xy)*uDepO.z + 0.5)/uDepO.w).r*0.6;
@@ -43426,7 +43450,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-564';
+const GAME_VERSION = 'rs-565';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

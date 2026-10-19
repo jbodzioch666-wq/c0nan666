@@ -19,6 +19,7 @@ module.exports = async page=>{
     const col = x.getImageData(30, 0, 1, 1024).data; let mn = 255, mx = 0; for (let i=0;i<1024;i++){ mn = Math.min(mn, col[i*4]); mx = Math.max(mx, col[i*4]); } return { dark, spread:mx - mn }; });
   console.log('boards', JSON.stringify(px)); A(px.dark >= 16 && px.dark < 200, 'gaps between the boards'); A(px.spread > 30, 'grain along each board');
   // by night: no daylight through the windows
-  const night = await ev(()=>{ exitInterior(); for (let i=0;i<20 && !isNightTime();i++) G.player.clock = DAY_LENGTH*(0.05*i); if (!isNightTime()) return -1; enterInterior('tavern'); if (!G.interior) return -2; setUi('playing'); renderGame(); return (V3.intWin||[]).length; }); A(night===0, 'no daylight at night');
+  const night = await ev(()=>{ exitInterior(); for (let i=0;i<20 && !isNightTime();i++) G.player.clock = DAY_LENGTH*(0.05*i); if (!isNightTime()) return -1; enterInterior('tavern'); if (!G.interior) return -2; setUi('playing'); renderGame(); renderGame(); return (V3.intWin||[]).filter(m=>m.visible && m.material.opacity > 0.005).length; }); A(night===0, 'no daylight at night (RS-390: the window light is always built, and dark at night)');
+  const day = await ev(()=>{ exitInterior(); G.player.clock = DAY_LENGTH*0.5; enterInterior('tavern'); setUi('playing'); renderGame(); renderGame(); return (V3.intWin||[]).filter(m=>m.visible && m.material.opacity > 0.005).length; }); A(day > 0, 'daylight through the windows by day: ' + day);
   await ev(()=>exitInterior());
 };
