@@ -20,7 +20,7 @@ module.exports = async page=>{
     return out; });
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
-  A(r.on && r.aoK===1 && r.size[0] > 100 && r.size[2]===r.size[0], 'the occlusion pass runs at half size');
+  A(r.on && r.aoK===1 && r.size[0] > 100, 'the occlusion pass runs at half size (RS-562: from the main pass depth, no prepass)');
   A(r.errs.length===0, 'its shaders compile');
   A(r.open===null || r.open > 200, 'open floor is barely occluded: ' + r.open);
   A(r.wall===null || r.open===null || r.wall < r.open - 12, 'the floor at a wall\'s foot is darker: ' + r.wall + ' vs ' + r.open);

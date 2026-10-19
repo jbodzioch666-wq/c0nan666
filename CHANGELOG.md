@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-562 - Dungeons run smooth again
+Fixes for the stutter and the loading card that came with the dungeon visual pass. Measured on the RTX 3080 Ti at 2560x1400: about 2 ms of CPU and 1 to 2 ms of card time a frame in a crypt, with the corner shadows on; opening a door no longer shows the card, and the frames after it stay under 5 ms.
+- **No loading card on doors:** opening a door rebuilds the floor, and every rebuild used to queue a shader warm-up that flashed the loading card. In the mist-filled places (crypts, mines, lairs, temples) each rebuild also made 48 fresh mist materials, so the warm-up ran 48 off-screen draws and the game stuttered for a second after every door. The mist now shares one material, props' glow sprites and rings are recognised as kinds already warmed, and the card only appears for a warm-up that really needs more than one step.
+- **No 90 ms frame on doors:** a rebuild always redrew the whole floor once off-screen; now it does so only when a new shader turned up.
+- **Corner shadows for free:** the ambient occlusion drew the whole floor a second time every frame to get its depth. It now reads the depth the main drawing already wrote, so the second drawing is gone. With many props and creatures that second drawing was the biggest cost.
+- **Room furnishings never seal a passage:** two heaps of rubble that each passed the check could still block a way between them. The whole floor is now walked after dressing and anything that cuts it off is removed.
+
 ## RS-561 - The dungeon stirs
 The last step of the dungeon visual pass: living details. No measurable card time.
 - **Rats:** a nest or two of rats lives beside the barrels, crates and rubble on each floor. They scatter from under your feet as you come near and creep back once you've gone.
