@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs556 | Dungeon fog and dust: floor mist in caves and crypts, dust that burns in torchlight, a haze of light round each torch |
 | rs555 | Butterflies over the flower fields by day and fireflies by night, each one instanced mesh flown on the card |
 | rs554 | Painterly grade: golden fields, blue-green woods, a sickly swamp; a painted haze on the distant land; light shafts in a foggy morning |
 | rs553 | Plants lean downwind by the gust, waves roll across the grass in the wind's direction, fallen leaves blow downwind |

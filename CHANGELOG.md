@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-556 - Fog and dust below ground
+The first step of the dungeon visual pass. Card time in the catacombs about 1.5 to 1.8 ms a frame, the same as before.
+- **Mist on the floor:** a thin mist hugs the floor of the catacombs, mines, dragon lairs, sunken temples and necromancers' towers, turning slowly in the open rooms. Grey-blue in a crypt, warm dust in a mine, green in a temple. Plain dungeons and castles are dry stone and have none.
+- **Dust in the torchlight:** the motes drifting in the air now burn bright where a torch lights them and barely show in the dark, instead of glowing evenly everywhere.
+- **A haze of light round each torch:** the air round a lit torch glows softly, so its light reads as light in the air and not only on the stone.
+- The mist is off on the phone tier.
+
 ## RS-555 - Butterflies and fireflies
 The last step of the overworld visual pass. No measurable card time: each is one draw, flown entirely on the card.
 - **Butterflies:** by day, in fair weather, butterflies wander over the flower fields, flapping as they go, in five colours. None in winter, rain or storms.
