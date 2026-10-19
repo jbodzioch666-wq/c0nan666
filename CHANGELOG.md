@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-573 - Fog and cursor fixed
+- **Unexplored rooms are dark again:** since RS-572, some floors showed every room, explored or not. While its shaders were still being built, a material could pick one up and be left without its settings. The floor and walls then drew without the darkness over the rooms you hadn't seen yet.
+- **No symbols under the cursor:** the same fault drew the cursor's marker as a strip of glowing symbols across the floor. It's back to its plain outline.
+- Once the shaders are built, every material in the scene that missed its settings now gets them. Loading is still as quick as in RS-572.
+
 ## RS-572 - No more freeze going down
 - **Shaders really built side by side now:** RS-571 meant to start all of a floor's shaders at once and let the browser build them in the background. But three.js waited on each shader as it started it, so they were still built one after another, and on the way down from the open land that froze the game for 8 to 10 seconds in one go. That wait is now skipped. Each shader picks up its settings once the browser has finished building it, and draws exactly as before.
 - **Creatures sculpted a piece at a time:** a floor's creatures used to be sculpted all at once, holding the page still for one to two seconds. They're now sculpted a little each frame behind the loading card, which keeps moving.

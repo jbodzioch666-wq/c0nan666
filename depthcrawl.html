@@ -24323,7 +24323,7 @@ function gfxPrelink(V, r, scene, cam){
   if (t) r.setRenderTarget(t); try{ r.compile(scene, cam); }catch(e){ console.error(e); } finally { r.setRenderTarget(rt); delete gl.getProgramParameter; if (gl.getProgramParameter!==gp) gl.getProgramParameter = gp; }
   const progs = r.info.programs.filter(p=>!before.has(p)); if (!progs.length) return false;
   try{ gl.flush(); }catch(e){}   /* (the links only start once the commands reach the driver) */
-  V.prelink = { r, ext, progs, mats, t0:performance.now() }; return true;
+  V.prelink = { r, ext, progs, mats, scene, t0:performance.now() }; return true;
 }
 function gfxPrelinkDone(V){
   const P = V.prelink; if (!P) return true; const r = P.r, gl = r.getContext(); try{ gl.flush(); }catch(e){}
@@ -24332,9 +24332,15 @@ function gfxPrelinkDone(V){
   V.prelink = null;
   /* each fresh program reads its uniforms afresh (what it was handed while linking may be empty), and each material set up on one
      goes through the setup again, to take them */
-  const fresh = new Set(P.progs);
   for (const p of P.progs){ try{ const WU = p.getUniforms().constructor, pr = p.program; let cu = null; p.getUniforms = ()=>cu || (cu = new WU(gl, pr)); }catch(e){} }
-  for (const m of P.mats){ const mp = r.properties.get(m); if (mp && mp.currentProgram && fresh.has(mp.currentProgram)){ mp.currentProgram = null; m.needsUpdate = true; } }
+  /* (RS-573) anything that took one of these programs while they were linking - a hover marker, a spell's sprite, another wall - got
+     the empty list too, and the materials set up in the compile weren't the only ones: those kept it, and drew with none of their
+     settings (the fog over unexplored rooms gone, glyphs strewn across the floor under the cursor). Every material in the scene still
+     holding an empty list now goes through the setup again as well. (Reading the real uniforms early instead would wait out the link
+     queue - a nine-second step) */
+  const fresh = new Set(P.progs), redo = m=>{ const mp = r.properties.get(m); if (mp && mp.currentProgram && fresh.has(mp.currentProgram) && !(mp.uniformsList && mp.uniformsList.length)){ mp.currentProgram = null; m.needsUpdate = true; } };
+  for (const m of P.mats) redo(m);
+  if (P.scene) P.scene.traverse(o=>{ const m = o.material; if (Array.isArray(m)) m.forEach(x=>x && redo(x)); else if (m) redo(m); });   /* (RS-573: and anything else in the scene still holding an empty list) */
   return true;
 }
 function gfxCompileSliced(V, r, scene, cam, grp, live){
@@ -43676,7 +43682,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-572';
+const GAME_VERSION = 'rs-573';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

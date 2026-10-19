@@ -1,4 +1,5 @@
-// RS-572: a floor loads without the long freezes. (1) gfxPrelink starts every program and returns at once - three's compile no
+// RS-572: a floor loads without the long freezes. (RS-573: and every material keeps its settings - the fog over unexplored rooms,
+// the cursor's marker.) (1) gfxPrelink starts every program and returns at once - three's compile no
 // longer waits out each link for its uniforms - and once linked, the materials draw exactly as through the plain path. (2) A floor's
 // creatures are sculpted a slice a frame behind the card (FPD.prep), each slice short, and come out built. (3) The chart is painted
 // a few milliseconds a step in the background, the same picture as painted in one go
@@ -26,7 +27,9 @@ module.exports = async page=>{
       const t0 = performance.now(); while (performance.now() - t0 < 60000){ renderGame(); await new Promise(r=>setTimeout(r, 16)); if (FPD.mapRef===G.map && !FPD.prep && !FPD.warmWait && !FPD.prelink) break; }
       sculptDbGet = gdb; fpdPrepStep = st0; window.__noWarmSlice = 1;
       const alive = G.mon.filter(m=>m.alive && m3dPortrait(m)), built = alive.filter(m=>{ const pt = m3dPortrait(m); return M3D.tpl.has(m3dTplKey(pt)); }).length;
-      out.prep = { steps, worst:+worst.toFixed(0), mons:alive.length, built, secs:+((performance.now() - t0)/1000).toFixed(1) }; G.gameMode = 0; }
+      for (let i=0;i<20;i++){ renderGame(); await new Promise(r=>setTimeout(r, 20)); }
+      let mats = 0, empty = 0; FPD.scene.traverse(o=>{ for (const m of [].concat(o.material||[])){ const mp = FPD.r.properties.get(m); if (!mp || !mp.currentProgram) continue; mats++; if (!mp.uniformsList || !mp.uniformsList.length) empty++; } });
+      out.prep = { steps, worst:+worst.toFixed(0), mons:alive.length, built, secs:+((performance.now() - t0)/1000).toFixed(1), mats, empty }; G.gameMode = 0; }
     // (3) the chart, sliced and at once
     { PM.cv = null; PM.job = null; PM.sched = false; let worst = 0; const sl = []; const it = pmBuildGen(); for (;;){ const t = performance.now(), dl = t + 6; let d = false; while (performance.now() < dl){ if (it.next().done){ d = true; break; } } worst = Math.max(worst, performance.now() - t); if (d) break; await new Promise(r=>setTimeout(r, 0)); }
       const a = PM.cv, ad = a.getContext('2d').getImageData(0, 0, a.width, a.height).data; pmBuild(); const b = PM.cv, bd = b.getContext('2d').getImageData(0, 0, b.width, b.height).data;
@@ -38,5 +41,6 @@ module.exports = async page=>{
   A(r.link.call < 60 && r.link.call < r.link.done*0.5 + 5, 'the programs are started and the call returns before they are linked: ' + JSON.stringify(r.link));
   A(r.link.lit > 100 && r.link.diff===0, 'linked that way, the materials draw exactly as through the plain path: ' + JSON.stringify(r.link));
   A(r.prep.steps > 3 && r.prep.worst < 120 && r.prep.built===r.prep.mons && r.prep.mons > 0, 'the floor\'s creatures sculpted a slice a frame, and all built: ' + JSON.stringify(r.prep));
+  A(r.prep.mats > 50 && r.prep.empty===0, 'RS-573: every material on the floor drawn with its settings (none left with the empty list a program had while linking): ' + r.prep.empty + ' of ' + r.prep.mats);
   A(r.chart.worst < 40 && r.chart.frac < 0.001, 'the chart painted a few ms a step, the same picture: ' + JSON.stringify(r.chart));
 };
