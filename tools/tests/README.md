@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs587 | the treasure room's door at the room's face, the wandering merchant in a boat on open water, a roamer clicked to chase and fight, a grill over the hearth fire, lighting a campfire compiles nothing |
 | rs586 | a hearth fire with logs, embers and shader flames in an open firebox; the sage hat's moon and stars in the trim dye; the robe's cord at the middle of the waist; the shut tome held in the palm |
 | rs585 | the dye works: a tome's emblem and clasp as its trim, on both covers; every dyeable unique has a trim that shows; worn gear only; the book shut; the staff up in the palm |
 | rs584 | lakes are fresh water: lake spots with river fish, no sea spots or platforms, no surf or gulls; the sea keeps its own; the bar names the land after the time |
@@ -450,6 +451,7 @@ Screenshots go to `tools/tests/shots/`.
 | zuniq | every unique item: whether it takes a dye and whether it has a trim |
 | zhearth | the tavern's hearth close up at night, from the front and the side (`ZTAG`) |
 | zhold | a robed figure's shut tome in the left hand from three sides, and the waist cord from the front (`ZTAG`) |
+| zcamp | the open land's frame with no camp, a campfire and a fire with a tent: frame times, draw calls, point lights and programs |
 | zhair | heads with each hairstyle from four sides, and under helmets |
 | zplate | plate armour on builds from slight to heavy |
 | zunder | the creator's undressed figures by race and sex |

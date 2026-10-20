@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-587 - Doors, boats and a camp that stays smooth
+
+- **The treasure room's door comes forward:** the iron-bound door to a floor's treasure room stood back in the middle of its short tunnel. It now stands at the room's face, out between the first pillars like every other doorway, and swings open into the tunnel.
+- **The wandering merchant sails:** a wandering merchant out on open water stands in a little sailing boat, as you do, instead of wading through the sea up to his hat.
+- **Click a roamer to fight it:** a click on a wandering band (or the merchant) now goes after it, and the way is laid again after every step as it moves. You fight when you catch it, or trade with the merchant. A click on one used to land on the ground behind it. Pointing at one shows who is in the band.
+- **A grill over the hearth fire:** at a tavern's or your house's hearth, a fish or a steak now grills on an iron grill over the flames in the firebox, and a stew sits in its pan on the bars. Everything used to go in a skillet out in front of the fire.
+- **Lighting a campfire no longer stutters:** the fire's light used to be a new light, and a new light makes the game rebuild the shaders of everything on the land: a frame of about two and a half seconds, then a stutter. The light is now there from the start, unlit until you light a fire. Once lit, a fire and a tent cost nothing measurable (17 ms a frame either way).
+
 ## RS-586 - A real hearth fire
 - **The hearth burns:** the tavern's and your house's hearths were a solid block of stone with a black slab on the front and one flat flame cut off by it. Now each is an open firebox with stone cheeks, a lintel, a sooty back and a stone floor in front. In it, three split logs are crossed on a bed of embers, and each coal glows and dims on its own beat. The flames lick up off the logs, white-yellow at the root through orange to red at the tips, swaying and never the same twice.
 - **The sage's hat, all in the trim:** dyeing the Visage of the Sage's trim now colours its moon and stars as well as its band.
