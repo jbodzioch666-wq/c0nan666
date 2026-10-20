@@ -1,5 +1,8 @@
 # Depthcrawl patch notes
 
+## RS-580 - The town fence stays up
+- **Palisades drawn from anywhere in town:** a town's fence of stakes is drawn as one batch, and since the three.js upgrade (RS-574) that batch was tested for being in view by the shape of a single stake at the town's corner. From anywhere but that corner the whole fence vanished, leaving only its rail and the gate. Each batch of repeated things is now tested by a sphere round all of it, worked out again whenever its pieces move or their number changes, so flocks and the plants kept to the view stay right too.
+
 ## RS-579 - Textures back on every figure
 - **Fur, wool and leather show again:** RS-578 moved the finish textures into one shared sheet, but read each one from the wrong row of it, mostly blank. Every person and creature came out in flat colour: a spider's fur, a guard's mail, a townsperson's wool. Each finish is read from its own place again, and they look as they did before RS-578.
 
