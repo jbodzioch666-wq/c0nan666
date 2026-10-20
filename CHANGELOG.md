@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-586 - A real hearth fire
+- **The hearth burns:** the tavern's and your house's hearths were a solid block of stone with a black slab on the front and one flat flame cut off by it. Now each is an open firebox with stone cheeks, a lintel, a sooty back and a stone floor in front. In it, three split logs are crossed on a bed of embers, and each coal glows and dims on its own beat. The flames lick up off the logs, white-yellow at the root through orange to red at the tips, swaying and never the same twice.
+- **The sage's hat, all in the trim:** dyeing the Visage of the Sage's trim now colours its moon and stars as well as its band.
+- **The robe's cord at the waist:** a robe's cord is tied at the middle of the waist. On a woman it could ride up under the chest.
+- **The book in the hand:** a shut tome is held in the palm by its lower edge, the thumb round its front and the fingers under it. It used to hang beside the hand.
+
 ## RS-585 - Trims for tomes and uniques, a firmer staff
 - **A tome's trim:** a tome now has a trim row in the dye works, for its emblem and its gold clasp together. Its emblem used to follow your shield emblem's colour.
 - **The emblem on both covers:** a tome's emblem is inlaid on the back cover as well as the front, open or shut.

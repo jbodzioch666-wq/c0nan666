@@ -9591,7 +9591,14 @@ function v3Bench(k, x, z, mats, grp, rot){
   else if (k==='cauldron'){ const pot = add(new T.Mesh(new T.SphereGeometry(0.34,16,10,0,Math.PI*2,Math.PI*0.35,Math.PI*0.65), mats.iron)); pot.position.y = 0.42; const brew = cyl(0.3,0.3,0.04,16,mats.brew,0,0.56,0); V3.brew = V3.brew || brew;
     for (let i=0;i<3;i++){ const a = i/3*Math.PI*2; cyl(0.02,0.02,0.5,5,mats.iron,Math.cos(a)*0.3,0.2,Math.sin(a)*0.3); }
     V3.lamps.push({ p:[x,0.8,z], col:0x50ff80, r:3.5, main:true, always:true }); V3.bubbles = V3.bubbles || { p:[x,0.58,z] }; }
-  else if (k==='hearth'){ box(1.0,1.4,0.5,mats.stone,0,0.7,-0.25); box(0.6,0.5,0.1,M('#120804'),0,0.35,0.02); const f = v3Flame(x, 0.25, z+0.08, grp); V3.lamps.push({ p:[x,0.5,z+0.2], col:0xff8030, r:5, main:true, forge:true }); cyl(0.2,0.24,1.6,8,mats.stone,0,2.0,-0.3);
+  else if (k==='hearth'){   /* (RS-586) an open firebox: stone cheeks either side, a lintel over, a sooty back and a stone hearth floor before it - it was a solid
+       block with a black slab on its face and a flat flame sprite cut off by it */
+    box(1.0,0.12,0.5,mats.stone,0,0.06,-0.25); box(0.2,1.4,0.5,mats.stone,-0.4,0.7,-0.25); box(0.2,1.4,0.5,mats.stone,0.4,0.7,-0.25);
+    box(0.6,0.84,0.5,mats.stone,0,0.98,-0.25); box(0.6,0.5,0.12,mats.stone,0,0.37,-0.44);
+    box(0.6,0.44,0.02,M('#0a0604', { roughness:1 }),0,0.34,-0.375); box(1.12,0.06,0.3,mats.stone,0,0.03,0.12);
+    box(1.1,0.08,0.08,mats.stone,0,0.58,0.03);   /* (the lintel's lip) */
+    const fire = v3HearthFire(T); fire.position.set(0, 0.12, -0.17); g.add(fire); V3.flames.push(fire);
+    V3.lamps.push({ p:[x,0.5,z+0.2], col:0xff8030, r:5, main:true, forge:true }); cyl(0.2,0.24,1.6,8,mats.stone,0,2.0,-0.3);
     const ck = cookRigMake(T, { pan:true, legH:0.2 }); ck.g.position.set(0, 0.3, 0.16); ck.g.scale.setScalar(1.5); g.add(ck.g); (V3.hearthCook = V3.hearthCook || []).push(ck); }   /* (RS-422: a skillet on a trivet before the fire, shown while you cook) */
   else if (k==='spinning'){ box(0.7,0.08,0.24,mats.wood,0,0.35,0); for (const s of [-0.3,0.3]) box(0.05,0.35,0.05,mats.wood,s,0.17,0); const w = add(new T.Mesh(new T.TorusGeometry(0.28,0.025,6,24), mats.wood)); w.position.set(-0.12,0.72,0); w.rotation.y = Math.PI/2;
     for (let i=0;i<6;i++){ const sp = box(0.02,0.52,0.02,mats.wood,-0.12,0.72,0); sp.rotation.x = i*Math.PI/6; } box(0.05,0.4,0.05,mats.wood,-0.12,0.52,0); cyl(0.05,0.05,0.14,8,M('#d8d0a8'),0.25,0.48,0); }
@@ -31609,6 +31616,46 @@ function v3GuardTorch(p){
   { const fg = new T.Group(); fg.position.set(0, 0.325, 0); fg.scale.setScalar(0.42); g.add(fg); g.flame = v3Flame(0, 0, 0, fg); }   /* (RS-415: on the charred crown of the new head; RS-416: a torch's flame, as small as a sconce's - it burned like a bonfire) */
   return g;
 }
+/* (RS-586) a fire on a hearth: three split logs crossed, a bed of embers glowing and dimming in patches, and the flames themselves as
+   crossed sheets drawn by a shader - tongues rising and licking, white-yellow at the root through orange to red at the tips, pulled
+   sideways by a slow noise, never the same twice. They all keep time with V3.fireT */
+const V3_FIRE_T = { value:0 };
+function v3FireMat(seed, tall){
+  const m = new THREE.ShaderMaterial({ uniforms:{ uT:V3_FIRE_T, uS:{ value:seed }, uH:{ value:tall } }, transparent:true, depthWrite:false, blending:THREE.AdditiveBlending, side:THREE.DoubleSide,
+    vertexShader:'varying vec2 vUv; varying float vF; void main(){ vUv = uv; vec4 mv = modelViewMatrix*vec4(position, 1.0); vF = abs(dot(normalize(normalMatrix*vec3(0.0, 0.0, 1.0)), normalize(-mv.xyz))); gl_Position = projectionMatrix*mv; }',   /* (vF: how squarely the sheet faces you - one seen edge-on fades, no bright line) */
+    fragmentShader:'uniform float uT, uS, uH; varying vec2 vUv; varying float vF;\n' +
+      'float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7)))*43758.5453); }\n' +
+      'float n(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0 - 2.0*f); return mix(mix(h(i), h(i + vec2(1.0, 0.0)), f.x), mix(h(i + vec2(0.0, 1.0)), h(i + vec2(1.0, 1.0)), f.x), f.y); }\n' +
+      'void main(){ vec2 p = vUv; float t = uT*uH;\n' +
+      '  float a = n(vec2(p.x*3.2 + uS*7.0, p.y*2.6 - t*2.3)), b = n(vec2(p.x*7.0 - uS*3.0, p.y*5.5 - t*3.6));\n' +
+      '  float sway = (n(vec2(uS*5.0, t*0.6)) - 0.5)*0.22*p.y;\n' +
+      '  float dx = abs(p.x - 0.5 - sway - (a - 0.5)*0.26*p.y);\n' +
+      '  float w = 0.42*pow(max(0.0, 1.0 - p.y), 0.75)*(0.75 + 0.5*b);\n' +
+      '  float k = smoothstep(w, w*0.25, dx)*smoothstep(0.0, 0.07, p.y)*smoothstep(1.0, 0.45 + a*0.35, p.y);\n' +
+      '  k *= (0.75 + 0.5*b)*smoothstep(0.08, 0.55, vF); if (k < 0.01) discard;\n' +
+      '  float heat = clamp(k*1.25 - p.y*0.55, 0.0, 1.0);\n' +
+      '  vec3 c = mix(vec3(0.75, 0.12, 0.02), vec3(1.0, 0.48, 0.08), smoothstep(0.1, 0.5, heat)); c = mix(c, vec3(1.0, 0.9, 0.55), smoothstep(0.55, 0.95, heat));\n' +
+      '  gl_FragColor = vec4(c*k*0.62, k); }' });   /* (dim: the bloom brings it up - at full it blew out to white) */
+  m.userData.special = 'fire'; m.userData.lin = true; return m;
+}
+function v3HearthFire(T){
+  const g = new T.Group(), lin = c=>new T.Color(c).convertSRGBToLinear();
+  const bark = new T.MeshStandardMaterial({ color:lin('#3a2616'), roughness:0.95, emissive:lin('#5a1404'), emissiveIntensity:0.35 }), cut = new T.MeshStandardMaterial({ color:lin('#2a1a10'), roughness:1, emissive:lin('#e04a10'), emissiveIntensity:0.45 });
+  bark.userData.lin = cut.userData.lin = true;
+  for (const [ry, y, dz, rz] of [[0.45, 0.035, 0.03, 0.06], [-0.5, 0.04, -0.02, -0.05], [Math.PI/2 + 0.1, 0.085, 0.0, 0.12]]){   /* (three split logs, the top one laid across the two) */
+    const lg = new T.Mesh(new T.CylinderGeometry(0.032, 0.036, 0.4, 9, 1), [bark, cut, cut]); lg.rotation.set(0, ry, Math.PI/2 + rz); lg.position.set(0, y, dz); lg.castShadow = true; g.add(lg); }
+  /* the embers: a low mound of coals, each glowing on its own beat */
+  const emb = new T.MeshStandardMaterial({ color:lin('#1a0c06'), roughness:1, emissive:lin('#c42a06'), emissiveIntensity:0.7 }); emb.userData.lin = true; g.userData.embers = emb;
+  const bed = new T.Mesh(new T.SphereGeometry(0.17, 18, 8, 0, Math.PI*2, 0, Math.PI/2), emb); bed.scale.set(1.15, 0.16, 0.85); g.add(bed);
+  const coals = []; for (let i=0;i<14;i++){ const a = i*2.39996, r = 0.03 + (i%5)*0.028, m = new T.MeshStandardMaterial({ color:lin('#160a04'), roughness:1, emissive:lin(i%3 ? '#ff5010' : '#ffa030'), emissiveIntensity:1.2 }); m.userData.lin = true;
+    const c = new T.Mesh(new T.DodecahedronGeometry(0.018 + (i%4)*0.005, 0), m); c.position.set(Math.cos(a)*r, 0.02, Math.sin(a)*r*0.7); c.rotation.set(i, i*1.7, 0); g.add(c); coals.push(m); }
+  g.userData.coals = coals;
+  /* the flames: three tall sheets crossed at the middle, and two short ones at the ends of the logs */
+  for (let i=0;i<3;i++){ const f = new T.Mesh(new T.PlaneGeometry(0.34, 0.46), v3FireMat(i*1.37 + 0.2, 1)); f.geometry.translate(0, 0.23, 0); f.rotation.y = i*Math.PI/3; f.position.y = 0.04; f.renderOrder = 5; g.add(f); }
+  for (const [px, s] of [[-0.12, 3.1], [0.13, 4.7]]){ const f = new T.Mesh(new T.PlaneGeometry(0.18, 0.24), v3FireMat(s, 1.3)); f.geometry.translate(0, 0.12, 0); f.position.set(px, 0.05, 0.02); f.rotation.y = s; f.renderOrder = 5; g.add(f); }
+  const glow = new T.Sprite(new T.SpriteMaterial({ map:v3Blob('rgba(255,140,50,0.9)'), blending:T.AdditiveBlending, depthWrite:false, transparent:true, opacity:0.35 })); glow.scale.set(0.8, 0.6, 1); glow.position.y = 0.16; g.add(glow);
+  g.userData.hearthFire = 1; return g;
+}
 function v3Flame(x,y,z,grp){
   const T = THREE, g = new T.Group(); g.position.set(x,y,z);
   let img = null; try{ img = fpUndeadSprite(obEntry('flame'),false).img; }catch(e){}
@@ -32325,7 +32372,10 @@ function v3Render(){
   if (V3.runes){ V3.runes.rotation.z += dt*0.15; V3.runes.material.opacity = 0.65 + Math.sin(V3.t*2)*0.25; }
   if (V3.marker){ const m = captainQuestMarker(); V3.marker.visible = !!m; if (m){ V3.marker.material.map = v3MarkerTex(m); V3.marker.position.y = 1.75 + Math.sin(V3.t*3)*0.07; } }
   if (V3.boardMark){ const m = villageQuestMarker(); V3.boardMark.visible = !!m; if (m){ V3.boardMark.material.map = v3MarkerTex(m); V3.boardMark.position.y = 2.25 + Math.sin(V3.t*3+1)*0.07; } }
-  V3.flames.forEach((f,i)=>{ const k = 0.9 + Math.sin(V3.t*13+i*2)*0.08 + Math.sin(V3.t*29+i)*0.05; f.scale.set(k,k,k); });
+  V3_FIRE_T.value = V3.t;   /* (RS-586: the hearth flames' shader) */
+  V3.flames.forEach((f,i)=>{ if (f.userData.hearthFire){ const E = f.userData.embers; if (E) E.emissiveIntensity = 0.62 + Math.sin(V3.t*2.1 + i)*0.12 + Math.sin(V3.t*5.3)*0.06;
+      const C = f.userData.coals; if (C) for (let j=0;j<C.length;j++) C[j].emissiveIntensity = 0.55 + 0.7*Math.max(0, Math.sin(V3.t*(1.3 + (j%5)*0.37) + j*1.9)); return; }   /* (the fire's own shader moves it - no swelling) */
+    const k = 0.9 + Math.sin(V3.t*13+i*2)*0.08 + Math.sin(V3.t*29+i)*0.05; f.scale.set(k,k,k); });
   if (V3.hearthCook && V3.hearthCook.length){ const on = G.ui==='cook' && G.cookAt==='hearth', pp = V3.player && V3.player.g && V3.player.g.position; let best = null, bd = 1e9;   /* (RS-422: the pan on the hearth nearest you) */
     if (on && pp) for (const h of V3.hearthCook){ const w = h.g.getWorldPosition(V3._hv || (V3._hv = new THREE.Vector3())), d = (w.x - pp.x)*(w.x - pp.x) + (w.z - pp.z)*(w.z - pp.z); if (d < bd){ bd = d; best = h; } }
     for (const h of V3.hearthCook) cookRigSync(h, h===best, V3.t); }
@@ -38167,7 +38217,7 @@ function m3dHumanoid(o){
   const hg = o.head==='drake' || o.head==='kobold' || o.head==='lizard' ? (()=>{ const g = new T.Group(); g.position.set(0, 0.026, -0.022); g.scale.set(1.08, 1.06, 1.1); head.add(g); return g; })() : head;
   const helm = o.helm, hm = m3dMat(mats, o.helmCol || '#8a8a90', helm==='cowl' || helm==='bandana' || helm==='wizard' ? 'cloth' : 'metal');
   const helmMesh = kind=>{ const m = new T.Mesh(m3dHelmGeo(kind), m3dVC(mats, hm)); m.scale.x = o.headWide||1; m.castShadow = true; hg.add(m); return m; };   /* (RS-281: sculpted helmets) */
-  if (helm==='wizard'){ const wm = helmMesh('wizard'); if (o.sageHat) m3dSageHat(hg, mats, wm.geometry, o.sageBand ? { band:o.sageBand } : undefined);
+  if (helm==='wizard'){ const wm = helmMesh('wizard'); if (o.sageHat) m3dSageHat(hg, mats, wm.geometry, o.sageBand ? { band:o.sageBand, gold:o.sageBand } : undefined);   /* (RS-586: the moon and stars in the trim dye too) */
     /* (RS-475) a wizard's hat finer each tier, like the metal helms: a band, then a glowing gem, then a gold band and stars, and at the top
        a tall tip crooked back, a crescent moon and a green gem */
     else if (o.hatTier >= 1){ const t = o.hatTier;
@@ -40946,7 +40996,7 @@ function m3dRobeShape(rig, torso, mats, b){
       const g2 = new T.BufferGeometry(); for (const nm in cg.attributes) g2.setAttribute(nm, cg.attributes[nm]); g2.setIndex(keep); g2.computeBoundingSphere(); g2.userData.robeCut = 1; g2.userData.from = cg; cm.geometry = g2; } }   /* (from: the whole sculpt it was trimmed from) */
   if (rig.pelvisMesh) rig.pelvisMesh.visible = false;
   /* the cord, round the narrowest part between the ribs and the hips, just over the cloth */
-  let wy = 0.1, wm = 1e9; for (let y=0.075;y<=Math.min(0.125, top - 0.03);y+=0.005){ let s = 0; for (let j=0;j<16;j++) s += Rr(y, j/16*Math.PI*2); if (s < wm){ wm = s; wy = y; } }
+  let wy = 0.08, wm = 1e9; for (let y=0.065;y<=Math.min(0.09, top - 0.03);y+=0.005){   /* (RS-586: at the middle of the waist - higher, on a woman, it found the narrow under the bust) */ let s = 0; for (let j=0;j<16;j++) s += Rr(y, j/16*Math.PI*2); if (s < wm){ wm = s; wy = y; } }
   const pts = []; for (let j=0;j<72;j++){ const th = j/72*Math.PI*2, R2 = Rr(wy, th) + 0.0045 + 0.0035; pts.push(new T.Vector3(Math.sin(th)*R2, wy, Math.cos(th)*R2)); }
   const sash = rig.sashM; delete rig.sashM; const cord = new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(pts, true), 144, 0.0055, 8, true), sash); cord.name = 'robeCord'; torso.add(cord);
   const kt = 0.38, kR = Rr(wy, kt) + 0.0045 + 0.007; m3dSphere(torso, 0.0085, sash, Math.sin(kt)*kR, wy, Math.cos(kt)*kR, 1.2, 0.9, 0.8);   /* (the knot, off to one side) */
@@ -41197,7 +41247,7 @@ function m3dTomeFollow(r, closed){
   r.torso.updateMatrixWorld(true); v.set(-(r.gripX||0.026), -0.045, 0.004); hand.localToWorld(v); r.torso.worldToLocal(v);
   /* where it sits in the body's frame, as it's posed now (RS-303: then handed to the hand, so the arm moves it from here on) */
   const P = r._tp || (r._tp = new T.Vector3()), E = r._te || (r._te = new T.Euler());
-  if (closed){ const bb = r.tomeB||1; E.set(0, 0, Math.PI/2 + 0.25); P.set(v.x - Math.max(0.041, 0.021 + 0.025*bb), v.y + 0.05, v.z - 0.006); }   /* (RS-300 to 302) shut and carried at the side: spine down, page edges up; (RS-308) on the palm side, its cover pressed flat to the palm and the fist round the binding at its foot, leaning in along the forearm - in from the grip by the hand's own size, clear of the forearm and of the thigh */
+  if (closed){ const bb = r.tomeB||1; E.set(0, 0, Math.PI/2 + 0.25); P.set(v.x - 0.02*bb, v.y + 0.07, v.z - 0.006); }   /* (RS-586: its lower edge in the fist, the cover against the palm - the thumb round its front, the fingers under it; it hung beside the hand) */   /* (RS-300 to 302) shut and carried at the side: spine down, page edges up; (RS-308) on the palm side, its cover pressed flat to the palm and the fist round the binding at its foot, leaning in along the forearm - in from the grip by the hand's own size, clear of the forearm and of the thigh */
   else { E.set(-0.75 - r.torso.rotation.x, 0, 0); P.set(v.x, v.y + 0.026*Math.cos(E.x), v.z + 0.026*Math.sin(E.x)); }   /* (open on the palm, tipped up to the face however far the body leans) */
   const M = r._tm || (r._tm = new T.Matrix4()), Q = r._tq || (r._tq = new T.Quaternion()), S = r._ts || (r._ts = new T.Vector3());
   const Hi = r._ti || (r._ti = new T.Matrix4());
@@ -44075,7 +44125,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-585';
+const GAME_VERSION = 'rs-586';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
