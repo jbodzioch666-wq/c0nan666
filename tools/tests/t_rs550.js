@@ -14,9 +14,8 @@ module.exports = async page=>{
     { const p = g.attributes.position, b = g.attributes.blend; let beachSand = 0, inlandSand = 0, n1 = 0, n2 = 0;
       for (let i=0;i<p.count;i++){ const y = p.getY(i), x = Math.floor(p.getX(i) - 0.5), z = Math.floor(p.getZ(i) - 0.5), t = o3Tile(x, z); if (t!==OW_GRASS) continue; if (y < O3_WATER_Y + 0.12 && y > O3_WATER_Y){ beachSand += b.getW(i); n1++; } else if (y > 0.1){ inlandSand += b.getW(i); n2++; } }
       out.sand = { beach:+(beachSand/Math.max(1, n1)).toFixed(3), inland:+(inlandSand/Math.max(1, n2)).toFixed(3) }; }
-    /* the roads: a worn track with its crown line, under its own shader */
-    let road = null; O3.scene.traverse(o=>{ if (o.isMesh && [].concat(o.material).some(mm=>mm && mm.customProgramCacheKey && /^gfxroad/.test(mm.customProgramCacheKey()))) road = o; });   /* (merged with the rest of the still land - see o3MergeWorld - but its material is its own) */
-    out.road = road ? { rd:!!road.geometry.getAttribute('rd'), verts:road.geometry.attributes.position.count } : null;
+    /* the roads: worn into the ground by the land's own shader, from the road texture (RS-591 - they were a strip of their own) */
+    out.road = O3.rmask ? { chains:O3.rmask.chains.length, inShader:/uRoad/.test(sh.fragmentShader) && !!sh.uniforms.uRoad && sh.uniforms.uRoad.value===O3.rmask.tex } : null;
     /* the cost: the card's ms a frame, painted against plain */
     const cost = async ()=>{ SET.fps = true; for (let i=0;i<30;i++){ renderGame(); await new Promise(r=>setTimeout(r, 16)); } for (let k=0;k<4;k++){ PROF.t = {}; PROF.gpuN = 0; for (let i=0;i<80;i++){ renderGame(); gfxGpuPoll(); await new Promise(r=>setTimeout(r, 16)); } gfxGpuPoll(); if (PROF.gpuN > 10) return (PROF.t.gpu||0)/PROF.gpuN; } return null; };
     out.msPaint = await cost();
@@ -28,7 +27,7 @@ module.exports = async page=>{
   A(r.paint && r.key==='gfxlandP' && r.blend===4 && r.tcol, 'the painted ground, with four blends and the tile colours');
   A(r.shader.tile && r.shader.sand && r.shader.wash, 'the shader takes the tiles, the sand and the wash');
   A(r.sand.beach > 0.5 && r.sand.inland < 0.05, 'sand on the beach, none inland');
-  A(r.road && r.road.rd && r.road.verts > 100, 'the roads are worn tracks');
+  A(r.road && r.road.chains > 0 && r.road.inShader, 'the roads are worn tracks, painted by the land');
   A(r.plainKey==='gfxland' && r.plainBlend===4, 'with painting off, the plain ground');
   A(r.msPaint===null || r.msPlain===null || r.msPaint < r.msPlain + 2.5, 'the painted ground costs under 2.5ms more: ' + r.msPaint + ' vs ' + r.msPlain);
 };

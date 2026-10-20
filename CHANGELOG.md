@@ -1,5 +1,15 @@
 # Depthcrawl patch notes
 
+## RS-591 - Worn paths and old roads
+
+- **Roads that curve:** roads used to run from tile centre to tile centre, so any road heading diagonally went in right-angled steps, with a ringed disc at every tile. Each road is now traced from junction to junction, or to a town gate, a bridge or a ferry, and smoothed into one easy curve. Diagonals run straight and bends sweep round.
+- **Worn into the ground:** the road is no longer a tan strip laid over the land. It's painted into the ground itself: a trampled, yellowed verge, then bare earth with ragged edges where the grass creeps in, and two wheel ruts down it. Grass grows right up to its edge. The old square of dirt under each road tile is gone.
+- **Old roads and country tracks:** near the towns, and in stretches out in the country, the old roads keep broken flagstones with grass in the joints. They fade back to dirt where the paving has gone. A third of the roads are country tracks that were never paved.
+- **Lanes to the hamlets:** a worn lane with a grass strip down the middle runs from each hamlet to the nearest road.
+- **By the roadside:** pebbles are kicked to the edges, worn kerb stones lie along the old paving, and a milestone stands every dozen tiles or so.
+- **Puddles:** when it rains, puddles fill the ruts, and they dry slowly afterwards.
+- **Low graphics** keeps the old road strip.
+
 ## RS-590 - A robe's cord, tied properly
 
 - **The cord sits lower:** a robe's cord is tied low on the waist, where it meets the hips. It used to sit up in the middle of the waist.

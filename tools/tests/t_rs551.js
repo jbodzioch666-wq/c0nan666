@@ -8,7 +8,7 @@ module.exports = async page=>{
     const has = m=>{ const sh = { uniforms:{}, vertexShader:'void main(){\n#include <begin_vertex>\n#include <project_vertex>\n}', fragmentShader:'void main(){\n#include <map_fragment>\n#include <color_fragment>\n#include <opaque_fragment>\n}' }; m.onBeforeCompile(sh); return /cshade/.test(sh.fragmentShader) && !!sh.uniforms.uCloudOff && !!sh.uniforms.uCloudK; };
     out.land = has(O3.land.material); out.water = has(O3.water.material);
     let road = null, leaf = null, grass = null; O3.scene.traverse(o=>{ if (!o.isMesh) return; for (const mm of [].concat(o.material)){ if (!mm || !mm.customProgramCacheKey) continue; const k = mm.customProgramCacheKey(); if (k==='gfxroadc') road = mm; else if (/^gfxsway0\.05/.test(k)) leaf = mm; else if (/^gfxsway0\.35/.test(k)) grass = mm; } });
-    out.road = !!road && has(road); out.leaf = !!leaf && has(leaf); out.grass = !!grass && has(grass);
+    out.road = road ? has(road) : !!O3.rmask && out.land;   /* (RS-591: the road is painted by the land, so the land's cloud shade is the road's) */ out.leaf = !!leaf && has(leaf); out.grass = !!grass && has(grass);
     /* the drift: with the wind, and faster in a storm */
     const U = GFX.u, o0 = U.uCloudOff.value.clone(); for (let i=0;i<10;i++){ renderGame(); await new Promise(r=>setTimeout(r, 30)); } const o1 = U.uCloudOff.value.clone(); out.calm = +o1.distanceTo(o0).toFixed(5);
     G.weather = 'storm'; for (let i=0;i<10;i++){ renderGame(); await new Promise(r=>setTimeout(r, 30)); } const o2 = U.uCloudOff.value.clone(); out.storm = +o2.distanceTo(o1).toFixed(5);
