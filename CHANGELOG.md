@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-585 - Trims for tomes and uniques, a firmer staff
+- **A tome's trim:** a tome now has a trim row in the dye works, for its emblem and its gold clasp together. Its emblem used to follow your shield emblem's colour.
+- **The emblem on both covers:** a tome's emblem is inlaid on the back cover as well as the front, open or shut.
+- **Every dyeable unique has a trim:** the Crown of Thieves gains its helm bands, the Visage of the Sage its hat band, moon and stars, Stormtread bands below the knee and above the ankle, and the Grasp of the Ogre a cuff at each wrist, all in the trim dye.
+- **The dye works shows what you wear:** the list of dyeable things in your pack is gone. Everything listed is on the figure beside it.
+- **The book shut in the dye works:** your tome is carried shut at your side there, so you see its cover.
+- **The staff in the palm:** a mage's staff sits up in the palm, the fingers and thumb closed round the shaft, instead of across the fingertips.
+
 ## RS-584 - Fresh-water lakes, and where you are
 - **The land, after the time:** the bar at the top now ends with the land you're in: grassland, forest, desert, swamp, tundra, mountains, a mountain pass, a river, a lake or the sea. In a town it names the country round it.
 - **Lakes are fresh water:** the game counted every lake as sea. Now any water that doesn't reach the edge of the world, and isn't sea-sized, is a lake.

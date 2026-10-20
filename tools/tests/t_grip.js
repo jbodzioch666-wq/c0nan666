@@ -9,7 +9,7 @@ module.exports = async page=>{
       A(handMesh(R).scale.x===1 && handMesh(L).scale.x===-1, nm+': the left hand is mirrored');
       const w = e.rig.weapon, H = e.rig.wk==='bow' && w.parent && w.parent.parent===L.hand ? L.hand : R.hand, holder = w.parent===H ? w : w.parent, g = m3dGrip(e.rig.b || 1);   /* (a bow is held in the left hand) */
       out[nm] = [e.rig.wk, holder.position.toArray().map(v=>+v.toFixed(3))];
-      A(holder.parent===H && Math.abs(holder.position.x) > 0.015 && (holder===w && e.rig.wk!=='bow' && e.rig.wk!=='staff' ? holder.position.z > 0.02 : Math.abs(holder.position.z) < 1e-6) && Math.abs(holder.position.y + 0.04) < 1e-6, nm+': the handle sits in the fist (RS-296: a hilted weapon slid up so the fist closes under the guard) '+JSON.stringify(out[nm]));
+      A(holder.parent===H && Math.abs(holder.position.x) > 0.015 && (holder===w && e.rig.wk!=='bow' && e.rig.wk!=='staff' ? holder.position.z > 0.02 : Math.abs(holder.position.z) < 1e-6) && Math.abs(holder.position.y - (e.rig.wk==='staff' ? -0.024 : -0.04)) < 1e-6, nm+': the handle sits in the fist (RS-585: a staff a little up into the palm) (RS-296: a hilted weapon slid up so the fist closes under the guard) '+JSON.stringify(out[nm]));
     }
     return out; });
   console.log(JSON.stringify(r));

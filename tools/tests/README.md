@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs585 | the dye works: a tome's emblem and clasp as its trim, on both covers; every dyeable unique has a trim that shows; worn gear only; the book shut; the staff up in the palm |
 | rs584 | lakes are fresh water: lake spots with river fish, no sea spots or platforms, no surf or gulls; the sea keeps its own; the bar names the land after the time |
 | rs583 | the finish textures made at boot in workers, to the byte the generator's, kept in the cache for the next session; the first town's people sculpted over frames after the town shows, with their plates and clicks |
 | rs582 | a town's scene parked while you're in a building and put straight back on the way out; back from the land the same houses, new people; a siege staged in town leaves the scene alone; a forced rebuild still rebuilds |
@@ -444,6 +445,8 @@ Screenshots go to `tools/tests/shots/`.
 | zpark3 | after a shop round trip: the town's materials the warm-up hasn't seen, whether the loading card showed, whose geometry got disposed |
 | zfirst | the first arrival profiled: every v3/o3/m3d/gfx function's inclusive time and calls for the first town build and the first step onto the land (`ZLAND=1`) |
 | zarrive | the first arrival at a town with the real warm-up on: the build's parts, the worst frames and what ran in them, the shaders compiled mid-frame, when the townsfolk appear (`ZWAIT=1` waits for the finish workers first) |
+| zstaff | the mage's staff in the fist from three sides, and the tome shut, close up (`ZTAG`; `ZDX`/`ZDY` try a grip; `ZNOSKIN=1` measures the fist's hole in the hand's frame) |
+| zuniq | every unique item: whether it takes a dye and whether it has a trim |
 | zhair | heads with each hairstyle from four sides, and under helmets |
 | zplate | plate armour on builds from slight to heavy |
 | zunder | the creator's undressed figures by race and sex |
