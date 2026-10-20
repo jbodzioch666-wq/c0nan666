@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## RS-583 - The first town, three times faster
+- **The creatures' finishes made at boot, beside the page:** every person and creature wears one of eleven finish textures (skin, cloth, leather, fur, hair, scales, metal, mail, horn, stone, planks), and the first one of a session to need them made them on the spot, seconds of noise in one frame. They're now made at boot in worker threads beside the page, while you read the title screen, and kept in the game's cache so the next session has them at once. The workers' pixels are the old generator's to the byte.
+- **Townsfolk step out as they're ready:** the first town of a session sculpted all its people in one go, three seconds in a single frame. The town now shows at once, and its people are sculpted a few milliseconds a frame and step out one by one as their figures are done, name plates and all. Anyone met before this session, or kept in the cache, is there from the start.
+- **Their shaders off the frame:** a newcomer's own finish used to compile in the next shadow pass, half a second in the frame. Their shaders are started as they arrive and they're drawn once linked.
+- **Your figure sculpted at the world map:** a new character's figure, as the towns draw it, is sculpted while the new world's map is shown instead of in the first town's first frame.
+- **The loading card first:** a town built from nothing takes a second or two; the loading card now comes up the frame before the build, not after it.
+- **The land's merchant sculpted a slice a frame,** like the beasts, instead of a second in the frame of the first step out. The post-processing shaders are started as each renderer is made rather than compiled in its first frame.
+- **Numbers, first session on the test machine:** the first town's frame 4.8 to 6.9 s before, 1.9 s now; the first step onto the land 2.5 to 5.8 s before, 1.7 s now; into the first dungeon 1.1 s before, 0.7 s now.
+
 ## RS-582 - Coming out of a building is instant
 - **The town stays while you're inside:** stepping into a shop used to throw the whole town away, and stepping out built it again from nothing: every house, wall, tree and townsperson, nine hundred fresh materials for the shader warm-up to draw one by one, and the town's signs painted and uploaded again. That was the worst hitch in the game, and it came on every door. The town's scene is now parked at the door and put straight back as you come out. On the test machine coming out of a shop went from a 270 ms freeze to a 20 ms frame, with nothing built, nothing freed and nothing to warm.
 - **Back from the land:** walking out of a town and back in built it again too. If the town is laid out the same, which it is unless its layout has changed, the houses and walls come back from the parked scene and only its people are made afresh. About 500 ms of building became about 40.

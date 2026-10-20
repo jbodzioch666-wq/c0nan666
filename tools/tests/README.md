@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs583 | the finish textures made at boot in workers, to the byte the generator's, kept in the cache for the next session; the first town's people sculpted over frames after the town shows, with their plates and clicks |
 | rs582 | a town's scene parked while you're in a building and put straight back on the way out; back from the land the same houses, new people; a siege staged in town leaves the scene alone; a forced rebuild still rebuilds |
 | rs581 | no screen-edge flashes unless asked for; the settings page in five tabs, picture sliders live as you drag and kept, the render resolution |
 | rs580 | instanced meshes culled by a sphere round all their instances: a town's palisade is drawn from every side of the town |
@@ -440,6 +441,8 @@ Screenshots go to `tools/tests/shots/`.
 | zpark | why a town come back to from the land isn't put back from the parked scene: which part of its key differs |
 | zpark2 | each scene build on re-entering a town: what called it, whether the map and the grid key changed, who reset the map reference, sieges staged |
 | zpark3 | after a shop round trip: the town's materials the warm-up hasn't seen, whether the loading card showed, whose geometry got disposed |
+| zfirst | the first arrival profiled: every v3/o3/m3d/gfx function's inclusive time and calls for the first town build and the first step onto the land (`ZLAND=1`) |
+| zarrive | the first arrival at a town with the real warm-up on: the build's parts, the worst frames and what ran in them, the shaders compiled mid-frame, when the townsfolk appear (`ZWAIT=1` waits for the finish workers first) |
 | zhair | heads with each hairstyle from four sides, and under helmets |
 | zplate | plate armour on builds from slight to heavy |
 | zunder | the creator's undressed figures by race and sex |
