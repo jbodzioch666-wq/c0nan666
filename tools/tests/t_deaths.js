@@ -13,7 +13,7 @@ module.exports = async page=>{
     FPD.mapRef = null; for (let i=0;i<4;i++){ renderGame(); await new Promise(r=>setTimeout(r, 20)); }
     const names = ['wolf','goblin warrior','skeleton warrior','gray ooze','ghost','wolf','wolf'], at = [[2,0],[-2,0],[0,2],[0,-2],[2,2],[-2,-2],[2,-2]];
     names.forEach((nm, i)=>{ const m = newMonster(); Object.assign(m, { alive:1, x:p.x+at[i][0], y:p.y+at[i][1], hp:20, maxHp:20, ac:5, atkBonus:1, dmg1:1, dmg2:2, xp:5, sym:'s', nm, col:'#8f8', art:null, abilities:[] }); if (nm==='ghost' || /skelet/.test(nm)) m.undead = true; G.mon.push(m); });
-    for (let i=0;i<300 && !(i > 10 && G.mon.every(m=>M3D.inst.get(m)));i++){ renderGame(); await new Promise(r=>setTimeout(r, 30)); }   /* (the skeleton's bones are sculpted in the background) */
+    { const t0 = performance.now(); for (let i=0; performance.now() - t0 < 45000 && !(i > 10 && G.mon.every(m=>M3D.inst.get(m))); i++){ renderGame(); await new Promise(r=>setTimeout(r, 30)); } }   /* (the skeleton's bones are sculpted in the background - waited for by the clock, not a count of frames that busier frames shorten) */
     const es = G.mon.map(m=>M3D.inst.get(m)), out = { have:es.map(e=>!!e) }, T = THREE;
     const hits = [null, null, null, null, null, { dmg:2, maxHp:20, kind:'melee' }, { dmg:60, maxHp:20, kind:'melee', crit:true }];
     G.mon.forEach((m, i)=>{ m.alive = 0; m3dKill(m, hits[i]); });

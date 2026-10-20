@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-576 - Steadier towns
+- **No shadows from tiny parts:** barrel hoops, buttons, buckles, a beard's edge, small boxes on shelves. Every one of these drew itself into the sun's shadow each time it was updated, for a shadow a few pixels across. They no longer cast one; everything bigger still does. In a town that's some 160 fewer things to draw on each shadow update.
+- **The town's shadow covers what you see:** the sun's shadow in town reached across most of the town, so far-off houses were redrawn into it every time. It now covers what's around you on screen, and the shadows are a little sharper for it.
+- **No hitch walking past a door:** stepping into a building is instant because its room is built ahead as you walk up to the door. Painting its floorboards and panels used to happen in one go, a third-of-a-second hitch passing a door. They're now painted a few rows at a time.
+- **Background work waits for spare moments:** the world map's painting and a room's boards now run in the browser's idle time between frames, so they never take time a frame needs.
+
 ## RS-575 - Lighter frames
 - **Animals off screen cost nothing:** on the open land, every animal and wandering beast within reach was still processed every frame, seen or not, part by part. That was nearly half the land's work per frame. Off screen they're now left out of the frame entirely, and they come back up to date the moment they step into view. Usually 20 of the 23 or so animals nearby are off screen.
 - **Your figure out in the world:** the full sculpt of your character was over 300,000 triangles, drawn twice each frame (once for its shadow). At the size you see it on the land, in towns and in dungeons, half of that looks the same, and phones have used the lighter build since RS-563. Every machine now uses it out in the world. The character creator keeps full detail.

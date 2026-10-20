@@ -9311,6 +9311,11 @@ function buildTailorShop(){
 const INT_STONE_FLOOR = { smith:'#7a7570', temple:'#b4ac94', guild:'#7a7268', bank:'#8c8a84', cellar:'#6a6560' };
 const INT_BOARDS = { tavern:'#5a3f2c', house:'#76583e', shop:'#6c5038', tailor:'#7a6048', alch:'#5c4432', tavern_up:'#68492f' };
 function v3TexRep(t, r){ const c = t.clone(); c.repeat.set(r, r); c.needsUpdate = true; return c; }
+/* (RS-576) the boards a room of this kind is made of - as v3InteriorMats asks for them - so they can be painted ahead, a little at a time */
+function v3InteriorBoardJobs(key){ const race = V3_RACE[G.villageRace] || V3_RACE.human, dim = (h, k)=>'#' + v3hex(h).map(v=>Math.round(v*k).toString(16).padStart(2,'0')).join(''), fw = dim(race.wood, 1.25), out = [];
+  if (!INT_STONE_FLOOR[key]) out.push([INT_BOARDS[key] || '#6c5038', { seed:7 + key.length }]);
+  out.push([fw, { boards:8, joints:false, knots:0.25, size:512, seed:41 }], [dim(race.wood, 1.45), { boards:4, joints:false, knots:0.3, size:512, seed:53 }], [fw, { boards:1, joints:false, gaps:false, knots:0.15, size:256, seed:61 }]);
+  return out; }
 function v3InteriorMats(key, mats){
   const T = THREE, race = V3_RACE[G.villageRace] || V3_RACE.human, std = o=>new T.MeshStandardMaterial(Object.assign({ roughness:0.8, metalness:0 }, o));
   const dim = (h, k)=>'#' + v3hex(h).map(v=>Math.round(v*k).toString(16).padStart(2,'0')).join('');
@@ -18166,10 +18171,8 @@ function pmPrebuild(){
   if (PM.cv || PM.sched || PM.job || !G.ow || !G.ow.map) return;
   PM.sched = true;
   setTimeout(()=>{ PM.sched = false; if (PM.cv || !G.ow || !G.ow.map) return;
-    const it = PM.job = pmBuildGen(), step = ()=>{ if (PM.job!==it) return; const dl = performance.now() + (gfxPhone() ? 4 : 6);
-      try{ while (performance.now() < dl) if (it.next().done){ PM.job = null; return; } }catch(e){ console.error(e); PM.job = null; return; }
-      setTimeout(step, 16); };
-    step(); }, 1500);   /* (RS-572: a few milliseconds a step) */
+    const it = PM.job = pmBuildGen();
+    gfxIdle(dl=>{ if (PM.job!==it) return true; try{ while (performance.now() < dl) if (it.next().done){ PM.job = null; return true; } }catch(e){ console.error(e); PM.job = null; return true; } return false; }); }, 1500);   /* (RS-572: a few milliseconds a step; RS-576: in idle time) */
   setTimeout(()=>{ try{ pmFogPattern(document.createElement('canvas').getContext('2d')); }catch(e){} }, 2600);
 }
 function owSeen(x,y){ const s = owSeenArr(); return x>=0 && y>=0 && x<OW_COLS && y<OW_ROWS && !!s[y*OW_COLS+x]; }
@@ -24325,9 +24328,30 @@ function gfxThreeSetup(){
     SM.computeBoundingSphere = function(){ const g = this.geometry; if (g.boundingSphere===null) g.computeBoundingSphere(); (this.boundingSphere || (this.boundingSphere = new THREE.Sphere())).copy(g.boundingSphere); }; }catch(e){}
   try{ const IP = THREE.InstancedMesh.prototype, rc = IP.raycast; IP.raycast = function(ray, hits){ this.boundingSphere = null; return rc.call(this, ray, hits); }; }catch(e){}
   try{ gfxCheapPointShadow(); }catch(e){}
+  /* (RS-576) a mesh whose geometry is marked too small to cast (gfxPruneCasters) never casts - many places turn a figure's shadows on
+     part by part after it's made */
+  try{ Object.defineProperty(THREE.Mesh.prototype, 'castShadow', { configurable:true, get(){ return !!this._cs && !(this.geometry && this.geometry.userData && this.geometry.userData.noCast); }, set(v){ this._cs = v; } }); }catch(e){}
 }
 try{ if (typeof THREE!=='undefined') gfxThreeSetup(); }catch(e){}   /* (three may have arrived before this script ran: its onload found no setup to call) */
 /* each renderer as made: the old light units (three r155 made physical ones the default, which would relight everything) */
+/* (RS-576) a part too small to throw a shadow worth drawing - a barrel's hoop, a button, a buckle, a small box on a shelf - stops casting
+   one: the town's shadow pass drew some 160 of these every time it ran, for shadows a few pixels across. (Instanced meshes, whose one
+   small shape stands for many, are left as they are) */
+function gfxPruneCasters(root, minR){
+  if (!root) return 0; minR = minR || 0.09; let n = 0; const v = new THREE.Vector3(); root.updateMatrixWorld(true);
+  root.traverse(o=>{ if (!o.isMesh || o.isInstancedMesh || !o.castShadow || !o.geometry || !o.geometry.attributes || !o.geometry.attributes.position) return; const g = o.geometry; if (!g.boundingSphere) g.computeBoundingSphere();
+    o.getWorldScale(v); const r = g.boundingSphere.radius*Math.max(Math.abs(v.x), Math.abs(v.y), Math.abs(v.z)); if (r < minR){ g.userData.noCast = true; o.castShadow = false; n++; } });   /* (on the geometry, which every copy of a figure shares - and see gfxThreeSetup: a part marked so never casts, whatever sets it later) */
+  return n;
+}
+/* (RS-576) background work - the skeleton's sculpt, the chart, a room's boards - in the browser's idle time between frames, as much as
+   that leaves: a fixed slice every 16ms took time a fast frame needed. step(deadline) does what it can before the deadline and says
+   when it's finished; with no idle time for a while, it still gets a sliver every quarter second */
+function gfxIdle(step, o){
+  const ric = window.requestIdleCallback;   /* (o - or a function giving it - { every, min }: a job others wait on, the skeleton, insists on a little more) */
+  const go = d=>{ const oo = typeof o==='function' ? o() : o, every = (oo && oo.every) || 100, min = (oo && oo.min) || 2; const dl = performance.now() + (d && d.timeRemaining ? (d.didTimeout ? Math.max(min, gfxPhone() ? 3 : 4) : Math.max(min, Math.min(8, d.timeRemaining() - 0.5))) : Math.max(min, gfxPhone() ? 4 : 6)); let done = true;
+    try{ done = step(dl); }catch(e){ console.error(e); } if (!done){ if (ric) ric(go, { timeout:every }); else setTimeout(go, 16); } };
+  if (ric) ric(go, { timeout:100 }); else setTimeout(go, 0);
+}
 function gfxThreeR(r){ try{ gfxThreeSetup(); if ('useLegacyLights' in r) r.useLegacyLights = true; }catch(e){} return r; }
 function gfxCheapPointShadow(){
   const C = THREE.ShaderChunk, s = C.shadowmap_pars_fragment, a = s.indexOf('vec2 offset = vec2( - 1, 1 ) * shadowRadius * texelSize.y;'), b = s.indexOf(') * ( 1.0 / 9.0 );', a);
@@ -30532,6 +30556,8 @@ function sk3Init(){
     const finish = ()=>{ try{ SK3.m = sk3Build(); const steps = SK3.m.steps.slice();
         const next = ()=>{ try{ const f = steps.shift(); if (f) f(); }catch(e){ SK3.building = false; return; } if (steps.length) setTimeout(next, 16); else { SK3.ok = true; SK3.building = false; } };
         next(); }catch(e){ console.error(e); SK3.building = false; } };
+    /* (a job a skeleton in a fight waits on, done the first time ever: its own steady share - unlike the chart and a room's boards it
+       isn't left to idle time, which a busy floor hardly has) */
     const tick = ()=>{ const deadline = performance.now() + (gfxPhone() ? 4 : 6);
       try{ while (jobs.length && performance.now() < deadline){ const j = jobs[0]; if (sk3SculptStep(j, deadline)){ jobs.shift(); SK3_READY.set(j.key, j.g); sculptDbPut(j.key, j.g); j.P = null; } } }catch(e){ console.error(e); SK3.building = false; return; }
       if (jobs.length) setTimeout(tick, 16); else finish(); };
@@ -30727,7 +30753,10 @@ function v3LowMem(){ try{ return document.body.classList.contains('touch') || (n
 const v3Rng = seed=>{ let s = seed % 2147483647 || 1; return ()=>(s = s*16807 % 2147483647)/2147483647; };
 const v3Wave = (x, y, S, a, b, ph)=>Math.sin(2*Math.PI*(a*x/S + b*y/S) + ph);
 // boards: o.boards across the canvas, joints where the boards butt end to end, grain running along each board, knots, gaps and worn bevels
-function v3TexBoards(col, o){
+/* (RS-576) the boards painted a few rows at a step, so a room built ahead of you as you walk up to its door (doorPrewarm) paints them
+   between frames - all at once, a floor's million pixels and its panels were a third of a second's hitch passing a door */
+function v3TexBoards(col, o){ const it = v3TexBoardsGen(col, o); let r; while (!(r = it.next()).done); return r.value; }
+function* v3TexBoardsGen(col, o){
   o = o||{}; const lm = v3LowMem(), key = 'boards'+col+JSON.stringify(o)+(lm ? 'L' : ''); if (V3_INT_TEX[key]) return V3_INT_TEX[key];
   const S = (o.size||1024)/(lm ? 2 : 1), NB = o.boards||16, BW = S/NB, rnd = v3Rng(o.seed||7), n = v3Noise((o.seed||7)+3), b = v3hex(col);
   const c = v3Canvas(S,S), cb = v3Canvas(S,S), id = c.getContext('2d').createImageData(S,S), bd = cb.getContext('2d').createImageData(S,S);
@@ -30740,7 +30769,7 @@ function v3TexBoards(col, o){
       segs.push({ y0:y, len, tone:0.8 + rnd()*0.32, warm:rnd()*0.08 - 0.04, ph:rnd()*6.3, fr:1.2 + rnd()*1.4, sk:rnd()*0.6 - 0.3, kn }); y += len; }
     cols.push({ off, segs });
   }
-  for (let y=0;y<S;y++) for (let x=0;x<S;x++){
+  for (let y=0;y<S;y++){ if ((y & 15)===15) yield; for (let x=0;x<S;x++){
     const bi = Math.floor(x/BW), lx = x - bi*BW, C = cols[bi], yy = ((y - C.off) % S + S) % S;
     let g = C.segs[0]; for (const sg of C.segs) if (yy >= sg.y0) g = sg;
     const ly = yy - g.y0, u = lx/BW;
@@ -30760,8 +30789,8 @@ function v3TexBoards(col, o){
     const q = (y*S + x)*4, w = g.warm;
     id.data[q] = Math.min(255, b[0]*k*(1 + w)); id.data[q+1] = Math.min(255, b[1]*k); id.data[q+2] = Math.min(255, b[2]*k*(1 - w)); id.data[q+3] = 255;
     const hv = Math.max(0, Math.min(255, h*255)); bd.data[q] = bd.data[q+1] = bd.data[q+2] = hv; bd.data[q+3] = 255;
-  }
-  c.getContext('2d').putImageData(id,0,0); cb.getContext('2d').putImageData(bd,0,0);
+  } }
+  yield; c.getContext('2d').putImageData(id,0,0); cb.getContext('2d').putImageData(bd,0,0);
   const map = v3CanvasTex(c), bump = new THREE.CanvasTexture(cb); bump.wrapS = bump.wrapT = THREE.RepeatWrapping; bump.anisotropy = 8;
   return (V3_INT_TEX[key] = { map, bump });
 }
@@ -31734,6 +31763,7 @@ function v3BuildScene(){
   try{ v3Festival(grp); }catch(e){ console.error(e); }
   v3LampGlows(grp);   /* (RS-424) */
   v3MergeWorld();   /* (RS-348) */
+  try{ gfxPruneCasters(V3.world); }catch(e){}   /* (RS-576) */
 }
 // (RS-183) sat on a chair, stool or pew: hips down on the seat, thighs level, shins hanging, hands in the lap, turned the way the
 // seat faces - the regulars lift their tankards now and then
@@ -31886,7 +31916,7 @@ function v3Init(){
     V3.cam = new T.PerspectiveCamera(32, 1, 0.5, 120);
     V3.hemi = new T.HemisphereLight(0xdde8ff, 0x5a4a30, 0.85); V3.scene.add(V3.hemi);
     const sun = V3.sun = new T.DirectionalLight(0xfff0d8, 1.8); sun.castShadow = true;
-    { const ms = gfxPhone() ? 1024 : 2048; sun.shadow.mapSize.set(ms, ms); } const s = sun.shadow.camera; s.left = -18; s.right = 18; s.top = 18; s.bottom = -18; s.near = 1; s.far = 80; sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.02;
+    { const ms = gfxPhone() ? 1024 : 2048; sun.shadow.mapSize.set(ms, ms); } const s = sun.shadow.camera; s.left = -13; s.right = 13; s.top = 13; s.bottom = -13; s.near = 1; s.far = 80; sun.shadow.bias = -0.0005;   /* (RS-576: round what's in view, not the whole town - 36 across drew every far house into the shadow each time) */ sun.shadow.normalBias = 0.02;
     sun.target.position.set(COLS/2, 0, ROWS/2); V3.scene.add(sun); V3.scene.add(sun.target);
     V3.plights = []; for (let i=0;i<(gfxPhone() ? 4 : 8);i++){ const pl = new T.PointLight(0xffb060, 0, 5, 2); V3.scene.add(pl); V3.plights.push(pl); }   /* (RS-348: four lamps lit on a phone) */
     V3.ray = new T.Raycaster(); V3.plane = new T.Plane(new T.Vector3(0,1,0), 0);
@@ -32026,11 +32056,15 @@ function doorPrewarm(){
   if (G.interior || !V3.mats || !G.player || v3LowMem()) return;   /* (not on phones: build a room only when you walk in) */ V3.warm = V3.warm || {};
   for (const b of VILLAGE_BUILDINGS){ if (V3.warm[b.key] || Math.abs(b.door.x - G.player.x) + Math.abs(b.door.y - G.player.y) > 4) continue;
     V3.warm[b.key] = true; const key = b.key, go = ()=>{ try{ v3InteriorMats(key, V3.mats); }catch(e){} };
-    if (window.requestIdleCallback) requestIdleCallback(go, { timeout:600 }); else setTimeout(go, 30); return; }
+    /* (RS-576) its boards painted first, a few milliseconds a step; then the rest of the room, which finds them made */
+    const jobs = v3InteriorBoardJobs(key).map(([c, o])=>v3TexBoardsGen(c, o)), mp = G.map;
+    gfxIdle(dl=>{ if (G.map!==mp) return true; try{ while (jobs.length && performance.now() < dl){ if (jobs[0].next().done) jobs.shift(); } }catch(e){ console.error(e); jobs.length = 0; }
+      if (jobs.length) return false; if (window.requestIdleCallback) requestIdleCallback(go, { timeout:600 }); else setTimeout(go, 30); return true; }); return; }
 }
 function v3Render(){
   if (!v3Init()) return false;
   v3HoverTick();
+  if (V3.world && V3.world.children.length!==V3.pruneN){ V3.pruneN = V3.world.children.length; try{ gfxPruneCasters(V3.world); }catch(e){} }   /* (RS-576: and what's added to the town after it's built - its folk, its props) */
   if (V3.stepping) return true;          // (a step taken from inside this frame: the frame itself will draw it)
   const T = THREE, now = performance.now(), dt = V3.last ? Math.min(0.1, (now-V3.last)/1000) : 0.016; V3.last = now; V3.t = (V3.t||0) + dt;
   if (V3.door && (V3.door.t > 4 || G.gameMode!==3)){ V3.door = null; doorFade(0); V3.labels.style.opacity = '1'; }   /* (never left half way through a door) */
@@ -40360,6 +40394,7 @@ function m3dTemplate(pt){
 }
 function m3dTemplateSkin(pt, key, t){
   if (m3dSkinnable(pt, t)){ const meta = M3D.meta.get(t); try{ const R = m3dSkinRoot(t, meta.rig, null); meta.skinned = R.made; meta.skinnedParts = R.gone; }catch(err){ console.error(err); meta.skinned = 0; } }   /* (RS-379: one skinned mesh per material, once per template) */
+  try{ const bb = new THREE.Box3().setFromObject(t), H = Math.max(0.05, bb.max.y - bb.min.y); gfxPruneCasters(t, H*0.1); }catch(e){}   /* (RS-576: a template is sculpted at its own scale - the size is the figure's own, about 9cm on a man) */
   M3D.tpl.set(key, t);
   return t;
 }
@@ -40395,6 +40430,7 @@ function m3dInstance(m, pt){
   const E = { owner, holder, root, rig, mats, H, beast:!!meta.beast, anim:meta.anim||null, seed:Math.random()*10, atk:0, pHp:G.player ? G.player.hp : 0, hurt:0, lift:pt.lift||meta.lift||0, dying:-1, stamp:0, rise: m.rise ? 0 : 1, skinned:meta.skinned||0, skinnedParts:meta.skinnedParts||0 };
   if (meta.loco && meta.anim){ const a0 = meta.anim, L0 = { y:root.position.y, x:root.rotation.x, z:root.rotation.z };
     E.anim = (r, t, mv, wind, strike, hurt, e2)=>{ a0(r, t, mv, wind, strike, hurt, e2); m3dLoco(E, meta.loco, L0, t, mv); }; }
+  try{ const bb = new THREE.Box3().setFromObject(root), H = Math.max(0.05, bb.max.y - bb.min.y); gfxPruneCasters(root, H*0.1); }catch(e){}   /* (RS-576: what the figure gets as it's made - a beard, its gear - too) */
   return E;
 }
 // (RS-346) a body that has no legs still shows it's going somewhere: an ooze heaves and lurches, a floating thing leans
@@ -43699,7 +43735,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-575';
+const GAME_VERSION = 'rs-576';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs576 | steadier town frames: no shadows from tiny parts (figures, town), the town sun shadow round what is in view, background work in idle time in short slices, room boards painted ahead a few rows a step (same picture) |
 | rs575 | lighter frames: animals and beasts off screen leave the frame (hidden, matrices skipped) and come back up to date in view; your figure sculpted lighter out in the world on every machine (see rs563) |
 | rs574 | three.js r159 drawing as r149 did: colour management off, old light units, custom shaders on the new chunk names, instanced/skinned meshes culled by their own geometry, shaders started at once (three compile + isReady) |
 | rs572 | a floor loads without long freezes: the parallel link returns at once and draws the same pixels, creatures sculpted a slice a frame behind the card, the chart painted a few ms a step (same picture) |
@@ -412,6 +413,8 @@ Screenshots go to `tools/tests/shots/`.
 | zcost | the land's frame (`ZSAVE`): draw calls and triangles, and the CPU cost of each big group (hidden in turn) |
 | zmat | the land's matrix walk (`ZSAVE`): per frame, and each top-level group's share |
 | zhero | your figure close up in a town, sculpted on a given grid (`ZPC`): a shot and its triangle count |
+| zdraws | draw calls and triangles of a view's frame (`ZSAVE`, `ZVIEW`), with and without the shadow pass; shadow casters by size; figures' meshes and why their parts aren't merged |
+| zsk3 | in a dungeon from a fresh start: when the skeleton's background sculpt finishes and a skeleton gets its model |
 | zhair | heads with each hairstyle from four sides, and under helmets |
 | zplate | plate armour on builds from slight to heavy |
 | zunder | the creator's undressed figures by race and sex |
