@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs581 | no screen-edge flashes unless asked for; the settings page in five tabs, picture sliders live as you drag and kept, the render resolution |
 | rs580 | instanced meshes culled by a sphere round all their instances: a town's palisade is drawn from every side of the town |
 | rs579 | the atlas tiles are read from their own row: a spider rendered close up shows its fur, against the same spider flat |
 | rs578 | one material for a figure: the finish textures in one atlas, each vertex carrying its tile, roughness, metalness and skin flag; a figure one skinned mesh plus its eyes, a prop one mesh, a townsperson in nine draws or fewer |
@@ -433,6 +434,7 @@ Screenshots go to `tools/tests/shots/`.
 | zinout | into a building and back out (`ZREAL=1` with the sliced warm-up on): shots inside, just out and later, and the frame times |
 | ztex | every textured material in town before a building visit and after: maps gone, empty or flat, and any disposed |
 | zfence | a town's instanced meshes from four corners and the middle: whether the culling draws the ones in view |
+| zset | the settings page on one tab (`ZTAB`, default picture) |
 | zhair | heads with each hairstyle from four sides, and under helmets |
 | zplate | plate armour on builds from slight to heavy |
 | zunder | the creator's undressed figures by race and sex |

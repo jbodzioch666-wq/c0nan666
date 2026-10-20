@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-581 - Settings in tabs, no edge flashes
+- **No more flashing screen edges:** in dungeons the screen's edges lit up red when you were hit, green every time you healed, which with life coming back a little at a time was over and over, gold on a level, and pulsed red when your life was low. They're all off now. Your life orb shows the same. Switch them back on under Effects if you liked them.
+- **Settings in tabs:** Sound, Graphics, Picture, Effects and Interface, each on its own page, instead of one long list.
+- **Picture sliders:** brightness, contrast, colour, the glow round bright lights, and the dark edges. They change the view as you drag, and go over each place's own look, so 100% is the game as it was.
+- **Render resolution:** a slider from 50% to 100% for drawing fewer pixels on a big screen. The game still steps down by itself when the frame rate drops.
+- **More switches:** the big spells' screen flash, and the soft shadows in dungeon corners, can each be turned off.
+
 ## RS-580 - The town fence stays up
 - **Palisades drawn from anywhere in town:** a town's fence of stakes is drawn as one batch, and since the three.js upgrade (RS-574) that batch was tested for being in view by the shape of a single stake at the town's corner. From anywhere but that corner the whole fence vanished, leaving only its rail and the gate. Each batch of repeated things is now tested by a sphere round all of it, worked out again whenever its pieces move or their number changes, so flocks and the plants kept to the view stay right too.
 
