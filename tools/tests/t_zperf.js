@@ -28,7 +28,7 @@ module.exports = async page=>{
       const loop = ()=>{ const t = performance.now(); fr.push(t - last); last = t; try{ const R = G.gameMode===3 ? V3.renderer : G.gameMode===0 ? O3.renderer : FPD.r; if (R){ calls += R.info.render.calls; tris += R.info.render.triangles; nInfo++; } }catch(e){} if (on) requestAnimationFrame(loop); }; requestAnimationFrame(loop);
       // walk: a step every 220ms, round a square, turning where it's blocked
       const dirs = [[1,0],[0,1],[-1,0],[0,-1]]; let di = 0, n = 0; const t0 = performance.now();
-      while (performance.now() - t0 < secs*1000){ const p = G.gameMode===0 ? G.owPos : G.player, x0 = p.x, y0 = p.y; try{ tryMove(dirs[di][0], dirs[di][1]); }catch(e){} const p2 = G.gameMode===0 ? G.owPos : G.player; n++;
+      while (performance.now() - t0 < secs*1000){ const p = G.gameMode===0 ? G.owPos : G.player, x0 = p.x, y0 = p.y; if (G.gameMode!==0){ const nx = p.x + dirs[di][0], ny = p.y + dirs[di][1], tt = G.map[nx] && G.map[nx][ny]; if (tt!==T_FLOOR || (G.gameMode===1 && dgDoorAt(nx, ny))){ di = (di + 1) % 4; await new Promise(r=>setTimeout(r, 10)); continue; } } try{ tryMove(dirs[di][0], dirs[di][1]); }catch(e){}   /* (streets and floors only: never through a door, onto stairs or a trap) */ const p2 = G.gameMode===0 ? G.owPos : G.player; n++;
         if ((p2.x===x0 && p2.y===y0) || n % 6===0) di = (di + 1) % 4; if (G.ui!=='playing') setUi('playing'); await new Promise(r=>setTimeout(r, 220)); }
       on = false; renderGame = rg; SET.fps = false; for (let i=0;i<4;i++){ await new Promise(r=>setTimeout(r, 16)); try{ gfxGpuPoll(); }catch(e){} }
       const q = (a, p)=>{ const s = a.slice().sort((x,y)=>x-y); return +s[Math.floor(s.length*p)].toFixed(2); };

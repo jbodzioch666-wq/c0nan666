@@ -7,7 +7,10 @@ module.exports = async page=>{
     try{
       const lk = rsPlayerLook();
       const me = m3dInstance({}, lk), sc = new T.Scene(); sc.add(me.holder); me.holder.position.set(5.5, 0, 5.5); ISO.player = me; const rg = me.rig, piv = rg.xbPiv, xb = piv && piv.children[0];
-      out.wk = rg.wk; { const want = new T.Color(G.gear.ranged.rsCol).lerp(new T.Color(0xffffff), 0.15); let hit = false; xb.traverse(o=>{ if (o.isMesh && o.material && o.material.metalness > 0.5){ const c = o.material.color, hs = {}, hw = {}; c.getHSL(hs); want.getHSL(hw); if (Math.abs(hs.h - hw.h) < 0.03 && Math.abs(hs.l - hw.l) < 0.08) hit = true; } }); out.col = hit; } out.parts = ['xbStrL', 'xbStrR', 'xbStrRest', 'xbBolt'].every(n=>piv && piv.getObjectByName(n));
+      out.wk = rg.wk; { const want = new T.Color(G.gear.ranged.rsCol).lerp(new T.Color(0xffffff), 0.15); let hit = false; const near = c=>{ const hs = {}, hw = {}; c.getHSL(hs); want.getHSL(hw); return Math.abs(hs.h - hw.h) < 0.03 && Math.abs(hs.l - hw.l) < 0.08; };
+        xb.traverse(o=>{ if (!o.isMesh || !o.material) return; const mx = o.material.userData.atlas && o.geometry.attributes.aMix, vc = o.geometry.attributes.color;   /* (RS-578: the metal parts ride in the prop's one atlas mesh - their metalness and colour per vertex) */
+          if (mx && vc){ for (let i=0;i<mx.count;i+=3) if (mx.getY(i) > 0.5 && near(new T.Color(vc.getX(i), vc.getY(i), vc.getZ(i)))){ hit = true; break; } }
+          else if (o.material.metalness > 0.5 && near(o.material.color)) hit = true; }); out.col = hit; } out.parts = ['xbStrL', 'xbStrR', 'xbStrRest', 'xbBolt'].every(n=>piv && piv.getObjectByName(n));
       const p = G.player; p.x = 5; p.y = 5; p.facing = 2; p.faceDiag = null; const fv = FACING_VECT[2];
       const gob = { x:5 + fv[0]*5 + (fv[0] ? 0 : 1), y:5 + fv[1]*5 + (fv[1] ? 0 : 1), alive:true, nm:'goblin' }, ge = m3dInstance({}, m3dPortrait({ nm:'goblin' })); sc.add(ge.holder); ge.holder.position.set(gob.x + 0.5, 0.8, gob.y + 0.5); M3D.inst.set(gob, ge); G.mon = [gob];
       me.holder.rotation.y = Math.atan2(fv[0], fv[1]);

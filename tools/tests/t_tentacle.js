@@ -9,7 +9,7 @@ module.exports = async page=>{
       e.anim(rig, 0.7, 0, 0, 0, 0, e); const p0 = list.map(A=>A.tb.geometry.attributes.position.array.slice());
       e.anim(rig, 0.7, 0, 0, 1, 0, e); let moved = 0; list.forEach((A, i)=>{ const p1 = A.tb.geometry.attributes.position.array; for (let j=0;j<p1.length;j+=7) moved = Math.max(moved, Math.abs(p1[j] - p0[i][j])); });
       const e2 = m3dInstance({ nm }, m3dPortrait({ nm })); e2.anim(e2.rig, 2.0, 1, 0, 0, 0, e2);
-      e.holder.updateMatrixWorld(true); const box = new THREE.Box3().setFromObject(e.holder); let verts = 0, gold = 0; e.holder.traverse(x=>{ if (x.isMesh){ verts += x.geometry.attributes.position.count; if (x.material.metalness > 0.5) gold++; } });
+      e.holder.updateMatrixWorld(true); const box = new THREE.Box3().setFromObject(e.holder); let verts = 0, gold = 0; e.holder.traverse(x=>{ if (x.isMesh){ verts += x.geometry.attributes.position.count; const mx = x.material.userData.atlas && x.geometry.attributes.aMix; if (mx){ for (let i=0;i<mx.count;i+=3) if (mx.getY(i) > 0.5){ gold++; break; } } else if (x.material.metalness > 0.5) gold++; } });   /* (RS-578: a gold part rides in the one atlas mesh, its metalness per vertex) */
       out[nm] = { tent:!!rig.tentacled, limbs:list.length, verts, moved:+moved.toFixed(3), own:(e2.rig.arms.length ? e2.rig.arms : e2.rig.stalks || e2.rig.tend)[0].tb.geometry!==tb.geometry, minY:+box.min.y.toFixed(3), crown:gold > 0 };
     }
     return out; });

@@ -29,7 +29,7 @@ module.exports = async page=>{
     saveCurrentGame(); loadGame(G.saveId); A(G.siteKind==='pyramid' && G.gameMode===1, 'back in the pyramid after a reload');
     // a model for every one of them, and for the bosses
     const meshCount = nm=>{ const m = { nm, undead:/mummy|pharaoh/.test(nm) }, pt = m3dPortrait(m); if (!pt) return -1; const e = m3dInstance(m, pt); let n = 0; e.holder.traverse(o=>{ if (o.isMesh) n++; }); return n; };
-    out.models = {}; for (const nm of TOMB_TIERS.map(t=>t[0]).concat(['risen pharaoh','Apep','Ammit'])){ out.models[nm] = meshCount(nm); A(out.models[nm] > 3, nm+' has a model: '+out.models[nm]); }
+    out.models = {}; for (const nm of TOMB_TIERS.map(t=>t[0]).concat(['risen pharaoh','Apep','Ammit'])){ out.models[nm] = meshCount(nm); A(out.models[nm] >= 1, nm+' has a model: '+out.models[nm]); }   /* (RS-578: a beast is its one atlas mesh and little else) */
     // the boss floor: the pharaoh, or one of the gods
     saveLevelCache(G.depth); loadLevel(G.dungeonMaxDepth, false); setUi('playing');
     const boss = G.mon[G.bossIdx]; out.boss = boss && boss.nm;

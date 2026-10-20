@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs578 | one material for a figure: the finish textures in one atlas, each vertex carrying its tile, roughness, metalness and skin flag; a figure one skinned mesh plus its eyes, a prop one mesh, a townsperson in nine draws or fewer |
 | rs577 | lighter land: still things stop recomputing their matrices (unfrozen when they move), plants drawn only within sight (none in view missing), cloth stepped at most sixty times a second |
 | rs576 | steadier town frames: no shadows from tiny parts (figures, town), the town sun shadow round what is in view, background work in idle time in short slices, room boards painted ahead a few rows a step (same picture) |
 | rs575 | lighter frames: animals and beasts off screen leave the frame (hidden, matrices skipped) and come back up to date in view; your figure sculpted lighter out in the world on every machine (see rs563) |
@@ -417,6 +418,14 @@ Screenshots go to `tools/tests/shots/`.
 | zdraws | draw calls and triangles of a view's frame (`ZSAVE`, `ZVIEW`), with and without the shadow pass; shadow casters by size; figures' meshes and why their parts aren't merged |
 | zsk3 | in a dungeon from a fresh start: when the skeleton's background sculpt finishes and a skeleton gets its model |
 | ztris | the land's heaviest meshes by triangles (`ZSAVE`; `ZNOVC=1` without the plant culling) |
+| zparts | the unmerged parts of a few creator figures: which rig key refers to each, whether posing moves it, what it is |
+| zparts2 | the same for the spawn town's own people, with their skinned meshes' material makes |
+| zleft | in the spawn town: every figure, its draws, and each part not in the atlas mesh with the reason |
+| zmons | a few creatures stood round you on a dungeon floor, for a close look (`ZMONS='[...]'`) |
+| zrd | a beast's ragdoll after the merge (`ZMON`): what the body measure sees, its lowest point after the fall, with `ZFREEZE=1` after its joints were left still |
+| zlp | the look preview's figure build timed piece by piece: the atlas draws, the sculpt tries, the skinning, the instance, each render |
+| zinst | what an instance of your figure costs, piece by piece: the template, the clone, the boxes, the material copies |
+| ztri | the skinning merge profiled by what it calls, and the dye works' figure timed |
 | zhair | heads with each hairstyle from four sides, and under helmets |
 | zplate | plate armour on builds from slight to heavy |
 | zunder | the creator's undressed figures by race and sex |

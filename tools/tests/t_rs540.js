@@ -5,8 +5,8 @@ module.exports = async page=>{
   const r = await page.evaluate(()=>{ goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); const out = {};
     const mk = ()=>{ const L = Object.assign(lookDefault('Human'), { body:0, hair:2 }), pt = rsPlayerLook({ race:'Human', look:L, bare:true }); return m3dInstance({}, pt); };
     const e = mk(), e2 = mk(); let hair = null; e.root.traverse(o=>{ if (o.name==='hair') hair = o; });
-    const W = hair.geometry.attributes.hairW, P = hair.geometry.attributes.position; let top = 0, low = 0;
-    for (let i=0;i<P.count;i++){ if (P.getY(i) > 0.13) top = Math.max(top, W.getX(i)); if (P.getY(i) < -0.05) low = Math.max(low, W.getX(i)); }
+    const W = hair.geometry.attributes.hairW, P = hair.geometry.attributes.position; let top = 0, low = 0; hair.geometry.computeBoundingBox(); const bb = hair.geometry.boundingBox;   /* (RS-578: the cards merged into one mesh in the figure's own space: the crown is its top, the ends its bottom) */
+    for (let i=0;i<P.count;i++){ if (P.getY(i) > bb.max.y - 0.06) top = Math.max(top, W.getX(i)); if (P.getY(i) < bb.min.y + 0.08) low = Math.max(low, W.getX(i)); }
     out.wTop = top; out.wLow = low;
     /* the GPU compiles it, and the uniform is this figure's own */
     const sc = new THREE.Scene(); sc.add(new THREE.HemisphereLight(0xffffff, 0x404040, 1)); sc.add(e.holder); sc.add(e2.holder); e2.holder.position.x = 3;

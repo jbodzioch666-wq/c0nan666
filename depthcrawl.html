@@ -24352,8 +24352,8 @@ try{ if (typeof THREE!=='undefined') gfxThreeSetup(); }catch(e){}   /* (three ma
 /* (RS-576) a part too small to throw a shadow worth drawing - a barrel's hoop, a button, a buckle, a small box on a shelf - stops casting
    one: the town's shadow pass drew some 160 of these every time it ran, for shadows a few pixels across. (Instanced meshes, whose one
    small shape stands for many, are left as they are) */
-function gfxPruneCasters(root, minR){
-  if (!root) return 0; minR = minR || 0.09; let n = 0; const v = new THREE.Vector3(); root.updateMatrixWorld(true);
+function gfxPruneCasters(root, minR, asIs){
+  if (!root) return 0; minR = minR || 0.09; let n = 0; const v = new THREE.Vector3(); if (!asIs) root.updateMatrixWorld(true);   /* (asIs: the matrices as the last frame left them) */
   root.traverse(o=>{ if (!o.isMesh || o.isInstancedMesh || !o.castShadow || !o.geometry || !o.geometry.attributes || !o.geometry.attributes.position) return; const g = o.geometry; if (!g.boundingSphere) g.computeBoundingSphere();
     o.getWorldScale(v); const r = g.boundingSphere.radius*Math.max(Math.abs(v.x), Math.abs(v.y), Math.abs(v.z)); if (r < minR){ g.userData.noCast = true; o.castShadow = false; n++; } });   /* (on the geometry, which every copy of a figure shares - and see gfxThreeSetup: a part marked so never casts, whatever sets it later) */
   return n;
@@ -32095,7 +32095,9 @@ function doorPrewarm(){
 function v3Render(){
   if (!v3Init()) return false;
   v3HoverTick();
-  if (V3.world && V3.world.children.length!==V3.pruneN){ V3.pruneN = V3.world.children.length; try{ gfxPruneCasters(V3.world); }catch(e){} }   /* (RS-576: and what's added to the town after it's built - its folk, its props) */
+  if (V3.world && V3.world!==V3.pruneW){ V3.pruneW = V3.world; V3.pruneAt = 0; }
+  if (V3.world && V3.pruneAt < 3 && (V3.frameN||0) % 30===10){ V3.pruneAt++; try{ gfxPruneCasters(V3.world, 0.09, true); }catch(e){} }   /* (RS-576: and what's added to the town just after it's built - its folk, its props; RS-578: three times in the first seconds, not on every puff of smoke) */
+  V3.frameN = (V3.frameN||0) + 1;
   if (V3.stepping) return true;          // (a step taken from inside this frame: the frame itself will draw it)
   const T = THREE, now = performance.now(), dt = V3.last ? Math.min(0.1, (now-V3.last)/1000) : 0.016; V3.last = now; V3.t = (V3.t||0) + dt;
   if (V3.door && (V3.door.t > 4 || G.gameMode!==3)){ V3.door = null; doorFade(0); V3.labels.style.opacity = '1'; }   /* (never left half way through a door) */
@@ -33819,7 +33821,9 @@ function m3dSkinnable(pt, tpl){
   if (r.subs || r.bird || r.mimic || r.ooze || r.vortex) return false;
   return true;
 }
+const M3D_SKIN_STATE = new WeakMap();   /* (RS-578: a template whose merge ran out of time, to be picked up next try) */
 function m3dSkinRoot(root, rig, mats){
+  const S0 = M3D_SKIN_STATE.get(root); if (S0) return m3dSkinGroups(root, S0);   /* (RS-578: picked up where the last try left off) */
   const T = THREE, skip = new Set(), seen = new Set(), out = { made:0, gone:0 };
   const walk = (v, d)=>{ if (!v || typeof v!=='object' || seen.has(v) || d > 6) return; seen.add(v); if (v.isObject3D){ skip.add(v); return; } if (v.isMaterial || v.isBufferGeometry || v.isColor || v.isVector3) return; const vals = Array.isArray(v) ? v : Object.values(v); for (const x of vals) walk(x, d+1); };
   walk(rig, 0); const rigRef = new Set(skip);
@@ -33827,53 +33831,74 @@ function m3dSkinRoot(root, rig, mats){
   const props = []; for (const k of ['weapon', 'shield', 'offWpn', 'tome']) if (rig && rig[k] && rig[k].isObject3D){ props.push(rig[k]); rig[k].traverse(o=>skip.add(o)); }
   root.updateMatrixWorld(true);
   const groups = new Map(), bones = [], boneIx = new Map(), rootInv = new T.Matrix4().copy(root.matrixWorld).invert(), plainCompile = T.Material.prototype.onBeforeCompile;
-  root.traverse(o=>{ if (!o.isMesh || o===root || o.isInstancedMesh || o.isSkinnedMesh || skip.has(o) || !o.visible) return; const m = o.material; if (!m || Array.isArray(m) || m.transparent || m.visible===false) return;
-    if (m.userData.special || m.userData.bend || (m.onBeforeCompile!==plainCompile && !m.userData.rim)) return;   /* (a shader of its own - a bending body, ice, slime, leaves - keeps its own mesh) */
+  /* (RS-578) a part the rig points at by name - a feather the wing fans, a tail segment, the chest kept for dressing - merges too,
+     with itself as its bone: it stays in the figure, hidden, and the merged mesh's vertices follow it as the pose turns it. A prop
+     (held, dropped, swapped) keeps its own meshes, as does anything whose geometry is rewritten as it moves (the cloth, by its
+     userData) */
+  const propSet = new Set(); for (const g of props) g.traverse(o=>propSet.add(o));
+  root.traverse(o=>{ if (!o.isMesh || o===root || o.isInstancedMesh || o.isSkinnedMesh || propSet.has(o) || !o.visible) return; const m = o.material; if (!m || Array.isArray(m) || m.visible===false) return;
+    const hair = m.userData.special==='hairCard';   /* (RS-578: a figure's hair, beard and moustache cards share one material - and now one mesh, its soft fringes another) */
+    if (!hair && (m.transparent || m.userData.special || m.userData.bend || (m.onBeforeCompile!==plainCompile && !m.userData.rim))) return;   /* (a shader of its own - a bending body, ice, slime, leaves - keeps its own mesh) */
     if (Object.keys(o.userData).length) return; const ga = o.geometry && o.geometry.attributes; if (!ga || !ga.position || !ga.normal || (o.geometry.morphAttributes && Object.keys(o.geometry.morphAttributes).length)) return;
     for (let q = o.parent; q && q!==root; q = q.parent) if (!q.visible) return;
-    /* (parts that differ only in colour share one mesh: the colour goes into the vertices, and the mesh gets one material of that make) */
-    const k = m3dMergeKey(o); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(o);
-    const j = o.parent; if (!boneIx.has(j)){ boneIx.set(j, bones.length); bones.push(j); } });
+    /* (parts that differ only in colour share one mesh: the colour goes into the vertices, and the mesh gets one material of that make;
+       RS-578: and parts of any finish share the atlas mesh) */
+    const k = hair ? 'hair|' + m.uuid + '|' + Object.keys(ga).filter(n=>n!=='color').sort().join(',') : m3dAtlasOk(o) ? m3dAtlasKey(o) : m3dMergeKey(o); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(o);
+    const j = skip.has(o) ? o : o.parent; if (!boneIx.has(j)){ boneIx.set(j, bones.length); bones.push(j); } });
   const N = new T.Matrix3(), v = new T.Vector3(), M = new T.Matrix4(), skel = bones.length ? new T.Skeleton(bones) : null, made = [];   /* (one skeleton for the whole figure: its joints are worked out once a frame, not once per mesh) */
   const bo = bones.map(b=>new T.Vector3().setFromMatrixPosition(b.matrixWorld).applyMatrix4(rootInv));   /* (where each joint sits in the bind pose, for its reach) */
-  for (const list of groups.values()){ if (list.length < 2) continue; const reach = new Map();
+  const S = { groups:[...groups], gi:0, g:null, skip, out, boneIx, bo, bones, rootInv, skel, made, mats, props, rigRef }; M3D_SKIN_STATE.set(root, S);
+  return m3dSkinGroups(root, S);
+}
+/* (RS-578) the groups merged one part at a time: in a sliced build (m3dTemplateTry) a try that runs out of time stops between
+   two parts and the next try carries on - a big figure's hide, a hundred thousand vertices, no longer lands in one frame */
+function m3dSkinGroups(root, S){
+  const T = THREE, { groups, skip, out, boneIx, bo, rootInv, skel, made, mats, props, rigRef } = S, N = new T.Matrix3(), v = new T.Vector3(), M = new T.Matrix4();
+  for (; S.gi < groups.length; S.gi++){ const [gk, list] = groups[S.gi]; if (list.length < 2) continue; const atlas = gk.startsWith('atlas|'), hair = gk.startsWith('hair|'); let G = S.g; if (!G){
     const names = Object.keys(list[0].geometry.attributes).filter(n=>n!=='color' && list.every(o=>o.geometry.attributes[n])); let nv = 0, ni = 0;   /* (RS-402: only what every part has - a loose merge may join parts with and without texture coordinates) */
     for (const o of list){ const g = o.geometry; nv += g.attributes.position.count; ni += g.index ? g.index.count : g.attributes.position.count; }
     const outA = {}; for (const nm of names) outA[nm] = new Float32Array(nv*list[0].geometry.attributes[nm].itemSize); const col = new Float32Array(nv*3);
-    const si = new Uint16Array(nv*4), sw = new Float32Array(nv*4), idx = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni); let vo = 0, io = 0;
-    for (const o of list){ const g = o.geometry, c = g.attributes.position.count, b = boneIx.get(o.parent); M.multiplyMatrices(rootInv, o.matrixWorld); N.getNormalMatrix(M); const flip = M.determinant() < 0;   /* (a mirrored part - a left hand, a left wing - has its triangles turned back the right way round) */
+    const si = new Uint16Array(nv*4), sw = new Float32Array(nv*4), idx = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni);
+    G = S.g = { names, outA, col, si, sw, idx, vo:0, io:0, pi:0, reach:new Map() }; }
+    const { names, outA, col, si, sw, idx, reach } = G; let vo = G.vo, io = G.io;
+    for (; G.pi < list.length; G.pi++){ const o = list[G.pi], g = o.geometry, c = g.attributes.position.count, b = boneIx.get(skip.has(o) ? o : o.parent); M.multiplyMatrices(rootInv, o.matrixWorld); N.getNormalMatrix(M); const flip = M.determinant() < 0;   /* (a mirrored part - a left hand, a left wing - has its triangles turned back the right way round) */
       const mc = o.material.color, vc = o.material.vertexColors && g.attributes.color ? g.attributes.color : null;
       for (const nm of names){ const a = g.attributes[nm], is = a.itemSize, dst = outA[nm], A = a.array, e = M.elements, n = N.elements;
-        if ((nm==='position' || nm==='normal') && !a.isInterleavedBufferAttribute && is===3 && !a.normalized){   /* (RS-520: straight off the arrays - a Vector3 a vertex was most of a template's skinning) */
-          if (nm==='position'){ const bx = bo[b].x, by = bo[b].y, bz = bo[b].z; let rr = reach.get(b)||0;
+        if ((nm==='position' || nm==='normal' || nm==='hairTan') && !a.isInterleavedBufferAttribute && is===3 && !a.normalized){   /* (RS-520: straight off the arrays - a Vector3 a vertex was most of a template's skinning; RS-578: a hair card's tangent turns like its normal) */
+          if (nm==='position'){ let bx = reach.get(b); if (!bx){ bx = [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity]; reach.set(b, bx); }   /* (RS-578: the box of what hangs from each joint, in the bind pose - the culling sphere's ball for it is centred on that, not on the joint) */
             for (let i=0;i<c;i++){ const x = A[i*3], y = A[i*3+1], z = A[i*3+2], w = 1/(e[3]*x + e[7]*y + e[11]*z + e[15]), px = (e[0]*x + e[4]*y + e[8]*z + e[12])*w, py = (e[1]*x + e[5]*y + e[9]*z + e[13])*w, pz = (e[2]*x + e[6]*y + e[10]*z + e[14])*w, o3 = (vo+i)*3;
-              dst[o3] = px; dst[o3+1] = py; dst[o3+2] = pz; const d = Math.sqrt((px-bx)*(px-bx) + (py-by)*(py-by) + (pz-bz)*(pz-bz)); if (d > rr) rr = d; }
-            if (rr > (reach.get(b)||0) || !reach.has(b)) reach.set(b, rr); }
+              dst[o3] = px; dst[o3+1] = py; dst[o3+2] = pz; if (px < bx[0]) bx[0] = px; if (py < bx[1]) bx[1] = py; if (pz < bx[2]) bx[2] = pz; if (px > bx[3]) bx[3] = px; if (py > bx[4]) bx[4] = py; if (pz > bx[5]) bx[5] = pz; } }
           else for (let i=0;i<c;i++){ const x = A[i*3], y = A[i*3+1], z = A[i*3+2]; let nx = n[0]*x + n[3]*y + n[6]*z, ny = n[1]*x + n[4]*y + n[7]*z, nz = n[2]*x + n[5]*y + n[8]*z; const l = Math.sqrt(nx*nx + ny*ny + nz*nz); if (l > 0){ nx /= l; ny /= l; nz /= l; } const o3 = (vo+i)*3; dst[o3] = nx; dst[o3+1] = ny; dst[o3+2] = nz; }
           continue; }
+        if (nm!=='position' && nm!=='normal' && !a.isInterleavedBufferAttribute && !a.normalized && A.length >= c*is){ dst.set(A.subarray(0, c*is), vo*is); continue; }   /* (RS-578: texture coordinates and the rest copied in one go) */
         for (let i=0;i<c;i++){
-          if (nm==='position'){ v.fromBufferAttribute(a, i).applyMatrix4(M); dst[(vo+i)*3] = v.x; dst[(vo+i)*3+1] = v.y; dst[(vo+i)*3+2] = v.z; const d = v.distanceTo(bo[b]); if (d > (reach.get(b)||0)) reach.set(b, d); }
+          if (nm==='position'){ v.fromBufferAttribute(a, i).applyMatrix4(M); dst[(vo+i)*3] = v.x; dst[(vo+i)*3+1] = v.y; dst[(vo+i)*3+2] = v.z; let bx = reach.get(b); if (!bx){ bx = [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity]; reach.set(b, bx); }
+            if (v.x < bx[0]) bx[0] = v.x; if (v.y < bx[1]) bx[1] = v.y; if (v.z < bx[2]) bx[2] = v.z; if (v.x > bx[3]) bx[3] = v.x; if (v.y > bx[4]) bx[4] = v.y; if (v.z > bx[5]) bx[5] = v.z; }
           else if (nm==='normal'){ v.fromBufferAttribute(a, i).applyMatrix3(N).normalize(); dst[(vo+i)*3] = v.x; dst[(vo+i)*3+1] = v.y; dst[(vo+i)*3+2] = v.z; }
           else for (let k=0;k<is;k++) dst[(vo+i)*is+k] = a.array[i*is+k]; } }
       const VA = vc && !vc.isInterleavedBufferAttribute && !vc.normalized && vc.itemSize===3 ? vc.array : null;
       for (let i=0;i<c;i++){ si[(vo+i)*4] = b; sw[(vo+i)*4] = 1; const r = VA ? VA[i*3] : vc ? vc.getX(i) : 1, gg = VA ? VA[i*3+1] : vc ? vc.getY(i) : 1, bb = VA ? VA[i*3+2] : vc ? vc.getZ(i) : 1; col[(vo+i)*3] = r*mc.r; col[(vo+i)*3+1] = gg*mc.g; col[(vo+i)*3+2] = bb*mc.b; }
       if (g.index){ const ia = g.index.array; if (flip) for (let i=0;i+2<ia.length;i+=3){ idx[io++] = ia[i] + vo; idx[io++] = ia[i+2] + vo; idx[io++] = ia[i+1] + vo; } else for (let i=0;i<ia.length;i++) idx[io++] = ia[i] + vo; }
       else if (flip) for (let i=0;i+2<c;i+=3){ idx[io++] = vo + i; idx[io++] = vo + i + 2; idx[io++] = vo + i + 1; } else for (let i=0;i<c;i++) idx[io++] = vo + i;
-      vo += c; }
+      vo += c; G.vo = vo; G.io = io;
+      if (M3D_BUDGET && G.pi + 1 < list.length && performance.now() > M3D_BUDGET){ G.pi++; throw M3D_YIELD; } }   /* (out of time: the rest next try) */
     const mg = new T.BufferGeometry(); for (const nm of names) mg.setAttribute(nm, new T.BufferAttribute(outA[nm], list[0].geometry.attributes[nm].itemSize));
     mg.setAttribute('color', new T.BufferAttribute(col, 3)); mg.setAttribute('skinIndex', new T.BufferAttribute(si, 4)); mg.setAttribute('skinWeight', new T.BufferAttribute(sw, 4)); mg.setIndex(new T.BufferAttribute(idx.subarray(0, io), 1)); mg.computeBoundingSphere(); mg.computeBoundingBox();
-    mg.userData.reach = { ix:[...reach.keys()], r:[...reach.values()] };   /* (RS-379: each joint this mesh hangs from, and how far its vertices reach from it - see m3dSkinWrap) */
-    const m0 = list[0].material, mat = m0.clone(); mat.color.setRGB(1, 1, 1); mat.vertexColors = true; mat.userData = Object.assign({}, m0.userData); if (m0.userData.rim) m3dRimify(mat); if (mat.emissive && mats) mats.push(mat);
-    const sm = new T.SkinnedMesh(mg, mat); sm.castShadow = list[0].castShadow; sm.receiveShadow = list[0].receiveShadow; sm.userData.skinned = list.length;
+    { const ix = [...reach.keys()], r = [], cc = []; for (const b of ix){ const bx = reach.get(b), cx = (bx[0] + bx[3])/2, cy = (bx[1] + bx[4])/2, cz = (bx[2] + bx[5])/2; r.push(Math.hypot(bx[3] - bx[0], bx[4] - bx[1], bx[5] - bx[2])/2);
+        v.set(cx, cy, cz).applyMatrix4(M.multiplyMatrices(rootInv, S.bones[b].matrixWorld).invert()); cc.push(v.x, v.y, v.z); }   /* (the box's centre in the joint's own frame, so it rides with the joint) */
+      mg.userData.reach = { ix, r, c:cc }; }   /* (RS-379: each joint this mesh hangs from, and how far its vertices reach round it - see m3dSkinWrap; RS-578: from the centre of what hangs there) */
+    let mat; if (atlas) mat = m3dAtlasBake(list, mg); else if (hair) mat = list[0].material;   /* (the hair cards' own material, shader and all) */
+    else { const m0 = list[0].material; mat = m0.clone(); mat.color.setRGB(1, 1, 1); mat.vertexColors = true; mat.userData = Object.assign({}, m0.userData); if (m0.userData.rim) m3dRimify(mat); if (mat.emissive && mats) mats.push(mat); }
+    const sm = new T.SkinnedMesh(mg, mat); if (hair) sm.name = (list.find(o=>o.name==='hair') || list[0]).name;   /* (RS-578: named as its hair, for whatever looks the hair up) */ sm.castShadow = atlas ? list.some(o=>o.castShadow) : list[0].castShadow; sm.receiveShadow = atlas ? list.some(o=>o.receiveShadow) : list[0].receiveShadow; sm.userData.skinned = list.length;
     root.add(sm); sm.updateMatrixWorld(true); sm.bind(skel); out.made++; made.push(sm);
-    for (const o of list){ o.parent.remove(o); out.gone++; } }
+    for (const o of list){ if (skip.has(o)){ o.visible = false; o.userData.ownBone = 1; } else o.parent.remove(o); out.gone++; } S.g = null; }   /* (RS-578: a part that is its own bone stays, hidden) */
   /* (RS-379) still culled like any other mesh - a mesh that is never culled is drawn into every torch's shadow map, six faces
      each, whether the torch can see it or not. A copy's meshes get a sphere that follows the joints each frame (m3dSkinWrap);
      the template keeps one round the whole standing figure, a little generous, as the fallback. A corpse thrown by the blow
      is let off culling in m3dKill */
   if (made.length){ const box = new T.Box3(); for (const sm of made){ box.union(sm.geometry.boundingBox); } const sph = box.getBoundingSphere(new T.Sphere()); sph.radius = sph.radius*1.25 + 0.1*(box.max.y - box.min.y); for (const sm of made) sm.geometry.boundingSphere = sph.clone(); }
   for (const g of props){ const R = m3dMergeProp(g, rigRef); out.made += R.made; out.gone += R.gone; }
-  return out;
+  M3D_SKIN_STATE.delete(root); return out;
 }
 /* (RS-414) a creature's copy let go of for good: what is its own on the graphics card - each skinned mesh's geometry (only its
    wrapper: the buffers are the template's, shared by every copy, so they're taken off it first or they'd go too), a hit box,
@@ -33899,9 +33924,10 @@ function m3dSkinWrap(sm){
   g2.boundingBox = g.boundingBox; g2.userData = g.userData; g2.name = g.name; g2.isSkinWrap = true;
   const base = g.boundingSphere ? g.boundingSphere.clone() : new T.Sphere(new T.Vector3(), 1), cur = base.clone(), R = g.userData.reach, inv = new T.Matrix4(), p = new T.Vector3(), c = new T.Vector3(); let key = null, over = null;
   Object.defineProperty(g2, 'boundingSphere', { configurable:true, get(){ if (over) return over; if (!R || !R.ix.length || !sm.skeleton) return base; const k = FP.t; if (k===key) return cur; key = k;
-      const bones = sm.skeleton.bones, ix = R.ix, rr = R.r, n = ix.length; inv.copy(sm.matrixWorld).invert(); let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
-      for (let i=0;i<n;i++){ p.setFromMatrixPosition(bones[ix[i]].matrixWorld).applyMatrix4(inv); if (p.x < x0) x0 = p.x; if (p.x > x1) x1 = p.x; if (p.y < y0) y0 = p.y; if (p.y > y1) y1 = p.y; if (p.z < z0) z0 = p.z; if (p.z > z1) z1 = p.z; }
-      c.set((x0 + x1)/2, (y0 + y1)/2, (z0 + z1)/2); let rad = 0; for (let i=0;i<n;i++){ p.setFromMatrixPosition(bones[ix[i]].matrixWorld).applyMatrix4(inv); const d = p.distanceTo(c) + rr[i]; if (d > rad) rad = d; }
+      const bones = sm.skeleton.bones, ix = R.ix, rr = R.r, cc = R.c, n = ix.length; inv.copy(sm.matrixWorld).invert(); let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
+      const at = i=>{ const m = bones[ix[i]].matrixWorld; if (cc) p.set(cc[i*3], cc[i*3+1], cc[i*3+2]).applyMatrix4(m); else p.setFromMatrixPosition(m); p.applyMatrix4(inv); };   /* (RS-578: the ball centred on what hangs from the joint) */
+      for (let i=0;i<n;i++){ at(i); if (p.x < x0) x0 = p.x; if (p.x > x1) x1 = p.x; if (p.y < y0) y0 = p.y; if (p.y > y1) y1 = p.y; if (p.z < z0) z0 = p.z; if (p.z > z1) z1 = p.z; }
+      c.set((x0 + x1)/2, (y0 + y1)/2, (z0 + z1)/2); let rad = 0; for (let i=0;i<n;i++){ at(i); const d = p.distanceTo(c) + rr[i]; if (d > rad) rad = d; }
       cur.center.copy(c); cur.radius = rad*1.12 + base.radius*0.01; return cur; }, set(v){ over = v || null; } });
   sm.geometry = g2;
 }
@@ -33916,6 +33942,81 @@ function m3dMergeKey(o){
   return m.type + '|' + (m.map ? m.map.uuid : '') + '|' + (m.normalMap ? m.normalMap.uuid : '') + '|' + (m.bumpMap ? m.bumpMap.uuid : '') + '|' + m.roughness + '|' + m.metalness + '|' + m.side + '|' + (m.flatShading ? 1 : 0) + '|' + (m.emissive ? m.emissive.getHex() : '') + '|' + (m.emissiveIntensity||0) + '|' + (m.userData.rim ? 'r' : '') + '|' + (m.alphaTest||0) + '|' + (m.normalScale ? m.normalScale.x.toFixed(2) : '') + '|' + (m.bumpScale||0)
       + '|' + (o.castShadow ? 1 : 0) + (o.receiveShadow ? 1 : 0) + '|' + Object.keys(ga).filter(n=>n!=='color').sort().join(',');
 }
+/* (RS-578) one material for a figure's whole hide and clothes. A figure was drawn as seven to eleven skinned meshes, one per kind of
+   finish - skin, wool, leather, mail, plate, horn - each with its own small texture and its own roughness; a town's twenty-odd folk
+   were most of its draws, twice over with their shadows. Now the eleven finish textures (and their normal maps) sit as tiles in one
+   atlas, each tile wrapped a little way round itself for the mipmaps, and every vertex carries which tile it reads, how rough and
+   how metallic it is, and whether it's skin (for the warm scattering of RS-528) - so all of a figure's rim-lit standard parts merge
+   into one skinned mesh, and a prop's rigid parts into one mesh. Still apart: what glows, what's see-through, hair cards, cloth */
+const M3D_ATLAS = { N:256, pad:16, cell:288, cols:4 };
+function m3dAtlas(){
+  if (M3D.atlas) return M3D.atlas;
+  const T = THREE, A = M3D_ATLAS, S = A.cell*A.cols, mk = ()=>{ const c = v3Canvas(S, S); return [c, c.getContext('2d')]; };
+  const [mc, mx] = mk(), [nc, nx] = mk(); nx.fillStyle = '#8080ff'; nx.fillRect(0, 0, S, S); mx.fillStyle = '#ffffff'; mx.fillRect(0, 0, S, S);
+  const map = new T.CanvasTexture(mc), nrm = new T.CanvasTexture(nc); for (const t of [map, nrm]){ t.anisotropy = 4; t.wrapS = t.wrapT = T.ClampToEdgeWrapping; }
+  return (M3D.atlas = { map, nrm, mx, nx, byUuid:new Map(), drawn:new Set(), uAtl:{ value:new T.Vector4(A.N/S, A.pad/S, A.cell/S, A.cols) } });
+}
+/* a kind's tile drawn into the atlas when first wanted (its pattern exists by then: a part's material was made from it) */
+function m3dAtlasDraw(kind){
+  const at = m3dAtlas(), A = M3D_ATLAS, i = M3D_PAT_KINDS.indexOf(kind), pt = M3D.pat && M3D.pat[kind]; if (i < 0 || !pt) return -2;
+  if (!at.drawn.has(kind)){ at.drawn.add(kind); const cx = (i % A.cols)*A.cell, cy = Math.floor(i/A.cols)*A.cell;
+    for (const [tex, ctx] of [[pt.map, at.mx], [pt.nrm, at.nx]]){ const img = tex.image; ctx.save(); ctx.beginPath(); ctx.rect(cx, cy, A.cell, A.cell); ctx.clip();
+      for (let dy=-1; dy<=1; dy++) for (let dx=-1; dx<=1; dx++) ctx.drawImage(img, cx + A.pad + dx*A.N, cy + A.pad + dy*A.N); ctx.restore(); }
+    at.map.needsUpdate = true; at.nrm.needsUpdate = true; at.byUuid.set(pt.map.uuid, i); at.byUuid.set(pt.nrm.uuid, i); }
+  return i;
+}
+/* a material's tile: -1 for none (a plain colour), -2 when it can't go in the atlas (a map that isn't one of the patterns) */
+function m3dAtlasTile(m){
+  if (!m.map) return m.normalMap ? -2 : -1;
+  const at = m3dAtlas(); let i = at.byUuid.get(m.map.uuid);
+  if (i===undefined){ for (const k in (M3D.pat||{})) if (M3D.pat[k] && M3D.pat[k].map===m.map){ i = m3dAtlasDraw(k); break; } }
+  if (i===undefined || i < 0) return -2; if (m.normalMap && at.byUuid.get(m.normalMap.uuid)!==i) return -2; return i;
+}
+function m3dAtlasOk(o){
+  const m = o.material; if (M3D_LOOSE || !m || !m.isMeshStandardMaterial || m.userData.atlas || m.transparent || m.flatShading || m.side===THREE.BackSide) return false;
+  if (m.bumpMap || m.alphaMap || m.roughnessMap || m.metalnessMap || m.emissiveMap || m.alphaTest || (m.emissive && m.emissive.getHex() && m.emissiveIntensity)) return false;
+  const ga = o.geometry && o.geometry.attributes; if (!ga || !ga.uv) return false;
+  return m3dAtlasTile(m) >= -1;
+}
+/* (the shadow flags aren't in the key: a template's parts carry whatever their builders left, and a copy sets its own on every part) */
+function m3dAtlasKey(o){ return 'atlas|' + (o.material.side===THREE.DoubleSide ? 'd' : '') + '|' + Object.keys(o.geometry.attributes).filter(n=>n!=='color').sort().join(','); }
+/* the merged geometry gets each vertex's tile, roughness, metalness, skin flag and normal strength; and the one material */
+function m3dAtlasBake(list, mg){
+  const nv = mg.attributes.position.count, mix = new Float32Array(nv*4), mix2 = new Float32Array(nv); let vo = 0;
+  for (const o of list){ const m = o.material, c = o.geometry.attributes.position.count, t = m3dAtlasTile(m), sk = m.userData.kind==='skin' ? 2 : m.userData.rim ? 1 : 0, ns = m.normalScale ? m.normalScale.x : 1;   /* (w: 0 plain, 1 rim-lit, 2 skin) */
+    for (let i=0;i<c;i++){ const k = (vo + i)*4; mix[k] = m.roughness; mix[k+1] = m.metalness; mix[k+2] = t; mix[k+3] = sk; mix2[vo + i] = ns; } vo += c; }
+  mg.setAttribute('aMix', new THREE.BufferAttribute(mix, 4)); mg.setAttribute('aMix2', new THREE.BufferAttribute(mix2, 1));
+  return m3dAtlasMat(list[0].material.side);
+}
+function m3dAtlasMat(side){
+  const at = m3dAtlas(), m = new THREE.MeshStandardMaterial({ map:at.map, normalMap:at.nrm, vertexColors:true, roughness:1, metalness:0, side:side||THREE.FrontSide });
+  m.userData = { atlas:true, rim:true, kind:'atlas', hex:'#ffffff' }; return m3dRimify(m);
+}
+/* the atlas material's shader: the tile read with the texture's own gradients, so mipmaps come from the tile and not the seams of the
+   atlas, and never coarser than a sixteenth of it (the wrapped margin covers that); roughness, metalness, the normal map's strength
+   and the skin's scattering from the vertex */
+function m3dAtlasify(m){
+  m.onBeforeCompile = (sh, r)=>{
+    if (!M3D.rim.value) M3D.rim.value = new THREE.Color(0.12, 0.1, 0.08);
+    sh.uniforms.uRim = M3D.rim; sh.uniforms.uAtl = m3dAtlas().uAtl;
+    const gl2 = !r || !r.capabilities || r.capabilities.isWebGL2!==false;
+    sh.vertexShader = 'attribute vec4 aMix; attribute float aMix2; varying vec4 vMix; varying float vMix2;\n' + sh.vertexShader.replace('#include <uv_vertex>', '#include <uv_vertex>\n  vMix = aMix; vMix2 = aMix2;');
+    sh.fragmentShader = 'uniform vec3 uRim; uniform vec4 uAtl; varying vec4 vMix; varying float vMix2;\n' +
+      'vec2 atlUv(vec2 uv, float t){ return vec2(mod(t, uAtl.w), floor(t/uAtl.w))*uAtl.z + uAtl.y + fract(uv)*uAtl.x; }\n' +
+      (gl2 ? 'vec4 atlTex(sampler2D s, vec2 uv, float t){ vec2 gx = dFdx(uv)*uAtl.x, gy = dFdy(uv)*uAtl.x; float gl = max(length(gx), length(gy)), cap = uAtl.x/16.0; if (gl > cap){ gx *= cap/gl; gy *= cap/gl; } return textureGrad(s, atlUv(uv, t), gx, gy); }\n'
+           : 'vec4 atlTex(sampler2D s, vec2 uv, float t){ return texture2D(s, atlUv(uv, t)); }\n') +
+      sh.fragmentShader
+        .replace('#include <map_fragment>', '  if (vMix.z >= 0.0){ vec4 sampledDiffuseColor = atlTex(map, vMapUv, vMix.z); diffuseColor *= sampledDiffuseColor; }')
+        .replace('#include <roughnessmap_fragment>', '  float roughnessFactor = vMix.x;')
+        .replace('#include <metalnessmap_fragment>', '  float metalnessFactor = vMix.y;')
+        .replace('#include <normal_fragment_maps>', '  if (vMix.z >= 0.0){ vec3 mapN = atlTex(normalMap, vNormalMapUv, vMix.z).xyz * 2.0 - 1.0; mapN.xy *= vMix2; normal = normalize( tbn * mapN ); }')
+        .replace('#include <opaque_fragment>', 'float rimOn = step(0.5, vMix.w), skinOn = step(1.5, vMix.w), rimF = pow(1.0 - clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0), 3.0) * rimOn;\n  outgoingLight += uRim * rimF;\n' +
+          '  float sssF = pow(1.0 - clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0), 1.7) * skinOn;\n  outgoingLight += totalDiffuse * vec3(0.55, 0.13, 0.06) * sssF + reflectedLight.indirectDiffuse * vec3(0.26, 0.08, 0.05) * skinOn;\n#include <opaque_fragment>');
+  };
+  m.customProgramCacheKey = ()=>'m3datlas';
+  m.userData.rim = true; m.userData.atlas = true;
+  return m;
+}
 /* (RS-379) a prop - a shield of planks, rim, boss and a ring of rivets was sixty draws - baked into one mesh per material,
    inside its own group, so it still hangs from the hand, swings with it and flies from it whole. Only its rigid parts: anything
    the rig points at (a pivot that keeps a bow upright, a staff's swirl) and everything under it keeps its own mesh */
@@ -33928,9 +34029,9 @@ function m3dMergeProp(group, rigRef){
     let hold = group; for (let q = o.parent; q && q!==group; q = q.parent){ if (!q.visible || rigRef.has(q)) return; if (q.name && hold===group) hold = q; }
     /* (RS-423) a named part (a tome's open and shut books) is merged within itself, so showing one and hiding the other still works -
        merged up into the prop, the open book's pages stayed showing inside the shut one */
-    const k = hold.uuid + '|' + m3dMergeKey(o); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(o); o.userData._mh = hold; });
+    const k = hold.uuid + '|' + (m3dAtlasOk(o) ? m3dAtlasKey(o) : m3dMergeKey(o)); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(o); o.userData._mh = hold; });   /* (RS-578: a prop's parts of any finish share the atlas mesh) */
   const N = new T.Matrix3(), v = new T.Vector3(), M = new T.Matrix4();
-  for (const list of groups.values()){ const hold = list[0].userData._mh || group; for (const o of list) delete o.userData._mh; if (list.length < 2) continue;
+  for (const [gk, list] of groups){ const hold = list[0].userData._mh || group; for (const o of list) delete o.userData._mh; if (list.length < 2) continue; const atlas = gk.includes('|atlas|');
     const hinv = hold===group ? inv : new T.Matrix4().copy(hold.matrixWorld).invert();
     const names = Object.keys(list[0].geometry.attributes).filter(n=>n!=='color' && list.every(o=>o.geometry.attributes[n])); let nv = 0, ni = 0;   /* (RS-402: only what every part has - a loose merge may join parts with and without texture coordinates) */
     for (const o of list){ const g = o.geometry; nv += g.attributes.position.count; ni += g.index ? g.index.count : g.attributes.position.count; }
@@ -33947,8 +34048,8 @@ function m3dMergeProp(group, rigRef){
       vo += c; }
     const mg = new T.BufferGeometry(); for (const nm of names) mg.setAttribute(nm, new T.BufferAttribute(outA[nm], list[0].geometry.attributes[nm].itemSize));
     mg.setAttribute('color', new T.BufferAttribute(col, 3)); mg.setIndex(new T.BufferAttribute(idx.subarray(0, io), 1)); mg.computeBoundingSphere(); mg.computeBoundingBox();
-    const m0 = list[0].material, mat = m0.clone(); mat.color.setRGB(1, 1, 1); mat.vertexColors = true; mat.userData = Object.assign({}, m0.userData); if (m0.userData.rim) m3dRimify(mat);
-    const mesh = new T.Mesh(mg, mat); mesh.castShadow = list[0].castShadow; mesh.receiveShadow = list[0].receiveShadow; mesh.userData.merged = list.length; hold.add(mesh); out.made++;
+    let mat; if (atlas) mat = m3dAtlasBake(list, mg); else { const m0 = list[0].material; mat = m0.clone(); mat.color.setRGB(1, 1, 1); mat.vertexColors = true; mat.userData = Object.assign({}, m0.userData); if (m0.userData.rim) m3dRimify(mat); }
+    const mesh = new T.Mesh(mg, mat); mesh.castShadow = atlas ? list.some(o=>o.castShadow) : list[0].castShadow; mesh.receiveShadow = atlas ? list.some(o=>o.receiveShadow) : list[0].receiveShadow; mesh.userData.merged = list.length; hold.add(mesh); out.made++;
     for (const o of list){ o.parent.remove(o); out.gone++; } }
   return out;
 }
@@ -35692,6 +35793,7 @@ function* m3dPatternGen(kind){
 M3D.rim = { value:null };                             // (made on first use: three.js may never load)
 function m3dRimify(m){
   if (!m || m.isMeshBasicMaterial || m.isSpriteMaterial) return m;
+  if (m.userData && m.userData.atlas) return m3dAtlasify(m);   /* (RS-578) */
   m.onBeforeCompile = (sh)=>{
     if (!M3D.rim.value) M3D.rim.value = new THREE.Color(0.12, 0.1, 0.08);
     sh.uniforms.uRim = M3D.rim;
@@ -36689,7 +36791,8 @@ function m3dHairSwU(m){ const d = m.userData; if (!d.hsw || !d.hsw.value || !d.h
 const M3D_HAIRSW = new WeakMap();
 function m3dHairSway(r, tNow){
   const h = r && r.head; if (!h) return; let H = M3D_HAIRSW.get(r); const T = THREE;
-  if (!H){ const ms = []; h.traverse(o=>{ if (o.isMesh && o.material && o.material.userData.special==='hairCard' && !ms.includes(o.material)) ms.push(o.material); }); H = { ms, p:null, v:new T.Vector3(), q:new T.Vector3(), d:new T.Vector3(), g:new T.Vector3(), m3:new T.Matrix3(), t:0 }; M3D_HAIRSW.set(r, H); }
+  if (!H){ const ms = [], add = o=>{ if (o.isMesh && o.material && o.material.userData.special==='hairCard' && !ms.includes(o.material)) ms.push(o.material); }; h.traverse(add);
+    for (let a = h.parent; a && !a.isScene && !ms.length; a = a.parent) a.children.forEach(add);   /* (RS-578: the cards merged into one mesh, a child of the figure's root - looked for up the tree, a level at a time, so another figure's hair is never taken) */ H = { ms, p:null, v:new T.Vector3(), q:new T.Vector3(), d:new T.Vector3(), g:new T.Vector3(), m3:new T.Matrix3(), t:0 }; M3D_HAIRSW.set(r, H); }
   if (!H.ms.length) return;
   const now = tNow != null ? tNow : performance.now()/1000, dt = Math.min(1/20, now - H.t); H.t = now;
   h.updateWorldMatrix(true, false); const E = h.matrixWorld.elements, s = Math.hypot(E[0], E[1], E[2]) || 1;
@@ -40428,7 +40531,7 @@ function m3dTemplate(pt){
   return m3dTemplateSkin(pt, key, m3dBuilders().get(pt.paint)(pt.o||{}));
 }
 function m3dTemplateSkin(pt, key, t){
-  if (m3dSkinnable(pt, t)){ const meta = M3D.meta.get(t); try{ const R = m3dSkinRoot(t, meta.rig, null); meta.skinned = R.made; meta.skinnedParts = R.gone; }catch(err){ console.error(err); meta.skinned = 0; } }   /* (RS-379: one skinned mesh per material, once per template) */
+  if (m3dSkinnable(pt, t)){ const meta = M3D.meta.get(t); try{ const R = m3dSkinRoot(t, meta.rig, null); meta.skinned = R.made; meta.skinnedParts = R.gone; }catch(err){ if (err===M3D_YIELD) throw err; console.error(err); meta.skinned = 0; } }   /* (RS-379: one skinned mesh per material, once per template; RS-578: or over several tries) */
   try{ const bb = new THREE.Box3().setFromObject(t), H = Math.max(0.05, bb.max.y - bb.min.y); gfxPruneCasters(t, H*0.1); }catch(e){}   /* (RS-576: a template is sculpted at its own scale - the size is the figure's own, about 9cm on a man) */
   M3D.tpl.set(key, t);
   return t;
@@ -41168,7 +41271,7 @@ function m3dBlowOf(hit){
   return { k, up, side, push };
 }
 function m3dDeathPrep(e, m, hit){
-  const T = THREE, root = e.root, hold = e.holder; hold.updateMatrixWorld(true);
+  const T = THREE, root = e.root, hold = e.holder; hold.traverse(o=>{ if (o.__afz){ o.__afz = false; o.matrixAutoUpdate = true; } }); hold.updateMatrixWorld(true);   /* (RS-578: a joint that stood still long enough to be left as it was (RS-577) is woken - the fall turns every one of them) */
   const rootInv = new T.Matrix4().copy(root.matrixWorld).invert(), boxR = new T.Box3(), v = new T.Vector3();
   root.traverse(o=>{ if (!o.isMesh || !o.geometry || o.material && o.material.visible===false) return; const g = o.geometry; if (!g.boundingBox) g.computeBoundingBox(); const b = g.boundingBox;
     for (let i=0;i<8;i++){ v.set(i&1 ? b.max.x : b.min.x, i&2 ? b.max.y : b.min.y, i&4 ? b.max.z : b.min.z).applyMatrix4(o.matrixWorld); boxR.expandByPoint(v.applyMatrix4(rootInv)); } });
@@ -41398,7 +41501,7 @@ function m3dBodyBall(e, bones, c, s, fallback, limbs){
   const T = THREE, hold = e.holder, v = new T.Vector3(), ds = [], set = new Set(bones.filter(Boolean)), skip = new Set((limbs||[]).filter(Boolean));
   hold.updateMatrixWorld(true);
   e.root.traverse(o=>{ if (!o.isMesh || !o.geometry || !o.geometry.attributes.position) return; const pa = o.geometry.attributes.position;
-    if (o.isSkinnedMesh && o.skeleton){ const si = o.geometry.attributes.skinIndex; if (!si) return; const ix = new Set(); o.skeleton.bones.forEach((bn, k)=>{ if (set.has(bn)) ix.add(k); }); if (!ix.size) return;
+    if (o.isSkinnedMesh && o.skeleton){ const si = o.geometry.attributes.skinIndex; if (!si) return; const ix = new Set(); o.skeleton.bones.forEach((bn, k)=>{ let q = bn, mine = false; while (q && q!==e.root){ if (skip.has(q)) return; if (set.has(q)) mine = true; q = q.parent; } if (mine) ix.add(k); }); if (!ix.size) return;   /* (RS-578: a bone under the body's joint counts as the body's, as a loose part under it did - the whole hide is one skinned mesh now, its bones the joints of every part) */
       const st = Math.max(1, Math.floor(pa.count/900)); for (let i=0;i<pa.count;i+=st){ if (!ix.has(si.getX(i))) continue; v.fromBufferAttribute(pa, i); o.boneTransform(i, v); v.applyMatrix4(o.matrixWorld); hold.worldToLocal(v); ds.push(v.distanceTo(c)/s); } return; }
     let q = o.parent, mine = false; while (q && q!==e.root){ if (skip.has(q)) return; if (set.has(q)) mine = true; q = q.parent; } if (!mine) return;
     const st = Math.max(1, Math.floor(pa.count/600)); for (let i=0;i<pa.count;i+=st){ v.fromBufferAttribute(pa, i).applyMatrix4(o.matrixWorld); hold.worldToLocal(v); ds.push(v.distanceTo(c)/s); } });
@@ -43773,7 +43876,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-577';
+const GAME_VERSION = 'rs-578';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -44219,18 +44322,22 @@ function lpMount(){
   }catch(e){ console.error(e); }
 }
 function lpAimY(){ const y0 = LP.y0||0, h = LP.fh||1, k = (LP.zoom - 1)/(LP_ZMAX - 1); return y0 + (0.5 + 0.34*Math.min(1, k*1.4))*h; }   /* (RS-527: the middle of the figure as it stands, toward its face as you zoom) */
+function lpStand(pt, coarse){
+  const st = pt.stature||1; if (LP.e) LP.scene.remove(LP.e.holder);
+  try{ LP.e = coarse ? m3dPlayerBuild(()=>m3dInstance({}, pt)) : m3dInstance({}, pt); LP.e.holder.scale.setScalar(st/LP.e.H); LP.scene.add(LP.e.holder);
+    /* (RS-527) framed to the figure as it stands - hat, horns, ears and boots - so a tall wood elf or a dwarf in a great helm fits head to foot */
+    try{ m3dPoseHumanoid(LP.e.rig, 0, 0, 0, 0, 0, LP.e); }catch(err){} LP.e.holder.updateMatrixWorld(true); const bx = new THREE.Box3().setFromObject(LP.e.holder);
+    LP.y0 = Math.min(0, bx.min.y); LP.fh = Math.max(0.3, bx.max.y - LP.y0); LP.f = LP.fh*1.18/1.1; }catch(err){ console.error(err); LP.e = null; }
+}
 function lpFrame(){
   LP.raf = 0;
   const cv = LP.r && LP.r.domElement; if (!cv || !cv.isConnected) return;
   const spec = lpSpec(); if (!spec) return;
   const key = JSON.stringify(spec) + (spec.bare ? '' : rsLookKey());
   if (key!==LP.key){ LP.key = key; try{ LP.pend = { pt:rsPlayerLook(spec) }; }catch(err){ console.error(err); LP.pend = null; } }   /* (RS-525: a changed look is sculpted a few ms a frame - see m3dTemplateTry - the figure you had standing until the new one is ready) */
+  if (LP.pend && !LP.e && !LP.pend.stood){ LP.pend.stood = true; const pt = LP.pend.pt; try{ if (m3dPlayerBuild(()=>M3D.tpl.has(m3dTplKey(pt)))) lpStand(pt, true); }catch(err){ console.error(err); } }   /* (RS-578: nothing standing yet - the lighter figure you walk about as (RS-575), if it's made, stands in while this one is sculpted) */
   if (LP.pend){ let tpl = null; try{ tpl = m3dTemplateTry(LP.pend.pt, performance.now() + 12); }catch(err){ console.error(err); LP.pend = null; }
-    if (tpl){ const pt = LP.pend.pt, st = pt.stature||1; LP.pend = null; if (LP.e) LP.scene.remove(LP.e.holder);
-      try{ LP.e = m3dInstance({}, pt); LP.e.holder.scale.setScalar(st/LP.e.H); LP.scene.add(LP.e.holder);
-        /* (RS-527) framed to the figure as it stands - hat, horns, ears and boots - so a tall wood elf or a dwarf in a great helm fits head to foot */
-        try{ m3dPoseHumanoid(LP.e.rig, 0, 0, 0, 0, 0, LP.e); }catch(err){} LP.e.holder.updateMatrixWorld(true); const bx = new THREE.Box3().setFromObject(LP.e.holder);
-        LP.y0 = Math.min(0, bx.min.y); LP.fh = Math.max(0.3, bx.max.y - LP.y0); LP.f = LP.fh*1.18/1.1; }catch(err){ console.error(err); LP.e = null; } } }
+    if (tpl){ const pt = LP.pend.pt; LP.pend = null; lpStand(pt, false); } }
   { const hint = cv.parentElement && cv.parentElement.querySelector('.lkhint'); if (hint){ const t = LP.pend ? 'sculpting...' : 'drag to turn'; if (hint.textContent!==t) hint.textContent = t; } }
   { const f = LP.f, z = LP.zoom, ty = LP.panY==null ? lpAimY() : (LP.panY = Math.max((LP.y0||0) + 0.1*(LP.fh||1), Math.min((LP.y0||0) + 0.9*(LP.fh||1), LP.panY)));   /* (RS-497: closer as you zoom, toward the face unless you've panned) */
     LP.cam.position.set(0, ty + 0.1*f/z, 2.05*f/z); LP.cam.lookAt(0, ty, 0); }
