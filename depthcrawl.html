@@ -20520,9 +20520,24 @@ function o3MerchantFig(){
 /* (RS-401) a creature out on the land is posed only while the camera can see it, and one far from you only every other frame: a
    serpent or a many-legged thing rebuilds its body's tube on the CPU each time it's posed, and zoomed out there could be
    dozens. The pose is worked from the clock, so a skipped frame just holds it. The view is last frame's (the camera barely moves) */
+/* (RS-577) the land's trees, bushes, rocks and grass are instanced across the whole window built round you - some 15,000 of them and
+   most of the land's million and a half triangles, drawn and shadowed whether in view or not. Whenever the camera has moved a little,
+   each kind is rewritten to hold only those within sight - with a margin, so a tree just out of view still throws its shadow in */
+function o3VegCull(F){
+  const W = O3.world; if (!W || window.__noVegCull) return;
+  if (O3.vcW !== W){ O3.vcW = W; O3.vcList = []; W.traverse(o=>{ if (o.isInstancedMesh && o.userData.icull) O3.vcList.push(o); }); O3.vcKey = ''; }
+  const c = O3.cam, k = Math.round(c.position.x*4) + ',' + Math.round(c.position.y*4) + ',' + Math.round(c.position.z*4) + ',' + Math.round(c.quaternion.y*200) + ',' + Math.round(c.quaternion.w*200) + ',' + Math.round((c.zoom||1)*20) + ',' + Math.round(c.fov||0);
+  if (k===O3.vcKey) return; O3.vcKey = k;
+  const S = O3.vcS || (O3.vcS = new THREE.Sphere());
+  for (const im of O3.vcList){ const U = im.userData.icull, A = im.instanceMatrix.array, C = im.instanceColor ? im.instanceColor.array : null; let n = 0; S.radius = U.r + 3.5;
+    for (let i=0;i<U.n;i++){ const b = i*16; S.center.set(U.m[b+12], U.m[b+13], U.m[b+14]); if (!F.intersectsSphere(S)) continue;
+      for (let j=0;j<16;j++) A[n*16+j] = U.m[b+j]; if (C && U.c) for (let j=0;j<3;j++) C[n*3+j] = U.c[i*3+j]; n++; }   /* (always from the whole list: the slots were last filled for another view) */
+    im.count = n; im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; }
+}
 function o3AnimTick(){
   const T = THREE, F = O3.fr || (O3.fr = new T.Frustum()), m = O3.frM || (O3.frM = new T.Matrix4());
   O3.cam.updateMatrixWorld(); m.multiplyMatrices(O3.cam.projectionMatrix, O3.cam.matrixWorldInverse); F.setFromProjectionMatrix(m); O3.animN = (O3.animN||0) + 1;
+  try{ o3VegCull(F); }catch(e){ console.error(e); }   /* (RS-577) */
   if (O3.animN % 8 === 0) o3CreatureShadows();
 }
 /* (RS-401) a creature out on the land throws a shadow only within a dozen tiles of you: zoomed out, the deer, birds and beasts far
@@ -24437,7 +24452,23 @@ function gfxWarmCard(){   /* (the loading card stays up while the driver links, 
   try{ const el = document.getElementById('loadCard'); if (el){ el.classList.add('show'); clearTimeout(loadingCard.tm); loadingCard.tm = setTimeout(()=>el.classList.remove('show'), 900); } }catch(e){}
   if (!gfxWarmCard.raf) gfxWarmCard.raf = requestAnimationFrame(()=>{ gfxWarmCard.raf = 0; try{ renderGame(); }catch(e){} });
 }
+/* (RS-577) whatever stands still stops working out its own matrix every frame: three recomposes the matrix of every object that's left
+   to it, each frame, moved or not - some 2,400 of them on the land, most never moving. Each frame a quarter of a scene's objects is
+   checked against where it last stood; one that hasn't moved in four checks running is frozen (its matrix made once), and one that
+   moves again is unfrozen at its next check. Cameras, lights and bones, always on the move, aren't watched */
+function gfxAutoFreeze(scene){
+  const A = scene.__af || (scene.__af = { list:[], f:0 }); A.f++;
+  if (A.f % 60===1){ const L = A.list = []; scene.traverse(o=>{ if (o!==scene && (o.matrixAutoUpdate || o.__afz) && !o.isCamera && !o.isLight && !o.isBone) L.push(o); }); }
+  const L = A.list;
+  for (let i = A.f & 3; i < L.length; i += 4){ const o = L[i], p = o.position, q = o.quaternion, k = o.scale, a = o.__afs;
+    if (!a){ if (o.matrixAutoUpdate) o.__afs = [p.x, p.y, p.z, q.x, q.y, q.z, q.w, k.x, k.y, k.z, 0]; continue; }
+    if (a[0]===p.x && a[1]===p.y && a[2]===p.z && a[3]===q.x && a[4]===q.y && a[5]===q.z && a[6]===q.w && a[7]===k.x && a[8]===k.y && a[9]===k.z){
+      if (!o.__afz && o.matrixAutoUpdate && ++a[10] >= 4){ o.updateMatrix(); o.matrixAutoUpdate = false; o.__afz = true; } }
+    else { a[0] = p.x; a[1] = p.y; a[2] = p.z; a[3] = q.x; a[4] = q.y; a[5] = q.z; a[6] = q.w; a[7] = k.x; a[8] = k.y; a[9] = k.z; a[10] = 0;
+      if (o.__afz){ o.__afz = false; o.matrixAutoUpdate = true; } } }
+}
 function gfxRender(r, scene, cam, view){
+  if (!window.__noAutoFreeze) try{ gfxAutoFreeze(scene); }catch(e){}
   try{ const V = view==='v3' ? V3 : view==='o3' ? O3 : view==='fpd' ? FPD : null; if (V && V.warmWait && gfxWarmStep(V)) return; }catch(e){}
   gfxShadowTick(r, view); if (SET.fps){ gfxGpuMark(r, 'shadow'); gfxGpuPoll(); } try{ gfxRenderInner(r, scene, cam, view); } finally { gfxGpuStop(); } }
 /* (RS-380) in a town and on the open land the sun's shadow map is drawn every other frame, every third on a phone or when
@@ -32707,6 +32738,8 @@ function* o3VegetationGen(grp, x0, y0, W){
         c.copy(base).multiplyScalar(0.8 + shade*0.4); gfxTint(c, kind, pn, shade); im.setColorAt(i, c);
       });
       im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true;
+      if (!geo.boundingSphere) geo.computeBoundingSphere();   /* (RS-577: kept whole, for o3VegCull to draw only what's in view) */
+      im.userData.icull = { m:im.instanceMatrix.array.slice(), c:im.instanceColor ? im.instanceColor.array.slice() : null, n:list.length, r:geo.boundingSphere.radius*1.4*0.62 + geo.boundingSphere.center.length()*0.62 };
       grp.add(im);
     }
   }
@@ -37087,6 +37120,7 @@ function m3dFastNormals(geo){
   for (let i=0;i<na.length;i+=3){ const l = Math.sqrt(na[i]*na[i] + na[i+1]*na[i+1] + na[i+2]*na[i+2]) || 1; na[i] /= l; na[i+1] /= l; na[i+2] /= l; }
   nrm.needsUpdate = true;
 }
+const M3D_CLOTH_STEP = 1/62;   /* (RS-577: the cloth's step: sixty a second, a touch under so a 60Hz screen still gets one every frame) */
 function m3dCapeCloth(c, r, dtIn, pre){
   if (!c || !c.geometry || !c.userData.grid) return; const T = THREE, K = M3D_CLOTH;
   if (!K.m){ K.m = new T.Matrix4(); K.d = new T.Matrix4(); K.v = new T.Vector3(); K.w = new T.Vector3(); K.a = new T.Vector3(); K.b = new T.Vector3(); }
@@ -37104,6 +37138,7 @@ function m3dCapeCloth(c, r, dtIn, pre){
   const reset = ()=>{ u.P = Float32Array.from(u.rest); u.Q = Float32Array.from(u.rest); u.M = M.clone(); u.t = now; A.set(u.P); pos.needsUpdate = true; c.geometry.computeVertexNormals(); };
   if (!u.P){ reset(); for (let i=0;i<40;i++) m3dCapeCloth(c, r, 1/60, true); return; }   /* (RS-459: and settled at once - onto a tail, say - not seen settling) */
   if (dtIn===undefined && u.manual) return; if (dtIn!==undefined && !pre) u.manual = true;   /* (stepped by hand, in a test: the frame's own steps stand aside) */
+  if (dtIn===undefined && now - u.t < M3D_CLOTH_STEP) return;   /* (RS-577: sixty steps a second at most; in between it rides on the body as it hangs) */
   let dt = dtIn===undefined ? now - u.t : dtIn; if (dtIn===undefined) u.t = now; if (!(dt > 0.0005)) return; dt = Math.min(dt, 0.05);
   const P = u.P, Q = u.Q, R = u.rest, inv = K.m.copy(M).invert(), D = K.d.multiplyMatrices(inv, u.M); u.M.copy(M);
   /* (carried over: where each point was in the world, seen from where the body is now) */
@@ -40548,6 +40583,9 @@ function m3dSkirtCloth(m, r){
       for (let i=0;i<NG;i++){ const dx = (base ? base[i*3] : A[i*3]) - bx, dy = (base ? base[i*3+1] : A[i*3+1]) - by, dz = (base ? base[i*3+2] : A[i*3+2]) - bz, d = dx*dx + dy*dy + dz*dz; if (d < bd){ bd = d; best = i; } }
       u.cap[j - NG] = best; } }   /* (the caps ride on the ring they close) */
   const TW = u.TW, P = u.P, V = u.V, O = u.O;
+  /* (RS-577) worked at most sixty times a second: in between, the cloth keeps the hang it last had on the pose as it is now - run every
+     drawn frame, it cost the same each frame at 240 a second as at 60 */
+  if (!u.fresh && u.solved && now - u.t < M3D_CLOTH_STEP){ for (let k=0;k<N*3;k++) A[k] += O[k]; return; }
   for (let i=0;i<N;i++){ const k = i*3, x = A[k], y = A[k+1], z = A[k+2]; TW[k] = E[0]*x + E[4]*y + E[8]*z + E[12]; TW[k+1] = E[1]*x + E[5]*y + E[9]*z + E[13]; TW[k+2] = E[2]*x + E[6]*y + E[10]*z + E[14]; }
   const dt = Math.min(1/30, now - u.t); u.t = now;
   const sy = Math.hypot(E[4], E[5], E[6]) || 1;
@@ -40581,7 +40619,7 @@ function m3dSkirtCloth(m, r){
   /* the cloth where it is now, and the state brought into line with what's drawn */
   for (let i=0;i<N;i++){ const k = i*3, x = A[k] + O[k], y = A[k+1] + O[k+1], z = A[k+2] + O[k+2]; A[k] = x; A[k+1] = y; A[k+2] = z;
     P[k] = E[0]*x + E[4]*y + E[8]*z + E[12]; P[k+1] = E[1]*x + E[5]*y + E[9]*z + E[13]; P[k+2] = E[2]*x + E[6]*y + E[10]*z + E[14]; }
-  u.rest = !wd && vmax < 2e-3 && omax < 1.5e-3;   /* (in the wind it never quite hangs still) */
+  u.rest = !wd && vmax < 2e-3 && omax < 1.5e-3; u.solved = true;   /* (in the wind it never quite hangs still) */
   u.mw = E[12].toFixed(4) + ',' + E[14].toFixed(4) + ',' + E[0].toFixed(4) + ',' + E[2].toFixed(4);
 }
 /* (RS-548) a robe in one piece: the skirt's cloth runs on up from the hips over the waist to under the bust, laid just over the bodice
@@ -43735,7 +43773,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-576';
+const GAME_VERSION = 'rs-577';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

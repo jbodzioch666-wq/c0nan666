@@ -6,7 +6,7 @@ const fs = require('fs');
 module.exports = async page=>{
   page.setDefaultTimeout(0);
   const txt = fs.readFileSync(process.env.ZSAVE, 'utf8'), views = (process.env.ZVIEWS || 'land,town,dungeon').split(','), secs = +(process.env.ZSECS || 12);
-  await page.evaluate(w=>{ window.__zwarm = w; }, +(process.env.ZWARM||0));
+  await page.evaluate(([w, naf, nvc])=>{ window.__zwarm = w; window.__noAutoFreeze = naf; window.__noVegCull = nvc; }, [+(process.env.ZWARM||0), !!process.env.ZNOAF, !!process.env.ZNOVC]);
   await page.evaluate(async txt=>{ window.__noWarmSlice = false; const d = JSON.parse(txt).data; importSaveText(txt); loadGame(d.id); saveCurrentGame = ()=>{}; G.player.hp = G.player.maxHp = 99999; setUi('playing'); }, txt);
   const cdp = await page.context().newCDPSession(page); await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval:200 });
   for (const view of views){

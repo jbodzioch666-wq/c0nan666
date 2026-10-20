@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-577 - Lighter land
+- **Still things stay still:** three.js worked out the position of every object in the scene every frame, moved or not. On the open land that's some 2,400 of them, most never moving. Now anything that hasn't moved for a moment is left as it is, and picked up again the moment it moves. That's about nine in ten of the land's objects. It works in towns and dungeons too.
+- **Only the plants you can see:** the trees, bushes, rocks and grass are built across the whole stretch of land kept ready around you, about 10,000 of them, and every one was drawn and cast a shadow, in view or not. Now only those in sight are drawn, about 1,300, with a margin so a tree just off screen still throws its shadow in. The land draws about half as many triangles a frame as before, which matters most on phones.
+- **Cloth at sixty steps a second:** the robes, skirts and cloaks were simulated once every drawn frame, so at 240 frames a second they cost four times what they do at 60, for motion that needs no more than 60. They now step at most 60 times a second and ride with the body in between, saving 40% of the cloth's work at 100 frames a second and 75% at 240. The draping, the swing and the way cloth falls over legs and tails are unchanged.
+
 ## RS-576 - Steadier towns
 - **No shadows from tiny parts:** barrel hoops, buttons, buckles, a beard's edge, small boxes on shelves. Every one of these drew itself into the sun's shadow each time it was updated, for a shadow a few pixels across. They no longer cast one; everything bigger still does. In a town that's some 160 fewer things to draw on each shadow update.
 - **The town's shadow covers what you see:** the sun's shadow in town reached across most of the town, so far-off houses were redrawn into it every time. It now covers what's around you on screen, and the shadows are a little sharper for it.
