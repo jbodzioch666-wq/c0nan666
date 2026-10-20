@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs592 | the walks between scenes: a door swings open before you go in, the town gate opens as you come near and you walk out through it, the stairs walked down into the dark before the next floor |
 | rs591 | roads traced into smooth curves and painted into the ground (verge, bed, ruts, lane strip, old paving), no grass on the bed, no tile-square dirt, stones by the road, the road texture built fast, the old strip on low graphics |
 | rs590 | a robe's cord low on the waist in the robe's trim colour, tied with a bound knot and two tasselled ends |
 | rs589 | the book shut at your side in the barber's chair |
@@ -460,6 +461,7 @@ Screenshots go to `tools/tests/shots/`.
 | zsit | what changes a seated robe's fold from frame to frame, and who calls the normals |
 | zcord | a robe's cord height, where its cloth starts and its top, on a woman and a man |
 | zroad | the roads on the open land: far, close and by a town's gate |
+| zdoor | walking into a building: the door's hinge, frames part way through |
 | zhair | heads with each hairstyle from four sides, and under helmets |
 | zplate | plate armour on builds from slight to heavy |
 | zunder | the creator's undressed figures by race and sex |

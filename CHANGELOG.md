@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-592 - Through the door, out the gate, down the stairs
+
+- **Doors swing open again:** a building's door now opens as you step up to it, and then you walk through. Doors had stopped moving at all: a speed-up that froze the town's still parts froze every door's hinge with them. Going out, the room's own door opens in front of you. Coming in, it shuts behind you.
+- **The town gate opens for you:** a town's gate now stands shut. It swings open as you come up to it and shuts again behind you as you walk away. When you leave town, you walk out through it as it opens before the road comes up. The gates used to stand open for good.
+- **Walking the stairs:** in a dungeon you now walk onto the flight and climb it, or go down it into the dark, before the next floor comes up. On the new floor you come off the end of its stairs onto the floor.
+- **A setting for it:** the Graphics tab has a "walk through gates and down stairs" switch, for anyone who'd rather change floors at once.
+
 ## RS-591 - Worn paths and old roads
 
 - **Roads that curve:** roads used to run from tile centre to tile centre, so any road heading diagonally went in right-angled steps, with a ringed disc at every tile. Each road is now traced from junction to junction, or to a town gate, a bridge or a ferry, and smoothed into one easy curve. Diagonals run straight and bends sweep round.

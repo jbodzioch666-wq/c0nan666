@@ -1451,7 +1451,7 @@ const QUEST_DELIVERY_FLAVORS = ['a token for the temple', 'proof of your mettle'
 // loot pickup, etc, so it can never be allowed to throw and break gameplay
 let _actx = null;
 // ---- player settings (Esc > Settings): volume, graphics, HUD - kept per browser ----
-const SET_DEF = { vol:{ master:1, sfx:1, ui:1, music:0.6, amb:0.8 }, post:true, gfx:'high', phoneTier:false, fps:false, uiScale:1, compact:false, loadCards:true, qb1:true, qb2:true, qbVert1:false, qbVert2:false,
+const SET_DEF = { vol:{ master:1, sfx:1, ui:1, music:0.6, amb:0.8 }, post:true, gfx:'high', phoneTier:false, fps:false, uiScale:1, compact:false, loadCards:true, trans:true, qb1:true, qb2:true, qbVert1:false, qbVert2:false,
   edgeFx:false, lowHpFx:false, spellFlash:true, ao:true, res:1, bright:1, contrast:1, satur:1, bloomK:1, vigK:1 };   /* (RS-581: the screen-edge flashes off by default; the picture's sliders) */   /* (RS-304: two quick bars, on by default, either way up) */
 let SET = JSON.parse(JSON.stringify(SET_DEF));
 try { const sv = JSON.parse(localStorage.getItem('depthcrawl_settings')||'null'); if (sv) SET = Object.assign(SET, sv, { vol:Object.assign({}, SET_DEF.vol, sv.vol||{}) }); } catch(e){}
@@ -7248,14 +7248,15 @@ function tryMove(dx,dy){
     // tower - see advanceTile()/retreatTile()
     case T_STAIRSD:
     case T_STAIRSU: {
-      if (t===advanceTile()){ leavingFloor=true; saveLevelCache(G.depth); loadLevel(G.depth+1, false); sfx('stairs'); }
-      else if (G.depth>1){ leavingFloor=true; saveLevelCache(G.depth); loadLevel(G.depth-1, true); sfx('stairs'); }
+      const adv = t===advanceTile();
+      if (adv || G.depth>1){ leavingFloor = true; const go = ()=>{ saveLevelCache(G.depth); if (adv) loadLevel(G.depth+1, false); else loadLevel(G.depth-1, true); sfx('stairs'); };
+        if (!isoStairWalk(nx, ny, t===T_STAIRSU, go)) go(); }   /* (RS-592: walked up or down the flight first) */
       break;
     }
     case T_EXIT: {
       leavingFloor = true;
       if (G.gameMode===2){ fieldLeave(true); break; }   /* (RS-382: the portal off a field with no way out) */
-      if (G.gameMode===3){ G.gameMode=0; logMsg('you head back out onto the road', 'new'); }
+      if (G.gameMode===3){ const go = ()=>{ G.gameMode = 0; logMsg('you head back out onto the road', 'new'); }; if (!(G.interior==null && v3GateWalk(nx, ny, go))) go(); }   /* (RS-592: out through the gate as it opens) */
       else {
         if (G.dgDone) logMsg(`you step through the portal and out into the open air - the ${SITE_WORD[G.siteKind]||'dungeon'} falls in behind you`, 'magic');
         else logMsg(G.siteKind==='dungeon' ? 'you climb back up to the surface' : 'you climb back down and outside', 'new');
@@ -9390,7 +9391,7 @@ function v3InteriorDoor(grp, mats, gL, dz){
   if (G.villageRace==='halfling'){
     const r = 0.46, cy = 0.08 + r, ring = new T.Mesh(new T.TorusGeometry(r + 0.05, 0.065, 8, 28), mats.wood); ring.position.set(cx, cy, dz); ring.castShadow = true; g.add(ring);
     for (const sx of [-1, 1]) g.add(v3Box(0.12, cy, 0.36, mats.wood, cx + sx*(r + 0.05), cy/2, dz));
-    const pv = new T.Group(); pv.position.set(cx - r, cy, dz - 0.04); g.add(pv);
+    const pv = new T.Group(); pv.position.set(cx - r, cy, dz - 0.04); g.add(pv); pv.userData.sgn = -1; V3.roomDoor = pv;   /* (RS-592: it swings out as you leave) */
     const leaf = new T.Mesh(new T.CylinderGeometry(r - 0.02, r - 0.02, 0.06, 28), v3DoorMat(G.interior && G.interior.key));
     leaf.rotation.x = Math.PI/2; leaf.position.x = r; leaf.castShadow = true; pv.add(leaf);
     const knob = new T.Mesh(new T.SphereGeometry(0.045, 10, 8), mats.gold || mats.iron); knob.position.set(r, 0, -0.05); pv.add(knob);
@@ -9398,7 +9399,7 @@ function v3InteriorDoor(grp, mats, gL, dz){
     const dh = 1.95;
     for (const jx of [gL, gL + 1]) g.add(v3Box(0.14, dh, 0.4, mats.wood, jx, dh/2, dz));
     g.add(v3Box(1.28, 0.16, 0.42, mats.wood, cx, dh + 0.08, dz));
-    const pv = new T.Group(); pv.position.set(gL + 0.08, 0, dz - 0.06); g.add(pv);
+    const pv = new T.Group(); pv.position.set(gL + 0.08, 0, dz - 0.06); g.add(pv); pv.userData.sgn = -1; V3.roomDoor = pv;   /* (RS-592) */
     pv.add(v3Box(0.84, 1.86, 0.06, v3DoorMat(G.interior && G.interior.key), 0.43, 0.95, 0, false));
     for (const y of [0.35, 1.55]) pv.add(v3Box(0.8, 0.07, 0.08, mats.iron, 0.43, y, 0));
     pv.add(v3Box(0.05, 0.12, 0.05, mats.iron, 0.76, 0.98, -0.06));
@@ -23518,7 +23519,7 @@ function townV3Walls(mats, grp){
 let V3_GATE_SHUT = false;
 // (RS-336) a gate's two oak doors, iron-banded, standing open inward against the gateway's sides
 function v3GateDoors(mats, grp, cxm, half, z, H){
-  const T = THREE;
+  const T = THREE; V3.gateAt = { x:cxm, z };
   for (const s of [-1,1]){
     const hinge = new T.Group(); hinge.position.set(cxm + s*half, 0, z); hinge.userData.open = -s*(Math.PI/2 - 0.14); hinge.rotation.y = V3_GATE_SHUT ? 0 : hinge.userData.open; grp.add(hinge);
     hinge.userData.shut = V3_GATE_SHUT; (V3.gateHinges = V3.gateHinges || []).push(hinge);   /* (RS-567: barred before a siege's battle, swung open when the gate gives way) */
@@ -31981,7 +31982,7 @@ function v3BuildScene(){
   V3.parked = parked;   /* (kept for the way back; a later parked town takes its place) */
   V3.worldTown = false; V3.worldKeys = null; V3.worldBefore = Object.assign({}, V3);   /* (what this build sets, for parking - see v3ParkNote) */
   const grp = V3.world = new T.Group(); sc.add(grp);
-  V3.gateHinges = []; V3.windows = []; V3.lamps = []; V3.smoke = []; V3.flames = []; V3.hearthCook = []; V3.signs = []; V3.banners = []; V3.doors = {}; V3.hits = []; V3.people = []; V3.parts = [];
+  V3.gateHinges = []; V3.gateAt = null; V3.roomDoor = null; V3.windows = []; V3.lamps = []; V3.smoke = []; V3.flames = []; V3.hearthCook = []; V3.signs = []; V3.banners = []; V3.doors = {}; V3.hits = []; V3.people = []; V3.parts = [];
   const mats = V3.mats = v3Materials();
   if (G.interior){ v3BuildInterior(grp, mats); v3BuildPeople(grp, mats); V3.worldBefore = null; return; }
   // ground: the painted town square plus the wide surrounding land
@@ -32357,7 +32358,7 @@ function v3Hide(){ if (V3.cv){ V3.cv.style.display = 'none'; V3.labels.style.dis
 // The step through a door changes the game at once, as it always did; only the picture lags behind: the door swings
 // open, you walk into the doorway as the camera leans in, the room is built in the moment you cross the threshold,
 // and the camera eases back out on the other side (and the door swings shut behind you on the way out).
-const DOOR_IN = 0.6, DOOR_OUT = 0.6;
+const DOOR_IN = 0.9, DOOR_OUT = 0.7;   /* (RS-592: long enough to see the door open before you go through it) */
 function doorWalk(enter, key, dx, dy){
   const live = v3Active() && V3.player && V3.mapRef===G.map && G.ui==='playing';
   if (!live){ if (enter) enterInterior(key); else exitInterior(); return; }
@@ -32365,7 +32366,7 @@ function doorWalk(enter, key, dx, dy){
   if (enter) to = new THREE.Vector3(G.player.x+0.5+dx*0.82, 0, G.player.y+0.5+dy*0.82);   /* (into the doorway itself, on the threshold) */
   else { to = new THREE.Vector3(ROOM.door.x+0.5, 0, ROOM.door.y+0.9); key = G.interior && G.interior.key; }
   // (set before the step, so the redraw the step asks for shows the doorway, not the room)
-  V3.path = []; V3.door = { phase:'in', t:0, enter, key, from, to, pv: enter ? V3.doors && V3.doors[key] : null };
+  V3.path = []; V3.door = { phase:'in', t:0, enter, key, from, to, pv: enter ? V3.doors && V3.doors[key] : null, rpv: enter ? null : V3.roomDoor };   /* (RS-592: rpv, the room's own door - it opens as you go out) */
   if (enter) enterInterior(key); else exitInterior();
   if (enter ? !G.interior : !!G.interior){ V3.door = null; doorFade(0); }   // (the door stayed shut - closed for the night)
 }
@@ -32384,17 +32385,24 @@ function doorFade(a){
   if (!V3.fadeEl){ const el = V3.fadeEl = document.createElement('div'); el.style.cssText = 'position:absolute;pointer-events:none;opacity:0;background:radial-gradient(ellipse at center, rgba(24,14,8,0.9) 0%, rgba(4,2,1,1) 70%);'; V3.cv.parentNode.insertBefore(el, V3.labels); }
   const el = V3.fadeEl, cv = V3.cv; el.style.left = cv.style.left; el.style.top = cv.style.top; el.style.width = cv.style.width; el.style.height = cv.style.height; el.style.display = a > 0.001 ? 'block' : 'none'; el.style.opacity = a.toFixed(3);
 }
-function doorSwing(pv, open){ if (!pv) return; pv.rotation.y = pv.userData.sgn*1.7*open; if (pv.userData.glow) pv.userData.glow.material.opacity = Math.min(1, open*1.5); }
+function doorSwing(pv, open){ if (!pv) return; pv.rotation.y = pv.userData.sgn*1.7*open; pv.updateMatrix(); pv.updateMatrixWorld(true); if (pv.userData.glow) pv.userData.glow.material.opacity = Math.min(1, open*1.5); }   /* (RS-592: its matrix made fresh - the still town is frozen, the door with it, so it never swung) */
+/* (RS-592) the scene changes that wait for their walk: a town's gate, a dungeon's stairs (doors change the game at once, and only the
+   picture lags behind). Off for a test browser unless the test asks - the step there changes the scene at once, as the tests expect */
+function transOn(){ return SET.trans!==false && (!navigator.webdriver || !!window.__trans); }
+function transFade(a, cv){
+  let el = document.getElementById('transFade'); if (!el){ el = document.createElement('div'); el.id = 'transFade'; el.style.cssText = 'position:absolute;pointer-events:none;opacity:0;background:radial-gradient(ellipse at center, rgba(20,12,6,0.92) 0%, rgba(3,2,1,1) 72%);'; }
+  if (cv && a > 0.001){ if (el.parentNode!==cv.parentNode || el.previousSibling!==cv) cv.parentNode.insertBefore(el, cv.nextSibling); for (const k of ['left', 'top', 'width', 'height', 'zIndex']) el.style[k] = cv.style[k]; }   /* (over the picture, under the HUD) */
+  el.style.display = a > 0.001 ? 'block' : 'none'; el.style.opacity = a.toFixed(3); }
 // the first half: still showing the side you are leaving
 function doorTickIn(dt){
   const D = V3.door, T = THREE; D.t += dt; const k = Math.min(1, D.t/DOOR_IN), e = k*k*(3-2*k), P = V3.player;
-  if (D.from && P){ const w = Math.min(1, k*1.25); P.g.position.x = D.from.x + (D.to.x - D.from.x)*w; P.g.position.z = D.from.z + (D.to.z - D.from.z)*w;
+  if (D.from && P){ const w = Math.max(0, Math.min(1, (k - 0.22)/0.68));   /* (RS-592: the door swings open first, then you step through) */ P.g.position.x = D.from.x + (D.to.x - D.from.x)*w; P.g.position.z = D.from.z + (D.to.z - D.from.z)*w;
     if (P.e){ const want = Math.atan2(D.to.x - D.from.x, D.to.z - D.from.z); let da = want - (P.yaw||0); da = Math.atan2(Math.sin(da), Math.cos(da)); P.yaw = (P.yaw||0) + da*Math.min(1, dt*12); P.e.holder.rotation.y = P.yaw; m3dPoseHumanoid(P.e.rig, V3.t, m3dEaseMv(P.e, w < 1 ? 1 : 0, dt), 0, 0, 0, P.e); } }
-  if (D.enter) doorSwing(D.pv, Math.min(1, k*2.4));
+  { const o = Math.min(1, k/0.36), oe = o*o*(3 - 2*o); doorSwing(D.enter ? D.pv : D.rpv, oe); }
   const yaw = viewYawNow(), Dd = V3.dist*(1 - 0.42*e), c = D.to, want = new T.Vector3(c.x + Math.sin(yaw)*Dd*0.72, Dd*0.92, c.z + Math.cos(yaw)*Dd*0.72);
   if (!V3.camPos) V3.camPos = want.clone(); else V3.camPos.lerp(want, 1 - Math.exp(-dt*9));
   V3.cam.position.copy(V3.camPos); V3.cam.lookAt(V3.camPos.x - Math.sin(yaw)*Dd*0.72, 0.6, V3.camPos.z - Math.cos(yaw)*Dd*0.72);
-  V3.labels.style.opacity = String(1 - e); doorFade(Math.max(0, (k - 0.55)/0.45));
+  V3.labels.style.opacity = String(1 - e); doorFade(Math.max(0, (k - 0.66)/0.34));
   gfxRender(V3.renderer, V3.scene, V3.cam, 'v3');
   if (k >= 1){ D.phase = 'out'; D.t = 0; return false; }   // (now build the other side)
   return true;
@@ -32404,9 +32412,35 @@ function doorTickOut(dt){
   const D = V3.door; D.t += dt; const k = Math.min(1, D.t/DOOR_OUT);
   doorFade(Math.max(0, 1 - k*1.6)); V3.labels.style.opacity = String(Math.min(1, k*1.4));
   if (!D.enter){ if (D.pv===undefined || D.pv===null) D.pv = V3.doors && V3.doors[D.key]; doorSwing(D.pv, 1 - Math.min(1, k*1.3)); }
+  else { if (!D.rpv) D.rpv = V3.roomDoor; if (D.rpv) doorSwing(D.rpv, k < 0.35 ? 1 : 1 - Math.min(1, (k - 0.35)/0.6)); }   /* (RS-592: and swings shut behind you inside) */
   if (k >= 1){ V3.door = null; doorFade(0); V3.labels.style.opacity = '1'; }
 }
 function doorZoom(){ const D = V3.door; if (!D || D.phase!=='out') return 1; const k = Math.min(1, D.t/DOOR_OUT), e = k*k*(3-2*k); return 0.58 + 0.42*e; }
+/* (RS-592) the town's gate stands shut; it swings open as you come up to it (and stands open for you as you arrive), shutting again
+   behind you - and when you go out, you walk out through it as it opens, before the road. The doors used to stand open for good */
+function v3GateSync(dt){
+  const H = V3.gateHinges, ga = V3.gateAt, pp = V3.player && V3.player.g && V3.player.g.position; if (!H || !H.length || G.interior || !ga) return;
+  const near = !!V3.gate || !!(pp && Math.abs(pp.x - ga.x) < 2.4 && Math.abs(pp.z - ga.z) < 3.0);
+  for (const h of H){ const want = near ? h.userData.open : 0; if (Math.abs(h.rotation.y - want) < 1e-3) continue; h.rotation.y += (want - h.rotation.y)*Math.min(1, dt*(near ? 3.4 : 1.5)); h.updateMatrix(); h.updateMatrixWorld(true); }
+}
+function v3GateWalk(nx, ny, go){
+  if (!transOn() || !v3Active() || !V3.player || !V3.gateAt || G.ui!=='playing') return false;
+  const from = V3.player.g.position.clone(), to = new THREE.Vector3(V3.gateAt.x, 0, V3.gateAt.z + 2.2);
+  V3.path = []; V3.gate = { t:0, from, to, go }; return true;
+}
+function v3GateTick(dt){
+  const D = V3.gate, T = THREE, P = V3.player; D.t += dt; const k = Math.min(1, D.t/1.5), e = k*k*(3 - 2*k);
+  if (P){ const w = Math.max(0, Math.min(1, (k - 0.2)/0.8)); P.g.position.x = D.from.x + (D.to.x - D.from.x)*w; P.g.position.z = D.from.z + (D.to.z - D.from.z)*w;
+    if (P.e){ const want = Math.atan2(D.to.x - D.from.x, D.to.z - D.from.z); let da = want - (P.yaw||0); da = Math.atan2(Math.sin(da), Math.cos(da)); P.yaw = (P.yaw||0) + da*Math.min(1, dt*10); P.e.holder.rotation.y = P.yaw; m3dPoseHumanoid(P.e.rig, V3.t, m3dEaseMv(P.e, w > 0 && w < 1 ? 1 : 0, dt), 0, 0, 0, P.e); } }
+  v3GateSync(dt);
+  const yaw = viewYawNow(), Dd = V3.dist*(1 - 0.18*e), c = P ? P.g.position : D.to, want = new T.Vector3(c.x + Math.sin(yaw)*Dd*0.72, Dd*0.92, c.z + Math.cos(yaw)*Dd*0.72);
+  if (!V3.camPos) V3.camPos = want.clone(); else V3.camPos.lerp(want, 1 - Math.exp(-dt*6));
+  V3.cam.position.copy(V3.camPos); V3.cam.lookAt(V3.camPos.x - Math.sin(yaw)*Dd*0.72, 0.6, V3.camPos.z - Math.cos(yaw)*Dd*0.72);
+  V3.labels.style.opacity = String(1 - e); doorFade(Math.max(0, (k - 0.7)/0.3));
+  gfxRender(V3.renderer, V3.scene, V3.cam, 'v3');
+  if (k >= 1 || D.t > 4){ V3.gate = null; V3.labels.style.opacity = '1'; doorFade(0); try{ D.go(); }catch(err){ console.error(err); } renderGame(); try{ saveCurrentGame(); }catch(err){} }
+  return true;
+}
 // build a room's surfaces ahead of time while you walk up to its door, so stepping in has nothing to wait for
 function doorPrewarm(){
   if (G.interior || !V3.mats || !G.player || v3LowMem()) return;   /* (not on phones: build a room only when you walk in) */ V3.warm = V3.warm || {};
@@ -32427,6 +32461,8 @@ function v3Render(){
   const T = THREE, now = performance.now(), dt = V3.last ? Math.min(0.1, (now-V3.last)/1000) : 0.016; V3.last = now; V3.t = (V3.t||0) + dt;
   if (V3.door && (V3.door.t > 4 || G.gameMode!==3)){ V3.door = null; doorFade(0); V3.labels.style.opacity = '1'; }   /* (never left half way through a door) */
   if (V3.door && V3.door.phase==='in' && doorTickIn(dt)) return true;
+  if (V3.gate && v3GateTick(dt)) return true;   /* (RS-592) */
+  try{ v3GateSync(dt); }catch(e){ console.error(e); }
   if (V3.mapRef !== G.map && V3.buildCard!==G.map && G.gameMode===3 && !G.interior && !window.__noWarmSlice && SET.loadCards!==false && !v3BuildQuick()){ V3.buildCard = G.map; gfxWarmCard(); return true; }   /* (RS-583: a town built from nothing takes a second or two - the loading card is shown the frame before, not after) */
   if (V3.mapRef !== G.map){ V3.mapRef = G.map; v3BuildScene(); V3.path = []; V3.camPos = null; if (V3.door) V3.door.t = 0; V3.compileDue = true; try{ gfxPadLights(V3, V3.scene); }catch(e){} }   /* (RS-502) */
   if (V3.peopleQ && !V3.warmWait) try{ v3PeopleStep(false); }catch(e){ console.error(e); V3.peopleQ = null; }   /* (RS-583: the townsfolk, a few a frame, once the town's own warm-up is done) */
@@ -43307,7 +43343,8 @@ function isoSyncPlayer(){
   const hurt = m3dHitReact(e, p.hp, effMaxHp(), FP.dt);   /* (RS-173: as hard as the blow) */
   const lunge = Math.max(strike, C.fol*0.6)*0.2 - hurt*0.1;   // step into the blow and follow it through; rock back when you're hit
   e.holder.position.set(e.pos.x + Math.sin(e.face)*lunge, 0, e.pos.y + Math.cos(e.face)*lunge); e.holder.rotation.y = e.face;
-  m3dPoseHumanoid(e.rig, FP.t + e.seed, moving, wind + FP.cast*0.4, strike, hurt*0.8, e);
+  const onStair = isoStairTick(e);   /* (RS-592) */
+  m3dPoseHumanoid(e.rig, FP.t + e.seed, onStair ? 1 : moving, wind + FP.cast*0.4, strike, hurt*0.8, e);
   rsPlayerFx(e, FP.t + e.seed, moving, true);
   const gw = G.gather && G.gather.mode===1 && G.gather.o.k==='mining' && G.gather.o.vein ? G.gather.o : null;
   if (gw){
@@ -43335,6 +43372,34 @@ function isoSyncPlayer(){
   }
 }
 
+/* (RS-592) the stairs walked: onto the flight and up it, or down it into the shaft, the picture going dark at the top or the bottom - then
+   the next floor, where you come down (or up) off the end of its own flight onto the floor. The flight rises (or sinks) toward the wall
+   behind it, as fpBuild lays it: c + a*t, t from -0.5 at its foot to 0.5 at its head */
+function isoStairWalk(x, y, up, go){
+  if (!transOn() || !ISO.on || !ISO.player || !fp3dActive() || G.gameMode!==1) return false;
+  const p0 = ISO.player.pos ? { x:ISO.player.pos.x, y:ISO.player.pos.y } : { x:x + 0.5, y:y + 0.5 };
+  FPD.stair = { t:0, x, y, up, go, map:G.map, p0 }; return true;
+}
+function isoStairPath(x, y, up){ const [ex, ey] = fpStairDir(x, y), ax = -ex, ay = -ey, H = up ? 0.92 : -0.55; return { c:[x + 0.5, y + 0.5], a:[ax, ay], at:t=>({ x:x + 0.5 + ax*t, y:y + 0.5 + ay*t, h:t <= 0.5 ? H*Math.max(0, Math.min(1, t + 0.5)) : (up ? H : H - (t - 0.5)*1.1) }) }; }
+function isoStairTick(e){
+  const cv = FPD.r && FPD.r.domElement, S = FPD.stair, A = FPD.arrive;
+  if (S){ S.t += FP.dt || 0.016; const k = Math.min(1, S.t/1.3), sp = isoStairPath(S.x, S.y, S.up), t0 = -0.5, t1 = S.up ? 0.42 : 0.95;
+    let q; if (k < 0.18){ const f = k/0.18, st = sp.at(t0); q = { x:S.p0.x + (st.x - S.p0.x)*f, y:S.p0.y + (st.y - S.p0.y)*f, h:0 }; } else q = sp.at(t0 + (t1 - t0)*(k - 0.18)/0.82);
+    e.pos.x = q.x; e.pos.y = q.y; e.holder.position.set(q.x, q.h, q.y); e.face = Math.atan2(sp.a[0], sp.a[1]); e.holder.rotation.y = e.face;
+    transFade(Math.max(0, (k - 0.6)/0.4), cv);
+    if ((k >= 1 && !S.done) || S.t > 4 || S.map!==G.map){ S.done = true; FPD.stair = null; const go = S.go; setTimeout(()=>{ try{ go(); }catch(err){ console.error(err); } isoStairArrive(); renderGame(); try{ saveCurrentGame(); }catch(err){} }, 0); }
+    return true; }
+  if (A){ if (A.map!==G.map){ FPD.arrive = null; transFade(0, cv); return false; } A.t += FP.dt || 0.016; const k = Math.min(1, A.t/0.95), sp = isoStairPath(A.sx, A.sy, A.up), st = sp.at(A.up ? 0.3 : 0.5), f = k*k*(3 - 2*k);
+    const q = { x:st.x + (A.fx - st.x)*f, y:st.y + (A.fy - st.y)*f, h:st.h*(1 - f) }; e.pos.x = q.x; e.pos.y = q.y; e.holder.position.set(q.x, q.h, q.y);
+    e.face = Math.atan2(A.fx - st.x, A.fy - st.y); e.holder.rotation.y = e.face; transFade(Math.max(0, 1 - k*1.6), cv);
+    if (k >= 1){ FPD.arrive = null; transFade(0, cv); } return k < 1; }
+  return false;
+}
+function isoStairArrive(){
+  if (G.gameMode!==1 || !G.map) { transFade(0); return; } const p = G.player;
+  for (const [dx, dy] of [[0,-1],[1,0],[0,1],[-1,0],[0,0]]){ const x = p.x + dx, y = p.y + dy, t = tileAt(x, y); if (t===T_STAIRSU || t===T_STAIRSD){ FPD.arrive = { t:0, sx:x, sy:y, up:t===T_STAIRSU, fx:p.x + 0.5, fy:p.y + 0.5, map:G.map }; return; } }
+  transFade(0);
+}
 // ---- you, alive: idling, kneeling to bury bones, casting, prayer icons over your head, level-up fireworks ----
 // (called after the pose in all three views - the dungeon, towns and the overworld; iso says it's the dungeon,
 // where the swing and cast timers run)
@@ -44294,7 +44359,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-591';
+const GAME_VERSION = 'rs-592';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -44576,6 +44641,7 @@ function buildSettings(){
         ${seg('post', 'bloom and colour grading', [[true,'on'],[false,'off']])}
         ${seg('ao', 'soft shadows in corners (dungeons, high quality)', [[true,'on'],[false,'off']])}
         ${seg('loadCards', 'loading cards between places', [[true,'on'],[false,'off']])}
+        ${seg('trans', 'walk through gates and down stairs', [[true,'on'],[false,'off']])}
         ${seg('fps', 'frame-rate counter', [[false,'off'],[true,'on']])}
       </div>`;
   else if (tab==='picture') body = `<div class="panel"><h4>PICTURE</h4>
@@ -46615,6 +46681,7 @@ function moveDir(dx,dy){
   if (G.sleepFx) return;   /* (RS-389: asleep - the night has to pass first) */
   if (G.ui!=='playing' || G.gameOver) return;
   if (typeof V3!=='undefined' && V3.door && V3.door.phase==='in') return;   // (half way through a door)
+  if ((typeof V3!=='undefined' && V3.gate) || (typeof FPD!=='undefined' && FPD.stair)) return;   /* (RS-592: walking out through the gate, or down the stairs) */
   if (G.gameMode===3 && G.owZoomedOut) return;   // (RS-210: close the map, M, before walking on)
   if (!foeHurry()) return;   // (RS-218/312: their answer to your blow lands first, then you move)
   G.sitAt = null;   // (RS-183: moving gets you up off a seat)
