@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs589 | the book shut at your side in the barber's chair |
 | rs588 | a seated robe folded once and kept (no refolds a frame), up again the seat forgotten; the hearth's grill out on the hearth stone |
 | rs587 | the treasure room's door at the room's face, the wandering merchant in a boat on open water, a roamer clicked to chase and fight, a grill over the hearth fire, lighting a campfire compiles nothing |
 | rs586 | a hearth fire with logs, embers and shader flames in an open firebox; the sage hat's moon and stars in the trim dye; the robe's cord at the middle of the waist; the shut tome held in the palm |

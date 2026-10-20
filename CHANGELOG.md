@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-589 - The book shut at the barber's
+
+- **A shut book in the barber's chair:** your figure in the barber's chair now holds its tome shut at its side, as it does at the dye works. It used to hold the book open as if mid-spell.
+
 ## RS-588 - A smooth tavern
 
 - **Seated folk no longer slow the game:** everyone sitting in a robe or a cape had their cloth refolded twice every frame, once for standing legs and again for the seat. Now it's folded once when they sit down and kept. A tavern at night went from about 20 ms a frame to about 13 ms in testing, and more in a busy one.
