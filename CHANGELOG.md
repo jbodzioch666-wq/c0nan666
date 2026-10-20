@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-590 - A robe's cord, tied properly
+
+- **The cord sits lower:** a robe's cord is tied low on the waist, where it meets the hips. It used to sit up in the middle of the waist.
+- **In the robe's trim colour:** the cord takes the robe's trim, so dyeing the trim dyes the cord too. It used to be a darker shade of the robe itself.
+- **Better ties:** the knot has a turn of cord bound round it. Two cord ends fall from it over the robe, spaced a little apart, each finished with a bound tassel with its threads showing. They used to be two straight spikes.
+
 ## RS-589 - The book shut at the barber's
 
 - **A shut book in the barber's chair:** your figure in the barber's chair now holds its tome shut at its side, as it does at the dye works. It used to hold the book open as if mid-spell.

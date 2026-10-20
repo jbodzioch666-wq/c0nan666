@@ -28,7 +28,7 @@ module.exports = async page=>{
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
   A(r.sage.band==='#c02a30' && r.sage.opt && r.sage.opt.band==='#c02a30' && r.sage.opt.gold==='#c02a30', 'the sage hat\'s band, moon and stars in the trim dye: ' + JSON.stringify(r.sage.opt));
-  A(r.fem && r.cordY >= 0.065 && r.cordY <= 0.09 && r.cordYm <= 0.09, 'the cord at the middle of the waist: ' + r.cordY + ' / ' + r.cordYm);
+  A(r.fem && r.cordY >= 0.028 && r.cordY <= 0.042 && r.cordYm <= 0.042, 'the cord at the middle of the waist: ' + r.cordY + ' / ' + r.cordYm);
   A(r.book.closed && (r.book.gripInBook || r.book.dist < 0.012) && r.book.nearBottom, 'the shut book held in the palm by its lower edge: ' + JSON.stringify(r.book));
   A(r.fires >= 1 && r.sheets >= 5 && r.logs >= 3 && r.ticks, 'the hearth has its fire: logs, flame sheets, keeping time');
   A(!errs.some(e=>/shader|WebGL|THREE/i.test(e)), 'its shader compiles: ' + errs.join(' | '));

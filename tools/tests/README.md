@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs590 | a robe's cord low on the waist in the robe's trim colour, tied with a bound knot and two tasselled ends |
 | rs589 | the book shut at your side in the barber's chair |
 | rs588 | a seated robe folded once and kept (no refolds a frame), up again the seat forgotten; the hearth's grill out on the hearth stone |
 | rs587 | the treasure room's door at the room's face, the wandering merchant in a boat on open water, a roamer clicked to chase and fight, a grill over the hearth fire, lighting a campfire compiles nothing |
@@ -456,6 +457,7 @@ Screenshots go to `tools/tests/shots/`.
 | zcamp | the open land's frame with no camp, a campfire and a fire with a tent: frame times, draw calls, point lights and programs |
 | ztavern | a tavern at night: frame and CPU times with the hearth fire, the cook rigs and the people each taken out, the heaviest meshes, a CPU profile |
 | zsit | what changes a seated robe's fold from frame to frame, and who calls the normals |
+| zcord | a robe's cord height, where its cloth starts and its top, on a woman and a man |
 | zhair | heads with each hairstyle from four sides, and under helmets |
 | zplate | plate armour on builds from slight to heavy |
 | zunder | the creator's undressed figures by race and sex |

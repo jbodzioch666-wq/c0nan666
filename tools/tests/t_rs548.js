@@ -25,7 +25,7 @@ module.exports = async page=>{
   for (const k of ['man', 'heavy', 'dancer', 'elf']){ const q = r[k];
     A(q.top > 0.11, k + ': the robe\'s cloth runs up to under the bust');
     A(!q.pelvis && q.trimmed, k + ': no second piece at the hips, the bodice trimmed under the cloth');
-    A(q.cordY >= 0.065 && q.cordY <= 0.09 && q.cordY < q.top - 0.02, k + ': the cord round the natural waist (RS-586: the middle of it, not up under the chest)');
+    A(q.cordY >= 0.028 && q.cordY <= 0.042 && q.cordY < q.top - 0.02, k + ': the cord round the waist (RS-590: low, where it meets the hips)');
     A(q.gap > -0.002 && q.gap < 0.012, k + ': the cloth lies just over the bodice');
     A(q.hold > 0.2, k + ': held to the body from the waist up, swinging below'); }
   A(r.turn > 0.3, 'above the hips the cloth turns with the torso');
