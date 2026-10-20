@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs575 | lighter frames: animals and beasts off screen leave the frame (hidden, matrices skipped) and come back up to date in view; your figure sculpted lighter out in the world on every machine (see rs563) |
 | rs574 | three.js r159 drawing as r149 did: colour management off, old light units, custom shaders on the new chunk names, instanced/skinned meshes culled by their own geometry, shaders started at once (three compile + isReady) |
 | rs572 | a floor loads without long freezes: the parallel link returns at once and draws the same pixels, creatures sculpted a slice a frame behind the card, the chart painted a few ms a step (same picture) |
 | rs571 | shaders load faster: a point shadow takes 5 samples round one cubeToUV (was 9 cubeToUVs), every program started at once and linked off the frame (KHR_parallel_shader_compile), no sun below ground |
