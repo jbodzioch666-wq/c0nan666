@@ -408,6 +408,10 @@ Screenshots go to `tools/tests/shots/`.
 | zperf | frame cost while walking the land, a town and a dungeon with a save (`ZSAVE`, `ZVIEWS`, `ZSECS`): frame spread, CPU and GPU ms, a CPU profile's top functions; `THREE_JS=` the unminified build for readable names |
 | zbear | a creature (`ZMON`) killed eight times: how far its body tips each time |
 | zleak | t_walkleak, listing each geometry left behind with where it was made |
+| zscene | what the land's scene holds (`ZSAVE`): objects, meshes, matrix updates, culling, by group |
+| zcost | the land's frame (`ZSAVE`): draw calls and triangles, and the CPU cost of each big group (hidden in turn) |
+| zmat | the land's matrix walk (`ZSAVE`): per frame, and each top-level group's share |
+| zhero | your figure close up in a town, sculpted on a given grid (`ZPC`): a shot and its triangle count |
 | zhair | heads with each hairstyle from four sides, and under helmets |
 | zplate | plate armour on builds from slight to heavy |
 | zunder | the creator's undressed figures by race and sex |

@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-575 - Lighter frames
+- **Animals off screen cost nothing:** on the open land, every animal and wandering beast within reach was still processed every frame, seen or not, part by part. That was nearly half the land's work per frame. Off screen they're now left out of the frame entirely, and they come back up to date the moment they step into view. Usually 20 of the 23 or so animals nearby are off screen.
+- **Your figure out in the world:** the full sculpt of your character was over 300,000 triangles, drawn twice each frame (once for its shadow). At the size you see it on the land, in towns and in dungeons, half of that looks the same, and phones have used the lighter build since RS-563. Every machine now uses it out in the world. The character creator keeps full detail.
+- **The numbers (desktop, every frame drawn):** dungeons 141 to 174 frames a second (graphics time 2.3 to 1.5 ms). The open land's processor time per frame fell from 8.6 to 7.5 ms. Towns stay around 110.
+
 ## RS-574 - three.js r159
 - **Newer 3D engine:** the game now runs on three.js r159, up from r149. It's the last version that still loads the way this one-file game does, and the first that properly builds shaders in the background. It keeps track of each shader the graphics driver is building and says when it's ready, so the game never has to stop and wait. The workaround from RS-572 and RS-573 is gone, replaced by three's own way.
 - **Looks the same:** the newer three.js changed how colours, lights and some shader pieces work by default. The game is set up to draw exactly as before: the same colours and the same light strength, and every custom shader effect still in place (water, hair, skin, cloth, clouds, fog). Screenshots of the open land, towns and dungeons match the old version.
