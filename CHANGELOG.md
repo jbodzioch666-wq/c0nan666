@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-584 - Fresh-water lakes, and where you are
+- **The land, after the time:** the bar at the top now ends with the land you're in: grassland, forest, desert, swamp, tundra, mountains, a mountain pass, a river, a lake or the sea. In a town it names the country round it.
+- **Lakes are fresh water:** the game counted every lake as sea. Now any water that doesn't reach the edge of the world, and isn't sea-sized, is a lake.
+- **Fresh-water fish in lakes:** lake fishing spots give trout, pike and salmon, dawn trout at dawn and icefish in winter, like a river. No shrimp, sardines or lobster from a lake, and no deep-sea spots out in the middle of one. A frozen lake on the tundra has its ice holes.
+- **Fishing platforms only on the sea:** a Fishing Guild platform is built out on the sea, never on a lake, since it's for lobster, swordfish and shark.
+- **No surf by a lake:** the crashing waves and the gulls are only by the sea. A lake laps softly.
+
 ## RS-583 - The first town, three times faster
 - **The creatures' finishes made at boot, beside the page:** every person and creature wears one of eleven finish textures (skin, cloth, leather, fur, hair, scales, metal, mail, horn, stone, planks), and the first one of a session to need them made them on the spot, seconds of noise in one frame. They're now made at boot in worker threads beside the page, while you read the title screen, and kept in the game's cache so the next session has them at once. The workers' pixels are the old generator's to the byte.
 - **Townsfolk step out as they're ready:** the first town of a session sculpted all its people in one go, three seconds in a single frame. The town now shows at once, and its people are sculpted a few milliseconds a frame and step out one by one as their figures are done, name plates and all. Anyone met before this session, or kept in the cache, is there from the start.

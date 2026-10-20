@@ -67,7 +67,7 @@ module.exports = async page=>{
     // the music player
     A(!AUD.cur, 'no background tune ever plays (RS-212)'); A(!document.getElementById('overlay').innerHTML.includes('music player'), 'no music player');
     // volume and the sound switch
-    setUi('settings'); A(document.getElementById('overlay').innerHTML.includes('fanfares') && !document.getElementById('overlay').innerHTML.includes('music player'), 'fanfare slider, no music player'); setSetting('vol.music', 0.3); A(Math.abs(_gains.music.gain.value - 0.3) < 1e-6, 'music volume'); setUi('playing');
+    G.setTab = 'sound'; setUi('settings'); A(document.getElementById('overlay').innerHTML.includes('fanfares') && !document.getElementById('overlay').innerHTML.includes('music player'), 'fanfare slider, no music player'); setSetting('vol.music', 0.3); A(Math.abs(_gains.music.gain.value - 0.3) < 1e-6, 'music volume'); setUi('playing');
     toggleSound(); audFrame(); await new Promise(r=>setTimeout(r, 200)); out.offState = AUD.ctx.state; toggleSound(); audFrame();
     out.ctx = AUD.ctx.state;
     return out;

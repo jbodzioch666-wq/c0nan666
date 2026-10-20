@@ -7788,7 +7788,18 @@ function dayPhase(){ return clockNow() % DAY_LENGTH / DAY_LENGTH; } // 0=midnigh
 function isNightTime(){ const p=dayPhase(); return p<0.22 || p>=0.78; }
 // (RS-151) the hour of the game day as a clock face would show it: midnight is 12:00 am, noon 12:00 pm
 function clockHM(){ const m = Math.floor(dayPhase()*24*60) % 1440, h = Math.floor(m/60), mm = m % 60; return `${(h % 12) || 12}:${String(mm).padStart(2,'0')} ${h < 12 ? 'am' : 'pm'}`; }
-function clockBarText(){ return `${G._hudLoc ? G._hudLoc + ' \u00b7 ' : ''}${seasonName()} ${timeOfDayLabel()} \u00b7 ${clockHM()}${G.weather && G.weather!=='clear' && G.gameMode!==2 ? ' \u00b7 '+G.weather : ''}`; }
+function clockBarText(){ const b = clockBiome(); return `${G._hudLoc ? G._hudLoc + ' \u00b7 ' : ''}${seasonName()} ${timeOfDayLabel()} \u00b7 ${clockHM()}${G.weather && G.weather!=='clear' && G.gameMode!==2 ? ' \u00b7 '+G.weather : ''}${b ? ' \u00b7 ' + b : ''}`; }
+/* (RS-584) the land you're in, after the time: the tile under you on the open land (a site's own tile says nothing, so its region),
+   a town's own country, nothing below ground */
+const OW_BIOME_NM = { [OW_GRASS]:'grassland', [OW_FOREST]:'forest', [OW_DESERT]:'desert', [OW_SWAMP]:'swamp', [OW_TUNDRA]:'tundra', [OW_MOUNTAIN]:'mountains', [OW_MOUNTAINPASS]:'mountain pass', [OW_RIVER]:'river' };
+function clockBiome(){
+  if (!G.ow || !G.ow.map || !G.owPos || !(G.gameMode===0 || (G.gameMode===3 && !G.interior))) return '';
+  const { x, y } = G.owPos, k = G.gameMode + ':' + x + ',' + y; if (G._bioK===k) return G._bioT; G._bioK = k;
+  const col = G.ow.map[x]; if (!col) return (G._bioT = ''); let t = col[y];
+  if (t===OW_WATER) return (G._bioT = owFresh(x, y) ? 'lake' : 'sea');
+  if (OW_SITE_TILES.includes(t)){ try{ t = x===G.ow.spawnPos.x && y===G.ow.spawnPos.y && G.ow.spawnBiome!=null ? G.ow.spawnBiome : detectRegionBiome(x, y); }catch(e){ t = null; } }   /* (a town or a site: the country round it) */
+  return (G._bioT = OW_BIOME_NM[t] || '');
+}
 // the bar at the top: where you are, the season, the time of day and the weather (it took the name plate's place)
 // (RS-297) the land you're walking through, always under the bar on the open land: its name and the combat levels it suits
 function clockLandText(){
@@ -10982,7 +10993,7 @@ function buildLamp(){
 function skGuideRows(k){
   const R = [], add = (l, t, c)=>R.push({ l, t, c:c||'u' });
   const tool = { fishing:'Fishing Rod', mining:'Pickaxe', woodcutting:'Hatchet' }[k];
-  if (k==='fishing') SK_FISH.forEach(f=>add(f.lvl, `${f.nm} - ${f.id==='eel' ? 'cave pools in dungeons' : f.id==='icefish' ? 'ice holes off tundra coasts, and any river in winter' : f.id==='dawntrout' ? 'river spots, only at dawn' : f.w==='s' ? (SK_SPOT.shore.fish.includes(f.id) ? 'shore spots' : `the open sea (you need a boat${['shark','marlin','kraken'].includes(f.id) ? ' and a harpoon' : ''})`) : 'river spots'}`));   /* (RS-463: by where it's really caught - tuna is deep sea only) */
+  if (k==='fishing') SK_FISH.forEach(f=>add(f.lvl, `${f.nm} - ${f.id==='eel' ? 'cave pools in dungeons' : f.id==='icefish' ? 'ice holes off tundra coasts and lakes, and any river or lake in winter' : f.id==='dawntrout' ? 'river and lake spots, only at dawn' : f.w==='s' ? (SK_SPOT.shore.fish.includes(f.id) ? 'shore spots' : `the open sea (you need a boat${['shark','marlin','kraken'].includes(f.id) ? ' and a harpoon' : ''})`) : 'river spots'}`));   /* (RS-463: by where it's really caught - tuna is deep sea only) */
   if (k==='fishing' || k==='mining') add(1, 'now and then a record-breaker: a trophy you can keep or sell (likelier at fine, pristine and rich spots)');
   if (k==='mining') SK_ORE.forEach(o=>add(o.lvl, `${o.nm}${o.lvl>60 ? ' - mine veins only' : o.lvl>45 ? ' - mine veins only (hill rocks too at total level 1000)' : ' - hill rocks and mine veins'}`));
   if (k==='woodcutting') SK_LOG.forEach(l=>add(l.lvl, `${l.nm} - ${RES_TREE_WHERE[l.id==='logs' ? 'tree' : l.id] || ''}`));
@@ -11152,6 +11163,7 @@ const SK_TREE = {
 };
 const SK_SPOT = {
   river: { nm:'River fishing spot',     fish:['trout','salmon','pike'],             col:'#a8e0ff', n:4 },
+  lake:  { nm:'Lake fishing spot',      fish:['trout','pike','salmon'],             col:'#9ad8e8', n:4 },   /* (RS-584: fresh water - lakes have river fish, never sea fish) */
   shore: { nm:'Shore fishing spot',     fish:['shrimp','sardine','lobster'],        col:'#f4f8ff', n:4 },
   deep:  { nm:'Deep-sea fishing spot',  fish:['tuna','swordfish','shark','marlin','kraken'], col:'#4a8ae8', n:5 },
   cave:  { nm:'Cave pool',              fish:['eel'],                               col:'#5ac8b0', n:4 },
@@ -11205,11 +11217,13 @@ function skNodeStatic(x, y){
     n = h < 0.18 ? herb(h2 < 0.3 ? 'starlily' : 'dragontongue') : null;
   } else if (t===OW_RIVER){
     n = { k:'fishing', type:'river', dens:0.2 };
+  } else if (t===OW_WATER && owFresh(x, y)){   /* (RS-584) a lake: fresh-water fish, along its shores and out in it */
+    n = { k:'fishing', type:'lake', dens:skWithin(x, y, 1, [OW_GRASS, OW_FOREST, OW_DESERT, OW_TUNDRA, OW_SWAMP, OW_MOUNTAIN, OW_MOUNTAINPASS, OW_TOWN]) ? 0.16 : 0.06 };
   } else if (t===OW_WATER){
     if (skWithin(x, y, 1, [OW_GRASS, OW_FOREST, OW_DESERT, OW_TUNDRA, OW_SWAMP, OW_MOUNTAIN, OW_MOUNTAINPASS, OW_TOWN])) n = { k:'fishing', type:'shore', dens:0.14 };
     else if (!skWithin(x, y, 3, [OW_GRASS, OW_FOREST, OW_DESERT, OW_TUNDRA, OW_SWAMP, OW_MOUNTAIN, OW_MOUNTAINPASS, OW_TOWN, OW_RIVER])) n = { k:'fishing', type:'deep', dens:0.035 };
   }
-  if (n && n.k==='fishing' && n.type==='shore' && skWithin(x, y, 1, [OW_TUNDRA])) n = { k:'fishing', type:'ice', dens:0.25 };
+  if (n && n.k==='fishing' && (n.type==='shore' || n.type==='lake') && skWithin(x, y, 1, [OW_TUNDRA])) n = { k:'fishing', type:'ice', dens:0.25 };   /* (RS-584: a frozen lake has its ice holes too - trout, pike and icefish, all fresh-water) */
   if (G.ow.islandOf){   // the islands' own: pearl beds on their shores, sunstone in their ground
     if (n && n.k==='fishing' && n.type==='shore' && h2 < 0.5 && islandShore(x, y)) n = { k:'fishing', type:'pearl', dens:0.3 };
     else if ((!n || n.k==='foraging') && (t===OW_GRASS || t===OW_DESERT || t===OW_FOREST) && skNH(x, y, 744) < 0.03 && islandAt(x, y)) n = { k:'mining', type:'sunstone' };
@@ -11256,7 +11270,7 @@ function skNodeAt(x, y){
 function skNodeItems(n){
   if (n.k==='woodcutting') return [SK_LOG.find(l=>l.id===SK_TREE[n.type].log)];
   if (n.k==='fishing'){ const l = SK_SPOT[n.type].fish.map(id=>SK_FISH.find(f=>f.id===id));
-    if (n.type==='river'){ if (isDawn()) l.push(SK_FISH.find(f=>f.id==='dawntrout')); if (seasonIdx()===3) l.push(SK_FISH.find(f=>f.id==='icefish')); }
+    if (n.type==='river' || n.type==='lake'){ if (isDawn()) l.push(SK_FISH.find(f=>f.id==='dawntrout')); if (seasonIdx()===3) l.push(SK_FISH.find(f=>f.id==='icefish')); }
     if (n.type==='deep' && !harpoonReady()) return l.filter(f=>!['shark','marlin','kraken'].includes(f.id));   // the biggest need a harpoon and a deck
     return l; }
   if (n.k==='mining') return (n.rock || SK_ROCK[n.type]).items.map(skItem);
@@ -11296,7 +11310,7 @@ function skNodeTipHtml(n){
     if (n.type==='yew' || n.type==='magic') extra.push('danger: 1 in 25 chops wakes a treant'); }
   if (n.type==='deep') extra.push(harpoonReady() ? `your ${HARPOONS[harpoonTier()].nm.toLowerCase()} can land sharks, marlin and kraken here` : 'sharks, marlin and kraken need a harpoon - and a caravel or bigger to throw it from');
   if (n.type==='pearl') extra.push('pearls now and then (about 1 in 6 catches)');
-  if (n.k==='fishing') extra.push(`danger: something big may take the line (1 in 65 casts) - a ${n.type==='deep' ? 'giant octopus or giant shark' : n.type==='river' ? 'giant eel' : 'giant crab'}`);
+  if (n.k==='fishing') extra.push(`danger: something big may take the line (1 in 65 casts) - a ${n.type==='deep' ? 'giant octopus or giant shark' : n.type==='river' || n.type==='lake' ? 'giant eel' : 'giant crab'}`);
   if (extra.length && !n.cave) html += `<div class="muted" style="margin-top:3px">ALSO</div>` + extra.map(t=>`<div>- ${esc(t)}</div>`).join('');
   if (n.glow) html += `<div style="color:${COL.gold}">glowing: every herb picked here counts double</div>`;
   if (n.type==='starlily') html += `<div class="muted">starlilies only open at night</div>`;
@@ -11488,7 +11502,7 @@ function skGatherTick(now){
     const req = skNodeReq(node);
     if (req > L){ skStop(`you need ${SK_DEFS.find(d=>d[0]===k)[1]} level ${req} for this ${skNodeName(node).toLowerCase()}`); return; }
     if (k==='fishing' && chn(0.015)){                      // something big takes the line
-      const big = node.type==='deep' ? (cbLvl() >= 90 ? 'giant shark' : 'giant octopus') : node.type==='river' ? 'giant eel' : 'giant crab';
+      const big = node.type==='deep' ? (cbLvl() >= 90 ? 'giant shark' : 'giant octopus') : node.type==='river' || node.type==='lake' ? 'giant eel' : 'giant crab';
       skSpecialFoe(SEA_SKIN, big, `something huge takes your line - a ${big} surges out of the water!`); return;
     }
   }
@@ -12027,7 +12041,7 @@ const RES_HERB_WHERE = {
   ghostcap:'pale blue patches near graveyards, necromancer towers and temples; cave herb patches on dungeon floors 3-5', sunpetal:'yellow patches on grassland and in the desert',
   dragontongue:'orange patches on mountain slopes and passes; cave herb patches on dungeon floor 6 and deeper', starlily:'glowing white patches on high ground beside mountains, on passes and in the tundra - they only open at night',
   flax:'blue-flowered patches on grassland, mostly near rivers and the coast' };
-const RES_SPOT_WHERE = { river:'on rivers', shore:'along coasts and lake shores', deep:'far out at sea - you need a boat and a harpoon', cave:'on dungeon floors' };
+const RES_SPOT_WHERE = { river:'on rivers', lake:'on lakes', shore:'along sea coasts', deep:'far out at sea - you need a boat and a harpoon', cave:'on dungeon floors' };
 // ===================== production: gems, jewellery, pottery, glass, lights, dishes, runecrafting, boss relics =====================
 SK_CRAFT_MATS.push(
   { id:'onyx', nm:'Uncut Onyx', lvl:67, xp:0 }, { id:'zenyte', nm:'Zenyte Shard' }, { id:'dscale', nm:'Dragon Scale' }, { id:'abyssal', nm:'Abyssal Shard' },
@@ -12362,7 +12376,7 @@ function resSources(id){
     if (fl.length) out.push(`ore veins in the mines, floor${fl.length>1?'s':''} ${fl[0]}${fl.length>1 ? '-'+fl[fl.length-1] : ''} (Mining ${ore.lvl})`);
   }
   for (const t in SK_ROCK) if (SK_ROCK[t].items.includes(id)) out.push(`${SK_ROCK[t].nm.toLowerCase()}s ${RES_ROCK_WHERE[t]} (Mining ${(skItem(id)||{}).lvl||1})`);
-  if (id==='dawntrout') out.push('river spots, only at dawn (Fishing 25)');
+  if (id==='dawntrout') out.push('river and lake spots, only at dawn (Fishing 25)');
   if (id==='icefish') out.push('rivers everywhere in winter (Fishing 45)');
   const bar = SK_BAR.find(b=>b.id===id);
   if (bar) out.push(`smelt ${bar.per||2} ${skName(bar.ore).toLowerCase()}${bar.coal ? ` and ${bar.coal} coal` : ''} at a furnace (Smithing ${bar.lvl})`);
@@ -14947,7 +14961,7 @@ function guildZoneAt(x, y){
   const [tx, ty] = town, hh = skNH(tx, ty, 951);
   const kind = hh < 0.34 ? 'mining' : hh < 0.6 ? 'fishing' : hh < 0.85 ? 'grove' : null; if (!kind) return null;
   let c = null;
-  if (kind==='fishing'){ for (let r=2;r<=4 && !c;r++) for (let i=-r;i<=r && !c;i++) for (let j=-r;j<=r;j++){ if (Math.max(Math.abs(i),Math.abs(j))!==r) continue; if (skOwTile(tx+i, ty+j)===OW_WATER){ c = [tx+i, ty+j]; break; } } if (!c) return null; }
+  if (kind==='fishing'){ for (let r=2;r<=4 && !c;r++) for (let i=-r;i<=r && !c;i++) for (let j=-r;j<=r;j++){ if (Math.max(Math.abs(i),Math.abs(j))!==r) continue; if (skOwTile(tx+i, ty+j)===OW_WATER && owSea(tx+i, ty+j)){ c = [tx+i, ty+j]; break; } } if (!c) return null; }   /* (RS-584: out on the sea - a lake has no lobster, swordfish or shark) */
   else { const dirs = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]], dd = dirs[Math.floor(skNH(tx, ty, 952)*8)%8]; c = [tx + dd[0]*3, ty + dd[1]*3]; }
   if (Math.max(Math.abs(x-c[0]), Math.abs(y-c[1])) > 1) return null;
   return { kind, town:[tx, ty] };
@@ -21747,6 +21761,22 @@ function islandsGen(){
       if (best) G.ow.pois.push({ id:'cache'+id, k:'cache', x:best[0], y:best[1], name:`a buried cache on ${nm}`, seed:Math.floor(r()*1e9), island:id }); }
   }
 }
+/* (RS-584) which water is fresh: a body of water joined to the world's edge, or bigger than any lake the rivers fill (owLakeFill
+   makes them OW_LAKE_MAX tiles at most), is the sea; every other is a lake. Worked out once a world, from the map itself, so
+   every save has it */
+const OW_SEA_MIN = 300;
+function owWaterKind(){
+  const ow = G.ow; if (!ow || !ow.map) return null; if (ow._wk && ow._wkMap===ow.map) return ow._wk;
+  const W = OW_COLS, H = OW_ROWS, m = ow.map, wk = new Uint8Array(W*H), q = new Int32Array(W*H);   /* (0 land, 1 sea, 2 lake) */
+  for (let x0=0;x0<W;x0++) for (let y0=0;y0<H;y0++){ if (m[x0][y0]!==OW_WATER || wk[y0*W+x0]) continue;
+    let n = 0, h = 0, edge = false; q[n++] = y0*W+x0; wk[y0*W+x0] = 3;
+    while (h < n){ const k = q[h++], x = k%W, y = (k/W)|0; if (x===0 || y===0 || x===W-1 || y===H-1) edge = true;
+      for (const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){ const nx = x+dx, ny = y+dy; if (nx<0||ny<0||nx>=W||ny>=H) continue; const kk = ny*W+nx; if (wk[kk] || m[nx][ny]!==OW_WATER) continue; wk[kk] = 3; q[n++] = kk; } }
+    const v = edge || n >= OW_SEA_MIN ? 1 : 2; for (let i=0;i<n;i++) wk[q[i]] = v; }
+  ow._wk = wk; ow._wkMap = ow.map; return wk;
+}
+function owFresh(x, y){ if (x<0 || y<0 || x>=OW_COLS || y>=OW_ROWS || !G.ow || !G.ow.map[x]) return false; const t = G.ow.map[x][y]; if (t===OW_RIVER) return true; if (t!==OW_WATER) return false; const wk = owWaterKind(); return !!(wk && wk[y*OW_COLS+x]===2); }
+function owSea(x, y){ if (x<0 || y<0 || x>=OW_COLS || y>=OW_ROWS || !G.ow || !G.ow.map[x] || G.ow.map[x][y]!==OW_WATER) return false; const wk = owWaterKind(); return !wk || wk[y*OW_COLS+x]!==2; }
 function islandAt(x, y){ const of = G.ow && G.ow.islandOf; if (!of || x<0 || y<0 || x>=OW_COLS || y>=OW_ROWS) return null; const i = of[y*OW_COLS+x]; return i>=0 ? G.ow.islands[i] : null; }
 function islandShore(x, y){ for (const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){ const i = islandAt(x+dx, y+dy); if (i) return i; } return null; }
 function islandCharted(id){ return !!(G.ow.wg && G.ow.wg.charted && G.ow.wg.charted[id]); }
@@ -23973,7 +24003,8 @@ function rainThunder(at, vol, muffled, crack){
   let t = at + 0.08; g.gain.setValueAtTime(0, at); for (let i=0;i<5;i++){ t += rainR(0.15, 0.6); g.gain.linearRampToValueAtTime(vol*rainR(0.5,1), t); }
   g.gain.exponentialRampToValueAtTime(0.0001, t + rainR(3, 4.5)); s.connect(f); f.connect(g); g.connect(A); s.start(at, rainR(0,1)); s.stop(t + 5);
 }
-function audNearWater(){ if (G.gameMode!==0 || !G.ow) return false; for (let i=-3;i<=3;i++) for (let j=-3;j<=3;j++){ const m = G.ow.map[G.owPos.x+i]; if (m && m[G.owPos.y+j]===OW_WATER) return true; } return false; }
+function audNearWater(){ if (G.gameMode!==0 || !G.ow) return false; for (let i=-3;i<=3;i++) for (let j=-3;j<=3;j++){ if (owSea(G.owPos.x+i, G.owPos.y+j)) return true; } return false; }   /* (RS-584: the sea - a lake has no surf and no gulls) */
+function audNearLake(){ if (G.gameMode!==0 || !G.ow) return false; for (let i=-2;i<=2;i++) for (let j=-2;j<=2;j++){ const x = G.owPos.x+i, y = G.owPos.y+j; if (G.ow.map[x] && G.ow.map[x][y]===OW_WATER && owFresh(x, y)) return true; } return false; }
 function audAmbTick(dt){
   const ctx = AUD.ctx; if (!ctx || ctx.state!=='running') return;
   for (const [n, ft, f, q, lh, la] of [['wind','lowpass',380,0.6,0.13,0.5], ['waves','lowpass',600,0.7,0.16,0.85], ['crowd','bandpass',420,1.1,0.4,0.4], ['insects','bandpass',4600,9,11,0.7], ['rumble','lowpass',85,0.7,0.07,0.6]]) audLayer(n, ft, f, q, lh, la);
@@ -23983,7 +24014,7 @@ function audAmbTick(dt){
   audLayerTo('wind', !out ? 0 : storm ? 0.32 : windy ? 0.16 : 0.05);
   AUD.wetT = wet ? (AUD.wetT||0) + dt : 0;
   const rm = rainMix(); for (const k in rm){ if (rm[k] > 0 || AUD.amb['rain:'+k]) rainLayer(k); audLayerTo('rain:'+k, rm[k]*RAIN_VOL); }   /* (RS-404: the rain 85% quieter) */
-  audLayerTo('waves', audNearWater() || (G.gameMode===3 && !G.interior && G.townLy && G.townLy.info.port) ? 0.2 : 0);
+  audLayerTo('waves', audNearWater() || (G.gameMode===3 && !G.interior && G.townLy && G.townLy.info.port) ? 0.2 : audNearLake() ? 0.05 : 0);   /* (RS-584: a lake only laps, soft) */
   audLayerTo('crowd', G.gameMode===3 && !G.interior && !night && !wet ? 0.05 : (G.interior && G.interior.key==='tavern' ? 0.06 : 0));
   audLayerTo('insects', out && night && !wet && t!==OW_TUNDRA ? (t===OW_SWAMP ? 0.05 : 0.025) : 0);
   audLayerTo('rumble', G.gameMode===1 ? 0.1 : 0);
@@ -44039,7 +44070,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-583';
+const GAME_VERSION = 'rs-584';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

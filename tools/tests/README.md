@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs584 | lakes are fresh water: lake spots with river fish, no sea spots or platforms, no surf or gulls; the sea keeps its own; the bar names the land after the time |
 | rs583 | the finish textures made at boot in workers, to the byte the generator's, kept in the cache for the next session; the first town's people sculpted over frames after the town shows, with their plates and clicks |
 | rs582 | a town's scene parked while you're in a building and put straight back on the way out; back from the land the same houses, new people; a siege staged in town leaves the scene alone; a forced rebuild still rebuilds |
 | rs581 | no screen-edge flashes unless asked for; the settings page in five tabs, picture sliders live as you drag and kept, the render resolution |
