@@ -63,7 +63,7 @@ module.exports = async page=>{
     enterInterior('tavern'); setUi('playing'); skAdd('trout', 20); let hx = -1, hy = -1; for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++) if (benchAt(x, y)==='hearth'){ hx = x; hy = y; }
     G.player.x = hx + 1; G.player.y = hy + 1; for (let i=0;i<20;i++){ renderGame(); await new Promise(r=>requestAnimationFrame(r)); }
     G.cookAt = 'hearth'; setUi('cook'); cqAdd('cook', 'trout', '', 20); for (let i=0;i<30;i++){ renderGame(); await new Promise(r=>requestAnimationFrame(r)); }
-    const H = (V3.hearthCook||[]).find(h=>h.g.visible); o.grill = H ? { grill:!!H.pan2, fish:H.foods.fish.visible, panHid:!H.pan2.visible, inBox:H.g.position.z < -0.1, y:H.g.position.y } : null;
+    const H = (V3.hearthCook||[]).find(h=>h.g.visible); o.grill = H ? { grill:!!H.pan2, fish:H.foods.fish.visible, panHid:!H.pan2.visible, inBox:H.g.position.z > 0.1, y:H.g.position.y } : null;
     if (H){ const T = THREE, c = H.g.getWorldPosition(new T.Vector3()), q = H.g.parent.getWorldQuaternion(new T.Quaternion()), fw = new T.Vector3(0, 0, 1).applyQuaternion(q), cam = V3.cam.clone();
       cam.aspect = 1.4; cam.fov = 35; cam.updateProjectionMatrix(); cam.position.copy(c).add(new T.Vector3(fw.x*1.1, 0.55, fw.z*1.1)); cam.lookAt(c.x, c.y, c.z);
       const r = V3.renderer; r.setSize(560, 400, false); gfxRender(r, V3.scene, cam, 'v3'); o.shot = r.domElement.toDataURL('image/png'); V3.sz = ''; }

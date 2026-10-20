@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-588 - A smooth tavern
+
+- **Seated folk no longer slow the game:** everyone sitting in a robe or a cape had their cloth refolded twice every frame, once for standing legs and again for the seat. Now it's folded once when they sit down and kept. A tavern at night went from about 20 ms a frame to about 13 ms in testing, and more in a busy one.
+- **Robes hang right after standing up:** a robe kept draping round the seat it had sat on, and lost its swaying cloth, long after its wearer had got up. It now folds back to the legs.
+- **The hearth's grill out on the hearth stone:** the grill stands out in front of the firebox, where the skillet used to be, with its legs on the stone.
+
 ## RS-587 - Doors, boats and a camp that stays smooth
 
 - **The treasure room's door comes forward:** the iron-bound door to a floor's treasure room stood back in the middle of its short tunnel. It now stands at the room's face, out between the first pillars like every other doorway, and swings open into the tunnel.
