@@ -1,5 +1,8 @@
 # Depthcrawl patch notes
 
+## RS-579 - Textures back on every figure
+- **Fur, wool and leather show again:** RS-578 moved the finish textures into one shared sheet, but read each one from the wrong row of it, mostly blank. Every person and creature came out in flat colour: a spider's fur, a guard's mail, a townsperson's wool. Each finish is read from its own place again, and they look as they did before RS-578.
+
 ## RS-578 - One mesh per figure
 - **Figures drawn in a third of the calls:** every person and creature was drawn as 15 to 18 separate pieces: seven to eleven skinned meshes, one for each kind of finish (skin, wool, leather, mail, plate, horn, scales...), each with its own small texture and roughness, plus loose pieces for the head, hair, beard, belt and the rest. A town's twenty-odd people were most of its drawing, twice over with their shadows. Now the finish textures sit as tiles in one atlas, each vertex knows its tile, roughness, metalness and whether it's skin, and a figure's whole hide and clothes draw as one mesh. The head joins it; the hair, beard and moustache draw as one more (the soft fringes as another); the eyes, a cloak, and a weapon's pieces stay their own. A townsperson is now 4 to 8 draws.
 - **Spawning a creature took a second:** the merge left each kept part pointing at its mesh in a place three.js copies by writing it out as text, so copying a figure wrote out its whole hide. Fixed: a copy takes 4 ms again.

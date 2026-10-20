@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs579 | the atlas tiles are read from their own row: a spider rendered close up shows its fur, against the same spider flat |
 | rs578 | one material for a figure: the finish textures in one atlas, each vertex carrying its tile, roughness, metalness and skin flag; a figure one skinned mesh plus its eyes, a prop one mesh, a townsperson in nine draws or fewer |
 | rs577 | lighter land: still things stop recomputing their matrices (unfrozen when they move), plants drawn only within sight (none in view missing), cloth stepped at most sixty times a second |
 | rs576 | steadier town frames: no shadows from tiny parts (figures, town), the town sun shadow round what is in view, background work in idle time in short slices, room boards painted ahead a few rows a step (same picture) |
@@ -426,6 +427,8 @@ Screenshots go to `tools/tests/shots/`.
 | zlp | the look preview's figure build timed piece by piece: the atlas draws, the sculpt tries, the skinning, the instance, each render |
 | zinst | what an instance of your figure costs, piece by piece: the template, the clone, the boxes, the material copies |
 | ztri | the skinning merge profiled by what it calls, and the dye works' figure timed |
+| zspider | one creature close up in its own renderer (`ZMON`, `ZTAG` names the shot) |
+| zspid2 | what a creature's parts carry into the atlas mesh: tiles, uv ranges, the atlas pixels |
 | zhair | heads with each hairstyle from four sides, and under helmets |
 | zplate | plate armour on builds from slight to heavy |
 | zunder | the creator's undressed figures by race and sex |
