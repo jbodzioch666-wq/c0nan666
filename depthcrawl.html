@@ -19868,10 +19868,11 @@ function siegeTownStage(S){
     let gx = TOWN_CX; for (let x=0;x<tw;x++) if (G.map[x][th-1]===T_EXIT) gx = x;
     for (let x=0;x<tw;x++){ walk.push([]); for (let y=0;y<th;y++) walk[x].push(G.map[x][y]!==T_WALL); }
     G.villagers = []; G.villageNpcs = [];   /* (the townsfolk are out fighting, or behind their doors) */
-    const sc0 = V3.scene, w0 = V3.world, bp = v3BuildPeople, holder = new THREE.Group(); let world = null, occ = [];
-    V3.scene = holder; V3.world = null; V3_GATE_SHUT = !S.raid && S.phase===1; v3BuildPeople = ()=>{};
+    const sc0 = V3.scene, w0 = V3.world, bp = v3BuildPeople, holder = new THREE.Group(), keep = Object.assign({}, V3), pl0 = (V3.plates||[]).length, lb0 = V3.labels ? V3.labels.childNodes.length : 0; let world = null, occ = [];
+    V3.scene = holder; V3.world = null; V3.parked = null; V3.worldTown = false; V3_GATE_SHUT = !S.raid && S.phase===1; v3BuildPeople = ()=>{};
     try{ v3BuildScene(); world = V3.world; occ = (V3.occ||[]).slice(); }
-    finally { V3.scene = sc0; V3.world = w0 && w0.parent ? w0 : null; V3.mapRef = null; V3_GATE_SHUT = false; v3BuildPeople = bp; }
+    finally { Object.assign(V3, keep); V3.scene = sc0; V3.world = w0 && w0.parent ? w0 : null; if (!V3.world) V3.mapRef = null; V3_GATE_SHUT = false; v3BuildPeople = bp;   /* (RS-582: the town you stand in keeps its scene and everything the view knew of it - it used to be built again from nothing) */
+      if (V3.plates && V3.plates.length > pl0) V3.plates.length = pl0; if (V3.labels) while (V3.labels.childNodes.length > lb0) V3.labels.removeChild(V3.labels.lastChild); }
     if (world){ holder.remove(world); world.name = 'siegeTown';
       /* (the town view's far ground, a plain sheet, would fight the painted ground round the walls - the painted one is kept) */
       for (const o of world.children.slice()) if (o.isMesh && o.geometry && o.geometry.parameters && o.geometry.parameters.width===200) world.remove(o); }
@@ -24423,9 +24424,12 @@ function gfxCompileSliced(V, r, scene, cam, grp, live){
   /* the real scene, the real camera, the real target - anything else and the driver builds different shader variants, and the
      first real frame still pays for all of them at once. All unwarmed materials start hidden; each slice shows a few more and
      draws the whole scene once, off screen, so only those few pay their first-draw cost in that slice */
-  const seen = gfxWarmSeen(r), mats = [], objs = [];
-  const put = m=>{ if (m && !seen.has(m) && mats.indexOf(m) < 0) mats.push(m); };
-  scene.traverse(o=>{ if ((o.isMesh || o.isPoints || o.isLine || o.isSprite) && o.material){ objs.push([o, o.frustumCulled]); o.frustumCulled = false; const m = o.material; if (Array.isArray(m)) m.forEach(put); else put(m); } });
+  const seen = gfxWarmSeen(r), mats = [], objs = [], K = r.__warmKinds;
+  /* (RS-582) a material of a kind this renderer has already warmed - on the same kind of object, a skinned figure's or a batch's
+     shader being its own - needs no warm draw: its program is compiled. A town's people made afresh are a hundred such */
+  const kinds = new Set();   /* (and of one kind, one warm draw: a town's smoke, every puff its own material, was eighty draws and the loading card) */
+  const put = (m, o)=>{ if (!m || seen.has(m) || mats.indexOf(m) >= 0) return; const ok = gfxObjKind(o), kk = gfxMatKind(m) + ok; if ((K && K.has(kk)) || kinds.has(kk)){ seen.add(m); return; } kinds.add(kk); m.__warmObj = ok; mats.push(m); };
+  scene.traverse(o=>{ if ((o.isMesh || o.isPoints || o.isLine || o.isSprite) && o.material){ objs.push([o, o.frustumCulled]); o.frustumCulled = false; const m = o.material; if (Array.isArray(m)) m.forEach(x=>put(x, o)); else put(m, o); } });
   if (!mats.length){ for (const [o, fc] of objs) o.frustumCulled = fc; if (grp) scene.remove(grp); return; }   /* (RS-502: the next floor down reuses the last one's shaders - no warm pause at all) */
   try{ gfxPrelink(V, r, scene, cam); }catch(e){ console.error(e); }   /* (RS-571: every program started at once, linked off the frame) */
   for (const m of mats){ m.__warmVis = m.visible; m.visible = false; }
@@ -24451,7 +24455,7 @@ function gfxWarmStep(V){
     const hid = []; for (const m of doneM) if (m.visible){ m.visible = false; hid.push(m); }
     try{ gfxWarmRender(W.r, W.scene, W.cam); }catch(e){ console.error(e); }
     for (const m of hid) m.visible = true;
-    for (const m of batch){ doneM.push(m); (W.r.__warmKinds || (W.r.__warmKinds = new Set())).add(gfxMatKind(m)); }   /* (RS-562: this kind is warm now) */
+    for (const m of batch){ doneM.push(m); (W.r.__warmKinds || (W.r.__warmKinds = new Set())).add(gfxMatKind(m) + (m.__warmObj || '')); }   /* (RS-562: this kind is warm now; RS-582: on this kind of object) */
     if (performance.now() - t0 > budget) break;
   }
   if (W.i < W.mats.length){ if (!W.live) gfxWarmCard(); return !W.live; }
@@ -31712,13 +31716,49 @@ function v3CullTops(){
     const vis = fr.intersectsSphere(sph); if (e.o.visible!==vis) e.o.visible = vis; if (!vis) hid++; }
   V3.culled = hid; return hid;
 }
+/* (RS-582) a town's scene is kept while you're inside a building, and put straight back when you come out: it used to be
+   thrown away at the door and built again from nothing on the way out, half a second of houses, walls, trees and people,
+   nine hundred fresh materials for the warm-up to draw one by one, and the town's signs painted and uploaded again. Coming
+   out was the worst hitch in the game, every time. Back from the open land to the same town, laid out the same, the houses
+   and walls come back too, with only its people made afresh */
+const V3_PARK_SKIP = new Set(['parked', 'worldTown', 'worldMap', 'worldGrid', 'worldAt', 'worldKeys', 'worldBefore', 'mapRef', 'path', 'camPos', 'door', 'compileDue', 'warmWait', 'prelink']);
+function v3ParkFits(P){ if (!P || G.interior) return false; if (P.map===G.map) return true; return P.at===v3ParkAt() && P.grid===v3GridKey(); }
+function v3ParkAt(){ return G.owPos ? G.owPos.x + ',' + G.owPos.y : ''; }
+function v3GridKey(){ const B = b=>[b.key, b.x0, b.y0, b.w, b.h, b.face, b.floors|0, b.stone ? 1 : 0, b.barracks ? 1 : 0, b.door && b.door.x, b.door && b.door.y];
+  return COLS + 'x' + ROWS + '|' + G.villageTheme + '|' + G.villageRace + '|' + G.map.map(c=>c.join(',')).join(';') + '|' + G.villageDeco.map(c=>c.join(',')).join(';') + '|' + JSON.stringify((VILLAGE_BUILDINGS||[]).map(B)) + '|' + JSON.stringify((VILLAGE_HOUSES||[]).map(B)); }
+/* which of the view's fields the town's build set - its world, lamps, people, plates and the rest; not what the view sets round a
+   build (the map it was built for, the walk, the camera, the door, the warm-up). Noted when the build is done */
+function v3ParkNote(){ const before = V3.worldBefore, keys = new Set(V3.worldKeys || []); if (before) for (const k of Object.keys(V3)) if (!V3_PARK_SKIP.has(k) && V3[k]!==before[k]) keys.add(k);
+  V3.worldKeys = [...keys]; V3.worldBefore = null; V3.worldTown = true; V3.worldMap = G.map; V3.worldAt = v3ParkAt(); V3.worldGrid = v3GridKey(); }
+/* those fields as they stand when the town is parked: a figure swapped for a finer one since the build, the folk who wandered in */
+function v3ParkSnap(){ const snap = {}; for (const k of V3.worldKeys || []) snap[k] = V3[k]; return snap; }
+/* a world let go of: its people's figures released the proper way (their skinned meshes only wrap the shared templates' buffers -
+   disposing those blindly made every later figure of the kind upload again), the rest of its geometry freed */
+function v3WorldDrop(w, S){ if (!w) return; S = S || V3; const keep = new Set();
+  for (const p of [S.player].concat(S.npcs||[], S.villagers||[])){ if (!p) continue; if (p.e){ try{ m3dRelease(p.e); }catch(e){} if (p.e.holder) p.e.holder.traverse(o=>keep.add(o)); } }
+  w.traverse(o=>{ if (o.geometry && !o.isSprite && !keep.has(o) && !o.geometry.isSkinWrap) o.geometry.dispose(); }); }   /* (not a sprite's: every sprite shares the one square) */
+function v3Unpark(P, sc){
+  const same = P.map===G.map; Object.assign(V3, P.snap); V3.world = P.world; if (P.world.parent!==sc) sc.add(P.world);
+  V3.labels.innerHTML = '';
+  if (same){ for (const pl of V3.plates||[]) if (pl.el) V3.labels.appendChild(pl.el); v3LampLights(); const pp = V3.player; if (pp && pp.g){ pp.g.position.set(G.player.x + 0.5, 0, G.player.y + 0.5); pp.at = [G.player.x, G.player.y]; } }
+  else { const grp = P.world, old = [V3.player].concat(V3.npcs||[], V3.villagers||[]).filter(Boolean), sps = new Set(old.map(p=>p.sp)); for (const p of old){ if (p.g) grp.remove(p.g); try{ if (p.e) m3dRelease(p.e); }catch(e){} }
+    V3.hits = (V3.hits||[]).filter(h=>!sps.has(h)); V3.marker = null; v3BuildPeople(grp, V3.mats); v3PlatesTown(); }   /* (the same houses, new people) */
+  v3Banner(); V3.worldKeys = Object.keys(P.snap); V3.worldBefore = null; v3ParkNote(); V3.night = null; v3ApplyTime(true); V3.compileLive = true;   /* (whatever is new - a puff of smoke - warms quietly: no loading card at a door) */
+}
 function v3BuildScene(){
   const T = THREE, sc = V3.scene;
-  if (V3.world){ sc.remove(V3.world); V3.world.traverse(o=>{ if (o.geometry) o.geometry.dispose(); }); }
+  let parked = V3.parked; V3.parked = null;
+  if (V3.world){ sc.remove(V3.world);
+    if (V3.worldTown && V3.worldMap!==G.map && V3.world!==(parked && parked.world)){ if (parked) v3WorldDrop(parked.world, parked.snap); parked = { world:V3.world, map:V3.worldMap, grid:V3.worldGrid, snap:v3ParkSnap(), at:V3.worldAt }; }   /* (a town left for a room, or for the land - its scene stayed while you walked - parked) */
+    else if (V3.world!==(parked && parked.world)) v3WorldDrop(V3.world);
+    V3.world = null; }
+  if (v3ParkFits(parked)){ v3Unpark(parked, sc); return; }   /* (the parked town, put back) */
+  V3.parked = parked;   /* (kept for the way back; a later parked town takes its place) */
+  V3.worldTown = false; V3.worldKeys = null; V3.worldBefore = Object.assign({}, V3);   /* (what this build sets, for parking - see v3ParkNote) */
   const grp = V3.world = new T.Group(); sc.add(grp);
   V3.gateHinges = []; V3.windows = []; V3.lamps = []; V3.smoke = []; V3.flames = []; V3.hearthCook = []; V3.signs = []; V3.banners = []; V3.doors = {}; V3.hits = []; V3.people = []; V3.parts = [];
   const mats = V3.mats = v3Materials();
-  if (G.interior){ v3BuildInterior(grp, mats); v3BuildPeople(grp, mats); return; }
+  if (G.interior){ v3BuildInterior(grp, mats); v3BuildPeople(grp, mats); V3.worldBefore = null; return; }
   // ground: the painted town square plus the wide surrounding land
   const gt = v3GroundTexture(G.villageTheme);
   const ground = new T.Mesh(new T.PlaneGeometry(gt.sizeW, gt.sizeH), new T.MeshStandardMaterial({ map:gt.tex, roughness:0.95 }));
@@ -31839,6 +31879,28 @@ function v3SeatPose(p, st){
     const c = new THREE.Vector3(st.x + 0.5, 0, st.y + 0.5); if (p.g.parent) p.g.parent.localToWorld(c);
     r.seatBox = { x:c.x, z:c.z, yaw:st.yaw, hw, hd, top:SEAT_H + 0.012, key:[c.x.toFixed(3), c.z.toFixed(3), st.yaw.toFixed(3), k].join() }; p.g.updateMatrixWorld(true); m3dSkirtFollow(r); }
 }
+// point lights (a fixed handful, reused)
+function v3LampLights(){
+  V3.plights.forEach(l=>{ l.intensity = 0; });
+  const mains = V3.lamps.filter(l=>l.main).slice(0, V3.plights.length);
+  mains.forEach((l,i)=>{ const pl = V3.plights[i]; pl.position.set(l.p[0], l.p[1], l.p[2]); pl.color.setHex(l.col); pl.distance = l.r; pl.userData = l; });
+}
+function v3PlatesTown(){
+  const T = THREE;
+  for (const [txt, x, y, z] of [['Waypoint', townWpAt()[0]+0.5, 1.95, townWpAt()[1] + 0.5]]){
+    const el = document.createElement('div'); el.className = 'v3plate small'; el.innerHTML = `<b>${txt}</b>`; V3.labels.appendChild(el);
+    V3.plates.push({ el, pos:new T.Vector3(x,y,z) });
+  }
+  for (const b of VILLAGE_BUILDINGS){ const el = document.createElement('div'); el.className = 'v3plate bld'; el.innerHTML = `<b>${esc(b.name)}</b>`; V3.labels.appendChild(el);
+    V3.plates.push({ el, pos:new T.Vector3(b.x0+b.w/2, (b.floors||1)*1.2+1.6, b.y0+b.h/2) }); }
+}
+function v3Banner(){
+  const f = townFlavorAt(G.owPos.x, G.owPos.y);
+  let bn = document.getElementById('v3banner');
+  if (!bn){ bn = document.createElement('div'); bn.id = 'v3banner'; document.querySelector('.mapwrap').appendChild(bn); }
+  bn.innerHTML = G.interior ? `<b>${esc(G.interior.name)}</b><span>${esc(f ? f.name : 'the village')}</span>` : f ? `<b>${esc(f.name)}</b><span>${esc(townInfo().ident.nm)} &middot; ${townInfo().tierNm}</span>` : '<b>A Village</b>';
+  bn.classList.remove('show'); void bn.offsetWidth; bn.classList.add('show');
+}
 function v3BuildPeople(grp, mats){
   const T = THREE;
   // people
@@ -31859,10 +31921,7 @@ function v3BuildPeople(grp, mats){
   V3.partMatSpark = new T.SpriteMaterial({ map:v3Blob('rgba(255,180,80,1)'), blending:T.AdditiveBlending, transparent:true, depthWrite:false });
   V3.partMatMote = new T.SpriteMaterial({ map:v3Blob('rgba(120,230,255,1)'), blending:T.AdditiveBlending, transparent:true, depthWrite:false });
   V3.partMatBubble = new T.SpriteMaterial({ map:v3Blob('rgba(120,255,150,1)'), blending:T.AdditiveBlending, transparent:true, depthWrite:false });
-  // point lights (a fixed handful, reused)
-  V3.plights.forEach(l=>{ l.intensity = 0; });
-  const mains = V3.lamps.filter(l=>l.main).slice(0, V3.plights.length);
-  mains.forEach((l,i)=>{ const pl = V3.plights[i]; pl.position.set(l.p[0], l.p[1], l.p[2]); pl.color.setHex(l.col); pl.distance = l.r; pl.userData = l; });
+  v3LampLights();
   // name plates
   V3.labels.innerHTML = '';
   V3.plates = [];
@@ -31872,23 +31931,15 @@ function v3BuildPeople(grp, mats){
     const el = document.createElement('div'); el.className = 'v3plate folk'; el.innerHTML = `<b>${esc(p.v.nm || NAME_POOL[h])}</b><span>${esc(p.v.role || role)}</span>`; V3.labels.appendChild(el); V3.plates.push({ el, obj:p.g, y:1.15, near:9, hover:true }); });   /* (RS-374: no plate over a citizen's head - point at them to see who they are) */
   if (G.interior) for (const [k,x,y] of ROOM_LAYOUT[G.interior.key].benches){ if (k==='stool' || k==='table') continue; if ((G.villageNpcs||[]).some(n=>n.seat && n.x===x && n.y===y)) continue;   /* (RS-382: a chair someone sits in shows their name, not its own) */ const el = document.createElement('div'); el.className = 'v3plate small'; el.innerHTML = `<b>${esc(BENCHES[k].nm)}</b>`; V3.labels.appendChild(el); V3.plates.push({ el, pos:new T.Vector3(x+0.5, 1.45, y+0.5) }); }
   if (G.interior && ROOM_STREET_DOOR(G.interior.key)){ const el = document.createElement('div'); el.className = 'v3plate small'; el.innerHTML = '<b>Door</b>'; V3.labels.appendChild(el); V3.plates.push({ el, pos:new T.Vector3(ROOM.door.x+0.5, 1.9, ROOM.door.y+0.2) }); }
-  if (!G.interior) for (const [txt, x, y, z] of [['Waypoint', townWpAt()[0]+0.5, 1.95, townWpAt()[1] + 0.5]]){
-    const el = document.createElement('div'); el.className = 'v3plate small'; el.innerHTML = `<b>${txt}</b>`; V3.labels.appendChild(el);
-    V3.plates.push({ el, pos:new T.Vector3(x,y,z) });
-  }
-  if (!G.interior) for (const b of VILLAGE_BUILDINGS){ const el = document.createElement('div'); el.className = 'v3plate bld'; el.innerHTML = `<b>${esc(b.name)}</b>`; V3.labels.appendChild(el);
-    V3.plates.push({ el, pos:new T.Vector3(b.x0+b.w/2, (b.floors||1)*1.2+1.6, b.y0+b.h/2) }); }
-  const f = townFlavorAt(G.owPos.x, G.owPos.y);
-  let bn = document.getElementById('v3banner');
-  if (!bn){ bn = document.createElement('div'); bn.id = 'v3banner'; document.querySelector('.mapwrap').appendChild(bn); }
-  bn.innerHTML = G.interior ? `<b>${esc(G.interior.name)}</b><span>${esc(f ? f.name : 'the village')}</span>` : f ? `<b>${esc(f.name)}</b><span>${esc(townInfo().ident.nm)} &middot; ${townInfo().tierNm}</span>` : '<b>A Village</b>';
-  bn.classList.remove('show'); void bn.offsetWidth; bn.classList.add('show');
+  if (!G.interior) v3PlatesTown();
+  v3Banner();
   const seen = new Set();
   V3.world.traverse(o=>{ const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : [];
     for (const m of ms){ if (seen.has(m) || m.userData.lin) continue; seen.add(m); m.userData.lin = true;
       if (m.color && !m.map) m.color.convertSRGBToLinear(); if (m.emissive) m.emissive.convertSRGBToLinear(); } });
   V3.night = null;
   v3ApplyTime(true);
+  if (!G.interior) v3ParkNote(); else V3.worldBefore = null;   /* (RS-582: a town is parked when you leave it - see v3ParkSnap; a room is not) */
 }
 // ---------- day / night ----------
 // (RS-157) the light follows the clock smoothly: the sun rises in the east, crosses the sky and sets in the west, its
@@ -42415,6 +42466,7 @@ function isoBasicMat(o){ const m = new THREE.MeshBasicMaterial(o); if (typeof FP
    birth: a prop's glow sprite, a ring, a portal's shader are fresh objects every rebuild, but the same programs - and each unseen one
    cost the warm-up a full off-screen draw, 15 of them on every door opened, with the loading card on top */
 function gfxMatKind(m){ return m.type + '|' + [m.transparent, m.blending, !!m.map, !!m.normalMap, !!m.emissiveMap, !!m.specularMap, m.side, m.depthWrite, m.alphaTest > 0, !!m.vertexColors, m.fog, !!m.flatShading, (m.userData && (m.userData.special || '')) || '', m.userData && m.userData.bend ? 1 : 0, m.userData && m.userData.rim ? 1 : 0, m.customProgramCacheKey ? m.customProgramCacheKey() : '', m.vertexShader ? m.vertexShader.length + '/' + m.fragmentShader.length : ''].join(','); }
+function gfxObjKind(o){ return o && o.isSkinnedMesh ? '|sk' : o && o.isInstancedMesh ? '|in' : o && o.isSprite ? '|sp' : o && (o.isPoints || o.isLine) ? '|pt' : ''; }   /* (RS-582: what a material draws - its shader differs by it) */
 function gfxMatBorn(r, m){ if (!r || !m) return; const K = r.__warmKinds; if (K && K.has(gfxMatKind(m))) gfxWarmSeen(r).add(m); }
 function gfxMatsBorn(r, root){ if (!r || !root) return; root.traverse(o=>{ const m = o.material; if (!m) return; if (Array.isArray(m)) m.forEach(x=>gfxMatBorn(r, x)); else gfxMatBorn(r, m); }); }
 function isoPropMat(key, col, o){
@@ -43901,7 +43953,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-581';
+const GAME_VERSION = 'rs-582';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

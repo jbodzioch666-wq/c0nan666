@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs582 | a town's scene parked while you're in a building and put straight back on the way out; back from the land the same houses, new people; a siege staged in town leaves the scene alone; a forced rebuild still rebuilds |
 | rs581 | no screen-edge flashes unless asked for; the settings page in five tabs, picture sliders live as you drag and kept, the render resolution |
 | rs580 | instanced meshes culled by a sphere round all their instances: a town's palisade is drawn from every side of the town |
 | rs579 | the atlas tiles are read from their own row: a spider rendered close up shows its fur, against the same spider flat |
@@ -435,6 +436,10 @@ Screenshots go to `tools/tests/shots/`.
 | ztex | every textured material in town before a building visit and after: maps gone, empty or flat, and any disposed |
 | zfence | a town's instanced meshes from four corners and the middle: whether the culling draws the ones in view |
 | zset | the settings page on one tab (`ZTAB`, default picture) |
+| zrepeat | the same thing three times over with the real warm-up on - into a shop and out, out of town and back, down a floor and up: worst frames, and what was made again (programs, textures, geometries, builds, templates, materials re-warmed) |
+| zpark | why a town come back to from the land isn't put back from the parked scene: which part of its key differs |
+| zpark2 | each scene build on re-entering a town: what called it, whether the map and the grid key changed, who reset the map reference, sieges staged |
+| zpark3 | after a shop round trip: the town's materials the warm-up hasn't seen, whether the loading card showed, whose geometry got disposed |
 | zhair | heads with each hairstyle from four sides, and under helmets |
 | zplate | plate armour on builds from slight to heavy |
 | zunder | the creator's undressed figures by race and sex |

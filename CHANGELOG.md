@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-582 - Coming out of a building is instant
+- **The town stays while you're inside:** stepping into a shop used to throw the whole town away, and stepping out built it again from nothing: every house, wall, tree and townsperson, nine hundred fresh materials for the shader warm-up to draw one by one, and the town's signs painted and uploaded again. That was the worst hitch in the game, and it came on every door. The town's scene is now parked at the door and put straight back as you come out. On the test machine coming out of a shop went from a 270 ms freeze to a 20 ms frame, with nothing built, nothing freed and nothing to warm.
+- **Back from the land:** walking out of a town and back in built it again too. If the town is laid out the same, which it is unless its layout has changed, the houses and walls come back from the parked scene and only its people are made afresh. About 500 ms of building became about 40.
+- **Sieges staged in town:** when a siege was staged while you stood in a town, the town's scene was thrown away and rebuilt afterwards. It's kept now.
+- **Figures let go of properly:** a scene thrown away freed the geometry of every figure in it, but their skinned meshes only wrap buffers shared with the creature templates, so every later figure of that kind had to upload again. They're released the proper way now.
+- **The warm-up skips what it knows:** a material of a kind the renderer has already warmed, on the same kind of object, needs no warm draw. A town's twenty people made afresh are a hundred such.
+- **No loading card at a door:** a town's smoke gives every puff its own material, so coming out of a shop found fifty of them new, warmed them one draw each, and showed the loading card while it did. One draw now warms a kind, and after a door whatever is new warms quietly.
+
 ## RS-581 - Settings in tabs, no edge flashes
 - **No more flashing screen edges:** in dungeons the screen's edges lit up red when you were hit, green every time you healed, which with life coming back a little at a time was over and over, gold on a level, and pulsed red when your life was low. They're all off now. Your life orb shows the same. Switch them back on under Effects if you liked them.
 - **Settings in tabs:** Sound, Graphics, Picture, Effects and Interface, each on its own page, instead of one long list.
