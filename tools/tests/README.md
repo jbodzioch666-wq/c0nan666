@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs598 | below ground you face a foe on the diagonal and a vein at an angle; a gathering spot's disc glows at its rim only |
 | rs597 | solid shadows under the trees again: no leaf masked for a dapple |
 | rs596 | no road on a mountain or over water, none worn up a steep bank; trees' shadows dappled, leaves drawn whole; rain dims the sun and fills the sky |
 | rs595 | the wind slowed (the plants' lean wave, how fast they follow a gust, the gusts' pace) and the dungeon torches' soft waver |

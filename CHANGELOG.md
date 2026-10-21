@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-598 - Face what you fight, no more crescents
+
+- **You face your foe at any angle:** in a dungeon you only ever faced the four straight ways, unless you'd just stepped diagonally. Now you turn square on to the monster you're fighting, beside you on a diagonal or under your bow or spell from further off. Failing that, you face any foe that comes right up beside you.
+- **And what you're working:** gathering at a vein, a cave pool or a patch of herbs set off at an angle, your facing used to settle somewhere in between. Now you face it straight on.
+- **No more crescent shadows:** a gathering spot's pale disc used to light up everything inside it, including a tree's shadow falling over it. The shadow then only showed round the disc's edge, as a dark crescent. The disc now glows at its rim only, so shadows inside it stay whole.
+
 ## RS-597 - Solid shade again
 
 - **Solid tree shadows:** trees cast solid shadows again instead of RS-596's dappled ones. The fainter shadows under cloud and rain stay.
