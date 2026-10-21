@@ -25,7 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
-| rs606 | the robe over the shoulders to the neck in one cloth with the shoulders and sleeves, its weave laid as theirs, its top in to the neck |
+| rs606 | the robe over the shoulders to the neck in one cloth with the shoulders and sleeves, its weave laid as theirs, its top in to the neck; RS-607: the weave blended three ways, kept under the rim light |
 | rs605 | a dungeon ready in seconds again (not the half-minute shader wait), and the canvas cleared as a new place is built |
 | rs604 | a robe in one piece, its cloth up over the chest to the shoulders; no automatic resolution drop |
 | rs603 | making "all" counts it: the cooking card says 0 / 7, and what's queued after by its number |

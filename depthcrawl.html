@@ -36307,6 +36307,7 @@ function m3dRimify(m){
   };
   m.customProgramCacheKey = ()=>m.userData.kind==='skin' ? 'm3drimskin' : 'm3drim';
   m.userData.rim = true;
+  if (m.userData.tri) m3dTriplanar(m, m.userData.tri);   /* (RS-607: a robe's three-way weave kept under its rim light) */
   return m;
 }
 /* (RS-377) a sculpted body that bends: the part of it forward of a pivot turns with the chest - the bend blended in over a span
@@ -41286,22 +41287,44 @@ function m3dRobeShape(rig, torso, mats, b){
      by x and y, sides by z and y, tops by x and z); the skirt's round-the-cylinder uvs spread it differently, so its weave was coarser
      than the sleeves' and the bodice's. A second set of uvs laid the same way carries the robe's weave (the hem's runes and trim keep the
      first). And its shade is the body's: its sculpt's own shading averaged, where a flat 0.76 left it greyer or whiter than the sleeves */
-  try{ const q = g.attributes.position, nr = g.attributes.normal, n = q.count, uv1 = new Float32Array(n*2), K = 7;
-    for (let i=0;i<n;i++){ const X = q.getX(i)*sx, Y = q.getY(i) + y0, Z = q.getZ(i)*sz, ax = Math.abs(nr.getX(i)*sz), ay = Math.abs(nr.getY(i)), az = Math.abs(nr.getZ(i)*sx);
-      if (az >= ax && az >= ay){ uv1[i*2] = X*K; uv1[i*2+1] = Y*K; } else if (ax >= ay){ uv1[i*2] = Z*K; uv1[i*2+1] = Y*K; } else { uv1[i*2] = X*K; uv1[i*2+1] = Z*K; } }
-    g.setAttribute('uv1', new T.BufferAttribute(uv1, 2));
+  try{ const q = g.attributes.position, n = q.count, tp = new Float32Array(n*3), uv1 = new Float32Array(n*2);
+    const nr = g.attributes.normal; for (let i=0;i<n;i++){ const X = q.getX(i)*sx, Y = q.getY(i) + y0, Z = q.getZ(i)*sz; tp[i*3] = X; tp[i*3+1] = Y; tp[i*3+2] = Z;   /* (RS-607: each point where it sits in the body's frame, at rest) */
+      const ax = Math.abs(nr.getX(i)), ay = Math.abs(nr.getY(i)), az = Math.abs(nr.getZ(i)); if (az >= ax && az >= ay){ uv1[i*2] = X*7; uv1[i*2+1] = Y*7; } else if (ax >= ay){ uv1[i*2] = Z*7; uv1[i*2+1] = Y*7; } else { uv1[i*2] = X*7; uv1[i*2+1] = Z*7; } }   /* (the frame the weave's bumps are turned by) */
+    g.setAttribute('aTri', new T.BufferAttribute(tp, 3)); g.setAttribute('uv1', new T.BufferAttribute(uv1, 2));
     const base = sk.material, bm = rig.chestMesh && rig.chestMesh.material, key = '__robe|' + base.uuid + '|' + (bm ? bm.uuid : '');
     let rm = mats[key]; if (!rm){ rm = base.clone(); rm.userData = Object.assign({}, base.userData);
-      for (const k of ['map', 'normalMap', 'roughnessMap']) if (rm[k]){ rm[k] = rm[k].clone(); rm[k].repeat.set(1, 1); rm[k].channel = 1; rm[k].needsUpdate = true; }
+      for (const k of ['map', 'normalMap', 'roughnessMap']) if (rm[k]){ rm[k] = rm[k].clone(); rm[k].repeat.set(1, 1); rm[k].channel = 1; rm[k].wrapS = rm[k].wrapT = T.RepeatWrapping; rm[k].needsUpdate = true; }
+      rm.roughnessMap = null; m3dTriplanar(rm, 7);   /* (RS-607: the weave blended three ways - no panels, no seams) */
       const cg = rig.chestMesh && (rig.chestMesh.geometry.userData.from || rig.chestMesh.geometry), ca = cg && cg.attributes.color;
       if (bm && bm.color){ let k = 1; if (ca && bm.vertexColors){ let sm = 0; const N = ca.count; for (let i=0;i<N;i++) sm += (ca.getX(i) + ca.getY(i) + ca.getZ(i))/3; k = sm/Math.max(1, N); } rm.color.copy(bm.color).multiplyScalar(k); }
       mats[key] = rm; }
     sk.material = rm;
-    const cm = rig.chestMesh, same = cm && cm.material; if (same){ const share = o=>{ if (!o.isMesh || o.material!==same || !o.geometry.attributes.uv) return; if (!o.geometry.attributes.uv1) o.geometry.setAttribute('uv1', o.geometry.attributes.uv); o.material = rm; };
+    const cm = rig.chestMesh, same = cm && cm.material; if (same){ const share = o=>{ if (!o.isMesh || o.material!==same || !o.geometry.attributes.uv) return; if (!o.geometry.attributes.uv1) o.geometry.setAttribute('uv1', o.geometry.attributes.uv);
+        if (!o.geometry.attributes.aTri){ const q = o.geometry.attributes.position, n = q.count, tp = new Float32Array(n*3), sc = o.scale, po = o===cm ? o.position : { x:0, y:0, z:0 };
+          for (let i=0;i<n;i++){ tp[i*3] = q.getX(i)*sc.x + po.x; tp[i*3+1] = q.getY(i)*sc.y + po.y; tp[i*3+2] = q.getZ(i)*sc.z + po.z; } o.geometry.setAttribute('aTri', new T.BufferAttribute(tp, 3));
+          if (o===cm && cm.geometry.userData.from && cm.geometry.userData.from!==cm.geometry) cm.geometry.userData.from.setAttribute('aTri', cm.geometry.attributes.aTri); }   /* (the bodice in the very frame the skirt's points are laid in, so the weave runs on across where they meet) */
+        o.material = rm; };
       share(cm); for (const A of rig.arms||[]) A.sh.traverse(share); }   /* (the shoulders above the cloth and the sleeves: the same cloth, no second look) */
   }catch(err){ console.error(err); }
   /* (RS-604) a strip down the front (trim, runes) laid on the robe's cloth, now that the cloth runs up over the chest - it sat on the bodice, under it */
   for (const m of torso.children){ if (!m.userData || !m.userData.frontTrim) continue; const y = m.position.y, d = 0.006, z0 = Rr(y - 0.008, 0), z1 = Rr(y + 0.008, 0); m.position.z = Rr(y, 0) + 0.0045 + d*0.5; m.rotation.x = Math.atan2(z1 - z0, 0.016); }
+}
+/* (RS-607) a cloth's weave laid three ways at once: seen from the front, the side and above, from each point's place on the body at rest
+   (aTri), blended by which way the face looks - a weave with no seams where a front face turns into a side or a top */
+function m3dTriPatch(sh, K){ sh.vertexShader = 'attribute vec3 aTri; varying vec3 vTriP; varying vec3 vTriN;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vTriP = aTri; vTriN = normal;');
+    sh.fragmentShader = 'varying vec3 vTriP; varying vec3 vTriN;\n' + sh.fragmentShader.replace('#include <normal_fragment_maps>', `#ifdef USE_NORMALMAP_TANGENTSPACE
+      vec3 mapN = (texture2D(normalMap, ta).xyz*tw.x + texture2D(normalMap, tb).xyz*tw.y + texture2D(normalMap, tc).xyz*tw.z)*2.0 - 1.0; mapN.xy *= normalScale; normal = normalize(tbn*mapN);
+      #else
+      #include <normal_fragment_maps>
+      #endif`).replace('#include <map_fragment>', `vec3 tw = pow(abs(normalize(vTriN)), vec3(4.0)); tw /= max(1e-4, tw.x + tw.y + tw.z);
+      vec2 ta = vTriP.zy*${K.toFixed(2)}, tb = vTriP.xz*${K.toFixed(2)}, tc = vTriP.xy*${K.toFixed(2)};
+      #ifdef USE_MAP
+      vec4 sampledDiffuseColor = texture2D(map, ta)*tw.x + texture2D(map, tb)*tw.y + texture2D(map, tc)*tw.z;
+      diffuseColor *= sampledDiffuseColor;
+      #endif`); }
+function m3dTriplanar(mat, K){ mat.userData.tri = K; const prev = mat.onBeforeCompile, pk = mat.customProgramCacheKey, base = THREE.Material.prototype;
+  mat.onBeforeCompile = function(sh, r){ if (prev && prev!==base.onBeforeCompile) prev.call(this, sh, r); m3dTriPatch(sh, K); };
+  mat.customProgramCacheKey = function(){ return (pk && pk!==base.customProgramCacheKey ? pk.call(this) : '') + '|m3dtri' + K; };
 }
 /* (RS-549) a cloak hangs outside what the body wears: over a robe's cloth and cord or a garment's back, on a stooped wood elf's
    bent spine too, where they pushed out through it. Each point of the cloak is kept a little behind the back of the body and its
@@ -44463,7 +44486,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-606';
+const GAME_VERSION = 'rs-607';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-607 - No panels on the robe
+
+- **The weave runs on without seams:** RS-606 laid the robe's weave flat across each face of the body. Where a front-facing part turned into a side or a top, the weave jumped, so the shoulders and chest showed panels with seams between them. The weave is now blended from all three directions at once by which way the cloth faces, so it flows over the shoulders, the chest and the sleeves as one piece.
+
 ## RS-606 - Sleeves and shoulders in the robe
 
 - **One cloth, arms and all:** the robe's cloth now runs on over the shoulders and slopes in to the neck. The shoulders and sleeves wear the same cloth, with the same weave size and the same shade. Before, the robe ended in a rim across each shoulder, and the shoulders and sleeves above it were a finer, different-looking cloth.
