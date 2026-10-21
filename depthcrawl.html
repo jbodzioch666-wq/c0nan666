@@ -30116,8 +30116,11 @@ const SDF = (()=>{
 // ---- the skeleton's anatomy, one sculpted part per rigid piece of the rig.
 // Each entry returns a finished BufferGeometry in its joint's local frame
 // (model faces +z, its right side is -x, y up, metres).
+/* (RS-610) the skeleton's grid, coarser by this: at full detail it was 725,000 triangles in 103 pieces, each drawn into the shadows
+   too - at the size it stands in the dungeon, a few of them cost more than the floor */
+const SK3_COARSE = 2;
 const SK3_PARTS = (()=>{
-  const { sph, ell, shellEll, cap, flat, cylE, torus, part, basis } = SDF;
+  const { sph, ell, shellEll, cap, flat, cylE, torus, basis } = SDF, part = (a, b, h)=>SDF.part(a, b, h*SK3_COARSE);
   const V = (x,y,z)=>[x,y,z];
   const lerp3 = (a,b,t)=>[a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t, a[2]+(b[2]-a[2])*t];
   const bump = (t, c, w)=> Math.exp(-Math.pow((t-c)/w, 2));
@@ -30890,6 +30893,7 @@ function sk3Instance(m){
   const inner = new T.Group(); inner.add(root); inner.scale.setScalar(H/SK3.height*1.12);
   const holder = new T.Group(); holder.add(inner);
   holder.traverse(o=>{ if (o.isMesh && !(o.material && o.material.transparent)) o.castShadow = true; });   /* (RS-163: a real shadow, no blob) */
+  try{ gfxPruneCasters(holder, H*0.1); }catch(e){}   /* (RS-610: its big bones cast it - every finger bone and vertebra in every torch's shadow was 102 casters a skeleton) */
   const mats = [...mmap.values()].filter(x=>x.emissive && x!==eyeM);
   return { holder, root:inner, rig, mats, H, sk:true, cls:dress.cls, seed:Math.random()*10, atk:0, pHp:G.player.hp, hurt:0, lift:0, dying:-1, stamp:0 };
 }
@@ -35782,8 +35786,8 @@ function fpdBuild(T){
   /* (RS-572) a slice a frame, behind the loading card (see fpdPrepStep): all at once, a floor of new creatures held the page still
      for one to two seconds. Tests keep the one sweep */
   FPD.prep = null;
-  try{ const q = [], seen = new Set(); for (const m of G.mon||[]){ const pt = m3dPortrait(m); if (!pt) continue; const k = m3dTplKey(pt); if (seen.has(k) || M3D.tpl.has(k)) continue; seen.add(k); q.push(pt); }
-    if (window.__noWarmSlice || !q.length) for (const pt of q) m3dTemplate(pt); else FPD.prep = { q, t0:performance.now() }; }catch(e){ console.error(e); }
+  try{ fpdMonBuild(()=>{ const q = [], seen = new Set(); for (const m of G.mon||[]){ const pt = m3dPortrait(m); if (!pt) continue; const k = m3dTplKey(pt); if (seen.has(k) || M3D.tpl.has(k)) continue; seen.add(k); q.push(pt); }
+    if (window.__noWarmSlice || !q.length) for (const pt of q) m3dTemplate(pt); else FPD.prep = { q, t0:performance.now() }; }); }catch(e){ console.error(e); }   /* (RS-610: on the coarser grid) */
 }
 // out of doors: ground running on to the horizon, a field's obstacles as real
 // bushes, boulders or (on a ship's deck) cargo crates, grass that sways in the
@@ -36359,11 +36363,16 @@ const M3D_PLAYER_COARSE_PHONE = 1.45;
 /* (RS-575) and on every machine, out in the world: at the size your figure stands on the land, in a town or below ground, the full
    sculpt's 317,000 triangles (drawn twice, for its shadow too) look no different from 159,000. The character creator keeps full detail */
 let M3D_PLAYER_COARSE = M3D_PLAYER_COARSE_PHONE;
+/* (RS-610) the creatures below ground - the floor's monsters, your raised dead, your thrall, the town's people in a siege - sculpted on
+   the townsfolk's coarser grid: at the size they stand in the dungeon the full sculpt looks no different, and it was close-up detail
+   for every one of them (a raised ghost 194,000 triangles, four of them more than the whole room around them) */
+const FPD_MON_COARSE = 1.6;
+function fpdMonBuild(fn){ const c0 = M3D_COARSE; M3D_COARSE = FPD_MON_COARSE; try{ return fn(); } finally { M3D_COARSE = c0; } }
 function m3dPlayerBuild(fn){ const c = gfxPhone() ? M3D_PLAYER_COARSE_PHONE : M3D_PLAYER_COARSE; if (c===1) return fn(); const c0 = M3D_COARSE; M3D_COARSE = c; try{ return fn(); } finally { M3D_COARSE = c0; } }
 /* (RS-500) sculpted geometry is deterministic for its key, so a finished sculpt is kept in IndexedDB and later sessions skip
    the field fill and the meshing altogether - that was over 2s of every town load, and the skeleton kept sculpting for 15s after.
    BUMP M3D_SCULPT_VER WHENEVER ANY SCULPTED SHAPE CHANGES (SDF code, SK3_PARTS, any m3dSculpt build), or players keep the old look */
-const M3D_SCULPT_VER = 15, SCULPT_CAP = 64*1048576;
+const M3D_SCULPT_VER = 16, SCULPT_CAP = 64*1048576;
 const SCULPT_DB = { map:new Map(), db:null, dirty:[] };
 function sculptDbOpen(){
   if (SCULPT_DB.opened) return; SCULPT_DB.opened = true; if (typeof indexedDB==='undefined'){ sculptDbReady(); return; }
@@ -39310,7 +39319,7 @@ function m3dSpecialMat(mats, hex, kind){
   if (kind==='bark'){ const t = m3dBarkTex(); return sp(new T.MeshStandardMaterial({ color:m3dCol(hex), map:t, bumpMap:t, bumpScale:2, roughness:0.95 })); }
   if (kind==='wrap'){ const t = m3dWrapTex(); return sp(new T.MeshStandardMaterial({ color:m3dCol(hex), map:t, bumpMap:t, bumpScale:0.6, roughness:0.95 })); }
   if (kind==='slime') return sp(new T.MeshStandardMaterial({ color:m3dCol(hex), roughness:0.12, metalness:0.05, transparent:true, opacity:0.72, emissive:m3dCol(hex), emissiveIntensity:0.12 }));
-  if (kind==='ghost') return sp(new T.MeshStandardMaterial({ color:m3dCol(hex), roughness:0.6, transparent:true, opacity:0.55, depthWrite:false, emissive:m3dCol(hex), emissiveIntensity:0.35, side:T.DoubleSide }));
+  if (kind==='ghost') return sp(new T.MeshStandardMaterial({ color:m3dCol(hex), roughness:0.6, transparent:true, opacity:0.55, depthWrite:false, emissive:m3dCol(hex), emissiveIntensity:0.35, side:T.FrontSide }));   /* (RS-610: its front only - both sides drew every layer twice) */
   return m3dMat(mats, hex, kind);
 }
 function m3dFinish(root, rig, anim, extra){ const box = new THREE.Box3().setFromObject(root), sz = box.getSize(new THREE.Vector3()); M3D.meta.set(root, Object.assign({ rig, anim, height: Math.max(0.05, box.max.y, Math.max(sz.x, sz.z)*0.62), foot: Math.max(0.05, sz.x, sz.z) }, extra||{})); return root; }
@@ -41775,7 +41784,7 @@ function m3dUpdate(m, pos, flash){
   const pt = m3dPortrait(m); if (!pt) return 0;
   let e = M3D.inst.get(m);
   if (e && e.pt!==pt){ if (e.holder.parent) e.holder.parent.remove(e.holder); M3D.live.delete(e); e = null; }   // (it changed shape)
-  if (!e){ e = m3dInstance(m, pt); e.pt = pt; M3D.inst.set(m, e); }
+  if (!e){ e = fpdMonBuild(()=>m3dInstance(m, pt)); e.pt = pt; M3D.inst.set(m, e); }   /* (RS-610: on the coarser grid) */
   if (!e.holder.parent) FPD.scene.add(e.holder);
   e.stamp = M3D.stamp; M3D.live.add(e);
   const moving = pos.mv!==undefined ? pos.mv : Math.min(1, Math.hypot(m.x+0.5-pos.x, m.y+0.5-pos.y)*3);
@@ -42938,7 +42947,7 @@ function isoSyncSprites(S, env){
 /* (RS-572) one slice of the floor's creature sculpts, to a few milliseconds' budget; true once they're all made (or it gave up) */
 function fpdPrepStep(){
   const P = FPD.prep; if (!P) return true; const dl = performance.now() + (gfxPhone() ? 10 : 16);
-  try{ while (P.q.length && performance.now() < dl){ const t = m3dTemplateTry(P.q[0], dl); if (t) P.q.shift(); } }   /* (a try goes a stage at a time - survey, sculpts, build, skin - so it's tried again while time is left) */
+  try{ while (P.q.length && performance.now() < dl){ const t = fpdMonBuild(()=>m3dTemplateTry(P.q[0], dl)); if (t) P.q.shift(); } }   /* (a try goes a stage at a time - survey, sculpts, build, skin - so it's tried again while time is left) */
   catch(e){ console.error(e); P.q.shift(); }
   if (P.q.length && performance.now() - P.t0 < 20000){ gfxWarmCard(); return false; }
   FPD.prep = null; return true;
@@ -44536,7 +44545,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-609';
+const GAME_VERSION = 'rs-610';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

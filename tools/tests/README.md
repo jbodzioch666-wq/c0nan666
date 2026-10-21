@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs610 | raised minions on the coarser dungeon grid (a ghost under 110,000 triangles, a skeleton under 260,000 with at most 24 shadow casters), a ghost's shroud front-sided, a dungeon creature's template the coarse one |
 | rs609 | into a dungeon's portal: walked up to the gate, it flares, drawn in shrinking and turning, then the road at full size; a robe's top carries none of the hem's runes |
 | rs608 | a robe in at the waist as the body under it, its cloth over the shoulders' tops to the neckline with no bodice showing, the figure in the world in the same weave, and a monster's death with no boneTransform warnings |
 | rs606 | the robe over the shoulders to the neck in one cloth with the shoulders and sleeves, its weave laid as theirs, its top in to the neck; RS-607: the weave blended three ways, kept under the rim light |
@@ -492,6 +493,8 @@ Screenshots go to `tools/tests/shots/`.
 | zdeath | what a monster's death costs a frame, with a CPU profile over five deaths |
 | zworld | the player's robed figure in the world: which scene draws it and with what materials |
 | ztavout | into the tavern and out again by walking, in a robe or from a save (ZT, ZH, ZSAVE), with any error on the way |
+| zminion | what raised minions cost a frame (ZK kind, ZN count): frame and GPU times, draw calls, triangles, and each figure's parts, with a shot |
+| zsk3 | the sculpted skeleton's and a ghost's parts by triangles |
 | zhair | heads with each hairstyle from four sides, and under helmets |
 | zplate | plate armour on builds from slight to heavy |
 | zunder | the creator's undressed figures by race and sex |

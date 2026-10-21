@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-610 - Raised dead that don't cost your frame rate
+
+- **Minions built for the dungeon:** raised minions were built at close-up detail. A single raised ghost was 194,000 triangles, more than the whole room around it, so four of them dragged the frame rate down. They're now sculpted on the same coarser grid as townsfolk, which looks the same at dungeon size. A ghost is now 83,000 triangles. Monsters, your thrall and siege allies below ground get the same treatment.
+- **Lighter skeletons:** the sculpted skeleton was 725,000 triangles in 103 pieces, and every piece cast a shadow from every torch. It's now 194,000 triangles, and only its 15 big bones cast shadows. This helps skeleton enemies as much as raised ones.
+- **Ghosts drawn once:** a ghost's see-through shroud was drawn on both sides, so every layer of it was drawn twice. It's now drawn from the front only.
+- **The numbers:** with four raised ghosts, a frame takes 6.1 ms instead of 12.2 ms. With four skeletons, it takes 6.8 ms against 4.2 ms with none.
+
 ## RS-609 - Into the portal
 
 - **Portals take you in:** stepping onto a dungeon's way out, or its red flee portal, used to cut straight to the road. Now you walk up to the gate, it flares brighter and swirls faster, and you're drawn into it, turning, shrinking and rising into its light before the screen goes dark and you come out on the other side. The portal off a field works the same way.
