@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs612 | a unique named as a robe (the Serpentskin Shroud) is drawn and named as one, still a Defence piece; an old one is put right on load; other uniques keep their look |
 | rs611 | a raised minion crawls up out of the ground: sunk and hunched at first, earth thrown up, its ring hidden, then standing ringed on the floor |
 | rs610 | raised minions on the coarser dungeon grid (a ghost under 110,000 triangles, a skeleton under 260,000 with at most 24 shadow casters), a ghost's shroud front-sided, a dungeon creature's template the coarse one |
 | rs609 | into a dungeon's portal: walked up to the gate, it flares, drawn in shrinking and turning, then the road at full size; a robe's top carries none of the hem's runes |

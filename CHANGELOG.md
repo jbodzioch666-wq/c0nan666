@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-612 - A shroud is a robe
+
+- **The Serpentskin Shroud is a robe:** a unique is made of whatever its strongest stats say, so the Shroud, mostly defence, came out as a platebody, or as a leather jerkin when ranged won. A unique with shroud, robe, vestment, cassock or habit in its name is now cut and named as a robe, whatever it's made of.
+- **Still a Defence piece:** its stats, its Defence requirement and the way it's upgraded don't change. Only its look and the word for it ("Unique Robe") do.
+- **Yours updates when you load:** the one in your bag changes as your save loads. Other uniques keep their own look.
+
 ## RS-611 - The dead crawl up
 
 - **Minions climb out of the ground:** a raised minion used to pop into place. Now it comes up through the floor head and shoulders first, hunched forward and heaving side to side as it drags itself out, throwing up clods of earth, then straightens and stands. Its green ring appears once it's on its feet. Ghosts rise straight up, more smoothly.
