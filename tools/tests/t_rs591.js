@@ -27,7 +27,7 @@ module.exports = async page=>{
     out.stones = 0; O3.wgGrp.traverse(o=>{ if (o.isInstancedMesh) out.stones += o.count; });
     return out; });
   await page.screenshot({ path: SHOTS + '/rs591-road.png' });
-  /* low graphics: the old strip, no errors */
+  /* low graphics: painted too since RS-616, no errors */
   const low = await page.evaluate(async ()=>{ const s0 = SET.gfx; SET.gfx = 'low'; O3.win = null; O3.wgKey = null; for (let i=0;i<120;i++){ renderGame(); await new Promise(r=>requestAnimationFrame(r)); }
     let ribbon = 0; O3.wgGrp.traverse(o=>{ if (o.isMesh && o.geometry.attributes.rd) ribbon++; }); SET.gfx = s0; return { ribbon }; });
   await page.screenshot({ path: SHOTS + '/rs591-low.png' });
@@ -40,6 +40,6 @@ module.exports = async page=>{
   A(r.tileDirt < 0.2, 'no square of dirt under each road tile: ' + r.tileDirt);
   A(r.stones > 20, 'pebbles, kerbs and milestones by the road: ' + r.stones);
   A(r.ms < 250, 'the road texture built quickly: ' + r.ms + 'ms');
-  A(r.low.ribbon >= 1, 'on low graphics the old strip: ' + JSON.stringify(r.low));
+  A(r.low.ribbon === 0, 'on low graphics the painted road too (RS-616: it was the old strip): ' + JSON.stringify(r.low));
   A(!errs.some(e=>/shader|WebGL|THREE|Error/i.test(e)), 'no errors: ' + errs.join(' | '));
 };

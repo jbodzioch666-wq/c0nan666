@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-616 - The new roads on phones
+
+- **Worn paths and old roads on every device:** phones, and the Low graphics setting, still had the old roads. Those were flat strips stepping from tile to tile in right angles, with a disc at every bend. They now get the same roads as a computer: smooth curves painted into the ground, with trampled verges, ruts, a grass strip down the lanes, broken flagstones on the old roads, and puddles after rain.
+- **Only the roads:** the rest of the painted ground (the wandering borders between grass, sand and snow, and the colour washes) stays off on phones to keep them quick.
+
 ## RS-615 - Up the steps to the door
 
 - **A stair to every raised door:** houses on stilts in marsh towns, and on stone terraces in hill towns, now have a flight of steps up to the door. Stilt houses get five wooden steps on two stringers, and terrace houses three stone steps. The steps sit on whichever side the door is. Before, a single plank floated under the south wall whichever way the door faced, and you walked in under the door.

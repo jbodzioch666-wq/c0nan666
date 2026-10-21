@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs616 | on a phone the roads are painted into the ground as on a computer (no old strips), the rest of the painted ground off (runs on an emulated phone) |
 | rs615 | a raised house (stilts in a marsh town, a hill terrace) has a stair up to its door; you climb it walking in and come down it walking out |
 | rs614 | the land build's end no longer walks the road mask's bytes (the merge under 40ms), and the mask is painted a few stretches a slice, the same as in one go |
 | rs613 | the Serpentskin Shroud a robe of snake's skin: scales and diamonds on its skirt and chest alike, glossier, green-edged unless dyed; other robes keep their weave |

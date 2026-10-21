@@ -24,7 +24,7 @@ module.exports = async page=>{
     return out; });
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
-  A(r.paint && r.key==='gfxlandP' && r.blend===4 && r.tcol, 'the painted ground, with four blends and the tile colours');
+  A(r.paint && /^gfxlandP/.test(r.key) && r.blend===4 && r.tcol, 'the painted ground, with four blends and the tile colours');
   A(r.shader.tile && r.shader.sand && r.shader.wash, 'the shader takes the tiles, the sand and the wash');
   A(r.sand.beach > 0.5 && r.sand.inland < 0.05, 'sand on the beach, none inland');
   A(r.road && r.road.chains > 0 && r.road.inShader, 'the roads are worn tracks, painted by the land');
