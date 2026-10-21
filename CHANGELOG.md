@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-594 - A smooth campfire
+
+- **Sitting at your fire no longer slows the game:** if you wore a cape, its cloth was thrown away and worked out from scratch every frame while you sat at your campfire, about 40 steps of cloth simulation a frame. A robe was also folded twice a frame. Now the cape and robe are hung over the seat once, and they move as cloth again when you get up. In testing, a frame at the fire went from about 27 ms to about 9 ms, the same as with no camp at all.
+
 ## RS-593 - No god rays
 
 - **The god rays are gone from the open land:** the golden shafts of light that stood over the woods around you at sunrise and sunset, and on foggy mornings, are no longer drawn.
