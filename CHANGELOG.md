@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-613 - Serpentskin
+
+- **A robe of snake's skin:** the Serpentskin Shroud now looks like its name. Its cloth is overlapping scales in rows, with a chain of dark-edged diamonds over them like a python's back, across the skirt, chest and sleeves as one piece. It's a little glossier than wool.
+- **Edged in green:** its trim is a snake green unless you dye it, in which case it takes your dye.
+- **Dye still works:** the scales and diamonds are shading over the cloth's colour, so a dyed Shroud keeps its pattern in the new colour.
+
 ## RS-612 - A shroud is a robe
 
 - **The Serpentskin Shroud is a robe:** a unique is made of whatever its strongest stats say, so the Shroud, mostly defence, came out as a platebody, or as a leather jerkin when ranged won. A unique with shroud, robe, vestment, cassock or habit in its name is now cut and named as a robe, whatever it's made of.
