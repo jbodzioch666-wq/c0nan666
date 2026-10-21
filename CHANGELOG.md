@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-593 - No god rays
+
+- **The god rays are gone from the open land:** the golden shafts of light that stood over the woods around you at sunrise and sunset, and on foggy mornings, are no longer drawn.
+
 ## RS-592 - Through the door, out the gate, down the stairs
 
 - **Doors swing open again:** a building's door now opens as you step up to it, and then you walk through. Doors had stopped moving at all: a speed-up that froze the town's still parts froze every door's hinge with them. Going out, the room's own door opens in front of you. Coming in, it shuts behind you.

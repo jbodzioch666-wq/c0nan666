@@ -18,5 +18,5 @@ module.exports = async page=>{
   A(r.key==='fields' && r.golden && r.woods && r.swamp, 'golden fields, blue-green woods, a sickly swamp');
   A(r.haze.near > r.haze.cd*2 && r.haze.far > r.haze.near + 60 && r.haze.own, 'a haze past the land you can see, in its own colour');
   A(r.fog.near < r.haze.near && r.fog.sky, 'a foggy day keeps its close fog in the sky\'s colour');
-  A(r.rayFog > r.rayClear + 0.05, 'shafts of light through the woods on a foggy morning: ' + r.rayFog + ' vs ' + r.rayClear);
+  A(r.rayFog===0 && r.rayClear===0, 'no shafts of light through the woods (RS-593: the god rays taken out): ' + r.rayFog + ' / ' + r.rayClear);
 };

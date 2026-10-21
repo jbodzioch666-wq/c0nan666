@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs593 | no god rays on the open land: no shafts of light through the woods at any hour |
 | rs592 | the walks between scenes: a door swings open before you go in, the town gate opens as you come near and you walk out through it, the stairs walked down into the dark before the next floor |
 | rs591 | roads traced into smooth curves and painted into the ground (verge, bed, ruts, lane strip, old paving), no grass on the bed, no tile-square dirt, stones by the road, the road texture built fast, the old strip on low graphics |
 | rs590 | a robe's cord low on the waist in the robe's trim colour, tied with a bound knot and two tasselled ends |
