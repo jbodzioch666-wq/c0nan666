@@ -12,7 +12,7 @@ module.exports = async page=>{
       out.dancer = { bodice:+rg.zf.toFixed(4), below:+front(rig, -0.03).toFixed(4), lower:+front(rig, -0.12).toFixed(4) }; }
     { const rig = robe('Wood Elf', 1), p = rig.chestMesh.geometry.attributes.position; const w = y=>{ let x = 0; for (let i=0;i<p.count;i++) if (Math.abs(p.getY(i) - y) < 0.006) x = Math.max(x, Math.abs(p.getX(i))); return x; };
       out.elf = { waist:+w(0.11).toFixed(4), hem:+w(0.03).toFixed(4) }; }
-    { const rig = robe('Gnome', 1); let pb = null; rig.torso.traverse(o=>{ if (o.isMesh && o.geometry.type==='SphereGeometry' && Math.abs(o.position.y - 0.1) < 0.001) pb = o; }); out.belly = pb ? { tint:pb.material.color.getHexString(), plain:rig.chestMesh.material.color.getHexString() } : null; }
+    { const rig = robe('Gnome', 1); let pb = null; rig.torso.traverse(o=>{ if (o.isMesh && o.geometry.type==='SphereGeometry' && Math.abs(o.position.y - 0.1) < 0.001) pb = o; }); out.belly = pb ? { tint:pb.material.color.getHexString(), plain:rig.chestMesh.material.color.getHexString(), robe:rig.skirt && rig.chestMesh.material===rig.skirt.material } : null; }
     const head = hair=>{ const L = Object.assign(lookDefault('Human'), { body:0, beard:0, hair }), pt = rsPlayerLook({ race:'Human', look:L, bare:true }); return M3D.meta.get(m3dBuilders().get(pt.paint)(pt.o)).rig.head; };
     { const p = head(7).getObjectByName('hair').geometry.attributes.position; let face = 0; for (let i=0;i<p.count;i++) if (p.getZ(i) > 0.05 && Math.abs(p.getX(i)) < 0.035 && p.getY(i) < 0.11 && p.getY(i) > 0.02) face++; out.dreadsFace = face; }
     { const p = head(5).getObjectByName('hair').geometry.attributes.position; let low = 1; for (let i=0;i<p.count;i++) if (p.getZ(i) < -0.04) low = Math.min(low, p.getY(i)); out.crestLow = +low.toFixed(3); }
@@ -22,7 +22,7 @@ module.exports = async page=>{
   A(r.dancer.below < r.dancer.bodice + 0.012, 'a slim robe falls from the belt - no bulge in front below it');
   A(r.dancer.lower >= r.dancer.below - 0.002, 'and widens toward the hem from there');
   A(r.elf.waist >= r.elf.hem - 0.012, 'a robe has no pinched waist');
-  A(r.belly && r.belly.tint !== r.belly.plain, 'a pot belly under cloth takes the garment\'s shade');
+  A(r.belly && (r.belly.tint !== r.belly.plain || r.belly.robe), 'a pot belly under cloth takes the garment shade (RS-606: the bodice is the robe cloth now)');
   A(r.dreadsFace === 0, 'dreadlocks hang clear of the face');
   A(r.crestLow > 0.07, 'the mohawk ends at the back of the crown, not lying down the head');
 };

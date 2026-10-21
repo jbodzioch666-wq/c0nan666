@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-606 - Sleeves and shoulders in the robe
+
+- **One cloth, arms and all:** the robe's cloth now runs on over the shoulders and slopes in to the neck. The shoulders and sleeves wear the same cloth, with the same weave size and the same shade. Before, the robe ended in a rim across each shoulder, and the shoulders and sleeves above it were a finer, different-looking cloth.
+
 ## RS-605 - Quick into dungeons again
 
 - **Dungeons and fights load quickly again:** since RS-602, going into a dungeon or a roadside fight could take up to half a minute. That release freed a stand-in used while a new floor's shaders are got ready, but it also let go of one of those shaders while the graphics driver was still preparing it. The game then waited the full half-minute limit for a shader that would never finish. A dungeon is ready in one to five seconds again.

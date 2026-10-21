@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs606 | the robe over the shoulders to the neck in one cloth with the shoulders and sleeves, its weave laid as theirs, its top in to the neck |
 | rs605 | a dungeon ready in seconds again (not the half-minute shader wait), and the canvas cleared as a new place is built |
 | rs604 | a robe in one piece, its cloth up over the chest to the shoulders; no automatic resolution drop |
 | rs603 | making "all" counts it: the cooking card says 0 / 7, and what's queued after by its number |
@@ -484,6 +485,7 @@ Screenshots go to `tools/tests/shots/`.
 | zfloorleak | ten trips between two floors: geometries and textures after each, what was drawn and never freed |
 | zrobe | a fine robe close in on a woman and a man, front, three-quarter and side |
 | zenter | into a dungeon, another, and a roadside fight: how long each takes to draw, the sculpting and warm-up frames, what holds it up |
+| zuv | how the robe's pieces lay their weave: bodice, skirt and sleeve vertices, position against uv |
 | zhair | heads with each hairstyle from four sides, and under helmets |
 | zplate | plate armour on builds from slight to heavy |
 | zunder | the creator's undressed figures by race and sex |
