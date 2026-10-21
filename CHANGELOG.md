@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-605 - Quick into dungeons again
+
+- **Dungeons and fights load quickly again:** since RS-602, going into a dungeon or a roadside fight could take up to half a minute. That release freed a stand-in used while a new floor's shaders are got ready, but it also let go of one of those shaders while the graphics driver was still preparing it. The game then waited the full half-minute limit for a shader that would never finish. A dungeon is ready in one to five seconds again.
+- **No glimpse of the last place:** while a new dungeon or fight was being set up, the screen kept showing the last dungeon you were in. The 3D view is now cleared the moment the new place starts building.
+
 ## RS-604 - A robe in one piece
 
 - **One cloth from hem to shoulders:** a robe used to be two pieces. The skirt's cloth ran up to under the bust, and above it was the figure's own chest in the robe's colour, with a different weave, a different shade and a seam under the bust. The robe's cloth now runs on up over the chest to the shoulders, so it's one garment. The trim strip down the front now lies on top of it.
