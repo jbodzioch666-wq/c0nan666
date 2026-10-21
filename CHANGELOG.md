@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-596 - Roads that stay down, dappled shade
+
+- **Roads stay off the mountains:** smoothing a road's bends could pull it up onto a mountain's flank, with dirt and flagstones climbing the slope. A road's line now never leaves its own tiles for a mountain or the water. The ground painting also fades out on any steep bank, so no road is worn up a slope.
+- **Dappled shadows under the trees:** trees used to cast one solid dark blob, like a lollipop on the grass. Now the light comes through their shadows in patches, dappled under a broadleaf and a little thinner under a pine. The leaves themselves are still drawn whole.
+- **Shadows fade in bad weather:** rain and storms barely dimmed the sun, so shadows were as black under a rain cloud as at a clear noon. Under cloud the sun is now much weaker and the sky's own light fills in, keeping the land as bright while the shadows go soft and faint. Fog softens them a little too.
+
 ## RS-595 - A gentler wind, softer torches
 
 - **The wind slowed down:** trees, bushes and grass used to rock back and forth together every three seconds. Now a slow wave rolls across them about every ten seconds and only bends them a little further. They take two or three seconds to follow a gust instead of a third of a second. Gusts build and die away over ten to twenty seconds instead of every couple of seconds, so capes and cloaks flap less jerkily too. A storm still blows hard, just steadily.
