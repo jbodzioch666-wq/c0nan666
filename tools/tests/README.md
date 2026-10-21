@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs614 | the land build's end no longer walks the road mask's bytes (the merge under 40ms), and the mask is painted a few stretches a slice, the same as in one go |
 | rs613 | the Serpentskin Shroud a robe of snake's skin: scales and diamonds on its skirt and chest alike, glossier, green-edged unless dyed; other robes keep their weave |
 | rs612 | a unique named as a robe (the Serpentskin Shroud) is drawn and named as one, still a Defence piece; an old one is put right on load; other uniques keep their look |
 | rs611 | a raised minion crawls up out of the ground: sunk and hunched at first, earth thrown up, its ring hidden, then standing ringed on the floor |
@@ -415,6 +416,27 @@ Screenshots go to `tools/tests/shots/`.
 | cavetip | hovering (or tapping, on a phone) an ore vein in a mine shows its tooltip: level, xp, how much is left |
 | portalwall | in every kind of site the portal and the stairs back onto a wall and never block a passage |
 | newworld | the load screen takes a character to a new world: a new save keeps the character, the old save stays untouched |
+| touch | on an emulated phone: real taps, a long press, a pinch and a drag drive the game, and the touch UI keeps up |
+| bal | the RS-100 balance: monsters bite harder, the lair boss has fixed strength, the world-boss giant is a real fight |
+| gen | RS-102 world generation: mountain ranges, an open start, nothing out of reach, old saves untouched |
+| grave | the gravestone card in the tracker: dismissed (the grave stays), F6 brings it back, a new death shows it again |
+| clock | RS-104: day and night on a real-time clock, 20 minutes of day and 10 of night; steps don't move the sun |
+| tasks | the town's task board: a task is taken, worked and handed in for its reward |
+| soak | a long fight at combat level 70: nothing leaks or stalls over many turns |
+| pace | RS-119: a fight you can see - one attack per beat however fast you click; a bow or spell stops walking in range |
+| fpdres | RS-107: the dungeon view's resolution steps between a few fixed sizes and doesn't see-saw |
+| map | the world map: its geography, drawn in good time, and what it marks |
+| wev | the open land's events: set up, ticking, and played through (random world - rerun once if it fails) |
+| wg | the world generator: the land as made, checked over (random world - rerun once if it fails) |
+| sail | an archipelago: islands to find, a boat to sail between them |
+| big | the house and Construction, and the other large systems played through end to end |
+| town | a town played through: its buildings, people and services (random world - rerun once if it fails) |
+| folk | RS-117: townsfolk step out of your way and walk in real time whether or not you move |
+| eco | the economy: shop stock, prices and selling, with the 3D off |
+| gfx | the graphics settings: each level draws, and switching between them holds up |
+| quest | quests: given, tracked, worked and finished |
+| audio | the music and sound: the title track, then the right music and sounds as you play |
+| lootstyle | RS-169: drops lean to the way you fight - a mage finds staves and robes, an archer bows and hide |
 | foodbar | cooked dishes show in the bag; every food in the side panel has its own picture and name; U shows what it eats next |
 | noscrolls | the old spell scrolls are gone: never stocked or dropped, and old saves cash them in for gold |
 | utilspell | utility spells are apart from combat spells, with their own pick and an auto-utility toggle that opens fights with them |
@@ -499,6 +521,10 @@ Screenshots go to `tools/tests/shots/`.
 | zminion | what raised minions cost a frame (ZK kind, ZN count): frame and GPU times, draw calls, triangles, and each figure's parts, with a shot |
 | zsk3 | the sculpted skeleton's and a ghost's parts by triangles |
 | zrise | a raised minion's rise frame by frame: its age, height and lean as drawn |
+| zdelve | a cave, a grotto and a ruin delve with the real warm-up on: the entry frames, then a steady stretch |
+| zroadms | what the land's road mask costs: tracing the roads, painting the mask |
+| zwalkprof | RS-505's walk at a phone's pace with a CPU profile and the land swap timed |
+| zsaves | every save in ZSAVES loaded and played a moment: any error, where it stands, what it kept |
 | zhair | heads with each hairstyle from four sides, and under helmets |
 | zplate | plate armour on builds from slight to heavy |
 | zunder | the creator's undressed figures by race and sex |

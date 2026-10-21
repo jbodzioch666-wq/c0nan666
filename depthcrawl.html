@@ -21495,12 +21495,16 @@ function o3RoadChains(x0, y0, W, M){
       c.pav.push(c.lane ? 0 : Math.max(0, Math.min(1, (o3VNoise(x*0.07, z*0.07, 881) - 0.5)*2.8 + Math.max(0, 1 - dt/7)*0.9))); } }
   return chains;
 }
-function o3RoadMask(x0, y0, W, M){
+function o3RoadMask(x0, y0, W, M){ const g = o3RoadMaskGen(x0, y0, W, M); let r; while (!(r = g.next()).done); return r.value; }
+/* (RS-614) made a few stretches of road at a time, a land build yielding between them: in one go it was 20-35ms here, four times that
+   at a phone's pace - the hitch as a walk's or a changed tile's rebuild began */
+function* o3RoadMaskGen(x0, y0, W, M){
   const T = THREE, ox = x0 - M, oy = y0 - M, N = W + 2*M, PX = O3_RM_PX, S = Math.round(N*PX), chains = o3RoadChains(x0, y0, W, M), out = new Uint8Array(S*S*4);
+  yield;
   /* each texel near a stretch of road takes its distance across it, in road widths: the bed flat out to near its edge, then the verge
      falling away; the two ruts; the crown; the paving left there. Where stretches meet, the most of each */
-  for (const c of chains){ const P = c.p, cw = c.lane ? 0.13 : 0.1;
-    for (let i=0;i<P.length - 1;i++){ const ax = P[i][0], az = P[i][1], dx = P[i+1][0] - ax, dz = P[i+1][1] - az, L2 = dx*dx + dz*dz || 1e-6, w = (c.w[i] + c.w[i+1])/2, R = w*1.15, p0 = c.pav[i], p1 = c.pav[i+1];
+  for (const c of chains){ const P = c.p, cw = c.lane ? 0.13 : 0.1; yield;
+    for (let i=0;i<P.length - 1;i++){ if (i && !(i % 24)) yield; const ax = P[i][0], az = P[i][1], dx = P[i+1][0] - ax, dz = P[i+1][1] - az, L2 = dx*dx + dz*dz || 1e-6, w = (c.w[i] + c.w[i+1])/2, R = w*1.15, p0 = c.pav[i], p1 = c.pav[i+1];
       const i0 = Math.max(0, Math.floor((Math.min(ax, ax + dx) - R - ox)*PX)), i1 = Math.min(S - 1, Math.ceil((Math.max(ax, ax + dx) + R - ox)*PX)), j0 = Math.max(0, Math.floor((Math.min(az, az + dz) - R - oy)*PX)), j1 = Math.min(S - 1, Math.ceil((Math.max(az, az + dz) + R - oy)*PX));
       for (let jj=j0; jj<=j1; jj++){ const wz = oy + (jj + 0.5)/PX; for (let ii=i0; ii<=i1; ii++){ const wx = ox + (ii + 0.5)/PX;
         let t = ((wx - ax)*dx + (wz - az)*dz)/L2; t = t < 0 ? 0 : t > 1 ? 1 : t; const ex = wx - ax - dx*t, ez = wz - az - dz*t, d = Math.sqrt(ex*ex + ez*ez); if (d > R) continue;
@@ -31934,8 +31938,8 @@ function v3FolkShadow(p){
    game still moves or clicks - anything O3 or GFX holds, anything carrying userData - is kept as it was */
 function o3MergeWorld(grp){
   if (!grp) return; const skip = new Set(), keep = o=>{ if (o && o.isObject3D && o!==grp && o!==O3.scene) o.traverse(c=>skip.add(c)); };
-  const seen = new Set(), walk = (v, d)=>{ if (!v || typeof v!=='object' || seen.has(v) || d > 3) return; seen.add(v); if (v.isObject3D){ keep(v); return; } if (v.isMaterial || v.isBufferGeometry || v.isTexture || v.nodeType) return; const vals = Array.isArray(v) ? v : Object.values(v); for (const x of vals) walk(x, d+1); };
-  for (const k in O3){ if (['scene','world','renderer','cam','mats','warmGrp','labels','cv','ray','nm','tex','land','water'].includes(k)) continue; try{ walk(O3[k], 0); }catch(e){} }
+  const seen = new Set(), walk = (v, d)=>{ if (!v || typeof v!=='object' || seen.has(v) || d > 3) return; seen.add(v); if (v.isObject3D){ keep(v); return; } if (v.isMaterial || v.isBufferGeometry || v.isTexture || v.nodeType || ArrayBuffer.isView(v)) return;   /* (RS-614: never into raw data - the road mask's 6.5 million bytes, one by one, froze each land build's end) */ const vals = Array.isArray(v) ? v : Object.values(v); for (const x of vals) walk(x, d+1); };
+  for (const k in O3){ if (['scene','world','renderer','cam','mats','warmGrp','labels','cv','ray','nm','tex','land','water','rmask'].includes(k)) continue; try{ walk(O3[k], 0); }catch(e){} }
   try{ for (const k in GFX){ if (k==='tex' || k==='u') continue; walk(GFX[k], 0); } }catch(e){}
   grp.traverse(o=>{ const u = o.userData; if (u && Object.keys(u).some(k=>k!=='lin' && k!=='merged')) keep(o); });
   let n0 = 0, n1 = 0; grp.traverse(o=>{ if (o.isMesh) n0++; });
@@ -31946,7 +31950,7 @@ function o3MergeWorld(grp){
 function v3MergeWorld(){
   if (typeof o3MergeStatic!=='function' || !V3.world) return;
   const skip = new Set(), keep = o=>{ if (o && o.isObject3D && o!==V3.world && o!==V3.scene) o.traverse(c=>skip.add(c)); };
-  const seen = new Set(), walk = (v, d)=>{ if (!v || typeof v!=='object' || seen.has(v) || d > 3) return; seen.add(v); if (v.isObject3D){ keep(v); return; } if (v.isMaterial || v.isBufferGeometry || v.isTexture || v.nodeType) return; const vals = Array.isArray(v) ? v : Object.values(v); for (const x of vals) walk(x, d+1); };
+  const seen = new Set(), walk = (v, d)=>{ if (!v || typeof v!=='object' || seen.has(v) || d > 3) return; seen.add(v); if (v.isObject3D){ keep(v); return; } if (v.isMaterial || v.isBufferGeometry || v.isTexture || v.nodeType || ArrayBuffer.isView(v)) return;   /* (RS-614: never into raw data - the road mask's 6.5 million bytes, one by one, froze each land build's end) */ const vals = Array.isArray(v) ? v : Object.values(v); for (const x of vals) walk(x, d+1); };
   /* (RS-380) the window, sign and banner lists are only ever filled, never read: nothing moves them, so they needn't be kept apart.
      Keeping them had left sixteen window panes a building as sixteen draws each */
   const dead = V3_MERGE_MAKE ? ['windows', 'signs', 'banners'] : [];
@@ -32776,7 +32780,7 @@ function* o3BuildGen(cx, cy){
   O3.hits = []; O3.plates.forEach(p=>p.el.remove()); O3.plates = []; O3.flames = []; O3.glows = []; O3.smoke = []; O3.parts = []; O3.windows = [];
   const W = O3_W, x0 = cx - W/2, y0 = cy - W/2, M = 5;   // M: margin sampled around the window
   O3.win = { cx, cy, x0, y0 };
-  try{ O3.rmask = o3RoadMask(x0, y0, W, M); }catch(e){ console.error(e); O3.rmask = null; }   /* (RS-591) */
+  try{ O3.rmask = yield* o3RoadMaskGen(x0, y0, W, M); }catch(e){ console.error(e); O3.rmask = null; }   /* (RS-591; RS-614: a few stretches a slice) */
   const tex = o3Textures();
   // mountain depth: how far inside a range each mountain tile sits (peaks rise toward the middle)
   const dep = {};
@@ -44581,7 +44585,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-613';
+const GAME_VERSION = 'rs-614';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

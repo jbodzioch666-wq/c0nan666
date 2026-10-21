@@ -30,5 +30,5 @@ module.exports = async page=>{
   A(!r.oldNames, 'no shader still hooks the old chunk names');
   A(r.hooks.tried===0 || r.hooks.hooked===r.hooks.tried, 'the custom shaders hook the new chunks: ' + JSON.stringify(r.hooks));
   A(r.compile.started && r.compile.call < 100 && r.compile.done, 'the shaders start at once and say when they are ready: ' + JSON.stringify(r.compile));
-  A(r.instCull===true, 'an instanced mesh is culled by its own geometry\'s sphere, as before');
+  A(r.instCull===false, 'an instanced mesh is culled by a sphere round its instances (RS-580: one stake sphere lost a whole palisade) - all far out of view, it is culled');
 };

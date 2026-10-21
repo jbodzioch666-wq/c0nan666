@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-614 - Audit before the merge
+
+- **No freeze at the end of each land rebuild:** since RS-591, every time the open land rebuilt around you as you walked, it ended with a stall of about 0.7 s at a phone's pace, about 175 ms on a desktop. The cause was the step that decides which parts of the land to keep separate: it went through the road texture byte by byte, 6.5 million of them. It now skips raw data. The worst slice of a rebuild during a long walk at a phone's pace dropped from 700 ms to 91 ms.
+- **Road painting spread over frames:** the roads are painted into the ground a few stretches at a time while the land builds, not all at once (16-32 ms here, four times that on a phone). The result is the same.
+- **Tests brought up to date:** four tests still checked things that have since been changed on purpose: the screen-edge flashes (off by default since RS-581), towns kept between visits (RS-582), how a town's palisade is culled (RS-580), and a missing setup step. The test list now has a README row for every test, and one test listed twice is listed once.
+- **Audit results:** of the 417 tests, the ones failing after this release are the same ones that were already failing before RS-574, plus a borderline frame limit in rs583. All five of your saves, from Oct 6 to Oct 21, load and play with no errors.
+
 ## RS-613 - Serpentskin
 
 - **A robe of snake's skin:** the Serpentskin Shroud now looks like its name. Its cloth is overlapping scales in rows, with a chain of dark-edged diamonds over them like a python's back, across the skirt, chest and sleeves as one piece. It's a little glossier than wool.

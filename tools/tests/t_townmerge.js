@@ -12,7 +12,7 @@ module.exports = async page=>{
       const winGone = V3.windows.length ? V3.windows.filter(w=>!w.parent).length/V3.windows.length : 1, pud = V3.townPuddles ? V3.townPuddles.children.length : 0, pudInst = !!(V3.townPuddles && V3.townPuddles.userData.im);
       let bakedOk = true; V3.world.traverse(o=>{ if (o.isMesh && o.userData.baked){ const m = o.material, c = o.geometry.attributes.color; if (!(m.vertexColors && c && m.color.r===1 && m.color.g===1 && m.color.b===1)) bakedOk = false; } });
       return { calls, least, tris, meshes, baked, bakedOk, glassMerged, glassLoose, winGone:+winGone.toFixed(2), windows:V3.windows.length, pud, pudInst, from:V3.mergedFrom, to:V3.mergedTo }; };
-    const now = await measure(); V3_MERGE_MAKE = false; const old = await measure(); V3_MERGE_MAKE = true;
+    const now = await measure(); V3_MERGE_MAKE = false; V3.parked = null; V3.worldTown = false; const old = await measure();   /* (RS-582 keeps a town between visits: built afresh for the old way) */ V3_MERGE_MAKE = true;
     return { now, old }; });
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
