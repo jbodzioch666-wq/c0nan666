@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs611 | a raised minion crawls up out of the ground: sunk and hunched at first, earth thrown up, its ring hidden, then standing ringed on the floor |
 | rs610 | raised minions on the coarser dungeon grid (a ghost under 110,000 triangles, a skeleton under 260,000 with at most 24 shadow casters), a ghost's shroud front-sided, a dungeon creature's template the coarse one |
 | rs609 | into a dungeon's portal: walked up to the gate, it flares, drawn in shrinking and turning, then the road at full size; a robe's top carries none of the hem's runes |
 | rs608 | a robe in at the waist as the body under it, its cloth over the shoulders' tops to the neckline with no bodice showing, the figure in the world in the same weave, and a monster's death with no boneTransform warnings |
@@ -495,6 +496,7 @@ Screenshots go to `tools/tests/shots/`.
 | ztavout | into the tavern and out again by walking, in a robe or from a save (ZT, ZH, ZSAVE), with any error on the way |
 | zminion | what raised minions cost a frame (ZK kind, ZN count): frame and GPU times, draw calls, triangles, and each figure's parts, with a shot |
 | zsk3 | the sculpted skeleton's and a ghost's parts by triangles |
+| zrise | a raised minion's rise frame by frame: its age, height and lean as drawn |
 | zhair | heads with each hairstyle from four sides, and under helmets |
 | zplate | plate armour on builds from slight to heavy |
 | zunder | the creator's undressed figures by race and sex |

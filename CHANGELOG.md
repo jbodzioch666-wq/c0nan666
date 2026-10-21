@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-611 - The dead crawl up
+
+- **Minions climb out of the ground:** a raised minion used to pop into place. Now it comes up through the floor head and shoulders first, hunched forward and heaving side to side as it drags itself out, throwing up clods of earth, then straightens and stands. Its green ring appears once it's on its feet. Ghosts rise straight up, more smoothly.
+- **The full rise, even on a slow frame:** the rise is timed by the frames it's drawn in, so the long frame when a minion's figure is first built no longer skips most of it.
+
 ## RS-610 - Raised dead that don't cost your frame rate
 
 - **Minions built for the dungeon:** raised minions were built at close-up detail. A single raised ghost was 194,000 triangles, more than the whole room around it, so four of them dragged the frame rate down. They're now sculpted on the same coarser grid as townsfolk, which looks the same at dungeon size. A ghost is now 83,000 triangles. Monsters, your thrall and siege allies below ground get the same treatment.
