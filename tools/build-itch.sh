@@ -43,7 +43,8 @@ link = f'<link rel="stylesheet" href="{fonts_css}">'
 pre = '<link rel="preconnect" href="https://fonts.googleapis.com">\n'
 for needle in (cdn, link, pre):
     if needle not in html: sys.exit(f'build-itch: expected to find {needle!r} in depthcrawl.html')
-html = html.replace(cdn, 'three.min.js').replace(link, '<link rel="stylesheet" href="fonts/fonts.css">').replace(pre, '')
+html = html.replace(cdn + '" crossorigin="anonymous"', cdn + '"').replace(cdn, 'three.min.js')   # (a local copy needs no CORS - and from a file:// page it would fail)
+html = html.replace(link, '<link rel="stylesheet" href="fonts/fonts.css">').replace(pre, '')
 if re.search(r'(src|href)="https?://', html): sys.exit('build-itch: an external script/stylesheet is still referenced')
 open(os.path.join(stage, 'index.html'), 'w', encoding='utf-8', newline='\n').write(html)
 PY

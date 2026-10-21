@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs609 | into a dungeon's portal: walked up to the gate, it flares, drawn in shrinking and turning, then the road at full size; a robe's top carries none of the hem's runes |
 | rs608 | a robe in at the waist as the body under it, its cloth over the shoulders' tops to the neckline with no bodice showing, the figure in the world in the same weave, and a monster's death with no boneTransform warnings |
 | rs606 | the robe over the shoulders to the neck in one cloth with the shoulders and sleeves, its weave laid as theirs, its top in to the neck; RS-607: the weave blended three ways, kept under the rim light |
 | rs605 | a dungeon ready in seconds again (not the half-minute shader wait), and the canvas cleared as a new place is built |
@@ -490,6 +491,7 @@ Screenshots go to `tools/tests/shots/`.
 | zwaist | a woman's body under a robe: the bodice's, pelvis's and cloth's breadth and depth by height (ZW sets the waist slider) |
 | zdeath | what a monster's death costs a frame, with a CPU profile over five deaths |
 | zworld | the player's robed figure in the world: which scene draws it and with what materials |
+| ztavout | into the tavern and out again by walking, in a robe or from a save (ZT, ZH, ZSAVE), with any error on the way |
 | zhair | heads with each hairstyle from four sides, and under helmets |
 | zplate | plate armour on builds from slight to heavy |
 | zunder | the creator's undressed figures by race and sex |

@@ -4,7 +4,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0c0a08">
 <title>Depthcrawl</title>
-<script src="https://cdn.jsdelivr.net/npm/three@0.159.0/build/three.min.js" async onload="try{ gfxThreeSetup(); }catch(e){}" onerror="window.__threeFail=1"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.159.0/build/three.min.js" crossorigin="anonymous" async onload="try{ gfxThreeSetup(); }catch(e){}" onerror="window.__threeFail=1"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap">
 <style>
@@ -1167,7 +1167,7 @@ function crashBanner(msg){
       + '<button onclick="location.reload()" style="margin-right:8px;padding:6px 12px;border-radius:6px;border:1px solid #c79a54;background:#3a2a16;color:#f3e6d0">Reload</button><button onclick="this.parentNode.remove()" style="padding:6px 12px;border-radius:6px;border:1px solid #6a5236;background:#1a1410;color:#f3e6d0">Dismiss</button>';
   }catch(e){}
 }
-window.addEventListener('error', e=>{ if (e && e.message && !/ResizeObserver/.test(e.message)) crashBanner(e.message + (e.lineno ? ' (line ' + e.lineno + ')' : '')); });
+window.addEventListener('error', e=>{ if (e && e.message && !/ResizeObserver/.test(e.message)) crashBanner(e.message + (e.lineno ? ' (line ' + e.lineno + (e.filename && !/depthcrawl|index\.html|^blob:|^about:/.test(e.filename) ? ' of ' + e.filename.split('/').pop() : '') + ')' : '') + (e.error && e.error.stack ? ' | ' + String(e.error.stack).split(String.fromCharCode(10)).slice(1, 3).map(l=>l.trim()).join(' | ') : '')); });   /* (RS-609: where it came from - three.js is loaded with crossorigin now, so its errors aren't hidden as a bare "Script error.") */
 window.addEventListener('unhandledrejection', e=>{ const r = e && e.reason; crashBanner((r && r.message) || String(r)); });
 /* ==========================================================================
    DEPTHCRAWL - web port
@@ -7255,19 +7255,20 @@ function tryMove(dx,dy){
     }
     case T_EXIT: {
       leavingFloor = true;
-      if (G.gameMode===2){ fieldLeave(true); break; }   /* (RS-382: the portal off a field with no way out) */
+      if (G.gameMode===2){ if (!isoPortalWalk(nx, ny, ()=>fieldLeave(true))) fieldLeave(true); break; }   /* (RS-382: the portal off a field with no way out; RS-609: walked into) */
       if (G.gameMode===3){ const go = ()=>{ G.gameMode = 0; logMsg('you head back out onto the road', 'new'); }; if (!(G.interior==null && v3GateWalk(nx, ny, go))) go(); }   /* (RS-592: out through the gate as it opens) */
-      else {
+      else { const go = ()=>{
         if (G.dgDone) logMsg(`you step through the portal and out into the open air - the ${SITE_WORD[G.siteKind]||'dungeon'} falls in behind you`, 'magic');
         else logMsg(G.siteKind==='dungeon' ? 'you climb back up to the surface' : 'you climb back down and outside', 'new');
-        dgFinish(true);   /* (the floor is kept for next time; a beaten site is let go - see dgFinish) */
-      }
+        dgFinish(true); };   /* (the floor is kept for next time; a beaten site is let go - see dgFinish) */
+        if (!isoPortalWalk(nx, ny, go)) go(); }   /* (RS-609: drawn into the portal first) */
       break;
     }
-    case T_FLEE: leavingFloor=true;
+    case T_FLEE: { leavingFloor=true;
       if (G.gameMode===2 && G.fieldWon){ fieldLeave(); break; }   /* (RS-382: the fight won, you walk off the field) */
-      if (G.wevFight && G.sqReturn){ G.wevFight = null; logMsg(G.cellar ? 'you climb back up out of the cellar' : 'you break off the fight and head back', 'new'); sqReturnIndoors(); break; }
-      G.cellar = false; G.gameMode=0; logMsg('you break off the fight and retreat', 'new'); break;
+      const go = ()=>{ if (G.wevFight && G.sqReturn){ G.wevFight = null; logMsg(G.cellar ? 'you climb back up out of the cellar' : 'you break off the fight and head back', 'new'); sqReturnIndoors(); return; }
+        G.cellar = false; G.gameMode=0; logMsg('you break off the fight and retreat', 'new'); };
+      if (!isoPortalWalk(nx, ny, go)) go(); break; }   /* (RS-609: the flee portal walked into too) */
     case T_TRAP: {
       try{ audEnv('trap'); }catch(e){}
       const rope = skHave('rope') > 0 && G.gameMode===1 && G.depth<G.dungeonMaxDepth;
@@ -35808,16 +35809,17 @@ function fpdPortals(world){
     const arch = new T.Mesh(new T.TorusGeometry(0.4, 0.085, 10, 24, Math.PI), stone); arch.position.set(0, 0.98, 0); arch.scale.z = 1.15; arch.castShadow = true; g.add(arch);
     box(0.1, 0.12, 0.24, 0, 1.4, 0);                                     // keystone
     const mat = new T.ShaderMaterial({
-      uniforms:{ t:{ value:0 }, col:{ value:col } },
+      uniforms:{ t:{ value:0 }, col:{ value:col }, flare:{ value:0 } },
       vertexShader:'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
       fragmentShader:[
-        'uniform float t; uniform vec3 col; varying vec2 vUv;',
+        'uniform float t; uniform vec3 col; uniform float flare; varying vec2 vUv;',
         'void main(){ vec2 p = vUv*2.0-1.0; p.y = p.y*1.35 - 0.1;',
         '  float r = length(p), a = atan(p.y, p.x);',
-        '  float sw = sin(a*4.0 + r*10.0 - t*3.2)*0.5+0.5, ring = sin(r*20.0 - t*5.0)*0.5+0.5;',
+        '  float sw = sin(a*4.0 + r*10.0 - t*(3.2 + flare*9.0))*0.5+0.5, ring = sin(r*20.0 - t*(5.0 + flare*12.0))*0.5+0.5;',
         '  float inside = smoothstep(1.0, 0.82, r), core = smoothstep(0.75, 0.0, r);',
         '  vec3 c = col*(0.45 + 0.9*sw*(0.6+0.4*ring)) + vec3(1.0)*core*core*0.7;',
-        '  gl_FragColor = vec4(c, inside*(0.5 + 0.5*sw)); }'].join('\n'),
+        '  c = c*(1.0 + flare*1.6) + vec3(1.0)*core*flare*1.2;',
+        '  gl_FragColor = vec4(c, min(1.0, inside*(0.5 + 0.5*sw)*(1.0 + flare))); }'].join('\n'),
       transparent:true, depthWrite:false, blending:T.AdditiveBlending, side:T.DoubleSide });
     const gate = new T.Mesh(new T.PlaneGeometry(0.66, 1.2), mat); gate.position.set(0, 0.68, 0.01); g.add(gate);
     const glowC = v3Canvas(64,64), gx = glowC.getContext('2d'), gr = gx.createRadialGradient(32,32,0,32,32,32);
@@ -35826,7 +35828,7 @@ function fpdPortals(world){
     pool.rotation.x = -Math.PI/2; pool.position.set(0, 0.075, 0.35); g.add(pool);
     const L = new T.PointLight(col, 0.9, 3.2, 1.6); L.position.set(0, 0.7, 0.35); g.add(L);
     world.add(g);
-    FPD.portals.push({ mat, L, pool, seed:x*7+y });
+    FPD.portals.push({ mat, L, pool, seed:x*7+y, x, y, g, face });
   }
 }
 function fpdLumpy(detail, amp, seed, smooth){
@@ -36153,7 +36155,7 @@ function fpdRender(env, T, camZ){
     for (const m of cr.mats){ m.opacity = cr.fade; m.depthWrite = cr.fade > 0.97; }
     cr.g.traverse(o=>{ if (o.isMesh) o.castShadow = cr.fade > 0.5; });
   }
-  for (const pt of FPD.portals||[]){ pt.mat.uniforms.t.value = FP.t + pt.seed; const k = 0.85 + 0.15*Math.sin(FP.t*3 + pt.seed); pt.L.intensity = 0.9*k; pt.pool.material.opacity = 0.55*k; }
+  for (const pt of FPD.portals||[]){ const fl = pt.flare || 0; pt.mat.uniforms.t.value = FP.t + pt.seed; pt.mat.uniforms.flare.value = fl; const k = 0.85 + 0.15*Math.sin(FP.t*3 + pt.seed); pt.L.intensity = 0.9*k*(1 + fl*3); pt.pool.material.opacity = Math.min(1, 0.55*k*(1 + fl*0.8)); }
   // (the shadow maps only exist after their first pass, so a fresh level gets a warm-up render)
   gfxCompileScene(FPD, FPD.r, FPD.scene, cam, null);   /* (RS-499: the dungeon compiles its floor like the towns do, then waits out the links) */
   if (FPD.warmGrp) fpdWarmDone();   /* (RS-345: the stand-ins have been drawn once) */
@@ -38331,8 +38333,8 @@ function m3dHumanoid(o){
   /* (RS-264: a woman's figure is sculpted into the torso itself - see m3dTorsoGeo) */
   { const pad = o.pads || (outfit==='plate' || o.pauldrons ? 'plate' : null);
     if (pad){ const pm = pad==='plate' ? plateM : o.mantle ? m3dMat(mats, o.mantle, 'cloth') : m3dMat(mats, mpTone(clothHex, -0.15), 'leather'),   /* (RS-431: a robe's mantle at the shoulders, in its own cloth) */ ps = (pad==='plate' ? 0.05 : 0.042)*(1 + (o.tier||0)*0.04)*b*(o.fem ? 0.92 : 1)*(o.mantle ? 1.2 : 1), px = (o.fem ? 0.086 : 0.1)*b, ptrim = o.trim || (o.mantle && o.robeTrim);
-      for (const s of [-1,1]){ const pd = new T.Mesh(m3dPauldronGeo(pad, ps), m3dVC(mats, pm)); pd.position.set(s*px, 0.287, 0); pd.scale.set(-s, 1, 1); pd.rotation.z = -s*0.12; torso.add(pd);   /* (RS-279: a sculpted pauldron) */
-        if (ptrim){ const tr = new T.Mesh(new T.TorusGeometry(ps*1.04, 0.0055, 6, 22), m3dMat(mats, ptrim, 'metal')); tr.rotation.x = Math.PI/2; tr.position.set(s*px, 0.282, 0); tr.scale.set(1.1, 1, 1); torso.add(tr); }
+      for (const s of [-1,1]){ const pd = new T.Mesh(m3dPauldronGeo(pad, ps), m3dVC(mats, pm)); pd.position.set(s*px, 0.287, 0); pd.scale.set(-s, 1, 1); pd.rotation.z = -s*0.12; pd.userData.pad = 1; torso.add(pd);   /* (RS-279: a sculpted pauldron) */
+        if (ptrim){ const tr = new T.Mesh(new T.TorusGeometry(ps*1.04, 0.0055, 6, 22), m3dMat(mats, ptrim, 'metal')); tr.rotation.x = Math.PI/2; tr.position.set(s*px, 0.282, 0); tr.scale.set(1.1, 1, 1); tr.userData.pad = 2; torso.add(tr); }
         if (o.spikes) for (let i=0;i<3;i++) m3dCone(torso, 0.009, 0.05, m3dMat(mats, o.spikes, 'horn'), s*(px - 0.01 + i*0.018*b), 0.285 + ps*0.62, -0.02 + i*0.014, 0, 0, -s*(0.25 + i*0.3)); } } }
   if (o.trim && outfit!=='robe'){ const tm = m3dMat(mats, o.trim, 'metal'); const col = new T.Mesh(new T.TorusGeometry(0.042*Math.sqrt(b), 0.006, 6, 20), tm); col.rotation.x = Math.PI/2; col.position.y = 0.3; torso.add(col);
     m3dFrontStrip(torso, tm, 0.012, 0.005, 0.055, 0.245, 0.071*Math.sqrt(b)); }   /* (RS-495: down the front, on it) */
@@ -41272,11 +41274,16 @@ function m3dRobeShape(rig, torso, mats, b){
     return (A[k]*(1 - tk) + A[k + 1]*tk)*(1 - tj) + (B[k]*(1 - tk) + B[k + 1]*tk)*tj; };
   const Pe = th=>{ const fj = (th/(Math.PI*2) + 1)*NS, j = Math.floor(fj), tj = fj - j; return pe[((j % NS) + NS) % NS]*(1 - tj) + pe[(((j + 1) % NS) + NS) % NS]*tj; };
   const tb = (ys - yJ)/(ys - yJ + 0.13);   /* (the share of the cloth's rows up the body to there; the rest go over the shoulders, about as far apart) */
-  for (let i=0;i<p.count;i++){ const Y = p.getY(i) + y0; if (Y < yJ - 0.002) continue; const X = p.getX(i)*sx, Z = p.getZ(i)*sz, d = Math.hypot(X, Z); if (d < 1e-6) continue;
+  const uvA = g.attributes.uv, mid = []; let rimSum = 0, rimN = 0;
+  for (let i=0;i<p.count;i++){ const Y = p.getY(i) + y0; if (Y < yJ - 0.002) continue; if (uvA) uvA.setY(i, 0.5);   /* (RS-608: the hem's runes and trim read nothing up here - the top's fan, once tucked under the bodice, carried a ring of them out over the shoulder) */
+    const X = p.getX(i)*sx, Z = p.getZ(i)*sz, d = Math.hypot(X, Z); if (d < 1e-6){ if (Y > top - 1e-4) mid.push(i); continue; }
     const th = Math.atan2(X, Z), tt = Math.max(0, Math.min(1, (Y - yJ)/(top - yJ))); let R2, Yn;
     if (tt <= tb){ Yn = yJ + (tt/tb)*(ys - yJ); R2 = Math.max(0.01, Rr(Yn, th) + 0.004); }   /* (just over the bodice) */
     else { const u = (tt - tb)/(1 - tb), f = u*Pe(th), rho = Pr(th, f) + 0.004*(1 - 0.6*u*u*u); R2 = Math.max(0.01, Math.cos(f)*rho); Yn = ys + Math.sin(f)*rho; }   /* (over the shoulder, along its outline, to the neckline) */
-    p.setX(i, Math.sin(th)*R2/sx); p.setY(i, Yn - y0); p.setZ(i, Math.cos(th)*R2/sz); }
+    if (tt >= 1){ rimSum += Yn; rimN++; } p.setX(i, Math.sin(th)*R2/sx); p.setY(i, Yn - y0); p.setZ(i, Math.cos(th)*R2/sz); }
+  if (rimN) for (const i of mid) p.setY(i, rimSum/rimN - 0.006 - y0);   /* (the fan closing the neck, just under its edge) */
+  if (uvA) uvA.needsUpdate = true;
+  for (const c of torso.children) if (c.userData && c.userData.pad){ c.position.y += 0.005; if (c.userData.pad===1) c.scale.multiplyScalar(1.06); }   /* (RS-608: a robe's shoulder pads sit on its cloth, now over the shoulders - it came up through their tops) */
   g.computeVertexNormals();
   /* under the cloth the bodice goes (and the bodice's hem below it): bending with the waist's joint as the body does, it pushed out through the cloth as the torso turned */
   { const cm = rig.chestMesh, cg = cm.geometry, q = cg.attributes.position, I = cg.index ? cg.index.array : null, sy = cm.scale.y, oy = cm.position.y, cut = 9, keep = [];   /* (RS-608: the cloth covers it all, to the neckline) */
@@ -43486,7 +43493,7 @@ function isoSyncPlayer(){
   const hurt = m3dHitReact(e, p.hp, effMaxHp(), FP.dt);   /* (RS-173: as hard as the blow) */
   const lunge = Math.max(strike, C.fol*0.6)*0.2 - hurt*0.1;   // step into the blow and follow it through; rock back when you're hit
   e.holder.position.set(e.pos.x + Math.sin(e.face)*lunge, 0, e.pos.y + Math.cos(e.face)*lunge); e.holder.rotation.y = e.face;
-  const onStair = isoStairTick(e);   /* (RS-592) */
+  const onPortal = isoPortalTick(e), onStair = onPortal!=null ? onPortal : isoStairTick(e);   /* (RS-592; RS-609: or into a portal) */
   m3dPoseHumanoid(e.rig, FP.t + e.seed, onStair ? 1 : moving, wind + FP.cast*0.4, strike, hurt*0.8, e);
   rsPlayerFx(e, FP.t + e.seed, moving, true);
   const gw = G.gather && G.gather.mode===1 && G.gather.o.k==='mining' && G.gather.o.vein ? G.gather.o : null;
@@ -43528,6 +43535,27 @@ function isoStairWalk(x, y, up, go){
   if (!transOn() || !ISO.on || !ISO.player || !fp3dActive() || G.gameMode!==1) return false;
   const p0 = ISO.player.pos ? { x:ISO.player.pos.x, y:ISO.player.pos.y } : { x:x + 0.5, y:y + 0.5 };
   FPD.stair = { t:0, x, y, up, go, map:G.map, p0 }; return true;
+}
+/* (RS-609) stepping into a portal: you walk up to the gate, it flares, and you are drawn into it - turning as you go, shrinking and
+   lifting into its light - before the dark, and then wherever it leads. It was a cut straight to the road */
+function isoPortalWalk(x, y, go){
+  if (!transOn() || !ISO.on || !ISO.player || !fp3dActive() || (G.gameMode!==1 && G.gameMode!==2)) return false;
+  const pt = (FPD.portals||[]).find(p=>p.x===x && p.y===y); if (!pt) return false;
+  const p0 = ISO.player.pos ? { x:ISO.player.pos.x, y:ISO.player.pos.y } : { x:G.player.x + 0.5, y:G.player.y + 0.5 };
+  FPD.portal = { t:0, x, y, go, map:G.map, p0, pt, s0:ISO.player.holder.scale.x || 1, gx:pt.g.position.x + pt.face[0]*0.06, gy:pt.g.position.z + pt.face[1]*0.06 }; try{ sfx('spell'); }catch(e){} return true;
+}
+const PORTAL_T = 1.5;
+function isoPortalTick(e){
+  const S = FPD.portal; if (!S) return null; const cv = FPD.r && FPD.r.domElement;
+  S.t += FP.dt || 0.016; const k = Math.min(1, S.t/PORTAL_T), wk = 0.3, fa = Math.atan2(S.gx - S.p0.x, S.gy - S.p0.y);
+  let x, y, h = 0, sc = 1, face = fa; if (k < wk){ const f = k/wk, q = f*f*(3 - 2*f)*0.8 + f*0.2; x = S.p0.x + (S.gx - S.p0.x)*q; y = S.p0.y + (S.gy - S.p0.y)*q; }
+  else { const f = (k - wk)/(1 - wk), q = f*f; x = S.gx; y = S.gy; h = q*0.32; sc = Math.max(0.04, 1 - q*0.96); face = fa + q*Math.PI*5; }   /* (a turn and more as it takes you) */
+  S.pt.flare = Math.min(1, Math.max(0, (k - 0.15)/0.45))*(1 - Math.max(0, (k - 0.92)/0.08)*0.5);
+  e.pos.x = x; e.pos.y = y; e.face = face; e.holder.position.set(x, h, y); e.holder.rotation.y = face; e.holder.scale.setScalar(S.s0*sc);
+  transFade(Math.max(0, (k - 0.72)/0.28), cv);
+  if ((k >= 1 && !S.done) || S.t > 4 || S.map!==G.map){ S.done = true; FPD.portal = null; S.pt.flare = 0; e.holder.scale.setScalar(S.s0); const go = S.go;
+    setTimeout(()=>{ try{ go(); }catch(err){ console.error(err); } transFade(0); renderGame(); try{ saveCurrentGame(); }catch(err){} }, 0); }
+  return k < wk;
 }
 function isoStairPath(x, y, up){ const [ex, ey] = fpStairDir(x, y), ax = -ex, ay = -ey, H = up ? 0.92 : -0.55; return { c:[x + 0.5, y + 0.5], a:[ax, ay], at:t=>({ x:x + 0.5 + ax*t, y:y + 0.5 + ay*t, h:t <= 0.5 ? H*Math.max(0, Math.min(1, t + 0.5)) : (up ? H : H - (t - 0.5)*1.1) }) }; }
 function isoStairTick(e){
@@ -44508,7 +44536,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-608';
+const GAME_VERSION = 'rs-609';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -46830,7 +46858,7 @@ function moveDir(dx,dy){
   if (G.sleepFx) return;   /* (RS-389: asleep - the night has to pass first) */
   if (G.ui!=='playing' || G.gameOver) return;
   if (typeof V3!=='undefined' && V3.door && V3.door.phase==='in') return;   // (half way through a door)
-  if ((typeof V3!=='undefined' && (V3.gate || V3.stair || V3.stairArr)) || (typeof FPD!=='undefined' && FPD.stair)) return;   /* (RS-592: walking out through the gate, or down the stairs) */
+  if ((typeof V3!=='undefined' && (V3.gate || V3.stair || V3.stairArr)) || (typeof FPD!=='undefined' && (FPD.stair || FPD.portal))) return;   /* (RS-592: walking out through the gate, or down the stairs; RS-609: or into a portal) */
   if (G.gameMode===3 && G.owZoomedOut) return;   // (RS-210: close the map, M, before walking on)
   if (!foeHurry()) return;   // (RS-218/312: their answer to your blow lands first, then you move)
   G.sitAt = null;   // (RS-183: moving gets you up off a seat)

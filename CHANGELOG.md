@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-609 - Into the portal
+
+- **Portals take you in:** stepping onto a dungeon's way out, or its red flee portal, used to cut straight to the road. Now you walk up to the gate, it flares brighter and swirls faster, and you're drawn into it, turning, shrinking and rising into its light before the screen goes dark and you come out on the other side. The portal off a field works the same way.
+- **No marks on the robe's shoulders:** the robe's top edge still carried its share of the hem's runes and trim. It used to be tucked under the chest, but since RS-608 the cloth goes over the shoulders, so a black band of glyphs showed there, with green glints at the neck. The top of the robe now carries no hem pattern at all.
+- **Shoulder pads sit on the robe:** the pads on finer robes are lifted and widened slightly, so the cloth that now runs over the shoulders doesn't come up through them.
+- **Clearer error messages:** errors from the 3D library used to show only as "Script error.", with nothing to go on. The library is now loaded so that its errors report their real message and where they happened. One appeared on leaving a tavern; I couldn't make it happen in testing, so if it shows again, the banner now says what went wrong.
+
 ## RS-608 - A robe with a waist, in one piece over the shoulders
 
 - **The robe follows your waist:** the robe's chest used to be a straight tube from under the arms to the belt, the same for every body, so the waist slider made no difference under it. It now comes in at the waist like your body does, a little softer since it's cloth. A slim waist is about a quarter narrower than a broad one.

@@ -24,7 +24,7 @@ async function runOne(name){
   page.on('pageerror', e=>errs.push('pageerror: '+e.message+'\n'+(e.stack||'').split('\n').slice(0,4).join('\n')));
   page.on('console', m=>{ if (m.type()==='error') errs.push('console: '+m.text()); else if (m.text().startsWith('SIM ')) console.log(m.text().slice(4)); });
   await page.route('**/*', r=>{ const u = r.request().url();
-    if (u.includes('three.min.js')) return THREE ? r.fulfill({ path:THREE, contentType:'application/javascript' }) : r.continue();
+    if (u.includes('three.min.js')) return THREE ? r.fulfill({ path:THREE, contentType:'application/javascript', headers:{ 'Access-Control-Allow-Origin':'*' } }) : r.continue();
     if (u.startsWith('file:')) return r.continue(); return r.abort(); });
   let ok = true, why = '';
   const timer = new Promise((_, rej)=>setTimeout(()=>rej(new Error(`timed out after ${minutes} min`)), minutes*60000));

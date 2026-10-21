@@ -61,7 +61,7 @@ const BOOT = `window.__boot = ()=>{ goToCharCreate(); ccBegin(); if (G.ui==='wor
     if (only.length && !only.includes(name)) continue;
     const page = await browser.newPage({ viewport:{ width:W, height:H } });
     page.on('pageerror', e=>console.log('pageerror', e.message));
-    await page.route('**/*', r=>{ const u = r.request().url(); if (u.includes('three.min.js') && fs.existsSync(THREE)) return r.fulfill({ path:THREE, contentType:'application/javascript' }); if (u.startsWith('file:')) return r.continue(); return r.abort(); });
+    await page.route('**/*', r=>{ const u = r.request().url(); if (u.includes('three.min.js') && fs.existsSync(THREE)) return r.fulfill({ path:THREE, contentType:'application/javascript', headers:{ 'Access-Control-Allow-Origin':'*' } }); if (u.startsWith('file:')) return r.continue(); return r.abort(); });
     await page.goto('file://'+PAGE); await page.waitForTimeout(1500); await page.evaluate(BOOT + '; window.fpDrawMinimap = function(){};' + (process.env.PRE||''));
     const extra = process.env['JS_'+name] || '';
     await page.evaluate(`(${SCENES[name].toString()})().then(async ()=>{ ${extra}; for (let i=0;i<40;i++){ renderGame(); try{ if (G.gameMode===0) o3Render(); }catch(e){} await new Promise(r=>setTimeout(r, 40)); } })`);
