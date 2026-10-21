@@ -35089,11 +35089,30 @@ function dgShadowTick(){
   let any = FPD.shadowFrames > 0; if (FPD.lan && FPD.lan.shadow){ FPD.lan.shadow.autoUpdate = false; if (n % lanEvery === 0 || FPD.shadowFrames > 0){ FPD.lan.shadow.needsUpdate = true; any = true; } }
   /* (RS-481) the torches' shadows are redrawn only while something moves - you, a monster, an ally - and a moment after: the stone never
      moves, so in a still room they cost nothing. They had been redrawn every other frame whatever happened */
-  let sig = ''; { const pp = ISO.player && ISO.player.pos; if (pp) sig += Math.round(pp.x*40) + ',' + Math.round(pp.y*40) + ';'; for (const m of G.mon||[]) if (m.alive) sig += m.x + ',' + m.y + ';'; for (const m of (G.player && G.player.minions)||[]) sig += m.x + ',' + m.y + ';'; }
-  const tnow = performance.now(); if (sig!==FPD.dynSig){ FPD.dynSig = sig; FPD.dynAt = tnow; }
-  const stirring = tnow - (FPD.dynAt||0) < 700;
-  (FPD.torches||[]).forEach((L, i)=>{ if (!L.shadow) return; L.shadow.autoUpdate = false; if ((stirring && (n + i) % torchEvery === 0) || FPD.shadowFrames > 0){ L.shadow.needsUpdate = true; any = true; } });
-  if (any) FPD.r.shadowMap.needsUpdate = true;
+  /* (RS-600) and each torch only for what moves within its own reach - a monster near it, or you if it's one of the two nearest you
+     (the only ones you cast a shadow from: see dgShadowSplit). Any step anywhere redrew every torch near you, every other frame */
+  const tnow = performance.now(), pp = ISO.player && ISO.player.pos, movers = [];
+  for (const m of G.mon||[]) if (m.alive) movers.push(m.x + 0.5, m.y + 0.5); for (const m of (G.player && G.player.minions)||[]) movers.push(m.x + 0.5, m.y + 0.5);
+  { const nk = (FPD.torches||[]).slice(0, 2).map(L=>L.position.x.toFixed(2) + ',' + L.position.z.toFixed(2)).join('|'); if (nk!==FPD.nearKey){ FPD.nearKey = nk; FPD.shadowFrames = Math.max(FPD.shadowFrames||0, 2); } }   /* (the nearest two changed: redrawn once, so a torch you've left behind keeps no shadow of you) */
+  (FPD.torches||[]).forEach((L, i)=>{ if (!L.shadow) return; L.shadow.autoUpdate = false; if (!(L.intensity > 0)) return; const u = L.userData, lx = L.position.x, lz = L.position.z, R2 = Math.pow(Math.max(3, L.distance||6) + 0.6, 2);
+    let sg = ''; if (i < 2 && pp) sg += Math.round(pp.x*40) + ',' + Math.round(pp.y*40) + ';'; for (let k=0;k<movers.length;k+=2){ const dx = movers[k] - lx, dz = movers[k+1] - lz; if (dx*dx + dz*dz < R2) sg += movers[k] + ',' + movers[k+1] + ';'; }
+    if (sg!==u.dsig){ u.dsig = sg; u.dAt = tnow; }
+    if ((tnow - (u.dAt||0) < 700 && (n + i) % torchEvery === 0) || FPD.shadowFrames > 0){ L.shadow.needsUpdate = true; any = true; } });
+  if (any){ FPD.r.shadowMap.needsUpdate = true; dgShadowSplit(); }
+}
+/* (RS-600) you throw your shadow from the two torches nearest you, not from every light about: your figure (a robed caster is 120,000
+   triangles) was drawn again into each of six faces of every torch's shadow as you walked. The shadow pass is split - the nearest two
+   with you in it, the rest (and your own lantern) without */
+function dgShadowSplit(){
+  const SM = FPD.r && FPD.r.shadowMap; if (!SM || SM.__split) return; SM.__split = true; const orig = SM.__orig = SM.render;
+  SM.render = function(lights, scene, camera){
+    const e = ISO.player, H = e && e.holder && e.holder.parent ? e.holder : null; if (!H || !FPD.torches || G.gameMode!==1) return orig.call(this, lights, scene, camera);
+    if (e.__cast !== H){ e.__cast = H; e.__casters = []; H.traverse(o=>{ if (o.isMesh && o._cs) e.__casters.push(o); }); }
+    const near = new Set(FPD.torches.slice(0, 2)), A = [], B = []; for (const l of lights) (near.has(l) ? A : B).push(l);
+    if (!B.length || !A.length && !B.length) return orig.call(this, lights, scene, camera);
+    const nu = this.needsUpdate; if (A.length) orig.call(this, A, scene, camera); this.needsUpdate = nu;
+    const C = e.__casters, was = C.map(o=>o._cs); for (const o of C) o._cs = false; try{ orig.call(this, B, scene, camera); } finally { C.forEach((o, i)=>{ o._cs = was[i]; }); }
+  };
 }
 // graphics quality: render resolution, shadows and how many particles effects throw
 const GFX_Q = { low:{ pr:1, fpd:0.6, fx:0.35, shadows:false }, medium:{ pr:1.5, fpd:0.85, fx:0.7, shadows:true }, high:{ pr:2, fpd:1, fx:1, shadows:true } };
@@ -35468,9 +35487,9 @@ function fpdCatacombProps(props, matFor, world){
     im.castShadow = !!cast; im.receiveShadow = true; im.frustumCulled = false; world.add(im);
   };
   const boneG = new TH.CylinderGeometry(1, 1, 1, 6); boneG.rotateZ(Math.PI/2);
-  mk(props.skull, new TH.SphereGeometry(1, 16, 12), matFor('skull'), true);
-  mk(props.bone, boneG, matFor('bone'), true);
-  mk(props.shroud, new TH.CapsuleGeometry ? (()=>{ const g = new TH.CapsuleGeometry(0.5, 1, 4, 8); g.rotateZ(Math.PI/2); return g; })() : new TH.BoxGeometry(1,1,1), matFor('cloth'), true);
+  mk(props.skull, new TH.SphereGeometry(1, 16, 12), matFor('skull'), false);   /* (RS-600: in the niches, under the wall's own shadow - some 600 of them drawn into every torch's) */
+  mk(props.bone, boneG, matFor('bone'), false);
+  mk(props.shroud, new TH.CapsuleGeometry ? (()=>{ const g = new TH.CapsuleGeometry(0.5, 1, 4, 8); g.rotateZ(Math.PI/2); return g; })() : new TH.BoxGeometry(1,1,1), matFor('cloth'), false);
   mk(props.candle, new TH.CylinderGeometry(1, 1.1, 1, 8), matFor('wax'), false);
   mk(props.flame, new TH.ConeGeometry(1, 1, 6), new TH.MeshBasicMaterial({ color:0xffb44a }), false);
   // a soft glow around each little cluster of candles
@@ -44412,7 +44431,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-599';
+const GAME_VERSION = 'rs-600';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

@@ -7,7 +7,7 @@ module.exports = async page=>{
     const frames = async n=>{ for (let i=0;i<n;i++){ renderGame(); await new Promise(r=>setTimeout(r, 20)); } };
     await frames(20); await new Promise(r=>setTimeout(r, 900)); await frames(4);
     const count = ()=>{ let k = 0; for (let i=0;i<10;i++){ (FPD.torches||[]).forEach(L=>{ L.shadow.needsUpdate = false; }); FPD.shadowFrames = 0; dgShadowTick(); (FPD.torches||[]).forEach(L=>{ if (L.shadow.needsUpdate) k++; }); } return k; };
-    const still = count(); FPD.dynSig = 'moved'; const moving = count();
+    const still = count(); (FPD.torches||[]).forEach(L=>{ L.userData.dsig = 'moved'; }); const moving = count();   /* (RS-600: each torch keeps its own note of what moves near it) */
     return { lantern:FPD.lan.castShadow, still, moving, torches:(FPD.torches||[]).length }; });
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };

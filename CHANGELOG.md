@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-600 - Lighter dungeon shadows
+
+- **Walking a dungeon is far lighter:** every step you took made every torch near you redraw its shadow, about every other frame. Each torch shadow is six views of the whole room. Now a torch redraws only when something moves within its own reach.
+- **Your shadow from the nearest torches:** your figure (a robed caster is around 120,000 triangles) was drawn again into every torch's shadow. Now you cast your shadow from the two torches nearest you, not from every light around.
+- **The catacombs' dead cast no shadows:** the hundreds of skulls, bones and shrouded dead in the niches no longer cast shadows of their own, which hardly showed inside the wall's shadow anyway.
+- On a walk through a graveyard's catacombs, the game now draws about 0.6 to 1.5 million triangles a frame instead of 3.4 to 6.5 million, and the GPU and CPU numbers swing far less.
+
 ## RS-599 - Up the tavern stairs
 
 - **Walking the stairs indoors:** taking the tavern's stairs, or the shop's cellar ladder, used to cut straight to the other floor. Now you walk onto the flight and climb it, or go down the stairwell or ladder, as the room goes dark. On the other floor you come off the end of its stairs onto the landing.

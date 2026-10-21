@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs600 | walking a dungeon only the two torches nearest you redraw their shadows, you cast from them alone (the shadow pass split), the catacombs' skulls and bones cast none |
 | rs599 | the tavern's stairs walked up and down before the other floor, off the far end onto the landing; the willow's canopy throws its whole shadow |
 | rs598 | below ground you face a foe on the diagonal and a vein at an angle; a gathering spot's disc glows at its rim only |
 | rs597 | solid shadows under the trees again: no leaf masked for a dapple |
@@ -472,6 +473,7 @@ Screenshots go to `tools/tests/shots/`.
 | zcamp2 | the open land's frame by the game's own timers, camping in a robe and cape: no camp, fire, tent, each piece off, the cloth calls a frame |
 | ztree | a tree's shadow at midday close in: as it is, leaves hidden, the sun's shadow off, in rain |
 | zroadbad | road points that land on a mountain or the water, and where in their chain they sit |
+| zsavewalk | a save (ZSAVE) walked where it stands: frame times, the 3D and GPU timers, draws, triangles, programs, slow frames, the heaviest meshes, a CPU profile |
 | zhair | heads with each hairstyle from four sides, and under helmets |
 | zplate | plate armour on builds from slight to heavy |
 | zunder | the creator's undressed figures by race and sex |
