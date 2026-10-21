@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs604 | a robe in one piece, its cloth up over the chest to the shoulders; no automatic resolution drop |
 | rs603 | making "all" counts it: the cooking card says 0 / 7, and what's queued after by its number |
 | rs602 | floor after floor, nothing left behind on the graphics card (shapes and pictures hold level) |
 | rs601 | a real fight below ground: bodies lie a few seconds and go (no turn of the land needed), never more than a dozen at once |
@@ -480,6 +481,7 @@ Screenshots go to `tools/tests/shots/`.
 | zfloorgrow | what piles up on a dungeon floor (fresh, after its monsters die, after leaving and coming back); ZSAVE for a save |
 | zfloorplay | a minute of real fighting on one floor, every ten seconds the frame and what could pile up, then leaving and coming back |
 | zfloorleak | ten trips between two floors: geometries and textures after each, what was drawn and never freed |
+| zrobe | a fine robe close in on a woman and a man, front, three-quarter and side |
 | zhair | heads with each hairstyle from four sides, and under helmets |
 | zplate | plate armour on builds from slight to heavy |
 | zunder | the creator's undressed figures by race and sex |

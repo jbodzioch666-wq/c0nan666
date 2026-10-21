@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-604 - A robe in one piece
+
+- **One cloth from hem to shoulders:** a robe used to be two pieces. The skirt's cloth ran up to under the bust, and above it was the figure's own chest in the robe's colour, with a different weave, a different shade and a seam under the bust. The robe's cloth now runs on up over the chest to the shoulders, so it's one garment. The trim strip down the front now lies on top of it.
+- **No more automatic resolution drops:** the game no longer lowers the 3D picture's resolution by itself when the frame rate dips. It softened the picture without gaining much. The render resolution slider in the settings is now the only control.
+
 ## RS-603 - Counted, not "all"
 
 - **The making card counts:** cooking, smelting or brewing "all" of something used to show "0 / all". It now shows how many you can make, such as "0 / 7" for seven raw shrimp, and the same for anything queued after it.

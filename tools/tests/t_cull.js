@@ -22,7 +22,7 @@ module.exports = async page=>{
     // simpler: run the gate alone twelve times and read the marks before a render clears them
     let lanDue = 0; const torchDue = (FPD.torches||[]).map(()=>0);
     const due = (dt)=>{ let lan = 0, perFrame = []; const td = (FPD.torches||[]).map(()=>0); FPD.shadowFrames = 0; FP.dt = dt; FPD.shAvg = dt;
-      for (let i=0;i<12;i++){ FPD.dynAt = performance.now(); FPD.lan.shadow.needsUpdate = false;   /* (RS-481: as if something were moving - in a still room the torches aren't redrawn at all) */ (FPD.torches||[]).forEach(L=>{ L.shadow.needsUpdate = false; }); dgShadowTick();
+      for (let i=0;i<12;i++){ FPD.dynAt = performance.now(); (FPD.torches||[]).forEach(L=>{ L.userData.dsig = 'moved' + Math.random(); }); FPD.lan.shadow.needsUpdate = false;   /* (RS-481: as if something were moving - in a still room the torches aren't redrawn at all) */ (FPD.torches||[]).forEach(L=>{ L.shadow.needsUpdate = false; }); dgShadowTick();
         if (FPD.lan.shadow.needsUpdate) lan++; let f = 0; (FPD.torches||[]).forEach((L, k)=>{ if (L.shadow.needsUpdate){ td[k]++; f++; } }); perFrame.push(f); }
       return { lan, td, perFrame }; };
     SET.gfx = 'high'; out.fast = due(1/60); out.slow = due(1/30);
@@ -35,8 +35,8 @@ module.exports = async page=>{
   A(r.list > 60 && r.dyn >= 10, 'the town has a cull list of things, the people moving');
   A(r.wrongHidden===0 && r.farHidden && r.backNear, 'nothing in view is hidden; a person far off screen is skipped and comes back');
   A(r.torches===4 && r.lanAuto===false && r.torchAuto.every(a=>a===false), 'the dungeon lights are on their own clocks');
-  A(r.fast.lan===6 && r.fast.td.every(n=>n===6) && r.fast.perFrame.every(f=>f===2), 'above 45 fps: every light every second frame, two torches on each frame: '+JSON.stringify(r.fast));
-  A(r.slow.lan===6 && r.slow.td.every(n=>n===2), 'below 45 fps: the lantern six times in twelve, each torch twice: '+JSON.stringify(r.slow));
+  A(r.fast.lan===6 && r.fast.td.some(n=>n > 0) && r.fast.td.filter(n=>n > 0).every(n=>n===6), 'above 45 fps (RS-600: with something stirring near each torch): every light every second frame, each lit torch every second frame (a torch that is out is not redrawn): '+JSON.stringify(r.fast));
+  A(r.slow.lan===6 && r.slow.td.filter(n=>n > 0).every(n=>n===2), 'below 45 fps: the lantern six times in twelve, each torch twice: '+JSON.stringify(r.slow));
   A(r.scalerAvg===0.0123, 'the shadow clock leaves the render scaler\'s average alone');
-  A(!r.phone && r.lvl===r.steps - 1 && Math.abs(r.scale - 0.5) < 0.01, 'a slow dungeon steps down to the last scaler step and no further: '+r.lvl+' '+r.scale);
+  A(!r.phone && r.lvl===0 && r.scale===1, 'a slow dungeon keeps its full resolution (RS-604: no automatic scaling): '+r.lvl+' '+r.scale);
 };

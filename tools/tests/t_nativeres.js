@@ -28,8 +28,6 @@ module.exports = async page=>{
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
   A(r.land===1 && r.pr_low===1 && r.pr_medium===1 && r.pr_high===1, 'the land draws at the screen\'s own resolution, whatever the quality');
-  A(r.at60===0 && r.under >= 1 && r.at58===r.under, 'a steady 60 holds full resolution, under 57 steps down, 58 holds');
-  A(r.backUp===r.under - 1, 'ten seconds back at 60 steps up again');
-  A(r.menu && r.hitch, 'menus and one-off hitches don\'t count');
+  A(r.at60===0 && r.under===0 && r.at58===0 && r.backUp===0, 'full resolution whatever the frame rate (RS-604: the automatic scaler is gone)');
   A(Math.abs(r.dungeon.w - r.dungeon.want) <= 2 && r.dungeon.scale===1, 'the dungeon draws at the screen\'s own size, no 1,280 cap');
 };
