@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs597 | solid shadows under the trees again: no leaf masked for a dapple |
 | rs596 | no road on a mountain or over water, none worn up a steep bank; trees' shadows dappled, leaves drawn whole; rain dims the sun and fills the sky |
 | rs595 | the wind slowed (the plants' lean wave, how fast they follow a gust, the gusts' pace) and the dungeon torches' soft waver |
 | rs594 | sat at the campfire in a robe and a cape: no cloth worked a frame, the cape still hung; up again, cloth again |
@@ -468,6 +469,7 @@ Screenshots go to `tools/tests/shots/`.
 | zdoor | walking into a building: the door's hinge, frames part way through |
 | zcamp2 | the open land's frame by the game's own timers, camping in a robe and cape: no camp, fire, tent, each piece off, the cloth calls a frame |
 | ztree | a tree's shadow at midday close in: as it is, leaves hidden, the sun's shadow off, in rain |
+| zroadbad | road points that land on a mountain or the water, and where in their chain they sit |
 | zhair | heads with each hairstyle from four sides, and under helmets |
 | zplate | plate armour on builds from slight to heavy |
 | zunder | the creator's undressed figures by race and sex |

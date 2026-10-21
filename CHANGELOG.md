@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-597 - Solid shade again
+
+- **Solid tree shadows:** trees cast solid shadows again instead of RS-596's dappled ones. The fainter shadows under cloud and rain stay.
+- **Road corners kept on land:** rounding a road's corners could still cut across the corner of a river beside a bridge, or a mountain on a bend. Those corners now stay on the land too.
+
 ## RS-596 - Roads that stay down, dappled shade
 
 - **Roads stay off the mountains:** smoothing a road's bends could pull it up onto a mountain's flank, with dirt and flagstones climbing the slope. A road's line now never leaves its own tiles for a mountain or the water. The ground painting also fades out on any steep bank, so no road is worn up a slope.

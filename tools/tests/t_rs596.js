@@ -20,7 +20,7 @@ module.exports = async page=>{
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
   A(r.road.pts > 100 && r.road.bad===0, 'no road drawn up a mountain or out over the water: ' + JSON.stringify(r.road));
   A(r.slope, 'and none worn up a steep bank');
-  A(r.leaves.n >= 2 && r.leaves.whole===r.leaves.n, 'the leaves throw a dappled shadow and are drawn whole: ' + JSON.stringify(r.leaves));
+  A(r.leaves.n===0, 'the trees throw solid shadows (RS-597: the dappled ones taken back out): ' + JSON.stringify(r.leaves));
   A(r.rain.sun < 0.6 && r.rain.sky > 1.05, 'under rain the sun is dim and the sky fills in: ' + JSON.stringify(r.rain));
   A(!errs.length, 'no errors: ' + errs.join(' | '));
 };
