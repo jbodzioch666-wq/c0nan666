@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-617 - Steps out from the door step
+
+- **The stair starts in front of the door step:** the steps up to a raised house began at the wall, so the stone door step in front of the door hid their top treads underneath it. They now come down from the front edge of that stone step, which works as the top tread: four wooden steps under a stilt house, two stone ones on a hill terrace.
+- **You stand on the stair:** waiting in front of a raised house's door, you stand on its lower steps rather than in the air beside them, and you come back to that step when you walk out.
+
 ## RS-616 - The new roads on phones
 
 - **Worn paths and old roads on every device:** phones, and the Low graphics setting, still had the old roads. Those were flat strips stepping from tile to tile in right angles, with a disc at every bend. They now get the same roads as a computer: smooth curves painted into the ground, with trampled verges, ruts, a grass strip down the lanes, broken flagstones on the old roads, and puddles after rain.

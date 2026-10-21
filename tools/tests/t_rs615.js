@@ -11,7 +11,7 @@ module.exports = async page=>{
     const fr = async n=>{ for (let i=0;i<n;i++){ renderGame(); await new Promise(r=>requestAnimationFrame(r)); } };
     await fr(150); const out = { theme:G.villageTheme, stilts:!!(G.townLy && G.townLy.info.style.stilts), steps:(V3.steps||[]).length };
     const st = (V3.steps||[]).find(q=>q.key==='tavern'), b = VILLAGE_BUILDINGS.find(q=>q.key==='tavern'); if (!st || !b){ out.none = true; return out; }
-    out.top = +st.top.toFixed(2); out.atSill = +v3StepH(st.x - st.nx*0.05, st.z - st.nz*0.05).toFixed(2); out.atFoot = +v3StepH(st.x + st.nx*0.56, st.z + st.nz*0.56).toFixed(2); out.mid = +v3StepH(st.x + st.nx*0.25, st.z + st.nz*0.25).toFixed(2);
+    out.top = +st.sill.toFixed(2); out.atSill = +v3StepH(st.x - st.nx*0.05, st.z - st.nz*0.05).toFixed(2); out.land = +v3StepH(st.x + st.nx*0.2, st.z + st.nz*0.2).toFixed(2); out.atFoot = +v3StepH(st.x + st.nx*(st.run + 0.05), st.z + st.nz*(st.run + 0.05)).toFixed(2); out.mid = +v3StepH(st.x + st.nx*0.5, st.z + st.nz*0.5).toFixed(2); out.front = +v3StepH(st.x + st.nx*0.56, st.z + st.nz*0.56).toFixed(2); out.stairFrom = STEP_SILL;
     const fx = b.door.x + Math.round(st.nx), fy = b.door.y + Math.round(st.nz); G.player.x = fx; G.player.y = fy; await fr(40); out.standY = +V3.player.g.position.y.toFixed(2);
     moveDir(-Math.round(st.nx), -Math.round(st.nz)); let upMax = 0; for (let i=0;i<70;i++){ await fr(1); if (V3.door && V3.door.phase==='in') upMax = Math.max(upMax, V3.player.g.position.y); if (i===38) window.__shot = 1; }
     out.upMax = +upMax.toFixed(2); out.inside = !!G.interior;
@@ -23,9 +23,9 @@ module.exports = async page=>{
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
   A(r.stilts && r.steps > 0 && !r.none, 'a marsh town on stilts, with steps at its doors');
-  A(r.top > 0.7 && Math.abs(r.atSill - r.top) < 0.01 && r.atFoot===0 && r.mid > 0.2 && r.mid < r.top, 'the stair rises from the square to the sill');
-  A(r.standY < 0.05, 'standing in front of the door, on the ground');
+  A(r.top > 0.7 && Math.abs(r.atSill - r.top) < 0.01 && r.land < r.top && r.land > 0.6 && r.atFoot===0 && r.mid > 0.2 && r.mid < r.land, 'the stair comes down from the front of the door stone step to the square (RS-617: it began under it)');
+  A(Math.abs(r.standY - r.front) < 0.03, 'standing in front of the door, on the step there: ' + r.standY + ' / ' + r.front);
   A(r.inside && r.upMax > r.top*0.8, 'walking in, up the steps to the door (it was walked under): ' + r.upMax);
-  A(r.outside && r.outMax > 0.3 && r.outEnd < 0.02, 'coming out, down from the sill to the square');
+  A(r.outside && r.outMax > r.top*0.9 && Math.abs(r.outEnd - r.front) < 0.03, 'coming out, down from the sill to the step in front of the door');
   A(!errs.length, 'no errors: ' + errs.join(' | '));
 };
