@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-595 - A gentler wind, softer torches
+
+- **The wind slowed down:** trees, bushes and grass used to rock back and forth together every three seconds. Now a slow wave rolls across them about every ten seconds and only bends them a little further. They take two or three seconds to follow a gust instead of a third of a second. Gusts build and die away over ten to twenty seconds instead of every couple of seconds, so capes and cloaks flap less jerkily too. A storm still blows hard, just steadily.
+- **Softer torchlight below ground:** dungeon wall torches used to jump by a fifth of their light several times a second. Now they waver gently and slowly. The torch or lantern you carry is steadier too.
+
 ## RS-594 - A smooth campfire
 
 - **Sitting at your fire no longer slows the game:** if you wore a cape, its cloth was thrown away and worked out from scratch every frame while you sat at your campfire, about 40 steps of cloth simulation a frame. A robe was also folded twice a frame. Now the cape and robe are hung over the seat once, and they move as cloth again when you get up. In testing, a frame at the fire went from about 27 ms to about 9 ms, the same as with no camp at all.

@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs595 | the wind slowed (the plants' lean wave, how fast they follow a gust, the gusts' pace) and the dungeon torches' soft waver |
 | rs594 | sat at the campfire in a robe and a cape: no cloth worked a frame, the cape still hung; up again, cloth again |
 | rs593 | no god rays on the open land: no shafts of light through the woods at any hour |
 | rs592 | the walks between scenes: a door swings open before you go in, the town gate opens as you come near and you walk out through it, the stairs walked down into the dark before the next floor |
