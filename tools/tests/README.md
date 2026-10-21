@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs615 | a raised house (stilts in a marsh town, a hill terrace) has a stair up to its door; you climb it walking in and come down it walking out |
 | rs614 | the land build's end no longer walks the road mask's bytes (the merge under 40ms), and the mask is painted a few stretches a slice, the same as in one go |
 | rs613 | the Serpentskin Shroud a robe of snake's skin: scales and diamonds on its skirt and chest alike, glossier, green-edged unless dyed; other robes keep their weave |
 | rs612 | a unique named as a robe (the Serpentskin Shroud) is drawn and named as one, still a Defence piece; an old one is put right on load; other uniques keep their look |
@@ -525,6 +526,7 @@ Screenshots go to `tools/tests/shots/`.
 | zroadms | what the land's road mask costs: tracing the roads, painting the mask |
 | zwalkprof | RS-505's walk at a phone's pace with a CPU profile and the land swap timed |
 | zsaves | every save in ZSAVES loaded and played a moment: any error, where it stands, what it kept |
+| zstilts | a marsh town on stilts (ZH=hill for a hill town): the tavern's stair, and you on it walking in (ZMS ms after the step) |
 | zhair | heads with each hairstyle from four sides, and under helmets |
 | zplate | plate armour on builds from slight to heavy |
 | zunder | the creator's undressed figures by race and sex |

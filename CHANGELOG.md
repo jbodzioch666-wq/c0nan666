@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-615 - Up the steps to the door
+
+- **A stair to every raised door:** houses on stilts in marsh towns, and on stone terraces in hill towns, now have a flight of steps up to the door. Stilt houses get five wooden steps on two stringers, and terrace houses three stone steps. The steps sit on whichever side the door is. Before, a single plank floated under the south wall whichever way the door faced, and you walked in under the door.
+- **You climb them:** walking into a raised house, you go up the steps as the door swings open. Coming out, you step out at the sill and walk down to the square in front. Townsfolk and anything else that stops on the steps stands on them too.
+
 ## RS-614 - Audit before the merge
 
 - **No freeze at the end of each land rebuild:** since RS-591, every time the open land rebuilt around you as you walked, it ended with a stall of about 0.7 s at a phone's pace, about 175 ms on a desktop. The cause was the step that decides which parts of the land to keep separate: it went through the road texture byte by byte, 6.5 million of them. It now skips raw data. The worst slice of a rebuild during a long walk at a phone's pace dropped from 700 ms to 91 ms.
