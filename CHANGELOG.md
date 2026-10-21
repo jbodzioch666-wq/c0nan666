@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-608 - A robe with a waist, in one piece over the shoulders
+
+- **The robe follows your waist:** the robe's chest used to be a straight tube from under the arms to the belt, the same for every body, so the waist slider made no difference under it. It now comes in at the waist like your body does, a little softer since it's cloth. A slim waist is about a quarter narrower than a broad one.
+- **Over the shoulders in one piece:** the cloth used to stop just below the tops of the shoulders, and the old chest piece showed above it as a separate cap. The cloth now goes up over each shoulder and in to the neckline, and none of the chest piece underneath shows.
+- **Monster deaths no longer drop the frame rate:** a dying monster's pose was read through an outdated three.js call that wrote a warning to the browser console for every point it checked. It now uses the current call, so a kill costs no more than any other frame.
+
 ## RS-607 - No panels on the robe
 
 - **The weave runs on without seams:** RS-606 laid the robe's weave flat across each face of the body. Where a front-facing part turned into a side or a top, the weave jumped, so the shoulders and chest showed panels with seams between them. The weave is now blended from all three directions at once by which way the cloth faces, so it flows over the shoulders, the chest and the sleeves as one piece.

@@ -11,7 +11,7 @@ module.exports = async page=>{
       let cord = null; rig.torsoIn.traverse(c=>{ if (c.name==='robeCord') cord = c; });
       /* how far the cloth stands off the bodice, just under its top edge, all round (tucked in at the very top) */
       const cm = rig.chestMesh, full = cm.geometry.userData.from || cm.geometry, q = full.attributes.position; let gap = 9;
-      for (let i=0;i<p.count;i++){ const Y = p.getY(i) + sk.position.y; if (Math.abs(Y - (top - 0.06)) > 0.006) continue; const X = p.getX(i)*sk.scale.x, Z = p.getZ(i)*sk.scale.z, th = Math.atan2(X, Z); let br = 0;
+      for (let i=0;i<p.count;i++){ const Y = p.getY(i) + sk.position.y; if (Math.abs(Y - Math.min(top - 0.06, 0.2)) > 0.006) continue;   /* (RS-608: on the body below the shoulders - above, the cloth goes over their tops) */ const X = p.getX(i)*sk.scale.x, Z = p.getZ(i)*sk.scale.z, th = Math.atan2(X, Z); let br = 0;
         for (let j=0;j<q.count;j++){ const y2 = q.getY(j)*cm.scale.y + cm.position.y; if (Math.abs(y2 - Y) > 0.006) continue; const x2 = q.getX(j), z2 = q.getZ(j); let dt = Math.abs(Math.atan2(x2, z2) - th); if (dt > Math.PI) dt = Math.PI*2 - dt; if (dt < 0.12) br = Math.max(br, Math.hypot(x2, z2)); }
         if (br) gap = Math.min(gap, Math.hypot(X, Z) - br); }
       out[nm] = { top:+top.toFixed(3), cordY:cord ? +cord.geometry.parameters.path.points[0].y.toFixed(3) : null, pelvis:!!(rig.pelvisMesh && rig.pelvisMesh.visible), trimmed:!!cm.geometry.userData.robeCut, gap:+gap.toFixed(4), hold:sk.userData.hold };

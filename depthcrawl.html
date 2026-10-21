@@ -36361,7 +36361,7 @@ function m3dPlayerBuild(fn){ const c = gfxPhone() ? M3D_PLAYER_COARSE_PHONE : M3
 /* (RS-500) sculpted geometry is deterministic for its key, so a finished sculpt is kept in IndexedDB and later sessions skip
    the field fill and the meshing altogether - that was over 2s of every town load, and the skeleton kept sculpting for 15s after.
    BUMP M3D_SCULPT_VER WHENEVER ANY SCULPTED SHAPE CHANGES (SDF code, SK3_PARTS, any m3dSculpt build), or players keep the old look */
-const M3D_SCULPT_VER = 14, SCULPT_CAP = 64*1048576;
+const M3D_SCULPT_VER = 15, SCULPT_CAP = 64*1048576;
 const SCULPT_DB = { map:new Map(), db:null, dirty:[] };
 function sculptDbOpen(){
   if (SCULPT_DB.opened) return; SCULPT_DB.opened = true; if (typeof indexedDB==='undefined'){ sculptDbReady(); return; }
@@ -36480,7 +36480,8 @@ function m3dBodyMass(P, B, L, mode){
   P.add(ell([0,0.2 + F*0.008,-0.005],[(0.1 - F*0.016)*b*(0.92 + 0.08*sh)*fr + L,0.1 - F*0.008,(0.07 - F*0.004)*bs*(1 + fd*0.07) + L]), skin ? 0.04 : 0.05, M);   // ribcage
   for (const s of [-1,1]) P.add(ell([s*(0.078 - F*0.012)*b*sh,0.185,-0.018*bs],[(0.028 + m0*0.012 - F*0.006)*b*(1 + md*0.9) + L,0.07,0.046*bs*(1 + md*0.25) + L], basis([0, 0, 1], [s*0.4, 1, 0])), 0.05, M);   // the lats: broad under the arms, tapering down and in to the waist
   for (const s of [-1,1]) P.add(ell([s*0.07*b*wa,0.12,0.008],[(0.026 + fd*0.016)*b + L,0.07,(0.04 + fd*0.007)*bs + L]), 0.035, M);         // flanks, fuller with weight
-  if (!pl && mode!=='chain' && !rb && (skin || bl <= 0.12)) P.sub(torus([0,0.112,0.004],(fem ? 0.098 : 0.11)*b*wa + Lh,skin || !fem ? 0.036 : 0.034,[0,1,0]), skin && fem ? 0.045 : 0.05);     // the waist, curving in between ribs and hips (hers deeper; a hauberk hangs straight)
+  if (!pl && mode!=='chain' && !rb && (skin || bl <= 0.12)) P.sub(torus([0,0.112,0.004],(fem ? 0.098 : 0.11)*b*wa + Lh,skin || !fem ? 0.036 : 0.034,[0,1,0]), skin && fem ? 0.045 : 0.05);
+  else if (rb && bl <= 0.12) P.sub(torus([0,0.112,0.004],(fem ? 0.098 : 0.11)*b*wa + L + 0.008,(fem ? 0.022 : 0.02)*b,[0,1,0]), 0.05);   /* (RS-608) a robe in at the waist too, as the body under it, softer - it hung straight down from the chest whatever the waist */     // the waist, curving in between ribs and hips (hers deeper; a hauberk hangs straight)
   if (bl > 0){ P.add(ell([0,0.075,0.012*bs],[(0.07 + bl*0.014)*b*wa + L,0.075 + bl*0.02,(0.05 + bl*0.045)*bs + L]), 0.04, M);              // a belly
     for (const s of [-1,1]) P.add(ell([s*0.078*b*wa,0.06,-0.005*bs],[(0.028 + bl*0.018)*b + L,0.05,(0.045 + bl*0.012)*bs + L]), 0.04, M); }   // and love handles
   for (const s of [-1,1]){ P.add(sph([s*(0.112 - F*0.016)*b*sh*(1 + md*0.06),0.268,0], (0.043 - F*0.007)*b*(1 + m0*0.1)*(1 + md*0.3) + Lh), 0.035, M);   // shoulders
@@ -41251,13 +41252,34 @@ function m3dRobeShape(rig, torso, mats, b){
   for (let k=0;k<tab.length;k++){ const r0 = tab[k], r1 = r0.slice(); for (let j=0;j<NS;j++) r1[j] = Math.max(r0[(j + NS - 1) % NS], r0[j], r0[(j + 1) % NS]); tab[k] = r1; }   /* (RS-604: each angle the most of its neighbours - read between them, the cloth dipped under the sharp turn of the chest by the arms, now it runs up that far) */
   const Rr = (Y, th)=>{ const fk = Math.max(0, Math.min(tab.length - 1.001, Y/DY - r0)), k = Math.floor(fk), tk = fk - k, fj = (th/(Math.PI*2) + 1)*NS, j = Math.floor(fj), tj = fj - j, A = tab[k], B = tab[k+1];
     const v = (row, jj)=>row[((jj % NS) + NS) % NS]; return (v(A, j)*(1 - tj) + v(A, j+1)*tj)*(1 - tk) + (v(B, j)*(1 - tj) + v(B, j+1)*tj)*tk; };
+  /* (RS-608) over the shoulders: the bodice's outline from a point on the axis below them, out to the side and round over the top to the
+     neckline, angle by angle round the body - the cloth's top rows are laid along it, so the cloth itself goes over the shoulders to the
+     neck. Before, it went in to the neck below their tops, and the bodice's shoulders stood out above it as a second piece */
+  const ys = Math.min(top - 0.05, 0.24), NP = 40, PM = Math.PI*0.5, pr = [], pe = new Float32Array(NS), cgq = rig.chestMesh.geometry.attributes.position, csc = rig.chestMesh.scale, cpo = rig.chestMesh.position;
+  for (let j=0;j<NS;j++) pr.push(new Float32Array(NP + 1).fill(-1));
+  { const rimY = new Float32Array(NS).fill(-1), rimF = new Float32Array(NS);
+    for (let i=0;i<cgq.count;i++){ const Y = cgq.getY(i)*csc.y + cpo.y; if (Y < ys) continue; const X = cgq.getX(i)*csc.x + cpo.x, Z = cgq.getZ(i)*csc.z + cpo.z, d = Math.hypot(X, Z);
+      const j = ((Math.round((Math.atan2(X, Z)/(Math.PI*2) + 1)*NS)) % NS), f = Math.atan2(Y - ys, d), rho = Math.hypot(d, Y - ys), k = Math.max(0, Math.min(NP, Math.round(f/PM*NP)));
+      if (rho > pr[j][k]) pr[j][k] = rho; if (d > 0.035 && Y > rimY[j]){ rimY[j] = Y; rimF[j] = f; } }   /* (the neckline's rim: the highest of the bodice at that angle, off the axis) */
+    for (let j=0;j<NS;j++){ if (rimY[j] < 0){ rimF[j] = -1; continue; } pe[j] = rimF[j]; }
+    for (let j=0;j<NS;j++) if (rimF[j] < 0){ let a = 1; while (a < NS && rimF[(j + a) % NS] < 0 && rimF[(j + NS - a) % NS] < 0) a++; pe[j] = Math.max(rimF[(j + a) % NS], rimF[(j + NS - a) % NS]); }
+    for (let j=0;j<NS;j++){ const row = pr[j], kE = Math.min(NP, Math.round(pe[j]/PM*NP)); row[0] = Rr(ys, (j/NS)*Math.PI*2);
+      for (let k=1;k<=NP;k++) if (row[k] < 0 || k > kE){ let a = k - 1; while (a > 0 && row[a] < 0) a--; row[k] = row[a]; } }
+    for (let pass=0;pass<2;pass++){ const cp = pr.map(r=>r.slice()); for (let j=0;j<NS;j++) for (let k=1;k<=NP;k++){ const L0 = cp[(j + NS - 1) % NS], C0 = cp[j], R0 = cp[(j + 1) % NS], kk = Math.min(NP, k + 1);
+      pr[j][k] = Math.max(C0[k], (C0[k]*2 + C0[k - 1] + C0[kk] + L0[k] + R0[k])/6); } }   /* (smoothed, never in under it) */
+    { const cp = pe.slice(); for (let j=0;j<NS;j++) pe[j] = (cp[(j + NS - 1) % NS] + cp[j]*2 + cp[(j + 1) % NS])/4; } }
+  const Pr = (th, f)=>{ const fj = (th/(Math.PI*2) + 1)*NS, j = Math.floor(fj), tj = fj - j, fk = Math.max(0, Math.min(NP - 0.001, f/PM*NP)), k = Math.floor(fk), tk = fk - k, A = pr[((j % NS) + NS) % NS], B = pr[(((j + 1) % NS) + NS) % NS];
+    return (A[k]*(1 - tk) + A[k + 1]*tk)*(1 - tj) + (B[k]*(1 - tk) + B[k + 1]*tk)*tj; };
+  const Pe = th=>{ const fj = (th/(Math.PI*2) + 1)*NS, j = Math.floor(fj), tj = fj - j; return pe[((j % NS) + NS) % NS]*(1 - tj) + pe[(((j + 1) % NS) + NS) % NS]*tj; };
+  const tb = (ys - yJ)/(ys - yJ + 0.13);   /* (the share of the cloth's rows up the body to there; the rest go over the shoulders, about as far apart) */
   for (let i=0;i<p.count;i++){ const Y = p.getY(i) + y0; if (Y < yJ - 0.002) continue; const X = p.getX(i)*sx, Z = p.getZ(i)*sz, d = Math.hypot(X, Z); if (d < 1e-6) continue;
-    const th = Math.atan2(X, Z), t = Math.max(0, Math.min(1, (top - Y)/0.04)), off = -0.0025 + 0.0065*t*t*(3 - 2*t); let R2 = Math.max(0.01, Rr(Y, th) + off);
-    { const u = Math.max(0, Math.min(1, (Y - (top - 0.032))/0.032)), q = u*u*(3 - 2*u), nR = 0.05*Math.sqrt(b); if (q > 0) R2 = R2 + (Math.min(R2, nR) - R2)*q; }   /* (RS-606: in to the neck over the shoulders' tops) */   /* (just over the bodice, its top edge going in under it) */
-    p.setX(i, Math.sin(th)*R2/sx); p.setZ(i, Math.cos(th)*R2/sz); }
+    const th = Math.atan2(X, Z), tt = Math.max(0, Math.min(1, (Y - yJ)/(top - yJ))); let R2, Yn;
+    if (tt <= tb){ Yn = yJ + (tt/tb)*(ys - yJ); R2 = Math.max(0.01, Rr(Yn, th) + 0.004); }   /* (just over the bodice) */
+    else { const u = (tt - tb)/(1 - tb), f = u*Pe(th), rho = Pr(th, f) + 0.004*(1 - 0.6*u*u*u); R2 = Math.max(0.01, Math.cos(f)*rho); Yn = ys + Math.sin(f)*rho; }   /* (over the shoulder, along its outline, to the neckline) */
+    p.setX(i, Math.sin(th)*R2/sx); p.setY(i, Yn - y0); p.setZ(i, Math.cos(th)*R2/sz); }
   g.computeVertexNormals();
   /* under the cloth the bodice goes (and the bodice's hem below it): bending with the waist's joint as the body does, it pushed out through the cloth as the torso turned */
-  { const cm = rig.chestMesh, cg = cm.geometry, q = cg.attributes.position, I = cg.index ? cg.index.array : null, sy = cm.scale.y, oy = cm.position.y, cut = top - 0.035, keep = [];
+  { const cm = rig.chestMesh, cg = cm.geometry, q = cg.attributes.position, I = cg.index ? cg.index.array : null, sy = cm.scale.y, oy = cm.position.y, cut = 9, keep = [];   /* (RS-608: the cloth covers it all, to the neckline) */
     if (I){ for (let t=0;t<I.length;t+=3){ const a = I[t], c = I[t+1], d = I[t+2]; if (Math.max(q.getY(a), q.getY(c), q.getY(d))*sy + oy >= cut) keep.push(a, c, d); }
       const g2 = new T.BufferGeometry(); for (const nm in cg.attributes) g2.setAttribute(nm, cg.attributes[nm]); g2.setIndex(keep); g2.computeBoundingSphere(); g2.userData.robeCut = 1; g2.userData.from = cg; cm.geometry = g2; } }   /* (from: the whole sculpt it was trimmed from) */
   if (rig.pelvisMesh) rig.pelvisMesh.visible = false;
@@ -42073,7 +42095,7 @@ function m3dBodyBall(e, bones, c, s, fallback, limbs){
   hold.updateMatrixWorld(true);
   e.root.traverse(o=>{ if (!o.isMesh || !o.geometry || !o.geometry.attributes.position) return; const pa = o.geometry.attributes.position;
     if (o.isSkinnedMesh && o.skeleton){ const si = o.geometry.attributes.skinIndex; if (!si) return; const ix = new Set(); o.skeleton.bones.forEach((bn, k)=>{ let q = bn, mine = false; while (q && q!==e.root){ if (skip.has(q)) return; if (set.has(q)) mine = true; q = q.parent; } if (mine) ix.add(k); }); if (!ix.size) return;   /* (RS-578: a bone under the body's joint counts as the body's, as a loose part under it did - the whole hide is one skinned mesh now, its bones the joints of every part) */
-      const st = Math.max(1, Math.floor(pa.count/900)); for (let i=0;i<pa.count;i+=st){ if (!ix.has(si.getX(i))) continue; v.fromBufferAttribute(pa, i); o.boneTransform(i, v); v.applyMatrix4(o.matrixWorld); hold.worldToLocal(v); ds.push(v.distanceTo(c)/s); } return; }
+      const st = Math.max(1, Math.floor(pa.count/900)); for (let i=0;i<pa.count;i+=st){ if (!ix.has(si.getX(i))) continue; v.fromBufferAttribute(pa, i); o.applyBoneTransform(i, v); v.applyMatrix4(o.matrixWorld); hold.worldToLocal(v); ds.push(v.distanceTo(c)/s); } return; }
     let q = o.parent, mine = false; while (q && q!==e.root){ if (skip.has(q)) return; if (set.has(q)) mine = true; q = q.parent; } if (!mine) return;
     const st = Math.max(1, Math.floor(pa.count/600)); for (let i=0;i<pa.count;i+=st){ v.fromBufferAttribute(pa, i).applyMatrix4(o.matrixWorld); hold.worldToLocal(v); ds.push(v.distanceTo(c)/s); } });
   if (ds.length < 20) return fallback;
@@ -42271,7 +42293,7 @@ function m3dLiftNeed(e, low, down){
   const box = Math.max(0, -low); if (!(box > 0) && !down) return 0;
   const v = m3dLiftNeed.v || (m3dLiftNeed.v = new THREE.Vector3()), y0 = e.holder.matrixWorld.elements[13]; let lo = Infinity;
   e.root.traverseVisible(o=>{ if (!o.isMesh || !o.geometry || (o.material && o.material.visible===false)) return; const pa = o.geometry.attributes.position; if (!pa) return;
-    const st = Math.max(1, Math.floor(pa.count/300)), at = i=>{ v.fromBufferAttribute(pa, i); if (o.isSkinnedMesh) o.boneTransform(i, v); v.applyMatrix4(o.matrixWorld); return v.y; };
+    const st = Math.max(1, Math.floor(pa.count/300)), at = i=>{ v.fromBufferAttribute(pa, i); if (o.isSkinnedMesh) o.applyBoneTransform(i, v); v.applyMatrix4(o.matrixWorld); return v.y; };
     let bi = -1, by = Infinity; for (let i=0;i<pa.count;i+=st){ const y = at(i); if (y < by){ by = y; bi = i; } }
     if (st > 1 && bi >= 0) for (let i=Math.max(0, bi - st), n = Math.min(pa.count, bi + st); i<n; i++){ const y = at(i); if (y < by) by = y; }   /* (then every vertex round the lowest found: neighbours in the list are neighbours on the body) */
     if (by < lo) lo = by; });
@@ -44486,7 +44508,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-607';
+const GAME_VERSION = 'rs-608';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

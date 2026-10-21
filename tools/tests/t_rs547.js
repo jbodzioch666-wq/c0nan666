@@ -21,7 +21,7 @@ module.exports = async page=>{
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
   A(r.dancer.below < r.dancer.bodice + 0.012, 'a slim robe falls from the belt - no bulge in front below it');
   A(r.dancer.lower >= r.dancer.below - 0.002, 'and widens toward the hem from there');
-  A(r.elf.waist >= r.elf.hem - 0.012, 'a robe has no pinched waist');
+  A(r.elf.waist >= r.elf.hem*0.76, 'a robe has no pinched waist (RS-608: in at the waist as the body is, softly - not on a stalk)');
   A(r.belly && (r.belly.tint !== r.belly.plain || r.belly.robe), 'a pot belly under cloth takes the garment shade (RS-606: the bodice is the robe cloth now)');
   A(r.dreadsFace === 0, 'dreadlocks hang clear of the face');
   A(r.crestLow > 0.07, 'the mohawk ends at the back of the crown, not lying down the head');
