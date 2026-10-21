@@ -23,6 +23,7 @@ module.exports = async page=>{
     G.ow.encounters = [{ x:wat.x, y:wat.y, merchant:true, id:9001 }, { x:land.x, y:land.y, merchant:false, id:9002 }]; encParty(G.ow.encounters[1]);
     moveOverworldEncounters = ()=>{};
     for (let i=0;i<400 && !(O3.beasts && O3.beasts.get('merch9001')); i++){ renderGame(); await new Promise(r=>requestAnimationFrame(r)); }
+    for (let i=0;i<600 && ![...(O3.beasts||new Map()).keys()].some(k=>k.startsWith('enc9002')); i++){ renderGame(); await new Promise(r=>requestAnimationFrame(r)); }   /* (the band's leader is sculpted a slice a frame too) */
     for (let i=0;i<10;i++){ renderGame(); await new Promise(r=>requestAnimationFrame(r)); }
     const f = O3.beasts && O3.beasts.get('merch9001'); o.boat = f ? { boat:!!(f.boat && f.boat.visible), up:+(f.e.holder.position.y - (-0.14)).toFixed(3), ringOff:!f.ring.visible, hb:!!f.hb } : null;
     if (f){ const T = THREE, c = f.e.holder.position.clone(), cam = O3.cam.clone(); cam.aspect = 1.4; cam.fov = 30; cam.updateProjectionMatrix(); cam.position.set(c.x + 2.2, c.y + 1.6, c.z + 2.2); cam.lookAt(c.x, c.y + 0.3, c.z);

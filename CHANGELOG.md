@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-602 - Nothing left behind between floors
+
+- **Changing floors no longer fills up the graphics card:** every time you went down or up a dungeon floor, the floor you left kept its props on the graphics card for good, about 60 shapes. A small picture used to warm up the next floor was also left behind each time. Over a long dive that kept growing. Both are now freed, so the memory stays level floor after floor.
+
 ## RS-601 - The dead are cleared away
 
 - **Long fights no longer slow a floor down:** a body killed below ground was meant to lie for a few turns, then fade away. But it counted the open land's steps, which never move in a dungeon, so every body you killed stayed in the scene until you left the floor. A long fight built up hundreds of figures. In testing, a minute's fighting took a frame from 12 ms to about 770 ms, and leaving the floor and coming back brought it back to 4 ms. That's why leaving and coming back made it run better.

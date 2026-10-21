@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs602 | floor after floor, nothing left behind on the graphics card (shapes and pictures hold level) |
 | rs601 | a real fight below ground: bodies lie a few seconds and go (no turn of the land needed), never more than a dozen at once |
 | rs600 | walking a dungeon only the two torches nearest you redraw their shadows, you cast from them alone (the shadow pass split), the catacombs' skulls and bones cast none |
 | rs599 | the tavern's stairs walked up and down before the other floor, off the far end onto the landing; the willow's canopy throws its whole shadow |
@@ -477,6 +478,7 @@ Screenshots go to `tools/tests/shots/`.
 | zsavewalk | a save (ZSAVE) walked where it stands: frame times, the 3D and GPU timers, draws, triangles, programs, slow frames, the heaviest meshes, a CPU profile |
 | zfloorgrow | what piles up on a dungeon floor (fresh, after its monsters die, after leaving and coming back); ZSAVE for a save |
 | zfloorplay | a minute of real fighting on one floor, every ten seconds the frame and what could pile up, then leaving and coming back |
+| zfloorleak | ten trips between two floors: geometries and textures after each, what was drawn and never freed |
 | zhair | heads with each hairstyle from four sides, and under helmets |
 | zplate | plate armour on builds from slight to heavy |
 | zunder | the creator's undressed figures by race and sex |
