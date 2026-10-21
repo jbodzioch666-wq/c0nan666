@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-603 - Counted, not "all"
+
+- **The making card counts:** cooking, smelting or brewing "all" of something used to show "0 / all". It now shows how many you can make, such as "0 / 7" for seven raw shrimp, and the same for anything queued after it.
+
 ## RS-602 - Nothing left behind between floors
 
 - **Changing floors no longer fills up the graphics card:** every time you went down or up a dungeon floor, the floor you left kept its props on the graphics card for good, about 60 shapes. A small picture used to warm up the next floor was also left behind each time. Over a long dive that kept growing. Both are now freed, so the memory stays level floor after floor.

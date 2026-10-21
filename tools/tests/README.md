@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs603 | making "all" counts it: the cooking card says 0 / 7, and what's queued after by its number |
 | rs602 | floor after floor, nothing left behind on the graphics card (shapes and pictures hold level) |
 | rs601 | a real fight below ground: bodies lie a few seconds and go (no turn of the land needed), never more than a dozen at once |
 | rs600 | walking a dungeon only the two torches nearest you redraw their shadows, you cast from them alone (the shadow pass split), the catacombs' skulls and bones cast none |
