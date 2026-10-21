@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs599 | the tavern's stairs walked up and down before the other floor, off the far end onto the landing; the willow's canopy throws its whole shadow |
 | rs598 | below ground you face a foe on the diagonal and a vein at an angle; a gathering spot's disc glows at its rim only |
 | rs597 | solid shadows under the trees again: no leaf masked for a dapple |
 | rs596 | no road on a mountain or over water, none worn up a steep bank; trees' shadows dappled, leaves drawn whole; rain dims the sun and fills the sky |

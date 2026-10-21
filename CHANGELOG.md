@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-599 - Up the tavern stairs
+
+- **Walking the stairs indoors:** taking the tavern's stairs, or the shop's cellar ladder, used to cut straight to the other floor. Now you walk onto the flight and climb it, or go down the stairwell or ladder, as the room goes dark. On the other floor you come off the end of its stairs onto the landing.
+- **The willow's whole shadow:** a willow's canopy is an open dome, and it only cast part of its shadow, a broken crescent. Tree canopies now cast their whole shadow.
+
 ## RS-598 - Face what you fight, no more crescents
 
 - **You face your foe at any angle:** in a dungeon you only ever faced the four straight ways, unless you'd just stepped diagonally. Now you turn square on to the monster you're fighting, beside you on a diagonal or under your bow or spell from further off. Failing that, you face any foe that comes right up beside you.

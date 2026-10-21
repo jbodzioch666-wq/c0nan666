@@ -39,7 +39,7 @@ module.exports = async page=>{
   Object.assign(out, await page.evaluate(()=>({ stairEnd:{ depth:G.depth, walking:!!FPD.stair, arriving:!!FPD.arrive, y:ISO.player ? +ISO.player.holder.position.y.toFixed(2) : null, fade:(document.getElementById('transFade')||{ style:{} }).style.display } })));
   console.log(JSON.stringify(out));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(out)); };
-  A(out.doorMid && out.doorMid.phase==='in' && Math.abs(out.doorMid.rot) > 1, 'the door swings open as you step up to it: ' + JSON.stringify(out.doorMid));
+  A(out.doorMid && out.doorMid.phase && Math.abs(out.doorMid.rot) > 1 && Math.abs(out.doorMid.live) > 1,   /* (open as you go through it - on a slow frame the walk may be past its first half by now) */ 'the door swings open as you step up to it: ' + JSON.stringify(out.doorMid));
   A(out.inside && out.roomDoor, 'and you go in; the room has a door of its own');
   A(out.gate.at && out.gate.far.every(r=>Math.abs(r) < 0.1), 'the gate stands shut while you\'re away from it: ' + out.gate.far);
   A(out.gate.near.every(r=>r > 0.8) && out.gate.walking && out.gate.mode===3, 'it swings open as you come up to it, and you walk out through it: ' + JSON.stringify(out.gate));

@@ -9582,6 +9582,7 @@ function v3StairDoor(grp, mats, x){
 function v3Bench(k, x, z, mats, grp, rot){
   if (k==='innbed') k = 'bed';
   const T = THREE, g = new T.Group(); g.position.set(x, 0, z); if (rot) g.rotation.y = rot; grp.add(g);
+  if (k==='stairs' || k==='stairsup' || k==='stairsdown' || k==='cellar') (V3.stairGrp = V3.stairGrp || {})[k] = g;   /* (RS-599: the flight you walk) */
   const lin = c=>new T.Color(c).convertSRGBToLinear(), M = (c,o)=>new T.MeshStandardMaterial(Object.assign({ color:lin(c), roughness:0.8 }, o||{}));
   const add = (o)=>{ o.castShadow = o.receiveShadow = true; g.add(o); return o; };
   const box = (w,h,d,m,px,py,pz)=>add(v3Box(w,h,d,m,px,py,pz)), cyl = (a,b,h,s,m,px,py,pz)=>add(v3Cyl(a,b,h,s,m,px,py,pz));
@@ -22870,10 +22871,8 @@ function sleepTillDawn(){ const p = G.player, c = clockNow(), day = Math.floor(c
 function townBench(kind){
   if (!G.interior || !kind) return false;
   const p = G.player, info = townInfo(), rec = info.rec, today = townDay();
-  if (kind==='stairs'){ townFloor('tavern_up', ROOM_STAIRS_LAND[0], ROOM_STAIRS_LAND[1]); return true; }
-  if (kind==='stairsdown'){ townFloor('tavern', ROOM_STAIRS_LAND[0], ROOM_STAIRS_LAND[1]); return true; }
-  if (kind==='cellar'){ townFloor('cellar', ROOM_STAIRS_LAND[0], ROOM_STAIRS_LAND[1]); return true; }
-  if (kind==='stairsup'){ townFloor('shop', ROOM_STAIRS_LAND[0], ROOM_STAIRS_LAND[1]); return true; }
+  { const to = { stairs:'tavern_up', stairsdown:'tavern', cellar:'cellar', stairsup:'shop' }[kind];
+    if (to){ const go = ()=>townFloor(to, ROOM_STAIRS_LAND[0], ROOM_STAIRS_LAND[1]); if (!v3StairWalk(kind, go)) go(); return true; } }   /* (RS-599: walked up or down first) */
   if (kind==='table'){ logMsg('a sturdy table ringed with old tankard marks - pull up a stool', ''); renderGame(); return true; }
   if (kind==='chair' || kind==='pew' || kind==='stool'){ const at = G.benchXY && benchAt(G.benchXY[0], G.benchXY[1])===kind ? G.benchXY : null, who = at && (G.villagers||[]).find(v=>v.seat && v.x===at[0] && v.y===at[1]);
     if (who){ logMsg(`${who.nm || 'someone'} is sitting there - they raise a tankard to you`, ''); renderGame(); return true; }
@@ -31982,7 +31981,7 @@ function v3BuildScene(){
   V3.parked = parked;   /* (kept for the way back; a later parked town takes its place) */
   V3.worldTown = false; V3.worldKeys = null; V3.worldBefore = Object.assign({}, V3);   /* (what this build sets, for parking - see v3ParkNote) */
   const grp = V3.world = new T.Group(); sc.add(grp);
-  V3.gateHinges = []; V3.gateAt = null; V3.roomDoor = null; V3.windows = []; V3.lamps = []; V3.smoke = []; V3.flames = []; V3.hearthCook = []; V3.signs = []; V3.banners = []; V3.doors = {}; V3.hits = []; V3.people = []; V3.parts = [];
+  V3.gateHinges = []; V3.gateAt = null; V3.roomDoor = null; V3.stairGrp = {}; V3.windows = []; V3.lamps = []; V3.smoke = []; V3.flames = []; V3.hearthCook = []; V3.signs = []; V3.banners = []; V3.doors = {}; V3.hits = []; V3.people = []; V3.parts = [];
   const mats = V3.mats = v3Materials();
   if (G.interior){ v3BuildInterior(grp, mats); v3BuildPeople(grp, mats); V3.worldBefore = null; return; }
   // ground: the painted town square plus the wide surrounding land
@@ -32441,6 +32440,33 @@ function v3GateTick(dt){
   if (k >= 1 || D.t > 4){ V3.gate = null; V3.labels.style.opacity = '1'; doorFade(0); try{ D.go(); }catch(err){ console.error(err); } renderGame(); try{ saveCurrentGame(); }catch(err){} }
   return true;
 }
+/* (RS-599) the stairs inside a building: you walk onto the flight and up it (or down the stairwell, or the cellar ladder) as the room
+   goes dark, then the other floor, where you come off the end of its own stairs onto the landing. Each path is in the flight's own
+   frame (see townV3Bench: the steps rise toward -z); the floor the stairs reach has the other end's kind */
+const V3_STAIR_PATH = { stairs:[[0,0,0.62],[0,0,0.45],[0,0.9,-0.36],[0,0.95,-0.62]], stairsup:[[0,0,0.62],[0,0,0.45],[0,0.9,-0.36],[0,0.95,-0.62]],
+  stairsdown:[[0,0,0.6],[0,0,0.38],[0,-0.75,-0.3],[0,-1.2,-0.5]], cellar:[[0,0,0.5],[0,0,0.3],[0,-0.6,0],[0,-1.2,0]] };
+const V3_STAIR_OTHER = { stairs:'stairsdown', stairsdown:'stairs', cellar:'stairsup', stairsup:'cellar' };
+function v3StairWalk(kind, go){
+  const g = V3.stairGrp && V3.stairGrp[kind]; if (!transOn() || !v3Active() || !V3.player || !g || G.ui!=='playing') return false;
+  g.updateMatrixWorld(true); const pts = V3_STAIR_PATH[kind].map(p=>g.localToWorld(new THREE.Vector3(p[0], p[1], p[2])));
+  V3.path = []; V3.stair = { t:0, from:V3.player.g.position.clone(), pts, go, next:V3_STAIR_OTHER[kind] }; return true;
+}
+function v3StairAlong(pts, f){ const n = pts.length - 1, u = Math.max(0, Math.min(0.9999, f))*n, i = Math.floor(u), k = u - i; return pts[i].clone().lerp(pts[i+1], k); }
+function v3StairTick(dt){
+  const P = V3.player; if (!P) return; const S = V3.stair, A = V3.stairArr; let at = null, to = null, mv = 1;
+  if (S){ S.t += dt; const k = Math.min(1, S.t/1.5);
+    if (k < 0.2){ at = S.from.clone().lerp(S.pts[0], k/0.2); to = S.pts[0]; } else { at = v3StairAlong(S.pts, (k - 0.2)/0.8); to = S.pts[S.pts.length - 1]; }
+    doorFade(Math.max(0, (k - 0.62)/0.38)); V3.labels.style.opacity = String(1 - k);
+    if (k >= 1 || S.t > 4){ V3.stair = null; const next = S.next; try{ S.go(); }catch(e){ console.error(e); } V3.stairArr = { t:0, kind:next, fx:G.player.x + 0.5, fz:G.player.y + 0.5 }; return; } }
+  else if (A){ const g = V3.stairGrp && V3.stairGrp[A.kind]; if (!g || V3.mapRef!==G.map){ A.t += dt; if (A.t > 2){ V3.stairArr = null; doorFade(0); V3.labels.style.opacity = '1'; } return; }
+    if (!A.pts){ g.updateMatrixWorld(true); A.pts = V3_STAIR_PATH[A.kind].slice(1, 3).reverse().map(p=>g.localToWorld(new THREE.Vector3(p[0], p[1], p[2]))).concat([new THREE.Vector3(A.fx, 0, A.fz)]); A.t = 0; }
+    A.t += dt; const k = Math.min(1, A.t/1.2); at = v3StairAlong(A.pts, k*k*(3 - 2*k)); to = A.pts[A.pts.length - 1];
+    doorFade(Math.max(0, 1 - k*1.8)); V3.labels.style.opacity = String(Math.min(1, k*1.5)); if (k >= 1){ V3.stairArr = null; doorFade(0); V3.labels.style.opacity = '1'; mv = 0; } }
+  else return;
+  P.g.position.copy(at);
+  if (P.e){ const want = Math.atan2(to.x - at.x, to.z - at.z); if (Math.hypot(to.x - at.x, to.z - at.z) > 0.02){ let da = want - (P.yaw||0); da = Math.atan2(Math.sin(da), Math.cos(da)); P.yaw = (P.yaw||0) + da*Math.min(1, dt*10); } P.e.holder.rotation.y = P.yaw||0;
+    m3dPoseHumanoid(P.e.rig, V3.t, m3dEaseMv(P.e, mv, dt), 0, 0, 0, P.e); }
+}
 // build a room's surfaces ahead of time while you walk up to its door, so stepping in has nothing to wait for
 function doorPrewarm(){
   if (G.interior || !V3.mats || !G.player || v3LowMem()) return;   /* (not on phones: build a room only when you walk in) */ V3.warm = V3.warm || {};
@@ -32526,7 +32552,7 @@ function v3Render(){
     const old = V3.player, grp = old.g.parent; V3.lookKey = rsLookKey();
     if (grp){ const np = m3dPlayerBuild(()=>v3Person(v3PlayerLook(), 1.0, grp)); np.g.position.copy(old.g.position); np.at = old.at; np.yaw = old.yaw||0; grp.remove(old.g); V3.player = np; }
   }
-  v3WindowTick(); if (G.sleepFx) bedSleepTick(dt); else { const st = G.interior && G.sitAt; if (st){ glide(V3.player, st.x - Math.sin(st.yaw)*0.06, st.y - Math.cos(st.yaw)*0.06); v3SeatPose(V3.player, st); } else { v3Stand(V3.player); glide(V3.player, G.player.x, G.player.y); } }
+  v3WindowTick(); if (G.sleepFx) bedSleepTick(dt); else { const st = G.interior && G.sitAt; if (st){ glide(V3.player, st.x - Math.sin(st.yaw)*0.06, st.y - Math.cos(st.yaw)*0.06); v3SeatPose(V3.player, st); } else if (V3.stair || V3.stairArr) v3StairTick(dt); else { v3Stand(V3.player); glide(V3.player, G.player.x, G.player.y); } }
   V3.villagers.forEach(p=>{ const st = p.v.seat; if (st){ glide(p, st.x - Math.sin(st.yaw)*0.06, st.y - Math.cos(st.yaw)*0.06, 6); v3SeatPose(p, st); } else { v3Stand(p); glide(p, p.v.x, p.v.y, 1.7); } v3FolkShadow(p); });   // (a walking pace: one tile in about the time between their steps)
   V3.npcs.forEach(p=>{ const st = p.n.seat; if (st){ glide(p, st.x - Math.sin(st.yaw)*0.06, st.y - Math.cos(st.yaw)*0.06); v3SeatPose(p, st); } else { v3Stand(p); glide(p, p.n.x, p.n.y); } v3FolkShadow(p); });   /* (RS-382: someone seated sits) */
   try{ townV3Tick(dt); }catch(e){ console.error(e); }
@@ -33114,6 +33140,7 @@ function* o3VegetationGen(grp, x0, y0, W){
       const glow = kind==='crystal' || kind==='lava', mat = new T.MeshStandardMaterial({ color:0xffffff, roughness: glow ? 0.3 : 0.85, flatShading: kind==='rock' || kind==='oak' || kind==='bush' || kind==='crystal', emissive: glow ? new T.Color(colr).convertSRGBToLinear() : 0x000000, emissiveIntensity: kind==='lava' ? 0.9 : glow ? 0.45 : 0 });
       const im = new T.InstancedMesh(geo, mat, list.length);
       if (/leaf|reed|snowcap/.test(pn)) gfxSway(mat, kind==='reed' ? 0.25 : 0.05);
+      if (/leaf|snowcap/.test(pn)) mat.shadowSide = T.DoubleSide;   /* (RS-599) */
       if (/^leaf/.test(pn) && kind!=='bush' && kind!=='reed') o3LeafDapple(mat, /pine|cypress/.test(kind));   /* (RS-596: a canopy's shadow broken by the light through its leaves - it was a solid black blob) */
       im.castShadow = true; im.receiveShadow = true;
       im.frustumCulled = false;   // its bounds are the one tree at the origin, not the whole forest
@@ -34005,7 +34032,7 @@ function o3NodeMat(key, col, o){
 function o3NodeTree(type){
   const T = THREE, g = new T.Group(), G3 = o3NodeGeo(), c = SK_TREE[type].canopy;
   const bark = o3NodeMat('bark'+(type==='magic'?'m':type==='willow'?'w':''), type==='magic' ? '#c8c8d8' : type==='willow' ? '#4a3a28' : '#5a4028');
-  const leaf = o3NodeMat('leaf_'+type, c, type==='magic' ? { emissive:new T.Color(c).convertSRGBToLinear(), emissiveIntensity:0.55 } : { flatShading:true });
+  const leaf = o3NodeMat('leaf_'+type, c, type==='magic' ? { emissive:new T.Color(c).convertSRGBToLinear(), emissiveIntensity:0.55 } : { flatShading:true }); leaf.shadowSide = T.DoubleSide;   /* (RS-599: the willow's open dome threw only part of its shadow - a crescent) */
   const tr = new T.Mesh(G3.trunk, bark); g.add(tr);
   leaf.userData.leafDepth = type==='yew' ? 'c' : 'b';   /* (RS-596: its shadow dappled - see o3LeafDepthMat) */
   const add = (geo, x, y, z, sx, sy, sz)=>{ const m = new T.Mesh(geo, leaf); m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.castShadow = true; o3LeafShadow(m); g.add(m); return m; };
@@ -44385,7 +44412,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-598';
+const GAME_VERSION = 'rs-599';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -46707,7 +46734,7 @@ function moveDir(dx,dy){
   if (G.sleepFx) return;   /* (RS-389: asleep - the night has to pass first) */
   if (G.ui!=='playing' || G.gameOver) return;
   if (typeof V3!=='undefined' && V3.door && V3.door.phase==='in') return;   // (half way through a door)
-  if ((typeof V3!=='undefined' && V3.gate) || (typeof FPD!=='undefined' && FPD.stair)) return;   /* (RS-592: walking out through the gate, or down the stairs) */
+  if ((typeof V3!=='undefined' && (V3.gate || V3.stair || V3.stairArr)) || (typeof FPD!=='undefined' && FPD.stair)) return;   /* (RS-592: walking out through the gate, or down the stairs) */
   if (G.gameMode===3 && G.owZoomedOut) return;   // (RS-210: close the map, M, before walking on)
   if (!foeHurry()) return;   // (RS-218/312: their answer to your blow lands first, then you move)
   G.sitAt = null;   // (RS-183: moving gets you up off a seat)
