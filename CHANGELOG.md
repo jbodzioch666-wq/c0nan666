@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-601 - The dead are cleared away
+
+- **Long fights no longer slow a floor down:** a body killed below ground was meant to lie for a few turns, then fade away. But it counted the open land's steps, which never move in a dungeon, so every body you killed stayed in the scene until you left the floor. A long fight built up hundreds of figures. In testing, a minute's fighting took a frame from 12 ms to about 770 ms, and leaving the floor and coming back brought it back to 4 ms. That's why leaving and coming back made it run better.
+- **Now a body lies for five seconds,** then fades and goes. If more than a dozen are lying at once, the oldest go early.
+
 ## RS-600 - Lighter dungeon shadows
 
 - **Walking a dungeon is far lighter:** every step you took made every torch near you redraw its shadow, about every other frame. Each torch shadow is six views of the whole room. Now a torch redraws only when something moves within its own reach.
