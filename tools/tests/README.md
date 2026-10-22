@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs625 | the Planet size (generator 14): plates, about a third land, ranges where plates push, deserts in the dry belts, tundra poleward, sea down the seam and at the poles; world code W, saves and loads; zoomed right out the map is a globe you drag to turn and zoom back into the chart; other sizes unchanged |
 | rs624 | the first kill has no long frame: hitsplat digits stamped from a sheet drawn at start-up (text only for non-digits), the Last Foe portrait an image drawn once per foe |
 | rs623 | provinces: every town the seat of a named province with a ruler and a foe, far land and townless islands wild marches, all land shared out; entering names it; borders on the world map and preview |
 | rs622 | world generator 13: sea cliffs high to their lip with deep water below, never by a road, pier, site or river, never lone, dark on the preview; none in a generator 12 world |
@@ -545,3 +546,6 @@ Screenshots go to `tools/tests/shots/`.
 | zphone2 | a save (`ZSAVE=path`) on an emulated phone: draw calls, triangles, shadow casters, GPU ms |
 | zkill | the frames after several kills: interval and frameLoop CPU per frame, plus a GPU trace of the longest events (`ZOFF=art/foe/hud/splat` switches a part off) |
 | zkill2 | the 2D canvas draw kinds seen for the first time after a kill |
+| zplanet | Planet worlds (`ZSEEDS=a,b`): generation time, terrain shares, temperature and moisture spread on land, each preview as shots/zplanet-<seed>.png |
+| zplanet2 | what the tiles are at given points of a planet (`ZSEED`, `ZPTS=x:y,...`) |
+| zglobe | a Planet world's globe from several turns and facing the seam (`ZSEEN=1` reveals the map): shots/zglobe-<n>.png and frame times |

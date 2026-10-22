@@ -22,7 +22,7 @@ module.exports = async page=>{
   await page.screenshot({ path: SHOTS + '/rs622-cliff.png' });
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
-  A(r.ver===13, 'new worlds are made by generator 13');
+  A(r.ver>=13, 'new worlds are made by generator 13 or later');
   A(r.w.every(w=>w.n > 5), 'every world has cliffs along its coasts');
   A(r.w.every(w=>w.bad===0 && w.lone===0), 'never by a road, a pier, a site or a river, and never a lone tile');
   A(r.v12, 'a generator 12 world has none (it comes out as it did)');

@@ -7589,6 +7589,7 @@ const WORLD_SIZE_TIERS = [
   {id:'medium', label:'Medium', cols:160, rows:160},
   {id:'large',  label:'Large',  cols:224, rows:224},
   {id:'xlarge', label:'XLarge', cols:288, rows:288},
+  {id:'planet', label:'Planet', cols:432, rows:216},   /* (RS-625: a whole world, laid flat - see owGen14Planet) */
 ];
 function setWorldSizeTier(tierId){
   const tier = WORLD_SIZE_TIERS.find(t=>t.id===tierId);
@@ -7686,7 +7687,7 @@ function buildWorldPreview(){
       <div class="muted" style="margin-bottom:6px;font-size:11px;">WORLD SIZE (changing this rerolls the map)</div>
       <div class="btnrow" style="justify-content:center;margin-bottom:12px;">${sizeRow}</div>
       ${wgPreviewHtml()}
-      <canvas id="worldPreviewCanvas" width="480" height="480" style="background:${COL.wall};border-radius:6px;max-width:100%;height:auto;"></canvas>
+      <canvas id="worldPreviewCanvas" width="${tier==='planet' ? 864 : 480}" height="${tier==='planet' ? 432 : 480}" style="background:${COL.wall};border-radius:6px;max-width:100%;height:auto;"></canvas>
       <div class="muted" style="margin-top:8px;font-size:11px;">
         <span style="color:${COL.white}">&#9679;</span> your spawn &middot;
         <span style="color:${COL.brightGreen}">&#9679;</span> village &middot;
@@ -7997,7 +7998,7 @@ function ensureSpawnEscape(){
 // (RS-106, generator 3: broader ranges, valleys walled in by them filled in as mountain, and nothing but a dragon's lair in or on them)
 // (RS-114, generator 4: a river that runs into a hollow fills it into a lake and flows on from its lowest edge)
 // (RS-115, generator 5: rivers join edge to edge - a diagonal step also fills the lower of its two side tiles)
-const OW_GEN_VER = 13;   /* (6: pyramids in the desert, RS-213; 7: a town for every race, RS-223; 8: roads skirt the volcano, RS-236; 9: landmarks on clear ground, RS-238) */
+const OW_GEN_VER = 14;   /* (6: pyramids in the desert, RS-213; 7: a town for every race, RS-223; 8: roads skirt the volcano, RS-236; 9: landmarks on clear ground, RS-238) */
 // any two river tiles that touch only at a corner get the lower of the two tiles beside them turned to river
 // (never a mountain, the sea or a lake); returns how many tiles it added
 function owRiverJoin(elev){
@@ -8058,23 +8059,104 @@ const OW_POCKET_MAX11 = 30;   /* (RS-618, generator 11: only small hollows - a w
 function owGen13Cliffs(elev){
   const W = OW_COLS, H = OW_ROWS, M = G.ow.map, out = new Uint8Array(W*H), road = G.ow.road;
   const near = (x, y, r, f)=>{ for (let dx=-r; dx<=r; dx++) for (let dy=-r; dy<=r; dy++){ const u = x + dx, v = y + dy; if (u>=0 && v>=0 && u<W && v<H && f(M[u][v], u, v)) return true; } return false; };
+  const sea = (G.ow.genVer||1) >= 14 ? owOpenSea() : null;   /* (RS-625, generator 14: a lake's shore is no sea cliff) */
   const piers = new Set(); for (const f of G.ow.ferries||[]) for (const p of [f.a, f.b]) for (let dx=-2; dx<=2; dx++) for (let dy=-2; dy<=2; dy++) piers.add((p[0] + dx) + ',' + (p[1] + dy));
   for (let x=1;x<W-1;x++) for (let y=1;y<H-1;y++){ const t = M[x][y]; if (t!==OW_GRASS && t!==OW_FOREST && t!==OW_TUNDRA && t!==OW_DESERT) continue;
     if (!(M[x+1][y]===OW_WATER || M[x-1][y]===OW_WATER || M[x][y+1]===OW_WATER || M[x][y-1]===OW_WATER)) continue;
-    const e = elev[x][y], high = e >= 0.6 || (e >= 0.55 && near(x, y, 2, u=>u===OW_MOUNTAIN)); if (!high) continue;
+    if (sea && !(sea[y*W + x + 1] || sea[y*W + x - 1] || sea[(y+1)*W + x] || sea[(y-1)*W + x])) continue;
+    const e = elev[x][y], high = sea ? e >= 0.545 || (e >= 0.5 && near(x, y, 3, u=>u===OW_MOUNTAIN)) : e >= 0.6 || (e >= 0.55 && near(x, y, 2, u=>u===OW_MOUNTAIN)); if (!high) continue;   /* (generator 14: on the open sea only, so a little lower) */
     if ((road && road[y*W + x]) || piers.has(x + ',' + y) || near(x, y, 1, u=>u===OW_RIVER) || near(x, y, 2, u=>OW_SITE_TILES.includes(u))) continue;
     if (road && near(x, y, 1, (u, a, b)=>road[b*W + a])) continue;
     out[y*W + x] = 1; }
   const keep = new Uint8Array(W*H); let n = 0; for (let x=1;x<W-1;x++) for (let y=1;y<H-1;y++){ if (!out[y*W + x]) continue; let k = 0; for (let dx=-1; dx<=1; dx++) for (let dy=-1; dy<=1; dy++) if ((dx || dy) && out[(y+dy)*W + x + dx]) k++; if (k){ keep[y*W + x] = 1; n++; } }
   G.ow.cliffN = n; return keep;
 }
+/* the open sea: water joined to the map's edge (not a lake) */
+function owOpenSea(){ const W = OW_COLS, H = OW_ROWS, M = G.ow.map, out = new Uint8Array(W*H), q = [];
+  for (let x=0;x<W;x++) for (const y of [0, H-1]) if (M[x][y]===OW_WATER && !out[y*W + x]){ out[y*W + x] = 1; q.push(y*W + x); }
+  for (let y=0;y<H;y++) for (const x of [0, W-1]) if (M[x][y]===OW_WATER && !out[y*W + x]){ out[y*W + x] = 1; q.push(y*W + x); }
+  for (let h=0; h<q.length; h++){ const j = q[h], x = j % W, y = (j/W)|0; for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]){ const u = x + dx, v = y + dy; if (u<0 || v<0 || u>=W || v>=H) continue; const k = v*W + u; if (!out[k] && M[u][v]===OW_WATER){ out[k] = 1; q.push(k); } } }
+  return out; }
 function owCliffAt(x, y){ const c = G.ow && G.ow.cliff; if (!(c && x>=0 && y>=0 && x<OW_COLS && y<OW_ROWS && c[y*OW_COLS + x])) return false;
   const M = G.ow.map; for (let dx=-1; dx<=1; dx++) for (let dy=-1; dy<=1; dy++){ const u = x + dx, v = y + dy; if (u>=0 && v>=0 && u<OW_COLS && v<OW_ROWS && OW_SITE_TILES.includes(M[u][v])) return false; }   /* (a site put down after, or moved there since: no cliff by it) */
   return true; }
+/* (RS-625) generator 14, the Planet size: the land is made on a sphere and laid flat, the way a map of the world is drawn, so turned back
+   into a globe it meets itself with no seam. Some fourteen to twenty plates cover it, each continental or oceanic, each turning about its
+   own pole. Where two meet the land answers as the Earth's does: two continents crumple into the highest ranges and a high plateau behind
+   them; an ocean plate diving under a continent raises a coastal range and digs a trench offshore; two ocean plates make a curved arc of
+   volcanic islands; plates pulling apart split a continent along a rift, or lift a ridge in mid-ocean; and a few hotspots raise lone
+   islands. The seam of the flat map is put down the widest ocean, and the poles are ice-bound sea */
+const OW_PLANET_LAND = 0.36;
+let OW_PLANET_OROG = null;   /* (how hard the plates push at each tile - for the ranges; kept off G.ow, which is saved) */
+function owIsPlanet(){ return !!(G.worldSizeTier==='planet' && G.ow && (G.ow.genVer||1) >= 14); }
+function smoothstep(a, b, t){ const k = clamp((t - a)/(b - a), 0, 1); return k*k*(3 - 2*k); }
+function hash3(x, y, z, seed){ let h = Math.imul(x, 374761393) ^ Math.imul(y, 668265263) ^ Math.imul(z, 1440670441) ^ Math.imul(seed, 2246822519); h = Math.imul(h ^ (h>>>13), 1274126177); h = (h ^ (h>>>16)) >>> 0; return h/4294967295; }
+function vnoise3(x, y, z, seed){
+  const x0 = Math.floor(x), y0 = Math.floor(y), z0 = Math.floor(z), u = smootherstep(x - x0), v = smootherstep(y - y0), w = smootherstep(z - z0);
+  const L = (a, b, t)=>a + (b - a)*t, h = (i, j, k)=>hash3(x0 + i, y0 + j, z0 + k, seed);
+  return L(L(L(h(0,0,0), h(1,0,0), u), L(h(0,1,0), h(1,1,0), u), v), L(L(h(0,0,1), h(1,0,1), u), L(h(0,1,1), h(1,1,1), u), v), w);
+}
+function fbm3(x, y, z, seed, oct, f, pers){ let t = 0, a = 1, m = 0; for (let o=0;o<oct;o++){ t += vnoise3(x*f + 31.7*o, y*f, z*f, seed + o*7919)*a; m += a; a *= pers; f *= 2; } return t/m; }
+function owPlanetPoint(x, y, lon0){ const lon = lon0 + (x + 0.5)/OW_COLS*Math.PI*2, lat = (0.5 - (y + 0.5)/OW_ROWS)*Math.PI; return [Math.cos(lat)*Math.cos(lon), Math.sin(lat), Math.cos(lat)*Math.sin(lon)]; }
+function owGen14Planet(seed, elev, moist){
+  const W = OW_COLS, H = OW_ROWS, rng = mulberry32((seed ^ 0x7e1a5c3) >>> 0), S = seed % 100000;
+  const unit = ()=>{ const z = rng()*2 - 1, t = rng()*Math.PI*2, r = Math.sqrt(1 - z*z); return [r*Math.cos(t), z, r*Math.sin(t)]; };
+  const dot = (a, b)=>a[0]*b[0] + a[1]*b[1] + a[2]*b[2], cross = (a, b)=>[a[1]*b[2] - a[2]*b[1], a[2]*b[0] - a[0]*b[2], a[0]*b[1] - a[1]*b[0]];
+  /* the plates: spread out (each new centre the best of a few tries, away from the others), about two in five continental */
+  const n = 14 + Math.floor(rng()*7), plates = [];
+  for (let i=0;i<n;i++){ let best = null, bd = -1; for (let k=0;k<8;k++){ const c = unit(); let d = 9; for (const p of plates) d = Math.min(d, 1 - dot(c, p.c)); if (d > bd){ bd = d; best = c; } }
+    const ax = unit(), sp = 0.5 + rng()*1.1; plates.push({ c:best, w:[ax[0]*sp, ax[1]*sp, ax[2]*sp], cont:false, id:i }); }
+  const order = plates.slice().sort(()=>rng() - 0.5), nc = Math.max(3, Math.round(n*(0.36 + rng()*0.1))); for (let i=0;i<nc;i++) order[i].cont = true;
+  const hot = []; for (let i=0;i<3 + Math.floor(rng()*3);i++) hot.push(unit());
+  const g = (d, w)=>Math.exp(-(d/w)*(d/w));
+  /* the height and the push of the plates at a point on the sphere */
+  const at = p=>{
+    const q = [p[0] + (fbm3(p[0]*1.7, p[1]*1.7, p[2]*1.7, S + 11, 3, 1, 0.5) - 0.5)*0.55, p[1] + (fbm3(p[0]*1.7 + 9, p[1]*1.7, p[2]*1.7, S + 12, 3, 1, 0.5) - 0.5)*0.55, p[2] + (fbm3(p[0]*1.7, p[1]*1.7 + 9, p[2]*1.7, S + 13, 3, 1, 0.5) - 0.5)*0.55];
+    let A = null, B = null, da = -9, db = -9; for (const pl of plates){ const d = dot(q, pl.c); if (d > da){ db = da; B = A; da = d; A = pl; } else if (d > db){ db = d; B = pl; } }
+    const ql = Math.hypot(q[0], q[1], q[2]), dd = (Math.acos(clamp(db/ql, -1, 1)) - Math.acos(clamp(da/ql, -1, 1)))*0.5;   /* (radians to the border: 1 = some 69 tiles) */
+    const crust = (A.cont ? 0.64 : 0.36) + (fbm3(p[0], p[1], p[2], S + 21, 4, 2.4, 0.55) - 0.5)*0.62, isC = crust > 0.5;
+    let e = 0.3 + smoothstep(0.43, 0.57, crust)*0.27 + (crust - 0.5)*0.12, orog = 0;
+    if (dd < 0.32){
+      const bc = B.cont, nrm0 = [B.c[0] - A.c[0], B.c[1] - A.c[1], B.c[2] - A.c[2]], k0 = dot(nrm0, p), nrm = [nrm0[0] - p[0]*k0, nrm0[1] - p[1]*k0, nrm0[2] - p[2]*k0], nl = Math.hypot(...nrm) || 1;
+      const va = cross(A.w, p), vb = cross(B.w, p), conv = ((va[0] - vb[0])*nrm[0] + (va[1] - vb[1])*nrm[1] + (va[2] - vb[2])*nrm[2])/nl;
+      const brk = fbm3(p[0]*5, p[1]*5, p[2]*5, S + 31, 3, 1, 0.5), k = clamp(Math.abs(conv), 0, 1.15);
+      if (conv > 0.12){
+        if (isC && bc){ orog += k*1.0*g(dd, 0.052); e += k*0.14*g(dd, 0.11); }                                           /* (two continents: the highest ranges, a plateau behind) */
+        else if (isC){ orog += k*0.9*g(dd - 0.06, 0.045); e += k*0.14*g(dd - 0.04, 0.1); }                           /* (an ocean plate dives under: a coastal range) */
+        else if (bc){ e -= k*0.12*g(dd, 0.035); }                                                                        /* (and its trench) */
+        else if (A.id > B.id){ const arc = k*g(dd - 0.07, 0.03)*(brk > 0.5 ? 1 : 0.35); e += arc*0.32; orog += arc*0.7*(brk > 0.6 ? 1 : 0); }   /* (an arc of volcanic islands) */
+      } else if (conv < -0.12){
+        if (isC && bc) e -= k*0.13*g(dd, 0.04);                                                                          /* (a rift) */
+        else if (!isC && !bc) e += k*0.07*g(dd, 0.05);                                                                   /* (a mid-ocean ridge) */
+      } else if (isC) e += (brk - 0.5)*0.08*g(dd, 0.05);                                                                 /* (a fault, sliding past) */
+      orog *= 0.55 + brk*0.9;
+    }
+    for (const h of hot){ const d = Math.acos(clamp(dot(p, h), -1, 1)); if (d < 0.2){ const b = g(d, 0.035) + 0.6*g(d - 0.08, 0.025); e += b*0.26; orog += b*0.5; } }
+    e += (fbm3(p[0], p[1], p[2], S + 41, 5, 5, 0.55) - 0.5)*0.17;
+    const lat = Math.abs(Math.asin(clamp(p[1], -1, 1))); const l0 = 1.05 + (fbm3(p[0], p[1], p[2], S + 51, 4, 7, 0.6) - 0.5)*0.7; if (lat > l0) e -= (lat - l0)*1.3;   /* (its edge ragged, or a plateau ends in a straight line) */   /* (the far north and south mostly sea: laid flat, land there stretches round the whole map) */
+    return [e, orog];
+  };
+  /* where the seam goes: down the meridian with the least land on it */
+  let lon0 = 0; { const cw = 72, chh = 36, land = new Float32Array(cw); const ev = []; for (let i=0;i<cw;i++) for (let j=0;j<chh;j++){ const lon = (i + 0.5)/cw*Math.PI*2, lat = (0.5 - (j + 0.5)/chh)*Math.PI; ev.push([i, at([Math.cos(lat)*Math.cos(lon), Math.sin(lat), Math.cos(lat)*Math.sin(lon)])[0]]); }
+    const sorted = ev.map(v=>v[1]).sort((a, b)=>a - b), thr = sorted[Math.floor(sorted.length*(1 - OW_PLANET_LAND))]; for (const [i, e] of ev) if (e > thr) land[i]++;
+    let bi = 0, bs = 1e9; for (let i=0;i<cw;i++){ let sm = 0; for (let k=-3;k<=3;k++) sm += land[(i + k + cw) % cw]*(4 - Math.abs(k)); if (sm < bs){ bs = sm; bi = i; } } lon0 = (bi + 0.5)/cw*Math.PI*2; }
+  const E = new Float32Array(W*H), O = new Float32Array(W*H); for (let x=0;x<W;x++) for (let y=0;y<H;y++){ const r = at(owPlanetPoint(x, y, lon0)); E[y*W + x] = r[0]; O[y*W + x] = r[1]; }
+  /* the sea level: so that some 36% of the planet is land */
+  const srt = Float32Array.from(E).sort(), thr = srt[Math.floor(srt.length*(1 - OW_PLANET_LAND))], seamB = Math.round(W*0.035), poleB = Math.max(3, Math.round(H*0.03));
+  for (let x=0;x<W;x++) for (let y=0;y<H;y++){ const d0 = E[y*W + x] - thr; let e = clamp(0.47 + (d0 > 0 ? 0.42*Math.tanh(d0*0.9/0.42) : d0), 0, 1);   /* (the land stretched up from the shore: lowland, hills and high ground) */ const m = Math.min(x, W - 1 - x); if (m < seamB){ const k = 1 - m/seamB; e -= k*k*0.45; if (m < 3) e = Math.min(e, 0.4); }
+    const pm = Math.min(y, H - 1 - y); if (pm < poleB) e = Math.min(e, 0.4); elev[x][y] = e; moist[x][y] = clamp(0.5 + (fbm2D(x + 500, y + 500, seed, 4, 1/22, 0.5) - 0.5)*1.3, 0, 1); }
+  OW_PLANET_OROG = O; G.ow.plates = { n, cont:nc, lon0:+lon0.toFixed(4) };
+}
+/* a range on a planet: where the plates' push is strong enough, broken by passes; the very highest ground is mountain too */
+function owPlanetMtn(x, y, e, seed){
+  if (e < 0.47) return false; const o = OW_PLANET_OROG[y*OW_COLS + x];
+  if (fbm2D(x+7700, y+7700, seed, 2, 1/11, 0.5) < 0.3) return false;   /* (a pass) */
+  return o > 0.36 || e > 0.86;
+}
 function owGen11Moisture(elev, moist, seed){
   const W = OW_COLS, H = OW_ROWS, cy = H/2, wind = [], mt = (x, y)=>elev[x][y] >= 0.47 && owRangeAt(x, y, elev[x][y], seed, 11);
   for (let x=0;x<W;x++) wind.push(new Float32Array(H));
-  for (let y=0;y<H;y++){ const dir = Math.abs(y - cy) < cy*0.28 ? -1 : 1; let h = 0.8;
+  const pl = owIsPlanet(); for (let y=0;y<H;y++){ const b = Math.abs(y + 0.5 - cy)/cy, dir = pl ? (b < 1/3 || b > 2/3 ? -1 : 1) : Math.abs(y - cy) < cy*0.28 ? -1 : 1; let h = 0.8;   /* (RS-625: a planet's belts of wind) */
     for (let k=0;k<W;k++){ const x = dir > 0 ? k : W - 1 - k, e = elev[x][y];
       if (e < 0.47) h = Math.min(1, h + 0.07); else if (mt(x, y)) h *= 0.8; else if (e > 0.6) h *= 0.955; else h *= 0.988;
       wind[x][y] = h; } }
@@ -8113,6 +8195,7 @@ function owGen11Town(placeFeature, placed, rfn, racePref){
   return placeFeature(16, placed, rfn, racePref);
 }
 function owRangeAt(x, y, e, seed, ver){
+  if (OW_PLANET_OROG && owIsPlanet()) return owPlanetMtn(x, y, e, seed);   /* (RS-625: a planet's ranges are where its plates meet) */
   const V = OW_RANGE_V[ver >= 11 ? 11 : ver >= 3 ? 3 : 2];
   const n = fbm2D(x+3100, y+3100, seed, 4, V.f1 || 1/34, 0.5), ridge = 1 - Math.abs(n - 0.5)*2;
   const n2 = fbm2D(x+5300, y+5300, seed, 3, V.f2 || 1/52, 0.5), ridge2 = 1 - Math.abs(n2 - 0.5)*2;
@@ -8222,7 +8305,9 @@ function generateOverworld(seed){
   // supercontinent with noise flecked around its coast.
   const edgeBand = Math.max(6, Math.round(Math.min(OW_COLS,OW_ROWS)*0.05));
   const shape = wgShaper(seed);   // the chosen shape of the world (see SECTION: WORLD GENERATION EXTRAS)
-  for (let x=0;x<OW_COLS;x++){
+  const planet = owIsPlanet(); OW_PLANET_OROG = null; G.ow.plates = null;
+  if (planet) owGen14Planet(seed, elev, moist);   /* (RS-625: a planet - the land raised by its plates, see owGen14Planet) */
+  else for (let x=0;x<OW_COLS;x++){
     for (let y=0;y<OW_ROWS;y++){
       let e = fbm2D(x,y,seed,5,1/20,0.55);
       e = clamp(shape(x, y, clamp(0.5 + (e-0.5)*1.3, 0, 1)), 0, 1);
@@ -8236,15 +8321,18 @@ function generateOverworld(seed){
 
   const ranges = (G.ow.genVer||1) >= 2, v11 = (G.ow.genVer||1) >= 11;
   if (v11) owGen11Moisture(elev, moist, seed);   /* (RS-618: wet coasts, dry behind the ranges - it was noise of its own) */
+  if (planet) for (let x=0;x<OW_COLS;x++) for (let y=0;y<OW_ROWS;y++){ const phi = Math.abs(0.5 - (y + 0.5)/OW_ROWS)*Math.PI;   /* (RS-625: the planet's belts - wet at the equator and about 60 degrees, dry about 30 and at the poles) */
+    moist[x][y] = clamp(moist[x][y] + Math.cos(phi*6)*0.17 + (phi < 0.2 ? 0.06 : 0) + 0.12, 0, 1); }
   // temperature: warmer toward the map's mid-latitude, cooler near the
   // poles and at altitude - tuned empirically for a varied mix of biomes
   // rather than any one dominating
   for (let x=0;x<OW_COLS;x++){
     for (let y=0;y<OW_ROWS;y++){
       const e = elev[x][y], m = moist[x][y];
-      const latitude = 1 - Math.pow(Math.abs(y-cy)/cy, 1.3);
-      const t = clamp(0.22 + latitude*0.68 - e*(v11 ? 0.42 : 0.28) + (v11 ? 0.05 : 0) + (fbm2D(x+900,y+900,seed,3,1/30,0.5)-0.5)*0.3, 0, 1);   /* (RS-618: colder with height - tundra on high ground, not only at the edges) */
-      let tile;
+      const latitude = planet ? Math.cos(Math.abs(y + 0.5 - cy)/cy*Math.PI/2)*1.08 - 0.08 : 1 - Math.pow(Math.abs(y-cy)/cy, 1.3);   /* (a planet: by the sun's height) */
+      const t = planet ? clamp(0.88 - 1.05*Math.pow(Math.abs(y + 0.5 - cy)/cy, 1.5) - (e - 0.47)*0.6 + (fbm2D(x+900,y+900,seed,3,1/30,0.5)-0.5)*0.3, 0, 1)   /* (RS-625: a planet's warmth by latitude - hot at the equator, deserts about 30 degrees, tundra from about 65 - and colder with height) */
+        : clamp(0.22 + latitude*0.68 - e*(v11 ? 0.42 : 0.28) + (v11 ? 0.05 : 0) + (fbm2D(x+900,y+900,seed,3,1/30,0.5)-0.5)*0.3, 0, 1);   /* (RS-618: colder with height - tundra on high ground, not only at the edges) */
+      let tile; if (planet && window.__planetDbg && e >= 0.47) window.__planetDbg.push([t, m, e, Math.abs(y + 0.5 - cy)/cy]);
       if (e < 0.47) tile = OW_WATER;
       else if (ranges ? owRangeAt(x, y, e, seed, G.ow.genVer) : e > 0.75) tile = OW_MOUNTAIN;
       else if (t < 0.18) tile = OW_TUNDRA;
@@ -8659,6 +8747,10 @@ function generateOverworld(seed){
   for (let i=0;i<NLAIR;i++){ slot++; placeOrRelocateLairSite(slot, placed); }
   // (RS-213) pyramids out in the desert - their slots come after every older kind, so an older world keeps its site numbering
   for (let i=0;i<NPYRAMID;i++){ slot++; placeOrRelocateSite(slot, 'pyramid', OW_PYRAMID, 18, placed, PREFER_DESERT); }
+  if ((G.ow.genVer||1) >= 14 && G.ow.cliff){ const C = G.ow.cliff, W = OW_COLS;   /* (RS-625, generator 14: with the sites down, a cliff by one goes, and then any cliff left on its own) */
+    for (let i=0;i<C.length;i++) if (C[i] && !owCliffAt(i % W, (i/W)|0)) C[i] = 0;
+    for (let i=0;i<C.length;i++){ if (!C[i]) continue; const x = i % W, y = (i/W)|0; let k = 0; for (let dx=-1;dx<=1;dx++) for (let dy=-1;dy<=1;dy++) if ((dx || dy) && C[(y+dy)*W + x + dx]) k++; if (!k) C[i] = 0; }
+    let n = 0; for (let i=0;i<C.length;i++) if (C[i]) n++; G.ow.cliffN = n; }
   // a short generated history per site (see generateSiteHistory) - a single
   // pass over the finished map rather than folding it into each placement
   // call above, so it works uniformly for every kind (including a site that
@@ -18361,7 +18453,7 @@ function pmMapKey(){
    time on a canvas of its own, which becomes the chart when it's done; opening the map before then paints it at once */
 function pmBuild(){ PM.job = null; const it = pmBuildGen(); while (!it.next().done); }
 function* pmBuildGen(){
-  const P = PM.P = Math.max(5, Math.min(9, Math.round(1150/Math.max(OW_COLS,OW_ROWS))));
+  const P = PM.P = Math.max(5, Math.min(9, Math.round(1150/Math.max(OW_COLS,OW_ROWS)))), planet = owIsPlanet();
   const W = OW_COLS*P, H = OW_ROWS*P;
   const c = document.createElement('canvas'); c.width = W; c.height = H;
   const x = c.getContext('2d'), id = x.createImageData(W,H), d = id.data;
@@ -18383,10 +18475,11 @@ function* pmBuildGen(){
   };
   for (let py=0; py<H; py++){ if (py % 12 === 11) yield; for (let px=0; px<W; px++){
     const fx = px/P - 0.5, fy = py/P - 0.5;
-    const L = samp(land, fx, fy, 0, 1) + (n(px/(P*1.1), py/(P*1.1))-0.5)*0.32 + (n3(px/(P*0.35), py/(P*0.35))-0.5)*0.08;
+    const wn = planet ? (f, a, b, s)=>{ const t = px/W; return f(a, b)*(1 - t) + f(a - W/s, b)*t; } : (f, a, b)=>f(a, b);   /* (a planet's chart: its noise blended across the width, so the two edges match) */
+    const L = samp(land, fx, fy, 0, 1) + (wn(n, px/(P*1.1), py/(P*1.1), P*1.1)-0.5)*0.32 + (wn(n3, px/(P*0.35), py/(P*0.35), P*0.35)-0.5)*0.08;
     // aged paper: large stains, fine grain, darker toward the edges
     const edge = Math.min(px, py, W-1-px, H-1-py) / Math.min(W,H);
-    const age = 0.9 + n2(px/140, py/140)*0.1 + (n(px/2.2, py/2.2)-0.5)*0.05 - Math.max(0, 0.08-edge)*1.6;
+    const age = 0.9 + wn(n2, px/140, py/140, 140)*0.1 + (wn(n, px/2.2, py/2.2, 2.2)-0.5)*0.05 - (planet ? 0 : Math.max(0, 0.08-edge)*1.6);   /* (a planet's chart wraps round a globe: no darkened edge at its seam) */
     let r, g, b;
     if (L > 0.5){
       const tr = samp(tint, fx, fy, 0, 3), tg = samp(tint, fx, fy, 1, 3), tb = samp(tint, fx, fy, 2, 3);
@@ -18423,9 +18516,9 @@ function* pmBuildGen(){
   for (let tx=0; tx<OW_COLS; tx++) for (let ty=0; ty<OW_ROWS; ty++) pmTileGlyphs(tx, ty, m[tx][ty], P, 0, 0, glyphs);
   glyphs.sort((a,b)=> a[2]-b[2]); yield;
   for (let i=0; i<glyphs.length; i++){ pmGlyph(x, glyphs[i], P); if (i % 150 === 149) yield; }
-  // a double inked border
-  x.strokeStyle = 'rgba(58,40,24,0.95)'; x.lineWidth = Math.max(2, P*0.35); x.strokeRect(P*0.6, P*0.6, W-P*1.2, H-P*1.2);
-  x.lineWidth = Math.max(1, P*0.12); x.strokeRect(P*1.3, P*1.3, W-P*2.6, H-P*2.6);
+  // a double inked border (not on a planet's chart, which wraps round the globe)
+  if (!planet){ x.strokeStyle = 'rgba(58,40,24,0.95)'; x.lineWidth = Math.max(2, P*0.35); x.strokeRect(P*0.6, P*0.6, W-P*1.2, H-P*1.2);
+  x.lineWidth = Math.max(1, P*0.12); x.strokeRect(P*1.3, P*1.3, W-P*2.6, H-P*2.6); }
   PM.cv = c; PM.key = pmMapKey();
 }
 // the little drawings on one tile of the chart (a peak, a tree or two, a tuft, a dune...), at P pixels a tile,
@@ -18551,6 +18644,7 @@ function pmCompass(x, cx, cy, R){
   x.restore();
 }
 function renderOverworldMapZoomed(){
+  if (owGlobeOn() && globeRender()) return;   /* (RS-625: a planet, zoomed right out, is a globe) */
   const savedCellPx = cellPx;
   const zs = owZoomScale(), lod = zs < 1.6 ? 0 : zs < 3 ? 1 : 2;   // far out, middling, close in
   cellPx = Math.max(canvas.width / OW_COLS, canvas.height / OW_ROWS) * zs;
@@ -18741,10 +18835,93 @@ function renderOverworldMapZoomed(){
 }
 
 // (RS-210) the world map opens on the open land and in towns alike
+/* (RS-625) the globe: a Planet world's map, zoomed right out past the whole chart, turns into the planet itself - the same chart wrapped
+   round a sphere (the world was made on one, so it meets itself), with the fog over what you haven't seen, a lit side and a shadowed one,
+   the seas catching the light, a thin blue air at the rim, and a pin where you stand. Drag it to turn it, scroll or pinch to come closer;
+   come close enough and it opens out into the chart again, centred on the land that was facing you */
+const GLOBE = { r:null, scene:null, cam:null, pivot:null, mesh:null, texKey:'', yaw:0, pitch:0, vyaw:0, vpitch:0, dist:4.6, stars:null, pins:null };
+function owGlobeOn(){ return !!(G.owGlobe && owIsPlanet() && owMapOpen() && typeof THREE!=='undefined'); }
+function globeLocal(tx, ty){ const u = (tx + 0.5)/OW_COLS, v = (ty + 0.5)/OW_ROWS; return [-Math.cos(u*Math.PI*2)*Math.sin(v*Math.PI), Math.cos(v*Math.PI), Math.sin(u*Math.PI*2)*Math.sin(v*Math.PI)]; }
+function globeFace(tx, ty){ const p = globeLocal(tx, ty); GLOBE.yaw = -Math.atan2(p[0], p[2]); GLOBE.pitch = clamp(Math.asin(clamp(p[1], -1, 1)), -1.2, 1.2); GLOBE.vyaw = GLOBE.vpitch = 0; }
+/* the tile facing you */
+function globeFacing(){ const T = THREE, v = new T.Vector3(0, 0, 1); v.applyAxisAngle(new T.Vector3(1, 0, 0), -GLOBE.pitch); v.applyAxisAngle(new T.Vector3(0, 1, 0), -GLOBE.yaw);
+  const th = Math.acos(clamp(v.y, -1, 1)), ph = Math.atan2(v.z, -v.x), u = ((ph/(Math.PI*2)) % 1 + 1) % 1;
+  return { x:clamp(Math.floor(u*OW_COLS), 0, OW_COLS - 1), y:clamp(Math.floor(th/Math.PI*OW_ROWS), 0, OW_ROWS - 1) }; }
+function globeOpen(){ if (!owIsPlanet()) return; if (!owMapOpen()) toggleOwZoom(); const c = owZoomCenter(); globeFace(c.x, c.y); GLOBE.dist = 6.2; G.owGlobe = true; try{ mapToolsSync(true); }catch(e){} renderGame(); }
+function globeClose(){ if (!G.owGlobe) return; const f = globeFacing(); G.owGlobe = false; G.owZoomCenter = { x:f.x, y:f.y }; G.owZoomScale = OW_ZOOM_MIN; try{ mapToolsSync(true); }catch(e){} renderGame(); }
+/* the chart wrapped round the sphere: its colour, the fog over the unseen, ice at the poles; and a relief and a shine map from the land */
+function globeTextures(){
+  const W = OW_COLS, H = OW_ROWS, TW = 2048, TH = 1024, key = PM.key + '|' + (G.ow.seenVer||0) + '|' + owSeenArr().reduce((a, b)=>a + b, 0);
+  if (GLOBE.texKey===key && GLOBE.tex) return; GLOBE.texKey = key;
+  const T = THREE, c = GLOBE.texCv || (GLOBE.texCv = document.createElement('canvas')); c.width = TW; c.height = TH; const x = c.getContext('2d');
+  x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high'; if ('filter' in x) x.filter = 'saturate(1.4) contrast(1.06)'; x.drawImage(PM.cv, 0, 0, TW, TH); if ('filter' in x) x.filter = 'none';
+  { /* the fog over the unseen, from the seen mask itself, wrapped two tiles round the seam so its blur meets itself */
+    const sm = GLOBE.fogSm || (GLOBE.fogSm = document.createElement('canvas')), pad = 2; sm.width = W + pad*2; sm.height = H; const sx = sm.getContext('2d'), id = sx.createImageData(W + pad*2, H), seen = owSeenArr();
+    for (let ty=0; ty<H; ty++) for (let i=0; i<W + pad*2; i++){ const tx = (i - pad + W) % W, o = (ty*(W + pad*2) + i)*4; id.data[o] = 216; id.data[o+1] = 203; id.data[o+2] = 168; id.data[o+3] = seen[ty*W + tx] ? 0 : 255; }
+    sx.putImageData(id, 0, 0);
+    const t = GLOBE.fogCv || (GLOBE.fogCv = document.createElement('canvas')); t.width = TW; t.height = TH; const fx = t.getContext('2d'); fx.clearRect(0, 0, TW, TH); fx.imageSmoothingEnabled = true;
+    if ('filter' in fx) fx.filter = 'blur(' + Math.round(TW/W*1.2) + 'px)'; fx.drawImage(sm, -pad*TW/W, 0, TW*(W + pad*2)/W, TH); if ('filter' in fx) fx.filter = 'none';
+    x.drawImage(t, 0, 0); }
+  for (const [y0, y1] of [[0, TH*0.045], [TH, TH*0.955]]){ const g = x.createLinearGradient(0, y0, 0, y1); g.addColorStop(0, 'rgba(240,246,250,1)'); g.addColorStop(1, 'rgba(240,246,250,0)'); x.fillStyle = g; x.fillRect(0, Math.min(y0, y1), TW, Math.abs(y1 - y0)); }
+  const b = GLOBE.bumpCv || (GLOBE.bumpCv = document.createElement('canvas')), sp = GLOBE.specCv || (GLOBE.specCv = document.createElement('canvas'));
+  { b.width = sp.width = W; b.height = sp.height = H; const bx = b.getContext('2d'), sx = sp.getContext('2d'), bi = bx.createImageData(W, H), si = sx.createImageData(W, H), M = G.ow.map, seen = owSeenArr();
+    for (let tx=0; tx<W; tx++) for (let ty=0; ty<H; ty++){ const t = seen[ty*W + tx] ? M[tx][ty] : -1, o = (ty*W + tx)*4, v = t===-1 ? 60 : t===OW_WATER ? 0 : t===OW_MOUNTAIN ? 255 : t===OW_RIVER ? 40 : t===OW_FOREST ? 120 : t===OW_TUNDRA ? 140 : 90, w = t===OW_WATER || t===OW_RIVER ? 200 : 14;   /* (the unseen flat and dull under its fog: no coast or range shows through) */
+      bi.data[o] = bi.data[o+1] = bi.data[o+2] = v; bi.data[o+3] = 255; si.data[o] = si.data[o+1] = si.data[o+2] = w; si.data[o+3] = 255; }
+    bx.putImageData(bi, 0, 0); sx.putImageData(si, 0, 0); }
+  if (!GLOBE.tex){ GLOBE.tex = new T.CanvasTexture(c); GLOBE.bump = new T.CanvasTexture(b); GLOBE.spec = new T.CanvasTexture(sp); for (const t of [GLOBE.tex, GLOBE.bump, GLOBE.spec]){ t.anisotropy = 4; t.wrapS = T.RepeatWrapping; }   /* (filtered across the seam, which meets itself) */ }
+  GLOBE.tex.needsUpdate = true; GLOBE.bump.needsUpdate = true; GLOBE.spec.needsUpdate = true;
+}
+function globeSetup(){
+  if (GLOBE.r) return true; const T = THREE;
+  try{ GLOBE.r = gfxThreeR(new T.WebGLRenderer({ antialias:true, alpha:true, preserveDrawingBuffer:true })); }catch(e){ GLOBE.r = null; return false; }
+  GLOBE.r.setClearColor(0x000000, 0);
+  const sc = GLOBE.scene = new T.Scene(), cam = GLOBE.cam = new T.PerspectiveCamera(30, 1, 0.1, 60); cam.position.set(0, 0, GLOBE.dist);
+  sc.add(new T.AmbientLight(0xffffff, 0.3)); const sun = new T.DirectionalLight(0xfff4e0, 0.82); sun.position.set(-2.2, 1.3, 2.4); sc.add(sun);
+  const pivot = GLOBE.pivot = new T.Group(); sc.add(pivot);
+  globeTextures();
+  const mat = new T.MeshPhongMaterial({ map:GLOBE.tex, bumpMap:GLOBE.bump, bumpScale:0.9, specularMap:GLOBE.spec, specular:new T.Color(0x1c222a), shininess:70 });
+  const mesh = GLOBE.mesh = new T.Mesh(new T.SphereGeometry(1, 128, 96), mat); pivot.add(mesh);
+  const atm = new T.Mesh(new T.SphereGeometry(1.1, 64, 48), new T.ShaderMaterial({ side:T.BackSide, transparent:true, blending:T.AdditiveBlending, depthWrite:false,
+    vertexShader:'varying vec3 vN; void main(){ vN = normalize(normalMatrix*normal); gl_Position = projectionMatrix*modelViewMatrix*vec4(position, 1.0); }',
+    fragmentShader:'varying vec3 vN; void main(){ float k = pow(clamp(0.72 - dot(vN, vec3(0.0, 0.0, 1.0)), 0.0, 1.0), 3.0); gl_FragColor = vec4(0.45, 0.66, 1.0, 1.0)*k*1.6; }' }));
+  sc.add(atm);
+  /* where you are: a red pin; the towns you know: points of light */
+  const pin = GLOBE.pin = new T.Group(); pin.add(new T.Mesh(new T.SphereGeometry(0.014, 16, 12), new T.MeshBasicMaterial({ color:0xff3a2a })));
+  const ring = GLOBE.ring = new T.Mesh(new T.RingGeometry(0.02, 0.026, 32), new T.MeshBasicMaterial({ color:0xff6a4a, transparent:true, side:T.DoubleSide, depthWrite:false })); pin.add(ring); mesh.add(pin);
+  return true;
+}
+function globePins(){
+  const T = THREE, key = (G.ow.visitedTowns||[]).length + '|' + GLOBE.texKey; if (GLOBE.pinsKey===key) return; GLOBE.pinsKey = key;
+  if (GLOBE.pins){ GLOBE.mesh.remove(GLOBE.pins); GLOBE.pins.geometry.dispose(); }
+  const pos = [], col = [], vis = new Set(G.ow.visitedTowns||[]);
+  for (const k in (G.ow.townPositions||{})){ const t = G.ow.townPositions[k]; if (!t || !owSeen(t.x, t.y)) continue; const p = globeLocal(t.x, t.y); pos.push(p[0]*1.004, p[1]*1.004, p[2]*1.004); const v = vis.has(t.x + ',' + t.y); col.push(v ? 1 : 0.55, v ? 0.92 : 0.95, v ? 0.4 : 0.55); }
+  const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new T.Float32BufferAttribute(col, 3));
+  GLOBE.pins = new T.Points(g, new T.PointsMaterial({ size:5*dpr, sizeAttenuation:false, vertexColors:true })); GLOBE.mesh.add(GLOBE.pins);
+}
+function globeStars(cw, ch){
+  if (GLOBE.stars && GLOBE.stars.width===cw && GLOBE.stars.height===ch) return GLOBE.stars;
+  const c = GLOBE.stars = document.createElement('canvas'); c.width = cw; c.height = ch; const x = c.getContext('2d'), r = mulberry32(99);
+  const g = x.createRadialGradient(cw/2, ch/2, 0, cw/2, ch/2, Math.hypot(cw, ch)/2); g.addColorStop(0, '#141a2e'); g.addColorStop(1, '#05060c'); x.fillStyle = g; x.fillRect(0, 0, cw, ch);
+  for (let i=0;i<cw*ch/2600;i++){ const a = 0.25 + r()*0.75, s = r() < 0.08 ? 1.6 : 0.9; x.fillStyle = `rgba(${200 + r()*55|0},${210 + r()*45|0},255,${a})`; x.fillRect(r()*cw, r()*ch, s*dpr, s*dpr); }
+  return c;
+}
+function globeRender(){
+  if (!PM.cv || PM.key !== pmMapKey()) pmBuild(); if (!PM.cv) return false; owReveal(G.owPos.x, G.owPos.y, wgSight()); pmFogMask();
+  if (!globeSetup()) return false;
+  const cw = canvas.width, ch = canvas.height, R = GLOBE.r; if (R.domElement.width!==cw || R.domElement.height!==ch){ R.setPixelRatio(1); R.setSize(cw, ch, false); GLOBE.cam.aspect = cw/ch; GLOBE.cam.updateProjectionMatrix(); }
+  globeTextures(); globePins();
+  if (!owZoomDragging){ GLOBE.yaw += GLOBE.vyaw; GLOBE.pitch = clamp(GLOBE.pitch + GLOBE.vpitch, -1.25, 1.25); GLOBE.vyaw *= 0.93; GLOBE.vpitch *= 0.9; }   /* (it keeps turning a little after a flick) */
+  GLOBE.pivot.rotation.x = GLOBE.pitch; GLOBE.mesh.rotation.y = GLOBE.yaw; GLOBE.cam.position.set(0, -0.06*GLOBE.dist/6.2, GLOBE.dist); GLOBE.cam.lookAt(0, -0.06*GLOBE.dist/6.2, 0);
+  { const p = globeLocal(G.owPos.x, G.owPos.y), T = THREE; GLOBE.pin.position.set(p[0]*1.006, p[1]*1.006, p[2]*1.006); GLOBE.pin.lookAt(p[0]*2, p[1]*2, p[2]*2);
+    const k = (performance.now()/1000) % 1.6/1.6; GLOBE.ring.scale.setScalar(1 + k*1.6); GLOBE.ring.material.opacity = 1 - k; }
+  R.render(GLOBE.scene, GLOBE.cam);
+  ctx.drawImage(globeStars(cw, ch), 0, 0); ctx.drawImage(R.domElement, 0, 0);
+  return true;
+}
 function owMapOpen(){ return !!G.owZoomedOut && (G.gameMode===0 || G.gameMode===3); }
 function toggleOwZoom(){
   if (G.gameMode!==0 && G.gameMode!==3){ if (G.gameMode===1 || G.gameMode===2) notify('The world map is for the open air - get out of here first', 'warn', 'error'); return; }
-  G.owZoomedOut = !G.owZoomedOut;
+  G.owZoomedOut = !G.owZoomedOut; if (!G.owZoomedOut) G.owGlobe = false;
   if (G.owZoomedOut) G.owZoomCenter = {x:G.owPos.x, y:G.owPos.y}; // opening the map fresh always re-centers on you, even if it was dragged away last time it was open
   if (G.owZoomedOut) G.mapMode = 'look'; else pinClose();
   G.routeWalk = null;
@@ -19187,14 +19364,14 @@ function mapSetMode(m){ G.mapMode = m; pinClose(); mapToolsSync(true); renderGam
 function mapToolsHtml(r){
   const mode = G.mapMode || 'look';
   const b = (m, label, tip)=> `<button class="mt-b ${mode===m ? 'on' : ''}" title="${tip}" onclick="mapSetMode('${m}')">${label}</button>`;
-  const hint = mode==='pin' ? 'click the map to drop a pin, or click a pin to change it'
+  const hint = owGlobeOn() ? 'drag to turn the world &middot; scroll or pinch in to open the chart' : mode==='pin' ? 'click the map to drop a pin, or click a pin to change it'
     : mode==='route' ? (r ? `${r.pts.length} stop${r.pts.length===1 ? '' : 's'} &middot; ${r.steps} steps${r.bad>=0 ? ` &middot; <b style="color:#ffa080">stop ${r.bad+1} can't be reached on foot</b>` : ''} &middot; click a stop to remove it` : 'click the map to add stops - the path keeps to land you can walk')
     : mapNarrow() ? 'drag to pan &middot; tap a pin or a gravestone' : 'drag to pan &middot; wheel to zoom &middot; click a pin or a gravestone';
   const routeBtns = (mode==='route' || r) ? `<button class="mt-b ${G.player.routeRoads !== false ? 'on' : ''}" title="prefer the roads (quicker and safer)" onclick="G.player.routeRoads=(G.player.routeRoads===false);routeInfo.c=null;mapToolsSync(true);renderGame()">By road</button><button class="mt-b" onclick="routeGo()" ${r && r.steps ? '' : 'disabled'}>Walk route</button><button class="mt-b" onclick="routeUndo()" ${r ? '' : 'disabled'}>Undo</button><button class="mt-b" onclick="routeClear()" ${r ? '' : 'disabled'}>Clear</button><span class="mt-sep"></span>` : '';
   const layers = G.mapLayersOpen ? `<div class="mt-bar mt-layers" onmousedown="event.preventDefault()">${MAP_LAYERS.map(([k,nm])=>{ const v = mapF(k), on = k==='sites' ? v!=='off' : !!v;
     return `<button class="mt-b ${on ? 'on' : ''}" onclick="mapToggle('${k}')">${k==='sites' ? 'Sites: '+SITE_MODE_NAME[v] : nm}</button>`; }).join('')}</div>` : '';
   return `<div class="mt-bar" onmousedown="event.preventDefault()">${b('look','Look','look around the map')}${b('pin','Pin','drop your own pins with a note')}${b('route','Route','plan a route and walk it')}<span class="mt-sep"></span>
-    ${routeBtns}<button class="mt-b ${G.mapLayersOpen ? 'on' : ''}" onclick="G.mapLayersOpen=!G.mapLayersOpen;mapToolsSync(true)">Layers</button><button class="mt-b" onclick="setUi('travellog')">Travel log</button><button class="mt-b" onclick="setUi('seacharts')">Sea charts</button><button class="mt-b" title="M" onclick="toggleOwZoom()">Close</button></div>
+    ${routeBtns}<button class="mt-b ${G.mapLayersOpen ? 'on' : ''}" onclick="G.mapLayersOpen=!G.mapLayersOpen;mapToolsSync(true)">Layers</button><button class="mt-b" onclick="setUi('travellog')">Travel log</button><button class="mt-b" onclick="setUi('seacharts')">Sea charts</button>${owIsPlanet() ? `<button class="mt-b ${G.owGlobe ? 'on' : ''}" title="see the whole planet" onclick="G.owGlobe ? globeClose() : globeOpen(); mapToolsSync(true)">${G.owGlobe ? 'Chart' : 'Globe'}</button>` : ''}<button class="mt-b" title="M" onclick="toggleOwZoom()">Close</button></div>
     ${layers}<div class="mt-bar mt-search" onmousedown="if(event.target.tagName!=='INPUT')event.preventDefault()"><input id="mapSearch" type="text" placeholder="search the map - towns, places, landmarks..." value="${esc(G.mapQuery||'')}" oninput="mapSearchSet(this.value)" autocomplete="off" spellcheck="false"><span id="mapSearchN" class="mt-n"></span>${G.mapQuery ? `<button class="mt-b" title="clear" onclick="mapSearchSet('');mapToolsSync(true)">&times;</button>` : ''}</div>
     <div id="mapSearchList" class="mt-list"></div>
     <div class="mt-info"><span>${hint}</span> <b id="mtHover"></b></div>`;
@@ -20902,7 +21079,7 @@ const CONTINENT_TYPES = [
   { id:'pangaea',     label:'One landmass', code:'P', d:'a single great continent ringed by sea' },
   { id:'continents',  label:'Continents',  code:'C', d:'two to four continents divided by open water' },
 ];
-const WORLD_SIZE_CODE = { small:'S', medium:'M', large:'L', xlarge:'X' };
+const WORLD_SIZE_CODE = { small:'S', medium:'M', large:'L', xlarge:'X', planet:'W' };
 function wgContinent(){ return (G.ow && G.ow.continent) || 'archipelago'; }
 // shapes the raw elevation noise into the chosen kind of world
 function wgShaper(seed){
@@ -20922,7 +21099,7 @@ function wgShaper(seed){
 // a world code: size, shape and seed - "MC-1A2B3C"
 function worldCode(){ return `${WORLD_SIZE_CODE[G.worldSizeTier||'medium']||'M'}${(CONTINENT_TYPES.find(c=>c.id===wgContinent())||CONTINENT_TYPES[0]).code}-${((G.ow.seed>>>0)).toString(36).toUpperCase()}`; }
 function worldCodeParse(code){
-  const m = /^\s*([SMLX])([APC])-([0-9A-Z]{1,8})\s*$/i.exec(String(code||'')); if (!m) return null;
+  const m = /^\s*([SMLXW])([APC])-([0-9A-Z]{1,8})\s*$/i.exec(String(code||'')); if (!m) return null;
   const size = Object.keys(WORLD_SIZE_CODE).find(k=>WORLD_SIZE_CODE[k]===m[1].toUpperCase()), cont = CONTINENT_TYPES.find(c=>c.code===m[2].toUpperCase());
   const seed = parseInt(m[3], 36); if (!size || !cont || !isFinite(seed) || seed < 0 || seed > 4294967295) return null;
   return { size, cont:cont.id, seed };
@@ -21587,9 +21764,10 @@ function wgPoiTip(p){
 }
 // the world preview screen: shape, size and a code to share
 function wgPreviewHtml(){
-  const cur = wgContinent();
-  return `<div class="muted" style="margin:0 0 6px;font-size:11px;">SHAPE OF THE WORLD</div>
-    <div class="btnrow" style="justify-content:center;margin-bottom:10px;">${CONTINENT_TYPES.map(c=>`<button class="btn${c.id===cur ? ' primary' : ''}" title="${c.d}" onclick="setContinentType('${c.id}')">${c.label}</button>`).join('')}</div>
+  const cur = wgContinent(), pl = G.worldSizeTier==='planet';
+  return (pl ? `<div class="muted" style="margin:0 0 10px;font-size:12px;">a whole planet, its lands raised by drifting plates - ${(G.ow.plates||{}).n||'many'} of them, ${(G.ow.plates||{}).cont||'some'} bearing continents. On the world map (M), zoom right out to see it as a globe</div>`
+    : `<div class="muted" style="margin:0 0 6px;font-size:11px;">SHAPE OF THE WORLD</div>
+    <div class="btnrow" style="justify-content:center;margin-bottom:10px;">${CONTINENT_TYPES.map(c=>`<button class="btn${c.id===cur ? ' primary' : ''}" title="${c.d}" onclick="setContinentType('${c.id}')">${c.label}</button>`).join('')}</div>`) + `
     <div class="muted" style="margin:0 0 10px;font-size:12px;">world code <b style="color:var(--ink);font-family:'JetBrains Mono',monospace;letter-spacing:0.08em;">${worldCode()}</b> <button class="btn" style="padding:2px 8px;" onclick="copyWorldCode()">copy</button>
       &nbsp; or play a friend's: <input id="worldCodeIn" placeholder="MC-1A2B3C" maxlength="12" style="width:110px;font-family:'JetBrains Mono',monospace;"> <button class="btn" style="padding:2px 8px;" onclick="useWorldCode()">use</button></div>`;
 }
@@ -44803,7 +44981,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-624';
+const GAME_VERSION = 'rs-625';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -46982,7 +47160,7 @@ function buildHelp(){
       <div><b>Your house, Archaeology and Necromancy</b>: Hollis the estate agent on every town square sells you a house (2,500 gold) whose door opens from any town. Build its furniture from logs, iron bars and essence to train Construction: a bed, hearth, furnace, anvil and the other benches, an altar that takes bones for three times the Prayer xp, a trophy wall, and a portal to your towns, islands, dig sites and landmarks. Five dig sites lie out in the wild: excavate the hotspots round each (with a pickaxe) and restore what you find at its dig camp; finish a site's collection for a relic power for good. Towns now come as hamlets, villages and cities: a village adds a temple (prayer, blessings, a crusade against the undead) and an archery range; a city adds a guild hall, an arena and stone walls; a town by the sea has a harbour with ships to the other ports and your charted islands. Talk to the townsfolk you bump into for gossip and hints, play darts, gamble and enter the cook-off at the tavern, read the notice board's news, and pay the mayor to build walls, a bigger market or a bigger town. Shops shut at night (knock if you must). Shops pay less for things you keep selling them, and the Peddler's shelf only refills slowly. Waypoints charge a fee. The journal (;) holds every quest - story quests from innkeepers, smiths, alchemists, priests, Captains, mayors, guildmasters, a hermit, a ghost and a skeleton's note, with chains, three factions and the main storyline, the Waking Lich - plus region diaries, clue trails and the tomes you've learned. Music follows where you are, by day and by night, and every tune you hear is kept in the music player (Settings). The banker on every square keeps your items (with tabs and a search box) and your gold, which death can't touch; Hollis sells property that pays into your bank every day. In a fight, press <kbd>-</kbd> (or the Raise button) to crush a bone and raise the dead to fight beside you; their hits train Necromancy, a fourth combat style.</div>
       <div>press <kbd>C</kbd> to make camp wherever you're standing &mdash; usually a free heal that also restores your prayer and cures poison, but sleeping in the open risks something finding you in the dark: no rest that night, and a monster comes for you - fight it or get away. Safer on grass, riskier in forest/swamp, and impossible while zoomed out. You can also camp inside any dungeon-type site once you've cleared every monster off the current floor &mdash; nothing left down there to ambush you, so it's just as safe as a village rest.</div>
       <div>press <kbd>M</kbd> to open the world map of the whole continent &mdash; press again to go back. To travel between towns you've visited, use the <b>waypoint stone</b> in any town square: it shows the world with every town you've visited. The map's tool bar lets you <b>drop pins</b> with a note, <b>plan a route</b> and walk it, and switch <b>layers</b> (place names, landmarks, sites, danger, resources and more) on and off; the mouse wheel zooms in far enough to see every tree, rock and house. Land you've seen is pencilled in and land you've walked is painted; every forest, range, sea and river has a name, and three great landmarks (a volcano, a giant tree and a wizard's tower) can be seen from far off. The <b>travel log</b> counts the regions, towns, sites and landmarks you've found.</div>
-      <div><b>The land:</b> when you start you pick the world's size and shape (an archipelago, one landmass or several continents), and every world has a <b>world code</b> - give it to a friend and they can play the same world. <b>Roads</b> join the towns: walking a road is quicker (every other step is free) and safer, and the route planner and the teleport list (T, "walk") follow them. Off the road, wading a river costs time; roads cross on <b>bridges</b> and fords, and a broken bridge can be mended. <b>Ferries</b> cross the water between landmasses. Every part of the land has a recommended combat level, shown when you enter it and on the map. Watch for <b>volcanic land, jungles, haunted woods, snowy highlands and crystal wastes</b> with their own creatures, and for <b>hamlets</b> (jobs, food and a safe barn), <b>lookouts</b> that reveal the map, <b>caves, grottos and ruins</b> to delve, <b>standing stones</b>, <b>abandoned camps</b>, <b>wishing wells</b> and <b>hermits</b>. Deer, rabbits, boars and birds roam the 3D land - click one to hunt it. Rain makes the fish bite, fog shortens your sight and storms make the sea dangerous. Buy a <b>tent, ward lantern, bedroll and cooking spit</b> from the Peddler for safer camping.</div>
+      <div><b>The land:</b> when you start you pick the world's size and shape (an archipelago, one landmass or several continents) - or a whole <b>Planet</b>, its continents raised by drifting plates, which the world map shows as a globe you can turn when you zoom right out - and every world has a <b>world code</b> - give it to a friend and they can play the same world. <b>Roads</b> join the towns: walking a road is quicker (every other step is free) and safer, and the route planner and the teleport list (T, "walk") follow them. Off the road, wading a river costs time; roads cross on <b>bridges</b> and fords, and a broken bridge can be mended. <b>Ferries</b> cross the water between landmasses. Every part of the land has a recommended combat level, shown when you enter it and on the map. Watch for <b>volcanic land, jungles, haunted woods, snowy highlands and crystal wastes</b> with their own creatures, and for <b>hamlets</b> (jobs, food and a safe barn), <b>lookouts</b> that reveal the map, <b>caves, grottos and ruins</b> to delve, <b>standing stones</b>, <b>abandoned camps</b>, <b>wishing wells</b> and <b>hermits</b>. Deer, rabbits, boars and birds roam the 3D land - click one to hunt it. Rain makes the fish bite, fog shortens your sight and storms make the sea dangerous. Buy a <b>tent, ward lantern, bedroll and cooking spit</b> from the Peddler for safer camping.</div>
       <div><b>The sea:</b> the Peddler who sells you a boat also has shipwrights build you a better one - a <b>sloop</b>, a <b>caravel</b> and a <b>galleon</b> (gold, logs and iron bars): each crosses the sea faster and rides out storms better. The islands with no town on them have their own <b>pearl beds</b>, <b>sunstone outcrops</b> (gold and gems) and a <b>buried cache</b>; land on one to chart it, and the <b>sea charts</b> (on the world map's tool bar) set a course back to any island you've charted. A <b>harpoon</b>, thrown from a caravel's deck or bigger, lands sharks, kraken and marlin in deep water. In winter the water along the tundra freezes - walk out onto it and fish through the ice holes.</div>
       <div><b>World events:</b> the world keeps its own time. A <b>giant</b> sleeps somewhere and now and then wakes to roam (a world boss - it's marked on the map while it's awake, and its wounds last between fights). <b>Monster camps</b> grow if they're left alone, until their warband lays <b>siege</b> to the nearest town; break the siege in time or the town is sacked. Every town rules the land nearest it - break every camp in a town's lands to <b>secure</b> them, and fewer monsters roam there. <b>Stars fall</b> and leave rich ore for a while. On the road you'll meet people who need a hand (or a fight), and towns hold <b>festivals</b> (10% off and a treat), <b>market days</b> (a rare trader on the plaza) and ring the alarm when monsters <b>raid</b>. Everything with a deadline shows its timer on the world map; the travel log lists what's going on.</div>
       <div>day turns to night and back on a steady cycle, and the weather shifts between clear, rain, fog and the occasional storm &mdash; both are shown in the corner of the overworld map. Night and bad weather raise the odds of a random encounter, so an easy stretch of road can turn dangerous after dark.</div>
@@ -47387,6 +47565,9 @@ canvas.addEventListener('wheel', (e)=>{
   if (G.gameMode!==0 && !(G.gameMode===3 && G.owZoomedOut)) return;   /* (RS-324: the world map opened in a town zooms too - and a pinch, which fires this) */
   e.preventDefault();
   const factor = e.deltaY < 0 ? OW_ZOOM_STEP : 1/OW_ZOOM_STEP;
+  if (G.owZoomedOut && owIsPlanet()){   /* (RS-625: the globe) */
+    if (G.owGlobe){ if (factor > 1){ GLOBE.dist /= 1.12; if (GLOBE.dist < 2.6) globeClose(); } else GLOBE.dist = Math.min(GLOBE.dist*1.12, 11); renderGame(); return; }
+    if (factor < 1 && owZoomScale() <= OW_ZOOM_MIN + 1e-6){ globeOpen(); return; } }
   if (G.owZoomedOut) G.owZoomScale = clamp(owZoomScale()*factor, OW_ZOOM_MIN, OW_ZOOM_MAX);
   else G.owMainZoomScale = clamp(owMainZoomScale()*factor, OW_MAIN_ZOOM_MIN, OW_MAIN_ZOOM_MAX);
   renderGame();
@@ -47486,7 +47667,7 @@ function owSiteTipHtml(x, y){
     ${row(`best ${SITE_WORD[kind]||'site'} clear`, best ? best+' turns' : 'none yet')}`;
 }
 canvas.addEventListener('mousemove', (e)=>{
-  if (!owMapOpen() || owZoomDragging || G.ui!=='playing') return;
+  if (!owMapOpen() || owZoomDragging || G.ui!=='playing' || owGlobeOn()) return;
   { const m = owMapPoint(e), pl = m ? owPlaceAt(m.x, m.y) : null, hv = document.getElementById('mtHover');   // the region under the mouse, named in the tool bar
     if (hv){ let t = ''; if (m && owSeen(m.x, m.y) && m.x>=0 && m.y>=0 && m.x<OW_COLS && m.y<OW_ROWS){ const a = wgArea(m.x, m.y), rn2 = wgRoadName(m.x, m.y);
       t = '\u00b7 ' + cap(pl ? pl.name : a.name) + (rn2 ? ' \u00b7 ' + rn2 : '') + ' \u00b7 ' + wgBandText(a.band) + (a.wild ? ' \u00b7 Wilderness ' + a.wild : ''); } hv.textContent = t; } }
@@ -47519,6 +47700,7 @@ window.addEventListener('pointermove', (e)=>{
   const dx = e.clientX - owZoomDragLastX, dy = e.clientY - owZoomDragLastY;
   owZoomDragMoved += Math.abs(dx) + Math.abs(dy);
   owZoomDragLastX = e.clientX; owZoomDragLastY = e.clientY;
+  if (owGlobeOn()){ const k = 0.0042*(GLOBE.dist - 1)/4.6; GLOBE.vyaw = dx*k; GLOBE.vpitch = dy*k; GLOBE.yaw += dx*k; GLOBE.pitch = clamp(GLOBE.pitch + dy*k, -1.25, 1.25); renderGame(); return; }   /* (RS-625: turning the globe) */
   const rect = canvas.getBoundingClientRect();
   const pxScale = canvas.width / rect.width; // CSS pixels -> canvas-internal pixels, same ratio dpr scaling already uses elsewhere
   const center = owZoomCenter();
@@ -47530,6 +47712,7 @@ window.addEventListener('pointerup', (e)=>{
   if (!owZoomDragging || !e.isPrimary) return;
   owZoomDragging = false;
   canvas.style.cursor = '';
+  if (owGlobeOn()) return;   /* (the globe: a drag turns it, a click does nothing) */
   if (owZoomDragMoved < 6 && G.ui==='playing' && e.pointerType!=='mouse'){ const mk = owMarkAtClient(e); if (mk){ tapTip(e, owMarkTip(mk), 4000); return; } }   /* (RS-210: a tap on a ! explains it) */
   if (owZoomDragMoved < 6 && G.ui==='playing' && !owMapClick(e)){   // a click, not a drag: pins and route stops first (owMapClick), then a town you've visited teleports you there
     const t = owTownAtClient(e);

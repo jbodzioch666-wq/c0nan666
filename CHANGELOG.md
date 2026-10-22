@@ -1,5 +1,20 @@
 # Depthcrawl patch notes
 
+## RS-625 - A whole planet
+
+- **New world size: Planet.** Pick it on the world screen. It's a whole world, twice as wide as it is tall and a little bigger than XLarge, with about 30 towns.
+- **Made by plate tectonics.** The land is built on a sphere covered by 14 to 20 drifting plates, some carrying continents. Where plates meet, the land answers as the Earth's does:
+  - two continents colliding push up the highest ranges, with a high plateau behind;
+  - an ocean plate diving under a continent raises a coastal range;
+  - two ocean plates make curved arcs of volcanic islands;
+  - plates pulling apart split the land along rifts;
+  - a few hotspots raise lone islands.
+- **Earth-like climate.** Jungle and forest are wettest at the equator, deserts lie in the dry belts about 30 degrees north and south, forests return further out, and tundra and pack ice sit toward the poles. The winds blow in belts as they do on Earth, so the rain shadows fall on the right side of the mountains.
+- **See it as a globe.** On the world map (M), zoom right out past the whole chart, or press Globe, and the map becomes the planet itself, with a lit side, the seas catching the sun and a thin blue rim of air. Drag to spin it, and scroll or pinch in to open the chart again at whatever land faces you. Fog still covers what you haven't explored, and your towns show as points of light.
+- **No seam.** The flat map is cut down the widest ocean, so the globe meets itself cleanly and no land is split.
+- **Planet world codes start with W**, so you can share them like any other.
+- **Sea cliffs fixed.** In new worlds of any size, cliffs now stand only on the open sea. Most of RS-622's cliffs had ended up round inland lakes; new worlds now get 50 to 100 real sea cliffs each. Existing worlds stay as they were.
+
 ## RS-624 - No hitch on the first kill
 
 - **The first kill of a session no longer freezes the screen.** The stall was the graphics card drawing two things for the first time: the damage number and the Last Foe portrait. It took about a tenth of a second; the worst frame after a first kill now matches every later kill (about 15 ms).
