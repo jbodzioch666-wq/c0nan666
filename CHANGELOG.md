@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-631 - The land curves away
+
+- **On a Planet, the 3D land bends away round you.** The ground drops off toward the edges of the view, and far hills and towns sink out of sight, so you can tell you're standing on a ball. The bend is 2.5 times the planet's true curve, so it shows from the game's high camera; at true size it was barely visible.
+- **Everything bends together.** Ground, water, trees, buildings, creatures and shadows all follow the curve.
+- **Clicks land where they look.** Clicking the land finds the curved ground, so you walk to the spot you clicked even far from you.
+- **Fix: a map drawing in the background no longer errors** when you start a world of a different size while it's still being drawn.
+- **Other world sizes stay flat.**
+
 ## RS-630 - A true sphere
 
 - **New Planet worlds are built as a real sphere.** The land is laid on a cube-sphere: six square faces blown up into a ball, each 124 tiles across. Every tile is close to the same size everywhere on the planet (the largest is under 1.5 times the smallest), and nothing is stretched toward the poles.

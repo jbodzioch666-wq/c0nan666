@@ -18492,8 +18492,8 @@ function pmPrebuild(){
   if (PM.cv || PM.sched || PM.job || !G.ow || !G.ow.map) return;
   PM.sched = true;
   setTimeout(()=>{ PM.sched = false; if (PM.cv || !G.ow || !G.ow.map) return;
-    const it = PM.job = pmBuildGen();
-    gfxIdle(dl=>{ if (PM.job!==it) return true; try{ while (performance.now() < dl) if (it.next().done){ PM.job = null; return true; } }catch(e){ console.error(e); PM.job = null; return true; } return false; }); }, 1500);   /* (RS-572: a few milliseconds a step; RS-576: in idle time) */
+    const it = PM.job = pmBuildGen(), mref = G.ow.map;
+    gfxIdle(dl=>{ if (PM.job!==it) return true; if (G.ow.map!==mref){ PM.job = null; return true; }   /* (RS-631: a new world since it began - a size change read the old map's columns past its edge) */ try{ while (performance.now() < dl) if (it.next().done){ PM.job = null; return true; } }catch(e){ console.error(e); PM.job = null; return true; } return false; }); }, 1500);   /* (RS-572: a few milliseconds a step; RS-576: in idle time) */
   setTimeout(()=>{ try{ pmFogPattern(document.createElement('canvas').getContext('2d')); }catch(e){} }, 2600);
 }
 function owSeen(x,y){ const s = owSeenArr(); return x>=0 && y>=0 && x<OW_COLS && y<OW_ROWS && !!s[y*OW_COLS+x]; }
@@ -25100,8 +25100,19 @@ function gfxInstSphere(im){
     const k = Math.sqrt(Math.max(A[b]*A[b] + A[b+1]*A[b+1] + A[b+2]*A[b+2], A[b+4]*A[b+4] + A[b+5]*A[b+5] + A[b+6]*A[b+6], A[b+8]*A[b+8] + A[b+9]*A[b+9] + A[b+10]*A[b+10])), d = Math.hypot(x - cx, y - cy, z - cz) + gs.radius*k; if (d > r) r = d; }
   s.center.set(cx, cy, cz); s.radius = r; im.__isph = { v:im.instanceMatrix.version, n, g:gs.radius, s }; return s;
 }
+/* (RS-631) a planet's curve: every built-in material's vertices drop by distance squared over twice the planet's radius, from where you
+   stand - so on a Planet the 3D land bends away toward its horizon and far land sinks out of sight. One shared uniform, plain-object
+   valued so every material's copy of it is the same object (three clones a Vector3, not this); zero for everything but the open land of a
+   planet, set and cleared round that one render (gfxRender) */
+const DC_CURVE = { x:0, y:0, z:0 };
+const O3_CURVE_X = 2.5;   /* (the bend made plain: at the planet's true size the camera, looking down, hardly sees it) */
+function o3CurveK(){ if (!owIsPlanet()) return 0; return O3_CURVE_X*Math.PI/OW_COLS; }   /* (1/(2R), R = circumference/(2 pi): the grid's width is once round the planet, laid flat or as a cube's four equator faces) */
+function o3CurveDrop(x, z){ const k = DC_CURVE.z; if (!k) return 0; const dx = x - DC_CURVE.x, dz = z - DC_CURVE.y; return k*(dx*dx + dz*dz); }
 function gfxThreeSetup(){
   if (typeof THREE==='undefined' || THREE.__dcSetup) return; THREE.__dcSetup = true;
+  try{ const C = THREE.ShaderChunk; C.common = 'uniform vec3 dcCurve;' + String.fromCharCode(10) + C.common;
+    C.project_vertex = C.project_vertex.replace('mvPosition = modelViewMatrix * mvPosition;', 'mvPosition = modelMatrix * mvPosition; { vec2 dcD = mvPosition.xz - dcCurve.xy; mvPosition.y -= dcCurve.z*dot(dcD, dcD); } mvPosition = viewMatrix * mvPosition;');
+    for (const k in THREE.ShaderLib) if (THREE.ShaderLib[k].uniforms) THREE.ShaderLib[k].uniforms.dcCurve = { value:DC_CURVE }; }catch(e){ console.error(e); }
   try{ if (THREE.ColorManagement) THREE.ColorManagement.enabled = false; }catch(e){}
   try{ const F = THREE.Frustum.prototype, io = F.intersectsObject, sp = new THREE.Sphere();
     F.intersectsObject = function(o){ if (o.isInstancedMesh){ sp.copy(gfxInstSphere(o)).applyMatrix4(o.matrixWorld); return this.intersectsSphere(sp); } if (o.isSkinnedMesh){ const g = o.geometry; if (g.boundingSphere===null) g.computeBoundingSphere(); sp.copy(g.boundingSphere).applyMatrix4(o.matrixWorld); return this.intersectsSphere(sp); } return io.call(this, o); }; }catch(e){}
@@ -25242,7 +25253,8 @@ function gfxAutoFreeze(scene){
 function gfxRender(r, scene, cam, view){
   if (!window.__noAutoFreeze) try{ gfxAutoFreeze(scene); }catch(e){}
   try{ const V = view==='v3' ? V3 : view==='o3' ? O3 : view==='fpd' ? FPD : null; if (V && V.warmWait && gfxWarmStep(V)) return; }catch(e){}
-  gfxShadowTick(r, view); if (SET.fps){ gfxGpuMark(r, 'shadow'); gfxGpuPoll(); } try{ gfxRenderInner(r, scene, cam, view); } finally { gfxGpuStop(); } }
+  if (view==='o3' && owIsPlanet() && O3.ppos && !window.__noCurve){ DC_CURVE.x = O3.ppos.x; DC_CURVE.y = O3.ppos.z; DC_CURVE.z = o3CurveK(); }   /* (RS-631: the land bends away round you) */
+  gfxShadowTick(r, view); if (SET.fps){ gfxGpuMark(r, 'shadow'); gfxGpuPoll(); } try{ gfxRenderInner(r, scene, cam, view); } finally { gfxGpuStop(); DC_CURVE.z = 0; } }
 /* (RS-380) in a town and on the open land the sun's shadow map is drawn every other frame, every third on a phone or when
    frames come slow: it was a second drawing of every shadow-caster in sight, every frame, and nothing in it moves fast
    enough to show. The dungeon's torches have had their own clock since RS-323 (dgShadowTick) */
@@ -35294,12 +35306,14 @@ function o3WalkTo(act){
    crossing narrowed by halving. A raycast against the land mesh tested every one of its triangles */
 function o3GroundHit(ray){
   if (!O3.heightAt || !O3.landBox) return null; const o = ray.origin, d = ray.direction; if (d.y >= -1e-4) return null;
-  const B = O3.landBox, hi = (O3.hMax==null ? 12 : O3.hMax) + 0.5, lo = (O3.hMin==null ? -2 : O3.hMin) - 0.5;
+  const ck = owIsPlanet() && O3.ppos ? o3CurveK() : 0, cx = O3.ppos ? O3.ppos.x : 0, cz = O3.ppos ? O3.ppos.z : 0, hA = O3.heightAt;   /* (RS-631: the ground as it's drawn, bending away) */
+  const hAt = ck ? (x, z)=>hA(x, z) - ck*((x - cx)*(x - cx) + (z - cz)*(z - cz)) : hA;
+  const B = O3.landBox, hi = (O3.hMax==null ? 12 : O3.hMax) + 0.5, lo = (O3.hMin==null ? -2 : O3.hMin) - 0.5 - (ck ? ck*O3_W*O3_W*0.6 : 0);
   const t0 = Math.max(0, (hi - o.y)/d.y), t1 = (lo - o.y)/d.y; if (t1 <= t0) return null;
   const hs = Math.hypot(d.x, d.z), dt = hs > 1e-6 ? 0.2/hs : (t1 - t0)/4; let tp = t0;
   for (let t = t0; ; t += dt){ const tt = Math.min(t, t1), x = o.x + d.x*tt, z = o.z + d.z*tt;
     if (x < B[0] || x > B[2] || z < B[1] || z > B[3]){ if (tt >= t1) return null; tp = tt; continue; }
-    if (o.y + d.y*tt < O3.heightAt(x, z)){ let a = tp, b = tt; for (let k=0;k<10;k++){ const m = (a + b)/2; if (o.y + d.y*m < O3.heightAt(o.x + d.x*m, o.z + d.z*m)) b = m; else a = m; }
+    if (o.y + d.y*tt < hAt(x, z)){ let a = tp, b = tt; for (let k=0;k<10;k++){ const m = (a + b)/2; if (o.y + d.y*m < hAt(o.x + d.x*m, o.z + d.z*m)) b = m; else a = m; }
       const tm = (a + b)/2; return new THREE.Vector3(o.x + d.x*tm, o.y + d.y*tm, o.z + d.z*tm); }
     if (tt >= t1) return null; tp = tt; }
 }
@@ -45145,7 +45159,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-630';
+const GAME_VERSION = 'rs-631';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

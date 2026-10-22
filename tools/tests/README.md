@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs631 | a Planet's 3D land bends away round you: the curve in three's shared vertex chunk, one uniform shared by every material, on only for a planet's open land and cleared after; clicks find the bent ground; other sizes flat |
 | rs630 | generator 15: a Planet is a cube-sphere of six 124-tile faces: every tile to the sphere and back, a step over each of the 12 edges lands beside it, tiles near one size, land over the joined edges, the preview a world map; a generator 14 Planet unchanged |
 | rs629 | a Planet is round: sailing west off the edge comes in at the east and back, sight revealed across the seam, the 3D land rebuilt on the far side; other sizes still stop at the edge |
 | rs628 | on a Planet world the map is the globe at every zoom, the chart laid over it: opens turned to you, a town found and a pin dropped by clicking the globe, turns where the map is moved, zooms from the whole world to the chart's nearest, smooth to drag; other sizes keep the flat chart |
@@ -553,3 +554,4 @@ Screenshots go to `tools/tests/shots/`.
 | zplanet2 | what the tiles are at given points of a planet (`ZSEED`, `ZPTS=x:y,...`) |
 | zglobe | a Planet world's globe from several turns and facing the seam (`ZSEEN=1` reveals the map): shots/zglobe-<n>.png and frame times |
 | zglobe2 | RS-628's globe map at the zoom it opens on, zoomed in, nearest, the whole world and up north (`ZSEEN=1` reveals the map): shots/zglobe2-<name>.png and frame times |
+| zcurve | a Planet's 3D land zoomed right out, with the curve (shots/zcurve-on.png) and without (zcurve-off.png) |
