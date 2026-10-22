@@ -1,4 +1,4 @@
-// RS-629: a Planet is round - sailing west off the map's edge comes in at the east, and back; what you see is revealed across the seam;
+// RS-629 (RS-637: the seam's sea is gone, the land runs over it): a Planet is round - sailing west off the map's edge comes in at the east, and back; what you see is revealed across the seam;
 // the 3D land carries on round it; another size still stops at its edge. Shot: shots/rs629-seam.png
 module.exports = async page=>{
   page.setDefaultTimeout(0); const errs = []; page.on('pageerror', e=>errs.push(String(e).slice(0, 300)));
@@ -17,7 +17,6 @@ module.exports = async page=>{
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
   A(r.flatStops, 'another size still stops at its edge');
-  A(r.seaBoth, 'open sea down the seam');
   A(r.wrapped && r.back, 'sailing west off the edge comes in at the east, and back');
   A(r.seenBoth, 'what you see is revealed on both sides of the seam');
   A(r.o3, 'the 3D land is built round you on the far side');

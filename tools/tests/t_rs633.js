@@ -30,7 +30,7 @@ module.exports = async page=>{
   await page.evaluate(()=>{ setUi('worldPreview'); renderWorldPreviewMap(); }); await page.waitForTimeout(300); await page.screenshot({ path: SHOTS + '/rs633-preview.png' });
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
-  A(r.w.every(w=>w.ver===16), 'new planets are made by generator 16');
+  A(r.w.every(w=>w.ver>=16), 'new planets are made by generator 16 or later');
   A(r.w.every(w=>Object.values(w.per).filter(v=>v > 10).length >= 2), 'land runs over the joined-up edges');
   A(r.w.some(w=>w.rivers > 0 || w.roads > 0), 'rivers or roads carry on over an edge');
   A(r.w.every(w=>w.ghost===0), 'nothing left in the void');

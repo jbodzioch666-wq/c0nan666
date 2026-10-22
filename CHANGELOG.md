@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-637 - One unbroken planet
+
+- **All the narrow seas between faces are gone.** On a new Planet world, the land runs freely over every edge between the planet's faces, including the three that still had a sea. The only seas left are small ones at the eight points where three faces meet, and the generator turns the planet to put those over ocean where it can.
+- **The weather comes from the sphere itself.** Moisture, warmth and mountain passes no longer change abruptly at a face edge. Either side of an edge now matches as closely as any two neighbouring tiles (87% against 85% in tests).
+- **Real winds on the polar faces.** The winds now blow round true circles of latitude: trade winds near the equator, westerlies in the middle latitudes, easterlies near the poles. So the rain shadows fall behind the mountains on the north and south faces too.
+- **Your Planet world stays as it was.** Only new Planet worlds get this; other world sizes are unchanged.
+
 ## RS-636 - Fishing spots on the water
 
 - **Fixed: fishing ripples floated in the air from a distance.** On a Planet, the land and sea curve away from you (RS-631), but the fishing spots' ripples, bubbles and glows didn't bend with them, so far-off ones hung above the water. They now sit on the water at any distance.

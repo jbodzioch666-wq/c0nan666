@@ -7999,7 +7999,7 @@ function ensureSpawnEscape(){
 // (RS-106, generator 3: broader ranges, valleys walled in by them filled in as mountain, and nothing but a dragon's lair in or on them)
 // (RS-114, generator 4: a river that runs into a hollow fills it into a lake and flows on from its lowest edge)
 // (RS-115, generator 5: rivers join edge to edge - a diagonal step also fills the lower of its two side tiles)
-const OW_GEN_VER = 16;   /* (6: pyramids in the desert, RS-213; 7: a town for every race, RS-223; 8: roads skirt the volcano, RS-236; 9: landmarks on clear ground, RS-238) */
+const OW_GEN_VER = 17;   /* (6: pyramids in the desert, RS-213; 7: a town for every race, RS-223; 8: roads skirt the volcano, RS-236; 9: landmarks on clear ground, RS-238) */
 // any two river tiles that touch only at a corner get the lower of the two tiles beside them turned to river
 // (never a mountain, the sea or a lake); returns how many tiles it added
 function owRiverJoin(elev){
@@ -8101,6 +8101,13 @@ let OW_PLANET_OROG = null;   /* (how hard the plates push at each tile - for the
    fall on ocean as far as it can */
 function owCube(){ return !!(owIsPlanet() && (G.ow.genVer||1) >= 15); }
 function owCube16(){ return owCube() && (G.ow.genVer||1) >= 16; }
+function owCube17(){ return owCube() && (G.ow.genVer||1) >= 17; }
+/* (RS-637) the eight corners of the cube, where three faces meet: in tiles, how far a tile is from the nearest (its direction's angle) */
+const CUBE_CORNERS = [-1, 1].flatMap(a=>[-1, 1].flatMap(b=>[-1, 1].map(c=>[a/Math.sqrt(3), b/Math.sqrt(3), c/Math.sqrt(3)])));
+function cubeCornerDist(x, y){ const d = cubeTileDir(x, y); if (!d) return 0; let m = -1; for (const c of CUBE_CORNERS) m = Math.max(m, d[0]*c[0] + d[1]*c[1] + d[2]*c[2]); return Math.acos(Math.min(1, m))/(Math.PI/2/cubeN()); }
+/* a planet's noise from the sphere itself, at a tile's direction: the same over a face's edge as either side of it (f in waves round
+   a quarter of the planet, as fbm2D's 1/f tiles) */
+function owSphereNoise(x, y, seed, oct, tiles){ const d = cubeTileDir(x, y); if (!d) return 0.5; const f = 1/(tiles*Math.PI/2/cubeN()); return fbm3(d[0]*f, d[1]*f, d[2]*f, (seed % 100000) + tiles*13, oct, 1, 0.5); }
 /* (RS-633) generator 16: a ghost strip, three tiles deep, in the void beside the four unjoined edges that have void beside them (the
    north and south faces' sides, and the tops and bottoms of L and R): copies of what lies over the edge. The passes that only look at a
    tile's neighbours then see the land run on; the ones that walk across (rivers, lakes, roads, landmasses) step with owOff instead. The
@@ -8145,6 +8152,7 @@ function owOff(x, y, dx, dy){ const N = OW_COLS >> 2, f = cubeFace(x, y); if (f 
   return [clamp(Math.floor(t.x), 0, OW_COLS - 1), clamp(Math.floor(t.y), 0, OW_ROWS - 1)]; }
 /* how far a tile is from the nearest of the seven unjoined edges (in tiles; 1e9 on F, which has none) */
 function cubeStraitDist(x, y){ const N = OW_COLS >> 2, f = cubeFace(x, y); if (f < 0) return 0; const o = CUBE_O[f], ix = x - o[0]*N + 0.5, iy = y - o[1]*N + 0.5, L = ix, R = N - ix, U = iy, Dn = N - iy;
+  if (owCube17()) return Math.max(0, cubeCornerDist(x, y) - 3);   /* (RS-637, generator 17: no edge keeps a sea, only the corners) */
   if (owCube16()){ let d = f===3 ? Math.min(U, Dn, R) : f===0 ? L : f===4 ? U : f===5 ? Dn : 1e9;   /* (RS-633, generator 16: the back face's three edges have no room beside them in the grid for the generator to see across) */
     for (const [cx, cy] of [[N, N], [2*N, N], [N, 2*N], [2*N, 2*N]]){ const r = Math.hypot(x + 0.5 - cx, y + 0.5 - cy) - 3; if (r < d) d = Math.max(0, r); }   /* (and where three faces meet round the middle one) */
     return d; }
@@ -8241,8 +8249,27 @@ function owGen15Fill(at, seed, elev, moist, n, nc, rng){
 /* a range on a planet: where the plates' push is strong enough, broken by passes; the very highest ground is mountain too */
 function owPlanetMtn(x, y, e, seed){
   if (e < 0.47) return false; const o = OW_PLANET_OROG[y*OW_COLS + x];
-  if (fbm2D(x+7700, y+7700, seed, 2, 1/11, 0.5) < 0.3) return false;   /* (a pass) */
+  if ((owCube17() ? owSphereNoise(x, y, seed + 7700, 2, 11) : fbm2D(x+7700, y+7700, seed, 2, 1/11, 0.5)) < 0.3) return false;   /* (a pass) */
   return o > 0.36 || e > 0.86;
+}
+/* (RS-637) a cube-sphere's weather, generator 17: the winds blow round true circles of latitude - two laps of each, its steps as long as
+   they are on the ground, so the rain shadows lie behind the ranges on the polar faces too (their grid's rows aren't latitudes) - then
+   smoothed over the faces' edges; the coast's damp measured over them; the noise from the sphere */
+function owGen17Moisture(elev, moist, seed){
+  const W = OW_COLS, H = OW_ROWS, N = cubeN(), ta = Math.PI/2/N, sum = new Float32Array(W*H), cnt = new Uint16Array(W*H);
+  const mt = (x, y)=>elev[x][y] >= 0.47 && owRangeAt(x, y, elev[x][y], seed, 11), NR = H, NL = 2*W;
+  for (let r=0; r<NR; r++){ const lat = (0.5 - (r + 0.5)/NR)*Math.PI, b = Math.abs(lat)/(Math.PI/2), dir = b < 1/3 || b > 2/3 ? -1 : 1, cl = Math.cos(lat), sl = Math.sin(lat), step = Math.max(0.02, cl*(Math.PI*2/NL)/ta); let h = 0.8;
+    for (let k=0; k<NL*2; k++){ const lon = (dir > 0 ? k : -k)*(Math.PI*2/NL), t = cubeDirTile([cl*Math.sin(lon), sl, cl*Math.cos(lon)]), x = Math.min(W - 1, Math.floor(t.x)), y = Math.min(H - 1, Math.floor(t.y)), e = elev[x][y];
+      if (e < 0.47) h = Math.min(1, h + 0.07*step); else if (mt(x, y)) h *= Math.pow(0.8, step); else if (e > 0.6) h *= Math.pow(0.955, step); else h *= Math.pow(0.988, step);
+      if (k >= NL){ const i = y*W + x; sum[i] += h; cnt[i]++; } } }
+  let wind = new Float32Array(W*H); for (let i=0;i<W*H;i++) wind[i] = cnt[i] ? sum[i]/cnt[i] : 0.8;
+  for (let pass=0; pass<2; pass++){ const nw = new Float32Array(W*H); for (let x=0;x<W;x++) for (let y=0;y<H;y++){ if (cubeFace(x, y) < 0) continue; let a = wind[y*W + x]*2, n = 2;
+      for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]){ const q = owOff(x, y, dx, dy); if (q){ a += wind[q[1]*W + q[0]]; n++; } } nw[y*W + x] = a/n; } wind = nw; }   /* (smoothed, over the edges too) */
+  const dist = new Int16Array(W*H).fill(-1), q = []; for (let x=0;x<W;x++) for (let y=0;y<H;y++) if (cubeFace(x, y) >= 0 && elev[x][y] < 0.47){ dist[y*W + x] = 0; q.push(y*W + x); }
+  for (let h=0; h<q.length; h++){ const j = q[h], x = j % W, y = (j/W)|0; for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]){ const o = owOff(x, y, dx, dy); if (!o) continue; const k = o[1]*W + o[0]; if (dist[k] >= 0) continue; dist[k] = dist[j] + 1; q.push(k); } }
+  for (let x=0;x<W;x++) for (let y=0;y<H;y++){ if (cubeFace(x, y) < 0){ moist[x][y] = 0.5; continue; }
+    const d = dist[y*W + x], coast = d >= 0 ? Math.exp(-d/5) : 0, nz = owSphereNoise(x, y, seed + 500, 4, 22), nz2 = owSphereNoise(x, y, seed + 2100, 3, 9);
+    moist[x][y] = clamp(0.06 + wind[y*W + x]*0.6 + coast*0.14 + (nz - 0.5)*0.5 + (nz2 - 0.5)*0.22, 0, 1); }
 }
 function owGen11Moisture(elev, moist, seed){
   const W = OW_COLS, H = OW_ROWS, cy = H/2, wind = [], mt = (x, y)=>elev[x][y] >= 0.47 && owRangeAt(x, y, elev[x][y], seed, 11);
@@ -8268,7 +8295,7 @@ function owGen11After(elev, moist, rng){
     if (t!==OW_TUNDRA && elev[x][y] < 0.5 && near(x, y, OW_RIVER, 1) && near(x, y, OW_WATER, 1) && moist[x][y] > 0.4){ M[x][y] = OW_SWAMP; st.mouths++; } }
   const lab = new Int32Array(W*H).fill(-1);
   for (let x=0;x<W;x++) for (let y=0;y<H;y++){ if (M[x][y]===OW_WATER || lab[y*W + x] >= 0) continue; const cells = [y*W + x]; lab[y*W + x] = 1;
-    for (let h=0; h<cells.length; h++){ const j = cells[h], a = j % W, b = (j/W)|0; for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]){ const u = a + dx, v = b + dy; if (u<0||v<0||u>=W||v>=H) continue; const k = v*W + u; if (lab[k] >= 0 || M[u][v]===OW_WATER) continue; lab[k] = 1; cells.push(k); } }
+    for (let h=0; h<cells.length; h++){ const j = cells[h], a = j % W, b = (j/W)|0; for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]){ let u = a + dx, v = b + dy; if (owCube17()){ const oq = owOff(a, b, dx, dy); if (!oq) continue; u = oq[0]; v = oq[1]; } if (u<0||v<0||u>=W||v>=H) continue; const k = v*W + u; if (lab[k] >= 0 || M[u][v]===OW_WATER) continue; lab[k] = 1; cells.push(k); } }
     if (cells.length < 25){ st.specks++; st.speckTiles += cells.length; for (const j of cells) M[j % W][(j/W)|0] = OW_WATER; } }
 }
 /* a town: on its race's own ground on a landmass of some size, near a river or the coast - then the same without the water, then anywhere
@@ -8277,7 +8304,7 @@ let OW_MASS11 = null;   /* (the landmasses' sizes for town placement - kept off 
 function owGen11Town(placeFeature, placed, rfn, racePref){
   const W = OW_COLS, H = OW_ROWS, M = G.ow.map; let size = OW_MASS11;
   const key = G.ow.seed + '|' + W + 'x' + H + '|' + wgContinent(); if (!size || size.ver !== key){ const lab = new Int32Array(W*H).fill(-1), sz = []; for (let x=0;x<W;x++) for (let y=0;y<H;y++){ if (M[x][y]===OW_WATER || lab[y*W + x] >= 0) continue; const id = sz.length, cells = [y*W + x]; lab[y*W + x] = id;
-      for (let h=0; h<cells.length; h++){ const j = cells[h], a = j % W, b = (j/W)|0; for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]){ const u = a + dx, v = b + dy; if (u<0||v<0||u>=W||v>=H) continue; const k = v*W + u; if (lab[k] >= 0 || M[u][v]===OW_WATER) continue; lab[k] = id; cells.push(k); } } sz.push(cells.length); }
+      for (let h=0; h<cells.length; h++){ const j = cells[h], a = j % W, b = (j/W)|0; for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]){ let u = a + dx, v = b + dy; if (owCube17()){ const oq = owOff(a, b, dx, dy); if (!oq) continue; u = oq[0]; v = oq[1]; } if (u<0||v<0||u>=W||v>=H) continue; const k = v*W + u; if (lab[k] >= 0 || M[u][v]===OW_WATER) continue; lab[k] = id; cells.push(k); } } sz.push(cells.length); }
     size = OW_MASS11 = { ver:key, lab, sz }; }
   const big = (x, y)=>size.sz[size.lab[y*W + x]] >= 300, wet = (x, y)=>{ for (let dx=-3; dx<=3; dx++) for (let dy=-3; dy<=3; dy++){ const u = x + dx, v = y + dy; if (u>=0 && v>=0 && u<W && v<H && (M[u][v]===OW_RIVER || M[u][v]===OW_WATER)) return true; } return false; };
   const rp = racePref || (()=>true);
@@ -8412,7 +8439,7 @@ function generateOverworld(seed){
   }
 
   const ranges = (G.ow.genVer||1) >= 2, v11 = (G.ow.genVer||1) >= 11;
-  if (v11) owGen11Moisture(elev, moist, seed);   /* (RS-618: wet coasts, dry behind the ranges - it was noise of its own) */
+  if (v11 && planet && owCube17()) owGen17Moisture(elev, moist, seed); else if (v11) owGen11Moisture(elev, moist, seed);   /* (RS-618: wet coasts, dry behind the ranges - it was noise of its own) */
   if (planet) for (let x=0;x<OW_COLS;x++) for (let y=0;y<OW_ROWS;y++){ const phi = owTileLatN(x, y)*Math.PI/2;   /* (RS-630: the tile's own latitude, on a cube-sphere too) */   /* (RS-625: the planet's belts - wet at the equator and about 60 degrees, dry about 30 and at the poles) */
     moist[x][y] = clamp(moist[x][y] + Math.cos(phi*6)*0.17 + (phi < 0.2 ? 0.06 : 0) + (owCube() ? -0.08 : 0.12), 0, 1); }
   // temperature: warmer toward the map's mid-latitude, cooler near the
@@ -8422,7 +8449,7 @@ function generateOverworld(seed){
     for (let y=0;y<OW_ROWS;y++){
       const e = elev[x][y], m = moist[x][y];
       const latitude = planet ? Math.cos(Math.abs(y + 0.5 - cy)/cy*Math.PI/2)*1.08 - 0.08 : 1 - Math.pow(Math.abs(y-cy)/cy, 1.3);   /* (a planet: by the sun's height) */
-      const t = planet ? clamp(0.88 - 1.05*Math.pow(owTileLatN(x, y), 1.5) - (e - 0.47)*0.6 + (fbm2D(x+900,y+900,seed,3,1/30,0.5)-0.5)*0.3, 0, 1)   /* (RS-625: a planet's warmth by latitude - hot at the equator, deserts about 30 degrees, tundra from about 65 - and colder with height) */
+      const t = planet ? clamp(0.88 - 1.05*Math.pow(owTileLatN(x, y), 1.5) - (e - 0.47)*0.6 + ((owCube17() ? owSphereNoise(x, y, seed + 900, 3, 30) : fbm2D(x+900,y+900,seed,3,1/30,0.5))-0.5)*0.3, 0, 1)   /* (RS-625: a planet's warmth by latitude - hot at the equator, deserts about 30 degrees, tundra from about 65 - and colder with height) */
         : clamp(0.22 + latitude*0.68 - e*(v11 ? 0.42 : 0.28) + (v11 ? 0.05 : 0) + (fbm2D(x+900,y+900,seed,3,1/30,0.5)-0.5)*0.3, 0, 1);   /* (RS-618: colder with height - tundra on high ground, not only at the edges) */
       let tile; if (planet && window.__planetDbg && e >= 0.47) window.__planetDbg.push([t, m, e, owTileLatN(x, y)]);
       if (e < 0.47) tile = OW_WATER;
@@ -45252,7 +45279,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-636';
+const GAME_VERSION = 'rs-637';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

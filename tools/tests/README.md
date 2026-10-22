@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs637 | generator 17: no narrow seas on a Planet's face edges, small seas only at the eight cube corners, land over the edges with the ground matching across them about as often as inside a face; a generator 16 planet unchanged |
 | rs636 | the hand-written shaders on the open land bend with a planet's curve: fishing ripples, bubbles and glows (and rain, fireflies, spell sparks) no longer hang in the air from afar |
 | rs635 | no glowing ring on the ground round a gathering spot on the open land; the spots still there to click |
 | rs634 | walking works on every face of a Planet: the arrow keys and a click on the ground move you on faces other than the middle one, the figure measured where it is drawn |
