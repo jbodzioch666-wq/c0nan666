@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs630 | generator 15: a Planet is a cube-sphere of six 124-tile faces: every tile to the sphere and back, a step over each of the 12 edges lands beside it, tiles near one size, land over the joined edges, the preview a world map; a generator 14 Planet unchanged |
 | rs629 | a Planet is round: sailing west off the edge comes in at the east and back, sight revealed across the seam, the 3D land rebuilt on the far side; other sizes still stop at the edge |
 | rs628 | on a Planet world the map is the globe at every zoom, the chart laid over it: opens turned to you, a town found and a pin dropped by clicking the globe, turns where the map is moved, zooms from the whole world to the chart's nearest, smooth to drag; other sizes keep the flat chart |
 | rs625 | the Planet size (generator 14): plates, about a third land, ranges where plates push, deserts in the dry belts, tundra poleward, sea down the seam and at the poles; world code W, saves and loads; zoomed right out the map is a globe you drag to turn and zoom back into the chart; other sizes unchanged |

@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## RS-630 - A true sphere
+
+- **New Planet worlds are built as a real sphere.** The land is laid on a cube-sphere: six square faces blown up into a ball, each 124 tiles across. Every tile is close to the same size everywhere on the planet (the largest is under 1.5 times the smallest), and nothing is stretched toward the poles.
+- **The poles keep their land.** With nothing stretched there, the north and south now have real polar lands of tundra and ice, instead of being pushed under the sea.
+- **The globe is the real shape.** It's built face by face from the planet itself, and the map's icons and names keep their proper shape at every latitude. They're only turned on the two polar faces.
+- **The world preview is a proper world map,** drawn from the sphere, with its provinces.
+- **Narrow seas mark some of the cube's edges, for now.** Land runs freely across five of the cube's twelve edges. The other seven are kept as narrow seas a few tiles wide, which only boats cross, until the 3D land can be laid out across them. The generator turns the planet to put those seas over ocean as far as it can.
+- **Your Planet world stays as it was.** Only new Planet worlds use the sphere; other world sizes are unchanged.
+
 ## RS-629 - A round world
 
 - **Sail all the way round a Planet.** East and west now meet: sail off one edge of the world and you come in at the other. Before, the edge of the map was a wall.

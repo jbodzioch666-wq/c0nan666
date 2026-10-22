@@ -299,6 +299,14 @@ _World generation and overworld content_
 212. [x] (473) Auto-walk along roads to a chosen destination
 213. [x] (58) Wilderness zone - a lawless region with riskier encounters and better loot, where you drop items on death
 
+#### Sphere grid: what's left (for a Fable pass; RS-629 to RS-630 did the first part)
+- [ ] The 3D land laid out across the cube's seven unjoined edges: a local frame unfolded round the player from `owOff`, so the narrow seas the generator keeps along them (`cubeStraitDist` in `owGen15Fill`) can go
+- [ ] The view turned a quarter (`ISO.rot`) when you cross a face edge whose grid is turned, so the keys keep their directions
+- [ ] Every "next tile" in the generator and the game through `owNb`/`owOff` (rivers, roads and their A*, floods, ferries, the route planner, encounters' wandering, the minimap), not the flat grid's x+1
+- [ ] The winds (`owGen11Moisture`) on the north and south faces, whose rows aren't lines of latitude
+- [ ] Map icons and names drawn upright on the polar faces (they're laid in the face's own grid, so turned)
+- [ ] Distances, town counts and travel times retuned for a planet with `tools/sim`
+
 ### World map
 _The parchment map, after the world it draws_
 

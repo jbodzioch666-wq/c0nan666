@@ -39,7 +39,7 @@ module.exports = async page=>{
   Object.assign(r, r2); console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
   A(r.flatOther, 'another size keeps the flat chart');
-  A(r.open.on && r.open.pa > 0.99 && r.open.facing && Math.abs(r.open.zs - 1.25) < 0.05, 'on a planet the map opens as the globe, turned to you, with the chart laid over it');
+  A(r.open.on && r.open.pa > 0.99 && r.open.facing && Math.abs(r.open.zs - 2.2) < 0.05, 'on a planet the map opens as the globe, turned to you, with the chart laid over it');
   A(r.town, 'a town is found where it shows on the globe');
   A(r.pin, 'a new pin opens where you click on the globe');
   A(r.turns, 'moving the map elsewhere turns the globe there');
