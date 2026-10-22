@@ -8166,6 +8166,9 @@ function owTileLatN(x, y){ if (owCube()){ const d = cubeTileDir(x, y); return d 
 function owWraps(){ return owIsPlanet() && !owCube(); }
 function owNb(x, y, dx, dy){ if (owCube()) return owOff(x, y, dx, dy); let nx = x + dx; const ny = y + dy; if (ny < 0 || ny >= OW_ROWS) return null;
   if (nx < 0 || nx >= OW_COLS){ if (!owWraps()) return null; nx = ((nx % OW_COLS) + OW_COLS) % OW_COLS; } return [nx, ny]; }
+/* (RS-638) the step (one of the eight) that takes you from one tile to the next one on a path */
+function owStepTo(ax, ay, bx, by){ const dx = bx - ax, dy = by - ay; if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1 && !owCube()) return [dx, dy];
+  for (const d of DIR8){ const q = owNb(ax, ay, d[0], d[1]); if (q && q[0]===bx && q[1]===by) return [d[0], d[1]]; } return [Math.sign(dx), Math.sign(dy)]; }
 function owWrapX(x){ return owWraps() ? ((x % OW_COLS) + OW_COLS) % OW_COLS : x; }
 function owIsPlanet(){ return !!(G.worldSizeTier==='planet' && G.ow && (G.ow.genVer||1) >= 14); }
 function smoothstep(a, b, t){ const k = clamp((t - a)/(b - a), 0, 1); return k*k*(3 - 2*k); }
@@ -9246,8 +9249,7 @@ function moveOverworldEncounters(){
     } else {
       const d = dirs4[rn(4)]; dx=d[0]; dy=d[1];
     }
-    const nx=e.x+dx, ny=e.y+dy;
-    if (nx<0||ny<0||nx>=OW_COLS||ny>=OW_ROWS) continue;
+    const nbe = owNb(e.x, e.y, dx, dy); if (!nbe) continue; const nx = nbe[0], ny = nbe[1];   /* (RS-638: round a planet and over its edges) */
     if (!encounterEligible(G.ow.map[nx][ny])) continue;
     if (owWetT(G.ow.map[nx][ny]) !== !!encWet(e)) continue;   /* (RS-369) land stays on land, sea on sea */
     if (G.ow.road && wgRoadAt(nx,ny) && !(dist>0 && dist<=noticeR) && chn(0.8)) continue;   // roamers mostly keep off the roads
@@ -10970,7 +10972,7 @@ function renderMiniMap(){
     cv.addEventListener('click', e=>{ if (!MM.view) return; const r = cv.getBoundingClientRect(), fx = (e.clientX-r.left)/r.width*cv.width, fy = (e.clientY-r.top)/r.height*cv.height;
       const S0 = cv.width, a = -(MM.rot||0), ux = fx - S0/2, uy = fy - S0/2, rx = ux*Math.cos(a) - uy*Math.sin(a) + S0/2, ry = ux*Math.sin(a) + uy*Math.cos(a) + S0/2;   /* (undo the minimap's turn, RS-140) */
       const x = Math.floor(MM.view.x0 + rx/MM.view.c), y = Math.floor(MM.view.y0 + ry/MM.view.c);
-      if (G.gameMode===0 && o3Active()) o3WalkTo({ kind:'ground', x, y }); else if (G.gameMode===3 && v3Active()) v3WalkTo({ kind:'ground', x, y, fx:x+0.5, fz:y+0.5 }); });
+      if (G.gameMode===0 && o3Active()){ const g = o3G(x, y); if (g) o3WalkTo({ kind:'ground', x:g[0], y:g[1] }); }   /* (RS-638: the minimap is in the frame; the walk is in the world) */ else if (G.gameMode===3 && v3Active()) v3WalkTo({ kind:'ground', x, y, fx:x+0.5, fz:y+0.5 }); });
     cv.addEventListener('contextmenu', e=>e.preventDefault()); }
   cv.style.display = 'block';
   const now = performance.now(); if (now - MM.t < 180) return; MM.t = now;
@@ -10982,19 +10984,20 @@ function renderMiniMap(){
   c.translate(S/2, S/2); c.rotate(rot); c.translate(-S/2, -S/2);
   const dot = (x, y, r, col, ring)=>{ c.fillStyle = col; c.beginPath(); c.arc(x, y, r, 0, Math.PI*2); c.fill(); if (ring){ c.strokeStyle = ring; c.lineWidth = 1.2; c.stroke(); } };
   if (G.gameMode===0){
-    const R = 20, cs = S/(2*R+1), x0 = G.owPos.x - R, y0 = G.owPos.y - R; MM.view = { x0, y0, c:cs };
-    for (let j=-9;j<=2*R+9;j++) for (let i=-9;i<=2*R+9;i++){   /* (a margin round the edge, so the turned square's corners are filled) */ const x = x0+i, y = y0+j; if (x<0||y<0||x>=OW_COLS||y>=OW_ROWS || !owSeen(x,y)) continue;
-      const t = G.ow.map[x][y]; let col;
+    const R = 20, cs = S/(2*R+1), PLm = o3PL(), x0 = PLm.x - R, y0 = PLm.y - R; MM.view = { x0, y0, c:cs };   /* (RS-638: in the 3D land's frame) */
+    const at = (lx, ly)=>{ const g = o3G(lx, ly); return g && owSeen(g[0], g[1]) ? g : null; }, ML = (gx, gy)=>{ const l = o3L(gx, gy); return l ? [l[0] - x0, l[1] - y0] : [-99, -99]; };
+    for (let j=-9;j<=2*R+9;j++) for (let i=-9;i<=2*R+9;i++){   /* (a margin round the edge, so the turned square's corners are filled) */ const g = at(x0+i, y0+j); if (!g) continue;
+      const t = G.ow.map[g[0]][g[1]]; let col;
       if (t===OW_WATER) col = '#24406a'; else if (t===OW_RIVER) col = '#3460a0';
       else { const rgb = O3_COL[t] || O3_COL[OW_GRASS]; col = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`; }
       c.fillStyle = col; c.fillRect(i*cs, j*cs, cs+0.6, cs+0.6); }
-    for (let j=-9;j<=2*R+9;j++) for (let i=-9;i<=2*R+9;i++){ const x = x0+i, y = y0+j; if (x<0||y<0||x>=OW_COLS||y>=OW_ROWS || !owSeen(x,y)) continue;
-      const t = G.ow.map[x][y]; if (OW_SITE_TILES.includes(t)) dot((i+0.5)*cs, (j+0.5)*cs, t===OW_TOWN ? cs*1.3 : cs*0.95, PM_SITE_BRIGHT[t]||'#fff', 'rgba(0,0,0,0.7)'); }
-    for (const e of (G.ow.encounters||[])){ const i = e.x-x0, j = e.y-y0; if (i>=-9 && j>=-9 && i<=2*R+9 && j<=2*R+9 && owSeen(e.x,e.y)) dot((i+0.5)*cs, (j+0.5)*cs, cs*0.6, e.merchant ? MERCHANT_COL : '#ff3a3a'); }
-    for (const b of (G.ow.mythicBeasts||[])){ if (b.slain || !mythicFound(b)) continue; const i = b.x-x0, j = b.y-y0; if (i>=-9 && j>=-9 && i<=2*R+9 && j<=2*R+9) dot((i+0.5)*cs, (j+0.5)*cs, cs*0.95, COL.mythic, '#000'); }   /* (RS-179) */
-    for (const q of questsShown()){ const t = questTarget(q); if (!t) continue; const i = clamp(t.x-x0, 0, 2*R), j = clamp(t.y-y0, 0, 2*R); dot((i+0.5)*cs, (j+0.5)*cs, cs*0.8, t.turnIn ? '#5ab0ff' : '#ffd24a', '#000'); }
-    for (const gv of gravesP()){ const i = clamp(gv.x-x0, 0, 2*R), j = clamp(gv.y-y0, 0, 2*R); dot((i+0.5)*cs, (j+0.5)*cs, cs*0.8, '#e8e8f0', '#000'); }
-    for (const tm of trailMarks()){ const i = clamp(tm.x-x0, 0, 2*R), j = clamp(tm.y-y0, 0, 2*R), mx = (i+0.5)*cs, my = (j+0.5)*cs, k = Math.max(2.5, cs*0.75);   /* (RS-433: the X on your map) */
+    for (let j=-9;j<=2*R+9;j++) for (let i=-9;i<=2*R+9;i++){ const g = at(x0+i, y0+j); if (!g) continue;
+      const t = G.ow.map[g[0]][g[1]]; if (OW_SITE_TILES.includes(t)) dot((i+0.5)*cs, (j+0.5)*cs, t===OW_TOWN ? cs*1.3 : cs*0.95, PM_SITE_BRIGHT[t]||'#fff', 'rgba(0,0,0,0.7)'); }
+    for (const e of (G.ow.encounters||[])){ const [i, j] = ML(e.x, e.y); if (i>=-9 && j>=-9 && i<=2*R+9 && j<=2*R+9 && owSeen(e.x,e.y)) dot((i+0.5)*cs, (j+0.5)*cs, cs*0.6, e.merchant ? MERCHANT_COL : '#ff3a3a'); }
+    for (const b of (G.ow.mythicBeasts||[])){ if (b.slain || !mythicFound(b)) continue; const [i, j] = ML(b.x, b.y); if (i>=-9 && j>=-9 && i<=2*R+9 && j<=2*R+9) dot((i+0.5)*cs, (j+0.5)*cs, cs*0.95, COL.mythic, '#000'); }   /* (RS-179) */
+    for (const q of questsShown()){ const t = questTarget(q); if (!t) continue; const m0 = ML(t.x, t.y), i = clamp(m0[0], 0, 2*R), j = clamp(m0[1], 0, 2*R); dot((i+0.5)*cs, (j+0.5)*cs, cs*0.8, t.turnIn ? '#5ab0ff' : '#ffd24a', '#000'); }
+    for (const gv of gravesP()){ const m0 = ML(gv.x, gv.y), i = clamp(m0[0], 0, 2*R), j = clamp(m0[1], 0, 2*R); dot((i+0.5)*cs, (j+0.5)*cs, cs*0.8, '#e8e8f0', '#000'); }
+    for (const tm of trailMarks()){ const m0 = ML(tm.x, tm.y), i = clamp(m0[0], 0, 2*R), j = clamp(m0[1], 0, 2*R), mx = (i+0.5)*cs, my = (j+0.5)*cs, k = Math.max(2.5, cs*0.75);   /* (RS-433: the X on your map) */
       dot(mx, my, k*1.25, '#e8d8a8', '#000'); c.strokeStyle = '#b01e1e'; c.lineWidth = Math.max(1.6, cs*0.35); c.beginPath(); c.moveTo(mx-k*0.7, my-k*0.7); c.lineTo(mx+k*0.7, my+k*0.7); c.moveTo(mx+k*0.7, my-k*0.7); c.lineTo(mx-k*0.7, my+k*0.7); c.stroke(); }
   } else {
     const cs = S/Math.max(COLS, ROWS), ox = (S - COLS*cs)/2, oy = (S - ROWS*cs)/2; MM.view = { x0:-ox/cs, y0:-oy/cs, c:cs };
@@ -19475,8 +19478,7 @@ function owBfs(sx, sy, tx, ty){
     const j = q[qh++]; if (j===goal) break;
     const x = j%W, y = (j/W)|0;
     for (let d=0; d<8; d++){
-      const nx = x + DIR8[d][0], ny = y + DIR8[d][1];
-      if (nx<0 || ny<0 || nx>=W || ny>=OW_ROWS) continue;
+      const nb = owNb(x, y, DIR8[d][0], DIR8[d][1]); if (!nb) continue; const nx = nb[0], ny = nb[1];   /* (RS-638: round a planet and over its faces' edges) */
       const k = ny*W+nx; if (prev[k]>=0) continue;
       if (!o3Passable(nx,ny) || !diagClear(x, y, DIR8[d][0], DIR8[d][1], o3Passable)) continue;
       if (k!==goal && OW_SITE_TILES.includes(G.ow.map[nx][ny])) continue;   // stepping on a site enters it, so the path goes round
@@ -19516,7 +19518,7 @@ function graveButton(){
   const byRoad = p.routeRoads !== false && G.ow.road, path = (byRoad && wgRoutePath(G.owPos.x, G.owPos.y, g.x, g.y)) || owBfs(G.owPos.x, G.owPos.y, g.x, g.y);
   if (!path || !path.length){ notify("You can't find a way to your gravestone on foot", 'warn'); return; }
   const steps = []; let px = G.owPos.x, py = G.owPos.y;
-  for (const j of path){ const x = j%OW_COLS, y = (j/OW_COLS)|0; steps.push([x-px, y-py]); px = x; py = y; }
+  for (const j of path){ const x = j%OW_COLS, y = (j/OW_COLS)|0; steps.push(owStepTo(px, py, x, y)); px = x; py = y; }
   G.owZoomedOut = false; pinClose(); hideItemTooltip();
   if (o3Active()){ O3.path = steps; O3.stepT = 0.05; O3.gatherAt = null; G.routeWalk = null; G.routeOn = false; G.graveOn = true; }
   else G.routeWalk = { steps, next:0, grave:true };
@@ -19543,7 +19545,7 @@ function routeClear(){ G.player.route = null; G.routeWalk = null; renderGame(); 
 function routeGo(){
   const r = routeInfo(); if (!r || !r.steps){ notify('Plan a route first: pick Route and click the map', 'warn'); return; }
   const steps = []; let px = G.owPos.x, py = G.owPos.y;
-  for (const j of r.tiles){ const x = j%OW_COLS, y = (j/OW_COLS)|0; steps.push([x-px, y-py]); px = x; py = y; }
+  for (const j of r.tiles){ const x = j%OW_COLS, y = (j/OW_COLS)|0; steps.push(owStepTo(px, py, x, y)); px = x; py = y; }   /* (RS-638: over a planet's edges too) */
   G.owZoomedOut = false; pinClose(); hideItemTooltip();
   if (o3Active()){ O3.path = steps; O3.stepT = 0.05; O3.gatherAt = null; G.routeWalk = null; G.routeOn = true; G.graveOn = false; }
   else G.routeWalk = { steps, next:0 };
@@ -21362,7 +21364,7 @@ function wgDijkstra(src, cost, targets, diag){
     if (targets && targets.has(j) && j!==src){ if (--left <= 0) break; }
     const x = j%W, y = (j/W)|0;
     for (let k=0;k<(diag ? 8 : 4);k++){
-      const v = WG_DIJ_DIRS[k]; let nx = x + v[0], ny = y + v[1]; if (OW_GENCUBE){ const q = owOff(x, y, v[0], v[1]); if (!q) continue; nx = q[0]; ny = q[1]; }   /* (RS-633: a road over a face's edge) */
+      const v = WG_DIJ_DIRS[k]; let nx = x + v[0], ny = y + v[1]; if (OW_GENCUBE){ const q = owOff(x, y, v[0], v[1]); if (!q) continue; nx = q[0]; ny = q[1]; } else if (WG_DIJ_NB){ const q = owNb(x, y, v[0], v[1]); if (!q) continue; nx = q[0]; ny = q[1]; }   /* (RS-633: a road over a face's edge) */
       if (nx<0 || ny<0 || nx>=W || ny>=OW_ROWS) continue;
       if (k>=4 && !diag(x, y, v[0], v[1])) continue;
       const n = ny*W+nx; let c = cost(nx, ny, n); if (c===Infinity) continue;
@@ -21379,7 +21381,8 @@ function wgGenerate(seed, elev){
   const W = OW_COLS, H = OW_ROWS, N = W*H, m = G.ow.map, sp = G.ow.spawnPos, rng = mulberry32((seed ^ 0x5bd1e995) >>> 0);
   const land = t=> t!==OW_WATER && t!==OW_MOUNTAIN;
   const site = t=> OW_SITE_TILES.includes(t);
-  const near = (x, y, tt, r)=>{ for (let i=-r;i<=r;i++) for (let j=-r;j<=r;j++){ const u = m[x+i] && m[x+i][y+j]; if (u===tt) return true; } return false; };
+  const c17 = OW_GENCUBE && owCube17(), at17 = (x, y, i, j)=>{ const q = owOff(x, y, i, j); return q ? m[q[0]][q[1]] : undefined; };   /* (RS-638, generator 17: a tile's surroundings over a face's edge) */
+  const near = (x, y, tt, r)=>{ for (let i=-r;i<=r;i++) for (let j=-r;j<=r;j++){ const u = c17 ? at17(x, y, i, j) : m[x+i] && m[x+i][y+j]; if (u===tt) return true; } return false; };
   const towns = []; for (let x=0;x<W;x++) for (let y=0;y<H;y++) if (m[x][y]===OW_TOWN) towns.push([x,y]);
   const townDist = (x, y)=>{ let d = 1e9; for (const [tx,ty] of towns) d = Math.min(d, Math.hypot(tx-x, ty-y)); return d; };
   // the Wilderness: along whichever edge lies farthest from the start
@@ -21462,7 +21465,7 @@ function wgGenerate(seed, elev){
   G.ow.bridges.filter(b=>Math.hypot(b.x-sp.x, b.y-sp.y) > 18).sort((a,b)=>o3Hash(a.x,a.y,seed%991)-o3Hash(b.x,b.y,seed%991)).slice(0, nBroken).forEach(b=>{ b.broken = true; for (const [x,y] of b.tiles) road[y*W+x] = 3; });
   // ferries: link every landmass that has a town to the start's, coast to coast
   const coastOf = c=>{ const out = []; for (let i=0;i<N;i++){ if (comp[i]!==c) continue; const x = i%W, y = (i/W)|0, t = m[x][y]; if (site(t) || t===OW_RIVER) continue;
-    if ([[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dy])=>m[x+dx] && m[x+dx][y+dy]===OW_WATER)) out.push(i); }
+    if ([[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dy])=>{ if (c17){ const q = owOff(x, y, dx, dy); return !!q && m[q[0]][q[1]]===OW_WATER; } return m[x+dx] && m[x+dx][y+dy]===OW_WATER; })) out.push(i); }   /* (RS-638: a coast, over a face's edge too) */
     // (generator 3: a pier stands on open coast, not on a pass or in a cove walled by mountains - unless the island has no other shore)
     const open = out.filter(i=>{ const x = i%W, y = (i/W)|0; return m[x][y]!==OW_MOUNTAINPASS && !owAmidMtn(x, y); }); return open.length ? open : out; };
   const tComps = [...new Set(tIdx.map(i=>comp[i]).filter(c=>c>=0))], linked = new Set([comp[sp.y*W+sp.x]]);
@@ -21487,7 +21490,7 @@ function wgGenerate(seed, elev){
   // points of interest
   const pois = G.ow.pois = [];
   const taken = (x, y, r)=> pois.some(p=>Math.abs(p.x-x) < r && Math.abs(p.y-y) < r) || G.ow.ferries.some(f=>[f.a,f.b].some(([px,py])=>Math.abs(px-x) < 3 && Math.abs(py-y) < 3));
-  const nearSite = (x, y, r)=>{ for (let i=-r;i<=r;i++) for (let j=-r;j<=r;j++){ const u = m[x+i] && m[x+i][y+j]; if (u!==undefined && site(u)) return true; } return false; };
+  const nearSite = (x, y, r)=>{ for (let i=-r;i<=r;i++) for (let j=-r;j<=r;j++){ const u = c17 ? at17(x, y, i, j) : m[x+i] && m[x+i][y+j]; if (u!==undefined && site(u)) return true; } return false; };
   const place = (k, n, ok, score)=>{
     for (let c=0;c<n;c++){
       let best = null, bs = -Infinity;
@@ -22367,12 +22370,13 @@ function wgWildWin(){
   logMsg(`the Wilderness pays well: ${gold} extra gold${extra}`, 'loot');
 }
 // the route planner's path: along the roads where it can, round sites, never through water you can't sail
+let WG_DIJ_NB = false;   /* (RS-638: a route planned in play goes by the world's own neighbours, over a planet's edges) */
 function wgRoutePath(sx, sy, tx, ty){
   if (sx===tx && sy===ty) return [];
   const W = OW_COLS, goal = ty*W+tx, src = sy*W+sx;
   const cost = (x, y, n)=>{ if (!o3Passable(x, y)) return Infinity; if (n!==goal && OW_SITE_TILES.includes(G.ow.map[x][y])) return Infinity;
     const k = wgRoadKind(x, y); return k===1 || k===2 || k===4 ? 1 : k===3 ? 3 : G.ow.map[x][y]===OW_RIVER ? 4 : 2.2; };
-  const { prev } = wgDijkstra(src, cost, new Set([goal]), (x, y, dx, dy)=>diagClear(x, y, dx, dy, o3Passable));
+  WG_DIJ_NB = owIsPlanet(); let prev; try{ prev = wgDijkstra(src, cost, new Set([goal]), (x, y, dx, dy)=>diagClear(x, y, dx, dy, o3Passable)).prev; } finally { WG_DIJ_NB = false; }
   if (prev[goal] < 0) return null;
   const out = []; for (let c = goal; c!==src && c!==-1; c = prev[c]) out.push(c);
   return out.reverse();
@@ -45279,7 +45283,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-637';
+const GAME_VERSION = 'rs-638';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

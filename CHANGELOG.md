@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-638 - Routes and the minimap over the edges
+
+- **Plan routes across face edges.** On a Planet, the world map's route planner, by road or across country, now finds the way over the edges between faces, and auto-walk follows it there.
+- **The minimap shows what's past an edge.** It's drawn the same way as the 3D land, so near an edge it shows the land on the other side, and clicking it walks you there.
+- **Wandering monsters cross edges too.** Groups on the land and at sea now wander across face edges, and round the old seam, instead of stopping at them.
+- **Coasts found correctly at edges.** In new Planet worlds, ferry piers and places by the water no longer mistake a face edge for a shore.
+
 ## RS-637 - One unbroken planet
 
 - **All the narrow seas between faces are gone.** On a new Planet world, the land runs freely over every edge between the planet's faces, including the three that still had a sea. The only seas left are small ones at the eight points where three faces meet, and the generator turns the planet to put those over ocean where it can.

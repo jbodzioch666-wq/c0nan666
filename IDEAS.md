@@ -305,7 +305,7 @@ _World generation and overworld content_
 - [x] (RS-637, generator 17: only the eight corners keep a sea) The last three narrow seas, all on the back face's edges (T top to B top, D bottom to B bottom, B east to L west): they have no void beside them in the grid for the ghost strip, so the generator can't see over them - a grid with a margin, or the remaining generator passes on `owOff`
 - [x] The view turned a quarter (`ISO.rot`) when you cross a face edge whose grid is turned, so the keys keep their directions (RS-632)
 - [x] The land curving away at the horizon (RS-631, `DC_CURVE` in three's project_vertex chunk; 2.5 times the true curve so it shows)
-- [ ] Every "next tile" in the generator and the game through `owNb`/`owOff` (rivers, roads and their A*, floods, ferries, the route planner, encounters' wandering, the minimap), not the flat grid's x+1
+- [x] Every "next tile" in the generator and the game through `owNb`/`owOff` (RS-633 to RS-638: rivers, roads, floods, landmasses, coasts; the route planners, `owStepTo`, the minimap in the frame, encounters' wandering)
 - [x] The winds on the north and south faces (RS-637, `owGen17Moisture`: round true latitudes; the weather's noise from the sphere, `owSphereNoise`)
 - [ ] Map icons and names drawn upright on the polar faces (they're laid in the face's own grid, so turned)
 - [ ] Distances, town counts and travel times retuned for a planet with `tools/sim`
