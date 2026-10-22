@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-634 - Walking on every face
+
+- **Fixed: you couldn't move on most of a Planet.** On any face but the middle one, neither the arrow keys nor clicking the ground moved you. The game holds each step until your figure catches up, and since RS-632 it was checking the figure against the wrong position, so it never thought you'd arrived. Keys and clicks now walk on every face.
+
 ## RS-633 - Walk the face edges
 
 - **Most of the narrow seas are gone.** On a new Planet world, land, rivers and roads now run straight across four of the seven edges between the planet's faces: both sides of the north face and both sides of the south face. You can walk across them on foot, and the 3D land carries on unbroken.

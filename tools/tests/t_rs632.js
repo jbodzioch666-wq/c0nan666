@@ -20,7 +20,7 @@ module.exports = async page=>{
   const r2 = await page.evaluate(async ()=>{ const raf = ()=>new Promise(r=>requestAnimationFrame(r)), N = cubeN(), out = { steps:[] };
     G.owPos = { x:N + 1, y:N >> 1 }; G.ow.map[N + 1][N >> 1] = OW_WATER; for (let i=0;i<120;i++) await raf();
     let prevL = o3PL(), cont = true, switched = -1, rot0 = ISO.rot, gStepBefore = null, gStepAfter = null;
-    for (let k=0;k<12;k++){ const key = viewRotDir([-1, 0]), d = o3DirToG(key[0], key[1]), at = [G.owPos.x, G.owPos.y]; const exp = owNb(at[0], at[1], d[0], d[1]);
+    for (let k=0;k<12;k++){ const key = viewRotDir([-1, 0]), d = o3DirToG(key[0], key[1]), at = [G.owPos.x, G.owPos.y]; const exp = owNb(at[0], at[1], d[0], d[1]); if (exp) G.ow.map[exp[0]][exp[1]] = OW_WATER;   /* (a clear way: generator 16 lets land reach these edges) */
       tryMoveOverworld(d[0], d[1]); for (let i=0;i<20;i++) await raf(); const l = o3PL();
       if (switched < 0 && O3F.face!==4) switched = k; if (switched < 0 && Math.abs(l.x - prevL.x) + Math.abs(l.y - prevL.y)!==1) cont = false; prevL = l;
       if (k===5) gStepBefore = [G.owPos.x - at[0], G.owPos.y - at[1]]; if (k===10) gStepAfter = [G.owPos.x - at[0], G.owPos.y - at[1]]; out.steps.push([G.owPos.x, G.owPos.y, O3F.face, ISO.rot]); }

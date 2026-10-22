@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs634 | walking works on every face of a Planet: the arrow keys and a click on the ground move you on faces other than the middle one, the figure measured where it is drawn |
 | rs633 | generator 16: land, rivers and roads run over four of the seven unjoined cube edges (the seas there gone), seas left only on the back face's three edges and the middle face's corners, nothing left in the void, a walk on foot over the north face's edge continuous with land drawn past it |
 | rs632 | the 3D land's frame on a cube-sphere: the lookups exact both ways, the north face's frame that face, sailing over its edge continuous, the frame changing a few tiles in with the camera turned so a key walks the same way, sites clicked at their world place; flat worlds untouched |
 | rs631 | a Planet's 3D land bends away round you: the curve in three's shared vertex chunk, one uniform shared by every material, on only for a planet's open land and cleared after; clicks find the bent ground; other sizes flat |
@@ -558,3 +559,6 @@ Screenshots go to `tools/tests/shots/`.
 | zglobe2 | RS-628's globe map at the zoom it opens on, zoomed in, nearest, the whole world and up north (`ZSEEN=1` reveals the map): shots/zglobe2-<name>.png and frame times |
 | zcurve | a Planet's 3D land zoomed right out, with the curve (shots/zcurve-on.png) and without (zcurve-off.png) |
 | zframe | RS-632's frame: the 3D land on the north face and sailing west over its edge, with the frame, the camera's turns and the player's place at each step |
+| zmove | does walking work: real arrow keys and a click on the 3D ground, on a medium world and a Planet |
+| zmove2 | where a step fails on a Planet: each stage of a move by hand |
+| zmove3 | a click on the 3D ground walks you there, on a Planet, on three faces |
