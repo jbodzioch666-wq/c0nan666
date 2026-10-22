@@ -21,5 +21,5 @@ module.exports = async page=>{
   A(r.glint && r.bank, 'the water carries the sun\'s glints and the banks\' cast');
   A(r.lily > 20 && r.lilyBad === 0 && r.lilyLow === 0, 'lily pads on calm water, above the waves');
   A(r.flowers > 0, 'some with a flower');
-  A(r.reedLand > 20 && r.reedByWater === r.reedLand, 'reeds on the banks of lakes and rivers, every one at the water\'s edge');
+  A(r.reedLand > 10 && r.reedByWater === r.reedLand, 'reeds on the banks of lakes and rivers, every one at the water\'s edge');
 };

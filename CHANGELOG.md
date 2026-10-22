@@ -1,5 +1,16 @@
 # Depthcrawl patch notes
 
+## RS-618 - A land made by its weather
+
+New worlds now come from world generator 11. Your current world and character are unchanged: an existing world keeps the generator it was made with. Across the same 12 test worlds:
+
+- **Mountain ranges, not blobs:** mountains run in longer, narrower chains with passes through them, instead of wide grey patches. They now cover 6-21% of the land instead of 21-35%. Only small hollows inside a range are filled in; a walled-in valley keeps its land and gets a pass.
+- **Weather that shapes the land:** moisture comes in on the wind off the sea and falls as the wind crosses the land, most of it on the near side of a range. The far side lies dry, and that's where the deserts and dry grassland are now. Coasts are damp. Before, moisture was random patches, which put deserts against swamps. High ground is colder too, so tundra can appear in the uplands, not only along the top and bottom of the map.
+- **Rivers that collect water:** about two and a half times as many rivers. They rise on wet uplands, often at the foot of a range, and run down into one another and the sea, covering about twice as much land as before. The land along a river is greener: there's no desert at a river's edge, there's forest along its banks where it's damp, and marsh where it reaches the sea on low ground.
+- **No specks of land:** islands under 25 tiles go back to the sea. A world is now in 4-16 pieces instead of 19-62. Every town except your starting one sits on a landmass of at least 300 tiles, by preference near a river or the coast, on its race's home ground.
+- **The volcano stays off the roads:** the volcano chooses its spot after the roads are laid, and now keeps its slopes clear of them.
+- **Rivers flow the right way at bends:** a river tile beside a bend, with two ways downstream that cancelled each other out, showed still water. It now follows the way nearer the sea.
+
 ## RS-617 - Steps out from the door step
 
 - **The stair starts in front of the door step:** the steps up to a raised house began at the wall, so the stone door step in front of the door hid their top treads underneath it. They now come down from the front edge of that stone step, which works as the top tread: four wooden steps under a stilt house, two stone ones on a hill terrace.

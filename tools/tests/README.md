@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs618 | world generator 11: ranges in chains, wind-borne moisture, more rivers running together, green banks, no specks, towns on fair-sized land; the same seed remakes the same world; a generator 10 world comes out exactly as before |
 | rs616 | on a phone the roads are painted into the ground as on a computer (no old strips), the rest of the painted ground off (runs on an emulated phone) |
 | rs615 | a raised house (stilts in a marsh town, a hill terrace) has a stair up to its door; you climb it walking in and come down it walking out |
 | rs614 | the land build's end no longer walks the road mask's bytes (the merge under 40ms), and the mask is painted a few stretches a slice, the same as in one go |
@@ -528,7 +529,10 @@ Screenshots go to `tools/tests/shots/`.
 | zwalkprof | RS-505's walk at a phone's pace with a CPU profile and the land swap timed |
 | zsaves | every save in ZSAVES loaded and played a moment: any error, where it stands, what it kept |
 | zstilts | a marsh town on stilts (ZH=hill for a hill town): the tavern's stair, and you on it walking in (ZMS ms after the step) |
-| zhair | heads with each hairstyle from four sides, and under helmets |
+| zworlds | a dozen worlds side by side (ZN, ZSEEDS): maps, difficulty bands and numbers - writes Downloads/Depthcrawl world maps.html and shots/zworlds.png |
+| zvolcroad | where the road builder finds the volcano, against where the finished world has it |
+| zstill | RS-565's world: river tiles the flow left still, with the ground round each |
+| zroadms | heads with each hairstyle from four sides, and under helmets |
 | zplate | plate armour on builds from slight to heavy |
 | zunder | the creator's undressed figures by race and sex |
 | zphone | a save (`ZSAVE=path`) on an emulated phone with the CPU slowed 4x: frame times and a CPU profile |

@@ -17,7 +17,7 @@ module.exports = async page=>{
       let cut = 0; for (let x=0;x<W;x++) for (let y=0;y<H;y++) if (OW_SITE_TILES.includes(m[x][y]) && !reach[y*W+x]) cut++;
       for (const p of (G.ow.pois||[])) if (!reach[p.y*W+p.x]) cut++;
       const pct = mtn/land*100; (out[kind] = out[kind] || []).push(+pct.toFixed(1));
-      A(pct > 15 && pct < 45, `${kind}/${seed}: mountains ${pct.toFixed(1)}% of the land`);
+      A((G.ow.genVer||1) >= 11 ? (pct > 4 && pct < 30) : (pct > 15 && pct < 45), `${kind}/${seed}: mountains ${pct.toFixed(1)}% of the land`);   /* (RS-618: generator 11 lays them in narrower chains) */
       // nothing in the mountains but a lair: no site, point of interest, mythic beast or gathering spot on a pass or deep in a range
       const bad = [];
       for (let x=2;x<W-2;x++) for (let y=2;y<H-2;y++){ const t = m[x][y];

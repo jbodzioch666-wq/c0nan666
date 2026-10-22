@@ -7980,7 +7980,7 @@ function ensureSpawnEscape(){
 // (RS-106, generator 3: broader ranges, valleys walled in by them filled in as mountain, and nothing but a dragon's lair in or on them)
 // (RS-114, generator 4: a river that runs into a hollow fills it into a lake and flows on from its lowest edge)
 // (RS-115, generator 5: rivers join edge to edge - a diagonal step also fills the lower of its two side tiles)
-const OW_GEN_VER = 10;   /* (6: pyramids in the desert, RS-213; 7: a town for every race, RS-223; 8: roads skirt the volcano, RS-236; 9: landmarks on clear ground, RS-238) */
+const OW_GEN_VER = 11;   /* (6: pyramids in the desert, RS-213; 7: a town for every race, RS-223; 8: roads skirt the volcano, RS-236; 9: landmarks on clear ground, RS-238) */
 // any two river tiles that touch only at a corner get the lower of the two tiles beside them turned to river
 // (never a mountain, the sea or a lake); returns how many tiles it added
 function owRiverJoin(elev){
@@ -8027,14 +8027,60 @@ function owLakeFill(x0, y0, elev, st){
   st.cuts++;
   return { x:spill[0], y:spill[1] };
 }
-const OW_RANGE_V = { 2:{ r1:0.972, r2:0.985, e2:0.56, peak:0.9, gap:0.36, lift:0.035 }, 3:{ r1:0.95, r2:0.972, e2:0.55, peak:0.86, gap:0.32, lift:0.05 } };
+const OW_RANGE_V = { 2:{ r1:0.972, r2:0.985, e2:0.56, peak:0.9, gap:0.36, lift:0.035 }, 3:{ r1:0.95, r2:0.972, e2:0.55, peak:0.86, gap:0.32, lift:0.05 },
+  11:{ r1:0.962, r2:0.982, e2:0.6, peak:0.9, gap:0.3, lift:0.022, f1:1/44, f2:1/64 } };   /* (RS-618: longer, narrower chains - the ranges were blobs a quarter of the land) */
 const OW_POCKET_MAX = 160;   // (generator 3: walled-in land up to this many tiles becomes mountain)
+const OW_POCKET_MAX11 = 30;   /* (RS-618, generator 11: only small hollows - a walled valley keeps its land and gets a pass) */
 // a mountain where a ridge line runs (where a smooth noise field crosses its middle), wider on high ground, broken by passes;
 // a few lone peaks on the very highest land
+/* (RS-618) generator 11, the land made by its weather. Moisture: a wind off the sea - westerly, easterly in the warm middle band - picks
+   up wet over water and lets it fall as it crosses the land, most of it on the windward side of a range, so the far side lies dry (the
+   rain shadow, where the deserts go); and the coasts are damp. It was a noise field of its own, which set deserts against swamps */
+function owGen11Moisture(elev, moist, seed){
+  const W = OW_COLS, H = OW_ROWS, cy = H/2, wind = [], mt = (x, y)=>elev[x][y] >= 0.47 && owRangeAt(x, y, elev[x][y], seed, 11);
+  for (let x=0;x<W;x++) wind.push(new Float32Array(H));
+  for (let y=0;y<H;y++){ const dir = Math.abs(y - cy) < cy*0.28 ? -1 : 1; let h = 0.8;
+    for (let k=0;k<W;k++){ const x = dir > 0 ? k : W - 1 - k, e = elev[x][y];
+      if (e < 0.47) h = Math.min(1, h + 0.07); else if (mt(x, y)) h *= 0.8; else if (e > 0.6) h *= 0.955; else h *= 0.988;
+      wind[x][y] = h; } }
+  /* the coast's damp: how far each land tile is from the sea */
+  const dist = new Int16Array(W*H).fill(-1), q = []; for (let x=0;x<W;x++) for (let y=0;y<H;y++) if (elev[x][y] < 0.47){ dist[y*W + x] = 0; q.push(y*W + x); }
+  for (let h=0; h<q.length; h++){ const j = q[h], x = j % W, y = (j/W)|0; for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]){ const u = x + dx, v = y + dy; if (u<0||v<0||u>=W||v>=H) continue; const k = v*W + u; if (dist[k] >= 0) continue; dist[k] = dist[j] + 1; q.push(k); } }
+  for (let x=0;x<W;x++) for (let y=0;y<H;y++){ let w = 0, n = 0; for (let dy=-4; dy<=4; dy++){ const v = y + dy; if (v<0||v>=H) continue; const k = 5 - Math.abs(dy); w += wind[x][v]*k; n += k; }   /* (smoothed across the rows, so no streaks) */
+    const d = dist[y*W + x], coast = d >= 0 ? Math.exp(-d/5) : 0, nz = fbm2D(x+500, y+500, seed, 4, 1/22, 0.5);
+    const nz2 = fbm2D(x+1300, y+2100, seed, 3, 1/9, 0.5); moist[x][y] = clamp(0.06 + (w/n)*0.6 + coast*0.14 + (nz - 0.5)*0.5 + (nz2 - 0.5)*0.22, 0, 1); }   /* (and a finer noise, so the dry belt breaks up) */
+}
+/* after the rivers: their banks green (no desert at a river's edge, forest along it where it's damp), a swamp where a river meets the
+   sea on low ground, and land in specks of under 25 tiles given back to the sea */
+function owGen11After(elev, moist, rng){
+  const W = OW_COLS, H = OW_ROWS, M = G.ow.map, near = (x, y, t, r)=>{ for (let dx=-r; dx<=r; dx++) for (let dy=-r; dy<=r; dy++){ const u = x + dx, v = y + dy; if (u>=0 && v>=0 && u<W && v<H && M[u][v]===t) return true; } return false; };
+  const st = G.ow.gen11 = { banks:0, mouths:0, specks:0, speckTiles:0 };
+  for (let x=0;x<W;x++) for (let y=0;y<H;y++){ const t = M[x][y]; if (t!==OW_DESERT && t!==OW_GRASS && t!==OW_TUNDRA) continue;
+    if (near(x, y, OW_RIVER, 1)){ if (t===OW_DESERT){ M[x][y] = OW_GRASS; st.banks++; } else if (t===OW_GRASS && moist[x][y] > 0.42 && rng() < 0.55){ M[x][y] = OW_FOREST; st.banks++; } }
+    if (t!==OW_TUNDRA && elev[x][y] < 0.5 && near(x, y, OW_RIVER, 1) && near(x, y, OW_WATER, 1) && moist[x][y] > 0.4){ M[x][y] = OW_SWAMP; st.mouths++; } }
+  const lab = new Int32Array(W*H).fill(-1);
+  for (let x=0;x<W;x++) for (let y=0;y<H;y++){ if (M[x][y]===OW_WATER || lab[y*W + x] >= 0) continue; const cells = [y*W + x]; lab[y*W + x] = 1;
+    for (let h=0; h<cells.length; h++){ const j = cells[h], a = j % W, b = (j/W)|0; for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]){ const u = a + dx, v = b + dy; if (u<0||v<0||u>=W||v>=H) continue; const k = v*W + u; if (lab[k] >= 0 || M[u][v]===OW_WATER) continue; lab[k] = 1; cells.push(k); } }
+    if (cells.length < 25){ st.specks++; st.speckTiles += cells.length; for (const j of cells) M[j % W][(j/W)|0] = OW_WATER; } }
+}
+/* a town: on its race's own ground on a landmass of some size, near a river or the coast - then the same without the water, then anywhere
+   its race likes, then where placeFeature finds room (towns stood alone on specks of islands, and seldom by water) */
+let OW_MASS11 = null;   /* (the landmasses' sizes for town placement - kept off G.ow, which is saved) */
+function owGen11Town(placeFeature, placed, rfn, racePref){
+  const W = OW_COLS, H = OW_ROWS, M = G.ow.map; let size = OW_MASS11;
+  const key = G.ow.seed + '|' + W + 'x' + H + '|' + wgContinent(); if (!size || size.ver !== key){ const lab = new Int32Array(W*H).fill(-1), sz = []; for (let x=0;x<W;x++) for (let y=0;y<H;y++){ if (M[x][y]===OW_WATER || lab[y*W + x] >= 0) continue; const id = sz.length, cells = [y*W + x]; lab[y*W + x] = id;
+      for (let h=0; h<cells.length; h++){ const j = cells[h], a = j % W, b = (j/W)|0; for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]){ const u = a + dx, v = b + dy; if (u<0||v<0||u>=W||v>=H) continue; const k = v*W + u; if (lab[k] >= 0 || M[u][v]===OW_WATER) continue; lab[k] = id; cells.push(k); } } sz.push(cells.length); }
+    size = OW_MASS11 = { ver:key, lab, sz }; }
+  const big = (x, y)=>size.sz[size.lab[y*W + x]] >= 300, wet = (x, y)=>{ for (let dx=-3; dx<=3; dx++) for (let dy=-3; dy<=3; dy++){ const u = x + dx, v = y + dy; if (u>=0 && v>=0 && u<W && v<H && (M[u][v]===OW_RIVER || M[u][v]===OW_WATER)) return true; } return false; };
+  const rp = racePref || (()=>true);
+  for (const test of [(x, y)=>rp(x, y) && big(x, y) && wet(x, y), (x, y)=>rp(x, y) && big(x, y), (x, y)=>big(x, y) && wet(x, y)]){
+    const r0 = rfn, p = placeFeature(16, placed, r0, test); if (p && test(p.x, p.y)) return p; }
+  return placeFeature(16, placed, rfn, racePref);
+}
 function owRangeAt(x, y, e, seed, ver){
-  const V = OW_RANGE_V[ver >= 3 ? 3 : 2];
-  const n = fbm2D(x+3100, y+3100, seed, 4, 1/34, 0.5), ridge = 1 - Math.abs(n - 0.5)*2;
-  const n2 = fbm2D(x+5300, y+5300, seed, 3, 1/52, 0.5), ridge2 = 1 - Math.abs(n2 - 0.5)*2;
+  const V = OW_RANGE_V[ver >= 11 ? 11 : ver >= 3 ? 3 : 2];
+  const n = fbm2D(x+3100, y+3100, seed, 4, V.f1 || 1/34, 0.5), ridge = 1 - Math.abs(n - 0.5)*2;
+  const n2 = fbm2D(x+5300, y+5300, seed, 3, V.f2 || 1/52, 0.5), ridge2 = 1 - Math.abs(n2 - 0.5)*2;
   const lift = clamp((e - 0.52)*V.lift/0.14, 0, V.lift);
   const gap = fbm2D(x+7700, y+7700, seed, 2, 1/11, 0.5);
   if (gap < V.gap) return false;                                 // a pass through the range
@@ -8153,7 +8199,8 @@ function generateOverworld(seed){
     }
   }
 
-  const ranges = (G.ow.genVer||1) >= 2;
+  const ranges = (G.ow.genVer||1) >= 2, v11 = (G.ow.genVer||1) >= 11;
+  if (v11) owGen11Moisture(elev, moist, seed);   /* (RS-618: wet coasts, dry behind the ranges - it was noise of its own) */
   // temperature: warmer toward the map's mid-latitude, cooler near the
   // poles and at altitude - tuned empirically for a varied mix of biomes
   // rather than any one dominating
@@ -8161,7 +8208,7 @@ function generateOverworld(seed){
     for (let y=0;y<OW_ROWS;y++){
       const e = elev[x][y], m = moist[x][y];
       const latitude = 1 - Math.pow(Math.abs(y-cy)/cy, 1.3);
-      const t = clamp(0.22 + latitude*0.68 - e*0.28 + (fbm2D(x+900,y+900,seed,3,1/30,0.5)-0.5)*0.3, 0, 1);
+      const t = clamp(0.22 + latitude*0.68 - e*(v11 ? 0.42 : 0.28) + (v11 ? 0.05 : 0) + (fbm2D(x+900,y+900,seed,3,1/30,0.5)-0.5)*0.3, 0, 1);   /* (RS-618: colder with height - tundra on high ground, not only at the edges) */
       let tile;
       if (e < 0.47) tile = OW_WATER;
       else if (ranges ? owRangeAt(x, y, e, seed, G.ow.genVer) : e > 0.75) tile = OW_MOUNTAIN;
@@ -8175,20 +8222,24 @@ function generateOverworld(seed){
   }
 
   // rivers: trace from a handful of high points down to the sea
-  const riverN = Math.round((4+rint(3))*OW_AREA_SCALE);
+  const riverN = Math.round((4+rint(3))*OW_AREA_SCALE*(v11 ? 2.6 : 1)), srcs = [];   /* (RS-618: a river from every wet upland, the smaller ones running into the bigger) */
   const lakes = (G.ow.genVer||1) >= 4, rst = G.ow.riverStats = { rivers:0, pits:0, lakes:0, lakeTiles:0, cuts:0 };
   for (let i=0;i<riverN;i++){
     let sx,sy,bestE=-1;
     for (let k=0;k<40;k++){
       const px=4+rint(OW_COLS-8), py=4+rint(OW_ROWS-8);
+      if (v11){ const e0 = elev[px][py], t0 = G.ow.map[px][py]; if (t0===OW_WATER || t0===OW_MOUNTAIN || t0===OW_RIVER || e0 < 0.55) continue; if (srcs.some(q=>Math.abs(q[0]-px) + Math.abs(q[1]-py) < 9)) continue;
+        let byM = false; for (let dx=-2; dx<=2 && !byM; dx++) for (let dy=-2; dy<=2; dy++){ const u = px + dx, v = py + dy; if (u>=0 && v>=0 && u<OW_COLS && v<OW_ROWS && G.ow.map[u][v]===OW_MOUNTAIN){ byM = true; break; } }
+        const sc = e0*(0.35 + moist[px][py])*(byM ? 1.7 : 1); if (sc > bestE){ bestE = sc; sx = px; sy = py; } continue; }   /* (by preference at the foot of a range: they come off the mountains) */
       if (elev[px][py]>bestE && elev[px][py]<0.9){ bestE=elev[px][py]; sx=px; sy=py; }
     }
     if (sx===undefined) continue;
-    let x=sx,y=sy,steps=0; rst.rivers++;
+    let x=sx,y=sy,steps=0; rst.rivers++; if (v11) srcs.push([sx, sy]); const mine = v11 ? new Set() : null;
     const maxSteps = Math.round(260*Math.sqrt(OW_AREA_SCALE));
     while (steps<maxSteps){
       if (G.ow.map[x][y]===OW_WATER) break;
-      if (G.ow.map[x][y]!==OW_MOUNTAIN) G.ow.map[x][y]=OW_RIVER;
+      if (v11 && G.ow.map[x][y]===OW_RIVER && !mine.has(x*4096 + y)){ rst.joins11 = (rst.joins11||0) + 1; break; }   /* (into a bigger river: a tributary) */
+      if (G.ow.map[x][y]!==OW_MOUNTAIN){ G.ow.map[x][y]=OW_RIVER; if (mine) mine.add(x*4096 + y); }
       let bx=x,by=y,bv=elev[x][y];
       for (const [ddx,ddy] of [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]){
         const nx=x+ddx, ny=y+ddy;
@@ -8204,8 +8255,9 @@ function generateOverworld(seed){
     }
   }
 
-  if (owMtnClear()) G.ow.pocketsFilled = owFillPockets(OW_POCKET_MAX);
+  if (owMtnClear()) G.ow.pocketsFilled = owFillPockets(v11 ? OW_POCKET_MAX11 : OW_POCKET_MAX);
   if ((G.ow.genVer||1) >= 5){ let n = 0, k = 0; for (let pass=0; pass<6; pass++){ k = owRiverJoin(elev); n += k; if (!k) break; } G.ow.riverStats.joined = n; }   // (after the valleys are filled, which can take a tile from a river; again until settled, as a filled tile can make a new corner)
+  if (v11) owGen11After(elev, moist, rng);   /* (RS-618: green banks, river mouths, no specks of land - after the rivers are joined) */
   // the island falloff biases high elevation toward the map's centre, so the
   // dead-centre tile itself is often mountain - search outward ring by ring
   // from there for the nearest tile that's naturally open ground, so the
@@ -8538,7 +8590,7 @@ function generateOverworld(seed){
       // deterministic draw per town slot as before, just reordered
       const raceRng = siteRng(960000+i);
       const raceKey = rollTownRace(raceRng, i, raceDeck);
-      const p = placeFeature(16, placed, siteRng(100000+i), TOWN_RACE_PREFER[raceKey]);
+      const rp = TOWN_RACE_PREFER[raceKey], p = v11 ? owGen11Town(placeFeature, placed, siteRng(100000+i), rp) : placeFeature(16, placed, siteRng(100000+i), rp);   /* (RS-618) */
       if (p){
         G.ow.map[p.x][p.y]=OW_TOWN; placed.push(p); G.ow.townPositions[i] = p;
         G.ow.townFlavor[i] = generateTownFlavor(raceKey, raceRng);
@@ -18782,7 +18834,8 @@ function* geoBuildGen(key){
     // near the edge of the largest range, where you can walk up to its foot
     let maxD = 0; for (const j of mt.tiles) maxD = Math.max(maxD, dist[j]);
     const want = Math.min(3, maxD); let best = -1, bs = -1;
-    const clearV = j=>{ const x = j%W, y = (j/W)|0, R = Math.ceil(VOLC.R); for (let i=-R;i<=R;i++) for (let k=-R;k<=R;k++){ const a = x+i, b = y+k; if (a<0||b<0||a>=W||b>=H || i*i+k*k > VOLC.R*VOLC.R) continue; const t = m[a][b]; if (OW_SITE_TILES.includes(t) || t===OW_MOUNTAINPASS) return false; } return true; };   /* (RS-238: no lair or pass under its cone) */
+    const rd11 = (G.ow.genVer||1) >= 11 && G.ow.road ? G.ow.road : null;
+    const clearV = j=>{ const x = j%W, y = (j/W)|0, R = Math.ceil(VOLC.R + (rd11 ? 1.5 : 0)); for (let i=-R;i<=R;i++) for (let k=-R;k<=R;k++){ const a = x+i, b = y+k; if (a<0||b<0||a>=W||b>=H || i*i+k*k > (rd11 ? (VOLC.R + 1.5)*(VOLC.R + 1.5) : VOLC.R*VOLC.R)) continue; const inCone = i*i+k*k <= VOLC.R*VOLC.R; const t = m[a][b]; if ((inCone && (OW_SITE_TILES.includes(t) || t===OW_MOUNTAINPASS)) || (rd11 && rd11[b*W + a])) return false; } return true; };   /* (RS-238: no lair or pass under its cone; RS-618, generator 11: nor a road - it was chosen after the roads, by the sites put down since, and stood on them) */
     for (const pass of [true, false]) if (best < 0) for (const j of mt.tiles){ if (Math.abs(dist[j]-want) > 0.6 || (pass && !clearV(j))) continue; const sc = o3Hash(j%W, (j/W)|0, seed%977+41); if (sc > bs){ bs = sc; best = j; } }
     if (best >= 0){ const pn = pnOf(lr);
       landmarks.push({ id:'volcano', kind:'volcano', name:'Mount '+pn, x:best%W, y:(best/W)|0, r:6,   /* (RS-238: its cone is solid, so you find it from its foot) */
@@ -20889,7 +20942,7 @@ function wgGenerate(seed, elev){
     const t = m[x][y]; if (t===OW_WATER || t===OW_MOUNTAIN) return Infinity;
     if (site(t)) return t===OW_TOWN ? 30 : Infinity;
     let c = t===OW_GRASS ? 1 : t===OW_FOREST ? 1.8 : t===OW_SWAMP ? 2.6 : t===OW_RIVER ? 3.2 : t===OW_MOUNTAINPASS ? 2 : 1.6;
-    if (volc && Math.hypot(x - volc.x, y - volc.y) < VOLC.R + 3) c += 60;
+    if (volc){ const dv = Math.hypot(x - volc.x, y - volc.y); if (dv < VOLC.R + 1.5 && (G.ow.genVer||1) >= 11) return Infinity; if (dv < VOLC.R + 3) c += 60; }   /* (RS-618: generator 11's narrower ranges leave its slopes open ground - a road went over them) */
     if (bio[n]===1 || bio[n]===3) c += 1.2; if (wgWildLevel(x, y)) c += 2.5;
     return road[n] ? Math.min(c, 1)*0.35 : c;
   };
@@ -25002,7 +25055,8 @@ function* gfxO3BuildGen(grp, x0, y0, W, M){   /* (RS-403: a step at a time - see
       uwalk(0);
       for (const ends of [true, false]) for (let j=0;j<N;j++) for (let i=0;i<N;i++){ if (!free(i, j) || up[at(i, j)] >= 0) continue; if (ends && R8.filter(([a, b])=>free(i + a, j + b)).length > 1) continue; uwalk(seed(i, j)); }   /* (else from one end of it) */
       for (let j=0;j<N;j++) for (let i=0;i<N;i++){ if (o3Tile(ox + i, oy + j)!==OW_RIVER) continue; const d = dist[at(i, j)]; let fx = 0, fz = 0;
-        if (d > 0){ for (const [a, b] of R8){ const ii = i + a, jj = j + b; if (ii<0 || jj<0 || ii>=N || jj>=N) continue; const t2 = o3Tile(ox + ii, oy + jj), d2 = dist[at(ii, jj)]; if ((t2===OW_RIVER || t2===OW_WATER) && d2 >= 0 && d2 < d){ fx += a; fz += b; } } }
+        if (d > 0){ for (const [a, b] of R8){ const ii = i + a, jj = j + b; if (ii<0 || jj<0 || ii>=N || jj>=N) continue; const t2 = o3Tile(ox + ii, oy + jj), d2 = dist[at(ii, jj)]; if ((t2===OW_RIVER || t2===OW_WATER) && d2 >= 0 && d2 < d){ fx += a; fz += b; } }
+          if (!fx && !fz){ let bd = d; for (const [a, b] of R8){ const ii = i + a, jj = j + b; if (ii<0 || jj<0 || ii>=N || jj>=N) continue; const d2 = dist[at(ii, jj)]; if (d2 >= 0 && d2 < bd){ bd = d2; fx = a; fz = b; } } } }   /* (RS-618: two ways down that cancel - a tile beside a bend - follows the nearer to the water) */
         else if (d < 0){ const u = up[at(i, j)]; for (const [a, b] of R8) if (free(i + a, j + b)){ const w = up[at(i + a, j + b)] - u; fx += a*w; fz += b*w; } if (!fx && !fz) fx = 1; }
         else { for (const [a, b] of R8) if (o3Tile(ox + i + a, oy + j + b)===OW_WATER){ fx += a; fz += b; } if (!fx && !fz){ fx = i===0 ? -1 : i===N-1 ? 1 : 0; fz = !fx ? (j===0 ? -1 : 1) : 0; } }   /* (at the sea, into it; at the window's edge, out over it) */
         const L = Math.hypot(fx, fz) || 1, k = at(i, j)*4; data[k+2] = Math.round(128 + fx/L*120); data[k+3] = Math.round(128 + fz/L*120); } }
@@ -44619,7 +44673,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-617';
+const GAME_VERSION = 'rs-618';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

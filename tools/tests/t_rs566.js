@@ -18,7 +18,7 @@ module.exports = async page=>{
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
   A(r.n >= 3, 'waterfalls where the rivers come off the mountains');
-  const tall = r.falls.filter(f=>f.drop > 4); A(tall.length >= 2 && tall.every(f=>f.steps >= 3), 'a tall fall comes down in steps');
+  const tall = r.falls.filter(f=>f.drop > 3.5);   /* (RS-618: generator 11's narrower ranges stand a little lower) */ A(tall.length >= 2 && tall.every(f=>f.steps >= 3), 'a tall fall comes down in steps');
   A(r.falls.every(f=>f.climb && f.pts >= 3), 'each stream climbs from the river to its spring');
   A(r.falls.every(f=>f.up===0), 'the water never runs uphill');
   A(r.falls.every(f=>f.sunk===0), 'the pools stay over the ground');
