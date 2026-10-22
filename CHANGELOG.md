@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-633 - Walk the face edges
+
+- **Most of the narrow seas are gone.** On a new Planet world, land, rivers and roads now run straight across four of the seven edges between the planet's faces: both sides of the north face and both sides of the south face. You can walk across them on foot, and the 3D land carries on unbroken.
+- **The seas that stay.** Three narrow seas remain, all along the back face's edges, plus small seas where three faces meet round the middle face. The world generator turns the planet to put them over open ocean as far as it can.
+- **Your Planet world stays as it was.** Only new Planet worlds get this; other world sizes are unchanged.
+
 ## RS-632 - The 3D land on every face
 
 - **The 3D land is laid out from the sphere around you.** Whichever of a Planet's six faces you're on, the land runs on unbroken past that face's edges. Before, it showed open sea past any of the seven unjoined edges.

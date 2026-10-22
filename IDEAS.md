@@ -300,8 +300,11 @@ _World generation and overworld content_
 213. [x] (58) Wilderness zone - a lawless region with riskier encounters and better loot, where you drop items on death
 
 #### Sphere grid: what's left (for a Fable pass; RS-629 to RS-630 did the first part)
-- [ ] The 3D land laid out across the cube's seven unjoined edges: a local frame unfolded round the player from `owOff`, so the narrow seas the generator keeps along them (`cubeStraitDist` in `owGen15Fill`) can go
-- [ ] The view turned a quarter (`ISO.rot`) when you cross a face edge whose grid is turned, so the keys keep their directions
+- [x] The 3D land laid out across the cube's edges: a frame turned from the face you're on (RS-632, `O3F`, `o3G`/`o3L`, `o3FrameSwitch`)
+- [x] Narrow seas gone from four of the seven unjoined edges (RS-633, generator 16: ghost strips in the void, `owGhost`; rivers, lakes, roads and landmasses step with `owOff`)
+- [ ] The last three narrow seas, all on the back face's edges (T top to B top, D bottom to B bottom, B east to L west): they have no void beside them in the grid for the ghost strip, so the generator can't see over them - a grid with a margin, or the remaining generator passes on `owOff`
+- [x] The view turned a quarter (`ISO.rot`) when you cross a face edge whose grid is turned, so the keys keep their directions (RS-632)
+- [x] The land curving away at the horizon (RS-631, `DC_CURVE` in three's project_vertex chunk; 2.5 times the true curve so it shows)
 - [ ] Every "next tile" in the generator and the game through `owNb`/`owOff` (rivers, roads and their A*, floods, ferries, the route planner, encounters' wandering, the minimap), not the flat grid's x+1
 - [ ] The winds (`owGen11Moisture`) on the north and south faces, whose rows aren't lines of latitude
 - [ ] Map icons and names drawn upright on the polar faces (they're laid in the face's own grid, so turned)
