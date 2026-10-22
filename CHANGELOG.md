@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-622 - Sea cliffs
+
+New worlds now come from world generator 13. Your current world is unchanged.
+
+- **Cliffs where the high ground meets the water:** a coast on high ground, or at the foot of a range, now stands as a sheer cliff over the sea or a lake, with rock at its edge and deep water below, instead of every shore being a sandy beach. A world has about 15 to 60 cliff tiles, in runs along its coasts, never a lone tile.
+- **Kept clear of the places you use:** there's no cliff by a town, a dungeon or other site, a road, a ferry's pier or a river's mouth. Water that meets only at a corner, such as a river joining on the diagonal, still runs through.
+- **Shown on the map:** cliffs are drawn as dark rock along the coast on the world preview.
+
 ## RS-621 - Roads along the valleys
 
 New worlds now come from world generator 12. Your current world is unchanged.

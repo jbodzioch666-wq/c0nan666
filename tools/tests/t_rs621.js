@@ -22,7 +22,7 @@ module.exports = async page=>{
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
   const avg = k=>r.w.reduce((s, w)=>s + w[k], 0)/r.w.length;
-  A(r.ver===12, 'new worlds are made by generator 12');
+  A(r.ver>=12, 'new worlds are made by generator 12 or later');
   A(avg('e12') < avg('e11') - 0.02 && r.w.every(w=>w.e12 <= w.e11 + 0.005), 'the roads keep to lower ground: ' + avg('e11').toFixed(3) + ' -> ' + avg('e12').toFixed(3));
   A(avg('p12') < avg('p11'), 'an island ferry lands nearer its town: ' + avg('p11').toFixed(1) + ' -> ' + avg('p12').toFixed(1));
   A(!r.junction || r.posts > 0, 'a signpost where the roads meet');

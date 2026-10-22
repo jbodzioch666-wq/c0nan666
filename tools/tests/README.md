@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs622 | world generator 13: sea cliffs high to their lip with deep water below, never by a road, pier, site or river, never lone, dark on the preview; none in a generator 12 world |
 | rs621 | world generator 12: roads on lower ground than generator 11, island ferries landing nearer their towns, signposts where roads meet |
 | rs620 | the HUD fonts (the hitsplat's 800 weight, which the page never loaded) fetched and drawn while the game starts |
 | rs619 | the world preview in clear colours (grass lighter than forest, bright rivers, pale ranges) and no Wilderness: no band, no level, an ordinary death with a grave where it lay, its achievement now The Far Reaches |
