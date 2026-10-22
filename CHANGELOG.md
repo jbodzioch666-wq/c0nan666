@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-620 - A smoother first kill
+
+- **No more waiting on a font mid-fight:** the first kill of a session could freeze for up to a tenth of a second. The damage numbers use a heavier weight of the game's number font that the page never loaded, so the first hit fetched it and built its letters mid-fight. That font and the HUD's other fonts now load while the game starts, and the damage digits are drawn once, out of sight, at every size a hit number grows through. The skill and prayer icons are drawn out of sight at startup too. On this PC the worst frame after a first kill typically drops from 70-110 ms to 30-50 ms.
+- **Raising minions was already smooth:** the first raised skeleton or ghost peaks at about 20 ms with the game's normal background loading. The one-second frame seen earlier only happened in a test setup with that loading turned off.
+
 ## RS-619 - A clear map, and no Wilderness
 
 - **A world preview you can read:** the map you choose a world from used to draw grass and forest in the same dark green, with rivers and mountain ranges sunk into it, so the shape of the land hardly showed. It now draws grass a lighter green than the woods, rivers in bright blue, the ranges in pale stone, and snow white. Volcanic land, jungle and the other rare biomes are a light tint, with the land showing through.
