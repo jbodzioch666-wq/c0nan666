@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## RS-628 - The planet is the map
+
+- **On a Planet world, the map (M) is the globe at every zoom.** It opens turned to where you stand. Scroll or pinch out to see the whole world, or in all the way to the chart's closest detail. There's no separate flat chart and no change-over.
+- **Everything the chart had is on it.** Towns, sites, levels, names, landmarks, pins, your planned route, quest marks, search results and the fog are drawn for the land facing you and laid onto the sphere. They turn with the globe, and fade away as you pull back to the whole planet.
+- **It works like the chart.** Click or tap a town, a site, a pin or a gravestone; drop pins and plan routes on the globe; hover for the same tooltips. The search and "show on map" turn the globe to the place.
+- **Smooth to turn.** The chart on the globe is redrawn only when the view has moved or something changes, so dragging runs at about 4 ms a frame.
+- **Lettering narrows near the poles,** as it would on a real globe.
+- **Other world sizes keep their flat chart.**
+
 ## RS-627 - Closer to the globe
 
 - **Zoom three times closer on the globe.** It now fills the screen with land, ranges and forests before it unrolls, and it unrolls into the chart at the matching close zoom, so there's still no change of size at the handover.

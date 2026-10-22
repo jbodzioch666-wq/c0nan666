@@ -25,7 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
-| rs626 | no jump between globe and chart: the globe at its nearest matches the chart's scale, it unrolls into the chart and rolls up out of it at a steady frame rate, and the wheel glides on both |
+| rs628 | on a Planet world the map is the globe at every zoom, the chart laid over it: opens turned to you, a town found and a pin dropped by clicking the globe, turns where the map is moved, zooms from the whole world to the chart's nearest, smooth to drag; other sizes keep the flat chart |
 | rs625 | the Planet size (generator 14): plates, about a third land, ranges where plates push, deserts in the dry belts, tundra poleward, sea down the seam and at the poles; world code W, saves and loads; zoomed right out the map is a globe you drag to turn and zoom back into the chart; other sizes unchanged |
 | rs624 | the first kill has no long frame: hitsplat digits stamped from a sheet drawn at start-up (text only for non-digits), the Last Foe portrait an image drawn once per foe |
 | rs623 | provinces: every town the seat of a named province with a ruler and a foe, far land and townless islands wild marches, all land shared out; entering names it; borders on the world map and preview |
@@ -550,6 +550,4 @@ Screenshots go to `tools/tests/shots/`.
 | zplanet | Planet worlds (`ZSEEDS=a,b`): generation time, terrain shares, temperature and moisture spread on land, each preview as shots/zplanet-<seed>.png |
 | zplanet2 | what the tiles are at given points of a planet (`ZSEED`, `ZPTS=x:y,...`) |
 | zglobe | a Planet world's globe from several turns and facing the seam (`ZSEEN=1` reveals the map): shots/zglobe-<n>.png and frame times |
-| zmorph | the globe-chart change slowed to 6 s: shots/zmorph-out-<k>.png and zmorph-in-<k>.png, beside zmorph-chart.png |
-| zmorph2 | frame times while the globe rolls up out of the chart and back (`ZWAIT=ms` before it starts) |
-| zsnap | the chart snapshot for the globe fade at its unroll zoom (three runs), and the chart's own frame and script times at that zoom |
+| zglobe2 | RS-628's globe map at the zoom it opens on, zoomed in, nearest, the whole world and up north (`ZSEEN=1` reveals the map): shots/zglobe2-<name>.png and frame times |
