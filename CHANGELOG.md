@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-626 - From globe to chart without a jump
+
+- **The globe unrolls into the chart.** Zoom in on a Planet's globe and, at the chart's own scale, the sphere unrolls into the flat parchment, turning to the land the chart will open on, then fades into the chart in place. Before, it cut straight from a big globe to a much smaller chart.
+- **And rolls back up.** Zoom out past the whole chart and it lifts off as a sheet and curls up into the globe, starting exactly where the chart was.
+- **The globe's nearest zoom matches the chart,** so there's no change of size at the handover.
+- **The wheel glides.** Each scroll step eases in, on the globe and on the chart, instead of snapping.
+- **No stall on the first roll.** The globe is made ready in the background when the world map opens, and the fade uses a single snapshot of the chart, so the change runs at full frame rate: about 6 ms a frame, worst 13 ms, where the first roll used to stall for about 120 ms.
+
 ## RS-625 - A whole planet
 
 - **New world size: Planet.** Pick it on the world screen. It's a whole world, twice as wide as it is tall and a little bigger than XLarge, with about 30 towns.
