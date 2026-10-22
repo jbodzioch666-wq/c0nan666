@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-623 - Provinces
+
+- **The land is shared into provinces.** Every town is now the seat of a named realm - a duchy, a dwarven hold, an elven realm, orc warlands, a halfling shire and so on, in the style of the people who live there. Borders follow the land, so they tend to run along mountain ranges and rivers.
+- **Each has a ruler and a trouble.** The first time you cross into a province the log says who rules it, from which town, and what plagues its roads. That foe really does turn up more often in its fights there.
+- **Wild marches.** Land far from every town, and islands with no town at all, belong to no lord. These marches have their own names, and their foes show up more often still.
+- **On the maps.** The world map draws the borders as dashed red lines, with the provinces' names when you zoom out. The world preview shows them too, so you can see how a new world is shared out before you set out.
+- **Your current world gets them too.** Provinces are worked out from the map when a world loads, so nothing changes in your save.
+
 ## RS-622 - Sea cliffs
 
 New worlds now come from world generator 13. Your current world is unchanged.
