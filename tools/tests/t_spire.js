@@ -7,7 +7,7 @@ module.exports = async page=>{
     goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{};
     const out = {}, geo = owGeo(), lm = geo.landmarks.find(l=>l.id==='spire'); out.has = !!lm; if (!lm) return out;
     const sp = G.ow.spawnPos; out.far = Math.hypot(lm.x - sp.x, lm.y - sp.y); out.others = geo.landmarks.filter(l=>l.id!=='spire').map(l=>Math.hypot(l.x - lm.x, l.y - lm.y));
-    out.wild = wgWildLevel(lm.x, lm.y); out.tile = G.ow.map[lm.x][lm.y]; out.site = OW_SITE_TILES.includes(out.tile); out.foot = !!owLandmarkFoot(lm.x, lm.y); out.spireAt = sqSpire();
+    out.wild = wgWildGen(lm.x, lm.y); out.tile = G.ow.map[lm.x][lm.y]; out.site = OW_SITE_TILES.includes(out.tile); out.foot = !!owLandmarkFoot(lm.x, lm.y); out.spireAt = sqSpire();
     // the model: tall, black, with its violet flame
     const o = o3LandmarkModel(lm); let meshes = 0, top = 0; o.g.traverse(q=>{ if (q.isMesh){ meshes++; top = Math.max(top, q.position.y); } }); out.meshes = meshes; out.top = top; out.hbH = o.hb.geometry.boundingBox ? 0 : (o.hb.geometry.computeBoundingBox(), o.hb.geometry.boundingBox.max.y);
     // sealed before the quest

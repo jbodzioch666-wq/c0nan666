@@ -47,16 +47,16 @@ module.exports = async page=>{
     const m0 = wgCampMult(); A(m0 < 1, 'safer camping '+m0);
     let t = 0; do { campOutside(); t++; if (G.gameMode===2){ G.mon.forEach(m=>m.alive=0); G.gameMode = 0; setUi('playing'); } } while (!G.player.campPitch && t < 20);
     A(G.player.campPitch && G.player.campPitch.spit, 'camp pitched with spit'); A(skFireHere(), 'campfire lit');
-    // the Wilderness: warned on entering, and death there leaves no grave
+    // (RS-619) the Wilderness is gone: out at the far edge where it lay, no warning, no Wilderness level, no badge, and a death leaves its grave
     const w = G.ow.wild; let wx = G.owPos.x, wy = G.owPos.y;
     if (w.side==='north') wy = 2; else if (w.side==='south') wy = OW_ROWS-3; else if (w.side==='west') wx = 2; else wx = OW_COLS-3;
-    for (let r=0;r<30;r++){ let ok = false; for (let i=-r;i<=r && !ok;i++) for (let j2=-r;j2<=r && !ok;j2++){ const xx = wx+i, yy = wy+j2; if (xx>0 && yy>0 && xx<OW_COLS-1 && yy<OW_ROWS-1 && o3Passable(xx,yy) && G.ow.map[xx][yy]!==OW_WATER && !OW_SITE_TILES.includes(G.ow.map[xx][yy]) && wgWildLevel(xx,yy)){ wx = xx; wy = yy; ok = true; } } if (ok) break; }
+    for (let r=0;r<30;r++){ let ok = false; for (let i=-r;i<=r && !ok;i++) for (let j2=-r;j2<=r && !ok;j2++){ const xx = wx+i, yy = wy+j2; if (xx>0 && yy>0 && xx<OW_COLS-1 && yy<OW_ROWS-1 && o3Passable(xx,yy) && G.ow.map[xx][yy]!==OW_WATER && !OW_SITE_TILES.includes(G.ow.map[xx][yy]) && wgWildGen(xx,yy)){ wx = xx; wy = yy; ok = true; } } if (ok) break; }
     G.owPos = { x:wx, y:wy }; G.player._areaKey = null; G.player.wildWarned = 0; setUi('playing'); wgOnStep(null);
-    A(G.ui==='wevent' && /Wilderness/.test(G.wevDlg.title), 'wilderness warning'); wevChoose(0);
-    out.wild = wgWildLevel(wx, wy); A(out.wild > 0, 'in the wild');
-    renderGame(); A(document.getElementById('wildHud') && document.getElementById('wildHud').style.display==='block', 'wild hud');
+    A(!(G.ui==='wevent' && /Wilderness/.test((G.wevDlg||{}).title||'')), 'no Wilderness warning where it lay'); if (G.ui==='wevent') wevChoose(0);
+    out.wild = wgWildLevel(wx, wy); A(out.wild===0 && wgWildGen(wx, wy) > 0, 'no Wilderness level where it lay');
+    renderGame(); A(!(document.getElementById('wildHud') && document.getElementById('wildHud').style.display==='block'), 'no Wilderness badge');
     G.inv.push(genItem(5,'weapon',2), genItem(5,'weapon',2), genItem(5,'weapon',2), genItem(5,'weapon',2), genItem(5,'weapon',2));
-    playerDies('a test'); A(G.deathWild, 'death flagged wild'); continueAfterDeath(false); A(!G.player.grave, 'no grave in the wild');
+    playerDies('a test'); A(!G.deathWild, 'a death there is an ordinary one'); continueAfterDeath(false); A(!!G.player.grave, 'it leaves a grave');
     // route by road and walking to a town
     G.gameMode = 0; setUi('playing'); const spx = G.ow.spawnPos; G.owPos = { x:spx.x, y:spx.y+1 };
     const tw = wevTowns().find(([x,y])=>!(x===spx.x && y===spx.y) && G.ow.comp[y*OW_COLS+x]===G.ow.comp[spx.y*OW_COLS+spx.x]);

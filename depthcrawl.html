@@ -7710,6 +7710,18 @@ function buildWorldPreview(){
 // game canvas/cellPx/ctx - this runs before the adventure itself has
 // started, and reusing renderOverworldMapZoomed's shared render state for
 // a screen with no real "current viewport" yet isn't worth the coupling)
+/* (RS-619) the world preview in clear colours: grass a lighter green than the woods, rivers bright, the ranges pale stone, the rarer biomes
+   a tint over the land beneath. It drew in the flat map's dark tones, where grass and forest were the same dark green and the rivers
+   and the ranges sank into them, so the land's shape hardly showed */
+const WG_PREVIEW_COL = { [OW_GRASS]:[134,168,92], [OW_FOREST]:[62,106,52], [OW_WATER]:[44,86,127], [OW_RIVER]:[96,160,224], [OW_MOUNTAIN]:[150,142,130], [OW_MOUNTAINPASS]:[184,168,128],
+  [OW_TUNDRA]:[226,232,236], [OW_DESERT]:[216,192,122], [OW_SWAMP]:[93,106,68] };
+function wgPreviewColor(t, x, y){
+  if (t===OW_WATER && iceAt(x, y)) return 'rgb(206,222,232)';
+  let base = WG_PREVIEW_COL[t];
+  if (!base){ const cache = G.ow.siteBiomeCache || (G.ow.siteBiomeCache = {}), key = x + ',' + y; if (!(key in cache)) cache[key] = detectRegionBiome(x, y); base = WG_PREVIEW_COL[cache[key]] || WG_PREVIEW_COL[OW_GRASS]; }
+  if (t!==OW_WATER && t!==OW_RIVER){ const bv = wgBioAt(x, y), bc = bv && BIO[bv] && (BIO[bv].chart || BIO[bv].rgb); if (bc){ const k = 0.42; base = [0, 1, 2].map(i=>base[i]*(1 - k) + bc[i]*k); } }   /* (a tint of the rarer biome, the land still showing) */
+  return 'rgb(' + base.map(v=>Math.max(0, Math.min(255, Math.round(v)))).join(',') + ')';
+}
 function renderWorldPreviewMap(){
   const cv = document.getElementById('worldPreviewCanvas');
   if (!cv) return;
@@ -7719,7 +7731,7 @@ function renderWorldPreviewMap(){
   c.fillRect(0,0,cv.width,cv.height);
   for (let y=0;y<OW_ROWS;y++){
     for (let x=0;x<OW_COLS;x++){
-      c.fillStyle = owBaseColor(G.ow.map[x][y], x, y);
+      c.fillStyle = wgPreviewColor(G.ow.map[x][y], x, y);
       c.fillRect(x*cellPx, y*cellPx, Math.ceil(cellPx)+0.5, Math.ceil(cellPx)+0.5);
     }
   }
@@ -17097,7 +17109,7 @@ const ACHIEVEMENTS = [
   {id:'farmhand', name:'Farmhand', desc:'do 5 jobs for the hamlets', check:p=>p.wgStat && p.wgStat.jobs>=5, bonus:{goldfind:0.03}},
   {id:'hunter', name:'Hunter', desc:'hunt 10 animals', check:p=>p.wgStat && p.wgStat.hunts>=10, bonus:{healkill:1}},
   {id:'lookout', name:'Lookout', desc:'climb 3 lookouts', check:p=>p.wgStat && p.wgStat.views>=3, bonus:{xpfind:0.02}},
-  {id:'wild_one', name:'Deep Wilderness', desc:'reach Wilderness level 20', check:p=>p.wgStat && p.wgStat.maxWild>=20, bonus:{crit:1}},
+  {id:'wild_one', name:'The Far Reaches', desc:'walk into land of recommended combat 100 or more', check:p=>p.wgStat && (p.wgStat.maxWild>=20 || p.wgStat.maxBand>=100), bonus:{crit:1}},
   // the sea
   {id:'islander', name:'Islander', desc:'chart 5 islands', check:p=>p.wgStat && p.wgStat.isles>=5, bonus:{magicfind:3}},
   {id:'admiral', name:'Admiral', desc:'build a galleon', check:p=>(p.boatTier||0)>=4, bonus:{resist:2}},
@@ -18874,7 +18886,7 @@ function* geoBuildGen(key){
     for (let y=6;y<H-6;y++) for (let x=6;x<W-6;x++){ if (x===6 && (y & 7)===0) yield;
       const t = m[x][y]; if (t!==OW_GRASS && t!==OW_SWAMP && t!==OW_TUNDRA && t!==OW_DESERT) continue;
       const sc = Math.hypot(x - sp.x, y - sp.y) + o3Hash(x, y, seed%977+53)*3; if (sc <= bs) continue;
-      let wild = 0; try{ if (typeof wgWildLevel==='function') for (const [i,j] of [[0,0],[4,0],[-4,0],[0,4],[0,-4]]) wild = wild || wgWildLevel(Math.max(0, Math.min(W-1, x+i)), Math.max(0, Math.min(H-1, y+j))); }catch(e){} if (wild) continue;   /* (not in or beside the Wilderness: dying on the quest there would cost too much) */
+      let wild = 0; try{ if (typeof wgWildGen==='function') for (const [i,j] of [[0,0],[4,0],[-4,0],[0,4],[0,-4]]) wild = wild || wgWildGen(Math.max(0, Math.min(W-1, x+i)), Math.max(0, Math.min(H-1, y+j))); }catch(e){} if (wild) continue;   /* (not in or beside the Wilderness: dying on the quest there would cost too much) */
       let ok = true; for (let i=-2;i<=2 && ok;i++) for (let j=-2;j<=2;j++){ const q = m[x+i][y+j]; if (q===OW_WATER || q===OW_MOUNTAIN || q===OW_RIVER){ ok = false; break; } }
       if (ok) for (const [sx2,sy2] of sites) if (Math.abs(sx2-x) <= 4 && Math.abs(sy2-y) <= 4){ ok = false; break; }
       if (ok) for (const lm of landmarks) if (Math.hypot(lm.x-x, lm.y-y) < 10){ ok = false; break; }
@@ -20847,7 +20859,11 @@ const BIO = [null,
 ];
 function wgBioAt(x, y){ const b = G.ow && G.ow.bio; return b && x>=0 && y>=0 && x<OW_COLS && y<OW_ROWS ? b[y*OW_COLS+x] : 0; }
 // ---- the Wilderness: a lawless band along the edge farthest from where you began ----
-function wgWildLevel(x, y){
+/* (RS-619) the Wilderness is no more: no lawless band, no losing what you carry, no warning. The band is still worked out where the world
+   is laid down (wgWildGen) - the roads, hamlets and landmarks were placed round it, and an old world must come out as it did */
+const WG_WILD_ON = false;
+function wgWildLevel(x, y){ return WG_WILD_ON ? wgWildGen(x, y) : 0; }
+function wgWildGen(x, y){
   const w = G.ow && G.ow.wild; if (!w) return 0;
   const d = w.side==='north' ? y : w.side==='south' ? OW_ROWS-1-y : w.side==='west' ? x : OW_COLS-1-x;
   return d >= w.depth ? 0 : 1 + Math.floor((w.depth-1-d) / w.depth * 30);
@@ -20943,7 +20959,7 @@ function wgGenerate(seed, elev){
     if (site(t)) return t===OW_TOWN ? 30 : Infinity;
     let c = t===OW_GRASS ? 1 : t===OW_FOREST ? 1.8 : t===OW_SWAMP ? 2.6 : t===OW_RIVER ? 3.2 : t===OW_MOUNTAINPASS ? 2 : 1.6;
     if (volc){ const dv = Math.hypot(x - volc.x, y - volc.y); if (dv < VOLC.R + 1.5 && (G.ow.genVer||1) >= 11) return Infinity; if (dv < VOLC.R + 3) c += 60; }   /* (RS-618: generator 11's narrower ranges leave its slopes open ground - a road went over them) */
-    if (bio[n]===1 || bio[n]===3) c += 1.2; if (wgWildLevel(x, y)) c += 2.5;
+    if (bio[n]===1 || bio[n]===3) c += 1.2; if (wgWildGen(x, y)) c += 2.5;
     return road[n] ? Math.min(c, 1)*0.35 : c;
   };
   const tIdx = towns.map(([x,y])=>y*W+x), tSet = new Set(tIdx);
@@ -21011,7 +21027,7 @@ function wgGenerate(seed, elev){
   };
   const nearRoad = (x, y, r)=>{ for (let i=-r;i<=r;i++) for (let j=-r;j<=r;j++){ const xx = x+i, yy = y+j; if (xx>=0 && yy>=0 && xx<W && yy<H && road[yy*W+xx]===1) return true; } return false; };
   const S = OW_AREA_SCALE;
-  place('hamlet', Math.max(2, Math.round(towns.length*0.6)), (x,y,t)=> (t===OW_GRASS || t===OW_FOREST) && nearRoad(x,y,1) && townDist(x,y) >= 10 && !wgWildLevel(x,y), (x,y)=> Math.min(townDist(x,y), 25)/25);
+  place('hamlet', Math.max(2, Math.round(towns.length*0.6)), (x,y,t)=> (t===OW_GRASS || t===OW_FOREST) && nearRoad(x,y,1) && townDist(x,y) >= 10 && !wgWildGen(x,y), (x,y)=> Math.min(townDist(x,y), 25)/25);
   place('view', Math.max(2, Math.round(2*S)), (x,y,t)=> near(x,y,OW_MOUNTAIN,2) && elev[x][y] > 0.6, (x,y)=> elev[x][y]*3);
   place('cave', Math.max(2, Math.round(1.3*S)), (x,y,t)=> [[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dy])=>m[x+dx][y+dy]===OW_MOUNTAIN), (x,y)=> [[1,0],[-1,0],[0,1],[0,-1]].filter(([dx,dy])=>m[x+dx][y+dy]===OW_MOUNTAIN).length);
   place('grotto', Math.max(1, Math.round(0.7*S)), (x,y,t)=> near(x,y,OW_RIVER,1) && near(x,y,OW_MOUNTAIN,2));
@@ -21085,6 +21101,7 @@ function wgOnStep(prevKey){
   if (a.key !== p._areaKey){
     const first = !(p.areasSeen||[]).includes(a.key); p._areaKey = a.key; (p.areasSeen = p.areasSeen||[]).push(a.key); if (p.areasSeen.length > 400) p.areasSeen.splice(0, 100);
     if (a.wild){ (p.wgStat = p.wgStat||{}).maxWild = Math.max((p.wgStat.maxWild||0), a.wild); }
+    { const bn = +a.band; if (isFinite(bn)){ (p.wgStat = p.wgStat||{}).maxBand = Math.max(p.wgStat.maxBand||0, bn); try{ checkAchievements(); }catch(e){} } }   /* (RS-619: for The Far Reaches) */
     if (a.wild){ notify(`Wilderness level ${a.wild} - ${wgBandText(a.band)}`, 'warn');
       if (!p.wildWarned){ p.wildWarned = 1; wevDialog('The Wilderness', `You are about to enter <b>the Wilderness</b>, a lawless land along the edge of the world. The monsters here are strong and the pickings rich - but <b>if you die here you lose everything but your 3 most valuable items for good</b>; there is no gravestone to go back to. The deeper you go, the higher the Wilderness level.`, [['Go on', ()=>{}], ['Turn back', ()=>{ if (prevKey){ const [px,py] = prevKey.split('|')[0].split(',').map(Number); G.owPos.x = px; G.owPos.y = py; } }]]); } }
     else if (first || turn - (p._areaT||0) > 30) notify(`${cap(a.name)} - ${wgBandText(a.band)}`, a.band > cbLvl()+13 ? 'warn' : 'info');
@@ -21366,7 +21383,7 @@ function pmWorldInk(x, P){
   for (const f of G.ow.ferries||[]){ x.beginPath(); x.moveTo((f.a[0]+0.5)*P, (f.a[1]+0.5)*P); x.quadraticCurveTo(((f.a[0]+f.b[0])/2+0.5)*P + P*2, ((f.a[1]+f.b[1])/2+0.5)*P - P*2, (f.b[0]+0.5)*P, (f.b[1]+0.5)*P); x.stroke(); }
   x.setLineDash([]);
   // the Wilderness: a dark red wash, a ditch along its edge, and its name
-  const w = G.ow.wild;
+  const w = WG_WILD_ON && G.ow.wild;
   if (w){ const D = w.depth*P, Wp = W*P, Hp = H*P;
     const rect = w.side==='north' ? [0,0,Wp,D] : w.side==='south' ? [0,Hp-D,Wp,D] : w.side==='west' ? [0,0,D,Hp] : [Wp-D,0,D,Hp];
     const g = w.side==='north' ? x.createLinearGradient(0,0,0,D) : w.side==='south' ? x.createLinearGradient(0,Hp,0,Hp-D) : w.side==='west' ? x.createLinearGradient(0,0,D,0) : x.createLinearGradient(Wp,0,Wp-D,0);
@@ -21483,7 +21500,7 @@ function wgPreviewMapExtras(c, cellPx){
   const road = G.ow.road; if (!road) return;
   c.fillStyle = 'rgba(210,180,120,0.9)';
   for (let y=0;y<OW_ROWS;y++) for (let x=0;x<OW_COLS;x++) if (road[y*OW_COLS+x]) c.fillRect(x*cellPx + cellPx*0.25, y*cellPx + cellPx*0.25, Math.max(1, cellPx*0.5), Math.max(1, cellPx*0.5));
-  const w = G.ow.wild; if (w){ const D = w.depth*cellPx, Wp = OW_COLS*cellPx, Hp = OW_ROWS*cellPx; c.fillStyle = 'rgba(160,20,10,0.22)';
+  const w = WG_WILD_ON && G.ow.wild; if (w){ const D = w.depth*cellPx, Wp = OW_COLS*cellPx, Hp = OW_ROWS*cellPx; c.fillStyle = 'rgba(160,20,10,0.22)';
     if (w.side==='north') c.fillRect(0,0,Wp,D); else if (w.side==='south') c.fillRect(0,Hp-D,Wp,D); else if (w.side==='west') c.fillRect(0,0,D,Hp); else c.fillRect(Wp-D,0,D,Hp); }
 }
 // the Wilderness level, shown while you're in it
@@ -44673,7 +44690,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-618';
+const GAME_VERSION = 'rs-619';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -46776,7 +46793,6 @@ function buildHelpLegend(){
       [sw('#8a1a1a', true), 'Route', 'your planned route, stop by stop - Walk route follows it'],
       [sw('#b0925f'), 'Road', 'quicker and safer to walk; bridges, fords (stepping stones) and broken bridges (a red cross) where it meets a river'],
       [sw('#7a5230'), 'Ferry landing', 'a boat across the water to another landmass'],
-      [sw('#6a1a10'), 'The Wilderness', 'beyond the red ditch: tough fights, rich loot, and you lose what you drop if you die'],
       [sw('#a07a4a'), 'Monster camp', 'grows if left alone (the red dots show how big); walk in to attack'],
       [sw('#ff5a3a', true), 'Giant', 'a world boss while it is awake - its timer shows when it sleeps again'],
       [sw('#9ad8ff', true), 'Fallen star', 'rich ore (up to runite) until it crumbles'],
@@ -46853,7 +46869,7 @@ function buildHelp(){
       <div><b>Your house, Archaeology and Necromancy</b>: Hollis the estate agent on every town square sells you a house (2,500 gold) whose door opens from any town. Build its furniture from logs, iron bars and essence to train Construction: a bed, hearth, furnace, anvil and the other benches, an altar that takes bones for three times the Prayer xp, a trophy wall, and a portal to your towns, islands, dig sites and landmarks. Five dig sites lie out in the wild: excavate the hotspots round each (with a pickaxe) and restore what you find at its dig camp; finish a site's collection for a relic power for good. Towns now come as hamlets, villages and cities: a village adds a temple (prayer, blessings, a crusade against the undead) and an archery range; a city adds a guild hall, an arena and stone walls; a town by the sea has a harbour with ships to the other ports and your charted islands. Talk to the townsfolk you bump into for gossip and hints, play darts, gamble and enter the cook-off at the tavern, read the notice board's news, and pay the mayor to build walls, a bigger market or a bigger town. Shops shut at night (knock if you must). Shops pay less for things you keep selling them, and the Peddler's shelf only refills slowly. Waypoints charge a fee. The journal (;) holds every quest - story quests from innkeepers, smiths, alchemists, priests, Captains, mayors, guildmasters, a hermit, a ghost and a skeleton's note, with chains, three factions and the main storyline, the Waking Lich - plus region diaries, clue trails and the tomes you've learned. Music follows where you are, by day and by night, and every tune you hear is kept in the music player (Settings). The banker on every square keeps your items (with tabs and a search box) and your gold, which death can't touch; Hollis sells property that pays into your bank every day. In a fight, press <kbd>-</kbd> (or the Raise button) to crush a bone and raise the dead to fight beside you; their hits train Necromancy, a fourth combat style.</div>
       <div>press <kbd>C</kbd> to make camp wherever you're standing &mdash; usually a free heal that also restores your prayer and cures poison, but sleeping in the open risks something finding you in the dark: no rest that night, and a monster comes for you - fight it or get away. Safer on grass, riskier in forest/swamp, and impossible while zoomed out. You can also camp inside any dungeon-type site once you've cleared every monster off the current floor &mdash; nothing left down there to ambush you, so it's just as safe as a village rest.</div>
       <div>press <kbd>M</kbd> to open the world map of the whole continent &mdash; press again to go back. To travel between towns you've visited, use the <b>waypoint stone</b> in any town square: it shows the world with every town you've visited. The map's tool bar lets you <b>drop pins</b> with a note, <b>plan a route</b> and walk it, and switch <b>layers</b> (place names, landmarks, sites, danger, resources and more) on and off; the mouse wheel zooms in far enough to see every tree, rock and house. Land you've seen is pencilled in and land you've walked is painted; every forest, range, sea and river has a name, and three great landmarks (a volcano, a giant tree and a wizard's tower) can be seen from far off. The <b>travel log</b> counts the regions, towns, sites and landmarks you've found.</div>
-      <div><b>The land:</b> when you start you pick the world's size and shape (an archipelago, one landmass or several continents), and every world has a <b>world code</b> - give it to a friend and they can play the same world. <b>Roads</b> join the towns: walking a road is quicker (every other step is free) and safer, and the route planner and the teleport list (T, "walk") follow them. Off the road, wading a river costs time; roads cross on <b>bridges</b> and fords, and a broken bridge can be mended. <b>Ferries</b> cross the water between landmasses. Every part of the land has a recommended combat level, shown when you enter it and on the map. Watch for <b>volcanic land, jungles, haunted woods, snowy highlands and crystal wastes</b> with their own creatures, and for <b>hamlets</b> (jobs, food and a safe barn), <b>lookouts</b> that reveal the map, <b>caves, grottos and ruins</b> to delve, <b>standing stones</b>, <b>abandoned camps</b>, <b>wishing wells</b> and <b>hermits</b>. Deer, rabbits, boars and birds roam the 3D land - click one to hunt it. Rain makes the fish bite, fog shortens your sight and storms make the sea dangerous. Buy a <b>tent, ward lantern, bedroll and cooking spit</b> from the Peddler for safer camping. Beyond the red ditch lies <b>the Wilderness</b>: tougher monsters, richer pickings, and if you die there your dropped items are gone for good.</div>
+      <div><b>The land:</b> when you start you pick the world's size and shape (an archipelago, one landmass or several continents), and every world has a <b>world code</b> - give it to a friend and they can play the same world. <b>Roads</b> join the towns: walking a road is quicker (every other step is free) and safer, and the route planner and the teleport list (T, "walk") follow them. Off the road, wading a river costs time; roads cross on <b>bridges</b> and fords, and a broken bridge can be mended. <b>Ferries</b> cross the water between landmasses. Every part of the land has a recommended combat level, shown when you enter it and on the map. Watch for <b>volcanic land, jungles, haunted woods, snowy highlands and crystal wastes</b> with their own creatures, and for <b>hamlets</b> (jobs, food and a safe barn), <b>lookouts</b> that reveal the map, <b>caves, grottos and ruins</b> to delve, <b>standing stones</b>, <b>abandoned camps</b>, <b>wishing wells</b> and <b>hermits</b>. Deer, rabbits, boars and birds roam the 3D land - click one to hunt it. Rain makes the fish bite, fog shortens your sight and storms make the sea dangerous. Buy a <b>tent, ward lantern, bedroll and cooking spit</b> from the Peddler for safer camping.</div>
       <div><b>The sea:</b> the Peddler who sells you a boat also has shipwrights build you a better one - a <b>sloop</b>, a <b>caravel</b> and a <b>galleon</b> (gold, logs and iron bars): each crosses the sea faster and rides out storms better. The islands with no town on them have their own <b>pearl beds</b>, <b>sunstone outcrops</b> (gold and gems) and a <b>buried cache</b>; land on one to chart it, and the <b>sea charts</b> (on the world map's tool bar) set a course back to any island you've charted. A <b>harpoon</b>, thrown from a caravel's deck or bigger, lands sharks, kraken and marlin in deep water. In winter the water along the tundra freezes - walk out onto it and fish through the ice holes.</div>
       <div><b>World events:</b> the world keeps its own time. A <b>giant</b> sleeps somewhere and now and then wakes to roam (a world boss - it's marked on the map while it's awake, and its wounds last between fights). <b>Monster camps</b> grow if they're left alone, until their warband lays <b>siege</b> to the nearest town; break the siege in time or the town is sacked. Every town rules the land nearest it - break every camp in a town's lands to <b>secure</b> them, and fewer monsters roam there. <b>Stars fall</b> and leave rich ore for a while. On the road you'll meet people who need a hand (or a fight), and towns hold <b>festivals</b> (10% off and a treat), <b>market days</b> (a rare trader on the plaza) and ring the alarm when monsters <b>raid</b>. Everything with a deadline shows its timer on the world map; the travel log lists what's going on.</div>
       <div>day turns to night and back on a steady cycle, and the weather shifts between clear, rain, fog and the occasional storm &mdash; both are shown in the corner of the overworld map. Night and bad weather raise the odds of a random encounter, so an easy stretch of road can turn dangerous after dark.</div>

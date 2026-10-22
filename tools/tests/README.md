@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs619 | the world preview in clear colours (grass lighter than forest, bright rivers, pale ranges) and no Wilderness: no band, no level, an ordinary death with a grave where it lay, its achievement now The Far Reaches |
 | rs618 | world generator 11: ranges in chains, wind-borne moisture, more rivers running together, green banks, no specks, towns on fair-sized land; the same seed remakes the same world; a generator 10 world comes out exactly as before |
 | rs616 | on a phone the roads are painted into the ground as on a computer (no old strips), the rest of the painted ground off (runs on an emulated phone) |
 | rs615 | a raised house (stilts in a marsh town, a hill terrace) has a stair up to its door; you climb it walking in and come down it walking out |

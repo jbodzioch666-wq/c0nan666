@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-619 - A clear map, and no Wilderness
+
+- **A world preview you can read:** the map you choose a world from used to draw grass and forest in the same dark green, with rivers and mountain ranges sunk into it, so the shape of the land hardly showed. It now draws grass a lighter green than the woods, rivers in bright blue, the ranges in pale stone, and snow white. Volcanic land, jungle and the other rare biomes are a light tint, with the land showing through.
+- **The Wilderness is gone:** there's no lawless band along the edge of the world any more. That means no Wilderness level, no warning when you go near it, no red band on the maps, and no losing what you carry if you die out there: a death there leaves a grave like anywhere else. The land where it lay takes its own area's difficulty instead. The world itself is laid out exactly as before, roads and all, so nothing in your current world moves.
+- **Its achievement is now The Far Reaches:** walk into land with a recommended combat level of 100 or more. If you already earned Deep Wilderness, you keep it and its bonus.
+
 ## RS-618 - A land made by its weather
 
 New worlds now come from world generator 11. Your current world and character are unchanged: an existing world keeps the generator it was made with. Across the same 12 test worlds:
