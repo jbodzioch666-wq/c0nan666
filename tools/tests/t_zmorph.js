@@ -12,6 +12,8 @@ module.exports = async page=>{
   const st = await page.evaluate(()=>({ M:!!GLOBE.M, globe:G.owGlobe, dist:+GLOBE.dist.toFixed(2), near:+globeNearDist().toFixed(2) })); console.log('after out', JSON.stringify(st));
   /* the flat sheet alone */
   await page.evaluate(async ()=>{ const M = GLOBE.M; window.__freeze = true; });
+  await page.evaluate(async ()=>{ GLOBE.distGoal = globeNearDist(); for (let i=0;i<200;i++) await new Promise(r=>requestAnimationFrame(r)); });
+  await page.screenshot({ path: SHOTS + '/zmorph-near.png' });
   await page.evaluate(()=>globeClose());
   for (let k=0;k<6;k++){ await page.screenshot({ path: SHOTS + '/zmorph-in-' + k + '.png' }); await page.waitForTimeout(1050); }
   await page.waitForTimeout(800);

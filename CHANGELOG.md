@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-627 - Closer to the globe
+
+- **Zoom three times closer on the globe.** It now fills the screen with land, ranges and forests before it unrolls, and it unrolls into the chart at the matching close zoom, so there's still no change of size at the handover.
+- **Sharper up close.** The globe's map is now drawn at the chart's full detail instead of a reduced copy.
+- **Smoother at close zoom.** The chart behind the fade is drawn the moment you scroll in, before the roll starts. At close zoom that drawing is heavy, and mid-roll it caused a 64 ms hitch; now every frame of the roll is under 10 ms.
+
 ## RS-626 - From globe to chart without a jump
 
 - **The globe unrolls into the chart.** Zoom in on a Planet's globe and, at the chart's own scale, the sphere unrolls into the flat parchment, turning to the land the chart will open on, then fades into the chart in place. Before, it cut straight from a big globe to a much smaller chart.

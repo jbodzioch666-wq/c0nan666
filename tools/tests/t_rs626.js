@@ -1,4 +1,4 @@
-// RS-626: no jump between the globe and the chart: the globe at its nearest is at the chart's own scale; going in, it unrolls into the chart
+// RS-626 (RS-627: the globe comes in to 3x the chart's widest, and unrolls into the chart at that zoom): no jump between the globe and the chart: the globe at its nearest is at the chart's own scale; going in, it unrolls into the chart
 // (turning to the land the chart opens on) and fades into it, and going out the chart rolls up into it; both at a steady frame rate; and a
 // step of the wheel glides, on the globe and on the chart
 module.exports = async page=>{
@@ -13,12 +13,12 @@ module.exports = async page=>{
     /* out: wheel out to the chart's widest, then once more */
     for (let i=0;i<20 && !G.owGlobe;i++){ wheel(100); for (let k=0;k<40;k++) await raf(); }
     out.started = G.owGlobe && !!GLOBE.M; out.flatAtStart = GLOBE.M ? Math.abs(GLOBE.dist - globePlaneDist(chartView(GLOBE.M.chart.zs, GLOBE.M.chart.c).cellPx)) < 1e-6 : false;
-    out.out = await run(); out.nearScale = Math.abs(GLOBE.dist - globeNearDist()) < 1e-6 && Math.abs(globeNearDist() - globePlaneDist(chartView(OW_ZOOM_MIN, { x:0, y:0 }).cellPx)) < 1e-9;
+    out.out = await run(); out.nearScale = GLOBE.dist >= globeNearDist() - 1e-6 && GLOBE_IN_ZS===3 && Math.abs(globeNearDist() - globePlaneDist(chartView(GLOBE_IN_ZS, { x:0, y:0 }).cellPx)) < 1e-9;
     /* the globe's wheel glides too */
     { const d0 = GLOBE.dist; wheel(100); await raf(); const d1 = GLOBE.dist; for (let i=0;i<120;i++) await raf(); out.gGlide = d1 > d0 && d1 < GLOBE.dist - 0.01; }
     /* in: wheel in till it unrolls */
-    for (let i=0;i<20 && !GLOBE.M;i++){ wheel(-100); for (let k=0;k<20;k++) await raf(); }
-    const face = globeFacing(); out.in = await run(); out.chart = !G.owGlobe && owMapOpen() && owZoomScale()===OW_ZOOM_MIN;
+    for (let i=0;i<40 && !GLOBE.M;i++){ wheel(-100); for (let k=0;k<20;k++) await raf(); }
+    const face = globeFacing(); out.in = await run(); out.chart = !G.owGlobe && owMapOpen() && owZoomScale()===GLOBE_IN_ZS; out.near = +globeNearDist().toFixed(2);
     out.centred = Math.abs(owZoomCenter().x - face.x) <= 2 && Math.abs(owZoomCenter().y - face.y) <= 2;
     return out; });
   console.log(JSON.stringify(r));
@@ -29,7 +29,7 @@ module.exports = async page=>{
   A(r.out.ms < 1500 && r.in.ms < 1500, 'each way takes under a second and a half: ' + [r.out.ms, r.in.ms]);
   A(r.nearScale, 'the globe ends at the chart\'s own scale');
   A(r.gGlide, 'a step of the wheel on the globe glides');
-  A(r.chart && r.centred, 'zooming in unrolls it into the chart, on the land that faced you');
+  A(r.chart && r.centred, 'zooming in unrolls it into the chart at that zoom, on the land that faced you');
   A(r.out.med < 14 && r.in.med < 14 && r.out.worst < 70 && r.in.worst < 70, 'smooth both ways: ' + JSON.stringify([r.out, r.in]));
   A(!errs.length, 'no errors: ' + errs.join(' | '));
 };

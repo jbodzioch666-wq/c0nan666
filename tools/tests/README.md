@@ -552,3 +552,4 @@ Screenshots go to `tools/tests/shots/`.
 | zglobe | a Planet world's globe from several turns and facing the seam (`ZSEEN=1` reveals the map): shots/zglobe-<n>.png and frame times |
 | zmorph | the globe-chart change slowed to 6 s: shots/zmorph-out-<k>.png and zmorph-in-<k>.png, beside zmorph-chart.png |
 | zmorph2 | frame times while the globe rolls up out of the chart and back (`ZWAIT=ms` before it starts) |
+| zsnap | the chart snapshot for the globe fade at its unroll zoom (three runs), and the chart's own frame and script times at that zoom |

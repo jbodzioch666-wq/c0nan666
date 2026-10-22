@@ -18853,24 +18853,25 @@ function globeFacing(){ const T = THREE, v = new T.Vector3(0, 0, 1); v.applyAxis
 /* (RS-626) between the globe and the chart there's no cut: the globe at its nearest is drawn at the chart's own scale, and going in, the
    sphere unrolls into the flat chart (turning as it goes to the land the chart will open on) and fades into the parchment; going out, the
    chart lifts off as a sheet and rolls up into the globe. GLOBE.M is the move under way */
-const GLOBE_MORPH_S = 0.85;
+const GLOBE_MORPH_S = 0.85, GLOBE_IN_ZS = 3;   /* (RS-627: the globe comes in to three times the chart's widest before it unrolls, into the chart at that zoom) */
 function chartView(zs, c){ const cellPx = Math.max(canvas.width/OW_COLS, canvas.height/OW_ROWS)*zs, vW = canvas.width/cellPx, vH = canvas.height/cellPx;
   return { cellPx, vW, vH, camFX:clamp(c.x + 0.5 - vW/2, 0, Math.max(0, OW_COLS - vW)), camFY:clamp(c.y + 0.5 - vH/2, 0, Math.max(0, OW_ROWS - vH)) }; }
 /* how far off the camera stands for a flat sheet one unit from the centre to show the chart at this scale */
 function globePlaneDist(cellPx){ return 1 + (Math.PI*2/OW_COLS)*(canvas.height/2)/(cellPx*Math.tan(15*Math.PI/180)); }
-function globeNearDist(){ return globePlaneDist(chartView(OW_ZOOM_MIN, { x:0, y:0 }).cellPx); }
+function globeNearDist(){ return globePlaneDist(chartView(GLOBE_IN_ZS, { x:0, y:0 }).cellPx); }
 function globeFaceAngles(tx, ty){ const p = globeLocal(tx, ty); return { yaw:-Math.atan2(p[0], p[2]), pitch:clamp(Math.asin(clamp(p[1], -1, 1)), -1.2, 1.2) }; }
 function globeMorph(dir){
   if (GLOBE.M || !owIsPlanet()) return; if (!owMapOpen()) toggleOwZoom();
   const W = OW_COLS, H = OW_ROWS, now = performance.now();
   if (dir > 0){   /* in: the globe unrolls into the chart, at the chart's widest */
-    const f = globeFacing(), c = { x:f.x, y:f.y }, v = chartView(OW_ZOOM_MIN, c), uc = (v.camFX + v.vW/2)/W, vc = (v.camFY + v.vH/2)/H, to = globeFaceAngles(uc*W - 0.5, vc*H - 0.5);
-    GLOBE.M = { dir, t0:now, uc, vc, from:{ yaw:GLOBE.yaw, pitch:GLOBE.pitch, dist:GLOBE.dist }, to:{ yaw:to.yaw, pitch:to.pitch, dist:globePlaneDist(v.cellPx) }, chart:{ c, zs:OW_ZOOM_MIN } };
+    const f = globeFacing(), c = { x:f.x, y:f.y }, v = chartView(GLOBE_IN_ZS, c), uc = (v.camFX + v.vW/2)/W, vc = (v.camFY + v.vH/2)/H, to = globeFaceAngles(uc*W - 0.5, vc*H - 0.5);
+    GLOBE.M = { dir, t0:now, uc, vc, from:{ yaw:GLOBE.yaw, pitch:GLOBE.pitch, dist:GLOBE.dist }, to:{ yaw:to.yaw, pitch:to.pitch, dist:globePlaneDist(v.cellPx) }, chart:{ c, zs:GLOBE_IN_ZS } };
   } else {   /* out: the chart as it is now rolls up into the globe */
     const zs = owZoomScale(), c = { x:owZoomCenter().x, y:owZoomCenter().y }, v = chartView(zs, c), uc = (v.camFX + v.vW/2)/W, vc = (v.camFY + v.vH/2)/H, to = globeFaceAngles(uc*W - 0.5, vc*H - 0.5), d0 = globePlaneDist(v.cellPx);
     G.owZoomGoal = null; GLOBE.yaw = to.yaw; GLOBE.pitch = to.pitch; GLOBE.vyaw = GLOBE.vpitch = 0; GLOBE.dist = d0;
     GLOBE.M = { dir, t0:now, uc, vc, from:{ yaw:to.yaw, pitch:to.pitch, dist:d0 }, to:{ yaw:to.yaw, pitch:to.pitch, dist:Math.max(d0, globeNearDist()) }, chart:{ c, zs } };
     G.owGlobe = true; }
+  GLOBE.M.snap = globeChartSnap(GLOBE.M); GLOBE.M.t0 = performance.now();   /* (RS-627: the chart for the fade drawn first, before the clock starts - at close zoom it's a heavy draw, and mid-roll it showed as a hitch) */
   GLOBE.distGoal = GLOBE.M.to.dist; try{ mapToolsSync(true); }catch(e){} renderGame();
 }
 /* the globe's renderer, textures and both its shaders made ready ahead of time - built on the first roll it held up that frame some 120 ms */
@@ -18888,7 +18889,7 @@ function globeOpen(){ if (!G.owGlobe) globeMorph(-1); }
 function globeClose(){ if (G.owGlobe) globeMorph(1); }
 /* the chart wrapped round the sphere: its colour, the fog over the unseen, ice at the poles; and a relief and a shine map from the land */
 function globeTextures(){
-  const W = OW_COLS, H = OW_ROWS, TW = 2048, TH = 1024, key = PM.key + '|' + (G.ow.seenVer||0) + '|' + owSeenArr().reduce((a, b)=>a + b, 0);
+  const W = OW_COLS, H = OW_ROWS, TW = PM.cv.width, TH = PM.cv.height, key = PM.key + '|' + (G.ow.seenVer||0) + '|' + owSeenArr().reduce((a, b)=>a + b, 0);
   if (GLOBE.texKey===key && GLOBE.tex) return; GLOBE.texKey = key;
   const T = THREE, c = GLOBE.texCv || (GLOBE.texCv = document.createElement('canvas')); c.width = TW; c.height = TH; const x = c.getContext('2d');
   x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high'; if ('filter' in x) x.filter = 'saturate(1.4) contrast(1.06)'; x.drawImage(PM.cv, 0, 0, TW, TH); if ('filter' in x) x.filter = 'none';
@@ -45045,7 +45046,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-626';
+const GAME_VERSION = 'rs-627';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
