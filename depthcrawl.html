@@ -34803,7 +34803,7 @@ function o3SyncNodes(){
 function o3BuildNodeChunk(list, g){
   const T = THREE;
   const G3 = o3NodeGeo(), hitM = O3.nodeHitM || (O3.nodeHitM = new T.MeshBasicMaterial({ visible:false }));
-  const hitG = O3.nodeHitG || (O3.nodeHitG = new T.BoxGeometry(0.9, 1.3, 0.9).translate(0, 0.55, 0)), discs = [], ripples = [], bubs = [], glows = [];
+  const hitG = O3.nodeHitG || (O3.nodeHitG = new T.BoxGeometry(0.9, 1.3, 0.9).translate(0, 0.55, 0)), ripples = [],   /* (RS-635: no glowing disc under a spot any more) */ bubs = [], glows = [];
   for (const n of list){
     const [gx, gz] = o3C(n.x, n.y), wet = n.k==='fishing', y0 = wet ? -0.13 : O3.heightAt(gx, gz);
     const grp = new T.Group(); grp.position.set(gx, y0, gz); g.add(grp);
@@ -34814,7 +34814,6 @@ function o3BuildNodeChunk(list, g){
       bm.material.userData.own = true; bm.position.y = 3.5; grp.add(bm); O3.nodeAnim.push({ kind:'beam', o:bm, ph:n.x }); }
     else if (n.qual===2 && !n.gone){ nGlow('rgba(255,250,220,1)', 0.4, n.k==='woodcutting' ? 1.1 : 0.4, n.x*1.3); }
     // a soft glow of the spot's own colour on the ground, so it stands out from the scenery
-    if (!n.gone) discs.push({ x:gx, y:y0 + 0.03*grp.scale.y, z:gz, s:grp.scale.x, col, ph:n.x*0.7+n.y*0.3 });   /* (RS-401: all of a chunk's discs are one mesh - o3NodeDiscs) */
     if (n.k==='woodcutting'){
       if (n.gone){ const st = new T.Mesh(G3.stump, o3NodeMat('stump', '#6a5034')); st.castShadow = true; grp.add(st); const top = new T.Mesh(new T.CircleGeometry(0.1, 10), o3NodeMat('ring', '#c8a878')); top.rotation.x = -Math.PI/2; top.position.y = 0.141; grp.add(top); }
       else { const tr = o3NodeTree(n.type); tr.rotation.y = skNH(n.x, n.y, 720)*6.28; grp.add(tr);
@@ -34866,12 +34865,8 @@ function o3BuildNodeChunk(list, g){
     const hit = new T.Mesh(hitG, hitM); hit.position.set(gx, y0, gz); hit.userData.act = { kind:'node', x:n.x, y:n.y }; g.add(hit); O3.nodeHits.push(hit);
   }
   try{ o3MergeStatic(g, new Set(O3.nodeAnim.map(a=>a.o).concat(O3.nodeHits)), new Set(Object.values(O3.mats||{}))); }catch(e){ console.error(e); }
-  if (discs.length) g.add(o3NodeDiscs(discs, G3.disc));
   for (const m of o3NodeFx(ripples, bubs, glows, G3)) g.add(m);
 }
-/* (RS-401) the soft glow on the ground under every gathering spot: each was its own mesh with its own material, its opacity
-   set by hand every frame - zoomed out, some 400 draws. A chunk's discs are one mesh now, each disc's colour and phase in
-   its vertices, and the card pulses them all from one clock */
 /* (RS-401) a chunk's fishing ripples and bubbles and its glows, each kind one mesh or one point cloud moved by the card: a fishing
    spot alone was six draws (two ripples, four bubbles), and every glow a sprite of its own */
 function o3NodeFx(rip, bub, glo, G3){
@@ -34904,20 +34899,6 @@ function o3NodeFx(rip, bub, glo, G3){
     out.push(new T.Points(g, m)); }
   for (const o of out){ o.renderOrder = 2; }
   return out;
-}
-function o3NodeDiscs(list, disc){
-  const T = THREE, src = disc.attributes.position, idx = disc.index, nv = src.count, ni = idx ? idx.count : 0;
-  const pos = new Float32Array(list.length*nv*3), colA = new Float32Array(list.length*nv*3), phA = new Float32Array(list.length*nv), rA = new Float32Array(list.length*nv), ind = new (list.length*nv > 65535 ? Uint32Array : Uint16Array)(list.length*ni);
-  list.forEach((d, k)=>{ const c = new T.Color(d.col).convertSRGBToLinear(), r = 0.46*d.s/0.46;
-    for (let i=0;i<nv;i++){ const o = (k*nv + i); pos[o*3] = d.x + src.getX(i)*d.s; pos[o*3+1] = d.y; pos[o*3+2] = d.z - src.getY(i)*d.s; colA[o*3] = c.r; colA[o*3+1] = c.g; colA[o*3+2] = c.b; phA[o] = d.ph; rA[o] = Math.hypot(src.getX(i), src.getY(i))/0.46; }
-    for (let i=0;i<ni;i++) ind[k*ni + i] = idx.getX(i) + k*nv; });
-  const g = new T.BufferGeometry(); g.setAttribute('position', new T.BufferAttribute(pos, 3)); g.setAttribute('aCol', new T.BufferAttribute(colA, 3)); g.setAttribute('aPh', new T.BufferAttribute(phA, 1)); g.setAttribute('aR', new T.BufferAttribute(rA, 1)); if (ni) g.setIndex(new T.BufferAttribute(ind, 1));
-  g.computeBoundingSphere();
-  const U = O3.discT || (O3.discT = { value:0 });
-  const m = O3.discMat || (O3.discMat = new T.ShaderMaterial({ uniforms:{ uT:U }, transparent:true, depthWrite:false, blending:T.AdditiveBlending,
-    vertexShader:'attribute vec3 aCol; attribute float aPh; attribute float aR; uniform float uT; varying vec4 vC; varying float vR; void main(){ vR = aR; vC = vec4(aCol, 0.2 + 0.1*sin(uT*2.4 + aPh)); gl_Position = projectionMatrix*modelViewMatrix*vec4(position, 1.0); }',
-    fragmentShader:'varying vec4 vC; varying float vR; void main(){ float k = smoothstep(0.74, 0.93, vR)*(1.0 - smoothstep(0.96, 1.0, vR)) + 0.06; gl_FragColor = vec4(vC.rgb, vC.a*k); \n#include <colorspace_fragment>\n}' }));   /* (RS-598: a glowing rim and the faintest wash inside - lit all over and added on top, it lifted a tree's shadow inside it, leaving a dark crescent round its edge) */   /* (additive with the source's alpha, like the old basic material; written out in the screen's encoding) */
-  const mesh = new T.Mesh(g, m); mesh.renderOrder = 1; return mesh;
 }
 /* (RS-333) bake every still, solid mesh under root that shares a material into one: the gathering spots in view were some
    3,000 separate draws (a herb patch alone was 21), and each draw costs the phone far more than its few triangles */
@@ -45265,7 +45246,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-634';
+const GAME_VERSION = 'rs-635';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

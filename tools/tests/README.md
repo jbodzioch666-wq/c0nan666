@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs635 | no glowing ring on the ground round a gathering spot on the open land; the spots still there to click |
 | rs634 | walking works on every face of a Planet: the arrow keys and a click on the ground move you on faces other than the middle one, the figure measured where it is drawn |
 | rs633 | generator 16: land, rivers and roads run over four of the seven unjoined cube edges (the seas there gone), seas left only on the back face's three edges and the middle face's corners, nothing left in the void, a walk on foot over the north face's edge continuous with land drawn past it |
 | rs632 | the 3D land's frame on a cube-sphere: the lookups exact both ways, the north face's frame that face, sailing over its edge continuous, the frame changing a few tiles in with the camera turned so a key walks the same way, sites clicked at their world place; flat worlds untouched |

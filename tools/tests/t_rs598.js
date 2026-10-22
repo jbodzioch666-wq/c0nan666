@@ -17,7 +17,7 @@ module.exports = async page=>{
     await run(40); out.free = +diff(ISO.player.face, Math.atan2(FACING_VECT[p.facing][0], FACING_VECT[p.facing][1])).toFixed(2);
     /* the gathering spots' discs: a rim */
     G.gameMode = 0; G.owPos = { x:G.ow.spawnPos.x, y:G.ow.spawnPos.y }; setUi('playing'); G.player.clock = DAY_LENGTH*10 + DAY_LENGTH*0.45; G.weather = 'clear'; O3.dist = 8; await run(150);
-    out.rim = !!(O3.discMat && /smoothstep\(0\.74/.test(O3.discMat.fragmentShader));
+    out.rim = !O3.discMat;   /* (RS-635: the discs are gone altogether) */
     return out; });
   await page.screenshot({ path: SHOTS + '/rs598-discs.png' });
   console.log(JSON.stringify(r));
@@ -25,6 +25,6 @@ module.exports = async page=>{
   A(r.foe!==undefined && r.foe < 0.15, 'square on to a foe on the diagonal: ' + r.foe);
   A(r.vein < 0.15, 'and to a vein off at an angle: ' + r.vein);
   A(r.free < 0.15, 'with nothing about, the way you face: ' + r.free);
-  A(r.rim, 'a gathering spot\'s disc glows at its rim');
+  A(r.rim, 'no glowing disc under a gathering spot (RS-635)');
   A(!errs.length, 'no errors: ' + errs.join(' | '));
 };

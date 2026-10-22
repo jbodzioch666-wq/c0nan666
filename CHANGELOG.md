@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-635 - No rings round the gathering spots
+
+- **The glowing rings on the ground round trees, rocks, herb patches and other gathering spots are gone,** so the land looks cleaner. The spots themselves are unchanged: still there, still clickable, still showing their tooltips. Fishing spots keep their ripples on the water, so you can still see where to fish.
+
 ## RS-634 - Walking on every face
 
 - **Fixed: you couldn't move on most of a Planet.** On any face but the middle one, neither the arrow keys nor clicking the ground moved you. The game holds each step until your figure catches up, and since RS-632 it was checking the figure against the wrong position, so it never thought you'd arrived. Keys and clicks now walk on every face.
