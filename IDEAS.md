@@ -307,7 +307,7 @@ _World generation and overworld content_
 - [x] The land curving away at the horizon (RS-631, `DC_CURVE` in three's project_vertex chunk; 2.5 times the true curve so it shows)
 - [x] Every "next tile" in the generator and the game through `owNb`/`owOff` (RS-633 to RS-638: rivers, roads, floods, landmasses, coasts; the route planners, `owStepTo`, the minimap in the frame, encounters' wandering)
 - [x] The winds on the north and south faces (RS-637, `owGen17Moisture`: round true latitudes; the weather's noise from the sphere, `owSphereNoise`)
-- [ ] Map icons and names drawn upright on the polar faces (they're laid in the face's own grid, so turned)
+- [x] Map icons and names drawn upright on the polar faces (RS-639, `globeUprightOn`)
 - [ ] Distances, town counts and travel times retuned for a planet with `tools/sim`
 
 ### World map

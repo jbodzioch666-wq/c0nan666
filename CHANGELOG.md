@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-639 - Upright names at the poles
+
+- **Map names stand upright on the globe's polar faces.** On a Planet's north and south faces, the place names, site badges and their level tags used to come out turned, sometimes upside down, because the map is laid in each face's own grid. Each one is now turned back about its own spot, so it reads normally wherever you look on the globe.
+
 ## RS-638 - Routes and the minimap over the edges
 
 - **Plan routes across face edges.** On a Planet, the world map's route planner, by road or across country, now finds the way over the edges between faces, and auto-walk follows it there.

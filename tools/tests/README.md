@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs639 | the names, badges and level tags on the globe's chart stand upright on the polar faces: each turned back about its own place by the angle the face's grid lies at on the screen |
 | rs638 | the game's own searches go over a Planet's face edges: a route from the north face onto L found by both planners, its steps landing on the stop, walked to the end; the minimap shows the land past the edge |
 | rs637 | generator 17: no narrow seas on a Planet's face edges, small seas only at the eight cube corners, land over the edges with the ground matching across them about as often as inside a face; a generator 16 planet unchanged |
 | rs636 | the hand-written shaders on the open land bend with a planet's curve: fishing ripples, bubbles and glows (and rain, fireflies, spell sparks) no longer hang in the air from afar |

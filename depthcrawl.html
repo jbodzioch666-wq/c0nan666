@@ -19083,6 +19083,19 @@ function globeStars(cw, ch){
   for (let i=0;i<cw*ch/2600;i++){ const a = 0.25 + r()*0.75, s = r() < 0.08 ? 1.6 : 0.9; x.fillStyle = `rgba(${200 + r()*55|0},${210 + r()*45|0},255,${a})`; x.fillRect(r()*cw, r()*ch, s*dpr, s*dpr); }
   return c;
 }
+/* (RS-639) the names and the badges on the chart laid over the globe, upright: on the polar faces a face's grid lies turned on the
+   screen, and everything drawn in it came out turned with it. While the chart is drawn for the globe, each piece of writing and each
+   site's badge and picture is turned back about its own place by that angle (r: the turn, in the chart's own space) */
+function globeUprightOn(r){
+  if (Math.abs(r) < 0.12) return ()=>{};
+  const c = ctx, ft = c.fillText, st = c.strokeText, pb = window.pmBadge, dma = window.drawMonsterArt, sbe = window.owSiteBadgeExtras; let dep = 0;   /* (dep: inside a group already turned, its writing isn't turned again) */
+  c.fillText = function(t, x, y, mw){ if (dep) return mw==null ? ft.call(this, t, x, y) : ft.call(this, t, x, y, mw); this.save(); this.translate(x, y); this.rotate(r); mw==null ? ft.call(this, t, 0, 0) : ft.call(this, t, 0, 0, mw); this.restore(); };
+  c.strokeText = function(t, x, y, mw){ if (dep) return mw==null ? st.call(this, t, x, y) : st.call(this, t, x, y, mw); this.save(); this.translate(x, y); this.rotate(r); mw==null ? st.call(this, t, 0, 0) : st.call(this, t, 0, 0, mw); this.restore(); };
+  window.pmBadge = function(x, px, py, R, t){ x.save(); x.translate(px, py); x.rotate(r); dep++; try{ return pb.call(this, x, 0, 0, R, t); } finally { dep--; x.restore(); } };
+  window.owSiteBadgeExtras = function(x, gx, gy, px, py, R){ x.save(); x.translate(px, py); x.rotate(r); dep++; try{ return sbe.call(this, x, gx, gy, 0, 0, R); } finally { dep--; x.restore(); } };   /* (a site's level tag and its progress ring, turned with its badge) */
+  window.drawMonsterArt = function(px, py, size, recipe, color, tc){ const k = ctx; if (tc) return dma.apply(this, arguments);   /* (a badge's own picture turns with its badge) */ k.save(); k.translate(px, py); k.rotate(r); try{ return dma.call(this, 0, 0, size, recipe, color, tc); } finally { k.restore(); } };
+  return ()=>{ c.fillText = ft; c.strokeText = st; window.pmBadge = pb; window.drawMonsterArt = dma; window.owSiteBadgeExtras = sbe; };
+}
 function globeRender(){
   if (!PM.cv || PM.key !== pmMapKey()) pmBuild(); if (!PM.cv) return false; owReveal(G.owPos.x, G.owPos.y, wgSight()); pmFogMask();
   if (!globeSetup()) return false;
@@ -19102,7 +19115,7 @@ function globeRender(){
   GLOBE.pivot.rotation.x = GLOBE.pitch; GLOBE.mesh.rotation.y = GLOBE.yaw; GLOBE.cam.position.set(0, 0, GLOBE.dist); GLOBE.cam.lookAt(0, 0, 0); GLOBE.cam.updateMatrixWorld();
   /* the chart for the land facing you: drawn at the size the sphere shows it, squeezed east to west as the globe squeezes it away from the equator */
   const f = globeFacingF(), cbe = owCube(), lat = (0.5 - (f.y + 0.5)/H)*Math.PI, cosL = cbe ? 1 : Math.max(0.25, Math.cos(lat)), pxU = (ch/2)/((GLOBE.dist - 1)*Math.tan(15*Math.PI/180)), cellNS = pxU*globeTileAng();
-  let ca = 1, sa = 0; if (cbe){ const p0 = globeTileScreen(Math.round(f.x), Math.round(f.y)), p1 = globeTileScreen(Math.round(f.x) + 1, Math.round(f.y)); if (p0 && p1 && cubeFace(Math.round(f.x) + 1, Math.round(f.y))===cubeFace(Math.round(f.x), Math.round(f.y))){ const an = Math.atan2(p1.y - p0.y, p1.x - p0.x); ca = Math.abs(Math.cos(an)); sa = Math.abs(Math.sin(an)); } }   /* (the face's grid turned on the screen: the chart drawn wide enough to cover it) */
+  let ca = 1, sa = 0; GLOBE.an = 0; if (cbe){ const p0 = globeTileScreen(Math.round(f.x), Math.round(f.y)), p1 = globeTileScreen(Math.round(f.x) + 1, Math.round(f.y)); if (p0 && p1 && cubeFace(Math.round(f.x) + 1, Math.round(f.y))===cubeFace(Math.round(f.x), Math.round(f.y))){ const an = Math.atan2(p1.y - p0.y, p1.x - p0.x); ca = Math.abs(Math.cos(an)); sa = Math.abs(Math.sin(an)); GLOBE.an = an; } }   /* (the face's grid turned on the screen: the chart drawn wide enough to cover it) */
   const M = 1.32, BW = cw/cosL, BH = ch, CW = (cw*ca + ch*sa)/cosL*M, CH = (cw*sa + ch*ca)*M, zs = cellNS/Math.max(BW/W, BH/H), pa = cbe ? smoothstep(1.45, 1.85, zs) : smoothstep(0.85, 1.12, zs); GLOBE.pa = pa;   /* (M: drawn a third past the screen's edges, where the sphere curves away) */
   /* the chart is redrawn only when the view has moved a good way, when the mouse or a click may have changed it, or four times a second for
      its clouds and smoke - it's fixed to its own patch of the sphere, so between times the last one turns with the globe, still in place */
@@ -19111,7 +19124,8 @@ function globeRender(){
   if (pa > 0 && !due){ /* (the last chart stands) */ }
   else if (pa > 0){ GLOBE.lastRef = { x:f.x, y:f.y, d:GLOBE.dist, t:now, pa }; GLOBE.dirty = false;
     const sc = { x:clamp(f.x, 0, W - 1), y:clamp(f.y, 0, H - 1) }; G.owZoomCenter = GLOBE.ctr = sc; G.owZoomScale = GLOBE.zsSet = Math.max(0.3, zs); G.owZoomGoal = null;
-    GLOBE.decal = { w:CW, h:CH, bw:BW, bh:BH }; ctx.save(); ctx.setTransform(cw/CW, 0, 0, ch/CH, 0, 0); try{ renderOverworldMapZoomed(); } finally { ctx.restore(); GLOBE.decal = null; }
+    GLOBE.decal = { w:CW, h:CH, bw:BW, bh:BH }; ctx.save(); ctx.setTransform(cw/CW, 0, 0, ch/CH, 0, 0); const unturn = globeUprightOn(-(GLOBE.an||0));
+    try{ renderOverworldMapZoomed(); } finally { unturn(); ctx.restore(); GLOBE.decal = null; }
     const cam = owZoomLastCam, cp = owZoomLastCellPx; GLOBE.lastCW = CW; GLOBE.pu.uRect.value.set(cam.x/W, cam.y/H, (cam.x + CW/cp)/W, (cam.y + CH/cp)/H); GLOBE.patch.needsUpdate = true; }
   else { owZoomLastCellPx = 0; GLOBE.lastRef = null; }   /* (no chart laid over: nothing on it to click) */
   GLOBE.pu.uPA.value = pa; if (GLOBE.pins) GLOBE.pins.visible = pa < 0.5; GLOBE.pin.visible = pa < 0.5;
@@ -45283,7 +45297,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-638';
+const GAME_VERSION = 'rs-639';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
