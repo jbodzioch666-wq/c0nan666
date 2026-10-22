@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-636 - Fishing spots on the water
+
+- **Fixed: fishing ripples floated in the air from a distance.** On a Planet, the land and sea curve away from you (RS-631), but the fishing spots' ripples, bubbles and glows didn't bend with them, so far-off ones hung above the water. They now sit on the water at any distance.
+- **The same fix for rain, fireflies and spell sparks,** which used the same kind of effect.
+
 ## RS-635 - No rings round the gathering spots
 
 - **The glowing rings on the ground round trees, rocks, herb patches and other gathering spots are gone,** so the land looks cleaner. The spots themselves are unchanged: still there, still clickable, still showing their tooltips. Fishing spots keep their ripples on the water, so you can still see where to fish.

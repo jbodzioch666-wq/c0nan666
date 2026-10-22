@@ -25135,6 +25135,12 @@ function gfxInstSphere(im){
 const DC_CURVE = { x:0, y:0, z:0 };
 const O3_CURVE_X = 2.5;   /* (the bend made plain: at the planet's true size the camera, looking down, hardly sees it) */
 function o3CurveK(){ if (!owIsPlanet()) return 0; return O3_CURVE_X*Math.PI/OW_COLS; }   /* (1/(2R), R = circumference/(2 pi): the grid's width is once round the planet, laid flat or as a cube's four equator faces) */
+/* (RS-636) a hand-written shader on the open land bends with it too: its "modelViewMatrix*vec4(p, 1.0)" goes through the same curve, and
+   it gets the shared uniform - the fishing ripples, bubbles and glows, the rain, the fireflies and spell sparks stood flat in the air over
+   a planet's land as it fell away */
+function dcCurveMat(o){ try{ o.uniforms = o.uniforms || {}; o.uniforms.dcCurve = { value:DC_CURVE };
+  o.vertexShader = 'uniform vec3 dcCurve; vec4 dcMV(vec3 p){ vec4 w = modelMatrix*vec4(p, 1.0); vec2 d = w.xz - dcCurve.xy; w.y -= dcCurve.z*dot(d, d); return viewMatrix*w; }' + String.fromCharCode(10)
+    + o.vertexShader.replace(/modelViewMatrix\s*\*\s*vec4\(([^;]*?),\s*1\.0\)/g, 'dcMV($1)'); }catch(e){ console.error(e); } return o; }
 function o3CurveDrop(x, z){ const k = DC_CURVE.z; if (!k) return 0; const dx = x - DC_CURVE.x, dz = z - DC_CURVE.y; return k*(dx*dx + dz*dz); }
 function gfxThreeSetup(){
   if (typeof THREE==='undefined' || THREE.__dcSetup) return; THREE.__dcSetup = true;
@@ -25355,11 +25361,11 @@ function gfxRainLines(n, span, top, off, opacity){
   for (let i=0;i<n;i++){ const x = Math.random()*span - span/2, y = Math.random()*top, z = Math.random()*span - span/2;
     pos.set([x, y, z, x + off[0], y + off[1], z + off[2]], i*6); base.set([x, y, z, x, y, z], i*6); }
   const g = new T.BufferGeometry(); g.setAttribute('position', new T.BufferAttribute(pos, 3)); g.setAttribute('aBase', new T.BufferAttribute(base, 3));
-  const m = new T.ShaderMaterial({ uniforms:{ uT:{ value:0 }, uP:{ value:new T.Vector3() }, uFall:{ value:14 }, uSlant:{ value:0 }, uLen:{ value:1 }, uTop:{ value:top }, uOp:{ value:opacity } }, transparent:true,
+  const m = new T.ShaderMaterial(dcCurveMat({ uniforms:{ uT:{ value:0 }, uP:{ value:new T.Vector3() }, uFall:{ value:14 }, uSlant:{ value:0 }, uLen:{ value:1 }, uTop:{ value:top }, uOp:{ value:opacity } }, transparent:true,
     vertexShader:`attribute vec3 aBase; uniform float uT, uFall, uSlant, uLen, uTop; uniform vec3 uP;
       void main(){ vec3 o = (position - aBase)*uLen; float y = mod(aBase.y - uT*uFall, uTop); vec3 p = uP + vec3(aBase.x - uSlant*(uTop - y), y, aBase.z) + o;
         gl_Position = projectionMatrix*modelViewMatrix*vec4(p, 1.0); }`,
-    fragmentShader:`uniform float uOp; void main(){ gl_FragColor = vec4(0.667, 0.733, 0.816, uOp); }` });
+    fragmentShader:`uniform float uOp; void main(){ gl_FragColor = vec4(0.667, 0.733, 0.816, uOp); }` }));
   m.opacity = opacity; const L = new T.LineSegments(g, m); L.frustumCulled = false; return L;
 }
 // ---- textures drawn once: grass, dirt and rock detail, and soft cloud noise ----
@@ -25394,7 +25400,7 @@ function gfxFlies(T, at, kind){
   const ab = new Float32Array(n*3), as = new Float32Array(n), ac = new Float32Array(n*3), pal = bf ? [0xf0b030, 0xe86030, 0xf8f0e0, 0x6a9ae0, 0xd870b0] : [0xd8ff70];
   at.forEach(([x, y, z], i)=>{ ab[i*3] = x; ab[i*3+1] = y; ab[i*3+2] = z; as[i] = o3Hash(Math.round(x*7), Math.round(z*7), 500)*6.283; const c = new T.Color(pal[(o3Hash(Math.round(x*5), Math.round(z*5), 501)*pal.length)|0]).convertSRGBToLinear(); ac[i*3] = c.r; ac[i*3+1] = c.g; ac[i*3+2] = c.b; });
   g.setAttribute('aBase', new T.InstancedBufferAttribute(ab, 3)); g.setAttribute('aSeed', new T.InstancedBufferAttribute(as, 1)); g.setAttribute('aCol', new T.InstancedBufferAttribute(ac, 3)); g.instanceCount = n;
-  const m = new T.ShaderMaterial({ uniforms:{ uT:GFX.u.uT, uNight:GFX.u.uNight }, transparent:!bf, depthWrite:bf, blending:bf ? T.NormalBlending : T.AdditiveBlending, side:T.DoubleSide,
+  const m = new T.ShaderMaterial(dcCurveMat({ uniforms:{ uT:GFX.u.uT, uNight:GFX.u.uNight }, transparent:!bf, depthWrite:bf, blending:bf ? T.NormalBlending : T.AdditiveBlending, side:T.DoubleSide,
     vertexShader:`attribute vec3 aBase; attribute float aSeed; attribute vec3 aCol; uniform float uT; uniform float uNight; varying vec3 vC; varying float vA; varying vec2 vUv;
       void main(){ vUv = uv; vC = aCol; float t = uT + aSeed*7.0;
         ` + (bf ? `vec3 p = position; float flap = sin(t*17.0)*1.1; p.y += abs(p.x)*sin(abs(flap)); p.x *= cos(flap);
@@ -25405,7 +25411,7 @@ function gfxFlies(T, at, kind){
         vec4 mv = modelViewMatrix*vec4(c, 1.0); mv.xy += position.xy*(0.8 + w*0.6); gl_Position = projectionMatrix*mv;`) + ` }`,
     fragmentShader:`varying vec3 vC; varying float vA; varying vec2 vUv;
       void main(){ ` + (bf ? `vec2 q = vUv - 0.5; float body = smoothstep(0.1, 0.03, abs(q.x))*smoothstep(0.5, 0.2, abs(q.y)); vec3 col = mix(vC, vec3(0.08, 0.05, 0.03), body + smoothstep(0.42, 0.5, abs(q.x))*0.5*step(0.2, abs(q.y)));
-        if (abs(q.y) > 0.5 - abs(q.x)*0.35) discard; gl_FragColor = vec4(col, 1.0);` : `float d = length(vUv - 0.5)*2.0; float a = smoothstep(1.0, 0.0, d)*vA; if (a < 0.01) discard; gl_FragColor = vec4(vC*(1.0 + (1.0 - d)*1.5), a);`) + ` }` });
+        if (abs(q.y) > 0.5 - abs(q.x)*0.35) discard; gl_FragColor = vec4(col, 1.0);` : `float d = length(vUv - 0.5)*2.0; float a = smoothstep(1.0, 0.0, d)*vA; if (a < 0.01) discard; gl_FragColor = vec4(vC*(1.0 + (1.0 - d)*1.5), a);`) + ` }` }));
   const mesh = new T.Mesh(g, m); mesh.frustumCulled = false; mesh.name = kind; mesh.userData.flies = n; return mesh;
 }
 // a shared bit of shader: the world position, for the land and the water
@@ -34880,22 +34886,22 @@ function o3NodeFx(rip, bub, glo, G3){
     const g = new T.BufferGeometry(); g.setAttribute('position', new T.BufferAttribute(A.position, 3)); g.setAttribute('normal', new T.BufferAttribute(A.normal, 3)); g.setAttribute('aC', new T.BufferAttribute(A.aC, 3)); g.setAttribute('aCol', new T.BufferAttribute(A.aCol, 3)); g.setAttribute('aPh', new T.BufferAttribute(A.aPh, 2)); if (ni) g.setIndex(new T.BufferAttribute(ind, 1));
     const bs = new T.Box3(); for (const d of list) bs.expandByPoint(new T.Vector3(d.x, d.y, d.z)); bs.expandByScalar(0.6); g.boundingSphere = bs.getBoundingSphere(new T.Sphere()); return g; };
   const lin = c=>new T.Color(c).convertSRGBToLinear();
-  if (rip.length){ const m = O3.ripMat || (O3.ripMat = new T.ShaderMaterial({ uniforms:{ uT:U }, transparent:true, depthWrite:false, side:T.DoubleSide,
+  if (rip.length){ const m = O3.ripMat || (O3.ripMat = new T.ShaderMaterial(dcCurveMat({ uniforms:{ uT:U }, transparent:true, depthWrite:false, side:T.DoubleSide,
       vertexShader:'attribute vec3 aC, aCol; attribute vec2 aPh; uniform float uT; varying vec4 vC; void main(){ float f = fract(uT*0.6 + aPh.x); vec3 p = aC + vec3(position.x, 0.0, -position.y)*(0.6 + f*1.9); vC = vec4(aCol, 0.75*(1.0 - f)); gl_Position = projectionMatrix*modelViewMatrix*vec4(p, 1.0); }',
-      fragmentShader:'varying vec4 vC; void main(){ gl_FragColor = vC; \n#include <colorspace_fragment>\n}' }));
+      fragmentShader:'varying vec4 vC; void main(){ gl_FragColor = vC; \n#include <colorspace_fragment>\n}' })));
     out.push(new T.Mesh(batch(G3.ring, rip, d=>lin(d.col)), m)); }
-  if (bub.length){ const m = O3.bubMat || (O3.bubMat = new T.ShaderMaterial({ uniforms:{ uT:U }, transparent:true,
+  if (bub.length){ const m = O3.bubMat || (O3.bubMat = new T.ShaderMaterial(dcCurveMat({ uniforms:{ uT:U }, transparent:true,
       vertexShader:'attribute vec3 aC; attribute vec2 aPh; uniform float uT; varying float vL; void main(){ float f = fract(uT*0.9 + aPh.x), a = aPh.y + uT*0.3; vec3 p = aC + vec3(cos(a)*0.16, f*0.12, sin(a)*0.16) + position*(1.0 - f*0.6); vL = 0.72 + 0.28*normal.y; gl_Position = projectionMatrix*modelViewMatrix*vec4(p, 1.0); }',
-      fragmentShader:'varying float vL; void main(){ gl_FragColor = vec4(vec3(vL), 0.85); \n#include <colorspace_fragment>\n}' }));
+      fragmentShader:'varying float vL; void main(){ gl_FragColor = vec4(vec3(vL), 0.85); \n#include <colorspace_fragment>\n}' })));
     out.push(new T.Mesh(batch(G3.bub, bub, ()=>({ r:1, g:1, b:1 })), m)); }
   if (glo.length){
     const N = glo.length, pos = new Float32Array(N*3), col = new Float32Array(N*3), sz = new Float32Array(N*2);
     glo.forEach((d, k)=>{ const c = lin(d.col.startsWith('rgba') ? (()=>{ const v = d.col.match(/[\d.]+/g); return new T.Color(+v[0]/255, +v[1]/255, +v[2]/255).getHex(); })() : d.col); pos.set([d.x, d.y, d.z], k*3); col.set([c.r, c.g, c.b], k*3); sz.set([d.size, d.ph], k*2); });
     const g = new T.BufferGeometry(); g.setAttribute('position', new T.BufferAttribute(pos, 3)); g.setAttribute('aCol', new T.BufferAttribute(col, 3)); g.setAttribute('aSz', new T.BufferAttribute(sz, 2)); g.computeBoundingSphere(); g.boundingSphere.radius += 1;
     if (!O3.glowTex){ const c = v3Canvas(64, 64), x = c.getContext('2d'), gr = x.createRadialGradient(32,32,0,32,32,32); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.35, 'rgba(255,255,255,0.45)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = gr; x.fillRect(0,0,64,64); O3.glowTex = new T.CanvasTexture(c); }
-    const m = O3.glowPtMat || (O3.glowPtMat = new T.ShaderMaterial({ uniforms:{ uT:U, uPx:PX, map:{ value:O3.glowTex } }, transparent:true, depthWrite:false, blending:T.AdditiveBlending,
+    const m = O3.glowPtMat || (O3.glowPtMat = new T.ShaderMaterial(dcCurveMat({ uniforms:{ uT:U, uPx:PX, map:{ value:O3.glowTex } }, transparent:true, depthWrite:false, blending:T.AdditiveBlending,
       vertexShader:'attribute vec3 aCol; attribute vec2 aSz; uniform float uT, uPx; varying vec4 vC; void main(){ vec4 mv = modelViewMatrix*vec4(position, 1.0); gl_Position = projectionMatrix*mv; gl_PointSize = aSz.x*uPx/max(0.1, -mv.z); vC = vec4(aCol, 0.55 + 0.25*sin(uT*2.0 + aSz.y)); }',
-      fragmentShader:'uniform sampler2D map; varying vec4 vC; void main(){ vec4 t = texture2D(map, gl_PointCoord); gl_FragColor = vec4(vC.rgb*t.rgb, t.a*vC.a); \n#include <colorspace_fragment>\n}' }));
+      fragmentShader:'uniform sampler2D map; varying vec4 vC; void main(){ vec4 t = texture2D(map, gl_PointCoord); gl_FragColor = vec4(vC.rgb*t.rgb, t.a*vC.a); \n#include <colorspace_fragment>\n}' })));
     out.push(new T.Points(g, m)); }
   for (const o of out){ o.renderOrder = 2; }
   return out;
@@ -44489,9 +44495,9 @@ function isoFx(){
     const mkPts = (add)=>{ const g = new T.BufferGeometry();
       g.setAttribute('position', new T.BufferAttribute(new Float32Array(ISO_FX_MAX*3), 3)); g.setAttribute('aCol', new T.BufferAttribute(new Float32Array(ISO_FX_MAX*3), 3)); g.setAttribute('aSz', new T.BufferAttribute(new Float32Array(ISO_FX_MAX*2), 2));
       for (const k of ['position', 'aCol', 'aSz']) g.attributes[k].setUsage(T.DynamicDrawUsage);
-      const m = new T.ShaderMaterial({ uniforms:{ uPx:{ value:800 } }, transparent:true, depthWrite:false, depthTest:false, blending:add ? T.AdditiveBlending : T.NormalBlending,
+      const m = new T.ShaderMaterial(dcCurveMat({ uniforms:{ uPx:{ value:800 } }, transparent:true, depthWrite:false, depthTest:false, blending:add ? T.AdditiveBlending : T.NormalBlending,
         vertexShader:'attribute vec3 aCol; attribute vec2 aSz; uniform float uPx; varying vec4 vC; void main(){ vec4 mv = modelViewMatrix*vec4(position, 1.0); gl_Position = projectionMatrix*mv; gl_PointSize = max(1.6, aSz.x*0.5*uPx/max(0.1, -mv.z)); vC = vec4(aCol, aSz.y); }',
-        fragmentShader:'varying vec4 vC; void main(){ vec2 d = gl_PointCoord - 0.5; if (dot(d, d) > 0.25) discard; gl_FragColor = vC; }' });
+        fragmentShader:'varying vec4 vC; void main(){ vec2 d = gl_PointCoord - 0.5; if (dot(d, d) > 0.25) discard; gl_FragColor = vC; }' }));
       const p = new T.Points(g, m); p.frustumCulled = false; p.renderOrder = 20; g.setDrawRange(0, 0); return p; };
     const blob = v3Blob('rgba(255,255,255,1)'), disc = new T.PlaneGeometry(2, 2);
     F = ISO.fx = { g:new T.Group(), add:mkPts(true), norm:mkPts(false), beams:new Map(), shots:new Map(), blob, disc, beamTex:gfxTextures().beam };
@@ -45246,7 +45252,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-635';
+const GAME_VERSION = 'rs-636';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
