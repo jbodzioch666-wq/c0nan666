@@ -25,7 +25,7 @@ module.exports = async page=>{
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
   const W = r.worlds, avg = k=>W.reduce((s, w)=>s + w[k], 0)/W.length;
-  A(r.ver===11, 'new worlds are made by generator 11');
+  A(r.ver>=11, 'new worlds are made by generator 11 or later');
   A(W.every(w=>w.minMass >= 25), 'no speck of land under 25 tiles');
   A(avg('masses') < 18, 'the land in fewer pieces: ' + avg('masses'));
   A(avg('mtnPct') < 20 && avg('mtnPct') > 4, 'mountains in chains, not a quarter of the land: ' + avg('mtnPct').toFixed(1) + '%');

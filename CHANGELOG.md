@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-621 - Roads along the valleys
+
+New worlds now come from world generator 12. Your current world is unchanged.
+
+- **Roads keep to the valleys:** a road now prefers low ground and gentle slopes, and goes round a hill instead of over it. Across six test worlds the roads run about 10% lower and are a little shorter.
+- **Ferries land near their towns:** a ferry to an island town used to land wherever the sea crossing was shortest, sometimes 30 or more tiles from the town it serves. It now counts the walk from the pier to the town too, so the average walk on the test worlds dropped from about 22 tiles to 15.
+- **Signposts at junctions:** where three roads meet, or a lane to a hamlet leaves a road, a weathered signpost stands at the side with an arm pointing down each way. Signposts appear in every world, including your current one.
+
 ## RS-620 - A smoother first kill
 
 - **No more waiting on a font mid-fight:** the first kill of a session could freeze for up to a tenth of a second. The damage numbers use a heavier weight of the game's number font that the page never loaded, so the first hit fetched it and built its letters mid-fight. That font and the HUD's other fonts now load while the game starts, and the damage digits are drawn once, out of sight, at every size a hit number grows through. The skill and prayer icons are drawn out of sight at startup too. On this PC the worst frame after a first kill typically drops from 70-110 ms to 30-50 ms.
