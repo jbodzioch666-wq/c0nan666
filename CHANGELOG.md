@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-629 - A round world
+
+- **Sail all the way round a Planet.** East and west now meet: sail off one edge of the world and you come in at the other. Before, the edge of the map was a wall.
+- **Exploring carries across.** What you see near the join is revealed on both sides of it, on the globe and on the map.
+- **First step toward a true sphere.** Every step across the world now goes through one rule for "the next tile", so a later sphere grid only has to change that rule.
+- **Other world sizes are unchanged;** their edges still stop you.
+
 ## RS-628 - The planet is the map
 
 - **On a Planet world, the map (M) is the globe at every zoom.** It opens turned to where you stand. Scroll or pinch out to see the whole world, or in all the way to the chart's closest detail. There's no separate flat chart and no change-over.
