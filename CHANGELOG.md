@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-624 - No hitch on the first kill
+
+- **The first kill of a session no longer freezes the screen.** The stall was the graphics card drawing two things for the first time: the damage number and the Last Foe portrait. It took about a tenth of a second; the worst frame after a first kill now matches every later kill (about 15 ms).
+- **Damage numbers are stamped, not typed.** Their digits are drawn once at start-up and stamped from that sheet. Before, they were drawn as outlined text at a new size almost every frame as the splat popped up. They look the same as before.
+- **The Last Foe portrait is drawn once per foe** and kept as a picture. Before, it was repainted onto a brand-new canvas every time the side panel refreshed.
+
 ## RS-623 - Provinces
 
 - **The land is shared into provinces.** Every town is now the seat of a named realm - a duchy, a dwarven hold, an elven realm, orc warlands, a halfling shire and so on, in the style of the people who live there. Borders follow the land, so they tend to run along mountain ranges and rivers.

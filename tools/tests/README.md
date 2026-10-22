@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs624 | the first kill has no long frame: hitsplat digits stamped from a sheet drawn at start-up (text only for non-digits), the Last Foe portrait an image drawn once per foe |
 | rs623 | provinces: every town the seat of a named province with a ruler and a foe, far land and townless islands wild marches, all land shared out; entering names it; borders on the world map and preview |
 | rs622 | world generator 13: sea cliffs high to their lip with deep water below, never by a road, pier, site or river, never lone, dark on the preview; none in a generator 12 world |
 | rs621 | world generator 12: roads on lower ground than generator 11, island ferries landing nearer their towns, signposts where roads meet |
@@ -542,3 +543,5 @@ Screenshots go to `tools/tests/shots/`.
 | zunder | the creator's undressed figures by race and sex |
 | zphone | a save (`ZSAVE=path`) on an emulated phone with the CPU slowed 4x: frame times and a CPU profile |
 | zphone2 | a save (`ZSAVE=path`) on an emulated phone: draw calls, triangles, shadow casters, GPU ms |
+| zkill | the frames after several kills: interval and frameLoop CPU per frame, plus a GPU trace of the longest events (`ZOFF=art/foe/hud/splat` switches a part off) |
+| zkill2 | the 2D canvas draw kinds seen for the first time after a kill |
