@@ -10,7 +10,7 @@ module.exports = async page=>{
     G.owPos = { x:1, y }; for (let i=0;i<60;i++) await raf();
     tryMoveOverworld(-1, 0); for (let i=0;i<5;i++) await raf(); tryMoveOverworld(-1, 0); out.west = [G.owPos.x, G.owPos.y]; out.wrapped = G.owPos.x===W-1 && G.owPos.y===y;
     const s = owSeenArr(); out.seenBoth = !!(s[y*W + W - 4] && s[y*W + 3]);
-    for (let i=0;i<120;i++) await raf(); out.o3 = !!(O3.win && Math.abs(O3.win.cx - G.owPos.x) < 30);
+    for (let i=0;i<120;i++) await raf(); out.o3 = !!(O3.win && Math.abs(O3.win.cx - o3PL().x) < 30);   /* (RS-632: the window is in the 3D land's frame) */
     tryMoveOverworld(1, 0); for (let i=0;i<5;i++) await raf(); out.back = G.owPos.x===0;
     for (let i=0;i<60;i++) await raf(); return out; });
   await page.screenshot({ path: SHOTS + '/rs629-seam.png' });

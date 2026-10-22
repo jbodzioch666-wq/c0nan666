@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-632 - The 3D land on every face
+
+- **The 3D land is laid out from the sphere around you.** Whichever of a Planet's six faces you're on, the land runs on unbroken past that face's edges. Before, it showed open sea past any of the seven unjoined edges.
+- **Seamless crossing.** Sail across one of the narrow seas between faces and the far shore is there as you approach. You come in on the other side with no jump.
+- **Your keys keep their directions.** A few tiles into a new face, the view quietly turns with the ground, so the key that took you across still takes you onward.
+- **Everything is placed through the same layout:** towns, sites, roads, creatures, events, quest marks, graves and gathering spots, and clicking finds the right place in the world.
+- **Next:** the narrow seas themselves go, so you can walk across the face edges too.
+
 ## RS-631 - The land curves away
 
 - **On a Planet, the 3D land bends away round you.** The ground drops off toward the edges of the view, and far hills and towns sink out of sight, so you can tell you're standing on a ball. The bend is 2.5 times the planet's true curve, so it shows from the game's high camera; at true size it was barely visible.

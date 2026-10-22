@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs632 | the 3D land's frame on a cube-sphere: the lookups exact both ways, the north face's frame that face, sailing over its edge continuous, the frame changing a few tiles in with the camera turned so a key walks the same way, sites clicked at their world place; flat worlds untouched |
 | rs631 | a Planet's 3D land bends away round you: the curve in three's shared vertex chunk, one uniform shared by every material, on only for a planet's open land and cleared after; clicks find the bent ground; other sizes flat |
 | rs630 | generator 15: a Planet is a cube-sphere of six 124-tile faces: every tile to the sphere and back, a step over each of the 12 edges lands beside it, tiles near one size, land over the joined edges, the preview a world map; a generator 14 Planet unchanged |
 | rs629 | a Planet is round: sailing west off the edge comes in at the east and back, sight revealed across the seam, the 3D land rebuilt on the far side; other sizes still stop at the edge |
@@ -555,3 +556,4 @@ Screenshots go to `tools/tests/shots/`.
 | zglobe | a Planet world's globe from several turns and facing the seam (`ZSEEN=1` reveals the map): shots/zglobe-<n>.png and frame times |
 | zglobe2 | RS-628's globe map at the zoom it opens on, zoomed in, nearest, the whole world and up north (`ZSEEN=1` reveals the map): shots/zglobe2-<name>.png and frame times |
 | zcurve | a Planet's 3D land zoomed right out, with the curve (shots/zcurve-on.png) and without (zcurve-off.png) |
+| zframe | RS-632's frame: the 3D land on the north face and sailing west over its edge, with the frame, the camera's turns and the player's place at each step |
