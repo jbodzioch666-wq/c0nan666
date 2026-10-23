@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs646 | nothing builds up on the graphics card over a session: rounds into the same dungeon (three floors, its monsters killed) and out leave the dungeon renderer with as many textures and shapes in the last round as in the second, the templates kept at their cap, and a released model's bones' texture freed |
 | rs645 | the fps meter's diagnosis on a phone: with no GPU timer it reads each frame's own time (and says so), starts from a double tap, has a dungeon's steps (its torches' shadows, the figures, the cloth, the post-processing, the ambient occlusion, half the resolution) and puts everything back when it stops |
 | rs644 | more of a Planet's world in its place on the turned faces: a bridge stands on its own tiles in the 3D land (no plank out at sea), a town is built by its tile in the world (its people and size), a ferry's pier runs out over the water; on the globe's chart a name drawn by two faces' charts turns the same in both, so its halves meet over the seam |
 | rs643 | the 3D land's ground in its own colours on every face of a Planet: framed on each face, the ground at every frame tile is its stored tile's (o3Ground read it through the frame a second time); stood in a tundra and a desert off the front face, the land laid in their colours; the map's places the same whichever face you're on; a medium world as it was |
@@ -575,3 +576,7 @@ Screenshots go to `tools/tests/shots/`.
 | zmove3 | a click on the 3D ground walks you there, on a Planet, on three faces |
 | zseam | a cube Planet's globe looking straight at its face edges (`ZSEAM=tl,fr,bl,tb,dr,c`, `ZZOOM=0,2.2,5`; `ZCHART=1` saves the chart laid over it, `ZCLIP=1` the middle at full size): shots/zseam-<edge>-<zoom>.png and where the seam lies on the screen |
 | zbiome | the land's colours in each view: stood in the middle of a desert, a tundra, a grassland and a forest (`ZTIER`, `ZKINDS=desert,tundra`), the 3D land with its minimap (shots/zbiome-<kind>.png), the globe's chart close in (zbiome-<kind>-map.png) and the globe right out (zbiome-globe.png) |
+| zsession | does anything build up over a session: `ZROUNDS` rounds into the same dungeon (three floors) and out - the scenes' objects, the renderers' geometries, textures and programs, the templates kept, the heap and the frame times after each (`ZTIER`) |
+| zleak2 | what's taken out of a 3D scene and never disposed of, by kind and by the code that took it out |
+| zleak3 | the textures made and kept, by where in the game they were made (and copied) |
+| zleak4 | geometries and textures a renderer uploaded that nothing uses any more (`ZTEX=1` textures only, `ZTIER`) |

@@ -35203,11 +35203,17 @@ function m3dSkinGroups(root, S){
    the renderer forgets those by itself, and freeing them lets go of their compiled shaders - the next deer would compile again) */
 function m3dRelease(e){
   if (!e || !e.holder || e.released) return; e.released = true;
+  /* (RS-646) a copy whose template has been let go (m3dTplTrim) was the last thing drawing its shapes - drawn again since, they went back on the
+     card - so they go with it, and its pictures (another copy of the same template still about would only send them again) */
+  let tplGone = false, keepG = null, keepX = null; if (e.tpl){ tplGone = true; for (const t of M3D.tpl.values()) if (t===e.tpl){ tplGone = false; break; } }
+  if (tplGone){ keepG = new Set(); keepX = new Set(); for (const t of M3D.tpl.values()) t.traverse(o=>{ if (o.geometry) keepG.add(o.geometry); for (const m of [].concat(o.material||[])) for (const k in m){ const v = m[k]; if (v && v.isTexture) keepX.add(v); } }); }   /* (not what the kept templates share - a sculpted part, a pattern) */
   e.holder.traverse(o=>{
     const g = o.geometry;
     if (o.isInstancedMesh){ o.dispose(); }
+    if (o.isSkinnedMesh && o.skeleton && o.skeleton.boneTexture) o.skeleton.dispose();   /* (RS-646: its bones' texture - every creature ever shown left one on the card) */
     if (g && g.isSkinWrap){ g.attributes = {}; g.index = null; g.dispose(); }
-    else if (g && g.userData && g.userData.own) g.dispose(); });
+    else if (g && ((tplGone && !keepG.has(g)) || (g.userData && (g.userData.own || g.userData.owner===o.uuid)))) g.dispose();
+    if (tplGone) for (const m of [].concat(o.material||[])) for (const k in m){ const v = m[k]; if (v && v.isTexture && !keepX.has(v)) v.dispose(); } });   /* (RS-646: and a figure's own copy of a shape it bends - a skirt, a fin) */
   if (e.owner && M3D.inst.get(e.owner)===e) M3D.inst.delete(e.owner);
 }
 /* (RS-379) a copy's skinned mesh gets a geometry of its own that shares the template's buffers, so it can have a culling
@@ -36402,7 +36408,7 @@ function fpdCatacombProps(props, matFor, world){
 function fpdBuild(T){
   const TH = THREE, spec = FP_THEME_SPECS[T.key], key = T.key;
   FPD.cryptRoof = null;
-  if (FPD.world){ FPD.scene.remove(FPD.world); FPD.world.traverse(o=>{ if (o.geometry) o.geometry.dispose(); }); }
+  if (FPD.world){ FPD.scene.remove(FPD.world); FPD.world.traverse(o=>{ if (o.geometry) o.geometry.dispose(); for (const m of [].concat(o.material||[])) if (m.map && m.map.userData && m.map.userData.worldOwn) m.map.dispose(); }); }   /* (RS-646: and the floor's own pictures) */
   const B = {};
   const bucket = (k)=> B[k] || (B[k] = { pos:[], nor:[], uv:[], col:[], idx:[] });
   // indoors the map's edge is solid rock; out of doors it's open ground running off to the horizon
@@ -36712,7 +36718,7 @@ function fpdPortals(world){
     const gate = new T.Mesh(new T.PlaneGeometry(0.66, 1.2), mat); gate.position.set(0, 0.68, 0.01); g.add(gate);
     const glowC = v3Canvas(64,64), gx = glowC.getContext('2d'), gr = gx.createRadialGradient(32,32,0,32,32,32);
     gr.addColorStop(0,'rgba(255,255,255,0.8)'); gr.addColorStop(1,'rgba(255,255,255,0)'); gx.fillStyle = gr; gx.fillRect(0,0,64,64);
-    const pool = new T.Mesh(new T.PlaneGeometry(1.6, 1.6), new T.MeshBasicMaterial({ map:new T.CanvasTexture(glowC), color:col, transparent:true, depthWrite:false, blending:T.AdditiveBlending }));
+    const pool = new T.Mesh(new T.PlaneGeometry(1.6, 1.6), new T.MeshBasicMaterial({ map:Object.assign(new T.CanvasTexture(glowC), { userData:{ worldOwn:1 } }), color:col, transparent:true, depthWrite:false, blending:T.AdditiveBlending }));   /* (RS-646: the floor's own picture - freed with it) */
     pool.rotation.x = -Math.PI/2; pool.position.set(0, 0.075, 0.35); g.add(pool);
     const L = new T.PointLight(col, 0.9, 3.2, 1.6); L.position.set(0, 0.7, 0.35); g.add(L);
     world.add(g);
@@ -37059,7 +37065,7 @@ function fpdRender(env, T, camZ){
 // one of them keeps its look. Each model is a jointed rig that breathes,
 // walks, swings at you, flinches when hit and topples when it dies. The
 // painted figures stay for everything else, and whenever WebGL isn't up.
-const M3D = { tpl:new Map(), meta:new WeakMap(), inst:new WeakMap(), live:new Set(), stamp:0, tex:null };
+const M3D = { tpl:new Map(), meta:new WeakMap(), inst:new WeakMap(), live:new Set(), held:new Set(), stamp:0, tex:null };   /* (RS-646: held - the floor's monsters' models made ahead, drawn once by its warm-up, not yet seen) */
 let M3D_BUILDERS = null;
 function m3dBuilders(){
   return M3D_BUILDERS || (M3D_BUILDERS = new Map([[mpHumanoid, m3dHumanoid], [mpBeast, m3dBeast], [mpDragon, m3dDragon], [mpHydra, m3dHydra], [mpSerpent, m3dSerpent],
@@ -41941,14 +41947,32 @@ function m3dTemplateTry(pt, deadline){
 }
 function m3dTemplate(pt){
   const key = m3dTplKey(pt);
-  if (M3D.tpl.has(key)) return M3D.tpl.get(key);
+  if (M3D.tpl.has(key)){ const t = M3D.tpl.get(key); M3D.tpl.delete(key); M3D.tpl.set(key, t); return t; }   /* (RS-646: to the back of the queue - the one used longest ago goes first) */
   return m3dTemplateSkin(pt, key, m3dBuilders().get(pt.paint)(pt.o||{}));
 }
 function m3dTemplateSkin(pt, key, t){
   if (m3dSkinnable(pt, t)){ const meta = M3D.meta.get(t); try{ const R = m3dSkinRoot(t, meta.rig, null); meta.skinned = R.made; meta.skinnedParts = R.gone; }catch(err){ if (err===M3D_YIELD) throw err; console.error(err); meta.skinned = 0; } }   /* (RS-379: one skinned mesh per material, once per template; RS-578: or over several tries) */
   try{ const bb = new THREE.Box3().setFromObject(t), H = Math.max(0.05, bb.max.y - bb.min.y); gfxPruneCasters(t, H*0.1); }catch(e){}   /* (RS-576: a template is sculpted at its own scale - the size is the figure's own, about 9cm on a man) */
-  M3D.tpl.set(key, t);
+  M3D.tpl.set(key, t); m3dTplTrim();
   return t;
+}
+/* (RS-646) the templates kept: each look of each creature made is a template - its shape, tens of thousands of points, and its textures on the
+   card - and every one was kept for the session. A monster's gear and colours make its look, so a long session made hundreds, the card filled
+   and the game slowed until it was reloaded. Now at most 32 are kept (16 on a phone), the one used longest ago let go first - unless something
+   in sight is drawn from it - with whichever of its shapes and textures nothing else kept uses (its materials stay: their shaders are shared) */
+function m3dTplCap(){ return gfxPhone() ? 16 : 32; }
+function m3dTplTrim(){
+  const cap = m3dTplCap(); if (M3D.tpl.size <= cap) return;
+  const scenes = [typeof FPD!=='undefined' && FPD.scene, typeof O3!=='undefined' && O3.scene, typeof V3!=='undefined' && V3.scene].filter(Boolean), drawn = new Set();
+  for (const sc of scenes) sc.traverse(o=>{ const g = o.geometry; if (g){ drawn.add(g); if (g.attributes && g.attributes.position) drawn.add(g.attributes.position); } });
+  const busy = t=>{ let b = false; t.traverse(o=>{ const g = o.geometry; if (g && (drawn.has(g) || (g.attributes && g.attributes.position && drawn.has(g.attributes.position)))) b = true; }); return b; };
+  for (const [key, t] of M3D.tpl){ if (M3D.tpl.size <= cap) break; if (busy(t)) continue; M3D.tpl.delete(key); try{ m3dTplFree(t, scenes); }catch(e){ console.error(e); } }
+}
+function m3dTplFree(t, scenes){
+  const keepG = new Set(), keepX = new Set(), texs = m=>{ const a = []; for (const k in m){ const v = m[k]; if (v && v.isTexture) a.push(v); } return a; };
+  const note = o=>{ if (o.geometry) keepG.add(o.geometry); for (const m of [].concat(o.material||[])) for (const x of texs(m)) keepX.add(x); };
+  for (const t2 of M3D.tpl.values()) t2.traverse(note); for (const sc of scenes) sc.traverse(note);
+  const gone = new Set(); t.traverse(o=>{ const g = o.geometry; if (g && !keepG.has(g) && !gone.has(g)){ gone.add(g); g.dispose(); } for (const m of [].concat(o.material||[])) for (const x of texs(m)) if (!keepX.has(x) && !gone.has(x)){ gone.add(x); x.dispose(); } });
 }
 // a copy of the template with its own rig and its own materials (so it can flash on its own)
 function m3dInstance(m, pt){
@@ -41979,7 +42003,7 @@ function m3dInstance(m, pt){
   /* (RS-163: no round blob under a creature - it casts a real shadow from the torches, or the sun and moon) */
   root.traverse(o=>{ if (o.isMesh && !(o.material && o.material.transparent)) o.castShadow = true; });
   const mats = [...mmap.values()].filter(x=>x.emissive);
-  const E = { owner, holder, root, rig, mats, H, beast:!!meta.beast, anim:meta.anim||null, seed:Math.random()*10, atk:0, pHp:G.player ? G.player.hp : 0, hurt:0, lift:pt.lift||meta.lift||0, dying:-1, stamp:0, rise: m.rise ? 0 : 1, skinned:meta.skinned||0, skinnedParts:meta.skinnedParts||0 };
+  const E = { owner, tpl, holder, root, rig, mats, H, beast:!!meta.beast, anim:meta.anim||null, seed:Math.random()*10, atk:0, pHp:G.player ? G.player.hp : 0, hurt:0, lift:pt.lift||meta.lift||0, dying:-1, stamp:0, rise: m.rise ? 0 : 1, skinned:meta.skinned||0, skinnedParts:meta.skinnedParts||0 };
   if (meta.loco && meta.anim){ const a0 = meta.anim, L0 = { y:root.position.y, x:root.rotation.x, z:root.rotation.z };
     E.anim = (r, t, mv, wind, strike, hurt, e2)=>{ a0(r, t, mv, wind, strike, hurt, e2); m3dLoco(E, meta.loco, L0, t, mv); }; }
   try{ const bb = new THREE.Box3().setFromObject(root), H = Math.max(0.05, bb.max.y - bb.min.y); gfxPruneCasters(root, H*0.1); }catch(e){}   /* (RS-576: what the figure gets as it's made - a beard, its gear - too) */
@@ -43223,6 +43247,9 @@ function m3dDeathFade(e, a){
 }
 function m3dFrame(){ M3D.stamp++; }
 function m3dSweep(){
+  /* (RS-646) a model made ahead for the floor's warm-up and never seen (its monster killed out of sight, or the floor left first) is freed once
+     its monster is gone: it was drawn once, below the floor, so the card held its shapes - every unseen monster of every floor, for the session */
+  if (M3D.held.size) for (const e of M3D.held){ if (M3D.live.has(e) || e.released){ M3D.held.delete(e); continue; } if (!(G.mon||[]).includes(e.owner)){ M3D.held.delete(e); if (e.holder.parent) e.holder.parent.remove(e.holder); m3dRelease(e); } }
   m3dOldDead(); for (const e of M3D.live){
     if (e.dying >= 0){
       // it topples (whichever way the blow sent it), bounces once and lies there a few turns, then fades away. (RS-367: a bug
@@ -43867,7 +43894,7 @@ function fpdWarm(){
   for (const m of G.mon||[]){ if (!m.alive || M3D.inst.get(m)) continue;
     try{ if (typeof sk3Wanted==='function' && sk3Wanted(m)){ const e = sk3Instance(m); if (e){ M3D.inst.set(m, e); grp.add(e.holder); mons.push(e); } continue; }   /* (RS-345: the skeletons' rigs too) */
       const pt = m3dPortrait(m); if (!pt) continue;
-      const e = m3dInstance(m, pt); e.pt = pt; M3D.inst.set(m, e); grp.add(e.holder); mons.push(e); }catch(e){ console.error(e); } }
+      const e = m3dInstance(m, pt); e.pt = pt; M3D.inst.set(m, e); M3D.held.add(e); grp.add(e.holder); mons.push(e); }catch(e){ console.error(e); } }
   const fc = new Map(); grp.traverse(o=>{ fc.set(o, o.frustumCulled); o.frustumCulled = false; }); grp.position.y = -80;   /* (RS-345: drawn by the warm frame too, below the floor, clipped away) */
   FPD.scene.add(grp);
   /* (RS-502) this one call compiled the whole floor's shaders in one blocking sweep - asking each new program for its uniforms
@@ -45438,7 +45465,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-645';
+const GAME_VERSION = 'rs-646';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

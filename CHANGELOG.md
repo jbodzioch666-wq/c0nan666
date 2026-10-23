@@ -1,5 +1,16 @@
 # Depthcrawl patch notes
 
+## RS-646 - No more slowing down over a long session
+
+- **The game no longer gets slower the longer you play.** Each creature model kept some of its data on the graphics chip after it was gone, so a long session through many dungeon floors slowly filled it up. On a phone that showed as the frame rate sinking until you reloaded. Five separate leaks are fixed:
+  - every creature's skeleton data was left behind when its model went;
+  - models made ahead of time for each floor's monsters were kept forever if you never saw those monsters;
+  - each figure's own copy of the parts it bends, such as skirts and fins, was never freed;
+  - every look of every creature was kept as a template for the whole session;
+  - each floor's portal glow stayed after you left the floor.
+- **Measured:** over 16 trips into a dungeon (three floors each, every monster killed) and back out, the dungeon's textures used to climb from 72 to 226 and its geometry from 142 to 476. They now hold steady at about 58 textures and 240 geometries.
+- **The template cache now has a limit:** 32 on a computer, 16 on a phone. The one used longest ago is freed first, but never while something on screen still uses it.
+
 ## RS-645 - A frame-rate check that works on phones
 
 - **Find out what's slow on your own device.** With the fps meter on, double-tap it on a phone (or double-click it on a computer) and the game switches one thing off at a time, measuring how much faster each frame gets without it. On a phone it used to wait for GPU timings that phone browsers don't give, and never moved. It now measures the frames themselves, and the readout says "frame ms" when it does.
