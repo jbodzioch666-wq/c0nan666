@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-640 - A planet spaced like the other worlds
+
+- **More monsters roam a Planet.** A Planet had the same 50 roaming groups as a Medium world on almost three times the land, so its wilds felt empty: about one group to 650 tiles of land, against Medium's one to 237. The number now grows with the land, up to 150. A Planet gets about 137, as thick on the ground as Medium's, and wilderness and respawn top-ups follow the same count. This applies to existing Planet worlds too.
+- **Dungeons, graveyards and mines spaced out.** New Planet worlds (generator 18) have about a fifth fewer of each, a site to about 168 tiles of land instead of 143, in line with Medium (171), Large (181) and Extra Large (194). On a test world that's 115 dungeons instead of 140. Castles, towers, temples, lairs and pyramids are unchanged.
+- **Walking distances were already right.** The new world simulator measured the walks before any change: a Planet's median walk to the nearest town is 23 steps (Medium 24), its towns are a median 33 steps apart (Medium 35), and 30 towns give one to about 1,080 tiles of land (Medium about 1,180). So towns and roads stay as they are.
+- **Existing worlds keep their layout.** A Planet made before this patch keeps its sites. Make a new world to get the new spacing; your character carries over as usual.
+
 ## RS-639 - Upright names at the poles
 
 - **Map names stand upright on the globe's polar faces.** On a Planet's north and south faces, the place names, site badges and their level tags used to come out turned, sometimes upside down, because the map is laid in each face's own grid. Each one is now turned back about its own spot, so it reads normally wherever you look on the globe.

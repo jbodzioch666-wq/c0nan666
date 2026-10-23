@@ -21,7 +21,7 @@ module.exports = async page=>{
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
   A(r.same16, 'a generator 16 planet comes out as before');
-  A(r.w.every(w=>w.ver===17), 'new planets are made by generator 17');
+  A(r.w.every(w=>w.ver>=17), 'new planets are made by generator 17 or later');
   A(r.w.every(w=>w.edgesWithLand >= 8), 'land runs over most of the faces\' edges (of 24 sides, as many as have land there)');
   A(r.w.every(w=>w.edgeMatch > w.innerMatch - 0.15), 'over an edge the ground matches near as often as inside a face');
   A(r.w.every(w=>w.seaBad===0 && w.corner > 0), 'small seas at the eight corners');

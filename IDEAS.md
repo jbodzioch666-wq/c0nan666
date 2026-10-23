@@ -308,7 +308,8 @@ _World generation and overworld content_
 - [x] Every "next tile" in the generator and the game through `owNb`/`owOff` (RS-633 to RS-638: rivers, roads, floods, landmasses, coasts; the route planners, `owStepTo`, the minimap in the frame, encounters' wandering)
 - [x] The winds on the north and south faces (RS-637, `owGen17Moisture`: round true latitudes; the weather's noise from the sphere, `owSphereNoise`)
 - [x] Map icons and names drawn upright on the polar faces (RS-639, `globeUprightOn`)
-- [ ] Distances, town counts and travel times retuned for a planet with `tools/sim`
+- [x] Distances, town counts and travel times retuned for a planet with `tools/sim` (RS-640, `tools/sim/s_world.js`: the walks to a town and between towns were already the medium world's; the roamers now scale with the land and generator 18 spaces the sites like the other sizes)
+- [ ] Large and Extra Large worlds keep 50 roamers too, so theirs are thinner than Medium's (one to some 470 and 800 tiles of land): scale them as RS-640 did the planet's?
 
 ### World map
 _The parchment map, after the world it draws_

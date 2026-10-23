@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs640 | a Planet's spacing set to the other sizes': roamers in proportion to its land (one to some 237 tiles, up to 150), generator 18 trimming its dungeons, graveyards and mines to a site per 160+ tiles of land, the same after a save and load; a generator 17 planet keeps its sites and the medium world its 50 roamers |
 | rs639 | the names, badges and level tags on the globe's chart stand upright on the polar faces: each turned back about its own place by the angle the face's grid lies at on the screen |
 | rs638 | the game's own searches go over a Planet's face edges: a route from the north face onto L found by both planners, its steps landing on the stop, walked to the end; the minimap shows the land past the edge |
 | rs637 | generator 17: no narrow seas on a Planet's face edges, small seas only at the eight cube corners, land over the edges with the ground matching across them about as often as inside a face; a generator 16 planet unchanged |
