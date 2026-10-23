@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs647 | on a Planet everything goes where the curve puts the land: the sprites bend with it, a town's name sits where the curve has drawn the town, a click on a dungeon a little way off reaches it, a landmark past the horizon is hidden and one near is seen, and the animals of the old frame are freed when it changes |
 | rs646 | nothing builds up on the graphics card over a session: rounds into the same dungeon (three floors, its monsters killed) and out leave the dungeon renderer with as many textures and shapes in the last round as in the second, the templates kept at their cap, and a released model's bones' texture freed |
 | rs645 | the fps meter's diagnosis on a phone: with no GPU timer it reads each frame's own time (and says so), starts from a double tap, has a dungeon's steps (its torches' shadows, the figures, the cloth, the post-processing, the ambient occlusion, half the resolution) and puts everything back when it stops |
 | rs644 | more of a Planet's world in its place on the turned faces: a bridge stands on its own tiles in the 3D land (no plank out at sea), a town is built by its tile in the world (its people and size), a ferry's pier runs out over the water; on the globe's chart a name drawn by two faces' charts turns the same in both, so its halves meet over the seam |
@@ -580,3 +581,4 @@ Screenshots go to `tools/tests/shots/`.
 | zleak2 | what's taken out of a 3D scene and never disposed of, by kind and by the code that took it out |
 | zleak3 | the textures made and kept, by where in the game they were made (and copied) |
 | zleak4 | geometries and textures a renderer uploaded that nothing uses any more (`ZTEX=1` textures only, `ZTIER`) |
+| zlandmark | a Planet's landmarks in the 3D land, stood some way off each (`ZDIST`, `ZKIND`, `ZTIER`): where it is in the world and the frame, whether it shows, with a shot each |

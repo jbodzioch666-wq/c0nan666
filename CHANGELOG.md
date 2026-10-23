@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## RS-647 - Everything on the curve of a Planet
+
+- **No more floating lights.** The glows over dungeons and towns, the icons over monsters and the smoke never bent with a Planet's curve, so a little way off they hung in the air above the ground. They now sit where the land is.
+- **Town and place names stay on their towns.** Names were placed as if the land were flat, so they floated above or beside the town. They now follow the curve, and a name hides when its town has gone behind a hill.
+- **Clicks reach things a little way off.** A click on a deer, a dungeon or a site some way off often missed it and walked you to the ground behind. Each thing now counts as being where the curve has drawn it.
+- **No more false volcanoes and towers.** A landmark past the horizon used to come back into sight somewhere it isn't, such as a volcano by a temple or a tower out at sea, and then vanish again as you walked. Landmarks past the horizon now stay hidden until they rise over it.
+- **Animals move and can be hunted again.** After you crossed onto another face of a Planet, the old herds stayed standing where they were: frozen, and impossible to click. They now leave with the old view. New herds are placed by their real spot in the world, so a herd you hunted stays gone whichever way you come at it, and "get closer" walks you to the right place.
+- **About the curve:** the land bends 2.5 times as fast as the true globe would, so the horizon stays close and the curve is easy to see. It isn't 1:1 with the globe.
+
 ## RS-646 - No more slowing down over a long session
 
 - **The game no longer gets slower the longer you play.** Each creature model kept some of its data on the graphics chip after it was gone, so a long session through many dungeon floors slowly filled it up. On a phone that showed as the frame rate sinking until you reloaded. Five separate leaks are fixed:
