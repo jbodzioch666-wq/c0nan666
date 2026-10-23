@@ -29,12 +29,14 @@ module.exports = async page=>{
   console.log(JSON.stringify(await page.evaluate(()=>({ lan:!!(FPD.lan && FPD.lan.castShadow), lanMap:FPD.lan && FPD.lan.shadow.mapSize.x, torchMap:(FPD.torches||[]).map(L=>L.castShadow ? L.shadow.mapSize.x : 0), gfx:SET.gfx }))));
   await page.evaluate(()=>{ const fl = []; for (let x=1;x<COLS-1;x++) for (let y=1;y<ROWS-1;y++) if (G.map[x][y]===T_FLOOR) fl.push([x, y]); let sd = 7; const rnd = ()=>{ sd = (sd*16807) % 2147483647; return sd/2147483647; }; window.__walkQ = []; for (let i=0;i<60;i++) window.__walkQ.push(fl[Math.floor(rnd()*fl.length)]); window.__walkOn = true;
     const loop = ()=>{ if (!ISO.path.length && window.__walkQ.length){ for (let k=0;k<8 && !ISO.path.length && window.__walkQ.length;k++){ const [x, y] = window.__walkQ.shift(); ISO.path = isoFindPath(x, y, false) || []; } ISO.nextStep = 0; } if (window.__walkOn) requestAnimationFrame(loop); }; requestAnimationFrame(loop); });
-  const cdp = await page.context().newCDPSession(page); await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval:250 }); await cdp.send('Profiler.start');
+  const cdp = await page.context().newCDPSession(page); await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval:250 });
+  if (process.env.ZTHROTTLE) await cdp.send('Emulation.setCPUThrottlingRate', { rate:+process.env.ZTHROTTLE });   /* (ZTHROTTLE=4: the CPU slowed, nearer a phone's) */
+  await cdp.send('Profiler.start');
 
   for (let k=0;k<5;k++) console.log(JSON.stringify(await snap('walking ' + k)));
   const { profile } = await cdp.send('Profiler.stop'); const self = new Map(), dt = profile.timeDeltas, byId = new Map(profile.nodes.map(n=>[n.id, n]));
   for (let i=0;i<profile.samples.length;i++){ const n = byId.get(profile.samples[i]), k = n.callFrame.functionName + ':' + n.callFrame.lineNumber; self.set(k, (self.get(k)||0) + (dt[i]||0)); }
   const tot = [...self.values()].reduce((a, b)=>a + b, 0);
-  console.log('profile (self ms over the walk, of ' + (tot/1000).toFixed(0) + '):\n' + [...self.entries()].sort((a, b)=>b[1] - a[1]).slice(0, 22).map(([k, v])=>'  ' + k + ' ' + (v/1000).toFixed(0)).join('\n'));
+  console.log('profile (self ms over the walk, of ' + (tot/1000).toFixed(0) + '):\n' + [...self.entries()].sort((a, b)=>b[1] - a[1]).slice(0, +(process.env.ZTOP||22)).map(([k, v])=>'  ' + k + ' ' + (v/1000).toFixed(0)).join('\n'));
   await page.evaluate(()=>{ window.__walkOn = false; });
 };

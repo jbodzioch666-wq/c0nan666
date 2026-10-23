@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-645 - A frame-rate check that works on phones
+
+- **Find out what's slow on your own device.** With the fps meter on, double-tap it on a phone (or double-click it on a computer) and the game switches one thing off at a time, measuring how much faster each frame gets without it. On a phone it used to wait for GPU timings that phone browsers don't give, and never moved. It now measures the frames themselves, and the readout says "frame ms" when it does.
+- **New dungeon steps.** Besides the old steps (sprites, lamps, shadows and so on), it now tests the torches' shadows, the figures, the cloth on skirts and robes, post-processing, ambient occlusion and half resolution. Each number on the meter's second line is how many milliseconds a frame saves without that thing. Double-tap again to stop, and everything is put back.
+
 ## RS-644 - Bridges back over their rivers
 
 - **Bridges are where they belong.** On a Planet, a bridge on any face but the front one was built in the wrong place, sometimes out in open sea. It now stands over its river or crossing in the 3D land.

@@ -42278,7 +42278,7 @@ function m3dCapeClear(rig, torso){
 function m3dSkirtFollow(r){
   const m = r.skirt, legs = r.legs; if (!m || !legs || legs.length < 2) return;
   const sw = legs.map(L=>L.hip.rotation.x), kn = legs.map(L=>L.knee.rotation.x), tilt = r.torso ? r.torso.rotation.x : 0, sig = sw[0]*7 + sw[1]*13 + kn[0]*17 + kn[1]*19 + (r.sitting ? 0 : tilt*23) +   /* (RS-588: a sitter's breathing doesn't refold the robe every frame) */ (r.hips ? r.hips.position.y*29 : 0) + (r.torso ? r.torso.rotation.y*31 + r.torso.rotation.z*37 : 0);   /* (RS-291: the waist turns with the torso) */
-  const ph = m.userData.phys, physOn = !r.seatBox && !(sw[0] < -1 && sw[1] < -1) && m3dNearHero(r, m);   /* (RS-516) */
+  const ph = m.userData.phys, physOn = !window.__noCloth && !r.seatBox && !(sw[0] < -1 && sw[1] < -1) && m3dNearHero(r, m);   /* (RS-516; RS-645: off for the diagnosis) */
   const mwE = m.matrixWorld.elements, mwSig = mwE[12].toFixed(4) + ',' + mwE[14].toFixed(4) + ',' + mwE[0].toFixed(4) + ',' + mwE[2].toFixed(4);
   if (m.userData.own && Math.abs(sig - (m.userData.sig||0)) < 1e-4 && (r.seatBox ? r.seatBox.key : '')===(m.userData.seatKey||'') && !(physOn && ph && (!ph.rest || ph.mw!==mwSig))) return;
   if (m.userData.own && !r.seatBox && (m.userData.tick = (m.userData.tick||0) + 1) % 2 && !m3dNearHero(r, m)) return;   /* (RS-461: folk away from you refold their robes every other frame) */
@@ -45438,7 +45438,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-644';
+const GAME_VERSION = 'rs-645';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -48401,9 +48401,20 @@ const DIAG_STEPS = [
   ['people', (sc)=>{ const h = []; for (const p of [typeof V3!=='undefined' && V3.player, ...((typeof V3!=='undefined' && V3.npcs)||[]), ...((typeof V3!=='undefined' && V3.villagers)||[])]) if (p && p.g && p.g.visible){ p.g.visible = false; h.push(p.g); } return h.length ? ()=>h.forEach(o=>o.visible = true) : null; }],
   ['ground', (sc)=>{ const h = []; sc.traverse(o=>{ if (o.isMesh && o.visible && o.geometry.type==='PlaneGeometry' && o.geometry.parameters.width > 40){ o.visible = false; h.push(o); } }); return h.length ? ()=>h.forEach(o=>o.visible = true) : null; }],
   ['transparent', (sc)=>{ const h = []; sc.traverse(o=>{ if (o.isMesh && o.visible && [].concat(o.material).some(m=>m.transparent)){ o.visible = false; h.push(o); } }); return h.length ? ()=>h.forEach(o=>o.visible = true) : null; }],
+  /* (RS-645) and what a dungeon has: its torches' shadows, the figures (you, the monsters, your allies), the cloth of their skirts and robes,
+     the post-processing, the ambient occlusion, and half the resolution */
+  ['torchshadow', (sc)=>{ const h = []; for (const L of (sc===FPD.scene && FPD.torches)||[]) if (L.castShadow){ L.castShadow = false; h.push(L); } if (!h.length) return null; diagMats(sc); return ()=>{ h.forEach(L=>L.castShadow = true); diagMats(sc); }; }],
+  ['figures', (sc)=>{ const h = []; sc.traverse(o=>{ if (o.isSkinnedMesh && o.visible){ o.visible = false; h.push(o); } }); return h.length ? ()=>h.forEach(o=>o.visible = true) : null; }],
+  ['cloth', ()=>{ if (window.__noCloth) return null; window.__noCloth = true; return ()=>{ window.__noCloth = false; }; }],
+  ['post', ()=>{ if (!gfxPostOn()) return null; window.__noPost = true; return ()=>{ window.__noPost = false; }; }],
+  ['ao', ()=>{ if (G.gameMode!==1 || !gfxAoOn('fpd')) return null; window.__noAo = true; return ()=>{ window.__noAo = false; }; }],
+  ['halfres', ()=>{ const k = window.__fpdScale; window.__fpdScale = (k||1)*0.5; return ()=>{ window.__fpdScale = k; }; }],
 ];
 function diagMats(sc){ sc.traverse(o=>{ if (o.material) [].concat(o.material).forEach(m=>{ m.needsUpdate = true; }); }); }
 function diagScene(){ if (G.gameMode===3 && typeof V3!=='undefined' && V3.scene) return V3.scene; if (G.gameMode===0 && typeof O3!=='undefined' && O3.scene) return O3.scene; return FPD.scene || null; }
+/* (RS-645) a phone's browser has no GPU timer: the diagnosis reads each frame's own time instead (diagFrameTick), and says so */
+function diagFrameTick(ts){ if (!DIAG.on){ DIAG.lastTs = 0; return; } const P = PROF.gpu; DIAG.frame = !(P && P.ext); if (!DIAG.frame){ DIAG.lastTs = 0; return; }
+  const dt = DIAG.lastTs ? ts - DIAG.lastTs : 0; DIAG.lastTs = ts; if (dt > 0 && dt < 500 && G.ui==='playing' && !document.hidden) diagFrame(dt); }
 function diagToggle(){ DIAG.on = !DIAG.on; if (DIAG.undo){ try{ DIAG.undo(); }catch(e){} DIAG.undo = null; } DIAG.k = -1; DIAG.n = 0; DIAG.sum = 0; DIAG.res = {}; DIAG.sav = {}; DIAG.base = undefined; DIAG.cyc = 0; DIAG.skip = 0; }
 // called with each frame's measured card time; steps on every 40 frames, skipping the first 6 after a switch.
 // RS-357: a fresh base is read before every step (base, sprites, base, grass, ...), each saving is against the base
@@ -48412,21 +48423,21 @@ function diagToggle(){ DIAG.on = !DIAG.on; if (DIAG.undo){ try{ DIAG.undo(); }ca
 function diagFrame(gpuMs){
   if (!DIAG.on) return; const sc = diagScene(), r = gfxViewRenderer(); if (!sc || !r) return;
   const L = 2*(DIAG_STEPS.length - 1);
-  if (DIAG.k < 0){ DIAG.k = 0; DIAG.skip = 6; DIAG.n = 0; DIAG.sum = 0; }
+  if (DIAG.k < 0){ DIAG.k = 0; DIAG.skip = 6; DIAG.n = 0; DIAG.sum = 0; DIAG.vals = []; }
   if (DIAG.skip > 0){ DIAG.skip--; return; }
-  if (gpuMs!==undefined){ DIAG.n++; DIAG.sum += gpuMs; }
-  if (DIAG.n < 40) return;
-  const v = DIAG.sum/DIAG.n, step = DIAG.k % 2 ? DIAG_STEPS[(DIAG.k+1)/2] : null;
+  if (gpuMs!==undefined){ DIAG.n++; DIAG.sum += gpuMs; (DIAG.vals = DIAG.vals || []).push(gpuMs); }
+  if (DIAG.n < (DIAG.frame ? 50 : 40)) return;
+  const v = DIAG.frame ? DIAG.vals.slice().sort((a, b)=>a - b)[DIAG.vals.length >> 1] : DIAG.sum/DIAG.n; DIAG.vals = []; const step = DIAG.k % 2 ? DIAG_STEPS[(DIAG.k+1)/2] : null;
   if (!step){ DIAG.base = v; DIAG.res.base = v; }
   else if (DIAG.base!==undefined){ const a = DIAG.sav[step[0]] || (DIAG.sav[step[0]] = { s:0, n:0 });   /* (DIAG.acc is the timer's per-frame sum) */ a.s += DIAG.base - v; a.n++; DIAG.res[step[0]] = a.s/a.n; }
   if (DIAG.undo){ try{ DIAG.undo(); }catch(e){} DIAG.undo = null; }
-  DIAG.k = (DIAG.k + 1) % L; if (DIAG.k===0) DIAG.cyc++; DIAG.n = 0; DIAG.sum = 0; DIAG.skip = 6;
+  DIAG.k = (DIAG.k + 1) % L; if (DIAG.k===0) DIAG.cyc++; DIAG.n = 0; DIAG.sum = 0; DIAG.skip = DIAG.frame ? 20 : 6;
   if (DIAG.k % 2){ const st = DIAG_STEPS[(DIAG.k+1)/2]; try{ DIAG.undo = st[1](sc, r); }catch(e){ console.error(e); DIAG.undo = null; } if (!DIAG.undo){ DIAG.res[st[0]] = null; DIAG.k = (DIAG.k + 1) % L; if (DIAG.k===0) DIAG.cyc++; } }   /* (a step with nothing to switch: straight on to the next base) */
 }
 function diagText(){
   if (!DIAG.on) return ''; const b = DIAG.res.base; const parts = [];
   for (const [name] of DIAG_STEPS){ if (name==='base') continue; const v = DIAG.res[name]; if (v===undefined) continue; parts.push(v===null ? `-${name} n/a` : `-${name} ${(Math.round(v*10)/10).toFixed(1)}`); }
-  const cur = DIAG.k < 0 ? '' : DIAG.k % 2 ? DIAG_STEPS[(DIAG.k+1)/2][0] : 'base'; return `\ndiag${b!==undefined ? ' base '+(Math.round(b*10)/10).toFixed(1) : ''}${DIAG.cyc > 0 ? ' x' + (DIAG.cyc + 1) : ''}${parts.length ? ' ' + parts.join(' ') : ''}${cur ? ' [' + cur + ']' : ''}`;
+  const cur = DIAG.k < 0 ? '' : DIAG.k % 2 ? DIAG_STEPS[(DIAG.k+1)/2][0] : 'base'; return `\ndiag${DIAG.frame ? ' (frame ms)' : ''}${b!==undefined ? ' base '+(Math.round(b*10)/10).toFixed(1) : ''}${DIAG.cyc > 0 ? ' x' + (DIAG.cyc + 1) : ''}${parts.length ? ' ' + parts.join(' ') : ''}${cur ? ' [' + cur + ']' : ''}`;
 }
 function profText(n){
   const t = PROF.t, ms = (v)=>v===undefined ? '-' : (Math.round(v*10)/10).toFixed(1); if (!n) return '';
@@ -48451,10 +48462,13 @@ function gfxGpuParse(nm){
 function gfxViewRenderer(){ if (G.gameMode===3 && typeof V3!=='undefined' && V3.renderer) return V3.renderer; if (G.gameMode===0 && typeof O3!=='undefined' && O3.renderer) return O3.renderer; return FPD.r || null; }
 function fpsTick(ts){
   if (!SET.fps){ if (FPSC.el) FPSC.el.style.display = 'none'; FPSC.t0 = 0; if (DIAG.on) diagToggle(); return; }
+  diagFrameTick(ts);   /* (RS-645) */
   FPSC.n++; if (!FPSC.t0){ FPSC.t0 = ts; FPSC.n = 0; return; }
   if (ts - FPSC.t0 < 500) return;
   const f = FPSC.n*1000/(ts-FPSC.t0), prof = profText(FPSC.n); FPSC.n = 0; FPSC.t0 = ts;
-  if (!FPSC.el){ FPSC.el = document.createElement('div'); FPSC.el.id = 'fpsCounter'; FPSC.el.dataset.drag = 'fps'; FPSC.el.title = 'frames a second - drag to move; double-click for the diagnosis (RS-355)'; FPSC.el.addEventListener('dblclick', e=>{ e.preventDefault(); diagToggle(); }); document.body.appendChild(FPSC.el); }
+  if (!FPSC.el){ FPSC.el = document.createElement('div'); FPSC.el.id = 'fpsCounter'; FPSC.el.dataset.drag = 'fps'; FPSC.el.title = 'frames a second - drag to move; double-click for the diagnosis (RS-355)'; FPSC.el.addEventListener('dblclick', e=>{ e.preventDefault(); diagToggle(); });
+    FPSC.el.addEventListener('touchend', ()=>{ const t = performance.now(); if (t - (FPSC.tapT||0) < 380){ FPSC.tapT = 0; diagToggle(); } else FPSC.tapT = t; });   /* (RS-645: a double tap, on a phone) */
+    document.body.appendChild(FPSC.el); }
   const gpu = gfxGpuName(gfxViewRenderer()); FPSC.el.style.display = 'block'; FPSC.el.textContent = Math.round(f)+' fps' + (gpu ? ' \u00b7 ' + gpu : '') + prof;   /* (RS-351: and the card drawing this view; RS-353: and where the frame's time goes) */
   /* (RS-334) on the right, just left of the buttons in the top corner - or wherever you've dragged it */
   if (LAYOUT.fps && LAYOUT.fps.x!==undefined){ if (!FPSC.el.classList.contains('dragging')) applyMoved('fps'); }
