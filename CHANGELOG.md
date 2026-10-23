@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## RS-642 - A seamless map on a Planet
+
+- **The chart covers the whole globe.** Close in, a Planet's chart used to cover one patch of the world. Past some of the cube's seams it just stopped, so you'd see parchment on one side and the plain coloured globe on the other, with the change running straight down the seam. Now every face of the planet in view gets its own chart, so the whole globe is parchment and you can't tell where the seams are.
+- **No false coastlines.** Land running across a seam used to get an inked coastline, waves and a band of fog drawn along it, as if the sea began there. The chart now looks across the seam at the real land, so coasts, fog and the colour of walked land carry on over it.
+- **Badges, markers and names stay whole.** A site or your own marker sitting on a seam is drawn on both sides, and place and town names near a seam shift onto their own side instead of being cut in half. Planned routes and quest trails no longer draw a stray line across the map at a seam.
+- **Even paper and hatching.** The chart's paper stains now come from the globe itself, and the pencil hatching is crossed, so the paper looks the same on both sides of a seam.
+- **One name for one sea.** On new Planet worlds, a sea, forest or desert that crosses a seam is one place with one name, instead of two names crowded on either side. Big seas also keep their second label well away from the first on the globe. Existing worlds keep their place names, so your travel log stays right.
+- **It stays smooth.** Each face's chart is redrawn only when the part you can see moves past what's drawn, one face per frame. Turning the globe close in runs at about 5 to 6 ms a frame.
+
 ## RS-641 - A globe that turns any way
 
 - **Spin the globe in every direction.** The Planet's world map used to stop tilting a little short of each pole. Now a drag turns it any way, as far as you like: over the north or south pole, down the far side, upside down and all the way round. Each drag turns the globe about the screen, so the land always moves the way you drag it, even upside down.

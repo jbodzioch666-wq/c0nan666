@@ -8002,7 +8002,7 @@ function ensureSpawnEscape(){
 // (RS-106, generator 3: broader ranges, valleys walled in by them filled in as mountain, and nothing but a dragon's lair in or on them)
 // (RS-114, generator 4: a river that runs into a hollow fills it into a lake and flows on from its lowest edge)
 // (RS-115, generator 5: rivers join edge to edge - a diagonal step also fills the lower of its two side tiles)
-const OW_GEN_VER = 18;   /* (6: pyramids in the desert, RS-213; 7: a town for every race, RS-223; 8: roads skirt the volcano, RS-236; 9: landmarks on clear ground, RS-238) */
+const OW_GEN_VER = 19;   /* (6: pyramids in the desert, RS-213; 7: a town for every race, RS-223; 8: roads skirt the volcano, RS-236; 9: landmarks on clear ground, RS-238) */
 // any two river tiles that touch only at a corner get the lower of the two tiles beside them turned to river
 // (never a mountain, the sea or a lake); returns how many tiles it added
 function owRiverJoin(elev){
@@ -8172,6 +8172,8 @@ function owNb(x, y, dx, dy){ if (owCube()) return owOff(x, y, dx, dy); let nx = 
 /* (RS-638) the step (one of the eight) that takes you from one tile to the next one on a path */
 function owStepTo(ax, ay, bx, by){ const dx = bx - ax, dy = by - ay; if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1 && !owCube()) return [dx, dy];
   for (const d of DIR8){ const q = owNb(ax, ay, d[0], d[1]); if (q && q[0]===bx && q[1]===by) return [d[0], d[1]]; } return [Math.sign(dx), Math.sign(dy)]; }
+/* (RS-642) whether a straight line on a cube planet's stored grid stays on its faces (not out over the void between them) */
+function owNetLine(ax, ay, bx, by){ const n = Math.ceil(Math.max(Math.abs(bx - ax), Math.abs(by - ay))/3); for (let i=0;i<=n;i++){ const t = n ? i/n : 0; if (cubeFace(Math.round(ax + (bx - ax)*t), Math.round(ay + (by - ay)*t)) < 0) return false; } return true; }
 function owWrapX(x){ return owWraps() ? ((x % OW_COLS) + OW_COLS) % OW_COLS : x; }
 function owIsPlanet(){ return !!(G.worldSizeTier==='planet' && G.ow && (G.ow.genVer||1) >= 14); }
 function smoothstep(a, b, t){ const k = clamp((t - a)/(b - a), 0, 1); return k*k*(3 - 2*k); }
@@ -18589,6 +18591,18 @@ function pmMapKey(){
 /* (RS-572) the chart painted all at once was half a second's task - in the background a moment after you reached the land, which
    often landed on the loading of the next floor down. It's a generator now: the background build paints it a few milliseconds at a
    time on a canvas of its own, which becomes the chart when it's done; opening the map before then paints it at once */
+/* (RS-642) a cube planet's chart along the seams its stored grid doesn't join (seven of the cube's twelve edges, with the grid's void or its
+   end beside them): the two tiles past such an edge given the land that's really across it on the sphere - so the chart's coast, its fog
+   and its colour run on over the edge instead of stopping at a false shore. Laid out as the fog's cells are (a tile of border round the
+   grid); each the tile it copies, or -1 */
+function pmGhostSrc(){ const W = OW_COLS, H = OW_ROWS, k = W + 'x' + H; if (pmGhostSrc.k===k) return pmGhostSrc.v;
+  const out = new Int32Array((W + 2)*(H + 2)).fill(-1), near = new Uint8Array((W + 2)*(H + 2)).fill(9);
+  for (let x=0;x<W;x++) for (let y=0;y<H;y++){ if (cubeFace(x, y) < 0) continue;
+    for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) for (let st=1; st<=2; st++){ const u = x + dx*st, v = y + dy*st; if (u < -1 || v < -1 || u > W || v > H || cubeFace(u, v) >= 0) break;
+      const c = (v + 1)*(W + 2) + u + 1; if (near[c] <= st) continue; const q = owOff(x, y, dx*st, dy*st); if (!q) continue; near[c] = st; out[c] = q[1]*W + q[0]; } }
+  pmGhostSrc.k = k; pmGhostSrc.v = out; return out; }
+function pmGhostRev(i){ const W = OW_COLS, k = W + 'x' + OW_ROWS; if (pmGhostRev.k!==k){ const g = pmGhostSrc(), m = new Map(); for (let c=0;c<g.length;c++) if (g[c] >= 0){ const a = m.get(g[c]); if (a) a.push(c); else m.set(g[c], [c]); } pmGhostRev.k = k; pmGhostRev.m = m; }
+  return pmGhostRev.m.get(i) || []; }
 function pmBuild(){ PM.job = null; const it = pmBuildGen(); while (!it.next().done); }
 function* pmBuildGen(){
   const P = PM.P = Math.max(5, Math.min(9, Math.round(1150/Math.max(OW_COLS,OW_ROWS)))), planet = owIsPlanet();
@@ -18596,14 +18610,15 @@ function* pmBuildGen(){
   const c = document.createElement('canvas'); c.width = W; c.height = H;
   const x = c.getContext('2d'), id = x.createImageData(W,H), d = id.data;
   const n = v3Noise(5), n2 = v3Noise(17), n3 = v3Noise(29), m = G.ow.map;
-  const tileAt = (tx,ty)=> (tx<0||ty<0||tx>=OW_COLS||ty>=OW_ROWS) ? OW_WATER : m[tx][ty];
+  const gsrc = owCube() ? pmGhostSrc() : null, src = (tx, ty)=>{ if (gsrc && tx >= -1 && ty >= -1 && tx <= OW_COLS && ty <= OW_ROWS){ const v = gsrc[(ty + 1)*(OW_COLS + 2) + tx + 1]; if (v >= 0) return v; } return -1; };   /* (RS-642: past a seam, the land across it) */
+  const tileAt = (tx,ty)=>{ const v = src(tx, ty); if (v >= 0) return m[v % OW_COLS][(v/OW_COLS)|0]; return (tx<0||ty<0||tx>=OW_COLS||ty>=OW_ROWS) ? OW_WATER : m[tx][ty]; };
   const isWater = t=> t===OW_WATER;
   // per-tile land value and tint, sampled bilinearly per pixel for soft, organic shapes
   const land = new Float32Array((OW_COLS+2)*(OW_ROWS+2)), tint = new Float32Array((OW_COLS+2)*(OW_ROWS+2)*3), K = (tx,ty)=> (ty+1)*(OW_COLS+2)+(tx+1);
   for (let tx=-1; tx<=OW_COLS; tx++) for (let ty=-1; ty<=OW_ROWS; ty++){
-    const t = tileAt(tx,ty), k = K(tx,ty);
+    const t = tileAt(tx,ty), k = K(tx,ty), s0 = src(tx, ty);
     land[k] = isWater(t) ? 0 : 1;
-    const g = OW_SITE_TILES.includes(t) ? OW_GRASS : t, bv = t!==OW_WATER && t!==OW_RIVER ? wgBioAt(tx, ty) : 0, c3 = bv ? BIO[bv].chart : (PM_TINT[g] || PM_TINT[OW_GRASS]);
+    const g = OW_SITE_TILES.includes(t) ? OW_GRASS : t, bv = t!==OW_WATER && t!==OW_RIVER ? (s0 >= 0 ? wgBioAt(s0 % OW_COLS, (s0/OW_COLS)|0) : wgBioAt(tx, ty)) : 0, c3 = bv ? BIO[bv].chart : (PM_TINT[g] || PM_TINT[OW_GRASS]);
     tint[k*3] = c3[0]; tint[k*3+1] = c3[1]; tint[k*3+2] = c3[2];
   }
   const samp = (arr, fx, fy, ch, stride)=>{
@@ -18611,13 +18626,19 @@ function* pmBuildGen(){
     const g = (i,j)=>{ const cx = Math.max(-1, Math.min(OW_COLS, i)), cy = Math.max(-1, Math.min(OW_ROWS, j)); return arr[K(cx,cy)*stride+ch]; };
     return g(tx,ty)*(1-ax)*(1-ay) + g(tx+1,ty)*ax*(1-ay) + g(tx,ty+1)*(1-ax)*ay + g(tx+1,ty+1)*ax*ay;
   };
+  let stC = null, stW = 0, stH = 0;
+  if (gsrc){ stW = Math.ceil((OW_COLS + 2)/2) + 1; stH = Math.ceil((OW_ROWS + 2)/2) + 1; stC = new Float32Array(stW*stH);   /* (RS-642: a cube planet's paper stained from the sphere, every second tile, so the stains run on over its seams) */
+    for (let j=0;j<stH;j++){ if ((j & 15)===15) yield; for (let i=0;i<stW;i++){ const tx = Math.min(OW_COLS, i*2 - 1), ty = Math.min(OW_ROWS, j*2 - 1), v = src(tx, ty), sx = v >= 0 ? v % OW_COLS : tx, sy = v >= 0 ? (v/OW_COLS)|0 : ty;
+      stC[j*stW + i] = cubeFace(sx, sy) >= 0 ? owSphereNoise(sx, sy, 17, 2, 28) : 0.5; } } }
+  const stS = (fx, fy)=>{ const gx = (fx + 1)/2, gy = (fy + 1)/2, ix = Math.max(0, Math.min(stW - 2, Math.floor(gx))), iy = Math.max(0, Math.min(stH - 2, Math.floor(gy))), ax = Math.max(0, Math.min(1, gx - ix)), ay = Math.max(0, Math.min(1, gy - iy)), o = iy*stW + ix;
+    return stC[o]*(1 - ax)*(1 - ay) + stC[o + 1]*ax*(1 - ay) + stC[o + stW]*(1 - ax)*ay + stC[o + stW + 1]*ax*ay; };
   for (let py=0; py<H; py++){ if (py % 12 === 11) yield; for (let px=0; px<W; px++){
     const fx = px/P - 0.5, fy = py/P - 0.5;
     const wn = planet ? (f, a, b, s)=>{ const t = px/W; return f(a, b)*(1 - t) + f(a - W/s, b)*t; } : (f, a, b)=>f(a, b);   /* (a planet's chart: its noise blended across the width, so the two edges match) */
     const L = samp(land, fx, fy, 0, 1) + (wn(n, px/(P*1.1), py/(P*1.1), P*1.1)-0.5)*0.32 + (wn(n3, px/(P*0.35), py/(P*0.35), P*0.35)-0.5)*0.08;
     // aged paper: large stains, fine grain, darker toward the edges
     const edge = Math.min(px, py, W-1-px, H-1-py) / Math.min(W,H);
-    const age = 0.9 + wn(n2, px/140, py/140, 140)*0.1 + (wn(n, px/2.2, py/2.2, 2.2)-0.5)*0.05 - (planet ? 0 : Math.max(0, 0.08-edge)*1.6);   /* (a planet's chart wraps round a globe: no darkened edge at its seam) */
+    const age = 0.9 + (stC ? stS(fx, fy) : wn(n2, px/140, py/140, 140))*0.1 + (wn(n, px/2.2, py/2.2, 2.2)-0.5)*0.05 - (planet ? 0 : Math.max(0, 0.08-edge)*1.6);   /* (a planet's chart wraps round a globe: no darkened edge at its seam) */
     let r, g, b;
     if (L > 0.5){
       const tr = samp(tint, fx, fy, 0, 3), tg = samp(tint, fx, fy, 1, 3), tb = samp(tint, fx, fy, 2, 3);
@@ -18742,8 +18763,8 @@ function pmFogMask(){
   // one pixel per tile, with a one-tile fogged border so the edges scale cleanly
   if (PM.fogVer === G.ow.seenVer && PM.fog && PM.fog.width===OW_COLS+2) return PM.fog;
   const c = PM.fog = PM.fog || document.createElement('canvas'); c.width = OW_COLS+2; c.height = OW_ROWS+2;
-  const x = c.getContext('2d'), id = x.createImageData(OW_COLS+2, OW_ROWS+2), s = owSeenArr();
-  for (let y=0;y<OW_ROWS+2;y++) for (let i=0;i<OW_COLS+2;i++){ const tx = i-1, ty = y-1, seen = tx>=0 && ty>=0 && tx<OW_COLS && ty<OW_ROWS && s[ty*OW_COLS+tx]; id.data[(y*(OW_COLS+2)+i)*4+3] = seen ? 0 : 255; }
+  const x = c.getContext('2d'), id = x.createImageData(OW_COLS+2, OW_ROWS+2), s = owSeenArr(), gsrc = owCube() ? pmGhostSrc() : null;
+  for (let y=0;y<OW_ROWS+2;y++) for (let i=0;i<OW_COLS+2;i++){ const tx = i-1, ty = y-1, g0 = gsrc ? gsrc[y*(OW_COLS+2)+i] : -1, seen = g0 >= 0 ? s[g0] : tx>=0 && ty>=0 && tx<OW_COLS && ty<OW_ROWS && s[ty*OW_COLS+tx];   /* (RS-642: past a seam, as seen as the land across it) */ id.data[(y*(OW_COLS+2)+i)*4+3] = seen ? 0 : 255; }
   x.putImageData(id,0,0); PM.fogVer = G.ow.seenVer;
   // upsample to 4px per tile and blur, so the fog's edge is a soft, rolling bank
   const S = 4, hi = PM.fogHi = PM.fogHi || document.createElement('canvas'); hi.width = c.width*S; hi.height = c.height*S;
@@ -18849,8 +18870,10 @@ function renderOverworldMapZoomed(){
   // sites, in coloured ink on a paper halo - only where you've explored
   const iconR = clamp(cellPx*1.2, 11*dpr, 22*dpr), danger = mapF('danger');
   const names = [], smokes = [];
+  const gsrcS = GLOBE.decal && owCube() ? pmGhostSrc() : null;
   for (let vy=-1; vy<=viewRows; vy++) for (let vx=-1; vx<=viewCols; vx++){
-    const x = zCamX+vx, y = zCamY+vy;
+    let x = zCamX+vx, y = zCamY+vy, ghost = false;
+    if (gsrcS && x >= -1 && y >= -1 && x <= OW_COLS && y <= OW_ROWS){ const c = gsrcS[(y + 1)*(OW_COLS + 2) + x + 1]; if (c >= 0){ x = c % OW_COLS; y = (c/OW_COLS)|0; ghost = true; } }   /* (RS-642: past a seam, the site across it - its badge drawn this side too, so it isn't cut in two there) */
     if (x<0||y<0||x>=OW_COLS||y>=OW_ROWS) continue;
     const t2 = G.ow.map[x][y];
     if (!OW_SITE_TILES.includes(t2) || !owSeen(x,y)) continue;
@@ -18863,15 +18886,17 @@ function renderOverworldMapZoomed(){
     if (owSiteKind(t2)) owSiteBadgeExtras(ctx, x, y, px, py, iconR);
     if (t2===OW_TOWN && (G.ow.visitedTowns||[]).includes(x+','+y) && !(x===G.owPos.x && y===G.owPos.y) && owTownHover===x+','+y){   // a glowing ring round the town you're pointing at
       ctx.save(); ctx.strokeStyle = 'rgba(90,200,255,0.95)'; ctx.lineWidth = 3*dpr; ctx.shadowColor = '#40c8ff'; ctx.shadowBlur = 12*dpr; ctx.beginPath(); ctx.arc(px, py, iconR*1.35, 0, Math.PI*2); ctx.stroke(); ctx.restore(); }
+    if (ghost) continue;   /* (its name kept on its own side, pmFaceKeep) */
     if (t2===OW_TOWN && (G.ow.visitedTowns||[]).includes(x+','+y)) smokes.push([px+iconR*0.45, py-iconR*0.9, x+y]);
     if (t2===OW_TOWN) names.push([px, py + iconR*1.25 + (x===G.owPos.x && y===G.owPos.y ? clamp(cellPx*1.3, 14*dpr, 24*dpr)*0.5 : 0), o3TownName(x,y), (G.ow.visitedTowns||[]).includes(x+','+y)]);   // pushed below the You marker when you're standing in it
   }
   for (const [px, py, s] of smokes) pmSmoke(px, py, iconR, now, (s%7)/7);   // chimney smoke over the towns you know
   ctx.textAlign = 'center'; ctx.textBaseline = 'top';
   for (const [px, py, nm, visited] of names){
-    ctx.font = `${visited?'700':'600 italic'} ${Math.round(clamp(cellPx*1.2, 13*dpr, 18*dpr))}px Cinzel, Georgia, serif`;
-    ctx.lineWidth = 3*dpr; ctx.strokeStyle = 'rgba(240,226,190,0.9)'; ctx.strokeText(nm, px, py);
-    ctx.fillStyle = visited ? '#3a1a0a' : '#5a4028'; ctx.fillText(nm, px, py);
+    const fsz = Math.round(clamp(cellPx*1.2, 13*dpr, 18*dpr)); ctx.font = `${visited?'700':'600 italic'} ${fsz}px Cinzel, Georgia, serif`;
+    const [qx, qy] = pmFaceKeep(px, py, ctx.measureText(nm).width/2 + 3*dpr, fsz*1.1, zCamX, zCamY);   /* (RS-642: kept off a seam) */
+    ctx.lineWidth = 3*dpr; ctx.strokeStyle = 'rgba(240,226,190,0.9)'; ctx.strokeText(nm, qx, qy);
+    ctx.fillStyle = visited ? '#3a1a0a' : '#5a4028'; ctx.fillText(nm, qx, qy);
   }
   // wandering threats: shown with the danger layer, or always once you're close in
   if (danger || lod===2){ const R = clamp(cellPx*0.45, 5*dpr, 10*dpr);
@@ -18887,7 +18912,7 @@ function renderOverworldMapZoomed(){
     const t = questTarget(q); if (!t) continue;
     const qx = (t.x-zCamX)*cellPx + cellPx/2, qy = (t.y-zCamY)*cellPx + cellPx/2, R = clamp(cellPx*1.1, 11*dpr, 19*dpr);
     if (q===tqm){ ctx.save(); ctx.setLineDash([7*dpr,6*dpr]); ctx.lineWidth = 2.5*dpr; ctx.strokeStyle = t.turnIn ? 'rgba(90,170,220,0.85)' : 'rgba(200,140,20,0.9)';
-      ctx.beginPath(); ctx.moveTo((G.owPos.x-zCamX)*cellPx+cellPx/2, (G.owPos.y-zCamY)*cellPx+cellPx/2); ctx.lineTo(qx, qy); ctx.stroke(); ctx.restore(); }
+      ctx.beginPath(); ctx.moveTo((G.owPos.x-zCamX)*cellPx+cellPx/2, (G.owPos.y-zCamY)*cellPx+cellPx/2); if (!owCube() || owNetLine(G.owPos.x, G.owPos.y, t.x, t.y)){ ctx.lineTo(qx, qy); ctx.stroke(); } ctx.restore(); }   /* (RS-642: not drawn across a planet's grid) */
     ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.arc(qx+2*dpr, qy-R*1.6+3*dpr, R, 0, Math.PI*2); ctx.fill();
     ctx.fillStyle = t.turnIn ? '#2a6a9a' : '#b8860b'; ctx.beginPath(); ctx.arc(qx, qy-R*1.6, R, 0, Math.PI*2); ctx.fill();
     ctx.lineWidth = 2*dpr; ctx.strokeStyle = '#fff4d0'; ctx.stroke();
@@ -18920,7 +18945,7 @@ function renderOverworldMapZoomed(){
   const route = mapF('route') ? routeInfo() : null;
   if (route){
     ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-    ctx.beginPath(); ctx.moveTo(TX(G.owPos.x), TY(G.owPos.y)); for (const j of route.tiles) ctx.lineTo(TX(j%OW_COLS), TY((j/OW_COLS)|0));
+    ctx.beginPath(); ctx.moveTo(TX(G.owPos.x), TY(G.owPos.y)); { let lx = G.owPos.x, ly = G.owPos.y; for (const j of route.tiles){ const rx = j%OW_COLS, ry = (j/OW_COLS)|0; if (Math.abs(rx - lx) > 1 || Math.abs(ry - ly) > 1) ctx.moveTo(TX(rx), TY(ry)); else ctx.lineTo(TX(rx), TY(ry)); lx = rx; ly = ry; } }   /* (RS-642: over a seam the grid doesn't join, the line lifted, not drawn across the grid) */
     ctx.strokeStyle = 'rgba(240,226,190,0.75)'; ctx.lineWidth = 6*dpr; ctx.stroke();
     ctx.setLineDash([2*dpr, 7*dpr]); ctx.lineDashOffset = -now*18*dpr; ctx.strokeStyle = '#8a1a1a'; ctx.lineWidth = 3.5*dpr; ctx.stroke();
     if (route.bad >= 0){ const from = route.tiles.length ? route.tiles[route.tiles.length-1] : G.owPos.y*OW_COLS+G.owPos.x, [bx, by] = route.pts[route.bad];
@@ -18943,14 +18968,16 @@ function renderOverworldMapZoomed(){
   ctx.restore(); applyOverworldTint(); ctx.save(); ctx.translate(-offX, -offY);   /* (the tint covers the screen, unshifted) */
   pmSearchMarks(zCamX, zCamY, viewCols, viewRows);   /* (RS-315) what the search found */
   // you are here: a red ring and dot, gently pulsing
-  const ppx = (G.owPos.x-zCamX)*cellPx + cellPx/2, ppy = (G.owPos.y-zCamY)*cellPx + cellPx/2, pr = clamp(cellPx*1.3, 14*dpr, 24*dpr), pulse = Math.sin(performance.now()/260)*0.5+0.5;
+  const pr = clamp(cellPx*1.3, 14*dpr, 24*dpr), pulse = Math.sin(performance.now()/260)*0.5+0.5, pps = [[(G.owPos.x-zCamX)*cellPx + cellPx/2, (G.owPos.y-zCamY)*cellPx + cellPx/2]];
+  if (GLOBE.decal && owCube()) for (const c of pmGhostRev(G.owPos.y*OW_COLS + G.owPos.x)){ const gx = c % (OW_COLS + 2) - 1, gy = ((c/(OW_COLS + 2))|0) - 1; if (inView(gx, gy, 3)) pps.push([(gx-zCamX)*cellPx + cellPx/2, (gy-zCamY)*cellPx + cellPx/2]); }   /* (RS-642: and past a seam, so you aren't cut in two there) */
+  for (const [ppx, ppy] of pps){
   ctx.strokeStyle = `rgba(255,90,70,${0.9-pulse*0.6})`; ctx.lineWidth = 3*dpr; ctx.beginPath(); ctx.arc(ppx, ppy, pr*(1.35+pulse*0.6), 0, Math.PI*2); ctx.stroke();
   ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.arc(ppx+2*dpr, ppy+3*dpr, pr, 0, Math.PI*2); ctx.fill();
   ctx.fillStyle = '#b01e1e'; ctx.beginPath(); ctx.arc(ppx, ppy, pr, 0, Math.PI*2); ctx.fill();
   ctx.lineWidth = 2.5*dpr; ctx.strokeStyle = '#f4e8c8'; ctx.stroke();
   drawMonsterArt(ppx, ppy+pr*0.12, pr*1.6, (G.gear.weapon && G.gear.weapon.basis==='Quarterstaff') ? PLAYER_ART_STAFF : PLAYER_ART_SWORD, '#ffffff');
   ctx.font = `700 ${Math.round(12*dpr)}px Cinzel, Georgia, serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-  ctx.lineWidth = 3*dpr; ctx.strokeStyle = 'rgba(26,20,14,0.9)'; ctx.strokeText('You', ppx, ppy - pr*1.2); ctx.fillStyle = '#ffe6a0'; ctx.fillText('You', ppx, ppy - pr*1.2);
+  ctx.lineWidth = 3*dpr; ctx.strokeStyle = 'rgba(26,20,14,0.9)'; ctx.strokeText('You', ppx, ppy - pr*1.2); ctx.fillStyle = '#ffe6a0'; ctx.fillText('You', ppx, ppy - pr*1.2); }
   ctx.restore();   /* (the compass and legend sit on the screen, not the chart) */
   if (GLOBE.decal){ cellPx = savedCellPx; return; }   /* (RS-628: for the globe, which puts the legend on the screen itself) */
   pmMapScreenUi(cw, ch, false);
@@ -19019,6 +19046,8 @@ function globeEv(e){
   const ray = new T.Raycaster(); ray.setFromCamera(new T.Vector2(nx, ny), GLOBE.cam); const o = ray.ray.origin, d = ray.ray.direction, b = o.dot(d), c = o.dot(o) - 1, disc = b*b - c;
   const far = { clientX:-1e6, clientY:-1e6, _globe:true, button:e.button, pointerType:e.pointerType, isPrimary:e.isPrimary, shiftKey:e.shiftKey, target:e.target, preventDefault(){}, stopPropagation(){} };
   if (disc < 0) return far; const t = -b - Math.sqrt(disc), hit = o.clone().addScaledVector(d, t), tl = globeTileOf(globeUnturn(hit));
+  if (owCube()){ const k = cubeFace(clamp(Math.floor(tl.x + 0.5), 0, OW_COLS - 1), clamp(Math.floor(tl.y + 0.5), 0, OW_ROWS - 1)), P = GLOBE.cpatch && GLOBE.cpatch[k];
+    if (!P || !P.on) return far; owZoomLastCam = P.cam; owZoomLastCellPx = P.cp; GLOBE.hoverFace = k; }   /* (RS-642: on that face's own chart) */
   let tx = tl.x; const cx0 = owZoomLastCam.x + (GLOBE.lastCW||canvas.width)/owZoomLastCellPx*0.5; if (!owCube()){ if (tx - cx0 > OW_COLS/2) tx -= OW_COLS; else if (cx0 - tx > OW_COLS/2) tx += OW_COLS; }
   const px = (tx + 0.5 - owZoomLastCam.x)*owZoomLastCellPx, py = (tl.y + 0.5 - owZoomLastCam.y)*owZoomLastCellPx;
   return Object.assign(far, { clientX:rect.left + px/k, clientY:rect.top + py/k, _real:{ x:e.clientX, y:e.clientY } });
@@ -19032,8 +19061,8 @@ function globeTextures(){
   const T = THREE, c = GLOBE.texCv || (GLOBE.texCv = document.createElement('canvas')); c.width = TW; c.height = TH; const x = c.getContext('2d');
   x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high'; if ('filter' in x) x.filter = 'saturate(1.4) contrast(1.06)'; x.drawImage(PM.cv, 0, 0, TW, TH); if ('filter' in x) x.filter = 'none';
   { /* the fog over the unseen, from the seen mask itself, wrapped two tiles round the seam so its blur meets itself */
-    const sm = GLOBE.fogSm || (GLOBE.fogSm = document.createElement('canvas')), pad = owCube() ? 0 : 2; sm.width = W + pad*2; sm.height = H; const sx = sm.getContext('2d'), id = sx.createImageData(W + pad*2, H), seen = owSeenArr();
-    for (let ty=0; ty<H; ty++) for (let i=0; i<W + pad*2; i++){ const tx = (i - pad + W) % W, vd = owCube() && cubeFace(tx, ty) < 0, o = (ty*(W + pad*2) + i)*4; id.data[o] = 216; id.data[o+1] = 203; id.data[o+2] = 168; id.data[o+3] = seen[ty*W + tx] || vd ? 0 : 255; }
+    const sm = GLOBE.fogSm || (GLOBE.fogSm = document.createElement('canvas')), pad = owCube() ? 0 : 2; sm.width = W + pad*2; sm.height = H; const sx = sm.getContext('2d'), id = sx.createImageData(W + pad*2, H), seen = owSeenArr(), gs = owCube() ? pmGhostSrc() : null;
+    for (let ty=0; ty<H; ty++) for (let i=0; i<W + pad*2; i++){ const tx = (i - pad + W) % W, vd = owCube() && cubeFace(tx, ty) < 0, g0 = vd && gs ? gs[(ty + 1)*(W + 2) + tx + 1] : -1, o = (ty*(W + pad*2) + i)*4; id.data[o] = 216; id.data[o+1] = 203; id.data[o+2] = 168; id.data[o+3] = vd ? (g0 >= 0 && !seen[g0] ? 255 : 0) : seen[ty*W + tx] ? 0 : 255; }   /* (RS-642: past a seam, the fog of the land across it) */
     sx.putImageData(id, 0, 0);
     const t = GLOBE.fogCv || (GLOBE.fogCv = document.createElement('canvas')); t.width = TW; t.height = TH; const fx = t.getContext('2d'); fx.clearRect(0, 0, TW, TH); fx.imageSmoothingEnabled = true;
     if ('filter' in fx) fx.filter = 'blur(' + Math.round(TW/W*1.2) + 'px)'; fx.drawImage(sm, -pad*TW/W, 0, TW*(W + pad*2)/W, TH); if ('filter' in fx) fx.filter = 'none';
@@ -19057,14 +19086,24 @@ function globeSetup(){
   globeTextures();
   /* the chart for the land facing you, laid over the sphere in its own patch of the map (uRect: u0, v0, u1, v1 from the top) */
   const patch = GLOBE.patch = new T.CanvasTexture(canvas); patch.generateMipmaps = false; patch.minFilter = T.LinearFilter; patch.magFilter = T.LinearFilter;
-  const PU = GLOBE.pu = { uPatch:{ value:patch }, uRect:{ value:new T.Vector4(0, 0, 1, 1) }, uPA:{ value:0 } };
+  const PU = GLOBE.pu = { uPatch:{ value:patch }, uRect:{ value:new T.Vector4(0, 0, 1, 1) }, uPA:{ value:0 }, uCube:{ value:0 } };
+  for (let k=0;k<6;k++){ PU['uPF' + k] = { value:patch }; PU['uRF' + k] = { value:new T.Vector4(0, 0, 1, 1) }; PU['uSF' + k] = { value:new T.Vector4(1, 1, 0, 0) }; PU['uFF' + k] = { value:new T.Vector4(1, 1, 1, 1) }; }   /* (RS-642: on a cube planet, each face's own chart: its rect, the part of its canvas it fills (and whether it's on), which edges fade) */
+  const FDEC = [0, 1, 2, 3, 4, 5].map(k=>'uniform sampler2D uPF' + k + '; uniform vec4 uRF' + k + ', uSF' + k + ', uFF' + k + ';').join(' '), FPICK = [0, 1, 2, 3, 4, 5].map(k=>(k < 5 ? 'vFace < ' + k + '.5 ? ' : '') + 'dcFacePatch(uPF' + k + ', uRF' + k + ', uSF' + k + ', uFF' + k + ', uvP, b0)').join(' : ');
   const mat = new T.MeshPhongMaterial({ map:GLOBE.tex, bumpMap:GLOBE.bump, bumpScale:0.9, specularMap:GLOBE.spec, specular:new T.Color(0x1c222a), shininess:70 });
   mat.onBeforeCompile = sh=>{ Object.assign(sh.uniforms, PU);
-    sh.fragmentShader = 'uniform sampler2D uPatch; uniform vec4 uRect; uniform float uPA;\n' + sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
-      if (uPA > 0.0){ float pu = (vMapUv.x - uRect.x)/(uRect.z - uRect.x), pv = ((1.0 - vMapUv.y) - uRect.y)/(uRect.w - uRect.y);
-        if (pu > 0.0 && pu < 1.0 && pv > 0.0 && pv < 1.0){ vec4 pc = texture2D(uPatch, vec2(pu, 1.0 - pv)); float ea = smoothstep(0.0, 0.025, min(min(pu, 1.0 - pu), min(pv, 1.0 - pv)));
-          diffuseColor.rgb = mix(diffuseColor.rgb, pc.rgb, uPA*ea); } }`); };
-  mat.customProgramCacheKey = ()=>'globePatch';
+    sh.vertexShader = 'attribute float aFace; varying float vFace;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vFace = aFace;');
+    sh.fragmentShader = 'uniform sampler2D uPatch; uniform vec4 uRect; uniform float uPA, uCube; varying float vFace; ' + FDEC + `
+      vec3 dcFacePatch(sampler2D t, vec4 r, vec4 sf, vec4 fd, vec2 uv, vec3 base){ if (sf.z < 0.5) return base; vec2 p = vec2((uv.x - r.x)/(r.z - r.x), (uv.y - r.y)/(r.w - r.y));
+        if (p.x < -0.002 || p.x > 1.002 || p.y < -0.002 || p.y > 1.002) return base; p = clamp(p, 0.0, 1.0);
+        float m = 1.0; if (fd.x > 0.5) m = min(m, p.x); if (fd.y > 0.5) m = min(m, p.y); if (fd.z > 0.5) m = min(m, 1.0 - p.x); if (fd.w > 0.5) m = min(m, 1.0 - p.y);
+        vec4 pc = texture2D(t, vec2(p.x*sf.x, 1.0 - p.y*sf.y)); return mix(base, pc.rgb, uPA*smoothstep(0.0, 0.025, m)); }
+` + sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
+      if (uPA > 0.0){ vec2 uvP = vec2(vMapUv.x, 1.0 - vMapUv.y);
+        if (uCube > 0.5){ vec3 b0 = diffuseColor.rgb; diffuseColor.rgb = ` + FPICK + `; }
+        else { float pu = (uvP.x - uRect.x)/(uRect.z - uRect.x), pv = (uvP.y - uRect.y)/(uRect.w - uRect.y);
+          if (pu > 0.0 && pu < 1.0 && pv > 0.0 && pv < 1.0){ vec4 pc = texture2D(uPatch, vec2(pu, 1.0 - pv)); float ea = smoothstep(0.0, 0.025, min(min(pu, 1.0 - pu), min(pv, 1.0 - pv)));
+            diffuseColor.rgb = mix(diffuseColor.rgb, pc.rgb, uPA*ea); } } }`); };
+  mat.customProgramCacheKey = ()=>'globePatch2';
   const mesh = GLOBE.mesh = new T.Mesh(globeGeo(), mat); GLOBE.geoKind = owCube() ? 'cube' + OW_COLS : 'sphere'; pivot.add(mesh);
   const atm = GLOBE.atm = new T.Mesh(new T.SphereGeometry(1.1, 64, 48), new T.ShaderMaterial({ side:T.BackSide, transparent:true, blending:T.AdditiveBlending, depthWrite:false,
     vertexShader:'varying vec3 vN; void main(){ vN = normalize(normalMatrix*normal); gl_Position = projectionMatrix*modelViewMatrix*vec4(position, 1.0); }',
@@ -19076,14 +19115,14 @@ function globeSetup(){
   return true;
 }
 function globeGeo(){ const T = THREE; if (!owCube()) return new T.SphereGeometry(1, 256, 160);
-  const S = 64, N = cubeN(), W = OW_COLS, H = OW_ROWS, pos = [], uv = [], idx = [];
+  const S = 64, N = cubeN(), W = OW_COLS, H = OW_ROWS, pos = [], uv = [], idx = [], fa = [];
   for (let f=0; f<6; f++){ const o = CUBE_O[f], base = pos.length/3;
-    for (let j=0;j<=S;j++) for (let i=0;i<=S;i++){ const a0 = -1 + 2*i/S, b0 = -1 + 2*j/S, d = cubeDir(f, cubeWarp(a0), cubeWarp(b0)); pos.push(d[0], d[1], d[2]);
+    for (let j=0;j<=S;j++) for (let i=0;i<=S;i++){ const a0 = -1 + 2*i/S, b0 = -1 + 2*j/S, d = cubeDir(f, cubeWarp(a0), cubeWarp(b0)); pos.push(d[0], d[1], d[2]); fa.push(f);
       uv.push((o[0]*N + (a0 + 1)/2*N)/W, 1 - (o[1]*N + (b0 + 1)/2*N)/H); }
     for (let j=0;j<S;j++) for (let i=0;i<S;i++){ const a = base + j*(S + 1) + i, b = a + 1, c = a + S + 1, d = c + 1;
       const p = k=>[pos[k*3], pos[k*3+1], pos[k*3+2]], A = p(a), B = p(b), C = p(c), n = [(B[1]-A[1])*(C[2]-A[2]) - (B[2]-A[2])*(C[1]-A[1]), (B[2]-A[2])*(C[0]-A[0]) - (B[0]-A[0])*(C[2]-A[2]), (B[0]-A[0])*(C[1]-A[1]) - (B[1]-A[1])*(C[0]-A[0])];
       if (n[0]*A[0] + n[1]*A[1] + n[2]*A[2] > 0) idx.push(a, b, c, b, d, c); else idx.push(a, c, b, b, c, d); } }   /* (wound to face outward) */
-  const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new T.Float32BufferAttribute(pos.slice(), 3)); g.setAttribute('uv', new T.Float32BufferAttribute(uv, 2)); g.setIndex(idx); return g; }
+  const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new T.Float32BufferAttribute(pos.slice(), 3)); g.setAttribute('uv', new T.Float32BufferAttribute(uv, 2)); g.setAttribute('aFace', new T.Float32BufferAttribute(fa, 1)); g.setIndex(idx); return g; }   /* (RS-642: aFace, which chart its pixels take) */
 function globePins(){
   const T = THREE, key = (G.ow.visitedTowns||[]).length + '|' + GLOBE.texKey; if (GLOBE.pinsKey===key) return; GLOBE.pinsKey = key;
   if (GLOBE.pins){ GLOBE.mesh.remove(GLOBE.pins); GLOBE.pins.geometry.dispose(); }
@@ -19112,6 +19151,65 @@ function globeUprightOn(r){
   window.drawMonsterArt = function(px, py, size, recipe, color, tc){ const k = ctx; if (tc) return dma.apply(this, arguments);   /* (a badge's own picture turns with its badge) */ k.save(); k.translate(px, py); k.rotate(r); try{ return dma.call(this, 0, 0, size, recipe, color, tc); } finally { k.restore(); } };
   return ()=>{ c.fillText = ft; c.strokeText = st; window.pmBadge = pb; window.drawMonsterArt = dma; window.owSiteBadgeExtras = sbe; };
 }
+/* (RS-642) a cube planet's chart, laid over every face that shows. One stretch of the stored grid ran off its land at the seams the grid's
+   cross doesn't join, and the plain globe showed past them; now each face that shows has a chart of its own part of the grid, with a
+   margin, its writing set upright for that face, and a face's pixels take only its own chart. While the globe moves, the faces are looked
+   over every few frames, and a face whose chart no longer covers what shows of it (or is at another zoom, or turned) is drawn afresh - one
+   a frame, the face you look at first; once it's still, the one you look at (or the one under the mouse) is kept fresh four times a
+   second for its clouds and smoke, and the others in turn */
+function globeCubeCharts(f, pa, zs, cw, ch, now){
+  const PU = GLOBE.pu, W = OW_COLS, H = OW_ROWS, N = cubeN(), CP = GLOBE.cpatch || (GLOBE.cpatch = []);
+  if (pa <= 0){ owZoomLastCellPx = 0; GLOBE.lastRef = null; GLOBE.cq = null; GLOBE.cview = null; for (let k=0;k<6;k++){ PU['uSF' + k].value.z = 0; if (CP[k]) CP[k].on = false; } return; }
+  const cp = Math.max(cw/W, ch/H)*Math.max(0.3, zs), fk = cubeFace(clamp(Math.round(f.x), 0, W - 1), clamp(Math.round(f.y), 0, H - 1)), wr = a=>Math.abs(((a % (Math.PI*2)) + Math.PI*3) % (Math.PI*2) - Math.PI);
+  const q = globeQ(), vk = [q.x, q.y, q.z, q.w, GLOBE.dist, cw, ch], V = GLOBE.cview;
+  if (!V || vk.some((v, i)=>Math.abs(v - V[i]) > 1e-7)){ GLOBE.cview = vk; GLOBE.cmoveT = now; GLOBE.cpend = true; }
+  if (!GLOBE.cq){ GLOBE.cq = []; GLOBE.cpend = true; GLOBE.cchk = 0; }
+  if (GLOBE.cpend && now - (GLOBE.cchk||0) > 60){ GLOBE.cchk = now; GLOBE.cpend = false;
+    const sc = { x:clamp(f.x, 0, W - 1), y:clamp(f.y, 0, H - 1) }; G.owZoomCenter = GLOBE.ctr = sc; G.owZoomScale = GLOBE.zsSet = Math.max(0.3, zs); G.owZoomGoal = null;
+    /* which faces show, and how much of each: a sample every twentieth of a face, a little past the screen's edges */
+    const S = 20, st = N/S, ex = Math.max(st*cp*1.2, 0.05*Math.max(cw, ch)), mg = clamp(0.08*Math.max(cw, ch)/cp, 4, 14), band = 12, hz = 1/GLOBE.dist - 0.03, v3 = new THREE.Vector3();
+    const scr = (tx, ty)=>{ const p = globeLocal(tx, ty); v3.set(p[0], p[1], p[2]).applyQuaternion(q); if (v3.z < hz) return null; v3.project(GLOBE.cam); return { x:(v3.x + 1)/2*cw, y:(1 - v3.y)/2*ch }; };   /* (where a tile shows: none past the horizon, which lies nearer than the globe's back) */
+    for (let k=0;k<6;k++){ const o = CUBE_O[k], bx = o[0]*N, by = o[1]*N, P = CP[k] || (CP[k] = { k }); let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9, n = 0, at = null, bd = 1e18;
+      for (let j=0;j<=S;j++) for (let i=0;i<=S;i++){ const tx = bx + Math.min(N - 1, Math.round(i*st)), ty = by + Math.min(N - 1, Math.round(j*st)), p = scr(tx, ty);
+        if (!p || p.x < -ex || p.y < -ex || p.x > cw + ex || p.y > ch + ex) continue; n++; x0 = Math.min(x0, tx); y0 = Math.min(y0, ty); x1 = Math.max(x1, tx); y1 = Math.max(y1, ty);
+        const dd = (p.x - cw/2)*(p.x - cw/2) + (p.y - ch/2)*(p.y - ch/2); if (dd < bd){ bd = dd; at = [tx, ty]; } }
+      if (!n){ if (P.on){ P.on = false; PU['uSF' + k].value.z = 0; } P.want = null; continue; }
+      const d = [Math.max(bx, x0 - st), Math.max(by, y0 - st), Math.min(bx + N, x1 + 1 + st), Math.min(by + N, y1 + 1 + st)];   /* (what shows of it) */
+      /* the face's grid as it lies on the screen where you see it best, so its writing can be set upright */
+      let an = GLOBE.an; if (k!==fk){ const c0 = [Math.min(at[0], bx + N - 2), at[1]], p0 = globeTileScreen(c0[0], c0[1]), p1 = globeTileScreen(c0[0] + 1, c0[1]); an = p0 && p1 ? Math.atan2(p1.y - p0.y, p1.x - p0.x) : (P.an||0); }
+      const r = P.r; if (P.on && r && d[0] >= r[0] && d[1] >= r[1] && d[2] <= r[2] && d[3] <= r[3] && Math.abs(Math.log(P.cp/cp)) < 0.06 && wr(an - (P.an||0)) < 0.1){ P.want = null; continue; }
+      P.want = { r:[Math.max(0, bx - band, Math.floor(d[0] - mg)), Math.max(0, by - band, Math.floor(d[1] - mg)), Math.min(W, bx + N + band, Math.ceil(d[2] + mg)), Math.min(H, by + N + band, Math.ceil(d[3] + mg))], an };
+      if (!GLOBE.cq.includes(k)) GLOBE.cq.push(k); }
+    GLOBE.cfk = fk; GLOBE.cq = GLOBE.cq.filter(k=>CP[k] && CP[k].want).sort((a, b)=>(b===fk) - (a===fk));   /* (the face you look at first) */
+  }
+  /* drawn this frame: the next face that needs it; or, still, the one you look at (the one under the mouse) or the next in turn */
+  let k = -1;
+  if (GLOBE.cq.length){ k = GLOBE.cq.shift(); const P = CP[k]; P.r = P.want.r; P.an = P.want.an; P.want = null; }
+  else if (now - (GLOBE.cmoveT||0) > 300){ const L = GLOBE.crt||0, dirty = GLOBE.dirty && now - L > 60;
+    if (dirty || now - L > 250){ GLOBE.crt = now; GLOBE.dirty = false; k = GLOBE.cfk;
+      if (dirty){ if (GLOBE.hoverFace!=null && CP[GLOBE.hoverFace] && CP[GLOBE.hoverFace].on) k = GLOBE.hoverFace; }
+      else if ((GLOBE.ctick = (GLOBE.ctick||0) + 1) % 2===0){ const o = [0, 1, 2, 3, 4, 5].filter(j=>j!==GLOBE.cfk && CP[j] && CP[j].on); if (o.length){ GLOBE.crr = ((GLOBE.crr||0) + 1) % o.length; k = o[GLOBE.crr]; } }
+      if (!(CP[k] && CP[k].on && CP[k].r)) k = -1; } }
+  if (k >= 0){ try{ globeCubePatch(k, cw, ch); } finally { G.owZoomCenter = GLOBE.ctr; } if (k===GLOBE.cfk) GLOBE.lastRef = { x:f.x, y:f.y, d:GLOBE.dist, t:now, pa, an:CP[k].an }; }
+  /* the clicks and hovers read the chart of the face you look at, unless they land on another (globeEv) */
+  const P0 = CP[GLOBE.cfk]; if (P0 && P0.on){ owZoomLastCam = P0.cam; owZoomLastCellPx = P0.cp; GLOBE.lastCW = P0.CW; } else owZoomLastCellPx = 0;
+}
+/* one face's chart: its part of the grid drawn at the chart's scale (no bigger than the screen), copied to its own canvas and laid over it */
+function globeCubePatch(k, cw, ch){
+  const T = THREE, P = GLOBE.cpatch[k], PU = GLOBE.pu, W = OW_COLS, H = OW_ROWS, N = cubeN(), o = CUBE_O[k], r = P.r, cp = Math.max(cw/W, ch/H)*owZoomScale();
+  const CW = (r[2] - r[0])*cp, CH = (r[3] - r[1])*cp, PW = Math.min(cw, 2048), PH = Math.min(ch, 2048), s = Math.min(1, (PW - 1)/CW, (PH - 1)/CH), pw = Math.max(1, Math.ceil(CW*s)), ph = Math.max(1, Math.ceil(CH*s));
+  G.owZoomCenter = { x:(r[0] + r[2])/2 - 0.5, y:(r[1] + r[3])/2 - 0.5 };
+  GLOBE.decal = { w:CW, h:CH, bw:cw, bh:ch }; GLOBE.upr = -(P.an||0); ctx.save(); ctx.setTransform(s, 0, 0, s, 0, 0); const unturn = globeUprightOn(-(P.an||0));
+  try{ renderOverworldMapZoomed(); } finally { unturn(); ctx.restore(); GLOBE.decal = null; GLOBE.upr = 0; }
+  const cam = owZoomLastCam, cpx = owZoomLastCellPx;
+  if (!P.cv || P.cv.width!==PW || P.cv.height!==PH){ P.cv = document.createElement('canvas'); P.cv.width = PW; P.cv.height = PH; if (P.tex) P.tex.dispose();
+    const tx = P.tex = new T.CanvasTexture(P.cv); tx.generateMipmaps = false; tx.minFilter = T.LinearFilter; tx.magFilter = T.LinearFilter; PU['uPF' + k].value = tx; }
+  const x = P.cv.getContext('2d'); x.drawImage(canvas, 0, 0, pw, ph, 0, 0, pw, ph); x.drawImage(canvas, pw - 1, 0, 1, ph, pw, 0, 1, ph); x.drawImage(canvas, 0, ph - 1, pw + 1, 1, 0, ph, pw + 1, 1);   /* (its last column and row once more, for the filtering at its edge) */
+  P.tex.needsUpdate = true; P.cam = cam; P.cp = cpx; P.CW = CW; P.on = true;
+  PU['uRF' + k].value.set(cam.x/W, cam.y/H, (cam.x + CW/cpx)/W, (cam.y + CH/cpx)/H); PU['uSF' + k].value.set(CW*s/PW, CH*s/PH, 1, 0);
+  /* its edges fade only inside its face; at the face's own edge it meets the next face's chart */
+  const bx = o[0]*N, by = o[1]*N, e = 0.5; PU['uFF' + k].value.set(cam.x > bx + e ? 1 : 0, cam.y > by + e ? 1 : 0, cam.x + CW/cpx < bx + N - e ? 1 : 0, cam.y + CH/cpx < by + N - e ? 1 : 0);
+}
 function globeRender(){
   if (!PM.cv || PM.key !== pmMapKey()) pmBuild(); if (!PM.cv) return false; owReveal(G.owPos.x, G.owPos.y, wgSight()); pmFogMask();
   if (!globeSetup()) return false;
@@ -19130,11 +19228,13 @@ function globeRender(){
   GLOBE.mesh.quaternion.copy(globeQ()); GLOBE.cam.position.set(0, 0, GLOBE.dist); GLOBE.cam.lookAt(0, 0, 0); GLOBE.cam.updateMatrixWorld();
   /* the chart for the land facing you: drawn at the size the sphere shows it, squeezed east to west as the globe squeezes it away from the equator */
   const f = globeFacingF(), cbe = owCube(), lat = (0.5 - (f.y + 0.5)/H)*Math.PI, cosL = cbe ? 1 : Math.max(0.25, Math.cos(lat)), pxU = (ch/2)/((GLOBE.dist - 1)*Math.tan(15*Math.PI/180)), cellNS = pxU*globeTileAng();
-  let ca = 1, sa = 0; GLOBE.an = 0; { const fx = Math.round(f.x), fy = Math.round(f.y), fx1 = cbe ? fx + 1 : (fx + 1) % W, p0 = globeTileScreen(fx, fy), p1 = globeTileScreen(fx1, fy); if (p0 && p1 && (!cbe || cubeFace(fx1, fy)===cubeFace(fx, fy))){   /* (RS-641: on any planet, as the globe rolls any way round) */ const an = Math.atan2(p1.y - p0.y, p1.x - p0.x); ca = Math.abs(Math.cos(an)); sa = Math.abs(Math.sin(an)); GLOBE.an = an; } }   /* (the face's grid turned on the screen: the chart drawn wide enough to cover it) */
+  let ca = 1, sa = 0; GLOBE.an = 0; { const fy = Math.round(f.y), e1 = cbe && cubeFace(Math.round(f.x) + 1, fy)!==cubeFace(Math.round(f.x), fy), fx = Math.round(f.x) - (e1 ? 1 : 0), fx1 = cbe ? fx + 1 : (fx + 1) % W, p0 = globeTileScreen(fx, fy), p1 = globeTileScreen(fx1, fy); if (p0 && p1 && (!cbe || cubeFace(fx1, fy)===cubeFace(fx, fy))){   /* (RS-642: at a face's last column, measured from the one before) */   /* (RS-641: on any planet, as the globe rolls any way round) */ const an = Math.atan2(p1.y - p0.y, p1.x - p0.x); ca = Math.abs(Math.cos(an)); sa = Math.abs(Math.sin(an)); GLOBE.an = an; } }   /* (the face's grid turned on the screen: the chart drawn wide enough to cover it) */
   const M = 1.32, BW = cw/cosL, BH = ch, CW = (cw*ca + ch*sa)/cosL*M, CH = (cw*sa + ch*ca)*M, zs = cellNS/Math.max(BW/W, BH/H), pa = cbe ? smoothstep(1.45, 1.85, zs) : smoothstep(0.85, 1.12, zs); GLOBE.pa = pa;   /* (M: drawn a third past the screen's edges, where the sphere curves away) */
   /* the chart is redrawn only when the view has moved a good way, when the mouse or a click may have changed it, or four times a second for
      its clouds and smoke - it's fixed to its own patch of the sphere, so between times the last one turns with the globe, still in place */
-  const lr = GLOBE.lastRef, moved = !lr || lr.pa===0 || Math.abs(f.x - lr.x)*cellNS*cosL > cw*(M - 1)*0.35 || Math.abs(f.y - lr.y)*cellNS > ch*(M - 1)*0.35 || Math.abs(Math.log((GLOBE.dist - 1)/(lr.d - 1))) > 0.06
+  GLOBE.pu.uCube.value = cbe ? 1 : 0;
+  if (cbe) globeCubeCharts(f, pa, zs, cw, ch, now);   /* (RS-642: a cube planet: a chart for each face that shows) */
+  else { const lr = GLOBE.lastRef, moved = !lr || lr.pa===0 || Math.abs(f.x - lr.x)*cellNS*cosL > cw*(M - 1)*0.35 || Math.abs(f.y - lr.y)*cellNS > ch*(M - 1)*0.35 || Math.abs(Math.log((GLOBE.dist - 1)/(lr.d - 1))) > 0.06
     || Math.abs(((GLOBE.an - (lr.an||0)) % (Math.PI*2) + Math.PI*3) % (Math.PI*2) - Math.PI) > 0.08;   /* (RS-641: or turned on the spot, so its writing is set upright again) */
   const due = pa > 0 && (moved || (GLOBE.dirty && now - lr.t > 60) || now - lr.t > 250);
   if (pa > 0 && !due){ /* (the last chart stands) */ }
@@ -19143,7 +19243,7 @@ function globeRender(){
     GLOBE.decal = { w:CW, h:CH, bw:BW, bh:BH }; ctx.save(); ctx.setTransform(cw/CW, 0, 0, ch/CH, 0, 0); const unturn = globeUprightOn(-(GLOBE.an||0));
     try{ renderOverworldMapZoomed(); } finally { unturn(); ctx.restore(); GLOBE.decal = null; }
     const cam = owZoomLastCam, cp = owZoomLastCellPx; GLOBE.lastCW = CW; GLOBE.pu.uRect.value.set(cam.x/W, cam.y/H, (cam.x + CW/cp)/W, (cam.y + CH/cp)/H); GLOBE.patch.needsUpdate = true; }
-  else { owZoomLastCellPx = 0; GLOBE.lastRef = null; }   /* (no chart laid over: nothing on it to click) */
+  else { owZoomLastCellPx = 0; GLOBE.lastRef = null; } }   /* (no chart laid over: nothing on it to click) */
   GLOBE.pu.uPA.value = pa; if (GLOBE.pins) GLOBE.pins.visible = pa < 0.5; GLOBE.pin.visible = pa < 0.5;
   { const p = globeLocal(G.owPos.x, G.owPos.y); GLOBE.pin.position.set(p[0]*1.006, p[1]*1.006, p[2]*1.006); GLOBE.pin.lookAt(p[0]*2, p[1]*2, p[2]*2);
     const k = (now/1000) % 1.6/1.6; GLOBE.ring.scale.setScalar(1 + k*1.6); GLOBE.ring.material.opacity = 1 - k; }
@@ -19210,9 +19310,10 @@ function owGeo(){
 }
 function geoBuild(key){ const it = geoBuildGen(key); let r; while (!(r = it.next()).done); return r.value; }
 function* geoBuildGen(key){
-  const W = OW_COLS, H = OW_ROWS, N = W*H, m = G.ow.map, seed = (G.ow.seed>>>0)||1;
+  const W = OW_COLS, H = OW_ROWS, N = W*H, m = G.ow.map, seed = (G.ow.seed>>>0)||1, cubeG = owCube() && (G.ow.genVer||1) >= 19;   /* (RS-642, generator 19: a cube planet's places over its seams; older worlds keep the names they had, the travel log lists them by name) */
   const kindAt = new Int8Array(N), comp = new Int32Array(N).fill(-1), placeAt = new Int16Array(N).fill(-1);
   for (let x=0;x<W;x++){ if ((x & 15)===15) yield; for (let y=0;y<H;y++){
+    if (cubeG && cubeFace(x, y) < 0) continue;   /* (a cube planet's void is nobody's sea: it joined the seas by the seams into one, its name out in the void) */
     let t = m[x][y]; if (OW_SITE_TILES.includes(t)) t = o3Ground(x,y);
     kindAt[y*W+x] = t===OW_FOREST ? 1 : (t===OW_MOUNTAIN || t===OW_MOUNTAINPASS) ? 2 : t===OW_DESERT ? 3 : t===OW_SWAMP ? 4 : t===OW_TUNDRA ? 5 : t===OW_WATER ? 6 : t===OW_RIVER ? 7 : 0;
   } }
@@ -19220,16 +19321,18 @@ function* geoBuildGen(key){
   const regions = [], stack = [];
   for (let i=0;i<N;i++){ if ((i & 4095)===4095) yield;
     if (!kindAt[i] || comp[i]>=0) continue;
-    const k = kindAt[i], tiles = []; let sx = 0, sy = 0;
+    const k = kindAt[i], tiles = []; let sx = 0, sy = 0; const sd = [0, 0, 0];
     comp[i] = i; stack.push(i);
     while (stack.length){
       const j = stack.pop(), x = j%W, y = (j/W)|0; tiles.push(j); sx += x; sy += y;
+      if (cubeG){ const dd = cubeTileDir(x, y); sd[0] += dd[0]; sd[1] += dd[1]; sd[2] += dd[2]; }   /* (its middle on the sphere: over a seam, the grid's is out in the void) */
+      if (cubeG){ for (let d=0; d<4; d++){ const q = owOff(x, y, d===0 ? 1 : d===1 ? -1 : 0, d===2 ? 1 : d===3 ? -1 : 0); if (!q) continue; const jj = q[1]*W + q[0]; if (comp[jj]<0 && kindAt[jj]===k){ comp[jj] = i; stack.push(jj); } } continue; }   /* (one sea or forest over a seam, one name) */
       if (x>0 && comp[j-1]<0 && kindAt[j-1]===k){ comp[j-1] = i; stack.push(j-1); }
       if (x<W-1 && comp[j+1]<0 && kindAt[j+1]===k){ comp[j+1] = i; stack.push(j+1); }
       if (y>0 && comp[j-W]<0 && kindAt[j-W]===k){ comp[j-W] = i; stack.push(j-W); }
       if (y<H-1 && comp[j+W]<0 && kindAt[j+W]===k){ comp[j+W] = i; stack.push(j+W); }
     }
-    regions.push({ root:i, k, tiles, cx:sx/tiles.length, cy:sy/tiles.length });
+    const sl = Math.hypot(sd[0], sd[1], sd[2]) || 1; regions.push({ root:i, k, tiles, cx:sx/tiles.length, cy:sy/tiles.length, cd:cubeG ? [sd[0]/sl, sd[1]/sl, sd[2]/sl] : null });
   }
   // how deep inside its own region each tile lies, so names sit in the middle of the land they name
   const dist = new Float32Array(N);
@@ -19259,11 +19362,11 @@ function* geoBuildGen(key){
     const kind = kn==='water' ? (n >= GEO_MIN.sea ? 'sea' : n >= GEO_MIN.lake ? 'lake' : null) : (n >= GEO_MIN[kn] ? kn : null);
     if (!kind) continue;
     // the label goes on the deepest tile (the one nearest the middle breaks ties); a big sea gets a second one far from the first
-    let best = -1, bd = -1;
-    for (const j of rg.tiles){ const x = j%W, y = (j/W)|0, sc = dist[j]*100 - Math.hypot(x-rg.cx, y-rg.cy); if (sc > bd){ bd = sc; best = j; } }
+    let best = rg.tiles[0], bd = -Infinity; const ta0 = Math.PI/2/(OW_COLS >> 2);
+    for (const j of rg.tiles){ const x = j%W, y = (j/W)|0, cj = rg.cd && cubeTileDir(x, y), sc = dist[j]*100 - (cj ? Math.acos(Math.max(-1, Math.min(1, cj[0]*rg.cd[0] + cj[1]*rg.cd[1] + cj[2]*rg.cd[2])))/ta0 : Math.hypot(x-rg.cx, y-rg.cy)); if (sc > bd){ bd = sc; best = j; } }
     const labels = [[best%W, (best/W)|0]];
-    if (kind==='sea' && n > 1200){ let b2 = -1, s2 = -1;
-      for (const j of rg.tiles){ const x = j%W, y = (j/W)|0, far = Math.hypot(x-labels[0][0], y-labels[0][1]); if (far < 45) continue; const sc = dist[j]*100 + far*0.1; if (sc > s2){ s2 = sc; b2 = j; } }
+    if (kind==='sea' && n > 1200){ let b2 = -1, s2 = -1; const d0 = cubeG ? cubeTileDir(labels[0][0], labels[0][1]) : null, ta = Math.PI/2/(OW_COLS >> 2);   /* (RS-642: on a cube planet, how far on the sphere - over a seam it's near) */
+      for (const j of rg.tiles){ const x = j%W, y = (j/W)|0, dj = d0 && cubeTileDir(x, y), far = dj ? Math.acos(Math.max(-1, Math.min(1, dj[0]*d0[0] + dj[1]*d0[1] + dj[2]*d0[2])))/ta : Math.hypot(x-labels[0][0], y-labels[0][1]); if (far < 45) continue; const sc = dist[j]*100 + far*0.1; if (sc > s2){ s2 = sc; b2 = j; } }
       if (b2 >= 0) labels.push([b2%W, (b2/W)|0]); }
     const id = places.length;
     places.push({ id, kind, n, name:nameFor(kind, rg.root), lx:labels[0][0], ly:labels[0][1], labels, root:rg.root, tiles:rg.tiles });
@@ -19387,11 +19490,12 @@ function maskDecode(s, str){
 function pmSketch(){
   if (PM.sk && PM.skKey === PM.key && PM.sk.width === PM.cv.width) return PM.sk;
   const W = PM.cv.width, H = PM.cv.height, c = PM.sk = PM.sk || document.createElement('canvas'); c.width = W; c.height = H;
-  const src = PM.cv.getContext('2d').getImageData(0, 0, W, H), d = src.data;
+  const src = PM.cv.getContext('2d').getImageData(0, 0, W, H), d = src.data, cube = owCube();
   for (let py=0; py<H; py++) for (let px=0; px<W; px++){
     const o = (py*W+px)*4, l = (d[o]*0.3 + d[o+1]*0.59 + d[o+2]*0.11)/255;
     let s = 0.2 + l*0.9;
     if (s < 0.9 && ((px - py) % 6 + 6) % 6 === 0) s -= 0.05 + (0.9-s)*0.3;   // pencil hatching in the darker parts
+    else if (cube && s < 0.9 && (px + py) % 6 === 0) s -= 0.05 + (0.9-s)*0.3;   /* (RS-642: crossed on a cube planet, so it's the same on a face turned a quarter beside it) */
     d[o] = Math.max(0, Math.min(255, 248*s)); d[o+1] = Math.max(0, Math.min(255, 232*s)); d[o+2] = Math.max(0, Math.min(255, 196*s));
   }
   c.getContext('2d').putImageData(src, 0, 0); PM.skKey = PM.key;
@@ -19404,6 +19508,7 @@ function pmWalkMask(){
   const c = PM.walk = PM.walk || document.createElement('canvas'); c.width = OW_COLS+2; c.height = OW_ROWS+2;
   const x = c.getContext('2d'), id = x.createImageData(c.width, c.height);
   for (let y=0;y<OW_ROWS;y++) for (let i=0;i<OW_COLS;i++) if (s[y*OW_COLS+i]) id.data[((y+1)*c.width+i+1)*4+3] = 255;
+  if (owCube()){ const gs = pmGhostSrc(); for (let j=0;j<gs.length;j++) if (gs[j] >= 0 && s[gs[j]]) id.data[j*4+3] = 255; }   /* (RS-642: and past a seam, as the land across it) */
   x.putImageData(id, 0, 0);
   const S = 4, hi = PM.walkHi = PM.walkHi || document.createElement('canvas'); hi.width = c.width*S; hi.height = c.height*S;
   const hx = hi.getContext('2d'); hx.clearRect(0, 0, hi.width, hi.height); hx.imageSmoothingEnabled = true; hx.imageSmoothingQuality = 'high';
@@ -19838,14 +19943,22 @@ function pmProvBorders(x, P, col, lw, dash){
     if (ty+1 < OW_ROWS){ const b = own[(ty+1)*W + tx]; if (b>=0 && b!==a){ x.moveTo(tx*P, (ty+1)*P); x.lineTo((tx+1)*P, (ty+1)*P); } } }
   x.stroke(); x.restore();
 }
+/* (RS-642) on a cube planet's globe, writing whose middle is at (px, py) on the chart, hw by hh about it, moved just enough to stay on its
+   own face where the edge beside it is a seam the stored grid doesn't join - its chart stops there, and it would be cut in two */
+const CUBE_NETJOIN = [[0, 1, 0, 0], [1, 1, 1, 1], [1, 1, 0, 0], [1, 0, 0, 0], [0, 0, 0, 1], [0, 0, 1, 0]];   /* (each face's left, right, top and bottom: joined in the grid?) */
+function pmFaceKeep(px, py, hw, hh, zx, zy){ if (!GLOBE.decal || !owCube()) return [px, py];
+  const N = cubeN(), ax = zx + px/cellPx, ay = zy + py/cellPx, f = cubeFace(Math.floor(ax), Math.floor(ay)); if (f < 0) return [px, py];
+  const o = CUBE_O[f], J = CUBE_NETJOIN[f], r = GLOBE.upr || 0, c = Math.abs(Math.cos(r)), sn = Math.abs(Math.sin(r)), ex = (c*hw + sn*hh)/cellPx, ey = (sn*hw + c*hh)/cellPx, x0 = o[0]*N, y0 = o[1]*N;
+  let x = ax, y = ay; if (2*ex < N){ if (!J[0]) x = Math.max(x, x0 + ex); if (!J[1]) x = Math.min(x, x0 + N - ex); } if (2*ey < N){ if (!J[2]) y = Math.max(y, y0 + ey); if (!J[3]) y = Math.min(y, y0 + N - ey); }
+  return [(x - zx)*cellPx, (y - zy)*cellPx]; }
 function pmPlaceNames(geo, lod, zx, zy, vc, vr){
   ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   const ls = 'letterSpacing' in ctx;
   if (lod===0) for (const pv of owProvinces().list){ if (!pv.n || pv.n < 120 || pv.cx==null || !owSeen(pv.cx, pv.cy)) continue;   /* (RS-623) the provinces' names, zoomed out */
     const px = (pv.cx-zx)*cellPx + cellPx/2, py = (pv.cy-zy)*cellPx + cellPx/2 + 18*dpr, fs = Math.round(11*dpr);
     ctx.font = `700 ${fs}px Cinzel, Georgia, serif`; if (ls) ctx.letterSpacing = Math.round(fs*0.25)+'px';
-    const txt = pv.name.replace(/^the /, '').toUpperCase(); ctx.lineWidth = 3*dpr; ctx.strokeStyle = 'rgba(240,228,196,0.8)'; ctx.strokeText(txt, px, py);
-    ctx.fillStyle = 'rgba(120,36,30,0.85)'; ctx.fillText(txt, px, py); }
+    const txt = pv.name.replace(/^the /, '').toUpperCase(), [qx, qy] = pmFaceKeep(px, py, ctx.measureText(txt).width/2 + 3*dpr, fs*0.7, zx, zy); ctx.lineWidth = 3*dpr; ctx.strokeStyle = 'rgba(240,228,196,0.8)'; ctx.strokeText(txt, qx, qy);
+    ctx.fillStyle = 'rgba(120,36,30,0.85)'; ctx.fillText(txt, qx, qy); }
   for (const pl of geo.places){
     if (lod===0 && (pl.kind==='river' || (pl.n < 60 && pl.kind!=='sea'))) continue;   // far out, only the big regions
     for (const [lx, ly] of pl.labels){
@@ -19854,9 +19967,9 @@ function pmPlaceNames(geo, lod, zx, zy, vc, vr){
       const fs = Math.round(clamp(Math.sqrt(pl.n)*cellPx*0.16, (pl.kind==='river' ? 10 : 12)*dpr, (big ? 30 : 22)*dpr));
       ctx.font = `${big ? 700 : 600} italic ${fs}px Cinzel, Georgia, serif`;
       if (ls) ctx.letterSpacing = big ? Math.round(fs*0.2)+'px' : '0px';
-      const txt = big ? pl.name.toUpperCase() : pl.name;
-      ctx.lineWidth = 4*dpr; ctx.strokeStyle = 'rgba(240,228,196,0.75)'; ctx.strokeText(txt, px, py);
-      ctx.fillStyle = PLACE_INK[pl.kind]; ctx.globalAlpha = 0.82; ctx.fillText(txt, px, py); ctx.globalAlpha = 1;
+      const txt = big ? pl.name.toUpperCase() : pl.name, [qx, qy] = pmFaceKeep(px, py, ctx.measureText(txt).width/2 + 4*dpr, fs*0.7, zx, zy);
+      ctx.lineWidth = 4*dpr; ctx.strokeStyle = 'rgba(240,228,196,0.75)'; ctx.strokeText(txt, qx, qy);
+      ctx.fillStyle = PLACE_INK[pl.kind]; ctx.globalAlpha = 0.82; ctx.fillText(txt, qx, qy); ctx.globalAlpha = 1;
     }
   }
   if (ls) ctx.letterSpacing = '0px';
@@ -45313,7 +45426,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-641';
+const GAME_VERSION = 'rs-642';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

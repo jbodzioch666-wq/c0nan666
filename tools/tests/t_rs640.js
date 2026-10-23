@@ -17,10 +17,10 @@ module.exports = async page=>{
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
   A(r.medium.target===50 && r.medium.enc <= 50, 'the medium world keeps its 50 roamers');
-  A(r.p18.ver===18 && r.p18.target > 100 && r.p18.target <= 150 && r.p18.perEnc > 200 && r.p18.perEnc < 280, 'a planet has as many roamers to its land as the medium world');
+  A(r.p18.ver>=18 && r.p18.target > 100 && r.p18.target <= 150 && r.p18.perEnc > 200 && r.p18.perEnc < 280, 'a planet has as many roamers to its land as the medium world');
   A(r.p18.enc > 80, 'and they are out on its land');
   A(r.p18.perSite >= 160, 'a planet\'s sites spaced like the other sizes\'');
   A(r.p17.nd > r.p18.nd, 'a generator 17 planet keeps its site counts');
-  A(r.load.same && r.load.ver===18 && r.load.slots.join()===r.load.was.join() && r.load.target===r.p18.target, 'loaded back, the same world and its counts');
+  A(r.load.same && r.load.ver>=18 && r.load.slots.join()===r.load.was.join() && r.load.target===r.p18.target, 'loaded back, the same world and its counts');
   A(!errs.length, 'no errors: ' + errs.join(' | '));
 };

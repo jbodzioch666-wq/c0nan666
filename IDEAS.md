@@ -310,6 +310,9 @@ _World generation and overworld content_
 - [x] Map icons and names drawn upright on the polar faces (RS-639, `globeUprightOn`)
 - [x] Distances, town counts and travel times retuned for a planet with `tools/sim` (RS-640, `tools/sim/s_world.js`: the walks to a town and between towns were already the medium world's; the roamers now scale with the land and generator 18 spaces the sites like the other sizes)
 - [ ] Large and Extra Large worlds keep 50 roamers too, so theirs are thinner than Medium's (one to some 470 and 800 tiles of land): scale them as RS-640 did the planet's?
+- [x] The globe's chart without seams (RS-642: a chart for each face that shows, the base layers copying the land across the unjoined seams, one place over a seam for generator 19)
+- [ ] The chart's tree and peak drawings are laid in each face's own grid, so on a face turned on the screen (the poles, or the globe rolled over) they lie on their side, and turn at a seam between two faces
+- [ ] A faint dotted line where two faces' pencil hatching meets out of step in open sea; a label straddling a joined seam bends a little there (each face sets its writing upright for itself)
 
 ### World map
 _The parchment map, after the world it draws_
