@@ -8,7 +8,7 @@ module.exports = async page=>{
     return { on:owGlobeOn(), ms:+(performance.now() - t0).toFixed(0), planet:owIsPlanet(), size:OW_COLS + 'x' + OW_ROWS, at:G.owPos }; }, !!process.env.ZSEEN);
   console.log(JSON.stringify(r));
   for (let n=0;n<4;n++){ await page.waitForTimeout(300); await page.screenshot({ path: SHOTS + '/zglobe-' + n + '.png' });
-    await page.evaluate(n=>{ if (n===2) globeFace(0, OW_ROWS/2 - 20); else { GLOBE.yaw += 1.4; GLOBE.pitch = [0.5, -0.6, 0.1, 0][n]; } GLOBE.vyaw = GLOBE.vpitch = 0; }, n); }
-  const f = await page.evaluate(async ()=>{ const fr = []; let l = performance.now(); for (let i=0;i<60;i++){ GLOBE.yaw += 0.02; await new Promise(r=>requestAnimationFrame(r)); const t = performance.now(); fr.push(t - l); l = t; } fr.sort((a, b)=>a - b); return { med:+fr[30].toFixed(1), worst:+fr[59].toFixed(1) }; });
+    await page.evaluate(n=>{ if (n===2) globeFace(0, OW_ROWS/2 - 20); else globeTurn(1.4, [0.5, -0.6, 0.1, 0][n]); GLOBE.vyaw = GLOBE.vpitch = 0; }, n); }
+  const f = await page.evaluate(async ()=>{ const fr = []; let l = performance.now(); for (let i=0;i<60;i++){ globeTurn(0.02, 0); await new Promise(r=>requestAnimationFrame(r)); const t = performance.now(); fr.push(t - l); l = t; } fr.sort((a, b)=>a - b); return { med:+fr[30].toFixed(1), worst:+fr[59].toFixed(1) }; });
   console.log('frames', JSON.stringify(f)); if (errs.length) console.log('ERRORS', errs.join(' | '));
 };

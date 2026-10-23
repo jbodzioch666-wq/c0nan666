@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-641 - A globe that turns any way
+
+- **Spin the globe in every direction.** The Planet's world map used to stop tilting a little short of each pole. Now a drag turns it any way, as far as you like: over the north or south pole, down the far side, upside down and all the way round. Each drag turns the globe about the screen, so the land always moves the way you drag it, even upside down.
+- **Names stay readable whichever way up it is.** Up close, place names, site badges and level tags turn to stay upright on the screen, however the globe is rolled. The chart is redrawn as soon as it's turned on the spot.
+- **Searches turn it back north up.** Opening the map, searching for a place, or showing something on the map swings the globe round to it with north at the top again.
+- **A flick spins it freely.** A flick now carries on the same in every direction. Before, an up or down flick stopped sooner than a sideways one.
+
 ## RS-640 - A planet spaced like the other worlds
 
 - **More monsters roam a Planet.** A Planet had the same 50 roaming groups as a Medium world on almost three times the land, so its wilds felt empty: about one group to 650 tiles of land, against Medium's one to 237. The number now grows with the land, up to 150. A Planet gets about 137, as thick on the ground as Medium's, and wilderness and respawn top-ups follow the same count. This applies to existing Planet worlds too.

@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs641 | the globe turns any way, as far as you like: dragged down it rolls over the north pole and on down the far side, upside down; a drag across then still moves the land the way you drag; a flick carries on; swung round to a place it comes north up; close in and rolled over, the chart redrawn with its writing upright; a generator 14 planet rolls over its pole too |
 | rs640 | a Planet's spacing set to the other sizes': roamers in proportion to its land (one to some 237 tiles, up to 150), generator 18 trimming its dungeons, graveyards and mines to a site per 160+ tiles of land, the same after a save and load; a generator 17 planet keeps its sites and the medium world its 50 roamers |
 | rs639 | the names, badges and level tags on the globe's chart stand upright on the polar faces: each turned back about its own place by the angle the face's grid lies at on the screen |
 | rs638 | the game's own searches go over a Planet's face edges: a route from the north face onto L found by both planners, its steps landing on the stop, walked to the end; the minimap shows the land past the edge |

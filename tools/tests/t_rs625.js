@@ -29,12 +29,12 @@ module.exports = async page=>{
     const wheel = dy=>canvas.dispatchEvent(new WheelEvent('wheel', { deltaY:dy, bubbles:true, cancelable:true }));
     wheel(100); out.globeOn = owGlobeOn(); for (let i=0;i<30;i++) await new Promise(r=>requestAnimationFrame(r));
     out.facing = (()=>{ const f = globeFacing(); return Math.abs(f.x - G.owPos.x) <= 2 && Math.abs(f.y - G.owPos.y) <= 2; })();   /* (RS-628: the map is the globe, turned to you) */
-    { const y0 = GLOBE.yaw, rc = canvas.getBoundingClientRect(), cx = rc.left + rc.width/2, cy = rc.top + rc.height/2;
+    { const q0 = globeQ().clone(), rc = canvas.getBoundingClientRect(), cx = rc.left + rc.width/2, cy = rc.top + rc.height/2;
       canvas.dispatchEvent(new PointerEvent('pointerdown', { clientX:cx, clientY:cy, isPrimary:true, pointerType:'mouse', button:0, bubbles:true }));
       window.dispatchEvent(new PointerEvent('pointermove', { clientX:cx + 120, clientY:cy, isPrimary:true, pointerType:'mouse', bubbles:true }));
-      window.dispatchEvent(new PointerEvent('pointerup', { clientX:cx + 120, clientY:cy, isPrimary:true, pointerType:'mouse', button:0, bubbles:true })); out.turned = Math.abs(GLOBE.yaw - y0) > 0.2; }
+      window.dispatchEvent(new PointerEvent('pointerup', { clientX:cx + 120, clientY:cy, isPrimary:true, pointerType:'mouse', button:0, bubbles:true })); out.turned = globeQ().angleTo(q0) > 0.2; }
     { const p = [Math.floor(OW_COLS*3/8), 30];   /* (a tile on the north face) */ globeFace(p[0], p[1]); const f = globeFacing(); out.faceRound = Math.abs(f.x - p[0]) <= 1 && Math.abs(f.y - p[1]) <= 1; globeFace(G.owPos.x, G.owPos.y); }
-    const fr = []; let l = performance.now(); for (let i=0;i<60;i++){ GLOBE.yaw += 0.01; await new Promise(r=>requestAnimationFrame(r)); const t = performance.now(); fr.push(t - l); l = t; } fr.sort((a, b)=>a - b); out.globeMs = +fr[30].toFixed(1);
+    const fr = []; let l = performance.now(); for (let i=0;i<60;i++){ globeTurn(0.01, 0); await new Promise(r=>requestAnimationFrame(r)); const t = performance.now(); fr.push(t - l); l = t; } fr.sort((a, b)=>a - b); out.globeMs = +fr[30].toFixed(1);
     return out; });
   await page.screenshot({ path: SHOTS + '/rs625-globe.png' });
   console.log(JSON.stringify(r));

@@ -18985,14 +18985,21 @@ function pmMapScreenUi(cw, ch, globe){
    shadowed one, the seas catching the light, a thin blue air at the rim. Come closer and the chart itself, with everything on it - towns,
    sites, names, pins, your route, the fog - is drawn for the land facing you and laid over the sphere there, so it's the map at every zoom
    the chart had, down to its nearest. A click, a tap or a hover is traced through the sphere to the chart's own handlers (globeEv) */
-const GLOBE = { r:null, scene:null, cam:null, pivot:null, mesh:null, texKey:'', yaw:0, pitch:0, vyaw:0, vpitch:0, dist:4.6, stars:null, pins:null, pa:0 };
+const GLOBE = { r:null, scene:null, cam:null, pivot:null, mesh:null, texKey:'', q:null, vyaw:0, vpitch:0, dist:4.6, stars:null, pins:null, pa:0 };
 function owGlobeOn(){ return !!(owIsPlanet() && owMapOpen() && typeof THREE!=='undefined' && GLOBE.ok!==false); }
 function globeLocal(tx, ty){ if (owCube()) return cubeTileDir(clamp(Math.round(tx), 0, OW_COLS - 1), clamp(Math.round(ty), 0, OW_ROWS - 1)) || [0, 0, 1]; const u = (tx + 0.5)/OW_COLS, v = (ty + 0.5)/OW_ROWS; return [-Math.cos(u*Math.PI*2)*Math.sin(v*Math.PI), Math.cos(v*Math.PI), Math.sin(u*Math.PI*2)*Math.sin(v*Math.PI)]; }
-function globeFaceAngles(tx, ty){ const p = globeLocal(tx, ty); return { yaw:-Math.atan2(p[0], p[2]), pitch:clamp(Math.asin(clamp(p[1], -1, 1)), -1.25, 1.25) }; }
-function globeFace(tx, ty){ const a = globeFaceAngles(tx, ty); GLOBE.yaw = a.yaw; GLOBE.pitch = a.pitch; GLOBE.vyaw = GLOBE.vpitch = 0; GLOBE.aim = null; }
+/* (RS-641) how the globe is turned: one rotation (GLOBE.q, its own sphere to the view), turned by the screen's own axes - a drag across
+   turns it about the screen's up, a drag up or down about its across - so it rolls whichever way you drag, as far as you like: over the
+   poles, upside down and round again. vyaw and vpitch are those two turns' speeds after a flick */
+function globeQ(){ if (!GLOBE.q) GLOBE.q = new THREE.Quaternion(); return GLOBE.q; }
+function globeTurn(ax, ay){ const T = THREE, q = globeQ(); if (ax) q.premultiply(new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), ax)); if (ay) q.premultiply(new T.Quaternion().setFromAxisAngle(new T.Vector3(1, 0, 0), ay)); q.normalize(); }
+/* the turn that faces a tile, north up (what the map opens to, and what the search or "show on map" swings round to) */
+function globeFaceQ(tx, ty){ const T = THREE, p = globeLocal(tx, ty), yaw = -Math.atan2(p[0], p[2]), pitch = Math.asin(clamp(p[1], -1, 1));
+  return new T.Quaternion().setFromAxisAngle(new T.Vector3(1, 0, 0), pitch).multiply(new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), yaw)); }
+function globeFace(tx, ty){ globeQ().copy(globeFaceQ(tx, ty)); GLOBE.vyaw = GLOBE.vpitch = 0; GLOBE.aim = null; }
 /* a point of the globe's own (unturned) sphere to a tile, in fractions of a tile; and the facing tile */
 function globeTileOf(v){ if (owCube()){ const t = cubeDirTile([v.x, v.y, v.z]); return { x:t.x - 0.5, y:t.y - 0.5 }; } const th = Math.acos(clamp(v.y, -1, 1)), ph = Math.atan2(v.z, -v.x), u = ((ph/(Math.PI*2)) % 1 + 1) % 1; return { x:u*OW_COLS - 0.5, y:th/Math.PI*OW_ROWS - 0.5 }; }
-function globeUnturn(v){ const T = THREE; v.applyAxisAngle(new T.Vector3(1, 0, 0), -GLOBE.pitch); v.applyAxisAngle(new T.Vector3(0, 1, 0), -GLOBE.yaw); return v; }
+function globeUnturn(v){ return v.applyQuaternion(globeQ().clone().conjugate()); }
 function globeFacingF(){ return globeTileOf(globeUnturn(new THREE.Vector3(0, 0, 1))); }
 function globeFacing(){ const f = globeFacingF(); return { x:clamp(Math.round(f.x), 0, OW_COLS - 1), y:clamp(Math.round(f.y), 0, OW_ROWS - 1) }; }
 /* the camera's distance for a given chart zoom (at the equator): the sphere's surface then shows tiles at the chart's size */
@@ -19002,7 +19009,7 @@ function globeZsDist(zs){ const cell = Math.max(canvas.width/OW_COLS, canvas.hei
 function globeMinDist(){ return globeZsDist(OW_ZOOM_MAX); }
 /* where a tile sits on the screen, in the canvas's pixels (null round the back) */
 function globeTileScreen(tx, ty){ if (!GLOBE.cam) return null; const T = THREE, p = globeLocal(tx, ty), v = new T.Vector3(p[0], p[1], p[2]);
-  v.applyAxisAngle(new T.Vector3(0, 1, 0), GLOBE.yaw); v.applyAxisAngle(new T.Vector3(1, 0, 0), GLOBE.pitch); if (v.z < 0.05) return null;
+  v.applyQuaternion(globeQ()); if (v.z < 0.05) return null;
   v.project(GLOBE.cam); return { x:(v.x + 1)/2*canvas.width, y:(1 - v.y)/2*canvas.height }; }
 /* a mouse or finger on the globe, as the chart's handlers would have it: traced to the sphere, then to where that spot lies on the chart
    laid over it - so pins, routes, towns, sites and tooltips all work as they did */
@@ -19115,23 +19122,23 @@ function globeRender(){
   /* the map just opened, or something else moved it (the search, a quest's "show on map"): turn to that place and zoom, the first at once */
   const zc = G.owZoomCenter;
   if (!GLOBE.open){ GLOBE.open = true; const c = zc || G.owPos; globeFace(c.x, c.y); GLOBE.dist = GLOBE.distGoal = clamp(globeZsDist(owCube() ? Math.max(2.2, owZoomScale()) : owZoomScale()), globeMinDist(), 16);   /* (RS-630: a cube-sphere's grid is bigger, so the same zoom is farther out: it opens a little nearer) */ GLOBE.ctr = zc; GLOBE.zsSet = owZoomScale(); }
-  else { if (zc && zc!==GLOBE.ctr){ GLOBE.aim = globeFaceAngles(zc.x, zc.y); GLOBE.ctr = zc; }
+  else { if (zc && zc!==GLOBE.ctr){ GLOBE.aim = globeFaceQ(zc.x, zc.y); GLOBE.ctr = zc; }
     if (G.owZoomScale!==GLOBE.zsSet && G.owZoomScale!=null){ GLOBE.distGoal = clamp(globeZsDist(G.owZoomScale), globeMinDist(), 16); GLOBE.zsSet = G.owZoomScale; } }
-  if (GLOBE.aim && !owZoomDragging){ const a = GLOBE.aim, k = 1 - Math.exp(-dt*7), dy = ((a.yaw - GLOBE.yaw + Math.PI*3) % (Math.PI*2)) - Math.PI; GLOBE.yaw += dy*k; GLOBE.pitch += (a.pitch - GLOBE.pitch)*k;
-    if (Math.abs(dy) < 1e-4 && Math.abs(a.pitch - GLOBE.pitch) < 1e-4) GLOBE.aim = null; }
+  if (GLOBE.aim && !owZoomDragging){ const q = globeQ(); q.slerp(GLOBE.aim, 1 - Math.exp(-dt*7)); if (q.angleTo(GLOBE.aim) < 1e-4){ q.copy(GLOBE.aim); GLOBE.aim = null; } }
   if (GLOBE.distGoal) GLOBE.dist += (GLOBE.distGoal - GLOBE.dist)*(1 - Math.exp(-dt*12));   /* (the wheel glides) */
-  if (!owZoomDragging && !GLOBE.aim){ GLOBE.yaw += GLOBE.vyaw; GLOBE.pitch = clamp(GLOBE.pitch + GLOBE.vpitch, -1.25, 1.25); GLOBE.vyaw *= 0.93; GLOBE.vpitch *= 0.9; }   /* (it keeps turning a little after a flick) */
-  GLOBE.pivot.rotation.x = GLOBE.pitch; GLOBE.mesh.rotation.y = GLOBE.yaw; GLOBE.cam.position.set(0, 0, GLOBE.dist); GLOBE.cam.lookAt(0, 0, 0); GLOBE.cam.updateMatrixWorld();
+  if (!owZoomDragging && !GLOBE.aim && (GLOBE.vyaw || GLOBE.vpitch)){ globeTurn(GLOBE.vyaw, GLOBE.vpitch); GLOBE.vyaw *= 0.93; GLOBE.vpitch *= 0.93; if (Math.abs(GLOBE.vyaw) + Math.abs(GLOBE.vpitch) < 1e-5) GLOBE.vyaw = GLOBE.vpitch = 0; }   /* (it keeps turning a little after a flick) */
+  GLOBE.mesh.quaternion.copy(globeQ()); GLOBE.cam.position.set(0, 0, GLOBE.dist); GLOBE.cam.lookAt(0, 0, 0); GLOBE.cam.updateMatrixWorld();
   /* the chart for the land facing you: drawn at the size the sphere shows it, squeezed east to west as the globe squeezes it away from the equator */
   const f = globeFacingF(), cbe = owCube(), lat = (0.5 - (f.y + 0.5)/H)*Math.PI, cosL = cbe ? 1 : Math.max(0.25, Math.cos(lat)), pxU = (ch/2)/((GLOBE.dist - 1)*Math.tan(15*Math.PI/180)), cellNS = pxU*globeTileAng();
-  let ca = 1, sa = 0; GLOBE.an = 0; if (cbe){ const p0 = globeTileScreen(Math.round(f.x), Math.round(f.y)), p1 = globeTileScreen(Math.round(f.x) + 1, Math.round(f.y)); if (p0 && p1 && cubeFace(Math.round(f.x) + 1, Math.round(f.y))===cubeFace(Math.round(f.x), Math.round(f.y))){ const an = Math.atan2(p1.y - p0.y, p1.x - p0.x); ca = Math.abs(Math.cos(an)); sa = Math.abs(Math.sin(an)); GLOBE.an = an; } }   /* (the face's grid turned on the screen: the chart drawn wide enough to cover it) */
+  let ca = 1, sa = 0; GLOBE.an = 0; { const fx = Math.round(f.x), fy = Math.round(f.y), fx1 = cbe ? fx + 1 : (fx + 1) % W, p0 = globeTileScreen(fx, fy), p1 = globeTileScreen(fx1, fy); if (p0 && p1 && (!cbe || cubeFace(fx1, fy)===cubeFace(fx, fy))){   /* (RS-641: on any planet, as the globe rolls any way round) */ const an = Math.atan2(p1.y - p0.y, p1.x - p0.x); ca = Math.abs(Math.cos(an)); sa = Math.abs(Math.sin(an)); GLOBE.an = an; } }   /* (the face's grid turned on the screen: the chart drawn wide enough to cover it) */
   const M = 1.32, BW = cw/cosL, BH = ch, CW = (cw*ca + ch*sa)/cosL*M, CH = (cw*sa + ch*ca)*M, zs = cellNS/Math.max(BW/W, BH/H), pa = cbe ? smoothstep(1.45, 1.85, zs) : smoothstep(0.85, 1.12, zs); GLOBE.pa = pa;   /* (M: drawn a third past the screen's edges, where the sphere curves away) */
   /* the chart is redrawn only when the view has moved a good way, when the mouse or a click may have changed it, or four times a second for
      its clouds and smoke - it's fixed to its own patch of the sphere, so between times the last one turns with the globe, still in place */
-  const lr = GLOBE.lastRef, moved = !lr || lr.pa===0 || Math.abs(f.x - lr.x)*cellNS*cosL > cw*(M - 1)*0.35 || Math.abs(f.y - lr.y)*cellNS > ch*(M - 1)*0.35 || Math.abs(Math.log((GLOBE.dist - 1)/(lr.d - 1))) > 0.06;
+  const lr = GLOBE.lastRef, moved = !lr || lr.pa===0 || Math.abs(f.x - lr.x)*cellNS*cosL > cw*(M - 1)*0.35 || Math.abs(f.y - lr.y)*cellNS > ch*(M - 1)*0.35 || Math.abs(Math.log((GLOBE.dist - 1)/(lr.d - 1))) > 0.06
+    || Math.abs(((GLOBE.an - (lr.an||0)) % (Math.PI*2) + Math.PI*3) % (Math.PI*2) - Math.PI) > 0.08;   /* (RS-641: or turned on the spot, so its writing is set upright again) */
   const due = pa > 0 && (moved || (GLOBE.dirty && now - lr.t > 60) || now - lr.t > 250);
   if (pa > 0 && !due){ /* (the last chart stands) */ }
-  else if (pa > 0){ GLOBE.lastRef = { x:f.x, y:f.y, d:GLOBE.dist, t:now, pa }; GLOBE.dirty = false;
+  else if (pa > 0){ GLOBE.lastRef = { x:f.x, y:f.y, d:GLOBE.dist, t:now, pa, an:GLOBE.an }; GLOBE.dirty = false;
     const sc = { x:clamp(f.x, 0, W - 1), y:clamp(f.y, 0, H - 1) }; G.owZoomCenter = GLOBE.ctr = sc; G.owZoomScale = GLOBE.zsSet = Math.max(0.3, zs); G.owZoomGoal = null;
     GLOBE.decal = { w:CW, h:CH, bw:BW, bh:BH }; ctx.save(); ctx.setTransform(cw/CW, 0, 0, ch/CH, 0, 0); const unturn = globeUprightOn(-(GLOBE.an||0));
     try{ renderOverworldMapZoomed(); } finally { unturn(); ctx.restore(); GLOBE.decal = null; }
@@ -45306,7 +45313,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-640';
+const GAME_VERSION = 'rs-641';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -48029,7 +48036,7 @@ window.addEventListener('pointermove', (e)=>{
   const dx = e.clientX - owZoomDragLastX, dy = e.clientY - owZoomDragLastY;
   owZoomDragMoved += Math.abs(dx) + Math.abs(dy);
   owZoomDragLastX = e.clientX; owZoomDragLastY = e.clientY;
-  if (owGlobeOn()){ GLOBE.aim = null; const k = 0.0042*(GLOBE.dist - 1)/4.6; GLOBE.vyaw = dx*k; GLOBE.vpitch = dy*k; GLOBE.yaw += dx*k; GLOBE.pitch = clamp(GLOBE.pitch + dy*k, -1.25, 1.25); renderGame(); return; }   /* (RS-625: turning the globe) */
+  if (owGlobeOn()){ GLOBE.aim = null; const k = 0.0042*(GLOBE.dist - 1)/4.6; GLOBE.vyaw = dx*k; GLOBE.vpitch = dy*k; globeTurn(dx*k, dy*k); renderGame(); return; }   /* (RS-625: turning the globe; RS-641: any way, over the poles) */
   const rect = canvas.getBoundingClientRect();
   const pxScale = canvas.width / rect.width; // CSS pixels -> canvas-internal pixels, same ratio dpr scaling already uses elsewhere
   const center = owZoomCenter();
