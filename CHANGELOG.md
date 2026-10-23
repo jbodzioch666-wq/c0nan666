@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-650 - The bar names the land you see
+
+- **Haunted forests, jungles and the other rare lands are named in the top bar.** These lands are painted over the ordinary ground: haunted forests, jungles, volcanic land, snowy highlands and crystal wastes. The bar only read the ground underneath, so the dark of a haunted wood said "grassland" and a jungle said "forest". It now says "haunted forest", "jungle", "volcanic land", "snowy highlands" or "crystal wasteland" while you're in one. Everywhere else it says what it did before.
+
 ## RS-649 - The towers are back
 
 - **Landmarks stand where their names are.** On a Planet, a tower, a great tree or another landmark you walked up to from far off could be missing: its name hung over empty grass and nothing stood under it. The landmarks' 3D positions are only refreshed now and then to save time each frame, and one that first came into view after that refresh was drawn somewhere else entirely, usually far from anywhere. Any landmark that moves is now put right at once. Most landmarks on a Planet start hidden past the horizon, so this happened often there.
