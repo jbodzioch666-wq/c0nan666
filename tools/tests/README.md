@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs643 | the 3D land's ground in its own colours on every face of a Planet: framed on each face, the ground at every frame tile is its stored tile's (o3Ground read it through the frame a second time); stood in a tundra and a desert off the front face, the land laid in their colours; the map's places the same whichever face you're on; a medium world as it was |
 | rs642 | a cube Planet's globe chart without seams: every face that shows has its own chart (every point of the globe on the screen under its own face's), the tiles past a seam the grid doesn't join copy the land across (no inked coast there, its fog the land's), no name out in the void, a line across the void lifted, writing kept on its face, a click across the seam read on that face's chart, turning smooth; generator 19 makes a forest or a desert over a seam one place, generator 18 keeps its places; a generator 14 planet keeps its one chart |
 | rs641 | the globe turns any way, as far as you like: dragged down it rolls over the north pole and on down the far side, upside down; a drag across then still moves the land the way you drag; a flick carries on; swung round to a place it comes north up; close in and rolled over, the chart redrawn with its writing upright; a generator 14 planet rolls over its pole too |
 | rs640 | a Planet's spacing set to the other sizes': roamers in proportion to its land (one to some 237 tiles, up to 150), generator 18 trimming its dungeons, graveyards and mines to a site per 160+ tiles of land, the same after a save and load; a generator 17 planet keeps its sites and the medium world its 50 roamers |
@@ -571,3 +572,4 @@ Screenshots go to `tools/tests/shots/`.
 | zmove2 | where a step fails on a Planet: each stage of a move by hand |
 | zmove3 | a click on the 3D ground walks you there, on a Planet, on three faces |
 | zseam | a cube Planet's globe looking straight at its face edges (`ZSEAM=tl,fr,bl,tb,dr,c`, `ZZOOM=0,2.2,5`; `ZCHART=1` saves the chart laid over it, `ZCLIP=1` the middle at full size): shots/zseam-<edge>-<zoom>.png and where the seam lies on the screen |
+| zbiome | the land's colours in each view: stood in the middle of a desert, a tundra, a grassland and a forest (`ZTIER`, `ZKINDS=desert,tundra`), the 3D land with its minimap (shots/zbiome-<kind>.png), the globe's chart close in (zbiome-<kind>-map.png) and the globe right out (zbiome-globe.png) |

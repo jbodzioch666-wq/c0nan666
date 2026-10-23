@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-643 - Biome colours back on a Planet
+
+- **The ground is the right colour on every face.** On a Planet, deserts and tundra showed as green grass in the 3D land, and grassland as sand, on five of the six faces of the world. Only the front face was right. The ground's colour was being looked up from the wrong tile, so it came from somewhere else on that face. Deserts are sandy and the snowfields white again, matching the minimap. This was broken since RS-632.
+- **Place names steadier.** The same mistake meant the map's regions around towns and other sites depended on which face you were standing on. They're now the same wherever you are.
+
 ## RS-642 - A seamless map on a Planet
 
 - **The chart covers the whole globe.** Close in, a Planet's chart used to cover one patch of the world. Past some of the cube's seams it just stopped, so you'd see parchment on one side and the plain coloured globe on the other, with the change running straight down the seam. Now every face of the planet in view gets its own chart, so the whole globe is parchment and you can't tell where the seams are.
