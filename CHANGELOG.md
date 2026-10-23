@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-644 - Bridges back over their rivers
+
+- **Bridges are where they belong.** On a Planet, a bridge on any face but the front one was built in the wrong place, sometimes out in open sea. It now stands over its river or crossing in the 3D land.
+- **Towns look like themselves.** On those same faces, towns were built as human villages of the default size whatever their people. A halfling town has its turf houses again and a city is city-sized. Each town and site also keeps its look when you cross a seam.
+- **Ferry piers run out over the water**, not onto the land.
+- **Names line up over the seams.** On the globe's chart, a name lying across a seam came out in two halves at different angles. Each name now turns upright by the angle of the land where it sits, so both halves meet.
+- **No line down the fog.** The mist over unexplored land on a Planet's globe is now an even wash. Its drifting pattern and the cloud shadows didn't meet across the seams. The pencil hatching over the sea is lighter too: it read as squared paper on a phone.
+
 ## RS-643 - Biome colours back on a Planet
 
 - **The ground is the right colour on every face.** On a Planet, deserts and tundra showed as green grass in the 3D land, and grassland as sand, on five of the six faces of the world. Only the front face was right. The ground's colour was being looked up from the wrong tile, so it came from somewhere else on that face. Deserts are sandy and the snowfields white again, matching the minimap. This was broken since RS-632.
