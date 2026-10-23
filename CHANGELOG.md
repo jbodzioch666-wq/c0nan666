@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-649 - The towers are back
+
+- **Landmarks stand where their names are.** On a Planet, a tower, a great tree or another landmark you walked up to from far off could be missing: its name hung over empty grass and nothing stood under it. The landmarks' 3D positions are only refreshed now and then to save time each frame, and one that first came into view after that refresh was drawn somewhere else entirely, usually far from anywhere. Any landmark that moves is now put right at once. Most landmarks on a Planet start hidden past the horizon, so this happened often there.
+- **They can be clicked again too.** The click box had stayed in the wrong place along with the model, so a click on the landmark used to miss it.
+
 ## RS-648 - A Planet's true curve
 
 - **The land now curves exactly as much as the globe.** Until now a Planet's land bent 2.5 times as fast as a world its size really would, to make the curve easy to see. It now matches the globe on the world map 1:1. The bend is gentler: the horizon is further off, you see more land around you, and landmarks rise over the horizon from further away (a tower from about 46 steps, a volcano from about 34).

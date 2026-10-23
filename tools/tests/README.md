@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs649 | a landmark first seen from far off (hidden past a Planet's horizon) is drawn where it stands once you come near, its click box with it, and a click on it reaches it |
 | rs647 | on a Planet everything goes where the curve puts the land: the sprites bend with it, a town's name sits where the curve has drawn the town, a click on a dungeon a little way off reaches it, a landmark past the horizon is hidden and one near is seen, and the animals of the old frame are freed when it changes |
 | rs646 | nothing builds up on the graphics card over a session: rounds into the same dungeon (three floors, its monsters killed) and out leave the dungeon renderer with as many textures and shapes in the last round as in the second, the templates kept at their cap, and a released model's bones' texture freed |
 | rs645 | the fps meter's diagnosis on a phone: with no GPU timer it reads each frame's own time (and says so), starts from a double tap, has a dungeon's steps (its torches' shadows, the figures, the cloth, the post-processing, the ambient occlusion, half the resolution) and puts everything back when it stops |

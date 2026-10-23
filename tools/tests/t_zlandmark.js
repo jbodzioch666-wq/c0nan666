@@ -14,7 +14,7 @@ module.exports = async page=>{
       if (!at && lm.r0 > 20){ for (let rr=lm.r0; rr<lm.r0 + 10 && !at; rr++) for (let a=0; a<16 && !at; a++){ const q = owNb(lm.x, lm.y, Math.round(Math.cos(a*Math.PI/8)*rr), Math.round(Math.sin(a*Math.PI/8)*rr)); if (q && G.ow.map[q[0]][q[1]]===OW_WATER) at = q; } }   /* (or out at sea) */
       if (!at) return { none:true }; G.owPos = { x:at[0], y:at[1] }; owReveal(at[0], at[1], 20); await fr(240);
       const o = (O3.lmObjs||[]).find(o=>o.lm.id===lm.id), l = o3L(lm.x, lm.y), pl = o3PL();
-      return { lm:lm.kind, at, frame:O3F.face, inFrame:l, pl:[pl.x, pl.y], tileThere:l ? o3Tile(l[0], l[1]) : null, worldTile:G.ow.map[lm.x][lm.y], vis:o ? o.g.visible : null, pos:o ? [+o.g.position.x.toFixed(1), +o.g.position.y.toFixed(1), +o.g.position.z.toFixed(1)] : null,
+      return { lm:lm.kind, at, frame:O3F.face, inFrame:l, pl:[pl.x, pl.y], tileThere:l ? o3Tile(l[0], l[1]) : null, worldTile:G.ow.map[lm.x][lm.y], vis:o ? o.g.visible : null, pos:o ? [+o.g.position.x.toFixed(1), +o.g.position.y.toFixed(1), +o.g.position.z.toFixed(1)] : null, mw:o ? [12, 13, 14].map(i=>+o.g.matrixWorld.elements[i].toFixed(1)) : null,
         far:o && o.anim.far ? o.anim.far.visible : null, volc:!!O3.volc, win:O3.win ? [O3.win.x0, O3.win.y0] : null, W:O3_W, d:l ? +Math.hypot(l[0] - pl.x, l[1] - pl.y).toFixed(1) : null }; }, lm);
     console.log(lm.kind, r0, JSON.stringify(r)); if (!r.none) await page.screenshot({ path: SHOTS + '/zlandmark-' + lm.kind + '-' + r0 + '.png' }); }
   if (errs.length) console.log('ERRORS', errs.slice(0, 5).join(' | '));
