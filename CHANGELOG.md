@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-648 - A Planet's true curve
+
+- **The land now curves exactly as much as the globe.** Until now a Planet's land bent 2.5 times as fast as a world its size really would, to make the curve easy to see. It now matches the globe on the world map 1:1. The bend is gentler: the horizon is further off, you see more land around you, and landmarks rise over the horizon from further away (a tower from about 46 steps, a volcano from about 34).
+
 ## RS-647 - Everything on the curve of a Planet
 
 - **No more floating lights.** The glows over dungeons and towns, the icons over monsters and the smoke never bent with a Planet's curve, so a little way off they hung in the air above the ground. They now sit where the land is.
