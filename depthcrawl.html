@@ -25446,11 +25446,32 @@ function gfxPscExt(r){ if (r.__pscExt===undefined){ let e = null; try{ e = r.get
 /* (RS-574) every program a scene needs started at once, and linked by the driver on its own threads while the frames run: three
    r158+ makes a program without waiting on its link (r149 read its uniforms as it made it, which did wait - RS-572/573 worked round
    that) and says when each is ready (program.isReady, from KHR_parallel_shader_compile) */
+/* (RS-657) the shadow passes' own programs - a depth material for the sun's shadow and a distance one for a torch's, each for plain,
+   skinned and instanced casters, back- or double-sided - are not among what r.compile() builds (it builds the objects' own materials),
+   so a scene's first shadow pass linked them one at a time, blocking: ~100ms on a room's first torch shadow, mid-walk. A group of
+   stand-in casters wearing those materials rides along in the prelink's compile, and their links run with the rest. Three keeps a
+   program per renderer, so it costs once a session */
+function gfxShadowKinds(scene){
+  const T = THREE, K = gfxShadowKinds.k || (gfxShadowKinds.k = { sc:new T.Scene(), made:new Set(), geo:new T.BoxGeometry(0.01, 0.01, 0.01), px:null });
+  if (!K.px){ K.px = new T.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1); K.px.needsUpdate = true; }
+  /* (a scene of their own, with no fog: the shadow pass draws against three's empty scene, so its programs are keyed fogless; the lights are
+     the real scene's, passed to compile as the target scene. One stand-in pair per kind of caster the scene has - plain, skinned or instanced;
+     the side the shadow pass draws; a texture, an alpha map, an alpha test, as three copies them into its depth material - so the pass finds
+     every program made) */
+  const sideOf = m=>m.shadowSide!=null ? m.shadowSide : m.side===T.FrontSide ? T.BackSide : m.side===T.BackSide ? T.FrontSide : T.DoubleSide;
+  scene.traverse(o=>{ if (!o.castShadow || !(o.isMesh || o.isPoints) || !o.material) return; for (const m of [].concat(o.material)){ if (!m) continue;
+    const kind = o.isSkinnedMesh ? 's' : o.isInstancedMesh ? 'i' : 'm', side = sideOf(m), map = !!m.map, am = !!m.alphaMap, at = m.alphaTest > 0, key = kind + side + (map ? 'M' : '') + (am ? 'A' : '') + (at ? 'T' : '');
+    if (K.made.has(key)) continue; K.made.add(key);
+    for (const M of [()=>new T.MeshDepthMaterial({ depthPacking:T.RGBADepthPacking, side }), ()=>new T.MeshDistanceMaterial({ side })]){ const mat = M(); if (map) mat.map = K.px; if (am) mat.alphaMap = K.px; if (at) mat.alphaTest = 0.5;
+      let st; if (kind==='s'){ st = new T.SkinnedMesh(K.geo, mat); const bone = new T.Bone(); st.add(bone); st.bind(new T.Skeleton([bone])); } else if (kind==='i') st = new T.InstancedMesh(K.geo, mat, 1); else st = new T.Mesh(K.geo, mat);
+      st.frustumCulled = false; st.castShadow = false; K.sc.add(st); } } });
+  return K.sc;
+}
 function gfxPrelink(V, r, scene, cam){
   const ext = gfxPscExt(r); if (!ext || window.__noPrelink) return false;
   r.debug.checkShaderErrors = false;
   const before = new Set(r.info.programs), rt = r.getRenderTarget(); let t = null, mats = null; try{ t = gfxTarget(r); }catch(e){}
-  if (t) r.setRenderTarget(t); try{ mats = r.compile(scene, cam); }catch(e){ console.error(e); } finally { r.setRenderTarget(rt); }
+  if (t) r.setRenderTarget(t); try{ mats = r.compile(scene, cam); if (r.shadowMap && r.shadowMap.enabled && !window.__noShadowKinds){ const fg = scene.fog; scene.fog = null; try{ r.compile(gfxShadowKinds(scene), cam, scene); }catch(e){ console.error(e); } finally { scene.fog = fg; } } }   /* (compile keys a material's program by the target scene's fog: nulled for the pass, the way the shadow pass sees it) */catch(e){ console.error(e); } finally { r.setRenderTarget(rt); }
   const progs = r.info.programs.filter(p=>!before.has(p)); if (!progs.length) return false;
   try{ r.getContext().flush(); }catch(e){}   /* (the links only start once the commands reach the driver) */
   V.prelink = { r, progs, t0:performance.now() }; return true;
@@ -25471,7 +25492,7 @@ function gfxCompileSliced(V, r, scene, cam, grp, live){
   const kinds = new Set();   /* (and of one kind, one warm draw: a town's smoke, every puff its own material, was eighty draws and the loading card) */
   const put = (m, o)=>{ if (!m || seen.has(m) || mats.indexOf(m) >= 0) return; const ok = gfxObjKind(o), kk = gfxMatKind(m) + ok; if ((K && K.has(kk)) || kinds.has(kk)){ seen.add(m); return; } kinds.add(kk); m.__warmObj = ok; mats.push(m); };
   scene.traverse(o=>{ if ((o.isMesh || o.isPoints || o.isLine || o.isSprite) && o.material){ objs.push([o, o.frustumCulled]); o.frustumCulled = false; const m = o.material; if (Array.isArray(m)) m.forEach(x=>put(x, o)); else put(m, o); } });
-  if (!mats.length){ for (const [o, fc] of objs) o.frustumCulled = fc; if (grp) scene.remove(grp); return; }   /* (RS-502: the next floor down reuses the last one's shaders - no warm pause at all) */
+  if (!mats.length){ for (const [o, fc] of objs) o.frustumCulled = fc; if (grp) scene.remove(grp); try{ gfxPrelink(V, r, scene, cam); }catch(e){ console.error(e); } return; }   /* (RS-502: the next floor down reuses the last one's shaders - no warm pause at all; RS-657: but a kind being warm doesn't make every program of it built - a newcomer's own variant linked, blocking, at its first draw (40-90ms) - so the compile still runs, and what waits on it (gfxUnveil) waits for the links) */
   try{ gfxPrelink(V, r, scene, cam); }catch(e){ console.error(e); }   /* (RS-571: every program started at once, linked off the frame) */
   for (const m of mats){ m.__warmVis = m.visible; m.visible = false; }
   V.warmWait = { r, scene, cam, grp, mats, objs, i:0, live:!!live }; V.warmNeeded = true;
@@ -25534,9 +25555,10 @@ function gfxAutoFreeze(scene){
     else { a[0] = p.x; a[1] = p.y; a[2] = p.z; a[3] = q.x; a[4] = q.y; a[5] = q.z; a[6] = q.w; a[7] = k.x; a[8] = k.y; a[9] = k.z; a[10] = 0;
       if (o.__afz){ o.__afz = false; o.matrixAutoUpdate = true; } } }
 }
+function gfxUnveil(V){ const L = V.unveil; V.unveil = null; for (const h of L) h.visible = true; }   /* (RS-657: whatever waited on the warm-up, shown) */
 function gfxRender(r, scene, cam, view){
   if (!window.__noAutoFreeze) try{ gfxAutoFreeze(scene); }catch(e){}
-  try{ const V = view==='v3' ? V3 : view==='o3' ? O3 : view==='fpd' ? FPD : null; if (V && V.warmWait && gfxWarmStep(V)) return; }catch(e){}
+  try{ const V = view==='v3' ? V3 : view==='o3' ? O3 : view==='fpd' ? FPD : null; if (V && V.warmWait && gfxWarmStep(V)) return; if (V && V.prelink && !V.warmWait) gfxPrelinkDone(V); if (V && V.unveil && !V.compileDue && !V.warmWait && !V.prelink) gfxUnveil(V); }catch(e){}   /* (RS-657: a prelink with no warm-up behind it (every kind warm) is polled here, so it clears when the links are done) */
   if (view==='o3' && owIsPlanet() && O3.ppos && !window.__noCurve){ DC_CURVE.x = O3.ppos.x; DC_CURVE.y = O3.ppos.z; DC_CURVE.z = o3CurveK(); }   /* (RS-631: the land bends away round you) */
   gfxShadowTick(r, view); if (SET.fps){ gfxGpuMark(r, 'shadow'); gfxGpuPoll(); } try{ gfxRenderInner(r, scene, cam, view); } finally { gfxGpuStop(); DC_CURVE.z = 0; } }
 /* (RS-380) in a town and on the open land the sun's shadow map is drawn every other frame, every third on a phone or when
@@ -33031,16 +33053,18 @@ function v3PeopleMake(Q, j){
     const el = document.createElement('div'); el.className = 'v3plate folk'; el.innerHTML = `<b>${esc(v.nm || NAME_POOL[h])}</b><span>${esc(v.role || role)}</span>`; V3.labels.appendChild(el); V3.plates.push({ el, obj:p.g, y:1.15, near:9, hover:true }); }   /* (RS-374: no plate over a citizen's head - point at them to see who they are) */
   try{ if (p.e) m3dSkinFigure(p.e); }catch(e){ console.error(e); }   /* (RS-352 merged within joints; RS-356 skins the whole figure) */
   return p;
+  return p;
 }
 /* the queue, a slice a frame: a figure's template sculpted a stage at a time (m3dTemplateTry), the person made when it's done. At the
    build (atBuild) only those whose template is made already - unless the sliced warm-up is off, when everyone is made at once */
 function v3PeopleStep(atBuild){
   const Q = V3.peopleQ; if (!Q) return; if (Q.grp!==V3.world){ V3.peopleQ = null; return; }
-  const all = window.__noWarmSlice ? true : false, dl = performance.now() + (atBuild ? 4 : gfxPhone() ? 8 : 12), c0 = M3D_COARSE; let made = 0; M3D_COARSE = V3_FOLK_COARSE;
+  const now = performance.now(), iv = Q.t ? Math.min(40, now - Q.t) : 16; Q.t = now;   /* (RS-657: the slice is cut to the frame's own interval - a 12ms slice on a 190Hz screen dropped three frames at a time) */
+  const all = window.__noWarmSlice ? true : false, dl = now + (atBuild ? 4 : gfxPhone() ? 8 : Math.max(4, Math.min(12, iv*0.6))), c0 = M3D_COARSE; let made = 0; M3D_COARSE = V3_FOLK_COARSE;
   try{ while (Q.i < Q.jobs.length){ const j = Q.jobs[Q.i]; let tpl = M3D.tpl.get(m3dTplKey(j.pt)) || null;
       if (!tpl){ if (atBuild && !all) break; try{ tpl = m3dTemplateTry(j.pt, all ? performance.now() + 1e9 : dl); }catch(e){ console.error(e); Q.i++; continue; } }
       if (!tpl){ if (!all && performance.now() >= dl) break; continue; }
-      try{ v3PeopleMake(Q, j); made++; }catch(e){ console.error(e); } Q.i++;
+      try{ const p = v3PeopleMake(Q, j); made++; if (!atBuild && p && p.g){ p.g.visible = false; (V3.unveil = V3.unveil || []).push(p.g); } }catch(e){ console.error(e); } Q.i++;   /* (RS-657: a newcomer made mid-play stays unseen until the live warm-up has linked its programs (gfxUnveil) - drawn at once, the frame blocked 40-90ms on the first link) */
       if (!all && performance.now() >= dl) break; }
   } finally { M3D_COARSE = c0; }
   if (made && !atBuild){ V3.compileDue = true; V3.compileLive = true; }   /* (their shaders started off the frame and drawn once linked - a newcomer's own finish compiled in the next shadow pass, half a second in the frame) */
@@ -33367,7 +33391,7 @@ function v3StairTick(dt){
 // build a room's surfaces ahead of time while you walk up to its door, so stepping in has nothing to wait for
 function doorPrewarm(){
   if (G.interior || !V3.mats || !G.player || v3LowMem()) return;   /* (not on phones: build a room only when you walk in) */ V3.warm = V3.warm || {};
-  for (const b of VILLAGE_BUILDINGS){ if (V3.warm[b.key] || Math.abs(b.door.x - G.player.x) + Math.abs(b.door.y - G.player.y) > 4) continue;
+  for (const b of VILLAGE_BUILDINGS){ if (V3.warm[b.key] || Math.abs(b.door.x - G.player.x) + Math.abs(b.door.y - G.player.y) > 7) continue;   /* (RS-657: from seven tiles off, not four - the boards paint a few milliseconds a step, and four tiles' walk wasn't time enough: 70ms of them painted on the doorstep) */
     V3.warm[b.key] = true; const key = b.key, go = ()=>{ try{ v3InteriorMats(key, V3.mats); }catch(e){} };
     /* (RS-576) its boards painted first, a few milliseconds a step; then the rest of the room, which finds them made */
     const jobs = v3InteriorBoardJobs(key).map(([c, o])=>v3TexBoardsGen(c, o)), mp = G.map;
@@ -38854,7 +38878,8 @@ function m3dCapeCloth(c, r, dtIn, pre){
     for (let q=0;q<u.len.length;q++){ const a = u.ties[q*2]*3, b2 = u.ties[q*2+1]*3; u.len[q] = Math.hypot(rest[a] - rest[b2], rest[a+1] - rest[b2+1], rest[a+2] - rest[b2+2]); } }
   c.updateWorldMatrix(true, false); const M = c.matrixWorld, now = performance.now()/1000, pos = c.geometry.attributes.position, A = pos.array;
   const reset = ()=>{ u.P = Float32Array.from(u.rest); u.Q = Float32Array.from(u.rest); u.M = M.clone(); u.t = now; A.set(u.P); pos.needsUpdate = true; c.geometry.computeVertexNormals(); };
-  if (!u.P){ reset(); for (let i=0;i<40;i++) m3dCapeCloth(c, r, 1/60, true); return; }   /* (RS-459: and settled at once - onto a tail, say - not seen settling) */
+  if (!u.P){ reset(); u.pre = 40; }   /* (RS-459: and settled at once - onto a tail, say - not seen settling) */
+  if (u.pre && !pre){ const dl = performance.now() + (dtIn!==undefined ? 1e9 : gfxPhone() ? 3 : 5); let n = 0; while (u.pre > 0 && (n===0 || performance.now() < dl)){ u.pre--; n++; m3dCapeCloth(c, r, 1/60, true); } return; }   /* (RS-657: the forty settling steps a few milliseconds a frame - every cloaked figure that came near you cost one 15-40ms frame; stepped by hand, in a test, still all at once; the steps themselves (pre) take the plain path below) */
   if (dtIn===undefined && u.manual) return; if (dtIn!==undefined && !pre) u.manual = true;   /* (stepped by hand, in a test: the frame's own steps stand aside) */
   if (dtIn===undefined && now - u.t < M3D_CLOTH_STEP) return;   /* (RS-577: sixty steps a second at most; in between it rides on the body as it hangs) */
   let dt = dtIn===undefined ? now - u.t : dtIn; if (dtIn===undefined) u.t = now; if (!(dt > 0.0005)) return; dt = Math.min(dt, 0.05);
@@ -42320,8 +42345,10 @@ function m3dSkirtCloth(m, r){
     const base = m.userData.base;
     const CL = m.userData.cloth;
     for (let i=0;i<N;i++){ const y = base ? base[i*3+1] : A[i*3+1], s = Math.max(0, Math.min(1, (hh - y)/hgt)), s0 = m.userData.hold || 0.12, q = Math.max(0, Math.min(1, (s - s0)/(1 - s0)));   /* (RS-548: a robe's held from under the bust down to its hips) */ u.wt[i] = Math.pow(q*q*(3 - 2*q), CL ? CL.hem : 1.15); }   /* (held at the waist, freest at the hem) */
-    for (let j=NG;j<N;j++){ let best = 0, bd = 1e9; const bx = base ? base[j*3] : A[j*3], by = base ? base[j*3+1] : A[j*3+1], bz = base ? base[j*3+2] : A[j*3+2];
-      for (let i=0;i<NG;i++){ const dx = (base ? base[i*3] : A[i*3]) - bx, dy = (base ? base[i*3+1] : A[i*3+1]) - by, dz = (base ? base[i*3+2] : A[i*3+2]) - bz, d = dx*dx + dy*dy + dz*dz; if (d < bd){ bd = d; best = i; } }
+    const B = base || A, rows = HSg + 1, rowY = new Float32Array(rows); for (let r2=0;r2<rows;r2++) rowY[r2] = B[r2*W*3 + 1];   /* (RS-657: the nearest grid vertex to a cap's, searched on the two nearest rings - not the whole grid: every vertex against every vertex was 40ms on a robe's first frame) */
+    for (let j=NG;j<N;j++){ let best = 0, bd = 1e9; const bx = B[j*3], by = B[j*3+1], bz = B[j*3+2];
+      let r0 = 0; for (let r2=1;r2<rows;r2++) if (Math.abs(rowY[r2] - by) < Math.abs(rowY[r0] - by)) r0 = r2;
+      for (const r2 of [r0, r0 > 0 ? r0 - 1 : r0 + 1, r0 < rows - 1 ? r0 + 1 : r0 - 1]) for (let i=r2*W, e=i + W;i<e && i<NG;i++){ const dx = B[i*3] - bx, dy = B[i*3+1] - by, dz = B[i*3+2] - bz, d = dx*dx + dy*dy + dz*dz; if (d < bd){ bd = d; best = i; } }
       u.cap[j - NG] = best; } }   /* (the caps ride on the ring they close) */
   const TW = u.TW, P = u.P, V = u.V, O = u.O;
   /* (RS-577) worked at most sixty times a second: in between, the cloth keeps the hang it last had on the pose as it is now - run every
@@ -45665,7 +45692,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-656';
+const GAME_VERSION = 'rs-657';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

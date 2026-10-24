@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs657 | the town's hitches: a cloak's forty settling steps spread over frames when a cloaked figure comes near (stepped by hand they still settle at once); the shadow passes' programs linked in the prelink with the scene's, so a room's first torch shadow links none; newcomers made mid-play unseen until their programs are linked |
 | rs654 | a Planet's turned faces audited: framed off the front face, the plants keep off the gathering trees and the landmarks' feet, the winter ice lies on the frozen water, the far land is laid in the frame you're in, a treasure map's mark stands at its tile; a medium world as it was |
 | rs652 | a barrow's sunken stair: the land is cut open in front of its door (no ground in it, a finer patch round it), no water or plants in it, and the walk goes down the steps to the door and into the dark |
 | rs651 | a dungeon on the land is a barrow you walk into: you stop clear of its door, Enter walks you up the forecourt, eyes look out of the dark, you go in and down as the dark takes the screen, then floor 1 |

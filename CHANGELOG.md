@@ -1,5 +1,15 @@
 # Depthcrawl patch notes
 
+## RS-657 - A smoother town
+
+Measured with the test save on the new PC, walking round a town at about 190 frames a second: the land and the dungeon had no slow frames at all, the town had five kinds. Four of them are gone.
+
+- **Cloaked folk no longer hitch as they come near.** When a cloaked figure came within a few steps, its cloth settled in forty steps inside one frame: a 15 to 40 ms stall for every cloak. The steps now run a few milliseconds a frame, and the cloth looks the same. Robes had a stall of their own on their first frame (40 ms, searching every vertex of the skirt for the hem's caps); that search is now a few rings wide.
+- **A room's first torch shadow no longer freezes.** Three builds the shadow passes' shaders (one per kind of thing that casts a shadow) the first time a torch's shadow is drawn, and that was 90 to 190 ms in one frame on your first step into a room. Stand-ins for every kind of caster in the scene now ride along in the loading-time shader build, so the shadow pass finds its shaders made. Dungeon torches get the same.
+- **Townsfolk made as you walk no longer stall the frame.** New folk were drawn the frame they were made, before the driver had finished their shaders: 40 to 90 ms. They now stay out of sight for the frame or two the links take, and their shaders are started even when the town has seen their kind before (each figure's own finish is its own shader).
+- **Smaller slices for the folk being sculpted.** The sculpting slice is cut to the screen's own frame instead of a fixed 12 ms, which on a fast monitor dropped three frames at a time. Buildings also start painting their rooms' boards from seven tiles off instead of four, so stepping in finds them painted.
+- **Still to do:** the sculpting of each townsperson still overruns its slice by one operation (about 20 ms frames while a town fills), stepping into a building builds its room in one frame (about 100 ms, more if the boards weren't painted ahead), and one 50 ms shader link remains in a room's warm-up.
+
 ## RS-656 - Floors below the first without the freeze
 
 Found by clearing the tests that had been failing for weeks: nineteen of them, two of which were pointing at real bugs.
