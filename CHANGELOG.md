@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-652 - Down the barrow stair
+
+- **The land can open up now.** The ground in front of a barrow is cut away for a sunken stair, as in the doorway concept: four stone steps go down between dry-stone walls to a floor at the door, with kerb stones and a sill along the lip. The cut runs on a finer patch of ground that matches the land round it, so there's no seam.
+- **The door stands at the foot of the stair.** Its two standing stones and lintel are set into the barrow at the bottom of the cut, and the dark carries on into the mound.
+- **You walk down it.** At Enter you go to the head of the stair, a pair of pale eyes looks up at you from the doorway, and then you go down the steps and on into the dark as it takes the screen. A key or tap still skips it.
+- **The stair stays clear.** No sea water shows down it, and no trees, grass, flowers or pebbles grow in it. The ground round a barrow with a stair is level out past its lip.
+- A barrow with water, rock, a cliff or another site where its stair would go keeps the ground-level door from RS-651.
+
 ## RS-651 - Walk into the barrows
 
 - **Dungeons on the land are barrows now.** The plain rock mound with a painted black mouth is gone. In its place is a turf-covered barrow with a dolmen door: two standing stones and a lintel over the dark, dry-stone kerbs along its forecourt and a torch on either side. The door is tall enough for you to walk through.

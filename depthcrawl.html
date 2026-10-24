@@ -17498,11 +17498,12 @@ function o3DoorWalkStart(){
   const PL = o3PL(), g = O3.doors && O3.doors.get(PL.x+','+PL.y); if (!g || !o3InScene(g)) return false;
   const T = THREE; g.updateWorldMatrix(true, false);
   const W = (lx, lz)=>{ const v = g.localToWorld(new T.Vector3(lx, 0, lz)); return [v.x, v.z]; }, L0 = g.worldToLocal(new T.Vector3(O3.ppos.x, g.matrixWorld.elements[13], O3.ppos.z));
-  const pts = [[O3.ppos.x, O3.ppos.z]];   /* (the barrow's own frame: its door at +z, 0.64 out; you look in from 0.9) */
-  if (!(L0.z > 0.6 && Math.abs(L0.x) < 0.3)){ if (L0.z < 0.3) pts.push(W(L0.x < 0 ? -1.0 : 1.0, 0.45)); pts.push(W(0, 1.04), W(0, 0.9)); }
+  const pts = [[O3.ppos.x, O3.ppos.z]], pit = g.userData.pit;   /* (the barrow's own frame: its door at +z, 0.64 out; you look in from 0.9) */
+  if (pit){ if (!(L0.z > 0.75 && Math.abs(L0.x) < 0.3)){ if (L0.z < 0.5) pts.push(W(L0.x < 0 ? -1.0 : 1.0, 0.9)); pts.push(W(0, 1.02)); } pts.push(W(0, 0.74)); }   /* (RS-652: to the head of the stair, where you look down it) */
+  else if (!(L0.z > 0.6 && Math.abs(L0.x) < 0.3)){ if (L0.z < 0.3) pts.push(W(L0.x < 0 ? -1.0 : 1.0, 0.45)); pts.push(W(0, 1.04), W(0, 0.9)); }
   if (G.gather) skStop();
   O3.path = []; O3.gatherAt = null; O3.chase = null;
-  O3.doorWalk = { g, pts, inPt:W(0, 0.12), leg:0, u:0, look:0, v:0, end:0, yaw:(O3.player && O3.player.yaw) || 0 };
+  O3.doorWalk = { g, pts, pit, inPts:pit ? [W(0, 0.22), W(0, -0.32)] : [W(0, 0.12)], leg:0, u:0, look:0, v:0, end:0, yaw:(O3.player && O3.player.yaw) || 0 };
   setUi('playing'); return true;
 }
 function o3DoorWalkTick(dt, pp){
@@ -17515,15 +17516,19 @@ function o3DoorWalkTick(dt, pp){
     if (d >= 1e-4) W.yaw = Math.atan2(b[0] - a[0], b[1] - a[1]);
     if (u >= 1){ pos = b; W.leg++; W.u = 0; } else { pos = [a[0] + (b[0] - a[0])*u, a[1] + (b[1] - a[1])*u]; W.u = u; }
   } else if (W.look < DOORWALK_LOOK){
-    W.look += dt; pos = last; mv = 0; W.yaw = Math.atan2(W.inPt[0] - last[0], W.inPt[1] - last[1]);
-  } else {
-    const d = Math.hypot(W.inPt[0] - last[0], W.inPt[1] - last[1]) || 1; W.v = Math.min(1, W.v + dt*0.8/d);
-    pos = [last[0] + (W.inPt[0] - last[0])*W.v, last[1] + (W.inPt[1] - last[1])*W.v]; sink = 0.4*W.v*W.v; fade = Math.min(1, Math.max(0, (W.v - 0.15)/0.7));
+    W.look += dt; pos = last; mv = 0; W.yaw = Math.atan2(W.inPts[0][0] - last[0], W.inPts[0][1] - last[1]);
+  } else {   /* (in: along the way in - for a barrow with a stair, down it and on into the dark; else a step in, going down as you go) */
+    const way = [last].concat(W.inPts), segs = []; let tot = 0; for (let i=1;i<way.length;i++){ const d = Math.hypot(way[i][0] - way[i-1][0], way[i][1] - way[i-1][1]); segs.push(d); tot += d; }
+    tot = tot || 1; W.v = Math.min(1, W.v + dt*(W.pit ? 0.95 : 0.8)/tot);
+    let at = W.v*tot, i = 0; while (i < segs.length - 1 && at > segs[i]){ at -= segs[i]; i++; } const a = way[i], b = way[i + 1], u = Math.min(1, at/(segs[i] || 1));
+    pos = [a[0] + (b[0] - a[0])*u, a[1] + (b[1] - a[1])*u]; if (segs[i] > 1e-4) W.yaw = Math.atan2(b[0] - a[0], b[1] - a[1]);
+    if (W.pit) fade = Math.min(1, Math.max(0, (W.v - 0.5)/0.42)); else { sink = 0.4*W.v*W.v; fade = Math.min(1, Math.max(0, (W.v - 0.15)/0.7)); }
     if (W.v >= 1 && (W.end += dt) > 0.15) done = true;
   }
   const on = !done && W.leg >= P.length - 1 && W.look > 0.08 && W.v < 0.3;   /* (something in there looks back, for a moment) */
   for (const e of eyes){ e.visible = on; if (on) e.material.opacity = 0.75 + Math.sin(performance.now()*0.02)*0.2; }
   pp.x = pos[0]; pp.z = pos[1]; pp.y = Math.max(O3.heightAt(pp.x, pp.z), -0.14) - sink;
+  if (W.pit){ const L = W.g.worldToLocal(new THREE.Vector3(pp.x, W.g.position.y, pp.z)); if (Math.abs(L.x) < O3_PIT.hw + 0.05 && L.z < O3_PIT.z1 + 0.04) pp.y = W.g.position.y + o3PitY(L.z)*O3_PIT.s; }   /* (RS-652: down the steps) */
   transFade(done ? 1 : fade, O3.cv);
   if (done){ O3.doorWalk = null; for (const e of eyes) e.visible = false;
     setTimeout(()=>{ try{ enterDungeonConfirm(true); }catch(err){ console.error(err); } transFade(0); renderGame(); }, 0); }
@@ -25833,6 +25838,7 @@ function* gfxO3BuildGen(grp, x0, y0, W, M){   /* (RS-403: a step at a time - see
         transformed.z += sin(wp0.x*1.3 + uT*1.4)*0.022 + sin(wp0.z*1.7 - uT*1.1)*0.018 + sin((wp0.x + wp0.z)*2.9 + uT*2.3)*0.007;`);
       sh.fragmentShader = GFX_CLOUD_DECL + 'uniform float uT; uniform float uNight; uniform vec3 uSky; uniform sampler2D uFoam; uniform vec4 uFoamO; uniform sampler2D uDep; uniform vec4 uDepO;\n' + sh.fragmentShader.replace('#include <opaque_fragment>', `#include <opaque_fragment>
         vec3 wn = normalize(cross(dFdx(vGW), dFdy(vGW))); if (wn.y < 0.0) wn = -wn;
+        if (texture2D(uDep, ((vGW.xz - uDepO.xy)*uDepO.z + 0.5)/uDepO.w).g > 0.5) discard;   /* (RS-652: the sea sheet runs under all the land - not down a barrow's stair) */
         float fr = pow(1.0 - max(dot(wn, normalize(cameraPosition - vGW)), 0.0), 3.0);
         gl_FragColor.rgb = mix(gl_FragColor.rgb, uSky, clamp(fr*0.9 + 0.1, 0.0, 0.6));
         vec4 fo = texture2D(uFoam, (vGW.xz - uFoamO.xy)/uFoamO.zw);
@@ -25892,6 +25898,7 @@ function* gfxO3BuildGen(grp, x0, y0, W, M){   /* (RS-403: a step at a time - see
     if (t===OW_GRASS && !isWinter() && o3Hash(x, y, 360) < 0.3) for (let i=0;i<1 + (o3Hash(x, y, 361)*3|0); i++){ const px = x + o3Hash(x, y, 370+i), pz = y + o3Hash(x, y, 380+i); if (rdPaint && !o3RoadClear(px, pz, 0.3)) continue; flowers.push([px, pz, [0xd84a4a, 0xf0d040, 0xf0f0f0, 0xa070e0, 0xf090b0][(o3Hash(x, y, 390+i)*5)|0]]); }
     if ((t===OW_DESERT || t===OW_MOUNTAINPASS) && o3Hash(x, y, 395) < 0.4) for (let i=0;i<3;i++) pebbles.push([x + o3Hash(x, y, 396+i), y + o3Hash(x, y, 399+i), o3Hash(x, y, 402+i)]);
   }
+  if (O3.cuts && O3.cuts.length) for (const L of [spots, flowers, pebbles]) for (let i=L.length-1; i>=0; i--) if (o3InCut(L[i][0], L[i][1], 0.06)) L.splice(i, 1);   /* (RS-652: none floating over a barrow's stair) */
   const m4 = new T.Matrix4(), q = new T.Quaternion(), s3 = new T.Vector3(), v3 = new T.Vector3(), up = new T.Vector3(0, 1, 0), c3 = new T.Color();
   if (spots.length){ const im = new T.InstancedMesh(blade, gm, spots.length);
     spots.forEach(([x, z, r, col], i)=>{ q.setFromAxisAngle(up, r*40); s3.set(1 + r*0.6, 0.7 + r*0.8, 1); v3.set(x, O3.heightAt(x, z) - 0.01, z); im.setMatrixAt(i, m4.compose(v3, q, s3)); c3.setRGB(col[0]*(0.8 + r*0.4), col[1]*(0.8 + r*0.4), col[2]*(0.8 + r*0.4)); im.setColorAt(i, c3); });
@@ -33744,6 +33751,8 @@ function* o3BuildGen(cx, cy){
   const landAt = (px, pz)=>{ const fx = px - 0.5, fz = pz - 0.5, tx = Math.floor(fx), tz = Math.floor(fz), ax = fx - tx, az = fz - tz; let l = 0;   /* (RS-311: how much land is at a point - 1 in a land tile's middle, 0 in the sea's) */
     for (const [qx, qz, w] of [[tx,tz,(1-ax)*(1-az)],[tx+1,tz,ax*(1-az)],[tx,tz+1,(1-ax)*az],[tx+1,tz+1,ax*az]]){ const t = o3Tile(qx, qz); if (t!==OW_WATER) l += w; } return l; };
   const lin = v=> Math.pow(v/255, 2.2);
+  const pits = O3.cuts = o3PitsFor(x0, y0, W);   /* (RS-652: the barrows' stairs in this window) */
+  for (const c of pits) c.pad = (inM(c.x,c.y) && lairH[dk(c.x,c.y)]) || Math.max(0.12, 0.04 + (n1((c.x+0.5)/5, (c.y+0.5)/5)-0.5)*0.35 + 0.03);
   for (let j=0;j<NV;j++){ if (j % 6 === 5) yield; for (let i=0;i<NV;i++){
     const wx = x0 + i/O3_R, wz = y0 + j/O3_R;
     // the (up to 4) tiles this vertex touches
@@ -33773,6 +33782,7 @@ function* o3BuildGen(cx, cy){
       const d = Math.hypot(wx-(sx+0.5), wz-(sz+0.5)), f = Math.max(0, Math.min(1, (1.25-d)/0.6)), pad = (inM(sx,sz) && lairH[dk(sx,sz)]) || Math.max(0.12, 0.04 + (n1((sx+0.5)/5, (sz+0.5)/5)-0.5)*0.35 + 0.03);   /* (RS-178: a lair's pad is its summit; RS-570: any other site's is level with the rolling ground round it - a fixed height sank a town in a pit wherever the land rose) */
       h += (pad - h)*f;
     }
+    for (const c of pits){ const d = Math.hypot(wx - c.cx, wz - c.cz); if (d < 1.55) h += (c.pad - h)*Math.min(1, (1.55 - d)/0.45); }   /* (RS-652: a barrow with a stair stands on level ground out past its lip) */
     // keep the ground clear of the water sheet (RS-105): wholly-land ground stays well above the wave tops,
     // a shore edge sits just above them, so the water ends at the tile's edge and never shows through the land
     { const xs = Number.isInteger(wx) ? [wx-1, wx] : [Math.floor(wx)], zs = Number.isInteger(wz) ? [wz-1, wz] : [Math.floor(wz)];
@@ -33838,9 +33848,10 @@ function* o3BuildGen(cx, cy){
   const nr = geo.attributes.normal, cliffNb = k=>{ const i = k % NV, j = (k/NV)|0; for (let a=-1; a<=1; a++) for (let b=-1; b<=1; b++){ const ii = i + a, jj = j + b; if (ii>=0 && jj>=0 && ii<NV && jj<NV && cliffV[jj*NV + ii]) return true; } return false; };   /* (RS-622: a cliff's face, down to the water, rock too) */
   for (let k=0;k<NV*NV;k++){ const st = 1 - nr.getY(k); if (cliffV[k]===2){ const rk = lin(86); col[k*3] += (rk - col[k*3])*0.9; col[k*3+1] += (rk*0.96 - col[k*3+1])*0.9; col[k*3+2] += (rk*0.9 - col[k*3+2])*0.9; continue; }   /* (RS-622: a cliff's lip is rock) */
     if (st > 0.25 && (H[k] > 0.4 || cliffV[k] || (H[k] < O3_WATER_Y && st > 0.5 && cliffNb(k)))){ const f = Math.min(1,(st-0.25)*2.2)*0.85, rk = lin(78); col[k*3] += (rk-col[k*3])*f; col[k*3+1] += (rk*0.97-col[k*3+1])*f; col[k*3+2] += (rk*0.94-col[k*3+2])*f; } }
+  if (pits.length) o3LandCut(geo, pits, x0, y0, NV);   /* (RS-652) */
   const land = new T.Mesh(geo, new T.MeshStandardMaterial({ vertexColors:true, map:tex.detail, roughness:0.95 }));
   land.receiveShadow = true; land.castShadow = true; grp.add(land); O3.land = land;
-  { const dd = new Uint8Array(NV*NV*4); for (let k=0;k<NV*NV;k++){ dd[k*4] = Math.round(Math.max(0, Math.min(1, (O3_WATER_Y - H[k])/0.6))*255); dd[k*4+3] = 255; }   /* (RS-311: how deep the water is over every point, for the shallows and the surf) */
+  { const dd = new Uint8Array(NV*NV*4); for (let k=0;k<NV*NV;k++){ dd[k*4] = Math.round(Math.max(0, Math.min(1, (O3_WATER_Y - H[k])/0.6))*255); dd[k*4+3] = 255; if (pits.length && o3InCut(x0 + (k % NV)/O3_R, y0 + ((k/NV)|0)/O3_R, 0.35, pits)) dd[k*4+1] = 255; }   /* (RS-652: green - no water drawn here, down a barrow's stair) */   /* (RS-311: how deep the water is over every point, for the shallows and the surf) */
     if (O3.depthTex) O3.depthTex.dispose(); const dt = O3.depthTex = new T.DataTexture(dd, NV, NV, T.RGBAFormat); dt.magFilter = dt.minFilter = T.LinearFilter; dt.needsUpdate = true; O3.depthO = new T.Vector4(x0, y0, O3_R, NV); }
   O3.heightAt = (wx, wz)=>{
     const fi = (wx-x0)*O3_R, fj = (wz-y0)*O3_R, i = Math.max(0, Math.min(NV-2, Math.floor(fi))), j = Math.max(0, Math.min(NV-2, Math.floor(fj))), a = fi-i, b2 = fj-j;
@@ -33871,7 +33882,7 @@ function* o3BuildGen(cx, cy){
 }
 // ---- (RS-349) building the land over frames ----
 // Everything the build writes to O3 is swapped out while the old land still shows, and swapped in when it's done
-const O3_BUILD_KEYS = ['rmask','win','lairTops','volc','land','heightAt','depthTex','depthO','water','hits','plates','flames','glows','smoke','parts','windows','encGrp','encKey','qKey','world'];
+const O3_BUILD_KEYS = ['rmask','win','lairTops','volc','cuts','land','heightAt','depthTex','depthO','water','hits','plates','flames','glows','smoke','parts','windows','encGrp','encKey','qKey','world'];
 function o3BuildFresh(){ const st = {}; for (const k of O3_BUILD_KEYS) st[k] = undefined; st.plates = []; st.hits = []; st.flames = []; st.glows = []; st.smoke = []; st.parts = []; st.windows = []; return st; }
 function o3BuildSwapIn(st){ const live = {}; for (const k of O3_BUILD_KEYS){ live[k] = O3[k]; O3[k] = st[k]; } return live; }
 function o3BuildSwapOut(st, live){ for (const k of O3_BUILD_KEYS){ st[k] = O3[k]; O3[k] = live[k]; } for (const p of st.plates||[]) if (!p.el.__pend){ p.el.__pend = 1; p.el.style.display = 'none'; } }
@@ -34071,6 +34082,7 @@ function* o3VegetationGen(grp, x0, y0, W){
   { const towns = []; for (let x=x0-1; x<x0+W+1; x++) for (let y=y0-1; y<y0+W+1; y++) if (o3Tile(x, y)===OW_TOWN) towns.push([x+0.5, y+0.5, 1 + (()=>{ try{ const q = o3G(x, y) || [x, y]; return townTier(q[0], q[1])*0.22; }catch(e){ return 0; } })()]);   /* (RS-644: its size from its tile in the world) */
     if (towns.length) for (let i=put.length-1; i>=0; i--){ const q = put[i], big = q[0]!=='bush' && q[0]!=='rock' && q[0]!=='reed', rr = big ? 1.25 : 0.85;
       if (towns.some(([tx, tz, k])=>Math.hypot(q[1] - tx, q[2] - tz) < rr*k)) put.splice(i, 1); } }
+  if (O3.cuts && O3.cuts.length) for (let i=put.length-1; i>=0; i--){ const q = put[i]; if (o3InCut(q[1], q[2], q[0]==='bush' || q[0]==='rock' || q[0]==='reed' ? 0.15 : 0.35)) put.splice(i, 1); }   /* (RS-652: nor in a barrow's stair) */
   yield;
   // parts per kind: [geometry, material colour(s), local transform]
   const bark = '#5a4028', PARTS = {
@@ -34140,6 +34152,58 @@ function o3Mats(){
   });
 }
 /* (RS-651) a rough stone: a dodecahedron with each corner pushed in or out by where it is, so corners shared by two faces stay joined */
+/* (RS-652) a barrow's sunken forecourt: a stair cut down into the land in front of its door. In the barrow's own frame (x across, z out
+   from the door, the site drawn at O3_PIT.s): hw its half-width, z0..z1 how far out it runs, floor its depth at the door. The land
+   leaves it open (o3LandCut) and the barrow builds its steps and walls (o3Site); a barrow with water, rock or another site where its
+   stair would go keeps the RS-651 door at ground level */
+const O3_PIT = { hw:0.24, z0:0, z1:0.62, s:1.3, floor:-0.4 };
+function o3PitYaw(x, y){ return 0.52 + (o3Hash(x, y, 9) - 0.5)*0.3; }   /* (the way a site faces - see o3SitesGen) */
+function o3PitLocal(c, wx, wz){ const dx = wx - c.cx, dz = wz - c.cz; return [(dx*c.co - dz*c.si)/O3_PIT.s, (dx*c.si + dz*c.co)/O3_PIT.s]; }
+function o3PitWorld(c, u, v){ return [c.cx + (u*c.co + v*c.si)*O3_PIT.s, c.cz + (-u*c.si + v*c.co)*O3_PIT.s]; }
+function o3InCut(wx, wz, m, L){ L = L || O3.cuts; if (!L || !L.length) return null; m = (m || 0)/O3_PIT.s;
+  for (const c of L){ if (Math.abs(wx - c.cx) > 1.8 || Math.abs(wz - c.cz) > 1.8) continue; const [u, v] = o3PitLocal(c, wx, wz); if (Math.abs(u) < O3_PIT.hw + m && v > O3_PIT.z0 - m && v < O3_PIT.z1 + m) return c; }
+  return null; }
+/* the stair's floor under a point of it, in the barrow's frame: level ground at its lip, down the steps to the floor at the door */
+function o3PitY(v){ return v >= 0.64 ? 0 : v <= 0.2 ? O3_PIT.floor : O3_PIT.floor*(0.64 - v)/0.44; }
+function o3PitsFor(x0, y0, W){ const out = [], bad = new Set([OW_WATER, OW_RIVER, OW_MOUNTAIN, OW_MOUNTAINPASS]);
+  for (let x=x0; x<x0+W; x++) for (let y=y0; y<y0+W; y++){   /* (the sites built - see o3SitesGen) */
+    if (o3Tile(x, y)!==OW_DUNGEON) continue;
+    const ry = o3PitYaw(x, y), c = { x, y, cx:x + 0.5, cz:y + 0.5, ry, co:Math.cos(ry), si:Math.sin(ry) }; let ok = true;
+    for (const u of [-0.42, -O3_PIT.hw, 0, O3_PIT.hw, 0.42]) for (const v of [0.05, 0.31, O3_PIT.z1, 0.74]){ const [wx, wz] = o3PitWorld(c, u, v), tx = Math.floor(wx), tz = Math.floor(wz), t = o3Tile(tx, tz);
+      if (tx===x && tz===y) continue; if (bad.has(t) || OW_SITE_TILES.includes(t) || o3Cliff(tx, tz) || owLandmarkFoot(tx, tz)){ ok = false; break; } }
+    if (ok && !out.some(o=>Math.hypot(o.cx - c.cx, o.cz - c.cz) < 3)) out.push(c); }   /* (two barrows side by side: the first keeps its stair) */
+  return out; }
+/* (RS-652) the land opened for the barrows' stairs: the grid's cells round each forecourt come out, and a finer patch of ground takes
+   their place - its heights, colours and light read off the grid, so it meets the land round it without a seam - with the stair's
+   rectangle left open, the points along its edge moved onto the edge so the cut runs straight */
+function o3LandCut(geo, pits, x0, y0, NV){
+  const R = O3_R, F = 6, A = geo.attributes, P = A.position.array, C = A.color.array, TC = A.tcol.array, N = A.normal.array, NC = NV - 1, drop = new Uint8Array(NC*NC), blocks = [];
+  for (const c of pits){ let lx = Infinity, hx = -Infinity, lz = Infinity, hz = -Infinity;
+    for (const u of [-O3_PIT.hw, O3_PIT.hw]) for (const v of [O3_PIT.z0, O3_PIT.z1]){ const [wx, wz] = o3PitWorld(c, u, v); lx = Math.min(lx, wx); hx = Math.max(hx, wx); lz = Math.min(lz, wz); hz = Math.max(hz, wz); }
+    const i0 = Math.max(0, Math.floor((lx - x0)*R)), i1 = Math.min(NC - 1, Math.floor((hx - x0)*R)), j0 = Math.max(0, Math.floor((lz - y0)*R)), j1 = Math.min(NC - 1, Math.floor((hz - y0)*R));
+    if (i1 < i0 || j1 < j0) continue; let clash = false; for (let j=j0;j<=j1 && !clash;j++) for (let i=i0;i<=i1;i++) if (drop[j*NC + i]){ clash = true; break; }
+    if (clash) continue; for (let j=j0;j<=j1;j++) for (let i=i0;i<=i1;i++) drop[j*NC + i] = 1; blocks.push([c, i0, i1, j0, j1]); }
+  if (!blocks.length) return;
+  const idx = []; for (let j=0;j<NC;j++) for (let i=0;i<NC;i++){ if (drop[j*NC + i]) continue; const a = j*NV+i, b2 = a+1, c = a+NV, d = c+1; idx.push(a,c,b2, b2,c,d); }
+  const xp = [], xc = [], xt = [], xn = [], xu = [], base = NV*NV;
+  const mix3 = (arr, fi, fj, out)=>{ const i = Math.min(NV - 2, Math.floor(fi)), j = Math.min(NV - 2, Math.floor(fj)), a = fi - i, b = fj - j, k = j*NV + i, w = [(1-a)*(1-b), a*(1-b), (1-a)*b, a*b], ks = [k, k+1, k+NV, k+NV+1];
+    const o = [0, 0, 0]; for (let q=0;q<4;q++) for (let e=0;e<3;e++) o[e] += arr[ks[q]*3 + e]*w[q]; out.push(o[0], o[1], o[2]); return o; };
+  for (const [c, i0, i1, j0, j1] of blocks){
+    const nI = (i1 - i0 + 1)*F + 1, nJ = (j1 - j0 + 1)*F + 1, v0 = base + xp.length/3, loc = [];
+    for (let b=0;b<nJ;b++) for (let a=0;a<nI;a++){ const fi = i0 + a/F, fj = j0 + b/F;
+      const p = mix3(P, fi, fj, xp); mix3(C, fi, fj, xc); mix3(TC, fi, fj, xt); const n = mix3(N, fi, fj, xn), l = Math.hypot(n[0], n[1], n[2]) || 1, k = xn.length - 3; xn[k] /= l; xn[k+1] /= l; xn[k+2] /= l;
+      xu.push(p[0]/3, p[2]/3); loc.push(o3PitLocal(c, p[0], p[2])); }
+    const inside = (u, v)=>Math.abs(u) < O3_PIT.hw && v > O3_PIT.z0 && v < O3_PIT.z1, used = new Uint8Array(nI*nJ);
+    const tri = (p, q, r)=>{ const u = (loc[p][0] + loc[q][0] + loc[r][0])/3, v = (loc[p][1] + loc[q][1] + loc[r][1])/3; if (inside(u, v)) return; idx.push(v0 + p, v0 + q, v0 + r); used[p] = used[q] = used[r] = 1; };
+    for (let b=0;b<nJ-1;b++) for (let a=0;a<nI-1;a++){ const p = b*nI + a, q = p + 1, r = p + nI, t2 = r + 1; tri(p, r, q); tri(q, r, t2); }
+    for (let k=0;k<nI*nJ;k++){ if (!used[k]) continue; const [u, v] = loc[k]; if (!inside(u, v)) continue;   /* (a point of the ground left standing inside the cut goes out to its edge) */
+      const dl = u + O3_PIT.hw, dr = O3_PIT.hw - u, d0 = v - O3_PIT.z0, d1 = O3_PIT.z1 - v, m = Math.min(dl, dr, d0, d1);
+      const [wx, wz] = m===dl ? o3PitWorld(c, -O3_PIT.hw, v) : m===dr ? o3PitWorld(c, O3_PIT.hw, v) : m===d0 ? o3PitWorld(c, u, O3_PIT.z0) : o3PitWorld(c, u, O3_PIT.z1);
+      const g = (v0 - base + k)*3; xp[g] = wx; xp[g+2] = wz; xu[(v0 - base + k)*2] = wx/3; xu[(v0 - base + k)*2 + 1] = wz/3; } }
+  const n = base + xp.length/3, cat = (old, ext, w)=>{ const a = new Float32Array(n*w); a.set(old.subarray(0, base*w)); a.set(ext, base*w); return a; };
+  geo.setAttribute('position', new THREE.BufferAttribute(cat(P, xp, 3), 3)); geo.setAttribute('color', new THREE.BufferAttribute(cat(C, xc, 3), 3)); geo.setAttribute('tcol', new THREE.BufferAttribute(cat(TC, xt, 3), 3));
+  geo.setAttribute('normal', new THREE.BufferAttribute(cat(N, xn, 3), 3)); geo.setAttribute('uv', new THREE.BufferAttribute(cat(A.uv.array, xu, 2), 2)); geo.setIndex(idx);
+  geo.userData.cuts = blocks.length; }
 function o3RockGeo(r, s){ const g = new THREE.DodecahedronGeometry(r, 1), p = g.attributes.position;
   for (let i=0;i<p.count;i++){ const x = p.getX(i), y = p.getY(i), z = p.getZ(i), h = Math.sin(Math.round(x*1e3)*12.9898 + Math.round(y*1e3)*78.233 + Math.round(z*1e3)*37.719 + s*4.1)*43758.5453, k = 1 + (h - Math.floor(h) - 0.5)*0.4; p.setXYZ(i, x*k, y*k, z*k); }
   g.computeVertexNormals(); return g; }
@@ -34305,14 +34369,40 @@ function o3Site(t, gx, gz){
     const lumpy = (seed)=>{ const mg = new T.SphereGeometry(1, 48, 24, 0, Math.PI*2, 0, Math.PI/2), mp = mg.attributes.position;   /* (lumpy, as turf over stones is) */
       for (let i=0;i<mp.count;i++){ const x = mp.getX(i), y = mp.getY(i), z = mp.getZ(i), h = Math.sin(Math.round(x*40)*12.9898 + Math.round(y*40)*78.233 + Math.round(z*40)*37.719 + seed)*43758.5453, k = 1 + (h - Math.floor(h) - 0.5)*0.07; mp.setXYZ(i, x*k, y > 0.02 ? y*k : y, z*k); }
       mg.computeVertexNormals(); const m = new T.Mesh(mg, turf); m.castShadow = m.receiveShadow = true; g.add(m); return m; };
-    const mound = lumpy(0); mound.scale.set(0.82, 1.0, 0.92); mound.position.set(0, -0.02, -0.3);
-    const lobe = lumpy(7); lobe.scale.set(0.52, 1.0, 0.55); lobe.position.set(0, -0.02, 0.06);   /* (the mound grows out round its door) */
-    const mouth = new T.Mesh(new T.PlaneGeometry(0.44, 0.84), vd); mouth.position.set(0, 0.42, 0.64); g.add(mouth);
-    for (const s of [-1,1]){ rk(0.12, s*0.31, 0.44, 0.68, 0.95, 4.0, 1.0, s + 2);
-      for (let i=0;i<3;i++) rk(0.075, s*(0.37 + i*0.02), 0.03, 0.8 + i*0.12, 1.3, 1.1 - i*0.25, 1.3, 10 + i + (s > 0 ? 5 : 0));
-      g.add(v3Cyl(0.024, 0.03, 0.56, 6, mats.wood, s*0.48, 0.28, 0.98)); flame(s*0.48, 0.6, 0.98); }
-    const lin = rk(0.12, 0, 0.93, 0.68, 3.9, 0.75, 1.0, 7); lin.rotation.z = 0.05;
-    g.userData.eyes = [-1, 1].map(s=>{ const e = o3Glow('rgba(214,255,232,1)', 0.065); e.position.set(s*0.045, 0.62, 0.65); e.visible = false; g.add(e); return e; });
+    const pit = (O3.cuts || []).find(c=>c.x===Math.floor(gx) && c.y===Math.floor(gz));
+    if (pit){
+      /* (RS-652) the barrow over its sunken stair, as in the concept: four steps down between dry-stone walls to a floor at the door,
+         the door two standing stones and a lintel at the stair's foot, the dark going on into the mound behind (a black passage you walk
+         into and are lost in); kerb stones and a sill along the lip hide the cut's edge, earth behind the walls closes it below */
+      g.userData.pit = pit;
+      const earth = mats.pitEarth || (mats.pitEarth = new T.MeshStandardMaterial({ color:new T.Color(0x4a3a2a).convertSRGBToLinear(), roughness:1 }));
+      const step = mats.pitStep || (mats.pitStep = new T.MeshStandardMaterial({ map:mats.stone.map, color:new T.Color(0x8c8272).convertSRGBToLinear(), roughness:0.95 }));   /* (old worn stone, in the shade of the cut) */
+      const mound = lumpy(0); mound.scale.set(0.8, 0.92, 0.66); mound.position.set(0, -0.02, -0.68);
+      const lobe = lumpy(7); lobe.scale.set(0.46, 0.62, 0.3); lobe.position.set(0, -0.02, -0.36);   /* (the turf over the door) */
+      g.add(v3Box(0.34, 0.8, 0.5, vd, 0, -0.02, -0.25, false));   /* (the passage in: dark all through) */
+      const F = O3_PIT.floor, Z1 = O3_PIT.z1;
+      for (let i=0;i<4;i++){ const top = F*(i + 1)/5, za = Z1 - (i + 1)*0.105, zb = Z1 - i*0.105; const sb = v3Box(0.46 + rnd(70 + i)*0.03, top + 0.56, zb - za + 0.01, step, (rnd(75 + i) - 0.5)*0.02, (top - 0.56)/2, (za + zb)/2); sb.rotation.y = (rnd(80 + i) - 0.5)*0.05; g.add(sb); }   /* (each laid by hand, a little askew) */
+      g.add(v3Box(0.48, 0.16, 0.24, step, 0, F - 0.08, 0.08));   /* (the floor at the door) */
+      for (const s of [-1, 1]){
+        g.add(v3Box(0.1, 0.55, 0.7, earth, s*0.29, -0.285, 0.31));   /* (the earth behind the wall) */
+        for (let k=0;k<3;k++) for (let i=0;i<5;i++) rk(0.068, s*0.25, F + 0.07 + k*0.13, 0.05 + i*0.13 + (k % 2)*0.05, 0.55, 0.78, 1.05, 20 + k*7 + i + (s > 0 ? 50 : 0));   /* (dry-stone courses) */
+        for (let i=0;i<4;i++) rk(0.075, s*(0.31 + (i % 2)*0.02), 0.01, 0.08 + i*0.165, 1.25, 0.55, 1.25, 10 + i + (s > 0 ? 5 : 0));   /* (kerb stones along the lip) */
+        rk(0.12, s*0.24, -0.02, 0.0, 0.8, 3.6, 0.9, s + 2);   /* (the door's standing stones) */
+        g.add(v3Cyl(0.024, 0.03, 0.56, 6, mats.wood, s*0.42, 0.28, 0.74)); flame(s*0.42, 0.6, 0.74); }
+      g.add(v3Box(0.58, 0.54, 0.08, earth, 0, -0.28, Z1 + 0.04));   /* (and below the lip) */
+      rk(0.08, 0, 0.0, Z1 + 0.02, 3.4, 0.4, 0.9, 30);   /* (the sill) */
+      const lin = rk(0.12, 0, 0.47, -0.02, 3.6, 0.8, 1.3, 7); lin.rotation.z = 0.05;
+      g.userData.eyes = [-1, 1].map(s=>{ const e = o3Glow('rgba(214,255,232,1)', 0.065); e.position.set(s*0.045, 0.08, 0.02); e.visible = false; g.add(e); return e; });
+    } else {
+      const mound = lumpy(0); mound.scale.set(0.82, 1.0, 0.92); mound.position.set(0, -0.02, -0.3);
+      const lobe = lumpy(7); lobe.scale.set(0.52, 1.0, 0.55); lobe.position.set(0, -0.02, 0.06);   /* (the mound grows out round its door) */
+      const mouth = new T.Mesh(new T.PlaneGeometry(0.44, 0.84), vd); mouth.position.set(0, 0.42, 0.64); g.add(mouth);
+      for (const s of [-1,1]){ rk(0.12, s*0.31, 0.44, 0.68, 0.95, 4.0, 1.0, s + 2);
+        for (let i=0;i<3;i++) rk(0.075, s*(0.37 + i*0.02), 0.03, 0.8 + i*0.12, 1.3, 1.1 - i*0.25, 1.3, 10 + i + (s > 0 ? 5 : 0));
+        g.add(v3Cyl(0.024, 0.03, 0.56, 6, mats.wood, s*0.48, 0.28, 0.98)); flame(s*0.48, 0.6, 0.98); }
+      const lin = rk(0.12, 0, 0.93, 0.68, 3.9, 0.75, 1.0, 7); lin.rotation.z = 0.05;
+      g.userData.eyes = [-1, 1].map(s=>{ const e = o3Glow('rgba(214,255,232,1)', 0.065); e.position.set(s*0.045, 0.62, 0.65); e.visible = false; g.add(e); return e; });
+    }
   } else if (t===OW_CASTLE){
     const wallH = 0.38, R = 0.52;
     for (const [x,z,w,d] of [[0,-R,2*R,0.1],[0,R,2*R,0.1],[-R,0,0.1,2*R],[R,0,0.1,2*R]]){ g.add(v3Box(w, wallH, d, mats.stone, x, wallH/2, z));
@@ -45556,7 +45646,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-651';
+const GAME_VERSION = 'rs-652';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
