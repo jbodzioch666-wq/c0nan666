@@ -6,11 +6,11 @@ module.exports = async page=>{
     const m = G.ow.map, sites = questNearbySites(G.owPos.x, G.owPos.y, 1, 120, ['dungeon']).filter(s=>m[s.x][s.y]===OW_DUNGEON);
     for (const s of sites) for (const [dx, dy] of [[1,1],[0,1],[1,0],[-1,1],[1,-1]]){ const q = owNb(s.x, s.y, dx, dy); if (!q || ![OW_GRASS, OW_FOREST, OW_DESERT, OW_TUNDRA, OW_SWAMP].includes(m[q[0]][q[1]])) continue;
       setUi('playing'); G.owPos = { x:q[0], y:q[1] }; owReveal(q[0], q[1], 8); await fr(120); moveDir(-dx, -dy); await fr(90);
-      if (G.owPos.x!==s.x || G.owPos.y!==s.y) continue; const PL = o3PL(), g = O3.doors && O3.doors.get(PL.x+','+PL.y); if (g && g.userData.pit){ setUi('playing'); return s; } break; }
+      if (G.owPos.x!==s.x || G.owPos.y!==s.y) continue; const PL = o3PL(), g = O3.doors && O3.doors.get(PL.x+','+PL.y); if (g && g.doorPit){ setUi('playing'); return s; } break; }
     return null; });
   if (!at) throw new Error('no stair barrow');
   const trees = !!process.env.ZP_TREES, zoom = +(process.env.ZP_DIST || 4.2);
-  const hide = ()=>page.evaluate(t=>{ if (t) return; const PL = o3PL(), g = O3.doors.get(PL.x+','+PL.y), c = g.userData.pit, m4 = new THREE.Matrix4(), v = new THREE.Vector3(), z = new THREE.Matrix4().makeScale(0, 0, 0);
+  const hide = ()=>page.evaluate(t=>{ if (t) return; const PL = o3PL(), g = O3.doors.get(PL.x+','+PL.y), c = g.doorPit, m4 = new THREE.Matrix4(), v = new THREE.Vector3(), z = new THREE.Matrix4().makeScale(0, 0, 0);
     O3.world.traverse(o=>{ if (!o.isInstancedMesh) return; let ch = false; for (let i=0;i<o.count;i++){ o.getMatrixAt(i, m4); v.setFromMatrixPosition(m4); if (Math.hypot(v.x - c.cx, v.z - c.cz) < 2.6){ o.setMatrixAt(i, z); ch = true; } } if (ch) o.instanceMatrix.needsUpdate = true; });
     document.querySelectorAll('.v3plate').forEach(e=>e.style.visibility = 'hidden'); }, trees);
   await hide();

@@ -12,12 +12,12 @@ module.exports = async page=>{
         setUi('playing'); G.owPos = { x:q[0], y:q[1] }; owReveal(q[0], q[1], 8); await fr(120); moveDir(-dx, -dy); await fr(90);
         if (G.owPos.x!==s.x || G.owPos.y!==s.y) continue;
         const PL = o3PL(), g = O3.doors && O3.doors.get(PL.x+','+PL.y);
-        if (g && g.userData.pit) return { s, from:[dx, dy], tried };
+        if (g && g.doorPit) return { s, from:[dx, dy], tried };
         break; }
     }
     return { none:true, tried }; });
   if (out.none) throw new Error('no barrow with a stair near ' + JSON.stringify(out));
-  Object.assign(out, await page.evaluate(()=>{ const PL = o3PL(), g = O3.doors.get(PL.x+','+PL.y), c = g.userData.pit;
+  Object.assign(out, await page.evaluate(()=>{ const PL = o3PL(), g = O3.doors.get(PL.x+','+PL.y), c = g.doorPit;
     /* the land: no triangle of the ground in the stair, and the finer patch is there */
     const geo = O3.land.geometry, P = geo.attributes.position.array, I = geo.index.array; let inPit = 0, edge = 0;
     for (let k=0;k<I.length;k+=3){ const a = I[k]*3, b = I[k+1]*3, d = I[k+2]*3, x = (P[a] + P[b] + P[d])/3, z = (P[a+2] + P[b+2] + P[d+2])/3;
@@ -25,14 +25,14 @@ module.exports = async page=>{
     /* the water's mask down the stair, and nothing growing in it */
     const [mx, mz] = o3PitWorld(c, 0, 0.3), dO = O3.depthO, i = Math.round((mx - dO.x)*dO.z), j = Math.round((mz - dO.y)*dO.z), dd = O3.depthTex.image.data, mask = dd[(j*dO.w + i)*4 + 1];
     let veg = 0; O3.world.traverse(o=>{ if (!o.isInstancedMesh || !o.count) return; const m4 = new THREE.Matrix4(), v3 = new THREE.Vector3(); for (let n=0;n<o.count;n++){ o.getMatrixAt(n, m4); v3.setFromMatrixPosition(m4); if (o3InCut(v3.x, v3.z, -0.04)) veg++; } });
-    const mt = o3Mats(); let stones = 0, turf = 0; g.traverse(o=>{ if (o.material===mt.rock) stones++; if (o.material===mt.barrowTurf) turf++; });   /* (RS-653: a cairn of the door's stone under old turf) */
+    const mt = o3Mats(); let stones = 0, turf = 0; g.traverse(o=>{ if (o.material===mt.rock) stones += o.userData.merged || 1; if (o.material===mt.barrowTurf) turf += o.userData.merged || 1; });   /* (RS-653: a cairn of the door's stone under old turf; RS-655: merged into a draw or two) */
     const w = new THREE.Vector3(); g.getWorldPosition(w);
     return { stones, turf, cutPatch:geo.userData.cuts, inPit, edge, mask, veg, stand:+Math.hypot(O3.ppos.x - w.x, O3.ppos.z - w.z).toFixed(2), ui:G.ui }; }));
   await page.screenshot({ path: SHOTS + '/rs652-stair.png' });
   Object.assign(out, await page.evaluate(async ()=>{ G.pendingDungeonModifier = null; enterDungeonConfirm();
     const r = { started:!!O3.doorWalk, pit:!!(O3.doorWalk && O3.doorWalk.pit), eyesSeen:false, maxFade:0, minY:9, onSteps:0, t:0 }; const y0 = O3.ppos.y, t0 = performance.now();
     await new Promise(res=>{ const f = ()=>{ const W = O3.doorWalk, PL = o3PL(), g = O3.doors && O3.doors.get(PL.x+','+PL.y);
-      if (g && (g.userData.eyes||[]).some(e=>e.visible)) r.eyesSeen = true;
+      if (g && (g.doorEyes||[]).some(e=>e.visible)) r.eyesSeen = true;
       const el = document.getElementById('transFade'); if (el && el.style.display==='block') r.maxFade = Math.max(r.maxFade, +el.style.opacity);
       if (W && O3.ppos){ const dy = O3.ppos.y - y0; r.minY = Math.min(r.minY, dy); if (dy < -0.15 && dy > -0.4 && !r.onSteps){ r.onSteps = 1; window.__shotNow = true; } }
       if (G.gameMode===1 || performance.now() - t0 > 10000){ r.t = +((performance.now() - t0)/1000).toFixed(1); res(); } else requestAnimationFrame(f); }; requestAnimationFrame(f); });

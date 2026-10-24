@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-655 - A barrow in a few draws
+
+Found by the full test run before merging RS-620 to RS-654 into `main`.
+
+- **Each barrow cost about a hundred draws.** The barrow's door bookkeeping (its eyes and its stair) sat on the model's own data, and anything there keeps a whole model out of the land's static merge, so every one of its stones was drawn on its own. Since RS-653 that was about a hundred draws a barrow. The bookkeeping has moved, and a barrow merges down to a draw or two, as every other site does.
+- **Two tests brought up to date:** the world preview's colour check no longer samples a sea cliff (grey stone since RS-622), and the land's normals check judges the land's grid clear of the barrows' stair cuts (RS-652).
+
 ## RS-654 - A Planet's turned faces, audited
 
 An audit of the 3D land on a Planet's five turned faces (every face but the one you start on), where the land is laid in a frame turned from the world's grid. Ten places still mixed the two up. None of this showed on a flat world, and the front face was right all along.

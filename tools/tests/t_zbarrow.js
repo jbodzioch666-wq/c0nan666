@@ -5,7 +5,7 @@ module.exports = async page=>{
     window.__trans = true; goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{}; G.player.wildWarned = 1; G.player.hp = G.player.maxHp = 99999; G.gameMode = 0; G.player.clock = DAY_LENGTH*0.45;
     const m = G.ow.map, sites = questNearbySites(G.owPos.x, G.owPos.y, 1, 80, ['dungeon']).filter(s=>m[s.x][s.y]===OW_DUNGEON);
     for (const s of sites) for (const [dx, dy] of [[1,1],[0,1],[1,0]]){ const q = owNb(s.x, s.y, dx, dy); if (!q || ![OW_GRASS, OW_FOREST, OW_DESERT, OW_TUNDRA, OW_SWAMP].includes(m[q[0]][q[1]])) continue;
-      setUi('playing'); G.owPos = { x:q[0], y:q[1] }; owReveal(q[0], q[1], 8); await fr(120); moveDir(-dx, -dy); await fr(90); if (G.owPos.x===s.x && G.owPos.y===s.y){ const PL = o3PL(), g = O3.doors && O3.doors.get(PL.x+','+PL.y); if (!process_pit || (g && g.userData.pit)){ setUi('playing'); return s; } break; } }
+      setUi('playing'); G.owPos = { x:q[0], y:q[1] }; owReveal(q[0], q[1], 8); await fr(120); moveDir(-dx, -dy); await fr(90); if (G.owPos.x===s.x && G.owPos.y===s.y){ const PL = o3PL(), g = O3.doors && O3.doors.get(PL.x+','+PL.y); if (!process_pit || (g && g.doorPit)){ setUi('playing'); return s; } break; } }
     return null; }, !process.env.ZB_ANY);
   if (!at) throw new Error('no barrow');
   const zoom = +(process.env.ZB_DIST || 7);

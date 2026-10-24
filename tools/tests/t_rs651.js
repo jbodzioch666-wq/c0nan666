@@ -15,14 +15,14 @@ module.exports = async page=>{
     return { none:true }; });
   if (out.none) throw new Error('no barrow to walk up to');
   Object.assign(out, await page.evaluate(()=>{ const PL = o3PL(), g = O3.doors && O3.doors.get(PL.x+','+PL.y), c = new THREE.Vector3(); if (!g) return { noModel:true }; g.getWorldPosition(c);
-    return { ui:G.ui, eyes:(g.userData.eyes||[]).length, stand:+Math.hypot(O3.ppos.x - c.x, O3.ppos.z - c.z).toFixed(2) }; }));
+    return { ui:G.ui, eyes:(g.doorEyes||[]).length, stand:+Math.hypot(O3.ppos.x - c.x, O3.ppos.z - c.z).toFixed(2) }; }));
   await page.screenshot({ path: SHOTS + '/rs651-barrow.png' });
   /* in: watch it every frame */
   Object.assign(out, await page.evaluate(async ()=>{ G.pendingDungeonModifier = null; enterDungeonConfirm();
     const r = { started:!!O3.doorWalk, modeAt:G.gameMode, uiAt:G.ui, eyesSeen:false, maxFade:0, minY:9, t:0 }; const y0 = O3.ppos.y, t0 = performance.now();
     window.__dw = r;
     await new Promise(res=>{ const f = ()=>{ const W = O3.doorWalk, PL = o3PL(), g = O3.doors && O3.doors.get(PL.x+','+PL.y);
-      if (g && (g.userData.eyes||[]).some(e=>e.visible)) r.eyesSeen = true;
+      if (g && (g.doorEyes||[]).some(e=>e.visible)) r.eyesSeen = true;
       const el = document.getElementById('transFade'); if (el && el.style.display==='block') r.maxFade = Math.max(r.maxFade, +el.style.opacity);
       if (W && O3.ppos) r.minY = Math.min(r.minY, O3.ppos.y - y0);
       if (G.gameMode===1 || performance.now() - t0 > 9000){ r.t = +((performance.now() - t0)/1000).toFixed(1); res(); } else requestAnimationFrame(f); }; requestAnimationFrame(f); });

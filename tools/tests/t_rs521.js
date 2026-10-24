@@ -10,8 +10,9 @@ module.exports = async page=>{
     let n = 0; while (O3.warmWait && n++ < 900){ await new Promise(r2=>requestAnimationFrame(r2)); renderGame(); } await new Promise(r2=>setTimeout(r2, 1500)); });
   const r0 = await page.evaluate(()=>{ const out = {};
     /* the land's normals, summed a few rows at a time, are three's own */
-    const NV = O3_W*O3_R + 1; let land = null; O3.world.traverse(o=>{ if (!land && o.isMesh && o.geometry.attributes.position && o.geometry.attributes.position.count===NV*NV) land = o; });
-    if (land){ const g = land.geometry.clone(); g.computeVertexNormals(); const a = land.geometry.attributes.normal.array, b = g.attributes.normal.array; let d = 0; for (let i=0;i<a.length;i++) d = Math.max(d, Math.abs(a[i] - b[i])); out.normDiff = d; } else out.normDiff = 'no land';
+    const NV = O3_W*O3_R + 1, land = O3.land;   /* (RS-654: the land's grid, then the barrows' stair patches after it (RS-652) - judged on the grid, clear of the cuts, whose triangles are re-laid) */
+    if (land){ const g = land.geometry.clone(); g.computeVertexNormals(); const a = land.geometry.attributes.normal.array, b = g.attributes.normal.array, P = land.geometry.attributes.position.array, cuts = O3.cuts||[]; let d = 0;
+      for (let k=0;k<NV*NV;k++){ if (cuts.some(c=>Math.abs(P[k*3] - c.cx) < 3 && Math.abs(P[k*3+2] - c.cz) < 3)) continue; for (let e=0;e<3;e++) d = Math.max(d, Math.abs(a[k*3+e] - b[k*3+e])); } out.normDiff = d; out.cuts = cuts.length; } else out.normDiff = 'no land';
     return out; });
   await cdp.send('Emulation.setCPUThrottlingRate', { rate:4 });
   const r = await page.evaluate(async ()=>{

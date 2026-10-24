@@ -4,12 +4,12 @@
 module.exports = async page=>{
   page.setDefaultTimeout(0); const errs = []; page.on('pageerror', e=>errs.push(String(e).slice(0, 200)));
   const r = await page.evaluate(async ()=>{ goToCharCreate(); ccBegin(); wgRegenerate(1947342953); for (let i=0;i<10;i++){ renderGame(); await new Promise(r=>requestAnimationFrame(r)); } const out = {};
-    const px = (t)=>{ for (let x=0;x<OW_COLS;x++) for (let y=0;y<OW_ROWS;y++) if (G.ow.map[x][y]===t && !wgBioAt(x, y)) return wgPreviewColor(t, x, y); return null; };
+    const px = (t)=>{ for (let x=0;x<OW_COLS;x++) for (let y=0;y<OW_ROWS;y++) if (G.ow.map[x][y]===t && !wgBioAt(x, y) && !owCliffAt(x, y)) return wgPreviewColor(t, x, y); return null; };   /* (RS-654: not a sea cliff - grey stone since RS-622, and the map's edge is full of them) */
     out.grass = px(OW_GRASS); out.forest = px(OW_FOREST); out.river = px(OW_RIVER); out.mtn = px(OW_MOUNTAIN);
     /* the band where the Wilderness lay: on the preview's canvas, no red wash */
     const w = G.ow.wild, cv = document.getElementById('worldPreviewCanvas'), cx = cv.getContext('2d'); out.side = w && w.side;
     let red = 0, n = 0, spot = null; const cell = cv.width/OW_COLS; for (let x=0;x<OW_COLS;x++) for (let y=0;y<OW_ROWS;y++){ if (!wgWildGen(x, y) || G.ow.map[x][y]===OW_WATER || OW_SITE_TILES.includes(G.ow.map[x][y])) continue; if ((x + y) % 7) continue;
-      n++; if (!spot && o3Passable(x, y)) spot = { x, y }; const d = cx.getImageData(Math.floor(x*cell + cell/2), Math.floor(y*cell + cell/2), 1, 1).data, want = wgPreviewColor(G.ow.map[x][y], x, y).match(/\d+/g).map(Number); if (Math.abs(d[0] - want[0]) > 8) red++; }
+      n++; if (!spot && o3Passable(x, y)) spot = { x, y }; const d = cx.getImageData(Math.floor(x*cell + cell/2), Math.floor(y*cell + cell/2), 1, 1).data, want = wgPreviewColor(G.ow.map[x][y], x, y).match(/\d+/g).map(Number); if (d[0] - want[0] > 8 && d[0] > d[1]) red++; }   /* (RS-655: reddened - the old wash reddened every point; the provinces' lettering (RS-623) now lies over a few, dark ink and pale parchment) */
     out.band = [red, n];
     let wildAny = 0, wildGen = 0; for (let x=0;x<OW_COLS;x+=2) for (let y=0;y<OW_ROWS;y+=2){ if (wgWildLevel(x, y)) wildAny++; if (wgWildGen(x, y)) wildGen++; } out.wild = [wildAny, wildGen];
     /* dying where it lay: an ordinary death, with a grave to go back to */
