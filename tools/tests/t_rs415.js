@@ -3,15 +3,16 @@
 // room's door a studded iron-bound one under it, no taller than the walls; torches in sconces on the town's gate towers; and
 // capes laid over the shoulders and on the back instead of standing off it
 module.exports = async page=>{
+  await page.evaluate(()=>{ M3D_SKIN = false; if (M3D.tpl) M3D.tpl.clear(); });   /* (the parts as built, not merged into skinned meshes (RS-379) nor the atlas (RS-578): this test looks at them one by one) */
   const r = await page.evaluate(async ()=>{
     goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); G.gameMode = 0; saveCurrentGame = ()=>{}; o3Pref = true;
     for (let i=0;i<8;i++){ renderGame(); await new Promise(r=>setTimeout(r, 30)); }
     const T = THREE, out = {}, box = o=>{ o.updateMatrixWorld(true); return new T.Box3().setFromObject(o); };
     // the hips and the skirt
     const body = (race, fem)=>{ goToCharCreate(); G.chosenRace = RACES.findIndex(q=>q[0]===race); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); G.gameMode = 0;
-      for (const sl of ['head','chest','legs','arms','feet','cape']) G.gear[sl] = newItem(); G.player.look.body = fem ? 1 : 0; const pt = rsPlayerLook(), e = m3dInstance({}, pt); return { e, b:pt.o.bulk || 1, outfit:pt.o.outfit }; };
+      for (const sl of ['head','chest','legs','arms','feet','cape']) G.gear[sl] = newItem(); G.gear.chest = rsMakeArmour('hide', 1, 'chest'); G.player.look.body = fem ? 1 : 0;   /* (RS-546: out of body armour you're in your underclothes - a jerkin, for its skirt) */ const pt = rsPlayerLook(), e = m3dInstance({}, pt); return { e, b:pt.o.bulk || 1, outfit:pt.o.outfit }; };
     const f = body('Dragonborn', true), m = body('Dragonborn', false), hipX = e=>Math.abs(e.rig.legs[0].hip.position.x);
-    let skTop = 0; f.e.rig.hips.traverse(o=>{ if (o.isMesh && o.geometry.type==='CylinderGeometry' && o.geometry.parameters.radialSegments===48){ const p = o.geometry.attributes.position; let ymax = -9; for (let i=0;i<p.count;i++) ymax = Math.max(ymax, p.getY(i)); for (let i=0;i<p.count;i++) if (p.getY(i) > ymax - 1e-4) skTop = Math.max(skTop, Math.abs(p.getX(i))*o.scale.x); } });
+    let skTop = 0; { const o = f.e.rig.pelvisMesh, p = o.geometry.attributes.position; let ymax = -9; for (let i=0;i<p.count;i++) ymax = Math.max(ymax, p.getY(i)); for (let i=0;i<p.count;i++) if (p.getY(i) > ymax - 0.01) skTop = Math.max(skTop, Math.abs(p.getX(i))*o.scale.x); }   /* (the garment's skirt is sculpted with the pelvis now (m3dWearGeo 'bot'): its waist, at the top of the sculpt) */
     out.hips = { f:+hipX(f.e).toFixed(4), m:+hipX(m.e).toFixed(4), skTop:+skTop.toFixed(4), outfit:f.outfit };
     // the pyramid
     G.gameMode = 0; O3.flames = O3.flames || []; O3.glows = O3.glows || []; O3.smoke = O3.smoke || [];

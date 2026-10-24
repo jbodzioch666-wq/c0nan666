@@ -21,7 +21,7 @@ module.exports = async page=>{
       A(!!pt.o.fem===fem, k+': the figure is '+(fem ? 'a woman' : 'a man'));
       A(top.y > 0.1, k+': the robe cloth runs up over the waist: '+top.y);
       A(cMin > top.y - 0.045, k+': nothing of the bodice below the cloth (tucked in under its top): '+JSON.stringify(out[k]));
-      A(cord && out[k].cordY > 0.07 && out[k].cordY < top.y - 0.02, k+': the cord round the natural waist, on the cloth: '+JSON.stringify(out[k]));
+      A(cord && out[k].cordY > 0.02 && out[k].cordY < top.y - 0.02,   /* (RS-590: low on the waist, where it meets the hips) */ k+': the cord round the natural waist, on the cloth: '+JSON.stringify(out[k]));
       A(!rig.pelvisMesh || !rig.pelvisMesh.visible, k+': no second piece at the hips'); }
     // a one-piece robe (a townsperson) meets the same way, and a robe top over plate legs keeps its bodice and sash
     { const e = m3dInstance({}, m3dPortrait({ nm:'cult acolyte' })), rig = e.rig; out.onePiece = { skirt:!!rig.skirt, bod:rig.chestMesh ? +ring(rig.chestMesh, q=>true).yMin.toFixed(3) : null }; A(out.onePiece.skirt && out.onePiece.bod > -0.012, 'a one-piece robe meets at the belt line too: '+JSON.stringify(out.onePiece)); }

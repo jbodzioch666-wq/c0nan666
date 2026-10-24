@@ -7,9 +7,9 @@ module.exports = async page=>{
     const p = G.player, out = {};
     G.gear.ammo = rsMakeAmmo(1); p.arrows = 36; p.ammoStacks = { 0:39 };
     out.names = [resName('arw_0'), resName('arw_1')]; out.counts = [resCount('arw_0'), resCount('arw_1')];
-    G.csBag = 'res'; setUi('inventory'); await new Promise(r=>setTimeout(r, 50));
-    const chips = [...document.querySelectorAll('.reschip')].filter(c=>/Arrows/.test(c.textContent)).map(c=>({ t:c.textContent.trim(), img:!!c.querySelector('img.resico') }));
-    out.chips = chips; out.plain = chips.some(c=>/^Arrows/.test(c.t)); setUi('playing');
+    SP.open = true; SP.tab = 'inv'; renderSidePanel(); await new Promise(r=>setTimeout(r, 50));   /* (the quiver is a grid in the pack panel now; the resource chips went with the old bag) */
+    const chips = [...document.querySelectorAll('[data-sp-ammo]')].map(c=>({ t:c.title, img:!!c.querySelector('img') })); SP.open = false; renderSidePanel();
+    out.chips = chips; out.plain = chips.some(c=>/^Arrows/.test(c.t));
     // the fps meter: right side, and it drags
     SET.fps = true; for (let i=0;i<50;i++) await new Promise(r=>requestAnimationFrame(r));
     const f = document.getElementById('fpsCounter'), fr = f.getBoundingClientRect(); out.fps = { right:fr.left > innerWidth/2, drag:f.dataset.drag };

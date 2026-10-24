@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-656 - Floors below the first without the freeze
+
+Found by clearing the tests that had been failing for weeks: nineteen of them, two of which were pointing at real bugs.
+
+- **Every new dungeon floor froze for a second.** Going deeper, the floor's creatures were sculpted in slices behind the loading card, as RS-572 meant, and then sculpted again all at once at full detail, because the warm-up looked them up on the wrong grid (since RS-610). Floors 2 to 6 of a fresh dungeon now come up in 350 to 500 ms with no task over 60 ms; they took 1.2 to 1.7 s with a 0.7 to 1.2 s freeze each. Monsters below ground are drawn on the coarser grid RS-610 intended, the same one townsfolk use.
+- **The hooded figure's corner is dim again.** RS-429's torch on the tavern's front-left post lit his table, which RS-383 had left to a candle. That post carries no torch now, and the tavern's west-wall sconce hangs at the back end of the wall.
+- **Nineteen tests cleared.** Fourteen were stale: they measured model parts the figure atlas (RS-578) merges, looked for the quiver (RS-334) and the robe's cord (RS-590) where they used to be, or waited a number of frames that was two seconds on a 60 Hz screen and under one on a fast monitor. The trot test now poses its wolf with the matrix freeze (RS-577) off, the death test kills with a blow as the game does, and the world-generator test walks off a won field as RS-382 asks.
+
 ## RS-655 - A barrow in a few draws
 
 Found by the full test run before merging RS-620 to RS-654 into `main`.

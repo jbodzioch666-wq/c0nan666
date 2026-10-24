@@ -11,7 +11,7 @@ module.exports = async page=>{
     SET.fps = true; let ts = 1000; FPSC.t0 = ts; fpsTick(ts); const out = {};
     const sprites = ()=>{ let n = 0, v = 0; V3.scene.traverse(o=>{ if (o.isSprite){ n++; if (o.visible) v++; } }); return [n, v]; };
     const R = V3.renderer, P = GFXP.get(R); out.samples0 = P ? P.scene.samples : -1; out.shadowType0 = R.shadowMap.type;
-    diagToggle(); out.on = DIAG.on;
+    out.sprites0 = sprites(); diagToggle(); out.on = DIAG.on;   /* (RS-575: off-screen sprites are culled, so not every sprite is visible to start with) */
     const feed = (ms, n)=>{ for (let i=0;i<n;i++){ DIAG.acc = (DIAG.acc||0) + ms; diagFrame(ms); } };   /* (RS-358: the card timer keeps its own running sum in DIAG.acc; the diag must not share it) */
     const at = ()=>DIAG.k % 2 ? DIAG_STEPS[(DIAG.k+1)/2][0] : 'base';
     feed(10, 46); out.base = DIAG.res.base; out.stepAfterBase = at(); out.spritesHidden = sprites();
@@ -27,12 +27,12 @@ module.exports = async page=>{
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
   A(r.on && r.base===10 && r.stepAfterBase==='sprites' && r.spritesHidden[0] > 0 && r.spritesHidden[1]===0, 'after the base, the sprites are switched off');
-  A(r.spritesBack[1]===r.spritesBack[0] && Math.abs(r.resSprites - 0.4) < 0.01, 'the sprites come back and their saving is kept');
+  A(r.spritesBack[0] - r.spritesBack[1] <= r.sprites0[0] - r.sprites0[1] && Math.abs(r.resSprites - 0.4) < 0.01,   /* (no more hidden than before the diag: flames spawn sprites as it runs) */ 'the sprites come back and their saving is kept');
   A(r.stepSoft==='softshadow' && r.softType===1 && r.softBack===r.shadowType0, 'the soft shadow filtering is swapped and restored');
   A(r.stepShadows==='shadows' && r.shadowsOff===false && r.shadowsBack===true, 'the shadows go off and come back');
   A(r.stepMsaa==='msaa' && (r.samples0===0 ? r.msaaSamples===0 : r.msaaSamples===0 && r.msaaBack===r.samples0), 'the multisampling goes off and comes back');
   A(r.stepPeople==='people' && r.peopleHidden && r.peopleBack, 'the people go and come back');
   A(r.stepNow==='base' && r.stepAfterPeople==='base', 'a fresh base is read between the steps');
   A(/diag base 12\.0 -sprites 0\.4 -grass 3\.0 -lamps 1\.2 -softshadow 2\.0 -shadows 4\.0 -msaa (1\.0|n\/a) -people 2\.0/.test(r.meter), 'the meter reads each saving against the base just before it: '+r.meter);
-  A(!r.off && r.spritesAfterOff[1]===r.spritesAfterOff[0] && !r.diagOffWithMeter, 'switching off undoes everything, and the meter going off does too');
+  A(!r.off && r.spritesAfterOff[0] - r.spritesAfterOff[1] <= r.sprites0[0] - r.sprites0[1] && !r.diagOffWithMeter, 'switching off undoes everything, and the meter going off does too');
 };

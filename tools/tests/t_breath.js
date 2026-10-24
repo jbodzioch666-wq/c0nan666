@@ -18,7 +18,7 @@ module.exports = async page=>{
     const out = { dist:Math.abs(m.x-p.x)+Math.abs(m.y-p.y), clear:shotClear(m.x,m.y,p.x,p.y), role:monAi(m).role, hurt:p.hp < hp0, breathT:!!m._breathT, shot:(ISO.shots||[]).some(s=>s.kind==='breath'), elem:((ISO.shots||[]).find(s=>s.kind==='breath')||{}).elem };
     // its jaws gape as it breathes
     const e = M3D.inst.get(m); let jaw = [];
-    for (let i=0;i<40;i++){ renderGame(); await new Promise(r=>setTimeout(r, 30)); if (e) jaw.push(e.rig.jaw.rotation.x); if (i===14) window.__mid = true; }
+    for (let i=0, t0 = performance.now(); performance.now() - t0 < 2200; i++){ renderGame(); await new Promise(r=>setTimeout(r, 30)); if (e) jaw.push(e.rig.jaw.rotation.x); if (i===14) window.__mid = true; }   /* (by the clock: the breath runs 1.37s from its start) */
     out.jawMax = e ? +Math.max(...jaw).toFixed(2) : null; out.gone = !(ISO.shots||[]).some(s=>s.kind==='breath');
     return out; });
   const A = (c, m)=>{ if (!c) throw new Error(m+' :: '+JSON.stringify(r)); };

@@ -2,6 +2,7 @@
 // the treants, the hydras (five-headed, on the dragon), the xorn, the dust devil and the manticore's wings, mane and tail; each
 // builds, is detailed, moves when it attacks, and stands on (or hovers just over) the floor
 module.exports = async page=>{
+  await page.evaluate(()=>{ M3D_SKIN = false; if (M3D.tpl) M3D.tpl.clear(); });   /* (the parts as built, not merged into skinned meshes (RS-379) nor the atlas (RS-578): this test looks at them one by one) */
   const r = await page.evaluate(()=>{
     const out = {}, snap = e=>{ const a = []; e.holder.updateMatrixWorld(true); e.holder.traverse(x=>{ if (x.isMesh){ const v = new THREE.Vector3(); x.getWorldPosition(v); a.push(v.x, v.y, v.z); } }); return a; };
     const list = ['reef shark','hunter shark','giant shark','quipper swarm','hawk','giant owl','giant vulture','treant','elder treant','the verdant horror','hydra','hydra of the tides','xorn','dust devil','manticore'];

@@ -2,6 +2,7 @@
 // open and snap), jackal- and hyena-headed gnolls (with a hinged jaw), bugbears, yetis, and kobolds and lizardfolk on the dragonborn's sculpt;
 // a dragonborn's helmets sit on his skull (raised, set back, a size larger), his cowl opens wide for the snout, and his crest stays under a helmet
 module.exports = async page=>{
+  await page.evaluate(()=>{ M3D_SKIN = false; if (M3D.tpl) M3D.tpl.clear(); });   /* (the parts as built, not merged into skinned meshes (RS-379) nor the atlas (RS-578): this test looks at them one by one) */
   const r = await page.evaluate(()=>{
     const out = {};
     const verts = h=>{ let n = 0, boxes = 0; h.traverse(x=>{ if (x.isMesh){ n += x.geometry.attributes.position.count; if (x.geometry.type==='BoxGeometry' && x.geometry.parameters.width > 0.05) boxes++; } }); return { n, boxes }; };

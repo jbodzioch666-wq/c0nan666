@@ -2,6 +2,7 @@
 // picking a creature keeps the list where you'd scrolled it; weapon hands are turned to close round the grip, and a one-handed
 // axe leads with its blade
 module.exports = async page=>{
+  await page.evaluate(()=>{ M3D_SKIN = false; if (M3D.tpl) M3D.tpl.clear(); });   /* (the parts as built, not merged into skinned meshes (RS-379) nor the atlas (RS-578): this test looks at them one by one) */
   const r = await page.evaluate(async ()=>{
     const A = (c, msg)=>{ if (!c) throw new Error('assert: '+msg); }, out = {}, wait = ms=>new Promise(r=>setTimeout(r, ms));
     goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing');

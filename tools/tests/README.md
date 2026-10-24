@@ -495,6 +495,8 @@ Screenshots go to `tools/tests/shots/`.
 | zdgload | how long a dungeon floor takes to come up from a fresh page (with `ZSAVE`): load to the end of the shader warm-up, the longest frames, the programs built; `ZNOPRE=1` turns off the parallel link to compare |
 | zlink | how long one standard material takes to link against a set of lights (point lights, how many shadowed, the shadow filter) |
 | zdgcache | t_zdgload twice in one browser, the page reloaded between: what the browser's own shader cache saves a second visit |
+| zfloors | going down floor by floor from a fresh character: each floor's wall time, longest main-thread task and fresh programs, with the CPU profile's long runs and their top functions (`ZFLOORS` floors below the first). Found RS-656's per-floor freeze |
+| ztavern2 | the tavern's lights round the hooded figure's corner: every main lamp with its distance from the corner, the candles, the layout near it (for t_rs382) |
 | zland | the open land from a fresh page with a save (`ZSAVE`): load to the end of its warm-up, the longest frames |
 | zpre | whether gfxPrelink returns at once: its call timed against the wait for the driver, on fresh heavy materials |
 | zviews | the open land and a town drawn through the players' warm-up path (sliced, parallel link): screenshots |

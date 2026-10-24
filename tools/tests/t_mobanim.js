@@ -11,14 +11,14 @@ module.exports = async page=>{
     const snap = (root)=>{ root.updateMatrixWorld(true); const a = [], v = new THREE.Vector3(); root.traverse(o=>{ if (o.isMesh && o.geometry && o.geometry.attributes.position){ const P = o.geometry.attributes.position, st = Math.max(1, Math.floor(P.count/24)); if (o.isSkinnedMesh) o.skeleton.update(); for (let i=0;i<P.count;i+=st){ v.fromBufferAttribute(P, i); if (o.isSkinnedMesh) o.boneTransform(i, v); v.applyMatrix4(o.matrixWorld); a.push(v.x, v.y, v.z); } } }); return a; };   /* (RS-379: a skinned mesh's vertices are moved by its joints on the card; here they're moved the same way by hand) */
     const diff = (a, b)=>{ let d = 0; for (let i=0;i<Math.min(a.length, b.length);i++) d = Math.max(d, Math.abs(a[i]-b[i])); return d; };
     const out = { n:names.length, noModel:[], noWalk:[], noFight:[], noDeath:[], errs:[], kinds:{} };
-    const keepDt = FP.dt; FP.dt = 0.05;
+    const keepDt = FP.dt; FP.dt = 1/30; for (let i=-4;i<=4;i++) for (let j=-4;j<=4;j++) if (G.map[5+i] && G.map[5+i][5+j]!==undefined) G.map[5+i][5+j] = T_FLOOR;   /* (open floor round where they fall: on a map with a wall at (5,5) a ragdoll propped itself against it) */
     for (const nm of names){
       const m = { nm, x:5, y:5, hp:10, maxHp:10, alive:true, undead:!!undead.get(nm) };
       try{
         let e, kind;
         if (sk3Wanted(m)){ e = sk3Instance(m); kind = 'skeleton'; }
         else { const pt = m3dPortrait(m); if (pt){ e = m3dInstance(m, pt); kind = e.anim ? 'sculpted' : e.beast ? 'beast' : 'humanoid'; } }
-        if (!e){ out.noModel.push(nm); continue; }
+        if (!e){ out.noModel.push(nm); continue; } e.holder.position.set(5.5, 0, 5.5);   /* (on the open floor cleared above - at the origin the ragdoll lay against the map's border wall) */
         out.kinds[kind] = (out.kinds[kind]||0) + 1;
         const rg = e.rig, pose = (t, mv, wind, strike)=>{ e.fol = 0; e.mvS = mv;
           if (kind==='skeleton') sk3Pose(t, mv, strike, 0, e.seed||0, rg, mv ? t*9 : 0);
@@ -30,7 +30,7 @@ module.exports = async page=>{
         if (fight < 0.02) out.noFight.push(nm+' '+fight.toFixed(3));
         // killed: it topples
         FPD.scene && FPD.scene.add(e.holder); if (!e.holder.parent){ const g = new THREE.Group(); g.add(e.holder); }
-        M3D.inst.set(m, e); m3dKill(m); for (let i=0;i<140;i++) m3dSweep();   /* (RS-371: a ragdoll takes a moment longer to settle than the old scripted topple) */
+        M3D.inst.set(m, e); m3dKill(m, { dmg:30, maxHp:10, kind:'melee', crit:true }); for (let i=0;i<200;i++) m3dSweep();   /* (RS-656: killed by a blow, as in the game - with no hit to throw it a bear's chain stood on its four legs and a heavy dwarf's knelt at 57 degrees, both at rest; and 1/30 steps, 200 of them) */   /* (RS-371: a ragdoll takes a moment longer to settle than the old scripted topple) */
         /* (RS-371) fallen: on its side or back - or, for an ooze, slumped into a puddle; a ghost thinned away; a skeleton in pieces */
         const fell = e.dkind==='tent' ? (e.s0 && e.root.scale.y < e.s0.y*0.7 ? 2 : 0) : e.dkind==='swarm' ? (e.parts && e.parts.length && e.parts.every(R=>R.t > 0) ? 2 : 0)   /* (RS-413: an octopus slumps flat, a swarm scatters) */
           : e.dkind==='ooze' ? (e.s0 && e.root.scale.y < e.s0.y*0.3 ? 2 : 0) : e.dkind==='ghost' ? (!e.holder.parent ? 2 : 0) : e.dkind==='bones' ? (e.parts && e.parts.length >= 8 ? 2 : 0)

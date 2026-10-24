@@ -14,7 +14,7 @@ module.exports = async page=>{
     g.updateMatrixWorld(true); g.traverse(o=>{ if (o.isMesh && o.geometry.type==='ExtrudeGeometry'){ const bb = new T.Box3().setFromObject(o); if (bb.min.y > 0.6){ arch++; if (o.material===FPD.trimMat) trim++; } else if (bb.max.y > plankTop && bb.min.y < 0.05) plankTop = bb.max.y; } });
     out.arch = { arch, trim, plankTop:+plankTop.toFixed(3), haveTrim:!!FPD.trimMat };
     // her clothes, front to back below the belt, against his
-    const front = (fem)=>{ const geo = m3dWearGeo(1, fem, 'jerkin', 'bot'), pa = geo.attributes.position; let z = -9; for (let i=0;i<pa.count;i++){ const y = pa.getY(i); if (y < -0.02 && y > -0.07 && Math.abs(pa.getX(i)) < 0.03) z = Math.max(z, pa.getZ(i)); } return +z.toFixed(4); };
+    const front = (fem)=>{ const geo = m3dWearGeo(m3dBodySpec({ fem }), 'jerkin', 'bot'), pa = geo.attributes.position;   /* (RS-524: sculpted to a body spec) */ let z = -9; for (let i=0;i<pa.count;i++){ const y = pa.getY(i); if (y < -0.02 && y > -0.07 && Math.abs(pa.getX(i)) < 0.03) z = Math.max(z, pa.getZ(i)); } return +z.toFixed(4); };
     out.front = { f:front(true), m:front(false) };
     return out; });
   console.log(JSON.stringify(r));

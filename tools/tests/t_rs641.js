@@ -23,7 +23,7 @@ module.exports = async page=>{
     /* a flick carries on a little after the mouse lets go */
     { await drag(25, 0, 3, true); const a = facing(); await fr(20); out.flick = +a.angleTo(facing()).toFixed(3); GLOBE.vyaw = GLOBE.vpitch = 0; }
     /* swung round to a place, as the search does: it comes round north up */
-    { const t = { x:G.owPos.x, y:G.owPos.y }; G.owZoomCenter = { x:t.x, y:t.y }; await fr(90); const f = globeFacing(); out.aim = { d:Math.max(Math.abs(f.x - t.x), Math.abs(f.y - t.y)), northY:+north().y.toFixed(2), aim:!!GLOBE.aim }; }
+    { const t = { x:G.owPos.x, y:G.owPos.y }; G.owZoomCenter = { x:t.x, y:t.y }; for (const t0 = performance.now(); (GLOBE.aim || performance.now() - t0 < 300) && performance.now() - t0 < 6000;) await fr(1); await fr(5); const f = globeFacing();   /* (until the swing is done, by the clock: 90 frames were 1.5s on a 60Hz screen, under half that here, and the swing still running turned the roll-over back) */ out.aim = { d:Math.max(Math.abs(f.x - t.x), Math.abs(f.y - t.y)), northY:+north().y.toFixed(2), aim:!!GLOBE.aim }; }
     /* the chart laid over, close in, with the globe upside down: its writing turned back upright */
     { canvas.dispatchEvent(new WheelEvent('wheel', { deltaY:-100, bubbles:true, cancelable:true })); for (let i=0;i<14;i++){ canvas.dispatchEvent(new WheelEvent('wheel', { deltaY:-100, bubbles:true, cancelable:true })); await fr(3); } await fr(40);
       const an0 = GLOBE.an||0; globeQ().premultiply(new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 0, 1), Math.PI)); GLOBE.vyaw = GLOBE.vpitch = 0; await fr(30);   /* (rolled over on the spot) */

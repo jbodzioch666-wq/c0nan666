@@ -2,6 +2,7 @@
 // down the back that lifts open over membrane wings, mandibles, feelers, six legs; the rust monster's propeller tail), and
 // the hyena pack and the town dogs moved onto the sculpted wolf (spots and a mane; shorter legs)
 module.exports = async page=>{
+  await page.evaluate(()=>{ M3D_SKIN = false; if (M3D.tpl) M3D.tpl.clear(); });   /* (the parts as built, not merged into skinned meshes (RS-379) nor the atlas (RS-578): this test looks at them one by one) */
   const r = await page.evaluate(()=>{
     const out = {};
     for (const nm of ['giant scarab','tomb scarab','rust monster']){

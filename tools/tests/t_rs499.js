@@ -11,7 +11,7 @@ module.exports = async page=>{
     G.gameMode = 0; G.owPos = { x:dx, y:dy }; G.pendingDungeon = { x:dx, y:dy }; enterDungeonConfirm(); setUi('playing');
     const t0 = performance.now(); renderGame();
     /* keep frames coming, as the browser would, until the sliced compile is done and a real frame has drawn */
-    let waited = 0; while (FPD.warmWait && waited < 30000){ await new Promise(r2=>requestAnimationFrame(r2)); renderGame(); waited = performance.now() - t0; }
+    let waited = 0; while ((FPD.warmWait || FPD.prep || FPD.prelink) && waited < 30000){ await new Promise(r2=>requestAnimationFrame(r2)); renderGame(); waited = performance.now() - t0; }
     for (let i=0;i<6;i++){ renderGame(); await new Promise(r2=>setTimeout(r2, 40)); }
     await new Promise(r2=>setTimeout(r2, 100));
     const cv = document.getElementById('dungeonGL');

@@ -26,7 +26,7 @@ module.exports = async page=>{
       G.gameMode = 0; G.owPos = { x:dx, y:dy }; G.pendingDungeon = { x:dx, y:dy }; enterDungeonConfirm(); setUi('playing');
       const t0 = performance.now(); while (performance.now() - t0 < 60000){ renderGame(); await new Promise(r=>setTimeout(r, 16)); if (FPD.mapRef===G.map && !FPD.prep && !FPD.warmWait && !FPD.prelink) break; }
       sculptDbGet = gdb; fpdPrepStep = st0; window.__noWarmSlice = 1;
-      const alive = G.mon.filter(m=>m.alive && m3dPortrait(m)), built = alive.filter(m=>{ const pt = m3dPortrait(m); return M3D.tpl.has(m3dTplKey(pt)); }).length;
+      const alive = G.mon.filter(m=>m.alive && m3dPortrait(m)), built = alive.filter(m=>{ const pt = m3dPortrait(m); return fpdMonBuild(()=>M3D.tpl.has(m3dTplKey(pt))); }).length;   /* (RS-656: on the coarse grid the dungeon builds them on) */
       for (let i=0;i<20;i++){ renderGame(); await new Promise(r=>setTimeout(r, 20)); }
       let mats = 0, empty = 0; FPD.scene.traverse(o=>{ for (const m of [].concat(o.material||[])){ const mp = FPD.r.properties.get(m); if (!mp || !mp.currentProgram) continue; mats++; if (mp.uniformsList && !mp.uniformsList.length) empty++;   /* (three r158+ makes the list at the first draw - null till then; an empty one is the RS-573 fault) */ } });
       out.prep = { steps, worst:+worst.toFixed(0), mons:alive.length, built, secs:+((performance.now() - t0)/1000).toFixed(1), mats, empty }; G.gameMode = 0; }

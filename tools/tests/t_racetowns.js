@@ -13,10 +13,10 @@ module.exports = async page=>{
       const t = towns.find(q=>q.race===race); if (!t){ out.fx[race] = 'no town'; continue; }
       G.owPos = { x:t.x, y:t.y }; enterVillage(); setUi('playing');
       const r = { k:townInfo().ident.k, vr:G.villageRace, folk:v3VillagerLook(0).stature, guard:townFolkLook({ guard:true }, 1).o };
-      const fl0 = p.skills.fletching||0, inv0 = G.inv.length, bag0 = JSON.stringify(p.bag), ac0 = p.buffACTurns||0, xp0 = p.skills.mining||0;
+      const fl0 = p.skills.fletching||0, inv0 = G.inv.length, bag0 = JSON.stringify(p.bag), am0 = JSON.stringify([p.arrows, p.ammoStacks]), ac0 = p.buffACTurns||0, xp0 = p.skills.mining||0;
       p.turnCount = (p.turnCount||0) + DAY_LENGTH*3;   /* a fresh day */
       townFixture(k); r.bagChanged = JSON.stringify(p.bag)!==bag0; r.ac = p.buffACTurns > ac0 ? p.buffACAmt : 0;
-      r.fletch = (p.skills.fletching||0) - fl0; r.arrows = G.inv.length > inv0 || JSON.stringify(p.bag)!==bag0;
+      r.fletch = (p.skills.fletching||0) - fl0; r.arrows = G.inv.length > inv0 || JSON.stringify(p.bag)!==bag0 || JSON.stringify([p.arrows, p.ammoStacks])!==am0;   /* (RS-334: arrows go straight into the quiver) */
       const before = JSON.stringify(p.bag), fl1 = p.skills.fletching||0; townFixture(k); r.again = JSON.stringify(p.bag)!==before; r.fletchAgain = (p.skills.fletching||0) - fl1;
       if (k==='stage'){ const a = p.skills.mining||0; skGainXP('mining', 1000); r.songGain = (p.skills.mining||0) - a; r.buff = buffList().some(x=>/song/.test(x.nm)); p.songT = -99999; const b = p.skills.mining||0; skGainXP('mining', 1000); r.plainGain = (p.skills.mining||0) - b; }
       out.fx[race] = r;

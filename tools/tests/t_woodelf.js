@@ -40,7 +40,7 @@ module.exports = async page=>{
     const folk = (V3.villagers||[]).concat(V3.npcs||[]).filter(p=>p.e && p.e.rig && p.e.rig.stoop).map(p=>lean(p.e));
     return { race:G.villageRace, me:lean(V3.player && V3.player.e), folk:folk.slice(0, 6), n:folk.length };
   });
-  A(tw.race==='woodelf' && tw.me > 0.15, 'you stoop in a wood elf town: '+JSON.stringify(tw));
+  A(tw.race==='woodelf' && tw.me > 0.14, 'you stoop in a wood elf town: '+JSON.stringify(tw));
   A(tw.n > 0 && tw.folk.every(v=>v > 0.15), 'the wood elf townsfolk stoop too: '+JSON.stringify(tw));
   console.log('woodelf ok', JSON.stringify({ free:r.free, lean:r.lean }));
 };

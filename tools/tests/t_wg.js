@@ -28,7 +28,7 @@ module.exports = async page=>{
     return out;
   });
   console.log(JSON.stringify(r1, null, 1));
-  await page.evaluate(()=>{ G.mon.forEach(m=>m.alive = 0); }); await frame(); await frame();
+  await page.evaluate(()=>{ G.mon.forEach(m=>m.alive = 0); }); await frame(); await frame(); await page.evaluate(()=>{ if (G.gameMode===2 && G.fieldWon) fieldLeave(); }); await frame();   /* (RS-382: a won fight stays on the field until you walk off it) */
   const r2 = await page.evaluate(()=>{
     const out = {}, A = (c, msg)=>{ if (!c) throw new Error('assert: '+msg); };
     A(G.gameMode===0 && wgState().done[window.__delve], 'delve cleared and looted '+G.gameMode);

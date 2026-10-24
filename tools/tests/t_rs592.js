@@ -16,7 +16,7 @@ module.exports = async page=>{
   await wait(1400);
   Object.assign(out, await page.evaluate(()=>({ inside:!!G.interior, roomDoor:!!V3.roomDoor })));
   /* out again, and to the gate: shut while you're away from it, open as you come near; out through it */
-  Object.assign(out, await page.evaluate(async ()=>{ exitInterior(); setUi('playing'); for (let i=0;i<120;i++){ renderGame(); await new Promise(r=>requestAnimationFrame(r)); }
+  Object.assign(out, await page.evaluate(async ()=>{ exitInterior(); setUi('playing'); for (const t0 = performance.now(); performance.now() - t0 < 2600;){ renderGame(); await new Promise(r=>requestAnimationFrame(r)); }   /* (by the clock: the gate eases shut at 1.5/s; 120 frames were two seconds on a 60Hz screen and under one on a fast one) */
     const H = V3.gateHinges, ga = V3.gateAt; const far = H.map(h=>+h.rotation.y.toFixed(2));
     let ex = null; for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++) if (G.map[x][y]===T_EXIT) ex = { x, y };
     G.player.x = ex.x; G.player.y = ex.y - 1; for (let i=0;i<90;i++){ renderGame(); await new Promise(r=>requestAnimationFrame(r)); }

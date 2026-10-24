@@ -7,7 +7,7 @@ module.exports = async page=>{
   const r = await page.evaluate(async ()=>{
     goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{}; G.player.wildWarned = 1;
     const s = questNearbySites(G.owPos.x, G.owPos.y, 1, 60, ['dungeon'])[0]; G.gameMode = 0; G.pendingDungeon = { x:s.x, y:s.y }; enterDungeonConfirm(); setUi('playing');
-    const p = G.player; p.hp = p.maxHp = 9999; for (const m of G.mon) m.alive = 0; G.mon = [];
+    window.__noAutoFreeze = true;   /* (RS-577 freezes the matrices of joints that stand still; this test poses them by hand between renders and reads where the paws are, so they must keep updating) */ const p = G.player; p.hp = p.maxHp = 9999; for (const m of G.mon) m.alive = 0; G.mon = [];
     { let best = null, bn = -1; for (let x=5;x<COLS-5;x++) for (let y=5;y<ROWS-5;y++){ if (G.map[x][y]!==T_FLOOR) continue; let n = 0; for (let i=-3;i<=3;i++) for (let j=-3;j<=3;j++) if (G.map[x+i][y+j]===T_FLOOR) n++; if (n > bn){ bn = n; best = [x, y]; } }
       p.x = best[0]; p.y = best[1]; }
     for (let i=-4;i<=4;i++) for (let j=-4;j<=4;j++){ G.map[p.x+i][p.y+j] = T_FLOOR; G.dungeonDeco[p.x+i][p.y+j] = ''; } FPD.mapRef = null;
@@ -26,9 +26,10 @@ module.exports = async page=>{
       const rng = k=>Math.max(...samples.map(q=>q[k])) - Math.min(...samples.map(q=>q[k]));
       let peaks = 0; for (let i=0;i<32;i++){ const a = samples[(i+31)%32].y, b = samples[i].y, c = samples[(i+1)%32].y; if (b > a && b >= c) peaks++; }
       o.trot = { bob:+rng('y').toFixed(3), peaks, flex:+rng('fx').toFixed(3), twist:+rng('fy').toFixed(3), leg:+rng('uA').toFixed(2), knee:+rng('kA').toFixed(2) };
-      pose(0, 1); const st = rg.legs.filter(L=>L.ph===0), sw = rg.legs.filter(L=>L.ph!==0);   // at phase 0 the legs with no offset stand mid-stance, the others swing
-      o.stance = { flat:+Math.max(...st.map(L=>Math.abs(pawDir(L)))).toFixed(3), lift:+(Math.min(...sw.map(pawY)) - Math.max(...st.map(pawY))).toFixed(3), bendSync:rg.bodyMesh.material.userData.bendA.value.x===rg.chest.rotation.x && rg.bodyMesh.material.userData.bendA.value.y===rg.chest.rotation.y };
-      pose(0, 0); const bots = rg.legs.map(L=>+(L.paw.getWorldPosition(new T.Vector3()).y - e.holder.position.y).toFixed(3));   /* (RS-379: the paw's joint, its mesh being skinned into the body) */ o.stand = { flat:+Math.max(...rg.legs.map(L=>Math.abs(pawDir(L)))).toFixed(3), low:+Math.max(...rg.legs.map(pawY)).toFixed(3), level:+Math.abs(rg.chest.rotation.x).toFixed(3), bots, down:Math.max(...bots) - Math.min(...bots) < 0.012 };
+      const legS = rg.legs.map(()=>[]); for (let i=0;i<32;i++){ pose(i/32*TAU, 1); rg.legs.forEach((L, j)=>legS[j].push([pawY(L), Math.abs(pawDir(L))])); }   /* (each paw over the stride: how far it lifts, and its pitch where it is lowest - planted) */
+      const lifts = legS.map(S=>Math.max(...S.map(q=>q[0])) - Math.min(...S.map(q=>q[0]))), flats = legS.map(S=>S.reduce((a, q)=>q[0] < a[0] ? q : a)[1]); pose(0, 1);
+      o.stance = { flat:+Math.max(...flats).toFixed(3), lift:+Math.min(...lifts).toFixed(3), bendSync:rg.bodyMesh.material.userData.bendA.value.x===rg.chest.rotation.x && rg.bodyMesh.material.userData.bendA.value.y===rg.chest.rotation.y };
+      pose(0, 0); const bots = rg.legs.map(L=>+(L.paw.getWorldPosition(new T.Vector3()).y - e.holder.position.y).toFixed(3));   /* (RS-379: the paw's joint, its mesh being skinned into the body) */ o.stand = { legLen:+Math.max(...rg.legs.map(L=>L.hip.getWorldPosition(new T.Vector3()).y - L.paw.getWorldPosition(new T.Vector3()).y)).toFixed(3), flat:+Math.max(...rg.legs.map(L=>Math.abs(pawDir(L)))).toFixed(3), low:+Math.max(...rg.legs.map(pawY)).toFixed(3), level:+Math.abs(rg.chest.rotation.x).toFixed(3), bots, down:Math.max(...bots) - Math.min(...bots) < 0.012 };
       // the chain
       m.alive = 0; m3dKill(m, { dmg:30, maxHp:20, kind:'melee', crit:true }); o.chain = !!e.chain && !e.rd; o.n = e.chain ? e.chain.p.length : 0;
       if (!e.chain) continue;
@@ -47,7 +48,7 @@ module.exports = async page=>{
   for (const nm of ['wolf', 'bear']){ const o = r[nm]; A(o && o.rig, nm+' is there');
     A(o.rig.chest && o.rig.foreOnChest && o.rig.hindOnBody && o.rig.neckOnChest && o.rig.ankles && o.rig.bend && o.rig.bendOwn, nm+': the rig - a chest carrying the forelegs and the neck, a bending body of its own, a wrist or a hock on every leg');
     A(o.trot.bob > 0.008 && o.trot.peaks===2 && o.trot.flex > 0.06 && o.trot.twist > 0.1 && o.trot.leg > 0.6 && o.trot.knee > 0.4, nm+': the trot - the body rises twice a stride, the back flexes and twists, the legs swing and fold');
-    A(o.stance.flat < 0.12 && o.stance.lift > 0.015 && o.stance.bendSync, nm+': paws flat through the stance and lifted through the swing; the body bends with the chest');
+    A(o.stance.flat < 0.12 && o.stance.lift > 0.06*o.stand.legLen && o.stance.bendSync,   /* (the lift against the leg's own length: a wolf's legs are shorter than a bear's) */ nm+': paws flat through the stance and lifted through the swing; the body bends with the chest');
     A(o.stand.flat < 0.1 && o.stand.low < 0.06 && o.stand.level < 0.001 && o.stand.down, nm+': standing square on flat paws, all four on the ground');
     A(o.chain && o.n===27, nm+': it dies as a chain of twenty-seven joints');
     A(o.low >= -0.03 && o.inWall===0 && o.err < 0.05, nm+': nothing goes through the floor or a wall, and every bone keeps its length');
