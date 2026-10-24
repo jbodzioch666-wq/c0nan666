@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-653 - A barrow built of stone
+
+- **The barrow's mound looks built, not grown.** It used to be a bright green hill. Now it's a cairn under old, dark, mossy turf, made of the same stone as its door.
+- **A ring of kerb stones** stands round its foot, leaning out a little as old kerbs do, open at the door.
+- **Stones break through the turf** all over the mound, and capstones and a small standing stone sit on its crown.
+- **A facade of great slabs** flanks the door on either side, like the front of a long barrow.
+- Barrows with and without a stair both get the new look.
+
 ## RS-652 - Down the barrow stair
 
 - **The land can open up now.** The ground in front of a barrow is cut away for a sunken stair, as in the doorway concept: four stone steps go down between dry-stone walls to a floor at the door, with kerb stones and a sill along the lip. The cut runs on a finer patch of ground that matches the land round it, so there's no seam.

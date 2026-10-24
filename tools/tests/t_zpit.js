@@ -1,4 +1,4 @@
-// probe (RS-652): a barrow's stair close up, trees hidden (ZP_TREES=1 keeps them), the four turns, then the walk down. Shots: shots/zpit-r0..3.png, zpit-w*.png
+// probe (RS-652; RS-653: the hero hidden for the turns): a barrow's stair close up, trees hidden (ZP_TREES=1 keeps them), the four turns, then the walk down. Shots: shots/zpit-r0..3.png, zpit-w*.png
 module.exports = async page=>{
   page.setDefaultTimeout(0);
   const at = await page.evaluate(async ()=>{ const fr = n=>new Promise(res=>{ let i = 0; const f = ()=>++i >= n ? res() : requestAnimationFrame(f); requestAnimationFrame(f); });
@@ -15,10 +15,10 @@ module.exports = async page=>{
     document.querySelectorAll('.v3plate').forEach(e=>e.style.visibility = 'hidden'); }, trees);
   await hide();
   for (let r = 0; r < 4; r++){
-    await page.evaluate(([r, z])=>{ ISO.rot = r; O3.dist = z; }, [r, zoom]); await page.waitForTimeout(1500);
+    await page.evaluate(([r, z])=>{ ISO.rot = r; O3.dist = z; if (O3.pgrp) O3.pgrp.visible = false; }, [r, zoom]); await page.waitForTimeout(1500);
     await page.screenshot({ path: SHOTS + '/zpit-r' + r + '.png', clip:{ x:250, y:60, width:900, height:620 } });
   }
-  await page.evaluate(([z])=>{ ISO.rot = 0; O3.dist = z; }, [zoom]); await page.waitForTimeout(1200);
+  await page.evaluate(([z])=>{ ISO.rot = 0; O3.dist = z; if (O3.pgrp) O3.pgrp.visible = true; }, [zoom]); await page.waitForTimeout(1200);
   await page.evaluate(()=>{ G.pendingDungeonModifier = null; enterDungeonConfirm(); });
   for (let i = 0; i < 8; i++){ await page.waitForTimeout(380); await page.screenshot({ path: SHOTS + '/zpit-w' + i + '.png', clip:{ x:250, y:60, width:900, height:620 } }); }
 };
