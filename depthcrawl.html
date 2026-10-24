@@ -8995,7 +8995,8 @@ function tryMoveOverworld(dx,dy){
   }
 }
 
-function enterDungeonConfirm(){
+function enterDungeonConfirm(walked){
+  if (!walked && (O3.doorWalk || o3DoorWalkStart())) return;   /* (RS-651: at a barrow you walk in first; the walk comes back here when you're through) */
   const {x:ex,y:ey} = G.pendingDungeon;
   const tile = G.ow.map[ex][ey], spire = typeof sqSpireAt==='function' && sqSpireAt(ex, ey);
   G.siteKind = spire ? 'necro' : (TILE_SITE_KIND[tile] || 'dungeon'); G.spireRun = spire ? 1 : 0;   /* (RS-360: the Spire is a necro tower in its own right, on its own slot) */
@@ -17485,6 +17486,50 @@ function o3PortalTick(dt, pp){
   }
   if (f.t >= 1.3){ G.owPortal = null; O3.pgrp.scale.setScalar(1); g.visible = false; waypointArrive(f.key); }
 }
+/* (RS-651) into a barrow on foot: from where you stopped, round to its front if you came at it from behind, up the forecourt between
+   the torches to the door - two pale eyes look out of the dark - and in, going down as you go while the dark takes the screen; then
+   the floor loads. A key or a tap skips to the end. Off with transitions (as the stair and portal walks are), at sea, or with the
+   barrow not built yet: then it is the cut it always was */
+const DOORWALK_SPD = 1.5, DOORWALK_LOOK = 0.6;
+function o3InScene(o){ while (o.parent) o = o.parent; return o===O3.scene; }
+function o3DoorWalkStart(){
+  if (!transOn() || typeof o3Active!=='function' || !o3Active() || G.gameMode!==0 || !G.pendingDungeon || !O3.ppos) return false;
+  const { x, y } = G.pendingDungeon; if (G.owPos.x!==x || G.owPos.y!==y || G.ow.map[x][y]!==OW_DUNGEON || (typeof sqSpireAt==='function' && sqSpireAt(x, y))) return false;
+  const PL = o3PL(), g = O3.doors && O3.doors.get(PL.x+','+PL.y); if (!g || !o3InScene(g)) return false;
+  const T = THREE; g.updateWorldMatrix(true, false);
+  const W = (lx, lz)=>{ const v = g.localToWorld(new T.Vector3(lx, 0, lz)); return [v.x, v.z]; }, L0 = g.worldToLocal(new T.Vector3(O3.ppos.x, g.matrixWorld.elements[13], O3.ppos.z));
+  const pts = [[O3.ppos.x, O3.ppos.z]];   /* (the barrow's own frame: its door at +z, 0.64 out; you look in from 0.9) */
+  if (!(L0.z > 0.6 && Math.abs(L0.x) < 0.3)){ if (L0.z < 0.3) pts.push(W(L0.x < 0 ? -1.0 : 1.0, 0.45)); pts.push(W(0, 1.04), W(0, 0.9)); }
+  if (G.gather) skStop();
+  O3.path = []; O3.gatherAt = null; O3.chase = null;
+  O3.doorWalk = { g, pts, inPt:W(0, 0.12), leg:0, u:0, look:0, v:0, end:0, yaw:(O3.player && O3.player.yaw) || 0 };
+  setUi('playing'); return true;
+}
+function o3DoorWalkTick(dt, pp){
+  const W = O3.doorWalk; if (!W) return null;
+  if (G.gameMode!==0){ O3.doorWalk = null; transFade(0); return null; }
+  const P = W.pts, eyes = W.g.userData.eyes || [], last = P[P.length - 1];
+  let pos, mv = 1, sink = 0, fade = 0, done = !!W.skip;
+  if (W.leg < P.length - 1){
+    const a = P[W.leg], b = P[W.leg + 1], d = Math.hypot(b[0] - a[0], b[1] - a[1]), u = d < 1e-4 ? 1 : W.u + dt*DOORWALK_SPD/d;
+    if (d >= 1e-4) W.yaw = Math.atan2(b[0] - a[0], b[1] - a[1]);
+    if (u >= 1){ pos = b; W.leg++; W.u = 0; } else { pos = [a[0] + (b[0] - a[0])*u, a[1] + (b[1] - a[1])*u]; W.u = u; }
+  } else if (W.look < DOORWALK_LOOK){
+    W.look += dt; pos = last; mv = 0; W.yaw = Math.atan2(W.inPt[0] - last[0], W.inPt[1] - last[1]);
+  } else {
+    const d = Math.hypot(W.inPt[0] - last[0], W.inPt[1] - last[1]) || 1; W.v = Math.min(1, W.v + dt*0.8/d);
+    pos = [last[0] + (W.inPt[0] - last[0])*W.v, last[1] + (W.inPt[1] - last[1])*W.v]; sink = 0.4*W.v*W.v; fade = Math.min(1, Math.max(0, (W.v - 0.15)/0.7));
+    if (W.v >= 1 && (W.end += dt) > 0.15) done = true;
+  }
+  const on = !done && W.leg >= P.length - 1 && W.look > 0.08 && W.v < 0.3;   /* (something in there looks back, for a moment) */
+  for (const e of eyes){ e.visible = on; if (on) e.material.opacity = 0.75 + Math.sin(performance.now()*0.02)*0.2; }
+  pp.x = pos[0]; pp.z = pos[1]; pp.y = Math.max(O3.heightAt(pp.x, pp.z), -0.14) - sink;
+  transFade(done ? 1 : fade, O3.cv);
+  if (done){ O3.doorWalk = null; for (const e of eyes) e.visible = false;
+    setTimeout(()=>{ try{ enterDungeonConfirm(true); }catch(err){ console.error(err); } transFade(0); renderGame(); }, 0); }
+  return { mv, yaw:W.yaw };
+}
+for (const ev of ['keydown', 'pointerdown']) addEventListener(ev, e=>{ const W = O3.doorWalk; if (!W || e.repeat) return; W.skip = true; e.preventDefault(); e.stopImmediatePropagation(); }, true);
 // ===================== SECTION: MONSTER CODEX (bestiary) =====================
 function buildBestiary(){ return bestHtml(); }
 function renderBestiaryArt(){ try{ bvMount(); }catch(e){ console.error(e); } }
@@ -34094,6 +34139,10 @@ function o3Mats(){
     moss: new T.MeshStandardMaterial({ map:st('#6a7a5a'), roughness:0.95 }),
   });
 }
+/* (RS-651) a rough stone: a dodecahedron with each corner pushed in or out by where it is, so corners shared by two faces stay joined */
+function o3RockGeo(r, s){ const g = new THREE.DodecahedronGeometry(r, 1), p = g.attributes.position;
+  for (let i=0;i<p.count;i++){ const x = p.getX(i), y = p.getY(i), z = p.getZ(i), h = Math.sin(Math.round(x*1e3)*12.9898 + Math.round(y*1e3)*78.233 + Math.round(z*1e3)*37.719 + s*4.1)*43758.5453, k = 1 + (h - Math.floor(h) - 0.5)*0.4; p.setXYZ(i, x*k, y*k, z*k); }
+  g.computeVertexNormals(); return g; }
 function o3Glow(col, size){
   const T = THREE, k = 'glow'+col;
   if (!O3.tex[k]){ const c = v3Canvas(64,64), x = c.getContext('2d'), g = x.createRadialGradient(32,32,0,32,32,32);
@@ -34247,9 +34296,23 @@ function o3Site(t, gx, gz){
     let tier = 1; try{ tier = townTier(sx, sz); }catch(e){}
     o3TownBuild(g, race, tier, mats, rnd, flame, gx, gz);
   } else if (t===OW_DUNGEON){
-    const mound = new T.Mesh(new T.DodecahedronGeometry(0.62,1), mats.rock); mound.scale.set(1,0.62,0.9); mound.position.y = 0.05; mound.castShadow = mound.receiveShadow = true; g.add(mound);
-    const mouth = new T.Mesh(new T.CircleGeometry(0.22, 20, 0, Math.PI), mats.black); mouth.position.set(0, 0.02, 0.52); mouth.rotation.x = -0.25; g.add(mouth);
-    for (const s of [-1,1]){ const post = v3Cyl(0.03,0.035,0.36,5,mats.wood, s*0.3, 0.18, 0.54); g.add(post); flame(s*0.3, 0.42, 0.54); }
+    /* (RS-651) a barrow you walk into (o3DoorWalkStart): a turf mound with a dolmen door - two standing stones and a lintel over the dark -
+       dry-stone kerbs along its forecourt and a torch either side. The door faces the camera like every site's (o3SitesGen) and stands
+       taller than you (0.95 on the land, the site drawn at 1.3x); two pale eyes wait in it (userData.eyes) */
+    const turf = mats.turf || (mats.turf = new T.MeshStandardMaterial({ map:v3TexTurf(O3.tex), roughness:0.95 }));
+    const vd = mats.void || (mats.void = new T.MeshBasicMaterial({ color:0x000000 }));
+    const rk = (r, x, y, z, sx, sy, sz, s)=>{ const m = new T.Mesh(o3RockGeo(r, s), mats.rock); m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.rotation.y = (rnd(60 + s) - 0.5)*0.5; m.castShadow = m.receiveShadow = true; g.add(m); return m; };
+    const lumpy = (seed)=>{ const mg = new T.SphereGeometry(1, 48, 24, 0, Math.PI*2, 0, Math.PI/2), mp = mg.attributes.position;   /* (lumpy, as turf over stones is) */
+      for (let i=0;i<mp.count;i++){ const x = mp.getX(i), y = mp.getY(i), z = mp.getZ(i), h = Math.sin(Math.round(x*40)*12.9898 + Math.round(y*40)*78.233 + Math.round(z*40)*37.719 + seed)*43758.5453, k = 1 + (h - Math.floor(h) - 0.5)*0.07; mp.setXYZ(i, x*k, y > 0.02 ? y*k : y, z*k); }
+      mg.computeVertexNormals(); const m = new T.Mesh(mg, turf); m.castShadow = m.receiveShadow = true; g.add(m); return m; };
+    const mound = lumpy(0); mound.scale.set(0.82, 1.0, 0.92); mound.position.set(0, -0.02, -0.3);
+    const lobe = lumpy(7); lobe.scale.set(0.52, 1.0, 0.55); lobe.position.set(0, -0.02, 0.06);   /* (the mound grows out round its door) */
+    const mouth = new T.Mesh(new T.PlaneGeometry(0.44, 0.84), vd); mouth.position.set(0, 0.42, 0.64); g.add(mouth);
+    for (const s of [-1,1]){ rk(0.12, s*0.31, 0.44, 0.68, 0.95, 4.0, 1.0, s + 2);
+      for (let i=0;i<3;i++) rk(0.075, s*(0.37 + i*0.02), 0.03, 0.8 + i*0.12, 1.3, 1.1 - i*0.25, 1.3, 10 + i + (s > 0 ? 5 : 0));
+      g.add(v3Cyl(0.024, 0.03, 0.56, 6, mats.wood, s*0.48, 0.28, 0.98)); flame(s*0.48, 0.6, 0.98); }
+    const lin = rk(0.12, 0, 0.93, 0.68, 3.9, 0.75, 1.0, 7); lin.rotation.z = 0.05;
+    g.userData.eyes = [-1, 1].map(s=>{ const e = o3Glow('rgba(214,255,232,1)', 0.065); e.position.set(s*0.045, 0.62, 0.65); e.visible = false; g.add(e); return e; });
   } else if (t===OW_CASTLE){
     const wallH = 0.38, R = 0.52;
     for (const [x,z,w,d] of [[0,-R,2*R,0.1],[0,R,2*R,0.1],[-R,0,0.1,2*R],[R,0,0.1,2*R]]){ g.add(v3Box(w, wallH, d, mats.stone, x, wallH/2, z));
@@ -34348,6 +34411,7 @@ function* o3SitesGen(grp, x0, y0, W){
     let sc = 1.3; if (t===OW_TOWN){ try{ const q = o3G(x, y) || [x, y]; sc *= [0.85, 1, 1.18][townTier(q[0], q[1])]; }catch(e){} }   /* (RS-485: a city stands bigger on the land than a village) */
     g.scale.setScalar(sc); g.position.set(gx, O3.heightAt(gx,gz), gz); g.rotation.y = 0.52 + (t===OW_TOWN ? 0 : (o3Hash(x,y,9)-0.5)*0.3);   // entrances face the camera
     grp.add(g);
+    if (t===OW_DUNGEON) (O3.doors || (O3.doors = new Map())).set(x+','+y, g);   /* (RS-651: the barrow you walk into, by its tile in the frame) */
     // an invisible box to click/hover the whole landmark
     const hb = new T.Mesh(new T.BoxGeometry(1,1.2,1), new T.MeshBasicMaterial({ visible:false })); hb.position.set(gx, g.position.y+0.6, gz);
     const [wx, wy] = o3G(x, y) || [x, y];   /* (RS-632: found in the 3D land's frame, named and clicked where it is in the world) */
@@ -35681,7 +35745,7 @@ function o3SiteStandOff(x, y){
   const t = G.ow.map[x] && G.ow.map[x][y]; if (!OW_SITE_TILES.includes(t)) return null;
   let dx = 0, dz = 0; const pv = O3.prevTile; if (pv && Math.max(Math.abs(pv[0]-x), Math.abs(pv[1]-y))===1){ dx = pv[0]-x; dz = pv[1]-y; }
   if (!dx && !dz){ for (const [ox, oz] of [[0,1],[1,1],[1,0],[-1,1],[0,-1],[-1,0],[1,-1],[-1,-1]]){ const nx = x+ox, ny = y+oz, nt = G.ow.map[nx] && G.ow.map[nx][ny]; if (nt!=null && nt!==OW_WATER && nt!==OW_MOUNTAIN && !OW_SITE_TILES.includes(nt)){ dx = ox; dz = oz; break; } } }
-  if (!dx && !dz) return null; const d = Math.hypot(dx, dz); return [dx/d*0.72, dz/d*0.72];
+  if (!dx && !dz) return null; const d = Math.hypot(dx, dz), r = t===OW_DUNGEON ? 1.05 : 0.72; return [dx/d*r, dz/d*r];   /* (RS-651: a barrow's door stands where you used to stop) */
 }
 /* (RS-501) the placed land never moves, but three.js was recomposing every tree, rock, gathering node and landmark's matrix
    every frame - a good share of each overworld frame on a busy map. The gathering nodes and landmarks are frozen once placed
@@ -35753,11 +35817,12 @@ function o3Render(){
   { const key = G.owPos.x+','+G.owPos.y; if (O3.tileKey!==key){ if (O3.tileKey) O3.prevTile = O3.tileKey.split(',').map(Number); O3.tileKey = key; } }
   const PLn = o3PL(); let tx = PLn.x+0.5, tz = PLn.y+0.5; { let off = o3SiteStandOff(G.owPos.x, G.owPos.y); if (off){ off = o3Rot(off, o3FrameTurn(G.owPos.x, G.owPos.y)); tx += off[0]; tz += off[1]; } }   /* (RS-632: where you stand, in the frame) */
   const pp = O3.ppos || (O3.ppos = new T.Vector3(tx,0,tz));
-  const k = 1-Math.exp(-dt*10), dxs = tx-pp.x, dzs = tz-pp.z, moving = Math.hypot(dxs,dzs) > 0.03;
+  let k = 1-Math.exp(-dt*10), dxs = tx-pp.x, dzs = tz-pp.z, moving = Math.hypot(dxs,dzs) > 0.03;
   { const d = Math.hypot(dxs,dzs), sp = dt/(O3_STEP*runMul()*wgRoadMul())*1.05*(G.stepLen||1);             // an even walking pace, one tile per step
     if (d > 3 || d <= sp){ pp.x = tx; pp.z = tz; } else { pp.x += dxs/d*sp; pp.z += dzs/d*sp; } }
   const gy = O3.heightAt(pp.x, pp.z);
   pp.y = sailing ? -0.14 : Math.max(gy, -0.14);
+  const DW = o3DoorWalkTick(dt, pp); if (DW) moving = DW.mv;   /* (RS-651: walking into a barrow) */
   O3.pgrp.position.copy(pp);
   o3PortalTick(dt, pp);
   try{ o3FerryTick(dt, pp); }catch(e){ console.error(e); G.owFerry && ferryLand(G.owFerry.to, G.owFerry.turns); }
@@ -35773,7 +35838,7 @@ function o3Render(){
   P.walk = (P.walk||0) + (moving ? dt*12 : 0);
   if (P.e){
     // the 3D figure: turn to face the way you're walking (at sea, face the bow) and stride when you move
-    let want = sailing ? (O3.boatYaw||0) : (moving ? Math.atan2(dxs, dzs) : P.yaw);
+    let want = DW ? DW.yaw : sailing ? (O3.boatYaw||0) : (moving ? Math.atan2(dxs, dzs) : P.yaw);
     let da = want - P.yaw; da = Math.atan2(Math.sin(da), Math.cos(da)); P.yaw += da*Math.min(1, dt*8);
     P.e.holder.rotation.y = P.yaw;
     const mv = m3dEaseMv(P.e, (moving && !sailing) ? 1 : 0, dt), r = P.e.rig, tt = O3.t;
@@ -45491,7 +45556,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-650';
+const GAME_VERSION = 'rs-651';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

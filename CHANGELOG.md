@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-651 - Walk into the barrows
+
+- **Dungeons on the land are barrows now.** The plain rock mound with a painted black mouth is gone. In its place is a turf-covered barrow with a dolmen door: two standing stones and a lintel over the dark, dry-stone kerbs along its forecourt and a torch on either side. The door is tall enough for you to walk through.
+- **You walk in instead of cutting to the dungeon.** Press Enter at the dungeon prompt and you walk up the forecourt to the door, a pair of pale eyes looks back out of the dark, and you step in and down while the dark takes the screen. Then the first floor loads. It takes about three seconds. If you came at the barrow from behind, you walk round to its front first.
+- **You stop clear of the door.** When you step onto a barrow you now stand a little further out, in its forecourt, instead of in the doorway.
+- **Skip it if you like.** Any key or tap during the walk goes straight into the dungeon. With transitions turned off in the settings, entering is the instant cut it was before.
+- Castles, towers, temples, graveyards, mines, lairs and pyramids enter as before for now. Their own walk-in doorways are planned next.
+
 ## RS-650 - The bar names the land you see
 
 - **Haunted forests, jungles and the other rare lands are named in the top bar.** These lands are painted over the ordinary ground: haunted forests, jungles, volcanic land, snowy highlands and crystal wastes. The bar only read the ground underneath, so the dark of a haunted wood said "grassland" and a jungle said "forest". It now says "haunted forest", "jungle", "volcanic land", "snowy highlands" or "crystal wasteland" while you're in one. Everywhere else it says what it did before.

@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs651 | a dungeon on the land is a barrow you walk into: you stop clear of its door, Enter walks you up the forecourt, eyes look out of the dark, you go in and down as the dark takes the screen, then floor 1 |
 | rs650 | the bar at the top names the rarer lands painted over the ground (haunted forest, jungle, volcanic land, snowy highlands, crystal wasteland) on a medium world and a Planet; plain grass is still grassland |
 | rs649 | a landmark first seen from far off (hidden past a Planet's horizon) is drawn where it stands once you come near, its click box with it, and a click on it reaches it |
 | rs647 | on a Planet everything goes where the curve puts the land: the sprites bend with it, a town's name sits where the curve has drawn the town, a click on a dungeon a little way off reaches it, a landmark past the horizon is hidden and one near is seen, and the animals of the old frame are freed when it changes |
