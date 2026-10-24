@@ -1,5 +1,16 @@
 # Depthcrawl patch notes
 
+## RS-654 - A Planet's turned faces, audited
+
+An audit of the 3D land on a Planet's five turned faces (every face but the one you start on), where the land is laid in a frame turned from the world's grid. Ten places still mixed the two up. None of this showed on a flat world, and the front face was right all along.
+
+- **The woods grew over the gathering trees.** On a turned face about a fifth of the woods' trees stood on gathering trees, and the gathering tiles themselves were bare, because the plants looked the gathering trees up at the frame's tile instead of the world's. The same slip grew trees in landmarks' feet and put palms on the wrong tiles.
+- **Winter had no ice.** On a turned face the frozen water was looked up at the frame's tile, so no ice was laid at all. It now lies on every frozen tile.
+- **The far land kept the old frame.** The land beyond what's built round you was never rebuilt when you walked onto another face, so the horizon showed the last face's seas and mountains, turned. It's rebuilt for each frame.
+- **Treasure-map marks stood in the wrong place** on a turned face, at the world's coordinates instead of the frame's: often a hundred tiles off.
+- **Smaller fixes:** the country lanes and paved roads are told apart by the road's real name; roads are smoothed properly beside mountains; autumn leaves fall round you on every face; a felled tree topples away from you; you, your boat and the roamers keep facing the same way in the world when the frame changes; and gathering beside a spot works over a face edge.
+- A barrow's stair (RS-652) now also checks a landmark's foot where it is in the world.
+
 ## RS-653 - A barrow built of stone
 
 - **The barrow's mound looks built, not grown.** It used to be a bright green hill. Now it's a cairn under old, dark, mossy turf, made of the same stone as its door.
