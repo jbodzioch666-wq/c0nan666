@@ -10,7 +10,7 @@ module.exports = async page=>{
     if (!s) return { none:true }; G.owPos = s; owReveal(s.x, s.y, 8); await fr(150);
     const out = [], turfMap = O3.mats && O3.mats.turf && O3.mats.turf.map;
     for (const [k, g] of (O3.doors || new Map())){ g.updateMatrixWorld(true); const inv = g.matrixWorld.clone().invert(), v = new THREE.Vector3();
-      g.traverse(o=>{ if (!o.isMesh || !o.material || o.material.map!==turfMap || !o.geometry.attributes.color) return; if (o.material.color.r > 0.9 && !o.material.vertexColors) return;
+      g.traverse(o=>{ if (!o.isMesh || o.userData.barrow || !o.material || o.material.map!==turfMap || !o.geometry.attributes.color) return; if (o.material.color.r > 0.9 && !o.material.vertexColors) return;
         const p = o.geometry.attributes.position, c = o.geometry.attributes.color, M = new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld); let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9, z0 = 1e9, z1 = -1e9, lowC = 0, lowN = 0, topC = 0, topN = 0;
         for (let i=0;i<p.count;i++){ v.fromBufferAttribute(p, i).applyMatrix4(M); x0 = Math.min(x0, v.x); x1 = Math.max(x1, v.x); y0 = Math.min(y0, v.y); y1 = Math.max(y1, v.y); z0 = Math.min(z0, v.z); z1 = Math.max(z1, v.z); }
         for (let i=0;i<p.count;i++){ v.fromBufferAttribute(p, i).applyMatrix4(M); const sum = c.getX(i) + c.getY(i) + c.getZ(i); if (v.y < y0 + (y1 - y0)*0.05){ lowC += sum; lowN++; } else if (v.y > y1 - (y1 - y0)*0.2){ topC += sum; topN++; } }

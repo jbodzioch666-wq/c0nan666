@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-662 - A door set into the hill
+
+- **The barrow's door is dug into its mound, not stood in front of it.** The turf over the passage used to be a low lump before the hill, with bare ground between the lintel and the mound. Now it rises right behind the lintel and above it, its face rounded against the door stones, and runs back into the mound.
+- **Banks of turf either side of the door.** Two low, broad shoulders of turf bury the backs of the facade slabs and run down to the ground beside the door and the sunken stair, so the stone front and the hill read as one.
+- **Works for both kinds of barrow**: the ones with a sunken stair and the ones whose door stands at ground level.
+
 ## RS-661 - A barrow that grows out of the land
 
 - **The barrow's mound is a low swell, not a ball.** It was a half sphere set on the ground, steep all the way down to a hard edge. Now its crown rounds over and falls away in a long skirt that meets the ground flat and sinks just under it, reaching out further at the back and sides (the door, its stair and forecourt stay clear). It's lower too, about two and a half times as wide as it is tall.
