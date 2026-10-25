@@ -25,7 +25,7 @@ module.exports = async page=>{
     /* the water's mask down the stair, and nothing growing in it */
     const [mx, mz] = o3PitWorld(c, 0, 0.3), dO = O3.depthO, i = Math.round((mx - dO.x)*dO.z), j = Math.round((mz - dO.y)*dO.z), dd = O3.depthTex.image.data, mask = dd[(j*dO.w + i)*4 + 1];
     let veg = 0; O3.world.traverse(o=>{ if (!o.isInstancedMesh || !o.count) return; const m4 = new THREE.Matrix4(), v3 = new THREE.Vector3(); for (let n=0;n<o.count;n++){ o.getMatrixAt(n, m4); v3.setFromMatrixPosition(m4); if (o3InCut(v3.x, v3.z, -0.04)) veg++; } });
-    const mt = o3Mats(); let stones = 0, turf = 0; g.traverse(o=>{ if (o.material===mt.rock) stones += o.userData.merged || 1; if (o.material===mt.barrowTurf) turf += o.userData.merged || 1; });   /* (RS-653: a cairn of the door's stone under old turf; RS-655: merged into a draw or two; RS-662: the mound, the lobe over the door and a bank either side) */
+    const mt = o3Mats(); let stones = 0, turf = 0; g.traverse(o=>{ if (o.material===mt.rock) stones += o.userData.merged || 1; if (o.material===mt.barrowTurf) turf += o.userData.merged || 1; });   /* (RS-653: a cairn of the door's stone under old turf; RS-655: merged into a draw or two; RS-662: one sheet of turf, the door dug into it) */
     const w = new THREE.Vector3(); g.getWorldPosition(w);
     return { stones, turf, cutPatch:geo.userData.cuts, inPit, edge, mask, veg, stand:+Math.hypot(O3.ppos.x - w.x, O3.ppos.z - w.z).toFixed(2), ui:G.ui }; }));
   await page.screenshot({ path: SHOTS + '/rs652-stair.png' });
@@ -40,7 +40,7 @@ module.exports = async page=>{
     return r; }));
   console.log(JSON.stringify(out));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(out)); };
-  A(out.stones > 60 && out.turf===4, 'the mound is a cairn: kerb ring, stones through its turf, capstones, a facade (' + out.stones + ' stones)');
+  A(out.stones > 60 && out.turf===1, 'the mound is a cairn: kerb ring, stones through its turf, capstones, a facade (' + out.stones + ' stones)');
   A(out.cutPatch >= 1, 'the land has its stair cut');
   A(out.inPit===0, 'no ground left in the stair');
   A(out.edge > 10, 'the finer ground runs up to the cut');

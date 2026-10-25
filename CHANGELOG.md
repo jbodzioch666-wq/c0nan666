@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-663 - A door dug into the hill
+
+- **The barrow's mound is now one sheet of turf, and the door is dug into it.** RS-662 only laid lumps of turf behind and beside the door, and they read as blobs stuck on. Now the mound itself rises into a raised front round the door: up behind the lintel to its top, then banked down either side over the backs of the big facade stones and out to the ground past the last of them. Stone and hill meet as one surface.
+- **The turf lies flat on the land.** Its grass picture runs level across the mound, so the rings that stretched round the old dome are gone, and the edge runs smoothly down under the ground instead of ending in a line.
+- **Both kinds of barrow get this**: the ones with a sunken stair and the taller ones whose door stands at ground level. The dark passage now reaches right up under the lintel, so no turf shows through the doorway.
+
 ## RS-662 - A door set into the hill
 
 - **The barrow's door is dug into its mound, not stood in front of it.** The turf over the passage used to be a low lump before the hill, with bare ground between the lintel and the mound. Now it rises right behind the lintel and above it, its face rounded against the door stones, and runs back into the mound.

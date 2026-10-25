@@ -1,6 +1,6 @@
 // RS-661: the barrow's mound runs out into the land: a low swell with a skirt that meets the ground flat and sinks under it (not a half
 // ball standing on it), wider than it is tall, reaching farther at the back than at the door, and washed toward the land's colour at its edge.
-// Every barrow near the start is checked, in its own group's space. Shot: shots/rs661.png
+// Every barrow near the start is checked, in its own group's space (RS-662: its size above the land; the turf runs on down under it). Shot: shots/rs661.png
 module.exports = async page=>{
   page.setDefaultTimeout(0); const errs = []; page.on('pageerror', e=>errs.push(String(e).slice(0, 300)));
   const r = await page.evaluate(async ()=>{ const fr = n=>new Promise(res=>{ let i = 0; const f = ()=>++i >= n ? res() : requestAnimationFrame(f); requestAnimationFrame(f); });
@@ -12,9 +12,9 @@ module.exports = async page=>{
     for (const [k, g] of (O3.doors || new Map())){ g.updateMatrixWorld(true); const inv = g.matrixWorld.clone().invert(), v = new THREE.Vector3();
       g.traverse(o=>{ if (!o.isMesh || o.userData.barrow || !o.material || o.material.map!==turfMap || !o.geometry.attributes.color) return; if (o.material.color.r > 0.9 && !o.material.vertexColors) return;
         const p = o.geometry.attributes.position, c = o.geometry.attributes.color, M = new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld); let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9, z0 = 1e9, z1 = -1e9, lowC = 0, lowN = 0, topC = 0, topN = 0;
-        for (let i=0;i<p.count;i++){ v.fromBufferAttribute(p, i).applyMatrix4(M); x0 = Math.min(x0, v.x); x1 = Math.max(x1, v.x); y0 = Math.min(y0, v.y); y1 = Math.max(y1, v.y); z0 = Math.min(z0, v.z); z1 = Math.max(z1, v.z); }
-        for (let i=0;i<p.count;i++){ v.fromBufferAttribute(p, i).applyMatrix4(M); const sum = c.getX(i) + c.getY(i) + c.getZ(i); if (v.y < y0 + (y1 - y0)*0.05){ lowC += sum; lowN++; } else if (v.y > y1 - (y1 - y0)*0.2){ topC += sum; topN++; } }
-        out.push({ k, w:+(x1 - x0).toFixed(2), d:+(z1 - z0).toFixed(2), h:+(y1 - y0).toFixed(2), y0:+y0.toFixed(3), low:+(lowC/Math.max(1, lowN)).toFixed(2), top:+(topC/Math.max(1, topN)).toFixed(2), pit:!!g.doorPit }); }); }
+        for (let i=0;i<p.count;i++){ v.fromBufferAttribute(p, i).applyMatrix4(M); y0 = Math.min(y0, v.y); if (v.y < -0.06) continue;   /* (the skirt's foot, a little under the land) */ x0 = Math.min(x0, v.x); x1 = Math.max(x1, v.x); y1 = Math.max(y1, v.y); z0 = Math.min(z0, v.z); z1 = Math.max(z1, v.z); }
+        for (let i=0;i<p.count;i++){ v.fromBufferAttribute(p, i).applyMatrix4(M); const sum = c.getX(i) + c.getY(i) + c.getZ(i); if (v.y > -0.03 && v.y < y1*0.05){ lowC += sum; lowN++; } else if (v.y > y1*0.8){ topC += sum; topN++; } }
+        out.push({ k, w:+(x1 - x0).toFixed(2), d:+(z1 - z0).toFixed(2), h:+y1.toFixed(2), y0:+y0.toFixed(3), low:+(lowC/Math.max(1, lowN)).toFixed(2), top:+(topC/Math.max(1, topN)).toFixed(2), pit:!!g.doorPit }); }); }
     return { at:s, mounds:out }; });
   await page.screenshot({ path: SHOTS + '/rs661.png' });
   console.log(JSON.stringify(r));
