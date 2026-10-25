@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-666 - Unstuck at the barrow door
+
+- **You can walk again after leaving a barrow.** Coming out of a barrow puts you on its tile, standing in front of the door. The game was waiting for your figure to reach the middle of the tile before it took each step, which it never does there, so clicks and keys did nothing until you reloaded. It now waits for the figure to reach the spot where it actually stands.
+
 ## RS-665 - Straight in
 
 - **No risk window when you step onto a dungeon.** Walking onto a dungeon, barrow, graveyard, mine, castle, temple, tower or pyramid now takes you straight in (a barrow by its walk through the door) instead of stopping you with the Risk picker first. Every run is at the standard risk.

@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs666 | after leaving a barrow you can walk again: the figure stands 1.05 out at the door, and a step no longer waits for it to reach the tile's middle |
 | rs665 | no risk window when you step onto a dungeon: every kind of site takes you straight in at the standard risk |
 | rs664 | no sheer turf beside the barrow's door: the bank comes forward beside the door past the lintel, nowhere steeper than about 65 degrees, the doorway and stair clear (every barrow near the start) |
 | rs663 | the barrow's door dug into its mound: one sheet of turf up behind the lintel to its top, a bank either side down to the ground past the facade, none over the doorway or stair (every barrow near the start) |
