@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-669 - Dye that stays
+
+- **Dye shows when you step outside.** Dyeing your clothes at the tailor's changed them inside, but out in the town your figure was back in the old colours until you restarted the game. The town is kept as it was while you're in a building, and your figure came back with it undressed. Now it is dressed again in what you wear.
+- **Town names read in full.** On the open land, the line under a town's name ("elven · village") is now as big as the name itself.
+
 ## RS-668 - The Dwarf Gate
 
 - **Mines are dwarf gates in the mountainside.** A mine is no longer a boulder with a black patch. It is a gate cut into the foot of a mountain, after the Doors of Durin: a cliff of the mountain's own rock, a dressed stone face with two fluted pillars, a lintel carved with runes and a gable bearing the gate's sign, two stone doors, cart rails running in, a cart of ore and a lantern on a post.
