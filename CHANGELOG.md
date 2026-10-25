@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-665 - Straight in
+
+- **No risk window when you step onto a dungeon.** Walking onto a dungeon, barrow, graveyard, mine, castle, temple, tower or pyramid now takes you straight in (a barrow by its walk through the door) instead of stopping you with the Risk picker first. Every run is at the standard risk.
+- **Quest arrivals still come first.** Where a quest led you to a site, its own scene still opens instead.
+
 ## RS-664 - Earth banked against the door
 
 - **No more sheer turf beside the barrow door.** From the side, the turf behind the door stones stood as a near-vertical green wall, and the raised front above the door was a flat-topped block. Now a rounded hood of turf sits over the door, and from the door stones outward it is banked forward and down to the ground beside the door, like earth heaped against the stone frame.

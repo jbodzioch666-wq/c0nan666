@@ -46,7 +46,7 @@ module.exports = async page=>{
   A(out.edge > 10, 'the finer ground runs up to the cut');
   A(out.mask===255, 'no water drawn down the stair');
   A(out.veg===0, 'nothing growing in the stair');
-  A(out.ui==='dungeonPrompt' && out.stand > 0.95 && out.stand < 1.2, 'you stop clear of it and are asked');
+  A(out.ui==='playing' && out.stand > 0.95 && out.stand < 1.2, 'you stop clear of it, not asked (RS-665)');
   A(out.started && out.pit, 'Enter walks you down the stair');
   A(out.eyesSeen, 'something looks out of the dark');
   A(out.minY < -0.45, 'you go down the steps to the door (' + out.minY + ')');

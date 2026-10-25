@@ -31,7 +31,7 @@ module.exports = async page=>{
   console.log(JSON.stringify(out));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(out)); };
   A(!out.noModel && out.eyes===2, 'the barrow is built, with its eyes in the door');
-  A(out.ui==='dungeonPrompt', 'stepping onto it asks first (' + out.ui + ')');
+  A(out.ui==='playing', 'stepping onto it asks nothing (RS-665: no risk window) (' + out.ui + ')');
   A(out.stand > 0.95 && out.stand < 1.2, 'you stop clear of its door, not in it');
   A(out.started && out.modeAt===0 && out.uiAt==='playing', 'Enter starts the walk, out on the land');
   A(out.eyesSeen, 'something looks out of the dark');
