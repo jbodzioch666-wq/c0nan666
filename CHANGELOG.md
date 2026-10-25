@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-670 - Unstuck on the planet's seams
+
+- **The touch screen no longer goes dead.** On a phone, when the game stalled for a few seconds (the land being built as you crossed between the planet's faces, with the view turning), the browser could drop the lift of the finger that was touching the screen. The game then thought that finger was still down, so every later tap counted as a two-finger pinch and was swallowed: nothing on the land answered until you reloaded. A finger that has gone quiet is now let go when the next one comes down, and switching away from the game lets them all go.
+- **A walk over a seam gets there.** Clicking across the line where two of the planet's faces meet used to stop you short, either at the edge (a diagonal step over it was refused) or a few tiles past it (when the land turned to the new face, the walk's steps were thrown away). Both are fixed: in a sweep of twelve crossings by boat, every one now reaches the far side, where two in ten did before.
+- **Routes over a seam plan the same way.** The map's route planner uses the same corner rule, so a route along a seam no longer gives up at a diagonal.
+
 ## RS-669 - Dye that stays
 
 - **Dye shows when you step outside.** Dyeing your clothes at the tailor's changed them inside, but out in the town your figure was back in the old colours until you restarted the game. The town is kept as it was while you're in a building, and your figure came back with it undressed. Now it is dressed again in what you wear.

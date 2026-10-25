@@ -10056,8 +10056,8 @@ function tmSetup(cv, cfg){
     const zoomAt = (mx, my, f)=>{ const v = S.view, wx = v.cx + (mx - TM_W/2)/v.z, wy = v.cy + (my - TM_H/2)/v.z; v.z *= f; tmClamp(S); v.cx = wx - (mx - TM_W/2)/v.z; v.cy = wy - (my - TM_H/2)/v.z; tmClamp(S); tmRender(cv); };
     S.zoomAt = zoomAt;
     cv.addEventListener('wheel', e=>{ e.preventDefault(); const q = at(e); zoomAt(q.x, q.y, e.deltaY > 0 ? 1/1.2 : 1.2); }, { passive:false });
-    cv.addEventListener('pointerdown', e=>{ try{ cv.setPointerCapture(e.pointerId); }catch(err){} S.ptrs.set(e.pointerId, at(e)); if (S.ptrs.size===1){ S.dragged = false; S.moved = 0; } S.pinch = null; });
-    cv.addEventListener('pointermove', e=>{ const prev = S.ptrs.get(e.pointerId); if (!prev) return; const q = at(e); S.ptrs.set(e.pointerId, q);
+    cv.addEventListener('pointerdown', e=>{ try{ cv.setPointerCapture(e.pointerId); }catch(err){} ptrStale(S.ptrs, e.pointerId); S.ptrs.set(e.pointerId, Object.assign(at(e), { t:performance.now() })); if (S.ptrs.size===1){ S.dragged = false; S.moved = 0; } S.pinch = null; });
+    cv.addEventListener('pointermove', e=>{ const prev = S.ptrs.get(e.pointerId); if (!prev) return; const q = at(e); q.t = performance.now(); S.ptrs.set(e.pointerId, q);
       if (S.ptrs.size===1){ const dx = q.x - prev.x, dy = q.y - prev.y; S.moved += Math.hypot(dx, dy)/q.k; if (S.moved > 6) S.dragged = true; if (S.dragged){ S.view.cx -= dx/S.view.z; S.view.cy -= dy/S.view.z; tmClamp(S); tmRender(cv); } }
       else if (S.ptrs.size===2){ const [a, b] = [...S.ptrs.values()], d = Math.hypot(a.x-b.x, a.y-b.y); S.dragged = true; if (S.pinch) S.zoomAt((a.x+b.x)/2, (a.y+b.y)/2, d/S.pinch); S.pinch = d; } });
     const up = e=>{ S.ptrs.delete(e.pointerId); if (S.ptrs.size < 2) S.pinch = null; };
@@ -14371,8 +14371,8 @@ function bvMount(){
     const rim = new T.DirectionalLight(0x9fb4ff, 1.0); rim.position.set(-1.5, 1.4, -2); BV.scene.add(rim);
     /* (RS-204) drag to turn it (and, zoomed in, up and down to look along it); the wheel, a pinch or the + / - buttons zoom */
     BV.pts = new Map();
-    cv.addEventListener('pointerdown', ev=>{ BV.pts.set(ev.pointerId, { x:ev.clientX, y:ev.clientY }); BV.drag = ev.clientX; BV.dragY = ev.clientY; BV.pinch = null; try{ cv.setPointerCapture(ev.pointerId); }catch(e){} });
-    cv.addEventListener('pointermove', ev=>{ const pt = BV.pts.get(ev.pointerId); if (!pt) return; pt.x = ev.clientX; pt.y = ev.clientY;
+    cv.addEventListener('pointerdown', ev=>{ ptrStale(BV.pts, ev.pointerId); BV.pts.set(ev.pointerId, { x:ev.clientX, y:ev.clientY, t:performance.now() }); BV.drag = ev.clientX; BV.dragY = ev.clientY; BV.pinch = null; try{ cv.setPointerCapture(ev.pointerId); }catch(e){} });
+    cv.addEventListener('pointermove', ev=>{ const pt = BV.pts.get(ev.pointerId); if (!pt) return; pt.x = ev.clientX; pt.y = ev.clientY; pt.t = performance.now();
       if (BV.pts.size >= 2){ const [a, b] = [...BV.pts.values()], d = Math.hypot(a.x-b.x, a.y-b.y); if (BV.pinch) bvZoom(d/BV.pinch); BV.pinch = d; BV.hold = performance.now(); return; }
       if (BV.drag!=null){ BV.yaw += (ev.clientX - BV.drag)*0.014; BV.drag = ev.clientX; if (BV.zoom > 1.05){ BV.ty = clamp(BV.ty + (ev.clientY - BV.dragY)*0.004/BV.zoom, 0.05, 1.0); } BV.dragY = ev.clientY; BV.hold = performance.now(); } });
     const up = ev=>{ BV.pts.delete(ev.pointerId); BV.pinch = null; if (!BV.pts.size) BV.drag = null; }; cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
@@ -18346,6 +18346,9 @@ const FACING_VECT = [[0,-1],[1,0],[0,1],[-1,0]]; // N,E,S,W - clockwise
 // (so a diagonal is always two cardinal steps in one, and no map gets a new way through). Melee stays square-on.
 const DIR8 = [[0,-1],[1,0],[0,1],[-1,0],[1,-1],[1,1],[-1,1],[-1,-1]];   // the four cardinals first, so paths stay straight
 function diagClear(x, y, dx, dy, open){ return !(dx && dy) || (open(x+dx, y) && open(x, y+dy)); }
+/* (RS-670) the same on the open land, stepping with owNb: at a Planet's face edge the tiles beside a diagonal step lie over the edge, and
+   read as off the grid they refused every diagonal step across it - a click-walk whose path crossed a seam on the diagonal stopped at the edge */
+function owDiagClear(x, y, dx, dy){ if (!(dx && dy)) return true; const a = owNb(x, y, dx, 0), b = owNb(x, y, 0, dy); return !!(a && b && o3Passable(a[0], a[1]) && o3Passable(b[0], b[1])); }
 function tileOpen(x, y){ const t = tileAt(x, y); return t!==undefined && t!==null && t!==T_WALL; }
 /* (RS-452) a flight of stairs or a way out is solid to the monsters - none stands in one, and nothing grows or lies in one either */
 function stairTile(x, y){ if (G.gameMode!==1) return false; const t = tileAt(x, y); return t===T_STAIRSD || t===T_STAIRSU || t===T_EXIT || t===T_FLEE; }
@@ -19703,7 +19706,7 @@ function owBfs(sx, sy, tx, ty){
     for (let d=0; d<8; d++){
       const nb = owNb(x, y, DIR8[d][0], DIR8[d][1]); if (!nb) continue; const nx = nb[0], ny = nb[1];   /* (RS-638: round a planet and over its faces' edges) */
       const k = ny*W+nx; if (prev[k]>=0) continue;
-      if (!o3Passable(nx,ny) || !diagClear(x, y, DIR8[d][0], DIR8[d][1], o3Passable)) continue;
+      if (!o3Passable(nx,ny) || !owDiagClear(x, y, DIR8[d][0], DIR8[d][1])) continue;
       if (k!==goal && OW_SITE_TILES.includes(G.ow.map[nx][ny])) continue;   // stepping on a site enters it, so the path goes round
       prev[k] = j; q[qt++] = k;
     }
@@ -22637,7 +22640,7 @@ function wgRoutePath(sx, sy, tx, ty){
   const W = OW_COLS, goal = ty*W+tx, src = sy*W+sx;
   const cost = (x, y, n)=>{ if (!o3Passable(x, y)) return Infinity; if (n!==goal && OW_SITE_TILES.includes(G.ow.map[x][y])) return Infinity;
     const k = wgRoadKind(x, y); return k===1 || k===2 || k===4 ? 1 : k===3 ? 3 : G.ow.map[x][y]===OW_RIVER ? 4 : 2.2; };
-  WG_DIJ_NB = owIsPlanet(); let prev; try{ prev = wgDijkstra(src, cost, new Set([goal]), (x, y, dx, dy)=>diagClear(x, y, dx, dy, o3Passable)).prev; } finally { WG_DIJ_NB = false; }
+  WG_DIJ_NB = owIsPlanet(); let prev; try{ prev = wgDijkstra(src, cost, new Set([goal]), (x, y, dx, dy)=>owDiagClear(x, y, dx, dy)).prev; } finally { WG_DIJ_NB = false; }
   if (prev[goal] < 0) return null;
   const out = []; for (let c = goal; c!==src && c!==-1; c = prev[c]) out.push(c);
   return out.reverse();
@@ -33736,7 +33739,7 @@ function o3FrameSwitch(X){
   const r0 = o3FrameTurn(G.owPos.x, G.owPos.y); o3FrameSet(X); const r1 = o3FrameTurn(G.owPos.x, G.owPos.y), d = ((r1 - r0) % 4 + 4) % 4;
   if (d){ ISO.rot = ((ISO.rot - d) % 4 + 4) % 4; try{ if (G.player) G.player.viewRot = ISO.rot; }catch(e){} if (VIEW.yaw!=null) VIEW.yaw -= d*Math.PI/2;
     if (O3.player) O3.player.yaw = (O3.player.yaw||0) - d*Math.PI/2; if (O3.boatYaw!=null) O3.boatYaw -= d*Math.PI/2; if (O3.beasts) for (const f of O3.beasts.values()) f.yaw -= d*Math.PI/2; }   /* (RS-654: you, the boat and the roamers keep facing the same way in the world) */
-  if (O3.pend) try{ o3BuildAbandon(); }catch(e){} O3.win = null; O3.ppos = null; O3.camTgt = null; O3.path = [];
+  if (O3.pend) try{ o3BuildAbandon(); }catch(e){} O3.win = null; O3.ppos = null; O3.camTgt = null;   /* (RS-670: the walk's steps kept - they are steps on the stored grid, good in any frame; a click-walk over a seam used to stop three tiles short) */
   for (const w of O3.wild||[]) if (w.e && w.e.holder){ if (w.e.holder.parent) w.e.holder.parent.remove(w.e.holder); try{ m3dRelease(w.e); }catch(e){} }   /* (RS-647: the animals go with the old frame - their figures had stayed where they stood in it, still, past clicking) */
   O3.wild = []; O3.wildKey = null; O3.wildHits = []; O3.frameSwitches = (O3.frameSwitches||0) + 1;
 }
@@ -45866,7 +45869,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-669';
+const GAME_VERSION = 'rs-670';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -46322,8 +46325,8 @@ function lpMount(){
       const key = new T.DirectionalLight(0xffe0b0, 1.35); key.position.set(1.2, 2, 1.6); LP.scene.add(key);
       const rim = new T.DirectionalLight(0x9fb4ff, 1.0); rim.position.set(-1.5, 1.4, -2); LP.scene.add(rim);
       const pd = ()=>{ const p = [...LP.pts.values()]; return p.length >= 2 ? Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) : 0; };
-      cv.addEventListener('pointerdown', ev=>{ LP.pts.set(ev.pointerId, { x:ev.clientX, y:ev.clientY }); LP.drag = ev.clientX; LP.dragY = ev.clientY; LP.pinch = pd(); try{ cv.setPointerCapture(ev.pointerId); }catch(e){} });
-      cv.addEventListener('pointermove', ev=>{ if (LP.pts.has(ev.pointerId)) LP.pts.set(ev.pointerId, { x:ev.clientX, y:ev.clientY });
+      cv.addEventListener('pointerdown', ev=>{ ptrStale(LP.pts, ev.pointerId); LP.pts.set(ev.pointerId, { x:ev.clientX, y:ev.clientY, t:performance.now() }); LP.drag = ev.clientX; LP.dragY = ev.clientY; LP.pinch = pd(); try{ cv.setPointerCapture(ev.pointerId); }catch(e){} });
+      cv.addEventListener('pointermove', ev=>{ if (LP.pts.has(ev.pointerId)) LP.pts.set(ev.pointerId, { x:ev.clientX, y:ev.clientY, t:performance.now() });
         if (LP.pts.size >= 2){ const d = pd(); if (LP.pinch > 0 && d > 0) lpZoom(d/LP.pinch); LP.pinch = d; return; }   /* (two fingers: pinch to zoom) */
         if (LP.drag!=null){ LP.yaw += (ev.clientX - LP.drag)*0.014; LP.drag = ev.clientX; LP.hold = performance.now();
           if (LP.zoom > 1.001 && LP.dragY!=null){ const h = cv.clientHeight || 300; LP.panY = (LP.panY==null ? lpAimY() : LP.panY) + (ev.clientY - LP.dragY)/h*1.1*LP.f/LP.zoom; } LP.dragY = ev.clientY; } });
@@ -48195,7 +48198,7 @@ function moveDir(dx,dy){
   G.stepLen = dx && dy ? Math.SQRT2 : 1;   // the 3D figures glide a diagonal at the same pace, so it lands in the same time
   if (G.gameMode===0){
     if (G.owZoomedOut) return; // zoom back in (M) before moving
-    if (!diagClear(G.owPos.x, G.owPos.y, dx, dy, o3Passable)) return;
+    if (!owDiagClear(G.owPos.x, G.owPos.y, dx, dy)) return;
     tryMoveOverworld(dx,dy);
   } else {
     if (!diagClear(G.player.x, G.player.y, dx, dy, tileOpen)) return;
@@ -48629,6 +48632,14 @@ window.addEventListener('pointerup', (e)=>{
 // map, and one finger drags the world map. The town and overworld views act on pointerdown, so on touch
 // their tap is held back until the finger lifts - that way a long press or a pinch never walks you anywhere.
 const TOUCH = { on:false, pts:new Map(), mode:null, tgt:null, timer:0, d0:0, quietUntil:0, lastTouch:0 };
+/* (RS-670) a finger whose lift never came: the browser drops a touch's pointerup or pointercancel when the page stalls for seconds (the land
+   built at once as a Planet's frame switched), and the finger stayed in the map of fingers down for ever - every later tap made a two-finger
+   pinch and was swallowed, nothing on the land answered until the game was reloaded. A finger that has sent nothing for a while is let go
+   when the next one comes down (each entry notes its last event, t); a hidden page or a lost window lets them all go */
+const PTR_STALE = 2500;
+function ptrStale(map, id){ const now = performance.now(); for (const [k, p] of map) if (k!==id && now - (p.t||0) > PTR_STALE) map.delete(k); }
+function touchReset(){ TOUCH.pts.clear(); clearTimeout(TOUCH.timer); TOUCH.mode = null; TOUCH.tgt = null; }
+document.addEventListener('visibilitychange', ()=>{ if (document.hidden) touchReset(); }); window.addEventListener('blur', touchReset);
 try { TOUCH.on = matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window && navigator.maxTouchPoints > 0); } catch(e){}
 function touchView(el){ return !!el && (el===canvas || (V3.cv && el===V3.cv) || (O3.cv && el===O3.cv)); }
 function touchHolds(el){ return touchView(el) || !!(el && el.closest && el.closest('[data-sp-inv],[data-qb]')); }
@@ -48653,7 +48664,8 @@ window.addEventListener('pointerdown', e=>{
   for (let n = e.target; n && n.hasAttribute; n = n.parentElement) if (n.hasAttribute('title')){ n.dataset.ttl = n.getAttribute('title'); n.removeAttribute('title'); }
   if (!TOUCH.on){ TOUCH.on = true; touchUiSync(); if (typeof renderGame==='function' && G.player) renderGame(); }
   if (!touchHolds(e.target)) return;
-  TOUCH.pts.set(e.pointerId, { x:e.clientX, y:e.clientY, x0:e.clientX, y0:e.clientY });
+  ptrStale(TOUCH.pts, e.pointerId); if (!TOUCH.pts.size){ clearTimeout(TOUCH.timer); TOUCH.mode = null; }
+  TOUCH.pts.set(e.pointerId, { x:e.clientX, y:e.clientY, x0:e.clientX, y0:e.clientY, t:performance.now() });
   if (TOUCH.pts.size===1){
     TOUCH.mode = 'tap'; TOUCH.tgt = e.target; clearTimeout(TOUCH.timer);
     TOUCH.timer = setTimeout(()=>{ if (TOUCH.mode!=='tap' || TOUCH.pts.size!==1) return;
@@ -48669,7 +48681,7 @@ window.addEventListener('pointerdown', e=>{
 window.addEventListener('pointermove', e=>{
   if (e.pointerType!=='touch' || e.__touchSynth) return;
   const p = TOUCH.pts.get(e.pointerId); if (!p) return;
-  p.x = e.clientX; p.y = e.clientY;
+  p.x = e.clientX; p.y = e.clientY; p.t = performance.now();
   if (TOUCH.mode==='tap' && Math.hypot(p.x-p.x0, p.y-p.y0) > 12){ TOUCH.mode = 'drag'; clearTimeout(TOUCH.timer); }
   if (TOUCH.mode==='pinch'){
     e.stopImmediatePropagation();
