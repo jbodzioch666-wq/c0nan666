@@ -10,7 +10,7 @@ module.exports = async page=>{
   if (!at) throw new Error('no barrow');
   const zoom = +(process.env.ZB_DIST || 7);
   for (let r = 0; r < 4; r++){
-    await page.evaluate(([r, z, bare])=>{ ISO.rot = r; O3.dist = z; if (bare) O3.scene.traverse(o=>{ if (o.isInstancedMesh && o.userData && o.userData.kind) o.visible = false; }); }, [r, zoom, !!process.env.ZB_BARE]);   /* (ZB_BARE=1: the plants hidden, to see the barrow whole) */ await page.waitForTimeout(1600);
+    await page.evaluate(([r, z, bare])=>{ ISO.rot = r; O3.dist = z; if (bare) O3.scene.traverse(o=>{ if (o.isInstancedMesh && o.userData && o.userData.kind) o.visible = false; }); if (bare===2){ const keep = new Set(); for (const g of (O3.doors || new Map()).values()) g.traverse(o=>keep.add(o)); O3.scene.traverse(o=>{ if (!o.isMesh || keep.has(o)) return; if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere(); if (o.geometry.boundingSphere.radius < 2.5) o.visible = false; }); } }, [r, zoom, +process.env.ZB_BARE||0]);   /* (ZB_BARE=1: the plants hidden, to see the barrow whole; 2: every small thing but the barrows too - trees, people) */ await page.waitForTimeout(1600);
     await page.screenshot({ path: SHOTS + '/zbarrow-r' + r + '.png' });
   }
   await page.evaluate(([z])=>{ ISO.rot = 0; O3.dist = z; }, [zoom]); await page.waitForTimeout(1500);

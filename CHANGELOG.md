@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-664 - Earth banked against the door
+
+- **No more sheer turf beside the barrow door.** From the side, the turf behind the door stones stood as a near-vertical green wall, and the raised front above the door was a flat-topped block. Now a rounded hood of turf sits over the door, and from the door stones outward it is banked forward and down to the ground beside the door, like earth heaped against the stone frame.
+- **Turf along the sunken stair.** On barrows with a stair, the banks run down both sides of the stair up to the lintel's ends.
+- **No hollow behind the door.** The hood now runs at full height back to the mound's crown, so there's no dip between the door and the top of the hill.
+- **A clean doorway.** A thin strip of turf that could show at the foot of the stair doorway is gone.
+
 ## RS-663 - A door dug into the hill
 
 - **The barrow's mound is now one sheet of turf, and the door is dug into it.** RS-662 only laid lumps of turf behind and beside the door, and they read as blobs stuck on. Now the mound itself rises into a raised front round the door: up behind the lintel to its top, then banked down either side over the backs of the big facade stones and out to the ground past the last of them. Stone and hill meet as one surface.

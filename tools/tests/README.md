@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs664 | no sheer turf beside the barrow's door: the bank comes forward beside the door past the lintel, nowhere steeper than about 65 degrees, the doorway and stair clear (every barrow near the start) |
 | rs663 | the barrow's door dug into its mound: one sheet of turf up behind the lintel to its top, a bank either side down to the ground past the facade, none over the doorway or stair (every barrow near the start) |
 | rs661 | the barrow's mound runs out into the land: wider than tall by far, its edge sunk under the ground, its skirt washed toward the land's colour (every barrow near the start) |
 | rs660 | the last town hitches: a town's point lights padded to a floor of ten from the start, so a room with more lights than the town (the tavern's nine) keys the same programs and its first entry builds none; the robe's shaping yields to the next sculpt try when the budget is spent |
