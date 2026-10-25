@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs668 | the Dwarf Gate: every mine at a mountain's foot (generator 21), the gate looking out from it; stepping on, the runes wake, the stone leaves swing in, you go on into the mine and they shut behind you |
 | rs667 | no white ring round the boat: sailing on open water, the boat carries no patch of foam under its hull |
 | rs666 | after leaving a barrow you can walk again: the figure stands 1.05 out at the door, and a step no longer waits for it to reach the tile's middle |
 | rs665 | no risk window when you step onto a dungeon: every kind of site takes you straight in at the standard risk |

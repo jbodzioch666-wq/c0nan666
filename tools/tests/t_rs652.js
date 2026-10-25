@@ -27,7 +27,7 @@ module.exports = async page=>{
     let veg = 0; O3.world.traverse(o=>{ if (!o.isInstancedMesh || !o.count) return; const m4 = new THREE.Matrix4(), v3 = new THREE.Vector3(); for (let n=0;n<o.count;n++){ o.getMatrixAt(n, m4); v3.setFromMatrixPosition(m4); if (o3InCut(v3.x, v3.z, -0.04)) veg++; } });
     const mt = o3Mats(); let stones = 0, turf = 0; g.traverse(o=>{ if (o.material===mt.rock) stones += o.userData.merged || 1; if (o.material===mt.barrowTurf) turf += o.userData.merged || 1; });   /* (RS-653: a cairn of the door's stone under old turf; RS-655: merged into a draw or two; RS-662: one sheet of turf, the door dug into it) */
     const w = new THREE.Vector3(); g.getWorldPosition(w);
-    return { stones, turf, cutPatch:geo.userData.cuts, inPit, edge, mask, veg, stand:+Math.hypot(O3.ppos.x - w.x, O3.ppos.z - w.z).toFixed(2), ui:G.ui }; }));
+    return { stones, turf, cutPatch:geo.userData.cuts, inPit, edge, mask, veg, stand:+(()=>{ const W = O3.doorWalk, sp = W ? W.pts[W.pts.length - 1] : [O3.ppos.x, O3.ppos.z]; return Math.hypot(sp[0] - w.x, sp[1] - w.z); })().toFixed(2)   /* (RS-668: where the walk stops to look, not where the figure has got to after so many frames) */, ui:G.ui }; }));
   await page.screenshot({ path: SHOTS + '/rs652-stair.png' });
   Object.assign(out, await page.evaluate(async ()=>{ G.pendingDungeonModifier = null; enterDungeonConfirm();
     const r = { started:!!O3.doorWalk, pit:!!(O3.doorWalk && O3.doorWalk.pit), eyesSeen:false, maxFade:0, minY:9, onSteps:0, t:0 }; const y0 = O3.ppos.y, t0 = performance.now();

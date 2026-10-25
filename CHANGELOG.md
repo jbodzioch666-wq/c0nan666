@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-668 - The Dwarf Gate
+
+- **Mines are dwarf gates in the mountainside.** A mine is no longer a boulder with a black patch. It is a gate cut into the foot of a mountain, after the Doors of Durin: a cliff of the mountain's own rock, a dressed stone face with two fluted pillars, a lintel carved with runes and a gable bearing the gate's sign, two stone doors, cart rails running in, a cart of ore and a lantern on a post.
+- **You walk in.** Step onto a mine and you walk up to the gate. The runes wake with a pale blue light, the doors swing inward onto a lantern-lit hall, and you follow the rails into the dark. The doors close behind you.
+- **Mines sit at the foot of the mountains (new worlds).** Each mine now has a mountain right beside it and open land in front, and its gate faces out from the mountain. Make a new world to see it; existing worlds keep their mines where they are. Every site still finds a place: 69 on a medium world, 130 on large, 207 on extra large and 192 on a planet, the same as before.
+- **Ready for the other doorways.** The walk-in from RS-651 now works for any kind of site. Graveyards, dragon lairs and pyramids get theirs next.
+
 ## RS-667 - No halo on the water
 
 - **No white ring round your boat.** The soft patch of foam under the hull looked like a glowing ring on the sea, so it has been removed. The boat now sits straight on the water.

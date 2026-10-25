@@ -8004,7 +8004,7 @@ function ensureSpawnEscape(){
 // (RS-106, generator 3: broader ranges, valleys walled in by them filled in as mountain, and nothing but a dragon's lair in or on them)
 // (RS-114, generator 4: a river that runs into a hollow fills it into a lake and flows on from its lowest edge)
 // (RS-115, generator 5: rivers join edge to edge - a diagonal step also fills the lower of its two side tiles)
-const OW_GEN_VER = 20;   /* (6: pyramids in the desert, RS-213; 7: a town for every race, RS-223; 8: roads skirt the volcano, RS-236; 9: landmarks on clear ground, RS-238) */
+const OW_GEN_VER = 21;   /* (6: pyramids in the desert, RS-213; 7: a town for every race, RS-223; 8: roads skirt the volcano, RS-236; 9: landmarks on clear ground, RS-238) */
 // any two river tiles that touch only at a corner get the lower of the two tiles beside them turned to river
 // (never a mountain, the sea or a lake); returns how many tiles it added
 function owRiverJoin(elev){
@@ -8669,6 +8669,8 @@ function generateOverworld(seed){
   const PREFER_DESERT = (x,y)=>G.ow.map[x][y]===OW_DESERT;
   const PREFER_TUNDRA = (x,y)=>G.ow.map[x][y]===OW_TUNDRA;
   const PREFER_NEAR_MOUNTAIN = (x,y)=>nearTile(x,y,OW_MOUNTAIN,2);
+  /* (RS-668, generator 21: a mine is a dwarf gate in the side of a mountain - a mountain right beside it and open land across from it, where the gate looks out) */
+  const PREFER_MTN_SIDE = (x,y)=>{ for (const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){ const a = owNbG(x, y, dx, dy), b = owNbG(x, y, -dx, -dy); if (a && b && G.ow.map[a[0]][a[1]]===OW_MOUNTAIN && isLand(G.ow.map[b[0]][b[1]])) return true; } return false; };
   const PREFER_FOREST = (x,y)=>G.ow.map[x][y]===OW_FOREST;
   // which terrain each village race calls home - human/grass and dwarf/
   // near-mountain reuse the exact same preferences a castle and a mine
@@ -8877,7 +8879,7 @@ function generateOverworld(seed){
   for (let i=0;i<NNECRO;i++){ slot++; placeOrRelocateSite(slot, 'necro', OW_NECROTOWER, 22, placed, PREFER_SWAMP); }
   for (let i=0;i<NTEMPLE;i++){ slot++; placeOrRelocateSite(slot, 'temple', OW_TEMPLE, 18, placed, PREFER_DESERT); }
   for (let i=0;i<NGRAVEYARD;i++){ slot++; placeOrRelocateSite(slot, 'graveyard', OW_GRAVEYARD, 12, placed, PREFER_TUNDRA); }
-  for (let i=0;i<NMINE;i++){ slot++; placeOrRelocateSite(slot, 'mine', OW_MINE, 12, placed, PREFER_NEAR_MOUNTAIN); }
+  for (let i=0;i<NMINE;i++){ slot++; placeOrRelocateSite(slot, 'mine', OW_MINE, 12, placed, (G.ow.genVer||1) >= 21 ? PREFER_MTN_SIDE : PREFER_NEAR_MOUNTAIN); }
   // dragon lairs: mountain-locked, reached by a carved pass - see
   // placeMountainSite/carveMountainPass above
   for (let i=0;i<NLAIR;i++){ slot++; placeOrRelocateLairSite(slot, placed); }
@@ -17491,19 +17493,27 @@ function o3PortalTick(dt, pp){
    the floor loads. A key or a tap skips to the end. Off with transitions (as the stair and portal walks are), at sea, or with the
    barrow not built yet: then it is the cut it always was */
 const DOORWALK_SPD = 1.5, DOORWALK_LOOK = 0.6;
+/* (RS-668) the sites you walk into: a barrow, and the Dwarf Gate, Crypt Stair, Dragon Maw and Sun-Slab Tomb. Each of the four sets
+   g.doorWay, in its own frame (door at +z): look - where you stop before it while it opens (openT seconds); front, side, back - the way
+   round to it if you came from behind; inPts - on in; speed, fadeAt [from, to] of the way in, fade - the colour the dark takes; down(z) -
+   how far below the land a stair is at z; anim(look, v) - its doors, glow and dust, from the time spent looking and the way in (0..1);
+   anim(0, 0) shuts it again */
+const DOOR_SITES = [OW_DUNGEON, OW_MINE, OW_GRAVEYARD, OW_LAIR, OW_PYRAMID];
 function o3InScene(o){ while (o.parent) o = o.parent; return o===O3.scene; }
 function o3DoorWalkStart(){
   if (!transOn() || typeof o3Active!=='function' || !o3Active() || G.gameMode!==0 || !G.pendingDungeon || !O3.ppos) return false;
-  const { x, y } = G.pendingDungeon; if (G.owPos.x!==x || G.owPos.y!==y || G.ow.map[x][y]!==OW_DUNGEON || (typeof sqSpireAt==='function' && sqSpireAt(x, y))) return false;
+  const { x, y } = G.pendingDungeon; if (G.owPos.x!==x || G.owPos.y!==y || !DOOR_SITES.includes(G.ow.map[x][y]) || (typeof sqSpireAt==='function' && sqSpireAt(x, y))) return false;
   const PL = o3PL(), g = O3.doors && O3.doors.get(PL.x+','+PL.y); if (!g || !o3InScene(g)) return false;
   const T = THREE; g.updateWorldMatrix(true, false);
   const W = (lx, lz)=>{ const v = g.localToWorld(new T.Vector3(lx, 0, lz)); return [v.x, v.z]; }, L0 = g.worldToLocal(new T.Vector3(O3.ppos.x, g.matrixWorld.elements[13], O3.ppos.z));
-  const pts = [[O3.ppos.x, O3.ppos.z]], pit = g.doorPit;   /* (the barrow's own frame: its door at +z, 0.64 out; you look in from 0.9) */
-  if (pit){ if (!(L0.z > 0.75 && Math.abs(L0.x) < 0.3)){ if (L0.z < 0.5) pts.push(W(L0.x < 0 ? -1.0 : 1.0, 0.9)); pts.push(W(0, 1.02)); } pts.push(W(0, 0.74)); }   /* (RS-652: to the head of the stair, where you look down it) */
+  const pts = [[O3.ppos.x, O3.ppos.z]], pit = g.doorPit, dw = g.doorWay;   /* (the barrow's own frame: its door at +z, 0.64 out; you look in from 0.9) */
+  if (dw){ if (!(L0.z > dw.look - 0.05 && Math.abs(L0.x) < 0.3)){ if (L0.z < dw.back) pts.push(W(L0.x < 0 ? -dw.side : dw.side, dw.back + 0.15)); pts.push(W(0, dw.front)); } pts.push(W(0, dw.look)); }
+  else if (pit){ if (!(L0.z > 0.75 && Math.abs(L0.x) < 0.3)){ if (L0.z < 0.5) pts.push(W(L0.x < 0 ? -1.0 : 1.0, 0.9)); pts.push(W(0, 1.02)); } pts.push(W(0, 0.74)); }   /* (RS-652: to the head of the stair, where you look down it) */
   else if (!(L0.z > 0.6 && Math.abs(L0.x) < 0.3)){ if (L0.z < 0.3) pts.push(W(L0.x < 0 ? -1.0 : 1.0, 0.45)); pts.push(W(0, 1.04), W(0, 0.9)); }
   if (G.gather) skStop();
   O3.path = []; O3.gatherAt = null; O3.chase = null;
-  O3.doorWalk = { g, pts, pit, inPts:pit ? [W(0, 0.22), W(0, -0.32)] : [W(0, 0.12)], leg:0, u:0, look:0, v:0, end:0, yaw:(O3.player && O3.player.yaw) || 0 };
+  if (dw && dw.anim) dw.anim(0, 0);
+  O3.doorWalk = { g, pts, pit, dw, inPts:dw ? dw.inPts.map(q=>W(q[0], q[1])) : pit ? [W(0, 0.22), W(0, -0.32)] : [W(0, 0.12)], leg:0, u:0, look:0, v:0, end:0, yaw:(O3.player && O3.player.yaw) || 0 };
   setUi('playing'); return true;
 }
 function o3DoorWalkTick(dt, pp){
@@ -17515,22 +17525,24 @@ function o3DoorWalkTick(dt, pp){
     const a = P[W.leg], b = P[W.leg + 1], d = Math.hypot(b[0] - a[0], b[1] - a[1]), u = d < 1e-4 ? 1 : W.u + dt*DOORWALK_SPD/d;
     if (d >= 1e-4) W.yaw = Math.atan2(b[0] - a[0], b[1] - a[1]);
     if (u >= 1){ pos = b; W.leg++; W.u = 0; } else { pos = [a[0] + (b[0] - a[0])*u, a[1] + (b[1] - a[1])*u]; W.u = u; }
-  } else if (W.look < DOORWALK_LOOK){
+  } else if (W.look < (W.dw ? W.dw.openT : DOORWALK_LOOK)){
     W.look += dt; pos = last; mv = 0; W.yaw = Math.atan2(W.inPts[0][0] - last[0], W.inPts[0][1] - last[1]);
   } else {   /* (in: along the way in - for a barrow with a stair, down it and on into the dark; else a step in, going down as you go) */
     const way = [last].concat(W.inPts), segs = []; let tot = 0; for (let i=1;i<way.length;i++){ const d = Math.hypot(way[i][0] - way[i-1][0], way[i][1] - way[i-1][1]); segs.push(d); tot += d; }
-    tot = tot || 1; W.v = Math.min(1, W.v + dt*(W.pit ? 0.95 : 0.8)/tot);
+    tot = tot || 1; W.v = Math.min(1, W.v + dt*(W.dw ? W.dw.speed : W.pit ? 0.95 : 0.8)/tot);
     let at = W.v*tot, i = 0; while (i < segs.length - 1 && at > segs[i]){ at -= segs[i]; i++; } const a = way[i], b = way[i + 1], u = Math.min(1, at/(segs[i] || 1));
     pos = [a[0] + (b[0] - a[0])*u, a[1] + (b[1] - a[1])*u]; if (segs[i] > 1e-4) W.yaw = Math.atan2(b[0] - a[0], b[1] - a[1]);
-    if (W.pit) fade = Math.min(1, Math.max(0, (W.v - 0.5)/0.42)); else { sink = 0.4*W.v*W.v; fade = Math.min(1, Math.max(0, (W.v - 0.15)/0.7)); }
+    if (W.dw){ const f = W.dw.fadeAt; fade = Math.min(1, Math.max(0, (W.v - f[0])/(f[1] - f[0]))); sink = W.dw.sink ? W.dw.sink(W.v) : 0; }
+    else if (W.pit) fade = Math.min(1, Math.max(0, (W.v - 0.5)/0.42)); else { sink = 0.4*W.v*W.v; fade = Math.min(1, Math.max(0, (W.v - 0.15)/0.7)); }
     if (W.v >= 1 && (W.end += dt) > 0.15) done = true;
   }
   const on = !done && W.leg >= P.length - 1 && W.look > 0.08 && W.v < 0.3;   /* (something in there looks back, for a moment) */
   for (const e of eyes){ e.visible = on; if (on) e.material.opacity = 0.75 + Math.sin(performance.now()*0.02)*0.2; }
   pp.x = pos[0]; pp.z = pos[1]; pp.y = Math.max(O3.heightAt(pp.x, pp.z), -0.14) - sink;
   if (W.pit){ const L = W.g.worldToLocal(new THREE.Vector3(pp.x, W.g.position.y, pp.z)); if (Math.abs(L.x) < O3_PIT.hw + 0.05 && L.z < O3_PIT.z1 + 0.04) pp.y = W.g.position.y + o3PitY(L.z)*O3_PIT.s; }   /* (RS-652: down the steps) */
-  transFade(done ? 1 : fade, O3.cv);
-  if (done){ O3.doorWalk = null; for (const e of eyes) e.visible = false;
+  if (W.dw){ const L = W.g.worldToLocal(new THREE.Vector3(pp.x, W.g.position.y, pp.z)); if (W.dw.down){ const d = W.dw.down(L.x, L.z); if (d) pp.y = W.g.position.y - d*W.g.scale.x; } if (W.dw.anim) W.dw.anim(W.look, done ? 1 : W.v); }   /* (RS-668: its stair, and its doors) */
+  transFade(done ? 1 : fade, O3.cv, W.dw && W.dw.fade);
+  if (done){ O3.doorWalk = null; for (const e of eyes) e.visible = false; if (W.dw && W.dw.anim) W.dw.anim(0, 0);
     setTimeout(()=>{ try{ enterDungeonConfirm(true); }catch(err){ console.error(err); } transFade(0); renderGame(); }, 0); }
   return { mv, yaw:W.yaw };
 }
@@ -33357,8 +33369,9 @@ function doorSwing(pv, open){ if (!pv) return; pv.rotation.y = pv.userData.sgn*1
 /* (RS-592) the scene changes that wait for their walk: a town's gate, a dungeon's stairs (doors change the game at once, and only the
    picture lags behind). Off for a test browser unless the test asks - the step there changes the scene at once, as the tests expect */
 function transOn(){ return SET.trans!==false && (!navigator.webdriver || !!window.__trans); }
-function transFade(a, cv){
-  let el = document.getElementById('transFade'); if (!el){ el = document.createElement('div'); el.id = 'transFade'; el.style.cssText = 'position:absolute;pointer-events:none;opacity:0;background:radial-gradient(ellipse at center, rgba(20,12,6,0.92) 0%, rgba(3,2,1,1) 72%);'; }
+function transFade(a, cv, bg){
+  let el = document.getElementById('transFade'); if (!el){ el = document.createElement('div'); el.id = 'transFade'; el.style.cssText = 'position:absolute;pointer-events:none;opacity:0;'; }
+  el.style.background = bg || 'radial-gradient(ellipse at center, rgba(20,12,6,0.92) 0%, rgba(3,2,1,1) 72%)';   /* (RS-668: a dragon's lair fades to ember red) */
   if (cv && a > 0.001){ if (el.parentNode!==cv.parentNode || el.previousSibling!==cv) cv.parentNode.insertBefore(el, cv.nextSibling); for (const k of ['left', 'top', 'width', 'height', 'zIndex']) el.style[k] = cv.style[k]; }   /* (over the picture, under the HUD) */
   el.style.display = a > 0.001 ? 'block' : 'none'; el.style.opacity = a.toFixed(3); }
 // the first half: still showing the side you are leaving
@@ -34408,6 +34421,33 @@ function o3GreatOak(g, mats, x, z, rnd){
   }
   crown(top.clone().addScaledVector(up, 0.24), 0.11, 1);
 }
+/* (RS-668) a sheet of rock or turf over the land in a site's own frame: heights H(x, z) on a 0.03 grid, kept where a corner stands above
+   -0.1 (its edge running on down under the land) and not where hole(x, z) cuts it; its picture runs up a face as over a top (u by x, v by
+   height less z), col(x, y, z) the colour of each point */
+function o3HField(mat, x0, x1, z0, z1, H, col, hole){
+  const T = THREE, st = 0.03, nx = Math.ceil((x1 - x0)/st), nz = Math.ceil((z1 - z0)/st), N = (nx + 1)*(nz + 1), pos = new Float32Array(N*3), uv = new Float32Array(N*2), cl = new Float32Array(N*3), idx = [];
+  for (let j=0;j<=nz;j++) for (let i=0;i<=nx;i++){ const k = j*(nx + 1) + i, x = x0 + st*i, z = z0 + st*j, y = H(x, z), c = col(x, y, z);
+    pos[k*3] = x; pos[k*3 + 1] = y; pos[k*3 + 2] = z; uv[k*2] = x*0.6; uv[k*2 + 1] = (y - z)*0.6; cl[k*3] = c[0]; cl[k*3 + 1] = c[1]; cl[k*3 + 2] = c[2]; }
+  for (let j=0;j<nz;j++) for (let i=0;i<nx;i++){ const a = j*(nx + 1) + i, b = a + nx + 1;
+    if (pos[a*3 + 1] <= -0.1 && pos[(a + 1)*3 + 1] <= -0.1 && pos[b*3 + 1] <= -0.1 && pos[(b + 1)*3 + 1] <= -0.1) continue;
+    if (hole && hole(x0 + st*(i + 0.5), z0 + st*(j + 0.5))) continue; idx.push(a, b, a + 1, a + 1, b, b + 1); }
+  const g = new T.BufferGeometry(); g.setAttribute('position', new T.BufferAttribute(pos, 3)); g.setAttribute('uv', new T.BufferAttribute(uv, 2)); g.setAttribute('color', new T.BufferAttribute(cl, 3)); g.setIndex(idx); g.computeVertexNormals();
+  const m = new T.Mesh(g, mat); m.castShadow = m.receiveShadow = true; return m;
+}
+/* (RS-668) the dwarf gate's runes: a row of angular letters cut along the top half, and the gate's sign - a crown over a hammer and anvil
+   in a ring of seven stars - in the bottom left quarter; white lines on clear, for a cut-out (alphaTest) that glows by its emissive */
+function o3RuneTex(){
+  if (O3.tex.runes) return O3.tex.runes;
+  const c = v3Canvas(512, 128), x = c.getContext('2d'); let sd = 41; const r = ()=>{ sd = (sd*16807) % 2147483647; return sd/2147483647; };
+  x.strokeStyle = '#fff'; x.fillStyle = '#fff'; x.lineCap = 'square'; x.lineWidth = 5;
+  for (let i=0;i<22;i++){ const cx = 14 + i*22.5, y0 = 12, y1 = 54; x.beginPath(); x.moveTo(cx, y0); x.lineTo(cx, y1);   /* (a stem, and a branch or two off it, as cirth are) */
+    const n = 1 + Math.floor(r()*2.4); for (let k=0;k<n;k++){ const ya = y0 + 4 + r()*30, d = r() < 0.5 ? -1 : 1, up = r() < 0.5 ? -1 : 1; x.moveTo(cx, ya); x.lineTo(cx + d*9, ya + up*9); } x.stroke(); }
+  x.lineWidth = 4; x.beginPath(); x.arc(64, 96, 27, 0, Math.PI*2); x.stroke();
+  for (let i=0;i<7;i++){ const a = -Math.PI*0.9 + i/6*Math.PI*0.8, sx = 64 + Math.cos(a)*21, sy = 96 + Math.sin(a)*21; x.fillRect(sx - 2.5, sy - 2.5, 5, 5); }
+  x.beginPath(); x.moveTo(52, 112); x.lineTo(76, 112); x.moveTo(56, 106); x.lineTo(72, 106); x.moveTo(64, 106); x.lineTo(64, 90); x.moveTo(57, 90); x.lineTo(71, 90); x.stroke();   /* (anvil and hammer) */
+  x.beginPath(); x.moveTo(55, 86); x.lineTo(57, 78); x.lineTo(61, 83); x.lineTo(64, 76); x.lineTo(67, 83); x.lineTo(71, 78); x.lineTo(73, 86); x.closePath(); x.fill();   /* (the crown) */
+  return (O3.tex.runes = v3CanvasTex(c));
+}
 function o3Site(t, gx, gz){
   const sq = o3G(Math.floor(gx), Math.floor(gz)) || [Math.floor(gx), Math.floor(gz)], sx = sq[0], sz = sq[1];   /* (RS-644: gx, gz are in the 3D land's frame; the town's people, its size and a site's own look are its tile's in the world) */
   const T = THREE, mats = o3Mats(), g = new T.Group(), rnd = (s)=> o3Hash(sx, sz, s);
@@ -34562,14 +34602,65 @@ function o3Site(t, gx, gz){
     for (const s of [-1,1]){ const b = new T.Mesh(new T.CylinderGeometry(0.01,0.025,0.34,4), mats.wood); b.position.set(-0.36+s*0.12, 0.62, -0.2); b.rotation.z = -s*0.9; g.add(b); }
     const mist = o3Glow('rgba(170,230,180,0.5)', 1.3); mist.position.y = 0.12; g.add(mist); O3.glows.push({ orb:mist, base:0.12, ph:rnd(4)*6, amp:0.02 });
   } else if (t===OW_MINE){
-    const hill = new T.Mesh(new T.DodecahedronGeometry(0.6,1), mats.rock); hill.scale.set(1.1,0.7,0.9); hill.position.set(0,0.05,-0.12); hill.castShadow = hill.receiveShadow = true; g.add(hill);
-    const hole = new T.Mesh(new T.PlaneGeometry(0.3,0.32), mats.black); hole.position.set(0,0.2,0.43); g.add(hole);
-    for (const s of [-1,1]) g.add(v3Box(0.05,0.4,0.05, mats.wood, s*0.18, 0.2, 0.45));
-    g.add(v3Box(0.46,0.06,0.07, mats.wood, 0, 0.42, 0.45));
-    for (const s of [-1,1]) g.add(v3Box(0.02,0.015,0.6, mats.iron, s*0.07, 0.01, 0.75));
-    for (let i=0;i<5;i++) g.add(v3Box(0.2,0.012,0.035, mats.wood, 0, 0.005, 0.5+i*0.12));
-    const cart = v3Box(0.16,0.1,0.2, mats.wood, 0, 0.08, 0.85); g.add(cart);
-    flame(0.24, 0.46, 0.5);
+    /* (RS-668) the Dwarf Gate, after the Doors of Durin: cut into the foot of a mountain (generator 21 puts a mine beside one, and the gate
+       turns its back to it - o3SitesGen), a cliff of grey rock with a face of dressed stone set in it; two pillars, a lintel carved with runes
+       and a gable with the gate's sign, and two stone leaves that swing in on a lantern-lit hall when you come to them (g.doorWay). The
+       mine's rails run in ahead of you, a cart of ore stands by */
+    const crag = mats.crag || (mats.crag = new T.MeshStandardMaterial({ map:gfxTextures().rock, color:new T.Color(0xae9f8f).convertSRGBToLinear(), roughness:0.95, vertexColors:true }));   /* (the mountain's own rock: grey-brown, banded by height) */
+    const carved = mats.carved || (mats.carved = new T.MeshStandardMaterial({ map:mats.stone.map, color:new T.Color(0xc9c2b4).convertSRGBToLinear(), roughness:0.82 }));
+    const leafM = mats.gateLeaf || (mats.gateLeaf = new T.MeshStandardMaterial({ map:mats.stone.map, color:new T.Color(0x8e877c).convertSRGBToLinear(), roughness:0.86 }));
+    const hall = mats.voidIn || (mats.voidIn = new T.MeshBasicMaterial({ color:0x000000, side:T.BackSide }));
+    const rk = (r, x, y, z, sx, sy, sz, sd)=>{ const m = new T.Mesh(o3RockGeo(r, sd), mats.rock); m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.rotation.y = rnd(400 + sd)*6.28; g.add(m); return m; };
+    /* the cliff: running back into the mountain, falling away at the sides, its face sheer at the gate and crumbling to scree either side */
+    const zf = x=>{ const ax = Math.abs(x); return 0.27 + (0.045*Math.sin(x*11.3 + 1.3) + 0.03*Math.sin(x*23.1))*smoothstep(0.42, 0.55, ax) - 0.32*smoothstep(0.55, 1.2, ax); };
+    const CH = (x, z)=>{ const ax = Math.abs(x), side = 1 - smoothstep(0.5, 1.45, ax), w = 0.42*smoothstep(0.45, 1.05, ax), f = 1 - smoothstep(zf(x) - 0.02 - w*0.6, zf(x) + 0.03 + w*0.4, z);   /* (sheer at the gate, sloping back into the mountain as buttresses beside it) */
+      let h = (1.3 + 0.55*smoothstep(0.1, -1.2, z) + 0.14*Math.sin(x*4.1 + 0.7 + rnd(1)*3) + 0.09*Math.sin(z*5.3 - x*2.2))*side*smoothstep(-1.55, -1.15, z);   /* (rising behind, as the mountain does) */
+      h += (Math.sin(x*17.3 + z*13.1) + 0.5*Math.sin(x*29.7 - z*23.3))*0.035*smoothstep(0.1, 0.5, h);
+      if (ax < 0.5 && z > zf(x) - 0.3) h = Math.min(h, 1.36);   /* (no higher than the dressed face over the gate) */
+      h = h*f; const sc = 0.24*(1 - smoothstep(0, 0.32, z - zf(x)))*smoothstep(0.44, 0.62, ax)*side*(z > zf(x) - 0.06 ? 1 : 0); h = Math.max(h, sc);   /* (scree at its foot) */
+      return h - 0.14*(1 - smoothstep(0, 0.04, h)); };
+    const cc = (x, y, z)=>{ const band = 0.8 + 0.13*Math.sin(y*31 + Math.sin(x*5.1)*2.2) + 0.06*Math.sin(x*41 + z*37), foot = 0.62 + 0.38*smoothstep(0, 0.45, y), k = band*foot; return [k, k, k]; };
+    g.add(o3HField(crag, -1.45, 1.45, -1.6, 0.8, CH, cc, (x, z)=>Math.abs(x) < 0.45 && z > 0.17 && z < 0.4));
+    /* the dressed face: a slab of smoothed stone set in the cliff, the doorway cut through it */
+    { const sh = new T.Shape(); sh.moveTo(-0.45, -0.04); sh.lineTo(0.45, -0.04); sh.lineTo(0.45, 1.3); sh.quadraticCurveTo(0, 1.52, -0.45, 1.3); sh.lineTo(-0.45, -0.04);
+      const hl = new T.Path(); hl.moveTo(-0.2125, 0.04); hl.lineTo(0.2125, 0.04); hl.lineTo(0.2125, 0.97); hl.lineTo(-0.2125, 0.97); hl.lineTo(-0.2125, 0.04); sh.holes.push(hl);
+      const fg = new T.ExtrudeGeometry(sh, { depth:0.12, bevelEnabled:true, bevelSize:0.008, bevelThickness:0.008, bevelSegments:2, curveSegments:12 }); fg.translate(0, 0, 0.17); v3WorldUV(fg);
+      g.add(new T.Mesh(fg, leafM)); }
+    const bev = (w, h, d, m, x, y, z, to)=>{ const b = Math.min(0.01, w/4, h/4, d/4), sh = new T.Shape(); sh.moveTo(-w/2 + b, -h/2 + b); sh.lineTo(w/2 - b, -h/2 + b); sh.lineTo(w/2 - b, h/2 - b); sh.lineTo(-w/2 + b, h/2 - b); sh.lineTo(-w/2 + b, -h/2 + b);
+      const eg = new T.ExtrudeGeometry(sh, { depth:d - 2*b, bevelEnabled:true, bevelSize:b, bevelThickness:b, bevelSegments:2, curveSegments:1 }); eg.translate(0, 0, -(d - 2*b)/2); v3WorldUV(eg); const o = new T.Mesh(eg, m); o.position.set(x, y, z); (to || g).add(o); return o; };
+    bev(0.62, 0.04, 0.2, carved, 0, 0.02, 0.4);   /* (the threshold) */
+    for (const s of [-1, 1]){ bev(0.09, 0.86, 0.1, carved, s*0.258, 0.5, 0.35); bev(0.13, 0.05, 0.13, carved, s*0.258, 0.95, 0.35); bev(0.13, 0.07, 0.13, carved, s*0.258, 0.075, 0.35);
+      for (let i=0;i<4;i++) bev(0.012, 0.74, 0.012, carved, s*0.258 + (i - 1.5)*0.018, 0.5, 0.401); }   /* (fluted pillars) */
+    bev(0.72, 0.1, 0.13, carved, 0, 1.025, 0.35);
+    { const gb = o3Gable(0.76, 0.1, 0.21, carved); gb.position.set(0, 1.075, 0.34); g.add(gb); }
+    /* the runes on the lintel and the gate's sign on the gable: dark cut lines that wake with light as you come (its own material, so one gate glows at a time) */
+    const rt = o3RuneTex(), rune = new T.MeshStandardMaterial({ map:rt, color:new T.Color(0x2e3a3c), emissive:new T.Color(0x7fe8ff), emissiveMap:rt, emissiveIntensity:0.22, alphaTest:0.4, roughness:0.6 });
+    const decal = (w, h, u0, v0, u1, v1, x, y, z)=>{ const pg = new T.PlaneGeometry(w, h), uv = pg.attributes.uv; for (let i=0;i<uv.count;i++) uv.setXY(i, u0 + uv.getX(i)*(u1 - u0), v0 + uv.getY(i)*(v1 - v0)); const o = new T.Mesh(pg, rune); o.position.set(x, y, z); o.userData.mv = 1; g.add(o); return o; };
+    decal(0.62, 0.075, 0, 0.5, 1, 1, 0, 1.025, 0.4175); decal(0.15, 0.15, 0, 0, 0.25, 0.5, 0, 1.135, 0.3915);
+    /* the leaves, hinged on the pillars, swinging in */
+    const leaves = [-1, 1].map(s=>{ const pv = new T.Group(); pv.position.set(s*0.2125, 0, 0.27); pv.userData.mv = 1; g.add(pv);
+      bev(0.208, 0.925, 0.045, leafM, -s*0.105, 0.505, 0, pv);
+      bev(0.17, 0.016, 0.012, carved, -s*0.105, 0.86, 0.026, pv); bev(0.17, 0.016, 0.012, carved, -s*0.105, 0.15, 0.026, pv); bev(0.016, 0.71, 0.012, carved, -s*0.032, 0.505, 0.026, pv); bev(0.016, 0.71, 0.012, carved, -s*0.178, 0.505, 0.026, pv);   /* (a raised border) */
+      for (const y of [0.24, 0.77]) bev(0.11, 0.022, 0.008, mats.iron, -s*0.05, y, 0.025, pv);   /* (iron straps at the hinge) */
+      const ring = new T.Mesh(new T.TorusGeometry(0.024, 0.006, 8, 20), mats.iron); ring.position.set(-s*0.17, 0.5, 0.03); pv.add(ring);
+      return pv; });
+    { const hb = new T.Mesh(new T.BoxGeometry(0.425, 0.93, 0.95), hall); hb.position.set(0, 0.505, -0.2); g.add(hb); }   /* (the hall: dark inside, open where the leaves are) */
+    const lamp = o3Glow('rgba(255,190,110,1)', 0.42); lamp.position.set(0.12, 0.66, -0.3); g.add(lamp); O3.flames.push(lamp);   /* (a lantern burning in the hall, seen when the leaves open) */
+    g.add(v3Box(0.04, 0.06, 0.04, mats.iron, 0.12, 0.62, -0.3));
+    /* the rails, running in */
+    for (const s of [-1, 1]) g.add(v3Box(0.014, 0.016, 1.7, mats.iron, s*0.07, 0.012, 0.3));
+    for (let i=0;i<13;i++) g.add(v3Box(0.21, 0.012, 0.035, mats.wood, (rnd(450 + i) - 0.5)*0.01, 0.004, -0.5 + i*0.13));
+    /* a cart of ore by the rails */
+    { const cg = new T.Group(); cg.position.set(0.5, 0, 0.74); cg.rotation.y = 0.45 + rnd(460)*0.3; g.add(cg);
+      const body = new T.Mesh(new T.CylinderGeometry(0.11, 0.08, 0.1, 4, 1), mats.wood); body.rotation.y = Math.PI/4; body.scale.set(1, 1, 1.35); body.position.y = 0.105; cg.add(body);
+      for (const [x, z] of [[-0.065, -0.07], [0.065, -0.07], [-0.065, 0.07], [0.065, 0.07]]){ const w = new T.Mesh(new T.CylinderGeometry(0.034, 0.034, 0.018, 16), mats.iron); w.rotation.z = Math.PI/2; w.position.set(x*1.25, 0.034, z*1.25); cg.add(w); }
+      const ore = mats.ore || (mats.ore = [new T.MeshStandardMaterial({ color:new T.Color(0xd9a548).convertSRGBToLinear(), metalness:0.75, roughness:0.35 }), new T.MeshStandardMaterial({ color:new T.Color(0xb86a38).convertSRGBToLinear(), metalness:0.6, roughness:0.45 })]);
+      for (let i=0;i<6;i++){ const m = new T.Mesh(o3RockGeo(0.032 + rnd(470 + i)*0.012, 470 + i), ore[i % 2]); m.position.set((rnd(480 + i) - 0.5)*0.1, 0.16 + rnd(490 + i)*0.02, (rnd(500 + i) - 0.5)*0.15); cg.add(m); } }
+    /* a lantern on a post */
+    g.add(v3Cyl(0.016, 0.022, 0.62, 8, mats.wood, -0.52, 0.31, 0.62)); g.add(v3Box(0.12, 0.022, 0.022, mats.wood, -0.47, 0.6, 0.62)); g.add(v3Box(0.045, 0.06, 0.045, mats.iron, -0.42, 0.56, 0.62)); flame(-0.42, 0.56, 0.62);
+    for (let i=0;i<7;i++){ const sd = (i % 2 ? 1 : -1); rk(0.05 + rnd(510 + i)*0.05, sd*(0.5 + rnd(520 + i)*0.3), 0.02, 0.36 + rnd(530 + i)*0.3, 1.2, 0.7, 1, 510 + i); }   /* (fallen stones) */
+    g.doorWay = { look:0.68, front:0.95, side:0.7, back:0.3, inPts:[[0, 0.2], [0, -0.4]], openT:1.6, speed:0.7, fadeAt:[0.3, 0.95],
+      anim:(look, v)=>{ const k = smoothstep(0, 0.6, look)*(1 - smoothstep(0.9, 1, v)), a = 1.5*smoothstep(0.55, 1.4, look)*(1 - smoothstep(0.72, 1, v)); rune.emissiveIntensity = 0.22 + 2.6*k; leaves[0].rotation.y = a; leaves[1].rotation.y = -a; for (const l of leaves){ l.updateMatrix(); l.updateMatrixWorld(true); } } };   /* (the land's sites are frozen: matrixAutoUpdate off) */
   } else if (t===OW_PYRAMID){
     // (RS-213) a pyramid with a gilded capstone, its door flanked by a pair of obelisks and two fires
     /* (RS-415) an Egyptian one, after Giza: four smooth faces at the old steep slope, cased in pale limestone laid in courses
@@ -34626,8 +34717,9 @@ function* o3SitesGen(grp, x0, y0, W){
     const gx = x+0.5, gz = y+0.5, g = o3Site(t, gx, gz);
     let sc = 1.3; if (t===OW_TOWN){ try{ const q = o3G(x, y) || [x, y]; sc *= [0.85, 1, 1.18][townTier(q[0], q[1])]; }catch(e){} }   /* (RS-485: a city stands bigger on the land than a village) */
     g.scale.setScalar(sc); g.position.set(gx, O3.heightAt(gx,gz), gz); g.rotation.y = 0.52 + (t===OW_TOWN ? 0 : (o3Hash(x,y,9)-0.5)*0.3);   // entrances face the camera
+    if (t===OW_MINE){ let ax = 0, az = 0; for (let i=-1;i<=1;i++) for (let j=-1;j<=1;j++) if ((i || j) && o3Tile(x+i, y+j)===OW_MOUNTAIN){ const w = i && j ? 0.5 : 1; ax -= i*w; az -= j*w; } if (ax || az) g.rotation.y = Math.atan2(ax, az); }   /* (RS-668: a dwarf gate turns its back to the mountain it is cut into) */
     grp.add(g);
-    if (t===OW_DUNGEON) (O3.doors || (O3.doors = new Map())).set(x+','+y, g);   /* (RS-651: the barrow you walk into, by its tile in the frame) */
+    if (DOOR_SITES.includes(t)) (O3.doors || (O3.doors = new Map())).set(x+','+y, g);   /* (RS-651: the barrow you walk into, by its tile in the frame; RS-668: and the other doorways) */
     // an invisible box to click/hover the whole landmark
     const hb = new T.Mesh(new T.BoxGeometry(1,1.2,1), new T.MeshBasicMaterial({ visible:false })); hb.position.set(gx, g.position.y+0.6, gz);
     const [wx, wy] = o3G(x, y) || [x, y];   /* (RS-632: found in the 3D land's frame, named and clicked where it is in the world) */
@@ -35957,7 +36049,7 @@ function o3SiteStandOff(x, y){
   const t = G.ow.map[x] && G.ow.map[x][y]; if (!OW_SITE_TILES.includes(t)) return null;
   let dx = 0, dz = 0; const pv = O3.prevTile; if (pv && Math.max(Math.abs(pv[0]-x), Math.abs(pv[1]-y))===1){ dx = pv[0]-x; dz = pv[1]-y; }
   if (!dx && !dz){ for (const [ox, oz] of [[0,1],[1,1],[1,0],[-1,1],[0,-1],[-1,0],[1,-1],[-1,-1]]){ const nx = x+ox, ny = y+oz, nt = G.ow.map[nx] && G.ow.map[nx][ny]; if (nt!=null && nt!==OW_WATER && nt!==OW_MOUNTAIN && !OW_SITE_TILES.includes(nt)){ dx = ox; dz = oz; break; } } }
-  if (!dx && !dz) return null; const d = Math.hypot(dx, dz), r = t===OW_DUNGEON ? 1.05 : 0.72; return [dx/d*r, dz/d*r];   /* (RS-651: a barrow's door stands where you used to stop) */
+  if (!dx && !dz) return null; const d = Math.hypot(dx, dz), r = t===OW_DUNGEON ? 1.05 : t===OW_MINE ? 1.0 : 0.72; return [dx/d*r, dz/d*r];   /* (RS-651: a barrow's door stands where you used to stop; RS-668: and the Dwarf Gate's) */
 }
 /* (RS-501) the placed land never moves, but three.js was recomposing every tree, rock, gathering node and landmark's matrix
    every frame - a good share of each overworld frame on a busy map. The gathering nodes and landmarks are frozen once placed
@@ -45772,7 +45864,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-667';
+const GAME_VERSION = 'rs-668';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
