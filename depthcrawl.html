@@ -9937,7 +9937,7 @@ function v3Bench(k, x, z, mats, grp, rot){
     box(1.1,0.08,0.08,mats.stone,0,0.58,0.03);   /* (the lintel's lip) */
     const fire = v3HearthFire(T); fire.position.set(0, 0.12, -0.17); g.add(fire); V3.flames.push(fire);
     V3.lamps.push({ p:[x,0.5,z+0.2], col:0xff8030, r:5, main:true, forge:true }); cyl(0.2,0.24,1.6,8,mats.stone,0,2.0,-0.3);
-    const ck = cookRigMake(T, { legH:0.16 }); ck.g.position.set(0, 0.3, 0.16); ck.g.scale.setScalar(1.5); g.add(ck.g); (V3.hearthCook = V3.hearthCook || []).push(ck); }   /* (RS-587: a grill - a steak or a fish grilled on it, a stew in its pan on the bars; RS-588: out in front of the firebox on the hearth stone, where the skillet stood, its legs on the stone) */
+    const mp = G.map; gfxIdle(()=>{ if (G.map!==mp || !g.parent) return true; const ck = cookRigMake(T, { legH:0.16 }); ck.g.position.set(0, 0.3, 0.16); ck.g.scale.setScalar(1.5); g.add(ck.g); (V3.hearthCook = V3.hearthCook || []).push(ck); try{ gfxMatsBorn(V3.renderer, ck.g); }catch(e){} return true; }); }   /* (RS-658: the grill made in idle time a moment after the room - its twenty-sided rods were 13-18ms of the step in; it starts unseen anyway, and shows when a pan goes on) */   /* (RS-587: a grill - a steak or a fish grilled on it, a stew in its pan on the bars; RS-588: out in front of the firebox on the hearth stone, where the skillet stood, its legs on the stone) */
   else if (k==='spinning'){ box(0.7,0.08,0.24,mats.wood,0,0.35,0); for (const s of [-0.3,0.3]) box(0.05,0.35,0.05,mats.wood,s,0.17,0); const w = add(new T.Mesh(new T.TorusGeometry(0.28,0.025,6,24), mats.wood)); w.position.set(-0.12,0.72,0); w.rotation.y = Math.PI/2;
     for (let i=0;i<6;i++){ const sp = box(0.02,0.52,0.02,mats.wood,-0.12,0.72,0); sp.rotation.x = i*Math.PI/6; } box(0.05,0.4,0.05,mats.wood,-0.12,0.52,0); cyl(0.05,0.05,0.14,8,M('#d8d0a8'),0.25,0.48,0); }
   else if (k==='tanning'){ for (const s of [-0.4,0.4]) box(0.06,1.3,0.06,mats.wood,s,0.65,0); box(0.9,0.06,0.06,mats.wood,0,1.28,0); box(0.9,0.06,0.06,mats.wood,0,0.25,0);
@@ -25231,7 +25231,7 @@ function gfxGrade(view, dt){
 /* (RS-583) the post chain's own shaders - the bright pass, the blur, the grade - started as the renderer is made and linked while
    the place builds: they compiled in the first frame, a quarter of a second of it */
 function gfxPostPrelink(r){ if (!r || !gfxPostOn() || typeof GFXP==='undefined') return; try{ const P = gfxPost(r); if (P.prelinked) return; P.prelinked = true;
-  for (const m of [P.bright, P.blur, P.comp]){ if (!m) continue; P.quad.material = m; r.compile(P.qs, P.qc); } P.quad.material = P.comp; try{ r.getContext().flush(); }catch(e){} }catch(e){} }
+  const rt0 = r.getRenderTarget(); for (const m of [P.bright, P.blur, P.ssao, P.comp]){ if (!m) continue; P.quad.material = m; r.setRenderTarget(m===P.comp ? null : P.a); r.compile(P.qs, P.qc); } r.setRenderTarget(rt0);   /* (RS-658: the occlusion's too, and each compiled against the kind of target its pass draws to - three keys a program by it, so the ones compiled against the screen were never the ones the passes used, and bright, blur and the occlusion all linked in the first real frame instead, 140ms below ground) */ P.quad.material = P.comp; try{ r.getContext().flush(); }catch(e){} }catch(e){} }
 function gfxPost(r){
   let P = GFXP.get(r); if (P) return P; const T = THREE;
   const mk = o=>new T.WebGLRenderTarget(4, 4, Object.assign({ type:T.HalfFloatType, minFilter:T.LinearFilter, magFilter:T.LinearFilter, depthBuffer:false }, o||{}));
@@ -25467,11 +25467,18 @@ function gfxShadowKinds(scene){
       st.frustumCulled = false; st.castShadow = false; K.sc.add(st); } } });
   return K.sc;
 }
+function gfxDepthKinds(mat){
+  const K = gfxDepthKinds.k || (gfxDepthKinds.k = new Map()); if (K.has(mat)) return K.get(mat);
+  const T = THREE, sc = new T.Scene(), geo = new T.BoxGeometry(0.01, 0.01, 0.01); sc.add(new T.Mesh(geo, mat)); const sk = new T.SkinnedMesh(geo, mat), bone = new T.Bone(); sk.add(bone); sk.bind(new T.Skeleton([bone])); sc.add(sk); sc.add(new T.InstancedMesh(geo, mat, 1));
+  sc.traverse(o=>{ o.frustumCulled = false; }); K.set(mat, sc); return sc;
+}
 function gfxPrelink(V, r, scene, cam){
   const ext = gfxPscExt(r); if (!ext || window.__noPrelink) return false;
   r.debug.checkShaderErrors = false;
   const before = new Set(r.info.programs), rt = r.getRenderTarget(); let t = null, mats = null; try{ t = gfxTarget(r); }catch(e){}
-  if (t) r.setRenderTarget(t); try{ mats = r.compile(scene, cam); if (r.shadowMap && r.shadowMap.enabled && !window.__noShadowKinds){ const fg = scene.fog; scene.fog = null; try{ r.compile(gfxShadowKinds(scene), cam, scene); }catch(e){ console.error(e); } finally { scene.fog = fg; } } }   /* (compile keys a material's program by the target scene's fog: nulled for the pass, the way the shadow pass sees it) */catch(e){ console.error(e); } finally { r.setRenderTarget(rt); }
+  if (t) r.setRenderTarget(t); try{ mats = r.compile(scene, cam);
+    if (typeof FPD!=='undefined' && scene===FPD.scene && gfxAoOn('fpd') && !window.__noShadowKinds) try{ const P = GFXP.get(r); if (P && P.depM) r.compile(gfxDepthKinds(P.depM), cam, scene); }catch(e){ console.error(e); }   /* (RS-658: the occlusion's depth prepass draws the floor with one override material, its program per kind of object - stand-ins, compiled with the rest, so the first real frame doesn't link them) */
+    if (r.shadowMap && r.shadowMap.enabled && !window.__noShadowKinds){ const fg = scene.fog; scene.fog = null; try{ r.compile(gfxShadowKinds(scene), cam, scene); }catch(e){ console.error(e); } finally { scene.fog = fg; } } }   /* (compile keys a material's program by the target scene's fog: nulled for the pass, the way the shadow pass sees it) */catch(e){ console.error(e); } finally { r.setRenderTarget(rt); }
   const progs = r.info.programs.filter(p=>!before.has(p)); if (!progs.length) return false;
   try{ r.getContext().flush(); }catch(e){}   /* (the links only start once the commands reach the driver) */
   V.prelink = { r, progs, t0:performance.now() }; return true;
@@ -32228,7 +32235,16 @@ const V3_RACE = {
   tiefling: { plaster:'#6a5a6a', stone:'#4a4250', wood:'#2a1e24', roof:'#3a2a4a', frame:false, stoneWalls:true },
   halfelf:  { plaster:'#dcd4b4', stone:'#949488', wood:'#6a5034', roof:'#5a6a3a', frame:true },
 };
+/* (RS-658) the town's palette is made once per race and theme and cloned for each build - its textures are painted once and shared, and a
+   clone is a fresh material for the build to change (the glass by day and night, the roofs under snow) and to let go of with the scene.
+   Making it afresh was 16-18ms of every step into a building and out */
+const V3_MATS_CACHE = new Map();
 function v3Materials(){
+  const key = (G.villageRace||'human') + '|' + G.villageTheme, C = V3_MATS_CACHE; let base = C.get(key);
+  if (!base){ base = v3MaterialsMake(); C.set(key, base); if (C.size > 6) C.delete(C.keys().next().value); }
+  const m = {}; for (const k in base) m[k] = base[k].clone(); return m;
+}
+function v3MaterialsMake(){
   const T = THREE, r = V3_RACE[G.villageRace] || V3_RACE.human, th = G.villageTheme;
   const plaster = th==='desert' ? '#d8b98c' : r.plaster, roof = th==='desert' ? '#a8603a' : r.roof;
   const std = (o)=> new T.MeshStandardMaterial(Object.assign({ roughness:0.88, metalness:0 }, o));
@@ -33059,7 +33075,7 @@ function v3PeopleMake(Q, j){
    build (atBuild) only those whose template is made already - unless the sliced warm-up is off, when everyone is made at once */
 function v3PeopleStep(atBuild){
   const Q = V3.peopleQ; if (!Q) return; if (Q.grp!==V3.world){ V3.peopleQ = null; return; }
-  const now = performance.now(), iv = Q.t ? Math.min(40, now - Q.t) : 16; Q.t = now;   /* (RS-657: the slice is cut to the frame's own interval - a 12ms slice on a 190Hz screen dropped three frames at a time) */
+  const now = performance.now(), iv0 = Q.t ? Math.min(40, now - Q.t) : 16; Q.t = now; const iv = Q.iv = Math.min(iv0, (Q.iv || 16)*1.03);   /* (RS-657: the slice is cut to the frame's own interval - a 12ms slice on a 190Hz screen dropped three frames at a time; RS-658: the screen's, tracked as the shortest seen - measured off the last frame, a slow slice made a slow frame made a long slice) */
   const all = window.__noWarmSlice ? true : false, dl = now + (atBuild ? 4 : gfxPhone() ? 8 : Math.max(4, Math.min(12, iv*0.6))), c0 = M3D_COARSE; let made = 0; M3D_COARSE = V3_FOLK_COARSE;
   try{ while (Q.i < Q.jobs.length){ const j = Q.jobs[Q.i]; let tpl = M3D.tpl.get(m3dTplKey(j.pt)) || null;
       if (!tpl){ if (atBuild && !all) break; try{ tpl = m3dTemplateTry(j.pt, all ? performance.now() + 1e9 : dl); }catch(e){ console.error(e); Q.i++; continue; } }
@@ -45692,7 +45708,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-657';
+const GAME_VERSION = 'rs-658';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

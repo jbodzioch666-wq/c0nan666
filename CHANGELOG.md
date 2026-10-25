@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## RS-658 - Through the door without a hitch
+
+The rest of the town's hitches, measured by walking up to the tavern, standing a moment and stepping in (the way you really do).
+
+- **Stepping into a building is a 40 ms frame, not 120.** The town's palette of materials was painted afresh on every step through a door (16 to 18 ms of textures); it's now made once per race and theme and cloned per build, the textures shared. The hearth's grill (13 to 18 ms of twenty-sided rods) is made a moment after the room in idle time; it starts unseen anyway and shows when a pan goes on.
+- **The first frame below ground no longer links shaders.** The post passes (bloom, blur, the occlusion) were compiled against the screen while the passes draw into offscreen targets, and three keys a shader by its target, so the compiled ones were never used and the real ones linked in the first frame: 140 ms on your first floor. They're compiled against the right kind of target now, and the occlusion's depth prepass has stand-ins per kind of caster like RS-657's shadow ones. A fresh dungeon's first floor comes up in 1.6 s instead of 2.0 to 2.3 s, its longest task 130 ms instead of 390.
+- **Steadier folk sculpting.** RS-657 cut the sculpting slice to the frame's interval, but measured off the last frame, a slow slice made a slow frame made a long slice. The slice now follows the screen's own rate, tracked as the shortest interval seen.
+- **What's left in a town, for the record:** a 15 to 20 ms frame per townsperson while a town fills (one robe-shaping step can't be split), the shader source build when a room is entered (about 18 ms), and a one-off 50 ms when the graphics driver finalises a large shader on its first use, once per shader per session.
+
 ## RS-657 - A smoother town
 
 Measured with the test save on the new PC, walking round a town at about 190 frames a second: the land and the dungeon had no slow frames at all, the town had five kinds. Four of them are gone.
