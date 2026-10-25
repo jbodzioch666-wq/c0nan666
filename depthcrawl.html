@@ -34444,19 +34444,36 @@ function o3Site(t, gx, gz){
     const turf = mats.turf || (mats.turf = new T.MeshStandardMaterial({ map:v3TexTurf(O3.tex), roughness:0.95 }));
     const vd = mats.void || (mats.void = new T.MeshBasicMaterial({ color:0x000000 }));
     const rk = (r, x, y, z, sx, sy, sz, s)=>{ const m = new T.Mesh(o3RockGeo(r, s), mats.rock); m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.rotation.y = (rnd(60 + s) - 0.5)*0.5; m.castShadow = m.receiveShadow = true; g.add(m); return m; };
-    const lumpy = (seed)=>{ const mg = new T.SphereGeometry(1, 48, 24, 0, Math.PI*2, 0, Math.PI/2), mp = mg.attributes.position;   /* (lumpy, as turf over stones is) */
-      for (let i=0;i<mp.count;i++){ const x = mp.getX(i), y = mp.getY(i), z = mp.getZ(i), h = Math.sin(Math.round(x*40)*12.9898 + Math.round(y*40)*78.233 + Math.round(z*40)*37.719 + seed)*43758.5453, k = 1 + (h - Math.floor(h) - 0.5)*0.07; mp.setXYZ(i, x*k, y > 0.02 ? y*k : y, z*k); }
-      mg.computeVertexNormals(); const m = new T.Mesh(mg, bt); m.castShadow = m.receiveShadow = true; g.add(m); return m; };
+    /* (RS-661) the mound's shape: not a half ball standing on the land but a long low swell that runs out into it - a bell's curve, a rounded
+       crown falling to a skirt that meets the ground flat and sinks a little under it, reaching out seven tenths as far again at the back and sides
+       (at the door's side no farther than before: the door, its stair and its forecourt stay clear). A point of the half sphere (its angle
+       from the crown, its way round) to the same on the mound, in the mound's own unit size; t: how far out it is, 0 at the crown to 1 at the edge */
+    const prof = (x, y, z)=>{ const hr = Math.hypot(x, z); if (hr < 1e-6) return [0, 1, 0, 0]; const t = Math.atan2(hr, Math.max(0, y))/(Math.PI/2), c = z/hr, S = 1.7 - 0.7*smoothstep(0.15, 0.75, c), r = t*S, h = (1 + Math.cos(Math.PI*t))/2*1.04 - 0.04;
+      return [x/hr*r, h, z/hr*r, t]; };
+    /* the skirt washed toward the land's own colour where it runs out into it, so the turf fades into the ground rather than ending at a line */
+    const gt = o3GroundL(Math.floor(gx), Math.floor(gz)), gc = (wgO3ColL(Math.floor(gx), Math.floor(gz), gt) || O3_COL[gt] || O3_COL[OW_GRASS]), tl = [0x6c, 0x75, 0x56], lin = v=>Math.pow(v/255, 2.2);
+    /* (the turf's own picture is darker than the land's: its mean, per channel, taken once - the skirt's colour is the land's over turf times tint) */
+    const tm = mats.turfMean || (mats.turfMean = (()=>{ try{ const im = turf.map.image, c = document.createElement('canvas'); c.width = c.height = 32; const x = c.getContext('2d'); x.drawImage(im, 0, 0, 32, 32); const d = x.getImageData(0, 0, 32, 32).data, a = [0, 0, 0];
+      for (let i=0;i<d.length;i+=4) for (let j=0;j<3;j++) a[j] += lin(d[i + j]); return a.map(v=>Math.max(0.02, v/(d.length/4))); }catch(e){ return [0.25, 0.3, 0.15]; } })());
+    const fade = gc.map((v, i)=>Math.min(6, lin(v)*0.82/(lin(tl[i])*tm[i])));
+    const lumpy = (seed)=>{ const mg = new T.SphereGeometry(1, 48, 24, 0, Math.PI*2, 0, Math.PI/2), mp = mg.attributes.position, col = new Float32Array(mp.count*3);   /* (lumpy, as turf over stones is) */
+      for (let i=0;i<mp.count;i++){ const [x, y, z, t] = prof(mp.getX(i), mp.getY(i), mp.getZ(i)), h = Math.sin(Math.round(x*40)*12.9898 + Math.round(y*40)*78.233 + Math.round(z*40)*37.719 + seed)*43758.5453, k = 1 + (h - Math.floor(h) - 0.5)*0.07*(1 - smoothstep(0.7, 1, t));
+        mp.setXYZ(i, x*k, y > 0.02 ? y*k : y, z*k); const w = smoothstep(0.5, 0.97, t); for (let j=0;j<3;j++) col[i*3 + j] = 1 + (fade[j] - 1)*w; }
+      mg.setAttribute('color', new T.BufferAttribute(col, 3)); mg.computeVertexNormals(); const m = new T.Mesh(mg, bt); m.castShadow = m.receiveShadow = true; g.add(m); return m; };
+    /* a point on the mound's surface (scaled rx, ry, rz, centred at cz) and its outward normal, from a point of the half sphere */
+    const onMound = (ux, uy, uz, cz, rx, ry, rz)=>{ const P = q=>{ const v = prof(q[0], q[1], q[2]); return new T.Vector3(v[0]*rx, v[1]*ry, cz + v[2]*rz); }, n0 = new T.Vector3(ux, uy, uz).normalize(), a = n0.toArray(), p = P(a);
+      const e1 = new T.Vector3(-a[2], 0, a[0]); if (e1.lengthSq() < 1e-8) e1.set(1, 0, 0); e1.normalize(); const e2 = new T.Vector3().crossVectors(n0, e1).normalize();
+      const pa = P(n0.clone().addScaledVector(e1, 0.01).normalize().toArray()), pb = P(n0.clone().addScaledVector(e2, 0.01).normalize().toArray()), n = new T.Vector3().crossVectors(pa.sub(p), pb.sub(p)).normalize(); if (n.y < 0) n.negate(); return [p, n]; };
     /* (RS-653) a mound built, not grown: old mossy turf over a cairn of the door's own stone - a ring of kerb stones round its foot
        (open at the door), stones breaking through the turf, and capstones and a little standing stone on its crown */
-    const bt = mats.barrowTurf || (mats.barrowTurf = new T.MeshStandardMaterial({ map:turf.map, color:new T.Color(0x6c7556).convertSRGBToLinear(), roughness:0.97 }));   /* (dark, mossy, old) */
+    const bt = mats.barrowTurf || (mats.barrowTurf = new T.MeshStandardMaterial({ map:turf.map, color:new T.Color(0x6c7556).convertSRGBToLinear(), roughness:0.97, vertexColors:true }));   /* (dark, mossy, old; RS-661: its skirt washed to the land's colour) */
     const cairn = (cz, rx, ry, rz)=>{ const up = new T.Vector3(0, 1, 0), n = new T.Vector3();
       for (let i=0;i<22;i++){ const a = (i + 0.5)/22*Math.PI*2, af = Math.atan2(Math.sin(a), Math.cos(a)); if (Math.abs(af) < 0.62) continue;
-        const tall = i % 3===0, k = 1.03 + rnd(200 + i)*0.05, m = rk(0.07, Math.sin(a)*rx*k, tall ? 0.09 : 0.04, cz + Math.cos(a)*rz*k, 0.95, tall ? 2.3 : 1.35, 0.7, 200 + i);
+        const tall = i % 3===0, [kp] = onMound(Math.sin(a), 0.16 - rnd(200 + i)*0.05, Math.cos(a), cz, rx, ry, rz), m = rk(0.07, kp.x, kp.y + (tall ? 0.06 : 0.02), kp.z, 0.95, tall ? 2.3 : 1.35, 0.7, 200 + i);   /* (RS-661: where the skirt runs low, half in the turf) */
         m.rotation.order = 'YXZ'; m.rotation.y = a + (rnd(230 + i) - 0.5)*0.3; m.rotation.x = 0.06 + rnd(250 + i)*0.08; }   /* (leaning out a little, as old kerbs do) */
-      for (let i=0;i<30;i++){ const th = 0.25 + rnd(260 + i)*1.1, ph = (rnd(280 + i) - 0.5)*2*Math.PI; if (Math.abs(ph) < 0.8 && th > 0.55) continue;   /* (none over the door) */
-        n.set(Math.sin(th)*Math.sin(ph)/rx, Math.cos(th)/ry, Math.sin(th)*Math.cos(ph)/rz).normalize();
-        const m = rk(0.08 + rnd(300 + i)*0.06, Math.sin(th)*Math.sin(ph)*rx*0.99, -0.02 + Math.cos(th)*ry*0.99, cz + Math.sin(th)*Math.cos(ph)*rz*0.99, 1.35, 0.5, 1.05, 260 + i);
+      for (let i=0;i<30;i++){ const th = 0.2 + rnd(260 + i)*0.8,   /* (RS-661: on the body, the skirt left smooth turf) */ ph = (rnd(280 + i) - 0.5)*2*Math.PI; if (Math.abs(ph) < 0.8 && th > 0.55) continue;   /* (none over the door) */
+        const [sp, sn] = onMound(Math.sin(th)*Math.sin(ph), Math.cos(th), Math.sin(th)*Math.cos(ph), cz, rx, ry, rz); n.copy(sn);   /* (RS-661: on the mound as it now lies) */
+        const m = rk(0.08 + rnd(300 + i)*0.06, sp.x, sp.y - 0.025, sp.z, 1.35, 0.5, 1.05, 260 + i);
         m.quaternion.setFromUnitVectors(up, n); m.rotateY(rnd(320 + i)*6.28); }
       rk(0.13, 0.02, ry - 0.03, cz - 0.04, 1.5, 0.42, 1.2, 340).rotation.z = 0.08;
       rk(0.09, -0.17, ry*0.93 - 0.05, cz + 0.06, 1.3, 0.45, 1.0, 341).rotation.z = 0.35;
@@ -34472,7 +34489,7 @@ function o3Site(t, gx, gz){
       g.doorPit = pit;
       const earth = mats.pitEarth || (mats.pitEarth = new T.MeshStandardMaterial({ color:new T.Color(0x4a3a2a).convertSRGBToLinear(), roughness:1 }));
       const step = mats.pitStep || (mats.pitStep = new T.MeshStandardMaterial({ map:mats.stone.map, color:new T.Color(0x8c8272).convertSRGBToLinear(), roughness:0.95 }));   /* (old worn stone, in the shade of the cut) */
-      const mound = lumpy(0); mound.scale.set(0.8, 0.92, 0.66); mound.position.set(0, -0.02, -0.68); cairn(-0.68, 0.8, 0.92, 0.66);
+      const mound = lumpy(0); mound.scale.set(0.8, 0.7, 0.66); mound.position.set(0, -0.02, -0.68); cairn(-0.68, 0.8, 0.7, 0.66);   /* (RS-661: lower, its skirt carrying it out into the land) */
       const lobe = lumpy(7); lobe.scale.set(0.46, 0.62, 0.3); lobe.position.set(0, -0.02, -0.36);   /* (the turf over the door) */
       g.add(v3Box(0.34, 0.8, 0.5, vd, 0, -0.02, -0.25, false));   /* (the passage in: dark all through) */
       const F = O3_PIT.floor, Z1 = O3_PIT.z1;
@@ -34489,7 +34506,7 @@ function o3Site(t, gx, gz){
       const lin = rk(0.12, 0, 0.47, -0.02, 3.6, 0.8, 1.3, 7); lin.rotation.z = 0.05;
       g.doorEyes = [-1, 1].map(s=>{ const e = o3Glow('rgba(214,255,232,1)', 0.065); e.position.set(s*0.045, 0.08, 0.02); e.visible = false; g.add(e); return e; });
     } else {
-      const mound = lumpy(0); mound.scale.set(0.82, 1.0, 0.92); mound.position.set(0, -0.02, -0.3); cairn(-0.3, 0.82, 1.0, 0.92);
+      const mound = lumpy(0); mound.scale.set(0.82, 0.76, 0.92); mound.position.set(0, -0.02, -0.3); cairn(-0.3, 0.82, 0.76, 0.92);   /* (RS-661: lower, its skirt carrying it out into the land) */
       const lobe = lumpy(7); lobe.scale.set(0.52, 1.0, 0.55); lobe.position.set(0, -0.02, 0.06);   /* (the mound grows out round its door) */
       const mouth = new T.Mesh(new T.PlaneGeometry(0.44, 0.84), vd); mouth.position.set(0, 0.42, 0.64); g.add(mouth);
       for (const s of [-1,1]){ rk(0.12, s*0.31, 0.44, 0.68, 0.95, 4.0, 1.0, s + 2);
@@ -45745,7 +45762,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-660';
+const GAME_VERSION = 'rs-661';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

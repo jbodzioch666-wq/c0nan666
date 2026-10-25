@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-661 - A barrow that grows out of the land
+
+- **The barrow's mound is a low swell, not a ball.** It was a half sphere set on the ground, steep all the way down to a hard edge. Now its crown rounds over and falls away in a long skirt that meets the ground flat and sinks just under it, reaching out further at the back and sides (the door, its stair and forecourt stay clear). It's lower too, about two and a half times as wide as it is tall.
+- **Its turf fades into the ground.** Where the skirt runs out, the dark mossy turf is washed toward the colour of the land it stands on, grass, sand, snow or marsh, so there's no line where the mound ends.
+- **The stones sit on the new shape.** The kerb ring lies half sunk in the skirt, the stones breaking through the turf keep to the body of the mound, and the skirt is left smooth.
+
 ## RS-660 - The last town hitches
 
 The two left on RS-658's list, with the real cause of one of them found.

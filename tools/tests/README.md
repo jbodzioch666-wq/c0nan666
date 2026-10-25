@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs661 | the barrow's mound runs out into the land: wider than tall by far, its edge sunk under the ground, its skirt washed toward the land's colour (every barrow near the start) |
 | rs660 | the last town hitches: a town's point lights padded to a floor of ten from the start, so a room with more lights than the town (the tavern's nine) keys the same programs and its first entry builds none; the robe's shaping yields to the next sculpt try when the budget is spent |
 | rs659 | a Planet's loose ends: the chart's trees and peaks drawn upright on the globe's turned faces (a bare chart, a turned glyph layer per face), the landmarks and pins turned too, a stipple instead of hatching on a cube planet, roamers scaled to the land on every size, generator 20's neighbour loops over face edges |
 | rs658 | the room-entry and first-floor hitches: the town's palette made once per race and theme and cloned per build, the hearth's grill made in idle time, the post passes compiled against the targets they draw to and the occlusion's depth stand-ins so the first frame below ground links nothing, the people slice tracking the shortest frame |
