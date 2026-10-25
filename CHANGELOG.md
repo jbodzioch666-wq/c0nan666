@@ -1,5 +1,15 @@
 # Depthcrawl patch notes
 
+## RS-659 - A Planet's loose ends
+
+The last items on the sphere-grid list.
+
+- **The chart's trees and peaks stand upright on the globe's turned faces.** They were baked into the chart in each face's own grid, so on the polar faces (or with the globe rolled over) every tree lay on its side, and they turned at a seam between two faces. The globe's face charts now draw from a bare chart and lay each tree, peak, tuft, dune and crystal turned upright for the screen where it is, the way the names already were (RS-639). The landmarks' pictures, the points of interest, the pins, a town's houses, the gathering spots and the chimney smoke turn too. The whole chart keeps its drawings for the globe seen from afar. Drawn once per face per zoom step, 7 to 9 ms for a face of woods, and kept while the chart only redraws for its clouds.
+- **A stipple instead of hatching on a cube planet.** The sketch's pencil hatching lay in each face's grid: on a turned face it read as squared paper, and where two faces met the lines met out of step, a faint seam down the open sea. On a cube planet the darker parts are stippled now, a dot or two to every five pixels, which looks the same whichever way a face lies and the same over a seam. Flat maps keep their hatching.
+- **Large and Extra Large worlds have roamers to their land.** They kept the medium world's fifty (one band to some 470 and 800 tiles of land, where the medium world has one to 237), as the Planet did before RS-640. Every size now scales with its land, never fewer than fifty: `tools/sim/run.js world` over two seeds gives medium 50 -> 52.5 (its land runs a little over the 11,800 the fifty were tuned on), large 50 -> 100.5, extra large 50 -> 150 (the cap), planet 137 as before.
+- **Generator 20: the generator's neighbour loops step over face edges.** A site's surroundings (near water, near mountains), the mountain score, the spawn's clearing and its tunnels, a pass's carving and a region's biome read the tile next door straight from the grid, so beside an unjoined edge they saw the void as water, and beside the back face's edges the end of the grid. They go through the planet's own neighbour rule now (`owNbG`). Worlds you already have regenerate as they were; a new Planet is a generator 20 one. A wanted quest's target wanders by the same rule.
+- **Also:** a label over a joined seam was already drawn alike by both faces' charts (RS-644); the item is closed with this. `wg` passes again since RS-656.
+
 ## RS-658 - Through the door without a hitch
 
 The rest of the town's hitches, measured by walking up to the tavern, standing a moment and stepping in (the way you really do).

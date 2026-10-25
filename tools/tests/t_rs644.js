@@ -34,7 +34,7 @@ module.exports = async page=>{
       ctx.fillText = function(t, x, y, mw){ if (cur >= 0 && GLOBE.decal){ const M = this.getTransform(), s = Math.hypot(M.a, M.b), q = 1/(s*cellPx), gx = owZoomLastCam.x + (M.a*x + M.c*y + M.e)*q, gy = owZoomLastCam.y + (M.b*x + M.d*y + M.f)*q;
         (rec[t] = rec[t] || []).push({ k:cur, an:Math.atan2(M.b, M.a), x:gx, y:gy }); } return P0.apply(this, arguments); };
       globeCubePatch = function(k){ cur = k; try{ return gp.apply(this, arguments); } finally { cur = -1; } };
-      try{ for (const P of (GLOBE.cpatch||[])) if (P) P.on = false; GLOBE.cview = null; await fr(12); } finally { if (own) ctx.fillText = P0; else delete ctx.fillText; globeCubePatch = gp; }
+      try{ for (const P of (GLOBE.cpatch||[])) if (P) P.on = false; GLOBE.cview = null; for (let i=0;i<80;i++){ await fr(1); if (i > 20 && !GLOBE.cpend && !GLOBE.cq.length) break; } }   /* (RS-659: until every face's chart is drawn again - at 190 Hz twelve frames were less than the charts' 60 ms look) */ finally { if (own) ctx.fillText = P0; else delete ctx.fillText; globeCubePatch = gp; }
       let pairs = 0, off = 0, worst = 0; for (const t in rec){ const a = rec[t], ks = new Set(a.map(v=>v.k)); if (ks.size < 2 || t.length < 4) continue;
         for (const u of a) for (const v of a){ if (u.k >= v.k || Math.hypot(u.x - v.x, u.y - v.y) > 0.5) continue; pairs++; const d = Math.abs(((u.an - v.an) % (Math.PI*2) + Math.PI*3) % (Math.PI*2) - Math.PI); worst = Math.max(worst, d); if (d > 0.02) off++; } }
       const multi = Object.entries(rec).filter(([t, a])=>new Set(a.map(v=>v.k)).size > 1).map(([t, a])=>[t, a.map(v=>[v.k, +v.x.toFixed(1), +v.y.toFixed(1), +v.an.toFixed(2)])]).slice(0, 6);

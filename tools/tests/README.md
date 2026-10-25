@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs659 | a Planet's loose ends: the chart's trees and peaks drawn upright on the globe's turned faces (a bare chart, a turned glyph layer per face), the landmarks and pins turned too, a stipple instead of hatching on a cube planet, roamers scaled to the land on every size, generator 20's neighbour loops over face edges |
 | rs658 | the room-entry and first-floor hitches: the town's palette made once per race and theme and cloned per build, the hearth's grill made in idle time, the post passes compiled against the targets they draw to and the occlusion's depth stand-ins so the first frame below ground links nothing, the people slice tracking the shortest frame |
 | rs657 | the town's hitches: a cloak's forty settling steps spread over frames when a cloaked figure comes near (stepped by hand they still settle at once); the shadow passes' programs linked in the prelink with the scene's, so a room's first torch shadow links none; newcomers made mid-play unseen until their programs are linked |
 | rs654 | a Planet's turned faces audited: framed off the front face, the plants keep off the gathering trees and the landmarks' feet, the winter ice lies on the frozen water, the far land is laid in the frame you're in, a treasure map's mark stands at its tile; a medium world as it was |
@@ -585,6 +586,7 @@ Screenshots go to `tools/tests/shots/`.
 | zmove | does walking work: real arrow keys and a click on the 3D ground, on a medium world and a Planet |
 | zmove2 | where a step fails on a Planet: each stage of a move by hand |
 | zmove3 | a click on the 3D ground walks you there, on a Planet, on three faces |
+| zpole | a cube Planet's globe looking at one face (`ZFACE`, its thickest woods or `ZAT=x,y`) at a few zooms (`ZZOOM`), with each face chart's draw time and its glyph layer's share; `ZCLIP=1` saves the middle at full size: shots/zpole-&lt;face&gt;-&lt;zoom&gt;.png |
 | zseam | a cube Planet's globe looking straight at its face edges (`ZSEAM=tl,fr,bl,tb,dr,c`, `ZZOOM=0,2.2,5`; `ZCHART=1` saves the chart laid over it, `ZCLIP=1` the middle at full size): shots/zseam-<edge>-<zoom>.png and where the seam lies on the screen |
 | zbiome | the land's colours in each view: stood in the middle of a desert, a tundra, a grassland and a forest (`ZTIER`, `ZKINDS=desert,tundra`), the 3D land with its minimap (shots/zbiome-<kind>.png), the globe's chart close in (zbiome-<kind>-map.png) and the globe right out (zbiome-globe.png) |
 | zsession | does anything build up over a session: `ZROUNDS` rounds into the same dungeon (three floors) and out - the scenes' objects, the renderers' geometries, textures and programs, the templates kept, the heap and the frame times after each (`ZTIER`) |

@@ -76,7 +76,7 @@ module.exports = async page=>{
   A(r.click.face===0 && r.click.hover===0 && r.click.d!=null && r.click.d <= 1, 'a click across the seam reads that face\'s chart');
   A(r.frames.med < 34, 'it turns smoothly');
   A(!r.flat.cube && r.flat.uCube===0 && r.flat.pa > 0.5 && r.flat.one, 'a generator 14 planet keeps its one chart');
-  A(r.flat.v19.ver===19 && r.flat.v19.same >= r.flat.v19.n*0.9 && r.flat.v19.vd===0, 'generator 19: a forest or a desert over a seam is one place, and the void none');
+  A(r.flat.v19.ver >= 19 && r.flat.v19.same >= r.flat.v19.n*0.9 && r.flat.v19.vd===0, 'generator 19: a forest or a desert over a seam is one place, and the void none');
   A(r.flat.v18.ver===18 && (r.flat.v18.n===0 || r.flat.v18.same < r.flat.v18.n*0.6) && r.flat.v18.vd > 0, 'generator 18 keeps its places as they were');
   A(!errs.length, 'no errors: ' + errs.join(' | '));
 };
