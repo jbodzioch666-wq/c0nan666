@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-667 - No halo on the water
+
+- **No white ring round your boat.** The soft patch of foam under the hull looked like a glowing ring on the sea, so it has been removed. The boat now sits straight on the water.
+
 ## RS-666 - Unstuck at the barrow door
 
 - **You can walk again after leaving a barrow.** Coming out of a barrow puts you on its tile, standing in front of the door. The game was waiting for your figure to reach the middle of the tile before it took each step, which it never does there, so clicks and keys did nothing until you reloaded. It now waits for the figure to reach the spot where it actually stands.
