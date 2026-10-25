@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-660 - The last town hitches
+
+The two left on RS-658's list, with the real cause of one of them found.
+
+- **Your first step into a tavern no longer rebuilds every shader.** RS-658 put about 18 ms of shader-source building down to the room's own materials. It wasn't: the town has eight point lights and the tavern nine, and three keys every shader by the number of lights, so the first room with more lights than the town had rebuilt all 38 programs of the scene (and the rooms after it, with the same count, reused them, which is why it looked like a fixed cost). The town now carries ten point lights from the start, two of them unlit stand-ins (as RS-587 did for your campfire), so every room keys the town's own shaders: the entry frame is 29 ms instead of 43 to 50, the compile 4 ms instead of 15, and the tavern makes three to five programs instead of 38.
+- **A townsperson in the making costs 17 to 19 ms frames, not 29.** The robe's shaping (7 to 9 ms, one step that can't be split) used to run on at the end of a sculpting slice that had already spent its time. It now waits for the next slice when the budget is spent, the way a sculpt does, and takes a frame of its own.
+- **For the record:** the town walks at 232 fps on the desktop (CPU 3.3 ms, GPU 4.4 ms a frame). What's left of the first dungeon's cost is its own: the renderer's creation (about 50 ms) and its first shader compile (about 40 ms) could move into idle time before you reach a dungeon; both happen once a session.
+
 ## RS-659 - A Planet's loose ends
 
 The last items on the sphere-grid list.

@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs660 | the last town hitches: a town's point lights padded to a floor of ten from the start, so a room with more lights than the town (the tavern's nine) keys the same programs and its first entry builds none; the robe's shaping yields to the next sculpt try when the budget is spent |
 | rs659 | a Planet's loose ends: the chart's trees and peaks drawn upright on the globe's turned faces (a bare chart, a turned glyph layer per face), the landmarks and pins turned too, a stipple instead of hatching on a cube planet, roamers scaled to the land on every size, generator 20's neighbour loops over face edges |
 | rs658 | the room-entry and first-floor hitches: the town's palette made once per race and theme and cloned per build, the hearth's grill made in idle time, the post passes compiled against the targets they draw to and the occlusion's depth stand-ins so the first frame below ground links nothing, the people slice tracking the shortest frame |
 | rs657 | the town's hitches: a cloak's forty settling steps spread over frames when a cloaked figure comes near (stepped by hand they still settle at once); the shadow passes' programs linked in the prelink with the scene's, so a room's first torch shadow links none; newcomers made mid-play unseen until their programs are linked |
@@ -586,6 +587,9 @@ Screenshots go to `tools/tests/shots/`.
 | zmove | does walking work: real arrow keys and a click on the 3D ground, on a medium world and a Planet |
 | zmove2 | where a step fails on a Planet: each stage of a move by hand |
 | zmove3 | a click on the 3D ground walks you there, on a Planet, on three faces |
+| zfirstdg | a fresh character's first dungeon straight from the world preview (no land or town first): every frame over 25ms from the step in, with the m3d/fpd/gfx calls in it and M3D_COARSE at each m3dInstance |
+| zroomcompile | what a room's prelink costs (`ZSAVE`, `ZROOM`): the programs its entry makes, each with its material and object, the lights in the town and the room, and r.compile's time on the room's scene once its programs exist |
+| zroomlights | the point lights of each room against the town's ceiling (`ZSAVE`): a room with more than the ceiling keyed every program afresh before RS-660 |
 | zpole | a cube Planet's globe looking at one face (`ZFACE`, its thickest woods or `ZAT=x,y`) at a few zooms (`ZZOOM`), with each face chart's draw time and its glyph layer's share; `ZCLIP=1` saves the middle at full size: shots/zpole-&lt;face&gt;-&lt;zoom&gt;.png |
 | zseam | a cube Planet's globe looking straight at its face edges (`ZSEAM=tl,fr,bl,tb,dr,c`, `ZZOOM=0,2.2,5`; `ZCHART=1` saves the chart laid over it, `ZCLIP=1` the middle at full size): shots/zseam-<edge>-<zoom>.png and where the seam lies on the screen |
 | zbiome | the land's colours in each view: stood in the middle of a desert, a tundra, a grassland and a forest (`ZTIER`, `ZKINDS=desert,tundra`), the 3D land with its minimap (shots/zbiome-<kind>.png), the globe's chart close in (zbiome-<kind>-map.png) and the globe right out (zbiome-globe.png) |
