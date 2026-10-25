@@ -49,7 +49,7 @@ module.exports = async page=>{
   const r2 = await page.evaluate(()=>{ toggleOwZoom(); const out = {}; for (const [tier, seed] of [['large', 777], ['medium', 777]]){ setWorldSizeTier(tier); wgRegenerate(seed); let land = 0; for (let x=0;x<OW_COLS;x++) for (let y=0;y<OW_ROWS;y++) if (G.ow.map[x][y]!==OW_WATER) land++; out[tier] = { land, target:owEncTarget(), n:G.ow.encounters.length }; } return out; });
   Object.assign(r, { sizes:r2 }); console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
-  A(r.ver===20 && r.cube, 'a fresh planet is a generator 20 cube');
+  A(r.ver >= 20 && r.cube, 'a fresh planet is a generator 20 (or later) cube');   /* (RS-671: generator 21 since RS-668) */
   A(r.nb.face===4 && r.nb.nbFace===0 && r.nb.oldFace===-1 && r.nb.spawnFace >= 0, 'over the north face\'s west edge the neighbour lies on the west face (the void to generator 19): ' + JSON.stringify(r.nb));
   A(r.enc.planet===r.enc.want && r.enc.planet > 50 && r.enc.n >= r.enc.planet*0.7, 'a planet\'s roamers to its land: ' + JSON.stringify(r.enc));
   A(r.sizes.large.target > 60 && r.sizes.large.target===Math.min(150, Math.max(50, Math.round(50*r.sizes.large.land/11800))) && r.sizes.large.n >= r.sizes.large.target*0.7, 'a large world has more than fifty roamers, to its land: ' + JSON.stringify(r.sizes));

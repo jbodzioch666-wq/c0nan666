@@ -25,6 +25,7 @@ Screenshots go to `tools/tests/shots/`.
 | test | covers |
 |---|---|
 | boot | the page loads and a character starts |
+| rs671 | at a cube Planet's corner the land is framed on the face you're on at once (not kept on the face you came from, with the void between the arms drawn as sea): every tile round you picks, a click over the seam walks you onto the next face |
 | rs670 | a tap whose lift was lost (the page stalled) doesn't swallow every later tap as a pinch; a hidden page lets every finger go; a click-walk over a Planet's seam reaches the far side (its steps kept over the frame switch, a diagonal step over the edge allowed) |
 | rs669 | dye a cape inside a building and step out: the town's figure (parked while you were inside) is dressed again; a town's plate on the land says what it is as big as its name |
 | rs668 | the Dwarf Gate: every mine at a mountain's foot (generator 21), the gate looking out from it; stepping on, the runes wake, the stone leaves swing in, you go on into the mine and they shut behind you |

@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-671 - Clicking over the seam at a corner
+
+- **At a planet's corners, the sea beyond the seam is real.** Where three faces of the planet meet, the land is drawn unfolded like a box, and when you arrived at the corner from a third face the game kept drawing it that way: the face across the seam from you sat on a different arm of the unfolded box, and the water between the arms was nothing at all, so a click there went nowhere. Within six tiles of a corner the land is now redrawn around the face you're on, where every face across a seam is right next to you and a click over it walks you there.
+
 ## RS-670 - Unstuck on the planet's seams
 
 - **The touch screen no longer goes dead.** On a phone, when the game stalled for a few seconds (the land being built as you crossed between the planet's faces, with the view turning), the browser could drop the lift of the finger that was touching the screen. The game then thought that finger was still down, so every later tap counted as a two-finger pinch and was swallowed: nothing on the land answered until you reloaded. A finger that has gone quiet is now let go when the next one comes down, and switching away from the game lets them all go.
