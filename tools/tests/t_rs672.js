@@ -7,7 +7,7 @@ module.exports = async page=>{
     goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{}; G.player.wildWarned = 1; G.gameMode = 0; G.player.clock = DAY_LENGTH*0.4; window.__trans = true;   /* (the walk-in plays with transitions on) */
     const m = G.ow.map, open = [OW_GRASS, OW_FOREST, OW_DESERT, OW_TUNDRA, OW_SWAMP], N8 = [[0,1],[1,0],[0,-1],[-1,0],[1,1],[-1,1],[1,-1],[-1,-1]], out = {};
     const sites = questNearbySites(G.owPos.x, G.owPos.y, 1, 400, ['graveyard']).filter(s=>m[s.x][s.y]===OW_GRAVEYARD); let at = null, g = null;
-    for (const s of sites){ const nb = N8.map(([dx, dy])=>({ dx, dy, q:owNb(s.x, s.y, dx, dy) })).filter(o=>o.q && open.includes(m[o.q[0]][o.q[1]])); if (nb.length < 3) continue;
+    for (const s of sites){ const nb = N8.map(([dx, dy])=>({ dx, dy, q:owNb(s.x, s.y, dx, dy) })).filter(o=>o.q && open.includes(m[o.q[0]][o.q[1]]) && owDiagClear(o.q[0], o.q[1], -o.dx, -o.dy));   /* (a step in you can take: not a diagonal between two blocked tiles) */ if (nb.length < 3) continue;
       G.owPos = { x:nb[0].q[0], y:nb[0].q[1] }; owReveal(nb[0].q[0], nb[0].q[1], 8); await fr(120);
       const C = o3C(s.x, s.y); g = O3.doors && O3.doors.get(Math.floor(C[0]) + ',' + Math.floor(C[1])); if (!g || !g.doorWay) continue;
       /* the open tile most behind the crypt */
@@ -16,7 +16,7 @@ module.exports = async page=>{
       at = { s, best, behind:+bd.toFixed(2) }; break; }
     if (!at) return { none:true, n:sites.length };
     out.behind = at.behind; out.gate = !!g.doorWay;
-    G.owPos = { x:at.best.q[0], y:at.best.q[1] }; await fr(90);
+    G.owPos = { x:at.best.q[0], y:at.best.q[1] }; await fr(90); { const c = o3C(at.best.q[0], at.best.q[1]); for (let i=0;i<400 && O3.ppos && Math.hypot(O3.ppos.x - c[0], O3.ppos.z - c[1]) > 0.15;i++) await fr(1); }   /* (there, not still on the way from the last tile) */
     const C = o3C(at.s.x, at.s.y); g = O3.doors.get(Math.floor(C[0]) + ',' + Math.floor(C[1]));
     moveDir(-at.best.dx, -at.best.dy); out.walk = !!O3.doorWalk;
     /* the way in: round the railings, never through them (the yard is |x| < 0.6, z -0.58..0.58 in the crypt's frame; you come in by the gate, x near 0) */

@@ -1538,7 +1538,7 @@ const SFX = {
   click:       ()=> playTone(1100, 0.035, 'sine', 0.07),
   grave:       ()=> playSeq([[196,0.25,'triangle',0.16],[247,0.25,'triangle',0.16],[294,0.35,'triangle',0.18],[392,0.5,'triangle',0.18]]),
   heartbeat:   ()=> { playTone(62, 0.16, 'sine', 0.34); playTone(52, 0.2, 'sine', 0.26, 0.2); },
-  rumble:      ()=> { playTone(46, 0.9, 'sawtooth', 0.1); playTone(34, 1.2, 'sine', 0.32, 0.08); playTone(58, 0.5, 'sawtooth', 0.06, 0.35); },   /* (RS-673: a dragon stirs) */
+  roar:        ()=> { playTone(82, 1.1, 'sawtooth', 0.15); playTone(61, 1.3, 'sawtooth', 0.12, 0.05); playTone(123, 0.8, 'square', 0.05, 0.1); playTone(41, 1.6, 'sine', 0.32, 0.1); },
 };
 function sfx(name){ const f = SFX[name]; if (f){ _sfxCat = SFX_UI.has(name) ? 'ui' : 'sfx'; try{ f(); }catch(e){} _sfxCat = 'sfx'; } }
 
@@ -17494,11 +17494,12 @@ function o3PortalTick(dt, pp){
    the floor loads. A key or a tap skips to the end. Off with transitions (as the stair and portal walks are), at sea, or with the
    barrow not built yet: then it is the cut it always was */
 const DOORWALK_SPD = 1.5, DOORWALK_LOOK = 0.6;
-/* (RS-668) the sites you walk into: a barrow, and the Dwarf Gate, Crypt Stair, Dragon Maw and Sun-Slab Tomb. Each of the four sets
+/* (RS-668) the sites you walk into: a barrow, and the Dwarf Gate, Crypt Stair, dragon's lair and Sun-Slab Tomb. Each of the four sets
    g.doorWay, in its own frame (door at +z): look - where you stop before it while it opens (openT seconds); front, side, back - the way
    round to it if you came from behind; inPts - on in; speed, fadeAt [from, to] of the way in, fade - the colour the dark takes; down(z) -
    how far below the land a stair is at z; anim(look, v) - its doors, glow and dust, from the time spent looking and the way in (0..1);
-   anim(0, 0) shuts it again; round(x, z) - its own way round to the front from where you are (the crypt's railings, RS-672) */
+   anim(0, 0) shuts it again; round(x, z) - its own way round to the front from where you are (the crypt's railings, RS-672); cam(look, v) - a camera
+   of its own while it plays, { k (how far eased in), eye, at } in its frame (RS-674); anything may set O3.shake to shake the camera */
 const DOOR_SITES = [OW_DUNGEON, OW_MINE, OW_GRAVEYARD, OW_LAIR, OW_PYRAMID];
 function o3InScene(o){ while (o.parent) o = o.parent; return o===O3.scene; }
 function o3DoorWalkStart(){
@@ -34472,6 +34473,102 @@ function o3CryptTex(){
   x.font = 'bold 50px Georgia, "Times New Roman", serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('REQVIESCANT', 256, 226, 480);
   return (O3.tex.crypt = v3CanvasTex(c));
 }
+/* (RS-674) the dragon's lair, after Smaug on his hoard in the Rankin/Bass Hobbit: a great crag with a cave mouth as wide as a hall, and the
+   dragon (the bestiary's own model, posed by its rig) asleep across the gold in it, his chin on the coins at the threshold. Come to the mouth
+   and he wakes: the head comes up, he comes out over the hoard and rears, roars and pours fire out over your head - then draws back down
+   into the dark, and you follow him in. Returns the site's doorWay (see o3DoorWalkStart) */
+function o3DragonLair(g, mats, rnd, gx, gz){
+  const T = THREE, ss = smoothstep;
+  const vc = (geo, f)=>{ const p = geo.attributes.position, c = new Float32Array(p.count*3); for (let i=0;i<p.count;i++){ const k = f(p.getX(i), p.getY(i), p.getZ(i)); c[i*3] = k[0]; c[i*3 + 1] = k[1]; c[i*3 + 2] = k[2]; } geo.setAttribute('color', new T.BufferAttribute(c, 3)); return geo; };
+  const rockM = mats.lairCrag || (mats.lairCrag = new T.MeshStandardMaterial({ color:0xffffff, roughness:0.93, vertexColors:true }));   /* (no texture: its strata read as wood grain on a crag this size; coloured by noise) */
+  const rockCol = (x, y, z, scorch)=>{ const n = fbm3(x, y, z, 77, 4, 2.2, 0.55), f = fbm3(x, y, z, 78, 2, 11, 0.5);
+    const k = 0.2*(0.72 + 1.3*(n - 0.5) + 0.45*(f - 0.5))*(0.62 + 0.38*ss(-0.05, 0.9, y))*(1 - 0.62*(scorch || 0)); return [k*1.04, k*0.98, k*0.92]; };
+  const goldM = mats.hoardG || (mats.hoardG = new T.MeshStandardMaterial({ color:new T.Color(0xf2c45a).convertSRGBToLinear(), metalness:0.62, roughness:0.28, emissive:new T.Color(0x3a2600) }));
+  const hall = mats.voidIn || (mats.voidIn = new T.MeshBasicMaterial({ color:0x000000, side:T.BackSide }));
+  const floorM = mats.lairFloor || (mats.lairFloor = new T.MeshBasicMaterial({ color:0x050302 }));
+  const charM = mats.charred || (mats.charred = new T.MeshStandardMaterial({ color:0x1a1410, roughness:1 }));
+  const upd = o=>{ o.traverse(c=>c.updateMatrix()); o.updateMatrixWorld(true); };   /* (the land's sites are frozen: what moves is updated by hand) */
+  const mv = o=>{ o.userData.mv = 1; return o; };   /* (kept out of the merge) */
+  const glow = (col, s, x, y, z)=>{ const o = o3Glow(col, s); o.position.set(x, y, z); mv(o); g.add(o); return o; };
+  const ZF = 0.12, AW = 0.5, AH = 0.82;   /* (the face the mouth is cut in, the mouth's half-width and height) */
+  /* the crag: rising to the back, sheer about the mouth, scorched black round it; its edge runs down into the ground, so on a slope it never hangs in the air */
+  const HH = (x, z)=>{ const r = Math.hypot(x/1.15, (z + 0.5)/1.0); let h = 1.9*(1 - ss(0.15, 1.0, r)) + 0.3*Math.exp(-(x*x/0.5 + Math.pow(z - ZF + 0.1, 2)/0.08))*(1 - ss(0.95, 1.3, r));
+    h += (0.42*(fbm3(x, 0, z, 91, 4, 2.4, 0.55) - 0.5) + 0.16*Math.pow(1 - Math.abs(2*fbm3(x, 0.5, z, 92, 3, 3.2, 0.5) - 1), 2))*ss(0.05, 0.4, h);
+    const face = 1 - ss(AW + 0.12, AW + 0.45, Math.abs(x)); h *= 1 - face*ss(ZF - 0.02, ZF + 0.06, z); return h - 0.6*(1 - ss(0, 0.04, h)); };
+  const hc = (x, y, z)=>rockCol(x, y, z, ss(0.9, 0.2, Math.hypot(x, z - ZF))*ss(0.9, 0.1, y));
+  g.add(o3HField(rockM, -1.3, 1.3, -1.5, 0.55, HH, hc, (x, z)=>Math.abs(x) < AW - 0.02 && z > ZF - 0.1 && z < ZF + 0.3));
+  { const sh = new T.Shape(), O = [[-(AW + 0.34), -0.06], [AW + 0.34, -0.06], [AW + 0.38, 0.3], [AW + 0.3, 0.7], [AW + 0.12, 1.0], [0.05, AH + 0.32], [-(AW + 0.1), 1.02], [-(AW + 0.32), 0.72], [-(AW + 0.4), 0.32]];   /* (the mouth: a rough arch of the same rock) */
+    sh.moveTo(O[0][0], O[0][1]); for (let i=1;i<O.length;i++){ const p = O[i], q = O[i - 1]; sh.quadraticCurveTo((p[0] + q[0])/2 + (rnd(800 + i) - 0.5)*0.12, (p[1] + q[1])/2 + (rnd(810 + i) - 0.5)*0.1, p[0], p[1]); } sh.lineTo(O[0][0], O[0][1]);
+    const hl = new T.Path(); hl.moveTo(-AW, 0); hl.lineTo(AW, 0); hl.lineTo(AW + 0.02, AH*0.42); hl.quadraticCurveTo(AW*0.9, AH*0.95, 0.04, AH); hl.quadraticCurveTo(-AW*0.85, AH*0.97, -AW - 0.02, AH*0.45); hl.lineTo(-AW, 0); sh.holes.push(hl);
+    const fg = new T.ExtrudeGeometry(sh, { depth:0.14, bevelEnabled:true, bevelSize:0.05, bevelThickness:0.05, bevelSegments:3, curveSegments:12 }); fg.translate(0, 0, ZF - 0.08);
+    vc(fg, (x, y, z)=>rockCol(x, y, z, 0.35*ss(1.0, 0.3, y))); g.add(new T.Mesh(fg, rockM)); }
+  { const sh = new T.Shape(), n = 16, W2 = AW + 0.12; sh.moveTo(-W2, AH - 0.08); sh.lineTo(W2, AH - 0.08); for (let i=n;i>=0;i--){ const x = -W2 + 2*W2*i/n; sh.lineTo(x, Math.max(AH + 0.1, HH(x, ZF - 0.14) + 0.04)); }   /* (the rock over the mouth, up to the crag's face) */
+    const fg = new T.ExtrudeGeometry(sh, { depth:0.1, bevelEnabled:false }); fg.translate(0, 0, ZF - 0.2); vc(fg, (x, y, z)=>hc(x, y, z - 0.3)); g.add(new T.Mesh(fg, rockM)); }
+  { const w = 2*AW + 0.1, h = AH + 0.12, d = 0.66, z = ZF - 0.45, hb = new T.Mesh(new T.BoxGeometry(w, h, d), hall); hb.position.set(0, h/2 - 0.02, z); g.add(hb);   /* (the dark within, and its floor) */
+    const fl = new T.Mesh(new T.PlaneGeometry(w, d), floorM); fl.rotation.x = -Math.PI/2; fl.position.set(0, 0.012, z); g.add(fl); }
+  for (let i=0;i<9;i++){ const a = 0.3 + i/8*(Math.PI - 0.6), x = Math.cos(a)*AW*0.92, y = AH*0.45 + Math.sin(a)*AH*0.52, h = 0.06 + rnd(700 + i)*0.1, st = new T.Mesh(new T.ConeGeometry(0.022 + rnd(710 + i)*0.02, h, 7), rockM); st.rotation.x = Math.PI; st.position.set(x, y - h/2 + 0.02, ZF + 0.02); vc(st.geometry, (a, b, c)=>rockCol(a, b + y, c, 0.5)); g.add(st); }   /* (teeth of rock round the arch) */
+  for (const [x, z, r, sd] of [[-0.95, 0.4, 0.17, 1], [0.92, 0.45, 0.2, 2], [-0.7, 0.62, 0.09, 3], [1.1, 0.15, 0.13, 4], [0.66, 0.7, 0.07, 5]]){ const b = new T.Mesh(o3RockGeo(r, 900 + sd), rockM); vc(b.geometry, (x2, y2, z2)=>rockCol(x2*5, 0.2 + y2*3, z2*5, 0.2)); b.position.set(x, r*0.45, z); b.scale.y = 0.75; g.add(b); }
+  for (let i=0;i<5;i++){ const a = -1.1 + i*0.55 + (rnd(600 + i) - 0.5)*0.3, x = Math.sin(a)*(1.25 + rnd(610 + i)*0.2), z = 0.35 + Math.cos(a)*0.5, h = 0.3 + rnd(620 + i)*0.25, sd = 630 + i*8;   /* (the burnt stumps of what grew here) */
+    const pts = [[x, -0.02, z], [x + (rnd(sd) - 0.5)*0.05, h*0.5, z + (rnd(sd + 1) - 0.5)*0.05], [x + (rnd(sd + 2) - 0.5)*0.1, h, z + (rnd(sd + 3) - 0.5)*0.1]]; g.add(m3dTaper(pts, 0.035, 0.008, charM, 8, 8));
+    const lb = [pts[1][0], h*0.6, pts[1][2]]; g.add(m3dTaper([lb, [lb[0] + (rnd(sd + 4) - 0.5)*0.15, h*0.8, lb[2] + (rnd(sd + 5) - 0.5)*0.15], [lb[0] + (rnd(sd + 6) - 0.5)*0.25, h*0.95, lb[2] + (rnd(sd + 7) - 0.5)*0.25]], 0.014, 0.003, charM, 6, 6)); }
+  /* the hoard: lumpy heaps of gold in the mouth, coins spilling out over the threshold, gems, a goblet */
+  { const x0 = 0, z0 = ZF - 0.05, R = 0.42, spill = 0.45, sd = 5000;
+    for (const [x, z, rx, ry, rz] of [[0, 0, R, R*0.42, R*0.8], [R*0.35, R*0.5, R*0.6, R*0.2, R*0.5], [-R*0.4, R*0.45, R*0.5, R*0.16, R*0.45], [0.05, R*0.95, R*0.45, R*0.08, R*0.4]]){
+      const hg = new T.SphereGeometry(1, 40, 16, 0, Math.PI*2, 0, Math.PI/2), p = hg.attributes.position; for (let i=0;i<p.count;i++){ const a = p.getX(i), b = p.getY(i), c = p.getZ(i), k = 1 + 0.16*(fbm3(a*3 + x*9, b*3, c*3 + z*9, sd + 7, 3, 1.6, 0.5) - 0.5)*ss(0.02, 0.3, b); p.setXYZ(i, a*k, b*k, c*k); } hg.computeVertexNormals();
+      const hp = new T.Mesh(hg, goldM); hp.scale.set(rx, ry, rz); hp.position.set(x0 + x, 0.005, z0 + z); g.add(hp); }
+    const N = 320, coin = new T.InstancedMesh(new T.CylinderGeometry(0.02, 0.02, 0.005, 14), goldM, N), M4 = new T.Matrix4(), Q = new T.Quaternion(), E = new T.Euler(), V = new T.Vector3(), S = new T.Vector3(1, 1, 1);
+    for (let i=0;i<N;i++){ const a = (rnd(sd + i) - 0.5)*2.4, d = Math.pow(rnd(sd + 400 + i), 1.4)*(R + spill), x = x0 + Math.sin(a)*d, z = z0 + Math.cos(a)*d*(a > -1.2 && a < 1.2 ? 1 : 0.6), y = R*0.42*Math.max(0, 1 - Math.pow(d/R, 2))*rnd(sd + 800 + i);
+      V.set(x, y + 0.006, z); E.set((rnd(sd + 1200 + i) - 0.5)*1.4, rnd(sd + 1600 + i)*6.28, (rnd(sd + 2000 + i) - 0.5)*1.4); Q.setFromEuler(E); M4.compose(V, Q, S); coin.setMatrixAt(i, M4); }
+    g.add(coin);
+    for (let i=0;i<6;i++){ const c = [0xe0203a, 0x20c060, 0x3060ff, 0xe0203a, 0xb040e0, 0x20c060][i], gm = new T.Mesh(new T.OctahedronGeometry(0.026, 0), new T.MeshStandardMaterial({ color:c, emissive:c, emissiveIntensity:0.45, roughness:0.15, metalness:0.2 }));
+      const a = (rnd(sd + 3000 + i) - 0.5)*2, d = rnd(sd + 3100 + i)*R*1.2; gm.position.set(x0 + Math.sin(a)*d, 0.04 + R*0.2*(1 - d/(R*1.2)), z0 + Math.cos(a)*d); gm.rotation.set(0.5, i, 0.2); g.add(gm); }
+    const gp = [[0, 0], [0.026, 0], [0.008, 0.014], [0.007, 0.05], [0.032, 0.07], [0.038, 0.108], [0.035, 0.112]].map(([r, y])=>new T.Vector2(r, y)), gb = new T.Mesh(new T.LatheGeometry(gp, 18), goldM); gb.position.set(x0 + R*0.7, 0.02, z0 + R*0.9); gb.rotation.z = 1.3; g.add(gb); }
+  /* what is left of the last who came for it: a knight's bones, his shield, his sword */
+  { const kg = new T.Group(); kg.position.set(-0.62, 0, ZF + 0.55); kg.rotation.y = 0.9; g.add(kg); const bm = mats.bone;
+    const sk = new T.Mesh(new T.SphereGeometry(0.05, 20, 14), bm); sk.scale.set(1, 0.9, 1.15); sk.position.set(0, 0.04, 0.17); kg.add(sk);
+    for (let i=0;i<4;i++){ const rb = new T.Mesh(new T.TorusGeometry(0.065 - i*0.006, 0.008, 6, 18, Math.PI), bm); rb.position.set(0, 0.016, 0.07 - i*0.04); rb.rotation.y = Math.PI/2; rb.rotation.x = -0.2; kg.add(rb); }
+    const shield = new T.Mesh(new T.CylinderGeometry(0.085, 0.085, 0.016, 24), new T.MeshStandardMaterial({ color:new T.Color(0x3a5a9a).convertSRGBToLinear(), roughness:0.6, metalness:0.2 })); shield.position.set(0.14, 0.04, -0.03); shield.rotation.set(1.2, 0, 0.3); kg.add(shield);
+    const sw = new T.Group(); sw.position.set(-0.13, 0, -0.07); sw.rotation.set(0.15, 0, -0.2); kg.add(sw);
+    sw.add(v3Box(0.022, 0.28, 0.006, mats.iron, 0, 0.08, 0, false)); sw.add(v3Box(0.11, 0.016, 0.02, mats.iron, 0, 0.23, 0, false)); sw.add(v3Cyl(0.01, 0.01, 0.07, 8, mats.wood, 0, 0.27, 0)); }
+  const deep = glow('rgba(255,120,40,1)', 0.6, 0, 0.3, ZF - 0.7);
+  O3.smoke.push({ p:[gx, O3.heightAt(gx, gz) + 2.2, gz], t:rnd(1)*0.4, dark:true });
+  /* the dragon himself: red and gold, a little heavier set than the bestiary's, as long as the mouth is wide and half again */
+  let D = null; try{ const pt = MP(mpDragon, { scale:'#a02a1e', belly:'#e0b870', eyes:'255,220,60' }, 1.34), E = m3dInstance({ nm:'ancient dragon' }, pt);
+    const hold = new T.Group(); mv(hold); g.add(hold); hold.add(E.root); E.root.scale.setScalar(1); E.root.updateMatrixWorld(true);
+    const bb = new T.Box3().setFromObject(E.root), L = bb.max.z - bb.min.z, S = 1.7/L; E.root.scale.set(S*1.18, S*1.1, S); E.root.position.set(-(bb.max.x + bb.min.x)/2*S*1.18, 0, -(bb.max.z + bb.min.z)/2*S);
+    E.root.traverse(o=>{ o.frustumCulled = false; if (o.isMesh){ o.castShadow = true; o.receiveShadow = true; } });
+    const R = E.rig, N = R.necks[0]; D = { E, hold, R, N, z0:ZF - 0.45 }; hold.position.set(0, 0, D.z0); }catch(e){ console.error(e); }
+  /* his breath: flame sprites strung out from the jaws, flickering, widening as they go */
+  const fire = []; for (let i=0;i<36;i++){ const s = glow('rgba(255,96,16,1)', 0.7, 0, -5, 0); s.visible = false; fire.push(s); }
+  const maw = glow('rgba(255,200,90,1)', 0.01, 0, -5, 0); maw.visible = false;
+  const breathe = (P, Dir, len, k, t)=>{ const n = fire.length; maw.visible = k > 0.02; if (maw.visible){ maw.position.copy(P); maw.scale.setScalar(0.5*k*(0.9 + 0.1*Math.sin(t*40))); maw.updateMatrix(); maw.updateMatrixWorld(true); }
+    for (let i=0;i<n;i++){ const s = fire[i], u = ((i/n) + t*1.7) % 1, on = k > 0.02; s.visible = on; if (!on) continue;
+      const d = u*len*k, w = 0.25 + u*1.8; s.position.set(P.x + Dir.x*d + Math.sin(i*7.3 + t*20)*0.035*w, P.y + Dir.y*d + Math.sin(i*3.1 + t*17)*0.035*w + u*u*0.3, P.z + Dir.z*d + Math.cos(i*5.7 + t*23)*0.035*w);
+      s.scale.setScalar(0.7*w*(0.7 + 0.3*Math.sin(i + t*30))); s.material.opacity = k*(1 - u)*(1 - u*0.3); s.updateMatrix(); s.updateMatrixWorld(true); } };
+  const pose = (wake, rear, jaw, back)=>{ if (!D) return; const { R, N, hold } = D;
+    const sleep = [0.42, 0.28, 0.12, 0.05, 0.02, 0.0], up = [-0.95, -0.55, -0.25, 0.05, 0.22, 0.3];   /* (the neck laid along the gold; reared up, out of the mouth) */
+    for (let i=0;i<N.J.length;i++){ const r0 = N.rest[i], s0 = sleep[i] != null ? sleep[i] : 0, u = up[i] != null ? up[i] : r0; N.J[i].rotation.x = s0 + (r0 - s0)*wake + (u - r0)*rear; }
+    N.head.rotation.x = 0.25 + (N.hRest - 0.25)*wake - 0.15*rear; N.jaw.rotation.x = 0.75*jaw;
+    if (R.body){ R.body.position.y = R.y0*(0.72 + 0.28*Math.max(wake, rear)) + 0.02*rear; R.body.rotation.x = -0.32*rear; }
+    for (const w of R.wings || []){ w.w.rotation.z = w.s*(-0.55 + 0.95*rear); w.w.rotation.y = w.s*(0.9 - 0.62*rear); }   /* (folded asleep, half spread as he rears) */
+    if (R.tailJ) R.tailJ.forEach(t=>{ t.j.rotation.y = 0.35*(1 - rear); });   /* (his tail curled round him) */
+    hold.position.z = D.z0 + 0.42*rear - 0.5*back; hold.position.y = -0.2*back; hold.visible = back < 1.05; upd(hold); };   /* (out over the hoard to rear; then back and down into the deep, and gone) */
+  pose(0, 0, 0, 0);
+  let roared = false; const P = new T.Vector3(), Dv = new T.Vector3(), M = new T.Matrix4();
+  return { look:1.08, front:1.1, side:1.1, back:0.4, inPts:[[0, ZF + 0.25], [0, ZF - 0.2], [0, ZF - 0.75]], openT:5.4, speed:0.55, fadeAt:[0.35, 0.95],
+    fade:'radial-gradient(ellipse at center, rgba(90,24,4,0.92) 0%, rgba(10,2,0,1) 72%)',
+    round:(x, z)=>{ if (z > 0.55) return []; const R = 1.3, zc = -0.45, th = Math.atan2(x, z - zc), n = Math.ceil(Math.abs(th)/0.45), out = []; for (let i=1;i<n;i++){ const f = th*(1 - i/n); out.push([R*Math.sin(f), zc + R*Math.cos(f)]); } return out; },   /* (round the crag to its mouth) */
+    down:(x, z)=>z < ZF ? Math.min(0.32, (ZF - z)*0.45) : 0,
+    cam:(look)=>({ k:ss(0, 0.9, look), eye:[1.25, 1.2, 3.0], at:[0, 0.55, 0.15] }),   /* (low before the mouth, behind you and to one side) */
+    anim:(look, v)=>{ const t = performance.now()/1000, wake = ss(0.3, 1.4, look), rear = ss(1.3, 2.0, look)*(1 - ss(3.6, 4.4, look)), jaw = ss(1.8, 2.1, look)*(1 - ss(3.4, 3.7, look)), back = Math.min(1.3, ss(3.8, 5.2, look) + 0.4*v);
+      pose(wake, rear, jaw, back);
+      if (look > 1.9 && !roared){ roared = true; try{ sfx('roar'); }catch(e){} O3.shake = Math.max(O3.shake || 0, 1.0); } if (!look && !v) roared = false;
+      const br = ss(2.0, 2.25, look)*(1 - ss(3.2, 3.55, look));
+      if (D && br > 0){ const H = D.N.head; H.updateMatrixWorld(true); P.set(0, -0.012, 0.16).applyMatrix4(H.matrixWorld); g.worldToLocal(P); M.copy(g.matrixWorld).invert();
+        Dv.set(0, -0.15, 1).transformDirection(H.matrixWorld).transformDirection(M).lerp(new T.Vector3(0, 0.32, 1).normalize(), 0.6).normalize(); if (br > 0.5) O3.shake = Math.max(O3.shake || 0, 0.35); breathe(P, Dv, 2.0, br, t); }
+      else breathe(P, Dv, 0, 0, t);
+      deep.scale.setScalar(0.6 + 0.6*br + 0.3*wake); deep.updateMatrix(); deep.updateMatrixWorld(true); } };
+}
 function o3Site(t, gx, gz){
   const sq = o3G(Math.floor(gx), Math.floor(gz)) || [Math.floor(gx), Math.floor(gz)], sx = sq[0], sz = sq[1];   /* (RS-644: gx, gz are in the 3D land's frame; the town's people, its size and a site's own look are its tile's in the world) */
   const T = THREE, mats = o3Mats(), g = new T.Group(), rnd = (s)=> o3Hash(sx, sz, s);
@@ -34805,81 +34902,7 @@ function o3Site(t, gx, gz){
     for (const s of [-1,1]){ g.add(v3Box(0.07, 0.5, 0.07, sand, s*0.55, 0.25, 0.95)); const tip = new T.Mesh(new T.ConeGeometry(0.05, 0.08, 4), mats.bone); tip.rotation.y = Math.PI/4; tip.position.set(s*0.55, 0.54, 0.95); g.add(tip); }
     flame(-0.25, 0.2, 0.8); flame(0.25, 0.2, 0.8);
   } else if (t===OW_LAIR){
-    /* (RS-673) the Dragon Maw, after Smaug's lair in the Rankin/Bass Hobbit: a hill of scorched basalt with a cave mouth in its face, framed
-       above and below by great ivory fangs, the hoard spilling out over the threshold - coins, a chest burst open, a goblet, gems - and
-       what is left of the last who came for it: bones, a shield, a sword in the ground. Embers glow inside; when you come to the mouth two
-       great slit eyes open in the dark, the light swells and the ground rumbles (g.doorWay), and you go on in */
-    const basalt = mats.basalt || (mats.basalt = new T.MeshStandardMaterial({ map:gfxTextures().rock, color:new T.Color(0x8a7d72).convertSRGBToLinear(), roughness:0.95, vertexColors:true }));
-    const fangM = mats.fang || (mats.fang = new T.MeshStandardMaterial({ color:0xffffff, roughness:0.42, vertexColors:true }));
-    const goldM = mats.hoard || (mats.hoard = new T.MeshStandardMaterial({ color:new T.Color(0xe2b44a).convertSRGBToLinear(), metalness:0.85, roughness:0.3, emissive:new T.Color(0x3a2400) }));
-    const hall = mats.voidIn || (mats.voidIn = new T.MeshBasicMaterial({ color:0x000000, side:T.BackSide }));
-    const vc = (geo, f)=>{ const p = geo.attributes.position, c = new Float32Array(p.count*3); for (let i=0;i<p.count;i++){ const k = f(p.getX(i), p.getY(i), p.getZ(i)); c[i*3] = k[0]; c[i*3 + 1] = k[1]; c[i*3 + 2] = k[2]; } geo.setAttribute('color', new T.BufferAttribute(c, 3)); return geo; };
-    const ZF = 0.18;   /* (the face the mouth is cut in) */
-    /* the hill: a dome rising to the back, sheer where the mouth is, scorched black about it */
-    const HH = (x, z)=>{ const r = Math.hypot(x/0.7, (z + 0.2)/0.58); let h = 0.88*(1 - smoothstep(0.3, 1.04, r))*(1 + 0.12*smoothstep(0.2, -0.6, z)) + 0.18*Math.exp(-(x*x/0.2 + z*z/0.12));   /* (and a shoulder of rock over the mouth) */
-      h += (0.07*Math.sin(x*9.1 + z*3.7 + rnd(1)*4) + 0.045*Math.sin(x*17.3 - z*14.1) + 0.03*Math.sin(x*31 + z*27))*smoothstep(0.05, 0.3, h);
-      const ax = Math.abs(x), face = 1 - smoothstep(0.42, 0.62, ax); h *= 1 - face*smoothstep(ZF - 0.02, ZF + 0.05, z);   /* (sheer about the mouth) */
-      return h - 0.14*(1 - smoothstep(0, 0.04, h)); };
-    const hc = (x, y, z)=>{ const sc = smoothstep(0.75, 0.2, Math.hypot(x, z - ZF))*smoothstep(0.75, 0.15, y), band = 0.86 + 0.1*Math.sin(y*37 + Math.sin(x*6.1)*2) + 0.05*Math.sin(x*43 - z*31), k = band*(1 - 0.55*sc), w = 0.55 + 0.45*smoothstep(0, 0.5, y);
-      return [k*w*1.02, k*w*0.95, k*w*0.9]; };
-    g.add(o3HField(basalt, -1.0, 1.0, -1.05, 0.5, HH, hc, (x, z)=>Math.abs(x) < 0.3 && z > ZF - 0.08 && z < ZF + 0.3));   /* (cut only within the brow's depth: behind it the hill roofs the dark) */
-    /* the mouth: a jagged frame of the same rock with the cave cut through it */
-    { const sh = new T.Shape(), O = [[-0.41, -0.06], [0.41, -0.06], [0.43, 0.2], [0.39, 0.44], [0.25, 0.62], [0.03, 0.69], [-0.21, 0.64], [-0.37, 0.48], [-0.43, 0.23]];   /* (a jagged brow round the mouth, the hill's own cliff either side) */
-      sh.moveTo(O[0][0], O[0][1]); for (let i=1;i<O.length;i++){ const p = O[i], q = O[i - 1]; sh.quadraticCurveTo((p[0] + q[0])/2 + (rnd(800 + i) - 0.5)*0.08, (p[1] + q[1])/2 + (rnd(810 + i) - 0.5)*0.06, p[0], p[1]); } sh.lineTo(O[0][0], O[0][1]);
-      const hl = new T.Path(); hl.moveTo(-0.27, 0); hl.lineTo(0.27, 0); hl.lineTo(0.28, 0.22); hl.quadraticCurveTo(0.26, 0.5, 0.02, 0.53); hl.quadraticCurveTo(-0.24, 0.52, -0.28, 0.24); hl.lineTo(-0.27, 0); sh.holes.push(hl);
-      const fg = new T.ExtrudeGeometry(sh, { depth:0.1, bevelEnabled:true, bevelSize:0.035, bevelThickness:0.035, bevelSegments:3, curveSegments:10 }); fg.translate(0, 0, ZF - 0.05);
-      v3WorldUV(fg); vc(fg, (x, y, z)=>{ const k = (0.5 + 0.2*smoothstep(0, 0.7, y))*(0.92 + 0.08*Math.sin(x*41 + y*29)); return [k*1.02, k*0.95, k*0.9]; }); g.add(new T.Mesh(fg, basalt)); }
-    { const sh = new T.Shape(), n = 12; sh.moveTo(-0.36, 0.45); sh.lineTo(0.36, 0.45); for (let i=n;i>=0;i--){ const x = -0.36 + 0.72*i/n; sh.lineTo(x, Math.max(0.5, HH(x, ZF - 0.12) + 0.03)); }   /* (the rock over the mouth, up to the hill: the hill is a sheet, cut open over the mouth) */
-      const fg = new T.ExtrudeGeometry(sh, { depth:0.07, bevelEnabled:false }); fg.translate(0, 0, ZF - 0.13); v3WorldUV(fg); vc(fg, (x, y, z)=>hc(x, y, z - 0.2)); g.add(new T.Mesh(fg, basalt)); }
-    { const hb = new T.Mesh(new T.BoxGeometry(0.54, 0.54, 0.48), hall); hb.position.set(0, 0.26, ZF - 0.24); g.add(hb);   /* (the dark within) */
-      const fl = new T.Mesh(new T.PlaneGeometry(0.54, 0.5), mats.lairFloor || (mats.lairFloor = new T.MeshBasicMaterial({ color:0x050302 }))); fl.rotation.x = -Math.PI/2; fl.position.set(0, 0.012, ZF - 0.24); g.add(fl); }   /* (its floor, over the land) */
-    /* the fangs: curved, ivory, yellowed at the root - down from the arch, up from the floor either side of the way in */
-    const fang = (bx, by, tx, ty, r, h, sd)=>{ const fgeo = new T.ConeGeometry(r, h, 16, 8), p = fgeo.attributes.position, bend = 0.25 + rnd(sd)*0.2;
-      for (let i=0;i<p.count;i++){ const u = (p.getY(i) + h/2)/h; p.setZ(i, p.getZ(i) + bend*h*u*u); } fgeo.computeVertexNormals();
-      vc(fgeo, (x, y)=>{ const u = (y + h/2)/h, k = smoothstep(0, 0.7, u); return [0.78 + 0.22*k, 0.68 + 0.3*k, 0.5 + 0.42*k]; });
-      const m = new T.Mesh(fgeo, fangM), dx = tx - bx, dy = ty - by, L = Math.hypot(dx, dy) || 1; m.rotation.z = Math.atan2(-dx/L, dy/L); m.position.set(bx + dx/L*h*0.42, by + dy/L*h*0.42, ZF + 0.07); g.add(m); };
-    for (let i=0;i<7;i++){ const th = 0.42 + i*(Math.PI - 0.84)/6, ax = Math.cos(th)*0.27, ay = 0.25 + Math.sin(th)*0.27; fang(ax, ay, ax*0.55, 0.1, 0.03 + 0.012*Math.sin(th), 0.12 + 0.08*Math.sin(th), 820 + i); }
-    for (const [x, h] of [[-0.23, 0.13], [-0.13, 0.17], [0.13, 0.16], [0.23, 0.12]]) fang(x, 0.0, x*0.8, 1, 0.032, h, 830 + Math.round(x*100));
-    /* inside: embers on the floor, a glow far in, two eyes in the dark */
-    const ember = mats.ember;
-    for (let i=0;i<6;i++){ const m = new T.Mesh(o3RockGeo(0.03 + rnd(840 + i)*0.025, 840 + i), ember); m.position.set((rnd(850 + i) - 0.5)*0.36, 0.01, ZF - 0.12 - rnd(860 + i)*0.26); g.add(m); }
-    const deep = o3Glow('rgba(255,120,40,1)', 0.32); deep.position.set(0, 0.16, ZF - 0.36); deep.userData.mv = 1; g.add(deep);
-    const eyeTex = O3.tex.dragonEye || (O3.tex.dragonEye = (()=>{ const c = v3Canvas(128, 64), x = c.getContext('2d'), gr = x.createRadialGradient(64, 32, 2, 64, 32, 34); gr.addColorStop(0, '#fff6b0'); gr.addColorStop(0.45, '#ffb21e'); gr.addColorStop(0.85, '#c03a08'); gr.addColorStop(1, 'rgba(120,20,0,0)');
-      x.fillStyle = gr; x.beginPath(); x.ellipse(64, 32, 60, 28, 0, 0, Math.PI*2); x.fill(); x.fillStyle = '#000'; x.beginPath(); x.ellipse(64, 32, 6, 27, 0, 0, Math.PI*2); x.fill(); return v3CanvasTex(c); })());
-    const eyeM = mats.dragonEye || (mats.dragonEye = new T.MeshBasicMaterial({ map:eyeTex, transparent:true, depthWrite:false }));
-    const eyes = [-1, 1].map(sx=>{ const e = new T.Mesh(new T.PlaneGeometry(0.14, 0.07), eyeM); e.position.set(sx*0.095, 0.3, ZF - 0.4); e.rotation.z = -sx*0.18; e.scale.y = 0.02; e.visible = false; e.userData.mv = 1; g.add(e); return e; });
-    /* the hoard, heaped in the mouth and spilling out over the threshold */
-    for (const [x, z, rx, ry, rz] of [[0.02, ZF - 0.14, 0.2, 0.09, 0.15], [-0.04, ZF + 0.1, 0.17, 0.035, 0.12], [0.1, ZF + 0.2, 0.1, 0.022, 0.08]]){ const hp = new T.Mesh(new T.SphereGeometry(1, 28, 12, 0, Math.PI*2, 0, Math.PI/2), goldM); hp.scale.set(rx, ry, rz); hp.position.set(x, 0.008, z); g.add(hp); }
-    { const N = 240, coin = new T.InstancedMesh(new T.CylinderGeometry(0.017, 0.017, 0.004, 14), goldM, N), M4 = new T.Matrix4(), Q = new T.Quaternion(), E = new T.Euler(), V = new T.Vector3(), S = new T.Vector3(1, 1, 1);
-      for (let i=0;i<N;i++){ const inside = i < 70, a = (rnd(900 + i) - 0.5)*(inside ? 1.2 : 2.1), d = inside ? rnd(910 + i)*0.3 : 0.03 + Math.pow(rnd(920 + i), 1.6)*0.5;
-        const x = Math.sin(a)*d*(inside ? 0.8 : 1.15), z = inside ? ZF - d : ZF + Math.cos(a)*d, pile = inside ? 0.09*(1 - d/0.32) : 0.07*Math.pow(Math.max(0, 1 - d/0.5), 1.6);
-        V.set(x, pile*rnd(930 + i) + (inside ? 0.016 : 0.004), z); E.set((rnd(940 + i) - 0.5)*1.2, rnd(950 + i)*6.28, (rnd(960 + i) - 0.5)*1.2); Q.setFromEuler(E); M4.compose(V, Q, S); coin.setMatrixAt(i, M4); }
-      coin.castShadow = true; coin.receiveShadow = true; g.add(coin); }
-    { const cg = new T.Group(); cg.position.set(0.36, 0, ZF + 0.26); cg.rotation.y = -0.6; g.add(cg);   /* (a chest burst open) */
-      cg.add(v3Box(0.13, 0.07, 0.085, mats.wood, 0, 0.035, 0)); for (const x of [-0.045, 0.045]) cg.add(v3Box(0.012, 0.072, 0.088, mats.iron, x, 0.036, 0, false));
-      const lid = new T.Mesh(new T.CylinderGeometry(0.0425, 0.0425, 0.13, 16, 1, false, 0, Math.PI), mats.wood); lid.rotation.z = Math.PI/2; lid.rotation.x = -1.9; lid.position.set(0, 0.075, -0.05); cg.add(lid);
-      for (let i=0;i<7;i++){ const c = new T.Mesh(new T.CylinderGeometry(0.016, 0.016, 0.004, 12), goldM); c.position.set((rnd(970 + i) - 0.5)*0.1, 0.072 + rnd(975 + i)*0.008, (rnd(980 + i) - 0.5)*0.06); c.rotation.set(rnd(985 + i), 0, rnd(990 + i)); cg.add(c); } }
-    { const gp = [[0, 0], [0.018, 0], [0.006, 0.01], [0.005, 0.035], [0.022, 0.05], [0.026, 0.075], [0.024, 0.078]].map(([r, y])=>new T.Vector2(r, y)), gb = new T.Mesh(new T.LatheGeometry(gp, 16), goldM); gb.position.set(-0.2, 0.01, ZF + 0.3); gb.rotation.z = 1.3; g.add(gb); }   /* (a goblet on its side) */
-    for (const [x, z, c] of [[0.14, ZF + 0.18, 0xe0203a], [-0.1, ZF + 0.12, 0x20c060], [0.05, ZF + 0.34, 0x3060ff]]){ const gm = new T.Mesh(new T.OctahedronGeometry(0.016, 0), new T.MeshStandardMaterial({ color:c, emissive:c, emissiveIntensity:0.5, roughness:0.15, metalness:0.2 })); gm.position.set(x, 0.03, z); gm.rotation.set(0.5, 0.3, 0); g.add(gm); }
-    /* the last who came: a knight's bones, his shield, his sword in the ground */
-    { const kg = new T.Group(); kg.position.set(-0.4, 0, ZF + 0.36); kg.rotation.y = 0.7; g.add(kg);
-      const sk = new T.Mesh(new T.SphereGeometry(0.035, 20, 14), mats.bone); sk.scale.set(1, 0.9, 1.15); sk.position.set(0, 0.03, 0.12); kg.add(sk);
-      for (let i=0;i<4;i++){ const rb = new T.Mesh(new T.TorusGeometry(0.045 - i*0.004, 0.006, 6, 18, Math.PI), mats.bone); rb.position.set(0, 0.012, 0.05 - i*0.028); rb.rotation.y = Math.PI/2; rb.rotation.x = -0.2; kg.add(rb); }
-      const sp = v3Cyl(0.006, 0.006, 0.13, 6, mats.bone, 0, 0.01, 0.0); sp.rotation.x = Math.PI/2; kg.add(sp);
-      const shield = new T.Mesh(new T.CylinderGeometry(0.06, 0.06, 0.012, 24), new T.MeshStandardMaterial({ color:new T.Color(0x3a5a9a).convertSRGBToLinear(), roughness:0.6, metalness:0.2 })); shield.position.set(0.1, 0.03, -0.02); shield.rotation.set(1.2, 0, 0.3); kg.add(shield);
-      const boss = new T.Mesh(new T.SphereGeometry(0.016, 14, 8, 0, Math.PI*2, 0, Math.PI/2), mats.iron); boss.position.set(0, 0.006, 0); shield.add(boss);
-      const sw = new T.Group(); sw.position.set(-0.09, 0, -0.05); sw.rotation.set(0.15, 0, -0.2); kg.add(sw);
-      sw.add(v3Box(0.016, 0.2, 0.004, mats.iron, 0, 0.06, 0, false)); sw.add(v3Box(0.08, 0.012, 0.014, mats.iron, 0, 0.165, 0, false)); sw.add(v3Cyl(0.007, 0.007, 0.05, 8, mats.wood, 0, 0.195, 0)); const pm = new T.Mesh(new T.SphereGeometry(0.011, 12, 8), goldM); pm.position.y = 0.225; sw.add(pm); }
-    for (let i=0;i<5;i++){ const bn = v3Cyl(0.008, 0.008, 0.1 + rnd(120 + i)*0.06, 6, mats.bone, (rnd(125 + i) - 0.5)*0.9, 0.01, ZF + 0.15 + rnd(130 + i)*0.4); bn.rotation.z = Math.PI/2; bn.rotation.y = rnd(140 + i)*3; g.add(bn); }
-    O3.smoke.push({ p:[gx, O3.heightAt(gx, gz) + 1.05, gz - 0.15], t:rnd(1)*0.4, dark:true });
-    let roared = false;
-    g.doorWay = { look:0.62, front:0.98, side:0.98, back:0.4, inPts:[[0, ZF + 0.08], [0, ZF - 0.14], [0, ZF - 0.4]], openT:2.0, speed:0.6, fadeAt:[0.4, 0.95],
-      fade:'radial-gradient(ellipse at center, rgba(70,16,4,0.92) 0%, rgba(10,2,0,1) 72%)',
-      round:(x, z)=>{ if (z > 0.5) return []; const R = 0.96, th = Math.atan2(x, z + 0.2), n = Math.ceil(Math.abs(th)/0.5), out = []; for (let i=1;i<n;i++){ const f = th*(1 - i/n); out.push([R*Math.sin(f), R*Math.cos(f) - 0.2]); } return out; },   /* (round the hill to its mouth) */
-      down:(x, z)=>z < ZF ? Math.min(0.3, (ZF - z)*0.55) : 0,
-      anim:(look, v)=>{ const k = smoothstep(0.1, 1.0, look)*(1 - smoothstep(0.92, 1, v)), o = smoothstep(0.5, 1.3, look)*(1 - smoothstep(0.85, 1, v));
-        if (o > 0.2 && !roared){ roared = true; try{ sfx('rumble'); }catch(e){} } if (!look && !v) roared = false;
-        deep.scale.setScalar(0.32 + 0.5*k); for (const e of eyes){ e.visible = o > 0.01; e.scale.y = 0.02 + 0.98*o; } for (const l of eyes.concat([deep])){ l.updateMatrix(); l.updateMatrixWorld(true); } } };
+    g.doorWay = o3DragonLair(g, mats, rnd, gx, gz);   /* (RS-674: Smaug on his hoard) */
   }
   g.traverse(o=>{ if (o.isMesh){ o.castShadow = true; o.receiveShadow = true; } });
   return g;
@@ -36234,7 +36257,7 @@ function o3SiteStandOff(x, y){
   const t = G.ow.map[x] && G.ow.map[x][y]; if (!OW_SITE_TILES.includes(t)) return null;
   let dx = 0, dz = 0; const pv = O3.prevTile; if (pv && Math.max(Math.abs(pv[0]-x), Math.abs(pv[1]-y))===1){ dx = pv[0]-x; dz = pv[1]-y; }
   if (!dx && !dz){ for (const [ox, oz] of [[0,1],[1,1],[1,0],[-1,1],[0,-1],[-1,0],[1,-1],[-1,-1]]){ const nx = x+ox, ny = y+oz, nt = G.ow.map[nx] && G.ow.map[nx][ny]; if (nt!=null && nt!==OW_WATER && nt!==OW_MOUNTAIN && !OW_SITE_TILES.includes(nt)){ dx = ox; dz = oz; break; } } }
-  if (!dx && !dz) return null; const d = Math.hypot(dx, dz), r = t===OW_DUNGEON ? 1.05 : t===OW_MINE ? 1.0 : t===OW_GRAVEYARD ? 1.1 : t===OW_LAIR ? 1.22 : 0.72; return [dx/d*r, dz/d*r];   /* (RS-651: a barrow's door stands where you used to stop; RS-668: and the Dwarf Gate's; RS-672: outside the churchyard's railings; RS-673: clear of the dragon's hill) */
+  if (!dx && !dz) return null; const d = Math.hypot(dx, dz), r = t===OW_DUNGEON ? 1.05 : t===OW_MINE ? 1.0 : t===OW_GRAVEYARD ? 1.1 : t===OW_LAIR ? 1.65 : 0.72; return [dx/d*r, dz/d*r];   /* (RS-651: a barrow's door stands where you used to stop; RS-668: and the Dwarf Gate's; RS-672: outside the churchyard's railings; RS-674: clear of the dragon's crag) */
 }
 /* (RS-501) the placed land never moves, but three.js was recomposing every tree, rock, gathering node and landmark's matrix
    every frame - a good share of each overworld frame on a busy map. The gathering nodes and landmarks are frozen once placed
@@ -36378,7 +36401,11 @@ function o3Render(){
     const k = Math.min(1, L.t/2.4), e = k*k*(3 - 2*k), at = new T.Vector3(tg.x, tg.y + 0.5, tg.z).lerp(look, e);
     O3.cam.position.copy(O3.camPos).lerp(eye, e); O3.cam.lookAt(at.x, at.y, at.z);
     const fov = 34 + 21*e, near = 0.5 + 2.8*e; if (Math.abs(O3.cam.fov - fov) > 0.01 || Math.abs(O3.cam.near - near) > 0.01){ O3.cam.fov = fov; O3.cam.near = near; O3.cam.updateProjectionMatrix(); }   /* (nothing right by the gallery - a treetop, the roof - blocks the view) */
-  } else { O3.cam.position.copy(O3.camPos); O3.cam.lookAt(tg.x, tg.y + 0.5, tg.z); }
+  } else { const DW = O3.doorWalk, cq = DW && DW.dw && DW.dw.cam ? DW.dw.cam(DW.look, DW.v) : null;   /* (a walk-in's own camera: down low before the site, eased in) */
+    if (cq && cq.k > 0.001){ const e = DW.g.localToWorld(new T.Vector3(cq.eye[0], cq.eye[1], cq.eye[2])), a = DW.g.localToWorld(new T.Vector3(cq.at[0], cq.at[1], cq.at[2])), k = cq.k*cq.k*(3 - 2*cq.k);
+      O3.cam.position.copy(O3.camPos).lerp(e, k); O3.cam.lookAt(new T.Vector3(tg.x, tg.y + 0.5, tg.z).lerp(a, k)); }
+    else { O3.cam.position.copy(O3.camPos); O3.cam.lookAt(tg.x, tg.y + 0.5, tg.z); } }
+  if (O3.shake > 0.002){ const a = O3.shake*0.07, q = O3.t; O3.cam.position.x += Math.sin(q*53)*a; O3.cam.position.y += Math.sin(q*71 + 1)*a; O3.cam.position.z += Math.sin(q*61 + 2)*a; O3.shake *= Math.exp(-dt*3.5); }   /* (the ground shakes: a roar, a door of stone falling) */
   // living details
   O3.tex.ripple.offset.set(O3.t*0.012, O3.t*0.007);
   O3.flames.forEach((f,i)=>{ const s = 0.26 * (0.85 + Math.sin(O3.t*13+i*2)*0.1 + Math.sin(O3.t*29+i)*0.06); f.scale.setScalar(s); f.material.opacity = 0.5 + O3.night*0.5; });
@@ -46049,7 +46076,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-673';
+const GAME_VERSION = 'rs-674';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

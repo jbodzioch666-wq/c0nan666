@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-674 - Smaug's Hoard
+
+- **A dragon lives in the lair now.** The Dragon Maw is gone. A dragon's lair is a great crag, half as big again as before, with a cave mouth as wide as a hall. A red-and-gold dragon sleeps across his hoard in it with his chin on the coins, after Smaug in the 1977 Hobbit cartoon.
+- **He wakes when you come.** Step onto a lair and you walk round the crag to its mouth. The dragon lifts his head, comes out over the gold and rears up. He roars, the ground shakes and he pours fire out over your head. Then he draws back down into the dark and you follow him in.
+- **The camera comes down for it.** While it plays, the camera swings down low in front of the cave, behind you and to one side, and shakes with the roar.
+- **The crag sits in the land.** Its edge runs down into the ground, so on a slope it no longer hangs in the air. The rock is shaded by noise instead of the old striped texture that read as wood grain.
+- **Still there:** the heaped gold spilling over the threshold, gems, a goblet, the last knight's bones with his shield and sword, burnt stumps, and smoke from the top.
+
 ## RS-673 - The Dragon Maw
 
 - **Dragon lairs are caves in a hill.** A lair is no longer a ring of rock spikes round a glowing patch. It is a hill of scorched basalt with a cave mouth in its face, framed above and below by great curved ivory fangs, after Smaug's lair in the 1977 Hobbit cartoon.
