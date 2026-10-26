@@ -1,7 +1,7 @@
 // RS-675: the Sun-Slab Tomb. The pyramid has a doorway cut into its face with a sun-slab for a door and a jackal of Anubis either side of
 // the way in; stepping onto it you walk round the pyramid to the causeway (its way round is checked from behind and both sides), the sun
 // catches the capstone (one chime), the winged sun blazes, the glyphs light from the top row down, the jackals' eyes open, the slab grinds
-// down into the ground (one grind, the ground shakes, sand pours), the torches down the passage light, the camera comes down before the
+// down into the ground (one grind, sand pours; RS-676: no screen shake, and you shrink to fit the door), the torches down the passage light, the camera comes down before the
 // door, and you go in and down. Shot: shots/rs675.png (the slab going down)
 module.exports = async page=>{
   page.setDefaultTimeout(0); const errs = []; page.on('pageerror', e=>errs.push(String(e).slice(0, 300)));
@@ -30,17 +30,20 @@ module.exports = async page=>{
       out.round = [[0.24, -0.61], [0.1, -1.15], [-0.05, -1.2], [1.12, -0.4], [-1.15, 0.0], [0.95, 0.75], [-0.95, 0.7]].map(([x, z])=>{ const w = way(x, z); return { n:w.length, thru:thruOf(w) }; }); }
     const s0 = window.sfx, heard = {}; window.sfx = n=>{ heard[n] = (heard[n] || 0) + 1; return s0(n); };
     const rowY = [...P.rows].map(o=>({ m:o.material, y:o.position.y })), lit = new Map();
+    const dw = g.doorWay, ZW = dw.inPts[0][1] - 0.1, BB = new THREE.Box3(); let fitTop = 0, fitS = O3.doorWalk ? O3.doorWalk.fitS : 1, figMin = 9;
     let slabMin = 9, shake = 0, camDown = 0, sand = 0, glows = 0, minY = 9, shot = false;
     const t0 = performance.now(); while (performance.now() - t0 < 30000 && G.gameMode===0){ await fr(1); const W = O3.doorWalk;
       if (W){ for (const q of rowY) if (q.m.emissiveIntensity > 0.5 && !lit.has(q.y)) lit.set(q.y, W.look); }
       slabMin = Math.min(slabMin, P.slab.position.y); shake = Math.max(shake, O3.shake || 0);
       const sn = P.sand.filter(s=>s.visible && s.material.opacity > 0.05).length; if (sn > sand){ sand = sn; if (sn > 30 && !shot){ shot = true; out.shot = O3.renderer.domElement.toDataURL('image/png'); } }
       glows = Math.max(glows, P.glows.filter(s=>s.visible).length);
+      if (W && W.v > 0 && O3.pgrp){ figMin = Math.min(figMin, O3.pgrp.scale.x); const L = g.worldToLocal(O3.pgrp.position.clone()); if (Math.abs(L.x) < 0.1 && L.z > ZW - 0.06 && L.z < ZW + 0.06){ BB.setFromObject((O3.player && O3.player.e && O3.player.e.holder) || O3.pgrp); fitTop = Math.max(fitTop, (BB.max.y - g.position.y)/g.scale.x); } }   /* (passing the door: how high the figure stands above the sill) */
       if (W && W.look > 1 && O3.camPos) camDown = Math.max(camDown, O3.camPos.y - O3.cam.position.y);
       if (W && W.v > 0.5 && O3.ppos) minY = Math.min(minY, (O3.ppos.y - O3.heightAt(O3.ppos.x, O3.ppos.z))/g.scale.x); }
     window.sfx = s0;
     const ys = [...lit.keys()].sort((a, b)=>b - a); out.rowsLit = ys.length; out.topFirst = ys.every((y, i)=>i===0 || lit.get(y) >= lit.get(ys[i - 1]) - 1e-6);
-    Object.assign(out, { slabDown:+(-slabMin).toFixed(2), shake:+shake.toFixed(2), camDown:+camDown.toFixed(2), sand, glows, chime:heard.sunchime || 0, grind:heard.slab || 0, down:+(-minY).toFixed(2), mode:G.gameMode, kind:G.siteKind });
+    Object.assign(out, { fitS:+fitS.toFixed(2), figMin:+figMin.toFixed(2), fitTop:+fitTop.toFixed(3), doorH:dw.doorH, slabDown:+(-slabMin).toFixed(2), shake:+shake.toFixed(2), camDown:+camDown.toFixed(2), sand, glows, chime:heard.sunchime || 0, grind:heard.slab || 0, down:+(-minY).toFixed(2), mode:G.gameMode, kind:G.siteKind });
+    await fr(5); out.figAfter = O3.pgrp ? +O3.pgrp.scale.x.toFixed(3) : 1;
     out.reset = Math.abs(P.slab.position.y) < 1e-4 && [...P.rows].every(o=>o.material.emissiveIntensity < 0.01) && P.sand.every(s=>!s.visible) && P.glows.every(s=>!s.visible);
     let blackStone = 0; g.traverse(o=>{ if (o.isMesh && o.material && o.material.vertexColors && !o.geometry.attributes.color && !o.isSkinnedMesh) blackStone++; }); out.blackStone = blackStone;
     return out; });
@@ -54,12 +57,15 @@ module.exports = async page=>{
   A(r.chime===1, 'the sun catches the capstone: one chime');
   A(r.rowsLit===6 && r.topFirst, 'the glyphs light, the top row first');
   A(r.slabDown > 0.4, 'the slab goes down into the ground');
-  A(r.grind===1 && r.shake > 0.5, 'grinding, once, and the ground shakes');
+  A(r.grind===1, 'grinding, once');
+  A(r.shake < 0.05, 'and the screen does not shake (RS-676)');
+  A(r.fitS < 1 && r.figMin <= r.fitS + 0.01 && r.fitTop > 0.1 && r.fitTop < r.doorH, 'you are made small enough to go through the door (RS-676)');
   A(r.sand > 30, 'sand pours from the slot');
   A(r.glows >= 9, 'the capstone, the winged sun, the jackals\' eyes and the torches down the passage alight');
   A(r.camDown > 1, 'the camera comes down before the door');
   A(r.down > 0.15, 'you go down into it');
   A(r.mode===1 && r.kind==='pyramid', 'and on into the pyramid');
+  A(r.figAfter===1, 'your own size again inside');
   A(r.reset, 'shut again behind you, its lights out');
   A(r.blackStone===0, 'every stone has its colours');
   A(!errs.length, 'no errors: ' + errs.join(' | '));

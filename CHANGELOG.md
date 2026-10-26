@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-676 - Through the Sun-Slab Door
+
+- **You fit through the pyramid's door.** As you walk up to the open door you shrink down to its height, about half your size, and walk in under the lintel instead of through it. Inside you are your own size again.
+- **No more screen shake at the pyramid.** The slab still grinds down with its sound, its pour of sand and its dust, but the camera holds still.
+
 ## RS-675 - The Sun-Slab Tomb
 
 - **Pyramids have a way in.** A great doorway is cut into the pyramid's face: a sheer front under a painted cornice of blue, red and green leaves, a column of hieroglyphs on either side, a gilded winged sun over the door, and the door itself one slab of red granite with the Aten carved on it, its rays ending in hands. Two black jackals of Anubis with gold collars and ears lie on little shrines either side of the way in, with torches on the walls of the cut and obelisks before it.
