@@ -1,6 +1,6 @@
 // probe (RS-677): the Drowned Shrine on the land and its walk-in. Shoots the game standing beside the nearest sunken temple (shots/ztemple-land.png),
 // the shrine alone on a flat green from four sides, shut and opened (shots/ztemple-iso.png), twelve frames of the walk in as the game draws it
-// (shots/ztemple-walk.png), and the time a shrine takes to build; ZPOSE=1 adds close views of the door at eight moments (shots/ztemple-pose.png)
+// (shots/ztemple-walk.png), and the time a shrine takes to build; ZPOSE=1 adds close views of the stair (RS-681) at eight moments (shots/ztemple-pose.png)
 const fs = require('fs');
 module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.on('pageerror', e=>errs.push(String(e).slice(0, 300))); const pose = !!process.env.ZPOSE;
     const r = await page.evaluate(async ({ pose })=>{ const fr = n=>new Promise(res=>{ let i = 0; const f = ()=>++i >= n ? res() : requestAnimationFrame(f); requestAnimationFrame(f); });
@@ -14,8 +14,8 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
       for (const o of nb){ const c = o3C(o.q[0], o.q[1]), dx = c[0] - C[0], dz = c[1] - C[1], d = (f.x*dx + f.z*dz)/Math.hypot(dx, dz); if (d > bd){ bd = d; best = o; } }
       at = { s, best, front:+bd.toFixed(2) }; break; }
     if (!at) return { none:true, n:sites.length };
-    { const n0 = O3.flames.length; let t = performance.now(); o3DrownedShrine(new THREE.Group(), o3Mats(), ()=>0.5); out.build = Math.round(performance.now() - t); O3.flames.length = n0; }
-    out.front = at.front; G.owPos = { x:at.best.q[0], y:at.best.q[1] }; await fr(120); { const c = o3C(at.best.q[0], at.best.q[1]); for (let i=0;i<400 && O3.ppos && Math.hypot(O3.ppos.x - c[0], O3.ppos.z - c[1]) > 0.15;i++) await fr(1); }   /* (there, not still on the way from the last tile) */
+    { const n0 = O3.flames.length; let t = performance.now(); o3DrownedShrine(new THREE.Group(), o3Mats(), ()=>0.5, {}); out.build = Math.round(performance.now() - t); O3.flames.length = n0; }
+    out.front = at.front; out.stairCut = !!g.stairCut; G.owPos = { x:at.best.q[0], y:at.best.q[1] }; await fr(120); { const c = o3C(at.best.q[0], at.best.q[1]); for (let i=0;i<400 && O3.ppos && Math.hypot(O3.ppos.x - c[0], O3.ppos.z - c[1]) > 0.15;i++) await fr(1); }   /* (there, not still on the way from the last tile) */
     const C = o3C(at.s.x, at.s.y); g = O3.doors.get(Math.floor(C[0]) + ',' + Math.floor(C[1]));
     const R = O3.renderer, cv = R.domElement, W = cv.width, H = cv.height, snap = ()=>new Promise(res=>{ const im = new Image(); im.onload = ()=>res(im); im.src = cv.toDataURL('image/png'); });
     const shots = { land:cv.toDataURL('image/png') };
@@ -30,8 +30,8 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
           R.setRenderTarget(null); R.render(sc, cam); const im = await snap(); sx.drawImage(im, (n % 4)*400, Math.floor(n/4)*400*H/W, 400, 400*H/W); n++; } }
       shots.iso = sheet.toDataURL('image/png'); if (g.doorWay.anim) g.doorWay.anim(0, 0);
       if (pose){ const ps = document.createElement('canvas'); ps.width = 1600; ps.height = 2*400*H/W; const px = ps.getContext('2d'); let n2 = 0; const L = new TT.Vector3(), E = new TT.Vector3();
-        for (const lk of [0, 0.6, 1.2, 1.7, 2.2, 2.8, 3.4, 4.4]){ g.doorWay.anim(0, 0); for (let t=0;t<=lk;t+=1/60) g.doorWay.anim(t, 0);
-          E.set(0.3, 0.55, 1.25); g.localToWorld(E); L.set(0, 0.2, 0.15); g.localToWorld(L); cam.position.copy(E); cam.lookAt(L);
+        for (const lk of [0, 0.8, 1.6, 2.2, 2.8, 3.4, 4.2, 5.2]){ g.doorWay.anim(0, 0); for (let t=0;t<=lk;t+=1/60) g.doorWay.anim(t, 0);
+          E.set(0.35, 0.8, 1.4); g.localToWorld(E); L.set(0, -0.08, 0.38); g.localToWorld(L); cam.position.copy(E); cam.lookAt(L);
           R.render(sc, cam); const im = await snap(); px.drawImage(im, (n2 % 4)*400, Math.floor(n2/4)*400*H/W, 400, 400*H/W); px.fillStyle = '#fff'; px.font = '16px sans-serif'; px.fillText(lk + 's', (n2 % 4)*400 + 8, Math.floor(n2/4)*400*H/W + 20); n2++; }
         shots.pose = ps.toDataURL('image/png'); g.doorWay.anim(0, 0); }
       sc.remove(gr); for (const o of hid) o.visible = true; O3.ok = true; await fr(30); }

@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-681 - The Drowned Stair
+
+- **The sunken temple at its first size.** The shrine is back to how it looked in RS-677: smaller, on three tiers, with four pillars round the platform (one snapped) and its bronze doors shut under the drowned god's eye.
+- **The waters open onto a stair.** Step onto the temple and you walk round the pool to its path. The eye wakes, the waters part into two walls, and the eight flagstones of the path sink one after another into a stair. It goes down through the pool floor to a dark doorway under the platform, with a sea-green light at the bottom.
+- **Your own size, no zoom.** You walk down the stair at your own size, and the camera stays where you had it.
+- **Where there's no room for it.** A few temples sit too close to water for the land to open under them. There, the path stays a path and you walk it to the platform.
+
 ## RS-680 - No Zoom at the Pyramid
 
 - **The camera stays put.** Stepping onto the pyramid no longer zooms the camera down to its stair. You watch the stones fold from wherever you had the view.
