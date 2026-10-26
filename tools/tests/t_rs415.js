@@ -16,7 +16,7 @@ module.exports = async page=>{
     out.hips = { f:+hipX(f.e).toFixed(4), m:+hipX(m.e).toFixed(4), skTop:+skTop.toFixed(4), outfit:f.outfit };
     // the pyramid
     G.gameMode = 0; O3.flames = O3.flames || []; O3.glows = O3.glows || []; O3.smoke = O3.smoke || [];
-    const pg = o3Site(OW_PYRAMID, 0, 0); let steps = 0, faces = 0, capstone = 0; pg.traverse(o=>{ if (!o.isMesh) return; const g = o.geometry; if (g.type==='BoxGeometry' && g.parameters.width > 0.5) steps++; if (g.attributes.uv && g.attributes.color && g.attributes.position.count >= 12) faces++;   /* (RS-675: the front face notched for the gatehouse) */ if (g.type==='ConeGeometry' && o.material.metalness > 0.5) capstone++; });
+    const pg = o3Site(OW_PYRAMID, 0, 0); let steps = 0, faces = 0, capstone = 0; pg.traverse(o=>{ if (!o.isMesh) return; const g = o.geometry; if (g.type==='BoxGeometry' && g.parameters.width > 0.6) steps++;   /* (RS-678: the cut's floor is 0.54 across now) */ if (g.attributes.uv && g.attributes.color && g.attributes.position.count >= 12) faces++;   /* (RS-675: the front face notched for the gatehouse) */ if (g.type==='ConeGeometry' && o.material.metalness > 0.5) capstone++; });
     out.pyramid = { steps, faces, capstone, h:+box(pg).max.y.toFixed(2) };
     // the rat king
     const rkP = m3dPortrait({ nm:'rat king' }), grP = m3dPortrait({ nm:'giant rat' }), rk = m3dInstance({ nm:'rat king' }, rkP), gr = m3dInstance({ nm:'giant rat' }, grP);

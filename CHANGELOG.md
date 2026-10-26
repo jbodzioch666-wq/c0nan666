@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-678 - Doors Your Own Size
+
+- **Walk in upright.** The pyramid's and the sunken temple's doors are now tall enough for you, so you go through them at your own size instead of shrinking.
+- **A steeper pyramid.** The pyramid keeps its base but rises twice as high, steep like the pyramids of Meroe. Its doorway, the glyph columns, the winged sun, the jackals' shrines and the obelisks are all bigger to match.
+- **A taller shrine.** The shrine in the sunken temple's pool is taller and wider, on two low steps, with a broad porch and a bigger eye of the drowned god over the doors. Two pillars stand in the water either side of the path, one of them snapped, and the parted waters rise higher.
+
 ## RS-677 - The Drowned Shrine
 
 - **The sunken temple has a way in.** It stands in a pool now: a small shrine on a stepped platform half under the water, fluted pillars round it (one snapped, a drum of it fallen in the pool), lily pads and reeds, and bronze doors gone green under the drowned god's eye.

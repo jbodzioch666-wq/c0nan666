@@ -1,7 +1,7 @@
 // RS-677: the Drowned Shrine. The sunken temple stands in a pool with a shrine on a stepped platform, bronze doors under the drowned god's
 // eye; stepping onto it you walk round the pool to the path (its way round is checked from behind and both sides), the eye wakes (one
 // toll), the waters part into two walls either side of the path (one rush), the doors swing in on a sea-green light, and you walk the
-// path dry, up the steps and in, made small enough for the door, with no screen shake. A door you walk into faces open land, not the
+// path dry, up the steps and in, with no screen shake; RS-678: the door is tall enough that you go through it your own size. A door you walk into faces open land, not the
 // sea. Shot: shots/rs677.png (the waters parted)
 module.exports = async page=>{
   page.setDefaultTimeout(0); const errs = []; page.on('pageerror', e=>errs.push(String(e).slice(0, 300)));
@@ -36,8 +36,8 @@ module.exports = async page=>{
       if (!shot && wallMax > 0.28 && W){ shot = true; out.shot = O3.renderer.domElement.toDataURL('image/png'); }
       if (W && W.v > 0 && O3.ppos){ const L = g.worldToLocal(O3.ppos.clone()), y = (O3.ppos.y - g.position.y)/g.scale.x;
         if (Math.abs(L.x) < 0.1 && L.z > 0.24 && L.z < 0.6 && y < 0.015) wet++;   /* (on the path: on its flags, not under the water) */
-        if (Math.abs(L.x) < 0.1 && L.z < 0.1 && L.z > -0.03) climb = Math.max(climb, y);
-        if (O3.pgrp){ figMin = Math.min(figMin, O3.pgrp.scale.x); if (Math.abs(L.x) < 0.1 && L.z > -0.05 && L.z < 0.05){ BB.setFromObject((O3.player && O3.player.e && O3.player.e.holder) || O3.pgrp); fitTop = Math.max(fitTop, (BB.max.y - g.position.y)/g.scale.x - 0.24); } } } }   /* (passing the door: how high the figure stands above the sill, on the top step) */
+        if (Math.abs(L.x) < 0.1 && L.z < 0.14 && L.z > -0.03) climb = Math.max(climb, y);
+        if (O3.pgrp){ figMin = Math.min(figMin, O3.pgrp.scale.x); if (Math.abs(L.x) < 0.1 && L.z > -0.05 && L.z < 0.05){ BB.setFromObject((O3.player && O3.player.e && O3.player.e.holder) || O3.pgrp); fitTop = Math.max(fitTop, (BB.max.y - g.position.y)/g.scale.x - 0.12); } } } }   /* (passing the door: how high the figure stands above the sill, on the top step) */
     window.sfx = s0;
     Object.assign(out, { fitS:+fitS.toFixed(2), figMin:+figMin.toFixed(2), fitTop:+fitTop.toFixed(3), doorH:dw.doorH, sigMax:+sigMax.toFixed(2), wallMax:+wallMax.toFixed(2), stripMin:+stripMin.toFixed(2), leafMax:+leafMax.toFixed(2),
       shake:+shake.toFixed(2), wet, climb:+climb.toFixed(2), toll:heard.drowned || 0, rush:heard.waters || 0, mode:G.gameMode, kind:G.siteKind });
@@ -56,9 +56,9 @@ module.exports = async page=>{
   A(r.toll===1 && r.sigMax > 1.5, 'the drowned god\'s eye wakes: one toll');
   A(r.rush===1 && r.wallMax > 0.28 && r.stripMin < 0.05, 'the waters part into two walls: one rush');
   A(r.leafMax > 1.3, 'the doors swing in');
-  A(r.wet===0 && r.climb > 0.2, 'you walk the path dry and climb the steps');
+  A(r.wet===0 && r.climb > 0.1, 'you walk the path dry and climb the steps');
   A(r.shake < 0.05, 'and the screen does not shake');
-  A(r.fitS < 1 && r.figMin <= r.fitS + 0.01 && r.fitTop > 0.1 && r.fitTop < r.doorH, 'you are made small enough to go through the door');
+  A(r.fitS===1 && r.figMin > 0.999 && r.fitTop > 0.5 && r.fitTop < r.doorH - 0.05, 'you go through the door your own size, under the lintel (RS-678)');
   A(r.mode===1 && r.kind==='temple', 'and on into the temple');
   A(r.figAfter===1, 'your own size again inside');
   A(r.reset, 'the waters close and the doors shut behind you');

@@ -1,7 +1,7 @@
 // RS-675: the Sun-Slab Tomb. The pyramid has a doorway cut into its face with a sun-slab for a door and a jackal of Anubis either side of
 // the way in; stepping onto it you walk round the pyramid to the causeway (its way round is checked from behind and both sides), the sun
 // catches the capstone (one chime), the winged sun blazes, the glyphs light from the top row down, the jackals' eyes open, the slab grinds
-// down into the ground (one grind, sand pours; RS-676: no screen shake, and you shrink to fit the door), the torches down the passage light, the camera comes down before the
+// down into the ground (one grind, sand pours; RS-676: no screen shake; RS-678: the door is tall enough that you go through it your own size), the torches down the passage light, the camera comes down before the
 // door, and you go in and down. Shot: shots/rs675.png (the slab going down)
 module.exports = async page=>{
   page.setDefaultTimeout(0); const errs = []; page.on('pageerror', e=>errs.push(String(e).slice(0, 300)));
@@ -59,7 +59,7 @@ module.exports = async page=>{
   A(r.slabDown > 0.4, 'the slab goes down into the ground');
   A(r.grind===1, 'grinding, once');
   A(r.shake < 0.05, 'and the screen does not shake (RS-676)');
-  A(r.fitS < 1 && r.figMin <= r.fitS + 0.01 && r.fitTop > 0.1 && r.fitTop < r.doorH, 'you are made small enough to go through the door (RS-676)');
+  A(r.fitS===1 && r.figMin > 0.999 && r.fitTop > 0.5 && r.fitTop < r.doorH - 0.05, 'you go through the door your own size, under the lintel (RS-678)');
   A(r.sand > 30, 'sand pours from the slot');
   A(r.glows >= 9, 'the capstone, the winged sun, the jackals\' eyes and the torches down the passage alight');
   A(r.camDown > 1, 'the camera comes down before the door');
