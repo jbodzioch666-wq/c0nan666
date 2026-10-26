@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-682 - The Draining Pool
+
+- **No walls of water.** The waters no longer rise into two walls either side of the path.
+- **The pool drains down the stair.** When the path's flagstones sink into the stair, the pool pours down it. Water runs over every step with foam at the top and bottom, the pool falls to its dark bed, and the lily pads settle on the mud. Then the sea-green light comes up at the foot, and you walk down.
+- **A bigger temple.** The whole sunken temple stands a little bigger, pool and all, and the shrine on its platform bigger again. Trees, rocks and flowers keep clear of its wider pool.
+
 ## RS-681 - The Drowned Stair
 
 - **The sunken temple at its first size.** The shrine is back to how it looked in RS-677: smaller, on three tiers, with four pillars round the platform (one snapped) and its bronze doors shut under the drowned god's eye.
