@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-679 - The Folding Stair
+
+- **The Great Pyramid again.** The pyramid has its classic Giza shape back, with a gilded capstone. The doorway cut into its face, the sun-slab and the winged sun are gone.
+- **Stones that fold into a stair.** Step onto the pyramid and you walk round to its foot. The capstone catches the sun, the jackals' eyes open, and a strip of casing stones up the middle of the face folds down, one after another, into a stair going down into the pyramid, the way the barrow stairs do. Sand puffs out as each stone lands.
+- **Down into the dark.** Glyphs carved down the stair's walls light up row by row, with torches between them and a glow at the foot. You walk down at your own size: no door to duck under and no screen shake.
+- **The jackals and obelisks stay.** A black jackal of Anubis still lies on a shrine either side of the stair's foot, with an obelisk beyond each.
+
 ## RS-678 - Doors Your Own Size
 
 - **Walk in upright.** The pyramid's and the sunken temple's doors are now tall enough for you, so you go through them at your own size instead of shrinking.

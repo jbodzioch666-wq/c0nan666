@@ -1,4 +1,4 @@
-// probe (RS-675): the Sun-Slab Tomb on the land and its walk-in. Shoots the game standing beside the nearest pyramid (shots/zpyr-land.png),
+// probe (RS-675; RS-679: the Folding Stair): the pyramid on the land and its walk-in. Shoots the game standing beside the nearest pyramid (shots/zpyr-land.png),
 // the tomb alone on a flat green from four sides, shut and opened (shots/zpyr-iso.png), twelve frames of the walk in as the game draws it
 // (shots/zpyr-walk.png), and the time a tomb takes to build; ZPOSE=1 adds close views of the door at eight moments (shots/zpyr-pose.png)
 const fs = require('fs');
@@ -14,8 +14,8 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
       for (const o of nb){ const c = o3C(o.q[0], o.q[1]), dx = c[0] - C[0], dz = c[1] - C[1], d = (f.x*dx + f.z*dz)/Math.hypot(dx, dz); if (d > bd){ bd = d; best = o; } }
       at = { s, best, front:+bd.toFixed(2) }; break; }
     if (!at) return { none:true, n:sites.length };
-    { const n0 = O3.flames.length; let t = performance.now(); o3SunTomb(new THREE.Group(), o3Mats(), ()=>0.5, 0, 0); out.build = Math.round(performance.now() - t); O3.flames.length = n0; }
-    out.front = at.front; G.owPos = { x:at.best.q[0], y:at.best.q[1] }; await fr(120); { const c = o3C(at.best.q[0], at.best.q[1]); for (let i=0;i<400 && O3.ppos && Math.hypot(O3.ppos.x - c[0], O3.ppos.z - c[1]) > 0.15;i++) await fr(1); }   /* (there, not still on the way from the last tile) */
+    { const n0 = O3.flames.length; let t = performance.now(); o3StairTomb(new THREE.Group(), o3Mats(), ()=>0.5, null); out.build = Math.round(performance.now() - t); O3.flames.length = n0; }
+    out.front = at.front; out.stairCut = !!g.stairCut; G.owPos = { x:at.best.q[0], y:at.best.q[1] }; await fr(120); { const c = o3C(at.best.q[0], at.best.q[1]); for (let i=0;i<400 && O3.ppos && Math.hypot(O3.ppos.x - c[0], O3.ppos.z - c[1]) > 0.15;i++) await fr(1); }   /* (there, not still on the way from the last tile) */
     const C = o3C(at.s.x, at.s.y); g = O3.doors.get(Math.floor(C[0]) + ',' + Math.floor(C[1]));
     const R = O3.renderer, cv = R.domElement, W = cv.width, H = cv.height, snap = ()=>new Promise(res=>{ const im = new Image(); im.onload = ()=>res(im); im.src = cv.toDataURL('image/png'); });
     const shots = { land:cv.toDataURL('image/png') };
@@ -30,8 +30,8 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
           R.setRenderTarget(null); R.render(sc, cam); const im = await snap(); sx.drawImage(im, (n % 4)*400, Math.floor(n/4)*400*H/W, 400, 400*H/W); n++; } }
       shots.iso = sheet.toDataURL('image/png'); if (g.doorWay.anim) g.doorWay.anim(0, 0);
       if (pose){ const ps = document.createElement('canvas'); ps.width = 1600; ps.height = 2*400*H/W; const px = ps.getContext('2d'); let n2 = 0; const L = new TT.Vector3(), E = new TT.Vector3();
-        for (const lk of [0, 1.2, 2.2, 3.1, 3.9, 4.5, 5.3, 6.3]){ g.doorWay.anim(0, 0); for (let t=0;t<=lk;t+=1/60) g.doorWay.anim(t, 0);
-          E.set(0.3, 0.45, 1.4); g.localToWorld(E); L.set(0, 0.25, 0.3); g.localToWorld(L); cam.position.copy(E); cam.lookAt(L);
+        for (const lk of [0, 0.6, 1.1, 1.6, 2.2, 2.9, 3.6, 4.6]){ g.doorWay.anim(0, 0); for (let t=0;t<=lk;t+=1/60) g.doorWay.anim(t, 0);
+          E.set(0.35, 0.75, 1.55); g.localToWorld(E); L.set(0, 0.0, 0.5); g.localToWorld(L); cam.position.copy(E); cam.lookAt(L);
           R.render(sc, cam); const im = await snap(); px.drawImage(im, (n2 % 4)*400, Math.floor(n2/4)*400*H/W, 400, 400*H/W); px.fillStyle = '#fff'; px.font = '16px sans-serif'; px.fillText(lk + 's', (n2 % 4)*400 + 8, Math.floor(n2/4)*400*H/W + 20); n2++; }
         shots.pose = ps.toDataURL('image/png'); g.doorWay.anim(0, 0); }
       sc.remove(gr); for (const o of hid) o.visible = true; O3.ok = true; await fr(30); }
