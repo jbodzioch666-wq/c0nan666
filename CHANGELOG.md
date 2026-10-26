@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-677 - The Drowned Shrine
+
+- **The sunken temple has a way in.** It stands in a pool now: a small shrine on a stepped platform half under the water, fluted pillars round it (one snapped, a drum of it fallen in the pool), lily pads and reeds, and bronze doors gone green under the drowned god's eye.
+- **The waters part.** Step onto the temple and you walk round the pool to its path. The eye wakes with a low toll, the water rises into two walls either side of a flagged path with a rush, and the doors swing in on a sea-green light. You walk the path dry, up the steps and in.
+- **You fit through the door.** You shrink to pass through it, as at the pyramid, and you're your own size again inside. Nothing shakes the screen.
+- **Doors face the land.** A temple, pyramid, graveyard or barrow by the sea turns its door toward open land, so you never walk in over the water.
+
 ## RS-676 - Through the Sun-Slab Door
 
 - **You fit through the pyramid's door.** As you walk up to the open door you shrink down to its height, about half your size, and walk in under the lintel instead of through it. Inside you are your own size again.
