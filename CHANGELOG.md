@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-675 - The Sun-Slab Tomb
+
+- **Pyramids have a way in.** A great doorway is cut into the pyramid's face: a sheer front under a painted cornice of blue, red and green leaves, a column of hieroglyphs on either side, a gilded winged sun over the door, and the door itself one slab of red granite with the Aten carved on it, its rays ending in hands. Two black jackals of Anubis with gold collars and ears lie on little shrines either side of the way in, with torches on the walls of the cut and obelisks before it.
+- **It opens for you.** Step onto a pyramid and you walk round it to the door. The sun catches the gold capstone with a chime, the winged sun blazes, the glyphs light from the top row down and the jackals' eyes open. Then the slab grinds down into the ground in a pour of sand, the ground shakes, and torches light one after another down the passage. You go in and down, and the screen fades to amber.
+- **The camera comes down for it.** While it plays, the camera looks down over your shoulder into the doorway.
+- **It keeps to its own square.** The doorway is cut into the pyramid rather than built out in front of it, and the pyramid is its old size, so the tiles beside it stay as clear as they were.
+
 ## RS-674 - Smaug's Hoard
 
 - **A dragon lives in the lair now.** The Dragon Maw is gone. A dragon's lair is a great crag, half as big again as before, with a cave mouth as wide as a hall. A red-and-gold dragon sleeps across his hoard in it with his chin on the coins, after Smaug in the 1977 Hobbit cartoon.
