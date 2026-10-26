@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-673 - The Dragon Maw
+
+- **Dragon lairs are caves in a hill.** A lair is no longer a ring of rock spikes round a glowing patch. It is a hill of scorched basalt with a cave mouth in its face, framed above and below by great curved ivory fangs, after Smaug's lair in the 1977 Hobbit cartoon.
+- **The hoard spills out.** Gold is heaped in the mouth and spills over the threshold: coins, a burst-open chest, a goblet, a few gems. Beside it lie the bones of the last knight who came for it, with his blue shield and his sword stuck in the ground. Embers glow on the cave floor and dark smoke rises from the top.
+- **You walk in.** Step onto a lair and you walk round the hill to its mouth. The light inside swells, two great slit eyes open in the dark and the ground rumbles. Then you go on in and down, and the screen fades to ember red.
+- **Lairs face out of their mountains.** A lair now turns its mouth away from the mountains it lies among, as mines do.
+- **Pyramids get their doorway next.**
+
 ## RS-672 - The Crypt Stair
 
 - **Graveyards are churchyards round a crypt.** A graveyard is no longer a few grey blocks inside a ring of sticks. It is a yard behind iron railings on a stone curb, with a gate standing open on a flagged path. Mossy headstones stand over grassed graves: round-topped and pointed slabs, plain and ringed crosses, a little obelisk. A twisted dead tree leans over the back, and a ghostly green lamp burns on each gatepost.
