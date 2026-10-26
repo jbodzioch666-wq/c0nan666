@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-680 - No Zoom at the Pyramid
+
+- **The camera stays put.** Stepping onto the pyramid no longer zooms the camera down to its stair. You watch the stones fold from wherever you had the view.
+
 ## RS-679 - The Folding Stair
 
 - **The Great Pyramid again.** The pyramid has its classic Giza shape back, with a gilded capstone. The doorway cut into its face, the sun-slab and the winged sun are gone.

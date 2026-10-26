@@ -3,7 +3,7 @@
 // (its way round is checked from behind and both sides), the sun catches the capstone (one chime), the jackals' eyes open, and the strip's
 // stones fold down one after another (one grind, a puff of sand as each lands) into a stair going down into the pyramid through a cut in
 // the land, as at the barrows; the glyphs down its walls light from the top row down with the torches between them, a glow at its foot,
-// and you walk down it your own size (no door, no shrinking, no shake). Shot: shots/rs679.png (the stones folding)
+// and you walk down it your own size (no door, no shrinking, no shake; RS-680: and the camera doesn't zoom in). Shot: shots/rs679.png (the stones folding)
 module.exports = async page=>{
   page.setDefaultTimeout(0); const errs = []; page.on('pageerror', e=>errs.push(String(e).slice(0, 300)));
   const r = await page.evaluate(async ()=>{ const fr = n=>new Promise(res=>{ let i = 0; const f = ()=>++i >= n ? res() : requestAnimationFrame(f); requestAnimationFrame(f); });
@@ -62,7 +62,7 @@ module.exports = async page=>{
   A(r.shake < 0.05, 'and the screen does not shake');
   A(r.rowsLit===4 && r.topFirst, 'the glyphs light, the top row first');
   A(r.glows >= 12, 'the capstone, the jackals\' eyes, the torches down the walls and the glow at the foot alight');
-  A(r.camDown > 1, 'the camera looks down the stair');
+  A(r.camDown < 0.01, 'the camera stays where it is: no zoom in (RS-680)');
   A(!r.doorH && r.fitS===1 && r.figMin > 0.999, 'no door to fit: you go down your own size');
   A(r.down > 0.2, 'you go down the stair');
   A(r.mode===1 && r.kind==='pyramid', 'and on into the pyramid');
