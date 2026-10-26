@@ -68,7 +68,7 @@ node tools/tests/run.js --soft grave boot   # named tests; --soft = software Web
 
 - Test names come from the `ALL` list in `tools/tests/run.js`. Add new tests to that list and to the README table.
 - The full suite takes about an hour with `--soft`. Run it only for broad changes, and run it in the background with a long timeout.
-- `wev`, `town`, `touch` and `wg` depend on the random world and sometimes fail. Rerun once before digging in.
+- `wev`, `town`, `touch` and `wg` depend on the random world and sometimes fail. Rerun once before digging in. `rs651` and `rs652` (the barrow walk-in) depend on where the nearest barrow lies and fail about one run in three, on RS-671 too (checked 2026-10-26).
 - If `npm install` can't fetch three.js, get it from the npm registry tarball (see `build-itch.sh`) and point `THREE_JS=/path/to/three.min.js` at it.
 - A test file exports `async page => {}` and throws on failure. Export `module.exports.mobile = true` to run it on an emulated phone.
 - In shell wait loops, never use `pgrep -f`. It matches its own command line and never exits.

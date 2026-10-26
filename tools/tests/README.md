@@ -26,6 +26,7 @@ Screenshots go to `tools/tests/shots/`.
 |---|---|
 | boot | the page loads and a character starts |
 | rs671 | at a cube Planet's corner the land is framed on the face you're on at once (not kept on the face you came from, with the void between the arms drawn as sea): every tile round you picks, a click over the seam walks you onto the next face |
+| rs672 | the Crypt Stair: a graveyard is a churchyard round a crypt; stepped onto from behind, you walk round its railings to the gate (never through them), the carving wakes, the barred gates swing in, you go down the stair into the graveyard and the gates shut behind you; no stone drawn black for want of its colours. Shot `shots/rs672.png` |
 | rs670 | a tap whose lift was lost (the page stalled) doesn't swallow every later tap as a pinch; a hidden page lets every finger go; a click-walk over a Planet's seam reaches the far side (its steps kept over the frame switch, a diagonal step over the edge allowed) |
 | rs669 | dye a cape inside a building and step out: the town's figure (parked while you were inside) is dressed again; a town's plate on the land says what it is as big as its name |
 | rs668 | the Dwarf Gate: every mine at a mountain's foot (generator 21), the gate looking out from it; stepping on, the runes wake, the stone leaves swing in, you go on into the mine and they shut behind you |
@@ -609,7 +610,7 @@ Screenshots go to `tools/tests/shots/`.
 | zleak4 | geometries and textures a renderer uploaded that nothing uses any more (`ZTEX=1` textures only, `ZTIER`) |
 | zlandmark | a Planet's landmarks in the 3D land, stood some way off each (`ZDIST`, `ZKIND`, `ZTIER`): where it is in the world and the frame, whether it shows, with a shot each |
 | zstuck | loads a save (`ZSAVE`) and reports what blocks a click-walk: the flags, the figure's lag, a walk to each neighbour |
-| zsiteiso | a walk-in site (`ZK` mine/graveyard/lair/pyramid/dungeon, `ZOPEN` seconds looked at) in its place on the land at the four turns, and alone on a green from eight angles, shut and open |
+| zsiteiso | a walk-in site (`ZK` mine/graveyard/lair/pyramid/dungeon, `ZOPEN` seconds looked at, `ZD` the sheet camera's distance) in its place on the land at the four turns, and alone on a green from eight angles, shut and open |
 | zseamwalk | walks eight steps over many of a Planet's face seams by the key path and click-walks on, reporting any step or click that fails (`ZN`) |
 | zseam2 | click-walks over a Planet's seams on the water: sailing in summer, the winter ice, a boat in winter (`ZSAVE`, `ZN`); reports crossings that stop short or freeze |
 | zcorner | a Planet's cube corners (the last narrow seas): a route and a sail over each (`ZSAVE`); reports a freeze with the state then |

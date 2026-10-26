@@ -1,11 +1,11 @@
-// probe (RS-668): a walk-in site in its place on the land. ZK = mine | graveyard | lair | pyramid | dungeon (default mine); ZOPEN = how long
+// probe (RS-668): a walk-in site in its place on the land. ZK = mine | graveyard | lair | pyramid | dungeon (default mine); ZD = the sheet camera's distance (default 4.4); ZOPEN = how long
 // it has been looked at (its doors part open, 0 = shut). Stands you on open land in front of the nearest one and shoots the game at each of
 // the four camera turns (shots/zsite-<kind>-r<n>.png), then the site alone on a flat green from eight angles round it, shut and open,
 // as one sheet (shots/zsite-<kind>-iso.png)
 const fs = require('fs');
 module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.on('pageerror', e=>errs.push(String(e).slice(0, 300)));
   const kind = process.env.ZK || 'mine', open = +(process.env.ZOPEN || 0);
-  const r = await page.evaluate(async ({ kind, open })=>{ const fr = n=>new Promise(res=>{ let i = 0; const f = ()=>++i >= n ? res() : requestAnimationFrame(f); requestAnimationFrame(f); });
+  const r = await page.evaluate(async ({ kind, open, zd })=>{ const fr = n=>new Promise(res=>{ let i = 0; const f = ()=>++i >= n ? res() : requestAnimationFrame(f); requestAnimationFrame(f); });
     goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{}; G.player.wildWarned = 1; G.gameMode = 0; G.player.clock = DAY_LENGTH*0.4;
     const T = { mine:OW_MINE, graveyard:OW_GRAVEYARD, lair:OW_LAIR, pyramid:OW_PYRAMID, dungeon:OW_DUNGEON }[kind], m = G.ow.map;
     const sites = questNearbySites(G.owPos.x, G.owPos.y, 1, 400, [kind]).filter(s=>m[s.x][s.y]===T);
@@ -27,11 +27,11 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
     const sheet = document.createElement('canvas'); sheet.width = 1600; sheet.height = 800; const sx = sheet.getContext('2d');
     const frame = ()=>{ const im = new Image(); im.src = R.domElement.toDataURL('image/png'); return new Promise(res=>{ im.onload = ()=>res(im); }); };
     let n = 0; for (const op of [0, 3]){ g.doorWay && g.doorWay.anim && g.doorWay.anim(op, 0);
-      for (let a=0;a<4;a++){ const yaw = g.rotation.y + [0, 0.7, -0.7, Math.PI][a], el = 0.42, d = 4.4*s; cam.position.set(P.x + Math.sin(yaw)*Math.cos(el)*d, P.y + Math.sin(el)*d + 0.4*s, P.z + Math.cos(yaw)*Math.cos(el)*d); cam.lookAt(P.x, P.y + 0.5*s, P.z);
+      for (let a=0;a<4;a++){ const yaw = g.rotation.y + [0, 0.7, -0.7, Math.PI][a], el = 0.42, d = zd*s; cam.position.set(P.x + Math.sin(yaw)*Math.cos(el)*d, P.y + Math.sin(el)*d + 0.4*s, P.z + Math.cos(yaw)*Math.cos(el)*d); cam.lookAt(P.x, P.y + 0.5*s, P.z);
         R.setRenderTarget(null); R.render(sc, cam); const im = await frame(); sx.drawImage(im, (n % 4)*400, Math.floor(n/4)*400, 400, 400*H/W); n++; } }
     shots.iso = sheet.toDataURL('image/png'); g.doorWay && g.doorWay.anim && g.doorWay.anim(0, 0);
     let meshes = 0; g.traverse(o=>{ if (o.isMesh) meshes++; });
-    return { at, shots, meshes, rot:+g.rotation.y.toFixed(2) }; }, { kind, open });
+    return { at, shots, meshes, rot:+g.rotation.y.toFixed(2) }; }, { kind, open, zd:+(process.env.ZD || 4.4) });
   if (r.shots) for (const [k, u] of Object.entries(r.shots)) fs.writeFileSync(SHOTS + '/zsite-' + kind + '-' + k + '.png', Buffer.from(u.split(',')[1], 'base64'));
   delete r.shots; console.log(JSON.stringify(r)); if (errs.length) console.log('ERRORS', errs.join(' | '));
 };

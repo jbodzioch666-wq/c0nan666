@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-672 - The Crypt Stair
+
+- **Graveyards are churchyards round a crypt.** A graveyard is no longer a few grey blocks inside a ring of sticks. It is a yard behind iron railings on a stone curb, with a gate standing open on a flagged path. Mossy headstones stand over grassed graves: round-topped and pointed slabs, plain and ringed crosses, a little obelisk. A twisted dead tree leans over the back, and a ghostly green lamp burns on each gatepost.
+- **The crypt has a door you walk through.** At the end of the path stands a stone crypt with two pillars, a carved pediment (a winged skull over crossed bones, and REQVIESCANT under it) and urns on its corners. Its barred iron gates are shut.
+- **You walk in.** Step onto a graveyard and you walk round the railings to the gate, up the path and the crypt's steps. The carving wakes with a cold green light, the gates swing inward, and you go down the stair into the dark. The gates shut behind you.
+- **Dragon lairs and pyramids get their doorways next.**
+
 ## RS-671 - Clicking over the seam at a corner
 
 - **At a planet's corners, the sea beyond the seam is real.** Where three faces of the planet meet, the land is drawn unfolded like a box, and when you arrived at the corner from a third face the game kept drawing it that way: the face across the seam from you sat on a different arm of the unfolded box, and the water between the arms was nothing at all, so a click there went nowhere. Within six tiles of a corner the land is now redrawn around the face you're on, where every face across a seam is right next to you and a click over it walks you there.
