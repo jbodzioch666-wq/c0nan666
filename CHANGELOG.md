@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-684 - A Bigger Churchyard
+
+- **The graveyard stands a little bigger.** The churchyard, its railings, the graves and the crypt are about a fifth bigger, so they no longer look small next to the mines and barrows.
+- **Clear ground inside the railings.** No tree, bush or rock from the land next door grows inside the railings or over the gate's path.
+- **You still walk in your own size.** You stop outside the bigger railings, walk round to the gate and go down the crypt's stair as before. The graveyard's name floats at the right height over the bigger crypt.
+
 ## RS-683 - Fewer Wanderers
 
 - **Half as many roaming groups.** A medium world now has about 25 wandering groups instead of 50, and the bigger sizes have up to 75 instead of 150. Each size still gets as many as its land calls for.
