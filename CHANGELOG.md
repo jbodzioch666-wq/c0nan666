@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-685 - Hips That Fit
+
+- **No more bulky bottoms on women.** A woman's hips were sculpted wider than the tops of her thighs, so they ended in a ledge where her legs came out and looked like bloomers. Her hips now taper smoothly into her thighs.
+- **Briefs that look like briefs.** Her underclothes are cut high at the leg, instead of running straight across both thighs like shorts.
+- **Armour follows the figure.** A leather jerkin's skirt and a breastplate's lames now come in toward her thighs instead of squaring off into a box. A heavy build keeps the wider cut, so her thighs never poke through.
+- **Men are unchanged.**
+
 ## RS-684 - A Bigger Churchyard
 
 - **The graveyard stands a little bigger.** The churchyard, its railings, the graves and the crypt are about a fifth bigger, so they no longer look small next to the mines and barrows.
