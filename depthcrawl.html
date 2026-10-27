@@ -8011,7 +8011,7 @@ function ensureSpawnEscape(){
 // (RS-106, generator 3: broader ranges, valleys walled in by them filled in as mountain, and nothing but a dragon's lair in or on them)
 // (RS-114, generator 4: a river that runs into a hollow fills it into a lake and flows on from its lowest edge)
 // (RS-115, generator 5: rivers join edge to edge - a diagonal step also fills the lower of its two side tiles)
-const OW_GEN_VER = 23;   /* (23: the sunken temples out at sea, RS-687; 22: a site's spacing before its liked terrain, half the graveyards, RS-686) */   /* (6: pyramids in the desert, RS-213; 7: a town for every race, RS-223; 8: roads skirt the volcano, RS-236; 9: landmarks on clear ground, RS-238) */
+const OW_GEN_VER = 24;   /* (24: a sunken temple with open water further round it, every other one on the land with room round it, RS-688; 23: the sunken temples out at sea, RS-687; 22: a site's spacing before its liked terrain, half the graveyards, RS-686) */   /* (6: pyramids in the desert, RS-213; 7: a town for every race, RS-223; 8: roads skirt the volcano, RS-236; 9: landmarks on clear ground, RS-238) */
 // any two river tiles that touch only at a corner get the lower of the two tiles beside them turned to river
 // (never a mountain, the sea or a lake); returns how many tiles it added
 function owRiverJoin(elev){
@@ -8619,7 +8619,7 @@ function generateOverworld(seed){
   // the exact same unrestricted search as before, so a preference can never
   // cause a site to fail to place - it only ever changes WHERE it lands
   // when there's a real choice available
-  function placeFeature(minDist, placed, rfn, preferTest, keepTerrain){
+  function placeFeature(minDist, placed, rfn, preferTest, keepTerrain, strict){
     const rint2 = (n)=>Math.floor(rfn()*n);
     /* (RS-686, generator 22) a site's spacing before its terrain: its liked ground only while it can keep 60% of its distance from the
        others (a world with a little tundra had its graveyards squeezed into it side by side), then anywhere, and never nearer than 4 */
@@ -8637,6 +8637,7 @@ function generateOverworld(seed){
         }
       }
       // preferred terrain search exhausted - fall through to the plain search below
+      if (strict) return null;   /* (RS-688: or give up, for a caller with a fallback of its own) */
     }
     for (let relax=minDist; relax>=af; relax-=2){
       for (let tries=0; tries<400; tries++){
@@ -8711,18 +8712,18 @@ function generateOverworld(seed){
   /* (RS-687, generator 23) a sunken temple lies out at sea: a water tile with open water on all eight sides and a shore within five
      tiles (on the open sea, where the map has one), as far from the other sites as the others keep, never nearer than 4; with none
      to be had it goes on the land as it did */
-  function placeSeaSite(minDist, placed, rfn){ const rint2 = (n)=>Math.floor(rfn()*n), W = OW_COLS, Hh = OW_ROWS, cube = owCube(), open = cube ? null : owOpenSea();
+  function placeSeaSite(minDist, placed, rfn){ const rint2 = (n)=>Math.floor(rfn()*n), W = OW_COLS, Hh = OW_ROWS, cube = owCube(), open = cube ? null : owOpenSea(), RR = (G.ow.genVer||1) >= 24 ? 3 : 1, SH = RR > 1 ? 6 : 5;   /* (RS-688, generator 24: open water 3.5 tiles round for the Rotunda's wider well, a shore within six) */
     for (let relax=minDist; relax>=4; relax-=2){
       for (let tries=0; tries<800; tries++){ const x = rint2(W), y = rint2(Hh);
         if (G.ow.map[x][y]!==OW_WATER || (cube && cubeFace(x, y) < 0) || (open && !open[y*W + x])) continue;
-        let ok = true; for (let dx=-1;dx<=1 && ok;dx++) for (let dy=-1;dy<=1;dy++){ if (!dx && !dy) continue; const nb = owNbG(x, y, dx, dy); if (!nb || G.ow.map[nb[0]][nb[1]]!==OW_WATER){ ok = false; break; } }
+        let ok = true; for (let dx=-RR;dx<=RR && ok;dx++) for (let dy=-RR;dy<=RR;dy++){ if ((!dx && !dy) || dx*dx + dy*dy > RR*RR + 3.25) continue; const nb = owNbG(x, y, dx, dy); if (!nb || G.ow.map[nb[0]][nb[1]]!==OW_WATER){ ok = false; break; } }
         if (!ok) continue;
-        let shore = false; for (let dx=-5;dx<=5 && !shore;dx++) for (let dy=-5;dy<=5;dy++){ const nb = owNbG(x, y, dx, dy); if (nb && isLand(G.ow.map[nb[0]][nb[1]])){ shore = true; break; } }
+        let shore = false; for (let dx=-SH;dx<=SH && !shore;dx++) for (let dy=-SH;dy<=SH;dy++){ const nb = owNbG(x, y, dx, dy); if (nb && isLand(G.ow.map[nb[0]][nb[1]])){ shore = true; break; } }
         if (!shore || Math.hypot(x-startX,y-startY) < 5) continue;
         if (placed.some(p=>Math.hypot(x-p.x,y-p.y) < relax)) continue;
         return {x,y}; } }
     return null; }
-  function placeOrRelocateSite(slot, kind, tileConst, minDist, placed, preferTest, keepTerrain){
+  function placeOrRelocateSite(slot, kind, tileConst, minDist, placed, preferTest, keepTerrain, ti){
     const mv = moved[slot];
     if (mv){
       G.ow.map[mv.x][mv.y] = tileConst;
@@ -8730,7 +8731,8 @@ function generateOverworld(seed){
       G.ow.dungeonIdx[mv.x][mv.y] = slot;
       return;
     }
-    const p = (kind==='temple' && (G.ow.genVer||1) >= 23 ? placeSeaSite(minDist, placed, siteRng(200000+slot)) : null) || placeFeature(minDist, placed, siteRng(200000+slot), preferTest, keepTerrain);   /* (RS-687, generator 23: a sunken temple out at sea) */
+    const gv = G.ow.genVer||1, seaT = kind==='temple' && gv >= 23 && (gv < 24 || !((ti||0) % 2)), roomT = kind==='temple' && gv >= 24;   /* (RS-687, generator 23: a sunken temple out at sea; RS-688, generator 24: every other one - and any with no open sea for it - on the land, with room round it for the Guardians' Gate) */
+    const p = (seaT ? placeSeaSite(minDist, placed, siteRng(200000+slot)) : null) || (roomT ? placeFeature(minDist, placed, siteRng(200000+slot), (x, y)=>owTempleRoom(x, y) && (!preferTest || preferTest(x, y)), false, true) || placeFeature(minDist, placed, siteRng(210000+slot), owTempleRoom, true, true) : null) || placeFeature(minDist, placed, siteRng(200000+slot), preferTest, keepTerrain);
     if (p){
       const depthRoll = siteRng(700000+slot)();
       G.ow.map[p.x][p.y] = tileConst;
@@ -8901,7 +8903,7 @@ function generateOverworld(seed){
   let slot = NDUNGEONS;
   for (let i=0;i<NCASTLES;i++){ slot++; placeOrRelocateSite(slot, 'castle', OW_CASTLE, 22, placed, PREFER_GRASS); }
   for (let i=0;i<NNECRO;i++){ slot++; placeOrRelocateSite(slot, 'necro', OW_NECROTOWER, 22, placed, PREFER_SWAMP); }
-  for (let i=0;i<NTEMPLE;i++){ slot++; placeOrRelocateSite(slot, 'temple', OW_TEMPLE, 18, placed, PREFER_DESERT); }
+  for (let i=0;i<NTEMPLE;i++){ slot++; placeOrRelocateSite(slot, 'temple', OW_TEMPLE, 18, placed, PREFER_DESERT, false, i); }
   for (let i=0;i<NGRAVEYARD;i++){ slot++; placeOrRelocateSite(slot, 'graveyard', OW_GRAVEYARD, 12, placed, PREFER_TUNDRA); }
   for (let i=0;i<NMINE;i++){ slot++; placeOrRelocateSite(slot, 'mine', OW_MINE, 12, placed, (G.ow.genVer||1) >= 21 ? PREFER_MTN_SIDE : PREFER_NEAR_MOUNTAIN, true); }
   // dragon lairs: mountain-locked, reached by a carved pass - see
@@ -11562,6 +11564,7 @@ function skNodeStatic(x, y){
   if (SKN.seed !== G.ow.seed || SKN.map !== G.ow.map){ SKN.st.clear(); SKN.seed = G.ow.seed; SKN.map = G.ow.map; }
   const key = x*4096+y; if (SKN.st.has(key)) return SKN.st.get(key);   /* (RS-401: the cache first - the landmark test below was run on every look, cached or not) */
   if (owLandmarkFoot(x, y)){ SKN.st.set(key, null); return null; }   // (RS-238) nor inside a landmark
+  for (let dx=-1;dx<=1;dx++) for (let dy=-1;dy<=1;dy++){ const c = G.ow.map[x + dx]; if ((dx || dy) && c && c[y + dy]===OW_TEMPLE && !owSeaSite(x + dx, y + dy)){ SKN.st.set(key, null); return null; } }   /* (RS-688: nor under the Guardians' Gate, which stands over the tiles round it) */
   if (OW_SITE_TILES.includes(skOwTile(x, y)) || wgPoiAt(x, y) || (G.ow.mythicBeasts||[]).some(b=>b.x===x && b.y===y)){ SKN.st.set(key, null); return null; }   // (RS-131) one thing to a tile
   const t = skOwTile(x, y), h = skNH(x, y, 701), h2 = skNH(x, y, 702), holy = [OW_GRAVEYARD, OW_NECROTOWER, OW_TEMPLE];
   if (t===OW_MOUNTAINPASS && owMtnClear()){ SKN.st.set(key, null); return null; }   // (generator 3: the passes stay clear)
@@ -33888,6 +33891,7 @@ function* o3BuildGen(cx, cy){
   const lin = v=> Math.pow(v/255, 2.2);
   const pits = O3.cuts = o3PitsFor(x0, y0, W);   /* (RS-652: the barrows' stairs in this window) */
   const seaSites = []; for (let sx=x0-2; sx<x0+W+2; sx++) for (let sz=y0-2; sz<y0+W+2; sz++) if (o3SeaSiteL(sx, sz)) seaSites.push([sx + 0.5, sz + 0.5]); O3.seaSites = seaSites;   /* (RS-687: the drowned temples in and about this window) */
+  const gates = []; for (let sx=x0-3; sx<x0+W+3; sx++) for (let sz=y0-3; sz<y0+W+3; sz++) if (o3Tile(sx, sz)===OW_TEMPLE && !o3SeaSiteL(sx, sz)) gates.push([sx + 0.5, sz + 0.5, Math.max(0.12, 0.04 + (n1((sx+0.5)/5, (sz+0.5)/5)-0.5)*0.35 + 0.03)]);   /* (RS-688: the Guardians' Gates, each on a pad as wide as it is) */
   const dryCuts = pits.filter(c=>!c.sea);
   for (const c of pits) if (!c.sea) c.pad = (inM(c.x,c.y) && lairH[dk(c.x,c.y)]) || Math.max(0.12, 0.04 + (n1((c.x+0.5)/5, (c.y+0.5)/5)-0.5)*0.35 + 0.03);
   for (let j=0;j<NV;j++){ if (j % 6 === 5) yield; for (let i=0;i<NV;i++){
@@ -33919,7 +33923,8 @@ function* o3BuildGen(cx, cy){
       const d = Math.hypot(wx-(sx+0.5), wz-(sz+0.5)), f = Math.max(0, Math.min(1, (1.25-d)/0.6)), pad = (inM(sx,sz) && lairH[dk(sx,sz)]) || Math.max(0.12, 0.04 + (n1((sx+0.5)/5, (sz+0.5)/5)-0.5)*0.35 + 0.03);   /* (RS-178: a lair's pad is its summit; RS-570: any other site's is level with the rolling ground round it - a fixed height sank a town in a pit wherever the land rose) */
       h += (pad - h)*f;
     }
-    for (const c of pits){ if (c.sea) continue; const d = Math.hypot(wx - c.cx, wz - c.cz); if (d < 1.55) h += (c.pad - h)*Math.min(1, (1.55 - d)/0.45); }   /* (RS-652: a barrow with a stair stands on level ground out past its lip) */
+    for (const c of pits){ if (c.sea) continue; const d = Math.hypot(wx - c.cx, wz - c.cz); if (d < 1.55) h += (c.pad - h)*Math.min(1, (1.55 - d)/0.45); }
+    for (const [cx2, cz2, pd] of gates){ const d = Math.hypot(wx - cx2, wz - cz2); if (d < 2.6) h += (pd - h)*Math.min(1, (2.6 - d)/0.65); }   /* (RS-688: level out past the gate's guardians) */   /* (RS-652: a barrow with a stair stands on level ground out past its lip) */
     // keep the ground clear of the water sheet (RS-105): wholly-land ground stays well above the wave tops,
     // a shore edge sits just above them, so the water ends at the tile's edge and never shows through the land
     { const xs = Number.isInteger(wx) ? [wx-1, wx] : [Math.floor(wx)], zs = Number.isInteger(wz) ? [wz-1, wz] : [Math.floor(wz)];
@@ -33946,7 +33951,7 @@ function* o3BuildGen(cx, cy){
         beach[j*NV+i] = L; }
       else if (!wet) h = Math.max(h, O3_WATER_Y + 0.15); else if (dry && !diagWet) h = sea ? Math.max(h, O3_WATER_Y + 0.05) : (h < O3_WATER_Y + 0.15 ? O3_WATER_Y + 0.005 : h); else h = Math.min(h, O3_WATER_Y - 0.1); }   // (a river bank on high ground - a mountainside - keeps its height)
     /* (RS-687) the well in the seabed under a drowned temple: a flat floor, a steep side up to a lip just under the waves, and down again to the sea floor */
-    for (const [cx2, cz2] of seaSites){ const S = O3_SEA_TEMPLE, d = Math.hypot(wx - cx2, wz - cz2); if (d >= S.out) continue; const ss2 = q=>q*q*(3 - 2*q);
+    for (const [cx2, cz2] of seaSites){ const S = O3_SEA_TEMPLE, d = Math.hypot(wx - cx2, wz - cz2); if (d >= S.out) continue; { const qt = o3Tile(Math.floor(wx), Math.floor(wz)); if (qt!==OW_WATER && qt!==OW_TEMPLE) continue; }   /* (RS-688: never into the land - a generator 23 well may have a shore nearer than the wider well) */ const ss2 = q=>q*q*(3 - 2*q);
       h = d < S.r0 ? S.floor : d < S.rim ? S.floor + (S.lip - S.floor)*ss2((d - S.r0)/(S.rim - S.r0)) : S.lip + (h - S.lip)*ss2((d - S.rim)/(S.out - S.rim)); }
     const k = j*NV+i; H[k] = h;
     pos[k*3] = wx; pos[k*3+1] = h; pos[k*3+2] = wz;
@@ -34306,18 +34311,24 @@ const O3_PYR_PIT = { hw:0.185, z0:-0.11, z1:0.765, s:1.3, floor:-0.6 };   /* (RS
    own coordinates, and in the 3D land's frame. The land under it is a well in the seabed (O3_SEA_TEMPLE, world units: its floor, the lip
    round it just under the waves, the flat floor's reach r0, the lip's radius, and where the seabed is itself again) with the drowned
    shrine at the bottom, its roof under the water */
+/* (RS-688) room for the Guardians' Gate on the land: open ground two tiles round (no water, river, mountain or other site) */
+function owTempleRoom(x, y){ const m = G.ow.map; for (let dx=-2;dx<=2;dx++) for (let dy=-2;dy<=2;dy++){ if ((!dx && !dy) || dx*dx + dy*dy > 5) continue; const q = owNbG(x, y, dx, dy); if (!q) return false; const t = m[q[0]][q[1]]; if (t!==OW_GRASS && t!==OW_FOREST && t!==OW_TUNDRA && t!==OW_DESERT && t!==OW_SWAMP) return false; } return true; }
 function owSeaSite(x, y){ const m = G.ow && G.ow.map; if (!m || !m[x] || m[x][y]!==OW_TEMPLE) return false; for (const [a, b] of [[1,0],[-1,0],[0,1],[0,-1]]){ const q = owNb(x, y, a, b); if (!q || m[q[0]][q[1]]!==OW_WATER) return false; } return true; }
 function o3SeaSiteL(x, y){ if (o3Tile(x, y)!==OW_TEMPLE) return false; for (const [a, b] of [[1,0],[-1,0],[0,1],[0,-1]]) if (o3Tile(x + a, y + b)!==OW_WATER) return false; return true; }
-const O3_SEA_TEMPLE = { floor:-1.78, lip:-0.36, r0:0.95, rim:1.6, out:2.15 };
-/* (RS-682) within r of a sunken temple's middle (its pool reaches about 1.04 out): for what grows and lies on the land to keep clear */
-function o3NearTemple(wx, wz, r){ const x = Math.floor(wx), z = Math.floor(wz); for (let i=-1;i<=1;i++) for (let j=-1;j<=1;j++) if (o3Tile(x + i, z + j)===OW_TEMPLE && Math.hypot(wx - (x + i + 0.5), wz - (z + j + 0.5)) < r) return true; return false; }
+const O3_SEA_TEMPLE = { floor:-2.3, lip:-0.4, r0:1.8, rim:2.4, out:2.95 };   /* (RS-688: wider and deeper for the Rotunda, its dome above the waves) */
+const O3_TEMPLE_S = 1.45;   /* (the temple's site scale; RS-688 builds in world units under it) */
+/* (RS-688) within the Guardians' Gate's footprint (in its frame, world units: |x| < O3_GATE_HX, |z| < O3_GATE_HZ, its guardians and base) by
+   r - 1 (the callers pass the old pool's reach, about 1.1): for what grows and lies on the land to keep clear. A drowned temple's well is water */
+const O3_GATE_HX = 1.65, O3_GATE_HZ = 1.42;
+function o3GateLocal(wx, wz, tx, tz){ const ry = o3SiteYaw(OW_TEMPLE, tx, tz), dx = wx - (tx + 0.5), dz = wz - (tz + 0.5); return [dx*Math.cos(ry) - dz*Math.sin(ry), dx*Math.sin(ry) + dz*Math.cos(ry)]; }
+function o3NearTemple(wx, wz, r){ const x = Math.floor(wx), z = Math.floor(wz), m = r - 1; for (let i=-2;i<=2;i++) for (let j=-2;j<=2;j++){ const tx = x + i, tz = z + j; if (o3Tile(tx, tz)!==OW_TEMPLE || o3SeaSiteL(tx, tz)) continue;
+    const [u, v] = o3GateLocal(wx, wz, tx, tz); if (Math.abs(u) < O3_GATE_HX + m && Math.abs(v) < O3_GATE_HZ + m) return true; } return false; }
 /* (RS-684) the graveyard stands a little bigger than the other sites; within its railings (|x| < 0.6, z -0.58..0.58 in its frame, the gate's
    flags out to 0.6) by m, nothing grows or lies on the land */
 const O3_GRAVE_S = 1.55;
 function o3NearGraveyard(wx, wz, m){ const x = Math.floor(wx), z = Math.floor(wz); for (let i=-1;i<=1;i++) for (let j=-1;j<=1;j++){ const tx = x + i, tz = z + j; if (o3Tile(tx, tz)!==OW_GRAVEYARD) continue;
     const ry = o3SiteYaw(OW_GRAVEYARD, tx, tz), dx = wx - (tx + 0.5), dz = wz - (tz + 0.5), u = (dx*Math.cos(ry) - dz*Math.sin(ry))/O3_GRAVE_S, v = (dx*Math.sin(ry) + dz*Math.cos(ry))/O3_GRAVE_S, mm = m/O3_GRAVE_S;
     if (Math.abs(u) < 0.6 + mm && v > -0.58 - mm && v < 0.6 + mm) return true; } return false; }
-const O3_SHRINE_PIT = { hw:0.135, z0:0.17, z1:0.628, s:1.45, floor:-0.6 };   /* (RS-682: the temple stands at 1.45) */   /* (RS-681: the sunken temple's stair under its path - see o3DrownedShrine) */
 /* the way a site faces (RS-679: one rule, for the site and the land's cut for its stair): to the camera, a little each way; a mine or a lair
    with its back to its mountain; a door you walk into to open land */
 function o3SiteYaw(t, x, y){ let ry = 0.52 + (t===OW_TOWN ? 0 : (o3Hash(x, y, 9) - 0.5)*0.3);
@@ -34334,10 +34345,9 @@ function o3InCut(wx, wz, m, L){ L = L || O3.cuts; if (!L || !L.length) return nu
 function o3PitY(v){ return v >= 0.64 ? 0 : v <= 0.2 ? O3_PIT.floor : O3_PIT.floor*(0.64 - v)/0.44; }
 function o3PitsFor(x0, y0, W){ const out = [], bad = new Set([OW_WATER, OW_RIVER, OW_MOUNTAIN, OW_MOUNTAINPASS]);
   for (let x=x0; x<x0+W; x++) for (let y=y0; y<y0+W; y++){   /* (the sites built - see o3SitesGen) */
-    const t = o3Tile(x, y); if (t!==OW_DUNGEON && t!==OW_PYRAMID && t!==OW_TEMPLE) continue;   /* (RS-679: and the pyramids' stairs; RS-681: the sunken temples') */
-    const D = t===OW_PYRAMID ? O3_PYR_PIT : t===OW_TEMPLE ? O3_SHRINE_PIT : O3_PIT, ry = o3SiteYaw(t, x, y), c = { x, y, t, d:D, cx:x + 0.5, cz:y + 0.5, ry, co:Math.cos(ry), si:Math.sin(ry) }; let ok = true;
+    const t = o3Tile(x, y); if (t!==OW_DUNGEON && t!==OW_PYRAMID) continue;   /* (RS-679: and the pyramids' stairs; RS-688: the sunken temples walk in at their doors) */
+    const D = t===OW_PYRAMID ? O3_PYR_PIT : O3_PIT, ry = o3SiteYaw(t, x, y), c = { x, y, t, d:D, cx:x + 0.5, cz:y + 0.5, ry, co:Math.cos(ry), si:Math.sin(ry) }; let ok = true;
     const U = t!==OW_DUNGEON ? [-D.hw, 0, D.hw] : [-0.42, -D.hw, 0, D.hw, 0.42], V = t!==OW_DUNGEON ? [D.z0, (D.z0 + D.z1)/2, D.z1] : [0.05, 0.31, D.z1, 0.74];
-    if (t===OW_TEMPLE && o3SeaSiteL(x, y)) c.sea = true;   /* (RS-687: a drowned temple's stair goes down from its well's floor; the water round it is no bar) */
     if (!c.sea) for (const u of U) for (const v of V){ const [wx, wz] = o3PitWorld(c, u, v), tx = Math.floor(wx), tz = Math.floor(wz), t2 = o3Tile(tx, tz);
       if (tx===x && tz===y) continue; if (bad.has(t2) || OW_SITE_TILES.includes(t2) || o3Cliff(tx, tz) || o3LmFoot(tx, tz)){ ok = false; break; } }
     if (ok && !out.some(o=>o.t===t && Math.hypot(o.cx - c.cx, o.cz - c.cz) < 3)) out.push(c); }   /* (two barrows side by side: the first keeps its stair) */
@@ -34806,170 +34816,193 @@ function o3DrownTex(){
    pillars, bronze doors gone green and the drowned god's eye carved over them; lily pads, reeds, a ring of mossy stones. Come to the
    pool's edge and the eye wakes, the waters part into two walls either side of a flagged path, and the doors swing in on a sea-green
    light; you walk the path, up the steps and in, made small enough for the door. Returns the site's doorWay (see o3DoorWalkStart) */
-function o3DrownedShrine(g, mats, rnd, pit, sea){
-  const T = THREE, ss = smoothstep;
-  const upd = o=>{ o.updateMatrix(); o.updateMatrixWorld(true); };   /* (the land's sites are frozen: what moves is updated by hand) */
-  const mv = o=>{ o.userData.mv = 1; return o; };   /* (kept out of the merge) */
-  const glow = (col, s, x, y, z, to)=>{ const o = o3Glow(col, s); o.position.set(x, y, z); o.visible = false; mv(o); (to || g).add(o); return o; };
-  const PR = 0.64, WY = 0.05, PW = 0.12, ZS = 0.2, CZ = -0.1, TOP = 0.24, CF = 0, GW = 0.085, GH = 0.36;   /* (the pool's radius and water level, the path's half-width and its inner end; the platform's middle and top; the shrine's front, its door's half-width and height) */
-  const PL = Math.sqrt(PR*PR - PW*PW) - ZS, NS = 8, RUN = PL/NS, RISE = 0.04, TH = 0.02, top = j=>-(j + 1)*RISE, z1 = ZS + PL;   /* (RS-681: the path's eight flags sink into a stair, the first at the pool's edge; its foot kept over the land's sea sheet, as the pyramid's; RS-682: RISE 0.04, the temple standing bigger) */
-  const sst = mats.shrineSt || (mats.shrineSt = new T.MeshStandardMaterial({ map:mats.stone.map, color:new T.Color(0xd2d6c6).convertSRGBToLinear(), roughness:0.86, vertexColors:true }));   /* (pale stone, stained green-black up to the old waterline) */
+/* (RS-688) the sunken temples stand to your size - a door 1.3 high (you are 0.95), the building two and a half tiles across: on the land
+   the Guardians' Gate (o3TempleGate), at sea the Rotunda at the bottom of its well (o3TempleRotunda). Each is built in world units in a
+   group that undoes the site's scale (O3_TEMPLE_S), from one kit of the drowned stone (o3TempleKit): bevelled blocks, coursed walls and
+   fluted columns made where they stand, stained green-black low and pale above, each block its own tone; doors of green bronze */
+function o3DrownedShrine(g, mats, rnd, pit, sea){ g.stairCut = false; return sea ? o3TempleRotunda(g, mats, rnd) : o3TempleGate(g, mats, rnd); }
+function o3TempleKit(g, mats, H){
+  const T = THREE, ss = smoothstep, S = O3_TEMPLE_S, w = new T.Group(); w.scale.setScalar(1/S); g.add(w);
+  const st = mats.templeSt || (mats.templeSt = new T.MeshStandardMaterial({ map:mats.stone.map, color:new T.Color(0xdcdccc).convertSRGBToLinear(), roughness:0.86, vertexColors:true }));
   const bronze = mats.verdigris || (mats.verdigris = new T.MeshStandardMaterial({ color:new T.Color(0x3f8a74).convertSRGBToLinear(), metalness:0.55, roughness:0.42 }));
-  const bed = mats.poolBed || (mats.poolBed = new T.MeshStandardMaterial({ color:new T.Color(0x1e2a24).convertSRGBToLinear(), roughness:1 }));
-  const water = mats.shrineWater || (mats.shrineWater = new T.MeshStandardMaterial({ color:new T.Color(0x1f6e68).convertSRGBToLinear(), roughness:0.06, metalness:0.3, transparent:true, opacity:0.8, depthWrite:false }));
-  const leaf = mats.lily || (mats.lily = new T.MeshStandardMaterial({ color:new T.Color(0x4f8a3a).convertSRGBToLinear(), roughness:0.6, side:T.DoubleSide }));
-  const reed = mats.reed || (mats.reed = new T.MeshStandardMaterial({ color:new T.Color(0x7a8a4a).convertSRGBToLinear(), roughness:0.9 }));
-  const wet = (x, y, z)=>{ const k = ss(0.03, 0.22, y), h = o3Hash(Math.round(x*300), Math.round(y*300 + z*200), 31), f = h > 0.85 ? 0.84 : 1; return [(0.36 + 0.64*k)*f, (0.46 + 0.54*k)*f, (0.4 + 0.6*k)*f]; };
-  const vc = (geo, f)=>{ const p = geo.attributes.position, c = new Float32Array(p.count*3); for (let i=0;i<p.count;i++){ const k = f(p.getX(i), p.getY(i), p.getZ(i)); c[i*3] = k[0]; c[i*3 + 1] = k[1]; c[i*3 + 2] = k[2]; } geo.setAttribute('color', new T.BufferAttribute(c, 3)); return geo; };
-  /* a bevelled block of the shrine's stone, made where it stands so its stain runs true (dy: how high its parent stands) */
-  const blk = (w, h, d, x, y, z, to, dy)=>{ const b = Math.min(0.008, w/4, h/4, d/4), sh = new T.Shape(); sh.moveTo(-w/2 + b, -h/2 + b); sh.lineTo(w/2 - b, -h/2 + b); sh.lineTo(w/2 - b, h/2 - b); sh.lineTo(-w/2 + b, h/2 - b); sh.lineTo(-w/2 + b, -h/2 + b);
-    const eg = new T.ExtrudeGeometry(sh, { depth:d - 2*b, bevelEnabled:true, bevelSize:b, bevelThickness:b, bevelSegments:2, curveSegments:1 }); eg.translate(x, y, z - (d - 2*b)/2); v3WorldUV(eg, 2.2); vc(eg, (a, c, e)=>wet(a, c + (dy || 0), e)); const o = new T.Mesh(eg, sst); (to || g).add(o); return o; };
-  const pillar = (x, z, y0, h, broken, to, dy)=>{ const P = new T.Group(); P.position.set(x, y0, z); (to || g).add(P); const D = (dy || 0) + y0;
-    const base = new T.Mesh(new T.TorusGeometry(0.046, 0.014, 10, 24), sst); base.rotation.x = Math.PI/2; base.position.y = 0.012; vc(base.geometry, (a, b, c)=>wet(a, D + 0.01, c)); P.add(base);
-    const sg = new T.CylinderGeometry(0.036, 0.042, h, 20, 6); { const p = sg.attributes.position; for (let i=0;i<p.count;i++){ const a = Math.atan2(p.getZ(i), p.getX(i)), r = Math.hypot(p.getX(i), p.getZ(i)), k = 1 - 0.07*Math.pow(Math.abs(Math.cos(a*10)), 0.6); p.setX(i, Math.cos(a)*r*k); p.setZ(i, Math.sin(a)*r*k); } sg.computeVertexNormals(); }   /* (fluted) */
-    if (broken){ const p = sg.attributes.position; for (let i=0;i<p.count;i++) if (p.getY(i) > h/2 - 1e-4) p.setY(i, h/2 - 0.05*(0.5 + 0.5*Math.sin(Math.atan2(p.getZ(i), p.getX(i))*3 + 1))); sg.computeVertexNormals(); }   /* (snapped off jagged) */
-    vc(sg, (a, b, c)=>wet(a, D + b + h/2, c)); const sh = new T.Mesh(sg, sst); sh.position.y = h/2 + 0.02; P.add(sh);
-    if (!broken){ const ec = new T.Mesh(new T.CylinderGeometry(0.056, 0.038, 0.03, 20), sst); ec.position.y = h + 0.035; vc(ec.geometry, ()=>wet(0, 1, 0)); P.add(ec); const ab = new T.Mesh(new T.BoxGeometry(0.12, 0.022, 0.12), sst); ab.position.y = h + 0.06; vc(ab.geometry, ()=>wet(0, 1, 0)); P.add(ab); }
-    return P; };
-  /* the pool: a dark bed, a ring of mossy stones (open where the path comes in), the water with the path's strip cut out of it and laid on its own */
-  const notch = (R, w, zi)=>{ const g0 = Math.asin(w/R), sh = new T.Shape(), N = 64; for (let i=0;i<=N;i++){ const a = -Math.PI/2 + g0 + (Math.PI*2 - 2*g0)*i/N; if (i===0) sh.moveTo(Math.cos(a)*R, Math.sin(a)*R); else sh.lineTo(Math.cos(a)*R, Math.sin(a)*R); }
-    sh.lineTo(-w, -zi); sh.lineTo(w, -zi); sh.closePath(); return new T.ShapeGeometry(sh, 4); };   /* (a disc open where the path comes in; shape y is -z: the path runs out to +z) */
-  { const bd = new T.Mesh(notch(PR + 0.02, PW, ZS), bed); bd.rotation.x = -Math.PI/2; bd.position.y = 0.008; g.add(bd); }   /* (RS-681: open over the stair) */
-  for (let i=0;i<26;i++){ const a = i/26*Math.PI*2 + 0.06, R = PR + 0.035; if (Math.abs(Math.atan2(Math.sin(a), Math.cos(a))) < 0.22) continue;
-    const b = blk(0.15, 0.09 + rnd(300 + i)*0.03, 0.075, 0, 0, 0); b.position.set(Math.sin(a)*R, 0.03 + rnd(310 + i)*0.012, Math.cos(a)*R); b.rotation.set((rnd(320 + i) - 0.5)*0.1, a, (rnd(330 + i) - 0.5)*0.12); }
-  const poolM = water.clone(), pool = new T.Mesh(notch(PR, PW, ZS), poolM); pool.rotation.x = -Math.PI/2; pool.position.y = WY; pool.userData.noSh = 1; mv(pool); g.add(pool);   /* (RS-682: it drains, on a material of its own so it fades as it goes) */
-  const strip = new T.Mesh(new T.PlaneGeometry(2*PW, PL), water); strip.rotation.x = -Math.PI/2; strip.position.set(0, WY, ZS + PL/2); strip.userData.noSh = 1; mv(strip); g.add(strip);
-  /* the stair under the path: its walls darkening as they go down, a block of its body under each step, the dark under the platform at its foot */
-  const deepM = mats.shrineDeep || (mats.shrineDeep = new T.MeshStandardMaterial({ map:mats.stone.map, roughness:0.9, vertexColors:true, side:T.DoubleSide }));
-  const dim = y=>0.22 + 0.78*ss(-0.5, 0.02, y), dc = (x, y)=>{ const k = dim(y); return [0.66*k, 0.72*k, 0.64*k]; };
-  for (const s of [-1, 1]){ const ge = new T.PlaneGeometry(z1 - ZS + 0.03, 0.716); ge.rotateY(Math.PI/2); ge.translate(s*PW, -0.35, (z1 + ZS - 0.03)/2); v3WorldUV(ge, 2.2); vc(ge, dc); g.add(new T.Mesh(ge, deepM)); }
-  for (let j=0;j<NS;j++){ const zb = j ? z1 - RUN*j : z1 + 0.002, za = j===NS - 1 ? ZS - 0.03 : z1 - RUN*(j + 1), y1 = top(j) - TH, ge = new T.BoxGeometry(2*PW - 0.004, y1 + 0.7, zb - za + 0.002);
-    ge.translate(0, (y1 - 0.7)/2, (za + zb)/2); v3WorldUV(ge, 2.2); vc(ge, dc); g.add(new T.Mesh(ge, deepM)); }
-  for (const sx of [-1, 1]) g.add(v3Box(O3_SHRINE_PIT.hw + 0.03 - PW, 0.69, z1 + 0.03 - O3_SHRINE_PIT.z0, mats.tombFloor || (mats.tombFloor = new T.MeshBasicMaterial({ color:0x070402 })), sx*(O3_SHRINE_PIT.hw + 0.03 + PW)/2, -0.355, (z1 + 0.03 + O3_SHRINE_PIT.z0)/2));   /* (earth behind the walls, where the land's cut runs a little wider) */
-  { const e = new T.Mesh(new T.PlaneGeometry(2*PW, 0.66), mats.tombFloor); e.position.set(0, -0.37, ZS + 0.002); g.add(e); }   /* (the dark under the platform: the way on down) */
-  blk(2*PW + 0.05, 0.045, 0.03, 0, -0.018, ZS + 0.016, g, 0);   /* (its lintel) */
-  /* the path's flags under the water: each sinks to its step */
-  const flags = []; for (let i=0;i<NS;i++){ const j = NS - 1 - i, f = blk(2*PW - 0.004, TH, RUN - 0.003, 0, 0, 0, g, 0.12); mv(f);   /* (washed paler than the bed: the steps read as steps) */
-    flags.push({ o:f, a:new T.Vector3(0, 0.016, ZS + (i + 0.5)*RUN), b:new T.Vector3(0, top(j) - TH/2, ZS + (i + 0.5)*RUN), j }); }
-  flags.sort((p, q)=>p.j - q.j);   /* (in the order they sink: the one at the pool's edge first) */
-  /* the platform: three tiers stepping up out of the water */
-  for (const [w, d, top, cz] of [[0.9, 0.6, 0.08, CZ], [0.68, 0.54, 0.16, CZ - 0.01], [0.62, 0.48, TOP, CZ - 0.02]]) blk(w, top + 0.3, d, 0, (top - 0.3)/2, cz);   /* (RS-682: the upper tiers a little deeper for the bigger shrine) */
-  /* the pillars round it, one snapped, a drum of it in the pool */
-  for (const [x, z, br] of [[-0.39, 0.14, 0], [0.39, 0.14, 0], [-0.39, -0.34, 0], [0.39, -0.34, 1]]) pillar(x, z, 0.08, br ? 0.26 : 0.5, br);
-  { const dr = new T.Mesh(new T.CylinderGeometry(0.04, 0.04, 0.1, 20), sst); vc(dr.geometry, (a, b, c)=>wet(a, b*0.3, c)); dr.rotation.set(0.1, 0.7, Math.PI/2 - 0.12); dr.position.set(0.5, 0.045, 0.2); g.add(dr); }
-  /* the shrine: leaning a little as it sinks, its front wall cut with the door, a porch, a roof and pediment */
-  const sh = new T.Group(); sh.position.set(0, TOP, 0); sh.rotation.set(0.02, 0, 0.035); sh.scale.setScalar(1.15); g.add(sh);   /* (RS-682: the shrine itself a little bigger again) */
-  { const s2 = new T.Shape(); s2.moveTo(-0.25, 0); s2.lineTo(0.25, 0); s2.lineTo(0.25, 0.48); s2.lineTo(-0.25, 0.48); s2.lineTo(-0.25, 0);
-    const hl = new T.Path(); hl.moveTo(-GW, 0.002); hl.lineTo(GW, 0.002); hl.lineTo(GW, GH); hl.lineTo(-GW, GH); hl.lineTo(-GW, 0.002); s2.holes.push(hl);
-    const fg = new T.ExtrudeGeometry(s2, { depth:0.06, bevelEnabled:true, bevelSize:0.006, bevelThickness:0.006, bevelSegments:2 }); fg.translate(0, 0, CF - 0.06); v3WorldUV(fg, 2.2); vc(fg, (a, b, c)=>wet(a, b + TOP, c)); sh.add(new T.Mesh(fg, sst)); }
-  for (const s of [-1, 1]) blk(0.05, 0.48, 0.2, s*0.225, 0.24, CF - 0.16, sh, TOP);
-  blk(0.5, 0.48, 0.05, 0, 0.24, CF - 0.285, sh, TOP);
-  blk(0.6, 0.04, 0.42, 0, 0.5, CF - 0.1, sh, TOP);   /* (the roof slab, out over the porch) */
-  { const pd = o3Gable(0.6, 0.42, 0.14, sst); vc(pd.geometry, ()=>wet(0, 1, 0)); pd.position.set(0, 0.52, CF - 0.1); sh.add(pd); }
-  for (const s of [-1, 1]) pillar(s*0.17, CF + 0.065, 0, 0.44, 0, sh, TOP);
-  for (const s of [-1, 1]) blk(0.03, GH + 0.02, 0.02, s*(GW + 0.012), (GH + 0.02)/2, CF + 0.006, sh, TOP);   /* (the door's frame) */
-  const sig = new T.MeshStandardMaterial({ map:o3DrownTex(), color:new T.Color(0x2a3a34), emissive:new T.Color(0x5affe0), emissiveMap:o3DrownTex(), emissiveIntensity:0.05, alphaTest:0.4, roughness:0.6 });
-  { const o = new T.Mesh(new T.PlaneGeometry(0.17, 0.085), sig); o.position.set(0, 0.432, CF + 0.0065); mv(o); sh.add(o); }
-  /* the doors: two leaves of green bronze, shut (RS-681: the way in is down the stair) */
-  const leaves = [-1, 1].map(s=>{ const pv = new T.Group(); pv.position.set(s*GW, 0, CF - 0.03); sh.add(pv);
-    const lf = new T.Mesh(new T.BoxGeometry(GW, GH - 0.004, 0.018), bronze); lf.position.set(-s*GW/2, GH/2, 0); pv.add(lf);
-    for (const y of [0.08, GH/2, GH - 0.08]){ const bd = new T.Mesh(new T.BoxGeometry(GW - 0.01, 0.012, 0.008), bronze); bd.position.set(-s*GW/2, y, 0.012); pv.add(bd); }
-    const ring = new T.Mesh(new T.TorusGeometry(0.014, 0.004, 8, 18), bronze); ring.position.set(-s*(GW - 0.022), GH*0.5, 0.016); pv.add(ring); return pv; });
-  sh.traverse(o=>{ if (o!==sh) o.updateMatrix(); });
-  /* lily pads, reeds at the edge */
-  const pads = [];
-  for (let i=0;i<(sea ? 0 : 9);i++){ const a = rnd(400 + i)*Math.PI*2, r = 0.3 + rnd(410 + i)*0.32, x = Math.sin(a)*r, z = Math.cos(a)*r; if (Math.abs(x) < PW + 0.06 && z > 0) continue; if (Math.abs(x) < 0.5 && z < 0.24 && z > -0.44) continue;
-    const lp = new T.Mesh(new T.CircleGeometry(0.03 + rnd(420 + i)*0.015, 16, 0.3, Math.PI*2 - 0.6), leaf); lp.rotation.set(-Math.PI/2, 0, rnd(430 + i)*6); lp.position.set(x, WY + 0.003, z); mv(lp); g.add(lp); pads.push(lp); }
-  for (let i=0;i<(sea ? 0 : 5);i++){ const a = (i % 2 ? 1 : -1)*(0.6 + i*0.35), r = PR + 0.04; for (let k=0;k<5;k++){ const x = Math.sin(a)*r + (rnd(440 + i*5 + k) - 0.5)*0.08, z = Math.cos(a)*r + (rnd(470 + i*5 + k) - 0.5)*0.08, h = 0.12 + rnd(500 + i*5 + k)*0.1;
-    g.add(m3dTaper([[x, 0, z], [x + (rnd(530 + k) - 0.5)*0.03, h*0.6, z], [x + (rnd(560 + k) - 0.5)*0.06, h, z + (rnd(590 + k) - 0.5)*0.04]], 0.005, 0.0015, reed, 6, 5)); } }
-  /* (RS-682) the pool drains down the stair: a sheet of water running down each step as it lands, its flow scrolling, foam at the lip and the foot */
+  const dark = mats.tombFloor || (mats.tombFloor = new T.MeshBasicMaterial({ color:0x070402 }));
+  const sig = new T.MeshStandardMaterial({ map:o3DrownTex(), color:new T.Color(0x2a3a34), emissive:new T.Color(0x5affe0), emissiveMap:o3DrownTex(), emissiveIntensity:0.05, alphaTest:0.4, roughness:0.6 });   /* (the drowned god's eye: its own, it wakes) */
+  const hash = (a, b, c)=>o3Hash(Math.round(a*97), Math.round(b*131), c), mv = o=>{ o.userData.mv = 1; return o; };
+  const vc = (geo, tone, h)=>{ const p = geo.attributes.position, c = new Float32Array(p.count*3); h = h || H;
+    for (let i=0;i<p.count;i++){ const y = p.getY(i), k = ss(0.05, 0.62*h, y), t = tone*(hash(p.getX(i), y + p.getZ(i), 7) > 0.9 ? 0.86 : 1); c[i*3] = (0.34 + 0.66*k)*t; c[i*3 + 1] = (0.44 + 0.56*k)*t; c[i*3 + 2] = (0.38 + 0.62*k)*t; }
+    geo.setAttribute('color', new T.BufferAttribute(c, 3)); return geo; };
+  const mesh = (geo, mat, par)=>{ const o = new T.Mesh(geo, mat); o.castShadow = o.receiveShadow = true; (par || w).add(o); return o; };
+  const fin = (geo, tone, par, h)=>{ geo.computeVertexNormals(); v3WorldUV(geo, 1.3); vc(geo, tone, h); return mesh(geo, st, par); };
+  /* a bevelled block, baked where it stands so the texture and the stain run true */
+  const blk = (bw, bh, bd, x, y, z, ry, par, tone, h)=>{ const b = Math.min(0.016, bw/5, bh/5, bd/5), sh = new T.Shape(); sh.moveTo(-bw/2 + b, -bh/2 + b); sh.lineTo(bw/2 - b, -bh/2 + b); sh.lineTo(bw/2 - b, bh/2 - b); sh.lineTo(-bw/2 + b, bh/2 - b); sh.closePath();
+    const ge = new T.ExtrudeGeometry(sh, { depth:bd - 2*b, bevelEnabled:true, bevelSize:b, bevelThickness:b, bevelSegments:2, curveSegments:1 }); ge.translate(0, 0, -(bd - 2*b)/2); if (ry) ge.rotateY(ry); ge.translate(x, y, z);
+    return fin(ge, tone==null ? 0.9 + hash(x, y, z)*0.14 : tone, par, h); };
+  /* a fluted column with its swell, its base and capital; broken, snapped off jagged */
+  const column = (x, z, y0, h, r, broken)=>{ blk(r*2.8, 0.06, r*2.8, x, y0 + 0.03, z, 0, w, 0.92);
+    { const ge = new T.TorusGeometry(r*1.12, r*0.22, 10, 28); ge.rotateX(Math.PI/2); ge.translate(x, y0 + 0.08, z); fin(ge, 0.95); }
+    const sh = h - (broken ? 0 : 0.16), ge = new T.CylinderGeometry(r*0.86, r, sh, 28, 10), p = ge.attributes.position;
+    for (let i=0;i<p.count;i++){ const y = p.getY(i), t = y/sh + 0.5, a = Math.atan2(p.getZ(i), p.getX(i)), rr = Math.hypot(p.getX(i), p.getZ(i)), k = (1 + 0.035*Math.sin(Math.PI*t))*(1 - 0.06*Math.pow(Math.abs(Math.cos(a*7)), 0.6));
+      const yy = broken && y > sh/2 - 1e-4 ? sh/2 - r*1.4*(0.5 + 0.5*Math.sin(a*3 + 1))*(0.6 + 0.4*Math.sin(a*7)) : y; p.setXYZ(i, Math.cos(a)*rr*k + x, yy + y0 + 0.1 + sh/2, Math.sin(a)*rr*k + z); }
+    fin(ge, 0.97);
+    if (!broken){ const ec = new T.CylinderGeometry(r*1.32, r*0.88, 0.09, 28); ec.translate(x, y0 + 0.1 + sh + 0.045, z); fin(ec, 0.97); blk(r*2.9, 0.07, r*2.9, x, y0 + 0.1 + sh + 0.125, z, 0, w, 0.97); } };
+  const drum = (x, z, y, r, l, ry)=>{ const ge = new T.CylinderGeometry(r, r, l, 24); ge.rotateZ(Math.PI/2); ge.rotateY(ry); ge.translate(x, y + r, z); fin(ge, 0.85); };
+  /* two leaves of green bronze hung at the sides of a doorway at z (they swing in: open(k)), banded and studded, a ring on each */
+  const doors = (z, y0, dw, dh)=>{ const L = [-1, 1].map(s=>{ const pv = mv(new T.Group()); pv.position.set(s*dw/2, y0, z); w.add(pv);
+      mesh(new T.BoxGeometry(dw/2, dh - 0.01, 0.03).translate(-s*dw/4, dh/2, 0), bronze, pv);
+      for (const y of [0.16, dh/2, dh - 0.16]) mesh(new T.BoxGeometry(dw/2 - 0.02, 0.025, 0.014).translate(-s*dw/4, y, 0.018), bronze, pv);
+      for (let i=0;i<5;i++) for (const y of [0.16, dh - 0.16]) mesh(new T.SphereGeometry(0.009, 8, 6).translate(-s*(0.03 + i*(dw/2 - 0.06)/4), y, 0.028), bronze, pv);
+      mesh(new T.TorusGeometry(0.03, 0.007, 8, 20).translate(-s*(dw/2 - 0.05), dh*0.5, 0.03), bronze, pv); return pv; });
+    const f = k=>{ L.forEach((pv, i)=>{ pv.rotation.y = (i ? -1 : 1)*1.45*k; pv.updateMatrix(); pv.updateMatrixWorld(true); }); }; f.leaves = L; return f; };
+  const eye = (x, y, z, s)=>{ const o = mv(new T.Mesh(new T.PlaneGeometry(s, s/2), sig)); o.position.set(x, y, z); w.add(o); return o; };
+  return { T, ss, S, w, st, bronze, dark, sig, hash, mv, vc, mesh, fin, blk, column, drum, doors, eye };
+}
+/* the Guardians' Gate: a massive battered block in courses on a two-step base, its door under a great lintel and a relieving triangle
+   carved with the eye, a stepped crown, two hooded stone guardians leaning on their swords before it. Walking up, the eye wakes and the
+   guardians' eyes kindle under their hoods; the bronze doors swing in on the dark, and you walk in through them, your own size */
+function o3TempleGate(g, mats, rnd){
+  const K = o3TempleKit(g, mats, 2.6), { T, ss, S, w, blk, fin, mesh, dark } = K;
+  const Y = 0.18, DW = 0.68, DH = 1.3, NC = 7, CH = 0.27, W0 = 2.0, W1 = 1.66, D0 = 1.8, D1 = 1.5;
+  blk(2.7, 0.5, 2.5, 0, -0.15, 0, 0, w, 0.86); blk(2.5, 0.08, 2.3, 0, 0.14, 0, 0, w, 0.9);   /* (the base, down into the ground where the land falls away) */
+  for (let k=0;k<NC;k++){ const ya = Y + k*CH, t = (k + 0.5)/NC, bw = W0 + (W1 - W0)*t, bd = D0 + (D1 - D0)*t, yc = ya + CH/2, gp = 0.012, low = ya - Y < DH - 1e-3, off = k % 2 ? 0.15 : 0;
+    const cuts = [-bw/2, -bw/4 - off, off*0.5, bw/4 + off*0.3, bw/2];   /* (the front and back in big blocks, their joints staggered course to course; the door cut from the low courses) */
+    for (const zf of [1, -1]) for (let i=0;i<cuts.length - 1;i++){ const a = cuts[i], b = cuts[i + 1], segs = [];
+      if (zf > 0 && low){ if (a < -DW/2 - 0.05) segs.push([a, Math.min(b, -DW/2 - 0.05)]); if (b > DW/2 + 0.05) segs.push([Math.max(a, DW/2 + 0.05), b]); } else segs.push([a, b]);
+      for (const [p, q] of segs) if (q - p > 0.05) blk(q - p - gp, CH - gp, 0.3, (p + q)/2, yc, zf*(bd/2 - 0.15), 0, w); }
+    for (const s of [-1, 1]) blk(bd - 0.6, CH - gp, 0.3, s*(bw/2 - 0.15), yc, 0, Math.PI/2, w); }
+  const FZ = (D0 + (D1 - D0)*(DH/(NC*CH)))/2;   /* (the front's face at the door's head) */
+  for (const s of [-1, 1]) blk(0.2, DH + 0.02, 0.4, s*(DW/2 + 0.1), Y + DH/2, FZ - 0.14, 0, w, 1.02);   /* (two monolith jambs) */
+  blk(DW + 0.7, 0.3, 0.46, 0, Y + DH + 0.15, FZ - 0.12, 0, w, 1.05);   /* (the great lintel) */
+  { const s = new T.Shape(); s.moveTo(-0.46, 0); s.lineTo(0, 0.52); s.lineTo(0.46, 0); s.closePath(); const ge = new T.ExtrudeGeometry(s, { depth:0.06, bevelEnabled:true, bevelSize:0.014, bevelThickness:0.014, bevelSegments:2 }); ge.translate(0, Y + DH + 0.3, FZ - 0.02); fin(ge, 0.72); }   /* (the relieving triangle, a darker stone) */
+  K.eye(0, Y + DH + 0.47, FZ + 0.065, 0.32);
+  const open = K.doors(FZ - 0.28, Y, DW, DH);
+  mesh(new T.BoxGeometry(DW + 0.02, DH, 1.0).translate(0, Y + DH/2, FZ - 0.8), dark);   /* (the dark within, that you walk into) */
+  const TY = Y + NC*CH; blk(W1 + 0.18, 0.1, D1 + 0.18, 0, TY + 0.05, 0, 0, w, 1); blk(W1 + 0.06, 0.14, D1 + 0.06, 0, TY + 0.17, 0, 0, w, 0.95); blk(W1 - 0.3, 0.12, D1 - 0.3, 0, TY + 0.3, 0, 0, w, 0.92);
+  /* the guardians: hooded and robed, the robe falling in folds, hands on the pommels of swords standing point-down before them */
+  const robe = [[0, 0], [0.27, 0], [0.28, 0.06], [0.25, 0.4], [0.21, 0.8], [0.19, 1.08], [0.23, 1.24], [0.235, 1.32], [0.19, 1.4], [0.15, 1.46], [0.16, 1.56], [0.145, 1.66], [0.1, 1.76], [0.04, 1.86], [0, 1.88]].map(([r, y])=>new T.Vector2(r, y));
+  const kin = [];
+  for (const s of [-1, 1]){ const sg = new T.Group(); sg.position.set(s*1.22, 0.18, 0.92); sg.rotation.y = -s*0.22; w.add(sg); const H2 = 3.2, B = 0.4;
+    blk(0.56, B + 0.4, 0.56, 0, B/2 - 0.2, 0, 0, sg, 0.86, 2.6); blk(0.62, 0.06, 0.62, 0, B - 0.03, 0, 0, sg, 0.95, 2.6);
+    const lg = new T.LatheGeometry(robe, 56); { const p = lg.attributes.position; for (let i=0;i<p.count;i++){ const x = p.getX(i), z = p.getZ(i), a = Math.atan2(x, z), y = p.getY(i);
+        let k = 1 + 0.07*Math.pow(Math.abs(Math.sin(a*6 + 0.4)), 0.7)*ss(1.25, 0.1, y) - 0.035; if (y > 1.42 && Math.cos(a) > 0.2) k *= 1 - 0.14*ss(1.42, 1.5, y)*ss(1.82, 1.7, y)*ss(0.2, 0.9, Math.cos(a));   /* (folds; the hood's mouth pressed in) */
+        p.setX(i, x*k); p.setZ(i, z*k*0.8 + (y > 1.6 ? -0.03*(y - 1.6)/0.28 : 0)); } }
+    lg.translate(0, B, 0); fin(lg, 0.93, sg, H2);
+    mesh(new T.SphereGeometry(0.105, 28, 18).scale(0.85, 1.2, 0.55).translate(0, B + 1.58, 0.06), dark, sg);   /* (the dark under the hood) */
+    { const ge = new T.TorusGeometry(0.115, 0.024, 10, 32, Math.PI*1.1); ge.rotateZ(-Math.PI*0.05); ge.scale(0.92, 1.3, 1); ge.translate(0, B + 1.55, 0.085); fin(ge, 0.98, sg, H2); }   /* (its rim) */
+    for (const t of [-1, 1]){ const a = new T.Vector3(t*0.21, B + 1.3, -0.01), b = new T.Vector3(t*0.06, B + 1.08, 0.25), L = a.distanceTo(b), ge = new T.CylinderGeometry(0.075, 0.105, L, 22); ge.translate(0, L/2, 0);
+      ge.applyQuaternion(new T.Quaternion().setFromUnitVectors(new T.Vector3(0, 1, 0), b.clone().sub(a).normalize())); ge.translate(a.x, a.y, a.z); fin(ge, 0.96, sg, H2);   /* (the sleeves) */
+      fin(new T.SphereGeometry(0.06, 16, 12).scale(1, 0.8, 1.2).translate(t*0.045, B + 1.1, 0.27), 0.98, sg, H2); }
+    blk(0.08, 0.95, 0.03, 0, B + 0.52, 0.29, 0, sg, 1, H2); blk(0.38, 0.05, 0.06, 0, B + 1.02, 0.29, 0, sg, 1, H2); blk(0.045, 0.1, 0.045, 0, B + 1.09, 0.29, 0, sg, 1, H2);   /* (the blade, its guard and grip) */
+    fin(new T.SphereGeometry(0.04, 16, 12).translate(0, B + 1.16, 0.29), 1, sg, H2);
+    for (const t of [-1, 1]){ const e = K.mv(o3Glow('rgba(90,255,220,1)', 0.07)); e.position.set(t*0.032, B + 1.6, 0.1); e.visible = false; sg.add(e); kin.push(e); } }   /* (eyes in the dark of the hood) */
+  const deep = K.mv(o3Glow('rgba(80,240,210,1)', 0.5)); deep.position.set(0, Y + 0.35, FZ - 0.55); deep.visible = false; w.add(deep);   /* (a sea-green light within, seen as the doors part) */
+  let rang = false, ground = false;
+  const anim = (look, v)=>{ const t = performance.now()/1000, eye = ss(0.2, 1.0, look); K.sig.emissiveIntensity = 0.05 + 2.2*eye;
+    if (look > 0.2 && !rang){ rang = true; try{ sfx('drowned'); }catch(e){} }
+    const ke = ss(0.5, 1.1, look); for (const e of kin){ e.visible = ke > 0.02; if (e.visible){ e.scale.setScalar(0.07*ke*(0.85 + 0.15*Math.sin(t*3))); e.updateMatrix(); e.updateMatrixWorld(true); } }
+    if (look > 1.0 && !ground){ ground = true; try{ sfx('slab'); }catch(e){} }
+    const dk = ss(1.0, 2.2, look); open(dk); deep.visible = dk > 0.05; if (deep.visible){ deep.scale.setScalar(0.5*dk*(0.9 + 0.1*Math.sin(t*2.5))); deep.updateMatrix(); deep.updateMatrixWorld(true); }
+    if (!look && !v){ rang = false; ground = false; } };
+  anim(0, 0);
+  /* the way in, in the site's frame (world units / S): stop before the steps, the doors open, in through them. Round the block and its
+     guardians from behind or the sides */
+  const u = q=>q/S, HX = 1.62, HZ = 1.4;
+  return { look:u(FZ + 0.85), front:u(FZ + 1.2), side:u(HX + 0.35), back:u(-HZ), inPts:[[0, u(FZ + 0.2)], [0, u(FZ - 0.4)], [0, u(FZ - 0.75)]], openT:2.6, speed:0.7, fadeAt:[0.4, 0.95], doorH:u(DH),
+    fade:'radial-gradient(ellipse at center, rgba(30,140,125,0.9) 0%, rgba(0,12,14,1) 72%)',
+    round:(x, z)=>{ const xw = x*S, zw = z*S; if (zw > HZ + 0.05 && Math.abs(xw) < HX) return []; const sx = xw < 0 ? -1 : 1, out = []; if (zw < -HZ + 0.2) out.push([u(sx*(HX + 0.35)), u(-HZ - 0.3)]); out.push([u(sx*(HX + 0.35)), u(HZ + 0.35)]); return out; },
+    down:(x, z)=>{ const xw = x*S, zw = z*S; if (Math.abs(xw) > 1.3) return 0; return zw < 1.15 ? -u(0.18) : zw < 1.25 ? -u(0.1) : 0; },   /* (up the base's two steps) */
+    parts:{ sig:K.sig, kin, deep, open }, anim };
+}
+/* the Rotunda: a round hall of coursed stone on a round podium, a ring of eight columns (one cracked) under a round entablature, and a
+   ribbed dome of green bronze standing up out of the sea. Its well in the seabed (O3_SEA_TEMPLE) has a stair built against its side from a
+   mooring stone at the lip three quarters of the way round to the floor. Sunlight falls through the water in shafts and fish circle it;
+   when the eye wakes the sea parts - the water in the well falls away to the floor, standing as a wall round it - and you step out of the
+   boat, which waits at the stone, go down the stair and in through the bronze doors as they swing open */
+function o3TempleRotunda(g, mats, rnd){
+  const K = o3TempleKit(g, mats, 2.2), { T, ss, S, w, blk, fin, mesh, dark, hash } = K, upd = o=>{ o.updateMatrix(); o.updateMatrixWorld(true); }, mv = K.mv;
+  const SEA = O3_SEA_TEMPLE, F = SEA.floor, SURF = O3_WATER_Y - F, RIM = SEA.rim, TOPY = SURF + 0.06, NSP = 30, SPIN = 1.5*Math.PI, MOOR = RIM + 0.4;   /* (world units over the well's floor: the water, the mooring stone's top; where the boat lies) */
+  const Y = 0.3, R0 = 0.56, R1 = 0.7, WH = 1.76, DW = 0.64, DH = 1.28, gap = Math.asin((DW/2 + 0.01)/R1);
+  [1.32, 1.21, 1.1].forEach((r, i)=>{ const ge = new T.CylinderGeometry(r, r + 0.02, 0.1 + (i ? 0 : 0.2), 64); ge.translate(0, 0.05 + i*0.1 - (i ? 0 : 0.1), 0); fin(ge, 0.88); });
+  const ring = (a0, a1, ya, yb, r0, r1, tone)=>{ const s = new T.Shape(), N = Math.max(3, Math.ceil((a1 - a0)/0.08)); for (let i=0;i<=N;i++){ const a = a0 + (a1 - a0)*i/N; i ? s.lineTo(Math.sin(a)*r1, -Math.cos(a)*r1) : s.moveTo(Math.sin(a)*r1, -Math.cos(a)*r1); }
+    for (let i=N;i>=0;i--){ const a = a0 + (a1 - a0)*i/N; s.lineTo(Math.sin(a)*r0, -Math.cos(a)*r0); } s.closePath();
+    const b = 0.01, ge = new T.ExtrudeGeometry(s, { depth:yb - ya - 2*b, bevelEnabled:true, bevelSize:b, bevelThickness:b, bevelSegments:2, curveSegments:1 }); ge.rotateX(-Math.PI/2); ge.translate(0, ya + b, 0); return fin(ge, tone); };   /* (a course's block: angles from +z towards +x) */
+  const n = Math.round(WH/0.2); for (let k=0;k<n;k++){ const ya = Y + k*WH/n, yb = ya + WH/n - 0.012, low = ya - Y < DH - 1e-3, off = (k % 2)*0.22, NB = 9;
+    for (let i=0;i<NB;i++){ let parts = [[off + i*2*Math.PI/NB + 0.008, off + (i + 1)*2*Math.PI/NB - 0.008]];
+      if (low) parts = parts.flatMap(([p, q])=>{ const o = []; let lo = p; for (const sh of [-2*Math.PI, 0, 2*Math.PI]){ const c0 = -gap + sh, c1 = gap + sh; if (q > c0 && lo < c1){ if (c0 - lo > 0.04) o.push([lo, c0]); lo = Math.max(lo, c1); } } if (q - lo > 0.04) o.push([lo, q]); return o; });   /* (the doorway cut through the low courses) */
+      for (const [p, q] of parts) ring(p, q, ya, yb, R0 + (hash(i, k, 21) - 0.5)*0.01, R1, 0.9 + hash(i, k, 22)*0.12); } }
+  const DZ = Math.sqrt(R1*R1 - (DW/2)*(DW/2));
+  for (const s of [-1, 1]) blk(0.08, DH, 0.18, s*(DW/2 + 0.04), Y + DH/2, Math.sqrt(R1*R1 - Math.pow(DW/2 + 0.04, 2)) - 0.02, 0, w, 1);
+  const open = K.doors(DZ - 0.05, Y, DW, DH); K.eye(0, Y + DH + 0.2, R1 + 0.01, 0.34);
+  mesh(new T.CylinderGeometry(R0 - 0.01, R0 - 0.01, WH, 32).translate(0, Y + WH/2, 0), dark);   /* (the dark within) */
+  for (let i=0;i<8;i++){ const a = Math.PI/8 + i*Math.PI/4; K.column(Math.sin(a)*1.0, Math.cos(a)*1.0, Y, 1.66, 0.082, i===5); }
+  K.drum(-1.45, -0.5, 0, 0.082, 0.34, 0.9);
+  const EY = Y + 1.76; ring(0, 2*Math.PI, EY, EY + 0.2, 0.5, 1.12, 0.98); ring(0, 2*Math.PI, EY + 0.2, EY + 0.27, 0.5, 1.17, 0.93);
+  fin(new T.CylinderGeometry(0.84, 0.86, 0.12, 64).translate(0, EY + 0.33, 0), 0.95);
+  const domeM = mats.templeDome || (mats.templeDome = new T.MeshStandardMaterial({ color:new T.Color(0x5aa08a).convertSRGBToLinear(), metalness:0.5, roughness:0.36, vertexColors:true }));
+  { const ge = new T.SphereGeometry(0.8, 64, 24, 0, Math.PI*2, 0, Math.PI/2); ge.scale(1, 0.78, 1); ge.translate(0, EY + 0.39, 0); const p = ge.attributes.position, c = new Float32Array(p.count*3);
+    for (let i=0;i<p.count;i++){ const a = Math.atan2(p.getX(i), p.getZ(i)), y = p.getY(i) - EY - 0.39, k = 0.7 + 0.3*ss(0, 0.6, y) - 0.25*Math.pow(Math.abs(Math.cos(a*8)), 18) + (hash(a*5, y*9, 31) - 0.5)*0.12; c[i*3] = k*0.95; c[i*3 + 1] = k; c[i*3 + 2] = k*0.97; }   /* (darker in the folds between the ribs, weathered streaks) */
+    ge.setAttribute('color', new T.BufferAttribute(c, 3)); mesh(ge, domeM); }
+  for (let i=0;i<16;i++){ const a = i*Math.PI/8, pts = []; for (let j=0;j<=12;j++){ const t = j/12*Math.PI/2; pts.push(new T.Vector3(Math.sin(a)*Math.cos(t)*0.815, EY + 0.39 + Math.sin(t)*0.78*0.8, Math.cos(a)*Math.cos(t)*0.815)); }
+    mesh(new T.TubeGeometry(new T.CatmullRomCurve3(pts), 24, 0.012, 6), K.bronze); }   /* (its ribs) */
+  { const top = EY + 0.39 + 0.62; fin(new T.CylinderGeometry(0.1, 0.13, 0.12, 24).translate(0, top + 0.05, 0), 0.98); mesh(new T.SphereGeometry(0.07, 24, 16).translate(0, top + 0.17, 0), K.bronze); mesh(new T.ConeGeometry(0.03, 0.2, 12).translate(0, top + 0.32, 0), K.bronze); }
+  /* the well's side (as the land digs it), the mooring stone and its bollard, the stair against the side from the stone round the back to the floor in front */
+  const wallY = r=>r <= SEA.r0 ? 0 : r >= RIM ? SEA.lip - F : (SEA.lip - F)*ss(SEA.r0, RIM, r);
+  const rAt = y=>{ let a = SEA.r0, b = RIM; for (let i=0;i<24;i++){ const m = (a + b)/2; if (wallY(m) < y) a = m; else b = m; } return (a + b)/2; };   /* (where the side stands y over the floor) */
+  const spiral = q=>{ const th = Math.PI/2 + SPIN*q, y = TOPY*(1 - q), r = Math.min(RIM - 0.12, rAt(y) - 0.08); return [r*Math.sin(th), y, r*Math.cos(th), th, r]; };   /* (each step at the side, a little in from it) */
+  const pier = blk(0.42, 0.75, 0.42, RIM, TOPY - 0.375, 0, 0, w, 0.9);
+  w.add(v3Cyl(0.03, 0.035, 0.22, 12, K.bronze, RIM + 0.1, TOPY + 0.1, 0.1)); { const o = new T.Mesh(new T.TorusGeometry(0.04, 0.007, 8, 20), K.bronze); o.position.set(RIM + 0.1, TOPY + 0.15, 0.135); w.add(o); }
+  const steps = []; for (let i=0;i<NSP;i++){ const [x, y, z, th, r] = spiral((i + 0.5)/NSP), foot = wallY(Math.max(SEA.r0, r - 0.22)), h = Math.max(0.12, y - foot + 0.06);
+    steps.push(blk(0.38, h, 0.44, x, y - h/2, z, th + Math.PI/2, w)); }   /* (each step a block standing down to the side under it) */
+  /* the sea in the well, its wall when it parts, light shafts, fish and foam */
+  const seaM = new T.MeshStandardMaterial({ color:new T.Color(0x2c6490).convertSRGBToLinear(), roughness:0.12, metalness:0.25, transparent:true, opacity:0.84, depthWrite:false, normalMap:O3.tex.ripple || null, normalScale:new T.Vector2(0.55, 0.55) });
+  const disc = mv(new T.Mesh(new T.CircleGeometry(RIM + 0.03, 64), seaM)); disc.rotation.x = -Math.PI/2; disc.position.y = SURF; disc.visible = false; disc.userData.noSh = 1; w.add(disc);   /* (the water in the well once the sheet opens over it: it falls) */
   if (!O3.tex.flow){ const c = v3Canvas(64, 128), x = c.getContext('2d'); x.fillStyle = '#7fd8cc'; x.fillRect(0, 0, 64, 128);
     for (let i=0;i<70;i++){ const px = fpHash(i, 1, 682)*64, py = fpHash(i, 2, 682)*128, L = 10 + fpHash(i, 3, 682)*34; x.fillStyle = `rgba(255,255,255,${(0.25 + 0.5*fpHash(i, 4, 682)).toFixed(2)})`; x.fillRect(px, py, 1 + fpHash(i, 5, 682)*2, L); x.fillRect(px, py - 128, 1 + fpHash(i, 5, 682)*2, L); }   /* (streaks along the flow) */
     const tx = new T.CanvasTexture(c); tx.wrapS = tx.wrapT = T.RepeatWrapping; O3.tex.flow = tx; }
-  const flowT = O3.tex.flow.clone(); flowT.needsUpdate = true;
-  const flowM = new T.MeshStandardMaterial({ map:flowT, color:new T.Color(0x9fe6dc), emissive:new T.Color(0x0c3a36), roughness:0.08, metalness:0.2, transparent:true, opacity:0, depthWrite:false, side:T.DoubleSide });
-  const runs = []; for (let j=0;j<NS;j++){ const zb = z1 - RUN*j, zf = zb - RUN, yt = top(j) + 0.005, yu = j ? top(j - 1) + 0.005 : 0.03, w = PW - 0.006, v0 = j*(RUN + RISE)*4;
-    const P = [-w, yu, zb - 0.003, w, yu, zb - 0.003, -w, yt, zb - 0.003, w, yt, zb - 0.003, -w, yt, zb - 0.003, w, yt, zb - 0.003, -w, yt, zf, w, yt, zf];   /* (over the lip and down the riser, then along the tread) */
-    const U = [0, v0, 1, v0, 0, v0 - (yu - yt)*4, 1, v0 - (yu - yt)*4, 0, v0 - (yu - yt)*4, 1, v0 - (yu - yt)*4, 0, v0 - (yu - yt + RUN)*4, 1, v0 - (yu - yt + RUN)*4];
-    const ge = new T.BufferGeometry(); ge.setAttribute('position', new T.Float32BufferAttribute(P, 3)); ge.setAttribute('uv', new T.Float32BufferAttribute(U, 2)); ge.setIndex([0, 2, 1, 1, 2, 3, 4, 6, 5, 5, 6, 7]); ge.computeVertexNormals();
-    const o = new T.Mesh(ge, flowM); o.visible = false; o.userData.noSh = 1; mv(o); g.add(o); runs.push(o); }
+  const wallT = O3.tex.flow.clone(); wallT.needsUpdate = true; wallT.repeat.set(24, 1.5);
+  const wallM = new T.MeshStandardMaterial({ map:wallT, color:new T.Color(0x7fd0c8).convertSRGBToLinear(), emissive:new T.Color(0x0a3236).convertSRGBToLinear(), roughness:0.1, metalness:0.2, transparent:true, opacity:0, depthWrite:false, side:T.DoubleSide });
+  const wall = mv(new T.Mesh(new T.CylinderGeometry(RIM + 0.03, RIM + 0.03, SURF, 72, 1, true), wallM)); wall.position.y = SURF/2; wall.visible = false; wall.userData.noSh = 1; w.add(wall);   /* (the sea standing round the well) */
+  if (!O3.tex.shaft){ const c = v3Canvas(16, 128), x = c.getContext('2d'), gr = x.createLinearGradient(0, 0, 0, 128); gr.addColorStop(0, 'rgba(255,255,255,0.9)'); gr.addColorStop(0.5, 'rgba(255,255,255,0.35)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = gr; x.fillRect(0, 0, 16, 128);
+    const g2 = x.createLinearGradient(0, 0, 16, 0); g2.addColorStop(0, 'rgba(0,0,0,1)'); g2.addColorStop(0.35, 'rgba(0,0,0,0)'); g2.addColorStop(0.65, 'rgba(0,0,0,0)'); g2.addColorStop(1, 'rgba(0,0,0,1)'); x.globalCompositeOperation = 'destination-out'; x.fillStyle = g2; x.fillRect(0, 0, 16, 128); O3.tex.shaft = new T.CanvasTexture(c); }
+  const shaftM = new T.MeshBasicMaterial({ map:O3.tex.shaft, color:new T.Color(0xbfeeff).convertSRGBToLinear(), transparent:true, opacity:0.5, blending:T.AdditiveBlending, depthWrite:false, side:T.DoubleSide });
+  const shafts = []; for (let i=0;i<9;i++){ const a = rnd(600 + i)*Math.PI*2, r = 1.25 + rnd(610 + i)*0.65, sg = mv(new T.Group()); sg.position.set(Math.sin(a)*r, SURF/2 - 0.01, Math.cos(a)*r); sg.rotation.set(0.08, rnd(620 + i)*3, 0.1);   /* (sunlight down through the water round the hall, two crossed planes each) */
+    for (let k=0;k<2;k++){ const p = new T.Mesh(new T.PlaneGeometry(0.16 + rnd(630 + i)*0.1, SURF - 0.02), shaftM); p.rotation.y = k*Math.PI/2; p.userData.noSh = 1; sg.add(p); } w.add(sg); shafts.push(sg); }
+  const fishM = mats.fish || (mats.fish = new T.MeshStandardMaterial({ color:new T.Color(0x3f5f6e).convertSRGBToLinear(), roughness:0.45, metalness:0.35 }));
+  const fishB = new T.SphereGeometry(1, 10, 7).scale(0.07, 0.028, 0.022), fishT = new T.ConeGeometry(0.025, 0.048, 6).rotateZ(-Math.PI/2).translate(-0.09, 0, 0), fish = [];
+  for (let j=0;j<8;j++){ const fg = mv(new T.Group()); fg.add(new T.Mesh(fishB, fishM)); fg.add(new T.Mesh(fishT, fishM)); fg.userData.sw = { rho:1.3 + rnd(640 + j)*0.45, y0:0.4 + rnd(650 + j)*1.3, w:(0.35 + rnd(660 + j)*0.4)*(j % 2 ? 1 : -1), ph:rnd(670 + j)*6.28 }; w.add(fg); fish.push(fg); }   /* (fish circling the hall, each on its own round) */
   if (!O3.tex.foamDot){ const c = v3Canvas(32, 32), x = c.getContext('2d'), gr = x.createRadialGradient(16, 16, 0, 16, 16, 16); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.5, 'rgba(230,250,248,0.6)'); gr.addColorStop(1, 'rgba(220,245,240,0)'); x.fillStyle = gr; x.fillRect(0, 0, 32, 32); O3.tex.foamDot = new T.CanvasTexture(c); }
-  const foam = Array.from({ length:24 }, ()=>{ const sp = new T.Sprite(new T.SpriteMaterial({ map:O3.tex.foamDot, color:0xdff6f2, transparent:true, depthWrite:false })); sp.visible = false; mv(sp); g.add(sp); return sp; });
-  const lit = (o, on, sc)=>{ o.visible = on; if (on){ o.scale.setScalar(sc); upd(o); } };
-  const deep = glow('rgba(80,240,210,1)', 0.3, 0, top(NS - 1) + 0.16, ZS + 0.05);
-  /* (RS-687) out at sea: the shrine stands at the bottom of a well in the seabed, its roof under the waves - sunlight falling through the
-     water in shafts, fish circling it. A mooring stone stands up out of the water at the well's lip, and from it a stair winds three
-     quarters of the way round the well down to the path's head. When the eye wakes the sea parts: the water in the well falls away to
-     the floor, standing as a wall round it, and the stair stands dry; then the pool drains down its own stair as on land */
-  let pier = null, steps = [], disc = null, wall = null, shafts = [], fish = [], sfoam = [], seaM = null, wallM = null, wallT = null, shaftM = null, holeOn = false;
-  const SS = O3_SHRINE_PIT.s, SURF = (O3_WATER_Y - O3_SEA_TEMPLE.floor)/SS, TOPY = SURF + 0.06, RIM = O3_SEA_TEMPLE.rim/SS, MOOR = RIM + 0.27, NSP = 26, SPIN = 1.5*Math.PI;   /* (in the shrine's own units: the water's height over the floor, the mooring stone's top, the lip's radius, where the boat lies) */
-  const spiral = u=>{ const th = Math.PI/2 + SPIN*u, r = 1.03 - 0.35*u; return [r*Math.sin(th), TOPY*(1 - u), r*Math.cos(th), th]; };   /* (from the mooring stone, clockwise round the back, to the path's head) */
-  if (sea){
-    pier = blk(0.26, 0.5, 0.26, RIM, TOPY - 0.25, 0, g, TOPY - 0.25);
-    { const post = v3Cyl(0.02, 0.024, 0.16, 12, bronze, RIM + 0.07, TOPY + 0.07, 0.07); g.add(post); const ring = new T.Mesh(new T.TorusGeometry(0.028, 0.005, 8, 20), bronze); ring.position.set(RIM + 0.07, TOPY + 0.1, 0.095); g.add(ring); }   /* (a bronze bollard and its ring) */
-    for (let i=0;i<NSP;i++){ const [x, y, z, th] = spiral((i + 0.5)/NSP), st = blk(0.2, 0.5, 0.2, 0, 0, 0, g, y - 0.25); st.position.set(x, y - 0.25, z); st.rotation.y = th + Math.PI/2; steps.push(st); }   /* (each step a block standing down into the well's side) */
-    seaM = new T.MeshStandardMaterial({ color:new T.Color(0x2c6490).convertSRGBToLinear(), roughness:0.12, metalness:0.25, transparent:true, opacity:0.84, depthWrite:false, normalMap:O3.tex.ripple || null, normalScale:new T.Vector2(0.55, 0.55) });
-    disc = new T.Mesh(new T.CircleGeometry(RIM + 0.03, 56), seaM); disc.rotation.x = -Math.PI/2; disc.position.y = SURF; disc.visible = false; disc.userData.noSh = 1; mv(disc); g.add(disc);   /* (the water in the well, once the sheet has opened over it: it falls) */
-    wallT = O3.tex.flow.clone(); wallT.needsUpdate = true; wallT.repeat.set(18, 1);
-    wallM = new T.MeshStandardMaterial({ map:wallT, color:new T.Color(0x7fd0c8).convertSRGBToLinear(), emissive:new T.Color(0x0a3236).convertSRGBToLinear(), roughness:0.1, metalness:0.2, transparent:true, opacity:0, depthWrite:false, side:T.DoubleSide });
-    wall = new T.Mesh(new T.CylinderGeometry(RIM + 0.03, RIM + 0.03, SURF, 64, 1, true), wallM); wall.position.y = SURF/2; wall.visible = false; wall.userData.noSh = 1; mv(wall); g.add(wall);   /* (the sea standing round the well) */
-    if (!O3.tex.shaft){ const c = v3Canvas(16, 128), x = c.getContext('2d'), gr = x.createLinearGradient(0, 0, 0, 128); gr.addColorStop(0, 'rgba(255,255,255,0.9)'); gr.addColorStop(0.5, 'rgba(255,255,255,0.35)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = gr; x.fillRect(0, 0, 16, 128);
-      const g2 = x.createLinearGradient(0, 0, 16, 0); g2.addColorStop(0, 'rgba(0,0,0,1)'); g2.addColorStop(0.35, 'rgba(0,0,0,0)'); g2.addColorStop(0.65, 'rgba(0,0,0,0)'); g2.addColorStop(1, 'rgba(0,0,0,1)'); x.globalCompositeOperation = 'destination-out'; x.fillStyle = g2; x.fillRect(0, 0, 16, 128); O3.tex.shaft = new T.CanvasTexture(c); }
-    shaftM = new T.MeshBasicMaterial({ map:O3.tex.shaft, color:new T.Color(0xbfeeff).convertSRGBToLinear(), transparent:true, opacity:0.5, blending:T.AdditiveBlending, depthWrite:false, side:T.DoubleSide });
-    for (let i=0;i<7;i++){ const a = rnd(600 + i)*Math.PI*2, r = 0.3 + rnd(610 + i)*0.6, x = Math.sin(a)*r, z = Math.cos(a)*r; if (Math.abs(x) < 0.36 && z > -0.5 && z < 0.3) continue;   /* (sunlight down through the water, two crossed planes each; none through the shrine) */
-      const sg = new T.Group(); sg.position.set(x, SURF/2 - 0.01, z); sg.rotation.set(0.08, rnd(620 + i)*3, 0.1); for (let k=0;k<2;k++){ const p = new T.Mesh(new T.PlaneGeometry(0.12 + rnd(630 + i)*0.08, SURF - 0.02), shaftM); p.rotation.y = k*Math.PI/2; p.userData.noSh = 1; sg.add(p); } mv(sg); g.add(sg); shafts.push(sg); }
-    const fishM = mats.fish || (mats.fish = new T.MeshStandardMaterial({ color:new T.Color(0x3f5f6e).convertSRGBToLinear(), roughness:0.45, metalness:0.35 }));
-    const fishB = new T.SphereGeometry(1, 10, 7).scale(0.05, 0.02, 0.016), fishT = new T.ConeGeometry(0.018, 0.034, 6).rotateZ(-Math.PI/2).translate(-0.064, 0, 0);
-    for (let j=0;j<6;j++){ const fg = new T.Group(); fg.add(new T.Mesh(fishB, fishM)); fg.add(new T.Mesh(fishT, fishM)); fg.userData.sw = { rho:0.4 + rnd(640 + j)*0.5, y0:0.25 + rnd(650 + j)*0.6, w:(0.45 + rnd(660 + j)*0.5)*(j % 2 ? 1 : -1), ph:rnd(670 + j)*6.28 }; mv(fg); g.add(fg); fish.push(fg); }   /* (fish circling the shrine, each on its own round) */
-    for (let i=0;i<16;i++){ const sp = new T.Sprite(new T.SpriteMaterial({ map:O3.tex.foamDot, color:0xdff6f2, transparent:true, depthWrite:false })); sp.visible = false; mv(sp); g.add(sp); sfoam.push(sp); }   /* (foam round the falling water's edge) */
-    O3.glows.push({ fn:t=>{ const on = shafts.length > 0 && shaftM.opacity > 0.01; for (let i=0;i<shafts.length;i++){ const s = shafts[i]; s.visible = on; if (on){ s.rotation.z = 0.1 + Math.sin(t*0.4 + i)*0.04; upd(s); } }
-      for (let j=0;j<fish.length;j++){ const f = fish[j], q = f.userData.sw; if (!f.visible) continue; const a = q.ph + q.w*t; f.position.set(q.rho*Math.sin(a), q.y0 + 0.04*Math.sin(t*2.3 + q.ph), q.rho*Math.cos(a)); f.rotation.y = q.w > 0 ? -a : Math.PI - a; f.rotation.z = Math.sin(t*9 + j)*0.08; upd(f); } } });   /* (the shafts sway and the fish swim on every frame, not only while the way in plays) */
-  }
-  const SEA0 = 1.0, SEA1 = 2.8, T0 = sea ? 2.5 : 1.0, DT = sea ? 0.15 : 0.2, FT = sea ? 0.35 : 0.45, tk = T0 + (NS - 1)*DT + FT, D0 = T0 + 0.25, D1 = tk + 1.0;   /* (RS-687: at sea the well empties first, from SEA0 to SEA1, and the flags go quicker after) */   /* (when the first flag starts down, how far apart they go, how long each takes; the last down; the pool draining from and to) */
-  let rang = false, rushed = false, ground = false, parted = false;
-  const anim = (look, v)=>{ const t = performance.now()/1000;
-    const eye = ss(0.2, 1.0, look); sig.emissiveIntensity = 0.05 + 2.2*eye;
+  const sfoam = []; for (let i=0;i<22;i++){ const sp = mv(new T.Sprite(new T.SpriteMaterial({ map:O3.tex.foamDot, color:0xdff6f2, transparent:true, depthWrite:false }))); sp.visible = false; w.add(sp); sfoam.push(sp); }   /* (foam round the falling water's edge) */
+  const deep = mv(o3Glow('rgba(80,240,210,1)', 0.5)); deep.position.set(0, Y + 0.35, DZ - 0.3); deep.visible = false; w.add(deep);   /* (a sea-green light within, seen as the doors part) */
+  O3.glows.push({ fn:t=>{ const on = shaftM.opacity > 0.01; for (let i=0;i<shafts.length;i++){ const s = shafts[i]; s.visible = on; if (on){ s.rotation.z = 0.1 + Math.sin(t*0.4 + i)*0.04; upd(s); } }
+    for (let j=0;j<fish.length;j++){ const f = fish[j], q = f.userData.sw; if (!f.visible) continue; const a = q.ph + q.w*t; f.position.set(q.rho*Math.sin(a), q.y0 + 0.05*Math.sin(t*2.3 + q.ph), q.rho*Math.cos(a)); f.rotation.y = q.w > 0 ? -a : Math.PI - a; f.rotation.z = Math.sin(t*9 + j)*0.08; upd(f); } } });   /* (the shafts sway and the fish swim on every frame, not only while the way in plays) */
+  const SEA0 = 1.0, SEA1 = 2.8;   /* (the well empties from SEA0 to SEA1; the doors open as you come round the stair's foot) */
+  let rang = false, parted = false, ground = false, holeOn = false;
+  const anim = (look, v)=>{ const t = performance.now()/1000, eye = ss(0.2, 1.0, look); K.sig.emissiveIntensity = 0.05 + 2.2*eye;
     if (look > 0.2 && !rang){ rang = true; try{ sfx('drowned'); }catch(e){} }
-    if (look > T0 && !rushed && pit && !sea){ rushed = true; try{ sfx('waters'); }catch(e){} }
-    if (sea){ const dr2 = ss(SEA0, SEA1, look), on = look > SEA0, lv2 = SURF - (SURF - 0.02)*dr2;   /* (the sea parts: the sheet opens over the well, the water in it falls to the floor and fades, the wall stands, the light and the fish go) */
-      if (on && !parted){ parted = true; try{ sfx('waters'); }catch(e){} }
-      if (on!==holeOn && g.parent){ holeOn = on; const wp = g.getWorldPosition(new T.Vector3()); O3.uHole.value.set(wp.x, wp.z, O3_SEA_TEMPLE.rim, on ? 1 : 0); }
-      disc.visible = on && dr2 < 0.995; disc.position.y = lv2; seaM.opacity = 0.84*(1 - ss(0.7, 1, dr2)); upd(disc);
-      wall.visible = on; wallM.opacity = 0.72*ss(SEA0, SEA0 + 0.5, look); wallT.offset.y = (t*0.7) % 1;
-      shaftM.opacity = 0.5*(1 - ss(SEA0, SEA0 + 0.6, look))*(0.8 + 0.2*Math.sin(t*0.9));
-      for (const f of fish) f.visible = look < SEA0 + 0.3;
-      const fo = on && dr2 < 0.999; for (let i=0;i<sfoam.length;i++){ const s = sfoam[i]; s.visible = fo; if (!fo) continue; const a = i/sfoam.length*Math.PI*2 + t*0.5, r = RIM - 0.02; s.position.set(Math.sin(a)*r, lv2 + 0.015, Math.cos(a)*r); s.scale.setScalar(0.05 + 0.02*Math.sin(t*5 + i)); s.material.opacity = 0.7; upd(s); } }
-    const go = pit ? 1 : 0, dr = go*ss(D0, D1, look), lv = WY + (0.011 - WY)*dr;   /* (the pool's level: down to its bed) */
-    pool.visible = dr < 0.995; pool.position.y = lv; poolM.opacity = 0.8*(1 - ss(0.45, 1, dr)); upd(pool); for (const p of pads){ p.position.y = lv + 0.003; upd(p); }
-    strip.visible = go*look < T0 + 0.35; strip.scale.x = Math.max(0.01, 1 - go*ss(T0, T0 + 0.35, look)); upd(strip);   /* (the water over the path goes first, down with its flags) */
-    const fl = go*ss(D0, D0 + 0.3, look)*(1 - ss(D1 - 0.35, D1 + 0.25, look)); flowM.opacity = 0.78*fl; flowT.offset.y = (t*1.6) % 1;
-    for (let i=0;i<foam.length;i++){ const s = foam[i], on = fl > 0.03; s.visible = on; if (!on) continue; const u = (i*0.37 + t*1.3) % 1, x = (fpHash(i, 7, 682) - 0.5)*2*(PW - 0.02);
-      if (i % 3===0) s.position.set(x, 0.035 + 0.02*Math.sin(t*6 + i), z1 - 0.01);   /* (at the lip) */
-      else if (i % 3===1) s.position.set(x, top(NS - 1) + 0.02 + 0.06*u, ZS + 0.03 + 0.04*u);   /* (splashing at the foot) */
-      else { const j = i % NS; s.position.set(x, top(j) + 0.02 + 0.02*Math.sin(t*7 + i), z1 - RUN*(j + 0.5)); }
-      s.scale.setScalar(0.04 + 0.025*Math.sin(i + t*5)); s.material.opacity = 0.75*fl*(i % 3===1 ? 1 - u : 1); upd(s); }
-    if (look > T0 && !ground && pit){ ground = true; try{ sfx('slab'); }catch(e){} }
-    flags.forEach((f, j)=>{ const k = pit ? ss(T0 + j*DT, T0 + j*DT + FT, look) : 0;   /* (no cut in the land under it: the path stays a path) */
-      f.o.position.lerpVectors(f.a, f.b, k); upd(f.o); runs[j].visible = fl > 0.01 && k > 0.98; });   /* (the water runs down each step once it's down) */
-    const dk = pit ? ss(D1 - 0.3, D1 + 0.4, look) : 0; lit(deep, dk > 0.01, 0.34*dk*(0.9 + 0.1*Math.sin(t*2.5)));
-    if (!look && !v){ rang = false; rushed = false; ground = false; parted = false; } };
+    const dr = ss(SEA0, SEA1, look), on = look > SEA0, lv = SURF - (SURF - 0.02)*dr;   /* (the sea parts: the sheet opens over the well, the water in it falls to the floor and fades, the wall stands, the light and the fish go) */
+    if (on && !parted){ parted = true; try{ sfx('waters'); }catch(e){} }
+    if (on!==holeOn && g.parent){ holeOn = on; const wp = g.getWorldPosition(new T.Vector3()); O3.uHole.value.set(wp.x, wp.z, RIM, on ? 1 : 0); }
+    disc.visible = on && dr < 0.995; disc.position.y = lv; seaM.opacity = 0.84*(1 - ss(0.7, 1, dr)); upd(disc);
+    wall.visible = on; wallM.opacity = 0.72*ss(SEA0, SEA0 + 0.5, look); wallT.offset.y = (t*0.7) % 1;
+    shaftM.opacity = 0.5*(1 - ss(SEA0, SEA0 + 0.6, look))*(0.8 + 0.2*Math.sin(t*0.9));
+    for (const f of fish) f.visible = look < SEA0 + 0.3;
+    const fo = on && dr < 0.999; for (let i=0;i<sfoam.length;i++){ const s = sfoam[i]; s.visible = fo; if (!fo) continue; const a = i/sfoam.length*Math.PI*2 + t*0.5, r = RIM - 0.03; s.position.set(Math.sin(a)*r, lv + 0.02, Math.cos(a)*r); s.scale.setScalar(0.08 + 0.03*Math.sin(t*5 + i)); s.material.opacity = 0.7; upd(s); }
+    if (v > 0.7 && !ground){ ground = true; try{ sfx('slab'); }catch(e){} }
+    const dk = ss(0.7, 0.88, v); open(dk); deep.visible = dk > 0.05; if (deep.visible){ deep.scale.setScalar(0.5*dk*(0.9 + 0.1*Math.sin(t*2.5))); upd(deep); }
+    if (!look && !v){ rang = false; parted = false; ground = false; } };
   anim(0, 0);
-  g.stairCut = !!pit;   /* (the land opened under the stair; without it the steps go down into the ground and you with them) */
-  const inL = [[0, z1 + 0.02], [0, ZS + PL*0.45], [0, ZS + 0.05]];
-  const dw = { look:0.86, front:1.0, side:0.95, back:0.2, inPts:inL, openT:pit ? D1 + 0.6 : 2.0, speed:0.5, fadeAt:[0.5, 0.95],
+  /* the way in, in the site's frame (world units / S): by boat round to the mooring, broadside to the stone; then on foot onto it, down the
+     stair, across the floor and up the podium's steps, in at the door */
+  const u = q=>q/S, spts = []; for (let i=1;i<=30;i++){ const q = spiral(i/30); spts.push([u(q[0]), u(q[2])]); }
+  return { sea:true, lookAt:[u(MOOR), 0], frontAt:[u(MOOR), 0], look:u(MOOR), front:u(MOOR), side:u(MOOR), back:-u(MOOR), openT:3.0, speed:1.5, fadeAt:[0.94, 0.995],
+    inPts:[[u(RIM - 0.02), 0]].concat(spts, [[0, u(1.45)], [0, u(1.0)], [0, u(DZ + 0.1)], [0, u(0.15)]]), doorH:u(DH),
     fade:'radial-gradient(ellipse at center, rgba(30,140,125,0.9) 0%, rgba(0,12,14,1) 72%)',
-    round:(x, z)=>{ if (z > 0.75) return []; const R = 0.95, th = Math.atan2(x, z), n = Math.ceil(Math.abs(th)/0.4), out = []; for (let i=Math.hypot(x, z) < R - 0.05 ? 0 : 1;i<n;i++){ const f = th*(1 - i/n); out.push([R*Math.sin(f), R*Math.cos(f)]); } return out; },   /* (round the pool to the path) */
-    down:(x, z)=>z > z1 || !pit ? 0 : Math.min(-top(NS - 1), (z1 - z)*RISE/RUN + 0.01),   /* (down the stair the water ran down; RS-681: no door, no camera of its own) */
-    parts:{ pool, pads, strip, runs, flowM, flags, deep, sig }, anim };
-  if (sea){ const spts = []; for (let i=1;i<=24;i++){ const q = spiral(i/24); spts.push([q[0], q[2]]); }   /* (RS-687: by boat to the mooring stone, then on foot down the winding stair and along the path) */
-    Object.assign(dw, { sea:true, lookAt:[MOOR, 0], frontAt:[MOOR, 0], look:MOOR, inPts:[[RIM, 0]].concat(spts, inL), speed:1.6, fadeAt:[0.74, 0.97],
-      round:(x, z)=>{ const R = 1.6, th = Math.atan2(x, z); if (Math.hypot(x - MOOR, z) < 0.2) return []; const front = th >= -Math.PI/2 && th < Math.PI/2, tgt = Math.atan2(MOOR, front ? 0.8 : -0.8); let a0 = th; if (!front && a0 < 0) a0 += Math.PI*2;   /* (round the well at a distance to the mooring, broadside to the stone) */
-        const n = Math.max(1, Math.ceil(Math.abs(tgt - a0)/0.4)), out = []; for (let i=Math.hypot(x, z) < R - 0.1 ? 0 : 1;i<n;i++){ const f = a0 + (tgt - a0)*i/n; out.push([R*Math.sin(f), R*Math.cos(f)]); } out.push([MOOR, front ? 0.8 : -0.8]); return out; },
-      down:(x, z)=>{ const r = Math.hypot(x, z); if (Math.abs(x) < PW + 0.02 && z >= ZS - 0.03 && z <= z1 + 0.02) return z > z1 || !pit ? 1e-4 : Math.min(-top(NS - 1), (z1 - z)*RISE/RUN + 0.01);   /* (the path and its stair; afloat beyond the lip; the stone's top; the floor; the winding stair by how far round it is) */
-        if (r > RIM + 0.2) return 0; if (Math.abs(z) < 0.2 && x > RIM - 0.2) return -TOPY; if (r < 0.66) return 1e-4;
-        let th = Math.atan2(x, z); if (th < Math.PI/2 - 0.05) th += Math.PI*2; const u = Math.max(0, Math.min(1, (th - Math.PI/2)/SPIN)); return -TOPY*(1 - u) || 1e-4; } });
-    Object.assign(dw.parts, { pier, steps, disc, wall, shafts, fish, seaM, wallM }); }
-  return dw;
+    round:(x, z)=>{ const R = MOOR, xw = x*S, zw = z*S, th = Math.atan2(xw, zw); if (Math.hypot(xw - MOOR, zw) < 0.3) return []; const front = th >= -Math.PI/2 && th < Math.PI/2, tgt = Math.atan2(MOOR, front ? 1.0 : -1.0); let a0 = th; if (!front && a0 < 0) a0 += Math.PI*2;   /* (round the well at a distance to the mooring) */
+      const k = Math.max(1, Math.ceil(Math.abs(tgt - a0)/0.4)), out = []; for (let i=Math.hypot(xw, zw) < R - 0.1 ? 0 : 1;i<k;i++){ const f = a0 + (tgt - a0)*i/k; out.push([u(R*Math.sin(f)), u(R*Math.cos(f))]); } out.push([u(MOOR), u(front ? 1.0 : -1.0)]); return out; },
+    down:(x, z)=>{ const xw = x*S, zw = z*S, r = Math.hypot(xw, zw); if (r > RIM + 0.15) return 0;   /* (afloat beyond the lip; the stone's top; the stair by how far round it is; the floor; the podium's steps) */
+      if (Math.abs(zw) < 0.3 && xw > RIM - 0.3) return -u(TOPY);
+      if (r > SEA.r0 - 0.25){ let th = Math.atan2(xw, zw); if (th < Math.PI/2 - 0.05) th += Math.PI*2; const q = Math.max(0, Math.min(1, (th - Math.PI/2)/SPIN)); return -u(TOPY*(1 - q)) || 1e-4; }
+      return r < 1.1 ? -u(0.3) : r < 1.21 ? -u(0.2) : r < 1.32 ? -u(0.1) : 1e-4; },
+    parts:{ pier, steps, disc, wall, shafts, fish, seaM, wallM, sig:K.sig, deep, open }, anim };
 }
 function o3Site(t, gx, gz){
   const sq = o3G(Math.floor(gx), Math.floor(gz)) || [Math.floor(gx), Math.floor(gz)], sx = sq[0], sz = sq[1];   /* (RS-644: gx, gz are in the 3D land's frame; the town's people, its size and a site's own look are its tile's in the world) */
@@ -35295,7 +35328,7 @@ function* o3SitesGen(grp, x0, y0, W){
     if (!OW_SITE_TILES.includes(t)) continue;
     yield;
     const gx = x+0.5, gz = y+0.5, g = o3Site(t, gx, gz);
-    let sc = t===OW_TEMPLE ? 1.45 : t===OW_GRAVEYARD ? O3_GRAVE_S : 1.3; if (t===OW_TOWN){ try{ const q = o3G(x, y) || [x, y]; sc *= [0.85, 1, 1.18][townTier(q[0], q[1])]; }catch(e){} }   /* (RS-485: a city stands bigger on the land than a village) */
+    let sc = t===OW_TEMPLE ? O3_TEMPLE_S : t===OW_GRAVEYARD ? O3_GRAVE_S : 1.3; if (t===OW_TOWN){ try{ const q = o3G(x, y) || [x, y]; sc *= [0.85, 1, 1.18][townTier(q[0], q[1])]; }catch(e){} }   /* (RS-485: a city stands bigger on the land than a village) */
     g.scale.setScalar(sc); g.position.set(gx, O3.heightAt(gx,gz), gz); g.rotation.y = o3SiteYaw(t, x, y);   /* (entrances face the camera; RS-679: see o3SiteYaw) */
     grp.add(g);
     if (DOOR_SITES.includes(t)) (O3.doors || (O3.doors = new Map())).set(x+','+y, g);   /* (RS-651: the barrow you walk into, by its tile in the frame; RS-668: and the other doorways) */
@@ -35306,7 +35339,7 @@ function* o3SitesGen(grp, x0, y0, W){
     const el = document.createElement('div'); el.className = 'v3plate' + (t===OW_TOWN ? ' vendor' : ' o3site');
     el.innerHTML = `<b>${esc(t===OW_TOWN ? o3TownName(wx, wy) : (O3_SITE_NAME[t]||''))}</b>${t===OW_TOWN ? o3TownSub(wx, wy) : ''}`;
     O3.labels.appendChild(el);
-    O3.plates.push({ el, pos:new T.Vector3(gx, g.position.y + (t===OW_GRAVEYARD ? sc : 1.3)*(t===OW_NECROTOWER ? 2.6 : t===OW_CASTLE ? 1.7 : 1.15), gz), town: t===OW_TOWN, x:wx, y:wy });
+    O3.plates.push({ el, pos:new T.Vector3(gx, g.position.y + (t===OW_TEMPLE ? (o3SeaSiteL(x, y) ? 3.75 : 2.95) : (t===OW_GRAVEYARD ? sc : 1.3)*(t===OW_NECROTOWER ? 2.6 : t===OW_CASTLE ? 1.7 : 1.15)), gz), town: t===OW_TOWN, x:wx, y:wy });
   }
 }
 // ---------- roaming encounters and mythic beasts ----------
@@ -36628,12 +36661,18 @@ function o3Input(cv){
    turned, so you stood in the fence and the way round to its gate cut through the yard. In the frame: how far to move out */
 function o3YardNudge(x, y){ for (const [a, b] of [[1,0],[-1,0],[0,1],[0,-1]]){ const q = owNb(x, y, a, b); if (!q || G.ow.map[q[0]][q[1]]!==OW_GRAVEYARD) continue; const l = o3L(x, y), lq = o3L(q[0], q[1]); if (!l || !lq) continue;
     const dx = l[0] - lq[0], dz = l[1] - lq[1], ry = o3SiteYaw(OW_GRAVEYARD, lq[0], lq[1]), co = Math.cos(ry), si = Math.sin(ry), u = (dx*co - dz*si)/O3_GRAVE_S, v = (dx*si + dz*co)/O3_GRAVE_S, d = Math.hypot(dx, dz) || 1;
-    if (Math.abs(u) < 0.68 && Math.abs(v) < 0.68 && d < 1.3) return [dx/d*(1.3 - d), dz/d*(1.3 - d)]; } return null; }
+    if (Math.abs(u) < 0.68 && Math.abs(v) < 0.68 && d < 1.3) return [dx/d*(1.3 - d), dz/d*(1.3 - d)]; }
+  for (const [a, b] of [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]]){ const q = owNb(x, y, a, b); if (!q || G.ow.map[q[0]][q[1]]!==OW_TEMPLE) continue; const l = o3L(x, y), lq = o3L(q[0], q[1]); if (!l || !lq) continue;   /* (RS-688: and clear of the Guardians' Gate, which reaches over the tiles round it: out by its nearer side; afloat, out past the Rotunda's well) */
+    if (owSeaSite(q[0], q[1])){ const dx = l[0] - lq[0], dz = l[1] - lq[1], d = Math.hypot(dx, dz) || 1, R = O3_SEA_TEMPLE.rim + 0.35; if (d < R) return [dx/d*(R - d), dz/d*(R - d)]; continue; }
+    const ry = o3SiteYaw(OW_TEMPLE, lq[0], lq[1]), co = Math.cos(ry), si = Math.sin(ry), dx = l[0] - lq[0], dz = l[1] - lq[1], u = dx*co - dz*si, v = dx*si + dz*co, ou = O3_GATE_HX + 0.18 - Math.abs(u), ov = O3_GATE_HZ + 0.18 - Math.abs(v);
+    if (ou <= 0 || ov <= 0) continue; const du = ou < ov ? Math.sign(u || 1)*ou : 0, dv = ou < ov ? 0 : Math.sign(v || 1)*ov; return [du*co + dv*si, -du*si + dv*co]; } return null; }
 function o3SiteStandOff(x, y){
   const t = G.ow.map[x] && G.ow.map[x][y]; if (!OW_SITE_TILES.includes(t)) return null;
   let dx = 0, dz = 0; const pv = O3.prevTile; if (pv && Math.max(Math.abs(pv[0]-x), Math.abs(pv[1]-y))===1){ dx = pv[0]-x; dz = pv[1]-y; }
   if (!dx && !dz){ for (const [ox, oz] of [[0,1],[1,1],[1,0],[-1,1],[0,-1],[-1,0],[1,-1],[-1,-1]]){ const nx = x+ox, ny = y+oz, nt = G.ow.map[nx] && G.ow.map[nx][ny]; if (nt!=null && nt!==OW_WATER && nt!==OW_MOUNTAIN && !OW_SITE_TILES.includes(nt)){ dx = ox; dz = oz; break; } } }
-  if (!dx && !dz) return null; const d = Math.hypot(dx, dz), r = t===OW_DUNGEON ? 1.05 : t===OW_MINE ? 1.0 : t===OW_GRAVEYARD ? 1.3 : t===OW_LAIR ? 1.65 : t===OW_PYRAMID ? 1.42 : t===OW_TEMPLE ? (owSeaSite(x, y) ? 1.2 : 1.17) : 0.72; return [dx/d*r, dz/d*r];   /* (RS-651: a barrow's door stands where you used to stop; RS-668: and the Dwarf Gate's; RS-672: outside the churchyard's railings (RS-684: 1.3 for its size); RS-674: clear of the dragon's crag; RS-675: off the pyramid's corners) */
+  if (!dx && !dz) return null; const d = Math.hypot(dx, dz);
+  if (t===OW_TEMPLE && !owSeaSite(x, y)){ const l = o3L(x, y), ry = l ? o3SiteYaw(OW_TEMPLE, l[0], l[1]) : 0, f = o3Rot([dx/d, dz/d], o3FrameTurn(x, y)), u = Math.abs(f[0]*Math.cos(ry) - f[1]*Math.sin(ry)), v = Math.abs(f[0]*Math.sin(ry) + f[1]*Math.cos(ry)), r = Math.min(u > 1e-3 ? (O3_GATE_HX + 0.22)/u : 9, v > 1e-3 ? (O3_GATE_HZ + 0.22)/v : 9); return [dx/d*r, dz/d*r]; }   /* (RS-688: out past the Guardians' Gate on the side you came from - it is longer than it is deep) */
+  const r = t===OW_DUNGEON ? 1.05 : t===OW_MINE ? 1.0 : t===OW_GRAVEYARD ? 1.3 : t===OW_LAIR ? 1.65 : t===OW_PYRAMID ? 1.42 : t===OW_TEMPLE ? O3_SEA_TEMPLE.rim + 0.4 : 0.72; return [dx/d*r, dz/d*r];   /* (RS-651: a barrow's door stands where you used to stop; RS-668: and the Dwarf Gate's; RS-672: outside the churchyard's railings (RS-684: 1.3 for its size); RS-674: clear of the dragon's crag; RS-675: off the pyramid's corners; RS-688: out past the Rotunda's well) */
 }
 /* (RS-501) the placed land never moves, but three.js was recomposing every tree, rock, gathering node and landmark's matrix
    every frame - a good share of each overworld frame on a busy map. The gathering nodes and landmarks are frozen once placed
@@ -46454,7 +46493,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-687';
+const GAME_VERSION = 'rs-688';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

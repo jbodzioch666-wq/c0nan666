@@ -1,5 +1,16 @@
 # Depthcrawl patch notes
 
+## RS-688 - Temples to Your Size
+
+- **Sunken temples fit you now.** The old shrine's door came up to your chest, and the whole building stood about as tall as you. Both new temples have doors taller than you (1.3 against your 0.95) and stand two to three times your height, two and a half tiles across.
+- **On the land: the Guardians' Gate.** A massive gate shrine of great stone courses, its walls sloping in as they rise. Its door sits under a huge lintel and a relieving triangle carved with the drowned god's eye, and two hooded stone guardians lean on their swords before it. Walk up and the eye wakes, the guardians' eyes kindle under their hoods, and the bronze doors swing in on a sea-green light. You walk in through them, no stair needed. The old pool and its sinking flagstones are gone.
+- **At sea: the Rotunda.** A round hall ringed by columns, one of them cracked, stands at the bottom of a wider, deeper well in the seabed. Its ribbed dome of green bronze rises above the waves and marks it from afar, with sunlight and fish in the water round it. When the sea parts you step out at the mooring stone, go down a stair built against the well's side, round three quarters of the well to the floor, and in through the bronze doors as they open.
+- **Both kinds in every new world.** New worlds (generator 24) put every other temple at sea and the rest on the land. A sea temple gets open water three or four tiles round it for the wider well. A land temple gets open land two tiles round it, in the desert where it can.
+- **Room round the gate.** No trees, rocks or gathering spots stand under the gate. On the tiles beside it you stand clear of its walls and guardians, and walking onto it from behind takes you round to its front. Beside a sea temple your boat lies out past the well, not over the dome.
+- **Older worlds:** a generator 23 world keeps its temples at sea (the well never digs into the shore), and an older one keeps them on the land. Make a new world to get both kinds, and keep your character.
+- **World sim, before and after (3 seeds):** towns, walking distances and roamers are unchanged on every size, and still no two sites stand within 4 tiles. Land: medium 11835.7 to 11834.7, large 23570.3 to 23568.3, xlarge 40180.7 to 40177.7, planet 32329 to 32326. Most sites within 8 tiles of one: large 2.3 to 3, xlarge 3 to 2.7. Most graveyards within 12 tiles of one: large 1 to 1.3, xlarge 2 to 1.3, planet 2 to 2.3.
+- **Tests:** the new rs688 walks into a Guardians' Gate. rs687 is rewritten for the Rotunda. rs682, the old pool shrine's test, is retired.
+
 ## RS-687 - The Drowned Temple
 
 - **The sunken temple is out at sea.** New worlds put every sunken temple on the water: a tile of open sea with a shore within a few tiles. You reach it by boat (the Peddler sells one). Your current world keeps its temples on the land; make a new world to find the drowned ones, and keep your character.
