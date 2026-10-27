@@ -1212,6 +1212,8 @@ function recomputeWorldSizeConstants(){
   // (RS-640) a generator 18 planet: fewer dungeons, graveyards and mines, spaced as the other sizes' are (tools/sim/s_world: a
   // planet had a site to some 143 tiles of land, the other sizes 171 to 194)
   if (OW_COLS*3===OW_ROWS*4 && typeof G!=='undefined' && G && G.worldSizeTier==='planet' && G.ow && (G.ow.genVer||1) >= 18){   /* (the size first: G isn't made yet on the first run) */ NDUNGEONS = Math.round(NDUNGEONS*0.82); NGRAVEYARD = Math.round(NGRAVEYARD*0.82); NMINE = Math.round(NMINE*0.82); }
+  /* (RS-686) generator 22: half as many graveyards - a set piece, they were as many as the mines (8 on a medium world, 25 on a planet) */
+  try{ if (G && G.ow && (G.ow.genVer||1) >= 22) NGRAVEYARD = Math.max(1, Math.round(NGRAVEYARD*0.5)); }catch(e){}   /* (G isn't made yet on the first run) */
   MAX_SITE_SLOT = NDUNGEONS + NCASTLES + NNECRO + NTEMPLE + NGRAVEYARD + NMINE + NLAIR + NPYRAMID;
 }
 recomputeWorldSizeConstants();
@@ -8009,7 +8011,7 @@ function ensureSpawnEscape(){
 // (RS-106, generator 3: broader ranges, valleys walled in by them filled in as mountain, and nothing but a dragon's lair in or on them)
 // (RS-114, generator 4: a river that runs into a hollow fills it into a lake and flows on from its lowest edge)
 // (RS-115, generator 5: rivers join edge to edge - a diagonal step also fills the lower of its two side tiles)
-const OW_GEN_VER = 21;   /* (6: pyramids in the desert, RS-213; 7: a town for every race, RS-223; 8: roads skirt the volcano, RS-236; 9: landmarks on clear ground, RS-238) */
+const OW_GEN_VER = 22;   /* (22: a site's spacing before its liked terrain, half the graveyards, RS-686) */   /* (6: pyramids in the desert, RS-213; 7: a town for every race, RS-223; 8: roads skirt the volcano, RS-236; 9: landmarks on clear ground, RS-238) */
 // any two river tiles that touch only at a corner get the lower of the two tiles beside them turned to river
 // (never a mountain, the sea or a lake); returns how many tiles it added
 function owRiverJoin(elev){
@@ -8617,10 +8619,13 @@ function generateOverworld(seed){
   // the exact same unrestricted search as before, so a preference can never
   // cause a site to fail to place - it only ever changes WHERE it lands
   // when there's a real choice available
-  function placeFeature(minDist, placed, rfn, preferTest){
+  function placeFeature(minDist, placed, rfn, preferTest, keepTerrain){
     const rint2 = (n)=>Math.floor(rfn()*n);
+    /* (RS-686, generator 22) a site's spacing before its terrain: its liked ground only while it can keep 60% of its distance from the
+       others (a world with a little tundra had its graveyards squeezed into it side by side), then anywhere, and never nearer than 4 */
+    const g22 = (G.ow.genVer||1) >= 22, af = g22 ? Math.min(4, minDist) : 0, pf = g22 ? (keepTerrain ? af : Math.ceil(minDist*0.6)) : 0;   /* (keepTerrain: a mine's gate in its mountain, a pyramid in its sand - their ground first, down to the 4) */
     if (preferTest){
-      for (let relax=minDist; relax>=0; relax-=2){
+      for (let relax=minDist; relax>=pf; relax-=2){
         for (let tries=0; tries<400; tries++){
           const x=rint2(OW_COLS), y=rint2(OW_ROWS);
           if (!isLand(G.ow.map[x][y]) || !preferTest(x,y) || owAmidMtn(x,y)) continue;
@@ -8633,7 +8638,7 @@ function generateOverworld(seed){
       }
       // preferred terrain search exhausted - fall through to the plain search below
     }
-    for (let relax=minDist; relax>=0; relax-=2){
+    for (let relax=minDist; relax>=af; relax-=2){
       for (let tries=0; tries<400; tries++){
         const x=rint2(OW_COLS), y=rint2(OW_ROWS);
         if (!isLand(G.ow.map[x][y]) || (relax > 0 && owAmidMtn(x,y))) continue;
@@ -8703,7 +8708,7 @@ function generateOverworld(seed){
   // places slot's site at its recorded relocation if it has one, otherwise
   // finds it a fresh spot exactly as before - either way the site's boss-fall
   // depth (max) and dungeonIdx (slot) land in the right cells
-  function placeOrRelocateSite(slot, kind, tileConst, minDist, placed, preferTest){
+  function placeOrRelocateSite(slot, kind, tileConst, minDist, placed, preferTest, keepTerrain){
     const mv = moved[slot];
     if (mv){
       G.ow.map[mv.x][mv.y] = tileConst;
@@ -8711,7 +8716,7 @@ function generateOverworld(seed){
       G.ow.dungeonIdx[mv.x][mv.y] = slot;
       return;
     }
-    const p = placeFeature(minDist, placed, siteRng(200000+slot), preferTest);
+    const p = placeFeature(minDist, placed, siteRng(200000+slot), preferTest, keepTerrain);
     if (p){
       const depthRoll = siteRng(700000+slot)();
       G.ow.map[p.x][p.y] = tileConst;
@@ -8884,12 +8889,12 @@ function generateOverworld(seed){
   for (let i=0;i<NNECRO;i++){ slot++; placeOrRelocateSite(slot, 'necro', OW_NECROTOWER, 22, placed, PREFER_SWAMP); }
   for (let i=0;i<NTEMPLE;i++){ slot++; placeOrRelocateSite(slot, 'temple', OW_TEMPLE, 18, placed, PREFER_DESERT); }
   for (let i=0;i<NGRAVEYARD;i++){ slot++; placeOrRelocateSite(slot, 'graveyard', OW_GRAVEYARD, 12, placed, PREFER_TUNDRA); }
-  for (let i=0;i<NMINE;i++){ slot++; placeOrRelocateSite(slot, 'mine', OW_MINE, 12, placed, (G.ow.genVer||1) >= 21 ? PREFER_MTN_SIDE : PREFER_NEAR_MOUNTAIN); }
+  for (let i=0;i<NMINE;i++){ slot++; placeOrRelocateSite(slot, 'mine', OW_MINE, 12, placed, (G.ow.genVer||1) >= 21 ? PREFER_MTN_SIDE : PREFER_NEAR_MOUNTAIN, true); }
   // dragon lairs: mountain-locked, reached by a carved pass - see
   // placeMountainSite/carveMountainPass above
   for (let i=0;i<NLAIR;i++){ slot++; placeOrRelocateLairSite(slot, placed); }
   // (RS-213) pyramids out in the desert - their slots come after every older kind, so an older world keeps its site numbering
-  for (let i=0;i<NPYRAMID;i++){ slot++; placeOrRelocateSite(slot, 'pyramid', OW_PYRAMID, 18, placed, PREFER_DESERT); }
+  for (let i=0;i<NPYRAMID;i++){ slot++; placeOrRelocateSite(slot, 'pyramid', OW_PYRAMID, 18, placed, PREFER_DESERT, true); }
   OW_GENCUBE = false;
   if ((G.ow.genVer||1) >= 14 && G.ow.cliff){ const C = G.ow.cliff, W = OW_COLS;   /* (RS-625, generator 14: with the sites down, a cliff by one goes, and then any cliff left on its own) */
     for (let i=0;i<C.length;i++) if (C[i] && !owCliffAt(i % W, (i/W)|0)) C[i] = 0;
@@ -46364,7 +46369,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-685';
+const GAME_VERSION = 'rs-686';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

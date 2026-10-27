@@ -1,5 +1,17 @@
 # Depthcrawl patch notes
 
+## RS-686 - Room Between the Ruins
+
+- **No more clusters of dungeons.** Sites that like a certain kind of ground (graveyards on tundra, castles on grass, necro towers in swamps) kept squeezing into that ground long after they ran out of room. A world with only a little tundra got its graveyards packed side by side, one even on top of a barrow. Now a site gives up its favourite ground before it gives up its spacing, and no two sites are ever within 4 tiles of each other.
+- **Half as many graveyards.** They're a set piece, but there were as many of them as mines: now 4 on a medium world (was 8) and 13 on a Planet (was 25).
+- **Mines and pyramids keep their ground.** A mine still sits at the foot of its mountain, and a pyramid still stands in the desert.
+- **World sim, before and after (3 seeds each):**
+  - Sites within 4 tiles of another: Planet 2 to 0 (other sizes already 0).
+  - Most sites within 8 tiles of one site: Planet 5 to 2.7, medium 3 to 2.3.
+  - Most graveyards within 12 tiles of one: Planet 5 to 1.7.
+  - Land, towns and walking distances are unchanged.
+- **Your current world keeps its layout.** This applies to new worlds. Make a new world to get it, and keep your character.
+
 ## RS-685 - Hips That Fit
 
 - **No more bulky bottoms on women.** A woman's hips were sculpted wider than the tops of her thighs, so they ended in a ledge where her legs came out and looked like bloomers. Her hips now taper smoothly into her thighs.

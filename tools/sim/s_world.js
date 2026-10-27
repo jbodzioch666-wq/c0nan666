@@ -26,12 +26,14 @@ module.exports = async page=>{
       const sp = G.ow.spawnPos, ds2 = []; { const r = bfs([[sp.x, sp.y]]); for (const [x, y] of sites) if (M[x][y]===OW_DUNGEON){ const v = r.d[y*W + x]; if (v >= 0) ds2.push(v); } } ds2.sort((a, b)=>a - b);
       return { tier, seed, ms:Math.round(ms), size:W + 'x' + H, land, towns:towns.length, sites:sites.length, landPerTown:Math.round(land/Math.max(1, towns.length)), landPerSite:Math.round(land/Math.max(1, sites.length)),
         toTown:{ med:q(0.5), p90:q(0.9), max:ds.length ? ds[ds.length - 1] : -1, reach:+(ds.length/Math.max(1, land)).toFixed(2) }, townGap:{ med:tt.length ? tt[tt.length >> 1] : -1, n:tt.length },
-        dungeons3:ds2.slice(0, 3), encounters:(G.ow.encounters||[]).length };
+        dungeons3:ds2.slice(0, 3), encounters:(G.ow.encounters||[]).length,
+        /* (RS-686) sites crowded together: how many have another site or town within 4 tiles, and the most sites (not towns) within 8 of one */
+        crowd:(()=>{ const all = sites.concat(towns); let near4 = 0, pack = 0; for (const [x, y] of sites){ if (all.some(([a, b])=>(a!==x || b!==y) && Math.hypot(a - x, b - y) < 4)) near4++; pack = Math.max(pack, sites.filter(([a, b])=>Math.hypot(a - x, b - y) <= 8).length); } const kinds = {}, gy = sites.filter(([x, y])=>M[x][y]===OW_GRAVEYARD); for (const [x, y] of sites){ const k = TILE_SITE_KIND[M[x][y]] || M[x][y]; kinds[k] = (kinds[k]||0) + 1; } let gpack = 0; for (const [x, y] of gy) gpack = Math.max(gpack, gy.filter(([a, b])=>Math.hypot(a - x, b - y) <= 12).length); return { near4, pack, gpack, kinds }; })() };
     }, [tier, seed]);
     rows.push(r); console.log(JSON.stringify(r));
   }
   /* the averages per size */
   const avg = (rs, f)=>+(rs.reduce((a, r)=>a + f(r), 0)/rs.length).toFixed(1);
   for (const tier of tiers){ const rs = rows.filter(r=>r.tier===tier);
-    console.log(`${tier.padEnd(7)} land ${avg(rs, r=>r.land)}  towns ${avg(rs, r=>r.towns)}  land/town ${avg(rs, r=>r.landPerTown)}  land/site ${avg(rs, r=>r.landPerSite)}  to a town: median ${avg(rs, r=>r.toTown.med)} p90 ${avg(rs, r=>r.toTown.p90)}  reachable ${avg(rs, r=>r.toTown.reach)}  town gap ${avg(rs, r=>r.townGap.med)}  start to 3rd dungeon ${avg(rs, r=>r.dungeons3[2]||0)}  roamers ${avg(rs, r=>r.encounters)}`); }
+    console.log(`${tier.padEnd(7)} land ${avg(rs, r=>r.land)}  towns ${avg(rs, r=>r.towns)}  land/town ${avg(rs, r=>r.landPerTown)}  land/site ${avg(rs, r=>r.landPerSite)}  to a town: median ${avg(rs, r=>r.toTown.med)} p90 ${avg(rs, r=>r.toTown.p90)}  reachable ${avg(rs, r=>r.toTown.reach)}  town gap ${avg(rs, r=>r.townGap.med)}  start to 3rd dungeon ${avg(rs, r=>r.dungeons3[2]||0)}  roamers ${avg(rs, r=>r.encounters)}  sites by another within 4 ${avg(rs, r=>r.crowd.near4)}  most within 8 ${avg(rs, r=>r.crowd.pack)}  graveyards ${avg(rs, r=>r.crowd.kinds.graveyard||0)} (most within 12 of one ${avg(rs, r=>r.crowd.gpack)})`); }
 };
