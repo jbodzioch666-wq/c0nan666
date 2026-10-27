@@ -3,7 +3,7 @@
 module.exports = async page=>{
   const r = await page.evaluate(async ()=>{
     goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{};
-    const p = G.player, out = { kinds:{} }; p.wildWarned = 1; p.clock = 100; let prompts = 0; const su = window.setUi; window.setUi = function(n){ if (n==='dungeonPrompt') prompts++; return su.apply(this, arguments); };
+    const p = G.player, out = { kinds:{} }; p.wildWarned = 1; p.clock = 100; p.hasBoat = 1; p.boatTier = 1;   /* (RS-687: the sunken temple lies at sea) */ let prompts = 0; const su = window.setUi; window.setUi = function(n){ if (n==='dungeonPrompt') prompts++; return su.apply(this, arguments); };
     const m = G.ow.map, W = m.length, H = m[0].length, home = { ...G.owPos };
     for (const t of [OW_DUNGEON, OW_GRAVEYARD, OW_MINE, OW_CASTLE, OW_TEMPLE, OW_NECROTOWER, OW_PYRAMID]){
       let done = false;

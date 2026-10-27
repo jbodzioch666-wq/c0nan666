@@ -15,7 +15,7 @@ module.exports = async page=>{
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
   const now = ['medium777', 'medium31337', 'planet777', 'planet424242'].map(k=>r[k]);
-  A(now.every(w=>w.ver===22), 'new worlds on generator 22');
+  A(now.every(w=>w.ver >= 22), 'new worlds on generator 22 or later');
   A(now.every(w=>w.near===0), 'no site within 4 tiles of another');
   A(now.every(w=>w.pack <= 3), 'no more than three sites within 8 tiles of one');
   A(r.medium777.graveyards===4 && r.planet777.graveyards <= 13 && now.every(w=>w.graveyards===w.ng), 'half as many graveyards: 4 on a medium world');

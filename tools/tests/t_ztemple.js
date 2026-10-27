@@ -4,7 +4,7 @@
 const fs = require('fs');
 module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.on('pageerror', e=>errs.push(String(e).slice(0, 300))); const pose = !!process.env.ZPOSE;
     const r = await page.evaluate(async ({ pose })=>{ const fr = n=>new Promise(res=>{ let i = 0; const f = ()=>++i >= n ? res() : requestAnimationFrame(f); requestAnimationFrame(f); });
-    goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{}; G.player.wildWarned = 1; G.gameMode = 0; G.player.clock = DAY_LENGTH*0.4; window.__trans = true;
+    goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{}; G.player.wildWarned = 1; G.gameMode = 0; G.player.clock = DAY_LENGTH*0.4; window.__trans = true; G.ow.genVer = 22; wgRegenerate(G.ow.seed); G.ow.genVer = OW_GEN_VER;   /* (RS-687: generator 23 puts the temples out at sea; this is the one on the land) */
     const m = G.ow.map, open = [OW_GRASS, OW_FOREST, OW_DESERT, OW_TUNDRA, OW_SWAMP, OW_MOUNTAINPASS], N8 = [[0,1],[1,0],[0,-1],[-1,0],[1,1],[-1,1],[1,-1],[-1,-1]], out = {};
     const sites = questNearbySites(G.owPos.x, G.owPos.y, 1, 600, ['temple']).filter(s=>m[s.x][s.y]===OW_TEMPLE); let at = null, g = null;
     for (const s of sites){ const nb = N8.map(([dx, dy])=>({ dx, dy, q:owNb(s.x, s.y, dx, dy) })).filter(o=>o.q && open.includes(m[o.q[0]][o.q[1]]) && owDiagClear(o.q[0], o.q[1], -o.dx, -o.dy));   /* (a step in you can take: not a diagonal between two blocked tiles) */ if (!nb.length) continue;

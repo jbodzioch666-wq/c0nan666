@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-687 - The Drowned Temple
+
+- **The sunken temple is out at sea.** New worlds put every sunken temple on the water: a tile of open sea with a shore within a few tiles. You reach it by boat (the Peddler sells one). Your current world keeps its temples on the land; make a new world to find the drowned ones, and keep your character.
+- **Seen through the water.** The shrine stands at the bottom of a well in the seabed with its roof just under the waves. Shafts of sunlight fall through the water onto it, fish circle it, and a mooring stone with a bronze bollard stands up out of the sea at the well's lip to mark it.
+- **The sea parts.** Sail onto it and you come alongside the mooring stone. The drowned god's eye wakes, and the sea opens over the well: the water falls away to the floor, standing as a wall round it with foam at its edge. Then you step out of the boat, which waits at the stone, and go down a stair that winds round the well to the path's head, where the flagstones sink into their own stair and the pool drains down it as before. A key or a tap skips ahead.
+- **Standing clear of a graveyard.** Beside a graveyard you now stand outside its railings. Since RS-684 made it bigger you could stand inside the fence on the tile behind it, and the walk to its gate cut through the yard.
+- **World sim, before and after (3 seeds):** land, towns, sites, walking distances and roamers are unchanged on every size; only where the temples stand has moved.
+
 ## RS-686 - Room Between the Ruins
 
 - **No more clusters of dungeons.** Sites that like a certain kind of ground (graveyards on tundra, castles on grass, necro towers in swamps) kept squeezing into that ground long after they ran out of room. A world with only a little tundra got its graveyards packed side by side, one even on top of a barrow. Now a site gives up its favourite ground before it gives up its spacing, and no two sites are ever within 4 tiles of each other.
