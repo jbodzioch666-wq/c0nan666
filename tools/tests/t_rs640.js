@@ -1,6 +1,6 @@
 // RS-640: a Planet's spacing set to the other sizes' (tools/sim/s_world): as many roaming groups to its land as the medium world has
 // (some 237 tiles of land to each, up to 150), and generator 18 trims its dungeons, graveyards and mines to a site per 160 tiles of land
-// or more; a generator 17 planet keeps its counts; the medium world keeps about its 50 roamers (to its land since RS-659)
+// or more; a generator 17 planet keeps its counts; the medium world keeps about its 25 roamers (to its land since RS-659; halved in RS-683)
 module.exports = async page=>{
   page.setDefaultTimeout(0); const errs = []; page.on('pageerror', e=>errs.push(String(e).slice(0, 300)));
   const r = await page.evaluate(()=>{ const out = {}; goToCharCreate(); ccBegin();
@@ -16,9 +16,9 @@ module.exports = async page=>{
     return out; });
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
-  A(r.medium.target >= 50 && r.medium.target <= 62 && r.medium.enc <= r.medium.target, 'the medium world keeps about its 50 roamers (RS-659: to its own land, like the others)');
-  A(r.p18.ver>=18 && r.p18.target > 100 && r.p18.target <= 150 && r.p18.perEnc > 200 && r.p18.perEnc < 280, 'a planet has as many roamers to its land as the medium world');
-  A(r.p18.enc > 80, 'and they are out on its land');
+  A(r.medium.target >= 25 && r.medium.target <= 31 && r.medium.enc <= r.medium.target, 'the medium world keeps about its 25 roamers (RS-659: to its own land, like the others; RS-683: half the old 50)');
+  A(r.p18.ver>=18 && r.p18.target > 50 && r.p18.target <= 75 && r.p18.perEnc > 400 && r.p18.perEnc < 560, 'a planet has as many roamers to its land as the medium world');
+  A(r.p18.enc > 40, 'and they are out on its land');
   A(r.p18.perSite >= 160, 'a planet\'s sites spaced like the other sizes\'');
   A(r.p17.nd > r.p18.nd, 'a generator 17 planet keeps its site counts');
   A(r.load.same && r.load.ver>=18 && r.load.slots.join()===r.load.was.join() && r.load.target===r.p18.target, 'loaded back, the same world and its counts');

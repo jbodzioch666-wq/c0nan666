@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-683 - Fewer Wanderers
+
+- **Half as many roaming groups.** A medium world now has about 25 wandering groups instead of 50, and the bigger sizes have up to 75 instead of 150. Each size still gets as many as its land calls for.
+- **Your world thins out on its own.** An existing save with the old numbers loses one group a step until it's down to the new count. It's always the group farthest from you, so nobody vanishes in front of you.
+- **The Wilderness still has more.** It keeps up to 40% more groups than the rest of the land.
+- **World sim, before and after (3 seeds each):** medium 51.7 to 25.7 roamers, large 100 to 50, extra large 150 to 75, planet 136.7 to 68.7. Land, towns, sites and walking distances are unchanged.
+
 ## RS-682 - The Draining Pool
 
 - **No walls of water.** The waters no longer rise into two walls either side of the path.
