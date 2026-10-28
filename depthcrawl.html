@@ -3560,6 +3560,26 @@ function withShotHold(m, fn){
   LOG_HOLD = lag > 0.02 ? Math.round(lag*1000) : 0;
   try{ return fn(); } finally { LOG_HOLD = h; }
 }
+/* (RS-710) a blow struck in the scene - your swing, a monster's at you - is felt as the weapon connects: until then the log, the xp, the
+   loot, the sounds and the notices wait (LOG_HOLD), the struck monster's life bar, hitsplat and death wait (BLOW_AT, read by
+   fpCollectSprites), and so does your own life (PHP_SHOW, read by the HUD). BLOW_CONTACT is where in a swing the weapon meets its mark */
+const BLOW_CONTACT = 0.46, BLOW_AT = new WeakMap(), PHP_SHOW = { hp:null, t:0 };
+function blow3d(){ return typeof ISO!=='undefined' && ISO.on && typeof FPD!=='undefined' && FPD.ok; }
+function meleeContactMs(){ return blow3d() ? Math.round(BLOW_CONTACT/1.8*1000) : 0; }   /* your swing: FP.swing runs down at 1.8 a second */
+function monContactMs(){ return blow3d() ? Math.round((BLOW_CONTACT - 0.22)/1.9*1000) : 0; }   /* a monster's: from 0.22 of its swing, at 1.9 (m3dPose) */
+function blowLag(m){ const t = m && BLOW_AT.get(m); return t ? clamp((t - performance.now())/1000, 0, 1) : 0; }
+function playerHpShown(){ const p = G.player; return PHP_SHOW.hp!=null && PHP_SHOW.t > performance.now() ? Math.max(p.hp, PHP_SHOW.hp) : p.hp; }
+function withBlowHold(ms, fn){
+  if (!(ms > 20)) return fn();
+  const h = LOG_HOLD, p = G.player, php = p.hp, hp0 = new Map((G.mon||[]).map(m=>[m, m.alive ? m.hp : null])), at = performance.now() + ms;
+  LOG_HOLD = Math.max(h, ms);
+  try{ return fn(); } finally {
+    LOG_HOLD = h;
+    for (const [m, hp] of hp0) if (hp!=null && (m.hp < hp || !m.alive)) BLOW_AT.set(m, Math.max(BLOW_AT.get(m)||0, at));
+    if (p.hp < php && p.hp > 0){ if (!(PHP_SHOW.t > performance.now())) PHP_SHOW.hp = php; PHP_SHOW.t = Math.max(PHP_SHOW.t, at);
+      setTimeout(()=>{ if (!(PHP_SHOW.t > performance.now() + 5)){ PHP_SHOW.hp = null; try{ renderGame(); }catch(e){} } }, ms + 15); }
+  }
+}
 function logMsg(msg, cls, raw){
   if (LOG_HOLD > 0){ setTimeout(()=>logMsg(msg, cls, raw), LOG_HOLD); return; }   /* (RS-708) */
   if (typeof CQ!=='undefined' && CQ && CQ.mute && cls!=='magic' && cls!=='new') return;
@@ -5988,7 +6008,7 @@ function noteFoe(mi){
 }
 // a hitsplat that isn't a monster's life dropping: a blue 0 for a miss or a block (RuneScape's), red
 // damage over you when you're hit - drawn by the dungeon/fight views like any other hitsplat
-function fxSplat(x, y, txt, kind){ if (typeof FP!=='undefined' && FP.floats) FP.floats.push({x, y, z:0.95, txt:String(txt), col:'#ffd27a', kind, crit:false, age:-(typeof ISO!=='undefined' && ISO.on ? isoShotDelay(x, y) : 0)}); }   /* (RS-703: a miss shows as the shot lands, as a hit does) */
+function fxSplat(x, y, txt, kind){ if (typeof FP!=='undefined' && FP.floats) FP.floats.push({x, y, z:0.95, txt:String(txt), col:'#ffd27a', kind, crit:false, age:-Math.max(LOG_HOLD/1000, typeof ISO!=='undefined' && ISO.on ? isoShotDelay(x, y) : 0)}); }   /* (RS-710: and a miss as the blade swings past) */   /* (RS-703: a miss shows as the shot lands, as a hit does) */
 function monsterDies(mi){
   const m = G.mon[mi];
   try{ townOnKill(m); sqOnKill(m); sqClueTask('kill', m.nm); }catch(e){ console.error(e); }
@@ -6308,7 +6328,7 @@ function singleAttackRoll(mi, missVerb, hitVerb){
 }
 // resolves a monster's whole turn against the player, including Multiattack
 // and Rampage's bonus swing when it applies
-function monsterStrikesPlayer(mi, missVerb, hitVerb){ G.monStriking = (G.monStriking||0) + 1; try{ return monsterStrikesPlayer0(mi, missVerb, hitVerb); } finally { G.monStriking--; } }   /* (RS-220: its blow's sounds don't swing your weapon) */
+function monsterStrikesPlayer(mi, missVerb, hitVerb){ G.monStriking = (G.monStriking||0) + 1; try{ return withBlowHold(monContactMs(), ()=>monsterStrikesPlayer0(mi, missVerb, hitVerb)); } finally { G.monStriking--; } }   /* (RS-710: felt as its blow connects) */   /* (RS-220: its blow's sounds don't swing your weapon) */
 function monsterStrikesPlayer0(mi, missVerb, hitVerb){
   if (G.mon[mi]){ G.mon[mi].engaged = true; G.mon[mi]._atkT = (typeof FP!=='undefined' && FP.t) || 0.001; }   /* (RS-172: its model swings) */
   const hits = multiattackCount(G.mon[mi]);
@@ -6511,7 +6531,7 @@ function fight(mi){
     if (G.gameOver) return;
     const m = G.mon[mi];
     if (!m || !m.alive) break; // it already died to an earlier swing this turn
-    if (singlePlayerAttack(mi)) return; // monsterDies() already ran - nothing left to counterattack
+    if (withBlowHold(rsAttackType()==='melee' ? meleeContactMs() : 0, ()=>singlePlayerAttack(mi))) return; // monsterDies() already ran - nothing left to counterattack   (RS-710: felt as the blade connects)
   }
   if (G.gameOver) return;
   // monster counterattack (Multiattack and this creature's Monster-Manual
@@ -17017,6 +17037,7 @@ function trackQuest(id){ G.player.trackedQuest = id; renderHud && renderHud(); }
 // pop-up notifications for things worth noticing mid-fight: a small card under the quest banner,
 // with its own sound; the same message won't repeat within a few seconds
 function notify(text, kind, sound){
+  if (LOG_HOLD > 0){ setTimeout(()=>notify(text, kind, sound), LOG_HOLD); return; }   /* (RS-710) */
   const now = Date.now(); notify.last = notify.last || {};
   if (notify.last[text] && now - notify.last[text] < 5000) return;
   notify.last[text] = now;
@@ -25431,6 +25452,7 @@ function audMonVoiceKind(m){
   return 'grunt';
 }
 function audMonster(m, what){
+  if (LOG_HOLD > 0){ setTimeout(()=>audMonster(m, what), LOG_HOLD); return; }   /* (RS-710) */
   const t = audT(); if (t===null) return; const v = audMonVoiceKind(m), out = _gains.sfx, big = m && (m.elite || m.namedElite || m.worldBoss) ? 0.75 : 1, die = what==='die';
   const sw = (type, f0, f1, d, vol)=>audTone(t, type, f0*big, f1*big, d*(die ? 1.6 : 1), vol);
   if (v==='roar'){ sw('sawtooth', 160, 70, 0.8, 0.09); audNoiseHit(out, t, 0.9, 'lowpass', 500, 0.3); }
@@ -27332,7 +27354,7 @@ function renderHud(){
       ${abilHtml}
     </div>`;
   }
-  const hpFrac = clamp(p.hp/effMaxHp(),0,1);
+  const hpFrac = clamp(playerHpShown()/effMaxHp(),0,1);   /* (RS-710) */
   const chgFrac = p.maxCharges>0 ? p.charges/p.maxCharges : (p.maxCharges===-1 ? 1 : 0);
   const chargeLabel = p.maxCharges===-1 ? 'AT-WILL' : (p.maxCharges===0 ? '-' : `${p.charges}/${p.maxCharges}`);
   const activeDm = dungeonModifierMult();
@@ -27412,7 +27434,7 @@ function renderHud(){
     <div class="panel">
       <h4>${esc(p.name||('the '+p.race+' '+p.cls))} &middot; ${modeLabel}</h4>
       <div class="muted" style="font-size:10px;margin:-4px 0 6px;">${p.ngPlus>0?`<span style="color:${COL.amber}">NG+${p.ngPlus}</span> &middot; `:''}Combat ${p.combatLevel} ${esc(p.race)} &middot; total level ${rsTotalLevel()}${p.companion ? ` &middot; <span style="color:${p.companion.col}" title="${esc(companionDef(p.companion).desc||'')}">${esc(p.companion.nm)}</span>` : ''}</div>
-      <div class="row"><span class="k">HP</span><span class="v">${p.hp}/${effMaxHp()}</span></div>
+      <div class="row"><span class="k">HP</span><span class="v">${playerHpShown()}/${effMaxHp()}</span></div>
       <div class="bar"><i class="hpfill" style="width:${hpFrac*100}%"></i></div>
       <div class="row"><span class="k">COMBAT</span><span class="v">${p.combatLevel}</span></div>
       <div class="row"><span class="k" style="color:${COL.purple}">CORRUPTION</span><span class="v" style="color:${COL.purple}">${Math.round(p.corruption||0)}%</span></div>
@@ -27527,7 +27549,7 @@ function renderImmersiveHud(){
   document.body.classList.toggle('dh-3d', fp3dActive());
   document.body.classList.toggle('dh-caster', !!G.player);
   if (!p){ if (el.__lastHtml){ el.innerHTML=''; el.__lastHtml=''; } return; }
-  const maxHp = effMaxHp(), hpF = clamp(p.hp/maxHp,0,1);
+  const maxHp = effMaxHp(), hpF = clamp(playerHpShown()/maxHp,0,1);   /* (RS-710) */
   // right orb: prayer points
   rsSync();
   const prL = rsLvl('prayer'), resF = prL ? clamp(p.prayPts/prL,0,1) : 0, resTxt = `${Math.ceil(p.prayPts||0)}/${prL}`, resLbl = p.prayers.length ? 'PRAYING' : 'PRAYER', mana = false;
@@ -44926,7 +44948,7 @@ function fpCollectSprites(vis){
     if (!pos){ pos = {x:m.x+0.5, y:m.y+0.5}; FP.monPos.set(m,pos); }
     const hit0 = { dmg:(prevHp||0) - m.hp, maxHp:m.maxHp, kind:m.hitKind||'melee', crit:!!m.hitCrit, elem:m.hitElem||'' };   /* (RS-371: what the killing blow was, for the throw) */
     /* (RS-703) a blow carried by a shot - a spell bolt, an arrow - lands with the shot: the flinch, the strike and a kill wait for it */
-    const lag = ISO.on && ((prevHp!==undefined && m.hp<prevHp) || (was && !m.alive)) ? isoShotDelay(pos.x, pos.y) : 0;
+    const lag = ISO.on && ((prevHp!==undefined && m.hp<prevHp) || (was && !m.alive)) ? Math.max(isoShotDelay(pos.x, pos.y), blowLag(m)) : 0;   /* (RS-710: or a blade still swinging) */
     if (prevHp!==undefined && m.hp<prevHp && seeTile(m.x,m.y)){
       FP.floats.push({x:pos.x, y:pos.y, z:0.95, txt:String(prevHp-Math.max(0,m.hp)), col:'#ffd27a', kind:m.hitKind||'melee', crit:!!m.hitCrit, age:-lag});
       m.hitCrit0 = m.hitCrit; m.hitKind = null; m.hitCrit = false;
@@ -46875,9 +46897,10 @@ function renderFirstPerson(){
   fpUpdateCamera(dt);
   // damage/heal feedback straight off the HP bar, so every source counts
   const p = G.player;
-  if (FP.lastHp!==null && p.hp < FP.lastHp){ FP.hurt = Math.min(1, 0.45 + (FP.lastHp-p.hp)/Math.max(1,p.maxHp)*3); const fr = (FP.lastHp-p.hp)/Math.max(1, effMaxHp()); FP.shake = Math.min(1, FP.shake + 0.2 + fr*3.5); }
-  else if (FP.lastHp!==null && p.hp > FP.lastHp + 0.5) FP.heal = 1;
-  FP.lastHp = p.hp;
+  const php = playerHpShown();   /* (RS-710: as the blow connects) */
+  if (FP.lastHp!==null && php < FP.lastHp){ FP.hurt = Math.min(1, 0.45 + (FP.lastHp-php)/Math.max(1,p.maxHp)*3); const fr = (FP.lastHp-php)/Math.max(1, effMaxHp()); FP.shake = Math.min(1, FP.shake + 0.2 + fr*3.5); }
+  else if (FP.lastHp!==null && php > FP.lastHp + 0.5) FP.heal = 1;
+  FP.lastHp = php;
   FP.hurt = Math.max(0, FP.hurt-dt*1.8); FP.heal = Math.max(0, FP.heal-dt*1.6); FP.glow = Math.max(0, FP.glow-dt*1.2);
   FP.cast = Math.max(0, FP.cast-dt*CAST_RATE); FP.swing = Math.max(0, FP.swing-dt*(typeof ISO!=='undefined' && rigIsBow(ISO.player) ? BOW_RATE : 1.8)); FP.fade = Math.max(0, FP.fade-dt*2.5);
   try{ foeTick(); }catch(e){ console.error(e); }   /* (RS-218) */
@@ -46985,8 +47008,9 @@ sfx = function(name){
   if (G && (G.gameMode===1 || G.gameMode===2)){
     if ((name==='hit' || name==='miss' || name==='crit') && !G.monStriking){ FP.swing = 1; FPW.lastSwing = name; }   /* (RS-220: only your own blows - a monster's hit plays the same sound, and used to swing you with it) */
     else if (name==='spell') FP.cast = 1;
-    else if (name==='levelUp' || name==='achievement') FP.glow = 1;
+    else if (name==='levelUp' || name==='achievement'){ if (LOG_HOLD > 0){ setTimeout(()=>sfx(name), LOG_HOLD); return; } FP.glow = 1; }
   }
+  if (LOG_HOLD > 0 && name!=='spell'){ setTimeout(()=>fpBaseSfx(name), LOG_HOLD); return; }   /* (RS-710: a blow's sound as it lands; the swing above starts now) */
   return fpBaseSfx(name);
 };
 
@@ -47131,7 +47155,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-709';
+const GAME_VERSION = 'rs-710';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

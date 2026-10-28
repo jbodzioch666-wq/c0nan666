@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-710 - On Contact
+
+- **Melee lands when the blade does.** Your swing starts as soon as you attack, but the hit itself waits until your weapon meets the foe, about a quarter of a second in. That covers the foe's life bar, the target plate, the damage number, the log line, the xp drop, the hit sound, and the death and loot from a killing blow. Until now all of it came at the start of the swing.
+- **A monster's blow does the same.** When something strikes you, your life on the HUD, the red flash and shake, the damage number, the log line and the sound wait until its swing connects.
+- **Spells and arrows too.** RS-708 already held their life bars and log lines. Now their hit sounds, a monster's death cry, level-up chimes and notices also wait for the shot to land.
+
 ## RS-709 - Ancestral
 
 - **Ancestral gear.** From combat level 90, a magic or rare drop is sometimes **Ancestral**: 4% at level 90, rising to 16% at 126, and two and a half times as often from a boss or an elite. An Ancestral piece is item level 126, and every bonus on it comes from the best tiers of its kind (the top three of seven, otherwise the top two).
