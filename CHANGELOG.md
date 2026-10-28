@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-698 - Tall Timber
+
+- **Trees you can chop now tower over you.** They stand about twice your height on longer, stouter trunks, with fuller crowns raised above your head. Before, the leaves came down to your chest and hid the axe as it went in. Now you can see the whole swing, the cut and the chips under the branches.
+- **Easier to click.** You can click a tree anywhere up its taller crown.
+
 ## RS-697 - Timber
 
 - **You walk up to the tree.** When you chop, you step in to an axe's reach from the trunk. You used to stand in the middle of the next tile. When you stop, you step back.
