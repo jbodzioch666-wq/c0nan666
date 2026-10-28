@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-701 - Both Hands Free
+
+- **The tome is put away while you work.** Chopping, mining or fishing, a spell tome no longer stays open in your left hand while that hand holds the axe's haft. It's back in your hand as soon as you stop.
+- **Shields stay on your back.** A shield is slung on your back while you work, clear of the axe's swing, as it already was.
+
 ## RS-700 - Full Swing
 
 - **A full swing.** Your arms now reach out long all the way through the chop. You lift the axe high over your right shoulder, sweep it wide round your right side and drive it into the trunk with your arms nearly straight. Before, your elbows stayed bent and the swing looked cramped.
