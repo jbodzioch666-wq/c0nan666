@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-690 - Back in the Boat
+
+- **Back in your boat after a drowned temple.** As you go down into the Rotunda, your boat waits at the mooring stone. When you came back out, the boat stayed there and you floated on the sea beside it, and it didn't follow when you sailed off. Now you come out standing in your boat, by the well, and sail on as before.
+- **Tests:** the new rs690 test sails in to a drowned temple and back out, and checks that you're in the boat and that it sails off with you. It fails on RS-689, where the boat stayed 2.8 tiles away.
+
 ## RS-689 - Taps at the Gate
 
 - **No more getting stuck beside a Guardians' Gate.** On the tiles next to the gate, you stand a little way out so its walls and guardians don't swallow you. From there, tapping the gate or the ground, or following a route, did nothing: the game waited for you to reach the middle of your tile, which the gate blocks. It now waits for the spot where you actually stand, so you walk on at once.
