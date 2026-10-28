@@ -36742,22 +36742,48 @@ function isoFishLine(e, g2){
    ready. Each blow throws chips from the cut, jolts the tree and shakes a few leaves down, and the notch deepens with every log
    taken; with the last the tree goes over, away from you (O3.fall takes this tree on). The tree stands on its own while you
    chop (o3ChopTick; its chunk leaves it out - O3.chopKey) */
-const CHOP_P = 1.3, CHOP_HIT = 0.6, CHOP_TURN = 0.5;   /* (a swing's length in seconds, and where in it the blow lands) */
+const CHOP_P = 1.3, CHOP_HIT = 0.6, CHOP_TURN = -0.55, CHOP_REACH = 0.29;   /* (CHOP_REACH: how far out from the trunk you stand, past its bark) */   /* (RS-699: turned to your right of the tree - side-on, left shoulder to it) */   /* (a swing's length in seconds, and where in it the blow lands) */
 function chopAnim(t){ const ph = (t/CHOP_P) % 1, ss = k=>k*k*(3 - 2*k);
   if (ph < 0.46) return { wind:ss(ph/0.46), strike:0, ph, stuck:0 };
   if (ph < CHOP_HIT){ const k = (ph - 0.46)/(CHOP_HIT - 0.46); return { wind:1 - ss(k), strike:k*k, ph, stuck:0 }; }
   if (ph < 0.7) return { wind:0, strike:1, ph, stuck:1 - (ph - CHOP_HIT)/(0.7 - CHOP_HIT) };
   return { wind:0, strike:1 - ss((ph - 0.7)/0.3), ph, stuck:0 }; }
-function rsChopPose(e, t){
-  const r = e.rig; if (!r || !r.arms || !e.tool) return false; const [R, L] = r.arms, A = chopAnim(t), w = A.wind, s = A.strike, jud = Math.sin(A.ph*170)*0.02*A.stuck;
-  R.sh.rotation.set(-0.8 - w*0.9 - s*0.12 + jud, 0, 0.3 - w*1.2 + s*0.15); R.el.rotation.x = -1.05 - w*0.6 + s*0.85;
-  /* the wrist: the haft from upright forward at the ready, back over the shoulder wound up, level out at the trunk as it bites */
-  R.hand.rotation.set(0.55 - w*1.5 + s*1.05 - Math.PI/2 - (R.sh.rotation.x + R.el.rotation.x), 0, 0);
-  r.torso.rotation.y = 0.12 + w*0.7 - s*0.8; r.torso.rotation.x += -w*0.1 + s*0.22;
-  r.hips.rotation.y = (r.hips.rotation.y||0) + w*0.18 - s*0.25; r.hips.position.y -= 0.008 + s*0.02;
+/* (RS-699) the axe itself is placed at each moment of the swing - where the right fist holds it, the haft's way from butt to head and the
+   blade's - in the body's frame, and both arms reach for it: the right fist up the haft toward the head, the left at its butt. At
+   the ready it's held across the body, head up by the right shoulder; wound up, back over the right shoulder; swung out round your
+   right side; in level, edge first, into the trunk on your left, where the edge bites into the bark (the blow's place is worked out
+   from the trunk - aim). Keys: [right fist, haft, blade] */
+const CHOP_KEYS = { R:[[-0.04, 0.39, 0.15], [-0.4, 0.6, 0.5], [0.4, 0, 1]], W:[[-0.13, 0.66, -0.02], [-0.2, 0.55, -0.8], [0, 0.85, 0.5]], M:[[-0.2, 0.46, 0.1], [-0.85, 0.12, 0.5], [0.5, -0.1, 1]] };
+function chopKey(K, p, d, e){ K.d.set(...d).normalize(); K.e.set(...e).addScaledVector(K.d, -K.e.dot(K.d)).normalize(); K.x.crossVectors(K.d, K.e); K.m.makeBasis(K.x, K.d, K.e); K.q.setFromRotationMatrix(K.m); K.p.set(...p); return K; }
+function rsChopPose(e, t, aim){
+  const r = e.rig; if (!r || !r.arms || !e.tool) return false; const T = THREE, [R, L] = r.arms, A = chopAnim(t), w = A.wind, s = A.strike;
+  const Z = rsChopPose.Z || (rsChopPose.Z = (()=>{ const k = ()=>({ p:new T.Vector3(), d:new T.Vector3(), e:new T.Vector3(), x:new T.Vector3(), m:new T.Matrix4(), q:new T.Quaternion() }); return { R:k(), W:k(), M:k(), H:k(), v:new T.Vector3(), v2:new T.Vector3(), c:new T.Vector3(), hd:new T.Vector3(), p:new T.Vector3(), q:new T.Quaternion(), q2:new T.Quaternion(), d:new T.Vector3() }; })());
+  /* the body: turned away to the right as you wind up, round into the blow, knees giving */
+  r.torso.rotation.y = -0.5*w + 0.4*s; r.torso.rotation.x += -w*0.06 + s*0.16;
+  r.hips.rotation.y = (r.hips.rotation.y||0) - w*0.15 + s*0.15; r.hips.position.y -= 0.008 + s*0.02;
   for (const Lg of r.legs){ Lg.knee.rotation.x += 0.1 + s*0.3; Lg.hip.rotation.x -= 0.05 + s*0.15; }
-  const K = rsChopPose.K || (rsChopPose.K = new THREE.Vector3()); e.tool.updateWorldMatrix(true, false); m3dReachL(r, e.tool.localToWorld(K.set(0, -0.06, 0)));
-  const hit = e.chopPh!==undefined && e.chopPh < CHOP_HIT && A.ph >= CHOP_HIT; e.chopPh = A.ph; return hit; }
+  e.holder.updateWorldMatrix(true, true); const hs = e.holder.getWorldScale(Z.v).x, rel = e.tool.getWorldScale(Z.v).x/hs;   /* (the tool's units in the body's) */
+  chopKey(Z.R, ...CHOP_KEYS.R); chopKey(Z.W, ...CHOP_KEYS.W); chopKey(Z.M, ...CHOP_KEYS.M);
+  /* the blow: the edge at the bark at the waist, the haft from a fist before your belly, the head travelling round from your right */
+  { const C = Z.c; if (aim){ C.copy(aim.c); e.holder.worldToLocal(C); } else C.set(Math.sin(-CHOP_TURN)*0.27, 0, Math.cos(-CHOP_TURN)*0.27); C.y = 0.33; const Rl = aim ? aim.r/hs : 0.06;
+    const Tn = Z.p.set(0.03, 0.34, 0.17), d = Z.d.copy(C).sub(Tn).normalize(), ed = Z.v2, hd = Z.hd;
+    for (let i=0;i<3;i++){ ed.set(d.z, 0, -d.x).normalize(); hd.copy(C).addScaledVector(ed, -(Rl - 0.035/hs + 0.11*rel)); d.copy(hd).sub(Tn).normalize(); }
+    ed.set(d.z, 0, -d.x).normalize(); const H = Z.H; H.p.copy(hd).addScaledVector(d, -0.4*rel).addScaledVector(ed, -0.1*rel); H.d.copy(d); H.e.copy(ed); H.x.crossVectors(H.d, H.e); H.m.makeBasis(H.x, H.d, H.e); H.q.setFromRotationMatrix(H.m); }
+  /* where in the swing: the ready to wound up, round the right side, into the trunk, stuck a moment, worked free and back */
+  const ph = A.ph, ss = k=>k*k*(3 - 2*k), P = Z.p, Q = Z.q, seg = (a, b, k)=>{ P.copy(a.p).lerp(b.p, k); Q.copy(a.q).slerp(b.q, k); };
+  if (ph < 0.46) seg(Z.R, Z.W, ss(ph/0.46));
+  else if (ph < 0.53) seg(Z.W, Z.M, Math.pow((ph - 0.46)/0.07, 1.4));
+  else if (ph < CHOP_HIT) seg(Z.M, Z.H, (ph - 0.53)/(CHOP_HIT - 0.53));
+  else if (ph < 0.7){ seg(Z.H, Z.H, 0); P.addScaledVector(Z.H.d, Math.sin(ph*170)*0.006*A.stuck); }
+  else seg(Z.H, Z.R, ss((ph - 0.7)/0.3));
+  /* the right hand turned to hold the axe so, the arm reaching its wrist to where that puts it; the left fist on the butt */
+  const qh = Z.q2.copy(e.holder.getWorldQuaternion(Z.q2)).multiply(Q).multiply(Z.q.copy(e.tool.quaternion).invert());
+  const fist = e.holder.localToWorld(P), wr = Z.v.set(...m3dGrip(1)).multiplyScalar(R.hand.getWorldScale(Z.v2).x).applyQuaternion(qh); fist.sub(wr);
+  m3dReachArm(R, fist, m3dArmPt(R, Z.v2.set(0, 0, 0)));
+  R.hand.parent.updateWorldMatrix(true, false); R.hand.quaternion.copy(R.hand.parent.getWorldQuaternion(Z.q).invert().multiply(qh));
+  e.tool.updateWorldMatrix(true, false); m3dReachArm(L, e.tool.localToWorld(Z.v.set(0, -0.06, 0)), m3dArmPt(L, Z.v2.set(-(r.gripX || 0.026), -0.045, 0.004)));
+  const hit = e.chopPh!==undefined && e.chopPh < CHOP_HIT && ph >= CHOP_HIT; e.chopPh = ph; return hit; }
+function o3ChopAim(){ const n = o3ChopNode(); if (!n) return null; const [x, z] = o3C(n.x, n.y), a = o3ChopAim.a || (o3ChopAim.a = { c:new THREE.Vector3(), r:0 }); a.c.set(x, O3.heightAt(x, z), z); a.r = o3ChopTrunkR(n, 0.25); return a; }
 function o3ChopSize(n){ return n.rich ? 1.35 : [0.8, 1, 1.22][n.size===undefined ? 1 : n.size]; }
 function o3ChopTrunkR(n, y){ const S = O3_TRUNK_S[n.type] || [1, 1]; return (0.1 - 0.05*Math.min(0.8, Math.max(0, y||0.2)))*S[0]*O3_TRUNK_W*0.72*o3ChopSize(n); }   /* (the trunk's radius at a height up it, in its own units: 0.1 at the foot to 0.06 at the top, 0.8 up) */
 function o3ChopNode(){ const g = G.gather, o = g && g.mode===0 && g.o; if (!o || o.k!=='woodcutting' || !o.at || (o.at.x===G.owPos.x && o.at.y===G.owPos.y)) return null;
@@ -36765,7 +36791,7 @@ function o3ChopNode(){ const g = G.gather, o = g && g.mode===0 && g.o; if (!o ||
 /* where you stand to fell it: an axe's reach from its trunk, on the side you came to it from */
 function o3ChopStand(){ const n = o3ChopNode(); if (!n) return null;
   const a = o3C(n.x, n.y), b = o3C(G.owPos.x, G.owPos.y), dx = a[0] - b[0], dz = a[1] - b[1], L = Math.hypot(dx, dz); if (L < 0.5 || L > 2) return null;
-  const k = Math.max(0, 1 - (o3ChopTrunkR(n) + 0.42)/L); return [dx*k, dz*k]; }
+  const k = Math.max(0, 1 - (o3ChopTrunkR(n) + CHOP_REACH)/L); return [dx*k, dz*k]; }
 function chopRig(sc){ const T = THREE, rig = { sc, chips:[], leaves:[] }, lin = c=>new T.Color(c).convertSRGBToLinear();
   const cg = new T.BoxGeometry(0.028, 0.007, 0.017), lg = new T.PlaneGeometry(0.032, 0.022);
   const pale = new T.MeshStandardMaterial({ color:lin('#e8d29c'), roughness:0.8 }), bark = new T.MeshStandardMaterial({ color:lin('#5a4028'), roughness:0.9 });
@@ -37108,10 +37134,10 @@ function o3Render(){
       // at work: face what you're working on - swing at rock and timber, hold a line out over the water, stoop to forage
       const gw = G.gather && G.gather.mode===0 ? G.gather.o : null;
       if (!gw || (gw.k!=='woodcutting' && gw.k!=='mining' && gw.k!=='fishing')) rsHoldTool(P.e, null);
-      if (P.e.chopT!=null && (!gw || gw.k!=='woodcutting' || moving)){ R.hand.rotation.set(0, 0, 0); P.e.chopT = null; P.e.chopPh = undefined; }   /* (RS-697: the wrist straight again) */
+      if (P.e.chopT!=null && (!gw || gw.k!=='woodcutting' || moving)){ R.hand.rotation.set(0, 0, 0); R.sh.rotation.y = 0; P.e.chopT = null; P.e.chopPh = undefined; }   /* (RS-697: the wrist straight again) */
       if (gw){
         if (gw.at && (gw.at.x!==G.owPos.x || gw.at.y!==G.owPos.y)){ const ga = o3C(gw.at.x, gw.at.y), gp = o3C(G.owPos.x, G.owPos.y), want2 = Math.atan2(ga[0] - gp[0], ga[1] - gp[1]) + (gw.k==='woodcutting' && !moving && P.e.chopT!=null ? CHOP_TURN : 0); let d2 = want2 - P.yaw; d2 = Math.atan2(Math.sin(d2), Math.cos(d2)); P.yaw += d2*Math.min(1, dt*8); P.e.holder.rotation.y = P.yaw; }
-        if (gw.k==='woodcutting'){ rsHoldTool(P.e, 'axe'); if (!moving){ P.e.chopT = (P.e.chopT||0) + dt; if (rsChopPose(P.e, P.e.chopT)) O3.chopHit = 1; } }   /* (RS-697: up at the trunk, the felling swing) */
+        if (gw.k==='woodcutting'){ rsHoldTool(P.e, 'axe'); if (!moving){ P.e.chopT = (P.e.chopT||0) + dt; if (rsChopPose(P.e, P.e.chopT, o3ChopAim())) O3.chopHit = 1; } }   /* (RS-697: up at the trunk, the felling swing) */
         else if (gw.k==='mining'){ rsHoldTool(P.e, 'pick'); rsToolSwing(P.e, tt); }
         else if (gw.k==='fishing'){ rsHoldTool(P.e, 'rod'); fishPose(R, L, G.gather, performance.now()); }   /* (RS-696) */
         else if (gw.k==='foraging'){ if (r.torso) r.torso.rotation.x = 0.7; R.sh.rotation.x = -0.9 + Math.sin(tt*3)*0.2; L.sh.rotation.x = -0.7; }
@@ -43952,15 +43978,19 @@ function m3dGrip2(r){
   m3dReachL(r, K.a.copy(r.g2).applyMatrix4(R.hand.matrixWorld));
 }
 /* the left hand put on a point (in the world): the elbow bent until the fist is as far from the shoulder, then the arm turned to it */
-function m3dReachL(r, tw){
+function m3dReachL(r, tw){ r._g2d = m3dReachArm(r.arms[1], tw, m3dArmMeasure(r)); }
+/* (RS-699) either arm put on a point: m is the arm's measures (shoulder to elbow E, elbow to the point in the hand that's to land there F) */
+function m3dArmPt(A, pt){ const T = THREE, k = pt.x+','+pt.y+','+pt.z, M = A._reach || (A._reach = {}); if (M[k]) return M[k];
+  A.sh.updateWorldMatrix(true, true); return M[k] = { E:A.sh.worldToLocal(A.el.getWorldPosition(new T.Vector3())), F:A.el.worldToLocal(A.hand.localToWorld(pt.clone())) }; }
+function m3dReachArm(L, tw, m){
   const T = THREE, K = m3dGrip2.K || (m3dGrip2.K = { a:new T.Vector3(), b:new T.Vector3(), c:new T.Vector3(), q:new T.Quaternion() });
-  const L = r.arms[1], P = L.sh.parent; P.updateWorldMatrix(true, false); const t = P.worldToLocal(tw), D = t.sub(L.sh.position), d = D.length();
-  const { E, F } = m3dArmMeasure(r), hx = (ph, out)=>{ const c = Math.cos(ph), s = Math.sin(ph); return out.set(E.x + F.x, E.y + F.y*c - F.z*s, E.z + F.y*s + F.z*c); };
+  const P = L.sh.parent; P.updateWorldMatrix(true, false); const t = P.worldToLocal(tw), D = t.sub(L.sh.position), d = D.length();
+  const { E, F } = m, hx = (ph, out)=>{ const c = Math.cos(ph), s = Math.sin(ph); return out.set(E.x + F.x, E.y + F.y*c - F.z*s, E.z + F.y*s + F.z*c); };
   /* the elbow: bent from straight until the fist is as far from the shoulder as the grip is */
   let lo = -2.7, hi = 0; if (hx(0, K.b).length() <= d) lo = 0; else if (hx(-2.7, K.b).length() >= d) hi = -2.7;
   else for (let i=0;i<16;i++){ const m = (lo + hi)/2; if (hx(m, K.b).length() > d) hi = m; else lo = m; }
   const ph = (lo + hi)/2; L.el.rotation.set(ph, 0, 0); hx(ph, K.b).normalize();
-  L.sh.quaternion.setFromUnitVectors(K.b, D.normalize()); r._g2d = [d, E.length() + F.length()];
+  L.sh.quaternion.setFromUnitVectors(K.b, D.normalize()); return [d, E.length() + F.length()];
 }
 // a bow: turn side-on, bow arm out straight, draw the string back to the cheek, then loose
 /* (RS-487) a shot as an archer makes it: turned side-on to the mark and looking down the arrow, the bow arm raised straight at it; the
@@ -46836,7 +46866,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-698';
+const GAME_VERSION = 'rs-699';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

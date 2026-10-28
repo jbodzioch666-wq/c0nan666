@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-699 - Right-Handed
+
+- **The axe swings in from the right.** You now stand side-on, left shoulder to the tree. You lift the axe back over your right shoulder, swing it out round your right side and bring it in level, edge first, into the trunk on your left. Before, the axe came down from the wrong side.
+- **Both hands on the handle.** Your right hand holds the handle up near the head and your left grips the end. Both stay on the handle through the whole swing: lifting it, swinging it, the blow and pulling it free. Before, the left hand floated beside the handle and let go of it at the top of the swing.
+- **The blade bites.** The swing is worked out from the trunk itself, so the edge lands in the bark at your waist, whatever size the tree.
+
 ## RS-698 - Tall Timber
 
 - **Trees you can chop now tower over you.** They stand about twice your height on longer, stouter trunks, with fuller crowns raised above your head. Before, the leaves came down to your chest and hid the axe as it went in. Now you can see the whole swing, the cut and the chips under the branches.

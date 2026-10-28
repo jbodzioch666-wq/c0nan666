@@ -1,7 +1,8 @@
 // RS-697: felling a tree. You walk up to the trunk (an axe's reach from it, not the middle of the next tile), the tree stands on its
 // own while you chop (its chunk leaves it out); the swing heaves the axe up over your shoulder and brings it in level at the trunk,
 // the left hand on the haft; each blow throws chips, shakes leaves down and jolts the tree, the notch deepens with the logs taken;
-// (RS-698: the tree well over your head, its crown up above the cut); stopping walks you back and puts the tree back in its chunk; the last log fells this tree, notch and all. Shot: shots/rs697.png
+// (RS-698: the tree well over your head, its crown up above the cut; RS-699: side-on, the tree on your left, the axe back over your right shoulder and
+// swung round from your right, both fists on the haft - the right up toward the head, the left at the butt); stopping walks you back and puts the tree back in its chunk; the last log fells this tree, notch and all. Shot: shots/rs697.png
 module.exports = async page=>{
   page.setDefaultTimeout(0); const errs = []; page.on('pageerror', e=>errs.push(String(e).slice(0, 300)));
   const r = await page.evaluate(async ()=>{ const fr = n=>new Promise(res=>{ let i = 0; const f = ()=>++i >= n ? res() : requestAnimationFrame(f); requestAnimationFrame(f); }), wait = ms=>new Promise(res=>setTimeout(res, ms));
@@ -16,17 +17,20 @@ module.exports = async page=>{
     out.before = chunkKey();
     const real = skGatherTick; skGatherTick = ()=>{};
     skDo(skNodeOption(n)); await wait(1200);
-    out.gather = !!G.gather; out.stand = +trunk(O3.ppos).toFixed(3); out.want = +(o3ChopTrunkR(skNodeAt(n.x, n.y)) + 0.42).toFixed(3); out.tile = +Math.hypot(hx - sx, hz - sz).toFixed(3);
+    out.gather = !!G.gather; out.stand = +trunk(O3.ppos).toFixed(3); out.want = +(o3ChopTrunkR(skNodeAt(n.x, n.y)) + CHOP_REACH).toFixed(3); out.tile = +Math.hypot(hx - sx, hz - sz).toFixed(3);
     out.own = !!(O3.chop && O3.chop.obj.parent===O3.scene && O3.chop.key===key); out.during = chunkKey();
     /* (RS-698) the tree well over your head, its crown up above the cut */
     { const tree = O3.chop.obj.children[0], b = new T.Box3(), cr = new T.Box3(); tree.updateMatrixWorld(true); b.setFromObject(tree); tree.children.forEach((m, i)=>{ if (i) cr.expandByObject(m); }); const pb = new T.Box3().setFromObject(e.holder);
       out.tall = { you:+(pb.max.y - pb.min.y).toFixed(2), tree:+(b.max.y - b.min.y).toFixed(2), crown:+(cr.min.y - O3.chop.obj.position.y).toFixed(2), type:n.type, size:+o3ChopSize(n).toFixed(2) }; }
     /* the swing, held at moments of it */
     const hold = async ph=>{ for (let f=0; f<2; f++){ e.chopT = ph*CHOP_P + 3*CHOP_P - 0.017; e.chopPh = undefined; await fr(1); }
-      const R = e.rig.arms[0], head = new T.Vector3(0, 0.66, 0.1); e.tool.updateWorldMatrix(true, false); e.tool.localToWorld(head); const lh = new T.Vector3(); e.rig.arms[1].hand.getWorldPosition(lh);
-      return { arm:+R.sh.rotation.x.toFixed(2), twist:+e.rig.torso.rotation.y.toFixed(2), head:+trunk(head).toFixed(3), headY:+(head.y - O3.ppos.y).toFixed(2), left:+lh.distanceTo(e.tool.localToWorld(new T.Vector3(0, -0.06, 0))).toFixed(3) }; };
-    out.ready = await hold(0); out.wound = await hold(0.42); out.blow = await hold(CHOP_HIT); out.back = await hold(0.85);
-    { await hold(CHOP_HIT); const c2 = O3.cam.clone(), d = new T.Vector3(sx - O3.ppos.x, 0, sz - O3.ppos.z).normalize(); c2.position.set(O3.ppos.x - d.x*0.9 + d.z*0.9, O3.ppos.y + 1.0, O3.ppos.z - d.z*0.9 - d.x*0.9); c2.lookAt(sx, O3.ppos.y + 0.4, sz); c2.updateProjectionMatrix(); O3.renderer.render(O3.scene, c2); out.shot = O3.renderer.domElement.toDataURL('image/png'); }
+      const [R, L] = e.rig.arms, head = new T.Vector3(0, 0.66, 0.1); e.tool.updateWorldMatrix(true, false); e.tool.localToWorld(head); const bh = e.holder.worldToLocal(head.clone()), tr = e.holder.worldToLocal(new T.Vector3(sx, O3.ppos.y, sz));
+      /* (RS-699) each fist where it holds the haft: how far up it from its butt end's grip (tool units: right 0.26, left -0.06) and how far off its line */
+      const on = pt=>{ const q = e.tool.worldToLocal(pt); return [+q.y.toFixed(2), +Math.hypot(q.x, q.z).toFixed(3)]; };
+      return { twist:+e.rig.torso.rotation.y.toFixed(2), head:+trunk(head).toFixed(3), headY:+(head.y - O3.ppos.y).toFixed(2), side:+bh.x.toFixed(2), fwd:+bh.z.toFixed(2), treeSide:+tr.x.toFixed(2),
+        right:on(R.hand.localToWorld(new T.Vector3(...m3dGrip(1)))), left:on(L.hand.localToWorld(new T.Vector3(-(e.rig.gripX || 0.026), -0.045, 0.004))) }; };
+    out.ready = await hold(0); out.wound = await hold(0.42); out.round = await hold(0.55); out.blow = await hold(CHOP_HIT + 0.03); out.back = await hold(0.85);
+    { await hold(CHOP_HIT); const c2 = O3.cam.clone(), y = e.holder.rotation.y - 0.6, a = new T.Vector3(); e.rig.arms[0].hand.getWorldPosition(a); c2.position.set(a.x + Math.sin(y)*1.1, a.y + 0.3, a.z + Math.cos(y)*1.1); c2.lookAt(a);   /* (from in front of you, to your right: both fists on the haft, the head in the trunk) */ c2.updateProjectionMatrix(); O3.renderer.render(O3.scene, c2); out.shot = O3.renderer.domElement.toDataURL('image/png'); }
     /* real blows */
     e.chopT = 0; e.chopPh = undefined; let jolt = 0, chips = 0, leaves = 0; const t0 = performance.now();
     while (performance.now() - t0 < 3000){ await fr(1); jolt = Math.max(jolt, Math.abs(O3.chop.obj.rotation.x) + Math.abs(O3.chop.obj.rotation.z)); chips = Math.max(chips, O3.crig.chips.filter(c=>c.t>=0).length); leaves = Math.max(leaves, O3.crig.leaves.filter(c=>c.t>=0).length); }
@@ -49,9 +53,11 @@ module.exports = async page=>{
   A(Math.abs(r.stand - r.want) < 0.04 && r.stand < r.tile - 0.25, 'walked up to the trunk, an axe\'s reach from it');
   A(r.own && r.before && !r.before.endsWith('c') && r.during && r.during.endsWith('c'), 'the tree stands on its own while you chop it, out of its chunk');
   A(r.tall.tree > r.tall.you*1.4 && r.tall.crown > r.blow.headY + 0.3, 'the tree stands well over you, its crown up above the cut (RS-698)');
-  A(r.wound.arm < r.ready.arm - 0.6 && r.wound.twist > r.ready.twist + 0.4 && r.wound.headY > 0.9, 'wound up: the axe heaved up over the shoulder, the body turned away');
-  A(r.blow.head < 0.12 && r.blow.headY > 0.2 && r.blow.headY < 0.6 && r.blow.twist < r.ready.twist - 0.5, 'the blow: the axe head at the trunk, at the waist, the body turned into it');
-  A(r.ready.left < 0.06 && r.blow.left < 0.06 && r.back.left < 0.06, 'the left hand on the haft');
+  A(r.blow.treeSide > 0.05, 'side-on to the tree: it stands on your left (RS-699)');
+  A(r.wound.side < -0.03 && r.wound.fwd < 0.1 && r.wound.headY > 0.9 && r.wound.twist < r.ready.twist - 0.3, 'wound up: the axe back over your right shoulder, the body turned away to the right (RS-699)');
+  A(r.round.side < -0.1, 'swung round from your right (RS-699)');
+  A(r.blow.head < r.want - 0.2 && r.blow.headY > 0.2 && r.blow.headY < 0.6 && r.blow.twist > r.ready.twist + 0.3, 'the blow: the axe head at the trunk, at the waist, the body turned into it');
+  A(['ready', 'wound', 'round', 'blow', 'back'].every(k=>{ const q = r[k]; return Math.abs(q.right[0] - 0.26) < 0.02 && q.right[1] < 0.02 && Math.abs(q.left[0] + 0.06) < 0.04 && q.left[1] < 0.03; }), 'both hands on the haft all through the swing: the right up it toward the head, the left at its butt (RS-699)');
   A(r.hits >= 2 && r.jolt > 0.01 && r.chips >= 5 && r.leaves >= 2 && r.notch && r.chipsDown, 'blows: chips thrown (and lying on the ground), leaves shaken down, the tree jolted, the notch cut');
   A(r.deeper[1] > r.deeper[0]*1.2, 'the notch deepens with the logs taken');
   A(!r.stopped.chop && !r.stopped.key && r.stopped.home < 0.05 && r.stopped.chunk && !r.stopped.chunk.endsWith('c') && r.stopped.wrist===0, 'stopped: back on your tile, the tree back in its chunk, the wrist straight');
