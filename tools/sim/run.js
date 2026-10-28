@@ -4,9 +4,9 @@
 // Options: --soft (software WebGL), --timeout=N minutes (default 30). Same harness as tools/tests/run.js.
 const fs = require('fs'), path = require('path');
 const ROOT = path.resolve(__dirname, '../..'), PAGE = path.join(ROOT, 'depthcrawl.html');
-const ALL = ['combat', 'gather', 'produce', 'economy', 'gear', 'world'];
+const ALL = ['combat', 'gather', 'produce', 'economy', 'gear', 'world', 'loot'];
 function load(mod, fallbacks){ for (const p of [mod].concat(fallbacks)){ try { return require(p); } catch(e){} } return null; }
-const pw = load('playwright', ['/opt/node-tools/node_modules/playwright']);
+const pw = load('playwright', [path.join(__dirname, '../tests/node_modules/playwright'), '/opt/node-tools/node_modules/playwright']);
 if (!pw){ console.error('playwright not found: run `npm install` in tools/tests'); process.exit(2); }
 const THREE = [process.env.THREE_JS, path.join(__dirname, '../tests/node_modules/three/build/three.min.js')].filter(Boolean).find(f=>fs.existsSync(f));
 const args = process.argv.slice(2), flag = k=>args.includes('--'+k);

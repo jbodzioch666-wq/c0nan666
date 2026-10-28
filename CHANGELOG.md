@@ -1,5 +1,18 @@
 # Depthcrawl patch notes
 
+## RS-704 - Prefixes and Suffixes
+
+- **Loot rolls bonuses now, in tiers.** A drop is plain, magic (blue: one or two rolled bonuses) or rare (yellow: three to six, up to three prefixes and three suffixes, never the same kind twice). About six drops in ten are plain, three magic and one in twelve rare at most levels, more of the better kinds deeper in and with magic find.
+- **Every bonus has a tier, T1 the best.** There are 27 families (Steady to Infallible attack, Sturdy to Unbreakable defence, of the Jackal to of the Colossus life, Fiery to Volcanic fire, of Fortune to of the Hoard gold, and so on), each with four to seven tiers that open as the drop's level climbs: a goblin at level 10 can only give the bottom tier, a level-110 drop can roll T1. The top open tier is a find; the next two are the common run.
+- **Names tell you what you found.** A magic piece is named for its bonuses: a Vicious Rune Scimitar of the Fox. A rare takes a name of its own - Doom Fang, Onyx Screech - with what it's made of under it.
+- **The tooltip shows the tiers.** Each bonus line carries its tier tag; a high roll is green and a perfect one gold. Hold Alt to see every roll's range (always shown on a touch screen and in the bag's detail pane).
+- **The bonuses feed the real numbers.** A rolled attack, strength, defence, ranged, magic, spell damage or prayer bonus counts exactly as the same bonus on the base would (10 attack = +1 to hit, 20 defence = +1 armour), on the character sheet, in the up/down arrows and in the loot filter. Life, regeneration, damage reduction, life steal, deadly strikes, crits, elemental damage, gold, magic and xp find work as before.
+- **Sets drop again.** The Vindicator's, Nightshade, Emberforge and Stormcaller's sets had stopped dropping; now about one drop in a hundred is a set piece.
+- **Bosses and champions.** A boss's drop is rare at the least (or a set piece); a champion's is magic at the least.
+- **Colour means what it says.** Gear used to be coloured for its metal (mithril blue, rune and dragon yellow). Now a plain rune platebody is white, like a bronze one, and the colour is what's rolled on it. Old saves are recoloured on load; crafted (Fine, Exceptional, Masterwork), famous and gilded pieces keep theirs. A Ring of Recoil's recoil and a charm's luck are the piece's own, built in, and don't colour it.
+- **Magic and rare pieces are worth more:** about 1.5 and 2.2 times a plain piece's price, and a little more with every bonus.
+- **Balance, from the new loot sim** (`node tools/sim/run.js loot`, a fighter at each level against its own monsters in the best plain metal, then with a middling magic piece in every slot, a middling rare, and the best rare of thirty): kills an hour at level 40 went 652 plain, 684 magic, 706 rare, 947 best rare; at level 80, 381, 434, 495, 633; at level 99, 226, 296, 307, 310. Damage taken a kill fell from 13.1 to 0 at level 80 and from 36.8 to 0 at 99 with the best rares, so a well-rolled rare is a real find, and a middling one a step up, without making the metal tiers pointless.
+
 ## RS-703 - Staff Forward
 
 - **Spells wait for the staff.** A spell used to fly the moment you cast it, while the staff was only starting up. Now the bolt leaves from the staff's head as you sweep it forward, about half a second in, and its sound goes with it.
