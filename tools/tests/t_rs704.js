@@ -7,9 +7,10 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
     const out = {}, p = G.player, tierOf = (a)=>{ const F = AFFIX_FAM[a.fam]; return F ? F.tiers[F.tiers.length - a.t] : null; };
     /* the shares at level 60, cap 3 */
     { const c = [0,0,0,0,0], bad = []; for (let i=0;i<600;i++){ const it = genItem(60, lootKind(), 3); c[it.quality||0]++;
-        if (it.quality===1 && !(it.aff.length>=1 && it.aff.length<=2)) bad.push('magic ' + it.aff.length);
-        if (it.quality===2){ const np = it.aff.filter(a=>AFFIX_FAM[a.fam] && AFFIX_FAM[a.fam].pre).length, ns = it.aff.filter(a=>AFFIX_FAM[a.fam] && !AFFIX_FAM[a.fam].pre).length, kinds = it.aff.map(a=>a.kind);
-          if (it.aff.length < 3 || it.aff.length > 6 || np > 3 || ns > 3 || new Set(kinds).size!==kinds.length || !RARE_PRE.some(w=>it.nm.startsWith(w)) || !it.baseNm) bad.push('rare ' + it.nm + ' ' + it.aff.length); }
+        const rolled = it.aff.filter(a=>!a.imp);   /* (a ring's or amulet's own bonus isn't a roll) */
+        if (it.quality===1 && !(rolled.length>=1 && rolled.length<=2)) bad.push('magic ' + rolled.length);
+        if (it.quality===2){ const np = rolled.filter(a=>AFFIX_FAM[a.fam] && AFFIX_FAM[a.fam].pre).length, ns = rolled.filter(a=>AFFIX_FAM[a.fam] && !AFFIX_FAM[a.fam].pre).length, kinds = rolled.map(a=>a.kind);
+          if (rolled.length < 3 || rolled.length > 6 || np > 3 || ns > 3 || new Set(kinds).size!==kinds.length || !RARE_PRE.some(w=>it.nm.startsWith(w)) || !it.baseNm) bad.push('rare ' + it.nm + ' ' + it.aff.length); }
         if (it.quality===3 && !(it.setId > 0 && it.baseNm)) bad.push('set ' + it.nm);
         if ((it.quality===1 || it.quality===2) && it.aff.some(a=>!a.imp && (!a.fam || !a.t || tierOf(a)[0] > 60))) bad.push('tier ' + it.nm);
         if (it.quality===0 && it.aff.some(a=>!a.imp)) bad.push('plain with a roll ' + it.nm); }

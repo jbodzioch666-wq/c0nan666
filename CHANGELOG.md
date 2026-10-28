@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## RS-705 - Loot on the Ground
+
+- **See what dropped where it fell.** Each drop's name floats over its beam in its rarity's colour: white plain, blue magic, yellow rare, green set, gold Unique. A magic or rare piece's name has a border in its colour. Several drops on one tile stack up. A piece with a T1 bonus says so (**T1** in gold).
+- **Better finds stand out.** The beam is taller the rarer the drop: a plain piece's is short, a Unique's three times higher. A rare and up sends sparks up its beam.
+- **Finds chime.** A magic drop plays a soft two-note chime, a rare a brighter bell. A kill that drops several plays one chime, for the best of them. Sets and Uniques keep their fanfare.
+- **The loot filter shows its work.** A drop it salvages still shows its name where it fell, in grey, with the gold it paid.
+- **The loot filter knows rarity.** A new RARITY row picks which of plain, magic and rare it salvages. Plain and magic are picked to begin with and a rare is kept. A TOP ROLLS row keeps any piece with a bonus of tier 1, 1-2 or 1-3 (off to begin with). The bag summary says how many pieces each kept back. Gilded armour still goes by its tier and bonuses.
+- **Bows roll suffixes.** A bow could only roll prefixes, so a rare bow sometimes came out with one or two bonuses instead of three. Bows now roll the general suffixes the other weapons get (life, gold, magic and xp find, heal on kill), and a rare always gets at least three bonuses.
+
 ## RS-704 - Prefixes and Suffixes
 
 - **Loot rolls bonuses now, in tiers.** A drop is plain, magic (blue: one or two rolled bonuses) or rare (yellow: three to six, up to three prefixes and three suffixes, never the same kind twice). About six drops in ten are plain, three magic and one in twelve rare at most levels, more of the better kinds deeper in and with magic find.

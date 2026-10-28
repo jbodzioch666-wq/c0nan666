@@ -16,7 +16,7 @@ module.exports = async page=>{
     return out; });
   const A = (c, m)=>{ if (!c) throw new Error(m+' :: '+JSON.stringify(r)); };
   A(r.q.every(q=>q===4), 'god staves, god capes and relics are Unique');
-  A(r.sold.every(x=>x===false) && r.plainSold===true, 'the loot filter salvages a plain piece but never the special things');
+  A(r.sold.every(x=>x===false) && r.plainSold > 0, 'the loot filter salvages a plain piece but never the special things');
   A(r.afterJunk===2, 'salvaging the bag leaves them too');
   A(r.est===null || r.est===126, 'a dragon lair\'s master is shown as level 126');
   A(r.lairSize > r.dragon, 'a lair master stands bigger than an ordinary dragon');

@@ -12,7 +12,7 @@ module.exports = async page=>{
     // the menu opens from the bag
     G.inv = []; setUi('inventory'); const btn = document.getElementById('lootFilterSel'); out.btn = btn ? btn.textContent.trim() : null; btn.click();
     out.ui = G.ui; const ov = document.getElementById('overlay'); out.title = (ov.querySelector('.panel-title')||{}).textContent; out.chips = ov.querySelectorAll('.lf-chip').length;
-    out.junkWord = /junk/i.test(ov.textContent); out.quality = /QUALITY/.test(ov.textContent); out.bonusChips = [...ov.querySelectorAll('.lf-chip')].map(b=>b.textContent.trim()).filter(t=>LOOTF_STATS.some(s=>s[1]===t));
+    out.junkWord = /junk/i.test(ov.textContent); out.quality = /QUALITY/.test(ov.textContent); out.bonusChips = [...ov.querySelectorAll('.lf-chip')].filter(b=>!b.querySelector('span')).map(b=>b.textContent.trim()).filter(t=>LOOTF_STATS.some(s=>s[1]===t));
     out.oldStats = /dexterity|wisdom|constitution|intelligence/.test(ov.textContent);
     // a bronze helm (tier 1, defence), a rune body (tier 5, defence), a steel sword (tier 2, melee), an oak bow (tier 2, ranged),
     // a plain staff (tier 1, magic and a little melee), a locked bronze helm, a set, a potion
