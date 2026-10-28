@@ -248,7 +248,7 @@
   .invrow .arrow-none{ color:transparent; }
   .muted{ color:var(--ink-faint); }
   .qN{ color:var(--ink); } .qMagic{ color:var(--blue); } .qRare{ color:var(--yellow); }
-  .qSet{ color:var(--green); } .qUnique{ color:var(--gold); }
+  .qSet{ color:var(--green); } .qUnique{ color:var(--gold); } .qCraft{ color:#4fd0b4; }
 
   .spelllvl{ margin-top:8px; }
   .spelllvl summary{
@@ -2891,8 +2891,8 @@ function afSumF(it, k){
   let t=0; for(const a of it.aff) if(a.kind===k) t+=a.f; return t;
 }
 
-function rarityColorClass(it){ return (!it.used || it.consumable) ? 'qN' : qualityClass(it.quality); }
-function rarityColorCss(it){ return (!it.used || it.consumable) ? COL.text : qualityColor(it.quality); }
+function rarityColorClass(it){ return (!it.used || it.consumable) ? 'qN' : it.made && !it.uniqueId ? 'qCraft' : qualityClass(it.quality); }   /* (RS-711: a piece you made, its own colour) */
+function rarityColorCss(it){ return (!it.used || it.consumable) ? COL.text : it.made && !it.uniqueId ? CRAFT_COL : qualityColor(it.quality); }
 // an item's name wrapped in its rarity-quality color, safe to splice into
 // already-built HTML (the name itself is escaped) - used wherever a drop
 // gets named in the log so loot reads at a glance the same way it does in
@@ -2923,7 +2923,7 @@ let afLastWord = '';
 /* (RS-704) rolls one bonus onto a piece from AFFIX_FAMS: a prefix or a suffix (wantPre) its classes allow, of a kind it doesn't
    have (usedKinds), at a tier its level d allows - the higher the tier the rarer, a tier just opened the likelier - and sets
    afLastWord to its name. cls is kept for the old callers; the piece's own classes decide */
-function rollOneAffix(it, d, cls, wantPre, usedKinds){
+function rollOneAffix(it, d, cls, wantPre, usedKinds, top){
   afLastWord = ''; const L = it.anc ? CB_HI : clampCb(d||CB_LO), on = afClasses(it), elig = [], wt = []; let tot = 0;   /* (RS-709: an Ancestral piece rolls at the top level) */
   for (const F of AFFIX_FAMS){
     if (!!F.pre !== !!wantPre) continue;
@@ -2935,7 +2935,7 @@ function rollOneAffix(it, d, cls, wantPre, usedKinds){
   if (!elig.length) return;
   let r = Math.random()*tot, pick = elig[elig.length-1];
   for (let i=0;i<elig.length;i++){ if (r < wt[i]){ pick = elig[i]; break; } r -= wt[i]; }
-  const [F, ti] = pick, i0 = it.anc ? mx(0, ti - afTopTiers(F) + 1) : 0; let tw = 0; const tws = [];   /* (RS-709: Ancestral - only the top tiers) */
+  const [F, ti] = pick, i0 = top ? ti : it.anc ? mx(0, ti - afTopTiers(F) + 1) : 0; let tw = 0; const tws = [];   /* (RS-709: Ancestral - only the top tiers; RS-711: top - the best tier open, for an Inspired craft) */
   for (let i=i0;i<=ti;i++){ const w = (AFFIX_TIER_W[i]||5) * (1 + 1.5*mx(0, 1 - (L - F.tiers[i][0])/40)); tws.push(w); tw += w; }
   let rr = Math.random()*tw, ix = ti; for (let i=i0;i<=ti;i++){ if (rr < tws[i - i0]){ ix = i; break; } rr -= tws[i - i0]; }
   const [lv, lo, hi] = F.tiers[ix], k = afSlotK(F, it);
@@ -12441,20 +12441,27 @@ function crLearn(idx){
 // the 99 recipes come out a quarter better on every bonus
 function crSuperior(it){
   for (const k of ['ac','acc','dmgB','rngAcc','magAcc','magDmg','magDmgPct','prayB']) if ((it[k]||0) > 0) it[k] = Math.max(it[k]+1, Math.round(it[k]*1.25));
-  it.superior = 1; it.nm = 'Superior ' + it.nm; it.price = Math.round((it.price||100)*3); return it;
+  it.superior = 1; it.anc = 1; it.nm = 'Superior ' + it.nm; it.price = Math.round((it.price||100)*3); return it;   /* (RS-711: Ancestral - its bonuses from the best tiers, a chance at greater ones) */
 }
-// a masterwork: now and then a craft comes out with something extra
+// Inspired (RS-711; it was called a masterwork, which is the smith's work now): now and then a craft comes out with one bonus more, at
+// the best tier its level allows - or, on a piece that rolls none, something extra on its base
 function crMaybeMasterwork(it, L, lvl, skill){
   let ch = 0.02 + Math.max(0, L - lvl)*0.0008; if (skill==='crafting') ch *= 1 + skPerk('crafting', 'mw');
   if (!it || !chn(ch)) return false;
+  if (it.made && crRollBonuses(it, it.ilvl || craftLvl(lvl, L), 1, true)){
+    const a = it.aff[it.aff.length - 1]; it.inspired = 1; it.quality = rsQualityOf(it);
+    it.nm = it.craftNm = it.baseNm = 'Inspired ' + it.nm.replace(/^(Fine|Exceptional) /, ''); it.price = Math.round((it.price||50)*1.8);
+    logMsg(`an inspired piece! ${itemNameHtml(it)} comes out with ${esc(affixText(it, it.aff.length - 1))} (T${a.t})`, 'magic', true); sfx('achievement');
+    return true;
+  }
   const opts = [];
   if (it.acc) opts.push(['acc', 8, '+8 attack']); if (it.dmgB) opts.push(['dmgB', 6, '+6 strength']);
   if (it.ac) opts.push(['ac', 15, '+15 defence']); if (it.rngAcc || it.range) opts.push(['rngAcc', 8, '+8 ranged']);
   if (it.magAcc) opts.push(['magAcc', 8, '+8 magic']); if (it.rsFam==='cloth' || it.rsStaff) opts.push(['magDmg', 2, '+2 spell damage']);
   opts.push(['prayB', 3, '+3 prayer']);
   const [k, v, txt] = opts[rn(opts.length)]; it[k] = (it[k]||0) + v;
-  it.masterwork = txt; it.nm = 'Masterwork ' + it.nm.replace(/^(Fine|Exceptional) /, ''); it.quality = Math.max(it.quality||0, 2); it.price = Math.round((it.price||50)*1.8);
-  logMsg(`a masterwork! ${itemNameHtml(it)} comes out with ${esc(txt)} more`, 'magic', true); sfx('achievement');
+  it.masterwork = txt; it.inspired = 1; it.nm = 'Inspired ' + it.nm.replace(/^(Fine|Exceptional) /, ''); if (it.made) it.craftNm = it.baseNm = it.nm; it.price = Math.round((it.price||50)*1.8);
+  logMsg(`an inspired piece! ${itemNameHtml(it)} comes out with ${esc(txt)} more`, 'magic', true); sfx('achievement');
   return true;
 }
 // ---- the work queue: make 1, 5, 10 or all, one after another, with a progress bar ----
@@ -13761,15 +13768,34 @@ function rsMakeJewel(kind, idx){
   it.price = 30 + Math.round(Math.pow(tierOfCb(j[1]),2)*10);
   return it;
 }
+/* (RS-711) a piece you make rolls bonuses as a drop does (rollOneAffix): Fine one, Exceptional two (a prefix and a suffix), at the
+   item level its material and your skill give it (craftLvl: the bar's or the recipe's level, and half again what you have past it) -
+   never the luck of a drop's level. It keeps its own name and colour (made, craftNm, CRAFT_COL); a Superior (99) piece is Ancestral */
+const CRAFT_COL = '#4fd0b4';
+function craftLvl(lvl, L){ return clampCb(Math.round(lvl*1.2 + 6 + Math.max(0, L - lvl)*0.6)); }
+function crCanRoll(it){ return !!(it && it.used && !it.uniqueId && !it.setId && !it.relic && !it.godStaff && !it.godCape && !it.questItem && !it.barrows && !it.famous && afClasses(it)); }
+function crRollBonuses(it, d, n, top){
+  if (!crCanRoll(it)) return 0;
+  const used = it.aff.map(a=>a.kind); let got = 0;
+  for (let i=0;i<n;i++){ const pre = n >= 2 ? (i%2===0 ? 1 : 0) : (chn(0.5) ? 1 : 0), k0 = it.aff.length;
+    rollOneAffix(it, d, '', pre, used, top); if (it.aff.length===k0) rollOneAffix(it, d, '', pre ? 0 : 1, used, top); if (it.aff.length > k0) got++; }
+  return got;
+}
+function crMade(it, d, n){
+  if (!crCanRoll(it)) return it;
+  it.made = 1; it.rsCraftV = 1; if (it.anc) d = CB_HI; it.ilvl = d;
+  crRollBonuses(it, d, n); it.quality = rsQualityOf(it); it.craftNm = it.baseNm = it.nm;
+  return it;
+}
 // gear you forge yourself is better made than anything a monster drops: every bonus
 // is raised by 15%, plus 1% for each Smithing level you have past the bar's own (up to +45%).
-// Past +25% it's a Masterwork, below that Fine
+// Past +25% it's Exceptional, below that Fine - and it rolls one bonus, or two (RS-711)
 function rsForgeQuality(it, L, barLvl){
   const pct = Math.round(Math.min(45, 15 + Math.max(0, L - barLvl)));
   for (const k of ['acc','dmgB','ac','rngAcc','magAcc','magDmgPct','prayB']) if ((it[k]||0) > 0) it[k] = it[k] + Math.max(Math.round(it[k]*pct/100), Math.floor(pct/10));   /* (RS-202: a better craft always shows - +1 on Fine, +2 on Exceptional and more as your level climbs, even on a 2-armour boot) */
   it.forgedPct = pct; it.forgedBy = G.player.name || 'you';
   if (!it.superior) it.nm = (pct >= 25 ? 'Exceptional ' : 'Fine ') + it.nm;
-  it.quality = Math.min(2, (it.quality||0) + (pct >= 25 ? 2 : 1));
+  crMade(it, craftLvl(barLvl, L), it.superior || pct >= 25 ? 2 : 1);   /* (RS-711: bonuses rolled; it was coloured magic or rare with none) */
   it.price = Math.round((it.price||20)*(1 + pct/100));
   return it;
 }
@@ -13805,7 +13831,21 @@ function rsArcherQuiver(){
 }
 /* (RS-704) a piece's colour was its metal's (rune and up yellow, mithril blue); now it's its bonuses'. Done once a piece; crafted
    (Fine, Exceptional, Masterwork, superior), famous, gilded, god, relic and quest pieces keep the colour they were given */
-function afMigrate(it){
+function afMigrate(it){ afMigrate2(it); try{ crMigrate(it); }catch(e){ console.error(e); } }
+/* (RS-711) a piece you made before it rolled bonuses: Fine one, Exceptional two, a masterwork (Inspired now) one more at its best tier, a
+   Superior piece Ancestral - once */
+function crMigrate(it){
+  if (!it || !it.used || it.rsCraftV || !(it.forgedPct || it.superior || it.masterwork) || it.uniqueId) return;
+  it.rsCraftV = 1; if (!crCanRoll(it)) return;
+  if (/^Masterwork /.test(it.nm||'')){ it.nm = it.nm.replace(/^Masterwork /, 'Inspired '); it.inspired = 1; }
+  if (it.reinfBase && /^Masterwork /.test(it.reinfBase.nm||'')) it.reinfBase.nm = it.reinfBase.nm.replace(/^Masterwork /, 'Inspired ');
+  if (it.superior) it.anc = 1;
+  const req = Math.max(it.reqAtt||0, it.reqDef||0, it.reqRng||0, it.reqMag||0, it.reqStr||0, 1), d = it.anc ? CB_HI : craftLvl(req, req + Math.max(0, (it.forgedPct||15) - 15));
+  const R = enchRolls(it).length; it.made = 1; it.ilvl = d;
+  if (!R){ crRollBonuses(it, d, it.superior || (it.forgedPct||0) >= 25 ? 2 : 1); if (it.inspired) crRollBonuses(it, d, 1, true); }
+  it.quality = rsQualityOf(it); const nm = (it.reinfBase && it.reinfBase.nm) || it.nm.replace(/ \+\d+$/, ''); it.craftNm = it.baseNm = nm;
+}
+function afMigrate2(it){
   if (!it || !it.used || it.consumable || it.kind==='scroll' || it.kind==='set' || (it.rsLootV||0) >= 2) return;
   const lv = it.rsLootV||0; it.rsLootV = 2; afBaseImplicit(it);   /* (RS-706: its base's own bonus, once) */
   if (lv >= 1) return;
@@ -13943,6 +13983,7 @@ function guaranteedEliteDrop(level){
 function itemPrice(it){
   if (it.kind==='set') return (it.setItems||[]).reduce((t,x)=>t+itemPrice(x), 0);
   if (it.consumable || it.kind==='wand' || it.kind==='scroll') return it.price||10;
+  if (it.rs && it.made && !it.uniqueId) return mx(3, roundH((it.price||20) * (it.inspired || (it.forgedPct||0) >= 25 || it.superior ? 2.2 : 1.5) * (it.anc && !it.superior ? 1.4 : 1)));   /* (RS-711: a made piece is worth what it was) */
   if (it.rs){ const q = it.quality||0; return mx(3, roundH((it.price||20) * (it.uniqueId ? 3 : q===3 ? 2.6 : q===2 ? 2.2 : q===1 ? 1.5 : 1) * (it.uniqueId ? 1 : 1 + 0.12*(it.aff||[]).filter(a=>a && !a.imp).length) * (it.anc ? 1.4 + 0.25*(it.aff||[]).filter(a=>a && a.g).length : 1))); }   /* (RS-709: Ancestral, and each greater bonus) */   /* (RS-706: a built-in bonus isn't a roll) */   /* (RS-704: a magic or a rare piece is worth more, and more with every bonus) */
   let b = (it.slot==='weapon' || it.slot==='ranged') ? (8+weaponAvg(it)*6) : (8+it.ac*7);
   return mx(3, roundH(b));
@@ -14117,6 +14158,7 @@ function itemSubName(it){
   if (it.uniqueId) return 'unique ' + (it.baseMat ? it.baseMat + ' ' : '') + (it.basis||'');
   if (it.setId) return 'Set ' + (it.baseNm || it.basis || '');
   const q = it.quality||0, an = it.anc ? 'ancestral ' : '';   /* (RS-709) */
+  if (it.made) return an + 'crafted ' + (it.basis || '');   /* (RS-711) */
   if ((q===1 || q===2) && it.baseNm && it.baseNm!==it.nm) return an + (q===2 ? 'rare ' : 'magic ') + it.baseNm;
   return an + (it.basis || '');
 }
@@ -47155,7 +47197,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-710';
+const GAME_VERSION = 'rs-711';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -48259,7 +48301,8 @@ function enchRename(it, wasRare){
   const q = rsQualityOf(it), R = enchRolls(it).filter(a=>a.fam && AFFIX_FAM[a.fam]), w = a=>{ const F = AFFIX_FAM[a.fam]; return F.nm[F.tiers.length - a.t]; };
   const cur = (it.nm||'').replace(/ \+\d+$/, '');
   let nm = base;
-  if (q===1){ const pr = R.find(a=>AFFIX_FAM[a.fam].pre), su = R.find(a=>!AFFIX_FAM[a.fam].pre); nm = `${pr ? w(pr) + ' ' : ''}${base}${su ? ' ' + w(su) : ''}`; }
+  if (it.made) nm = it.craftNm || base;   /* (RS-711: a made piece keeps its name) */
+  else if (q===1){ const pr = R.find(a=>AFFIX_FAM[a.fam].pre), su = R.find(a=>!AFFIX_FAM[a.fam].pre); nm = `${pr ? w(pr) + ' ' : ''}${base}${su ? ' ' + w(su) : ''}`; }
   else if (q===2) nm = wasRare ? cur : rareName();
   it.quality = Math.max(q, it.forgedPct ? (it.quality||0) : 0);
   if (it.reinf){ if (it.reinfBase) it.reinfBase.nm = nm; it.nm = `${nm} +${it.reinf}`; } else it.nm = nm;
@@ -48278,7 +48321,9 @@ function enchLaw(it, i){
 }
 function enchChaos(it){
   if (enchFixed(it) || !enchCanChaos(it) || !enchSpend('es_chaos')) return;
-  const q = rsQualityOf(it), wasRare = q===2; it.aff = it.aff.filter(a=>a && a.imp); it.naff = it.aff.length;
+  const q = rsQualityOf(it), wasRare = q===2, nR = enchRolls(it).length;
+  if (it.made){ it.aff = it.aff.filter(a=>a && a.imp); it.naff = it.aff.length; crRollBonuses(it, enchLvl(it), nR); it.quality = rsQualityOf(it); enchRename(it, wasRare); enchDone(it, `the Essence of Chaos tears through the ${esc(it.nm)} - every bonus rolled anew`); return; }   /* (RS-711: a made piece, as many as it had) */
+  it.aff = it.aff.filter(a=>a && a.imp); it.naff = it.aff.length;
   if (!it.baseNm) it.baseNm = (it.reinfBase && it.reinfBase.nm) || it.nm;
   const keepNm = it.nm; afDress(it, enchLvl(it), q); if (wasRare) it.nm = keepNm;
   enchRename(it, wasRare); enchDone(it, `the Essence of Chaos tears through the ${esc(it.nm)} - every bonus rolled anew`);
@@ -48295,7 +48340,7 @@ function enchBlood(it){
    one of Chaos or Blood, and a chance at Law */
 function enchBreakYield(it){ const q = rsQualityOf(it), y = q===1 ? [['es_change', 1], ['es_blood', 0.35]] : q===2 ? [['es_change', 2], [chn(0.5) ? 'es_chaos' : 'es_blood', 1], ['es_law', 0.25]] : []; if (y.length && it.anc) y.push(['es_law', 0.5]); return y; }   /* (RS-709: an Ancestral piece a chance at Law more) */
 function enchBreak(it){
-  const i = G.inv.indexOf(it), q = rsQualityOf(it); if (i < 0 || it.locked || enchFixed(it) || (q!==1 && q!==2)) return;
+  const i = G.inv.indexOf(it), q = rsQualityOf(it); if (i < 0 || it.locked || it.made || enchFixed(it) || (q!==1 && q!==2)) return;   /* (RS-711: not a piece you made - it would turn bars into essences) */
   G.inv.splice(i, 1); if (ENCH.sel===it) ENCH.sel = null; const got = [];
   for (const [id, x] of enchBreakYield(it)){ const n = x >= 1 ? x : (chn(x) ? 1 : 0); if (n){ skAdd(id, n); got.push(`${n} ${esNm(id, n)}`); } }
   logMsg(`the smith breaks the ${itemNameHtml(it)} down: ${got.join(', ')}`, 'loot', true); sfx('gold'); try{ clampInvSel(); }catch(e){} renderOverlay(); saveCurrentGame();
@@ -48335,7 +48380,7 @@ function buildEnchantHtml(){
     const q = rsQualityOf(it), inBag = G.inv.includes(it), y = enchBreakYield(it);
     const whole = fixed ? `<div class="muted">a Unique's, a set piece's or a relic's bonuses are its own - it can only be masterworked</div>`
       : `<div class="ench-acts">${b('Chaos &middot; reroll all', 'es_chaos', enchCanChaos(it), 'enchChaos(ENCH.sel)', 'only a magic or rare piece')}${b('Blood &middot; add a bonus', 'es_blood', enchCanBlood(it), 'enchBlood(ENCH.sel)', 'six bonuses is the most a piece holds')}
-         ${inBag && (q===1 || q===2) ? `<button class="btn" ${it.locked ? 'disabled title="locked"' : ''} onclick="hideItemTooltip();enchBreak(ENCH.sel)" title="${esc('break it down: ' + y.map(([id, x])=>x >= 1 ? x + ' ' + esNm(id, x) : Math.round(x*100) + '% ' + esNm(id, 1)).join(', '))}">break down</button>` : ''}</div>`;
+         ${inBag && !it.made && (q===1 || q===2) ? `<button class="btn" ${it.locked ? 'disabled title="locked"' : ''} onclick="hideItemTooltip();enchBreak(ENCH.sel)" title="${esc('break it down: ' + y.map(([id, x])=>x >= 1 ? x + ' ' + esNm(id, x) : Math.round(x*100) + '% ' + esNm(id, 1)).join(', '))}">break down</button>` : ''}</div>`;
     const n = it.reinf||0, c = mwCost(it), mw = !rerollable(it) ? '<div class="muted">nothing on it a hammer can raise</div>' : n >= MW_MAX ? `<div class="muted">masterworked to +${MW_MAX} - as good as it gets</div>`
       : `<div class="ench-row"><span>+${n + 1}: its own numbers +${Math.round(MW_STEP*(n + 1)*100)}% over the base${n + 1===4 || n + 1===8 ? ', and one bonus grows by a quarter' : ''}</span><span><button class="btn" ${G.player.gold >= c.gold && skHave('es_law') >= c.law ? '' : 'disabled'} onclick="hideItemTooltip();smithMasterwork(ENCH.sel)">${c.gold.toLocaleString()}g${c.law ? ` + ${c.law} Law` : ''}</button></span></div>`;
     det = `<div class="ench-sel"><div class="ench-h"><span class="${rarityColorClass(it)}">${esc(it.nm)}</span> <span class="muted">${esc(itemSubName(it))}${it.reinf ? ` &middot; masterworked +${it.reinf}/${MW_MAX}` : ''}</span></div>${rows || '<div class="muted">no bonuses yet</div>'}${whole}

@@ -1,5 +1,15 @@
 # Depthcrawl patch notes
 
+## RS-711 - Crafted
+
+- **What you make rolls bonuses.** Smithed, crafted and fletched gear now rolls prefixes and suffixes, as loot does. A Fine piece gets one bonus, and an Exceptional piece gets two: a prefix and a suffix. The forge's +15–45% on the base numbers stays.
+- **Your skill sets the tiers, not luck.** A made piece's item level comes from its bar or recipe and how far your level is past it. Rune at Smithing 99 rolls at about item level 113, bronze at level 1 at 7.
+- **A colour of its own.** Made pieces show in jade, with "crafted" under their name. Before, Fine pieces were coloured magic and Exceptional ones rare, even though they had no bonuses.
+- **Inspired, not Masterwork.** The lucky craft is now called Inspired, so it no longer shares a name with the smith's masterworking. It adds one more bonus at the best tier its level allows.
+- **Superior is Ancestral.** The level-99 Superior robes and dragonhide come out Ancestral: their bonuses come from the top tiers, and each one has a chance to be greater.
+- **At the anvil.** A made piece keeps its name through Change, Law, Chaos and Blood. Chaos rerolls as many bonuses as it had. Made pieces can't be broken down for essences, so bars don't turn into essences.
+- **Your old gear.** Crafted pieces you already own get their bonuses once when you load: Fine one, Exceptional two, and an old Masterwork (now Inspired) one more at its best tier. Old Superior pieces turn Ancestral. Sale prices stay as they were.
+
 ## RS-710 - On Contact
 
 - **Melee lands when the blade does.** Your swing starts as soon as you attack, but the hit itself waits until your weapon meets the foe, about a quarter of a second in. That covers the foe's life bar, the target plate, the damage number, the log line, the xp drop, the hit sound, and the death and loot from a killing blow. Until now all of it came at the start of the swing.
