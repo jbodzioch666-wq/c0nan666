@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-708 - On Impact
+
+- **A spell's damage shows when it lands.** A spell takes about three quarters of a second to leave the staff and fly, but the foe's life bar and the target plate beside yours dropped the moment you cast. Now they hold until the bolt hits.
+- **The log waits too.** The log's "your Fire Strike hits the goblin for 12", the xp drop and a kill's loot beam and chime now come as the bolt lands, not as it leaves.
+- **Arrows, bolts and thrown weapons** work the same way.
+- **A foe the bolt kills** keeps its place on the target plate until the bolt reaches it.
+
 ## RS-707 - Essences
 
 - **Four essences, a new crafting currency.** Essence of Change, Chaos, Blood and Law. A kill leaves one about one time in twenty (more with magic find), and a boss's hoard holds two or three. They have their own row in the bag's Resources tab.
