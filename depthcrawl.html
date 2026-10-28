@@ -45823,7 +45823,7 @@ function isoSyncPlayer(){
   const lunge = Math.max(strike, C.fol*0.6)*0.2 - hurt*0.1;   // step into the blow and follow it through; rock back when you're hit
   e.holder.position.set(e.pos.x + Math.sin(e.face)*lunge, 0, e.pos.y + Math.cos(e.face)*lunge); e.holder.rotation.y = e.face;
   const onPortal = isoPortalTick(e), onStair = onPortal!=null ? onPortal : isoStairTick(e);   /* (RS-592; RS-609: or into a portal) */
-  m3dPoseHumanoid(e.rig, FP.t + e.seed, onStair ? 1 : moving, wind + FP.cast*0.4, strike, hurt*0.8, e);
+  m3dPoseHumanoid(e.rig, FP.t + e.seed, onStair ? 1 : moving, wind, strike, hurt*0.8, e);   /* (RS-702: the cast's own turn and lean are in rsCastPose - added here as a jump of wind, it snapped the body round) */
   rsPlayerFx(e, FP.t + e.seed, moving, true);
   const gw = G.gather && G.gather.mode===1 && G.gather.o.k==='mining' && G.gather.o.vein ? G.gather.o : null;
   if (gw){
@@ -45993,6 +45993,46 @@ function rsSheath(e, fight, dt, t, moving){
     if (!r.tome){ L.sh.rotation.x = mx(L.sh.rotation.x, -0.08 + sw*0.45 + br*0.02); L.sh.rotation.z = mx(L.sh.rotation.z, 0.12); L.el.rotation.x = mx(L.el.rotation.x, -0.25 - Math.max(0, -sw)*0.3); } }
   if (bump > 0){ const [sx, sz, ex] = r.shd.back ? [-2.7, -0.35, -1.5] : [-0.6, 0.55, -1.25]; R.sh.rotation.x += (sx - R.sh.rotation.x)*bump; R.sh.rotation.z += (sz - R.sh.rotation.z)*bump; R.el.rotation.x += (ex - R.el.rotation.x)*bump; }
 }
+/* (RS-702) a spell cast, u 0 to 1 through it, as one flowing motion: the staff is drawn up and back over the shoulder in an arc as the
+   off hand gathers light before the chest and the body turns away, then swept forward and down to point at the foe as the off hand
+   thrusts the light out and the body turns and leans into it, the knees giving, and carried through before easing back. Each channel
+   is a smooth curve through CAST_KEYS (a cubic through the keys, its slopes from the neighbours, so nothing starts or stops dead),
+   and the whole is blended in from the pose the frame already had (the guard) and back out to it, so it leaves and returns without a
+   jump. The staff is turned in the fist to lean as Lean says - measured, not set, as the arm's lift and the fist's tip work against
+   each other (a fixed tip laid it flat behind the head mid-raise). With a tome the off hand stays mostly on the book. Gives the
+   gathered light's strength, 0 to 1 */
+const CAST_U = [0, 0.2, 0.38, 0.54, 0.68, 1];
+const CAST_KEYS = {   /* (the arms' angles, then additions: torso lean and turn, knees, the staff tipped in the fist, the light) */
+  Rsx:[-0.6, -1.6, -2.45, -1.55, -1.3, -0.6], Rsz:[-0.2, -0.4, -0.3, -0.1, -0.14, -0.2], Rel:[-0.6, -0.5, -0.35, -0.08, -0.25, -0.6],
+  Lsx:[-0.4, -0.85, -1.05, -1.6, -1.2, -0.4], Lsz:[0.25, 0.35, 0.3, 0.1, 0.2, 0.25], Lel:[-0.8, -1.35, -1.45, -0.18, -0.5, -0.8],
+  Tx:[0, -0.06, -0.12, 0.16, 0.1, 0], Ty:[0, 0.18, 0.3, -0.24, -0.12, 0], Kn:[0, 0.05, 0.08, 0.22, 0.16, 0],
+  Lean:[0, -0.3, -0.25, 0.75, 0.5, 0], Glow:[0, 0.5, 0.85, 1, 0.3, 0] };   /* (Lean: the staff's own lean, radians forward of upright, whatever the arm is doing) */
+function castCurve(ys, u){
+  const X = CAST_U, n = X.length; u = Math.max(0, Math.min(1, u)); let i = 0; while (i < n - 2 && u > X[i+1]) i++;
+  const h = X[i+1] - X[i], s = (u - X[i])/h, sl = j=>j<=0 || j>=n-1 ? 0 : (ys[j+1] - ys[j-1])/(X[j+1] - X[j-1]);
+  const m0 = sl(i)*h, m1 = sl(i+1)*h, s2 = s*s, s3 = s2*s;
+  return (2*s3 - 3*s2 + 1)*ys[i] + (s3 - 2*s2 + s)*m0 + (-2*s3 + 3*s2)*ys[i+1] + (s3 - s2)*m1; }
+function castLean(e, piv){   /* (how far the staff leans forward of upright in the body's frame: its butt-to-head line, from the fist) */
+  const T = THREE, r = e.rig, m = new T.Matrix4(), M = new T.Matrix4(), tip = new T.Vector3(), org = new T.Vector3();
+  const chain = (o, top, out)=>{ out.identity(); const L = []; for (let q = o; q && q!==top; q = q.parent) L.push(q); for (let i=L.length-1;i>=0;i--) out.multiply(m.compose(L[i].position, L[i].quaternion, L[i].scale)); return out; };   /* (made from the parts' own turns - gfxAutoFreeze leaves a still part's matrix as it was) */
+  if (!r._castTip){ const b = new T.Box3(), v = new T.Vector3(), W = new T.Matrix4(); r.weapon.traverse(o=>{ if (!o.isMesh || !o.geometry) return; const g = o.geometry; if (!g.boundingBox) g.computeBoundingBox(); const gb = g.boundingBox; W.copy(chain(o, piv, M));
+      for (let i=0;i<8;i++) b.expandByPoint(v.set(i&1 ? gb.max.x : gb.min.x, i&2 ? gb.max.y : gb.min.y, i&4 ? gb.max.z : gb.min.z).applyMatrix4(W)); });
+    const c = b.getCenter(new T.Vector3()), s = b.getSize(new T.Vector3()), ax = s.x > s.y ? (s.x > s.z ? 'x' : 'z') : (s.y > s.z ? 'y' : 'z');   /* (the head: the far end of the staff's length from the fist) */
+    r._castTip = c.clone(); r._castTip[ax] = Math.abs(b.max[ax]) > Math.abs(b.min[ax]) ? b.max[ax] : b.min[ax]; }
+  return ()=>{ chain(piv, e.holder, M); tip.copy(r._castTip).applyMatrix4(M); org.setFromMatrixPosition(M); tip.sub(org); return Math.atan2(tip.z, tip.y); }; }
+function rsCastPose(e, u){
+  const r = e.rig, [R, Lf] = r.arms, K = CAST_KEYS, c = k=>castCurve(K[k], u), sm = x=>x<=0 ? 0 : x>=1 ? 1 : x*x*(3 - 2*x);
+  const w = sm(u/0.3)*sm((1 - u)/0.34), lw = w*(r.tome ? 0.3 : 1), mix = (o, k, v, ww)=>{ o[k] += (v - o[k])*ww; };
+  for (const o of [R.sh, R.el, R.hand, Lf.sh, Lf.el, Lf.hand, r.torso, r.hips].concat((r.legs||[]).flatMap(L=>[L.hip, L.knee, L.ankle]))) if (o && o.__afz){ o.__afz = false; o.matrixAutoUpdate = true; }   /* (woken: a joint still at guard is left frozen by gfxAutoFreeze - the cast's first frames showed it where it was) */
+  const piv = r.wk==='staff' && r.weapon && r.weapon.parent ? m3dWpPiv(r) : null, lean = piv && r.weapon.parent===piv ? castLean(e, piv) : null, lean0 = lean ? lean() : 0;
+  mix(R.sh.rotation, 'x', c('Rsx'), w); mix(R.sh.rotation, 'z', c('Rsz'), w); mix(R.el.rotation, 'x', c('Rel'), w); R.sh.rotation.y *= 1 - w; R.hand.rotation.x *= 1 - w;
+  mix(Lf.sh.rotation, 'x', c('Lsx'), lw); mix(Lf.sh.rotation, 'z', c('Lsz'), lw); mix(Lf.el.rotation, 'x', c('Lel'), lw); Lf.sh.rotation.y *= 1 - lw;
+  if (r.torso){ r.torso.rotation.x += c('Tx')*w; r.torso.rotation.y += c('Ty')*w; }
+  if (r.hips) r.hips.rotation.y = (r.hips.rotation.y||0) + c('Ty')*0.3*w;
+  const kn = c('Kn')*w; if (kn && r.legs){ if (r.hips) r.hips.position.y -= kn*0.03; r.legs.forEach(L=>{ L.knee.rotation.x += kn; L.hip.rotation.x -= kn*0.5; if (L.ankle) L.ankle.rotation.x -= kn*0.5; }); }
+  if (lean){ const want = lean0 + (c('Lean') - lean0)*w; if (piv.__afz){ piv.__afz = false; piv.matrixAutoUpdate = true; }   /* (woken too) */   /* (two Newton steps on the fist's tip, the slope found by a nudge) */
+    for (let i=0;i<2;i++){ const a = lean(); piv.rotation.x += 0.05; const d = (lean() - a)/0.05; piv.rotation.x -= 0.05; if (Math.abs(d) > 0.2) piv.rotation.x += Math.max(-1.2, Math.min(1.2, (want - a)/d)); } }
+  return Math.max(0, c('Glow'))*sm(u/0.1); }
 function rsPlayerFx(e, t, moving, iso){
   e.fight = rsFightNow();   /* (RS-300: for the next frame's pose - the tome shuts out of a fight) */
   if (!e || !e.rig || !e.holder || !G.player || typeof THREE==='undefined') return;
@@ -46026,14 +46066,11 @@ function rsPlayerFx(e, t, moving, iso){
   if (sb < 1.8 && sb > 0.5){ if (!e._bury){ e._bury = new T.Sprite(new T.SpriteMaterial({ map:M3D.glowMat('#fff0b0', 0.9).map, transparent:true, depthWrite:false, blending:T.AdditiveBlending })); e.holder.add(e._bury); }
     const u = (sb-0.5)/1.3; e._bury.visible = true; e._bury.position.set(0, (0.05 + u*0.5)*S, 0.25*S); e._bury.scale.setScalar((0.12 + u*0.2)*S); e._bury.material.opacity = Math.sin(u*Math.PI); }
   else if (e._bury) e._bury.visible = false;
-  // casting: raise the staff, gather light in the off hand, then thrust it out
+  // casting: raise the staff, gather light in the off hand, then thrust it out (RS-702: one flowing motion - see rsCastPose)
   if (iso && R && FP.cast > 0){
-    const u = 1 - FP.cast, raise = Math.min(1, u/0.35), rel = u > 0.55 ? Math.sin(Math.min(1, (u-0.55)/0.45)*Math.PI) : 0;
-    R.sh.rotation.x = -0.55 - raise*2.0 + rel*1.3; R.sh.rotation.z = -0.2; R.el.rotation.x = -0.3*raise;
-    Lf.sh.rotation.x = -0.3 - raise*1.1 - rel*0.4; Lf.sh.rotation.z = 0.3; Lf.el.rotation.x = -0.5;
-    if (r.torso) r.torso.rotation.x = 0.06 - raise*0.12 + rel*0.2 + (r.stoop||0);
+    const glow = rsCastPose(e, 1 - FP.cast);
     if (!e._cast){ e._cast = new T.Sprite(new T.SpriteMaterial({ map:M3D.glowMat('#c8d0ff', 0.95).map, transparent:true, depthWrite:false, blending:T.AdditiveBlending })); Lf.hand.add(e._cast); }
-    e._cast.visible = true; e._cast.scale.setScalar(0.04 + Math.sin(Math.min(1, u/0.6)*Math.PI/2)*(1-rel*0.8)*0.16); e._cast.position.set(0, -0.06, 0.03);
+    e._cast.visible = glow > 0.01; e._cast.scale.setScalar(0.03 + glow*0.17); e._cast.position.set(0, -0.06, 0.03);
   } else if (e._cast) e._cast.visible = false;
   // prayers: the protection prayer you have up glows over your head; boosting prayers ring your feet in light
   const pr = p.prayers || [], prot = pr.map(id=>(RS_ALLPRAY().find(x=>x.id===id)||{}).prot).find(Boolean);
@@ -46867,7 +46904,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-701';
+const GAME_VERSION = 'rs-702';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

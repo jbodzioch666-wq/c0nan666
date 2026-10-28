@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-702 - Flowing Staff
+
+- **Casting is one smooth motion.** You draw your staff up and back overhead while your off hand gathers light before your chest, then sweep it forward to point at your foe as you thrust the light out, leaning into the spell, and ease back to your guard.
+- **No more jerks.** The staff used to jump up as a cast began, rise in a straight line and hold, then drop back in a single frame at the end. Now it eases out of your guard and back into it (the staff's biggest jolt from one frame to the next is about a twelfth of what it was).
+- **The staff stands up overhead.** It used to lie flat behind your head as you raised it. Now it stands upright, with or without a tome in your other hand.
+
 ## RS-701 - Both Hands Free
 
 - **The tome is put away while you work.** Chopping, mining or fishing, a spell tome no longer stays open in your left hand while that hand holds the axe's haft. It's back in your hand as soon as you stop.
