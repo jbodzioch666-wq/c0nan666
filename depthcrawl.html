@@ -25859,9 +25859,9 @@ function* gfxO3BuildGen(grp, x0, y0, W, M){   /* (RS-403: a step at a time - see
   // the ground: grass, dirt and rock blended by slope, roads and soil; strata on the cliffs; cloud shadows
   const land = O3.land;
   if (land){
-    const g = land.geometry, pos = g.attributes.position, nor = g.attributes.normal, n = pos.count, bl = new Float32Array(n*4);
+    const g = land.geometry, pos = g.attributes.position, nor = g.attributes.normal, n = pos.count, bl = new Float32Array(n*4), RK = g.userData.rock;   /* (RS-694: a mine's cliff, rock) */
     for (let i=0;i<n;i++){ const x = pos.getX(i), h = pos.getY(i), z = pos.getZ(i), slope = 1 - nor.getY(i), tx0 = Math.floor(x - 0.5), tz0 = Math.floor(z - 0.5), t = o3Tile(tx0, tz0);
-      const rock = Math.min(1, Math.max(0, (slope - 0.16)/0.3) + (h > 2.2 ? 0.35 : 0) + (t===OW_MOUNTAIN ? 0.25 : 0));
+      const rock = Math.min(1, Math.max(0, (slope - 0.16)/0.3) + (h > 2.2 ? 0.35 : 0) + (t===OW_MOUNTAIN ? 0.25 : 0) + (RK && i >= RK.at ? RK.w[i - RK.at] : 0));
       const sand = Math.min(1 - rock, (t===OW_DESERT ? 0.8 : 0) + (h < O3_WATER_Y + 0.14 && t!==OW_SWAMP && t!==OW_MOUNTAIN ? 0.85 : 0));   /* (RS-550: sand on the beaches and the dunes - they were dirt) */
       const dirt = Math.min(1 - rock - sand, (o3RoadAt(tx0, tz0) && !(gfxRoadPaintOn() && O3.rmask) ? 0.9 : 0) + (h < 0.03 ? 0.45 : 0) + (t===OW_MOUNTAINPASS ? 0.6 : 0));   /* (RS-591: painted, the road's own texture wears the ground - this laid a square of dirt under each road tile) */
       bl[i*4] = Math.max(0, 1 - rock - dirt - sand); bl[i*4+1] = dirt; bl[i*4+2] = rock; bl[i*4+3] = sand; }
@@ -26032,7 +26032,7 @@ function* gfxO3BuildGen(grp, x0, y0, W, M){   /* (RS-403: a step at a time - see
     if ((t===OW_DESERT || t===OW_MOUNTAINPASS) && o3Hash(x, y, 395) < 0.4) for (let i=0;i<3;i++) pebbles.push([x + o3Hash(x, y, 396+i), y + o3Hash(x, y, 399+i), o3Hash(x, y, 402+i)]);
   }
   if (O3.cuts && O3.cuts.length) for (const L of [spots, flowers, pebbles]) for (let i=L.length-1; i>=0; i--) if (o3InCut(L[i][0], L[i][1], 0.06)) L.splice(i, 1);   /* (RS-652: none floating over a barrow's stair) */
-  for (const L of [spots, flowers, pebbles]) for (let i=L.length-1; i>=0; i--) if (o3NearTemple(L[i][0], L[i][1], 1.08) || o3NearGraveyard(L[i][0], L[i][1], 0.02)) L.splice(i, 1);   /* (RS-682: nor poking up through a sunken temple's pool; RS-684: nor a graveyard's flags) */
+  for (const L of [spots, flowers, pebbles]) for (let i=L.length-1; i>=0; i--) if (o3NearTemple(L[i][0], L[i][1], 1.08) || o3NearGraveyard(L[i][0], L[i][1], 0.02) || o3NearMine(L[i][0], L[i][1], 0.03)) L.splice(i, 1);   /* (RS-682: nor poking up through a sunken temple's pool; RS-684: nor a graveyard's flags) */
   const m4 = new T.Matrix4(), q = new T.Quaternion(), s3 = new T.Vector3(), v3 = new T.Vector3(), up = new T.Vector3(0, 1, 0), c3 = new T.Color();
   if (spots.length){ const im = new T.InstancedMesh(blade, gm, spots.length);
     spots.forEach(([x, z, r, col], i)=>{ q.setFromAxisAngle(up, r*40); s3.set(1 + r*0.6, 0.7 + r*0.8, 1); v3.set(x, O3.heightAt(x, z) - 0.01, z); im.setMatrixAt(i, m4.compose(v3, q, s3)); c3.setRGB(col[0]*(0.8 + r*0.4), col[1]*(0.8 + r*0.4), col[2]*(0.8 + r*0.4)); im.setColorAt(i, c3); });
@@ -34011,6 +34011,8 @@ function* o3BuildGen(cx, cy){
   for (let k=0;k<NV*NV;k++){ const st = 1 - nr.getY(k); if (cliffV[k]===2){ const rk = lin(86); col[k*3] += (rk - col[k*3])*0.9; col[k*3+1] += (rk*0.96 - col[k*3+1])*0.9; col[k*3+2] += (rk*0.9 - col[k*3+2])*0.9; continue; }   /* (RS-622: a cliff's lip is rock) */
     if (st > 0.25 && (H[k] > 0.4 || cliffV[k] || (H[k] < O3_WATER_Y && st > 0.5 && cliffNb(k)))){ const f = Math.min(1,(st-0.25)*2.2)*0.85, rk = lin(78); col[k*3] += (rk-col[k*3])*f; col[k*3+1] += (rk*0.97-col[k*3+1])*f; col[k*3+2] += (rk*0.94-col[k*3+2])*f; } }
   if (pits.length) o3LandCut(geo, pits, x0, y0, NV);   /* (RS-652) */
+  try{ o3LandMines(geo, x0, y0, NV, W, (wx, wz)=>{ const fi = (wx-x0)*O3_R, fj = (wz-y0)*O3_R, i = Math.max(0, Math.min(NV-2, Math.floor(fi))), j = Math.max(0, Math.min(NV-2, Math.floor(fj))), a = fi-i, b2 = fj-j;
+    return H[j*NV+i]*(1-a)*(1-b2) + H[j*NV+i+1]*a*(1-b2) + H[(j+1)*NV+i]*(1-a)*b2 + H[(j+1)*NV+i+1]*a*b2; }); }catch(e){ console.error(e); }   /* (RS-694) */
   const land = new T.Mesh(geo, new T.MeshStandardMaterial({ vertexColors:true, map:tex.detail, roughness:0.95 }));
   land.receiveShadow = true; land.castShadow = true; grp.add(land); O3.land = land;
   { const dd = new Uint8Array(NV*NV*4); for (let k=0;k<NV*NV;k++){ dd[k*4] = Math.round(Math.max(0, Math.min(1, (O3_WATER_Y - H[k])/0.6))*255); dd[k*4+3] = 255; if (dryCuts.length && o3InCut(x0 + (k % NV)/O3_R, y0 + ((k/NV)|0)/O3_R, 0.35, dryCuts)) dd[k*4+1] = 255; }   /* (RS-687: the sea stays over a drowned temple's stair until it parts) */   /* (RS-652: green - no water drawn here, down a barrow's stair) */   /* (RS-311: how deep the water is over every point, for the shallows and the surf) */
@@ -34248,7 +34250,7 @@ function* o3VegetationGen(grp, x0, y0, W){
     if (towns.length) for (let i=put.length-1; i>=0; i--){ const q = put[i], big = q[0]!=='bush' && q[0]!=='rock' && q[0]!=='reed', rr = big ? 1.25 : 0.85;
       if (towns.some(([tx, tz, k])=>Math.hypot(q[1] - tx, q[2] - tz) < rr*k)) put.splice(i, 1); } }
   if (O3.cuts && O3.cuts.length) for (let i=put.length-1; i>=0; i--){ const q = put[i]; if (o3InCut(q[1], q[2], q[0]==='bush' || q[0]==='rock' || q[0]==='reed' ? 0.15 : 0.35)) put.splice(i, 1); }   /* (RS-652: nor in a barrow's stair) */
-  for (let i=put.length-1; i>=0; i--){ const q = put[i]; if (o3NearTemple(q[1], q[2], q[0]==='bush' || q[0]==='rock' || q[0]==='reed' ? 1.1 : 1.3) || o3NearGraveyard(q[1], q[2], q[0]==='bush' || q[0]==='rock' || q[0]==='reed' ? 0.06 : 0.2)) put.splice(i, 1); }   /* (RS-682: nor in a sunken temple's pool; RS-684: nor over a graveyard's railings) */
+  for (let i=put.length-1; i>=0; i--){ const q = put[i], sm = q[0]==='bush' || q[0]==='rock' || q[0]==='reed'; if (o3NearTemple(q[1], q[2], sm ? 1.1 : 1.3) || o3NearGraveyard(q[1], q[2], sm ? 0.06 : 0.2) || o3NearMine(q[1], q[2], sm ? 0.1 : 0.3)) put.splice(i, 1); }   /* (RS-694: nor in a mine's cliff) */   /* (RS-682: nor in a sunken temple's pool; RS-684: nor over a graveyard's railings) */
   yield;
   // parts per kind: [geometry, material colour(s), local transform]
   const bark = '#5a4028', PARTS = {
@@ -34400,6 +34402,69 @@ function o3LandCut(geo, pits, x0, y0, NV){
   geo.setAttribute('position', new THREE.BufferAttribute(cat(P, xp, 3), 3)); geo.setAttribute('color', new THREE.BufferAttribute(cat(C, xc, 3), 3)); geo.setAttribute('tcol', new THREE.BufferAttribute(cat(TC, xt, 3), 3));
   geo.setAttribute('normal', new THREE.BufferAttribute(cat(N, xn, 3), 3)); geo.setAttribute('uv', new THREE.BufferAttribute(cat(A.uv.array, xu, 2), 2)); geo.setIndex(idx);
   geo.userData.cuts = blocks.length; }
+/* (RS-694) the Dwarf Gate set into its mountain: the land itself, made finer round the gate (F points a step, as o3LandCut), rises
+   in a sheer face of the mountain's own rock behind the gate's dressed stone - the gate brought its own crag before, a block of
+   other rock against the mountain - and runs back into the mountain behind it, falling away to the ground at its sides, with the
+   doorway left open into the hall. The shape is the old crag's, in the gate's frame (o3SiteYaw, the site's scale O3_MINE_S); the
+   ground you walk on (O3.heightAt) is the land as it was, level at the door */
+const O3_MINE_S = 1.3;
+function o3MineCliff(lx, lz, sd){ if (Math.abs(lx) > 1.45 || lz < -1.6 || lz > 0.8) return null; const ax = Math.abs(lx), ss = smoothstep;
+  const zf = x=>{ const a = Math.abs(x); return 0.23 + (0.045*Math.sin(x*11.3 + 1.3) + 0.03*Math.sin(x*23.1))*ss(0.42, 0.55, a) - 0.62*ss(0.55, 0.95, a); }, z0 = zf(lx);   /* (beside the door back to the mountain's foot, the tile's edge, so the tiles either side stay clear) */
+  const side = 1 - ss(0.5, 1.45, ax), w = 0.42*ss(0.45, 1.05, ax), f = 1 - ss(z0 - 0.02 - w*0.6, z0 + 0.03 + w*0.4, lz);   /* (sheer at the gate, sloping back as buttresses beside it) */
+  let h = (1.3 + 0.55*ss(0.1, -1.2, lz) + 0.14*Math.sin(lx*4.1 + 0.7 + sd*3) + 0.09*Math.sin(lz*5.3 - lx*2.2))*side;
+  h += (Math.sin(lx*17.3 + lz*13.1) + 0.5*Math.sin(lx*29.7 - lz*23.3))*0.012*ss(0.1, 0.5, h);
+  if (ax < 0.5 && lz > z0 - 0.3) h = Math.min(h, 1.36);   /* (no higher than the dressed face over the gate) */
+  h *= f; const sc = 0.24*(1 - ss(0, 0.32, lz - z0))*ss(0.44, 0.62, ax)*side*(lz > z0 - 0.06 ? 1 : 0); h = Math.max(h, sc);   /* (scree at its foot) */
+  return h - 0.14*(1 - ss(0, 0.04, h)); }
+/* (RS-694) how far a point may rise into a mine's cliff: over the mine's tile and the mountain's, not over open land (blended over the tiles
+   about it as the land's heights are, so a tile beside it, where you walk and a tree or a rock to gather stands, is clear at its middle) */
+function o3MineRoom(wx, wz){ const fx = wx - 0.5, fz = wz - 0.5, tx = Math.floor(fx), tz = Math.floor(fz), ax = fx - tx, az = fz - tz; let s = 0;
+  for (const [qx, qz, w] of [[tx, tz, (1-ax)*(1-az)], [tx+1, tz, ax*(1-az)], [tx, tz+1, (1-ax)*az], [tx+1, tz+1, ax*az]]){ const q = o3Tile(qx, qz); if (q===OW_MOUNTAIN || q===OW_MINE) s += w; }
+  return smoothstep(0.2, 0.7, s); }
+/* (RS-694) whether a point of the land is under a mine's cliff (raised there), or within m of it: nothing grows or stands in it */
+function o3NearMine(wx, wz, m){ const x = Math.floor(wx), z = Math.floor(wz), S = O3_MINE_S, k = (m || 0)/S; for (let i=-2;i<=2;i++) for (let j=-2;j<=2;j++){ const tx = x + i, tz = z + j; if (o3Tile(tx, tz)!==OW_MINE) continue;
+    const ry = o3SiteYaw(OW_MINE, tx, tz), co = Math.cos(ry), si = Math.sin(ry), dx = wx - tx - 0.5, dz = wz - tz - 0.5, lx = (dx*co - dz*si)/S, lz = (dx*si + dz*co)/S, sd = o3Hash(tx, tz, 41);
+    if (o3MineRoom(wx, wz) < 0.02) continue; for (const [a, b] of [[0, 0], [k, 0], [-k, 0], [0, k], [0, -k]]){ const h = o3MineCliff(lx + a, lz + b, sd); if (h!=null && h > 0.01) return true; } } return false; }
+function o3LandMines(geo, x0, y0, NV, W, hAt){
+  const R = O3_R, F = 6, S = O3_MINE_S, A = geo.attributes, P = A.position.array, C = A.color.array, TC = A.tcol.array, N = A.normal.array, UV = A.uv.array, NC = NV - 1, NB = NV*NV, base = A.position.count;
+  const I = geo.index ? geo.index.array : null; if (!I) return; const have = new Uint8Array(NC*NC);
+  const cellOf = (a, b, c)=>Math.min((a/NV)|0, (b/NV)|0, (c/NV)|0)*NC + Math.min(a % NV, b % NV, c % NV);   /* (a cell's two triangles: its corners' least row and column) */
+  for (let q=0;q<I.length;q+=3){ const a = I[q], b = I[q+1], c = I[q+2]; if (a >= NB || b >= NB || c >= NB) continue; have[cellOf(a, b, c)] = 1; }   /* (the cells of the plain grid still drawn - not cut away for a barrow's stair) */
+  const blocks = [], drop = new Uint8Array(NC*NC);
+  for (let x=x0-2;x<x0+W+2;x++) for (let y=y0-2;y<y0+W+2;y++){ if (o3Tile(x, y)!==OW_MINE) continue;
+    const cx = x + 0.5, cz = y + 0.5, ry = o3SiteYaw(OW_MINE, x, y), co = Math.cos(ry), si = Math.sin(ry); let lx0 = Infinity, hx = -Infinity, lz0 = Infinity, hz = -Infinity;
+    for (const u of [-1.45, 1.45]) for (const v of [-1.6, 0.8]){ const wx = cx + S*(u*co + v*si), wz = cz + S*(-u*si + v*co); lx0 = Math.min(lx0, wx); hx = Math.max(hx, wx); lz0 = Math.min(lz0, wz); hz = Math.max(hz, wz); }
+    const i0 = Math.max(0, Math.floor((lx0 - x0)*R) - 1), i1 = Math.min(NC - 1, Math.floor((hx - x0)*R) + 1), j0 = Math.max(0, Math.floor((lz0 - y0)*R) - 1), j1 = Math.min(NC - 1, Math.floor((hz - y0)*R) + 1);
+    if (i1 <= i0 || j1 <= j0) continue; let ok = true; for (let j=j0;j<=j1 && ok;j++) for (let i=i0;i<=i1;i++) if (!have[j*NC + i] || drop[j*NC + i]){ ok = false; break; }
+    if (!ok) continue; for (let j=j0;j<=j1;j++) for (let i=i0;i<=i1;i++) drop[j*NC + i] = 1;
+    blocks.push({ x, y, cx, cz, co, si, pad:hAt(cx, cz), sd:o3Hash(x, y, 41), i0, i1, j0, j1 }); }
+  if (!blocks.length) return;
+  const idx = []; for (let q=0;q<I.length;q+=3){ const a = I[q], b = I[q+1], c = I[q+2]; if (a < NB && b < NB && c < NB && drop[cellOf(a, b, c)]) continue; idx.push(a, b, c); }
+  const xp = [], xc = [], xt = [], xn = [], xu = [], xr = [], lin = v=>Math.pow(v/255, 2.2), nz = v3Noise(7);
+  const mix = (arr, fi, fj)=>{ const i = Math.min(NV - 2, Math.floor(fi)), j = Math.min(NV - 2, Math.floor(fj)), a = fi - i, b = fj - j, k = j*NV + i, w = [(1-a)*(1-b), a*(1-b), (1-a)*b, a*b], ks = [k, k+1, k+NV, k+NV+1], o = [0, 0, 0];
+    for (let q=0;q<4;q++) for (let e=0;e<3;e++) o[e] += arr[ks[q]*3 + e]*w[q]; return o; };
+  for (const B of blocks){
+    const nI = (B.i1 - B.i0 + 1)*F + 1, nJ = (B.j1 - B.j0 + 1)*F + 1, v0 = base + xp.length/3, hh = new Float32Array(nI*nJ), lift = new Float32Array(nI*nJ), loc = [], dd = 1/(R*F);
+    const rc = [0, 0, 0]; { let nn = 0; for (let j=B.j0;j<=B.j1+1;j++) for (let i=B.i0;i<=B.i1+1;i++){ const k = j*NV + i; if (o3Tile(Math.floor(P[k*3]), Math.floor(P[k*3+2]))!==OW_MOUNTAIN || P[k*3+1] > 2.3) continue; rc[0] += C[k*3]; rc[1] += C[k*3+1]; rc[2] += C[k*3+2]; nn++; }
+      if (nn) for (let e=0;e<3;e++) rc[e] /= nn; else { rc[0] = lin(88); rc[1] = lin(84); rc[2] = lin(80); } }   /* (the colour of the mountain's own rock about it, below its snow) */
+    for (let b=0;b<nJ;b++) for (let a=0;a<nI;a++){ const fi = B.i0 + a/F, fj = B.j0 + b/F, wx = x0 + fi/R, wz = y0 + fj/R, k = b*nI + a, h0 = mix(P, fi, fj)[1];
+      const dx = wx - B.cx, dz = wz - B.cz, lx = (dx*B.co - dz*B.si)/S, lz = (dx*B.si + dz*B.co)/S; loc.push([lx, lz]);
+      let h = h0; const tl = (a===0 || b===0 || a===nI-1 || b===nJ-1) ? null : o3MineCliff(lx, lz, B.sd);   /* (the block's edge is the land as it was) */
+      if (tl!=null){ let tw = B.pad + S*tl; tw += (h0 - tw)*smoothstep(-0.95, -1.55, lz); if (tw > h0) h = h0 + (tw - h0)*o3MineRoom(wx, wz); }   /* (behind, into the mountain's own slope; only over the mountain and the mine) */
+      hh[k] = h; lift[k] = h - h0; }
+    for (let b=0;b<nJ;b++) for (let a=0;a<nI;a++){ const k = b*nI + a, fi = B.i0 + a/F, fj = B.j0 + b/F, wx = x0 + fi/R, wz = y0 + fj/R, h = hh[k];
+      xp.push(wx, h, wz); xu.push(wx/3, wz/3); const t3 = mix(TC, fi, fj); xt.push(t3[0], t3[1], t3[2]);
+      const n0 = mix(N, fi, fj), hl = hh[b*nI + Math.max(0, a-1)], hr = hh[b*nI + Math.min(nI-1, a+1)], hu = hh[Math.max(0, b-1)*nI + a], hd = hh[Math.min(nJ-1, b+1)*nI + a];
+      const sx = (a > 0 && a < nI-1 ? 2 : 1)*dd, sz = (b > 0 && b < nJ-1 ? 2 : 1)*dd, n1 = [-(hr - hl)/sx, 1, -(hd - hu)/sz], kk = smoothstep(0, 0.06, lift[k]);   /* (its own light where the face rises, the land's where it doesn't) */
+      let nx = n0[0] + (n1[0] - n0[0])*kk, ny = n0[1] + (n1[1] - n0[1])*kk, nw = n0[2] + (n1[2] - n0[2])*kk; { const l = Math.hypot(nx, ny, nw) || 1; nx /= l; ny /= l; nw /= l; } xn.push(nx, ny, nw);
+      const c3 = mix(C, fi, fj), rk = smoothstep(0.02, 0.3, lift[k]), v = Math.pow(0.9 + nz(wx*0.9 + 50, wz*0.9)*0.18 + 0.05*Math.sin(h*23 + Math.sin(wx*5.1)*2.2), 2.2);   /* (the mountain's rock, a little banded) */
+      xc.push(c3[0] + (rc[0]*v - c3[0])*rk, c3[1] + (rc[1]*v - c3[1])*rk, c3[2] + (rc[2]*v - c3[2])*rk); xr.push(rk); }
+    const door = (p, q, r)=>{ const u = (loc[p][0] + loc[q][0] + loc[r][0])/3, w = (loc[p][1] + loc[q][1] + loc[r][1])/3; return Math.abs(u) < 0.23 && w > 0.17 && w < 0.4 && (hh[p] + hh[q] + hh[r])/3 > B.pad + 0.03; };   /* (behind the doorway: open, into the hall) */
+    for (let b=0;b<nJ-1;b++) for (let a=0;a<nI-1;a++){ const p = b*nI + a, q = p + 1, r = p + nI, s = r + 1; if (!door(p, r, q)) idx.push(v0 + p, v0 + r, v0 + q); if (!door(q, r, s)) idx.push(v0 + q, v0 + r, v0 + s); } }
+  const n = base + xp.length/3, cat = (old, ext, w)=>{ const a = new Float32Array(n*w); a.set(old.subarray(0, base*w)); a.set(ext, base*w); return a; };
+  geo.setAttribute('position', new THREE.BufferAttribute(cat(P, xp, 3), 3)); geo.setAttribute('color', new THREE.BufferAttribute(cat(C, xc, 3), 3)); geo.setAttribute('tcol', new THREE.BufferAttribute(cat(TC, xt, 3), 3));
+  geo.setAttribute('normal', new THREE.BufferAttribute(cat(N, xn, 3), 3)); geo.setAttribute('uv', new THREE.BufferAttribute(cat(UV, xu, 2), 2)); geo.setIndex(idx);
+  geo.userData.mines = blocks.map(B=>[B.x, B.y]); geo.userData.rock = { at:base, w:Float32Array.from(xr) }; }   /* (gfxO3BuildGen: rock in the ground's blend) */
 function o3RockGeo(r, s){ const g = new THREE.DodecahedronGeometry(r, 1), p = g.attributes.position;
   for (let i=0;i<p.count;i++){ const x = p.getX(i), y = p.getY(i), z = p.getZ(i), h = Math.sin(Math.round(x*1e3)*12.9898 + Math.round(y*1e3)*78.233 + Math.round(z*1e3)*37.719 + s*4.1)*43758.5453, k = 1 + (h - Math.floor(h) - 0.5)*0.4; p.setXYZ(i, x*k, y*k, z*k); }
   g.computeVertexNormals(); return g; }
@@ -35266,21 +35331,11 @@ function o3Site(t, gx, gz){
        turns its back to it - o3SitesGen), a cliff of grey rock with a face of dressed stone set in it; two pillars, a lintel carved with runes
        and a gable with the gate's sign, and two stone leaves that swing in on a lantern-lit hall when you come to them (g.doorWay). The
        mine's rails run in ahead of you, a cart of ore stands by */
-    const crag = mats.crag || (mats.crag = new T.MeshStandardMaterial({ map:gfxTextures().rock, color:new T.Color(0xae9f8f).convertSRGBToLinear(), roughness:0.95, vertexColors:true }));   /* (the mountain's own rock: grey-brown, banded by height) */
     const carved = mats.carved || (mats.carved = new T.MeshStandardMaterial({ map:mats.stone.map, color:new T.Color(0xc9c2b4).convertSRGBToLinear(), roughness:0.82 }));
     const leafM = mats.gateLeaf || (mats.gateLeaf = new T.MeshStandardMaterial({ map:mats.stone.map, color:new T.Color(0x8e877c).convertSRGBToLinear(), roughness:0.86 }));
     const hall = mats.voidIn || (mats.voidIn = new T.MeshBasicMaterial({ color:0x000000, side:T.BackSide }));
     const rk = (r, x, y, z, sx, sy, sz, sd)=>{ const m = new T.Mesh(o3RockGeo(r, sd), mats.rock); m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.rotation.y = rnd(400 + sd)*6.28; g.add(m); return m; };
-    /* the cliff: running back into the mountain, falling away at the sides, its face sheer at the gate and crumbling to scree either side */
-    const zf = x=>{ const ax = Math.abs(x); return 0.27 + (0.045*Math.sin(x*11.3 + 1.3) + 0.03*Math.sin(x*23.1))*smoothstep(0.42, 0.55, ax) - 0.32*smoothstep(0.55, 1.2, ax); };
-    const CH = (x, z)=>{ const ax = Math.abs(x), side = 1 - smoothstep(0.5, 1.45, ax), w = 0.42*smoothstep(0.45, 1.05, ax), f = 1 - smoothstep(zf(x) - 0.02 - w*0.6, zf(x) + 0.03 + w*0.4, z);   /* (sheer at the gate, sloping back into the mountain as buttresses beside it) */
-      let h = (1.3 + 0.55*smoothstep(0.1, -1.2, z) + 0.14*Math.sin(x*4.1 + 0.7 + rnd(1)*3) + 0.09*Math.sin(z*5.3 - x*2.2))*side*smoothstep(-1.55, -1.15, z);   /* (rising behind, as the mountain does) */
-      h += (Math.sin(x*17.3 + z*13.1) + 0.5*Math.sin(x*29.7 - z*23.3))*0.035*smoothstep(0.1, 0.5, h);
-      if (ax < 0.5 && z > zf(x) - 0.3) h = Math.min(h, 1.36);   /* (no higher than the dressed face over the gate) */
-      h = h*f; const sc = 0.24*(1 - smoothstep(0, 0.32, z - zf(x)))*smoothstep(0.44, 0.62, ax)*side*(z > zf(x) - 0.06 ? 1 : 0); h = Math.max(h, sc);   /* (scree at its foot) */
-      return h - 0.14*(1 - smoothstep(0, 0.04, h)); };
-    const cc = (x, y, z)=>{ const band = 0.8 + 0.13*Math.sin(y*31 + Math.sin(x*5.1)*2.2) + 0.06*Math.sin(x*41 + z*37), foot = 0.62 + 0.38*smoothstep(0, 0.45, y), k = band*foot; return [k, k, k]; };
-    g.add(o3HField(crag, -1.45, 1.45, -1.6, 0.8, CH, cc, (x, z)=>Math.abs(x) < 0.45 && z > 0.17 && z < 0.4));
+    /* (RS-694) the cliff it is cut into is the land's own, the mountain's face: o3LandMines */
     /* the dressed face: a slab of smoothed stone set in the cliff, the doorway cut through it */
     { const sh = new T.Shape(); sh.moveTo(-0.45, -0.04); sh.lineTo(0.45, -0.04); sh.lineTo(0.45, 1.3); sh.quadraticCurveTo(0, 1.52, -0.45, 1.3); sh.lineTo(-0.45, -0.04);
       const hl = new T.Path(); hl.moveTo(-0.2125, 0.04); hl.lineTo(0.2125, 0.04); hl.lineTo(0.2125, 0.97); hl.lineTo(-0.2125, 0.97); hl.lineTo(-0.2125, 0.04); sh.holes.push(hl);
@@ -46604,7 +46659,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-693';
+const GAME_VERSION = 'rs-694';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

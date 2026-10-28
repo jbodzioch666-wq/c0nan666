@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-694 - Into the Mountain
+
+- **The Dwarf Gate is cut into the real mountain.** A mine's gate used to bring its own little cliff, a block of different rock stuck against the mountain beside it. Now the mountain itself comes down to the gate: its own rock rises in a sheer face around the dressed stone and runs back up into the peaks behind, with the doorway open into the lantern-lit hall.
+- **The tiles beside a mine stay clear.** The rock only rises over the mine and the mountain, so the open ground either side, where you walk and gather, is never buried, and no tree or bush grows out of the cliff.
+
 ## RS-693 - Import Without a Picker
 
 - **No picker? The paste box opens instead.** Some places you can play (the claude.ai page among them) never open the file picker when you press IMPORT a save file. Now, if no picker shows within about a second, the paste box opens by itself: paste the save's text or code there.

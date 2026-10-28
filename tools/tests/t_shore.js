@@ -18,7 +18,7 @@ module.exports = async page=>{
     const crest = O3_WATER_Y + 0.05; let land = 0, low = 0, worst = 9, edges = 0, lowEdge = 0, rivEdges = 0, highRiv = 0, seaEdges = 0, beachEdges = 0, convex = 0, rounded = 0;
     const { x0, y0 } = O3.win;
     for (let x=x0+2;x<x0+O3_W-2;x++) for (let y=y0+2;y<y0+O3_W-2;y++){
-      if (wet(x,y)) continue; if (typeof owCliffAt==='function' && [[0,0],[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]].some(([p,q])=>owCliffAt(x+p, y+q))) continue; land++;   /* (RS-622: a sea cliff stands sheer - no beach to judge) */
+      if (wet(x,y) || (typeof o3SeaSiteL==='function' && o3SeaSiteL(x, y))) continue; if (typeof owCliffAt==='function' && [[0,0],[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]].some(([p,q])=>owCliffAt(x+p, y+q))) continue; land++;   /* (RS-622: a sea cliff stands sheer - no beach to judge) */
       // the middle and the inner half of every land tile
       // (the quarter of a land tile that touches a corner where two water tiles meet diagonally dips to let the water through)
       const diagCorner = (cx, cz)=> (wet(cx-1, cz-1) && wet(cx, cz) && !wet(cx-1, cz) && !wet(cx, cz-1)) || (wet(cx, cz-1) && wet(cx-1, cz) && !wet(cx-1, cz-1) && !wet(cx, cz));
