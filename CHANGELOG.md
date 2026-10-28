@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-697 - Timber
+
+- **You walk up to the tree.** When you chop, you step in to an axe's reach from the trunk. You used to stand in the middle of the next tile. When you stop, you step back.
+- **A real felling swing.** You stand side-on to the tree with both hands on the haft. You heave the axe back over your right shoulder, turning away, then bring it down and across into the trunk at your waist, leaning into the blow. It bites, sticks a moment and is worked free. It used to be an overhead chop at the air in front of you.
+- **Every blow lands.** Chips of pale wood and bark fly from the cut and lie where they fall. The tree jolts and sways back, and a few leaves flutter down. The chop sounds as the axe lands.
+- **The notch grows.** A cut appears in the trunk where your axe bites, and it deepens with every log you take. When the last log comes, that same tree goes over, notch and all.
+
 ## RS-696 - Gone Fishing
 
 - **You really fish now.** Fishing used to be a still pose with a line hanging out to a bobbing float. Now your angler swings the rod back over their shoulder and whips it forward, and the float flies out from the rod's tip in an arc and lands on the water with a splash.
