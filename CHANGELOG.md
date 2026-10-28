@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-692 - No Rings
+
+- **Fishing spots without the rings.** The white rings that spread round every fishing spot are gone. The fish circling and leaping there show where it is, with a couple of bubbles rising among them.
+- **Tests:** rs691 checks that no rings are drawn. rs636, which checks that the water effects bend with a planet's curve, now checks the bubbles instead of the rings.
+
 ## RS-691 - Lobsters and Shoals
 
 - **A lobster on the fire looks like a lobster.** Cooking one used to put the trout on the grill. Now a lobster cooks there: a domed shell, a tail of six plates ending in a fan, two big claws on jointed arms (one heavier for crushing), four pairs of legs, long feelers swept back and eyes on stalks. It starts mottled blue-black with rusty tips and turns bright scarlet with a pale belly as the cooking bar fills. The lobster is built once and shared by every grill and town hearth.

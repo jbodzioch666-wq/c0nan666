@@ -18,7 +18,7 @@ module.exports = async page=>{
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
   A(r.fn, 'a hand-written shader is routed through the curve');
-  A(r.mats.rip!==false && r.mats.bub!==false && r.mats.glow!==false && (r.mats.rip || r.mats.glow), 'the fishing ripples, bubbles and glows bend with the land');
+  A(r.mats.rip!==false && r.mats.bub!==false && r.mats.glow!==false && (r.mats.rip || r.mats.bub || r.mats.glow), 'the fishing ripples, bubbles and glows bend with the land');
   A(r.k > 0, 'on a planet');
   A(!errs.length, 'no errors: ' + errs.join(' | '));
 };

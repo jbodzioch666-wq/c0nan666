@@ -21,7 +21,7 @@ module.exports = async page=>{
     const meshes = (k)=>{ const l = []; O3.scene.traverse(o=>{ if (o.userData && o.userData.fish===k) l.push(o); }); return l; };
     let sw = meshes('swim'), jp = meshes('jump');
     if (!sw.length){ for (let x=G.owPos.x - 30;x<=G.owPos.x + 30 && !sw.length;x+=6) for (let y=G.owPos.y - 30;y<=G.owPos.y + 30 && !sw.length;y+=6){ if (!o3Passable(x, y) || G.ow.map[x][y]===OW_WATER) continue; G.owPos = { x, y }; await fr(60); sw = meshes('swim'); } jp = meshes('jump'); }
-    out.swim = sw.reduce((s, o)=>s + o.userData.n, 0); out.jump = jp.reduce((s, o)=>s + o.userData.n, 0); out.chunks = sw.length;
+    out.rings = 0; O3.scene.traverse(o=>{ if (o.isMesh && O3.ripMat && o.material===O3.ripMat) out.rings++; }); out.swim = sw.reduce((s, o)=>s + o.userData.n, 0); out.jump = jp.reduce((s, o)=>s + o.userData.n, 0); out.chunks = sw.length;
     out.prog = (O3.renderer.info.programs || []).map(p=>p.cacheKey || '').filter(k=>/fish/.test(k)).length;
     /* the nearest spot on screen, through a close camera: the fish draw something there */
     let sp = null, bd = 1e9; for (const o of sw){ const A = o.geometry.attributes.aC, nv = A.count/o.userData.n; for (let k=0;k<o.userData.n;k++){ const v = o.localToWorld(new T.Vector3(A.getX(k*nv), A.getY(k*nv), A.getZ(k*nv))), d = Math.hypot(v.x - O3.ppos.x, v.z - O3.ppos.z); if (d < bd){ bd = d; sp = v; } } }
@@ -50,6 +50,7 @@ module.exports = async page=>{
   A(r.iconRaw.n > 350 && r.iconDone.n > 350 && r.iconRaw.b > r.iconRaw.r && r.iconDone.r > 2*r.iconDone.b, 'its icons a lobster, raw blue and cooked red');
   A(r.chunks >= 1 && r.swim >= 3 && r.swim===3*r.jump, 'three fish circling every fishing spot and one to leap');
   A(r.prog >= 1, 'their shader built');
+  A(r.rings===0, 'no ripple rings round a spot (RS-692)');
   A(r.fishPx > 400, 'and on screen at the spot: ' + r.fishPx);
   A(r.leapPx > 300 && r.hiddenPx < 20, 'the leaper out of the water at the top of its leap, hidden between leaps: ' + r.leapPx + '/' + r.hiddenPx);
   A(!errs.length, 'no errors: ' + errs.join(' | '));
