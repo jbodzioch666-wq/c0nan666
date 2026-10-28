@@ -2,7 +2,8 @@
 // own while you chop (its chunk leaves it out); the swing heaves the axe up over your shoulder and brings it in level at the trunk,
 // the left hand on the haft; each blow throws chips, shakes leaves down and jolts the tree, the notch deepens with the logs taken;
 // (RS-698: the tree well over your head, its crown up above the cut; RS-699: side-on, the tree on your left, the axe back over your right shoulder and
-// swung round from your right, both fists on the haft - the right up toward the head, the left at the butt); stopping walks you back and puts the tree back in its chunk; the last log fells this tree, notch and all. Shot: shots/rs697.png
+// swung round from your right, both fists on the haft - the right up toward the head, the left at the butt; RS-700: the arms out long, nearly straight
+// at the blow); stopping walks you back and puts the tree back in its chunk; the last log fells this tree, notch and all. Shot: shots/rs697.png
 module.exports = async page=>{
   page.setDefaultTimeout(0); const errs = []; page.on('pageerror', e=>errs.push(String(e).slice(0, 300)));
   const r = await page.evaluate(async ()=>{ const fr = n=>new Promise(res=>{ let i = 0; const f = ()=>++i >= n ? res() : requestAnimationFrame(f); requestAnimationFrame(f); }), wait = ms=>new Promise(res=>setTimeout(res, ms));
@@ -27,7 +28,7 @@ module.exports = async page=>{
       const [R, L] = e.rig.arms, head = new T.Vector3(0, 0.66, 0.1); e.tool.updateWorldMatrix(true, false); e.tool.localToWorld(head); const bh = e.holder.worldToLocal(head.clone()), tr = e.holder.worldToLocal(new T.Vector3(sx, O3.ppos.y, sz));
       /* (RS-699) each fist where it holds the haft: how far up it from its butt end's grip (tool units: right 0.26, left -0.06) and how far off its line */
       const on = pt=>{ const q = e.tool.worldToLocal(pt); return [+q.y.toFixed(2), +Math.hypot(q.x, q.z).toFixed(3)]; };
-      return { twist:+e.rig.torso.rotation.y.toFixed(2), head:+trunk(head).toFixed(3), headY:+(head.y - O3.ppos.y).toFixed(2), side:+bh.x.toFixed(2), fwd:+bh.z.toFixed(2), treeSide:+tr.x.toFixed(2),
+      return { el:+R.el.rotation.x.toFixed(2), twist:+e.rig.torso.rotation.y.toFixed(2), head:+trunk(head).toFixed(3), headY:+(head.y - O3.ppos.y).toFixed(2), side:+bh.x.toFixed(2), fwd:+bh.z.toFixed(2), treeSide:+tr.x.toFixed(2),
         right:on(R.hand.localToWorld(new T.Vector3(...m3dGrip(1)))), left:on(L.hand.localToWorld(new T.Vector3(-(e.rig.gripX || 0.026), -0.045, 0.004))) }; };
     out.ready = await hold(0); out.wound = await hold(0.42); out.round = await hold(0.55); out.blow = await hold(CHOP_HIT + 0.03); out.back = await hold(0.85);
     { await hold(CHOP_HIT); const c2 = O3.cam.clone(), y = e.holder.rotation.y - 0.6, a = new T.Vector3(); e.rig.arms[0].hand.getWorldPosition(a); c2.position.set(a.x + Math.sin(y)*1.1, a.y + 0.3, a.z + Math.cos(y)*1.1); c2.lookAt(a);   /* (from in front of you, to your right: both fists on the haft, the head in the trunk) */ c2.updateProjectionMatrix(); O3.renderer.render(O3.scene, c2); out.shot = O3.renderer.domElement.toDataURL('image/png'); }
@@ -57,6 +58,7 @@ module.exports = async page=>{
   A(r.wound.side < -0.03 && r.wound.fwd < 0.1 && r.wound.headY > 0.9 && r.wound.twist < r.ready.twist - 0.3, 'wound up: the axe back over your right shoulder, the body turned away to the right (RS-699)');
   A(r.round.side < -0.1, 'swung round from your right (RS-699)');
   A(r.blow.head < r.want - 0.2 && r.blow.headY > 0.2 && r.blow.headY < 0.6 && r.blow.twist > r.ready.twist + 0.3, 'the blow: the axe head at the trunk, at the waist, the body turned into it');
+  A(r.blow.el > -0.5 && r.round.el > -1.15 && r.wound.el > -1.8, 'a full swing: the arms out long - nearly straight at the blow, reaching wide round your right, high over your shoulder (RS-700)');
   A(['ready', 'wound', 'round', 'blow', 'back'].every(k=>{ const q = r[k]; return Math.abs(q.right[0] - 0.26) < 0.02 && q.right[1] < 0.02 && Math.abs(q.left[0] + 0.06) < 0.04 && q.left[1] < 0.03; }), 'both hands on the haft all through the swing: the right up it toward the head, the left at its butt (RS-699)');
   A(r.hits >= 2 && r.jolt > 0.01 && r.chips >= 5 && r.leaves >= 2 && r.notch && r.chipsDown, 'blows: chips thrown (and lying on the ground), leaves shaken down, the tree jolted, the notch cut');
   A(r.deeper[1] > r.deeper[0]*1.2, 'the notch deepens with the logs taken');

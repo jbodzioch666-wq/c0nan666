@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-700 - Full Swing
+
+- **A full swing.** Your arms now reach out long all the way through the chop. You lift the axe high over your right shoulder, sweep it wide round your right side and drive it into the trunk with your arms nearly straight. Before, your elbows stayed bent and the swing looked cramped.
+- **You stand back a little** from the tree to make room for the longer swing.
+
 ## RS-699 - Right-Handed
 
 - **The axe swings in from the right.** You now stand side-on, left shoulder to the tree. You lift the axe back over your right shoulder, swing it out round your right side and bring it in level, edge first, into the trunk on your left. Before, the axe came down from the wrong side.
