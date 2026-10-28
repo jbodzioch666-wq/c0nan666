@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-709 - Ancestral
+
+- **Ancestral gear.** From combat level 90, a magic or rare drop is sometimes **Ancestral**: 4% at level 90, rising to 16% at 126, and two and a half times as often from a boss or an elite. An Ancestral piece is item level 126, and every bonus on it comes from the best tiers of its kind (the top three of seven, otherwise the top two).
+- **Greater bonuses.** Each bonus on an Ancestral piece has an 18% chance to be **greater**: half again what its tier rolls (a T1 life suffix rolls 53-66 instead of 35-44). The tooltip marks it with a star.
+- **Worth chasing.** In the loot sim at level 99, kills an hour in a middling rare in every slot went from 290 to 393 in a middling Ancestral rare. In the best of thirty, it went from 366 to 535.
+- **At the anvil.** Change and Law keep a greater bonus greater. Chaos and Blood roll an Ancestral piece from the top tiers again, with a fresh chance at greater bonuses. Breaking one down gives an extra chance at an Essence of Law.
+- **Kept and shown.** The loot filter never salvages an Ancestral piece with a greater bonus. On the ground, its label reads "Ancestral ..." with a fiery border and the number of greater bonuses, and a drop with a greater bonus gets a notice. It sells for 40% more, plus a quarter for each greater bonus.
+
 ## RS-708 - On Impact
 
 - **A spell's damage shows when it lands.** A spell takes about three quarters of a second to leave the staff and fly, but the foe's life bar and the target plate beside yours dropped the moment you cast. Now they hold until the bolt hits.
