@@ -1,5 +1,5 @@
 // RS-190: the old spell scrolls are gone - no shop or monster hands them out, and any left in an old save (pack, bank, quick
-// bar) are cashed in for gold on load; the Scroll of Reforging stays
+// bar) are cashed in for gold on load; the Scroll of Reforging turns into an Essence of Change (RS-707)
 module.exports = async page=>{
   const r = await page.evaluate(async ()=>{
     o3Pref = false; v3Pref = false;
@@ -12,13 +12,13 @@ module.exports = async page=>{
     // an old save: two in the pack, one in the bank, one on the quick bar
     G.inv.push(old('Scroll of Fireball'), old('Scroll of Haste')); bankP().stash.push(old('Scroll of Magic Missile')); G.inv.push(mkReforgeScroll());
     qbSlots()[3] = { t:'item', nm:'Scroll of Fireball', kind:'scroll' };
-    const g0 = G.player.gold; saveCurrentGame(); loadGame(G.saveId);
-    out.after = { inv:G.inv.filter(i=>i.scrollSpell).length, bank:bankP().stash.filter(i=>i.scrollSpell).length, qb:qbSlots()[3], gold:G.player.gold - g0, reforge:G.inv.some(i=>i.reforge) };
+    const g0 = G.player.gold, e0 = skHave('es_change'); saveCurrentGame(); loadGame(G.saveId);
+    out.after = { inv:G.inv.filter(i=>i.scrollSpell).length, bank:bankP().stash.filter(i=>i.scrollSpell).length, qb:qbSlots()[3], gold:G.player.gold - g0, reforge:G.inv.some(i=>i.reforge), ess:skHave('es_change') - e0 };
     return out; });
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
   A(r.gone, 'the spell scroll table and its makers are gone');
   A(r.shop===0, 'no shop stocks a spell scroll');
   A(r.after.inv===0 && r.after.bank===0 && r.after.qb===null && r.after.gold===135, 'old scrolls in the pack, bank and quick bar are cashed in on load');
-  A(r.after.reforge, 'the Scroll of Reforging stays');
+  A(!r.after.reforge && r.after.ess===1, 'the Scroll of Reforging becomes an Essence of Change');
 };

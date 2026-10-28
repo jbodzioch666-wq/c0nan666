@@ -1,5 +1,19 @@
 # Depthcrawl patch notes
 
+## RS-707 - Essences
+
+- **Four essences, a new crafting currency.** Essence of Change, Chaos, Blood and Law. A kill leaves one about one time in twenty (more with magic find), and a boss's hoard holds two or three. They have their own row in the bag's Resources tab.
+- **Enchant at the smith.** The smith's new ENCHANT & MASTERWORK section lists your worn gear and your bag. Pick a piece, or choose Enchant from its menu in the bag while you're at the smith.
+  - **Change** rerolls one bonus within its tier.
+  - **Law** raises one bonus a tier, as far as the piece's level allows.
+  - **Chaos** rerolls every bonus on a magic or rare piece. A rare stays rare and keeps its name.
+  - **Blood** adds a bonus. A plain piece turns magic, a magic one takes a second, and a third makes it rare, up to six.
+  - Uniques, set pieces and relics keep their own bonuses and can't be enchanted.
+- **Break gear down.** At the smith, a magic piece from your bag breaks into an Essence of Change, with a chance of Blood. A rare breaks into two Changes, a Chaos or a Blood, and a chance of Law. Locked pieces are never touched.
+- **Masterworking replaces reinforcing.** Any piece, not only metal, can be masterworked from +1 to +8 for gold, and it never fails. Each step raises the piece's own numbers by 5% of the base. +4 and +8 each take Essences of Law and grow one of its bonuses by a quarter (marked ★). Pieces you reinforced before carry on from their step.
+- **The Scroll of Reforging is gone.** Any you have become Essences of Change.
+- **Plate can roll attack and strength.** Plate had only two kinds of prefix, so with its built-in damage reduction a platebody could hold four bonuses at most. Plate now also rolls attack and strength, at a quarter to two fifths of a weapon's value depending on the slot. Loot sim, kills an hour for a middling rare (RS-704 → now): level 80 492 → 546, level 99 300 → 293, within the sim's noise.
+
 ## RS-706 - Built In
 
 - **Every base has a bonus of its own.** Each base now carries a built-in bonus that suits it:

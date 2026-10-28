@@ -19,9 +19,9 @@ module.exports = async page=>{
     for (const k of ['attack','strength','defence']) skP().skills[k] = SK_XP[60]; rsSync();
     G.gear.weapon = rsMakeWeapon(5, 3); const acc0 = G.gear.weapon.acc, c1 = reinfCost(G.gear.weapon);
     p.gold = 1e6; smithReinforce('weapon'); A(G.gear.weapon.reinf===1 && G.gear.weapon.acc > acc0 && p.gold===1e6 - c1 && /\+1$/.test(G.gear.weapon.nm), 'reinforced +1');
-    const c2 = reinfCost(G.gear.weapon); A(c2 > c1*2, 'the next step costs more'); smithReinforce('weapon'); A(G.gear.weapon.reinf===2 && /\+2$/.test(G.gear.weapon.nm) && !/\+1 \+2/.test(G.gear.weapon.nm), 'reinforced +2');
+    const c2 = reinfCost(G.gear.weapon); A(c2 > c1*1.5, 'the next step costs more'); smithReinforce('weapon'); A(G.gear.weapon.reinf===2 && /\+2$/.test(G.gear.weapon.nm) && !/\+1 \+2/.test(G.gear.weapon.nm), 'reinforced +2');
     out.costs = [c1, c2, reinfCost(G.gear.weapon)];
-    const t = townList()[0]; G.owPos = { x:t.x, y:t.y }; enterVillage(); setUi('blacksmith'); A(document.getElementById('overlay').innerHTML.includes('REINFORCE YOUR GEAR'), 'the smith offers it');
+    const t = townList()[0]; G.owPos = { x:t.x, y:t.y }; enterVillage(); setUi('blacksmith'); A(document.getElementById('overlay').innerHTML.includes('ENCHANT &amp; MASTERWORK'), 'the smith offers it (RS-707: masterworking)');
     setUi('playing');
     // RS-101: the pace, the sickle, scarce top resources, and the Peddler buying raw goods
     A(XP_RATE===0.3, 'xp at a tenth of RuneScape pace'); const a0 = skP().skills.attack; skGainXP('attack', 100); A(skP().skills.attack - a0===30, 'xp scaled');

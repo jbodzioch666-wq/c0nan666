@@ -12,8 +12,8 @@ module.exports = async page=>{
     add('town projects, one town', TOWN_PROJECTS.reduce((a,t)=>a+(t.cost.gold||0), 0), 'plus logs and bars; per town');
     add('property, one town', ECO_PROPS.reduce((a,p)=>a+p.price, 0), `earns ${ECO_PROPS.reduce((a,p)=>a+p.inc, 0)}g a day (a day is ${DAY_LENGTH} turns, about 30 minutes)`);
     let reinf = 0; const pieces = [rsMakeWeapon(5, 3)].concat(['head','chest','legs','arms','feet','offhand'].map(sl=>rsMakeArmour('metal', 5, sl)));
-    for (const it of pieces) for (let n=0;n<5;n++){ it.reinf = n; reinf += reinfCost(it); }
-    add('reinforcing a full rune set to +5', reinf, 'some +4 and +5 attempts fail and still cost');
+    for (const it of pieces) for (let n=0;n<MW_MAX;n++){ it.reinf = n; reinf += reinfCost(it); }
+    add('masterworking a full rune set to +8', reinf, 'and 3 Essences of Law a piece');
     add('a rune scimitar and full rune at the Peddler', pieces.reduce((a,it)=>a+(it.price||0), 0), 'if it were all in stock');
     const total = rows.reduce((a,r)=>a+r.gold, 0);
     return { rows, total };
