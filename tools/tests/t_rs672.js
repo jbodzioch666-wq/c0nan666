@@ -18,7 +18,7 @@ module.exports = async page=>{
     out.behind = at.behind; out.gate = !!g.doorWay;
     /* (RS-684) a little bigger than the other sites, and the land kept clear inside its railings */
     out.scale = +g.scale.x.toFixed(2); { const c = o3C(at.s.x, at.s.y); out.clearIn = o3NearGraveyard(c[0], c[1], 0) && !o3NearGraveyard(c[0] + Math.sin(g.rotation.y)*1.3, c[1] + Math.cos(g.rotation.y)*1.3, 0.2); }
-    G.owPos = { x:at.best.q[0], y:at.best.q[1] }; await fr(90); { const c = o3C(at.best.q[0], at.best.q[1]); for (let i=0;i<400 && O3.ppos && Math.hypot(O3.ppos.x - c[0], O3.ppos.z - c[1]) > 0.15;i++) await fr(1); }   /* (there, not still on the way from the last tile) */
+    G.owPos = { x:at.best.q[0], y:at.best.q[1] }; await fr(90); for (let i=0;i<400 && O3.ppos && figLag() > 0.05;i++) await fr(1);   /* (there, not still on the way from the last tile - RS-689: where the yard nudges you, which figLag now measures to; the tile's middle was passed on the way and the walk began inside the railings) */
     const C = o3C(at.s.x, at.s.y); g = O3.doors.get(Math.floor(C[0]) + ',' + Math.floor(C[1]));
     moveDir(-at.best.dx, -at.best.dy); out.walk = !!O3.doorWalk;
     /* the way in: round the railings, never through them (the yard is |x| < 0.6, z -0.58..0.58 in the crypt's frame; you come in by the gate, x near 0) */

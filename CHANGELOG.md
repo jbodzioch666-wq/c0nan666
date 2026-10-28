@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-689 - Taps at the Gate
+
+- **No more getting stuck beside a Guardians' Gate.** On the tiles next to the gate, you stand a little way out so its walls and guardians don't swallow you. From there, tapping the gate or the ground, or following a route, did nothing: the game waited for you to reach the middle of your tile, which the gate blocks. It now waits for the spot where you actually stand, so you walk on at once.
+- **Tap any part of the temple.** The new temples kept the small tap area of the old shrine. A tap on the gate's door, a guardian or a wall missed it and walked you to the tile behind instead of taking you in. The tap area now covers the whole gate, and the whole Rotunda from your boat.
+- **Tests:** the new rs689 runs on a phone. It stands beside a gate, taps the ground and walks off, then taps the gate's door, guardians and crown and the Rotunda's dome, and goes in each time. rs672 now waits until you stand where the graveyard's railings nudge you, which stops it failing now and then.
+
 ## RS-688 - Temples to Your Size
 
 - **Sunken temples fit you now.** The old shrine's door came up to your chest, and the whole building stood about as tall as you. Both new temples have doors taller than you (1.3 against your 0.95) and stand two to three times your height, two and a half tiles across.
