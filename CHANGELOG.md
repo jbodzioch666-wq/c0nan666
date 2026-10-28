@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-693 - Import Without a Picker
+
+- **No picker? The paste box opens instead.** Some places you can play (the claude.ai page among them) never open the file picker when you press IMPORT a save file. Now, if no picker shows within about a second, the paste box opens by itself: paste the save's text or code there.
+- **Drop a save file to import it.** Drag a save file onto the title screen, or onto the paste box, and it imports - no picker needed.
+- Where the picker does open, nothing changes: pick a file as before.
+
 ## RS-692 - No Rings
 
 - **Fishing spots without the rings.** The white rings that spread round every fishing spot are gone. The fish circling and leaping there show where it is, with a couple of bubbles rising among them.
