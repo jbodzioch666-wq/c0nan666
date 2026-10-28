@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-696 - Gone Fishing
+
+- **You really fish now.** Fishing used to be a still pose with a line hanging out to a bobbing float. Now your angler swings the rod back over their shoulder and whips it forward, and the float flies out from the rod's tip in an arc and lands on the water with a splash.
+- **Bites and strikes.** While you wait, the float bobs and now and then dips at a nibble. When a fish takes it, the float is pulled under with a splash, and you strike: the rod comes up and your other hand winds the reel.
+- **The fish comes out on the line.** A fish you catch leaves the water, swings in to hang from the rod's tip, goes into your bag, and then you cast again. It's tinted like the spot's fish, and bigger fish (higher level) hang bigger.
+- **Misses look like misses.** Sometimes a nibble draws a strike at nothing: the rod jerks up, the float is yanked out of the water and drops back.
+- **Cave pools too.** Fishing in a cave pool plays the same cast, bite, catch and miss.
+
 ## RS-695 - Every Gate in Its Mountain
 
 - **No more bare gates.** In RS-694 a mine near another mine, or near a barrow's or pyramid's stair, could miss its rock entirely and stand alone on open ground. Every mine's gate now gets its mountain face, however close its neighbours are.

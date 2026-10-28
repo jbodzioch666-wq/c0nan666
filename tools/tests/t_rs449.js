@@ -10,10 +10,10 @@ module.exports = async page=>{
     const px = p.x, py = p.y; let at = null; for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) if (G.map[px+dx][py+dy]===T_FLOOR){ at = [px+dx, py+dy]; break; }
     G.dungeonDeco[at[0]][at[1]] = 'eelpool'; FPD.mapRef = null; await fr(6);
     skP().tools.rod = Math.max(1, skP().tools.rod||0); skP().skills.fishing = SK_XP[60];
-    const o = skOptions().find(o=>o.cave==='eelpool'); out.opt = !!o; if (o) skDo(o); await fr(10);
+    const o = skOptions().find(o=>o.cave==='eelpool'); out.opt = !!o; if (o) skDo(o); await fr(10); await new Promise(r=>setTimeout(r, 1150)); await fr(3);   /* (RS-696: the first cast lands in the pool) */
 
-    const L = ISO.fline, F = ISO.ffloat; out.line = !!(L && L.visible && F && F.visible);
-    if (L){ const a = L.geometry.attributes.position; out.end = [+(a.getX(11) - at[0] - 0.5).toFixed(2), +(a.getZ(11) - at[1] - 0.5).toFixed(2)]; out.rise = +(a.getY(0) - a.getY(11)).toFixed(2); }
+    const L = ISO.frig && ISO.frig.line, F = ISO.frig && ISO.frig.float; out.line = !!(L && L.visible && F && F.visible);
+    if (L){ const a = L.geometry.attributes.position; out.end = [+(a.getX(19) - at[0] - 0.5).toFixed(2), +(a.getZ(19) - at[1] - 0.5).toFixed(2)]; out.rise = +(a.getY(0) - a.getY(19)).toFixed(2); }
     skStop && skStop(); await fr(4); out.after = !(L && L.visible);
     // a tome shuts with the weapon put away
     G.gear.weapon = rsMakeStaff(1); G.gear.offhand = rsMakeArmour('cloth', 3, 'offhand'); rsSync && rsSync();

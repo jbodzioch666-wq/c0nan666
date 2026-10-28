@@ -11920,7 +11920,8 @@ function skGatherTick(now){
   if (node && node.type==='gem'){ const wt = { sapphire:50, emerald:30, ruby:15, diamond:5 }; let tot = 0; for (const e of ok) tot += wt[e.id]||1; let r = Math.random()*tot; for (const e of ok){ r -= wt[e.id]||1; if (r <= 0){ pick = e; break; } } }
   const chance = clamp(0.3 - (pick.hard||0) + (L - pick.lvl)*0.012 + tier*0.03 + (G.gameMode===1 ? 0.1 : 0) + skPerk(k, 'gch') + (node && node.type==='deep' && harpoonReady() ? 0.04*harpoonTier() : 0) + (k==='fishing' && G.gameMode===0 && (G.weather==='rain' || G.weather==='storm') ? 0.1 : 0), 0.12, 0.95);   // (fish bite in the rain)
   g.ch = chance; g.label = pick.nm;
-  if (!chn(chance)){ renderGame(); return; }
+  if (!chn(chance)){ g.last = 'miss'; renderGame(); return; }
+  g.last = 'catch'; g.lastFish = pick.id;   /* (RS-696: the fishing animation lands it) */
   let amt = node && node.glow ? 2 : 1;
   if (node && node.rich) amt *= 3;
   if (chn(skPerk(k, 'dbl') + (node ? [0, 0.05, 0.12][node.qual||0] : 0))){ amt *= 2; logMsg(`a double ${k==='woodcutting' ? 'log' : k==='fishing' ? 'catch' : k==='mining' ? 'ore' : k==='archaeology' ? 'find' : 'herb'}!`, 'good'); }
@@ -36626,38 +36627,105 @@ function o3AnimNodes(dt){
     if (f.t > 1.6){ const fade = Math.max(0, 1 - (f.t-1.6)/0.8); f.obj.traverse(o=>{ if (o.material) o.material.opacity = fade; }); }
     if (f.t > 2.4){ O3.scene.remove(f.obj); f.obj.traverse(o=>{ if (o.material && o.material.userData && o.material.userData.own) o.material.dispose(); }); O3.fall = null; }
   }
-  // your line out to the spot you're fishing, with a bobbing float
+  // your line out to the spot you're fishing (RS-696: cast, bite, strike and the fish reeled in - fishRig)
   const gw = G.gather && G.gather.mode===0 && G.gather.o.k==='fishing' ? G.gather.o : null;
-  if (!O3.fline){
-    const T = THREE, geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(new Float32Array(12*3), 3));
-    O3.fline = new T.Line(geo, new T.LineBasicMaterial({ color:0xe8e8e0, transparent:true, opacity:0.8 })); O3.fline.frustumCulled = false; O3.scene.add(O3.fline);
-    O3.float = new T.Mesh(new T.SphereGeometry(0.035, 8, 6), new T.MeshStandardMaterial({ color:0xd02a2a, roughness:0.5 })); O3.scene.add(O3.float);
+  if (!O3.frig || O3.frig.sc!==O3.scene) O3.frig = fishRig(O3.scene, 0.035);
+  if (!(gw && gw.at && O3.ppos)){ fishRigHide(O3.frig); }
+  else {
+    const pp = O3.ppos, yaw = O3.player ? O3.player.yaw||0 : 0, tipO = O3.player && O3.player.e && O3.player.e.tool && O3.player.e.tool.userData.tip, tip = new THREE.Vector3(pp.x + Math.sin(yaw)*0.45, pp.y + 1.05, pp.z + Math.cos(yaw)*0.45);
+    if (tipO) tipO.getWorldPosition(tip);
+    const [sx, sz] = o3C(gw.at.x, gw.at.y), nd = gw.node ? skNodeAt(gw.node.x, gw.node.y) : null;
+    fishRigTick(O3.frig, G.gather, performance.now(), tip, new THREE.Vector3(sx, -0.12, sz), new THREE.Vector3(pp.x, pp.y + 0.55, pp.z), (nd && O3_FISH_TINT[nd.type]) || '#e4ecd0');
   }
-  O3.fline.visible = O3.float.visible = !!(gw && gw.at && O3.ppos);
-  if (O3.fline.visible){
-    const pp = O3.ppos, yaw = O3.player ? O3.player.yaw||0 : 0, tipO = O3.player && O3.player.e && O3.player.e.tool && O3.player.e.tool.userData.tip;
-    let hx = pp.x + Math.sin(yaw)*0.45, hz = pp.z + Math.cos(yaw)*0.45, hy = pp.y + 1.05;
-    if (tipO){ const v = new THREE.Vector3(); tipO.getWorldPosition(v); hx = v.x; hy = v.y; hz = v.z; }
-    const [sx, sz] = o3C(gw.at.x, gw.at.y), bob = Math.sin(O3.t*3)*0.012 + (Math.random()<0.004 ? -0.03 : 0), sy = -0.12 + bob;
-    const a = O3.fline.geometry.attributes.position;
-    for (let i=0;i<12;i++){ const u = i/11, sag = Math.sin(u*Math.PI)*0.18*(1-u*0.3); a.setXYZ(i, hx + (sx-hx)*u, hy + (sy-hy)*u - sag, hz + (sz-hz)*u); }
-    a.needsUpdate = true; O3.float.position.set(sx, sy, sz);
-  }
+}
+/* (RS-696) fishing, animated, on the land and in a cave pool alike, timed by the gathering's own beat (each beat a try for a fish): the first
+   cast (the rod back over your shoulder and whipped out, the float arcing out to land with a splash); waiting, the float bobbing and now
+   and then nibbled; a try that fails is often a nibble and a strike at nothing, the float yanked up and dropping back; one that lands a
+   fish is a bite that takes the float under, a strike, the fish thrashing out of the water and swung in on the line as you reel, into
+   your bag, and a cast out again. fishAnim is where things are at a moment; fishPose sets the arms, fishRig draws the line, float, fish
+   and splashes. Sped up to fit a quick beat */
+function fishAnim(g, now){
+  const iv = Math.max(0.6, (g.iv || 2800)/1000), ts = Math.max(0, Math.min(iv, (now - g.next)/1000 + iv)), t = now/1000, last = g.last || (g.n ? 'miss' : 'start'), v = o3Hash(g.n||0, 7, 3), ez = (a, b, x)=>smoothstep(a, b, x);
+  const A = { arm:-0.75 + Math.sin(t*1.3)*0.05, el:-0.55, lsh:-0.35, lel:-0.4, crank:0, fl:'water', dip:Math.sin(t*3)*0.012, fly:0, yank:0, fish:-1, bag:0, splash:[], ts };
+  const k = last==='catch' ? Math.min(1, (iv - 0.25)/2.2) : last==='start' ? Math.min(1, (iv - 0.2)/0.9) : Math.min(1, (iv - 0.2)/0.8), s = x=>x*k;   /* (a quick beat: the whole of it faster) */
+  const cast = (t0)=>{   /* (back over the shoulder, and whipped out: the float flies from the tip to the water) */
+    const b = s(0.3), w = s(0.2), f0 = t0 + b + w*0.35, f1 = f0 + s(0.48);
+    if (ts < t0 + b){ const q = ez(t0, t0 + b, ts); A.arm = A.arm + (-2.65 - A.arm)*q; A.el = -0.55 + 0.35*q; A.lsh = -0.35 - 0.6*q; A.fl = 'tip'; }
+    else if (ts < t0 + b + w){ const q = ez(t0 + b, t0 + b + w, ts); A.arm = -2.65 + (2.65 - 0.62)*q; A.el = -0.2 - 0.35*q; A.lsh = -0.95 + 0.6*q; A.fl = ts < f0 ? 'tip' : 'fly'; A.fly = Math.max(0, (ts - f0)/(f1 - f0)); }
+    else if (ts < f1){ A.arm = -0.62; A.fl = 'fly'; A.fly = (ts - f0)/(f1 - f0); }
+    A.splash.push([f1, 1]); return f1; };
+  if (last==='start') cast(0);
+  else if (last==='catch'){
+    const b0 = s(0.22), st = s(0.4), up = s(0.95), hold = s(1.2), bag = s(1.36);
+    if (ts < b0){ A.dip = -0.1*ez(0, b0*0.6, ts); A.arm = -0.62; A.fl = 'water'; }   /* (the bite: the float goes under, the tip pulled down) */
+    else if (ts < hold){ A.arm = -0.62 + (-1.55 + 0.62)*ez(b0, st, ts) + Math.sin(t*9)*0.03; A.el = -0.55 + 0.25*ez(b0, st, ts); A.crank = ez(b0, st, ts)*(1 - ez(up, hold, ts)); A.fl = 'fish'; A.fish = ez(b0, up, ts);   /* (the strike, and reeling it in) */
+      if (ts > up) A.arm += (-1.1 + 1.55)*ez(up, hold, ts); }
+    else if (ts < bag){ A.arm = -1.1 + 0.35*ez(hold, bag, ts); A.fl = 'fish'; A.fish = 1; A.bag = ez(hold, bag, ts); }   /* (off the hook and into your bag) */
+    else cast(bag);
+    A.splash.push([b0 + s(0.04), 1.4]); }
+  else if (v < 0.55){   /* (a nibble, a strike, and nothing on it) */
+    const n1 = s(0.28), st = s(0.42), dn = s(0.62), back = s(0.85);
+    if (ts < n1) A.dip = -0.045*Math.abs(Math.sin(ts*22));
+    else if (ts < back){ A.arm = -0.75 + (-1.3 + 0.75)*ez(n1, st, ts)*(1 - ez(st, back, ts)); A.yank = ez(n1, st, ts)*(1 - ez(st, dn, ts)); A.fl = 'water'; }
+    A.splash.push([dn, 0.55]); }
+  if (A.fl==='water' && ts > iv - 0.55 && o3Hash(g.n||0, 11, 5) < 0.5) A.dip += -0.03*Math.max(0, Math.sin((ts - iv + 0.55)*19));   /* (nibbles before the next try) */
+  return A; }
+function fishPose(R, L, g, now){ const A = fishAnim(g, now); R.sh.rotation.x = A.arm; R.el.rotation.x = A.el; L.sh.rotation.z = 0.2;
+  if (A.crank > 0){ const c = now/1000*13; L.sh.rotation.x = A.lsh + (-0.75 - A.lsh + Math.sin(c)*0.16)*A.crank; L.el.rotation.x = -0.4 + (-0.55 + Math.cos(c)*0.3)*A.crank; }   /* (the other hand at the reel, winding) */
+  else { L.sh.rotation.x = A.lsh; L.el.rotation.x = A.lel; } }
+/* the line, float, hooked fish and splashes, one set a scene (fishRig), placed each frame by fishRigTick */
+function fishRig(sc, fr){ const T = THREE, rig = { sc, fr, sp:[], prevTs:-1, prevN:-1 };
+  const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(new Float32Array(20*3), 3));
+  rig.line = new T.Line(geo, new T.LineBasicMaterial({ color:0xe8e8e0, transparent:true, opacity:0.85 })); rig.line.frustumCulled = false; sc.add(rig.line);
+  { const fg = new T.SphereGeometry(fr, 16, 12), cl = [], P = fg.attributes.position; for (let i=0;i<P.count;i++){ const y = P.getY(i)/fr, c = new T.Color(y > 0.05 ? '#d42a24' : y > -0.12 ? '#1c1c1c' : '#f2efe6').convertSRGBToLinear(); cl.push(c.r, c.g, c.b); }   /* (a red cap over a white belly, a dark band between) */
+    fg.setAttribute('color', new T.Float32BufferAttribute(cl, 3)); const st = new T.CylinderGeometry(fr*0.12, fr*0.12, fr*1.6, 6); st.translate(0, fr*1.5, 0);
+    rig.float = new T.Group(); rig.float.add(new T.Mesh(fg, new T.MeshStandardMaterial({ vertexColors:true, roughness:0.45 }))); rig.float.add(new T.Mesh(st, new T.MeshStandardMaterial({ color:0xd42a24, roughness:0.5 }))); sc.add(rig.float); }
+  rig.fishM = new T.MeshStandardMaterial({ vertexColors:true, roughness:0.32, metalness:0.15 }); rig.fish = new T.Mesh(o3NodeGeo().fish, rig.fishM); rig.fish.visible = false; sc.add(rig.fish);
+  const ringM = new T.MeshBasicMaterial({ color:0xf4f8ff, transparent:true, opacity:0.8, depthWrite:false, side:T.DoubleSide }), dropM = new T.MeshBasicMaterial({ color:0xf0f6ff, transparent:true, opacity:0.9, depthWrite:false }), dropG = new T.SphereGeometry(0.014, 6, 4), ringG = new T.RingGeometry(0.82, 1, 28).rotateX(-Math.PI/2);
+  for (let i=0;i<2;i++){ const S = { t:-1, ring:new T.Mesh(ringG, ringM.clone()), ring2:new T.Mesh(ringG, ringM.clone()), drops:[] }; sc.add(S.ring); sc.add(S.ring2);
+    for (let j=0;j<10;j++){ const d = new T.Mesh(dropG, dropM); d.visible = false; sc.add(d); S.drops.push({ m:d, a:j/10*6.283 + o3Hash(i, j, 4), up:0.9 + o3Hash(i, j, 5)*0.9, out:0.25 + o3Hash(i, j, 6)*0.35 }); }
+    S.ring.visible = S.ring2.visible = false; rig.sp.push(S); }
+  return rig; }
+function fishRigHide(rig){ if (!rig) return; rig.line.visible = rig.float.visible = rig.fish.visible = false; for (const S of rig.sp){ S.t = -1; S.ring.visible = S.ring2.visible = false; for (const d of S.drops) d.m.visible = false; } rig.prevN = -1; }
+function fishSplash(rig, x, y, z, big){ const S = rig.sp[0].t < 0 || rig.sp[1].t >= 0 && rig.sp[0].t > rig.sp[1].t ? rig.sp[0] : rig.sp[1]; S.t = 0; S.x = x; S.y = y; S.z = z; S.big = big; }
+function fishRigTick(rig, g, now, tip, spot, home, tint){
+  const A = fishAnim(g, now), t = now/1000, T = THREE, dt = Math.min(0.1, Math.max(0, t - (rig.lastT || t))); rig.lastT = t;
+  /* splashes due since the last frame */
+  if (rig.prevN===g.n) for (const [at, big] of A.splash) if (rig.prevTs < at && A.ts >= at) fishSplash(rig, spot.x, spot.y + 0.01, spot.z, big);
+  rig.prevN = g.n; rig.prevTs = A.ts;
+  /* where the line's end is: the float on the water, at the tip, flying, or the fish */
+  const fl = rig.v1 || (rig.v1 = new T.Vector3()), hang = rig.v2 || (rig.v2 = new T.Vector3()); let fishOn = false, slack = 1;   /* (kept, not made a frame) */
+  if (A.fl==='tip'){ fl.set(tip.x, tip.y - 0.22, tip.z); slack = 0; }
+  else if (A.fl==='fly'){ const q = A.fly; fl.set(tip.x + (spot.x - tip.x)*q, tip.y + (spot.y - tip.y)*q + Math.sin(q*Math.PI)*0.55, tip.z + (spot.z - tip.z)*q); slack = 0.3; }
+  else if (A.fl==='fish'){ fishOn = true; const q = A.fish; hang.set(tip.x, tip.y - 0.28, tip.z); fl.set(spot.x + (hang.x - spot.x)*q, spot.y + (hang.y - spot.y)*q + Math.sin(q*Math.PI)*0.45, spot.z + (hang.z - spot.z)*q); slack = 0.15*(1 - q);
+    if (A.bag > 0) fl.lerp(home, A.bag); }
+  else { fl.set(spot.x, spot.y + A.dip, spot.z); if (A.yank > 0){ fl.x += (tip.x - spot.x)*0.14*A.yank; fl.z += (tip.z - spot.z)*0.14*A.yank; fl.y += 0.2*A.yank; slack = 1 - A.yank; } }
+  rig.float.visible = !fishOn; rig.float.position.copy(fl); rig.float.rotation.set(A.fl==='water' ? Math.sin(t*2.1)*0.12 : 0, 0, A.fl==='water' ? Math.cos(t*1.7)*0.12 : 0);
+  /* the fish: thrashing as it comes, hanging head up from the hook, then into your bag */
+  rig.fish.visible = fishOn && A.bag < 0.98;
+  if (rig.fish.visible){ const f = SK_FISH.find(f=>f.id===g.lastFish), sz = 1.25 + Math.min(1.5, ((f && f.lvl) || 1)/99*1.8), sc = sz*(1 - A.bag), L = 0.17*sc;
+    rig.fishM.color.set(tint); rig.fish.scale.setScalar(Math.max(0.001, sc)); rig.fish.position.set(fl.x, fl.y - L*0.5, fl.z);
+    const thr = A.fish < 1 ? 1 : 0.45; rig.fish.rotation.set(0, t*2.3 + Math.sin(t*17)*0.9*thr, -Math.PI/2 + Math.sin(t*21)*0.5*thr, 'YXZ'); }
+  /* the line, from the tip, sagging as slack as it is */
+  rig.line.visible = true; const a = rig.line.geometry.attributes.position, d = tip.distanceTo(fl);
+  for (let i=0;i<20;i++){ const u = i/19, sag = Math.sin(u*Math.PI)*Math.min(0.2, d*0.08)*slack*(1 - u*0.3); a.setXYZ(i, tip.x + (fl.x - tip.x)*u, tip.y + (fl.y - tip.y)*u - sag, tip.z + (fl.z - tip.z)*u); }
+  a.needsUpdate = true;
+  /* the splashes: a ring or two spreading, drops flung up and falling */
+  for (const S of rig.sp){ if (S.t < 0) continue; S.t += dt; const life = 0.75, q = S.t/life, B = S.big;
+    if (q >= 1){ S.t = -1; S.ring.visible = S.ring2.visible = false; for (const dr of S.drops) dr.m.visible = false; continue; }
+    S.ring.visible = true; S.ring.position.set(S.x, S.y, S.z); S.ring.scale.setScalar(0.04 + q*0.32*B); S.ring.material.opacity = 0.75*(1 - q);
+    const q2 = Math.max(0, q - 0.25)/0.75; S.ring2.visible = q2 > 0; S.ring2.position.set(S.x, S.y, S.z); S.ring2.scale.setScalar(0.03 + q2*0.22*B); S.ring2.material.opacity = 0.6*(1 - q2);
+    const n = Math.round(4 + 6*Math.min(1, B)); S.drops.forEach((dr, j)=>{ dr.m.visible = j < n && S.t < 0.6; if (!dr.m.visible) return; const tt = S.t, r = dr.out*B*tt*1.4, h = dr.up*B*tt - 4.2*tt*tt;
+      dr.m.position.set(S.x + Math.cos(dr.a)*r, S.y + Math.max(0, h), S.z + Math.sin(dr.a)*r); dr.m.scale.setScalar(0.7 + B*0.5); }); }
 }
 /* (RS-449) fishing a cave pool, your line runs from the rod's tip out to the pool, sagging, with a float bobbing on the water - as it does
    on the open land; down here there had been only the rod */
 function isoFishLine(e, g2){
   const sc = FPD && FPD.scene; if (!sc) return; const T = THREE;
-  if (!ISO.fline || ISO.fline.parent!==sc){
-    if (ISO.fline && ISO.fline.parent) ISO.fline.parent.remove(ISO.fline), ISO.ffloat.parent && ISO.ffloat.parent.remove(ISO.ffloat);
-    const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(new Float32Array(12*3), 3));
-    ISO.fline = new T.Line(geo, new T.LineBasicMaterial({ color:0xe8e8e0, transparent:true, opacity:0.85 })); ISO.fline.frustumCulled = false; sc.add(ISO.fline);
-    ISO.ffloat = new T.Mesh(new T.SphereGeometry(0.03, 10, 8), new T.MeshStandardMaterial({ color:0xd02a2a, roughness:0.5 })); sc.add(ISO.ffloat); }
-  const tipO = g2 && e.tool && e.tool.userData.tip; ISO.fline.visible = ISO.ffloat.visible = !!tipO; if (!tipO) return;
-  const v = new T.Vector3(); e.holder.updateMatrixWorld(true); tipO.getWorldPosition(v);
-  const sx = g2.vein.x + 0.5, sz = g2.vein.y + 0.5, t = FP.t || 0, sy = 0.03 + Math.sin(t*3)*0.01 + (Math.random() < 0.004 ? -0.025 : 0), a = ISO.fline.geometry.attributes.position;
-  for (let i=0;i<12;i++){ const u = i/11, sag = Math.sin(u*Math.PI)*0.12*(1 - u*0.3); a.setXYZ(i, v.x + (sx - v.x)*u, v.y + (sy - v.y)*u - sag, v.z + (sz - v.z)*u); }
-  a.needsUpdate = true; ISO.ffloat.position.set(sx, sy, sz);
+  if (!ISO.frig || ISO.frig.sc!==sc) ISO.frig = fishRig(sc, 0.03);   /* (RS-696: the same cast, bite and catch as on the land) */
+  const tipO = g2 && e.tool && e.tool.userData.tip; if (!tipO || !G.gather){ fishRigHide(ISO.frig); return; }
+  const v = new T.Vector3(); e.holder.updateMatrixWorld(true); tipO.getWorldPosition(v); const h = new T.Vector3(); e.holder.getWorldPosition(h); h.y += 0.5;
+  fishRigTick(ISO.frig, G.gather, performance.now(), v, new T.Vector3(g2.vein.x + 0.5, 0.03, g2.vein.y + 0.5), h, O3_FISH_TINT.cave);
 }
 function o3NodeFromHit(a){ return a && a.kind==='node' ? skNodeAt(a.x, a.y) : null; }
 // walk to a spot and start working it: beside a tree or the water, onto a herb patch
@@ -36957,7 +37025,7 @@ function o3Render(){
       if (gw){
         if (gw.at && (gw.at.x!==G.owPos.x || gw.at.y!==G.owPos.y)){ const ga = o3C(gw.at.x, gw.at.y), gp = o3C(G.owPos.x, G.owPos.y), want2 = Math.atan2(ga[0] - gp[0], ga[1] - gp[1]); let d2 = want2 - P.yaw; d2 = Math.atan2(Math.sin(d2), Math.cos(d2)); P.yaw += d2*Math.min(1, dt*8); P.e.holder.rotation.y = P.yaw; }
         if (gw.k==='woodcutting' || gw.k==='mining'){ rsHoldTool(P.e, gw.k==='mining' ? 'pick' : 'axe'); rsToolSwing(P.e, tt); }
-        else if (gw.k==='fishing'){ rsHoldTool(P.e, 'rod'); R.sh.rotation.x = -0.75 + Math.sin(tt*1.3)*0.05; R.el.rotation.x = -0.55; L.sh.rotation.x = -0.35; L.sh.rotation.z = 0.2; L.el.rotation.x = -0.4; }
+        else if (gw.k==='fishing'){ rsHoldTool(P.e, 'rod'); fishPose(R, L, G.gather, performance.now()); }   /* (RS-696) */
         else if (gw.k==='foraging'){ if (r.torso) r.torso.rotation.x = 0.7; R.sh.rotation.x = -0.9 + Math.sin(tt*3)*0.2; L.sh.rotation.x = -0.7; }
       }
     }
@@ -45647,7 +45715,7 @@ function isoSyncPlayer(){
       const vx = g2.vein.x+0.5, vy = g2.vein.y+0.5;
       const r = e.rig, tt = FP.t;
       if (r.arms){ const [R, L] = r.arms;
-        if (g2.k==='fishing'){ rsHoldTool(e, 'rod'); R.sh.rotation.x = -0.75 + Math.sin(tt*1.3)*0.05; R.el.rotation.x = -0.55; L.sh.rotation.x = -0.35; L.sh.rotation.z = 0.2; L.el.rotation.x = -0.4; }
+        if (g2.k==='fishing'){ rsHoldTool(e, 'rod'); fishPose(R, L, G.gather, performance.now()); }   /* (RS-696) */
         else { if (r.torso) r.torso.rotation.x = 0.7; R.sh.rotation.x = -0.9 + Math.sin(tt*3)*0.2; L.sh.rotation.x = -0.7; } }
     }
     try{ isoFishLine(e, g2 && g2.k==='fishing' ? g2 : null); }catch(err){ console.error(err); }   /* (RS-449: the line out to a cave pool) */
@@ -46670,7 +46738,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-695';
+const GAME_VERSION = 'rs-696';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
