@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-691 - Lobsters and Shoals
+
+- **A lobster on the fire looks like a lobster.** Cooking one used to put the trout on the grill. Now a lobster cooks there: a domed shell, a tail of six plates ending in a fan, two big claws on jointed arms (one heavier for crushing), four pairs of legs, long feelers swept back and eyes on stalks. It starts mottled blue-black with rusty tips and turns bright scarlet with a pale belly as the cooking bar fills. The lobster is built once and shared by every grill and town hearth.
+- **A new lobster icon.** In your bag and on the quick bar, raw and cooked lobster now look like lobsters, seen from above with claws, a plated tail, legs and feelers. The raw one is blue, light enough to see on the bag's dark background, and the cooked one is red.
+- **Fishing spots have fish.** Every fishing spot in the open land now has three fish circling just under the surface, their backs and fins breaking the water and their tails beating. Every few seconds a fourth leaps out and dives back in. The fish are tinted for their water: green-gold in rivers and lakes, silver at the shore, blue out at sea, dark in an eel pool, gold at a legendary spot. The ripples stay, and the bubbles drop from four to two. All the fish in an area draw together with the ripples, so they cost little even on a phone.
+- **Tests:** the new rs691 test checks that a lobster appears on the grill, raw dark and cooked scarlet, and that a trout and a shrimp still show the fish. It checks both lobster icons, that every fishing spot has three swimmers and a leaper and that they show on screen, and that a leaper is out of the water at the top of its leap and hidden between leaps.
+
 ## RS-690 - Back in the Boat
 
 - **Back in your boat after a drowned temple.** As you go down into the Rotunda, your boat waits at the mooring stone. When you came back out, the boat stayed there and you floated on the sea beside it, and it didn't follow when you sailed off. Now you come out standing in your boat, by the well, and sail on as before.
