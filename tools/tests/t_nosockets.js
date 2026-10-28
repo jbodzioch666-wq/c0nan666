@@ -13,7 +13,7 @@ module.exports = async page=>{
     p.quests = [{ id:'q1', kind:'supply', itemKind:'rune', runeType:'Bone', target:2, progress:0, text:'bring 2 Bone Runes' }];
     rsMigrateAll();
     out.gold = p.gold - g0; A(out.gold===750 && !p.runes, 'runes cashed in: '+out.gold);
-    A(!('sockets' in w) && !('runewordName' in w) && w.aff.length===1 && !('sockets' in a), 'sockets gone, the runeword bonus stays');
+    A(!('sockets' in w) && !('runewordName' in w) && w.aff.filter(q=>!q.bi).length===1 && !('sockets' in a), 'sockets gone, the runeword bonus stays');
     const q = p.quests[0]; A(q.itemKind==='potion' && q.potionName===POTIONS[0][0] && !/Rune/.test(q.text), 'the quest asks for a potion now');
     // the board never asks for runes
     let runeQ = 0; for (let i=0;i<400;i++){ const o = legacyQuestOffer('t'+i, 5); if (o.itemKind==='rune' || /Rune/.test(o.text||'')) runeQ++; } A(runeQ===0, 'no rune quests: '+runeQ);

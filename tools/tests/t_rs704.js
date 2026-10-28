@@ -16,8 +16,8 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
         if (it.quality===0 && it.aff.some(a=>!a.imp)) bad.push('plain with a roll ' + it.nm); }
       out.share = c.map(x=>+(x/6).toFixed(1)); out.bad = bad.slice(0, 5); }
     /* a magic piece is named for its bonuses */
-    { let it; for (let i=0;i<300 && !(it && it.quality===1 && it.aff.length===2);i++) it = genItem(60, 'chest', 3);
-      const [a, b] = it.aff, Fa = AFFIX_FAM[a.fam], Fb = AFFIX_FAM[b.fam], pre = Fa.pre ? Fa : Fb, suf = Fa.pre ? Fb : Fa;
+    { let it; for (let i=0;i<300 && !(it && it.quality===1 && it.aff.filter(q=>!q.imp).length===2);i++) it = genItem(60, 'chest', 3);   /* (RS-706: a base's own bonus isn't a roll) */
+      const [a, b] = it.aff.filter(q=>!q.imp), Fa = AFFIX_FAM[a.fam], Fb = AFFIX_FAM[b.fam], pre = Fa.pre ? Fa : Fb, suf = Fa.pre ? Fb : Fa;
       out.magic = { nm:it.nm, base:it.baseNm, ok:it.nm===`${pre.nm[pre.tiers.length - (pre===Fa ? a : b).t]} ${it.baseNm} ${suf.nm[suf.tiers.length - (suf===Fa ? a : b).t]}`, sub:itemSubName(it) }; }
     /* the tiers open by level: none above the level, and the top tier at 126 */
     { let over = 0, t1 = 0, n = 0, famless = []; for (let i=0;i<300;i++){ const it = genItem(10, 'weapon', 3); for (const a of it.aff){ n++; const tr = tierOf(a); if (!tr){ famless.push(it.nm + ':' + a.kind); continue; } if (tr[0] > 10) over++; } }
@@ -32,7 +32,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
     /* the tooltip: a tier tag on each line, its range under Alt */
     { const it = rsMakeArmour('metal', 3, 'chest'); afDress(it, 80, 2); const plain = itemCompareTooltipHtml(it); TT_ALT = true; const alt = itemCompareTooltipHtml(it); TT_ALT = false;
       out.tip = { tags:(plain.match(/class="afft/g)||[]).length, n:it.aff.length, range:!/affr/.test(plain) && /affr/.test(alt) && /\[\d+&ndash;\d+\]/.test(alt), hint:/hold Alt/.test(plain) && !/hold Alt/.test(alt), sub:/rare Mithril Platebody/.test(plain), examine:examineItem(it) };
-      const R = afRange(it.aff[0], it); out.tip.q = !!(R && R.q >= 0 && R.q <= 1 && R.lo <= R.hi); }
+      const R = afRange(it.aff.find(q=>!q.imp), it); out.tip.q = !!(R && R.q >= 0 && R.q <= 1 && R.lo <= R.hi); }
     /* colour and worth */
     { const rune = rsMakeArmour('metal', 5, 'chest'), it = newItem(); rsFillBase(it, 60, 'chest'); const m = rsMakeArmour('metal', 5, 'chest'); afDress(m, 60, 1); const rr = rsMakeArmour('metal', 5, 'chest'); afDress(rr, 60, 2);
       out.colour = { rune:rsQualityOf(rune), filled:it.quality, magic:m.quality, rare:rr.quality, price:itemPrice(rune) < itemPrice(m) && itemPrice(m) < itemPrice(rr) }; }
@@ -44,7 +44,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
     /* sets drop */
     { let set = null; for (let i=0;i<4000 && !set;i++){ const it = genItem(90, 'chest', 3); if (it.setId) set = it; } out.set = set ? { q:set.quality, base:set.baseNm, nm:set.nm, n:set.aff.length } : null; }
     /* an awakening weapon still grows a real bonus, from the table */
-    { const sw = rsMakeWeapon(5, 3); sw.kills = 49; G.gear.weapon = sw; itemSentienceOnKill(sw); out.awaken = { n:sw.aff.length, fam:sw.aff[0] && sw.aff[0].fam, q:sw.quality }; G.gear.weapon = newItem(); }
+    { const sw = rsMakeWeapon(5, 3); sw.kills = 49; G.gear.weapon = sw; itemSentienceOnKill(sw); const sr = sw.aff.filter(q=>!q.imp); out.awaken = { n:sr.length, fam:sr[0] && sr[0].fam, q:sw.quality }; G.gear.weapon = newItem(); }
     /* a boss drop is rare at the least; a champion's magic at the least */
     { let lo = 0; for (let i=0;i<60;i++){ const it = genBossLoot('chest', 80); if (!it.uniqueId && (it.quality||0) < 2 && !/Fire Cape/.test(it.nm)) lo++; } for (let i=0;i<60;i++){ const it = genItem(60, 'chest', 3, false, 1); if ((it.quality||0) < 1) lo++; } out.bossLow = lo; }
     return out; });

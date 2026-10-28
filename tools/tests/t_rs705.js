@@ -21,7 +21,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
     const pl = ISO.beams.map(b=>b.plate); out.plates = pl.map(c=>!!c && c.width > 40 && c.height > 12);
     { const c = pl[2], x = c.getContext('2d'), d = x.getImageData(0, 0, c.width, c.height).data; let near = 0; for (let i=0;i<d.length;i+=4) if (d[i] > 140 && d[i+1] > 130 && d[i+2] < d[i] - 50) near++;   /* (yellow ink) */ out.rareInk = near; }
     /* a top roll is tagged */
-    { const it = mk(2); it.aff[0].t = 1; out.top = lootTopRoll(it) && !lootTopRoll(mk(0)); ISO.beams = []; G.dropAt = { x:P.x, y:P.y + 1 }; addToInventory(it); G.dropAt = null; out.topBeam = ISO.beams[0] && ISO.beams[0].top; }
+    { const it = mk(2); it.aff.find(q=>!q.imp).t = 1; out.top = lootTopRoll(it) && !lootTopRoll(mk(0)); ISO.beams = []; G.dropAt = { x:P.x, y:P.y + 1 }; addToInventory(it); G.dropAt = null; out.topBeam = ISO.beams[0] && ISO.beams[0].top; }
     /* one chime a kill: two magic drops and a rare -> the rare's chime once */
     await wait(20); sounds.length = 0; G.dropAt = { x:P.x, y:P.y + 1 }; addToInventory(mk(1)); addToInventory(mk(2)); addToInventory(mk(1)); G.dropAt = null; await wait(20); out.sounds2 = sounds.filter(n=>/^drop/.test(n));
     sounds.length = 0; G.dropAt = { x:P.x, y:P.y + 1 }; addToInventory(mk(1)); G.dropAt = null; await wait(20); out.sounds3 = sounds.filter(n=>/^drop/.test(n));
@@ -31,7 +31,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
       const keepArrow = lootArrow; lootArrow = ()=>''; Object.assign(F2, { on:true, tiers:[0,1,2,3,4,5,6], stats:[] });
       out.why = [mk(0), mk(1), mk(2)].map(it=>lootfWhy(it, F2)).join();
       F2.rar = [0,1,2]; out.whyAll = lootfWhy(mk(2), F2); F2.rar = [0,1];
-      const t1 = mk(1); t1.aff[0].t = 1; const t3 = mk(1); t3.aff.forEach(a=>a.t = Math.max(3, a.t)); F2.keepT = 2; out.whyTop = [lootfWhy(t1, F2), lootfWhy(t3, F2)].join(); F2.keepT = 0;
+      const t1 = mk(1); t1.aff.find(q=>!q.imp).t = 1; const t3 = mk(1); t3.aff.forEach(a=>a.t = Math.max(3, a.t)); F2.keepT = 2; out.whyTop = [lootfWhy(t1, F2), lootfWhy(t3, F2)].join(); F2.keepT = 0;
       ISO.beams = []; G.inv = []; const g0 = P.gold; G.dropAt = { x:P.x, y:P.y + 1 }; addToInventory(mk(0)); G.dropAt = null; const b = ISO.beams[0];
       out.salv = { taken:G.inv.length===0 && P.gold > g0, label:!!b && b.salv===P.gold - g0 && !!b.nm };
       for (let i=0;i<4;i++){ renderGame(); await fr(); } out.salv.noBeam = !!b && !fx.beams.get(b); out.salv.plate = !!(b && b.plate);

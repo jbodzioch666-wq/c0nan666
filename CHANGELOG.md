@@ -1,5 +1,15 @@
 # Depthcrawl patch notes
 
+## RS-706 - Built In
+
+- **Every base has a bonus of its own.** Each base now carries a built-in bonus that suits it:
+  - Weapons: a dagger crits on 19-20, a mace and a warhammer add flat damage, a shortsword heals you on a kill, a scimitar and a battleaxe have a chance of deadly strikes, a spear and a halberd add defence, a longsword and a greatsword hit harder.
+  - Bows and staves: a shortbow crits, a longbow has deadly strikes, a crossbow adds damage, a staff regenerates life.
+  - Armour: a plate helm and a coif add life, a platebody cuts damage taken, platelegs too, gauntlets reflect a little, a shield adds defence, a leather body regenerates, vambraces have deadly strikes, a wizard hat adds magic find and a robe adds experience.
+- **Built in, not rolled.** The built-in bonus sits above the rolled bonuses in the tooltip, tagged *built in*. It doesn't make a piece magic, doesn't add to its price as a roll does, and a rolled bonus never repeats it. Gear you already have gets its built-in bonus when the save loads.
+- **Skilling suffixes.** Hats, gloves, boots, capes, rings and amulets can now roll a skilling suffix: of the Lumberjack, of the Prospector, of the Harpooner, of the Druid, of the Forgemaster, of the Feastmaker, of the Runesmith and more, thirteen skills in all. Each gives 4% to 18% more xp in its skill. For woodcutting, mining, fishing, foraging and archaeology it also gives a chance of a double haul, half the xp bonus. They are uncommon, and the up/down arrows ignore them, since they don't help in a fight.
+- **Numbers** (loot sim, kills an hour in plain gear, RS-704 → now): level 40 652 → 680, level 80 381 → 401, level 99 226 → 250. Magic and rare gear moved within the sim's noise.
+
 ## RS-705 - Loot on the Ground
 
 - **See what dropped where it fell.** Each drop's name floats over its beam in its rarity's colour: white plain, blue magic, yellow rare, green set, gold Unique. A magic or rare piece's name has a border in its colour. Several drops on one tile stack up. A piece with a T1 bonus says so (**T1** in gold).
