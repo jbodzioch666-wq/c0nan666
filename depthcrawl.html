@@ -34425,46 +34425,57 @@ function o3MineRoom(wx, wz){ const fx = wx - 0.5, fz = wz - 0.5, tx = Math.floor
 function o3NearMine(wx, wz, m){ const x = Math.floor(wx), z = Math.floor(wz), S = O3_MINE_S, k = (m || 0)/S; for (let i=-2;i<=2;i++) for (let j=-2;j<=2;j++){ const tx = x + i, tz = z + j; if (o3Tile(tx, tz)!==OW_MINE) continue;
     const ry = o3SiteYaw(OW_MINE, tx, tz), co = Math.cos(ry), si = Math.sin(ry), dx = wx - tx - 0.5, dz = wz - tz - 0.5, lx = (dx*co - dz*si)/S, lz = (dx*si + dz*co)/S, sd = o3Hash(tx, tz, 41);
     if (o3MineRoom(wx, wz) < 0.02) continue; for (const [a, b] of [[0, 0], [k, 0], [-k, 0], [0, k], [0, -k]]){ const h = o3MineCliff(lx + a, lz + b, sd); if (h!=null && h > 0.01) return true; } } return false; }
+/* (RS-695) each mine's patch is only the cells its rock rises over (and one round them): mines near one another share one patch, each
+   point as high as the highest cliff over it - a big square a mine and a mine beside it overlapped, and the second had none - and a
+   barrow's or a pyramid's stair cut in the patch keeps its own cells (the whole mine went without before) */
 function o3LandMines(geo, x0, y0, NV, W, hAt){
   const R = O3_R, F = 6, S = O3_MINE_S, A = geo.attributes, P = A.position.array, C = A.color.array, TC = A.tcol.array, N = A.normal.array, UV = A.uv.array, NC = NV - 1, NB = NV*NV, base = A.position.count;
   const I = geo.index ? geo.index.array : null; if (!I) return; const have = new Uint8Array(NC*NC);
   const cellOf = (a, b, c)=>Math.min((a/NV)|0, (b/NV)|0, (c/NV)|0)*NC + Math.min(a % NV, b % NV, c % NV);   /* (a cell's two triangles: its corners' least row and column) */
   for (let q=0;q<I.length;q+=3){ const a = I[q], b = I[q+1], c = I[q+2]; if (a >= NB || b >= NB || c >= NB) continue; have[cellOf(a, b, c)] = 1; }   /* (the cells of the plain grid still drawn - not cut away for a barrow's stair) */
-  const blocks = [], drop = new Uint8Array(NC*NC);
+  /* the mines, and the cells each one's rock rises over */
+  const mines = [], lift1 = (M, wx, wz, h0)=>{ const dx = wx - M.cx, dz = wz - M.cz, lx = (dx*M.co - dz*M.si)/S, lz = (dx*M.si + dz*M.co)/S, tl = o3MineCliff(lx, lz, M.sd); if (tl==null) return 0;
+    let tw = M.pad + S*tl; tw += (h0 - tw)*smoothstep(-0.95, -1.55, lz); return tw > h0 ? (tw - h0)*o3MineRoom(wx, wz) : 0; };   /* (behind, into the mountain's own slope; only over the mountain and the mine) */
   for (let x=x0-2;x<x0+W+2;x++) for (let y=y0-2;y<y0+W+2;y++){ if (o3Tile(x, y)!==OW_MINE) continue;
-    const cx = x + 0.5, cz = y + 0.5, ry = o3SiteYaw(OW_MINE, x, y), co = Math.cos(ry), si = Math.sin(ry); let lx0 = Infinity, hx = -Infinity, lz0 = Infinity, hz = -Infinity;
-    for (const u of [-1.45, 1.45]) for (const v of [-1.6, 0.8]){ const wx = cx + S*(u*co + v*si), wz = cz + S*(-u*si + v*co); lx0 = Math.min(lx0, wx); hx = Math.max(hx, wx); lz0 = Math.min(lz0, wz); hz = Math.max(hz, wz); }
-    const i0 = Math.max(0, Math.floor((lx0 - x0)*R) - 1), i1 = Math.min(NC - 1, Math.floor((hx - x0)*R) + 1), j0 = Math.max(0, Math.floor((lz0 - y0)*R) - 1), j1 = Math.min(NC - 1, Math.floor((hz - y0)*R) + 1);
-    if (i1 <= i0 || j1 <= j0) continue; let ok = true; for (let j=j0;j<=j1 && ok;j++) for (let i=i0;i<=i1;i++) if (!have[j*NC + i] || drop[j*NC + i]){ ok = false; break; }
-    if (!ok) continue; for (let j=j0;j<=j1;j++) for (let i=i0;i<=i1;i++) drop[j*NC + i] = 1;
-    blocks.push({ x, y, cx, cz, co, si, pad:hAt(cx, cz), sd:o3Hash(x, y, 41), i0, i1, j0, j1 }); }
-  if (!blocks.length) return;
+    const ry = o3SiteYaw(OW_MINE, x, y), M = { x, y, cx:x + 0.5, cz:y + 0.5, co:Math.cos(ry), si:Math.sin(ry), sd:o3Hash(x, y, 41) }; M.pad = hAt(M.cx, M.cz);
+    let i0 = Infinity, i1 = -Infinity, j0 = Infinity, j1 = -Infinity;
+    for (let u=-1.45;u<=1.45;u+=0.05) for (let v=-1.6;v<=0.8;v+=0.05){ const wx = M.cx + S*(u*M.co + v*M.si), wz = M.cz + S*(-u*M.si + v*M.co); if (lift1(M, wx, wz, hAt(wx, wz)) < 0.004) continue;
+      const i = Math.floor((wx - x0)*R), j = Math.floor((wz - y0)*R); if (i < i0) i0 = i; if (i > i1) i1 = i; if (j < j0) j0 = j; if (j > j1) j1 = j; }
+    if (i0 > i1) continue; M.r = [Math.max(0, i0 - 1), Math.min(NC - 1, i1 + 1), Math.max(0, j0 - 1), Math.min(NC - 1, j1 + 1)]; if (M.r[1] <= M.r[0] || M.r[3] <= M.r[2]) continue; mines.push(M); }
+  if (!mines.length) return;
+  /* patches: the mines' cells, overlapping or touching ones joined */
+  let blocks = mines.map(M=>({ r:M.r.slice(), ms:[M] })), joined = true;
+  while (joined){ joined = false; for (let a=0;a<blocks.length && !joined;a++) for (let b=a+1;b<blocks.length;b++){ const p = blocks[a].r, q = blocks[b].r;
+    if (p[0] > q[1] + 1 || q[0] > p[1] + 1 || p[2] > q[3] + 1 || q[2] > p[3] + 1) continue;
+    blocks[a] = { r:[Math.min(p[0], q[0]), Math.max(p[1], q[1]), Math.min(p[2], q[2]), Math.max(p[3], q[3])], ms:blocks[a].ms.concat(blocks[b].ms) }; blocks.splice(b, 1); joined = true; break; } }
+  const drop = new Uint8Array(NC*NC); for (const B of blocks){ const [i0, i1, j0, j1] = B.r; for (let j=j0;j<=j1;j++) for (let i=i0;i<=i1;i++) if (have[j*NC + i]) drop[j*NC + i] = 1; }
   const idx = []; for (let q=0;q<I.length;q+=3){ const a = I[q], b = I[q+1], c = I[q+2]; if (a < NB && b < NB && c < NB && drop[cellOf(a, b, c)]) continue; idx.push(a, b, c); }
   const xp = [], xc = [], xt = [], xn = [], xu = [], xr = [], lin = v=>Math.pow(v/255, 2.2), nz = v3Noise(7);
   const mix = (arr, fi, fj)=>{ const i = Math.min(NV - 2, Math.floor(fi)), j = Math.min(NV - 2, Math.floor(fj)), a = fi - i, b = fj - j, k = j*NV + i, w = [(1-a)*(1-b), a*(1-b), (1-a)*b, a*b], ks = [k, k+1, k+NV, k+NV+1], o = [0, 0, 0];
     for (let q=0;q<4;q++) for (let e=0;e<3;e++) o[e] += arr[ks[q]*3 + e]*w[q]; return o; };
-  for (const B of blocks){
-    const nI = (B.i1 - B.i0 + 1)*F + 1, nJ = (B.j1 - B.j0 + 1)*F + 1, v0 = base + xp.length/3, hh = new Float32Array(nI*nJ), lift = new Float32Array(nI*nJ), loc = [], dd = 1/(R*F);
-    const rc = [0, 0, 0]; { let nn = 0; for (let j=B.j0;j<=B.j1+1;j++) for (let i=B.i0;i<=B.i1+1;i++){ const k = j*NV + i; if (o3Tile(Math.floor(P[k*3]), Math.floor(P[k*3+2]))!==OW_MOUNTAIN || P[k*3+1] > 2.3) continue; rc[0] += C[k*3]; rc[1] += C[k*3+1]; rc[2] += C[k*3+2]; nn++; }
+  for (const B of blocks){ const [I0, I1, J0, J1] = B.r;
+    const nI = (I1 - I0 + 1)*F + 1, nJ = (J1 - J0 + 1)*F + 1, v0 = base + xp.length/3, hh = new Float32Array(nI*nJ), lift = new Float32Array(nI*nJ), loc = [], dd = 1/(R*F);
+    const rc = [0, 0, 0]; { let nn = 0; for (let j=J0;j<=J1+1;j++) for (let i=I0;i<=I1+1;i++){ const k = j*NV + i; if (o3Tile(Math.floor(P[k*3]), Math.floor(P[k*3+2]))!==OW_MOUNTAIN || P[k*3+1] > 2.3) continue; rc[0] += C[k*3]; rc[1] += C[k*3+1]; rc[2] += C[k*3+2]; nn++; }
       if (nn) for (let e=0;e<3;e++) rc[e] /= nn; else { rc[0] = lin(88); rc[1] = lin(84); rc[2] = lin(80); } }   /* (the colour of the mountain's own rock about it, below its snow) */
-    for (let b=0;b<nJ;b++) for (let a=0;a<nI;a++){ const fi = B.i0 + a/F, fj = B.j0 + b/F, wx = x0 + fi/R, wz = y0 + fj/R, k = b*nI + a, h0 = mix(P, fi, fj)[1];
-      const dx = wx - B.cx, dz = wz - B.cz, lx = (dx*B.co - dz*B.si)/S, lz = (dx*B.si + dz*B.co)/S; loc.push([lx, lz]);
-      let h = h0; const tl = (a===0 || b===0 || a===nI-1 || b===nJ-1) ? null : o3MineCliff(lx, lz, B.sd);   /* (the block's edge is the land as it was) */
-      if (tl!=null){ let tw = B.pad + S*tl; tw += (h0 - tw)*smoothstep(-0.95, -1.55, lz); if (tw > h0) h = h0 + (tw - h0)*o3MineRoom(wx, wz); }   /* (behind, into the mountain's own slope; only over the mountain and the mine) */
-      hh[k] = h; lift[k] = h - h0; }
-    for (let b=0;b<nJ;b++) for (let a=0;a<nI;a++){ const k = b*nI + a, fi = B.i0 + a/F, fj = B.j0 + b/F, wx = x0 + fi/R, wz = y0 + fj/R, h = hh[k];
+    const cut = (a, b)=>{ const ci = I0 + Math.floor(a/F), cj = J0 + Math.floor(b/F); for (const [di, dj] of [[0, 0], [-1, 0], [0, -1], [-1, -1]]){ const ii = (a % F || !di) ? ci : ci + di, jj = (b % F || !dj) ? cj : cj + dj; if (ii >= I0 && ii <= I1 && jj >= J0 && jj <= J1 && !have[jj*NC + ii]) return true; } return false; };   /* (a point on a stair's cell, which keeps its own) */
+    for (let b=0;b<nJ;b++) for (let a=0;a<nI;a++){ const fi = I0 + a/F, fj = J0 + b/F, wx = x0 + fi/R, wz = y0 + fj/R, k = b*nI + a, h0 = mix(P, fi, fj)[1];
+      let up = 0; if (a > 0 && b > 0 && a < nI-1 && b < nJ-1 && !cut(a, b)) for (const M of B.ms) up = Math.max(up, lift1(M, wx, wz, h0));   /* (the patch's edge, and a stair's, are the land as it was) */
+      hh[k] = h0 + up; lift[k] = up; loc.push(wx, wz); }
+    for (let b=0;b<nJ;b++) for (let a=0;a<nI;a++){ const k = b*nI + a, fi = I0 + a/F, fj = J0 + b/F, wx = x0 + fi/R, wz = y0 + fj/R, h = hh[k];
       xp.push(wx, h, wz); xu.push(wx/3, wz/3); const t3 = mix(TC, fi, fj); xt.push(t3[0], t3[1], t3[2]);
       const n0 = mix(N, fi, fj), hl = hh[b*nI + Math.max(0, a-1)], hr = hh[b*nI + Math.min(nI-1, a+1)], hu = hh[Math.max(0, b-1)*nI + a], hd = hh[Math.min(nJ-1, b+1)*nI + a];
       const sx = (a > 0 && a < nI-1 ? 2 : 1)*dd, sz = (b > 0 && b < nJ-1 ? 2 : 1)*dd, n1 = [-(hr - hl)/sx, 1, -(hd - hu)/sz], kk = smoothstep(0, 0.06, lift[k]);   /* (its own light where the face rises, the land's where it doesn't) */
       let nx = n0[0] + (n1[0] - n0[0])*kk, ny = n0[1] + (n1[1] - n0[1])*kk, nw = n0[2] + (n1[2] - n0[2])*kk; { const l = Math.hypot(nx, ny, nw) || 1; nx /= l; ny /= l; nw /= l; } xn.push(nx, ny, nw);
       const c3 = mix(C, fi, fj), rk = smoothstep(0.02, 0.3, lift[k]), v = Math.pow(0.9 + nz(wx*0.9 + 50, wz*0.9)*0.18 + 0.05*Math.sin(h*23 + Math.sin(wx*5.1)*2.2), 2.2);   /* (the mountain's rock, a little banded) */
       xc.push(c3[0] + (rc[0]*v - c3[0])*rk, c3[1] + (rc[1]*v - c3[1])*rk, c3[2] + (rc[2]*v - c3[2])*rk); xr.push(rk); }
-    const door = (p, q, r)=>{ const u = (loc[p][0] + loc[q][0] + loc[r][0])/3, w = (loc[p][1] + loc[q][1] + loc[r][1])/3; return Math.abs(u) < 0.23 && w > 0.17 && w < 0.4 && (hh[p] + hh[q] + hh[r])/3 > B.pad + 0.03; };   /* (behind the doorway: open, into the hall) */
-    for (let b=0;b<nJ-1;b++) for (let a=0;a<nI-1;a++){ const p = b*nI + a, q = p + 1, r = p + nI, s = r + 1; if (!door(p, r, q)) idx.push(v0 + p, v0 + r, v0 + q); if (!door(q, r, s)) idx.push(v0 + q, v0 + r, v0 + s); } }
+    const door = (p, q, r)=>{ for (const M of B.ms){ const wx = (loc[p*2] + loc[q*2] + loc[r*2])/3 - M.cx, wz = (loc[p*2+1] + loc[q*2+1] + loc[r*2+1])/3 - M.cz, u = (wx*M.co - wz*M.si)/S, w = (wx*M.si + wz*M.co)/S;
+      if (Math.abs(u) < 0.23 && w > 0.17 && w < 0.4 && (hh[p] + hh[q] + hh[r])/3 > M.pad + 0.03) return true; } return false; };   /* (behind the doorway: open, into the hall) */
+    for (let b=0;b<nJ-1;b++) for (let a=0;a<nI-1;a++){ if (!have[(J0 + Math.floor(b/F))*NC + I0 + Math.floor(a/F)]) continue;   /* (a stair's cell: its own triangles) */
+      const p = b*nI + a, q = p + 1, r = p + nI, s = r + 1; if (!door(p, r, q)) idx.push(v0 + p, v0 + r, v0 + q); if (!door(q, r, s)) idx.push(v0 + q, v0 + r, v0 + s); } }
   const n = base + xp.length/3, cat = (old, ext, w)=>{ const a = new Float32Array(n*w); a.set(old.subarray(0, base*w)); a.set(ext, base*w); return a; };
   geo.setAttribute('position', new THREE.BufferAttribute(cat(P, xp, 3), 3)); geo.setAttribute('color', new THREE.BufferAttribute(cat(C, xc, 3), 3)); geo.setAttribute('tcol', new THREE.BufferAttribute(cat(TC, xt, 3), 3));
   geo.setAttribute('normal', new THREE.BufferAttribute(cat(N, xn, 3), 3)); geo.setAttribute('uv', new THREE.BufferAttribute(cat(UV, xu, 2), 2)); geo.setIndex(idx);
-  geo.userData.mines = blocks.map(B=>[B.x, B.y]); geo.userData.rock = { at:base, w:Float32Array.from(xr) }; }   /* (gfxO3BuildGen: rock in the ground's blend) */
+  geo.userData.mines = mines.map(M=>[M.x, M.y]); geo.userData.rock = { at:base, w:Float32Array.from(xr) }; }   /* (gfxO3BuildGen: rock in the ground's blend) */
 function o3RockGeo(r, s){ const g = new THREE.DodecahedronGeometry(r, 1), p = g.attributes.position;
   for (let i=0;i<p.count;i++){ const x = p.getX(i), y = p.getY(i), z = p.getZ(i), h = Math.sin(Math.round(x*1e3)*12.9898 + Math.round(y*1e3)*78.233 + Math.round(z*1e3)*37.719 + s*4.1)*43758.5453, k = 1 + (h - Math.floor(h) - 0.5)*0.4; p.setXYZ(i, x*k, y*k, z*k); }
   g.computeVertexNormals(); return g; }
@@ -46659,7 +46670,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-694';
+const GAME_VERSION = 'rs-695';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

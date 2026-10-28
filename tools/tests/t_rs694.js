@@ -13,6 +13,9 @@ module.exports = async page=>{
     G.owPos = { x:at.q[0], y:at.q[1] }; owReveal(at.q[0], at.q[1], 8); await fr(150);
     const T = THREE, C = o3C(at.s.x, at.s.y), tx = Math.floor(C[0]), tz = Math.floor(C[1]), g = O3.doors && O3.doors.get(tx + ',' + tz), out = {};
     const geo = O3.land.geometry; out.mines = (geo.userData.mines || []).some(([x, y])=>x===tx && y===tz);
+    /* (RS-695) every mine in the land built round you has its cliff - one near another, or near a barrow's stair, had none */
+    { const L = geo.userData.mines || [], w = O3.win || O3.lastWin; let all = 0, got = 0; const [lx, ly] = [Math.floor(O3.ppos.x) - 40, Math.floor(O3.ppos.z) - 40];
+      for (let x=lx;x<lx+80;x++) for (let y=ly;y<ly+80;y++) if (o3Tile(x, y)===OW_MINE){ all++; if (L.some(([a, b])=>a===x && b===y)) got++; } out.allMines = all; out.gotMines = got; }
     out.ownCrag = 0; if (g) g.traverse(o=>{ if (o.isMesh && o.material && o.material.vertexColors) out.ownCrag++; });
     /* the land round the gate as a mesh of its own, to cast rays on */
     const P = geo.attributes.position, I = geo.index.array, S = O3_MINE_S, ry = o3SiteYaw(OW_MINE, tx, tz), co = Math.cos(ry), si = Math.sin(ry), cx = tx + 0.5, cz = tz + 0.5, pad = O3.heightAt(cx, cz);
@@ -35,12 +38,25 @@ module.exports = async page=>{
     /* the open tiles round it: their middles (where a tree or a rock to gather stands, and you) not buried in the cliff */
     out.tiles = 0; out.buried = 0; for (let i=-2;i<=2;i++) for (let j=-2;j<=2;j++){ const q = o3Tile(tx + i, tz + j); if ((!i && !j) || q==null || q===OW_MOUNTAIN || q===OW_WATER || q===OW_RIVER) continue; const h = down(tx + i + 0.5, tz + j + 0.5); if (h==null) continue; out.tiles++; out.buried = Math.max(out.buried, +(h - O3.heightAt(tx + i + 0.5, tz + j + 0.5)).toFixed(3)); }
     out.veg = 0; O3.scene.traverse(o=>{ if (o.isInstancedMesh && o.count){ const mm = new T.Matrix4(), v = new T.Vector3(); for (let k=0;k<o.count;k++){ o.getMatrixAt(k, mm); v.setFromMatrixPosition(mm).applyMatrix4(o.matrixWorld); if (Math.abs(v.x - cx) < 2.6 && Math.abs(v.z - cz) < 2.6 && o3NearMine(v.x, v.z, 0)) out.veg++; } } });   /* (nothing grown in it) */
+    /* (RS-695) a second mine five tiles off: its patch and the gate's overlap - both have their cliffs, the land between whole */
+    { let put = null; for (let d=4; d<=5 && !put; d++) for (const [i, j] of [[d, 0], [-d, 0], [0, d], [0, -d], [d, 1], [-d, 1], [1, d], [1, -d]]){ const x = tx + i, y = tz + j, q = o3Tile(x, y); if (put || ![OW_GRASS, OW_DESERT, OW_FOREST, OW_TUNDRA].includes(q)) continue;
+        let near = false; for (let a=-2;a<=2;a++) for (let b=-2;b<=2;b++) if (OW_SITE_TILES.includes(o3Tile(x + a, y + b)) && (x + a!==tx || y + b!==tz)) near = true; if (!near) put = [x, y, q]; }
+      if (put){ const g2 = o3G(put[0], put[1]); m[g2[0]][g2[1]] = OW_MINE; O3.win = null; await fr(120);
+        const L = O3.land.geometry.userData.mines || []; out.pair = [L.some(([a, b])=>a===tx && b===tz), L.some(([a, b])=>a===put[0] && b===put[1])];
+        const P2 = O3.land.geometry.attributes.position, I2 = O3.land.geometry.index.array, mx = (tx + put[0])/2 + 0.5, mz = (tz + put[1])/2 + 0.5, nr = k=>Math.abs(P2.getX(k) - mx) < 4.5 && Math.abs(P2.getZ(k) - mz) < 4.5, ix2 = [];
+        for (let q=0;q<I2.length;q+=3) if (nr(I2[q]) || nr(I2[q+1]) || nr(I2[q+2])) ix2.push(I2[q], I2[q+1], I2[q+2]);
+        const sub2 = new T.BufferGeometry(); sub2.setAttribute('position', P2); sub2.setIndex(ix2); const mesh2 = new T.Mesh(sub2, new T.MeshBasicMaterial({ side:T.DoubleSide }));
+        let miss2 = 0, n2 = 0; const doorAt = (wx, wz)=>[[tx, tz], [put[0], put[1]]].some(([sx, sz])=>{ const r2 = o3SiteYaw(OW_MINE, sx, sz), dx = wx - sx - 0.5, dz = wz - sz - 0.5, u = (dx*Math.cos(r2) - dz*Math.sin(r2))/S, v = (dx*Math.sin(r2) + dz*Math.cos(r2))/S; return Math.abs(u) < 0.3 && v > 0.1 && v < 0.45; });
+        for (let wx=mx - 4; wx<=mx + 4; wx+=0.07) for (let wz=mz - 4; wz<=mz + 4; wz+=0.07){ if (doorAt(wx, wz)) continue; n2++; rc.set(new T.Vector3(wx, 20, wz), new T.Vector3(0, -1, 0)); if (!rc.intersectObject(mesh2)[0]) miss2++; }
+        rc.set(new T.Vector3(put[0] + 0.5, 20, put[1] + 0.5), new T.Vector3(0, -1, 0)); const hm = rc.intersectObject(mesh2)[0]; out.pairRise = hm ? +(hm.point.y - O3.heightAt(put[0] + 0.5, put[1] + 0.5)).toFixed(2) : null;   /* (its own tile raised behind its door) */
+        out.pairMiss = miss2; out.pairRays = n2; m[g2[0]][g2[1]] = put[2]; O3.win = null; await fr(120); } }
     { const c2 = O3.cam.clone(), [fx, fz] = W(0, 3.4); c2.position.set(fx, pad + 2.2*S, fz); c2.lookAt(cx, pad + 0.7*S, cz); c2.updateProjectionMatrix(); O3.renderer.render(O3.scene, c2); out.shot = O3.renderer.domElement.toDataURL('image/png'); }
     return out; });
   if (r.shot) require('fs').writeFileSync(SHOTS + '/rs694.png', Buffer.from(r.shot.split(',')[1], 'base64')); r.shot = !!r.shot;
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: ' + m + ' ' + JSON.stringify(r)); };
   A(!r.none, 'a mine at the foot of a mountain');
+  A(r.gotMines===r.allMines, 'every mine about you has its cliff: ' + r.gotMines + ' of ' + r.allMines);
   A(r.mines && r.ownCrag===0, 'the land is raised round the gate, and the gate brings no crag of its own');
   A(r.behind.every(h=>h > 1.2) && r.front.every(h=>Math.abs(h) < 0.06), 'the mountain\'s face rises behind the gate, the ground before it as it was');
   A(r.door===null && r.beside!==null && r.beside > 0 && r.beside < 0.4, 'the doorway open into the hall, the face beside it solid');
@@ -49,5 +65,6 @@ module.exports = async page=>{
   A(Math.abs(r.walk) < 0.05, 'the ground you walk on level at the door');
   A(r.tiles >= 4 && r.buried < 0.12, 'the open tiles round it not buried in the cliff: ' + r.buried);
   A(r.veg===0, 'no tree, bush, rock or grass in the cliff');
+  A(r.pair && r.pair[0] && r.pair[1] && r.pairRise > 0.5 && r.pairRays > 5000 && r.pairMiss===0, 'a mine five tiles from another: both have their cliffs, the land between them whole');
   A(!errs.length, 'no errors: ' + errs.join(' | '));
 };

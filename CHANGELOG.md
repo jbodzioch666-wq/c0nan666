@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-695 - Every Gate in Its Mountain
+
+- **No more bare gates.** In RS-694 a mine near another mine, or near a barrow's or pyramid's stair, could miss its rock entirely and stand alone on open ground. Every mine's gate now gets its mountain face, however close its neighbours are.
+
 ## RS-694 - Into the Mountain
 
 - **The Dwarf Gate is cut into the real mountain.** A mine's gate used to bring its own little cliff, a block of different rock stuck against the mountain beside it. Now the mountain itself comes down to the gate: its own rock rises in a sheer face around the dressed stone and runs back up into the peaks behind, with the doorway open into the lantern-lit hall.
