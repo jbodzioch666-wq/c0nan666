@@ -14,7 +14,7 @@ module.exports = async page=>{
     const m = { nm:'test goblin', alive:true, hp:5, maxHp:5, x:gx, y:gy, sym:'g', col:'#8a8' }; G.mon.push(m);
     FP.parts = []; fpBurst(p.x+0.5, p.y+0.5, 0.5, '#ffd27a', 40, 1.2);
     (ISO.beams = ISO.beams || []).push({ x:gx, y:gy, col:'#ffd040', q:3, t:0, life:3, depth:G.depth, mode:G.gameMode });
-    ISO.shots = []; isoShot(m, 'spell', '#60a0ff', 0, { tier:2, elem:'water' }); isoShot(m, 'arrow', '#9aa3a8', 0); ISO.shots.forEach(s=>{ s.dur = 5; });
+    ISO.shots = []; isoShot(m, 'spell', '#60a0ff', 0, { tier:2, elem:'water' }); isoShot(m, 'arrow', '#9aa3a8', 0); ISO.shots.forEach(s=>{ s.dur = 5; s.t = Math.max(s.t, 0); });   /* (RS-703: a spell bolt waits for the staff's thrust - here, already on its way) */
     const rc = canvas.getBoundingClientRect(), pr = (()=>{ const v = new THREE.Vector3(gx+0.5, 0, gy+0.5).project(FPD.cam); return { x:rc.left + (v.x*0.5+0.5)*rc.width, y:rc.top + (-v.y*0.5+0.5)*rc.height }; })();
     ISO.mouse = pr;
     const sp0 = isoSpellParticles, mm0 = fpDrawMinimap; window.isoSpellParticles = ()=>{}; window.fpDrawMinimap = ()=>{};   /* (the spell's element motes are 2D by design; the minimap draws its dots with arcs) */

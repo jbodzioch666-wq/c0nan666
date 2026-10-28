@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-703 - Staff Forward
+
+- **Spells wait for the staff.** A spell used to fly the moment you cast it, while the staff was only starting up. Now the bolt leaves from the staff's head as you sweep it forward, about half a second in, and its sound goes with it.
+- **A slower cast.** Casting now takes about a second instead of two-thirds of one, so you can see the staff go up and come down.
+- **Hits land with the bolt.** A foe flinches, shows the hit, or shows a miss's splash only when the bolt reaches it. A foe your spell kills stays standing until the bolt arrives, then falls. Arrows work the same way now.
+- **Your staff stays out.** A spell that killed its foe used to put your staff away before the bolt had even left. Now you finish the cast first.
+
 ## RS-702 - Flowing Staff
 
 - **Casting is one smooth motion.** You draw your staff up and back overhead while your off hand gathers light before your chest, then sweep it forward to point at your foe as you thrust the light out, leaning into the spell, and ease back to your guard.

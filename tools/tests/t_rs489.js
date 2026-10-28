@@ -13,7 +13,7 @@ module.exports = async page=>{
     const me = m3dInstance({}, rsPlayerLook()), keep = ISO.player; ISO.player = me;
     FP.swing = 1; let n = 0; while (FP.swing > 0 && n < 400){ FP.swing = Math.max(0, FP.swing - 0.01*(rigIsBow(ISO.player) ? BOW_RATE : 1.8)); n++; } out.swingS = +(n*0.01).toFixed(2);
     const on = ISO.on, ok = FPD.ok, ss = ISO.shots; ISO.on = true; FPD.ok = true; ISO.shots = []; isoShot({ x:G.player.x + 3, y:G.player.y }, 'arrow', '#fff', 0); out.lag = +(-ISO.shots[0].t).toFixed(2);
-    ISO.shots = []; isoShot({ x:G.player.x + 3, y:G.player.y }, 'spell', '#fff', 0); out.spellLag = -ISO.shots[0].t;
+    ISO.shots = []; isoShot({ x:G.player.x + 3, y:G.player.y }, 'spell', '#fff', 0); out.spellLag = +(-ISO.shots[0].t).toFixed(3); out.castFire = +CAST_FIRE.toFixed(3); FP.cast = 0;
     ISO.on = on; FPD.ok = ok; ISO.shots = ss; ISO.player = keep;
     return out; });
   console.log(JSON.stringify(r));
@@ -24,5 +24,5 @@ module.exports = async page=>{
     A(Math.abs(o.up) < 0.2, k+': the drawing elbow is level with the shoulder');
     A(o.toCheek < 0.03, k+': the hand still at the cheek'); }
   A(r.swingS > 1, 'the bow shot takes over a second');
-  A(r.lag > 0.4 && r.lag < 0.5 && r.spellLag === 0, 'the arrow leaves at the loose, a spell straight away');
+  A(r.lag > 0.4 && r.lag < 0.5 && r.spellLag === r.castFire, 'the arrow leaves at the loose, a spell as the staff comes forward (RS-703)');
 };

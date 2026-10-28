@@ -15,7 +15,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
       const e = ISO.player, rg = e.rig, piv = m3dWpPiv(rg); e.holder.traverse(o=>{ if (o.__afz){ o.__afz = false; o.matrixAutoUpdate = true; } }); e.holder.updateMatrixWorld(true);
       const bx = new T.Box3().setFromObject(rg.weapon), top = piv.worldToLocal(new T.Vector3((bx.min.x + bx.max.x)/2, bx.max.y, (bx.min.z + bx.max.z)/2));
       const pose = c=>{ FP.cast = c; FP.dt = 1/60; isoSyncPlayer(); e.holder.updateMatrixWorld(true); const h = piv.localToWorld(top.clone()), o = piv.getWorldPosition(new T.Vector3()); e.holder.worldToLocal(h); e.holder.worldToLocal(o); return { h, lean:Math.atan2(h.z - o.z, h.y - o.y) }; };
-      const tr = []; for (let i=0;i<10;i++) tr.push(pose(0)); const c0 = tr.length; for (let c=1; c>0; c-=1.5/60) tr.push(pose(c)); const c1 = tr.length; for (let i=0;i<10;i++) tr.push(pose(0));
+      const tr = []; for (let i=0;i<10;i++) tr.push(pose(0)); const c0 = tr.length; for (let c=1; c>0; c-=CAST_RATE/60) tr.push(pose(c)); const c1 = tr.length; for (let i=0;i<10;i++) tr.push(pose(0));
       const sp = []; for (let i=1;i<tr.length;i++) sp.push(tr[i].h.distanceTo(tr[i-1].h)*100); const acc = []; for (let i=1;i<sp.length;i++) acc.push(Math.abs(sp[i] - sp[i-1]));
       const at = u=>tr[c0 + Math.round(u*(c1 - c0))];
       out[(tome ? 'tome' : 'two') + 'S'] = sp.slice(c0 - 3, c0 + 6).map(x=>+x.toFixed(2)); out[(tome ? 'tome' : 'two') + 'I'] = +(e.idleT||0).toFixed(2);

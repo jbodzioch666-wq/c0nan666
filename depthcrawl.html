@@ -5880,7 +5880,7 @@ function noteFoe(mi){
 }
 // a hitsplat that isn't a monster's life dropping: a blue 0 for a miss or a block (RuneScape's), red
 // damage over you when you're hit - drawn by the dungeon/fight views like any other hitsplat
-function fxSplat(x, y, txt, kind){ if (typeof FP!=='undefined' && FP.floats) FP.floats.push({x, y, z:0.95, txt:String(txt), col:'#ffd27a', kind, crit:false, age:0}); }
+function fxSplat(x, y, txt, kind){ if (typeof FP!=='undefined' && FP.floats) FP.floats.push({x, y, z:0.95, txt:String(txt), col:'#ffd27a', kind, crit:false, age:-(typeof ISO!=='undefined' && ISO.on ? isoShotDelay(x, y) : 0)}); }   /* (RS-703: a miss shows as the shot lands, as a hit does) */
 function monsterDies(mi){
   const m = G.mon[mi];
   try{ townOnKill(m); sqOnKill(m); sqClueTask('kill', m.nm); }catch(e){ console.error(e); }
@@ -16000,7 +16000,7 @@ function rsCastAt(mi, id){
   isoShot(m, 'spell', rsSpellCol(sp), 0, { tier:rsSpellTier(sp), elem:sp[6] });
   const stEl = rsStaffElem();
   if (stEl && sp[4][stEl] && !G.player.rsStaffTip){ G.player.rsStaffTip = 1; logMsg(`your staff supplies the ${stEl} runes for ${sp[1]} - you only spend the others`, 'magic'); }
-  sfx('spell');
+  if (!(ISO.on && FPD.ok)) sfx('spell');   /* (RS-703: in the scene, it sounds as the bolt leaves the staff - isoShotLaunch) */
   const cx = m.x, cy = m.y;
   rsSpellHit(mi, sp);
   if (meta.aoe){
@@ -43921,7 +43921,7 @@ function m3dTomeFollow(r, closed){
 function rsFightNow(){
   if (!G.player || G.ui!=='playing') return false;
   if (G.gameMode!==1 && G.gameMode!==2) return false;
-  return (typeof FP!=='undefined' && FP.swing > 0) || !!(ISO.fighting && ISO.fighting.alive) || audInFight();
+  return (typeof FP!=='undefined' && (FP.swing > 0 || FP.cast > 0)) || !!(ISO.fighting && ISO.fighting.alive) || audInFight();   /* (RS-703: and a cast till it's done - a spell that kills its foe put the staff away before its bolt had left) */
 }
 // how each kind of weapon is swung: a stab is a thrust from a bent elbow, a slash sweeps across, a crush comes
 // down from overhead (the base pose, made heavier), and a halberd's blow carries the whole body round
@@ -44721,14 +44721,18 @@ function fpCollectSprites(vis){
     let pos = FP.monPos.get(m);
     if (!pos){ pos = {x:m.x+0.5, y:m.y+0.5}; FP.monPos.set(m,pos); }
     const hit0 = { dmg:(prevHp||0) - m.hp, maxHp:m.maxHp, kind:m.hitKind||'melee', crit:!!m.hitCrit, elem:m.hitElem||'' };   /* (RS-371: what the killing blow was, for the throw) */
+    /* (RS-703) a blow carried by a shot - a spell bolt, an arrow - lands with the shot: the flinch, the strike and a kill wait for it */
+    const lag = ISO.on && ((prevHp!==undefined && m.hp<prevHp) || (was && !m.alive)) ? isoShotDelay(pos.x, pos.y) : 0;
     if (prevHp!==undefined && m.hp<prevHp && seeTile(m.x,m.y)){
-      FP.floats.push({x:pos.x, y:pos.y, z:0.95, txt:String(prevHp-Math.max(0,m.hp)), col:'#ffd27a', kind:m.hitKind||'melee', crit:!!m.hitCrit, age:-(ISO.on ? isoShotDelay(pos.x, pos.y) : 0)});
+      FP.floats.push({x:pos.x, y:pos.y, z:0.95, txt:String(prevHp-Math.max(0,m.hp)), col:'#ffd27a', kind:m.hitKind||'melee', crit:!!m.hitCrit, age:-lag});
       m.hitCrit0 = m.hitCrit; m.hitKind = null; m.hitCrit = false;
-      FP.monFlash.set(m, 1);
-      { const mt = fxStrikeKind(m), crit = !!m.hitCrit0; fxStrike(pos.x, pos.y, mt, crit ? 1.6 : 1); if (crit) FP.hitStop = Math.max(FP.hitStop||0, 0.07); }   /* (RS-479: by what it struck) */
+      if (lag > 0.02) m._hitAt = FP.t + lag; else m._hitAt = -1;
     }
-    if (was && !m.alive && seeTile(m.x,m.y)){ fpBurst(pos.x, pos.y, 0.35, m.col||'#999', 22, 1.6); fxStrike(pos.x, pos.y, fxStrikeKind(m), 2.4); FP.hitStop = Math.max(FP.hitStop||0, 0.11); m3dKill(m, hit0); }   /* (RS-479: and a kill a bigger one, with a beat's pause) */
-    if (!m.alive || !seeTile(m.x,m.y)){ pos.x = m.x+0.5; pos.y = m.y+0.5; continue; }
+    if (m._hitAt!=null && FP.t >= m._hitAt){ m._hitAt = null; FP.monFlash.set(m, 1);
+      { const mt = fxStrikeKind(m), crit = !!m.hitCrit0; fxStrike(pos.x, pos.y, mt, crit ? 1.6 : 1); if (crit) FP.hitStop = Math.max(FP.hitStop||0, 0.07); } }   /* (RS-479: by what it struck) */
+    if (was && !m.alive && seeTile(m.x,m.y)){ m._killAt = FP.t + (lag > 0.02 ? lag : 0); m._killHit = hit0; }
+    if (m._killAt!=null && FP.t >= m._killAt){ m._killAt = null; if (seeTile(m.x,m.y)){ fpBurst(pos.x, pos.y, 0.35, m.col||'#999', 22, 1.6); fxStrike(pos.x, pos.y, fxStrikeKind(m), 2.4); FP.hitStop = Math.max(FP.hitStop||0, 0.11); m3dKill(m, m._killHit); } m._killHit = null; }   /* (RS-479: and a kill a bigger one, with a beat's pause) */
+    if ((!m.alive && m._killAt==null) || !seeTile(m.x,m.y)){ pos.x = m.x+0.5; pos.y = m.y+0.5; continue; }   /* (one struck dead stands till the shot lands) */
     if (Math.hypot(m.x+0.5-pos.x, m.y+0.5-pos.y)>2){ pos.x = m.x+0.5; pos.y = m.y+0.5; }
     if (ISO.on && FPD.ok) isoGlide(pos, m.x+0.5, m.y+0.5);   // an even walking pace from tile to tile
     else { const kk = 1-Math.exp(-FP.dt*12); pos.x += (m.x+0.5-pos.x)*kk; pos.y += (m.y+0.5-pos.y)*kk; }
@@ -46002,6 +46006,9 @@ function rsSheath(e, fight, dt, t, moving){
    each other (a fixed tip laid it flat behind the head mid-raise). With a tome the off hand stays mostly on the book. Gives the
    gathered light's strength, 0 to 1 */
 const CAST_U = [0, 0.2, 0.38, 0.54, 0.68, 1];
+/* (RS-703) a cast takes 1/CAST_RATE seconds (it was 1/1.5); its bolt leaves the staff's head CAST_FIRE seconds in, as the staff comes
+   forward (CAST_FIRE_U through the cast) - it flew as the staff was only starting up */
+const CAST_RATE = 0.95, CAST_FIRE_U = 0.5, CAST_FIRE = CAST_FIRE_U/CAST_RATE;
 const CAST_KEYS = {   /* (the arms' angles, then additions: torso lean and turn, knees, the staff tipped in the fist, the light) */
   Rsx:[-0.6, -1.6, -2.45, -1.55, -1.3, -0.6], Rsz:[-0.2, -0.4, -0.3, -0.1, -0.14, -0.2], Rel:[-0.6, -0.5, -0.35, -0.08, -0.25, -0.6],
   Lsx:[-0.4, -0.85, -1.05, -1.6, -1.2, -0.4], Lsz:[0.25, 0.35, 0.3, 0.1, 0.2, 0.25], Lel:[-0.8, -1.35, -1.45, -0.18, -0.5, -0.8],
@@ -46124,10 +46131,21 @@ function isoShot(m, kind, col, delay, extra){
   if (!ISO.on || !FPD.ok || !m) return;
   const p = G.player, d = Math.hypot(m.x-p.x, m.y-p.y), dur = (kind==='chin' ? 0.2 : kind==='bolt' ? 0.08 : 0.12) + d*(kind==='bolt' ? 0.035 : kind==='chin' ? 0.06 : 0.045);
   if ((kind==='arrow' || kind==='crystal' || kind==='bolt') && !(extra && extra.minion) && rigIsBow(ISO.player)) delay = (delay||0) + BOW_LOOSE;
-  (ISO.shots = ISO.shots || []).push(Object.assign({ x0:p.x+0.5, y0:p.y+0.5, x1:m.x+0.5, y1:m.y+0.5, t:-(delay||0), dur, kind, col:col||'#fff', m }, extra||{}));
-  FP.cast = kind==='spell' ? 1 : FP.cast;
+  const cast = kind==='spell' && !(extra && extra.minion), past = 1 - CAST_FIRE_U;   /* (RS-703: off the staff as it comes forward - with a cast already running, as that one does; past it, at once) */
+  if (cast) delay = (delay||0) + (FP.cast > past ? (FP.cast - past)/CAST_RATE : FP.cast > 0 ? 0 : CAST_FIRE);
+  (ISO.shots = ISO.shots || []).push(Object.assign({ x0:p.x+0.5, y0:p.y+0.5, x1:m.x+0.5, y1:m.y+0.5, t:-(delay||0), dur, kind, col:col||'#fff', m, fromStaff:cast, snd:cast ? 'spell' : null }, extra||{}));
+  if (cast && !(FP.cast > 0)) FP.cast = 1;
 }
 // how long until a shot already flying at this spot lands (so its hitsplat waits for it)
+/* (RS-703) a spell bolt leaves from the head of your staff (or the light in your off hand), wherever the thrust has put it, and drops
+   to its flight height on the way; its sound as it goes */
+function isoShotLaunch(s){
+  if (s.snd){ s.sndAt = performance.now(); try{ fpBaseSfx(s.snd); }catch(e){} }   /* (the plain sound: through sfx, a 'spell' sound starts a cast pose) */
+  if (!s.fromStaff) return; const e = ISO.player, r = e && e.rig; if (!r) return;
+  try{ const T = THREE, v = new T.Vector3(), piv = r.wk==='staff' && r.weapon && r.weapon.parent && r._castTip ? m3dWpPiv(r) : null;
+    if (piv){ piv.updateWorldMatrix(true, false); v.copy(r._castTip); piv.localToWorld(v); } else if (e._cast && e._cast.visible){ e._cast.updateWorldMatrix(true, false); e._cast.getWorldPosition(v); } else return;
+    if (Math.hypot(v.x - s.x0, v.z - s.y0) > 1.2) return; s.x0 = v.x; s.y0 = v.z; s.h0 = v.y; }catch(err){} }
+function isoShotH(s, k){ return 0.55 + 0.08*Math.sin(k*Math.PI) + (s.h0!=null ? (s.h0 - 0.55)*(1 - k)*(1 - k) : 0); }
 function isoShotDelay(x, y){ let d = 0; for (const s of ISO.shots||[]) if (Math.hypot(s.x1-x, s.y1-y) < 0.8) d = Math.max(d, s.dur - s.t); return d; }
 // a column of light where loot fell, in the item's rarity colour - brighter,
 // taller and longer-lived the rarer it is; set and unique pieces also pulse
@@ -46197,9 +46215,10 @@ function isoFxShots(dt, F){
   const T = THREE, keep = [], live = new Set();
   for (const s of ISO.shots||[]){
     s.t += dt; if (s.t < 0){ keep.push(s); continue; }
+    if (!s.go){ s.go = 1; isoShotLaunch(s); }
     if (s.t > s.dur){ isoShotLand(s); continue; }
     keep.push(s); if (s.kind!=='arrow' && s.kind!=='spell') continue; live.add(s);
-    const k = s.t/s.dur, at = (kk, v)=>v.set(s.x0+(s.x1-s.x0)*kk, 0.55 + (s.kind==='arrow' ? Math.sin(kk*Math.PI)*0.35 : 0.08*Math.sin(kk*Math.PI)), s.y0+(s.y1-s.y0)*kk);
+    const k = s.t/s.dur, at = (kk, v)=>v.set(s.x0+(s.x1-s.x0)*kk, s.kind==='arrow' ? 0.55 + Math.sin(kk*Math.PI)*0.35 : isoShotH(s, kk), s.y0+(s.y1-s.y0)*kk);
     let o = F.shots.get(s);
     if (!o){
       if (s.kind==='arrow'){
@@ -46266,7 +46285,7 @@ function isoDrawShots(){
     if (s.t < 0) continue;
     if (s.kind==='breath'){ try{ isoDrawBreath(s, ppu); }catch(e){} continue; }
     if (s.kind!=='arrow' && s.kind!=='spell'){ isoDrawMissile(s, ppu); continue; }
-    if (s.kind==='spell'){ const k = s.t/s.dur, a = isoProject(s.x0+(s.x1-s.x0)*k, s.y0+(s.y1-s.y0)*k, 0.55 + 0.08*Math.sin(k*Math.PI)); if (a.ok){ ctx.save(); ctx.globalCompositeOperation = 'lighter'; try{ isoSpellParticles(s, a, ppu, 1 + (s.tier||0)*0.35); }catch(e){} ctx.restore(); } }   /* (the bolt itself is in the scene: isoFxShots) */
+    if (s.kind==='spell'){ const k = s.t/s.dur, a = isoProject(s.x0+(s.x1-s.x0)*k, s.y0+(s.y1-s.y0)*k, isoShotH(s, k)); if (a.ok){ ctx.save(); ctx.globalCompositeOperation = 'lighter'; try{ isoSpellParticles(s, a, ppu, 1 + (s.tier||0)*0.35); }catch(e){} ctx.restore(); } }   /* (the bolt itself is in the scene: isoFxShots) */
   }
 }
 // ---- what's under the mouse: the tile, and a monster's name ----
@@ -46652,7 +46671,7 @@ function renderFirstPerson(){
   else if (FP.lastHp!==null && p.hp > FP.lastHp + 0.5) FP.heal = 1;
   FP.lastHp = p.hp;
   FP.hurt = Math.max(0, FP.hurt-dt*1.8); FP.heal = Math.max(0, FP.heal-dt*1.6); FP.glow = Math.max(0, FP.glow-dt*1.2);
-  FP.cast = Math.max(0, FP.cast-dt*1.5); FP.swing = Math.max(0, FP.swing-dt*(typeof ISO!=='undefined' && rigIsBow(ISO.player) ? BOW_RATE : 1.8)); FP.fade = Math.max(0, FP.fade-dt*2.5);
+  FP.cast = Math.max(0, FP.cast-dt*CAST_RATE); FP.swing = Math.max(0, FP.swing-dt*(typeof ISO!=='undefined' && rigIsBow(ISO.player) ? BOW_RATE : 1.8)); FP.fade = Math.max(0, FP.fade-dt*2.5);
   try{ foeTick(); }catch(e){ console.error(e); }   /* (RS-218) */
   FP.shake = Math.max(0, FP.shake-dt*3);
   if (FP.moving>0.02) FP.stepPhase = (FP.stepPhase||0) + dt*9;
@@ -46904,7 +46923,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-702';
+const GAME_VERSION = 'rs-703';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

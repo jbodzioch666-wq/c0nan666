@@ -12,8 +12,8 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
     ISO.player.holder.traverse(o=>{ if (o.__afz){ o.__afz = false; o.matrixAutoUpdate = true; } }); const T = THREE, e = ISO.player, rg = e.rig, out = { wk:rg.wk, twoHand:!!rg.twoHand, grip2:!!rg.grip2, look:rsPlayerLook().o.weapon, key:ISO.lookKey };
     const piv = m3dWpPiv(rg); e.holder.updateMatrixWorld(true); const bx = new T.Box3().setFromObject(rg.weapon), top = piv.worldToLocal(new T.Vector3((bx.min.x + bx.max.x)/2, bx.max.y, (bx.min.z + bx.max.z)/2)), hd = [piv, top.x, top.y, top.z];
     const pose = c=>{ FP.cast = c; FP.dt = 1/60; isoSyncPlayer(); e.holder.updateMatrixWorld(true); const v = new T.Vector3(hd[1], hd[2], hd[3]); hd[0].localToWorld(v); return e.holder.worldToLocal(v); };
-    /* trace: 30 frames of rest, the cast at 60 fps (FP.cast falls 1.5 a second), 30 frames after */
-    const tr = []; for (let i=0;i<20;i++) tr.push(pose(0)); for (let c=1; c>0; c-=1.5/60) tr.push(pose(c)); for (let i=0;i<20;i++) tr.push(pose(0));
+    /* trace: 30 frames of rest, the cast at 60 fps (FP.cast falls CAST_RATE a second), 30 frames after */
+    const tr = []; for (let i=0;i<20;i++) tr.push(pose(0)); for (let c=1; c>0; c-=CAST_RATE/60) tr.push(pose(c)); for (let i=0;i<20;i++) tr.push(pose(0));
     const sp = []; for (let i=1;i<tr.length;i++) sp.push(tr[i].distanceTo(tr[i-1]));
     const acc = []; for (let i=1;i<sp.length;i++) acc.push(Math.abs(sp[i] - sp[i-1]));
     out.speed = sp.map(x=>+(x*100).toFixed(1)); out.maxAcc = +(Math.max(...acc)*100).toFixed(2); out.maxAt = acc.indexOf(Math.max(...acc)) + 1; out.n = tr.length;
