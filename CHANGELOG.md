@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-719 - Into the Pot
+
+- **Lobster is boiled, not fried.** Cook a lobster at the Cooks' Guild range and it goes into the range's stewpot, not the skillet. The pot is full of water that simmers and then comes to a rolling boil, with steam pouring off it, and the lobster turns from blue-black to scarlet as it cooks. The range's own pan stays on the hotplate.
+- **A pot on the fire.** At a tavern hearth or your campfire, an iron pot of water with a bail handle sits on the grill for a lobster, in place of the skillet.
+- Fish, steaks and stews still go in the skillet as before.
+
 ## RS-718 - On the Range
 
 You can now watch your food cook on the Cooks' Guild range, as you can on a hearth or a campfire.
