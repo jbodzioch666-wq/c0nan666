@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-714 - Fair Compare
+
+A magic ring could say "downgrade" against the Ring of Saint Aurel with no visible reason.
+
+- **Prayer in the swap list.** "If you swap it in" now lists prayer. The verdict always counted it, but the list never showed it, so losing Saint Aurel's +8 prayer was hidden.
+- **What the verdict left out.** Under "upgrade" or "downgrade", a small line now says which stats it ignored. For example: "judged for melee - magic doesn't help a melee fighter". It also names bonuses it doesn't weigh, such as HP on Kill, on either piece, for you to judge yourself.
+
 ## RS-713 - Why Not
 
 The anvil now tells you why an essence won't work, instead of doing nothing.
