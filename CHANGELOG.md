@@ -1,5 +1,15 @@
 # Depthcrawl patch notes
 
+## RS-743 - The Colosseum
+
+- **The arena is a real arena.** A town's arena waves used to be fought on a random roadside field: grass, a dirt road, and no one watching. Now you walk out onto an oval of raked sand inside a stone podium wall.
+- **A crowd in the stands.** Five tiers of stone seats rise all round, packed with several hundred townsfolk in every colour. Banners hang along the top, and the town's worthies sit in a canopied box on the north side. The crowd bobs and waves, and when a beast goes down they all leap up with their arms in the air and roar.
+- **You can always see the fight.** The stands on the camera's side are cut down to the front row, just as dungeon walls are, so they never hide the sand.
+- **The gate is the way out.** The arena's gate stands open in the south wall. Walk out through it to yield: the run ends and you're back in the town beside the arena master. Before, leaving the field dropped you on the open land outside the town.
+- **No death in the arena.** If you're beaten, the arena's people drag you out and patch you up to a quarter of your life. Your run ends there, but you lose nothing else.
+- **Back beside the arena master.** After a won wave you now stand next to the arena master, ready for the next wave.
+- **The town's arena building is whole.** Only one corner of its ring was being drawn, since RS-118 stretched the towns; the full ring now stands, with raked sand inside instead of a flat yellow slab.
+
 ## RS-742 - Staff and Robe
 
 - **Magic needs a wizard's staff.** Every combat and utility spell is cast through a staff, battlestaff or god staff in your hand. With a sword or a bow, the spell won't cast, and the message tells you where staves come from: monster drops, the Peddler's stock, or the fletching bench. The alchemy spells still work without one, because they work on an item in your pack.

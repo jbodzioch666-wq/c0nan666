@@ -4775,6 +4775,7 @@ function checkDeathWard(){
    it is survived like a standard one, with the usual losses */
 function hcFatal(){ return !!(G.player && G.player.hardcore && !(G.saveId && typeof saveLocked==='function' && saveLocked(G.saveId))); }
 function playerDies(cause){
+  if (arenaKnockout()) return;   /* (RS-743: beaten in a town's arena, you're dragged out, not killed) */
   G.gameOver = 1; G.deathCause = cause;
   G.deathWild = (()=>{ try{ return wgDeathIsWild(); }catch(e){ return false; } })();   // the Wilderness keeps what you drop
   const st = pStats(); st.deaths++;
@@ -6271,7 +6272,7 @@ function noteFoe(mi){
 function fxSplat(x, y, txt, kind){ if (typeof FP!=='undefined' && FP.floats) FP.floats.push({x, y, z:0.95, txt:String(txt), col:'#ffd27a', kind, crit:false, age:-Math.max(LOG_HOLD/1000, typeof ISO!=='undefined' && ISO.on ? isoShotDelay(x, y) : 0)}); }   /* (RS-710: and a miss as the blade swings past) */   /* (RS-703: a miss shows as the shot lands, as a hit does) */
 function monsterDies(mi){
   const m = G.mon[mi];
-  try{ townOnKill(m); sqOnKill(m); sqClueTask('kill', m.nm); }catch(e){ console.error(e); }
+  try{ townOnKill(m); sqOnKill(m); sqClueTask('kill', m.nm); arenaRoar(m.elite ? 1 : 0.75); }catch(e){ console.error(e); }
   if (m.champ && m.champ.includes('explosive')) try{ monExplode(m); }catch(e){}
   logMsg(`the ${m.nm} falls`, 'good');
   sfx('monsterDie'); try{ audMonster(m, 'die'); }catch(e){}
@@ -7676,7 +7677,8 @@ function tryMove(dx,dy){
     }
     case T_FLEE: { leavingFloor=true;
       if (G.gameMode===2 && G.fieldWon){ fieldLeave(); break; }   /* (RS-382: the fight won, you walk off the field) */
-      const go = ()=>{ if (G.wevFight && G.sqReturn){ G.wevFight = null; logMsg(G.cellar ? 'you climb back up out of the cellar' : 'you break off the fight and head back', 'new'); sqReturnIndoors(); return; }
+      const go = ()=>{ if (G.wevFight && G.wevFight.kind==='townarena'){ arenaYield(); return; }   /* (RS-743: out through the gate - you yield) */
+        if (G.wevFight && G.sqReturn){ G.wevFight = null; logMsg(G.cellar ? 'you climb back up out of the cellar' : 'you break off the fight and head back', 'new'); sqReturnIndoors(); return; }
         G.cellar = false; G.gameMode=0; logMsg('you break off the fight and retreat', 'new'); };
       if (!isoPortalWalk(nx, ny, go)) go(); break; }   /* (RS-609: the flee portal walked into too) */
     case T_TRAP: {
@@ -22292,11 +22294,63 @@ function wevCampEntry(kind, L){
 }
 function wevFightStart(kind, id, build){
   if (G.gather) skStop();
-  generateArena();
+  if (kind==='townarena') generateColosseum(); else generateArena();   /* (RS-743: a town's arena is fought in its colosseum) */
   G.gameMode = 2; G.mandatoryFight = false; G.mon = []; G.fieldWon = false;
   build(cbLvl());
   G.wevFight = { kind, id };
   setUi('playing'); renderGame();
+}
+/* (RS-743) THE COLOSSEUM. A town's arena fight is fought in the arena itself, not on a field by the road: an oval of raked sand inside
+   a stone podium wall (deco 'wall', raised by fpdSiegeWorks), its gate in the south wall standing open - walk out through it and you
+   yield - and five tiers of stone stands all round (deco 'stand'; built by fpdColosseum), packed with a crowd that cheers, waves and
+   roars when a beast goes down. Beaten there, you aren't killed: the arena's people drag you out (arenaKnockout) */
+const ARENA_C = { cols:24, rows:22, cx:12, cy:11, rx:8.6, ry:7.3, gp:0.45, g0:0.85, gw:0.8, h0:1.62, dh:0.4, tiers:5, wallH:1.4 };
+function arenaEll(x, y){ const C = ARENA_C; return Math.hypot((x + 0.5 - C.cx)/C.rx, (y + 0.5 - C.cy)/C.ry); }
+function generateColosseum(){
+  generateArena();   /* (everything a fresh fight resets; its field is replaced below) */
+  const C = ARENA_C; setGrid(C.cols, C.rows);
+  G.map = makeGrid(T_WALL); G.floorItem = makeItemGrid(); G.arenaDeco = makeGrid('', COLS, ROWS); G.mon = [];
+  G.arenaTheme = 'colosseum'; G.mandatoryFight = false;
+  for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++) if (arenaEll(x, y) <= 1) G.map[x][y] = T_FLOOR;
+  const open = (x, y)=>x>=0 && y>=0 && x<COLS && y<ROWS && G.map[x][y]===T_FLOOR;
+  for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++){ if (G.map[x][y]===T_FLOOR) continue;
+    let near = false; for (const [a, b] of DIR8) if (open(x+a, y+b)) near = true;
+    G.arenaDeco[x][y] = near ? 'awall' : 'stand'; }   /* (the podium wall itself is built smooth, round the oval: fpdColosseum) */
+  // the gate: two tiles of the south wall, open - the way out, and yielding
+  for (const gx of [C.cx - 1, C.cx]){ let gy = ROWS - 1; while (gy > 0 && G.map[gx][gy - 1]!==T_FLOOR) gy--; G.map[gx][gy] = T_FLEE; G.arenaDeco[gx][gy] = 'gate'; }
+  const p = G.player, gy0 = G.arenaDeco[C.cx].indexOf('gate'); p.x = C.cx; p.y = gy0 - 2; p.facing = 0;
+  placeCompanionNearPlayer(); placeSummonNearPlayer(); for (const m of ((p && p.minions)||[])) necroPlace(m);
+}
+// the crowd's roar: louder for a kill, a groan when you go down (audio and the cheering both follow it)
+function arenaRoar(k){ if (!(G.gameMode===2 && G.arenaTheme==='colosseum')) return; G.arenaRoarAt = performance.now(); G.arenaRoarK = k || 1;
+  try{ const ctx = AUD.ctx; if (!ctx || ctx.state!=='running' || !_gains.amb) return; const at = ctx.currentTime + 0.02, v = Math.min(1, k || 1);
+    if (k < 0){ audNoiseHit(_gains.amb, at, 1.8, 'lowpass', 300, 0.16, 0.7); return; }
+    audNoiseHit(_gains.amb, at, 1.9, 'bandpass', 620, 0.2*v, 0.9); audNoiseHit(_gains.amb, at + 0.08, 1.5, 'bandpass', 1300, 0.08*v, 1.2); audNoiseHit(_gains.amb, at + 0.15, 2.2, 'lowpass', 260, 0.12*v); }catch(e){} }
+function arenaRoarNow(){ const t = G.arenaRoarAt ? (performance.now() - G.arenaRoarAt)/1000 : 9; return G.arenaRoarK < 0 ? 0 : Math.max(0, 1 - t/2.6)*Math.min(1, G.arenaRoarK || 1); }
+// back beside the arena master, out of the way
+function arenaPlaceAtMaster(){
+  const p = G.player, n = G.villageNpcs.find(o=>o.service==='arena'); if (!n){ p.x = TOWN_CX; p.y = ROWS-3; return; }
+  for (const [a, b] of [[1,0],[-1,0],[0,-1],[1,-1],[-1,-1],[0,1],[1,1],[-1,1]]){ const x = n.x + a, y = n.y + b;
+    if (G.map[x] && G.map[x][y]===T_FLOOR && !G.villagers.some(v=>v.x===x && v.y===y)){ p.x = x; p.y = y; return; } }
+  p.x = TOWN_CX; p.y = ROWS-3;
+}
+// walking out through the gate: you yield, and the run ends
+function arenaYield(){
+  const run = G.arenaRun, w = run ? run.wave : 0; G.wevFight = null; G.arenaRun = null; G.mon = [];
+  enterVillage(); arenaPlaceAtMaster(); setUi('playing');
+  logMsg(w ? `you yield and walk out through the gate - your run ends after wave ${w}` : 'you yield and walk out through the gate - the crowd jeers', 'new');
+}
+// beaten in the arena: no death - the arena's people drag you out, and the run ends
+function arenaKnockout(){
+  if (!(G.gameMode===2 && G.wevFight && G.wevFight.kind==='townarena' && G.player)) return false;
+  G.player.hp = 1; arenaRoar(-1); if (!G.arenaKO){ G.arenaKO = true; setTimeout(arenaCarriedOut, 0); }
+  return true;
+}
+function arenaCarriedOut(){
+  if (!G.arenaKO) return; G.arenaKO = false; if (!(G.gameMode===2 && G.wevFight && G.wevFight.kind==='townarena')) return;
+  const run = G.arenaRun, a = arenaRec(), w = run ? run.wave : 0, p = G.player; G.wevFight = null; G.arenaRun = null; G.mon = [];
+  enterVillage(); arenaPlaceAtMaster(); p.hp = Math.max(p.hp, Math.ceil(p.maxHp*0.25));
+  wevDialog('Beaten!', `You go down in the sand of wave ${w + 1}, and the crowd groans. The arena's people drag you out through the gate and patch you up.<br>Your run ends with ${w} wave${w===1 ? '' : 's'} won (your best: ${a.best}).`, [['Get up', ()=>{}]], 'the arena');
 }
 function wevCampFight(c){
   wevFightStart('camp', c.id, L=>{
@@ -25862,7 +25916,7 @@ function arenaFight(){
     for (let i=0;i<n;i++) wevMon(wevCampEntry(kinds[(wave + i) % kinds.length], lv), lv);
     if (wave % 5===0) upgradeToNamedElite(G.mon[0]); else if (wave >= 3) upgradeToElite(G.mon[0]);
   });
-  logMsg(`the gate rattles up - wave ${wave}! The crowd roars`, 'new');
+  logMsg(`the beasts' gate rattles up - wave ${wave}! The crowd roars`, 'new'); arenaRoar(0.8);
 }
 function townArenaWon(f){
   const run = G.arenaRun, a = arenaRec(), p = G.player; if (!run) return false;
@@ -25870,7 +25924,7 @@ function townArenaWon(f){
   const gold = roundH((40 + run.wave*40 + cbT()*5)*goldFindMult()); p.gold += gold;
   const info = townInfo(), titles = { 5:'Arena Fighter', 10:'Champion of '+info.name, 15:'Grand Champion' }, t = titles[run.wave];
   let extra = ''; if (t && !a.titles.includes(t)){ a.titles.push(t); extra = ` You are named <b>${esc(t)}</b>!`; sfx('achievement'); }
-  enterVillage(); G.player.x = tX(23); G.player.y = tY(8); if (G.map[G.player.x][G.player.y]!==T_FLOOR){ G.player.x = TOWN_CX; G.player.y = ROWS-3; }
+  enterVillage(); arenaPlaceAtMaster();   /* (RS-743: beside the arena master) */
   wevDialog(`Wave ${run.wave} cleared!`, `The crowd throws coins: <b>${gold} gold</b>.${extra}`, [[`Fight wave ${run.wave+1}`, ()=>arenaFight()], ['Take your winnings and rest', ()=>{ G.arenaRun = null; }]], 'the arena');
   checkAchievements(); return true;
 }
@@ -26312,8 +26366,8 @@ function townV3Build(grp, mats){
   }
   // the arena: a ring of stone with banners, sand inside
   if (info.tier >= 2){
-    for (let x=21;x<=26;x++) for (let y=10;y<=15;y++) if (deco(x,y)==='arenawall'){ add(v3Box(1, 1.05, 1, mats.stoneBig, x+0.5, 0.52, y+0.5)); if ((x+y)%2===0) add(v3Box(0.35, 0.25, 0.35, mats.stoneBig, x+0.5, 1.17, y+0.5)); }
-    const sand = new T.Mesh(new T.PlaneGeometry(4, 4), M('#d8b878', { roughness:1 })); sand.rotation.x = -Math.PI/2; sand.position.set(tX(24), 0.02, tY(13)); sand.receiveShadow = true; grp.add(sand);
+    for (let x=tX(21);x<=tX(26);x++) for (let y=tY(10);y<=tY(15);y++) if (deco(x,y)==='arenawall'){   /* (RS-743: where they stand, stretched - only a corner of the ring was drawn) */ add(v3Box(1, 1.05, 1, mats.stoneBig, x+0.5, 0.52, y+0.5)); if ((x+y)%2===0) add(v3Box(0.35, 0.25, 0.35, mats.stoneBig, x+0.5, 1.17, y+0.5)); }
+    const sand = new T.Mesh(new T.PlaneGeometry(4, 4), new T.MeshStandardMaterial({ map:v3TexSand(V3_INT_TEX), roughness:1 }));   /* (RS-743: raked sand, not a glaring slab) */ sand.rotation.x = -Math.PI/2; sand.position.set(tX(24), 0.02, tY(13)); sand.receiveShadow = true; grp.add(sand);
     for (const [x,z] of [[21.5,10.5],[26.5,10.5],[21.5,15.5],[26.5,15.5]].map(([a,b])=>[tX(a-0.5)+0.5, tY(b-0.5)+0.5])){ add(v3Cyl(0.05, 0.05, 2.6, 6, mats.wood, x, 1.3, z)); const f = new T.Mesh(new T.PlaneGeometry(0.5, 0.7), M('#a01a1a', { side:T.DoubleSide })); f.position.set(x+0.27, 2.25, z); grp.add(f); }
     const hb = new T.Mesh(new T.BoxGeometry(6, 1.4, 6), new T.MeshBasicMaterial({ visible:false })); hb.position.set(tX(24), 0.7, tY(13)); hb.userData.act = { kind:'tile', x:tX(22), y:tY(9), label:'The arena' }; grp.add(hb); V3.hits.push(hb);
   }
@@ -27053,7 +27107,7 @@ function audAmbTick(dt){
   AUD.wetT = wet ? (AUD.wetT||0) + dt : 0;
   const rm = rainMix(); for (const k in rm){ if (rm[k] > 0 || AUD.amb['rain:'+k]) rainLayer(k); audLayerTo('rain:'+k, rm[k]*RAIN_VOL); }   /* (RS-404: the rain 85% quieter) */
   audLayerTo('waves', audNearWater() || (G.gameMode===3 && !G.interior && G.townLy && G.townLy.info.port) ? 0.2 : audNearLake() ? 0.05 : 0);   /* (RS-584: a lake only laps, soft) */
-  audLayerTo('crowd', G.gameMode===3 && !G.interior && !night && !wet ? 0.05 : (G.interior && G.interior.key==='tavern' ? 0.06 : 0));
+  audLayerTo('crowd', G.gameMode===2 && G.arenaTheme==='colosseum' ? 0.13 + arenaRoarNow()*0.3 : G.gameMode===3 && !G.interior && !night && !wet ? 0.05 : (G.interior && G.interior.key==='tavern' ? 0.06 : 0), G.gameMode===2 ? 0.2 : 0.05);   /* (RS-743: the arena's crowd) */
   audLayerTo('insects', out && night && !wet && t!==OW_TUNDRA ? (t===OW_SWAMP ? 0.05 : 0.025) : 0);
   audLayerTo('rumble', G.gameMode===1 ? 0.1 : 0);
   // the calls: birds by day, owls and crickets by night, drips below, gulls at sea, thunder in a storm
@@ -27078,6 +27132,7 @@ function audSurface(){
     return { [OW_DESERT]:'sand', [OW_TUNDRA]:'snow', [OW_SWAMP]:'mud', [OW_RIVER]:'water', [OW_WATER]:'snow', [OW_MOUNTAIN]:'stone', [OW_MOUNTAINPASS]:'stone', [OW_TOWN]:'stone' }[t] || 'grass'; }
   if (G.gameMode===3){ if (G.interior) return G.interior.key==='cellar' || G.interior.key==='temple' ? 'stone' : 'wood'; const d = G.villageDeco[G.player.x] && G.villageDeco[G.player.x][G.player.y];
     return d==='path' || d==='npc' ? 'stone' : d==='pier' ? 'wood' : d==='sand' ? 'sand' : G.villageTheme==='tundra' ? 'snow' : G.villageTheme==='desert' ? 'sand' : 'grass'; }
+  if (G.gameMode===2 && G.arenaTheme==='colosseum') return 'sand';
   if (G.gameMode===2) return G.cellar || G.arenaTheme==='street' || (G.siegeWar && G.siegeWar.phase===2 && SIEGE_TOWN && G.player.y < SIEGE_TOWN.th) ? 'stone' : G.arenaTheme==='sea' ? 'wood' : 'grass';
   return 'stone';
 }
@@ -29301,6 +29356,7 @@ function renderImmersiveHud(){
   const siteWord = SITE_WORD[G.siteKind] || 'dungeon';
   const loc = G.gameMode===1 ? `${siteWord} &middot; ${ASCEND_SITES[G.siteKind] ? 'floor' : 'depth'} ${G.depth}/${G.dungeonMaxDepth}${G.isBossFloor?' &middot; lair':''}${activeDm ? ' &middot; '+esc(DUNGEON_MODIFIERS.find(d=>d.id===G.dungeonModifier).name) : ''}`
     : G.gameMode===2 && G.cellar ? 'the cellar'
+    : G.gameMode===2 && G.arenaTheme==='colosseum' ? `the arena &middot; wave ${(G.arenaRun ? G.arenaRun.wave : 0) + 1}`
     : G.gameMode===2 ? `roadside encounter${(typeof isNightTime==='function' && isNightTime()) ? ' &middot; night' : ''}${G.weather && G.weather!=='clear' ? ' &middot; '+esc(G.weather) : ''}`
     : villageFlavor ? esc(villageFlavor.name) : 'the wilds';
   const nPot = potCount(i=>i.kind==='heal');
@@ -30023,6 +30079,10 @@ const FP_THEME_SPECS = {
   tundra: { outdoor:true, sky:[[118,148,190],[222,232,242]],
     wall: fpRock({base:[180,200,216], seed:95}), wall2: fpRock({base:[150,160,170], seed:96}),
     floor: fpSnow({base:[226,234,244], seed:97}), floor2: fpSnow({base:[214,224,236], seed:98}), edge: fpSnow({base:[200,210,222], seed:99}) },
+  // (RS-743) the colosseum: dressed sandstone, raked sand
+  colosseum: { outdoor:true, sky:[[84,132,196],[240,214,170]],
+    wall: fpBricks({base:[196,174,138], mc:[104,88,66], rows:3, cols:2, seed:231, jitter:0.2}), wall2: fpBricks({base:[184,162,128], mc:[96,82,62], rows:3, cols:2, seed:232, jitter:0.25}),
+    floor: fpSand({base:[218,188,140], seed:233}), floor2: fpSand({base:[218,188,140], seed:233}), edge: fpSand({base:[200,170,126], seed:235}) },
   sea: { outdoor:true, sky:[[68,118,180],[192,216,232]],
     wall: fpRock({base:[98,114,122], seed:101}), wall2: fpRock({base:[90,104,110], seed:102}),
     floor: fpBricks({base:[134,100,66], mc:[60,40,24], rows:4, cols:1, seed:103, jitter:0.2}), floor2: fpBricks({base:[126,94,62], mc:[56,38,22], rows:4, cols:1, seed:104}), edge: fpWater({seed:105}) },
@@ -34398,6 +34458,14 @@ function v3Roof(x0,z0,w,d,y, h, mats, grp, snow){
 // RS-224: in a halfling shire every building is a hobbit hole - a turfed hill with a round door, round windows
 // and a chimney poking up through the grass
 /* (RS-736) bare earth, turned over: brown with clods, grit and a few stones */
+/* (RS-743) the town arena's raked sand */
+function v3TexSand(cache){
+  if (cache.sand) return cache.sand;
+  const c = v3Canvas(128,128), x = c.getContext('2d'); x.fillStyle = '#b89a6a'; x.fillRect(0,0,128,128);
+  for (let y=0;y<128;y+=6){ x.strokeStyle = 'rgba(120,92,56,0.35)'; x.lineWidth = 1.4; x.beginPath(); for (let i=0;i<=128;i+=8) x.lineTo(i, y + Math.sin(i*0.09 + y)*1.2); x.stroke(); }
+  for (let i=0;i<1600;i++){ x.fillStyle = ['rgba(90,70,40,0.35)','rgba(220,200,160,0.35)','rgba(150,120,80,0.3)'][i%3]; x.beginPath(); x.arc(Math.random()*128, Math.random()*128, 0.4 + Math.random()*1.1, 0, 7); x.fill(); }
+  return (cache.sand = v3CanvasTex(c, 2));
+}
 function v3TexDirt(cache){
   if (cache.dirt) return cache.dirt;
   const c = v3Canvas(128,128), x = c.getContext('2d'); x.fillStyle = '#7a5a3a'; x.fillRect(0,0,128,128);
@@ -40183,12 +40251,13 @@ function fpdHorizonTex(kind, seed){
 /* (RS-418) a field tile that's a built wall - a besieged town's wall and gate towers, the houses of its streets - not a bush or a boulder */
 function fpdFieldWall(x, y){ const d = G.gameMode===2 && G.arenaDeco && G.arenaDeco[x] ? G.arenaDeco[x][y] : ''; return d==='wall' || d==='wall2' || d==='tower' || d==='house' || d==='house2'; }
 /* (RS-419) how high each is built: the town wall a man and a half, its towers higher, the houses lower under their roofs */
-function fpdFieldWallH(x, y){ const d = G.arenaDeco[x][y]; return d==='tower' ? 2.5 : (d==='house' || d==='house2') ? 1.35 : G.arenaTheme==='street' ? 1.85 : 1.7; }
+function fpdFieldWallH(x, y){ const d = G.arenaDeco[x][y]; return d==='tower' ? 2.5 : (d==='house' || d==='house2') ? 1.35 : G.arenaTheme==='street' ? 1.85 : G.arenaTheme==='colosseum' ? ARENA_C.wallH : 1.7; }
 /* (RS-419) a besieged town's works, built over the field: every wall raised to its height and capped, merlons along the town wall and
    its towers, a gabled roof - red tile or thatch - over each block of houses, and the gate: a stone gatehouse with an arched passage
    and two iron-bound oak doors, barred before the battle, broken in after it (one door hanging open, the other torn off and flat) */
 function fpdSiegeWorks(world, matFor){
-  if (G.gameMode!==2 || !(G.arenaTheme==='siege' || G.arenaTheme==='street') || !G.arenaDeco) return;
+  if (G.gameMode!==2 || !(G.arenaTheme==='siege' || G.arenaTheme==='street' || G.arenaTheme==='colosseum') || !G.arenaDeco) return;
+  const colos = G.arenaTheme==='colosseum';
   const T = THREE, deco = (x, y)=>x>=0 && y>=0 && x<COLS && y<ROWS ? G.arenaDeco[x][y] : '';
   const B = { wall:{ p:[], n:[], u:[] }, wall2:{ p:[], n:[], u:[] } };
   const quad = (b, o, U, V, N, uu, vv)=>{ const c = [[0,0],[1,0],[1,1],[0,1]], pt = c.map(([a,e])=>[o[0]+U[0]*a+V[0]*e, o[1]+U[1]*a+V[1]*e, o[2]+U[2]*a+V[2]*e]);
@@ -40203,7 +40272,7 @@ function fpdSiegeWorks(world, matFor){
       const ux = -dy, uz = dx, o = [x+0.5+dx*0.5-ux*0.5, lo, y+0.5+dy*0.5-uz*0.5];   /* (the face above the dungeon-height wall below it, or above a lower neighbour) */
       quad(b, o, [ux,0,uz], [0,h-lo,0], [dx,0,dy], (a,e,q)=>[ux ? q[0]*ux : q[2]*uz, q[1]]); }
     quad(b, [x, h, y+1], [1,0,0], [0,0,-1], [0,1,0], (a,e,q)=>[q[0], -q[2]]);   /* (its top) */
-    if (d==='wall' || d==='tower'){ const along = fpdFieldWall(x-1, y) || fpdFieldWall(x+1, y) || deco(x-1, y)==='gate' || deco(x+1, y)==='gate';   /* (merlons along its length) */
+    if ((d==='wall' || d==='tower') && !colos){ const along = fpdFieldWall(x-1, y) || fpdFieldWall(x+1, y) || deco(x-1, y)==='gate' || deco(x+1, y)==='gate';   /* (merlons along its length) */
       for (const k of [0.22, 0.72]){ const mx0 = along ? x + k - 0.11 : x + 0.3, mz0 = along ? y + 0.3 : y + k - 0.11; box(b, mx0, h, mz0, mx0 + (along ? 0.22 : 0.4), h + 0.24, mz0 + (along ? 0.4 : 0.22)); } }
   }
   for (const k in B){ const b = B[k]; if (!b.p.length) continue; const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(b.p, 3)); g.setAttribute('normal', new T.Float32BufferAttribute(b.n, 3)); g.setAttribute('uv', new T.Float32BufferAttribute(b.u, 2)); g.setAttribute('color', new T.Float32BufferAttribute(new Array(b.p.length).fill(0.96), 3));
@@ -40225,7 +40294,7 @@ function fpdSiegeWorks(world, matFor){
     roof.position.set(x0 + w/2, 1.35, y0 + dz/2); if (long) roof.rotation.y = Math.PI/2; world.add(roof); }
   // the gate
   const gt = []; for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++) if (deco(x, y)==='gate') gt.push([x, y]);
-  if (gt.length){ const gx = gt.reduce((a, c)=>a + c[0], 0)/gt.length + 0.5, gy = gt[0][1] + 0.5, broken = G.arenaTheme==='street';
+  if (gt.length){ const gx = gt.reduce((a, c)=>a + c[0], 0)/gt.length + 0.5, gy = gt[0][1] + 0.5, broken = G.arenaTheme==='street', open = colos;
     const stone = matFor('wall'), oak = FPD.mats.siegeOak || (FPD.mats.siegeOak = new T.MeshStandardMaterial({ color:new T.Color('#5a3a1e').convertSRGBToLinear(), roughness:0.85 })), iron = FPD.mats.siegeIron || (FPD.mats.siegeIron = new T.MeshStandardMaterial({ color:new T.Color('#34322e').convertSRGBToLinear(), roughness:0.45, metalness:0.65 }));
     const g = new T.Group(); g.position.set(gx, 0, gy); world.add(g);
     const W = 1.0, HG = 2.1, SPR = 1.15, R = 0.82, DEP = 0.95;
@@ -40242,16 +40311,147 @@ function fpdSiegeWorks(world, matFor){
         for (let k=0;k<4;k++){ const sd = new T.Mesh(new T.SphereGeometry(0.016, 8, 6), iron); sd.position.set(-s0*(0.1 + k*(R - 0.2)/3), y, -0.055); hg.add(sd); } }
       return hg; };
     const L = leaf(-1), Rt = leaf(1);
-    if (!broken){ const bar = new T.Mesh(new T.BoxGeometry(2*R - 0.1, 0.12, 0.1), oak); bar.position.set(0, 0.62, -DEP*0.15 - 0.09); g.add(bar);   /* (barred: a beam across both doors) */
+    if (open){ L.rotation.y = -1.3; Rt.rotation.y = 1.3; }   /* (RS-743: the arena's gate stands open - the way out) */
+    else if (!broken){ const bar = new T.Mesh(new T.BoxGeometry(2*R - 0.1, 0.12, 0.1), oak); bar.position.set(0, 0.62, -DEP*0.15 - 0.09); g.add(bar);   /* (barred: a beam across both doors) */
       for (const sx of [-1, 1]){ const br = new T.Mesh(new T.BoxGeometry(0.1, 0.22, 0.14), iron); br.position.set(sx*(R - 0.25), 0.62, -DEP*0.15 - 0.1); g.add(br); } }
     else { L.rotation.y = -1.35;   /* (one door hanging open) */
       Rt.position.set(0.25, 0.05, -DEP*0.15 - 1.1); Rt.rotation.set(-Math.PI/2 + 0.08, 0.35, 0);   /* (the other torn off its hinges and flat in the street) */
       for (let i=0;i<6;i++){ const sp = new T.Mesh(new T.BoxGeometry(0.05, 0.03, 0.25 + fpHash(i, 1, 421)*0.2), oak); sp.position.set((fpHash(i, 2, 421) - 0.5)*1.4, 0.02, -0.9 - fpHash(i, 3, 421)*0.6); sp.rotation.y = fpHash(i, 4, 421)*3; g.add(sp); } }   /* (and its splinters) */
   }
 }
+/* (RS-743) the colosseum's stands and its crowd. Five stone tiers rise round the podium wall to a parapet hung with banners, a canopied
+   box on the north side for the town's worthies, and on every tier the crowd: one instanced figure (a robe, a head, hair or a hood,
+   two arms) in many colours, which bob and wave their arms in the air - all of them when the crowd roars (FPD.roarU, arenaRoar), a few
+   at any time. The stands and the crowd on the side nearest the camera are cut down to the two front rows, as the dungeon's walls are
+   cut, so the fight is never hidden (colosHide, against the camera's direction in FPD.cutU.uCutD) */
+function colosHide(m, key){
+  const C = ARENA_C, T = THREE; FPD.cutU = FPD.cutU || { uCutF:{ value:new T.Vector3(0, 0, 0) }, uCutD:{ value:new T.Vector2(0.7, 0.7) } };
+  const arc = { value:new T.Vector4(C.cx, C.cy, C.rx, C.ry) }, hideH = C.h0 + 0.02;
+  m.onBeforeCompile = (sh)=>{ sh.uniforms.uCutD = FPD.cutU.uCutD; sh.uniforms.uArC = arc;
+    sh.vertexShader = 'varying vec3 vColW;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n  vColW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = 'uniform vec2 uCutD;\nuniform vec4 uArC;\nvarying vec3 vColW;\n' + sh.fragmentShader.replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
+  { vec2 dv = (vColW.xz - uArC.xy)/uArC.zw; float hide = smoothstep(0.3, 0.5, dot(normalize(dv), uCutD)) * step(${hideH.toFixed(2)}, vColW.y);
+    vec2 q = mod(floor(gl_FragCoord.xy), 4.0); float th = (mod(q.x*2.0 + q.y*3.0, 4.0)*4.0 + mod(q.x + q.y*2.0, 4.0) + 0.5)/16.0;
+    if (hide > th) discard; }`); };
+  m.customProgramCacheKey = ()=>'colos:' + key; return m;
+}
+function fpdColosseum(world, matFor){
+  const T = THREE, C = ARENA_C, N = 160, P = (th, g)=>[C.cx + (C.rx + g)*Math.cos(th), C.cy + (C.ry + g)*Math.sin(th)];
+  matFor('wall');   /* (makes the cut's uniforms) */
+  const B = { p:[], n:[], u:[], c:[] };
+  const quad = (a, b, c, d, nrm, uv, k)=>{   /* (a b c d round the quad; wound to face nrm) */
+    const e1 = [b[0]-a[0], b[1]-a[1], b[2]-a[2]], e2 = [c[0]-a[0], c[1]-a[1], c[2]-a[2]], cr = [e1[1]*e2[2]-e1[2]*e2[1], e1[2]*e2[0]-e1[0]*e2[2], e1[0]*e2[1]-e1[1]*e2[0]];
+    const flip = cr[0]*nrm[0] + cr[1]*nrm[1] + cr[2]*nrm[2] < 0, q = flip ? [a, d, c, b] : [a, b, c, d], uq = flip ? [uv[0], uv[3], uv[2], uv[1]] : uv;
+    for (const i of [0, 1, 2, 0, 2, 3]){ B.p.push(...q[i]); B.n.push(...nrm); B.u.push(...uq[i]); B.c.push(k, k, k); } };
+  const nIn = (th, g)=>{ const x = -Math.cos(th)/(C.rx + g), z = -Math.sin(th)/(C.ry + g), l = Math.hypot(x, z); return [x/l, 0, z/l]; };
+  const arcLen = (th, g)=>th*((C.rx + C.ry)/2 + g);
+  const gOut = C.g0 + C.tiers*C.gw, hTop = C.h0 + (C.tiers - 1)*C.dh, hPar = hTop + 0.85;
+  for (let i=0;i<N;i++){ const t0 = i/N*Math.PI*2, t1 = (i+1)/N*Math.PI*2;
+    for (let k=0;k<C.tiers;k++){ const gi = C.g0 + k*C.gw, go = gi + C.gw, h = C.h0 + k*C.dh, hp = k ? h - C.dh : 0, sh = 0.94 + (k%2)*0.06;
+      const [ax, az] = P(t0, gi), [bx, bz] = P(t0, go), [cx, cz] = P(t1, go), [dx, dz] = P(t1, gi);
+      quad([ax, h, az], [bx, h, bz], [cx, h, cz], [dx, h, dz], [0, 1, 0], [[ax, -az], [bx, -bz], [cx, -cz], [dx, -dz]], sh);   /* (the seat) */
+      const n = nIn((t0 + t1)/2, gi), s0 = arcLen(t0, gi), s1 = arcLen(t1, gi);
+      quad([ax, hp, az], [dx, hp, dz], [dx, h, dz], [ax, h, az], n, [[s0, hp], [s1, hp], [s1, h], [s0, h]], 0.7); }   /* (its riser) */
+    // the parapet behind the top row: its inside face, its coping, and the outer wall down to the ground
+    const [ax, az] = P(t0, gOut), [dx, dz] = P(t1, gOut), [bx, bz] = P(t0, gOut + 0.3), [cx, cz] = P(t1, gOut + 0.3), n = nIn((t0 + t1)/2, gOut), s0 = arcLen(t0, gOut), s1 = arcLen(t1, gOut);
+    quad([ax, hTop, az], [dx, hTop, dz], [dx, hPar, dz], [ax, hPar, az], n, [[s0, hTop], [s1, hTop], [s1, hPar], [s0, hPar]], 0.82);
+    quad([ax, hPar, az], [bx, hPar, bz], [cx, hPar, cz], [dx, hPar, dz], [0, 1, 0], [[ax, -az], [bx, -bz], [cx, -cz], [dx, -dz]], 0.96);
+    quad([bx, 0, bz], [cx, 0, cz], [cx, hPar, cz], [bx, hPar, bz], n.map(v=>-v), [[s0, 0], [s1, 0], [s1, hPar], [s0, hPar]], 0.8);
+  }
+  // the podium wall, smooth round the oval (open at the gate), with a coping
+  { const sv = { p:B.p, n:B.n, u:B.u, c:B.c }; B.p = []; B.n = []; B.u = []; B.c = [];
+    for (let i=0;i<N;i++){ const t0 = i/N*Math.PI*2, t1 = (i+1)/N*Math.PI*2, tm = (t0 + t1)/2, [mx] = P(tm, C.gp); if (Math.sin(tm) > 0 && Math.abs(mx - C.cx) < 1.02) continue;   /* (the gate's gap) */
+      const [ax, az] = P(t0, C.gp), [dx, dz] = P(t1, C.gp), [bx, bz] = P(t0, C.g0), [cx, cz] = P(t1, C.g0), n = nIn(tm, C.gp), s0 = arcLen(t0, C.gp), s1 = arcLen(t1, C.gp), h = C.wallH;
+      quad([ax, 0, az], [dx, 0, dz], [dx, h, dz], [ax, h, az], n, [[s0, 0], [s1, 0], [s1, h], [s0, h]], 0.9);
+      quad([ax, h, az], [bx, h, bz], [cx, h, cz], [dx, h, dz], [0, 1, 0], [[ax, -az], [bx, -bz], [cx, -cz], [dx, -dz]], 1);
+      quad([ax, h - 0.1, az], [dx, h - 0.1, dz], [dx, h, dz], [ax, h, az], n, [[s0, h - 0.1], [s1, h - 0.1], [s1, h], [s0, h]], 0.72); }
+    const W = { p:B.p, n:B.n, u:B.u, c:B.c }; Object.assign(B, sv);
+    const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(W.p, 3)); g.setAttribute('normal', new T.Float32BufferAttribute(W.n, 3)); g.setAttribute('uv', new T.Float32BufferAttribute(W.u, 2)); g.setAttribute('color', new T.Float32BufferAttribute(W.c, 3));
+    const mesh = new T.Mesh(g, matFor('wall')); mesh.castShadow = mesh.receiveShadow = true; world.add(mesh); }
+  { const gz = C.cy + C.ry + C.gp + 0.27, dk = new T.Mesh(new T.PlaneGeometry(1.7, 2.0), FPD.mats.colosDark || (FPD.mats.colosDark = new T.MeshBasicMaterial({ color:new T.Color('#140e0a').convertSRGBToLinear() })));
+    dk.position.set(C.cx, 1.0, gz); dk.rotation.y = Math.PI; world.add(dk); }   /* (the dark of the passage behind the gate) */
+  { const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(B.p, 3)); g.setAttribute('normal', new T.Float32BufferAttribute(B.n, 3)); g.setAttribute('uv', new T.Float32BufferAttribute(B.u, 2)); g.setAttribute('color', new T.Float32BufferAttribute(B.c, 3));
+    let m = FPD.mats.colosStand; if (!m){ m = colosHide(fpdMaterial('colosseum:stand', FP_THEME_SPECS.colosseum.wall, { bump:8 }), 'stand'); FPD.mats.colosStand = m; }
+    const mesh = new T.Mesh(g, m); mesh.castShadow = mesh.receiveShadow = true; world.add(mesh); }
+  // the box on the north side: a dais, four posts and a striped awning
+  const boxTh = -Math.PI/2, boxW = 0.17, M = (k, f)=>FPD.mats[k] || (FPD.mats[k] = colosHide(f(), k));
+  { const wood = M('colosWood', ()=>new T.MeshStandardMaterial({ color:new T.Color('#5a3a1e').convertSRGBToLinear(), roughness:0.8 }));
+    const cloth = M('colosAwn', ()=>{ const c = v3Canvas(64, 64), x = c.getContext('2d'); for (let i=0;i<8;i++){ x.fillStyle = i%2 ? '#e8dcc0' : '#8a1e1e'; x.fillRect(i*8, 0, 8, 64); } x.fillStyle = '#c8962e'; x.fillRect(0, 56, 64, 8);
+      const tx = v3CanvasTex(c); return new T.MeshStandardMaterial({ map:tx, roughness:0.9, side:T.DoubleSide }); });
+    const gi = C.g0 + C.gw, go = C.g0 + 4*C.gw, hD = C.h0 + C.dh + 0.06, hR = C.h0 + 3*C.dh + 1.25;
+    const [x0, z0] = P(boxTh - boxW, gi), [x1, z1] = P(boxTh + boxW, gi), [x2, z2] = P(boxTh, go), wdt = Math.hypot(x1 - x0, z1 - z0), dep = Math.abs(z2 - z0);
+    const dais = new T.Mesh(new T.BoxGeometry(wdt, 0.12, dep*0.42), wood); dais.position.set(C.cx, hD + 0.06, z0 - dep*0.21); dais.castShadow = dais.receiveShadow = true; world.add(dais);
+    for (const [px, pz] of [[x0, z0], [x1, z1], [x0, z2], [x1, z2]]){ const ph = hR - (pz===z2 ? 0 : 0.3), po = new T.Mesh(new T.CylinderGeometry(0.045, 0.05, ph, 10), wood); po.position.set(px, ph/2, pz); po.castShadow = true; world.add(po); }
+    const awn = new T.Mesh(new T.PlaneGeometry(wdt + 0.3, dep + 0.3), cloth); awn.rotation.x = -Math.PI/2 - 0.12; awn.position.set(C.cx, hR - 0.15, (z0 + z2)/2); awn.castShadow = true; world.add(awn);
+    const fr = new T.Mesh(new T.PlaneGeometry(wdt + 0.3, 0.22), cloth); fr.position.set(C.cx, hR - 0.42, z0 + 0.15); world.add(fr); }
+  // banners round the parapet
+  { const pole = M('colosWood', ()=>null), bG = (()=>{ const sp = new T.Shape(); sp.moveTo(-0.2, 0); sp.lineTo(0.2, 0); sp.lineTo(0.2, -0.78); sp.lineTo(0, -0.62); sp.lineTo(-0.2, -0.78); sp.lineTo(-0.2, 0); return new T.ShapeGeometry(sp); })();
+    const red = M('colosBanR', ()=>new T.MeshStandardMaterial({ color:new T.Color('#7a1a1a').convertSRGBToLinear(), roughness:0.85, side:T.DoubleSide })), gold = M('colosBanG', ()=>new T.MeshStandardMaterial({ color:new T.Color('#b8862a').convertSRGBToLinear(), roughness:0.8, side:T.DoubleSide }));
+    for (let i=0;i<16;i++){ const th = (i + 0.5)/16*Math.PI*2, [px, pz] = P(th, gOut + 0.15), n = nIn(th, gOut);
+      const po = new T.Mesh(new T.CylinderGeometry(0.03, 0.035, 1.5, 8), pole); po.position.set(px, hPar + 0.75, pz); po.castShadow = true; world.add(po);
+      const bar = new T.Mesh(new T.CylinderGeometry(0.018, 0.018, 0.46, 6), pole); bar.rotation.z = Math.PI/2; bar.rotation.y = Math.atan2(n[0], n[2]) + Math.PI/2; bar.position.set(px + n[0]*0.06, hPar + 1.42, pz + n[2]*0.06); world.add(bar);
+      const fl = new T.Mesh(bG, i%2 ? gold : red); fl.position.set(px + n[0]*0.07, hPar + 1.42, pz + n[2]*0.07); fl.rotation.y = Math.atan2(n[0], n[2]); fl.castShadow = true; world.add(fl); } }
+  fpdCrowd(world, P, boxTh, boxW);
+}
+function fpdCrowdGeo(){
+  const T = THREE, parts = [];
+  const put = (g, part, arm)=>{ const n = g.attributes.position.count; g.setAttribute('aPart', new T.Float32BufferAttribute(new Array(n).fill(part), 1)); g.setAttribute('aArm', new T.Float32BufferAttribute(new Array(n).fill(arm), 1)); parts.push(g); };
+  const robe = new T.LatheGeometry([[0, 0], [0.15, 0], [0.155, 0.08], [0.135, 0.28], [0.118, 0.44], [0.13, 0.5], [0.09, 0.56], [0.04, 0.6], [0, 0.6]].map(([x, y])=>new T.Vector2(x, y)), 14); put(robe, 0, 0);
+  const head = new T.SphereGeometry(0.072, 14, 10); head.scale(0.94, 1.08, 0.98); head.translate(0, 0.672, 0.006); put(head, 1, 0);
+  const hair = new T.SphereGeometry(0.079, 14, 7, 0, Math.PI*2, 0, Math.PI*0.52); hair.translate(0, 0.682, -0.01); put(hair, 2, 0);
+  const belt = new T.CylinderGeometry(0.128, 0.13, 0.035, 14, 1, true); belt.translate(0, 0.33, 0); put(belt, 3, 0);
+  const nose = new T.ConeGeometry(0.014, 0.03, 6); nose.rotateX(Math.PI/2); nose.translate(0, 0.665, 0.08); put(nose, 1, 0);
+  for (const s of [-1, 1]){ const arm = new T.CylinderGeometry(0.026, 0.03, 0.24, 8); arm.translate(s*0.105, 0.5 + 0.12, 0); put(arm, 0, s);
+    const hand = new T.SphereGeometry(0.03, 8, 6); hand.translate(s*0.105, 0.5 + 0.255, 0); put(hand, 1, s); }
+  // merged by hand, indexed
+  const pos = [], nor = [], pa = [], ar = [], idx = []; let base = 0;
+  for (const g of parts){ const P = g.attributes.position, Nn = g.attributes.normal, A = g.attributes.aPart, R = g.attributes.aArm;
+    for (let i=0;i<P.count;i++){ pos.push(P.getX(i), P.getY(i), P.getZ(i)); nor.push(Nn.getX(i), Nn.getY(i), Nn.getZ(i)); pa.push(A.getX(i)); ar.push(R.getX(i)); }
+    const I = g.index; if (I) for (let i=0;i<I.count;i++) idx.push(base + I.getX(i)); else for (let i=0;i<P.count;i++) idx.push(base + i);
+    base += P.count; g.dispose(); }
+  const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new T.Float32BufferAttribute(nor, 3));
+  g.setAttribute('color', new T.Float32BufferAttribute(new Array(pos.length).fill(1), 3)); g.setAttribute('aPart', new T.Float32BufferAttribute(pa, 1)); g.setAttribute('aArm', new T.Float32BufferAttribute(ar, 1)); g.setIndex(idx);
+  return g;
+}
+const CROWD_CLOTH = ['#8a3b22','#b8862e','#6b6b2e','#3e5470','#5a3e26','#cdbf98','#6a2430','#3d5a34','#7a756a','#9a5a2a','#4a3a5a','#a8a080','#2e4a4a','#8a6a3a'];
+const CROWD_SKIN = ['#e8c09a','#d8a47e','#c08a62','#a06c48','#7a5236','#f0cca8'];
+const CROWD_HAIR = ['#3a2616','#1e1612','#7a3a1a','#c8a050','#8a8478','#5a3a20'];
+function fpdCrowd(world, P, boxTh, boxW){
+  const T = THREE, C = ARENA_C, geo = fpdCrowdGeo(), spots = [], dens = SET.gfx==='low' ? 0.5 : SET.gfx==='medium' ? 0.72 : 0.9;
+  for (let k=0;k<C.tiers;k++){ const g = C.g0 + k*C.gw + C.gw*0.5, h = C.h0 + k*C.dh; let th = 0;
+    for (let j=0; th < Math.PI*2; j++){ const r = Math.hypot((C.rx + g)*Math.sin(th), (C.ry + g)*Math.cos(th)), i = j*7 + k*1009;
+      const inBox = Math.abs(((th - boxTh + Math.PI*3) % (Math.PI*2)) - Math.PI) < boxW + 0.03 && k >= 1 && k <= 3;
+      if (fpHash(i, k, 743) < dens && !inBox){ const jg = (fpHash(i, k, 744) - 0.5)*0.16, [x, z] = P(th, g + jg); spots.push({ x, z, y:h, th, k, i }); }
+      th += (0.36 + fpHash(i, k, 745)*0.1)/r; } }
+  // the worthies in the box: in purple and white, gold on their heads
+  { const [x, z] = P(boxTh, C.g0 + C.gw*2.2), h = C.h0 + C.dh + 0.18; for (const dx of [-0.5, 0, 0.5]) spots.push({ x:x + dx, z, y:h, th:boxTh, k:9, i:spots.length, vip:true }); }
+  const n = spots.length, im = new T.InstancedMesh(geo, null, n), M4 = new T.Matrix4(), Q = new T.Quaternion(), S = new T.Vector3(), V = new T.Vector3(), Y = new T.Vector3(0, 1, 0);
+  const cl = new Float32Array(n*3), sk = new Float32Array(n*3), hr = new Float32Array(n*3), ph = new Float32Array(n), col = hex=>new T.Color(hex).convertSRGBToLinear();
+  spots.forEach((s, i)=>{ const h = j=>fpHash(s.i, j, 746), sc = s.vip ? 0.95 : 0.74 + h(1)*0.18;
+    Q.setFromAxisAngle(Y, Math.atan2(C.cx - s.x, C.cy - s.z) + (h(2) - 0.5)*0.5); S.set(sc, sc*(0.92 + h(3)*0.16), sc); V.set(s.x, s.y, s.z); im.setMatrixAt(i, M4.compose(V, Q, S));
+    const c = s.vip ? col(i%2 ? '#5a2a6a' : '#e0d8c8') : col(CROWD_CLOTH[Math.floor(h(4)*CROWD_CLOTH.length)]), sn = col(CROWD_SKIN[Math.floor(h(5)*CROWD_SKIN.length)]);
+    const hood = h(6) < 0.25, hc = s.vip ? col('#d8a830') : hood ? col(CROWD_CLOTH[Math.floor(h(7)*CROWD_CLOTH.length)]) : col(CROWD_HAIR[Math.floor(h(8)*CROWD_HAIR.length)]);
+    cl.set([c.r, c.g, c.b], i*3); sk.set([sn.r, sn.g, sn.b], i*3); hr.set([hc.r, hc.g, hc.b], i*3); ph[i] = h(9); });
+  geo.setAttribute('aCloth', new T.InstancedBufferAttribute(cl, 3)); geo.setAttribute('aSkin', new T.InstancedBufferAttribute(sk, 3)); geo.setAttribute('aHair', new T.InstancedBufferAttribute(hr, 3)); geo.setAttribute('aPh', new T.InstancedBufferAttribute(ph, 1));
+  FPD.roarU = FPD.roarU || { value:0 };
+  let m = FPD.mats.colosCrowd; if (!m){ m = new T.MeshLambertMaterial({ vertexColors:true });
+    const arc = { value:new T.Vector4(C.cx, C.cy, C.rx, C.ry) };
+    m.onBeforeCompile = (sh)=>{ sh.uniforms.uT = FPD.grassT; sh.uniforms.uRoar = FPD.roarU; sh.uniforms.uCutD = FPD.cutU.uCutD; sh.uniforms.uArC = arc;
+      sh.vertexShader = 'attribute float aPart;\nattribute float aArm;\nattribute vec3 aCloth;\nattribute vec3 aSkin;\nattribute vec3 aHair;\nattribute float aPh;\nuniform float uT;\nuniform float uRoar;\nuniform vec2 uCutD;\nuniform vec4 uArC;\n' + sh.vertexShader
+        .replace('#include <color_vertex>', '#include <color_vertex>\n  vColor = aPart < 0.5 ? aCloth*(0.62 + 0.38*smoothstep(0.0, 0.5, position.y)) : (aPart < 1.5 ? aSkin : (aPart < 2.5 ? aHair : aCloth*0.35));')
+        .replace('#include <begin_vertex>', `#include <begin_vertex>
+  float lift = clamp(uRoar*1.4 + step(0.74, fract(aPh*7.31))*0.75, 0.0, 1.0);
+  if (aArm != 0.0){ vec3 q = transformed - vec3(aArm*0.105, 0.5, 0.0); float a = -aArm*(mix(2.8, 0.42, lift) + sin(uT*9.0 + aPh*6.283)*0.38*lift); float c = cos(a), s = sin(a);
+    transformed = vec3(c*q.x - s*q.y, s*q.x + c*q.y, q.z) + vec3(aArm*0.105, 0.5, 0.0); }
+  transformed.y += max(0.0, sin(uT*7.5 + aPh*6.283))*0.05*lift; transformed.x += sin(uT*1.3 + aPh*20.0)*0.012;
+  { vec4 wc = modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0); vec2 dv = (wc.xz - uArC.xy)/uArC.zw; if (dot(normalize(dv), uCutD) > 0.4) transformed = vec3(0.0); }`); };
+    m.customProgramCacheKey = ()=>'colosCrowd'; FPD.mats.colosCrowd = m; }
+  im.material = m; im.frustumCulled = false; im.receiveShadow = true; im.castShadow = false; im.userData.crowd = true; world.add(im); FPD.crowd = im;
+}
 function fpdOutdoor(T, spec, world, matFor){
   const TH = THREE, key = T.key, field = G.gameMode===2;
   if (!FPD.town) try{ fpdSiegeWorks(world, matFor); }catch(e){ console.error(e); }   /* (RS-419; RS-567: at the real town, its own walls stand) */
+  if (field && G.arenaTheme==='colosseum') try{ fpdColosseum(world, matFor); }catch(e){ console.error(e); }   /* (RS-743) */
   const add = (m, cast)=>{ m.castShadow = cast!==false; m.receiveShadow = true; world.add(m); return m; };
   const cxm = COLS/2, czm = ROWS/2;
   // ground beyond the map's edge (the sea's is open water)
@@ -40269,7 +40469,7 @@ function fpdOutdoor(T, spec, world, matFor){
     const rockG = [fpdLumpy(2, 0.2, 3), fpdLumpy(2, 0.24, 9)], bushG = [fpdLumpy(2, 0.16, 5, true), fpdLumpy(2, 0.2, 12, true)];
     const boxG = new TH.BoxGeometry(1,1,1), barrelG = new TH.CylinderGeometry(0.2, 0.2, 0.5, 14);
     for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
-      if (G.map[x][y]!==T_WALL || fpdFieldWall(x, y) || (G.arenaDeco && G.arenaDeco[x][y]==='gate') || (FPD.town && x < FPD.town.tw && y < FPD.town.th)) continue;   /* (RS-418: a built wall, not an obstacle; RS-419: or the gate; RS-567: or the town itself) */
+      if (G.map[x][y]!==T_WALL || fpdFieldWall(x, y) || (G.arenaDeco && (G.arenaDeco[x][y]==='gate' || G.arenaDeco[x][y]==='stand' || G.arenaDeco[x][y]==='awall')) || (FPD.town && x < FPD.town.tw && y < FPD.town.th)) continue;   /* (RS-418: a built wall, not an obstacle; RS-419: or the gate; RS-567: or the town itself) */
       const deco = G.arenaDeco && G.arenaDeco[x] ? G.arenaDeco[x][y] : '', h = (i)=>fpHash(x,y,40+i);
       const kind = key==='sea' ? 'crate' : (deco==='rock' || key==='desert' || key==='tundra') ? 'rock' : 'bush';
       const px = x+0.5, pz = y+0.5;
@@ -40416,7 +40616,7 @@ function fpdRender(env, T, camZ){
       const k = FPD.ringKind==='hills' ? 0.7 : (env.night ? 0.45 : 0.38), base = FPD.ringKind==='hills' ? (T.key==='tundra' ? [200,210,226] : [196,160,118]) : [30,44,34];
       FPD.ring.material.color.setRGB((base[0]+(fc[0]-base[0])*k)/255, (base[1]+(fc[1]-base[1])*k)/255, (base[2]+(fc[2]-base[2])*k)/255).convertSRGBToLinear();
     }
-    FPD.grassT.value = FP.t;
+    FPD.grassT.value = FP.t; if (FPD.roarU) FPD.roarU.value = arenaRoarNow();
   } else {
     fog.color.setHex(0x030407); fog.near = 6*DG_LIGHT + fogAdd; fog.far = 17*DG_LIGHT + fogAdd*1.2;
     /* (RS-323) every other light down here - crystals, lava, braziers, glows - reaches the same share less far */
@@ -48978,7 +49178,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-742';
+const GAME_VERSION = 'rs-743';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
