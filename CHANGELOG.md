@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-741 - Surrounded
+
+- **Monsters flank you:** a pack of melee monsters used to queue up behind the first one to reach you and wait their turn. Now each one heads for a free square around you, including the corners, and walks around the ones already fighting you to get there. In an open room, five of them can all be at you within a few turns. In the same test before this patch, the four behind the first just stood in line.
+- **Corridors still help you:** where no side can be reached, like in a one-wide corridor or with every side taken, they come straight at you and wait their turn as before. A monster won't take a long way round when the queue at the front is much shorter. Fighting in a doorway or a corridor is now the way to take a crowd one at a time.
+
 ## RS-740 - A Bed to Sleep In
 
 - **A bed first:** a new cottage comes with a parlour and a bedroom, and the bed's space is chalked out. Building the bed (6 logs) is the first thing you do, so you don't have to saw planks for a bedroom before you can sleep at home. Hollis says so when you buy, and his offer describes the cottage that way. The plots for more rooms come when he builds it bigger, starting with the house.

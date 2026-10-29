@@ -19949,8 +19949,37 @@ function monChaseMap(){
     for (const [ax, ay] of [[1,0],[-1,0],[0,1],[0,-1]]){ const nx = x+ax, ny = y+ay; if (nx<0 || ny<0 || nx>=W || ny>=H) continue; const n = nx + ny*W; if (d[n] >= 0 || !tileOpen(nx, ny) || stairTile(nx, ny)) continue; d[n] = dc + 1; q.push(n); } }
   monChaseMap.k = key; monChaseMap.m = G.map; monChaseMap.d = d; return d;
 }
+/* (RS-741) the squares round you a monster can fight from - the eight about you, the corners where no wall's corner stands between - and
+   which monster means to take each this turn. A rusher heads for a free one of its own, walking round the monsters already at you,
+   so a crowd closes in on every side instead of queueing behind the first; where none can be reached (a corridor, every side taken) it
+   falls back to the way straight at you and waits its turn */
+function monSlots(){
+  const p = G.player, key = p.x + ',' + p.y + '|' + (p.turnCount||0) + '|' + COLS;
+  if (monSlots.k===key && monSlots.m===G.map) return monSlots.s;
+  const sl = []; for (const [ax, ay] of DIR8){ const x = p.x + ax, y = p.y + ay; if (!tileOpen(x, y) || stairTile(x, y) || (G.gameMode===1 && dgSolid(x, y)) || !diagClear(p.x, p.y, ax, ay, tileOpen)) continue; sl.push({ x, y, by:-1 }); }
+  monSlots.k = key; monSlots.m = G.map; return (monSlots.s = sl);
+}
+function monFlankDir(m, i){
+  const p = G.player; if (Math.max(Math.abs(m.x - p.x), Math.abs(m.y - p.y)) <= 1) return null;
+  const sl = monSlots(), mine = sl.find(o=>o.by===i), free = sl.filter(o=>(o.by < 0 || o.by===i || !(G.mon[o.by] && G.mon[o.by].alive)) && !occupiedBy(o.x, o.y, i)); if (!free.length) return null;
+  const W = COLS, H = ROWS, d = new Int16Array(W*H).fill(-1), src = new Int16Array(W*H).fill(-1), q = [];
+  free.forEach((o, k)=>{ const c = o.x + o.y*W; d[c] = 0; src[c] = k; q.push(c); });
+  const blocked = (x, y)=>!tileOpen(x, y) || stairTile(x, y) || (x===p.x && y===p.y) || (!(x===m.x && y===m.y) && occupiedBy(x, y, i));
+  const goal = m.x + m.y*W;
+  for (let h=0; h<q.length; h++){ const c = q[h], x = c % W, y = (c - x)/W, dc = d[c]; if (d[goal] >= 0 && dc >= d[goal]) break; if (dc >= 20) continue;
+    for (const [ax, ay] of DIR8){ const nx = x + ax, ny = y + ay; if (nx<0 || ny<0 || nx>=W || ny>=H) continue; const n = nx + ny*W; if (d[n] >= 0 || blocked(nx, ny) || !diagClear(x, y, ax, ay, tileOpen)) continue; d[n] = dc + 1; src[n] = src[c]; q.push(n); } }
+  const here = d[goal]; if (here < 0) return null;
+  /* (not the long way round: a free side much further off than the queue's front is left for the queue) */
+  const straight = monChaseMap()[goal]; if (straight >= 0 && here > straight + 6) return null;
+  let best = null, bd = here;
+  for (const [ax, ay] of DIR8){ const nx = m.x + ax, ny = m.y + ay; if (nx<0 || ny<0 || nx>=W || ny>=H) continue; const v = d[nx + ny*W]; if (v < 0 || v >= bd || blocked(nx, ny) || !diagClear(m.x, m.y, ax, ay, tileOpen)) continue; best = [ax, ay]; bd = v; }
+  if (!best) return null;
+  if (mine) mine.by = -1; free[src[(m.x + best[0]) + (m.y + best[1])*W]].by = i;   /* (its side, claimed: the next one picks another) */
+  return best;
+}
 // the step that brings this monster nearer you along the way round (null: nowhere better to stand)
 function monChaseDir(m, i){
+  { const f = monFlankDir(m, i); if (f) return f; }   /* (RS-741) */
   const d = monChaseMap(), W = COLS, here = d[m.x + m.y*W]; if (here < 0) return null;
   let best = null, bd = here;
   /* (RS-420) the diagonals too, where the corner is clear: a step across one closes two of the map's straight steps */
@@ -48941,7 +48970,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-740';
+const GAME_VERSION = 'rs-741';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
