@@ -8,7 +8,8 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
     G.inv = [m, r2, f].concat(G.inv); const t = townList()[0]; G.owPos = { x:t.x, y:t.y }; enterVillage(); anvilOpen(it, 'blacksmith'); });
   await page.waitForTimeout(3500); await page.screenshot({ path:SHOTS + '/zench.png' });
   await page.evaluate(()=>anvHold('es_law')); await page.waitForTimeout(200); await page.screenshot({ path:SHOTS + '/zench_law.png' });
-  await page.evaluate(()=>{ anvHold(null); anvMasterwork(); }); await page.waitForTimeout(170); await page.screenshot({ path:SHOTS + '/zench_hit.png' });
+  await page.evaluate(()=>{ anvHold(null); G.player.gold = 0; anvMasterwork(); }); await page.waitForTimeout(200); await page.screenshot({ path:SHOTS + '/zench_why.png' });
+  await page.evaluate(()=>{ G.player.gold = 1e6; ENCH.msg = ''; anvMasterwork(); }); await page.waitForTimeout(170); await page.screenshot({ path:SHOTS + '/zench_hit.png' });
   await page.waitForTimeout(600);
   if (errs.length) console.log('ERRORS', errs.join(' | '));
 };

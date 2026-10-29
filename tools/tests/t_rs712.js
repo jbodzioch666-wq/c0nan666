@@ -21,7 +21,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   const rareSel = await ev(()=>`[data-anv-pc="${ENCH.list.findIndex(x=>x[0].zr)}"]`);
   await drag(rareSel, '.anv-stage'); await wait(200);
   out.placed = await ev(()=>({ on:!!(ENCH.sel && ENCH.sel.zr), lines:document.querySelectorAll('.anv-ln[data-anv-ln]').length, opts:[...document.querySelectorAll('.anv-ln[data-anv-ln] .anv-lo')].every(o=>/Change/.test(o.textContent) && /Law/.test(o.textContent)),
-    pre:document.querySelectorAll('.anv-pool .anv-pl').length, txt:/WHAT IT CAN ROLL/.test(document.querySelector('.anv-right').textContent), brk:!document.querySelector('.anv-hb.smash').disabled }));
+    pre:document.querySelectorAll('.anv-pool .anv-pl').length, txt:/WHAT IT CAN ROLL/.test(document.querySelector('.anv-right').textContent), brk:!document.querySelector(".anv-hb.smash").classList.contains("dim") }));
   /* drag Law onto a bonus that can go up */
   const law = await ev(()=>{ const it = ENCH.sel; it.aff.forEach(a=>{ if (a.fam && !a.imp){ const F = AFFIX_FAM[a.fam]; afRollTier(it, a, F, 0); } }); renderOverlay(); const i = it.aff.findIndex(a=>enchCanLaw(it, a)); return { i, t:it.aff[i].t, n:skHave('es_law') }; });
   await drag('[data-anv-es="es_law"]', `[data-anv-ln="${law.i}"]`); await wait(600);
@@ -38,7 +38,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   out.smash = await ev(e=>({ gone:!G.inv.some(x=>x.zr), got:skHave('es_change') - e, last:(document.querySelector('.anv-last')||{}).textContent||'' }), e0);
   /* a made piece can't be smashed; the worn weapon masterworks */
   const madeSel = await ev(()=>`[data-anv-pc="${ENCH.list.findIndex(x=>x[0].zm)}"]`); await tap(madeSel); await wait(150);
-  out.made = await ev(()=>({ dis:document.querySelector('.anv-hb.smash').disabled, why:/a piece you made/.test(document.querySelector('.anv-yield').textContent) }));
+  out.made = await ev(()=>({ dis:document.querySelector(".anv-hb.smash").classList.contains("dim"), why:/a piece you made/.test(document.querySelector('.anv-yield').textContent) }));
   const wSel = await ev(()=>`[data-anv-pc="${ENCH.list.findIndex(x=>x[0]===G.gear.weapon)}"]`); await tap(wSel); await wait(150);
   await tap('.anv-hb:not(.smash)'); await wait(600); out.mw = await ev(()=>G.gear.weapon.reinf||0);
   /* Ancestral: the list says so */

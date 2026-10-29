@@ -1,5 +1,15 @@
 # Depthcrawl patch notes
 
+## RS-713 - Why Not
+
+The anvil now tells you why an essence won't work, instead of doing nothing.
+
+- **Said on the anvil.** Tap or drop an essence where it can't work, and a red note under the anvil says why. It goes in the log too. Nothing is spent.
+- **Every reason.** The reasons are: no piece on the anvil, none of that essence left (and where they come from), a Unique, set piece or relic whose bonuses are its own, a built-in bonus, a bonus with only one value at its tier, a bonus already T1 or at the best its item level allows, Chaos on a piece with no bonuses, and Blood on a piece with six bonuses or no room left.
+- **Seen before you try.** An essence that can't work on the piece is marked with a red cross, and its tooltip says why. While you hold Law or Change, each bonus it can't touch says why underneath, and the essence stays in your hand when you tap one.
+- **While dragging.** A label under the essence says "let go to use it", or why not, and a bonus it can't touch is outlined in red.
+- **Hammer buttons.** Masterwork and Smash are dimmed instead of dead when they can't be used. A tap says why, for example "masterworking to +5 costs 13,079 gold - you have 0", or "take it off to break it down".
+
 ## RS-712 - The Anvil
 
 - **A screen of its own.** Every anvil (the ones in the smithy, and yours at home) opens THE ANVIL, with two tabs: **Forge from bars** and **Work a piece**. The smith's menu has a button that takes you straight to Work a piece, and Escape takes you back to the smith.
