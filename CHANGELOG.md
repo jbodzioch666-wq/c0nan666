@@ -1,5 +1,18 @@
 # Depthcrawl patch notes
 
+## RS-748 - Monsters for the New Loot
+
+- **Monsters stand up to rolled gear.** Since the loot system put bonuses on every slot, a monster of your level usually died before it could swing back: in the gear you'd have found by then (the best of eight drops for each slot, jewellery included), you lost almost no life a kill and ate no food at all from level 10 to 40. Monsters now gain life, a little more damage, a surer aim and the xp to match, by level:
+  - **Low levels (up to about combat 25):** unchanged.
+  - **The middle levels:** the most - up to +80% life, +25% damage and +2 accuracy around combat 45, easing off from there.
+  - **The top:** less, since monsters there already bite - +35% life around combat 95, +25% at the very top, and no extra damage or accuracy.
+  - **XP a kill** rises with their life (up to +60%), so a player in found gear levels at about the same pace as before.
+- **The numbers** (the new `mobs` sim, same-level fights, averaged over six sets of gear):
+  - **Found gear:** about 3% of your life lost a kill (was 1.3%) and 37 food an hour (was 14). Level 99: 9% a kill and 136 food an hour (was 5% and 55).
+  - **Plain metal with no bonuses:** now the hard way - about 8% a kill and 110 food an hour (was 3% and 61), and no deaths at any level. Maxing melee in plain metal takes 72 hours (was 66).
+  - **The best rares:** still a big step up. At level 80 they lose 1 life a kill against 18 in plain dragon.
+- **Bosses are unchanged.** They are built from your own damage, as before.
+
 ## RS-747 - Rewards of the New Loot
 
 - **The guild store sells for the loot system.** Guild tokens now buy Essences for the smith - three of Change (5 tokens), two of Blood (7), one of Chaos (8) or one of Law (14) - and a **Guild Strongbox** (20): a rare piece of gear for your level with three to six bonuses.

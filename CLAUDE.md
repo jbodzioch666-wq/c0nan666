@@ -7,7 +7,7 @@ A RuneScape-flavoured roguelike in one file, `depthcrawl.html`. It uses three.js
 - `tools/build-itch.sh`: builds the itch.io zip into `dist/`, which is gitignored.
 - `tools/itch-art/make.sh`: makes the itch.io page art (cover, banner, page background, embed background) from in-game scenes into `dist/itch-art/out`. Slow: about half an hour of software rendering. Each run uses a fresh random world, so check the shots.
 - `tools/tests/`: Playwright browser tests. See `tools/tests/README.md`.
-- `tools/sim/`: balance simulators that drive the game's own code in a browser (`node tools/sim/run.js --soft combat gather produce economy gear world`, same harness and `THREE_JS` as the tests; `world` compares the sizes' land, towns, sites, walking distances, roamers and how crowded the sites are). Run them before and after touching xp rates, drops, prices or world layout, and quote the numbers in the changelog.
+- `tools/sim/`: balance simulators that drive the game's own code in a browser (`node tools/sim/run.js --soft combat gather produce economy gear world`, same harness and `THREE_JS` as the tests; `world` compares the sizes' land, towns, sites, walking distances, roamers and how crowded the sites are; `mobs` fights same-level monsters in plain, found and farmed loot-system gear, and `MOB_K='{...}'` tries other `MON_LOOT` curves). The node process can linger after a sim prints `DONE`: send the output to a file and stop it once `DONE` shows. Run them before and after touching xp rates, drops, prices or world layout, and quote the numbers in the changelog.
 
 ## Model choice
 
