@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-729 - Clay and Glass
+
+- **The potter's wheel gets a work screen.** The wheel head and the flywheel spin while the potter's hands work, and the lump of clay rises into a pot, bowl or pie dish in the shape you chose. Finished pots wait on the shelf.
+- **So does the orb kiln.** The brick kiln glows with smoke rising from its chimney. Glass: a gob swells on the blowpipe. Orbs: the orb sits on its stand and pulses in its element's colour as it charges. Lights: a torch or lantern catches and its flame grows.
+- **What you make lifts out as itself:** a pot, a bowl, a dish, a lump of molten glass, a vial, a fishbowl, a lens, an orb, a torch or a lantern.
+- **Runes show in their element's colour** among the materials along the top.
+- All the crafting benches now share this screen. Only the cauldron and the dye vat still use the old lists.
+
 ## RS-728 - The Jeweller's Benches
 
 - **Silver jewellery moves to the jeweller's bench.** Silver rings and amulets are no longer forged on the anvil with Smithing. They're cast at the jeweller's bench with Crafting, in the first row (a ring from 1 silver bar at Crafting 12, an amulet from 2 at 15). Which one comes out is still rolled, with finer ones the higher your level. The anvil now only shows the metals it forges, and the furnace sends silver to the jeweller's bench.

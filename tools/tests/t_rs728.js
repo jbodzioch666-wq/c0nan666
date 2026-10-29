@@ -32,6 +32,6 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   A(r0.title==='GEM-CUTTING TABLE' && r0.lap, 'the gem-cutting table: ' + JSON.stringify(r0));
   A(r1.q===0 && r1.cut===2 && r1.raw===0, 'two sapphires cut: ' + JSON.stringify(r1));
   A(r2.title==="JEWELLER'S BENCH" && r2.mandrel && r2.rows[0]==='SILVER JEWELLERY 12' && r2.rolled, "the jeweller's bench, silver first: " + JSON.stringify(r2));
-  A(r3.slot==='ring' && r3.n===r2.n0 + 1 && r3.silver===2 && r3.crafted, 'a silver ring cast at the bench: ' + JSON.stringify(r3));
+  A(r3.slot==='ring' && r3.n===r2.n0 + 1 && r3.silver >= 2 && r3.crafted, 'a silver ring cast at the bench (Crafting may keep the bar): ' + JSON.stringify(r3));
   A(!errs.length, 'no errors: ' + errs.join(' | '));
 };
