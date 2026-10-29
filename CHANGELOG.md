@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## RS-716 - Crown Jewels
+
+Unique rings and amulets took a random jewel and grew whatever stats it had. A Band of Vitality could come out a Sapphire Ring of nothing but magic.
+
+- **Their own jewel.** The Sunstone is an Amulet of Glory, the Locket of the Drowned an Amulet of Defence, the Band of Vitality a Diamond Ring, the Serpent's Coil an Emerald Ring and Gravewarden's Ring a Ruby Ring. It's the same jewel every time.
+- **Stats that fit.** Their stats lean the way their bonuses do, scaled to their level. The Sunstone is all-round, the Band and the Locket mostly defence, the Coil attack and ranged, and Gravewarden's strength and defence. The random jewel's own bonus (Recoil's thorns, Wealth's gold) is gone.
+- **Where they stand at level 126.** Against a fighter's gear: the Sunstone scores 23 (the best of 30 rare amulets 11), Gravewarden's 18 (best ring 10), the Locket 15, the Band 12 and the Coil 8, the last three close to the best of 30.
+- **Your old ones.** Rings and amulets reforged in RS-715 keep their bonuses. Only their jewel and stats change.
+
 ## RS-715 - Uniques Reforged
 
 Uniques kept the fixed numbers they had before the loot rework, so a good rare now beat most of them. They roll properly now.
