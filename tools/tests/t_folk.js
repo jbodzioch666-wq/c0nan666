@@ -13,7 +13,7 @@ module.exports = async page=>{
     for (const b of VILLAGE_BUILDINGS) if (G.map[b.door.x][b.door.y]!==b.tile) bad.push('door '+b.key);
     { const [wx, wy] = townWpAt(); if (G.map[wx][wy]!==T_WAYPOINT) bad.push('waypoint'); }   /* (RS-422: in the middle of the square) */ { const [bx,by] = townBoardAt(); if (G.villageDeco[bx][by]!=='board') bad.push('board'); } if (G.map[TOWN_CX][ROWS-1]!==T_EXIT) bad.push('gate');
     return { stretched:!!G.townLy.stretched, cols:COLS, rows:ROWS, base:G.townLy.W0, bad }; });
-  A(lay.stretched && lay.rows===23, 'the town is roomier: '+JSON.stringify(lay)); A(!lay.bad.length, 'everything stands on open ground: '+lay.bad.join(', '));
+  A(lay.stretched && lay.rows===TOWN_ROWS_OF() + 3, 'the town is roomier: '+JSON.stringify(lay)); A(!lay.bad.length, 'everything stands on open ground: '+lay.bad.join(', '));
   // RS-129: the bounty board and the Captain stand together, clear of the bank; the props stand where their tiles are
   const tidy = await ev(()=>{ const bank = buildingByKey('bank'), cap = G.villageNpcs.find(n=>n.service==='questgiver'), [bx,by] = townBoardAt();
     const gap = (x,y)=>Math.max(bank.x0 - x, x - (bank.x0+bank.w-1), bank.y0 - y, y - (bank.y0+bank.h-1));
@@ -50,3 +50,4 @@ module.exports = async page=>{
   A(await ev(()=>!(G.villagers||[]).some(v=>!v.indoors && v.x===G.player.x && v.y===G.player.y)), 'nobody stands on you');
   console.log(JSON.stringify(r));
 };
+function TOWN_ROWS_OF(){ return 28; }   // (RS-720: the crafts quarter - TOWN_ROWS before the stretch)

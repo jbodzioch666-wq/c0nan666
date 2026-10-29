@@ -1,5 +1,17 @@
 # Depthcrawl patch notes
 
+## RS-720 - The Crafts Quarter
+
+- **A workshop for every trade.** The Tailor's used to cram eight stations into one room, and the Smithy held the jeweller's benches too. Now each trade has its own building, along a new lane of workshops south of the town square.
+- **The Tailor** keeps only the spinning wheel, the loom and the dye vat, and sells plain robes.
+- **The Tannery** has the tanning rack and a new **leatherworking bench**, where leather and dragonhide armour are now cut and stitched (the loom weaves only robes). The tanner sells plain leathers.
+- **The Fletcher** has the fletching bench (bows, crossbows, arrows, bolts, thrown weapons) and a new **staff-carver's lathe**, a pole lathe where staves and battlestaves are now turned. The fletcher sells bows and staves.
+- **The Glassblower & Potter** has the kiln and the potter's wheel.
+- **The Barber** has the barber's chair; talk to the barber to restyle.
+- **The Jeweller** has the gem-cutting table and the jeweller's bench, out of the Smithy, and sells plain rings and amulets. The Smithy keeps its furnace and anvils.
+- **Towns grow their trades.** Every town has a tannery and a fletcher. Villages add the tailor, the glassblower & potter and the barber, and cities add the jeweller. Towns are a few rows longer to fit the new lane.
+- **Next:** the crafting menus get their own visual work screens, like the anvil, one station at a time.
+
 ## RS-719 - Into the Pot
 
 - **Lobster is boiled, not fried.** Cook a lobster at the Cooks' Guild range and it goes into the range's stewpot, not the skillet. The pot is full of water that simmers and then comes to a rolling boil, with steam pouring off it, and the lobster turns from blue-black to scarlet as it cooks. The range's own pan stays on the hotplate.
