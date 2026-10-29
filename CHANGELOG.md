@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-749 - The Necromancers
+
+- **The liches have a new look.** Lich acolytes, liches, archliches and the risen lich-lords (the necromancers of the towers) are now built on the sculpted skeleton instead of the old blocky robed figure. They wear a layered robe split up the front and torn at the hem, a ragged mantle open over the ribs, and wide sleeves with bone hands showing.
+- **Each rank looks different.** An acolyte wears a deep peaked hood in grey-black. A lich wears an iron crown, a long tattered cloak and purple robes. An archlich has a taller spiked crown, a high collar and midnight blue. A lich-lord has a hood, collar and cloak in dried-blood red. The higher ranks stand taller.
+- **Their kit.** A gnarled staff topped with a skull in curled prongs, burning with green soul-fire. A green phylactery on a chain at the breast, and a skull and a chained grimoire at the belt. Their eyes burn green.
+
 ## RS-748 - Monsters for the New Loot
 
 - **Monsters stand up to rolled gear.** Since the loot system put bonuses on every slot, a monster of your level usually died before it could swing back: in the gear you'd have found by then (the best of eight drops for each slot, jewellery included), you lost almost no life a kill and ate no food at all from level 10 to 40. Monsters now gain life, a little more damage, a surer aim and the xp to match, by level:

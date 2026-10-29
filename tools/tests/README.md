@@ -83,6 +83,7 @@ Screenshots go to `tools/tests/shots/`.
 | rs746 | estate property kept through a reload and listed by every agent, a moved town's record rehomed, the Release box high on the screen |
 | rs747 | the guild store and quest point rewards of the loot system: essences, a strongbox of rare gear, rares for your level, an Ancestral Quest Point Cape |
 | rs748 | monsters for the loot system's gear: life, damage, aim and xp by tier (most in the middle levels), applied once, in real fights |
+| rs749 | the liches are the sculpted skeleton in robes, sleeves, hood or crown, a skull staff and green eyes, each rank its own (shot rs749_lich) |
 | zloot | probe: the drops at a few levels - rarity shares, names with their bonuses and tiers, a rare's tooltip text (ZL levels, ZN drops a level) |
 | zloottip | probe: a rare's, a magic piece's and a Ring of Recoil's tooltip, plain and with Alt held, as shots/zloottip0-3.png |
 | rs703 | A spell leaves the staff as it comes forward: a real cast at a foe three tiles off, sampled every frame - the bolt waits about half a second, leaves from the staff's head as it leans ahead, its sound with it; the foe flinches (and a miss splashes) only as it lands; the cast lasts about a second; a foe it kills stands till the bolt lands, and the staff isn't put away mid-cast |
