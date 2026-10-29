@@ -8,7 +8,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   const r0 = await ev(()=>{
     goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{}; townClosedCheck = ()=>false;
     const p = G.player; p.clock = p.turnCount = 60; G.owPos = { x:G.ow.spawnPos.x, y:G.ow.spawnPos.y }; enterVillage(); setUi('playing');
-    p.gold = 100000; houseBuy(); const h = houseP(); setUi('estate'); const est = document.getElementById('overlay').textContent;
+    p.gold = 200000; houseBuy(); const h = houseP(); setUi('estate'); const est = document.getElementById('overlay').textContent;
     enterHouse(); const [dx, dy] = houseDoorXY();
     const spots0 = ROOM_LAYOUT.house.benches.map(b=>b[0]); skAdd('logs', 6); houseBuildDialog(HOUSE_SPOTS.find(s=>s.id==='bed')); wevChoose(0);
     return { spots0, bed:ROOM_LAYOUT.house.benches.some(b=>b[0]==='bed'), h:JSON.stringify(h), est:/cottage/i.test(est) && /build it bigger/.test(est), at:[p.x, p.y], door:[dx, dy], doorTile:G.map[dx][dy]===T_DOOROUT, plots:ROOM_LAYOUT.house.benches.filter(b=>b[0]==='plot').length,
@@ -19,12 +19,12 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
     const out = { ui:G.ui, rooms:ov.querySelectorAll('.hroom').length, at:G.housePlot };
     skAdd('plank', 10); return out; });
   await page.waitForTimeout(300); await page.screenshot({ path:SHOTS + '/rs736_plot.png' });
-  const r2 = await ev(()=>{ houseBuildRoom('workshop'); const h = houseP(); return { rooms:h.rooms.map(o=>o.k+'@'+o.c+','+o.r), planks:skHave('plank'), spots:ROOM_LAYOUT.house.benches.map(b=>b[0]), ui:G.ui,
+  const r2 = await ev(()=>{ const chn0 = chn; chn = ()=>false; houseBuildRoom('workshop'); chn = chn0;   /* (no 'careful hand' saving the planks: Construction is high here) */ const h = houseP(); return { rooms:h.rooms.map(o=>o.k+'@'+o.c+','+o.r), planks:skHave('plank'), spots:ROOM_LAYOUT.house.benches.map(b=>b[0]), ui:G.ui,
       free:G.map[G.player.x][G.player.y]===T_FLOOR, again:(houseBuildRoom('workshop'), houseP().rooms.length) }; });
   /* bigger: house, manor, estate; every room; every piece of furniture */
   const r3 = await ev(async ()=>{ const p = G.player; setUi('playing'); exitInterior(); skGainXP('construction', 4000000); const out = { sizes:['House'] };
     for (let i=0;i<2;i++){ const N = HOUSE_SIZES[houseP().size + 1]; for (const k in N.cost) skAdd(k, N.cost[k]); houseUpgrade(); out.sizes.push(houseSz().nm); }
-    out.gold = p.gold; enterHouse();
+    out.gold = p.gold; out.cost = HOUSE_SIZES.slice(1).reduce((t, z)=>t + z.gold, 0); enterHouse();
     for (const k of Object.keys(HOUSE_ROOMS)){ if (houseHas(k) || HOUSE_ROOMS[k].out) continue;   /* (the garden and farmyard have tests of their own) */ const S = houseSz(); let at = null; for (let r=0;r<S.r && !at;r++) for (let c=0;c<S.c && !at;c++) if (!houseRoomAt(c, r)) at = { c, r };
       G.housePlot = at; for (const m in HOUSE_ROOMS[k].cost) skAdd(m, HOUSE_ROOMS[k].cost[m]); houseBuildRoom(k); }
     skAdd('logs', 400); skAdd('ironb', 200); skAdd('essence', 1000);
@@ -55,7 +55,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   A(r2.rooms.join()==='parlour@0,0,bedroom@1,0,workshop@0,1' && r2.planks===0 && r2.spots.includes('spot_furnace') && r2.spots.filter(k=>k==='plot').length===1 && r2.free && r2.again===3, 'a workshop built on the plot: ' + JSON.stringify(r2));
   A(r3.sizes.join()==='House,Manor,Estate' && r3.size===4 && r3.rooms===7 && r3.built===10, 'an estate with every room and every piece of furniture: ' + JSON.stringify(r3));
   A(r3.spots.join()==='plot,plot' && r3.reach===r3.benches, 'every piece of furniture and the last two plots within reach: ' + JSON.stringify(r3));
-  A(r3.gold===100000 - 2500 - 6000 - 15000 - 40000, 'the sizes cost their gold: ' + r3.gold);
+  A(r3.cost===111000 && r3.gold===200000 - r3.cost, 'the sizes cost their gold: ' + r3.gold);
   A(r4.occ > 0 && r4.faded > 0, 'a back wall fades when it hides you: ' + JSON.stringify(r4));
   A(r5.size===3 && r5.rooms.join()==='parlour,bedroom,kitchen,chapel,portal' && r5.portal===2 && r5.beds===1 && r5.altar && !r5.moved, 'an old house rebuilt as rooms, its furniture kept: ' + JSON.stringify(r5));
   A(!errs.length, 'no errors: ' + errs.join(' | '));

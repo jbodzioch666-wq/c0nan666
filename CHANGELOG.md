@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-750 - A House Is an Investment
+
+- **A cottage now costs 50,000 gold** (it was 2,500). Owning a house is a goal to save toward. In the economy sim's shopping list it now costs half as much as a full set of dragon tools, and more than three towns' worth of town projects. Growing it into a house, manor or estate costs the same as before.
+- **The Heartlands diary follows the price.** "Buy a house" moves from the second tier to the third, and swaps places with "Pay for a town upgrade". Tiers you have already finished stay finished.
+
 ## RS-749 - The Necromancers
 
 - **The liches have a new look.** Lich acolytes, liches, archliches and the risen lich-lords (the necromancers of the towers) are now built on the sculpted skeleton instead of the old blocky robed figure. They wear a layered robe split up the front and torn at the hem, a ragged mantle open over the ribs, and wide sleeves with bone hands showing.
