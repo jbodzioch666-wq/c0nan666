@@ -52,8 +52,8 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   A(r0.est && r0.doorTile && r0.plots===0 && r0.spots0.includes('spot_trophy') && r0.spots0.includes('spot_bed') && r0.bed, 'a cottage: the parlour with its trophy space, and a bedroom whose bed is built first: ' + JSON.stringify(r0));
   A(r0.at[0]===r0.door[0] && r0.at[1]===r0.door[1] - 1, 'you come in at the front door');
   A(r1.ui==='housePlot' && r1.rooms===8 && r1.at.c===0 && r1.at.r===1, 'the plot lists the eight rooms: ' + JSON.stringify(r1));
-  A(r2.rooms.join()==='parlour@0,0,bedroom@1,0,workshop@0,1' && r2.planks===0 && r2.spots.includes('spot_carpentry') && r2.spots.filter(k=>k==='plot').length===1 && r2.free && r2.again===3, 'a workshop built on the plot: ' + JSON.stringify(r2));
-  A(r3.sizes.join()==='House,Manor,Estate' && r3.size===4 && r3.rooms===7 && r3.built===11, 'an estate with every room and every piece of furniture: ' + JSON.stringify(r3));
+  A(r2.rooms.join()==='parlour@0,0,bedroom@1,0,workshop@0,1' && r2.planks===0 && r2.spots.includes('spot_furnace') && r2.spots.filter(k=>k==='plot').length===1 && r2.free && r2.again===3, 'a workshop built on the plot: ' + JSON.stringify(r2));
+  A(r3.sizes.join()==='House,Manor,Estate' && r3.size===4 && r3.rooms===7 && r3.built===10, 'an estate with every room and every piece of furniture: ' + JSON.stringify(r3));
   A(r3.spots.join()==='plot,plot' && r3.reach===r3.benches, 'every piece of furniture and the last two plots within reach: ' + JSON.stringify(r3));
   A(r3.gold===100000 - 2500 - 6000 - 15000 - 40000, 'the sizes cost their gold: ' + r3.gold);
   A(r4.occ > 0 && r4.faded > 0, 'a back wall fades when it hides you: ' + JSON.stringify(r4));

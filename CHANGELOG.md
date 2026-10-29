@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-745 - The Yard's Bench
+
+- **The carpentry bench is in the Boatyard.** It stands in the back corner, under the oars, next to the saw pit where you cut your planks. Walk up to it to saw 4 logs into a flatpack of furniture for Construction xp, and sell the flatpacks to the furniture dealer for gold. "Make as many as you can" still works through a whole stack.
+- **You no longer need a house for it.** The house's Workshop now holds just the furnace and the anvil. If you'd built a carpentry bench at home, it's gone, and the Boatyard's bench does the same job.
+
 ## RS-744 - Release
 
 - **A wave ends when the last beast hits the sand.** The arena declared victory the instant the last monster's life ran out, before your blow had even landed. Now it waits for that monster to fall, then a beat more.
