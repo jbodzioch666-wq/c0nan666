@@ -46,9 +46,10 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
       /* a piece reinforced before RS-707 carries on */
       const o = rsMakeArmour('metal', 3, 'chest'); o.reinfBase = { acc:0, dmgB:0, ac:o.ac, nm:o.nm }; o.reinf = 2; o.ac = Math.round(o.reinfBase.ac*1.12) + 0; o.nm += ' +2'; G.gear.chest = o; smithReinforce('chest'); out.mw.old = o.reinf===3 && /\+3$/.test(o.nm) && !/\+2/.test(o.nm); }
     /* the smith's screen */
-    { give(5); const it = rare(); G.inv = [it]; ENCH.sel = it; setUi('blacksmith'); const ov = document.getElementById('overlay'), txt = ov.textContent;
-      out.ui = { panel:/ENCHANT & MASTERWORK/.test(txt), ess:ov.querySelectorAll('.ench-es').length, rows:ov.querySelectorAll('.ench-row').length, reinforce:/REINFORCE/.test(txt) };
-      const nm0 = it.nm, chaos = [...ov.querySelectorAll('.ench-acts .btn')].find(b=>/Chaos/.test(b.textContent)); chaos.click(); out.ui.clicked = it.nm===nm0 && skHave('es_chaos')===4;
+    { give(5); const it = rare(); G.inv = [it]; setUi('blacksmith'); const ov = document.getElementById('overlay'), txt = ov.textContent;   /* (RS-712: the work is done at the anvil now) */
+      out.ui = { panel:/Work a piece at the anvil/.test(txt), reinforce:/REINFORCE/.test(txt) }; anvilOpen(it, 'blacksmith');
+      out.ui.ess = ov.querySelectorAll('.anv-es').length; out.ui.rows = ov.querySelectorAll('.anv-ln').length;
+      const nm0 = it.nm; document.querySelector('.anv-stage').remove(); anvUse('es_chaos'); out.ui.clicked = it.nm===nm0 && skHave('es_chaos')===4;
       setUi('playing'); }
     return out; });
   console.log(JSON.stringify(r));

@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-712 - The Anvil
+
+- **A screen of its own.** Every anvil (the ones in the smithy, and yours at home) opens THE ANVIL, with two tabs: **Forge from bars** and **Work a piece**. The smith's menu has a button that takes you straight to Work a piece, and Escape takes you back to the smith.
+- **Drag and drop.** Drag a piece onto the anvil to work on it. Drag an essence onto it: Change and Law onto one of its bonuses, Chaos and Blood onto the piece. You can also tap instead: tap a piece, tap an essence, then tap where it goes. The essences you hold and your gold sit along the top.
+- **The hammer.** **Masterwork** strikes the piece up a step. **Smash** breaks a magic or rare piece from your bag into essences; it takes two taps, so you can't smash one by accident. Sparks fly as the hammer lands, and the work is done the moment it hits.
+- **Your pieces, sorted.** On the left: what can be broken down, what you're wearing, and the rest of your bag.
+- **What it can become.** On the right are the piece's numbers. Under each bonus you can see what **Change** would roll it to (its tier's range) and what **Law** would make it (the next tier's name and range, or why it can't go higher). Below that, **What it can roll** lists every prefix and suffix the piece could get at its level, from its lowest tier to its best, with the ones it already has marked. That's what Blood can add and Chaos can give. Holding an essence lights up where it can go.
+
 ## RS-711 - Crafted
 
 - **What you make rolls bonuses.** Smithed, crafted and fletched gear now rolls prefixes and suffixes, as loot does. A Fine piece gets one bonus, and an Exceptional piece gets two: a prefix and a suffix. The forge's +15–45% on the base numbers stays.
