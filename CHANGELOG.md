@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-734 - Under the Cape
+
+- **The robe stays under your cape when you stoop.** Foraging bends you forward, but the robe's cloth over your back was still folded for standing, so it bulged up through the cape like a hump. The robe and cape now hang after the body takes its working pose, for every gathering skill.
+
 ## RS-733 - The Dragon's Mountain
 
 - **Dragons' lairs deep in the big ranges**: a lair could sit on any mountain tile with a few mountains round it, often a small hill at the edge of a range, so its great rock looked perched on a bump. In new worlds every lair goes deep inside a big range: at least two rings of mountain all round it, in a range of 30 tiles or more. Measured over three seeds of each size, the smallest range holding a lair grew from 11 to 29 tiles to 167 or more.
