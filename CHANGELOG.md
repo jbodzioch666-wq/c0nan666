@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## RS-723 - The Furnace
+
+- **A furnace screen of its own.** The furnace no longer opens a plain list of rows. Every bar is down the left: its ore, the bar, how many you can make, how many you hold, and the Smithing level it needs if it's locked.
+- **Watch it poured.** The stone furnace sits in the middle with its fire going. For each bar you smelt, the crucible tips and pours the metal into the mould, where it cools to the bar's colour and lifts out.
+- **Tap or drag.** Tap a bar to pick it, then Smelt 1, 5, 10 or all. Or drag a bar onto the furnace to smelt one.
+- **What it takes and makes.** On the right: the ore and coal for each bar against what you carry, your coal-saving chance, what each bar forges into at the anvil and how many bars that takes, and where the ore is mined. Your ores and coal are counted along the top.
+- **Says why.** A bar you can't make says why: the level it needs, or the ore you're short of.
+- **On a phone** the furnace comes first, then the bars, then the details.
+
 ## RS-722 - Behind the Counter
 
 - **Fixed: a stuck empty menu in the new workshops.** Walking into a counter skipped the shopkeeper's own screen. At the glassblower's, or at the tanner's, fletcher's, jeweller's or barber's counter, it opened an empty panel you couldn't close, even by clicking outside. Now the counter does the same as talking to the keeper: their shop, the barber's chair, or (for the glassblower) just a word in passing.
