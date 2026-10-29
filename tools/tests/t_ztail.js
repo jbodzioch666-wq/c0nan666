@@ -1,12 +1,12 @@
 // (probe, not in ALL) a tiefling in a robe and a cape, the tail swishing: from behind, three-quarter and the side, at three moments of
-// the swish; ZROBE=0 for plate. Shot: shots/<ZOUT or ztail>.png
+// the swish; ZROBE=0 for plate, ZRACE=Dragonborn for another race. Shot: shots/<ZOUT or ztail>.png
 module.exports = async page=>{
   page.setDefaultTimeout(0); const out = process.env.ZOUT || 'ztail';
-  const r = await page.evaluate(async ([ROBE, CAPE])=>{ goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{};
-    M3D_SKIN = false; if (M3D.tpl) M3D.tpl.clear(); const T = THREE, p = G.player; p.race = 'Tiefling'; for (const k of ['weapon','offhand','ranged','cape','chest','legs']) G.gear[k] = newItem();
+  const r = await page.evaluate(async ([ROBE, CAPE, RACE])=>{ goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{};
+    M3D_SKIN = false; if (M3D.tpl) M3D.tpl.clear(); const T = THREE, p = G.player; p.race = RACE; for (const k of ['weapon','offhand','ranged','cape','chest','legs']) G.gear[k] = newItem();
     G.gear.weapon = rsMakeStaff(2); if (ROBE){ G.gear.chest = rsMakeArmour('cloth', 3, 'chest'); G.gear.legs = rsMakeArmour('cloth', 3, 'legs'); } else { G.gear.chest = rsMakeArmour('metal', 3, 'chest'); G.gear.legs = rsMakeArmour('metal', 3, 'legs'); }
     if (CAPE) G.gear.cape = rsMakeCape(60, 'Saradomin Cape'); rsSync && rsSync();
-    const e = m3dInstance({}, rsPlayerLook({ race:'Tiefling' })), rg = e.rig; const info = { tail:!!rg.tail, skirt:!!rg.skirt, cape:!!rg.cape };
+    const e = m3dInstance({}, rsPlayerLook({ race:RACE })), rg = e.rig; const info = { tail:!!rg.tail, skirt:!!rg.skirt, cape:!!rg.cape };
     const W = 300, H = 400, ROWS = 3, cv = document.createElement('canvas'); cv.width = W*3; cv.height = H*ROWS; const R = gfxThreeR(new T.WebGLRenderer({ canvas:cv, antialias:true })); R.setSize(W*3, H*ROWS, false); R.setScissorTest(true);
     R.toneMapping = T.ACESFilmicToneMapping; R.outputColorSpace = T.SRGBColorSpace;
     const sc = new T.Scene(); sc.background = new T.Color('#3a332c'); sc.add(new T.HemisphereLight(0xdde4f0, 0x2a2018, 0.8)); const dl = new T.DirectionalLight(0xffe0b0, 1.4); dl.position.set(-1.2, 2, -1.6); sc.add(dl); const rl = new T.DirectionalLight(0x9fb4ff, 0.8); rl.position.set(1.5, 1.4, 2); sc.add(rl);
@@ -21,7 +21,7 @@ module.exports = async page=>{
       const bb = new T.Box3().setFromObject(e.holder), hgt = bb.max.y - bb.min.y;
       [Math.PI, Math.PI*0.7, Math.PI/2].forEach((yaw, k)=>{ e.holder.rotation.y = yaw; e.holder.updateMatrixWorld(true); const c = new T.Vector3(0, hgt*0.35, 0), cam = new T.PerspectiveCamera(30, W/H, 0.01, 50); cam.position.set(0, hgt*0.45, hgt*1.5); cam.lookAt(c);
         R.setViewport(k*W, (ROWS - 1 - row)*H, W, H); R.setScissor(k*W, (ROWS - 1 - row)*H, W, H); R.render(sc, cam); }); e.holder.rotation.y = 0; }
-    return { info, shot:cv.toDataURL('image/png') }; }, [process.env.ZROBE!=='0', process.env.ZCAPE!=='0']);
+    return { info, shot:cv.toDataURL('image/png') }; }, [process.env.ZROBE!=='0', process.env.ZCAPE!=='0', process.env.ZRACE || 'Tiefling']);
   require('fs').writeFileSync(SHOTS + '/' + out + '.png', Buffer.from(r.shot.split(',')[1], 'base64'));
   console.log(JSON.stringify(r.info));
 };

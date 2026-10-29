@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-753 - Tails Out
+
+- **A tail comes out through a robe:** a tiefling's tail now comes straight out through the back of a long robe and hangs clear of it, the way a dragonborn's does. RS-752 had tucked both tails inside the robe; they now swish fully again.
+- **Clear of the hem:** over a robe the tail rides a little higher behind, so the back leg's stride doesn't kick the hem through it. With a cape, the cape still drapes over the root.
+
 ## RS-752 - Tucked Tails and Whole Shadows
 
 - **A tiefling's tail stays under a long robe.** In a robe that reaches the ankles, the tail hangs close to the legs and swishes only a little, so it stays inside the robe. It used to swing out through the skirt and the cape over it. Without a robe it swishes as before, and a cape still drapes over it.

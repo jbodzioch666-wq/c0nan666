@@ -87,6 +87,7 @@ Screenshots go to `tools/tests/shots/`.
 | rs750 | a house costs 50,000 gold; the agent asks it, "Buy a house" is a tier-3 Heartlands diary task |
 | rs751 | a cape lies flat under a 2h sword, staff, bow or shield slung on the back: gear tilted out onto it, cloth held under it, standing and walking (shot rs751_hero) |
 | rs752 | a tiefling's tail stays inside a robe (tucked, small swish); a willow's dome is closed underneath, its shadow whole (no crescent) |
+| rs753 | a tail comes out through a robe and hangs clear of it (tiefling and dragonborn), full swish, caps for the cape |
 | zloot | probe: the drops at a few levels - rarity shares, names with their bonuses and tiers, a rare's tooltip text (ZL levels, ZN drops a level) |
 | zloottip | probe: a rare's, a magic piece's and a Ring of Recoil's tooltip, plain and with Alt held, as shots/zloottip0-3.png |
 | rs703 | A spell leaves the staff as it comes forward: a real cast at a foe three tiles off, sampled every frame - the bolt waits about half a second, leaves from the staff's head as it leans ahead, its sound with it; the foe flinches (and a miss splashes) only as it lands; the cast lasts about a second; a foe it kills stands till the bolt lands, and the staff isn't put away mid-cast |
