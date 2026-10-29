@@ -8377,7 +8377,7 @@ function ensureSpawnEscape(){
 // (RS-106, generator 3: broader ranges, valleys walled in by them filled in as mountain, and nothing but a dragon's lair in or on them)
 // (RS-114, generator 4: a river that runs into a hollow fills it into a lake and flows on from its lowest edge)
 // (RS-115, generator 5: rivers join edge to edge - a diagonal step also fills the lower of its two side tiles)
-const OW_GEN_VER = 24;   /* (24: a sunken temple with open water further round it, every other one on the land with room round it, RS-688; 23: the sunken temples out at sea, RS-687; 22: a site's spacing before its liked terrain, half the graveyards, RS-686) */   /* (6: pyramids in the desert, RS-213; 7: a town for every race, RS-223; 8: roads skirt the volcano, RS-236; 9: landmarks on clear ground, RS-238) */
+const OW_GEN_VER = 25;   /* (25: a dragon's lair deep in a big range, its pass the shortest way out, RS-733; 24: a sunken temple with open water further round it, every other one on the land with room round it, RS-688; 23: the sunken temples out at sea, RS-687; 22: a site's spacing before its liked terrain, half the graveyards, RS-686) */   /* (6: pyramids in the desert, RS-213; 7: a town for every race, RS-223; 8: roads skirt the volcano, RS-236; 9: landmarks on clear ground, RS-238) */
 // any two river tiles that touch only at a corner get the lower of the two tiles beside them turned to river
 // (never a mountain, the sea or a lake); returns how many tiles it added
 function owRiverJoin(elev){
@@ -9180,6 +9180,51 @@ function generateOverworld(seed){
       }
     }
   }
+  /* (RS-733, generator 25) a dragon's lair deep in a big range - it sat on any mountain tile with four mountains round it, often a
+     little hill at a range's edge, and the 3D land built it low. deepMtn: each mountain tile's depth (steps in from the range's edge,
+     8 ways, so 3 means two rings of mountain all round) and the size of its range */
+  function deepMtn(){
+    const W = OW_COLS, H = OW_ROWS, M = G.ow.map, dep = new Int16Array(W*H), comp = new Int32Array(W*H).fill(-1), sizes = [], isM = (x,y)=>M[x][y]===OW_MOUNTAIN;
+    let q = [];
+    for (let x=0;x<W;x++) for (let y=0;y<H;y++){ if (!isM(x,y)) continue; let edge = false;
+      for (let dx=-1;dx<=1 && !edge;dx++) for (let dy=-1;dy<=1;dy++){ if (!dx && !dy) continue; const nb = owNbG(x, y, dx, dy); if (!nb || !isM(nb[0], nb[1])){ edge = true; break; } }
+      if (edge){ dep[x*H+y] = 1; q.push(x*H+y); } }
+    while (q.length){ const nq = [];
+      for (const j of q){ const x = (j/H)|0, y = j%H; for (let dx=-1;dx<=1;dx++) for (let dy=-1;dy<=1;dy++){ if (!dx && !dy) continue; const nb = owNbG(x, y, dx, dy); if (!nb) continue;
+        const k = nb[0]*H + nb[1]; if (dep[k] || !isM(nb[0], nb[1])) continue; dep[k] = dep[j] + 1; nq.push(k); } }
+      q = nq; }
+    for (let s0=0;s0<W*H;s0++){ if (comp[s0] >= 0 || !dep[s0]) continue; const id = sizes.length, st = [s0]; let n = 0; comp[s0] = id;
+      while (st.length){ const j = st.pop(); n++; const x = (j/H)|0, y = j%H;
+        for (const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){ const nb = owNbG(x, y, dx, dy); if (!nb) continue; const k = nb[0]*H + nb[1]; if (comp[k] >= 0 || !dep[k]) continue; comp[k] = id; st.push(k); } }
+      sizes.push(n); }
+    return { dep, comp, sizes, H };
+  }
+  /* the deepest tile of a range of 30 tiles or more that keeps the lairs' spacing: three in if it can, else two; null sends it to
+     the old search */
+  function placeDeepLair(minDist, placed, rfn){
+    const I = deepMtn(), H = I.H, c = [];
+    for (let j=0;j<I.dep.length;j++){ const d = I.dep[j]; if (d >= 2 && I.sizes[I.comp[j]] >= 30) c.push([j, d, Math.min(d, 5) + rfn()*0.9]); }
+    c.sort((a,b)=>b[2]-a[2]);
+    for (const need of [3, 2]) for (let relax=minDist; relax>=0; relax-=4) for (const [j, d] of c){ if (d < need) continue; const x = (j/H)|0, y = j%H;
+      if (Math.hypot(x-startX, y-startY) < 5 || placed.some(p=>Math.hypot(x-p.x, y-p.y) < relax)) continue; return { x, y }; }
+    return null;
+  }
+  /* its pass: the shortest way through the range (4 ways, the tie broken by the seed) to open ground - grass, forest, tundra,
+     desert or swamp - so the path climbs straight up from the range's foot; false sends it to carveMountainPass */
+  function carveLairPass(lx, ly, rfn){
+    const H = OW_ROWS, M = G.ow.map, OPEN = new Set([OW_GRASS, OW_FOREST, OW_TUNDRA, OW_DESERT, OW_SWAMP]), start = lx*H + ly, prev = new Map([[start, -1]]);
+    const dirs = [[1,0],[-1,0],[0,1],[0,-1]]; for (let i=3;i>0;i--){ const j = Math.floor(rfn()*(i+1)); [dirs[i], dirs[j]] = [dirs[j], dirs[i]]; }
+    let q = [start], end = -1;
+    while (q.length && end < 0){ const nq = [];
+      for (const j of q){ const x = (j/H)|0, y = j%H;
+        for (const [dx,dy] of dirs){ const nb = owNbG(x, y, dx, dy); if (!nb) continue; const k = nb[0]*H + nb[1]; if (prev.has(k)) continue; const t = M[nb[0]][nb[1]];
+          if (t===OW_MOUNTAIN){ prev.set(k, j); nq.push(k); } else if (OPEN.has(t)){ prev.set(k, j); end = k; break; } }
+        if (end >= 0) break; }
+      q = nq; }
+    if (end < 0) return false;
+    for (let j = prev.get(end); j!==start && j!==-1; j = prev.get(j)) M[(j/H)|0][j%H] = OW_MOUNTAINPASS;
+    return true;
+  }
   // a dragon lair's own placement wrapper, mirroring placeOrRelocateSite's
   // shape (including honoring a boss-fall relocation) but with a mountain-
   // biased search and a pass carved out to it, and a short 1-3 floor depth
@@ -9190,10 +9235,12 @@ function generateOverworld(seed){
       G.ow.map[mv.x][mv.y] = OW_LAIR;
       G.ow.dungeonMax[mv.x][mv.y] = mv.max;
       G.ow.dungeonIdx[mv.x][mv.y] = slot;
-      carveMountainPass(mv.x, mv.y, siteRng(800000+slot));
+      if (!((G.ow.genVer||1) >= 25 && carveLairPass(mv.x, mv.y, siteRng(800000+slot)))) carveMountainPass(mv.x, mv.y, siteRng(800000+slot));
       return;
     }
-    let p = placeMountainSite(20, placed, siteRng(200000+slot));
+    const g25 = (G.ow.genVer||1) >= 25;
+    let p = g25 ? placeDeepLair(20, placed, siteRng(200000+slot)) : null;
+    if (!p) p = placeMountainSite(20, placed, siteRng(200000+slot));
     if (!p) p = placeFeature(20, placed, siteRng(200000+slot));
     if (p){
       const depthRoll = siteRng(700000+slot)();
@@ -9201,7 +9248,7 @@ function generateOverworld(seed){
       G.ow.dungeonMax[p.x][p.y] = 1+Math.floor(depthRoll*3);
       G.ow.dungeonIdx[p.x][p.y] = slot;
       placed.push(p);
-      carveMountainPass(p.x, p.y, siteRng(800000+slot));
+      if (!(g25 && carveLairPass(p.x, p.y, siteRng(800000+slot)))) carveMountainPass(p.x, p.y, siteRng(800000+slot));
     }
   }
 
@@ -35043,7 +35090,7 @@ function* o3BuildGen(cx, cy){
   for (let x=x0-M; x<=x0+W+M; x++) for (let y=y0-M; y<=y0+W+M; y++){
     if (o3Tile(x,y)!==OW_MOUNTAIN){ dep[dk(x,y)] = 0; continue; }
     let d = 4;
-    for (let r=1;r<=3 && d===4;r++) for (let i=-r;i<=r && d===4;i++) for (let j=-r;j<=r;j++){ if (Math.max(Math.abs(i),Math.abs(j))!==r) continue; if (o3Tile(x+i,y+j)!==OW_MOUNTAIN){ d = r; break; } }
+    for (let r=1;r<=3 && d===4;r++) for (let i=-r;i<=r && d===4;i++) for (let j=-r;j<=r;j++){ if (Math.max(Math.abs(i),Math.abs(j))!==r) continue; const t = o3Tile(x+i,y+j); if (t!==OW_MOUNTAIN && t!==OW_LAIR){ d = r; break; } }   /* (RS-733: a lair doesn't hollow out the peaks round it) */
     dep[dk(x,y)] = d;
   }
   const n1 = v3Noise(7), n2 = v3Noise(9);
@@ -35319,7 +35366,7 @@ function* o3FarLandGen(){
   // how far inside a range each mountain tile sits, over the whole map
   const dep = new Uint8Array(OW_COLS*OW_ROWS);
   for (let x=0;x<OW_COLS;x++){ if ((x & 15)===15) yield; for (let y=0;y<OW_ROWS;y++){ if (o3Tile(x, y)!==OW_MOUNTAIN) continue; let d = 4;
-    for (let r=1;r<=3 && d===4;r++) for (let i=-r;i<=r && d===4;i++) for (let j=-r;j<=r;j++){ if (Math.max(Math.abs(i),Math.abs(j))!==r) continue; if (o3Tile(x+i,y+j)!==OW_MOUNTAIN){ d = r; break; } }
+    for (let r=1;r<=3 && d===4;r++) for (let i=-r;i<=r && d===4;i++) for (let j=-r;j<=r;j++){ if (Math.max(Math.abs(i),Math.abs(j))!==r) continue; const t = o3Tile(x+i,y+j); if (t!==OW_MOUNTAIN && t!==OW_LAIR){ d = r; break; } }   /* (RS-733: a lair doesn't hollow out the peaks round it) */
     dep[x*OW_ROWS + y] = d; } }
   const lin = v=>Math.pow(v/255, 2.2), pos = new Float32Array(NX*NZ*3), col = new Float32Array(NX*NZ*3);
   const tile = (x, y)=>{ const t = o3Tile(x, y);
@@ -48129,7 +48176,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-732';
+const GAME_VERSION = 'rs-733';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-733 - The Dragon's Mountain
+
+- **Dragons' lairs deep in the big ranges**: a lair could sit on any mountain tile with a few mountains round it, often a small hill at the edge of a range, so its great rock looked perched on a bump. In new worlds every lair goes deep inside a big range: at least two rings of mountain all round it, in a range of 30 tiles or more. Measured over three seeds of each size, the smallest range holding a lair grew from 11 to 29 tiles to 167 or more.
+- **A path straight up to it**: the pass to a lair now takes the shortest way out through the range to open ground, so it climbs steadily from the foot of the mountain to the lair (3 to 8 tiles, where the old passes wandered up to 34).
+- **Tall peaks round the lair**: the 3D land no longer treats the lair's own tile as a gap in the range, so the peaks round it stand at full height.
+- **New worlds only** (generator 25): your current world keeps its lairs. Make a new world (your character carries over) to get the new ones.
+
 ## RS-732 - True Colours on the Tome
 
 - **A tome's emblem takes its dye**: the device on a tome's cover had a fixed gold glow that swamped its trim dye, so a red or blue cross still looked gold (only the clasp changed). The faint glow is now the emblem's own colour: red is red, white is white, and a tome with no dye keeps its gold.

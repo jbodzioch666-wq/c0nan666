@@ -58,7 +58,7 @@ module.exports = async page=>{
   const fs = require('fs'); for (const [k, f] of [['shotSea', 'rs687-sea'], ['shotParted', 'rs687-parted']]){ if (r[k]) fs.writeFileSync(SHOTS + '/' + f + '.png', Buffer.from(r[k].split(',')[1], 'base64')); r[k] = !!r[k]; }
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
-  A(r.ver===24 && r.temples >= 2 && r.atSea >= 1 && r.atSea <= Math.ceil(r.temples/2) && r.ring===r.atSea && r.shore===r.atSea, 'every other sunken temple out at sea, open water 3.5 tiles round, a shore within six');
+  A(r.ver >= 24 && r.temples >= 2 && r.atSea >= 1 && r.atSea <= Math.ceil(r.temples/2) && r.ring===r.atSea && r.shore===r.atSea, 'every other sunken temple out at sea, open water 3.5 tiles round, a shore within six');
   A(r.noBoat, 'without a boat it is out of reach');
   A(r.sea && r.parts && !r.cut, 'built as the Rotunda: the mooring stone, 30 steps, the water in the well and its wall, shafts of light, eight fish, bronze doors, the eye');
   A(r.floor < -2.1 && r.lip > -0.6 && r.lip < -0.25, 'a well in the seabed: the floor deep, a lip just under the waves: ' + [r.floor, r.lip, r.bed]);

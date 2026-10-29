@@ -48,7 +48,7 @@ module.exports = async page=>{
   if (r.shot) require('fs').writeFileSync(SHOTS + '/rs688.png', Buffer.from(r.shot.split(',')[1], 'base64')); r.shot = !!r.shot;
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
-  A(r.ver===24 && r.land >= 1 && r.room===r.land, 'every other temple on the land, with open land two tiles round it');
+  A(r.ver >= 24 && r.land >= 1 && r.room===r.land, 'every other temple on the land, with open land two tiles round it');
   A(r.nodes===0 && r.veg, 'nothing gathered or growing under it');
   A(r.parts && !r.cut && !r.sea, 'built as the Guardians\' Gate: the eye, four eyes under the hoods, a light within, two bronze doors; no stair cut');
   A(r.door >= 1.25, 'its door taller than you (0.95): ' + r.door);
