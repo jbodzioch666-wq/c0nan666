@@ -12,7 +12,7 @@ module.exports = async page=>{
     for (const [k, g] of (O3.doors || new Map())){ if (!g.doorLintel || !g.doorTurf) continue; g.updateMatrixWorld(true); const inv = g.matrixWorld.clone().invert(), v = new THREE.Vector3();
       const lb = new THREE.Box3(), lp = g.doorLintel.geometry.attributes.position, LM = new THREE.Matrix4().multiplyMatrices(inv, g.doorLintel.matrixWorld); for (let i=0;i<lp.count;i++) lb.expandByPoint(v.fromBufferAttribute(lp, i).applyMatrix4(LM));
       const at = (x, z)=>{ const o = new THREE.Vector3(x, 5, z).applyMatrix4(g.matrixWorld), d = new THREE.Vector3(x, 0, z).applyMatrix4(g.matrixWorld).sub(o).normalize(); rc.set(o, d); const h = rc.intersectObject(g.doorTurf, false)[0]; return h ? h.point.applyMatrix4(inv).y : null; };
-      let turfN = 0; g.traverse(o=>{ if (o.isMesh && o.material===mt.barrowTurf) turfN++; });
+      let turfN = 0; g.traverse(o=>{ if (o.isMesh && o.material && /^barrowTurf/.test(Object.keys(mt).find(k=>mt[k]===o.material) || '')) turfN++;   /* (RS-754: or its land's, barrowTurf_<biome>) */ });
       const L = { top:lb.max.y, back:lb.min.z, mid:(lb.min.z + lb.max.z)/2, x1:Math.max(-lb.min.x, lb.max.x) };
       out.push({ k, pit:!!g.doorPit, turfN, lin:{ top:r2(L.top), back:r2(L.back), x1:r2(L.x1) }, behind:r2(at(0, L.back - 0.03)),
         bank:[-1, 1].map(s=>r2(at(s*(L.x1 - 0.1), L.back - 0.3))), out:[-1, 1].map(s=>r2(at(s*1.05, L.back))), door:r2(at(0, L.mid + 0.15)) }); }

@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-754 - Dungeons of the Land
+
+- **Barrows match their land:** a dungeon's mound now takes the look of the land around it. In the desert it's sand over sandstone; in the snow, drifted snow over frosted stone; in a swamp, dark peat. The jungle gives deep moss, volcanic land ash over black basalt, a haunted wood grey turf, and the crystal waste pale grit. Grassland and forest barrows keep their mossy turf.
+- **And so do their insides:** each land has its own stone and floor below too. Desert dungeons have sandstone walls and drifted sand; cold ones frosted stone, snow and a pale mist; swamp ones peat floors, standing pools and a green mist. Under a forest you'll find earth and roots, in the jungle vine-grown carved stone, in volcanic land basalt cracked with embers, under a haunted wood cold grey stone, and in the crystal waste lilac stone. The light and mist are tinted to match.
+- **Wet or dry:** damp lands (swamp, jungle, forest) get drips, puddles, flooded halls and roots; dry ones (desert, snow, ash, crystal) get none of them.
+
 ## RS-753 - Tails Out
 
 - **A tail comes out through a robe:** a tiefling's tail now comes straight out through the back of a long robe and hangs clear of it, the way a dragonborn's does. RS-752 had tucked both tails inside the robe; they now swish fully again.
