@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-728 - The Jeweller's Benches
+
+- **Silver jewellery moves to the jeweller's bench.** Silver rings and amulets are no longer forged on the anvil with Smithing. They're cast at the jeweller's bench with Crafting, in the first row (a ring from 1 silver bar at Crafting 12, an amulet from 2 at 15). Which one comes out is still rolled, with finer ones the higher your level. The anvil now only shows the metals it forges, and the furnace sends silver to the jeweller's bench.
+- **The gem-cutting table gets a work screen.** The uncut gem sits on its dop stick against the spinning lap while the hand wheel turns. The facets come up as it's cut, with sparkles in the gem's colour, and the cut gem lifts out. Gem arrowtips are cut here too.
+- **So does the jeweller's bench.** A ring sits on the mandrel, glowing hot from the blowpipe flame, while the little hammer taps it and it cools to gold or silver with its gem set on top. Amulets and holy symbols hang on a stand instead.
+- **Jewellery cards show their gem's colour.** Gold, silver and the gems you hold are counted along the top.
+
 ## RS-727 - Bow and Lathe
 
 - **The Fletcher's fletching bench and staff-carver's lathe get work screens,** like the other benches. Every bow, arrow, bolt, dart, knife and staff is a card with its picture, how many you can make, and the level or recipe book it needs.
