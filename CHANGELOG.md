@@ -1,5 +1,23 @@
 # Depthcrawl patch notes
 
+## RS-736 - A House of Rooms
+
+Your house is no longer a single room. It's laid out in plots: you build a room on each empty one, and the estate agent builds the house bigger as your Construction grows.
+
+- **A cottage to start:** it still costs 2,500 gold from Hollis on any town square. You get two plots: a parlour with the front door (your trophy wall, a bookcase and two fireside chairs), and one empty plot staked out with string and a builder's sign.
+- **Build it bigger:** Hollis turns your cottage into a **House** (4 plots, Construction 15, 6,000 gold, 30 oak planks and 30 nails), a **Manor** (6 plots, Construction 35, 15,000 gold, 50 maple planks and 60 nails) or an **Estate** (9 plots, Construction 55, 40,000 gold, 80 yew planks and 120 nails). The house grows back and to the east, so your rooms stay where they are.
+- **Add rooms:** walk up to an empty plot and choose a room to build there, using planks from the Boatyard's saw pit:
+  - **Bedroom** (Construction 1, 10 planks): your bed.
+  - **Workshop** (1, 10 planks): the carpentry bench, a furnace and an anvil.
+  - **Kitchen** (5, 14 planks): the hearth, on a flagged floor.
+  - **Chapel** (25, 20 oak planks): the altar, with two pews.
+  - **Craft room** (30, 25 oak planks): the jeweller's bench, the brewing cauldron and the fletching bench.
+  - **Portal chamber** (45, 30 maple planks): the portal.
+
+  Each room gives Construction xp, and you then furnish it as before, with logs, iron bars and essence.
+- **Walk through it:** a doorway joins every pair of neighbouring rooms. Each room's back walls stand full height, with a torch and a window where they face outside. They fade when they hide you, and the front walls are cut low so you can see in. Empty plots and the yard are fenced.
+- **Your old house** is rebuilt as rooms the first time you go in: a parlour, plus a room for each kind of furniture you had built, on a house big enough to hold them. Every piece you built is kept, and the portal keeps its grade.
+
 ## RS-735 - The Boatyard
 
 Boats are built now, not bought. Every town has a Boatyard on the crafts lane, run by a shipwright.

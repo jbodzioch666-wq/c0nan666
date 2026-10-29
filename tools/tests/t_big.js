@@ -11,7 +11,10 @@ module.exports = async page=>{
     houseBuy(); A(houseP() && p.gold===1e6-HOUSE_PRICE, 'bought'); checkAchievements(); A(p.achievements.includes('homeowner'), 'homeowner');
     renderOverlay(); A(document.getElementById('overlay').innerHTML.includes('go home'), 'go home button');
     enterHouse(); A(G.interior && G.interior.key==='house' && G.ui==='playing', 'inside the house');
-    A(ROOM_LAYOUT.house.benches.length===HOUSE_SPOTS.length && ROOM_LAYOUT.house.benches.every(b=>b[0].startsWith('spot_')), 'empty spaces');
+    A(ROOM_LAYOUT.house.benches.every(b=>b[0].startsWith('spot_') || b[0]==='plot'), 'empty spaces');
+    /* (RS-736) an estate with every room, for the furniture to go in */
+    { const h = houseP(); h.size = 4; let i = 1; for (const k of Object.keys(HOUSE_ROOMS)) if (k!=='parlour'){ h.rooms.push({ k, c:i % 3, r:Math.floor(i/3) }); i++; } houseLayout(); }
+    A(ROOM_LAYOUT.house.benches.filter(b=>b[0].startsWith('spot_')).length===HOUSE_SPOTS.length, 'a space for every piece');
     for (let i=0;i<6;i++){ renderGame(); await new Promise(r=>setTimeout(r, 30)); }
     out.v3 = v3Active();
     // too low a level: nothing happens
@@ -20,7 +23,7 @@ module.exports = async page=>{
     skP().skills.construction = SK_XP[99]; skAdd(SK_LOG[0].id, 2000); skAdd('ironb', 500); skAdd('essence', 2000);
     for (const s of HOUSE_SPOTS){ for (let t=0; t<(s.tiers ? s.tiers.length : 1); t++){ houseBuildDialog(s); A(G.ui==='wevent', 'dialog for '+s.id); wevChoose(0); } A(houseTier(s.id)===(s.tiers ? 3 : 1), 'built '+s.id); }
     checkAchievements(); A(p.achievements.includes('master_builder'), 'master builder');
-    A(ROOM_LAYOUT.house.benches.every(b=>!b[0].startsWith('spot_')), 'furniture in place');
+    A(ROOM_LAYOUT.house.benches.every(b=>!b[0].startsWith('spot_')) && ROOM_LAYOUT.house.benches.filter(b=>b[0]!=='plot').length===HOUSE_SPOTS.length, 'furniture in place');
     for (let i=0;i<6;i++){ renderGame(); await new Promise(r=>setTimeout(r, 30)); }
     out.hits = (V3.hits||[]).length;
     // the furniture works

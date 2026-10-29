@@ -7,10 +7,10 @@ module.exports = async page=>{
     const out = { layout:[], rooms:{} };
     // the layouts: wall furniture on a wall
     const onWall = (x, y)=>x===ROOM.x0 || y===ROOM.y0;
-    for (const key in ROOM_LAYOUT) for (const [k,x,y] of ROOM_LAYOUT[key].benches){
+    for (const key in ROOM_LAYOUT) if (key!=='house') for (const [k,x,y] of ROOM_LAYOUT[key].benches){
       if (['books','hearth','shrine','bed','innbed'].includes(k) && !onWall(x, y)) out.layout.push(key+':'+k+'@'+x+','+y);
       if (['stairs','stairsup'].includes(k) && y!==ROOM.y0) out.layout.push(key+':'+k+' not at the back wall'); }
-    for (const sp of HOUSE_SPOTS) if (['bed','hearth'].includes(sp.k) && !onWall(sp.x, sp.y)) out.layout.push('house:'+sp.k);
+    for (const sp of HOUSE_SPOTS) if (['bed','hearth','trophy'].includes(sp.k) && sp.ly!==0) out.layout.push('house:'+sp.k);   /* (RS-736: against its room's back wall) */
     // each room in 3D
     const rooms = ['smith','tavern','alch','shop','tailor','bank','temple','tavern_up','cellar'];
     for (const k of rooms){
