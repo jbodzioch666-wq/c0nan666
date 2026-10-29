@@ -45,7 +45,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   A(setup.nudge > 0.75, 'beside the gate you are nudged past FIG_LAG_MAX: ' + setup.nudge);
   A(out.lag < 0.1, 'and figLag counts from where the nudge puts you: ' + out.lag);
   A(out.away.path >= 1 && out.awayLeft===0 && (out.awayPos[0]!==setup.at[0] || out.awayPos[1]!==setup.at[1]), 'a tap on the ground walks you off from there');
-  for (const t of out.taps) A(t.off || (t.pick==='site:true' && t.mode===1 && t.kind==='temple'), 'a tap on the gate\'s ' + t.nm + ' takes you in');
+  for (const t of out.taps) A(t.off || (t.pick==='site:true' && t.mode===1 && t.kind==='city'), 'a tap on the gate (the Lost City since RS-756)\'s ' + t.nm + ' takes you in');
   A(out.taps.filter(t=>!t.off).length >= 3, "enough of the gate is on the phone's screen to tap");
   if (out.sea) A(out.sea.pick==='site:true' && out.sea.mode===1 && out.sea.kind==='temple', 'a tap on the Rotunda\'s dome takes you in from your boat');
   A(!errs.length, 'no errors: ' + errs.join(' | '));

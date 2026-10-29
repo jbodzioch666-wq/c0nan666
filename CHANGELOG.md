@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## RS-756 - The Lost City
+
+- **The jungle looks like a jungle.** Rainforest giants on bent, mossy trunks with buttress roots, lumpy layered crowns and hanging lianas; palms with ringed, leaning trunks, nuts and drooping fronds; and an understory of arching ferns and big heart-shaped leaves with the odd orchid among them.
+- **Trees you can chop wear the jungle's canopy there** - flat, spreading tiers of deep green (a yew is a dark stack of them), so the woodcutting trees no longer look like an English wood in the middle of it.
+- **The Lost City.** A sunken temple that stands on the land is now the Lost City: named so on the land, the world map and when examined, carved green stone under moss and vines inside with a mosaic floor broken by grass, and the jungle's creatures and the restless dead for its folk (spiders, swamp things, skeletons, zombies, goblins, demons). It is a hard site: tougher, richer and better rewarded than a temple. Its floors are still the temple's rooms for now - the overgrown city itself comes next.
+- **New worlds (generator 26):** every Lost City stands in a jungle grown round it, and the jungle itself comes in twice as many, slightly bigger patches, in the hot, wet lowlands by the rivers and coasts. Existing worlds keep their land; their land temples become Lost Cities.
+- **A Lost City that falls rises again in a jungle,** with room round it, where one can be found.
+- **The bestiary's "where to find" names each place once** (since RS-755 it could say "dungeons and dungeons and...").
+
 ## RS-755 - Folk of the Land
 
 - **A dungeon's monsters match its land:** each floor of a plain dungeon picks its two monster families from those of the land above. Desert barrows hold scarabs, kalphites and mummies, with kobolds and skeletons; cold ones frost-born, kobolds and goblins; swamp ones leeches, bog beasts and zombies. Forests have spiders and goblins, the jungle spiders and swamp things, volcanic land demons and giants, a haunted wood the dead and the creatures of the night, and the crystal waste kobolds and giants. About three monsters in ten are still the usual mix, and grassland dungeons are as before.

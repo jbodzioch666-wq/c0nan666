@@ -59,7 +59,7 @@ module.exports = async page=>{
   A(r.toll===1 && r.sigMax > 1.5 && r.kinMax===4, 'the eye wakes, one toll, the guardians\' eyes kindle');
   A(r.leaf > 1.3 && r.grind===1 && r.deep > 0 && r.rush===0, 'the doors swing in: one grind, a light within, no water');
   A(r.shake < 0.05 && !r.cam && r.camDown < 0.01 && r.figMin > 0.999, 'no shake, no zoom, your own size');
-  A(r.mode===1 && r.kind==='temple' && r.figAfter===1, 'and on into the temple');
+  A(r.mode===1 && r.kind==='city' && r.figAfter===1, 'and on into the temple (on the land, the Lost City since RS-756)');
   A(r.reset, 'the doors shut again behind you');
   A(r.blackStone===0, 'every stone has its colours');
   A(!errs.length, 'no errors: ' + errs.join(' | '));
