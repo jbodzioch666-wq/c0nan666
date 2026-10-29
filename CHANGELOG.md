@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## RS-724 - Wheel and Loom
+
+- **The spinning wheel and the loom get work screens,** like the furnace's. Everything the bench makes is down the left in its rows (Wizard robes, Splitbark robes and so on), each with its picture, how many you can make, and the level or recipe book it needs if it's locked.
+- **Watch them work.** At the wheel, the big wheel turns, the treadle rocks, yarn runs from the flax to the bobbin and the bobbin fills. At the loom, the heddle lifts, the shuttle runs across, the reed beats and the cloth grows in the robe's own colour. A linen bolt, a bowstring or the finished piece lifts out at the end of each one.
+- **Tap or drag.** Tap a recipe, then Make 1, 5, 10 or all. Or drag it onto the bench to make one. "All" now counts how many linen or bowstrings you'll get.
+- **What it takes and makes.** On the right: each material against what you carry, the piece it makes with its bonuses, and how much better a handmade one comes out at your level. The bench's materials are counted along the top.
+- **Says why.** A recipe you can't make tells you whether it's your level, a recipe book you haven't read, or the materials you're short of.
+- The other benches keep their old lists for now and get their own screens in the next releases.
+
 ## RS-723 - The Furnace
 
 - **A furnace screen of its own.** The furnace no longer opens a plain list of rows. Every bar is down the left: its ore, the bar, how many you can make, how many you hold, and the Smithing level it needs if it's locked.

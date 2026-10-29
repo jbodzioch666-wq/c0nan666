@@ -60,6 +60,7 @@ Screenshots go to `tools/tests/shots/`.
 | rs721 | A click on the game view outside a menu (a shop, the bag, a bench) closes it and goes no further; a click inside stays; the title screen stays; the glassblower has no menu, a word in the log |
 | rs721m | The same on a phone: a tap outside the shop closes it, and you stay put |
 | rs723 | The furnace screen: every bar listed, a tap picks one, smelting pours it, a drag onto the furnace smelts one, a bar you can't make says why |
+| rs724 | The spinning wheel and the loom work screens: a tap picks, the wheel spins linen, a drag makes a bowstring, the loom weaves a hat, Ahrim's asks for its book |
 | zloot | probe: the drops at a few levels - rarity shares, names with their bonuses and tiers, a rare's tooltip text (ZL levels, ZN drops a level) |
 | zloottip | probe: a rare's, a magic piece's and a Ring of Recoil's tooltip, plain and with Alt held, as shots/zloottip0-3.png |
 | rs703 | A spell leaves the staff as it comes forward: a real cast at a foe three tiles off, sampled every frame - the bolt waits about half a second, leaves from the staff's head as it leans ahead, its sound with it; the foe flinches (and a miss splashes) only as it lands; the cast lasts about a second; a foe it kills stands till the bolt lands, and the staff isn't put away mid-cast |
