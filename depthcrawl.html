@@ -3361,7 +3361,57 @@ function buildUnique(id, d, classOnly){
     if (a.i1) a.i1 = mx(1, Math.round(a.i1*k));
     if (a.f) a.f = +(a.f*k).toFixed(3);
   }
-  return rsUniqueify(it);
+  return uqReforge(rsUniqueify(it), d, classOnly);   /* (RS-715: its bonuses from its own families, its base the best its level gives) */
+}
+/* (RS-715) a Unique's bonuses: five families of its own (UNIQUE_KIT, by id), each at the best tier its item level opens - its level plus
+   15, and from 90 the top level, an Ancestral piece's - the better of two rolls, and from 90 a chance (ANC_GREATER) to be greater. They had
+   kept their old fixed numbers (+15 Maximum HP at 126, where a rolled T1 gives 35 to 44), so a good rare beat most of them. Its base is
+   the best its level gives too: it had been picked at random, so a level-126 Frostbite came out bronze and sold for 135 gold */
+const UNIQUE_KIT = [
+  ['edmg','str','acc','feast','vamp'], ['edmg','fire','vamp','life','str'], ['edmg','acc','dead','crit','str'],
+  ['def','gold','vamp','life','mf'], ['mag','xp','life','mf','sdmg'],
+  ['def','res','life','regen','xp'], ['def','res','rng','life','thorn'],
+  ['def','rng','life','ward','acc'], ['str','def','thorn','life','dead'],
+  ['acc','str','def','life','gold'], ['life','regen','res','feast','def'], ['leech','rng','acc','mf','fer'],
+  ['cold','crit','edmg','acc','str'], ['regen','res','mag','def','pray'], ['feast','thorn','def','life','pray'],
+];
+function uqLvl(d){ return d >= ANC_LVL ? CB_HI : clampCb((d||CB_LO) + 15); }
+function uqKit(it){ return it.uniqueId ? UNIQUE_KIT[it.uniqueId - 1] : it.barrows ? BARROWS_KIT[(it.reinfBase && it.reinfBase.nm) || it.nm] : null; }   /* (a masterworked one's name ends +n) */
+function uqRoll(it, d){
+  const L = uqLvl(d), anc = d >= ANC_LVL, v = a=>a.f || a.i2 || a.i1 || 0;
+  it.aff = (it.aff||[]).filter(a=>a && a.imp);
+  for (const key of uqKit(it) || []){
+    const F = AFFIX_FAM[key]; if (!F) continue; const ix = mx(0, afTierMax(F, L)), a = { kind:F.kind, fam:F.key, i1:0, i2:0, f:0, u:1 }, b = { kind:F.kind, fam:F.key, i1:0, i2:0, f:0 };
+    afRollTier(it, a, F, ix); afRollTier(it, b, F, ix); if (v(b) > v(a)){ a.i1 = b.i1; a.i2 = b.i2; a.f = b.f; }   /* (the better of two) */
+    if (anc && chn(ANC_GREATER)) afGreater(a, F);
+    it.aff.push(a);
+  }
+  it.naff = it.aff.length;
+}
+function uqBase(it, d, forMe){
+  const L = clampCb(d||CB_LO);
+  if (it.slot==='weapon' && !it.rsStaff && !it.range && RS_METALS.some(m=>m[0]===it.baseMat)){
+    let t = 0; for (let i=0;i<=5;i++) if (RS_METALS[i][2] <= L && (!forMe || RS_METALS[i][1] <= rsLvl('attack'))) t = i;
+    if (t > (it.rsTier||0)){ const m = RS_METALS[t]; it.baseMat = m[0]; it.rsTier = t; it.rsCol = m[5]; it.reqAtt = m[1]; it.price = Math.round(RS_TIER_PRICE[t]*1.2*2.5); }
+  } else if (['head','chest','legs','arms','feet'].includes(it.slot) && RS_ARMOUR[it.rsFam]){
+    const F = RS_ARMOUR[it.rsFam], skill = { reqDef:'defence', reqRng:'ranged', reqMag:'magic' }[F.req]; let t = 0;
+    F.tiers.forEach((tr, i)=>{ if (tr[2] <= L && (!forMe || tr[1] <= rsLvl(skill))) t = i; });
+    if (t > (it.rsTier||0)){ const x = rsMakeArmour(it.rsFam, t, it.slot); it.baseMat = x.baseMat; it.rsTier = t; it.rsCol = x.rsCol; it.price = Math.round((x.price||0)*2.5);
+      for (const k of ['reqDef','reqRng','reqMag']){ if (x[k]) it[k] = x[k]; else delete it[k]; } }
+  }
+}
+function uqReforge(it, d, forMe){
+  if (!it || !it.used || !uqKit(it)) return it;
+  if (it.uniqueId) uqBase(it, d, forMe); uqRoll(it, d); it.uqV = 1; if (!it.ilvl) it.ilvl = clampCb(d);
+  return it;
+}
+/* an old save's Unique, once: its bonuses rolled afresh at its item level, a masterwork's quarter growth (+4, +8) put back */
+function uqMigrate(it){
+  if (!it || !it.used || it.uqV || !uqKit(it)) return;
+  try{ rsMigrateItem(it); }catch(e){}
+  uqReforge(it, it.barrows ? mx(70, it.ilvl || cbLvl()) : it.ilvl || cbLvl());
+  const n = it.reinf||0, R = it.aff.filter(a=>a.u && !['fire','cold','pois','crit'].includes(a.kind));
+  for (const m of [4, 8]) if (n >= m && R.length){ const a = R[rn(R.length)]; a.mw = (a.mw||0) + 1; if (a.f) a.f = +(a.f*1.25).toFixed(3); else a.i1 = Math.max(a.i1 + 1, Math.round(a.i1*1.25)); }
 }
 // a unique on the RuneScape rules: its old D&D stat mods turn into attack/strength/
 // defence/ranged/magic bonuses (and it is a cut above its tier), while what makes it
@@ -13295,8 +13345,11 @@ const BARROWS = [
 function crBarrows(i){
   const b = BARROWS[i===undefined ? rn(BARROWS.length) : i], it = rsMakeWeapon(6, b[1]);
   it.nm = b[0]; it.baseMat = b[0].split("'")[0]; Object.assign(it, b[2]); it.acc = Math.round(it.acc*1.1); it.dmgB = Math.round(it.dmgB*1.15);
-  it.reqAtt = 70; it.rsCol = '#7a8478'; it.quality = 4; it.barrows = b[3]; it.price = 45000; return it;
+  it.reqAtt = 70; it.rsCol = '#7a8478'; it.quality = 4; it.barrows = b[3]; it.price = 45000;
+  return uqReforge(it, mx(70, cbLvl()));   /* (RS-715: four bonuses of its own, as a Unique's five) */
 }
+/* (RS-715) a Barrows weapon's bonuses: four of its own, rolled as a Unique's (uqRoll) at its level, 70 at the least */
+const BARROWS_KIT = { "Dharok's Greataxe":['str','edmg','life','dead'], "Guthan's Warspear":['acc','str','vamp','life'], "Verac's Flail":['acc','edmg','crit','str'], "Torag's Hammers":['str','acc','edmg','feast'] };
 function crDragonWeapon(){ const it = rsMakeWeapon(6, [3, 5, 0][rn(3)]); if (it.basis==='Dagger' && chn(0.5)){ it.poisoned = 3; it.nm += ' (p++)'; } return it; }
 function lootRareWeapon(it, why){ addToInventory(it); logMsg(`${why}: ${itemNameHtml(it)}!`, 'magic', true); sfx('achievement'); }
 // poison and its cure
@@ -13887,7 +13940,7 @@ function rsArcherQuiver(){
 }
 /* (RS-704) a piece's colour was its metal's (rune and up yellow, mithril blue); now it's its bonuses'. Done once a piece; crafted
    (Fine, Exceptional, Masterwork, superior), famous, gilded, god, relic and quest pieces keep the colour they were given */
-function afMigrate(it){ afMigrate2(it); try{ crMigrate(it); }catch(e){ console.error(e); } }
+function afMigrate(it){ afMigrate2(it); try{ crMigrate(it); }catch(e){ console.error(e); } try{ uqMigrate(it); }catch(e){ console.error(e); } }   /* (RS-715) */
 /* (RS-711) a piece you made before it rolled bonuses: Fine one, Exceptional two, a masterwork (Inspired now) one more at its best tier, a
    Superior piece Ancestral - once */
 function crMigrate(it){
@@ -47268,7 +47321,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-714';
+const GAME_VERSION = 'rs-715';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

@@ -1,5 +1,15 @@
 # Depthcrawl patch notes
 
+## RS-715 - Uniques Reforged
+
+Uniques kept the fixed numbers they had before the loot rework, so a good rare now beat most of them. They roll properly now.
+
+- **Five bonuses of their own.** Every Unique rolls five bonuses from families that fit it, at the best tier its level allows. The Gnasher rolls Enhanced Damage, strength, attack, HP on Kill and Life Steal. The Crown of Thieves rolls defence, Gold Find, Life Steal, Maximum HP and Magic Find. Each bonus is the better of two rolls. Its named power stays.
+- **Better than rares.** A Unique's item level is its level plus 15. From level 90 it rolls at the top level, like an Ancestral piece, and each bonus has the same chance to be greater. At level 126 a Unique weapon scores 28 to 35 against a fighter's gear. A middling rare scores about 13, and the best of 30 rares about 24.
+- **The right base.** A Unique is made of the best its level gives. It used to be picked at random, so a level-126 Frostbite could come out bronze and sell for 135 gold. Now it's rune and worth 19,800.
+- **Barrows weapons too.** Dharok's, Guthan's, Verac's and Torag's weapons roll four bonuses of their own, alongside their special effects.
+- **Your old ones.** The Uniques and Barrows weapons you already own are reforged once when you load. A masterwork's +4 and +8 growth is put back.
+
 ## RS-714 - Fair Compare
 
 A magic ring could say "downgrade" against the Ring of Saint Aurel with no visible reason.
