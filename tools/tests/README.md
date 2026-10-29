@@ -71,6 +71,7 @@ Screenshots go to `tools/tests/shots/`.
 | rs732 | a tome's emblem takes its trim dye (its glow is the emblem's own colour, not a fixed gold) |
 | rs733 | (generator 25) every dragon's lair deep in a big range, its pass reaching open ground, the nearest standing high with its path climbing to it |
 | rs734 | Stooped to forage in a robe and cape, the robe's top no longer comes out through the cape: robe and cape hang after the work's pose (shots rs734_forage, rs734_side) |
+| rs735 | The Boatyard: planks sawn at the saw pit, rope and sailcloth at the ropewalk, a rowboat built on the slipway stage by stage through the work queue (the boat growing in 3D), then a sloop at Construction 20 with its fee; no boat for sale at the Peddler |
 | zloot | probe: the drops at a few levels - rarity shares, names with their bonuses and tiers, a rare's tooltip text (ZL levels, ZN drops a level) |
 | zloottip | probe: a rare's, a magic piece's and a Ring of Recoil's tooltip, plain and with Alt held, as shots/zloottip0-3.png |
 | rs703 | A spell leaves the staff as it comes forward: a real cast at a foe three tiles off, sampled every frame - the bolt waits about half a second, leaves from the staff's head as it leans ahead, its sound with it; the foe flinches (and a miss splashes) only as it lands; the cast lasts about a second; a foe it kills stands till the bolt lands, and the staff isn't put away mid-cast |

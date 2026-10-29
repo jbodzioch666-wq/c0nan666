@@ -10,8 +10,9 @@ module.exports = async page=>{
     let pearl = 0, sun = 0; for (let x=0;x<OW_COLS;x++) for (let y=0;y<OW_ROWS;y++){ const n = skNodeStatic(x, y); if (!n) continue; if (n.type==='pearl') pearl++; if (n.type==='sunstone') sun++; }
     out.pearlBeds = pearl; out.sunstone = sun; A(pearl + sun > 0, 'island resources');
     // boats: buy, then build up to a galleon
-    const p = G.player; p.gold = 100000; p.level = 30; buyBoat(); A(boatTier()===1, 'rowboat');
-    for (let t=2;t<=4;t++){ skAdd('logs', 100); skAdd('ironb', 30); sailUpgrade(); A(boatTier()===t, 'tier '+t); }
+    /* (RS-735) built on the slipway, stage by stage */
+    const p = G.player; p.gold = 100000; skGainXP('construction', 400000);
+    for (let t=1;t<=4;t++){ for (const s of boatStages(t)) for (const k in s.need) skAdd(k, s.need[k]); let n = 0; while (boatTier() < t && n++ < 300) if (!boatWork()) break; A(boatTier()===t, 'tier '+t); }
     out.boat = boatName(); A(stormRisk()===0, 'galleon storm proof');
     p._sailN = 0; const c = [sailStepCost(), sailStepCost(), sailStepCost()]; A(c.reduce((a,b)=>a+b,0)===1, 'galleon steps '+c);
     checkAchievements(); A(p.achievements.includes('admiral'), 'admiral');

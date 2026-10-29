@@ -1,5 +1,21 @@
 # Depthcrawl patch notes
 
+## RS-735 - The Boatyard
+
+Boats are built now, not bought. Every town has a Boatyard on the crafts lane, run by a shipwright.
+
+- **The saw pit:** saws logs into planks for a boat's keel, frames, hull and deck. Plain planks need Construction 1, oak 15, maple 40 and yew 60. You watch the rip saw work down the log.
+- **The ropewalk:** twists 2 flax into rope (Crafting 1) and sews 2 linen into sailcloth (Crafting 8). You watch the strands twist and the seams get sewn. Nails come from the anvil at the Smithy, and iron bars from its furnace.
+- **The slipway:** you build each boat in six stages: keel, frames, planking, deck, masts and rigging, then sails. Each stage takes its materials when you start it, then some turns of work. You can stop and come back, because the boat stays on the slipway. Each stage gives Construction xp.
+- **Watch it being built:** the slipway screen draws the boat side on, with each part added as you work. The next part shows faintly where it will go, and the mallet swings while you build. The boat also grows in 3D on the ways in the Boatyard: first the keel and stem, then the ribs, then the hull plank by plank, then the deck, rails and castles, then the masts and rigging, and last the sails. Once she's planked, shores prop her up. On the last turn she slides down the ways.
+- **What each boat takes:**
+  - **Rowboat:** Construction 1, 11 planks, 2 rope, 1 sailcloth, 30 turns, no fee.
+  - **Sloop:** Construction 20, 28 oak planks, 60 nails, 6 rope, 3 sailcloth, 2 iron bars, 46 turns, and a 300-gold yard fee.
+  - **Caravel:** Construction 40, 44 maple planks, 100 nails, 10 rope, 6 sailcloth, 5 bars, 60 turns, 1,000 gold.
+  - **Galleon:** Construction 60, 66 yew planks, 140 nails, 16 rope, 10 sailcloth, 10 bars, 76 turns, 3,000 gold.
+  - The gold side used to be 21,900 for all four. The fees now add up to 4,300, and the materials are the real cost.
+- **The Peddler** doesn't sell boats any more. Boats you already own stay yours, and the next one you build is the next size up.
+
 ## RS-734 - Under the Cape
 
 - **The robe stays under your cape when you stoop.** Foraging bends you forward, but the robe's cloth over your back was still folded for standing, so it bulged up through the cape like a hump. The robe and cape now hang after the body takes its working pose, for every gathering skill.

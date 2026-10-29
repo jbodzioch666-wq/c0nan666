@@ -6,7 +6,7 @@ module.exports = async page=>{
     const rows = [], add = (nm, gold, note)=>rows.push({ nm, gold:Math.round(gold), note:note||'' });
     const tools = SK_TIER.filter(t=>t[0]!=='Dragon' && t[0]!=='Infernal').reduce((a,t)=>a+t[2], 0);
     add('tools, bronze to rune, all four', tools*4); add('dragon tools, all four', 25000*4); add('infernal tools, all four', 60000*4);
-    add('rowboat and every boat upgrade', BOAT_PRICE + BOAT_TIERS.filter(Boolean).reduce((a,t)=>a+(t.gold||0), 0), 'plus logs and bars');
+    add('the boatyard fees for every boat', BOAT_FEE.filter(Boolean).reduce((a, f)=>a + f, 0), 'plus planks, nails, rope, sailcloth and bars');
     add('harpoons, iron to dragon', HARPOONS.filter(Boolean).reduce((a,h)=>a+h.price, 0));
     add('a house', HOUSE_PRICE, 'furniture costs logs and bars');
     add('town projects, one town', TOWN_PROJECTS.reduce((a,t)=>a+(t.cost.gold||0), 0), 'plus logs and bars; per town');
