@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-722 - Behind the Counter
+
+- **Fixed: a stuck empty menu in the new workshops.** Walking into a counter skipped the shopkeeper's own screen. At the glassblower's, or at the tanner's, fletcher's, jeweller's or barber's counter, it opened an empty panel you couldn't close, even by clicking outside. Now the counter does the same as talking to the keeper: their shop, the barber's chair, or (for the glassblower) just a word in passing.
+- **No more dead ends.** If a menu ever has nothing to show, it closes itself instead of sitting empty over the game.
+
 ## RS-721 - Click Away
 
 - **Click outside a menu to close it.** Clicking or tapping the game world around any menu (a shop, your bag, a crafting bench, a dialog) now closes it, just as Escape does. That click only closes the menu; it doesn't also walk you somewhere. Clicks inside a menu work as before.

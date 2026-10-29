@@ -1,6 +1,6 @@
 // RS-721: a click on the game view outside a menu closes the menu, as Escape would, and goes no further (you don't walk there); a click
 // inside the menu leaves it open; the title screen isn't closed by a click. The glassblower has nothing to sell, so no menu: a word in
-// the log instead
+// the log instead (RS-722: walking into the counter too - it opened a screen that didn't exist, empty and with no way out)
 module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.on('pageerror', e=>errs.push(String(e).slice(0, 300)));
   const ev = (f, a)=>page.evaluate(f, a), A = (c, msg)=>{ if (!c) throw new Error('assert: '+msg); };
   const outside = ()=>ev(()=>{ for (let y=120; y<innerHeight-120; y+=37) for (let x=40; x<innerWidth-40; x+=41){ const t = document.elementFromPoint(x, y); if (ovGameView(t)) return [x, y]; } return null; });
@@ -24,6 +24,10 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   await ev(()=>{ enterInterior('tailor'); G.bench = 'loom'; setUi('bench'); }); xy = await outside(); await click(xy); out.bench = await ev(()=>G.ui);
   /* the glassblower: no menu, a word */
   out.potter = await ev(()=>{ exitInterior(); enterInterior('pottery'); const n = (document.getElementById('log')||document.body).textContent.length; villageInteract(10, 5); const u = G.ui; exitInterior(); return { ui:u, said:/kiln/.test((document.getElementById('log')||document.body).textContent) }; });
+  /* (RS-722) walking into each workshop's counter: the keeper's own screen, or none - never an empty one you can't leave */
+  out.counter = await ev(()=>{ const o = {}; for (const k of ['pottery','tannery','fletcher','jeweller','barber','tailor','smith']){ if (!buildingByKey(k)) continue; enterInterior(k); setUi('playing'); G.player.x = 10; G.player.y = 7; tryMove(0, -1);
+      const ov = document.getElementById('overlay'); o[k] = G.ui + (ov.classList.contains('show') && !ov.innerHTML.trim() ? ':EMPTY' : ''); if (G.ui==='makeover') makeoverLeave(); setUi('playing'); exitInterior(); } return o; });
+  out.unknown = await ev(()=>{ setUi('nosuchscreen'); return { ui:G.ui, show:document.getElementById('overlay').classList.contains('show') }; });
   console.log(JSON.stringify({ t0, t1, r0, out }));
   A(t0==='titleScreen' && t1==='titleScreen', 'a click on the title screen leaves it');
   A(out.inside==='shop', 'a click inside the menu leaves it open');
@@ -31,5 +35,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   A(out.shop.at[0]===r0.at[0] && out.shop.at[1]===r0.at[1] && !out.shop.path, 'and goes no further - you stay where you were');
   A(out.inv==='playing' && out.bench==='playing', 'the bag and a bench close the same way: ' + out.inv + ' ' + out.bench);
   A(out.potter.ui==='playing' && out.potter.said, 'the glassblower: no menu, a word in the log');
+  A(out.counter.pottery==='playing' && out.counter.tannery==='tailor' && out.counter.fletcher==='tailor' && out.counter.barber==='makeover' && out.counter.smith==='blacksmith' && !Object.values(out.counter).some(v=>/EMPTY/.test(v)), 'each counter opens its keeper screen or none: ' + JSON.stringify(out.counter));
+  A(out.unknown.ui==='playing' && !out.unknown.show, 'a screen with nothing to draw closes itself');
   A(!errs.length, 'no errors: ' + errs.join(' | '));
 };
