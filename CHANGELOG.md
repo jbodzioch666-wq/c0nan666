@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-732 - True Colours on the Tome
+
+- **A tome's emblem takes its dye**: the device on a tome's cover had a fixed gold glow that swamped its trim dye, so a red or blue cross still looked gold (only the clasp changed). The faint glow is now the emblem's own colour: red is red, white is white, and a tome with no dye keeps its gold.
+
 ## RS-731 - What You're Dyeing
 
 - **The dye works names each piece**: a named piece, like a unique or a set piece, gave no hint whether it was gloves, boots or a helm. Now a small tag beside its name says what it is (gauntlets, boots, trousers and so on). Pieces whose name already says it, like Bronze Gauntlets, get no tag.
