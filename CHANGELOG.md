@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-727 - Bow and Lathe
+
+- **The Fletcher's fletching bench and staff-carver's lathe get work screens,** like the other benches. Every bow, arrow, bolt, dart, knife and staff is a card with its picture, how many you can make, and the level or recipe book it needs.
+- **Carving a bow:** the stave sits in the vice while a knife shaves along it and the shavings fall. The bowstring goes on at the end, in the wood's colour from plain logs to magic.
+- **Fletching ammo:** the arrow lies on the bench with its head in the metal's colour while its feathers grow on. A bundle lifts out, and the right side shows how many go into your quiver and how many are already there.
+- **Turning a staff:** the blank spins on the pole lathe, the spring pole bobs, the treadle rocks and the chisel runs along. The orbs it binds sit beside it.
+- **Tidier.** Enchanting gem-tipped arrows folds away below the fletching bench. The materials along the top now show only what you hold or what the chosen recipe needs.
+
 ## RS-726 - The Tannery at Work
 
 - **The tanning rack and the leatherworking bench get work screens,** like the wheel and the loom. Every leather and every piece of armour is a card with its picture, how many you can make, and the level it needs.

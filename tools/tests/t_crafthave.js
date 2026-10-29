@@ -17,7 +17,7 @@ module.exports = async page=>{
     G.cookAt = 'hearth'; const ck = buildCook(); out.cook = { raw:/can cook 3/.test(ck), pie:/can make 1/.test(ck) };
     // a bench: the fletching bench, with logs short
     G.bench = 'fletching'; setUi('bench'); await new Promise(res=>setTimeout(res, 50)); const bh = document.body.innerHTML;
-    out.bench = { colours:has(bh, G_) || has(bh, R_), counts:/&times;\d+<\/b><\/button>|×\d+<\/b><\/button>/.test(bh), red:bh.includes(R_.replace('#','')) || /color:\s*#d1495b|rgb\(209, 73, 91\)/.test(bh) };
+    out.bench = { colours:has(bh, G_) || has(bh, R_), counts:/&times;\d+<\/b><\/button>|×\d+<\/b><\/button>|make <b>\d+<\/b>|can make \d+/.test(bh)   /* (RS-727: the bench's work screen counts on its cards) */, red:bh.includes(R_.replace('#','')) || /color:\s*#d1495b|rgb\(209, 73, 91\)/.test(bh) };
     // house building: logs in colour
     out.house = houseCostText({ logs:6 }).includes(R_) || houseCostText({ logs:6 }).includes(G_);
     /* RS-193: things you buy with materials - a boat upgrade, a town project, the smith's upgrades, tools - in colour too */

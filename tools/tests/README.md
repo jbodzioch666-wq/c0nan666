@@ -63,6 +63,7 @@ Screenshots go to `tools/tests/shots/`.
 | rs724 | The spinning wheel and the loom work screens: a tap picks, the wheel spins linen, a drag makes a bowstring, the loom weaves a hat, Ahrim's asks for its book |
 | rs725 | The anvil's Forge from bars tab: bar chips pick the metal, pieces as cards, all daggers from twelve bars with the hammer going, a platebody short of bars says why, nails, silver jewellery only |
 | rs726 | The tanning rack and leatherworking bench work screens: two leathers tanned for gold, dragon leather asks for the hide, leather boots stitched |
+| rs727 | The fletching bench and the staff-carver's lathe work screens: arrows into the quiver, a shortbow carved and strung, a plain staff turned, the fire staff's orb shown; enchanting arrows folds below |
 | zloot | probe: the drops at a few levels - rarity shares, names with their bonuses and tiers, a rare's tooltip text (ZL levels, ZN drops a level) |
 | zloottip | probe: a rare's, a magic piece's and a Ring of Recoil's tooltip, plain and with Alt held, as shots/zloottip0-3.png |
 | rs703 | A spell leaves the staff as it comes forward: a real cast at a foe three tiles off, sampled every frame - the bolt waits about half a second, leaves from the staff's head as it leans ahead, its sound with it; the foe flinches (and a miss splashes) only as it lands; the cast lasts about a second; a foe it kills stands till the bolt lands, and the staff isn't put away mid-cast |
