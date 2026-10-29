@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-755 - Folk of the Land
+
+- **A dungeon's monsters match its land:** each floor of a plain dungeon picks its two monster families from those of the land above. Desert barrows hold scarabs, kalphites and mummies, with kobolds and skeletons; cold ones frost-born, kobolds and goblins; swamp ones leeches, bog beasts and zombies. Forests have spiders and goblins, the jungle spiders and swamp things, volcanic land demons and giants, a haunted wood the dead and the creatures of the night, and the crystal waste kobolds and giants. About three monsters in ten are still the usual mix, and grassland dungeons are as before.
+
 ## RS-754 - Dungeons of the Land
 
 - **Barrows match their land:** a dungeon's mound now takes the look of the land around it. In the desert it's sand over sandstone; in the snow, drifted snow over frosted stone; in a swamp, dark peat. The jungle gives deep moss, volcanic land ash over black basalt, a haunted wood grey turf, and the crystal waste pale grit. Grassland and forest barrows keep their mossy turf.
