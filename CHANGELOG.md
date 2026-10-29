@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-758 - Gate of the Sun
+
+- **The Lost City has its own entrance:** a temple-pyramid of six mossy green tiers in coursed stone, in place of the Guardians' Gate. A corbelled portal with bronze doors stands at its foot, a carved sun on its lintel; steep twin stairs climb either side to a shrine on the top under a pierced roof comb; vines hang from its ledges and leaves have taken its terraces.
+- **Feathered serpents guard the stairs:** a stone head at the foot of each, jaws open, fangs and plumes.
+- **It wakes as you come:** the sun glows gold, the serpents' eyes kindle, and the doors swing in on a warm light. The way in, the taps and walking round it are all as before.
+- **Always in the jungle (new worlds, generator 27):** a Lost City that finds no jungle with room for it now takes open grass, forest or swamp, never desert or snow, and its own jungle grows round it. Over 12 test worlds, 12 of 12 stand in jungle (before, 8 of 12 - one on open tundra).
+
 ## RS-757 - Streets of the Lost City
 
 - **The Lost City's first floor is the city itself,** open to the sky: paved streets with the grass coming up through them, an avenue up to a plaza where two stone guardians stand, and the ruins of houses all round - their walls fallen to half height in places, gaps you can climb through, a doorway in each.
