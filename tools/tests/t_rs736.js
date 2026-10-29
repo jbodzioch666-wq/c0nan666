@@ -50,7 +50,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   console.log(JSON.stringify({ r0, r1, r2, r3, r4, r5 }));
   A(r0.est && r0.doorTile && r0.plots===1 && r0.spots.includes('spot_trophy'), 'a cottage: the parlour with its trophy space and one empty plot: ' + JSON.stringify(r0));
   A(r0.at[0]===r0.door[0] && r0.at[1]===r0.door[1] - 1, 'you come in at the front door');
-  A(r1.ui==='housePlot' && r1.rooms===7, 'the plot lists the seven rooms: ' + JSON.stringify(r1));
+  A(r1.ui==='housePlot' && r1.rooms===8, 'the plot lists the eight rooms: ' + JSON.stringify(r1));
   A(r2.rooms.join()==='parlour@0,0,bedroom@1,0' && r2.planks===0 && r2.spots.includes('spot_bed') && !r2.spots.includes('plot') && r2.free && r2.again===2, 'a bedroom built on the plot: ' + JSON.stringify(r2));
   A(r3.sizes.join()==='House,Manor,Estate' && r3.size===4 && r3.rooms===7 && r3.built===11, 'an estate with every room and every piece of furniture: ' + JSON.stringify(r3));
   A(r3.spots.join()==='plot,plot' && r3.reach===r3.benches, 'every piece of furniture and the last two plots within reach: ' + JSON.stringify(r3));

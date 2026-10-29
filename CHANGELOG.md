@@ -1,5 +1,17 @@
 # Depthcrawl patch notes
 
+## RS-738 - The Farmyard
+
+Your house can have a farmyard now, where you raise chickens and cows for meat.
+
+- **The farmyard:** build it on an empty plot of your house. It needs Construction 20, 15 oak planks and 20 nails, and gives 300 xp. It's a fenced yard of trodden earth with a hen house on legs (with a pop-hole, a ramp and a nest box), a thatched byre with straw underfoot and a hay rack, a feed trough and a stack of hay bales.
+- **Chicks and calves:** buy them at the hen house (25 gold a chick, room for 4) and the byre (150 gold a calf, room for 2). They walk about the yard, and they step aside when you walk into them, like the hens in town.
+- **Feeding:** fill the trough with flax. It holds 60. A chick eats 2 flax a day and night while it grows, and a calf eats 6. They only grow while there's feed in the trough. When it runs dry they stop and you're told. The trough shows how full it is, and how long the feed will last.
+- **Growing up:** a chick becomes a hen in about 15 minutes of play, and a calf a cow in about 45, if they're kept fed. Point at one to see how long it has left. You're told when one grows, and it's swapped for the grown model.
+- **Butchering:** at its pen, a grown hen gives 2 raw chicken and bones. A grown cow gives 4 raw beef, 2 cowhides and big bones.
+- **New foods:** raw chicken cooks into roast chicken at Cooking 5 and heals about 14% of your life. Raw beef cooks into cooked beef at Cooking 20 and heals about 24%. Both have their own pictures in the food bag.
+- **The cows:** a new sculpted model in the same detail as the bears and elk. It has a deep square body with hip bones, a broad face with a wide wet nose, ears that stand out sideways, curved horns, a dewlap, an udder, and a long tail with a switch on the end. There are red, black-and-white and dun cows. Calves are smaller, with no horns.
+
 ## RS-737 - The Kitchen Garden
 
 Your house can have a garden now: a fenced room out of doors where you grow flax and herbs from seed.
