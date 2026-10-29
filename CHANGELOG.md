@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-744 - Release
+
+- **A wave ends when the last beast hits the sand.** The arena declared victory the instant the last monster's life ran out, before your blow had even landed. Now it waits for that monster to fall, then a beat more.
+- **You choose on the sand.** "Fight wave N" brings the next wave into the same arena, entering from the far side, with the crowd still roaring. "Take your winnings and leave" walks you out to the arena master. Walking out through the gate after a won wave also takes your winnings.
+- **You fall when you die.** Your figure topples onto its back with its arms flung out, the world fades to grey with a red edge, and "Oh dear, you are dead!" appears with a **Release** button (Enter or Space work too). The death screen comes only after you release.
+- **Beaten in the arena,** you go down in the sand and the crowd groans. Release, and the arena's people drag you out.
+
 ## RS-743 - The Colosseum
 
 - **The arena is a real arena.** A town's arena waves used to be fought on a random roadside field: grass, a dirt road, and no one watching. Now you walk out onto an oval of raked sand inside a stone podium wall.

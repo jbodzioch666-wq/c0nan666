@@ -4776,7 +4776,7 @@ function checkDeathWard(){
 function hcFatal(){ return !!(G.player && G.player.hardcore && !(G.saveId && typeof saveLocked==='function' && saveLocked(G.saveId))); }
 function playerDies(cause){
   if (arenaKnockout()) return;   /* (RS-743: beaten in a town's arena, you're dragged out, not killed) */
-  G.gameOver = 1; G.deathCause = cause;
+  G.gameOver = 1; G.deathCause = cause; G.playerDown = { at:performance.now(), map:G.map };   /* (RS-744: you fall where you stand, then Release) */
   G.deathWild = (()=>{ try{ return wgDeathIsWild(); }catch(e){ return false; } })();   // the Wilderness keeps what you drop
   const st = pStats(); st.deaths++;
   if (G.player && !hcFatal()) G.deathSplit = deathSplit();
@@ -4803,7 +4803,49 @@ function playerDies(cause){
     G.saveId = null;
   }
 }
+/* (RS-744) DOWN. A death no longer cuts straight to the death screen: you fall where you stood (isoPlayerFall), the world greys and
+   reddens at the edges, and after a moment "Oh dear, you are dead!" and a Release button (Enter or Space too). Release opens the death
+   screen - or, beaten in a town's arena, you're dragged out (arenaCarriedOut) */
+const DOWN_SHOW_MS = 1100;
+function downSync(){
+  const dn = G.playerDown, on = !!(dn && G.player && G.ui==='playing'); let el = document.getElementById('downBox');
+  document.body.classList.toggle('downed', on);
+  if (!on){ if (el) el.remove(); return; }
+  if (!document.getElementById('downCss')){ const st = document.createElement('style'); st.id = 'downCss';
+    st.textContent = `body.downed canvas{filter:grayscale(0.8) brightness(0.8);transition:filter 1.4s}
+#downBox{position:fixed;inset:0;z-index:60;pointer-events:none;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at center,rgba(40,0,0,0) 35%,rgba(70,0,0,0.6) 100%);opacity:0;transition:opacity 1s}
+#downBox.show{opacity:1}#downBox .dbx{pointer-events:auto;text-align:center;padding:18px 28px;opacity:0;transform:translateY(8px);transition:opacity .6s,transform .6s}
+#downBox.ready .dbx{opacity:1;transform:none}#downBox h2{font-family:Cinzel,serif;color:#e8c8a0;font-size:30px;letter-spacing:2px;margin:0 0 6px;text-shadow:0 2px 8px #000}
+#downBox .sub{color:#d8c0a0;margin-bottom:14px;text-shadow:0 1px 4px #000}#downBox .btn{font-size:18px;padding:10px 34px}`; document.head.appendChild(st); }
+  if (!el){ el = document.createElement('div'); el.id = 'downBox';
+    el.innerHTML = `<div class="dbx"><h2>${dn.arena ? 'You are beaten!' : 'Oh dear, you are dead!'}</h2><div class="sub">${dn.arena ? 'You go down in the sand, and the crowd groans.' : esc(G.deathCause ? 'Slain by ' + G.deathCause : 'You have fallen.')}</div><button class="btn primary" onclick="playerRelease()">Release</button></div>`;
+    document.body.appendChild(el); requestAnimationFrame(()=>el.classList.add('show')); }
+  el.classList.toggle('ready', performance.now() - dn.at > DOWN_SHOW_MS);
+}
+function playerRelease(){
+  const dn = G.playerDown; if (!dn || performance.now() - dn.at < DOWN_SHOW_MS*0.6) return; sfx('click');
+  G.playerDown = null; downSync();
+  if (dn.arena) arenaCarriedOut(); else if (G.gameOver===1) setUi('death');
+}
+document.addEventListener('keydown', e=>{ const dn = G.playerDown; if (!dn || G.ui!=='playing') return;
+  if (e.key==='Enter' || e.key===' '){ e.preventDefault(); e.stopPropagation(); playerRelease(); } }, true);
+/* (RS-744) your figure falls where it stands: it topples back, arms flung out, the head lolling, and settles with a bump on the floor */
+function isoPlayerFall(e, dn){
+  const T = THREE, r = e.root, t = (performance.now() - dn.at)/1000, k = Math.min(1, t/0.8), ease = k*k, after = Math.max(0, t - 0.8);
+  if (!e.downed){ e.downed = true; e.rootY0d = r.position.y;
+    const hold = e.holder; hold.updateMatrixWorld(true); const inv = new T.Matrix4().copy(r.matrixWorld).invert(), box = new T.Box3(), v = new T.Vector3();
+    r.traverse(o=>{ if (!o.isMesh || !o.geometry || (o.material && o.material.visible===false)) return; const g = o.geometry; if (!g.boundingBox) g.computeBoundingBox(); const b = g.boundingBox;
+      for (let i=0;i<8;i++){ v.set(i&1 ? b.max.x : b.min.x, i&2 ? b.max.y : b.min.y, i&4 ? b.max.z : b.min.z).applyMatrix4(o.matrixWorld).applyMatrix4(inv); box.expandByPoint(v); } });
+    e.dcornP = box.isEmpty() ? null : [0,1,2,3,4,5,6,7].map(i=>new T.Vector3(i&1 ? box.max.x : box.min.x, i&2 ? box.max.y : box.min.y, i&4 ? box.max.z : box.min.z)); }
+  const R = e.rig; if (R && R.arms){ const [A, B] = R.arms; for (const [J, sd] of [[A, 1], [B, -1]]) if (J && J.sh){ J.sh.rotation.z = sd*ease*1.25; J.sh.rotation.x = -ease*0.5; if (J.el) J.el.rotation.x = -ease*0.3; } }
+  if (R && R.head) R.head.rotation.x = -ease*0.35;
+  r.rotation.x = -ease*1.5; r.rotation.z = ease*0.12;
+  if (e.dcornP){ const dc = e.dcorn, y0 = e.rootY0; e.dcorn = e.dcornP; e.rootY0 = e.rootY0d; m3dToppleLift(e); e.dcorn = dc; e.rootY0 = y0; }
+  if (after > 0) r.position.y += Math.abs(Math.sin(after*9))*0.05*Math.exp(-after*5);
+}
+function isoPlayerUp(e){ const r = e.root; r.rotation.x = 0; r.rotation.z = 0; r.position.y = e.rootY0d || 0; e.downed = false; }
 function continueAfterDeath(walkToGrave){
+  G.playerDown = null;
   if (hcFatal()) return; // hardcore has no continuing - use descendAgain()
   G.gameOver = 0; if (G.player.hardcore) logMsg('your lock on this adventurer held - a hardcore death, survived', 'magic');   /* (RS-407) */
   const p = G.player, ds = G.deathSplit || deathSplit();
@@ -7676,6 +7718,7 @@ function tryMove(dx,dy){
       break;
     }
     case T_FLEE: { leavingFloor=true;
+      if (G.gameMode===2 && G.fieldWon && G.arenaTheme==='colosseum' && G.arenaRun){ arenaLeave(); break; }   /* (RS-744: a won wave's winnings) */
       if (G.gameMode===2 && G.fieldWon){ fieldLeave(); break; }   /* (RS-382: the fight won, you walk off the field) */
       const go = ()=>{ if (G.wevFight && G.wevFight.kind==='townarena'){ arenaYield(); return; }   /* (RS-743: out through the gate - you yield) */
         if (G.wevFight && G.sqReturn){ G.wevFight = null; logMsg(G.cellar ? 'you climb back up out of the cellar' : 'you break off the fight and head back', 'new'); sqReturnIndoors(); return; }
@@ -7910,7 +7953,7 @@ function loadGame(id){
   G.questBoard = (G.gameMode===3 && G.questBoards[questTownKey(G.owPos.x,G.owPos.y)]) || data.questBoard||[];
   G.tavernCursor = data.tavernCursor||(1+rn(5));
   G.log = data.log||[];
-  G.gameOver = 0;
+  G.gameOver = 0; G.playerDown = null;
   G.lastFoe = null;
   G.vault = null;
   G.isBossFloor = 0;
@@ -8011,7 +8054,7 @@ function setWorldSizeTier(tierId){
 }
 function startGame(name){
   G.log = [];
-  G.gameOver = 0;
+  G.gameOver = 0; G.playerDown = null;
   G.regenTick = 0;
   G.tavernCursor = 1+rn(5);
   G.isBossFloor = 0;
@@ -22321,6 +22364,20 @@ function generateColosseum(){
   const p = G.player, gy0 = G.arenaDeco[C.cx].indexOf('gate'); p.x = C.cx; p.y = gy0 - 2; p.facing = 0;
   placeCompanionNearPlayer(); placeSummonNearPlayer(); for (const m of ((p && p.minions)||[])) necroPlace(m);
 }
+// (RS-744) a beast of a wave comes on from the far side of the sand, not at your elbow
+function arenaFar(m){ const p = G.player, d = (x, y)=>Math.max(Math.abs(x - p.x), Math.abs(y - p.y)); if (!m || d(m.x, m.y) >= 5) return m;
+  const ok = []; for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++) if (G.map[x][y]===T_FLOOR && d(x, y) >= 6 && !G.mon.some(o=>o!==m && o.alive && o.x===x && o.y===y)) ok.push([x, y]);
+  if (ok.length){ const [x, y] = ok[rn(ok.length)]; m.x = x; m.y = y; } return m; }
+/* (RS-744) the wave is won when the last of it lies in the sand: no blow still in the air (foePending), every figure fallen (its death
+   played to the ground), and a moment's pause - it was won the instant the last one's life ran out, before the blow even landed */
+function arenaSettled(){
+  if (foePending()) return false; const now = performance.now(); if (!G.arenaClearAt) G.arenaClearAt = now; const t = now - G.arenaClearAt;
+  if (t > 5000) return true; if (t < 700) return false;
+  for (const m of G.mon){ const e = typeof M3D!=='undefined' && M3D.inst && M3D.inst.get(m); if (m._killAt!=null || m._hitAt!=null || (e && e.holder && e.holder.parent && e.dying >= 0 && e.dying < 1.15)) return false; }
+  return true;
+}
+// taking your winnings: out of the arena, beside its master
+function arenaLeave(){ G.arenaRun = null; G.wevFight = null; G.mon = []; enterVillage(); arenaPlaceAtMaster(); setUi('playing'); logMsg('you take your winnings and walk out of the arena to the crowd\'s applause', 'good'); }
 // the crowd's roar: louder for a kill, a groan when you go down (audio and the cheering both follow it)
 function arenaRoar(k){ if (!(G.gameMode===2 && G.arenaTheme==='colosseum')) return; G.arenaRoarAt = performance.now(); G.arenaRoarK = k || 1;
   try{ const ctx = AUD.ctx; if (!ctx || ctx.state!=='running' || !_gains.amb) return; const at = ctx.currentTime + 0.02, v = Math.min(1, k || 1);
@@ -22343,11 +22400,11 @@ function arenaYield(){
 // beaten in the arena: no death - the arena's people drag you out, and the run ends
 function arenaKnockout(){
   if (!(G.gameMode===2 && G.wevFight && G.wevFight.kind==='townarena' && G.player)) return false;
-  G.player.hp = 1; arenaRoar(-1); if (!G.arenaKO){ G.arenaKO = true; setTimeout(arenaCarriedOut, 0); }
+  G.player.hp = 1; if (!G.arenaKO){ arenaRoar(-1); G.arenaKO = true; G.gameOver = 3; G.playerDown = { at:performance.now(), map:G.map, arena:true }; }   /* (RS-744: you go down; Release and you're dragged out) */
   return true;
 }
 function arenaCarriedOut(){
-  if (!G.arenaKO) return; G.arenaKO = false; if (!(G.gameMode===2 && G.wevFight && G.wevFight.kind==='townarena')) return;
+  if (!G.arenaKO) return; G.arenaKO = false; G.playerDown = null; if (G.gameOver===3) G.gameOver = 0; if (!(G.gameMode===2 && G.wevFight && G.wevFight.kind==='townarena')) return;
   const run = G.arenaRun, a = arenaRec(), w = run ? run.wave : 0, p = G.player; G.wevFight = null; G.arenaRun = null; G.mon = [];
   enterVillage(); arenaPlaceAtMaster(); p.hp = Math.max(p.hp, Math.ceil(p.maxHp*0.25));
   wevDialog('Beaten!', `You go down in the sand of wave ${w + 1}, and the crowd groans. The arena's people drag you out through the gate and patch you up.<br>Your run ends with ${w} wave${w===1 ? '' : 's'} won (your best: ${a.best}).`, [['Get up', ()=>{}]], 'the arena');
@@ -25911,11 +25968,15 @@ function buildArenaUi(){
 function arenaFight(){
   const info = townInfo(); if (!G.arenaRun || G.arenaRun.key!==info.key) G.arenaRun = { key:info.key, wave:0 };
   const wave = G.arenaRun.wave + 1, kinds = Object.keys(WEV_CAMP_KINDS);
-  wevFightStart('townarena', wave, L=>{
+  const build = L=>{
     const n = Math.min(5, 1 + Math.floor(wave/2)), lv = clampCb(L + Math.floor(wave/3)*CB_PER_TIER);
-    for (let i=0;i<n;i++) wevMon(wevCampEntry(kinds[(wave + i) % kinds.length], lv), lv);
+    for (let i=0;i<n;i++) arenaFar(wevMon(wevCampEntry(kinds[(wave + i) % kinds.length], lv), lv));
     if (wave % 5===0) upgradeToNamedElite(G.mon[0]); else if (wave >= 3) upgradeToElite(G.mon[0]);
-  });
+  };
+  G.arenaClearAt = 0;
+  if (G.gameMode===2 && G.arenaTheme==='colosseum'){   /* (RS-744: already on the sand - the next wave comes on where you stand) */
+    G.mon = []; G.fieldWon = false; build(cbLvl()); G.wevFight = { kind:'townarena', id:wave }; setUi('playing'); renderGame(); }
+  else wevFightStart('townarena', wave, build);
   logMsg(`the beasts' gate rattles up - wave ${wave}! The crowd roars`, 'new'); arenaRoar(0.8);
 }
 function townArenaWon(f){
@@ -25924,8 +25985,8 @@ function townArenaWon(f){
   const gold = roundH((40 + run.wave*40 + cbT()*5)*goldFindMult()); p.gold += gold;
   const info = townInfo(), titles = { 5:'Arena Fighter', 10:'Champion of '+info.name, 15:'Grand Champion' }, t = titles[run.wave];
   let extra = ''; if (t && !a.titles.includes(t)){ a.titles.push(t); extra = ` You are named <b>${esc(t)}</b>!`; sfx('achievement'); }
-  enterVillage(); arenaPlaceAtMaster();   /* (RS-743: beside the arena master) */
-  wevDialog(`Wave ${run.wave} cleared!`, `The crowd throws coins: <b>${gold} gold</b>.${extra}`, [[`Fight wave ${run.wave+1}`, ()=>arenaFight()], ['Take your winnings and rest', ()=>{ G.arenaRun = null; }]], 'the arena');
+  arenaRoar(1);   /* (RS-744: you stay on the sand to choose - the next wave, or your winnings and the way out) */
+  wevDialog(`Wave ${run.wave} cleared!`, `The crowd throws coins: <b>${gold} gold</b>.${extra}`, [[`Fight wave ${run.wave+1}`, ()=>arenaFight()], ['Take your winnings and leave', ()=>arenaLeave()]], 'the arena');
   checkAchievements(); return true;
 }
 // ---- minigames: the archery range, darts and the cook-off at the tavern, the fishing contest at the harbour ----
@@ -48076,8 +48137,10 @@ function isoSyncPlayer(){
   const lunge = Math.max(strike, C.fol*0.6)*0.2 - hurt*0.1;   // step into the blow and follow it through; rock back when you're hit
   e.holder.position.set(e.pos.x + Math.sin(e.face)*lunge, 0, e.pos.y + Math.cos(e.face)*lunge); e.holder.rotation.y = e.face;
   const onPortal = isoPortalTick(e), onStair = onPortal!=null ? onPortal : isoStairTick(e);   /* (RS-592; RS-609: or into a portal) */
-  m3dPoseHumanoid(e.rig, FP.t + e.seed, onStair ? 1 : moving, wind, strike, hurt*0.8, e);   /* (RS-702: the cast's own turn and lean are in rsCastPose - added here as a jump of wind, it snapped the body round) */
-  rsPlayerFx(e, FP.t + e.seed, moving, true);
+  const down = G.playerDown && G.playerDown.map===G.map ? G.playerDown : null;   /* (RS-744: fallen) */
+  m3dPoseHumanoid(e.rig, FP.t + e.seed, down ? 0 : onStair ? 1 : moving, down ? 0 : wind, down ? 0 : strike, down ? 0 : hurt*0.8, e);   /* (RS-702: the cast's own turn and lean are in rsCastPose - added here as a jump of wind, it snapped the body round) */
+  rsPlayerFx(e, FP.t + e.seed, down ? 0 : moving, true);
+  if (down){ isoPlayerFall(e, down); return; } else if (e.downed) isoPlayerUp(e);
   const gw = G.gather && G.gather.mode===1 && G.gather.o.k==='mining' && G.gather.o.vein ? G.gather.o : null;
   if (gw){
     rsHoldTool(e, 'pick');
@@ -49178,7 +49241,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-743';
+const GAME_VERSION = 'rs-744';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -49235,7 +49298,7 @@ function titleNewWorld(id){
   if (p.sq) for (const k in p.sq) if (p.sq[k] && p.sq[k].state==='active') delete p.sq[k];   // (side quests half done in the old world; finished ones stay finished)
   p.worldNo = (p.worldNo||1) + 1;
   G.saveId = 'c'+Date.now().toString(36)+rn(1e6).toString(36); G.createdAt = Date.now();
-  G.log = []; G.gameOver = 0; G.isBossFloor = 0; G.owZoomedOut = false; G.owFerry = null; G.interior = null; G.townState = null; G.gather = null; G.routeWalk = null;
+  G.log = []; G.gameOver = 0; G.playerDown = null; G.isBossFloor = 0; G.owZoomedOut = false; G.owFerry = null; G.interior = null; G.townState = null; G.gather = null; G.routeWalk = null;
   G.gameMode = 0; G.siteKind = 'dungeon'; G.depth = 1; G.dungeonSlot = 0; G.dungeonModifier = null; G.dungeonEntrance = { x:0, y:0 };
   G.questBoard = []; G.questBoards = {}; G.weather = 'clear';
   G.ow.overrides = {}; G.ow.visitedTowns = []; G.ow.genVer = OW_GEN_VER;
@@ -52517,7 +52580,8 @@ function frameLoop(ts){
     // so nothing happens to you while you're just standing there deciding
     if (G.ui==='playing' && !G.gameOver && G.gameMode===2){
       const allDead = G.mon.length>0 && G.mon.every(m=>!m.alive);
-      if (allDead && !G.fieldWon){ G.fieldWon = true;   /* (RS-382: paid once; the field stays open until you walk off it) */
+      if (allDead && !G.fieldWon && G.wevFight && G.wevFight.kind==='townarena' && !arenaSettled()){}   /* (RS-744: not till the last of the wave lies in the sand) */
+      else if (allDead && !G.fieldWon){ G.fieldWon = true;   /* (RS-382: paid once; the field stays open until you walk off it) */
         if (!G.siegeWar) logMsg("the field falls quiet - you've won the fight", 'good');   /* (RS-418: a siege's waves come on until it's done) */
         // a terrain set-piece (see triggerOverworldEncounter/terrainSetPieceEncounter)
         // pays out once, on clearing the whole encounter, rather than per
@@ -52541,7 +52605,8 @@ function frameLoop(ts){
     statsTick(Math.min(1, (ts - (frameLoop.lt||ts))/1000)); frameLoop.lt = ts;
     cntTick();
     gfxApply();
-    if (G.gameOver===1 && G.ui==='playing') setUi('death');
+    if (G.gameOver===1 && G.ui==='playing' && !G.playerDown) G.playerDown = { at:performance.now(), map:G.map };
+    downSync();   /* (RS-744: the death screen waits for Release) */
     townRealtimeTick(performance.now());
     HUDT.inFrame = true; try{ renderGame(); } finally { HUDT.inFrame = false; }   /* (RS-399: the frame's render rebuilds the HUD on its own clock) */
     // safety-net autosave, catches anything that changed state outside a

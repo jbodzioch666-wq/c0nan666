@@ -24,7 +24,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   A(r1.crowd > 200 && r1.inScene, 'the stands are full: ' + JSON.stringify(r1));
   A(r1.roar > 0.5, 'the crowd roars at a kill: ' + JSON.stringify(r1));
   /* beaten: dragged out, not killed */
-  const r2 = await ev(async ()=>{ setUi('playing'); G.arenaRun = null; arenaFight(); setUi('playing'); const p = G.player; G.arenaRun.wave = 3; p.hp = 0; playerDies('a goblin'); const was = { over:!!G.gameOver, hp:p.hp };
+  const r2 = await ev(async ()=>{ setUi('playing'); G.arenaRun = null; arenaFight(); setUi('playing'); const p = G.player; G.arenaRun.wave = 3; p.hp = 0; playerDies('a goblin'); const was = { over:G.gameOver===1, hp:p.hp }; G.playerDown.at -= 5000; playerRelease();   /* (RS-744: you go down, then Release) */
     await new Promise(r=>setTimeout(r, 50)); const n = G.villageNpcs.find(o=>o.service==='arena');
     return { was, mode:G.gameMode, ui:G.ui, title:G.wevDlg && G.wevDlg.title, run:G.arenaRun, hp:p.hp, max:p.maxHp, near:Math.max(Math.abs(p.x - n.x), Math.abs(p.y - n.y)), over:!!G.gameOver }; });
   console.log(JSON.stringify(r2));
@@ -38,10 +38,10 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   console.log(JSON.stringify(r3));
   A(r3.mode===3 && !r3.run && r3.near===1 && /yield/.test(r3.log), 'out through the gate you yield, back in the town: ' + JSON.stringify(r3));
   /* a won wave: beside the arena master */
-  const r4 = await ev(()=>{ setUi('playing'); arenaFight(); setUi('playing'); for (const m of G.mon){ m.alive = 0; m.hp = 0; } const won = wevArenaWon(); const p = G.player, n = G.villageNpcs.find(o=>o.service==='arena');
-    return { won, mode:G.gameMode, near:Math.max(Math.abs(p.x - n.x), Math.abs(p.y - n.y)), floor:G.map[p.x][p.y]===T_FLOOR, best:arenaRec().best }; });
+  const r4 = await ev(()=>{ setUi('playing'); arenaFight(); setUi('playing'); for (const m of G.mon){ m.alive = 0; m.hp = 0; } const won = wevArenaWon(), stay = G.gameMode===2 && G.ui==='wevent'; wevChoose(1); const p = G.player, n = G.villageNpcs.find(o=>o.service==='arena');
+    return { won, stay, mode:G.gameMode, near:Math.max(Math.abs(p.x - n.x), Math.abs(p.y - n.y)), floor:G.map[p.x][p.y]===T_FLOOR, best:arenaRec().best }; });
   console.log(JSON.stringify(r4));
-  A(r4.won && r4.mode===3 && r4.near===1 && r4.floor && r4.best >= 1, 'a won wave: back beside the arena master: ' + JSON.stringify(r4));
+  A(r4.won && r4.stay && r4.mode===3 && r4.near===1 && r4.floor && r4.best >= 1, 'a won wave: back beside the arena master: ' + JSON.stringify(r4));
   /* the town's arena: its whole ring drawn */
   await ev(()=>{ setUi('playing'); const p = G.player, n = G.villageNpcs.find(o=>o.service==='arena'); p.x = n.x; p.y = n.y + 7; if (G.map[p.x][p.y]!==T_FLOOR) p.y = n.y - 1; });
   await frames(40); await page.screenshot({ path:SHOTS + '/rs743_town.png' });

@@ -39,8 +39,8 @@ module.exports = async page=>{
     // the arena
     setUi('arena'); A(document.getElementById('overlay').innerHTML.includes('THE ARENA'), 'arena screen');
     arenaFight(); A(G.gameMode===2 && G.mon.length >= 1 && G.wevFight.kind==='townarena', 'arena fight');
-    for (const m of G.mon){ m.alive = 0; m.hp = 0; } A(wevArenaWon(), 'arena won'); A(G.gameMode===3 && G.ui==='wevent', 'back in town with a dialog');
-    out.arena = G.wevDlg.title; wevChoose(1); A(!G.arenaRun && arenaRec().best===1, 'arena record');
+    for (const m of G.mon){ m.alive = 0; m.hp = 0; } A(wevArenaWon(), 'arena won'); A(G.gameMode===2 && G.ui==='wevent', 'a dialog on the sand (RS-744)');
+    out.arena = G.wevDlg.title; wevChoose(1); A(G.gameMode===3 && !G.arenaRun && arenaRec().best===1, 'winnings taken, back in town; arena record');
     // games and gambling
     G.gamesAt = 'range'; setUi('games'); A(/TRAINING RANGE/.test(document.getElementById('overlay').innerHTML), 'the range is a training range (RS-333)'); out.archery = 'training range';
     G.gamesAt = 'tavern'; setUi('games'); mgDarts(); for (let i=0;i<3;i++) dartsThrow(0, -0.6); while (G.darts.stage!=='done') dartsTheirs(); out.darts = G.mgLast;   /* (RS-391: a real board) */ skAdd('c_shrimp', 2); mgCook(); out.cook = G.mgLast; A(mgRec().cook > 0, 'cook-off');
