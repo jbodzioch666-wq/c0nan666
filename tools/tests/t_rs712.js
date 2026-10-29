@@ -51,7 +51,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   await page.keyboard.press('Escape'); await wait(150); out.esc = await ev(()=>G.ui);
   console.log(JSON.stringify(out));
   const A = (c, m)=>{ if (!c) throw new Error('assert: ' + m + ' ' + JSON.stringify(out)); };
-  A(out.bench.ui==='bench' && out.bench.forge && out.bench.tab==='forge' && !out.bench.wide, 'an anvil bench opens the anvil on its Forge tab');
+  A(out.bench.ui==='bench' && out.bench.forge && out.bench.tab==='forge' && out.bench.wide, 'an anvil bench opens the anvil on its Forge tab');
   A(out.work.tab==='work' && out.work.es===4 && /CAN BREAK DOWN 1/.test(out.work.groups) && /WORN/.test(out.work.groups) && /IN YOUR BAG 1/.test(out.work.groups) && out.work.wide, 'Work a piece: the essences, and your pieces by what can break down');
   A(out.placed.on && out.placed.lines >= 3 && out.placed.opts && out.placed.pre >= 6 && out.placed.txt && out.placed.brk, 'a piece dragged onto the anvil: each bonus with what Change and Law make of it, and what it could roll');
   A(out.law.up && out.law.spent===1, 'an Essence of Law dragged onto a bonus raises it a tier');

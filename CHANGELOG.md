@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## RS-725 - At the Anvil
+
+- **Forge from bars, remade.** The anvil's forging tab was a crowded block of buttons for every bar at once. It now works like the furnace: your bars sit along the top, and tapping one picks the metal.
+- **Pieces as cards.** The chosen metal's weapons, armour and small work (nails, and cannonballs from steel) are listed down the left. Each shows its picture, how many bars it takes and how many you can make. Silver shows its rings and amulets.
+- **Forge 1, 5, 10 or all.** Forging now has the same count buttons as everything else, and "all" says how many you'll get.
+- **The hammer at work.** The piece sits on the anvil while you forge it, glowing hot, with the hammer swinging and sparks flying.
+- **The numbers on the right:** the bars it takes against what you hold, the piece's bonuses, how much better a hand-forged one comes out at your level, and your chance to save a bar.
+- **Tidier.** The godsword forge and gear upgrades fold away below and only show when you have something for them.
+
 ## RS-724 - Wheel and Loom
 
 - **The spinning wheel and the loom get work screens,** like the furnace's. Everything the bench makes is down the left in its rows (Wizard robes, Splitbark robes and so on), each with its picture, how many you can make, and the level or recipe book it needs if it's locked.

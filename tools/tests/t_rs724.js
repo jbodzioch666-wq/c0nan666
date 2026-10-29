@@ -39,7 +39,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   console.log(JSON.stringify({ r0, r1, r2, r3, hov, r4, r5, r6, r7 }));
   A(r0.title==='SPINNING WHEEL' && r0.cards===2 && r0.wide && r0.stage, 'the spinning wheel: two recipes, the wheel, wide: ' + JSON.stringify(r0));
   A(r1==='Linen cloth' && r2.pour && r2.linen >= 1, 'a tap picks linen and the wheel spins it: ' + JSON.stringify(r2));
-  A(r3.q===0 && r3.linen===4 && r3.flax===8, 'four linen from four flax: ' + JSON.stringify(r3));
+  A(r3.q===0 && r3.linen===4 && r3.flax >= 8, 'four linen from up to four flax (Crafting 99 may keep some): ' + JSON.stringify(r3));
   A(hov && r4.bow===1 && !r4.ghost, 'dragging the bowstring onto the wheel makes one: ' + JSON.stringify(r4));
   A(r5.rows.every(r=>/robes$/.test(r)) && r5.weave && /Hat/.test(r5.right) && /IT TAKES/.test(r5.right), 'the loom weaves robes: ' + JSON.stringify(r5));
   A(r6.made && /Hat/.test(r6.made) && r6.crafted, 'a hat woven at the loom: ' + r6.made);
