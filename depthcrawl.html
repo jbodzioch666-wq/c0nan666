@@ -4812,8 +4812,8 @@ function downSync(){
   document.body.classList.toggle('downed', on);
   if (!on){ if (el) el.remove(); return; }
   if (!document.getElementById('downCss')){ const st = document.createElement('style'); st.id = 'downCss';
-    st.textContent = `body.downed canvas{filter:grayscale(0.8) brightness(0.8);transition:filter 1.4s}
-#downBox{position:fixed;inset:0;z-index:60;pointer-events:none;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at center,rgba(40,0,0,0) 35%,rgba(70,0,0,0.6) 100%);opacity:0;transition:opacity 1s}
+    st.textContent = `body.downed canvas{filter:grayscale(0.8) brightness(0.8);transition:filter 1.4s}body.downed #townWelcome,body.downed #v3banner{display:none}
+#downBox{position:fixed;inset:0;z-index:60;pointer-events:none;display:flex;align-items:flex-start;justify-content:center;padding-top:11vh;box-sizing:border-box;background:radial-gradient(ellipse at center,rgba(40,0,0,0) 35%,rgba(70,0,0,0.6) 100%);opacity:0;transition:opacity 1s}
 #downBox.show{opacity:1}#downBox .dbx{pointer-events:auto;text-align:center;padding:18px 28px;opacity:0;transform:translateY(8px);transition:opacity .6s,transform .6s}
 #downBox.ready .dbx{opacity:1;transform:none}#downBox h2{font-family:Cinzel,serif;color:#e8c8a0;font-size:30px;letter-spacing:2px;margin:0 0 6px;text-shadow:0 2px 8px #000}
 #downBox .sub{color:#d8c0a0;margin-bottom:14px;text-shadow:0 1px 4px #000}#downBox .btn{font-size:18px;padding:10px 34px}`; document.head.appendChild(st); }
@@ -7940,6 +7940,7 @@ function loadGame(id){
   if (G.player && Array.isArray(G.player.ferryTo)){ G.owPos.x = G.player.ferryTo[0]; G.owPos.y = G.player.ferryTo[1]; delete G.player.ferryTo; }   /* (RS-322: saved under sail - you come ashore at the far landing) */
   try{ ISO.rot = ((G.player && G.player.viewRot)|0) % 4; VIEW.yaw = null; }catch(e){}   // (RS-140) the camera turn you left it at
   G.ow.wg = data.owWg || null;   // the world's events (see SECTION: WORLD EVENTS)
+  try{ ecoRehome(); }catch(e){ console.error(e); }   /* (RS-746) */
   G.gameMode = data.gameMode||0;
   G.depth = data.depth||1;
   G.dungeonMaxDepth = data.dungeonMaxDepth||1;
@@ -26816,12 +26817,29 @@ function ecoPropSummary(){
   let inc = 0; const t = G.ow.wg.towns; for (const k in t) if (t[k].prop && Object.keys(t[k].prop).length) inc += ecoIncome(k);
   return `<div class="muted" style="font-size:12px;margin-top:8px;">You own ${n} propert${n===1 ? 'y' : 'ies'}, earning ${inc.toLocaleString()} gold a day into this bank (${(G.player.propEarned||0).toLocaleString()} so far).</div>`;
 }
+/* (RS-746) property bought in a town whose place on the map has since moved (its record keyed by the old place) goes to the nearest town */
+function ecoRehome(){
+  const t = G.ow && G.ow.wg && G.ow.wg.towns, live = townList(); if (!t || !live.length) return 0; let n = 0;
+  for (const k of Object.keys(t)){ const r = t[k]; if (!r || !r.prop || !Object.keys(r.prop).length) continue; const [x, y] = k.split(',').map(Number);
+    if (live.some(q=>q.x===x && q.y===y)) continue;
+    let best = live[0], bd = 1e9; for (const q of live){ const d = Math.hypot(q.x - x, q.y - y); if (d < bd){ bd = d; best = q; } }
+    const dst = townRec(best.x + ',' + best.y); dst.prop = Object.assign(dst.prop || {}, r.prop); if (dst.propDay===undefined) dst.propDay = r.propDay; delete r.prop; delete r.propDay; n++; }
+  return n;
+}
+/* (RS-746) what you own in the other towns, on every agent's page */
+function ecoPropElsewhere(here){
+  const t = (G.ow && G.ow.wg && G.ow.wg.towns) || {}, ks = Object.keys(t).filter(k=>k!==here && t[k].prop && Object.keys(t[k].prop).length); if (!ks.length) return '';
+  let inc = 0; const rows = ks.map(k=>{ const [x, y] = k.split(',').map(Number), d = ecoIncome(k); inc += d;
+    return `<div class="shoprow"><span><b>${esc(o3TownName(x, y))}</b></span><span class="desc">${esc(ECO_PROPS.filter(pp=>t[k].prop[pp.id]).map(pp=>pp.nm.toLowerCase()).join(', '))}</span><span class="muted">${d} gold a day</span><span><span style="color:${COL.green}">yours</span></span></div>`; }).join('');
+  return `<h4 style="color:var(--ink-faint);margin:12px 0 6px;">YOUR PROPERTY IN OTHER TOWNS</h4>${rows}`;
+}
 function ecoPropHtml(){
   const info = townInfo(), pr = ecoProps(info.key), p = G.player;
   const rows = ECO_PROPS.filter(pp=>!pp.port || info.port).map(pp=>`<div class="shoprow"><span><b>${esc(pp.nm)}</b></span><span class="desc">${esc(pp.d)} &middot; ${pp.inc} gold a day</span>
     <span>${pr[pp.id] ? '<span style="color:'+COL.green+'">yours</span>' : `<button class="btn" ${p.gold >= pp.price ? '' : 'disabled'} onclick="ecoBuyProp('${pp.id}')">buy (${pp.price.toLocaleString()} gold)</button>`}</span></div>`).join('');
   return `<h4 style="color:var(--ink-faint);margin:12px 0 6px;">PROPERTY IN ${esc(info.name.toUpperCase())}</h4>${rows}
-    <div class="muted" style="font-size:12px;">Income goes into your bank every day (more where the town counts you a friend). ${ecoPropCount() ? `Your properties here earn ${ecoIncome(info.key)} gold a day.` : ''}</div>`;
+    <div class="muted" style="font-size:12px;">Income goes into your bank every day (more where the town counts you a friend). ${Object.keys(pr).length ? `Your properties here earn ${ecoIncome(info.key)} gold a day.` : ''}${ecoPropCount() ? ` You own ${ecoPropCount()} in all, and they have earned ${(p.propEarned||0).toLocaleString()} gold so far.` : ''}</div>
+    ${ecoPropElsewhere(info.key)}`;
 }
 function ecoBuyProp(id){
   const info = townInfo(), pp = ECO_PROPS.find(x=>x.id===id), pr = ecoProps(info.key), p = G.player;
@@ -49242,7 +49260,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-745';
+const GAME_VERSION = 'rs-746';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

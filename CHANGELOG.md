@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-746 - Property on the Books
+
+- **The Release button stands high on the screen.** "Oh dear, you are dead!" and its Release button now sit near the top, not in the middle where they covered your fallen figure, and the town's name banner no longer shows through them.
+- **Every estate agent lists all your property.** Hollis's page now shows what you own in every other town - each stall, set of rooms, share and warehouse, and what it earns a day - and how much you own in all and have earned so far. A stall bought in one town no longer looks lost when you talk to the agent in the next.
+- **Property follows its town.** If a town's place on the map ever changes, what you bought there moves with it to the nearest town instead of being left at the old spot. (A bought property was already kept through a save, a reload and a load; a test now checks that it stays that way.)
+
 ## RS-745 - The Yard's Bench
 
 - **The carpentry bench is in the Boatyard.** It stands in the back corner, under the oars, next to the saw pit where you cut your planks. Walk up to it to saw 4 logs into a flatpack of furniture for Construction xp, and sell the flatpacks to the furniture dealer for gold. "Make as many as you can" still works through a whole stack.
