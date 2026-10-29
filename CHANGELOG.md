@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-718 - On the Range
+
+You can now watch your food cook on the Cooks' Guild range, as you can on a hearth or a campfire.
+
+- **In the pan.** Cooking at the range sets a cast-iron skillet on its hotplate in place of its idle pan. Each fish, steak or lobster drops into it raw and browns to done as it cooks, with steam rising off it.
+- **The room stays in view.** While the food cooks, the range's menu shrinks to the small card in the corner, so the hall stays in sight. It used to cover the screen with the full list. The card is titled "The Cooks' Guild range", and the full menu says the range burns far less.
+
 ## RS-717 - Masters of the Hall
 
 The guild hall's banners on poles are gone. Each guild now has a master you can talk to.
