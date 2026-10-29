@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-751 - Slung Over the Cape
+
+- **Gear on your back lies over your cape.** A two-handed sword, a staff, a bow or a shield on your back now sits on top of the cape instead of sinking into it. Below the shoulder blades the cape hangs out over your hips, so the lower end of anything slung there used to run into the cloth and poke out the other side. Each piece is now tilted and moved out just enough to lie on the cape.
+- **The cape is strapped flat under it.** Where gear crosses your back, the cloth is pressed flat between the gear and your back, and it streams out freely below. This holds while you walk and run as well as when you stand.
+- In a test of four setups (2h sword, staff and shield, sword and shield, bow), the points of cape showing through the gear fell from 9 to 42 per setup to none, standing or walking.
+
 ## RS-750 - A House Is an Investment
 
 - **A cottage now costs 50,000 gold** (it was 2,500). Owning a house is a goal to save toward. In the economy sim's shopping list it now costs half as much as a full set of dragon tools, and more than three towns' worth of town projects. Growing it into a house, manor or estate costs the same as before.
