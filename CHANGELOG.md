@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-752 - Tucked Tails and Whole Shadows
+
+- **A tiefling's tail stays under a long robe.** In a robe that reaches the ankles, the tail hangs close to the legs and swishes only a little, so it stays inside the robe. It used to swing out through the skirt and the cape over it. Without a robe it swishes as before, and a cape still drapes over it.
+- **Willows cast a whole shadow.** A willow's canopy was an open dome, and at some hours its shadow came out as a crescent. The dome is now closed underneath (you never see that side), so the shadow is a full round patch at every hour. This covers the willows you chop and the scenery willows in swamps and by rivers.
+
 ## RS-751 - Slung Over the Cape
 
 - **Gear on your back lies over your cape.** A two-handed sword, a staff, a bow or a shield on your back now sits on top of the cape instead of sinking into it. Below the shoulder blades the cape hangs out over your hips, so the lower end of anything slung there used to run into the cloth and poke out the other side. Each piece is now tilted and moved out just enough to lie on the cape.
