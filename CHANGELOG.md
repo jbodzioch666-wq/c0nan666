@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-717 - Masters of the Hall
+
+The guild hall's banners on poles are gone. Each guild now has a master you can talk to.
+
+- **Six guild masters.** Sir Tiffany of the Warriors' Guild, Leon the Fletcher of the Rangers', Archmage Sedridor of the Wizards', Doric of the Miners', the Master Crafter and the Champion stand where the banners stood, each dressed for their guild. A master sends you away until you qualify ("Come back when you have Attack + Strength 50"). Once you do, they offer the guild's daily training or its benches.
+- **The Cooks' Guild range.** The Cooks' Guild is now a black iron range against the west wall, with its grate glowing, a stewpot on the hotplate and a flue up to the rafters. Use it to cook straight away, burning far less, from Cooking 32. Below that, a cook waves you off.
+- **Dressed for the guild.** In every town the masters take the town's face and skin but keep their guild's colours, robes and weapons.
+
 ## RS-716 - Crown Jewels
 
 Unique rings and amulets took a random jewel and grew whatever stats it had. A Band of Vitality could come out a Sapphire Ring of nothing but magic.

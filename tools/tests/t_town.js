@@ -33,7 +33,7 @@ module.exports = async page=>{
     skP().skills.attack = SK_XP[40]; skP().skills.strength = SK_XP[40]; rsSync(); const ax = skP().skills.attack;
     townGuild('warriors'); wevChoose(0); A(skP().skills.attack > ax, 'sparred');
     townGuild('warriors'); wevChoose(0); const ax2 = skP().skills.attack; A(ax2===skP().skills.attack, 'once a day');
-    skP().skills.cooking = SK_XP[40]; townGuild('cooks'); wevChoose(0); A(G.ui==='cook' && G.cookAt==='guild', 'guild range'); setUi('playing');
+    skP().skills.cooking = SK_XP[40]; townGuild('cooks'); A(G.ui==='cook' && G.cookAt==='guild', 'guild range'); setUi('playing');
     for (let i=0;i<4;i++){ renderGame(); await new Promise(r=>setTimeout(r, 25)); }
     exitInterior();
     // the arena
