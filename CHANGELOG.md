@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-726 - The Tannery at Work
+
+- **The tanning rack and the leatherworking bench get work screens,** like the wheel and the loom. Every leather and every piece of armour is a card with its picture, how many you can make, and the level it needs.
+- **Tanning:** the hide is laced into the rack and the scraper works down it while the hide turns to leather, in the leather's own colour (cowhide brown, green, blue, red or black dragon). The paddle stirs the tanning tub, and the finished leather lifts out.
+- **Stitching:** the leather sits in the stitching pony while the needle runs along the seam and the thread follows it, in the colour of the armour you're making. The round knife, awl, mallet and thread lie on the bench.
+- **What it takes:** each hide and the tanner's fee against what you carry; for armour, the piece with its bonuses and how much better a handmade one comes out at your level. Leather now says it's for the leatherworking bench.
+- **Make 1, 5, 10 or all,** or drag a card onto the bench. A recipe you can't make says why.
+
 ## RS-725 - At the Anvil
 
 - **Forge from bars, remade.** The anvil's forging tab was a crowded block of buttons for every bar at once. It now works like the furnace: your bars sit along the top, and tapping one picks the metal.
