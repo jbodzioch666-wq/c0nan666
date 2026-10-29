@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-747 - Rewards of the New Loot
+
+- **The guild store sells for the loot system.** Guild tokens now buy Essences for the smith - three of Change (5 tokens), two of Blood (7), one of Chaos (8) or one of Law (14) - and a **Guild Strongbox** (20): a rare piece of gear for your level with three to six bonuses.
+- **Ring of Wealth and Adventurer's Cape roll as rares.** The ring keeps its 20% more gold and the cape its 5% more xp as built-in bonuses, and each comes as a rare for your level with three to six bonuses besides. The cape is built on the best cape your level can wear, not the old fixed +6 defence. Buy one again for a fresh roll.
+- **Quest point rewards are rolled for your level.** The Amulet of Glory, Cape of Legends and Dragon Sq Shield keep their own stats and come as rares for your level. The Cape of Legends now has the Legends Cape's +7 to every style and +2 prayer, and costs 9,000 gold.
+- **The Quest Point Cape is Ancestral.** Its +10 defence, +6 to every style and +4 prayer now come with six Ancestral bonuses from the top tiers. It no longer shows in the set-piece colour it had by mistake since RS-704.
+
 ## RS-746 - Property on the Books
 
 - **The Release button stands high on the screen.** "Oh dear, you are dead!" and its Release button now sit near the top, not in the middle where they covered your fallen figure, and the town's name banner no longer shows through them.
