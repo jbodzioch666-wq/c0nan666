@@ -7,7 +7,7 @@ module.exports = async page=>{
     for (let i=0;i<200;i++) await new Promise(r=>requestAnimationFrame(r));
     /* its figure made first (as when one's been raised before), so the rise itself is what's watched */
     { const def = NECRO_MINIONS[0], m = { k:def.k, nm:'your ' + def.nm, x:G.player.x, y:G.player.y }; for (let i=0;i<900 && !M3D.inst.get(necroProxy(m));i++){ sk3Update(necroProxy(m), necroProxy(m)._pos, 0, 0); await new Promise(r=>requestAnimationFrame(r)); } const e = M3D.inst.get(necroProxy(m)); if (e && e.holder.parent) e.holder.parent.remove(e.holder); }
-    skAdd(RS_BONES[0][0], 3); const n0 = FP.parts.length; necroRaise('skeleton'); const m = necroMinions().slice(-1)[0];
+    G.gear.chest = rsMakeArmour('cloth', 0, 'chest'); /* (RS-742) the dead answer a robed caller */  skAdd(RS_BONES[0][0], 3); const n0 = FP.parts.length; necroRaise('skeleton'); const m = necroMinions().slice(-1)[0];
     for (let i=0;i<12;i++) await new Promise(r=>requestAnimationFrame(r));
     const e = M3D.inst.get(necroProxy(m)); return { raised:!!m, at:!!(m && m.raisedAt), fig:!!e, y:e ? +e.holder.position.y.toFixed(2) : null, lean:e ? +e.holder.rotation.x.toFixed(2) : null, ring:e && e._ring ? e._ring.visible : null, parts:FP.parts.length - n0 }; });
   await page.waitForTimeout(250); await page.screenshot({ path: SHOTS + '/rs611-rise.png' });

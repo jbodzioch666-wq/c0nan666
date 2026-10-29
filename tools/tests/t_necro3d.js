@@ -8,7 +8,7 @@ module.exports = async page=>{
     skAdd('bones', 10); G.player.skills.necromancy = Math.max(G.player.skills.necromancy||0, SK_XP[31]);   // (Necromancy 30: zombies too)
     for (let i=0;i<4;i++){ renderGame(); await new Promise(r=>setTimeout(r, 60)); }
     const out = {};
-    necroRaise('skeleton'); necroRaise('zombie');
+    G.gear.chest = rsMakeArmour('cloth', 0, 'chest'); /* (RS-742) the dead answer a robed caller */  necroRaise('skeleton'); necroRaise('zombie');
     for (let i=0;i<6;i++){ renderGame(); await new Promise(r=>setTimeout(r, 60)); }
     for (let i=0;i<100 && !(typeof SK3!=='undefined' && SK3.ok);i++){ renderGame(); await new Promise(r=>setTimeout(r, 150)); }   // (the sculpted skeleton is built in the background)
     for (let i=0;i<4;i++){ renderGame(); await new Promise(r=>setTimeout(r, 60)); }

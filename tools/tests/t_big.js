@@ -103,7 +103,7 @@ module.exports = async page=>{
     randomEncounter(false); setUi('playing'); A(G.gameMode===2, 'a fight '+G.gameMode);
     for (const m of G.mon){ m.hp = m.maxHp = 400; }
     necroRaise(); A(!necroMinions().length, 'no bones, no minion');
-    skAdd('bones', 30); skAdd('bigbones', 5);
+    skAdd('bones', 30); skAdd('bigbones', 5); G.gear.chest = rsMakeArmour('cloth', 0, 'chest'); /* (RS-742) the dead answer a robed caller */ 
     const lvlBefore = rsCombatLevel();
     skP().skills.necromancy = SK_XP[85]; rsSync(); out.cb = [lvlBefore, rsCombatLevel()]; A(rsCombatLevel() > lvlBefore, 'necromancy counts to combat level');
     for (let i=0;i<5;i++) necroRaise();

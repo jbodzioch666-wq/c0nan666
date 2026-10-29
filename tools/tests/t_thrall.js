@@ -5,7 +5,7 @@ module.exports = async page=>{
     goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{};
     let dx=-1, dy=-1; for (let x=0;x<OW_COLS && dx<0;x++) for (let y=0;y<OW_ROWS;y++) if (G.ow.map[x][y]===OW_DUNGEON){ dx=x; dy=y; break; }
     G.gameMode = 0; G.pendingDungeon = { x:dx, y:dy }; enterDungeonConfirm(); setUi('playing'); G.mon = [];
-    skGainXP('magic', 5e6); for (const r of ['air','mind','chaos','soul','fire','blood']) skAdd('r_'+r, 500); rsSwitchBook('arceuus');
+    skGainXP('magic', 5e6); for (const r of ['air','mind','chaos','soul','fire','blood']) skAdd('r_'+r, 500); rsSwitchBook('arceuus'); G.gear.weapon = rsMakeStaff(1); /* (RS-742) spells need a staff */
     for (let x=1;x<COLS-1;x++) for (let y=1;y<ROWS-1;y++) G.dungeonSeen[x][y] = true; });
   const out = {};
   for (const [id, want] of [['lesserthrall','ghost'], ['supthrall','skeleton'], ['grthrall','zombie']]){

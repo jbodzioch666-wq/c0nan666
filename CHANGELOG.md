@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-742 - Staff and Robe
+
+- **Magic needs a wizard's staff.** Every combat and utility spell is cast through a staff, battlestaff or god staff in your hand. With a sword or a bow, the spell won't cast, and the message tells you where staves come from: monster drops, the Peddler's stock, or the fletching bench. The alchemy spells still work without one, because they work on an item in your pack.
+- **Necromancy needs cloth.** The dead answer only a robed caller: wear cloth body armour (a robe or a mage's top) to raise minions. In metal or hide, the Raise button dims and says "wear a robe".
+- **The mage's start kit is unchanged.** It already comes with a staff and a robe.
+
 ## RS-741 - Surrounded
 
 - **Monsters flank you:** a pack of melee monsters used to queue up behind the first one to reach you and wait their turn. Now each one heads for a free square around you, including the corners, and walks around the ones already fighting you to get there. In an open room, five of them can all be at you within a few turns. In the same test before this patch, the four behind the first just stood in line.

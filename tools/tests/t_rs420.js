@@ -21,7 +21,7 @@ module.exports = async page=>{
     for (let t=0;t<10;t++) necroTick(); out.archer = { hurt:o2.hp < 500 };
     // the picker: a zombie, from big bones
     p.skills.necromancy = SK_XP[20]; skAdd('bones', 3); skAdd('bigbones', 2); p.minions = []; room(); p.x = 3; p.y = 3; setUi('playing'); G.gameMode = 1;
-    necroPickSet('k', 'zombie'); necroPickSet('bone', 'bigbones'); necroRaise();
+    G.gear.chest = rsMakeArmour('cloth', 0, 'chest'); /* (RS-742) the dead answer a robed caller */  necroPickSet('k', 'zombie'); necroPickSet('bone', 'bigbones'); necroRaise();
     out.pick = { k:p.minions[0] && p.minions[0].k, big:skHave('bigbones'), plain:skHave('bones'), panel:!!document.getElementById('necroPanel') };
     // a monster on the diagonal strikes; behind a wall's corner it can't
     room(); p.minions = []; p.x = 4; p.y = 4; const o3 = foe(5, 5); let strikes = 0; const ms0 = monsterStrikesPlayer; monsterStrikesPlayer = (...a)=>{ strikes++; };
