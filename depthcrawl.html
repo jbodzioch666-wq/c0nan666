@@ -10826,7 +10826,7 @@ function v3SconceModel(mats){
 }
 function v3BuildInterior(grp, mats){
   const T = THREE, key = G.interior.key;
-  V3.crystal = V3.runes = V3.marker = V3.motes = V3.sparks = V3.bubbles = V3.brew = V3.cglow = null; V3.grassT = null;
+  V3.crystal = V3.runes = V3.marker = V3.motes = V3.sparks = V3.bubbles = V3.brew = V3.cglow = null; V3.grassT = null; V3.garden = null;
   V3.occ = []; V3.occDyn = new Set();
   const dark = new T.Mesh(new T.PlaneGeometry(200,200), new T.MeshStandardMaterial({ color:0x0b0907, roughness:1 }));
   dark.rotation.x = -Math.PI/2; dark.position.set(COLS/2, -0.02, ROWS/2); grp.add(dark); V3.ground = dark;
@@ -10926,6 +10926,9 @@ function v3BuildHouse(grp, mats){
   for (let c=0;c<S.c;c++) for (let r=0;r<S.r;r++){ const o = houseRoomAt(c, r), [x0, y0] = houseCellXY(c, r), R = o && HOUSE_ROOMS[o.k];
     if (R && !R.out){ const fl = v3Box(6, 0.06, 6, R.stone ? flagM(R.stone) : mats.floor, x0 + 2.5, -0.03, y0 + 2.5); fl.castShadow = false; grp.add(fl);
       if (R.rug) v3Rug(grp, x0 + 2.5, y0 + 2.5, 2.6, 1.8, v3TexRug(R.rug[0], R.rug[1], R.rug[2], o.k.length)); }
+    else if (R && R.out){ const pm = new T.MeshStandardMaterial({ map:v3TexGravel(V3_INT_TEX), roughness:1 });   /* (RS-737) gravel paths across it, to the gate in each side */
+      for (const [w, d] of [[1.0, 5.6], [5.6, 1.0]]){ const pg = new T.PlaneGeometry(w, d), uv = pg.attributes.uv; for (let i=0;i<uv.count;i++) uv.setXY(i, uv.getX(i)*w, uv.getY(i)*d); const pa = new T.Mesh(pg, pm); pa.rotation.x = -Math.PI/2; pa.position.set(x0 + 2.5, 0.006, y0 + 2.5); pa.receiveShadow = true; grp.add(pa); }
+      if (o.k==='garden'){ V3.garden = GARDEN_BEDS.map(([lx, ly], i)=>{ const g = new T.Group(); g.position.set(x0 + lx + 0.5, 0.18, y0 + ly + 0.5); grp.add(g); return { g, i, key:null }; }); } }
     else if (!o){ const e = new T.Mesh(new T.PlaneGeometry(4.6, 4.6), earthM); e.rotation.x = -Math.PI/2; e.position.set(x0 + 2.5, 0.004, y0 + 2.5); e.receiveShadow = true; grp.add(e);
       const st = [[0.2, 0.2], [4.8, 0.2], [4.8, 4.8], [0.2, 4.8]];
       for (const [sx, sz] of st) grp.add(v3Box(0.06, 0.4, 0.06, mats.wood, x0 + sx, 0.2, y0 + sz));
@@ -10974,6 +10977,29 @@ function v3BuildHouse(grp, mats){
     if (k!=='plot') v3Bench(k, x + 0.5, y + 0.5 + back(k, x, y), mats, grp, roomBenchRot(k, x, y));
     for (const [tx, ty] of roomBenchTiles(k, x, y)){ const hb = new T.Mesh(new T.BoxGeometry(0.95, 1.4, 0.95), new T.MeshBasicMaterial({ visible:false })); hb.position.set(tx + 0.5, 0.7, ty + 0.5); hb.userData.act = { kind:'tile', x:tx, y:ty, label:k==='plot' ? 'Empty plot: build a room' : BENCHES[k].nm }; grp.add(hb); V3.hits.push(hb); } }
   for (const [k, x, y] of (L.deco||[])) v3Bench(k, x + 0.5, y + 0.5 + back(k, x, y), mats, grp, roomBenchRot(k, x, y));
+  v3GardenSync(true);
+}
+/* (RS-737) the crop in each garden bed, as far as it's grown: nine plants in rows, sprouting, in leaf, in bud, then flowering in the
+   herb's own colour (flax tall, with its blue flowers); a watered bed's earth dark and wet. Rebuilt when a bed's stage changes */
+const GARDEN_M = {};
+function gardenMat(k, col, o){ return GARDEN_M[k] || (GARDEN_M[k] = new THREE.MeshStandardMaterial(Object.assign({ color:new THREE.Color(col).convertSRGBToLinear(), roughness:0.75 }, o||{}))); }
+function gardenGeo(){ if (GARDEN_M.geo) return GARDEN_M.geo; const T = THREE; return (GARDEN_M.geo = { leaf:new T.SphereGeometry(1, 12, 8), stem:new T.CylinderGeometry(0.006, 0.009, 1, 6), bloom:new T.IcosahedronGeometry(1, 1), wet:new T.PlaneGeometry(0.8, 0.8) }); }
+function v3GardenSync(force){
+  if (!V3.garden || !(G.interior && G.interior.key==='house')) return; if (!force && (V3.gardenT = (V3.gardenT||0) + 1) % 30) return;
+  const T = THREE, beds = gardenP() || [], geo = gardenGeo();
+  for (const B of V3.garden){ const b = beds[B.i], st = gardenStage(b), key = b ? b.id+':'+st+':'+(b.w ? 1 : 0) : ''; if (key===B.key) continue; B.key = key;
+    for (const c of B.g.children.slice()) B.g.remove(c); if (!b) continue;
+    if (b.w){ const w = new T.Mesh(geo.wet, gardenMat('wet', '#2a1a0c', { roughness:0.15, transparent:true, opacity:0.55 })); w.rotation.x = -Math.PI/2; w.position.y = 0.002; B.g.add(w); }
+    const col = SK_HERB_COL[b.id] || '#d8d0b0', leafM = gardenMat('leaf:'+(b.id==='flax' ? 'f' : 'h'), b.id==='flax' ? '#6a8a3a' : '#3f7a34'), budM = gardenMat('bud', '#5a7a2a'), bloomM = gardenMat('bloom:'+b.id, col, { emissive:new T.Color(col).convertSRGBToLinear(), emissiveIntensity:0.12, roughness:0.5 }), stemM = gardenMat('stem', '#5a7a30');
+    const add = (g, m, x, y, z, sx, sy, sz, ry)=>{ const o = new T.Mesh(g, m); o.position.set(x, y, z); o.scale.set(sx, sy, sz); if (ry) o.rotation.y = ry; o.castShadow = true; B.g.add(o); return o; };
+    for (let ix=-1; ix<=1; ix++) for (let iz=-1; iz<=1; iz++){ const px = ix*0.25 + Math.sin(ix*7 + iz*3 + B.i)*0.03, pz = iz*0.25 + Math.cos(ix*5 + iz*9 + B.i)*0.03, rr = (ix*3 + iz*7 + B.i*5)%7;
+      if (b.id==='flax'){ const h = [0.08, 0.2, 0.32, 0.38][st]; for (let k=0;k<3;k++){ const a = rr + k*2.1, ox = Math.cos(a)*0.035, oz = Math.sin(a)*0.035; add(geo.stem, stemM, px + ox, h/2, pz + oz, 1, h, 1).rotation.z = Math.cos(a)*0.08;
+          if (st===2) add(geo.leaf, budM, px + ox, h, pz + oz, 0.012, 0.02, 0.012); if (st===3) add(geo.bloom, bloomM, px + ox, h + 0.01, pz + oz, 0.022, 0.012, 0.022); } continue; }
+      const sz = [0.03, 0.055, 0.075, 0.085][st], n = st ? 4 : 2;
+      for (let k=0;k<n;k++){ const a = rr + k*Math.PI*2/n; add(geo.leaf, leafM, px + Math.cos(a)*sz*0.6, sz*0.45, pz + Math.sin(a)*sz*0.6, sz, sz*0.32, sz*0.55, -a); }
+      if (st >= 1) add(geo.leaf, leafM, px, sz*0.8, pz, sz*0.55, sz*0.7, sz*0.55);
+      if (st===2) for (let k=0;k<3;k++){ const a = rr + k*2.1; add(geo.stem, stemM, px + Math.cos(a)*0.02, sz + 0.04, pz + Math.sin(a)*0.02, 1, 0.08, 1); add(geo.leaf, budM, px + Math.cos(a)*0.02, sz + 0.085, pz + Math.sin(a)*0.02, 0.014, 0.022, 0.014); }
+      if (st===3) for (let k=0;k<3;k++){ const a = rr + k*2.1; add(geo.stem, stemM, px + Math.cos(a)*0.025, sz + 0.05, pz + Math.sin(a)*0.025, 1, 0.1, 1); add(geo.bloom, bloomM, px + Math.cos(a)*0.025, sz + 0.105, pz + Math.sin(a)*0.025, 0.026, 0.018, 0.026); } } }
 }
 /* (RS-720) the new workshops' rooms: hides drying on the tannery's back wall and its soaking vats; the fletcher's bows on pegs, a barrel
    of arrows and a stack of logs; the potter's shelf of pots and sacks of sand; the jeweller's display case; the barber's mirror and basin */
@@ -11310,6 +11336,17 @@ function v3Bench(k, x, z, mats, grp, rot){
     const ring = add(new T.Mesh(new T.TorusGeometry(0.5,0.08,8,28), mats.stone)); ring.position.set(0,0.75,0);
     const disc = add(new T.Mesh(new T.CircleGeometry(0.44,28), M(pc,{ emissive:lin(pc), emissiveIntensity:1.2, transparent:true, opacity:0.75, side:T.DoubleSide }))); disc.position.set(0,0.75,0);
     box(0.9,0.1,0.3,mats.stone,0,0.05,0); V3.lamps.push({ p:[x,0.8,z+0.3], col:new T.Color(pc).getHex(), r:3.5, main:true, always:true }); }
+  else if (k==='patch'){   /* (RS-737) a raised bed: a plank frame on its corner posts, full of dark earth (the crop is grown on it by v3GardenSync) */
+    for (const [w, d, px, pz] of [[0.9, 0.05, 0, -0.43], [0.9, 0.05, 0, 0.43], [0.05, 0.9, -0.43, 0], [0.05, 0.9, 0.43, 0]]) box(w, 0.22, d, mats.planks, px, 0.11, pz);
+    for (const [px, pz] of [[-0.43, -0.43], [0.43, -0.43], [0.43, 0.43], [-0.43, 0.43]]) box(0.07, 0.27, 0.07, mats.wood, px, 0.135, pz);
+    box(0.82, 0.18, 0.82, GARDEN_M.soil || (GARDEN_M.soil = new THREE.MeshStandardMaterial({ map:v3TexSoil(V3_INT_TEX), roughness:1 })), 0, 0.09, 0); }
+  else if (k==='wbutt'){   /* (RS-737) a water butt: a staved barrel on a stand, rainwater to the brim, a dipper on its rim */
+    box(0.5, 0.18, 0.5, mats.wood, 0, 0.09, 0); cyl(0.24, 0.21, 0.62, 18, mats.planks, 0, 0.49, 0); for (const y of [0.3, 0.68]) cyl(0.245, 0.245, 0.04, 18, mats.iron, 0, y, 0);
+    cyl(0.22, 0.22, 0.01, 18, M('#2a4a5a', { roughness:0.05, metalness:0.2 }), 0, 0.77, 0); const dp = cyl(0.05, 0.04, 0.06, 10, mats.iron, 0.17, 0.82, 0.05); const hd = box(0.02, 0.02, 0.24, mats.wood, 0.17, 0.85, -0.08); hd.rotation.x = -0.3; }
+  else if (k==='compost'){   /* (RS-737) the compost heap in its slatted bin */
+    for (const [w, d, px, pz] of [[0.84, 0.04, 0, -0.4], [0.04, 0.84, -0.4, 0], [0.04, 0.84, 0.4, 0]]) for (let i=0;i<4;i++) box(w, 0.08, d, mats.planks, px, 0.08 + i*0.13, pz);
+    const heap = add(new T.Mesh(new T.SphereGeometry(0.36, 20, 12, 0, Math.PI*2, 0, Math.PI/2), M('#4a3220', { roughness:1 }))); heap.scale.y = 0.75; heap.position.set(0, 0.02, 0.02);
+    for (let i=0;i<6;i++){ const lf = add(new T.Mesh(new T.SphereGeometry(0.04, 8, 6), M(['#6a8a3a', '#a08a3a', '#8a5a2a'][i%3], { roughness:0.9 }))); lf.scale.set(1.4, 0.4, 1); lf.position.set(Math.cos(i*2.2)*0.18, 0.2 + (i%2)*0.04, Math.sin(i*2.2)*0.16); } }
   else if (k.startsWith('spot_')){
     // an empty space: chalk lines on the floor and a builder's peg
     const cm = M('#e8e0c8',{ transparent:true, opacity:0.6 }); for (const [w,d,px,pz] of [[0.8,0.03,0,-0.4],[0.8,0.03,0,0.4],[0.03,0.8,-0.4,0],[0.03,0.8,0.4,0]]) box(w,0.01,d,cm,px,0.01,pz);
@@ -13204,6 +13241,7 @@ function skGatherTick(now){
   if (k==='fishing') try{ audSkill('reel'); }catch(e){}
   try{ sqClueTask('gather', k); }catch(e){}
   skAdd(pick.id, amt); skGainXP(k, pick.xp * amt * (GATHER_XP[k]||1) * (G.gameMode===1 ? 1.2 : 1) * (node ? [1, 1.25, 1.5][node.qual||0] : 1));
+  if (k==='foraging' && GARDEN_GROW[pick.id] && chn(0.12)) gardenSeedFound(pick.id);   /* (RS-737) */
   if (node && node.type==='pearl' && chn(0.18)){ skAdd('pearl', 1); const st = G.player.wgStat = G.player.wgStat||{}; st.pearls = (st.pearls||0) + 1; logMsg('a pearl! it gleams in the shell', 'loot'); checkAchievements(); }
   if (node && node.type==='ice'){ const st = G.player.wgStat = G.player.wgStat||{}; st.ice = (st.ice||0) + 1; checkAchievements(); }
   if (pick.id==='marlin'){ const st = G.player.wgStat = G.player.wgStat||{}; st.marlin = (st.marlin||0) + 1; checkAchievements(); }
@@ -14044,7 +14082,8 @@ function resCatsRaw(){
     ['Logs', SK_LOG.map(e=>e.id).concat(['bark'])],
     ['Fish & food', SK_FISH.map(e=>e.id).concat(SK_MEAT.map(e=>e.id), SK_FISH.map(e=>'c_'+e.id), SK_MEAT.map(e=>'c_'+e.id), SK_DISHES.map(d=>'c_'+d.id), ['burnt'])],   /* (RS-189: and the pies and stews) */
     ['Herbs & flax', SK_HERB.map(e=>e.id).concat(['flax'])],
-    ['Crafting materials', SK_CRAFT_MATS.map(e=>e.id).filter(id=>id!=='flax' && id!=='bark' && !/^es_/.test(id))],
+    ['Seeds', SK_CRAFT_MATS.map(e=>e.id).filter(id=>/^seed_/.test(id))],   /* (RS-737) */
+    ['Crafting materials', SK_CRAFT_MATS.map(e=>e.id).filter(id=>id!=='flax' && id!=='bark' && !/^es_|^seed_/.test(id))],
     ['Essences', ESSENCES.map(e=>e[0])],   /* (RS-707) */
     ['Runes & ammunition', RS_RUNES.map(r=>'r_'+r[0]).concat(RS_AMMO.map((a, t)=>'arw_'+t))],   /* (RS-334: every arrow and bolt type by name, not one "Arrows" counting only the loaded ones) */
     ['Bones', RS_BONES.map(b=>b[0])],
@@ -14058,6 +14097,7 @@ function resColor(id){
   if (id.startsWith('r_')){ const r = RS_RUNES.find(r=>'r_'+r[0]===id); return r ? r[2] : null; }
   if (ORE_COL[id]) return id==='coal' ? '#9a9a9a' : ORE_COL[id];
   if (SK_HERB_COL[id]) return SK_HERB_COL[id];
+  if (/^seed_/.test(id)) return SK_HERB_COL[id.slice(5)] ? mpTone(SK_HERB_COL[id.slice(5)], -0.35) : '#8a6a3a';   /* (RS-737) */
   const t = Object.keys(SK_TREE).find(k=>SK_TREE[k].log===id); if (t) return SK_TREE[t].canopy;
   return null;
 }
@@ -24526,6 +24566,7 @@ const HOUSE_ROOMS = {
   bedroom:  { nm:'Bedroom',        lvl:1,  cost:{ plank:10 }, xp:120, does:'your bed - a full rest, your run energy and your prayer', deco:[['crates',3,0],['books',4,0]], rug:['#2a4a6a','#d8c890','#6a2a20'] },
   workshop: { nm:'Workshop',       lvl:1,  cost:{ plank:10 }, xp:120, does:'a carpentry bench for flatpacks, a furnace and an anvil', deco:[['casks',0,4],['crates',4,4]] },
   kitchen:  { nm:'Kitchen',        lvl:5,  cost:{ plank:14 }, xp:170, does:'a hearth to cook your fish and meat', deco:[['table',3,2],['casks',4,0],['crates',0,4]], stone:'#8a7e70' },
+  garden:   { nm:'Garden',         lvl:10, cost:{ plank:12 }, xp:150, out:true, does:'four raised beds to grow flax and herbs in from seed, a water butt and a compost heap - out of doors, fenced', deco:[['compost',0,0],['wbutt',4,0]] },   /* (RS-737) */
   chapel:   { nm:'Chapel',         lvl:25, cost:{ oak_plank:20 }, xp:440, does:'an altar to offer bones on, for three times the Prayer xp', deco:[['pew',1,3],['pew',3,3]], stone:'#b4ac94', rug:['#7a1a1a','#c8a040','#e8dcc0'] },
   craft:    { nm:'Craft room',     lvl:30, cost:{ oak_plank:25 }, xp:550, does:"a jeweller's bench, a brewing cauldron and a fletching bench", deco:[['books',3,0],['crates',4,4]], rug:['#3a5a3a','#c8b070','#3a2a1a'] },
   portal:   { nm:'Portal chamber', lvl:45, cost:{ maple_plank:30 }, xp:900, does:'a portal to the towns you know - and built higher, your islands, the dig sites and the great landmarks', deco:[], stone:'#7a7268' },
@@ -24550,6 +24591,7 @@ Object.assign(BENCHES, {
 });
 for (const s of HOUSE_SPOTS) BENCHES['spot_'+s.id] = { nm:'Empty space: '+s.nm, does:'build furniture here' };
 BENCHES.plot = { nm:'Empty plot', does:'build a room here' };   /* (RS-736) */
+BENCHES.patch = { nm:'Garden bed', does:'sow seeds, water them and harvest the crop' };   /* (RS-737) */
 function houseP(){ const p = G.player; if (!p.house || typeof p.house!=='object') p.house = null; return p.house ? houseMigrate(p.house) : null; }
 /* (RS-736) a house from before the rooms - one room with every piece of furniture in it - is rebuilt as rooms: the parlour, and a room
    for each kind of furniture it had, on a house big enough to hold them, every piece where it was built */
@@ -24563,6 +24605,7 @@ function houseMigrate(h){
   return h;
 }
 const HOUSE_X0 = 3, HOUSE_Y0 = 3;
+for (const id of ['flax', 'silverleaf', 'bloodmoss', 'ghostcap', 'sunpetal', 'dragontongue', 'starlily']) SK_CRAFT_MATS.push({ id:'seed_'+id, nm:(id==='flax' ? 'Flax' : SK_HERB.find(h=>h.id===id).nm) + ' seed', lvl:1, xp:0 });   /* (RS-737: the garden's seeds) */
 function houseSz(){ const h = houseP(); return HOUSE_SIZES[(h && h.size) || 1]; }
 function houseRoomAt(c, r){ const h = houseP(); return h && (h.rooms||[]).find(o=>o.c===c && o.r===r) || null; }
 function houseHas(k){ const h = houseP(); return !!(h && (h.rooms||[]).some(o=>o.k===k)); }
@@ -24649,12 +24692,49 @@ function houseLayout(){
   for (let c=0;c<S.c;c++) for (let r=0;r<S.r;r++){ const o = houseRoomAt(c, r), [x0, y0] = houseCellXY(c, r);
     if (!o){ roomBenchMark('plot', x0 + 2, y0 + 2); benches.push(['plot', x0 + 2, y0 + 2]); continue; }
     for (const sp of HOUSE_SPOTS.filter(sp=>sp.room===o.k)){ const k = houseTier(sp.id) ? sp.k : 'spot_'+sp.id; roomBenchMark(k, x0 + sp.lx, y0 + sp.ly); benches.push([k, x0 + sp.lx, y0 + sp.ly]); }
+    if (o.k==='garden') for (const [lx, ly] of GARDEN_BEDS){ roomBenchMark('patch', x0 + lx, y0 + ly); benches.push(['patch', x0 + lx, y0 + ly]); }   /* (RS-737) */
     for (const [k, lx, ly] of (HOUSE_ROOMS[o.k].deco||[])){ G.map[x0 + lx][y0 + ly] = T_WALL; deco.push([k, x0 + lx, y0 + ly]); } }
   ROOM_LAYOUT.house = { benches, decor:'house', deco };
 }
 /* standing where a new room put something solid: the nearest open tile */
 function houseUnstick(){ const p = G.player; if (G.map[p.x] && G.map[p.x][p.y]===T_FLOOR) return;
   for (let r=1;r<8;r++) for (let i=-r;i<=r;i++) for (let j=-r;j<=r;j++){ const x = p.x + i, y = p.y + j; if (G.map[x] && G.map[x][y]===T_FLOOR){ p.x = x; p.y = y; return; } } }
+/* (RS-737) the garden: four raised beds, each sown with a seed of flax or a herb (you find them as you forage those, and the garden
+   comes with a few); a crop grows on the clock (GARDEN_GROW, in clock units - a day and night is DAY_LENGTH), through sprouting,
+   leafing and budding to ready; watered once from the butt, it gives two more. Picked, it gives three and more with your Foraging,
+   Foraging xp, and often a seed back. The beds' state: houseP().garden, [{ id, t0, w }] or null */
+const GARDEN_GROW = { flax:30, silverleaf:40, bloodmoss:60, ghostcap:80, sunpetal:110, dragontongue:150, starlily:200 };
+const GARDEN_BEDS = [[1,1],[3,1],[1,3],[3,3]];
+function gardenLvl(id){ return id==='flax' ? 1 : (SK_HERB.find(h=>h.id===id)||{}).lvl || 1; }
+function gardenNm(id){ return id==='flax' ? 'flax' : skName(id).toLowerCase(); }
+function gardenP(){ const h = houseP(); if (!h) return null; if (!Array.isArray(h.garden) || h.garden.length!==4) h.garden = [0, 1, 2, 3].map(i=>(h.garden||[])[i] || null); return h.garden; }
+function gardenBedAt(x, y){ const o = houseP() && houseP().rooms.find(o=>o.k==='garden'); if (!o) return -1; const [x0, y0] = houseCellXY(o.c, o.r); return GARDEN_BEDS.findIndex(([lx, ly])=>x0 + lx===x && y0 + ly===y); }
+function gardenStage(b){ if (!b || !GARDEN_GROW[b.id]) return -1; const f = (clockNow() - b.t0)/GARDEN_GROW[b.id]; return f >= 1 ? 3 : f >= 0.6 ? 2 : f >= 0.25 ? 1 : 0; }   /* (0 sprouting, 1 in leaf, 2 in bud, 3 ready) */
+function gardenTime(u){ const m = Math.max(1, Math.round(u*30/DAY_LENGTH)); return m >= 60 ? `about ${Math.round(m/6)/10} hours` : `about ${m} minute${m > 1 ? 's' : ''}`; }   /* (a day and night is half an hour) */
+function gardenSeedFound(id){ skAdd('seed_'+id, 1); logMsg(`you find ${/^[aeiou]/i.test(id) ? 'an' : 'a'} ${skName('seed_'+id).toLowerCase()} as you pick it - sow it in your garden`, 'loot'); }
+function gardenUse(i){
+  const g = gardenP(); if (!g || i < 0) return; const b = g[i], L = skLvl('foraging');
+  if (!b){ const seeds = Object.keys(GARDEN_GROW).filter(id=>skHave('seed_'+id) > 0);
+    if (!seeds.length){ wevDialog('Garden bed', 'Turned earth, ready for sowing - but you have no seeds. You find them now and then as you forage flax and herbs.', [['Close', ()=>{}]], 'your garden'); return; }
+    wevDialog('Garden bed', 'Turned earth, ready for sowing. What will you plant?', seeds.map(id=>{ const lv = gardenLvl(id), ok = L >= lv;
+      return [ok ? `Sow ${gardenNm(id)} (${skHave('seed_'+id)} seed${skHave('seed_'+id) > 1 ? 's' : ''}) - ready in ${gardenTime(GARDEN_GROW[id])}` : `${cap(gardenNm(id))} needs Foraging ${lv}`, ()=>{ if (ok) gardenSow(i, id); }]; }).concat([['Not now', ()=>{}]]), 'your garden'); return; }
+  const st = gardenStage(b);
+  if (st===3){ gardenHarvest(i); return; }
+  if (!b.w){ b.w = 1; logMsg(`you water the ${gardenNm(b.id)} from the butt - a watered bed gives a bigger crop`, 'good'); sfx('potion'); v3GardenSync(true); saveCurrentGame(); return; }
+  logMsg(`the ${gardenNm(b.id)} is ${['just sprouting', 'in leaf', 'in bud'][st]} - ready in ${gardenTime(b.t0 + GARDEN_GROW[b.id] - clockNow())}`, '');
+}
+function gardenSow(i, id){
+  const g = gardenP(); if (!g || g[i] || skHave('seed_'+id) < 1) return;
+  skAdd('seed_'+id, -1); g[i] = { id, t0:clockNow() }; skGainXP('foraging', Math.round(gardenLvl(id)*0.6 + 6));
+  logMsg(`you sow the ${gardenNm(id)} - it'll be ready in ${gardenTime(GARDEN_GROW[id])}. Water it for a bigger crop`, 'good'); sfx('click'); v3GardenSync(true); saveCurrentGame();
+}
+function gardenHarvest(i){
+  const g = gardenP(), b = g && g[i]; if (!b || gardenStage(b) < 3) return;
+  const it = b.id==='flax' ? { xp:6 } : SK_HERB.find(h=>h.id===b.id), L = skLvl('foraging'), n = Math.min(12, 3 + Math.floor(Math.max(0, L - gardenLvl(b.id))/12) + (b.w ? 2 : 0) + (chn(0.5) ? 1 : 0));
+  skAdd(b.id, n); skGainXP('foraging', Math.round(it.xp*n*(GATHER_XP.foraging||1)*0.75)); g[i] = null;
+  const seed = chn(0.6); if (seed) skAdd('seed_'+b.id, 1);
+  logMsg(`you harvest ${n} ${b.id==='flax' ? 'flax' : skName(b.id).toLowerCase()} from the bed${seed ? ', and save a seed' : ''}`, 'loot', true); sfx('loot'); v3GardenSync(true); saveCurrentGame();
+}
 /* (RS-736) an empty plot: which room to build on it */
 function buildHousePlot(){
   const at = G.housePlot || { c:0, r:0 }, L = skLvl('construction');
@@ -24670,13 +24750,15 @@ function houseBuildRoom(k){
   const R = HOUSE_ROOMS[k], h = houseP(), at = G.housePlot; if (!R || !h || !at || houseRoomAt(at.c, at.r) || houseHas(k)) return;
   if (skLvl('construction') < R.lvl || !houseCostOk(R.cost)) return;
   houseCostPay(R.cost); h.rooms.push({ k, c:at.c, r:at.r }); skGainXP('construction', R.xp);
-  logMsg(`you build ${/^[aeiou]/i.test(R.nm) ? 'an' : 'a'} ${R.nm.toLowerCase()} on the plot - now furnish it`, 'magic', true); sfx('achievement'); checkAchievements();
+  logMsg(k==='garden' ? 'you dig the beds, build the frames and fence the garden' : `you build ${/^[aeiou]/i.test(R.nm) ? 'an' : 'a'} ${R.nm.toLowerCase()} on the plot - now furnish it`, 'magic', true); sfx('achievement'); checkAchievements();
+  if (k==='garden'){ skAdd('seed_flax', 3); skAdd('seed_silverleaf', 3); logMsg('there are seeds in a pot by the water butt - three of flax and three of silverleaf. Sow them in the beds', 'loot'); }
   const px = G.player.x, py = G.player.y; setUi('playing'); houseLayout(); G.player.x = px; G.player.y = py; houseUnstick(); saveCurrentGame(); renderGame();
 }
 // using furniture (or an empty space) in the house; true when it was ours to handle
 function houseBench(kind){
   if (!G.interior || G.interior.key!=='house' || !kind) return false;
   if (kind.startsWith('spot_')){ houseBuildDialog(HOUSE_SPOTS.find(s=>s.id===kind.slice(5))); return true; }
+  if (kind==='patch'){ const xy = G.benchXY || [G.player.x, G.player.y]; gardenUse(gardenBedAt(xy[0], xy[1])); return true; }   /* (RS-737) */
   if (kind==='plot'){ const xy = G.benchXY || [G.player.x, G.player.y]; G.housePlot = houseCellOfXY(xy[0], xy[1]) || G.housePlot; setUi('housePlot'); return true; }   /* (RS-736) */
   if (kind==='bed'){ const p = G.player; bedSleep(()=>{ fullyRestPlayer(); p.runEnergy = 100; p.prayPts = rsLvl('prayer'); }, 'you sleep in your own bed and wake at dawn, fully rested'); return true; }
   if (kind==='carpentry'){ houseCarpentry(); return true; }
@@ -34164,6 +34246,21 @@ function v3TexDirt(cache){
   for (let i=0;i<22;i++){ x.fillStyle = ['#9a9286','#7a7268','#b0a898'][i%3]; x.beginPath(); x.ellipse(Math.random()*128, Math.random()*128, 1.4 + Math.random()*1.6, 1 + Math.random(), Math.random()*3, 0, 7); x.fill(); }
   return (cache.dirt = v3CanvasTex(c, 2));
 }
+/* (RS-737) a garden bed's tilled earth, in drills; a garden path's gravel */
+function v3TexSoil(cache){
+  if (cache.soil) return cache.soil;
+  const c = v3Canvas(128,128), x = c.getContext('2d'); x.fillStyle = '#5a3e26'; x.fillRect(0,0,128,128);
+  for (let i=0;i<4;i++){ const y = 16 + i*32, g = x.createLinearGradient(0, y - 16, 0, y + 16); g.addColorStop(0, 'rgba(40,26,14,0.5)'); g.addColorStop(0.5, 'rgba(130,98,64,0.35)'); g.addColorStop(1, 'rgba(40,26,14,0.5)'); x.fillStyle = g; x.fillRect(0, y - 16, 128, 32); }
+  for (let i=0;i<1600;i++){ x.fillStyle = ['rgba(38,24,12,0.5)','rgba(140,105,70,0.35)','rgba(25,16,8,0.35)'][i%3]; const r = 0.5 + Math.random()*1.8; x.beginPath(); x.arc(Math.random()*128, Math.random()*128, r, 0, 7); x.fill(); }
+  return (cache.soil = v3CanvasTex(c, 1));
+}
+function v3TexGravel(cache){
+  if (cache.gravel) return cache.gravel;
+  const c = v3Canvas(128,128), x = c.getContext('2d'); x.fillStyle = '#9a8c74'; x.fillRect(0,0,128,128);
+  for (let i=0;i<900;i++){ const v = 110 + Math.floor(Math.random()*90); x.fillStyle = `rgb(${v},${v - 8 - Math.floor(Math.random()*10)},${v - 26})`; x.beginPath(); x.ellipse(Math.random()*128, Math.random()*128, 1 + Math.random()*1.8, 0.8 + Math.random()*1.2, Math.random()*3, 0, 7); x.fill();
+    x.fillStyle = 'rgba(40,32,22,0.25)'; x.fillRect(Math.random()*128, Math.random()*128, 1.2, 1.2); }
+  return (cache.gravel = v3CanvasTex(c, 1));
+}
 function v3TexTurf(cache){
   if (cache.turf) return cache.turf;
   const c = v3Canvas(128,128), x = c.getContext('2d'); x.fillStyle = '#4e7a30'; x.fillRect(0,0,128,128);
@@ -35341,7 +35438,7 @@ function v3Render(){
     const old = V3.player, grp = old.g.parent, key = rsLookKey(); old.lookKey = key;
     if (grp){ const np = m3dPlayerBuild(()=>v3Person(v3PlayerLook(), 1.0, grp)); np.g.position.copy(old.g.position); np.at = old.at; np.yaw = old.yaw||0; np.lookKey = key; grp.remove(old.g); V3.player = np; }
   }
-  v3WindowTick(); if (G.sleepFx) bedSleepTick(dt); else { const st = G.interior && G.sitAt; if (st){ glide(V3.player, st.x - Math.sin(st.yaw)*0.06, st.y - Math.cos(st.yaw)*0.06); v3SeatPose(V3.player, st); } else if (V3.stair || V3.stairArr) v3StairTick(dt); else { v3Stand(V3.player); glide(V3.player, G.player.x, G.player.y); if (!G.interior && !(V3.door && V3.door.phase==='in')){ const g = V3.player.g.position; g.y += (v3StepH(g.x, g.z) - g.y)*Math.min(1, dt*14); } } }   /* (RS-615: on a raised house's steps, up them) */
+  v3WindowTick(); v3GardenSync(); if (G.sleepFx) bedSleepTick(dt); else { const st = G.interior && G.sitAt; if (st){ glide(V3.player, st.x - Math.sin(st.yaw)*0.06, st.y - Math.cos(st.yaw)*0.06); v3SeatPose(V3.player, st); } else if (V3.stair || V3.stairArr) v3StairTick(dt); else { v3Stand(V3.player); glide(V3.player, G.player.x, G.player.y); if (!G.interior && !(V3.door && V3.door.phase==='in')){ const g = V3.player.g.position; g.y += (v3StepH(g.x, g.z) - g.y)*Math.min(1, dt*14); } } }   /* (RS-615: on a raised house's steps, up them) */
   V3.villagers.forEach(p=>{ const st = p.v.seat; if (st){ glide(p, st.x - Math.sin(st.yaw)*0.06, st.y - Math.cos(st.yaw)*0.06, 6); v3SeatPose(p, st); } else { v3Stand(p); glide(p, p.v.x, p.v.y, 1.7); } v3FolkShadow(p); });   // (a walking pace: one tile in about the time between their steps)
   V3.npcs.forEach(p=>{ const st = p.n.seat; if (st){ glide(p, st.x - Math.sin(st.yaw)*0.06, st.y - Math.cos(st.yaw)*0.06); v3SeatPose(p, st); } else { v3Stand(p); glide(p, p.n.x, p.n.y); } v3FolkShadow(p); });   /* (RS-382: someone seated sits) */
   try{ townV3Tick(dt); }catch(e){ console.error(e); }
@@ -48695,7 +48792,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-736';
+const GAME_VERSION = 'rs-737';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

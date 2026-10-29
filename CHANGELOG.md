@@ -1,5 +1,15 @@
 # Depthcrawl patch notes
 
+## RS-737 - The Kitchen Garden
+
+Your house can have a garden now: a fenced room out of doors where you grow flax and herbs from seed.
+
+- **The garden:** build it on an empty plot of your house. It needs Construction 10 and 12 planks, and gives 150 xp. It has four raised beds, a water butt, a compost heap and gravel paths to the gates on each side. It comes with three flax seeds and three silverleaf seeds in a pot by the butt.
+- **Seeds:** you find them now and then while foraging. Picking flax or a herb gives a 12% chance of a seed of the same plant. They go in a new Seeds section of the bag. Herb seeds need your Foraging level for that herb before you can sow them.
+- **Sowing and growing:** use an empty bed and pick a seed. It grows on the day and night clock, from sprouting to in leaf to in bud to ready. Flax takes about 5 minutes and silverleaf about 6. The slowest, starlily, takes a full day and night of about half an hour. Use a growing bed to see how long it has left. You watch it grow in 3D: shoots, then leaves, then buds, then flowers in the herb's own colour.
+- **Watering:** use a bed once after sowing to water it from the butt. The soil darkens, and the crop gives two more.
+- **Harvest:** use a ready bed to pick it. You get 3 plus 1 for every 12 Foraging levels above the plant's level, plus 2 if you watered it, with a chance of 1 more, up to 12. You also get Foraging xp for every one, and a 60% chance of a seed back.
+
 ## RS-736 - A House of Rooms
 
 Your house is no longer a single room. It's laid out in plots: you build a room on each empty one, and the estate agent builds the house bigger as your Construction grows.
