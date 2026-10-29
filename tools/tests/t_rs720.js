@@ -26,7 +26,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
     const shop = k=>{ G.craftShop = k; G.craftStock = {}; setUi('tailor'); const t = document.getElementById('overlay').textContent; const w = tailorWares().map(i=>i.nm); setUi('playing'); return { t:t.slice(0, 40), w }; };
     out.shops = { tailor:shop('tailor'), tanner:shop('tanner'), fletcher:shop('fletcher'), jeweller:shop('jeweller') };
     enterInterior('barber'); villageInteract(10, 5); out.barber = G.ui; if (G.ui==='makeover') makeoverLeave(); setUi('playing'); exitInterior();
-    enterInterior('pottery'); villageInteract(10, 5); out.potter = G.ui==='wevent' && /kiln/.test(document.getElementById('overlay').textContent); setUi('playing'); exitInterior();
+    enterInterior('pottery'); villageInteract(10, 5); out.potter = G.ui==='playing';   /* (RS-721: the glassblower has nothing to sell - no menu) */ setUi('playing'); exitInterior();
     /* stitch a leather body at the new bench */
     const lr = crRecipes().find(r=>r.row==='Leather armour'); for (const m in lr.need) skAdd(m, lr.need[m]*2); if (skLvl('crafting') < lr.lvl) skGainXP('crafting', 1e7); p.gold += lr.gold||0;
     enterInterior('tannery'); G.bench = 'leather'; setUi('bench'); out.leatherBench = /leather/i.test(document.getElementById('overlay').textContent);
@@ -53,7 +53,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   A(R.staves.length >= 6 && !R.fletching.some(r=>/^(Staves|Battlestaves|Mystic|Master|Combination)/.test(r)) && R.fletching.includes('Arrows'), 'staves on the lathe, not the fletching bench');
   A(/TAILOR/.test(R.shops.tailor.t) && /TANNERY/.test(R.shops.tanner.t) && /FLETCHER/.test(R.shops.fletcher.t) && /JEWELLER/.test(R.shops.jeweller.t), 'each keeper has their own shop');
   A(R.shops.jeweller.w.some(n=>/Ring/.test(n)) && R.shops.fletcher.w.some(n=>/staff/i.test(n)) && !R.shops.tailor.w.some(n=>/staff|bow/i.test(n)), 'each sells their own trade: ' + JSON.stringify(R.shops));
-  A(R.barber==='makeover' && R.potter, 'the barber restyles you; the potter has a word');
+  A(R.barber==='makeover' && R.potter, 'the barber restyles you; the glassblower opens no menu');
   A(R.leatherBench && R.made, 'leather armour is stitched at the leatherworking bench');
   A(!errs.length, 'no errors: ' + errs.join(' | '));
 };

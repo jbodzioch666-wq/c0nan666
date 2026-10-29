@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-721 - Click Away
+
+- **Click outside a menu to close it.** Clicking or tapping the game world around any menu (a shop, your bag, a crafting bench, a dialog) now closes it, just as Escape does. That click only closes the menu; it doesn't also walk you somewhere. Clicks inside a menu work as before.
+- **No empty menus.** The glassblower had nothing to sell but still opened a menu. Now they just say a word in passing; use the kiln and the potter's wheel directly.
+
 ## RS-720 - The Crafts Quarter
 
 - **A workshop for every trade.** The Tailor's used to cram eight stations into one room, and the Smithy held the jeweller's benches too. Now each trade has its own building, along a new lane of workshops south of the town square.
