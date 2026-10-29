@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-731 - What You're Dyeing
+
+- **The dye works names each piece**: a named piece, like a unique or a set piece, gave no hint whether it was gloves, boots or a helm. Now a small tag beside its name says what it is (gauntlets, boots, trousers and so on). Pieces whose name already says it, like Bronze Gauntlets, get no tag.
+- **Icons**: every worn piece in the dye works shows its icon beside its name.
+
 ## RS-730 - Cauldron and Dye Vat
 
 The last two crafting benches get the work screen.

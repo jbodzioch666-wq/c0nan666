@@ -67,6 +67,7 @@ Screenshots go to `tools/tests/shots/`.
 | rs728 | The gem-cutting table and jeweller's bench work screens: two sapphires cut, a silver ring cast at the bench (silver jewellery moved off the anvil, first row), the anvil and furnace no longer offer silver forging |
 | rs729 | The potter's wheel and kiln work screens: two pots thrown (all counts two), glass melted, a vial blown, a torch lit, charging a fire orb asks for runes |
 | rs730 | the brewing cauldron and the dye vat get the work screen: brew potions (a vial for a stronger one), antipoison and a dye; the dye works still opens |
+| rs731 | the dye works says what each worn piece is (gauntlets, boots, trousers) beside its name and icon, for named pieces that don't say it |
 | zloot | probe: the drops at a few levels - rarity shares, names with their bonuses and tiers, a rare's tooltip text (ZL levels, ZN drops a level) |
 | zloottip | probe: a rare's, a magic piece's and a Ring of Recoil's tooltip, plain and with Alt held, as shots/zloottip0-3.png |
 | rs703 | A spell leaves the staff as it comes forward: a real cast at a foe three tiles off, sampled every frame - the bolt waits about half a second, leaves from the staff's head as it leans ahead, its sound with it; the foe flinches (and a miss splashes) only as it lands; the cast lasts about a second; a foe it kills stands till the bolt lands, and the staff isn't put away mid-cast |
