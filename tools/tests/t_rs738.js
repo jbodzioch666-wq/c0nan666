@@ -9,7 +9,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
     goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{}; townClosedCheck = ()=>false;
     const p = G.player; p.clock = p.turnCount = 60; G.owPos = { x:G.ow.spawnPos.x, y:G.ow.spawnPos.y }; enterVillage(); setUi('playing');
     p.gold = 100000; houseBuy(); skGainXP('construction', 200000); const N = HOUSE_SIZES[2]; for (const k in N.cost) skAdd(k, N.cost[k]); houseUpgrade();
-    enterHouse(); G.housePlot = { c:1, r:0 }; skAdd('oak_plank', 15); skAdd('nails', 20); const o0 = skHave('oak_plank'), n0 = skHave('nails'); houseBuildRoom('farmyard');
+    enterHouse(); G.housePlot = { c:0, r:1 }; skAdd('oak_plank', 15); skAdd('nails', 20); const o0 = skHave('oak_plank'), n0 = skHave('nails'); houseBuildRoom('farmyard');
     const h = houseP(), L = ROOM_LAYOUT.house, o = h.rooms.find(o=>o.k==='farmyard');
     return { rooms:h.rooms.map(o=>o.k), at:o && [o.c, o.r], paid:[o0 - skHave('oak_plank'), n0 - skHave('nails')], benches:L.benches.map(b=>b[0]).filter(k=>/coop|byre|trough/.test(k)), deco:L.deco.map(d=>d[0]), animals:G.villagers.length }; });
   /* the trough, empty, then filled with flax */
@@ -48,7 +48,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
     out.made = V3.villagers.filter(q=>q.v.farm).length; return out; });
   const fs = require('fs'); fs.writeFileSync(SHOTS + '/rs738_close.jpg', Buffer.from(r6.close.split(',')[1], 'base64')); fs.writeFileSync(SHOTS + '/rs738_cow.jpg', Buffer.from(r6.cow.split(',')[1], 'base64'));
   console.log(JSON.stringify({ r0, r1, r2, r3, r4, r5, made:r6.made }));
-  A(r0.rooms.includes('farmyard') && r0.at.join()==='1,0' && r0.paid.join()==='15,20' && r0.benches.join()==='coop,byre,trough' && r0.deco.includes('hay') && r0.animals===0, 'a farmyard built: ' + JSON.stringify(r0));
+  A(r0.rooms.includes('farmyard') && r0.at.join()==='0,1' && r0.paid.join()==='15,20' && r0.benches.join()==='coop,byre,trough' && r0.deco.includes('hay') && r0.animals===0, 'a farmyard built: ' + JSON.stringify(r0));
   A(r1.d0.join()==='Close' && /^Fill it with flax - 30/.test(r1.d1[0]) && r1.feed===30 && r1.flax===0, 'the trough filled with flax: ' + JSON.stringify(r1));
   A(r2.buys.join()==='0,0,0,0,-1,0,0,-1' && r2.spent===4*25 + 2*150 && r2.herd==='calf,calf,chick,chick,chick,chick', 'four chicks and two calves bought: ' + JSON.stringify(r2));
   A(Math.abs(r3.feed1 - 25) < 0.1 && r3.g1.join()==='50,50,50,50,50,50' && r3.hens===4 && r3.stalled && r3.hungry===1 && /once there is feed/.test(r3.txt), 'they grow while fed, and stop when the trough is empty: ' + JSON.stringify(r3));

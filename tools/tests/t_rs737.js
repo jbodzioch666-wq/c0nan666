@@ -10,9 +10,8 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
     const p = G.player; p.clock = p.turnCount = 60; G.owPos = { x:G.ow.spawnPos.x, y:G.ow.spawnPos.y }; enterVillage(); setUi('playing');
     p.gold = 100000; houseBuy(); skGainXP('construction', 200000); const N = HOUSE_SIZES[2]; for (const k in N.cost) skAdd(k, N.cost[k]); houseUpgrade();
     enterHouse(); const L0 = skLvl('construction');
-    G.housePlot = { c:1, r:0 }; skAdd('plank', 8); const pl0 = skHave('plank'); houseBuildRoom('garden'); const h = houseP(), o = h.rooms.find(o=>o.k==='garden'), spots0 = ROOM_LAYOUT.house.benches.filter(b=>/^spot_gbed/.test(b[0])).length, patch0 = ROOM_LAYOUT.house.benches.filter(b=>b[0]==='patch').length;
-    skAdd('plank', 10); skAdd('oak_plank', 10); for (let i=1;i<=4;i++){ houseBuildDialog(HOUSE_SPOTS.find(s=>s.id==='gbed'+i)); wevChoose(0); } const L = ROOM_LAYOUT.house;
-    return { con:L0, spots0, patch0, rooms:h.rooms.map(o=>o.k), at:o && [o.c, o.r], seeds:[skHave('seed_flax'), skHave('seed_silverleaf')], planks:pl0 - skHave('plank'),
+    G.housePlot = { c:0, r:1 }; skAdd('plank', 12); const pl0 = skHave('plank'); houseBuildRoom('garden'); const h = houseP(), L = ROOM_LAYOUT.house, o = h.rooms.find(o=>o.k==='garden');
+    return { con:L0, rooms:h.rooms.map(o=>o.k), at:o && [o.c, o.r], seeds:[skHave('seed_flax'), skHave('seed_silverleaf')], planks:pl0 - skHave('plank'),
       patches:L.benches.filter(b=>b[0]==='patch').length, deco:(L.deco||[]).map(d=>d[0]), garden:JSON.stringify(gardenP()), v3:(V3.garden||[]).length }; });
   /* sow a bed: the dialog lists the seeds; water it; ask after it */
   const r1 = await ev(()=>{ const p = G.player, o = houseP().rooms.find(o=>o.k==='garden'), [x0, y0] = houseCellXY(o.c, o.r), [lx, ly] = GARDEN_BEDS[0];
@@ -35,13 +34,12 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
     const c = new T.PerspectiveCamera(40, sz.x/sz.y, 0.05, 100); c.position.set(cx + 1.2, 3.4, cz + 4.2); c.lookAt(cx, 0.2, cz); c.updateProjectionMatrix(); R.render(V3.scene, c);
     const kids = V3.garden.map(B=>B.g.children.length), stages = gardenP().map(gardenStage); return { kids, stages, url:R.domElement.toDataURL('image/jpeg', 0.88) }; });
   require('fs').writeFileSync(SHOTS + '/rs737_beds.jpg', Buffer.from(r4.url.split(',')[1], 'base64')); delete r4.url;
-  /* (RS-739) a garden from RS-737 came with its beds: it keeps them; the paths are three pieces that don't overlap */
-  const r5 = await ev(()=>{ const h = houseP(), b0 = Object.assign({}, h.built); delete h.gbeds; for (let i=1;i<=4;i++) delete h.built['gbed'+i]; const k = Object.keys(houseP().built).filter(k=>/^gbed/.test(k)).length;
-    const paths = []; V3.world.traverse(o=>{ if (o.isMesh && o.geometry && o.geometry.type==='PlaneGeometry' && o.material && o.material.map===V3_INT_TEX.gravel) paths.push(o.geometry.parameters.width+'x'+o.geometry.parameters.height); });
-    return { kept:k, paths:paths.join() }; });
+  /* (RS-739) the paths are three pieces that don't overlap (they flickered where two crossed) */
+  const r5 = await ev(()=>{ const paths = []; V3.world.traverse(o=>{ if (o.isMesh && o.geometry && o.geometry.type==='PlaneGeometry' && o.material && o.material.map===V3_INT_TEX.gravel) paths.push(o.geometry.parameters.width+'x'+o.geometry.parameters.height); });
+    return { paths:paths.join() }; });
   console.log(JSON.stringify({ r0, r1, r2, r3, r4, r5 }));
-  A(r5.kept===4 && r5.paths==='1x5.6,2.3x1,2.3x1', 'an old garden keeps its beds; the paths: ' + JSON.stringify(r5));
-  A(r0.rooms.includes('garden') && r0.at.join()==='1,0' && r0.planks===8 && r0.spots0===4 && r0.patch0===0 && r0.patches===4 && r0.deco.includes('compost') && r0.deco.includes('wbutt') && r0.v3===4, 'a garden built with four beds: ' + JSON.stringify(r0));
+  A(r5.paths==='1x5.6,2.3x1,2.3x1', 'the paths: ' + JSON.stringify(r5));
+  A(r0.rooms.includes('garden') && r0.at.join()==='0,1' && r0.planks===12 && r0.patches===4 && r0.deco.includes('compost') && r0.deco.includes('wbutt') && r0.v3===4, 'a garden built with four beds: ' + JSON.stringify(r0));
   A(r0.seeds.join()==='3,3', 'it comes with three flax and three silverleaf seeds');
   A(r1.dlg && r1.sown==='flax' && r1.seeds===2 && r1.w===1 && r1.st===0 && r1.bed===0 && /sprouting/.test(r1.info), 'a bed sown with flax, watered, then asked after: ' + JSON.stringify(r1));
   A(r2.st.join()==='0,1,2,3' && r2.got >= 5 && r2.got <= 12 && r2.xp > 0 && r2.empty, 'it grows on the clock and is picked: ' + JSON.stringify(r2));

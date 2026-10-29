@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-740 - A Bed to Sleep In
+
+- **A bed first:** a new cottage comes with a parlour and a bedroom, and the bed's space is chalked out. Building the bed (6 logs) is the first thing you do, so you don't have to saw planks for a bedroom before you can sleep at home. Hollis says so when you buy, and his offer describes the cottage that way. The plots for more rooms come when he builds it bigger, starting with the house.
+- **Garden beds back:** the garden comes with its four raised beds again, for 12 planks, as in RS-737. If you built beds in RS-739, the garden just has its beds. The fix for the flickering paths is kept.
+
 ## RS-739 - Beds First
 
 - **Garden paths:** where the two gravel paths crossed, the middle flickered. The paths were two strips lying at the same height, and they fought over which one to draw. Now the arms stop at the middle, and the gravel runs on unbroken across the join. The farmyard's paths had the same problem and are fixed too.

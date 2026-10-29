@@ -1,4 +1,4 @@
-// RS-736: a house of rooms. The estate agent sells a cottage of two plots (a parlour with the front door, and one to build on) and
+// RS-736: a house of rooms. The estate agent sells a cottage of two plots (a parlour with the front door, and - RS-740 - a bedroom, its bed the first thing to build) and
 // builds it bigger - house, manor, estate - as Construction grows; a room goes up on an empty plot, and its furniture is built in it.
 // An old one-room house is rebuilt as rooms on a house big enough, its furniture kept.
 // Shots: shots/rs736_cottage.png, rs736_plot.png (the room list), rs736_estate.png (every room, from the front door), rs736_back.png
@@ -10,19 +10,20 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
     const p = G.player; p.clock = p.turnCount = 60; G.owPos = { x:G.ow.spawnPos.x, y:G.ow.spawnPos.y }; enterVillage(); setUi('playing');
     p.gold = 100000; houseBuy(); const h = houseP(); setUi('estate'); const est = document.getElementById('overlay').textContent;
     enterHouse(); const [dx, dy] = houseDoorXY();
-    return { h:JSON.stringify(h), est:/cottage/i.test(est) && /build it bigger/.test(est), at:[p.x, p.y], door:[dx, dy], doorTile:G.map[dx][dy]===T_DOOROUT, plots:ROOM_LAYOUT.house.benches.filter(b=>b[0]==='plot').length,
+    const spots0 = ROOM_LAYOUT.house.benches.map(b=>b[0]); skAdd('logs', 6); houseBuildDialog(HOUSE_SPOTS.find(s=>s.id==='bed')); wevChoose(0);
+    return { spots0, bed:ROOM_LAYOUT.house.benches.some(b=>b[0]==='bed'), h:JSON.stringify(h), est:/cottage/i.test(est) && /build it bigger/.test(est), at:[p.x, p.y], door:[dx, dy], doorTile:G.map[dx][dy]===T_DOOROUT, plots:ROOM_LAYOUT.house.benches.filter(b=>b[0]==='plot').length,
       spots:ROOM_LAYOUT.house.benches.map(b=>b[0]), cols:COLS, rows:ROWS }; });
   await frames(20); await page.screenshot({ path:SHOTS + '/rs736_cottage.png' });
-  /* the plot: the room list; a bedroom built on it */
-  const r1 = await ev(()=>{ const pl = ROOM_LAYOUT.house.benches.find(b=>b[0]==='plot'); G.benchXY = [pl[1], pl[2]]; useBench('plot'); const ov = document.getElementById('overlay');
+  /* built bigger to a house: a plot, its room list; a workshop built on it */
+  const r1 = await ev(()=>{ skGainXP('construction', 4000000); exitInterior(); const N = HOUSE_SIZES[2]; for (const k in N.cost) skAdd(k, N.cost[k]); houseUpgrade(); enterHouse(); setUi('playing'); const pl = ROOM_LAYOUT.house.benches.find(b=>b[0]==='plot'); G.benchXY = [pl[1], pl[2]]; useBench('plot'); const ov = document.getElementById('overlay');
     const out = { ui:G.ui, rooms:ov.querySelectorAll('.hroom').length, at:G.housePlot };
     skAdd('plank', 10); return out; });
   await page.waitForTimeout(300); await page.screenshot({ path:SHOTS + '/rs736_plot.png' });
-  const r2 = await ev(()=>{ houseBuildRoom('bedroom'); const h = houseP(); return { rooms:h.rooms.map(o=>o.k+'@'+o.c+','+o.r), planks:skHave('plank'), spots:ROOM_LAYOUT.house.benches.map(b=>b[0]), ui:G.ui,
-      free:G.map[G.player.x][G.player.y]===T_FLOOR, again:(houseBuildRoom('bedroom'), houseP().rooms.length) }; });
+  const r2 = await ev(()=>{ houseBuildRoom('workshop'); const h = houseP(); return { rooms:h.rooms.map(o=>o.k+'@'+o.c+','+o.r), planks:skHave('plank'), spots:ROOM_LAYOUT.house.benches.map(b=>b[0]), ui:G.ui,
+      free:G.map[G.player.x][G.player.y]===T_FLOOR, again:(houseBuildRoom('workshop'), houseP().rooms.length) }; });
   /* bigger: house, manor, estate; every room; every piece of furniture */
-  const r3 = await ev(async ()=>{ const p = G.player; setUi('playing'); exitInterior(); skGainXP('construction', 4000000); const out = { sizes:[] };
-    for (let i=0;i<3;i++){ const N = HOUSE_SIZES[houseP().size + 1]; for (const k in N.cost) skAdd(k, N.cost[k]); houseUpgrade(); out.sizes.push(houseSz().nm); }
+  const r3 = await ev(async ()=>{ const p = G.player; setUi('playing'); exitInterior(); skGainXP('construction', 4000000); const out = { sizes:['House'] };
+    for (let i=0;i<2;i++){ const N = HOUSE_SIZES[houseP().size + 1]; for (const k in N.cost) skAdd(k, N.cost[k]); houseUpgrade(); out.sizes.push(houseSz().nm); }
     out.gold = p.gold; enterHouse();
     for (const k of Object.keys(HOUSE_ROOMS)){ if (houseHas(k) || HOUSE_ROOMS[k].out) continue;   /* (the garden and farmyard have tests of their own) */ const S = houseSz(); let at = null; for (let r=0;r<S.r && !at;r++) for (let c=0;c<S.c && !at;c++) if (!houseRoomAt(c, r)) at = { c, r };
       G.housePlot = at; for (const m in HOUSE_ROOMS[k].cost) skAdd(m, HOUSE_ROOMS[k].cost[m]); houseBuildRoom(k); }
@@ -48,10 +49,10 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
     enterHouse(); const L = ROOM_LAYOUT.house; const out = { size:h.size, rooms:h.rooms.map(o=>o.k), portal:houseTier('portal'), beds:L.benches.filter(b=>b[0]==='bed').length, altar:L.benches.some(b=>b[0]==='altar'), moved:!!h.moved };
     exitInterior(); return out; });
   console.log(JSON.stringify({ r0, r1, r2, r3, r4, r5 }));
-  A(r0.est && r0.doorTile && r0.plots===1 && r0.spots.includes('spot_trophy'), 'a cottage: the parlour with its trophy space and one empty plot: ' + JSON.stringify(r0));
+  A(r0.est && r0.doorTile && r0.plots===0 && r0.spots0.includes('spot_trophy') && r0.spots0.includes('spot_bed') && r0.bed, 'a cottage: the parlour with its trophy space, and a bedroom whose bed is built first: ' + JSON.stringify(r0));
   A(r0.at[0]===r0.door[0] && r0.at[1]===r0.door[1] - 1, 'you come in at the front door');
-  A(r1.ui==='housePlot' && r1.rooms===8, 'the plot lists the eight rooms: ' + JSON.stringify(r1));
-  A(r2.rooms.join()==='parlour@0,0,bedroom@1,0' && r2.planks===0 && r2.spots.includes('spot_bed') && !r2.spots.includes('plot') && r2.free && r2.again===2, 'a bedroom built on the plot: ' + JSON.stringify(r2));
+  A(r1.ui==='housePlot' && r1.rooms===8 && r1.at.c===0 && r1.at.r===1, 'the plot lists the eight rooms: ' + JSON.stringify(r1));
+  A(r2.rooms.join()==='parlour@0,0,bedroom@1,0,workshop@0,1' && r2.planks===0 && r2.spots.includes('spot_carpentry') && r2.spots.filter(k=>k==='plot').length===1 && r2.free && r2.again===3, 'a workshop built on the plot: ' + JSON.stringify(r2));
   A(r3.sizes.join()==='House,Manor,Estate' && r3.size===4 && r3.rooms===7 && r3.built===11, 'an estate with every room and every piece of furniture: ' + JSON.stringify(r3));
   A(r3.spots.join()==='plot,plot' && r3.reach===r3.benches, 'every piece of furniture and the last two plots within reach: ' + JSON.stringify(r3));
   A(r3.gold===100000 - 2500 - 6000 - 15000 - 40000, 'the sizes cost their gold: ' + r3.gold);
