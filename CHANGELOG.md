@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## RS-730 - Cauldron and Dye Vat
+
+The last two crafting benches get the work screen.
+
+- **The brewing cauldron**: the healing potions, and the poisons and cures, are now cards down the left (Make 1, x5, x10 or all). The middle shows a black iron pot over a log fire: herbs drop in, the ladle stirs, and the brew clears from murk to its colour, bubbling and steaming, until the potion lifts out.
+- **What a brew makes**: the right side shows what the potion heals (or what the poison does), and what a vial adds (one more die, and it fetches more). It also shows how many vials you hold; they sit on the table beside the pot. Your herbs and vials show as chips along the top.
+- **The dye vat**: a length of cloth on a pole is dipped into the staved tub and comes up in the dye's colour, dripping. A basket holds the herbs it takes, and jars of other dyes stand on the shelf.
+- **Dye your gear**: the dye vat's button to dye your armour, robes, capes and shields is still there, below the bench.
+
 ## RS-729 - Clay and Glass
 
 - **The potter's wheel gets a work screen.** The wheel head and the flywheel spin while the potter's hands work, and the lump of clay rises into a pot, bowl or pie dish in the shape you chose. Finished pots wait on the shelf.
