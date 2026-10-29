@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-739 - Beds First
+
+- **Garden paths:** where the two gravel paths crossed, the middle flickered. The paths were two strips lying at the same height, and they fought over which one to draw. Now the arms stop at the middle, and the gravel runs on unbroken across the join. The farmyard's paths had the same problem and are fixed too.
+- **Garden beds are built:** a new garden is bare, fenced ground with its water butt and compost heap. Its four beds are chalked out, and building them is the first thing to do. The first bed needs Construction 10 and 4 planks. The second needs Construction 14 and 6 planks, the third Construction 18 and 4 oak planks, and the fourth Construction 22 and 6 oak planks. Each one gives Construction xp.
+- **Cheaper garden:** the garden itself now costs 8 planks instead of 12, because the beds are paid for separately.
+- **Existing gardens:** a garden built in RS-737 keeps its four beds and whatever is growing in them.
+
 ## RS-738 - The Farmyard
 
 Your house can have a farmyard now, where you raise chickens and cows for meat.

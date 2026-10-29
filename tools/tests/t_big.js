@@ -20,10 +20,10 @@ module.exports = async page=>{
     // too low a level: nothing happens
     houseBench('spot_portal'); A(G.ui==='wevent', 'build dialog'); wevChoose(0); A(!houseTier('portal'), 'portal needs the level');
     // build everything
-    skP().skills.construction = SK_XP[99]; skAdd(SK_LOG[0].id, 2000); skAdd('ironb', 500); skAdd('essence', 2000);
+    skP().skills.construction = SK_XP[99]; skAdd(SK_LOG[0].id, 2000); skAdd('ironb', 500); skAdd('essence', 2000); skAdd('plank', 100); skAdd('oak_plank', 100);
     for (const s of HOUSE_SPOTS){ for (let t=0; t<(s.tiers ? s.tiers.length : 1); t++){ houseBuildDialog(s); A(G.ui==='wevent', 'dialog for '+s.id); wevChoose(0); } A(houseTier(s.id)===(s.tiers ? 3 : 1), 'built '+s.id); }
     checkAchievements(); A(p.achievements.includes('master_builder'), 'master builder');
-    A(ROOM_LAYOUT.house.benches.every(b=>!b[0].startsWith('spot_')) && ROOM_LAYOUT.house.benches.filter(b=>!/^(plot|patch|coop|byre|trough)$/.test(b[0])).length===HOUSE_SPOTS.length, 'furniture in place');
+    A(ROOM_LAYOUT.house.benches.every(b=>!b[0].startsWith('spot_')) && ROOM_LAYOUT.house.benches.filter(b=>!/^(plot|coop|byre|trough)$/.test(b[0])).length===HOUSE_SPOTS.length, 'furniture in place');
     for (let i=0;i<6;i++){ renderGame(); await new Promise(r=>setTimeout(r, 30)); }
     out.hits = (V3.hits||[]).length;
     // the furniture works

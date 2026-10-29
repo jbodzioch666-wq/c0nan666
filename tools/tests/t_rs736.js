@@ -27,7 +27,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
     for (const k of Object.keys(HOUSE_ROOMS)){ if (houseHas(k) || HOUSE_ROOMS[k].out) continue;   /* (the garden and farmyard have tests of their own) */ const S = houseSz(); let at = null; for (let r=0;r<S.r && !at;r++) for (let c=0;c<S.c && !at;c++) if (!houseRoomAt(c, r)) at = { c, r };
       G.housePlot = at; for (const m in HOUSE_ROOMS[k].cost) skAdd(m, HOUSE_ROOMS[k].cost[m]); houseBuildRoom(k); }
     skAdd('logs', 400); skAdd('ironb', 200); skAdd('essence', 1000);
-    for (const s of HOUSE_SPOTS) for (let t=0; t<(s.tiers ? s.tiers.length : 1); t++){ houseBuildDialog(s); wevChoose(0); }
+    for (const s of HOUSE_SPOTS.filter(s=>houseHas(s.room))) for (let t=0; t<(s.tiers ? s.tiers.length : 1); t++){ houseBuildDialog(s); wevChoose(0); }
     setUi('playing'); const h = houseP(), L = ROOM_LAYOUT.house;
     /* every bench and every plot can be walked up to from the door */
     const [dx, dy] = houseDoorXY(), seen = new Set([dx+','+(dy - 1)]), q = [[dx, dy - 1]];
