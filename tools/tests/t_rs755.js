@@ -8,7 +8,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
     const sites = questNearbySites(G.owPos.x, G.owPos.y, 1, 80, ['dungeon']).filter(s=>m[s.x][s.y]===OW_DUNGEON); if (sites.length < 2) return { none:true };
     const ring = (s, t)=>{ for (const [dx, dy] of DIR8){ const q = owNb(s.x, s.y, dx, dy); if (q && OW_LAND_KEY[m[q[0]][q[1]]]) m[q[0]][q[1]] = t; } G.ow.bio[s.y*OW_COLS + s.x] = 0; };
     const run = (s, t)=>{ ring(s, t); G.gameMode = 0; setUi('playing'); G.pendingDungeon = { x:s.x, y:s.y }; enterDungeonConfirm(); setUi('playing'); const fams = new Set(), met = {};
-      for (let d=1; d<=Math.min(4, G.dungeonMaxDepth||4); d++){ G.dgCache = {}; loadLevel(d, false); (G.floorFams||[]).forEach(f=>fams.add(f)); for (const mo of G.mon) if (mo.alive){ const f = FAM_BY_NAME[mo.nm] || FAM_BY_NAME[mo.baseNm]; met[f || 'other'] = (met[f || 'other']||0) + 1; } }
+      for (let d0=0; d0<2*Math.min(4, G.dungeonMaxDepth||4); d0++){ const d = 1 + (d0 >> 1); G.dgCache = {};   /* (each floor twice: one alone could meet too few to judge) */ loadLevel(d, false); (G.floorFams||[]).forEach(f=>fams.add(f)); for (const mo of G.mon) if (mo.alive){ const f = FAM_BY_NAME[mo.nm] || FAM_BY_NAME[mo.baseNm]; met[f || 'other'] = (met[f || 'other']||0) + 1; } }
       return { key:dgThemeKey(), fams:[...fams], met }; };
     out.desert = run(sites[0], OW_DESERT); out.grass = run(sites[1], OW_GRASS);
     out.eco = { desert:MON_ECOSYS.dgDesert, grass:MON_ECOSYS.dungeon };

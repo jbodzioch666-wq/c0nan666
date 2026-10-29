@@ -1,5 +1,15 @@
 # Depthcrawl patch notes
 
+## RS-757 - Streets of the Lost City
+
+- **The Lost City's first floor is the city itself,** open to the sky: paved streets with the grass coming up through them, an avenue up to a plaza where two stone guardians stand, and the ruins of houses all round - their walls fallen to half height in places, gaps you can climb through, a doorway in each.
+- **A stepped pyramid stands at its heart:** five tiers of mossy green stone, a steep stair up its face to the shrine on top, and at its foot a dark doorway over the way down.
+- **The jungle closes it in:** rainforest giants, palms, ferns and big leaves all round the edge and running off past it, with clumps grown up between the ruins and ferns in the grass. Trees between you and the camera fade away as walls do.
+- **Lit by the hour:** bright jungle daylight by day; at night the city lies dark under the moon, lit by your lantern.
+- **Below it are its halls,** in the city's carved stone, down to the boss in the pyramid's heart.
+- **Already been in?** A Lost City floor saved from RS-756 (when it was still the temple's rooms) is laid out afresh as the city.
+- **Tests:** the "folk of the land" test now looks at each floor twice, as one pass could meet too few monsters to judge.
+
 ## RS-756 - The Lost City
 
 - **The jungle looks like a jungle.** Rainforest giants on bent, mossy trunks with buttress roots, lumpy layered crowns and hanging lianas; palms with ringed, leaning trunks, nuts and drooping fronds; and an understory of arching ferns and big heart-shaped leaves with the odd orchid among them.

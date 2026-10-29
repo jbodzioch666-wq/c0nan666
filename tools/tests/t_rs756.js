@@ -32,7 +32,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   A(r.plants.some(p=>p==='fern' || p==='bigleaf'), 'over a floor of ferns and big leaves: ' + r.plants);
   A(r.map && /Lost City/.test(r.map), 'examine names it');
   A(r.labels.some(t=>/Lost City/.test(t)), 'its label on the land says Lost City: ' + JSON.stringify(r.labels));
-  A(r.kind==='city' && r.theme==='city', 'inside it is the Lost City, in its own stone: ' + r.kind + ' ' + r.theme);
+  A(r.kind==='city' && /^city/.test(r.theme), 'inside it is the Lost City, in its own stone (its streets under the sky since RS-757): ' + r.kind + ' ' + r.theme);
   A(r.fams.length && r.fams.every(f=>r.eco.includes(f)), 'its folk are the jungle and the dead: ' + JSON.stringify(r.fams));
   A(!/dungeons and dungeons/.test(r.where||''), 'the bestiary says where once each: ' + r.where);
   A(r.mon > 0 && r.power > 1, 'monsters wait there, and it is a hard site');

@@ -5717,6 +5717,58 @@ function generateTempleLevel(d){
   placeCastleContents(d, rooms);
 }
 
+// ---- (RS-757) the Lost City: its first floor is the city itself, open to the sky - paved streets broken by the jungle's grass, a
+// plaza and an avenue up to a stepped pyramid at its heart, the ruins of houses (their walls fallen here and there) all round, the
+// jungle closing it in. The way down is at the pyramid's foot; the floors below are its halls (the temple's rooms), the last its heart
+const CITY_PYR = { w:9, h:7, y0:4 };
+function cityPyr(){ const x0 = (COLS - CITY_PYR.w) >> 1; return { x0, y0:CITY_PYR.y0, x1:x0 + CITY_PYR.w, y1:CITY_PYR.y0 + CITY_PYR.h }; }   /* (x1, y1 past its edge) */
+function cityStreet(x, y){ const P = cityPyr(), cx = COLS >> 1, cy = ROWS - 10;
+  return (Math.abs(x - cx) <= 1 && y >= P.y1) || (y >= P.y1 && y <= P.y1 + 3 && x >= P.x0 - 2 && x < P.x1 + 2) || (y >= P.y0 - 1 && y <= P.y1 && x >= P.x0 - 1 && x <= P.x1)
+    || (y===cy && x >= 3 && x < COLS - 3) || ((x===6 || x===COLS - 7) && y >= 3 && y < ROWS - 3); }
+function cityPaved(x, y){ return cityStreet(x, y) ? fbm2D(x, y, 758, 2, 1/3, 0.5) > 0.3 : fbm2D(x, y, 757, 2, 1/4, 0.5) > 0.62; }   /* (the streets' stones, the grass come through them; a stretch of old paving here and there between) */
+function cityWallH(x, y){ const h = fpHash(x, y, 611); return h < 0.35 ? 0.42 + fpHash(x, y, 612)*0.25 : 0.86 + fpHash(x, y, 613)*0.14; }   /* (a ruin's walls, some fallen to half their height) */
+function generateCityLevel(d){
+  if (d > 1) return generateTempleLevel(d);
+  setGrid(DUN_W, DUN_H); G.genRooms = null;
+  G.floorFams = famForFloor(d);
+  G.map = makeGrid(T_FLOOR);
+  G.floorItem = makeItemGrid();
+  G.trapSeen = makeGrid(false);
+  G.dungeonSeen = makeGrid(false);
+  G.dungeonDeco = makeGrid('', COLS, ROWS);
+  G.shopStock = [];
+  const D = G.dungeonDeco, P = cityPyr(), cx = COLS >> 1, occ = makeGrid(false), edge = (x, y)=>Math.min(x, y, COLS-1-x, ROWS-1-y);
+  const jung = (x, y)=>{ G.map[x][y] = T_WALL; D[x][y] = 'jung'; occ[x][y] = true; };
+  // the jungle round it, two tiles deep and ragged
+  for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++){ const e = edge(x, y); if ((e < 2 || (e===2 && fpHash(x, y, 601 + d) < 0.45)) && !(Math.abs(x - cx) <= 1 && y > P.y1 && e >= 2)) jung(x, y); }
+  // the pyramid, solid; the way down at the foot of its stair
+  for (let x=P.x0;x<P.x1;x++) for (let y=P.y0;y<P.y1;y++){ G.map[x][y] = T_WALL; D[x][y] = 'pyr'; occ[x][y] = true; }
+  // the houses, fallen in: walls round a room (a doorway and a gap or two in them) along the streets, a lane between each and the
+  // next, the jungle and the pyramid
+  const rooms = [{ x:cx-1, y:ROWS-4, w:3, h:2 }];
+  for (let t=0; t<900 && rooms.length < 19; t++){
+    const w = 3 + rn(4), h = 3 + rn(3), x0 = 3 + rn(COLS - 6 - w), y0 = 3 + rn(ROWS - 6 - h); let bad = false;
+    for (let x=x0-1; x<=x0+w && !bad; x++) for (let y=y0-1; y<=y0+h; y++){ const inH = x >= x0 && y >= y0 && x < x0 + w && y < y0 + h;
+      if (x < 0 || y < 0 || x >= COLS || y >= ROWS || occ[x][y] || (inH && (edge(x, y) < 3 || cityStreet(x, y)))){ bad = true; break; } }
+    if (bad) continue;
+    const sides = [];
+    for (let x=x0; x<x0+w; x++) for (let y=y0; y<y0+h; y++){ occ[x][y] = true; const rim = x===x0 || y===y0 || x===x0+w-1 || y===y0+h-1; if (!rim) continue;
+      const corner = (x===x0 || x===x0+w-1) && (y===y0 || y===y0+h-1); G.map[x][y] = T_WALL; if (!corner) sides.push([x, y]); }
+    for (const [x, y] of sides) if (fpHash(x, y, 615 + d) < 0.18) G.map[x][y] = T_FLOOR;   /* (fallen) */
+    { const [x, y] = sides[rn(sides.length)]; G.map[x][y] = T_FLOOR; }   /* (its doorway) */
+    if (w > 2 && h > 2) rooms.push({ x:x0+1, y:y0+1, w:w-2, h:h-2 });
+  }
+  // the jungle come in: a clump here and there on the open ground
+  for (let t=0, n=0; t<200 && n<9; t++){ const x = 3 + rn(COLS-6), y = 3 + rn(ROWS-6); if (occ[x][y] || cityStreet(x, y)) continue; let ok = true; for (let i=-1;i<=1 && ok;i++) for (let j=-1;j<=1;j++) if (occ[x+i][y+j] && D[x+i][y+j]!=='jung'){ ok = false; break; } if (ok){ jung(x, y); n++; } }
+  // stone guardians either side of the avenue at the plaza
+  for (const sx of [-3, 3]) D[cx + sx][P.y1 + 1] = 'idol';
+  G.genStart.x = cx; G.genStart.y = ROWS - 3;
+  G.map[cx][P.y1] = advanceTile();
+  sealUnreachableFloor(G.genStart.x, G.genStart.y);
+  rooms.push({ x:P.x0 - 2, y:P.y1 + 1, w:P.x1 - P.x0 + 4, h:3 }, { x:3, y:3, w:COLS - 6, h:ROWS - 6 }, { x:3, y:3, w:COLS - 6, h:ROWS - 6 });
+  placeCastleContents(d, rooms);
+}
+
 // ---- (RS-213) pyramid: the way in at the foot, a long gallery climbing up the middle, a chamber to either side and
 // the burial hall at the top with its pillars and the god-king's slab, two small store rooms off its corners ----
 function generatePyramidLevel(d){
@@ -5929,7 +5981,7 @@ function saveLevelCache(d){
     shopStock: G.shopStock.map(it=>copyItem(it)),
     isBossFloor: G.isBossFloor,
     at: Date.now(), ent: G.dungeonEntrance ? G.dungeonEntrance.x+','+G.dungeonEntrance.y : '',   /* (RS-205: kept in the save; a moved site drops its old floors) */
-    bossIdx: G.bossIdx,
+    bossIdx: G.bossIdx, lay: G.siteKind==='city' && d===1 ? 'city1' : '',   /* (RS-757: the Lost City's surface, laid out as a city) */
   };
 }
 function restoreLevelCache(d){
@@ -6056,6 +6108,7 @@ function dgPruneTorches(){
     if (G.map[x][y]!==T_WALL || open!==1) G.dungeonDeco[x][y] = null; }
 }
 function placeWallTorches(){
+  if (G.siteKind==='city' && G.depth===1) return;   /* (RS-757: the Lost City lies open to the sky) */
   if (G.siteKind==='graveyard' && G.depth===1) return; // no walls to hang them on up top - just railings and tombs under the moon (the catacombs below do get them)
   // (RS-165) evenly spaced along the walls, so their pools of light meet rather than pile up: a torch on a straight stretch
   // of wall (open floor on one side only - not a corner or a pillar), and the next no nearer than six tiles
@@ -6087,7 +6140,8 @@ function loadLevel(d, arrivingFromBelow, fellThrough){
     checkAchievements();
   }
   let fresh = true;
-  const cached = G.dgCache[cacheKey(G.dungeonSlot,d)];
+  let cached = G.dgCache[cacheKey(G.dungeonSlot,d)];
+  if (cached && G.siteKind==='city' && d===1 && cached.lay!=='city1'){ delete G.dgCache[cacheKey(G.dungeonSlot,d)]; cached = null; }   /* (RS-757: the temple's rooms it had in RS-756) */
   if (G.gameMode===1 && G.dungeonSlot>=1 && G.dungeonSlot<=MAX_SITE_SLOT+1 && cached){
     restoreLevelCache(d);
     if (G.siteKind==='pyramid' && G.dungeonDeco) for (const c of G.dungeonDeco) for (let y=0;y<c.length;y++) if (c[y]==='brazier' || c[y]==='altar') c[y] = '';   /* (RS-369: a pyramid's braziers are gone, on a kept floor too; RS-427: and its altar) */
@@ -6096,8 +6150,10 @@ function loadLevel(d, arrivingFromBelow, fellThrough){
     generateCastleLevel(d);
   } else if (G.siteKind==='necro'){
     generateNecroTowerLevel(d);
-  } else if (G.siteKind==='temple' || G.siteKind==='city'){
+  } else if (G.siteKind==='temple'){
     generateTempleLevel(d);
+  } else if (G.siteKind==='city'){
+    generateCityLevel(d);   /* (RS-757) */
   } else if (G.siteKind==='graveyard'){
     generateGraveyardLevel(d);
   } else if (G.siteKind==='mine'){
@@ -16426,6 +16482,7 @@ const DRESS_KITS = {
   mine:['crate','barrel','rubble','crystal','crate'], lair:['skulls','rubble','brazier','skulls'], graveyard:['skulls','cobweb','rubble','chains'],
   pyramid:['rubble','crate','cobweb','skulls','rubble'],   /* (RS-369: no braziers in a pyramid) */
   city:['moss','rubble','brazier','moss','puddle','cobweb'],   /* (RS-756) */
+  cityOut:['rubble','moss','column','rubble','moss'],   /* (RS-757: the city's streets) */
   /* (RS-754) a plain dungeon's, by its land (dgThemeKey) */
   dgDesert:['rubble','crate','skulls','rubble','barrel'], dgFrost:['rubble','crate','skulls','chains','barrel'], dgSwamp:['moss','puddle','moss','skulls','rubble'],
   dgForest:['moss','rubble','barrel','crate','cobweb','moss'], dgJungle:['moss','moss','rubble','puddle','cobweb'], dgAsh:['rubble','skulls','brazier','rubble'],
@@ -16445,7 +16502,7 @@ function dressLevel(d){
   dgStairsClear();
   /* (RS-427) the stairs go in after the altars: an altar that ended up beside them, or cutting a way off, is taken away */
   for (let x=1;x<COLS-1;x++) for (let y=1;y<ROWS-1;y++) if (G.dungeonDeco[x][y]==='altar'){ G.dungeonDeco[x][y] = ''; if (dgOpenSpot(x, y)) G.dungeonDeco[x][y] = 'altar'; }
-  const D = G.dungeonDeco, k = G.siteKind==='graveyard' && d>1 ? 'graveyard' : G.siteKind==='dungeon' ? dgThemeKey() : (DRESS_KITS[G.siteKind] ? G.siteKind : 'dungeon'), kit = DRESS_KITS[k];
+  const D = G.dungeonDeco, k = G.siteKind==='graveyard' && d>1 ? 'graveyard' : G.siteKind==='city' && d===1 ? 'cityOut' : G.siteKind==='dungeon' ? dgThemeKey() : (DRESS_KITS[G.siteKind] ? G.siteKind : 'dungeon'), kit = DRESS_KITS[k];
   const W = (x,y)=>x<0 || y<0 || x>=COLS || y>=ROWS || G.map[x][y]===T_WALL;
   const busy = (x,y)=>D[x][y] || (x===G.genStart.x && y===G.genStart.y) || G.mon.some(m=>m.alive && m.x===x && m.y===y) || G.floorItem[x][y];
   const open = (x,y)=>x>0 && y>0 && x<COLS-1 && y<ROWS-1 && G.map[x][y]===T_FLOOR && !busy(x,y);
@@ -28022,8 +28079,9 @@ function gfxParts(PARTS, T){
 /* (RS-756) the jungle's plants, painted after Bakshi's deep greens: a rainforest giant (jtree) on a bent trunk flared into buttress roots,
    its crown in layers of lumpy leaf, lianas hanging from it; a palm on a ringed, leaning trunk under a head of drooping fronds and a cluster
    of nuts; a fern of arching, toothed fronds; and big-leaf understory (bigleaf) - heart-shaped leaves on stalks, an orchid among them.
-   Each part is one geometry (merged), shaded by vertex colour (userData.vc) and drawn two-sided where it's a sheet (userData.ds) */
-function o3JungleParts(T, PARTS){
+   Each part is one geometry (merged), shaded by vertex colour (userData.vc) and drawn two-sided where it's a sheet (userData.ds).
+   (RS-757) lo: a lighter cut of each, for the hundreds round the Lost City (fpdCityJungle) */
+function o3JungleParts(T, PARTS, lo){ const q = lo ? 0.5 : 1, nV = lo ? 3 : 5, nF = lo ? 3 : 5;
   const mesh = (geo, p, r, sc)=>{ const m = new T.Mesh(geo); if (p) m.position.set(p[0], p[1], p[2]); if (r) m.rotation.set(r[0], r[1], r[2], r[3] || 'XYZ'); if (sc) m.scale.set(sc[0], sc[1], sc[2]); return m; };
   const merge = (list, vc, ds)=>{ const g = m3dMergeMeshes(list).geometry; g.userData.vc = !!vc; g.userData.ds = !!ds; g.computeBoundingSphere(); return g; };
   const paint = (geo, f)=>{ const pa = geo.attributes.position, no = geo.attributes.normal, c = new Float32Array(pa.count*3); for (let i=0;i<pa.count;i++){ const k = f(pa.getX(i), pa.getY(i), pa.getZ(i), no ? no.getY(i) : 0); c[i*3] = k[0]; c[i*3+1] = k[1]; c[i*3+2] = k[2]; } geo.setAttribute('color', new T.BufferAttribute(c, 3)); return geo; };
@@ -28035,33 +28093,33 @@ function o3JungleParts(T, PARTS){
     for (let i=0;i<segs;i++){ const a = i*3; idx.push(a, a + 3, a + 1, a + 1, a + 3, a + 4, a + 1, a + 4, a + 2, a + 2, a + 4, a + 5); }
     const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new T.Float32BufferAttribute(col, 3)); g.setIndex(idx); g.computeVertexNormals(); return g; };
   /* a lumpy, flattened crown of leaf, lighter on top and dark beneath */
-  const crown = (r, fy, seed)=>{ const g = new T.IcosahedronGeometry(r, 2), pa = g.attributes.position; for (let i=0;i<pa.count;i++){ const x = pa.getX(i), y = pa.getY(i), z = pa.getZ(i), k = 0.82 + 0.3*hs(Math.round(x*40) + seed, Math.round(z*40) + Math.round(y*40)*3); pa.setXYZ(i, x*k, y*k*fy, z*k); }
+  const crown = (r, fy, seed)=>{ const g = new T.IcosahedronGeometry(r, lo ? 1 : 2), pa = g.attributes.position; for (let i=0;i<pa.count;i++){ const x = pa.getX(i), y = pa.getY(i), z = pa.getZ(i), k = 0.82 + 0.3*hs(Math.round(x*40) + seed, Math.round(z*40) + Math.round(y*40)*3); pa.setXYZ(i, x*k, y*k*fy, z*k); }
     g.computeVertexNormals(); return paint(g, (x, y, z, ny)=>{ const t = 0.5 + 0.5*ny; return [0.55 + 0.4*t, 0.62 + 0.45*t, 0.5 + 0.3*t]; }); };
   /* the rainforest giant */
-  { const tr = new T.CylinderGeometry(0.042, 0.08, 1.7, 10, 10).translate(0, 0.85, 0), pa = tr.attributes.position; for (let i=0;i<pa.count;i++){ const y = pa.getY(i); pa.setX(i, pa.getX(i) + 0.05*Math.sin(y*1.7)); pa.setZ(i, pa.getZ(i) + 0.03*Math.sin(y*2.3 + 1)); } tr.computeVertexNormals();
+  { const tr = new T.CylinderGeometry(0.042, 0.08, 1.7, lo ? 6 : 10, lo ? 4 : 10).translate(0, 0.85, 0), pa = tr.attributes.position; for (let i=0;i<pa.count;i++){ const y = pa.getY(i); pa.setX(i, pa.getX(i) + 0.05*Math.sin(y*1.7)); pa.setZ(i, pa.getZ(i) + 0.03*Math.sin(y*2.3 + 1)); } tr.computeVertexNormals();
     paint(tr, (x, y)=>{ const m = 1 - Math.min(1, y/0.5); return [0.7 + 0.2*(1 - m) - 0.15*m, 0.66 + 0.2*(1 - m) + 0.12*m, 0.6 + 0.12*(1 - m) - 0.12*m]; });   /* (moss up from its foot) */
     const parts = [mesh(tr)];
-    for (let i=0;i<5;i++){ const sh = new T.Shape(); sh.moveTo(0, 0); sh.lineTo(0.2 + hs(i, 3)*0.06, 0); sh.quadraticCurveTo(0.05, 0.04, 0.0, 0.36 + hs(i, 5)*0.1); sh.lineTo(0, 0);
-      const fin = new T.ExtrudeGeometry(sh, { depth:0.016, bevelEnabled:false, curveSegments:6 }).translate(0, 0, -0.008); paint(fin, (x, y)=>[0.5, 0.62 + 0.3*Math.max(0, 0.3 - y), 0.42]);
+    for (let i=0;i<nF;i++){ const sh = new T.Shape(); sh.moveTo(0, 0); sh.lineTo(0.2 + hs(i, 3)*0.06, 0); sh.quadraticCurveTo(0.05, 0.04, 0.0, 0.36 + hs(i, 5)*0.1); sh.lineTo(0, 0);
+      const fin = new T.ExtrudeGeometry(sh, { depth:0.016, bevelEnabled:false, curveSegments:lo ? 3 : 6 }).translate(0, 0, -0.008); paint(fin, (x, y)=>[0.5, 0.62 + 0.3*Math.max(0, 0.3 - y), 0.42]);
       parts.push(mesh(fin, [Math.cos(i*1.26)*0.05, 0, -Math.sin(i*1.26)*0.05], [0, i*1.26 + hs(i, 7)*0.3, 0])); }
     PARTS.jtree = [['trunk', merge(parts, true), '#6a5034']];
     PARTS.jtree.push(['leaf', merge([mesh(crown(0.62, 0.42, 1), [0.02, 1.78, 0]), mesh(crown(0.42, 0.5, 2), [0.42, 1.5, 0.12]), mesh(crown(0.4, 0.5, 3), [-0.36, 1.42, -0.2]), mesh(crown(0.36, 0.5, 4), [-0.06, 1.55, 0.44])], true), '#2c6a2a']);
-    const vines = []; for (let i=0;i<5;i++){ const a = i*1.3 + 0.4, r0 = 0.38 + hs(i, 11)*0.2, y0 = 1.42, y1 = 0.35 + hs(i, 13)*0.5, cx = Math.cos(a)*r0, cz = Math.sin(a)*r0;
-      const cv = new T.CatmullRomCurve3([new T.Vector3(cx, y0, cz), new T.Vector3(cx*0.92, (y0 + y1)/2 + 0.08, cz*0.92), new T.Vector3(cx*0.95 + 0.02, y1, cz*0.95)]); vines.push(mesh(new T.TubeGeometry(cv, 10, 0.007, 4))); }
+    const vines = []; for (let i=0;i<nV;i++){ const a = i*1.3 + 0.4, r0 = 0.38 + hs(i, 11)*0.2, y0 = 1.42, y1 = 0.35 + hs(i, 13)*0.5, cx = Math.cos(a)*r0, cz = Math.sin(a)*r0;
+      const cv = new T.CatmullRomCurve3([new T.Vector3(cx, y0, cz), new T.Vector3(cx*0.92, (y0 + y1)/2 + 0.08, cz*0.92), new T.Vector3(cx*0.95 + 0.02, y1, cz*0.95)]); vines.push(mesh(new T.TubeGeometry(cv, lo ? 5 : 10, 0.007, lo ? 3 : 4))); }
     PARTS.jtree.push(['vine', merge(vines), '#3e5e26']); }
   /* the palm */
-  { const cv = new T.QuadraticBezierCurve3(new T.Vector3(0, 0, 0), new T.Vector3(0.02, 0.7, 0), new T.Vector3(0.22, 1.22, 0)), tg = new T.TubeGeometry(cv, 18, 0.045, 8), pa = tg.attributes.position;
-    for (let i=0;i<19;i++){ const c = cv.getPointAt(i/18), k = 1.25 - 0.45*(i/18); for (let j=0;j<9;j++){ const vi = i*9 + j, v = new T.Vector3().fromBufferAttribute(pa, vi).sub(c).multiplyScalar(k).add(c); pa.setXYZ(vi, v.x, v.y, v.z); } } tg.computeVertexNormals();
+  { const cv = new T.QuadraticBezierCurve3(new T.Vector3(0, 0, 0), new T.Vector3(0.02, 0.7, 0), new T.Vector3(0.22, 1.22, 0)), TS = lo ? 9 : 18, TR = lo ? 5 : 8, tg = new T.TubeGeometry(cv, TS, 0.045, TR), pa = tg.attributes.position;
+    for (let i=0;i<=TS;i++){ const c = cv.getPointAt(i/TS), k = 1.25 - 0.45*(i/TS); for (let j=0;j<=TR;j++){ const vi = i*(TR + 1) + j, v = new T.Vector3().fromBufferAttribute(pa, vi).sub(c).multiplyScalar(k).add(c); pa.setXYZ(vi, v.x, v.y, v.z); } } tg.computeVertexNormals();
     paint(tg, (x, y)=>{ const ring = 0.82 + 0.18*Math.abs(Math.sin(y*44)); return [0.8*ring, 0.68*ring, 0.52*ring]; });   /* (its rings) */
-    const nuts = []; for (let i=0;i<4;i++) nuts.push(mesh(paint(new T.SphereGeometry(0.035, 10, 8), ()=>[0.62, 0.5, 0.3]), [0.22 + Math.cos(i*1.6)*0.04, 1.17, Math.sin(i*1.6)*0.04]));
+    const nuts = []; for (let i=0;i<4;i++) nuts.push(mesh(paint(new T.SphereGeometry(0.035, lo ? 5 : 10, lo ? 4 : 8), ()=>[0.62, 0.5, 0.3]), [0.22 + Math.cos(i*1.6)*0.04, 1.17, Math.sin(i*1.6)*0.04]));
     PARTS.palm = [['trunk', merge([mesh(tg)].concat(nuts), true), '#8a6a44']];
-    const fr = []; for (let i=0;i<9;i++) fr.push(mesh(blade(0.6, 0.085, 0.95, 14, true, 1.12), [0.22, 1.22, 0], [0, i/9*Math.PI*2 + 0.2, (hs(i, 21) - 0.5)*0.3, 'YZX']));
+    const fr = [], nP = lo ? 7 : 9; for (let i=0;i<nP;i++) fr.push(mesh(blade(0.6, 0.085, 0.95, lo ? 8 : 14, true, 1.12), [0.22, 1.22, 0], [0, i/nP*Math.PI*2 + 0.2, (hs(i, 21) - 0.5)*0.3, 'YZX']));
     PARTS.palm.push(['leaf', merge(fr, true, true), '#4a8a34']); }
   /* the fern: arching, toothed fronds from a crown at the ground */
-  { const fr = []; for (let i=0;i<8;i++) fr.push(mesh(blade(0.42 + hs(i, 31)*0.1, 0.06, 0.75, 16, true), [0, 0.02, 0], [0, i/8*Math.PI*2 + hs(i, 33)*0.4, 0.15, 'YZX']));
+  { const fr = [], nf = lo ? 6 : 8; for (let i=0;i<nf;i++) fr.push(mesh(blade(0.42 + hs(i, 31)*0.1, 0.06, 0.75, lo ? 8 : 16, true), [0, 0.02, 0], [0, i/nf*Math.PI*2 + hs(i, 33)*0.4, 0.15, 'YZX']));
     PARTS.fern = [['leaf', merge(fr, true, true), '#3c7a2c']]; }
   /* big-leaf understory: heart-shaped leaves held out on stalks; an orchid in it */
-  { const heart = ()=>{ const sh = new T.Shape(); sh.moveTo(0, 0); sh.bezierCurveTo(0.06, 0.1, 0.16, 0.08, 0.22, 0); sh.bezierCurveTo(0.16, -0.08, 0.06, -0.1, 0, 0); const g = new T.ShapeGeometry(sh, 8), pa = g.attributes.position;
+  { const heart = ()=>{ const sh = new T.Shape(); sh.moveTo(0, 0); sh.bezierCurveTo(0.06, 0.1, 0.16, 0.08, 0.22, 0); sh.bezierCurveTo(0.16, -0.08, 0.06, -0.1, 0, 0); const g = new T.ShapeGeometry(sh, lo ? 4 : 8), pa = g.attributes.position;
       for (let i=0;i<pa.count;i++){ const x = pa.getX(i), y = pa.getY(i); pa.setXYZ(i, x, -0.25*x*x*4 + 0.02*Math.abs(y)*4, y); } g.computeVertexNormals(); return paint(g, (x, y, z)=>{ const v = Math.abs(z) < 0.006 ? 1.15 : 1; return [0.7*v, (0.8 + 0.6*x)*v, 0.6*v]; }); };
     const lv = [], st = []; for (let i=0;i<6;i++){ const a = i/6*Math.PI*2 + hs(i, 41)*0.5, h0 = 0.16 + hs(i, 43)*0.14, r = 0.07;
       st.push(mesh(new T.CylinderGeometry(0.006, 0.008, h0, 4).translate(0, h0/2, 0), [Math.cos(a)*r*0.4, 0, -Math.sin(a)*r*0.4], [0, a, 0.35]));
@@ -30270,6 +30328,9 @@ const FP_THEME_SPECS = {
   // (RS-756) the Lost City: carved green stone under moss and vines, a mosaic floor broken by the jungle's grass
   city: { wall: fpFrieze(fpBricks({base:[126,134,108], mc:[42,50,36], rows:3, cols:2, seed:381, moss:0.55, mossCol:[50,94,36]}), [86,104,72]), wall2: fpCarved({base:[120,130,104], mc:[40,48,34], seed:382}),
     floor: fpMosaic({pal:[[120,126,100],[150,140,104],[96,118,92],[132,110,84]], mc:[40,50,34], seed:383}), floor2: fpGrass({base:[60,92,42], seed:384}), ceil: fpRock({base:[70,80,60], seed:385}), amb:[0.032,0.046,0.032], mist:0x9cc090 },
+  // (RS-757) the Lost City's streets, under the jungle's sky: its stone as below, paving and grass underfoot (lit by the hour, day:true)
+  cityOut: { outdoor:true, day:true, sky:[[92,146,198],[212,226,198]], wall: fpFrieze(fpBricks({base:[126,134,108], mc:[42,50,36], rows:3, cols:2, seed:381, moss:0.55, mossCol:[50,94,36]}), [86,104,72]), wall2: fpBricks({base:[120,130,104], mc:[40,48,34], rows:3, cols:2, seed:387, moss:0.7, mossCol:[46,90,34]}),
+    floor: fpBricks({base:[138,136,112], mc:[60,82,44], rows:4, cols:3, seed:388, moss:0.3, mossCol:[70,110,50], mortar:3}), floor2: fpGrass({base:[64,102,42], seed:389}), mist:0xb8d0a8 },
   // (RS-213) sandstone block walls with a painted frieze, sand drifted over an inlaid floor
   pyramid: {
     wall: fpGlyphWall(fpBricks({base:[204,174,116], mc:[116,90,52], rows:3, cols:1, seed:81, jitter:0.08}), 'a'),   /* (RS-214: registers of hieroglyphs on smooth-dressed blocks) */
@@ -30318,11 +30379,12 @@ const FP_THEME_SPECS = {
 function fpTheme(){
   const key = G.gameMode===2 ? (G.cellar ? 'dungeon' : FP_THEME_SPECS[G.arenaTheme] ? G.arenaTheme : 'forest')
     : (G.siteKind==='graveyard' && G.depth>1) ? 'catacomb'          // under the graveyard
+    : (G.siteKind==='city' && (G.depth||1)===1) ? 'cityOut'           // (RS-757: the Lost City itself, under the sky)
     : G.siteKind==='dungeon' ? dgThemeKey()                       // (RS-754: a plain dungeon in its own land's stone)
     : (FP_THEME_SPECS[G.siteKind] ? G.siteKind : 'dungeon');
   if (FP.themes[key]) return FP.themes[key];
   const s = FP_THEME_SPECS[key];
-  const T = { key, outdoor:!!s.outdoor, sky:s.sky, yard:!!s.yard, amb:s.amb||null, mist:s.mist||null };
+  const T = { key, outdoor:!!s.outdoor, day:!!s.day, sky:s.sky, yard:!!s.yard, amb:s.amb||null, mist:s.mist||null };
   T.fence = s.fence ? fpMakeTex(s.fence) : null;
   T.wall = fpMakeTex(s.wall);
   T.wall2 = fpMakeTex(s.wall2 || s.wall);
@@ -39753,9 +39815,10 @@ function fpEnv(){
   if (G.gameMode!==2 || G.cellar){
     const T = fpTheme();
     // an open-air site (the graveyard) is always a misty moonlit night
-    if (T.outdoor) return { amb:[0.13,0.16,0.27], lan:[1.0,0.86,0.66], lanK:1.3, R, sky:T.sky, fog:[22,28,44],
+    if (T.outdoor && !T.day) return { amb:[0.13,0.16,0.27], lan:[1.0,0.86,0.66], lanK:1.3, R, sky:T.sky, fog:[22,28,44],
       fogNear:3, fogFar:13, night:true, moon:true };
-    return { amb:T.amb || [0.03,0.036,0.05], lan:[1.0,0.86,0.66], lanK:1.35, R, fog:null };
+    if (!T.outdoor) return { amb:T.amb || [0.03,0.036,0.05], lan:[1.0,0.86,0.66], lanK:1.35, R, fog:null };
+    /* (RS-757) one lit by the hour (the Lost City) goes on to the open land's light, below */
   }
   const night = isNightTime(), storm = G.weather==='storm', fogw = G.weather==='fog', rain = G.weather==='rain';
   let amb = night ? [0.2,0.24,0.38] : [0.95,0.94,0.9];
@@ -39812,6 +39875,7 @@ function fpFloorSlots(T){
     else if (G.gameMode===1 && G.dungeonDeco){
       const d = G.dungeonDeco[x][y];
       if (d==='rune') s = 5; else if (d==='pool') s = 6;
+      else if (T && T.key==='cityOut') s = cityPaved(x, y) ? 0 : 1;   /* (RS-757: paving, or the grass come through it) */
     }
     f[y*COLS+x] = s;
   }
@@ -40129,6 +40193,23 @@ function fpdInscriptionTex(seed){
   const t = new THREE.CanvasTexture(c); return t;
 }
 // headstones, mausoleums and the crypt over the stair down
+/* (RS-757) the jungle round the Lost City and come into it: the land's own plants (o3JungleParts) - giants and palms over ferns and big
+   leaves on its jungle tiles and out past the edge, a fern or a big leaf in the grass of its streets. Each part of each plant is one
+   merged mesh; their materials are kept (FPD.mats) and dissolve between you and the camera as the walls do (fpdCutify) */
+function fpdCityJungle(world){
+  const T = THREE; if (!FPD.cityParts){ const P0 = {}; o3JungleParts(T, P0, true); FPD.cityParts = P0; }
+  FPD.mats = FPD.mats || {}; const PT = FPD.cityParts, L = {}, put = (k, x, z, sc, r)=>(L[k] = L[k] || []).push([x, z, sc, r]), D = G.dungeonDeco, P = cityPyr();
+  for (let y=-3; y<ROWS+3; y++) for (let x=-3; x<COLS+3; x++){ const h = i=>fpHash(x + 50, y + 50, 620 + i), inb = x>=0 && y>=0 && x<COLS && y<ROWS;
+    if (inb && G.map[x][y]===T_WALL && D[x][y]==='jung'){ if (h(0) < 0.48) put(h(1) < 0.3 ? 'palm' : 'jtree', x + 0.3 + h(2)*0.4, y + 0.3 + h(3)*0.4, 0.7 + h(4)*0.35, h(5)*6.28);
+      put(h(6) < 0.5 ? 'fern' : 'bigleaf', x + 0.2 + h(7)*0.6, y + 0.2 + h(8)*0.6, 1.3 + h(9)*0.6, h(10)*6.28); }
+    else if (inb){ if (G.map[x][y]===T_FLOOR && !D[x][y] && !cityPaved(x, y) && !(x >= P.x0 - 1 && x <= P.x1 && y >= P.y0 - 1 && y <= P.y1 + 1) && h(0) < 0.1) put(h(1) < 0.6 ? 'fern' : 'bigleaf', x + 0.2 + h(2)*0.6, y + 0.2 + h(3)*0.6, 0.8 + h(4)*0.4, h(5)*6.28); }
+    else { if (h(0) < 0.42) put(h(1) < 0.25 ? 'palm' : 'jtree', x + 0.2 + h(2)*0.6, y + 0.2 + h(3)*0.6, 0.8 + h(4)*0.4, h(5)*6.28); if (h(6) < 0.3) put(h(7) < 0.6 ? 'fern' : 'bigleaf', x + h(8), y + h(9), 1.3 + h(10)*0.5, h(11)*6.28); } }
+  for (const k in L) for (const [nm, geo, col] of PT[k] || []){
+    const list = L[k].map(([x, z, sc, r])=>{ const m = new T.Mesh(geo); m.position.set(x, 0, z); m.rotation.y = r; m.scale.setScalar(sc); return m; });
+    const g = m3dMergeMeshes(list).geometry, mk = 'cityJ:' + k + ':' + nm;
+    let mat = FPD.mats[mk]; if (!mat){ mat = FPD.mats[mk] = new T.MeshStandardMaterial({ color:new T.Color(col).convertSRGBToLinear(), roughness:0.8, vertexColors:!!geo.userData.vc, side:geo.userData.ds ? T.DoubleSide : T.FrontSide }); fpdCutify(mat); }
+    const m = new T.Mesh(g, mat); m.castShadow = k==='jtree' || k==='palm'; m.receiveShadow = true; world.add(m); }
+}
 function fpdGraveyard(world, matFor){
   FPD.cryptRoof = null;
   const TH = THREE, D = G.dungeonDeco, boxG = new TH.BoxGeometry(1,1,1);
@@ -40309,13 +40390,18 @@ function fpdBuild(T){
   };
   const skullAt = (px, py, pz, faceX, faceZ, seed)=>prop(props.skull, px, py, pz, Math.atan2(-faceX, -faceZ) + (fpHash(seed,2,241)-0.5)*0.8, 0.056, 0.06, 0.068, (fpHash(seed,3,241)-0.5)*0.3, (fpHash(seed,4,241)-0.5)*0.3);
   const boneAt = (px, py, pz, ang, len)=>prop(props.bone, px, py, pz, ang, len, 0.011, 0.011);
-  const cata = key==='catacomb', stairTiles = [];
+  const cata = key==='catacomb', stairTiles = [], cityO = key==='cityOut';
   const ramp = (t, lo)=> lo + (1-lo)*Math.min(1, t/0.14);
   for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
     if (town) break;
     if (solid(x,y)){
       // seen from above, the ground runs on under a field's bushes and a graveyard's fences and tombs
-      if (ISO.on && out) face('floor0', [x,-0.002,y+1], [1,0,0], [0,0,-1], [0,1,0], [0,1], [0,1], ()=>0.85);
+      if (ISO.on && out) face(cityO ? 'floor1' : 'floor0', [x,-0.002,y+1], [1,0,0], [0,0,-1], [0,1,0], [0,1], [0,1], ()=>0.85);
+      if (cityO && !G.dungeonDeco[x][y]){   /* (RS-757) a ruin's wall, open to the sky: its top, and its face above a lower stretch beside it */
+        const h = cityWallH(x, y); face('wall2', [x,h,y+1], [1,0,0], [0,0,-1], [0,1,0], [0,1], [0,1], ()=>0.95, [1, 1]);
+        for (const [dx,dy] of FACING_VECT){ const nx = x+dx, ny = y+dy; if (nx<0 || ny<0 || nx>=COLS || ny>=ROWS || G.map[nx][ny]!==T_WALL || G.dungeonDeco[nx][ny]) continue; const nh = cityWallH(nx, ny); if (nh >= h) continue;
+          const ex = -dx, ey = -dy, ux = -ey, uz = ex; face('wall', [nx+0.5+ex*0.5-ux*0.5, nh, ny+0.5+ey*0.5-uz*0.5], [ux,0,uz], [0,h-nh,0], [dx,0,dy], [0,1], [0,1], ()=>0.9, [1, h-nh, 0, nh]); }
+      }
       continue;
     }
     // walls around this open tile
@@ -40325,6 +40411,7 @@ function fpdBuild(T){
       const inb = wx>=0 && wy>=0 && wx<COLS && wy<ROWS, dW = inb && G.dungeonDeco && !field ? G.dungeonDeco[wx][wy] : '';
       const fenceT = yard && (wx===0 || wy===0 || wx===COLS-1 || wy===ROWS-1);
       if (yard && !fenceT && dW!=='cryptW') continue;           // (the graveyard's tombs are modelled whole - see fpdGraveyard)
+      if (cityO && (dW==='jung' || dW==='pyr')) continue;       /* (RS-757: the jungle and the pyramid are built whole - fpdCityJungle, and the pyramid below) */
       let wk = 'wall';
       if (inb){
         if (fenceT) wk = 'fence';
@@ -40361,6 +40448,7 @@ function fpdBuild(T){
         }
         continue;
       }
+      if (cityO){ const hw = cityWallH(wx, wy); face(wk, O, [ux,0,uz], [0,hw,0], [-dx,0,-dy], S5, S5, aoW, [1, hw]); continue; }   /* (RS-757: a ruin's walls, some half fallen) */
       face(wk, O, [ux,0,uz], [0,1,0], [-dx,0,-dy], S5, S5, aoW);
     }
     // floor, darkened toward any wall it runs into
@@ -40463,6 +40551,20 @@ function fpdBuild(T){
     box('trim', x-r-0.025, 0, y-r-0.025, x+r+0.025, 0.1, y+r+0.025, 0.55);   // its footing
     box('trim', x-r-0.02, 0.92, y-r-0.02, x+r+0.02, 0.97, y+r+0.02, 0.8);   // and a capital under the ceiling
   }
+  /* (RS-757) the Lost City's stepped pyramid: five tiers of green stone, a stair up its face to the shrine on top, and at its foot,
+     over the way down, a dark doorway into it */
+  if (cityO){ const P = cityPyr(), cxm = (P.x0 + P.x1)/2, TH5 = 0.5, IN = 0.55;
+    for (let i=0;i<5;i++) box(i % 2 ? 'wall' : 'wall2', P.x0 + i*IN, i*TH5, P.y0 + i*IN, P.x1 - i*IN, (i+1)*TH5, P.y1 - i*IN, i ? 0.8 : 0.5);
+    const zt0 = P.y0 + 4*IN, zt1 = P.y1 - 4*IN, ztm = (zt0 + zt1)/2;
+    box('wall2', cxm - 1.05, 2.5, ztm - 0.6, cxm + 1.05, 3.3, ztm + 0.6, 0.7); box('wall', cxm - 1.25, 3.3, ztm - 0.8, cxm + 1.25, 3.45, ztm + 0.8, 0.8); box('wall2', cxm - 0.8, 3.45, ztm - 0.5, cxm + 0.8, 3.75, ztm + 0.5, 0.8);
+    face('wall', [cxm - 0.35, 2.5, ztm + 0.605], [0.7,0,0], [0,0.55,0], [0,0,1], [0,1], [0,1], ()=>0.04);   /* (the shrine's door) */
+    /* (the stair: steeper than the tiers, so it stands out from them, from the first terrace to a landing before the shrine) */
+    const rise = 0.25, run = 0.15, steps = Math.round(4*TH5/rise), zs = P.y1 - 0.06;
+    for (let j=0;j<steps;j++){ const z1 = zs - j*run, y1 = TH5 + (j+1)*rise; box('wall', cxm - 0.65, TH5, z1 - run - 0.02, cxm + 0.65, y1, z1, 0.75);
+      for (const sx of [-0.8, 0.65]) box('wall2', cxm + sx, TH5, z1 - run - 0.02, cxm + sx + 0.15, y1 + 0.14, z1, 0.75); }   /* (and its balustrades) */
+    box('wall', cxm - 0.8, TH5, zt1, cxm + 0.8, 5*TH5, zs - steps*run, 0.75);   /* (the landing) */
+    face('wall', [cxm - 0.45, 0, P.y1 + 0.006], [0.9,0,0], [0,0.46,0], [0,0,1], [0,1], [0,1], ()=>0.03);   /* (the doorway at its foot) */
+    box('wall2', cxm - 0.62, 0.46, P.y1 - 0.04, cxm + 0.62, 0.56, P.y1 + 0.1, 0.8); }
   /* (RS-335) no more ribs and timber frames across the corridor ceilings: seen from above they were bars across the way */
   const slotFns = [spec.floor, spec.floor2||spec.floor, spec.floor, spec.floor, fpPit(spec.floor), fpRuneFloor(spec.floor), fpWater(), spec.edge||spec.floor];
   // rough-hewn rock varies a lot in brightness, so it takes a much gentler bump than laid stone
@@ -40520,6 +40622,7 @@ function fpdBuild(T){
   }
   if (out) fpdOutdoor(T, spec, world, matFor);
   if (yard) fpdGraveyard(world, matFor);
+  if (key==='cityOut') try{ fpdCityJungle(world); }catch(e){ console.error(e); }   /* (RS-757) */
   if (props.skull.length || props.bone.length || props.candle.length || props.shroud.length) fpdCatacombProps(props, matFor, world);
   fpdPortals(world);
   gfxMatsBorn(FPD.r, world); FPD.scene.add(world); FPD.world = world;   /* (RS-562) */
@@ -40837,7 +40940,7 @@ function fpdOutdoor(T, spec, world, matFor){
     const gp = gg.attributes.position, guv = gg.attributes.uv;
     for (let i=0;i<gp.count;i++) guv.setXY(i, gp.getX(i), -gp.getZ(i));
     gg.setAttribute('color', new TH.Float32BufferAttribute(new Array(gp.count*3).fill(0.92), 3));
-    add(new TH.Mesh(gg, matFor(key==='sea' ? 'floor7' : 'floor0')), false);
+    add(new TH.Mesh(gg, matFor(key==='sea' ? 'floor7' : key==='cityOut' ? 'floor1' : 'floor0')), false);
   }
   // the field's obstacles
   if (field){
@@ -49613,7 +49716,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-756';
+const GAME_VERSION = 'rs-757';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
