@@ -106,6 +106,7 @@ Screenshots go to `tools/tests/shots/`.
 | rs768 | the season turning during a background land build: no crash, the land rebuilt in the new season |
 | rs769 | RS-769: the river at night - no surf rings down a river, the flow's streaks wide enough not to shimmer, the shallows and foam dark at night (read from the drawn pixels) |
 | rs770 | RS-770: the loot filter takes a Fire Cape (plain, not a set piece; an old one mended on load); a cape in the filter's tier by the level it's found from |
+| rs771 | RS-771: a wizard out of runes walks up and bashes with the staff (melee, Attack xp), told once, not a red 'no runes' every swing; casts again with runes |
 | zloot | probe: the drops at a few levels - rarity shares, names with their bonuses and tiers, a rare's tooltip text (ZL levels, ZN drops a level) |
 | zloottip | probe: a rare's, a magic piece's and a Ring of Recoil's tooltip, plain and with Alt held, as shots/zloottip0-3.png |
 | rs703 | A spell leaves the staff as it comes forward: a real cast at a foe three tiles off, sampled every frame - the bolt waits about half a second, leaves from the staff's head as it leans ahead, its sound with it; the foe flinches (and a miss splashes) only as it lands; the cast lasts about a second; a foe it kills stands till the bolt lands, and the staff isn't put away mid-cast |

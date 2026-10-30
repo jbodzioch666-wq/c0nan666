@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-771 - Staff and Stone
+
+- **Out of runes, fight with your staff:** when a wizard runs dry, clicking a foe walks you up to it and you bash it with your staff, which is a crush weapon too, with its own attack and strength bonuses. These hits train Attack, Strength or Defence by your combat style.
+- **Told plainly, once:** instead of a red "you have no runes for any spell" on every swing, you get one line, "out of runes - you fight with your staff", with what your spell still needs, and a pop-up. When you have runes again the staff goes back to casting, and if you run dry again you're told again.
+
 ## RS-770 - Into the Fire
 
 - **The loot filter takes Fire Capes:** a Fire Cape was still marked with the old "boss item" grade, which now means a set piece, so the filter always kept it and its name showed in set green. It's a plain piece now, and the ones you already have are fixed when you load.
