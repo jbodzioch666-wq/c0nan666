@@ -43856,17 +43856,20 @@ function m3dHumanoid(o){
     const tm = m3dMat(mats, o.tailCol || mpTone(skinHex, -0.3), 'skin');
     const pts = (rig.skirt ? [[0,0,0],[0,-0.03,-0.07],[0,-0.1,-0.17],[0,-0.24,-0.25],[0,-0.38,-0.25]] : [[0,0,0],[0,-0.05,-0.08],[0,-0.14,-0.16],[0,-0.28,-0.2],[0,-0.4,-0.18]]).map(p=>new T.Vector3(...p));   /* (RS-753: from a robe to the ankles it comes straight out through the back and falls clear of the cloth, as a dragon's does) */
     const tail = new T.Group(); tail.position.set(0, -0.01, -0.06); hips.add(tail);
+    const tuck = rig.skirt && rig.cape ? m3dTailUnderCape(rig, hips, o.tail==='dragon' ? 0.034*b : 0.016*b) : null;   /* (RS-762: under a cape, down the robe's back and out below the cape's hem) */
+    if (tuck && o.tail!=='dragon') pts.splice(0, pts.length, ...tuck);
     if (o.tail==='dragon'){
       // thick at the root, tapering to a point, with a row of spines down its back
-      const dp = [[0,0,0],[0,-0.06,-0.09],[0,-0.17,-0.18],[0,-0.3,-0.25],[0,-0.42,-0.3]].map(p=>new T.Vector3(...p)), cv = new T.CatmullRomCurve3(dp);
+      const dp = tuck || [[0,0,0],[0,-0.06,-0.09],[0,-0.17,-0.18],[0,-0.3,-0.25],[0,-0.42,-0.3]].map(p=>new T.Vector3(...p)), cv = new T.CatmullRomCurve3(dp);
       const tg = new T.TubeGeometry(cv, 20, 0.034*b, 8), pa = tg.attributes.position, seg = 21, rad = 9;
       for (let i=0;i<seg;i++){ const c = cv.getPointAt(i/(seg-1)), k = 1 - 0.85*(i/(seg-1)); for (let j=0;j<rad;j++){ const vi = i*rad + j, v = new T.Vector3().fromBufferAttribute(pa, vi).sub(c).multiplyScalar(k).add(c); pa.setXYZ(vi, v.x, v.y, v.z); } }
-      tg.computeVertexNormals(); tail.add(new T.Mesh(tg, tm)); tail.userData.caps = dp.slice(1).map((p2, i)=>[dp[i], p2, 0.034*b*(1 - 0.85*i/4) + 0.012]);   /* (RS-459: for a cloak to drape over; with its spines) */
-      const sm = m3dMat(mats, '#d8ccb0', 'horn'); for (let i=2;i<8;i++){ const u = i/9, c = cv.getPointAt(u), tn = cv.getTangentAt(u), r = 0.034*b*(1 - 0.85*u), ny = -tn.z, nz = tn.y, dy = ny + 0.7*tn.y, dz = nz + 0.7*tn.z;
+      tg.computeVertexNormals(); tail.add(new T.Mesh(tg, tm)); tail.userData.caps = dp.slice(1).map((p2, i)=>[dp[i], p2, 0.034*b*(1 - 0.85*i/(dp.length - 1)) + 0.012]);   /* (RS-459: for a cloak to drape over; with its spines) */
+      const sm = m3dMat(mats, '#d8ccb0', 'horn'); for (let i=tuck ? 5 : 2;i<8;i++){   /* (RS-762: tucked under a cape, its spines only where it comes out) */ const u = i/9, c = cv.getPointAt(u), tn = cv.getTangentAt(u), r = 0.034*b*(1 - 0.85*u), ny = -tn.z, nz = tn.y, dy = ny + 0.7*tn.y, dz = nz + 0.7*tn.z;
         m3dCone(tail, 0.01*(1-u*0.6), 0.034*(1-u*0.5), sm, c.x, c.y + ny*r*0.9, c.z + nz*r*0.9, Math.atan2(dz, dy)); }
     } else { tail.add(new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(pts), 16, 0.016*b, 6), tm)); tail.userData.caps = pts.slice(1).map((p2, i)=>[pts[i], p2, 0.016*b]); }
     if (o.tail==='spade'){ const e = pts[pts.length - 1]; m3dCone(tail, 0.03, 0.05, tm, 0, e.y - 0.03, e.z, Math.PI); }
-    if (rig.skirt) tail.rotation.x = 0.2;   /* (RS-753: and over a robe it rides a little higher behind, clear of the hem the back leg kicks out) */
+    if (rig.skirt && !tuck) tail.rotation.x = 0.2;   /* (RS-753: and over a robe it rides a little higher behind, clear of the hem the back leg kicks out) */
+    rig.tailSwish = tuck ? 0.07 : 0.3; rig.tailTuck = !!tuck;   /* (RS-762: hanging under a cape it only stirs) */
     rig.tail = tail;
   }
   if (o.aura){ const sp = new T.Sprite(M3D.glowMat('#'+o.aura.split(',').map(v=>(+v).toString(16).padStart(2,'0')).join(''), o.auraA||0.35)); sp.scale.setScalar(1.1); sp.position.y = 0.55; root.add(sp); }
@@ -46621,6 +46624,18 @@ function m3dCapeClear(rig, torso){
   if (moved){ cg.computeVertexNormals(); p.needsUpdate = true; }
   return moved;
 }
+/* (RS-762) a tail's path under a cape over a robe, in the tail's own frame (its root at the hips, 0, -0.01, -0.06): out through the
+   robe's back just below the belt, down between the robe and the cape, close on the cloth as the robe flares (its back, -0.098 at the hips
+   to -0.25 at the hem), and out below the cape's hem, curving back to the ground behind - it went straight back through the cape */
+function m3dTailUnderCape(rig, hips, rad){
+  const T = THREE; let hem = -0.233;
+  try{ let top = hips; while (top.parent) top = top.parent; top.updateMatrixWorld(true); const M = rig.cape.matrixWorld.clone().premultiply(hips.matrixWorld.clone().invert()), pa = rig.cape.geometry.attributes.position, v = new T.Vector3(); let mn = 9;
+    for (let i=0;i<pa.count;i++){ v.fromBufferAttribute(pa, i).applyMatrix4(M); if (Math.abs(v.x) < 0.08) mn = Math.min(mn, v.y); } if (mn < 0) hem = mn; }catch(err){}
+  const robe = y=>-0.098 - Math.max(0, -y)*0.34, gap = y=>rad + 0.01 + Math.max(0, -y)*0.12, e = Math.max(-0.31, Math.min(-0.12, hem - 0.04)), H = [[-0.01, -0.06]];   /* (more room lower down, where a stride kicks the robe back) */
+  for (const y of [-0.05, -0.14]) if (y > e + 0.03) H.push([y, robe(y) - gap(y)]);
+  H.push([e, robe(e) - gap(e)], [e - 0.08, robe(e - 0.08) - gap(e) - 0.11], [e - 0.12, robe(e - 0.12) - gap(e) - 0.21]);
+  return H.map(([y, z])=>new T.Vector3(0, y + 0.01, z + 0.06));
+}
 function m3dSkirtFollow(r){
   const m = r.skirt, legs = r.legs; if (!m || !legs || legs.length < 2) return;
   const sw = legs.map(L=>L.hip.rotation.x), kn = legs.map(L=>L.knee.rotation.x), tilt = r.torso ? r.torso.rotation.x : 0, sig = sw[0]*7 + sw[1]*13 + kn[0]*17 + kn[1]*19 + (r.sitting ? 0 : tilt*23) +   /* (RS-588: a sitter's breathing doesn't refold the robe every frame) */ (r.hips ? r.hips.position.y*29 : 0) + (r.torso ? r.torso.rotation.y*31 + r.torso.rotation.z*37 : 0);   /* (RS-291: the waist turns with the torso) */
@@ -46810,7 +46825,7 @@ function m3dPoseHumanoid(r, t, moving, wind, strike, hurt, e){
   if (r.head && r.drakeJaw!==null){ if (r.drakeJaw===undefined) r.drakeJaw = r.head.getObjectByName('drakeJaw') || null; if (r.drakeJaw) r.drakeJaw.rotation.x = Math.max(0, wind*0.25 + strike*0.5 - 0.02) + 0.03; }   /* (RS-292: a dragonborn's jaw drops as it strikes) */
   r.head.rotation.x = -0.05 + breath*0.02 + hurt*0.3 - (r.hunch ? 0.4 : 0) - (r.stoop||0)*0.45 - (r.headBack||0) + (r.zombie ? 0.25 + Math.sin(t*0.8)*0.1 : 0); r.head.rotation.y = Math.sin(t*0.7)*0.15; r.head.rotation.z = r.zombie ? Math.sin(t*0.6)*0.2 : 0;
   if (r.wings) r.wings.forEach(W=>{ W.w.rotation.y = W.s*(-0.5 + Math.sin(t*(e.lift ? 7 : 2.5))*0.35); });
-  if (r.tail) r.tail.rotation.z = Math.sin(t*2.4)*0.3;
+  if (r.tail){ r.tail.rotation.z = Math.sin(t*2.4)*(r.tailSwish!=null ? r.tailSwish : 0.3); if (r.tailTuck) r.tail.rotation.x = 0.24*mv; }   /* (RS-762: tucked under a cape it swings back with the stride, clear of the robe the back leg kicks out) */
   if (r.cape && !r.sitting){ if (m3dClothOn(r)){ if (!r.clothLate) m3dCapeCloth(r.cape, r); } else {   /* (RS-588: a sitter's cape is hung by the seat, once) */ const cu = r.cape.userData; if (cu.P){ cu.P = null; cu.ax = undefined; } if ((cu.tick = (cu.tick||0) + 1) % 2) m3dCapeSwing(r.cape, 0.05 + moving*0.3 + Math.sin(t*1.5)*0.04 + strike*0.15, Math.sin(m3dStride(e, t, moving))*0.06*moving + Math.sin(t*0.9)*0.02); } }
   if (r.swing && (wind || strike || (r.grip2 && !r.sheathed && !(e && e.toolKey)))) m3dPoseSwing(r, wind, strike);   /* (RS-465: a two-handed weapon is held at guard in both hands between blows) */
   if (r.wk==='bow'){ if (wind || strike) m3dPoseBow(r, wind, strike); else if (r.bowPiv){ m3dBowParts(r); r.bowPiv.userData.drawK = 0; } }
@@ -49934,7 +49949,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-761';
+const GAME_VERSION = 'rs-762';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

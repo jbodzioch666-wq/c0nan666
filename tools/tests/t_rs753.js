@@ -18,7 +18,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
     return out; });
   console.log(JSON.stringify(r));
   for (const k of ['tief', 'drag']){ const f = r[k]; A(f.skirt && f.tot > 100 && f.inN===0, k + ': past its root the tail is outside the robe: ' + JSON.stringify(f));
-    A(f.swish > 0.25 && f.sz===1, k + ': the full swish, no tuck: ' + JSON.stringify(f)); A(f.cape && f.caps >= 4, k + ': caps for the cape: ' + JSON.stringify(f)); }
+    A(f.swish > 0.04 && f.swish < 0.1 && f.sz===1, k + ': under the cape it only stirs (RS-762): ' + JSON.stringify(f)); A(f.cape && f.caps >= 4, k + ': caps for the cape: ' + JSON.stringify(f)); }
   A(r.plate.zMin > -0.22 && r.plate.zMin < -0.17 && r.plate.swish > 0.25 && !r.plate.skirt, 'without a robe the old curve: ' + JSON.stringify(r.plate));
   A(!errs.length, 'no errors: ' + errs.join(' | '));
 };

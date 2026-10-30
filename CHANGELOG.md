@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-762 - Under the Cape
+
+- **A tail no longer pokes through your cape.** Over a robe with a cape, a tiefling's or dragonborn's tail now comes out of the robe's back and runs down under the cape, between the cape and the robe. It comes out below the cape's hem and curves back along the ground behind you.
+- **It moves with you.** Under a cape the tail only stirs instead of swishing hard, and it swings back as you stride, so the robe doesn't swallow it mid-step.
+- **Without a cape nothing changes:** the tail sticks out behind the robe and swishes freely, as before.
+
 ## RS-761 - Labelled Beds
 
 - **Garden beds have tooltips.** Point at one and a name plate shows, like the farmyard's animals have. It tells you what is growing, what stage it's at (sprouting, in leaf, in bud), how long until it's ready, and whether it's watered. An empty bed says to sow a seed, and a finished one says it's ready to pick.
