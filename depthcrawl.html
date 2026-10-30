@@ -40169,17 +40169,18 @@ function fpUpdateCamera(dt){
   }
   // the eye sits toward the back of its tile, like a classic grid crawler, so
   // a wall or a monster one step ahead is framed instead of filling the view
+  if (fpv()) fpmTick(dt);   /* (FP-003) */
   if (FP.lookYaw!=null && (!fpv() || p.facing!==FP.lookF)) FP.lookYaw = null;   /* (FP-002: turned some other way - square to the quarter again) */
   if (FP.lookYaw==null && FP.pitch) FP.pitch *= Math.exp(-dt*6);
-  const look = FP.lookYaw!=null, ta = look ? FP.lookYaw : FP_FACING_ANGLE[(p.facing|0)&3], gp = fpv() && ISO.player && ISO.player.pos && ISO.player.map===G.map ? ISO.player.pos : null;   /* (FP-001: at your walking pace, not hopping tile to tile) */
-  const tx = (gp ? gp.x : p.x+0.5)-Math.cos(ta)*FP_EYE_BACK, ty = (gp ? gp.y : p.y+0.5)-Math.sin(ta)*FP_EYE_BACK;
+  const look = FP.lookYaw!=null, ta = look ? FP.lookYaw : FP_FACING_ANGLE[(p.facing|0)&3], gp = fpv() && FPM.map===G.map ? FPM : null;   /* (FP-001: at your walking pace, not hopping tile to tile; FP-003: where your free walk has you) */
+  const eb = gp ? FPM_EYE_BACK : FP_EYE_BACK, tx = (gp ? gp.x : p.x+0.5)-Math.cos(ta)*eb, ty = (gp ? gp.y : p.y+0.5)-Math.sin(ta)*eb;
   let c = FP.cam;
   if (!c || mapChanged || Math.hypot(c.x-tx,c.y-ty)>2.5){ c = FP.cam = {x:tx, y:ty, a:ta}; }
   const k = gp ? 1 : 1-Math.exp(-dt*15);
   c.x += (tx-c.x)*k; c.y += (ty-c.y)*k;
   let da = ta-c.a; while (da>Math.PI) da -= Math.PI*2; while (da<-Math.PI) da += Math.PI*2;
   c.a += da*(look ? 1 : 1-Math.exp(-dt*13));
-  FP.moving = gp ? Math.min(1, gp.mv||0) : Math.min(1, Math.hypot(tx-c.x, ty-c.y));
+  FP.moving = gp ? Math.min(1, FPM.spd || (ISO.player && ISO.player.pos && ISO.player.pos.mv) || 0) : Math.min(1, Math.hypot(tx-c.x, ty-c.y));
 }
 
 // ---------- world raycast ----------
@@ -48311,7 +48312,7 @@ function isoOn(){ return ISO.on && FPD.ok && fp3dActive(); }
 function fpv(){ return !!(SET.fpView && ISO.on && typeof FPD!=='undefined' && FPD.ok && fp3dActive()); }
 function isoView(){ return ISO.on && !fpv(); }
 const FPV_EYE = 0.62;   /* (eye height - the walls stand 1 high) */
-function fpvToggle(){ SET.fpView = !SET.fpView; try{ saveSettings(); }catch(e){} ISO.held && ISO.held.clear(); ISO.path = []; FP.lookYaw = null; FP.pitch = 0; logMsg(SET.fpView ? (fp3dActive() ? 'first-person view - W and S walk, A and D step aside, Z and X turn, hold the right mouse button to look round (O to go back)' : 'first-person view on - it shows below ground and in roadside fights (O to turn it off)') : 'seen from above again', ''); renderGame(); }
+function fpvToggle(){ SET.fpView = !SET.fpView; try{ saveSettings(); }catch(e){} ISO.held && ISO.held.clear(); ISO.path = []; FP.lookYaw = null; FP.pitch = 0; logMsg(SET.fpView ? (fp3dActive() ? 'first-person view - W, A, S and D walk freely, Z and X turn, hold the right mouse button to look round (O to go back)' : 'first-person view on - it shows below ground and in roadside fights (O to turn it off)') : 'seen from above again', ''); renderGame(); }
 /* the world step for a key held in first person: forward, back and aside from the way you face; null for a turning key */
 function fpvKeyDir(k){ const f = (G.player.facing|0)&3, r = { arrowup:0, w:0, arrowdown:2, s:2, a:3, d:1 }[String(k).toLowerCase()]; return r===undefined ? null : FACING_VECT[(f + r)%4]; }
 function fpvHeldSum(){ let sx = 0, sy = 0; for (const h of ISO.held || []){ const d = fpvKeyDir(h); if (d){ sx += d[0]; sy += d[1]; } } return (sx || sy) ? [Math.sign(sx), Math.sign(sy)] : null; }
@@ -48328,6 +48329,50 @@ function fpvLook(dx, dy){ const p = G.player; if (!fpv() || !p) return;
   const y0 = FP.lookYaw!=null ? FP.lookYaw : FP.cam ? FP.cam.a : FP_FACING_ANGLE[(p.facing|0)&3];
   FP.lookYaw = y0 + dx*FPV_LOOK_K; FP.pitch = clamp((FP.pitch||0) - dy*FPV_LOOK_K, -FPV_PITCH_MAX, FPV_PITCH_MAX);
   const f = fpvQuarter(FP.lookYaw); if (f!==p.facing){ p.facing = f; p.faceDiag = null; } FP.lookF = p.facing; renderGame(); }
+/* (FP-003) free movement: in the first-person view the held keys walk you smoothly any way you look - forward and back along
+   the view, aside across it - at the pace of a walked step. Walls, solid things and creatures stop you a body's width short;
+   each time you cross into another tile that's a step, taken as any step is (moveDir: a turn for the creatures, traps, gold,
+   stairs, doors). A step the game refuses (a door pushed open, a locked one, a stun) puts you back in your tile; walking into a
+   creature or a chest is a blow or the chest opened. Moved some other way (a walk to a click, the pad, a trap) you glide with
+   your figure */
+const FPM_R = 0.3, FPM_EYE_BACK = 0.14;   /* (your body's reach round you, and your eyes a little behind its middle: a wall walked up to stands 0.44 off, not filling the view) */
+const FPM = { x:0, y:0, map:null, follow:false, spd:0, noX:-1, noY:-1, noT:0, bumpT:0 };
+function fpmSolid(x, y){ return !isoPassable(x, y) || G.mon.some(m=>m.alive && m.x===x && m.y===y) || (x===FPM.noX && y===FPM.noY && performance.now() < FPM.noT); }
+/* how deep a body at (x,y) sinks into the solid tiles round its own */
+function fpmPen(x, y){ const p = G.player; let pen = 0;
+  for (let i=-1;i<=1;i++) for (let j=-1;j<=1;j++){ const tx = p.x+i, ty = p.y+j; if ((!i && !j) || !fpmSolid(tx, ty)) continue;
+    const nx = clamp(x, tx, tx+1), ny = clamp(y, ty, ty+1), d = Math.hypot(x - nx, y - ny); if (d < FPM_R) pen = Math.max(pen, FPM_R - d); }
+  return pen; }
+function fpmStepTo(dx, dy){ const p = G.player, ox = p.x, oy = p.y, f = p.facing; moveDir(dx, dy); p.facing = f; p.faceDiag = null; return p.x===ox+dx && p.y===oy+dy ? 1 : p.x===ox && p.y===oy ? 0 : -1; }
+function fpmTick(dt){
+  const p = G.player; FPM.spd = 0;
+  if (FPM.map!==G.map){ FPM.map = G.map; FPM.x = p.x+0.5; FPM.y = p.y+0.5; FPM.follow = false; }
+  if (Math.floor(FPM.x)!==p.x || Math.floor(FPM.y)!==p.y) FPM.follow = true;   /* moved some other way: with your figure as it glides all the way in, or onto the tile */
+  if (FPM.follow){ const gp = ISO.player && ISO.player.pos && ISO.player.map===G.map ? ISO.player.pos : null, gd = gp ? Math.hypot(gp.x - (p.x+0.5), gp.y - (p.y+0.5)) : 9;
+    if (gd < 1.6){ FPM.x = gp.x; FPM.y = gp.y; if (gd < 0.02) FPM.follow = false; } else { FPM.x = p.x+0.5; FPM.y = p.y+0.5; FPM.follow = false; }
+    if (FPM.follow) return; }
+  if (G.ui!=='playing' || G.gameOver || G.sleepFx || !ISO.held || !ISO.held.size) return;
+  let fw = 0, sd = 0; for (const h of ISO.held){ const r = { arrowup:0, w:0, arrowdown:2, s:2, a:3, d:1 }[h]; if (r===0) fw++; else if (r===2) fw--; else if (r===3) sd--; else if (r===1) sd++; }
+  if (!fw && !sd) return;
+  const a = FP.cam ? FP.cam.a : FP_FACING_ANGLE[(p.facing|0)&3], n = Math.hypot(fw, sd), sp = 1000/ISO_STEP_MS*dt/n;
+  const mx = (Math.cos(a)*fw - Math.sin(a)*sd)*sp, my = (Math.sin(a)*fw + Math.cos(a)*sd)*sp, steps = Math.max(1, Math.ceil(Math.hypot(mx, my)/0.04));
+  const x0 = FPM.x, y0 = FPM.y;
+  for (let k=0; k<steps; k++){
+    const pen = fpmPen(FPM.x, FPM.y);
+    if (fpmPen(FPM.x + mx/steps, FPM.y) <= pen + 1e-5) FPM.x += mx/steps;
+    if (fpmPen(FPM.x, FPM.y + my/steps) <= pen + 1e-5) FPM.y += my/steps;
+    const tx = Math.floor(FPM.x), ty = Math.floor(FPM.y);
+    if (tx!==p.x || ty!==p.y){ const ox = p.x, oy = p.y, r = fpmStepTo(Math.sign(tx - p.x), Math.sign(ty - p.y));
+      if (r===0){ FPM.noX = tx; FPM.noY = ty; FPM.noT = performance.now() + 450; FPM.x = clamp(FPM.x, ox+0.001, ox+0.999); FPM.y = clamp(FPM.y, oy+0.001, oy+0.999); }
+      if (r<0 || G.map!==FPM.map || G.ui!=='playing') return;
+      if (r===0) break; }
+  }
+  const moved = Math.hypot(FPM.x - x0, FPM.y - y0), want = Math.hypot(mx, my); FPM.spd = want ? moved/want : 0;
+  /* stopped short: a creature there is struck, a chest opened */
+  if (moved < want*0.3){ const tx = Math.floor(FPM.x + mx/want*(FPM_R+0.15)), ty = Math.floor(FPM.y + my/want*(FPM_R+0.15)), dx = tx - p.x, dy = ty - p.y;
+    if ((dx || dy) && Math.abs(dx)<=1 && Math.abs(dy)<=1){ const foe = G.mon.some(m=>m.alive && m.x===tx && m.y===ty), now = performance.now();
+      if (foe ? isoSwingReady() : dgChestAt(tx, ty) && now > FPM.bumpT){ FPM.bumpT = now + 600; fpmStepTo(dx, dy); } } }
+}
 function fpvLookEnd(){ if (!FPL.on) return; FPL.on = false; FPL.end = performance.now(); canvas.style.cursor = ''; }
 function isoCamera(cam, aspect){
   const p = G.player, pp = ISO.player && ISO.player.pos && ISO.player.map===G.map ? ISO.player.pos : null;
@@ -49733,7 +49778,7 @@ function isoTickHeld(now){
   if (!ISO.held || !ISO.held.size) return;
   if (G.ui!=='playing' || G.gameOver){ ISO.held.clear(); return; }
   if (now < ISO.heldNext) return;
-  if (fpv()){ const v = fpvHeldSum(); if (!v) return; ISO.heldNext = now + isoStepDelay(v); fpvStep(v); return; }   /* (FP-001) */
+  if (fpv()) return;   /* (FP-001; FP-003: the keys held walk freely, in fpmTick) */
   const d = isoHeldSum(); if (!d) return;
   const v = isoDirFor(d[0], d[1]);
   ISO.heldNext = now + isoStepDelay(v);
@@ -49749,8 +49794,7 @@ function isoHandleKey(k){
     const kl = String(k).toLowerCase();
     if (kl==='z' || kl==='arrowleft'){ ISO.path = []; fpvTurn(-1); return true; }
     if (kl==='x' || kl==='arrowright'){ ISO.path = []; fpvTurn(1); return true; }
-    if (fpvKeyDir(k)){ ISO.held = ISO.held || new Set(); if (ISO.held.has(kl)) return true; ISO.held.add(kl); const v = fpvHeldSum(); if (!v) return true;
-      ISO.heldNext = performance.now() + isoStepDelay(v); ISO.path = []; ISO.fighting = null; fpvStep(v); return true; }
+    if (fpvKeyDir(k)){ ISO.held = ISO.held || new Set(); ISO.held.add(kl); ISO.path = []; ISO.fighting = null; return true; }   /* (FP-003: walked in fpmTick, freely) */
   }
   const hd = isoHeldDir(k);
   if (hd){
@@ -50213,7 +50257,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'fp-002';
+const GAME_VERSION = 'fp-003';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -50509,7 +50553,7 @@ function buildSettings(){
         ${seg('loadCards', 'loading cards between places', [[true,'on'],[false,'off']])}
         ${seg('trans', 'walk through gates and down stairs', [[true,'on'],[false,'off']])}
         ${seg('fpView', 'first-person view below ground (O)', [[false,'off'],[true,'on']])}
-        ${note('seen through your own eyes in dungeons and roadside fights: W and S walk forward and back, A and D step aside, Z and X or the left and right arrows turn; hold the right mouse button and drag to look round')}
+        ${note('seen through your own eyes in dungeons and roadside fights: W and S walk forward and back and A and D aside, freely, the way you look; Z and X or the left and right arrows turn; hold the right mouse button and drag to look round')}
         ${seg('fps', 'frame-rate counter', [[false,'off'],[true,'on']])}
       </div>`;
   else if (tab==='picture') body = `<div class="panel"><h4>PICTURE</h4>

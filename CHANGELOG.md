@@ -1,5 +1,17 @@
 # Depthcrawl patch notes
 
+## FP-003 - Free Roaming
+
+You asked for free movement. In the first-person view you now walk smoothly in any direction, instead of hopping from tile to tile.
+
+- **W, A, S and D walk freely**, forward and back along your view and sideways across it. With mouse look you walk exactly where you're looking, diagonals and all.
+- **Same pace and same rules.** You walk at the speed of a normal step, and each time you cross into a new tile it counts as a step: monsters take their turn, and gold, traps, doors and stairs work as before.
+- **Walls and monsters stop you** a body's width away, so you don't end up with your nose against the stone.
+- **Walk into a monster to hit it**, at the usual pace of a fight. Walk into a chest to open it.
+- **A door you push open** takes its turn as before. Keep walking and you go through.
+- **Clicking still walks you there,** and the view glides smoothly the whole way.
+- The phone pad still steps a tile at a time.
+
 ## FP-002 - Look Around
 
 You asked for mouse look with the right mouse button. In the first-person view, you can now look around freely with the mouse.

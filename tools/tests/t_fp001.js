@@ -29,13 +29,15 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   { const mx = Math.cos(fp.mini)*F0[0] - Math.sin(fp.mini)*F0[1], my = Math.sin(fp.mini)*F0[0] + Math.cos(fp.mini)*F0[1]; A(my < -0.95 && Math.abs(mx) < 0.2, 'the minimap shows your facing up: ' + [mx.toFixed(2), my.toFixed(2)]); }
   fs.writeFileSync(SHOTS + '/fp001-iso.jpg', Buffer.from(iso.shot.split(',')[1], 'base64')); fs.writeFileSync(SHOTS + '/fp001-fp.jpg', Buffer.from(fp.shot.split(',')[1], 'base64'));
   /* W forward, S back, A aside keeping the facing */
-  const walk = async (k, want, msg)=>{ const b = await st(); await page.keyboard.press(k); await frames(40); const a = await st();
+  /* (FP-003: walking is free - a key held until you're over into the next tile) */
+  const toTile = (async k=>{ const t0 = await ev(()=>[G.player.x, G.player.y]); await page.keyboard.down(k); await ev(async t0=>{ const end = performance.now() + 2000; while (performance.now() < end && G.player.x===t0[0] && G.player.y===t0[1]){ renderGame(); await new Promise(r=>requestAnimationFrame(r)); } }, t0); await page.keyboard.up(k); });
+  const walk = async (k, want, msg)=>{ const b = await st(); await toTile(k); await frames(10); const a = await st();
     A(a.px===b.px+want[0] && a.py===b.py+want[1], msg + ': moved ' + [a.px-b.px, a.py-b.py] + ', wanted ' + want); A(a.f===b.f, msg + ': still facing ' + b.f + ', now ' + a.f); return a; };
   const L0 = await ev(()=>FACING_VECT[(G.player.facing+3)%4]);
   await walk('w', F0, 'W walks forward');
   await walk('s', [-F0[0], -F0[1]], 'S walks back');
   const a1 = await walk('a', L0, 'A steps left');
-  A(Math.hypot(a1.cx - (a1.px + 0.5) + F0[0]*0.32, a1.cz - (a1.py + 0.5) + F0[1]*0.32) < 0.15, 'the camera followed the step');
+  A(Math.floor(a1.cx)===a1.px && Math.floor(a1.cz)===a1.py, 'the camera followed the step');
   await walk('d', [-L0[0], -L0[1]], 'D steps right');
   /* Z and X turn, the camera with them */
   const f0 = (await st()).f; await page.keyboard.press('z'); await frames(30); const z = await st(); A(z.f===(f0+3)%4, 'Z turns left: ' + f0 + ' to ' + z.f);

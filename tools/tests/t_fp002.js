@@ -39,7 +39,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   A(Math.abs(s4.yaw - s2.yaw) < 0.03 && s4.look!=null, 'the look stays where it was left: ' + s4.yaw.toFixed(3) + ' vs ' + s2.yaw.toFixed(3));
   A(Math.abs(s4.pitch) < 0.05, 'level again after looking back down: ' + s4.pitch.toFixed(3));
   /* W walks the way you face (east), the look kept */
-  await page.keyboard.press('w'); await frames(40); const s5 = await st();
+  await (async k=>{ const t0 = await ev(()=>[G.player.x, G.player.y]); await page.keyboard.down(k); await ev(async t0=>{ const end = performance.now() + 2000; while (performance.now() < end && G.player.x===t0[0] && G.player.y===t0[1]){ renderGame(); await new Promise(r=>requestAnimationFrame(r)); } }, t0); await page.keyboard.up(k); })('w'); await frames(10); const s5 = await st();   /* (FP-003: held until over into the next tile) */
   A(s5.px===s4.px+1 && s5.py===s4.py, 'W walked east: ' + [s5.px-s4.px, s5.py-s4.py]); A(s5.look!=null && Math.abs(s5.yaw - s4.yaw) < 0.03, 'the look kept while walking');
   /* a right-click without a drag: the menu */
   await page.mouse.click(box.x, box.y + 120, { button:'right' }); await frames(5); const s6 = await st();
