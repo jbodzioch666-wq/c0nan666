@@ -1,5 +1,16 @@
 # Depthcrawl patch notes
 
+## FP-005 - Steady Aim
+
+You said the left click wasn't shooting, and that the cursor drifted round the screen while you held the right mouse button. Aiming now works like a shooter: the right button holds the mouse in place and puts a crosshair in the middle of the view.
+
+- **Hold the right button to aim.** The cursor disappears and the mouse stays put while you look round. A crosshair shows in the middle of the view, and moving the mouse turns your view, with no edge of the screen to run into. Let go and the cursor comes back.
+- **Left-click while aiming to fire at the crosshair**, not at where the cursor was. Without aiming, a left click still attacks whatever is under the cursor.
+- **Both buttons together work.** Before, a left click while the right button was held did nothing at all.
+- **Short monsters are easier to hit.** Goblins and rats stand below your eye line, so a level crosshair passed over their heads. A monster in the line of your aim now counts as hit even when the crosshair sits just above it.
+- **It tells you why a click does nothing.** Click a monster you can't hit and the log says whether it's out of sight, out of range, or out of reach. With a melee weapon only, it says a bow and arrows, or a spell you have the runes for, would reach it.
+- **Press Esc** to let go of the mouse at any time.
+
 ## FP-004 - Point and Shoot
 
 You asked for first-person shooter combat on the left click. In the first-person view, the left mouse button now attacks whatever is under the cursor.

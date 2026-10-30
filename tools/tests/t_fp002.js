@@ -19,6 +19,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
     return { f:p.facing, a:FP.cam.a, look:FP.lookYaw, pitch:FP.pitch||0, yaw:Math.atan2(d.z, d.x), dy:d.y, px:p.x, py:p.y, ctx:CTX.open, cur:canvas.style.cursor }; });
   const s0 = await st(); A(s0.look==null && Math.abs(s0.yaw + Math.PI/2) < 0.02, 'facing north at first: ' + s0.yaw.toFixed(3));
   const box = await page.evaluate(()=>{ const r = canvas.getBoundingClientRect(); return { x:r.left + r.width/2, y:r.top + r.height*0.45 }; });
+  await page.evaluate(()=>{ window.__noLock = true; });   /* (FP-005: the right button holds the mouse where the page may; this drives the cursor drag) */
   let DX = 0, DY = 0;
   const drag = async (dx, dy, steps)=>{ for (let i=1; i<=steps; i++) await page.mouse.move(box.x + DX + dx*i/steps, box.y + DY + dy*i/steps); DX += dx; DY += dy; };
   await page.mouse.move(box.x, box.y); await page.mouse.down({ button:'right' });

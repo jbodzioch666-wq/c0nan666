@@ -48549,10 +48549,21 @@ function fpvAimPoint(e){ const r = canvas.getBoundingClientRect(), ray = ISO.ray
   ray.setFromCamera({ x:(e.clientX-r.left)/r.width*2-1, y:-((e.clientY-r.top)/r.height*2-1) }, FPD.cam);
   const h = FPD.world && ray.intersectObject(FPD.world, true).find(h=>h.object.isMesh && h.object.visible!==false), o = ray.ray.origin, d = ray.ray.direction;
   const P = h && h.distance < 14 ? h.point : o.clone().addScaledVector(d, 8); return { x:P.x, y:P.z, h:P.y }; }
+/* (FP-005) the creature your aim passes over: along the line from your eyes, the first creature whose tile it crosses no higher
+   than a little over its head, within 0.4 of its middle - a goblin is shorter than your eyes, and the crosshair held level goes over its figure. A wall ends it */
+function fpvRayMon(e){ const r = canvas.getBoundingClientRect(), ray = ISO.ray || (ISO.ray = new THREE.Raycaster());
+  ray.setFromCamera({ x:(e.clientX-r.left)/r.width*2-1, y:-((e.clientY-r.top)/r.height*2-1) }, FPD.cam);
+  const o = ray.ray.origin, d = ray.ray.direction, p = G.player;
+  for (let t=0.05; t<14; t+=0.05){ const x = o.x + d.x*t, y = o.y + d.y*t, z = o.z + d.z*t, tx = Math.floor(x), ty = Math.floor(z); if (y < 0) return null;
+    if (tx===p.x && ty===p.y) continue; const m = G.mon.find(m=>m.alive && m.x===tx && m.y===ty);
+    if (m){ const ins = M3D.inst.get(m), hp = ins && ins.holder ? ins.holder.position : { x:m.x+0.5, z:m.y+0.5 }; if (y <= (ins && ins.H || 1) + 0.35 && Math.hypot(x - hp.x, z - hp.z) < 0.4) return m; continue; }   /* (near its middle, not a corner of its tile) */
+    if (!isoPassable(tx, ty)) return null; }
+  return null; }
 function fpvFire(e){
   const p = G.player; if (G.ui!=='playing' || G.gameOver || !fpv()) return;
   ISO.path = []; ISO.fighting = null;
-  const pk = isoPick(e, true), m = pk && pk.mon && pk.mon.alive && shotClear(p.x, p.y, pk.mon.x, pk.mon.y) ? pk.mon : null;
+  const pk = isoPick(e, true) || {}; if (!pk.mon) pk.mon = fpvRayMon(e);   /* (FP-005: a short creature under the line of your aim counts) */
+  const m = pk.mon && pk.mon.alive && shotClear(p.x, p.y, pk.mon.x, pk.mon.y) ? pk.mon : null;
   if (m){ const dx = m.x - p.x, dy = m.y - p.y;
     if (Math.max(Math.abs(dx), Math.abs(dy))===1){ if (fpvBeat()) fpmStepTo(dx, dy); return; }
     if (spearReach(m)){ if (fpvBeat()) reachAttack(m); return; }
@@ -48561,6 +48572,9 @@ function fpvFire(e){
     const full = isoPick(e); if (full && !full.mon){ const { gx, gy } = full, D = G.dungeonDeco;
       if (Math.max(Math.abs(gx - p.x), Math.abs(gy - p.y)) <= 3 && (dgChestAt(gx, gy) || (G.gameMode===1 && D && D[gx] && SK_CAVE_DECOS.includes(D[gx][gy])) || tileAt(gx, gy)===T_ITEM)){ FPF.down = false; isoAct(full, false); return; } }
   }
+  /* (FP-005) a creature aimed at that can't be struck or shot: say why */
+  { const aimed = pk && pk.mon && pk.mon.alive ? pk.mon : null, now = performance.now(); if (aimed && now > (FPF.noteAt||0)){ FPF.noteAt = now + 4000;
+    logMsg(!m ? `you can't see a clear line to the ${aimed.nm}` : rangedPick() ? `the ${aimed.nm} is out of range` : `the ${aimed.nm} is out of reach - a bow and arrows, or a spell you have the runes for, would reach it`, ''); } }
   /* nothing to hit: the shot flies to the spot, or the blade cuts the air */
   if (!fpvBeat()) return;
   const mode = rangedPick(), A = fpvAimPoint(e);
@@ -48569,7 +48583,12 @@ function fpvFire(e){
     try{ fpBaseSfx(mode==='bow' ? 'miss' : 'spell'); }catch(err){} if (mode==='magic') FP.cast = 1; }
   else { FP.swing = 1; FPW.lastSwing = 'miss'; try{ fpBaseSfx('miss'); }catch(err){} }
 }
-function fpvLookEnd(){ if (!FPL.on) return; FPL.on = false; FPL.end = performance.now(); canvas.style.cursor = ''; }
+function fpvCrosshair(){ const x = canvas.width/2, y = canvas.height/2, u = dpr, g = 4*u, l = 9*u;
+  ctx.save(); ctx.lineCap = 'round';
+  for (const [w, c] of [[4*u, 'rgba(0,0,0,0.55)'], [1.6*u, 'rgba(255,240,210,0.95)']]){ ctx.strokeStyle = c; ctx.lineWidth = w; ctx.beginPath();
+    ctx.moveTo(x - g - l, y); ctx.lineTo(x - g, y); ctx.moveTo(x + g, y); ctx.lineTo(x + g + l, y); ctx.moveTo(x, y - g - l); ctx.lineTo(x, y - g); ctx.moveTo(x, y + g); ctx.lineTo(x, y + g + l); ctx.stroke(); }
+  ctx.fillStyle = 'rgba(255,240,210,0.95)'; ctx.fillRect(x - u, y - u, 2*u, 2*u); ctx.restore(); }
+function fpvLookEnd(){ if (!FPL.on) return; FPL.on = false; FPL.end = performance.now(); canvas.style.cursor = ''; if (fpvLocked()) try{ document.exitPointerLock(); }catch(e){} }
 function isoCamera(cam, aspect){
   const p = G.player, pp = ISO.player && ISO.player.pos && ISO.player.map===G.map ? ISO.player.pos : null;
   const tx = pp ? pp.x : p.x+0.5, ty = pp ? pp.y : p.y+0.5;
@@ -50216,6 +50235,7 @@ function renderFirstPerson(){
   if (FP.shake>0){ const s = FP.shake*6*dpr; ctx.translate((Math.random()-0.5)*s, (Math.random()-0.5)*s); }
   isoDrawOverlay(sprites);
   if (fpv()) try{ fpwDraw(); }catch(e){ console.error(e); }   /* (FP-004) */
+  if (fpv() && FPL.on) fpvCrosshair();   /* (FP-005) */
   if (G.gameMode===2 && (G.weather==='rain' || G.weather==='storm')) fpDrawRain();
   ctx.restore();
   fpDrawPost();
@@ -50265,21 +50285,33 @@ canvas.addEventListener('wheel', (e)=>{
 }, { passive:false });
 canvas.addEventListener('contextmenu', (e)=>{
   if (!fp3dActive() || G.ui!=='playing' || !(ISO.on && FPD.ok)) return;
-  e.preventDefault(); if ((FPL.on || performance.now() - FPL.end < 600) && FPL.moved > 5) return;   /* (FP-002: a look round, not a click) */ isoContext(e);
+  e.preventDefault(); if ((FPL.on || performance.now() - FPL.end < 600) && (FPL.moved > 5 || FPL.end - (FPL.lockAt||0) > 350)) return;   /* (FP-002: a look round, not a click) */ isoContext(e);
 });
-canvas.addEventListener('pointerdown', e=>{ if (e.pointerType!=='mouse' || e.button!==0 || e.shiftKey || !fpv() || G.ui!=='playing' || dgMiniTile(e)) return;   /* (FP-004) */
-  FPF.down = true; FPF.x = e.clientX; FPF.y = e.clientY; fpvFire(e); });
-window.addEventListener('pointermove', e=>{ if (FPF.down){ FPF.x = e.clientX; FPF.y = e.clientY; } });
-window.addEventListener('pointerup', e=>{ if (e.button===0) FPF.down = false; });
-window.addEventListener('blur', ()=>{ FPF.down = false; });
-function fpvFireTick(){ if (!FPF.down) return; if (!fpv() || G.ui!=='playing'){ FPF.down = false; return; } if (performance.now() >= FPF.next) fpvFire({ clientX:FPF.x, clientY:FPF.y }); }
-canvas.addEventListener('pointerdown', e=>{ if (e.pointerType!=='mouse' || e.button!==2 || !fpv() || G.ui!=='playing') return;   /* (FP-002) */
-  FPL.on = true; FPL.x = e.clientX; FPL.y = e.clientY; FPL.moved = 0; try{ canvas.setPointerCapture(e.pointerId); }catch(err){} });
-window.addEventListener('pointermove', e=>{ if (!FPL.on) return; if (!(e.buttons & 2) || !fpv() || G.ui!=='playing'){ fpvLookEnd(); return; }
-  const dx = e.clientX - FPL.x, dy = e.clientY - FPL.y; FPL.x = e.clientX; FPL.y = e.clientY; FPL.moved += Math.abs(dx) + Math.abs(dy);
-  if (FPL.moved > 5){ canvas.style.cursor = 'none'; fpvLook(dx, dy); } });
-window.addEventListener('pointerup', e=>{ if (e.button===2) fpvLookEnd(); });
-window.addEventListener('blur', ()=>fpvLookEnd());
+/* (FP-005) the mouse buttons as mousedown and mouseup: a second button pressed while one is held gives no pointerdown (pointer
+   events are chorded), and a left click while the right is held - aiming - has to fire. Holding the right button holds the mouse
+   to the middle of the view (pointer lock, the cursor gone and nothing for it to drift off or hit the screen's edge), its moves turn
+   the view, and a left click then fires at the crosshair in the middle; letting go gives the cursor back where it was. Where the
+   page may not hold the mouse, the drag turns the view by the cursor's moves as before */
+function fpvLocked(){ return document.pointerLockElement===canvas; }
+function fpvCenter(){ const r = canvas.getBoundingClientRect(); return { clientX:r.left + r.width/2, clientY:r.top + r.height/2 }; }
+function fpvAimEv(e){ return FPL.on ? fpvCenter() : e; }
+canvas.addEventListener('mousedown', e=>{ if (isTouchMouse(e) || !fpv() || G.ui!=='playing') return;
+  if (e.button===0){ if (e.shiftKey || (!FPL.on && dgMiniTile(e))) return;   /* (FP-004) */
+    FPF.down = true; FPF.x = e.clientX; FPF.y = e.clientY; fpvFire(fpvAimEv(e)); return; }
+  if (e.button===2 && !FPL.on){   /* (FP-002) */
+    FPL.on = true; FPL.x = e.clientX; FPL.y = e.clientY; FPL.moved = 0; FPL.lockAt = performance.now();
+    if (!window.__noLock) try{ const r = canvas.requestPointerLock(); if (r && r.catch) r.catch(()=>{}); }catch(err){} } });
+window.addEventListener('mousemove', e=>{
+  if (FPF.down && !FPL.on){ FPF.x = e.clientX; FPF.y = e.clientY; }
+  if (!FPL.on) return; if ((!(e.buttons & 2) && !fpvLocked()) || !fpv() || G.ui!=='playing'){ fpvLookEnd(); return; }   /* (held, a move can say no button is down - the lock's own first move does - and the mouseup always comes) */
+  if (fpvLocked() && FPL.skip > 0){ FPL.skip--; return; }   /* (the first move once held is the browser's own jump, not yours) */
+  let dx, dy; if (fpvLocked()){ dx = clamp(e.movementX||0, -200, 200); dy = clamp(e.movementY||0, -200, 200); }   /* (a held mouse's first move can jump) */ else { if (FPL.x==null){ FPL.x = e.clientX; FPL.y = e.clientY; } dx = e.clientX - FPL.x; dy = e.clientY - FPL.y; FPL.x = e.clientX; FPL.y = e.clientY; }
+  FPL.moved += Math.abs(dx) + Math.abs(dy); ISO.mouse = (c=>({ x:c.clientX, y:c.clientY }))(fpvCenter());   /* (what the crosshair is on glows, not what the hidden cursor was on) */
+  if (FPL.moved > 5 || fpvLocked()){ canvas.style.cursor = 'none'; fpvLook(dx, dy); } });
+window.addEventListener('mouseup', e=>{ if (e.button===0) FPF.down = false; if (e.button===2) fpvLookEnd(); });
+window.addEventListener('blur', ()=>{ FPF.down = false; fpvLookEnd(); });
+document.addEventListener('pointerlockchange', ()=>{ if (fpvLocked()) FPL.skip = 1; else if (FPL.on) FPL.x = null; });   /* (the mouse let go - Esc, or the browser - while the button's still held: the look goes on by the cursor's moves) */
+function fpvFireTick(){ if (!FPF.down) return; if (!fpv() || G.ui!=='playing'){ FPF.down = false; return; } if (performance.now() >= FPF.next) fpvFire(FPL.on ? fpvCenter() : { clientX:FPF.x, clientY:FPF.y }); }
 /* (RS-408) a click on the dungeon's minimap walks you to that spot, if you've seen it: the minimap's turn is undone to find the
    tile, and the walk is the same as a click on the floor (a wall clicked walks you up beside it). A click anywhere on the
    minimap never reaches the floor under it */
@@ -50462,7 +50494,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'fp-004';
+const GAME_VERSION = 'fp-005';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -50758,7 +50790,7 @@ function buildSettings(){
         ${seg('loadCards', 'loading cards between places', [[true,'on'],[false,'off']])}
         ${seg('trans', 'walk through gates and down stairs', [[true,'on'],[false,'off']])}
         ${seg('fpView', 'first-person view below ground (O)', [[false,'off'],[true,'on']])}
-        ${note('seen through your own eyes in dungeons and roadside fights: W and S walk forward and back and A and D aside, freely, the way you look; Z and X or the left and right arrows turn; hold the right mouse button and drag to look round; the left one strikes or shoots at what is under the cursor')}
+        ${note('seen through your own eyes in dungeons and roadside fights: W and S walk forward and back and A and D aside, freely, the way you look; Z and X or the left and right arrows turn; hold the right mouse button to look round and aim at the crosshair; the left one strikes or shoots at what is under the cursor, or the crosshair while you aim')}
         ${seg('fps', 'frame-rate counter', [[false,'off'],[true,'on']])}
       </div>`;
   else if (tab==='picture') body = `<div class="panel"><h4>PICTURE</h4>
