@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-764 - Every Way Down
+
+- **Every stair down now opens through its wall.** I checked all 69 flights over two worlds (dungeons, graveyards, mines, lairs, necromancer towers, pyramids, castles, temples and the Lost City) and every dungeon theme. Two kinds were still blocked.
+- **Catacombs:** the wall with burial niches stood solid across the doorway. It is now cut like any other.
+- **Graveyards:** grass tufts grew over the stair shaft and floated over the hole. Grass no longer grows on stairs.
+
 ## RS-763 - Through the Wall
 
 - **The doorway at the foot of a stair down is a real opening now.** RS-760's doorway was a dark patch painted on the wall, so it still looked like a wall in the way. The wall is now cut through, and a short passage runs on behind it: its steps keep going down at the stair's slope under a sloping ceiling and fade to black.
