@@ -1,5 +1,17 @@
 # Depthcrawl patch notes
 
+## FP-008 - Full Size
+
+You asked for big towns and ceilings everywhere. In the first-person view, towns out on the land now stand at full size, and every room in town has a ceiling.
+
+- **Towns at full size on the land.** From above, a town on the land is a small model on its tile. Through your eyes it is now four and a half times bigger: houses taller than you, a tower over the roofs, and a wall or stockade a few tiles out from the town's tile. The trees, bushes and gathering spots around it make room for it.
+- **Walk in at the gate.** The town's wall stops you, and the gate lets you in: walk through it and you're in the town. Villages with only a low fence, and towns whose gate faces water or rock, can be walked into from any side. Clicking a town still walks you there, and you go in when you reach its wall.
+- **Come out at the gate.** Leaving a town puts you just outside its gate, looking out, instead of in the middle of it.
+- **A close-set stockade.** At full size, a town's stakes stand side by side instead of spaced out like fence posts, and the town's plaster, roof tiles and stone keep their fine grain.
+- **Ceilings.** Every room in town has a ceiling now, with plaster or boards between wooden joists and a beam down the middle. That covers the shops, the tavern and its rooms upstairs, the cellar and your own house.
+- **Through the door with your own eyes.** Going in or out of a building, the view stays at your eyes as you step through the doorway, instead of jumping up above for a moment.
+- Towns and rooms change size when you press O, so the view from above is just as it was.
+
 ## FP-007 - Through Your Own Eyes
 
 You asked for the whole game in first person. The first-person view (O) now covers towns, the insides of buildings and the open land as well as dungeons, with the same keys and mouse everywhere.
