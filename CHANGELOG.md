@@ -1,5 +1,18 @@
 # Depthcrawl patch notes
 
+## FP-007 - Through Your Own Eyes
+
+You asked for the whole game in first person. The first-person view (O) now covers towns, the insides of buildings and the open land as well as dungeons, with the same keys and mouse everywhere.
+
+- **Towns at eye level.** Walk the streets between the houses with your hands and weapon in front of you. Your own figure is hidden, so nothing gets in the way.
+- **Inside buildings.** In first person, the walls you used to see over (cut low so the camera above could look in) now stand full height, with the wall over the door, so a room feels like a room. Turning the view on or off inside rebuilds the room to match.
+- **The open land.** Walk across fields, forests and roads at eye height, and sail in your boat. A haze hangs a little closer than usual so you don't see where the drawn land ends. Towns and sites out on the land are still the small models you know from above, so they look like a toy village from up close.
+- **Walk freely.** W and S walk forward and back and A and D step aside, the way you look, just as below ground. Each tile you cross is a step, so encounters, roads and borders work as before. Z and X or the left and right arrows turn.
+- **Mouse look and aim.** Hold the right mouse button to look round, with the crosshair in the middle. The left button does what a click always did there: talk to people, trade, open doors, gather, travel, or walk to a spot. Shift-click still examines.
+- **The minimap turns with you,** with the way you face at the top.
+- **Click walks follow you.** Click somewhere to walk there and your view turns the way you're led, then stops when you arrive, even at a counter or beside a site.
+- **Seen from above again with O.** The camera, your figure and the usual mouse come back.
+
 ## FP-006 - Hands On
 
 You asked for the view zoomed out a bit, and for arms and hands that look better and sit naturally when holding things.
