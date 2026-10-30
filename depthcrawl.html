@@ -40169,14 +40169,16 @@ function fpUpdateCamera(dt){
   }
   // the eye sits toward the back of its tile, like a classic grid crawler, so
   // a wall or a monster one step ahead is framed instead of filling the view
-  const ta = FP_FACING_ANGLE[(p.facing|0)&3], gp = fpv() && ISO.player && ISO.player.pos && ISO.player.map===G.map ? ISO.player.pos : null;   /* (FP-001: at your walking pace, not hopping tile to tile) */
+  if (FP.lookYaw!=null && (!fpv() || p.facing!==FP.lookF)) FP.lookYaw = null;   /* (FP-002: turned some other way - square to the quarter again) */
+  if (FP.lookYaw==null && FP.pitch) FP.pitch *= Math.exp(-dt*6);
+  const look = FP.lookYaw!=null, ta = look ? FP.lookYaw : FP_FACING_ANGLE[(p.facing|0)&3], gp = fpv() && ISO.player && ISO.player.pos && ISO.player.map===G.map ? ISO.player.pos : null;   /* (FP-001: at your walking pace, not hopping tile to tile) */
   const tx = (gp ? gp.x : p.x+0.5)-Math.cos(ta)*FP_EYE_BACK, ty = (gp ? gp.y : p.y+0.5)-Math.sin(ta)*FP_EYE_BACK;
   let c = FP.cam;
   if (!c || mapChanged || Math.hypot(c.x-tx,c.y-ty)>2.5){ c = FP.cam = {x:tx, y:ty, a:ta}; }
   const k = gp ? 1 : 1-Math.exp(-dt*15);
   c.x += (tx-c.x)*k; c.y += (ty-c.y)*k;
   let da = ta-c.a; while (da>Math.PI) da -= Math.PI*2; while (da<-Math.PI) da += Math.PI*2;
-  c.a += da*(1-Math.exp(-dt*13));
+  c.a += da*(look ? 1 : 1-Math.exp(-dt*13));
   FP.moving = gp ? Math.min(1, gp.mv||0) : Math.min(1, Math.hypot(tx-c.x, ty-c.y));
 }
 
@@ -41398,7 +41400,8 @@ function fpdRender(env, T, camZ){
   if (!isoView()){
     if (cam.view && cam.view.enabled) cam.clearViewOffset();
     cam.near = 0.03; cam.aspect = w/h; cam.fov = 2*Math.atan(FP_PLANE/cam.aspect)*180/Math.PI; cam.updateProjectionMatrix();
-    cam.position.set(c.x, camZ, c.y); cam.lookAt(c.x+Math.cos(c.a), camZ, c.y+Math.sin(c.a));
+    const pt = fpv() ? FP.pitch||0 : 0, cp = Math.cos(pt);   /* (FP-002: looking up and down) */
+    cam.position.set(c.x, camZ, c.y); cam.lookAt(c.x+Math.cos(c.a)*cp, camZ+Math.sin(pt), c.y+Math.sin(c.a)*cp);
   }
   // lantern and ambient, as the raycaster had them
   const lan = env.lan;
@@ -48308,13 +48311,24 @@ function isoOn(){ return ISO.on && FPD.ok && fp3dActive(); }
 function fpv(){ return !!(SET.fpView && ISO.on && typeof FPD!=='undefined' && FPD.ok && fp3dActive()); }
 function isoView(){ return ISO.on && !fpv(); }
 const FPV_EYE = 0.62;   /* (eye height - the walls stand 1 high) */
-function fpvToggle(){ SET.fpView = !SET.fpView; try{ saveSettings(); }catch(e){} ISO.held && ISO.held.clear(); ISO.path = []; logMsg(SET.fpView ? (fp3dActive() ? 'first-person view - W and S walk, A and D step aside, Z and X turn (O to go back)' : 'first-person view on - it shows below ground and in roadside fights (O to turn it off)') : 'seen from above again', ''); renderGame(); }
+function fpvToggle(){ SET.fpView = !SET.fpView; try{ saveSettings(); }catch(e){} ISO.held && ISO.held.clear(); ISO.path = []; FP.lookYaw = null; FP.pitch = 0; logMsg(SET.fpView ? (fp3dActive() ? 'first-person view - W and S walk, A and D step aside, Z and X turn, hold the right mouse button to look round (O to go back)' : 'first-person view on - it shows below ground and in roadside fights (O to turn it off)') : 'seen from above again', ''); renderGame(); }
 /* the world step for a key held in first person: forward, back and aside from the way you face; null for a turning key */
 function fpvKeyDir(k){ const f = (G.player.facing|0)&3, r = { arrowup:0, w:0, arrowdown:2, s:2, a:3, d:1 }[String(k).toLowerCase()]; return r===undefined ? null : FACING_VECT[(f + r)%4]; }
 function fpvHeldSum(){ let sx = 0, sy = 0; for (const h of ISO.held || []){ const d = fpvKeyDir(h); if (d){ sx += d[0]; sy += d[1]; } } return (sx || sy) ? [Math.sign(sx), Math.sign(sy)] : null; }
 /* a step that keeps your eyes where they were - backing off or stepping aside doesn't spin the view; into a foe it turns you to it */
 function fpvStep(v){ const p = G.player, f = p.facing, foe = G.mon && G.mon.some(m=>m.alive && m.x===p.x+v[0] && m.y===p.y+v[1]); isoStep(v); if (!foe) p.facing = f; }
-function fpvTurn(d){ const p = G.player; p.facing = ((p.facing|0) + (d > 0 ? 1 : 3))%4; p.faceDiag = null; renderGame(); }
+function fpvTurn(d){ const p = G.player; p.facing = ((p.facing|0) + (d > 0 ? 1 : 3))%4; p.faceDiag = null; FP.lookYaw = null; renderGame(); }
+/* (FP-002) mouse look: hold the right mouse button and drag to look round and up and down. You face the quarter you look toward,
+   so W walks the way you look; the look stays where you leave it until a turn (Z, X, a step into a foe, a walk to a click) sets
+   you square to a quarter again. A right-click without a drag is still the menu */
+const FPV_LOOK_K = 0.0045, FPV_PITCH_MAX = 1.1;
+const FPL = { on:false, x:0, y:0, moved:0, end:0 };
+function fpvQuarter(a){ return ((Math.round(a/(Math.PI/2)) + 1)%4 + 4)%4; }
+function fpvLook(dx, dy){ const p = G.player; if (!fpv() || !p) return;
+  const y0 = FP.lookYaw!=null ? FP.lookYaw : FP.cam ? FP.cam.a : FP_FACING_ANGLE[(p.facing|0)&3];
+  FP.lookYaw = y0 + dx*FPV_LOOK_K; FP.pitch = clamp((FP.pitch||0) - dy*FPV_LOOK_K, -FPV_PITCH_MAX, FPV_PITCH_MAX);
+  const f = fpvQuarter(FP.lookYaw); if (f!==p.facing){ p.facing = f; p.faceDiag = null; } FP.lookF = p.facing; renderGame(); }
+function fpvLookEnd(){ if (!FPL.on) return; FPL.on = false; FPL.end = performance.now(); canvas.style.cursor = ''; }
 function isoCamera(cam, aspect){
   const p = G.player, pp = ISO.player && ISO.player.pos && ISO.player.map===G.map ? ISO.player.pos : null;
   const tx = pp ? pp.x : p.x+0.5, ty = pp ? pp.y : p.y+0.5;
@@ -50009,8 +50023,15 @@ canvas.addEventListener('wheel', (e)=>{
 }, { passive:false });
 canvas.addEventListener('contextmenu', (e)=>{
   if (!fp3dActive() || G.ui!=='playing' || !(ISO.on && FPD.ok)) return;
-  e.preventDefault(); isoContext(e);
+  e.preventDefault(); if ((FPL.on || performance.now() - FPL.end < 600) && FPL.moved > 5) return;   /* (FP-002: a look round, not a click) */ isoContext(e);
 });
+canvas.addEventListener('pointerdown', e=>{ if (e.pointerType!=='mouse' || e.button!==2 || !fpv() || G.ui!=='playing') return;   /* (FP-002) */
+  FPL.on = true; FPL.x = e.clientX; FPL.y = e.clientY; FPL.moved = 0; try{ canvas.setPointerCapture(e.pointerId); }catch(err){} });
+window.addEventListener('pointermove', e=>{ if (!FPL.on) return; if (!(e.buttons & 2) || !fpv() || G.ui!=='playing'){ fpvLookEnd(); return; }
+  const dx = e.clientX - FPL.x, dy = e.clientY - FPL.y; FPL.x = e.clientX; FPL.y = e.clientY; FPL.moved += Math.abs(dx) + Math.abs(dy);
+  if (FPL.moved > 5){ canvas.style.cursor = 'none'; fpvLook(dx, dy); } });
+window.addEventListener('pointerup', e=>{ if (e.button===2) fpvLookEnd(); });
+window.addEventListener('blur', ()=>fpvLookEnd());
 /* (RS-408) a click on the dungeon's minimap walks you to that spot, if you've seen it: the minimap's turn is undone to find the
    tile, and the walk is the same as a click on the floor (a wall clicked walks you up beside it). A click anywhere on the
    minimap never reaches the floor under it */
@@ -50192,7 +50213,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'fp-001';
+const GAME_VERSION = 'fp-002';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -50488,7 +50509,7 @@ function buildSettings(){
         ${seg('loadCards', 'loading cards between places', [[true,'on'],[false,'off']])}
         ${seg('trans', 'walk through gates and down stairs', [[true,'on'],[false,'off']])}
         ${seg('fpView', 'first-person view below ground (O)', [[false,'off'],[true,'on']])}
-        ${note('seen through your own eyes in dungeons and roadside fights: W and S walk forward and back, A and D step aside, Z and X or the left and right arrows turn')}
+        ${note('seen through your own eyes in dungeons and roadside fights: W and S walk forward and back, A and D step aside, Z and X or the left and right arrows turn; hold the right mouse button and drag to look round')}
         ${seg('fps', 'frame-rate counter', [[false,'off'],[true,'on']])}
       </div>`;
   else if (tab==='picture') body = `<div class="panel"><h4>PICTURE</h4>

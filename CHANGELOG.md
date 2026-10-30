@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## FP-002 - Look Around
+
+You asked for mouse look with the right mouse button. In the first-person view, you can now look around freely with the mouse.
+
+- **Hold the right mouse button and drag** to look left and right, up and down. The cursor hides while you look.
+- **You face where you look.** Your facing follows the quarter you're looking toward, so W walks the way you're looking, and A, D and S go from there.
+- **The look stays put** when you let go, even while you walk. Turning with Z, X or the arrows sets you square to a quarter again and brings the view level, and so does stepping into a foe or walking to a click.
+- **A right-click without a drag** still opens the menu, as before.
+
 ## FP-001 - Through Your Own Eyes
 
 The first release of the first-person branch, built on RS-778. Below ground you can now see the dungeon through your own eyes instead of from above. It's off at first: press **O**, or turn on "first-person view below ground" in the graphics settings.
