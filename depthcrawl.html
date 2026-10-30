@@ -24913,8 +24913,8 @@ Object.assign(BENCHES, {
 for (const s of HOUSE_SPOTS) BENCHES['spot_'+s.id] = { nm:'Empty space: '+s.nm, does:'build furniture here' };
 BENCHES.plot = { nm:'Empty plot', does:'build a room here' };   /* (RS-736) */
 BENCHES.patch = { nm:'Garden bed', does:'sow seeds, water them and harvest the crop' };   /* (RS-737) */
-BENCHES.coop = { nm:'Hen house', does:'buy chicks, see how your hens are growing, butcher the grown ones' };   /* (RS-738) */
-BENCHES.byre = { nm:'Byre', does:'buy calves, see how your cows are growing, butcher the grown ones' };
+BENCHES.coop = { nm:'Hen house', does:'buy chicks, one or a pen-full, see how your hens are growing, butcher the grown ones, one or all' };   /* (RS-738) */
+BENCHES.byre = { nm:'Byre', does:'buy calves, one or a byre-full, see how your cows are growing, butcher the grown ones, one or all' };
 BENCHES.trough = { nm:'Feed trough', does:'fill it with flax - your animals only grow while there is feed in it' };
 function houseP(){ const p = G.player; if (!p.house || typeof p.house!=='object') p.house = null; if (!p.house) return null; const h = houseMigrate(p.house);
   if (h.gbeds){ for (let i=1;i<=4;i++) delete h.built['gbed'+i]; delete h.gbeds; }   /* (RS-740: RS-739's garden beds to build are gone - they come with the garden again) */
@@ -25099,32 +25099,139 @@ function houseRelayout(){ if (!G.interior || G.interior.key!=='house') return; c
 function farmMove(){
   const f = farmP(); if (!f) return; const grown = farmUpdate();
   if (grown.length){ for (const a of grown) logMsg(`your ${FARM_KIND[a.k].young} has grown into a ${FARM_KIND[a.k].nm} - butcher it at the ${FARM_KIND[a.k].pen.toLowerCase()}`, 'good'); houseRelayout(); return; }
-  for (const v of (G.villagers||[])){ if (!v.farm) continue; const [x0, y0] = v.farm, inYard = (x, y)=>x >= x0 && y >= y0 && x < x0 + 5 && y < y0 + 5;
+  for (const v of (G.villagers||[])){ if (!v.farm || v.butch) continue; const [x0, y0] = v.farm, inYard = (x, y)=>x >= x0 && y >= y0 && x < x0 + 5 && y < y0 + 5;
     if (!inYard(v.x, v.y)){ townStep(v, x0 + 2, y0 + 2); continue; }
     if (!chn(v.animal==='cow' || v.animal==='calf' ? 0.2 : 0.5)) continue; const [a, b] = [[1,0],[-1,0],[0,1],[0,-1]][rn(4)];
     if (inYard(v.x + a, v.y + b) && townFree(v.x + a, v.y + b, v)){ v.x += a; v.y += b; } }
 }
-function farmUse(kind){
+function farmUse(kind, note){
+  if (V3.butch) v3ButchEnd(true);   /* (RS-759: one being butchered before you is done with at once) */
   const f = farmP(); if (!f) return; farmUpdate(); const K = FARM_KIND[kind], mine = f.a.filter(a=>a.k===kind), big = mine.filter(farmGrown), small = mine.filter(a=>!farmGrown(a));
   const next = small.length ? Math.min(...small.map(a=>K.grow - a.g)) : 0, n = (c, one, many)=>`${c} ${c===1 ? one : many}`;
-  const txt = (mine.length ? `${[big.length ? n(big.length, K.nm, K.nms)+' grown' : '', small.length ? n(small.length, K.young, K.youngs)+' growing' : ''].filter(Boolean).join(' and ')}${small.length ? ` - the next grown in ${gardenTime(next)}${f.feed > 0 ? '' : ', once there is feed in the trough'}` : ''}.` : `Empty - there is room for ${K.max} ${K.nms}.`)
-    + ` A ${K.young} eats ${K.eat} flax a day and night while it grows (the trough has ${Math.floor(f.feed)}), and is grown in ${gardenTime(K.grow)} if it's kept fed.`;
-  const opts = [];
-  if (mine.length < K.max) opts.push([`Buy a ${K.young} - ${K.price} gold`, ()=>farmBuy(kind)]);
-  if (big.length) opts.push([`Butcher a ${K.nm} - ${K.yieldTxt}`, ()=>farmButcher(kind)]);
+  const txt = (note ? `<div style="color:#9fd27a;margin-bottom:8px">${note}</div>` : '') + (mine.length ? `${[big.length ? n(big.length, K.nm, K.nms)+' grown' : '', small.length ? n(small.length, K.young, K.youngs)+' growing' : ''].filter(Boolean).join(' and ')}${small.length ? ` - the next grown in ${gardenTime(next)}${f.feed > 0 ? '' : ', once there is feed in the trough'}` : ''}.` : `Empty - there is room for ${K.max} ${K.nms}.`)
+    + ` A ${K.young} eats ${K.eat} flax a day and night while it grows (the trough has ${Math.floor(f.feed)}), and is grown in ${gardenTime(K.grow)} if it's kept fed. You have ${(G.player.gold||0).toLocaleString()} gold.`;
+  const room = K.max - mine.length, can = Math.min(room, Math.floor((G.player.gold||0)/K.price)), opts = [];
+  /* (RS-759) the menu stays open after a purchase, and takes several at once: a pen filled, every grown one butchered */
+  if (room > 0) opts.push([`Buy a ${K.young} - ${K.price} gold`, ()=>farmUse(kind, farmBuyNote(kind, farmBuy(kind, 1)))]);
+  if (can >= 2) opts.push([`Buy ${can} ${K.youngs} - ${can*K.price} gold`, ()=>farmUse(kind, farmBuyNote(kind, farmBuy(kind, can)))]);
+  if (big.length) opts.push([`Butcher a ${K.nm} - ${K.yieldTxt}`, ()=>farmButcher(kind, 1)]);
+  if (big.length >= 2) opts.push([`Butcher all ${big.length} ${K.nms}`, ()=>farmButcher(kind, big.length)]);
   opts.push(['Close', ()=>{}]);
   wevDialog(K.pen, txt, opts, 'your farmyard');
 }
-function farmBuy(kind){
-  const f = farmP(), K = FARM_KIND[kind], p = G.player; if (!f || f.a.filter(a=>a.k===kind).length >= K.max) return;
-  if ((p.gold||0) < K.price){ logMsg(`a ${K.young} costs ${K.price} gold - you have ${p.gold||0}`, 'bad'); return; }
-  farmUpdate(); p.gold -= K.price; f.a.push({ k:kind, g:0 }); logMsg(`you buy a ${K.young} for ${K.price} gold - keep the trough filled with flax and it's grown in ${gardenTime(K.grow)}`, 'good'); sfx(kind==='chicken' ? 'cluck' : 'coins');
-  houseRelayout(); saveCurrentGame();
+function farmBuyNote(kind, c){ const K = FARM_KIND[kind]; return c > 1 ? `You buy ${c} ${K.youngs}.` : c ? `You buy a ${K.young}.` : `You can't afford a ${K.young} - it costs ${K.price} gold.`; }
+/* buys up to n young ones, as many as there's room for and gold to pay: how many */
+function farmBuy(kind, n){
+  const f = farmP(), K = FARM_KIND[kind], p = G.player; if (!f) return 0; const room = K.max - f.a.filter(a=>a.k===kind).length; if (room <= 0) return 0;
+  if ((p.gold||0) < K.price){ logMsg(`a ${K.young} costs ${K.price} gold - you have ${p.gold||0}`, 'bad'); return 0; }
+  const c = Math.max(1, Math.min(n||1, room, Math.floor(p.gold/K.price)));
+  farmUpdate(); p.gold -= K.price*c; for (let i=0;i<c;i++) f.a.push({ k:kind, g:0 });
+  logMsg(`you buy ${c > 1 ? c + ' ' + K.youngs : 'a ' + K.young} for ${K.price*c} gold - keep the trough filled with flax and ${c > 1 ? 'they\'re' : 'it\'s'} grown in ${gardenTime(K.grow)}`, 'good'); sfx(kind==='chicken' ? 'cluck' : 'coins');
+  houseRelayout(); saveCurrentGame(); return c;
 }
-function farmButcher(kind){
-  const f = farmP(), K = FARM_KIND[kind]; if (!f) return; const i = f.a.findIndex(a=>a.k===kind && farmGrown(a)); if (i < 0) return;
-  f.a.splice(i, 1); for (const id in K.yield) skAdd(id, K.yield[id]);
-  logMsg(`you butcher a ${K.nm}: ${K.yieldTxt}`, 'loot'); sfx('loot'); houseRelayout(); saveCurrentGame();
+/* butchers up to n grown ones: what they give is yours at once; the yard shows it done (v3ButchStart), or the menu comes straight back */
+function farmButcher(kind, n){
+  if (V3.butch) v3ButchEnd(true); const f = farmP(), K = FARM_KIND[kind]; if (!f) return; farmUpdate();
+  const big = f.a.map((a, i)=>({ a, i })).filter(o=>o.a.k===kind && farmGrown(o.a)).slice(0, Math.max(1, n||1)); if (!big.length) return;
+  const q = big.map(o=>({ a:o.a, v:(G.villagers||[]).find(v=>v.farm && v.look===o.i) || null }));   /* (farmHerd's look is the animal's place in the list) */
+  for (const o of q){ f.a.splice(f.a.indexOf(o.a), 1); for (const id in K.yield) skAdd(id, K.yield[id]); }
+  saveCurrentGame();
+  if (v3ButchStart(kind, q)) return;
+  farmButchSay(kind, q.length); houseRelayout(); farmUse(kind, farmButchNote(kind, q.length));
+}
+function farmButchSay(kind, n){ const K = FARM_KIND[kind]; logMsg(n > 1 ? `you butcher ${n} ${K.nms}: ${K.yieldTxt} from each` : `you butcher a ${K.nm}: ${K.yieldTxt}`, 'loot'); sfx('loot'); }
+function farmButchNote(kind, n){ const K = FARM_KIND[kind]; return n > 1 ? `You butcher ${n} ${K.nms} - ${K.yieldTxt} from each.` : `You butcher a ${K.nm} - ${K.yieldTxt}.`; }
+/* (RS-759) butchering, seen: the grown animal is led up beside you, you turn to it with a cleaver in your hand, two chops - blood, and
+   feathers off a hen - it topples onto its side away from you and sinks from sight; then the next, for all of them, and the pen's menu
+   again. Only the showing: what it gives was yours when you chose, and walking off cuts it short.
+   V3.butch: { kind, q:[{ a, v, p, go }], n, i, t, said, at, t0, junk } - p the animal's figure, go where it's led */
+const BUTCH_CHOP = 0.75, BUTCH_HIT = 0.5;
+function v3ButchStart(kind, q){
+  if (G.gameMode!==3 || !G.interior || G.interior.key!=='house' || !V3.player || !V3.player.e || !V3.villagers || !V3.world || V3.mapRef!==G.map) return false;
+  const list = q.map(o=>Object.assign({}, o, { p:o.v ? V3.villagers.find(p=>p.v===o.v && p.e && p.e.rig && p.g.parent) : null })).filter(o=>o.p);
+  if (!list.length) return false;
+  for (const o of list) o.v.butch = 1;
+  V3.butch = { kind, q:list, n:q.length, i:0, t:0, said:0, at:[G.player.x, G.player.y], t0:performance.now(), junk:[] };
+  if (list.length < q.length){ V3.butch.said = q.length - list.length; farmButchSay(kind, V3.butch.said); }   /* (one with no room in the yard to be seen) */
+  return true;
+}
+/* your arms at the chop, u the time into it: up over your head, down hard through it, held, back to the ready - mixed in by w */
+function farmChopPose(e, u, w, big){
+  const r = e.rig; if (!r || !r.arms || w <= 0) return; const [R, L] = r.arms, ss = k=>k*k*(3 - 2*k);
+  const A = [-0.95, -0.7, 0.15, 0.1], U = [-2.85, -1.35, -0.08, 0.05], S = big ? [-1.2, -0.2, 0.2, 0.15] : [-0.4, -0.1, 0.45, 0.45];   /* (shoulder, elbow, lean, knees) */
+  let a, b, k;
+  if (u < 0.42){ a = A; b = U; k = ss(Math.max(0, u)/0.42); } else if (u < BUTCH_HIT){ a = U; b = S; k = Math.pow((u - 0.42)/(BUTCH_HIT - 0.42), 1.5); } else if (u < 0.6){ a = b = S; k = 0; } else { a = S; b = A; k = ss(Math.min(1, (u - 0.6)/0.15)); }
+  const q = i=>a[i] + (b[i] - a[i])*k, m = (cur, v)=>cur + (v - cur)*w;
+  R.sh.rotation.x = m(R.sh.rotation.x, q(0)); R.sh.rotation.z = m(R.sh.rotation.z, -0.18); R.el.rotation.x = m(R.el.rotation.x, q(1));
+  L.sh.rotation.x = m(L.sh.rotation.x, big ? -1.0 : -0.75); L.sh.rotation.z = m(L.sh.rotation.z, 0.2); L.el.rotation.x = m(L.el.rotation.x, -0.45); L.sh.rotation.y = m(L.sh.rotation.y, 0);
+  if (r.torso){ r.torso.rotation.x = m(r.torso.rotation.x, q(2)); r.torso.rotation.y = m(r.torso.rotation.y, 0); }
+  for (const Lg of r.legs || []){ if (Lg.knee) Lg.knee.rotation.x += q(3)*w; if (Lg.hip) Lg.hip.rotation.x -= q(3)*0.5*w; }   /* (on the stand m3dPoseHumanoid gave them this frame) */
+}
+function v3ButchMat(col){ const M = v3ButchMat.M || (v3ButchMat.M = {}); return M[col] || (M[col] = new THREE.SpriteMaterial({ map:v3Blob(col), transparent:true, depthWrite:false })); }
+/* a chop lands: blood from the neck, feathers off a hen */
+function v3ButchHit(o, hen){
+  const T = THREE, g = o.p.g, O = o.go, fx = Math.sin(O.side), fz = Math.cos(O.side), nk = hen ? 0.07 : 0.34, fl = V3.player.g.position.y + 0.015;
+  const x = g.position.x + fx*nk - O.dx*(hen ? 0.03 : 0.12), y = fl + TOWN_ANIMALS[hen ? 'chicken' : 'cow'].h*(hen ? 0.65 : 0.72), z = g.position.z + fz*nk - O.dz*(hen ? 0.03 : 0.12);
+  const add = (mat, v, life, s0, s1, gr, sw)=>{ if (V3.parts.length >= 500) return; const sp = new T.Sprite(mat); sp.position.set(x, y, z); sp.scale.setScalar(s0); V3.world.add(sp); V3.parts.push({ sp, v, life, age:0, s0, s1, g:gr, fl, sw }); };
+  const red = v3ButchMat('rgba(160,14,10,1)'), dark = v3ButchMat('rgba(92,6,6,1)');
+  for (let i=0;i<(hen ? 12 : 18);i++){ const a = Math.random()*6.283, sp = 0.2 + Math.random()*0.7; add(i%3 ? red : dark, [Math.cos(a)*sp - O.dx*0.35, 0.5 + Math.random()*1.3, Math.sin(a)*sp - O.dz*0.35], 1.8 + Math.random(), 0.035 + Math.random()*0.03, 0.03, 6.5, 0); }   /* (spattered away from the blade) */
+  if (hen){ const fc = ['rgba(240,236,224,1)', 'rgba(176,108,48,1)', 'rgba(66,48,36,1)'][(o.v.look|0)%3]; for (let i=0;i<9;i++){ const a = Math.random()*6.283; add(v3ButchMat(fc), [Math.cos(a)*0.45, 0.6 + Math.random()*0.7, Math.sin(a)*0.45], 2.6 + Math.random(), 0.055, 0.045, 2.4, 1 + Math.random()*6); } sfx('cluck'); }
+  sfx('hit');
+}
+/* the pool spreading under it as it lies */
+function v3ButchPool(o, B, hen){
+  const T = THREE, geo = v3ButchPool.geo || (v3ButchPool.geo = (()=>{ const gg = new T.CircleGeometry(1, 28), P = gg.attributes.position;
+    for (let i=1;i<P.count;i++){ const a = Math.atan2(P.getY(i), P.getX(i)), r = 0.8 + 0.16*Math.sin(a*3 + 1) + 0.1*Math.sin(a*7 + 2); P.setXY(i, P.getX(i)*r, P.getY(i)*r); }
+    gg.rotateX(-Math.PI/2); gg.userData.keep = 1; return gg; })());
+  const mat = v3ButchPool.mat || (v3ButchPool.mat = new T.MeshStandardMaterial({ color:new T.Color('#5c0a08').convertSRGBToLinear(), roughness:0.15, metalness:0.1, transparent:true, opacity:0.94, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-3 }));
+  const m = new T.Mesh(geo, mat), g = o.p.g, O = o.go, nk = hen ? 0.06 : 0.3;
+  m.position.set(g.position.x + Math.sin(O.side)*nk + O.dx*(hen ? 0.04 : 0.15), V3.player.g.position.y + 0.012, g.position.z + Math.cos(O.side)*nk + O.dz*(hen ? 0.04 : 0.15));
+  m.rotation.y = Math.random()*6.28; m.scale.setScalar(0.01); m.receiveShadow = true; m.renderOrder = 1; V3.world.add(m); B.junk.push(m); o.pool = m; o.poolR = hen ? 0.17 : 0.42;
+}
+function v3ButchTick(dt){
+  const B = V3.butch; if (!B) return; const P = V3.player, e = P && P.e;
+  if (!G.interior || G.interior.key!=='house' || G.player.x!==B.at[0] || G.player.y!==B.at[1] || !e || G.gameOver){ v3ButchEnd(true); return; }
+  const o = B.q[B.i]; if (!o){ v3ButchEnd(false); return; }
+  const p = o.p, g = p.g, hen = B.kind==='chicken'; if (!V3.villagers.includes(p) || !g.parent){ v3ButchEnd(true); return; }
+  rsHoldTool(e, 'cleaver');
+  const t0 = B.t; B.t += dt*(B.i ? 1.35 : 1); const t = B.t, pc = P.g.position, ss = k=>k*k*(3 - 2*k), cl = k=>Math.max(0, Math.min(1, k));
+  if (!o.go){   /* where it's led: the open tile beside you nearest it, one in the yard if there is one; stood just off your toes, side-on */
+    const [x0, y0] = o.v.farm || [-99, -99], inYard = (x, y)=>x >= x0 && y >= y0 && x < x0 + 5 && y < y0 + 5; let best = null, bd = 1e9;
+    for (const [a, b] of DIR8){ const x = G.player.x + a, y = G.player.y + b; if (!G.map[x] || G.map[x][y]!==T_FLOOR) continue;
+      const d = Math.hypot(x + 0.5 - g.position.x, y + 0.5 - g.position.z) + (inYard(x, y) ? 0 : 3) + (a && b ? 0.4 : 0); if (d < bd){ bd = d; best = [a, b]; } }
+    let dx = best ? best[0] : g.position.x - pc.x, dz = best ? best[1] : g.position.z - pc.z; const l = Math.hypot(dx, dz) || 1; dx /= l; dz /= l;
+    const reach = hen ? 0.42 : 0.74, tx = G.player.x + 0.5 + dx*reach, tz = G.player.y + 0.5 + dz*reach, d = Math.hypot(tx - g.position.x, tz - g.position.z);
+    o.go = { sx:g.position.x, sz:g.position.z, tx, tz, dx, dz, w:Math.max(0.35, Math.min(1.8, d/(hen ? 1.1 : 0.8))), side:Math.atan2(dx, dz) + Math.PI/2 };
+    sfx(hen ? 'cluck' : 'moo'); }
+  const O = o.go, c1 = O.w + 0.3, tp = c1 + BUTCH_CHOP*2 + 0.05, ts = tp + 1.2, tEnd = ts + 0.7;
+  /* the animal: led up, turned side-on, struck, toppling away from you, sinking from sight */
+  if (t < O.w){ const k = ss(t/O.w); g.position.x = O.sx + (O.tx - O.sx)*k; g.position.z = O.sz + (O.tz - O.sz)*k; if (Math.hypot(O.tx - O.sx, O.tz - O.sz) > 0.05) g.rotation.y = Math.atan2(O.tx - O.sx, O.tz - O.sz); }
+  else { g.position.x = O.tx; g.position.z = O.tz; let da = O.side - g.rotation.y; da = Math.atan2(Math.sin(da), Math.cos(da)); g.rotation.y += da*Math.min(1, dt*10); }
+  if (t < tp){ const tt = V3.t + (p.ph || (p.ph = Math.random()*6)), mv = m3dEaseMv(p.e, t < O.w ? 1 : 0, dt);
+    try{ if (p.e.anim) p.e.anim(p.e.rig, tt, mv, 0, 0, 0, p.e); else if (p.e.beast) m3dPoseBeast(p.e.rig, tt, mv, 0, 0, 0, p.e); else m3dPoseHumanoid(p.e.rig, tt, mv, 0, 0, 0, p.e); }catch(err){} }
+  for (const h of [c1 + BUTCH_HIT, c1 + BUTCH_CHOP + BUTCH_HIT]) if (t0 < h && t >= h){ o.jt = 0; o.hits = (o.hits||0) + 1; v3ButchHit(o, hen); }
+  const halfW = hen ? 0.07 : 0.2; let roll = 0;
+  if (o.jt != null){ o.jt += dt; roll = (hen ? 0.3 : 0.16)*Math.exp(-o.jt*7)*Math.sin(o.jt*28); }   /* (it jolts away from the blow) */
+  if (t >= tp){ const k = cl((t - tp)/0.5); roll = Math.PI/2*(k < 0.75 ? Math.pow(k/0.75, 2) : 1 - 0.07*Math.sin((k - 0.75)/0.25*Math.PI));
+    if (!o.down){ o.down = 1; B.said++; farmButchSay(B.kind, 1); v3ButchPool(o, B, hen); } }
+  if (o.pool) o.pool.scale.setScalar(o.poolR*(0.15 + 0.85*Math.sqrt(cl((t - tp)/1.4))));
+  let sink = 0; if (t >= ts){ const k = cl((t - ts)/0.6); sink = k*k*(halfW*2 + 0.08); g.scale.setScalar(1 - 0.35*k); }
+  g.rotation.z = roll; g.position.y = pc.y + Math.sin(Math.max(0, roll))*halfW*(t >= tp ? 1 : 0) - sink;
+  /* you: turned to it, the cleaver up and down */
+  const want = Math.atan2(g.position.x - pc.x, g.position.z - pc.z); let da = want - (P.yaw||0); da = Math.atan2(Math.sin(da), Math.cos(da)); P.yaw = (P.yaw||0) + da*Math.min(1, dt*9); e.holder.rotation.y = P.yaw;
+  const w = t < c1 ? cl((t - (c1 - 0.35))/0.35) : cl(1 - (t - (c1 + BUTCH_CHOP*2))/0.35), u = t - c1;
+  farmChopPose(e, u < BUTCH_CHOP ? u : u < BUTCH_CHOP*2 ? u - BUTCH_CHOP : BUTCH_CHOP, w, !hen);
+  if (t >= tEnd){ g.visible = false; o.v.gone = 1; B.i++; B.t = 0; if (B.i >= B.q.length) v3ButchEnd(false); }
+}
+/* done (or cut short): the cleaver put away, the yard laid out again without them, the menu back unless you walked off */
+function v3ButchEnd(cut){
+  const B = V3.butch; V3.butch = null; if (!B) return;
+  for (const o of B.q) o.v.butch = 0;
+  for (const m of B.junk) if (m.parent) m.parent.remove(m);
+  try{ if (V3.player && V3.player.e) rsHoldTool(V3.player.e, null); }catch(err){}
+  if (B.n > B.said) farmButchSay(B.kind, B.n - B.said);
+  if (G.interior && G.interior.key==='house'){ houseRelayout(); if (!cut && G.ui==='playing' && !G.gameOver) farmUse(B.kind, farmButchNote(B.kind, B.n)); }
+  saveCurrentGame();
 }
 function farmTrough(){
   const f = farmP(); if (!f) return; farmUpdate(); const have = skHave('flax'), room = Math.max(0, FARM_FEED_MAX - Math.floor(f.feed)), put = Math.min(have, room);
@@ -25771,6 +25878,7 @@ Object.assign(SFX, {
   clink:  ()=> playTone(1500, 0.04, 'square', 0.035),
   cluck:  ()=> playSeq([[760,0.04,'square',0.025],[640,0.05,'square',0.02]]),
   bark:   ()=> playSeq([[300,0.06,'sawtooth',0.04],[260,0.08,'sawtooth',0.035]]),
+  moo:    ()=> playSeq([[118,0.3,'sawtooth',0.035],[98,0.5,'sawtooth',0.04]]),   /* (RS-759) */
   murmur: ()=> playSeq([[210,0.09,'sine',0.03],[180,0.12,'sine',0.025],[230,0.08,'sine',0.02]]),
   coins:  ()=> playSeq([[1320,0.04,'sine',0.08],[1560,0.05,'sine',0.07],[1180,0.06,'sine',0.06]]),
 });
@@ -26737,7 +26845,7 @@ function v3RaceBannerMat(race){
 function townV3Tick(dt){
   const T = THREE;
   for (const p of (V3.villagers||[])){ const v = p.v; if (!v) continue;
-    p.g.visible = !v.indoors;
+    p.g.visible = !v.indoors && !v.gone;   /* (RS-759: one butchered is gone) */
     if (v.guard && !p.torch) p.torch = v3GuardTorch(p);
     if (p.torch){ p.torch.flame.visible = !!V3.night;
       /* (RS-333) a real torch in the watchman's free hand: it follows the hand and stays upright, lit at night */
@@ -36074,8 +36182,9 @@ function v3Render(){
     if (grp){ const np = m3dPlayerBuild(()=>v3Person(v3PlayerLook(), 1.0, grp)); np.g.position.copy(old.g.position); np.at = old.at; np.yaw = old.yaw||0; np.lookKey = key; grp.remove(old.g); V3.player = np; }
   }
   v3WindowTick(); v3GardenSync(); if (G.sleepFx) bedSleepTick(dt); else { const st = G.interior && G.sitAt; if (st){ glide(V3.player, st.x - Math.sin(st.yaw)*0.06, st.y - Math.cos(st.yaw)*0.06); v3SeatPose(V3.player, st); } else if (V3.stair || V3.stairArr) v3StairTick(dt); else { v3Stand(V3.player); glide(V3.player, G.player.x, G.player.y); if (!G.interior && !(V3.door && V3.door.phase==='in')){ const g = V3.player.g.position; g.y += (v3StepH(g.x, g.z) - g.y)*Math.min(1, dt*14); } } }   /* (RS-615: on a raised house's steps, up them) */
-  V3.villagers.forEach(p=>{ const st = p.v.seat; if (st){ glide(p, st.x - Math.sin(st.yaw)*0.06, st.y - Math.cos(st.yaw)*0.06, 6); v3SeatPose(p, st); } else { v3Stand(p); glide(p, p.v.x, p.v.y, 1.7); } v3FolkShadow(p); });   // (a walking pace: one tile in about the time between their steps)
+  V3.villagers.forEach(p=>{ if (p.v.butch) return; const st = p.v.seat; if (st){ glide(p, st.x - Math.sin(st.yaw)*0.06, st.y - Math.cos(st.yaw)*0.06, 6); v3SeatPose(p, st); } else { v3Stand(p); glide(p, p.v.x, p.v.y, 1.7); } v3FolkShadow(p); });   // (a walking pace: one tile in about the time between their steps)
   V3.npcs.forEach(p=>{ const st = p.n.seat; if (st){ glide(p, st.x - Math.sin(st.yaw)*0.06, st.y - Math.cos(st.yaw)*0.06); v3SeatPose(p, st); } else { v3Stand(p); glide(p, p.n.x, p.n.y); } v3FolkShadow(p); });   /* (RS-382: someone seated sits) */
+  if (V3.butch) try{ v3ButchTick(dt); }catch(e){ console.error(e); V3.butch = null; }   /* (RS-759) */
   try{ townV3Tick(dt); }catch(e){ console.error(e); }
   // camera follows you from the south-east at an angle
   const pp = V3.player.g.position, yaw = viewYawSmooth(dt), D = V3.dist*doorZoom();
@@ -36114,6 +36223,8 @@ function v3Render(){
     if (t>=1){ V3.world.remove(q.sp); if (q.sp.material.map===V3.partMatSmoke.map) q.sp.material.dispose(); V3.parts.splice(i,1); continue; }
     q.sp.position.x += q.v[0]*dt; q.sp.position.y += q.v[1]*dt; q.sp.position.z += q.v[2]*dt;
     if (q.sp.material===V3.partMatSpark) q.v[1] -= dt*3;
+    if (q.g){ q.v[1] = Math.max(q.sw ? -0.3 : -9, q.v[1] - dt*q.g); if (q.sw){ q.sp.position.x += Math.sin(q.age*6 + q.sw)*0.3*dt; q.v[0] *= 1 - Math.min(1, dt*2); q.v[2] *= 1 - Math.min(1, dt*2); }   /* (RS-759: blood falls and lies where it lands; a feather drifts down) */
+      if (q.sp.position.y < q.fl){ q.sp.position.y = q.fl; q.v[0] = q.v[1] = q.v[2] = 0; q.g = 0; } }
     q.sp.scale.setScalar(q.s0 + (q.s1-q.s0)*t); if (q.sp.material.map===V3.partMatSmoke.map) q.sp.material.opacity = 0.45*(1-t);
   }
   // click marker
@@ -36169,7 +36280,7 @@ function v3Render(){
   const v = new T.Vector3(), mx = V3.mxy; let best = null, bd = 1e9;
   for (const pl of V3.plates){
     const ob = pl.objFn ? pl.objFn() : pl.obj;
-    if (pl.hover){ pl.el.style.display = 'none'; if (!mx || !ob) continue; v.copy(ob.position); v.y += pl.y; v.project(V3.cam); if (v.z >= 1) continue;
+    if (pl.hover){ pl.el.style.display = 'none'; if (!mx || !ob || !ob.visible) continue; v.copy(ob.position); v.y += pl.y; v.project(V3.cam); if (v.z >= 1) continue;
       const sx = (v.x*0.5+0.5)*cw, sy = (-v.y*0.5+0.5)*ch, dx = mx.x - sx, dy = mx.y - sy; if (Math.abs(dx) < 30 && dy > -6 && dy < 95){ const dd = Math.abs(dx) + Math.abs(dy - 45)*0.5; if (dd < bd){ bd = dd; best = [pl, sx, sy]; } } continue; }
     if (ob){ v.copy(ob.position); v.y += pl.y; } else v.copy(pl.pos);
     const far = pl.near && ob && V3.player && Math.hypot(ob.position.x - V3.player.g.position.x, ob.position.z - V3.player.g.position.z) > pl.near;
@@ -48918,7 +49029,7 @@ function rsPlayerFx(e, t, moving, iso){
   try{ rsSheath(e, e.fight, dt, t, moving); }catch(err){ console.error(err); }   /* (RS-422: out of a fight the weapon is put away) */
   if (r.hips) r.hips.rotation.z = 0; if (r.torso) r.torso.rotation.z = 0; (r.legs||[]).forEach(L=>{ L.hip.rotation.z = 0; });
   // idle: after a few still seconds you shift your weight, look about and now and then stretch; by your campfire you sit
-  const busy = moving > 0.05 || (iso && (FP.swing > 0 || FP.cast > 0)) || !!G.gather;
+  const busy = moving > 0.05 || (iso && (FP.swing > 0 || FP.cast > 0)) || !!G.gather || !!V3.butch;   /* (RS-759: not sat down by the fire with a cleaver in hand) */
   e.idleT = busy ? 0 : (e.idleT||0) + dt;
   const sb = now - PFX.bury, sc = now - PFX.camp;
   let fire = false; try{ fire = !!skFireHere(); }catch(err){}
@@ -49224,6 +49335,16 @@ function rsToolModel(kind, tier){
     g.traverse(o=>{ if (o.isMesh) o.castShadow = true; });
     return g;
   }
+  if (kind==='cleaver'){   /* (RS-759) a butcher's cleaver: a short handle bound in brass, a broad square blade with a bright edge, a hole to hang it by */
+    const hd = new T.Mesh(new T.CylinderGeometry(0.032, 0.036, 0.34, 12), wood); hd.position.y = 0.04; g.add(hd);
+    const brass = new T.MeshStandardMaterial({ color:lin('#b08a3a'), metalness:0.7, roughness:0.35 });
+    for (const y of [-0.12, 0.2]){ const b = new T.Mesh(new T.CylinderGeometry(0.038, 0.038, 0.025, 12), brass); b.position.y = y; g.add(b); }
+    const bl = new T.Mesh(new T.BoxGeometry(0.016, 0.3, 0.27), metal); bl.position.set(0, 0.36, 0.1); g.add(bl);
+    const ed = new T.Mesh(new T.BoxGeometry(0.008, 0.3, 0.035), new T.MeshStandardMaterial({ color:lin('#e8eef2'), metalness:0.9, roughness:0.18 })); ed.position.set(0, 0.36, 0.25); g.add(ed);
+    const ho = new T.Mesh(new T.TorusGeometry(0.026, 0.008, 6, 14), wood); ho.rotation.y = Math.PI/2; ho.position.set(0, 0.46, 0.02); g.add(ho);
+    g.traverse(o=>{ if (o.isMesh) o.castShadow = true; });
+    return g;
+  }
   const handle = new T.Mesh(new T.CylinderGeometry(0.022, 0.026, 0.82, 8), wood); handle.position.y = 0.3; g.add(handle);
   if (kind==='pick'){
     // a curved double-pointed head, tapering to the tips
@@ -49240,7 +49361,7 @@ function rsToolModel(kind, tier){
 // puts the tool in the figure's hands (and its weapon and shield away), or back again with kind null
 function rsHoldTool(e, kind){
   const r = e && e.rig; if (!r || !r.arms) return;
-  const tier = kind ? Math.max(0, (skP().tools[kind]||1) - 1) : 0, key = kind ? kind + tier : '';
+  const tier = kind==='cleaver' ? 2 : kind ? Math.max(0, (skP().tools[kind]||1) - 1) : 0, key = kind ? kind + tier : '';   /* (RS-759: the cleaver is the butcher's steel) */
   if (e.toolKey===key) return;
   e.toolKey = key;
   if (e.tool && e.tool.parent) e.tool.parent.remove(e.tool);
@@ -49798,7 +49919,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-758';
+const GAME_VERSION = 'rs-759';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

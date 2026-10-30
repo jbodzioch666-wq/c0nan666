@@ -93,6 +93,7 @@ Screenshots go to `tools/tests/shots/`.
 | rs756 | the Lost City: generator 26 grows a jungle round each land temple, which is now siteKind city - its names, theme and folk; the jungle's plants |
 | rs757 | the Lost City's surface: generateCityLevel (jungle ring, stepped pyramid with the way down at its foot, ruined houses, paving and grass), theme cityOut lit by the hour, fpdCityJungle; halls below; an RS-756 cached floor 1 made afresh |
 | rs758 | the Lost City's entrance (o3LostCityGate: temple-pyramid, sun, serpents, shrine, vines) and generator 27's owJungleRoom - every Lost City in its jungle |
+| rs759 | the pen menus stay open (buy one or a pen-full, butcher one or all); butchering shown: led up, cleaver, two chops, blood and feathers, toppled, a pool, gone; walking off cuts it short |
 | zloot | probe: the drops at a few levels - rarity shares, names with their bonuses and tiers, a rare's tooltip text (ZL levels, ZN drops a level) |
 | zloottip | probe: a rare's, a magic piece's and a Ring of Recoil's tooltip, plain and with Alt held, as shots/zloottip0-3.png |
 | rs703 | A spell leaves the staff as it comes forward: a real cast at a foe three tiles off, sampled every frame - the bolt waits about half a second, leaves from the staff's head as it leans ahead, its sound with it; the foe flinches (and a miss splashes) only as it lands; the cast lasts about a second; a foe it kills stands till the bolt lands, and the staff isn't put away mid-cast |

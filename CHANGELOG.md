@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## RS-759 - Butcher's Yard
+
+- **The pen menus stay open.** Buying a chick or a calf brings the hen house's or the byre's menu straight back, with what you bought and your gold shown, so you can keep going without walking away and back.
+- **Buy a pen-full at once.** A new option buys as many chicks or calves as there is room and gold for, in one go.
+- **Butcher all.** With two or more grown, "Butcher all" does every one of them; "Butcher a hen" or "Butcher a cow" still takes just one.
+- **Butchering is shown.** The grown animal is led up beside you and you turn to it with a butcher's cleaver. Two chops, with blood, and feathers off a hen. It topples onto its side away from you, a pool spreads under it, and it sinks from sight. With "Butcher all" the next one follows, a little quicker, and the menu comes back when the last is done.
+- **Nothing is lost if you walk off.** The meat, hides and bones are yours as soon as you choose. Walking away just cuts the scene short.
+- **A cow lows** as it's led up to you.
+
 ## RS-758 - Gate of the Sun
 
 - **The Lost City has its own entrance:** a temple-pyramid of six mossy green tiers in coursed stone, in place of the Guardians' Gate. A corbelled portal with bronze doors stands at its foot, a carved sun on its lintel; steep twin stairs climb either side to a shrine on the top under a pierced roof comb; vines hang from its ledges and leaves have taken its terraces.
