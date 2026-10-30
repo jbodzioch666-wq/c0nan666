@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-776 - Drumstick
+
+You asked for chicken to have its own cooking graphic. Until now it showed as a beef steak.
+
+- **A chicken leg on the fire.** Raw chicken now goes onto the campfire grill or into the hearth skillet as a drumstick, matching its bag icon. The meat is plump toward its end and a little lumpy, resting on the bone with its knuckle down on the grill.
+- **It roasts as it cooks.** The leg starts pale pink, with fat showing under the skin and pinker flesh at the shank. As the cook bar fills it turns golden brown, with crisp darker patches and the grill's marks seared across the top.
+- **Beef is still a steak.**
+
 ## RS-775 - Pick and Stone
 
 You asked for a better mining animation and sound, so mining is now a real swing.
