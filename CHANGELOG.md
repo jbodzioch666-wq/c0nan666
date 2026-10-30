@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-770 - Into the Fire
+
+- **The loot filter takes Fire Capes:** a Fire Cape was still marked with the old "boss item" grade, which now means a set piece, so the filter always kept it and its name showed in set green. It's a plain piece now, and the ones you already have are fixed when you load.
+- **Capes in the right tier:** a cape needs no level, so the filter used to put every cape in Tier 1 with the bronze. Now a cape goes by the level it's found from, so a Fire Cape sits in the top tier. To salvage Fire Capes, pick the top tier and plain rarity.
+
 ## RS-769 - Still Waters
 
 - **Calm rivers at night:** a river no longer fills with rings and moiré stripes after dark. The beach surf's foam lines, drawn by depth, ran from bank to bank down a river (a river is shallow all the way across); they now stay on the sea and lakes.
