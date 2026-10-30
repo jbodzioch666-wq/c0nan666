@@ -24,7 +24,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
     Object.assign(m, { alive:1, x:at.x + at.F[0]*k, y:at.y + at.F[1]*k, hp:9999, maxHp:9999, ac:5, atkBonus:1, dmg1:1, dmg2:2, xp:5, sym:'g', nm:'goblin', col:'#8f8', art:null, abilities:[], speed:0 }); }, [at, k]);
   /* where the goblin's middle is on the screen */
   const aimAt = ()=>ev(()=>{ const m = G.mon.find(m=>m.alive), e = M3D.inst.get(m), r = canvas.getBoundingClientRect();
-    const v = e && e.holder ? e.holder.position.clone() : new THREE.Vector3(m.x+0.5, 0, m.y+0.5); v.y += e && e.H ? e.H*0.5 : 0.4; v.project(FPD.cam);
+    const v = e && e.holder ? e.holder.position.clone() : new THREE.Vector3(m.x+0.5, 0, m.y+0.5); v.y += e && e.H ? e.H*0.75 : 0.5;   /* (its chest: with FP-006's wider view an adjacent goblin's middle sits behind the quick bar) */ v.project(FPD.cam);
     return { x:r.left + (v.x*0.5+0.5)*r.width, y:r.top + (-v.y*0.5+0.5)*r.height, model:!!(e && e.holder) }; });
   const st = ()=>ev(()=>({ fights:window.__fights, ticks:window.__ticks, swing:FP.swing||0, atk:!!FPW.atk, fpw:FPW.ok, shots:(ISO.shots||[]).map(s=>[s.kind, s.m ? s.m.nm : null, +s.x0.toFixed(2), +s.y0.toFixed(2)]), px:G.player.x, py:G.player.y }));
   await goblin(1); await frames(40); const g1 = await aimAt(); A(g1.model, 'the goblin has a model');

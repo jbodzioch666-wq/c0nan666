@@ -1,5 +1,16 @@
 # Depthcrawl patch notes
 
+## FP-006 - Hands On
+
+You asked for the view zoomed out a bit, and for arms and hands that look better and sit naturally when holding things.
+
+- **A wider view.** The first-person view now shows about 77 degrees across instead of 66, so you see more of the room around you. On a phone held upright it stops short of a fisheye stretch.
+- **Real hands.** Each hand has a palm, four jointed fingers and a thumb, and it closes round whatever it holds. The fingers wrap the grip with their tips coming back toward you, and the thumb folds over them. Before, a box-shaped glove sat beside the grip.
+- **Dressed as you are.** Bare hands are your own skin, with fingernails. Gloves show in their colour, and gauntlets are polished metal plates over the back of the hand and the fingers, with a flared cuff.
+- **Sleeves to match.** A shirt sleeve is pushed up to the elbow, leather armour gives a leather sleeve, a robe gives a wide bell sleeve, and a platebody gives a steel vambrace.
+- **Natural arms.** Forearms are shaped and fuller toward the elbow, and they come toward you from below. Before, they were thin sticks running to the corners of the screen. The hands are drawn nearer, so the arms are a natural length, and they follow every swing.
+- **Each hand where it belongs.** A sword hand sits just below the crossguard, and two-handed swords, axes and halberds have both hands on the grip. A spear or staff is held in both hands along the shaft. With nothing in hand, you raise two proper fists in a guard, thumbs folded over.
+
 ## FP-005 - Steady Aim
 
 You said the left click wasn't shooting, and that the cursor drifted round the screen while you held the right mouse button. Aiming now works like a shooter: the right button holds the mouse in place and puts a crosshair in the middle of the view.
