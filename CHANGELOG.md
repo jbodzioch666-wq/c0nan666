@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-777 - Hearth and Home
+
+You reported that the hearth in your house faded out whenever you stood next to it.
+
+- **The hearth stays solid.** The cooking gear over the hearth is hidden until you cook, but the boiling pot's bubbles inside it each stood a full unit wide. The game's check for "what stands between the camera and you" still counted those hidden bubbles, so it faded the whole hearth from every tile around it. Hidden parts no longer count, and the bubbles stay tiny until the pot boils.
+- **Taverns and the guild range too.** The same fix covers every hearth with a cooking rig, not just your house's.
+
 ## RS-776 - Drumstick
 
 You asked for chicken to have its own cooking graphic. Until now it showed as a beef steak.

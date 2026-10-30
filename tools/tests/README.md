@@ -112,6 +112,7 @@ Screenshots go to `tools/tests/shots/`.
 | rs774 | RS-774: a fallen master's way out is a portal again (dungeon and graveyard), walked into, still a portal after a reload; the site's own way out stays stairs |
 | rs775 | Mining: the pick swung overhead in both hands onto the rock's near shoulder (rsMinePose), a step in to the rock or vein, chips, dust and sparks (mineRig), audMineHit, the old tick quiet, the remade pick (pickHeadGeo); below ground too |
 | rs776 | A chicken on the fire is a drumstick of its own (cookRigMake's 'chicken'), pink raw and roasted golden, on the grill and in the skillet; beef still a steak |
+| rs777 | The hearth in your house doesn't fade while you stand by it: the see-through check skips what's inside a hidden group (v3Shown), and the cooking rig's pot bubbles start tiny |
 | zloot | probe: the drops at a few levels - rarity shares, names with their bonuses and tiers, a rare's tooltip text (ZL levels, ZN drops a level) |
 | zloottip | probe: a rare's, a magic piece's and a Ring of Recoil's tooltip, plain and with Alt held, as shots/zloottip0-3.png |
 | rs703 | A spell leaves the staff as it comes forward: a real cast at a foe three tiles off, sampled every frame - the bolt waits about half a second, leaves from the staff's head as it leans ahead, its sound with it; the foe flinches (and a miss splashes) only as it lands; the cast lasts about a second; a foe it kills stands till the bolt lands, and the staff isn't put away mid-cast |
