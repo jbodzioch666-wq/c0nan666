@@ -1,5 +1,15 @@
 # Depthcrawl patch notes
 
+## FP-009 - Hands to the Work
+
+You asked for the entrances and the skill animations in first person. Walking into places and working at a skill now happen through your own eyes, with the tool in your hands.
+
+- **Entrances through your eyes.** Walking up to a barrow, down into a pit, through a doorway, onto a portal or onto a ferry, the view rides along at your eyes as you walk in. It no longer jumps up above you. Going down, you look down the steps.
+- **Stairs and gates too.** In dungeons and towns the stairs walk you up or down at eye height, looking up the flight or down it. Through a town gate, you walk through with your own eyes.
+- **The tool in your hands.** Chopping, you swing an axe up over your shoulder and bite it into the trunk. Mining, you raise a pick and drive it into the rock. Butchering at your pen, you chop with a cleaver. Fishing, you hold the rod and whip it back and out on each cast. Foraging, both hands reach down to pick.
+- **Eyes on the work.** When you start a job, the view turns to the tree, rock, water or patch you're working, and looks a little down to a rock or the water, or well down to what you pick. Looking around yourself still works.
+- **Steady while you work.** You stand where your figure works, and each blow jars the tool a little.
+
 ## FP-008 - Full Size
 
 You asked for big towns and ceilings everywhere. In the first-person view, towns out on the land now stand at full size, and every room in town has a ceiling.
