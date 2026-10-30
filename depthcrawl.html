@@ -39526,7 +39526,11 @@ function fishAnim(g, now){
     A.splash.push([dn, 0.55]); }
   if (A.fl==='water' && ts > iv - 0.55 && o3Hash(g.n||0, 11, 5) < 0.5) A.dip += -0.03*Math.max(0, Math.sin((ts - iv + 0.55)*19));   /* (nibbles before the next try) */
   return A; }
+/* (FP-010) the wrist lowers the rod once it's cast - out toward the float at about 35 degrees, not stood up at 70 - and keeps it up through
+   the back-cast and the whip forward (k: 0 with the arm raised past the shoulder, 1 back at rest) */
+const FISH_WRIST = 0.62;
 function fishPose(R, L, g, now){ const A = fishAnim(g, now); R.sh.rotation.x = A.arm; R.el.rotation.x = A.el; L.sh.rotation.z = 0.2;
+  { const k = Math.min(1, Math.max(0, (A.arm + 1.4)/0.65)); R.hand.rotation.x = FISH_WRIST*k*k*(3 - 2*k); }
   if (A.crank > 0){ const c = now/1000*13; L.sh.rotation.x = A.lsh + (-0.75 - A.lsh + Math.sin(c)*0.16)*A.crank; L.el.rotation.x = -0.4 + (-0.55 + Math.cos(c)*0.3)*A.crank; }   /* (the other hand at the reel, winding) */
   else { L.sh.rotation.x = A.lsh; L.el.rotation.x = A.lel; } }
 /* the line, float, hooked fish and splashes, one set a scene (fishRig), placed each frame by fishRigTick */
@@ -39646,6 +39650,37 @@ function o3MineNode(){ const g = G.gather, o = g && g.mode===0 && g.o; if (!o ||
 function o3MineRock(n){ const sz = n.rich ? 1.35 : [0.8, 1, 1.22][n.size===undefined ? 1 : n.size], soft = mineKind(n.type)==='soft'; return { r:(soft ? 0.36 : 0.3)*sz, h:(soft ? 0.12 : 0.3)*sz }; }   /* (the rock's radius and height in the world - o3SyncNodes builds it of three blobs about this big) */
 function o3MineAim(){ const n = o3MineNode(); if (!n) return null; const [x, z] = o3C(n.x, n.y), pp = O3.ppos, a = o3MineAim.a || (o3MineAim.a = { c:new THREE.Vector3(), n:null });
   const R = o3MineRock(n), dx = (pp ? pp.x : x) - x, dz = (pp ? pp.z : z) - z, L = Math.hypot(dx, dz) || 1; a.c.set(x + dx/L*R.r*0.75, O3.heightAt(x, z) + R.h*0.75, z + dz/L*R.r*0.75); a.n = n; return a; }
+/* (FP-010) foraging on the open land: step up to the patch, a crouched arm's reach from its middle (archaeology digs where you stand) */
+const FORAGE_P = 1.7, FORAGE_K = { reach:0.3, hx:-1.3, kn:2.3, tor:0.8, head:-0.5, py:0.1, far:0 };   /* (the stand off the patch's middle, the legs' bend, the lean, the head lifted to look, the plant's height and how far to the near side) */
+function o3ForageStand(){ const g = G.gather, o = g && g.mode===0 && g.o; if (!o || o.k!=='foraging' || !o.at || (o.at.x===G.owPos.x && o.at.y===G.owPos.y)) return null;
+  const a = o3C(o.at.x, o.at.y), b = o3C(G.owPos.x, G.owPos.y), dx = a[0] - b[0], dz = a[1] - b[1], L = Math.hypot(dx, dz); if (L < 0.5 || L > 2) return null;
+  const k = Math.max(0, 1 - FORAGE_K.reach/L); return [dx*k, dz*k]; }
+/* (FP-010) picking: down into a crouch, bent over the patch; the right hand reaches down to a plant (a different one each time, on the near
+   side), closes on it, and draws it back to the left hand, which holds the bunch before the left knee. aim: the patch's middle on the
+   ground, in the world. It was a stoop with the arms swinging over the grass, the hands never down to it */
+function rsForagePose(e, t, aim){ const r = e.rig; if (!r || !r.arms || !r.legs || !r.hips) return; const T = THREE, [R, L] = r.arms;
+  const Z = rsForagePose.Z || (rsForagePose.Z = { a:new T.Vector3(), b:new T.Vector3(), c:new T.Vector3(), d:new T.Vector3() });
+  const ph = (t/FORAGE_P) % 1, n = Math.floor(t/FORAGE_P), ss = k=>k*k*(3 - 2*k), bob = Math.sin(ph*Math.PI*2)*0.03;
+  for (const o of [R.sh, R.el, R.hand, L.sh, L.el, L.hand, r.torso, r.hips, r.head].concat(r.legs.flatMap(Lg=>[Lg.hip, Lg.knee, Lg.ankle]))) if (o && o.__afz){ o.__afz = false; o.matrixAutoUpdate = true; }   /* (woken: a joint gfxAutoFreeze left frozen in the stand would keep its old matrix as the legs bend) */
+  const FK = FORAGE_K, hx = FK.hx, kn = FK.kn, foot = Lg=>(Lg.ankle || Lg.knee).getWorldPosition(Z.c).y;
+  e.holder.updateWorldMatrix(true, true); const f0 = Math.min(...r.legs.map(foot));
+  for (const Lg of r.legs){ Lg.hip.rotation.x = hx + (Lg.s<0 ? -0.1 : 0.1); Lg.hip.rotation.z = (Lg.s||1)*0.2; Lg.knee.rotation.x = kn; if (Lg.ankle) Lg.ankle.rotation.x = -(Lg.hip.rotation.x + kn); }
+  e.holder.updateWorldMatrix(true, true); const f1 = Math.min(...r.legs.map(foot)), ps = r.hips.parent.getWorldScale(Z.c).y || 1;
+  r.hips.position.y -= (f1 - f0)/ps;   /* (down as far as the bent legs lift the feet: they stay on the ground) */
+  if (r.torso) r.torso.rotation.x = FK.tor + bob; if (r.head) r.head.rotation.x = (r.head.rotation.x||0) + FK.head;
+  e.holder.updateWorldMatrix(true, true); const hs = e.holder.getWorldScale(Z.d).x;
+  /* the plant: on the near side of the patch, to either hand of its middle */
+  const P = Z.a.copy(aim), to = Z.b.copy(e.holder.getWorldPosition(Z.c)).sub(aim).setY(0); const dl = to.length() || 1; to.multiplyScalar(1/dl);
+  const u = o3Hash(n, 3, 11) - 0.5, w = o3Hash(n, 5, 13); P.x += to.x*w*FK.far*hs - to.z*u*0.14*hs; P.z += to.z*w*FK.far*hs + to.x*u*0.14*hs; P.y += FK.py*hs;   /* (by the stems, below the heads) */
+  /* the bunch, held before the left knee; the right hand's way down to the plant and back */
+  const Hh = e.holder.localToWorld(Z.c.set(0.02, 0.24, 0.2)), Lh = e.holder.localToWorld(Z.d.set(0.07, 0.21, 0.19));
+  let k; if (ph < 0.38) k = ss(ph/0.38); else if (ph < 0.52) k = 1; else if (ph < 0.86) k = 1 - ss((ph - 0.52)/0.34); else k = 0;
+  const Rt = Hh.clone().lerp(P, k); if (ph >= 0.38 && ph < 0.52) Rt.y += Math.sin((ph - 0.38)/0.14*Math.PI)*0.012*hs;   /* (a tug as it comes away) */
+  m3dReachArm(R, Rt, m3dArmPt(R, Z.b.set(r.gripX || 0.026, -0.04, 0)));
+  m3dReachArm(L, Lh, m3dArmPt(L, Z.b.set(-(r.gripX || 0.026), -0.045, 0.004))); }
+function o3ForageAim(o){ const v = o3ForageAim.v || (o3ForageAim.v = new THREE.Vector3());
+  if (o.at && (o.at.x!==G.owPos.x || o.at.y!==G.owPos.y)){ const c = o3C(o.at.x, o.at.y); return v.set(c[0], O3.heightAt(c[0], c[1]), c[1]); }
+  const e = O3.player && O3.player.e; if (!e) return null; e.holder.localToWorld(v.set(0, 0, 0.26)); v.y = O3.heightAt(v.x, v.z); return v; }   /* (a dig where you stand: the ground before you) */
 function o3MineStand(){ const n = o3MineNode(); if (!n) return null;
   const a = o3C(n.x, n.y), b = o3C(G.owPos.x, G.owPos.y), dx = a[0] - b[0], dz = a[1] - b[1], L = Math.hypot(dx, dz); if (L < 0.5 || L > 2) return null;
   const k = Math.max(0, 1 - (o3MineRock(n).r + MINE_REACH)/L); return [dx*k, dz*k]; }
@@ -39990,7 +40025,7 @@ function o3Render(){
   /* (RS-386) on a town's or a site's tile you stand just outside its model, on the side you came from - never in the middle of it */
   { const key = G.owPos.x+','+G.owPos.y; if (O3.tileKey!==key){ if (O3.tileKey) O3.prevTile = O3.tileKey.split(',').map(Number); O3.tileKey = key; } }
   const PLn = o3PL(); let tx = PLn.x+0.5, tz = PLn.y+0.5; { let off = o3SiteStandOff(G.owPos.x, G.owPos.y); if (off){ off = o3Rot(off, o3FrameTurn(G.owPos.x, G.owPos.y)); tx += off[0]; tz += off[1]; } else { const nd = o3YardNudge(G.owPos.x, G.owPos.y); if (nd){ tx += nd[0]; tz += nd[1]; } } }
-  { const co = o3ChopStand() || o3MineStand(); if (co){ tx += co[0]; tz += co[1]; } }   /* (RS-775: up to the rock you're mining) */   /* (RS-697: up to the tree you're felling) */   /* (RS-632: where you stand, in the frame; RS-687: clear of a graveyard's railings) */
+  { const co = o3ChopStand() || o3MineStand() || o3ForageStand(); if (co){ tx += co[0]; tz += co[1]; } }   /* (FP-010: up to the patch you pick) */   /* (RS-775: up to the rock you're mining) */   /* (RS-697: up to the tree you're felling) */   /* (RS-632: where you stand, in the frame; RS-687: clear of a graveyard's railings) */
   const pp = O3.ppos || (O3.ppos = new T.Vector3(tx,0,tz));
   let k = 1-Math.exp(-dt*10), dxs = tx-pp.x, dzs = tz-pp.z, moving = Math.hypot(dxs,dzs) > 0.03;
   { const d = Math.hypot(dxs,dzs), sp = dt/(O3_STEP*runMul()*wgRoadMul())*1.05*(G.stepLen||1);             // an even walking pace, one tile per step
@@ -40033,7 +40068,7 @@ function o3Render(){
         if (gw.k==='woodcutting'){ rsHoldTool(P.e, 'axe'); if (!moving){ P.e.chopT = (P.e.chopT||0) + dt; if (rsChopPose(P.e, P.e.chopT, o3ChopAim())) O3.chopHit = 1; } }   /* (RS-697: up at the trunk, the felling swing) */
         else if (gw.k==='mining'){ rsHoldTool(P.e, 'pick'); if (!moving){ P.e.mineT = (P.e.mineT||0) + dt; const ma = o3MineAim(); if (rsMinePose(P.e, P.e.mineT, ma) && ma) O3.mineHit = { c:ma.c.clone(), n:ma.n }; } }   /* (RS-775: overhead onto the rock, both hands on the pick) */
         else if (gw.k==='fishing'){ rsHoldTool(P.e, 'rod'); fishPose(R, L, G.gather, performance.now()); }   /* (RS-696) */
-        else if (gw.k==='foraging'){ if (r.torso) r.torso.rotation.x = 0.7; R.sh.rotation.x = -0.9 + Math.sin(tt*3)*0.2; L.sh.rotation.x = -0.7; }
+        else if ((gw.k==='foraging' || gw.k==='archaeology') && !moving){ const a = o3ForageAim(gw); P.e.forT = (P.e.forT||0) + dt; if (a) rsForagePose(P.e, P.e.forT, a); }   /* (FP-010: down to the plants and picking them; digging, scraping at the ground) */
       }
     }
     rsPlayerFx(P.e, tt, mv, false);
@@ -41455,6 +41490,7 @@ function fpdRender(env, T, camZ){
     cam.near = 0.03; cam.aspect = w/h; cam.fov = Math.min(78, 2*Math.atan(FP_PLANE/cam.aspect)*180/Math.PI); cam.updateProjectionMatrix();   /* (no fisheye on a phone held upright) */
     const pt = fpv() ? FP.pitch||0 : 0, cp = Math.cos(pt);   /* (FP-002: looking up and down) */
     cam.position.set(c.x, camZ, c.y); cam.lookAt(c.x+Math.cos(c.a)*cp, camZ+Math.sin(pt), c.y+Math.sin(c.a)*cp);
+    if (fpv()) fpwHeadCam(cam);   /* (FP-010: at work, your eyes in your figure's head) */
   }
   // lantern and ambient, as the raycaster had them
   const lan = env.lan;
@@ -48330,30 +48366,115 @@ function fpwEnchant(w){
    your weapon, swung in time with its own swing (its chopT and mineT, the fishing line's cast and strike, the butcher's beat); foraging
    your bare hands reach down and pick. Each: how it's held, a cycle of [time, rig offset, rig rotation, wrist roll] as FPW_ATK, its
    length in seconds and where the blow lands */
-const FPW_TOOL = {
-  axe:     { st:{ hp:[0.26,-0.26,-0.9], rot:[-0.35,0,0.35], gy:-0.3, left:0.02 }, my:-Math.PI/2, get len(){ return CHOP_P; }, get hit(){ return CHOP_HIT; },
-    kf:[[0,[0,0,0],[0,0,0],0,[0,0,0]],[0.45,[0.1,0.14,0.12],[0,0,0],0,[0.65,0.3,-0.95]],[0.6,[-0.14,0.02,-0.12],[0,0,0],0,[-0.95,-0.1,0.45]],[0.76,[-0.13,0.02,-0.12],[0,0,0],0,[-0.93,-0.1,0.44]],[1,[0,0,0],[0,0,0],0,[0,0,0]]] },
-  pick:    { st:{ hp:[0.24,-0.26,-0.9], rot:[-0.3,0,0.2], gy:-0.3, left:0.02 }, my:0, get len(){ return MINE_P; }, get hit(){ return MINE_HIT; },
-    kf:[[0,[0,0,0],[0,0,0],0,[0,0,0]],[0.42,[0,0.25,0.1],[0,0,0],0,[1.1,0,-0.1]],[0.55,[-0.06,-0.04,-0.15],[0,0,0],0,[-1.1,0,0]],[0.6,[-0.06,-0.03,-0.15],[0,0,0],0,[-1.05,0,0]],[0.7,[-0.04,-0.08,-0.08],[0,0,0],0,[-1.25,0,0]],[0.76,[-0.06,-0.04,-0.15],[0,0,0],0,[-1.1,0,0]],[1,[0,0,0],[0,0,0],0,[0,0,0]]] },
-  cleaver: { st:{ hp:[0.38,-0.28,-0.95], rot:[-0.2,0.2,0.1], gy:-0.04 }, my:Math.PI, len:0.9, hit:0.55,
-    kf:[[0,[0,0,0],[0,0,0],0,[0,0,0]],[0.4,[0.02,0.12,0.06],[0,0,0],0,[0.7,0,0]],[0.55,[-0.04,-0.06,-0.1],[0,0,0],0,[-1.0,0,0]],[0.72,[-0.04,-0.06,-0.1],[0,0,0],0,[-1.0,0,0]],[1,[0,0,0],[0,0,0],0,[0,0,0]]] },
-  rod:     { st:{ hp:[0.24,-0.3,-0.85], rot:[-0.85,0.12,0.12], gy:-0.2, left:0.0 }, my:0 },
-  forage:  { st:{ hp:[0.3,-0.36,-0.82], rot:[0,0.3,0.6], hr:-0.5 }, len:1.6, hit:0.5,
-    kf:[[0,[0,0,0],[0,0,0],0],[0.4,[-0.06,0.05,-0.3],[0.3,0,0],0],[0.6,[-0.07,0.03,-0.32],[0.34,0,0],0],[1,[0,0,0],[0,0,0],0]] },
-};
+/* (FP-010) at work you see your own figure's pose through its eyes (fpwMirrorTick): the tool where its hand holds it, your hands where its
+   hands grip, each arm by the figure's elbow to its shoulder. FPW_WORK: each tool's grip, the haft's radius */
+const FPW_WORK = { axe:{ grip:0.024 }, pick:{ grip:0.024 }, cleaver:{ grip:0.034 }, rod:{ grip:0.03 } };
 function fpwWorker(){ return G.gameMode===0 ? O3.player && O3.player.e : G.gameMode===3 ? V3.player && V3.player.e : ISO.player; }
-function fpwWork(){ const e = fpwWorker(), tk = e && e.toolKey ? String(e.toolKey) : '', k = tk.replace(/\d+$/, '');
-  if (k && FPW_TOOL[k]) return { kind:k, tier:+tk.slice(k.length)||0, e };
-  const o = G.gather && G.gather.o; if (o && !(e && e.toolKey) && !['woodcutting','mining','fishing'].includes(o.k) && (G.gather.mode===0 ? G.gameMode===0 : G.gameMode===1 || G.gameMode===2) && (o.at || o.vein)) return { kind:'forage', e };
+/* what you're at: a tool in the figure's hand, burying bones (down on one knee, scraping), or foraging or digging empty-handed */
+function fpwWork(){ const e = fpwWorker(); if (!e || !e.rig || !e.rig.arms || !e.holder) return null;
+  const tk = e.toolKey ? String(e.toolKey) : '', k = tk.replace(/\d+$/, '');
+  if (k && FPW_WORK[k] && e.tool) return { kind:k, tier:+tk.slice(k.length)||0, e };
+  if (performance.now()/1000 - PFX.bury < 1.8) return { kind:'bury', e };
+  const o = G.gather && G.gather.o; if (o && !['woodcutting','mining','fishing'].includes(o.k) && (G.gather.mode===0 ? G.gameMode===0 : G.gameMode===1 || G.gameMode===2) && (o.at || o.vein)) return { kind:'forage', e };
   return null; }
-/* where in its cycle the work is: the figure's own clock for the axe and pick (none while you walk: held ready), the butcher's and
-   foraging's own beat */
-function fpwWorkPhase(W){ const e = W.e, T = FPW_TOOL[W.kind];
-  if (W.kind==='axe') return e && e.chopT!=null ? (e.chopT/T.len) % 1 : 0;
-  if (W.kind==='pick') return e && e.mineT!=null ? (e.mineT/T.len) % 1 : 0;
-  if (W.kind==='cleaver') return V3.butch ? (FPW.t/T.len) % 1 : 0;
-  if (W.kind==='forage') return (FPW.t/T.len) % 1;
-  return 0; }
+/* (FP-010) the work's tool and hands: held carries the tool's frame in the view (or the view's own, empty-handed), each hand placed in it
+   by its matrix every frame; an arm for each - forearm, elbow and upper arm */
+function fpwSetWork(WK){
+  const T = THREE, tool = !!FPW_WORK[WK.kind];
+  FPW.style = 'work'; FPW.st = FPW_STYLE.fists; FPW.work = WK.kind; FPW.atk = null; FPW.leftFist = null; FPW.flailHead = null; FPW.ench = null; FPW.motes = [];
+  const held = new T.Group(); held.matrixAutoUpdate = false; let g = null;
+  if (tool){ g = fpwToolModel(WK.kind, WK.tier); g.traverse(o=>{ if (o.isMesh) o.castShadow = false; }); held.add(g); }
+  const hands = [fpwHand(tool ? FPW_WORK[WK.kind].grip : 0.004), fpwHand(tool ? FPW_WORK[WK.kind].grip : 0.004)];
+  for (const h of hands){ h.matrixAutoUpdate = false; held.add(h); }
+  FPW.rig.add(held); FPW.held = held; FPW.weaponG = g; FPW.info = { tipY:0.7, tool };
+  FPW.mir = { hands, tool };
+  FPW.arms = hands.map(h=>{ const fa = fpwForearm(), sm = FPW.hm.sleeveM || FPW.hm.skin, el = new T.Mesh(new T.SphereGeometry(0.047*0.78, 24, 16), sm);
+    fa.up.material = fpwFadeMat(fa.up.material, true); const fm = new Map(); fa.g.traverse(o=>{ if (o.isMesh){ if (!fm.has(o.material)) fm.set(o.material, fpwFadeMat(o.material)); o.material = fm.get(o.material); } }); el.material = fpwFadeMat(sm);
+    FPW.armGrp.add(fa.g); FPW.armGrp.add(fa.up); FPW.armGrp.add(el); return { h, g:fa.g, up:fa.up, el }; });   /* (the elbow rounded off) */
+}
+/* (FP-010) an upper arm is seen by its elbow and lost toward the shoulder, at the edge of sight: drawn fading out along its length (the
+   cylinder's own y, -0.5 at the elbow) - a sleeve that ends in nothing, not a stump or a ball by your cheek */
+/* An arm also fades where it comes nearer your eyes than a hand's breadth or so (FPW.nearU, set from the hands' scale): out of focus at
+   the edge of sight, not a wall of sleeve across the view as the pick goes up over your head */
+function fpwFadeMat(m, along){ const f = m.clone(); f.transparent = true; f.depthWrite = !along; FPW.nearU = FPW.nearU || { value:new THREE.Vector2(0.05, 0.12) };
+  f.onBeforeCompile = sh=>{ sh.uniforms.uNear = FPW.nearU; sh.vertexShader = 'varying float vFadeY;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vFadeY = position.y;');
+    sh.fragmentShader = 'varying float vFadeY;\nuniform vec2 uNear;\n' + sh.fragmentShader.replace('#include <dithering_fragment>', '#include <dithering_fragment>\n gl_FragColor.a *= smoothstep(uNear.x, uNear.y, length(vViewPosition))' + (along ? ' * (1.0 - smoothstep(-0.2, 0.45, vFadeY))' : '') + ';'); };
+  f.customProgramCacheKey = ()=>'fpwFade' + (along ? 1 : 0); return f; }
+/* (FP-010) the work's tools as close as your hands: the third-person ones (rsToolModel) in the same frame, but the axe's head forged - a
+   bearded blade bevelled and drawn thin to its edge, the edge ground bright - its haft smooth and knobbed; the rod's parts round; the
+   cleaver's blade bevelled and ground to its edge. The pick's is already its own */
+function fpwToolModel(kind, tier){
+  if (kind!=='axe' && kind!=='rod' && kind!=='cleaver') return rsToolModel(kind, tier);
+  const T = THREE, g = new T.Group(), lin = c=>new T.Color(c).convertSRGBToLinear(), tc = lin(TOOL_TIER_COL[Math.max(0, Math.min(7, tier))]), bright = lin('#e8eef2');
+  const wood = new T.MeshStandardMaterial({ color:lin('#7a5230'), roughness:0.72 }), metal = new T.MeshStandardMaterial({ color:tc, metalness:0.65, roughness:0.32 });
+  if (tier>=7){ metal.emissive = lin('#ff5a10'); metal.emissiveIntensity = 0.6; }
+  /* a blade: the shape in the tool's (z, y), extruded across x, thinned toward the edge (z past e0) and coloured from the forged metal to
+     the ground edge */
+  const blade = (pts, th, e0, e1, ex)=>{ const sh = new T.Shape(); sh.moveTo(pts[0][0], pts[0][1]); for (const q of pts.slice(1)) q.length===4 ? sh.quadraticCurveTo(q[0], q[1], q[2], q[3]) : sh.lineTo(q[0], q[1]);
+    const geo = new T.ExtrudeGeometry(sh, { depth:th, bevelEnabled:true, bevelThickness:0.004, bevelSize:0.003, bevelSegments:2, curveSegments:14 }), P = geo.attributes.position, col = [];
+    for (let i=0;i<P.count;i++){ const z = P.getX(i), y = P.getY(i), u = Math.min(1, Math.max(0, (z - e0)/(e1 - e0))); let x = P.getZ(i) - th/2; x *= 1 - 0.82*Math.pow(u, 1.3); P.setXYZ(i, x, y, z);
+      const b = Math.min(1, Math.max(0, (z - ex)/(e1 - ex))), c = tc.clone().multiplyScalar(0.82 + 0.18*u).lerp(bright, b*b*0.85); col.push(c.r, c.g, c.b); }
+    geo.setAttribute('color', new T.Float32BufferAttribute(col, 3)); geo.computeVertexNormals();
+    const m = new T.MeshStandardMaterial({ vertexColors:true, metalness:0.72, roughness:0.3 }); if (tier>=7){ m.emissive = lin('#ff5a10'); m.emissiveIntensity = 0.5; } return new T.Mesh(geo, m); };
+  if (kind==='axe'){
+    const haft = new T.Mesh(new T.CylinderGeometry(0.021, 0.026, 0.82, 20), wood); haft.position.y = 0.3; g.add(haft);
+    const knob = new T.Mesh(new T.SphereGeometry(0.031, 20, 12), wood); knob.scale.y = 0.6; knob.position.y = -0.11; g.add(knob);
+    g.add(blade([[-0.04, 0.7], [-0.045, 0.66], [-0.04, 0.625], [0.035, 0.625], [0.09, 0.61, 0.13, 0.55], [0.17, 0.5, 0.235, 0.525], [0.265, 0.63, 0.24, 0.75], [0.17, 0.725, 0.035, 0.705], [-0.04, 0.7]], 0.032, 0.03, 0.25, 0.19));
+    const eye = new T.Mesh(new T.CylinderGeometry(0.031, 0.034, 0.1, 20), metal); eye.position.y = 0.665; g.add(eye);
+    const wedge = new T.Mesh(new T.CylinderGeometry(0.01, 0.02, 0.022, 4), new T.MeshStandardMaterial({ color:lin('#3a3632'), metalness:0.5, roughness:0.5 })); wedge.position.y = 0.722; wedge.rotation.y = Math.PI/4; g.add(wedge);
+  } else if (kind==='cleaver'){
+    const hd = new T.Mesh(new T.CylinderGeometry(0.032, 0.036, 0.34, 20), wood); hd.position.y = 0.04; g.add(hd);
+    const brass = new T.MeshStandardMaterial({ color:lin('#b08a3a'), metalness:0.7, roughness:0.35 });
+    for (const y of [-0.12, 0.2]){ const b = new T.Mesh(new T.CylinderGeometry(0.038, 0.038, 0.025, 20), brass); b.position.y = y; g.add(b); }
+    g.add(blade([[-0.035, 0.22], [0.2, 0.21], [0.255, 0.215, 0.26, 0.26], [0.27, 0.36], [0.262, 0.47, 0.22, 0.51], [-0.035, 0.51], [-0.035, 0.22]], 0.018, 0.12, 0.27, 0.21));
+    const ho = new T.Mesh(new T.TorusGeometry(0.026, 0.008, 10, 20), wood); ho.rotation.y = Math.PI/2; ho.position.set(0, 0.46, 0.02); g.add(ho);
+  } else {
+    const rod = new T.Mesh(new T.CylinderGeometry(0.008, 0.022, 1.9, 16), wood); rod.position.y = 0.8; g.add(rod);
+    const grip = new T.Mesh(new T.CylinderGeometry(0.03, 0.03, 0.26, 20), new T.MeshStandardMaterial({ color:lin('#c8a878'), roughness:0.9 })); grip.position.y = 0.02; g.add(grip);
+    for (const y of [-0.11, 0.15]){ const b = new T.Mesh(new T.CylinderGeometry(0.033, 0.033, 0.016, 20), metal); b.position.y = y; g.add(b); }
+    const reel = new T.Mesh(new T.CylinderGeometry(0.05, 0.05, 0.035, 28), metal); reel.rotation.z = Math.PI/2; reel.position.set(0.05, 0.12, 0); g.add(reel);
+    const crank = new T.Mesh(new T.CylinderGeometry(0.006, 0.006, 0.04, 8), metal); crank.rotation.z = Math.PI/2; crank.position.set(0.085, 0.14, 0); g.add(crank);
+    for (let i=1;i<=3;i++){ const ring = new T.Mesh(new T.TorusGeometry(0.018, 0.004, 8, 16), metal); ring.position.set(0.018, 0.25+i*0.42, 0); ring.rotation.y = Math.PI/2; g.add(ring); }
+  }
+  return g; }
+function fpwMirrorCam(){ return G.gameMode===0 ? O3.cam : G.gameMode===3 ? V3.cam : FPD.cam; }
+/* (FP-010) the figure's pose seen from its eyes, every frame: FPW's scene is the world camera's view space and FPW.cam takes that camera's
+   field of view, so the axe's edge meets the bark you see. Each hand goes where the figure's fist closes (m3dGrip; the left's as rsChopPose
+   reaches it) - slid along a haft to its place there, or off it as a fist in the hand - turned round its grip so its wrist faces the elbow */
+function fpwMirrorTick(){
+  const M = FPW.mir, e = fpwWorker(), cam = fpwMirrorCam(); if (!M || !e || !e.rig || !e.rig.arms || !e.holder || !cam) return false;
+  const T = THREE, Z = fpwMirrorTick.Z || (fpwMirrorTick.Z = { L:new T.Matrix4(), F:new T.Matrix4(), G:new T.Matrix4(), H:new T.Matrix4(), I:new T.Matrix4(), v:new T.Vector3(), w:new T.Vector3(), u:new T.Vector3(), q:new T.Quaternion(), qx:new T.Quaternion().setFromAxisAngle(new T.Vector3(1,0,0), Math.PI/2), s:new T.Vector3(), up:new T.Vector3(0,1,0) });
+  const r = e.rig, gx = r.gripX || 0.026, tw = M.tool && e.tool ? e.tool : null;
+  e.holder.updateWorldMatrix(true, true); cam.updateMatrixWorld(); const V = cam.matrixWorldInverse;
+  if (FPW.cam.fov!==cam.fov || FPW.cam.near!==0.002){ FPW.cam.fov = cam.fov; FPW.cam.near = 0.002; FPW.cam.far = 60; FPW.cam.updateProjectionMatrix(); }
+  FPW.rig.position.set(0, 0, 0); FPW.rig.rotation.set(0, 0, 0); FPW.rig.scale.setScalar(1);
+  const held = FPW.held; if (tw){ held.matrix.multiplyMatrices(V, tw.matrixWorld); Z.L.copy(tw.matrixWorld).invert(); } else { held.matrix.identity(); Z.L.copy(V); }   /* (L: the world to held's own frame) */
+  held.matrixWorldNeedsUpdate = true;
+  for (let i=0;i<2;i++){ const A = r.arms[i], h = M.hands[i];
+    Z.F.compose(Z.v.set(i ? -gx : gx, i ? -0.045 : -0.04, i ? 0.004 : 0), Z.qx, Z.s.setScalar(0.42)).premultiply(A.hand.matrixWorld).premultiply(Z.L);   /* (a fist's grip as a tool would be held in it, in held's frame) */
+    if (tw){ Z.v.setFromMatrixPosition(Z.F); if (i===0 || Math.hypot(Z.v.x, Z.v.z) < 0.12) Z.F.makeTranslation(0, Z.v.y, 0); }   /* (on the haft: along it, square to it) */
+    A.el.getWorldPosition(Z.w).applyMatrix4(Z.L).applyMatrix4(Z.G.copy(Z.F).invert());   /* (the elbow, in the grip's own frame) */
+    const phi = Math.atan2(-Z.w.z, Z.w.x), D = Math.PI/180;
+    Z.H.makeRotationY(i ? phi - 242*D : phi + 62*D); if (i) Z.H.multiply(Z.I.makeScale(-1, 1, 1));
+    h.matrix.multiplyMatrices(Z.F, Z.H); h.matrixWorldNeedsUpdate = true; }
+  FPW.scene.updateMatrixWorld(true);
+  { const s0 = Z.s.setFromMatrixColumn(M.hands[0].matrixWorld, 1).length(); if (FPW.nearU) FPW.nearU.value.set(0.2*s0, 0.45*s0); }   /* (in the tools' units, about metres: gone nearer than 20 cm, whole past 45) */
+  for (let i=0;i<2;i++){ const A = r.arms[i], X = FPW.arms[i]; if (!X) continue;
+    const W = X.h.localToWorld(Z.u.copy(X.h.userData.wrist)), E = A.el.getWorldPosition(Z.v).applyMatrix4(V), S = A.sh.getWorldPosition(Z.w).applyMatrix4(V);
+    const k = Z.s.setFromMatrixColumn(X.h.matrixWorld, 1).length()/0.78, d1 = E.clone().sub(W), l1 = d1.length(), d2 = S.clone().sub(E), l2 = d2.length();
+    X.g.position.copy(W); X.g.quaternion.setFromUnitVectors(Z.up, d1.normalize()); X.g.scale.set(k, l1/(FPW_ARM_L/0.78), k);
+    X.el.position.copy(E); X.el.scale.setScalar(k); X.elNear = FPW.nearU && E.length() < FPW.nearU.value.y;   /* (a ball by your eye would show as a ghost through its fade: gone instead) */
+    X.up.position.copy(E).addScaledVector(d2.normalize(), l2/2); X.up.quaternion.setFromUnitVectors(Z.up, d2); X.up.scale.set(k, l2, k); }
+  return true;
+}
+/* (FP-010) at work your eyes are in your figure's head - down with it as it stoops or kneels, round with it into a swing - eased there
+   and back; the way you look stays your own */
+function fpwEyeOf(e){ const r = e.rig, h = r && (r.head || r.neck); if (!h) return null; e.holder.updateWorldMatrix(true, true);   /* (the head's own parts are merged into the body: its bone is all there is) */
+  return h.localToWorld((fpwEyeOf.v || (fpwEyeOf.v = new THREE.Vector3())).set(0, 0.082, 0.05)); }
+function fpwHeadCam(cam){ const now = performance.now(), dt = Math.min(0.05, (now - (FX.wkT||now))/1000); FX.wkT = now;
+  const k = FX.wk = clamp((FX.wk||0) + (FPW.mir && FPW.work ? 1 : -1)*dt*3, 0, 1); if (!k) return; const e = fpwWorker(); if (!e || !e.rig || !e.holder) return;
+  const p = fpwEyeOf(e); if (!p) return; const d = cam.getWorldDirection(new THREE.Vector3()), f = k*k*(3 - 2*k);
+  cam.position.lerp(p, f); cam.lookAt(cam.position.x + d.x, cam.position.y + d.y, cam.position.z + d.z); }
 function fpwStyleFor(w){
   if (!w || !w.used) return 'fists';
   if (w.rsStaff) return 'staff';
@@ -48369,7 +48490,7 @@ function fpwStyleFor(w){
   return 'blade1';
 }
 function fpwSetWeapon(){
-  const WK = fpwWork(), w = WK ? null : G.gear.weapon, wk = WK ? 'work:' + WK.kind + (WK.tier||0) : w && w.used ? ((w.rsStaff ? 'staff:' : '')+w.basis+'|'+(w.quality||0)+'|'+fpwEnchant(w)+'|'+(w.rsCol||'')) : 'fists';   /* (FP-009: or the tool you work with) */
+  const WK = fpwWork(), w = WK ? null : G.gear.weapon, wk = WK ? 'work:' + WK.kind + (WK.tier||0) : w && w.used ? ((w.rsStaff ? 'staff:' : '')+w.basis+'|'+(w.quality||0)+'|'+fpwEnchant(w)+'|'+(w.rsCol||'')) : 'fists';   /* (FP-009: or the tool you work with; FP-010: or bones you bury) */
   const dk = it=>it && it.used ? (it.rsFam||'')+(it.dye||it.rsCol||'')+(it.trimDye||'') : '', P = G.player||{}, key = wk+'|'+dk(G.gear.arms)+'|'+dk(G.gear.chest)+'|'+P.race+'|'+JSON.stringify(P.look||0);   /* (FP-006: and how you're dressed) */
   if (key===FPW.wkey) return;
   FPW.wkey = key;
@@ -48377,11 +48498,13 @@ function fpwSetWeapon(){
   const clear = (grp)=>{ while (grp.children.length){ const c = grp.children[0]; grp.remove(c); c.traverse(o=>{ if (o.geometry) o.geometry.dispose(); }); } };
   clear(FPW.rig); if (FPW.armGrp) clear(FPW.armGrp); else { FPW.armGrp = new T.Group(); FPW.scene.add(FPW.armGrp); }
   FPW.hm = fpwHandMats();
-  const tool = WK && WK.kind!=='forage', styleKey = WK ? (tool ? 'tool' : 'fists') : fpwStyleFor(w), st = WK ? Object.assign({ atk:'chop', dur:0.4 }, FPW_TOOL[WK.kind].st) : FPW_STYLE[styleKey];
-  FPW.style = styleKey; FPW.st = st; FPW.work = WK ? WK.kind : null;
-  const { g, info } = tool ? (()=>{ const g = new T.Group(), m = rsToolModel(WK.kind, WK.tier); m.rotation.y = FPW_TOOL[WK.kind].my||0; g.add(m); m.traverse(o=>{ if (o.isMesh) o.castShadow = false; }); return { g, info:{ tipY:WK.kind==='rod' ? 1.75 : 0.7, grip:WK.kind==='rod' ? 0.03 : WK.kind==='cleaver' ? 0.034 : 0.024, tool:true } }; })() : fpwBuild(w && (w.rsStaff ? 'Quarterstaff' : w.basis), w);
+  if (WK){ fpwSetWork(WK); return; }
+  FPW.mir = null; FPW.work = null;
+  const styleKey = fpwStyleFor(w), st = FPW_STYLE[styleKey];
+  FPW.style = styleKey; FPW.st = st;
+  const { g, info } = fpwBuild(w && (w.rsStaff ? 'Quarterstaff' : w.basis), w);
   // the blade takes its metal's colour: bronze, iron, steel, mithril blue, adamant green, rune cyan, dragon red
-  if (!WK && w && w.used && w.rsCol){ const tm = fpwTierMat(w.rsCol); g.traverse(o=>{ if (o.isMesh && (o.material===M.steel || o.material===M.plate)) o.material = tm; }); }
+  if (w && w.used && w.rsCol){ const tm = fpwTierMat(w.rsCol); g.traverse(o=>{ if (o.isMesh && (o.material===M.steel || o.material===M.plate)) o.material = tm; }); }
   const held = new T.Group(); held.add(g); if (st.gy) g.position.y = st.gy;   // slide the weapon so the top hand sits by the guard
   /* (FP-006) each hand closed round its grip (the grip's own radius, a fist's fingers tight on nothing), turned round it by the
      style's hr/hl; its arm runs back from the wrist toward a shoulder low and behind, out of sight */
@@ -48409,7 +48532,7 @@ function fpwSetWeapon(){
     for (const c of g.children.slice()){ if (c!==pivot && c.position.y >= 0.29 && !c.isSprite){ g.remove(c); c.position.y -= 0.28; pivot.add(c); } }
     FPW.flailHead = pivot;
   }
-  const ench = WK ? null : fpwEnchant(w);
+  const ench = fpwEnchant(w);
   FPW.ench = ench; FPW.motes = [];
   if (ench && !info.fists){
     const [hex, css] = FPW_ENCH[ench];
@@ -48448,6 +48571,9 @@ function fpwDraw(dom){
   FPW.key.color.setRGB(clamp(lan[0],0,1), clamp(lan[1]*0.95,0,1), clamp(lan[2]*0.85,0,1));
   FPW.key.intensity = 0.6 + lit*1.6; FPW.hemi.intensity = 0.15 + lit*0.4; FPW.rim.intensity = 0.35 + lit*0.5;
   FPW.r.toneMappingExposure = 0.9 + lit*0.3;
+  if (FPW.mir){ const ok = fpwMirrorTick(); FPW.held.visible = ok; for (const A of FPW.arms||[]){ A.g.visible = A.up.visible = ok; A.el.visible = ok && !A.elNear; }   /* (FP-010: at work, your figure's own pose) */
+    FPW.glow.intensity = 0; FPW.r.render(FPW.scene, FPW.cam); if (!dom) ctx.drawImage(FPW.cv, 0, 0, cw, chh); return true; }
+  if (FPW.cam.fov!==47 || FPW.cam.near!==0.05){ FPW.cam.fov = 47; FPW.cam.near = 0.05; FPW.cam.far = 20; FPW.cam.updateProjectionMatrix(); }
   // an attack starts whenever the game plays a swing (FP.swing jumps back up to 1)
   const st = FPW.st, sw = FP.swing||0;
   if (sw > (FPW.prevSwing||0) + 0.2) FPW.atk = { t:0, hold:0, landed:false, hit: FPW.lastSwing!=='miss' };
@@ -48461,17 +48587,12 @@ function fpwDraw(dom){
     p = Math.min(1, a.t);
     if (a.t >= 1) FPW.atk = null;
   }
-  let KF = FPW_ATK[st.atk] || FPW_ATK.slash, rodX = 0;
-  if (FPW.work){ const W = fpwWork(), TL = FPW_TOOL[FPW.work]; FPW.atk = null;   /* (FP-009: the work's own cycle) */
-    if (TL.kf){ KF = TL.kf; p = W ? fpwWorkPhase(W) : 0; const hit = p >= TL.hit && (FPW.workPh||0) < TL.hit && p - (FPW.workPh||0) < 0.5; FPW.workPh = p; if (hit && FPW.work!=='forage') FPW.jolt = 1; }
-    else if (FPW.work==='rod' && G.gather){ try{ const A = fishAnim(G.gather, performance.now()); rodX = -(A.arm + 0.75)*0.55 + (A.yank||0)*0.35 + (A.dip||0)*2; }catch(e){} p = 0; } }
-  FPW.jolt = (FPW.jolt||0)*Math.exp(-dt*14);
+  let KF = FPW_ATK[st.atk] || FPW_ATK.slash;
   if (window.__fpwP !== undefined) p = window.__fpwP;       // (tests pin a pose)
   let a = KF[0], b2 = KF[KF.length-1];
   for (let i=0;i<KF.length-1;i++) if (p>=KF[i][0] && p<=KF[i+1][0]){ a = KF[i]; b2 = KF[i+1]; break; }
   let f = (p - a[0]) / Math.max(1e-6, b2[0]-a[0]); f = f*f*(3-2*f);
   const off = [0,1,2].map(i=> a[1][i] + (b2[1][i]-a[1][i])*f), rr = [0,1,2].map(i=> a[2][i] + (b2[2][i]-a[2][i])*f), wr = a[3] + (b2[3]-a[3])*f;
-  const ht = a[4] && b2[4] ? [0,1,2].map(i=> a[4][i] + (b2[4][i]-a[4][i])*f) : null;   /* (FP-009: a work cycle turns the tool in your hands too) */
   // breathing at rest, a figure-eight bob as you walk, and lag behind turns
   const breath = Math.sin(FPW.t*1.6);
   const bobX = Math.sin(FP.stepPhase||0)*0.018, bobY = Math.abs(Math.cos(FP.stepPhase||0))*0.022;
@@ -48481,9 +48602,8 @@ function fpwDraw(dom){
   const aspect = cw/chh, xs = Math.min(1, Math.min(aspect, 1.8)/1.78), lift = immersiveUi ? 0.1 : 0;
   const R = FPW.rig;
   R.position.set(FPW_CHEST[0] + (st.hp[0]*xs - st.hp[0]) + bobX + off[0] + FPW.sway*0.25, FPW_CHEST[1] + lift - bobY + breath*0.006 + off[1], FPW_CHEST[2] + off[2]);
-  R.rotation.set(rr[0] + breath*0.01 + rodX*0.3, rr[1] + FPW.sway, rr[2]); R.position.y += rodX*0.06; R.position.y += Math.sin((1 - FPW.jolt)*26)*FPW.jolt*0.012; R.position.multiplyScalar(FPW_NEAR); R.scale.setScalar(FPW_NEAR);   /* (FP-009: the rod's cast and strike; the jar of a blow) */
-  if (rodX) FPW.held.rotation.set(st.rot[0] + rodX*0.75, st.rot[1], st.rot[2] + wr);   /* (the rod turns in your hand over the shoulder and out, the hand kept in sight) */
-  else if (ht) FPW.held.rotation.set(st.rot[0] + ht[0], st.rot[1] + ht[1], st.rot[2] + wr + ht[2]); else FPW.held.rotation.set(st.rot[0], st.rot[1], st.rot[2] + wr);
+  R.rotation.set(rr[0] + breath*0.01, rr[1] + FPW.sway, rr[2]); R.position.multiplyScalar(FPW_NEAR); R.scale.setScalar(FPW_NEAR);
+  FPW.held.rotation.z = st.rot[2] + wr;
   if (FPW.leftFist) FPW.leftFist.position.y = FPW.leftFistAt[1]-FPW_CHEST[1] + Math.sin(FPW.t*1.6+1)*0.008;
   // the flail's head swings on its chain, and whirls round in an attack
   if (FPW.flailHead){ FPW.flailHead.rotation.z = Math.sin(FPW.t*2.1)*0.18 - FPW.sway*1.5 - bobX*4; FPW.flailHead.rotation.x = p>0 && p<0.8 ? -p/0.8*Math.PI*2 : Math.sin(FPW.t*1.7)*0.1; }
@@ -48659,7 +48779,7 @@ function fpxApplyCam(cam, c, gy, eye, id){ const cp = Math.cos(c.pt), y = gy + e
   cam.position.set(c.x, y, c.y); cam.lookAt(c.x + Math.cos(c.a)*cp, y + Math.sin(c.pt), c.y + Math.sin(c.a)*cp);
   const fov = Math.min(78, 2*Math.atan(FP_PLANE/(cam.aspect||1.6))*180/Math.PI);
   if (Math.abs(cam.fov - fov) > 0.01 || cam.near!==0.05){ cam.fov = fov; cam.near = 0.05; cam.updateProjectionMatrix(); }
-  FX.on[id] = true; }
+  fpwHeadCam(cam); FX.on[id] = true; }
 /* (FP-009) a walk the game plays for you - through a door or the town gate, up or down the stairs, into a barrow or a dwarf gate, into
    a portal, aboard the ferry: your eyes go with your hidden figure (x, z on the ground at gy, turned yaw3 as three turns it), looking
    the way it walks, pt up or down; eye is how high they are. Your free walk takes up again from wherever it ends */
@@ -48669,10 +48789,21 @@ function fpxRide(cam, x, z, gy, yaw3, eye, pt, id, dt){ const a = Math.PI/2 - ya
   fpxApplyCam(cam, { x:x - Math.cos(FX.a)*FPM_EYE_BACK, y:z - Math.sin(FX.a)*FPM_EYE_BACK, a:FX.a, pt:FX.ridePt }, gy, eye, id); }
 /* (FP-009) at work your eyes turn to it: the tree, the rock, the water, the patch you forage - a little down to a rock or the water,
    well down to what you pick. Not while you look round yourself or walk */
-function fpxWorkLook(dt){ const g = G.gather, o = g && g.o; if (!o || FPL.on || (ISO.held && ISO.held.size)) return;
+function fpxWorkLook(dt){ const g = G.gather, o = g && g.o;
+  { const b = performance.now()/1000 - PFX.bury < 1.8, k = Math.min(1, dt*4);   /* (FP-010: kneeling to bury bones you look down at the hole, then up again) */
+    if (b && !FPL.on){ if (FX.buryP0==null){ FX.buryP0 = FP.pitch||0; FX.buryLY = FP.lookYaw; if (FP.lookYaw==null){ FP.lookYaw = fpvYawNow(); FP.lookF = G.player.facing; } }   /* (held to the way you face: a free look's pitch would sink back level) */
+      FP.pitch = (FP.pitch||0) + (-1.15 - (FP.pitch||0))*k; return; }
+    if (FX.buryP0!=null){ FP.pitch = (FP.pitch||0) + (FX.buryP0 - (FP.pitch||0))*k; if (Math.abs(FP.pitch - FX.buryP0) < 0.01 || FPL.on){ if (FX.buryLY==null && !FPL.on) FP.lookYaw = null; FX.buryP0 = null; } } }
+  if (!o || FPL.on || (ISO.held && ISO.held.size)) return;
   let tx, ty; if (g.mode===0 && G.gameMode===0 && o.at && (o.at.x!==G.owPos.x || o.at.y!==G.owPos.y)){ const c = o3C(o.at.x, o.at.y); tx = c[0]; ty = c[1]; }
   else if (g.mode===1 && (G.gameMode===1 || G.gameMode===2) && o.vein){ tx = o.vein.x + 0.5; ty = o.vein.y + 0.5; } else return;
-  const want = Math.atan2(ty - FPM.y, tx - FPM.x), pt = o.k==='woodcutting' ? 0.06 : o.k==='mining' ? -0.22 : o.k==='fishing' ? -0.18 : -0.6;
+  /* (FP-010) and look at where the work is done, from your eyes in your head: the bark at your waist where the axe bites (rsChopPose), the
+     rock's shoulder the pick strikes, the ground you pick from; out over the water to the float */
+  const e = fpwWorker(), ey = e && e.rig && e.holder ? fpwEyeOf(e) : null, v = fpxWorkLook.v || (fpxWorkLook.v = new THREE.Vector3()); let th = null;
+  if (ey && o.k==='woodcutting') th = e.holder.getWorldPosition(v).y + 0.33*e.holder.getWorldScale(v).x;
+  else if (ey && o.k==='mining'){ const a = G.gameMode===0 ? o3MineAim() : ISO.mineAim; if (a){ th = a.c.y; tx = a.c.x; ty = a.c.z; } }
+  else if (ey && o.k!=='fishing'){ const h = e.holder.getWorldPosition(v); tx += (h.x - tx)*0.35; ty += (h.z - ty)*0.35; th = (G.gameMode===0 ? O3.heightAt(tx, ty) : h.y) + 0.12*e.holder.getWorldScale(v).x; }   /* (a little nearer and above the ground: the plants and your hand at them) */
+  const want = Math.atan2(ty - FPM.y, tx - FPM.x), pt = th!=null ? clamp(Math.atan2(th - ey.y, Math.max(0.12, Math.hypot(tx - ey.x, ty - ey.z))), -1.25, 0.3) : o.k==='fishing' ? -0.35 : -0.6;
   const cur = FP.lookYaw!=null ? FP.lookYaw : fpvYawNow(); let da = want - cur; da = Math.atan2(Math.sin(da), Math.cos(da)); const k = Math.min(1, dt*4);
   FP.lookYaw = cur + da*k; FP.lookF = G.player.facing; FP.pitch = (FP.pitch||0) + (pt - (FP.pitch||0))*k; }
 function fpxCamOff(cam, fov, id){ if (!FX.on[id]) return; FX.on[id] = false; cam.fov = fov; cam.near = 0.5; cam.updateProjectionMatrix(); }
@@ -49459,7 +49590,7 @@ function isoSyncPlayer(){
   const C = m3dAtkCurve(FP.swing>0 ? 1-FP.swing : 0), wind = C.wind, strike = C.strike; e.fol = C.fol;
   const hurt = m3dHitReact(e, p.hp, effMaxHp(), FP.dt);   /* (RS-173: as hard as the blow) */
   const lunge = Math.max(strike, C.fol*0.6)*0.2 - hurt*0.1;   // step into the blow and follow it through; rock back when you're hit
-  { const gm = !moving && G.gather && G.gather.mode===1 && G.gather.o.k==='mining' && G.gather.o.vein ? G.gather.o.vein : null, want = gm ? Math.max(0, Math.hypot(gm.x + 0.5 - e.pos.x, gm.y + 0.5 - e.pos.y) - 0.24 - MINE_REACH) : 0;   /* (RS-775: a step in to the vein, a pick's reach from it) */
+  { const gm = !moving && G.gather && G.gather.mode===1 && (G.gather.o.k==='mining' || G.gather.o.k==='foraging') && G.gather.o.vein ? G.gather.o.vein : null, want = gm ? Math.max(0, Math.hypot(gm.x + 0.5 - e.pos.x, gm.y + 0.5 - e.pos.y) - 0.24 - (G.gather.o.k==='foraging' ? FORAGE_K.reach : MINE_REACH)) : 0;   /* (RS-775: a step in to the vein, a pick's reach from it) */
     e.mineStep = (e.mineStep||0) + (want - (e.mineStep||0))*Math.min(1, (FP.dt||0.016)*6); if (!gm && e.mineT!=null){ e.mineT = null; e.minePh = undefined; const R0 = e.rig.arms && e.rig.arms[0]; if (R0) R0.hand.rotation.set(0, 0, 0); } }
   e.holder.position.set(e.pos.x + Math.sin(e.face)*(lunge + (e.mineStep||0)), 0, e.pos.y + Math.cos(e.face)*(lunge + (e.mineStep||0))); e.holder.rotation.y = e.face;
   const onPortal = isoPortalTick(e), onStair = onPortal!=null ? onPortal : isoStairTick(e);   /* (RS-592; RS-609: or into a portal) */
@@ -49486,7 +49617,7 @@ function isoSyncPlayer(){
       const r = e.rig, tt = FP.t;
       if (r.arms){ const [R, L] = r.arms;
         if (g2.k==='fishing'){ rsHoldTool(e, 'rod'); fishPose(R, L, G.gather, performance.now()); }   /* (RS-696) */
-        else { if (r.torso) r.torso.rotation.x = 0.7; R.sh.rotation.x = -0.9 + Math.sin(tt*3)*0.2; L.sh.rotation.x = -0.7; } }
+        else if (!moving){ e.forT = (e.forT||0) + (FP.dt||0.016); rsForagePose(e, e.forT, new THREE.Vector3(vx, 0, vy)); } }   /* (FP-010: stepped in to it, picking) */
     }
     try{ isoFishLine(e, g2 && g2.k==='fishing' ? g2 : null); }catch(err){ console.error(err); }   /* (RS-449: the line out to a cave pool) */
   }
@@ -50101,7 +50232,7 @@ function rsHoldTool(e, kind){
   const r = e && e.rig; if (!r || !r.arms) return;
   const tier = kind==='cleaver' ? 2 : kind ? Math.max(0, (skP().tools[kind]||1) - 1) : 0, key = kind ? kind + tier : '';   /* (RS-759: the cleaver is the butcher's steel) */
   if (e.toolKey===key) return;
-  e.toolKey = key;
+  e.toolKey = key; r.arms[0].hand.rotation.set(0, 0, 0);   /* (FP-010: the wrist straight again from the rod's lowering) */
   if (e.tool && e.tool.parent) e.tool.parent.remove(e.tool);
   e.tool = null;
   if (r.weapon) r.weapon.visible = !kind || !!r.sheathed;   /* (RS-422: put away, it stays on your hip or back) */
@@ -50746,7 +50877,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'fp-009';
+const GAME_VERSION = 'fp-010';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

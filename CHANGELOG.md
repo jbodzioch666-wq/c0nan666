@@ -1,5 +1,17 @@
 # Depthcrawl patch notes
 
+## FP-010 - True to Life
+
+You asked for every skill animation to match a real view of your hands and arms while you work. In first person, the hands and tools you see are now your own figure's, seen from the eyes in its head. Where a skill's movement wasn't believable, it has been redone.
+
+- **Your own arms.** At work, the view no longer shows a separate pair of arms. It shows your figure's hands, forearms and elbows, posed exactly as your figure is, so the axe you see is the axe your figure swings and its edge meets the bark you're looking at. Arms fade out softly where they come close to your eyes, so the sleeve doesn't fill the screen as you swing a pick overhead.
+- **Eyes in your head.** At work, the view sits at your figure's eyes and moves with your head as you lean into a swing or crouch.
+- **Better tools up close.** The axe has a forged, bearded head with a bright ground edge and a smooth knobbed haft. The cleaver's blade is bevelled to its edge, and the rod has a proper grip, reel and rings.
+- **Chopping.** You look at the notch in the trunk where the axe bites, not up into the branches.
+- **Fishing.** The rod rests out at an angler's slant while you wait for a bite, instead of standing nearly upright. This shows from above too.
+- **Foraging.** You step up to the patch and crouch down. One hand reaches to a plant, a different one each time, pulls it free and brings it back to the bunch held in your other hand. It used to be a stoop with the arms swinging over the grass. This shows from above too, in caves as well.
+- **Burying bones.** Kneeling to bury bones, you look down at the hole and see your hands scrape the earth, then look back up as you were.
+
 ## FP-009 - Hands to the Work
 
 You asked for the entrances and the skill animations in first person. Walking into places and working at a skill now happen through your own eyes, with the tool in your hands.

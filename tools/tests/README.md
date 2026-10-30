@@ -123,6 +123,7 @@ Screenshots go to `tools/tests/shots/`.
 | fp007 | first person in towns, rooms and on the open land: the camera at your eyes, figure hidden, hands over the view, W walks a tile, Z turns, the right button looks, the left is the town's click; a room's near walls full height; O back |
 | fp008 | full-size towns on the land through your eyes: out at the gate, the wall solid but for the gate, in at the gate; a room's ceiling |
 | fp009 | FP-009: the tool in hand and the view turned to the work (axe, pick), the camera riding a barrow walk-in at your eyes, your eyes going down a dungeon stair |
+| fp010 | At work through your eyes you see your figure's own pose: the tool where its hands hold it, the eyes in its head; the rod at a slant; foraging crouched with the hand down at the plants; burying looks down and back up |
 | zloot | probe: the drops at a few levels - rarity shares, names with their bonuses and tiers, a rare's tooltip text (ZL levels, ZN drops a level) |
 | zloottip | probe: a rare's, a magic piece's and a Ring of Recoil's tooltip, plain and with Alt held, as shots/zloottip0-3.png |
 | rs703 | A spell leaves the staff as it comes forward: a real cast at a foe three tiles off, sampled every frame - the bolt waits about half a second, leaves from the staff's head as it leans ahead, its sound with it; the foe flinches (and a miss splashes) only as it lands; the cast lasts about a second; a foe it kills stands till the bolt lands, and the staff isn't put away mid-cast |

@@ -18,7 +18,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
       return { work:FPW.work, held:!!FPW.held, off:Math.abs(Math.atan2(Math.sin(d), Math.cos(d))), pitch:FP.pitch }; });
     A(w.work===kind && w.held, k + ': the ' + kind + ' in hand: ' + JSON.stringify(w));
     A(w.off < 0.15, k + ': you turn to it: ' + JSON.stringify(w));
-    A(kind==='axe' ? w.pitch > 0 : w.pitch < -0.1, k + ': looking at the trunk or down at the rock: ' + w.pitch);
+    A(kind==='axe' ? w.pitch > -0.9 && w.pitch < 0.1 : w.pitch < -0.1, k + ': looking at the trunk where the axe bites (FP-010: from the eyes in your head, a little down) or down at the rock: ' + w.pitch);
     if (kind==='axe'){ await ev(()=>{ window.__fpwP = 0.45; }); await wait(300); await page.screenshot({ path:SHOTS + '/fp009-axe.jpg', type:'jpeg', quality:82 }); await ev(()=>{ delete window.__fpwP; }); }
   }
   await ev(()=>{ skStop(); G.gather = null; FP.lookYaw = null; FP.pitch = 0; }); await wait(600);
