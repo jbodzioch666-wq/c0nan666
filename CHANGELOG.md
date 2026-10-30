@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-773 - True Colours
+
+- **Your cape's emblem shows in its dye on the finest capes.** The best capes (Legends, the top uniques) have embroidery that glows, and that glow was always gold. Laid over a black cross, it made the cross look gold. Now the glow takes the emblem's own colour: a black emblem stays black, a red one glows red, and an undyed emblem is still gold thread glowing gold.
+- **The embroidered bands follow your trim dye** the same way.
+
 ## RS-772 - Under the Cape, Bent Double
 
 - **Your back stays under your cape when you bend over.** Stooping to pick cave herbs, or kneeling to bury bones, bent your body after the cape and robe had already been hung for standing, so your back came up through the cape. Now the cape and robe hang after every bend, below ground and on the open land.
