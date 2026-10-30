@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-772 - Under the Cape, Bent Double
+
+- **Your back stays under your cape when you bend over.** Stooping to pick cave herbs, or kneeling to bury bones, bent your body after the cape and robe had already been hung for standing, so your back came up through the cape. Now the cape and robe hang after every bend, below ground and on the open land.
+- **Measured on Ingrid's own save:** stooped over cave herbs, the points of body and robe showing through the cape fell from about 1,700 to 21, the same as standing. Burying bones fell from about 1,900 to 21.
+
 ## RS-771 - Staff and Stone
 
 - **Out of runes, fight with your staff:** when a wizard runs dry, clicking a foe walks you up to it and you bash it with your staff, which is a crush weapon too, with its own attack and strength bonuses. These hits train Attack, Strength or Defence by your combat style.
