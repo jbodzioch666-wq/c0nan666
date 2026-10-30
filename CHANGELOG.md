@@ -1,5 +1,18 @@
 # Depthcrawl patch notes
 
+## FP-001 - Through Your Own Eyes
+
+The first release of the first-person branch, built on RS-778. Below ground you can now see the dungeon through your own eyes instead of from above. It's off at first: press **O**, or turn on "first-person view below ground" in the graphics settings.
+
+- **Eye height, in your own tile.** The camera stands where you stand and looks the way you face. A ceiling closes over you, your carried lantern lights the way ahead, and your own figure is hidden.
+- **Walking.** W and S walk forward and back. A and D step aside without turning, so you can back away from a foe and still face it. Z and X (or the left and right arrows) turn a quarter. Hold a key to keep walking at the usual pace. A step into a monster still attacks it.
+- **Smooth steps.** The view glides with your walk instead of hopping tile to tile, with a little bob as you go.
+- **Phone pad.** Up and down walk forward and back, left and right turn, and the corners step forward or back to one side. The turn buttons by the minimap turn you too.
+- **The minimap turns with you,** so the way you face is always up.
+- **Clicking still works.** Click a monster, a chest, the stairs or a tile to walk there or fight, as in the view from above.
+- **Roadside fights too.** They use the same view when it's on.
+- **O again** goes back to the view from above. The setting is remembered.
+
 ## RS-778 - From the Farmyard
 
 You asked for cooking recipes for beef and chicken. The chicken and beef from your farmyard now go into five new dishes, which you cook at a hearth, the guild range or your campfire.
