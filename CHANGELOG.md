@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-768 - Turn of the Season
+
+- **Fixed a crash when the season changes.** If the season turned while the land around you was still being built in the background (usually as you walked a long way), the game stopped with "Cannot read properties of null (reading 'cx')". The unfinished build is now thrown away, and the land is rebuilt in the new season's colours.
+
 ## RS-767 - Bone Magic
 
 - **Monster spellcasters cast your spells.** Skeleton mages, shamans, liches and every other caster now cast the same Strike, Bolt, Blast, Wave or Surge you could at their level, in an element of their own.
