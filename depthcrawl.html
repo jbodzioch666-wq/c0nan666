@@ -13362,7 +13362,7 @@ function skGatherTick(now){
   const o = g.o, k = o.k, L = skLvl(k), tier = { fishing:skP().tools.rod, mining:skP().tools.pick, woodcutting:skP().tools.axe, archaeology:skP().tools.pick, foraging:skP().tools.sickle }[k] || 0;
   // (balance, RS-101: half as many takes an hour, each worth twice the xp - resources stay scarce)
   // (RS-120: that comment used to sit mid-line and swallowed the next three statements, so gathering ran every frame)
-  g.iv = Math.round((2800 - tier*140) * (rsTotalLevel() >= 500 ? 0.9 : 1)); g.next = now + g.iv; g.n++; try{ if (!(k==='woodcutting' && G.gameMode===0 && O3.chop)) audSkill(k); }catch(e){}   /* (RS-697: chopping a tree on the land, each blow of the axe sounds as it lands) */
+  g.iv = Math.round((2800 - tier*140) * (rsTotalLevel() >= 500 ? 0.9 : 1)); g.next = now + g.iv; g.n++; try{ if (!(k==='woodcutting' && G.gameMode===0 && O3.chop) && !(k==='mining' && performance.now() - (G._mineBlowAt||0) < 3000)) audSkill(k); }catch(e){}   /* (RS-697: chopping a tree on the land, each blow of the axe sounds as it lands) */
   // time passes, and out in the wilds something may come looking
   G.player.turnCount = (G.player.turnCount||0) + 2;
   if (G.gameMode===1){ tickMonsters(); if (G.mon.some(m=>m.alive && Math.abs(m.x-G.player.x)<=1 && Math.abs(m.y-G.player.y)<=1)){ skStop('something is upon you - you stop mining'); return; } }
@@ -27564,6 +27564,15 @@ function audSkill(k){
   else if (k==='smith'){ for (let i=0;i<3;i++){ audTone(t + i*0.22, 'square', 1700, 1500, 0.2, 0.05); audTone(t + i*0.22, 'square', 2550, 2300, 0.15, 0.03); } }
   else if (k==='fire'){ for (let i=0;i<10;i++) audNoiseHit(out, t + Math.random()*0.9, 0.02, 'bandpass', 2000 + Math.random()*2000, 0.12); audNoiseHit(out, t, 1.0, 'lowpass', 300, 0.08); }
 }
+/* (RS-775) the pick's blow, as it lands: a hard steel chink on the stone, the pick head ringing (three partials, never quite the same
+   pitch twice), the stone's own thud under it, and grit trickling down after. Coal is duller; clay and sand a soft thud and a patter */
+function audMineHit(kind){ const t = audT(); if (t===null) return; const out = _gains.sfx, v = 0.85 + Math.random()*0.3, p = 0.93 + Math.random()*0.14; G._mineBlowAt = performance.now();
+  if (kind==='soft'){ audTone(t, 'sine', 130*p, 55, 0.15, 0.22*v); audNoiseHit(out, t, 0.12, 'lowpass', 650, 0.32*v); for (let i=0;i<4;i++) audNoiseHit(out, t + 0.06 + Math.random()*0.25, 0.03, 'bandpass', 1100 + Math.random()*700, 0.05, 2); return; }
+  const coal = kind==='coal';
+  audNoiseHit(out, t, 0.028, 'bandpass', (coal ? 2200 : 3300)*p, (coal ? 0.3 : 0.45)*v, 1.4);   /* (the chink) */
+  if (!coal){ audTone(t, 'sine', 2380*p, 2320*p, 0.34, 0.05*v); audTone(t, 'sine', 3710*p, 3640*p, 0.24, 0.03*v); audTone(t, 'sine', 5230*p, 5120*p, 0.13, 0.016*v); }   /* (the head ringing) */
+  audTone(t, 'triangle', 170*p, 70, 0.1, 0.17*v); audNoiseHit(out, t, 0.08, 'lowpass', 900, 0.24*v);   /* (the stone's thud) */
+  const n = 3 + (Math.random()*4|0); for (let i=0;i<n;i++) audNoiseHit(out, t + 0.07 + Math.random()*0.35, 0.012 + Math.random()*0.02, 'bandpass', 2500 + Math.random()*3500, 0.035 + Math.random()*0.04, 3); }   /* (grit falling) */
 /* (RS-561) a drop of water landing on stone somewhere near, quieter the further off */
 function audDrip(d){ const t = audT(); if (t===null || !isSoundOn()) return; const v = 0.09*Math.max(0.15, 1 - d/5); audTone(t, 'sine', 1900 + Math.random()*600, 900, 0.07, v); audTone(t + 0.02, 'sine', 2600, 1800, 0.05, v*0.4); }
 function audEnv(k){
@@ -39398,6 +39407,7 @@ function o3AnimNodes(dt){
     if (f.t > 2.4){ O3.scene.remove(f.obj); f.obj.traverse(o=>{ if (o.material && o.material.userData && o.material.userData.own) o.material.dispose(); }); O3.fall = null; }
   }
   o3ChopTick(dt);   /* (RS-697) */
+  o3MineTick(dt);   /* (RS-775) */
   // your line out to the spot you're fishing (RS-696: cast, bite, strike and the fish reeled in - fishRig)
   const gw = G.gather && G.gather.mode===0 && G.gather.o.k==='fishing' ? G.gather.o : null;
   if (!O3.frig || O3.frig.sc!==O3.scene) O3.frig = fishRig(O3.scene, 0.035);
@@ -39554,6 +39564,48 @@ function o3ChopNode(){ const g = G.gather, o = g && g.mode===0 && g.o; if (!o ||
 function o3ChopStand(){ const n = o3ChopNode(); if (!n) return null;
   const a = o3C(n.x, n.y), b = o3C(G.owPos.x, G.owPos.y), dx = a[0] - b[0], dz = a[1] - b[1], L = Math.hypot(dx, dz); if (L < 0.5 || L > 2) return null;
   const k = Math.max(0, 1 - (o3ChopTrunkR(n) + CHOP_REACH)/L); return [dx*k, dz*k]; }
+/* (RS-775) mining on the open land: the rock you're working, where its near shoulder is (the point lands there), and where you stand
+   to reach it - a pick's reach out from the rock, on the side you came from */
+function o3MineNode(){ const g = G.gather, o = g && g.mode===0 && g.o; if (!o || o.k!=='mining' || !o.at || (o.at.x===G.owPos.x && o.at.y===G.owPos.y)) return null;
+  const n = skNodeAt(o.at.x, o.at.y); return n && !n.gone && n.k==='mining' ? n : null; }
+function o3MineRock(n){ const sz = n.rich ? 1.35 : [0.8, 1, 1.22][n.size===undefined ? 1 : n.size], soft = mineKind(n.type)==='soft'; return { r:(soft ? 0.36 : 0.3)*sz, h:(soft ? 0.12 : 0.3)*sz }; }   /* (the rock's radius and height in the world - o3SyncNodes builds it of three blobs about this big) */
+function o3MineAim(){ const n = o3MineNode(); if (!n) return null; const [x, z] = o3C(n.x, n.y), pp = O3.ppos, a = o3MineAim.a || (o3MineAim.a = { c:new THREE.Vector3(), n:null });
+  const R = o3MineRock(n), dx = (pp ? pp.x : x) - x, dz = (pp ? pp.z : z) - z, L = Math.hypot(dx, dz) || 1; a.c.set(x + dx/L*R.r*0.75, O3.heightAt(x, z) + R.h*0.75, z + dz/L*R.r*0.75); a.n = n; return a; }
+function o3MineStand(){ const n = o3MineNode(); if (!n) return null;
+  const a = o3C(n.x, n.y), b = o3C(G.owPos.x, G.owPos.y), dx = a[0] - b[0], dz = a[1] - b[1], L = Math.hypot(dx, dz); if (L < 0.5 || L > 2) return null;
+  const k = Math.max(0, 1 - (o3MineRock(n).r + MINE_REACH)/L); return [dx*k, dz*k]; }
+/* chips of the rock and its ore flying from the blow and lying where they fall, a puff of dust, and sparks off the steel on hard stone */
+function mineRig(sc){ const T = THREE, rig = { sc, chips:[], dust:[], sparks:[] }, lin = c=>new T.Color(c).convertSRGBToLinear();
+  const cg = new T.IcosahedronGeometry(1, 0); rig.stoneM = new T.MeshStandardMaterial({ color:lin('#7a7670'), roughness:0.9, flatShading:true }); rig.oreM = new T.MeshStandardMaterial({ roughness:0.5, metalness:0.3, flatShading:true });
+  for (let i=0;i<16;i++){ const m = new T.Mesh(cg, i%3 ? rig.stoneM : rig.oreM); m.visible = false; m.castShadow = true; sc.add(m); rig.chips.push({ m, t:-1, b:1, v:new T.Vector3(), s:new T.Vector3() }); }
+  const dt = gfxTextures().soft; for (let i=0;i<6;i++){ const m = new T.Sprite(new T.SpriteMaterial({ map:dt, color:0xb8b0a0, transparent:true, depthWrite:false, opacity:0 })); m.visible = false; sc.add(m); rig.dust.push({ m, t:-1, v:new T.Vector3() }); }
+  const sg = new T.BoxGeometry(0.006, 0.006, 0.05), smat = new T.MeshBasicMaterial({ color:0xffd27a, transparent:true, blending:T.AdditiveBlending, depthWrite:false });
+  for (let i=0;i<12;i++){ const m = new T.Mesh(sg, smat); m.visible = false; sc.add(m); rig.sparks.push({ m, t:-1, v:new T.Vector3() }); }
+  rig.sparkM = smat; return rig; }
+function mineBurst(rig, p, ax, az, col, kind){
+  if (col) rig.oreM.color.set(col).convertSRGBToLinear();
+  const soft = kind==='soft'; rig.stoneM.color.set(soft ? col || '#8a6a4a' : '#7a7670').convertSRGBToLinear();
+  let k = 0; for (const c of rig.chips){ if (c.t >= 0 || k >= (soft ? 5 : 7)) continue; k++; const sp = (Math.random() - 0.5)*1.8, f = 0.35 + Math.random()*0.7;
+    c.t = 0; c.b = (soft ? 0.016 : 0.011) + Math.random()*0.012; c.m.visible = true; c.m.scale.set(c.b, c.b*0.7, c.b*1.2); c.m.position.copy(p); c.m.rotation.set(Math.random()*6, Math.random()*6, 0);
+    c.v.set(ax*f - az*sp*0.5, 0.6 + Math.random()*1.1, az*f + ax*sp*0.5); c.s.set(Math.random()*30 - 15, Math.random()*30 - 15, Math.random()*30 - 15); }
+  k = 0; for (const d of rig.dust){ if (d.t >= 0 || k >= 2) continue; k++; d.t = 0; d.m.visible = true; d.m.position.copy(p); d.m.position.y += 0.02; d.v.set(ax*0.12 + (Math.random() - 0.5)*0.1, 0.1 + Math.random()*0.08, az*0.12 + (Math.random() - 0.5)*0.1);
+    d.m.material.color.set(soft ? col || '#a08060' : '#b8b0a0'); }
+  if (kind==='hard'){ k = 0; for (const sp of rig.sparks){ if (sp.t >= 0 || k >= 6) continue; k++; const a = Math.random()*6.283, f = 1.2 + Math.random()*1.4; sp.t = 0; sp.m.visible = true; sp.m.position.copy(p);
+    sp.v.set(ax*f*0.6 + Math.cos(a)*f*0.5, 0.4 + Math.random()*1.2, az*f*0.6 + Math.sin(a)*f*0.5); } } }
+function mineRigTick(rig, dt, groundAt){
+  for (const c of rig.chips){ if (c.t < 0) continue; c.t += dt; const m = c.m, gy = groundAt(m.position.x, m.position.z) + c.b*0.5;
+    if (m.position.y > gy || c.v.y > 0){ c.v.y -= 5.2*dt; m.position.addScaledVector(c.v, dt); m.rotation.x += c.s.x*dt; m.rotation.y += c.s.y*dt; m.rotation.z += c.s.z*dt;
+      if (m.position.y <= gy){ m.position.y = gy; if (c.v.y < -0.8){ c.v.y *= -0.25; c.v.x *= 0.4; c.v.z *= 0.4; c.s.multiplyScalar(0.3); } else c.v.set(0, 0, 0); } }   /* (a bounce, then lying where it fell) */
+    if (c.t > 3.5){ c.t = -1; m.visible = false; } else if (c.t > 3) m.scale.setScalar(c.b*(3.5 - c.t)/0.5); }
+  for (const d of rig.dust){ if (d.t < 0) continue; d.t += dt; const m = d.m, k = d.t/1.1; m.position.addScaledVector(d.v, dt); d.v.multiplyScalar(1 - dt*1.5); m.scale.setScalar(0.08 + k*0.22); m.material.opacity = 0.32*(1 - k)*Math.min(1, d.t*8);
+    if (k >= 1){ d.t = -1; m.visible = false; } }
+  for (const sp of rig.sparks){ if (sp.t < 0) continue; sp.t += dt; const m = sp.m; sp.v.y -= 4*dt; m.position.addScaledVector(sp.v, dt); m.lookAt(m.position.x + sp.v.x, m.position.y + sp.v.y, m.position.z + sp.v.z);
+    m.scale.setScalar(Math.max(0.01, 1 - sp.t/0.3)); if (sp.t > 0.3){ sp.t = -1; m.visible = false; } } }
+function o3MineTick(dt){
+  if (!O3.mrig || O3.mrig.sc!==O3.scene) O3.mrig = mineRig(O3.scene);
+  if (O3.mineHit && O3.mineHit.n){ const h = O3.mineHit, pp = O3.ppos, dx = pp.x - h.c.x, dz = pp.z - h.c.z, L = Math.hypot(dx, dz) || 1, kind = mineKind(h.n.type);
+    mineBurst(O3.mrig, h.c, dx/L, dz/L, skNodeCol(h.n), kind); try{ audMineHit(kind); }catch(err){} }
+  O3.mineHit = null; mineRigTick(O3.mrig, dt, (x, z)=>O3.heightAt(x, z)); }
 function chopRig(sc){ const T = THREE, rig = { sc, chips:[], leaves:[] }, lin = c=>new T.Color(c).convertSRGBToLinear();
   const cg = new T.BoxGeometry(0.028, 0.007, 0.017), lg = new T.PlaneGeometry(0.032, 0.022);
   const pale = new T.MeshStandardMaterial({ color:lin('#e8d29c'), roughness:0.8 }), bark = new T.MeshStandardMaterial({ color:lin('#5a4028'), roughness:0.9 });
@@ -39861,7 +39913,7 @@ function o3Render(){
   /* (RS-386) on a town's or a site's tile you stand just outside its model, on the side you came from - never in the middle of it */
   { const key = G.owPos.x+','+G.owPos.y; if (O3.tileKey!==key){ if (O3.tileKey) O3.prevTile = O3.tileKey.split(',').map(Number); O3.tileKey = key; } }
   const PLn = o3PL(); let tx = PLn.x+0.5, tz = PLn.y+0.5; { let off = o3SiteStandOff(G.owPos.x, G.owPos.y); if (off){ off = o3Rot(off, o3FrameTurn(G.owPos.x, G.owPos.y)); tx += off[0]; tz += off[1]; } else { const nd = o3YardNudge(G.owPos.x, G.owPos.y); if (nd){ tx += nd[0]; tz += nd[1]; } } }
-  { const co = o3ChopStand(); if (co){ tx += co[0]; tz += co[1]; } }   /* (RS-697: up to the tree you're felling) */   /* (RS-632: where you stand, in the frame; RS-687: clear of a graveyard's railings) */
+  { const co = o3ChopStand() || o3MineStand(); if (co){ tx += co[0]; tz += co[1]; } }   /* (RS-775: up to the rock you're mining) */   /* (RS-697: up to the tree you're felling) */   /* (RS-632: where you stand, in the frame; RS-687: clear of a graveyard's railings) */
   const pp = O3.ppos || (O3.ppos = new T.Vector3(tx,0,tz));
   let k = 1-Math.exp(-dt*10), dxs = tx-pp.x, dzs = tz-pp.z, moving = Math.hypot(dxs,dzs) > 0.03;
   { const d = Math.hypot(dxs,dzs), sp = dt/(O3_STEP*runMul()*wgRoadMul())*1.05*(G.stepLen||1);             // an even walking pace, one tile per step
@@ -39898,10 +39950,11 @@ function o3Render(){
       const gw = G.gather && G.gather.mode===0 ? G.gather.o : null;
       if (!gw || (gw.k!=='woodcutting' && gw.k!=='mining' && gw.k!=='fishing')) rsHoldTool(P.e, null);
       if (P.e.chopT!=null && (!gw || gw.k!=='woodcutting' || moving)){ R.hand.rotation.set(0, 0, 0); R.sh.rotation.y = 0; P.e.chopT = null; P.e.chopPh = undefined; }   /* (RS-697: the wrist straight again) */
+      if (P.e.mineT!=null && (!gw || gw.k!=='mining' || moving)){ R.hand.rotation.set(0, 0, 0); R.sh.rotation.y = 0; P.e.mineT = null; P.e.minePh = undefined; }   /* (RS-775) */
       if (gw){
         if (gw.at && (gw.at.x!==G.owPos.x || gw.at.y!==G.owPos.y)){ const ga = o3C(gw.at.x, gw.at.y), gp = o3C(G.owPos.x, G.owPos.y), want2 = Math.atan2(ga[0] - gp[0], ga[1] - gp[1]) + (gw.k==='woodcutting' && !moving && P.e.chopT!=null ? CHOP_TURN : 0); let d2 = want2 - P.yaw; d2 = Math.atan2(Math.sin(d2), Math.cos(d2)); P.yaw += d2*Math.min(1, dt*8); P.e.holder.rotation.y = P.yaw; }
         if (gw.k==='woodcutting'){ rsHoldTool(P.e, 'axe'); if (!moving){ P.e.chopT = (P.e.chopT||0) + dt; if (rsChopPose(P.e, P.e.chopT, o3ChopAim())) O3.chopHit = 1; } }   /* (RS-697: up at the trunk, the felling swing) */
-        else if (gw.k==='mining'){ rsHoldTool(P.e, 'pick'); rsToolSwing(P.e, tt); }
+        else if (gw.k==='mining'){ rsHoldTool(P.e, 'pick'); if (!moving){ P.e.mineT = (P.e.mineT||0) + dt; const ma = o3MineAim(); if (rsMinePose(P.e, P.e.mineT, ma) && ma) O3.mineHit = { c:ma.c.clone(), n:ma.n }; } }   /* (RS-775: overhead onto the rock, both hands on the pick) */
         else if (gw.k==='fishing'){ rsHoldTool(P.e, 'rod'); fishPose(R, L, G.gather, performance.now()); }   /* (RS-696) */
         else if (gw.k==='foraging'){ if (r.torso) r.torso.rotation.x = 0.7; R.sh.rotation.x = -0.9 + Math.sin(tt*3)*0.2; L.sh.rotation.x = -0.7; }
       }
@@ -48838,7 +48891,9 @@ function isoSyncPlayer(){
   const C = m3dAtkCurve(FP.swing>0 ? 1-FP.swing : 0), wind = C.wind, strike = C.strike; e.fol = C.fol;
   const hurt = m3dHitReact(e, p.hp, effMaxHp(), FP.dt);   /* (RS-173: as hard as the blow) */
   const lunge = Math.max(strike, C.fol*0.6)*0.2 - hurt*0.1;   // step into the blow and follow it through; rock back when you're hit
-  e.holder.position.set(e.pos.x + Math.sin(e.face)*lunge, 0, e.pos.y + Math.cos(e.face)*lunge); e.holder.rotation.y = e.face;
+  { const gm = !moving && G.gather && G.gather.mode===1 && G.gather.o.k==='mining' && G.gather.o.vein ? G.gather.o.vein : null, want = gm ? Math.max(0, Math.hypot(gm.x + 0.5 - e.pos.x, gm.y + 0.5 - e.pos.y) - 0.24 - MINE_REACH) : 0;   /* (RS-775: a step in to the vein, a pick's reach from it) */
+    e.mineStep = (e.mineStep||0) + (want - (e.mineStep||0))*Math.min(1, (FP.dt||0.016)*6); if (!gm && e.mineT!=null){ e.mineT = null; e.minePh = undefined; const R0 = e.rig.arms && e.rig.arms[0]; if (R0) R0.hand.rotation.set(0, 0, 0); } }
+  e.holder.position.set(e.pos.x + Math.sin(e.face)*(lunge + (e.mineStep||0)), 0, e.pos.y + Math.cos(e.face)*(lunge + (e.mineStep||0))); e.holder.rotation.y = e.face;
   const onPortal = isoPortalTick(e), onStair = onPortal!=null ? onPortal : isoStairTick(e);   /* (RS-592; RS-609: or into a portal) */
   const down = G.playerDown && G.playerDown.map===G.map ? G.playerDown : null;   /* (RS-744: fallen) */
   e.rig.clothLate = !e.rig.sitting && !down;   /* (RS-772: below ground too the cape and robe are hung after the last bend - stooped over cave herbs, the back came up through the cape) */
@@ -48849,11 +48904,11 @@ function isoSyncPlayer(){
   if (gw){
     rsHoldTool(e, 'pick');
     const vx = gw.vein.x+0.5, vy = gw.vein.y+0.5;   /* (RS-598: turned to it with the rest - isoFaceTarget) */
-    if (rsToolSwing(e, FP.t)){                             // the pick bites: chips of the vein's own ore fly, and it rings
-      const oc = ORE_COL[veinOre(gw.vein.x, gw.vein.y)] || '#c8a060';
-      fpBurst(vx - (vx-e.pos.x)*0.35, vy - (vy-e.pos.y)*0.35, 0.3, oc, 7, 1.0); fpBurst(vx - (vx-e.pos.x)*0.35, vy - (vy-e.pos.y)*0.35, 0.32, '#fff2c0', 4, 1.4);
-      try{ fpBaseSfx('hit'); }catch(err){}
-    }
+    const ore = veinOre(gw.vein.x, gw.vein.y), oc = ORE_COL[ore] || '#c8a060', ddx = e.pos.x - vx, ddy = e.pos.y - vy, dL = Math.hypot(ddx, ddy) || 1, kind = mineKind(ore);
+    const aim = ISO.mineAim || (ISO.mineAim = { c:new THREE.Vector3() }); aim.c.set(vx + ddx/dL*0.17, 0.2, vy + ddy/dL*0.17);   /* (RS-775: the vein's near shoulder) */
+    if (!moving){ e.mineT = (e.mineT||0) + FP.dt; if (rsMinePose(e, e.mineT, aim)){   // the pick bites: chips of the vein's own ore fly, sparks off hard stone, dust, and it rings
+      const bx = aim.c.x, by = aim.c.z; fpBurst(bx, by, 0.2, oc, 7, 1.0); fpBurst(bx, by, 0.2, '#8a847a', 4, 0.8); if (kind==='hard') fpBurst(bx, by, 0.22, '#ffe2a0', 5, 2.0);
+      try{ audMineHit(kind); }catch(err){} } }
   } else {
     rsHoldTool(e, null);
     // fishing a cave pool or picking cave herbs: face it, hold the line out or stoop to pick
@@ -49448,10 +49503,16 @@ function rsToolModel(kind, tier){
   }
   const handle = new T.Mesh(new T.CylinderGeometry(0.022, 0.026, 0.82, 8), wood); handle.position.y = 0.3; g.add(handle);
   if (kind==='pick'){
-    // a curved double-pointed head, tapering to the tips
-    const head = new T.Mesh(new T.TorusGeometry(0.3, 0.028, 6, 16, 1.5), metal); head.rotation.set(0, Math.PI/2, Math.PI/2 - 0.75); head.position.set(0, 0.46, 0); g.add(head);
-    for (const sd of [-1,1]){ const tip = new T.Mesh(new T.ConeGeometry(0.028, 0.1, 6), metal); tip.position.set(0, 0.62, sd*0.2); tip.rotation.x = sd*2.1; g.add(tip); }
-    const collar = new T.Mesh(new T.BoxGeometry(0.07, 0.09, 0.07), metal); collar.position.y = 0.7; g.add(collar);
+    /* (RS-775) a forged pick head: one piece swept in a shallow arc down from the eye to two points, thick at the eye and drawn out to
+       needle tips, a little flattened across; a socket round the haft with a bevelled band, an iron wedge in the top, and a leather
+       grip bound low on the haft */
+    g.remove(handle); const haft = new T.Mesh(new T.CylinderGeometry(0.021, 0.027, 0.86, 16), wood); haft.position.y = 0.3; g.add(haft);
+    const head = new T.Mesh(pickHeadGeo(), metal); head.position.y = 0.66; g.add(head);
+    const eye = new T.Mesh(new T.CylinderGeometry(0.038, 0.042, 0.11, 16), metal); eye.position.y = 0.665; g.add(eye);
+    for (const y of [0.61, 0.72]){ const b = new T.Mesh(new T.TorusGeometry(0.04, 0.007, 8, 18), metal); b.rotation.x = Math.PI/2; b.position.y = y; g.add(b); }
+    const wedge = new T.Mesh(new T.CylinderGeometry(0.012, 0.024, 0.03, 4), new T.MeshStandardMaterial({ color:lin('#3a3632'), metalness:0.5, roughness:0.5 })); wedge.position.y = 0.73; wedge.rotation.y = Math.PI/4; g.add(wedge);
+    const lea = new T.MeshStandardMaterial({ color:lin('#4a2e1c'), roughness:0.85 }); for (let i=0;i<5;i++){ const w = new T.Mesh(new T.TorusGeometry(0.028, 0.006, 6, 16), lea); w.rotation.x = Math.PI/2; w.position.y = -0.06 + i*0.025; g.add(w); }
+    const knob = new T.Mesh(new T.SphereGeometry(0.03, 16, 10), wood); knob.position.y = -0.12; knob.scale.y = 0.6; g.add(knob);
   } else {
     const blade = new T.Mesh(new T.BoxGeometry(0.02, 0.16, 0.2), metal); blade.position.set(0, 0.66, 0.1); g.add(blade);
     const edge = new T.Mesh(new T.BoxGeometry(0.012, 0.22, 0.04), metal); edge.position.set(0, 0.66, 0.21); g.add(edge);
@@ -49459,6 +49520,13 @@ function rsToolModel(kind, tier){
   g.traverse(o=>{ if (o.isMesh) o.castShadow = true; });
   return g;
 }
+/* (RS-775) the pick head's one curved piece: swept along an arc in the tool's y-z plane through the eye (0, 0) to the points at z +-0.23,
+   y -0.07, each ring 14-sided, thickest at the eye and tapering to a point, a little flattened across (x) */
+function pickHeadGeo(){ if (pickHeadGeo.g) return pickHeadGeo.g; const T = THREE, N = 14, S = 26, pos = [], idx = [];
+  for (let i=0;i<=S;i++){ const u = i/S*2 - 1, a = u*0.62, R = 0.37, cy = R*(Math.cos(a) - 1), cz = R*Math.sin(a), tz = Math.cos(a), ty = -Math.sin(a), rr = 0.034*Math.pow(1 - Math.abs(u), 0.7) + 0.002;
+    for (let j=0;j<N;j++){ const b = j/N*Math.PI*2, ox = Math.cos(b)*rr*0.72, on = Math.sin(b)*rr; pos.push(ox, cy + on*tz, cz - on*ty); } }   /* (the ring across the arc: x flat, and along the arc's normal in y-z) */
+  for (let i=0;i<S;i++) for (let j=0;j<N;j++){ const a = i*N + j, b = i*N + (j + 1)%N, c = (i + 1)*N + j, d = (i + 1)*N + (j + 1)%N; idx.push(a, c, b, b, c, d); }
+  const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); g.userData.keep = 1; return pickHeadGeo.g = g; }
 // puts the tool in the figure's hands (and its weapon and shield away), or back again with kind null
 function rsHoldTool(e, kind){
   const r = e && e.rig; if (!r || !r.arms) return;
@@ -49474,6 +49542,7 @@ function rsHoldTool(e, kind){
   if (!kind) return;
   const t = rsToolModel(kind, tier); t.rotation.x = Math.PI/2; t.position.set(...m3dGrip(1)); t.scale.setScalar(0.42);
   if (kind==='axe') t.position.z -= 0.26*0.42;   /* (RS-697: the right hand up the haft toward the head, room below it for the left - rsChopPose) */
+  if (kind==='pick') t.position.z -= 0.2*0.42;   /* (RS-775: so too the pick's - rsMinePose) */
   r.arms[0].hand.add(t); e.tool = t;
 }
 // a two-handed overhead swing: heave it up over the shoulder, bring it down hard, recover.
@@ -49493,6 +49562,52 @@ function rsToolSwing(e, t){
   e.swingPh = ph;
   return hit;
 }
+/* (RS-775) mining: the pick swung in both hands, overhead and down onto the rock - raised back over the right shoulder, the body
+   arching back; driven over the head and down, the body bending into the blow and the knees giving; the point bites the rock where
+   aim says (its near shoulder) with a jar that kicks back up the haft; levered once to break the stone; and back to the ready. Placed
+   as the axe is (rsChopPose): keys [right fist, haft butt to head, the striking point] in the body's frame, both arms reaching for it */
+const MINE_P = 1.2, MINE_HIT = 0.55, MINE_REACH = 0.3;   /* (a swing's length in seconds; where in it the blow lands; how far out from the rock you stand, in the world) */
+const MINE_KEYS = { R:[[-0.05, 0.36, 0.2], [0.08, 0.55, 0.83], [0, -1, 0.45]], W:[[-0.1, 0.8, -0.03], [-0.05, 0.45, -0.89], [0, 0.88, 0.47]], M:[[-0.06, 0.76, 0.18], [0, 0.96, 0.28], [0, -0.28, 0.96]] };
+function mineAnim(t){ const ph = (t/MINE_P) % 1, ss = k=>k*k*(3 - 2*k);
+  if (ph < 0.42) return { ph, wind:ss(ph/0.42), strike:0, jar:0, pry:0 };
+  if (ph < MINE_HIT){ const k = (ph - 0.42)/(MINE_HIT - 0.42); return { ph, wind:1 - ss(k), strike:k*k, jar:0, pry:0 }; }
+  if (ph < 0.64) return { ph, wind:0, strike:1, jar:1 - (ph - MINE_HIT)/(0.64 - MINE_HIT), pry:0 };
+  if (ph < 0.76) return { ph, wind:0, strike:1, jar:0, pry:Math.sin((ph - 0.64)/0.12*Math.PI) };
+  return { ph, wind:0, strike:1 - ss((ph - 0.76)/0.24), jar:0, pry:0 }; }
+function rsMinePose(e, t, aim){
+  const r = e.rig; if (!r || !r.arms || !e.tool) return false; const T = THREE, [R, L] = r.arms, A = mineAnim(t), w = A.wind, s = A.strike, ph = A.ph;
+  const Z = rsMinePose.Z || (rsMinePose.Z = (()=>{ const k = ()=>({ p:new T.Vector3(), d:new T.Vector3(), e:new T.Vector3(), x:new T.Vector3(), m:new T.Matrix4(), q:new T.Quaternion() }); return { R:k(), W:k(), M:k(), H:k(), v:new T.Vector3(), v2:new T.Vector3(), c:new T.Vector3(), p:new T.Vector3(), tip:new T.Vector3(), q:new T.Quaternion(), q2:new T.Quaternion(), qp:new T.Quaternion(), ax:new T.Vector3() }; })());
+  /* the body: arched back as the pick goes up, bent over into the blow, knees giving; jolted as it bites */
+  const jolt = A.jar*Math.sin((1 - A.jar)*26)*0.05;
+  r.torso.rotation.x += -0.16*w + 0.4*s + jolt; r.torso.rotation.y = (r.torso.rotation.y||0) - 0.2*w + 0.06*s;
+  r.hips.rotation.y = (r.hips.rotation.y||0) - 0.08*w; r.hips.position.y += 0.01*w - 0.028*s;
+  for (const Lg of r.legs){ Lg.knee.rotation.x += 0.08 + s*0.42; Lg.hip.rotation.x -= 0.04 + s*0.24; if (Lg.ankle) Lg.ankle.rotation.x -= s*0.18; }
+  if (r.head) r.head.rotation.x += 0.14*s - 0.1*w;   /* (eyes on the rock) */
+  e.holder.updateWorldMatrix(true, true); const hs = e.holder.getWorldScale(Z.v).x, rel = e.tool.getWorldScale(Z.v).x/hs;   /* (the tool's units in the body's) */
+  chopKey(Z.R, ...MINE_KEYS.R); chopKey(Z.W, ...MINE_KEYS.W); chopKey(Z.M, ...MINE_KEYS.M);
+  /* the blow: the haft a little below level toward the rock, the point straight down into it, the fist back up the haft */
+  { const C = Z.c; if (aim){ C.copy(aim.c); e.holder.worldToLocal(C); } else C.set(-0.02, 0.2, 0.5);
+    const hz = Math.hypot(C.x, C.z) || 1, ux = C.x/hz, uz = C.z/hz, th = -0.27, H = Z.H;
+    H.d.set(ux*Math.cos(th), Math.sin(th), uz*Math.cos(th)); H.e.set(ux*Math.sin(th), -Math.cos(th), uz*Math.sin(th)); H.x.crossVectors(H.d, H.e); H.m.makeBasis(H.x, H.d, H.e); H.q.setFromRotationMatrix(H.m);
+    H.p.copy(C).addScaledVector(H.d, -0.42*rel).addScaledVector(H.e, -0.2*rel); }
+  const ss = k=>k*k*(3 - 2*k), P = Z.p, Q = Z.q, seg = (a, b, k, by)=>{ P.copy(a.p).lerp(b.p, k); Q.copy(a.q).slerp(b.q, k); if (by) P.y += by*Math.sin(k*Math.PI); };
+  if (ph < 0.42) seg(Z.R, Z.W, ss(ph/0.42), 0.05);
+  else if (ph < 0.48) seg(Z.W, Z.M, Math.pow((ph - 0.42)/0.06, 1.3));
+  else if (ph < MINE_HIT) seg(Z.M, Z.H, Math.pow((ph - 0.48)/(MINE_HIT - 0.48), 1.2));
+  else if (ph < 0.76){ seg(Z.H, Z.H, 0);
+    if (A.jar) P.addScaledVector(Z.H.e, -Math.abs(Math.sin((1 - A.jar)*26))*A.jar*0.02);   /* (it kicks back up off the stone) */
+    if (A.pry){ /* levered: the haft pulled down and back, turning about the point in the stone */ const tip = Z.tip.copy(P).addScaledVector(Z.H.d, 0.42*rel).addScaledVector(Z.H.e, 0.2*rel);
+      Z.ax.crossVectors(Z.H.d, Z.v.set(0, 1, 0)).normalize(); Z.qp.setFromAxisAngle(Z.ax, -0.32*A.pry); Q.premultiply(Z.qp); P.sub(tip).applyQuaternion(Z.qp).add(tip); } }
+  else seg(Z.H, Z.R, ss((ph - 0.76)/0.24));
+  /* the right hand turned to hold the pick so, the arm reaching its wrist to where that puts it; the left fist low on the haft */
+  const qh = Z.q2.copy(e.holder.getWorldQuaternion(Z.q2)).multiply(Q).multiply(Z.q.copy(e.tool.quaternion).invert());
+  const fist = e.holder.localToWorld(P), wr = Z.v.set(...m3dGrip(1)).multiplyScalar(R.hand.getWorldScale(Z.v2).x).applyQuaternion(qh); fist.sub(wr);
+  m3dReachArm(R, fist, m3dArmPt(R, Z.v2.set(0, 0, 0)));
+  R.hand.parent.updateWorldMatrix(true, false); R.hand.quaternion.copy(R.hand.parent.getWorldQuaternion(Z.q).invert().multiply(qh));
+  e.tool.updateWorldMatrix(true, false); m3dReachArm(L, e.tool.localToWorld(Z.v.set(0, -0.04, 0)), m3dArmPt(L, Z.v2.set(-(r.gripX || 0.026), -0.045, 0.004)));
+  const hit = e.minePh!==undefined && e.minePh < MINE_HIT && ph >= MINE_HIT; e.minePh = ph; return hit; }
+/* (RS-775) the rock's kind for the blow's sound and what flies from it: soft (clay, sand), coal (no sparks), else hard stone */
+function mineKind(type){ return type==='clay' || type==='sand' ? 'soft' : type==='coal' ? 'coal' : 'hard'; }
 // ---- health bars, damage numbers and sparks, drawn over the scene ----
 function isoDrawOverlay(S){
   const dt = FP.dt, ppu = ISO.ppu || 40;
@@ -50020,7 +50135,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-774';
+const GAME_VERSION = 'rs-775';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

@@ -1,5 +1,15 @@
 # Depthcrawl patch notes
 
+## RS-775 - Pick and Stone
+
+You asked for a better mining animation and sound, so mining is now a real swing.
+
+- **Both hands on the pick.** You raise it back over your right shoulder and lean back. Then you drive it over your head and down, bending into the blow with your knees giving. The point bites the rock's near side, jars back up the haft, and levers once to break the stone. Then you return to the ready stance.
+- **You step up to the rock.** You stand a pick's reach from it instead of a whole tile away. This works on the open land and at the veins below ground.
+- **Every blow throws chips.** Chips of stone and ore fly off, bounce and lie where they land, with a puff of dust. Hard rock throws sparks off the steel. Clay and sand give a soft spray of earth instead.
+- **A new sound.** Each blow makes a hard steel chink as it lands, with the pick head ringing (never quite the same pitch twice), the thud of the stone, and grit trickling down. Coal sounds duller, and clay and sand are a soft thud. The old gathering tick is gone while you swing.
+- **A new pick.** The head is now one forged piece that curves from the eye down to two needle points. It has a banded socket, an iron wedge in the top, and a leather grip bound low on the haft.
+
 ## RS-774 - The Victor's Portal
 
 - **Killing a site's boss opens a portal again.** Since RS-767 the way out a boss's fall opens looked like the site's own way out: stairs up indoors, an open archway in a graveyard. Now it's the shimmering blue portal again, in every kind of site, and you're drawn into it when you step in.

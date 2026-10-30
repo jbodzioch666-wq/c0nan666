@@ -110,6 +110,7 @@ Screenshots go to `tools/tests/shots/`.
 | rs772 | RS-772: bent over (cave herbs, burying bones, below ground and on the open land) the back stays under the cape - the player's cape and robe hang after the last bend |
 | rs773 | RS-773: a tier-6 cape's emblem in its dye - the thread's glow takes the emblem's colour (black stays black; undyed glows gold) |
 | rs774 | RS-774: a fallen master's way out is a portal again (dungeon and graveyard), walked into, still a portal after a reload; the site's own way out stays stairs |
+| rs775 | Mining: the pick swung overhead in both hands onto the rock's near shoulder (rsMinePose), a step in to the rock or vein, chips, dust and sparks (mineRig), audMineHit, the old tick quiet, the remade pick (pickHeadGeo); below ground too |
 | zloot | probe: the drops at a few levels - rarity shares, names with their bonuses and tiers, a rare's tooltip text (ZL levels, ZN drops a level) |
 | zloottip | probe: a rare's, a magic piece's and a Ring of Recoil's tooltip, plain and with Alt held, as shots/zloottip0-3.png |
 | rs703 | A spell leaves the staff as it comes forward: a real cast at a foe three tiles off, sampled every frame - the bolt waits about half a second, leaves from the staff's head as it leans ahead, its sound with it; the foe flinches (and a miss splashes) only as it lands; the cast lasts about a second; a foe it kills stands till the bolt lands, and the staff isn't put away mid-cast |
