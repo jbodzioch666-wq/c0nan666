@@ -1,5 +1,17 @@
 # Depthcrawl patch notes
 
+## RS-778 - From the Farmyard
+
+You asked for cooking recipes for beef and chicken. The chicken and beef from your farmyard now go into five new dishes, which you cook at a hearth, the guild range or your campfire.
+
+- **Chicken Pie** (Cooking 12): a pie dish and 2 raw chicken. Heals about 22% of your life.
+- **Chicken Soup** (Cooking 16): a bowl, a raw chicken and silverleaf. Heals about 25%.
+- **Beef Pie** (Cooking 30): a pie dish and 2 raw beef. Heals about 32%.
+- **Beef & Bloodmoss Stew** (Cooking 38): a bowl, a raw beef and bloodmoss. Heals about 34%.
+- **Farmhouse Pie** (Cooking 42): a pie dish, a raw beef, a raw chicken and ghostcap. Heals about 37%.
+- **Each looks like itself.** The soup is golden in its bowl and the stew is dark, and each pie has its own filling. In the pan they brown in their own broth.
+- **The raw meat tells you.** Raw chicken and raw beef now list the dishes they cook into.
+
 ## RS-777 - Hearth and Home
 
 You reported that the hearth in your house faded out whenever you stood next to it.
