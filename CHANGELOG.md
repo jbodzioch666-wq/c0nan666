@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-765 - Rare Renewal
+
+- **Regeneration is out of the ordinary bonus pool.** It could roll on every piece of armour and jewellery and stacked into far too much healing. Ordinary magic and rare drops no longer roll it, and Blood and Chaos at the smith no longer give it.
+- **It's now a top-tier bonus.** Only Ancestral pieces (from level 90) can roll it, from its best tiers. Uniques that list it in their bonuses, set pieces and quarterstaves or hide bodies (which carry it as their base bonus) keep it.
+- **Gear you already have keeps its regeneration.**
+
 ## RS-764 - Every Way Down
 
 - **Every stair down now opens through its wall.** I checked all 69 flights over two worlds (dungeons, graveyards, mines, lairs, necromancer towers, pyramids, castles, temples and the Lost City) and every dungeon theme. Two kinds were still blocked.

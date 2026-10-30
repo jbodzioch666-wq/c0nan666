@@ -99,6 +99,7 @@ Screenshots go to `tools/tests/shots/`.
 | rs762 | a tail over a robe under a cape: out through the robe, down under the cape, out below its hem - never through the cape, never inside the robe over a stride |
 | rs763 | the doorway at the head of a flight down is a real opening: rays through it reach the passage's stone, not wall, ground or plinth |
 | rs764 | every flight down's doorway open in a graveyard and its catacombs (t_zstairall: every site and dungeon theme) |
+| rs765 | regeneration only on Ancestral pieces: no plain magic or rare drop, Blood's pool or Chaos gives it; uniques' kits keep it |
 | zloot | probe: the drops at a few levels - rarity shares, names with their bonuses and tiers, a rare's tooltip text (ZL levels, ZN drops a level) |
 | zloottip | probe: a rare's, a magic piece's and a Ring of Recoil's tooltip, plain and with Alt held, as shots/zloottip0-3.png |
 | rs703 | A spell leaves the staff as it comes forward: a real cast at a foe three tiles off, sampled every frame - the bolt waits about half a second, leaves from the staff's head as it leans ahead, its sound with it; the foe flinches (and a miss splashes) only as it lands; the cast lasts about a second; a foe it kills stands till the bolt lands, and the staff isn't put away mid-cast |
