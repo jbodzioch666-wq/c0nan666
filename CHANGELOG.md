@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-763 - Through the Wall
+
+- **The doorway at the foot of a stair down is a real opening now.** RS-760's doorway was a dark patch painted on the wall, so it still looked like a wall in the way. The wall is now cut through, and a short passage runs on behind it: its steps keep going down at the stair's slope under a sloping ceiling and fade to black.
+- **The Lost City's pyramid** has its way in cut through its first tier the same way, and the grass that ran across the passage under it is gone.
+- **The low stone plinth along the walls** no longer runs across the top of a stair down. It used to show as a ledge across the doorway.
+
 ## RS-762 - Under the Cape
 
 - **A tail no longer pokes through your cape.** Over a robe with a cape, a tiefling's or dragonborn's tail now comes out of the robe's back and runs down under the cape, between the cape and the robe. It comes out below the cape's hem and curves back along the ground behind you.
