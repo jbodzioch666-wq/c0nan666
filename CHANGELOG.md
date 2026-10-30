@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-767 - Bone Magic
+
+- **Monster spellcasters cast your spells.** Skeleton mages, shamans, liches and every other caster now cast the same Strike, Bolt, Blast, Wave or Surge you could at their level, in an element of their own.
+- **You can see them cast.** Before, a skeleton mage's spell drew no bolt, so it looked as if it never cast. Every monster spell now flies at you with the same colour and size as yours, and the log names it ("the skeleton mage casts Earth Blast - it hits you for 6").
+- **Your range, too.** Casters reach 8 tiles, as your staff does; they used to reach only 4 or 5. Their damage stays where it was.
+
 ## RS-766 - Home Ground
 
 **New worlds only:** the placement changes need a new world (the generator is now version 28). Your character comes with you; old worlds still load as they were.
