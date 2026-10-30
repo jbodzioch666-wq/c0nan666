@@ -40169,7 +40169,7 @@ function fpUpdateCamera(dt){
   }
   // the eye sits toward the back of its tile, like a classic grid crawler, so
   // a wall or a monster one step ahead is framed instead of filling the view
-  if (fpv()) fpmTick(dt);   /* (FP-003) */
+  if (fpv()){ fpmTick(dt); fpvFireTick(); }   /* (FP-003, FP-004) */
   if (FP.lookYaw!=null && (!fpv() || p.facing!==FP.lookF)) FP.lookYaw = null;   /* (FP-002: turned some other way - square to the quarter again) */
   if (FP.lookYaw==null && FP.pitch) FP.pitch *= Math.exp(-dt*6);
   const look = FP.lookYaw!=null, ta = look ? FP.lookYaw : FP_FACING_ANGLE[(p.facing|0)&3], gp = fpv() && FPM.map===G.map ? FPM : null;   /* (FP-001: at your walking pace, not hopping tile to tile; FP-003: where your free walk has you) */
@@ -48189,6 +48189,169 @@ const FPW_ATK = {
 };
 const FPW_CONTACT = { slash:0.5, stab:0.5, lunge:0.52, chop:0.58, cleave:0.6, smash:0.6, thrust:0.55, sweep:0.58, punch:0.45 };
 const FPW_CHEST = [0.02, -0.62, -0.35];
+/* (FP-004) the weapon in your hands in the first-person view - the old crawler's, removed with it in RS-109 and back as it was:
+   its own small renderer drawn over the view, swung whenever the game plays one of your blows (FP.swing) */
+function fpwTierMat(col){
+  FPW.tierMats = FPW.tierMats || {};
+  if (!FPW.tierMats[col]){ const m = FPW.m.steel.clone(); const c = new THREE.Color(col); m.color = c.lerp(new THREE.Color(0xffffff), 0.25).multiplyScalar(1.25); FPW.tierMats[col] = m; }
+  return FPW.tierMats[col];
+}
+function fpwHand(){
+  const T = THREE, M = FPW.m, h = new T.Group();
+  const palm = new T.Mesh(new T.BoxGeometry(0.1, 0.11, 0.075), M.glove); palm.position.set(-0.035, 0, 0); h.add(palm);
+  for (let i=0;i<4;i++){ const y = 0.04 - i*0.028;
+    const f1 = new T.Mesh(new T.CapsuleGeometry(0.014, 0.04, 4, 8), M.glove); f1.rotation.z = Math.PI/2; f1.position.set(0.01, y, 0.035); h.add(f1);
+    const f2 = new T.Mesh(new T.CapsuleGeometry(0.013, 0.03, 4, 8), M.glove); f2.position.set(0.04, y, 0.012); f2.rotation.x = Math.PI/2; h.add(f2);
+    const kn = new T.Mesh(new T.BoxGeometry(0.03, 0.022, 0.02), M.plate); kn.position.set(-0.01, y, 0.042); h.add(kn); }
+  const th = new T.Mesh(new T.CapsuleGeometry(0.015, 0.045, 4, 8), M.glove); th.position.set(-0.01, 0.07, -0.02); th.rotation.set(0.3, 0, -0.9); h.add(th);
+  const back = new T.Mesh(new T.BoxGeometry(0.075, 0.1, 0.02), M.plate); back.position.set(-0.05, 0, 0.04); back.rotation.y = 0.3; h.add(back);
+  const cuff = new T.Mesh(new T.CylinderGeometry(0.058, 0.07, 0.1, 12), M.plate); cuff.position.set(-0.07, -0.1, 0); cuff.rotation.z = 0.35; h.add(cuff);
+  return h;
+}
+function fpwEnchant(w){
+  if (!w || !w.used) return null;
+  let e = null;
+  for (const a of (w.aff||[])){ if (a.kind==='fire') e = 'fire'; else if (a.kind==='cold' && e!=='fire') e = 'cold'; else if (a.kind==='pois' && !e) e = 'pois'; }
+  if (!e && (w.quality||0) >= 4) e = 'unique';
+  return e;
+}
+function fpwStyleFor(w){
+  if (!w || !w.used) return 'fists';
+  if (w.rsStaff) return 'staff';
+  const b = w.basis||'';
+  if (/Dagger/i.test(b)) return 'dagger';
+  if (/Rapier/i.test(b)) return 'rapier';
+  if (/Greatsword/i.test(b)) return 'blade2';
+  if (/Greataxe|Maul/i.test(b)) return 'head2';
+  if (/Halberd/i.test(b)) return 'polearm';
+  if (/Spear/i.test(b)) return 'spear';
+  if (/Quarterstaff/i.test(b)) return 'staff';
+  if (/axe|Pick|Club|Mace|Hammer|Morningstar|Flail/i.test(b)) return 'head1';
+  return 'blade1';
+}
+function fpwSetWeapon(){
+  const w = G.gear.weapon, key = w && w.used ? ((w.rsStaff ? 'staff:' : '')+w.basis+'|'+(w.quality||0)+'|'+fpwEnchant(w)+'|'+(w.rsCol||'')) : 'fists';
+  if (key===FPW.wkey) return;
+  FPW.wkey = key;
+  const T = THREE, M = FPW.m;
+  const clear = (grp)=>{ while (grp.children.length){ const c = grp.children[0]; grp.remove(c); c.traverse(o=>{ if (o.geometry) o.geometry.dispose(); }); } };
+  clear(FPW.rig); if (FPW.armGrp) clear(FPW.armGrp); else { FPW.armGrp = new T.Group(); FPW.scene.add(FPW.armGrp); }
+  const styleKey = fpwStyleFor(w), st = FPW_STYLE[styleKey];
+  FPW.style = styleKey; FPW.st = st;
+  const { g, info } = fpwBuild(w && (w.rsStaff ? 'Quarterstaff' : w.basis), w);
+  // the blade takes its metal's colour: bronze, iron, steel, mithril blue, adamant green, rune cyan, dragon red
+  if (w && w.used && w.rsCol){ const tm = fpwTierMat(w.rsCol); g.traverse(o=>{ if (o.isMesh && (o.material===M.steel || o.material===M.plate)) o.material = tm; }); }
+  const held = new T.Group(); held.add(g); if (st.gy) g.position.y = st.gy;   // slide the weapon so the top hand sits by the guard
+  const right = fpwHand(); held.add(right);
+  const hands = [{ h:right, shoulder: st.up2 ? [0.75,-1.5,-0.6] : [0.46,-1.75,-0.8] }];
+  if (st.left!==undefined){                       // a second hand further along the grip or shaft
+    const left = fpwHand(); left.scale.x = -1; left.position.y = st.left; g.add(left);
+    // an upright two-hander is held like a longsword: the right hand high by the guard with its
+    // arm coming in from the right, the left just below it from the left, both sets of knuckles
+    // facing forward and the fingers wrapping round the grip toward you
+    if (st.up2){ right.scale.x = -1; right.rotation.y = -Math.PI/4; left.scale.x = 1; left.rotation.y = -Math.PI/4; }
+    hands.push({ h:left, shoulder: st.up2 ? [-0.55,-1.6,-0.6] : [-0.42,-1.75,-0.8] });
+  }
+  if (styleKey==='fists'){                          // both fists up in a guard
+    const left = fpwHand(); left.scale.x = -1; FPW.rig.add(left);
+    left.position.set(-0.3-FPW_CHEST[0], -0.17-FPW_CHEST[1], -1.0-FPW_CHEST[2]); left.rotation.set(-0.1, -0.5, 0.25); left.scale.set(-0.78,0.78,0.78);
+    hands.push({ h:left, shoulder:[-0.42,-1.75,-0.8] }); FPW.leftFist = left;
+  } else FPW.leftFist = null;
+  FPW.rig.add(held); FPW.held = held; FPW.info = info; FPW.weaponG = g;
+  held.position.set(st.hp[0]-FPW_CHEST[0], st.hp[1]-FPW_CHEST[1], st.hp[2]-FPW_CHEST[2]);
+  held.rotation.set(st.rot[0], st.rot[1], st.rot[2]); held.scale.setScalar(0.78);
+  // forearms: rebuilt every frame from each wrist back to its shoulder, off-screen, so they never flip into view
+  FPW.arms = hands.map(({h, shoulder})=>{
+    const arm = new T.Mesh(new T.CylinderGeometry(0.03, 0.04, 1, 12), FPW.sleeve || (FPW.sleeve = (()=>{ const m = M.leather.clone(); m.color = new T.Color(0x5a3e2a); return m; })()));
+    const vam = new T.Mesh(new T.CylinderGeometry(0.036, 0.042, 0.13, 12), M.plate);   // the steel cuff of the gauntlet running up the wrist
+    FPW.armGrp.add(arm); FPW.armGrp.add(vam);
+    return { h, shoulder:new T.Vector3(...shoulder), arm, vam };
+  });
+  // a flail's chain and ball hang from a pivot so they can swing
+  FPW.flailHead = null;
+  if (/Flail/i.test((w&&w.basis)||'')){
+    const pivot = new T.Group(); pivot.position.y = 0.28; g.add(pivot);
+    for (const c of g.children.slice()){ if (c!==pivot && c.position.y >= 0.29 && !c.isSprite){ g.remove(c); c.position.y -= 0.28; pivot.add(c); } }
+    FPW.flailHead = pivot;
+  }
+  const ench = fpwEnchant(w);
+  FPW.ench = ench; FPW.motes = [];
+  if (ench && !info.fists){
+    const [hex, css] = FPW_ENCH[ench];
+    const c = v3Canvas(64,64), x = c.getContext('2d'), gr = x.createRadialGradient(32,32,0,32,32,32); gr.addColorStop(0,css); gr.addColorStop(1,'rgba(0,0,0,0)'); x.fillStyle = gr; x.fillRect(0,0,64,64);
+    const tex = new T.CanvasTexture(c);
+    for (let i=0;i<14;i++){ const sp = new T.Sprite(new T.SpriteMaterial({ map:tex, transparent:true, depthWrite:false, blending:T.AdditiveBlending })); sp.scale.setScalar(0.05); g.add(sp); FPW.motes.push({ sp, t:Math.random(), s:0.3+Math.random()*0.5 }); }
+    FPW.glow.color.setHex(hex);
+    if (info.blade){ info.blade.material = info.blade.material.clone(); info.blade.material.emissive = new T.Color(hex); info.blade.material.emissiveIntensity = ench==='unique' ? 0.06 : ench==='cold' ? 0.12 : 0.07; }
+  }
+  FPW.atk = null;
+}
+function fpwDraw(){
+  if (!fpwInit()) return false;
+  const T = THREE, cw = canvas.width, chh = canvas.height, dt = Math.min(0.05, FP.dt || 0.016);
+  if (FPW.cv.width !== cw || FPW.cv.height !== chh){ FPW.r.setPixelRatio(1); FPW.r.setSize(cw, chh, false); FPW.cam.aspect = cw/chh; FPW.cam.updateProjectionMatrix(); }
+  fpwSetWeapon();
+  FPW.t += dt;
+  // light it like the spot you're standing in
+  let lit = 0.8; try{ lit = clamp(fpLightAt(FP.envNow || fpEnv(), G.player.x+0.5, G.player.y+0.5, 0.3), 0.18, 1.1); }catch(e){}
+  const env = FP.envNow, lan = env && env.lan ? env.lan : [1,0.8,0.55];
+  FPW.key.color.setRGB(clamp(lan[0],0,1), clamp(lan[1]*0.95,0,1), clamp(lan[2]*0.85,0,1));
+  FPW.key.intensity = 0.6 + lit*1.6; FPW.hemi.intensity = 0.15 + lit*0.4; FPW.rim.intensity = 0.35 + lit*0.5;
+  FPW.r.toneMappingExposure = 0.9 + lit*0.3;
+  // an attack starts whenever the game plays a swing (FP.swing jumps back up to 1)
+  const st = FPW.st, sw = FP.swing||0;
+  if (sw > (FPW.prevSwing||0) + 0.2) FPW.atk = { t:0, hold:0, landed:false, hit: FPW.lastSwing!=='miss' };
+  FPW.prevSwing = sw;
+  let p = 0;
+  if (FPW.atk){
+    const a = FPW.atk, contact = FPW_CONTACT[st.atk]||0.5;
+    if (a.hold > 0) a.hold -= dt; else a.t += dt / st.dur;
+    // a heavy blow that connects: a moment's hitstop and a jolt through the view
+    if (!a.landed && a.t >= contact){ a.landed = true; if (a.hit){ const heavy = st.atk==='smash' || st.atk==='cleave'; a.hold = heavy ? 0.07 : 0.035; if (heavy) FP.shake = Math.max(FP.shake||0, 0.45); } }
+    p = Math.min(1, a.t);
+    if (a.t >= 1) FPW.atk = null;
+  }
+  if (window.__fpwP !== undefined) p = window.__fpwP;       // (tests pin a pose)
+  const KF = FPW_ATK[st.atk] || FPW_ATK.slash;
+  let a = KF[0], b2 = KF[KF.length-1];
+  for (let i=0;i<KF.length-1;i++) if (p>=KF[i][0] && p<=KF[i+1][0]){ a = KF[i]; b2 = KF[i+1]; break; }
+  let f = (p - a[0]) / Math.max(1e-6, b2[0]-a[0]); f = f*f*(3-2*f);
+  const off = [0,1,2].map(i=> a[1][i] + (b2[1][i]-a[1][i])*f), rr = [0,1,2].map(i=> a[2][i] + (b2[2][i]-a[2][i])*f), wr = a[3] + (b2[3]-a[3])*f;
+  // breathing at rest, a figure-eight bob as you walk, and lag behind turns
+  const breath = Math.sin(FPW.t*1.6);
+  const bobX = Math.sin(FP.stepPhase||0)*0.018, bobY = Math.abs(Math.cos(FP.stepPhase||0))*0.022;
+  const yaw = FP.cam ? FP.cam.a : 0; let dA = yaw - (FPW.lastYaw===undefined ? yaw : FPW.lastYaw); FPW.lastYaw = yaw;
+  dA = Math.atan2(Math.sin(dA), Math.cos(dA));
+  FPW.sway = clamp((FPW.sway||0)*Math.exp(-dt*7) - dA*0.9, -0.35, 0.35);
+  const aspect = cw/chh, xs = Math.min(1, Math.min(aspect, 1.8)/1.78), lift = immersiveUi ? 0.1 : 0;
+  const R = FPW.rig;
+  R.position.set(FPW_CHEST[0] + (st.hp[0]*xs - st.hp[0]) + bobX + off[0] + FPW.sway*0.25, FPW_CHEST[1] + lift - bobY + breath*0.006 + off[1], FPW_CHEST[2] + off[2]);
+  R.rotation.set(rr[0] + breath*0.01, rr[1] + FPW.sway, rr[2]);
+  FPW.held.rotation.z = st.rot[2] + wr;
+  if (FPW.leftFist) FPW.leftFist.position.y = -0.17-FPW_CHEST[1] + Math.sin(FPW.t*1.6+1)*0.008;
+  // the flail's head swings on its chain, and whirls round in an attack
+  if (FPW.flailHead){ FPW.flailHead.rotation.z = Math.sin(FPW.t*2.1)*0.18 - FPW.sway*1.5 - bobX*4; FPW.flailHead.rotation.x = p>0 && p<0.8 ? -p/0.8*Math.PI*2 : Math.sin(FPW.t*1.7)*0.1; }
+  // forearms from each wrist back to its shoulder
+  FPW.scene.updateMatrixWorld(true);
+  const up = new T.Vector3(0,1,0);
+  for (const A of (FPW.arms||[])){
+    const wrist = A.h.localToWorld(new T.Vector3(-0.07,-0.1,0));
+    const sh = A.shoulder.clone().add(new T.Vector3(bobX, -bobY + lift, 0));
+    const dir = sh.clone().sub(wrist), len = Math.max(0.05, dir.length()); dir.normalize();
+    A.arm.position.copy(wrist).addScaledVector(dir, len/2); A.arm.quaternion.setFromUnitVectors(up, dir); A.arm.scale.set(1, len, 1);
+    A.vam.position.copy(wrist).addScaledVector(dir, 0.06); A.vam.quaternion.setFromUnitVectors(up, dir);
+  }
+  if (FPW.info && FPW.info.crystal){ FPW.info.crystal.rotation.y += dt*1.5; FPW.m.crystal.emissiveIntensity = 1.2 + Math.sin(FPW.t*3)*0.4 + (FP.cast||0)*2; FPW.info.halo.scale.setScalar(0.26 + Math.sin(FPW.t*3)*0.04 + (FP.cast||0)*0.3); }
+  if (FPW.info && FPW.info.rune) FPW.info.rune.material.opacity = 0.45 + Math.sin(FPW.t*2.2)*0.2;
+  // enchantment motes drifting up the weapon, and its glow on the gauntlet
+  const tipY = FPW.info ? FPW.info.tipY : 0.8;
+  for (const m of (FPW.motes||[])){ m.t += dt*m.s; if (m.t > 1) m.t -= 1;
+    const y = 0.1 + m.t*(tipY-0.1), ang = m.t*9 + m.s*20; m.sp.position.set(Math.cos(ang)*0.035, y, Math.sin(ang)*0.035 + 0.01); m.sp.material.opacity = Math.sin(m.t*Math.PI)*0.9; m.sp.scale.setScalar(0.03 + 0.04*Math.sin(m.t*Math.PI)); }
+  if (FPW.ench && !(FPW.info && FPW.info.fists)){ const wp = new T.Vector3(0, tipY*0.5, 0); FPW.weaponG.localToWorld(wp); FPW.glow.position.copy(wp); FPW.glow.intensity = 0.8 + Math.sin(FPW.t*7)*0.2; } else FPW.glow.intensity = 0;
+  FPW.r.render(FPW.scene, FPW.cam);
+  ctx.drawImage(FPW.cv, 0, 0, cw, chh);
+  return true;
+}
 // ---------- screen overlays: minimap, compass, target, damage feedback ----------
 function fpDrawMinimap(vis){
   if (SET.compact || G.ui!=='playing') return;   /* (RS-411: not over the inventory or any other menu, like the land's) */
@@ -48312,7 +48475,7 @@ function isoOn(){ return ISO.on && FPD.ok && fp3dActive(); }
 function fpv(){ return !!(SET.fpView && ISO.on && typeof FPD!=='undefined' && FPD.ok && fp3dActive()); }
 function isoView(){ return ISO.on && !fpv(); }
 const FPV_EYE = 0.62;   /* (eye height - the walls stand 1 high) */
-function fpvToggle(){ SET.fpView = !SET.fpView; try{ saveSettings(); }catch(e){} ISO.held && ISO.held.clear(); ISO.path = []; FP.lookYaw = null; FP.pitch = 0; logMsg(SET.fpView ? (fp3dActive() ? 'first-person view - W, A, S and D walk freely, Z and X turn, hold the right mouse button to look round (O to go back)' : 'first-person view on - it shows below ground and in roadside fights (O to turn it off)') : 'seen from above again', ''); renderGame(); }
+function fpvToggle(){ SET.fpView = !SET.fpView; try{ saveSettings(); }catch(e){} ISO.held && ISO.held.clear(); ISO.path = []; FP.lookYaw = null; FP.pitch = 0; logMsg(SET.fpView ? (fp3dActive() ? 'first-person view - W, A, S and D walk freely, the left mouse button strikes or shoots at what is under it, hold the right one to look round (O to go back)' : 'first-person view on - it shows below ground and in roadside fights (O to turn it off)') : 'seen from above again', ''); renderGame(); }
 /* the world step for a key held in first person: forward, back and aside from the way you face; null for a turning key */
 function fpvKeyDir(k){ const f = (G.player.facing|0)&3, r = { arrowup:0, w:0, arrowdown:2, s:2, a:3, d:1 }[String(k).toLowerCase()]; return r===undefined ? null : FACING_VECT[(f + r)%4]; }
 function fpvHeldSum(){ let sx = 0, sy = 0; for (const h of ISO.held || []){ const d = fpvKeyDir(h); if (d){ sx += d[0]; sy += d[1]; } } return (sx || sy) ? [Math.sign(sx), Math.sign(sy)] : null; }
@@ -48371,7 +48534,40 @@ function fpmTick(dt){
   /* stopped short: a creature there is struck, a chest opened */
   if (moved < want*0.3){ const tx = Math.floor(FPM.x + mx/want*(FPM_R+0.15)), ty = Math.floor(FPM.y + my/want*(FPM_R+0.15)), dx = tx - p.x, dy = ty - p.y;
     if ((dx || dy) && Math.abs(dx)<=1 && Math.abs(dy)<=1){ const foe = G.mon.some(m=>m.alive && m.x===tx && m.y===ty), now = performance.now();
-      if (foe ? isoSwingReady() : dgChestAt(tx, ty) && now > FPM.bumpT){ FPM.bumpT = now + 600; fpmStepTo(dx, dy); } } }
+      if (foe ? fpvBeat() : dgChestAt(tx, ty) && now > FPM.bumpT){ FPM.bumpT = now + 600; fpmStepTo(dx, dy); } } }
+}
+/* (FP-004) combat like a shooter: in the first-person view the left mouse button strikes or shoots at what's under the cursor.
+   A creature within reach is struck (a spear's reach too); further off it's shot or cast at if a bow or a spell can reach it, and
+   it has to be in your line of sight. Nothing there: a bow or spell flies to the spot and is spent on nothing (no turn taken), a
+   blade swings at the air. A chest, a vein or something lying on the floor is used as a click always did. Held down, it strikes
+   again on the beat (FPV_BEAT_MS) at wherever the cursor is. Shift-click still examines; a tap on a phone is as before */
+const FPV_BEAT_MS = 1200;
+const FPF = { down:false, x:0, y:0, next:0 };
+function fpvBeat(){ const now = performance.now(); if (now < FPF.next) return false; FPF.next = now + FPV_BEAT_MS; ISO.swingAt = FPF.next - 30; return true; }
+/* where the aim meets the walls or the floor */
+function fpvAimPoint(e){ const r = canvas.getBoundingClientRect(), ray = ISO.ray || (ISO.ray = new THREE.Raycaster());
+  ray.setFromCamera({ x:(e.clientX-r.left)/r.width*2-1, y:-((e.clientY-r.top)/r.height*2-1) }, FPD.cam);
+  const h = FPD.world && ray.intersectObject(FPD.world, true).find(h=>h.object.isMesh && h.object.visible!==false), o = ray.ray.origin, d = ray.ray.direction;
+  const P = h && h.distance < 14 ? h.point : o.clone().addScaledVector(d, 8); return { x:P.x, y:P.z, h:P.y }; }
+function fpvFire(e){
+  const p = G.player; if (G.ui!=='playing' || G.gameOver || !fpv()) return;
+  ISO.path = []; ISO.fighting = null;
+  const pk = isoPick(e, true), m = pk && pk.mon && pk.mon.alive && shotClear(p.x, p.y, pk.mon.x, pk.mon.y) ? pk.mon : null;
+  if (m){ const dx = m.x - p.x, dy = m.y - p.y;
+    if (Math.max(Math.abs(dx), Math.abs(dy))===1){ if (fpvBeat()) fpmStepTo(dx, dy); return; }
+    if (spearReach(m)){ if (fpvBeat()) reachAttack(m); return; }
+    if (rangedReachIdx(m) >= 0){ if (fpvBeat()){ G.foeRef = m; rangedAttack(m); renderGame(); } return; }
+  } else {
+    const full = isoPick(e); if (full && !full.mon){ const { gx, gy } = full, D = G.dungeonDeco;
+      if (Math.max(Math.abs(gx - p.x), Math.abs(gy - p.y)) <= 3 && (dgChestAt(gx, gy) || (G.gameMode===1 && D && D[gx] && SK_CAVE_DECOS.includes(D[gx][gy])) || tileAt(gx, gy)===T_ITEM)){ FPF.down = false; isoAct(full, false); return; } }
+  }
+  /* nothing to hit: the shot flies to the spot, or the blade cuts the air */
+  if (!fpvBeat()) return;
+  const mode = rangedPick(), A = fpvAimPoint(e);
+  if (mode){ const sp = mode==='magic' ? rsCastableSpell() : null, kind = mode==='bow' ? 'arrow' : 'spell', col = mode==='bow' ? '#9aa3a8' : (sp ? rsSpellCol(sp) : '#80b0ff');
+    (ISO.shots = ISO.shots || []).push({ x0:FPM.x, y0:FPM.y, x1:A.x, y1:A.y, t:0, dur:0.12 + Math.hypot(A.x - FPM.x, A.y - FPM.y)*0.045, kind, col, m:null, tier:1 });
+    try{ fpBaseSfx(mode==='bow' ? 'miss' : 'spell'); }catch(err){} if (mode==='magic') FP.cast = 1; }
+  else { FP.swing = 1; FPW.lastSwing = 'miss'; try{ fpBaseSfx('miss'); }catch(err){} }
 }
 function fpvLookEnd(){ if (!FPL.on) return; FPL.on = false; FPL.end = performance.now(); canvas.style.cursor = ''; }
 function isoCamera(cam, aspect){
@@ -49377,7 +49573,8 @@ function isoShot(m, kind, col, delay, extra){
   if ((kind==='arrow' || kind==='crystal' || kind==='bolt') && !(extra && extra.minion) && rigIsBow(ISO.player)) delay = (delay||0) + BOW_LOOSE;
   const cast = kind==='spell' && !(extra && extra.minion), past = 1 - CAST_FIRE_U;   /* (RS-703: off the staff as it comes forward - with a cast already running, as that one does; past it, at once) */
   if (cast) delay = (delay||0) + (FP.cast > past ? (FP.cast - past)/CAST_RATE : FP.cast > 0 ? 0 : CAST_FIRE);
-  (ISO.shots = ISO.shots || []).push(Object.assign({ x0:p.x+0.5, y0:p.y+0.5, x1:m.x+0.5, y1:m.y+0.5, t:-(delay||0), dur, kind, col:col||'#fff', m, fromStaff:cast, snd:cast ? 'spell' : null }, extra||{}));
+  const eye = fpv() && FPM.map===G.map;   /* (FP-004: from your eyes) */
+  (ISO.shots = ISO.shots || []).push(Object.assign({ x0:eye ? FPM.x : p.x+0.5, y0:eye ? FPM.y : p.y+0.5, x1:m.x+0.5, y1:m.y+0.5, t:-(delay||0), dur, kind, col:col||'#fff', m, fromStaff:cast, snd:cast ? 'spell' : null }, extra||{}));
   if (cast && !(FP.cast > 0)) FP.cast = 1;
 }
 // how long until a shot already flying at this spot lands (so its hitsplat waits for it)
@@ -49385,7 +49582,7 @@ function isoShot(m, kind, col, delay, extra){
    to its flight height on the way; its sound as it goes */
 function isoShotLaunch(s){
   if (s.snd){ s.sndAt = performance.now(); try{ fpBaseSfx(s.snd); }catch(e){} }   /* (the plain sound: through sfx, a 'spell' sound starts a cast pose) */
-  if (!s.fromStaff) return; const e = ISO.player, r = e && e.rig; if (!r) return;
+  if (!s.fromStaff || fpv()) return; const e = ISO.player, r = e && e.rig; if (!r) return;
   try{ const T = THREE, v = new T.Vector3(), piv = r.wk==='staff' && r.weapon && r.weapon.parent && r._castTip ? m3dWpPiv(r) : null;
     if (piv){ piv.updateWorldMatrix(true, false); v.copy(r._castTip); piv.localToWorld(v); } else if (e._cast && e._cast.visible){ e._cast.updateWorldMatrix(true, false); e._cast.getWorldPosition(v); } else return;
     if (Math.hypot(v.x - s.x0, v.z - s.y0) > 1.2) return; s.x0 = v.x; s.y0 = v.z; s.h0 = v.y; }catch(err){} }
@@ -50018,6 +50215,7 @@ function renderFirstPerson(){
   ctx.save();
   if (FP.shake>0){ const s = FP.shake*6*dpr; ctx.translate((Math.random()-0.5)*s, (Math.random()-0.5)*s); }
   isoDrawOverlay(sprites);
+  if (fpv()) try{ fpwDraw(); }catch(e){ console.error(e); }   /* (FP-004) */
   if (G.gameMode===2 && (G.weather==='rain' || G.weather==='storm')) fpDrawRain();
   ctx.restore();
   fpDrawPost();
@@ -50069,6 +50267,12 @@ canvas.addEventListener('contextmenu', (e)=>{
   if (!fp3dActive() || G.ui!=='playing' || !(ISO.on && FPD.ok)) return;
   e.preventDefault(); if ((FPL.on || performance.now() - FPL.end < 600) && FPL.moved > 5) return;   /* (FP-002: a look round, not a click) */ isoContext(e);
 });
+canvas.addEventListener('pointerdown', e=>{ if (e.pointerType!=='mouse' || e.button!==0 || e.shiftKey || !fpv() || G.ui!=='playing' || dgMiniTile(e)) return;   /* (FP-004) */
+  FPF.down = true; FPF.x = e.clientX; FPF.y = e.clientY; fpvFire(e); });
+window.addEventListener('pointermove', e=>{ if (FPF.down){ FPF.x = e.clientX; FPF.y = e.clientY; } });
+window.addEventListener('pointerup', e=>{ if (e.button===0) FPF.down = false; });
+window.addEventListener('blur', ()=>{ FPF.down = false; });
+function fpvFireTick(){ if (!FPF.down) return; if (!fpv() || G.ui!=='playing'){ FPF.down = false; return; } if (performance.now() >= FPF.next) fpvFire({ clientX:FPF.x, clientY:FPF.y }); }
 canvas.addEventListener('pointerdown', e=>{ if (e.pointerType!=='mouse' || e.button!==2 || !fpv() || G.ui!=='playing') return;   /* (FP-002) */
   FPL.on = true; FPL.x = e.clientX; FPL.y = e.clientY; FPL.moved = 0; try{ canvas.setPointerCapture(e.pointerId); }catch(err){} });
 window.addEventListener('pointermove', e=>{ if (!FPL.on) return; if (!(e.buttons & 2) || !fpv() || G.ui!=='playing'){ fpvLookEnd(); return; }
@@ -50100,6 +50304,7 @@ function dgMiniClick(e){
 canvas.addEventListener('click', (e)=>{
   if (!fp3dActive() || G.ui!=='playing') return;
   if (dgMiniClick(e)) return;
+  if (fpv() && !e.shiftKey && (e.pointerType==='mouse' || !document.body.classList.contains('touch'))) return;   /* (FP-004: fired on the press) */
   if (ISO.on && FPD.ok) isoClick(e);
 });
 // weapon swing / spell glow cues ride along on the existing sound hooks, so
@@ -50257,7 +50462,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'fp-003';
+const GAME_VERSION = 'fp-004';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -50553,7 +50758,7 @@ function buildSettings(){
         ${seg('loadCards', 'loading cards between places', [[true,'on'],[false,'off']])}
         ${seg('trans', 'walk through gates and down stairs', [[true,'on'],[false,'off']])}
         ${seg('fpView', 'first-person view below ground (O)', [[false,'off'],[true,'on']])}
-        ${note('seen through your own eyes in dungeons and roadside fights: W and S walk forward and back and A and D aside, freely, the way you look; Z and X or the left and right arrows turn; hold the right mouse button and drag to look round')}
+        ${note('seen through your own eyes in dungeons and roadside fights: W and S walk forward and back and A and D aside, freely, the way you look; Z and X or the left and right arrows turn; hold the right mouse button and drag to look round; the left one strikes or shoots at what is under the cursor')}
         ${seg('fps', 'frame-rate counter', [[false,'off'],[true,'on']])}
       </div>`;
   else if (tab==='picture') body = `<div class="panel"><h4>PICTURE</h4>

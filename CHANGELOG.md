@@ -1,5 +1,17 @@
 # Depthcrawl patch notes
 
+## FP-004 - Point and Shoot
+
+You asked for first-person shooter combat on the left click. In the first-person view, the left mouse button now attacks whatever is under the cursor.
+
+- **Your weapon in your hands.** The sword, axe, staff or fists you have equipped show at the bottom of the view, and they swing with every blow you land or miss.
+- **Click to strike.** Left-click a monster next to you to hit it, or one a spear's reach away. Hold the button to keep attacking about once a second.
+- **Click to shoot.** With a bow or a spell ready, left-click a monster further off to shoot or cast at it, as long as you can see it. Arrows and spells fly from your eyes.
+- **Missing is free.** Click empty air and your blade swings at nothing, or the shot flies to the spot. That uses no arrows and no runes, and the monsters don't get a turn.
+- **Things still work with a click.** A chest, an ore vein or an item on the floor nearby is used as before. Shift-click still examines.
+- **Walking to a spot** now comes from the minimap. Clicking the floor is an attack in this view.
+- **A faster beat.** Fights in the first-person view go at about a blow a second instead of one every 2.6 seconds. The monsters still answer each blow, as before.
+
 ## FP-003 - Free Roaming
 
 You asked for free movement. In the first-person view you now walk smoothly in any direction, instead of hopping from tile to tile.

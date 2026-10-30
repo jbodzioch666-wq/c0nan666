@@ -6,7 +6,7 @@ const fs = require('fs');
 module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.on('pageerror', e=>errs.push(String(e).slice(0, 300)));
   const A = (c, msg)=>{ if (!c) throw new Error('assert: '+msg); };
   const ev = (f, a)=>page.evaluate(f, a), frames = n=>ev(async n=>{ const t = performance.now() + n*20; for (let i=0; i<n || performance.now() < t; i++){ renderGame(); await new Promise(r=>requestAnimationFrame(r)); } }, n);
-  const hold = async (k, ms)=>{ await page.keyboard.down(k); await frames(Math.round(ms/20)); await page.keyboard.up(k); await frames(3); };
+  const hold = async (k, ms)=>{ await page.keyboard.down(k); await ev(async ms=>{ const t = performance.now() + ms; while (performance.now() < t){ renderGame(); await new Promise(r=>requestAnimationFrame(r)); } }, ms); await page.keyboard.up(k); await frames(3); };   /* (by the clock: the frames here run 30 to 40 ms) */
   await ev(async ()=>{ goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{}; G.player.wildWarned = 1; G.player.hp = G.player.maxHp = 99999;
     const s = questNearbySites(G.owPos.x, G.owPos.y, 1, 80, ['dungeon'])[0]; G.gameMode = 0; G.pendingDungeon = { x:s.x, y:s.y }; enterDungeonConfirm(); setUi('playing'); G.mon.length = 0; });
   await frames(50);
@@ -21,12 +21,12 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   await page.keyboard.press('o'); await frames(30);
   const st = ()=>ev(()=>({ x:FPM.x, y:FPM.y, px:G.player.x, py:G.player.y, f:G.player.facing, t:window.__steps||0, cx:FPD.cam.position.x, cz:FPD.cam.position.z, fpv:fpv() }));
   const s0 = await st(); A(s0.fpv && Math.abs(s0.x - (at.x+0.5)) < 0.01 && Math.abs(s0.y - (at.y+0.5)) < 0.01, 'starts in the middle of the tile');
-  /* a click on the floor three tiles ahead: you glide there smoothly, never back, and end in the tile's middle */
+  /* a walk to the floor three tiles ahead: you glide there smoothly, never back, and end in the tile's middle */
   { const pt = await ev(at=>{ const v = new THREE.Vector3(at.x + at.F[0]*3 + 0.5, 0.02, at.y + at.F[1]*3 + 0.5).project(FPD.cam), r = canvas.getBoundingClientRect(); return { x:r.left + (v.x*0.5+0.5)*r.width, y:r.top + (-v.y*0.5+0.5)*r.height }; }, at);
-    await page.mouse.click(pt.x, pt.y);
+    await ev(at=>{ ISO.path = isoFindPath(at.x + at.F[0]*3, at.y + at.F[1]*3) || []; ISO.nextStep = 0; }, at);   /* (FP-004: a click on the floor is a swing now - a walk to a spot comes from the minimap or a tap) */
     const tr = await ev(async F=>{ const out = []; const end = performance.now() + 2500; while (performance.now() < end){ renderGame(); await new Promise(r=>requestAnimationFrame(r)); out.push(FPM.x*F[0] + FPM.y*F[1]); } return out; }, at.F);
     let back = 0; for (let i=1;i<tr.length;i++) back = Math.max(back, tr[i-1] - tr[i]);
-    const e = await st(); A((e.px - at.x)*at.F[0] + (e.py - at.y)*at.F[1]===3, 'the click walked you three tiles'); A(back < 0.01, 'gliding there, never back: ' + back.toFixed(3));
+    const e = await st(); A((e.px - at.x)*at.F[0] + (e.py - at.y)*at.F[1]===3, 'the walk took you three tiles: ' + JSON.stringify([e.px - at.x, e.py - at.y, at.F, await ev(()=>[ISO.path.length, G.ui, FPM.follow])])); A(back < 0.01, 'gliding there, never back: ' + back.toFixed(3));
     A(Math.abs(e.x - (e.px + 0.5)) < 0.03 && Math.abs(e.y - (e.py + 0.5)) < 0.03, 'in the middle of the tile at the end');
     await ev(at=>{ const p = G.player; p.x = at.x; p.y = at.y; FPM.x = at.x + 0.5; FPM.y = at.y + 0.5; FPM.follow = false; ISO.path = []; }, at); await frames(10); }
   const s0b = await st();
