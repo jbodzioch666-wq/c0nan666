@@ -1,0 +1,25 @@
+// probe: the town arena and the arena fight, in 3D
+module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.on('pageerror', e=>errs.push(String(e).slice(0, 300))); page.on('console', m=>{ if (m.type()==='error') errs.push(m.text().slice(0, 300)); });
+  const ev = (f, a)=>page.evaluate(f, a), fs = require('fs');
+  const frames = n=>ev(async n=>{ for (let i=0;i<n;i++){ renderGame(); await new Promise(r=>setTimeout(r, 40)); } }, n);
+  const r0 = await ev(()=>{ goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{};
+    const p = G.player; p.gold = 1e6; p.wildWarned = 1; p.clock = p.turnCount = 60*12; p.hp = p.maxHp = 99999; G.weather = 'clear';
+    const city = townList().find(t=>townInfo(t.x, t.y).tier===2); G.owPos = { x:city.x, y:city.y }; trackVisitedTown(city.x, city.y); setUi('playing'); enterVillage(); setUi('playing');
+    const n = G.villageNpcs.find(n=>n.service==='arena'); p.x = n.x; p.y = n.y + 7; if (G.map[p.x][p.y]!==T_FLOOR) p.y = n.y - 1;
+    return { npc:[n.x, n.y] }; });
+  await frames(40); await page.screenshot({ path:SHOTS + '/zarena_town.png' });
+  const r1 = await ev(()=>{ arenaFight(); setUi('playing'); G.weather = 'clear'; return { mode:G.gameMode, theme:G.arenaTheme, cols:COLS, rows:ROWS, mon:G.mon.map(m=>m.x+','+m.y), p:[G.player.x, G.player.y] }; });
+  console.log(JSON.stringify(r1));
+  await frames(60); await page.screenshot({ path:SHOTS + '/zarena_fight.png' });
+  await ev(()=>{ G.player.y = 6; G.player.x = 12; }); await frames(30); await page.screenshot({ path:SHOTS + '/zarena_fight2.png' });
+  await ev(()=>{ arenaRoar(1); }); await frames(8); await page.screenshot({ path:SHOTS + '/zarena_roar.png' });
+  const r2 = await ev(()=>{ const T = THREE, R = FPD.r, sz = R.getSize(new T.Vector2()), out = {}, C = ARENA_C;
+    const shot = (px, py, pz, lx, ly, lz)=>{ const c = new T.PerspectiveCamera(45, sz.x/sz.y, 0.05, 200); c.userData.d = [0, pz > lz ? 1 : -1]; c.position.set(px, py, pz); c.lookAt(lx, ly, lz); c.updateProjectionMatrix(); c.userData.d && FPD.cutU.uCutD.value.set(...c.userData.d); R.render(FPD.scene, c); return R.domElement.toDataURL('image/jpeg', 0.88); };
+    out.over = shot(C.cx, 24, C.cy + 16, C.cx, 0, C.cy - 1);
+    out.crowd = shot(C.cx + 2, 1.5, C.cy - 3, C.cx + 1, 2.4, C.cy - C.ry - 3);
+    out.box = shot(C.cx, 2.0, C.cy - 1, C.cx, 3.0, C.cy - C.ry - 2.5);
+    out.gate = shot(C.cx, 2.2, C.cy + 2, C.cx, 1.0, C.cy + C.ry + 1);
+    out.crowdN = FPD.crowd ? FPD.crowd.count : 0; return out; });
+  for (const k of ['over','crowd','box','gate']) fs.writeFileSync(SHOTS + '/zarena_' + k + '.jpg', Buffer.from(r2[k].split(',')[1], 'base64'));
+  console.log(JSON.stringify({ crowd:r2.crowdN }), errs.join(' | '));
+};
