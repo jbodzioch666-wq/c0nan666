@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-774 - The Victor's Portal
+
+- **Killing a site's boss opens a portal again.** Since RS-767 the way out a boss's fall opens looked like the site's own way out: stairs up indoors, an open archway in a graveyard. Now it's the shimmering blue portal again, in every kind of site, and you're drawn into it when you step in.
+- **It stays a portal** after saving and loading. The site's own way out is still the stairs or the archway you came in by.
+
 ## RS-773 - True Colours
 
 - **Your cape's emblem shows in its dye on the finest capes.** The best capes (Legends, the top uniques) have embroidery that glows, and that glow was always gold. Laid over a black cross, it made the cross look gold. Now the glow takes the emblem's own colour: a black emblem stays black, a red one glows red, and an undyed emblem is still gold thread glowing gold.

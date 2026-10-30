@@ -1,6 +1,6 @@
 // RS-767: a site's way out looks like a way in. Indoors it is a flight of stairs up, lit by the day at its top (FPD.exitStairs), and
 // you walk up it as up any stairs; out under the sky (a graveyard, the Lost City) it is a stone archway, its doors standing open on
-// the day (FPD.exitDoors), and you walk out through it. A fallen master's way out on a lower floor is stairs too. No blue portal
+// the day (FPD.exitDoors), and you walk out through it. No blue portal - but a fallen master's way out is one (RS-774)
 module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.on('pageerror', e=>errs.push(String(e).slice(0, 300)));
   const A = (c, msg)=>{ if (!c) throw new Error('assert: '+msg); };
   const r = await page.evaluate(async ()=>{ const out = {}, fr = async n=>{ for (let i=0;i<n;i++){ renderGame(); await new Promise(r=>setTimeout(r, 30)); } };
@@ -23,6 +23,6 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   console.log(JSON.stringify(r));
   for (const k of ['dungeon', 'mine']) A(r[k].look==='stair' && r[k].stairs >= 1 && !r[k].portal && r[k].walk==='up' && r[k].out && r[k].hi > 0.3, k + ': its way out a flight up, walked up and out: ' + JSON.stringify(r[k]));
   A(r.graveyard.look==='door' && r.graveyard.doors >= 1 && !r.graveyard.portal && r.graveyard.walk==='flat' && r.graveyard.out, 'a graveyard\'s way out an open doorway, walked through: ' + JSON.stringify(r.graveyard));
-  A(r.boss.at && r.boss.look==='stair' && r.boss.stairs >= 1, 'a fallen master\'s way out is stairs up: ' + JSON.stringify(r.boss));
+  A(r.boss.at && r.boss.look==='portal' && r.boss.portals >= 1, 'a fallen master\'s way out is a portal (RS-774): ' + JSON.stringify(r.boss));
   A(!errs.length, 'no errors: ' + errs.join(' | '));
 };

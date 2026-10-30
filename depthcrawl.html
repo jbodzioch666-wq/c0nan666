@@ -3773,6 +3773,7 @@ const G = {
   bossIdx: -1,
   dgCache: {}, // key `${slot}_${depth}` -> {map,floorItem,genStart,mon,shopStock,isBossFloor,bossIdx} (RS-205: saved with the game)
   dgDone: 0, // the site's master has fallen and its exit portal stands open (see dgOpenExit/dgFinish)
+  dgBossExit: null, // (RS-774) where that portal stands, { x, y, d } - a portal, not the stairs or doorway a site's way out is (exitLook)
   log: [], // {msg, cls}
   chosenRace: 0, chosenClass: 0,
   preAb: [10,10,10,10,10,10],
@@ -6069,9 +6070,9 @@ function dgOpenExit(){
     if (best) break;
   }
   if (!best) return;
-  G.map[best[0]][best[1]] = T_EXIT; G.dgDone = 1;
+  G.map[best[0]][best[1]] = T_EXIT; G.dgDone = 1; G.dgBossExit = { x:best[0], y:best[1], d:G.depth };
   if (typeof FPD!=='undefined') FPD.mapRef = null;
-  logMsg('stone grinds aside nearby and daylight falls through - a way up to the open air, yours whenever you are done down here', 'magic'); try{ audEnv('portal'); }catch(e){}
+  logMsg('a portal shimmers open nearby - a way out to the open air, yours whenever you are done down here', 'magic'); try{ audEnv('portal'); }catch(e){}
 }
 // leaving a site by any road: the floor is kept for next time, unless its master has fallen, when the site is gone for good
 // (the land reclaims it and a new one rises elsewhere, see bossDefeated) and any gravestone of yours inside comes up with it
@@ -6081,7 +6082,7 @@ function dgFinish(cacheIt){
     if (G.dgDone){ invalidateDungeonCache(G.dungeonSlot); for (const g of gravesP()) if (g.dg && g.dg.slot===G.dungeonSlot){ delete g.dg; logMsg('your gravestone from below is cast up with the collapse - it waits where the entrance stood', 'loot'); } }
     else if (cacheIt && !G.inRaid) saveLevelCache(G.depth);
   }
-  G.dgDone = 0; G.inRaid = null; G.gameMode = 0; G.dungeonSlot = 0; G.isBossFloor = 0; G.bossIdx = -1;
+  G.dgDone = 0; G.dgBossExit = null; G.inRaid = null; G.gameMode = 0; G.dungeonSlot = 0; G.isBossFloor = 0; G.bossIdx = -1;
   dgStepOut();
 }
 // (RS-207) out of a site you stand on the open ground beside its entrance, not in the middle of it: the nearest land tile
@@ -7774,7 +7775,7 @@ function tryMove(dx,dy){
       if (G.gameMode===2){ if (!isoPortalWalk(nx, ny, ()=>fieldLeave(true))) fieldLeave(true); break; }   /* (RS-382: the portal off a field with no way out; RS-609: walked into) */
       if (G.gameMode===3){ const go = ()=>{ G.gameMode = 0; logMsg('you head back out onto the road', 'new'); }; if (!(G.interior==null && v3GateWalk(nx, ny, go))) go(); }   /* (RS-592: out through the gate as it opens) */
       else { const go = ()=>{
-        if (G.dgDone) logMsg(`you climb out into the open air - the ${SITE_WORD[G.siteKind]||'dungeon'} falls in behind you`, 'magic');
+        if (G.dgDone) logMsg(`${dgBossExitAt(nx, ny) ? 'you step through the portal' : 'you climb out'} into the open air - the ${SITE_WORD[G.siteKind]||'dungeon'} falls in behind you`, 'magic');
         else logMsg(G.siteKind==='dungeon' ? 'you climb back up to the surface' : 'you climb back down and outside', 'new');
         dgFinish(true); };   /* (the floor is kept for next time; a beaten site is let go - see dgFinish) */
         const lk = exitLook(nx, ny);   /* (RS-767: up the flight, or out through the doorway) */
@@ -7850,7 +7851,7 @@ function serializeGame(){
     gameMode: (G.gameMode===2 || G.gameMode===3) ? 0 : G.gameMode, inTown: G.gameMode===3 ? 1 : 0,   /* (RS-382: saved in a town, you start in it) */
     depth: G.depth, dungeonMaxDepth: G.dungeonMaxDepth,
     dungeonEntrance: {x:G.dungeonEntrance.x,y:G.dungeonEntrance.y}, dungeonSlot: G.dungeonSlot,
-    siteKind: G.siteKind, dungeonModifier: G.dungeonModifier||null, dgDone: G.dgDone||0, dgCache: dgCacheEncode(), questBoard: G.questBoard, questBoards: G.questBoards||{},
+    siteKind: G.siteKind, dungeonModifier: G.dungeonModifier||null, dgDone: G.dgDone||0, dgBossExit: G.dgBossExit||null, dgCache: dgCacheEncode(), questBoard: G.questBoard, questBoards: G.questBoards||{},
     tavernCursor: G.tavernCursor,
     log: G.log.slice(-20),
   };
@@ -8012,7 +8013,7 @@ function loadGame(id){
   G.dungeonSlot = data.dungeonSlot||0;
   G.siteKind = data.siteKind||'dungeon';
   G.dungeonModifier = data.dungeonModifier||null;
-  G.dgDone = data.dgDone||0; G.dgCache = dgCacheDecode(data.dgCache);   /* (RS-205: the floors you have walked; old saves start with none) */
+  G.dgDone = data.dgDone||0; G.dgBossExit = data.dgBossExit||null; G.dgCache = dgCacheDecode(data.dgCache);   /* (RS-205: the floors you have walked; old saves start with none) */
   G.questBoards = data.questBoards||{};
   setTimeout(()=>{ try{ questValidateAll(); }catch(e){} }, 0);   // sites may have moved since these were posted
   G.questBoard = (G.gameMode===3 && G.questBoards[questTownKey(G.owPos.x,G.owPos.y)]) || data.questBoard||[];
@@ -8918,7 +8919,7 @@ function generateOverworld(seed){
   G.ow.dungeonMax = makeGrid(0, OW_COLS, OW_ROWS);
   G.ow.dungeonIdx = makeGrid(0, OW_COLS, OW_ROWS);
   G.ow.siteBiomeCache = {}; // see owBaseColor - stale entries from a previous map would otherwise leak through
-  G.dgCache = {}; G.dgDone = 0;
+  G.dgCache = {}; G.dgDone = 0; G.dgBossExit = null;
   G.dungeonSlot = 0;
 
   const rng = mulberry32(seed);
@@ -9593,7 +9594,7 @@ function enterDungeonConfirm(walked){
   G.dungeonSlot = spire ? MAX_SITE_SLOT + 1 : G.ow.dungeonIdx[ex][ey];
   G.player.siteEnterTurn = G.player.turnCount||0;
   G.dungeonModifier = G.pendingDungeonModifier || null; // committed from the entry prompt's picker - see sitePower/dungeonModifierMult
-  G.dgDone = 0; dgCacheCheck();
+  G.dgDone = 0; G.dgBossExit = null; dgCacheCheck();
   G.gameMode = 1;
   G.owZoomedOut = false;
   setUi('playing');
@@ -48911,7 +48912,8 @@ function isoPortalTick(e){
 }
 /* (RS-767) how a site's way out is shown: indoors, backed onto a wall, a flight of stairs up into the daylight ('stair'); out under the
    sky (a graveyard, the Lost City), a stone archway with its doors standing open ('door'); a field's, or one with no wall, the old portal */
-function exitLook(x, y){ if (G.gameMode!==1 || tileAt(x, y)!==T_EXIT) return 'portal'; const T = fpTheme(); if (T.outdoor) return 'door'; return stairWallDir(x, y) ? 'stair' : 'portal'; }
+function dgBossExitAt(x, y){ const b = G.dgBossExit; return !!(b && G.dgDone && b.x===x && b.y===y && b.d===G.depth); }   /* (RS-774) */
+function exitLook(x, y){ if (G.gameMode!==1 || tileAt(x, y)!==T_EXIT || dgBossExitAt(x, y)) return 'portal';   /* (RS-774: the portal its master's fall opens stays a portal) */ const T = fpTheme(); if (T.outdoor) return 'door'; return stairWallDir(x, y) ? 'stair' : 'portal'; }
 const FP_STAIR_DOOR = 0.5;   /* (RS-760) the height of the doorway at the head of a flight down: the figure's head passes under it at the flight's foot (h -0.55) */
 function isoStairPath(x, y, up, flat){ const [ex, ey] = fpStairDir(x, y), ax = -ex, ay = -ey, H = flat ? 0 : up ? 0.92 : -0.55; return { c:[x + 0.5, y + 0.5], a:[ax, ay], at:t=>({ x:x + 0.5 + ax*t, y:y + 0.5 + ay*t, h:t <= 0.5 ? H*Math.max(0, Math.min(1, t + 0.5)) : (up ? H : H - (t - 0.5)*1.1) }) }; }
 function isoStairTick(e){
@@ -50018,7 +50020,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-773';
+const GAME_VERSION = 'rs-774';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
