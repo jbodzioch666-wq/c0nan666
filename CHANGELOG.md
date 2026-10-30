@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-769 - Still Waters
+
+- **Calm rivers at night:** a river no longer fills with rings and moiré stripes after dark. The beach surf's foam lines, drawn by depth, ran from bank to bank down a river (a river is shallow all the way across); they now stay on the sea and lakes.
+- **No more shimmer:** the streaks that show a river's current were finer than a pixel and broke into stripes, by day too. They're wider now and fainter at night.
+- **The night's light on the water:** the turquoise shallows and the white foam glowed at night. Both now darken with the dark (at night the river's brightness halved and its pixel-to-pixel stripes dropped by three quarters, measured in the new test).
+
 ## RS-768 - Turn of the Season
 
 - **Fixed a crash when the season changes.** If the season turned while the land around you was still being built in the background (usually as you walked a long way), the game stopped with "Cannot read properties of null (reading 'cx')". The unfinished build is now thrown away, and the land is rebuilt in the new season's colours.

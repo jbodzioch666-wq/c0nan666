@@ -13,7 +13,7 @@ module.exports = async page=>{
         for (const [a, b] of R8){ const dd = (a*fx + b*fz)/Math.hypot(a, b), t2 = o3Tile(ox + x + a, oy + y + b); if (dd > bd && (t2===OW_RIVER || t2===OW_WATER)){ bd = dd; best = [a, b]; } }
         if (!best) break; x += best[0]; y += best[1]; if (x<0 || y<0 || x>=N || y>=N || o3Tile(ox + x, oy + y)===OW_WATER){ reach++; break; }
         if (seen.has(x + ',' + y)){ back++; break; } seen.add(x + ',' + y); } }
-    return { rivers, still, tried, reach, back, shader:/along\*0\.35 - uT/.test(sh.fragmentShader) }; });
+    return { rivers, still, tried, reach, back, shader:/along\*0\.3 - uT/.test(sh.fragmentShader) }; });
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
   A(r.rivers > 10 && r.still===0, 'every river tile knows which way it runs');
