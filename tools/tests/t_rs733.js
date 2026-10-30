@@ -26,7 +26,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   });
   await page.waitForTimeout(2500); await page.screenshot({ path:SHOTS + '/rs733_lair.png' });
   console.log(JSON.stringify(r));
-  A(r.gen===25, 'a new world is generator 25');
+  A(r.gen >= 25, 'a new world is generator 25 or later');
   A(r.lairs.length && r.lairs.every(l=>l.d >= 2 && l.range >= 30), 'every lair deep in a big range: ' + JSON.stringify(r.lairs));
   A(r.lairs.every(l=>l.foot && l.pass >= 1), 'every lair has a pass out to open ground');
   A(r.h > 3, 'the nearest lair stands high: ' + r.h);

@@ -1,5 +1,15 @@
 # Depthcrawl patch notes
 
+## RS-766 - Home Ground
+
+**New worlds only:** the placement changes need a new world (the generator is now version 28). Your character comes with you; old worlds still load as they were.
+
+- **Pyramids stand in open desert.** Crystal wastes and volcanic land are often painted over a desert, and up to a third of pyramids ended up inside them. A pyramid now needs open desert on at least five of its eight sides. In test worlds of every size, every pyramid lands in plain desert.
+- **Every mine sits beside a mountain.** On a Planet, a third of the mines missed their mountains and were dropped anywhere. The generator now checks every tile that fits instead of 400 random tries. In tests, all 100 mines on four Planets now have a mountain beside them.
+- **Dragon lairs sit on a broad summit.** The mountains round a lair are raised to just under it, with the pass cut through them. It used to stand on a thin spire.
+- **A dungeon's way out looks like a way in.** The blue swirling portal is gone from dungeons. Indoors, the way out is a flight of stairs up with daylight at the top, and you walk up it like any stairs. That includes the one that opens when a site's master falls. On the graveyard and Lost City surface, it is a stone archway with its doors open on the daylight, and you walk out through it.
+- World sim (3 seeds per size): no sites crowded within 4 tiles, the same site counts as before.
+
 ## RS-765 - Rare Renewal
 
 - **Regeneration is out of the ordinary bonus pool.** It could roll on every piece of armour and jewellery and stacked into far too much healing. Ordinary magic and rare drops no longer roll it, and Blood and Chaos at the smith no longer give it.

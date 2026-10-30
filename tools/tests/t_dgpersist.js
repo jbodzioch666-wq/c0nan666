@@ -43,7 +43,7 @@ module.exports = async page=>{
     out.portal = [px, py, +pd.toFixed(1), !!stairWallDir(px, py)];
     victoryContinue(); out.uiBack = G.ui;
     for (let i=0;i<4;i++){ renderGame(); await new Promise(r=>setTimeout(r, 80)); }
-    out.portals3d = typeof FPD!=='undefined' && FPD.portals ? FPD.portals.length : -1;
+    out.portals3d = typeof FPD!=='undefined' && FPD.portals ? FPD.portals.length + (FPD.exitStairs||0) + (FPD.exitDoors||0) : -1;   /* (RS-767: the way out is stairs up, or a doorway, now) */
     // step through: out on the land, the floors let go
     P.x = px; P.y = py; G.map[px][py] = T_FLOOR; const w = portalWallDir(px, py) || [0, 1]; P.x = px + w[0]; P.y = py + w[1]; G.map[px][py] = T_EXIT; G.map[P.x][P.y] = T_FLOOR;
     for (const m of G.mon) m.alive = 0;
@@ -60,7 +60,7 @@ module.exports = async page=>{
   A(r.boss[0]===1 && r.boss[1]>=0, 'boss floor '+JSON.stringify(r.boss));
   A(r.afterBoss.ui==='victory' && r.afterBoss.mode===1 && r.afterBoss.slot===r.slot && r.afterBoss.done===1 && r.afterBoss.cacheKept && r.afterBoss.entTile, 'after the boss you are still inside '+JSON.stringify(r.afterBoss));
   A(r.portal[0]>=0 && r.portal[2] <= 12 && r.portal[3], 'a portal near you, against a room wall '+JSON.stringify(r.portal));
-  A(r.uiBack==='playing' && r.portals3d===1, 'the portal is modelled '+JSON.stringify([r.uiBack, r.portals3d]));
+  A(r.uiBack==='playing' && r.portals3d===1, 'the way out is modelled '+JSON.stringify([r.uiBack, r.portals3d]));
   A(r.left.mode===0 && r.left.slot===0 && r.left.done===0 && r.left.cache===0, 'stepping through leaves the site behind '+JSON.stringify(r.left));
   console.log('dgpersist ok '+JSON.stringify({ kb:r.savedKB, portal:r.portal }));
 };

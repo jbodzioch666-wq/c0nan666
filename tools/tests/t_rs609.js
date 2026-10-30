@@ -8,6 +8,7 @@ module.exports = async page=>{
     /* the robe's top: its uvs for the hem's layers all on the blank middle of their textures */
     { G.gear.chest = rsMakeArmour('cloth', 4, 'chest'); const e = m3dInstance({}, rsPlayerLook()), sk = e.rig.skirt, q = sk.geometry.attributes.position, uv = sk.geometry.attributes.uv, yJ = sk.userData.extFrom; let bad = 0, n = 0;
       for (let i=0;i<q.count;i++) if (q.getY(i) + sk.position.y > yJ + 0.01){ n++; if (Math.abs(uv.getY(i) - 0.5) > 1e-4) bad++; } out.robeUv = [n, bad]; }
+    exitLook = ()=>'portal';   /* (RS-767: a dungeon's way out is stairs now - the walk into a portal, a field's and a flee portal's, tried on one) */
     const s = questNearbySites(G.owPos.x, G.owPos.y, 1, 60, ['dungeon'])[0]; G.gameMode = 0; G.pendingDungeon = { x:s.x, y:s.y }; enterDungeonConfirm(); setUi('playing');
     for (const m of G.mon) m.alive = 0; for (let i=0;i<200;i++) await new Promise(r=>requestAnimationFrame(r));
     let ex = null; for (let x=0;x<COLS && !ex;x++) for (let y=0;y<ROWS;y++) if (G.map[x][y]===T_EXIT){ ex = { x, y }; break; }
