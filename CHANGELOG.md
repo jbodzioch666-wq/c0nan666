@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-760 - The Way Down
+
+- **The Lost City's entrance lines up.** The pyramid now stands centred on its way down, so the stairs lead straight into its doorway. On some cities the doorway used to sit a tile to one side.
+- **Going downstairs goes somewhere.** Every flight down that ends at a wall now has a low, stone-framed doorway into the dark at its head. You walk down the steps and into it, out of sight. You used to walk down into solid stone.
+- **A Lost City's first floor is laid out again** the next time you visit, so its pyramid and stairs match.
+
 ## RS-759 - Butcher's Yard
 
 - **The pen menus stay open.** Buying a chick or a calf brings the hen house's or the byre's menu straight back, with what you bought and your gold shown, so you can keep going without walking away and back.

@@ -41,7 +41,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   A(r.stairAt && r.reach, 'the way down at the pyramid\'s foot, and a way to it');
   A(r.mon > 0 && r.fams.length && r.fams.every(f=>r.eco.includes(f)), 'its folk wait in it: ' + r.mon + ' ' + JSON.stringify(r.fams));
   A(['jtree', 'palm', 'fern'].every(k=>r.plants.some(p=>p.startsWith('cityJ:' + k + ':'))), 'the jungle\'s plants built round it: ' + r.plants);
-  A(r.lay==='city1', 'its cache knows it is the city');
+  A(r.lay==='city2', 'its cache knows it is the city');
   A(r.below.depth===2 && r.below.theme==='city' && !r.below.outdoor, 'below, its halls: ' + JSON.stringify(r.below));
   A(r.redo.walls > 200 && r.redo.theme==='cityOut', 'a floor cached before the city was laid out is made afresh: ' + JSON.stringify(r.redo));
   A(!errs.length, 'no errors: ' + errs.join(' | '));
