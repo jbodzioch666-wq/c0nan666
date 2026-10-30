@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-761 - Labelled Beds
+
+- **Garden beds have tooltips.** Point at one and a name plate shows, like the farmyard's animals have. It tells you what is growing, what stage it's at (sprouting, in leaf, in bud), how long until it's ready, and whether it's watered. An empty bed says to sow a seed, and a finished one says it's ready to pick.
+- **The fixed "Garden bed" labels are gone.** Each bed now has just its one tooltip.
+
 ## RS-760 - The Way Down
 
 - **The Lost City's entrance lines up.** The pyramid now stands centred on its way down, so the stairs lead straight into its doorway. On some cities the doorway used to sit a tile to one side.
