@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## FP-016 - Put It Away
+
+You said the shield disappears after chopping wood, and that weapons don't get put away when you're not fighting.
+
+- **Your shield stays on your arm.** Once your figure had stood still for a moment, the copy of its shield in your left hand came out turned edge-on, as it hangs on your back, so it was as good as gone. After chopping wood the left hand is rebuilt, which is when you saw it vanish. It's now always face out, its back to you.
+- **Weapons are put away out of a fight.** Through your eyes your hands now do what your figure does: out of a fight your weapon, shield and arms sink out of sight, so you walk the towns and the land with empty hands. When a fight starts they come up as your figure draws, and a blow, a shot or a spell has them up at once. When the fight is over they go down again.
+
 ## FP-015 - Swing It
 
 You said the pickaxe doesn't swing in the mine. It did swing, but you couldn't see it: a mine's veins are low and at your feet, so through your eyes you looked straight down onto the vein, and the overhead swing came straight at you end-on.
