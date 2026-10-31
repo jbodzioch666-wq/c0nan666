@@ -56,7 +56,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   await ev(()=>{ G.gear.weapon = newItem(); FPW.bowOut = null; G.player.rsLastType = 'melee'; G.player.arrows = 0; }); await wait(400);
   { const s = await st(); A(s.kind==='bow' && !s.arrow, 'no melee weapon: the bow in hand, empty with no arrows: ' + JSON.stringify(s)); }
   await ev(()=>{ G.player.arrows = 20; }); await wait(300);
-  A((await st()).arrow, 'arrows again: one nocked');
+  A((await st()).arrow, 'arrows again: one nocked: ' + JSON.stringify(await st()) + ' ' + JSON.stringify(await ev(()=>({ n:rangedAmmoN(G.gear.ranged), out:FPW.bowOut, last:G.player.rsLastType, kind:fpwRangedKind(), key:FPW.wkey.slice(0, 40) }))));
   /* the arrowhead in the arrows' colour; a magic longbow and a yew longbow longer than a shortbow */
   const look = await ev(()=>{ const B = FPW.bow; let c = null; B.arrow.traverse(o=>{ if (o.isMesh && o.material.metalness > 0.5 && !c) c = '#' + o.material.color.getHexString(); });
     const h = ()=>{ const b = new THREE.Box3(); for (const l of FPW.bow.limbs) b.expandByObject(l.m); return b.max.y - b.min.y; }; const short = h();

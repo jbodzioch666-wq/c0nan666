@@ -1,5 +1,16 @@
 # Depthcrawl patch notes
 
+## FP-017 - Your Own Swing
+
+You said the weapons don't look natural when swinging, not like they do in third person. Through your eyes you now see your own figure's fight, from its head - the same swings you see from above.
+
+- **The weapon in your hands is your figure's own.** It is the very model in its hand, held as it holds it: upright at guard, drawn back over the shoulder, cut down past the foe. Every weapon swings the way it does from above, two-handers in both hands, a staff and its orbs, a flail and its chain.
+- **Your shield is on your left arm.** It is carried a little lower and to the left than your figure holds it, so you see its top rim and the foe past it, your fist on its back. A tome or an off-hand blade is in your left hand the same way.
+- **Your eyes are in your figure's head** while the weapon is out, so a dwarf sees the fight from lower down, and the view dips to a short foe before you. Bare fists come up in a boxer's guard.
+- **Out of a fight the weapon goes on your hip**, as your figure's does, and your hands go down: nothing in the view on the roads and in the towns.
+- **Your hidden figure stands where you walk and faces where you look.** Striking a foe off to one side turns you to face it.
+- The pick, axe, rod and bow are as they were.
+
 ## FP-016 - Put It Away
 
 You said the shield disappears after chopping wood, and that weapons don't get put away when you're not fighting.

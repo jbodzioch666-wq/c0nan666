@@ -50,8 +50,8 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   A(bu.work==='bury' && bu.pitch < -0.9, 'kneeling to bury, looking down at the hole: ' + JSON.stringify(bu));
   await page.screenshot({ path:SHOTS + '/fp010-bury.jpg', type:'jpeg', quality:82 });
   await wait(2000);
-  const up = await ev(()=>({ work:FPW.work, pitch:FP.pitch, ly:FP.lookYaw, fov:FPW.cam.fov, near:FPW.cam.near }));
+  const up = await ev(()=>({ work:FPW.work, pitch:FP.pitch, ly:FP.lookYaw, fov:FPW.cam.fov, near:FPW.cam.near, wp:!!(FPW.mir && FPW.mir.wp) }));
   A(!up.work && Math.abs(up.pitch - p0) < 0.1 && up.ly==null, 'and back up after, as you were: ' + JSON.stringify(up));
-  A(up.fov===47 && up.near===0.05, 'your hands back in their own view after work: ' + JSON.stringify(up));
+  A(up.wp, 'your hands back to your weapon after work (FP-017: your figure\'s own, put away): ' + JSON.stringify(up));
   A(!errs.length, 'page errors: ' + errs.join(' | '));
 };

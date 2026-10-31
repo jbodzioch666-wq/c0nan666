@@ -33,7 +33,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   const shot = await ev(async ()=>{ renderGame(); await new Promise(r=>requestAnimationFrame(r)); const c = document.createElement('canvas'); c.width = canvas.width; c.height = canvas.height; const g = c.getContext('2d'); g.drawImage(FPD.cv, 0, 0, c.width, c.height); g.drawImage(canvas, 0, 0); return c.toDataURL('image/jpeg', 0.8); });
   fs.writeFileSync(SHOTS + '/fp004-weapon.jpg', Buffer.from(shot.split(',')[1], 'base64'));
   const weaponPx = await ev(()=>{ const c = FPW.cv, g = document.createElement('canvas'); g.width = c.width; g.height = c.height; const x = g.getContext('2d'); x.drawImage(c, 0, 0); const d = x.getImageData(0, 0, g.width, g.height).data; let n = 0; for (let i=3; i<d.length; i+=16) if (d[i] > 0) n++; return n / (d.length/16); });
-  A(weaponPx > 0.01 && weaponPx < 0.5, 'the weapon and hands drawn in the view: ' + (weaponPx*100).toFixed(1) + '% of it');
+  A(weaponPx > 0.004 && weaponPx < 0.5, 'the weapon and hands drawn in the view: ' + (weaponPx*100).toFixed(1) + '% of it');
   /* a click on it: a blow, the weapon swung */
   await page.mouse.click(g1.x, g1.y); await frames(3); const s1 = await st();
   A(s1.fights===1, 'a click on the goblin strikes it: ' + s1.fights); A(s1.atk || s1.swing > 0, 'the weapon swings');

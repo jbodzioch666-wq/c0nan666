@@ -20,7 +20,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
     const box = new T.Box3(); meshes.forEach(m=>{ m.geometry.computeBoundingBox(); const b = m.geometry.boundingBox.clone(); m.updateMatrix(); b.applyMatrix4(m.matrix); box.union(b); });
     const c = box.getCenter(new T.Vector3());
     const starts = FPW.arms.map(a=>a.g.position.distanceTo(a.h.localToWorld(a.h.userData.wrist.clone())));
-    const sh = FPW.arms.map(a=>{ const p = a.shoulder.clone().project(FPW.cam); return p.y; });
+    const sh = FPW.arms.map(a=>{ const p = (a.shAt || a.shoulder).clone(), behind = p.z > 0; p.project(FPW.cam); return behind ? -9 : p.y; });   /* (FP-017: the figure's own shoulders, behind the eye) */
     const hex = m=>m && m.color ? m.color.getHexString() : null;
     return { n:meshes.length, cx:c.x, cz:c.z, hands:hands.length, skin:H.finger===H.skin, finger:hex(H.finger), fMetal:H.finger.metalness||0, sleeve:H.sleeve, starts, sh, nails:!!H.nail }; });
   const fov = await ev(()=>{ const c = FPD.cam; return 2*Math.atan(Math.tan(c.fov*Math.PI/360)*c.aspect)*180/Math.PI; });

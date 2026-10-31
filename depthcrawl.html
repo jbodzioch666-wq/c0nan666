@@ -40049,7 +40049,7 @@ function o3Render(){
   P.walk = (P.walk||0) + (moving ? dt*12 : 0);
   if (P.e){
     // the 3D figure: turn to face the way you're walking (at sea, face the bow) and stride when you move
-    let want = DW ? DW.yaw : sailing ? (O3.boatYaw||0) : (moving ? Math.atan2(dxs, dzs) : P.yaw);
+    let want = DW ? DW.yaw : sailing ? (O3.boatYaw||0) : moving ? Math.atan2(dxs, dzs) : fpvLand() && !G.gather && !owIsPlanet() ? (a=>Math.atan2(Math.cos(a), Math.sin(a)))(fpvYawNow()) : P.yaw;   /* (FP-017: standing, through your eyes, you face where you look) */
     let da = want - P.yaw; da = Math.atan2(Math.sin(da), Math.cos(da)); P.yaw += da*Math.min(1, dt*8);
     P.e.holder.rotation.y = P.yaw;
     const mv = m3dEaseMv(P.e, (moving && !sailing) ? 1 : 0, dt), r = P.e.rig, tt = O3.t;
@@ -40253,8 +40253,12 @@ function fpUpdateCamera(dt){
   // the eye sits toward the back of its tile, like a classic grid crawler, so
   // a wall or a monster one step ahead is framed instead of filling the view
   if (fpv()){ fpmTick(dt); fpvFireTick(); fpxWorkLook(dt); }   /* (FP-003, FP-004; FP-009: turned to your work) */
+  if (FP.turnTo!=null){ if (!fpv() || FPL.on || G.ui!=='playing') FP.turnTo = null; else { const cur = FP.lookYaw!=null ? FP.lookYaw : (FP.cam ? FP.cam.a : FP_FACING_ANGLE[(p.facing|0)&3]); let d = FP.turnTo - cur; d = Math.atan2(Math.sin(d), Math.cos(d));
+      if (Math.abs(d) < 0.02) FP.turnTo = null; else { FP.lookYaw = cur + d*Math.min(1, dt*9); const f = fpvQuarter(FP.lookYaw); if (f!==p.facing){ p.facing = f; p.faceDiag = null; } FP.lookF = p.facing; } } }   /* (FP-017: turned to the foe you struck) */
   if (FP.lookYaw!=null && (!fpv() || p.facing!==FP.lookF)) FP.lookYaw = null;   /* (FP-002: turned some other way - square to the quarter again) */
-  if (FP.lookYaw==null && FP.pitch) FP.pitch *= Math.exp(-dt*6);
+  const fl = fpv() && !FPL.on ? fpvFightPitch() : null;   /* (FP-017: down at a short foe before you, as your figure looks) */
+  if (FP.lookYaw==null && FP.pitch && fl==null) FP.pitch *= Math.exp(-dt*6);
+  if (fl!=null) FP.pitch = (FP.pitch||0) + (fl - (FP.pitch||0))*Math.min(1, dt*5);
   const look = FP.lookYaw!=null, ta = look ? FP.lookYaw : FP_FACING_ANGLE[(p.facing|0)&3], gp = fpv() && FPM.map===G.map ? FPM : null;   /* (FP-001: at your walking pace, not hopping tile to tile; FP-003: where your free walk has you) */
   const eb = gp ? FPM_EYE_BACK : FP_EYE_BACK, tx = (gp ? gp.x : p.x+0.5)-Math.cos(ta)*eb, ty = (gp ? gp.y : p.y+0.5)-Math.sin(ta)*eb;
   let c = FP.cam;
@@ -48393,10 +48397,53 @@ function fpwSetWork(WK){
   for (const h of hands){ h.matrixAutoUpdate = false; held.add(h); }
   FPW.rig.add(held); FPW.held = held; FPW.weaponG = g; FPW.info = { tipY:0.7, tool };
   FPW.mir = { hands, tool };
-  FPW.arms = hands.map(h=>{ const fa = fpwForearm(), sm = FPW.hm.sleeveM || FPW.hm.skin, el = new T.Mesh(new T.SphereGeometry(0.047*0.78, 24, 16), sm);
-    fa.up.material = fpwFadeMat(fa.up.material, true); const fm = new Map(); fa.g.traverse(o=>{ if (o.isMesh){ if (!fm.has(o.material)) fm.set(o.material, fpwFadeMat(o.material)); o.material = fm.get(o.material); } }); el.material = fpwFadeMat(sm);
-    FPW.armGrp.add(fa.g); FPW.armGrp.add(fa.up); FPW.armGrp.add(el); return { h, g:fa.g, up:fa.up, el }; });   /* (the elbow rounded off) */
+  FPW.arms = fpwMirArms(hands);
 }
+function fpwMirArms(hands){ const T = THREE;
+  return hands.map(h=>{ const fa = fpwForearm(), sm = FPW.hm.sleeveM || FPW.hm.skin, el = new T.Mesh(new T.SphereGeometry(0.047*0.78, 24, 16), sm);
+    fa.up.material = fpwFadeMat(fa.up.material, true); const fm = new Map(); fa.g.traverse(o=>{ if (o.isMesh){ if (!fm.has(o.material)) fm.set(o.material, fpwFadeMat(o.material)); o.material = fm.get(o.material); } }); el.material = fpwFadeMat(sm);
+    FPW.armGrp.add(fa.g); FPW.armGrp.add(fa.up); FPW.armGrp.add(el); return { h, g:fa.g, up:fa.up, el }; }); }   /* (the elbow rounded off) */
+/* (FP-017) a fight through your eyes is your own figure's fight seen from its head, as its work is (FP-010): its weapon - the very model
+   in its hand, its grip, its guard, its blow (m3dPoseHumanoid, m3dPoseSwing), put away on its hip or back out of a fight (rsSheath) -
+   and its shield, tome or off-hand blade, with your hands where its fists close. The FPW_ATK keyframes and FPW_OFF are kept for a view
+   with no figure to mirror */
+function fpwMirKey(){ const e = fpwWorker(), r = e && e.rig; return r ? [r.weapon, r.shield, r.tome, r.offWpn].map(o=>o ? o.uuid.slice(0, 8) : '-').join(',') : ''; }
+function fpwMirrorable(){ const e = fpwWorker(); return !!(e && e.rig && e.rig.arms && e.holder); }
+function fpwSetWeaponMirror(w){
+  const T = THREE, e = fpwWorker(), r = e.rig, styleKey = fpwStyleFor(w), st = FPW_STYLE[styleKey], src = w && w.used ? r.weapon : null;
+  FPW.style = styleKey; FPW.st = st; FPW.work = null; FPW.atk = null; FPW.leftFist = null; FPW.flailHead = null; FPW.twist = null;
+  const info = { tipY:0.9, blade:null, fists:!src, grip:0.021 };
+  const held = new T.Group(); held.matrixAutoUpdate = false; let g = new T.Group();
+  if (src){ g = src.clone(true); g.matrixAutoUpdate = false; g.matrix.identity(); g.userData.mirSrc = src;
+    /* (the copy's parts follow the figure's own each frame - fpwMirCopy - so a staff's orbs and a flail's chain move as they do there) */
+    const A = [], B = []; src.traverse(o=>A.push(o)); g.traverse(o=>B.push(o)); g.userData.mirPairs = A.map((a, i)=>[a, B[i]]);
+    let top = null, ty = -1; g.traverse(o=>{ o.matrixAutoUpdate = false; if (o.isMesh){ o.castShadow = o.receiveShadow = false; o.userData.fpwShared = 1; o.geometry.computeBoundingBox(); const b = o.geometry.boundingBox, h = b.max.y - b.min.y; if (h > ty && !o.isSprite){ ty = h; top = o; } } });
+    const bb = m3dRbBox([src], src); info.tipY = Math.max(0.2, bb.max.y); info.blade = top;   /* (the weapon's own frame: its tip up its +y) */ info.grip = /Dagger|Rapier/i.test((w && w.basis)||'') ? 0.018 : 0.021;
+    held.add(g); }
+  const rg = info.fists ? 0.004 : info.grip, hands = [fpwHand(rg), fpwHand(rg)]; for (const h of hands){ h.matrixAutoUpdate = false; held.add(h); }
+  FPW.rig.add(held); FPW.held = held; FPW.weaponG = g; FPW.info = info;
+  FPW.mir = { hands, tool:!!src, wp:true };
+  FPW.arms = fpwMirArms(hands);
+  fpwSetMirOff(r);
+  const ench = fpwEnchant(w); FPW.ench = ench; FPW.motes = [];
+  if (ench && src){
+    const [hex, css] = FPW_ENCH[ench];
+    const c = v3Canvas(64,64), x = c.getContext('2d'), gr = x.createRadialGradient(32,32,0,32,32,32); gr.addColorStop(0,css); gr.addColorStop(1,'rgba(0,0,0,0)'); x.fillStyle = gr; x.fillRect(0,0,64,64);
+    const tex = new T.CanvasTexture(c), mg = new T.Group(); mg.userData.motes = 1; g.add(mg);
+    for (let i=0;i<14;i++){ const sp = new T.Sprite(new T.SpriteMaterial({ map:tex, transparent:true, depthWrite:false, blending:T.AdditiveBlending })); sp.scale.setScalar(0.05); mg.add(sp); FPW.motes.push({ sp, t:Math.random(), s:0.3+Math.random()*0.5 }); }
+    FPW.glow.color.setHex(hex);
+    if (info.blade){ info.blade.material = info.blade.material.clone(); info.blade.material.emissive = new T.Color(hex); info.blade.material.emissiveIntensity = ench==='unique' ? 0.06 : ench==='cold' ? 0.12 : 0.07; }
+  }
+}
+/* the figure's shield, tome and off-hand blade, copied (geometry shared) and laid each frame where the figure's own are */
+function fpwSetMirOff(r){ const T = THREE; fpwOffClear(); const srcs = [r.shield, r.tome, r.offWpn].filter(Boolean); if (!srcs.length) return;
+  const O = new T.Group(); O.matrixAutoUpdate = false; FPW.scene.add(O); FPW.offG = O; FPW.offKind = fpwOffKind(); FPW.offAt = null; FPW.offRot = null;
+  O.userData.mir = srcs.map(src=>{ const c = src.clone(true); c.matrixAutoUpdate = false; c.traverse(o=>{ o.matrixAutoUpdate = false; if (o.isMesh){ o.castShadow = o.receiveShadow = false; o.userData.fpwShared = 1; } });
+    const A = [], B = []; src.traverse(o=>A.push(o)); c.traverse(o=>B.push(o)); c.userData.mirPairs = A.map((a, i)=>[a, B[i]]); O.add(c); return { c, src }; }); }
+/* a copy's parts as the figure's are now: the root where V puts the figure's part, each part under it with its own matrix and visibility */
+function fpwMirCopy(c, src, V){ if (V) c.matrix.multiplyMatrices(V, src.matrixWorld); else c.matrix.identity(); c.visible = fpwWorldVis(src);
+  for (const [a, b] of c.userData.mirPairs || []){ if (b===c) continue; b.visible = a.visible; if (!a.userData.motes) b.matrix.copy(a.matrix); } }
+function fpwWorldVis(o){ const top = fpwWorker().holder; for (let q = o; q; q = q.parent){ if (!q.visible && q!==top) return false; if (q===top) break; } return true; }
 /* (FP-010) an upper arm is seen by its elbow and lost toward the shoulder, at the edge of sight: drawn fading out along its length (the
    cylinder's own y, -0.5 at the elbow) - a sleeve that ends in nothing, not a stump or a ball by your cheek */
 /* An arm also fades where it comes nearer your eyes than a hand's breadth or so (FPW.nearU, set from the hands' scale): out of focus at
@@ -48449,7 +48496,7 @@ function fpwMirrorCam(){ return G.gameMode===0 ? O3.cam : G.gameMode===3 ? V3.ca
 function fpwMirrorTick(){
   const M = FPW.mir, e = fpwWorker(), cam = fpwMirrorCam(); if (!M || !e || !e.rig || !e.rig.arms || !e.holder || !cam) return false;
   const T = THREE, Z = fpwMirrorTick.Z || (fpwMirrorTick.Z = { L:new T.Matrix4(), F:new T.Matrix4(), G:new T.Matrix4(), H:new T.Matrix4(), I:new T.Matrix4(), v:new T.Vector3(), w:new T.Vector3(), u:new T.Vector3(), q:new T.Quaternion(), qx:new T.Quaternion().setFromAxisAngle(new T.Vector3(1,0,0), Math.PI/2), s:new T.Vector3(), up:new T.Vector3(0,1,0) });
-  const r = e.rig, gx = r.gripX || 0.026, tw = M.tool && e.tool ? e.tool : null;
+  const r = e.rig, gx = r.gripX || 0.026, tw = M.tool && e.tool ? e.tool : M.wp && r.weapon ? r.weapon : null;   /* (FP-017: or the weapon in its hand) */
   e.holder.updateWorldMatrix(true, true); cam.updateMatrixWorld(); const V = cam.matrixWorldInverse;
   if (FPW.cam.fov!==cam.fov || FPW.cam.near!==0.002){ FPW.cam.fov = cam.fov; FPW.cam.near = 0.002; FPW.cam.far = 60; FPW.cam.updateProjectionMatrix(); }
   FPW.rig.position.set(0, 0, 0); FPW.rig.rotation.set(0, 0, 0); FPW.rig.scale.setScalar(1);
@@ -48457,11 +48504,14 @@ function fpwMirrorTick(){
   held.matrixWorldNeedsUpdate = true;
   for (let i=0;i<2;i++){ const A = r.arms[i], h = M.hands[i];
     Z.F.compose(Z.v.set(i ? -gx : gx, i ? -0.045 : -0.04, i ? 0.004 : 0), Z.qx, Z.s.setScalar(0.42)).premultiply(A.hand.matrixWorld).premultiply(Z.L);   /* (a fist's grip as a tool would be held in it, in held's frame) */
-    if (tw){ Z.v.setFromMatrixPosition(Z.F); if (i===0 || Math.hypot(Z.v.x, Z.v.z) < 0.12) Z.F.makeTranslation(0, Z.v.y, 0); }   /* (on the haft: along it, square to it) */
+    if (tw){ Z.v.setFromMatrixPosition(Z.F); if (M.wp ? Math.hypot(Z.v.x, Z.v.z) < (i===0 ? 0.25 : 0.12) : (i===0 || Math.hypot(Z.v.x, Z.v.z) < 0.12)) Z.F.makeTranslation(0, Z.v.y, 0); }   /* (on the haft: along it, square to it; FP-017: a weapon put away is on the hip - the hand stays its own) */
+    if (i===1 && M.wp && r.shield && !r.sheathed && fpwWorldVis(r.shield)){ const sb = r.shield.userData.fpwBack || (r.shield.userData.fpwBack = m3dRbBox([r.shield], r.shield).max.y + 0.012);   /* (FP-017: the shield hand's fist on the middle of its back - the figure's own hand sits up at its rim, hidden there from above) */
+      Z.w.set(0, sb, 0).applyMatrix4(r.shield.matrixWorld).applyMatrix4(Z.L); Z.F.setPosition(Z.w); }
     A.el.getWorldPosition(Z.w).applyMatrix4(Z.L).applyMatrix4(Z.G.copy(Z.F).invert());   /* (the elbow, in the grip's own frame) */
     const phi = Math.atan2(-Z.w.z, Z.w.x), D = Math.PI/180;
     Z.H.makeRotationY(i ? phi - 242*D : phi + 62*D); if (i) Z.H.multiply(Z.I.makeScale(-1, 1, 1));
     h.matrix.multiplyMatrices(Z.F, Z.H); h.matrixWorldNeedsUpdate = true; }
+  if (M.wp){ const g = FPW.weaponG; if (g && g.userData.mirSrc) fpwMirCopy(g, g.userData.mirSrc, null); if (FPW.offG && FPW.offG.userData.mir) for (const { c, src } of FPW.offG.userData.mir) fpwMirCopy(c, src, V); }   /* (FP-017: the weapon's parts in held's frame - held is already at it - and the off hand's in the view's) */
   FPW.scene.updateMatrixWorld(true);
   { const s0 = Z.s.setFromMatrixColumn(M.hands[0].matrixWorld, 1).length(); if (FPW.nearU) FPW.nearU.value.set(0.2*s0, 0.45*s0); }   /* (in the tools' units, about metres: gone nearer than 20 cm, whole past 45) */
   for (let i=0;i<2;i++){ const A = r.arms[i], X = FPW.arms[i]; if (!X) continue;
@@ -48469,20 +48519,23 @@ function fpwMirrorTick(){
     const k = Z.s.setFromMatrixColumn(X.h.matrixWorld, 1).length()/0.78, d1 = E.clone().sub(W), l1 = d1.length(), d2 = S.clone().sub(E), l2 = d2.length();
     X.g.position.copy(W); X.g.quaternion.setFromUnitVectors(Z.up, d1.normalize()); X.g.scale.set(k, l1/(FPW_ARM_L/0.78), k);
     X.el.position.copy(E); X.el.scale.setScalar(k); X.elNear = FPW.nearU && E.length() < FPW.nearU.value.y;   /* (a ball by your eye would show as a ghost through its fade: gone instead) */
-    X.up.position.copy(E).addScaledVector(d2.normalize(), l2/2); X.up.quaternion.setFromUnitVectors(Z.up, d2); X.up.scale.set(k, l2, k); }
+    X.up.position.copy(E).addScaledVector(d2.normalize(), l2/2); X.up.quaternion.setFromUnitVectors(Z.up, d2); X.up.scale.set(k, l2, k); (X.shAt || (X.shAt = new T.Vector3())).copy(S); }
   return true;
 }
 /* (FP-010) at work your eyes are in your figure's head - down with it as it stoops or kneels, round with it into a swing - eased there
    and back; the way you look stays your own */
+/* (FP-017) the weapon out in a fight: your eyes go up into your figure's head, where its blow is seen from */
+function fpwDrawn(){ const e = fpwWorker(), r = e && e.rig; return !!(FPW.mir && FPW.mir.wp && r && (r.weapon && r.shK!=null ? r.shK < 0.5 : rsFightNow())); }
 function fpwEyeOf(e){ const r = e.rig, h = r && (r.head || r.neck); if (!h) return null; e.holder.updateWorldMatrix(true, true);   /* (the head's own parts are merged into the body: its bone is all there is) */
   const v = h.localToWorld((fpwEyeOf.v || (fpwEyeOf.v = new THREE.Vector3())).set(0, 0.082, 0.05));
   /* (FP-015) at a vein below ground the eyes stand a little back from the head and above it: the vein is low at your feet and a pick's
      reach off, so from the head you looked straight down and the overhead swing came at you end on - never seen to swing */
   if (G.gameMode!==0 && G.gameMode!==3 && G.gather && G.gather.mode===1 && G.gather.o.k==='mining' && G.gather.o.vein){ const f = e.holder.rotation.y; v.x -= Math.sin(f)*FPW_VEIN_EYE[0]; v.z -= Math.cos(f)*FPW_VEIN_EYE[0]; v.y += FPW_VEIN_EYE[1]; }
+  else if (fpwDrawn()){ const a = fpvYawNow(), E = window.__zFightEye || FPW_FIGHT_EYE; v.x -= Math.cos(a)*E[0]; v.z -= Math.sin(a)*E[0]; v.y += E[1]; }   /* (FP-017: in a fight a little back from the head along the view - the holder's turn isn't the facing on the land - so the arm and the blade stay in sight through a blow) */
   return v; }
-const FPW_VEIN_EYE = [0.2, 0.12];
+const FPW_VEIN_EYE = [0.2, 0.12], FPW_FIGHT_EYE = [0.12, 0.03], FPW_SHIELD_GUARD = [-0.5, 0.45, -1.95];   /* (the shield arm through your eyes: shoulder x and z, elbow x) */
 function fpwHeadCam(cam){ const now = performance.now(), dt = Math.min(0.05, (now - (FX.wkT||now))/1000); FX.wkT = now;
-  const k = FX.wk = clamp((FX.wk||0) + (FPW.mir && FPW.work ? 1 : -1)*dt*3, 0, 1); if (!k) return; const e = fpwWorker(); if (!e || !e.rig || !e.holder) return;
+  const k = FX.wk = clamp((FX.wk||0) + (FPW.mir && (FPW.work || fpwDrawn()) ? 1 : -1)*dt*3, 0, 1); if (!k) return; const e = fpwWorker(); if (!e || !e.rig || !e.holder) return;
   const p = fpwEyeOf(e); if (!p) return; const d = cam.getWorldDirection(new THREE.Vector3()), f = k*k*(3 - 2*k);
   cam.position.lerp(p, f); cam.lookAt(cam.position.x + d.x, cam.position.y + d.y, cam.position.z + d.z); }
 function fpwStyleFor(w){
@@ -48555,7 +48608,7 @@ function fpwSetWeapon(){
   const WK = fpwWork(), RK = WK ? null : fpwRangedKind(), rw = RK ? G.gear.ranged : null, w = WK || RK ? null : G.gear.weapon;   /* (FP-012: or the bow you shoot with) */
   const wk = WK ? 'work:' + WK.kind + (WK.tier||0) : RK ? 'rng:' + RK + '|' + rw.basis + '|' + (rw.rsTier|0) + '|' + (rw.rsCol||'') + '|' + (rw.noAmmo ? 'c' : '') + (rw.darkBow ? 'd' : '') + '|' + shotCol(rw)
     : w && w.used ? ((w.rsStaff ? 'staff:' : '')+w.basis+'|'+(w.quality||0)+'|'+fpwEnchant(w)+'|'+(w.rsCol||'')) : 'fists';   /* (FP-009: or the tool you work with; FP-010: or bones you bury) */
-  const dk = it=>it && it.used ? (it.rsFam||'')+(it.dye||it.rsCol||'')+(it.trimDye||'') : '', P = G.player||{}, key = wk+'|'+dk(G.gear.arms)+'|'+dk(G.gear.chest)+'|'+P.race+'|'+JSON.stringify(P.look||0) + '|' + (WK || RK ? '' : fpwOffKey());   /* (FP-006: and how you're dressed; FP-011: and what's in your left hand) */
+  const dk = it=>it && it.used ? (it.rsFam||'')+(it.dye||it.rsCol||'')+(it.trimDye||'') : '', P = G.player||{}, key = wk+'|'+dk(G.gear.arms)+'|'+dk(G.gear.chest)+'|'+P.race+'|'+JSON.stringify(P.look||0) + '|' + (WK || RK ? '' : fpwOffKey() + '|' + fpwMirKey());   /* (FP-006: and how you're dressed; FP-011: and what's in your left hand; FP-017: the figure's own weapon and off hand) */
   if (key===FPW.wkey) return;
   FPW.wkey = key;
   const T = THREE, M = FPW.m;
@@ -48565,6 +48618,7 @@ function fpwSetWeapon(){
   if (WK){ fpwSetWork(WK); return; }
   FPW.mir = null; FPW.work = null;
   if (RK){ fpwSetBow(RK, rw); return; }
+  if (fpwMirrorable()){ fpwSetWeaponMirror(w); return; }   /* (FP-017) */
   const styleKey = fpwStyleFor(w), st = FPW_STYLE[styleKey];
   FPW.style = styleKey; FPW.st = st;
   const { g, info } = fpwBuild(w && (w.rsStaff ? 'Quarterstaff' : w.basis), w);
@@ -48790,8 +48844,8 @@ function fpwDraw(dom){
   FPW.key.color.setRGB(clamp(lan[0],0,1), clamp(lan[1]*0.95,0,1), clamp(lan[2]*0.85,0,1));
   FPW.key.intensity = 0.6 + lit*1.6; FPW.hemi.intensity = 0.15 + lit*0.4; FPW.rim.intensity = 0.35 + lit*0.5;
   FPW.r.toneMappingExposure = 0.9 + lit*0.3;
-  if (FPW.mir){ const ok = fpwMirrorTick(); FPW.held.visible = ok; FPW.rig.visible = true; if (FPW.armGrp) FPW.armGrp.visible = true; FPW.away = null; for (const A of FPW.arms||[]){ A.g.visible = A.up.visible = ok; A.el.visible = ok && !A.elNear; }   /* (FP-010: at work, your figure's own pose) */
-    FPW.glow.intensity = 0; FPW.r.render(FPW.scene, FPW.cam); if (!dom) ctx.drawImage(FPW.cv, 0, 0, cw, chh); return true; }
+  if (FPW.mir){ const ok = fpwMirrorTick(); FPW.prevSwing = FP.swing||0; FPW.held.visible = ok; FPW.rig.visible = true; if (FPW.armGrp) FPW.armGrp.visible = true; FPW.away = null; for (const A of FPW.arms||[]){ A.g.visible = A.up.visible = ok; A.el.visible = ok && !A.elNear; }   /* (FP-010: at work, your figure's own pose; FP-017: in a fight too) */
+    if (FPW.offG) FPW.offG.visible = ok; fpwWeaponFx(dt); if (!FPW.mir.wp) FPW.glow.intensity = 0; FPW.r.render(FPW.scene, FPW.cam); if (!dom) ctx.drawImage(FPW.cv, 0, 0, cw, chh); return true; }
   if (FPW.cam.fov!==47 || FPW.cam.near!==0.05){ FPW.cam.fov = 47; FPW.cam.near = 0.05; FPW.cam.far = 20; FPW.cam.updateProjectionMatrix(); }
   if (FPW.bow){ fpwBowDraw(dt, cw, chh); FPW.glow.intensity = 0; FPW.r.render(FPW.scene, FPW.cam); if (!dom) ctx.drawImage(FPW.cv, 0, 0, cw, chh); return true; }   /* (FP-012) */
   // an attack starts whenever the game plays a swing (FP.swing jumps back up to 1)
@@ -48832,17 +48886,19 @@ function fpwDraw(dom){
     O.rotation.set(q[0] + breath*0.01, q[1] + FPW.sway*0.8, q[2]); O.scale.setScalar(FPW_NEAR); }
   fpwAwayPose(fpwAwayTick(dt));   /* (FP-016: put away out of a fight) */
   fpwLayArms(bobX, -bobY + lift);
-  if (FPW.info && FPW.info.crystal){ FPW.info.crystal.rotation.y += dt*1.5; FPW.m.crystal.emissiveIntensity = 1.2 + Math.sin(FPW.t*3)*0.4 + (FP.cast||0)*2; FPW.info.halo.scale.setScalar(0.26 + Math.sin(FPW.t*3)*0.04 + (FP.cast||0)*0.3); }
-  if (FPW.info && FPW.info.rune) FPW.info.rune.material.opacity = 0.45 + Math.sin(FPW.t*2.2)*0.2;
-  // enchantment motes drifting up the weapon, and its glow on the gauntlet
-  const tipY = FPW.info ? FPW.info.tipY : 0.8;
-  for (const m of (FPW.motes||[])){ m.t += dt*m.s; if (m.t > 1) m.t -= 1;
-    const y = 0.1 + m.t*(tipY-0.1), ang = m.t*9 + m.s*20; m.sp.position.set(Math.cos(ang)*0.035, y, Math.sin(ang)*0.035 + 0.01); m.sp.material.opacity = Math.sin(m.t*Math.PI)*0.9; m.sp.scale.setScalar(0.03 + 0.04*Math.sin(m.t*Math.PI)); }
-  if (FPW.ench && !(FPW.info && FPW.info.fists)){ const wp = new T.Vector3(0, tipY*0.5, 0); FPW.weaponG.localToWorld(wp); FPW.glow.position.copy(wp); FPW.glow.intensity = 0.8 + Math.sin(FPW.t*7)*0.2; } else FPW.glow.intensity = 0;
+  fpwWeaponFx(dt);
   FPW.r.render(FPW.scene, FPW.cam);
   if (!dom) ctx.drawImage(FPW.cv, 0, 0, cw, chh);
   return true;
 }
+/* a staff's crystal and rune, an enchantment's motes drifting up the weapon and its glow on the gauntlet */
+function fpwWeaponFx(dt){ const T = THREE;
+  if (FPW.info && FPW.info.crystal){ FPW.info.crystal.rotation.y += dt*1.5; FPW.m.crystal.emissiveIntensity = 1.2 + Math.sin(FPW.t*3)*0.4 + (FP.cast||0)*2; FPW.info.halo.scale.setScalar(0.26 + Math.sin(FPW.t*3)*0.04 + (FP.cast||0)*0.3); }
+  if (FPW.info && FPW.info.rune) FPW.info.rune.material.opacity = 0.45 + Math.sin(FPW.t*2.2)*0.2;
+  const tipY = FPW.info ? FPW.info.tipY : 0.8;
+  for (const m of (FPW.motes||[])){ m.t += dt*m.s; if (m.t > 1) m.t -= 1;
+    const y = 0.1 + m.t*(tipY-0.1), ang = m.t*9 + m.s*20; m.sp.position.set(Math.cos(ang)*0.035, y, Math.sin(ang)*0.035 + 0.01); m.sp.material.opacity = Math.sin(m.t*Math.PI)*0.9; m.sp.scale.setScalar(0.03 + 0.04*Math.sin(m.t*Math.PI)); m.sp.updateMatrix(); }
+  if (FPW.ench && !(FPW.info && FPW.info.fists) && FPW.weaponG){ const wp = new T.Vector3(0, tipY*0.5, 0); FPW.weaponG.localToWorld(wp); FPW.glow.position.copy(wp); FPW.glow.intensity = 0.8 + Math.sin(FPW.t*7)*0.2; } else FPW.glow.intensity = 0; }
 // ---------- screen overlays: minimap, compass, target, damage feedback ----------
 function fpDrawMinimap(vis){
   if (SET.compact || G.ui!=='playing') return;   /* (RS-411: not over the inventory or any other menu, like the land's) */
@@ -49168,6 +49224,7 @@ function fpvFire(e){
   const pk = isoPick(e, true) || {}; if (!pk.mon) pk.mon = fpvRayMon(e);   /* (FP-005: a short creature under the line of your aim counts) */
   const m = pk.mon && pk.mon.alive && shotClear(p.x, p.y, pk.mon.x, pk.mon.y) ? pk.mon : null;
   if (m){ const dx = m.x - p.x, dy = m.y - p.y;
+    fpvTurnTo(m);   /* (FP-017: squared to it, as your figure is) */
     if (Math.max(Math.abs(dx), Math.abs(dy))===1){ if (fpvBeat()) fpmStepTo(dx, dy); return; }
     if (spearReach(m)){ if (fpvBeat()) reachAttack(m); return; }
     if (rangedReachIdx(m) >= 0){ if (fpvBeat()){ G.foeRef = m; rangedAttack(m); renderGame(); } return; }
@@ -49187,6 +49244,18 @@ function fpvFire(e){
     try{ fpBaseSfx(mode==='bow' ? 'miss' : 'spell'); }catch(err){} if (mode==='magic') FP.cast = 1; }
   else { FP.swing = 1; FPW.lastSwing = 'miss'; try{ fpBaseSfx('miss'); }catch(err){} }
 }
+/* (FP-017) a foe struck or shot more than a little off the middle of the view: the view turns to it (eased in fpUpdateCamera) */
+/* (FP-017) in a fight, with the eyes up in your figure's head, a goblin's is well below them: the view dips to the chest of the foe
+   before you (the one you're fighting, else the nearest within 60 degrees of the view), eased; a mouse look is your own */
+function fpvFightPitch(){ if (!fpwDrawn()) return null; const e = ISO.player, ey = e && e.rig && e.holder ? fpwEyeOf(e) : null; if (!ey) return null;
+  const f = G.foeRef && G.foeRef.alive && (G.mon||[]).includes(G.foeRef) ? G.foeRef : null, ya = fpvYawNow(); let best = null, bd = 2.6;
+  for (const m of G.mon||[]){ if (!m.alive) continue; const q = FP.monPos && FP.monPos.get(m), mx = q ? q.x : m.x + 0.5, my = q ? q.y : m.y + 0.5, d = Math.hypot(mx - FPM.x, my - FPM.y); if (d > bd && m!==f) continue;
+    let da = Math.atan2(my - FPM.y, mx - FPM.x) - ya; da = Math.abs(Math.atan2(Math.sin(da), Math.cos(da))); if (da > 1.05) continue;
+    if (m===f || !best){ best = { m, d }; bd = d; if (m===f) break; } }
+  if (!best) return null; const ins = M3D.inst.get(best.m), H = ins && ins.H ? ins.H : 0.8, th = H*0.62 + ((ins && ins.lift) || 0);
+  return clamp(Math.atan2(th - ey.y, Math.max(0.3, best.d)), -0.75, 0.25); }
+function fpvTurnTo(m){ if (FPL.on) return; const q = FP.monPos && FP.monPos.get(m), mx = q ? q.x : m.x + 0.5, my = q ? q.y : m.y + 0.5, want = Math.atan2(my - FPM.y, mx - FPM.x), cur = fpvYawNow();
+  let d = want - cur; d = Math.atan2(Math.sin(d), Math.cos(d)); if (Math.abs(d) > 0.2) FP.turnTo = want; }
 function fpvCrosshair(){ const x = canvas.width/2, y = canvas.height/2, u = dpr, g = 4*u, l = 9*u;
   ctx.save(); ctx.lineCap = 'round';
   for (const [w, c] of [[4*u, 'rgba(0,0,0,0.55)'], [1.6*u, 'rgba(255,240,210,0.95)']]){ ctx.strokeStyle = c; ctx.lineWidth = w; ctx.beginPath();
@@ -49810,10 +49879,15 @@ function isoSyncPlayer(){
   const e = ISO.player;
   if (e.holder.parent!==FPD.scene) FPD.scene.add(e.holder);
   if (!e.pos || e.map!==G.map || Math.hypot(e.pos.x-(p.x+0.5), e.pos.y-(p.y+0.5)) > 2.5){ e.pos = { x:p.x+0.5, y:p.y+0.5 }; e.map = G.map; }
-  isoGlide(e.pos, p.x+0.5, p.y+0.5);
+  /* (FP-017) through your eyes your figure stands where your free walk has you and faces where you look (fpvFire turns you to a foe
+     you strike) - its blow seen from its head is then your own; it glided tile to tile while the eyes walked freely */
+  const fpFree = fpv() && FPM.map===G.map && !FPM.follow && !FPD.stair && !FPD.arrive && !FPD.portal && !(G.gather && G.gather.mode===1);
+  if (fpFree){ e.pos.x = FPM.x; e.pos.y = FPM.y; const want = FPM.spd > 0.05 ? 1 : 0, mv0 = e.pos.mv||0; e.pos.mv = mv0 + (want - mv0)*Math.min(1, FP.dt*(want ? 16 : 5)); }
+  else isoGlide(e.pos, p.x+0.5, p.y+0.5);
   const moving = e.pos.mv;
   const fd = p.faceDiag && p.faceDiag.f===p.facing ? p.faceDiag.v : null, v = fd || FACING_VECT[(p.facing|0)&3]; let fa = Math.atan2(v[0], v[1]);
   { const ft = isoFaceTarget(e.pos, moving); if (ft) fa = Math.atan2(ft.x - e.pos.x, ft.y - e.pos.y); }   /* (RS-598: square on to what you're fighting or working, at any angle - it was the four ways, or a tug between them and the work) */
+  if (fpFree){ const ca = fpvYawNow(); fa = Math.atan2(Math.cos(ca), Math.sin(ca)); }
   let da = fa - (e.face===undefined ? fa : e.face); da = Math.atan2(Math.sin(da), Math.cos(da)); e.face = (e.face===undefined ? fa : e.face) + da*Math.min(1, FP.dt*12);
   const C = m3dAtkCurve(FP.swing>0 ? 1-FP.swing : 0), wind = C.wind, strike = C.strike; e.fol = C.fol;
   const hurt = m3dHitReact(e, p.hp, effMaxHp(), FP.dt);   /* (RS-173: as hard as the blow) */
@@ -49826,6 +49900,10 @@ function isoSyncPlayer(){
   e.rig.clothLate = !e.rig.sitting && !down;   /* (RS-772: below ground too the cape and robe are hung after the last bend - stooped over cave herbs, the back came up through the cape) */
   m3dPoseHumanoid(e.rig, FP.t + e.seed, down ? 0 : onStair ? 1 : moving, down ? 0 : wind, down ? 0 : strike, down ? 0 : hurt*0.8, e);   /* (RS-702: the cast's own turn and lean are in rsCastPose - added here as a jump of wind, it snapped the body round) */
   rsPlayerFx(e, FP.t + e.seed, down ? 0 : moving, true);
+  /* (FP-017) seen from its own eyes, the shield held before the chest (RS-467) was a wall across the view: through your eyes it's
+     carried lower and out to the left, its top rim in sight, the foe past it (the figure itself is hidden here, so from above it's as it was) */
+  if (fpFree && !down && !e.rig.weapon && e.rig.arms && e.fight){ const k = 1 - Math.max(wind, strike); for (const [A, sx] of [[e.rig.arms[0], -1], [e.rig.arms[1], 1]]){ A.sh.rotation.x += (-1.15 - A.sh.rotation.x)*k; A.sh.rotation.z += (sx*0.35 - A.sh.rotation.z)*k; A.el.rotation.x += (-2.0 - A.el.rotation.x)*k; } }   /* (FP-017: bare fists up in a guard before you, as a boxer's - at the figure's sides they were below the view) */
+  if (fpFree && !down && e.rig.shield && !e.rig.sheathed && e.rig.arms){ const L = e.rig.arms[1], SG = window.__zShieldG || FPW_SHIELD_GUARD; L.sh.rotation.x = SG[0] - Math.sin(m3dStride(e, FP.t + e.seed, moving))*0.1*moving; L.sh.rotation.z = SG[1]; L.el.rotation.x = SG[2]; }
   if (down){ isoPlayerFall(e, down); return; } else if (e.downed) isoPlayerUp(e);
   const gw = G.gather && G.gather.mode===1 && G.gather.o.k==='mining' && G.gather.o.vein ? G.gather.o : null;
   if (gw){
@@ -51106,7 +51184,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'fp-016';
+const GAME_VERSION = 'fp-017';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

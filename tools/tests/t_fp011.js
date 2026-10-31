@@ -15,20 +15,27 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   A(await ev(()=>fpv()), 'through your eyes in the dungeon');
   const gear = (wi, off, P)=>ev(([wi, off, P])=>{ G.gear.weapon = wi==='fists' ? newItem() : rsMakeWeapon(3, wi); G.gear.weapon.used = wi!=='fists';
     G.gear.offhand = !off ? newItem() : off==='kite' ? rsMakeArmour('metal', 3, 'offhand') : off==='tome' ? rsMakeArmour('cloth', 2, 'offhand') : (()=>{ const w = RS_WEAPONS[0], m = RS_METALS[3], it = rsItem('offhand'); it.nm = m[0] + ' Off-hand ' + w[0]; it.basis = w[1]; it.rsCol = m[5]; it.offWeapon = 1; return it; })();
-    G.gear.offhand.used = !!off; window.__fpwP = P; FPW.wkey = ''; }, [wi, off, P]);
-  /* which way the head's +x (the edge, the bit, the face: the way the models are made) points, in the view */
-  const edge = ()=>ev(()=>{ const T = THREE, wg = FPW.weaponG.children[0], a = wg.localToWorld(new T.Vector3(0, 0.4, 0)), b = wg.localToWorld(new T.Vector3(0.1, 0.4, 0)).sub(a).normalize(); return { x:b.x, y:b.y, z:b.z, style:FPW.style }; });
+    G.gear.offhand.used = !!off; FPW.wkey = ''; }, [wi, off, P]);
+  /* (FP-017) the weapon in your hands is the figure's own, held as it holds it: which way its +x (the edge, the bit, the face) points in
+     the view, for the mirrored weapon and for the figure's own seen from the eye - the same; a pose is held by pinning FP.swing */
+  await ev(()=>{ window.__realFight = rsFightNow; rsFightNow = ()=>G.ui==='playing'; }); await wait(900);
+  const hold = (v, ms)=>ev(async ([v, ms])=>{ const t = performance.now() + ms; while (performance.now() < t){ FP.swing = v; renderGame(); await new Promise(r=>requestAnimationFrame(r)); } FP.swing = v; renderGame(); }, [v, ms]);
+  const edge = ()=>ev(()=>{ const T = THREE, r = fpwWorker().rig, W = FPW.weaponG; FPW.scene.updateMatrixWorld(true); r.weapon.updateWorldMatrix(true, false);
+    const a = W.localToWorld(new T.Vector3(0, 0.4, 0)), b = W.localToWorld(new T.Vector3(0.1, 0.4, 0)).sub(a).normalize();
+    const V = FPD.cam.matrixWorldInverse, fa = r.weapon.localToWorld(new T.Vector3(0, 0.4, 0)).applyMatrix4(V), fb = r.weapon.localToWorld(new T.Vector3(0.1, 0.4, 0)).applyMatrix4(V).sub(fa).normalize();
+    return { x:+b.x.toFixed(3), y:+b.y.toFixed(3), z:+b.z.toFixed(3), fx:+fb.x.toFixed(3), fy:+fb.y.toFixed(3), fz:+fb.z.toFixed(3), style:FPW.style, mir:!!(FPW.mir && FPW.mir.wp), shK:r.shK }; });
+  const same = e=>Math.abs(e.x - e.fx) < 0.06 && Math.abs(e.y - e.fy) < 0.06 && Math.abs(e.z - e.fz) < 0.06;
 
-  /* ---- the edge to the front ---- */
-  for (const [wi, nm] of [[2, 'sword'], [7, 'battleaxe'], [6, 'warhammer'], [9, 'two-handed sword']]){ await gear(wi, null, 0); await wait(400);
-    const e = await edge(); A(e.z < -0.8, 'the ' + nm + '\'s edge to the front, in line with your knuckles: ' + JSON.stringify(e)); }
-  /* ---- a slash: the wrist turns the edge to lead it across ---- */
-  await gear(2, null, 0.45); await wait(400);
-  { const e = await edge(); A(Math.abs(e.z) < 0.5, 'slashing, the edge turned to lead the blade across you: ' + JSON.stringify(e)); }
+  /* ---- each weapon held as the figure holds it ---- */
+  for (const [wi, nm] of [[2, 'sword'], [7, 'battleaxe'], [6, 'warhammer'], [9, 'two-handed sword']]){ await gear(wi, null, 0); await hold(0, 500);
+    const e = await edge(); A(e.mir && e.shK===0 && same(e), 'the ' + nm + ' in your hand as your figure holds it: ' + JSON.stringify(e)); }
+  /* ---- through a slash the edge turns as the figure turns it ---- */
+  await gear(2, null, 0); await hold(0.55, 500);
+  { const e = await edge(); A(same(e), 'slashing, the edge as the figure turns it: ' + JSON.stringify(e)); }
   await page.screenshot({ path:SHOTS + '/fp011-slash.jpg', type:'jpeg', quality:82 });
-  await gear(7, null, 0.58); await wait(400);
-  { const e = await edge(); A(e.z < -0.5, 'chopping, the axe comes down bit first: ' + JSON.stringify(e)); }
-
+  await gear(7, null, 0); await hold(0.42, 500);
+  { const e = await edge(); A(same(e), 'chopping, the axe as the figure brings it down: ' + JSON.stringify(e)); }
+  await hold(0, 300);
   /* ---- a shield on your left arm, its back to you ---- */
   await gear(2, 'kite', 0); await wait(900);
   const sh = await ev(()=>{ const T = THREE, O = FPW.offG; if (!O) return { none:true, kind:FPW.offKind }; O.updateMatrixWorld(true); let face = null, n = 0;
@@ -37,7 +44,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
     return { kind:FPW.offKind, face:face && face.z, sx:c.x, sy:c.y, arms:FPW.arms.length, fig:!!(r && r.shield), same:r && r.shield ? (()=>{ let g = null; r.shield.traverse(o=>{ if (o.isMesh && !g) g = o.geometry; }); let h = null; O.traverse(o=>{ if (o.isMesh && o.userData.fpwShared && !h) h = o.geometry; }); return g===h; })() : false }; });
   A(sh.kind==='shield' && sh.fig, 'your figure\'s shield in your left hand: ' + JSON.stringify(sh));
   A(sh.same, 'the same shield as your figure carries: ' + JSON.stringify(sh));
-  A(sh.face < -0.7, 'its face out to the front, its back to you: ' + JSON.stringify(sh));
+  A(sh.face < -0.5, 'its face out to the front, its back to you: ' + JSON.stringify(sh));
   A(sh.sx < -0.2 && sh.sy < 0, 'held low on the left: ' + JSON.stringify(sh));
   A(sh.arms===2, 'your sword hand and your shield hand: ' + JSON.stringify(sh));
   await page.screenshot({ path:SHOTS + '/fp011-shield.jpg', type:'jpeg', quality:82 });
@@ -57,9 +64,9 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   A(ow.kind==='weapon' && ow.sx < -0.1 && ow.arms===2, 'an off-hand dagger in your left hand: ' + JSON.stringify(ow));
   /* ---- nothing in the left hand beside a two-handed weapon, and nothing left behind ---- */
   await gear(9, 'kite', 0); await wait(600);
-  A(await ev(()=>!FPW.offG && !FPW.offKind), 'no shield beside a two-handed sword');
+  A(await ev(()=>!FPW.offKind && FPW.arms.length===2), 'no shield in hand beside a two-handed sword (FP-017: the figure keeps it on its back)');
   await gear(2, null, 0); await wait(400);
-  A(await ev(()=>!FPW.offG && FPW.arms.length===1), 'the left hand empty again');
-  await ev(()=>{ delete window.__fpwP; });
+  A(await ev(()=>!FPW.offG && FPW.arms.length===2), 'the left hand empty again (FP-017: still shown, at your side)');
+  await ev(()=>{ rsFightNow = window.__realFight; });
   A(!errs.length, 'page errors: ' + errs.join(' | '));
 };

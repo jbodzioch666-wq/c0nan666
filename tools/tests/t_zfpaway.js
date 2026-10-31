@@ -14,7 +14,8 @@ module.exports = async page=>{ page.setDefaultTimeout(0); page.on('pageerror', e
     G.gear.weapon = rsMakeWeapon(3, 2); G.gear.weapon.used = true; G.gear.offhand = rsMakeArmour('metal', 3, 'offhand'); G.gear.offhand.used = true; FPW.wkey = ''; if (!SET.fpView) fpvToggle(); });
   if (process.env.ZA_OFF) await ev(o=>{ FPW_OFF.shield.at = o.slice(0, 3); FPW_OFF.shield.rot = o.slice(3, 6); FPW.wkey = ''; }, JSON.parse(process.env.ZA_OFF));
   await wait(1500);
-  const st = tag=>ev(tag=>({ tag, away:FPW.away, rigVis:FPW.rig.visible, offVis:FPW.offG && FPW.offG.visible, shK:fpwWorker().rig.shK, fight:rsFightNow() }), tag);
+  const st = tag=>ev(tag=>{ const T = THREE, e = fpwWorker(), r = e.rig, cam = fpwMirrorCam(); e.holder.updateWorldMatrix(true, true); cam.updateMatrixWorld(); const V = cam.matrixWorldInverse, w = o=>{ const p = o.getWorldPosition(new T.Vector3()); return [+p.x.toFixed(2), +p.y.toFixed(2), +p.z.toFixed(2)]; }, vw = o=>{ const p = o.getWorldPosition(new T.Vector3()).applyMatrix4(V); return [+p.x.toFixed(2), +p.y.toFixed(2), +p.z.toFixed(2)]; };
+    return { tag, shK:r.shK, fight:rsFightNow(), drawn:fpwDrawn(), yaw:+fpvYawNow().toFixed(2), holdRot:+e.holder.rotation.y.toFixed(2), holdPos:w(e.holder), eye:fpwEyeOf(e).toArray().map(x=>+x.toFixed(2)), cam:cam.position.toArray().map(x=>+x.toFixed(2)), camDir:cam.getWorldDirection(new T.Vector3()).toArray().map(x=>+x.toFixed(2)), handV:vw(r.arms[0].hand), wpnV:r.weapon ? vw(r.weapon) : null, headV:vw(r.head||r.neck), mir:!!(FPW.mir && FPW.mir.wp), wk:FX.wk }; }, tag);
   console.log(JSON.stringify(await st('peace'))); await page.screenshot({ path:'tools/tests/out/zfpaway-peace.png' });
   await ev(()=>{ window.__realFight = rsFightNow; rsFightNow = ()=>G.ui==='playing'; }); await wait(250); console.log(JSON.stringify(await st('drawing')));
   await wait(1000); console.log(JSON.stringify(await st('fight'))); await page.screenshot({ path:'tools/tests/out/zfpaway-fight.png' });
