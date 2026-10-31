@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## FP-013 - Round the Corner
+
+You said the player sometimes gets stuck moving forward. That was your body catching on the corner of a wall: walking forward past a doorway, the end of a fence or any gap in a wall, if you were heading almost along the wall you could stop dead against its corner and stay there until you turned away.
+
+- **Sliding past corners.** Walking through your eyes now slides you round the corner of a wall instead of catching you on it, in towns, in dungeons and on the open land (a full-size town's wall included). Walk along a wall past a doorway and you carry straight on.
+- **Walls still stop you.** Walking straight into a wall still stops you a body's width short of it, and at a slant you slide along it as before.
+- **How it was found.** A new test walk takes hundreds of strides every way through a dungeon, a town and the open land. Before the fix, 4 of 240 strides in towns caught on a wall's corner. After it, none of 500 did.
+
 ## FP-012 - Loose
 
 You asked for the bow and the crossbow in first person next. Until now, shooting through your eyes played your sword's swing while an arrow flew out of nowhere. Now you see the bow or crossbow in your own hands and shoot it.

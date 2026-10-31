@@ -49068,6 +49068,16 @@ function fpmPen(x, y){ const h = fpmHere(); let pen = 0;
   for (let i=-1;i<=1;i++) for (let j=-1;j<=1;j++){ const tx = h[0]+i, ty = h[1]+j; if ((!i && !j) || !fpmSolid(tx, ty)) continue;
     const nx = clamp(x, tx, tx+1), ny = clamp(y, ty, ty+1), d = Math.hypot(x - nx, y - ny); if (d < FPM_R) pen = Math.max(pen, FPM_R - d); }
   return pen; }
+/* (FP-013) a body moved to (x,y) and pushed back out of whatever it ran into - each solid tile from its nearest point, a full-size town's
+   wall from its middle - so a walk along a wall slides on round a corner (a doorway's jamb, a gap in a fence) instead of being caught on it */
+function fpmSlide(x, y){ const h = fpmHere();
+  for (let it=0; it<3; it++){ let moved = false;
+    for (let i=-1;i<=1;i++) for (let j=-1;j<=1;j++){ const tx = h[0]+i, ty = h[1]+j; if ((!i && !j) || !fpmSolid(tx, ty)) continue;
+      const nx = clamp(x, tx, tx+1), ny = clamp(y, ty, ty+1), d = Math.hypot(x - nx, y - ny); if (d >= FPM_R || d < 1e-6) continue; x += (x - nx)/d*(FPM_R - d + 1e-4); y += (y - ny)/d*(FPM_R - d + 1e-4); moved = true; }
+    if (G.gameMode===0) for (const t of o3TownsNear(h[0], h[1])){ if (t.open) continue; const dx = x - t.cx, dy = y - t.cz, d = Math.hypot(dx, dy); if (d >= t.r + FPM_R || d < 1e-6) continue;
+      let da = Math.atan2(dy, dx) - t.ga; da = Math.abs(Math.atan2(Math.sin(da), Math.cos(da))); if (da < t.gw && d > t.r - 1.2) continue; x += dx/d*(t.r + FPM_R - d + 1e-4); y += dy/d*(t.r + FPM_R - d + 1e-4); moved = true; }
+    if (!moved) break; }
+  return [x, y]; }
 function fpmStepTo(dx, dy){ const p = G.player, h0 = fpmHere(), f = p.facing, m0 = G.gameMode, k0 = fpmKey();
   if (G.gameMode===0){ const g = o3DirToG(dx, dy); moveDir(g[0], g[1]); } else moveDir(dx, dy);   /* (on a planet the frame's way is turned to the grid's) */
   p.facing = f; p.faceDiag = null; if (G.gameMode!==m0 || fpmKey()!==k0) return -1;
@@ -49092,9 +49102,10 @@ function fpmTick(dt){
   const mx = (Math.cos(a)*fw - Math.sin(a)*sd)*sp, my = (Math.sin(a)*fw + Math.cos(a)*sd)*sp, steps = Math.max(1, Math.ceil(Math.hypot(mx, my)/0.04));
   const x0 = FPM.x, y0 = FPM.y;
   for (let k=0; k<steps; k++){
-    const pen = fpmPen(FPM.x, FPM.y);
-    if (fpmPen(FPM.x + mx/steps, FPM.y) <= pen + 1e-5) FPM.x += mx/steps;
-    if (fpmPen(FPM.x, FPM.y + my/steps) <= pen + 1e-5) FPM.y += my/steps;
+    const pen = fpmPen(FPM.x, FPM.y), sl = fpmSlide(FPM.x + mx/steps, FPM.y + my/steps);
+    if (fpmPen(sl[0], sl[1]) <= pen + 1e-5 && Math.hypot(sl[0] - FPM.x, sl[1] - FPM.y) <= Math.hypot(mx, my)/steps*1.5 + 1e-4){ FPM.x = sl[0]; FPM.y = sl[1]; }   /* (FP-013: slid round what's in the way) */
+    else { if (fpmPen(FPM.x + mx/steps, FPM.y) <= pen + 1e-5) FPM.x += mx/steps;
+      if (fpmPen(FPM.x, FPM.y + my/steps) <= pen + 1e-5) FPM.y += my/steps; }
     const tx = Math.floor(FPM.x), ty = Math.floor(FPM.y), hh = fpmHere();
     if (tx!==hh[0] || ty!==hh[1]){ const ox = hh[0], oy = hh[1], r = fpmStepTo(Math.sign(tx - ox), Math.sign(ty - oy));
       if (r===0){ FPM.noX = tx; FPM.noY = ty; FPM.noT = performance.now() + 450; FPM.x = clamp(FPM.x, ox+0.001, ox+0.999); FPM.y = clamp(FPM.y, oy+0.001, oy+0.999); }
@@ -51075,7 +51086,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'fp-012';
+const GAME_VERSION = 'fp-013';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
