@@ -48275,6 +48275,10 @@ const FPW_ATK = {
   sweep:  [[0,[0,0,0],[0,0,0],0],[0.25,[0.1,0.03,0],[0,0.3,-0.2],0],[0.6,[-0.3,0.02,-0.05],[0,-0.5,0.3],0],[0.78,[-0.32,0.02,-0.05],[0,-0.52,0.3],0],[1,[0,0,0],[0,0,0],0]],
   punch:  [[0,[0,0,0],[0,0,0],0],[0.2,[0.02,0,0.05],[0,0,0],0],[0.45,[-0.14,0.06,-0.36],[0,0.1,0],0],[0.6,[-0.13,0.06,-0.33],[0,0.1,0],0],[1,[0,0,0],[0,0,0],0]],
 };
+/* (FP-011) the wrist turned through a cut, in quarter turns: the edge, carried to the front in a guard, turned to lead the blade as it
+   sweeps across you (a slash, a cleave), and back after. A chop or a smash comes down edge first as it is */
+const FPW_TWIST = { slash:[[0,0],[0.3,1],[0.72,1],[1,0]], cleave:[[0,0],[0.32,1],[0.78,1],[1,0]] };
+function fpwTwistAt(atk, p){ const K = FPW_TWIST[atk]; if (!K || !(p > 0)) return 0; for (let i=0;i<K.length-1;i++) if (p>=K[i][0] && p<=K[i+1][0]){ let f = (p - K[i][0])/Math.max(1e-6, K[i+1][0] - K[i][0]); f = f*f*(3 - 2*f); return (K[i][1] + (K[i+1][1] - K[i][1])*f)*Math.PI/2; } return 0; }
 const FPW_CONTACT = { slash:0.5, stab:0.5, lunge:0.52, chop:0.58, cleave:0.6, smash:0.6, thrust:0.55, sweep:0.58, punch:0.45 };
 const FPW_CHEST = [0.02, -0.62, -0.35];
 /* (FP-004) the weapon in your hands in the first-person view - the old crawler's, removed with it in RS-109 and back as it was:
@@ -48489,14 +48493,66 @@ function fpwStyleFor(w){
   if (/axe|Pick|Club|Mace|Hammer|Morningstar|Flail/i.test(b)) return 'head1';
   return 'blade1';
 }
+/* (FP-011) a weapon the way your hand holds it: its edge - a blade's, an axe's bit, a hammer's face, a pick's point - in line with your
+   knuckles, to the front, as the figure holds its own (RS-296). The models are made with the edge out to the side (+x): the head is
+   turned a quarter round the grip (wg, inside g, so a second hand on g stays where it was). A spear's head and a staff are round enough */
+const FPW_TURN = { blade1:1, dagger:1, rapier:1, blade2:1, head1:1, head2:1, polearm:1 };
+function fpwTurn(g, styleKey){ if (!FPW_TURN[styleKey]) return g; const wg = new THREE.Group(); wg.rotation.y = Math.PI/2; while (g.children.length) wg.add(g.children[0]); g.add(wg); return wg; }
+/* (FP-011) the left hand: your figure's own shield (a copy of the one strapped to its forearm - the same face, rim and emblem - turned so
+   you see its back with your fist on its grip, as you would), its tome held open, or an off-hand weapon held as the right holds its own,
+   mirrored. None beside a two-handed weapon. at: where it's held (camera space, before FPW_NEAR, as a style's hp); w: its width */
+const FPW_OFF = { shield:{ at:[-0.47,-0.38,-0.95], rot:[-0.1,0.5,0.08], w:0.4 }, tome:{ at:[-0.27,-0.36,-0.8], rot:[0,0.25,0], w:0.3 } };
+function fpwOffKind(){ const oh = G.gear.offhand; if (!oh || !oh.used || is2H(G.gear.weapon)) return null; if (oh.offWeapon) return 'weapon';
+  const e = fpwWorker(), r = e && e.rig; return r && r.shield ? 'shield' : r && r.tome ? 'tome' : null; }
+function fpwOffKey(){ const k = fpwOffKind(), oh = G.gear.offhand, e = fpwWorker(), r = e && e.rig; if (!k) return '';
+  return k + (k==='shield' ? r.shield.uuid : k==='tome' ? r.tome.uuid : oh.basis + (oh.rsCol||'') + (oh.quality||0)); }   /* (the figure's model itself: a new one when its gear is put on again) */
+function fpwOffClear(){ const O = FPW.offG; FPW.offKind = null; if (!O) return; FPW.scene.remove(O); O.traverse(o=>{ if (o.geometry && !o.userData.fpwShared) o.geometry.dispose(); }); FPW.offG = null; }
+function fpwSetOff(kind){
+  const T = THREE, e = fpwWorker(), r = e && e.rig, oh = G.gear.offhand, O = new T.Group(), D = FPW_OFF[kind]; let h;
+  /* a copy of one of the figure's own models, w wide, its middle at the origin of its frame (its geometry shared: never disposed here) */
+  const copy = (src, w)=>{ const c = src.clone(true); c.position.set(0, 0, 0); c.rotation.set(0, 0, 0); c.scale.setScalar(1);
+    c.traverse(o=>{ o.visible = o.name!=='tomeClosed'; if (o.isMesh){ o.castShadow = o.receiveShadow = false; o.userData.fpwShared = 1; } }); c.updateMatrixWorld(true);
+    const bb = new T.Box3().setFromObject(c), k = w/Math.max(1e-4, bb.max.x - bb.min.x), cn = bb.getCenter(new T.Vector3()); c.scale.setScalar(k); c.position.copy(cn).multiplyScalar(-k); return { c, bb, k }; };
+  if (kind==='shield' || kind==='tome'){
+    const { c, bb, k } = copy(kind==='shield' ? r.shield : r.tome, D.w), f = new T.Group(); f.matrixAutoUpdate = false; f.add(c); O.add(f);
+    if (kind==='shield'){
+      /* the shield's face is out along its -y, its point down along -z: here its face to the front (-z), its point down, its back to you */
+      f.matrix.makeBasis(new T.Vector3(-1, 0, 0), new T.Vector3(0, 0, 1), new T.Vector3(0, 1, 0));
+      const zb = (bb.max.y - (bb.min.y + bb.max.y)/2)*k, gm = new T.MeshStandardMaterial({ color:m3dCol('#4a3020'), roughness:0.85 }), im = new T.MeshStandardMaterial({ color:m3dCol('#3a3a3e'), roughness:0.45, metalness:0.7 });
+      /* a grip down the middle of its back, on two iron brackets, and a strap across for the forearm */
+      const gp = new T.Mesh(new T.CylinderGeometry(0.016, 0.016, 0.1, 16), gm); gp.position.set(0, 0.05, zb + 0.03); O.add(gp);
+      /* its back lined in bare wood, as a shield's is under the paint of its face: the shield's own shape (one merged mesh, rim and all)
+         again in plain wood, a little smaller and just behind it - seen only from behind, which is all you see of it */
+      { let fm = null, fa = 0; c.traverse(o=>{ if (o.isMesh){ o.geometry.computeBoundingBox(); const b = o.geometry.boundingBox, a = (b.max.x - b.min.x)*(b.max.z - b.min.z); if (a > fa){ fa = a; fm = o; } } });
+        if (fm){ const ln = new T.Mesh(fm.geometry, new T.MeshStandardMaterial({ color:m3dCol('#5c3e24'), roughness:0.9 })); ln.position.copy(fm.position); ln.quaternion.copy(fm.quaternion); ln.scale.copy(fm.scale).multiply(new T.Vector3(0.93, 1, 0.93)); ln.position.y += 0.006; ln.userData.fpwShared = 1; fm.parent.add(ln); } }
+      for (const y of [-0.06, 0.1]){ const b = new T.Mesh(new T.BoxGeometry(0.03, 0.012, 0.04), im); b.position.set(0, y, zb + 0.012); O.add(b); }
+      const sp = new T.Mesh(new T.BoxGeometry(0.17, 0.035, 0.008), gm); sp.position.set(0, -0.17, zb + 0.02); O.add(sp);
+      h = fpwHand(0.016); h.scale.x = -1; h.position.set(0, 0.055, zb + 0.03); O.add(h);
+    } else {
+      /* the tome: its pages turned up to your face, held by the foot of its spine */
+      f.matrix.makeBasis(new T.Vector3(1, 0, 0), new T.Vector3(0, 0.62, 0.78), new T.Vector3(0, -0.78, 0.62));
+      h = fpwHand(0.012); h.scale.x = -1; h.position.set(0, -0.06, 0.05); h.rotation.x = 0.9; O.add(h);
+    }
+    FPW.offAt = D.at; FPW.offRot = D.rot;
+  } else {
+    /* an off-hand weapon: built, turned and held as the right hand holds its own, and the whole mirrored to the left */
+    const sk = fpwStyleFor(oh), st = FPW_STYLE[sk], { g, info } = fpwBuild(oh.basis, oh), M = FPW.m;
+    if (oh.rsCol){ const tm = fpwTierMat(oh.rsCol); g.traverse(o=>{ if (o.isMesh && (o.material===M.steel || o.material===M.plate)) o.material = tm; }); }
+    fpwTurn(g, sk); if (st.gy) g.position.y = st.gy;
+    const mir = new T.Group(), H = new T.Group(); mir.scale.set(-0.78, 0.78, 0.78); O.add(mir); mir.add(H); H.add(g); H.rotation.set(st.rot[0], st.rot[1], st.rot[2]);
+    h = fpwHand(info.grip || 0.021); h.rotation.y = st.hr||0; if (st.ry) h.position.y = st.ry; H.add(h);
+    FPW.offAt = [-st.hp[0], st.hp[1], st.hp[2]]; FPW.offRot = [0, 0, 0];
+  }
+  FPW.scene.add(O); FPW.offG = O; FPW.offKind = kind;
+  return { h, shoulder:[-0.44,-0.72,-0.18] }; }
 function fpwSetWeapon(){
   const WK = fpwWork(), w = WK ? null : G.gear.weapon, wk = WK ? 'work:' + WK.kind + (WK.tier||0) : w && w.used ? ((w.rsStaff ? 'staff:' : '')+w.basis+'|'+(w.quality||0)+'|'+fpwEnchant(w)+'|'+(w.rsCol||'')) : 'fists';   /* (FP-009: or the tool you work with; FP-010: or bones you bury) */
-  const dk = it=>it && it.used ? (it.rsFam||'')+(it.dye||it.rsCol||'')+(it.trimDye||'') : '', P = G.player||{}, key = wk+'|'+dk(G.gear.arms)+'|'+dk(G.gear.chest)+'|'+P.race+'|'+JSON.stringify(P.look||0);   /* (FP-006: and how you're dressed) */
+  const dk = it=>it && it.used ? (it.rsFam||'')+(it.dye||it.rsCol||'')+(it.trimDye||'') : '', P = G.player||{}, key = wk+'|'+dk(G.gear.arms)+'|'+dk(G.gear.chest)+'|'+P.race+'|'+JSON.stringify(P.look||0) + '|' + (WK ? '' : fpwOffKey());   /* (FP-006: and how you're dressed; FP-011: and what's in your left hand) */
   if (key===FPW.wkey) return;
   FPW.wkey = key;
   const T = THREE, M = FPW.m;
   const clear = (grp)=>{ while (grp.children.length){ const c = grp.children[0]; grp.remove(c); c.traverse(o=>{ if (o.geometry) o.geometry.dispose(); }); } };
-  clear(FPW.rig); if (FPW.armGrp) clear(FPW.armGrp); else { FPW.armGrp = new T.Group(); FPW.scene.add(FPW.armGrp); }
+  clear(FPW.rig); if (FPW.armGrp) clear(FPW.armGrp); else { FPW.armGrp = new T.Group(); FPW.scene.add(FPW.armGrp); } fpwOffClear();
   FPW.hm = fpwHandMats();
   if (WK){ fpwSetWork(WK); return; }
   FPW.mir = null; FPW.work = null;
@@ -48505,21 +48561,24 @@ function fpwSetWeapon(){
   const { g, info } = fpwBuild(w && (w.rsStaff ? 'Quarterstaff' : w.basis), w);
   // the blade takes its metal's colour: bronze, iron, steel, mithril blue, adamant green, rune cyan, dragon red
   if (w && w.used && w.rsCol){ const tm = fpwTierMat(w.rsCol); g.traverse(o=>{ if (o.isMesh && (o.material===M.steel || o.material===M.plate)) o.material = tm; }); }
+  const wg = fpwTurn(g, styleKey), offKind = fpwOffKind();   /* (FP-011: its edge to the front, in line with your knuckles) */
   const held = new T.Group(); held.add(g); if (st.gy) g.position.y = st.gy;   // slide the weapon so the top hand sits by the guard
   /* (FP-006) each hand closed round its grip (the grip's own radius, a fist's fingers tight on nothing), turned round it by the
      style's hr/hl; its arm runs back from the wrist toward a shoulder low and behind, out of sight */
   const rg = info.fists ? 0.004 : info.grip || 0.021;
   const right = fpwHand(rg); right.rotation.y = (st.hr||0); if (st.rflip) right.rotation.x = Math.PI; if (st.ry) right.position.y = st.ry; held.add(right);
   const hands = [{ h:right, shoulder:st.rs || [0.46,-0.72,-0.18] }];
-  if (st.left!==undefined){                       // a second hand further along the grip or shaft
+  if (st.left!==undefined && !offKind){           // a second hand further along the grip or shaft (FP-011: not with a shield or a tome in it)
     const left = fpwHand(rg); left.scale.x = -1; left.rotation.y = -(st.hl||0); if (st.lflip) left.rotation.x = Math.PI; left.position.y = st.left; g.add(left);
     hands.push({ h:left, shoulder:st.ls || [-0.44,-0.72,-0.18] });
   }
-  if (styleKey==='fists'){                          // both fists up in a guard
+  if (styleKey==='fists' && !offKind){             // both fists up in a guard
     const left = fpwHand(rg), lw = new T.Group(); lw.add(left); left.rotation.y = st.hr||0; FPW.rig.add(lw); FPW.leftFist = lw; FPW.leftFistAt = [-st.hp[0]+0.04, st.hp[1]+0.03, st.hp[2]+0.06];
     lw.position.set(FPW.leftFistAt[0]-FPW_CHEST[0], FPW.leftFistAt[1]-FPW_CHEST[1], FPW.leftFistAt[2]-FPW_CHEST[2]); lw.rotation.set(st.rot[0], -st.rot[1], -st.rot[2]); lw.scale.set(-0.78,0.78,0.78);   /* (mirrored, so turned round its grip as the right one is) */
     hands.push({ h:left, shoulder:st.ls || [-0.44,-0.72,-0.18] });
   } else FPW.leftFist = null;
+  { const oh = offKind ? fpwSetOff(offKind) : null; if (oh) hands.push(oh); }   /* (FP-011: the left hand's shield, tome or weapon) */
+  { const tw = new T.Group(); for (const c of held.children.slice()) tw.add(c); held.add(tw); FPW.twist = tw; }   /* (FP-011: the wrist, turning the grip and the hand on it together) */
   FPW.rig.add(held); FPW.held = held; FPW.info = info; FPW.weaponG = g;
   held.position.set(st.hp[0]-FPW_CHEST[0], st.hp[1]-FPW_CHEST[1], st.hp[2]-FPW_CHEST[2]);
   held.rotation.set(st.rot[0], st.rot[1], st.rot[2]); held.scale.setScalar(0.78);
@@ -48528,8 +48587,8 @@ function fpwSetWeapon(){
   // a flail's chain and ball hang from a pivot so they can swing
   FPW.flailHead = null;
   if (/Flail/i.test((w&&w.basis)||'')){
-    const pivot = new T.Group(); pivot.position.y = 0.28; g.add(pivot);
-    for (const c of g.children.slice()){ if (c!==pivot && c.position.y >= 0.29 && !c.isSprite){ g.remove(c); c.position.y -= 0.28; pivot.add(c); } }
+    const pivot = new T.Group(); pivot.position.y = 0.28; wg.add(pivot);
+    for (const c of wg.children.slice()){ if (c!==pivot && c.position.y >= 0.29 && !c.isSprite){ wg.remove(c); c.position.y -= 0.28; pivot.add(c); } }
     FPW.flailHead = pivot;
   }
   const ench = fpwEnchant(w);
@@ -48603,10 +48662,13 @@ function fpwDraw(dom){
   const R = FPW.rig;
   R.position.set(FPW_CHEST[0] + (st.hp[0]*xs - st.hp[0]) + bobX + off[0] + FPW.sway*0.25, FPW_CHEST[1] + lift - bobY + breath*0.006 + off[1], FPW_CHEST[2] + off[2]);
   R.rotation.set(rr[0] + breath*0.01, rr[1] + FPW.sway, rr[2]); R.position.multiplyScalar(FPW_NEAR); R.scale.setScalar(FPW_NEAR);
-  FPW.held.rotation.z = st.rot[2] + wr;
+  FPW.held.rotation.z = st.rot[2] + wr; if (FPW.twist) FPW.twist.rotation.y = fpwTwistAt(st.atk, p);
   if (FPW.leftFist) FPW.leftFist.position.y = FPW.leftFistAt[1]-FPW_CHEST[1] + Math.sin(FPW.t*1.6+1)*0.008;
   // the flail's head swings on its chain, and whirls round in an attack
   if (FPW.flailHead){ FPW.flailHead.rotation.z = Math.sin(FPW.t*2.1)*0.18 - FPW.sway*1.5 - bobX*4; FPW.flailHead.rotation.x = p>0 && p<0.8 ? -p/0.8*Math.PI*2 : Math.sin(FPW.t*1.7)*0.1; }
+  if (FPW.offG){ const O = FPW.offG, at = FPW.offAt, q = FPW.offRot, dip = p > 0 && p < 1 ? Math.sin(p*Math.PI) : 0;   /* (FP-011: the left hand, not swung with the right: down and aside a little as it strikes) */
+    O.position.set(at[0]*xs + bobX*0.8 + FPW.sway*0.2 - dip*0.05, at[1] + lift - bobY + Math.sin(FPW.t*1.6 + 1)*0.007 - dip*0.06, at[2] + dip*0.03).multiplyScalar(FPW_NEAR);
+    O.rotation.set(q[0] + breath*0.01, q[1] + FPW.sway*0.8, q[2]); O.scale.setScalar(FPW_NEAR); }
   // forearms from each wrist back to its shoulder
   FPW.scene.updateMatrixWorld(true);
   const up = new T.Vector3(0,1,0);
@@ -50877,7 +50939,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'fp-010';
+const GAME_VERSION = 'fp-011';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

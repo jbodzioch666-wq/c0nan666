@@ -1,5 +1,15 @@
 # Depthcrawl patch notes
 
+## FP-011 - Edge First
+
+You asked for combat in first person to have weapons facing the right way and the shield in the right place. Weapons are now held the way a hand really holds them, and whatever you carry in your left hand is finally there.
+
+- **Edges to the front.** Every weapon's edge now lines up with your knuckles: a sword's edge, an axe's bit, a warhammer's face (spike behind) and a halberd's blade all point forward at what you're fighting. Before, they all pointed out to the side, so you saw the flat of every blade and the side of every axe head.
+- **The wrist turns through a cut.** A slash or a two-handed cleave turns your wrist so the edge leads the blade across, then comes back to your guard. Chops and smashes come down edge first.
+- **Your shield on your arm.** A shield is now in your left hand, held at chest height on the left. It's the same shield your figure carries: the same shape, colours and rim. You see what you would really see: its bare wooden back, your fist on its grip and your forearm below. It eases down and aside as your sword arm strikes.
+- **A tome or a second weapon.** A spell tome is held open in your left hand with its pages turned up to you. An off-hand dagger, sword or scimitar is held in your left hand, the mirror of your right.
+- **One hand for the spear and staff.** With a shield or tome, a spear or staff is held in one hand, and bare fists keep only the right one up.
+
 ## FP-010 - True to Life
 
 You asked for every skill animation to match a real view of your hands and arms while you work. In first person, the hands and tools you see are now your own figure's, seen from the eyes in its head. Where a skill's movement wasn't believable, it has been redone.

@@ -21,6 +21,13 @@ module.exports = async page=>{ page.setDefaultTimeout(0);
     FPW.wkey = ''; window.__fpwP = P; }, [wpn, gear, P]);
   const grab = ()=>ev(async ()=>{ renderGame(); await new Promise(r=>requestAnimationFrame(r)); const c = document.createElement('canvas'); c.width = canvas.width; c.height = canvas.height; const g = c.getContext('2d'); g.drawImage(FPD.cv, 0, 0, c.width, c.height); g.drawImage(canvas, 0, 0); return c.toDataURL('image/png'); });
   const sheets = { a:[['fists'],[2],[0],[1]], b:[[5],[7],[9],[8]], c:[[4],['staff'],[2,'leather'],[2,'metal']], d:[['fists','metal'],[9,'leather'],[4,'robe'],[6]] };
+  if (process.env.ZFPW_OFF){ const shots = [];   /* (FP-011) the left hand: ZFPW_OFF='[[weapon, offhand], ...]', offhand kite|tower|tome|dagger|sword|scim */
+    for (const [wpn, off] of JSON.parse(process.env.ZFPW_OFF)){ await set(wpn); await ev(off=>{ G.gear.offhand = off==='kite' ? rsMakeArmour('metal', 3, 'offhand') : off==='tower' ? rsMakeArmour('metal', 5, 'tower') : off==='tome' ? rsMakeArmour('cloth', 2, 'offhand') : (()=>{ const w = RS_WEAPONS[{ dagger:0, sword:2, scim:3 }[off]], m = RS_METALS[3], it = rsItem('offhand'); it.nm = m[0] + ' Off-hand ' + w[0]; it.basis = w[1]; it.rsCol = m[5]; it.offWeapon = 1; return it; })(); G.gear.offhand.used = true; FPW.wkey = ''; }, off);
+      await wait(900); shots.push(await grab()); }
+    const out = await ev(async shots=>{ const im = await Promise.all(shots.map(s=>new Promise(r=>{ const i = new Image(); i.onload = ()=>r(i); i.src = s; })));
+      const w = im[0].width/2, h = im[0].height/2, c = document.createElement('canvas'); c.width = w*2; c.height = h*Math.ceil(im.length/2); const g = c.getContext('2d');
+      im.forEach((i, n)=>g.drawImage(i, (n%2)*w, Math.floor(n/2)*h, w, h)); return c.toDataURL('image/jpeg', 0.86); }, shots);
+    fs.writeFileSync(SHOTS + '/zfpw-off.jpg', Buffer.from(out.split(',')[1], 'base64')); return; }
   if (process.env.ZFPW_FIST){ const shots = [];
     for (const v of JSON.parse(process.env.ZFPW_FIST)){ await ev(v=>{ Object.assign(FPW_STYLE.fists, v); }, v); await set('fists'); await wait(500); shots.push(await grab()); }
     const out = await ev(async shots=>{ const im = await Promise.all(shots.map(s=>new Promise(r=>{ const i = new Image(); i.onload = ()=>r(i); i.src = s; })));
