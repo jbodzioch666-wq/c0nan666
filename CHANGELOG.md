@@ -1,5 +1,16 @@
 # Depthcrawl patch notes
 
+## FP-012 - Loose
+
+You asked for the bow and the crossbow in first person next. Until now, shooting through your eyes played your sword's swing while an arrow flew out of nowhere. Now you see the bow or crossbow in your own hands and shoot it.
+
+- **The bow in your hands.** Once you shoot, or whenever you carry no melee weapon, your bow is in your left fist with an arrow nocked and your right fingers on the string. It's canted a little and held low while you walk. A blow with your melee weapon puts the bow away again, just as your figure does.
+- **Draw, hold, loose.** A shot raises the bow and draws the string back under your right eye: the limbs bend and the string comes back in two halves to your fingers. The arrow lines up just left of your crosshair. It looses on the same beat as your figure's shot, so the arrow leaves the bow as you see the string snap. The string quivers, the bow arm kicks and your hand flies back past your ear.
+- **The next arrow.** Your hand goes back to the quiver and returns low on the right with a fresh arrow, which it lays on the string. With no arrows left, the string stays empty.
+- **Every bow its own.** Longbows stand taller than shortbows, which have tips curled forward. The wood shows the grade: pale plain wood, oak, yellow willow, red maple, dark yew, and blue-grey magic wood with a faint glow. A crystal bow is glass and the dark bow is black. The arrowhead is the colour of the arrows you have loaded. Each bow has a leather grip bound with cord, an arrow shelf, horn nocks and a brass nocking point on the string.
+- **The crossbow.** It's held low on the right in both hands: your right hand round the wrist of the stock, your left under the fore-end. A shot raises it to your cheek so you sight down the bolt's groove. It kicks as it looses and the string snaps straight across. Then you lower it, tip it nose down, draw the string back to the nut and lay the next bolt.
+- **A shot at nothing.** Firing your bow at an empty spot draws and looses in the same way, and the arrow flies in your arrows' colour (bolts from a crossbow).
+
 ## FP-011 - Edge First
 
 You asked for combat in first person to have weapons facing the right way and the shield in the right place. Weapons are now held the way a hand really holds them, and whatever you carry in your left hand is finally there.

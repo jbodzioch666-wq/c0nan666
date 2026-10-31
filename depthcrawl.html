@@ -17535,6 +17535,7 @@ function shotCol(w){ return w.thrown ? (w.rsCol || '#c0c4ca') : w.noAmmo ? '#8af
 // one turn's shooting: the first shot, then any extra (each spends its own ammo)
 function rangedVolley(t, w){
   const shots = 1 + rangedExtraShots(w), savedWeapon = G.gear.weapon;
+  FPW.shotAt = performance.now(); FPW.bowOut = true;   /* (FP-012: through your eyes, the bow comes up for it) */
   G.gear.weapon = w;
   try {
     for (let i=0;i<shots;i++){
@@ -48546,16 +48547,19 @@ function fpwSetOff(kind){
   FPW.scene.add(O); FPW.offG = O; FPW.offKind = kind;
   return { h, shoulder:[-0.44,-0.72,-0.18] }; }
 function fpwSetWeapon(){
-  const WK = fpwWork(), w = WK ? null : G.gear.weapon, wk = WK ? 'work:' + WK.kind + (WK.tier||0) : w && w.used ? ((w.rsStaff ? 'staff:' : '')+w.basis+'|'+(w.quality||0)+'|'+fpwEnchant(w)+'|'+(w.rsCol||'')) : 'fists';   /* (FP-009: or the tool you work with; FP-010: or bones you bury) */
-  const dk = it=>it && it.used ? (it.rsFam||'')+(it.dye||it.rsCol||'')+(it.trimDye||'') : '', P = G.player||{}, key = wk+'|'+dk(G.gear.arms)+'|'+dk(G.gear.chest)+'|'+P.race+'|'+JSON.stringify(P.look||0) + '|' + (WK ? '' : fpwOffKey());   /* (FP-006: and how you're dressed; FP-011: and what's in your left hand) */
+  const WK = fpwWork(), RK = WK ? null : fpwRangedKind(), rw = RK ? G.gear.ranged : null, w = WK || RK ? null : G.gear.weapon;   /* (FP-012: or the bow you shoot with) */
+  const wk = WK ? 'work:' + WK.kind + (WK.tier||0) : RK ? 'rng:' + RK + '|' + rw.basis + '|' + (rw.rsTier|0) + '|' + (rw.rsCol||'') + '|' + (rw.noAmmo ? 'c' : '') + (rw.darkBow ? 'd' : '') + '|' + shotCol(rw)
+    : w && w.used ? ((w.rsStaff ? 'staff:' : '')+w.basis+'|'+(w.quality||0)+'|'+fpwEnchant(w)+'|'+(w.rsCol||'')) : 'fists';   /* (FP-009: or the tool you work with; FP-010: or bones you bury) */
+  const dk = it=>it && it.used ? (it.rsFam||'')+(it.dye||it.rsCol||'')+(it.trimDye||'') : '', P = G.player||{}, key = wk+'|'+dk(G.gear.arms)+'|'+dk(G.gear.chest)+'|'+P.race+'|'+JSON.stringify(P.look||0) + '|' + (WK || RK ? '' : fpwOffKey());   /* (FP-006: and how you're dressed; FP-011: and what's in your left hand) */
   if (key===FPW.wkey) return;
   FPW.wkey = key;
   const T = THREE, M = FPW.m;
   const clear = (grp)=>{ while (grp.children.length){ const c = grp.children[0]; grp.remove(c); c.traverse(o=>{ if (o.geometry) o.geometry.dispose(); }); } };
-  clear(FPW.rig); if (FPW.armGrp) clear(FPW.armGrp); else { FPW.armGrp = new T.Group(); FPW.scene.add(FPW.armGrp); } fpwOffClear();
+  clear(FPW.rig); if (FPW.armGrp) clear(FPW.armGrp); else { FPW.armGrp = new T.Group(); FPW.scene.add(FPW.armGrp); } fpwOffClear(); fpwBowClear();
   FPW.hm = fpwHandMats();
   if (WK){ fpwSetWork(WK); return; }
   FPW.mir = null; FPW.work = null;
+  if (RK){ fpwSetBow(RK, rw); return; }
   const styleKey = fpwStyleFor(w), st = FPW_STYLE[styleKey];
   FPW.style = styleKey; FPW.st = st;
   const { g, info } = fpwBuild(w && (w.rsStaff ? 'Quarterstaff' : w.basis), w);
@@ -48605,6 +48609,144 @@ function fpwSetWeapon(){
 }
 /* (FP-007) the town's and the land's 3D canvases lie over the game's, so there the hands are their own canvas laid over them, and the
    crosshair a mark of its own */
+// forearms from each wrist back to its shoulder (raised by dy, out by dx: your step's bob)
+function fpwLayArms(dx, dy){
+  const T = THREE; FPW.scene.updateMatrixWorld(true);
+  const up = new T.Vector3(0,1,0);
+  for (const A of (FPW.arms||[])){
+    const wrist = A.h.localToWorld(A.h.userData.wrist.clone());
+    const sh = A.shoulder.clone().add(new T.Vector3(dx, dy, 0));
+    const dir = sh.clone().sub(wrist), len = dir.length(); dir.normalize();
+    A.g.position.copy(wrist); A.g.quaternion.setFromUnitVectors(up, dir); A.g.scale.setScalar(FPW_NEAR);
+    const fl = FPW_ARM_L*FPW_NEAR, rest = Math.max(0.05, len - fl) + 0.5; A.up.position.copy(wrist).addScaledVector(dir, fl - 0.01 + rest/2); A.up.quaternion.copy(A.g.quaternion); A.up.scale.set(FPW_NEAR, rest, FPW_NEAR);
+  }
+}
+/* (FP-012) a bow or a crossbow through your eyes, when your figure has it out (your last shot was with it, or you've no melee weapon):
+   the bow held upright in your left fist, canted, an arrow nocked and your right fingers on the string; a shot brings it up, draws the
+   string back to your jaw, holds, and looses at BOW_LOOSE as your figure's does - the string snapping back, your hand flying past your
+   ear - then reaches back to the quiver for the next arrow and nocks it. A crossbow is held low in both hands, raised to your cheek to
+   sight down the tiller, kicks as it looses, then is lowered to span the string and lay the next bolt. The bow's wood by its grade
+   (FPW_BOW_WOOD: plain, oak, willow, maple, yew, magic), a crystal bow's glass, the dark bow's black; the arrowhead in your ammunition's
+   colour. FPW_BOW: the poses, in your eyes' space (before FPW_NEAR): G the grip, D the way the arrow points, roll its cant; ls/rs the
+   shoulders */
+const FPW_BOW_WOOD = ['#7a5a3a','#8c6a40','#b09a6a','#94603a','#6a3a26','#3a5e70'];
+const FPW_BOW = {
+  bow:{ aimG:[-0.035,-0.055,-0.72], aimD:[-0.094,0.043,-0.995], aimRoll:-0.12, idleG:[-0.2,-0.28,-0.68], idleD:[0.22,-0.03,-1], idleRoll:-0.6,
+    lRy:-0.4, rRy:0.8, dl:0.52, ls:[-0.22,-0.32,0.06], rs:[0.3,-0.5,0.02], quiver:[0.3,-0.12,0.32], back:[0.1,-0.24,-0.42] },
+  xbow:{ k:0.8, aimG:[0.012,-0.118,-0.27], aimR:[0,Math.PI,0], idleG:[0.2,-0.32,-0.45], idleR:[-0.14,Math.PI+0.14,0.1],
+    rAt:[0,0.004,-0.07], rRot:[Math.PI/2,3.2,0], lAt:[0,-0.004,0.4], lRot:[Math.PI/2,1.52,0], rg:0.032, ls:[-0.2,-0.3,0.02], rs:[0.22,-0.28,0.1] } };   /* (rRot, lRot: the grip laid along the tiller, rolled round it) */
+function fpwRangedKind(){ const g = G.gear, r = g && g.ranged, w = g && g.weapon; if (!r || !r.used || !r.range || r.thrown || r.kind==='wand') return null;
+  const out = FPW.bowOut!=null ? FPW.bowOut : !!(G.player && G.player.rsLastType==='ranged'); if (!out && w && w.used) return null; return r.xbow ? 'xbow' : 'bow'; }
+function fpwBowClear(){ const B = FPW.bow; if (!B) return; FPW.scene.remove(B.root); B.root.traverse(o=>{ if (o.geometry) o.geometry.dispose(); }); FPW.bow = null; }
+/* a limb from the riser out to its tip, up (s 1) or down (s -1), bent back toward you by the draw d: a longbow's plain D, a shortbow's tips
+   curled forward a little */
+function fpwBowLimb(H, s, d, curl){ const pts = []; for (let i=0;i<=10;i++){ const u = i/10; pts.push([0, s*(0.075 + u*(H - 0.075)*(1 - 0.05*d)), 0.15*Math.pow(u, 1.5) + d*0.13*Math.pow(u, 1.7) - (curl ? 0.05*Math.pow(Math.max(0, u - 0.75)/0.25, 2) : 0)]); } return pts; }
+function fpwArrow(col){
+  const T = THREE, g = new T.Group(), L = 0.72;   /* (its nock at the origin, its head out along -z) */
+  const shaft = new T.CylinderGeometry(0.0042, 0.0042, L, 10); shaft.rotateX(Math.PI/2); shaft.translate(0, 0, -L/2); g.add(new T.Mesh(shaft, new T.MeshStandardMaterial({ color:m3dCol('#b48a58'), roughness:0.6 })));
+  const metal = new T.MeshStandardMaterial({ color:m3dCol(col || '#9aa3a8').lerp(new T.Color(0xffffff), 0.1), metalness:0.75, roughness:0.3 });
+  const hd = new T.ConeGeometry(0.0088, 0.048, 4); hd.rotateX(-Math.PI/2); hd.rotateZ(Math.PI/4); hd.scale(1.25, 0.55, 1); hd.translate(0, 0, -L - 0.03); g.add(new T.Mesh(hd, metal));
+  const so = new T.CylinderGeometry(0.0046, 0.0056, 0.022, 12); so.rotateX(Math.PI/2); so.translate(0, 0, -L - 0.002); g.add(new T.Mesh(so, metal));
+  const sh = new T.Shape(); sh.moveTo(0, 0); sh.quadraticCurveTo(0.025, 0.017, 0.092, 0.015); sh.quadraticCurveTo(0.1, 0.008, 0.1, 0); sh.lineTo(0, 0);
+  const vg = new T.ShapeGeometry(sh, 10); vg.rotateY(Math.PI/2); vg.translate(0, 0.0038, -0.018);
+  for (let k=0;k<3;k++){ const v = new T.Mesh(vg, new T.MeshStandardMaterial({ color:m3dCol(k===0 ? '#a8382a' : '#ece4d4'), roughness:0.85, side:T.DoubleSide })); v.rotation.z = k*Math.PI*2/3; g.add(v); }
+  const nk = new T.CylinderGeometry(0.0049, 0.0049, 0.014, 10); nk.rotateX(Math.PI/2); nk.translate(0, 0, -0.006); g.add(new T.Mesh(nk, new T.MeshStandardMaterial({ color:m3dCol('#2a2622'), roughness:0.5 })));
+  return g;
+}
+function fpwSetBow(kind, w){
+  const T = THREE, K = FPW_BOW[kind], root = new T.Group(), model = new T.Group(), inner = new T.Group(), B = { kind, K, w, root, model, inner, t:null };
+  root.scale.setScalar(FPW_NEAR); FPW.scene.add(root); root.add(model); model.add(inner);
+  const hands = [];
+  if (kind==='bow'){
+    const long = /Long/i.test(w.basis||'') || !!w.darkBow || !!w.noAmmo, H = long ? 0.8 : 0.58, hex = w.noAmmo ? '#9ae8f0' : w.darkBow ? '#2a2430' : FPW_BOW_WOOD[clamp(w.rsTier|0, 0, 5)];
+    const wood = new T.MeshStandardMaterial({ color:m3dCol(hex), roughness:w.noAmmo ? 0.12 : 0.36, metalness:0.04 });   /* (oiled and polished; a crystal bow glass) */
+    if (w.noAmmo){ wood.transparent = true; wood.opacity = 0.82; wood.emissive = m3dCol('#4ac8e0'); wood.emissiveIntensity = 0.35; } else if ((w.rsTier|0) >= 5){ wood.emissive = m3dCol('#3a8ab0'); wood.emissiveIntensity = 0.12; }
+    const lea = new T.MeshStandardMaterial({ color:m3dCol('#4a2e1c'), roughness:0.75 }), cord = new T.MeshStandardMaterial({ color:m3dCol('#d8ccb0'), roughness:0.8 }), horn = new T.MeshStandardMaterial({ color:m3dCol('#e6dac0'), roughness:0.4 });
+    /* the riser, its leather grip bound round with cord, the arrow shelf on its left */
+    const rs = new T.Mesh(new T.CylinderGeometry(0.016, 0.017, 0.17, 20), wood); rs.scale.set(1.25, 1, 1); inner.add(rs);
+    const gp = new T.Mesh(new T.CylinderGeometry(0.0195, 0.0195, 0.1, 24), lea); gp.scale.set(1.15, 1, 1); inner.add(gp);
+    { const pts = []; for (let i=0;i<=140;i++){ const u = i/140, a = u*Math.PI*2*13; pts.push(new T.Vector3(Math.cos(a)*0.0225, -0.05 + u*0.1, Math.sin(a)*0.0198)); } inner.add(new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(pts), 280, 0.0013, 5), lea)); }
+    const shelf = new T.Mesh(new T.BoxGeometry(0.012, 0.007, 0.032), wood); shelf.position.set(-0.019, 0.054, 0); inner.add(shelf);
+    /* the limbs, flatter than thick, morphed between braced and fully drawn */
+    B.limbs = []; B.tips = [];
+    for (const sg of [1, -1]){ const a = m3dTaper(fpwBowLimb(H, sg, 0, !long), 0.0135, 0.0058, wood, 24, 16), b = m3dTaper(fpwBowLimb(H, sg, 1, !long), 0.0135, 0.0058, wood, 24, 16);
+      a.scale.x = 1.9; inner.add(a); const p0 = a.geometry.attributes.position.array.slice(), p1 = b.geometry.attributes.position.array.slice(); b.geometry.dispose();
+      B.limbs.push({ m:a, p0, p1 }); const t0 = fpwBowLimb(H, sg, 0, !long).pop(), t1 = fpwBowLimb(H, sg, 1, !long).pop(); B.tips.push([new T.Vector3(...t0), new T.Vector3(...t1)]);
+      const nk = new T.Mesh(new T.ConeGeometry(0.0062, 0.034, 12), horn); if (sg < 0) nk.rotation.x = Math.PI; inner.add(nk); B.limbs[B.limbs.length - 1].nock = nk; }
+    B.zs = B.tips[0][0].z; B.ny = 0.05;
+    const sg = new T.CylinderGeometry(0.0021, 0.0021, 1, 6); B.str = [new T.Mesh(sg, cord), new T.Mesh(sg, cord)]; for (const m of B.str) inner.add(m);
+    B.bead = new T.Mesh(new T.SphereGeometry(0.0042, 12, 8), new T.MeshStandardMaterial({ color:m3dCol('#b88a3a'), metalness:0.7, roughness:0.35 })); inner.add(B.bead);
+    B.arrow = fpwArrow(shotCol(w)); root.add(B.arrow);
+    /* the left fist round the grip, the right hand's fingers hooked on the string */
+    const lh = fpwHand(0.028); lh.scale.set(-0.78, 0.78, 0.78); lh.rotation.y = K.lRy; lh.position.y = -0.004; inner.add(lh);   /* (at the hands' scale in a fight, 0.78) */
+    const rh = fpwHand(0.005); rh.scale.setScalar(0.78); root.add(rh); B.rh = rh;
+    hands.push({ h:lh, shoulder:K.ls }, { h:rh, shoulder:K.rs });
+  } else {
+    const xb = m3dCrossbow(FPW.xbMats || (FPW.xbMats = {}), w.rsCol); xb.scale.setScalar(K.k); inner.add(xb); xb.traverse(o=>{ if (o.isMesh) o.castShadow = false; });
+    B.xb = { L:xb.getObjectByName('xbStrL'), R:xb.getObjectByName('xbStrR'), rest:xb.getObjectByName('xbStrRest'), bolt:xb.getObjectByName('xbBolt') };
+    model.rotation.order = 'YXZ';
+    const rh = fpwHand(K.rg); rh.scale.setScalar(0.78); root.add(rh); B.rh = rh; const lh = fpwHand(K.rg); lh.scale.set(-0.78, 0.78, 0.78); root.add(lh); B.lh = lh;
+    hands.push({ h:lh, shoulder:K.ls }, { h:rh, shoulder:K.rs });
+  }
+  FPW.bow = B; FPW.style = kind; FPW.st = null; FPW.held = null; FPW.weaponG = null; FPW.info = null; FPW.leftFist = null; FPW.flailHead = null; FPW.twist = null; FPW.motes = []; FPW.ench = null; FPW.atk = null;
+  FPW.arms = hands.map(({ h, shoulder })=>{ const fa = fpwForearm(); FPW.armGrp.add(fa.g); FPW.armGrp.add(fa.up); return { h, sh0:new T.Vector3(...shoulder), shoulder:new T.Vector3(), g:fa.g, up:fa.up }; });
+}
+/* p, the shot: 0 at rest, raised and drawn by 0.3, loosed at BOW_LOOSE (0.4 of it), lowered and loaded again by 1 */
+function fpwBowDraw(dt){
+  const T = THREE, B = FPW.bow, K = B.K, sw = FP.swing||0, L = BOW_LOOSE*BOW_RATE, sm = x=>{ x = clamp(x, 0, 1); return x*x*(3 - 2*x); };
+  if (sw > (FPW.prevSwing||0) + 0.2) B.t = 0; FPW.prevSwing = sw;
+  if (B.t!=null){ B.t += dt*BOW_RATE; if (B.t >= 1) B.t = null; }
+  let p = B.t==null ? 0 : B.t; if (window.__fpwP !== undefined) p = window.__fpwP;
+  const up = p < L ? sm(p/0.28) : 1 - sm((p - 0.55)/0.4), fly = p >= L ? Math.exp(-(p - L)*12)*sm((p - L)/0.025) : 0;
+  const loaded = rangedAmmoN(B.w) > 0 || !!B.w.noAmmo, lerp3 = (a, b, f)=>new T.Vector3(a[0] + (b[0] - a[0])*f, a[1] + (b[1] - a[1])*f, a[2] + (b[2] - a[2])*f);
+  /* breathing, the step's bob and a lag behind turns, steadied as you aim */
+  const breath = Math.sin(FPW.t*1.6), bobX = Math.sin(FP.stepPhase||0)*0.018*(1 - 0.6*up), bobY = Math.abs(Math.cos(FP.stepPhase||0))*0.022*(1 - 0.6*up);
+  const yaw = fpvYawNow(); let dA = yaw - (FPW.lastYaw===undefined ? yaw : FPW.lastYaw); FPW.lastYaw = yaw; dA = Math.atan2(Math.sin(dA), Math.cos(dA));
+  FPW.sway = clamp((FPW.sway||0)*Math.exp(-dt*7) - dA*0.9, -0.35, 0.35);
+  const lift = immersiveUi ? 0.1 : 0, R = B.root, M = B.model, I = B.inner;
+  R.position.set(bobX + FPW.sway*0.2*(1 - 0.7*up), lift*(1 - up) - bobY + breath*0.006*(1 - 0.7*up), 0).multiplyScalar(FPW_NEAR); R.rotation.set(breath*0.006*(1 - up), FPW.sway*(1 - 0.6*up), 0);
+  const toRoot = v=>v.clone().applyMatrix4(I.matrix).applyMatrix4(M.matrix);
+  if (B.kind==='bow'){
+    const d = p < L ? sm((p - 0.06)/0.26) : 0, G0 = lerp3(K.idleG, K.aimG, up), D = lerp3(new T.Vector3(...K.idleD).normalize().toArray(), new T.Vector3(...K.aimD).normalize().toArray(), up).normalize();
+    /* the bow's frame: -z along the arrow, its top rolled over by the cant (and the bow arm's kick at the loose) */
+    const z = D.clone().negate(), x = new T.Vector3(0, 1, 0).cross(z).normalize(), y = z.clone().cross(x), q = new T.Quaternion().setFromRotationMatrix(new T.Matrix4().makeBasis(x, y, z));
+    q.multiply(new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 0, 1), K.idleRoll + (K.aimRoll - K.idleRoll)*up - fly*0.3));
+    M.position.copy(G0).addScaledVector(D, fly*0.035); M.quaternion.copy(q); M.updateMatrix(); I.updateMatrix();
+    if (B.dLast!==d){ B.dLast = d; for (const l of B.limbs){ const a = l.m.geometry.attributes.position, A = a.array; for (let i=0;i<A.length;i++) A[i] = l.p0[i] + (l.p1[i] - l.p0[i])*d; a.needsUpdate = true; l.m.geometry.computeVertexNormals(); } }   /* (bent only as the draw changes) */
+    const tips = B.tips.map(([a, b])=>a.clone().lerp(b, d)); B.limbs.forEach((l, i)=>l.nock.position.copy(tips[i]));
+    /* the string: tip to nock and back, drawn by your fingers, quivering after the loose */
+    const vib = p >= L ? Math.sin((p - L)*130)*Math.exp(-(p - L)*16)*0.014 : 0, nock = new T.Vector3(0, B.ny*(1 - 0.3*d), tips[0].z + d*K.dl + vib), Y = new T.Vector3(0, 1, 0);
+    B.str.forEach((m, i)=>{ const dir = nock.clone().sub(tips[i]), len = dir.length(); m.position.copy(tips[i]).addScaledVector(dir, 0.5); m.quaternion.setFromUnitVectors(Y, dir.normalize()); m.scale.set(1, len, 1); });
+    B.bead.position.copy(nock).add(new T.Vector3(0, 0.008, 0));
+    const nR = toRoot(nock), restR = toRoot(new T.Vector3(-0.016, 0.06, -0.005)), hq = q.clone().multiply(new T.Quaternion().setFromAxisAngle(Y, K.rRy));
+    /* the right hand: on the string; flung back past the ear at the loose; to the quiver and back with the next arrow */
+    const rhOn = nR.clone().add(new T.Vector3(0, -0.005, 0.012).applyQuaternion(q)), Q = new T.Vector3(...K.quiver);
+    let hp = rhOn;
+    if (p >= L){ const a = sm((p - L)/0.07), b = sm((p - L - 0.12)/0.22), c1 = sm((p - 0.72)/0.12), c = sm((p - 0.85)/0.13), nF = toRoot(new T.Vector3(0, B.ny*0.7, B.tips[0][1].z + K.dl)), hL = nF.clone().add(new T.Vector3(0, -0.005, 0.012).applyQuaternion(q));   /* (from where it held the string at full draw) */
+      hp = hL.lerp(nF.clone().add(new T.Vector3(0.05, 0.03, 0.12)), a).lerp(Q, b).lerp(new T.Vector3(...K.back), c1).lerp(rhOn, c); }   /* (up from the quiver into sight low on the right) */
+    B.rh.position.copy(hp); B.rh.quaternion.copy(hq);
+    /* the arrow: nocked and drawn, gone at the loose, the next one in your fingers and laid on the string */
+    const A = B.arrow, inHand = p >= 0.8 && p < 0.97; A.visible = loaded && (p < L || p >= 0.8);
+    if (inHand){ A.position.copy(hp).add(new T.Vector3(0, 0.005, -0.012).applyQuaternion(q)); A.quaternion.copy(q).multiply(new T.Quaternion().setFromEuler(new T.Euler(0.5*(1 - sm((p - 0.85)/0.12)), 0, 0))); }
+    else { A.position.copy(nR); A.quaternion.setFromUnitVectors(new T.Vector3(0, 0, -1), restR.clone().sub(nR).normalize()); }
+    B.p = p; B.d = d;
+  } else {
+    /* the crossbow: raised to sight down the tiller, kicking up at the loose; lowered, spanned and loaded again */
+    const xu = p < L ? up : 1 - sm((p - L - 0.06)/0.16), span = sm((p - 0.5)/0.1)*(1 - sm((p - 0.86)/0.12)), G0 = lerp3(K.idleG, K.aimG, xu), E = lerp3(K.idleR, K.aimR, xu);   /* (lowered soon after, tipped nose down to span) */
+    M.position.copy(G0).add(new T.Vector3(-0.04*span, fly*0.012 - 0.03*span, fly*0.05 + 0.06*span)); M.rotation.set(E.x + fly*0.16 - 0.3*span, E.y - 0.1*span, E.z); M.updateMatrix(); I.updateMatrix();
+    const spanned = p < L || p >= 0.8, xb = B.xb; if (xb.L){ xb.L.visible = xb.R.visible = spanned; xb.rest.visible = !spanned; } if (xb.bolt) xb.bolt.visible = loaded && (p < L || p >= 0.88);
+    const mq = M.quaternion.clone(), eq = r=>mq.clone().multiply(new T.Quaternion().setFromEuler(new T.Euler(r[0], r[1], r[2])));
+    /* the right hand on the grip: off it to the string at the prod, drawing it back to the nut, laying the bolt, and back */
+    const grip = toRoot(new T.Vector3(...K.rAt)), prod = toRoot(new T.Vector3(0, 0.07, 0.55)), nut = toRoot(new T.Vector3(0, 0.07, 0.13));
+    const a = sm((p - 0.55)/0.1), b = sm((p - 0.68)/0.12), c = sm((p - 0.88)/0.1);
+    B.rh.position.copy(grip.clone().lerp(prod, a).lerp(nut, b).lerp(grip, c)); B.rh.quaternion.copy(eq(K.rRot));
+    B.lh.position.copy(toRoot(new T.Vector3(...K.lAt))); B.lh.quaternion.copy(eq(K.lRot));
+    B.p = p;
+  }
+  R.updateMatrixWorld(true);
+  for (const A of FPW.arms) A.shoulder.copy(R.localToWorld(A.sh0.clone()));
+  fpwLayArms(0, 0);
+}
 function fpwOverlay(cv3){
   if (!cv3 || G.ui!=='playing'){ if (FPW.dom){ FPW.cv.style.display = 'none'; if (FPW.ch) FPW.ch.style.display = 'none'; } return; }
   if (!fpwInit()) return; const cv = FPW.cv;
@@ -48633,6 +48775,7 @@ function fpwDraw(dom){
   if (FPW.mir){ const ok = fpwMirrorTick(); FPW.held.visible = ok; for (const A of FPW.arms||[]){ A.g.visible = A.up.visible = ok; A.el.visible = ok && !A.elNear; }   /* (FP-010: at work, your figure's own pose) */
     FPW.glow.intensity = 0; FPW.r.render(FPW.scene, FPW.cam); if (!dom) ctx.drawImage(FPW.cv, 0, 0, cw, chh); return true; }
   if (FPW.cam.fov!==47 || FPW.cam.near!==0.05){ FPW.cam.fov = 47; FPW.cam.near = 0.05; FPW.cam.far = 20; FPW.cam.updateProjectionMatrix(); }
+  if (FPW.bow){ fpwBowDraw(dt, cw, chh); FPW.glow.intensity = 0; FPW.r.render(FPW.scene, FPW.cam); if (!dom) ctx.drawImage(FPW.cv, 0, 0, cw, chh); return true; }   /* (FP-012) */
   // an attack starts whenever the game plays a swing (FP.swing jumps back up to 1)
   const st = FPW.st, sw = FP.swing||0;
   if (sw > (FPW.prevSwing||0) + 0.2) FPW.atk = { t:0, hold:0, landed:false, hit: FPW.lastSwing!=='miss' };
@@ -48669,16 +48812,7 @@ function fpwDraw(dom){
   if (FPW.offG){ const O = FPW.offG, at = FPW.offAt, q = FPW.offRot, dip = p > 0 && p < 1 ? Math.sin(p*Math.PI) : 0;   /* (FP-011: the left hand, not swung with the right: down and aside a little as it strikes) */
     O.position.set(at[0]*xs + bobX*0.8 + FPW.sway*0.2 - dip*0.05, at[1] + lift - bobY + Math.sin(FPW.t*1.6 + 1)*0.007 - dip*0.06, at[2] + dip*0.03).multiplyScalar(FPW_NEAR);
     O.rotation.set(q[0] + breath*0.01, q[1] + FPW.sway*0.8, q[2]); O.scale.setScalar(FPW_NEAR); }
-  // forearms from each wrist back to its shoulder
-  FPW.scene.updateMatrixWorld(true);
-  const up = new T.Vector3(0,1,0);
-  for (const A of (FPW.arms||[])){
-    const wrist = A.h.localToWorld(A.h.userData.wrist.clone());
-    const sh = A.shoulder.clone().add(new T.Vector3(bobX, -bobY + lift, 0));
-    const dir = sh.clone().sub(wrist), len = dir.length(); dir.normalize();
-    A.g.position.copy(wrist); A.g.quaternion.setFromUnitVectors(up, dir); A.g.scale.setScalar(FPW_NEAR);
-    const fl = FPW_ARM_L*FPW_NEAR, rest = Math.max(0.05, len - fl) + 0.5; A.up.position.copy(wrist).addScaledVector(dir, fl - 0.01 + rest/2); A.up.quaternion.copy(A.g.quaternion); A.up.scale.set(FPW_NEAR, rest, FPW_NEAR);
-  }
+  fpwLayArms(bobX, -bobY + lift);
   if (FPW.info && FPW.info.crystal){ FPW.info.crystal.rotation.y += dt*1.5; FPW.m.crystal.emissiveIntensity = 1.2 + Math.sin(FPW.t*3)*0.4 + (FP.cast||0)*2; FPW.info.halo.scale.setScalar(0.26 + Math.sin(FPW.t*3)*0.04 + (FP.cast||0)*0.3); }
   if (FPW.info && FPW.info.rune) FPW.info.rune.material.opacity = 0.45 + Math.sin(FPW.t*2.2)*0.2;
   // enchantment motes drifting up the weapon, and its glow on the gauntlet
@@ -49016,8 +49150,9 @@ function fpvFire(e){
   /* nothing to hit: the shot flies to the spot, or the blade cuts the air */
   if (!fpvBeat()) return;
   const mode = rangedPick(), A = fpvAimPoint(e);
-  if (mode){ const sp = mode==='magic' ? rsCastableSpell() : null, kind = mode==='bow' ? 'arrow' : 'spell', col = mode==='bow' ? '#9aa3a8' : (sp ? rsSpellCol(sp) : '#80b0ff');
-    (ISO.shots = ISO.shots || []).push({ x0:FPM.x, y0:FPM.y, x1:A.x, y1:A.y, t:0, dur:0.12 + Math.hypot(A.x - FPM.x, A.y - FPM.y)*0.045, kind, col, m:null, tier:1 });
+  if (mode){ const sp = mode==='magic' ? rsCastableSpell() : null, rw = G.gear.ranged, kind = mode==='bow' ? (rw && rw.xbow ? 'bolt' : 'arrow') : 'spell', col = mode==='bow' ? (rw && rw.used ? shotCol(rw) : '#9aa3a8') : (sp ? rsSpellCol(sp) : '#80b0ff');
+    if (mode==='bow'){ FPW.shotAt = performance.now(); FPW.bowOut = true; FP.swing = 1; FPW.lastSwing = 'miss'; }   /* (FP-012: drawn and loosed at the spot, as at a foe) */
+    (ISO.shots = ISO.shots || []).push({ x0:FPM.x, y0:FPM.y, x1:A.x, y1:A.y, t:mode==='bow' && fpMeBow() ? -BOW_LOOSE : 0, dur:0.12 + Math.hypot(A.x - FPM.x, A.y - FPM.y)*0.045, kind, col, m:null, tier:1 });
     try{ fpBaseSfx(mode==='bow' ? 'miss' : 'spell'); }catch(err){} if (mode==='magic') FP.cast = 1; }
   else { FP.swing = 1; FPW.lastSwing = 'miss'; try{ fpBaseSfx('miss'); }catch(err){} }
 }
@@ -50024,10 +50159,11 @@ const ISO_ELEM_COL = { air:'#e8f0ff', water:'#5aa0ff', earth:'#b08a4a', fire:'#f
    lands) at the loose, BOW_LOOSE seconds in, rather than leaving the bow before the string is even drawn */
 const BOW_RATE = 0.9, BOW_LOOSE = 0.4/BOW_RATE;
 function rigIsBow(e){ return !!(e && e.rig && (e.rig.wk==='bow' || e.rig.wk==='xbow')); }   /* (RS-490: and a crossbow) */
+function fpMeBow(){ return rigIsBow(ISO.player) || !!(fpv() && fpwRangedKind()); }   /* (FP-012: your shot at a bow's pace, loosed at BOW_LOOSE, when it's your figure's or your own eyes' bow) */
 function isoShot(m, kind, col, delay, extra){
   if (!ISO.on || !FPD.ok || !m) return;
   const p = G.player, d = Math.hypot(m.x-p.x, m.y-p.y), dur = (kind==='chin' ? 0.2 : kind==='bolt' ? 0.08 : 0.12) + d*(kind==='bolt' ? 0.035 : kind==='chin' ? 0.06 : 0.045);
-  if ((kind==='arrow' || kind==='crystal' || kind==='bolt') && !(extra && extra.minion) && rigIsBow(ISO.player)) delay = (delay||0) + BOW_LOOSE;
+  if ((kind==='arrow' || kind==='crystal' || kind==='bolt') && !(extra && extra.minion) && fpMeBow()) delay = (delay||0) + BOW_LOOSE;
   const cast = kind==='spell' && !(extra && extra.minion), past = 1 - CAST_FIRE_U;   /* (RS-703: off the staff as it comes forward - with a cast already running, as that one does; past it, at once) */
   if (cast) delay = (delay||0) + (FP.cast > past ? (FP.cast - past)/CAST_RATE : FP.cast > 0 ? 0 : CAST_FIRE);
   const eye = fpv() && FPM.map===G.map;   /* (FP-004: from your eyes) */
@@ -50650,7 +50786,7 @@ function renderFirstPerson(){
   else if (FP.lastHp!==null && php > FP.lastHp + 0.5) FP.heal = 1;
   FP.lastHp = php;
   FP.hurt = Math.max(0, FP.hurt-dt*1.8); FP.heal = Math.max(0, FP.heal-dt*1.6); FP.glow = Math.max(0, FP.glow-dt*1.2);
-  FP.cast = Math.max(0, FP.cast-dt*CAST_RATE); FP.swing = Math.max(0, FP.swing-dt*(typeof ISO!=='undefined' && rigIsBow(ISO.player) ? BOW_RATE : 1.8)); FP.fade = Math.max(0, FP.fade-dt*2.5);
+  FP.cast = Math.max(0, FP.cast-dt*CAST_RATE); FP.swing = Math.max(0, FP.swing-dt*(typeof ISO!=='undefined' && fpMeBow() ? BOW_RATE : 1.8)); FP.fade = Math.max(0, FP.fade-dt*2.5);
   try{ foeTick(); }catch(e){ console.error(e); }   /* (RS-218) */
   FP.shake = Math.max(0, FP.shake-dt*3);
   if (FP.moving>0.02) FP.stepPhase = (FP.stepPhase||0) + dt*9;
@@ -50789,7 +50925,7 @@ canvas.addEventListener('click', (e)=>{
 const fpBaseSfx = sfx;
 sfx = function(name){
   if (G && (G.gameMode===1 || G.gameMode===2)){
-    if ((name==='hit' || name==='miss' || name==='crit') && !G.monStriking){ FP.swing = 1; FPW.lastSwing = name; }   /* (RS-220: only your own blows - a monster's hit plays the same sound, and used to swing you with it) */
+    if ((name==='hit' || name==='miss' || name==='crit') && !G.monStriking){ FP.swing = 1; FPW.lastSwing = name; if (performance.now() - (FPW.shotAt||-1e9) > 700) FPW.bowOut = false; }   /* (FP-012: a blow of your own puts the bow away) */   /* (RS-220: only your own blows - a monster's hit plays the same sound, and used to swing you with it) */
     else if (name==='spell') FP.cast = 1;
     else if (name==='levelUp' || name==='achievement'){ if (LOG_HOLD > 0){ setTimeout(()=>sfx(name), LOG_HOLD); return; } FP.glow = 1; }
   }
@@ -50939,7 +51075,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'fp-011';
+const GAME_VERSION = 'fp-012';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

@@ -60,7 +60,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   /* at the wall: it flies there, nothing spent, no turn */
   await wait(1400); await ev(()=>{ G.mon.forEach(m=>{ m.alive = 0; }); ISO.shots = []; }); await frames(5);
   const a1 = await ev(()=>rangedAmmoN(G.gear.ranged)), t1 = (await st()).ticks; await ev(()=>{ window.__wild = 0; const l0 = isoShotLand; window.isoShotLand = s=>{ if (!s.m) window.__wild++; return l0(s); }; });
-  await page.mouse.click(r.x, r.y + 60); await wait(600); const s6 = await st(); s6.wild = await ev(()=>window.__wild);
+  await page.mouse.click(r.x, r.y + 60); await wait(1100); const s6 = await st(); s6.wild = await ev(()=>window.__wild);
   A(s6.wild===1, 'a shot at nothing flies and lands: ' + s6.wild); A(await ev(()=>rangedAmmoN(G.gear.ranged))===a1 && s6.ticks===t1, 'spending nothing and taking no turn');
   /* shift-click examines */
   await goblin(1); await wait(1400); const g7 = await aimAt(); const f7 = (await st()).fights;
