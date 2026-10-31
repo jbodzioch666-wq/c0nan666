@@ -1,5 +1,16 @@
 # Depthcrawl patch notes
 
+## FP-018 - Real Time
+
+You asked for fights through your eyes in real time, so the monsters can move freely. Below ground and in roadside fights, with the first-person view on, the fight no longer waits for your move.
+
+- **Monsters move on their own clocks.** Each one comes for you, steps, shoots or casts at its own pace whether you act or not, and walks on without a halt between steps. Rushers close in at a little under your walking pace, so you can fall back; orcs and other dashers are quicker.
+- **A blow at you winds up first.** A monster beside you raises its weapon, and the blow lands about half a second later - if you are still within its reach. Step back out of reach and it finds only air.
+- **Your blow lands when it connects.** Click a foe and your figure swings at once; the blow is rolled as the blade lands, on that foe if it is still within reach, or else on whatever has come within reach before you by then. A swing at the air catches a goblin that walks into it.
+- **Nothing you do hands the monsters a turn** any more: a step, a spell, a shot, a potion. Your poison, prayer, buffs, companions and the swinging blades keep their own clock, a turn every 1.2 seconds. A potion or a bite of food takes a moment before the next.
+- **From above the fight is turn-based as ever.** A setting (fights through your eyes: real time or turn by turn) puts the old way back.
+- Paralysis wears off on the world's clock, and holds your feet while it lasts.
+
 ## FP-017 - Your Own Swing
 
 You said the weapons don't look natural when swinging, not like they do in third person. Through your eyes you now see your own figure's fight, from its head - the same swings you see from above.

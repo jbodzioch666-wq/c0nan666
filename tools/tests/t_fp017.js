@@ -13,7 +13,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
     for (let x=1; x<COLS-1; x++) for (let y=1; y<ROWS-1; y++) for (let f=0; f<4; f++){ const F = FACING_VECT[f], L = FACING_VECT[(f+3)%4]; let good = true; for (let kk=0; kk<=3 && good; kk++) good = ok(x+F[0]*kk, y+F[1]*kk) && ok(x+F[0]*kk+L[0], y+F[1]*kk+L[1]);
       const d = Math.hypot(x - p.x, y - p.y); if (good && d < bd){ bd = d; best = [x, y, f]; } }
     p.x = best[0]; p.y = best[1]; p.facing = best[2]; p.faceDiag = null; FP.lookYaw = null; FP.pitch = 0; FP.turnTo = null; G.mon.forEach(m=>{ m.alive = 0; });
-    const F = FACING_VECT[p.facing], L = FACING_VECT[(p.facing+3)%4], m = newMonster(); G.mon.push(m); Object.assign(m, { alive:1, x:p.x + F[0]*k[0] + L[0]*k[1], y:p.y + F[1]*k[0] + L[1]*k[1], hp:9999, maxHp:9999, ac:5, atkBonus:1, dmg1:1, dmg2:2, xp:5, sym:'g', nm:'goblin', col:'#8f8', art:null, abilities:[], speed:0 }); return m.nm; }, k);
+    const F = FACING_VECT[p.facing], L = FACING_VECT[(p.facing+3)%4], m = newMonster(); G.mon.push(m); Object.assign(m, { alive:1, x:p.x + F[0]*k[0] + L[0]*k[1], y:p.y + F[1]*k[0] + L[1]*k[1], hp:9999, maxHp:9999, ac:5, atkBonus:1, dmg1:1, dmg2:2, xp:5, sym:'g', nm:'goblin', col:'#8f8', art:null, abilities:[], speed:0, stunTurns:99 }); return m.nm; }, k);   /* (held fast: in real time (FP-018) it would come at you) */
   await place([1, 0]);
   await ev(()=>{ G.gear.weapon = rsMakeWeapon(3, 2); G.gear.weapon.used = true; G.gear.offhand = rsMakeArmour('metal', 3, 'offhand'); G.gear.offhand.used = true; FPW.wkey = ''; if (!SET.fpView) fpvToggle();
     window.__realFight = rsFightNow; rsFightNow = ()=>G.ui==='playing' && G.mon.some(m=>m.alive); });

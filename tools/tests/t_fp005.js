@@ -24,9 +24,10 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   const st = ()=>ev(()=>({ fights:window.__fights, on:FPL.on, locked:document.pointerLockElement===canvas, cur:canvas.style.cursor, msgs:window.__msgs.slice(-4) }));
   const side = await ev(()=>{ const r = canvas.getBoundingClientRect(); return { x:r.left + r.width*0.12, y:r.top + r.height*0.5 }; });
   await goblin(1); await wait(1400);
-  /* the goblin is in the middle, the cursor far off to the left over nothing: a plain left click there strikes nothing */
-  await page.mouse.move(side.x, side.y); await page.mouse.click(side.x, side.y); await wait(200);
-  A((await st()).fights===0, 'a plain click at the cursor, off the goblin, strikes nothing');
+  /* the goblin is in the middle, the cursor far off to the left over nothing: a plain left click there is a swing at the air - which
+     (FP-018) lands at its contact on whatever stands within reach before you: the goblin, though the cursor was off it */
+  await page.mouse.move(side.x, side.y); await page.mouse.click(side.x, side.y); await wait(500);
+  A((await st()).fights===1, 'but the swing lands on the goblin before you (FP-018)'); await ev(()=>{ window.__fights = 0; });
   await wait(1400);
   /* aiming: the right button held where the cursor is */
   await page.mouse.down({ button:'right' }); await wait(300); const s1 = await st();
@@ -35,7 +36,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
     const c = document.createElement('canvas'); c.width = canvas.width; c.height = canvas.height; const g = c.getContext('2d'); g.drawImage(FPD.cv, 0, 0, c.width, c.height); g.drawImage(canvas, 0, 0); return { b, shot:c.toDataURL('image/jpeg', 0.8) }; });
   A(cross.b > 200, 'a crosshair in the middle: ' + cross.b); fs.writeFileSync(SHOTS + '/fp005-aim.jpg', Buffer.from(cross.shot.split(',')[1], 'base64'));
   /* a left click while aiming: at the crosshair - the goblin - though the cursor was far to the left */
-  await page.mouse.down({ button:'left' }); await wait(200); await page.mouse.up({ button:'left' }); const s2 = await st();
+  await page.mouse.down({ button:'left' }); await wait(200); await page.mouse.up({ button:'left' }); await wait(450); const s2 = await st();   /* (FP-018: landed at its contact) */
   A(s2.fights===1, 'a left click while aiming strikes the goblin under the crosshair: ' + s2.fights);
   await page.mouse.up({ button:'right' }); await wait(300); const s3 = await st();
   A(!s3.on && !s3.locked && s3.cur!=='none', 'letting go gives the cursor back');

@@ -17,11 +17,11 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
       const d = Math.hypot(x - p.x, y - p.y); if (good && d < bd){ bd = d; best = [x, y, f]; } }
     p.x = best[0]; p.y = best[1]; p.facing = best[2];
     window.__ex = 0; const x0 = examineSay; window.examineSay = (...a)=>{ window.__ex++; return x0(...a); }; window.__fights = 0; const f0 = fight; window.fight = (...a)=>{ window.__fights++; return f0(...a); };
-    window.__ticks = 0; const t0 = tickMonsters; window.tickMonsters = (...a)=>{ window.__ticks++; return t0(...a); };
+    window.__ticks = 0; const t0 = tickMonsters; window.tickMonsters = (...a)=>{ if (!G.rtWorld) window.__ticks++; return t0(...a); };   /* (FP-018: the world's own clock aside) */
     return { x:p.x, y:p.y, F:FACING_VECT[p.facing] }; });
   await page.keyboard.press('o'); await frames(30);
   const goblin = k=>ev(([at, k])=>{ G.mon.forEach(m=>{ m.alive = 0; }); const m = newMonster(); G.mon.push(m);
-    Object.assign(m, { alive:1, x:at.x + at.F[0]*k, y:at.y + at.F[1]*k, hp:9999, maxHp:9999, ac:5, atkBonus:1, dmg1:1, dmg2:2, xp:5, sym:'g', nm:'goblin', col:'#8f8', art:null, abilities:[], speed:0 }); }, [at, k]);
+    Object.assign(m, { alive:1, x:at.x + at.F[0]*k, y:at.y + at.F[1]*k, hp:9999, maxHp:9999, ac:5, atkBonus:1, dmg1:1, dmg2:2, xp:5, sym:'g', nm:'goblin', col:'#8f8', art:null, abilities:[], speed:0, stunTurns:99 }); }, [at, k]);   /* (FP-018: held fast - in real time it would come at you on its own clock) */
   /* where the goblin's middle is on the screen */
   const aimAt = ()=>ev(()=>{ const m = G.mon.find(m=>m.alive), e = M3D.inst.get(m), r = canvas.getBoundingClientRect();
     const v = e && e.holder ? e.holder.position.clone() : new THREE.Vector3(m.x+0.5, 0, m.y+0.5); v.y += e && e.H ? e.H*0.75 : 0.5;   /* (its chest: with FP-006's wider view an adjacent goblin's middle sits behind the quick bar) */ v.project(FPD.cam);
@@ -35,21 +35,21 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   const weaponPx = await ev(()=>{ const c = FPW.cv, g = document.createElement('canvas'); g.width = c.width; g.height = c.height; const x = g.getContext('2d'); x.drawImage(c, 0, 0); const d = x.getImageData(0, 0, g.width, g.height).data; let n = 0; for (let i=3; i<d.length; i+=16) if (d[i] > 0) n++; return n / (d.length/16); });
   A(weaponPx > 0.004 && weaponPx < 0.5, 'the weapon and hands drawn in the view: ' + (weaponPx*100).toFixed(1) + '% of it');
   /* a click on it: a blow, the weapon swung */
-  await page.mouse.click(g1.x, g1.y); await frames(3); const s1 = await st();
-  A(s1.fights===1, 'a click on the goblin strikes it: ' + s1.fights); A(s1.atk || s1.swing > 0, 'the weapon swings');
+  await page.mouse.click(g1.x, g1.y); await frames(3); const s0 = await st(); A(s0.atk || s0.swing > 0, 'the weapon swings'); await wait(450); const s1 = await st();   /* (FP-018: the blow lands at its contact) */
+  A(s1.fights===1, 'a click on the goblin strikes it: ' + s1.fights);
   A(s1.px===at.x && s1.py===at.y, 'you stay where you are');
-  await page.mouse.click(g1.x, g1.y); await frames(3); A((await st()).fights===1, 'a click within the beat does nothing more');
+  await page.mouse.click(g1.x, g1.y); await wait(450); A((await st()).fights===1, 'a click within the beat does nothing more');
   /* held: again on the beat */
-  await wait(1300); await page.mouse.move(g1.x, g1.y); await page.mouse.down(); await wait(2800); await page.mouse.up(); const s2 = await st();   /* (by the clock: the frames here run 30 to 40 ms) */
-  A(s2.fights >= 3 && s2.fights <= 4, 'held, it strikes on the beat: ' + s2.fights + ' blows');
+  await wait(1300); await page.mouse.move(g1.x, g1.y); await page.mouse.down(); await wait(2800); await page.mouse.up(); await wait(450); const s2 = await st();   /* (by the clock: the frames here run 30 to 40 ms; FP-018: the beat is RT_BEAT_MS) */
+  A(s2.fights >= 4 && s2.fights <= 5, 'held, it strikes on the beat: ' + s2.fights + ' blows');
   /* at the air: a swing at nothing, no turn */
   await wait(1300); const t0 = (await st()).ticks; const r = await ev(()=>{ const c = canvas.getBoundingClientRect(); return { x:c.left + c.width*0.5, y:c.top + c.height*0.12 }; });
   await ev(()=>{ G.mon.forEach(m=>{ m.alive = 0; }); }); await frames(5);
-  await page.mouse.click(r.x, r.y); await frames(3); const s3 = await st();
-  A(s3.fights===s2.fights && s3.ticks===t0, 'a swing at the air strikes nothing and takes no turn'); A(s3.atk || s3.swing > 0, 'but the weapon swings');
+  await page.mouse.click(r.x, r.y); await frames(3); const s3 = await st(); await wait(450); const s3b = await st();
+  A(s3b.fights===s2.fights && s3b.ticks===t0, 'a swing at the air strikes nothing and takes no turn'); A(s3.atk || s3.swing > 0, 'but the weapon swings');
   /* out of reach with a blade: not struck */
-  await goblin(3); await wait(1400); const g3 = await aimAt(); await page.mouse.click(g3.x, g3.y); await frames(3); const s4 = await st();
-  A(s4.fights===s3.fights, 'a goblin three tiles off isn\'t struck with a blade');
+  await goblin(3); await wait(1400); const g3 = await aimAt(); await page.mouse.click(g3.x, g3.y); await wait(450); const s4 = await st();
+  A(s4.fights===s3b.fights, 'a goblin three tiles off isn\'t struck with a blade');
   /* a bow: shot from your eyes */
   await ev(()=>{ const P = G.player, bow = rsMakeBow(0, false); bow.used = true; G.gear.ranged = bow; G.gear.ammo = rsMakeAmmo(0); P.arrows = 50; P.rangedMode = 'bow'; });
   await wait(1400); const g5 = await aimAt(); const a0 = await ev(()=>rangedAmmoN(G.gear.ranged));
