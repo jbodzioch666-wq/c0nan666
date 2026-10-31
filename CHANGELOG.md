@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## FP-019 - Clear View
+
+You showed a brown slab across the whole view with a pale blob beside it. That was your staff: put away, it hangs on your back, and your eyes sat right where it hangs; the blob was your own hand at your side, a finger's breadth from the eye.
+
+- **Nothing is drawn while the weapon is put away.** On the roads, in towns and below ground between fights, the view is clear, as in Skyrim with your weapon sheathed. The hands and weapon come up as your figure draws.
+- **Nothing can fill the screen.** Anything nearer than four centimetres from the eye is cut off instead of drawn across the view.
+
 ## FP-018 - Real Time
 
 You asked for fights through your eyes in real time, so the monsters can move freely. Below ground and in roadside fights, with the first-person view on, the fight no longer waits for your move.

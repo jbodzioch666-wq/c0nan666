@@ -12,7 +12,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); page.on('pageerror', e
       const d = Math.hypot(x - p.x, y - p.y); if (good && d < bd){ bd = d; best = [x, y, f]; } }
     p.x = best[0]; p.y = best[1]; p.facing = best[2]; G.mon.forEach(m=>{ m.alive = 0; });
     const F = FACING_VECT[p.facing], m = newMonster(); G.mon.push(m); Object.assign(m, { alive:1, x:p.x + F[0], y:p.y + F[1], hp:9999, maxHp:9999, ac:5, atkBonus:1, dmg1:1, dmg2:2, xp:5, sym:'g', nm:'goblin', col:'#8f8', art:null, abilities:[], speed:0 });
-    if (wi!=='keep'){ G.gear.weapon = wi==='fists' ? newItem() : rsMakeWeapon(3, +wi); G.gear.weapon.used = wi!=='fists'; }
+    if (wi!=='keep'){ G.gear.weapon = wi==='fists' ? newItem() : wi==='staff' ? rsMakeStaff(2) : rsMakeWeapon(3, +wi); G.gear.weapon.used = wi!=='fists'; }
     if (off!=='keep') G.gear.offhand = off==='none' ? newItem() : off==='kite' ? rsMakeArmour('metal', 3, 'offhand') : off==='tome' ? rsMakeArmour('cloth', 2, 'offhand') : (()=>{ const w = RS_WEAPONS[0], mt = RS_METALS[3], it = rsItem('offhand'); it.nm = mt[0] + ' Off-hand ' + w[0]; it.basis = w[1]; it.rsCol = mt[5]; it.offWeapon = 1; return it; })();
     if (off!=='keep') G.gear.offhand.used = off!=='none'; FPW.wkey = ''; if (!SET.fpView) fpvToggle(); }, [process.env.ZF_W || '2', process.env.ZF_OFF || 'kite']);
   if (process.env.ZF_SG) await ev(v=>{ window.__zShieldG = v; }, JSON.parse(process.env.ZF_SG));

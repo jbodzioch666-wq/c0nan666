@@ -19,7 +19,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
     window.__realFight = rsFightNow; rsFightNow = ()=>G.ui==='playing' && G.mon.some(m=>m.alive); });
   await wait(1500);
   const pin = v=>ev(async v=>{ const t = performance.now() + 300; while (performance.now() < t){ FP.swing = v; renderGame(); await new Promise(r=>requestAnimationFrame(r)); } FP.swing = v; renderGame(); }, v);
-  const st = ()=>ev(()=>{ const T = THREE, e = ISO.player, r = e.rig, out = { mir:!!(FPW.mir && FPW.mir.wp), shK:r.shK, pitch:+(FP.pitch||0).toFixed(2), off:FPW.offKind, camY:+FPD.cam.position.y.toFixed(3), eyeY:+fpwEyeOf(e).y.toFixed(3), eyeOff:+FPD.cam.position.distanceTo(fpwEyeOf(e)).toFixed(3), face:e.face, yaw:fpvYawNow(), pos:[e.pos.x, e.pos.y], fpm:[FPM.x, FPM.y] };
+  const st = ()=>ev(()=>{ const T = THREE, e = ISO.player, r = e.rig, out = { mir:!!(FPW.mir && FPW.mir.wp), shK:r.shK, shown:!!(FPW.held.visible && FPW.arms.every(A=>A.g.visible)), near:FPW.cam.near, pitch:+(FP.pitch||0).toFixed(2), off:FPW.offKind, camY:+FPD.cam.position.y.toFixed(3), eyeY:+fpwEyeOf(e).y.toFixed(3), eyeOff:+FPD.cam.position.distanceTo(fpwEyeOf(e)).toFixed(3), face:e.face, yaw:fpvYawNow(), pos:[e.pos.x, e.pos.y], fpm:[FPM.x, FPM.y] };
     FPW.scene.updateMatrixWorld(true); e.holder.updateWorldMatrix(true, true);
     const pr = (o, cam, v)=>{ const w = o.localToWorld(v.clone()); const z = cam===FPW.cam ? w.z : w.clone().applyMatrix4(cam.matrixWorldInverse).z; w.project(cam); return [+w.x.toFixed(3), +w.y.toFixed(3), z < 0]; };
     out.hands = FPW.mir ? FPW.mir.hands.map(h=>pr(h, FPW.cam, new T.Vector3())) : null;
@@ -55,7 +55,8 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
 
   /* ---- the fight over: put away, out of sight, the eyes back down ---- */
   await ev(()=>{ G.mon.forEach(m=>{ m.alive = 0; }); FP.swing = 0; }); await wait(1800); const s1 = await st();
-  A(s1.shK===1, 'the goblin dead, the sword put away: ' + s1.shK);
+  A(s1.shK===1 && !s1.shown, 'the goblin dead, the sword put away and nothing drawn (FP-019: on the back it hung through the eye): ' + JSON.stringify([s1.shK, s1.shown]));
+  A(g0.shown && g0.near >= 0.03, 'in the fight the hands were drawn, with a near plane: ' + JSON.stringify([g0.shown, g0.near]));
   A(!s1.tip[2] || s1.tip[1] < -1 || Math.abs(s1.tip[0]) > 1, 'the sword on your hip, out of sight: ' + JSON.stringify(s1.tip));
   A(s1.hands.every(h=>!h[2] || h[1] < -1), 'your hands down at your sides: ' + JSON.stringify(s1.hands));
   A(Math.abs(s1.camY - 0.62) < 0.03 && s1.eyeOff > 0.04 && Math.abs(s1.pitch) < 0.08, 'the eyes back at their own height, the view level: ' + JSON.stringify([s1.camY, s1.eyeOff, s1.pitch]));
