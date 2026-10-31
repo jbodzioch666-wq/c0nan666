@@ -7391,147 +7391,147 @@ function foeFlush(){
   try{ renderGame(); saveCurrentGame(); }catch(e){}
 }
 function foeTick(){ if (foePending() && (performance.now() >= (G.foeAt||0) || G.gameMode!==1 && G.gameMode!==2)) foeFlush(); }
-/* (FP-018) one monster's turn: its upkeep (timers, lingering damage, a lost turn) and then its action. In a real-time fight
-   (rtOn) the world's clock runs the upkeep of every monster at once (G.rtWorld) and each monster's own clock runs its action
-   (G.rtMon, rtTick); in a turn-based one both come in the same call, once per player action, as ever */
-function monTurnBody(m, i, dirs){
-    if (!G.rtMon){   /* (FP-018: in a real-time fight the upkeep comes on the world's clock, the action on the monster's own) */
-
-      // debuffEnemy/control spell effects wear off at the start of the
-      // monster's own turn, exactly like the player's status effects above
-      if (m.debuffACTurns>0) m.debuffACTurns--;
-      if (m.debuffAtkTurns>0) m.debuffAtkTurns--;
-      if (m.weakTurns>0) m.weakTurns--;
-      if (m.frightenedTurns>0) m.frightenedTurns--; // Fear - it flees rather than closing in, see the movement block below
-      if (m.silencedTurns>0) m.silencedTurns--; // Silence - blocks its spellcast ability while active
-      if (m.polymorphTurns>0){
-        m.polymorphTurns--;
-        if (m.polymorphTurns<=0 && m.polymorphOrig){
-          // Polymorph wearing off - the harmless beast reverts to its true form
-          m.atkBonus = m.polymorphOrig.atkBonus; m.dmg1 = m.polymorphOrig.dmg1; m.dmg2 = m.polymorphOrig.dmg2;
-          logMsg(`the ${m.nm} reverts to its true form`, 'hit');
-          m.polymorphOrig = null;
-        }
-      }
-      if (m.dotTurns>0){
-        // a lingering damage tick from a dmgDot spell (Melf's Acid Arrow, ...) -
-        // fires once at the start of the target's next turn, then clears itself
-        m.dotTurns--;
-        const dd = mx(1, rollDice(m.dotD1||1, m.dotD2||4));
-        m.hp -= dd; m.hitKind = 'poison'; m.hitCrit = false;
-        noteFoe(i);
-        logMsg(`the ${m.nm} takes ${dd} lingering damage`, 'magic');
-        if (m.hp<=0){ logMsg(`the ${m.nm} is destroyed`, 'good'); monsterDies(i); return; }
-      }
-      if (monStatusTick(m, i)) return;
-      if (m.dazedTurns>0){ m.dazedTurns--; return; }   // dazed by a blow - it loses this turn
-      if (m.banishedTurns>0){ m.banishedTurns--; return; } // banish - it isn't even on this plane, so it can't act
-      if (m.stunTurns>0){ m.stunTurns--; return; } // a control spell (Sleep, Hold Person, ...) - it loses this turn entirely
-  } else if (m.dazedTurns>0 || m.banishedTurns>0 || m.stunTurns>0) return;   /* (its turn lost: it stands) */
-    try{ if (G.allies && G.allies.length && siegeMonVsAlly(m, i)) return; }catch(e){ console.error(e); }
-    if (G.rtWorld) return;   /* (FP-018: the world's clock ticks its upkeep only) */   /* (RS-418: it turns on the town's people beside it) */
-
-    // Regeneration (troll): heals at the start of its turn, unless it was
-    // burned by an elemental hit since your last turn
-    if (hasAbility(m,'regen') && !m.tookFireLastHit && m.hp>0 && m.hp<m.maxHp){
-      m.hp = mn(m.maxHp, m.hp + 2+rn(9));
-    }
-    m.tookFireLastHit = false;
-    if (m.burnTurns>0) m.burnTurns--;
-
-    const dist = Math.abs(m.x-G.player.x)+Math.abs(m.y-G.player.y);
-    // aggression, roles, packs, summoners and the bosses' phases and style switches (see monAiTurn)
-    try{ if (monAiTurn(m, i, dist)) return; }catch(e){ console.error(e); }
-
-    // a lich (or anything else with 'spellcast') can strike you with a
-    // spell from range, no need to close to melee first - but not through
-    // a wall it can't see you past
-    if (hasAbility(m,'spellcast') && !(m.silencedTurns>0) && dist>1 && dist<=MON_SPELL_RANGE && shotClear(m.x,m.y,G.player.x,G.player.y)){   /* (RS-767: your spells, your range - it reached 4 and nothing was seen to fly) */
-      monCastSpell(m, i);
-      return;
-    }
-    // Frightful Presence: the first time you're within sight of it, fear
-    // rattles your aim for a few turns - "sight" means actual line of sight
-    // now, not just being somewhere within 6 tiles through a wall. Checked
-    // before breath (not after) since it's a passive trait a dragon
-    // triggers regardless of which action it takes that turn, not something
-    // that should get skipped just because it chose to breathe instead
-    if (hasAbility(m,'frightful') && !m.frightfulUsed && dist<=6 && hasLineOfSight(m.x,m.y,G.player.x,G.player.y)){
-      m.frightfulUsed = true;
-      G.player.frightenedTurns = mx(G.player.frightenedTurns||0, 3);
-      logMsg(`the ${m.nm}'s frightful presence shakes your resolve`, 'hit');
-    }
-    // a dragon's breath weapon - real D&D 5e shape, not a flat proc: it's
-    // ready by default, fires whenever it's charged and you're in range,
-    // then goes on recharge (a d6 roll each of its turns, back at 5-6,
-    // matching 5e's "Recharge 5-6") instead of a random 25% chance every
-    // turn regardless of whether it was just used. Damage scales off the
-    // dragon's own maxHp (itself driven by hd, which climbs sharply by age
-    // tier - see the dragon stat overrides in the skin tables) instead of a
-    // flat 8d6 for every dragon regardless of age or type, and a failed
-    // save (vs a DC that scales with the dragon's level, like a real spell
-    // save DC) means full damage rather than a flat coin-flip half/no-half
-    if (hasAbility(m,'breath')){
-      // undefined means "never fired yet" - real dragons start every fight
-      // with breath ready, so that reads as charged without needing every
-      // monster-spawn site to explicitly initialize the flag
-      if (m.breathCharged===false) m.breathCharged = !!chn(1/3); // Recharge 5-6 on a d6 - chn() returns 0/1, not a real boolean, and 0!==false in JS
-      if (m.breathCharged!==false && dist>0 && dist<=3 && shotClear(m.x,m.y,G.player.x,G.player.y)){
-        noteFoe(i);
-        m.breathCharged = false;
-        // real dragon stat blocks use breath INSTEAD OF Multiattack on the
-        // turn they breathe, not on top of it - sized so it lands in the
-        // same ballpark as what a full Multiattack turn would have dealt,
-        // not a separate pile of damage added to one
-        const breathDice = mx(2, Math.round((m.maxHp||30)/25));
-        let bdmg = rollDice(breathDice,6);
-        const dc = 8 + Math.floor(tierOfCb(monCombatLevel(m))/2);
-        const saveRoll = rollDie(20);
-        let dodged = false;
-        if (saveRoll>=dc){ bdmg = Math.floor(bdmg/2); dodged = true; }
-        bdmg = mitigate(mx(1,bdmg));
-        G.player.hp -= bdmg;
-        const elem = DRAGON_BREATH_ELEM[m.nm]||'fire';
-        try{ isoBreath(m, elem); }catch(e){}   /* (RS-267: it rears back and breathes at you) */
-        logMsg(`the ${m.nm} unleashes a blast of ${elem} for ${bdmg}${dodged?` (DEX save vs DC ${dc} succeeded - half damage)`:` (failed the DC ${dc} DEX save)`}`, 'hit');
-        if (G.player.hp<=0 && !checkDeathWard()){ playerDies(m.nm); }
-        return; // breath replaces its normal turn, exactly like the real stat block choosing one or the other
-      }
-    }
-
-    // held by Bind, Snare, Entangle, a grasp or ice: it can't step, but still strikes if you're beside it
-    if (m.rootTurns>0){ m.rootTurns--; if (dist===1 || monDiagAdj(m)) monAttackNow(m, i); return; }
-    const fleeing = (hasAbility(m,'nimbleEscape') && m.hp < m.maxHp*0.25) || (m.frightenedTurns>0); // Fear - it runs from you rather than closing in
-    if (!fleeing && monDiagAdj(m)){ monAttackNow(m, i); return; }   /* (RS-420: it strikes from the diagonal, as from the side) */
-    let dx=0, dy=0;
-    // (RS-169) anything that fights hand to hand rushes you - from well off, and round walls rather than stopping at them
-    const rusher = !fleeing && rsMonStyle(m)==='melee' && !['archer','caster'].includes(monAi(m).role) && (dist<=14 || m.engaged);
-    const chase = rusher ? monChaseDir(m, i) : null;
-    if (chase){ dx = chase[0]; dy = chase[1]; }
-    else if (dist<=5){
-      dx = sg(G.player.x-m.x); dy = sg(G.player.y-m.y);
-      if (fleeing){ dx=-dx; dy=-dy; } // a bloodied goblin disengages and runs instead of fighting on
-      const diagOk = dx!==0 && dy!==0 && diagClear(m.x, m.y, dx, dy, tileOpen) && tileAt(m.x+dx, m.y+dy)!==T_WALL && !occupiedBy(m.x+dx, m.y+dy, i);
-      if (dx!==0 && dy!==0 && !diagOk){ if (chn(0.5)) dy=0; else dx=0; }
-    } else if (chn(0.5)){
-      const d = dirs[rn(4)]; dx=d[0]; dy=d[1];
-    }
-    if (dx===0 && dy===0) return;
-
-    // orcs can Dash as a bonus action, closing two tiles of ground per turn
-    const steps = (hasAbility(m,'aggressive') && !fleeing && !G.rtMon) ? 2 : 1;   /* (FP-018: a dash is a quicker clock instead) */
-    for (let s=0; s<steps; s++){
-      if (G.gameOver || !m.alive) break;
-      const nx=m.x+dx, ny=m.y+dy;
-      if (nx===G.player.x && ny===G.player.y){ monAttackNow(m, i); break; }
-      if (tileAt(nx,ny)!==T_WALL && !stairTile(nx, ny) && !occupiedBy(nx,ny,i) && diagClear(m.x, m.y, dx, dy, tileOpen)){ dgDoorOpen(nx, ny, true); m.x=nx; m.y=ny; } else break;
-      /* (RS-171) a dash stops once it's beside you, and a rusher picks its second step afresh - it used to run on past you and back again every turn */
-      if (fleeing) continue;
-      if (Math.abs(G.player.x-m.x)+Math.abs(G.player.y-m.y)<=1 || monDiagAdj(m)) break;
-      if (chase){ const c2 = monChaseDir(m, i); if (!c2) break; dx = c2[0]; dy = c2[1]; }
-    }
-}
-function monAttackNow(m, i){ if (G.rtMon) rtMonWind(m, i); else monsterAttacks(i); }
+/* (FP-018) one monster's turn: its upkeep (timers, lingering damage, a lost turn) and then its action. In a real-time fight
+   (rtOn) the world's clock runs the upkeep of every monster at once (G.rtWorld) and each monster's own clock runs its action
+   (G.rtMon, rtTick); in a turn-based one both come in the same call, once per player action, as ever */
+function monTurnBody(m, i, dirs){
+    if (!G.rtMon){   /* (FP-018: in a real-time fight the upkeep comes on the world's clock, the action on the monster's own) */
+
+      // debuffEnemy/control spell effects wear off at the start of the
+      // monster's own turn, exactly like the player's status effects above
+      if (m.debuffACTurns>0) m.debuffACTurns--;
+      if (m.debuffAtkTurns>0) m.debuffAtkTurns--;
+      if (m.weakTurns>0) m.weakTurns--;
+      if (m.frightenedTurns>0) m.frightenedTurns--; // Fear - it flees rather than closing in, see the movement block below
+      if (m.silencedTurns>0) m.silencedTurns--; // Silence - blocks its spellcast ability while active
+      if (m.polymorphTurns>0){
+        m.polymorphTurns--;
+        if (m.polymorphTurns<=0 && m.polymorphOrig){
+          // Polymorph wearing off - the harmless beast reverts to its true form
+          m.atkBonus = m.polymorphOrig.atkBonus; m.dmg1 = m.polymorphOrig.dmg1; m.dmg2 = m.polymorphOrig.dmg2;
+          logMsg(`the ${m.nm} reverts to its true form`, 'hit');
+          m.polymorphOrig = null;
+        }
+      }
+      if (m.dotTurns>0){
+        // a lingering damage tick from a dmgDot spell (Melf's Acid Arrow, ...) -
+        // fires once at the start of the target's next turn, then clears itself
+        m.dotTurns--;
+        const dd = mx(1, rollDice(m.dotD1||1, m.dotD2||4));
+        m.hp -= dd; m.hitKind = 'poison'; m.hitCrit = false;
+        noteFoe(i);
+        logMsg(`the ${m.nm} takes ${dd} lingering damage`, 'magic');
+        if (m.hp<=0){ logMsg(`the ${m.nm} is destroyed`, 'good'); monsterDies(i); return; }
+      }
+      if (monStatusTick(m, i)) return;
+      if (m.dazedTurns>0){ m.dazedTurns--; return; }   // dazed by a blow - it loses this turn
+      if (m.banishedTurns>0){ m.banishedTurns--; return; } // banish - it isn't even on this plane, so it can't act
+      if (m.stunTurns>0){ m.stunTurns--; return; } // a control spell (Sleep, Hold Person, ...) - it loses this turn entirely
+  } else if (m.dazedTurns>0 || m.banishedTurns>0 || m.stunTurns>0) return;   /* (its turn lost: it stands) */
+    try{ if (G.allies && G.allies.length && siegeMonVsAlly(m, i)) return; }catch(e){ console.error(e); }
+    if (G.rtWorld) return;   /* (FP-018: the world's clock ticks its upkeep only) */   /* (RS-418: it turns on the town's people beside it) */
+
+    // Regeneration (troll): heals at the start of its turn, unless it was
+    // burned by an elemental hit since your last turn
+    if (hasAbility(m,'regen') && !m.tookFireLastHit && m.hp>0 && m.hp<m.maxHp){
+      m.hp = mn(m.maxHp, m.hp + 2+rn(9));
+    }
+    m.tookFireLastHit = false;
+    if (m.burnTurns>0) m.burnTurns--;
+
+    const dist = Math.abs(m.x-G.player.x)+Math.abs(m.y-G.player.y);
+    // aggression, roles, packs, summoners and the bosses' phases and style switches (see monAiTurn)
+    try{ if (monAiTurn(m, i, dist)) return; }catch(e){ console.error(e); }
+
+    // a lich (or anything else with 'spellcast') can strike you with a
+    // spell from range, no need to close to melee first - but not through
+    // a wall it can't see you past
+    if (hasAbility(m,'spellcast') && !(m.silencedTurns>0) && dist>1 && dist<=MON_SPELL_RANGE && shotClear(m.x,m.y,G.player.x,G.player.y)){   /* (RS-767: your spells, your range - it reached 4 and nothing was seen to fly) */
+      monCastSpell(m, i);
+      return;
+    }
+    // Frightful Presence: the first time you're within sight of it, fear
+    // rattles your aim for a few turns - "sight" means actual line of sight
+    // now, not just being somewhere within 6 tiles through a wall. Checked
+    // before breath (not after) since it's a passive trait a dragon
+    // triggers regardless of which action it takes that turn, not something
+    // that should get skipped just because it chose to breathe instead
+    if (hasAbility(m,'frightful') && !m.frightfulUsed && dist<=6 && hasLineOfSight(m.x,m.y,G.player.x,G.player.y)){
+      m.frightfulUsed = true;
+      G.player.frightenedTurns = mx(G.player.frightenedTurns||0, 3);
+      logMsg(`the ${m.nm}'s frightful presence shakes your resolve`, 'hit');
+    }
+    // a dragon's breath weapon - real D&D 5e shape, not a flat proc: it's
+    // ready by default, fires whenever it's charged and you're in range,
+    // then goes on recharge (a d6 roll each of its turns, back at 5-6,
+    // matching 5e's "Recharge 5-6") instead of a random 25% chance every
+    // turn regardless of whether it was just used. Damage scales off the
+    // dragon's own maxHp (itself driven by hd, which climbs sharply by age
+    // tier - see the dragon stat overrides in the skin tables) instead of a
+    // flat 8d6 for every dragon regardless of age or type, and a failed
+    // save (vs a DC that scales with the dragon's level, like a real spell
+    // save DC) means full damage rather than a flat coin-flip half/no-half
+    if (hasAbility(m,'breath')){
+      // undefined means "never fired yet" - real dragons start every fight
+      // with breath ready, so that reads as charged without needing every
+      // monster-spawn site to explicitly initialize the flag
+      if (m.breathCharged===false) m.breathCharged = !!chn(1/3); // Recharge 5-6 on a d6 - chn() returns 0/1, not a real boolean, and 0!==false in JS
+      if (m.breathCharged!==false && dist>0 && dist<=3 && shotClear(m.x,m.y,G.player.x,G.player.y)){
+        noteFoe(i);
+        m.breathCharged = false;
+        // real dragon stat blocks use breath INSTEAD OF Multiattack on the
+        // turn they breathe, not on top of it - sized so it lands in the
+        // same ballpark as what a full Multiattack turn would have dealt,
+        // not a separate pile of damage added to one
+        const breathDice = mx(2, Math.round((m.maxHp||30)/25));
+        let bdmg = rollDice(breathDice,6);
+        const dc = 8 + Math.floor(tierOfCb(monCombatLevel(m))/2);
+        const saveRoll = rollDie(20);
+        let dodged = false;
+        if (saveRoll>=dc){ bdmg = Math.floor(bdmg/2); dodged = true; }
+        bdmg = mitigate(mx(1,bdmg));
+        G.player.hp -= bdmg;
+        const elem = DRAGON_BREATH_ELEM[m.nm]||'fire';
+        try{ isoBreath(m, elem); }catch(e){}   /* (RS-267: it rears back and breathes at you) */
+        logMsg(`the ${m.nm} unleashes a blast of ${elem} for ${bdmg}${dodged?` (DEX save vs DC ${dc} succeeded - half damage)`:` (failed the DC ${dc} DEX save)`}`, 'hit');
+        if (G.player.hp<=0 && !checkDeathWard()){ playerDies(m.nm); }
+        return; // breath replaces its normal turn, exactly like the real stat block choosing one or the other
+      }
+    }
+
+    // held by Bind, Snare, Entangle, a grasp or ice: it can't step, but still strikes if you're beside it
+    if (m.rootTurns>0){ m.rootTurns--; if (dist===1 || monDiagAdj(m)) monAttackNow(m, i); return; }
+    const fleeing = (hasAbility(m,'nimbleEscape') && m.hp < m.maxHp*0.25) || (m.frightenedTurns>0); // Fear - it runs from you rather than closing in
+    if (!fleeing && monDiagAdj(m)){ monAttackNow(m, i); return; }   /* (RS-420: it strikes from the diagonal, as from the side) */
+    let dx=0, dy=0;
+    // (RS-169) anything that fights hand to hand rushes you - from well off, and round walls rather than stopping at them
+    const rusher = !fleeing && rsMonStyle(m)==='melee' && !['archer','caster'].includes(monAi(m).role) && (dist<=14 || m.engaged);
+    const chase = rusher ? monChaseDir(m, i) : null;
+    if (chase){ dx = chase[0]; dy = chase[1]; }
+    else if (dist<=5){
+      dx = sg(G.player.x-m.x); dy = sg(G.player.y-m.y);
+      if (fleeing){ dx=-dx; dy=-dy; } // a bloodied goblin disengages and runs instead of fighting on
+      const diagOk = dx!==0 && dy!==0 && diagClear(m.x, m.y, dx, dy, tileOpen) && tileAt(m.x+dx, m.y+dy)!==T_WALL && !occupiedBy(m.x+dx, m.y+dy, i);
+      if (dx!==0 && dy!==0 && !diagOk){ if (chn(0.5)) dy=0; else dx=0; }
+    } else if (chn(0.5)){
+      const d = dirs[rn(4)]; dx=d[0]; dy=d[1];
+    }
+    if (dx===0 && dy===0) return;
+
+    // orcs can Dash as a bonus action, closing two tiles of ground per turn
+    const steps = (hasAbility(m,'aggressive') && !fleeing && !G.rtMon) ? 2 : 1;   /* (FP-018: a dash is a quicker clock instead) */
+    for (let s=0; s<steps; s++){
+      if (G.gameOver || !m.alive) break;
+      const nx=m.x+dx, ny=m.y+dy;
+      if (nx===G.player.x && ny===G.player.y){ monAttackNow(m, i); break; }
+      if (tileAt(nx,ny)!==T_WALL && !stairTile(nx, ny) && !occupiedBy(nx,ny,i) && diagClear(m.x, m.y, dx, dy, tileOpen)){ dgDoorOpen(nx, ny, true); m.x=nx; m.y=ny; } else break;
+      /* (RS-171) a dash stops once it's beside you, and a rusher picks its second step afresh - it used to run on past you and back again every turn */
+      if (fleeing) continue;
+      if (Math.abs(G.player.x-m.x)+Math.abs(G.player.y-m.y)<=1 || monDiagAdj(m)) break;
+      if (chase){ const c2 = monChaseDir(m, i); if (!c2) break; dx = c2[0]; dy = c2[1]; }
+    }
+}
+function monAttackNow(m, i){ if (G.rtMon) rtMonWind(m, i); else monsterAttacks(i); }
 function tickMonsters(excludeIdx){
   if (rtOn() && !G.rtWorld && !G.rtMon) return;   /* (FP-018: in a real-time fight your actions give the monsters no turn - they act on their own clocks, rtTick) */
   if (foePending() && !G.foeFlushing) foeFlush();   /* (RS-218: the last answer comes first) */
