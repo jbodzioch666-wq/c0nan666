@@ -128,6 +128,7 @@ Screenshots go to `tools/tests/shots/`.
 | fp012 | FP-012: a bow or crossbow through your eyes - in hand once you shoot (or with no melee weapon), drawn, loosed at BOW_LOOSE with the arrow's flight, the next arrow fetched and nocked; the crossbow raised, loosed, spanned and loaded; put away by a melee blow; the arrowhead in the arrows' colour, a longbow taller than a shortbow; darts not drawn |
 | fp013 | FP-013: walking forward through your eyes slides round a wall's corner (a doorway's jamb, a gap's end) instead of catching on it, in any of the eight ways round; walls still stop you head on |
 | fp014 | FP-014: the d-pad's walk through your eyes stops when you let go; a menu opening lets go too (phone) |
+| fp015 | FP-015: through your eyes the pick is seen to swing at a mine's vein (eyes back from the head, small chips) |
 | zloot | probe: the drops at a few levels - rarity shares, names with their bonuses and tiers, a rare's tooltip text (ZL levels, ZN drops a level) |
 | zloottip | probe: a rare's, a magic piece's and a Ring of Recoil's tooltip, plain and with Alt held, as shots/zloottip0-3.png |
 | rs703 | A spell leaves the staff as it comes forward: a real cast at a foe three tiles off, sampled every frame - the bolt waits about half a second, leaves from the staff's head as it leans ahead, its sound with it; the foe flinches (and a miss splashes) only as it lands; the cast lasts about a second; a foe it kills stands till the bolt lands, and the staff isn't put away mid-cast |

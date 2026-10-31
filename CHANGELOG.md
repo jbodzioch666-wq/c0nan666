@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## FP-015 - Swing It
+
+You said the pickaxe doesn't swing in the mine. It did swing, but you couldn't see it: a mine's veins are low and at your feet, so through your eyes you looked straight down onto the vein, and the overhead swing came straight at you end-on.
+
+- **The pick is seen to swing at a vein below ground.** While you mine a vein, your eyes now sit a little behind your head and above it, looking down at the vein rather than straight down. The pick goes up out of sight, comes down into the vein and bites in the middle of the view, both hands on the haft.
+- **Chips, not blobs.** Through your eyes, the stone chips and dust that fly off the vein are small chips instead of big soft blobs in your face. The overhead view's chips are as before.
+- When you stop mining, your eyes go back into your head.
+
 ## FP-014 - Let Go
 
 You said the player keeps walking forward in the Peddler's shop when you walk into the desk. On a phone, the on-screen d-pad's walk never let go: once you had pressed it in a town, a shop or on the open land, you kept walking forward after lifting your finger. Something solid (the Peddler's desk) eventually stopped you, but it opened the shop, and as soon as you shut the shop you walked straight back into the desk.
