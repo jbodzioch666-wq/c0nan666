@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## FP-014 - Let Go
+
+You said the player keeps walking forward in the Peddler's shop when you walk into the desk. On a phone, the on-screen d-pad's walk never let go: once you had pressed it in a town, a shop or on the open land, you kept walking forward after lifting your finger. Something solid (the Peddler's desk) eventually stopped you, but it opened the shop, and as soon as you shut the shop you walked straight back into the desk.
+
+- **The d-pad lets go.** Lift your finger and you stop where you are, in towns, in every shop and room, and on the open land.
+- **A menu lets go too.** Opening any menu (a shop, your bag, the map) stops a walk, so nothing can carry on walking behind it. A key you are still holding when the menu shuts starts you walking again, as it always did.
+
 ## FP-013 - Round the Corner
 
 You said the player sometimes gets stuck moving forward. That was your body catching on the corner of a wall: walking forward past a doorway, the end of a fence or any gap in a wall, if you were heading almost along the wall you could stop dead against its corner and stay there until you turned away.
