@@ -1,5 +1,15 @@
 # Depthcrawl patch notes
 
+## FP-030 - Orcs, Tieflings and Dragonborn
+
+Every race's town has sculpted people now.
+
+- **Orcs** are the body built broad, green-skinned, with their drawn tusks carried onto the sculpted head.
+- **Tieflings** keep their horns, in every style, and their spade tails.
+- **Dragonborn keep their drawn heads whole,** scales, crest and snout, fitted onto the sculpted body, with their tails. A helmet still sits on the crest.
+- **Tails hang from the sculpted figure's hips,** swishing as before.
+- The townsfolk of all ten races are sculpted; the only setting left on them is none. Bare feet and the long-limbed wood elf build remain the shared body's.
+
 ## FP-029 - Elves
 
 - **Elven, wood-elven and half-elven towns have sculpted people now.** Their pointed ears are the drawn ones, carried onto the sculpted head and sized to it, the same way as the dwarves' beards.
