@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## FP-040 - The Wood Elf's Arms Hang
+
+- **A hunched wood elf's arms hang down** instead of swinging back behind the hips. Bending the back for the hunch carried the arms back with it. They are now set to hang after the bend, both in the character preview and in the idle and walking animations in the world.
+
 ## FP-039 - The Rest of the Gear Fitted
 
 - **Studs and rivets are back** on studded leather, hide and plate, laid on the sculpted chest above the belt instead of left off.
