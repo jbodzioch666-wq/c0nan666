@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## FP-029 - Elves
+
+- **Elven, wood-elven and half-elven towns have sculpted people now.** Their pointed ears are the drawn ones, carried onto the sculpted head and sized to it, the same way as the dwarves' beards.
+- **High elves keep their silver circlets, wood elves their leaf caps.**
+- Still drawn: orcish, dragonborn and tiefling towns. Wood elves wear the kit's shoes, and their long, thin limbs are the shared body's.
+
 ## FP-028 - Dwarves, Halflings and Gnomes
 
 The short races join the sculpted townsfolk, and what is worn on the head finally sits right.

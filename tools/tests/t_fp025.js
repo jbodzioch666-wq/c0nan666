@@ -1,6 +1,7 @@
 // FP-025: the townsfolk as the sculpted body (FP-026: always - the setting is gone, and an old save's tpFolk 'drawn' is ignored): in a town every person with a human rig carries the model (dressed by their look: a guard in the ranger kit, a villager in the
 // peasant's), their drawn bodies hidden and the model's head at the drawn head, the animals left as they are; the models follow the town's
-// walk (FP-027: only in towns of a race the body can show - an elven town's people stay drawn; FP-028: a dwarven town's people are the
+// walk (FP-027: only in towns of a race the body can show - an orcish town's people stay drawn; FP-029: an elven town's people are the model
+// with the drawn pointed ears carried to its head; FP-028: a dwarven town's people are the
 // model built stout, with a bigger head, and a great beard or a helmet carried from the drawn head fitted to the model's)
 module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.on('pageerror', e=>errs.push(String(e).slice(0, 300)));
   const A = (c, msg)=>{ if (!c) throw new Error('assert: '+msg); };
@@ -22,9 +23,17 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   A(m.animalTp===0, 'the animals as they were');
   A(m.kits.peasant > 0, 'villagers in the peasant\'s kit: ' + JSON.stringify(m.kits));
   A(m.walking===m.tp, 'the models follow the town\'s own walk');
+  await ev(()=>{ const t = townList().find(t=>(townFlavorAt(t.x, t.y)||{}).race==='orc'); G.gameMode = 0; G.owPos = { x:t.x, y:t.y }; enterVillage(); setUi('playing'); G.interior = null; }); await wait(3000);
+  const or = await look(); console.log('orc', JSON.stringify(or));
+  A(!or.on && or.humans >= 5 && or.tp===0, 'the orcs drawn');
   await ev(()=>{ const t = townList().find(t=>(townFlavorAt(t.x, t.y)||{}).race==='elf'); G.gameMode = 0; G.owPos = { x:t.x, y:t.y }; enterVillage(); setUi('playing'); G.interior = null; }); await wait(3000);
   const el = await look(); console.log('elf', JSON.stringify(el));
-  A(!el.on && el.humans >= 5 && el.tp===0, 'the elves drawn');
+  A(el.on && el.humans >= 5 && el.tp===el.humans && el.headBad===0, 'the elves as the model');
+  const ee = await ev(()=>{ const T = THREE, D = TPB.data, all = [...(V3.villagers||[]), ...(V3.npcs||[])].filter(p=>p.e && p.e.tp && !(p.v && p.v.animal)), out = { n:all.length, eared:0, fit:0 }, W = o=>new T.Vector3().setFromMatrixPosition(o.matrixWorld);
+    for (const p of all){ const e = p.e, tp = e.tp; p.g.updateMatrixWorld(true); const hb = tp.bones[D.bones.indexOf('Head')], hy = W(hb).y, hx = new T.Vector3().setFromMatrixPosition(hb.matrixWorld), hs = e.holder.matrixWorld.getMaxScaleOnAxis(); let ears = 0, near = 0;
+      e.holder.traverse(m=>{ if (m.isMesh && m.userData.tpKeep && m.visible && m.geometry.type==='ConeGeometry' && m.geometry.parameters.radius < 0.02){ ears++; if (W(m).distanceTo(hx)/hs < 0.14) near++; } }); if (ears >= 2){ out.eared++; if (near===ears) out.fit++; } }
+    return out; }); console.log('elf ears', JSON.stringify(ee));
+  A(ee.eared >= ee.n - 2 && ee.fit===ee.eared, 'the elf ears carried to the model head: ' + ee.fit + ' of ' + ee.n);
   await ev(()=>{ const t = townList().find(t=>(townFlavorAt(t.x, t.y)||{}).race==='dwarf'); G.gameMode = 0; G.owPos = { x:t.x, y:t.y }; enterVillage(); setUi('playing'); G.interior = null; }); await wait(3000);
   const dw = await look(); console.log('dwarf', JSON.stringify(dw));
   A(dw.on && dw.humans >= 5 && dw.tp===dw.humans && dw.headBad===0, 'the dwarves as the model');
