@@ -1,0 +1,6 @@
+// (art probe, not in ALL) the tail on the creator's sculpted dragonborn: where it is, whether it shows
+module.exports = async page=>{ console.log(await page.evaluate(async RACE=>{ goToCharCreate(); renderOverlay(); ccSelectRace(RACE); let k = 0; do { await new Promise(r=>requestAnimationFrame(r)); } while ((LP.pend || !LP.e) && k++ < 600);
+  for (let i=0;i<3;i++) await new Promise(r=>requestAnimationFrame(r)); const e = LP.e, t = e.rig.tail, T = THREE; if (!t) return 'no rig.tail';
+  const vis = o=>{ const out = []; for (let a = o; a; a = a.parent) out.push((a.name||a.type) + ':' + a.visible); return out.join(' < '); };
+  let n = 0, shown = 0; t.traverse(m=>{ if (m.isMesh){ n++; if (m.visible) shown++; } }); const w = new T.Vector3().setFromMatrixPosition(t.matrixWorld), h = new T.Vector3().setFromMatrixPosition(e.holder.matrixWorld);
+  return JSON.stringify({ tp:!!e.tp, n, shown, keep:t.userData.tpKeep, inHide:e.tp && e.tp.hide.filter(m=>{ let a = m; while (a){ if (a===t) return true; a = a.parent; } return false; }).length, chain:vis(t), pos:w.sub(h).toArray().map(v=>+v.toFixed(3)), scale:t.matrixWorld.getMaxScaleOnAxis().toFixed(3), parentIsHips:t.parent===e.rig.hips, sock:e.tp && [...e.tp.sock].filter(([n])=>n===t.parent).map(([n,k])=>k) }); }, +(process.env.ZW_RACE||7))); };

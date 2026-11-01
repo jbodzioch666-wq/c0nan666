@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## FP-036 - The Wood Elf's Hunch, and Tails
+
+- **Wood elves stoop again.** The sculpted wood elf now bends forward through its back and neck like the old drawn one, with a rounded hump between the shoulder blades and the head pushed out ahead, still looking forward.
+- **The wood elf's face is back.** The head is narrower and longer, and the long pointed nose and heavy sleepy lids are carried over from the drawn face.
+- **The sculpted figures no longer look at the sky.** A hunched race's drawn neck had a built-in bend that posing cleared, and the sculpted head followed it upward.
+- **Dragonborn and tiefling tails show again** on the sculpted figure, in the creator, in town and below ground. The tail's meshes were being folded into the hidden body.
+- **Half-orcs get their slight stoop and hump** from the old look, and high elves their slimmer head.
+
 ## FP-035 - Your Sculpted Self
 
 - **You are the sculpted figure everywhere now,** like the townsfolk: below ground, on the open land and in town. The "your figure" setting is gone.
