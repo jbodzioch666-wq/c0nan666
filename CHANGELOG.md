@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## FP-026 - The Townsfolk Stay
+
+You liked the sculpted townsfolk, so they stay.
+
+- **The towns' people are now always the sculpted men and women.** Each is dressed by their own look: guards in the ranger's jerkin, villagers in the peasant's tunic, with their own skin, hair and beard.
+- **The townsfolk setting is gone.** An old save that had them drawn shows them sculpted too.
+- The dogs, cats, chickens and cows are still drawn.
+
 ## FP-025 - Sculpted Townsfolk (test)
 
 The fifth step of the Quaternius look: the people of the towns as his body, beside the drawn ones. Nothing new to download: it is the same body your own figure uses.
