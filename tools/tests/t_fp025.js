@@ -52,5 +52,11 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   A(dd.fat===dd.n, 'every dwarf built stout: ' + dd.fat + ' of ' + dd.n);
   A(dd.bigHead >= dd.n - 2, 'the dwarf heads bigger than the body scale: ' + dd.bigHead + ' of ' + dd.n);
   A(dd.worn > 0 && dd.wornFit===dd.worn, 'what is worn on the head - a beard, a helmet - carried near the model head: ' + dd.wornFit + ' of ' + dd.worn);
+  await ev(()=>{ const t = townList().find(t=>(townFlavorAt(t.x, t.y)||{}).race==='halfling'); G.gameMode = 0; G.owPos = { x:t.x, y:t.y }; enterVillage(); setUi('playing'); G.interior = null; }); await wait(3000);
+  const hf = await ev(()=>{ const T = THREE, D = TPB.data, all = [...(V3.villagers||[]), ...(V3.npcs||[])].filter(p=>p.e && p.e.tp && !(p.v && p.v.animal)), out = { n:all.length, cut:0, feet:0 }, W = o=>new T.Vector3().setFromMatrixPosition(o.matrixWorld);
+    for (const p of all){ const e = p.e, tp = e.tp; p.g.updateMatrixWorld(true); const fm = tp.meshes.find(m=>/\.Feet/.test(m.name)); if (fm && fm.geometry.index.count < TPB.geo[fm.name.slice(3)].index.count*0.8) out.cut++;
+      const fb = ['foot_r', 'foot_l'].map(n=>W(tp.bones[D.bones.indexOf(n)])), hs = e.holder.matrixWorld.getMaxScaleOnAxis(); let k = 0; e.holder.traverse(m=>{ if (m.isMesh && m.userData.tpKeep && m.visible && fb.some(b=>W(m).distanceTo(b)/hs < 0.08)) k++; }); if (k >= 2) out.feet++; }
+    return out; }); console.log('halfling feet', JSON.stringify(hf));
+  A(hf.cut >= hf.n - 2 && hf.feet >= hf.n - 2, 'the halfling kit shoes cut off at the ankle and the drawn bare feet at the model ankles (FP-033): ' + JSON.stringify(hf));
   A(!errs.length, 'page errors: ' + errs.join(' | '));
 };

@@ -43788,6 +43788,7 @@ function m3dHumanoid(o){
     sh.end.add(f);
     if (o.legTrim){ const tm = m3dMat(mats, o.legTrim, 'metal');   /* (RS-585) a band round the top of the shin, under the knee, and one above the ankle */
       for (const [g, y, r] of [[kn, -0.012, 0.037], [sh.end, 0.03, 0.03]]){ const ring = new T.Mesh(new T.TorusGeometry(r*b*TH, 0.0045*b, 8, 28), tm); ring.rotation.x = Math.PI/2; ring.position.y = y; ring.castShadow = true; g.add(ring); } }
+    if (tpDrawnFeet(o)) f.traverse(c=>{ if (c.isMesh) c.userData.tpKeep = 1; });   /* (FP-033: bare feet and a dragonborn's claws are the drawn ones, carried on the sculpted figure's ankles) */
     rig.legs.push({ hip, knee:kn, ankle:f, s });   /* (RS-376: the foot turns at the ankle) */
   }
   // torso
@@ -48517,6 +48518,13 @@ function tpPartTint(mt, k, hex, tex, kk){ mt.color.copy(tpTint(hex, tex)); const
     if (!w) return; const t = new T.Color(hex).convertSRGBToLinear().multiplyScalar(TP_ALB*(kk || 1)); mt.color.setRGB(Math.min(4, t.r*w/Math.max(0.01, m[0])), Math.min(4, t.g*w/Math.max(0.01, m[1])), Math.min(4, t.b*w/Math.max(0.01, m[2]))); }catch(e){} };
   if (im.complete && im.naturalWidth) go(); else im.addEventListener('load', go, { once:true }); }
 /* FP-028: a dwarf's great beard or a braided one (styles from 3) is the drawn one, sculpted and carried on the model's head; the kit's one short beard serves the rest */
+function tpDrawnFeet(o){ return o.feet==='bare' || o.feet==='dclaw'; }   /* (FP-033: a halfling's hairy feet, an elf's long toes, a dragonborn's claws - the kit has only shoes) */
+/* FP-033: the kit's Feet piece is the shin and the shoe in one - cut at the ankle (a triangle stays when each corner's heaviest bone is a thigh or
+   a calf), the shin stays and the drawn bare foot is carried to the model's ankle in its place */
+function tpShinGeo(k, base, inv){ const key = k + '|shin|' + (base.uuid); if (TPB.geo[key]) return TPB.geo[key]; const T = THREE, D = TPB.data, g = base.clone(), SI = g.attributes.skinIndex, SW = g.attributes.skinWeight, leg = D.bones.map(n=>/^(thigh|calf)_/.test(n));
+  const top = i=>{ let b = 0, w = -1; for (let j=0;j<4;j++){ const x = SW.getComponent(i, j); if (x > w){ w = x; b = SI.getComponent(i, j); } } return b; }, ix = g.index.array, keep = [];
+  for (let t=0;t<ix.length;t+=3){ if (leg[top(ix[t])] && leg[top(ix[t+1])] && leg[top(ix[t+2])]) keep.push(ix[t], ix[t+1], ix[t+2]); }
+  g.setIndex(new T.BufferAttribute(ix instanceof Uint32Array ? new Uint32Array(keep) : new Uint16Array(keep), 1)); g.computeBoundingSphere(); return TPB.geo[key] = g; }
 function tpDrawnBeard(o){ return !!(o.beard && (o.greatBeard || (o.beardStyle|0) >= 3)); }
 function tpParts(o){ const D = TPB.data, S = o.fem ? 'f' : 'm', kit = TP_RANGER.test(o.outfit || '') ? 'ranger' : 'peasant', drake = o.head==='drake', out = drake ? [] : [S + '.head', S + '.eyes', S + '.brows'];   /* (FP-030: a dragonborn keeps the drawn head, scales and all) */
   for (const k in D.parts) if (k.startsWith(S + '.' + kit + '.') && !/Head_Hood/.test(k)) out.push(k);
@@ -48574,6 +48582,8 @@ function tpAttach(e, pt, K){
     const cM = mb.getCenter(new T.Vector3()), cD = dbw.getCenter(new T.Vector3()), ratio = (mb.max.y - mb.min.y)/Math.max(0.01, dbw.max.y - dbw.min.y);
     const A = new T.Matrix4().makeTranslation(cM.x, cM.y, cM.z).multiply(new T.Matrix4().makeScale(ratio, ratio, ratio)).multiply(new T.Matrix4().makeTranslation(-cD.x, -cD.y, -cD.z));
     carry[hk] = Wc[hi].clone().invert().multiply(A).multiply(Jh); } }catch(err){ console.error(err); }
+  if (K.feetFit) for (const k of [TP_MAP.findIndex(x=>x[0]==='foot_r'), TP_MAP.findIndex(x=>x[0]==='foot_l')]){ if (k < 0) continue; const cD = new T.Vector3().setFromMatrixPosition(J[k].matrixWorld), cM = new T.Vector3().setFromMatrixPosition(Wc[bi[k]]);   /* (FP-033: the drawn bare foot set at the model's ankle - the legs' lengths differ) */
+    carry[k] = Wc[bi[k]].clone().invert().multiply(new T.Matrix4().makeTranslation(cM.x - cD.x, cM.y - cD.y, cM.z - cD.z)).multiply(J[k].matrixWorld); }
   /* what's the figure's own body, hidden: every mesh but what's held or worn over it (weapon, shield, tome, quiver, cape, wings, helmet) */
   const keep = new Set([K.keepWeapon ? r.weapon : null, K.keepWeapon ? r.shield : null, r.tome, r.offWpn, r.quiver, r.cape, ...(r.wings || [])].filter(Boolean)), hide = [];   /* (FP-024: a creature's drawn weapon under the model's own) */
   const kept = o3=>{ for (let a = o3; a && a!==e.holder; a = a.parent) if (keep.has(a) || (a.userData && a.userData.tpKeep)) return true; return false; };
@@ -48746,7 +48756,8 @@ function tpKitFolk(pt){ if (G.villageRace==='orc' && !(pt && pt.o && pt.o.bulk))
   return Object.assign(tpKitPlayer(pt, true), { mon:true }); }
 function tpKitPlayer(pt, on){ const o = (pt && pt.o) || {}, P = tpParts(o), S = o.fem ? 'f' : 'm', D = TPB.data, bk = o.bulk || 1;
   const fat = Math.abs(bk - 1) > 0.01 ? { torso:bk, limb:1 + (bk - 1)*0.6, hand:1 + (bk - 1)*0.3, key:bk.toFixed(3) } : null;   /* (FP-028: the look's bulk - a dwarf's, a big frame's - as the build) */
-  return { on:on!=null ? on : tpOn(), P, inv:TPB.inv, bodyInv:D.parts[S + '.' + P.kit + '.Body'].inv, part:k=>D.parts[k], geo:fat ? k=>tpFatGeo(k, fat, TPB.inv[D.parts[k].inv]) : tpGeo, tex:tpTex, keepWeapon:true, mon:false, headScale:o.headScale || 1, headPart:S + '.head',
+  const geo0 = fat ? k=>tpFatGeo(k, fat, TPB.inv[D.parts[k].inv]) : tpGeo, feet = tpDrawnFeet(o), geo = feet ? k=>(/\.Feet/.test(k) ? tpShinGeo(k, geo0(k), TPB.inv[D.parts[k].inv]) : geo0(k)) : geo0;   /* (FP-033: the shoes cut off for the drawn feet) */
+  return { on:on!=null ? on : tpOn(), P, inv:TPB.inv, bodyInv:D.parts[S + '.' + P.kit + '.Body'].inv, part:k=>D.parts[k], geo, tex:tpTex, keepWeapon:true, mon:false, headScale:o.headScale || 1, headPart:S + '.head', feetFit:feet,
     dress:(mt, k, pd)=>{ const T = THREE; mt.userData.kind = /Regular|Superhero/.test(pd.tex) ? 'skin' : /Hair/.test(pd.tex) ? 'hair' : 'cloth'; m3dRimify(mt);   /* (the drawn figures' rim, and on skin their warm light through it) */
       if (/Regular|Superhero/.test(pd.tex)) tpPartTint(mt, k, o.skin || '#c9a07c', pd.tex);
       else if (/Hair/.test(pd.tex)) tpPartTint(mt, k, k==='hair.Beard' ? (o.beard || o.hair || '#4a3018') : (o.hair || '#4a3018'), pd.tex, 0.7);   /* (the drawn hair darker still between its strands) */
@@ -51716,7 +51727,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'fp-032';
+const GAME_VERSION = 'fp-033';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

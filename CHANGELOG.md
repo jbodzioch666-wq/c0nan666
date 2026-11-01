@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## FP-033 - Bare Feet
+
+- **Halflings and wood elves go barefoot again, and dragonborn have their claws.** The sculpted body's shoes are cut off at the ankle, and the drawn feet - the halfling's big hairy ones, the elf's long toes, the dragonborn's scaled claws - are carried on the sculpted figure's ankles.
+- The same goes for your own figure when its look has bare feet.
+
 ## FP-032 - Sculpted Gathering Trees
 
 - **With the land's sculpted kit on, the trees you cut are the kit's too:** the oak, maple, yew, ancient and magic trees are the Stylized Nature pieces, scaled to the drawn trees' heights, their leaves tinted to each kind's own colour, the magic tree's leaves glowing.
