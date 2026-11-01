@@ -2,11 +2,11 @@
 // shirt (none) - the drawn figure beside the model from five sides (shots/zwe5_<set>_<mode>_<view>.png), and the drawn chest's bounds
 // against the model's torso in the holder's frame
 module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.on('pageerror', e=>errs.push(String(e).slice(0, 300)));
-  const set = process.env.ZW_SET || 'plate', race = +(process.env.ZW_RACE || 0);
-  await page.evaluate(([set, race])=>{ window.__noLock = true; goToCharCreate(); ccSelectRace(race); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{}; window.__tpOn = tpOn;
-    const fam = { plate:'metal', robe:'cloth', hide:'hide' }[set], tier = { plate:5, robe:3, hide:5 }[set];
+  const set = process.env.ZW_SET || 'plate', race = +(process.env.ZW_RACE || 0), fem = process.env.ZW_FEM==='1', capeT = +(process.env.ZW_CAPE || 2), off = process.env.ZW_OFF || '', tier = process.env.ZW_TIER ? +process.env.ZW_TIER : null, legT = process.env.ZW_LEGS ? +process.env.ZW_LEGS : null, tag = process.env.ZW_TAG || '';
+  await page.evaluate(([set, race, fem, capeT, off, tier0, legT0])=>{ window.__noLock = true; goToCharCreate(); ccSelectRace(race); if (fem){ const L = lookTarget(); L.body = 1; } ccBegin(); window.__legT = legT0; if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{}; window.__tpOn = tpOn;
+    const fam = { plate:'metal', robe:'cloth', hide:'hide' }[set], tier = tier0!=null ? tier0 : { plate:5, robe:3, hide:5 }[set];
     if (fam) for (const sl of ['chest', 'legs', 'head', 'arms', 'feet']){ G.gear[sl] = rsMakeArmour(fam, tier, sl); G.gear[sl].used = true; }
-    G.gear.cape = rsMakeCape(2, 'Red Cape'); G.gear.cape.used = true; openDyeWorks(); renderOverlay(); }, [set, race]);
+    if (window.__legT!=null && fam){ G.gear.legs = rsMakeArmour(fam, window.__legT, 'legs'); G.gear.legs.used = true; } G.gear.cape = rsMakeCape(capeT, 'Red Cape'); G.gear.cape.used = true; if (off==='shield'){ G.gear.offhand = rsMakeArmour('metal', tier, 'offhand'); G.gear.offhand.used = true; G.gear.weapon = rsMakeWeapon(3, 2); G.gear.weapon.used = true; } if (off==='tome'){ G.gear.offhand = rsMakeArmour('cloth', tier, 'offhand'); G.gear.offhand.used = true; G.gear.weapon = rsMakeStaff ? rsMakeStaff(3) : G.gear.weapon; if (G.gear.weapon) G.gear.weapon.used = true; } openDyeWorks(); renderOverlay(); }, [set, race, fem, capeT, off, tier, legT]);
   for (const mode of ['drawn', 'model']){
     const r = await page.evaluate(async mode=>{ tpOn = mode==='model' ? window.__tpOn : ()=>false; LP.key = ''; if (LP.e) LP.scene.remove(LP.e.holder); LP.e = null; let k = 0; do { await new Promise(r=>requestAnimationFrame(r)); } while ((LP.pend || !LP.e) && k++ < 900);
       for (let i=0;i<3;i++) await new Promise(r=>requestAnimationFrame(r)); const T = THREE, e = LP.e, r = e.rig, D = TPB.data, Li = new T.Matrix4().copy(e.holder.matrixWorld).invert();
@@ -20,6 +20,6 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
       return out; }, mode); console.log(mode, JSON.stringify(r));
     for (const [view, yaw, zoom] of [['front', 0, 1], ['side', Math.PI/2, 1], ['back', Math.PI, 1], ['three', 0.6, 1], ['chest', 0.6, 1.9]]){
       await page.evaluate(async ([yaw, zoom])=>{ LP.yaw = yaw; LP.zoom = zoom; LP.panY = null; for (let i = 0; i < 4; i++) await new Promise(r=>requestAnimationFrame(r)); }, [yaw, zoom]);
-      await (await page.$('#lpSlot canvas')).screenshot({ path:__dirname + '/shots/zwe5_' + set + '_' + mode + '_' + view + '.png' }); } }
+      await (await page.$('#lpSlot canvas')).screenshot({ path:__dirname + '/shots/zwe5_' + set + tag + '_' + mode + '_' + view + '.png' }); } }
   if (errs.length) throw new Error('page errors: ' + errs.join(' | '));
 };

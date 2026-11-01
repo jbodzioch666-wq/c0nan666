@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## FP-038 - Gear Fitted to the Sculpted Body
+
+- **Pauldrons, brooches and the cape's yoke sit on the sculpted figure's own shoulders,** which are narrower and lower than the old figure's they were cut for. The cape no longer hangs off to one side.
+- **A hunched wood elf's cape clears the hump** instead of cutting through it.
+- **The wood elf's horn is gone:** the old figure's long nose, carried onto the sculpted head, stood off the brow like a horn. The face is shaped long and thin instead.
+- **A shield carried out of a fight hangs at the hip** on the forearm as it did, not low behind the leg; a shield or weapon put away on the back goes with the upper back when the figure bends.
+- **Robes:** the trim down the front, rune stitching, a tabard and its device lie on the sculpted chest instead of floating where the old chest was (on a woman the trim stood out in the air in front of the bust), and the trousers' waistband no longer pokes through the robe's gathered waist.
+
 ## FP-037 - Your Gear on the Sculpted Body, and the Face Sliders
 
 - **Armour and clothes show on the sculpted figure again.** Plate, chain, leather and robes are drawn in the same materials the old figure used, on the sculpted body: a rune platebody is rune metal, a dragonhide body is leather, a mystic robe is its cloth. Legs, gloves and boots each take their own gear's colour and material; the hands and shoes are cut off their parts so gauntlets and boots can differ from the sleeves and trousers.

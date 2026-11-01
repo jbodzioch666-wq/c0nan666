@@ -16,13 +16,13 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
         head:+(W(tp.bones[D.bones.indexOf('Head')]).distanceTo(W(e.rig.head))/e.holder.matrixWorld.getMaxScaleOnAxis()).toFixed(3), face:[...document.querySelectorAll('.bdhead')].some(h=>h.textContent==='FACE'),
         ...(()=>{ const Li = new T.Matrix4().copy(e.holder.matrixWorld).invert(), hs = e.holder.matrixWorld.getMaxScaleOnAxis(), Lp = n=>W(tp.bones[D.bones.indexOf(n)]).applyMatrix4(Li), fw = new T.Vector3(0, 0, 1).transformDirection(tp.bones[D.bones.indexOf('Head')].matrixWorld).transformDirection(Li);
           const bm = tp.meshes.find(m=>/Body$/.test(m.name)); let tail = null; if (e.rig.tail){ tail = 0; e.rig.tail.traverse(m=>{ if (m.isMesh && vis(m)) tail++; }); } let nose = 0; e.holder.traverse(m=>{ if (m.isMesh && m.userData.tpKeep && vis(m) && m.geometry.type==='ConeGeometry' && m.geometry.parameters.height > 0.04 && m.geometry.parameters.height < 0.045) nose++; });
-          return { lean:+((Lp('neck_01').z - Lp('pelvis').z)).toFixed(3), headUp:+fw.y.toFixed(2), hump:!!bm && Object.entries(TPB.geo).some(([k, g])=>g===bm.geometry && k.includes('|hump|')), tail, nose }; })() }; }, i);
+          const hm = tp.meshes.find(m=>/\.head$/.test(m.name)); return { headFace:!!hm && Object.keys(TPB.geo).some(k=>TPB.geo[k]===hm.geometry && k.includes('|face|')), lean:+((Lp('neck_01').z - Lp('pelvis').z)).toFixed(3), headUp:+fw.y.toFixed(2), hump:!!bm && Object.entries(TPB.geo).some(([k, g])=>g===bm.geometry && k.includes('|hump|')), tail, nose }; })() }; }, i);
     console.log(JSON.stringify(r));
     A(r.tp && r.shown===r.meshes && r.bodyLeft===0, r.race + ': the preview is the model, the drawn body hidden');
     A(r.head < 0.12, r.race + ': the model head at the drawn head');
     A(r.face, r.race + ': the face sliders shown (FP-037: back, shaping the sculpted head)');
     A(Math.abs(r.headUp) < 0.3, r.race + ': the model looks ahead, not up or down: ' + r.headUp);
-    if (r.race==='Wood Elf') A(r.lean > 0.08 && r.hump && r.nose===1, 'the wood elf hunched (the neck well ahead of the hips), the hump on the back and the long drawn nose (FP-036): ' + JSON.stringify(r));
+    if (r.race==='Wood Elf') A(r.lean > 0.08 && r.hump && r.headFace && r.nose===0, 'the wood elf hunched (the neck well ahead of the hips), the hump on the back and a long nose shaped into the head, no cone (FP-038): ' + JSON.stringify(r));
     if (!/Wood Elf|Half-Orc/.test(r.race)) A(r.lean < 0.06 && !r.hump, r.race + ': stands straight, no hump');
     if (r.race==='Dragonborn' || r.race==='Tiefling') A(r.tail > 0, r.race + ': the tail shows on the model (FP-036)');
     try{ await (await page.$('#lpSlot canvas')).screenshot({ path:__dirname + '/shots/fp035_' + r.race.replace(/\W+/g, '_') + '.png' }); }catch(e){}
