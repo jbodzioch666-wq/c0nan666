@@ -8,7 +8,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); page.on('pageerror', e
       for (const [dx, dy] of [[0,1],[1,0],[0,-1],[-1,0]]){ const x = q.x + dx, y = q.y + dy; if (o3Passable(x, y) && G.ow.map[x][y]!==OW_WATER && !skNodeAt(x, y)){ n = q; st = [x, y]; break; } } }
     if (!n) return { none:true }; G.owPos = { x:st[0], y:st[1] }; owReveal(st[0], st[1], 8); window.__zn = n; return { n:[n.x, n.y], st }; });
   console.log(JSON.stringify(r)); if (r.none) return;
-  await wait(1500); await ev(()=>{ if (!SET.fpView) fpvToggle(); }); await wait(1500);
+  await wait(1500); await ev(a=>{ if (!SET.fpView) fpvToggle(); if (a) SET.fpArms = a; }, process.env.ZS_ARMS || ''); await wait(1500);   /* (FP-020: ZS_ARMS=model)*/
   const st = tag=>ev(tag=>{ const e = O3.player.e, rr = e.rig; return JSON.stringify({ tag, ui:G.ui, g:!!G.gather, offKind:FPW.offKind, offG:!!(FPW.offG && FPW.offG.parent), figShield:!!rr.shield, sheathed:rr.sheathed, toolKey:e.toolKey, style:FPW.style, work:FPW.work, gone:!!(skNodeAt(__zn.x, __zn.y)||{}).gone, fight:e.fight }); }, tag).then(console.log);
   await st('before'); await page.screenshot({ path:'tools/tests/out/zfpsh0.png' });
   await ev(()=>{ skDo(skNodeOption(__zn)); });

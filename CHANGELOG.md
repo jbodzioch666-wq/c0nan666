@@ -1,5 +1,16 @@
 # Depthcrawl patch notes
 
+## FP-020 - Sculpted Arms (test)
+
+You wanted to see whether ready-made models would look better than the game's own. This is a first try: your arms and hands through your eyes as a sculpted, textured model, beside the drawn ones.
+
+- **A new setting: your arms through your eyes - drawn, or sculpted model (test).** Off by default; switch it in the settings to compare.
+- **The model is Quaternius's Universal Base Character** (free to use, CC0): real hands with knuckles, veins and nails, cut from the body and built into the game, about half a megabyte.
+- **It moves with your own figure.** Each hand goes where your figure's fist is and closes round the hilt, haft or staff; the forearm runs from the figure's elbow, the upper arm from its shoulder. Every weapon, tool and swing you had before works with it.
+- **Dressed as you are.** Your skin's colour; gloves and gauntlets over the hands; sleeves, leather and plate vambraces over the arms, with a clean cuff; a shirt's sleeve rolled to mid-forearm.
+- **Bare fists come up in a proper guard**, knuckles forward and in line with the forearm.
+- Shooting (bows and the like) still uses the drawn hands.
+
 ## FP-019 - Clear View
 
 You showed a brown slab across the whole view with a pale blob beside it. That was your staff: put away, it hangs on your back, and your eyes sat right where it hangs; the blob was your own hand at your side, a finger's breadth from the eye.

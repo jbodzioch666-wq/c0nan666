@@ -17,6 +17,9 @@ module.exports = async page=>{ page.setDefaultTimeout(0); page.on('pageerror', e
     if (off!=='keep') G.gear.offhand.used = off!=='none'; FPW.wkey = ''; if (!SET.fpView) fpvToggle(); }, [process.env.ZF_W || '2', process.env.ZF_OFF || 'kite']);
   if (process.env.ZF_SG) await ev(v=>{ window.__zShieldG = v; }, JSON.parse(process.env.ZF_SG));
   if (process.env.ZF_EYE) await ev(v=>{ window.__zFightEye = v; }, JSON.parse(process.env.ZF_EYE));
+  if (process.env.ZF_ARMS) await ev(v=>{ SET.fpArms = v; }, process.env.ZF_ARMS);   /* (FP-020: 'model' for the sculpted arms) */
+  if (process.env.ZF_PRE) await page.evaluate(process.env.ZF_PRE);
+  if (process.env.ZF_FPAOFF) await ev(v=>{ window.__fpaOff = v; FPA.cal = {}; }, JSON.parse(process.env.ZF_FPAOFF));
   await wait(1200);
   const st = ()=>ev(()=>{ const T = THREE, e = ISO.player, r = e.rig, out = { wpn:G.gear.weapon && G.gear.weapon.used ? G.gear.weapon.nm : null, fight:rsFightNow(), aud:audInFight(), efight:e.fight, pitch:+(FP.pitch||0).toFixed(2), mir:!!(FPW.mir && FPW.mir.wp), shK:r.shK, sheathed:r.sheathed, swing:+(FP.swing||0).toFixed(2), off:FPW.offKind, offVis:FPW.offG && FPW.offG.visible, face:+(e.face||0).toFixed(2), cam:+(FP.cam ? FP.cam.a : 0).toFixed(2), pos:[+e.pos.x.toFixed(2), +e.pos.y.toFixed(2)], fpm:[+FPM.x.toFixed(2), +FPM.y.toFixed(2)] };
     FPW.scene.updateMatrixWorld(true); const pr = o=>{ const v = o.getWorldPosition(new T.Vector3()); const z = v.z; v.project(FPW.cam); return [+v.x.toFixed(2), +v.y.toFixed(2), z < 0 ? 'front' : 'behind']; };
@@ -30,7 +33,10 @@ module.exports = async page=>{ page.setDefaultTimeout(0); page.on('pageerror', e
   if (sheath || process.env.ZF_GUARD==='1') return;
   const P = JSON.parse(process.env.ZF_P || '[1,0.8,0.62,0.54,0.45,0.25]');
   for (let i=0;i<P.length;i++){ await ev(async v=>{ const t = performance.now() + 250; while (performance.now() < t){ FP.swing = v; renderGame(); await new Promise(r=>requestAnimationFrame(r)); } FP.swing = v; renderGame(); }, P[i]);
-    console.log('P' + i + ' swing ' + P[i], JSON.stringify(await st())); await page.screenshot({ path:'tools/tests/out/zfpmir2-' + i + '.png' }); }
+    console.log('P' + i + ' swing ' + P[i], JSON.stringify(await st())); await page.screenshot({ path:'tools/tests/out/zfpmir2-' + i + '.png' });
+    if (process.env.ZF_ZOOM) for (const hi of [0, 1]){ const url = await ev(([hi, fov])=>{ const T = THREE, h = FPW.mir.hands[hi], p = h.getWorldPosition(new T.Vector3()), c = FPW.cam.clone(); c.fov = fov; c.updateProjectionMatrix(); c.lookAt(p); const v0 = FPA.mesh && FPA.mesh.visible; FPW.r.render(FPW.scene, c); return FPW.cv.toDataURL('image/png'); }, [hi, +process.env.ZF_ZOOM]);
+      require('fs').writeFileSync('tools/tests/out/zfpmir2-' + i + (hi ? 'L' : 'R') + '.png', Buffer.from(url.split(',')[1], 'base64')); } }
+  if (process.env.ZF_EVAL) console.log('EVAL', JSON.stringify(await page.evaluate(process.env.ZF_EVAL)));
   if (process.env.ZF_ISO!=='1') return;
   /* the same from above, close in, for a reference */
   await ev(()=>{ fpvToggle(); ISO.dist = 7; }); await wait(800);

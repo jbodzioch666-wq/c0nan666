@@ -21,6 +21,10 @@ mv "$STAGE/package/build/three.min.js" "$STAGE/three.min.js"; mv "$STAGE/package
 curl -fsSL -A "$UA" "$FONTS_CSS" -o "$STAGE/fonts/google.css"
 curl -fsSL "https://raw.githubusercontent.com/google/fonts/main/ofl/cinzel/OFL.txt" -o "$STAGE/licenses/Cinzel-OFL.txt"
 curl -fsSL "https://raw.githubusercontent.com/google/fonts/main/ofl/jetbrainsmono/OFL.txt" -o "$STAGE/licenses/JetBrainsMono-OFL.txt"
+printf 'The first-person arms model (fpArmsData in index.html) is cut from Quaternius'"'"'s Universal Base Characters, with two poses from
+his Universal Animation Library: both released under CC0 1.0 Universal (Public Domain Dedication),
+https://creativecommons.org/publicdomain/zero/1.0/ - models by @Quaternius, https://quaternius.com
+' > "$STAGE/licenses/Quaternius-CC0.txt"
 
 # (on Windows, python3 can be the Store's stand-in that only prints a message: use whichever Python really runs)
 PY=python3; "$PY" -c '' 2>/dev/null || PY=python
