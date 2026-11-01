@@ -1,5 +1,17 @@
 # Depthcrawl patch notes
 
+## FP-021 - Sculpted Figure (test)
+
+You picked the Quaternius look from the style comparison. This is the first step: your own figure, seen from above, as a sculpted, textured model, beside the drawn one.
+
+- **A new setting: your figure - drawn, or sculpted model (test).** Off by default; switch it in the settings to compare.
+- **The model is Quaternius's work** (free to use, CC0): a body and face for a man or a woman, five hairstyles and a beard, and two outfits from his fantasy set. Leather, mail and plate get the ranger's jerkin and boots; robes, shirts and bare skin get the peasant's tunic.
+- **It moves as your figure moves.** Standing and walking it breathes, walks and jogs with his own animations, its stride matched to your pace. In a fight, swinging, casting, working, sitting by the fire or burying bones, its arms and legs take your figure's own pose, so every swing and stance you had before still shows.
+- **What you carry goes with it.** Your weapon sits in its fist, the shield on its arm, the sword on its hip and the shield on its back when put away, and your helmet on its head.
+- **Your colours.** Its skin and hair take your skin and hair colour, matched to how the drawn figure shows them; plate is tinted to your armour.
+- **Everywhere you walk:** below ground, in towns and on the open land. Through your eyes the model is never drawn.
+- It adds about 3.6 MB to the page.
+
 ## FP-020 - Sculpted Arms (test)
 
 You wanted to see whether ready-made models would look better than the game's own. This is a first try: your arms and hands through your eyes as a sculpted, textured model, beside the drawn ones.

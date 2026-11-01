@@ -22,7 +22,9 @@ curl -fsSL -A "$UA" "$FONTS_CSS" -o "$STAGE/fonts/google.css"
 curl -fsSL "https://raw.githubusercontent.com/google/fonts/main/ofl/cinzel/OFL.txt" -o "$STAGE/licenses/Cinzel-OFL.txt"
 curl -fsSL "https://raw.githubusercontent.com/google/fonts/main/ofl/jetbrainsmono/OFL.txt" -o "$STAGE/licenses/JetBrainsMono-OFL.txt"
 printf 'The first-person arms model (fpArmsData in index.html) is cut from Quaternius'"'"'s Universal Base Characters, with two poses from
-his Universal Animation Library: both released under CC0 1.0 Universal (Public Domain Dedication),
+his Universal Animation Library. The sculpted figure (tpBodyData in index.html: bodies, heads, hair, the peasant and ranger outfits,
+its idle, walk and jog) is made from his Universal Base Characters, Modular Character Outfits - Fantasy and Universal Animation
+Library. All released under CC0 1.0 Universal (Public Domain Dedication),
 https://creativecommons.org/publicdomain/zero/1.0/ - models by @Quaternius, https://quaternius.com
 ' > "$STAGE/licenses/Quaternius-CC0.txt"
 
