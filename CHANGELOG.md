@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## FP-032 - Sculpted Gathering Trees
+
+- **With the land's sculpted kit on, the trees you cut are the kit's too:** the oak, maple, yew, ancient and magic trees are the Stylized Nature pieces, scaled to the drawn trees' heights, their leaves tinted to each kind's own colour, the magic tree's leaves glowing.
+- **The axe's notch and chips sit on the kit trunk,** which is fatter than the drawn one; felling, the stump and the shake are as before.
+- The willow keeps its drawn dome, and the jungle's crowns stay drawn. With the land setting off, every tree is drawn as before.
+
 ## FP-031 - Flashes and the Puglin's Neck
 
 - **The sculpted figures flash when hit,** as the drawn ones always did: your own figure, the townsfolk and the sculpted monsters.

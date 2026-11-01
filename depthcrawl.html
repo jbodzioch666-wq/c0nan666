@@ -38949,6 +38949,7 @@ const O3_JUNGLE_CROWN = { tree:[[0, 1.0, 0, 1.35, 0.42, 1.35], [0.15, 1.28, 0.05
   maple:[[0, 1.05, 0, 1.5, 0.42, 1.5], [0.12, 1.36, 0.05, 1.0, 0.36, 1.0], [-0.3, 0.86, 0.25, 0.85, 0.3, 0.85]], yew:[[0, 0.8, 0, 1.3, 0.38, 1.3], [0, 1.12, 0, 1.0, 0.34, 1.0], [0, 1.4, 0, 0.7, 0.3, 0.7]],
   ancient:[[0, 1.2, 0, 1.9, 0.5, 1.9], [0.45, 1.05, 0.3, 1.1, 0.4, 1.1], [-0.3, 1.5, -0.25, 1.2, 0.4, 1.2]] };
 function o3NodeTree(type, jungle){
+  if (!jungle && nkOn()){ const k = o3NodeTreeKit(type); if (k) return k; }   /* (FP-032: with the land's kit on, a gathering tree is the kit's too) */
   const T = THREE, g = new T.Group(), G3 = o3NodeGeo(), jc = jungle && O3_JUNGLE_CROWN[type], c = jc ? (type==='yew' ? '#1e4a24' : type==='maple' ? '#3a7a2a' : '#2c6a2a') : SK_TREE[type].canopy;
   const bark = o3NodeMat('bark'+(type==='magic'?'m':type==='willow'?'w':''), type==='magic' ? '#c8c8d8' : type==='willow' ? '#4a3a28' : '#5a4028');
   const leaf = o3NodeMat('leaf_'+type+(jc ? '_j' : ''), c, type==='magic' ? { emissive:new T.Color(c).convertSRGBToLinear(), emissiveIntensity:0.55 } : { flatShading:true }); leaf.shadowSide = T.DoubleSide;   /* (RS-599: the willow's open dome threw only part of its shadow - a crescent) */
@@ -38969,6 +38970,17 @@ function o3NodeTree(type, jungle){
   g.scale.setScalar(0.72);
   return g;
 }
+/* FP-032: the gathering trees as the land kit's (FP-023's Stylized Nature pieces): a type's piece, its scale to the drawn tree's height
+   and its trunk's radius against the drawn trunk's (rk: the axe's notch and chips sit on the fatter trunk), the leaves tinted to the
+   type's canopy (nkTint: the canopy over the texture's mean), the magic tree's leaves glowing; the willow (its open dome) and the jungle
+   crowns stay drawn. The materials are shared by type */
+const NK_NODE = { oak:['oak1', 0.87, 1.41], maple:['oak2', 0.73, 1.48], yew:['pine3', 0.78, 1.04], ancient:['oak1', 1.2, 1.53], magic:['oak3', 0.99, 2.4] };
+function nkTint(hex, mk){ const T = THREE, t = NK.data.tex[NK.data.mats[mk].map], c = new T.Color(hex).convertSRGBToLinear(); if (!t || !t.mean) return c;
+  const m = new T.Color(t.mean[0]/255, t.mean[1]/255, t.mean[2]/255).convertSRGBToLinear(); return new T.Color(Math.min(4, c.r/Math.max(0.02, m.r)), Math.min(4, c.g/Math.max(0.02, m.g)), Math.min(4, c.b/Math.max(0.02, m.b))); }
+function o3NodeTreeKit(type){ const d = NK_NODE[type]; if (!d) return null; const T = THREE, [key, sc, rk] = d, parts = nkParts(key, 0.19); if (!parts) return null; const g = new T.Group(), can = SK_TREE[type].canopy, M = NK.nodeMats || (NK.nodeMats = {});
+  for (const [kind, geo, mk] of parts){ const ck = type + '|' + mk; let mt = M[ck]; if (!mt){ mt = M[ck] = nkMat(mk); if (kind==='leaf'){ mt.color.copy(nkTint(can, mk)); mt.userData.leafDepth = type==='yew' ? 'c' : 'b'; if (type==='magic'){ mt.emissive = new T.Color(can).convertSRGBToLinear(); mt.emissiveIntensity = 0.4; } } else if (type==='magic') mt.color.copy(nkTint('#c8c8d8', mk)); }
+    const m = new T.Mesh(geo, mt); m.castShadow = true; m.receiveShadow = kind!=='leaf'; g.add(m); }
+  g.scale.setScalar(sc); g.userData.rk = rk; return g; }
 // the spots you can see: rebuilt when the set of them (or their state) changes
 // (RS-338) the gathering spots are built in chunks of 6 by 6 tiles, each kept until something in it changes (a tree felled, a
 // patch picked, a starlily opening) or it falls out of range - walking only builds the chunks coming into view. They used to
@@ -39769,16 +39781,16 @@ function o3ChopTick(dt){
     tr.rotation.y = skNH(n.x, n.y, 720)*6.28; obj.add(tr); obj.position.set(gx, O3.heightAt(gx, gz), gz); obj.scale.setScalar(sz); O3.scene.add(obj);
     const nm = new T.Mesh(chopNotchGeo(), O3.notchMat || (O3.notchMat = new T.MeshStandardMaterial({ vertexColors:true, roughness:0.85, polygonOffset:true, polygonOffsetFactor:-2 }))); nm.visible = false; obj.add(nm);
     const a = Math.atan2(px - gx, pz - gz); nm.rotation.y = a;
-    C = O3.chop = { key, x:n.x, y:n.y, type:n.type, obj, notch:nm, sc:O3.scene, a, ux:Math.sin(a), uz:Math.cos(a), sz, jt:9, hits:0, cutY:null }; }
+    C = O3.chop = { key, x:n.x, y:n.y, type:n.type, obj, notch:nm, sc:O3.scene, a, ux:Math.sin(a), uz:Math.cos(a), sz, jt:9, hits:0, cutY:null, rk:tr.userData.rk || 1 }; }   /* (FP-032: rk - the kit trunk's radius over the drawn one's) */
   if (C && O3.chopHit && O3.player.e.tool){ const e = O3.player.e, S = O3_TRUNK_S[C.type] || [1, 1], v = new T.Vector3(0, 0.66, 0.1); e.tool.updateWorldMatrix(true, false); e.tool.localToWorld(v);
     if (C.cutY===null) C.cutY = Math.max(0.06, Math.min(0.5, (v.y - C.obj.position.y)/C.sz/(0.72*o3TrunkH(C.type))));   /* (where the axe bit, up the trunk in its own units - the notch stays there) */
-    C.hits++; C.jt = 0; const yW = C.cutY*0.72*o3TrunkH(C.type)*C.sz, rW = o3ChopTrunkR(n, C.cutY), ob = C.obj.position;
+    C.hits++; C.jt = 0; const yW = C.cutY*0.72*o3TrunkH(C.type)*C.sz, rW = o3ChopTrunkR(n, C.cutY)*C.rk, ob = C.obj.position;
     chopBurst(O3.crig, new T.Vector3(ob.x + C.ux*rW, ob.y + yW, ob.z + C.uz*rW), C.ux, C.uz, new T.Vector3(ob.x, ob.y + (1.0 + O3_TREE_LIFT)*0.72*C.sz, ob.z), 0.42*C.sz);
     try{ audSkill('woodcutting'); }catch(err){} }
   O3.chopHit = 0;
   if (C && !C.fell){ C.jt += dt; const th = 0.05*Math.exp(-C.jt*5)*Math.sin(C.jt*26); C.obj.rotation.set(-th*C.uz, 0, th*C.ux);   /* (jolted away from you, and swaying back) */
     const S = O3_TRUNK_S[C.type] || [1, 1], prog = n.max ? 1 - n.left/n.max : 0, h = 0.07 + 0.11*Math.min(1, prog + C.hits*0.04);
-    C.notch.visible = C.hits > 0; if (C.hits){ const y = C.cutY, rr = (0.1 - 0.05*y)*S[0]*O3_TRUNK_W*0.72; C.notch.position.y = y*0.72*o3TrunkH(C.type); C.notch.scale.set(rr, h*0.72*S[1]*0.5, rr); } }
+    C.notch.visible = C.hits > 0; if (C.hits){ const y = C.cutY, rr = (0.1 - 0.05*y)*S[0]*O3_TRUNK_W*0.72*C.rk; C.notch.position.y = y*0.72*o3TrunkH(C.type); C.notch.scale.set(rr, h*0.72*S[1]*0.5, rr); } }
   chopRigTick(O3.crig, dt);
 }
 function o3NodeFromHit(a){ return a && a.kind==='node' ? skNodeAt(a.x, a.y) : null; }
@@ -51704,7 +51716,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'fp-031';
+const GAME_VERSION = 'fp-032';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
