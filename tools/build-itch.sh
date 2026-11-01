@@ -25,7 +25,8 @@ printf 'The first-person arms model (fpArmsData in index.html) is cut from Quate
 his Universal Animation Library. The sculpted figure (tpBodyData in index.html: bodies, heads, hair, the peasant and ranger outfits,
 its idle, walk and jog) is made from his Universal Base Characters, Modular Character Outfits - Fantasy and Universal Animation
 Library. The dungeon kit (dkitData in index.html: floor, wall, corner, doorframe and props) is from his Medieval Village MegaKit
-and Fantasy Props MegaKit. All released under CC0 1.0 Universal (Public Domain Dedication),
+and Fantasy Props MegaKit; the land kit (nkitData: trees, bushes, rocks) from his Stylized Nature MegaKit. All released under CC0 1.0
+Universal (Public Domain Dedication),
 https://creativecommons.org/publicdomain/zero/1.0/ - models by @Quaternius, https://quaternius.com
 ' > "$STAGE/licenses/Quaternius-CC0.txt"
 

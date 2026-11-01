@@ -1,5 +1,15 @@
 # Depthcrawl patch notes
 
+## FP-023 - Sculpted Land (test)
+
+The third step of the Quaternius look: the trees, bushes and rocks of the open land as his nature kit, beside the drawn ones.
+
+- **A new setting: the land's trees and rocks - drawn, or sculpted kit (test).** Off by default; switch it in the settings to compare.
+- **The woods are the kit's trees,** from his Stylized Nature megakit (free to use, CC0): three broadleaf trees, three pines, two dead trees, a flowering bush and three rocks, with real leaves and bark. Each tree picks its shape by where it stands, so a wood is never three of the same.
+- **Everything else is as it was:** the trees stand where they stood, sway as they swayed, turn with the seasons and throw their shadows on the grass. Birches are the pale broadleaf, cypresses the narrow pine.
+- **What stays drawn:** the trees you cut for wood, the willows, snow pines, palms, cacti, reeds and the jungle's giants.
+- It adds about 1.4 MB to the page.
+
 ## FP-022 - Sculpted Dungeon (test)
 
 The second step of the Quaternius look: the dungeons' stone as his kit, beside the drawn stone.
