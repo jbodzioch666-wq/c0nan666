@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## FP-034 - Stop Gathering with a Tap
+
+- **On a phone, a tap now stops your chopping, fishing or foraging.** Tapping the ground round your feet used to count as tapping the tree beside you, so the work just started again, and a tap on your own tile walked you nowhere and left you working. Now:
+- **A tap on the ground stops the work,** and walks you there if it's further off.
+- **A tap on the tree, rock or pool you're working stops you,** instead of starting over.
+- The ground you stand on no longer counts as the spot beside you.
+
 ## FP-033 - Bare Feet
 
 - **Halflings and wood elves go barefoot again, and dragonborn have their claws.** The sculpted body's shoes are cut off at the ankle, and the drawn feet - the halfling's big hairy ones, the elf's long toes, the dragonborn's scaled claws - are carried on the sculpted figure's ankles.
