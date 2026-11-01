@@ -24,7 +24,8 @@ curl -fsSL "https://raw.githubusercontent.com/google/fonts/main/ofl/jetbrainsmon
 printf 'The first-person arms model (fpArmsData in index.html) is cut from Quaternius'"'"'s Universal Base Characters, with two poses from
 his Universal Animation Library. The sculpted figure (tpBodyData in index.html: bodies, heads, hair, the peasant and ranger outfits,
 its idle, walk and jog) is made from his Universal Base Characters, Modular Character Outfits - Fantasy and Universal Animation
-Library. All released under CC0 1.0 Universal (Public Domain Dedication),
+Library. The dungeon kit (dkitData in index.html: floor, wall, corner, doorframe and props) is from his Medieval Village MegaKit
+and Fantasy Props MegaKit. All released under CC0 1.0 Universal (Public Domain Dedication),
 https://creativecommons.org/publicdomain/zero/1.0/ - models by @Quaternius, https://quaternius.com
 ' > "$STAGE/licenses/Quaternius-CC0.txt"
 

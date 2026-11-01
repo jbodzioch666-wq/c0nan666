@@ -1,5 +1,16 @@
 # Depthcrawl patch notes
 
+## FP-022 - Sculpted Dungeon (test)
+
+The second step of the Quaternius look: the dungeons' stone as his kit, beside the drawn stone.
+
+- **A new setting: the dungeon - drawn, or sculpted kit (test).** Off by default; switch it in the settings to compare.
+- **The floors and walls are the kit's uneven brick,** from his Medieval Village megakit (free to use, CC0): a tile on every open tile, a face on every wall, a block of rock trim at every outer corner.
+- **Tinted to the place.** Each theme's own stone colours the brick: grey in a dungeon, brown in a mine, dark in a necromancer's tower.
+- **The dressing is the kit's too, where it has the piece:** barrels, crates, rubble, chains and benches come from his Fantasy Props megakit.
+- **What stays drawn:** the stairs and the doorways at their heads, the pits, rune floors and pools, the catacombs' burial niches, and everything out of doors - a graveyard, a field, the Lost City.
+- It adds about 1.7 MB to the page.
+
 ## FP-021 - Sculpted Figure (test)
 
 You picked the Quaternius look from the style comparison. This is the first step: your own figure, seen from above, as a sculpted, textured model, beside the drawn one.
