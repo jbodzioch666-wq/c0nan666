@@ -1,11 +1,11 @@
 // FP-025: the townsfolk as the sculpted body (FP-026: always - the setting is gone, and an old save's tpFolk 'drawn' is ignored): in a town every person with a human rig carries the model (dressed by their look: a guard in the ranger kit, a villager in the
 // peasant's), their drawn bodies hidden and the model's head at the drawn head, the animals left as they are; the models follow the town's
-// walk
+// walk (FP-027: only in human and half-elven towns - a dwarven town's people stay drawn)
 module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.on('pageerror', e=>errs.push(String(e).slice(0, 300)));
   const A = (c, msg)=>{ if (!c) throw new Error('assert: '+msg); };
   const ev = (f, a)=>page.evaluate(f, a), wait = ms=>ev(async ms=>{ const t = performance.now() + ms; while (performance.now() < t){ renderGame(); await new Promise(r=>requestAnimationFrame(r)); } }, ms);
   await ev(()=>{ window.__noLock = true; window.__noWarmSlice = true; goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{}; G.player.wildWarned = 1; G.player.clock = DAY_LENGTH*0.4; PFX.camp = -1e9;
-    SET.tpFolk = 'drawn'; const t = townList()[0]; G.gameMode = 0; G.owPos = { x:t.x, y:t.y }; enterVillage(); setUi('playing'); G.interior = null; });
+    SET.tpFolk = 'drawn'; const t = townList().find(t=>(townFlavorAt(t.x, t.y)||{}).race==='human'); G.gameMode = 0; G.owPos = { x:t.x, y:t.y }; enterVillage(); setUi('playing'); G.interior = null; });
   await wait(3000);
   const look = ()=>ev(()=>{ const T = THREE, D = TPB.data, all = [...(V3.villagers||[]), ...(V3.npcs||[])], vis = o=>{ for (let a = o; a; a = a.parent) if (!a.visible) return false; return true; };
     const out = { folk:all.length, humans:0, tp:0, animals:0, animalTp:0, shown:0, modelHidden:0, headBad:0, kits:{}, walking:0, on:tpFolkOn() };
@@ -21,5 +21,8 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   A(m.animalTp===0, 'the animals as they were');
   A(m.kits.peasant > 0, 'villagers in the peasant\'s kit: ' + JSON.stringify(m.kits));
   A(m.walking===m.tp, 'the models follow the town\'s own walk');
+  await ev(()=>{ const t = townList().find(t=>(townFlavorAt(t.x, t.y)||{}).race==='dwarf'); G.gameMode = 0; G.owPos = { x:t.x, y:t.y }; enterVillage(); setUi('playing'); G.interior = null; }); await wait(3000);
+  const dw = await look(); console.log('dwarf', JSON.stringify(dw));
+  A(!dw.on && dw.humans >= 5 && dw.tp===0, 'the dwarves drawn');
   A(!errs.length, 'page errors: ' + errs.join(' | '));
 };

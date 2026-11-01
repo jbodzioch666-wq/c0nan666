@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## FP-027 - Every Race Its Own Look
+
+FP-026 gave every town the same sculpted human, so dwarves stood as tall as men, elves lost their pointed ears and dragonborn their snouts.
+
+- **Only human and half-elven towns have the sculpted townsfolk.** Their people look right on the shared body.
+- **Dwarven, halfling, gnomish, elven, wood-elven, orcish, dragonborn and tiefling towns are back to their drawn people,** with their own stature, ears, tusks, horns, hats and scaled heads.
+- Each of those races will get its own sculpted look in later patches.
+
 ## FP-026 - The Townsfolk Stay
 
 You liked the sculpted townsfolk, so they stay.
