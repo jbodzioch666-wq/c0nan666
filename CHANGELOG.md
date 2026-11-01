@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## FP-025 - Sculpted Townsfolk (test)
+
+The fifth step of the Quaternius look: the people of the towns as his body, beside the drawn ones. Nothing new to download: it is the same body your own figure uses.
+
+- **A new setting: the townsfolk - drawn, or sculpted model (test).** Off by default; switch it in the settings to compare.
+- **Every villager, guard, trader and master** stands as the sculpted man or woman, dressed by their own look: the ranger's jerkin and boots for those in leather or mail, the peasant's tunic for the rest, their own skin and hair, a beard where they had one.
+- **They go about their errands as before.** The model sits on each person's drawn figure, so their walks, their work and their turning to greet you are unchanged. The dogs, cats, chickens and cows stay drawn.
+- Switching the setting rebuilds the town you stand in.
+
 ## FP-024 - Sculpted Monsters (test)
 
 The fourth step of the Quaternius look: the first monsters as his models, beside the drawn ones.
