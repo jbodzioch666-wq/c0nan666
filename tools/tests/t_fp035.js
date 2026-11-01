@@ -1,6 +1,6 @@
 // FP-035: the sculpted body is your figure everywhere, the creator too: the tpBody setting is gone; in the character creator every
-// race's preview carries the model (its drawn body hidden, the model shown, its head at the drawn head) and the face sliders are gone
-// (the sculpted head has one face for each sex); FP-036: the model looks ahead; a wood elf's hunch, hump and long nose from the drawn one;
+// race's preview carries the model (its drawn body hidden, the model shown, its head at the drawn head) and the face sliders are shown
+// (FP-037: they shape the sculpted head); FP-036: the model looks ahead; a wood elf's hunch, hump and long nose from the drawn one;
 // a dragonborn's and a tiefling's tails shown on it; a shot of each race's preview into shots/fp035_<race>.png
 module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.on('pageerror', e=>errs.push(String(e).slice(0, 300)));
   const A = (c, msg)=>{ if (!c) throw new Error('assert: '+msg); };
@@ -20,7 +20,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
     console.log(JSON.stringify(r));
     A(r.tp && r.shown===r.meshes && r.bodyLeft===0, r.race + ': the preview is the model, the drawn body hidden');
     A(r.head < 0.12, r.race + ': the model head at the drawn head');
-    A(!r.face, r.race + ': no face sliders');
+    A(r.face, r.race + ': the face sliders shown (FP-037: back, shaping the sculpted head)');
     A(Math.abs(r.headUp) < 0.3, r.race + ': the model looks ahead, not up or down: ' + r.headUp);
     if (r.race==='Wood Elf') A(r.lean > 0.08 && r.hump && r.nose===1, 'the wood elf hunched (the neck well ahead of the hips), the hump on the back and the long drawn nose (FP-036): ' + JSON.stringify(r));
     if (!/Wood Elf|Half-Orc/.test(r.race)) A(r.lean < 0.06 && !r.hump, r.race + ': stands straight, no hump');
