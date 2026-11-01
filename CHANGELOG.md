@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## FP-031 - Flashes and the Puglin's Neck
+
+- **The sculpted figures flash when hit,** as the drawn ones always did: your own figure, the townsfolk and the sculpted monsters.
+- **The Puglin looks ahead.** The goblins' and kobolds' sculpted model carried its head tilted back, eyes on the ceiling, once its hunched neck was stood up on the drawn rig. Its head is now pitched down to look where the drawn goblin looks.
+
 ## FP-030 - Orcs, Tieflings and Dragonborn
 
 Every race's town has sculpted people now.

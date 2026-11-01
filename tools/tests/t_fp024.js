@@ -27,6 +27,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   A(!by('goblin archer').parts.includes('Stick') && by('goblin archer').wpVis, 'the archer keeps its drawn bow and loses the stick');
   A(by('imp').parts.includes('Mace') && by('imp').parts.length===5, 'the imp is the Imp, mace and all');
   A(m.every(o=>o.headGap < 0.12*o.sc), 'the model\'s head at the drawn head: ' + m.map(o=>o.headGap).join(','));
+  const fl = await ev(()=>G.mon.map(m=>{ const e = M3D.inst.get(m); return !!(e && e.tp && e.tp.meshes.every(x=>e.mats.includes(x.material))); })); A(fl.every(Boolean), 'the model flashes with a hit: its materials in the flash list (FP-031)');
   await ev(()=>{ if (!SET.fpView) fpvToggle(); }); await wait(1200);
   const f = await look(); console.log('fp', JSON.stringify(f.map(o=>[o.nm, o.tp, o.modelVis])));
   A(await ev(()=>fpv()) && f.every(o=>o.tp && o.modelVis), 'through your eyes the models still show');
