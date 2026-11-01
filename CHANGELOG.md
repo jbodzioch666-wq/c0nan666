@@ -1,5 +1,16 @@
 # Depthcrawl patch notes
 
+## FP-028 - Dwarves, Halflings and Gnomes
+
+The short races join the sculpted townsfolk, and what is worn on the head finally sits right.
+
+- **Dwarven, halfling and gnomish towns have sculpted people now.** They are the shared body built to the race: a dwarf stout through the chest and limbs, a halfling and a gnome with their bigger heads. Their height was always right; the dwarves were only too slim.
+- **Dwarves keep their great beards.** A braided or great beard is the drawn one, carried on the sculpted head and sized to it, so it hangs from the chin to the chest.
+- **Gnomes keep their tall hats and goggles.**
+- **Helmets, hats and beards fit the sculpted head.** The drawn heads are larger than the sculpted ones (a dwarf's nearly twice), so a helmet used to float above the model. Everything worn on the head is now scaled and placed to the sculpted head, for your own figure and every townsperson.
+- **A big or small frame shows on your figure too:** the body sliders' frame and head size now reach the sculpted model.
+- Still drawn: elven, wood-elven, orcish, dragonborn and tiefling towns. Halflings wear the kit's shoes rather than going barefoot, and the dwarves' long hair is the kit's one long style.
+
 ## FP-027 - Every Race Its Own Look
 
 FP-026 gave every town the same sculpted human, so dwarves stood as tall as men, elves lost their pointed ears and dragonborn their snouts.
