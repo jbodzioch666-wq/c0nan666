@@ -27,6 +27,8 @@ its idle, walk and jog) is made from his Universal Base Characters, Modular Char
 Library. The dungeon kit (dkitData in index.html: floor, wall, corner, doorframe and props) is from his Medieval Village MegaKit
 and Fantasy Props MegaKit; the land kit (nkitData: trees, bushes, rocks) from his Stylized Nature MegaKit. All released under CC0 1.0
 Universal (Public Domain Dedication),
+The monster models (mkitData: the Imp and the Puglin) are from the free part of his Bestiary - Dungeon Monsters Kit, used under the
+Quaternius Asset License v1.0 (https://quaternius.com/license.html): free for use in a game, not to be taken out and passed on as assets.
 https://creativecommons.org/publicdomain/zero/1.0/ - models by @Quaternius, https://quaternius.com
 ' > "$STAGE/licenses/Quaternius-CC0.txt"
 

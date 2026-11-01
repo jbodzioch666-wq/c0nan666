@@ -1,5 +1,15 @@
 # Depthcrawl patch notes
 
+## FP-024 - Sculpted Monsters (test)
+
+The fourth step of the Quaternius look: the first monsters as his models, beside the drawn ones.
+
+- **A new setting: goblins, kobolds and imps - drawn, or sculpted model (test).** Off by default; switch it in the settings to compare.
+- **Two creatures from his Bestiary kit** (the free part, under his asset licence): the Puglin stands in for every goblin and kobold, the Imp for imps and lesser demons, each sized to the monster it replaces. Their eyes glow.
+- **They move as the drawn monsters move.** The model sits on the drawn monster's own skeleton, so every walk, blow, stagger and fall is the one you know. Goblins carry the Puglin's stick; archers and shamans keep their bows and staves.
+- **Everything else stays drawn:** orcs, bandits, gnolls, trolls, the undead, the beasts and the bosses. The free kit has only these two creatures.
+- It adds about 0.7 MB to the page.
+
 ## FP-023 - Sculpted Land (test)
 
 The third step of the Quaternius look: the trees, bushes and rocks of the open land as his nature kit, beside the drawn ones.
