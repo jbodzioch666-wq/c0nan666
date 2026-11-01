@@ -2,7 +2,7 @@
 // shirt (none) - the drawn figure beside the model from five sides (shots/zwe5_<set>_<mode>_<view>.png), and the drawn chest's bounds
 // against the model's torso in the holder's frame
 module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.on('pageerror', e=>errs.push(String(e).slice(0, 300)));
-  const set = process.env.ZW_SET || 'plate', race = +(process.env.ZW_RACE || 0), fem = process.env.ZW_FEM==='1', capeT = +(process.env.ZW_CAPE || 2), off = process.env.ZW_OFF || '', tier = process.env.ZW_TIER ? +process.env.ZW_TIER : null, legT = process.env.ZW_LEGS ? +process.env.ZW_LEGS : null, tag = process.env.ZW_TAG || '';
+  const set = process.env.ZW_SET || 'plate', race = +(process.env.ZW_RACE || 0), fem = process.env.ZW_FEM==='1', capeT = process.env.ZW_CAPE ? +process.env.ZW_CAPE : 2, off = process.env.ZW_OFF || '', tier = process.env.ZW_TIER ? +process.env.ZW_TIER : null, legT = process.env.ZW_LEGS ? +process.env.ZW_LEGS : null, tag = process.env.ZW_TAG || '';
   await page.evaluate(([set, race, fem, capeT, off, tier0, legT0])=>{ window.__noLock = true; goToCharCreate(); ccSelectRace(race); if (fem){ const L = lookTarget(); L.body = 1; } ccBegin(); window.__legT = legT0; if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{}; window.__tpOn = tpOn;
     const fam = { plate:'metal', robe:'cloth', hide:'hide' }[set], tier = tier0!=null ? tier0 : { plate:5, robe:3, hide:5 }[set];
     if (fam) for (const sl of ['chest', 'legs', 'head', 'arms', 'feet']){ G.gear[sl] = rsMakeArmour(fam, tier, sl); G.gear[sl].used = true; }

@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## FP-039 - The Rest of the Gear Fitted
+
+- **Studs and rivets are back** on studded leather, hide and plate, laid on the sculpted chest above the belt instead of left off.
+- **Plate wears one belt, not two:** under metal armour the sculpted body shows a single belt in the armour's trim (or dark leather), as the old figure did. Over hide both straps stay, in dark leather.
+- **The cape's cord sits round the neck** instead of sticking out through the beard like a red stick.
+- **Robes fit the sculpted body:** the gold trim down the front lies on the chest (it stood 4 to 10 cm off it, worst on a hunched wood elf), the collar sits at the neck, and the skirt's gathered waist is drawn in to the waist instead of standing out round it like a barrel's rim.
+- **A wood elf's hunch is lit as its shape**, and the face is smooth across the sculpted head's seams.
+- **The face sliders reach as far as they used to:** jaw, chin, cheeks, brow, nose, mouth, lips and eyes move about half again as much. A short nose no longer turns up into a snout.
+
 ## FP-038 - Gear Fitted to the Sculpted Body
 
 - **Pauldrons, brooches and the cape's yoke sit on the sculpted figure's own shoulders,** which are narrower and lower than the old figure's they were cut for. The cape no longer hangs off to one side.
