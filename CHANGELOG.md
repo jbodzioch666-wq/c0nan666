@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## FP-037 - Your Gear on the Sculpted Body, and the Face Sliders
+
+- **Armour and clothes show on the sculpted figure again.** Plate, chain, leather and robes are drawn in the same materials the old figure used, on the sculpted body: a rune platebody is rune metal, a dragonhide body is leather, a mystic robe is its cloth. Legs, gloves and boots each take their own gear's colour and material; the hands and shoes are cut off their parts so gauntlets and boots can differ from the sleeves and trousers.
+- **The pieces that made a set look finer come across too:** pauldrons by tier, trims and collars, a tabard with its device, spikes, a fur collar, a robe's skirt with its hem band and runes, trouser cuffs and leg trims. A robe's skirt is cut at the waist on the sculpted body; the bodice is the body's own cloth.
+- **The face sliders are back,** and they shape the sculpted head: jaw, chin, cheeks, brow, nose length and width, mouth, lips, eye size and spacing. Age hollows the cheeks and greys the hair. The sculpted head has one base face per sex, so the range is narrower than the old drawn head's, but every slider does something.
+- **Fixed:** the creator opened cold stood the old drawn figure instead of the sculpted one until something else had loaded the body.
+
 ## FP-036 - The Wood Elf's Hunch, and Tails
 
 - **Wood elves stoop again.** The sculpted wood elf now bends forward through its back and neck like the old drawn one, with a rounded hump between the shoulder blades and the head pushed out ahead, still looking forward.
