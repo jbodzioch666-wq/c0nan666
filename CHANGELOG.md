@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## FP-035 - Your Sculpted Self
+
+- **You are the sculpted figure everywhere now,** like the townsfolk: below ground, on the open land and in town. The "your figure" setting is gone.
+- **The character creator shows it too,** for every race. The dye works and the barber's chair show it as well. The preview fits it head to foot.
+- **The face sliders are gone,** because the sculpted head has one face for each sex. Build, hair, beard, colours and race features (ears, tusks, horns, a dragonborn's head, a dwarf's stout build) still show.
+- In the creator you stand in a plain peasant's shirt and trousers, since the sculpted body has no underclothes.
+
 ## FP-034 - Stop Gathering with a Tap
 
 - **On a phone, a tap now stops your chopping, fishing or foraging.** Tapping the ground round your feet used to count as tapping the tree beside you, so the work just started again, and a tap on your own tile walked you nowhere and left you working. Now:

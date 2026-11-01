@@ -1,7 +1,7 @@
-// FP-021: your figure as a sculpted model (SET.tpBody 'model', a test against the drawn one - 'drawn' the default): below ground the
+// FP-021: your figure as a sculpted model (FP-035: always, the setting gone): below ground the
 // model is built over the drawn figure, whose own body is hidden; it stands on the floor as tall as the figure; out of a fight the sword
 // on the hip and the shield on the back go with it; in a fight with a sword and a kite shield its arms take the drawn ones' pose and the
-// sword sits in its fist (the fingers' middle by the hilt); it walks with a stride; back to 'drawn' and the drawn figure is back
+// sword sits in its fist (the fingers' middle by the hilt); it walks with a stride
 module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.on('pageerror', e=>errs.push(String(e).slice(0, 300)));
   const A = (c, msg)=>{ if (!c) throw new Error('assert: '+msg); };
   const ev = (f, a)=>page.evaluate(f, a), wait = ms=>ev(async ms=>{ const t = performance.now() + ms; while (performance.now() < t){ renderGame(); await new Promise(r=>requestAnimationFrame(r)); } }, ms);
@@ -9,8 +9,6 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
     const s = questNearbySites(G.owPos.x, G.owPos.y, 1, 80, ['dungeon'])[0]; G.gameMode = 0; G.pendingDungeon = { x:s.x, y:s.y }; enterDungeonConfirm(); setUi('playing'); G.mon.length = 0; PFX.camp = -1e9;
     G.gear.weapon = rsMakeWeapon(3, 2); G.gear.weapon.used = true; G.gear.offhand = rsMakeArmour('metal', 3, 'offhand'); G.gear.offhand.used = true; });
   await wait(1200);
-  A(await ev(()=>SET.tpBody==='drawn' && !ISO.player.tp), 'the drawn figure by default');
-  A(await ev(()=>{ const h = buildSettings(); return h.includes("setSetting('tpBody', 'model')"); }), 'a row in the settings');
   const look = ()=>ev(()=>{ const T = THREE, e = ISO.player, r = e.rig, tp = e.tp, D = TPB.data, hy = e.holder.matrixWorld.elements[13];
     const W = o=>new T.Vector3().setFromMatrixPosition(o.matrixWorld), vis = o=>{ for (let a = o; a; a = a.parent) if (!a.visible) return false; return true; };
     if (!tp) return { tp:false, bodyShown:(()=>{ let n = 0; e.holder.traverse(m=>{ if (m.isMesh && vis(m)) n++; }); return n; })() };
@@ -21,7 +19,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
       headTop:hb && +(hb.max.y - hy).toFixed(3), feet:fb && +(fb.min.y - hy).toFixed(3), figHead:+(W(r.head).y - hy).toFixed(3), figHips:+(W(r.hips).y - hy).toFixed(3),
       sheathed:!!r.sheathed, wpPelvis:+W(r.weapon).distanceTo(B('pelvis')).toFixed(3), shSpine:r.shield ? +W(r.shield).distanceTo(B('spine_03')).toFixed(3) : null, wpVis:vis(r.weapon),
       fist:+W(r.weapon).distanceTo(ring).toFixed(3), handR:+W(r.arms[0].hand).distanceTo(B('hand_r')).toFixed(3), wUp:+tp.wUp.toFixed(2), jog:+tp.jogK.toFixed(2), scale:+e.holder.matrixWorld.getMaxScaleOnAxis().toFixed(3) }; });
-  await ev(()=>{ SET.tpBody = 'model'; ISO.lookKey = ''; PFX.camp = -1e9; }); await wait(1500);
+  await ev(()=>{ PFX.camp = -1e9; }); await wait(1500);
   const s = await look(); console.log('standing', JSON.stringify(s));
   A(s.tp && s.meshes >= 8 && s.shown===s.meshes, 'the model built and shown');
   A(s.hidden > 0 && s.bodyLeft===0, 'the drawn body hidden');
@@ -43,8 +41,5 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
     const cam = FPD.cam || FPD.camera, ly = m=>!cam || cam.layers.test(m.layers); return { tp:true, fpv:fpv(), set:SET.fpView, iso:ISO.on, a:fp3dActive(), ok:FPD.ok, seen:tp.meshes.filter(m=>vis(m) && ly(m)).length }; });
   console.log('fp', JSON.stringify(fp)); A(fp.fpv && (!fp.tp || fp.seen===0), 'through your eyes the model is not drawn');
   await ev(()=>{ if (SET.fpView) fpvToggle(); }); await wait(600);
-  await ev(()=>{ SET.tpBody = 'drawn'; ISO.lookKey = ''; }); await wait(1500);
-  const d = await look(); console.log('drawn', JSON.stringify(d));
-  A(!d.tp && d.bodyShown > 5, 'the drawn figure back');
   A(!errs.length, 'page errors: ' + errs.join(' | '));
 };

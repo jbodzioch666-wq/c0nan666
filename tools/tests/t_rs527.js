@@ -3,7 +3,7 @@
 module.exports = async page=>{
   const r = await page.evaluate(async ()=>{ goToCharCreate(); renderOverlay(); const out = {}, v = new THREE.Vector3();
     for (let i=0;i<RACES.length;i++){ ccSelectRace(i); await new Promise(res=>setTimeout(res, 60)); let n = 0; do { await new Promise(res=>requestAnimationFrame(res)); } while ((LP.pend || !LP.e) && n++ < 600);
-      await new Promise(res=>requestAnimationFrame(res)); LP.e.holder.updateMatrixWorld(true); LP.cam.updateMatrixWorld(); const bx = new THREE.Box3().setFromObject(LP.e.holder);
+      await new Promise(res=>requestAnimationFrame(res)); LP.e.holder.updateMatrixWorld(true); LP.cam.updateMatrixWorld(); const bx = new THREE.Box3(), vis = o=>{ for (let a = o; a; a = a.parent) if (!a.visible) return false; return true; }; LP.e.holder.traverse(m=>{ if (m.isMesh && vis(m)) bx.expandByObject(m, !!m.isSkinnedMesh); });   /* (FP-035: what shows - the drawn body is hidden under the model) */
       const ndc = y=>v.set(0, y, 0).project(LP.cam).y; out[RACES[i][0]] = [+ndc(bx.max.y).toFixed(3), +ndc(bx.min.y).toFixed(3)]; }
     LP.zoom = LP_ZMAX; await new Promise(res=>requestAnimationFrame(res)); await new Promise(res=>requestAnimationFrame(res)); const h = LP.e.rig.head.getWorldPosition(new THREE.Vector3()); LP.cam.updateMatrixWorld(); out.face = +h.clone().project(LP.cam).y.toFixed(3); LP.zoom = 1;
     return out; });
