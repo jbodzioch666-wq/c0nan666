@@ -44187,7 +44187,7 @@ function m3dHumanoid(o){
       ch.position.y = y - z*Math.sin(a); ch.position.z = f(y) + z*Math.cos(a);
       if (!shs.includes(ch)) ch.rotation.x += a; if (ch===neck) rig.neckBend = a; }   /* (the shoulders are posed every frame, so they only move; FP-036: the neck's bend kept, for the sculpted body - posing sets it anew) */
     rig.headBack = th(neck.position.y)*0.12;   /* (RS-468: lifting the head by three quarters of the neck's lean tipped a wood elf's face 23 degrees up to the sky; this much leaves it looking ahead, as a man does) */
-    if (rig.cape){   /* (RS-297: a cloak drapes over the hump - bent with the spine, pushed out over the rounded upper back, and from
+    if (rig.cape && !rig.tpWear){   /* (FP-042: not on the sculpted body - its back is bent less, and tpAttach lays the cloak over its hump; bent with the drawn spine, a wood elf's stood up behind its head) */   /* (RS-297: a cloak drapes over the hump - bent with the spine, pushed out over the rounded upper back, and from
                         the crest of the hump it hangs clear of the body rather than following the back in) */
       const cp = rig.cape, g = cp.geometry = cp.geometry.clone(), ps = g.attributes.position, c0 = cp.position.y, crest = 0.22;
       const L = (o.stoop||0) + 0.06, zB = -0.1*Math.sqrt(b);   /* (how far the body leans, so which way is down; the seat behind) */
@@ -48501,9 +48501,34 @@ function tpGeo(k){ if (TPB.geo[k]) return TPB.geo[k]; const T = THREE, p = TPB.d
   g.setAttribute('skinIndex', new T.BufferAttribute(fpaB64(p.si, Uint8Array), 4)); g.setAttribute('skinWeight', new T.BufferAttribute(fpaB64(p.sw, Uint8Array), 4, true));
   g.setIndex(new T.BufferAttribute(p.i32 ? fpaB64(p.ix, Uint32Array) : fpaB64(p.ix, Uint16Array), 1)); g.computeBoundingSphere();
   return TPB.geo[k] = g; }
+/* FP-042: the look's proportions on the shared body - the legs and arms lengthened along their bones (the look's legLen, its limbLen and
+   armLen, as the drawn figure's, and a Rankin/Bass wood elf's long shanks, tpLegs) and the torso shortened up the spine (tpTorso), what's above it
+   carried down with it. A part's corners and its bind are moved alike: each corner by its bones' moves, each bone's rest by its own, and the
+   inverse binds made anew from the moved rest - so the skinning stays true and the bones' turns are the kit's */
+function tpPropFor(o){ const leg = (o.legLen || o.limbLen || 1)*(o.tpLegs || 1), arm = (o.limbLen || 1)*(o.armLen || 1), torso = o.tpTorso || 1;
+  if (Math.abs(leg - 1) < 0.005 && Math.abs(arm - 1) < 0.005 && Math.abs(torso - 1) < 0.005) return null; return { leg, arm, torso, key:'p' + leg.toFixed(3) + ',' + arm.toFixed(3) + ',' + torso.toFixed(3) }; }
+function tpPropDisp(idx, pr){ const ck = idx + '|' + pr.key, C = TPB.pdisp || (TPB.pdisp = {}); if (C[ck]) return C[ck]; const T = THREE, D = TPB.data, inv = TPB.inv[idx], P = inv.map(m=>new T.Vector3().setFromMatrixPosition(m.clone().invert())), bi = n=>D.bones.indexOf(n);
+  const pY = P[bi('pelvis')].y, nY = P[bi('neck_01')].y, top = new T.Vector3(0, (pr.torso - 1)*(nY - pY), 0), seg = (a, b, L)=>{ const ax = P[bi(b)].clone().sub(P[bi(a)]), len = ax.length(); ax.normalize(); return { o:P[bi(a)], ax, L, E:ax.clone().multiplyScalar((L - 1)*len) }; };
+  const S = {}; for (const sd of ['l', 'r']){ S['thigh_' + sd] = seg('thigh_' + sd, 'calf_' + sd, pr.leg); S['calf_' + sd] = seg('calf_' + sd, 'foot_' + sd, pr.leg); S['upperarm_' + sd] = seg('upperarm_' + sd, 'lowerarm_' + sd, pr.arm); S['lowerarm_' + sd] = seg('lowerarm_' + sd, 'hand_' + sd, pr.arm); }
+  const along = (g, v, out)=>out.addScaledVector(g.ax, (g.L - 1)*v.clone().sub(g.o).dot(g.ax));
+  /* each bone's move of a point: a thigh's and a shin's stretched along them, a foot after both; the spine's scaled toward the pelvis; the neck, the head, the shoulders and arms carried down with the top, the arms stretched too */
+  const fn = D.bones.map(n=>{ const sd = n.slice(-1); let m;
+    if ((m = /^(thigh|calf)_[lr]$/.exec(n))) return (v, out)=>{ if (m[1]==='calf') out.add(S['thigh_' + sd].E); along(S[n], v, out); };
+    if (/^(foot|ball)/.test(n)) return (v, out)=>{ out.add(S['thigh_' + sd].E).add(S['calf_' + sd].E); };
+    if (/^spine_/.test(n)) return (v, out)=>{ out.y += (pr.torso - 1)*(v.y - pY); };
+    if (/^(neck_01|Head|clavicle_)/.test(n)) return (v, out)=>{ out.add(top); };
+    if ((m = /^(upperarm|lowerarm)_[lr]$/.exec(n))) return (v, out)=>{ out.add(top); if (m[1]==='lowerarm') out.add(S['upperarm_' + sd].E); along(S[n], v, out); };
+    if (/^(hand|thumb|index|middle|ring|pinky)/.test(n)) return (v, out)=>{ out.add(top).add(S['upperarm_' + sd].E).add(S['lowerarm_' + sd].E); };
+    return null; });
+  return C[ck] = { fn, P, top, lift:-(S.thigh_l.E.y + S.calf_l.E.y) }; }   /* (lift: how far the longer legs set the hips up) */
+function tpPropInv(idx, pr){ const ck = idx + '|' + pr.key, C = TPB.pinv || (TPB.pinv = {}); if (C[ck]) return C[ck]; const T = THREE, { fn, P } = tpPropDisp(idx, pr), d = new T.Vector3();
+  return C[ck] = TPB.inv[idx].map((m, b)=>{ const W = m.clone().invert(); if (!fn[b]) return m; d.set(0, 0, 0); fn[b](P[b], d); return new T.Matrix4().makeTranslation(d.x, d.y, d.z).multiply(W).invert(); }); }
+function tpPropGeo(k, pr){ const key = k + '|' + pr.key; if (TPB.geo[key]) return TPB.geo[key]; const T = THREE, D = TPB.data, g = tpGeo(k).clone(), { fn } = tpPropDisp(D.parts[k].inv, pr), P = g.attributes.position, SI = g.attributes.skinIndex, SW = g.attributes.skinWeight, v = new T.Vector3(), d = new T.Vector3(), a = new T.Vector3();
+  for (let i=0;i<P.count;i++){ v.fromBufferAttribute(P, i); a.set(0, 0, 0); for (let j=0;j<4;j++){ const w = SW.getComponent(i, j), b = SI.getComponent(i, j); if (!w || !fn[b]) continue; d.set(0, 0, 0); fn[b](v, d); a.addScaledVector(d, w); } P.setXYZ(i, v.x + a.x, v.y + a.y, v.z + a.z); }
+  P.needsUpdate = true; g.computeBoundingSphere(); return TPB.geo[key] = g; }
 /* FP-028: a stout race's build on the shared body - the part's vertices pushed out from their bones in the bind pose (the torso and neck
    from the spine's line, a limb from its own, the hands less), so the bones, the grip and the clips are untouched; one geometry per build */
-function tpFatGeo(k, fat, inv){ const key = k + '|' + fat.key; if (TPB.geo[key]) return TPB.geo[key]; const T = THREE, D = TPB.data, g = tpGeo(k).clone();
+function tpFatGeo(k, fat, inv, base){ const key = k + '|' + fat.key + (base ? '|' + base.uuid : ''); if (TPB.geo[key]) return TPB.geo[key]; const T = THREE, D = TPB.data, g = (base || tpGeo(k)).clone();
   const W0 = inv.map(m=>m.clone().invert()), bp = W0.map(m=>new T.Vector3().setFromMatrixPosition(m)), zc = bp[D.bones.indexOf('pelvis')].z, TOR = /pelvis|spine|neck|clavicle/;
   const grp = D.bones.map(n=>TOR.test(n) ? fat.torso : /Head|root/.test(n) ? 1 : /hand|index|middle|ring|pinky|thumb/.test(n) ? fat.hand : fat.limb);
   const ax = D.bones.map((n, i)=>{ if (TOR.test(n)) return new T.Vector3(0, 1, 0); const c = D.parent.indexOf(i); return (c >= 0 ? bp[c].clone().sub(bp[i]) : bp[i].clone().sub(bp[D.parent[i]])).normalize(); });
@@ -48539,8 +48564,8 @@ function tpSplitGeo(k, base, re, tag, drop){ const key = k + '|split|' + tag + (
    as pushes on the kit's head, eyes and brows, each about a landmark of the face in its bind space (the eyes' height from the eyes part,
    the rest below it as the heads measure: the nose tip 5 cm under the eyes, the mouth 8.5, the chin 13) */
 const TP_FACE = { m:{ eyeY:1.699 }, f:{ eyeY:1.656 } };
-function tpFaceGeo(k, base, F, S, eyePart){ const key = k + '|face|' + F.key + '|' + base.uuid; if (TPB.geo[key]) return TPB.geo[key]; const T = THREE, D = TPB.data, g = base.clone(), P = g.attributes.position, SI = g.attributes.skinIndex, SW = g.attributes.skinWeight, hi = D.bones.indexOf('Head');
-  const eY = TP_FACE[S].eyeY, eX = 0.03, noseY = eY - 0.049, mouthY = eY - 0.084, chinY = eY - 0.13, cheekY = eY - 0.028, browY = eY + 0.02;
+function tpFaceGeo(k, base, F, S, eyePart, hdy){ const key = k + '|face|' + F.key + '|' + base.uuid; if (TPB.geo[key]) return TPB.geo[key]; const T = THREE, D = TPB.data, g = base.clone(), P = g.attributes.position, SI = g.attributes.skinIndex, SW = g.attributes.skinWeight, hi = D.bones.indexOf('Head');
+  const eY = TP_FACE[S].eyeY + (hdy || 0), eX = 0.03, noseY = eY - 0.049, mouthY = eY - 0.084, chinY = eY - 0.13, cheekY = eY - 0.028, browY = eY + 0.02;
   const jw = 0.68 + 0.64*F.jaw, cn = 0.6 + 0.8*F.chin, ck = 0.8 + 0.4*F.cheeks, bw = 0.4 + 1.2*F.brow, nl = F.noseLen - 0.5, nw = 0.62 + 0.76*F.noseW, mw = 0.7 + 0.6*F.mouth, lp = 0.6 + 0.8*F.lips, AG = Math.max(0, Math.min(1, (F.age - 0.4)/0.6)), EK = m3dEyeK(F), es = 1 + (EK.es - 1)*1.7, ep = 1 + (EK.ep - 1)*1.7;   /* (FP-039: the drawn head's reach - at its own numbers the sculpted face hardly moved) */
   const cl = v=>Math.max(0, Math.min(1, v)), bell = (v, c, r)=>{ const t = Math.abs(v - c)/r; if (t >= 1) return 0; const u = 1 - t*t; return u*u; }, ramp = (v, a, b)=>{ const t = cl((v - a)/(b - a)); return t*t*(3 - 2*t); };
   for (let i=0;i<P.count;i++){ let wh = 0; for (let j=0;j<4;j++) if (SI.getComponent(i, j)===hi) wh += SW.getComponent(i, j); if (wh < 0.05) continue;
@@ -48614,7 +48639,7 @@ function tpAttach(e, pt, K){
   e.holder.updateMatrixWorld(true); const J = TP_MAP.map(([b, j])=>tpJoint(r, j)), bi = TP_MAP.map(([b])=>D.bones.indexOf(b));
   const hw = new T.Vector3().setFromMatrixPosition(e.holder.matrixWorld), hipsY = new T.Vector3().setFromMatrixPosition(r.hips.matrixWorld).y - hw.y;
   const fk = ()=>{ root.updateMatrixWorld(true); const Wm = []; bones.forEach((b, i)=>{ const pi = D.parent[i]; Wm[i] = (pi < 0 ? root.matrixWorld : Wm[pi]).clone().multiply(new T.Matrix4().compose(loc[i].p, loc[i].q, loc[i].s)); }); return Wm; };
-  let Wm = fk(); const pv = D.bones.indexOf('pelvis'); root.scale.setScalar(Math.max(0.05, hipsY/Math.max(0.01, new T.Vector3().setFromMatrixPosition(Wm[pv]).y - hw.y))); Wm = fk();
+  let Wm = fk(); const pv = D.bones.indexOf('pelvis'); root.scale.setScalar(Math.max(0.05, hipsY/Math.max(0.01, new T.Vector3().setFromMatrixPosition(Wm[pv]).y - hw.y))); if (K.lift && D.parent[pv] >= 0){ const Ri = W0[D.parent[pv]].clone().invert(); loc[pv].p.add(new T.Vector3(0, K.lift, 0).applyMatrix4(Ri).sub(new T.Vector3().applyMatrix4(Ri))); Wm = fk(); const nI = D.bones.indexOf('neck_01'), mh = new T.Vector3().setFromMatrixPosition(Wm[nI]).y - hw.y, dh = new T.Vector3().setFromMatrixPosition(r.neck.matrixWorld).y - hw.y; if (mh > 0.01 && dh > 0.01) root.scale.multiplyScalar(Math.max(0.6, Math.min(1.6, dh/mh))); } Wm = fk();   /* (FP-042: set up on the longer legs - a wood elf's feet were sunk to the ankles - and sized by the neck, so it stands as tall as the figure drawn) */
   const v = new T.Vector3(), w = new T.Vector3(), q = new T.Quaternion(), qp = new T.Quaternion(), s3 = new T.Vector3();
   const aimB = i=>{ const a = (K.aim && K.aim[D.bones[i]]) || TP_AIM[D.bones[i]]; if (!a) return;   /* (FP-024: a creature's kit aims its spine too) */ const ci = D.bones.indexOf(a[0]), jc = tpJoint(r, a[1]), jb = J[TP_MAP.findIndex(x=>x[0]===D.bones[i])];
     v.setFromMatrixPosition(Wm[ci]).sub(w.setFromMatrixPosition(Wm[i])).normalize(); const d = new T.Vector3().setFromMatrixPosition(jc.matrixWorld).sub(w.setFromMatrixPosition(jb.matrixWorld)).normalize();
@@ -48643,10 +48668,28 @@ function tpAttach(e, pt, K){
      to the model's, which are narrower and lower; the cape's yoke narrowed to them too, and over a hunched model's hump - deeper than the
      drawn one it was cut to - the cloth below the yoke pushed back */
   try{ const Lh = new T.Matrix4().copy(e.holder.matrixWorld).invert(), kS = TP_MAP.findIndex(x=>x[1]==='sh0'), dS = new T.Vector3().setFromMatrixPosition(J[kS].matrixWorld).applyMatrix4(Lh), mS = new T.Vector3().setFromMatrixPosition(Wc[bi[kS]]).applyMatrix4(Lh), sx = Math.abs(dS.x) > 0.01 ? Math.min(1.2, Math.abs(mS.x)/Math.abs(dS.x)) : 1, dy = mS.y - dS.y;
-    const jts = new Set([r.cape, r.neck, ...r.arms.map(A=>A.sh)]); if (r.torsoIn) for (const c of r.torsoIn.children) if (!jts.has(c) && !c.userData.tp && Math.abs(c.position.x) > 0.06){ c.position.x *= sx; c.position.y += dy; }   /* (the pieces, not the arms' own pivots) */
+    const jts = new Set([r.cape, r.neck, ...r.arms.map(A=>A.sh)]); if (r.torsoIn) for (const c of r.torsoIn.children) if (!jts.has(c) && !c.userData.tp && Math.abs(c.position.x) > 0.06){ c.position.x *= sx; c.position.y += dy; if (sx < 1) c.scale.multiplyScalar(Math.max(0.7, sx)); }   /* (the pieces, not the arms' own pivots; FP-042: on narrower shoulders smaller - a wood elf's were swamped) */
     if (r.torsoIn) for (const c of r.torsoIn.children) if (c.userData.capeCord){ c.scale.x *= sx; c.scale.y *= sx; } else if (c.userData.stud) c.position.x *= sx;   /* (FP-039: the cape's cord round the model's neck - at the drawn one's width it stood out through the beard) */
-    if (r.cape && (Math.abs(sx - 1) > 0.01 || K.hump)){ const c = r.cape, u = m3dCapeOwn(c), b = u.base, H = u.h, P = c.geometry.attributes.position, wall = u.wall, d = K.hump ? 1.3*K.hump*TP_HUMP/2.2 : 0;   /* (FP-041: the cape over the smaller hump) */
-      for (let i=0;i<P.count;i++){ const dn = -b[i*3+1]/H, t = Math.max(0, Math.min(1, (dn - 0.05)/0.2)), push = d*t*t*(3 - 2*t); b[i*3] *= sx + (1 - sx)*Math.min(1, dn*2); b[i*3+2] -= push; if (wall && typeof wall[i]==='number') wall[i] -= push; P.setXYZ(i, b[i*3], b[i*3+1], b[i*3+2]); } P.needsUpdate = true; } }catch(err){ console.error(err); }
+    if (r.cape && r.torsoIn){ const c = r.cape, u = m3dCapeOwn(c), b = u.base, H = u.h, W = u.grid[0] + 1, N = b.length/3, wall = u.wall, P = c.geometry.attributes.position;
+      /* FP-042: the cloak hung on the model - its yoke at the model's neck, just behind its back there, and from the yoke down it falls
+         straight, clear of the furthest-back of the body above (the hump's crest, the shoulder blades, the seat): cut to the drawn back and
+         hung in the torso's frame, a hunched wood elf's stood up behind its head like a scarf, then stood off its back like a board */
+      const back = new Map(), v = new T.Vector3(), a = new T.Vector3(), t2 = new T.Vector3(), tm = new T.Matrix4();
+      for (const m of meshes) if (/\.(Body|Legs)$/.test(m.name)){ const g = m.geometry, Q = g.attributes.position, QI = g.attributes.skinIndex, QW = g.attributes.skinWeight, iv = K.inv[K.part(m.name.slice(3)).inv];
+        for (let i=0;i<Q.count;i++){ v.fromBufferAttribute(Q, i); if (Math.abs(v.x) > 0.12) continue; a.set(0, 0, 0); for (let k=0;k<4;k++){ const w = QW.getComponent(i, k); if (!w) continue; const bI = QI.getComponent(i, k); tm.multiplyMatrices(Wc[bI], iv[bI]); a.addScaledVector(t2.copy(v).applyMatrix4(tm), w); } a.applyMatrix4(Lh); if (Math.abs(a.x) > 0.08) continue; const k = Math.round(a.y/0.01); if (!back.has(k) || back.get(k) > a.z) back.set(k, a.z); } }
+      if (r.skirt && r.skirt.visible !== false){ const g = r.skirt.geometry, Q = g.attributes.position, ix = g.index ? g.index.array : null, Ms = new T.Matrix4().multiplyMatrices(Lh, r.skirt.matrixWorld), n = ix ? ix.length : Q.count;   /* (and a robe's skirt, flared out behind: the cloak over it, not through it) */
+        for (let t=0;t<n;t++){ v.fromBufferAttribute(Q, ix ? ix[t] : t).applyMatrix4(Ms); if (Math.abs(v.x) > 0.08) continue; const k = Math.round(v.y/0.01); if (!back.has(k) || back.get(k) > v.z) back.set(k, v.z); } }
+      const kN = TP_MAP.findIndex(x=>x[1]==='neck'), mN = new T.Vector3().setFromMatrixPosition(Wc[bi[kN]]).applyMatrix4(Lh), Mh = ()=>{ c.updateMatrix(); c.matrixWorld.multiplyMatrices(c.parent.matrixWorld, c.matrix); return new T.Matrix4().multiplyMatrices(Lh, c.matrixWorld); };
+      for (let i=0;i<N;i++) b[i*3] *= sx;   /* (narrowed its whole length - narrowed at the yoke alone a dwarf's flared to a tent) */
+      let zb = Infinity; for (let k=Math.round((mN.y - 0.04)/0.01);k<=Math.round((mN.y + 0.01)/0.01);k++) if (back.has(k)) zb = Math.min(zb, back.get(k));
+      const i0 = W >> 1, p0 = new T.Vector3(b[i0*3], b[i0*3+1], b[i0*3+2]).applyMatrix4(Mh()), tgt = new T.Vector3(0, mN.y + 0.014, isFinite(zb) ? Math.min(zb - 0.012, mN.z - 0.07) : p0.z);
+      const Pi = new T.Matrix4().copy(c.parent.matrixWorld).invert().multiply(e.holder.matrixWorld); c.position.add(tgt.clone().applyMatrix4(Pi).sub(p0.clone().applyMatrix4(Pi)));
+      const M = Mh(), Mi = M.clone().invert(), ky = Math.max(0.8, Math.min(1.6, (H - (tgt.y - p0.y))/H)), hp = [];   /* (its hem kept where it hung) */
+      for (let i=0;i<N;i++){ b[i*3+1] *= ky; hp.push(new T.Vector3(b[i*3], b[i*3+1], b[i*3+2]).applyMatrix4(M)); }
+      const kT = Math.round(hp[i0].y/0.01), cur = new Map(); let mz = Infinity; for (let k=kT;k>=kT - 200;k--){ if (back.has(k)) mz = Math.min(mz, back.get(k)); cur.set(k, mz - 0.01); }
+      for (let i=0;i<N;i++){ const row = Math.floor(i/W); if (row <= 2) continue; const pc = hp[2*W + i%W], zc = hp[2*W + i0].z, cz = cur.get(Math.round(hp[i].y/0.01)), t = Math.min(1, (row - 2)/3);
+        const z = Math.min(pc.z, (cz!=null && isFinite(cz) ? cz : pc.z) + (pc.z - zc)), q = hp[i]; q.z += (z - q.z)*t; q.applyMatrix4(Mi); b[i*3] = q.x; b[i*3+1] = q.y; b[i*3+2] = q.z; if (wall && typeof wall[i]==='number') wall[i] = q.z; }
+      for (let i=0;i<N;i++) P.setXYZ(i, b[i*3], b[i*3+1], b[i*3+2]); P.needsUpdate = true; u.rest = null; u.P = null; } }catch(err){ console.error(err); }
   /* FP-038: the trims down the front, the rune boxes, the emblem and the tabard lie on the drawn chest - on the model, whose chest is
      another depth (a drawn woman's bust stood the trim off in the air), each is moved to the model's front at its height */
   try{ const bm = r.torsoIn && r.chestMesh && meshes.find(m=>/\.Body$/.test(m.name)); if (bm){ const g = bm.geometry, P = g.attributes.position, SI = g.attributes.skinIndex, SW = g.attributes.skinWeight, inv = K.inv[K.part(bm.name.slice(3)).inv];
@@ -48659,14 +48702,17 @@ function tpAttach(e, pt, K){
       const zDrawn = (y, x)=>{ const org = new T.Vector3(x || 0, y, 0.6).applyMatrix4(Tw), to = new T.Vector3(x || 0, y, 0).applyMatrix4(Tw).sub(org).normalize();   /* (the stored matrix, not localToWorld: that refreshes the ancestors from the person's present place, and a figure built then moved had its hips there and its model where it was built - three townsfolk's models stood twenty tiles off) */ rc.set(org, to); const h = rc.intersectObjects(dTo, false)[0]; return h ? h.point.clone().applyMatrix4(Ti).z : null; };
       const dz = (y, x)=>{ const zm = zModel(y, x), zd = zDrawn(y, x); return zm==null || zd==null ? 0 : zm - zd; };
       const kN = TP_MAP.findIndex(x=>x[1]==='neck'), nk = kN < 0 ? null : new T.Vector3().setFromMatrixPosition(Wc[bi[kN]]).applyMatrix4(Ti).sub(new T.Vector3().setFromMatrixPosition(J[kN].matrixWorld).applyMatrix4(Ti)).setX(0);
-      let sMap = null; { const kS = TP_MAP.findIndex(x=>x[1]==='sh0'), dSh = new T.Vector3().setFromMatrixPosition(J[kS].matrixWorld).applyMatrix4(Ti).y, mSh = new T.Vector3().setFromMatrixPosition(Wc[bi[kS]]).applyMatrix4(Ti).y; let bt = -Infinity;   /* (FP-039: the studs' rows from above the model's belts - higher than the drawn one's - to under its shoulders) */
+      let sMap = null, cMap = y=>y, cK = 1; { const kS = TP_MAP.findIndex(x=>x[1]==='sh0'), dSh = new T.Vector3().setFromMatrixPosition(J[kS].matrixWorld).applyMatrix4(Ti).y, mSh = new T.Vector3().setFromMatrixPosition(Wc[bi[kS]]).applyMatrix4(Ti).y; let bt = -Infinity;   /* (FP-039: the studs' rows from above the model's belts - higher than the drawn one's - to under its shoulders) */
         for (const m of meshes) if (/Body_Belt_\d$/.test(m.name)){ const q = m.geometry.attributes.position, QI = m.geometry.attributes.skinIndex, QW = m.geometry.attributes.skinWeight, iv = K.inv[K.part(m.name.slice(3)).inv]; for (let i=0;i<q.count;i+=3){ v.fromBufferAttribute(q, i); a.set(0, 0, 0); for (let j=0;j<4;j++){ const w = QW.getComponent(i, j); if (!w) continue; const bI = QI.getComponent(i, j); tm.multiplyMatrices(Wc[bI], iv[bI]); a.addScaledVector(t2.copy(v).applyMatrix4(tm), w); } a.applyMatrix4(Ti); bt = Math.max(bt, a.y); } }
-        if (bt > -Infinity && mSh - bt > 0.08){ const ad = 0.06, am = bt + 0.012, k = (mSh - am)/(dSh - ad); sMap = y=>am + (y - ad)*k; } }
+        if (bt > -Infinity && mSh - bt > 0.08){ const ad = 0.06, am = bt + 0.012, k = (mSh - am)/(dSh - ad); sMap = y=>am + (y - ad)*k; }
+        const kT = TP_MAP.findIndex(x=>x[1]==='torso'), dT = new T.Vector3().setFromMatrixPosition(J[kT].matrixWorld).applyMatrix4(Ti).y, mT = new T.Vector3().setFromMatrixPosition(Wc[bi[kT]]).applyMatrix4(Ti).y, kc = dSh - dT > 0.05 ? Math.max(0.5, Math.min(1.5, (mSh - mT)/(dSh - dT))) : 1;   /* (FP-042: the chest's heights, its waist to its shoulders, the drawn chest's to the model's - a wood elf's trunk is short) */
+        cMap = y=>mSh + (y - dSh)*kc; cK = kc; if (!sMap) sMap = cMap; }
       for (const c of r.torsoIn.children){ if (c===r.cape || c===r.chestMesh || c.userData.tp || c.userData.pad) continue;
-        if (c.name==='tabard' && c.geometry){ const q = c.geometry.attributes.position, d0 = dz(0.04); for (let i=0;i<q.count;i++){ const y = q.getY(i) + c.position.y; q.setZ(i, q.getZ(i) + (y > 0.04 ? dz(y) : d0)); } q.needsUpdate = true; c.geometry.computeVertexNormals(); continue; }
+        if (c.name==='tabard' && c.geometry){ c.geometry = c.geometry.clone(); const q = c.geometry.attributes.position, Y0 = cMap(0.04) - 0.04, zd0 = zDrawn(0.04), zm0 = zModel(cMap(0.04)), d0 = zd0==null || zm0==null ? 0 : zm0 - zd0;
+          for (let i=0;i<q.count;i++){ const y = q.getY(i) + c.position.y, y1 = y > 0.04 ? cMap(y) : y + Y0, zd = y > 0.04 ? zDrawn(y) : null, zm = y > 0.04 ? zModel(y1) : null; q.setY(i, y1 - c.position.y); q.setZ(i, q.getZ(i) + (zd!=null && zm!=null ? zm - zd : d0)); } q.needsUpdate = true; c.geometry.computeVertexNormals(); c.geometry.computeBoundingSphere(); continue; }   /* (FP-042: its heights mapped too, its own copy) */
         if (nk && c.position.y >= 0.27 && Math.abs(c.position.x) < 0.06 && !c.userData.frontTrim){ c.position.add(nk); continue; }   /* (FP-039: a collar, a ruff, the cape's cord - round the model's neck, which a hunch puts further back) */
         if (c.userData.stud){ const x = c.position.x, y0 = c.position.y, y1 = sMap ? sMap(y0) : y0, zd = zDrawn(y0, x), zm = zModel(y1, x); c.position.y = y1; if (zd!=null && zm!=null) c.position.z += zm - zd; continue; }   /* (off the drawn chest where it was, onto the model where it goes) */
-        if (Math.abs(c.position.x) < 0.045 && c.position.z > 0.03){ c.position.z += dz(c.position.y); if (c.userData.frontTrim){ const za = zModel(c.position.y - 0.012), zb = zModel(c.position.y + 0.012); if (za!=null && zb!=null) c.rotation.x = Math.atan2(zb - za, 0.024); } } } } }catch(err){ console.error(err); }   /* (the trim's segments turned to the model's slope - at the drawn one they lay like beads) */
+        if (Math.abs(c.position.x) < 0.045 && c.position.z > 0.03){ const y0 = c.position.y, y1 = cMap(y0), zd = zDrawn(y0), zm = zModel(y1); c.position.y = y1; if (zd!=null && zm!=null) c.position.z += zm - zd; if (c.userData.frontTrim && cK > 1) c.scale.y *= cK; if (c.userData.frontTrim){ const za = zModel(c.position.y - 0.012), zb = zModel(c.position.y + 0.012); if (za!=null && zb!=null) c.rotation.x = Math.atan2(zb - za, 0.024); } } } } }catch(err){ console.error(err); }   /* (the trim's segments turned to the model's slope - at the drawn one they lay like beads) */
   /* FP-039: a robe's waist - the skirt's top, cut where the model's body takes over, and the cord tied round it - drawn to the drawn waist,
      stood out round the model's narrower one like a barrel's rim: each drawn in (or out) to the model's waist at its height */
   if (r.skirt && r.skirt.geometry.userData.tpFullIx) try{ const pts = [], v = new T.Vector3(), a = new T.Vector3(), t2 = new T.Vector3(), tm = new T.Matrix4();
@@ -48677,6 +48723,8 @@ function tpAttach(e, pt, K){
       if (n < 8 || c < 8 || cx < 0.01 || cf - cb < 0.01) return; const kx = (mx + pad)/cx, zc0 = (cf + cb)/2, zc1 = (zf + zb)/2, kz = (zf - zb + 2*pad)/(cf - cb);
       for (const B of arrs) for (let i=0;i<B.length;i+=3){ const w = wf(B[i+1]); if (w <= 0) continue; B[i] *= 1 + (kx - 1)*w; B[i+2] += (zc1 + (B[i+2] - zc0)*kz - B[i+2])*w; } };
     const sk = r.skirt, top = sk.userData.extFrom - sk.position.y + 0.05; if (!sk.userData.own){ sk.geometry = sk.geometry.clone(); sk.userData.own = true; sk.userData.base = Float32Array.from(sk.geometry.attributes.position.array); for (const c of sk.children) if (c.userData.hemLayer) c.geometry = sk.geometry; }   /* (its own copy, as m3dSkirtFollow takes one) */
+    { const Li = sk.matrixWorld.clone().invert(), an = new T.Vector3().setFromMatrixPosition(Wc[D.bones.indexOf('foot_r')]).applyMatrix4(Li).y, A0 = sk.userData.base, Ap = sk.geometry.attributes.position.array; let hem = Infinity; for (let i=1;i<A0.length;i+=3) hem = Math.min(hem, A0[i]);   /* (FP-042: down to the model's ankles - on a wood elf's long shanks the robe stopped at the shin) */
+      const want = an + 0.02; if (hem > want + 0.01 && top - hem > 0.1){ const k = (top - want)/(top - hem); for (const B of [A0, Ap]) for (let i=1;i<B.length;i+=3) if (B[i] < top - 0.14) B[i] = top - 0.14 + (B[i] - top + 0.14)*((top - 0.14 - want)/(top - 0.14 - hem)); } }
     sk.userData.sig = null; fit([sk.geometry.attributes.position.array, sk.userData.base], sk.matrixWorld, top, y=>{ const t = Math.max(0, Math.min(1, (y - top + 0.14)/0.14)); return t*t*(3 - 2*t); }, 0.008); sk.geometry.attributes.position.needsUpdate = true; sk.geometry.computeVertexNormals(); sk.geometry.computeBoundingSphere();
     const cd = r.torsoIn && r.torsoIn.children.find(c=>c.name==='robeCord'); if (cd){ cd.geometry = cd.geometry.clone(); const q = cd.geometry.attributes.position.array; let ym = 0; for (let i=1;i<q.length;i+=3) ym += q[i]; ym /= q.length/3; cd.updateMatrixWorld(true); fit([q], cd.matrixWorld, ym, ()=>1, 0.013); cd.geometry.attributes.position.needsUpdate = true; cd.geometry.computeVertexNormals(); cd.geometry.computeBoundingSphere(); } }catch(err){ console.error(err); }
   const off = TP_MAP.map((x, k)=>J[k].matrixWorld.clone().invert().multiply(Wc[bi[k]]));
@@ -48866,10 +48914,12 @@ function tpFolkOn(){ return !!tpData(); }
 function tpKitFolk(pt){ if (G.villageRace==='orc' && !(pt && pt.o && pt.o.bulk)) pt = Object.assign({}, pt, { o:Object.assign({}, pt && pt.o, { bulk:RACE_BODY.orc[1] }) });   /* (FP-030: an orc's build) */
   return Object.assign(tpKitPlayer(pt, true), { mon:true }); }
 function tpKitPlayer(pt, on){ const D = tpData(); if (!D) return { on:false };   /* (FP-037: the kit read before its data was - the creator opened cold stood the drawn figure) */ const o = (pt && pt.o) || {}, P = tpParts(o), S = o.fem ? 'f' : 'm', bk = o.bulk || 1;
-  const fat = Math.abs(bk - 1) > 0.01 ? { torso:bk, limb:1 + (bk - 1)*0.6, hand:1 + (bk - 1)*0.3, key:bk.toFixed(3) } : null;   /* (FP-028: the look's bulk - a dwarf's, a big frame's - as the build) */
-  const geoF = fat ? k=>tpFatGeo(k, fat, TPB.inv[D.parts[k].inv]) : tpGeo, geo0 = o.hump ? k=>tpHumpGeo(k, geoF(k), TPB.inv[D.parts[k].inv], o.hump) : geoF, feet = tpDrawnFeet(o), geo1 = feet ? k=>(/\.Feet/.test(k) ? tpShinGeo(k, geo0(k), TPB.inv[D.parts[k].inv]) : geo0(k)) : geo0;   /* (FP-033: the shoes cut off for the drawn feet) */
+  const thin = o.limbThin ? 0.6 + 0.4*o.limbThin : 1, lb = (1 + (bk - 1)*0.6)*thin;   /* (FP-042: a wood elf's thin limbs) */
+  const fat = Math.abs(bk - 1) > 0.01 || thin < 0.995 ? { torso:bk, limb:lb, hand:1 + (bk - 1)*0.3, key:bk.toFixed(3) + (thin < 0.995 ? 't' + thin.toFixed(3) : '') } : null;   /* (FP-028: the look's bulk - a dwarf's, a big frame's - as the build) */
+  const pr = tpPropFor(o), INV = pr ? TPB.inv.map((t, i)=>tpPropInv(i, pr)) : TPB.inv, geoP = pr ? k=>tpPropGeo(k, pr) : tpGeo;   /* (FP-042: the look's proportions) */
+  const geoF = fat ? k=>tpFatGeo(k, fat, INV[D.parts[k].inv], pr ? geoP(k) : null) : geoP, geo0 = o.hump ? k=>tpHumpGeo(k, geoF(k), INV[D.parts[k].inv], o.hump) : geoF, feet = tpDrawnFeet(o), geo1 = feet ? k=>(/\.Feet/.test(k) ? tpShinGeo(k, geo0(k), INV[D.parts[k].inv]) : geo0(k)) : geo0;   /* (FP-033: the shoes cut off for the drawn feet) */
   const F0 = o.face || o.pointNose ? Object.assign({}, M3D_FACE0, o.face || {}) : null; if (F0 && o.pointNose){ F0.noseLen = Math.min(1, F0.noseLen + 0.4); F0.noseW = Math.max(0, F0.noseW - 0.35); }   /* (FP-038: a wood elf's long thin nose) */
-  const FC = F0 ? m3dFaceSpec(F0) : null, geo = FC ? k=>(/\.(head|eyes|brows)$/.test(k) ? tpFaceGeo(k, geo1(k), FC, S, /\.eyes$/.test(k)) : geo1(k)) : geo1;   /* (FP-037: the face sliders) */
+  const FC = F0 ? m3dFaceSpec(F0) : null, geo = FC ? k=>(/\.(head|eyes|brows)$/.test(k) ? tpFaceGeo(k, geo1(k), FC, S, /\.eyes$/.test(k), pr ? tpPropDisp(D.parts[k].inv, pr).top.y : 0) : geo1(k)) : geo1;   /* (FP-037: the face sliders) */
   const AG = o.face ? Math.max(0, Math.min(1, (o.face.age - 0.4)/0.6)) : 0, grey = hex=>AG ? '#' + new THREE.Color(hex).lerp(new THREE.Color('#b8b4ac'), AG*0.85).getHexString() : hex;   /* (age greys the hair) */
   let wear = null;
   if (o.tpWear){ const mats = {}, T = THREE, wm = (hex, kind)=>{ const m = m3dMat(mats, hex, kind), k2 = '__tp|' + m.uuid; if (mats[k2]) return mats[k2]; const c = m.clone(); if (m.userData.rim) m3dRimify(c);   /* (FP-037: the drawn figure's own materials - plate, chain, leather, the robe's cloth - on the kit's parts, their maps tiled over the atlas) */
@@ -48886,7 +48936,7 @@ function tpKitPlayer(pt, on){ const D = tpData(); if (!D) return { on:false };  
       if (/Feet_Boots|ranger\.Feet$/.test(k)) return bootM ? { mat:bootM } : null;
       if (/\.Feet$/.test(k)){ const shin = legM || mt; if (!bootM) return one(shin); const sp = tpSplitGeo(k, g, FOOT, 'foot'); return sp.split ? { geo:sp.geo, mat:[shin, bootM] } : sp.all==='B' ? { mat:bootM } : one(shin); }
       return null; }; }
-  return { on:on!=null ? on : tpOn(), P, inv:TPB.inv, bodyInv:D.parts[S + '.' + P.kit + '.Body'].inv, part:k=>D.parts[k], geo, tex:tpTex, keepWeapon:true, mon:false, headScale:o.headScale || 1, headPart:S + '.head', feetFit:feet, wear, hump:o.hump || 0, curve:o.curve || 0, headShape:o.headNarrow ? [0.86, 1.06] : o.headSlim ? [0.93, 1.03] : null,
+  return { on:on!=null ? on : tpOn(), P, inv:INV, lift:pr ? tpPropDisp(D.parts[S + '.' + P.kit + '.Body'].inv, pr).lift : 0, bodyInv:D.parts[S + '.' + P.kit + '.Body'].inv, part:k=>D.parts[k], geo, tex:tpTex, keepWeapon:true, mon:false, headScale:o.headScale || 1, headPart:S + '.head', feetFit:feet, wear, hump:o.hump || 0, curve:o.curve || 0, headShape:o.headNarrow ? [0.86, 1.06] : o.headSlim ? [0.93, 1.03] : null,
     dress:(mt, k, pd)=>{ const T = THREE; mt.userData.kind = /Regular|Superhero/.test(pd.tex) ? 'skin' : /Hair/.test(pd.tex) ? 'hair' : 'cloth'; m3dRimify(mt);   /* (the drawn figures' rim, and on skin their warm light through it) */
       if (/Regular|Superhero/.test(pd.tex)) tpPartTint(mt, k, o.skin || '#c9a07c', pd.tex);
       else if (/Hair/.test(pd.tex)) tpPartTint(mt, k, grey(k==='hair.Beard' ? (o.beard || o.hair || '#4a3018') : (o.hair || '#4a3018')), pd.tex, 0.7);   /* (the drawn hair darker still between its strands) */
@@ -50372,7 +50422,7 @@ function dwarfLook(o){ return { headScale:Math.max(o.headScale||1, 1.14), legLen
 function highElfLook(o){ const w = { circlet:o.helm ? null : '#dfe2ea', cheekbones:true, almond:true, headSlim:true };
   if (o.outfit==='shirt'){ w.outfit = 'robe'; w.robeTrim = '#c8a85a'; if (!o.legWear || o.legWear==='plain') w.legWear = null; if (!o.cape) w.cape = '#6e7c70'; }
   return w; }
-function woodElfLook(o){ const w = { limbLen:1.13, limbThin:0.72, stoop:0.15, curve:0.12, hump:0.05, headNarrow:true, pointNose:true, lids:true, leafTunic:true, earLen:o.earLen || 0.085 };
+function woodElfLook(o){ const w = { limbLen:1.13, limbThin:0.72, tpLegs:1.24, tpTorso:0.76,   /* (FP-042: the sculpted body's long shanks and short trunk, as Rankin/Bass drew them) */ stoop:0.15, curve:0.12, hump:0.05, headNarrow:true, pointNose:true, lids:true, leafTunic:true, earLen:o.earLen || 0.085 };
   if (!o.helm) w.leafCap = '#3e5a2c'; if (!o.boots){ w.feet = 'bare'; w.longToes = true; } if (!o.legWear || o.legWear==='plain') w.legWear = 'skin'; return w; }   /* (bare legs under the tunic) */
 const RS_COSTUME_KEYS = ['cape', 'capeTier', 'capeTrimCol', 'capeEdge', 'capeEm', 'capeEmCol', 'capeFire', 'furCollar', 'hoodDown', 'highCollar', 'mantle', 'tabard', 'emblem', 'pads', 'studs', 'trim', 'spikes',
   'robeTrim', 'robeRunes', 'robeTier', 'robePat', 'tunicTrim', 'sleeve', 'waistcoat', 'apron', 'gnomeHat', 'goggles', 'leafCap', 'leafTunic', 'circlet', 'buckle', 'quiver', 'gloves', 'boots', 'trouserTier', 'trouserTrim', 'trouserRunes', 'legCol', 'plate', 'tier', 'helm', 'helmCol', 'cloth'];
@@ -51857,7 +51907,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'fp-041';
+const GAME_VERSION = 'fp-042';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

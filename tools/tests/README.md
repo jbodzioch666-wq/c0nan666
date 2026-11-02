@@ -144,6 +144,7 @@ Screenshots go to `tools/tests/shots/`.
 | fp037 | FP-037: the face sliders shape the sculpted head (a long nose, large eyes); in the dye works rune plate, mystic robes and black dragonhide dress the sculpted body - the drawn materials by slot, hands and shoes cut for gloves and boots, pauldrons and tabard carried, the kit pauldron dropped, the robe skirt cut at the waist with its hem, the fingertips gloved |
 | fp039 | FP-039: studs on the sculpted chest, one belt under plate, a robe's trim and waist on the model, the hump's float normals, the face sliders' reach |
 | fp040 | FP-040: a hunched wood elf's arms hang in the preview and on the idle clip |
+| fp042 | the look's proportions on the sculpted body: a wood elf's long legs and short trunk, a dwarf's short legs, both on the ground, the elf as tall as drawn |
 | zloot | probe: the drops at a few levels - rarity shares, names with their bonuses and tiers, a rare's tooltip text (ZL levels, ZN drops a level) |
 | zloottip | probe: a rare's, a magic piece's and a Ring of Recoil's tooltip, plain and with Alt held, as shots/zloottip0-3.png |
 | rs703 | A spell leaves the staff as it comes forward: a real cast at a foe three tiles off, sampled every frame - the bolt waits about half a second, leaves from the staff's head as it leans ahead, its sound with it; the foe flinches (and a miss splashes) only as it lands; the cast lasts about a second; a foe it kills stands till the bolt lands, and the staff isn't put away mid-cast |

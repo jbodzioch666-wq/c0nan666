@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## FP-042 - Long Shanks, and Gear That Fits
+
+- **Wood elves get the Rankin/Bass build:** much longer legs and a shorter body on the sculpted figure. They stand as tall as before, and their feet are on the ground.
+- **Body sliders now shape the sculpted figure:** the leg and arm length sliders, and a dwarf's or gnome's short legs, change the model itself, not just the hidden drawn figure. Wood elves also get their thin limbs.
+- **Capes hang properly:** the cape ties at your own neck, lies over your back and any hump, and falls straight down from there, over a robe's skirt instead of through it. Before, a wood elf's cape stood up behind its head like a scarf, and a dwarf's or half-orc's spread out like a tent.
+- **Pauldrons fit narrow shoulders:** on slim shoulders they're smaller, so a wood elf in plate isn't swamped by them.
+- **Chest trims, tabards and studs follow your chest:** on a short-bodied figure they're spread between its waist and its shoulders.
+- **Robes reach the ankles** on long-legged figures.
+
 ## FP-041 - A Gentler Hunch
 
 - **The wood elf's hunch is toned down:** the back bends forward about half as far, and the hump between the shoulders is under half the size. Before, it stood out like a pack on the back. A cape over it follows the smaller hump.

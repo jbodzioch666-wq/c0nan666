@@ -1,0 +1,13 @@
+// (probe) the cape against the sculpted body in the dye works: ZC_RACE, ZC_SET; prints cape rows and the model's bounds in the holder's frame
+module.exports = async page=>{ page.setDefaultTimeout(0); const race = +(process.env.ZC_RACE || 2), set = process.env.ZC_SET || 'robe';
+  const out = await page.evaluate(async ([race, set])=>{ window.__noLock = true; goToCharCreate(); ccSelectRace(race); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{};
+    const fam = { plate:'metal', robe:'cloth' }[set]; if (fam) for (const sl of ['chest', 'legs', 'head', 'arms', 'feet']){ G.gear[sl] = rsMakeArmour(fam, 3, sl); G.gear[sl].used = true; }
+    G.gear.cape = rsMakeCape(2, 'Red Cape'); G.gear.cape.used = true; openDyeWorks(); renderOverlay(); LP.key = ''; if (LP.e) LP.scene.remove(LP.e.holder); LP.e = null; let k = 0; do { await new Promise(r=>requestAnimationFrame(r)); } while ((LP.pend || !LP.e) && k++ < 900); for (let i=0;i<30;i++) await new Promise(r=>requestAnimationFrame(r));
+    const e = LP.e, h = e.holder, r = e.rig || e.r; h.updateMatrixWorld(true); const Hi = new THREE.Matrix4().copy(h.matrixWorld).invert(), f = v=>v.toArray().map(x=>+x.toFixed(3));
+    const c = r.cape, pa = c.geometry.attributes.position, u = c.userData, W = u.grid[0] + 1, rows = [];
+    for (let j=0;j<=u.grid[1];j+=2){ const i = j*W + (W>>1), v = new THREE.Vector3().fromBufferAttribute(pa, i).applyMatrix4(c.matrixWorld).applyMatrix4(Hi); rows.push(j + ':' + f(v)); }
+    const bb = {}; h.traverse(m=>{ if (!m.isMesh || !m.visible) return; let vis = true, o = m; while (o){ if (!o.visible) vis = false; o = o.parent; } if (!vis) return; if (!/Head|Body|Hair|Legs/.test(m.name)) return; const b = new THREE.Box3().setFromObject(m, true); b.applyMatrix4(Hi); bb[m.name] = f(b.min).concat(f(b.max)); });
+    const tq = new THREE.Quaternion(); r.torsoIn.getWorldQuaternion(tq); const up = new THREE.Vector3(0, 1, 0).applyQuaternion(tq);
+    const sk = []; h.traverse(m=>{ if (m.isSkinnedMesh && /^tp:/.test(m.name) && !sk.length) sk.push(m.skeleton); }); const bones = { n:sk[0] && sk[0].bones.slice(0, 8).map(b=>b.name).join(',') }; if (sk[0]) for (const b of sk[0].bones) if (/(neck|Head|spine_03|pelvis|upperarm_l)/i.test(b.name)) bones[b.name] = f(new THREE.Vector3().setFromMatrixPosition(b.matrixWorld).applyMatrix4(Hi));
+    return { bones, rows, bb, torsoUp:f(up), capePos:f(c.position), capeRot:f(new THREE.Vector3(c.rotation.x, c.rotation.y, c.rotation.z)), manual:u.manual, keys:Object.keys(e).slice(0, 30) }; }, [race, set]);
+  console.log(JSON.stringify(out, null, 1)); };

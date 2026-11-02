@@ -22,7 +22,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
     A(r.head < 0.12, r.race + ': the model head at the drawn head');
     A(r.face, r.race + ': the face sliders shown (FP-037: back, shaping the sculpted head)');
     A(Math.abs(r.headUp) < 0.3, r.race + ': the model looks ahead, not up or down: ' + r.headUp);
-    if (r.race==='Wood Elf') A(r.lean > 0.08 && r.hump && r.headFace && r.nose===0, 'the wood elf hunched (the neck well ahead of the hips), the hump on the back and a long nose shaped into the head, no cone (FP-038): ' + JSON.stringify(r));
+    if (r.race==='Wood Elf') A(r.lean > 0.045 && r.hump && r.headFace && r.nose===0, 'the wood elf hunched (the neck well ahead of the hips), the hump on the back and a long nose shaped into the head, no cone (FP-038): ' + JSON.stringify(r));
     if (!/Wood Elf|Half-Orc/.test(r.race)) A(r.lean < 0.06 && !r.hump, r.race + ': stands straight, no hump');
     if (r.race==='Dragonborn' || r.race==='Tiefling') A(r.tail > 0, r.race + ': the tail shows on the model (FP-036)');
     try{ await (await page.$('#lpSlot canvas')).screenshot({ path:__dirname + '/shots/fp035_' + r.race.replace(/\W+/g, '_') + '.png' }); }catch(e){}
