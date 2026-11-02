@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## FP-044 - Robes That Hang, Tails That Stay On
+
+- **Dragonborn and tiefling tails are attached again:** FP-043 moved a robed figure's tail back off its body. Now it runs down inside the robe's back and comes out below the cape's hem, as it used to.
+- **Robes hang smoothly:** FP-043 pushed the cloth out point by point wherever a leg came through. That left lumps, and the robe's waist stood out from the belt like a hoop. Now the robe flares out smoothly over the legs, like an A-line gown, and the cloth falls straight down from wherever a leg pushes it out. Standing, a robe is back to snug at the waist (1.0 to 1.1 times the hips, from 1.3 to 1.4). Legs still don't come through.
+- **Long-legged figures' robes also fit when standing:** a wood elf's robe now follows its own legs while standing, not only when running, so its back leg no longer pokes out behind.
+
 ## FP-043 - Nothing Through the Cloth
 
 - **Legs no longer come through capes:** a cape now drapes over your arms, legs, feet and tail. Before, a running figure's back leg kicked straight through it, at about 150 points of the body per frame. Now it's 0 to 1.
