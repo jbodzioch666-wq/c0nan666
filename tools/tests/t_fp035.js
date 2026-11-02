@@ -34,6 +34,6 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   const tw = await page.evaluate(()=>{ const T = THREE, D = TPB.data, e = V3.player.e, tp = e.tp; if (!tp) return { tp:false }; const W = o=>new T.Vector3().setFromMatrixPosition(o.matrixWorld), Li = new T.Matrix4().copy(e.holder.matrixWorld).invert(), Lp = n=>W(tp.bones[D.bones.indexOf(n)]).applyMatrix4(Li);
     const fw = new T.Vector3(0, 0, 1).transformDirection(tp.bones[D.bones.indexOf('Head')].matrixWorld).transformDirection(Li); return { tp:true, race:G.player.race, wUp:+tp.wUp.toFixed(2), lean:+(Lp('neck_01').z - Lp('pelvis').z).toFixed(3), headUp:+fw.y.toFixed(2) }; });
   console.log('town', JSON.stringify(tw)); try{ await page.screenshot({ path:__dirname + '/shots/fp035_town.png' }); }catch(e){}
-  A(tw.tp && tw.lean > 0.08 && Math.abs(tw.headUp) < 0.45, 'the wood elf hunched and looking ahead in town, on the model idle (a human on it -0.26): ' + JSON.stringify(tw));
+  A(tw.tp && tw.lean > 0.045 && Math.abs(tw.headUp) < 0.45, 'the wood elf hunched and looking ahead in town, on the model idle (a human on it -0.26; FP-041 a gentler stoop, 0.067): ' + JSON.stringify(tw));
   A(!errs.length, 'page errors: ' + errs.join(' | '));
 };

@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## FP-041 - A Gentler Hunch
+
+- **The wood elf's hunch is toned down:** the back bends forward about half as far, and the hump between the shoulders is under half the size. Before, it stood out like a pack on the back. A cape over it follows the smaller hump.
+
 ## FP-040 - The Wood Elf's Arms Hang
 
 - **A hunched wood elf's arms hang down** instead of swinging back behind the hips. Bending the back for the hunch carried the arms back with it. They are now set to hang after the bend, both in the character preview and in the idle and walking animations in the world.
