@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## FP-045 - One Robe, All Over
+
+- **Legs stay inside robes everywhere:** outside towns and in dungeons the robe was refolded to the old hidden legs after it had been fitted, so your real legs came through it. It now fits your legs on the land, in dungeons and in town alike. Leg points through the skirt while walking on the land, from FP-044 to now: 34 per check to between 0 and 2.
+- **A robe is one colour:** the skirt took a darker shade than the bodice, which showed plainly on pale dyes. Both now use the same colour (`#cec6af` on the undyed cloth robe, where the skirt was `#9a9483`).
+- **One piece at the waist:** the skirt now runs in a straight line from the waist out over the hips, with no shelf standing off the bodice.
+- **No trousers showing on wood elves:** a wood elf's short trunk left a gap between bodice and skirt. The skirt's top now tucks up under the bodice all the way round.
+- **The loose gold cord is gone:** the bodice already has its own belt, and the second one floated off the waist when you leaned. It's hidden on your figure.
+- **Less work while sitting:** sitting figures in robes or capes were refitting their cloth every frame since FP-043. It's now done once per seat.
+
 ## FP-044 - Robes That Hang, Tails That Stay On
 
 - **Dragonborn and tiefling tails are attached again:** FP-043 moved a robed figure's tail back off its body. Now it runs down inside the robe's back and comes out below the cape's hem, as it used to.

@@ -147,6 +147,7 @@ Screenshots go to `tools/tests/shots/`.
 | fp042 | the look's proportions on the sculpted body: a wood elf's long legs and short trunk, a dwarf's short legs, both on the ground, the elf as tall as drawn |
 | fp043 | running in a cape, plain and robed, five races: nothing of the model through the cape or the robe (a few points at most) |
 | fp044 | a robe's shape and a tail kept: standing, the robe snug at the waist and a tail on the body; running, nothing through |
+| fp045 | a robe in the real open-land frame, walking, pale over blue: skirt and bodice one colour, no second belt, the skirt on the figure, its top under the hem, legs not through it |
 | zloot | probe: the drops at a few levels - rarity shares, names with their bonuses and tiers, a rare's tooltip text (ZL levels, ZN drops a level) |
 | zloottip | probe: a rare's, a magic piece's and a Ring of Recoil's tooltip, plain and with Alt held, as shots/zloottip0-3.png |
 | rs703 | A spell leaves the staff as it comes forward: a real cast at a foe three tiles off, sampled every frame - the bolt waits about half a second, leaves from the staff's head as it leans ahead, its sound with it; the foe flinches (and a miss splashes) only as it lands; the cast lasts about a second; a foe it kills stands till the bolt lands, and the staff isn't put away mid-cast |
