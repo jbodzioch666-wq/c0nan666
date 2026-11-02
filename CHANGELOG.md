@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## FP-043 - Nothing Through the Cloth
+
+- **Legs no longer come through capes:** a cape now drapes over your arms, legs, feet and tail. Before, a running figure's back leg kicked straight through it, at about 150 points of the body per frame. Now it's 0 to 1.
+- **Robes fold over your legs:** a robe now folds to the sculpted figure's own legs and stride, not the hidden drawn figure's. It also folds over the full length of a wood elf's longer thigh. Knees and shins no longer show through the front and back (a running wood elf had about 600 points through its robe; now about 1).
+- **A shorter stride in a robe**, shorter again on long legs, and a smaller back kick under a cape, so the cloth can follow.
+- **A robe's top follows a stooped back:** on a hunched wood elf, the robe above the belt now leans with the model's back instead of standing off it.
+- **Tails:** a tail by a robe comes out at the robe's back, not from deep inside it. A tiefling's thin tail now hangs under the cape and out below its hem instead of poking through.
+- **Long robes are wider at the hem**, so long legs fit inside when they stride.
+
 ## FP-042 - Long Shanks, and Gear That Fits
 
 - **Wood elves get the Rankin/Bass build:** much longer legs and a shorter body on the sculpted figure. They stand as tall as before, and their feet are on the ground.
