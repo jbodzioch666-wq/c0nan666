@@ -132,6 +132,7 @@ Screenshots go to `tools/tests/shots/`.
 | `rs797` | armour type follows the body armour you see: a robe with metal's rules is magic on the sheet and in the triangle; plate, hide and none as before (ZI_SAVE: also on a player's save) |
 | `rs798` | snakes crawl and die with their whole body: live tube, head stays on, stays on the floor, no heap, hood folds and flares | |
 | `rs799` | the magic clipper: magic planks, the build and its cost, free steps and storms, the yard and sea models | |
+| `rs800` | all five ships at sea are the slipway's ships: deck, guns, rigging, the water kept out, yard still builds in stages | |
 | `rs789` | A shire's door stones and flags are dark: their average vertex colour stays low |
 | `rs788` | The open land has its older grass again: no blade chunks, RS-785's code gone |
 | `rs787` | A battle at a town: the card before and after, the banner's words, the trees told where you stand, no shader built by a fade, new creatures warmed off the frame |

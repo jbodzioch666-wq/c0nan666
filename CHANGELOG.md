@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-800 - New Ships
+
+- **All five boats are rebuilt.** The ship you sail is now the same ship you built on the slipway: a proper hull, deck, masts, yards and rigging, instead of a small rowboat with extra poles.
+- **Painted hulls.** Each boat has its own wood, tarred below the waterline, with a band of colour along the top.
+- **Guns on show.** From the sloop up, ships carry cannons run out through their sides: 4 on a sloop, 6 on a caravel, 12 on a galleon, 10 on a magic clipper. They don't fire yet; that comes in the cannon update.
+- **New sails.** Sewn panels, and the galleon's are now a proper deep red. Sails between you and the camera fade so you can still see yourself.
+- **You stand at the wheel.** You now stand on the deck by the ship's wheel and rise and fall with her.
+
 ## RS-799 - The Magic Clipper
 
 - **A fifth boat.** After the galleon you can now build the Magic Clipper at the Boatyard, a three-masted ship of teal magic wood with runes glowing down her sides and a swan's neck at the prow.
