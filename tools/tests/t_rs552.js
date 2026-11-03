@@ -6,7 +6,7 @@ module.exports = async page=>{
     G.owPos = { x:100, y:24 }; G.player.clock = G.player.turnCount = DAY_LENGTH/2; G.weather = 'clear'; O3.win = null; O3.ppos = null;
     for (let i=0;i<12;i++){ renderGame(); await new Promise(r=>setTimeout(r, 40)); }
     const sh = { uniforms:{}, vertexShader:'void main(){\n#include <begin_vertex>\n#include <project_vertex>\n}', fragmentShader:'void main(){\n#include <opaque_fragment>\n}' }; O3.water.material.onBeforeCompile(sh);
-    out.glint = /directionalLights\[0\]/.test(sh.fragmentShader) && /winking/.test(sh.fragmentShader); out.bank = /banks in the water/.test(sh.fragmentShader);
+    out.glint = /directionalLights\[0\]/.test(sh.fragmentShader) && /glitter/.test(sh.fragmentShader); /* (RS-794: the banks' cast is now the real mirror) */ out.bank = /uRf/.test(sh.fragmentShader);
     let lily = null, reeds = 0, flowers = 0; O3.world.traverse(o=>{ if (o.isInstancedMesh && o.userData.lily) lily = o; });
     O3.scene.traverse(o=>{ if (!o.isInstancedMesh) return; const pr = o.geometry.parameters || {}; if (o.geometry.type==='ConeGeometry' && Math.abs(pr.height - 0.4) < 1e-6) reeds += o.count; if (o.geometry.type==='ConeGeometry' && Math.abs(pr.height - 0.05) < 1e-6) flowers += o.count; });
     out.reeds = reeds; out.flowers = flowers; out.lily = lily ? lily.count : 0;

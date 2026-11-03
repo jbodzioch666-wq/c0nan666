@@ -13,7 +13,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   A(r.intoLand >= r.edge*0.05, 'water wanders past the tile edge');
   A(r.intoRiver >= r.edge*0.05, 'land wanders past the tile edge');
   A(r.seam < r.inner*0.2, 'the wave texture has no seam');
-  A(r.noMap && r.key==='gfxwaterd', 'the surface is the flowing one');
+  A(r.noMap && /^gfxwater/.test(r.key), 'the surface is the flowing one');
   A(r.bank > 5 && r.moved >= r.bank*0.8, 'the flow reaches the banks');
   A(!errs.length, 'no page errors: ' + errs.slice(0, 2).join(' | '));
 };

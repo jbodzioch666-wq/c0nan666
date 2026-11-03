@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-794 - Real Water
+
+- **Real waves.** Water near you now runs a true wave simulation. Ripples spread out, slow down in the shallows, stop at the bank and drift down a river.
+- **Things disturb it.** Wading, a boat's wake, leaping fish, foes crossing a ford, waterfalls and rain all make their own ripples.
+- **You can see into it.** Shallows are clear, with the bed bent by the waves and sunlight playing across it, and the colour deepens to blue with depth.
+- **Reflections.** Trees and hills now reflect in the water, broken up by the surface, along with a sky that shows the shape of each wave. The old square sparkles are gone.
+- **Sun glitter.** The sun now breaks into small bright flashes on the waves, wherever its reflection falls. Open water no longer shows a repeating pattern.
+
 ## RS-793 - Living Rivers
 
 - **Rivers have natural banks.** A river's edge now curves and wanders instead of following the square tiles, so its corners are bends rather than steps. Tiles still work as before: only the look of the bank has moved.

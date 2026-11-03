@@ -28098,7 +28098,7 @@ function gfxRender(r, scene, cam, view){
   if (!window.__noAutoFreeze) try{ gfxAutoFreeze(scene); }catch(e){}
   try{ const V = view==='v3' ? V3 : view==='o3' ? O3 : view==='fpd' ? FPD : null; if (V && V.warmWait && gfxWarmStep(V)) return; if (V && V.prelink && !V.warmWait) gfxPrelinkDone(V); if (V && V.unveil && !V.compileDue && !V.warmWait && !V.prelink) gfxUnveil(V); }catch(e){}   /* (RS-657: a prelink with no warm-up behind it (every kind warm) is polled here, so it clears when the links are done) */
   if (view==='o3' && owIsPlanet() && O3.ppos && !window.__noCurve){ DC_CURVE.x = O3.ppos.x; DC_CURVE.y = O3.ppos.z; DC_CURVE.z = o3CurveK(); }   /* (RS-631: the land bends away round you) */
-  gfxShadowTick(r, view); if (SET.fps){ gfxGpuMark(r, 'shadow'); gfxGpuPoll(); } try{ gfxRenderInner(r, scene, cam, view); } finally { gfxGpuStop(); DC_CURVE.z = 0; } }
+  gfxShadowTick(r, view); if (SET.fps){ gfxGpuMark(r, 'shadow'); gfxGpuPoll(); } if (view==='o3') try{ gfxWaterMirror(r, scene, cam); }catch(e){ console.error(e); WVIEW.u.ron.value = 0; } try{ gfxRenderInner(r, scene, cam, view); } finally { gfxGpuStop(); DC_CURVE.z = 0; } }
 /* (RS-380) in a town and on the open land the sun's shadow map is drawn every other frame, every third on a phone or when
    frames come slow: it was a second drawing of every shadow-caster in sight, every frame, and nothing in it moves fast
    enough to show. The dungeon's torches have had their own clock since RS-323 (dgShadowTick) */
@@ -28230,6 +28230,50 @@ function gfxWaterTex(){ if (GFX.waterTex) return GFX.waterTex; const T = THREE, 
   const fs = new Float32Array(N*N*4); let mS = 0, mH = 0, mF = 0; for (let y=0;y<N;y++) for (let x=0;x<N;x++){ let h = 0, sx = 0, sy = 0, f = 0; for (const [kx, ky, ph, A, K] of W){ const q = kx*x + ky*y + ph, sn = Math.sin(q), cs = Math.cos(q); h += A*sn; sx += A*kx*cs; sy += A*ky*cs; if (K > 9) f += A*sn; } const k = (y*N + x)*4; fs[k] = sx; fs[k+1] = sy; fs[k+2] = f; fs[k+3] = h; mS = Math.max(mS, Math.abs(sx), Math.abs(sy)); mF = Math.max(mF, Math.abs(f)); mH = Math.max(mH, Math.abs(h)); }
   for (let k=0;k<N*N*4;k+=4){ d[k] = Math.round(127.5 + fs[k]/mS*127.5); d[k+1] = Math.round(127.5 + fs[k+1]/mS*127.5); d[k+2] = Math.round(127.5 + fs[k+2]/mF*127.5); d[k+3] = Math.round(127.5 + fs[k+3]/mH*127.5); }
   const t = new T.DataTexture(d, N, N, T.RGBAFormat); t.wrapS = t.wrapT = T.RepeatWrapping; t.magFilter = T.LinearFilter; t.minFilter = T.LinearMipmapLinearFilter; t.generateMipmaps = true; t.anisotropy = 8; t.needsUpdate = true; return (GFX.waterTex = t); }
+/* (RS-794) real waves round you: the wave equation solved on the card, on a square of the water 24 tiles wide that follows you. Each cell
+   keeps its height and its speed, and is pulled toward the mean of its neighbours. Waves run slower as the water shoals, stop and turn
+   back at the bank, drift down a river, and die away at the square's edge. Anything can drop a stone in: o3Splash */
+const WSIM = { N:512, S:24, q:[], cx:0, cz:0, on:false, reset:2, acc:0, steps:0, u:{ tex:{ value:null }, o:{ value:null } } };
+function o3Splash(x, z, amp, r){ r = Math.max(r || 0, 0.2); /* (no smaller than four cells: a drop on the grid's own scale rings as a lattice) */ const q = WSIM.q; if (!WSIM.on || q.length > 96) return; q.push([x, z, r||0.16, amp==null ? 0.1 : amp]); }
+function gfxWsimMake(r){ const T = THREE, N = WSIM.N, mk = ()=>new T.WebGLRenderTarget(N, N, { type:T.HalfFloatType, format:T.RGBAFormat, minFilter:T.LinearFilter, magFilter:T.LinearFilter, depthBuffer:false, stencilBuffer:false, generateMipmaps:false });
+  WSIM.a = mk(); WSIM.b = mk(); WSIM.u.o.value = new T.Vector4(0, 0, WSIM.S, 0);
+  const drops = []; for (let i=0;i<16;i++) drops.push(new T.Vector4());
+  WSIM.m = new T.RawShaderMaterial({ depthTest:false, depthWrite:false, uniforms:{ tH:{ value:null }, tDep:O3.uDep || (O3.uDep = { value:null }), tFoam:{ value:null }, uDepO:O3.uDepO || (O3.uDepO = { value:new T.Vector4() }), uFoamO:{ value:new T.Vector4() }, uC:{ value:new T.Vector2() }, uShift:{ value:new T.Vector2() }, uS:{ value:WSIM.S }, uE:{ value:1/N }, uReset:{ value:1 }, uD:{ value:drops } },
+    vertexShader:'precision highp float; attribute vec3 position; varying vec2 v; void main(){ v = position.xy*0.5 + 0.5; gl_Position = vec4(position.xy, 0.0, 1.0); }',
+    fragmentShader:`precision highp float; varying vec2 v; uniform sampler2D tH, tDep, tFoam; uniform vec4 uDepO, uFoamO; uniform vec2 uC, uShift; uniform float uS, uE, uReset; uniform vec4 uD[16];
+      void main(){ if (uReset > 0.5){ gl_FragColor = vec4(0.0); return; } vec2 w = uC + (v - 0.5)*uS; float dep = texture2D(tDep, ((w - uDepO.xy)*uDepO.z + 0.5)/uDepO.w).r*0.6;
+        vec2 fl = (texture2D(tFoam, (w - uFoamO.xy)/uFoamO.zw).ba*2.0 - 1.0)*0.62*smoothstep(0.0, 0.2, dep); vec2 uv = v + uShift - fl*(1.0/60.0)/uS;
+        vec4 c = texture2D(tH, uv), nb = texture2D(tH, uv + vec2(uE, 0.0)) + texture2D(tH, uv - vec2(uE, 0.0)) + texture2D(tH, uv + vec2(0.0, uE)) + texture2D(tH, uv - vec2(0.0, uE)); float lap = nb.r - 4.0*c.r, lapV = nb.g - 4.0*c.g;
+        float K = 0.24*clamp(dep/0.14, 0.12, 1.0), sp = (c.g + lap*K + lapV*0.05)*0.996, h = c.r + sp + lap*0.03; /* (the two small blurs kill the one-cell chatter that shows as a waffle, and leave the long waves be) */ h *= 0.9985;
+        for (int i=0;i<16;i++){ if (uD[i].w != 0.0){ float d = length(w - uD[i].xy)/uD[i].z; if (d < 1.0) h -= uD[i].w*(0.5 + 0.5*cos(3.14159*d)); } }
+        float wet = smoothstep(0.0, 0.012, dep); h *= wet; sp *= wet; float e = min(min(v.x, 1.0 - v.x), min(v.y, 1.0 - v.y)), ed = smoothstep(0.0, 0.06, e); gl_FragColor = vec4(clamp(h*ed, -2.0, 2.0), clamp(sp*ed, -2.0, 2.0), 0.0, 1.0); }` });
+  WSIM.scene = new T.Scene(); WSIM.cam = new T.Camera(); const q = new T.Mesh(new T.PlaneGeometry(2, 2), WSIM.m); q.frustumCulled = false; WSIM.scene.add(q); }
+function gfxWsimAllowed(r){ if (SET.gfx==='low' || window.__noWsim || !r.capabilities.isWebGL2) return false; const x = r.extensions; return !!(x.has('EXT_color_buffer_float') || x.has('EXT_color_buffer_half_float')); }
+/* what stirs it: you, a boat's wake, foes wading a ford, leaping fish, the foot of a waterfall, rain, and now and then something small rising to the surface */
+function gfxWsimStir(dt, pp){ const W = WSIM, wy = O3_WATER_Y, t = GFX.u.uT.value; W.t0 = (W.t0||0) + dt; const R = W.S*0.42, rnd = ()=>Math.random();
+  const lp = W.lp, sp = lp ? Math.hypot(pp.x - lp[0], pp.z - lp[1])/Math.max(dt, 1e-3) : 0; W.lp = [pp.x, pp.z]; const inW = (O3.boat && O3.boat.visible) || O3.heightAt(pp.x, pp.z) < wy - 0.015, boat = O3.boat && O3.boat.visible;
+  if (inW && sp < 40){ W.tw = (W.tw||0) - dt; if (W.tw <= 0){ if (sp > 0.05){ W.tw = 0.08; o3Splash(pp.x, pp.z, Math.min(boat ? 0.09 : 0.055, 0.02 + sp*0.03), boat ? 0.32 : 0.17); } else { W.tw = 1.1; o3Splash(pp.x + (rnd() - 0.5)*0.1, pp.z + (rnd() - 0.5)*0.1, boat ? 0.018 : 0.012, 0.2); } } }
+  if (O3.leapers) for (const f of O3.leapers){ if (Math.abs(f.x - pp.x) > R || Math.abs(f.z - pp.z) > R) continue; const h1 = (f.ph*7.31) % 1, h2 = (f.ph*3.17 + 0.3) % 1, P = 4.5 + 4*h1, tt = (O3.discT ? O3.discT.value : t)/P + h2, cyc = Math.floor(tt), u = tt - cyc, st = u < 0.17 ? 1 : 2; if (f.wsC!==cyc + st/4){ const was = f.wsC; f.wsC = cyc + st/4; if (was!==undefined){ const a = f.a + cyc*2.4, x = (st===1 ? -0.3 : 0.3); o3Splash(f.x + Math.cos(a)*x, f.z + Math.sin(a)*x, st===1 ? 0.07 : 0.12, 0.13); } } }
+  for (const f of (GFX.falls||[])){ const q = f.path && f.path[0]; if (!q || Math.abs(q[0] - pp.x) > R || Math.abs(q[1] - pp.z) > R) continue; f.wsT = (f.wsT||0) - dt; if (f.wsT <= 0){ f.wsT = 0.06; o3Splash(q[0] + (rnd() - 0.5)*0.6, q[1] + (rnd() - 0.5)*0.6, 0.05 + rnd()*0.06, 0.16); } }
+  const wet = G.weather==='storm' ? 9 : G.weather==='rain' ? 4 : 0; for (let i=0;i<wet;i++) o3Splash(pp.x + (rnd() - 0.5)*W.S*0.8, pp.z + (rnd() - 0.5)*W.S*0.8, 0.012 + rnd()*0.018, 0.1);
+  W.tl = (W.tl||0) - dt; if (W.tl <= 0){ W.tl = 0.35 + rnd()*0.7; o3Splash(pp.x + (rnd() - 0.5)*W.S*0.7, pp.z + (rnd() - 0.5)*W.S*0.7, 0.012 + rnd()*0.012, 0.09); }
+  W.te = (W.te||0) - dt; if (W.te <= 0 && G.ow && G.ow.encounters){ W.te = 0.15; for (const e of G.ow.encounters){ if (e.wsX===e.x && e.wsY===e.y) continue; const fst = e.wsX===undefined; e.wsX = e.x; e.wsY = e.y; if (fst) continue; const L = o3L(e.x, e.y); if (!L || Math.abs(L[0] - pp.x) > R || Math.abs(L[1] - pp.z) > R) continue; if (o3Tile(L[0], L[1])===OW_RIVER) for (let i=0;i<3;i++) o3Splash(L[0] + 0.2 + rnd()*0.6, L[1] + 0.2 + rnd()*0.6, 0.05, 0.16); } } }
+function gfxWsimTick(dt, pp){ const r = O3.renderer, W = WSIM; if (!r || !O3.water) return; if (W.allow===undefined || W.allowR!==r){ W.allowR = r; W.allow = gfxWsimAllowed(r); } const on = W.allow && !window.__noWsim && SET.gfx!=='low'; W.on = on; if (!on){ if (W.u.o.value) W.u.o.value.w = 0; return; } if (!W.a) gfxWsimMake(r);
+  const dep = O3.uDep && O3.uDep.value, fm = O3.water.material.userData.ownTex && O3.water.material.userData.ownTex[0]; if (!dep || !fm){ W.u.o.value.w = 0; return; }
+  const tx = W.S/W.N, cx = Math.round(pp.x/tx)*tx, cz = Math.round(pp.z/tx)*tx, U = W.m.uniforms; if (W.wat!==O3.water || Math.hypot(cx - W.cx, cz - W.cz) > W.S*0.3){ W.wat = O3.water; W.reset = 2; W.q.length = 0; W.lp = null; }
+  if (!W.reset) gfxWsimStir(dt, pp); W.acc = Math.min(W.acc + dt, 0.06); const n = W.reset ? 2 : Math.min(3, Math.floor(W.acc*60)); if (!W.reset) W.acc -= n/60; if (n){ const rt = r.getRenderTarget(); try{ U.tFoam.value = fm; U.uFoamO.value.set(fm.wsOx, fm.wsOy, fm.image.width, fm.image.height); U.uS.value = W.S;
+    for (let i=0;i<n;i++){ U.uReset.value = W.reset ? 1 : 0; if (W.reset) W.reset--; U.uC.value.set(cx, cz); U.uShift.value.set(i ? 0 : (cx - W.cx)/W.S, i ? 0 : (cz - W.cz)/W.S); if (!i){ W.cx0 = W.cx; W.cx = cx; W.cz = cz; } for (let k=0;k<16;k++){ const d = W.q[k]; if (d) U.uD.value[k].set(d[0], d[1], d[2], d[3]); else U.uD.value[k].w = 0; } W.q.splice(0, 16); U.tH.value = W.a.texture; r.setRenderTarget(W.b); r.render(W.scene, W.cam); const sw = W.a; W.a = W.b; W.b = sw; W.steps++; } } finally { r.setRenderTarget(rt); } }
+  W.u.tex.value = W.a.texture; W.u.o.value.set(W.cx, W.cz, W.S, 1); }
+/* (RS-794) what the water shows. The picture so far is copied as the water starts to draw (the only cost a copy): the bed and whatever is under
+   the surface are read from it, bent by the waves. And the trees and hills drawn again from a camera under the mirror of the water, at half size,
+   the land's own surface left out, only when there's water by you, for the water to reflect. Both need the post target: without it the water stays see-through as it was */
+const WVIEW = { u:{ gr:{ value:null }, res:{ value:null }, on:{ value:0 }, rf:{ value:null }, rm:{ value:null }, ron:{ value:0 } } };
+function gfxWaterGrab(r){ const U = WVIEW.u, rt = r.getRenderTarget(); if (!rt || window.__noWaterGrab){ U.on.value = 0; return; } const T = THREE, w = rt.width, h = rt.height, gl = r.getContext(); let g = WVIEW.grab; if (!g){ g = WVIEW.grab = new T.WebGLRenderTarget(w, h, { type:rt.texture.type, format:T.RGBAFormat, minFilter:T.LinearFilter, magFilter:T.LinearFilter, depthBuffer:false, stencilBuffer:false }); } else if (g.width!==w || g.height!==h) g.setSize(w, h); const pr = r.properties.get(g); if (!pr.__webglFramebuffer){ r.setRenderTarget(g); r.setRenderTarget(rt); }   /* (that sets its framebuffer up) */ const cur = gl.getParameter(gl.FRAMEBUFFER_BINDING), sc = gl.isEnabled(gl.SCISSOR_TEST); if (sc) gl.disable(gl.SCISSOR_TEST); gl.bindFramebuffer(gl.READ_FRAMEBUFFER, cur); gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, pr.__webglFramebuffer); gl.blitFramebuffer(0, 0, w, h, 0, 0, w, h, gl.COLOR_BUFFER_BIT, gl.NEAREST); gl.bindFramebuffer(gl.FRAMEBUFFER, cur); if (sc) gl.enable(gl.SCISSOR_TEST); U.gr.value = g.texture; (U.res.value || (U.res.value = new T.Vector2())).set(w, h); U.on.value = 1; }
+function gfxWaterNear(pp){ const W = WVIEW, now = performance.now(); if (W.nearAt && now - W.nearAt < 400) return W.near; W.nearAt = now; W.near = false; const dt = O3.depthTex, o = O3.depthO; if (!dt || !o) return false; const D = dt.image.data, N = dt.image.width, R = 16; for (let a=-R;a<=R && !W.near;a+=1) for (let b=-R;b<=R;b+=1){ const i = Math.round((pp.x + a - o.x)*o.z), j = Math.round((pp.z + b - o.y)*o.z); if (i<0 || j<0 || i>=N || j>=N) continue; if (D[(j*N + i)*4] > 6){ W.near = true; break; } } return W.near; }
+function gfxWaterMirror(r, scene, cam){ const U = WVIEW.u, T = THREE, W = WVIEW; U.ron.value = 0; if (!gfxPostOn() || window.__noWaterMirror || SET.gfx==='low' || !O3.water || !O3.ppos || !gfxWaterNear(O3.ppos)) return; const P = GFX.post; r.getDrawingBufferSize(W.v2 || (W.v2 = new T.Vector2())); const w = Math.max(4, W.v2.x>>1), h = Math.max(4, W.v2.y>>1);
+  if (!W.rt){ W.rt = new T.WebGLRenderTarget(w, h, { type:T.HalfFloatType, minFilter:T.LinearFilter, magFilter:T.LinearFilter, depthBuffer:true, stencilBuffer:false }); W.cam = new T.PerspectiveCamera(); W.bias = new T.Matrix4().set(0.5, 0, 0, 0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5, 0.5, 0, 0, 0, 1); U.rm.value = new T.Matrix4(); U.rf.value = W.rt.texture; W.a = new T.Vector3(); W.b = new T.Vector3(); W.c = new T.Vector3(); } else if (W.rt.width!==w || W.rt.height!==h) W.rt.setSize(w, h);
+  const wy = O3_WATER_Y + (O3.water.parent ? O3.water.parent.position.y : 0), c = W.cam; cam.updateMatrixWorld(); W.a.setFromMatrixPosition(cam.matrixWorld); W.b.set(0, 0, -1).transformDirection(cam.matrixWorld); W.c.set(0, 1, 0).transformDirection(cam.matrixWorld); c.position.set(W.a.x, 2*wy - W.a.y, W.a.z); c.up.set(W.c.x, -W.c.y, W.c.z); c.lookAt(W.a.x + W.b.x, 2*wy - (W.a.y + W.b.y), W.a.z + W.b.z); c.near = cam.near; c.far = cam.far; c.projectionMatrix.copy(cam.projectionMatrix); c.projectionMatrixInverse.copy(cam.projectionMatrixInverse); c.updateMatrixWorld(); U.rm.value.copy(W.bias).multiply(c.projectionMatrix).multiply(c.matrixWorldInverse);
+  const hid = [O3.water, O3.land, O3.rain, O3.clickRing].filter(o=>o && o.visible); for (const o of hid) o.visible = false; const bg = scene.background, cc = r.getClearColor(W.cc || (W.cc = new T.Color())), ca = r.getClearAlpha(), rt = r.getRenderTarget(), au = r.shadowMap.autoUpdate, nu = r.shadowMap.needsUpdate; try{ scene.background = null; r.setClearColor(0x000000, 0); r.shadowMap.autoUpdate = false; r.shadowMap.needsUpdate = false; r.setRenderTarget(W.rt); r.clear(); r.render(scene, c); U.ron.value = 1; } finally { r.setRenderTarget(rt); scene.background = bg; r.setClearColor(cc, ca); r.shadowMap.autoUpdate = au; r.shadowMap.needsUpdate = nu; for (const o of hid) o.visible = true; } }
 // a shared bit of shader: the world position, for the land and the water
 function gfxWorldPos(shader){
   shader.vertexShader = 'varying vec3 vGW;\n' + shader.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n  vGW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
@@ -28443,18 +28487,18 @@ function* gfxO3BuildGen(grp, x0, y0, W, M){   /* (RS-403: a step at a time - see
         const L = Math.hypot(fx, fz) || 1, k = at(i, j)*4; data[k+2] = Math.round(128 + fx/L*120); data[k+3] = Math.round(128 + fz/L*120); }
       /* (RS-794) the flow eased round its bends, and carried onto the land tiles beside a river, where a wandering bank now lets the water reach */
       for (let pass=0;pass<3;pass++){ const was = data.slice(); for (let j=0;j<N;j++) for (let i=0;i<N;i++){ const t0 = o3Tile(ox + i, oy + j), riv0 = t0===OW_RIVER; if (t0===OW_WATER) continue; let sx = riv0 ? (was[at(i, j)*4+2] - 128)*2 : 0, sz = riv0 ? (was[at(i, j)*4+3] - 128)*2 : 0, n = riv0 ? 2 : 0; for (const [a, b] of R8){ const ii = i + a, jj = j + b; if (ii<0 || jj<0 || ii>=N || jj>=N) continue; const u = at(ii, jj)*4; if (o3Tile(ox + ii, oy + jj)!==OW_RIVER) continue; sx += was[u+2] - 128; sz += was[u+3] - 128; n++; } if (!n) continue; const k = at(i, j)*4; data[k+2] = Math.round(128 + sx/n); data[k+3] = Math.round(128 + sz/n); } } }
-    const foam = new T.DataTexture(data, N, N, T.RGBAFormat); foam.magFilter = foam.minFilter = T.LinearFilter; foam.needsUpdate = true;
+    const foam = new T.DataTexture(data, N, N, T.RGBAFormat); foam.magFilter = foam.minFilter = T.LinearFilter; foam.needsUpdate = true; foam.wsOx = ox; foam.wsOy = oy;   /* (RS-794: for the waves) */
     water.geometry.dispose(); water.geometry = new T.PlaneGeometry(N, N, N, N);
     const m = water.material; m.userData.ownTex = [foam];   /* (RS-414: freed with the land - see o3DisposeWorld) */
     /* (RS-414) the depth of the land showing, through a uniform the swap sets: a water built over frames could compile while the old
        land still showed, and kept the old land's depth map - its shallows in the wrong places, and the old map kept on the card */
     const uDep = O3.uDep || (O3.uDep = { value:null }), uDepO = O3.uDepO || (O3.uDepO = { value:new T.Vector4() });
-    m.onBeforeCompile = sh=>{ Object.assign(sh.uniforms, { uT:U.uT, uNight:U.uNight, uSky:U.uSky, uFoam:{ value:foam }, uFoamO:{ value:new T.Vector4(ox, oy, N, N) }, uDep, uDepO, uWat:{ value:gfxWaterTex() }, uHole:O3.uHole || (O3.uHole = { value:new T.Vector4() }) }); gfxCloudUniforms(sh);
+    m.onBeforeCompile = sh=>{ Object.assign(sh.uniforms, { uT:U.uT, uNight:U.uNight, uSky:U.uSky, uFoam:{ value:foam }, uFoamO:{ value:new T.Vector4(ox, oy, N, N) }, uDep, uDepO, uWat:{ value:gfxWaterTex() }, uGr:WVIEW.u.gr, uRes:(WVIEW.u.res.value || (WVIEW.u.res.value = new T.Vector2(1, 1)), WVIEW.u.res), uGrOn:WVIEW.u.on, uRf:WVIEW.u.rf, uRm:(WVIEW.u.rm.value || (WVIEW.u.rm.value = new T.Matrix4()), WVIEW.u.rm), uRfOn:WVIEW.u.ron, uWs:WSIM.u.tex, uWsO:(WSIM.u.o.value || (WSIM.u.o.value = new T.Vector4(0, 0, WSIM.S, 0)), WSIM.u.o), uHole:O3.uHole || (O3.uHole = { value:new T.Vector4() }) }); gfxCloudUniforms(sh);
       gfxWorldPos(sh);
       sh.vertexShader = 'uniform float uT;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
         vec4 wp0 = modelMatrix * vec4(transformed, 1.0);
         transformed.z += sin(wp0.x*1.3 + uT*1.4)*0.022 + sin(wp0.z*1.7 - uT*1.1)*0.018 + sin((wp0.x + wp0.z)*2.9 + uT*2.3)*0.007;`);
-      sh.fragmentShader = GFX_CLOUD_DECL + 'uniform float uT; uniform float uNight; uniform vec3 uSky; uniform sampler2D uFoam; uniform vec4 uFoamO; uniform sampler2D uDep; uniform vec4 uDepO; uniform vec4 uHole; uniform sampler2D uWat;\n' + sh.fragmentShader.replace('#include <normal_fragment_maps>', `
+      sh.fragmentShader = GFX_CLOUD_DECL + 'uniform float uT; uniform float uNight; uniform vec3 uSky; uniform sampler2D uFoam; uniform vec4 uFoamO; uniform sampler2D uDep; uniform vec4 uDepO; uniform vec4 uHole; uniform sampler2D uWat; uniform sampler2D uWs; uniform vec4 uWsO; uniform sampler2D uGr; uniform vec2 uRes; uniform float uGrOn; uniform sampler2D uRf; uniform mat4 uRm; uniform float uRfOn;\n' + sh.fragmentShader.replace('#include <normal_fragment_maps>', `
         /* (RS-794) the surface moves with the water: the wave texture is carried along the flow and starts over twice in a cycle, the two
            phases crossfaded so the restart never shows, each spot on its own beat. A river runs slower by its banks. Lakes and the sea drift on the wind */
         vec4 fo0 = texture2D(uFoam, (vGW.xz - uFoamO.xy)/uFoamO.zw);
@@ -28462,48 +28506,47 @@ function* gfxO3BuildGen(grp, x0, y0, W, M){   /* (RS-403: a step at a time - see
         vec2 flw = (fo0.ba*2.0 - 1.0)*0.62*smoothstep(0.0, 0.2, dep0);
         float beat = texture2D(uWat, vGW.xz*0.043).a, ph0 = fract(uT*0.55 + beat), ph1 = fract(uT*0.55 + beat + 0.5), w0 = 1.0 - abs(2.0*ph0 - 1.0), w1 = 1.0 - w0;
         vec2 fd0 = flw*ph0/0.55, fd1 = flw*ph1/0.55, drift = vec2(0.07, 0.045)*uT;
-        vec2 sl = (texture2D(uWat, (vGW.xz - fd0)*0.31 + drift*0.31).rg*w0 + texture2D(uWat, (vGW.xz - fd1)*0.31 + drift*0.31 + 0.37).rg*w1)*2.0 - 1.0;
-        sl += ((texture2D(uWat, (vGW.xz - fd0)*0.97 - drift*0.8).rg*w0 + texture2D(uWat, (vGW.xz - fd1)*0.97 - drift*0.8 + 0.61).rg*w1)*2.0 - 1.0)*0.7;
+        const mat2 wR1 = mat2(0.961, 0.276, -0.276, 0.961), wR2 = mat2(0.8, 0.6, -0.6, 0.8); /* (each layer turned off the grid, its own size, and the fine one stronger and weaker from place to place, so the texture's repeat never shows as a lattice on open water) */
+        vec2 sl = transpose(wR1)*((texture2D(uWat, wR1*(vGW.xz - fd0)*0.23 + drift*0.31).rg*w0 + texture2D(uWat, wR1*(vGW.xz - fd1)*0.23 + drift*0.31 + 0.37).rg*w1)*2.0 - 1.0);
+        sl += transpose(wR2)*((texture2D(uWat, wR2*(vGW.xz - fd0)*0.71 - drift*0.8).rg*w0 + texture2D(uWat, wR2*(vGW.xz - fd1)*0.71 - drift*0.8 + 0.61).rg*w1)*2.0 - 1.0)*0.7*(0.35 + 1.3*texture2D(uWat, vGW.xz*0.067 + 0.2).a);
+        /* (RS-794) and the real waves on top of it: their slope, and their height for a little foam on the big ones */
+        float wsH = 0.0; if (uWsO.w > 0.5){ vec2 wu = (vGW.xz - uWsO.xy)/uWsO.z + 0.5; float wE = 2.5/512.0, wf = smoothstep(0.0, 0.1, min(min(wu.x, 1.0 - wu.x), min(wu.y, 1.0 - wu.y))); sl += vec2(texture2D(uWs, wu + vec2(wE, 0.0)).r - texture2D(uWs, wu - vec2(wE, 0.0)).r, texture2D(uWs, wu + vec2(0.0, wE)).r - texture2D(uWs, wu - vec2(0.0, wE)).r)*wf*22.0; wsH = texture2D(uWs, wu).r*wf; }
         vec3 wN = normalize(vec3(-sl.x*0.42, 1.0, -sl.y*0.42));
         normal = normalize((viewMatrix*vec4(wN, 0.0)).xyz);`).replace('#include <opaque_fragment>', `#include <opaque_fragment>
-        vec3 wn = normalize(cross(dFdx(vGW), dFdy(vGW))); if (wn.y < 0.0) wn = -wn;
         if (texture2D(uDep, ((vGW.xz - uDepO.xy)*uDepO.z + 0.5)/uDepO.w).g > 0.5) discard;   /* (RS-652: the sea sheet runs under all the land - not down a barrow's stair) */
         float hd = length(vGW.xz - uHole.xy); if (uHole.z > 0.0 && uHole.w > 0.5 && hd < uHole.z) discard;   /* (RS-687: the sea parted over a drowned temple's well) */
-        float fr = pow(1.0 - max(dot(wn, normalize(cameraPosition - vGW)), 0.0), 3.0);
-        gl_FragColor.rgb = mix(gl_FragColor.rgb, uSky, clamp(fr*0.9 + 0.1, 0.0, 0.6));
         vec4 fo = texture2D(uFoam, (vGW.xz - uFoamO.xy)/uFoamO.zw);
         float nz = texture2D(uCloud, vGW.xz*1.1 + vec2(uT*0.05, uT*0.03)).r;
         /* (RS-794) a river's foam is carried on the same two phases: flecks in midstream, more where the flow bends (the flow's own change from side to side), none at night's full glow */
         vec2 fe = vec2(0.75/uFoamO.z, 0.0); float bend = length(texture2D(uFoam, (vGW.xz - uFoamO.xy)/uFoamO.zw + fe.xy).ba - texture2D(uFoam, (vGW.xz - uFoamO.xy)/uFoamO.zw - fe.xy).ba) + length(texture2D(uFoam, (vGW.xz - uFoamO.xy)/uFoamO.zw + fe.yx).ba - texture2D(uFoam, (vGW.xz - uFoamO.xy)/uFoamO.zw - fe.yx).ba);
         float fln = texture2D(uWat, (vGW.xz - fd0)*0.63).b*w0 + texture2D(uWat, (vGW.xz - fd1)*0.63 + 0.29).b*w1, fln2 = texture2D(uWat, (vGW.xz - fd0)*1.7).b*w0 + texture2D(uWat, (vGW.xz - fd1)*1.7 + 0.47).b*w1;
-        float run = fo0.g*smoothstep(0.56, 0.74, fln*0.6 + fln2*0.4)*clamp(0.14 + bend*1.1 + (1.0 - smoothstep(0.02, 0.12, dep0))*0.22, 0.0, 0.8)*(1.0 - uNight*0.6);
+        float run = fo0.g*smoothstep(0.6, 0.82, fln*0.6 + fln2*0.4)*clamp(0.07 + bend*0.9 + (1.0 - smoothstep(0.02, 0.12, dep0))*0.12, 0.0, 0.65)*(1.0 - uNight*0.6);
         /* (RS-311) the shallows and the surf: clear turquoise over the sand, deepening to blue; a lapping line of foam at the waterline,
            and lines of foam rolling in to the beach */
         float dep = texture2D(uDep, ((vGW.xz - uDepO.xy)*uDepO.z + 0.5)/uDepO.w).r*0.6;
-        float shal = 1.0 - smoothstep(0.0, 0.38, dep);
-        gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.14, 0.50, 0.47)*(0.3 + 0.7*(1.0 - uNight)), shal*0.62);   /* (RS-769: darker at night - the shallows glowed) */
-        gl_FragColor.a = mix(gl_FragColor.a, 0.38, shal*shal);
+        /* (RS-794) light through water. The bed is read from the picture so far, bent by the waves, dimmed by how far the light came through the water: red goes first, then green, so shallows are clear and turquoise and the deep goes to the lit colour of the water itself. Sunlight focused by the waves plays on a shallow bed. Over it all the sky and the trees, more of them the flatter you look along the surface, and the sun's side of each wave a little brighter so its shape shows */
+        vec3 tr = exp(-vec3(9.5, 3.8, 2.7)*dep), wV = normalize(cameraPosition - vGW), wR = reflect(-wV, wN); float wNV = max(dot(wN, wV), 0.0), dayK = 1.0 - uNight*0.85;
+        float fres = clamp((0.03 + 0.97*pow(1.0 - wNV, 5.0))*2.2 + 0.07, 0.0, 0.75)*smoothstep(0.0, 0.035, dep);
+        vec3 skyR = mix(uSky*1.2, uSky*0.6, clamp(wR.y*1.15, 0.0, 1.0)); if (uRfOn > 0.5){ vec4 rfc = uRm*vec4(vGW.x + wN.x*0.5, ${O3_WATER_Y.toFixed(3)}, vGW.z + wN.z*0.5, 1.0); vec4 rfs = texture2DProj(uRf, rfc); skyR = mix(skyR, rfs.rgb, clamp(rfs.a, 0.0, 1.0)*0.92); }
+        vec3 wBody = gl_FragColor.rgb; if (uGrOn > 0.5){ vec2 suv = gl_FragCoord.xy/uRes + sl*0.016*smoothstep(0.0, 0.12, dep); vec3 bed = texture2D(uGr, suv).rgb; float c1 = texture2D(uWat, vGW.xz*0.37 + vec2(uT*0.021, uT*0.016) - fd0*0.2).a, c2 = texture2D(uWat, vGW.xz*0.53 - vec2(uT*0.017, -uT*0.024) + 0.4).a, cau = pow(clamp(1.0 - abs(c1 + c2 - 1.0)*3.4, 0.0, 1.0), 5.0); bed *= 1.0 + cau*2.2*dayK*smoothstep(0.0, 0.03, dep)*(1.0 - smoothstep(0.1, 0.42, dep)); wBody = bed*tr + (wBody*1.35 + vec3(0.02, 0.15, 0.19)*dayK)*(1.0 - tr); gl_FragColor.a = 1.0; } else gl_FragColor.a = clamp(1.0 - tr.g*0.8, 0.0, 1.0)*smoothstep(0.0, 0.02, dep);
+        gl_FragColor.rgb = mix(wBody, skyR, fres);
+        #if NUM_DIR_LIGHTS > 0
+        { vec3 sW = normalize(transpose(mat3(viewMatrix))*directionalLights[0].direction); gl_FragColor.rgb *= 1.0 + clamp(dot(sl, sW.xz)*0.42, -0.34, 0.5)*dayK*smoothstep(0.0, 0.05, dep); /* sun glitter: the sun's mirror image broken up by the waves */ vec3 gN = normalize(vec3(-sl.x*1.1, 1.0, -sl.y*1.1)); float gl0 = max(dot(reflect(-wV, gN), sW), 0.0); gl_FragColor.rgb += directionalLights[0].color*(pow(gl0, 90.0)*0.14 + pow(gl0, 800.0)*0.8)*dayK*smoothstep(0.0, 0.03, dep); }
+        #endif
         float hc = uHole.z > 0.0 ? 1.0 - smoothstep(uHole.z - 0.15, uHole.z + 0.4, hd) : 0.0; gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.13, 0.42, 0.42), hc*0.45); gl_FragColor.a = mix(gl_FragColor.a, 0.4, hc);   /* (RS-687: clearer over the well, the drowned temple showing through) */
         float brk = smoothstep(0.25, 0.75, texture2D(uCloud, vGW.xz*2.3 + vec2(-uT*0.04, uT*0.05)).r);   /* (the surf breaks up along the beach) */
         float lap = (1.0 - smoothstep(0.0, 0.035, dep - 0.01*sin(uT*1.7 + vGW.x*2.3 + vGW.z*1.9)))*(0.45 + 0.55*brk);
         float roll = smoothstep(0.72, 1.0, sin(dep*16.0 + uT*0.9 + nz*8.0))*(1.0 - smoothstep(0.015, 0.14, dep))*step(0.003, dep)*brk*(1.0 - fo.g);   /* (RS-769: not on a river; RS-794: a broad, broken swell up the beach, not fine rings of depth) */
-        float surf = clamp(lap*0.7 + roll*0.45, 0.0, 0.8)*(0.6 + 0.4*nz);
-        gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.92, 0.96, 1.0)*(0.3 + 0.7*(1.0 - uNight)), clamp(surf + run, 0.0, 0.9));   /* (RS-769: the foam in the night's light, not glowing white) */
-        gl_FragColor.a = max(gl_FragColor.a, surf*0.95);
-        float st = step(0.995, fract(sin(dot(floor(vGW.xz*12.0), vec2(12.9898, 78.233)))*43758.5453))*uNight*(0.55 + 0.45*sin(uT*3.0 + vGW.x*7.0 + vGW.z*3.0));
-        gl_FragColor.rgb += vec3(st*0.7);
-        /* (RS-552) the banks in the water: along a shore the water carries a darker, greener cast, the trees and grass above it reflected;
-           and the sun's glints - the ripples' own normals catching the sun, broken into sparkles by a drifting noise, where the sun
-           sits between you and the water */
-        gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.1, 0.19, 0.11), fo.r*0.32*(1.0 - shal)*(1.0 - uNight*0.7));
-        #if NUM_DIR_LIGHTS > 0
-        { vec3 Vv = normalize(vViewPosition), Hn = normalize(directionalLights[0].direction + Vv); float gl = pow(max(dot(normalize(normal), Hn), 0.0), 48.0);
-          vec2 cp = vGW.xz*15.0 + vec2(uT*0.6, -uT*0.4), cell = floor(cp), cf = fract(cp) - 0.5; float h1 = fract(sin(dot(cell, vec2(12.9898, 78.233)))*43758.5453), h2 = fract(sin(dot(cell, vec2(39.3467, 11.135)))*24634.6345);
-          float tw = smoothstep(0.78, 1.0, 0.5 + 0.5*sin(uT*2.8 + h1*31.0)), sp = step(0.95, h2)*tw*smoothstep(0.2, 0.04, length(cf + (vec2(h1, h2) - 0.5)*0.4));   /* (a round point in one cell in twenty, each winking in its own time) */
-          gl_FragColor.rgb += directionalLights[0].color*gl*sp*2.6*(1.0 - uNight)*(1.0 - shal*0.5); }
-        #endif` + GFX_CLOUD_GLSL + `
-        gl_FragColor.rgb *= mix(1.0, cshade, 0.75);`); };   /* (RS-551: the clouds' shadows cross the water too) */
-    m.customProgramCacheKey = ()=>'gfxwaterd'; m.needsUpdate = true;
+        float surf = clamp(lap*(0.5 - 0.32*fo.g) + roll*0.34, 0.0, 0.7)*(0.45 + 0.55*nz)*smoothstep(0.0, 0.012, dep);
+        gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.92, 0.96, 1.0)*(0.3 + 0.7*(1.0 - uNight)), clamp(surf + run + smoothstep(0.035, 0.12, wsH)*0.55, 0.0, 0.9));   /* (RS-769: the foam in the night's light, not glowing white) */
+        if (uGrOn < 0.5) gl_FragColor.a = max(gl_FragColor.a, surf*0.95);
+        /* (RS-794) the stars in the water: fine points, bent by the waves, each twinkling */
+        vec2 stp = (vGW.xz + wN.xz*0.6)*26.0, stc = floor(stp); float sth = fract(sin(dot(stc, vec2(12.9898, 78.233)))*43758.5453), st = step(0.994, sth)*smoothstep(0.42, 0.08, length(fract(stp) - 0.5))*uNight*(0.55 + 0.45*sin(uT*3.0 + sth*40.0))*smoothstep(0.04, 0.12, dep);
+        gl_FragColor.rgb += vec3(st*0.5);
+        gl_FragColor.rgb = min(gl_FragColor.rgb, vec3(1.25));   /* (a glint's bloom stays round: a blinding pixel went blocky in the blur) */
+        ` + GFX_CLOUD_GLSL + `
+        gl_FragColor.rgb *= mix(1.0, cshade, 0.4);`); };   /* (RS-551: the clouds' shadows cross the water too) */
+    m.customProgramCacheKey = ()=>'gfxwaterf'; m.needsUpdate = true;
   }
   yield;
   // waterfalls where a river comes down off the mountains
@@ -28711,6 +28754,7 @@ function gfxO3Tick(dt, pp){
   if (GFX.flies) GFX.flies.visible = (GFX.day||0) > 0.3 && G.weather!=='storm' && G.weather!=='rain';   /* (RS-555: butterflies by day, in fair weather) */
   if (GFX.fireflies) GFX.fireflies.visible = (U.uNight.value||0) > 0.3;   /* (and fireflies by night) */
   for (const f of (GFX.falls||[])) gfxWaterfallTick(f, U.uT.value);
+  gfxWsimTick(dt, pp);   /* (RS-794) */
   const dp = dayPhase(), dawnMist = Math.max(0, 1 - Math.abs(dp - 0.27)/0.08);
   for (const m of (GFX.mist||[])){ const o = m.dawn ? dawnMist*0.35 : 0.22 + (U.uNight.value)*0.15 + (G.weather==='fog' ? 0.15 : 0); m.pl.material.opacity = o*(0.75 + 0.25*Math.sin(U.uT.value*0.4 + m.ph)); m.pl.visible = o > 0.01; m.pl.rotation.z += dt*0.02; }
   // shafts of light through the woods near you, low and golden at sunrise and sunset
@@ -36948,13 +36992,13 @@ function* o3BuildGen(cx, cy){
     const pool = o3Glow('rgba(255,110,30,1)', 2.4); pool.position.set(VOL.x, VOLC.foot + VOLC.H - VOLC.pit + 0.5, VOL.z); grp.add(pool); }
   // water: one rippling sheet at sea level
   const water = new T.Mesh(new T.PlaneGeometry(W+2*M, W+2*M), new T.MeshStandardMaterial({ color:new T.Color(0x2c6490).convertSRGBToLinear(), roughness:0.12, metalness:0.25, transparent:true, opacity:0.84 }));
-  water.rotation.x = -Math.PI/2; water.position.set(cx, O3_WATER_Y, cy); water.receiveShadow = true; grp.add(water); O3.water = water;
+  water.rotation.x = -Math.PI/2; water.position.set(cx, O3_WATER_Y, cy); water.receiveShadow = true; water.renderOrder = -1; water.onBeforeRender = r=>{ try{ gfxWaterGrab(r); }catch(e){ if (!WVIEW.errd){ WVIEW.errd = 1; console.error(e); } WVIEW.u.on.value = 0; } }; grp.add(water); O3.water = water;   /* (RS-794: first of the see-through things, the picture so far read back) */
   { const uHole = O3.uHole || (O3.uHole = { value:new T.Vector4() }); if (seaSites.length) uHole.value.set(seaSites[0][0], seaSites[0][1], O3_SEA_TEMPLE.rim, 0); else uHole.value.set(0, 0, 0, 0); }   /* (RS-687: the sheet clearer over a drowned temple's well, and open when the sea parts - see o3DrownedShrine) */
   // a big dim plane far out so the edge of the built window never shows
   let farGeo = new T.PlaneGeometry(600,600); if (seaSites.length){ const fs = new T.Shape(); fs.moveTo(-300, -300); fs.lineTo(300, -300); fs.lineTo(300, 300); fs.lineTo(-300, 300); fs.closePath();
     for (const [sx, sz] of seaSites){ const hp = new T.Path(); hp.absarc(sx - cx, -(sz - cy), O3_SEA_TEMPLE.rim + 0.05, 0, Math.PI*2, true); fs.holes.push(hp); } farGeo = new T.ShapeGeometry(fs, 28); } O3.farHoles = seaSites.length;   /* (RS-687: open over a drowned temple's well, which goes down past this plane) */
   const far = new T.Mesh(farGeo, new T.MeshStandardMaterial({ color:new T.Color(0x2c6490).convertSRGBToLinear(), roughness:0.6 }));   /* (RS-349: the sea beyond the map's edge; the far land is o3FarLand) */
-  far.rotation.x = -Math.PI/2; far.position.set(cx,-0.5,cy); grp.add(far);
+  far.rotation.x = -Math.PI/2; far.position.set(cx,-0.72,cy); grp.add(far);   /* (RS-794: under the sea floor, now the bed shows through the water) */
   yield; yield* o3VegetationGen(grp, x0, y0, W);
   yield; yield* o3SitesGen(grp, x0, y0, W);   /* (RS-521: a site a step - a town was a 100ms step on its own with the rest) */
   yield; try{ yield* gfxO3BuildGen(grp, x0, y0, W, M); }catch(e){ console.error(e); }
@@ -39296,6 +39340,7 @@ function o3BuildNodeChunk(list, g){
   }
   try{ o3MergeStatic(g, new Set(O3.nodeAnim.map(a=>a.o).concat(O3.nodeHits)), new Set(Object.values(O3.mats||{}))); }catch(e){ console.error(e); }
   for (const m of o3NodeFx(ripples, bubs, glows, G3, fishes)) g.add(m);
+  O3.leapers = fishes.filter(f=>f.jump);   /* (RS-794: their splashes) */
 }
 /* (RS-401) a chunk's fishing ripples and bubbles and its glows, each kind one mesh or one point cloud moved by the card: a fishing
    spot alone was six draws (two ripples, four bubbles), and every glow a sprite of its own */
@@ -50467,7 +50512,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-793';
+const GAME_VERSION = 'rs-794';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
