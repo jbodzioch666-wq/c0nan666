@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-797 - Robes Are Robes
+
+- **Armour type follows what you're wearing.** A unique robe that kept metal's rules, like the Serpentskin Shroud, now counts as cloth, so it shows as magic and fights as magic in the style triangle. It still asks for Defence to wear.
+- **Comparing gear.** Those robes now compare as magic pieces too, instead of 'a different style' for a mage.
+
 ## RS-796 - Three Ways to Fight
 
 - **R now switches between melee, archer and magic.** The action bar shows which one you're on.
