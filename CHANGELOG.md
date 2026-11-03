@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-786 - Raid Without the Lag
+
+- **Raids and sieges in a shire run smoothly again.** A raid on a halfling town dropped to 12 frames a second, because the fight kept checking every tree and patch of ground in the shire to see what stood between the camera and you. It now skips them, as the town view already does: 12 to 230 frames a second on a save from a raid at Gideon's Meadow.
+
 ## RS-785 - Knee High
 
 - **Real grass on the open land.** The shire's grass now grows across the grasslands, woods and swamps, with hundreds of thousands of blades around you, replacing the old little triangles.
