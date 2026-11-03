@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## RS-780 - Barefoot by the Water
+
+You asked for real hobbit feet and a better spot for the boatyard.
+
+- **Hobbit feet:** halflings now have big bare feet with a round heel, a broad ball, five separate toes with nails, the big toe on the inside, and curly hair over the top and round the ankle.
+- **No more shoes on halflings:** a halfling stays barefoot even with boots equipped. The boots still give their bonuses; they just don't show. Other races keep their boots.
+- **The boatyard has moved:** in halfling towns it no longer sits right by the gate. It now stands on the bank of a new pond on the west side of town, with a lane to its door. The vegetable bed that stood on its doorstep and one by the tannery are gone. Other races' boatyards stay where they were.
+- **The pond:** rippling water that catches the sky, reeds and bulrushes, lily pads, a plank jetty with a rowing boat tied up beside it, and a hull upturned on trestles with planks stacked by.
+
 ## RS-779 - The Shire
 
 You asked for a halfling village that looks like a shire, with real grass and real dirt paths. Every halfling town is rebuilt from the ground up. Other races' towns are unchanged.
