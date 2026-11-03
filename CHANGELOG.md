@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## RS-781 - Pick and Paddle
+
+- **The mining swing is back underground.** After walking up to a rock, your pick stayed still for minutes because the game still thought you were walking. It now swings within a second of arriving. Checked on a player's own save, deep in a mine.
+- **You stand on the stairs, not in them.** If you end up on a flight of steps in a dungeon, you now stand on the tread. If a monster blocks the floor in front of the stairs when you arrive, you step off beside it.
+- **No more bare patches in far grass.** Thinning the shire's grass at a distance used to drop whole tiles. It now thins evenly.
+- **The boatyard has moved in every town.** It stands west of the square, away from the gate, with an upturned boat on trestles in front of its door. This replaces RS-780, which moved it only in shires.
+- **The shire's pond has its own ground.** It had been squeezed against the burrow kitchens. It now lies across the lane from the boatyard, a little bigger, with its jetty on the near bank.
+- **The burrow kitchens are a proper hill.** The smooth old dome is now a grassy hill like the shire's other homes, with a round door, windows and a chimney.
+
 ## RS-780 - Barefoot by the Water
 
 You asked for real hobbit feet and a better spot for the boatyard.

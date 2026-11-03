@@ -24,6 +24,6 @@ module.exports = async page=>{
   A(R.owHob > 4 && R.owOther===0, 'on the land the shire is little hills, other towns are not: '+R.owHob+' / '+R.owOther);
   A(R.stakes >= 80 && R.oakParts >= 15, 'a stockade of pointed stakes round a great oak with its limbs: '+R.stakes+' stakes, '+R.oakParts+' bark parts');
   A(R.v3, 'the town is drawn in 3D');
-  A(R.hills===R.lots, 'every building and house is a hill: '+R.hills+' of '+R.lots);
+  A(R.hills===R.lots + 1, 'every building and house is a hill, and the burrow kitchens: '+R.hills+' of '+R.lots+' + 1');
   A(R.doors.length && R.doors.every(d=>d.ok && d.round && d.glow), 'every shop door is a round door on its hinge: '+JSON.stringify(R.doors));
 };
