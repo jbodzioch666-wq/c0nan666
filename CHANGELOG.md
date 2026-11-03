@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-799 - The Magic Clipper
+
+- **A fifth boat.** After the galleon you can now build the Magic Clipper at the Boatyard, a three-masted ship of teal magic wood with runes glowing down her sides and a swan's neck at the prow.
+- **The fastest thing afloat.** Three of every four steps at sea are free (a galleon gets two of three), she sails faster still, and no storm can touch her.
+- **Magic planks.** The saw pit now cuts magic logs into magic planks, at Construction 80.
+- **What she takes.** Construction 80, 88 magic planks, 180 nails, 20 rope, 14 sailcloth, 15 iron bars, an 8,000-gold yard fee and more work on the slipway than any other boat. All the yard fees together go from 4,300 to 12,300 gold.
+- **Your galleon stays yours.** The Admiral achievement is still for building a galleon.
+
 ## RS-798 - Snakes With a Spine
 
 - **Snakes crawl with their whole body.** The body now follows the path the head took in sliding S-curves, instead of lying frozen while only the head moved. It rears up when it stops or strikes.

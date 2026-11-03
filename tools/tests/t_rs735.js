@@ -45,10 +45,10 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   console.log(JSON.stringify({ r0, r1, r2, mid, r3, r4 }));
   A(r0.yard && /Boatyard/.test(r0.name) && /slipway/.test(r0.benches) && /sawpit/.test(r0.benches) && /ropewalk/.test(r0.benches), 'every town has a boatyard with its benches: ' + JSON.stringify(r0));
   A(r0.peddler==='undefined' && r0.sail==='undefined', 'no buying or upgrading a boat for gold');
-  A(r0.title==='SAW PIT' && r0.wide && r0.saws && r0.recipes.length===4, 'the saw pit work screen: ' + JSON.stringify(r0));
+  A(r0.title==='SAW PIT' && r0.wide && r0.saws && r0.recipes.length===5, 'the saw pit work screen: ' + JSON.stringify(r0));
   A(r1.planks===2 && r1.logs <= 4, 'two logs sawn into planks: ' + JSON.stringify(r1));
   A(r2.rope===2 && r2.flax < 4 && r2.cloth===1, 'rope from flax and sailcloth from linen: ' + JSON.stringify(r2));
-  A(r2.slip.title==='SLIPWAY' && r2.slip.stages===6 && r2.slip.boats===4 && r2.slip.svg, 'the slipway screen: ' + JSON.stringify(r2.slip));
+  A(r2.slip.title==='SLIPWAY' && r2.slip.stages===6 && r2.slip.boats===5 && r2.slip.svg, 'the slipway screen: ' + JSON.stringify(r2.slip));
   A(r2.q && r2.q.kind==='boat' && r2.q.total >= 1 && r2.kids0===0, 'the keel goes through the queue on an empty slipway: ' + JSON.stringify(r2));
   A(mid.pour && mid.mal, 'the slipway works while you build: ' + JSON.stringify(mid));
   A(r3.st===1 && r3.kids1 >= 3, 'the keel done, and in 3D: ' + JSON.stringify(r3));
