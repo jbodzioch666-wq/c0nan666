@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-782 - Down by the Harbour
+
+- **The boatyard has moved to the east end of town.** It now stands among the shire's homes in every town and every size, and by the water where the town has a harbour. This replaces the spot from RS-781, which was cramped.
+- **The boat sits along the yard's side.** The upturned hull on its trestles no longer blocks the door.
+- **Harbour towns get a jetty.** It runs from the end of the yard, with a rowing boat tied up beside it.
+- **The shire's pond is right outside the boatyard door.** It only appears in shires without a harbour, and its jetty starts just below the door.
+- **A shire's harbour has real water.** It uses the pond's moving water instead of a flat blue sheet, with stones along the bank.
+
 ## RS-781 - Pick and Paddle
 
 - **The mining swing is back underground.** After walking up to a rock, your pick stayed still for minutes because the game still thought you were walking. It now swings within a second of arriving. Checked on a player's own save, deep in a mine.

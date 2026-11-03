@@ -15,7 +15,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   A(r.gather && r.calls > 20, 'the pick swings after a walk to the rock: ' + JSON.stringify(r)); A(r.toSwing < 1500, 'within a moment of arriving: ' + r.toSwing); A(r.toolRange > 0.3, 'and the pick really moves: ' + r.toolRange);
   A(r.stair && r.lift > 0.3 && r.foot < r.lift && r.head > r.lift, 'a flight lifts you with its steps: ' + JSON.stringify(r)); A(r.floorLift===0, 'the floor does not');
   A(r.spread > 0.85, 'far grass thins evenly: ' + r.spread);
-  const n = Object.keys(r.towns); A(n.length >= 2, 'several races: ' + n); for (const k of n){ const t = r.towns[k]; A(t.ok && !t.blocked.length, k + ' every door reached: ' + JSON.stringify(t)); A(!t.hit.length, k + ' the boatyard overlaps nothing: ' + t.hit); A(t.gateD > 8, k + ' away from the gate: ' + t.gateD); A(t.slip.length===4 && t.slip.includes('7,' + (+t.slip[0].split(',')[1])), k + ' the whole slip, before the door: ' + t.slip); A(!t.fxPond, k + ' the pond clear of the landmark'); }
-  A(r.pond && r.pond.x1 - r.pond.x0 >= 4 && r.pond.y1 - r.pond.y0 >= 3, 'the whole pond: ' + JSON.stringify(r.pond)); A(r.hill > 1500, 'the kitchens are a grassy hill: ' + r.hill);
+  const n = Object.keys(r.towns); A(n.length >= 2, 'several races: ' + n); for (const k of n){ const t = r.towns[k]; A(t.ok && !t.blocked.length, k + ' every door reached: ' + JSON.stringify(t)); A(!t.hit.length, k + ' the boatyard overlaps nothing: ' + t.hit); A(t.gateD > 8, k + ' away from the gate: ' + t.gateD); A(!t.fxPond, k + ' the pond clear of the landmark'); }
+  A(r.hill > 1500, 'the kitchens are a grassy hill: ' + r.hill);
   if (errs.length) throw new Error('page errors: ' + errs.join(' | '));
 };

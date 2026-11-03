@@ -15,7 +15,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
       const b = VILLAGE_BUILDINGS.find(b=>b.key==='boatyard'), o = doorOut(b), P = shirePond(), seen = new Set([G.player.x + ',' + G.player.y]), q = [[G.player.x, G.player.y]]; while (q.length){ const [x, y] = q.pop(); for (const [a, c] of DIR8){ const nx = x + a, ny = y + c, k = nx + ',' + ny; if (seen.has(k) || !v3Walkable(nx, ny) || !diagClear(x, y, a, c, v3Walkable)) continue; seen.add(k); q.push([nx, ny]); } }
       let lane = 0; for (let a=-1;a<=1;a+=0.25) for (let c=-1;c<=1;c+=0.25) lane = Math.max(lane, V3.shire.mask.at(o.x + 0.5 + a, o.y + 0.5 + c));
       const blocked = VILLAGE_BUILDINGS.filter(b=>!seen.has(doorOut(b).x + ',' + doorOut(b).y)).map(b=>b.key), gx = TOWN_CX, gy = ROWS - 1;
-      out.towns[tier] = { race:G.villageRace, gateD:Math.hypot(o.x - gx, o.y - gy), pond:!!P, pondD:P ? Math.hypot(o.x - P.x0, o.y - P.cz) : 99, water:!!V3.world.getObjectByName('shirePond'), walk:seen.has(o.x + ',' + o.y), lane:+lane.toFixed(2), blocked }; }
+      out.towns[tier] = { port:!!G.townLy.info.port, race:G.villageRace, gateD:Math.hypot(o.x - gx, o.y - gy), pond:!!P, pondD:P ? Math.hypot(o.x - P.cx, o.y - P.cz) : 99, water:!!V3.world.getObjectByName('shirePond'), walk:seen.has(o.x + ',' + o.y), lane:+lane.toFixed(2), blocked }; }
     townInfo = ti;
     /* a human town keeps its boatyard where it was */
     { const h = townList().find(t=>{ const f = townFlavorAt(t.x, t.y)||{}; return f.race && f.race!=='halfling'; }); G.owPos = { x:h.x, y:h.y }; enterVillage(); setUi('playing'); await nap(1000); const b = VILLAGE_BUILDINGS.find(b=>b.key==='boatyard'); out.other = { race:G.villageRace, w:b.w, h:b.h, pond:!!shirePond() }; }
@@ -26,7 +26,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   A(r.parts.foot===2 && r.parts.hair===2 && r.parts.verts > 8000, 'two sculpted feet with real hair: ' + JSON.stringify(r.parts));
   A(r.bigToe.atPlus < 0 && r.bigToe.atMinus > 0, 'the big toe on the inside of each foot: ' + JSON.stringify(r.bigToe));
   A(r.human.boots, 'other races keep their boots: ' + JSON.stringify(r.human));
-  for (const k of [0, 1, 2]){ const t = r.towns[k]; A(t.race==='halfling', 'tier ' + k + ' is a shire'); A(t.gateD > 8, 'tier ' + k + ' boatyard away from the gate: ' + t.gateD); A(t.pond && t.water && t.pondD < 6.5, 'tier ' + k + ' on the pond: ' + JSON.stringify(t)); A(t.walk && t.lane > 0.4, 'tier ' + k + ' reached by a lane: ' + JSON.stringify(t)); A(!t.blocked.length, 'tier ' + k + ' every door reached: ' + t.blocked); }
+  for (const k of [0, 1, 2]){ const t = r.towns[k]; A(t.race==='halfling', 'tier ' + k + ' is a shire'); A(t.gateD > 8, 'tier ' + k + ' boatyard away from the gate: ' + t.gateD); A(t.port || t.pond && t.water && t.pondD < 4.5, 'tier ' + k + ' on the pond: ' + JSON.stringify(t)); A(t.walk && t.lane > 0.4, 'tier ' + k + ' reached by a lane: ' + JSON.stringify(t)); A(!t.blocked.length, 'tier ' + k + ' every door reached: ' + t.blocked); }
   A(r.other.race!=='halfling' && !r.other.pond, 'other towns have no pond: ' + JSON.stringify(r.other));
   if (errs.length) throw new Error('page errors: ' + errs.join(' | '));
 };
