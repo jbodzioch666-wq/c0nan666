@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-790 - Green Commons
+
+- **Real grass in the other towns.** Towns on green, swamp and mountain land now have the shire's thick grass, with flowers, wind, and blades that part as people walk through. It keeps off the cobbles, the square, buildings and the road.
+- **Real trees too.** Their old trees are now the shire's leafy ones, and they open up around the line to you as you walk behind them.
+- **Firs.** Mountain towns are mostly firs, and forest towns have a few.
+- **Colour by land.** Swamp grass is duller and yellower, and mountain grass paler.
+- **Desert and snow towns are unchanged.** Green grass wouldn't belong on sand or snow.
+
 ## RS-789 - Darker Doorstones
 
 - **Darker stone at the hobbit doors.** The ring of stones round each door and the flagstones in front of it are now a good deal darker.

@@ -121,6 +121,7 @@ Screenshots go to `tools/tests/shots/`.
 | `rs783` | One sign to a building: each race's and size's shops have one banner each and no board as well |
 | `rs784` | A shire's doors: a whole ring of stones round each and flagstones under it, in each town size; other races' towns none |
 | `rs786` | A raid in a shire: the merged trees and land stay out of the see-through rays, the tick is cheap, a house in the way still fades |
+| `rs790` | The shire's grass and trees in other towns on green land: built, off cobbles and buildings, tinted by the land, sand and snow unchanged, a raid still runs |
 | `rs789` | A shire's door stones and flags are dark: their average vertex colour stays low |
 | `rs788` | The open land has its older grass again: no blade chunks, RS-785's code gone |
 | `rs787` | A battle at a town: the card before and after, the banner's words, the trees told where you stand, no shader built by a fade, new creatures warmed off the frame |
