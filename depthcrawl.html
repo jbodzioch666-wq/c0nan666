@@ -28224,6 +28224,12 @@ function gfxFlies(T, at, kind){
         if (abs(q.y) > 0.5 - abs(q.x)*0.35) discard; gl_FragColor = vec4(col, 1.0);` : `float d = length(vUv - 0.5)*2.0; float a = smoothstep(1.0, 0.0, d)*vA; if (a < 0.01) discard; gl_FragColor = vec4(vC*(1.0 + (1.0 - d)*1.5), a);`) + ` }` }));
   const mesh = new T.Mesh(g, m); mesh.frustumCulled = false; mesh.name = kind; mesh.userData.flies = n; return mesh;
 }
+/* (RS-794) the water's surface: a tiling sum of many small waves of all sizes and directions, a whole number of waves across the
+   texture so it has no seam. Red and green its slope, blue the fine waves alone (foam breaks up on them), alpha its height */
+function gfxWaterTex(){ if (GFX.waterTex) return GFX.waterTex; const T = THREE, N = 256, d = new Uint8Array(N*N*4); let sd = 7331; const rnd = ()=>(sd = (sd*16807) % 2147483647)/2147483647, W = []; for (let i=0;i<64;i++){ const big = i < 16, a = rnd()*6.283, r = big ? 1.5 + rnd()*4 : 5 + rnd()*rnd()*30; let kx = Math.round(Math.cos(a)*r), ky = Math.round(Math.sin(a)*r); if (!kx && !ky) kx = 1; const K = Math.hypot(kx, ky); W.push([kx*6.2832/N, ky*6.2832/N, rnd()*6.283, 1/Math.pow(K, 1.15), K]); }
+  const fs = new Float32Array(N*N*4); let mS = 0, mH = 0, mF = 0; for (let y=0;y<N;y++) for (let x=0;x<N;x++){ let h = 0, sx = 0, sy = 0, f = 0; for (const [kx, ky, ph, A, K] of W){ const q = kx*x + ky*y + ph, sn = Math.sin(q), cs = Math.cos(q); h += A*sn; sx += A*kx*cs; sy += A*ky*cs; if (K > 9) f += A*sn; } const k = (y*N + x)*4; fs[k] = sx; fs[k+1] = sy; fs[k+2] = f; fs[k+3] = h; mS = Math.max(mS, Math.abs(sx), Math.abs(sy)); mF = Math.max(mF, Math.abs(f)); mH = Math.max(mH, Math.abs(h)); }
+  for (let k=0;k<N*N*4;k+=4){ d[k] = Math.round(127.5 + fs[k]/mS*127.5); d[k+1] = Math.round(127.5 + fs[k+1]/mS*127.5); d[k+2] = Math.round(127.5 + fs[k+2]/mF*127.5); d[k+3] = Math.round(127.5 + fs[k+3]/mH*127.5); }
+  const t = new T.DataTexture(d, N, N, T.RGBAFormat); t.wrapS = t.wrapT = T.RepeatWrapping; t.magFilter = T.LinearFilter; t.minFilter = T.LinearMipmapLinearFilter; t.generateMipmaps = true; t.anisotropy = 8; t.needsUpdate = true; return (GFX.waterTex = t); }
 // a shared bit of shader: the world position, for the land and the water
 function gfxWorldPos(shader){
   shader.vertexShader = 'varying vec3 vGW;\n' + shader.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n  vGW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
@@ -28434,19 +28440,32 @@ function* gfxO3BuildGen(grp, x0, y0, W, M){   /* (RS-403: a step at a time - see
           if (!fx && !fz){ let bd = d; for (const [a, b] of R8){ const ii = i + a, jj = j + b; if (ii<0 || jj<0 || ii>=N || jj>=N) continue; const d2 = dist[at(ii, jj)]; if (d2 >= 0 && d2 < bd){ bd = d2; fx = a; fz = b; } } } }   /* (RS-618: two ways down that cancel - a tile beside a bend - follows the nearer to the water) */
         else if (d < 0){ const u = up[at(i, j)]; for (const [a, b] of R8) if (free(i + a, j + b)){ const w = up[at(i + a, j + b)] - u; fx += a*w; fz += b*w; } if (!fx && !fz) fx = 1; }
         else { for (const [a, b] of R8) if (o3Tile(ox + i + a, oy + j + b)===OW_WATER){ fx += a; fz += b; } if (!fx && !fz){ fx = i===0 ? -1 : i===N-1 ? 1 : 0; fz = !fx ? (j===0 ? -1 : 1) : 0; } }   /* (at the sea, into it; at the window's edge, out over it) */
-        const L = Math.hypot(fx, fz) || 1, k = at(i, j)*4; data[k+2] = Math.round(128 + fx/L*120); data[k+3] = Math.round(128 + fz/L*120); } }
+        const L = Math.hypot(fx, fz) || 1, k = at(i, j)*4; data[k+2] = Math.round(128 + fx/L*120); data[k+3] = Math.round(128 + fz/L*120); }
+      /* (RS-794) the flow eased round its bends, and carried onto the land tiles beside a river, where a wandering bank now lets the water reach */
+      for (let pass=0;pass<3;pass++){ const was = data.slice(); for (let j=0;j<N;j++) for (let i=0;i<N;i++){ const t0 = o3Tile(ox + i, oy + j), riv0 = t0===OW_RIVER; if (t0===OW_WATER) continue; let sx = riv0 ? (was[at(i, j)*4+2] - 128)*2 : 0, sz = riv0 ? (was[at(i, j)*4+3] - 128)*2 : 0, n = riv0 ? 2 : 0; for (const [a, b] of R8){ const ii = i + a, jj = j + b; if (ii<0 || jj<0 || ii>=N || jj>=N) continue; const u = at(ii, jj)*4; if (o3Tile(ox + ii, oy + jj)!==OW_RIVER) continue; sx += was[u+2] - 128; sz += was[u+3] - 128; n++; } if (!n) continue; const k = at(i, j)*4; data[k+2] = Math.round(128 + sx/n); data[k+3] = Math.round(128 + sz/n); } } }
     const foam = new T.DataTexture(data, N, N, T.RGBAFormat); foam.magFilter = foam.minFilter = T.LinearFilter; foam.needsUpdate = true;
     water.geometry.dispose(); water.geometry = new T.PlaneGeometry(N, N, N, N);
     const m = water.material; m.userData.ownTex = [foam];   /* (RS-414: freed with the land - see o3DisposeWorld) */
     /* (RS-414) the depth of the land showing, through a uniform the swap sets: a water built over frames could compile while the old
        land still showed, and kept the old land's depth map - its shallows in the wrong places, and the old map kept on the card */
     const uDep = O3.uDep || (O3.uDep = { value:null }), uDepO = O3.uDepO || (O3.uDepO = { value:new T.Vector4() });
-    m.onBeforeCompile = sh=>{ Object.assign(sh.uniforms, { uT:U.uT, uNight:U.uNight, uSky:U.uSky, uFoam:{ value:foam }, uFoamO:{ value:new T.Vector4(ox, oy, N, N) }, uDep, uDepO, uHole:O3.uHole || (O3.uHole = { value:new T.Vector4() }) }); gfxCloudUniforms(sh);
+    m.onBeforeCompile = sh=>{ Object.assign(sh.uniforms, { uT:U.uT, uNight:U.uNight, uSky:U.uSky, uFoam:{ value:foam }, uFoamO:{ value:new T.Vector4(ox, oy, N, N) }, uDep, uDepO, uWat:{ value:gfxWaterTex() }, uHole:O3.uHole || (O3.uHole = { value:new T.Vector4() }) }); gfxCloudUniforms(sh);
       gfxWorldPos(sh);
       sh.vertexShader = 'uniform float uT;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
         vec4 wp0 = modelMatrix * vec4(transformed, 1.0);
         transformed.z += sin(wp0.x*1.3 + uT*1.4)*0.022 + sin(wp0.z*1.7 - uT*1.1)*0.018 + sin((wp0.x + wp0.z)*2.9 + uT*2.3)*0.007;`);
-      sh.fragmentShader = GFX_CLOUD_DECL + 'uniform float uT; uniform float uNight; uniform vec3 uSky; uniform sampler2D uFoam; uniform vec4 uFoamO; uniform sampler2D uDep; uniform vec4 uDepO; uniform vec4 uHole;\n' + sh.fragmentShader.replace('#include <opaque_fragment>', `#include <opaque_fragment>
+      sh.fragmentShader = GFX_CLOUD_DECL + 'uniform float uT; uniform float uNight; uniform vec3 uSky; uniform sampler2D uFoam; uniform vec4 uFoamO; uniform sampler2D uDep; uniform vec4 uDepO; uniform vec4 uHole; uniform sampler2D uWat;\n' + sh.fragmentShader.replace('#include <normal_fragment_maps>', `
+        /* (RS-794) the surface moves with the water: the wave texture is carried along the flow and starts over twice in a cycle, the two
+           phases crossfaded so the restart never shows, each spot on its own beat. A river runs slower by its banks. Lakes and the sea drift on the wind */
+        vec4 fo0 = texture2D(uFoam, (vGW.xz - uFoamO.xy)/uFoamO.zw);
+        float dep0 = texture2D(uDep, ((vGW.xz - uDepO.xy)*uDepO.z + 0.5)/uDepO.w).r*0.6;
+        vec2 flw = (fo0.ba*2.0 - 1.0)*0.62*smoothstep(0.0, 0.2, dep0);
+        float beat = texture2D(uWat, vGW.xz*0.043).a, ph0 = fract(uT*0.55 + beat), ph1 = fract(uT*0.55 + beat + 0.5), w0 = 1.0 - abs(2.0*ph0 - 1.0), w1 = 1.0 - w0;
+        vec2 fd0 = flw*ph0/0.55, fd1 = flw*ph1/0.55, drift = vec2(0.07, 0.045)*uT;
+        vec2 sl = (texture2D(uWat, (vGW.xz - fd0)*0.31 + drift*0.31).rg*w0 + texture2D(uWat, (vGW.xz - fd1)*0.31 + drift*0.31 + 0.37).rg*w1)*2.0 - 1.0;
+        sl += ((texture2D(uWat, (vGW.xz - fd0)*0.97 - drift*0.8).rg*w0 + texture2D(uWat, (vGW.xz - fd1)*0.97 - drift*0.8 + 0.61).rg*w1)*2.0 - 1.0)*0.7;
+        vec3 wN = normalize(vec3(-sl.x*0.42, 1.0, -sl.y*0.42));
+        normal = normalize((viewMatrix*vec4(wN, 0.0)).xyz);`).replace('#include <opaque_fragment>', `#include <opaque_fragment>
         vec3 wn = normalize(cross(dFdx(vGW), dFdy(vGW))); if (wn.y < 0.0) wn = -wn;
         if (texture2D(uDep, ((vGW.xz - uDepO.xy)*uDepO.z + 0.5)/uDepO.w).g > 0.5) discard;   /* (RS-652: the sea sheet runs under all the land - not down a barrow's stair) */
         float hd = length(vGW.xz - uHole.xy); if (uHole.z > 0.0 && uHole.w > 0.5 && hd < uHole.z) discard;   /* (RS-687: the sea parted over a drowned temple's well) */
@@ -28454,10 +28473,10 @@ function* gfxO3BuildGen(grp, x0, y0, W, M){   /* (RS-403: a step at a time - see
         gl_FragColor.rgb = mix(gl_FragColor.rgb, uSky, clamp(fr*0.9 + 0.1, 0.0, 0.6));
         vec4 fo = texture2D(uFoam, (vGW.xz - uFoamO.xy)/uFoamO.zw);
         float nz = texture2D(uCloud, vGW.xz*1.1 + vec2(uT*0.05, uT*0.03)).r;
-        /* (RS-565) a river's ripples stream downstream: lines drawn long along the way it runs, short across it, moving with it */
-        vec2 fl = fo.ba*2.0 - 1.0; float flL = length(fl); fl = flL > 0.05 ? fl/flL : vec2(0.6, 0.8); vec2 fp = vec2(fl.y, -fl.x);
-        float along = dot(vGW.xz, fl), across = dot(vGW.xz, fp);
-        float run = fo.g*smoothstep(0.5, 0.8, texture2D(uCloud, vec2(along*0.3 - uT*0.32, across*0.9)).r*0.75 + texture2D(uCloud, vec2(along*0.6 - uT*0.5, across*1.5 + 0.3)).r*0.35)*(1.0 - uNight*0.6);   /* (RS-769: wider across - at 2.2 and 4 repeats a tile the noise was finer than a pixel and shimmered into stripes; fainter by night) */
+        /* (RS-794) a river's foam is carried on the same two phases: flecks in midstream, more where the flow bends (the flow's own change from side to side), none at night's full glow */
+        vec2 fe = vec2(0.75/uFoamO.z, 0.0); float bend = length(texture2D(uFoam, (vGW.xz - uFoamO.xy)/uFoamO.zw + fe.xy).ba - texture2D(uFoam, (vGW.xz - uFoamO.xy)/uFoamO.zw - fe.xy).ba) + length(texture2D(uFoam, (vGW.xz - uFoamO.xy)/uFoamO.zw + fe.yx).ba - texture2D(uFoam, (vGW.xz - uFoamO.xy)/uFoamO.zw - fe.yx).ba);
+        float fln = texture2D(uWat, (vGW.xz - fd0)*0.63).b*w0 + texture2D(uWat, (vGW.xz - fd1)*0.63 + 0.29).b*w1, fln2 = texture2D(uWat, (vGW.xz - fd0)*1.7).b*w0 + texture2D(uWat, (vGW.xz - fd1)*1.7 + 0.47).b*w1;
+        float run = fo0.g*smoothstep(0.56, 0.74, fln*0.6 + fln2*0.4)*clamp(0.14 + bend*1.1 + (1.0 - smoothstep(0.02, 0.12, dep0))*0.22, 0.0, 0.8)*(1.0 - uNight*0.6);
         /* (RS-311) the shallows and the surf: clear turquoise over the sand, deepening to blue; a lapping line of foam at the waterline,
            and lines of foam rolling in to the beach */
         float dep = texture2D(uDep, ((vGW.xz - uDepO.xy)*uDepO.z + 0.5)/uDepO.w).r*0.6;
@@ -28467,9 +28486,9 @@ function* gfxO3BuildGen(grp, x0, y0, W, M){   /* (RS-403: a step at a time - see
         float hc = uHole.z > 0.0 ? 1.0 - smoothstep(uHole.z - 0.15, uHole.z + 0.4, hd) : 0.0; gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.13, 0.42, 0.42), hc*0.45); gl_FragColor.a = mix(gl_FragColor.a, 0.4, hc);   /* (RS-687: clearer over the well, the drowned temple showing through) */
         float brk = smoothstep(0.25, 0.75, texture2D(uCloud, vGW.xz*2.3 + vec2(-uT*0.04, uT*0.05)).r);   /* (the surf breaks up along the beach) */
         float lap = (1.0 - smoothstep(0.0, 0.035, dep - 0.01*sin(uT*1.7 + vGW.x*2.3 + vGW.z*1.9)))*(0.45 + 0.55*brk);
-        float roll = smoothstep(0.86, 1.0, sin(dep*44.0 + uT*2.1 + nz*3.0))*(1.0 - smoothstep(0.03, 0.22, dep))*step(0.003, dep)*brk*(1.0 - fo.g);   /* (RS-769: not on a river - shallow from bank to bank, it filled with the depth's rings) */
+        float roll = smoothstep(0.72, 1.0, sin(dep*16.0 + uT*0.9 + nz*8.0))*(1.0 - smoothstep(0.015, 0.14, dep))*step(0.003, dep)*brk*(1.0 - fo.g);   /* (RS-769: not on a river; RS-794: a broad, broken swell up the beach, not fine rings of depth) */
         float surf = clamp(lap*0.7 + roll*0.45, 0.0, 0.8)*(0.6 + 0.4*nz);
-        gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.92, 0.96, 1.0)*(0.3 + 0.7*(1.0 - uNight)), clamp(surf + run*0.3, 0.0, 0.9));   /* (RS-769: the foam in the night's light, not glowing white) */
+        gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.92, 0.96, 1.0)*(0.3 + 0.7*(1.0 - uNight)), clamp(surf + run, 0.0, 0.9));   /* (RS-769: the foam in the night's light, not glowing white) */
         gl_FragColor.a = max(gl_FragColor.a, surf*0.95);
         float st = step(0.995, fract(sin(dot(floor(vGW.xz*12.0), vec2(12.9898, 78.233)))*43758.5453))*uNight*(0.55 + 0.45*sin(uT*3.0 + vGW.x*7.0 + vGW.z*3.0));
         gl_FragColor.rgb += vec3(st*0.7);
@@ -28484,7 +28503,7 @@ function* gfxO3BuildGen(grp, x0, y0, W, M){   /* (RS-403: a step at a time - see
           gl_FragColor.rgb += directionalLights[0].color*gl*sp*2.6*(1.0 - uNight)*(1.0 - shal*0.5); }
         #endif` + GFX_CLOUD_GLSL + `
         gl_FragColor.rgb *= mix(1.0, cshade, 0.75);`); };   /* (RS-551: the clouds' shadows cross the water too) */
-    m.customProgramCacheKey = ()=>'gfxwaterc'; m.needsUpdate = true;
+    m.customProgramCacheKey = ()=>'gfxwaterd'; m.needsUpdate = true;
   }
   yield;
   // waterfalls where a river comes down off the mountains
@@ -36794,6 +36813,11 @@ function* o3BuildGen(cx, cy){
   const landAt = (px, pz)=>{ const fx = px - 0.5, fz = pz - 0.5, tx = Math.floor(fx), tz = Math.floor(fz), ax = fx - tx, az = fz - tz; let l = 0;   /* (RS-311: how much land is at a point - 1 in a land tile's middle, 0 in the sea's) */
     for (const [qx, qz, w] of [[tx,tz,(1-ax)*(1-az)],[tx+1,tz,ax*(1-az)],[tx,tz+1,(1-ax)*az],[tx+1,tz+1,ax*az]]){ const t = o3Tile(qx, qz); if (t!==OW_WATER && !o3SeaSiteL(qx, qz)) l += w; } return l; };
   const lin = v=> Math.pow(v/255, 2.2);
+  /* (RS-793) the wet field for a river's banks */
+  const wetC = new Map(), rivC = new Map(), ss01 = q=>{ q = Math.max(0, Math.min(1, q)); return q*q*(3 - 2*q); }, wetT = (a, b)=>{ const k2 = a*100003 + b; let v = wetC.get(k2); if (v===undefined){ const t = o3Tile(a, b); v = t===OW_WATER || t===OW_RIVER || o3SeaSiteL(a, b) ? 1 : 0; wetC.set(k2, v); } return v; };
+  const rivBy = (wx, wz)=>{ const a = Math.floor(wx), b = Math.floor(wz), k2 = a*100003 + b; let v = rivC.get(k2); if (v===undefined){ v = false; for (let i=-1;i<=1 && !v;i++) for (let j=-1;j<=1;j++) if (o3Tile(a + i, b + j)===OW_RIVER){ v = true; break; } rivC.set(k2, v); } return v; };
+  const wetBi = (px, pz)=>{ const fx = px - 0.5, fz = pz - 0.5, tx = Math.floor(fx), tz = Math.floor(fz), ax = fx - tx, az = fz - tz; return (wetT(tx, tz)*(1 - ax) + wetT(tx + 1, tz)*ax)*(1 - az) + (wetT(tx, tz + 1)*(1 - ax) + wetT(tx + 1, tz + 1)*ax)*az; };
+  const wetSoft = (wx, wz)=>{ const px = wx + (n1(wx*0.8 + 11, wz*0.8 - 7) - 0.5)*0.85 + (n2(wx*2.4 + 3, wz*2.4 + 8) - 0.5)*0.22, pz = wz + (n1(wx*0.8 - 23, wz*0.8 + 19) - 0.5)*0.85 + (n2(wx*2.4 - 6, wz*2.4 - 2) - 0.5)*0.22; let S = 0; for (const [ox, oz] of BLUR) S += wetBi(px + ox, pz + oz); return S/BLUR.length; };
   const pits = O3.cuts = o3PitsFor(x0, y0, W);   /* (RS-652: the barrows' stairs in this window) */
   const seaSites = []; for (let sx=x0-2; sx<x0+W+2; sx++) for (let sz=y0-2; sz<y0+W+2; sz++) if (o3SeaSiteL(sx, sz)) seaSites.push([sx + 0.5, sz + 0.5]); O3.seaSites = seaSites;   /* (RS-687: the drowned temples in and about this window) */
   const gates = []; for (let sx=x0-3; sx<x0+W+3; sx++) for (let sz=y0-3; sz<y0+W+3; sz++) if (o3Tile(sx, sz)===OW_TEMPLE && !o3SeaSiteL(sx, sz)) gates.push([sx + 0.5, sz + 0.5, Math.max(0.12, 0.04 + (n1((sx+0.5)/5, (sz+0.5)/5)-0.5)*0.35 + 0.03)]);   /* (RS-688: the Guardians' Gates, each on a pad as wide as it is) */
@@ -36854,7 +36878,10 @@ function* o3BuildGen(cx, cy){
         else h = O3_WATER_Y - Math.pow((Lc - L)/Lc, 1.5)*0.48;   /* (a shelf of shallows, then down to the sea floor) */
         { const qx = Math.floor(wx), qz = Math.floor(wz); if (o3Tile(qx, qz)===OW_WATER){ const cd = Math.max(Math.abs(wx - qx - 0.5), Math.abs(wz - qz - 0.5)); h = Math.min(h, O3_WATER_Y - 0.16*Math.max(0, 1 - cd/0.5)); } }   /* (but a pond or a narrow inlet is still water in its middle, not a sandbank) */
         beach[j*NV+i] = L; }
-      else if (!wet) h = Math.max(h, O3_WATER_Y + 0.15); else if (dry && !diagWet) h = sea ? Math.max(h, O3_WATER_Y + 0.05) : (h < O3_WATER_Y + 0.15 ? O3_WATER_Y + 0.005 : h); else h = Math.min(h, O3_WATER_Y - 0.1); }   // (a river bank on high ground - a mountainside - keeps its height)
+      else if (!wet) h = Math.max(h, O3_WATER_Y + 0.15); else if (dry && !diagWet) h = sea ? Math.max(h, O3_WATER_Y + 0.05) : (h < O3_WATER_Y + 0.15 ? O3_WATER_Y + 0.005 : h); else h = Math.min(h, O3_WATER_Y - 0.1);   // (a river bank on high ground - a mountainside - keeps its height)
+      /* (RS-793) a river's banks curve and wander: how wet a point is comes from the tiles round it, softened and pushed about by noise, so the waterline stops following the tiles' edges and square corners; the bed falls away from it, and the bank rises from it */
+      if (!cliffN && !beachV && rivBy(wx, wz)){ const S = wetSoft(wx, wz), TH = 0.46; if (S >= TH) h = Math.min(h, O3_WATER_Y - 0.012 - 0.34*ss01((S - TH)/(1 - TH))); else h = Math.max(h, O3_WATER_Y + 0.012 + 0.2*ss01((TH - S)/0.3)); }
+    }
     /* (RS-687) the well in the seabed under a drowned temple: a flat floor, a steep side up to a lip just under the waves, and down again to the sea floor */
     for (const [cx2, cz2] of seaSites){ const S = O3_SEA_TEMPLE, d = Math.hypot(wx - cx2, wz - cz2); if (d >= S.out) continue; { const qt = o3Tile(Math.floor(wx), Math.floor(wz)); if (qt!==OW_WATER && qt!==OW_TEMPLE) continue; }   /* (RS-688: never into the land - a generator 23 well may have a shore nearer than the wider well) */ const ss2 = q=>q*q*(3 - 2*q);
       h = d < S.r0 ? S.floor : d < S.rim ? S.floor + (S.lip - S.floor)*ss2((d - S.r0)/(S.rim - S.r0)) : S.lip + (h - S.lip)*ss2((d - S.rim)/(S.out - S.rim)); }
@@ -36920,7 +36947,7 @@ function* o3BuildGen(cx, cy){
       grp.add(new T.Mesh(tube, lavaM)); }
     const pool = o3Glow('rgba(255,110,30,1)', 2.4); pool.position.set(VOL.x, VOLC.foot + VOLC.H - VOLC.pit + 0.5, VOL.z); grp.add(pool); }
   // water: one rippling sheet at sea level
-  const water = new T.Mesh(new T.PlaneGeometry(W+2*M, W+2*M), new T.MeshStandardMaterial({ color:new T.Color(0x2c6490).convertSRGBToLinear(), roughness:0.12, metalness:0.25, transparent:true, opacity:0.84, normalMap:tex.ripple, normalScale:new T.Vector2(0.55,0.55) }));
+  const water = new T.Mesh(new T.PlaneGeometry(W+2*M, W+2*M), new T.MeshStandardMaterial({ color:new T.Color(0x2c6490).convertSRGBToLinear(), roughness:0.12, metalness:0.25, transparent:true, opacity:0.84 }));
   water.rotation.x = -Math.PI/2; water.position.set(cx, O3_WATER_Y, cy); water.receiveShadow = true; grp.add(water); O3.water = water;
   { const uHole = O3.uHole || (O3.uHole = { value:new T.Vector4() }); if (seaSites.length) uHole.value.set(seaSites[0][0], seaSites[0][1], O3_SEA_TEMPLE.rim, 0); else uHole.value.set(0, 0, 0, 0); }   /* (RS-687: the sheet clearer over a drowned temple's well, and open when the sea parts - see o3DrownedShrine) */
   // a big dim plane far out so the edge of the built window never shows
@@ -50440,7 +50467,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-792';
+const GAME_VERSION = 'rs-793';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

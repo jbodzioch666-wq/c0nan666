@@ -1,0 +1,17 @@
+// (probe) the land's water by eye, fixed world (ZSEED): for each ZW '[["name","kind",clockFrac,dist,weather]]' (kinds: bend - a river bending between grass; ford - where two rivers run wide; mouth - a river into the sea; coast; lake) a shot of the game's view, zw_<name>.jpg, and zw_<name>_bare.jpg with only land and water showing. Prints frame rate. ZW_SETUP: js run in the page once it stands
+module.exports = async page=>{ page.setDefaultTimeout(0); page.on('pageerror', e=>console.log('PERR', String(e).slice(0, 300))); page.on('console', m=>{ const t = m.text(); if (m.type()==='error' || /^ZW/.test(t)) console.log(t.slice(0, 400)); });
+  const sets = process.env.ZW ? JSON.parse(process.env.ZW) : [['bend', 'bend', 0.45], ['mouth', 'mouth', 0.45], ['coast', 'coast', 0.45], ['lake', 'lake', 0.45]];
+  await page.evaluate(async seed=>{ window.__noLock = true; goToCharCreate(); ccBegin(); wgRegenerate(seed); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); o3Pref = true; G.gameMode = 0; weatherSync = ()=>{}; saveCurrentGame = ()=>{}; G.player.wildWarned = 1; G.player.hp = G.player.maxHp = 999999;
+    window.__find = kind=>{ const W = OW_COLS, H = OW_ROWS, M = G.ow.map, best = []; for (let x=24;x<W-24;x++) for (let y=24;y<H-24;y++){ const t = M[x][y]; let r = 0, s = 0, g = 0, f = 0; for (let i=-4;i<=4;i++) for (let j=-4;j<=4;j++){ const u = M[x+i][y+j]; if (u===OW_RIVER) r++; else if (u===OW_WATER) s++; else if (u===OW_GRASS) g++; else if (u===OW_FOREST) f++; } let sc = -1;
+        if (kind==='bend'){ if (t===OW_GRASS && r >= 12 && s===0 && g > 40) sc = g + r*2; }
+        else if (kind==='mouth'){ if (t===OW_GRASS && r >= 5 && s >= 14 && g > 25) sc = g + r*3; }
+        else if (kind==='coast'){ if (t===OW_GRASS && s >= 25 && r===0 && g >= 25) sc = g; }
+        else if (kind==='lake'){ if (t===OW_GRASS && s >= 8 && s < 30 && r===0 && g > 30) sc = g; }
+        if (sc > 0) best.push([sc, x, y]); } best.sort((a, b)=>b[0] - a[0]); return best.length ? [best[0][1], best[0][2]] : [W>>1, H>>1]; }; }, +(process.env.ZSEED || 12345));
+  for (const [nm, kind, clk, dist, wx] of sets){
+    const r = await page.evaluate(async ([kind, clk, dist, wx, setup])=>{ const [x, y] = kind[0]==='@' ? kind.slice(1).split(',').map(Number) : __find(kind); G.owPos = { x, y }; G.player.clock = G.player.turnCount = Math.round(DAY_LENGTH*(clk==null ? 0.45 : clk)); G.weather = wx || 'clear'; O3.win = null; O3.ppos = null; if (dist) O3.dist = dist; for (let i=0;i<20;i++){ renderGame(); await new Promise(r=>setTimeout(r, 40)); } if (setup) (0, eval)(setup); await new Promise(r=>setTimeout(r, 1500)); let n = 0; const e = performance.now() + 1500; while (performance.now() < e){ await new Promise(r=>requestAnimationFrame(r)); n++; } return { at:[x, y], tile:G.ow.map[x][y], fps:Math.round(n/1.5) }; }, [kind, clk, dist, wx, process.env.ZW_SETUP || null]);
+    console.log(nm, JSON.stringify(r)); await page.screenshot({ path:__dirname + '/shots/zw_' + nm + '.jpg', type:'jpeg', quality:85 });
+    await page.evaluate(async ()=>{ window.__hid = []; O3.world.traverse(o=>{ if ((o.isMesh || o.isSprite || o.isPoints || o.isInstancedMesh) && o!==O3.land && o!==O3.water && o.visible){ o.visible = false; __hid.push(o); } }); if (O3.pgrp) O3.pgrp.visible = false; await new Promise(r=>setTimeout(r, 500)); });
+    await page.screenshot({ path:__dirname + '/shots/zw_' + nm + '_bare.jpg', type:'jpeg', quality:85 });
+    await page.evaluate(()=>{ for (const o of __hid) o.visible = true; if (O3.pgrp) O3.pgrp.visible = true; });
+  } };

@@ -1,0 +1,19 @@
+// RS-793: a river's banks wander: water reaches past some tile edges and land past others, the middle of a river tile is still water and a land tile's middle still dry, and a town's ground is unchanged by it
+module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.on('pageerror', e=>errs.push(String(e)));
+  const r = await page.evaluate(async ()=>{ window.__noLock = true; goToCharCreate(); ccBegin(); wgRegenerate(12345); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); o3Pref = true; G.gameMode = 0; saveCurrentGame = ()=>{}; G.player.wildWarned = 1; let at = null; for (let x=24;x<OW_COLS-24 && !at;x++) for (let y=24;y<OW_ROWS-24;y++){ let n = 0; for (let i=-5;i<=5;i++) for (let j=-5;j<=5;j++) if (G.ow.map[x+i][y+j]===OW_RIVER) n++; if (G.ow.map[x][y]===OW_GRASS && n >= 14){ at = [x, y]; break; } } G.owPos = { x:at[0], y:at[1] }; O3.win = null; O3.ppos = null; for (let i=0;i<25;i++){ renderGame(); await new Promise(r=>setTimeout(r, 40)); }
+    const H = O3.heightAt, wy = O3_WATER_Y, out = { river:0, riverWet:0, landDryMid:0, landMid:0, intoLand:0, intoRiver:0, edge:0, at }; const w = O3.win; for (let x=at[0]-14;x<at[0]+14;x++) for (let y=at[1]-14;y<at[1]+14;y++){ const t = o3Tile(x, y); const riv = t===OW_RIVER, wet = u=>u===OW_RIVER || u===OW_WATER; if (riv){ out.river++; if (H(x + 0.5, y + 0.5) < wy) out.riverWet++; } if (!wet(t) && [[1,0],[-1,0],[0,1],[0,-1]].some(([a, b])=>o3Tile(x + a, y + b)===OW_RIVER)){ out.landMid++; if (H(x + 0.5, y + 0.5) > wy) out.landDryMid++; }
+        for (const [a, b] of [[1,0],[0,1]]){ const u = o3Tile(x + a, y + b); if (wet(t)===wet(u) || !(t===OW_RIVER || u===OW_RIVER)) continue; for (const f of [0.17, 0.5, 0.83]){ const ex = a ? x + 1 : x + f, ez = a ? y + f : y + 1, dx = wet(t) ? a : -a, dz = wet(t) ? b : -b; out.edge++; if (H(ex + dx*0.15, ez + dz*0.15) < wy) out.intoLand++; if (H(ex - dx*0.15, ez - dz*0.15) > wy) out.intoRiver++; } } }
+    /* the surface moves on the flow: the wave texture tiles, the flow reaches the land tiles beside a river */
+    const W = O3.water.material, tx = gfxWaterTex(), D = tx.image.data, N = tx.image.width; let seam = 0, inner = 0; for (let i=0;i<N;i++){ seam = Math.max(seam, Math.abs(D[i*4 + 3] - D[(N*(N - 1) + i)*4 + 3])); inner = Math.max(inner, Math.abs(D[(N*40 + i)*4 + 3] - D[(N*200 + i)*4 + 3])); } out.seam = seam; out.inner = inner; out.noMap = !W.normalMap; out.key = W.customProgramCacheKey(); const fo = W.userData.ownTex[0].image, nn = fo.width, ox = at[0], oy = at[1]; let bank = 0, moved = 0; const o = O3.win; for (let x=at[0]-14;x<at[0]+14;x++) for (let y=at[1]-14;y<at[1]+14;y++){ const t = o3Tile(x, y); if (t===OW_RIVER || t===OW_WATER || ![[1,0],[-1,0],[0,1],[0,-1]].some(([a, b])=>o3Tile(x + a, y + b)===OW_RIVER)) continue; const vec = new THREE.Vector4(); const i = x - Math.round(O3.water.position.x - nn/2), j = y - Math.round(O3.water.position.z - nn/2); if (i<0 || j<0 || i>=nn || j>=nn) continue; bank++; if (Math.abs(fo.data[(j*nn + i)*4 + 2] - 128) + Math.abs(fo.data[(j*nn + i)*4 + 3] - 128) > 8) moved++; } out.bank = bank; out.moved = moved; return out; });
+  console.log('rs793', JSON.stringify(r));
+  const A = (c, m)=>{ if (!c) throw new Error('assert: ' + m + ' ' + JSON.stringify(r)); };
+  A(r.river >= 10 && r.edge >= 30, 'a river in view');
+  A(r.riverWet >= r.river*0.9, 'a river tile\'s middle is water');
+  A(r.landDryMid >= r.landMid*0.9, 'a land tile\'s middle is dry');
+  A(r.intoLand >= r.edge*0.05, 'water wanders past the tile edge');
+  A(r.intoRiver >= r.edge*0.05, 'land wanders past the tile edge');
+  A(r.seam < r.inner*0.2, 'the wave texture has no seam');
+  A(r.noMap && r.key==='gfxwaterd', 'the surface is the flowing one');
+  A(r.bank > 5 && r.moved >= r.bank*0.8, 'the flow reaches the banks');
+  A(!errs.length, 'no page errors: ' + errs.slice(0, 2).join(' | '));
+};

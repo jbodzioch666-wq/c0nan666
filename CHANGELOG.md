@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-793 - Living Rivers
+
+- **Rivers have natural banks.** A river's edge now curves and wanders instead of following the square tiles, so its corners are bends rather than steps. Tiles still work as before: only the look of the bank has moved.
+- **The bed slopes.** River beds now fall away gradually from each bank, ready for proper depth colour in a later patch.
+- **Water flows.** The striped ripples are gone. The whole surface now moves with the river, round its bends, slower by the banks and faster in midstream. Lakes and the sea drift on the wind.
+- **Foam goes where it should.** Rivers carry flecks of foam downstream, with more on the bends. Waves on a beach roll in as a broad, broken swell instead of fine rings.
+
 ## RS-792 - Open Flues
 
 - **Chimneys have holes.** House chimneys are now hollow at the top, with a rim round a dark flue, and the smoke rises out of it. Hobbit chimneys, the smithy's stack and the hermit's hut get a dark mouth too.
