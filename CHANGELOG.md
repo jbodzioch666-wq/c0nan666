@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-795 - Clear Floors
+
+- **Three dungeon props are gone.** Roots coming down through the ceiling, glowing blue crystals and small lava pools no longer appear in dungeons, along with the flames that floated over the crystals and lava.
+- **No more lava burns.** Nothing on a dungeon floor sears you for stepping on it now.
+- **Floors you've already visited clear too.** Your saved floors lose them when you go back.
+- **Still there.** Braziers stay, and so do the crystals and lava out on the open land.
+
 ## RS-794 - Real Water
 
 - **Real waves.** Water near you now runs a true wave simulation. Ripples spread out, slow down in the shallows, stop at the bank and drift down a river.

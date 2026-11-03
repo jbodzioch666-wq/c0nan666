@@ -126,6 +126,7 @@ Screenshots go to `tools/tests/shots/`.
 | `rs792` | Open chimney flues, no market stall, every door and paved spot joined to the road out, the far ground kept under a siege's field |
 | `rs793` | A river's banks wander past the tile edges, the middle of a river tile stays water and a land tile's stays dry |
 | `rs794` | A splash lifts the water and spreads, the land stays still, the bed and the mirror passes run by water and not inland, and with no post target nothing breaks |
+| `rs795` | the roots, crystals and lava are gone from the dungeons: no floor of any kind of site has them, a saved floor loses them, only a brazier gets a flame |
 | `rs789` | A shire's door stones and flags are dark: their average vertex colour stays low |
 | `rs788` | The open land has its older grass again: no blade chunks, RS-785's code gone |
 | `rs787` | A battle at a town: the card before and after, the banner's words, the trees told where you stand, no shader built by a fade, new creatures warmed off the frame |
