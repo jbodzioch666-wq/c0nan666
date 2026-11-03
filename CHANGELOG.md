@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-792 - Open Flues
+
+- **Chimneys have holes.** House chimneys are now hollow at the top, with a rim round a dark flue, and the smoke rises out of it. Hobbit chimneys, the smithy's stack and the hermit's hut get a dark mouth too.
+- **The fruit stand is gone** from the towns, along with its crates and barrel.
+- **Every door is on a road.** The Tailor's and the Boatyard's doorsteps, and the range instructor's spot, used to sit alone in the grass or sand. A road now joins them up.
+- **Solid ground outside the walls.** In a siege, the field past the painted ground showed bare sky colour under the grass and on the sand. The land now runs on under it.
+
 ## RS-791 - Bind How Many
 
 - **Choose how many runes to make.** An altar's menu now offers 1, 5, 10, 25 or 100 essence as well as all of it, showing the runes and xp for each. It only lists amounts you have.

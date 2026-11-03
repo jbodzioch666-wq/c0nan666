@@ -123,6 +123,7 @@ Screenshots go to `tools/tests/shots/`.
 | `rs786` | A raid in a shire: the merged trees and land stay out of the see-through rays, the tick is cheap, a house in the way still fades |
 | `rs790` | The shire's grass and trees in other towns on green land: built, off cobbles and buildings, tinted by the land, sand and snow unchanged, a raid still runs |
 | `rs791` | an altar's menu: bind 1, 5, 10, 25, 100 or all essence, only amounts you have, plain and combination runes |
+| `rs792` | Open chimney flues, no market stall, every door and paved spot joined to the road out, the far ground kept under a siege's field |
 | `rs789` | A shire's door stones and flags are dark: their average vertex colour stays low |
 | `rs788` | The open land has its older grass again: no blade chunks, RS-785's code gone |
 | `rs787` | A battle at a town: the card before and after, the banner's words, the trees told where you stand, no shader built by a fade, new creatures warmed off the frame |

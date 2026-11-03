@@ -22,7 +22,7 @@ module.exports = async page=>{
     let sd = null; for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++) if (G.villageDeco[x][y]==='stall') sd = [x,y];
     return { board:gap(bx,by), cap:gap(cap.x,cap.y), together:Math.abs(cap.x-bx)+Math.abs(cap.y-by), stall, sd, desk, capTile:G.map[cap.x][cap.y]===T_QUESTGIVER }; });
   A(tidy.board >= 3 && tidy.cap >= 3, 'the board and the Captain stand clear of the bank: '+JSON.stringify(tidy)); A(tidy.together===1 && tidy.capTile, 'the Captain stands by his board');
-  A(tidy.stall && tidy.sd && tidy.stall[0]===tidy.sd[0] && tidy.stall[1]===tidy.sd[1], 'the market stall stands on its own tile, not in a tree: '+JSON.stringify(tidy)); A(tidy.desk===0, 'the banker\'s old outdoor desk is gone');
+  A(!tidy.stall && !tidy.sd, 'the market stall is gone (RS-792): '+JSON.stringify(tidy)); A(tidy.desk===0, 'the banker\'s old outdoor desk is gone');
   // RS-142: the bank's front door faces the square (west): you walk in from the square side, and back out onto it
   const bk = await ev(()=>{ const b = buildingByKey('bank'), o = doorOut(b); G.interior = null; G.player.x = o.x; G.player.y = o.y; const fl = G.map[o.x][o.y]; tryMove(1, 0);
     const inside = G.interior && G.interior.key; let back = null; if (inside){ exitInterior(); back = [G.player.x, G.player.y]; } return { face:b.face, o:[o.x,o.y], fl, x0:b.x0, inside, back }; });
