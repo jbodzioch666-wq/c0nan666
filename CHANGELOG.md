@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-783 - One Sign Will Do
+
+- **Every building now has one sign.** Shops and halls had both a painted banner and a wooden board showing the same picture. The banner stays and the board is gone, in every town.
+- **The barber's banner is off its doorstep.** On narrow buildings the banner stood in front of the door. It now stands beside the step.
+
 ## RS-782 - Down by the Harbour
 
 - **The boatyard has moved to the east end of town.** It now stands among the shire's homes in every town and every size, and by the water where the town has a harbour. This replaces the spot from RS-781, which was cramped.

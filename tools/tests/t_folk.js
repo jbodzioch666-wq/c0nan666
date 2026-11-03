@@ -31,7 +31,7 @@ module.exports = async page=>{
   const fl = await ev(()=>{ renderGame(); const bs = V3.banners||[]; let floating = 0; V3.world && V3.world.traverse(o=>{ if (o.isSprite && o.material.map && o.material.map.image && o.material.map.image.tagName==='CANVAS' && o.material.alphaTest===0.2) floating++; }); return { n:bs.length, painted:bs.every(b=>!!b.material.map), floating, signs:(V3.signs||[]).length }; });
   A(fl.n >= 7 && fl.painted, 'every shop banner has its picture painted on: ' + JSON.stringify(fl));
   A(fl.floating === 0, 'no pictures float above the banner poles');
-  A(fl.signs >= 7, 'the door signs still hang');
+  A(fl.signs===0, 'one sign to a building: the banners, no boards as well (RS-783): ' + fl.signs);
   // put a villager right in front of you and walk into them
   const r = await ev(()=>{ const p = G.player, v = (G.villagers||[]).find(o=>!o.animal && !o.guard && !o.sit);
     const dirs = [[0,-1],[1,0],[-1,0],[0,1]]; let d = null;
