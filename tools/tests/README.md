@@ -119,6 +119,7 @@ Screenshots go to `tools/tests/shots/`.
 | `rs781` | The pick swings after a real walk to a rock underground; a flight lifts a figure with its steps; far shire grass thins evenly; the boatyard stands clear in every race's town with every door reached |
 | `rs782` | The boatyard at the east end of town in each size, race and with or without a harbour; a shire's pond before its door |
 | `rs783` | One sign to a building: each race's and size's shops have one banner each and no board as well |
+| `rs784` | A shire's doors: a whole ring of stones round each and flagstones under it, in each town size; other races' towns none |
 | zloot | probe: the drops at a few levels - rarity shares, names with their bonuses and tiers, a rare's tooltip text (ZL levels, ZN drops a level) |
 | zloottip | probe: a rare's, a magic piece's and a Ring of Recoil's tooltip, plain and with Alt held, as shots/zloottip0-3.png |
 | rs703 | A spell leaves the staff as it comes forward: a real cast at a foe three tiles off, sampled every frame - the bolt waits about half a second, leaves from the staff's head as it leans ahead, its sound with it; the foe flinches (and a miss splashes) only as it lands; the cast lasts about a second; a foe it kills stands till the bolt lands, and the staff isn't put away mid-cast |

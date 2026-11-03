@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-784 - Set in Stone
+
+- **Shire doors have real stonework.** Each round door now has a full ring of rounded, hand-cut stones, each with its own size and shade, instead of nine plain blocks across the top.
+- **Flagstones under every door.** A long threshold stone sits under each door, and uneven flags lead out to the lane with grass and dirt between them, replacing the flat slab.
+
 ## RS-783 - One Sign Will Do
 
 - **Every building now has one sign.** Shops and halls had both a painted banner and a wooden board showing the same picture. The banner stays and the board is gone, in every town.
