@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-789 - Darker Doorstones
+
+- **Darker stone at the hobbit doors.** The ring of stones round each door and the flagstones in front of it are now a good deal darker.
+
 ## RS-788 - Back to the Old Grass
 
 - **The open land's grass is back as it was.** The thick grass from RS-785 was too much, so the land has its old grass and flowers again. The shire's grass in town is unchanged.
