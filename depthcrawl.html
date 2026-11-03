@@ -11313,7 +11313,7 @@ function v3ShipBuild(g, t, st, f, sea){
       const y1 = NSl===2 && !k ? (yy + yT)/2 + 0.02 : yT + q.sh + 0.16, y0s = k ? (yy + yT)/2 - 0.01 : yy - 0.02, w = (k ? yw*0.85 : yw)*0.96, h = y0s - y1;
       const sg = new T.PlaneGeometry(w*2, h, 10, 8), sp = sg.attributes.position;
       for (let i=0;i<sp.count;i++){ const px = sp.getX(i), py = sp.getY(i); sp.setZ(i, -0.13*h*(1 - Math.pow(px/w, 2))*(0.55 + 0.45*(0.5 - py/h))); }
-      sg.rotateY(-Math.PI/2); sg.computeVertexNormals(); const sl = toM(add(new T.Mesh(sg, sea ? sailM.clone() : sailM))); sl.position.set(0.06, (y0s + y1)/2, 0); g.userData.sails.push(sl); } });
+      sg.rotateY(-Math.PI/2); sg.computeVertexNormals(); const sl = toM(add(new T.Mesh(sg, sea ? sailM.clone() : sailM))); sl.position.set(0.06, (y0s + y1)/2, 0); sl.userData.y0 = (y0s + y1)/2; sl.userData.h = h; g.userData.sails.push(sl); } });
   if (st >= 6){ const pen = add(new T.Mesh(new T.PlaneGeometry(0.26, 0.07), new T.MeshStandardMaterial({ color:lin(mg ? '#40e8d0' : '#9a2a22'), side:T.DoubleSide }))); pen.position.set(MP[0]*L/2 - 0.13, yT + station(MP[0]).sh + H0 - 0.02, 0); g.userData.pennant = pen; }
   /* the shores that hold her upright, once she's planked */
   const shoreM = new T.MeshStandardMaterial({ map:YB.tex.dark, color:lin('#c8a888'), roughness:0.85 });
@@ -24618,20 +24618,16 @@ function wgLogHtml(){
 // tundra freezes hard enough to walk on, with holes cut for ice fishing.
 const BOAT_TIERS = [null,
   { nm:'Rowboat',  d:'a sturdy little boat - the open sea is yours to cross' },
-  { nm:'Sloop',    d:'a single-masted sloop: every other stretch of open water costs no turn, and storms hit it less', gold:1500, logs:20, bars:5 },
+  { nm:'Sloop',    d:'a single-masted sloop: quicker before the wind, and storms hit it less', gold:1500, logs:20, bars:5 },
   { nm:'Caravel',  d:'a caravel with a deck to fish from: faster still, and hardly troubled by storms (a harpoon needs a deck)', gold:5000, logs:40, bars:10 },
-  { nm:'Galleon',  d:'a three-masted galleon: two of every three steps at sea are free, and no storm can touch it', gold:15000, logs:80, bars:20 },
-  { nm:'Magic Clipper', d:'a clipper of magic wood, runes alight along her sides: three of every four steps at sea are free, she is the fastest thing afloat, and no storm can touch her' },   /* (RS-799) */
+  { nm:'Galleon',  d:'a three-masted galleon: a great weight of sail, slow to turn but fast once she has way on, and no storm can touch it', gold:15000, logs:80, bars:20 },
+  { nm:'Magic Clipper', d:'a clipper of magic wood, runes alight along her sides: the fastest thing afloat, she turns quicker than a galleon and points closer to the wind, and no storm can touch her' },   /* (RS-799) */
 ];
 const BOAT_SAIL = [null, '#ffffff', '#c8e0ff', '#ffe0a0', '#ffb0a0', '#a8f8e8'];
 function boatTier(){ const p = G.player; if (!p || !p.hasBoat) return 0; return Math.max(1, Math.min(5, p.boatTier||1)); }
 function boatName(){ const t = boatTier(); return t ? BOAT_TIERS[t].nm : 'no boat'; }
-// a step on the open sea: a sloop or caravel makes every other one free, a galleon two of every three, a magic clipper three of every four
-function sailStepCost(){
-  const t = boatTier(), p = G.player; if (t < 2) return 1;
-  p._sailN = ((p._sailN||0) + 1) % (t >= 5 ? 4 : t >= 4 ? 3 : 2);
-  return p._sailN === 0 ? 1 : 0;
-}
+// (RS-801) every tile sailed is a step: a better ship's gain is her speed and her handling, not free steps
+function sailStepCost(){ return 1; }
 function sailMul(){ const t = boatTier(); return [1, 1, 0.85, 0.72, 0.6, 0.5][t]; }
 function stormRisk(){ return [1, 1, 0.65, 0.3, 0, 0][boatTier()]; }
 /* (RS-735) boats are built, not bought: at the Boatyard on any town's crafts lane, in six stages on the slipway - the keel, the frames,
@@ -24922,9 +24918,64 @@ function o3BoatTier(){
   m.position.y = -(U.y0 + U.D*wl)*sc + 0.05; inner.add(m); O3.sail = U.sails[0] || null; O3.pennant = U.pennant || null;
   O3.ship = { t, sails:U.sails, masts:U.masts, guns:U.guns, deckY:U.deckY*sc + m.position.y, standD:-U.standX*sc, L:U.L*sc };
 }
+/* (RS-801) sailing. At sea the ship has a position, a heading and a speed of her own, and her tile follows her: crossing into a new tile takes the ordinary step (moveDir), so turns, events, discovery and Planet seams work as they do on foot.
+   A direction key turns her that way and hoists the sails; Space (or the panel's button) takes them in, and she carries her way until the water stops her. A tap sets a course: she steers along the path and takes in sail at the end. She stops at a coast unless you are making for it (holding the key, or a tap ashore) */
+const SHIP_SAIL = [null, { a:2.4, turn:2.7, up:0.48 }, { a:1.9, turn:2.2, up:0.34 }, { a:1.5, turn:1.7, up:0.32 }, { a:1.2, turn:1.25, up:0.3 }, { a:1.8, turn:1.6, up:0.38 }];
+function seaOn(){ if (typeof O3==='undefined' || !G.player || !G.player.hasBoat || G.gameMode!==0 || !G.owPos || !G.ow || !G.ow.map || G.owFerry || G.owPortal || O3.doorWalk || !o3Active()) return false; return G.ow.map[G.owPos.x][G.owPos.y]===OW_WATER && !iceAt(G.owPos.x, G.owPos.y) && !o3YardNudge(G.owPos.x, G.owPos.y); }   /* (a tile beside a sea temple's well keeps the plain step: she lies off it, outside her tile) */
+/* where the wind blows to, and how hard: it wanders slowly with the clock, freshens in a storm and dies in fog */
+function seaWind(){ if (window.__seaWind) return window.__seaWind; const c = clockNow()/60, sd = ((G.ow && G.ow.seed)||0) % 628; return { a:sd/100 + Math.sin(c*0.37)*2.1 + Math.sin(c*0.11 + 1)*1.6, s:Math.min(1.25, Math.max(0.5, (0.8 + 0.2*Math.sin(c*0.9 + 2))*(G.weather==='storm' ? 1.35 : G.weather==='fog' ? 0.7 : 1))) }; }
+/* how she goes by the angle off the wind (0 running before it, pi dead into it): best with it across her */
+function seaPolar(th, up){ const P = [[0, 0.85], [1.05, 1], [1.75, 1.05], [2.45, 0.7], [Math.PI, up]]; th = Math.abs(Math.atan2(Math.sin(th), Math.cos(th))); for (let i=1;i<P.length;i++) if (th <= P[i][0]){ const k = (th - P[i-1][0])/(P[i][0] - P[i-1][0]); return P[i-1][1] + (P[i][1] - P[i-1][1])*k; } return up; }
+function seaState(){ return O3.sea || (O3.sea = { yaw:O3.boatYaw||0, v:0, sail:0, k:0, want:null, heldAt:-9, roll:0, pitch:0, blocked:0, bumps:0 }); }
+function seaSteer(dx, dy){ const S = seaState(); if (G.gather) skStop(); O3.path = []; O3.gatherAt = null; O3.chase = null; G.routeOn = false; G.graveOn = false; S.want = Math.atan2(dx, dy); S.sail = 1; S.heldAt = O3.t; }
+function seaSailToggle(){ const S = seaState(); S.sail = S.sail ? 0 : 1; if (!S.sail){ O3.path = []; O3.gatherAt = null; O3.chase = null; S.want = null; } else if (S.want==null) S.want = S.yaw; sfx('click'); seaHudSync(); }
+/* the path's tile i steps on, as a place in the frame */
+function seaPathTile(i){ let g = [G.owPos.x, G.owPos.y]; for (let k=0;k<=i && k<O3.path.length;k++){ const q = owNb(g[0], g[1], O3.path[k][0], O3.path[k][1]); if (!q) return null; g = q; } return { g, l:o3L(g[0], g[1]) }; }
+/* a tile she may sail on */
+function seaWet(lx, ly){ const g = o3G(lx, ly); if (!g) return false; return G.ow.map[g[0]][g[1]]===OW_WATER && !iceAt(g[0], g[1]); }
+/* one frame's sailing; false if the ship isn't what moves you (the glide then takes you to your tile) */
+function seaTick(dt, pp, PL){ const S = seaState();
+  /* the land's frame turned under her at a seam: her heading turns with it, by where the tile she left now lies */
+  if (S.pp && S.pp!==pp && S.lastG && S.lastA!=null){ const a = o3L(S.lastG[0], S.lastG[1]); if (a && Math.hypot(PL.x - a[0], PL.y - a[1]) < 2.5){ const dl = Math.atan2(PL.x - a[0], PL.y - a[1]) - S.lastA; S.yaw += dl; O3.boatYaw = S.yaw; if (S.want!=null) S.want += dl; } } S.pp = pp;
+  if (!seaOn() || Math.floor(pp.x)!==PL.x || Math.floor(pp.z)!==PL.y){ S.v = 0; S.k = 0; S.sail = 0; S.want = null; S.yaw = O3.boatYaw||S.yaw; return false; }
+  if (G.ui!=='playing' || G.gameOver) return true;
+  dt = Math.min(dt, 0.1); const t = Math.max(1, boatTier()), C = SHIP_SAIL[t], W = seaWind(), vMax = 1/(O3_STEP*sailMul()), hasPath = O3.path && O3.path.length > 0; let slow = 1, stopAt = Infinity;
+  if (hasPath){ S.sail = 1; const q = seaPathTile(Math.min(1, O3.path.length - 1)), n0 = seaPathTile(0); if (q && q.l && n0 && n0.l){ const tgt = O3.path.length > 1 && seaWet(q.l[0], q.l[1]) ? q.l : n0.l, tx = tgt[0] + 0.5, tz = tgt[1] + 0.5; S.want = Math.atan2(tx - pp.x, tz - pp.z); const lastT = seaPathTile(O3.path.length - 1); if (lastT && lastT.l){ const dl = Math.hypot(lastT.l[0] + 0.5 - pp.x, lastT.l[1] + 0.5 - pp.z); stopAt = Math.sqrt(2*3.2*dl) + 0.3; S.arrive = 1; } } else O3.path = []; }
+  else if (S.pathOn){ S.sail = 0; S.want = null; S.arriveT = O3.t; } S.pathOn = hasPath && O3.path.length > 0;
+  if (G.gather){ S.sail = 0; S.v *= Math.exp(-dt*4); }
+  /* the helm: she answers slower with no way on, and eases off a hard turn so she never circles what she's steering for */
+  let err = 0; if (S.want!=null){ err = Math.atan2(Math.sin(S.want - S.yaw), Math.cos(S.want - S.yaw)); const rate = C.turn*(0.5 + 0.5*Math.min(1, S.v/1.5)), st = Math.max(-rate*dt, Math.min(rate*dt, err)); S.yaw += st; S.turn = st/Math.max(dt, 1e-3); } else S.turn = 0;
+  S.k += ((S.sail ? 1 : 0) - S.k)*(1 - Math.exp(-dt*(S.sail ? 1.6 : 2.6)));
+  const off = S.yaw - W.a; S.polar = seaPolar(off, C.up); let vT = vMax*S.k*S.polar*(0.72 + 0.28*W.s)*slow; if (S.want!=null) vT *= Math.max(0.3, Math.cos(Math.min(Math.PI/2, Math.abs(err)))); if (hasPath && Math.abs(err) > 0.9) vT = Math.min(vT, 0.8);
+  vT = Math.min(vT, stopAt); const brakeHard = stopAt < Infinity || (S.arriveT!=null && O3.t - S.arriveT < 1.2), dec = brakeHard ? 3.2 : 1.5;   /* (a course ends where you tapped: she backs her sails to stop; let go, she carries her way) */
+  S.v += Math.max(-dec*dt, Math.min((vT < S.v ? dec : C.a)*dt, vT - S.v)); if (S.v < 0.004 && !S.sail) S.v = 0;
+  const hx = Math.sin(S.yaw), hz = Math.cos(S.yaw), held = O3.t - S.heldAt < 0.45, intent = hasPath || held;
+  /* the bow finds the coast first: she stops short of it, unless you're making for it */
+  if (!intent){ const L = O3.ship ? O3.ship.L*0.42 : 0.4, bx = Math.floor(pp.x + hx*L), bz = Math.floor(pp.z + hz*L); if ((bx!==PL.x || bz!==PL.y) && !seaWet(bx, bz)){ if (S.v > 0.6 && !S.blocked) sfx('thud'); S.v = 0; S.blocked = 1; S.sail = 0; S.want = null; } else S.blocked = 0; } else S.blocked = 0;
+  const nx = pp.x + hx*S.v*dt, nz = pp.z + hz*S.v*dt, lx = Math.floor(nx), lz = Math.floor(nz);
+  if (lx!==PL.x || lz!==PL.y){ const g = o3G(lx, lz), wet = seaWet(lx, lz); let ok = !!g && (wet || intent);
+    if (ok){ const was = [G.owPos.x, G.owPos.y], d = o3DirToG(lx - PL.x, lz - PL.y); let k = -1; if (hasPath) for (let i=0;i<O3.path.length;i++){ const q = seaPathTile(i); if (q && q.g[0]===g[0] && q.g[1]===g[1]){ k = i; break; } } const dest = hasPath ? seaPathTile(O3.path.length - 1) : null, gat = O3.gatherAt;
+      S.lastG = was; S.lastA = Math.atan2(lx - PL.x, lz - PL.y); O3.stepping = true; const keep = O3.path; O3.path = []; try{ moveDir(d[0], d[1]); } finally { O3.stepping = false; O3.path = keep; }
+      if (G.ui!=='playing' || G.gameMode!==0){ O3.path = []; O3.gatherAt = null; O3.chase = null; S.v = 0; S.sail = 0; return true; }
+      ok = G.owPos.x!==was[0] || G.owPos.y!==was[1];
+      if (ok){ pp.x = nx; pp.z = nz; if (!wet){ O3.path = []; S.v = 0; S.sail = 0; S.want = null; return false; } if (hasPath){ if (k >= 0) O3.path.splice(0, k + 1); else { const np = dest ? o3PathTo(dest.g[0], dest.g[1]) : null; O3.path = np || []; } if (!O3.path.length){ if (O3.chase!=null){ try{ o3ChaseStep(); }catch(e){} } else if (gat){ O3.gatherAt = null; o3GoGather(gat.x, gat.y); } } else if (O3.chase!=null){ try{ o3ChaseStep(); }catch(e){} } } S.bumps = 0; } }
+    if (!ok){ S.v = 0; if (hasPath && ++S.bumps > 3){ O3.path = []; O3.gatherAt = null; S.sail = 0; S.bumps = 0; } else if (!hasPath){ S.sail = 0; S.want = null; } } }
+  else { pp.x = nx; pp.z = nz; }
+  O3.boatYaw = S.yaw;
+  /* she heels to the wind and leans out of a turn, and lifts her bow as she gets way on */
+  const sideW = Math.sin(W.a - S.yaw)*S.k*W.s, rollT = sideW*0.11 - (S.turn||0)*Math.min(1, S.v/3)*0.05, pitchT = -Math.min(0.05, S.v*0.012); S.roll += (rollT - S.roll)*(1 - Math.exp(-dt*2)); S.pitch += (pitchT - S.pitch)*(1 - Math.exp(-dt*2));
+  return true; }
+/* the wind and sail panel, while you're at sea */
+function seaHudSync(){ let el = document.getElementById('seaHud'); const on = G.player && G.ui==='playing' && seaOn(); if (!on){ if (el && el.style.display!=='none') el.style.display = 'none'; return; }
+  if (!el){ el = document.createElement('div'); el.id = 'seaHud'; el.innerHTML = '<div class="sh-wind"><svg viewBox="-20 -20 40 40" width="44" height="44" aria-hidden="true"><circle r="18" fill="rgba(10,20,30,0.55)" stroke="#c8a860" stroke-width="1.2"/><g id="seaHudArrow"><path d="M0 -13 L5 3 L0 0 L-5 3 Z" fill="#a8e8ff"/><path d="M0 0 L0 13" stroke="#a8e8ff" stroke-width="1.6" stroke-dasharray="3 2"/></g></svg></div><div class="sh-info"><div id="seaHudTxt"></div><button class="btn" id="seaHudBtn" onclick="seaSailToggle()"></button></div>'; el.style.cssText = 'position:fixed;right:18px;top:252px;z-index:40;display:flex;gap:8px;align-items:center;padding:6px 8px;background:rgba(14,12,8,0.72);border:1px solid #6a5a34;border-radius:6px;color:#e8dcc0;font-size:12px;'; document.body.appendChild(el); }
+  if (el.style.display==='none') el.style.display = 'flex';
+  const S = seaState(), W = seaWind(), a = document.getElementById('seaHudArrow'); if (a){ const deg = (W.a - viewYawNow())*180/Math.PI; a.setAttribute('transform', 'rotate(' + (180 - deg).toFixed(1) + ')'); }
+  const off = Math.abs(Math.atan2(Math.sin(S.yaw - W.a), Math.cos(S.yaw - W.a))), pt = off > 2.5 ? 'into the wind' : off > 1.9 ? 'close to the wind' : off > 0.9 ? 'wind abeam' : 'wind behind', txt = (S.sail ? pt : 'sails in') + ' &middot; ' + (S.v*2).toFixed(0) + ' kn', tEl = document.getElementById('seaHudTxt'), b = document.getElementById('seaHudBtn'), lb = S.sail ? 'Sails down' : 'Sails up'; if (S.hudT!==txt){ S.hudT = txt; tEl.innerHTML = txt; } if (S.hudB!==lb){ S.hudB = lb; b.textContent = lb; } }
 /* (RS-800) she breathes on the swell: the sails belly and slacken, the pennant streams */
 function o3ShipAnim(){ const S = O3.ship; if (!S) return; const tt = O3.t, cam = O3.cam, pw = S.v0 || (S.v0 = new THREE.Vector3()), qw = S.v1 || (S.v1 = new THREE.Vector3()), P = O3.player; if (P && P.g) P.g.getWorldPosition(pw);
-  S.sails.forEach((q, i)=>{ q.scale.x = 0.82 + 0.2*Math.sin(tt*1.1 + i*0.7) + 0.05*Math.sin(tt*3.3 + i*1.9);
+  const SS = O3.sea, W = seaWind(), kS = SS ? SS.k : 0, luff = SS && SS.polar!==undefined ? Math.max(0, (0.55 - SS.polar)/0.25) : 0;
+  /* the yards brace round to the wind */ { const rel = SS ? Math.atan2(Math.sin(W.a - SS.yaw), Math.cos(W.a - SS.yaw)) : 0, br = Math.max(-0.7, Math.min(0.7, rel))*kS; for (const m of S.masts) m.rotation.y += (br - m.rotation.y)*0.04; }
+  S.sails.forEach((q, i)=>{ const y0 = q.userData.y0, h0 = q.userData.h, up = 0.14 + 0.86*kS; q.scale.y = up; if (h0) q.position.y = y0 + h0*(1 - up)/2; q.scale.x = kS*W.s*(0.85 + 0.25*(SS && SS.polar || 0.8))*(1 - luff*0.75) + 0.18 + luff*0.22*Math.sin(tt*11 + i*1.7) + 0.05*Math.sin(tt*2.2 + i*1.9);
     /* a sail between you and the eye thins, so you can always see yourself at the wheel */
     let fade = 1; if (cam && P && P.g){ q.getWorldPosition(qw); const cx = cam.position.x - pw.x, cz = cam.position.z - pw.z, cl = Math.hypot(cx, cz) || 1, dx = qw.x - pw.x, dz = qw.z - pw.z, al = (dx*cx + dz*cz)/cl, la = Math.abs(dx*cz - dz*cx)/cl; if (al > 0 && la < 0.7) fade = 0.22; }
     const m = q.material, o = m.opacity + (fade - m.opacity)*0.12; if (o < 0.995){ if (!m.transparent){ m.transparent = true; m.needsUpdate = true; } m.opacity = o; m.depthWrite = o > 0.7; } else if (m.transparent){ m.transparent = false; m.opacity = 1; m.depthWrite = true; m.needsUpdate = true; } }); if (O3.pennant) O3.pennant.rotation.x = Math.sin(tt*6)*0.25; }
@@ -40255,7 +40306,8 @@ function o3Render(){
   if (O3.sz !== cw+'x'+ch+'@'+pr){ O3.sz = cw+'x'+ch+'@'+pr; O3.renderer.setPixelRatio(pr); O3.renderer.setSize(cw, ch, false); O3.cam.aspect = cw/Math.max(1,ch); O3.cam.updateProjectionMatrix(); }
   Object.assign(O3.labels.style, { left:cv.style.left, top:cv.style.top, width:cw+'px', height:ch+'px', inset:'auto' });
   // click-walking, one grid step at a time through the normal move rules
-  if (O3.path.length && G.ui==='playing' && !G.gameOver){
+  if (O3.path.length && G.ui==='playing' && !G.gameOver && seaOn() && O3.ppos && Math.floor(O3.ppos.x)===o3PL().x && Math.floor(O3.ppos.z)===o3PL().y){ /* (RS-801: the ship follows the path herself, in seaTick) */ }
+  else if (O3.path.length && G.ui==='playing' && !G.gameOver){
     O3.stepT -= dt;
     if (O3.stepT <= 0 && !O3.stepping && figLag() <= FIG_LAG_MAX){ const [dx,dy] = O3.path.shift(); O3.stepT = O3_STEP*runMul()*wgRoadMul(); O3.stepping = true; try{ moveDir(dx,dy); } finally { O3.stepping = false; } const ex = owNb(gpx, gpy, dx, dy); if (G.ui!=='playing' || G.gameMode!==0 || !ex || G.owPos.x!==ex[0] || G.owPos.y!==ex[1]){ O3.path = []; O3.gatherAt = null; O3.chase = null; }
       else if (O3.chase!=null) o3ChaseStep();
@@ -40277,7 +40329,9 @@ function o3Render(){
   { const co = o3ChopStand() || o3MineStand(); if (co){ tx += co[0]; tz += co[1]; } }   /* (RS-775: up to the rock you're mining) */   /* (RS-697: up to the tree you're felling) */   /* (RS-632: where you stand, in the frame; RS-687: clear of a graveyard's railings) */
   const pp = O3.ppos || (O3.ppos = new T.Vector3(tx,0,tz));
   let k = 1-Math.exp(-dt*10), dxs = tx-pp.x, dzs = tz-pp.z, moving = Math.hypot(dxs,dzs) > 0.03;
-  { const d = Math.hypot(dxs,dzs), sp = dt/(O3_STEP*runMul()*wgRoadMul())*1.05*(G.stepLen||1);             // an even walking pace, one tile per step
+  const shipGo = seaTick(dt, pp, PLn);   /* (RS-801) at sea the ship carries you */
+  if (shipGo){ const S = O3.sea; moving = S.v > 0.05; dxs = Math.sin(S.yaw)*S.v; dzs = Math.cos(S.yaw)*S.v; }
+  else { const d = Math.hypot(dxs,dzs), sp = dt/(O3_STEP*runMul()*wgRoadMul())*1.05*(G.stepLen||1);             // an even walking pace, one tile per step
     if (d > 3 || d <= sp){ pp.x = tx; pp.z = tz; } else { pp.x += dxs/d*sp; pp.z += dzs/d*sp; } }
   const gy = O3.heightAt(pp.x, pp.z);
   pp.y = sailing ? -0.14 : Math.max(gy, -0.14);
@@ -40329,8 +40383,8 @@ function o3Render(){
   }
   o3Campfire(T); o3TrailMarks(T); o3SyncRoadside(T); o3SyncQuestFinds(T);
   if (sailing){
-    if (moving) O3.boatYaw = Math.atan2(dxs, dzs);           // turn to the way you're sailing, and keep that heading when you stop
-    O3.boat.rotation.set(Math.sin(O3.t*1.3)*0.03, O3.boatYaw||0, Math.sin(O3.t*1.6)*0.05);
+    if (moving && !shipGo) O3.boatYaw = Math.atan2(dxs, dzs);           // turn to the way you're sailing, and keep that heading when you stop
+    { const Sx = shipGo ? O3.sea : null; O3.boat.rotation.set(Math.sin(O3.t*1.3)*0.03 + (Sx ? Sx.pitch : 0), O3.boatYaw||0, Math.sin(O3.t*1.6)*0.05 + (Sx ? Sx.roll : 0)); }
     O3.boat.position.set(0, Math.sin(O3.t*2)*0.02, 0); P.g.position.y += O3.boat.position.y; o3ShipAnim();   /* (RS-690: under you again - the walk down into a drowned temple left it at the mooring, and back out of the temple you floated beside it) */
     { const sd = O3.ship ? O3.ship.standD : 0.2; P.g.position.x = -Math.sin(O3.boatYaw||0)*sd; P.g.position.z = -Math.cos(O3.boatYaw||0)*sd; }   // at the wheel
     if (O3.foam){ O3.foam.material.opacity = moving ? 0.9 : 0.45; }
@@ -50103,6 +50157,7 @@ function isoStepDelay(v){ const p = G.player; return G.mon.some(m=>m.alive && m.
 document.addEventListener('keyup', (e)=>{ if (ISO.held){ ISO.held.delete(String(e.key).toLowerCase()); if (NUMPAD_KEY[e.code]) ISO.held.delete(NUMPAD_KEY[e.code].toLowerCase()); } });
 window.addEventListener('blur', ()=>{ if (ISO.held) ISO.held.clear(); });
 function isoHandleKey(k){
+  if (k===' ' && seaOn()){ seaSailToggle(); return true; }   /* (RS-801) */
   if (k===' '){ ISO.path = []; ISO.fighting = null; playerWait(); return true; }
   const hd = isoHeldDir(k);
   if (hd){
@@ -50560,7 +50615,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-800';
+const GAME_VERSION = 'rs-801';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -53248,7 +53303,7 @@ function buildHelp(){
       <div>press <kbd>C</kbd> to make camp wherever you're standing &mdash; usually a free heal that also restores your prayer and cures poison, but sleeping in the open risks something finding you in the dark: no rest that night, and a monster comes for you - fight it or get away. Safer on grass, riskier in forest/swamp, and impossible while zoomed out. You can also camp inside any dungeon-type site once you've cleared every monster off the current floor &mdash; nothing left down there to ambush you, so it's just as safe as a village rest.</div>
       <div>press <kbd>M</kbd> to open the world map of the whole continent &mdash; press again to go back. To travel between towns you've visited, use the <b>waypoint stone</b> in any town square: it shows the world with every town you've visited. The map's tool bar lets you <b>drop pins</b> with a note, <b>plan a route</b> and walk it, and switch <b>layers</b> (place names, landmarks, sites, danger, resources and more) on and off; the mouse wheel zooms in far enough to see every tree, rock and house. Land you've seen is pencilled in and land you've walked is painted; every forest, range, sea and river has a name, and three great landmarks (a volcano, a giant tree and a wizard's tower) can be seen from far off. The <b>travel log</b> counts the regions, towns, sites and landmarks you've found.</div>
       <div><b>The land:</b> when you start you pick the world's size and shape (an archipelago, one landmass or several continents) - or a whole <b>Planet</b>, its continents raised by drifting plates, which the world map shows as a globe you can turn when you zoom right out - and every world has a <b>world code</b> - give it to a friend and they can play the same world. <b>Roads</b> join the towns: walking a road is quicker (every other step is free) and safer, and the route planner and the teleport list (T, "walk") follow them. Off the road, wading a river costs time; roads cross on <b>bridges</b> and fords, and a broken bridge can be mended. <b>Ferries</b> cross the water between landmasses. Every part of the land has a recommended combat level, shown when you enter it and on the map. Watch for <b>volcanic land, jungles, haunted woods, snowy highlands and crystal wastes</b> with their own creatures, and for <b>hamlets</b> (jobs, food and a safe barn), <b>lookouts</b> that reveal the map, <b>caves, grottos and ruins</b> to delve, <b>standing stones</b>, <b>abandoned camps</b>, <b>wishing wells</b> and <b>hermits</b>. Deer, rabbits, boars and birds roam the 3D land - click one to hunt it. Rain makes the fish bite, fog shortens your sight and storms make the sea dangerous. Buy a <b>tent, ward lantern, bedroll and cooking spit</b> from the Peddler for safer camping.</div>
-      <div><b>The sea:</b> boats are built at the <b>Boatyard</b> on any town's crafts lane: saw logs into planks at its saw pit, lay flax into rope and stitch linen into sailcloth at its ropewalk, then build her on the slipway with Construction - the keel, the frames, the planking, the deck, the masts and rigging and the sails, each stage a few turns of work. First a <b>rowboat</b>, then a <b>sloop</b>, a <b>caravel</b>, a <b>galleon</b> and at last a <b>magic clipper</b> (better planks, nails and iron too): each crosses the sea faster and rides out storms better. The islands with no town on them have their own <b>pearl beds</b>, <b>sunstone outcrops</b> (gold and gems) and a <b>buried cache</b>; land on one to chart it, and the <b>sea charts</b> (on the world map's tool bar) set a course back to any island you've charted. A <b>harpoon</b>, thrown from a caravel's deck or bigger, lands sharks, kraken and marlin in deep water. In winter the water along the tundra freezes - walk out onto it and fish through the ice holes.</div>
+      <div><b>The sea:</b> boats are built at the <b>Boatyard</b> on any town's crafts lane: saw logs into planks at its saw pit, lay flax into rope and stitch linen into sailcloth at its ropewalk, then build her on the slipway with Construction - the keel, the frames, the planking, the deck, the masts and rigging and the sails, each stage a few turns of work. First a <b>rowboat</b>, then a <b>sloop</b>, a <b>caravel</b>, a <b>galleon</b> and at last a <b>magic clipper</b> (better planks, nails and iron too): each crosses the sea faster and rides out storms better. At sea a direction key (or a tap) sets your heading and hoists the sails, and <b>Space</b> takes them in. She carries her way, turns wide, goes best with the wind across her and slowly into it; the panel under the map shows the wind. The islands with no town on them have their own <b>pearl beds</b>, <b>sunstone outcrops</b> (gold and gems) and a <b>buried cache</b>; land on one to chart it, and the <b>sea charts</b> (on the world map's tool bar) set a course back to any island you've charted. A <b>harpoon</b>, thrown from a caravel's deck or bigger, lands sharks, kraken and marlin in deep water. In winter the water along the tundra freezes - walk out onto it and fish through the ice holes.</div>
       <div><b>World events:</b> the world keeps its own time. A <b>giant</b> sleeps somewhere and now and then wakes to roam (a world boss - it's marked on the map while it's awake, and its wounds last between fights). <b>Monster camps</b> grow if they're left alone, until their warband lays <b>siege</b> to the nearest town; break the siege in time or the town is sacked. Every town rules the land nearest it - break every camp in a town's lands to <b>secure</b> them, and fewer monsters roam there. <b>Stars fall</b> and leave rich ore for a while. On the road you'll meet people who need a hand (or a fight), and towns hold <b>festivals</b> (10% off and a treat), <b>market days</b> (a rare trader on the plaza) and ring the alarm when monsters <b>raid</b>. Everything with a deadline shows its timer on the world map; the travel log lists what's going on.</div>
       <div>day turns to night and back on a steady cycle, and the weather shifts between clear, rain, fog and the occasional storm &mdash; both are shown in the corner of the overworld map. Night and bad weather raise the odds of a random encounter, so an easy stretch of road can turn dangerous after dark.</div>
       <div style="margin-top:10px;color:var(--ink-faint);">QUESTS</div>
@@ -53383,6 +53438,7 @@ function moveBufTick(){
 }
 /* a step from a key or a click: held for your figure if it's behind (moveDir itself steps at once - scripted moves use it) */
 function moveInput(dx, dy){
+  if (seaOn() && O3.ppos){ seaSteer(dx, dy); return; }   /* (RS-801: at sea a direction is a heading) */
   if (G.gameMode===0 && !O3F.id){ const g = o3DirToG(dx, dy); dx = g[0]; dy = g[1]; }   /* (RS-632: past a face's edge its grid lies turned in the frame) */
   if (G.ui==='playing' && !G.gameOver && !ISO.inTick && !ISO.inPath && figLag() > FIG_LAG_MAX){ G.moveBuf = { d:[dx, dy], mode:G.gameMode, map:G.map, at:performance.now() }; return; }
   G.moveBuf = null; moveDir(dx, dy);
@@ -53432,7 +53488,7 @@ function handlePlayingKey(k){
     case 'Home': case 'PageUp': case 'End': case 'PageDown': { const d = (G.gameMode===0 || G.gameMode===3) ? viewRotDir(keyDir(k)) : keyDir(k); moveInput(d[0], d[1]); break; }
     case 'z': case 'Z': viewRotate(-1); break;
     case 'x': case 'X': viewRotate(1); break;
-    case ' ': playerWait(); break;
+    case ' ': if (seaOn()) seaSailToggle(); else playerWait(); break;   /* (RS-801) */
     case 'f': case 'F': rsCycleStyle(); break;
     case 'g': case 'G': spHotKey('spells'); break;
     case 'n': case 'N': spHotKey('prayer'); break;
@@ -53957,6 +54013,7 @@ function frameLoop(ts){
   const _pt0 = SET.fps ? performance.now() : 0;
   syncGrid();
   touchUiSync();
+  try{ seaHudSync(); }catch(e){}
   if (G.player && G.gather) skGatherTick(performance.now());
   if (G.moveBuf) try{ moveBufTick(); }catch(e){ console.error(e); }   /* (RS-410: a step held for your figure) */
   try{ skGatherBar(performance.now()); cqTick(performance.now()); necroHudSync(); ttNodeRefresh(); xpDropsFollow(); }catch(e){ console.error(e); }

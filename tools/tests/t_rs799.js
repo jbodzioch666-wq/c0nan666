@@ -23,8 +23,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   A(r.goldLeft===12000, 'the fee is paid', r);
   A(r.left.every(x=>x===0), 'the materials are used', r);
   A(r.storm===0 && r.sailMul < 0.6, 'storm proof and faster than a galleon', r);
-  A(r.steps.reduce((a, b)=>a + b, 0)===1, 'three of every four steps are free', r);
-  A(r.yardFull > r.kids[0], 'the 3D model in the yard grows', r);
+    A(r.yardFull > r.kids[0], 'the 3D model in the yard grows', r);
   await page.evaluate(()=>{ G.bench = 'slipway'; setUi('bench'); }); await page.waitForTimeout(300); await page.screenshot({ path:SHOTS + '/rs799_slip.png' });
   await page.evaluate(()=>{ setUi('playing'); ISO.dist = 7; const P = G.player; P.boatBuild = { t:5, st:5, pr:11 }; v3YardSync(); }); await page.waitForTimeout(6000); await page.screenshot({ path:SHOTS + '/rs799_yard.png' });
   /* at sea */

@@ -14,7 +14,7 @@ module.exports = async page=>{
     const p = G.player; p.gold = 100000; skGainXP('construction', 400000);
     for (let t=1;t<=4;t++){ for (const s of boatStages(t)) for (const k in s.need) skAdd(k, s.need[k]); let n = 0; while (boatTier() < t && n++ < 300) if (!boatWork()) break; A(boatTier()===t, 'tier '+t); }
     out.boat = boatName(); A(stormRisk()===0, 'galleon storm proof');
-    p._sailN = 0; const c = [sailStepCost(), sailStepCost(), sailStepCost()]; A(c.reduce((a,b)=>a+b,0)===1, 'galleon steps '+c);
+    A(sailStepCost()===1, 'every tile sailed is a step');
     checkAchievements(); A(p.achievements.includes('admiral'), 'admiral');
     // harpoons: the big fish need one
     const deep = { k:'fishing', type:'deep', x:0, y:0 };

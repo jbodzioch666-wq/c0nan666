@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## RS-801 - Under Sail
+
+- **Ships sail now, not walk.** A ship has weight: she gathers way slowly, carries it when you stop, and turns in a wide circle. A galleon is heavy and slow to come round; a rowboat spins on the spot.
+- **The wind matters.** It wanders over time, freshens in a storm and dies in fog. She goes fastest with it across her, well enough with it behind her, and slowly straight into it. The yards swing round to it and the sails belly out or flap.
+- **Steering.** A direction key sets your heading and hoists the sails, and she holds that course until you change it. Space, or the new button, takes the sails in. A tap sets a course, and she steers there and stops herself.
+- **Coasts.** She stops short of the shore on her own. Hold the key towards the land, or tap ashore, to step off.
+- **A new panel** under the map shows the wind, your point of sail, your speed and the sail button.
+- **Free steps are gone.** Every tile sailed now counts as one step. Better ships make up for it with speed and handling, so the Magic Clipper's free steps have gone too.
+
 ## RS-800 - New Ships
 
 - **All five boats are rebuilt.** The ship you sail is now the same ship you built on the slipway: a proper hull, deck, masts, yards and rigging, instead of a small rowboat with extra poles.

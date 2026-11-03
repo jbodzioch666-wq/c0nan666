@@ -15,7 +15,7 @@ module.exports = async page=>{
     out.ashore = ashore; out.inMode = G.gameMode; out.kind = G.siteKind;
     /* back out */
     dgFinish(true); setUi('playing'); await fr(60);
-    const C = o3C(s.x, s.y), state = ()=>{ const P = O3.player; return { pos:[G.owPos.x, G.owPos.y], onSite:G.owPos.x===s.x && G.owPos.y===s.y, boat:!!O3.boat.visible, off:+Math.hypot(O3.boat.position.x, O3.boat.position.z).toFixed(3), inBoat:P && P.g.position.y > 0.1, out:+Math.hypot(O3.ppos.x - C[0], O3.ppos.z - C[1]).toFixed(2) }; };
+    const C = o3C(s.x, s.y), state = ()=>{ const P = O3.player; return { pos:[G.owPos.x, G.owPos.y], onSite:G.owPos.x===s.x && G.owPos.y===s.y, boat:!!O3.boat.visible, off:+Math.hypot(O3.boat.position.x, O3.boat.position.z).toFixed(3), inBoat:P && !!O3.ship && P.g.position.y > O3.ship.deckY - 0.05, out:+Math.hypot(O3.ppos.x - C[0], O3.ppos.z - C[1]).toFixed(2) }; };
     let last = null, still = 0; for (let i=0;i<600 && still < 15;i++){ await fr(1); const p = O3.ppos.x.toFixed(3) + ',' + O3.ppos.z.toFixed(3); still = p===last ? still + 1 : 0; last = p; }
     out.back = state(); out.mode = G.gameMode;
     out.shot = O3.renderer.domElement.toDataURL('image/png');
