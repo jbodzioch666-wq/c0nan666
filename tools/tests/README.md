@@ -127,6 +127,8 @@ Screenshots go to `tools/tests/shots/`.
 | `rs793` | A river's banks wander past the tile edges, the middle of a river tile stays water and a land tile's stays dry |
 | `rs794` | A splash lifts the water and spreads, the land stays still, the bed and the mirror passes run by water and not inland, and with no post target nothing breaks |
 | `rs795` | the roots, crystals and lava are gone from the dungeons: no floor of any kind of site has them, a saved floor loses them, only a brazier gets a flame |
+| `rs796m` | the same on a phone: a tap on a stat row shows its tip |
+| `rs796` | R goes round melee, archer, magic; a staff swings on melee and out of spells; the bow shoots a foe beside you and uses an arrow; a Bonuses tab, sources add up to the game's own numbers, every row of every tab has a tip (ZI_SAVE: also on a player's save) |
 | `rs789` | A shire's door stones and flags are dark: their average vertex colour stays low |
 | `rs788` | The open land has its older grass again: no blade chunks, RS-785's code gone |
 | `rs787` | A battle at a town: the card before and after, the banner's words, the trees told where you stand, no shader built by a fade, new creatures warmed off the frame |

@@ -1,5 +1,15 @@
 # Depthcrawl patch notes
 
+## RS-796 - Three Ways to Fight
+
+- **R now switches between melee, archer and magic.** The action bar shows which one you're on.
+- **Arrows keep flying.** On archer you shoot even a foe standing right beside you. Before, a staff's autocast took over as soon as anything got close, so your arrows seemed to stop working.
+- **Staves fight as melee.** On melee your staff swings instead of casting. On magic with no spell you can cast, it swings too, and you walk up to the foe instead of standing back.
+- **Out of arrows, you fight by hand.** Archer falls back on what's in your hand rather than switching to spells.
+- **New Bonuses tab on the character sheet.** It lists everything from your gear added up, your sets, active effects and prayers, minions and allies, and what's always with you, such as your race and skill milestones.
+- **Every stat explains itself.** Hover any row, or tap it on a phone, to see what it does and which gear it comes from.
+- **Defence bonus now counts everything.** It used to leave out boots, cape, shield and rolled bonuses.
+
 ## RS-795 - Clear Floors
 
 - **Three dungeon props are gone.** Roots coming down through the ceiling, glowing blue crystals and small lava pools no longer appear in dungeons, along with the flames that floated over the crystals and lava.
