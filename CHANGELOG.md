@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-785 - Knee High
+
+- **Real grass on the open land.** The shire's grass now grows across the grasslands, woods and swamps, with hundreds of thousands of blades around you, replacing the old little triangles.
+- **It moves.** You and roaming creatures push it aside and flatten it as you pass, and it slowly springs back. Wind runs through it in gusts, and rain weighs it down.
+- **It belongs to the land.** It keeps off water, sand, bare rock, roads and sites, and thins out at the edges. Its colour follows the woods, swamps, jungle, haunted land, autumn and winter.
+- **Flowers.** Wildflowers on stems now grow in the meadows.
+
 ## RS-784 - Set in Stone
 
 - **Shire doors have real stonework.** Each round door now has a full ring of rounded, hand-cut stones, each with its own size and shade, instead of nine plain blocks across the top.
