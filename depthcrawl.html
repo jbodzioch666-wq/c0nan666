@@ -39420,7 +39420,7 @@ function m3dSkinRoot(root, rig, mats){
   root.traverse(o=>{ if (!o.isMesh || o===root || o.isInstancedMesh || o.isSkinnedMesh || propSet.has(o) || !o.visible) return; const m = o.material; if (!m || Array.isArray(m) || m.visible===false) return;
     const hair = m.userData.special==='hairCard';   /* (RS-578: a figure's hair, beard and moustache cards share one material - and now one mesh, its soft fringes another) */
     if (!hair && (m.transparent || m.userData.special || m.userData.bend || (m.onBeforeCompile!==plainCompile && !m.userData.rim))) return;   /* (a shader of its own - a bending body, ice, slime, leaves - keeps its own mesh) */
-    if (Object.keys(o.userData).length) return; const ga = o.geometry && o.geometry.attributes; if (!ga || !ga.position || !ga.normal || (o.geometry.morphAttributes && Object.keys(o.geometry.morphAttributes).length)) return;
+    if (Object.keys(o.userData).length) return; if (o.geometry && o.geometry.userData && o.geometry.userData.nR!==undefined) return;   /* (RS-798: a tube, m3dTube, is rewritten as it moves: merged, its frozen copy was what showed, a snake moved only its head and its head fell from a body left standing) */ const ga = o.geometry && o.geometry.attributes; if (!ga || !ga.position || !ga.normal || (o.geometry.morphAttributes && Object.keys(o.geometry.morphAttributes).length)) return;
     for (let q = o.parent; q && q!==root; q = q.parent) if (!q.visible) return;
     /* (parts that differ only in colour share one mesh: the colour goes into the vertices, and the mesh gets one material of that make;
        RS-578: and parts of any finish share the atlas mesh) */
@@ -45469,27 +45469,54 @@ function m3dSerpent(o){
     spine = (t, mv, wind, strike)=>{ const E = coil[cn-1], sw = Math.sin(t*1.1)*0.025*(1 - strike), lean = strike*0.2 - wind*0.07;
       const raised = new T.CatmullRomCurve3([E.clone(), new T.Vector3(E.x + 0.02, R + 0.03, E.z + 0.07), new T.Vector3(sw*1.5 + 0.05, 0.14 + wind*0.03, 0.05 + lean*0.4), new T.Vector3(sw, 0.25 + wind*0.04 - strike*0.03, 0.06 + lean*0.8), new T.Vector3(sw*0.6, 0.27 + wind*0.03 - strike*0.06, 0.13 + lean*1.15)]).getPoints(26);
       return coil.slice(0, cn-1).concat(raised); };
+    /* (RS-798) it crawls: the coil is the start of a trail, in the holder's parent's space, that the snake's middle lays down as it goes, and the body is read back along that trail, so it follows
+       the way it came, round corners, and its tail unwinds out of the coil. The S of its crawl belongs to the ground (by distance gone, not by time), so each part of it passes through the same bends and
+       nothing slides. Coil lengths count for less than laid-out ones (COILK), or a giant snake laid straight would run seven tiles. Its fore-body rears when it stops or strikes and goes low to crawl */
+    const COILK = 0.65, WAVE_A = 0.042, WAVE_W = Math.PI*2/0.27, Y0 = R*0.62*0.9, NR = 46, NF = 18;
+    const crawlInit = (e, hx, hy, hz, c, sn, sc)=>{ const tr = coil.map(q=>({ x:hx + (q.x*c + q.z*sn)*sc, z:hz + (-q.x*sn + q.z*c)*sc, wy:hy, yl:q.y, d:0, w:0, px:0, pz:0, a:0 })); for (let i=1;i<tr.length;i++) tr[i].a = Math.hypot(tr[i].x - tr[i-1].x, tr[i].z - tr[i-1].z)/sc*COILK;
+      let L = 0; for (const q of tr) L += q.a; return { tr, L, d:0, lx:hx, lz:hz, q:1, tp:null, slack:0, pop:null, popK:0, sc }; };
+    rig.crawl = (r, t, mv, wind, strike, e)=>{ const h = e.holder, sc = e.root.scale.x || 1, yaw = h.rotation.y, c = Math.cos(yaw), sn = Math.sin(yaw), hx = h.position.x, hy = h.position.y, hz = h.position.z;
+      let S = e.crawlS; if (!S || S.sc!==sc || Math.hypot(hx - S.lx, hz - S.lz) > 2.5) S = e.crawlS = crawlInit(e, hx, hy, hz, c, sn, sc);   /* (a new floor, a land rebuilt under it: it starts again, coiled) */
+      const dt = S.tp==null ? 0 : Math.max(0, Math.min(0.1, t - S.tp)); S.tp = t; const tr = S.tr;
+      if (Math.hypot(hx - S.lx, hz - S.lz) >= 0.03*sc){ const last = tr[tr.length-1], dx = hx - last.x, dz = hz - last.z, seg = Math.hypot(dx, dz) || 1e-5, a = seg/sc;
+        if (!last.w){ S.slack += a; S.pop = { x:last.x - hx, z:last.z - hz }; S.popK = 1; } else S.slack = Math.max(0, S.slack - a);   /* (leaving the coil: its neck eases across, and its tail waits until the snake has gone that far) */
+        S.d += a; tr.push({ x:hx, z:hz, wy:hy, yl:Y0, d:S.d, w:1, px:-dz/seg, pz:dx/seg, a }); S.lx = hx; S.lz = hz;
+        let tot = 0, keep = 0; for (let i=tr.length-1;i>=1;i--){ tot += tr[i].a; if (tot > (S.L + S.slack)*1.2 + 0.2){ keep = i - 1; break; } } if (keep > 0) tr.splice(0, keep); }
+      const hard = wind > 0.01 || strike > 0.01, qT = hard ? 1 : mv > 0.08 ? 0.18 : 1; S.q += (qT - S.q)*(1 - Math.exp(-dt*(qT < S.q ? 6 : 1.8))); const q = S.q; r.rearQ = q; S.popK *= Math.exp(-dt*5);
+      // the body, from the neck back
+      const Lr = S.L + S.slack, rear = []; let i = tr.length - 1, run = 0;
+      for (let k=0;k<NR;k++){ const want = k/(NR - 1)*Lr; while (i > 0 && run + tr[i].a < want){ run += tr[i].a; i--; }
+        const A = tr[i], B = tr[Math.max(0, i-1)], f = i > 0 && A.a > 1e-6 ? Math.min(1, (want - run)/A.a) : 0, w = A.w + (B.w - A.w)*f, dd = A.d + (B.d - A.d)*f, fr = want/Math.max(0.01, Lr);
+        const wv = WAVE_A*w*ss(0, 0.16, fr)*(1 - 0.45*ss(0.8, 1, fr))*Math.sin(dd*WAVE_W)*sc, px = A.w ? A.px : B.px, pz = A.w ? A.pz : B.pz;
+        let wx = A.x + (B.x - A.x)*f + px*wv, wz = A.z + (B.z - A.z)*f + pz*wv; if (S.pop && S.popK > 0.01){ const fall = S.popK*Math.max(0, 1 - want/0.32); wx += S.pop.x*fall; wz += S.pop.z*fall; }
+        const dx = (wx - hx)/sc, dz = (wz - hz)/sc, yy = A.yl + (B.yl - A.yl)*f + ((A.wy + (B.wy - A.wy)*f) - hy)/sc, br = Math.sin(t*1.25 - want*7)*0.005*q*ss(0, 0.2, fr);   /* (at rest its sides still move as it breathes) */
+        rear.push(new T.Vector3(dx*c - dz*sn + br, yy, dx*sn + dz*c)); }
+      // the fore-body, up from there to the head
+      const Bs = rear[0], tan = rear[0].clone().sub(rear[3]); tan.y = 0; if (tan.lengthSq() < 1e-8) tan.set(0, 0, 1); tan.normalize(); const lf = (a, b)=>a + (b - a)*q;
+      const sw = Math.sin(t*1.1)*0.025*(1 - strike)*q + Math.sin(S.d*WAVE_W)*0.02*(1 - q), lean = strike*0.2 - wind*0.07;
+      const fore = new T.CatmullRomCurve3([Bs.clone(), new T.Vector3(Bs.x + tan.x*0.07, lf(Y0 + 0.008, R + 0.03), Bs.z + tan.z*0.07), new T.Vector3(sw*1.5 + 0.05*q, lf(0.045, 0.14) + wind*0.03, lf(0.09, 0.05) + lean*0.4), new T.Vector3(sw, lf(0.065, 0.25) + wind*0.04 - strike*0.03, lf(0.15, 0.06) + lean*0.8), new T.Vector3(sw*0.6, lf(0.07, 0.27) + wind*0.03 - strike*0.06, lf(0.21, 0.13) + lean*1.15)]).getPoints(NF - 1);
+      rear.reverse(); rear.pop(); return rear.concat(fore); };
     const hd = snakeHead(root, o.eyes || '255,210,60', 1.15*th); rig.head = hd.h; rig.jaw = hd.jaw; rig.tongue = hd.tongue;
     if (o.frill){   // a cobra's hood, spread behind the head
       const sh = new T.Shape(); sh.moveTo(0, 0.06); sh.bezierCurveTo(0.07, 0.07, 0.085, -0.02, 0.03, -0.09); sh.lineTo(-0.03, -0.09); sh.bezierCurveTo(-0.085, -0.02, -0.07, 0.07, 0, 0.06);
       const hg = new T.ShapeGeometry(sh, 24), hp = hg.attributes.position, cols = [];
-      for (let i=0;i<hp.count;i++){ const x = hp.getX(i), y = hp.getY(i); hp.setZ(i, -Math.pow(Math.abs(x)/0.08, 2)*0.025); const eye = Math.hypot(Math.abs(x) - 0.035, y - 0.0); const edge = ss(0.0, 0.012, 0.075 - Math.hypot(x*0.95, y*0.7)); const c = lerpC(cS, lerpC(C(o.frill), C(mpTone(o.frill, 0.35)), ss(0.05, 0.0, Math.abs(x))), edge*0.9); const c2 = lerpC(c, C('#101010'), ss(0.012, 0.007, eye)); c2.convertSRGBToLinear(); cols.push(c2.r, c2.g, c2.b); }
+      for (let i=0;i<hp.count;i++){ const x = hp.getX(i), y = hp.getY(i); hp.setZ(i, Math.pow(Math.abs(x)/0.08, 2)*0.03); const eye = Math.hypot(Math.abs(x) - 0.035, y - 0.0); const edge = ss(0.0, 0.012, 0.075 - Math.hypot(x*0.95, y*0.7)); const c = lerpC(cS, lerpC(C(o.frill), C(mpTone(o.frill, 0.35)), ss(0.05, 0.0, Math.abs(x))), edge*0.9); const c2 = lerpC(c, C('#101010'), ss(0.012, 0.007, eye)); c2.convertSRGBToLinear(); cols.push(c2.r, c2.g, c2.b); }
       hg.setAttribute('color', new T.Float32BufferAttribute(cols, 3)); hg.computeVertexNormals();
       const hm = new T.MeshStandardMaterial({ color:0xffffff, vertexColors:true, roughness:0.5, side:T.DoubleSide }); m3dRimify(hm); hm.userData.hex = '#ffffff'; hm.userData.kind = 'membrane';
-      rig.hood = new T.Group(); root.add(rig.hood); const hood = new T.Mesh(hg, hm); hood.position.set(0, 0.012, -0.012); hood.scale.setScalar(th); rig.hood.add(hood); }
+      rig.hood = new T.Group(); root.add(rig.hood); const hood = new T.Mesh(hg, hm); hood.rotation.x = Math.PI/2; hood.position.set(0, 0.016*th, -0.035*th); hood.scale.setScalar(th); rig.hood.add(hood); }   /* (RS-798: it lies along the neck, as a real one does: built across the spine it made a flat brim round a reared neck) */
     if (scale==='#1a1a22' || o.horns) for (const s of [-1,1]) hd.hi.add(m3dTaper([[s*0.016,0.018,0.02],[s*0.022,0.03,0.0],[s*0.026,0.036,-0.025]], 0.004, 0.0004, glossM('#ffffff', 0.3, true), 10, 10, hornCol(C('#3a1a14'), C('#c84030'))));   /* (apep's brow horns) */
     finish = (r, t, mv, wind, strike, pts, F)=>{ r.jaw.rotation.x = 0.03 + wind*0.45 + strike*1.0; r.tongue.visible = (Math.sin(t*3.1) > 0.55 || Math.sin(t*7.3) > 0.9) && strike < 0.2; r.tongue.position.z = 0.05 + Math.max(0, Math.sin(t*20))*0.008;
-      if (r.hood) m3dOnSpine(r.hood, pts, F, 0.955); };
+      if (r.hood){ m3dOnSpine(r.hood, pts, F, 0.93); const iH = Math.floor(0.93*(pts.length - 1)), up = Math.abs(F.T[iH] ? F.T[iH].y : 0), rq = r.rearQ===undefined ? 1 : Math.max(0, (r.rearQ - 0.18)/0.82), fl = Math.max(strike, Math.min(rq, Math.min(1, Math.max(0, (up - 0.15)/0.4)))); r.hood.scale.x = 0.42 + 0.58*fl*fl*(3 - 2*fl); } };   /* (RS-798: folded along the neck as it crawls, flared as it rears or strikes) */
   }
   rig.spine = spine; rig.rad = rad; rig.finish = finish;
-  const pose = (r, t, mv, wind, strike)=>{ let pts = r.spine(t, mv, wind, strike);
+  const pose = (r, t, mv, wind, strike, e)=>{ const crawl = r.crawl && e && e.holder; let pts = crawl ? r.crawl(r, t, mv, wind, strike, e) : r.spine(t, mv, wind, strike); if (crawl) r.livePts = pts;
     /* (RS-346) it slithers: a wave runs down its body as it moves, quietest at the head. (RS-361: on a copy of the points - the
        coil's points are kept between frames, and adding the wave to them in place let the coil drift and stretch across the room) */
-    if (mv > 0.01){ const n = pts.length - 1; pts = pts.map((p, i)=>{ const s = i/n; return new T.Vector3(p.x + Math.sin(t*7 - s*10)*0.05*mv*(1 - s*0.75), p.y, p.z); }); }
+    if (mv > 0.01 && !crawl){ const n = pts.length - 1; pts = pts.map((p, i)=>{ const s = i/n; return new T.Vector3(p.x + Math.sin(t*7 - s*10)*0.05*mv*(1 - s*0.75), p.y, p.z); }); }
     const F = m3dSpineFrames(pts, r.up0); m3dTubeSet(r.tube, pts, F, r.rad); m3dOnSpine(r.head, pts, F, 1);
     if (r.finish) r.finish(r, t, mv, wind, strike, pts, F); };
   pose(rig, 0.7, 0, 0, 0);
-  return m3dFinish(root, rig, (r, t, mv, wind, strike, hurt, e)=>pose(r, t, mv, wind, strike), extra);
+  return m3dFinish(root, rig, (r, t, mv, wind, strike, hurt, e)=>pose(r, t, mv, wind, strike, e), extra);
 }
 // (RS-269) tentacled things in high detail: a sculpted mantle, head or eye-orb painted in mottled skin, and every arm, stalk
 // or tendril one smooth tapering tube that curls and lashes, with rows of pale suckers along its underside
@@ -47758,6 +47785,9 @@ function m3dChainStep(e, dt){
   for (let k=0;k<steps;k++){
     if (!C.started && C.sink){ for (const i2 of [0, 1, 2, 3, 24, 25, 26]) if (P[i2]) P[i2].xp.y += C.sink*h; }   /* (RS-432: the body sinks onto its legs as it goes down, before it rolls) */
     if (!C.started){ C.started = true; const K2 = C.kk || [0.4, 0.9]; for (const p of P){ const kk = Math.max(0.25, Math.min(1.6, K2[0] + (p.x.y/C.h0)*K2[1])); p.xp.copy(p.x).addScaledVector(C.v0, -kk*h); if (C.roll) p.xp.addScaledVector(C.roll, -Math.max(0, p.x.y/C.h0 - 0.35)*h); if (C.hop) p.xp.y -= C.hop*Math.max(0, 1 - p.x.y/C.h0)*h; } }   /* (the top of it thrown hardest; a roll, if it has one, turns it over; a hop lifts its feet with it) */
+    if (C.serp && C.t < 2.5){   /* (RS-798) it thrashes: waves run down the length of it, hard at first and dying away, with a last shudder down the tail */
+      const fd = Math.max(0, 1 - C.t/1.7), tw = C.t > 1.95 ? Math.sin((C.t - 1.95)/0.55*Math.PI)*0.3 : 0, n = P.length; for (let i=1;i<n-1;i++){ const tx = P[i+1].x.x - P[i-1].x.x, tz = P[i+1].x.z - P[i-1].x.z, l = Math.hypot(tx, tz) || 1e-5, u = i/(n - 1);
+        const f = (C.serp.a*fd*fd*Math.sin(C.t*15 - u*19)*(0.45 + 0.55*u) + C.serp.a*tw*Math.sin(C.t*26 - u*14)*(1 - u))*h*h; P[i].x.x += -tz/l*f; P[i].x.z += tx/l*f; } }
     const dmp = C.damp || 0.995; for (const p of P){ const vx = (p.x.x - p.xp.x)*dmp, vy = (p.x.y - p.xp.y)*dmp, vz = (p.x.z - p.xp.z)*dmp;   /* (RS-427: a body damps harder - its limbs go slack rather than flailing) */ p.xp.copy(p.x); p.x.x += vx; p.x.y += vy - (p.noFloor ? 0 : C.g*h*h); p.x.z += vz; }   /* (a point that rides inside a body frame has no weight of its own: the frame's weight sits at its centre, and nothing tips it) */
     /* (RS-377) a beast down but not yet on its side slumps the rest of the way over, the way the blow pushed it (before the bones and the floor are solved, so what's drawn is sound): its back eased
        over and its belly under, slowly, until it lies on its side (the box ragdoll's slump of RS-373, done with the joints) */
@@ -47805,7 +47835,7 @@ function m3dChainStep(e, dt){
   { const lim = 4*(C.reach || 1.25) + 2; let bad = false; for (const p of P){ const x = p.x; if (!(isFinite(x.x) && isFinite(x.y) && isFinite(x.z)) || Math.abs(x.x) > lim || Math.abs(x.z) > lim || x.y > lim || x.y < -lim){ bad = true; break; } }
     if (bad) for (let i=0;i<P.length;i++){ P[i].x.copy(snap[i]); P[i].xp.copy(snap[i]); } }
   C.t += dt; let ke = 0, onF = 0; for (const p of P){ ke += p.x.distanceToSquared(p.xp); if (p.x.y <= p.r + 0.002) onF++; } ke /= h*h*P.length;
-  if (ke < 0.02 && onF >= 4) C.rest += dt; else C.rest = 0;
+  if (ke < 0.02 && onF >= 4 && !(C.serp && C.t < 2.5)) C.rest += dt; else C.rest = 0;
   if (C.rest > 0.4) for (const p of P) p.xp.lerp(p.x, 0.3);   /* (settling: it comes to rest instead of creeping) */
   (C.pose || m3dChainPose)(e);
 }
@@ -47983,23 +48013,32 @@ function m3dChainMakeSerpent(e, B, b){
   const T = THREE, r = e.rig, hold = e.holder, root = e.root, s = root.scale.y || 1;
   if (!r.spine || !r.tube || !r.rad || !r.head) return null;
   hold.updateMatrixWorld(true); root.updateMatrixWorld(true);
-  const pts0 = r.spine(FP.t + e.seed, 0, 0, 0), n = pts0.length; if (n < 3) return null;
+  const pts0 = r.livePts || r.spine(FP.t + e.seed, 0, 0, 0), n = pts0.length; if (n < 3) return null;   /* (RS-798: from where its body really is) */
   const pts = pts0.map(p2=>hold.worldToLocal(root.localToWorld(p2.clone())));
-  const P = pts.map((x, i)=>({ x, xp:x.clone(), r:Math.max(0.006, (r.rad(i/(n - 1))[1]||0.02))*s, mu:0.5 }));
+  const P = pts.map((x, i)=>{ const q = r.rad(i/(n - 1)), rr = Math.max(0.006, (q[1]||0.02)*(q[2]||1))*s; if (x.y < rr) x.y = rr; return { x, xp:x.clone(), r:rr, mu:0.5 }; });   /* (RS-798: it touches the floor with its flattened belly, and starts out of the floor: a point starting inside it was thrown out by what it had to climb, the whole body up into the air) */
   const C = [], bone = (i, j)=>P[i].x.distanceTo(P[j].x);
   for (let i=0;i+1<n;i++) C.push({ i, j:i+1, lo:bone(i, i+1), hi:bone(i, i+1) });
-  for (let i=0;i+2<n;i++){ const st = bone(i, i+1) + bone(i+1, i+2); C.push({ i, j:i+2, lo:st*0.6, hi:st*0.999 }); }
+  for (let i=0;i+2<n;i++){ const st = bone(i, i+1) + bone(i+1, i+2); C.push({ i, j:i+2, lo:Math.min(st*0.93, bone(i, i+2)), hi:st*1.001 }); }   /* (RS-798: it may lie straight: a limit just under straight squeezed a body laid out along its trail until it buckled up off the floor and flew) */
+  /* (RS-798) a spine that can't fold tight: over a run of its length the two ends stay well apart (no nearer than they start, if it starts coiled), so what falls comes down in long curves and not in a heap */
+  for (const [gap, f] of [[Math.max(3, Math.round(n*0.07)), 0.82], [Math.max(5, Math.round(n*0.17)), 0.68]]) for (let i=0;i+gap<n;i+=2){ let st = 0; for (let k=i;k<i+gap;k++) st += bone(k, k+1); C.push({ i, j:i+gap, lo:Math.min(st*f, bone(i, i+gap)), hi:st*1.001 }); }
   const K = B.k, v0 = new T.Vector3(b.x*0.5*K, 0.2*B.up*K, b.z*0.5*K), h0 = Math.max(0.1, Math.max(...pts.map(p2=>p2.y)));
-  return { p:P, c:C, h:[], s, h0, v0, started:false, wall:G.gameMode===1 || G.gameMode===2, rot:hold.rotation.y, hx:hold.position.x, hz:hold.position.z, g:9.5, t:0, rest:0, upY:0, lift:0, x0:pts[n-1].clone(),
-    kk:[0.85, 0.15], reach:3.5, pose:m3dChainPoseSerpent, serp:{ n } };   /* (the whole length shoved alike: shoving the head end alone buckled the body up into a standing loop) */
+  const fw = pts[n-1].clone().sub(pts[Math.floor(n*0.7)]); fw.y = 0; if (fw.lengthSq() < 1e-6) fw.set(Math.sin(0), 0, 1); fw.normalize().multiplyScalar(h0*5.5);   /* (RS-798: what was reared topples forward and lies out, the way the head was going: dropped straight down it piled up in a knot) */
+  return { p:P, c:C, h:[], s, h0, v0, roll:fw, started:false, wall:G.gameMode===1 || G.gameMode===2, rot:hold.rotation.y, hx:hold.position.x, hz:hold.position.z, g:9.5, t:0, rest:0, upY:0, lift:0, x0:pts[n-1].clone(),
+    kk:[0.85, 0.15], damp:0.985, reach:Math.max(3.5, Math.max(...pts.map(p2=>Math.hypot(p2.x, p2.z))) + 1), pose:m3dChainPoseSerpent, serp:{ n, a:r.jaw ? 34 : 20, flip:!!r.jaw } };   /* (the whole length shoved alike: shoving the head end alone buckled the body up into a standing loop) */
 }
 function m3dChainPoseSerpent(e){
   const T = THREE, C = e.chain, P = C.p, r = e.rig, root = e.root, s = C.s, S = m3dChainPoseSerpent;
   root.position.set(0, 0, 0); root.rotation.set(0, 0, 0);
-  const pts = P.map(p2=>p2.x.clone().multiplyScalar(1/s)), F = m3dSpineFrames(pts, r.up0);
+  const pts = P.map(p2=>p2.x.clone().multiplyScalar(1/s));
+  /* (RS-798) the skin is drawn over the chain's points smoothed: a zigzag a point or two long, which the solver leaves behind, showed as a row of lumps down the body */
+  if (C.serp){ const nn = pts.length, A = S.a || (S.a = []); for (let pass=0;pass<4;pass++){ for (let i=0;i<nn;i++){ if (!A[i]) A[i] = new T.Vector3(); A[i].copy(pts[i]); } for (let i=1;i<nn-1;i++){ pts[i].x = 0.25*A[i-1].x + 0.5*A[i].x + 0.25*A[i+1].x; pts[i].y = 0.25*A[i-1].y + 0.5*A[i].y + 0.25*A[i+1].y; pts[i].z = 0.25*A[i-1].z + 0.5*A[i].z + 0.25*A[i+1].z; } } }
+  const F = m3dSpineFrames(pts, r.up0), go = Math.min(1, Math.max(0, (C.t - 0.35)/1.15)), ez = go*go*(3 - 2*go), n = pts.length;
+  /* (RS-798) the snake rolls as the life goes out of it, its pale belly up along the middle of its length, its head onto its side */
+  if (C.serp && C.serp.flip && ez > 0) for (let i=0;i<n;i++){ const u = i/(n - 1), a = ez*Math.PI*Math.min(1, u*4)*(u > 0.8 ? 1 - (u - 0.8)/0.2*0.62 : 1), ca = Math.cos(a), sa = Math.sin(a), N0 = F.N[i], B0 = F.B[i], N1 = N0.clone().multiplyScalar(ca).addScaledVector(B0, sa), B1 = B0.clone().multiplyScalar(ca).addScaledVector(N0, -sa); F.N[i] = N1; F.B[i] = B1; }
   m3dTubeSet(r.tube, pts, F, r.rad); m3dOnSpine(r.head, pts, F, 1);
   if (r.jaw && r.jaw.rotation) r.jaw.rotation.x = 0.06; if (r.tongue) r.tongue.visible = false;
   if (r.finish){ try{ r.finish(r, FP.t + e.seed, 0, 0, 0, pts, F); }catch(err){} }
+  if (C.serp && C.serp.flip){ const jw = Math.min(1, C.t/0.25); if (r.jaw && r.jaw.rotation) r.jaw.rotation.x = 0.06 + jw*(0.95 - 0.4*ez); if (r.tongue){ r.tongue.visible = true; r.tongue.position.z = 0.05; r.tongue.rotation.x = 0.45*ez; } }   /* (its mouth falls open and its tongue lolls) */
   e.holder.updateMatrixWorld(true); const bb = S.bb || (S.bb = new T.Box3()); bb.makeEmpty(); bb.expandByObject(root); const low = bb.min.y - e.holder.matrixWorld.elements[13];
   const need = m3dLiftNeed(e, low); if (need > 0) root.position.y += need; C.lift = need; C.upY = 0;
 }
@@ -50494,7 +50533,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-797';
+const GAME_VERSION = 'rs-798';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

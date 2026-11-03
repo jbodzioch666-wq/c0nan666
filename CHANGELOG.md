@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-798 - Snakes With a Spine
+
+- **Snakes crawl with their whole body.** The body now follows the path the head took in sliding S-curves, instead of lying frozen while only the head moved. It rears up when it stops or strikes.
+- **A real death.** A snake thrashes, slumps to the floor in long curves, rolls its pale belly up and lets its jaw fall open, with a last shudder down the tail. The head stays on.
+- **Cobra hoods.** A hood now lies along the neck: folded while crawling, flared when the snake rears or strikes. It used to stick out round the neck like a hat brim.
+- **Other long bodies move again.** Eels, worms, leeches, the remorhaz, tentacles, wraith tails and frog tongues had the same frozen body and now move as they should.
+
 ## RS-797 - Robes Are Robes
 
 - **Armour type follows what you're wearing.** A unique robe that kept metal's rules, like the Serpentskin Shroud, now counts as cloth, so it shows as magic and fights as magic in the style triangle. It still asks for Defence to wear.

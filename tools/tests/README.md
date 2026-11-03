@@ -130,6 +130,7 @@ Screenshots go to `tools/tests/shots/`.
 | `rs796m` | the same on a phone: a tap on a stat row shows its tip |
 | `rs796` | R goes round melee, archer, magic; a staff swings on melee and out of spells; the bow shoots a foe beside you and uses an arrow; a Bonuses tab, sources add up to the game's own numbers, every row of every tab has a tip (ZI_SAVE: also on a player's save) |
 | `rs797` | armour type follows the body armour you see: a robe with metal's rules is magic on the sheet and in the triangle; plate, hide and none as before (ZI_SAVE: also on a player's save) |
+| `rs798` | | `rs798` | snakes crawl and die with their whole body: live tube, head stays on, stays on the floor, no heap, hood folds and flares | |
 | `rs789` | A shire's door stones and flags are dark: their average vertex colour stays low |
 | `rs788` | The open land has its older grass again: no blade chunks, RS-785's code gone |
 | `rs787` | A battle at a town: the card before and after, the banner's words, the trees told where you stand, no shader built by a fade, new creatures warmed off the frame |
