@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-791 - Bind How Many
+
+- **Choose how many runes to make.** An altar's menu now offers 1, 5, 10, 25 or 100 essence as well as all of it, showing the runes and xp for each. It only lists amounts you have.
+- **Bind all stays on top**, so the old tap still does what it did.
+- **Combination runes count too.** With combination runes on, the menu now shows the runes they use and the combination runes you'll get.
+
 ## RS-790 - Green Commons
 
 - **Real grass in the other towns.** Towns on green, swamp and mountain land now have the shire's thick grass, with flowers, wind, and blades that part as people walk through. It keeps off the cobbles, the square, buildings and the road.
