@@ -1,5 +1,17 @@
 # Depthcrawl patch notes
 
+## RS-779 - The Shire
+
+You asked for a halfling village that looks like a shire, with real grass and real dirt paths. Every halfling town is rebuilt from the ground up. Other races' towns are unchanged.
+
+- **Real grass:** about 1.47 million separate blades (at High graphics), growing over the land and up the hills of the hobbit holes, with wildflowers among them and thick round every door. Low and Medium graphics grow fewer.
+- **Grass with physics:** every patch is a spring. Walkers and villagers push it aside and crush it as they pass, the push ripples out, and it rises again over a few seconds. Gusts of wind travel across the fields, harder in rain and storms, and wet grass droops.
+- **Real dirt paths:** winding lanes worn along the easiest way, forking from the green to every door, with ruts, scattered stones and soft grassy edges. They go dark and shiny in the rain.
+- **Laid out like a shire:** hobbit holes stand back from the lanes on their own plots, with more homes across the east of town, chimneys with smoke, kitchen gardens, a pond, an orchard and a great oak on the green.
+- **Rolling country:** a hedgerow and a thatched lych-gate replace the palisade, and hills and leafy trees roll away beyond it. The paved compass is gone from the green, and wooden lanterns light the lanes at night.
+- **See through the leaves:** a hedge or bough between the camera and you melts away, so it never blocks the view.
+- **Frame rate:** measured at 200 to 240 frames a second on the PC at 1400x900. Phones will run it far slower: this one is built for looks first.
+
 ## RS-778 - From the Farmyard
 
 You asked for cooking recipes for beef and chicken. The chicken and beef from your farmyard now go into five new dishes, which you cook at a hearth, the guild range or your campfire.
