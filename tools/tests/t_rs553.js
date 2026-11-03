@@ -5,9 +5,9 @@ module.exports = async page=>{
   const r = await page.evaluate(async ()=>{ const out = {}; goToCharCreate(); ccBegin(); wgRegenerate(12345); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); o3Pref = true; G.gameMode = 0; weatherSync = ()=>{};
     G.owPos = { x:24, y:54 }; G.player.clock = G.player.turnCount = DAY_LENGTH/2; G.weather = 'clear'; O3.win = null; O3.ppos = null;
     for (let i=0;i<12;i++){ renderGame(); await new Promise(r=>setTimeout(r, 40)); }
-    let grass = null, leaf = null; O3.scene.traverse(o=>{ if (!o.isMesh) return; for (const mm of [].concat(o.material)){ if (!mm || !mm.customProgramCacheKey) continue; const k = mm.customProgramCacheKey(); if (/^shireGrassBL/.test(k)) grass = mm; else if (/^gfxsway0\.05/.test(k)) leaf = mm; } });
+    let grass = null, leaf = null; O3.scene.traverse(o=>{ if (!o.isMesh) return; for (const mm of [].concat(o.material)){ if (!mm || !mm.customProgramCacheKey) continue; const k = mm.customProgramCacheKey(); if (/^gfxsway0\.35/.test(k)) grass = mm; else if (/^gfxsway0\.05/.test(k)) leaf = mm; } });
     const has = m=>{ const sh = { uniforms:{}, vertexShader:'void main(){\n#include <begin_vertex>\n#include <project_vertex>\n}', fragmentShader:'void main(){\n#include <color_fragment>\n}' }; m.onBeforeCompile(sh); return /uWindV\.xy\*lean/.test(sh.vertexShader) && sh.uniforms.uWindV===GFX.u.uWindV && /along/.test(sh.vertexShader); };
-    out.grass = !!grass && !!O3G.U && !!O3G.U.uWindD && O3G.U.uGT.value > 0;   /* (RS-785: the land's real grass, its wind in its own uniforms) */ out.leaf = !!leaf && has(leaf);
+    out.grass = !!grass && has(grass); out.leaf = !!leaf && has(leaf);
     const U = GFX.u; let calmK = 0, stormK = 0; for (let i=0;i<60;i++){ renderGame(); await new Promise(r=>setTimeout(r, 16)); calmK = Math.max(calmK, U.uWindV.value.z); } const w = m3dClothWind(U.uT.value), v = U.uWindV.value, s = Math.hypot(w[0], w[1]);
     out.dir = +((w[0]*v.x + w[1]*v.y)/s).toFixed(3); out.calmK = +calmK.toFixed(3);
     G.weather = 'storm'; for (let i=0;i<150;i++){ renderGame(); await new Promise(r=>setTimeout(r, 16)); stormK = Math.max(stormK, U.uWindV.value.z); } out.stormK = +stormK.toFixed(3); G.weather = 'clear';   /* (the peak of the gusts in each, not one moment that may be a lull) */

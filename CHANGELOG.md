@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-788 - Back to the Old Grass
+
+- **The open land's grass is back as it was.** The thick grass from RS-785 was too much, so the land has its old grass and flowers again. The shire's grass in town is unchanged.
+
 ## RS-787 - Hold the Gate
 
 - **No more freezes going into battle.** The town still takes a few seconds to build, but a loading card with the town's name now goes up first, on the way in and on the way home after you win.

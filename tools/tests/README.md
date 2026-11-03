@@ -120,8 +120,8 @@ Screenshots go to `tools/tests/shots/`.
 | `rs782` | The boatyard at the east end of town in each size, race and with or without a harbour; a shire's pond before its door |
 | `rs783` | One sign to a building: each race's and size's shops have one banner each and no board as well |
 | `rs784` | A shire's doors: a whole ring of stones round each and flagstones under it, in each town size; other races' towns none |
-| `rs785` | Real grass on the open land: blades round you, off water and roads, the old triangles gone, pushed and crushed by you, following a walk, frame rate |
 | `rs786` | A raid in a shire: the merged trees and land stay out of the see-through rays, the tick is cheap, a house in the way still fades |
+| `rs788` | The open land has its older grass again: no blade chunks, RS-785's code gone |
 | `rs787` | A battle at a town: the card before and after, the banner's words, the trees told where you stand, no shader built by a fade, new creatures warmed off the frame |
 | zloot | probe: the drops at a few levels - rarity shares, names with their bonuses and tiers, a rare's tooltip text (ZL levels, ZN drops a level) |
 | zloottip | probe: a rare's, a magic piece's and a Ring of Recoil's tooltip, plain and with Alt held, as shots/zloottip0-3.png |
