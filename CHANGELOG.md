@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-787 - Hold the Gate
+
+- **No more freezes going into battle.** The town still takes a few seconds to build, but a loading card with the town's name now goes up first, on the way in and on the way home after you win.
+- **Fewer stops mid-fight.** A building fading out of your way no longer stutters your walk (it was 100-270 ms, a few times a battle). A new wave's first stop is down from about 500 ms to 200-350, and going through the gate from about 320 ms to 60-110.
+- **Shire trees get out of the way.** In a siege or raid, a shire's trees now open up around the line between the camera and you, as they do in town.
+- **The right name on the banner.** It now says the siege or raid and the town, with the wave or "the streets", not "roadside encounter".
+
 ## RS-786 - Raid Without the Lag
 
 - **Raids and sieges in a shire run smoothly again.** A raid on a halfling town dropped to 12 frames a second, because the fight kept checking every tree and patch of ground in the shire to see what stood between the camera and you. It now skips them, as the town view already does: 12 to 230 frames a second on a save from a raid at Gideon's Meadow.

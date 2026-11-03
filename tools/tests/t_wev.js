@@ -62,7 +62,7 @@ module.exports = async page=>{
     window.__rep0 = repAt(key); window.__key = key;
     tryMoveOverworld(from[2], from[3]);
     A(G.ui==='wevent' && G.wevDlg && /siege/i.test(G.wevDlg.title), 'siege prompt '+G.ui);
-    wevChoose(0); A(G.gameMode===2 && G.wevFight.kind==='siegewar', 'siege battle (RS-418)');
+    SET.loadCards = false; /* (RS-787: with the card up the fight starts a moment later) */ wevChoose(0); A(G.gameMode===2 && G.wevFight.kind==='siegewar', 'siege battle (RS-418)');
     G.mon.forEach(m=>{ m.alive = 0; });
     return true;
   });

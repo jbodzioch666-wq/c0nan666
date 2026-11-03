@@ -5071,9 +5071,10 @@ const LOAD_TIPS = [
   'the bounty board on every tavern\'s wall posts work - a gold ! over it means new jobs',
   'your pack has 50 slots; gold, runes, arrows and resources never take one',
 ];
-function loadingCard(k){
+function loadingCard(k, title0, sub0){
   let title, sub = '', badge = null;
-  if (k.startsWith('site:')){ const kind = G.siteKind, d = G.depth;
+  if (k==='siege'){ title = title0; sub = sub0 || ''; badge = OW_TOWN; }   /* (RS-787) */
+  else if (k.startsWith('site:')){ const kind = G.siteKind, d = G.depth;
     title = SITE_TITLE[kind] || 'Dungeon'; sub = `${ASCEND_SITES[kind] ? 'floor' : 'depth'} ${d} of ${G.dungeonMaxDepth}${G.isBossFloor ? ' &middot; the lair' : ''}`;
     try { badge = G.ow.map[G.dungeonEntrance.x][G.dungeonEntrance.y]; } catch(e){} }
   else if (k.startsWith('town:')){ const fl = townFlavorAt(G.owPos.x, G.owPos.y); title = (fl && fl.name) || 'Town'; sub = (fl && fl.blurb) ? esc(fl.blurb) : 'a safe place to rest and trade'; badge = OW_TOWN; }
@@ -22640,12 +22641,22 @@ function siegeTownMap(S, open){
 }
 /* a free spot out on the far side of the field, where the besiegers come from */
 function siegeFieldSpot(){ const th = SIEGE_TOWN ? SIEGE_TOWN.th : 0; for (let t=0;t<200;t++){ const x = 1 + rn(COLS - 2), y = Math.max(th + 5, ROWS - 4) + rn(3); if (y < ROWS - 1 && siegeFree(x, y)) return [x, y]; } return null; }
+/* (RS-787) what the banner says during the battle */
+function siegeLabel(S){ const nm = esc(o3TownName(S.x, S.y)); return S.raid ? `raid on ${nm}` : S.phase===1 ? `siege of ${nm} &middot; wave ${S.wave} of ${SIEGE_WAVES}` : `siege of ${nm} &middot; the streets`; }
+/* (RS-787) a building's fade draws it see-through, a new shader for each kind of material, linked at the first fade: 100-270 ms in mid-walk, three or four times a battle. One small stand-in of each kind goes in with the town, so they're built with it */
+function siegeFadeWarm(Tn){ const T = THREE, grp = new T.Group(), seen = new Set(), add = o=>{ if (!o.isMesh || !o.material || o.isInstancedMesh || o.isSkinnedMesh) return; const src = o.material, list = Array.isArray(src) ? src : [src]; for (const m of list){ const c = Object.assign(m.clone(), { transparent:true, depthWrite:false }), g = o.geometry, k = gfxMatKind(c) + '|' + !!o.receiveShadow + '|' + Object.keys(g.attributes).join(); if (seen.has(k)) continue; seen.add(k); const sm = new T.Mesh(g, c); sm.receiveShadow = o.receiveShadow; sm.frustumCulled = false; sm.position.y = -80; sm.scale.setScalar(0.0001); sm.updateMatrix(); grp.add(sm); } }; for (const o of Tn.occ) if (o.userData.grp) o.userData.grp.traverse(add); for (const o of Tn.world.children) if (!/^shire/.test(o.name)) o.traverse(add); grp.name = 'siegeFadeWarm'; Tn.world.add(grp); Tn.fadeW = grp; Tn.fadeWn = 0; return seen.size; }
+/* (RS-787) building a whole town takes a few seconds and can't be cut up: the loading card goes up first, and has its moment to show, so it isn't a freeze in mid-game */
+function siegeCardThen(title, sub, go){ if (siegeCardThen.busy) return; if (!SET.loadCards) return go(); try{ loadingCard('siege', title, sub); }catch(e){ console.error(e); } siegeCardThen.busy = true; requestAnimationFrame(()=>setTimeout(()=>{ siegeCardThen.busy = false; if (G.player && !G.gameOver) go(); }, 170)); }
+/* the battle won: home to the town you saved, or on your way */
+function siegeWinHome(S, nm, sub){ if (G.owPos.x===S.x && G.owPos.y===S.y){ siegeCardThen(nm, sub, ()=>{ siegeTownDrop(); enterVillage(); }); return true; } siegeTownDrop(); return false; }
 /* each frame of the battle: the gate's doors swing to their place, and any building between the camera and you fades, as in the town */
 function siegeTownTick(){
   const Tn = SIEGE_TOWN; if (!Tn || Tn.world.parent!==FPD.scene) return;
   const T = THREE, now = performance.now(), dt = Math.min(0.1, (now - (Tn.t0 || now))/1000); Tn.t0 = now;
+  if (Tn.fadeW && !FPD.warmWait && !FPD.compileDue && ++Tn.fadeWn > 3){ Tn.world.remove(Tn.fadeW); Tn.fadeW = null; }
   for (const h of Tn.hinges){ const want = h.userData.shut ? 0 : h.userData.open; h.rotation.y += (want - h.rotation.y)*Math.min(1, dt*2.2); }
   const pp = ISO.player && ISO.player.pos && ISO.player.map===G.map ? ISO.player.pos : { x:G.player.x + 0.5, y:G.player.y + 0.5 };
+  { const U = shireUniforms(); U.uCamP.value.copy(FPD.cam.position); U.uFocus.value.set(pp.x, 0.6, pp.y); }   /* (RS-787: a shire's trees open round the line to you, as in the town; only the town's own frame fed them) */
   const cam = FPD.cam, ray = Tn.ray || (Tn.ray = new T.Raycaster()), faded = new Set(), tgt = new T.Vector3();
   for (const hy of [0.15, 0.55, 0.95]){ tgt.set(pp.x, hy, pp.y); const dir = tgt.clone().sub(cam.position), len = dir.length(); dir.normalize(); ray.set(cam.position, dir); ray.far = len - 0.2; for (const h of ray.intersectObjects(Tn.occ, false)) faded.add(h.object.userData.grp); }
   /* (and, as in the town, anything else over you - the gatehouse, a tower, a lamp's hood - whatever the camera's line to you passes through) */
@@ -22742,18 +22753,17 @@ function siegeWarWon(f){
   const e = wevP(), p = G.player, st = wevStats(), Lt = cbT();
   if (S.raid){ const t = e.town[S.key]; if (t && t.id===S.id){ t.done = true; t.until = wevTurn(); }   /* (RS-419: a raid beaten off) */
     const nm = o3TownName(S.x, S.y), gold = roundH((120 + Lt*18)*goldFindMult()); p.gold += gold; st.defended++; p.rep = p.rep || {}; p.rep[S.key] = repAt(S.key) + 3; tkP().cur.guild += 1;
-    G.siegeWar = null; G.allies = []; siegeTownDrop();
+    G.siegeWar = null; G.allies = [];
     wevSay(`the raiders flee ${nm}! The reeve pays you ${gold} gold and a guild token (+3 standing)`, 'magic', `You saved ${nm}`); checkAchievements();
-    if (G.owPos.x===S.x && G.owPos.y===S.y){ enterVillage(); return true; } return false; }
+    return siegeWinHome(S, nm, 'the raiders are gone'); }
   const d = e.dyn.find(d=>d.id===S.id); if (d) e.dyn.splice(e.dyn.indexOf(d), 1);
   const nm = o3TownName(S.x, S.y), gold = roundH((220 + Lt*30)*goldFindMult()), saved = (G.allies||[]).filter(a=>a.hp > 0).length;
   p.gold += gold; st.defended++; p.rep = p.rep || {}; p.rep[S.key] = repAt(S.key) + 5; tkP().cur.guild += 3;
   addToInventory(genItem(lootAt(6), lootKind(), 3, chn(0.5)));
-  G.siegeWar = null; G.allies = []; siegeTownDrop();
+  G.siegeWar = null; G.allies = [];
   wevSay(`${nm} is saved! The townsfolk pour out to cheer you${saved ? ` and the ${saved} of the watch still standing` : ''}. The reeve pays you ${gold} gold, a piece from the town's armoury and 3 guild tokens (+5 standing)`, 'magic', `You broke the siege of ${nm}`);
   checkAchievements();
-  if (G.owPos.x===S.x && G.owPos.y===S.y){ enterVillage(); return true; }
-  return false;
+  return siegeWinHome(S, nm, 'the siege is broken');
 }
 // once a turn, after the monsters: each of the town's people closes on the nearest foe and strikes it
 function siegeAllyTick(){
@@ -22895,7 +22905,7 @@ function wevTownGate(x, y){
   const d = e.dyn.find(d=>d.kind==='siege' && d.x===x && d.y===y); if (!d) return false;
   const nm = o3TownName(x, y);
   wevDialog(`The siege of ${nm}`, `A ${WEV_CAMP_KINDS[d.camp] ? WEV_CAMP_KINDS[d.camp].nm.replace(/ camp$| hideout$| warren$/, '') : 'raiding'} host has ${nm} surrounded. Smoke rises over the palisade and the gate is barred. If no one breaks the siege in ${wevTime(d.until - wevTurn())}, the town will be sacked.`,
-    [[`Break the siege (battle at the gates, then in the streets)`, ()=>{ wevSiegeFight(d); }], ['Turn back', ()=>{ logMsg('you keep your distance from the siege lines', ''); }]]);
+    [[`Break the siege (battle at the gates, then in the streets)`, ()=>{ siegeCardThen(`The siege of ${nm}`, 'the battle before the gate', ()=>wevSiegeFight(d)); }], ['Turn back', ()=>{ logMsg('you keep your distance from the siege lines', ''); }]]);
   return true;
 }
 // arriving in a town: the lost child's family, a festival treat, a market trader, a raid
@@ -22914,7 +22924,7 @@ function wevOnEnterTown(){
   } else if (t.kind==='market'){ wevMarketNpc(t); logMsg(`it's market day - a travelling trader has set up on the plaza with rare goods (${wevTime(t.until-turn)} left)`, 'new', true); }
   else if (t.kind==='raid' && !t.done){
     G.wevPending = [`Raid on ${nm}!`, `The alarm bell is ringing - monsters have broken through the fields and are at the palisade. The watch is outnumbered. Will you help defend ${nm}?`,
-      [['Defend the town (fight)', ()=>{ wevSiegeFight({ kind:'raid', id:t.id, camp:['goblin','orc','kobold'][t.id%3] }); wevSay(`you run to the palisade with the watch!`, 'new'); }], ['Leave it to the watch', ()=>{ logMsg('you leave the watch to it', ''); }]]];   // shown once the town is on screen (see wevFrame)
+      [['Defend the town (fight)', ()=>{ siegeCardThen(`Raid on ${nm}`, 'the alarm bell is ringing', ()=>{ wevSiegeFight({ kind:'raid', id:t.id, camp:['goblin','orc','kobold'][t.id%3] }); wevSay(`you run to the palisade with the watch!`, 'new'); }); }], ['Leave it to the watch', ()=>{ logMsg('you leave the watch to it', ''); }]]];   // shown once the town is on screen (see wevFrame)
   }
 }
 // ---- the market-day trader ----
@@ -29791,6 +29801,7 @@ function renderImmersiveHud(){
   const loc = G.gameMode===1 ? `${siteWord} &middot; ${ASCEND_SITES[G.siteKind] ? 'floor' : 'depth'} ${G.depth}/${G.dungeonMaxDepth}${G.isBossFloor?' &middot; lair':''}${activeDm ? ' &middot; '+esc(DUNGEON_MODIFIERS.find(d=>d.id===G.dungeonModifier).name) : ''}`
     : G.gameMode===2 && G.cellar ? 'the cellar'
     : G.gameMode===2 && G.arenaTheme==='colosseum' ? `the arena &middot; wave ${(G.arenaRun ? G.arenaRun.wave : 0) + 1}`
+    : G.gameMode===2 && G.siegeWar ? `${siegeLabel(G.siegeWar)}${(typeof isNightTime==='function' && isNightTime()) ? ' &middot; night' : ''}${G.weather && G.weather!=='clear' ? ' &middot; '+esc(G.weather) : ''}`   /* (RS-787) */
     : G.gameMode===2 ? `roadside encounter${(typeof isNightTime==='function' && isNightTime()) ? ' &middot; night' : ''}${G.weather && G.weather!=='clear' ? ' &middot; '+esc(G.weather) : ''}`
     : villageFlavor ? esc(villageFlavor.name) : 'the wilds';
   const nPot = potCount(i=>i.kind==='heal');
@@ -41216,7 +41227,7 @@ function fpdBuild(T){
   if (props.skull.length || props.bone.length || props.candle.length || props.shroud.length) fpdCatacombProps(props, matFor, world);
   fpdPortals(world);
   gfxMatsBorn(FPD.r, world); FPD.scene.add(world); FPD.world = world;   /* (RS-562) */
-  if (town && town.world.parent!==FPD.scene){ FPD.scene.add(town.world); try{ gfxMatsBorn(FPD.r, town.world); }catch(e){} }
+  if (town && town.world.parent!==FPD.scene){ if (!town.fadeDone){ town.fadeDone = true; try{ siegeFadeWarm(town); }catch(e){ console.error(e); } } FPD.scene.add(town.world); try{ gfxMatsBorn(FPD.r, town.world); }catch(e){} }
   FPD.shadowFrames = 3; FPD.lightKey = ''; FPD.warm = true;
   // sculpt every creature on this floor now, under the fade-in, rather than mid-fight when it first steps into view.
   /* (RS-572) a slice a frame, behind the loading card (see fpdPrepStep): all at once, a floor of new creatures held the page still
@@ -47469,7 +47480,7 @@ function m3dUpdate(m, pos, flash){
   let e = M3D.inst.get(m);
   if (e && e.pt!==pt){ if (e.holder.parent) e.holder.parent.remove(e.holder); M3D.live.delete(e); e = null; }   // (it changed shape)
   if (!e){ e = fpdMonBuild(()=>m3dInstance(m, pt)); e.pt = pt; M3D.inst.set(m, e); }   /* (RS-610: on the coarser grid) */
-  if (!e.holder.parent) FPD.scene.add(e.holder);
+  if (!e.holder.parent){ FPD.scene.add(e.holder); if (G.siegeWar){ FPD.compileDue = true; FPD.compileLive = true; } }   /* (RS-787: a new wave's shaders are started off the frame and it's drawn once they've linked: a 500 ms stop as it charged, 100-300 as one first came into view) */
   e.stamp = M3D.stamp; M3D.live.add(e);
   const moving = pos.mv!==undefined ? pos.mv : Math.min(1, Math.hypot(m.x+0.5-pos.x, m.y+0.5-pos.y)*3);
   m3dPose(e, pos, m, moving, flash);
@@ -50440,7 +50451,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-786';
+const GAME_VERSION = 'rs-787';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
