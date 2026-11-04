@@ -144,6 +144,7 @@ Screenshots go to `tools/tests/shots/`.
 | `rs808` | the rod never lands the harpoon's fish, shoal or open water | |
 | `rs809` | ships off the lakes; frozen lakes, old saves, fords | |
 | `rs810` | the crew: hire, reload and repair, losses, hands on deck, shots rs810_deck, rs810_guns | |
+| `rs811` | boarding: when she can be boarded, her deck, your crew, the prize, breaking off, shots rs811_deck, rs811_deck2, rs811_along | |
 | `rs789` | A shire's door stones and flags are dark: their average vertex colour stays low |
 | `rs788` | The open land has its older grass again: no blade chunks, RS-785's code gone |
 | `rs787` | A battle at a town: the card before and after, the banner's words, the trees told where you stand, no shader built by a fade, new creatures warmed off the frame |

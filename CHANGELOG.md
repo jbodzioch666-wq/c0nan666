@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## RS-811 - Boarders Away
+
+- **Board a pirate.** When she's within about two and a half tiles and down to 40% of her hull, or on your harpoon, press B or the panel's Board button. Grapples haul her alongside.
+- **A fight on her deck.** A real ship to fight on: rails, guns, masts, cargo and a great cabin, with your own ship alongside. A captain and her hands meet you, fewer the more you've shot away.
+- **Your crew crosses with you.** Up to six fight beside you, and any who fall are gone. Alone it's very hard; with a crew, far better.
+- **The prize.** Much more gold than sinking her, cannonballs and planks, one or two pieces of good gear, and a chance some of her hands sign on. Then she goes down.
+- **Changed your mind?** Walk back over the plank and she cuts the grapples and runs.
+- **New achievement.** Boarding Party: take 5 ships.
+
 ## RS-810 - Hands on Deck
 
 - **A crew.** Sign on hands at the Boatyard's slipway, once you have a sloop: 4 on a sloop, 6 on a caravel, 12 on a galleon, 10 on a clipper. Each costs a one-time fee (60g to 400g by ship).
