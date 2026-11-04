@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## RS-814 - Fish Fight Like Whales
+
+- **Harpooned fish play like the whale:** the line pulls the same gentle way on every fish. A fish tires while you hold the line in the green, comes in when it rests, and is landed when it's spent. Sharks and kraken spawn take longer, about 18 to 29 seconds, but don't pull harder.
+- **The percentage shows on fish:** the panel shows how much fight is left, like the whale's.
+- **No more running out the line:** a fish at the end of your line just tightens it. It gets away only if the line snaps or goes slack.
+- **The wake stays:** the waves were wiped every 18 tiles or so as the land rebuilt round you, taking your ship's and the whale's wake with them. They now carry on.
+- **Fishing tooltips say what catches what:** the Fishing skill lists every fish with its level, where it lives and rod or harpoon, and each fishing spot lists its own, harpoon fish included.
+- **Legendary spots:** they no longer have sharks, since a rod could still catch one there.
+
 ## RS-813 - Shrouds Have Magic
 
 - **Every Serpentskin Shroud has magic:** magic only came with some of them, so most had none or even -20, however high their level. Any Shroud without magic now gets the magic of a robe of its level, about +30 at level 90.
