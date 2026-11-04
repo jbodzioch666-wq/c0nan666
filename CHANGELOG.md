@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-804 - At the Helm
+
+- **New sailing keys.** Left and right (or A and D) steer while held, by the ship's own left and right, wherever the camera points. Let go and she holds her new course.
+- **Sails in steps.** Each press of up (W) adds a step of sail and each press of down (S) takes one off: three steps to full, three to none, and your speed follows. With no sail she slows to a stop. Hold up with the bow on a coast to go ashore.
+- **Right mouse fires.** The side facing the pointer fires towards it, as far round as its arc allows. Point near a pirate and the guns lead her. Q and E still fire left and right.
+- **No options window at sea.** Right-clicking at sea no longer opens the menu; on land it works as before.
+- **On a phone:** tapping still sets a course, a long press now fires towards your finger, and the panel has - and + buttons for the sails.
+
 ## RS-803 - Off the Rocks
 
 - **Ships no longer get stuck against a coast or the edge of the map.** With the bow against either, a ship kept bumping forward as it turned, and each bump cancelled your key press or tapped course. Now it turns on the spot and keeps your order, then sails off once the bow is clear.
