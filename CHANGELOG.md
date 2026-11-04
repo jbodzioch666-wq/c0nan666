@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-803 - Off the Rocks
+
+- **Ships no longer get stuck against a coast or the edge of the map.** With the bow against either, a ship kept bumping forward as it turned, and each bump cancelled your key press or tapped course. Now it turns on the spot and keeps your order, then sails off once the bow is clear.
+- **Unchanged:** sailing straight at a coast still stops you, and holding the key still takes you ashore.
+
 ## RS-802 - Broadsides
 
 - **Your guns fire.** A sloop or bigger fires its side with Q (left) or E (right), or the panel's buttons, gun by gun down the side. Each gun uses one cannonball, then that side reloads.

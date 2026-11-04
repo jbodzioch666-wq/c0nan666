@@ -24947,14 +24947,15 @@ function seaTick(dt, pp, PL){ const S = seaState();
   else if (S.pathOn){ S.sail = 0; S.want = null; S.arriveT = O3.t; } S.pathOn = hasPath && O3.path.length > 0;
   if (G.gather){ S.sail = 0; S.v *= Math.exp(-dt*4); }
   /* the helm: she answers slower with no way on, and eases off a hard turn so she never circles what she's steering for */
-  let err = 0; if (S.want!=null){ err = Math.atan2(Math.sin(S.want - S.yaw), Math.cos(S.want - S.yaw)); const rate = C.turn*(0.5 + 0.5*Math.min(1, S.v/1.5)), st = Math.max(-rate*dt, Math.min(rate*dt, err)); S.yaw += st; S.turn = st/Math.max(dt, 1e-3); } else S.turn = 0;
+  const bowL = O3.ship ? O3.ship.L*0.42 : 0.4, bwx = Math.floor(pp.x + Math.sin(S.yaw)*bowL), bwz = Math.floor(pp.z + Math.cos(S.yaw)*bowL), bowBad = (bwx!==PL.x || bwz!==PL.y) && !seaWet(bwx, bwz);
+  let err = 0; if (S.want!=null){ err = Math.atan2(Math.sin(S.want - S.yaw), Math.cos(S.want - S.yaw)); const rate = Math.max(C.turn*(0.5 + 0.5*Math.min(1, S.v/1.5)), bowBad ? 1.1 : 0), st = Math.max(-rate*dt, Math.min(rate*dt, err)); S.yaw += st; S.turn = st/Math.max(dt, 1e-3); } else S.turn = 0;
   S.k += ((S.sail ? 1 : 0) - S.k)*(1 - Math.exp(-dt*(S.sail ? 1.6 : 2.6)));
   const off = S.yaw - W.a; S.polar = seaPolar(off, C.up); let vT = vMax*S.k*S.polar*(0.72 + 0.28*W.s)*slow; if (S.want!=null) vT *= Math.max(0.3, Math.cos(Math.min(Math.PI/2, Math.abs(err)))); if (hasPath && Math.abs(err) > 0.9) vT = Math.min(vT, 0.8);
   vT = Math.min(vT, stopAt); const brakeHard = stopAt < Infinity || (S.arriveT!=null && O3.t - S.arriveT < 1.2), dec = brakeHard ? 3.2 : 1.5;   /* (a course ends where you tapped: she backs her sails to stop; let go, she carries her way) */
   S.v += Math.max(-dec*dt, Math.min((vT < S.v ? dec : C.a)*dt, vT - S.v)); if (S.v < 0.004 && !S.sail) S.v = 0;
   const hx = Math.sin(S.yaw), hz = Math.cos(S.yaw), held = O3.t - S.heldAt < 0.45, intent = hasPath || held;
-  /* the bow finds the coast first: she stops short of it, unless you're making for it */
-  if (!intent){ const L = O3.ship ? O3.ship.L*0.42 : 0.4, bx = Math.floor(pp.x + hx*L), bz = Math.floor(pp.z + hz*L); if ((bx!==PL.x || bz!==PL.y) && !seaWet(bx, bz)){ if (S.v > 0.6 && !S.blocked) sfx('thud'); S.v = 0; S.blocked = 1; S.sail = 0; S.want = null; } else S.blocked = 0; } else S.blocked = 0;
+  /* the bow finds the coast first: she stops short of it, unless you're making for it. (RS-803) Told to turn away, she pivots where she lies and keeps your order, with no way on until her bow is clear: bumping forward as she came round used to cancel every key and every tap, and pin her there */
+  const aimed = S.want==null || Math.abs(err) < 0.35; if (bowBad && !(intent && aimed)){ if (S.v > 0.6 && !S.blocked) sfx('thud'); S.v = 0; S.blocked = 1; if (aimed && Math.abs(err) < 0.05){ S.sail = 0; S.want = null; } } else S.blocked = 0;
   const nx = pp.x + hx*S.v*dt, nz = pp.z + hz*S.v*dt, lx = Math.floor(nx), lz = Math.floor(nz);
   if (lx!==PL.x || lz!==PL.y){ const g = o3G(lx, lz), wet = seaWet(lx, lz); let ok = !!g && (wet || intent);
     if (ok){ const was = [G.owPos.x, G.owPos.y], d = o3DirToG(lx - PL.x, lz - PL.y); let k = -1; if (hasPath) for (let i=0;i<O3.path.length;i++){ const q = seaPathTile(i); if (q && q.g[0]===g[0] && q.g[1]===g[1]){ k = i; break; } } const dest = hasPath ? seaPathTile(O3.path.length - 1) : null, gat = O3.gatherAt;
@@ -24962,7 +24963,7 @@ function seaTick(dt, pp, PL){ const S = seaState();
       if (G.ui!=='playing' || G.gameMode!==0){ O3.path = []; O3.gatherAt = null; O3.chase = null; S.v = 0; S.sail = 0; return true; }
       ok = G.owPos.x!==was[0] || G.owPos.y!==was[1];
       if (ok){ pp.x = nx; pp.z = nz; if (!wet){ O3.path = []; S.v = 0; S.sail = 0; S.want = null; return false; } if (hasPath){ if (k >= 0) O3.path.splice(0, k + 1); else { const np = dest ? o3PathTo(dest.g[0], dest.g[1]) : null; O3.path = np || []; } if (!O3.path.length){ if (O3.chase!=null){ try{ o3ChaseStep(); }catch(e){} } else if (gat){ O3.gatherAt = null; o3GoGather(gat.x, gat.y); } } else if (O3.chase!=null){ try{ o3ChaseStep(); }catch(e){} } } S.bumps = 0; try{ seaSailedTile(); }catch(e){ console.error(e); } } }
-    if (!ok){ S.v = 0; if (hasPath && ++S.bumps > 3){ O3.path = []; O3.gatherAt = null; S.sail = 0; S.bumps = 0; } else if (!hasPath){ S.sail = 0; S.want = null; } } }
+    if (!ok){ S.v = 0; if (Math.abs(err) >= 0.35){ /* (still coming round: the order stands) */ } else if (hasPath && ++S.bumps > 3){ O3.path = []; O3.gatherAt = null; S.sail = 0; S.bumps = 0; } else if (!hasPath){ S.sail = 0; S.want = null; } } }
   else { pp.x = nx; pp.z = nz; }
   O3.boatYaw = S.yaw;
   /* she heels to the wind and leans out of a turn, and lifts her bow as she gets way on */
@@ -50738,7 +50739,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-802';
+const GAME_VERSION = 'rs-803';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
