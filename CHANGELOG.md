@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-813 - Shrouds Have Magic
+
+- **Every Serpentskin Shroud has magic:** magic only came with some of them, so most had none or even -20, however high their level. Any Shroud without magic now gets the magic of a robe of its level, about +30 at level 90.
+- **Yours too:** a Shroud you already own gets this when your save loads. One that already rolled magic keeps its number.
+- **Still its own armour:** it still asks for Defence and keeps its defence, ranged and other bonuses.
+
 ## RS-812 - Keep It Taut
 
 - **Hold the line in its band:** a harpooned fish or whale now has a green band on the tension bar. Hold it there and it comes in or tires; too tight and the line snaps, too slack for a moment and the hook falls out. A whale can get away now.
