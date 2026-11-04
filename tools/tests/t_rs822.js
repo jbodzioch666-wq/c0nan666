@@ -22,10 +22,10 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   A(r.noPanel && r.oldGone, 'no line panel with nothing on the line, nothing left on the sea panel', r);
   A(r.st==='whale', 'a whale takes it', r);
   const near = o=>o.show==='block' && o.side < 60 && o.reel && o.cut;
-  A(near(r.up) && r.up.t > r.up.sy, 'whale above the boat on screen: the panel sits by the boat, below', r.up);
+  A(near(r.up) && r.up.t > r.up.sy, 'whale above the boat on screen: the panel sits below the boat', r.up);
   await page.screenshot({ path:SHOTS + '/rs822_high.png' });
   const low = await page.evaluate(async ()=>{ const pp = O3.ppos, W = O3.seaF.wh, c = O3.cam, a = new THREE.Vector3(pp.x, O3_WATER_Y, pp.z).project(c), b = new THREE.Vector3(pp.x + 1, O3_WATER_Y, pp.z).project(c), d = new THREE.Vector3(pp.x, O3_WATER_Y, pp.z + 1).project(c), by = b.y - a.y, dy = d.y - a.y, n = Math.hypot(by, dy); window.__wpos = [-by/n*4.5, -dy/n*4.5]; await __w(500); const e = document.getElementById('seaLineHud'), R = e.getBoundingClientRect(), v = new THREE.Vector3(pp.x, O3_WATER_Y, pp.z).project(c), rc = O3.renderer.domElement.getBoundingClientRect(), sx = rc.left + (v.x*0.5 + 0.5)*rc.width, sy = rc.top + (-v.y*0.5 + 0.5)*rc.height; return { show:e.style.display, t:R.top, b:R.bottom, sx, sy, side:Math.abs(R.left + R.width/2 - sx) }; });
-  console.log('low', JSON.stringify(low)); A(low.show==='block' && low.side < 60 && low.b < low.sy, 'whale below the boat on screen: the panel goes above', low);
+  console.log('low', JSON.stringify(low)); A(low.show==='block' && low.side < 60 && Math.abs(low.t - r.up.t) < 1, 'whale below the boat on screen: the panel stays where it is (RS-829)', [low, r.up]);
   await page.screenshot({ path:SHOTS + '/rs822_low.png' });
   /* the Reel button reels; Cut lets go and the panel goes */
   const btn = await page.evaluate(async ()=>{ const F = O3.seaF, b = document.getElementById('seaReel'); b.dispatchEvent(new PointerEvent('pointerdown', { bubbles:true })); const on = !!F.reel; b.dispatchEvent(new PointerEvent('pointerup', { bubbles:true })); const off = !F.reel; clearInterval(__keep); clearInterval(__hold); document.getElementById('seaCut').click(); await __w(200); return { on, off, st:F.H && F.H.st, show:document.getElementById('seaLineHud').style.display }; });

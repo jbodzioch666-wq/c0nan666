@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-829 - Steady Reel
+
+- **The reel panel stays put:** the line bar with Reel and Cut now sits in one fixed spot on the screen, centred under the boat. It no longer drifts with the boat or jumps above her when the whale swims round, so the buttons are always in the same place.
+
 ## RS-828 - The Deep Blue
 
 - **Deep water is darker:** out at sea the water eases from the shore's turquoise to a dark blue, starting about 3 tiles from land and reaching full depth at 7, so you can see when you've left the coast.
