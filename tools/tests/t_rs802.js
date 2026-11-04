@@ -26,8 +26,8 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   console.log('down', JSON.stringify(d)); A(d.sinking && d.boatDown, 'she goes down', d); A(d.sinkDone && d.land, 'you wash ashore', d); A(d.hasBoat===1 && d.tier===4 && d.hull===100, 'with your ship, badly holed', d); A(!d.gameOver && !d.boatVis, 'alive, on land', d); A(d.foes===0, 'and the pirates are gone', d); await page.screenshot({ path:SHOTS + '/rs802_sink.png' });
   /* off the map's edge is no water, and no crash */
   const edge = await page.evaluate(()=>{ const o = {}; try{ o.a = seaFoeWet(-3.5, 9.5); o.b = seaFoeWet(OW_COLS + 4.5, 9.5); o.c = seaWet(-3, 9); o.d = seaFoeWet(9.5, OW_ROWS + 4.5); }catch(e){ o.err = String(e); } return o; }); A(!edge.err && !edge.a && !edge.b && !edge.c && !edge.d, 'the map edge is no water', edge);
-  /* a rowboat has no guns and meets no pirates */
+  /* a rowboat has no guns, and since RS-827 the pirates come for her all the same */
   const w = await page.evaluate(async ()=>{ const p = G.player, o = {}; p.boatTier = 1; delete p.hull; o.hull = hullMax(); window.__noPirates = false; p.seaSince = 99999; const c0 = chn; chn = ()=>true; seaSailedTile(); chn = c0; o.foes = O3.seaF.foes.length; o.fire = seaFire(-1); return o; });
-  A(w.foes===0 && w.hull===40 && w.fire===false, 'no pirates for a rowboat', w);
+  A(w.foes===1 && w.hull===40 && w.fire===false, 'pirates come for a rowboat, and she has nothing to fire', w);
   A(!errs.length, 'no page errors', errs);
 };

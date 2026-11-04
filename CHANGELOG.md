@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-827 - No Safe Boat
+
+- **The sea stays dangerous:** pirates and monsters now go by the best boat you've built, not the one you chose. Taking a smaller boat no longer means smaller pirates, smaller shark packs or no Kraken.
+- **Rowboats get attacked too:** sharks, serpents, pirates and bosses come for a rowboat like any other boat. If you've only built a rowboat you meet the smallest pirates and no Kraken. A caravel-class pirate at level 58 sank a rowboat sitting still in about 6 seconds, so row for it.
+- **A rowboat's hull shows at sea:** the panel shows her hull and a Repair button, and planks patch her. She still has no guns.
+
 ## RS-826 - Choose Your Boat
 
 - **Pick your ship at the slipway:** every boat you've built stays yours. Tap one in the Your Boats list and she's the one you sail, with her own speed, guns, crew room and hull.
