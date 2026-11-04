@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-818 - Up to the Knees
+
+- **You wade rivers now.** You walked across the top of the water: now you go down onto the river bed, in up to your thighs in the middle and shallower near the banks, with your legs showing through the water.
+- **You push through it.** You lean into the water with your arms held out over it, and rock from side to side as you walk.
+- **The water answers.** Foam round your legs, a ring and a few drops from each step, slow rings when you stand still, and no shadow on the surface.
+- **Your escort wades too.** Bridges and winter ice are walked on top, as before.
+
 ## RS-817 - True Colours
 
 - **The herb in your hand is the plant you're picking.** It was green whatever you picked: now a silverleaf comes up white, a bloodmoss red, a sunpetal yellow, on the land and in a cave.

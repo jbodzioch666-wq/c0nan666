@@ -39385,7 +39385,7 @@ function o3SyncEscort(pp, dxs, dzs, sailing){
   if (Math.hypot(dxs,dzs) > 0.05) O3.escortDir.set(dxs,0,dzs).normalize();
   const want = pp.clone().addScaledVector(O3.escortDir, -0.85);
   if (O3.escortPos.distanceTo(want) > 4) O3.escortPos.copy(want); else O3.escortPos.lerp(want, 1-Math.exp(-0.016*7));
-  O3.escortPos.y = Math.max(O3.heightAt(O3.escortPos.x, O3.escortPos.z), -0.14);
+  { const gy = O3.heightAt(O3.escortPos.x, O3.escortPos.z); O3.escortPos.y = Math.max(gy, -0.14) - o3WadeDepth(O3.escortPos.x, O3.escortPos.z, gy); }
   E.g.position.copy(O3.escortPos);
   const moving = Math.hypot(want.x-O3.escortPos.x, want.z-O3.escortPos.z) > 0.05;
   if (E.e){
@@ -40203,6 +40203,16 @@ function fishPose(R, L, g, now){ const A = fishAnim(g, now); R.sh.rotation.x = A
   if (A.crank > 0){ const c = now/1000*13; L.sh.rotation.x = A.lsh + (-0.75 - A.lsh + Math.sin(c)*0.16)*A.crank; L.el.rotation.x = -0.4 + (-0.55 + Math.cos(c)*0.3)*A.crank; }   /* (the other hand at the reel, winding) */
   else { L.sh.rotation.x = A.lsh; L.el.rotation.x = A.lel; } }
 /* the line, float, hooked fish and splashes, one set a scene (fishRig), placed each frame by fishRigTick */
+/* (RS-818) wading a river: you stand on its bed, not on the water. The bed is as the land mesh has it, only on a river's own tile (a sea
+   needs the boat, roads cross on their own tiles) and not on a winter's ice */
+const O3_WADE_MAX = 0.3;
+function o3WadeDepth(x, z, gy){ if (gy >= O3_WATER_Y - 0.01) return 0; const tx = Math.floor(x), tz = Math.floor(z); if (o3Tile(tx, tz)!==OW_RIVER) return 0; const w = o3G(tx, tz); if (w && iceAt(w[0], w[1])) return 0; return Math.min(O3_WATER_Y - gy, O3_WADE_MAX); }
+/* the water answering: a broken white line round your legs, a ring from each footfall with drops flung up, a slow ring when you stand */
+function o3WadeRingGeo(segs, r0, r1, wob){ const T = THREE, n = segs + 1, pos = new Float32Array(n*3*3), col = new Float32Array(n*3*4), idx = []; for (let i=0;i<n;i++){ const a = i/segs*6.283, k = wob ? 1 + (Math.sin(a*3 + 0.7) + Math.sin(a*7 + 2.1)*0.6 + Math.sin(a*13)*0.35)*wob : 1, rr = [r0, r1, 1]; for (let j=0;j<3;j++){ const o = i*3 + j; pos.set([Math.cos(a)*rr[j]*k, 0, Math.sin(a)*rr[j]*k], o*3); col.set([1, 1, 1, j===1 ? 1 : 0], o*4); } if (i < segs) for (let j=0;j<2;j++){ const o = i*3 + j; idx.push(o, o + 3, o + 1, o + 1, o + 3, o + 4); } } const g = new T.BufferGeometry(); g.setAttribute('position', new T.BufferAttribute(pos, 3)); g.setAttribute('color', new T.BufferAttribute(col, 4)); g.setIndex(idx); g.computeVertexNormals(); return g; }   /* (a ring soft at both edges: clear, white along its crest, clear) */
+function o3WadeFx(){ const T = THREE, sc = O3.scene; if (O3.wfx && O3.wfx.sc===sc) return O3.wfx; const mk = o=>new T.MeshStandardMaterial(Object.assign({ color:0xf2f7fa, roughness:0.55, transparent:true, depthWrite:false, side:T.DoubleSide }, o)), ringG = o3WadeRingGeo(48, 0.74, 0.92, 0.03), dropG = new T.SphereGeometry(0.0065, 10, 8), dropM = mk({ opacity:0.9 }), F = { sc, rings:[], drops:[], ri:0, di:0, tr:0, lastS:0 }; F.collar = new T.Mesh(o3WadeRingGeo(64, 0.5, 0.74, 0.13), mk({ opacity:0, vertexColors:true })); F.collar.visible = false; F.collar.renderOrder = 3; sc.add(F.collar); for (let i=0;i<8;i++){ const m = new T.Mesh(ringG, mk({ opacity:0, vertexColors:true })); m.visible = false; m.renderOrder = 3; sc.add(m); F.rings.push({ m, t:-1 }); } for (let i=0;i<18;i++){ const m = new T.Mesh(dropG, dropM); m.visible = false; sc.add(m); F.drops.push({ m, t:-1, x:0, y:0, z:0, vx:0, vy:0, vz:0 }); } return O3.wfx = F; }
+function o3WadeRing(F, x, z, life, size, op){ const R = F.rings[F.ri = (F.ri + 1) % F.rings.length]; R.t = 0; R.life = life; R.x = x; R.z = z; R.size = size; R.op = op; }
+function o3WadeDrops(F, x, z, n, a){ for (let i=0;i<n;i++){ const D = F.drops[F.di = (F.di + 1) % F.drops.length], th = a + (Math.random() - 0.5)*2.6, v = 0.25 + Math.random()*0.4; D.t = 0; D.x = x; D.z = z; D.y = O3_WATER_Y + 0.02; D.vx = Math.sin(th)*v; D.vz = Math.cos(th)*v; D.vy = 0.55 + Math.random()*0.6; } }
+function o3WadeFxTick(dt, pp, moving, P){ const d = O3.wadeD||0; if (!O3.wfx && d < 0.02) return; const F = o3WadeFx(), wy = O3_WATER_Y + 0.045, on = d > 0.02, w = Math.min(1, d/0.15), yaw = P.yaw||0; F.collar.visible = on; if (on){ const sp = moving ? 1 : 0; F.mv = (F.mv||0) + (sp - (F.mv||0))*Math.min(1, dt*6); F.collar.position.set(pp.x + Math.sin(yaw)*0.05*F.mv, wy, pp.z + Math.cos(yaw)*0.05*F.mv); F.collar.rotation.y = O3.t*0.7; const b = 0.15 + Math.sin(O3.t*3.1)*0.008 + F.mv*0.03; F.collar.scale.set(b, 1, b); F.collar.material.opacity = (0.6 + F.mv*0.3)*w; if (moving){ const s = Math.sin(P.e.wph!=null ? P.e.wph : O3.t*9) > 0 ? 1 : -1; if (s!==F.lastS){ F.lastS = s; const fx = pp.x + Math.cos(yaw)*s*0.07 + Math.sin(yaw)*0.1, fz = pp.z - Math.sin(yaw)*s*0.07 + Math.cos(yaw)*0.1; o3WadeRing(F, fx, fz, 0.8, 0.34, 0.55*w); o3WadeDrops(F, fx, fz, 4, yaw); o3Splash(fx, fz, 0.05, 0.2); } F.tr = 0.5; } else { F.tr -= dt; if (F.tr <= 0){ F.tr = 1.5; o3WadeRing(F, pp.x, pp.z, 1.5, 0.5, 0.35*w); } } } for (const R of F.rings){ if (R.t < 0) continue; R.t += dt; const q = R.t/R.life; if (q >= 1){ R.t = -1; R.m.visible = false; continue; } R.m.visible = true; R.m.position.set(R.x, wy, R.z); R.m.scale.setScalar(0.12 + (1 - (1 - q)*(1 - q))*R.size); R.m.material.opacity = R.op*(1 - q); } for (const D of F.drops){ if (D.t < 0) continue; D.t += dt; D.vy -= 3.4*dt; D.x += D.vx*dt; D.y += D.vy*dt; D.z += D.vz*dt; if (D.y < O3_WATER_Y){ D.t = -1; D.m.visible = false; continue; } D.m.visible = true; D.m.position.set(D.x, D.y, D.z); } }
 function fishRig(sc, fr){ const T = THREE, rig = { sc, fr, sp:[], prevTs:-1, prevN:-1 };
   const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(new Float32Array(20*3), 3));
   rig.line = new T.Line(geo, new T.LineBasicMaterial({ color:0xe8e8e0, transparent:true, opacity:0.85 })); rig.line.frustumCulled = false; sc.add(rig.line);
@@ -40672,7 +40682,8 @@ function o3Render(){
   else { const d = Math.hypot(dxs,dzs), sp = dt/(O3_STEP*runMul()*wgRoadMul())*1.05*(G.stepLen||1);             // an even walking pace, one tile per step
     if (d > 3 || d <= sp){ pp.x = tx; pp.z = tz; } else { pp.x += dxs/d*sp; pp.z += dzs/d*sp; } }
   const gy = O3.heightAt(pp.x, pp.z);
-  pp.y = sailing ? -0.14 : Math.max(gy, -0.14);
+  { const wd = sailing ? 0 : o3WadeDepth(pp.x, pp.z, gy); O3.wadeD = (O3.wadeD||0) + (wd - (O3.wadeD||0))*Math.min(1, dt*10); if (O3.wadeD < 0.002 && !wd) O3.wadeD = 0; }   /* (RS-818: down on the river bed, the water round your legs) */
+  pp.y = sailing ? -0.14 : Math.max(gy, -0.14) - O3.wadeD;
   const DW = o3DoorWalkTick(dt, pp); if (DW){ moving = DW.mv; if (DW.ashore) sailing = false; else if (sailing) O3.boatYaw = DW.yaw; }   /* (RS-687: round to the mooring in the boat; then out of it) */   /* (RS-651: walking into a barrow) */
   O3.pgrp.position.copy(pp);
   o3PortalTick(dt, pp);
@@ -40683,7 +40694,7 @@ function o3Render(){
     O3.player = m3dPlayerBuild(()=>v3Person(v3PlayerLook(), 0.95, O3.pgrp)); if (old) O3.player.yaw = old.yaw||0;
   }
   const P = O3.player; P.g.visible = true; O3.boat.visible = sailing;
-  P.sh.visible = !sailing;                                  // no ground shadow on the water; you stand in the boat instead
+  P.sh.visible = !sailing && O3.wadeD < 0.03;                                  // no ground shadow on the water; you stand in the boat instead
   P.g.position.set(0, sailing ? (O3.ship ? O3.ship.deckY : 0.17) : 0, sailing ? -0.18 : 0);
   const sx = dxs - dzs; if (Math.abs(sx) > 0.05) P.face = sx < 0 ? -1 : 1;
   P.walk = (P.walk||0) + (moving ? dt*12 : 0);
@@ -40698,6 +40709,7 @@ function o3Render(){
     if (r.arms){ const [R, L] = r.arms; R.sh.rotation.x = -0.08 - sw*0.45; R.sh.rotation.z = -0.12; R.el.rotation.x = r.weapon ? -0.5 : -0.25;
       L.sh.rotation.x = (r.shield ? -0.25 : -0.08) + sw*0.45; L.sh.rotation.z = 0.12; L.el.rotation.x = r.shield ? -0.9 : -0.25; L.sh.rotation.y = 0;
       if (r.shield && !r.sheathed){ L.sh.rotation.x = -0.3 + sw*0.15; L.sh.rotation.z = 0.12; L.sh.rotation.y = -0.55; L.el.rotation.x = -2.3; }   /* (RS-467) */
+      P.e.wadeArm = 0; if (O3.wadeD > 0.02 && !G.gather && !sailing){ const w = Math.min(1, O3.wadeD/0.18), ph = P.e.wph!=null ? P.e.wph : tt*9, lean = Math.cos(ph)*mv; r.torso.rotation.x += 0.14*w*(0.4 + 0.6*mv); r.torso.rotation.z -= lean*0.05*w; r.hips.rotation.z += lean*0.05*w; P.e.wadeArm = w; R.sh.rotation.z -= 0.55*w; R.sh.rotation.x += 0.1*w + sw*0.2*w; R.el.rotation.x -= 0.35*w; if (!r.shield || r.sheathed){ L.sh.rotation.z += 0.55*w; L.sh.rotation.x += 0.1*w - sw*0.2*w; L.el.rotation.x -= 0.35*w; } }   /* (RS-818: pushing through the water, leaning into it with the arms held out over it) */
       if (r.twoHand){ R.sh.rotation.x = -0.35; R.el.rotation.x = -0.9; if (r.wk==='staff' && r.weapon) m3dWpPiv(r).rotation.x = M3D_STAFF_X - 0.135;   /* (RS-211: the arm hangs lower standing in the open, so the staff turns in the hand to stand as it does in the barber's chair) */ }
       // at work: face what you're working on - swing at rock and timber, hold a line out over the water, stoop to forage
       const gw = G.gather && G.gather.mode===0 ? G.gather.o : null;
@@ -40731,6 +40743,7 @@ function o3Render(){
   }
   else if (DW && DW.ashore && DW.boatAt){ O3.boat.visible = true; O3.boat.position.set(DW.boatAt[0] - pp.x, -0.14 - pp.y + Math.sin(O3.t*2)*0.02, DW.boatAt[1] - pp.z); O3.boat.rotation.set(Math.sin(O3.t*1.3)*0.03, DW.boatYaw||0, Math.sin(O3.t*1.6)*0.05); if (O3.foam) O3.foam.material.opacity = 0.45; }   /* (RS-687: the boat waits at the mooring while you go down) */
   try{ seaFightTick(dt, pp); }catch(e){ console.error(e); }   /* (RS-802) */
+  o3WadeFxTick(dt, pp, moving && !sailing, P);   /* (RS-818) */
   o3ApplyTime();
   o3AnimNodes(dt);
   o3SyncEscort(pp, dxs, dzs, sailing);
@@ -49979,8 +49992,8 @@ function rsSheath(e, fight, dt, t, moving){
   if (e.toolKey || G.gather) return;   /* (RS-428: at work - a pickaxe, an axe, a rod - the arms are the work's: hanging them loose here stopped the swing) */
   const [R, L] = r.arms, rel = k*k*(3 - 2*k), bump = k > 0 && k < 1 ? Math.sin(Math.PI*k) : 0;
   if (rel > 0){ const sw = -Math.sin(e.wph!=null ? e.wph : t*9)*moving, br = Math.sin(t*2.2), mx = (a, b2)=>a + (b2 - a)*rel;   /* (the hands free, the arms hang and swing with the stride) */
-    R.sh.rotation.x = mx(R.sh.rotation.x, -0.08 - sw*0.45 + br*0.02); R.sh.rotation.z = mx(R.sh.rotation.z, -0.12); R.el.rotation.x = mx(R.el.rotation.x, -0.25 - Math.max(0, sw)*0.3);
-    if (!r.tome){ L.sh.rotation.x = mx(L.sh.rotation.x, -0.08 + sw*0.45 + br*0.02); L.sh.rotation.z = mx(L.sh.rotation.z, 0.12); L.el.rotation.x = mx(L.el.rotation.x, -0.25 - Math.max(0, -sw)*0.3); } }
+    R.sh.rotation.x = mx(R.sh.rotation.x, -0.08 - sw*0.45 + br*0.02); R.sh.rotation.z = mx(R.sh.rotation.z, -0.12 - (e.wadeArm||0)*0.55); R.el.rotation.x = mx(R.el.rotation.x, -0.25 - Math.max(0, sw)*0.3 - (e.wadeArm||0)*0.35);   /* (RS-818: held out over the water, wading) */
+    if (!r.tome){ L.sh.rotation.x = mx(L.sh.rotation.x, -0.08 + sw*0.45 + br*0.02); L.sh.rotation.z = mx(L.sh.rotation.z, 0.12 + (e.wadeArm||0)*0.55); L.el.rotation.x = mx(L.el.rotation.x, -0.25 - Math.max(0, -sw)*0.3 - (e.wadeArm||0)*0.35); } }
   if (bump > 0){ const [sx, sz, ex] = r.shd.back ? [-2.7, -0.35, -1.5] : [-0.6, 0.55, -1.25]; R.sh.rotation.x += (sx - R.sh.rotation.x)*bump; R.sh.rotation.z += (sz - R.sh.rotation.z)*bump; R.el.rotation.x += (ex - R.el.rotation.x)*bump; }
 }
 /* (RS-702) a spell cast, u 0 to 1 through it, as one flowing motion: the staff is drawn up and back over the shoulder in an arc as the
@@ -51010,7 +51023,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-817';
+const GAME_VERSION = 'rs-818';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
