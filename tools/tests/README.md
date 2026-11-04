@@ -154,6 +154,7 @@ Screenshots go to `tools/tests/shots/`.
 | `rs818` | wading a river stands you on the bed, arms out, foam and rings; bank, ice and off the river unchanged | |
 | `rs819` | a quiver has no cape, the slung bow is higher, ammo above your Ranged level can't be loaded or fired | |
 | `rs820` | Sea monsters wander until roused, hits scale with level, the Kraken's lead and grip, the serpent's dive, venom and body hits | |
+| `rs821` | Opposite walking keys cancel without an error; a harpooned serpent still spits and strikes | |
 | `rs789` | A shire's door stones and flags are dark: their average vertex colour stays low |
 | `rs788` | The open land has its older grass again: no blade chunks, RS-785's code gone |
 | `rs787` | A battle at a town: the card before and after, the banner's words, the trees told where you stand, no shader built by a fade, new creatures warmed off the frame |

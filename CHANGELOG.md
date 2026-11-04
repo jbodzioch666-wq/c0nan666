@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-821 - Hooked and Angry
+
+- **Fixed a crash:** pressing two opposite walking keys at once (left and right, or up and down) threw the 'Something went wrong' screen. Now they cancel out and you stand still until you lift one.
+- **A harpooned serpent fights back:** it used to stop spitting venom while on your line. Now it keeps spitting, and it still strikes if you reel it in close.
+
 ## RS-820 - Things in the Water
 
 - **The Kraken has a face:** big yellow eyes under a scowling brow, a hooked beak that opens when it strikes, feeding arms and a warty mantle. The old model never had one.
