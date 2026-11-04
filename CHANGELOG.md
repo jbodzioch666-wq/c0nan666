@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-825 - Pull and Board
+
+- **You row the rowboat.** No mast and no sail any more: a pair of oars that swing, dip and pull, and you sitting on the thwart with your back to the bow, your weapon put away. Her speed no longer depends on the wind, the panel says rowing instead of sails, and new rowboats take no sailcloth to build.
+- **Boarding looks like the ships.** You now fight on the same planks and in the same colours as the ship you're on, with her pointed hull, a cabin with a door and lit windows, a forecastle, a wheel, her real number of guns under their lids, and open water all round. Your own ship lies alongside in her own colours.
+- **Masts don't hide the fight.** The upper mast, yards and rigging thin out when they stand between you and the camera.
+
 ## RS-824 - Planks and People
 
 - **Real planking.** Decks, hulls, cabins and forecastles are now laid in proper boards, with seams, butt joints, pegs and grain, in place of the old blotchy wood. Decks run fore and aft, and each hull strake is a row of boards.

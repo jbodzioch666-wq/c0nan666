@@ -158,6 +158,7 @@ Screenshots go to `tools/tests/shots/`.
 | `rs822` | The harpoon flies past pirates and monsters and doesn't open boarding; the reel and line bar float by the boat, away from the whale | |
 | `rs823` | Nothing roams the water, a hunter at sea is a fin; the Plesiosaur wanders, rams, snaps, breaches and pays | |
 | `rs824` | `rs824` | RS-824: ships are planked in world units, cabins and forecastles stay inside the hull, you and your crew stand at ship scale at sea and full size ashore | |
+| `rs825` | `rs825` | RS-825: a rowboat is rowed with no mast, sail or wind; a boarding is fought on the ships' own planks and hull shape, and a mast's rig thins when it stands in the way | |
 | `rs789` | A shire's door stones and flags are dark: their average vertex colour stays low |
 | `rs788` | The open land has its older grass again: no blade chunks, RS-785's code gone |
 | `rs787` | A battle at a town: the card before and after, the banner's words, the trees told where you stand, no shader built by a fade, new creatures warmed off the frame |
