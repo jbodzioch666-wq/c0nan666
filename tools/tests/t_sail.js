@@ -19,7 +19,7 @@ module.exports = async page=>{
     // harpoons: the big fish need one
     const deep = { k:'fishing', type:'deep', x:0, y:0 };
     A(!skNodeItems(deep).some(f=>f.id==='marlin'), 'no marlin without a harpoon');
-    skP().skills = skP().skills || {}; p.harpoon = 1; A(skNodeItems(deep).some(f=>f.id==='marlin'), 'marlin with harpoon');
+    skP().skills = skP().skills || {}; p.harpoon = 1; A(!skNodeItems(deep).some(f=>f.id==='marlin'), 'a harpoon adds nothing to the rod'); A(skNodeItems(deep, true).some(f=>f.id==='marlin'), 'marlin for the harpoon');
     // charting an island and its cache
     const isl = G.ow.islands[0]; G.owPos = { x:isl.land[0], y:isl.land[1] }; p._areaKey = null; p.wildWarned = 1; wgOnStep(null);
     if (G.ui==='wevent') wevChoose(0);

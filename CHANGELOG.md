@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-808 - Harpoon Only
+
+- **Sharks, marlin and kraken now need the harpoon:** a rod could still catch them, from a deep shoal if you owned a harpoon, and from open water with no shoal even if you didn't. Now only the harpoon lands them.
+- **A rod still works for the rest:** deep shoals give tuna and swordfish by rod, and the shoal's tooltip tells you how to fire the harpoon at it.
+- **No more rod bonus from a harpoon:** carrying a harpoon no longer improves your rod's catch chance at deep shoals.
+
 ## RS-807 - Release the Kraken
 
 - **Monsters from the deep:** out on the open sea, sharks, serpents and the Kraken now hunt you in real time. Your guns and harpoon both work on them.
