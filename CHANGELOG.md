@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-809 - Ships Keep to the Sea
+
+- **No more boats on lakes:** ships can't get onto inland lakes any more. Only the sea carries them, and pirates, whales and sea monsters stay out of lakes too. Rivers were already waded on foot.
+- **Frozen lakes:** you can still walk across them in winter.
+- **If you're afloat on a lake:** an old save parked on one puts you ashore when you load it.
+- **Fords to stranded land:** a few sites and islands could only be reached across a lake, so they now get a short shallow ford you can wade. Every town, site and island stayed reachable in the world sizes checked.
+- **Fix on Planet worlds:** a corner of sea cut off at a planet's seam could be counted as a lake. It now counts as sea.
+
 ## RS-808 - Harpoon Only
 
 - **Sharks, marlin and kraken now need the harpoon:** a rod could still catch them, from a deep shoal if you owned a harpoon, and from open water with no shoal even if you didn't. Now only the harpoon lands them.
