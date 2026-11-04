@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-822 - Eyes on the Whale
+
+- **The line by your boat:** the tension bar, Reel and Cut now float beside your ship instead of on the side panel, so you can watch the whale and the bar together. The panel moves above or below the ship to stay on the far side from whatever you've hooked.
+- **The harpoon is for fish and whales:** it now flies straight past pirates and sea monsters without hooking or hurting them. Use the guns for those.
+- **Boarding:** a harpoon no longer opens boarding, so a pirate has to be close and down to 40% of her hull. Serpents keep attacking as normal, so the RS-821 hook fix no longer comes up.
+
 ## RS-821 - Hooked and Angry
 
 - **Fixed a crash:** pressing two opposite walking keys at once (left and right, or up and down) threw the 'Something went wrong' screen. Now they cancel out and you stand still until you lift one.
