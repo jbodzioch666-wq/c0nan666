@@ -5255,7 +5255,7 @@ function rangedAttack0(tgt){
     const rk = rngKind(w);
     if (rk==='thrown' && (w.qty||0)<=0){ logMsg(`you have no ${w.basis.toLowerCase()} left`, 'hit'); return; }
     if (rk==='none' && (w.charges||0)<=0){ logMsg(`your ${w.nm} has no charges left`, 'hit'); return; }
-    if ((rk==='arrow' || rk==='bolt') && rangedAmmoN(w)<=0 && !ammoAutoLoad()){ logMsg(`you have no ${ammoWord(w)} for your ${w.nm.toLowerCase()}`, 'hit'); return; }
+    if ((rk==='arrow' || rk==='bolt') && rangedAmmoN(w)<=0 && !ammoAutoLoad()){ const hi = quiverList().find(q=>ammoFits(q.t, w)); logMsg(hi ? ammoNeedMsg(hi.t) : `you have no ${ammoWord(w)} for your ${w.nm.toLowerCase()}`, 'hit'); return; }
     const t = tIdx >= 0 ? tIdx : nearestMonsterInRange(rangedRange(w));
     if (t===-1){ logMsg(`no target in range for your ${w.nm}`, ''); return; }
     noteFoe(t);
@@ -12127,7 +12127,7 @@ function spBody(tab){
     const foods = skFoods();
     return `<div class="sp-note">${dock}</div><div class="sp-grid">${cells}${empties}</div>
       <div class="sp-foot"><span>${G.inv.length}/${MAXINV}</span><span style="color:#ffd24a">${p.gold.toLocaleString()} gold</span></div>
-      ${quiverList().length ? `<div class="sp-sub">QUIVER &middot; click a type to load it</div><div class="sp-grid">${quiverList().map(q=>`<div class="sp-cell${q.loaded ? ' sel' : ''}" data-sp-ammo="${q.t}" title="${RS_AMMO[q.t][0]} x${q.n} - ranged strength +${RS_AMMO[q.t][3]}${q.loaded ? ' (loaded)' : ' - click to load'}" style="--qc:${ammoCol(q.t)}"><img alt="" src="${dhIcon(obEntry('armor',{kind:'ammo', metal:ammoCol(q.t)}))}"><b>${q.n}</b>${q.loaded ? '<i class="lk">ON</i>' : ''}</div>`).join('')}</div>` : ''}
+      ${quiverList().length ? `<div class="sp-sub">QUIVER &middot; click a type to load it</div><div class="sp-grid">${quiverList().map(q=>`<div class="sp-cell${q.loaded ? ' sel' : ''}" data-sp-ammo="${q.t}" title="${RS_AMMO[q.t][0]} x${q.n} - ranged strength +${RS_AMMO[q.t][3]}${ammoLvlOk(q.t) ? '' : ' - needs Ranged ' + RS_AMMO[q.t][1]}${q.loaded ? ' (loaded)' : ' - click to load'}" style="--qc:${ammoCol(q.t)}${ammoLvlOk(q.t) ? '' : ';opacity:0.45'}"><img alt="" src="${dhIcon(obEntry('armor',{kind:'ammo', metal:ammoCol(q.t)}))}"><b>${q.n}</b>${q.loaded ? '<i class="lk">ON</i>' : ''}</div>`).join('')}</div>` : ''}
       ${foods.length ? `<div class="sp-sub">FOOD &middot; drag to the quick bar</div><div class="sp-grid">${foods.map(f=>`<div class="sp-cell food" data-sp-food="${f.id}" draggable="true" title="${esc(f.nm)} x${f.n} - heals ${skFoodHeal(f)}"><img alt="" src="${foodIconUrl(f.id)}"><i class="fdnm">${esc(foodShort(f.nm))}</i><b>${f.n}</b></div>`).join('')}</div>` : ''}
       ${spMatsHtml()}`;
   }
@@ -14931,11 +14931,14 @@ function ensureAmmo(){
 }
 function addArrows(n, t){
   const p = G.player; t = t||0; ensureAmmo();
-  if (ammoType()===t || ammoType()<0){ if (ammoType()<0){ const it = rsMakeAmmo(t); it.qty = 0; G.gear.ammo = it; } p.arrows = (p.arrows||0) + n; }
+  if (ammoType()===t || (ammoType()<0 && ammoLvlOk(t))){ if (ammoType()<0){ const it = rsMakeAmmo(t); it.qty = 0; G.gear.ammo = it; } p.arrows = (p.arrows||0) + n; }
   else { p.ammoStacks = p.ammoStacks || {}; p.ammoStacks[t] = (p.ammoStacks[t]||0) + n; }
 }
+/* (RS-819) arrows and bolts obey their Ranged level: too high for you they wait in the quiver, and can't be loaded or fired */
+function ammoLvlOk(t){ const a = RS_AMMO[t]; return !a || rsLvl('ranged') >= (a[1]||1); }
+function ammoNeedMsg(t){ return `you need Ranged ${RS_AMMO[t][1]} to fire ${RS_AMMO[t][0].toLowerCase()}`; }
 function loadAmmo(t, quiet){
-  const p = G.player, cur = ammoType(); if (cur===t) return;
+  const p = G.player, cur = ammoType(); if (cur===t) return; if (!ammoLvlOk(t)){ logMsg(ammoNeedMsg(t), 'hit'); sfx('error'); return false; }
   p.ammoStacks = p.ammoStacks || {};
   if (cur >= 0 && (p.arrows||0) > 0) p.ammoStacks[cur] = (p.ammoStacks[cur]||0) + p.arrows;
   p.arrows = p.ammoStacks[t]||0; delete p.ammoStacks[t];
@@ -14943,7 +14946,7 @@ function loadAmmo(t, quiet){
   if (!quiet){ logMsg(`you load ${RS_AMMO[t][0].toLowerCase()} (${p.arrows})`, ''); sfx('click'); renderGame(); saveCurrentGame(); }
 }
 function ammoAutoLoad(){
-  const w = G.gear.ranged, q = quiverList().filter(x=>!x.loaded && (!w || !w.used || !w.range || ammoFits(x.t, w))); if (!q.length) return false;
+  const w = G.gear.ranged, q = quiverList().filter(x=>!x.loaded && ammoLvlOk(x.t) && (!w || !w.used || !w.range || ammoFits(x.t, w))); if (!q.length) return false;
   const best = q.sort((a,b)=>RS_AMMO[b.t][3]-RS_AMMO[a.t][3])[0]; loadAmmo(best.t, true); logMsg(`out of that ammo - you load ${RS_AMMO[best.t][0].toLowerCase()} (${G.player.arrows})`, ''); return true;
 }
 function quiverList(){
@@ -17495,7 +17498,7 @@ function ammoCol(t){ const a = RS_AMMO[t]; if (!a) return '#9aa3a8'; if (a[4]) r
 function rngKind(w){ w = w===undefined ? G.gear.ranged : w; return !w || !w.used || !w.range ? null : w.thrown ? 'thrown' : w.noAmmo ? 'none' : w.xbow ? 'bolt' : 'arrow'; }
 function ammoFits(t, w){ const k = rngKind(w); return (k==='bolt' || k==='arrow') && ammoKind(t)===k; }
 function ammoWord(w){ return rngKind(w)==='bolt' ? 'bolts' : 'arrows'; }
-function ammoInUse(w){ w = w || G.gear.weapon; const t = ammoType(); return !!(w && w.range && t>=0 && ammoFits(t, w)); }
+function ammoInUse(w){ w = w || G.gear.weapon; const t = ammoType(); return !!(w && w.range && t>=0 && ammoFits(t, w) && ammoLvlOk(t)); }
 function rangedAmmoN(w){ w = w || G.gear.ranged; const k = rngKind(w); if (k==='thrown') return w.qty||0; if (k==='none') return w.charges||0; return ammoInUse(w) ? (G.player.arrows||0) : 0; }
 // how far you can shoot: the weapon's own reach, +2 in the Longrange style
 function rangedRange(w){ w = w || G.gear.ranged; return ((w && w.range)||0) + (rsStyle().id==='longrange' ? 2 : 0); }
@@ -17710,7 +17713,7 @@ function isoShotLand(s){
 function bowReady(){
   const w = G.gear.ranged; if (!(w && w.used && w.range && w.kind!=='wand')) return false;
   const k = rngKind(w); if (k==='thrown') return (w.qty||0) > 0; if (k==='none') return (w.charges||0) > 0;
-  return rangedAmmoN(w) > 0 || quiverList().some(q=>ammoFits(q.t, w));
+  return rangedAmmoN(w) > 0 || quiverList().some(q=>ammoFits(q.t, w) && ammoLvlOk(q.t));
 }
 function rangedPref(){ const p = G.player; if (p.rangedMode) return p.rangedMode; const w = G.gear.weapon; return w && w.used && w.rsStaff ? 'magic' : (G.gear.ranged && G.gear.ranged.used && G.gear.ranged.range ? 'bow' : 'magic'); }
 /* (RS-796) R picks what you fight with: melee, bow or magic. Null means hand to hand: you chose melee, or what you chose has run out. Only a character who has never pressed R and holds no staff still falls back from one to the other */
@@ -49634,7 +49637,7 @@ function rsPlayerLook(opt){
   if (o.weapon==='staff' && w && w.rsStaff) o.swirl = o.gem ? m3dRgb(o.gem) : '#c0a0ff';
   if (o.weapon==='staff' && w && w.rsStaff){ const n = w.nm || ''; o.staffGrade = /Master|Ancient/.test(n) ? 3 : /Mystic/.test(n) ? 2 : /Battlestaff/.test(n) ? 1 : 0; if (!o.gem && o.staffGrade>=3) o.swirl = '#b44aff'; }   /* (RS-476: finer each grade) */   /* (RS-465: a quarterstaff is plain wood - the motes are a wizard's) */
   const lg = gl('legs'), cp = gl('cape'), oh = gl('offhand'), ar = gl('arms'), ft = gl('feet');
-  if (cp && cp.used) o.cape = cp.dye || cp.capeCol || cp.rsCol || '#6a2a2a';
+  if (cp && cp.used && cp.basis!=='Quiver') o.cape = cp.dye || cp.capeCol || cp.rsCol || '#6a2a2a';   /* (RS-819: a quiver sits on your back with no cloth behind it) */
   /* (RS-472) and finer each tier, like the shields: a trimmed hem, then your emblem on its back, gold edging, a fur collar, an embroidered
      band, and at the top glowing embroidery (a fire cape's flames) */
   o.quiver = cp && cp.used && cp.basis==='Quiver' ? { col:cp.dye || cp.rsCol || '#7a5230', trim:/Dizana/.test(cp.nm||'') ? '#d8b050' : null } : false;   /* (RS-491) */
@@ -49910,6 +49913,7 @@ function sheathScabbard(F){
   const M = new T.Matrix4().makeBasis(F.c, F.b, F.n); body.quaternion.setFromRotationMatrix(M); body.position.copy(F.c.clone().multiplyScalar(cm)).add(F.n.clone().multiplyScalar(nm));
   return g;
 }
+const BOW_BACK_Y = 0.25;   /* (RS-819: up between the shoulders, it hung at the small of the back) */
 function rsSheathInit(r){
   const T = THREE, V = (x,y,z)=>new T.Vector3(x,y,z), bw = r.bw || 1, wy = r.waistY || 0.07, wk = r.wk || '', back = SHEATH_BACK.test(wk), S = r.shd = { back, items:[] };
   const backZ = -(0.072*bw + (r.cape ? 0.03 : 0.012)), hipX = 0.1*bw + 0.012;
@@ -49920,7 +49924,7 @@ function rsSheathInit(r){
     if (scab && SHEATH_BLADE.test(wk)){ const sg = sheathScabbard(F); if (sg){ sg.position.copy(pos); sg.quaternion.copy(F.q); sg.scale.setScalar(sc); holder.add(sg); it.sc = sg; } }
     S.items.push(it); };
   const blade2 = /^(greatsword|greataxe)$/.test(wk);
-  if (back) put(r.weapon, r.torso, blade2 ? V(0.55, -1, 0) : wk==='bow' ? V(-0.85, 1, 0) : V(-0.6, 1, 0), V(0, 0, -1), V(0, (wk==='bow' ? 0.12 : 0.17) - wy, backZ), true, true);
+  if (back) put(r.weapon, r.torso, blade2 ? V(0.55, -1, 0) : wk==='bow' ? V(-0.85, 1, 0) : V(-0.6, 1, 0), V(0, 0, -1), V(0, (wk==='bow' ? BOW_BACK_Y : 0.17) - wy, backZ), true, true);
   else put(r.weapon, r.hips, V(0, -1, -0.48), V(1, 0, 0), V(hipX, 0.03, 0.035), false, true);
   if (r.offWpn) put(r.offWpn, r.hips, V(0, -1, -0.48), V(-1, 0, 0), V(-hipX, 0.03, 0.035), false, false);
   if (r.shield) put(r.shield, r.torso, V(0, -1, 0), V(0, 0, -1), V(0, 0.15 - wy, backZ - (back ? 0.03 : 0)), true, false, true);   /* (its point down, its face out) */
@@ -51023,7 +51027,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-818';
+const GAME_VERSION = 'rs-819';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -53108,10 +53112,10 @@ function csResHtml(only){
 // (RS-369) the quiver: every kind of arrow and bolt you carry, how many, and which is loaded. (RS-372) laid out like the rest of
 // the bag: a grid of pictures - drag one onto the quiver slot on the figure, or tap it, to load it
 function quiverTipHtml(t){ const a = RS_AMMO[t], w = G.gear.ranged, fits = !w || !w.used || !w.range || ammoFits(t, w), n = arrowCount(t);
-  return `<b style="color:${ammoCol(t)}">${esc(a[0])}</b> &times;${n}<br>ranged strength +${a[3]}${fits ? '' : `<br><span style="color:${COL.red}">not for your ${esc((w.nm||'weapon').toLowerCase())}</span>`}<br><span class="muted">${ammoType()===t ? 'loaded' : 'drag onto the quiver slot, or tap, to load'}</span>`; }
+  return `<b style="color:${ammoCol(t)}">${esc(a[0])}</b> &times;${n}<br>ranged strength +${a[3]}${fits ? '' : `<br><span style="color:${COL.red}">not for your ${esc((w.nm||'weapon').toLowerCase())}</span>`}${ammoLvlOk(t) ? '' : `<br><span style="color:${COL.red}">needs Ranged ${a[1]}</span>`}<br><span class="muted">${ammoType()===t ? 'loaded' : 'drag onto the quiver slot, or tap, to load'}</span>`; }
 function csQuiverHtml(){
   const q = quiverList(); if (!q.length) return '<div class="muted" style="padding:8px;">your quiver is empty - arrows and bolts you find, buy or fletch go in here</div>';
-  const cells = q.map(x=>`<div class="sp-cell inv-cell csdrag can${x.loaded ? ' sel' : ''}" data-csq="${x.t}" style="--qc:${ammoCol(x.t)}" onclick="if (!CSD.justDropped || performance.now() - CSD.justDropped > 300){ loadAmmo(${x.t}); renderOverlay(); }" onmouseenter="showTooltip(event, quiverTipHtml(${x.t}))" onmousemove="moveItemTooltip(event)" onmouseleave="hideItemTooltip()"><img alt="" src="${dhIcon(obEntry('armor',{kind:'ammo', metal:ammoCol(x.t)}))}"><b class="qty">${x.n}</b>${x.loaded ? '<i class="lk">ON</i>' : ''}</div>`);
+  const cells = q.map(x=>`<div class="sp-cell inv-cell csdrag can${x.loaded ? ' sel' : ''}" data-csq="${x.t}" style="--qc:${ammoCol(x.t)}${ammoLvlOk(x.t) ? '' : ';opacity:0.45'}" onclick="if (!CSD.justDropped || performance.now() - CSD.justDropped > 300){ loadAmmo(${x.t}); renderOverlay(); }" onmouseenter="showTooltip(event, quiverTipHtml(${x.t}))" onmousemove="moveItemTooltip(event)" onmouseleave="hideItemTooltip()"><img alt="" src="${dhIcon(obEntry('armor',{kind:'ammo', metal:ammoCol(x.t)}))}"><b class="qty">${x.n}</b>${x.loaded ? '<i class="lk">ON</i>' : ''}</div>`);
   const pad = Math.max(CS_BAG_COLS, Math.ceil(cells.length/CS_BAG_COLS)*CS_BAG_COLS) - cells.length; for (let i=0;i<pad;i++) cells.push('<div class="cs-bagempty"></div>');
   return `<div class="cs-bag cs-quiver" style="grid-template-columns:repeat(${CS_BAG_COLS}, 1fr);">${cells.join('')}</div><div class="cs-resall">drag a kind onto the quiver slot on the figure, or tap it, to load it</div>`;
 }
@@ -53361,7 +53365,7 @@ function csTakeOff(key, at){
   logMsg(`you take off the ${it.nm}`, ''); return true; }
 function csDrop(d, t){
   hideItemTooltip();
-  if (d.from==='quiver'){ loadAmmo(d.t, true); logMsg(`you load ${RS_AMMO[d.t][0].toLowerCase()} (${G.player.arrows})`, ''); sfx('loot'); rsSync(); renderOverlay(); renderGame(); saveCurrentGame(); return; }
+  if (d.from==='quiver'){ if (loadAmmo(d.t, true)===false){ renderOverlay(); return; } logMsg(`you load ${RS_AMMO[d.t][0].toLowerCase()} (${G.player.arrows})`, ''); sfx('loot'); rsSync(); renderOverlay(); renderGame(); saveCurrentGame(); return; }
   if (d.from==='bag'){
     if (t.bag!=null){ if (t.bag===d.i) return; const [it] = G.inv.splice(d.i, 1); G.inv.splice(Math.min(t.bag, G.inv.length), 0, it); G.charSheetInvSel = -1; }
     else { const it = G.inv[d.i]; G._ringPick = it.slot==='ring' && t.slot && /^ring/.test(t.slot) ? t.slot : null;

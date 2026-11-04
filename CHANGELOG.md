@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-819 - Slung High
+
+- **A quiver is just a quiver.** Wearing one in the cape slot also hung a plain cape down your back in the quiver's colour. Now you only see the quiver.
+- **The bow rides higher.** Slung on your back it hung at the small of the back; now it sits up between the shoulders.
+- **Arrows and bolts obey their Ranged level.** Their level was only written on the tooltip. Now you can't load or fire ammo above your level. It waits in the quiver, greyed out, with the level shown, and the reload picks the best you can use. If a save has too-high arrows loaded, it swaps them out the next time you shoot.
+
 ## RS-818 - Up to the Knees
 
 - **You wade rivers now.** You walked across the top of the water: now you go down onto the river bed, in up to your thighs in the middle and shallower near the banks, with your legs showing through the water.

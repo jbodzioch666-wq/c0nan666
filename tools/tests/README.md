@@ -152,6 +152,7 @@ Screenshots go to `tools/tests/shots/`.
 | `rs816` | the picked herb stays flower up, in a robe and out of one | |
 | `rs817` | the held herb and its petal burst take the picked plant's colour, land and cave, glow included | |
 | `rs818` | wading a river stands you on the bed, arms out, foam and rings; bank, ice and off the river unchanged | |
+| `rs819` | a quiver has no cape, the slung bow is higher, ammo above your Ranged level can't be loaded or fired | |
 | `rs789` | A shire's door stones and flags are dark: their average vertex colour stays low |
 | `rs788` | The open land has its older grass again: no blade chunks, RS-785's code gone |
 | `rs787` | A battle at a town: the card before and after, the banner's words, the trees told where you stand, no shader built by a fade, new creatures warmed off the frame |

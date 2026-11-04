@@ -5,7 +5,7 @@
 module.exports = async page=>{
   const r = await page.evaluate(async ()=>{
     goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{}; G.player.wildWarned = 1;
-    const p = G.player, out = {}; G.inv = []; p.ammoStacks = {}; lootFilterTake = ()=>false;
+    { const rl = rsLvl; rsLvl = k=>k==='ranged' ? 99 : rl(k); }   /* (RS-819: the arrows here are all within your level) */ const p = G.player, out = {}; G.inv = []; p.ammoStacks = {}; lootFilterTake = ()=>false;
     const mk = (t, n)=>{ const x = rsMakeAmmo(t); x.qty = n; return x; };
     const a0 = rsMakeAmmo(1); a0.qty = 0; G.gear.ammo = a0; p.arrows = 20;   /* iron arrows loaded */
     addToInventory(mk(1, 15)); out.loaded = p.arrows; out.inv1 = G.inv.length;
