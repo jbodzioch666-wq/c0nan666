@@ -161,6 +161,7 @@ Screenshots go to `tools/tests/shots/`.
 | `rs825` | `rs825` | RS-825: a rowboat is rowed with no mast, sail or wind; a boarding is fought on the ships' own planks and hull shape, and a mast's rig thins when it stands in the way | |
 | `rs826` | `rs826` | choosing a built boat at the slipway: the 2D and 3D slipway, old saves, building from the best, each hull's damage, crew ashore, sailing the choice | |
 | `rs827` | `rs827` | the sea's danger goes by your best boat: foes, a rowboat attacked, patched and sunk, her panel without guns | |
+| `rs828` | `rs828` | deep water: each sea tile's distance from land, the 3D sea's depth map, shots of the shore, the edge, the deep and the map | |
 | `rs789` | A shire's door stones and flags are dark: their average vertex colour stays low |
 | `rs788` | The open land has its older grass again: no blade chunks, RS-785's code gone |
 | `rs787` | A battle at a town: the card before and after, the banner's words, the trees told where you stand, no shader built by a fade, new creatures warmed off the frame |

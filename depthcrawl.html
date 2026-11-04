@@ -12556,7 +12556,7 @@ function renderMiniMap(){
     const at = (lx, ly)=>{ const g = o3G(lx, ly); return g && owSeen(g[0], g[1]) ? g : null; }, ML = (gx, gy)=>{ const l = o3L(gx, gy); return l ? [l[0] - x0, l[1] - y0] : [-99, -99]; };
     for (let j=-9;j<=2*R+9;j++) for (let i=-9;i<=2*R+9;i++){   /* (a margin round the edge, so the turned square's corners are filled) */ const g = at(x0+i, y0+j); if (!g) continue;
       const t = G.ow.map[g[0]][g[1]]; let col;
-      if (t===OW_WATER) col = '#24406a'; else if (t===OW_RIVER) col = '#3460a0';
+      if (t===OW_WATER) col = owSeaDeep(g[0], g[1]) > 0.5 ? '#142750' : '#2a5080'; else if (t===OW_RIVER) col = '#3460a0';
       else { const rgb = O3_COL[t] || O3_COL[OW_GRASS]; col = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`; }
       c.fillStyle = col; c.fillRect(i*cs, j*cs, cs+0.6, cs+0.6); }
     for (let j=-9;j<=2*R+9;j++) for (let i=-9;i<=2*R+9;i++){ const g = at(x0+i, y0+j); if (!g) continue;
@@ -20570,10 +20570,10 @@ function* pmBuildGen(){
   const tileAt = (tx,ty)=>{ const v = src(tx, ty); if (v >= 0) return m[v % OW_COLS][(v/OW_COLS)|0]; return (tx<0||ty<0||tx>=OW_COLS||ty>=OW_ROWS) ? OW_WATER : m[tx][ty]; };
   const isWater = t=> t===OW_WATER;
   // per-tile land value and tint, sampled bilinearly per pixel for soft, organic shapes
-  const land = new Float32Array((OW_COLS+2)*(OW_ROWS+2)), tint = new Float32Array((OW_COLS+2)*(OW_ROWS+2)*3), K = (tx,ty)=> (ty+1)*(OW_COLS+2)+(tx+1);
+  const seaD = new Float32Array((OW_COLS+2)*(OW_ROWS+2)), land = new Float32Array((OW_COLS+2)*(OW_ROWS+2)), tint = new Float32Array((OW_COLS+2)*(OW_ROWS+2)*3), K = (tx,ty)=> (ty+1)*(OW_COLS+2)+(tx+1);
   for (let tx=-1; tx<=OW_COLS; tx++) for (let ty=-1; ty<=OW_ROWS; ty++){
     const t = tileAt(tx,ty), k = K(tx,ty), s0 = src(tx, ty);
-    land[k] = isWater(t) ? 0 : 1;
+    land[k] = isWater(t) ? 0 : 1; if (isWater(t)) seaD[k] = s0 >= 0 ? owSeaDeep(s0 % OW_COLS, (s0/OW_COLS)|0) : owSeaDeep(tx, ty);   /* (RS-828) */
     const g = OW_SITE_TILES.includes(t) ? OW_GRASS : t, bv = t!==OW_WATER && t!==OW_RIVER ? (s0 >= 0 ? wgBioAt(s0 % OW_COLS, (s0/OW_COLS)|0) : wgBioAt(tx, ty)) : 0, c3 = bv ? BIO[bv].chart : (PM_TINT[g] || PM_TINT[OW_GRASS]);
     tint[k*3] = c3[0]; tint[k*3+1] = c3[1]; tint[k*3+2] = c3[2];
   }
@@ -20602,7 +20602,7 @@ function* pmBuildGen(){
       if (L < 0.58){ const k = (0.58-L)/0.08; r *= 1-k*0.1; g *= 1-k*0.1; b *= 1-k*0.12; }   // a shaded rim inside the coast
     } else {
       const deep = Math.max(0, Math.min(1, (0.5-L)*2.2));
-      r = 160 - deep*40; g = 186 - deep*30; b = 192 - deep*14;
+      r = 160 - deep*40; g = 186 - deep*30; b = 192 - deep*14; { const dk = samp(seaD, fx, fy, 0, 1); r -= dk*62; g -= dk*62; b -= dk*30; }   /* (RS-828: the deep, a darker blue) */
       // ripple lines hugging the shore
       const band = (L*9) % 1; if (L > 0.12 && L < 0.46 && band < 0.1) { r -= 26; g -= 22; b -= 14; }
     }
@@ -24899,6 +24899,13 @@ function owWaterKind(){
 /* (RS-809) ships keep off the lakes, so land that stands in a lake would be lost: a town, a site or an island with no way to it gets a ford, the shortest line of shallows (river tiles, waded) to the land you can reach. Worked out afresh from the map, on a new world and on every load */
 function owLakeFords(){ const ow = G.ow; if (!ow || !ow.map) return 0; ow._wk = null; const wk = owWaterKind(); if (!wk) return 0; const W = OW_COLS, H = OW_ROWS, m = ow.map, R = new Uint8Array(W*H), lake = k=>m[k%W][(k/W)|0]===OW_WATER && wk[k]===2, open = k=>{ const t = m[k%W][(k/W)|0]; return t!==OW_MOUNTAIN && !(t===OW_WATER && wk[k]===2); }, nbs = (k, fn)=>{ for (const [a, b] of [[1,0],[-1,0],[0,1],[0,-1]]){ const n = owNb(k%W, (k/W)|0, a, b); if (n) fn(n[1]*W + n[0]); } }, fill = (st, mark)=>{ const q = [st]; mark[st] = 1; for (let h=0;h<q.length;h++) nbs(q[h], n=>{ if (!mark[n] && open(n)){ mark[n] = 1; q.push(n); } }); return q; }, sp = ow.spawnPos || G.owPos; if (!sp) return 0; fill(sp.y*W + sp.x, R); const want = []; for (let x=0;x<W;x++) for (let y=0;y<H;y++){ const t = m[x][y]; if (t===OW_TOWN || OW_SITE_TILES.includes(t)) want.push(y*W + x); } for (const i of (ow.islands||[])) if (i.land) want.push(i.land[1]*W + i.land[0]); let fords = 0; for (const st of want){ if (R[st] || !open(st)) continue; const C = new Uint8Array(W*H), comp = fill(st, C), from = new Int32Array(W*H).fill(-2), q = []; for (const k of comp){ from[k] = -1; q.push(k); } let hit = -1; for (let h=0;h<q.length && hit < 0;h++){ const k = q[h]; nbs(k, n=>{ if (hit >= 0 || from[n]!==-2) return; if (R[n]){ from[n] = k; hit = n; return; } if (lake(n) || open(n)){ from[n] = k; q.push(n); } }); } if (hit < 0) continue; for (let c = from[hit]; c >= 0 && from[c]!==-1; c = from[c]) if (lake(c)){ m[c%W][(c/W)|0] = OW_RIVER; wk[c] = 0; ow.fordAt = [c%W, (c/W)|0]; } fords++; for (let c = from[hit]; c >= 0; c = from[c]){ if (open(c) && !R[c]) fill(c, R); if (from[c]===-1) break; } if (!R[st]) fill(st, R); } ow.fords = fords; return fords; }
 function owFresh(x, y){ if (x<0 || y<0 || x>=OW_COLS || y>=OW_ROWS || !G.ow || !G.ow.map[x]) return false; const t = G.ow.map[x][y]; if (t===OW_RIVER) return true; if (t!==OW_WATER) return false; const wk = owWaterKind(); return !!(wk && wk[y*OW_COLS+x]===2); }
+/* (RS-828) how far out to sea: each sea tile's distance from the nearest land or lake, up to SEA_DEEP_MAX tiles, over a cube planet's seams too. owSeaDeep is 0 near the shore and 1 in the deep, for the water's colour and the maps */
+const SEA_DEEP0 = 3, SEA_DEEP1 = 7, SEA_DEEP_MAX = 12;
+function owSeaDist(){ const ow = G.ow; if (!ow || !ow.map) return null; if (ow._sd && ow._sdMap===ow.map) return ow._sd; const W = OW_COLS, H = OW_ROWS, m = ow.map, wk = owWaterKind(), N = W*H, d = new Float32Array(N).fill(SEA_DEEP_MAX), cube = owCube(), B = []; for (let i=0;i<=SEA_DEEP_MAX*10;i++) B.push([]); const STEP = [[1,0,10],[-1,0,10],[0,1,10],[0,-1,10],[1,1,14],[1,-1,14],[-1,1,14],[-1,-1,14]];
+  for (let x=0;x<W;x++) for (let y=0;y<H;y++){ const k = y*W + x; if (cube && cubeFace(x, y) < 0) continue; if (m[x][y]!==OW_WATER || (wk && wk[k]===2)){ d[k] = 0; B[0].push(k); } }
+  for (let b=0;b<B.length;b++){ const Q = B[b]; for (let i=0;i<Q.length;i++){ const k = Q[i]; if (Math.round(d[k]*10)!==b) continue; const x = k % W, y = (k/W)|0; for (const S of STEP){ const nb = owNb(x, y, S[0], S[1]); if (!nb) continue; const kk = nb[1]*W + nb[0], nd = b + S[2]; if (nd >= B.length || nd >= Math.round(d[kk]*10)) continue; d[kk] = nd/10; B[nd].push(kk); } } }
+  ow._sd = d; ow._sdMap = ow.map; return d; }
+function owSeaDeep(x, y){ if (x<0 || y<0 || x>=OW_COLS || y>=OW_ROWS) return 1; const d = owSeaDist(); if (!d) return 0; const v = Math.max(0, Math.min(1, (d[y*OW_COLS + x] - SEA_DEEP0)/(SEA_DEEP1 - SEA_DEEP0))); return v*v*(3 - 2*v); }
 function owSea(x, y){ if (x<0 || y<0 || x>=OW_COLS || y>=OW_ROWS || !G.ow || !G.ow.map[x] || G.ow.map[x][y]!==OW_WATER) return false; const wk = owWaterKind(); return !wk || wk[y*OW_COLS+x]!==2; }
 function islandAt(x, y){ const of = G.ow && G.ow.islandOf; if (!of || x<0 || y<0 || x>=OW_COLS || y>=OW_ROWS) return null; const i = of[y*OW_COLS+x]; return i>=0 ? G.ow.islands[i] : null; }
 function islandShore(x, y){ for (const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){ const i = islandAt(x+dx, y+dy); if (i) return i; } return null; }
@@ -28978,6 +28985,8 @@ function* gfxO3BuildGen(grp, x0, y0, W, M){   /* (RS-403: a step at a time - see
         float fres = clamp((0.03 + 0.97*pow(1.0 - wNV, 5.0))*2.2 + 0.07, 0.0, 0.75)*smoothstep(0.0, 0.035, dep);
         vec3 skyR = mix(uSky*1.2, uSky*0.6, clamp(wR.y*1.15, 0.0, 1.0)); if (uRfOn > 0.5){ vec4 rfc = uRm*vec4(vGW.x + wN.x*0.5, ${O3_WATER_Y.toFixed(3)}, vGW.z + wN.z*0.5, 1.0); vec4 rfs = texture2DProj(uRf, rfc); skyR = mix(skyR, rfs.rgb, clamp(rfs.a, 0.0, 1.0)*0.92); }
         vec3 wBody = gl_FragColor.rgb; if (uGrOn > 0.5){ vec2 suv = gl_FragCoord.xy/uRes + sl*0.016*smoothstep(0.0, 0.12, dep); vec3 bed = texture2D(uGr, suv).rgb; float c1 = texture2D(uWat, vGW.xz*0.37 + vec2(uT*0.021, uT*0.016) - fd0*0.2).a, c2 = texture2D(uWat, vGW.xz*0.53 - vec2(uT*0.017, -uT*0.024) + 0.4).a, cau = pow(clamp(1.0 - abs(c1 + c2 - 1.0)*3.4, 0.0, 1.0), 5.0); bed *= 1.0 + cau*2.2*dayK*smoothstep(0.0, 0.03, dep)*(1.0 - smoothstep(0.1, 0.42, dep)); wBody = bed*tr + (wBody*1.35 + vec3(0.02, 0.15, 0.19)*dayK)*(1.0 - tr); gl_FragColor.a = 1.0; } else gl_FragColor.a = clamp(1.0 - tr.g*0.8, 0.0, 1.0)*smoothstep(0.0, 0.02, dep);
+        /* (RS-828) far from land the sea goes to a dark blue, its edge wandering with the clouds' noise so no tile shows */
+        vec2 dpW = vGW.xz + (texture2D(uCloud, vGW.xz*0.043).rg - 0.5)*5.0; float seaDeep = texture2D(uDep, ((dpW - uDepO.xy)*uDepO.z + 0.5)/uDepO.w).b; wBody = mix(wBody, wBody*vec3(0.09, 0.16, 0.33) + vec3(0.0, 0.004, 0.02)*dayK, seaDeep); fres *= 1.0 - seaDeep*0.6;
         gl_FragColor.rgb = mix(wBody, skyR, fres);
         #if NUM_DIR_LIGHTS > 0
         { vec3 sW = normalize(transpose(mat3(viewMatrix))*directionalLights[0].direction); gl_FragColor.rgb *= 1.0 + clamp(dot(sl, sW.xz)*0.42, -0.34, 0.5)*dayK*smoothstep(0.0, 0.05, dep); /* sun glitter: the sun's mirror image broken up by the waves */ vec3 gN = normalize(vec3(-sl.x*1.1, 1.0, -sl.y*1.1)); float gl0 = max(dot(reflect(-wV, gN), sW), 0.0); gl_FragColor.rgb += directionalLights[0].color*(pow(gl0, 90.0)*0.14 + pow(gl0, 800.0)*0.8)*dayK*smoothstep(0.0, 0.03, dep); }
@@ -37427,7 +37436,8 @@ function* o3BuildGen(cx, cy){
     return H[j*NV+i]*(1-a)*(1-b2) + H[j*NV+i+1]*a*(1-b2) + H[(j+1)*NV+i]*(1-a)*b2 + H[(j+1)*NV+i+1]*a*b2; }); }catch(e){ console.error(e); }   /* (RS-694) */
   const land = new T.Mesh(geo, new T.MeshStandardMaterial({ vertexColors:true, map:tex.detail, roughness:0.95 }));
   land.receiveShadow = true; land.castShadow = true; grp.add(land); O3.land = land;
-  { const dd = new Uint8Array(NV*NV*4); for (let k=0;k<NV*NV;k++){ dd[k*4] = Math.round(Math.max(0, Math.min(1, (O3_WATER_Y - H[k])/0.6))*255); dd[k*4+3] = 255; if (dryCuts.length && o3InCut(x0 + (k % NV)/O3_R, y0 + ((k/NV)|0)/O3_R, 0.35, dryCuts)) dd[k*4+1] = 255; }   /* (RS-687: the sea stays over a drowned temple's stair until it parts) */   /* (RS-652: green - no water drawn here, down a barrow's stair) */   /* (RS-311: how deep the water is over every point, for the shallows and the surf) */
+  { const dd = new Uint8Array(NV*NV*4), dpN = Math.ceil((NV - 1)/O3_R) + 3, dpX = Math.floor(x0) - 1, dpY = Math.floor(y0) - 1, dpA = new Float32Array(dpN*dpN); for (let j=0;j<dpN;j++) for (let i=0;i<dpN;i++){ const g = o3G(dpX + i, dpY + j); dpA[j*dpN + i] = g ? owSeaDeep(g[0], g[1]) : 1; }   /* (RS-828: how far out to sea, tile by tile) */
+    for (let k=0;k<NV*NV;k++){ { const fu = x0 + (k % NV)/O3_R - 0.5 - dpX, fv = y0 + ((k/NV)|0)/O3_R - 0.5 - dpY, iu = Math.max(0, Math.min(dpN - 2, Math.floor(fu))), iv = Math.max(0, Math.min(dpN - 2, Math.floor(fv))), au = Math.max(0, Math.min(1, fu - iu)), av = Math.max(0, Math.min(1, fv - iv)); dd[k*4 + 2] = Math.round(255*(dpA[iv*dpN + iu]*(1 - au)*(1 - av) + dpA[iv*dpN + iu + 1]*au*(1 - av) + dpA[(iv + 1)*dpN + iu]*(1 - au)*av + dpA[(iv + 1)*dpN + iu + 1]*au*av)); } dd[k*4] = Math.round(Math.max(0, Math.min(1, (O3_WATER_Y - H[k])/0.6))*255); dd[k*4+3] = 255; if (dryCuts.length && o3InCut(x0 + (k % NV)/O3_R, y0 + ((k/NV)|0)/O3_R, 0.35, dryCuts)) dd[k*4+1] = 255; }   /* (RS-687: the sea stays over a drowned temple's stair until it parts) */   /* (RS-652: green - no water drawn here, down a barrow's stair) */   /* (RS-311: how deep the water is over every point, for the shallows and the surf) */
     if (O3.depthTex) O3.depthTex.dispose(); const dt = O3.depthTex = new T.DataTexture(dd, NV, NV, T.RGBAFormat); dt.magFilter = dt.minFilter = T.LinearFilter; dt.needsUpdate = true; O3.depthO = new T.Vector4(x0, y0, O3_R, NV); }
   O3.heightAt = (wx, wz)=>{
     const fi = (wx-x0)*O3_R, fj = (wz-y0)*O3_R, i = Math.max(0, Math.min(NV-2, Math.floor(fi))), j = Math.max(0, Math.min(NV-2, Math.floor(fj))), a = fi-i, b2 = fj-j;
@@ -51100,7 +51110,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-827';
+const GAME_VERSION = 'rs-828';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

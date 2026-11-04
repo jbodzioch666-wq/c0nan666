@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-828 - The Deep Blue
+
+- **Deep water is darker:** out at sea the water eases from the shore's turquoise to a dark blue, starting about 3 tiles from land and reaching full depth at 7, so you can see when you've left the coast.
+- **On the maps too:** the minimap and the world map shade the deep the same way.
+- **Lakes stay light:** only the open sea goes dark.
+
 ## RS-827 - No Safe Boat
 
 - **The sea stays dangerous:** pirates and monsters now go by the best boat you've built, not the one you chose. Taking a smaller boat no longer means smaller pirates, smaller shark packs or no Kraken.
