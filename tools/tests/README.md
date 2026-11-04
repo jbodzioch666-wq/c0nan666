@@ -138,6 +138,7 @@ Screenshots go to `tools/tests/shots/`.
 | `rs802` | sea fights: hull, broadsides with reload and real shot, pirates that close and fire, holes, plank repairs, a sunk pirate's crate, washing ashore, the map's edge | |
 | `rs803` | a bow on a coast or the map's edge comes round on one key press or a tap; straight at a coast still stops; holding on still lands | |
 | `rs804` | at the helm, with real keys: steering by her own left and right, three steps of sail, a key repeat is no press; right mouse fires towards the pointer within the arc; no options window at sea, still on land | |
+| `rs805` | the harpoon: rope, misses, a fish on the line, a pirate held | |
 | `rs789` | A shire's door stones and flags are dark: their average vertex colour stays low |
 | `rs788` | The open land has its older grass again: no blade chunks, RS-785's code gone |
 | `rs787` | A battle at a town: the card before and after, the banner's words, the trees told where you stand, no shader built by a fade, new creatures warmed off the frame |

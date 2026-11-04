@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-805 - The Harpoon
+
+- **A gun on your foredeck:** with a harpoon and at least a caravel, a swivel gun sits on the bow. **R** chooses it or the guns, and the right mouse fires whichever you chose towards the pointer.
+- **It flies on a rope:** you can watch the line pay out, sag and come back when you miss.
+- **Fight the big fish:** strike a shoal of deep-sea bubbles and a fish takes the line. Hold the button to reel in and ease off when it surges, or the line snaps. Let it run too far and it pulls free. Landing one gives 4 to 6 fish in about 6 to 15 seconds, faster than the rod, which still works.
+- **Hook a pirate:** the harpoon bites her hull, she can't run while you hold her, and reeling hauls her in for your broadside. **C** or Cut lets go.
+- **On a phone:** a long press fires, and the panel has Reel and Cut buttons.
+
 ## RS-804 - At the Helm
 
 - **New sailing keys.** Left and right (or A and D) steer while held, by the ship's own left and right, wherever the camera points. Let go and she holds her new course.
