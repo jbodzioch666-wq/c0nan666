@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-824 - Planks and People
+
+- **Real planking.** Decks, hulls, cabins and forecastles are now laid in proper boards, with seams, butt joints, pegs and grain, in place of the old blotchy wood. Decks run fore and aft, and each hull strake is a row of boards.
+- **People who fit.** You and your crew now stand less than half as tall on board, about 0.45 instead of 1. A Galleon is five of you long instead of two, so there's room on deck. You shrink as you board and return to full size ashore.
+- **New cabins.** Cabins are twice as tall and follow the hull's curve, so no corners hang over the sides, with a dark roof, corner posts, a door and framed windows. Forecastles follow the bow the same way, and the stern lantern now stands on a post on the cabin roof.
+
 ## RS-823 - The Long Neck
 
 - **Nothing walks on the sea:** wandering groups no longer roam the water or the rivers, so there are no more figures striding over the waves or tile-by-tile fights out at sea. The sea is now only ships, sharks, serpents, whales and bosses. Land keeps about the same number of roamers as before: a medium world has about 12 groups, which is the share that was already on land.
