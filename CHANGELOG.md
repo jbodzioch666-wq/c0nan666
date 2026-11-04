@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-807 - Release the Kraken
+
+- **Monsters from the deep:** out on the open sea, sharks, serpents and the Kraken now hunt you in real time. Your guns and harpoon both work on them.
+- **Giant shark:** a fin circles, then charges and bites your hull. It leaves shark meat if you kill it.
+- **Sea serpent:** great coils roll through the water while a horned head rears up and spits venom at you. It leaves venom glands and a floating crate.
+- **The Kraken:** a huge boss rises beside caravels and bigger ships, more often in a storm. When the water boils, sail out before the arm comes down on your deck. It also sinks and comes up elsewhere, unless your harpoon holds it at the surface.
+- **Its hoard:** the Kraken leaves its beak as a trophy, kraken spawn, ambergris, three rich gear drops and three crates. Slaying it earns the Release Nothing achievement.
+
 ## RS-806 - Thar She Blows
 
 - **Whales on the open sea:** sail far enough and a great sperm whale surfaces. She blows, sounds with her flukes in the air and sometimes breaches clear of the water.
