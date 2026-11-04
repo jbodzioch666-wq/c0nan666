@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## RS-820 - Things in the Water
+
+- **The Kraken has a face:** big yellow eyes under a scowling brow, a hooked beak that opens when it strikes, feeding arms and a warty mantle. The old one was built inside out, which is why it had no face.
+- **The Kraken hits hard:** its arm damage now grows with its level instead of your hull, and it aims where your ship will be, following your turn. Only changing course once the water boils gets you clear. In test fights with a scripted helmsman, a level 90 galleon won with 37% of its hull left, was sunk with the Kraken at 20%, and once slipped away with 96%. A Tier 3 ship at level 45 was sunk with the Kraken at 31%, so a Kraken your own size is a real risk, and running is an answer.
+- **It takes hold:** an arm comes over the rail, holds the ship almost still and crushes it. Shoot the Kraken to break the grip, or it lets go after 10 seconds.
+- **Sea monsters wander:** sharks, serpents and the Kraken roam until you sail close or shoot them, so a fin on the horizon is a choice. Bigger ships meet shark packs. The Kraken needs a ship of Tier 3 or more, level 25 and open water.
+- **Serpents fight like serpents:** they dive under your hull and come up on the other side, spit venom that eats the hull slowly (it can't sink you), and your shots can hit them along the whole body. A level 45 serpent cost a Tier 3 ship 30% of its hull, a level 90 shark pack cost a galleon 29%.
+- **Fixed:** leaving a fight no longer leaves a beast's arms standing in the sea.
+
 ## RS-819 - Slung High
 
 - **A quiver is just a quiver.** Wearing one in the cape slot also hung a plain cape down your back in the quiver's colour. Now you only see the quiver.
