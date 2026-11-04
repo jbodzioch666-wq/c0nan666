@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-826 - Choose Your Boat
+
+- **Pick your ship at the slipway:** every boat you've built stays yours. Tap one in the Your Boats list and she's the one you sail, with her own speed, guns, crew room and hull.
+- **She stands on the slipway:** the boat you sail is on the slipway, whole, in the panel's picture and in the yard itself. A new hull takes her place while you work on it, and she waits at the quay.
+- **Building goes on from your best:** taking a smaller boat never sets your next build back, and a newly launched boat becomes the one you sail.
+- **Each boat keeps her own damage:** changing ships is no free repair. Hands who don't fit aboard wait ashore for a bigger deck, and a harpoon still needs a caravel or bigger.
+
 ## RS-825 - Pull and Board
 
 - **You row the rowboat.** No mast and no sail any more: a pair of oars that swing, dip and pull, and you sitting on the thwart with your back to the bow, your weapon put away. Her speed no longer depends on the wind, the panel says rowing instead of sails, and new rowboats take no sailcloth to build.

@@ -53,9 +53,9 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   A(mid.pour && mid.mal, 'the slipway works while you build: ' + JSON.stringify(mid));
   A(r3.st===1 && r3.kids1 >= 3, 'the keel done, and in 3D: ' + JSON.stringify(r3));
   A(r3.tier===1 && r3.has && r3.counts[r3.counts.length - 2] > r3.kids1, 'the rowboat is built and launched, growing on the way: ' + JSON.stringify(r3.counts));
-  A(r3.counts[r3.counts.length - 1]===0, 'the slipway is empty after the launch');
+  A(r3.counts[r3.counts.length - 1] > 0, 'after the launch (RS-826) the boat you sail stands on the slipway');
   A(/Construction 20/.test(r3.why), 'a sloop needs Construction 20: ' + r3.why);
   A(r3.sloop.st===4 && r3.sloopKids.length && r3.sloopKids[r3.sloopKids.length - 1] > r3.sloopKids[0] && r3.gold===4700, 'the sloop under way, its fee paid: ' + JSON.stringify(r3.sloop) + ' gold ' + r3.gold + ' ' + JSON.stringify(r3.sloopKids));
-  A(r4.tier===2 && r4.kids===0, 'the sloop launched: ' + JSON.stringify(r4));
+  A(r4.tier===2 && r4.kids > 0, 'the sloop launched, and on the slipway: ' + JSON.stringify(r4));
   A(!errs.length, 'no errors: ' + errs.join(' | '));
 };
