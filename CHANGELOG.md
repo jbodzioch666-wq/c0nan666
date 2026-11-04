@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## RS-812 - Keep It Taut
+
+- **Hold the line in its band:** a harpooned fish or whale now has a green band on the tension bar. Hold it there and it comes in or tires; too tight and the line snaps, too slack for a moment and the hook falls out. A whale can get away now.
+- **The harpoon is for big game:** it strikes only sharks, marlin and kraken spawn. Tuna and swordfish stay with the rod. Below the Fishing level for them, it tells you what you need.
+- **XP you can trust:** every recipe, furnace, cooking, brewing, building, bone, spell, lamp and quest list showed xp before the game's pace was applied, so 140 xp paid 42 and a 40 xp bar paid 12. The lists now show what you'll really get, bonuses included. The pay itself hasn't changed.
+- **Shot at the shipwright:** buy cannonballs at the slipway, 12g each, in 20s, 50s and 100s. A steel bar now forges 8 instead of 4.
+- **Sea goods say what they do:** whale oil, whalebone, ambergris and cannonballs now list their uses and sources in their tooltips.
+- **Picking herbs:** you kneel, part the leaves, work the plant loose, tug it free in a burst of leaves and petals, look it over and bag it, on the land and in caves.
+
 ## RS-811 - Boarders Away
 
 - **Board a pirate.** When she's within about two and a half tiles and down to 40% of her hull, or on your harpoon, press B or the panel's Board button. Grapples haul her alongside.
