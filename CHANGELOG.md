@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-810 - Hands on Deck
+
+- **A crew.** Sign on hands at the Boatyard's slipway, once you have a sloop: 4 on a sloop, 6 on a caravel, 12 on a galleon, 10 on a clipper. Each costs a one-time fee (60g to 400g by ship).
+- **What they do.** A full crew reloads the guns 35% faster and patches her 45% faster; fewer hands, less of it.
+- **What it costs.** Each hit on her has a 12% chance to kill a hand, and half drown if she sinks.
+- **You can see them.** Up to five stand about the deck and run to the guns when a fight starts.
+
 ## RS-809 - Ships Keep to the Sea
 
 - **No more boats on lakes:** ships can't get onto inland lakes any more. Only the sea carries them, and pirates, whales and sea monsters stay out of lakes too. Rivers were already waded on foot.
