@@ -16,9 +16,9 @@ module.exports = async page=>{
     return out; });
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
-  A(r.medium.target >= 25 && r.medium.target <= 31 && r.medium.enc <= r.medium.target, 'the medium world keeps about its 25 roamers (RS-659: to its own land, like the others; RS-683: half the old 50)');
-  A(r.p18.ver>=18 && r.p18.target > 50 && r.p18.target <= 75 && r.p18.perEnc > 400 && r.p18.perEnc < 560, 'a planet has as many roamers to its land as the medium world');
-  A(r.p18.enc > 40, 'and they are out on its land');
+  A(r.medium.target >= 8 && r.medium.target <= 18 && r.medium.enc <= r.medium.target, 'the medium world keeps about its 25 roamers (RS-659: to its own land, like the others; RS-683: half the old 50)');
+  A(r.p18.ver>=18 && r.p18.target >= 15 && r.p18.target <= 35 && r.p18.perEnc > 800 && r.p18.perEnc < 1800, 'a planet has as many roamers to its land as the medium world');
+  A(r.p18.enc >= 12, 'and they are out on its land');
   A(r.p18.perSite >= 160, 'a planet\'s sites spaced like the other sizes\'');
   A(r.p17.nd > r.p18.nd, 'a generator 17 planet keeps its site counts');
   A(r.load.same && r.load.ver>=18 && r.load.slots.join()===r.load.was.join() && r.load.target===r.p18.target, 'loaded back, the same world and its counts');

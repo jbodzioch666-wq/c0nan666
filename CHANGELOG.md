@@ -1,5 +1,15 @@
 # Depthcrawl patch notes
 
+## RS-823 - The Long Neck
+
+- **Nothing walks on the sea:** wandering groups no longer roam the water or the rivers, so there are no more figures striding over the waves or tile-by-tile fights out at sea. The sea is now only ships, sharks, serpents, whales and bosses. Land keeps about the same number of roamers as before: a medium world has about 12 groups, which is the share that was already on land.
+- **A fin, not a walker:** when something would have come for you while you worked at sea, it's now a shark in the water.
+- **New boss, the Plesiosaur:** a huge four-flippered beast with a neck as tall as a mast. You see it a long way off, and it hunts you if you come close or shoot it.
+- **Its charge:** its head goes down and it charges, following you until it's close, then it can't turn. Change course late to get clear; hold on and it knocks the way off your ship.
+- **Its neck:** stay within reach and the neck rears up and comes down on the deck, sometimes taking one of your crew.
+- **Its breach:** once hurt, it dives and comes up under your keel, so sail out of the boiling water.
+- **Its spoils:** its skull as a trophy, whalebone, whale oil and two rare pieces of gear. In test fights with a scripted helmsman and no crew, a level 90 Tier 4 ship won with 12% to 65% of its hull left, and a level 45 Tier 3 ship won with 3% left.
+
 ## RS-822 - Eyes on the Whale
 
 - **The line by your boat:** the tension bar, Reel and Cut now float beside your ship instead of on the side panel, so you can watch the whale and the bar together. The panel moves above or below the ship to stay on the far side from whatever you've hooked.

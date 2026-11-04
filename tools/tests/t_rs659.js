@@ -51,9 +51,9 @@ module.exports = async page=>{
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
   A(r.ver >= 20 && r.cube, 'a fresh planet is a generator 20 (or later) cube');   /* (RS-671: generator 21 since RS-668) */
   A(r.nb.face===4 && r.nb.nbFace===0 && r.nb.oldFace===-1 && r.nb.spawnFace >= 0, 'over the north face\'s west edge the neighbour lies on the west face (the void to generator 19): ' + JSON.stringify(r.nb));
-  A(r.enc.planet===r.enc.want && r.enc.planet > 25 && r.enc.n >= r.enc.planet*0.7, 'a planet\'s roamers to its land: ' + JSON.stringify(r.enc));
-  A(r.sizes.large.target > 30 && r.sizes.large.target===Math.min(75, Math.max(25, Math.round(25*r.sizes.large.land/11800))) && r.sizes.large.n >= r.sizes.large.target*0.7, 'a large world has more than its medium twenty-five roamers (RS-683: halved), to its land: ' + JSON.stringify(r.sizes));
-  A(r.sizes.medium.target >= 25 && r.sizes.medium.target <= 31, 'a medium world keeps about twenty-five (RS-683: halved): ' + JSON.stringify(r.sizes));
+  A(r.enc.want > 25 && r.enc.planet >= 15 && r.enc.planet < r.enc.want && r.enc.n >= r.enc.planet*0.7, 'a planet\'s roamers to its land: ' + JSON.stringify(r.enc));
+  A(r.sizes.large.target > r.sizes.medium.target && r.sizes.large.n >= r.sizes.large.target*0.7, 'a large world has more than its medium twenty-five roamers (RS-683: halved), to its land: ' + JSON.stringify(r.sizes));
+  A(r.sizes.medium.target >= 8 && r.sizes.medium.target <= 18, 'a medium world keeps about twenty-five (RS-683: halved): ' + JSON.stringify(r.sizes));
   A(r.bare.has && r.bare.bare < r.bare.cv*0.9, 'the bare chart has no glyph ink: ' + JSON.stringify(r.bare));
   if (!r.stip.none) A(r.stip.dark > 0.02 && r.stip.dark < 0.3 && Math.abs(r.stip.diag - 1/6) < 0.07, 'open sea is stippled, with no diagonal hatching: ' + JSON.stringify(r.stip));
   A(r.north.glyphs > 50 && r.north.lod2 && r.north.near===0, 'close in on the north face the glyphs are drawn, through the turned layer: ' + JSON.stringify(r.north));

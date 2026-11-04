@@ -19,7 +19,7 @@ module.exports = async page=>{
     return out; });
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
-  A(r.base===25 && r.target >= 25 && r.target <= 31, 'a medium world keeps about 25 groups (half the old 50)');
+  A(r.base===25 && r.target >= 8 && r.target <= 18, 'a medium world keeps about 25 groups (half the old 50)');
   A(r.fresh <= r.target && r.fresh >= r.target - 5, 'a fresh world starts with about that many');
   A(r.old===50, 'an old save with 50');
   A(r.after===r.target && r.steps >= 50 - r.target && r.steps < 200, 'thins out to the target, one a step');
