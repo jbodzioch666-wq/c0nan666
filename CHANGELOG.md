@@ -1,5 +1,15 @@
 # Depthcrawl patch notes
 
+## RS-806 - Thar She Blows
+
+- **Whales on the open sea:** sail far enough and a great sperm whale surfaces. She blows, sounds with her flukes in the air and sometimes breaches clear of the water.
+- **Hook one:** a mithril harpoon or better holds her; iron glances off. Once the rope comes taut she takes your ship in tow, sails or no sails.
+- **Tire her out:** haul in when she rests and ease off when she runs, or the line snaps. Taking in sail tires her faster. Ground your ship and the line parts, and get too close while she runs and her flukes stove in your side.
+- **Oil, bone and ambergris:** a whale gives whale oil, whalebone and sometimes valuable ambergris, plus a lot of Fishing xp. Your biggest also gives a jawbone trophy.
+- **Whale oil in the seams:** while you carry oil, each plank repairs twice as much of the hull.
+- **Whalebone harpoon:** the Peddler's new top harpoon (Fishing 85, 12 whalebone) has the longest reach.
+- **New achievement:** Thar She Blows, for taking 5 whales.
+
 ## RS-805 - The Harpoon
 
 - **A gun on your foredeck:** with a harpoon and at least a caravel, a swivel gun sits on the bow. **R** chooses it or the guns, and the right mouse fires whichever you chose towards the pointer.
