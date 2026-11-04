@@ -148,6 +148,7 @@ Screenshots go to `tools/tests/shots/`.
 | `rs812` | tension band, harpoon big fish only, shot at the slipway and 8 a bar, tooltips, xp shown equals xp paid, herb pose | |
 | `rs813` | every Serpentskin Shroud has magic, new and old; rolled magic kept; other uniques untouched | |
 | `rs814` | Fishing tooltips list rod or harpoon; a legendary spot has no shark; waves stand through a water rebuild | |
+| `rs815` | picking a herb: walks up from the next tile; a robe kneels on both knees, nothing at the hip; all back when it stops | |
 | `rs789` | A shire's door stones and flags are dark: their average vertex colour stays low |
 | `rs788` | The open land has its older grass again: no blade chunks, RS-785's code gone |
 | `rs787` | A battle at a town: the card before and after, the banner's words, the trees told where you stand, no shader built by a fade, new creatures warmed off the frame |

@@ -32,7 +32,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   console.log(JSON.stringify(r));
   A(!r.noOpt, 'a cave herb patch to pick');
   A(r.stand.tot > 1000 && r.stand.worst < 0.05 && r.stand.n < 80, 'standing below ground, the cape over the back: ' + JSON.stringify(r.stand));
-  A(r.herb.every(h=>h.bend > 0.6 && h.tot > 1000 && h.worst < 0.05 && h.n < 40), 'stooped over the herbs, the back under the cape: ' + JSON.stringify(r.herb));
+  /* (RS-812, RS-815: picking a herb bends and straightens through its cycle, less in a robe, so a sample can be nearly upright; it must bend somewhere) */ A(Math.max(...r.herb.map(h=>h.bend)) > 0.35 && r.herb.every(h=>h.tot > 1000 && h.worst < 0.05 && h.n < 40), 'stooped over the herbs, the back under the cape: ' + JSON.stringify(r.herb));
   A(r.bury.bend > 0.6 && r.bury.worst < 0.05 && r.bury.n < 40, 'burying bones below ground: ' + JSON.stringify(r.bury));
   A(r.owBury.bend > 0.6 && r.owBury.worst < 0.05 && r.owBury.n < 40, 'burying bones on the open land: ' + JSON.stringify(r.owBury));
   A(!errs.length, 'no errors: ' + errs.join(' | '));

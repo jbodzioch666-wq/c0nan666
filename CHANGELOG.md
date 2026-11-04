@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-815 - Down Among the Herbs
+
+- **You walk up to the plants:** picking from the next tile, you now step right up to the patch before kneeling, so your hand reaches the herb. You step back onto your tile when you stop.
+- **Robes stay closed:** in a robe you kneel on both knees with the skirt folded over them, so your trousers no longer come through. A sword at your hip is put out of sight while you kneel, or it went through the cloth.
+- **A smaller sprig stalk:** the herb you pull has a finer stem.
+
 ## RS-814 - Fish Fight Like Whales
 
 - **Harpooned fish play like the whale:** the line pulls the same gentle way on every fish. A fish tires while you hold the line in the green, comes in when it rests, and is landed when it's spent. Sharks and kraken spawn take longer, about 18 to 29 seconds, but don't pull harder.
