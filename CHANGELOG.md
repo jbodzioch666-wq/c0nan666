@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-817 - True Colours
+
+- **The herb in your hand is the plant you're picking.** It was green whatever you picked: now a silverleaf comes up white, a bloodmoss red, a sunpetal yellow, on the land and in a cave.
+- **The whole flower head matches.** The yellow centre is gone, and a plant that glows gives you a sprig that glows.
+- **The burst of petals** takes the same colour.
+
 ## RS-816 - Flower Side Up
 
 - **The herb comes up the right way:** the plant you pull now stays flower up in your hand, whichever way your arm is turned. It hung head down.
