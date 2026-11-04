@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-816 - Flower Side Up
+
+- **The herb comes up the right way:** the plant you pull now stays flower up in your hand, whichever way your arm is turned. It hung head down.
+- **Sized like the plants:** the herb in your hand is a little smaller, closer to the ones still growing.
+
 ## RS-815 - Down Among the Herbs
 
 - **You walk up to the plants:** picking from the next tile, you now step right up to the patch before kneeling, so your hand reaches the herb. You step back onto your tile when you stop.
