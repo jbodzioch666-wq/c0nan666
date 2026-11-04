@@ -135,6 +135,7 @@ Screenshots go to `tools/tests/shots/`.
 | `rs800` | all five ships at sea are the slipway's ships: deck, guns, rigging, the water kept out, yard still builds in stages | |
 | `rs801p` | sailing over a Planet seam: she keeps her way and heading |
 | `rs801` | sailing: momentum, wind, sails up and down, the turning circle, coasts and landing, a tapped course, the panel | |
+| `rs802` | sea fights: hull, broadsides with reload and real shot, pirates that close and fire, holes, plank repairs, a sunk pirate's crate, washing ashore, the map's edge | |
 | `rs789` | A shire's door stones and flags are dark: their average vertex colour stays low |
 | `rs788` | The open land has its older grass again: no blade chunks, RS-785's code gone |
 | `rs787` | A battle at a town: the card before and after, the banner's words, the trees told where you stand, no shader built by a fade, new creatures warmed off the frame |

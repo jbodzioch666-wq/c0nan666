@@ -1,5 +1,17 @@
 # Depthcrawl patch notes
 
+## RS-802 - Broadsides
+
+- **Your guns fire.** A sloop or bigger fires its side with Q (left) or E (right), or the panel's buttons, gun by gun down the side. Each gun uses one cannonball, then that side reloads.
+- **Real shot.** Each ball flies through the air and lands where it lands. Aim by putting your target inside the arc marked on the water, which turns green when a side is ready and bears.
+- **Pirate ships.** Black sails come out of the open sea as you cover distance, roughly every few minutes of sailing. They sail by the same wind, close to gun range and circle to bring a broadside on you. A faster ship can run away.
+- **Hull health.** Your ship now has a hull bar. Shot leaves holes in the hull and deck where it hits. Below half she smokes and slows, and lower still she burns and lists. Pirates show the same damage.
+- **Repairs.** O or the Repair button patches the hull with planks, one at a time, while you keep sailing.
+- **Spoils.** A sunk pirate floats a crate: sail over it for gold, cannonballs, planks and sometimes rope, sailcloth or gear. Sinking one gives Ranged xp, and a new achievement waits at ten.
+- **Going down.** If your ship sinks you wash ashore alive and keep her, at a quarter hull. You lose 5% of your gold and half your cannonballs.
+- **20 free cannonballs.** The shipwright leaves them in your hold the first time you sail with guns. Forge more from steel at any anvil. Rowboats carry no guns and meet no pirates.
+- **Test duels at each ship size** lasted 35 to 47 seconds and cost 24 to 50 cannonballs, with 26% to 67% of the hull left.
+
 ## RS-801 - Under Sail
 
 - **Ships sail now, not walk.** A ship has weight: she gathers way slowly, carries it when you stop, and turns in a wide circle. A galleon is heavy and slow to come round; a rowboat spins on the spot.
