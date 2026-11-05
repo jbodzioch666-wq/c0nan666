@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-831 - Grass on the Card
+
+- **Towns run twice as fast.** The grass in green towns and the Shire was worked out on the CPU, 160,000 cells every frame. It now runs on the graphics card and behaves the same: wind, and people pushing through and flattening it. Measured with no frame cap on a desktop: a town 149 to 328 fps, the Shire 160 to 352.
+- **Older phones and cards.** A device that can't do this on the card keeps the old way, so nothing changes there.
+
 ## RS-830 - Loose Ends
 
 - **The victor's portal stays put.** Reloading a save on a beaten floor could move the portal its fallen master opened and turn it into a plain way out somewhere else. It now stays where it opened and stays a portal.
