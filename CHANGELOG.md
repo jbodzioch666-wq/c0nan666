@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-836 - Standing Ground
+
+- **Sites and trees stay put on a walk:** when the land rebuilds as you walk, the towns, dungeons, trees and bushes still in view are kept instead of being made again. 33 of 39 sites carry over in a typical rebuild, and the land comes out mesh for mesh the same as a whole rebuild.
+- **New creatures no longer stall the frame:** a roaming monster or animal of a kind you hadn't met yet made the game wait for its shaders on the frame it first appeared. It now waits out of sight for a moment and steps in when it's ready, as in towns and dungeons.
+- **Worst frame, walking fully zoomed out:** 132-168 ms before, 24-37 ms now, on the test PC. Zoomed in: 33-35 ms before, 30-34 ms now. Average fps is unchanged.
+- **The longest build step:** 21-25 ms before, 11-16 ms now.
+- **What's left:** a short frame of about 25-35 ms right after each land swap, every dozen tiles or so zoomed out, while the new ground reaches the graphics card.
+
 ## RS-835 - Long View
 
 - **Walking zoomed out is much smoother.** Fully zoomed out, the land was rebuilding every 6 tiles. It now rebuilds as often as its last build's real speed needs: 3 times in 40 tiles instead of 5. On the test PC fps on that walk went from 142 to 173, long frames (over 10 ms) from about 240 to about 165, and the worst frame from about 70 ms to about 45 ms.
