@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-834 - One Pass
+
+- **Smoke, wakes and sails cost much less.** Each see-through sheet was drawn twice a frame, front and back, with the graphics library recomputing its shader settings both times: about 52 times a frame in a sea fight. A flat sheet only ever shows one face, so these now draw once.
+- **A three-ship battle is up again, to 257 fps** from 191-226 after Fleet Bake, and it looks the same: ships showed no changed pixels with see-through sails either way.
+
 ## RS-833 - Door Prep
 
 - **No more hitch walking up to a door.** The game paints a room's surfaces as you approach, so stepping in is instant. The stone floors and plaster were painted in one go, a 54 ms hitch in town; they now paint a little at a time like the wooden boards.

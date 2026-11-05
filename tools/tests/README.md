@@ -166,6 +166,7 @@ Screenshots go to `tools/tests/shots/`.
 | `rs831` | `rs831` | a green town's grass field runs on the card: wind moves it, a CPU fallback, a raid never reads the town's target | |
 | `rs832` | `rs832` | Ships at sea are baked: meshes per ship bounded, every gun an instance that follows its barrel's recoil and runs back out, crew posts still at the guns, sails still on their masts, no geometry left behind by rebuilds | |
 | `rs833` | `rs833` | A room's flags, plaster and boards paint in thin slices on the walk to its door: slices short, no long frame, all made in time | |
+| `rs834` | `rs834` | Flat see-through double-sided sheets and depth-only lids draw once; a closed see-through shape keeps both passes; the ship's lid stops redoing its program | |
 | `rs789` | A shire's door stones and flags are dark: their average vertex colour stays low |
 | `rs788` | The open land has its older grass again: no blade chunks, RS-785's code gone |
 | `rs787` | A battle at a town: the card before and after, the banner's words, the trees told where you stand, no shader built by a fade, new creatures warmed off the frame |
