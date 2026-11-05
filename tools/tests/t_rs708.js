@@ -12,21 +12,27 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
     const plate = ()=>{ const el = document.querySelector('.dh-tsub'); return el ? +(el.textContent.match(/^(\d+)\//)||[0, -1])[1] : null; };
     const shot = async (fire, pick)=>{ while (FP.cast > 0) await fr(); const hp0 = m.hp, n0 = G.log.length, x0 = (P.skills||skP().skills).magic, t0 = performance.now(), rows = []; const had = new Set(ISO.shots||[]), rr = Math.random; Math.random = ()=>0.97; try{ fire(); } finally { Math.random = rr; }
       const s = (ISO.shots||[]).find(q=>!had.has(q));   /* (the shot this fired: a bolt, an arrow) */
-      while (performance.now() - t0 < 1700){ await fr(); rows.push({ ms:performance.now() - t0, live:!!(s && ISO.shots.includes(s)), go:!!(s && s.go), shown:monHpShown(m), plate:plate(), log:G.log.slice(n0).some(l=>/hits|for \d+/.test(l.msg)) }); }
-      const land = rows.find(q=>q.go && !q.live), before = rows.filter(q=>land && q.ms < land.ms - 25), after = rows.filter(q=>land && q.ms > land.ms + 40);
-      return { dmg:hp0 - m.hp, landMs:land && Math.round(land.ms), barBefore:before.every(q=>q.shown===hp0), plateBefore:before.every(q=>q.plate===null || q.plate===hp0), logBefore:before.some(q=>q.log),
+      while (performance.now() - t0 < 1700){ await fr(); rows.push({ ms:performance.now() - t0, live:!!(s && ISO.shots.includes(s)), go:!!(s && s.go), shown:monHpShown(m), plate:plate(), log:G.log.slice(n0).some(l=>/hits|for \d+/.test(l.msg) && !/hits you|you for/i.test(l.msg)), msg:G.log.slice(n0).map(l=>l.msg).join(' | ').slice(0,200) }); }
+      const land = rows.find(q=>q.go && !q.live), before = rows.filter(q=>land && q.ms < land.ms - 50), after = rows.filter(q=>land && q.ms > land.ms + 40);
+      return { dmg:hp0 - m.hp, landMs:land && Math.round(land.ms), barBefore:before.every(q=>q.shown===hp0), plateBefore:before.every(q=>q.plate===null || q.plate===hp0), logBefore:before.some(q=>q.log), early:(before.find(q=>q.log)||{}).msg, earlyMs:(before.find(q=>q.log)||{}).ms,
         barAfter:after.length > 0 && after.every(q=>q.shown===m.hp), plateAfter:after.some(q=>q.plate===m.hp), logAfter:after.some(q=>q.log) }; };
     noteFoe(0); out.spell = await shot(()=>rsCastAt(0, P.rsSpell), 'spell'); await wait(800);
     /* an arrow */
-    G.gear.weapon = newItem(); G.gear.ranged = rsMakeBow(3, true); P.arrows = 200; try{ loadAmmo(0, true); }catch(e){} rsSync && rsSync();
+    P.rangedMode = 'bow'; skP().skills.ranged = SK_XP[99]; G.gear.weapon = newItem(); G.gear.ranged = rsMakeBow(3, true); try{ loadAmmo(0, true); }catch(e){} P.arrows = 200; rsSync && rsSync();
     out.arrow = await shot(()=>{ try{ rangedAttack0(0); }catch(e){ out.arrowErr = String(e); } }, 'arrow'); await wait(800);
+    /* (RS-830) a bolt held back by slow frames: the log waits for it, not for the timer */
+    { P.rangedMode = 'magic'; G.gear.weapon = rsMakeStaff(1); G.gear.ranged = newItem(); rsSync && rsSync(); while (FP.cast > 0) await fr(); m.hp = m.maxHp; const n0 = G.log.length, had = new Set(ISO.shots||[]), rr = Math.random; Math.random = ()=>0.97; try{ rsCastAt(0, P.rsSpell); } finally { Math.random = rr; }
+      const s = (ISO.shots||[]).find(q=>q.kind==='spell' && !had.has(q)), t0 = performance.now(), said = ()=>G.log.slice(n0).some(l=>/hits the/.test(l.msg)); let early = false, freed = null, saidAt = null;
+      while (performance.now() - t0 < 2200){ const live = s && ISO.shots.includes(s); if (performance.now() - t0 < 1250 && live) s.t = Math.min(s.t, 0.02); else if (freed===null) freed = performance.now() - t0; if (live && performance.now() - t0 < 1250 && said()) early = true; if (said() && saidAt===null) saidAt = performance.now() - t0; await fr(); }
+      out.stall = { shot:!!s, early, freed:freed && Math.round(freed), saidAt:saidAt && Math.round(saidAt) }; await wait(300); }
     /* a kill: the plate stays till the bolt lands */
-    G.gear.weapon = rsMakeStaff(1); G.gear.ranged = newItem(); m.hp = 1; let gone = null, landed = null; { const rr = Math.random; Math.random = ()=>0.97; try{ rsCastAt(0, P.rsSpell); } finally { Math.random = rr; } }
+    P.rangedMode = 'magic'; G.gear.weapon = rsMakeStaff(1); G.gear.ranged = newItem(); m.hp = 1; let gone = null, landed = null; { const rr = Math.random; Math.random = ()=>0.97; try{ rsCastAt(0, P.rsSpell); } finally { Math.random = rr; } }
       const s = (ISO.shots||[]).find(q=>q.kind==='spell'), t0 = performance.now(); while (performance.now() - t0 < 1500){ await fr(); const live = s && ISO.shots.includes(s); if (plate()===null && gone===null) gone = performance.now() - t0; if (s && s.go && !live && landed===null) landed = performance.now() - t0; }
       out.kill = { gone:gone && Math.round(gone), landed:landed && Math.round(landed), dead:!m.alive };
     return out; });
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: ' + m + ' ' + JSON.stringify(r)); };
+  A(r.stall.shot && !r.stall.early && r.stall.saidAt > r.stall.freed - 20, 'a bolt held back: its log line waits till it lands (RS-830)');
   for (const k of ['spell', 'arrow']){ const x = r[k];
     A(x.dmg > 0 && x.landMs > 200, k + ': it hit, and flew a while');
     A(x.barBefore && x.plateBefore && !x.logBefore, k + ': the life bar, the target plate and the log keep still till it lands');

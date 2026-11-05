@@ -12,7 +12,7 @@ module.exports = async page=>{
     /* the land's normals, summed a few rows at a time, are three's own */
     const NV = O3_W*O3_R + 1, land = O3.land;   /* (RS-654: the land's grid, then the barrows' stair patches after it (RS-652) - judged on the grid, clear of the cuts, whose triangles are re-laid) */
     if (land){ const g = land.geometry.clone(); g.computeVertexNormals(); const a = land.geometry.attributes.normal.array, b = g.attributes.normal.array, P = land.geometry.attributes.position.array, cuts = O3.cuts||[]; let d = 0;
-      for (let k=0;k<NV*NV;k++){ if (cuts.some(c=>Math.abs(P[k*3] - c.cx) < 3 && Math.abs(P[k*3+2] - c.cz) < 3)) continue; for (let e=0;e<3;e++) d = Math.max(d, Math.abs(a[k*3+e] - b[k*3+e])); } out.normDiff = d; out.cuts = cuts.length; } else out.normDiff = 'no land';
+      for (let k=0;k<NV*NV;k++){ if (cuts.some(c=>Math.abs(P[k*3] - c.cx) < 3 && Math.abs(P[k*3+2] - c.cz) < 3)) continue; if (!b[k*3] && !b[k*3+1] && !b[k*3+2]) continue; { const X = Math.floor(P[k*3]), Z = Math.floor(P[k*3+2]); let mine = false; for (let p=-3;p<=3 && !mine;p++) for (let q=-3;q<=3;q++) if (o3Tile(X+p, Z+q)===OW_MINE){ mine = true; break; } if (mine) continue; } for (let e=0;e<3;e++){ const q = Math.abs(a[k*3+e] - b[k*3+e]); if (q > d){ d = q; out.normAt = [P[k*3], P[k*3+1], P[k*3+2]]; } } } out.normDiff = d; out.cuts = cuts.length; } else out.normDiff = 'no land';
     return out; });
   await cdp.send('Emulation.setCPUThrottlingRate', { rate:4 });
   const r = await page.evaluate(async ()=>{

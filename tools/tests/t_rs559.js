@@ -12,7 +12,7 @@ module.exports = async page=>{
       G.pendingDungeon = { x:dx, y:dy }; enterDungeonConfirm(); setUi('playing'); G.mon = []; if (depth > 1){ loadLevel(depth, false); G.mon = []; } for (let i=0;i<10;i++){ renderGame(); await new Promise(r=>setTimeout(r, 40)); } };
     await go(OW_GRAVEYARD, 2); const mats = {}; FPD.world.traverse(o=>{ if (o.isMesh && o.material && o.material.isMeshPhongMaterial) for (const k in FPD.mats) if (FPD.mats[k]===o.material) mats[k] = o.material; });
     const f0 = mats['catacomb:f0'], w0 = mats['catacomb:wall2']; out.crypt = { floorSpec:!!(f0 && f0.specularMap), floorShine:f0 ? f0.shininess : null, floorSpecK:f0 ? +f0.specular.r.toFixed(2) : null, wallSpec:!!(w0 && w0.specularMap), wallShine:w0 ? w0.shininess : null, keys:Object.keys(mats).length };
-    await go(OW_DUNGEON, 1); const d0 = FPD.mats['dungeon:f0']; out.dungeon = { floorShine:d0 ? d0.shininess : null, floorSpecK:d0 ? +d0.specular.r.toFixed(2) : null, spec:!!(d0 && d0.specularMap) };
+    await go(OW_DUNGEON, 1); const d0 = FPD.mats[Object.keys(FPD.mats).filter(k=>/:f0$/.test(k) && !/^crypt/.test(k)).pop()]; out.dungeon = { floorShine:d0 ? d0.shininess : null, floorSpecK:d0 ? +d0.specular.r.toFixed(2) : null, spec:!!(d0 && d0.specularMap) };
     return out; });
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };

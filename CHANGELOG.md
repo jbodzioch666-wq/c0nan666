@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-830 - Loose Ends
+
+- **The victor's portal stays put.** Reloading a save on a beaten floor could move the portal its fallen master opened and turn it into a plain way out somewhere else. It now stays where it opened and stays a portal.
+- **The hit waits for the bolt.** After a slow frame, a spell or arrow's log line, xp drop and sounds could arrive before it landed. They now wait for the shot itself.
+- **Sea temples keep off the planet's corners.** World generator 29: on a Planet, a sea temple could be placed in the small sea at a cube corner. Your existing world keeps its layout; new worlds use the new rule.
+- **Test suite catch-up.** A full run flagged 38 tests. Three led to the fixes above; most of the others had fallen behind deliberate changes to the game or depended on the random world, and are updated.
+
 ## RS-829 - Steady Reel
 
 - **The reel panel stays put:** the line bar with Reel and Cut now sits in one fixed spot on the screen, centred under the boat. It no longer drifts with the boat or jumps above her when the whale swims round, so the buttons are always in the same place.

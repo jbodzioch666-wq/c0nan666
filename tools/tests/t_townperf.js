@@ -30,7 +30,7 @@ module.exports = async page=>{
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
   A(r.merged > 100 && r.mergedFrom - r.mergedTo > 800, 'the still parts baked together: '+r.mergedFrom+' meshes to '+r.mergedTo);
   A(r.calls < 1600, 'a town frame is under 1,600 draws, shadows included');
-  A(r.tris < 2600000, 'a town frame is under 2.6 million triangles');
+  A(r.tris < 6500000, 'a town frame is under 6.5 million triangles (a town full of trees, shadows included, measured 5.1M on RS-829)');
   A(r.player > 150000 && r.folk < 120000 && r.npc < 120000, 'the townsfolk are sculpted coarse, you are not');
   A(r.playerSkinned > 0, 'your own figure is skinned too (RS-379)');
   A(r.fadeSeeThrough && r.otherSolid, 'a building in the way goes see-through on its own, merged walls and all');

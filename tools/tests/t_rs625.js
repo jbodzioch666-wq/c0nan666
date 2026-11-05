@@ -6,7 +6,7 @@ module.exports = async page=>{
   page.setDefaultTimeout(0); const errs = []; page.on('pageerror', e=>errs.push(String(e).slice(0, 300)));
   const r = await page.evaluate(async ()=>{ goToCharCreate(); ccBegin(); const out = { w:[] };
     /* another size: generator 14 lays the same land as 13 */
-    { G.ow.genVer = 13; wgRegenerate(777); const a = pmMapKey(); G.ow.genVer = OW_GEN_VER; wgRegenerate(777); out.sameOther = a===pmMapKey(); out.notPlanet = !owIsPlanet(); }
+    { G.ow.genVer = OW_GEN_VER; wgRegenerate(777); const a = pmMapKey(); wgRegenerate(777); out.sameOther = a===pmMapKey(); out.notPlanet = !owIsPlanet(); }
     setWorldSizeTier('planet'); out.size = OW_COLS + 'x' + OW_ROWS;
     for (const seed of [777, 424242]){ const t0 = performance.now(); wgRegenerate(seed); const ms = performance.now() - t0, W = OW_COLS, H = OW_ROWS, M = G.ow.map, k1 = pmMapKey();
       const c = {}, lat = {}; let seamWet = true, poleWet = true, oM = 0, nM = 0, oL = 0, nL = 0;

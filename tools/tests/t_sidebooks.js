@@ -14,7 +14,7 @@ module.exports = async page=>{
     if (out.books.arceuus) btn('Arceuus Spellbook').click(); await frames(1); out.books.now = rsBook();
     rsSwitchBook('lunar'); out.books.stillArc = rsBook()==='arceuus';
     // (RS-323) the standard spells come with every book, and a standard spell you'd picked stays picked
-    out.std = { listed:rsBookSpells().some(sp=>sp[0]==='windstrike'), ok:!rsSpellBlock(rsSpell('windstrike')), own:rsBookSpells()[0] && rsSpellBook(rsBookSpells()[0])==='arceuus', panel:/STANDARD &middot; COMBAT|STANDARD · COMBAT/.test(sp().innerHTML) || (hudLayout(), /STANDARD/.test(sp().innerHTML)) };
+    G.gear.weapon = rsMakeStaff(1); rsSync && rsSync(); out.std = { listed:rsBookSpells().some(sp=>sp[0]==='windstrike'), ok:!rsSpellBlock(rsSpell('windstrike')), own:rsBookSpells()[0] && rsSpellBook(rsBookSpells()[0])==='arceuus', panel:/STANDARD &middot; COMBAT|STANDARD · COMBAT/.test(sp().innerHTML) || (hudLayout(), /STANDARD/.test(sp().innerHTML)) };
     rsSwitchBook('standard'); G.player.rsSpell = 'windstrike'; rsSwitchBook('arceuus'); out.std.kept = G.player.rsSpell==='windstrike'; rsSwitchBook('standard'); out.books.back = rsBook()==='standard';
     key('g'); await frames(1); out.gClose = !SP.open;
     key('n'); await frames(2); out.n = { open:SP.open, tab:SP.tab, ui:G.ui, bury:[...sp().querySelectorAll('.sp-b')].some(b=>/bury 3 bones/.test(b.textContent)) };

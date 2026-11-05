@@ -17,7 +17,7 @@ module.exports = async page=>{
     { let land = 0; for (let x=0;x<W;x++) for (let y=0;y<H;y++) if (m[x][y]!==OW_WATER && cubeFace(x, y) >= 0) land++; out.enc = { planet:owEncTarget(), want:clamp(Math.round(25*land/11800), 25, 75), n:G.ow.encounters.length }; }
     /* (1), (2): the chart */
     toggleOwZoom(); await fr(10); if (!PM.cv) pmBuild();
-    { const ink = cv=>{ const d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data; let n = 0; for (let i=0;i<d.length;i+=16) if (d[i] < 110 && d[i+1] < 90) n++; return n; }; out.bare = { has:!!PM.bare, cv:ink(PM.cv), bare:PM.bare ? ink(PM.bare) : -1 }; }
+    { const ink = cv=>{ const d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data; let n = 0; for (let i=0;i<d.length;i+=16) if (d[i] < 110 && d[i+1] < 90 && d[i+2] < d[i]) n++; return n; }; out.bare = { has:!!PM.bare, cv:ink(PM.cv), bare:PM.bare ? ink(PM.bare) : -1 }; }
     { /* a stretch of open sea inside a face: dots, and no bias to the old hatching's diagonal */
       let sea = null; for (let f=0; f<6 && !sea; f++){ const o = CUBE_O[f]; for (let y=o[1]*N + 8; y<o[1]*N + N - 40 && !sea; y+=6) for (let x=o[0]*N + 8; x<o[0]*N + N - 40 && !sea; x+=6){ let ok = true; for (let j=0;j<32 && ok;j++) for (let i=0;i<32 && ok;i++) if (m[x + i][y + j]!==OW_WATER) ok = false; if (ok) sea = [x, y]; } }
       if (sea){ const P = PM.P, sk = pmSketch(), d = sk.getContext('2d').getImageData(sea[0]*P, sea[1]*P, 32*P, 32*P).data, w = 32*P; let dark = 0, diag = 0, n = 0, sum = 0;

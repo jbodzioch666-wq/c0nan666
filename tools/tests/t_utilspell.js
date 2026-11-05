@@ -18,7 +18,7 @@ module.exports = async page=>{
     let dx=-1, dy=-1; for (let x=0;x<OW_COLS && dx<0;x++) for (let y=0;y<OW_ROWS;y++) if (G.ow.map[x][y]===OW_DUNGEON){ dx=x; dy=y; break; }
     G.gameMode = 0; G.pendingDungeon = { x:dx, y:dy }; enterDungeonConfirm(); setUi('playing');
     const m = Object.assign(newMonster(), famEntry('goblin', 0)); m.alive = 1; m.hp = m.maxHp = 400; m.x = p.x + 1; m.y = p.y; G.mon.forEach(o=>o.alive = 0); G.mon.push(m); const mi = G.mon.length - 1;
-    p.rsUtilAuto = true; p.rsAutocast = false; const w0 = skHave('r_water');
+    G.gear.weapon = rsMakeStaff(1); rsSync && rsSync(); p.rsUtilAuto = true; p.rsAutocast = false; const w0 = skHave('r_water');
     fight(mi); out.first = { confused:m.debuffAtkTurns > 0, spent:skHave('r_water') < w0, hp:m.hp };
     const hp1 = m.hp, w1 = skHave('r_water'); fight(mi); out.second = { noRecast:skHave('r_water')===w1 };
     // off: no utility cast

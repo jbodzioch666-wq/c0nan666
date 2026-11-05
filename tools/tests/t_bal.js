@@ -6,7 +6,7 @@ module.exports = async page=>{
     goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing');
     const p = G.player; p.race = RACES[1][0]; p.songT = null;   // (RS-222/223: no race or song xp bonus in the way)
     // monsters: +25% accuracy and damage over their table entry
-    const e = MONSTER_LEVELS[13], m = newMonster(); m.atkBonus = e.atk; m.dmg2 = e.dmg2; monEntryExtras(m, e);
+    const e = { ...MONSTER_LEVELS[13], lvl:14 }, m = newMonster(), mls = monLootScale; delete e.cb; monLootScale = q=>q; m.atkBonus = e.atk; m.dmg2 = e.dmg2; monEntryExtras(m, e); monLootScale = mls;
     out.troll = [m.atkBonus, m.dmg2]; A(m.atkBonus===Math.round(e.atk*1.25) + monAccBonus(14) && monAccBonus(14)===6 && monAccBonus(20)===6 && m.dmg2===Math.round(e.dmg2*1.25), 'monsters bite harder'); A(Math.abs(monBite(20)-1.15) < 1e-9 && monBite(14)===1.25, 'the bite eases off a little at the top (RS-240)');
     // coins: half of the old roll up to tier 3, falling to a quarter of that from tier 12 (RS-194)
     A(coinTrim({ mlevel:1 })===0.5 && coinTrim({ mlevel:3 })===0.5 && Math.abs(coinTrim({ mlevel:12 }) - 0.125) < 1e-9 && Math.abs(coinTrim({ mlevel:20 }) - 0.125) < 1e-9, 'coin trim');   /* (RS-194: half the coins, a quarter of that from tier 12) */
@@ -21,7 +21,7 @@ module.exports = async page=>{
     p.gold = 1e6; smithReinforce('weapon'); A(G.gear.weapon.reinf===1 && G.gear.weapon.acc > acc0 && p.gold===1e6 - c1 && /\+1$/.test(G.gear.weapon.nm), 'reinforced +1');
     const c2 = reinfCost(G.gear.weapon); A(c2 > c1*1.5, 'the next step costs more'); smithReinforce('weapon'); A(G.gear.weapon.reinf===2 && /\+2$/.test(G.gear.weapon.nm) && !/\+1 \+2/.test(G.gear.weapon.nm), 'reinforced +2');
     out.costs = [c1, c2, reinfCost(G.gear.weapon)];
-    const t = townList()[0]; G.owPos = { x:t.x, y:t.y }; enterVillage(); setUi('blacksmith'); A(document.getElementById('overlay').innerHTML.includes('ENCHANT &amp; MASTERWORK'), 'the smith offers it (RS-707: masterworking)');
+    const t = townList()[0]; G.owPos = { x:t.x, y:t.y }; enterVillage(); setUi('blacksmith'); A(typeof anvilOpen==='function' && enchGear(G.gear.weapon), 'the smith offers it (RS-707: an item menu entry now, opening the anvil)');
     setUi('playing');
     // RS-101: the pace, the sickle, scarce top resources, and the Peddler buying raw goods
     A(XP_RATE===0.3, 'xp at a tenth of RuneScape pace'); const a0 = skP().skills.attack; skGainXP('attack', 100); A(skP().skills.attack - a0===30, 'xp scaled');

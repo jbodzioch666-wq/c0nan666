@@ -3,7 +3,7 @@
 module.exports = async page=>{
   page.setDefaultTimeout(0); const errs = []; page.on('pageerror', e=>errs.push(String(e).slice(0, 200)));
   const r = await page.evaluate(async ()=>{ goToCharCreate(); G.chosenKit = 2; ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{}; G.player.wildWarned = 1; G.player.hp = G.player.maxHp = 99999;
-    G.gear.cape = rsMakeCape(5); const out = {};
+    G.gear.cape = (()=>{ let c; do c = rsMakeCape(5); while (c.basis==='Quiver'); return c; })(); const out = {};
     const s = questNearbySites(G.owPos.x, G.owPos.y, 1, 60, ['dungeon'])[0]; G.gameMode = 0; G.pendingDungeon = { x:s.x, y:s.y }; enterDungeonConfirm(); setUi('playing'); for (const m of G.mon) m.alive = false;
     for (let i=0;i<120;i++) await new Promise(r=>requestAnimationFrame(r));
     const fl = []; for (let x=1;x<COLS-1;x++) for (let y=1;y<ROWS-1;y++) if (G.map[x][y]===T_FLOOR) fl.push([x, y]); let sd = 11; const rnd = ()=>{ sd = (sd*16807) % 2147483647; return sd/2147483647; };

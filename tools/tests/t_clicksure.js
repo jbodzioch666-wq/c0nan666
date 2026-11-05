@@ -28,9 +28,9 @@ module.exports = async page=>{
   // the boat
   const b = await page.evaluate(async ()=>{
     G.gameMode = 0; G.mon = []; const sp = G.ow.spawnPos; let at = null;
-    for (let r=2; r<60 && !at; r++) for (let dx=-r; dx<=r && !at; dx++) for (let dy=-r; dy<=r; dy++){ const x = sp.x+dx, y = sp.y+dy; if (G.ow.map[x] && G.ow.map[x][y]===OW_WATER && !iceAt(x, y)){ at = { x, y }; break; } }
+    for (let r=2; r<60 && !at; r++) for (let dx=-r; dx<=r && !at; dx++) for (let dy=-r; dy<=r; dy++){ const x = sp.x+dx, y = sp.y+dy; if (G.ow.map[x] && G.ow.map[x][y]===OW_WATER && !iceAt(x, y) && !owFresh(x, y)){ at = { x, y }; break; } }
     if (!at) return { skip:true };
-    G.player.boat = G.player.boat || 1; G.owPos = at; O3.win = null; for (let k=0;k<8;k++){ renderGame(); await new Promise(r=>setTimeout(r, 40)); }
+    G.player.hasBoat = 1; G.owPos = at; O3.win = null; for (let k=0;k<8;k++){ renderGame(); await new Promise(r=>setTimeout(r, 40)); }
     const T = THREE, out = { vis:O3.boat.visible }; let lid = null, fl = null; O3.boat.traverse(o=>{ if (o.name==='waterLid') lid = o; if (o.name==='boatFloor') fl = o; });
     out.lid = !!lid && lid.material.colorWrite===false && lid.material.depthWrite===true && lid.renderOrder < (O3.water.renderOrder||0);
     /* the floor's lowest point, at the boat's lowest bob and most roll, against the highest wave top */

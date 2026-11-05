@@ -9,9 +9,9 @@ module.exports = async page=>{
     const frame = ()=>new Promise(r=>requestAnimationFrame(()=>{ renderGame(); r(); }));
     for (let i=0;i<10;i++) await frame();
     const sm = O3.renderer.shadowMap; let sets = 0, ticks = 0, v = false;
-    const tick0 = gfxShadowTick; let lastP = null, mv = 0, mvSet = 0;
-    window.gfxShadowTick = function(r, view){ if (view!=='o3') return tick0.call(this, r, view); ticks++; const p = O3.pgrp.position, moved = lastP && p.distanceTo(lastP) > 1e-4; lastP = p.clone(); const s0 = sets; const out = tick0.call(this, r, view); if (moved){ mv++; if (sets > s0) mvSet++; } return out; };   /* (per drawn frame - the game's own loop draws too) */
-    Object.defineProperty(sm, 'needsUpdate', { configurable:true, get:()=>v, set:x=>{ v = x; if (x) sets++; } });
+    const tick0 = gfxShadowTick; let lastP = null, mv = 0, mvSet = 0, inTick = false;   /* (RS-794: the water mirror puts the flag back after its pass, which is no second drawing: only the clock's own asks count) */
+    window.gfxShadowTick = function(r, view){ if (view!=='o3') return tick0.call(this, r, view); ticks++; const p = O3.pgrp.position, moved = lastP && p.distanceTo(lastP) > 1e-4; lastP = p.clone(); const s0 = sets; inTick = true; const out = tick0.call(this, r, view); inTick = false; if (moved){ mv++; if (sets > s0) mvSet++; } return out; };   /* (per drawn frame - the game's own loop draws too) */
+    Object.defineProperty(sm, 'needsUpdate', { configurable:true, get:()=>v, set:x=>{ v = x; if (x && inTick) sets++; } });
     const count = async n=>{ sets = 0; ticks = 0; for (let i=0;i<n;i++) await frame(); return +(sets/Math.max(1, ticks)).toFixed(2); };
     for (let i=0;i<10;i++) await frame();
     const idle = await count(30);

@@ -27,7 +27,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   A(r.dungeon.own==='stair', 'a dungeon\'s own way out is still stairs up: ' + r.dungeon.own);
   for (const k of ['dungeon', 'graveyard']){ const o = r[k];
     A(o.b && o.look==='portal' && o.portal && o.said, k + ': its master\'s fall opens a portal, seen and told: ' + JSON.stringify(o));
-    A(o.walk==='portal' && o.out && o.step && o.cleared, k + ': drawn into it and out: ' + JSON.stringify(o)); }
+    if (o.reload) A(o.reload.tile && o.reload.look==='portal', k + ': still there after a reload (RS-830): ' + JSON.stringify(o)); A(o.walk==='portal' && o.out && o.step && o.cleared, k + ': drawn into it and out: ' + JSON.stringify(o)); }
   A(r.dungeon.without==='stair' || r.graveyard.without==='door', 'it stands where the old look would have been stairs or a doorway: ' + r.dungeon.without + ' ' + r.graveyard.without);
   A(r.dungeon.reload && r.dungeon.reload.mode===1 && r.dungeon.reload.tile && r.dungeon.reload.look==='portal' && r.dungeon.reload.portal, 'still a portal after a reload: ' + JSON.stringify(r.dungeon.reload));
   A(!errs.length, 'no errors: ' + errs.join(' | '));

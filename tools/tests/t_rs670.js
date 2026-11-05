@@ -11,7 +11,7 @@ module.exports = async page=>{
     /* a tap on the land as the phone sends it: pointerdown and pointerup of a touch, through the window's touch layer and on to the canvas */
     const cv = O3.cv, rc = cv.getBoundingClientRect(), ev = (type, id, x, y)=>cv.dispatchEvent(new PointerEvent(type, { pointerType:'touch', pointerId:id, isPrimary:true, clientX:x, clientY:y, bubbles:true, cancelable:true, button:0, buttons:type==='pointerup' ? 0 : 1 }));
     const tap = async (id, x, y)=>{ ev('pointerdown', id, x, y); await fr(2); ev('pointerup', id, x, y); await fr(6); };
-    const spot = ()=>{ for (let k=0;k<40;k++){ const x = rc.left + rc.width*(0.3 + 0.4*Math.random()), y = rc.top + rc.height*(0.3 + 0.4*Math.random()); const a = o3Pick({ clientX:x, clientY:y }); if (a && a.kind==='ground' && (a.x!==G.owPos.x || a.y!==G.owPos.y) && o3Passable(a.x, a.y) && (o3PathTo(a.x, a.y)||[]).length) return [x, y, a]; }   /* (a spot a walk can reach) */ return null; };
+    const spot = ()=>{ for (let k=0;k<40;k++){ const x = rc.left + rc.width*(0.3 + 0.4*Math.random()), y = rc.top + rc.height*(0.3 + 0.4*Math.random()); const a = o3Pick({ clientX:x, clientY:y }); if (a && a.kind==='ground' && (a.x!==G.owPos.x || a.y!==G.owPos.y) && o3Passable(a.x, a.y) && (o3PathTo(a.x, a.y)||[]).length >= 3) return [x, y, a]; }   /* (a spot a walk can reach) */ return null; };
     const s1 = spot(); if (!s1) return { none:true };
     O3.path = []; await tap(11, s1[0], s1[1]); out.tap1 = { path:(O3.path||[]).length, pts:TOUCH.pts.size };
     /* a finger whose lift is lost */

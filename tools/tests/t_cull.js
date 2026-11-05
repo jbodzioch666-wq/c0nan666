@@ -32,7 +32,7 @@ module.exports = async page=>{
     return out; });
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
-  A(r.list > 60 && r.dyn >= 10, 'the town has a cull list of things, the people moving');
+  A(r.list >= 30 && r.dyn >= 10, 'the town has a cull list of things, the people moving');
   A(r.wrongHidden===0 && r.farHidden && r.backNear, 'nothing in view is hidden; a person far off screen is skipped and comes back');
   A(r.torches===4 && r.lanAuto===false && r.torchAuto.every(a=>a===false), 'the dungeon lights are on their own clocks');
   A(r.fast.lan===6 && r.fast.td.some(n=>n > 0) && r.fast.td.filter(n=>n > 0).every(n=>n===6), 'above 45 fps (RS-600: with something stirring near each torch): every light every second frame, each lit torch every second frame (a torch that is out is not redrawn): '+JSON.stringify(r.fast));

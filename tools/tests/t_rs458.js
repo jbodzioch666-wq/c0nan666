@@ -2,7 +2,7 @@
 // stay where they were in the world as the body moves on), settles back when you stop, and never passes through the back or the striding legs
 module.exports = async page=>{
   const r = await page.evaluate(()=>{ goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing');
-    const T = THREE; G.gear.cape = rsMakeCape(30); rsSync && rsSync(); const e = m3dInstance({}, rsPlayerLook()), c = e.rig.cape, ud = c.userData;
+    const T = THREE; G.gear.cape = (()=>{ let c; do c = rsMakeCape(30); while (c.basis==='Quiver'); return c; })(); rsSync && rsSync(); const e = m3dInstance({}, rsPlayerLook()), c = e.rig.cape, ud = c.userData;
     const step = (n, speed, moving)=>{ let t = 0; for (let i=0;i<n;i++){ t += 1/60; e.holder.position.z += speed/60; m3dPoseHumanoid(e.rig, 5 + i/60, moving, 0, 0, 0, e); e.holder.updateMatrixWorld(true); m3dCapeCloth(c, e.rig, 1/60); } };
     const pos = ()=>Float32Array.from(c.geometry.attributes.position.array), N = ud.grid[0] + 1, rows = ud.grid[1] + 1, hemAt = (A, k)=>{ let s = 0; for (let i=0;i<N;i++) s += A[((rows - 1)*N + i)*3 + k]; return s/N; };
     const topMove = (A, B)=>{ let m = 0; for (let i=0;i<N*2;i++) m = Math.max(m, Math.hypot(A[i*3] - B[i*3], A[i*3+1] - B[i*3+1], A[i*3+2] - B[i*3+2])); return m; };

@@ -149,7 +149,6 @@ Screenshots go to `tools/tests/shots/`.
 | `rs813` | every Serpentskin Shroud has magic, new and old; rolled magic kept; other uniques untouched | |
 | `rs814` | Fishing tooltips list rod or harpoon; a legendary spot has no shark; waves stand through a water rebuild | |
 | `rs815` | picking a herb: walks up from the next tile; a robe kneels on both knees, nothing at the hip; all back when it stops | |
-| `rs816` | the picked herb stays flower up, in a robe and out of one | |
 | `rs817` | the held herb and its petal burst take the picked plant's colour, land and cave, glow included | |
 | `rs818` | wading a river stands you on the bed, arms out, foam and rings; bank, ice and off the river unchanged | |
 | `rs819` | a quiver has no cape, the slung bow is higher, ammo above your Ranged level can't be loaded or fired | |
@@ -163,6 +162,7 @@ Screenshots go to `tools/tests/shots/`.
 | `rs827` | `rs827` | the sea's danger goes by your best boat: foes, a rowboat attacked, patched and sunk, her panel without guns | |
 | `rs828` | `rs828` | deep water: each sea tile's distance from land, the 3D sea's depth map, shots of the shore, the edge, the deep and the map | |
 | `rs829` | `rs829` | the reel panel holds one spot on the screen while the boat sails and turns and the whale runs | |
+| `rs830` | `rs830` | a cube planet's sea temples stand clear of its corners, whose small seas stay open | |
 | `rs789` | A shire's door stones and flags are dark: their average vertex colour stays low |
 | `rs788` | The open land has its older grass again: no blade chunks, RS-785's code gone |
 | `rs787` | A battle at a town: the card before and after, the banner's words, the trees told where you stand, no shader built by a fade, new creatures warmed off the frame |

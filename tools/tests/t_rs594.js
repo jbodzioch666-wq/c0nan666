@@ -3,7 +3,7 @@
 module.exports = async page=>{
   page.setDefaultTimeout(0);
   const r = await page.evaluate(async ()=>{ goToCharCreate(); G.chosenKit = 2; ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{}; G.gameMode = 0; G.mon = []; G.weather = 'clear';
-    G.gear.cape = rsMakeCape(5); G.player.look.body = 1;
+    G.gear.cape = (()=>{ let c; do c = rsMakeCape(5); while (c.basis==='Quiver'); return c; })(); G.player.look.body = 1;
     let spot = null; const sp = G.ow.spawnPos;
     for (let r=1; r<12 && !spot; r++) for (let dx=-r; dx<=r && !spot; dx++) for (let dy=-r; dy<=r; dy++){ const x = sp.x+dx, y = sp.y+dy, t = G.ow.map[x] && G.ow.map[x][y]; if ((t===OW_GRASS || t===OW_DESERT) && !skNodeAt(x, y) && !owPlaceAt(x, y)){ spot = { x, y }; break; } }
     G.owPos = { x:spot.x, y:spot.y }; const run = async n=>{ for (let i=0;i<n;i++) await new Promise(r=>requestAnimationFrame(r)); }; await run(200);

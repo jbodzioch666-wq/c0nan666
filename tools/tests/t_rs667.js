@@ -3,10 +3,10 @@
 module.exports = async page=>{
   page.setDefaultTimeout(0); const errs = []; page.on('pageerror', e=>errs.push(String(e).slice(0, 300)));
   const r = await page.evaluate(async ()=>{ const fr = n=>new Promise(res=>{ let i = 0; const f = ()=>++i >= n ? res() : requestAnimationFrame(f); requestAnimationFrame(f); });
-    goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{}; G.player.wildWarned = 1; G.gameMode = 0; G.player.clock = DAY_LENGTH*0.45;
+    goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{}; G.player.wildWarned = 1; G.player.hasBoat = 1; G.gameMode = 0; G.player.clock = DAY_LENGTH*0.45;
     const m = G.ow.map, W = m.length, H = m[0].length, o = G.owPos; let w = null;
     for (let d=1; d<60 && !w; d++) for (let dx=-d; dx<=d && !w; dx++) for (const dy of [-d, d]){ const x = o.x + dx, y = o.y + dy; if (x < 3 || y < 3 || x >= W-3 || y >= H-3) continue;
-      let ok = true; for (let i=-2;i<=2 && ok;i++) for (let j=-2;j<=2;j++) if (m[x+i][y+j]!==OW_WATER){ ok = false; break; } if (ok){ w = { x, y }; break; } }
+      let ok = true; for (let i=-2;i<=2 && ok;i++) for (let j=-2;j<=2;j++) if (m[x+i][y+j]!==OW_WATER || owFresh(x+i, y+j)){ ok = false; break; } if (ok){ w = { x, y }; break; } }
     if (!w) return { none:true };
     G.owPos = w; owReveal(w.x, w.y, 8); await fr(150);
     let sheets = 0, meshes = 0; O3.boat.traverse(q=>{ if (!q.isMesh) return; meshes++; if (q.material && q.material.transparent && q.geometry.type==='PlaneGeometry' && Math.abs(q.rotation.x + Math.PI/2) < 0.01) sheets++; });

@@ -26,6 +26,7 @@ module.exports = async page=>{
           return snap(e.holder); };
         let walk = 0, fight = 0;
         for (const t of [1.0, 1.13, 1.27, 1.41, 1.58]){ e.wph = t*9; const still = pose(t, 0, 0, 0); e.wph = t*9; walk = Math.max(walk, diff(pose(t, 1, 0, 0), still)); fight = Math.max(fight, diff(pose(t, 0, 1, 0), still), diff(pose(t, 0, 0, 1), still)); }
+        if (walk < 0.012 && rg.tube){ const a0 = rg.tube.geometry.attributes.position.array.slice(); for (let i=0;i<14;i++){ e.holder.position.x += 0.12; e.mvS = 1; pose(2 + i*0.1, 1, 0, 0); } const a1 = rg.tube.geometry.attributes.position.array; for (let i=0;i<a0.length;i++) walk = Math.max(walk, Math.abs(a0[i] - a1[i])); e.holder.position.set(5.5, 0, 5.5); }   /* (RS-798: a snake's body follows the way its head went, so it has to go somewhere) */
         if (walk < 0.012) out.noWalk.push(nm+' '+walk.toFixed(3));
         if (fight < 0.02) out.noFight.push(nm+' '+fight.toFixed(3));
         // killed: it topples

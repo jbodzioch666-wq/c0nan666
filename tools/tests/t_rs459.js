@@ -2,7 +2,7 @@
 // wildly, through the body), and it drapes over a dragonborn's or a tiefling's tail instead of the tail poking through it
 module.exports = async page=>{
   const r = await page.evaluate(()=>{ goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing');
-    const T = THREE, out = {}; G.gear.cape = rsMakeCape(30); rsSync && rsSync();
+    const T = THREE, out = {}; G.gear.cape = (()=>{ let c; do c = rsMakeCape(30); while (c.basis==='Quiver'); return c; })(); rsSync && rsSync();
     const make = tail=>{ const L = rsPlayerLook(); if (tail) L.o = Object.assign({}, L.o, { tail, tailCol:'#7a5a2a' }); return m3dInstance({}, L); };
     const step = (e, n, f)=>{ for (let i=0;i<n;i++){ if (f) f(i); m3dPoseHumanoid(e.rig, 5 + i/60, 1, 0, 0, 0, e); e.holder.updateMatrixWorld(true); m3dCapeCloth(e.rig.cape, e.rig, 1/60); } };
     const inBody = e=>{ e.holder.updateMatrixWorld(true); const c = e.rig.cape, ch = e.rig.chestMesh, side = ch.material.side; ch.material.side = T.DoubleSide; const ps = c.geometry.attributes.position, ray = new T.Raycaster(), v = new T.Vector3(); let n = 0;

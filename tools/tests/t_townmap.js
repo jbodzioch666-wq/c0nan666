@@ -9,7 +9,7 @@ module.exports = async page=>{
     enterVillage(); setUi('playing'); await frames(6);
     const slot = [...document.querySelectorAll('[title]')].some(e=>/world map/.test(e.getAttribute('title')||''));
     toggleOwZoom(); await frames(6); const town = look();
-    const z0 = owZoomScale(); canvas.dispatchEvent(new WheelEvent('wheel', { deltaY:-100, bubbles:true, cancelable:true })); town.zoom = owZoomScale() > z0;   /* (RS-324: the wheel zooms the map in a town) */
+    const z0 = owZoomScale(); canvas.dispatchEvent(new WheelEvent('wheel', { deltaY:-100, bubbles:true, cancelable:true })); town.zoom = (G.owZoomGoal||0) > z0;   /* (RS-324: the wheel zooms the map in a town) */
     toggleOwZoom(); await frames(3); const back = look();
     return { out, town, slot, back, win:[window.innerWidth, window.innerHeight] }; });
   console.log(JSON.stringify(r));

@@ -24,13 +24,13 @@ module.exports = async page=>{
     goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing');
     G.gameMode = 0; o3Pref = true; G.player.clock = G.player.turnCount = 60; G.ow.encounters = []; G.player.wildWarned = 1;
     let f = null; for (let x=6;x<OW_COLS-6 && !f;x++) for (let y=6;y<OW_ROWS-6;y++){ let ok = true; for (let i=-4;i<=4 && ok;i++) for (let j=-4;j<=4;j++) if (!o3Passable(x+i,y+j) || OW_SITE_TILES.includes(G.ow.map[x+i][y+j])){ ok = false; break; } if (ok){ f = [x,y]; break; } }
-    G.owPos = { x:f[0], y:f[1] }; for (let i=0;i<14;i++){ renderGame(); await new Promise(r=>setTimeout(r, 40)); }
+    G.owPos = { x:f[0], y:f[1] }; { const t0 = performance.now(); for (let i=0;i<14 || ((O3.pend || !O3.win || !O3.heightAt) && performance.now() - t0 < 15000);i++){ renderGame(); await new Promise(r=>setTimeout(r, 40)); } }
     const r = O3.cv.getBoundingClientRect(); return { o3:o3Active(), cx:r.left + r.width/2, cy:r.top + r.height*0.45, pad:getComputedStyle(document.getElementById('touchControls')).display };
   });
   out.g = g; A(g.o3, 'the 3D overworld'); A(g.pad==='flex', 'the d-pad shows while playing');
 
   // a tap walks (once the finger lifts)
-  await tap(g.cx + 70, g.cy - 40); out.tapPath = await page.evaluate(()=>O3.path.length);
+  for (const [ox, oy] of [[70, -40], [-70, -40], [70, 40], [-70, 40], [110, 0], [-110, 0], [0, -90], [0, 90], [130, -70], [-130, 70]]){ await tap(g.cx + ox, g.cy + oy); out.tapPath = await page.evaluate(()=>O3.path.length); if (out.tapPath > 0) break; }
   A(out.tapPath > 0, 'a tap walks');
   await page.evaluate(()=>{ O3.path = []; });
   // a long press opens the menu and doesn't walk

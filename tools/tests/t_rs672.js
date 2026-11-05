@@ -13,7 +13,7 @@ module.exports = async page=>{
       /* the open tile most behind the crypt */
       const f = new THREE.Vector3(0, 0, 1).applyQuaternion(g.quaternion); let best = null, bd = 9;
       for (const o of nb){ const c = o3C(o.q[0], o.q[1]), dx = c[0] - C[0], dz = c[1] - C[1], d = (f.x*dx + f.z*dz)/Math.hypot(dx, dz); if (d < bd){ bd = d; best = o; } }
-      at = { s, best, behind:+bd.toFixed(2) }; break; }
+      if (bd >= 0) continue;   /* (no open tile behind this one: another graveyard) */ at = { s, best, behind:+bd.toFixed(2) }; break; }
     if (!at) return { none:true, n:sites.length };
     out.behind = at.behind; out.gate = !!g.doorWay;
     /* (RS-684) a little bigger than the other sites, and the land kept clear inside its railings */

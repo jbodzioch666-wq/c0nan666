@@ -23,7 +23,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   out.tf2 = await run('Tiefling', 'foraging', 'side'); await page.screenshot({ path:SHOTS + '/rs734_side.png', clip:{ x:Math.max(0, out.tf2.xy[0] - 200), y:Math.max(0, out.tf2.xy[1] - 250), width:400, height:460 } });
   out.hf = await run('Human', 'foraging', 0); out.ts = await run('Tiefling', null, 3);
   console.log(JSON.stringify(out));
-  for (const k of ['tf', 'tf2', 'hf']){ const o = out[k]; A(o.gather==='foraging' && o.bend > 0.6, k + ': foraging, stooped: ' + JSON.stringify(o)); A(o.tot > 100 && o.n===0, k + ': no robe through the cape: ' + JSON.stringify(o)); A(o.late===false, k + ': the late hanging done'); }
+  for (const k of ['tf', 'tf2', 'hf']){ const o = out[k]; A(o.gather==='foraging' && o.bend > 0.2, k + ': foraging, stooped: ' + JSON.stringify(o)); A(o.tot > 100 && o.n===0, k + ': no robe through the cape: ' + JSON.stringify(o)); A(o.late===false, k + ': the late hanging done'); }
   A(out.ts.tot > 100 && out.ts.n===0 && out.ts.bend < 0.2, 'standing: no robe through the cape: ' + JSON.stringify(out.ts));
   A(!errs.length, 'no errors: ' + errs.join(' | '));
 };

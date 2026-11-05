@@ -30,8 +30,9 @@ module.exports = async page=>{
     // citizens: no plate until you point at one
     { setUi('playing'); const t = townList()[0]; G.owPos = { x:t.x, y:t.y }; G.gameMode = 0; enterVillage(); setUi('playing'); for (let i=0;i<6;i++){ renderGame(); await wait(40); }
       const folk = V3.plates.filter(p=>p.hover); out.folk = folk.length; renderGame(); out.shown0 = folk.filter(p=>p.el.style.display!=='none').length;
-      const pl = folk.find(p=>{ const v = p.obj.position.clone(); v.y += 0.6; v.project(V3.cam); return v.z < 1 && Math.abs(v.x) < 0.8 && Math.abs(v.y) < 0.8; });
-      if (pl){ const v = pl.obj.position.clone(); v.y += 0.6; v.project(V3.cam); const mc = V3.cv.parentElement || V3.cv; V3.mxy = { x:(v.x*0.5+0.5)*mc.clientWidth, y:(-v.y*0.5+0.5)*mc.clientHeight }; renderGame(); await wait(30); out.shown1 = folk.filter(p=>p.el.style.display!=='none').length; out.which = pl.el.style.display!=='none'; }
+      /* (they may all be off the screen: stand by one; one behind a wall or another figure doesn't answer: try each on the screen) */
+      { const q = folk[0].obj.position; G.player.x = clamp(Math.floor(q.x), 1, COLS - 2); G.player.y = clamp(Math.floor(q.z), 1, ROWS - 2); const t0 = performance.now(); while (performance.now() - t0 < 900){ renderGame(); await wait(30); } }
+            for (const pl of folk){ const v = pl.obj.position.clone(); v.y += 0.6; v.project(V3.cam); if (!(v.z < 1 && Math.abs(v.x) < 0.8 && Math.abs(v.y) < 0.8)) continue; const mc = V3.cv.parentElement || V3.cv; V3.mxy = { x:(v.x*0.5+0.5)*mc.clientWidth, y:(-v.y*0.5+0.5)*mc.clientHeight }; renderGame(); await wait(30); out.shown1 = folk.filter(p=>p.el.style.display!=='none').length; out.which = pl.el.style.display!=='none'; if (out.shown1===1 && out.which) break; }
       V3.mxy = null; }
     return out; });
   console.log(JSON.stringify(r));

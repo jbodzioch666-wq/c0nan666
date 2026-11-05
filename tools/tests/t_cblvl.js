@@ -8,7 +8,7 @@ module.exports = async page=>{
     // a monster at an in-between level takes the nearer archetype and is scaled to the exact level
     const e = pickMonsterEntry(50, 0); out.e = { nm:e.nm, lvl:e.lvl, cb:e.cb };
     const m = newMonster(); m.hp = m.maxHp = 40; m.dmg2 = 6; m.xp = 100; m.atkBonus = 6; monEntryExtras(m, e); out.m = { cb:m.cb, hp:m.maxHp, shown:monCombatLevel(m) };
-    const lo = newMonster(); lo.hp = lo.maxHp = 40; lo.dmg2 = 6; lo.xp = 100; lo.atkBonus = 6; monEntryExtras(lo, pickMonsterEntry(40, 0)); out.lo = { nm:lo.nm, cb:lo.cb, hp:lo.maxHp };
+    const lo = newMonster(); lo.hp = lo.maxHp = 40; lo.dmg2 = 6; lo.xp = 100; lo.atkBonus = 6; monEntryExtras(lo, pickMonsterEntry(40, 0)); out.lo = { nm:lo.nm, cb:lo.cb, hp:lo.maxHp, k:monLootK(tierOfCb(40)).hp };
     // floors and bosses in combat levels
     out.floor = [floorCb(1), floorCb(5), floorCb(10)];
     // loot: a tier drops from the level it needs
@@ -27,7 +27,7 @@ module.exports = async page=>{
   const A = (c, m)=>{ if (!c) throw new Error(m+' :: '+JSON.stringify(r)); };
   A(r.cbs[0]===3 && r.cbs[19]===126 && r.cbs[7]===48, 'archetype combat levels');
   A(r.e.nm==='ghoul' && r.e.cb===50 && r.m.cb===50 && r.m.shown===50 && r.m.hp > 40, 'a level-50 foe is a scaled ghoul');
-  A(r.lo.cb===40 && r.lo.hp < 40, 'a level-40 foe is scaled down from its archetype');
+  A(r.lo.cb===40 && r.lo.hp < 40*r.lo.k, 'a level-40 foe is scaled down from its archetype');
   A(r.floor[0]===9 && r.floor[2]===126 && r.floor[1] > r.floor[0], 'floors in combat levels');
   A(r.loot===r.cb, 'loot level is the combat level outside dungeons');
   A(!r.at39.includes('Rune') && r.at40.includes('Rune') && !r.at40.includes('Dragon') && r.at126.includes('Dragon'), 'rune drops from 40, dragon from 60: '+r.at39+' / '+r.at40);

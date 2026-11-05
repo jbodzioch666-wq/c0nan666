@@ -2,7 +2,7 @@
 // screen's refresh it hides a cost: no camp, a fire stood away from, sitting at the fire, with a tent; then each piece of the camp off in turn
 module.exports = async page=>{
   page.setDefaultTimeout(0);
-  const r = await page.evaluate(async ()=>{ goToCharCreate(); G.chosenKit = window.__kit===undefined ? 2 : window.__kit; ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{}; G.gameMode = 0; G.mon = []; G.weather = 'clear'; SET.fps = true; G.gear.cape = rsMakeCape(5); G.player.look.body = 1; G.player.look.beard = 0;
+  const r = await page.evaluate(async ()=>{ goToCharCreate(); G.chosenKit = window.__kit===undefined ? 2 : window.__kit; ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{}; G.gameMode = 0; G.mon = []; G.weather = 'clear'; SET.fps = true; G.gear.cape = (()=>{ let c; do c = rsMakeCape(5); while (c.basis==='Quiver'); return c; })(); G.player.look.body = 1; G.player.look.beard = 0;
     G.player.clock = DAY_LENGTH*10 + DAY_LENGTH*0.85;   /* (evening: the fire's light counts) */
     let spot = null; const sp = G.ow.spawnPos;
     for (let r=1; r<12 && !spot; r++) for (let dx=-r; dx<=r && !spot; dx++) for (let dy=-r; dy<=r; dy++){ const x = sp.x+dx, y = sp.y+dy, t = G.ow.map[x] && G.ow.map[x][y]; if ((t===OW_GRASS || t===OW_DESERT) && !skNodeAt(x, y) && !owPlaceAt(x, y)){ spot = { x, y }; break; } }
