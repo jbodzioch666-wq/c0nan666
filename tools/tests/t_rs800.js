@@ -2,7 +2,7 @@
 // Shots: shots/rs800_t1.png to rs800_t5.png, each from the side and the stern quarter (rs800_t5b.png)
 module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.on('pageerror', e=>errs.push(String(e).slice(0, 300)));
   const A = (c, m, d)=>{ if (!c) throw new Error(m + ' :: ' + JSON.stringify(d)); };
-  await page.evaluate(async ()=>{ const fr = n=>new Promise(res=>{ let i = 0; const f = ()=>++i >= n ? res() : requestAnimationFrame(f); requestAnimationFrame(f); }); window.__noLock = true;
+  await page.evaluate(async ()=>{ window.__noShipBake = true; /* (looks at single parts: RS-832 bakes them) */ const fr = n=>new Promise(res=>{ let i = 0; const f = ()=>++i >= n ? res() : requestAnimationFrame(f); requestAnimationFrame(f); }); window.__noLock = true;
     goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{}; weatherSync = ()=>{}; const p = G.player; p.hasBoat = 1; p.boatTier = 1; p.clock = 100;
     let best = null, bw = -1; for (let x=4;x<OW_COLS-4;x++) for (let y=4;y<OW_ROWS-4;y++){ if (G.ow.map[x][y]!==OW_WATER) continue; let w = 0; for (let i=-4;i<=4;i++) for (let j=-4;j<=4;j++) if (G.ow.map[x+i] && G.ow.map[x+i][y+j]===OW_WATER) w++; if (w > bw){ bw = w; best = { x, y }; } if (w===81) break; }
     G.owPos = { x:best.x, y:best.y }; owReveal(best.x, best.y, 8); G.gameMode = 0; for (let i=0;i<40 && !(O3.boat && O3.boat.visible && O3.ship);i++) await fr(20); await fr(30); return { boat:!!O3.boat, ship:!!O3.ship, active:o3Active(), ui:G.ui, mode:G.gameMode }; });

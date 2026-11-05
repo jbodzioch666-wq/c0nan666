@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-832 - Fleet Bake
+
+- **The sea fight runs far smoother.** A three-ship battle went from 142 to 226 fps on the test PC, and open sailing from 253 to 277. Draw calls fell from 1328 to 590 in a fight and from 600 to 370 under sail.
+- **Each ship is now drawn in one go.** A ship's hull, rails, rigging and fittings bake into a few meshes (the Clipper from 160 to 32), and her guns draw as one set. Baked and unbaked ships match pixel for pixel.
+- **Nothing that moves has changed.** Sails, masts, oars, pennants and each gun's recoil all still work on their own.
+
 ## RS-831 - Grass on the Card
 
 - **Towns run twice as fast.** The grass in green towns and the Shire was worked out on the CPU, 160,000 cells every frame. It now runs on the graphics card and behaves the same: wind, and people pushing through and flattening it. Measured with no frame cap on a desktop: a town 149 to 328 fps, the Shire 160 to 352.
