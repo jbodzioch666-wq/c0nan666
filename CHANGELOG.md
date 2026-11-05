@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-835 - Long View
+
+- **Walking zoomed out is much smoother.** Fully zoomed out, the land was rebuilding every 6 tiles. It now rebuilds as often as its last build's real speed needs: 3 times in 40 tiles instead of 5. On the test PC fps on that walk went from 142 to 173, long frames (over 10 ms) from about 240 to about 165, and the worst frame from about 70 ms to about 45 ms.
+- **The land-build hitch is smaller at every zoom.** The longest single piece of work in a build fell from 75 ms to about 25 ms: the cliffs, the mine cuts, the ground blend, the water, the trees and the merge now run in small steps. At default zoom long frames fell from about 52 to about 34.
+- **Rocks are remembered.** A rock's shape was rebuilt from nothing at every land build, a quarter of the work with the barrows' cairns. It is now kept and copied.
+- **The land itself is unchanged.** All 591 meshes hash the same on the old and new builds.
+
 ## RS-834 - One Pass
 
 - **Smoke, wakes and sails cost much less.** Each see-through sheet was drawn twice a frame, front and back, with the graphics library recomputing its shader settings both times: about 52 times a frame in a sea fight. A flat sheet only ever shows one face, so these now draw once.

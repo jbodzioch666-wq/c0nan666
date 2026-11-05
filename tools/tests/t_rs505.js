@@ -29,5 +29,5 @@ module.exports = async page=>{
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(Object.assign(r0, r))); };
   A(r.walked >= 25 && r.builds >= 1, 'walked far enough to rebuild the land');
   A(r.loadWarms===0, 'no whole-scene loading warm-up mid-walk');
-  A(r.worstSlice < 450, 'no land-build slice froze the walk (the hurry used to finish the build in one frame, ~1s)');
+  A(r.worstSlice < 350, 'no land-build slice froze the walk (the hurry used to finish the build in one frame, ~1s)');
 };
