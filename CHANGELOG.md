@@ -2,7 +2,7 @@
 
 ## RS-836 - Standing Ground
 
-- **Sites and trees stay put on a walk:** when the land rebuilds as you walk, the towns, dungeons, trees and bushes still in view are kept instead of being made again. 33 of 39 sites carry over in a typical rebuild, and the land comes out mesh for mesh the same as a whole rebuild.
+- **Sites stay put on a walk:** when the land rebuilds as you walk, the towns, dungeons and other sites still in reach are kept instead of being made again, and trees and bushes reuse their shapes and finishes. 33 of 39 sites carried over in the rebuild tested, and the land came out mesh for mesh the same as a whole rebuild.
 - **New creatures no longer stall the frame:** a roaming monster or animal of a kind you hadn't met yet made the game wait for its shaders on the frame it first appeared. It now waits out of sight for a moment and steps in when it's ready, as in towns and dungeons.
 - **Worst frame, walking fully zoomed out:** 132-168 ms before, 24-37 ms now, on the test PC. Zoomed in: 33-35 ms before, 30-34 ms now. Average fps is unchanged.
 - **The longest build step:** 21-25 ms before, 11-16 ms now.
