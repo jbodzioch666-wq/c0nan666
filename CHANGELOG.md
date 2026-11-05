@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-833 - Door Prep
+
+- **No more hitch walking up to a door.** The game paints a room's surfaces as you approach, so stepping in is instant. The stone floors and plaster were painted in one go, a 54 ms hitch in town; they now paint a little at a time like the wooden boards.
+- **Each slice is thinner.** On a busy frame the painting now takes 2 ms instead of 4, and the longest frame on a walk through town fell from 54 ms to 15 ms. The rooms still come out ready before you reach the door.
+
 ## RS-832 - Fleet Bake
 
 - **The sea fight runs far smoother.** A three-ship battle went from 142 to 226 fps on the test PC, and open sailing from 253 to 277. Draw calls fell from 1328 to 590 in a fight and from 600 to 370 under sail.
