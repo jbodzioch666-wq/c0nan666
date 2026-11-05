@@ -169,6 +169,7 @@ Screenshots go to `tools/tests/shots/`.
 | `rs834` | `rs834` | Flat see-through double-sided sheets and depth-only lids draw once; a closed see-through shape keeps both passes; the ship's lid stops redoing its program | |
 | `rs835` | `rs835` | Walking fully zoomed out: at most 4 land builds in 40 tiles, build steps short, the build times itself, kept rocks equal fresh ones and aren't shared, the land rebuilt sliced equals the first | |
 | `rs836` | `rs836` | A walk's rebuild keeps sites still in the window, the land matches a whole rebuild, a changed world remakes them, nothing grows over laps; a new creature stays hidden until its shaders link | |
+| `rs837` | `rs837` | A doorway's arch is of its own floor's wall stone on floor after floor, with its shading, and its boxes' faces at the walls' scale | |
 | `rs789` | A shire's door stones and flags are dark: their average vertex colour stays low |
 | `rs788` | The open land has its older grass again: no blade chunks, RS-785's code gone |
 | `rs787` | A battle at a town: the card before and after, the banner's words, the trees told where you stand, no shader built by a fade, new creatures warmed off the frame |

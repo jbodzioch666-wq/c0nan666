@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-837 - Fitted Arches
+
+- **Dungeon archways now match their walls:** the arch over a door or open doorway is built from the same stone as the walls and pillars around it, moss and all.
+- **No more black or plain arches:** an arch used to pick up the previous floor's stone, was plain tan on your first floor, and could draw almost black. Each now takes its own floor's stone once the floor is built.
+- **Treasure room doors too:** the stone jambs, keystones and arch footings show the stone at its proper scale instead of a whole wall texture squeezed onto each face.
+
 ## RS-836 - Standing Ground
 
 - **Sites stay put on a walk:** when the land rebuilds as you walk, the towns, dungeons and other sites still in reach are kept instead of being made again, and trees and bushes reuse their shapes and finishes. 33 of 39 sites carried over in the rebuild tested, and the land came out mesh for mesh the same as a whole rebuild.
