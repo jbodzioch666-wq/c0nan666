@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## RS-839 - Castle Plans
+
+- **Castles are built like castles:** every keep is now laid out room by room, and no two are alike. You storm it floor by floor, from the gate up to the king's floor.
+- **First floor:** the gatehouse with its towers, the outer bailey, the inner gate, the inner bailey, then the door of the keep.
+- **Keep floors:** from the stair foot through two great halls (a feasting hall, a gallery or a library) to the landing of the next stair.
+- **Top floor:** through the antechamber of the royal guard into a pillared throne room. The castle's master stands before his throne, with his treasury off one side and his bedchamber off the other.
+- **Side rooms:** barracks, stables, a smithy, a chapel, kitchens, an armoury, a library, a solar, stores and guard rooms open off the halls, each furnished for its use.
+- **Old saves:** a castle floor you'd already visited is rebuilt in the new style.
+
 ## RS-838 - Doors of the Deep
 
 - **Every dungeon theme hangs its own door:** the catacombs under a graveyard are shut by iron gates of bars with a rusted lock box; forest dungeons by lashed logs with ivy; jungle dungeons by bamboo; swamp dungeons by rotten planks with moss and slime; desert dungeons by cedar banded in bronze with a sun boss; frost dungeons by rimed wood hung with icicles; ash dungeons by iron plates with fire glowing through the seams; haunted dungeons by broken black planks with a ghost-light through the gaps and a skull knocker; crystal caves by a dark slab set with glowing shards. Plain dungeons keep their oak door.

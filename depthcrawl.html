@@ -5526,70 +5526,108 @@ function rollMonsterAt(x,y,floorLevel,sp){
   return m;
 }
 
-// ---- castle: a fixed, symmetric fortress floorplan - a gatehouse, a
-// courtyard, two flanking chambers, a throne room/great hall at the back,
-// and a tower at each of the four corners - instead of the generic
-// dungeon's scattered random rooms, so it actually reads as "a castle"
-// rather than another dungeon with a different name
+// ---- castle (RS-839): put together from rooms, as a castle is - every one laid out differently, every one read as a castle. Each
+// floor runs up a spine from the way in to the way on: the first floor through the gatehouse, across the bailey and into the keep;
+// the keep's floors from the stair foot through a great hall - a feasting hall, a gallery or a library - to the landing of the next
+// stair; the top floor through the antechamber of the royal guard into the throne room, where the castle's master waits on his
+// throne, his treasury off one side and his bedchamber off the other. Off the spine's rooms open side rooms, picked from what a
+// castle has - barracks, stables, a smithy, a chapel, kitchens, an armoury, a library, a solar, stores - each furnished for its
+// use, and towers flank the gate. Rooms are laid on a grid a wall apart, each joined to the one it opens off by a doorway, so every
+// room is reached and the floor is one building. Old floors kept from before (lay 'castle2' marks the new ones) are made afresh
+const CASTLE_SIDES = {
+  bailey:['barracks', 'stables', 'smithy', 'chapel', 'store', 'barracks'],
+  hall:['barracks', 'kitchen', 'chapel', 'armoury', 'library', 'solar', 'store', 'guard'],
+  ante:['guard', 'armoury', 'guard'],
+};
+const CASTLE_ROOM_NAME = { innerGate:'inner gate', gate:'gatehouse', bailey:'bailey', keepEntry:'keep door', stairFoot:'stair foot', landing:'landing', feast:'feasting hall', gallery:'gallery', library:'library', ante:'antechamber', throne:'throne room',
+  barracks:'barracks', stables:'stables', smithy:'smithy', chapel:'chapel', store:'stores', kitchen:'kitchens', armoury:'armoury', solar:'solar', guard:'guard room', treasury:'treasury', bedchamber:'bedchamber', tower:'tower' };
+function castlePlan(d){
+  const max = G.dungeonMaxDepth || 1, top = d >= max, first = d === 1;
+  const rr = (a, b)=>a + rn(b - a + 1), odd = v=>v | 1;
+  // the spine, from the way in up to the way on
+  let spine;
+  if (first && !top) spine = [{ k:'gate', w:5, h:3 }, { k:'bailey', w:odd(rr(13, 17)), h:rr(6, 7) }, { k:'innerGate', w:5, h:3 }, { k:'bailey', w:odd(rr(9, 13)), h:rr(5, 6), inner:true }, { k:'keepEntry', w:7, h:3 }];   /* (an outer bailey, an inner gate, an inner bailey, then the keep) */
+  else if (first && top) spine = [{ k:'gate', w:5, h:3 }, { k:'bailey', w:odd(rr(11, 13)), h:rr(5, 6) }, { k:'ante', w:7, h:3 }, { k:'throne', w:odd(rr(9, 11)), h:rr(8, 9) }];
+  else if (top) spine = [{ k:'stairFoot', w:5, h:3 }, { k:'ante', w:7, h:rr(3, 4) }, { k:'throne', w:odd(rr(9, 11)), h:rr(9, 11) }];
+  else { const H = ['feast', 'gallery', 'library'].sort(()=>Math.random() - 0.5); spine = [{ k:'stairFoot', w:5, h:3 }, { k:H[0], w:odd(rr(11, 15)), h:rr(6, 7), hall:true }, { k:H[1], w:odd(rr(9, 11)), h:rr(4, 5), hall:true }, { k:'landing', w:5, h:3 }]; }   /* (two halls, one above the other) */
+  const room = (k, x, y, w, h)=>({ k, x, y, w, h });
+  const rooms = [], links = [];
+  const fits = (r)=>r.x >= 1 && r.y >= 1 && r.x + r.w <= COLS - 1 && r.y + r.h <= ROWS - 1 && !rooms.some(o=>r.x < o.x + o.w + 1 && o.x < r.x + r.w + 1 && r.y < o.y + o.h + 1 && o.y < r.y + r.h + 1);
+  const cx = (COLS >> 1) + rr(-2, 2), tall = spine.reduce((a, s)=>a + s.h + 1, -1); let y = ROWS - 2 - Math.max(0, (ROWS - 3 - tall) >> 1);   /* (the whole of it in the middle of the floor) */
+  for (const s of spine){ const r = room(s.k, cx - (s.w >> 1), y - s.h + 1, s.w, s.h); r.spine = true; r.hall = !!s.hall; if (!fits(r)) return null; if (rooms.length) links.push([rooms[rooms.length - 1], r]); rooms.push(r); y = r.y - 2; }
+  // what opens off the spine's rooms
+  const sideOf = (s, side, k, w, h, yAt)=>{ const x = side < 0 ? s.x - 1 - w : s.x + s.w + 1, r = room(k, x, yAt, w, h); return fits(r) ? r : null; };
+  const pool = (list)=>list.slice().sort(()=>Math.random() - 0.5);
+  for (const s of rooms.slice()){
+    if (s.k === 'gate' || s.k === 'innerGate'){ for (const side of [-1, 1]) if (chn(0.85)){ const r = sideOf(s, side, 'tower', 3, 3, s.y); if (r){ rooms.push(r); links.push([s, r]); } } continue; }
+    if (s.k === 'throne'){ const sides = chn(0.5) ? ['treasury', 'bedchamber'] : ['bedchamber', 'treasury'];
+      [-1, 1].forEach((side, i)=>{ const k = sides[i], h = rr(4, 5), w = rr(4, 6); for (let tries=0;tries<6;tries++){ const r = sideOf(s, side, k, w - (tries >> 1), h, s.y + rn(Math.max(1, s.h - h))); if (r){ rooms.push(r); links.push([s, r]); break; } } }); continue; }
+    const kind = s.k === 'bailey' ? 'bailey' : s.hall ? 'hall' : s.k === 'ante' ? 'ante' : null; if (!kind) continue;
+    const P = pool(CASTLE_SIDES[kind]), used = new Set(rooms.map(r=>r.k));
+    for (const side of [-1, 1]){
+      const stack = s.h >= 6 ? 2 : 1; let yy = s.y - (s.h >= 6 ? 1 : rn(2));
+      for (let n=0;n<stack;n++){ let k = P.find(q=>!used.has(q)) || P[rn(P.length)]; used.add(k);
+        const h = stack === 2 ? rr(3, Math.max(3, Math.floor((s.h + 2)/2) - 1)) : rr(3, 5), w = rr(4, 7); let placed = null;
+        for (let tries=0;tries<8 && !placed;tries++){ const r = sideOf(s, side, k, Math.max(3, w - (tries >> 1)), h, yy + (tries & 1)); if (r && r.y <= s.y + s.h - 1 && r.y + r.h - 1 >= s.y) placed = r; }
+        if (!placed) continue; rooms.push(placed); links.push([s, placed]); yy = placed.y + placed.h + 1;
+        /* now and then a tower off the far side of a side room on the first floor */
+        if (first && chn(0.35)){ const t = sideOf(placed, side, 'tower', 3, 3, placed.y); if (t){ rooms.push(t); links.push([placed, t]); } } } } }
+  return { rooms, links, top, first };
+}
 function generateCastleLevel(d){
-  setGrid(20, 20);
+  setGrid(DUN_W, DUN_H);
   G.map = makeGrid(T_WALL);
   G.floorItem = makeItemGrid();
   G.trapSeen = makeGrid(false);
   G.dungeonSeen = makeGrid(false);
   G.dungeonDeco = makeGrid('', COLS, ROWS);
   G.shopStock = [];
-
-  const rooms = [
-    {x:8,  y:17, w:4,  h:3}, // 0 gatehouse (start / entrance)
-    {x:7,  y:12, w:6,  h:4}, // 1 courtyard
-    {x:2,  y:8,  w:4,  h:4}, // 2 west chamber (guardroom)
-    {x:14, y:8,  w:4,  h:4}, // 3 east chamber (armory)
-    {x:5,  y:2,  w:10, h:5}, // 4 great hall / throne room (deepest room - stairs down)
-    {x:0,  y:0,  w:3,  h:3}, // 5 NW tower
-    {x:17, y:0,  w:3,  h:3}, // 6 NE tower
-    {x:0,  y:16, w:3,  h:3}, // 7 SW tower
-    {x:17, y:16, w:3,  h:3}, // 8 SE tower
-  ];
-  for (const r of rooms){
-    for (let yy=r.y; yy<r.y+r.h; yy++)
-      for (let xx=r.x; xx<r.x+r.w; xx++)
-        G.map[xx][yy] = T_FLOOR;
+  let P = null; for (let i=0;i<30 && !P;i++) P = castlePlan(d);
+  if (!P) P = castlePlanFallback(d);
+  const { rooms, links, top } = P, D = G.dungeonDeco;
+  for (const r of rooms) for (let x=r.x;x<r.x+r.w;x++) for (let y=r.y;y<r.y+r.h;y++) G.map[x][y] = T_FLOOR;
+  // a doorway in the wall between each room and the one it opens off: the spine's ways are open arches into the bailey and the
+  // throne room, doors elsewhere
+  for (const [a, b] of links){
+    let dx, dy;
+    if (a.x + a.w < b.x || b.x + b.w < a.x){ const wx = a.x + a.w < b.x ? a.x + a.w : b.x + b.w, y0 = Math.max(a.y, b.y), y1 = Math.min(a.y + a.h, b.y + b.h) - 1; dx = wx; dy = y0 + ((y1 - y0) >> 1) + (y1 - y0 >= 2 ? rn(2) - (y1 - y0 >= 4 ? 1 : 0) : 0); dy = Math.max(y0, Math.min(y1, dy)); }
+    else { const wy = a.y + a.h < b.y ? a.y + a.h : b.y + b.h, x0 = Math.max(a.x, b.x), x1 = Math.min(a.x + a.w, b.x + b.w) - 1; dy = wy; dx = a.spine && b.spine ? Math.max(x0, Math.min(x1, a.x + (a.w >> 1))) : x0 + ((x1 - x0) >> 1); }
+    G.map[dx][dy] = T_FLOOR; D[dx][dy] = (b.k === 'bailey' || b.k === 'innerGate' || b.k === 'throne' || b.k === 'ante' && a.k === 'bailey') ? 'arch' : 'door';
   }
-  const rcx = r => r.x+Math.floor(r.w/2), rcy = r => r.y+Math.floor(r.h/2);
-  function corridor(a,b){
-    let x=rcx(a), y=rcy(a); const bx=rcx(b), by=rcy(b);
-    while (x!==bx){ G.map[x][y]=T_FLOOR; x += (x<bx)?1:-1; }
-    while (y!==by){ G.map[x][y]=T_FLOOR; y += (y<by)?1:-1; }
-  }
-  corridor(rooms[0], rooms[1]); // gate -> courtyard
-  corridor(rooms[1], rooms[2]); // courtyard -> west chamber
-  corridor(rooms[1], rooms[3]); // courtyard -> east chamber
-  corridor(rooms[1], rooms[4]); // courtyard -> great hall
-  corridor(rooms[4], rooms[5]); // great hall -> NW tower
-  corridor(rooms[4], rooms[6]); // great hall -> NE tower
-  corridor(rooms[2], rooms[7]); // west chamber -> SW tower
-  corridor(rooms[3], rooms[8]); // east chamber -> SE tower
-
-  G.genStart.x = rcx(rooms[0]); G.genStart.y = rcy(rooms[0]);
-  if (d>1) G.map[G.genStart.x][G.genStart.y] = retreatTile();
-  const hall = rooms[4];
-  G.map[rcx(hall)][hall.y+3] = advanceTile(); // stairs up, right in front of the throne - you're climbing this keep, not descending into it
-
-  // a real great hall is lined with stone columns you have to walk around,
-  // with a throne facing the door - the columns are actual wall tiles (you
-  // can't stand in them), the throne and banners are just floor dressing
-  // (G.dungeonDeco), drawn by renderDungeonMap exactly like village
-  // decorations are drawn by renderVillageMap
-  G.map[hall.x+2][hall.y+1] = T_WALL; G.map[hall.x+7][hall.y+1] = T_WALL;
-  G.map[hall.x+2][hall.y+3] = T_WALL; G.map[hall.x+7][hall.y+3] = T_WALL;
-  G.dungeonDeco[rcx(hall)][hall.y] = 'throne';
-  G.dungeonDeco[rcx(hall)-2][hall.y] = 'banner';
-  G.dungeonDeco[rcx(hall)+2][hall.y] = 'banner';
-  G.dungeonDeco[rcx(rooms[0])-1][rooms[0].y] = 'banner';
-  G.dungeonDeco[rcx(rooms[0])+1][rooms[0].y] = 'banner';
-
+  const entry = rooms[0], goal = rooms.filter(r=>r.spine).pop(), mid = r=>r.x + (r.w >> 1);
+  G.genStart.x = mid(entry); G.genStart.y = entry.y + entry.h - 1;
+  if (d > 1) G.map[G.genStart.x][G.genStart.y] = retreatTile();
+  if (top){ const tx = mid(goal); D[tx][goal.y] = 'throne'; G.map[tx][goal.y + 2] = advanceTile();   /* (the master stands before his throne: spawnBoss takes the stair's place) */
+    for (const s of [-2, 2]) D[tx + s][goal.y] = 'banner';
+    for (let y = goal.y + 3; y < goal.y + goal.h - 2; y += 2) for (const s of [-3, 3]) if (tx + s > goal.x && tx + s < goal.x + goal.w - 1) G.map[tx + s][y] = T_WALL;   /* (a hall of pillars down to the doors) */ }
+  else G.map[mid(goal)][goal.y] = advanceTile();
+  G.genRooms = rooms.map(r=>({ x:r.x, y:r.y, w:r.w, h:r.h, k:r.k, castle:true }));
+  castleFurnish(rooms);
   placeCastleContents(d, rooms);
+}
+/* a plan that always fits, for the rare seed where no layout came out: the spine alone */
+function castlePlanFallback(d){
+  const max = G.dungeonMaxDepth || 1, top = d >= max, cx = COLS >> 1, rooms = [], links = [];
+  const ks = top ? [['stairFoot', 5, 3], ['ante', 7, 3], ['throne', 9, 9]] : d === 1 ? [['gate', 5, 3], ['bailey', 11, 7], ['keepEntry', 7, 3]] : [['stairFoot', 5, 3], ['feast', 11, 6], ['landing', 5, 3]];
+  let y = ROWS - 2; for (const [k, w, h] of ks){ const r = { k, x:cx - (w >> 1), y:y - h + 1, w, h, spine:true }; if (rooms.length) links.push([rooms[rooms.length - 1], r]); rooms.push(r); y = r.y - 2; }
+  return { rooms, links, top, first:d === 1 };
+}
+/* each room furnished for its use, out of the way through it (dgOpenSpot: never against a doorway or the stairs, never cutting a
+   way off) - along the walls where a thing stands against one, in the middle where it stands free */
+const CASTLE_FURNISH = {
+  gate:[['brazier', 2]], innerGate:[['brazier', 2]], bailey:[['barrel', 2], ['crate', 1], ['sacks', 1], ['brazier', 2]], keepEntry:[['brazier', 2]], stairFoot:[['brazier', 1], ['banner2', 1]], landing:[['brazier', 1], ['banner2', 1]],
+  feast:[['bench', 4, 'mid'], ['banner2', 2], ['brazier', 2]], gallery:[['banner2', 4], ['brazier', 2]], library:[['bench', 2, 'mid'], ['crate', 2], ['banner2', 1]],
+  ante:[['rack', 2], ['brazier', 2]], throne:[['brazier', 2]],
+  barracks:[['rack', 2], ['bench', 2], ['barrel', 1]], stables:[['sacks', 2], ['heap', 1], ['barrel', 1]], smithy:[['rack', 2], ['brazier', 1], ['crate', 1]], chapel:[['shrine', 1, 'mid'], ['banner2', 1], ['brazier', 1]],
+  store:[['sacks', 2], ['crate', 2], ['barrel', 1]], kitchen:[['barrel', 2], ['sacks', 2], ['brazier', 1]], armoury:[['rack', 3], ['crate', 1]], solar:[['bench', 1], ['banner2', 2], ['brazier', 1]],
+  guard:[['rack', 1], ['bench', 1], ['brazier', 1]], bedchamber:[['bench', 1], ['banner2', 1], ['brazier', 1]], treasury:[], tower:[['barrel', 1], ['crate', 1]],
+};
+function castleFurnish(rooms){
+  const D = G.dungeonDeco, W = (x, y)=>G.map[x] === undefined || G.map[x][y] === T_WALL;
+  const spots = (r, where)=>{ const c = []; for (let x=r.x;x<r.x+r.w;x++) for (let y=r.y;y<r.y+r.h;y++){ const w = W(x-1, y) + W(x+1, y) + W(x, y-1) + W(x, y+1); if (where === 'mid' ? w === 0 : w >= 1) c.push([x, y]); } return c.sort(()=>Math.random() - 0.5); };
+  for (const r of rooms){ for (const [deco, n, where] of (CASTLE_FURNISH[r.k] || [])){ let m = 0; for (const [x, y] of spots(r, where)){ if (m >= n) break; if (!dgOpenSpot(x, y)) continue; D[x][y] = deco; m++; } }
+    if (r.k === 'treasury'){ let n = 0; for (const [x, y] of spots(r)){ if (n >= 2 + rn(2)) break; if (dgOpenSpot(x, y)){ G.map[x][y] = T_VAULT; n++; } } for (const [x, y] of spots(r)){ if (n >= 6) break; if (G.map[x][y] === T_FLOOR && !D[x][y] && !(x === G.genStart.x && y === G.genStart.y)){ G.map[x][y] = T_GOLD; n++; } } }
+    if (r.k === 'bedchamber' && chn(0.7)){ const s = spots(r).find(([x, y])=>dgOpenSpot(x, y)); if (s) G.map[s[0]][s[1]] = T_VAULT; } }
 }
 function placeCastleContents(d, rooms){
   const roomCnt = rooms.length;
@@ -6002,7 +6040,7 @@ function saveLevelCache(d){
     shopStock: G.shopStock.map(it=>copyItem(it)),
     isBossFloor: G.isBossFloor,
     at: Date.now(), ent: G.dungeonEntrance ? G.dungeonEntrance.x+','+G.dungeonEntrance.y : '',   /* (RS-205: kept in the save; a moved site drops its old floors) */
-    bossIdx: G.bossIdx, lay: G.siteKind==='city' && d===1 ? 'city2' : '',   /* (RS-757: the Lost City's surface, laid out as a city) */
+    bossIdx: G.bossIdx, lay: G.siteKind==='city' && d===1 ? 'city2' : G.siteKind==='castle' ? 'castle2' : '',   /* (RS-757: the Lost City's surface, laid out as a city) */
   };
 }
 function restoreLevelCache(d){
@@ -6162,7 +6200,8 @@ function loadLevel(d, arrivingFromBelow, fellThrough){
   }
   let fresh = true;
   let cached = G.dgCache[cacheKey(G.dungeonSlot,d)];
-  if (cached && G.siteKind==='city' && d===1 && cached.lay!=='city2'){ delete G.dgCache[cacheKey(G.dungeonSlot,d)]; cached = null; }   /* (RS-757: the temple's rooms it had in RS-756) */
+  if (cached && G.siteKind==='city' && d===1 && cached.lay!=='city2'){ delete G.dgCache[cacheKey(G.dungeonSlot,d)]; cached = null; }
+  if (cached && G.siteKind==='castle' && cached.lay!=='castle2'){ delete G.dgCache[cacheKey(G.dungeonSlot,d)]; cached = null; }   /* (RS-839: a castle kept from before is built afresh, from rooms) */   /* (RS-757: the temple's rooms it had in RS-756) */
   if (G.gameMode===1 && G.dungeonSlot>=1 && G.dungeonSlot<=MAX_SITE_SLOT+1 && cached){
     restoreLevelCache(d);
     if (G.siteKind==='pyramid' && G.dungeonDeco) for (const c of G.dungeonDeco) for (let y=0;y<c.length;y++) if (c[y]==='brazier' || c[y]==='altar') c[y] = '';   /* (RS-369: a pyramid's braziers are gone, on a kept floor too; RS-427: and its altar) */
@@ -16678,7 +16717,7 @@ function dressLevel(d){
    down through the ceiling. Everything solid stays out of the ways through (dgRingOk) and off the stairs; the first and last rooms
    (the way in, the way down) are left as they are */
 function dgRoomPurpose(k, d, H){
-  const R = G.genRooms; if (!R || R.length < 4) return; const { W, open, D } = H, picks = [];
+  const R = G.genRooms; if (!R || R.length < 4 || G.siteKind==='castle') return; const { W, open, D } = H, picks = [];   /* (RS-839: a castle's rooms are furnished as they're laid out) */
   const kinds = { dungeon:['guard','shrine','flooded','collapsed','store'], castle:['guard','store','shrine','guard'], necro:['shrine','collapsed'], temple:['shrine','flooded','collapsed'],
     mine:['store','collapsed','collapsed','flooded'], lair:['collapsed'], graveyard:['shrine','collapsed'], pyramid:['shrine','store','collapsed'],
     city:['shrine','collapsed','flooded'],
@@ -18998,6 +19037,7 @@ function spawnBoss(){
   for (let y=0;y<ROWS && !found;y++) for (let x=0;x<COLS && !found;x++)
     if (G.map[x][y]===advanceTile()){ bx=x; by=y; found=true; G.map[x][y]=T_FLOOR; }
   if (!found){ bx=G.genStart.x; by=G.genStart.y; }
+  if (G.siteKind==='castle'){ const t = (G.genRooms||[]).find(r=>r.k==='throne'); if (t && G.map[t.x + (t.w>>1)][t.y + 1]===T_FLOOR){ bx = t.x + (t.w>>1); by = t.y + 1; } }   /* (RS-839: the castle's master stands before his throne) */
 
   const sp = sitePower();
   const lvl = cbT();
@@ -51310,7 +51350,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-838';
+const GAME_VERSION = 'rs-839';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
