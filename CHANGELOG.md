@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-849 - The Realms Grow
+
+- **As many realms as the land wants:** the number of realms now follows the world's size: 4 on a small world, 6 on a medium, 8 on a large and 11 on a planet (each still with its castle and at least one town). It needs a new world: start one and keep your character.
+- **The Realms panel:** a new Realms button on the map's toolbar lists every realm, with its king, castle, towns, troubles and share of the land. Yours come first, with their rents, wardens, gate, raids beaten back and any raid marching on them; a castle lost to a usurper says so.
+- **Your colours:** on the map's Territories layer, the realms you rule are washed in gold.
+
 ## RS-848 - Raids, Sharpened
 
 - **Raids on the map:** a raid marching on your castle shows on the world map as a pulsing red ring with the hours left, and its tooltip gives the foe and your garrison.

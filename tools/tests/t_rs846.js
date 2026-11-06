@@ -29,8 +29,8 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
     return out; });
   console.log(JSON.stringify(r)); assert.equal(errs.length, 0, errs.join('|'));
   for (const sz in r.sizes){ const s = r.sizes[sz];
-    assert.equal(s.gv, 31, 'generator'); assert.equal(s.realms, 6, `${sz}: ${s.realms} realms`); assert.ok(s.seatsOk, `${sz}: a realm without its castle on its seat`);
-    assert.ok(s.castles >= 6, `${sz}: castles ${s.castles}`); assert.ok(s.cover >= 0.97, `${sz}: only ${s.cover} of the land in a realm`); assert.equal(s.inRealm, s.towns, `${sz}: a town in no realm`);
+    assert.ok(s.gv >= 31, 'generator'); assert.ok(s.realms >= 4 && s.realms <= 12, `${sz}: ${s.realms} realms`);   /* (RS-849: as many as the land wants) */ assert.ok(s.seatsOk, `${sz}: a realm without its castle on its seat`);
+    assert.ok(s.castles >= s.realms, `${sz}: castles ${s.castles}`); assert.ok(s.cover >= 0.97, `${sz}: only ${s.cover} of the land in a realm`); assert.equal(s.inRealm, s.towns, `${sz}: a town in no realm`);
     assert.ok(s.spread <= 2.5, `${sz}: realms uneven (largest/smallest ${s.spread})`); }
   for (const sz in r.sizes) assert.ok(!/\(0\)/.test(r.sizes[sz].names), sz + ': a realm with no town'); assert.ok(!/\(0\)/.test(r.c0.names), 'a realm with no town');
   assert.ok(r.sameRealms, 'the realms changed when the land was rebuilt');

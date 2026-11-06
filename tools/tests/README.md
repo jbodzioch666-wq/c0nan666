@@ -181,6 +181,7 @@ Screenshots go to `tools/tests/shots/`.
 | `rs846` | `rs846` | six realms of near even land on every size, each with a town and its castle on its seat; the realms the same after a rebuild; the Territories layer on and off; the castle stays when its king falls; the claim makes every town of the realm hail you, and any pays the rents | |
 | `rs847` | `rs847` | word of a raid, the steward's hire and gate, three waves at the gate with a warden striking, the spoils; the garrison holding alone, the raid resolved on the tick, the castle falling (floors gone, no rents) and stormed back | |
 | `rs848` | `rs848` | the raid's ring and tooltip on the map, the raid's level (the castle's, or yours less four), a warden's thrust turned to its foe, and no "the the" | |
+| `rs849` | `rs849` | the realm count by size (4, 6, 8, 11) with a castle slot and a town each; the map's Realms button and panel, yours first with its garrison and raid; your realm gold on the map | |
 | `rs789` | A shire's door stones and flags are dark: their average vertex colour stays low |
 | `rs788` | The open land has its older grass again: no blade chunks, RS-785's code gone |
 | `rs787` | A battle at a town: the card before and after, the banner's words, the trees told where you stand, no shader built by a fade, new creatures warmed off the frame |
