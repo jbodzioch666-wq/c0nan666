@@ -6043,7 +6043,7 @@ function saveLevelCache(d){
     shopStock: G.shopStock.map(it=>copyItem(it)),
     isBossFloor: G.isBossFloor,
     at: Date.now(), ent: G.dungeonEntrance ? G.dungeonEntrance.x+','+G.dungeonEntrance.y : '',   /* (RS-205: kept in the save; a moved site drops its old floors) */
-    bossIdx: G.bossIdx, lay: G.siteKind==='city' && d===1 ? 'city2' : G.siteKind==='castle' ? 'castle3' : '', rooms: G.siteKind==='castle' && G.genRooms ? G.genRooms.map(r=>({...r})) : null,   /* (RS-841: a castle's rooms kept with it, for its throne room) */   /* (RS-757: the Lost City's surface, laid out as a city) */
+    bossIdx: G.bossIdx, lay: G.siteKind==='city' && d===1 ? 'city2' : G.siteKind==='castle' ? 'castle3' : '', rooms: G.siteKind==='castle' && G.genRooms ? G.genRooms.map(r=>({...r})) : null, folk: G.folk && G.folk.length ? G.folk.map(f=>({...f})) : null,   /* (RS-842: and its folk) */   /* (RS-841: a castle's rooms kept with it, for its throne room) */   /* (RS-757: the Lost City's surface, laid out as a city) */
   };
 }
 function restoreLevelCache(d){
@@ -6060,6 +6060,7 @@ function restoreLevelCache(d){
   G.isBossFloor = c.isBossFloor;
   G.bossIdx = c.bossIdx;
   if (c.rooms) G.genRooms = c.rooms.map(r=>({...r}));   /* (RS-841) */
+  G.folk = (c.folk||[]).map(f=>({...f}));   /* (RS-842) */
 }
 function invalidateDungeonCache(slot){
   for (const k of Object.keys(G.dgCache)) if (k.startsWith(slot+'_')) delete G.dgCache[k];
@@ -6080,7 +6081,7 @@ function dgCacheEncode(maxSites){
       const w = c.map.length, h = c.map[0].length, enc = (g, f)=>g.map(col=>col.map(f).join('')).join('|');
       const sparse = (g, f)=>{ const L = []; if (g) for (let x=0;x<w;x++) for (let y=0;y<h;y++){ const v = g[x] && g[x][y]; if (v) L.push([x, y, f ? f(v) : v]); } return L; };
       const e = { at:c.at||0, ent:c.ent||'', w, h, map:enc(c.map, t=>String.fromCharCode(48+t)), ts:c.trapSeen ? enc(c.trapSeen, v=>v?'1':'0') : null, ds:c.dungeonSeen ? enc(c.dungeonSeen, v=>v?'1':'0') : null,
-        deco:sparse(c.dungeonDeco), fi:sparse(c.floorItem), gs:c.genStart, mon:(c.mon||[]).map(monPlain), shop:c.shopStock||[], bf:c.isBossFloor||0, bi:c.bossIdx==null ? -1 : c.bossIdx, lay:c.lay||'', rooms:c.rooms||null };   /* (RS-841: the layout's mark and a castle's rooms, kept in the save) */
+        deco:sparse(c.dungeonDeco), fi:sparse(c.floorItem), gs:c.genStart, mon:(c.mon||[]).map(monPlain), shop:c.shopStock||[], bf:c.isBossFloor||0, bi:c.bossIdx==null ? -1 : c.bossIdx, lay:c.lay||'', rooms:c.rooms||null, folk:c.folk||null };   /* (RS-841: the layout's mark and a castle's rooms, kept in the save) */
       JSON.stringify(e); out[k] = e; c._enc = e; c._encAt = c.at;
     }catch(err){ console.error(err); }
   }
@@ -6093,7 +6094,7 @@ function dgCacheDecode(d){
     const grid = (L, z)=>{ const g = []; for (let x=0;x<c.w;x++) g.push(new Array(c.h).fill(z)); for (const [x,y,v] of L||[]) if (g[x] && y < c.h) g[x][y] = v; return g; };
     if (!c.map || !c.gs) continue;
     out[k] = { at:c.at||0, ent:c.ent||'', map:dec(c.map, ch=>ch.charCodeAt(0)-48), trapSeen:c.ts ? dec(c.ts, ch=>ch==='1') : null, dungeonSeen:c.ds ? dec(c.ds, ch=>ch==='1') : null,
-      dungeonDeco:grid(c.deco, ''), floorItem:grid(c.fi, null), genStart:c.gs, mon:c.mon||[], shopStock:c.shop||[], isBossFloor:c.bf||0, bossIdx:c.bi==null ? -1 : c.bi, lay:c.lay||'', rooms:c.rooms||null };
+      dungeonDeco:grid(c.deco, ''), floorItem:grid(c.fi, null), genStart:c.gs, mon:c.mon||[], shopStock:c.shop||[], isBossFloor:c.bf||0, bossIdx:c.bi==null ? -1 : c.bi, lay:c.lay||'', rooms:c.rooms||null, folk:c.folk||null };
   }catch(err){ console.error(err); } }
   return out;
 }
@@ -6194,7 +6195,7 @@ function placeWallTorches(){
 }
 
 function loadLevel(d, arrivingFromBelow, fellThrough){
-  G.depth = d; G.inRaid = null;
+  G.depth = d; G.inRaid = null; G.folk = [];   /* (RS-842: a floor's folk are its own) */
   G.isBossFloor = 0;
   if (G.gameMode===1 && G.dungeonSlot && G.player){ const sd = G.player.siteDeepest = G.player.siteDeepest||{}; sd[G.dungeonSlot] = Math.max(sd[G.dungeonSlot]||0, d); }
   G.activeZones = []; // a point-placed zone's coordinates belong to the floor you cast it on, not the next one
@@ -6232,6 +6233,7 @@ function loadLevel(d, arrivingFromBelow, fellThrough){
   // (like everything else about its layout) are already baked into the
   // restored G.dungeonDeco, so placing new ones on top would double up
   if (fresh){ placeWallTorches(); try{ dressLevel(d); }catch(e){ console.error(e); } dgPruneTorches(); }
+  if (fresh && G.siteKind==='castle') try{ castleFolkPlace(d); }catch(e){ console.error(e); G.folk = []; }   /* (RS-842) */
   G.player.charges = G.player.maxCharges;
   if (arrivingFromBelow){
     // retreating back up onto THIS floor should land the player on the
@@ -6428,6 +6430,7 @@ function occupiedBy(nx,ny,exceptIdx){
     if (i!==exceptIdx && G.mon[i].alive && G.mon[i].x===nx && G.mon[i].y===ny) return true;
   }
   if (G.allies && G.allies.length && G.allies.some(a=>a.hp > 0 && a.x===nx && a.y===ny)) return true;   /* (RS-418: the town's people stand their ground) */
+  if (G.gameMode===1 && G.folk && G.folk.length && folkAt(nx, ny)) return true;   /* (RS-842: and the castle's folk) */
   return false;
 }
 function noteFoe(mi){
@@ -7459,6 +7462,7 @@ function tickMonsters(excludeIdx){
   if (G.gameOver) return;
   G.dgTurn = (G.dgTurn||0) + 1;   /* (RS-314) the turn count down here: the swinging blades keep time by it */
   if (G.player && (G.player.paraGuard||0) > 0) G.player.paraGuard--;
+  if (G.gameMode===1 && G.folk && G.folk.length) try{ folkTick(); }catch(e){ console.error(e); }   /* (RS-842) */
   rsPrayerTick();
   // poison and fear tick down (or bite) once per player turn, exactly like
   // every other turn-based effect in this game
@@ -7768,6 +7772,7 @@ function tryMove(dx,dy){
     if (foePending()){ G.foeAt = performance.now() + FOE_DELAY_MS; setTimeout(()=>{ try{ foeTick(); }catch(e){} }, FOE_DELAY_MS + 40); }   /* (and a timer, should the frames stall) */
     return;
   }
+  if (G.gameMode===1 && G.folk && G.folk.length){ const f = folkAt(nx, ny); if (f){ folkMeet(f); tickMonsters(); return; } }   /* (RS-842: walking into one of the castle's folk) */
   { const al = G.allies && G.allies.length ? siegeAllyAt(nx, ny) : null; if (al){ al.x = G.player.x; al.y = G.player.y; } }   /* (RS-418: you change places with one of the town's people) */
   if (tileAt(nx,ny)===T_WALL){ if (G.gameMode===3 && !G.interior && G.villageDeco && G.villageDeco[nx] && G.villageDeco[nx][ny]==='board') tkOpen('board'); else if (G.gameMode===3 && !G.interior) townBumpWall(nx, ny); return; } // bumping a wall isn't an action - no turn spent (the bounty board opens)
   if (G.player.frozenTurns>0 && G.gameMode!==0){ logMsg('you are frozen in place - you strain against the ice (you can still fight what stands beside you)', 'hit'); tickMonsters(); return; }
@@ -16437,6 +16442,80 @@ function isoMonShot(m, kind, col, o){
   const me = typeof M3D!=='undefined' && M3D.inst ? M3D.inst.get(m) : null; if (kind==='arrow' && me && me.rig && me.rig.wk==='xbow') kind = 'bolt';   /* (RS-519: a crossbowman shoots bolts) */
   const lag = (kind==='arrow' || kind==='bolt') && rigIsBow(me) ? BOW_LOOSE : 0;   /* (RS-489: an archer's arrow at its loose) */
   (ISO.shots = ISO.shots || []).push({ x0:m.x+0.5, y0:m.y+0.5, x1:p.x+0.5, y1:p.y+0.5, t:-lag, dur:0.12 + d*0.045, kind, col:col||'#fff', m:null, tier:(o && o.tier) || 1, elem: o && o.elem ? o.elem : kind==='spell' ? 'shadow' : '' });
+}
+/* (RS-842) the castle's own folk, who are no fighters: servants about their work who drop it and run when they see you, prisoners
+   shackled in the towers and guard rooms who'll thank you for their freedom, and the king's jester. They're kept in G.folk, off the
+   monster list: they take no blows and give none, go their own way, and you meet them by walking into them */
+const FOLK_SERVANTS = [['a scullion', 'castle servant'], ['a kitchen maid', 'castle maid'], ['the cook', 'castle cook'], ['a footman', 'castle page'], ['a chambermaid', 'castle maid'], ['a stable boy', 'castle servant'], ['a page', 'castle page'], ['a washerwoman', 'castle maid']];
+const FOLK_SERVANT_ROOMS = { kitchen:2, feast:2, store:1, stables:1, bedchamber:1, solar:1, library:1, gallery:1, bailey:1, chapel:1, landing:1 };
+const FOLK_PRISONERS = ['a captured knight', 'a poacher', 'a travelling minstrel', 'a disgraced steward', 'a merchant held for ransom', 'a village elder', 'a wounded ranger', 'a hedge wizard'];
+const FOLK_HINTS = ['"The king keeps his gold off the throne room, behind the iron-bound chests."', '"When the king lowers his head, get out of his way!"', '"He\'ll call his guard when he\'s hurt - mind the doors."', '"His champion strikes twice. Twice!"', '"There\'s prisoners in the towers - nobody feeds them."', '"The jester\'s the only one who laughs in this place."'];
+const FOLK_JESTS = ['Why did the goblin cross the bailey? The king paid him to!', 'How many guards does it take to light a brazier? Four - one to hold it and three to blame the cook!', 'The king asked me for a joke about his crown. I said it was over his head!', 'I told the king his castle was haunted. He raised the rents on the ghosts!', 'What do you call a knight who runs from a fight? Sir Render!', 'The cook\'s stew is so thin, the castle rats bring their own bread!', 'I\'d tell you a joke about the dungeon, but you\'d never get out of it!', 'The champion asked for a mirror. Now he has two of them - he hit it!'];
+const FOLK_D8 = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
+function folkAt(x, y){ return (G.folk||[]).find(f=>!f.gone && f.x===x && f.y===y) || null; }
+/* where one of the folk may step: open floor, nothing solid, no foe, no one else, not you (a shut door only for one who's set free) */
+function folkFree(x, y, door){
+  const p = G.player; if (!G.map[x] || x<1 || y<1 || x>=COLS-1 || y>=ROWS-1) return false; const t = G.map[x][y];
+  if (t===T_WALL || t===T_VAULT || t===T_CORRUPT_CHEST || dgSolid(x, y) || (!door && dgDoorAt(x, y)) || (x===p.x && y===p.y)) return false;
+  return !G.mon.some(m=>m.alive && m.x===x && m.y===y) && !folkAt(x, y);
+}
+function castleFolkPlace(d){
+  G.folk = []; const rooms = G.genRooms||[], top = d >= (G.dungeonMaxDepth||1), N4 = [[1,0],[-1,0],[0,1],[0,-1]];
+  const spot = (r, wall)=>{ const c = []; for (let x=r.x;x<r.x+r.w;x++) for (let y=r.y;y<r.y+r.h;y++){ if (!dgOpenSpot(x, y) || !folkFree(x, y) || Math.abs(x - G.genStart.x) + Math.abs(y - G.genStart.y) < 3) continue; if (!wall || N4.some(([i, j])=>G.map[x+i][y+j]===T_WALL)) c.push([x, y]); } return c.length ? c[rn(c.length)] : null; };
+  for (const r of rooms){ const n = FOLK_SERVANT_ROOMS[r.k]||0; for (let i=0;i<n;i++){ if (!chn(0.6)) continue; const s = spot(r); if (!s) continue; const [nm, look] = pick(FOLK_SERVANTS); G.folk.push({ k:'servant', nm, look, x:s[0], y:s[1] }); } }
+  /* prisoners against a tower's or a guard room's wall, a chain beside them */
+  const cells = rooms.filter(r=>['tower', 'guard', 'barracks', 'store', 'armoury', 'stables'].includes(r.k)), want = cells.filter(()=>chn(0.4));
+  if (d===1 && !want.length && cells.length) want.push(pick(cells));   /* (every castle holds someone below: one on the first floor at least) */
+  if (d===1 && !want.length){ const side = rooms.filter(r=>!r.spine); if (side.length) want.push(pick(side)); }
+  for (const r of want){ const s = spot(r, true) || spot(r); if (!s) continue; G.folk.push({ k:'prisoner', nm:pick(FOLK_PRISONERS), look:'castle prisoner', x:s[0], y:s[1] });
+    for (const [i, j] of N4){ const x = s[0]+i, y = s[1]+j; if (dgOpenSpot(x, y) && N4.some(([a, b])=>G.map[x+a][y+b]===T_WALL)){ G.dungeonDeco[x][y] = 'chains'; break; } } }
+  /* the jester, near his king: in the bedchamber off the throne room, or the antechamber */
+  if (top){ const jr = rooms.find(r=>r.k==='bedchamber') || rooms.find(r=>r.k==='ante'), s = jr && spot(jr); if (s) G.folk.push({ k:'jester', nm:'the jester', look:'jester', x:s[0], y:s[1], hx:s[0], hy:s[1] }); }
+}
+/* a step along the way to (tx, ty), round whatever stands in it */
+function folkStepTo(f, tx, ty){
+  const W = COLS, H = ROWS, dist = new Int16Array(W*H).fill(-1), q = [tx + ty*W]; dist[q[0]] = 0;
+  const pass = (x, y)=>G.map[x] && G.map[x][y]!==undefined && G.map[x][y]!==T_WALL && !dgSolid(x, y);
+  for (let h=0; h<q.length; h++){ const c = q[h], x = c % W, y = (c / W) | 0; if (Math.abs(x - f.x) <= 1 && Math.abs(y - f.y) <= 1) break; for (const [i, j] of FOLK_D8){ const a = x+i, b = y+j, k = a + b*W; if (a<0 || b<0 || a>=W || b>=H || dist[k] >= 0 || !pass(a, b) || (i && j && !diagClear(x, y, i, j, tileOpen))) continue; dist[k] = dist[c] + 1; q.push(k); } }
+  let best = null, bd = 1e9; for (const [i, j] of FOLK_D8){ const x = f.x+i, y = f.y+j, k = x + y*W; if (x<0 || y<0 || x>=W || y>=H || dist[k] < 0 || dist[k] >= bd || !folkFree(x, y, true) || (i && j && !diagClear(f.x, f.y, i, j, tileOpen))) continue; bd = dist[k]; best = [x, y]; }
+  if (best){ f.x = best[0]; f.y = best[1]; return true; } return false;
+}
+function folkTick(){
+  const p = G.player, near = (a, b)=>Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
+  for (const f of G.folk){ if (f.gone) continue;
+    const dP = near(f, p);
+    if (f.k==='prisoner'){ if (!f.freed) continue; const ex = G.genStart; if (near(f, ex) <= 0 || (!folkStepTo(f, ex.x, ex.y) && near(f, ex) <= 1) || (f.x===ex.x && f.y===ex.y)){ f.gone = 1; logMsg(`${f.nm} slips out of the castle a free soul`, ''); } continue; }
+    const fight = G.mon.some(m=>m.alive && m.engaged && near(m, f) <= 3);
+    if (!f.scared && (fight || (f.k==='servant' && dP <= 5 && shotClear(p.x, p.y, f.x, f.y)))){ f.scared = 1; logMsg(f.k==='jester' ? 'the jester squeals and scampers out of harm\'s way' : `${f.nm} sees you, drops everything and runs!`, ''); }
+    if (f.scared){
+      if (dP > 8 && !fight){ f.scared = 0; f.cower = 0; continue; }   /* (far enough off: they stop to catch their breath) */
+      let best = null, bd = dP; for (const [i, j] of FOLK_D8){ const x = f.x+i, y = f.y+j; if (!folkFree(x, y) || (i && j && !diagClear(f.x, f.y, i, j, tileOpen))) continue; const d = Math.max(Math.abs(x - p.x), Math.abs(y - p.y)) + Math.hypot(x - p.x, y - p.y)*0.01; if (d > bd){ bd = d; best = [x, y]; } }
+      if (best){ f.x = best[0]; f.y = best[1]; f.cower = 0; const t = G.map[f.x][f.y]; if (t===retreatTile() || t===advanceTile() || t===T_EXIT){ f.gone = 1; logMsg(`${f.nm} flees by the stairs`, ''); } }
+      else f.cower = 1;   /* (backed into a corner) */ }
+    else if (f.k==='jester' && (G.dgTurn||0) % 3===0){ const [i, j] = pick(FOLK_D8), x = f.x+i, y = f.y+j; if (folkFree(x, y) && Math.max(Math.abs(x - f.hx), Math.abs(y - f.hy)) <= 2) { f.x = x; f.y = y; } }   /* (capering about) */
+  }
+}
+/* walking into one of the folk */
+function folkMeet(f){
+  const p = G.player;
+  if (f.k==='servant'){ f.scared = 1;
+    if (!f.paid){ f.paid = 1; const g = Math.max(3, Math.round((6 + cbT()*4)*(0.7 + Math.random()*0.6))); p.gold += g; try{ sfx('coins'); }catch(e){} logMsg(`${f.nm} presses ${g} gold into your hand - "Take it, only let me go!" - and whispers: ${pick(FOLK_HINTS)}`, 'loot'); }
+    else logMsg(`${f.nm} cowers - "I've nothing more, I swear it!"`, ''); }
+  else if (f.k==='prisoner'){
+    if (!f.freed){ f.freed = 1; const g = Math.round((15 + cbT()*10)*(0.8 + Math.random()*0.4)); p.gold += g; p.folkFreed = (p.folkFreed||0) + 1;
+      if (G.dungeonSeen) for (let x=0;x<COLS;x++) for (let y=0;y<ROWS;y++) if (G.map[x][y]!==T_WALL) G.dungeonSeen[x][y] = true;
+      try{ sfx('coins'); }catch(e){} logMsg(`you strike off the shackles of ${f.nm}. "Bless you! Take this - and mark the way, as I learned it" - they press ${g} gold on you and scratch this floor's plan in the dust (your map shows it), then make for the way out`, 'good'); }
+    else logMsg(`${f.nm} nods their thanks and hurries on`, ''); }
+  else if (f.k==='jester'){ const j = pick(FOLK_JESTS);
+    if (!f.laughed){ f.laughed = 1; const h = Math.max(1, Math.round(p.maxHp*0.25)); p.hp = Math.min(p.maxHp, p.hp + h); logMsg(`the jester capers: "${j}" You laugh in spite of yourself, and feel the better for it (+${h} life)`, 'good'); }
+    else logMsg(`the jester capers: "${j}"`, ''); }
+  try{ renderOverlay(); }catch(e){}
+}
+const FOLK_PX = new WeakMap();
+function folkProxy(f){
+  let px = FOLK_PX.get(f);
+  if (!px){ px = { nm:f.look, baseNm:f.look, alive:1, hp:1, maxHp:1, minion:true, ally:true, _pos:{ x:f.x+0.5, y:f.y+0.5, mv:0 } }; FOLK_PX.set(f, px); }
+  px.x = f.x; px.y = f.y; px.faceAt = null; return px;
 }
 /* (RS-840) the king's own: his royal guard and his champion, out of the castle's garrison, under his colours */
 function castleRoyal(kind, x, y){
@@ -32903,6 +32982,13 @@ const MONSTER_PORTRAITS = {
   'king':           HUM({outfit:'robe', cloth:'#6a1020', trim:'#e0c060', cape:'#4a0814', capeTier:5, capeEdge:'#efe6d2', furCollar:'#efe6d2', crown:true, hair:'#d6cebc', beard:'#d6cebc', weapon:'sword', gold:true, aura:'255,220,140'}, 1.16),
   'royal guard':    HUM({outfit:'plate', plate:'#a8aeb6', tabard:'#7a1020', trim:'#d8b040', weapon:'spear', helm:'kettle', cape:'#6a0f1a'}, 1.04),
   "king's champion":HUM({outfit:'plate', plate:'#d8c070', tabard:'#7a1020', weapon:'greatsword', helm:'great', helmCol:'#c8a850', cape:'#5a0a18', capeEdge:'#d8b040'}, 1.12),
+  /* (RS-842) the castle's folk: servants in homespun, the cook in his whites, maids, pages in the king's red; a ragged prisoner; the jester in motley and a belled cap */
+  'castle servant': HUM({outfit:'shirt', cloth:'#7a6a4a', legWear:'trews', legCol:'#4a3a28', hair:'#5a3a20'}, 0.96),
+  'castle cook':    HUM({outfit:'shirt', cloth:'#e6dfcc', legWear:'trews', legCol:'#5a4a36', hair:'#3a2a18', beard:'#3a2a18', bulk:1.2}, 0.98),
+  'castle maid':    HUM({fem:true, outfit:'robe', cloth:'#5a6a7a', trim:'#e8e0cc', hair:'#7a4a22'}, 0.92),
+  'castle page':    HUM({outfit:'shirt', cloth:'#8a1a24', trim:'#d8b040', legWear:'trews', legCol:'#d8b040', hair:'#c89a50'}, 0.9),
+  'castle prisoner':HUM({outfit:'rags', cloth:'#6a604c', hair:'#4a4036', beard:'#4a4036'}, 0.95),
+  'jester':         HUM({outfit:'shirt', cloth:'#d8a828', trim:'#6a1a7a', legWear:'trews', legCol:'#6a1a7a', jesterCap:['#d8a828', '#6a1a7a']}, 0.9),
   // ---- the drowned cult ----
   'fanatic':          HUM({outfit:'robe', cloth:'#7a2a24', head:'hood', weapon:'dagger', eyes:'255,160,90'}),
   'cult acolyte':     HUM({outfit:'robe', cloth:'#4a2a5a', head:'hood', weapon:'dagger', trim:'#8a6a2a'}),
@@ -42048,7 +42134,7 @@ function fpdBuild(T){
   /* (RS-572) a slice a frame, behind the loading card (see fpdPrepStep): all at once, a floor of new creatures held the page still
      for one to two seconds. Tests keep the one sweep */
   FPD.prep = null;
-  try{ fpdMonBuild(()=>{ const q = [], seen = new Set(); for (const m of G.mon||[]){ const pt = m3dPortrait(m); if (!pt) continue; const k = m3dTplKey(pt); if (seen.has(k) || M3D.tpl.has(k)) continue; seen.add(k); q.push(pt); }
+  try{ fpdMonBuild(()=>{ const q = [], seen = new Set(); for (const m of (G.mon||[]).concat((G.folk||[]).map(f=>({ nm:f.look, baseNm:f.look })))){ const pt = m3dPortrait(m); if (!pt) continue; const k = m3dTplKey(pt); if (seen.has(k) || M3D.tpl.has(k)) continue; seen.add(k); q.push(pt); }
     if (window.__noWarmSlice || !q.length) for (const pt of q) m3dTemplate(pt); else FPD.prep = { q, t0:performance.now() }; }); }catch(e){ console.error(e); }   /* (RS-610: on the coarser grid) */
 }
 // out of doors: ground running on to the horizon, a field's obstacles as real
@@ -44978,6 +45064,12 @@ function m3dHumanoid(o){
     for (let i=0;i<4;i++){ const a = (i - 1.5)*0.62, lf = new T.Mesh(new T.SphereGeometry(0.04, 8, 6), lm); lf.scale.set(0.45, 1.35, 0.14);
       lf.position.set(Math.sin(a)*0.045, 0.226, -0.014 + Math.cos(a*1.7)*0.012); lf.rotation.set(0.2, a*0.6, -a*0.75); head.add(lf); }
     m3dCone(head, 0.006, 0.03, cm, 0, 0.182, -0.014, 0); }
+  if (o.jesterCap && !o.helm){   /* (RS-842) a jester's cap of two colours: a band round the brow and three floppy points, a gold bell at each tip */
+    const ma = m3dMat(mats, o.jesterCap[0], 'cloth'), mb = m3dMat(mats, o.jesterCap[1], 'cloth'), bell = m3dMat(mats, '#e8c040', 'metal');
+    const cap = new T.Mesh(new T.SphereGeometry(0.083, 24, 12, 0, Math.PI*2, 0, Math.PI*0.52), ma); cap.position.set(0, 0.105, -0.016); cap.scale.set(1.06, 0.9, 1.1); head.add(cap);
+    const band = new T.Mesh(new T.TorusGeometry(0.083, 0.012, 8, 28), mb); band.rotation.x = Math.PI/2 + 0.1; band.position.set(0, 0.112, -0.014); band.scale.set(1.06, 1.1, 1); head.add(band);
+    for (const [sd, m] of [[-1, mb], [0, ma], [1, mb]]){ const pts = sd ? [[sd*0.04, 0.16, -0.02], [sd*0.1, 0.21, -0.03], [sd*0.16, 0.2, -0.04], [sd*0.19, 0.13, -0.05]] : [[0, 0.17, -0.03], [0, 0.24, -0.06], [0, 0.235, -0.13], [0, 0.17, -0.17]];
+      head.add(m3dTaper(pts, 0.032, 0.007, m, 16, 12)); const e = pts[pts.length-1]; m3dSphere(head, 0.016, bell, e[0], e[1] - 0.014, e[2]); } }
   /* (RS-294) what's worn on the head sits on the skull it's worn over: a dragonborn's skull is higher and further back than a man's, its eyes and brows
      well forward, so his helmets, hats, crowns and masks are raised, set back and made a size larger */
   const hg = o.head==='drake' || o.head==='kobold' || o.head==='lizard' ? (()=>{ const g = new T.Group(); g.position.set(0, 0.026, -0.022); g.scale.set(1.08, 1.06, 1.1); head.add(g); return g; })() : head;
@@ -49078,6 +49170,13 @@ function fpCollectSprites(vis){
       let mh = 0; try{ mh = m3dUpdate(px, pos, 0); }catch(err){ console.error(err); }
       if (mh){ siegeAllyRing(px); S.push({x:pos.x, y:pos.y, model:true, h:mh, lift:0, hp: a.hp < a.maxHp ? clamp(a.hp/a.maxHp, 0, 1) : null}); continue; } }
     const mp = monsterPortraitFor(a.pnm, false); S.push({x:a.x+0.5, y:a.y+0.5, spr: mp ? fpUndeadSprite(mp, false) : fpGlyphSprite('@', '#6ab4ff'), h:0.7, lift:0, shadow:true, glow:'#6ab4ff', hp: a.hp < a.maxHp ? clamp(a.hp/a.maxHp, 0, 1) : null}); }
+  /* (RS-842) the castle's folk: real figures, walking their own way */
+  if (G.gameMode===1) for (const f of (G.folk||[])) if (!f.gone && seeTile(f.x, f.y)){
+    if (ISO.on && FPD.ok){ const px = folkProxy(f), pos = px._pos;
+      if (Math.hypot(f.x+0.5-pos.x, f.y+0.5-pos.y) > 2){ pos.x = f.x+0.5; pos.y = f.y+0.5; } isoGlide(pos, f.x+0.5, f.y+0.5);
+      let mh = 0; try{ mh = m3dUpdate(px, pos, 0); }catch(err){ console.error(err); }
+      if (mh){ S.push({x:pos.x, y:pos.y, model:true, h:mh, lift:0}); continue; } }
+    S.push({x:f.x+0.5, y:f.y+0.5, spr:fpGlyphSprite('@', f.k==='prisoner' ? '#c8b890' : '#e8d070'), h:0.7, lift:0, shadow:true}); }
   /* (RS-321) your thrall: a real figure beside you - a ghost, a skeleton or a zombie - ringed in green like the raised dead */
   { const th = G.player.thrall; if (th && (G.gameMode===1 || G.gameMode===2) && thrallSpot() && seeTile(th.x, th.y)){
       if (ISO.on && FPD.ok){ const px = thrallProxy(th), pos = px._pos;
@@ -51496,7 +51595,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-841';
+const GAME_VERSION = 'rs-842';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-842 - Castle Folk
+
+- **Servants:** cooks, maids, pages and stable boys go about the castle's halls, kitchens and stores. When they see you, they drop everything and run, sometimes all the way down the stairs. Catch one and they'll press a little gold on you to be let go, with a whispered tip about the king.
+- **Prisoners:** captives are chained against the walls of the towers, guard rooms and stores, and every castle holds at least one on its first floor. Walk into one to strike off their shackles: they give you gold, scratch the floor's plan in the dust so your map shows all of it, and make for the way out.
+- **The jester:** in motley and a belled cap, he capers in a room beside the throne room. Walk into him for a joke; the first one makes you laugh and heals a quarter of your life. When fighting breaks out near him, he scampers away.
+- **Not foes:** castle folk take no blows and give none. The garrison can't stand where they stand, and the castle remembers them, including those who have fled or been freed, when you come back or load a save.
+
 ## RS-841 - The Throne Room
 
 - **A dais and a runner:** the king's throne now stands on a dais of two pale stone steps edged in gold, and a crimson runner bordered in gold leads from the doors, up the steps, to his feet.
