@@ -8081,7 +8081,7 @@ function loadGame(id){
     owWalk(G.owPos.x, G.owPos.y, 7);
   }
   G.ow.walkVer = (G.ow.walkVer||0) + 1;
-  G.ow.ev = data.owEvents || null; wevAfterLoad();
+  G.ow.ev = data.owEvents || null; owProvinces.c = null; wevAfterLoad();   /* (RS-850: the realms again, with the towns the kings' wars took) */
   if (G.player && Array.isArray(G.player.ferryTo)){ G.owPos.x = G.player.ferryTo[0]; G.owPos.y = G.player.ferryTo[1]; delete G.player.ferryTo; }   /* (RS-322: saved under sail - you come ashore at the far landing) */
   try{ ISO.rot = ((G.player && G.player.viewRot)|0) % 4; VIEW.yaw = null; }catch(e){}   // (RS-140) the camera turn you left it at
   G.ow.wg = data.owWg || null;   // the world's events (see SECTION: WORLD EVENTS)
@@ -9651,25 +9651,29 @@ function owRealmsBuild(seats){
   const W = OW_COLS, H = OW_ROWS, M = G.ow.map, N = W*H, cube = owCube(), K = seats.length, towns = skTowns();
   const cost = t=> t===OW_WATER ? 14 : t===OW_MOUNTAIN ? 10 : t===OW_RIVER ? 4 : t===OW_FOREST || t===OW_SWAMP ? 3 : 2;
   const nb = (x, y, dx, dy)=>{ if (cube){ const n = owNbG(x, y, dx, dy); return n && cubeFace(n[0], n[1]) >= 0 ? n : null; } const u = x + dx, v = y + dy; return u<0 || v<0 || u>=W || v>=H ? null : [u, v]; };
-  const f = seats.map(()=>16), extra = []; let own = null;   /* (extra: a town given to a realm that had none, grown from as well) */
+  const tk = G.ow.ev && G.ow.ev.rw && G.ow.ev.rw.taken, conq = tk ? Object.keys(tk).map(k=>{ const [x, y] = k.split(',').map(Number); return [x, y, tk[k]]; }).filter(c=>c[2] >= 0 && c[2] < K) : [];
+  const quick = conq.length > 0 && G.ow.realmF && G.ow.realmF.length===K;   /* (RS-850: towns taken in the kings' wars grow for their new realm, at the paces first found) */
+  const f = quick ? G.ow.realmF.slice() : seats.map(()=>16), extra = quick ? (G.ow.realmExtra||[]).filter(e=>!conq.some(c=>c[0]===e[0] && c[1]===e[1])).concat(conq) : []; let own = null;   /* (extra: a town given to a realm that had none, grown from as well) */
   const grow = ()=>{ const o = new Int16Array(N).fill(-1), dist = new Int32Array(N).fill(2e9), Q = [];
     seats.map((s, k)=>[s.x, s.y, k]).concat(extra).forEach(([x, y, k])=>{ const i = y*W + x; o[i] = k; dist[i] = 0; (Q[0] = Q[0] || []).push(i); });
     for (let d=0; d<Q.length; d++){ const q = Q[d]; if (!q) continue; Q[d] = null; for (const i of q){ if (dist[i]!==d) continue; const x = i % W, y = (i/W)|0, fk = f[o[i]];
       for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]){ const n = nb(x, y, dx, dy); if (!n) continue; const j = n[1]*W + n[0], nd = d + cost(M[n[0]][n[1]])*fk; if (nd < dist[j]){ dist[j] = nd; o[j] = o[i]; (Q[nd] = Q[nd] || []).push(j); } } } }
     return o; };
-  for (let it=0; it<9; it++){ own = grow();
+  if (quick) own = grow(); else for (let it=0; it<9; it++){ own = grow();
     if (it >= 3 && towns.length >= K){ const cnt = new Array(K).fill(0); for (const t of towns){ const k = own[t[1]*W + t[0]]; if (k >= 0) cnt[k]++; } let added = 0;   /* (every realm a town at least: one without is given the nearest from a realm with more than one) */
       for (let k=0;k<K;k++){ if (cnt[k]) continue; let best = null, bd = 1e18; for (const t of towns){ const o = own[t[1]*W + t[0]]; if (o < 0 || cnt[o] < 2 || extra.some(e=>e[0]===t[0] && e[1]===t[1])) continue; const d = (t[0] - seats[k].x)**2 + (t[1] - seats[k].y)**2; if (d < bd){ bd = d; best = t; } }
         if (best){ extra.push([best[0], best[1], k]); cnt[own[best[1]*W + best[0]]]--; cnt[k]++; added++; } }
       if (added) continue; }
     if (K < 2 || it >= 6) break; const area = new Float64Array(K); for (let i=0;i<N;i++) if (own[i] >= 0 && owRealmLand(M[i % W][(i/W)|0])) area[own[i]]++;
     const mean = area.reduce((a, b)=>a + b, 0)/K; if (!mean) break; for (let k=0;k<K;k++) f[k] = Math.max(6, Math.min(64, Math.round(f[k]*Math.pow(Math.max(1, area[k])/mean, 0.6)))); }
+  if (!quick){ G.ow.realmF = f.slice(); G.ow.realmExtra = extra.map(e=>e.slice()); }
   for (let i=0;i<N;i++) if (own[i] >= 0 && !owRealmLand(M[i % W][(i/W)|0])) own[i] = -1;   /* (the sea is no one's) */
   const rng = mulberry32((G.ow.seed|0) ^ 0x5f3a91), used = new Set(), nm = ()=>{ for (let k=0;k<40;k++){ const n = PLACE_ROOT[Math.floor(rng()*PLACE_ROOT.length)] + PLACE_END[Math.floor(rng()*PLACE_END.length)]; if (!used.has(n)){ used.add(n); return n; } } return 'Nowhere'; };
   const list = seats.map((s, id)=>{ const tw = towns.filter(t=>own[t[1]*W + t[0]]===id), rc = {};
     for (const t of tw){ const fl = townFlavorAt(t[0], t[1]), r = fl && PROV_FMT[fl.race] ? fl.race : 'human'; rc[r] = (rc[r]||0) + 1; }
     const race = Object.keys(rc).sort((a, b)=>rc[b] - rc[a])[0] || 'human', n = nm(), fm = PROV_FMT[race], foe = PROV_FOES[Math.floor(rng()*PROV_FOES.length)], names = VILLAGE_NPC_NAMES[race] || VILLAGE_NPC_NAMES.human;
     return { id, realm:1, seat:{ x:s.x, y:s.y, name:'Castle ' + n, castle:1 }, race, name:fm[Math.floor(rng()*fm.length)].replace('%', n), ruler:'King ' + names[Math.floor(rng()*names.length)], foe, towns:tw.map(t=>t[0] + ',' + t[1]), n:0, sx:0, sy:0 }; });
+  if (!quick) G.ow.realmBase = list.map(p=>({ race:p.race, name:p.name, ruler:p.ruler, foe:p.foe, seat:p.seat })); else list.forEach((p, i)=>{ const b = G.ow.realmBase && G.ow.realmBase[i]; if (b) Object.assign(p, b); });   /* (a realm keeps its name and king when its towns change hands) */
   for (let i=0;i<N;i++){ const k = own[i]; if (k<0) continue; const p = list[k]; p.n++; p.sx += i % W; p.sy += (i/W)|0; }
   for (const p of list){ if (!p.n) continue; const cx = p.sx/p.n, cy = p.sy/p.n; let bi = -1, bd = 1e18; for (let i=0;i<N;i++) if (own[i]===p.id){ const d = (i % W - cx)**2 + (((i/W)|0) - cy)**2; if (d < bd){ bd = d; bi = i; } } p.cx = bi % W; p.cy = (bi/W)|0; delete p.sx; delete p.sy; }
   const v = { own, list }; owProvinces.c = { ref:G.ow.map, seed:G.ow.seed, v }; return v;
@@ -21024,7 +21028,7 @@ const PM_TINT = { [OW_GRASS]:[214,200,150], [OW_FOREST]:[160,172,112], [OW_TUNDR
 function pmMapKey(){
   let h = 0; const m = G.ow.map;
   for (let x=0;x<OW_COLS;x++){ const col = m[x]; for (let y=0;y<OW_ROWS;y++) h = (h*31 + col[y]*(y+7)) | 0; }
-  return OW_COLS+'x'+OW_ROWS+':'+h+'|'+(G.ow.wg && G.ow.wg.fixed ? Object.keys(G.ow.wg.fixed).length : 0);   // (a mended bridge redraws the chart)
+  return OW_COLS+'x'+OW_ROWS+':'+h+'|'+(G.ow.wg && G.ow.wg.fixed ? Object.keys(G.ow.wg.fixed).length : 0)+'|'+(G.ow.ev && G.ow.ev.rw ? G.ow.ev.rw.n||0 : 0);   /* (RS-850: a town changing hands redraws the borders) */   // (a mended bridge redraws the chart)
 }
 /* (RS-572) the chart painted all at once was half a second's task - in the background a moment after you reached the land, which
    often landed on the loading of the next floor down. It's a generator now: the background build paints it a few milliseconds at a
@@ -22613,6 +22617,48 @@ function travelTick(prevKey){
   }
   checkAchievements();
 }
+/* (RS-850) the rival kings: every few days one of the kings you don't rule marches on a town of a neighbouring realm (one near his own
+   land, from a realm with a town to spare) - your realms too. It is a siege like any other: break it and the town stays where it was;
+   leave it, and when the time runs out the town falls to him, and the borders move with it. Kept in the world's events (e.rw): the
+   towns taken (taken: town key -> realm), a count of the changes (n, for the map's chart) and a chronicle (log) */
+function realmWarSide(id){ const L = owProvinces().list; return id!=null && L[id] ? L[id] : null; }
+function realmWarState(){ const e = wevP(); if (!e) return null; if (!e.rw || typeof e.rw!=='object') e.rw = { next:wevTurn() + DAY_LENGTH*(2 + Math.random()), taken:{}, log:[], n:0 }; const r = e.rw; r.taken = r.taken||{}; r.log = r.log||[]; return r; }
+function realmWarSay(r, s){ r.log.unshift({ t:wevTurn(), s }); if (r.log.length > 12) r.log.length = 12; }
+function realmWarTick(){
+  if (!G.ow || !G.ow.map || (G.ow.genVer||1) < 31 || G.gameOver) return; const e = wevP(), r = realmWarState(); if (!e || !r) return; const turn = wevTurn();
+  if (turn < r.next) return; r.next = turn + DAY_LENGTH*(2 + Math.random()*2);
+  if (e.dyn.some(d=>d.kind==='siege')) return;   /* (one siege at a time) */
+  const PV = owProvinces(), L = PV.list; if (L.length < 2 || !L[0].realm) return;
+  const W = OW_COLS, H = OW_ROWS, own = PV.own, opts = [];
+  for (const A of L){ if (provHeld(A)) continue;
+    for (const B of L){ if (B.id===A.id || (B.towns||[]).length < 2) continue;
+      for (const k of B.towns){ if (e.sacked[k] || (e.town[k] && wevTurn() < e.town[k].until)) continue; const [x, y] = k.split(',').map(Number); let near = 99;
+        for (let dx=-10; dx<=10 && near > 1; dx++) for (let dy=-10; dy<=10; dy++){ const u = x + dx, v = y + dy; if (u<0 || v<0 || u>=W || v>=H || own[v*W + u]!==A.id) continue; const d = Math.max(Math.abs(dx), Math.abs(dy)); if (d < near) near = d; }
+        if (near <= 10) opts.push({ A, B, k, x, y, w:11 - near }); } } }
+  if (!opts.length) return;
+  let q = Math.random()*opts.reduce((a, o)=>a + o.w, 0), o = opts[0]; for (const c of opts){ if ((q -= c.w) <= 0){ o = c; break; } }
+  const d = { id:e.seq++, kind:'siege', key:o.k, x:o.x, y:o.y, camp:'bandit', until:turn + Math.round(DAY_LENGTH*1.5), war:{ a:o.A.id, b:o.B.id } }; e.dyn.push(d);
+  const yours = !!provHeld(o.B), nm = o3TownName(o.x, o.y), known = yours || owSeen(o.x, o.y);
+  realmWarSay(r, `${o.A.ruler} of ${o.A.name} marched on ${nm} in ${o.B.name}`);
+  wevSay(`war! ${o.A.ruler} of ${o.A.name} marches on ${nm}${yours ? ', a town of your realm' : ' in ' + o.B.name} - break the siege within ${wevTime(d.until - turn)}, or it falls to ${o.A.name}`, 'hit', known ? (yours ? `${nm} - your town - is besieged!` : `War: ${nm} besieged`) : null);
+  return d;
+}
+/* nobody broke it: the town changes hands */
+function realmWarTaken(d){
+  const r = realmWarState(), A = realmWarSide(d.war.a), B = realmWarSide(d.war.b), nm = o3TownName(d.x, d.y), wasYours = !!(B && provHeld(B));
+  r.taken[d.key] = d.war.a; r.n = (r.n||0) + 1; owProvinces.c = null;
+  for (const c of Object.values(G.player.castles||{})){ if (!c || !c.towns) continue; c.towns = c.towns.filter(k=>k!==d.key); if (c.town===d.key && c.towns.length) c.town = c.towns[0]; }   /* (it no longer pays your rents) */
+  const nowA = realmWarSide(d.war.a); if (nowA && provHeld(nowA)){ for (const c of Object.values(G.player.castles||{})) if (c && c.held && !c.lost && c.prov===nowA.name && c.towns && !c.towns.includes(d.key)) c.towns.push(d.key); }
+  realmWarSay(r, `${nm} fell to ${A ? A.name : 'a rival realm'}`);
+  wevSay(`${nm} has fallen to ${A ? A.ruler : 'a rival king'}${wasYours ? ' - it no longer answers to you' : ''}: it belongs to ${A ? A.name : 'another realm'} now, and the borders have moved`, 'hit', wasYours || owSeen(d.x, d.y) ? `${nm} fell to ${A ? A.name : 'a rival'}` : null);
+}
+/* you broke it: the town stays, and its king thanks you */
+function realmWarBroken(d){
+  const r = realmWarState(), A = realmWarSide(d.war.a), B = realmWarSide(d.war.b), nm = o3TownName(d.x, d.y), p = G.player;
+  realmWarSay(r, `you broke ${A ? A.name : 'a rival realm'}'s siege of ${nm}`);
+  if (B && provHeld(B)) logMsg(`${nm} stays in your realm - ${A ? A.ruler : 'the rival king'}'s army is scattered`, 'good');
+  else if (B){ p.rep = p.rep || {}; for (const k of (B.towns||[])) if (k!==d.key) p.rep[k] = repAt(k) + 1; logMsg(`${B.ruler} of ${B.name} sends thanks for ${nm} - the realm's other towns think the better of you (+1 standing)`, 'good'); }
+}
 /* (RS-849) the Realms: who rules each, from which castle, over which towns - and for yours, the rents, the garrison and any raid coming */
 function buildRealms(){
   const PV = owProvinces(), p = G.player, W = OW_COLS, land = PV.list.map(()=>0); let tot = 0;
@@ -22628,9 +22674,11 @@ function buildRealms(){
     else { const lost = Object.values(p.castles||{}).find(c=>c && c.lost && c.prov===pv.name); if (lost) mine = `<div style="margin-top:4px;font-size:12px;color:#ff8a6a">Taken from you by a usurper - storm ${esc(pv.seat.name)} to win it back</div>`; }
     return `<div class="qrep" style="margin:6px 0;opacity:${known ? 1 : 0.6}"><b style="color:var(--ink)">${sw(col)}${known ? esc(cap(pv.name)) : 'A realm beyond your maps'}</b> <span class="muted" style="float:right">${pct}% of the land</span>
       <div class="muted" style="font-size:12px;">${known ? `${held ? 'You rule it' : esc(pv.ruler) + ' rules it'} from ${esc(pv.seat.name)} &middot; ${(pv.towns||[]).length} town${(pv.towns||[]).length===1 ? '' : 's'}: ${towns} &middot; ${esc(PROV_FOE_NM[pv.foe]||'raiders')} trouble its roads` : `${(pv.towns||[]).length} town${(pv.towns||[]).length===1 ? '' : 's'} - find its castle to learn more`}</div>${mine}</div>`; }).join('');
-  const n = PV.list.filter(pv=>provHeld(pv)).length;
+  const n = PV.list.filter(pv=>provHeld(pv)).length, ev = G.ow.ev, rw = ev && ev.rw, wars = ((ev && ev.dyn)||[]).filter(d=>d.kind==='siege' && d.war);   /* (RS-850: the kings' wars) */
+  const warHtml = (wars.length ? wars.map(d=>{ const A = realmWarSide(d.war.a), B = realmWarSide(d.war.b); return `<div class="qrep" style="margin:6px 0;border-color:#a0402a"><b style="color:#ff7a5a">War:</b> ${esc(A ? A.ruler + ' of ' + A.name : 'a king')} besieges ${esc(o3TownName(d.x, d.y))} in ${esc(B ? B.name : 'a realm')}${B && provHeld(B) ? ' - <b>your town</b>' : ''} &middot; it falls in ${wevTime(d.until - wevTurn())} unless the siege is broken</div>`; }).join('') : '')
+    + (rw && rw.log && rw.log.length ? `<div class="muted" style="font-size:12px;margin:6px 0 10px;"><b style="color:var(--ink)">Of late:</b> ${rw.log.slice(0, 6).map(l=>esc(cap(l.s)) + ` <span style="opacity:.7">(${wevTime(Math.max(1, wevTurn() - l.t))} ago)</span>`).join(' &middot; ')}</div>` : '');
   return `<h2 class="panel-title">THE REALMS</h2><div class="sub">${PV.list.length} realms share the land, each ruled from a castle. ${n ? `You rule ${n} of them.` : 'Take a castle\'s throne to rule its realm.'}</div>
-    <div class="ovbody">${PV.list.length && PV.list[0].realm ? rows : '<div class="muted">This world was made before the realms - make a new world to see them.</div>'}
+    <div class="ovbody">${warHtml}${PV.list.length && PV.list[0].realm ? rows : '<div class="muted">This world was made before the realms - make a new world to see them.</div>'}
     <div class="btnrow"><button class="btn" onclick="setUi('playing')">close</button></div></div>`;
 }
 function buildTravelLog(){
@@ -22978,6 +23026,7 @@ function wevTick(){
   for (const d of e.dyn.slice()){
     if (turn < d.until) continue;
     e.dyn.splice(e.dyn.indexOf(d), 1);
+    if (d.kind==='siege' && d.war){ realmWarTaken(d); continue; }   /* (RS-850) */
     if (d.kind==='siege'){ e.sacked[d.key] = turn + DAY_LENGTH; wevSay(`no one came to break the siege of ${o3TownName(d.x, d.y)} - the raiders sacked it, and its shops will charge more for a day`, 'hit', `${o3TownName(d.x, d.y)} was sacked`); }
   }
   for (const k in e.sacked) if (turn >= e.sacked[k]) delete e.sacked[k];
@@ -23320,7 +23369,7 @@ function siegeWarWon(f){
     G.siegeWar = null; G.allies = [];
     wevSay(`the raiders flee ${nm}! The reeve pays you ${gold} gold and a guild token (+3 standing)`, 'magic', `You saved ${nm}`); checkAchievements();
     return siegeWinHome(S, nm, 'the raiders are gone'); }
-  const d = e.dyn.find(d=>d.id===S.id); if (d) e.dyn.splice(e.dyn.indexOf(d), 1);
+  const d = e.dyn.find(d=>d.id===S.id); if (d) e.dyn.splice(e.dyn.indexOf(d), 1); if (d && d.war) try{ realmWarBroken(d); }catch(er){ console.error(er); }   /* (RS-850: a king's siege broken) */
   const nm = o3TownName(S.x, S.y), gold = roundH((220 + Lt*30)*goldFindMult()), saved = (G.allies||[]).filter(a=>a.hp > 0).length;
   p.gold += gold; st.defended++; p.rep = p.rep || {}; p.rep[S.key] = repAt(S.key) + 5; tkP().cur.guild += 3;
   addToInventory(genItem(lootAt(6), lootKind(), 3, chn(0.5)));
@@ -23443,7 +23492,7 @@ function wevArenaWon(){
   if (f.kind==='siegewar') return siegeWarWon(f);   /* (RS-418) */
   if (f.kind==='siege' || f.kind==='raid'){
     let key = null;
-    if (f.kind==='siege'){ const d = e.dyn.find(d=>d.id===f.id); if (!d) return false; e.dyn.splice(e.dyn.indexOf(d), 1); key = d.key; }
+    if (f.kind==='siege'){ const d = e.dyn.find(d=>d.id===f.id); if (!d) return false; e.dyn.splice(e.dyn.indexOf(d), 1); key = d.key; if (d.war) try{ realmWarBroken(d); }catch(er){ console.error(er); } }
     else { for (const k in e.town) if (e.town[k].id===f.id){ key = k; e.town[k].done = true; e.town[k].until = wevTurn(); } }
     if (!key) return false;
     const [x,y] = key.split(',').map(Number), nm = o3TownName(x, y);
@@ -23470,6 +23519,8 @@ function wevTownGate(x, y){
   const e = wevP(); if (!e) return false;
   const d = e.dyn.find(d=>d.kind==='siege' && d.x===x && d.y===y); if (!d) return false;
   const nm = o3TownName(x, y);
+  if (d.war){ const A = realmWarSide(d.war.a); wevDialog(`The siege of ${nm}`, `The army of <b>${esc(A ? A.ruler : 'a rival king')}</b> of ${esc(A ? A.name : 'a rival realm')} has ${esc(nm)} surrounded, to take it for its king. If no one breaks the siege in ${wevTime(d.until - wevTurn())}, ${esc(nm)} falls to ${esc(A ? A.name : 'them')}, and the borders move with it.`,
+    [[`Break the siege (battle at the gates, then in the streets)`, ()=>{ siegeCardThen(`The siege of ${nm}`, 'the battle before the gate', ()=>wevSiegeFight(d)); }], ['Turn back', ()=>{ logMsg('you keep your distance from the siege lines', ''); }]]); return true; }   /* (RS-850) */
   wevDialog(`The siege of ${nm}`, `A ${WEV_CAMP_KINDS[d.camp] ? WEV_CAMP_KINDS[d.camp].nm.replace(/ camp$| hideout$| warren$/, '') : 'raiding'} host has ${nm} surrounded. Smoke rises over the palisade and the gate is barred. If no one breaks the siege in ${wevTime(d.until - wevTurn())}, the town will be sacked.`,
     [[`Break the siege (battle at the gates, then in the streets)`, ()=>{ siegeCardThen(`The siege of ${nm}`, 'the battle before the gate', ()=>wevSiegeFight(d)); }], ['Turn back', ()=>{ logMsg('you keep your distance from the siege lines', ''); }]]);
   return true;
@@ -23651,6 +23702,7 @@ function wevTipHtml(o){
   if (o.k==='craid') return `<div style="font-weight:600;color:#ff6a50">${esc(cap(castleFoeNm(o.c.raid.foe)))} march on your castle</div><div class="examine">Be at its first floor's gate before they come to hold it with your wardens - or the garrison stands alone.</div>${row('they come in', o.hrs + 'h', '#ffb060')}${row('garrison', castleWardensOf(o.c) + ' wardens, ' + CASTLE_GATES[o.c.gate||0])}`;   /* (RS-848) */
   if (o.k==='boss'){ const b = G.ow.ev.boss, m = wevBossEntry(b);
     return `<div style="font-weight:600;color:#ff5a3a">${esc(wevBossName(b))}</div><div class="examine">A world boss: a giant that sleeps for days, then wakes and roams. Its wounds last between fights.</div><hr>${row('combat level', CB_HI, '#ff7a5a')}${row('life', b.hp && b.maxHp ? `${b.hp} / ${b.maxHp}` : 'unhurt')}${row('sleeps in', wevTime(o.left))}<div class="muted">walk into it to fight</div>`; }
+  if (o.k==='siege' && o.d && o.d.war){ const A = realmWarSide(o.d.war.a), B = realmWarSide(o.d.war.b); return `<div style="font-weight:600;color:#ff6a50">${esc(o3TownName(o.x, o.y))} is under siege</div><div class="examine">${esc(A ? A.ruler + ' of ' + A.name : 'A rival king')} wants it from ${esc(B ? B.name : 'its realm')}. Walk into the town to break the siege, or it falls to them.</div>${row('time left', wevTime(o.left), '#ffb060')}`; }   /* (RS-850) */
   if (o.k==='siege') return `<div style="font-weight:600;color:#ff6a50">${esc(o3TownName(o.x, o.y))} is under siege</div><div class="examine">Walk into the town to break the siege, or it will be sacked.</div>${row('time left', wevTime(o.left), '#ffb060')}`;
   if (o.k==='meteor') return `<div style="font-weight:600;color:#9ad8ff">A fallen star</div><div class="examine">Mine it for iron, coal, mithril, adamantite and runite before it crumbles.</div>${row('crumbles in', wevTime(o.left))}`;
   if (o.k==='town_festival') return `<div style="font-weight:600;color:#ffd060">The ${esc(o.t.name)} in ${esc(o3TownName(o.x, o.y))}</div><div class="examine">10% off in every shop and a treat for each visitor.</div>${row('ends in', wevTime(o.left))}`;
@@ -51941,7 +51993,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-849';
+const GAME_VERSION = 'rs-850';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -55350,7 +55402,7 @@ function frameLoop(ts){
   if (G.player && G.ui==='playing'){ const ck = Math.floor(clockNow()), lbl = timeOfDayLabel();
     if (ck!==frameLoop.ck){ frameLoop.ck = ck; try{ seasonTick(); }catch(e){ console.error(e); } }
     if (lbl!==frameLoop.tod){ const had = frameLoop.tod; frameLoop.tod = lbl; if (had!==undefined) try{ renderGame(); }catch(e){ console.error(e); } } }
-  if (G.player && G.ui==='playing' && (G.player.turnCount||0)!==frameLoop.rt){ frameLoop.rt = G.player.turnCount||0; try{ seasonTick(); richTick(); wevTick(); mythicTick(); castleRaidTick(); }catch(e){ console.error(e); } }
+  if (G.player && G.ui==='playing' && (G.player.turnCount||0)!==frameLoop.rt){ frameLoop.rt = G.player.turnCount||0; try{ seasonTick(); richTick(); wevTick(); mythicTick(); castleRaidTick(); realmWarTick(); }catch(e){ console.error(e); } }
   // each new overworld tile: paint in the map, regions, landmarks, route stops (see travelTick)
   if (G.player && G.ui==='playing' && G.gameMode===0 && G.owPos && G.ow && G.ow.map){ const k = G.owPos.x+','+G.owPos.y+'|'+G.ow.seed;
     if (k!==frameLoop.op){ const prev = frameLoop.op; frameLoop.op = k; try{ travelTick(prev && prev.split('|')[1]===String(G.ow.seed) ? prev : null); wgOnStep(prev); }catch(e){ console.error(e); } } }

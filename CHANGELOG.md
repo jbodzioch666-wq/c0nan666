@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-850 - Rival Kings
+
+- **The kings go to war:** every few days a king whose realm you don't rule marches on a town of a neighbouring realm, one close to his own land. Your realms are fair game too. You get word of it, and the town shows as besieged on the map.
+- **Break the siege, or lose the town:** walk into the town to fight the king's army at the gate and in the streets, as in any siege. Win, and the town stays where it was (its realm's other towns think the better of you, +1 standing). Leave it, and the town falls to the king: it joins his realm, the borders move on the map, and a town of yours stops paying your rents.
+- **Take the realm, take its conquests:** claim a conquering king's castle and the towns he took come with it.
+- **The Realms panel** shows every war going on and a chronicle of the latest marches and conquests. Realms keep their names and kings when towns change hands, and conquests are kept in the save.
+
 ## RS-849 - The Realms Grow
 
 - **As many realms as the land wants:** the number of realms now follows the world's size: 4 on a small world, 6 on a medium, 8 on a large and 11 on a planet (each still with its castle and at least one town). It needs a new world: start one and keep your character.
