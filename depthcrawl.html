@@ -6148,7 +6148,7 @@ function dgFinish(cacheIt){
     else if (G.dgDone){ invalidateDungeonCache(G.dungeonSlot); for (const g of gravesP()) if (g.dg && g.dg.slot===G.dungeonSlot){ delete g.dg; logMsg('your gravestone from below is cast up with the collapse - it waits where the entrance stood', 'loot'); } }
     else if (cacheIt && !G.inRaid) saveLevelCache(G.depth);
   }
-  G.dgDone = 0; G.dgBossExit = null; G.inRaid = null; G.gameMode = 0; G.dungeonSlot = 0; G.isBossFloor = 0; G.bossIdx = -1;
+  G.dgDone = 0; G.dgBossExit = null; G.inRaid = null; G.castleSiege = null; G.gameMode = 0; G.dungeonSlot = 0; G.isBossFloor = 0; G.bossIdx = -1;
   dgStepOut();
 }
 // (RS-207) out of a site you stand on the open ground beside its entrance, not in the middle of it: the nearest land tile
@@ -6282,7 +6282,7 @@ function loadLevel(d, arrivingFromBelow, fellThrough){
   if (G.gameMode===1 && fresh) skPlaceCaveNodes();
   try{ dgStairsClear(); }catch(e){ console.error(e); }   /* (RS-452: a kept floor too) */
   if (G.gameMode===1 && fresh) for (const m of G.mon) try{ monAi(m); }catch(e){}
-  if (castleHeldHere()) try{ castleHeldDress(d); }catch(e){ console.error(e); }   /* (RS-844) */
+  if (castleHeldHere()) try{ castleHeldDress(d); castleSiegeStart(d); }catch(e){ console.error(e); }   /* (RS-844; RS-847: a raid at the gate) */
   if (G.gameMode===1 && d===G.dungeonMaxDepth && fresh && !castleHeldHere()){
     spawnBoss();
     setUi('bossPreview');
@@ -7468,6 +7468,7 @@ function tickMonsters(excludeIdx){
   G.dgTurn = (G.dgTurn||0) + 1;   /* (RS-314) the turn count down here: the swinging blades keep time by it */
   if (G.player && (G.player.paraGuard||0) > 0) G.player.paraGuard--;
   if (G.gameMode===1 && G.folk && G.folk.length) try{ folkTick(); }catch(e){ console.error(e); }   /* (RS-842) */
+  if (G.castleSiege) try{ castleSiegeTick(); }catch(e){ console.error(e); }   /* (RS-847: raiders at your castle's gate) */
   if (G.gameMode===1 && G.siteKind==='castle') try{ castleSecretTick(); }catch(e){ console.error(e); }   /* (RS-843) */
   rsPrayerTick();
   // poison and fear tick down (or bite) once per player turn, exactly like
@@ -16587,12 +16588,12 @@ function castleSecretOpen(x, y){
 function castleClaimAt(x, y){
   if (G.gameMode!==1 || G.siteKind!=='castle' || !G.dgDone || !G.dungeonDeco || G.dungeonDeco[x][y]!=='throne') return false;
   const p = G.player, key = G.dungeonEntrance.x + ',' + G.dungeonEntrance.y; p.castles = p.castles || {};
-  if (p.castles[key]){ logMsg(`you sit a while on your own throne. ${p.castles[key].tn} pays you its rents when you come in`, ''); return true; }
+  if (p.castles[key] && !p.castles[key].lost){ logMsg(`you sit a while on your own throne. ${p.castles[key].tn} pays you its rents when you come in`, ''); return true; }
   let pv = null; try{ pv = provAt(G.dungeonEntrance.x, G.dungeonEntrance.y); if (pv && (pv.wild || !pv.seat)) pv = null; }catch(e){}   /* (RS-845: the lord of its province, hailed by the seat) */
   let tw = pv ? [pv.seat.x, pv.seat.y] : wevNearestTown(false);
   if (pv && pv.realm){ let bd = 1e9; tw = null; for (const k of pv.towns||[]){ const [a, b] = k.split(',').map(Number), d = Math.hypot(a - G.dungeonEntrance.x, b - G.dungeonEntrance.y); if (d < bd){ bd = d; tw = [a, b]; } } if (!tw) tw = wevNearestTown(false); }   /* (RS-846: a realm's castle - its nearest town brings the rents, every town of it hails you) */ if (!tw){ logMsg('you sit on the throne - but no town is near enough to call you lord', ''); return true; }
   const tk = questTownKey(tw[0], tw[1]), tn = townName(tw[0], tw[1]);
-  p.castles[key] = { town:tk, tn, prov:pv ? pv.name : '', towns:pv && pv.realm ? (pv.towns||[]).slice() : undefined, day:Math.floor(clockNow()/DAY_LENGTH), cb:floorCb(G.depth), at:Date.now() };
+  p.castles[key] = { town:tk, tn, prov:pv ? pv.name : '', towns:pv && pv.realm ? (pv.towns||[]).slice() : undefined, nextRaid:clockNow() + DAY_LENGTH*(2 + Math.random()*2), day:Math.floor(clockNow()/DAY_LENGTH), cb:floorCb(G.depth), at:Date.now() };
   try{ castleKeepInPlace(p.castles[key]); castleHeldDress(G.depth); }catch(e){ console.error(e); }   /* (RS-844: it stays where it stands, and yours) */
   p.rep = p.rep || {}; p.rep[tk] = repAt(tk) + 5;
   if (pv && pv.realm){ const ts = pv.towns||[]; p.rep = p.rep || {}; for (const k of ts) if (k!==tk) p.rep[k] = repAt(k) + 3; logMsg(`you are the ruler of ${pv.name} now, from ${pv.seat.name} - ${ts.length} town${ts.length===1 ? '' : 's'} of the realm will hail you (+3 standing in each), and any of them will bring you the realm's rents`, 'good'); }
@@ -16620,14 +16621,112 @@ function castleHeldDress(d){
   G.mon = (G.mon||[]).filter(m=>m.ally || m.minion); G.bossIdx = -1; G.isBossFloor = 0; G.folk = G.folk || [];
   for (const f of G.folk) if (f.k==='servant'){ f.calm = 1; f.scared = 0; f.cower = 0; }
   const near = (x0, y0, r0, r1, n, mk)=>{ const c = []; for (let x=x0-r1;x<=x0+r1;x++) for (let y=y0-r1;y<=y0+r1;y++){ const r = Math.max(Math.abs(x - x0), Math.abs(y - y0)); if (r < r0 || r > r1 || !G.map[x] || G.map[x][y]!==T_FLOOR || G.dungeonDeco[x][y] || !folkFree(x, y)) continue; c.push([x, y, r]); } c.sort((a, b)=>a[2] - b[2] || Math.random() - 0.5); for (let i=0;i<n && i<c.length;i++) G.folk.push(mk(c[i][0], c[i][1])); };
-  if (!G.folk.some(f=>f.k==='warden')) near(G.genStart.x, G.genStart.y, 2, 4, 2, (x, y)=>({ k:'warden', nm:'one of your wardens', look:'castle warden', x, y }));
+  { const hc = castleHeldHere(), want = hc ? (d===1 ? castleWardensOf(hc) : Math.min(2, castleWardensOf(hc))) : 2, ws = G.folk.filter(f=>f.k==='warden' && !f.gone);   /* (RS-847: as many at the first floor's gate as you keep) */
+    for (let i=want;i<ws.length;i++) ws[i].gone = 1; for (const f of ws) f.hp = 4;
+    if (ws.length < want) near(G.genStart.x, G.genStart.y, 2, 5, want - ws.length, (x, y)=>({ k:'warden', nm:'one of your wardens', look:'castle warden', x, y })); }
   if (d >= (G.dungeonMaxDepth||1) && !G.folk.some(f=>f.k==='steward')){ const t = (G.genRooms||[]).find(r=>r.k==='throne'); if (t) near(t.x + (t.w >> 1), t.y + 1, 2, 4, 1, (x, y)=>({ k:'steward', nm:'your steward', look:'castle steward', x, y })); }
+}
+/* (RS-847) raids on your castles: every few days the foe that troubles a held castle's realm marches on it, and a rider brings you
+   word a day ahead. Come to its gate in time and the raiders come in at it, wave on wave, with your wardens fighting beside you; stay
+   away and your garrison - its wardens and its gate - must hold alone: hold, and the fields are burned (the rents owed lost, perhaps a
+   warden fallen); fall, and a usurper sits on your throne until you storm it again. Your steward hires wardens and strengthens the gate */
+const RAID_WAVES = 3, RAID_MAX_WARDENS = 6;
+const CASTLE_GATES = ['a broken gate', 'a mended gate', 'an iron-bound gate', 'a great portcullis'];
+function castleWardensOf(c){ return c.wardens==null ? 2 : c.wardens; }
+function castleTierOf(c){ return tierOfCb(c.cb||CB_LO); }
+function castleRaidFoe(key){ const [x, y] = key.split(',').map(Number); let pv = null; try{ pv = provAt(x, y); }catch(e){} return pv && pv.foe ? pv.foe : 'orc'; }
+function castleFoeNm(foe){ return PROV_FOE_NM[foe] || 'raiders'; }
+function castleRaidTick(){
+  const p = G.player; if (!p || !p.castles) return; const now = clockNow();
+  for (const key in p.castles){ const c = p.castles[key]; if (!c || !c.held || c.lost) continue;
+    if (c.nextRaid==null){ c.nextRaid = now + DAY_LENGTH*(2 + Math.random()*2); continue; }
+    if (!c.raid && now >= c.nextRaid){ const foe = castleRaidFoe(key), [x, y] = key.split(',').map(Number), w = castleWardensOf(c);
+      c.raid = { foe, due:now + DAY_LENGTH, str:2 + rn(4) + Math.min(3, (c.raids||0) >> 1) }; c.raids = (c.raids||0) + 1;
+      logMsg(`a rider brings word: ${castleFoeNm(foe)} march on your castle${c.prov ? ' in ' + c.prov : ''}${G.gameMode===0 ? ' (' + wevWhere(x, y) + ')' : ''}! Come to its gate before this time tomorrow and hold it - or your ${w} warden${w===1 ? '' : 's'} must stand alone`, 'hit');
+      try{ notify('Raiders march on your castle!', 'warn'); }catch(e){} continue; }
+    if (c.raid && now >= c.raid.due && castleHeldHere()!==c) castleRaidResolve(key); }
+}
+/* nobody came: the garrison holds or falls on its own (str: the raid's strength, for a test) */
+function castleRaidResolve(key, str){
+  const p = G.player, c = p.castles && p.castles[key]; if (!c || !c.raid) return null; const foe = c.raid.foe, s = str!=null ? str : c.raid.str;
+  const guard = castleWardensOf(c) + (c.gate||0)*1.5 + (str!=null ? 0 : Math.random()*3);
+  c.raid = null; c.nextRaid = clockNow() + DAY_LENGTH*(3 + Math.random()*3);
+  if (guard >= s){ c.day = Math.floor(clockNow()/DAY_LENGTH); let fell = 0; if (castleWardensOf(c) > 1 && (str!=null ? false : chn(0.4))){ c.wardens = castleWardensOf(c) - 1; fell = 1; }
+    logMsg(`your wardens held your castle against the ${castleFoeNm(foe)} without you - but the raiders burned its fields, and the rents owed are lost${fell ? ', and one of your wardens fell' : ''}`, 'hit');
+    try{ notify('Your castle held', 'warn'); }catch(e){} return 'held'; }
+  c.lost = 1; c.held = 0; if (c.slot) invalidateDungeonCache(c.slot);
+  logMsg(`your castle has fallen to the ${castleFoeNm(foe)}! A usurper sits on your throne - storm it and take it back`, 'hit');
+  try{ notify('Your castle has fallen!', 'warn'); }catch(e){} try{ O3.mapRef = null; }catch(e){}
+  return 'lost';
+}
+/* you're at the gate: the defence of the first floor */
+function castleSiegeStart(d){
+  G.castleSiege = null; const c = castleHeldHere(); if (!c || !c.raid || d!==1) return;
+  G.castleSiege = { key:G.dungeonEntrance.x + ',' + G.dungeonEntrance.y, wave:0, gap:9, foe:c.raid.foe, cb:floorCb(1) };
+  logMsg(`the ${castleFoeNm(c.raid.foe)} are at the gate! Hold your castle - ${RAID_WAVES} waves of them - with your wardens beside you`, 'hit');
+  try{ notify('Raiders at the gate!', 'warn'); }catch(e){}
+}
+function castleRaider(x, y, S){
+  const L = clampCb(S.cb + 2), e = famPickFrom([S.foe], L, 3) || pickMonsterEntry(L), sp = sitePower(), m = newMonster();
+  m.alive = 1; m.x = x; m.y = y; m.hp = m.maxHp = roundH((rollDice(e.hd, 8) + e.hd)*sp.hp); m.ac = e.ac; m.atkBonus = e.atk; m.dmg1 = e.dmg1; m.dmg2 = roundH(e.dmg2*sp.dmg); m.xp = roundH(e.xp*sp.xp);
+  m.sym = e.sym; m.nm = e.nm; m.baseNm = e.nm; m.col = monsterCol(e); m.undead = e.undead; m.mlevel = e.lvl; m.abilities = e.abilities.slice(); m.art = e.art; monEntryExtras(m, e); m.corrupted = 0;
+  m.raider = 1; m.engaged = true; G.mon.push(m); return m;
+}
+function castleSiegeTick(){
+  const S = G.castleSiege; if (!S) return; const p = G.player, c = p.castles && p.castles[S.key];
+  if (!c || !c.raid || c.lost || G.gameMode!==1 || G.depth!==1){ G.castleSiege = null; return; }
+  if (G.mon.some(m=>m.alive && m.raider)) return;
+  if (S.wave >= RAID_WAVES){ castleSiegeWon(c, S); return; }
+  if (++S.gap < 2) return; S.gap = 0;
+  const n = Math.max(1, 2 + S.wave + (S.wave===RAID_WAVES - 1 ? 1 : 0) - ((c.gate||0) >= 2 ? 1 : 0));
+  /* in at the gate: open floor two to six steps from the way in, not on top of you */
+  const W = COLS, H = ROWS, g = G.genStart, dist = new Int16Array(W*H).fill(-1), q = [g.x + g.y*W], spots = []; dist[q[0]] = 0;
+  for (let h=0; h<q.length; h++){ const k = q[h], x = k % W, y = (k / W) | 0, dk = dist[k]; if (dk >= 2 && dk <= 6 && folkFree(x, y) && G.map[x][y]===T_FLOOR && Math.max(Math.abs(x - p.x), Math.abs(y - p.y)) >= 2) spots.push([x, y]); if (dk >= 6) continue;
+    for (const [i, j] of [[1,0],[-1,0],[0,1],[0,-1]]){ const a = x+i, b = y+j, kk = a + b*W; if (a<1 || b<1 || a>=W-1 || b>=H-1 || dist[kk] >= 0 || G.map[a][b]===T_WALL || dgSolid(a, b)) continue; dist[kk] = dk + 1; q.push(kk); } }
+  for (let i=spots.length-1;i>0;i--){ const j = rn(i+1), t = spots[i]; spots[i] = spots[j]; spots[j] = t; }
+  let made = 0; for (const [x, y] of spots){ if (made >= n || G.mon.length >= MAXMON) break; if (castleRaider(x, y, S)){ made++; try{ fpBurst(x+0.5, y+0.5, 0.2, '#c86a3a', 10, 0.7); }catch(e){} } }
+  S.wave++;
+  logMsg(S.wave===1 ? `${made} ${castleFoeNm(S.foe)} burst in at the gate!` : `another wave of ${castleFoeNm(S.foe)} pours in at the gate (${S.wave} of ${RAID_WAVES})`, 'hit');
+  try{ if (typeof FP!=='undefined') FP.shake = Math.max(FP.shake||0, 0.3); }catch(e){}
+}
+function castleSiegeWon(c, S){
+  const p = G.player; G.castleSiege = null; c.raid = null; c.defended = (c.defended||0) + 1; c.nextRaid = clockNow() + DAY_LENGTH*(3 + Math.random()*3);
+  const g = roundH((40 + castleTierOf(c)*15)*RAID_WAVES); p.gold += g; p.rep = p.rep || {}; for (const k of (c.towns && c.towns.length ? c.towns : [c.town])) if (k) p.rep[k] = repAt(k) + 2;
+  logMsg(`the last of the ${castleFoeNm(S.foe)} break and flee - your castle stands! Its towns will sing of it (+2 standing), and the raiders' spoils come to ${g} gold`, 'good');
+  try{ notify('Castle defended!', 'good', 'achievement'); }catch(e){} try{ sfx('coins'); }catch(e){}
+}
+/* a warden in the fight: makes for the nearest raider and spears it; a raider beside it may wound it, and at four wounds it falls */
+function castleWardenAct(f){
+  let best = -1, bd = 7; G.mon.forEach((m, i)=>{ if (!m.alive || m.ally || m.minion) return; const d = Math.max(Math.abs(m.x - f.x), Math.abs(m.y - f.y)); if (d < bd){ bd = d; best = i; } });
+  if (best < 0) return; const m = G.mon[best];
+  if (bd > 1){ folkStepTo(f, m.x, m.y); return; }
+  const d = Math.max(1, Math.round(m.maxHp*(0.12 + Math.random()*0.1))); m.hp -= d; m.hitKind = 'melee'; m.hitCrit = false; f._atkT = (typeof FP!=='undefined' && FP.t) || 0.001;
+  try{ fxSplat(m.x+0.5, m.y+0.5, d, 'hit'); }catch(e){} logMsg(`your warden spears the ${m.nm} for ${d}`, '');
+  if (m.hp <= 0){ monsterDies(best); return; }
+  if (chn(0.35)){ f.hp = (f.hp==null ? 4 : f.hp) - 1; if (f.hp <= 0){ f.gone = 1; const c = castleHeldHere(); if (c) c.wardens = Math.max(0, castleWardensOf(c) - 1); logMsg(`one of your wardens falls to the ${m.nm}!`, 'hit'); } }
+}
+/* the steward's counsel: the rents, the garrison and any raid coming; wardens hired and the gate strengthened here */
+function castleHireCost(c){ return roundH(60 + castleTierOf(c)*25); }
+function castleGateCost(c){ return roundH((100 + castleTierOf(c)*40)*((c.gate||0) + 1)); }
+function castleHire(c){ const g = castleHireCost(c); if (castleWardensOf(c) >= RAID_MAX_WARDENS || G.player.gold < g) return false; G.player.gold -= g; c.wardens = castleWardensOf(c) + 1; try{ sfx('coins'); }catch(e){} logMsg(`you pay ${g} gold - a new warden takes the castle's colours (${c.wardens} now), and will keep the gate`, 'good'); return true; }
+function castleGateUp(c){ const g = castleGateCost(c); if ((c.gate||0) >= CASTLE_GATES.length - 1 || G.player.gold < g) return false; G.player.gold -= g; c.gate = (c.gate||0) + 1; try{ sfx('coins'); }catch(e){} logMsg(`you pay ${g} gold - the masons make it ${CASTLE_GATES[c.gate]}`, 'good'); return true; }
+function castleStewardTalk(c){
+  const day = Math.floor(clockNow()/DAY_LENGTH), owed = Math.min(7, day - (c.day||0)), w = castleWardensOf(c), hc = castleHireCost(c), gc = castleGateCost(c), gt = c.gate||0;
+  const rd = c.raid ? Math.max(1, Math.round((c.raid.due - clockNow())/DAY_LENGTH*24)) : 0;
+  const txt = `"Welcome home, my liege." ${esc(c.tn||'')}'s reeve gathers your rents - about <b>${roundH(30 + castleTierOf(c)*12)}</b> gold a day${owed > 0 ? `, ${owed} day${owed===1 ? '' : 's'} of it waiting for you there` : ''}.<br><br>`
+    + `The garrison: <b>${w}</b> warden${w===1 ? '' : 's'} and <b>${CASTLE_GATES[gt]}</b>.${c.defended ? ` You have beaten back ${c.defended} raid${c.defended===1 ? '' : 's'}.` : ''}<br><br>`
+    + (c.raid ? `<b style="color:#e06a4a">${cap(castleFoeNm(c.raid.foe))} march on us - they'll be at the gate in about ${rd} hour${rd===1 ? '' : 's'}.</b> Meet them at the first floor's gate.` : 'The roads are quiet, for now. Raiders come every few days - the more wardens and the stronger the gate, the better we hold without you.');
+  const opts = [];
+  if (w < RAID_MAX_WARDENS) opts.push([`Hire a warden (${hc} gold)`, ()=>{ if (!castleHire(c)) logMsg(`a warden costs ${hc} gold`, ''); }]);
+  if (gt < CASTLE_GATES.length - 1) opts.push([`Make it ${CASTLE_GATES[gt + 1]} (${gc} gold)`, ()=>{ if (!castleGateUp(c)) logMsg(`the masons want ${gc} gold`, ''); }]);
+  opts.push(['Leave', ()=>{}]);
+  wevDialog('Your Steward', txt, opts, esc(c.prov || ''));
 }
 /* coming into a town that is answerable to one of your castles: the cheer the first time, and the rents for the days since (up to a week) */
 function castleRents(){
   const p = G.player, k = curTownKey(); if (!k || !p || !p.castles) return 0;
   const day = Math.floor(clockNow()/DAY_LENGTH); let paid = 0;
-  for (const ck in p.castles){ const c = p.castles[ck]; if (!c || (c.town!==k && !(c.towns && c.towns.includes(k)))) continue;
+  for (const ck in p.castles){ const c = p.castles[ck]; if (!c || c.lost || (c.town!==k && !(c.towns && c.towns.includes(k)))) continue;
     if (!c.hailed){ c.hailed = 1; logMsg(`the people of ${c.tn} cheer as you come in - word has spread that you hold the castle now`, 'good'); }
     const n = Math.min(7, day - (c.day||0)); if (n <= 0) continue; const g = roundH((30 + tierOfCb(c.cb||CB_LO)*12)*n*(c.towns ? 1 + 0.25*Math.max(0, c.towns.length - 1) : 1));   /* (RS-846: a realm's rents, the more towns the more) */ p.gold += g; paid += g; c.day = day;
     logMsg(`the reeve of ${c.tn} brings you your castle's rents: ${g} gold for ${n} day${n===1 ? '' : 's'}`, 'loot'); }
@@ -16677,6 +16776,7 @@ function folkTick(){
   const p = G.player, near = (a, b)=>Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
   for (const f of G.folk){ if (f.gone) continue;
     const dP = near(f, p);
+    if (f.k==='warden' && G.castleSiege){ castleWardenAct(f); continue; }   /* (RS-847: to arms) */
     if (f.k==='warden' || f.k==='steward') continue;   /* (RS-844: at their posts) */
     if (f.k==='prisoner'){ if (!f.freed) continue; const ex = G.genStart, moved = near(f, ex) > 0 && folkStepTo(f, ex.x, ex.y); f.stuck = moved ? 0 : (f.stuck||0) + 1; if (near(f, ex) <= (moved ? 0 : 1) || f.stuck >= 6){   /* (boxed in for a few turns: they find their own way) */ f.gone = 1; logMsg(`${f.nm} slips out of the castle a free soul`, ''); } continue; }
     const fight = G.mon.some(m=>m.alive && m.engaged && near(m, f) <= 3);
@@ -16693,6 +16793,7 @@ function folkTick(){
 function folkMeet(f){
   const p = G.player;
   if (f.k==='warden'){ logMsg(`${cap(f.nm)} salutes: "Hail, my liege! The gate is held and all is quiet."`, ''); return; }
+  if (f.k==='steward' && castleHeldHere()){ castleStewardTalk(castleHeldHere()); return; }   /* (RS-847: the garrison and the raids) */
   if (f.k==='steward'){ const c = castleHeldHere(); const day = Math.floor(clockNow()/DAY_LENGTH), owed = c ? Math.min(7, day - (c.day||0)) : 0;
     logMsg(c ? `your steward bows: "Welcome home, my liege. The castle is yours and all is well. ${c.tn}'s reeve gathers your rents - about ${roundH(30 + tierOfCb(c.cb||CB_LO)*12)} gold a day${owed > 0 ? `, ${owed} day${owed===1 ? '' : 's'} of it waiting for you there` : ''}."` : 'the steward bows', ''); return; }
   if (f.k==='servant' && f.calm){ logMsg(`${cap(f.nm)} bobs a bow - "My liege! Welcome home."`, ''); return; }
@@ -39423,7 +39524,7 @@ function* o3SitesGen(grp, x0, y0, W){
     const [wx, wy] = o3G(x, y) || [x, y];   /* (RS-632: found in the 3D land's frame, named and clicked where it is in the world) */
     hb.userData.act = { kind:'site', x:wx, y:wy, t }; grp.add(hb); O3.hits.push(hb);
     const el = document.createElement('div'); el.className = 'v3plate' + (t===OW_TOWN ? ' vendor' : ' o3site');
-    el.innerHTML = `<b>${esc(t===OW_TOWN ? o3TownName(wx, wy) : owLostCity(wx, wy) ? 'Lost City' : t===OW_CASTLE && castleHeld(wx, wy) ? 'Your Castle' : (O3_SITE_NAME[t]||''))}</b>${t===OW_TOWN ? o3TownSub(wx, wy) : ''}`;
+    el.innerHTML = `<b>${esc(t===OW_TOWN ? o3TownName(wx, wy) : owLostCity(wx, wy) ? 'Lost City' : t===OW_CASTLE && castleHeld(wx, wy) ? (castleHeld(wx, wy).raid ? 'Your Castle - raiders coming!' : 'Your Castle') : (O3_SITE_NAME[t]||''))}</b>${t===OW_TOWN ? o3TownSub(wx, wy) : ''}`;
     O3.labels.appendChild(el);
     const plate = { el, pos:new T.Vector3(gx, g.position.y + (t===OW_TEMPLE ? (o3SeaSiteL(x, y) ? 3.75 : 2.95) : (t===OW_GRAVEYARD ? sc : 1.3)*(t===OW_NECROTOWER ? 2.6 : t===OW_CASTLE ? 1.7 : 1.15)), gz), town: t===OW_TOWN, x:wx, y:wy }; O3.plates.push(plate);
     O3.sites.set(sk, { g, hb, plate, fl:O3.flames.slice(nF), gl:O3.glows.slice(nG), sm:O3.smoke.slice(nS), win:O3.windows.slice(nW) });
@@ -51805,7 +51906,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-846';
+const GAME_VERSION = 'rs-847';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -55214,7 +55315,7 @@ function frameLoop(ts){
   if (G.player && G.ui==='playing'){ const ck = Math.floor(clockNow()), lbl = timeOfDayLabel();
     if (ck!==frameLoop.ck){ frameLoop.ck = ck; try{ seasonTick(); }catch(e){ console.error(e); } }
     if (lbl!==frameLoop.tod){ const had = frameLoop.tod; frameLoop.tod = lbl; if (had!==undefined) try{ renderGame(); }catch(e){ console.error(e); } } }
-  if (G.player && G.ui==='playing' && (G.player.turnCount||0)!==frameLoop.rt){ frameLoop.rt = G.player.turnCount||0; try{ seasonTick(); richTick(); wevTick(); mythicTick(); }catch(e){ console.error(e); } }
+  if (G.player && G.ui==='playing' && (G.player.turnCount||0)!==frameLoop.rt){ frameLoop.rt = G.player.turnCount||0; try{ seasonTick(); richTick(); wevTick(); mythicTick(); castleRaidTick(); }catch(e){ console.error(e); } }
   // each new overworld tile: paint in the map, regions, landmarks, route stops (see travelTick)
   if (G.player && G.ui==='playing' && G.gameMode===0 && G.owPos && G.ow && G.ow.map){ const k = G.owPos.x+','+G.owPos.y+'|'+G.ow.seed;
     if (k!==frameLoop.op){ const prev = frameLoop.op; frameLoop.op = k; try{ travelTick(prev && prev.split('|')[1]===String(G.ow.seed) ? prev : null); wgOnStep(prev); }catch(e){ console.error(e); } } }

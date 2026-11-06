@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-847 - Raids
+
+- **Raiders march on your castles:** every few days the foe that troubles a castle's realm (goblins, orcs, the walking dead...) marches on it. A rider brings word a day ahead, and the castle's name plate warns you.
+- **Hold the gate:** come to the castle's first floor before they arrive and they burst in at the gate in three waves, while your wardens fight beside you, spearing raiders and taking wounds (a warden falls at four). Win and the realm's towns sing of it (+2 standing) and the raiders' spoils are yours.
+- **Or leave it to the garrison:** stay away and your wardens and gate fight alone. A strong garrison holds, but the fields burn and the rents owed are lost (sometimes a warden too); a weak one falls, and a usurper takes your throne until you storm the castle again.
+- **Your steward's counsel:** talk to the steward for the rents, the garrison and any raid coming, then hire wardens (up to six) or strengthen the gate, from a broken gate to a great portcullis. Stronger gates mean smaller waves.
+
 ## RS-846 - The Six Realms
 
 - **Six realms:** the land is no longer cut into a province per town. It is shared into six realms of much the same size (largest to smallest about 1.2 to 1 on a medium world, 1.9 to 1 on a planet), the islands joined to the realm across the water. Every realm holds at least one town. It needs a new world: start one and keep your character.
