@@ -6141,7 +6141,8 @@ function dgOpenExit(){
 function dgFinish(cacheIt){
   if (G.dgDone) try{ sqTakeLeftRelic(); }catch(e){ console.error(e); }   /* (RS-337: a quest relic left lying in a beaten site comes with you) */
   if (G.dungeonSlot>=1 && G.dungeonSlot<=MAX_SITE_SLOT+1){
-    if (G.dgDone){ invalidateDungeonCache(G.dungeonSlot); for (const g of gravesP()) if (g.dg && g.dg.slot===G.dungeonSlot){ delete g.dg; logMsg('your gravestone from below is cast up with the collapse - it waits where the entrance stood', 'loot'); } }
+    if (G.dgDone && castleHeldHere()) saveLevelCache(G.depth);   /* (RS-844: your castle's floors are kept as you left them) */
+    else if (G.dgDone){ invalidateDungeonCache(G.dungeonSlot); for (const g of gravesP()) if (g.dg && g.dg.slot===G.dungeonSlot){ delete g.dg; logMsg('your gravestone from below is cast up with the collapse - it waits where the entrance stood', 'loot'); } }
     else if (cacheIt && !G.inRaid) saveLevelCache(G.depth);
   }
   G.dgDone = 0; G.dgBossExit = null; G.inRaid = null; G.gameMode = 0; G.dungeonSlot = 0; G.isBossFloor = 0; G.bossIdx = -1;
@@ -6278,7 +6279,8 @@ function loadLevel(d, arrivingFromBelow, fellThrough){
   if (G.gameMode===1 && fresh) skPlaceCaveNodes();
   try{ dgStairsClear(); }catch(e){ console.error(e); }   /* (RS-452: a kept floor too) */
   if (G.gameMode===1 && fresh) for (const m of G.mon) try{ monAi(m); }catch(e){}
-  if (G.gameMode===1 && d===G.dungeonMaxDepth && fresh){
+  if (castleHeldHere()) try{ castleHeldDress(d); }catch(e){ console.error(e); }   /* (RS-844) */
+  if (G.gameMode===1 && d===G.dungeonMaxDepth && fresh && !castleHeldHere()){
     spawnBoss();
     setUi('bossPreview');
   }
@@ -16491,15 +16493,38 @@ function castleSecretOpen(x, y){
 /* the throne, the king fallen: take it, and the castle with it */
 function castleClaimAt(x, y){
   if (G.gameMode!==1 || G.siteKind!=='castle' || !G.dgDone || !G.dungeonDeco || G.dungeonDeco[x][y]!=='throne') return false;
-  const p = G.player, key = G.owPos.x + ',' + G.owPos.y; p.castles = p.castles || {};
+  const p = G.player, key = G.dungeonEntrance.x + ',' + G.dungeonEntrance.y; p.castles = p.castles || {};
   if (p.castles[key]){ logMsg(`you sit a while on your own throne. ${p.castles[key].tn} pays you its rents when you come in`, ''); return true; }
   const tw = wevNearestTown(false); if (!tw){ logMsg('you sit on the throne - but no town is near enough to call you lord', ''); return true; }
   const tk = questTownKey(tw[0], tw[1]), tn = townName(tw[0], tw[1]);
   p.castles[key] = { town:tk, tn, day:Math.floor(clockNow()/DAY_LENGTH), cb:floorCb(G.depth), at:Date.now() };
+  try{ castleKeepInPlace(p.castles[key]); castleHeldDress(G.depth); }catch(e){ console.error(e); }   /* (RS-844: it stays where it stands, and yours) */
   p.rep = p.rep || {}; p.rep[tk] = repAt(tk) + 5;
-  logMsg(`you take the king's throne. The castle is yours! Word will reach ${tn}, where they will hail you as its lord (+5 standing), and its reeve will bring you the castle's rents whenever you come in`, 'good', true);
+  logMsg(`you take the king's throne. The castle is yours, and it stays where it stands - its garrison throws down its arms, and your own wardens take the gate. Word will reach ${tn}, where they will hail you as its lord (+5 standing), and its reeve will bring you the castle's rents whenever you come in`, 'good', true);
   try{ notify(`Lord of the castle - ${tn} hails you`, 'good', 'achievement'); }catch(e){}
   return true;
+}
+/* (RS-844) a castle you've claimed stays yours: it doesn't move on when its king falls as other sites do, its floors are kept as you
+   left them, and no garrison or king comes back. Your wardens keep its gate, its servants serve you, and a steward waits by the throne */
+function castleHeld(x, y){ const c = G.player && G.player.castles && G.player.castles[x + ',' + y]; return c && c.held && !c.lost ? c : null; }
+function castleHeldHere(){ return G.gameMode===1 && G.siteKind==='castle' && G.dungeonEntrance ? castleHeld(G.dungeonEntrance.x, G.dungeonEntrance.y) : null; }
+/* the king's fall moved the castle away, as a beaten site moves (bossDefeated): taken, it goes back where it stood */
+function castleKeepInPlace(c){
+  const slot = G.dungeonSlot, ox = G.dungeonEntrance.x, oy = G.dungeonEntrance.y, O = G.ow; if (!O || !O.map || !O.map[ox]) return;
+  const mv = O.siteMoves && O.siteMoves[slot];
+  if (mv && (mv.x!==ox || mv.y!==oy) && O.map[mv.x] && O.map[mv.x][mv.y]===OW_CASTLE && O.dungeonIdx[mv.x][mv.y]===slot){ O.map[mv.x][mv.y] = OW_GRASS; O.dungeonMax[mv.x][mv.y] = 0; O.dungeonIdx[mv.x][mv.y] = 0; }
+  O.map[ox][oy] = OW_CASTLE; O.dungeonMax[ox][oy] = G.dungeonMaxDepth; O.dungeonIdx[ox][oy] = slot;
+  O.siteMoves = O.siteMoves || {}; O.siteMoves[slot] = { kind:'castle', x:ox, y:oy, max:G.dungeonMaxDepth };
+  c.slot = slot; c.max = G.dungeonMaxDepth; c.held = 1;
+  if (typeof O3!=='undefined') O3.mapRef = null;
+}
+/* a floor of your castle: no foe on it, the servants at ease, your wardens at its way in, and on the top floor your steward */
+function castleHeldDress(d){
+  G.mon = (G.mon||[]).filter(m=>m.ally || m.minion); G.bossIdx = -1; G.isBossFloor = 0; G.folk = G.folk || [];
+  for (const f of G.folk) if (f.k==='servant'){ f.calm = 1; f.scared = 0; f.cower = 0; }
+  const near = (x0, y0, r0, r1, n, mk)=>{ const c = []; for (let x=x0-r1;x<=x0+r1;x++) for (let y=y0-r1;y<=y0+r1;y++){ const r = Math.max(Math.abs(x - x0), Math.abs(y - y0)); if (r < r0 || r > r1 || !G.map[x] || G.map[x][y]!==T_FLOOR || G.dungeonDeco[x][y] || !folkFree(x, y)) continue; c.push([x, y, r]); } c.sort((a, b)=>a[2] - b[2] || Math.random() - 0.5); for (let i=0;i<n && i<c.length;i++) G.folk.push(mk(c[i][0], c[i][1])); };
+  if (!G.folk.some(f=>f.k==='warden')) near(G.genStart.x, G.genStart.y, 2, 4, 2, (x, y)=>({ k:'warden', nm:'one of your wardens', look:'castle warden', x, y }));
+  if (d >= (G.dungeonMaxDepth||1) && !G.folk.some(f=>f.k==='steward')){ const t = (G.genRooms||[]).find(r=>r.k==='throne'); if (t) near(t.x + (t.w >> 1), t.y + 1, 2, 4, 1, (x, y)=>({ k:'steward', nm:'your steward', look:'castle steward', x, y })); }
 }
 /* coming into a town that is answerable to one of your castles: the cheer the first time, and the rents for the days since (up to a week) */
 function castleRents(){
@@ -16555,9 +16580,10 @@ function folkTick(){
   const p = G.player, near = (a, b)=>Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
   for (const f of G.folk){ if (f.gone) continue;
     const dP = near(f, p);
+    if (f.k==='warden' || f.k==='steward') continue;   /* (RS-844: at their posts) */
     if (f.k==='prisoner'){ if (!f.freed) continue; const ex = G.genStart, moved = near(f, ex) > 0 && folkStepTo(f, ex.x, ex.y); f.stuck = moved ? 0 : (f.stuck||0) + 1; if (near(f, ex) <= (moved ? 0 : 1) || f.stuck >= 6){   /* (boxed in for a few turns: they find their own way) */ f.gone = 1; logMsg(`${f.nm} slips out of the castle a free soul`, ''); } continue; }
     const fight = G.mon.some(m=>m.alive && m.engaged && near(m, f) <= 3);
-    if (!f.scared && (fight || (f.k==='servant' && dP <= 5 && shotClear(p.x, p.y, f.x, f.y)))){ f.scared = 1; logMsg(f.k==='jester' ? 'the jester squeals and scampers out of harm\'s way' : `${f.nm} sees you, drops everything and runs!`, ''); }
+    if (!f.scared && (fight || (f.k==='servant' && !f.calm && dP <= 5 && shotClear(p.x, p.y, f.x, f.y)))){ f.scared = 1; logMsg(f.k==='jester' ? 'the jester squeals and scampers out of harm\'s way' : `${f.nm} sees you, drops everything and runs!`, ''); }
     if (f.scared){
       if (dP > 8 && !fight){ f.scared = 0; f.cower = 0; continue; }   /* (far enough off: they stop to catch their breath) */
       let best = null, bd = dP; for (const [i, j] of FOLK_D8){ const x = f.x+i, y = f.y+j; if (!folkFree(x, y) || (i && j && !diagClear(f.x, f.y, i, j, tileOpen))) continue; const d = Math.max(Math.abs(x - p.x), Math.abs(y - p.y)) + Math.hypot(x - p.x, y - p.y)*0.01; if (d > bd){ bd = d; best = [x, y]; } }
@@ -16569,6 +16595,10 @@ function folkTick(){
 /* walking into one of the folk */
 function folkMeet(f){
   const p = G.player;
+  if (f.k==='warden'){ logMsg(`${cap(f.nm)} salutes: "Hail, my liege! The gate is held and all is quiet."`, ''); return; }
+  if (f.k==='steward'){ const c = castleHeldHere(); const day = Math.floor(clockNow()/DAY_LENGTH), owed = c ? Math.min(7, day - (c.day||0)) : 0;
+    logMsg(c ? `your steward bows: "Welcome home, my liege. The castle is yours and all is well. ${c.tn}'s reeve gathers your rents - about ${roundH(30 + tierOfCb(c.cb||CB_LO)*12)} gold a day${owed > 0 ? `, ${owed} day${owed===1 ? '' : 's'} of it waiting for you there` : ''}."` : 'the steward bows', ''); return; }
+  if (f.k==='servant' && f.calm){ logMsg(`${cap(f.nm)} bobs a bow - "My liege! Welcome home."`, ''); return; }
   if (f.k==='servant'){ f.scared = 1;
     if (!f.paid){ f.paid = 1; const g = Math.max(3, Math.round((6 + cbT()*4)*(0.7 + Math.random()*0.6))); p.gold += g; try{ sfx('coins'); }catch(e){} logMsg(`${f.nm} presses ${g} gold into your hand - "Take it, only let me go!" - and whispers: ${pick(FOLK_HINTS)}`, 'loot'); }
     else logMsg(`${f.nm} cowers - "I've nothing more, I swear it!"`, ''); }
@@ -33063,6 +33093,9 @@ const MONSTER_PORTRAITS = {
   'castle page':    HUM({outfit:'shirt', cloth:'#8a1a24', trim:'#d8b040', legWear:'trews', legCol:'#d8b040', hair:'#c89a50'}, 0.9),
   'castle prisoner':HUM({outfit:'rags', cloth:'#6a604c', hair:'#4a4036', beard:'#4a4036'}, 0.95),
   'jester':         HUM({outfit:'shirt', cloth:'#d8a828', trim:'#6a1a7a', legWear:'trews', legCol:'#6a1a7a', jesterCap:['#d8a828', '#6a1a7a']}, 0.9),
+  /* (RS-844) your own people: wardens in blue with your star on their tabards, and a grey-bearded steward */
+  'castle warden':  HUM({outfit:'chain', tabard:'#1e3a6e', emblem:'#e8d080', weapon:'spear', helm:'kettle', cape:'#1e3a6e', hair:'#5a3a20'}, 1.02),
+  'castle steward': HUM({outfit:'robe', cloth:'#2a3a5a', trim:'#d8b040', hair:'#9a8a7a', beard:'#9a8a7a'}, 0.98),
   // ---- the drowned cult ----
   'fanatic':          HUM({outfit:'robe', cloth:'#7a2a24', head:'hood', weapon:'dagger', eyes:'255,160,90'}),
   'cult acolyte':     HUM({outfit:'robe', cloth:'#4a2a5a', head:'hood', weapon:'dagger', trim:'#8a6a2a'}),
@@ -39287,7 +39320,7 @@ function* o3SitesGen(grp, x0, y0, W){
     const [wx, wy] = o3G(x, y) || [x, y];   /* (RS-632: found in the 3D land's frame, named and clicked where it is in the world) */
     hb.userData.act = { kind:'site', x:wx, y:wy, t }; grp.add(hb); O3.hits.push(hb);
     const el = document.createElement('div'); el.className = 'v3plate' + (t===OW_TOWN ? ' vendor' : ' o3site');
-    el.innerHTML = `<b>${esc(t===OW_TOWN ? o3TownName(wx, wy) : owLostCity(wx, wy) ? 'Lost City' : (O3_SITE_NAME[t]||''))}</b>${t===OW_TOWN ? o3TownSub(wx, wy) : ''}`;
+    el.innerHTML = `<b>${esc(t===OW_TOWN ? o3TownName(wx, wy) : owLostCity(wx, wy) ? 'Lost City' : t===OW_CASTLE && castleHeld(wx, wy) ? 'Your Castle' : (O3_SITE_NAME[t]||''))}</b>${t===OW_TOWN ? o3TownSub(wx, wy) : ''}`;
     O3.labels.appendChild(el);
     const plate = { el, pos:new T.Vector3(gx, g.position.y + (t===OW_TEMPLE ? (o3SeaSiteL(x, y) ? 3.75 : 2.95) : (t===OW_GRAVEYARD ? sc : 1.3)*(t===OW_NECROTOWER ? 2.6 : t===OW_CASTLE ? 1.7 : 1.15)), gz), town: t===OW_TOWN, x:wx, y:wy }; O3.plates.push(plate);
     O3.sites.set(sk, { g, hb, plate, fl:O3.flames.slice(nF), gl:O3.glows.slice(nG), sm:O3.smoke.slice(nS), win:O3.windows.slice(nW) });
@@ -51669,7 +51702,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-843';
+const GAME_VERSION = 'rs-844';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

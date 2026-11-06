@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-844 - Your Castle
+
+- **Claimed castles stay yours:** before this, a castle moved to a new spot when its king fell, as every beaten site does, so the one you claimed vanished and a new king held the next. Now the throne you take keeps the castle where it stands.
+- **No king comes back:** your castle's floors are kept as you left them, and its garrison throws down its arms when you claim it. No king or garrison returns, even on a floor the game has to rebuild.
+- **Your people:** two of your wardens, in blue with a gold star, hold each floor's way in. Your steward waits by the throne and tells you how the rents stand. The servants stop running and welcome you home.
+- **On the land:** the castle's name plate reads Your Castle.
+
 ## RS-843 - Secrets and Spoils
 
 - **Secret passages:** every castle floor hides a room behind one of its walls. Walk past it and you may feel a draught from a crack in the stone; walk into it and the wall swings open on a hidden pivot. Below the top floor it's a stash: a chest and some gold.

@@ -176,6 +176,7 @@ Screenshots go to `tools/tests/shots/`.
 | `rs841` | `rs841` | the throne room: dais, runner, round pillars with banners, windows and shafts that follow the hour; castle rooms kept with the floor and in the save | |
 | `rs842` | `rs842` | castle folk: servants who flee and pay, prisoners freed for gold and the floor's plan, the jester's healing joke; kept in the save | |
 | `rs843` | `rs843` | castle secrets and spoils: a hidden room per floor (the king's hoard on top), the draught, claiming the throne, the town's rents | |
+| `rs844` | `rs844` | a claimed castle stays put and yours: floors kept, no king or garrison back, wardens, steward, calm servants | |
 | `rs789` | A shire's door stones and flags are dark: their average vertex colour stays low |
 | `rs788` | The open land has its older grass again: no blade chunks, RS-785's code gone |
 | `rs787` | A battle at a town: the card before and after, the banner's words, the trees told where you stand, no shader built by a fade, new creatures warmed off the frame |
