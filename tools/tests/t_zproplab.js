@@ -1,0 +1,10 @@
+// (art probe, not in ALL) dungeon props (isoPropModel) side by side under a plain light, three turns each. ZPROP names the kinds (comma list), ZTAG the shot
+module.exports = async page=>{ page.setDefaultTimeout(0); const tag = process.env.ZTAG || 'a', kinds = (process.env.ZPROP || 'throne').split(','); await page.setViewportSize({ width:1600, height:1000 });
+  const r = await page.evaluate(async kinds=>{ goToCharCreate(); ccBegin(); wgRegenerate(12345); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{};
+    const T = THREE, cv = document.createElement('canvas'); cv.width = 1600; cv.height = 1000; cv.style.cssText = 'position:fixed;left:0;top:0;z-index:99999;width:1600px;height:1000px'; document.body.appendChild(cv);
+    const rr = new T.WebGLRenderer({ canvas:cv, antialias:true }); rr.setPixelRatio(1); rr.setSize(1600, 1000, false); rr.shadowMap.enabled = true; rr.useLegacyLights = true; try{ T.ColorManagement.enabled = false; }catch(e){}
+    const sc = new T.Scene(); sc.background = new T.Color(0x2a2c32); sc.add(new T.HemisphereLight(0xdde4ff, 0x40362c, 0.95)); const sun = new T.DirectionalLight(0xfff0dd, 1.25); sun.position.set(2, 5, 6); sun.castShadow = true; sc.add(sun);
+    const fl = new T.Mesh(new T.PlaneGeometry(40, 20), new T.MeshStandardMaterial({ color:0x55504a })); fl.rotation.x = -Math.PI/2; fl.receiveShadow = true; sc.add(fl); const out = [];
+    kinds.forEach((k, i)=>[0, -0.7, -2.4].forEach((ry, j)=>{ const g = isoPropModel({ kind:k, x:0, y:0 }); g.position.set((j - 1)*1.3 + i*4.2 - (kinds.length - 1)*2.1, 0, 0); g.rotation.y = ry; sc.add(g); let n = 0; g.traverse(o=>{ if (o.isMesh){ o.castShadow = true; n++; } }); out.push(k + ' ' + n); }));
+    const cam = new T.PerspectiveCamera(30, 1.6, 0.1, 100); cam.position.set(0, 2.2, 6.2); cam.lookAt(0, 0.6, 0); rr.render(sc, cam); rr.render(sc, cam); return out; }, kinds);
+  console.log(JSON.stringify(r)); await page.waitForTimeout(300); await page.screenshot({ path: SHOTS + '/zproplab_' + tag + '.png' }); };
