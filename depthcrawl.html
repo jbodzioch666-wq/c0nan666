@@ -5604,6 +5604,9 @@ function generateCastleLevel(d){
   G.genRooms = rooms.map(r=>({ x:r.x, y:r.y, w:r.w, h:r.h, k:r.k, castle:true }));
   castleFurnish(rooms);
   placeCastleContents(d, rooms);
+  if (top){ const tx = mid(goal), ante = rooms.find(r=>r.k==='ante'); for (const s of [-2, 2]) castleRoyal('guard', tx + s, goal.y + 1);   /* (RS-840: his guard either side of the throne, two more in the antechamber, his champion before him) */
+    if (ante) for (const s of [-2, 2]) castleRoyal('guard', mid(ante) + s, ante.y + (ante.h >> 1));
+    castleRoyal('champion', tx, goal.y + 4) || castleRoyal('champion', tx + 1, goal.y + 4) || castleRoyal('champion', tx - 1, goal.y + 4); }
 }
 /* a plan that always fits, for the rare seed where no layout came out: the spine alone */
 function castlePlanFallback(d){
@@ -16434,15 +16437,51 @@ function isoMonShot(m, kind, col, o){
   const lag = (kind==='arrow' || kind==='bolt') && rigIsBow(me) ? BOW_LOOSE : 0;   /* (RS-489: an archer's arrow at its loose) */
   (ISO.shots = ISO.shots || []).push({ x0:m.x+0.5, y0:m.y+0.5, x1:p.x+0.5, y1:p.y+0.5, t:-lag, dur:0.12 + d*0.045, kind, col:col||'#fff', m:null, tier:(o && o.tier) || 1, elem: o && o.elem ? o.elem : kind==='spell' ? 'shadow' : '' });
 }
+/* (RS-840) the king's own: his royal guard and his champion, out of the castle's garrison, under his colours */
+function castleRoyal(kind, x, y){
+  if (!G.map[x] || G.map[x][y] !== T_FLOOR || occupiedBy(x, y, -1) || (x === G.player.x && y === G.player.y) || G.mon.length >= MAXMON || (G.dungeonDeco[x] && DG_SOLID_DECOS.includes(G.dungeonDeco[x][y]))) return null;
+  const champ = kind === 'champion', sp = sitePower(), m = rollMonsterAt(x, y, clampCb(floorCb(G.depth) + (champ ? 12 : 4)), sp);
+  m.nm = m.baseNm = champ ? "king's champion" : 'royal guard'; m.sym = champ ? 'C' : 'G'; m.undead = false; m.col = COL.gold; m.royal = kind; m.corrupted = 0;
+  m.hp = m.maxHp = roundH(m.maxHp*(champ ? 1.8 : 1.25)); m.xp = roundH((m.xp||4)*(champ ? 2.5 : 1.4));
+  if (champ && !m.abilities.includes('multiattack2')){ m.abilities.push('multiattack2'); m.dmg1 = Math.max(1, Math.round(m.dmg1*0.6)); m.dmg2 = Math.max(2, Math.round(m.dmg2*0.6)); }
+  if (!m.abilities.includes('martialAdvantage')) m.abilities.push('martialAdvantage');
+  G.mon.push(m); return m;
+}
+/* (RS-840) "Guards!" - at two-thirds of his life the king calls two of his guard, who come in at the throne room's doors (or round him on a floor kept from before) */
+function kingCallGuard(m){
+  const t = (G.genRooms||[]).find(r=>r.k==='throne'), spots = [];
+  if (t) for (let x=t.x;x<t.x+t.w;x++) for (let y=t.y;y<t.y+t.h;y++) for (const [i, j] of [[1,0],[-1,0],[0,1],[0,-1]]){ const d = G.dungeonDeco[x+i] && G.dungeonDeco[x+i][y+j]; if (d && /door|arch/.test(d)) spots.push([x, y]); }
+  for (let r=1;r<=2;r++) for (let i=-r;i<=r;i++) for (let j=-r;j<=r;j++) spots.push([m.x + i, m.y + j]);
+  let made = 0; for (const [x, y] of spots){ if (made >= 2) break; const g = castleRoyal('guard', x, y); if (g){ g.engaged = true; made++; try{ fpBurst(x+0.5, y+0.5, 0.2, '#ffd27a', 14, 0.8); }catch(e){} } }
+  m._castT = typeof FP!=='undefined' ? FP.t : 0; if (typeof FP!=='undefined') FP.shake = Math.max(FP.shake||0, 0.4); return made;
+}
+/* (RS-840) the royal charge: with you two to four steps off in a straight line, the king raises his sword - a turn's warning - and
+   then runs the line. Still in it, he crashes into you for half again his blow; stepped out of it, he runs on past and stumbles,
+   and for a turn he's yours to strike. Not again for six turns */
+function kingCharge(m, i, dist){
+  const p = G.player, B = m._boss;
+  if (B.charge){ const c = B.charge; B.charge = null; B.chargeCd = 6;
+    let x = m.x, y = m.y, steps = 0;
+    while (steps < 5){ const nx = x + c.dx, ny = y + c.dy; if (nx === p.x && ny === p.y) break; if (!dgFree(nx, ny) || tileAt(nx, ny) !== T_FLOOR && tileAt(nx, ny) !== T_GOLD || occupiedBy(nx, ny, i)) break; x = nx; y = ny; steps++; }
+    m.x = x; m.y = y; noteFoe(i); B.charged = (B.charged||0) + 1;
+    if (Math.abs(p.x - x) <= 1 && Math.abs(p.y - y) <= 1 && x + c.dx === p.x && y + c.dy === p.y){ const d1 = m.dmg1, d2 = m.dmg2; m.dmg2 = Math.round(m.dmg2*1.5); B.chargeHit = (B.chargeHit||0) + 1; try{ monsterStrikesPlayer(i, 'charges at you - you turn the blow', 'charges into you'); } finally { m.dmg1 = d1; m.dmg2 = d2; } if (typeof FP!=='undefined') FP.shake = Math.max(FP.shake||0, 0.5); }
+    else { m.stunTurns = Math.max(m.stunTurns||0, 1); B.chargeMiss = (B.chargeMiss||0) + 1; logMsg('the king charges past you and stumbles - strike now!', 'loot', true); }
+    return true; }
+  if (B.chargeCd > 0){ B.chargeCd--; return false; }
+  const ax = Math.abs(p.x - m.x), ay = Math.abs(p.y - m.y), far = Math.max(ax, ay);
+  if (far >= 2 && far <= 4 && (ax === 0 || ay === 0 || ax === ay) && shotClear(m.x, m.y, p.x, p.y)){ B.charge = { dx:Math.sign(p.x - m.x), dy:Math.sign(p.y - m.y) }; logMsg('the king raises his sword and lowers his head - he means to charge! step out of his line', 'hit', true); m._castT = typeof FP!=='undefined' ? FP.t : 0; return true; }
+  return false;
+}
 // a boss: calls for help at two-thirds health, enrages at one third, and switches attack styles -
 // telegraphed a turn ahead, so you can swap your protection prayer in time
 function monBossTurn(m, i, dist){
   const p = G.player, B = m._boss = m._boss || { phase:0, t:0, next:null }, f = m.hp/Math.max(1, m.maxHp);
   if (!B.start && m.hp < m.maxHp) B.start = (p.turnCount||0) || 1;
   if (!m.rsStyle) rsMonStyle(m);
-  if (B.phase < 1 && f <= 0.66){ B.phase = 1; logMsg(`*** the ${m.nm} roars - it calls for help! ***`, 'new', true); monSummon(m, 2, true); if (typeof FP!=='undefined') FP.shake = Math.max(FP.shake||0, 0.4); return true; }
+  if (B.phase < 1 && f <= 0.66){ B.phase = 1; if (m.king){ logMsg('*** the king cries "Guards! To your king!" ***', 'new', true); kingCallGuard(m); } else { logMsg(`*** the ${m.nm} roars - it calls for help! ***`, 'new', true); monSummon(m, 2, true); } if (typeof FP!=='undefined') FP.shake = Math.max(FP.shake||0, 0.4); return true; }
   if (B.phase < 2 && f <= 0.33){ B.phase = 2; m.enraged = 1; m.dmg2 = Math.round(m.dmg2*1.4); m.atkBonus += 3; logMsg(`*** the ${m.nm} flies into a rage - it hits far harder now! ***`, 'new', true); sfx('crit'); }
   B.t++;
+  if (m.king && kingCharge(m, i, dist)) return true;   /* (RS-840) */
   if (B.next){ m.rsStyle = B.next; B.next = null; logMsg(`the ${m.nm} attacks with ${m.rsStyle}!`, 'hit'); }
   else if (B.t % 4===0){
     const opts = ['melee','ranged','magic'].filter(x=>x!==m.rsStyle); B.next = opts[rn(opts.length)];
@@ -19064,7 +19103,7 @@ function spawnBoss(){
     // (monsterDies, resolveSpellEffect, tickMonsters, etc.) supplies its own
     // "the ${m.nm}", same as every regular monster's bare name; a boss name
     // that embedded its own article used to read as "the the castellan usurper"
-    nm = 'castellan usurper'; sym = 'K'; col = COL.gold; undead = false;
+    nm = 'king'; sym = 'K'; col = COL.gold; undead = false;   /* (RS-840: the castle's king, on his throne) */
     abilities = ['multiattack2','martialAdvantage'];
     art = biped(0,-32,15,28,34,-9,2,15).concat([['p',[-10,-44,0,-56,10,-44]],['d',0,-46,2.5,'#ffe6a0'],['l',18,-30,32,-52,4]]);
   } else if (G.siteKind==='necro'){
@@ -19122,7 +19161,7 @@ function spawnBoss(){
   m.dmg1 = mn(40, mx(2, roundH(avgHit/((bd2+1)/2)*sp.dmg)));
   m.xp = roundH((refEntry.xp*4 + G.dungeonMaxDepth*15 + lvl*30) * sp.xp);
   m.sym = sym; m.nm = nm; m.col = col; m.undead = undead; m.mlevel = archOf(bossLevel); m.cb = bossLevel;
-  m.abilities = abilities; m.art = art;
+  m.abilities = abilities; m.art = art; if (G.siteKind==='castle') m.king = 1;
   try{ namedBossApply(m); }catch(e){ console.error(e); }
   // Multiattack splits total damage across several swings rather than
   // multiplying it - divide the per-hit dice down so a Multiattack boss
@@ -32859,6 +32898,10 @@ const MONSTER_PORTRAITS = {
   'pretender knight': HUM({outfit:'plate', plate:'#3a3a44', weapon:'sword', shield:{col:'#1a1a1a',rim:'#8a1a1a',emblem:'#8a1a1a'}, helm:'great', helmCol:'#3a3a44', eyes:'255,60,40', cape:'#1a0a0a'}, 1.1),
   'the usurper king': HUM({outfit:'plate', plate:'#d0b060', weapon:'greatsword', crown:true, cape:'#4a1a6a', beard:'#3a2010', hair:'#3a2010', gold:true, aura:'255,210,120'}, 1.14),
   'castellan usurper':HUM({outfit:'plate', plate:'#c0a060', weapon:'greatsword', crown:true, cape:'#6a1a1a', beard:'#5a3a20', hair:'#5a3a20', gold:true, aura:'255,210,120'}, 1.14),
+  /* (RS-840) the castle's king, in a crimson robe hemmed in gold, a long royal cloak edged and collared in white fur, crown and grey beard, a sword to hand; his royal guard in plate under his colours with their spears; his champion in gilded plate and a great helm */
+  'king':           HUM({outfit:'robe', cloth:'#6a1020', trim:'#e0c060', cape:'#4a0814', capeTier:5, capeEdge:'#efe6d2', furCollar:'#efe6d2', crown:true, hair:'#d6cebc', beard:'#d6cebc', weapon:'sword', gold:true, aura:'255,220,140'}, 1.16),
+  'royal guard':    HUM({outfit:'plate', plate:'#a8aeb6', tabard:'#7a1020', trim:'#d8b040', weapon:'spear', helm:'kettle', cape:'#6a0f1a'}, 1.04),
+  "king's champion":HUM({outfit:'plate', plate:'#d8c070', tabard:'#7a1020', weapon:'greatsword', helm:'great', helmCol:'#c8a850', cape:'#5a0a18', capeEdge:'#d8b040'}, 1.12),
   // ---- the drowned cult ----
   'fanatic':          HUM({outfit:'robe', cloth:'#7a2a24', head:'hood', weapon:'dagger', eyes:'255,160,90'}),
   'cult acolyte':     HUM({outfit:'robe', cloth:'#4a2a5a', head:'hood', weapon:'dagger', trim:'#8a6a2a'}),
@@ -51350,7 +51393,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-839';
+const GAME_VERSION = 'rs-840';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

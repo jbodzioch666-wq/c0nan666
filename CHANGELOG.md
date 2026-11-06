@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-840 - The King
+
+- **A king on the throne:** the castle's master is now its king, crowned, in a crimson robe and a long royal cloak edged with white fur, with a grey beard and a sword.
+- **His royal guard:** guards in plate under his colours stand either side of the throne and in the antechamber, and his champion, in gilded plate and a great helm, stands before him and strikes twice.
+- **"Guards! To your king!":** at two-thirds of his life he calls two more of his guard in at the throne room's doors.
+- **The royal charge:** with you two to four steps off in a straight line, he raises his sword for a turn and then charges. Stay in his line and he crashes into you for half again his blow; step out and he runs past, stumbles, and is yours to strike for a turn.
+
 ## RS-839 - Castle Plans
 
 - **Castles are built like castles:** every keep is now laid out room by room, and no two are alike. You storm it floor by floor, from the gate up to the king's floor.

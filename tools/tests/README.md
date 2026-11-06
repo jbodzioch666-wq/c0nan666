@@ -172,6 +172,7 @@ Screenshots go to `tools/tests/shots/`.
 | `rs837` | `rs837` | A doorway's arch is of its own floor's wall stone on floor after floor, with its shading, and its boxes' faces at the walls' scale | |
 | `rs838` | `rs838` | Each dungeon theme's door is its own (a graveyard's an iron gate), a plain dungeon keeps the oak, a few draws each, open ones swing, a real catacomb floor hangs the gate | |
 | `rs839` | `rs839` | Castles are built from rooms: the first floor's gate, baileys and keep door, the keep's halls, the throne room with treasury and bedchamber on top; every floor joined, one way on, no two alike; the master before his throne; an old kept floor made afresh | |
+| `rs840` | `rs840` | the king, his guard and champion, his call for guards and his charge | |
 | `rs789` | A shire's door stones and flags are dark: their average vertex colour stays low |
 | `rs788` | The open land has its older grass again: no blade chunks, RS-785's code gone |
 | `rs787` | A battle at a town: the card before and after, the banner's words, the trees told where you stand, no shader built by a fade, new creatures warmed off the frame |
