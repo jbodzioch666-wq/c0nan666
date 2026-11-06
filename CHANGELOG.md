@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-845 - A Castle for Every Province
+
+- **One castle to each province:** every realm on the map now has its own castle, set well inside its borders and away from its seat town (a medium world has 10 castles, up from 3; a planet 30, up from 6). It needs a new world: start one and keep your character.
+- **Lord of the province:** taking a castle's throne makes you lord of the province it stands in. The province's own seat hails you and pays your rents, not just whichever town is nearest, and riding into the province tells you that you hold its castle.
+- **A beaten castle stays in its realm:** when an unclaimed castle's king falls, a new one rises again within the same province's borders.
+- **Fixed in place:** each castle's spot is locked when the world is made, so it never drifts when the land is rebuilt on loading.
+- **World sim:** land per site on a medium world 182 -> 164 tiles, large 193 -> 177, planet 180 -> 159; no site within 4 tiles of another; world creation time unchanged (planet about 3 s).
+
 ## RS-844 - Your Castle
 
 - **Claimed castles stay yours:** before this, a castle moved to a new spot when its king fell, as every beaten site does, so the one you claimed vanished and a new king held the next. Now the throne you take keeps the castle where it stands.
