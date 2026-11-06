@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-851 - Left Hands and Fair Raids
+
+- **A skeleton's left hand is a left hand again:** it hung palm up, so it read as a right hand. Now it's turned palm down at the wrist, with the thumb up and in, closed round the shield's grip or the bow on every skeleton, and resting palm down on a lich's belly.
+- **Early raids are fairer:** a new raid sim (`tools/sim` `raid`) lost 5 or 6 raids in 6 at level 20, even with four wardens. While you're under combat 45, raiders now come seven levels below you, in waves of 1, 2 and 2 instead of 2, 3 and 5. At level 20 you now hold every raid with four wardens and about half with two; from level 30 up you hold them all. From 45 the raids are as they were (level 60: lost 0 or 1 in 6).
+- **Checked: a king besieging your own town:** played from the gate, through the waves and the streets. The town stays yours, the chronicle says you broke the siege, and no border moves.
+- **Checked: a planet's borders after a conquest** redraw in about 20 ms.
+
 ## RS-850 - Rival Kings
 
 - **The kings go to war:** every few days a king whose realm you don't rule marches on a town of a neighbouring realm, one close to his own land. Your realms are fair game too. You get word of it, and the town shows as besieged on the map.
