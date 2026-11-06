@@ -16663,7 +16663,7 @@ function castleRaidTick(){
 /* nobody came: the garrison holds or falls on its own (str: the raid's strength, for a test) */
 function castleRaidResolve(key, str){
   const p = G.player, c = p.castles && p.castles[key]; if (!c || !c.raid) return null; const foe = c.raid.foe, s = str!=null ? str : c.raid.str;
-  const guard = castleWardensOf(c) + (c.gate||0)*1.5 + (str!=null ? 0 : Math.random()*3);
+  const guard = castleWardensOf(c) + (c.gate||0)*1.5 + (castleWork(c, 'w') ? 3 : 0) + (str!=null ? 0 : Math.random()*3);   /* (RS-853: the curtain walls) */
   c.raid = null; c.nextRaid = clockNow() + DAY_LENGTH*(3 + Math.random()*3);
   if (guard >= s){ c.day = Math.floor(clockNow()/DAY_LENGTH); let fell = 0; if (castleWardensOf(c) > 1 && (str!=null ? false : chn(0.4))){ c.wardens = castleWardensOf(c) - 1; fell = 1; }
     logMsg(`your wardens held your castle against ${castleTheFoe(foe)} without you - but the raiders burned its fields, and the rents owed are lost${fell ? ', and one of your wardens fell' : ''}`, 'hit');
@@ -16692,7 +16692,7 @@ function castleSiegeTick(){
   if (G.mon.some(m=>m.alive && m.raider)) return;
   if (S.wave >= RAID_WAVES){ castleSiegeWon(c, S); return; }
   if (++S.gap < 2) return; S.gap = 0;
-  const n = Math.max(1, castleRaidWave(S, S.wave) - ((c.gate||0) >= 2 ? 1 : 0));
+  const n = Math.max(1, castleRaidWave(S, S.wave) - ((c.gate||0) >= 2 ? 1 : 0) - (castleWork(c, 'w') && S.wave===RAID_WAVES - 1 ? 1 : 0));
   /* in at the gate: open floor two to six steps from the way in, not on top of you */
   const W = COLS, H = ROWS, g = G.genStart, dist = new Int16Array(W*H).fill(-1), q = [g.x + g.y*W], spots = []; dist[q[0]] = 0;
   for (let h=0; h<q.length; h++){ const k = q[h], x = k % W, y = (k / W) | 0, dk = dist[k]; if (dk >= 2 && dk <= 6 && folkFree(x, y) && G.map[x][y]===T_FLOOR && Math.max(Math.abs(x - p.x), Math.abs(y - p.y)) >= 2) spots.push([x, y]); if (dk >= 6) continue;
@@ -16720,19 +16720,21 @@ function castleWardenAct(f){
   if (chn(0.35)){ f.hp = (f.hp==null ? 4 : f.hp) - 1; if (f.hp <= 0){ f.gone = 1; const c = castleHeldHere(); if (c) c.wardens = Math.max(0, castleWardensOf(c) - 1); logMsg(`one of your wardens falls to the ${m.nm}!`, 'hit'); } }
 }
 /* the steward's counsel: the rents, the garrison and any raid coming; wardens hired and the gate strengthened here */
-function castleHireCost(c){ return roundH(60 + castleTierOf(c)*25); }
+function castleHireCost(c){ return roundH((60 + castleTierOf(c)*25)*(castleWork(c, 'b') ? 0.75 : 1)); }   /* (RS-853: a quarter off with barracks) */
 function castleGateCost(c){ return roundH((100 + castleTierOf(c)*40)*((c.gate||0) + 1)); }
-function castleHire(c){ const g = castleHireCost(c); if (castleWardensOf(c) >= RAID_MAX_WARDENS || G.player.gold < g) return false; G.player.gold -= g; c.wardens = castleWardensOf(c) + 1; try{ sfx('coins'); }catch(e){} logMsg(`you pay ${g} gold - a new warden takes the castle's colours (${c.wardens} now), and will keep the gate`, 'good'); return true; }
+function castleHire(c){ const g = castleHireCost(c); if (castleWardensOf(c) >= castleMaxWardens(c) || G.player.gold < g) return false; G.player.gold -= g; c.wardens = castleWardensOf(c) + 1; try{ sfx('coins'); }catch(e){} logMsg(`you pay ${g} gold - a new warden takes the castle's colours (${c.wardens} now), and will keep the gate`, 'good'); return true; }
 function castleGateUp(c){ const g = castleGateCost(c); if ((c.gate||0) >= CASTLE_GATES.length - 1 || G.player.gold < g) return false; G.player.gold -= g; c.gate = (c.gate||0) + 1; try{ sfx('coins'); }catch(e){} logMsg(`you pay ${g} gold - the masons make it ${CASTLE_GATES[c.gate]}`, 'good'); return true; }
 function castleStewardTalk(c){
   const day = Math.floor(clockNow()/DAY_LENGTH), owed = Math.min(7, day - (c.day||0)), w = castleWardensOf(c), hc = castleHireCost(c), gc = castleGateCost(c), gt = c.gate||0;
   const rd = c.raid ? Math.max(1, Math.round((c.raid.due - clockNow())/DAY_LENGTH*24)) : 0;
-  const txt = `"Welcome home, my liege." ${esc(c.tn||'')}'s reeve gathers your rents - about <b>${roundH(30 + castleTierOf(c)*12)}</b> gold a day${owed > 0 ? `, ${owed} day${owed===1 ? '' : 's'} of it waiting for you there` : ''}.<br><br>`
-    + `The garrison: <b>${w}</b> warden${w===1 ? '' : 's'} and <b>${CASTLE_GATES[gt]}</b>.${c.defended ? ` You have beaten back ${c.defended} raid${c.defended===1 ? '' : 's'}.` : ''}<br><br>`
+  const txt = `"Welcome home, my liege." ${esc(c.tn||'')}'s reeve gathers your rents - about <b>${castleRentDay(c)}</b> gold a day (taxed ${CASTLE_TAX[castleTaxOf(c)][0].toLowerCase()})${owed > 0 ? `, ${owed} day${owed===1 ? '' : 's'} of it waiting for you there` : ''}.<br><br>`
+    + `The garrison: <b>${w}</b> warden${w===1 ? '' : 's'}${c.away ? ` (${c.away} more away at war)` : ''} and <b>${CASTLE_GATES[gt]}</b>.${c.defended ? ` You have beaten back ${c.defended} raid${c.defended===1 ? '' : 's'}.` : ''}${Object.keys(CASTLE_WORKS).filter(k=>castleWork(c, k)).length ? ` Built: ${Object.keys(CASTLE_WORKS).filter(k=>castleWork(c, k)).map(k=>CASTLE_WORKS[k][0].toLowerCase()).join(', ')}.` : ''}<br><br>`
     + (c.raid ? `<b style="color:#e06a4a">${cap(castleFoeNm(c.raid.foe))} march on us - they'll be at the gate in about ${rd} hour${rd===1 ? '' : 's'}.</b> Meet them at the first floor's gate.` : 'The roads are quiet, for now. Raiders come every few days - the more wardens and the stronger the gate, the better we hold without you.');
   const opts = [];
-  if (w < RAID_MAX_WARDENS) opts.push([`Hire a warden (${hc} gold)`, ()=>{ if (!castleHire(c)) logMsg(`a warden costs ${hc} gold`, ''); }]);
+  if (w < castleMaxWardens(c)) opts.push([`Hire a warden (${hc} gold)`, ()=>{ if (!castleHire(c)) logMsg(`a warden costs ${hc} gold`, ''); }]);
   if (gt < CASTLE_GATES.length - 1) opts.push([`Make it ${CASTLE_GATES[gt + 1]} (${gc} gold)`, ()=>{ if (!castleGateUp(c)) logMsg(`the masons want ${gc} gold`, ''); }]);
+  for (const k of Object.keys(CASTLE_WORKS)) if (!castleWork(c, k)){ const g = castleWorkCost(c, k); opts.push([`Build the ${CASTLE_WORKS[k][0].toLowerCase()} (${g} gold): ${CASTLE_WORKS[k][1]}`, ()=>{ if (!castleBuild(c, k)) logMsg(`the masons want ${g} gold`, ''); }]); }   /* (RS-853) */
+  CASTLE_TAX.forEach((t, i)=>{ if (i!==castleTaxOf(c)) opts.push([`Tax ${['lightly', 'fairly', 'heavily'][i]} (rents x${t[1]}${t[2] ? '; ' + t[2] : ''})`, ()=>castleSetTax(c, i)]); });
   opts.push(['Leave', ()=>{}]);
   wevDialog('Your Steward', txt, opts, esc(c.prov || ''));
 }
@@ -16742,8 +16744,8 @@ function castleRents(){
   const day = Math.floor(clockNow()/DAY_LENGTH); let paid = 0;
   for (const ck in p.castles){ const c = p.castles[ck]; if (!c || c.lost || (c.town!==k && !(c.towns && c.towns.includes(k)))) continue;
     if (!c.hailed){ c.hailed = 1; logMsg(`the people of ${c.tn} cheer as you come in - word has spread that you hold the castle now`, 'good'); }
-    const n = Math.min(7, day - (c.day||0)); if (n <= 0) continue; const g = roundH((30 + tierOfCb(c.cb||CB_LO)*12)*n*(c.towns ? 1 + 0.25*Math.max(0, c.towns.length - 1) : 1));   /* (RS-846: a realm's rents, the more towns the more) */ p.gold += g; paid += g; c.day = day;
-    logMsg(`the reeve of ${c.tn} brings you your castle's rents: ${g} gold for ${n} day${n===1 ? '' : 's'}`, 'loot'); }
+    const n = Math.min(7, day - (c.day||0)); if (n <= 0) continue; const g = castleRentDay(c)*n;   /* (RS-846: a realm's rents, the more towns the more; RS-853: the treasury and the tax) */ p.gold += g; paid += g; c.day = day; const tr = castleTaxRep(c, n);
+    logMsg(`the reeve of ${c.tn} brings you your castle's rents: ${g} gold for ${n} day${n===1 ? '' : 's'}${tr > 0 ? ' - and the realm\'s towns bless your light hand (+1 standing)' : tr < 0 ? ` - and the realm's towns grumble at your taxes (${tr} standing)` : ''}`, 'loot'); }
   if (paid) try{ sfx('coins'); }catch(e){}
   return paid;
 }
@@ -16809,7 +16811,7 @@ function folkMeet(f){
   if (f.k==='warden'){ logMsg(`${cap(f.nm)} salutes: "Hail, my liege! The gate is held and all is quiet."`, ''); return; }
   if (f.k==='steward' && castleHeldHere()){ castleStewardTalk(castleHeldHere()); return; }   /* (RS-847: the garrison and the raids) */
   if (f.k==='steward'){ const c = castleHeldHere(); const day = Math.floor(clockNow()/DAY_LENGTH), owed = c ? Math.min(7, day - (c.day||0)) : 0;
-    logMsg(c ? `your steward bows: "Welcome home, my liege. The castle is yours and all is well. ${c.tn}'s reeve gathers your rents - about ${roundH(30 + tierOfCb(c.cb||CB_LO)*12)} gold a day${owed > 0 ? `, ${owed} day${owed===1 ? '' : 's'} of it waiting for you there` : ''}."` : 'the steward bows', ''); return; }
+    logMsg(c ? `your steward bows: "Welcome home, my liege. The castle is yours and all is well. ${c.tn}'s reeve gathers your rents - about ${castleRentDay(c)} gold a day${owed > 0 ? `, ${owed} day${owed===1 ? '' : 's'} of it waiting for you there` : ''}."` : 'the steward bows', ''); return; }
   if (f.k==='servant' && f.calm){ logMsg(`${cap(f.nm)} bobs a bow - "My liege! Welcome home."`, ''); return; }
   if (f.k==='servant'){ f.scared = 1;
     if (!f.paid){ f.paid = 1; const g = Math.max(3, Math.round((6 + cbT()*4)*(0.7 + Math.random()*0.6))); p.gold += g; try{ sfx('coins'); }catch(e){} logMsg(`${f.nm} presses ${g} gold into your hand - "Take it, only let me go!" - and whispers: ${pick(FOLK_HINTS)}`, 'loot'); }
@@ -22629,15 +22631,17 @@ function realmWarState(){ const e = wevP(); if (!e) return null; if (!e.rw || ty
 function realmWarSay(r, s){ r.log.unshift({ t:wevTurn(), s }); if (r.log.length > 12) r.log.length = 12; }
 function realmWarTick(){
   if (!G.ow || !G.ow.map || (G.ow.genVer||1) < 31 || G.gameOver) return; const e = wevP(), r = realmWarState(); if (!e || !r) return; const turn = wevTurn();
+  try{ realmTributeTick(r); }catch(er){ console.error(er); }   /* (RS-853) */
   if (turn < r.next) return; r.next = turn + DAY_LENGTH*(2 + Math.random()*2);
   if (e.dyn.some(d=>d.kind==='siege')) return;   /* (one siege at a time) */
   const PV = owProvinces(), L = PV.list; if (L.length < 2 || !L[0].realm) return;
   const W = OW_COLS, H = OW_ROWS, own = PV.own, opts = [];
-  for (const A of L){ if (provHeld(A)) continue;
-    for (const B of L){ if (B.id===A.id || (B.towns||[]).length < 2) continue;
+  const spite = r.spite!=null && L[r.spite] && !provHeld(L[r.spite]) ? r.spite : null; r.spite = null;   /* (RS-853: a king you insulted comes for you first) */
+  for (const A of L){ if (provHeld(A) || (spite!=null && A.id!==spite)) continue; const pa = realmPact(A.id);
+    for (const B of L){ if (B.id===A.id || (B.towns||[]).length < 2 || (spite!=null && !provHeld(B) && realmMine().length) || (pa && pa.truce > turn && provHeld(B))) continue;
       for (const k of B.towns){ if (e.sacked[k] || (e.town[k] && wevTurn() < e.town[k].until)) continue; const [x, y] = k.split(',').map(Number); let near = 99;
         for (let dx=-10; dx<=10 && near > 1; dx++) for (let dy=-10; dy<=10; dy++){ const u = x + dx, v = y + dy; if (u<0 || v<0 || u>=W || v>=H || own[v*W + u]!==A.id) continue; const d = Math.max(Math.abs(dx), Math.abs(dy)); if (d < near) near = d; }
-        if (near <= 10) opts.push({ A, B, k, x, y, w:11 - near }); } } }
+        if (near <= 10 || spite!=null) opts.push({ A, B, k, x, y, w:11 - Math.min(10, near) }); } } }   /* (RS-853: a king you insulted marches however far) */
   if (!opts.length) return;
   let q = Math.random()*opts.reduce((a, o)=>a + o.w, 0), o = opts[0]; for (const c of opts){ if ((q -= c.w) <= 0){ o = c; break; } }
   const d = { id:e.seq++, kind:'siege', key:o.k, x:o.x, y:o.y, camp:'bandit', until:turn + Math.round(DAY_LENGTH*1.5), war:{ a:o.A.id, b:o.B.id } }; e.dyn.push(d);
@@ -22653,7 +22657,7 @@ function realmWarTaken(d){
   for (const c of Object.values(G.player.castles||{})){ if (!c || !c.towns) continue; c.towns = c.towns.filter(k=>k!==d.key); if (c.town===d.key && c.towns.length) c.town = c.towns[0]; }   /* (it no longer pays your rents) */
   const nowA = realmWarSide(d.war.a); if (nowA && provHeld(nowA)){ for (const c of Object.values(G.player.castles||{})) if (c && c.held && !c.lost && c.prov===nowA.name && c.towns && !c.towns.includes(d.key)) c.towns.push(d.key); }
   realmWarSay(r, `${nm} fell to ${A ? A.name : 'a rival realm'}`);
-  wevSay(`${nm} has fallen to ${A ? A.ruler : 'a rival king'}${wasYours ? ' - it no longer answers to you' : ''}: it belongs to ${A ? A.name : 'another realm'} now, and the borders have moved`, 'hit', wasYours || owSeen(d.x, d.y) ? `${nm} fell to ${A ? A.name : 'a rival'}` : null);
+  if (!d.mine) wevSay(`${nm} has fallen to ${A ? A.ruler : 'a rival king'}${wasYours ? ' - it no longer answers to you' : ''}: it belongs to ${A ? A.name : 'another realm'} now, and the borders have moved`, 'hit', wasYours || owSeen(d.x, d.y) ? `${nm} fell to ${A ? A.name : 'a rival'}` : null);
 }
 /* you broke it: the town stays, and its king thanks you */
 function realmWarBroken(d){
@@ -22783,6 +22787,93 @@ function o3ArmsSite(g, t, x, y){
     for (const sx of [-0.3, 0.3]){ const m = new T.Mesh(new T.PlaneGeometry(0.13, 0.2), armsBannerMat(a)); m.position.set(sx, 0.25, 0.52 + 0.054); m.castShadow = false; g.add(m); } }
   else o3ArmsBanner(g, a, 0.6, 0.62, 0.95, 0.16);
 }
+/* (RS-853) A REALM TO GROW. Your castles' works (barracks, walls, treasury) and taxes, set with the steward; your wardens sent to take a
+   town from a neighbouring realm (a siege of your own: left to them it's a roll on their numbers, or you lead the storming yourself);
+   and the kings dealt with in the Realms panel - a truce bought with tribute, or tribute demanded of a weaker king. Kept on the castle
+   (c.works {b, w, t}, c.tax 0-2, c.away) and in the world's events (e.rw.pacts: realm -> { truce, trib, g }; e.rw.spite) */
+const CASTLE_WORKS = { b:['Barracks', 'room for ten wardens, and each one hired for three-quarters of the price'], w:['Curtain walls', 'the garrison holds far better without you, and the last wave of a raid is one raider fewer'], t:['Treasury', 'a quarter more in rents'] };
+const CASTLE_TAX = [['Light', 0.6, 'the realm\'s towns think the better of you each time the rents come in'], ['Fair', 1, ''], ['Heavy', 1.5, 'the realm\'s towns think the worse of you for every day of it']];
+function castleWork(c, k){ return !!(c && c.works && c.works[k]); }
+function castleWorkCost(c, k){ return roundH(({ b:400, w:500, t:600 }[k] + castleTierOf(c)*({ b:120, w:150, t:150 }[k]))); }
+function castleMaxWardens(c){ return castleWork(c, 'b') ? 10 : RAID_MAX_WARDENS; }
+function castleTaxOf(c){ return c && c.tax!=null && CASTLE_TAX[c.tax] ? c.tax : 1; }
+/* a day's rents from a castle: its level, its towns, the treasury and the tax */
+function castleRentDay(c){ return roundH((30 + tierOfCb(c.cb||CB_LO)*12)*(c.towns ? 1 + 0.25*Math.max(0, c.towns.length - 1) : 1)*(castleWork(c, 't') ? 1.25 : 1)*CASTLE_TAX[castleTaxOf(c)][1]); }
+function castleBuild(c, k){ const g = castleWorkCost(c, k); if (castleWork(c, k) || G.player.gold < g) return false; G.player.gold -= g; c.works = c.works || {}; c.works[k] = 1; try{ sfx('coins'); }catch(e){}
+  logMsg(`you pay ${g} gold - the ${CASTLE_WORKS[k][0].toLowerCase()} ${k==='w' ? 'rise' : 'rises'} at your castle: ${CASTLE_WORKS[k][1]}`, 'good'); return true; }
+function castleSetTax(c, t){ c.tax = t; logMsg(`your heralds cry the new tax through ${c.prov || 'the realm'}: ${CASTLE_TAX[t][0].toLowerCase()}${CASTLE_TAX[t][2] ? ' - ' + CASTLE_TAX[t][2] : ''}`, t===2 ? 'hit' : 'good'); }
+/* the standing a tax costs or earns when the rents come in (n days of them) */
+function castleTaxRep(c, n){ const t = castleTaxOf(c); if (t===1) return 0; const d = t===0 ? 1 : -Math.min(3, n), p = G.player; p.rep = p.rep || {}; for (const k of (c.towns && c.towns.length ? c.towns : [c.town])) if (k) p.rep[k] = repAt(k) + d; return d; }
+
+/* ---- your own wars ---- */
+function realmMine(){ return owProvinces().list.filter(pv=>provHeld(pv)); }
+/* the castle that sends the wardens: the one with most of them */
+function realmMusterCastle(){ let best = null; for (const c of Object.values(G.player.castles||{})){ if (!c || !c.held || c.lost) continue; if (!best || castleWardensOf(c) > castleWardensOf(best)) best = c; } return best; }
+function realmMusterKey(c){ for (const k in G.player.castles||{}) if (G.player.castles[k]===c) return k; return null; }
+/* towns of other realms within ten tiles of your land: the ones you can march on */
+function realmTargets(){
+  const PV = owProvinces(), own = PV.own, W = OW_COLS, H = OW_ROWS, mine = new Set(realmMine().map(pv=>pv.id)), out = [], e = wevP();
+  if (!mine.size) return out;
+  for (const B of PV.list){ if (mine.has(B.id)) continue;
+    for (const k of B.towns||[]){ if (e && (e.sacked[k] || e.dyn.some(d=>d.kind==='siege' && d.key===k))) continue; const [x, y] = k.split(',').map(Number); let near = 99;
+      for (let dx=-10; dx<=10 && near > 1; dx++) for (let dy=-10; dy<=10; dy++){ const u = x + dx, v = y + dy; if (u<0 || v<0 || u>=W || v>=H || !mine.has(own[v*W + u])) continue; const d = Math.max(Math.abs(dx), Math.abs(dy)); if (d < near) near = d; }
+      if (near <= 10) out.push({ B, k, x, y, near }); } }
+  return out.sort((a, b)=>a.near - b.near);
+}
+/* the odds your wardens take a town alone: their numbers against its size */
+function realmMarchOdds(force, x, y){ let tier = 1; try{ tier = townTier(x, y); }catch(e){} return Math.max(0.1, Math.min(0.9, 0.2 + force*0.1 - tier*0.1)); }
+function realmMarch(k){
+  const t = realmTargets().find(t=>t.k===k), c = realmMusterCastle(), e = wevP(), r = realmWarState(); if (!t || !c || !e || !r) return false;
+  const w = castleWardensOf(c); if (w < 3){ logMsg('you need three wardens at a castle to march - two to go and one to keep the gate', ''); return false; }
+  if (e.dyn.some(d=>d.kind==='siege' && d.war && d.mine)){ logMsg('your wardens are already in the field', ''); return false; }
+  const A = realmMine()[0], force = w - 1, turn = wevTurn(); c.wardens = 1; c.away = force;
+  const d = { id:e.seq++, kind:'siege', key:t.k, x:t.x, y:t.y, camp:'bandit', until:turn + Math.round(DAY_LENGTH*1.5), war:{ a:A.id, b:t.B.id }, mine:1, force, from:realmMusterKey(c) }; e.dyn.push(d);
+  const nm = o3TownName(t.x, t.y); realmWarSay(r, `your wardens marched on ${nm} in ${t.B.name}`);
+  r.pacts = r.pacts || {}; if (r.pacts[t.B.id]) delete r.pacts[t.B.id];   /* (a march breaks any truce) */
+  logMsg(`${force} of your wardens march on ${nm} in ${t.B.name}. Left to them, they take it about ${Math.round(realmMarchOdds(force, t.x, t.y)*100)} times in a hundred within ${wevTime(d.until - turn)} - or come to its gate and lead the storming yourself`, 'hit');
+  try{ notify(`Your wardens march on ${nm}`, 'warn'); }catch(e){} return d;
+}
+/* the wardens come home: some fall */
+function realmMarchHome(d, won){ const c = d.from && G.player.castles && G.player.castles[d.from]; if (!c) return 0; const lost = Math.min(d.force - (won ? 1 : 0), rn(won ? 2 : 3)), back = Math.max(won ? 1 : 0, d.force - lost); c.wardens = Math.min(castleMaxWardens(c), castleWardensOf(c) + back); c.away = 0; return d.force - back; }
+/* the time runs out on your own siege: the roll */
+function realmMarchEnd(d, roll){
+  const r = realmWarState(), nm = o3TownName(d.x, d.y), B = realmWarSide(d.war.b), won = (roll!=null ? roll : Math.random()) < realmMarchOdds(d.force, d.x, d.y);
+  if (won){ realmWarTaken(d); const fell = realmMarchHome(d, true); logMsg(`your wardens storm ${nm}! It answers to you now${fell ? ` - ${fell} of them fell in the taking` : ''}, and they march home`, 'good'); return true; }
+  const fell = realmMarchHome(d, false); realmWarSay(r, `${nm} held against your wardens`);
+  logMsg(`your wardens could not take ${nm}${B ? ' from ' + B.name : ''}${fell ? ` - ${fell} of them fell before its walls` : ''}; the rest come home`, 'hit'); try{ notify(`${nm} held`, 'warn'); }catch(e){} return false;
+}
+/* at the gate of a town your wardens besiege */
+function realmMarchGate(d){
+  const nm = o3TownName(d.x, d.y), B = realmWarSide(d.war.b), odds = Math.round(realmMarchOdds(d.force, d.x, d.y)*100);
+  wevDialog(`Your siege of ${nm}`, `${d.force} of your wardens have ${esc(nm)} surrounded. Left to them, they take it about ${odds} times in a hundred when the time runs out (in ${wevTime(d.until - wevTurn())}). Lead the storming yourself and it falls if you beat its guard.`,
+    [[`Lead the storming (a battle against ${esc(B ? B.name : 'the town')}'s guard)`, ()=>{ siegeCardThen(`The storming of ${nm}`, 'the battle at the gate', ()=>realmStormStart(d)); }], ['Leave it to them', ()=>{}]]);
+  return true;
+}
+function realmStormStart(d){ let tier = 1; try{ tier = townTier(d.x, d.y); }catch(e){} const n = Math.max(2, 3 + tier*2 - (d.force >> 1));
+  wevFightStart('storm', d.id, L=>{ for (let i=0;i<n;i++) wevMon(wevHumanEntry(L), L); upgradeToElite(G.mon[0]); G.mon[0].nm = 'Captain of the Guard'; });
+  logMsg(`you lead the storming of ${o3TownName(d.x, d.y)} - ${n} of its guard stand against you, your wardens at the walls`, 'hit'); }
+function realmStormWon(f){ const e = wevP(), d = e && e.dyn.find(d=>d.id===f.id && d.mine); if (!d) return false; e.dyn.splice(e.dyn.indexOf(d), 1);
+  realmWarTaken(d); const fell = realmMarchHome(d, true), nm = o3TownName(d.x, d.y); G.player.rep = G.player.rep || {}; G.player.rep[d.key] = repAt(d.key) + 1;
+  logMsg(`the guard of ${nm} throws down its arms - the town is yours, and its people take you for their lord${fell ? ` (${fell} of your wardens fell)` : ''}`, 'good'); try{ notify(`${nm} taken!`, 'good', 'achievement'); }catch(e){} return false; }
+
+/* ---- the kings: truces and tribute ---- */
+function realmStrength(pvs){ let s = 0; for (const pv of pvs) s += (pv.towns||[]).length*2; return s; }
+function realmMyStrength(){ let s = realmStrength(realmMine()); for (const c of Object.values(G.player.castles||{})) if (c && c.held && !c.lost) s += castleWardensOf(c) + (c.gate||0) + (castleWork(c, 'w') ? 2 : 0); return s; }
+function realmPact(id){ const r = realmWarState(); if (!r) return null; r.pacts = r.pacts || {}; const p = r.pacts[id]; if (!p) return null; const t = wevTurn(); if ((p.truce||0) <= t && (p.trib||0) <= t){ delete r.pacts[id]; return null; } return p; }
+function realmTruceCost(B){ return roundH(150 + (B.towns||[]).length*60 + cbT()*20); }
+function realmTruce(id){ const B = realmWarSide(id), r = realmWarState(), g = B && realmTruceCost(B), p = G.player; if (!B || !r) return false; if (p.gold < g){ logMsg(`${B.ruler} wants ${g} gold for a truce`, ''); return false; }
+  p.gold -= g; r.pacts = r.pacts || {}; r.pacts[id] = Object.assign(r.pacts[id] || {}, { truce:wevTurn() + DAY_LENGTH*7 }); try{ sfx('coins'); }catch(e){} realmWarSay(r, `${B.ruler} of ${B.name} took tribute for a truce`);
+  logMsg(`you send ${g} gold to ${B.ruler} of ${B.name} - a truce for seven days: he won't march on your towns`, 'good'); return true; }
+function realmDemand(id){ const B = realmWarSide(id), r = realmWarState(); if (!B || !r) return false; const mine = realmMyStrength(), theirs = realmStrength([B]) + 4;
+  r.pacts = r.pacts || {}; if (r.pacts[id] && r.pacts[id].asked > wevTurn()){ logMsg(`${B.ruler} has given you his answer already`, ''); return false; }
+  if (mine > theirs){ const g = roundH(20 + (B.towns||[]).length*12 + cbT()*4); r.pacts[id] = { truce:wevTurn() + DAY_LENGTH*7, trib:wevTurn() + DAY_LENGTH*7, g, asked:wevTurn() + DAY_LENGTH*7 }; realmWarSay(r, `${B.ruler} of ${B.name} bent the knee and pays you tribute`);
+    logMsg(`${B.ruler} of ${B.name} will not try your strength: he pays you ${g} gold a day for seven days, and keeps the peace`, 'good'); try{ notify(`${B.name} pays you tribute`, 'good'); }catch(e){} return 'yes'; }
+  r.pacts[id] = { asked:wevTurn() + DAY_LENGTH*3 }; r.spite = id; r.next = Math.min(r.next, wevTurn() + DAY_LENGTH*0.25); realmWarSay(r, `${B.ruler} of ${B.name} laughed at your demand`);
+  logMsg(`${B.ruler} of ${B.name} laughs at your heralds and sends them back without their beards - he is gathering an army against you`, 'hit'); try{ notify(`${B.ruler} refuses - war is coming`, 'warn'); }catch(e){} return 'no'; }
+/* each day's tribute, paid as the day turns */
+function realmTributeTick(r){ const day = Math.floor(wevTurn()/DAY_LENGTH); if (r.tday===day) return; const was = r.tday; r.tday = day; if (was==null) return; let g = 0;
+  for (const id in r.pacts||{}){ const p = realmPact(id); if (p && p.trib > wevTurn() && p.g){ g += p.g; } }
+  if (g){ G.player.gold += g; logMsg(`the tribute of the kings comes in: ${g} gold`, 'loot'); try{ sfx('coins'); }catch(e){} } }
 /* (RS-849) the Realms: who rules each, from which castle, over which towns - and for yours, the rents, the garrison and any raid coming */
 function buildRealms(){
   const PV = owProvinces(), p = G.player, W = OW_COLS, land = PV.list.map(()=>0); let tot = 0;
@@ -22793,16 +22884,19 @@ function buildRealms(){
     const towns = (pv.towns||[]).map(k=>{ const [x, y] = k.split(',').map(Number); return owSeen(x, y) ? esc(o3TownName(x, y)) : 'an unknown town'; }).join(' &middot; ') || 'no town';
     let mine = '';
     if (held){ const c = held, w = castleWardensOf(c), hrs = castleRaidHours(c);
-      mine = `<div style="margin-top:4px;font-size:12px;"><b style="color:${COL.gold}">Yours</b> &middot; about ${roundH((30 + castleTierOf(c)*12)*(c.towns ? 1 + 0.25*Math.max(0, c.towns.length - 1) : 1))} gold a day in rents &middot; ${w} warden${w===1 ? '' : 's'}, ${CASTLE_GATES[c.gate||0]}${c.defended ? ` &middot; ${c.defended} raid${c.defended===1 ? '' : 's'} beaten back` : ''}`
+      mine = `<div style="margin-top:4px;font-size:12px;"><b style="color:${COL.gold}">Yours</b> &middot; about ${castleRentDay(c)} gold a day in rents (taxed ${CASTLE_TAX[castleTaxOf(c)][0].toLowerCase()}) &middot; ${w} warden${w===1 ? '' : 's'}${c.away ? ` (+${c.away} at war)` : ''}, ${CASTLE_GATES[c.gate||0]}${c.defended ? ` &middot; ${c.defended} raid${c.defended===1 ? '' : 's'} beaten back` : ''}`
         + (c.raid ? `<br><b style="color:#ff6a50">${esc(cap(castleFoeNm(c.raid.foe)))} march on it - at the gate in about ${hrs} hour${hrs===1 ? '' : 's'}</b>` : '') + `</div>`; }
-    else { const lost = Object.values(p.castles||{}).find(c=>c && c.lost && c.prov===pv.name); if (lost) mine = `<div style="margin-top:4px;font-size:12px;color:#ff8a6a">Taken from you by a usurper - storm ${esc(pv.seat.name)} to win it back</div>`; }
+    else { const lost = Object.values(p.castles||{}).find(c=>c && c.lost && c.prov===pv.name); if (lost) mine = `<div style="margin-top:4px;font-size:12px;color:#ff8a6a">Taken from you by a usurper - storm ${esc(pv.seat.name)} to win it back</div>`;
+      else if (realmMine().length && (known || realmPact(pv.id))){ const pa = realmPact(pv.id), t = wevTurn();   /* (RS-853: dealings with its king) */
+        mine = `<div style="margin-top:4px;font-size:12px;">${pa && pa.trib > t ? `<b style="color:${COL.gold}">Pays you tribute</b>: ${pa.g} gold a day for ${wevTime(pa.trib - t)} &middot; ` : ''}${pa && pa.truce > t ? `<b style="color:#8ad08a">Truce</b> for ${wevTime(pa.truce - t)}` : `<button class="btn" style="padding:2px 8px;font-size:12px;" onclick="realmTruce(${pv.id});renderOverlay()">Buy a truce (${realmTruceCost(pv)} gold)</button>`}${pa && pa.asked > t ? '' : ` <button class="btn" style="padding:2px 8px;font-size:12px;" onclick="realmDemand(${pv.id});renderOverlay()">Demand tribute</button> <span class="muted">(your strength ${realmMyStrength()}, his ${realmStrength([pv]) + 4})</span>`}</div>`; } }
     return `<div class="qrep" style="margin:6px 0;opacity:${known ? 1 : 0.6}"><b style="color:var(--ink)">${sw(col)}${known ? esc(cap(pv.name)) : 'A realm beyond your maps'}</b> <span class="muted" style="float:right">${pct}% of the land</span>
       <div class="muted" style="font-size:12px;">${known ? `${held ? 'You rule it' : esc(pv.ruler) + ' rules it'} from ${esc(pv.seat.name)} &middot; ${(pv.towns||[]).length} town${(pv.towns||[]).length===1 ? '' : 's'}: ${towns} &middot; ${esc(PROV_FOE_NM[pv.foe]||'raiders')} trouble its roads` : `${(pv.towns||[]).length} town${(pv.towns||[]).length===1 ? '' : 's'} - find its castle to learn more`}</div>${mine}</div>`; }).join('');
   const n = PV.list.filter(pv=>provHeld(pv)).length, ev = G.ow.ev, rw = ev && ev.rw, wars = ((ev && ev.dyn)||[]).filter(d=>d.kind==='siege' && d.war);   /* (RS-850: the kings' wars) */
-  const warHtml = (wars.length ? wars.map(d=>{ const A = realmWarSide(d.war.a), B = realmWarSide(d.war.b); return `<div class="qrep" style="margin:6px 0;border-color:#a0402a"><b style="color:#ff7a5a">War:</b> ${esc(A ? A.ruler + ' of ' + A.name : 'a king')} besieges ${esc(o3TownName(d.x, d.y))} in ${esc(B ? B.name : 'a realm')}${B && provHeld(B) ? ' - <b>your town</b>' : ''} &middot; it falls in ${wevTime(d.until - wevTurn())} unless the siege is broken</div>`; }).join('') : '')
+  const warHtml = (wars.length ? wars.map(d=>{ const A = realmWarSide(d.war.a), B = realmWarSide(d.war.b); if (d.mine) return `<div class="qrep" style="margin:6px 0;border-color:#a08a2a"><b style="color:#ffd060">Your war:</b> ${d.force} of your wardens besiege ${esc(o3TownName(d.x, d.y))} in ${esc(B ? B.name : 'a realm')} &middot; about ${Math.round(realmMarchOdds(d.force, d.x, d.y)*100)} in 100 they take it alone, in ${wevTime(d.until - wevTurn())} &middot; go to its gate to lead the storming</div>`; return `<div class="qrep" style="margin:6px 0;border-color:#a0402a"><b style="color:#ff7a5a">War:</b> ${esc(A ? A.ruler + ' of ' + A.name : 'a king')} besieges ${esc(o3TownName(d.x, d.y))} in ${esc(B ? B.name : 'a realm')}${B && provHeld(B) ? ' - <b>your town</b>' : ''} &middot; it falls in ${wevTime(d.until - wevTurn())} unless the siege is broken</div>`; }).join('') : '')
     + (rw && rw.log && rw.log.length ? `<div class="muted" style="font-size:12px;margin:6px 0 10px;"><b style="color:var(--ink)">Of late:</b> ${rw.log.slice(0, 6).map(l=>esc(cap(l.s)) + ` <span style="opacity:.7">(${wevTime(Math.max(1, wevTurn() - l.t))} ago)</span>`).join(' &middot; ')}</div>` : '');
   return `<h2 class="panel-title">THE REALMS</h2><div class="sub">${PV.list.length} realms share the land, each ruled from a castle. ${n ? `You rule ${n} of them.` : 'Take a castle\'s throne to rule its realm.'}</div>
-    <div class="ovbody">${n || armsOf() ? (()=>{ const A = armsOf(); return `<div class="qrep" style="margin:6px 0;display:flex;gap:12px;align-items:center;">${A ? `<img src="${armsShieldUrl(A, 96)}" width="56" alt="your arms">` : ''}<div style="flex:1"><b style="color:var(--ink)">${A ? 'Your arms' : 'You bear no arms yet'}</b><div class="muted" style="font-size:12px;">${A ? esc(armsBlazon(A)) : 'Choose a banner for your castle and the towns of your realm'}</div></div><button class="btn" onclick="armsOpen()">${A ? 'Change' : 'Choose'}</button></div>`; })() : ''}${warHtml}${PV.list.length && PV.list[0].realm ? rows : '<div class="muted">This world was made before the realms - make a new world to see them.</div>'}
+    <div class="ovbody">${(()=>{ if (!n) return ''; const T = realmTargets().slice(0, 6), c = realmMusterCastle(), w = c ? castleWardensOf(c) : 0, busy = ((ev && ev.dyn)||[]).some(d=>d.mine);   /* (RS-853: your wardens march) */
+      return T.length && !busy ? `<div class="qrep" style="margin:6px 0;"><b style="color:var(--ink)">March on a town</b> <span class="muted" style="font-size:12px;">${w >= 3 ? `${w - 1} wardens go, one keeps the gate` : 'you need three wardens at a castle'}</span><div style="margin-top:4px;">${T.map(t=>`<button class="btn" style="padding:2px 8px;font-size:12px;margin:2px;" ${w >= 3 ? '' : 'disabled'} onclick="realmMarch('${t.k}');renderOverlay()">${esc(owSeen(t.x, t.y) ? o3TownName(t.x, t.y) : 'a town')} (${esc(t.B.name)}) ${Math.round(realmMarchOdds(Math.max(2, w - 1), t.x, t.y)*100)}%</button>`).join('')}</div></div>` : ''; })()}${n || armsOf() ? (()=>{ const A = armsOf(); return `<div class="qrep" style="margin:6px 0;display:flex;gap:12px;align-items:center;">${A ? `<img src="${armsShieldUrl(A, 96)}" width="56" alt="your arms">` : ''}<div style="flex:1"><b style="color:var(--ink)">${A ? 'Your arms' : 'You bear no arms yet'}</b><div class="muted" style="font-size:12px;">${A ? esc(armsBlazon(A)) : 'Choose a banner for your castle and the towns of your realm'}</div></div><button class="btn" onclick="armsOpen()">${A ? 'Change' : 'Choose'}</button></div>`; })() : ''}${warHtml}${PV.list.length && PV.list[0].realm ? rows : '<div class="muted">This world was made before the realms - make a new world to see them.</div>'}
     <div class="btnrow"><button class="btn" onclick="setUi('playing')">close</button></div></div>`;
 }
 function buildTravelLog(){
@@ -23150,7 +23244,7 @@ function wevTick(){
   for (const d of e.dyn.slice()){
     if (turn < d.until) continue;
     e.dyn.splice(e.dyn.indexOf(d), 1);
-    if (d.kind==='siege' && d.war){ realmWarTaken(d); continue; }   /* (RS-850) */
+    if (d.kind==='siege' && d.war){ if (d.mine) realmMarchEnd(d); else realmWarTaken(d); continue; }   /* (RS-850; RS-853: your own, a roll on your wardens) */
     if (d.kind==='siege'){ e.sacked[d.key] = turn + DAY_LENGTH; wevSay(`no one came to break the siege of ${o3TownName(d.x, d.y)} - the raiders sacked it, and its shops will charge more for a day`, 'hit', `${o3TownName(d.x, d.y)} was sacked`); }
   }
   for (const k in e.sacked) if (turn >= e.sacked[k]) delete e.sacked[k];
@@ -23586,6 +23680,7 @@ function wevArenaWon(){
   G.wevFight = null;
   if (f.kind==='board'){ seaBoardWon(f); return true; }   /* (RS-811) */
   if (f.kind==='townarena') return townArenaWon(f);
+  if (f.kind==='storm') return realmStormWon(f);   /* (RS-853) */
   if (f.kind==='sqfight' || f.kind==='sqboss') return sqFightWon(f);
   if (f.kind==='delve' || f.kind==='hunt') return wgArenaWon(f);
   const e = wevP(), p = G.player, st = wevStats(), L = cbT();
@@ -23643,6 +23738,7 @@ function wevTownGate(x, y){
   const e = wevP(); if (!e) return false;
   const d = e.dyn.find(d=>d.kind==='siege' && d.x===x && d.y===y); if (!d) return false;
   const nm = o3TownName(x, y);
+  if (d.mine) return realmMarchGate(d);   /* (RS-853) */
   if (d.war){ const A = realmWarSide(d.war.a); wevDialog(`The siege of ${nm}`, `The army of <b>${esc(A ? A.ruler : 'a rival king')}</b> of ${esc(A ? A.name : 'a rival realm')} has ${esc(nm)} surrounded, to take it for its king. If no one breaks the siege in ${wevTime(d.until - wevTurn())}, ${esc(nm)} falls to ${esc(A ? A.name : 'them')}, and the borders move with it.`,
     [[`Break the siege (battle at the gates, then in the streets)`, ()=>{ siegeCardThen(`The siege of ${nm}`, 'the battle before the gate', ()=>wevSiegeFight(d)); }], ['Turn back', ()=>{ logMsg('you keep your distance from the siege lines', ''); }]]); return true; }   /* (RS-850) */
   wevDialog(`The siege of ${nm}`, `A ${WEV_CAMP_KINDS[d.camp] ? WEV_CAMP_KINDS[d.camp].nm.replace(/ camp$| hideout$| warren$/, '') : 'raiding'} host has ${nm} surrounded. Smoke rises over the palisade and the gate is barred. If no one breaks the siege in ${wevTime(d.until - wevTurn())}, the town will be sacked.`,
@@ -23826,6 +23922,7 @@ function wevTipHtml(o){
   if (o.k==='craid') return `<div style="font-weight:600;color:#ff6a50">${esc(cap(castleFoeNm(o.c.raid.foe)))} march on your castle</div><div class="examine">Be at its first floor's gate before they come to hold it with your wardens - or the garrison stands alone.</div>${row('they come in', o.hrs + 'h', '#ffb060')}${row('garrison', castleWardensOf(o.c) + ' wardens, ' + CASTLE_GATES[o.c.gate||0])}`;   /* (RS-848) */
   if (o.k==='boss'){ const b = G.ow.ev.boss, m = wevBossEntry(b);
     return `<div style="font-weight:600;color:#ff5a3a">${esc(wevBossName(b))}</div><div class="examine">A world boss: a giant that sleeps for days, then wakes and roams. Its wounds last between fights.</div><hr>${row('combat level', CB_HI, '#ff7a5a')}${row('life', b.hp && b.maxHp ? `${b.hp} / ${b.maxHp}` : 'unhurt')}${row('sleeps in', wevTime(o.left))}<div class="muted">walk into it to fight</div>`; }
+  if (o.k==='siege' && o.d && o.d.mine){ const B = realmWarSide(o.d.war.b); return `<div style="font-weight:600;color:#ffd060">Your wardens besiege ${esc(o3TownName(o.x, o.y))}</div><div class="examine">${o.d.force} of them, to take it from ${esc(B ? B.name : 'its realm')}. Walk to its gate to lead the storming.</div>${row('time left', wevTime(o.left), '#ffb060')}`; }   /* (RS-853) */
   if (o.k==='siege' && o.d && o.d.war){ const A = realmWarSide(o.d.war.a), B = realmWarSide(o.d.war.b); return `<div style="font-weight:600;color:#ff6a50">${esc(o3TownName(o.x, o.y))} is under siege</div><div class="examine">${esc(A ? A.ruler + ' of ' + A.name : 'A rival king')} wants it from ${esc(B ? B.name : 'its realm')}. Walk into the town to break the siege, or it falls to them.</div>${row('time left', wevTime(o.left), '#ffb060')}`; }   /* (RS-850) */
   if (o.k==='siege') return `<div style="font-weight:600;color:#ff6a50">${esc(o3TownName(o.x, o.y))} is under siege</div><div class="examine">Walk into the town to break the siege, or it will be sacked.</div>${row('time left', wevTime(o.left), '#ffb060')}`;
   if (o.k==='meteor') return `<div style="font-weight:600;color:#9ad8ff">A fallen star</div><div class="examine">Mine it for iron, coal, mithril, adamantite and runite before it crumbles.</div>${row('crumbles in', wevTime(o.left))}`;
@@ -52119,7 +52216,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-852';
+const GAME_VERSION = 'rs-853';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

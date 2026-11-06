@@ -14,7 +14,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
     /* the steward: the garrison, wardens hired, the gate made stronger */
     p.gold = 100000; out.hired = castleHire(c) && c.wardens===3; out.gated = castleGateUp(c) && c.gate===1;
     /* word of a raid */ c.nextRaid = clockNow() - 1; castleRaidTick(); out.raid = !!c.raid; out.word = /march on your castle/.test(logs());
-    castleStewardTalk(c); out.stewardUi = G.ui==='wevent' && /march on us/.test(G.wevDlg.text) && G.wevDlg.opts.length===3; setUi('playing');
+    castleStewardTalk(c); out.stewardUi = G.ui==='wevent' && /march on us/.test(G.wevDlg.text) && G.wevDlg.opts.filter(o=>/Hire a warden|Make it|Leave/.test(o[0])).length===3;   /* (RS-853: the works and the taxes besides) */ setUi('playing');
     /* at the gate: three waves */ G.depth = 1; loadLevel(1); setUi('playing'); out.siege = !!G.castleSiege; out.wardensAtGate = G.folk.filter(f=>f.k==='warden' && !f.gone).length;
     let waves = 0, raiders = 0, struck = null; const g0 = p.gold;
     for (let it=0; it<40 && G.castleSiege; it++){ castleSiegeTick(); if (!G.castleSiege) break; waves = G.castleSiege.wave;

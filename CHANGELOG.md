@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-853 - A Realm to Grow
+
+- **Castle works:** your steward can build barracks (room for ten wardens, each hired for a quarter less), curtain walls (the garrison holds much better without you, and a raid's last wave is one raider fewer) and a treasury (a quarter more in rents).
+- **Taxes:** tax lightly, fairly or heavily. Light taxes pay 0.6 times the rents and raise your standing in the realm's towns each time the rents come in. Heavy taxes pay 1.5 times and cost standing for every day of them.
+- **March on your neighbours:** from the Realms panel, send your wardens against a town of a neighbouring realm (one stays home to keep the gate). Left to them, they take it on a roll of their numbers against the town's size. Or go to its gate and lead the storming yourself: beat its guard and the town is yours. Either way the borders move, and your wardens come home, some fallen.
+- **Deal with the kings:** buy a seven-day truce from a king whose castle you've found, and he won't march on your towns. Or demand tribute: a king weaker than your realm (its towns, wardens, gates and walls) pays you gold every day for a week. A stronger one laughs, and comes for you next.
+- **The Realms panel** shows your wars, the tribute coming in, the truces, and your strength against each king's.
+
 ## RS-852 - Coats of Arms
 
 - **Choose your arms:** when you first take a castle's throne, you choose your coat of arms: a field in one of eight colours, plain or divided with gold or silver (per pale, per fess, quarterly, per bend, chevron, bordure), and a charge (crown, tower, sword, star, rose, key, eagle, stag, moon or axe). The heralds read it back to you, as in "Azure, an eagle Or".
