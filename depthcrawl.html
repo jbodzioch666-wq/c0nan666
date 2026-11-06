@@ -16636,6 +16636,10 @@ function castleWardensOf(c){ return c.wardens==null ? 2 : c.wardens; }
 function castleTierOf(c){ return tierOfCb(c.cb||CB_LO); }
 function castleRaidFoe(key){ const [x, y] = key.split(',').map(Number); let pv = null; try{ pv = provAt(x, y); }catch(e){} return pv && pv.foe ? pv.foe : 'orc'; }
 function castleFoeNm(foe){ return PROV_FOE_NM[foe] || 'raiders'; }
+function castleTheFoe(foe){ const n = castleFoeNm(foe); return /^the /.test(n) ? n : 'the ' + n; }
+/* (RS-848) a raid's level: the castle's king's floor, or yours four below if you've grown past it - a raid is never a walk-over */
+function castleRaidCb(c){ return clampCb(Math.max(c.cb||floorCb(1), cbLvl() - 4)); }
+function castleRaidHours(c){ return c && c.raid ? Math.max(1, Math.round((c.raid.due - clockNow())/DAY_LENGTH*24)) : 0; }
 function castleRaidTick(){
   const p = G.player; if (!p || !p.castles) return; const now = clockNow();
   for (const key in p.castles){ const c = p.castles[key]; if (!c || !c.held || c.lost) continue;
@@ -16652,22 +16656,22 @@ function castleRaidResolve(key, str){
   const guard = castleWardensOf(c) + (c.gate||0)*1.5 + (str!=null ? 0 : Math.random()*3);
   c.raid = null; c.nextRaid = clockNow() + DAY_LENGTH*(3 + Math.random()*3);
   if (guard >= s){ c.day = Math.floor(clockNow()/DAY_LENGTH); let fell = 0; if (castleWardensOf(c) > 1 && (str!=null ? false : chn(0.4))){ c.wardens = castleWardensOf(c) - 1; fell = 1; }
-    logMsg(`your wardens held your castle against the ${castleFoeNm(foe)} without you - but the raiders burned its fields, and the rents owed are lost${fell ? ', and one of your wardens fell' : ''}`, 'hit');
+    logMsg(`your wardens held your castle against ${castleTheFoe(foe)} without you - but the raiders burned its fields, and the rents owed are lost${fell ? ', and one of your wardens fell' : ''}`, 'hit');
     try{ notify('Your castle held', 'warn'); }catch(e){} return 'held'; }
   c.lost = 1; c.held = 0; if (c.slot) invalidateDungeonCache(c.slot);
-  logMsg(`your castle has fallen to the ${castleFoeNm(foe)}! A usurper sits on your throne - storm it and take it back`, 'hit');
+  logMsg(`your castle has fallen to ${castleTheFoe(foe)}! A usurper sits on your throne - storm it and take it back`, 'hit');
   try{ notify('Your castle has fallen!', 'warn'); }catch(e){} try{ O3.mapRef = null; }catch(e){}
   return 'lost';
 }
 /* you're at the gate: the defence of the first floor */
 function castleSiegeStart(d){
   G.castleSiege = null; const c = castleHeldHere(); if (!c || !c.raid || d!==1) return;
-  G.castleSiege = { key:G.dungeonEntrance.x + ',' + G.dungeonEntrance.y, wave:0, gap:9, foe:c.raid.foe, cb:floorCb(1) };
-  logMsg(`the ${castleFoeNm(c.raid.foe)} are at the gate! Hold your castle - ${RAID_WAVES} waves of them - with your wardens beside you`, 'hit');
+  G.castleSiege = { key:G.dungeonEntrance.x + ',' + G.dungeonEntrance.y, wave:0, gap:9, foe:c.raid.foe, cb:castleRaidCb(c) };
+  logMsg(`${castleTheFoe(c.raid.foe)} are at the gate! Hold your castle - ${RAID_WAVES} waves of them - with your wardens beside you`, 'hit');
   try{ notify('Raiders at the gate!', 'warn'); }catch(e){}
 }
 function castleRaider(x, y, S){
-  const L = clampCb(S.cb + 2), e = famPickFrom([S.foe], L, 3) || pickMonsterEntry(L), sp = sitePower(), m = newMonster();
+  const L = clampCb(S.cb), e = famPickFrom([S.foe], L, 3) || pickMonsterEntry(L), sp = sitePower(), m = newMonster();
   m.alive = 1; m.x = x; m.y = y; m.hp = m.maxHp = roundH((rollDice(e.hd, 8) + e.hd)*sp.hp); m.ac = e.ac; m.atkBonus = e.atk; m.dmg1 = e.dmg1; m.dmg2 = roundH(e.dmg2*sp.dmg); m.xp = roundH(e.xp*sp.xp);
   m.sym = e.sym; m.nm = e.nm; m.baseNm = e.nm; m.col = monsterCol(e); m.undead = e.undead; m.mlevel = e.lvl; m.abilities = e.abilities.slice(); m.art = e.art; monEntryExtras(m, e); m.corrupted = 0;
   m.raider = 1; m.engaged = true; G.mon.push(m); return m;
@@ -16692,7 +16696,7 @@ function castleSiegeTick(){
 function castleSiegeWon(c, S){
   const p = G.player; G.castleSiege = null; c.raid = null; c.defended = (c.defended||0) + 1; c.nextRaid = clockNow() + DAY_LENGTH*(3 + Math.random()*3);
   const g = roundH((40 + castleTierOf(c)*15)*RAID_WAVES); p.gold += g; p.rep = p.rep || {}; for (const k of (c.towns && c.towns.length ? c.towns : [c.town])) if (k) p.rep[k] = repAt(k) + 2;
-  logMsg(`the last of the ${castleFoeNm(S.foe)} break and flee - your castle stands! Its towns will sing of it (+2 standing), and the raiders' spoils come to ${g} gold`, 'good');
+  logMsg(`the last of ${castleTheFoe(S.foe)} break and flee - your castle stands! Its towns will sing of it (+2 standing), and the raiders' spoils come to ${g} gold`, 'good');
   try{ notify('Castle defended!', 'good', 'achievement'); }catch(e){} try{ sfx('coins'); }catch(e){}
 }
 /* a warden in the fight: makes for the nearest raider and spears it; a raider beside it may wound it, and at four wounds it falls */
@@ -16700,7 +16704,7 @@ function castleWardenAct(f){
   let best = -1, bd = 7; G.mon.forEach((m, i)=>{ if (!m.alive || m.ally || m.minion) return; const d = Math.max(Math.abs(m.x - f.x), Math.abs(m.y - f.y)); if (d < bd){ bd = d; best = i; } });
   if (best < 0) return; const m = G.mon[best];
   if (bd > 1){ folkStepTo(f, m.x, m.y); return; }
-  const d = Math.max(1, Math.round(m.maxHp*(0.12 + Math.random()*0.1))); m.hp -= d; m.hitKind = 'melee'; m.hitCrit = false; f._atkT = (typeof FP!=='undefined' && FP.t) || 0.001;
+  const d = Math.max(1, Math.round(m.maxHp*(0.12 + Math.random()*0.1))); m.hp -= d; m.hitKind = 'melee'; m.hitCrit = false; f._atkT = (typeof FP!=='undefined' && FP.t) || 0.001; f.foe = m;   /* (RS-848: the thrust, turned to its foe) */
   try{ fxSplat(m.x+0.5, m.y+0.5, d, 'hit'); }catch(e){} logMsg(`your warden spears the ${m.nm} for ${d}`, '');
   if (m.hp <= 0){ monsterDies(best); return; }
   if (chn(0.35)){ f.hp = (f.hp==null ? 4 : f.hp) - 1; if (f.hp <= 0){ f.gone = 1; const c = castleHeldHere(); if (c) c.wardens = Math.max(0, castleWardensOf(c) - 1); logMsg(`one of your wardens falls to the ${m.nm}!`, 'hit'); } }
@@ -16816,7 +16820,7 @@ const FOLK_PX = new WeakMap();
 function folkProxy(f){
   let px = FOLK_PX.get(f);
   if (!px){ px = { nm:f.look, baseNm:f.look, alive:1, hp:1, maxHp:1, minion:true, ally:true, _pos:{ x:f.x+0.5, y:f.y+0.5, mv:0 } }; FOLK_PX.set(f, px); }
-  px.x = f.x; px.y = f.y; px.faceAt = null; return px;
+  px.x = f.x; px.y = f.y; px._atkT = f._atkT; px.faceAt = f.foe && f.foe.alive ? f.foe : null; return px;
 }
 /* (RS-840) the king's own: his royal guard and his champion, out of the castle's garrison, under his colours */
 function castleRoyal(kind, x, y){
@@ -23604,6 +23608,7 @@ function wevMapList(){
   for (const d of e.dyn) out.push({ k:d.kind, x:d.x, y:d.y, left:d.until-turn, d });
   for (const key in e.town){ const t = e.town[key]; if (turn >= t.until || t.done) continue; const [x,y] = key.split(',').map(Number); out.push({ k:'town_'+t.kind, x, y, left:t.until-turn, t }); }
   const rt = G.player && G.player.roadTask; if (rt){ const [x,y] = rt.key.split(',').map(Number); out.push({ k:'child', x, y, left:rt.until-turn }); }
+  const pc = G.player && G.player.castles; if (pc) for (const key in pc){ const c = pc[key]; if (!c || !c.raid || !c.held || c.lost) continue; const [x, y] = key.split(',').map(Number); out.push({ k:'craid', x, y, hrs:castleRaidHours(c), c }); }   /* (RS-848) a raid marching on your castle */
   return out;
 }
 // RS-179: a mythic beast's tooltip - on the 3D land and on the map
@@ -23620,6 +23625,7 @@ function wevTipHtml(o){
   if (o.k==='camp'){ const c = o.c, ti = wevTerrAt(c.x, c.y);
     return `<div style="font-weight:600;color:#ff9a6a">${esc(cap(wevCampName(c)))}</div><div class="examine">${esc(cap(WEV_SIZE_WORD[c.size]))}. It grows if it's left alone, and a full war-camp marches on the nearest town.</div><hr>${row('size', c.size+' / 5')}${row('in', esc(wevTerrName(ti)))}${row('grows in', wevTime(c.grow - wevTurn()))}<div class="muted">walk into it to attack</div>`; }
   if (o.k==='myth') return mythicTipHtml(o.b);
+  if (o.k==='craid') return `<div style="font-weight:600;color:#ff6a50">${esc(cap(castleFoeNm(o.c.raid.foe)))} march on your castle</div><div class="examine">Be at its first floor's gate before they come to hold it with your wardens - or the garrison stands alone.</div>${row('they come in', o.hrs + 'h', '#ffb060')}${row('garrison', castleWardensOf(o.c) + ' wardens, ' + CASTLE_GATES[o.c.gate||0])}`;   /* (RS-848) */
   if (o.k==='boss'){ const b = G.ow.ev.boss, m = wevBossEntry(b);
     return `<div style="font-weight:600;color:#ff5a3a">${esc(wevBossName(b))}</div><div class="examine">A world boss: a giant that sleeps for days, then wakes and roams. Its wounds last between fights.</div><hr>${row('combat level', CB_HI, '#ff7a5a')}${row('life', b.hp && b.maxHp ? `${b.hp} / ${b.maxHp}` : 'unhurt')}${row('sleeps in', wevTime(o.left))}<div class="muted">walk into it to fight</div>`; }
   if (o.k==='siege') return `<div style="font-weight:600;color:#ff6a50">${esc(o3TownName(o.x, o.y))} is under siege</div><div class="examine">Walk into the town to break the siege, or it will be sacked.</div>${row('time left', wevTime(o.left), '#ffb060')}`;
@@ -23634,6 +23640,11 @@ function pmEventIcon(c, px, py, R, o, now){
   c.save(); c.lineJoin = 'round'; c.lineCap = 'round';
   const label = (txt, col, dy)=>{ c.font = `700 ${Math.round(clamp(R*0.62, 10*dpr, 13*dpr))}px 'JetBrains Mono', monospace`; c.textAlign = 'center'; c.textBaseline = 'top';
     const w = c.measureText(txt).width + 8*dpr, h = Math.round(clamp(R*0.62, 10*dpr, 13*dpr)) + 4*dpr; c.fillStyle = 'rgba(26,20,14,0.85)'; c.fillRect(px - w/2, py + dy - 1*dpr, w, h); c.fillStyle = col; c.fillText(txt, px, py + dy + 1*dpr); };
+  if (o.k==='craid'){   /* (RS-848) a pulsing red ring round your castle, and the hours left */
+    const pulse = 0.5 + Math.sin(now*4)*0.5, BR = R*1.25;
+    c.strokeStyle = `rgba(255,70,40,${(0.45+pulse*0.5).toFixed(3)})`; c.lineWidth = 3*dpr; c.beginPath(); c.arc(px, py, BR*(1.2+pulse*0.3), 0, Math.PI*2); c.stroke();
+    c.lineWidth = 2*dpr; c.strokeStyle = '#ff5a3a'; c.beginPath(); c.arc(px, py, BR, 0, Math.PI*2); c.stroke();
+    label('RAID ' + o.hrs + 'h', '#ff8a6a', BR*1.25); c.restore(); return; }
   if (o.k==='camp'){
     const n = o.c.size, s = R*0.85;
     for (let i=0;i<Math.min(3, 1+Math.floor(n/2));i++){ const tx = px + (i-1)*s*0.9, ty = py + (i%2 ? -s*0.25 : 0);
@@ -51906,7 +51917,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-847';
+const GAME_VERSION = 'rs-848';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

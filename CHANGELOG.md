@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-848 - Raids, Sharpened
+
+- **Raids on the map:** a raid marching on your castle shows on the world map as a pulsing red ring with the hours left, and its tooltip gives the foe and your garrison.
+- **Raiders worth the name:** they come at your castle's own level (its king's floor), or four levels below yours if you've grown past it, so a raid is never a walk-over.
+- **The wardens' thrust:** a warden that strikes now thrusts its spear, turned to its foe, instead of only showing a number.
+- **Fixed:** "the the walking dead" and "the the restless dead" in the raid messages.
+
 ## RS-847 - Raids
 
 - **Raiders march on your castles:** every few days the foe that troubles a castle's realm (goblins, orcs, the walking dead...) marches on it. A rider brings word a day ahead, and the castle's name plate warns you.
