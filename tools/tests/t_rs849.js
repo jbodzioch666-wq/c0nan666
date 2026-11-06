@@ -14,7 +14,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
     const max = G.dungeonMaxDepth; G.depth = max; loadLevel(max); setUi('playing'); const k = G.mon[G.bossIdx]; k.hp = 0; k.alive = false; bossDefeated(); setUi('playing');
     const t = G.genRooms.find(r=>r.k==='throne'), tx = t.x + (t.w>>1); p.x = tx; p.y = t.y + 1; G.mon = G.mon.filter(m=>!(m.x===tx && m.y===t.y + 1)); tryMove(0, -1); dgFinish(false); setUi('playing');
     const c = p.castles[cs[0] + ',' + cs[1]]; c.raid = { foe:'orc', due:clockNow() + DAY_LENGTH/4, str:3 };
-    setUi('realms'); ov = document.getElementById('overlay').innerHTML; out.yours = /You rule 1 of them/.test(ov) && /Yours/.test(ov) && /warden/.test(ov) && /march on it/.test(ov) && ov.indexOf('Yours') < ov.indexOf('class="qrep"', ov.indexOf('class="qrep"') + 1);   /* (yours first) */
+    setUi('realms'); ov = document.getElementById('overlay').innerHTML; out.yours = /You rule 1 of them/.test(ov) && /Yours/.test(ov) && /warden/.test(ov) && /march on it/.test(ov) && (()=>{ const rows = ov.split('class="qrep"').slice(1).filter(x=>!/armsOpen/.test(x)); return /Yours/.test(rows[0]); })();   /* (yours first; RS-852: below the arms row) */
     setUi('playing');
     /* gold on the map */ G.owZoomedOut = false; toggleOwZoom(); for (let i=0;i<6;i++){ renderGame(); await wait(30); }
     const cv = pmRealmWash.cv, px = cv.getContext('2d').getImageData(cs[0], cs[1], 1, 1).data; out.gold = [px[0], px[1], px[2]].join(',')===REALM_GOLD.join(',');

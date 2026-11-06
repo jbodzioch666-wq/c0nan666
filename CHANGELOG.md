@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-852 - Coats of Arms
+
+- **Choose your arms:** when you first take a castle's throne, you choose your coat of arms: a field in one of eight colours, plain or divided with gold or silver (per pale, per fess, quarterly, per bend, chevron, bordure), and a charge (crown, tower, sword, star, rose, key, eagle, stag, moon or axe). The heralds read it back to you, as in "Azure, an eagle Or".
+- **Your banners fly:** your castle on the land flies your arms from its keep and hangs two more on its gate wall. The towns of your realms fly your banner on the land and hang it at their gates; a halfling shire hangs it from its lych-gate.
+- **Your colours on the map:** your realms take your field's colour in the Territories layer instead of plain gold. On a sable (black) field they take your metal's colour, so they still show.
+- **Change them any time:** the Realms panel shows your shield and blazon, with a button to repaint every banner.
+
 ## RS-851 - Left Hands and Fair Raids
 
 - **A skeleton's left hand is a left hand again:** it hung palm up, so it read as a right hand. Now it's turned palm down at the wrist, with the thumb up and in, closed round the shield's grip or the bow on every skeleton, and resting palm down on a lich's belly.

@@ -184,6 +184,7 @@ Screenshots go to `tools/tests/shots/`.
 | `rs849` | `rs849` | the realm count by size (4, 6, 8, 11) with a castle slot and a town each; the map's Realms button and panel, yours first with its garrison and raid; your realm gold on the map | |
 | `rs850` | `rs850` | a king's war on a neighbour's town (the map, its tooltip, the gate and the Realms panel), the town falling to him (borders moved, names kept, the chart redrawn, kept through a save), and a war broken | |
 | `rs851` | `rs851` | the skeleton's left hand turned palm down, round its grip; a king's siege of your own town walked through from the gate; a planet's borders timed after a conquest | |
+| `rs852` | `rs852` | the arms picker at your first throne (Escape bears it), the map in the field's colour, the Realms panel row, banners on your castle on the land and at your town's gate, kept through a save | |
 | `rs789` | A shire's door stones and flags are dark: their average vertex colour stays low |
 | `rs788` | The open land has its older grass again: no blade chunks, RS-785's code gone |
 | `rs787` | A battle at a town: the card before and after, the banner's words, the trees told where you stand, no shader built by a fade, new creatures warmed off the frame |
