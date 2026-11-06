@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## RS-843 - Secrets and Spoils
+
+- **Secret passages:** every castle floor hides a room behind one of its walls. Walk past it and you may feel a draught from a crack in the stone; walk into it and the wall swings open on a hidden pivot. Below the top floor it's a stash: a chest and some gold.
+- **The king's hoard:** on the top floor the hidden room sits by the throne room. It holds three chests, heaps of gold and a magic or better piece of gear.
+- **Who knows where:** freed prisoners tell you which way the hollow wall lies, and servants whisper about it too.
+- **Claim the castle:** once the king has fallen, walk into his throne to take it. The nearest town hails you as its lord (+5 standing there, enough to make you a Friend at once).
+- **Castle rents:** whenever you come into that town, its reeve brings the rents for the days since your last visit, up to a week's worth.
+- **Freed prisoners never get stuck:** a freed prisoner who can't find a path out slips away on their own after a few turns.
+
 ## RS-842 - Castle Folk
 
 - **Servants:** cooks, maids, pages and stable boys go about the castle's halls, kitchens and stores. When they see you, they drop everything and run, sometimes all the way down the stairs. Catch one and they'll press a little gold on you to be let go, with a whispered tip about the king.
