@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-838 - Doors of the Deep
+
+- **Every dungeon theme hangs its own door:** the catacombs under a graveyard are shut by iron gates of bars with a rusted lock box; forest dungeons by lashed logs with ivy; jungle dungeons by bamboo; swamp dungeons by rotten planks with moss and slime; desert dungeons by cedar banded in bronze with a sun boss; frost dungeons by rimed wood hung with icicles; ash dungeons by iron plates with fire glowing through the seams; haunted dungeons by broken black planks with a ghost-light through the gaps and a skull knocker; crystal caves by a dark slab set with glowing shards. Plain dungeons keep their oak door.
+- **Cheap to draw:** each door's parts are merged, 2 to 6 draws a door.
+- **Same rules as before:** a shut door still blocks sight and is pushed open the same way, the iron gate included.
+
 ## RS-837 - Fitted Arches
 
 - **Dungeon archways now match their walls:** the arch over a door or open doorway is built from the same stone as the walls and pillars around it, moss and all.

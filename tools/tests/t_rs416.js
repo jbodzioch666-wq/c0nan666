@@ -10,7 +10,7 @@ module.exports = async page=>{
     let dx=-1, dy=-1; for (let x=0;x<OW_COLS && dx<0;x++) for (let y=0;y<OW_ROWS;y++) if (G.ow.map[x][y]===OW_DUNGEON){ dx=x; dy=y; break; }
     G.gameMode = 0; G.owPos = { x:dx, y:dy }; G.pendingDungeon = { x:dx, y:dy }; enterDungeonConfirm(); setUi('playing'); FPD.mapRef = null;
     for (let i=0;i<6;i++){ renderGame(); await new Promise(r=>setTimeout(r, 40)); }
-    const g = isoPropModel({ x:0, y:0, kind:'dress', d:'door', rot:0, side:1 }); let arch = 0, trim = 0, plankTop = 0;
+    const g = isoPropModel({ x:0, y:0, kind:'dress', d:'door', rot:0, side:1, th:'dungeon' /* (RS-838: the plain dungeon's oak door - a themed floor hangs its own) */ }); let arch = 0, trim = 0, plankTop = 0;
     g.updateMatrixWorld(true); g.traverse(o=>{ if (o.isMesh && o.geometry.type==='ExtrudeGeometry'){ const bb = new T.Box3().setFromObject(o); if (bb.min.y > 0.6){ arch++; if (o.material===FPD.trimMat) trim++; } else if (bb.max.y > plankTop && bb.min.y < 0.05) plankTop = bb.max.y; } });
     out.arch = { arch, trim, plankTop:+plankTop.toFixed(3), haveTrim:!!FPD.trimMat };
     // her clothes, front to back below the belt, against his
