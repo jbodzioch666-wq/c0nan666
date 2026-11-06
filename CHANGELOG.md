@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-841 - The Throne Room
+
+- **A dais and a runner:** the king's throne now stands on a dais of two pale stone steps edged in gold, and a crimson runner bordered in gold leads from the doors, up the steps, to his feet.
+- **A new throne:** a high arched back of dark oak with a velvet panel edged in gilt, carved arms with gilt knobs, a deep cushion and a small crown at its peak.
+- **Pillars and banners:** the hall's pillars are round stone columns now, not blocks of wall, each hung with the king's swallowtail banner turned toward the runner.
+- **Light from high windows:** tall arched windows line the side walls. By day the sunny side throws shafts of light across the floor, rose at dawn and orange at dusk; at night the glass glows faintly blue.
+- **Castles remember their rooms:** a castle floor you come back to, or load from a save, keeps its rooms (castle floors from before are built afresh once). Before this, loading a save rebuilt a castle's floors.
+
 ## RS-840 - The King
 
 - **A king on the throne:** the castle's master is now its king, crowned, in a crimson robe and a long royal cloak edged with white fur, with a grey beard and a sword.

@@ -5599,7 +5599,7 @@ function generateCastleLevel(d){
   if (d > 1) G.map[G.genStart.x][G.genStart.y] = retreatTile();
   if (top){ const tx = mid(goal); D[tx][goal.y] = 'throne'; G.map[tx][goal.y + 2] = advanceTile();   /* (the master stands before his throne: spawnBoss takes the stair's place) */
     for (const s of [-2, 2]) D[tx + s][goal.y] = 'banner';
-    for (let y = goal.y + 3; y < goal.y + goal.h - 2; y += 2) for (const s of [-3, 3]) if (tx + s > goal.x && tx + s < goal.x + goal.w - 1) G.map[tx + s][y] = T_WALL;   /* (a hall of pillars down to the doors) */ }
+    for (let y = goal.y + 3; y < goal.y + goal.h - 2; y += 2) for (const s of [-3, 3]) if (tx + s > goal.x && tx + s < goal.x + goal.w - 1) D[tx + s][y] = 'pillar';   /* (a hall of pillars down to the doors - RS-841: round columns, fpdThroneHall) */ }
   else G.map[mid(goal)][goal.y] = advanceTile();
   G.genRooms = rooms.map(r=>({ x:r.x, y:r.y, w:r.w, h:r.h, k:r.k, castle:true }));
   castleFurnish(rooms);
@@ -6043,7 +6043,7 @@ function saveLevelCache(d){
     shopStock: G.shopStock.map(it=>copyItem(it)),
     isBossFloor: G.isBossFloor,
     at: Date.now(), ent: G.dungeonEntrance ? G.dungeonEntrance.x+','+G.dungeonEntrance.y : '',   /* (RS-205: kept in the save; a moved site drops its old floors) */
-    bossIdx: G.bossIdx, lay: G.siteKind==='city' && d===1 ? 'city2' : G.siteKind==='castle' ? 'castle2' : '',   /* (RS-757: the Lost City's surface, laid out as a city) */
+    bossIdx: G.bossIdx, lay: G.siteKind==='city' && d===1 ? 'city2' : G.siteKind==='castle' ? 'castle3' : '', rooms: G.siteKind==='castle' && G.genRooms ? G.genRooms.map(r=>({...r})) : null,   /* (RS-841: a castle's rooms kept with it, for its throne room) */   /* (RS-757: the Lost City's surface, laid out as a city) */
   };
 }
 function restoreLevelCache(d){
@@ -6059,6 +6059,7 @@ function restoreLevelCache(d){
   G.shopStock = c.shopStock.map(it=>copyItem(it));
   G.isBossFloor = c.isBossFloor;
   G.bossIdx = c.bossIdx;
+  if (c.rooms) G.genRooms = c.rooms.map(r=>({...r}));   /* (RS-841) */
 }
 function invalidateDungeonCache(slot){
   for (const k of Object.keys(G.dgCache)) if (k.startsWith(slot+'_')) delete G.dgCache[k];
@@ -6079,7 +6080,7 @@ function dgCacheEncode(maxSites){
       const w = c.map.length, h = c.map[0].length, enc = (g, f)=>g.map(col=>col.map(f).join('')).join('|');
       const sparse = (g, f)=>{ const L = []; if (g) for (let x=0;x<w;x++) for (let y=0;y<h;y++){ const v = g[x] && g[x][y]; if (v) L.push([x, y, f ? f(v) : v]); } return L; };
       const e = { at:c.at||0, ent:c.ent||'', w, h, map:enc(c.map, t=>String.fromCharCode(48+t)), ts:c.trapSeen ? enc(c.trapSeen, v=>v?'1':'0') : null, ds:c.dungeonSeen ? enc(c.dungeonSeen, v=>v?'1':'0') : null,
-        deco:sparse(c.dungeonDeco), fi:sparse(c.floorItem), gs:c.genStart, mon:(c.mon||[]).map(monPlain), shop:c.shopStock||[], bf:c.isBossFloor||0, bi:c.bossIdx==null ? -1 : c.bossIdx };
+        deco:sparse(c.dungeonDeco), fi:sparse(c.floorItem), gs:c.genStart, mon:(c.mon||[]).map(monPlain), shop:c.shopStock||[], bf:c.isBossFloor||0, bi:c.bossIdx==null ? -1 : c.bossIdx, lay:c.lay||'', rooms:c.rooms||null };   /* (RS-841: the layout's mark and a castle's rooms, kept in the save) */
       JSON.stringify(e); out[k] = e; c._enc = e; c._encAt = c.at;
     }catch(err){ console.error(err); }
   }
@@ -6092,7 +6093,7 @@ function dgCacheDecode(d){
     const grid = (L, z)=>{ const g = []; for (let x=0;x<c.w;x++) g.push(new Array(c.h).fill(z)); for (const [x,y,v] of L||[]) if (g[x] && y < c.h) g[x][y] = v; return g; };
     if (!c.map || !c.gs) continue;
     out[k] = { at:c.at||0, ent:c.ent||'', map:dec(c.map, ch=>ch.charCodeAt(0)-48), trapSeen:c.ts ? dec(c.ts, ch=>ch==='1') : null, dungeonSeen:c.ds ? dec(c.ds, ch=>ch==='1') : null,
-      dungeonDeco:grid(c.deco, ''), floorItem:grid(c.fi, null), genStart:c.gs, mon:c.mon||[], shopStock:c.shop||[], isBossFloor:c.bf||0, bossIdx:c.bi==null ? -1 : c.bi };
+      dungeonDeco:grid(c.deco, ''), floorItem:grid(c.fi, null), genStart:c.gs, mon:c.mon||[], shopStock:c.shop||[], isBossFloor:c.bf||0, bossIdx:c.bi==null ? -1 : c.bi, lay:c.lay||'', rooms:c.rooms||null };
   }catch(err){ console.error(err); } }
   return out;
 }
@@ -6204,7 +6205,7 @@ function loadLevel(d, arrivingFromBelow, fellThrough){
   let fresh = true;
   let cached = G.dgCache[cacheKey(G.dungeonSlot,d)];
   if (cached && G.siteKind==='city' && d===1 && cached.lay!=='city2'){ delete G.dgCache[cacheKey(G.dungeonSlot,d)]; cached = null; }
-  if (cached && G.siteKind==='castle' && cached.lay!=='castle2'){ delete G.dgCache[cacheKey(G.dungeonSlot,d)]; cached = null; }   /* (RS-839: a castle kept from before is built afresh, from rooms) */   /* (RS-757: the temple's rooms it had in RS-756) */
+  if (cached && G.siteKind==='castle' && cached.lay!=='castle3'){ delete G.dgCache[cacheKey(G.dungeonSlot,d)]; cached = null; }   /* (RS-839: a castle kept from before is built afresh, from rooms) */   /* (RS-757: the temple's rooms it had in RS-756) */
   if (G.gameMode===1 && G.dungeonSlot>=1 && G.dungeonSlot<=MAX_SITE_SLOT+1 && cached){
     restoreLevelCache(d);
     if (G.siteKind==='pyramid' && G.dungeonDeco) for (const c of G.dungeonDeco) for (let y=0;y<c.length;y++) if (c[y]==='brazier' || c[y]==='altar') c[y] = '';   /* (RS-369: a pyramid's braziers are gone, on a kept floor too; RS-427: and its altar) */
@@ -16776,7 +16777,7 @@ function dgRoomPurpose(k, d, H){
     else if (p==='store'){ put(wallSide(r), 'sacks', 2 + rn(2), true); put(wallSide(r), 'crate', 1 + rn(2), true); put(wallSide(r), 'barrel', 1, true); } }
 }
 // ---- (RS-369) solid things on a dungeon floor: the refuse and the chests, shut or opened. You bump a chest to open it ----
-const DG_SOLID_DECOS = ['barrel','crate','rubble','skulls','chains','brazier','lchest','raidchest','chesto_v','chesto_c','chesto_i','chesto_r','chests_v','altar','rack','column','heap','shrine','bench','sacks'];   /* (RS-560: the racks, fallen columns, rubble heaps, shrines, benches and sacks are solid too) */   /* (RS-427: an altar is solid - you pray beside it) */
+const DG_SOLID_DECOS = ['pillar','barrel','crate','rubble','skulls','chains','brazier','lchest','raidchest','chesto_v','chesto_c','chesto_i','chesto_r','chests_v','altar','rack','column','heap','shrine','bench','sacks'];   /* (RS-560: the racks, fallen columns, rubble heaps, shrines, benches and sacks are solid too) */   /* (RS-427: an altar is solid - you pray beside it) */
 /* (RS-427) can a solid thing (a chest, an altar) stand on (x,y) without cutting a way through? Its open neighbours must make one unbroken
    arc round it - so it isn't in a passage, a doorway or the neck between two rooms - and it's not beside the stairs, an exit or a door */
 function dgOpenSpot(x, y){
@@ -41633,6 +41634,99 @@ function fpdCatacombProps(props, matFor, world){
 }
 // the level's stone: a face for every side of a wall that borders open floor,
 // floor and ceiling tiles, each vertex darkened where surfaces meet
+/* (RS-841) the throne room dressed as one: a dais of two steps under the throne, a crimson runner bordered in gold from the doors
+   up the steps, round pillars hung with the king's swallowtail banners, and tall arched windows down the side walls - the sunny side's
+   throwing shafts of daylight across the floor that follow the hour (winLightAt), gone at night when the glass glows moon-blue */
+function fpdHallMats(){
+  const T = THREE, M = {};
+  M.stone = new T.MeshStandardMaterial({ color:0x9a9284, roughness:0.5, metalness:0.05 });
+  M.pillar = new T.MeshStandardMaterial({ color:0xb0a898, roughness:0.45, metalness:0.04 });
+  M.gold = new T.MeshStandardMaterial({ color:0xd8a830, roughness:0.3, metalness:0.85, emissive:new T.Color('#3a2400') });
+  M.frame = new T.MeshStandardMaterial({ color:0x7c7468, roughness:0.7 });
+  /* the runner: a crimson field between gold bands, a gold lozenge and a small cross down its length */
+  { const c = v3Canvas(128, 512), x = c.getContext('2d'); x.fillStyle = '#6e1018'; x.fillRect(0, 0, 128, 512);
+    x.fillStyle = '#c89a38'; x.fillRect(0, 0, 14, 512); x.fillRect(114, 0, 14, 512); x.fillStyle = '#3a0a0e'; x.fillRect(14, 0, 3, 512); x.fillRect(111, 0, 3, 512); x.fillRect(4, 0, 2, 512); x.fillRect(122, 0, 2, 512);
+    x.fillStyle = '#8a1a22'; for (let y=8;y<512;y+=16){ x.beginPath(); x.moveTo(20, y); x.lineTo(26, y + 8); x.lineTo(20, y + 16); x.fill(); x.beginPath(); x.moveTo(108, y); x.lineTo(102, y + 8); x.lineTo(108, y + 16); x.fill(); }
+    for (const cy of [128, 384]){ x.fillStyle = '#c89a38'; x.beginPath(); x.moveTo(64, cy - 70); x.lineTo(98, cy); x.lineTo(64, cy + 70); x.lineTo(30, cy); x.closePath(); x.fill(); x.fillStyle = '#6e1018'; x.beginPath(); x.moveTo(64, cy - 56); x.lineTo(86, cy); x.lineTo(64, cy + 56); x.lineTo(42, cy); x.closePath(); x.fill(); x.fillStyle = '#c89a38'; x.fillRect(60, cy - 22, 8, 44); x.fillRect(48, cy - 4, 32, 8); }
+    for (const cy of [0, 256, 512]){ x.fillStyle = '#b08830'; x.beginPath(); x.arc(64, cy, 10, 0, Math.PI*2); x.fill(); }
+    x.fillStyle = 'rgba(0,0,0,0.14)'; for (let y=0;y<512;y+=3) x.fillRect(0, y, 128, 1); x.fillStyle = 'rgba(0,0,0,0.07)'; for (let i=0;i<128;i+=4) x.fillRect(i, 0, 1, 512);
+    const rnd = v3Rng(841); for (let i=0;i<900;i++){ x.fillStyle = rnd() < 0.5 ? 'rgba(0,0,0,0.1)' : 'rgba(255,230,200,0.05)'; x.fillRect(rnd()*128, rnd()*512, 2 + rnd()*3, 1); }
+    const map = v3CanvasTex(c); map.wrapS = T.ClampToEdgeWrapping; M.carpetTex = map; M.carpet = new T.MeshStandardMaterial({ map, roughness:0.95 }); }
+  /* the king's banner: crimson, a gold border and crown, cut swallowtail at its foot */
+  { const c = v3Canvas(128, 256), x = c.getContext('2d'); x.fillStyle = '#c89a38'; x.fillRect(0, 0, 128, 256); x.fillStyle = '#7a1020'; x.fillRect(8, 8, 112, 240);
+    x.fillStyle = '#c89a38'; x.beginPath(); x.moveTo(34, 118); x.lineTo(34, 78); x.lineTo(48, 96); x.lineTo(64, 70); x.lineTo(80, 96); x.lineTo(94, 78); x.lineTo(94, 118); x.closePath(); x.fill(); x.fillRect(34, 122, 60, 10);
+    for (const px of [34, 64, 94]){ x.beginPath(); x.arc(px, px===64 ? 68 : 76, 5, 0, Math.PI*2); x.fill(); }
+    x.fillStyle = '#e8d8b0'; for (let i=0;i<3;i++){ x.beginPath(); x.arc(48 + i*16, 108, 4, 0, Math.PI*2); x.fill(); }
+    x.fillStyle = '#c89a38'; x.fillRect(20, 150, 88, 4); x.fillRect(20, 160, 88, 2);
+    x.globalCompositeOperation = 'destination-out'; x.beginPath(); x.moveTo(0, 256); x.lineTo(64, 200); x.lineTo(128, 256); x.closePath(); x.fill(); x.globalCompositeOperation = 'source-over';
+    x.fillStyle = '#c89a38'; x.save(); x.beginPath(); x.moveTo(0, 248); x.lineTo(64, 192); x.lineTo(128, 248); x.lineTo(128, 256); x.lineTo(64, 200); x.lineTo(0, 256); x.closePath(); x.fill(); x.restore();
+    x.fillStyle = 'rgba(0,0,0,0.1)'; for (let y=0;y<256;y+=3) x.fillRect(0, y, 128, 1);
+    const map = v3CanvasTex(c); map.wrapS = map.wrapT = T.ClampToEdgeWrapping; M.banner = new T.MeshStandardMaterial({ map, roughness:0.9, side:T.DoubleSide, alphaTest:0.5 }); }
+  /* the window's light on the floor: the arch and its leading, soft at the edges */
+  { const c = v3Canvas(128, 128), x = c.getContext('2d'); x.fillStyle = '#000'; x.fillRect(0, 0, 128, 128); x.filter = 'blur(5px)'; x.fillStyle = '#fff';
+    x.beginPath(); x.moveTo(30, 120); x.lineTo(30, 52); x.quadraticCurveTo(30, 10, 64, 6); x.quadraticCurveTo(98, 10, 98, 52); x.lineTo(98, 120); x.closePath(); x.fill();
+    x.filter = 'blur(2px)'; x.fillStyle = 'rgba(0,0,0,0.75)'; x.fillRect(61, 6, 6, 116); x.fillRect(30, 60, 68, 5); x.filter = 'none';
+    const map = v3CanvasTex(c); map.wrapS = map.wrapT = T.ClampToEdgeWrapping; M.poolTex = map; }
+  M.pool = new T.MeshBasicMaterial({ map:M.poolTex, transparent:true, blending:T.AdditiveBlending, depthWrite:false, opacity:0.5 });
+  M.shaft = new T.MeshBasicMaterial({ vertexColors:true, transparent:true, blending:T.AdditiveBlending, depthWrite:false, side:T.DoubleSide, opacity:0.12 });
+  M.glass = new T.MeshBasicMaterial({ color:0xfff0d2 });
+  return M;
+}
+function fpdArch(w, h){ const s = new THREE.Shape(), r = w/2; s.moveTo(-r, 0); s.lineTo(r, 0); s.lineTo(r, h - r*1.2); s.quadraticCurveTo(r, h - r*0.15, 0, h); s.quadraticCurveTo(-r, h - r*0.15, -r, h - r*1.2); s.closePath(); return s; }
+function fpdThroneHall(world){
+  FPD.hall = null;
+  if (G.siteKind!=='castle' || G.gameMode!==1 || !G.genRooms) return;
+  const t = G.genRooms.find(r=>r.k==='throne'); if (!t) return;
+  const T = THREE, M = FPD.hallMats || (FPD.hallMats = fpdHallMats()), g = new T.Group(), tx = t.x + (t.w >> 1), cx = tx + 0.5, z0 = t.y, z1 = t.y + t.h, D = G.dungeonDeco;
+  const mesh = (geo, m, x, y, z, cast)=>{ const o = new T.Mesh(geo, m); o.position.set(x, y, z); o.castShadow = cast!==false; o.receiveShadow = true; g.add(o); return o; };
+  const plane = (w, d, m, x, y, z, rep)=>{ const geo = new T.PlaneGeometry(w, d); geo.rotateX(-Math.PI/2); if (rep){ const uv = geo.attributes.uv; for (let i=0;i<uv.count;i++) uv.setY(i, uv.getY(i)*rep); } return mesh(geo, m, x, y, z, false); };
+  /* the dais: two steps of pale stone, gold at their noses */
+  mesh(new T.BoxGeometry(3.3, 0.07, 1.25), M.stone, cx, 0.035, z0 + 0.625); mesh(new T.BoxGeometry(2.7, 0.07, 0.95), M.stone, cx, 0.105, z0 + 0.475);
+  mesh(new T.BoxGeometry(3.3, 0.014, 0.03), M.gold, cx, 0.066, z0 + 1.236, false); mesh(new T.BoxGeometry(2.7, 0.014, 0.03), M.gold, cx, 0.136, z0 + 0.936, false);
+  /* the runner: from the doors to the dais, up its steps to the throne's foot */
+  let zEnd = z1 - 0.15; for (const dx of [0, -1, 1]) if (/arch|door/.test((D[tx + dx] && D[tx + dx][z1]) || '')){ if (!dx) zEnd = z1 + 1; break; }
+  const zA = z0 + 1.25, len = zEnd - zA; plane(1.25, len, M.carpet, cx, 0.009, zA + len/2, len/2.2);
+  plane(1.1, 0.3, M.carpet, cx, 0.0715, z0 + 1.1, 0.14); plane(1.1, 0.4, M.carpet, cx, 0.1415, z0 + 0.75, 0.18);
+  for (const [z, y0, y1] of [[z0 + 1.252, 0, 0.072], [z0 + 0.952, 0.07, 0.142]]){ const r = new T.PlaneGeometry(1.1, y1 - y0); mesh(r, M.carpet, cx, (y0 + y1)/2, z, false); }
+  /* the pillars, each with a banner turned to the runner */
+  const bGeo = new T.PlaneGeometry(0.32, 0.64, 2, 8); { const p = bGeo.attributes.position; for (let i=0;i<p.count;i++){ const y = p.getY(i), x = p.getX(i); p.setZ(i, Math.sin((0.32 - y)*5 + x*6)*0.012*(0.32 - y)); } bGeo.computeVertexNormals(); }
+  const prof = [[0.29,0],[0.29,0.05],[0.25,0.06],[0.25,0.09],[0.27,0.1],[0.27,0.12],[0.21,0.15],[0.195,0.2],[0.18,0.6],[0.172,0.82],[0.2,0.85],[0.2,0.87],[0.25,0.92],[0.29,0.96],[0.29,1],[0,1]].map(([r, y])=>new T.Vector2(r, y));
+  const colGeo = new T.LatheGeometry(prof, 32), pl = [];
+  for (let x=t.x;x<t.x+t.w;x++) for (let y=t.y;y<t.y+t.h;y++) if (D[x][y]==='pillar') pl.push([x, y]);
+  for (const [x, y] of pl){ mesh(colGeo, M.pillar, x + 0.5, 0, y + 0.5); mesh(new T.BoxGeometry(0.62, 0.05, 0.62), M.pillar, x + 0.5, 0.025, y + 0.5); mesh(new T.BoxGeometry(0.64, 0.05, 0.64), M.pillar, x + 0.5, 1.0, y + 0.5);
+    mesh(new T.TorusGeometry(0.18, 0.012, 6, 32), M.gold, x + 0.5, 0.84, y + 0.5, false).rotation.x = Math.PI/2;
+    const s = Math.sign(cx - (x + 0.5)) || 1, bx = x + 0.5 + s*0.205, b = mesh(bGeo, M.banner, bx, 0.5, y + 0.5); b.rotation.y = s*Math.PI/2;
+    const rod = mesh(new T.CylinderGeometry(0.01, 0.01, 0.4, 8), M.gold, bx + s*0.01, 0.83, y + 0.5, false); rod.rotation.x = Math.PI/2;
+    for (const e of [-0.2, 0.2]) mesh(new T.SphereGeometry(0.018, 10, 8), M.gold, bx + s*0.01, 0.83, y + 0.5 + e, false); }
+  /* the windows: an arch of glass in a stone frame down each side wall, between the pillars; the shafts from the sunny side */
+  const glassGeo = new T.ShapeGeometry(fpdArch(0.3, 0.44), 12), frameS = fpdArch(0.4, 0.52); frameS.holes.push(new T.Path(fpdArch(0.3, 0.44).getPoints(12).map(p=>new T.Vector2(p.x, p.y + 0.04)).reverse()));
+  const frameGeo = new T.ExtrudeGeometry(frameS, { depth:0.05, bevelEnabled:true, bevelThickness:0.01, bevelSize:0.01, bevelSegments:2, curveSegments:12 });
+  const leadGeo = new T.BoxGeometry(0.012, 0.44, 0.012), leadH = new T.BoxGeometry(0.3, 0.012, 0.012), shafts = [], pools = [];
+  const wallAt = (x, y)=>G.map[x] && G.map[x][y]===T_WALL && !D[x][y];
+  for (const side of [-1, 1]){ const wx = side < 0 ? t.x - 1 : t.x + t.w, fx = side < 0 ? t.x : t.x + t.w, inw = -side;
+    for (let y=z0 + 2; y<z1 - 1; y+=2){ if (!wallAt(wx, y)) continue; const z = y + 0.5, y0 = 0.46;
+      const win = new T.Group(); win.position.set(fx + inw*0.004, y0, z); win.rotation.y = inw > 0 ? Math.PI/2 : -Math.PI/2; g.add(win);
+      const gl = new T.Mesh(glassGeo, M.glass); gl.position.y = 0.04; win.add(gl);
+      const fr = new T.Mesh(frameGeo, M.frame); fr.position.z = -0.02; fr.castShadow = true; win.add(fr);
+      const sill = new T.Mesh(new T.BoxGeometry(0.46, 0.04, 0.09), M.frame); sill.position.set(0, -0.005, 0.035); sill.castShadow = true; win.add(sill);
+      const l1 = new T.Mesh(leadGeo, M.frame); l1.position.set(0, 0.26, 0.004); win.add(l1); const l2 = new T.Mesh(leadH, M.frame); l2.position.set(0, 0.3, 0.004); win.add(l2);
+      if (side < 0) continue;
+      /* the light falls in and down, a little toward the doors: the window's arch carried to the floor along it */
+      const L = [inw*1.45, -1, 0.4], hit = (px, py, pz)=>[px + L[0]*py, 0.012, pz + L[2]*py], wx0 = fx + inw*0.01;
+      const W = [[wx0, y0 + 0.04, z - 0.15], [wx0, y0 + 0.04, z + 0.15], [wx0, y0 + 0.48, z + 0.15], [wx0, y0 + 0.48, z - 0.15]], F = W.map(p=>hit(...p));
+      const pos = [], col = [], idx = []; for (let i=0;i<4;i++){ const a = W[i], b = W[(i + 1) % 4], c = F[(i + 1) % 4], d = F[i], n = pos.length/3; pos.push(...a, ...b, ...c, ...d); col.push(1,1,1, 1,1,1, 0.25,0.25,0.25, 0.25,0.25,0.25); idx.push(n, n+1, n+2, n, n+2, n+3); }
+      const sg = new T.BufferGeometry(); sg.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); sg.setAttribute('color', new T.Float32BufferAttribute(col, 3)); sg.setIndex(idx);
+      const sh = new T.Mesh(sg, M.shaft.clone()); sh.renderOrder = 3; sh.userData.op0 = 0.13; g.add(sh); shafts.push(sh);
+      const pg = new T.BufferGeometry(); pg.setAttribute('position', new T.Float32BufferAttribute([...F[0], ...F[1], ...F[2], ...F[3]], 3)); pg.setAttribute('uv', new T.Float32BufferAttribute([1,1, 0,1, 0,0, 1,0], 2)); pg.setIndex([0, 2, 1, 0, 3, 2]);
+      const po = new T.Mesh(pg, M.pool.clone()); po.renderOrder = 2; po.userData.op0 = 0.55; g.add(po); pools.push(po); } }
+  world.add(g); FPD.hall = { g, shafts, pools, q:-1 }; fpdHallTick(true);
+}
+function fpdHallTick(force){
+  const H = FPD.hall; if (!H) return; const ph = dayPhase(), q = Math.round(ph*400); if (!force && q===H.q) return; H.q = q;
+  const { col, k } = winLightAt(ph), M = FPD.hallMats, warm = winWarm(col);
+  for (const m of H.shafts.concat(H.pools)){ m.visible = k > 0.01; m.material.color.copy(col); m.material.opacity = m.userData.op0*k*(1 + 0.6*warm); }
+  M.glass.color.copy(new THREE.Color(0x2a3a60)).lerp(new THREE.Color(0xfff4dc).lerp(col, 0.4 + 0.5*warm), k);
+}
 function fpdBuild(T){
   const TH = THREE, spec = FP_THEME_SPECS[T.key], key = T.key;
   FPD.cryptRoof = null;
@@ -41946,6 +42040,7 @@ function fpdBuild(T){
   if (key==='cityOut') try{ fpdCityJungle(world); }catch(e){ console.error(e); }   /* (RS-757) */
   if (props.skull.length || props.bone.length || props.candle.length || props.shroud.length) fpdCatacombProps(props, matFor, world);
   fpdPortals(world);
+  try{ fpdThroneHall(world); }catch(e){ console.error(e); FPD.hall = null; }   /* (RS-841) */
   gfxMatsBorn(FPD.r, world); FPD.scene.add(world); FPD.world = world;   /* (RS-562) */
   if (town && town.world.parent!==FPD.scene){ if (!town.fadeDone){ town.fadeDone = true; try{ siegeFadeWarm(town); }catch(e){ console.error(e); } } FPD.scene.add(town.world); try{ gfxMatsBorn(FPD.r, town.world); }catch(e){} }
   FPD.shadowFrames = 3; FPD.lightKey = ''; FPD.warm = true;
@@ -42405,6 +42500,7 @@ function fpdRender(env, T, camZ){
   if (stale){ const newFloor = FPD.mapRef!==G.map; FPD.mapRef = G.map; FPD.theme = T.key; FPD.ftile = ft.slice(); if (newFloor) try{ const r = FPD.r, old = r.getRenderTarget(), cc = r.getClearColor(new THREE.Color()), ca = r.getClearAlpha(); r.setRenderTarget(null); r.setClearColor(0x000000, 1); r.clear(true, true, true); r.setClearColor(cc, ca); r.setRenderTarget(old); }catch(e){}   /* (RS-605: the canvas cleared the moment a new place is built - it went on showing the last one through the creatures' sculpting and the warm-up) */ fpdBuild(T); FPD.compileDue = true; try{ gfxFpdBuild(T); }catch(e){ console.error(e); } try{ gfxPadLights(FPD, FPD.scene); }catch(e){}   /* (RS-499, RS-502) */
     if (!FPD.prep) try{ fpdWarm(); }catch(e){ console.error(e); try{ gfxCompile(FPD.r, FPD.scene, FPD.cam); }catch(e2){} } }
   /* (RS-572) the floor's creatures sculpted a slice a frame behind the card; then its warm-up, which finds them made */
+  if (FPD.hall) fpdHallTick();
   if (FPD.prep){ if (!fpdPrepStep()) return; try{ fpdWarm(); }catch(e){ console.error(e); try{ gfxCompile(FPD.r, FPD.scene, FPD.cam); }catch(e2){} } }   // (RS-110) build every shader the floor needs now, while it loads, not on your first steps; (RS-344) its props and monsters too
   // resolution adapts to keep the frame rate up on slower graphics. Each change reallocates buffers (a hitch), so (RS-107) it only
   // moves between a few fixed steps, judges the frame rate over about two seconds, ignores one-off spikes, and once a step up
@@ -49677,13 +49773,20 @@ function isoPropModel(p){
       const bd = add(new T.BoxGeometry(0.5, 0.22, 0.04), M('plank', '#8a6238'), 0.12, 0.72, 0); bd.rotation.y = 0.3;
       if (p.sealed){ for (const r of [0.7, -0.7]){ const x = add(new T.BoxGeometry(0.4, 0.04, 0.02), isoGlowMat('seal', '#e03020'), 0.12, 0.72, 0.03); x.rotation.set(0, 0.3, r); } }
       break; }
-    case 'throne': {
-      const red = M('velvet', '#8a1a24', { roughness:0.95 });
-      add(new T.BoxGeometry(0.64, 0.12, 0.56), stone, 0, 0.06, 0);
-      add(new T.BoxGeometry(0.52, 0.34, 0.46), dwood, 0, 0.29, 0.02); add(new T.BoxGeometry(0.48, 0.06, 0.42), red, 0, 0.48, 0.03);
-      add(new T.BoxGeometry(0.52, 0.95, 0.08), dwood, 0, 0.82, -0.2); add(new T.BoxGeometry(0.4, 0.7, 0.02), red, 0, 0.8, -0.155);
-      for (const s of [-1,1]){ add(new T.BoxGeometry(0.07, 0.2, 0.44), dwood, s*0.27, 0.56, 0.02); add(new T.SphereGeometry(0.05, 10, 8), gold, s*0.25, 1.33, -0.2); }
-      add(new T.ConeGeometry(0.06, 0.16, 8), gold, 0, 1.36, -0.2);
+    case 'throne': {   /* (RS-841) a king's chair: a high pointed back of dark oak, bevelled, with a velvet panel edged in gilt, carved arms
+         ending in gilt knobs, a deep cushion, and a crown at the peak; up on its dais in a castle */
+      const red = M('velvet', '#7a1420', { roughness:0.9 }), oak = M('throneOak', '#4a2a16', { roughness:0.5 }), lift = G.siteKind==='castle' && G.gameMode===1 ? 0.14 : 0, r = new T.Group(); r.position.y = lift; g.add(r);
+      const A = (geo, mat, x, y, z)=>{ const m = new T.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = m.receiveShadow = true; r.add(m); return m; };
+      if (!lift) A(new T.BoxGeometry(0.66, 0.1, 0.58), stone, 0, 0.05, 0);
+      const back = new T.ExtrudeGeometry(fpdArch(0.56, 0.96), { depth:0.07, bevelEnabled:true, bevelThickness:0.02, bevelSize:0.02, bevelSegments:3, curveSegments:16 }); A(back, oak, 0, 0.3, -0.27);
+      const panel = new T.ExtrudeGeometry(fpdArch(0.38, 0.7), { depth:0.012, bevelEnabled:true, bevelThickness:0.006, bevelSize:0.008, bevelSegments:2, curveSegments:14 }); A(panel, red, 0, 0.4, -0.18);
+      const edge = fpdArch(0.42, 0.75).getPoints(20).slice(1).map(p=>new T.Vector3(p.x, p.y, 0)).filter((v, i, a)=>!i || v.distanceTo(a[i-1]) > 1e-4); A(new T.TubeGeometry(new T.CatmullRomCurve3(edge, false, 'centripetal'), 64, 0.012, 8, false), gold, 0, 0.38, -0.175);   /* (up one side, over and down: none along the cushion) */
+      A(new T.BoxGeometry(0.56, 0.3, 0.48), oak, 0, 0.15, 0); const cu = A(new T.SphereGeometry(0.25, 32, 16), red, 0, 0.31, 0.02); cu.scale.set(1.05, 0.22, 0.92);
+      for (const sx of [-1, 1]){ A(new T.BoxGeometry(0.07, 0.05, 0.46), oak, sx*0.29, 0.52, 0.0); const post = A(new T.CylinderGeometry(0.028, 0.034, 0.22, 16), oak, sx*0.29, 0.4, 0.19); A(new T.SphereGeometry(0.042, 20, 14), gold, sx*0.29, 0.555, 0.22);
+        A(new T.SphereGeometry(0.04, 20, 14), gold, sx*0.3, 0.3 + 0.62, -0.235); A(new T.ConeGeometry(0.03, 0.08, 16), gold, sx*0.3, 0.3 + 0.68, -0.235);
+        for (const fz of [-0.2, 0.2]) A(new T.SphereGeometry(0.04, 16, 12), gold, sx*0.24, 0.02, fz).scale.y = 0.6; }
+      const crown = new T.Group(); crown.position.set(0, 0.3 + 0.98, -0.235); r.add(crown); const cr = new T.Mesh(new T.CylinderGeometry(0.07, 0.065, 0.045, 24, 1, true), gold); cr.castShadow = true; crown.add(cr);
+      for (let i=0;i<5;i++){ const a = i/5*Math.PI*2, pt = new T.Mesh(new T.ConeGeometry(0.018, 0.06, 10), gold); pt.position.set(Math.cos(a)*0.065, 0.05, Math.sin(a)*0.065); crown.add(pt); const gm = new T.Mesh(new T.SphereGeometry(0.011, 10, 8), isoGlowMat('cgem', '#d02030')); gm.position.set(Math.cos(a)*0.07, 0.0, Math.sin(a)*0.07); crown.add(gm); }
       break; }
     case 'dress': { dgPropModel(p, g, add, M, { wood, dwood, stone, iron, gold }, h); break; }
     case 'banner': {
@@ -51393,7 +51496,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-840';
+const GAME_VERSION = 'rs-841';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
