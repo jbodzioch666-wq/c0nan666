@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-846 - The Six Realms
+
+- **Six realms:** the land is no longer cut into a province per town. It is shared into six realms of much the same size (largest to smallest about 1.2 to 1 on a medium world, 1.9 to 1 on a planet), the islands joined to the realm across the water. Every realm holds at least one town. It needs a new world: start one and keep your character.
+- **Ruled from a castle:** each realm's capital is a castle at its heart, held by its king. A realm's castle stays on its seat when its king falls; leave the throne empty and another king takes it.
+- **Ruler of the realm:** take the throne and you rule the whole realm. Every town in it hails you (+3 standing, +5 in the nearest), any of them brings you the rents, and a realm with more towns pays more.
+- **Territories on the map:** a new Territories layer (on by default, under Layers) washes each realm in its own colour. Switch it off for the plain chart; the borders stay.
+- **World sim:** 6 castles on every size; land per site on a medium world 164 -> 174 tiles, planet 159 -> 180; planet creation about 3.2 s (was 3.0).
+
 ## RS-845 - A Castle for Every Province
 
 - **One castle to each province:** every realm on the map now has its own castle, set well inside its borders and away from its seat town (a medium world has 10 castles, up from 3; a planet 30, up from 6). It needs a new world: start one and keep your character.

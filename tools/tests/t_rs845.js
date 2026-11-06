@@ -23,15 +23,15 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
     /* the throne taken: the province's seat hails you */
     const t = G.genRooms.find(r=>r.k==='throne'), tx = t.x + (t.w>>1), p = G.player; p.x = tx; p.y = t.y + 1; if (G.mon.some(m=>m.alive && m.x===tx && m.y===t.y + 1)) G.mon = []; const l0 = (G.log||[]).length; tryMove(0, -1);
     const c = p.castles && p.castles[cs[0] + ',' + cs[1]]; out.claimed = !!(c && c.held); out.seat = c && c.town===pv.seat.x + ',' + pv.seat.y; out.provSaved = c && c.prov===pv.name;
-    out.lordMsg = (G.log||[]).slice(-12).map(l=>String(l.msg)).some(s=>/lord of/.test(s)); out.line = provLine(pv);
+    out.lordMsg = (G.log||[]).slice(-12).map(l=>String(l.msg)).some(s=>/lord of|ruler of/.test(s)); out.line = provLine(pv);
     dgFinish(false); setUi('playing');
     return out; });
   console.log(JSON.stringify(r)); assert.equal(errs.length, 0, errs.join('|'));
-  assert.equal(r.genVer, 30, 'generator');
+  assert.ok(r.genVer >= 30, 'generator'); const g31 = r.genVer >= 31;   /* (RS-846: the realms' castles are their seats, and stay put) */
   for (const sz in r.sizes){ const s = r.sizes[sz];
     assert.equal(s.slots, s.castles + (s.slots - s.castles), sz);
     assert.ok(s.held >= s.realms - 1, `${sz}: ${s.held} of ${s.realms} provinces have one castle`); assert.equal(s.twice, 0, `${sz}: a province with two castles`); assert.equal(s.wildOnes, 0, `${sz}: a castle in the wilds`);
-    assert.ok(s.minSeat >= 4, `${sz}: a castle at its seat's door ${s.minSeat}`); }
+    assert.ok(g31 || s.minSeat >= 4, `${sz}: a castle at its seat's door ${s.minSeat}`); }
   assert.ok(r.sameAfterRegen, 'the castles moved when the land was rebuilt'); assert.ok(r.locked >= r.c0.castles, 'castles not locked in place');
-  assert.ok(r.moved && r.sameProv, 'a beaten castle left its province');
-  assert.ok(r.claimed && r.seat && r.provSaved, 'the claim did not go to the province\'s seat'); assert.ok(r.lordMsg, 'no word of the lordship'); assert.ok(/You hold/.test(r.line), r.line); };
+  assert.ok((g31 ? !r.moved : r.moved) && r.sameProv, 'a beaten castle left its province');
+  assert.ok(r.claimed && (r.seat || g31) && r.provSaved, 'the claim did not go to the province\'s seat'); assert.ok(r.lordMsg, 'no word of the lordship'); assert.ok(/You (hold|rule)/.test(r.line), r.line); };

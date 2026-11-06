@@ -178,6 +178,7 @@ Screenshots go to `tools/tests/shots/`.
 | `rs843` | `rs843` | castle secrets and spoils: a hidden room per floor (the king's hoard on top), the draught, claiming the throne, the town's rents | |
 | `rs844` | `rs844` | a claimed castle stays put and yours: floors kept, no king or garrison back, wardens, steward, calm servants | |
 | `rs845` | `rs845` | one castle in each province on every size, clear of its seat and locked in place; a beaten one rises in its own province; the claim goes to the province's seat | |
+| `rs846` | `rs846` | six realms of near even land on every size, each with a town and its castle on its seat; the realms the same after a rebuild; the Territories layer on and off; the castle stays when its king falls; the claim makes every town of the realm hail you, and any pays the rents | |
 | `rs789` | A shire's door stones and flags are dark: their average vertex colour stays low |
 | `rs788` | The open land has its older grass again: no blade chunks, RS-785's code gone |
 | `rs787` | A battle at a town: the card before and after, the banner's words, the trees told where you stand, no shader built by a fade, new creatures warmed off the frame |
