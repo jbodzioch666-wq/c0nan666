@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-854 - Your Seat
+
+- **Sit on your throne:** walk into your own throne and you take your seat on its cushion, facing your hall with your hands on its arms. Step away, or start a fight, to rise.
+- **Your wardens step aside:** walk into one of your own wardens and you change places with them. One standing in a doorway could bar the way to the throne room.
+- **The steward waits on you:** hiring a warden, strengthening the gate, building works or setting taxes no longer closes the steward's counsel, so you can buy several in a row. It now shows your purse too.
+
 ## RS-853 - A Realm to Grow
 
 - **Castle works:** your steward can build barracks (room for ten wardens, each hired for a quarter less), curtain walls (the garrison holds much better without you, and a raid's last wave is one raider fewer) and a treasury (a quarter more in rents).

@@ -7783,7 +7783,7 @@ function tryMove(dx,dy){
   }
   if (G.gameMode===1 && castleClaimAt(nx, ny)) return;   /* (RS-843: the fallen king's throne) */
   if (G.gameMode===1 && castleSecretOpen(nx, ny)){ tickMonsters(); return; }   /* (RS-843: a hidden wall swings in) */
-  if (G.gameMode===1 && G.folk && G.folk.length){ const f = folkAt(nx, ny); if (f){ folkMeet(f); tickMonsters(); return; } }   /* (RS-842: walking into one of the castle's folk) */
+  if (G.gameMode===1 && G.folk && G.folk.length){ const f = folkAt(nx, ny); if (f){ if (f.k==='warden' && !G.castleSiege && castleHeldHere()){ f.x = G.player.x; f.y = G.player.y; } else { folkMeet(f); tickMonsters(); return; } } }   /* (RS-854: your own wardens step aside - one in a doorway barred the way to the throne) */   /* (RS-842: walking into one of the castle's folk) */
   { const al = G.allies && G.allies.length ? siegeAllyAt(nx, ny) : null; if (al){ al.x = G.player.x; al.y = G.player.y; } }   /* (RS-418: you change places with one of the town's people) */
   if (tileAt(nx,ny)===T_WALL){ if (G.gameMode===3 && !G.interior && G.villageDeco && G.villageDeco[nx] && G.villageDeco[nx][ny]==='board') tkOpen('board'); else if (G.gameMode===3 && !G.interior) townBumpWall(nx, ny); return; } // bumping a wall isn't an action - no turn spent (the bounty board opens)
   if (G.player.frozenTurns>0 && G.gameMode!==0){ logMsg('you are frozen in place - you strain against the ice (you can still fight what stands beside you)', 'hit'); tickMonsters(); return; }
@@ -16595,7 +16595,7 @@ function castleSecretOpen(x, y){
 function castleClaimAt(x, y){
   if (G.gameMode!==1 || G.siteKind!=='castle' || !G.dgDone || !G.dungeonDeco || G.dungeonDeco[x][y]!=='throne') return false;
   const p = G.player, key = G.dungeonEntrance.x + ',' + G.dungeonEntrance.y; p.castles = p.castles || {};
-  if (p.castles[key] && !p.castles[key].lost){ logMsg(`you sit a while on your own throne. ${p.castles[key].tn} pays you its rents when you come in`, ''); return true; }
+  if (p.castles[key] && !p.castles[key].lost){ G.throneSit = { x, y, px:p.x, py:p.y, map:G.map }; logMsg(`you take your seat on your throne${p.castles[key].prov ? ', lord of ' + p.castles[key].prov : ''}. Step away to rise`, ''); return true; }   /* (RS-854: you sit on it) */
   let pv = null; try{ pv = provAt(G.dungeonEntrance.x, G.dungeonEntrance.y); if (pv && (pv.wild || !pv.seat)) pv = null; }catch(e){}   /* (RS-845: the lord of its province, hailed by the seat) */
   let tw = pv ? [pv.seat.x, pv.seat.y] : wevNearestTown(false);
   if (pv && pv.realm){ let bd = 1e9; tw = null; for (const k of pv.towns||[]){ const [a, b] = k.split(',').map(Number), d = Math.hypot(a - G.dungeonEntrance.x, b - G.dungeonEntrance.y); if (d < bd){ bd = d; tw = [a, b]; } } if (!tw) tw = wevNearestTown(false); }   /* (RS-846: a realm's castle - its nearest town brings the rents, every town of it hails you) */ if (!tw){ logMsg('you sit on the throne - but no town is near enough to call you lord', ''); return true; }
@@ -16731,12 +16731,13 @@ function castleStewardTalk(c){
     + `The garrison: <b>${w}</b> warden${w===1 ? '' : 's'}${c.away ? ` (${c.away} more away at war)` : ''} and <b>${CASTLE_GATES[gt]}</b>.${c.defended ? ` You have beaten back ${c.defended} raid${c.defended===1 ? '' : 's'}.` : ''}${Object.keys(CASTLE_WORKS).filter(k=>castleWork(c, k)).length ? ` Built: ${Object.keys(CASTLE_WORKS).filter(k=>castleWork(c, k)).map(k=>CASTLE_WORKS[k][0].toLowerCase()).join(', ')}.` : ''}<br><br>`
     + (c.raid ? `<b style="color:#e06a4a">${cap(castleFoeNm(c.raid.foe))} march on us - they'll be at the gate in about ${rd} hour${rd===1 ? '' : 's'}.</b> Meet them at the first floor's gate.` : 'The roads are quiet, for now. Raiders come every few days - the more wardens and the stronger the gate, the better we hold without you.');
   const opts = [];
-  if (w < castleMaxWardens(c)) opts.push([`Hire a warden (${hc} gold)`, ()=>{ if (!castleHire(c)) logMsg(`a warden costs ${hc} gold`, ''); }]);
-  if (gt < CASTLE_GATES.length - 1) opts.push([`Make it ${CASTLE_GATES[gt + 1]} (${gc} gold)`, ()=>{ if (!castleGateUp(c)) logMsg(`the masons want ${gc} gold`, ''); }]);
-  for (const k of Object.keys(CASTLE_WORKS)) if (!castleWork(c, k)){ const g = castleWorkCost(c, k); opts.push([`Build the ${CASTLE_WORKS[k][0].toLowerCase()} (${g} gold): ${CASTLE_WORKS[k][1]}`, ()=>{ if (!castleBuild(c, k)) logMsg(`the masons want ${g} gold`, ''); }]); }   /* (RS-853) */
-  CASTLE_TAX.forEach((t, i)=>{ if (i!==castleTaxOf(c)) opts.push([`Tax ${['lightly', 'fairly', 'heavily'][i]} (rents x${t[1]}${t[2] ? '; ' + t[2] : ''})`, ()=>castleSetTax(c, i)]); });
+  const again = ()=>castleStewardTalk(c);   /* (RS-854: the steward waits on you till you leave - it closed after every purchase) */
+  if (w < castleMaxWardens(c)) opts.push([`Hire a warden (${hc} gold)`, ()=>{ if (!castleHire(c)) logMsg(`a warden costs ${hc} gold`, ''); again(); }]);
+  if (gt < CASTLE_GATES.length - 1) opts.push([`Make it ${CASTLE_GATES[gt + 1]} (${gc} gold)`, ()=>{ if (!castleGateUp(c)) logMsg(`the masons want ${gc} gold`, ''); again(); }]);
+  for (const k of Object.keys(CASTLE_WORKS)) if (!castleWork(c, k)){ const g = castleWorkCost(c, k); opts.push([`Build the ${CASTLE_WORKS[k][0].toLowerCase()} (${g} gold): ${CASTLE_WORKS[k][1]}`, ()=>{ if (!castleBuild(c, k)) logMsg(`the masons want ${g} gold`, ''); again(); }]); }   /* (RS-853) */
+  CASTLE_TAX.forEach((t, i)=>{ if (i!==castleTaxOf(c)) opts.push([`Tax ${['lightly', 'fairly', 'heavily'][i]} (rents x${t[1]}${t[2] ? '; ' + t[2] : ''})`, ()=>{ castleSetTax(c, i); again(); }]); });
   opts.push(['Leave', ()=>{}]);
-  wevDialog('Your Steward', txt, opts, esc(c.prov || ''));
+  wevDialog('Your Steward', txt + `<br><br><span class="muted">Your purse: <b style="color:${COL.gold}">${G.player.gold}</b> gold</span>`, opts, esc(c.prov || ''));
 }
 /* coming into a town that is answerable to one of your castles: the cheer the first time, and the rents for the days since (up to a week) */
 function castleRents(){
@@ -50922,6 +50923,20 @@ function rsPlayerLook(opt){
   if (opt.undress){ for (const k of RS_COSTUME_KEYS) delete o[k]; o.outfit = 'none'; o.legWear = 'skin'; o.under = '#e4d8be'; if (!o.feet) o.feet = 'bare'; }
   return HUM(o, 1, { stature:RB[0]*(0.92 + 0.16*LB.height) });
 }
+/* (RS-854) sat on your own throne: on its cushion, facing your hall, hands on its arms - until you step away, or a fight starts */
+const THRONE_SEAT_Y = 0.5;
+function isoThroneSit(e){
+  const S = G.throneSit, p = G.player, r = e.rig;
+  if (S && (S.map!==G.map || p.x!==S.px || p.y!==S.py || G.gameMode!==1 || G.castleSiege || FP.swing > 0 || G.gather)) G.throneSit = null;
+  if (!G.throneSit || !r || !r.legs || !r.hips){ if (e.throneSat){ e.throneSat = false; if (r) r.sitting = false; } return false; }
+  const s = e.holder.scale.y || 1; e.throneSat = true; r.sitting = true; e.face = 0;
+  e.holder.position.set(S.x + 0.5, THRONE_SEAT_Y - SEAT_H, S.y + 0.5 + 0.02); e.holder.rotation.y = 0;
+  r.hips.position.y = (SEAT_H + 0.2)/s; r.hips.rotation.set(0, 0, 0);
+  r.legs.forEach((L, i)=>{ L.hip.rotation.x = -1.5; L.hip.rotation.z = (i ? 1 : -1)*0.08; L.knee.rotation.x = 1.4; if (L.ankle) L.ankle.rotation.x = 0.1; });
+  if (r.torso) r.torso.rotation.set(-0.06 + Math.sin(FP.t*1.4)*0.01, 0, 0);
+  if (r.arms) r.arms.forEach((A, i)=>{ A.sh.rotation.set(-0.45, 0, (i ? 1 : -1)*-0.12); A.el.rotation.set(-0.85, 0, 0); });
+  return true;
+}
 function isoSyncPlayer(){
   const T = THREE, p = G.player;
   const key = rsLookKey();
@@ -50951,6 +50966,7 @@ function isoSyncPlayer(){
   m3dPoseHumanoid(e.rig, FP.t + e.seed, down ? 0 : onStair ? 1 : moving, down ? 0 : wind, down ? 0 : strike, down ? 0 : hurt*0.8, e);   /* (RS-702: the cast's own turn and lean are in rsCastPose - added here as a jump of wind, it snapped the body round) */
   rsPlayerFx(e, FP.t + e.seed, down ? 0 : moving, true);
   if (down){ isoPlayerFall(e, down); return; } else if (e.downed) isoPlayerUp(e);
+  if (isoThroneSit(e)) return;   /* (RS-854) */
   const gw = G.gather && G.gather.mode===1 && G.gather.o.k==='mining' && G.gather.o.vein ? G.gather.o : null;
   if (gw){
     rsHoldTool(e, 'pick');
@@ -52216,7 +52232,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-853';
+const GAME_VERSION = 'rs-854';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

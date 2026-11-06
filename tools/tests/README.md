@@ -186,6 +186,7 @@ Screenshots go to `tools/tests/shots/`.
 | `rs851` | `rs851` | the skeleton's left hand turned palm down, round its grip; a king's siege of your own town walked through from the gate; a planet's borders timed after a conquest | |
 | `rs852` | `rs852` | the arms picker at your first throne (Escape bears it), the map in the field's colour, the Realms panel row, banners on your castle on the land and at your town's gate, kept through a save | |
 | `rs853` | `rs853` | castle works (barracks, walls, treasury) and taxes from the steward; your wardens' march taken on the roll, held against you and stormed yourself; a truce kept, tribute demanded and paid, a refusal that brings the king on you; kept through a save | |
+| `rs854` | `rs854` | a warden in the way steps aside; you sit on your own throne and rise when you step away; the steward stays open after each purchase | |
 | `rs789` | A shire's door stones and flags are dark: their average vertex colour stays low |
 | `rs788` | The open land has its older grass again: no blade chunks, RS-785's code gone |
 | `rs787` | A battle at a town: the card before and after, the banner's words, the trees told where you stand, no shader built by a fade, new creatures warmed off the frame |
