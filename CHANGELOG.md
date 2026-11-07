@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-855 - The Throne, Truly Yours
+
+- **You really sit on your throne now:** RS-854's seat only worked on the visit you took the castle. Come back another day and the throne ignored you, because the game only counted it as a throne the day its king fell. Your own throne now seats you on every visit.
+- **Click or tap the throne:** from anywhere in the hall you walk up to it and sit down. It used to do nothing, since the throne isn't a tile you can walk on.
+- **Your banners in your castle:** in a castle you hold, the banners on the throne hall's pillars and the banners on poles through the castle now show your arms instead of the old king's crimson and gold.
+
 ## RS-854 - Your Seat
 
 - **Sit on your throne:** walk into your own throne and you take your seat on its cushion, facing your hall with your hands on its arms. Step away, or start a fight, to rise.
