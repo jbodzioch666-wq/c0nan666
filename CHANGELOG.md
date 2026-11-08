@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-856 - Routes That Keep Going
+
+- **Landing no longer ends your route:** when your ship reached the shore, the rest of the route was thrown away and you stood on the beach. Now you step ashore and walk on to your stop.
+- **The boat picks the route up again:** bumping the coast a few times at sea, a step blocked on land, or a menu or fight stopped a route for good. Now, while a route is on and you haven't reached its last stop, you set off again from where you are after a moment.
+- **Stopping still stops:** the route button, steering yourself, a movement key, a teleport, a ferry or walking into a site ends the route as before. If the way is truly blocked, it gives up after three tries and tells you.
+
 ## RS-855 - The Throne, Truly Yours
 
 - **You really sit on your throne now:** RS-854's seat only worked on the visit you took the castle. Come back another day and the throne ignored you, because the game only counted it as a throne the day its king fell. Your own throne now seats you on every visit.

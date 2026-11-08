@@ -19788,7 +19788,7 @@ function worldTeleport(key, free){
   let best = null;
   for (const [dx,dy] of [[1,1],[1,0],[0,1],[-1,1],[1,-1],[-1,0],[0,-1],[-1,-1]]){ const nx = px+dx, ny = py+dy; if (o3Passable(nx,ny) && skOwTile(nx,ny)!==OW_WATER){ best = [nx,ny]; break; } }
   if (!best) best = [px+1, py+1];
-  O3.path = []; O3.gatherAt = null;
+  O3.path = []; G.routeOn = false; O3.gatherAt = null;
   G.owPortal = { key, x:best[0], y:best[1], t:0 };
   logMsg('you trace the sign of the waypoint and a portal tears open beside you', 'magic'); sfx && sfx('spell');
   renderGame();
@@ -19838,7 +19838,7 @@ function o3DoorWalkStart(){
   else if (pit){ if (!(L0.z > 0.75 && Math.abs(L0.x) < 0.3)){ if (L0.z < 0.5) pts.push(W(L0.x < 0 ? -1.0 : 1.0, 0.9)); pts.push(W(0, 1.02)); } pts.push(W(0, 0.74)); }   /* (RS-652: to the head of the stair, where you look down it) */
   else if (!(L0.z > 0.6 && Math.abs(L0.x) < 0.3)){ if (L0.z < 0.3) pts.push(W(L0.x < 0 ? -1.0 : 1.0, 0.45)); pts.push(W(0, 1.04), W(0, 0.9)); }
   if (G.gather) skStop();
-  O3.path = []; O3.gatherAt = null; O3.chase = null;
+  O3.path = []; G.routeOn = false; O3.gatherAt = null; O3.chase = null;
   if (dw && dw.anim) dw.anim(0, 0);
   let fitS = 1; if (dw && dw.doorH && O3.pgrp){ O3.pgrp.scale.setScalar(1); O3.pgrp.updateMatrixWorld(true); const bb = new T.Box3().setFromObject((O3.player && O3.player.e && O3.player.e.holder) || O3.pgrp), h0 = bb.max.y - bb.min.y;   /* (the figure alone: the group also holds hidden things) */ if (h0 > 1e-3) fitS = Math.min(1, 0.86*dw.doorH*g.scale.x/h0); }   /* (RS-676: a door too low for you - you shrink to fit it on the way in) */
   O3.doorWalk = { g, pts, pit, dw, fitS, fig:1, inPts:dw ? dw.inPts.map(q=>W(q[0], q[1])) : pit ? [W(0, 0.22), W(0, -0.32)] : [W(0, 0.12)], leg:0, u:0, look:0, v:0, end:0, yaw:(O3.player && O3.player.yaw) || 0 };
@@ -22154,10 +22154,29 @@ function routeGo(){
   const steps = []; let px = G.owPos.x, py = G.owPos.y;
   for (const j of r.tiles){ const x = j%OW_COLS, y = (j/OW_COLS)|0; steps.push(owStepTo(px, py, x, y)); px = x; py = y; }   /* (RS-638: over a planet's edges too) */
   G.owZoomedOut = false; pinClose(); hideItemTooltip();
-  if (o3Active()){ O3.path = steps; O3.stepT = 0.05; O3.gatherAt = null; G.routeWalk = null; G.routeOn = true; G.graveOn = false; }
+  if (o3Active()){ O3.path = steps; O3.stepT = 0.05; O3.gatherAt = null; G.routeWalk = null; G.routeOn = true; G.graveOn = false; G.routeStuck = null; G.routeResumeAt = 0; }
   else G.routeWalk = { steps, next:0 };
   logMsg(`you set off along your route - ${steps.length} steps`, '');
   renderGame();
+}
+/* (RS-856) a route you set off on carries on until you stop it or reach its end. Its path is cleared by a lot of small things - the
+   ship stepping ashore at a landing (the sailing cleared the whole path there), bumping the coast a few times at sea, a step blocked on
+   land, a menu or a fight - and nothing took it up again, so the boat sat still and the walk never started on the shore. Now, with the
+   route still on and its path run out short of the last stop, you set off again from where you are after a moment. Steering yourself,
+   the route button, a key, a teleport, a ferry or a door turn it off for good. Three tries from the same tile and it gives up */
+function routeResumeTick(now){
+  const p = G.player, rt = p && p.route;
+  if (!rt || !rt.pts || !rt.pts.length || G.gameOver){ G.routeOn = false; G.routeResumeAt = 0; return; }
+  if (G.gameMode!==0 || G.ui!=='playing' || !o3Active() || G.owZoomedOut || G.gather || (O3.path && O3.path.length) || O3.chase!=null){ G.routeResumeAt = 0; return; }
+  if (seaOn() && seaState().v > 0.05) return;   /* (let her come to a stop first) */
+  if (!G.routeResumeAt){ G.routeResumeAt = now + 600; return; }
+  if (now < G.routeResumeAt) return; G.routeResumeAt = 0;
+  const here = G.owPos.x + ',' + G.owPos.y, st = G.routeStuck && G.routeStuck.at===here ? G.routeStuck : (G.routeStuck = { at:here, n:0 });
+  if (++st.n > 3){ G.routeOn = false; G.routeStuck = null; notify('Your route is blocked here - tap the route button to try again', 'warn'); logMsg('your route is blocked here - tap the route button to try again', ''); return; }
+  routeInfo.c = null; const r = routeInfo(); if (!r || !r.steps){ G.routeOn = false; notify("Your route can't go on from here", 'warn'); return; }
+  const steps = []; let px = G.owPos.x, py = G.owPos.y;
+  for (const j of r.tiles){ const x = j%OW_COLS, y = (j/OW_COLS)|0; steps.push(owStepTo(px, py, x, y)); px = x; py = y; }
+  O3.path = steps; O3.stepT = 0.05; O3.gatherAt = null;
 }
 // (the flat map walks the route one step at a time; the 3D land walks it as a click-walk path)
 function routeWalkTick(now){
@@ -24788,7 +24807,7 @@ function ferryRoute(from, to){
 }
 function ferrySail(poi, to, f){
   const p = G.player, turns = Math.ceil(f.d/2);
-  if (typeof O3!=='undefined') O3.path = [];
+  if (typeof O3!=='undefined') O3.path = []; G.routeOn = false;
   if (!(typeof o3Active==='function' && o3Active())){ ferryLand(to, turns); return; }
   G.owFerry = { route:ferryRoute([G.owPos.x, G.owPos.y], to), i:0, acc:0, to, turns }; p.ferryTo = [to[0], to[1]];
   wevSay('the ferryman casts off - the boat slides out from the landing', 'new'); sfx && sfx('click');
@@ -25827,7 +25846,7 @@ function seaTick(dt, pp, PL){ const S = seaState();
       S.lastG = was; S.lastA = Math.atan2(lx - PL.x, lz - PL.y); O3.stepping = true; const keep = O3.path; O3.path = []; try{ moveDir(d[0], d[1]); } finally { O3.stepping = false; O3.path = keep; }
       if (G.ui!=='playing' || G.gameMode!==0){ O3.path = []; O3.gatherAt = null; O3.chase = null; S.v = 0; S.sail = 0; return true; }
       ok = G.owPos.x!==was[0] || G.owPos.y!==was[1];
-      if (ok){ pp.x = nx; pp.z = nz; if (!wet){ O3.path = []; S.v = 0; S.sail = 0; S.want = null; return false; } if (hasPath){ if (k >= 0) O3.path.splice(0, k + 1); else { const np = dest ? o3PathTo(dest.g[0], dest.g[1]) : null; O3.path = np || []; } if (!O3.path.length){ if (O3.chase!=null){ try{ o3ChaseStep(); }catch(e){} } else if (gat){ O3.gatherAt = null; o3GoGather(gat.x, gat.y); } } else if (O3.chase!=null){ try{ o3ChaseStep(); }catch(e){} } } S.bumps = 0; try{ seaSailedTile(); }catch(e){ console.error(e); } } }
+      if (ok){ pp.x = nx; pp.z = nz; if (!wet){ O3.path = hasPath && k >= 0 ? O3.path.slice(k + 1) : []; O3.stepT = 0.15; S.v = 0; S.sail = 0; S.want = null; return false; }   /* (RS-856: ashore, the rest of the way is walked - it was all thrown away) */ if (hasPath){ if (k >= 0) O3.path.splice(0, k + 1); else { const np = dest ? o3PathTo(dest.g[0], dest.g[1]) : null; O3.path = np || []; } if (!O3.path.length){ if (O3.chase!=null){ try{ o3ChaseStep(); }catch(e){} } else if (gat){ O3.gatherAt = null; o3GoGather(gat.x, gat.y); } } else if (O3.chase!=null){ try{ o3ChaseStep(); }catch(e){} } } S.bumps = 0; try{ seaSailedTile(); }catch(e){ console.error(e); } } }
     if (!ok){ S.v = 0; if (Math.abs(err) >= 0.35){ /* (still coming round: the order stands) */ } else if (hasPath && ++S.bumps > 3){ O3.path = []; O3.gatherAt = null; S.sail = 0; S.bumps = 0; } else if (!hasPath){ S.sail = 0; S.want = null; } } }
   else { pp.x = nx; pp.z = nz; }
   O3.boatYaw = S.yaw;
@@ -52241,7 +52260,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-855';
+const GAME_VERSION = 'rs-856';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -55107,7 +55126,7 @@ function keyDir(k){
 function handlePlayingKey(k){
   if (seaKey(k)) return;   /* (RS-802: the guns and the repair, which keep your course) */
   if (G.gameMode===3 && V3.path) V3.path = [];  // any key takes over from click-walking
-  if (G.gameMode===0 && O3.path) O3.path = [];
+  if (G.gameMode===0 && O3.path){ O3.path = []; G.routeOn = false; }
   G.routeWalk = null;   // ...and from walking a planned route
   if (fpHandleKey(k)) return; // first-person view: relative movement, turning, and M to flip views
   switch(k){
@@ -55656,6 +55675,7 @@ function frameLoop(ts){
   if (G.player && G.ui==='playing' && G.gameMode===0 && G.owPos && G.ow && G.ow.map){ const k = G.owPos.x+','+G.owPos.y+'|'+G.ow.seed;
     if (k!==frameLoop.op){ const prev = frameLoop.op; frameLoop.op = k; try{ travelTick(prev && prev.split('|')[1]===String(G.ow.seed) ? prev : null); wgOnStep(prev); }catch(e){ console.error(e); } } }
   if (G.routeWalk){ try{ routeWalkTick(performance.now()); }catch(e){ console.error(e); G.routeWalk = null; } }
+  if (G.routeOn){ try{ routeResumeTick(performance.now()); }catch(e){ console.error(e); } }   /* (RS-856) */
   if (G.player && G.gameMode===1){ try{ lightFloorTick(); }catch(e){} }
   if (G.player){
     // combat is turn-based: monsters only ever act in direct response to a
