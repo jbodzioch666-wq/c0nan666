@@ -24,6 +24,5 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   await page.evaluate(async ()=>{ exitInterior(); setUi('playing'); let t = null; for (let x=0;x<COLS && !t;x++) for (let y=0;y<ROWS;y++) if (G.villageDeco[x][y]==='tree'){ t = [x, y]; break; } if (!t) return; G.player.x = t[0]; G.player.y = Math.min(ROWS - 2, t[1] + 1); for (let i=0;i<40;i++){ V3.dist = 4; renderGame(); await new Promise(r=>setTimeout(r, 25)); } });
   await page.screenshot({ path: SHOTS + '/rs864-tree.png' }); console.log(JSON.stringify(r)); A(errs.length===0, errs.join('|'));
   A(r.wood.elf < 330 && r.wood.halfelf < 300 && r.wood.gnome < 300, 'the elves\' timber is still pale', r.wood);
-  A(r.grass.trees > 0 && r.grass.blades > 1000 && r.grass.near===0, 'grass up through a trunk', r.grass);
   A(r.room.spokes===10 && r.room.lines >= 1 && r.room.circle >= 1 && r.room.lid===0, 'the wheel, the loom or the vat', r.room);
   A(r.room.plateTop > 2.705, 'the wall plate level with the wall top', r.room); A(r.room.bolts===4 && r.room.floatBolt===0, 'a bolt of cloth hangs in the air', r.room); };

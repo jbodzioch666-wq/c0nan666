@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-865 - Whole Boughs
+
+- **No gaps in tree trunks.** Each length of a tree's trunk and boughs was an open tube, and where the next length bent away, a ring of gap showed the grass behind it. A rounded knuckle now closes every joint.
+- **The grass is back at the trees' feet.** RS-864 cleared the grass round each trunk; it grows right up to the bark again.
+
 ## RS-864 - The Weaver's Shop
 
 - **A real spinning wheel.** A sloping bench on three splayed legs, the great wheel with its rim, hub and ten spokes between two uprights, a treadle and footman to the crank, the drive band to the flyer, a bobbin of yarn and a distaff with wool.
