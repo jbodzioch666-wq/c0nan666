@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## RS-863 - Cloaks That Hang True
+
+- **No tabard poking through a gown.** An elven town's guards wear a gown, and their tabard was fitted to the chest underneath, showing in blue patches through it. A gown is worn without one now.
+- **Cloaks fall outside a gown's skirt.** A cloak is cut to the flare of a long skirt as well as the back, so it hangs over the skirt instead of straight down through it.
+- **Townsfolk walk at a steady pace.** They eased into each tile, surging and stalling with every step.
+- **Their cloaks hang and sway.** A townsman's cloak was dragged back at a slant as they walked, and a turn flung the hem out sideways like a flag. Now it trails a little and swings. Your own cloak still billows as before.
+- **Cloth moves on everyone near you.** Cloaks sway on townsfolk within about seven heights of you, up from three, so the ones a few steps away no longer hang stiff.
+- **Cloaks keep up at low frame rates.** At under twenty frames a second a cloak was left behind every frame. It now follows the real time between frames.
+
 ## RS-862 - Grain and Workbench
 
 - **Real wood grain everywhere.** The wood texture was a marbled swirl; now it's sawn timber, with fine straight grain, dark growth lines, knots and a shade for each plank. It runs along every beam, post, board and stake instead of across or around it, on gates, houses, fences and furniture.

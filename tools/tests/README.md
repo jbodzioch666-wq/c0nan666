@@ -195,6 +195,7 @@ Screenshots go to `tools/tests/shots/`.
 | `rs860` | `rs860` | the gate towers (hipped roof, no cone; boards and braces), a house's turned timbers, framed windows and board shutters, the cask and crate | |
 | `rs861` | `rs861` | the street lamp (turned post, scrolled arm, caged lantern), a city's walls (corbels, 32-sided towers), the ragged pines | |
 | `rs862` | `rs862` | the stations' parts are turned and round, the anvil, forge and carpenter's bench rebuilt, the wood grain is laid along each piece | |
+| `rs863` | `rs863` | no tabard under a gown, a cloak cut to a gown's skirt, townsfolk at a steady pace with cloaks that trail a little, not out like a flag | |
 | `rs789` | A shire's door stones and flags are dark: their average vertex colour stays low |
 | `rs788` | The open land has its older grass again: no blade chunks, RS-785's code gone |
 | `rs787` | A battle at a town: the card before and after, the banner's words, the trees told where you stand, no shader built by a fade, new creatures warmed off the frame |
