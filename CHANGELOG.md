@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## RS-862 - Grain and Workbench
+
+- **Real wood grain everywhere.** The wood texture was a marbled swirl; now it's sawn timber, with fine straight grain, dark growth lines, knots and a shade for each plank. It runs along every beam, post, board and stake instead of across or around it, on gates, houses, fences and furniture.
+- **The smith's anvil** is a shaped iron body with a step, a hardy hole and a tapering horn, set on an oak stump bound with iron, with a hammer on its face and tongs leaning on it.
+- **The forge** stands on a footing, with an arched stone mouth, a hood narrowing to a round flue, glowing coals on its hearth and bellows at its side.
+- **The carpenter's bench** has a heavy board top on legs with stretchers and a shelf, a wooden vice with its screw, a toothed saw, a mallet, a plane and curls of shavings.
+- **The tavern's street bench** has two seat boards on splayed trestle legs, a stretcher and a mug left on it.
+- **Every crafting station** has turned edges and truly round parts. The alchemist's cauldron has a rolled lip on curved legs, and the alchemist's phials sit on an open rack.
+
 ## RS-861 - Iron and Ashlar
 
 - **Street lamps:** a turned iron post on a stone plinth, with a collar, a scrolled arm, and a lantern in a cage of bars under a pointed cap. It was a pole with a box.

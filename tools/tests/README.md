@@ -194,6 +194,7 @@ Screenshots go to `tools/tests/shots/`.
 | `rs859` | `rs859` | a castle you hold: its tooltip (arms, realm, rents waiting, tax, garrison, works, next raid), the gold ring and shield on the map, your realm's towns; a real hover on the zoomed map | |
 | `rs860` | `rs860` | the gate towers (hipped roof, no cone; boards and braces), a house's turned timbers, framed windows and board shutters, the cask and crate | |
 | `rs861` | `rs861` | the street lamp (turned post, scrolled arm, caged lantern), a city's walls (corbels, 32-sided towers), the ragged pines | |
+| `rs862` | `rs862` | the stations' parts are turned and round, the anvil, forge and carpenter's bench rebuilt, the wood grain is laid along each piece | |
 | `rs789` | A shire's door stones and flags are dark: their average vertex colour stays low |
 | `rs788` | The open land has its older grass again: no blade chunks, RS-785's code gone |
 | `rs787` | A battle at a town: the card before and after, the banner's words, the trees told where you stand, no shader built by a fade, new creatures warmed off the frame |
