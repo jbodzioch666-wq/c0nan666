@@ -199,6 +199,7 @@ Screenshots go to `tools/tests/shots/`.
 | `rs864` | `rs864` | the tailor's wheel, loom, open dye vat and bolts on a table; wall plates proud of the wall; darker elven timber; no grass through a trunk | |
 | `rs865` | `rs865` | every bough's joint closed by a knuckle, no ring of gap at a bend | |
 | `rs866` | `rs866` | a crossbow upgrades at the anvil, and the ranged slot shows on the upgrade and enchanting lists | |
+| `rs867` | `rs867` | Rework with bars on the anvil's Work a piece tab, the Forge tab's upgrade list open | |
 | `rs789` | A shire's door stones and flags are dark: their average vertex colour stays low |
 | `rs788` | The open land has its older grass again: no blade chunks, RS-785's code gone |
 | `rs787` | A battle at a town: the card before and after, the banner's words, the trees told where you stand, no shader built by a fade, new creatures warmed off the frame |

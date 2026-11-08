@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-867 - Rework at the Anvil
+
+- **Rework with bars on the Work a piece tab.** Upgrading a smithed piece with bars of its own metal (up to +5, +6% to its bonuses each time) now has a button beside Masterwork and Smash. Lay the piece on the anvil and tap Rework. If you can't, it says why: level, bars, or the metal.
+- **The upgrade list starts open.** Under Forge from bars, the Upgrade your gear section was folded shut at the bottom and easy to miss.
+
 ## RS-866 - The Smithed Crossbow
 
 - **Crossbows can be upgraded at the anvil.** A crossbow is smithed from bars, so it now takes up to +5 with bars of its own metal, +6% to its bonuses each time. Every ranged weapon had been left out. Wooden bows still can't.
