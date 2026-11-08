@@ -11025,7 +11025,8 @@ function v3InteriorMats(key, mats){
   const fw = dim(race.wood, 1.25), pan = v3TexBoards(fw, { boards:8, joints:false, knots:0.25, size:512, seed:41 });
   m.panel = std({ map:v3TexRep(pan.map, 0.5), bumpMap:v3TexRep(pan.bump, 0.5), bumpScale:0.025, roughness:0.55 });
   const pl = v3TexBoards(dim(race.wood, 1.45), { boards:4, joints:false, knots:0.3, size:512, seed:53 }); m.planks = std({ map:v3TexRep(pl.map, 1), bumpMap:v3TexRep(pl.bump, 1), bumpScale:0.02, roughness:0.55 });
-  const wd = v3TexBoards(fw, { boards:1, joints:false, gaps:false, knots:0.15, size:256, seed:61 }); m.wood = std({ map:v3TexRep(wd.map, 2), roughness:0.6 });
+  const wd = v3TexBoards(fw, { boards:1, joints:false, gaps:false, knots:0.15, size:256, seed:61 }); m.wood = std({ map:v3TexRep(wd.map, 2), bumpMap:v3TexRep(wd.bump, 2), bumpScale:0.012, roughness:0.52 });
+  m.woodDk = std({ map:v3TexRep(wd.map, 2), color:0x8a7c70, roughness:0.62 });   /* (RS-858: the backs of the cases, plinths and mouldings a shade darker) */
   V3_INT_TEX[ck] = m; return Object.assign({}, mats, m, { winGlass:glass });
 }
 // RS-857: the temple's stained glass - diamond quarries of amber, rose, sky and green round a gold sun, in dark lead cames
@@ -11041,6 +11042,82 @@ function v3TempleGlassTex(){ if (V3_INT_TEX.templeGlass) return V3_INT_TEX.templ
   x.fillStyle = '#20180f'; x.beginPath(); x.arc(m, m, S*0.115, 0, Math.PI*2); x.fill(); x.fillStyle = '#f0d070'; x.beginPath(); x.arc(m, m, S*0.095, 0, Math.PI*2); x.fill();
   x.strokeStyle = '#20180f'; x.lineWidth = 6; x.strokeRect(3, 3, S - 6, S - 6);
   return V3_INT_TEX.templeGlass = v3CanvasTex(c); }
+// RS-858: furniture with turned edges - a box whose edges and corners are rounded off (r), so the light catches every edge as on
+// real joinery; its geometry is kept per size, and its wood grain laid on in world units like any v3Box
+const V3_RB = {}, V3_FURN = {};
+function v3RBoxGeo(w, h, d, r){ const key = w + '|' + h + '|' + d + '|' + r; if (V3_RB[key]) return V3_RB[key];
+  const T = THREE, S = 5, seg = 2, H = [w/2, h/2, d/2]; r = Math.max(0.001, Math.min(r, H[0] - 1e-4, H[1] - 1e-4, H[2] - 1e-4));
+  const g = new T.BoxGeometry(1, 1, 1, S, S, S), P = g.attributes.position.array, N = g.attributes.normal.array, v = [0,0,0], q = [0,0,0], o = [0,0,0];
+  for (let i=0;i<P.length;i+=3){ for (let a=0;a<3;a++){ const k = Math.round((P[i+a] + 0.5)*S); v[a] = k <= seg ? -H[a] + r*k/seg : H[a] - r*(S - k)/seg; q[a] = Math.max(-(H[a] - r), Math.min(H[a] - r, v[a])); o[a] = v[a] - q[a]; }
+    const L = Math.hypot(o[0], o[1], o[2]) || 1; for (let a=0;a<3;a++){ P[i+a] = q[a] + o[a]/L*r; N[i+a] = o[a]/L; } }
+  v3WorldUV(g); g.userData.keep = true; return V3_RB[key] = g; }
+function v3RBox(w, h, d, r, mat, x, y, z){ const o = new THREE.Mesh(v3RBoxGeo(w, h, d, r), mat); if (x!==undefined) o.position.set(x, y, z); o.castShadow = o.receiveShadow = true; return o; }
+function v3FurnMat(k, col, o){ if (!V3_FURN[k]){ const T = THREE, m = new T.MeshStandardMaterial(Object.assign({ color:new T.Color(col).convertSRGBToLinear(), roughness:0.7 }, o)); m.userData.lin = true; V3_FURN[k] = m; } return V3_FURN[k]; }
+/* many small coloured boxes (books, their gilt bands) as one mesh in vertex colours: a full bookcase is one draw, not a hundred */
+function v3ColourMerge(parts){ const T = THREE, P = [], N = [], C = [], m4 = new T.Matrix4(), q = new T.Quaternion(), e = new T.Euler(), nm = new T.Matrix3(), v = new T.Vector3(), one = new T.Vector3(1, 1, 1);
+  for (const pt of parts){ const g = pt.g.index ? pt.g.toNonIndexed() : pt.g, gp = g.attributes.position, gn = g.attributes.normal, c = new T.Color(pt.c).convertSRGBToLinear();
+    e.set(pt.rx||0, pt.ry||0, pt.rz||0); q.setFromEuler(e); m4.compose(new T.Vector3(pt.x, pt.y, pt.z), q, one); nm.getNormalMatrix(m4);
+    for (let i=0;i<gp.count;i++){ v.fromBufferAttribute(gp, i).applyMatrix4(m4); P.push(v.x, v.y, v.z); v.fromBufferAttribute(gn, i).applyMatrix3(nm).normalize(); N.push(v.x, v.y, v.z); C.push(c.r, c.g, c.b); } }
+  const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(P, 3)); g.setAttribute('normal', new T.Float32BufferAttribute(N, 3)); g.setAttribute('color', new T.Float32BufferAttribute(C, 3)); return g; }
+/* an open case against a wall, its back at z = -d/2 in its own frame: plinth, sides, a panelled back, shelves with a lip, a moulded top.
+   Returns { g, shelves:[[y, gap]...], iw, d } - fill it with v3CaseBooks or by hand */
+function v3Case(grp, mats, x, z, w, h, d, rot, n){ const T = THREE, g = new T.Group(); g.position.set(x, 0, z); if (rot) g.rotation.y = rot; grp.add(g);
+  const W = mats.wood, Dk = mats.woodDk || mats.wood, add = o=>{ g.add(o); return o; }, st = 0.045, iw = w - 2*st, base = 0.11;
+  add(v3RBox(w - 0.02, base, d - 0.03, 0.012, Dk, 0, base/2, 0.005));
+  for (const sx of [-1, 1]) add(v3RBox(st, h - 0.02, d, 0.012, W, sx*(w/2 - st/2), (h - 0.02)/2, 0));
+  add(v3RBox(iw + 0.01, h - base - 0.06, 0.02, 0.004, Dk, 0, base + (h - base - 0.06)/2, -d/2 + 0.012));
+  add(v3RBox(w + 0.03, 0.035, d + 0.03, 0.012, W, 0, h - 0.0175, 0.008)); add(v3RBox(w + 0.09, 0.04, d + 0.06, 0.018, W, 0, h + 0.02, 0.02));
+  add(v3RBox(w + 0.05, 0.03, 0.03, 0.012, Dk, 0, h - 0.05, d/2 + 0.012));
+  const shelves = [], top = h - 0.06; n = n || Math.max(2, Math.round((top - base)/0.42)); const step = (top - base)/n;
+  for (let i=0;i<n;i++){ const y = base + i*step; if (i > 0){ add(v3RBox(iw, 0.03, d - 0.03, 0.006, W, 0, y, 0)); add(v3RBox(iw, 0.045, 0.022, 0.008, W, 0, y + 0.005, d/2 - 0.012)); } shelves.push([y + (i > 0 ? 0.015 : 0), step - (i > 0 ? 0.015 : 0)]); }
+  return { g, shelves, iw, d }; }
+/* books on a case's shelves: bound in leather of many colours, gilt bands on some spines, a gap, a book leaning, a short stack lying flat */
+function v3CaseBooks(cs, seed){ const T = THREE, parts = []; let a = ((seed|0)*2654435761 >>> 0) || 7; const rnd = ()=>{ a ^= a << 13; a >>>= 0; a ^= a >>> 17; a ^= a << 5; a >>>= 0; return a/4294967296; };
+  const COL = ['#6a1e18','#7a2a20','#2a3e5e','#24402a','#5a3a1e','#3a2a40','#8a6a30','#4a1a24','#1e2a24','#6a4a2a','#2e2418','#5e5a48'], GOLD = '#c8a048';
+  const bx = (w, h, d)=>new T.BoxGeometry(w, h, d);
+  for (const [y0, gap] of cs.shelves){ let x = -cs.iw/2 + 0.012; const xe = cs.iw/2 - 0.012, zb = -cs.d/2 + 0.03;
+    while (x < xe - 0.03){ const r = rnd();
+      if (r < 0.07){ x += 0.04 + rnd()*0.08; continue; }
+      if (r < 0.14 && xe - x > 0.2){ let yy = y0; const w0 = 0.15 + rnd()*0.05, nk = 2 + (rnd()*2|0); for (let k=0;k<nk;k++){ const t = 0.03 + rnd()*0.02; parts.push({ g:bx(w0 - k*0.01, t, cs.d*0.62), c:COL[rnd()*COL.length|0], x:x + w0/2, y:yy + t/2, z:zb + cs.d*0.31, ry:(rnd() - 0.5)*0.2 }); yy += t; } x += w0 + 0.02; continue; }
+      const bw = 0.028 + rnd()*0.04, bh = Math.min(gap - 0.03, gap*(0.6 + rnd()*0.3)), bd = cs.d*(0.6 + rnd()*0.22), c = COL[rnd()*COL.length|0], lean = (x + bw > xe - 0.07 && rnd() < 0.6) ? -0.32 : 0;
+      const cx = x + bw/2 + (lean ? bh*0.15 : 0), cy = y0 + (lean ? bh*0.47 : bh/2), zc = zb + bd/2;
+      parts.push({ g:bx(bw, bh, bd), c, x:cx, y:cy, z:zc, rz:lean });
+      if (rnd() < 0.55) for (const f of [0.18, 0.8]) parts.push({ g:bx(bw + 0.002, 0.008, 0.004), c:GOLD, x:cx - Math.sin(lean)*bh*(f - 0.5), y:cy + Math.cos(lean)*bh*(f - 0.5), z:zc + bd/2 + 0.001, rz:lean });
+      if (rnd() < 0.3) parts.push({ g:bx(bw*0.6, bh*0.16, 0.004), c:'#d8c89a', x:cx - Math.sin(lean)*bh*0.12, y:cy + Math.cos(lean)*bh*0.12, z:zc + bd/2 + 0.0015, rz:lean });
+      x += bw + 0.002 + (lean ? bh*0.35 : 0); if (lean) break; } }
+  const m = new T.Mesh(v3ColourMerge(parts), v3FurnMat('books', '#ffffff', { vertexColors:true, roughness:0.68 })); m.castShadow = m.receiveShadow = true; cs.g.add(m); return m; }
+/* the counter: a panelled front in stiles and rails, raised panels, a plinth, a moulding and an overhanging top with a rounded edge;
+   on it an open ledger, an inkwell and quill, and a candle in a brass stick. Its front (the customer's side) faces +z */
+function v3Counter(grp, mats, cx, cz, w, h, d){ const T = THREE, g = new T.Group(); g.position.set(cx, 0, cz); grp.add(g);
+  const W = mats.wood, Dk = mats.woodDk || mats.wood, Pl = mats.planks || W, add = o=>{ g.add(o); return o; }, base = 0.1, top = 0.06, bh = h - base - top;
+  add(v3RBox(w - 0.08, base, d - 0.08, 0.01, Dk, 0, base/2, 0));
+  add(v3RBox(w - 0.04, bh, d - 0.04, 0.01, W, 0, base + bh/2, 0));
+  add(v3RBox(w + 0.14, top, d + 0.14, 0.024, Pl, 0, h - top/2, 0)); add(v3RBox(w + 0.04, 0.035, d + 0.04, 0.015, Dk, 0, h - top - 0.0175, 0));
+  const face = (len, cnt, put)=>{ const sw = 0.07, pw = (len - sw*(cnt + 1))/cnt;
+    for (let i=0;i<=cnt;i++) put(v3RBox(sw, bh - 0.02, 0.035, 0.01, W), -len/2 + sw/2 + i*(pw + sw), base + bh/2);
+    for (const yy of [base + 0.045, h - top - 0.07]) put(v3RBox(len, 0.07, 0.035, 0.01, W), 0, yy);
+    for (let i=0;i<cnt;i++){ const px = -len/2 + sw + pw/2 + i*(pw + sw), ph = bh - 0.2; put(v3RBox(pw - 0.03, ph, 0.03, 0.018, Dk), px, base + 0.08 + ph/2); put(v3RBox(pw - 0.11, ph - 0.08, 0.034, 0.02, W), px, base + 0.08 + ph/2); } };
+  face(w - 0.04, Math.max(2, Math.round(w/1.0)), (o, x, y)=>{ o.position.set(x, y, d/2 - 0.005); add(o); });
+  for (const s of [-1, 1]) face(d - 0.04, 1, (o, x, y)=>{ o.position.set(s*(w/2 - 0.005), y, -x); o.rotation.y = Math.PI/2; add(o); });
+  const paper = v3FurnMat('paper', '#ece0c2', { roughness:0.9 }), leather = v3FurnMat('ledger', '#5a2418', { roughness:0.6 }), brass = v3FurnMat('brass', '#c8a050', { roughness:0.32, metalness:0.85 }), ink = v3FurnMat('ink', '#141018', { roughness:0.15 }), wax = v3FurnMat('wax', '#efe6cf', { roughness:0.55 }), quill = v3FurnMat('quill', '#f2efe6', { roughness:0.8, side:T.DoubleSide });
+  const ty = h, lx = -w*0.22; for (const s of [-1, 1]){ const c = add(v3RBox(0.2, 0.012, 0.28, 0.004, leather, lx + s*0.1, ty + 0.006, 0.04)); c.rotation.z = -s*0.04; const pg = add(v3RBox(0.185, 0.02, 0.26, 0.006, paper, lx + s*0.095, ty + 0.02, 0.04)); pg.rotation.z = -s*0.06; }
+  add(v3RBox(0.012, 0.022, 0.26, 0.004, leather, lx, ty + 0.012, 0.04));
+  const ix = lx + 0.3, put = (geo, m, x, y, z)=>{ const o = new T.Mesh(geo, m); o.position.set(x, y, z); return add(o); };
+  put(new T.CylinderGeometry(0.03, 0.04, 0.06, 24), ink, ix, ty + 0.03, -0.05); put(new T.CylinderGeometry(0.018, 0.024, 0.012, 20), brass, ix, ty + 0.066, -0.05);
+  const qs = new T.Shape(); qs.moveTo(0, 0); qs.quadraticCurveTo(0.03, 0.08, 0.008, 0.2); qs.quadraticCurveTo(-0.015, 0.1, 0, 0); const qm = put(new T.ShapeGeometry(qs, 12), quill, ix + 0.01, ty + 0.06, -0.05); qm.rotation.set(0, 0.6, -0.35);
+  const kx = w*0.32; put(new T.CylinderGeometry(0.06, 0.07, 0.015, 28), brass, kx, ty + 0.008, -0.08); put(new T.CylinderGeometry(0.012, 0.016, 0.07, 16), brass, kx, ty + 0.05, -0.08);
+  put(new T.CylinderGeometry(0.018, 0.018, 0.12, 16), wax, kx, ty + 0.145, -0.08);
+  g.traverse(o=>{ if (o.isMesh){ o.castShadow = o.receiveShadow = true; } }); return g; }
+/* a window in a back wall at (wx, cy) on the wall face z0: a moulded frame, a lintel over it (stone in a stone room), a sill on brackets,
+   slim glazing bars. The pane itself is laid by the caller */
+function v3WindowFrame(grp, mats, wx, cy, z0, stone){ const W = mats.wood, add = o=>{ grp.add(o); return o; }, half = 0.49, fr = 0.085, fd = 0.13;
+  for (const s of [-1, 1]) add(v3RBox(fr, 2*half + fr, fd, 0.018, W, wx + s*half, cy, z0 + fd/2 - 0.01));
+  for (const s of [-1, 1]) add(v3RBox(2*half + fr, fr, fd, 0.018, W, wx, cy + s*half, z0 + fd/2 - 0.01));
+  for (const s of [-1, 1]) add(v3RBox(0.024, 2*half + fr + 0.05, 0.03, 0.008, W, wx + s*(half + fr/2 + 0.012), cy, z0 + 0.012));
+  add(v3RBox(0.036, 2*half, 0.05, 0.01, W, wx, cy, z0 + 0.07)); add(v3RBox(2*half, 0.036, 0.05, 0.01, W, wx, cy, z0 + 0.07));
+  const L = stone && mats.stone ? mats.stone : W; add(v3RBox(2*half + 0.36, 0.14, fd + 0.05, 0.02, L, wx, cy + half + fr/2 + 0.07, z0 + (fd + 0.05)/2 - 0.02));
+  add(v3RBox(2*half + 0.3, 0.055, 0.25, 0.022, W, wx, cy - half - fr/2 - 0.025, z0 + 0.115));
+  for (const s of [-1, 1]) add(v3RBox(0.06, 0.14, 0.12, 0.015, W, wx + s*(half - 0.05), cy - half - fr/2 - 0.12, z0 + 0.06)); }
 // a rug laid flat on the floor (long side along x when w > d)
 function v3Rug(grp, x, z, w, d, tex){ const T = THREE, long = w > d, g = new T.PlaneGeometry(long ? d : w, long ? w : d), m = new T.Mesh(g, new T.MeshStandardMaterial({ map:tex.map, roughness:0.97 }));
   m.rotation.set(-Math.PI/2, 0, long ? Math.PI/2 : 0); m.position.set(x, 0.012, z); m.receiveShadow = true; grp.add(m); return m; }
@@ -11158,9 +11235,15 @@ function v3BuildInterior(grp, mats){
   grp.add(v3Box(fw+1, H, 0.3, wallM, ROOM.x0+fw/2-0.5, H/2, ROOM.y0-0.15));
   grp.add(v3Box(0.3, H, fd+1, wallM, ROOM.x0-0.15, H/2, ROOM.y0+fd/2-0.5));
   /* (RS-386) the posts stop just short of the wall top - level with it, the two tops fought and flickered - and the corner has one post, not two overlapping */
-  for (let x=ROOM.x0; x<=ROOM.x1+1; x+=3) grp.add(v3Box(0.14, H-0.015, 0.14, mats.wood, x-0.05, (H-0.015)/2, ROOM.y0-0.02));
-  for (let y=ROOM.y0+3; y<=ROOM.y1+1; y+=3) grp.add(v3Box(0.14, H-0.015, 0.14, mats.wood, ROOM.x0-0.02, (H-0.015)/2, y-0.05));
-  grp.add(v3Box(fw+1, 0.16, 0.2, mats.wood, ROOM.x0+fw/2-0.5, H-0.1, ROOM.y0));
+  /* (RS-858) the timber frame: posts with turned edges on a plinth block under a capital, braced to the wall plate by knee braces (none
+     over a window), and a wall plate along both back walls */
+  const winX = [ROOM.x0+2.5, ROOM.x1-1.5], PH0 = H - 0.17;
+  const post = (px, pz, alongX)=>{ grp.add(v3RBox(0.15, PH0, 0.15, 0.025, mats.wood, px, PH0/2, pz)); grp.add(v3RBox(0.21, 0.14, 0.21, 0.02, mats.woodDk || mats.wood, px, 0.07, pz)); grp.add(v3RBox(0.2, 0.07, 0.2, 0.018, mats.wood, px, PH0 - 0.035, pz));
+    for (const s of [-1, 1]){ const bx = alongX ? px + s*0.32 : px, bz = alongX ? pz : pz + s*0.32; if (alongX && winX.some(w=>Math.abs(bx - w) < 0.85)) continue; if (alongX ? (bx < ROOM.x0 - 0.3 || bx > ROOM.x1 + 1.3) : (bz < ROOM.y0 - 0.3 || bz > ROOM.y1 + 1.3)) continue;
+      const b = v3RBox(0.085, 0.56, 0.085, 0.016, mats.wood, bx, PH0 - 0.2, bz); if (alongX) b.rotation.z = -s*Math.PI/4; else b.rotation.x = s*Math.PI/4; grp.add(b); } };
+  for (let x=ROOM.x0; x<=ROOM.x1+1; x+=3) post(x-0.05, ROOM.y0-0.02 + 0.03, true);
+  for (let y=ROOM.y0+3; y<=ROOM.y1+1; y+=3) post(ROOM.x0-0.02 + 0.03, y-0.05, false);
+  grp.add(v3RBox(fw+1, 0.17, 0.22, 0.03, mats.wood, ROOM.x0+fw/2-0.5, H-0.085, ROOM.y0+0.01)); grp.add(v3RBox(0.22, 0.17, fd+1, 0.03, mats.wood, ROOM.x0+0.01, H-0.085, ROOM.y0+fd/2-0.5));
   // panelling to waist height on plastered walls, with a rail along the top; a skirting board on stone ones
   if (!stoneRoom){ const ph = 0.95;
     grp.add(v3Box(fw+0.7, ph, 0.04, mats.panel, ROOM.x0+fw/2-0.35, ph/2, ROOM.y0+0.02)); grp.add(v3Box(0.04, ph, fd+0.7, mats.panel, ROOM.x0+0.02, ph/2, ROOM.y0+fd/2-0.35+0.35));
@@ -11169,9 +11252,7 @@ function v3BuildInterior(grp, mats){
   // windows: panes split by a cross of glazing bars, a deep sill, and daylight falling in
   V3.intWin = [];
   for (const wx of [ROOM.x0+2.5, ROOM.x1-1.5]){ const win = v3Box(0.9, 0.9, 0.06, mats.winGlass, wx, 1.7, ROOM.y0+0.02); grp.add(win);   /* (RS-857: the temple's too - it had the street's lamp glass, which glowed a hot violet at dawn and by day) */
-    grp.add(v3Box(0.06, 0.94, 0.1, mats.wood, wx, 1.7, ROOM.y0+0.06)); grp.add(v3Box(0.94, 0.06, 0.1, mats.wood, wx, 1.7, ROOM.y0+0.06));
-    for (const s of [-1,1]){ grp.add(v3Box(0.08, 1.02, 0.12, mats.wood, wx + s*0.49, 1.7, ROOM.y0+0.06)); grp.add(v3Box(1.06, 0.08, 0.12, mats.wood, wx, 1.7 + s*0.49, ROOM.y0+0.06)); }
-    grp.add(v3Box(1.16, 0.06, 0.22, mats.wood, wx, 1.2, ROOM.y0+0.1));
+    v3WindowFrame(grp, mats, wx, 1.7, ROOM.y0, stoneRoom);   /* (RS-858: a moulded frame, a lintel, a sill on brackets) */
     V3.intWin.push(...v3WindowLight(grp, wx, ROOM.y0)); }   /* (RS-390: always there, lit by the hour in v3WindowTick - dark at night) */
   V3.winGlass = mats.winGlass; v3WindowTick(true);
   // (RS-182) the cut-down front wall runs either side of a real doorway: an opening with its jambs and a stone threshold, a mat inside
@@ -11189,22 +11270,25 @@ function v3BuildInterior(grp, mats){
   { const RUG = { tavern:[10, 9.5, 4.4, 2.6, '#6a2a20','#2a2a38','#c89a48'], shop:[10, 9, 3.2, 2.0, '#2a4a6a','#5a2a20','#d8b060'], bank:[10, 9, 3.6, 2.2, '#2a3a5a','#1a1a24','#c8a040'], tailor:[10.5, 8.6, 2.6, 1.8, '#5a3a7a','#2a2030','#d8c890'], alch:[10, 9, 2.6, 1.8, '#2a5a3a','#3a2a1a','#c8b070'], temple:[10, 9, 2.0, 3.6, '#7a1a1a','#c8a040','#e8dcc0'], guild:[10, 9, 3.2, 2.0, '#3a2a5a','#1a1a24','#c8a040'] }[key];
     if (RUG) v3Rug(grp, RUG[0], RUG[1], RUG[2], RUG[3], v3TexRug(RUG[4], RUG[5], RUG[6], key.length)); }
   // the counter and shelves behind the vendor
-  if (!['house','tavern_up','cellar'].includes(key)){ grp.add(v3Box(3, 0.9, 0.7, mats.planks, 10.5, 0.45, 6.5)); grp.add(v3Box(3.1, 0.08, 0.78, mats.wood, 10.5, 0.93, 6.5));
+  if (!['house','tavern_up','cellar'].includes(key)){ v3Counter(grp, mats, 10.5, 6.5, 3, 0.96, 0.66);   /* (RS-858: a panelled counter, its ledger, ink and candle) */
     /* (RS-448) any part of the counter is the shop: click or tap it anywhere and you step up to it and are served (walking into it already did) */
     const vn = (G.villageNpcs||[]).find(n=>!n.free), hm = new T.MeshBasicMaterial({ visible:false });
     for (let cx=9; cx<=11; cx++){ const hb = new T.Mesh(new T.BoxGeometry(1, 1.1, 0.9), hm); hb.position.set(cx + 0.5, 0.55, 6.5); hb.userData.act = { kind:'tile', x:cx, y:6, label:vn ? vn.name : 'Counter' }; grp.add(hb); V3.hits.push(hb); } }
   const SHELF_X = key==='house' ? [] : [9.4, 11.3];   /* (RS-182: between the windows, not in front of them - and not in the house, whose back wall has its hearth and trophies) */
-  for (const sx of SHELF_X){ grp.add(v3Box(1.0, 1.9, 0.35, mats.wood, sx, 0.95, ROOM.y0+0.25)); for (let i=0;i<3;i++) grp.add(v3Box(0.92, 0.05, 0.36, mats.planks, sx, 0.5+i*0.55, ROOM.y0+0.27)); }
+  const CASES = SHELF_X.map(sx=>v3Case(grp, mats, sx, ROOM.y0+0.25, 1.0, 1.9, 0.36, 0, 4));   /* (RS-858: open cases - the jars stood inside a solid block and never showed) */
   const lin = c=>new T.Color(c).convertSRGBToLinear();
   const jar = (x,y,z,c)=>{ const m = new T.Mesh(new T.CylinderGeometry(0.06,0.07,0.18,8), new T.MeshStandardMaterial({ color:lin(c), roughness:0.3, emissive:lin(c), emissiveIntensity:0.15 })); m.position.set(x,y,z); grp.add(m); };
   const shelfCols = { smith:['#8a8a90','#6a5a4a','#c8a060'], alch:['#50e080','#e05050','#5080e0'], tavern:['#c89040','#6a4020','#e0d0a0'], shop:['#e0a020','#c03020','#40a030'], tailor:['#6a4ab0','#b08a5a','#e0e0d0'], house:['#c89a5a','#e0d0a0','#8a5a3a'], temple:['#e8e0c0','#d8b050','#c8a0ff'], guild:['#c04030','#4a5ac8','#3a8a3a'], tavern_up:['#c89040','#6a4020','#e0d0a0'], cellar:['#6a2a3a','#4a3a2a','#8a6a4a'] }[key] || ['#c89040','#6a4020','#e0d0a0'];
-  for (const sx of SHELF_X) for (let r=0;r<3;r++) for (let i=0;i<4;i++) jar(sx-0.33+i*0.22, 0.62+r*0.55, ROOM.y0+0.27, shelfCols[(i+r)%3]);
+  const bottle = (x,y,z,c)=>{ const pts = [[0,0],[0.05,0],[0.055,0.02],[0.055,0.13],[0.03,0.17],[0.016,0.2],[0.016,0.24],[0.02,0.25],[0,0.25]].map(([a,b])=>new T.Vector2(a,b)); const m = new T.Mesh(new T.LatheGeometry(pts, 20), new T.MeshStandardMaterial({ color:lin(c), roughness:0.12, metalness:0.1, transparent:true, opacity:0.82 })); m.position.set(x,y,z); m.castShadow = true; grp.add(m); };
+  CASES.forEach((cs, ci)=>{ const sx = SHELF_X[ci]; cs.shelves.forEach(([y, gap], r)=>{ if (r===0){ for (let i=0;i<2;i++) grp.add(v3RBox(0.36, 0.22, 0.26, 0.02, mats.woodDk || mats.wood, sx - 0.2 + i*0.4, y + 0.11, ROOM.y0+0.23)); return; }
+      if ((r + ci) % 3===2){ v3CaseBooks({ g:cs.g, shelves:[[y, gap]], iw:cs.iw, d:cs.d }, 31 + ci*7 + r); return; }
+      for (let i=0;i<4;i++){ const c = shelfCols[(i+r)%3], px = sx - 0.33 + i*0.22; if ((i + r) % 2) bottle(px, y, ROOM.y0+0.24, c); else jar(px, y + 0.09, ROOM.y0+0.24, c); } }); });
   // (RS-392) torches in iron sconces on the walls, not lanterns hung from the ceiling: one on the back wall between the shelves, one on the west wall, clear of what stands against it
   /* (RS-428) and on the open sides - midway along the east wall and near each end of the front one - a timber post rises out of the low
      wall with a torch in an iron sconce on its inner face, so the near half of the room isn't left dark (RS-429: posts and sconces, not
      standing torches) */
   { const PH = 1.8, PW = 0.18, ex = ROOM.x1 + 1.15, fz = ROOM.y1 + 1.15, midZ = ROOM.y0 + (ROOM.y1 - ROOM.y0 + 1)/2;
-    const post = (x, z)=>{ const p = v3Box(PW, PH, PW, mats.wood, x, PH/2, z); p.castShadow = true; grp.add(p); grp.add(v3Box(PW + 0.06, 0.06, PW + 0.06, mats.wood, x, PH + 0.03, z)); };
+    const post = (x, z)=>{ grp.add(v3RBox(PW, PH, PW, 0.025, mats.wood, x, PH/2, z)); grp.add(v3RBox(PW + 0.07, 0.07, PW + 0.07, 0.02, mats.wood, x, PH + 0.035, z)); grp.add(v3RBox(PW + 0.05, 0.12, PW + 0.05, 0.02, mats.woodDk || mats.wood, x, 0.6, z)); };   /* (RS-858: turned edges, a cap, a collar where it rises out of the low wall) */
     post(ex, midZ); v3Sconce(grp, mats, ex - PW/2, midZ, -Math.PI/2);
     for (const px of [ROOM.x0 + 0.5, ROOM.x1 + 0.5]){ if (px >= ROOM.door.x - 0.2 && px <= ROOM.door.x + 1.2) continue; post(px, fz); if (key==='tavern' && px < ROOM.x0 + 1) continue; v3Sconce(grp, mats, px, fz - PW/2, Math.PI); } }   /* (RS-656: the tavern's front-left post carries no torch - the hooded figure's corner is kept dim, a candle and a shadow (RS-383); RS-429's post sconce had lit it) */
   v3Sconce(grp, mats, ROOM.x0+5.35, ROOM.y0, 0); { const wz = (key==='tavern' ? [1.5, 3.45, 5.45] : [3.45, 5.45, 1.5]).map(d=>ROOM.y0+d).find(z=>!ROOM_LAYOUT[key].benches.some(([k, bx, by])=>bx===ROOM.x0 && Math.abs(by + 0.5 - z) < 0.9)); v3Sconce(grp, mats, ROOM.x0, wz==null ? ROOM.y0+1.5 : wz, Math.PI/2); }   /* (RS-656: in the tavern, up by the back wall - the far end from the hooded figure's corner) */
@@ -28258,17 +28342,22 @@ function townV3Bench(k, box, cyl, add, M, mats){
     for (const sx of [-0.26, 0.26]) box(0.04, 0.3, 0.04, mats.wood, sx, 0.12, -0.3);
     box(0.68, 0.04, 0.66, mats.planks, -0.72, 0.02, 0); for (const sz of [-0.2, 0.2]) box(0.62, 0.012, 0.06, mats.iron, -0.72, 0.045, sz);
     const ring = add(new T.Mesh(new T.TorusGeometry(0.06, 0.012, 6, 14), mats.iron)); ring.rotation.x = Math.PI/2; ring.position.set(-0.98, 0.048, 0); return true; }
-  if (k==='books'){ box(0.95, 1.8, 0.35, mats.wood, 0, 0.9, -0.3); for (let s=0;s<4;s++){ box(0.9, 0.04, 0.33, mats.planks, 0, 0.3 + s*0.42, -0.28);
-      for (let i=0;i<9;i++) box(0.07, 0.26 + ((i*7+s)%3)*0.04, 0.24, M(['#7a2a20','#2a4a7a','#3a6a2a','#8a6a2a','#5a2a6a'][(i+s)%5]), -0.38 + i*0.095, 0.45 + s*0.42, -0.28); } return true; }
+  if (k==='books'){ const cs = v3Case(add(new THREE.Group()), mats, 0, -0.3, 0.95, 1.8, 0.35, 0, 4); v3CaseBooks(cs, (townV3Bench.nb = (townV3Bench.nb||0) + 1)); return true; }   /* (RS-858: an open case of books - they stood inside a solid block) */
   /* (RS-183) seats sized to the people: the seat at knee height, the back up to the shoulder blades */
   if (k==='chair'){ box(0.32, 0.04, 0.3, mats.planks, 0, SEAT_H - 0.02, 0); box(0.3, 0.2, 0.03, mats.wood, 0, SEAT_H + 0.22, -0.135); for (const [sx,sz] of [[-0.13,-0.13],[0.13,-0.13],[-0.13,0.12],[0.13,0.12]]) box(0.035, SEAT_H - 0.04, 0.035, mats.wood, sx, (SEAT_H - 0.04)/2, sz);
     for (const sx of [-0.13, 0.13]) box(0.035, 0.36, 0.035, mats.wood, sx, SEAT_H + 0.16, -0.135); return true; }
-  if (k==='pew'){ box(0.9, 0.05, 0.3, mats.planks, 0, SEAT_H - 0.025, 0); box(0.9, 0.26, 0.04, mats.wood, 0, SEAT_H + 0.2, -0.13); for (const sx of [-0.42, 0.42]) box(0.05, SEAT_H + 0.38, 0.3, mats.wood, sx, (SEAT_H + 0.38)/2, 0); return true; }
+  if (k==='pew'){   /* (RS-858) shaped ends sweeping up to the back, a seat with a rounded nose, a back of two rails, a book rest behind */
+    if (!townV3Bench.pewEnd){ const T = THREE, sh = new T.Shape(), top = SEAT_H + 0.4; sh.moveTo(-0.17, 0); sh.lineTo(0.15, 0); sh.lineTo(0.15, top); sh.quadraticCurveTo(0.15, top + 0.05, 0.1, top + 0.05); sh.quadraticCurveTo(0.04, top + 0.04, 0.03, SEAT_H + 0.12); sh.quadraticCurveTo(0.0, SEAT_H + 0.06, -0.12, SEAT_H + 0.08); sh.quadraticCurveTo(-0.17, SEAT_H + 0.08, -0.17, SEAT_H); sh.lineTo(-0.17, 0.06); sh.lineTo(-0.13, 0.03); sh.lineTo(-0.13, 0); sh.lineTo(-0.17, 0);
+      const eg = new T.ExtrudeGeometry(sh, { depth:0.04, bevelEnabled:true, bevelThickness:0.008, bevelSize:0.008, bevelSegments:3, curveSegments:14 }); eg.translate(0, 0, -0.02); eg.computeVertexNormals(); townV3Bench.pewEnd = v3WorldUV(eg); }
+    for (const sx of [-0.43, 0.43]){ const e = add(new THREE.Mesh(townV3Bench.pewEnd, mats.wood)); e.rotation.y = Math.PI/2; e.position.set(sx, 0, 0); }
+    add(v3RBox(0.84, 0.045, 0.31, 0.016, mats.planks, 0, SEAT_H - 0.022, 0.01)); add(v3RBox(0.84, 0.05, 0.05, 0.02, mats.wood, 0, SEAT_H - 0.05, 0.14));
+    for (const [yy, hh] of [[SEAT_H + 0.17, 0.1], [SEAT_H + 0.33, 0.08]]){ const b = add(v3RBox(0.84, hh, 0.03, 0.012, mats.wood, 0, yy, -0.125 + (yy - SEAT_H)*0.06)); b.rotation.x = -0.1; }
+    add(v3RBox(0.84, 0.02, 0.09, 0.008, mats.wood, 0, SEAT_H + 0.37, -0.19)); return true; }
   if (k==='stool'){ cyl(0.15, 0.14, 0.04, 14, mats.planks, 0, SEAT_H - 0.02, 0); for (let i=0;i<3;i++){ const a = i*2.094 + 0.5, l = box(0.03, SEAT_H, 0.03, mats.wood, Math.cos(a)*0.1, SEAT_H/2 - 0.02, Math.sin(a)*0.1); l.rotation.set(Math.sin(a)*0.15, 0, -Math.cos(a)*0.15); } return true; }
   if (k==='table'){ cyl(0.42, 0.42, 0.05, 18, mats.planks, 0, 0.46, 0); cyl(0.06, 0.08, 0.44, 8, mats.wood, 0, 0.22, 0); cyl(0.22, 0.25, 0.03, 12, mats.wood, 0, 0.015, 0);
     cyl(0.04, 0.045, 0.09, 8, M('#8a8a90', { metalness:0.6, roughness:0.4 }), 0.14, 0.53, 0.06); cyl(0.035, 0.035, 0.012, 8, M('#e8d8a0'), 0.14, 0.573, 0.06);
     cyl(0.1, 0.1, 0.012, 12, M('#d8d0c0'), -0.12, 0.49, -0.1); return true; }
-  if (k==='shrine'){ box(0.6, 0.9, 0.4, mats.stone, 0, 0.45, -0.1); const s = box(0.08, 0.5, 0.08, M('#d8b050', { metalness:0.7, roughness:0.3 }), 0, 1.15, -0.1); box(0.3, 0.08, 0.08, M('#d8b050', { metalness:0.7, roughness:0.3 }), 0, 1.25, -0.1);
+  if (k==='shrine'){ add(v3RBox(0.7, 0.1, 0.48, 0.02, mats.stone, 0, 0.05, -0.1)); add(v3RBox(0.58, 0.72, 0.38, 0.025, mats.stone, 0, 0.46, -0.1)); add(v3RBox(0.68, 0.08, 0.46, 0.025, mats.stone, 0, 0.86, -0.1));   /* (RS-858: a plinth, a block and a capstone with turned edges) */ const s = box(0.08, 0.5, 0.08, M('#d8b050', { metalness:0.7, roughness:0.3 }), 0, 1.15, -0.1); box(0.3, 0.08, 0.08, M('#d8b050', { metalness:0.7, roughness:0.3 }), 0, 1.25, -0.1);
     for (const sx of [-0.2, 0.2]){ cyl(0.03, 0.03, 0.15, 6, M('#f4f0e0'), sx, 0.98, 0.05); } return true; }
   if (k==='crates'){ box(0.7, 0.5, 0.6, mats.planks, 0, 0.25, 0); box(0.5, 0.4, 0.45, mats.planks, 0.05, 0.7, 0.02); box(0.72, 0.05, 0.05, mats.wood, 0, 0.5, 0.31); return true; }
   if (k==='casks'){ const c = cyl(0.3, 0.3, 0.8, 14, mats.wood, 0, 0.35, 0); c.rotation.x = Math.PI/2; for (const z of [-0.3, 0.3]){ const r = cyl(0.31, 0.31, 0.05, 14, mats.iron, 0, 0.35, z); r.rotation.x = Math.PI/2; } box(0.8, 0.05, 0.5, mats.wood, 0, 0.03, 0); return true; }
@@ -52275,7 +52364,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-857';
+const GAME_VERSION = 'rs-858';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## RS-858 - The Joiner's Hand
+
+- **Open cases, full shelves:** the bookshelves and the cabinets behind the counters were solid blocks - their books and jars stood hidden inside them. They are open cases now, with a plinth, a panelled back, shelves with a lip and a moulded top, filled with leather-bound books (gilt bands, a gap, one leaning, a few lying flat), jars, bottles and boxes.
+- **A proper counter:** a panelled front of stiles, rails and raised panels on a plinth, under an overhanging top with a rounded edge; on it an open ledger, an inkwell and quill, and a candle in a brass stick.
+- **Windows with a frame:** a moulded frame and slim glazing bars, a lintel above (stone in stone rooms) and a sill on brackets.
+- **A timber frame:** the posts stand on plinth blocks under capitals, braced to a wall plate along both back walls; the torch posts have caps and collars.
+- **Pews and shrines:** pews have shaped ends sweeping up to the back, a rounded seat, back rails and a book rest; the shrine has a plinth and capstone.
+- **Turned edges:** every part has rounded edges so the light catches them like real joinery, and the wood has a grain you can see.
+
 ## RS-857 - Stained Glass and Stopping to Fish
 
 - **The temple's windows are stained glass:** a violet sheet had been laid over them since the towns were first built. It glowed the same at dawn, noon and midnight and stood taller than the frames, so it showed above them. The panes are now leaded glass - amber, rose, sky and green round a gold sun - lit by the hour like every other window: rose at dawn, bright by day, dark at night.
