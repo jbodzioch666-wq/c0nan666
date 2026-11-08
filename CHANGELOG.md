@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-866 - The Smithed Crossbow
+
+- **Crossbows can be upgraded at the anvil.** A crossbow is smithed from bars, so it now takes up to +5 with bars of its own metal, +6% to its bonuses each time. Every ranged weapon had been left out. Wooden bows still can't.
+- **Your drawn bow or crossbow shows at the smith.** The anvil's upgrade list and the enchanting and masterwork bench only looked at your melee and armour slots. The bow or crossbow in your ranged slot now shows on both, worn or in your bag.
+
 ## RS-865 - Whole Boughs
 
 - **No gaps in tree trunks.** Each length of a tree's trunk and boughs was an open tube, and where the next length bent away, a ring of gap showed the grass behind it. A rounded knuckle now closes every joint.
