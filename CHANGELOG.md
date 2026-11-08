@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## RS-861 - Iron and Ashlar
+
+- **Street lamps:** a turned iron post on a stone plinth, with a collar, a scrolled arm, and a lantern in a cage of bars under a pointed cap. It was a pole with a box.
+- **Banner poles:** a round pole on a stone foot, topped with a gilt ball and spike.
+- **City walls:** a battered footing, a string course, a parapet on a row of corbels, and merlons with turned edges.
+- **Corner towers:** round, on a footing, with a corbelled ring under a tall pointed roof and an iron finial.
+- **Gatehouse:** footings, string courses, a parapet ledge, merlons on every side, arrow slits, and voussoirs over the gate.
+- **Pines:** the tiers have ragged, drooping edges, each turned a little from the one below, instead of plain cones.
+
 ## RS-860 - Timber, Shingle and Stone
 
 - **Gate towers rebuilt:** squared oak posts on stone pads, crossed braces on three faces, a plank deck on joists, a parapet of separate boards with a rail, and corner posts under a proper hipped roof. Its shingles now run along the eaves - the old four-sided cone made them step round in rings. The roof has a soffit, fascia boards, caps along the hips and a turned finial.
