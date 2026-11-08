@@ -191,6 +191,7 @@ Screenshots go to `tools/tests/shots/`.
 | `rs856` | `rs856` | a route sailed to a stop inland lands and walks on to it; a path cleared at sea is taken up again; the route button's stop holds | |
 | `rs857` | `rs857` | the temple's panes are stained glass lit by the hour, with no violet sheet over them; fishing from the boat, a click on the water stops the fishing and sails you off | |
 | `rs858` | `rs858` | inside the buildings: no solid cabinet blocks, books and jars on open shelves, a ledger on the counter, framed windows, shaped pews, turned parts | |
+| `rs859` | `rs859` | a castle you hold: its tooltip (arms, realm, rents waiting, tax, garrison, works, next raid), the gold ring and shield on the map, your realm's towns; a real hover on the zoomed map | |
 | `rs789` | A shire's door stones and flags are dark: their average vertex colour stays low |
 | `rs788` | The open land has its older grass again: no blade chunks, RS-785's code gone |
 | `rs787` | A battle at a town: the card before and after, the banner's words, the trees told where you stand, no shader built by a fade, new creatures warmed off the frame |

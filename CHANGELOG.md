@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-859 - Lord of the Castle
+
+- **Your castle's tooltip is your own:** on the world map and in the 3D land, a castle you hold shows your shield and "Your Castle", the realm you rule from it, how many towns hail you, its rents a day and the gold waiting with the reeve (and where to collect it), the tax, the garrison and its gate, the works you've built, when the next raid is due, and your war if your wardens are in the field.
+- **Marked on the map:** every castle you hold has a gold ring, your shield above it and its realm's name beneath. Under a raid it keeps the red raid ring and countdown, still under your shield.
+- **Your towns say so:** a town of your realm says it is yours in its tooltip, on the map and in the land, with the rents its reeve is holding for you.
+- **The castle's name plate** in the land adds the realm it is the seat of and its wardens.
+
 ## RS-858 - The Joiner's Hand
 
 - **Open cases, full shelves:** the bookshelves and the cabinets behind the counters were solid blocks - their books and jars stood hidden inside them. They are open cases now, with a plinth, a panelled back, shelves with a lip and a moulded top, filled with leather-bound books (gilt bands, a gap, one leaning, a few lying flat), jars, bottles and boxes.
