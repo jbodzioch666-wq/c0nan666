@@ -1,5 +1,15 @@
 # Depthcrawl patch notes
 
+## RS-864 - The Weaver's Shop
+
+- **A real spinning wheel.** A sloping bench on three splayed legs, the great wheel with its rim, hub and ten spokes between two uprights, a treadle and footman to the crank, the drive band to the flyer, a bobbin of yarn and a distaff with wool.
+- **A real floor loom.** Tall back posts under a castle, two harness shafts hung on cords, a swinging beater with its reed, warp threads running to the woven cloth, the cloth and warp beams, treadles below, and a shuttle on the web.
+- **The dye vat is open.** It had a wooden lid hiding the dye. It's now a tub of staves with iron hoops and glossy dye below the rim.
+- **Bolts of cloth rest on a table.** At the tailor's they hung in the air. Now three lie on a trestle table and a fourth leans against it.
+- **No flicker along the tops of the walls.** The beam along the top of a room's back walls sat exactly level with the wall top and flickered; it now stands just proud of it.
+- **Darker timber for elves, half-elves and gnomes.** Their wood read as raw orange pine.
+- **No grass through tree trunks.** In towns with long grass, the grass now keeps clear of a tree's trunk, and the trunks are rounder.
+
 ## RS-863 - Cloaks That Hang True
 
 - **No tabard poking through a gown.** An elven town's guards wear a gown, and their tabard was fitted to the chest underneath, showing in blue patches through it. A gown is worn without one now.
