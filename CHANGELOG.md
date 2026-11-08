@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-857 - Stained Glass and Stopping to Fish
+
+- **The temple's windows are stained glass:** a violet sheet had been laid over them since the towns were first built. It glowed the same at dawn, noon and midnight and stood taller than the frames, so it showed above them. The panes are now leaded glass - amber, rose, sky and green round a gold sun - lit by the hour like every other window: rose at dawn, bright by day, dark at night.
+- **A click on the water stops your fishing:** fishing from your boat, the ship lies still, so the course you clicked was never sailed and you fished on. A click on the water or the ground now stops gathering and takes you there, at sea and on land.
+
 ## RS-856 - Routes That Keep Going
 
 - **Landing no longer ends your route:** when your ship reached the shore, the rest of the route was thrown away and you stood on the beach. Now you step ashore and walk on to your stop.

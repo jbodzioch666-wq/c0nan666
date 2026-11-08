@@ -189,6 +189,7 @@ Screenshots go to `tools/tests/shots/`.
 | `rs854` | `rs854` | a warden in the way steps aside; you sit on your own throne and rise when you step away; the steward stays open after each purchase | |
 | `rs855` | `rs855` | on a later visit to your castle a click on the throne from across the hall seats you; the hall's and the poles' banners are your arms | |
 | `rs856` | `rs856` | a route sailed to a stop inland lands and walks on to it; a path cleared at sea is taken up again; the route button's stop holds | |
+| `rs857` | `rs857` | the temple's panes are stained glass lit by the hour, with no violet sheet over them; fishing from the boat, a click on the water stops the fishing and sails you off | |
 | `rs789` | A shire's door stones and flags are dark: their average vertex colour stays low |
 | `rs788` | The open land has its older grass again: no blade chunks, RS-785's code gone |
 | `rs787` | A battle at a town: the card before and after, the banner's words, the trees told where you stand, no shader built by a fade, new creatures warmed off the frame |
