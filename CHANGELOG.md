@@ -1,5 +1,15 @@
 # Depthcrawl patch notes
 
+## RS-860 - Timber, Shingle and Stone
+
+- **Gate towers rebuilt:** squared oak posts on stone pads, crossed braces on three faces, a plank deck on joists, a parapet of separate boards with a rail, and corner posts under a proper hipped roof. Its shingles now run along the eaves - the old four-sided cone made them step round in rings. The roof has a soffit, fascia boards, caps along the hips and a turned finial.
+- **The gate:** each leaf is a row of separate boards with iron bands, under a rounded lintel with iron straps.
+- **Houses:** rounded timbers with stouter corner posts, the joist ends showing under a jettied floor, and a plinth with a coping.
+- **Windows:** a moulded frame, slim glazing bars, a lintel, and a sill on two brackets. The shutters are two boards and two battens, hung at the frame and swung open.
+- **Doors:** a dressed-stone surround (jambs on plinths, a lintel with a keystone), two steps, and a lantern in an iron cage on a bracket.
+- **Roofs:** a rounded ridge, barge boards up the gables and fascia boards along the eaves.
+- **Casks and crates:** a bellied cask with four hoops and a lid, and crates of boards inside a frame of battens.
+
 ## RS-859 - Lord of the Castle
 
 - **Your castle's tooltip is your own:** on the world map and in the 3D land, a castle you hold shows your shield and "Your Castle", the realm you rule from it, how many towns hail you, its rents a day and the gold waiting with the reeve (and where to collect it), the tax, the garrison and its gate, the works you've built, when the next raid is due, and your war if your wardens are in the field.

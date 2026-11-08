@@ -11,6 +11,10 @@ module.exports = async page=>{
     grp.traverse(o=>{ if (!o.isMesh || o.material!==mats.wood && o.material!==mats.planks) return; const rz = Math.abs(o.rotation.z) + Math.abs(o.rotation.x);
       if (rz > 0.3 && o.material===mats.wood){ for (const g of glass) if (Math.hypot(o.position.x - g.position.x, o.position.y - g.position.y, o.position.z - g.position.z) < 0.35) cross++; }
       if (o.material===mats.planks && Math.abs(o.rotation.y) > 0.2 && o.geometry.parameters && Math.abs(o.geometry.parameters.height - 0.46) < 0.01){ shut++; if (Math.abs(o.rotation.y) > 1.0) square++; } });
+    /* (RS-860) the shutters are boards on a hinge now: each group's face to its wall - flat to the wall it faces out, standing square it faces along it */
+    const sb = v3RBoxGeo(0.085, 0.48, 0.03, 0.01), cx = b.x0 + b.w/2, cz = b.y0 + b.h/2, seen = new Set();
+    grp.traverse(o=>{ if (!o.isMesh || o.geometry!==sb || seen.has(o.parent)) return; const g = o.parent; seen.add(g); shut++; const dx = g.position.x - cx, dz = g.position.z - cz, fn = Math.abs(dx/b.w) > Math.abs(dz/b.h) ? [Math.sign(dx), 0] : [0, Math.sign(dz)];
+      const nx = Math.sin(g.rotation.y), nz = Math.cos(g.rotation.y); if (Math.abs(nx*fn[0] + nz*fn[1]) < 0.5) square++; });
     return { race:G.villageRace, glass:glass.length, cross, shut, square }; });
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
