@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-873 - The Stranger Who Howls
+
+- **The werewolf is a man first:** met in the dungeon it walks as a ragged, bearded woodsman with yellow eyes, until you come within five steps in plain sight, or hurt it from afar.
+- **Then it changes:** it doubles over with a howl, fur bursts out and the model grows and shudders into the wolf over most of a second. The change takes its turn.
+- **A new werewolf model:** sculpted and hunched, a head taller than a man, with a wolf's head and snarling jaw, glowing slit eyes, long clawed arms, digitigrade legs, a jointed tail and strand fur over the mane, ruff, back and limbs.
+- **It fights like one:** it breathes and prowls on two legs and rakes you with its claws. The bestiary shows the wolf.
+
 ## RS-872 - A Castle to Your Size
 
 - **The castle is built to your scale:** it stands about 1.7 times bigger on the land, with a taller gatehouse and keep, so the gate's arch is taller than you and you walk in at your own height instead of shrinking at the door.

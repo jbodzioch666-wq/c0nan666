@@ -5,7 +5,7 @@ module.exports = async page=>{
   await page.evaluate(()=>{ M3D_SKIN = false; if (M3D.tpl) M3D.tpl.clear(); });   // (the parts as built, not merged into skinned meshes - this test looks at them one by one)
   const r = await page.evaluate(()=>{
     const out = {};
-    for (const nm of ['wolf', 'dire wolf', 'winter wolf', 'winter wolf alpha', 'jackal', 'hellhound', 'werewolf']){
+    for (const nm of ['wolf', 'dire wolf', 'winter wolf', 'winter wolf alpha', 'jackal', 'hellhound']){
       const e = m3dInstance({ nm }, m3dPortrait({ nm })), rig = e.rig;
       e.anim(rig, 0.7, 0, 0, 0, 0, e); e.holder.updateMatrixWorld(true);
       const box = new THREE.Box3().setFromObject(e.holder), jaw0 = rig.jaw.rotation.x, hx0 = rig.legs[0].up.rotation.x;
@@ -19,7 +19,7 @@ module.exports = async page=>{
     out.dog = !!dog.rig.wolf && dog.beast;
     return out; });
   const A = (c, m)=>{ if (!c) throw new Error(m+' :: '+JSON.stringify(r)); };
-  for (const nm of ['wolf', 'dire wolf', 'winter wolf', 'winter wolf alpha', 'jackal', 'hellhound', 'werewolf']){ const w = r[nm];
+  for (const nm of ['wolf', 'dire wolf', 'winter wolf', 'winter wolf alpha', 'jackal', 'hellhound']){ const w = r[nm];
     A(w.wolf && w.beast, nm+': uses the sculpted wolf, and still moves like a beast');
     A(w.legs===4 && w.fronts===2 && w.ears===2 && w.tail===4, nm+': four legs, two ears, a jointed tail');
     A(w.verts > 40000, nm+': high detail ('+w.verts+' vertices)');
