@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## RS-868 - Furnished Depths
+
+- **Chests made properly.** Every chest in the dungeons is now built the same careful way: grained oak boards on a plinth, a domed lid, studded iron bands, corner brackets, a hasp and padlock, and drop handles at the ends. That covers treasure chests, the iron strongbox, corrupt chests and the gold raid chest. Opened chests still swing their lids up.
+- **Barrels and crates.** Barrels are turned casks of sixteen staves with four iron hoops and a boarded lid. Crates are boarded boxes in a frame of battens, braced across each side.
+- **Stone and bone.** Rubble, fallen heaps and coal are lumpy, chipped stone instead of twelve-sided dice. Fallen columns are fluted with jagged broken ends. Skulls have a dome, deep sockets and a flat face. Long bones are knobbed at both ends, including the thousands in the catacomb walls.
+- **Brazier, altar, idol and shrine.** The brazier is an iron bowl with a rolled rim on three scrolled legs, heaped with glowing coals. The altar is moulded stone on a stepped plinth, with a glowing rune on its face and top and candles in brass dishes. The idol has a robed body, a crown and arms folded over a glowing orb. The shrine has an iron offering bowl.
+- **The rest of the furniture.** Weapon racks hold real spears, swords and axes. Benches stand on splayed trestle legs. Sacks are coarse weave, tied at the neck. Signs are planks nailed to a turned post. Banners are swallow-tailed and hang in folds on a pole with a gilt finial. Your headstone is arched, and the coins in a pile are milled.
+- **No slower to draw.** Each piece of furniture is merged into a few draws, so a furnished room costs about what it did.
+
 ## RS-867 - Rework at the Anvil
 
 - **Rework with bars on the Work a piece tab.** Upgrading a smithed piece with bars of its own metal (up to +5, +6% to its bonuses each time) now has a button beside Masterwork and Smash. Lay the piece on the anvil and tap Rework. If you can't, it says why: level, bars, or the metal.
