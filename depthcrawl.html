@@ -22492,23 +22492,18 @@ function pinSave(){
 function pinDelete(){ const e = G.pinEdit; if (!e) return; if (e.i>=0) pinsP().splice(e.i, 1); pinClose(); saveCurrentGame(); renderGame(); }
 function pinClose(){ G.pinEdit = null; const el = document.getElementById('pinEdit'); if (el){ el.style.display = 'none'; el.innerHTML = ''; } }
 // ---- planning a route ----
+/* (RS-876) a walk's path for the route planner, the way back to your gravestone and a click on the land: the cheapest way, not the
+   shortest - a step on the open sea costs OW_SEA_COST steps on land, so you go round by land wherever it can be done, and take the
+   boat only where there's no way on foot or the way round is very long. Frozen sea is ground */
+const OW_SEA_COST = 40;
+function owSeaTile(x, y){ return G.ow.map[x][y]===OW_WATER && !iceAt(x, y); }
 function owBfs(sx, sy, tx, ty){
   if (sx===tx && sy===ty) return [];
-  const W = OW_COLS, N = W*OW_ROWS, prev = new Int32Array(N).fill(-1), q = new Int32Array(N), s = sy*W+sx, goal = ty*W+tx;
-  let qh = 0, qt = 0; prev[s] = s; q[qt++] = s;
-  while (qh < qt){
-    const j = q[qh++]; if (j===goal) break;
-    const x = j%W, y = (j/W)|0;
-    for (let d=0; d<8; d++){
-      const nb = owNb(x, y, DIR8[d][0], DIR8[d][1]); if (!nb) continue; const nx = nb[0], ny = nb[1];   /* (RS-638: round a planet and over its faces' edges) */
-      const k = ny*W+nx; if (prev[k]>=0) continue;
-      if (!o3Passable(nx,ny) || !owDiagClear(x, y, DIR8[d][0], DIR8[d][1])) continue;
-      if (k!==goal && OW_SITE_TILES.includes(G.ow.map[nx][ny])) continue;   // stepping on a site enters it, so the path goes round
-      prev[k] = j; q[qt++] = k;
-    }
-  }
+  const W = OW_COLS, s0 = sy*W+sx, goal = ty*W+tx;
+  const cost = (x, y, n)=>!o3Passable(x, y) || (n!==goal && OW_SITE_TILES.includes(G.ow.map[x][y])) ? Infinity : owSeaTile(x, y) ? OW_SEA_COST : 1;   /* (stepping on a site enters it, so the path goes round) */
+  WG_DIJ_NB = true; let prev; try{ prev = wgDijkstra(s0, cost, new Set([goal]), (x, y, dx, dy)=>owDiagClear(x, y, dx, dy)).prev; } finally { WG_DIJ_NB = false; }   /* (RS-638: round a planet and over its faces' edges) */
   if (prev[goal]<0) return null;
-  const out = []; for (let c = goal; c!==s; c = prev[c]) out.push(c);
+  const out = []; for (let c = goal; c!==s0; c = prev[c]) out.push(c);
   return out.reverse();
 }
 function routeP(){ const p = G.player; if (!p.route || !Array.isArray(p.route.pts)) p.route = { pts:[] }; return p.route; }
@@ -25860,7 +25855,7 @@ let WG_DIJ_NB = false;   /* (RS-638: a route planned in play goes by the world's
 function wgRoutePath(sx, sy, tx, ty){
   if (sx===tx && sy===ty) return [];
   const W = OW_COLS, goal = ty*W+tx, src = sy*W+sx;
-  const cost = (x, y, n)=>{ if (!o3Passable(x, y)) return Infinity; if (n!==goal && OW_SITE_TILES.includes(G.ow.map[x][y])) return Infinity;
+  const cost = (x, y, n)=>{ if (!o3Passable(x, y)) return Infinity; if (n!==goal && OW_SITE_TILES.includes(G.ow.map[x][y])) return Infinity; if (owSeaTile(x, y)) return OW_SEA_COST;   /* (RS-876: by land wherever it can) */
     const k = wgRoadKind(x, y); return k===1 || k===2 || k===4 ? 1 : k===3 ? 3 : G.ow.map[x][y]===OW_RIVER ? 4 : 2.2; };
   WG_DIJ_NB = owIsPlanet(); let prev; try{ prev = wgDijkstra(src, cost, new Set([goal]), (x, y, dx, dy)=>owDiagClear(x, y, dx, dy)).prev; } finally { WG_DIJ_NB = false; }
   if (prev[goal] < 0) return null;
@@ -41995,36 +41990,20 @@ function o3GoGather(x, y){
 }
 const O3_STEP = 0.36;                // seconds per tile when you walk the overworld
 function o3Passable(x,y){ if (x<0||y<0||x>=OW_COLS||y>=OW_ROWS) return false; const t = G.ow.map[x][y]; if (t===OW_MOUNTAIN) return false; if ((t===OW_WATER || owSeaSite(x, y)) && (!G.player.hasBoat || owFresh(x, y)) && !iceAt(x,y)) return false; if (owLandmarkFoot(x, y)) return false; return true; }
-function o3PathTo(tx, ty){
-  if (owCube()) return o3PathToCube(tx, ty);   /* (RS-632) */
-  const sx = G.owPos.x, sy = G.owPos.y, key = (x,y)=>x+','+y, prev = new Map([[key(sx,sy), null]]), q = [[sx,sy]], lim = 60;
-  let end = null;
-  while (q.length && !end){
-    const [x,y] = q.shift();
-    for (const [dx,dy] of DIR8){
-      const nx = x+dx, ny = y+dy, k = key(nx,ny);
-      if (prev.has(k) || Math.abs(nx-sx)>lim || Math.abs(ny-sy)>lim || !o3Passable(nx,ny) || !diagClear(x, y, dx, dy, o3Passable)) continue;
-      // don't route THROUGH a site (stepping on one enters it) unless it's where you're going
-      const t = G.ow.map[nx][ny];
-      if (OW_SITE_TILES.includes(t) && !(nx===tx && ny===ty)) continue;
-      prev.set(k, [x,y]); if (nx===tx && ny===ty){ end = [nx,ny]; break; } q.push([nx,ny]);
-    }
-  }
-  if (!end) return null;
-  const steps = []; let c = end;
-  while (c && !(c[0]===sx && c[1]===sy)){ const p = prev.get(key(c[0],c[1])); steps.unshift([c[0]-p[0], c[1]-p[1]]); c = p; }
-  return steps;
-}
-function o3PathToCube(tx, ty){
-  const sx = G.owPos.x, sy = G.owPos.y, key = (x, y)=>x*4096 + y, prev = new Map([[key(sx, sy), null]]), q = [[sx, sy, 0]]; let end = null;
-  const ok = (x, y)=>o3Passable(x, y);
-  for (let h=0; h<q.length && !end; h++){ const [x, y, dep] = q[h]; if (dep >= 60) continue;
-    for (const [dx, dy] of DIR8){ const nb = owOff(x, y, dx, dy); if (!nb) continue; const [nx, ny] = nb, k = key(nx, ny); if (prev.has(k) || !ok(nx, ny)) continue;
-      if (dx && dy){ const a = owOff(x, y, dx, 0), b = owOff(x, y, 0, dy); if (!a || !b || !ok(a[0], a[1]) || !ok(b[0], b[1])) continue; }   /* (no cutting a corner past a wall) */
-      const t = G.ow.map[nx][ny]; if (OW_SITE_TILES.includes(t) && !(nx===tx && ny===ty)) continue;
-      prev.set(k, [x, y, dx, dy]); if (nx===tx && ny===ty){ end = [nx, ny]; break; } q.push([nx, ny, dep + 1]); } }
-  if (!end) return null; const steps = []; let c = end;
-  while (c && !(c[0]===sx && c[1]===sy)){ const p = prev.get(key(c[0], c[1])); steps.unshift([p[2], p[3]]); c = p; }
+function o3PathTo(tx, ty){   /* (RS-876: the cheapest way within sixty steps - by land before by sea, see OW_SEA_COST; a cube planet's edges by owOff, RS-632) */
+  const cube = owCube(), W = OW_COLS, sx = G.owPos.x, sy = G.owPos.y, src = sy*W + sx, goal = ty*W + tx;
+  const dist = new Map([[src, 0]]), prev = new Map([[src, null]]), dep = new Map([[src, 0]]), h = wgHeap(); h.push(src, 0);
+  while (h.size){ const [d, j] = h.pop(); if (d > dist.get(j)) continue; if (j===goal) break;
+    const x = j%W, y = (j/W)|0, dp = dep.get(j); if (dp >= 60) continue;
+    for (const [dx, dy] of DIR8){ let nx, ny; if (cube){ const nb = owOff(x, y, dx, dy); if (!nb) continue; nx = nb[0]; ny = nb[1]; } else { nx = x + dx; ny = y + dy; }
+      if (!o3Passable(nx, ny)) continue;
+      if (cube){ if (dx && dy){ const a = owOff(x, y, dx, 0), b = owOff(x, y, 0, dy); if (!a || !b || !o3Passable(a[0], a[1]) || !o3Passable(b[0], b[1])) continue; } }   /* (no cutting a corner past a wall) */
+      else if (!diagClear(x, y, dx, dy, o3Passable)) continue;
+      const n = ny*W + nx; if (n!==goal && OW_SITE_TILES.includes(G.ow.map[nx][ny])) continue;   /* (don't route THROUGH a site - stepping on one enters it) */
+      const nd = d + (owSeaTile(nx, ny) ? OW_SEA_COST : 1) + (dx && dy ? 0.001 : 0);
+      if (!dist.has(n) || nd < dist.get(n)){ dist.set(n, nd); prev.set(n, [j, dx, dy]); dep.set(n, dp + 1); h.push(n, nd); } } }
+  if (!prev.has(goal)) return null;
+  const steps = []; for (let c = goal; c!==src; ){ const p = prev.get(c); steps.unshift([p[1], p[2]]); c = p[0]; }
   return steps;
 }
 // a landmark: walk to the nearest ground at its foot (too far for one walk, and the map's route planner is suggested)
@@ -53180,7 +53159,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-875';
+const GAME_VERSION = 'rs-876';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

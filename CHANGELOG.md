@@ -1,5 +1,10 @@
 # Depthcrawl patch notes
 
+## RS-876 - Keep to the Land
+
+- **Auto-walks avoid the boat:** walking by clicking the land, following a planned route, walking back to your gravestone, chasing a roaming band or walking to a gathering spot now goes round by land wherever it can. Once you own a boat, the old paths cut straight across any bay or lake in the way.
+- **The sea is a last resort:** a step on open water counts as forty on land, so the walk only takes to the boat where there's no way on foot (an island) or the way round is very long. Frozen sea counts as land.
+
 ## RS-875 - Palms Down
 
 - **The werewolf's hands turned palm down:** it reached out with its palms up, as if begging. Now its hands hang palm down with the claws hooked forward, and it rakes down with them when it strikes.
