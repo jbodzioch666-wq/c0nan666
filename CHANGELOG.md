@@ -1,5 +1,16 @@
 # Depthcrawl patch notes
 
+## RS-870 - Five Chests
+
+- **Chests come in five looks.** Each treasure chest is one of:
+  - a banded oak chest with a domed lid;
+  - a dark strongbox under a flat lid, girdled and strapped in iron and studded with bosses;
+  - an ornate walnut chest on ball feet, with gilt mouldings, raised panels and a shield lock set with a red stone;
+  - a rustic chest of rough boards, with a plank lid and rope handles;
+  - a leather travelling trunk on wooden slats, with brass corners, a hipped lid and buckled straps.
+- **A chest keeps its look when opened.** The look comes from where the chest stands, so opening it shows the same chest with its lid up.
+- **Special chests stay recognisable.** The locked treasure-room chest is always the iron strongbox, and the raid's prize chest is the ornate one in gold. Corrupt chests keep their purple.
+
 ## RS-869 - Things on the Floor
 
 - **Dropped items in their own shapes.** Potions are round-bellied glass flasks with a cork and the draught glowing inside. Scrolls are rolled on turned rollers, tied and sealed. Wands are turned and banded with a cut gem at the tip. Rings and amulets are set with faceted stones.
