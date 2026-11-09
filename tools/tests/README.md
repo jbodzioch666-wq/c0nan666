@@ -206,6 +206,7 @@ Screenshots go to `tools/tests/shots/`.
 | `rs871` | The castle remade (no plain boxes or cones, merged stone), built to your size (RS-872: no shrinking at the gate, its footprint kept clear), its drawbridge lowering, portcullis rising and walk-in over the bridge; shots |
 | `rs873` | The werewolf walks as a man until you come within five steps in sight (or hurt it), then changes with a howl into the werewolf and grows into it; the bestiary shows the wolf; RS-874: its coat of fur shells (instanced, shader kept in each copy, light enough), a hit and a death; RS-875: palms down; shots |
 | `rs876` | An auto-walk keeps off the water: a click, the route planner and the plain route go round a lake by land with a boat in hand; to an island they still sail |
+| `rs877` | A werewolf falls as a ragdoll (a chain of its own joints, posed from its rig): down on the floor, nothing through it, not flung away; and no ferries on a new world (generator 33) or an old one |
 | `rs789` | A shire's door stones and flags are dark: their average vertex colour stays low |
 | `rs788` | The open land has its older grass again: no blade chunks, RS-785's code gone |
 | `rs787` | A battle at a town: the card before and after, the banner's words, the trees told where you stand, no shader built by a fade, new creatures warmed off the frame |
@@ -533,7 +534,6 @@ Screenshots go to `tools/tests/shots/`.
 | hooded | The Thieves' Guild quests come from a hooded figure in the tavern's corner, not the tavernkeeper |
 | bagmats | Herbs, forage, ores and materials show in the side window's bag and under the All tab |
 | dglight | Light carries half as far in dungeons (lantern, torches, fog, glows, narrower shafts); a blade swings in real time |
-| ferry | Taking a ferry sails you across the water in your boat to the far landing (no jump), unsteerable, same time cost |
 | qbpick | Clicking an empty quick-bar slot opens the bag in the side window showing only what can go on the bar; tapping one fills the slot |
 | thrall | A resurrected thrall stands beside you as a 3D ghost, skeleton or zombie and swings at the foe it strikes |
 | waitbtn | On a phone the d-pad's middle hourglass waits a turn in dungeons and fights (dimmed on the land) |

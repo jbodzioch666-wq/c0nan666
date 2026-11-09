@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-877 - Down Like a Wolf, No More Ferries
+
+- **The werewolf falls as a ragdoll:** killed, he no longer topples over stiff as a board. He drops as a body of joints, thrown by the blow, and sprawls limp on the floor: arms flung out, legs folding, head lolling.
+- **Ferries are gone:** the ferry landings and their crossings have been taken out. A landmass across the water is reached in your own boat.
+- **Older worlds keep their layout:** they lose their ferry landings, but every road, town and site stays where it was.
+
 ## RS-876 - Keep to the Land
 
 - **Auto-walks avoid the boat:** walking by clicking the land, following a planned route, walking back to your gravestone, chasing a roaming band or walking to a gathering spot now goes round by land wherever it can. Once you own a boat, the old paths cut straight across any bay or lake in the way.
