@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-869 - Things on the Floor
+
+- **Dropped items in their own shapes.** Potions are round-bellied glass flasks with a cork and the draught glowing inside. Scrolls are rolled on turned rollers, tied and sealed. Wands are turned and banded with a cut gem at the tip. Rings and amulets are set with faceted stones.
+- **Armour you can tell apart on the ground.** Metal helms have a riveted band and a nasal. Hoods and caps have soft crowns. Leg armour tapers to the knee. Gloves and gauntlets have fingers and a thumb. Plate shows as a breastplate with pauldrons, and cloth and leather tops lie folded with their sleeves.
+- **Cobwebs.** Webs are finer, with a spiral that sags between the spokes, and some have their spider sitting on them.
+- **Moss, puddles and drips.** Moss grows in ragged, speckled patches with cushions standing up off the stone. Puddles and wet spots have uneven edges, and the stone round a puddle is darkened wet.
+
 ## RS-868 - Furnished Depths
 
 - **Chests made properly.** Every chest in the dungeons is now built the same careful way: grained oak boards on a plinth, a domed lid, studded iron bands, corner brackets, a hasp and padlock, and drop handles at the ends. That covers treasure chests, the iron strongbox, corrupt chests and the gold raid chest. Opened chests still swing their lids up.
