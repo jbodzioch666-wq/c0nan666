@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-871 - The Drawbridge
+
+- **The castle on the land is rebuilt** in the old storybook style: pale stone curtain walls with merlons, slender round towers under tall blue witch-hat roofs with gold spikes and pennants, a round keep with its stair turret, lit windows and a hall, all ringed by a stone-banked moat.
+- **A gatehouse with a working entrance:** step onto a castle and you walk up to the moat, the drawbridge comes down on its chains and lands with a thud, the portcullis grinds up, and you cross the planks and go in under the arch. Behind you it all shuts again.
+- **Your realm's arms** still fly from the keep and hang on the new front wall when you hold the castle.
+
 ## RS-870 - Five Chests
 
 - **Chests come in five looks.** Each treasure chest is one of:
