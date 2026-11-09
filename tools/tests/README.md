@@ -204,7 +204,7 @@ Screenshots go to `tools/tests/shots/`.
 | `rs869` | `rs869` | Dropped items in their shapes, finer cobwebs with spiders, ragged moss and puddles; no old shapes left, a few draws each, item and deco shots | |
 | `rs870` | `rs870` | Chests in five looks picked by tile, the same look shut and opened, strongbox and raid chests fixed; shut and open shots | |
 | `rs871` | The castle remade (no plain boxes or cones, merged stone), built to your size (RS-872: no shrinking at the gate, its footprint kept clear), its drawbridge lowering, portcullis rising and walk-in over the bridge; shots |
-| `rs873` | The werewolf walks as a man until you come within five steps in sight (or hurt it), then changes with a howl into the sculpted, furred werewolf and grows into it; the bestiary shows the wolf; shots |
+| `rs873` | The werewolf walks as a man until you come within five steps in sight (or hurt it), then changes with a howl into the werewolf and grows into it; the bestiary shows the wolf; RS-874: its coat of fur shells (instanced, shader kept in each copy, light enough), a hit and a death; shots |
 | `rs789` | A shire's door stones and flags are dark: their average vertex colour stays low |
 | `rs788` | The open land has its older grass again: no blade chunks, RS-785's code gone |
 | `rs787` | A battle at a town: the card before and after, the banner's words, the trees told where you stand, no shader built by a fade, new creatures warmed off the frame |

@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-874 - A Proper Werewolf
+
+- **The werewolf remade from scratch:** the last one was a thin, near-hairless figure with a dog's head and a few stray tufts. The new one is a hulking, hunched beast, a head taller than a man, with a heaped-up hump of shoulders, a deep chest, heavy arms, a wolf's haunches and legs, and a bushy tail.
+- **Real fur:** the coat is drawn as a dozen layers of strands over the body, so it looks soft and thick: a long grizzled mane over the shoulders, a great ruff round the neck and throat, long fur off the backs of the forearms and calves, and short, sleek fur on the muzzle and belly. Darker at the roots, paler at the tips.
+- **A wolf's head, snarling:** a long muzzle wrinkled back from the teeth, bared gums and long fangs, a heavy scowling brow over sunken, glowing slit-pupilled eyes, tall swept-back ears, and a cheek ruff.
+- **It grows into the wolf from the moment you see it:** the change's growth now starts on the first frame the beast appears, so it never skips past.
+
 ## RS-873 - The Stranger Who Howls
 
 - **The werewolf is a man first:** met in the dungeon it walks as a ragged, bearded woodsman with yellow eyes, until you come within five steps in plain sight, or hurt it from afar.
