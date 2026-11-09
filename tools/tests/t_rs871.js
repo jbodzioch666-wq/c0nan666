@@ -1,6 +1,7 @@
 // RS-871: the castle on the land remade - pale walls with merlons, slender round towers under tall blue witch-hat roofs, a round keep
 // with its stair turret and hall, a moat all round and a gatehouse. Stepping onto it you walk up to the moat, the drawbridge comes down
 // on its chains (with a thud), the portcullis rises, and you walk over the bridge and in through the gate; behind you it shuts again.
+// RS-872: built to your size (x2.2), you go in under the arch at your own height, nothing grows in its moat.
 // No plain boxes or few-sided cylinders, the stone merged to a few draws. Shots: shots/rs871-shut.png, rs871-lowering.png, rs871-open.png
 module.exports = async page=>{
   page.setDefaultTimeout(0); const errs = []; page.on('pageerror', e=>errs.push(String(e).slice(0, 300)));
@@ -20,7 +21,7 @@ module.exports = async page=>{
     /* a camera on the gate for the shots */
     const shoot = async nm=>{ await fr(4); out.shots[nm] = O3.renderer.domElement.toDataURL('image/png'); };
     await shoot('shut');
-    moveDir(at.d[0], at.d[1]); out.walk = !!O3.doorWalk; let minX = 9, maxY = 0, shake = 0, onBridge = 0;
+    moveDir(at.d[0], at.d[1]); out.walk = !!O3.doorWalk; out.fit = O3.doorWalk ? +O3.doorWalk.fitS.toFixed(3) : null; out.scale = +g.scale.x.toFixed(2); out.near = o3NearCastle(C[0] + 1.3, C[1] + 0.2, 0) && !o3NearCastle(C[0] + 2.6, C[1], 0); let minX = 9, maxY = 0, shake = 0, onBridge = 0;
     const t0 = performance.now(); while (performance.now() - t0 < 20000 && G.gameMode===0){ await fr(1); const W = O3.doorWalk;
       if (bridge){ minX = Math.min(minX, Math.abs(bridge.rotation.x)); } if (pc) maxY = Math.max(maxY, pc.position.y); shake = Math.max(shake, O3.shake || 0);
       if (W && W.v > 0.05 && W.v < 0.5 && O3.ppos){ const L = g.worldToLocal(new THREE.Vector3(O3.ppos.x, g.position.y, O3.ppos.z)); if (L.z > 0.56 && L.z < 0.8){ onBridge = Math.max(onBridge, +(O3.ppos.y - g.position.y).toFixed(3)); out.dbg = [O3.ppos.y, g.position.y, O3.heightAt(O3.ppos.x, O3.ppos.z), L.x, L.z].map(v=>+v.toFixed(3)); } }
@@ -37,6 +38,8 @@ module.exports = async page=>{
   A(r.flag , 'the keep keeps its flag for the realm banner');
   A(r.raised < -1.5, 'the drawbridge is raised while you are away');
   A(r.walk, 'stepping onto it you walk up to the gate');
+  A(r.scale >= 2.1 && r.fit >= 0.999, 'RS-872: the castle is built to your size - you walk in under the gate without shrinking');
+  A(r.near, 'RS-872: its footprint reaches over the next tiles, and no further');
   A(r.minX < 0.06, 'the drawbridge comes down');
   A(r.maxY > 0.25, 'the portcullis rises');
   A(r.shake > 0.1, 'the bridge lands with a thud');

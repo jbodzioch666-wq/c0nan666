@@ -1,5 +1,11 @@
 # Depthcrawl patch notes
 
+## RS-872 - A Castle to Your Size
+
+- **The castle is built to your scale:** it stands about 1.7 times bigger on the land, with a taller gatehouse and keep, so the gate's arch is taller than you and you walk in at your own height instead of shrinking at the door.
+- **A longer drawbridge** spans the wider moat, and the portcullis lifts clear over your head.
+- **Room round it:** trees and bushes keep out of the moat, and arriving beside a castle you stand outside its banks.
+
 ## RS-871 - The Drawbridge
 
 - **The castle on the land is rebuilt** in the old storybook style: pale stone curtain walls with merlons, slender round towers under tall blue witch-hat roofs with gold spikes and pennants, a round keep with its stair turret, lit windows and a hall, all ringed by a stone-banked moat.
