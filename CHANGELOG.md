@@ -1,5 +1,9 @@
 # Depthcrawl patch notes
 
+## RS-875 - Palms Down
+
+- **The werewolf's hands turned palm down:** it reached out with its palms up, as if begging. Now its hands hang palm down with the claws hooked forward, and it rakes down with them when it strikes.
+
 ## RS-874 - A Proper Werewolf
 
 - **The werewolf remade from scratch:** the last one was a thin, near-hairless figure with a dog's head and a few stray tufts. The new one is a hulking, hunched beast, a head taller than a man, with a heaped-up hump of shoulders, a deep chest, heavy arms, a wolf's haunches and legs, and a bushy tail.

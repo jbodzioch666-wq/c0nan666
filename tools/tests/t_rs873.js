@@ -35,10 +35,12 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   /* (RS-874) the coat: shells over the skin, one instanced draw a part, and a hit, a death and its fall don't trip on them */
   const r4 = await page.evaluate(async ()=>{ const wait = ms=>new Promise(r=>setTimeout(r, ms)), w = G.mon[0], e = M3D.inst.get(w), out = { shells:0, shellTris:0 };
     e.holder.traverse(o=>{ if (o.isInstancedMesh && o.name==='furShell'){ out.shells++; out.shellTris += o.geometry.index.count/3*o.count; out.keep = !!o.material.onBeforeCompile && o.material.userData.special==='furShell'; } });
-    out.shellTris = Math.round(out.shellTris); e.flash = performance.now(); for (let i=0;i<4;i++){ renderGame(); await wait(30); }
+    out.shellTris = Math.round(out.shellTris);
+    /* (RS-875) its hands palm down, claws forward */ { const t = m3dInstance({ nm:'werewolf' }, m3dPortrait({ nm:'werewolf' })); t.anim(t.rig, 1, 0, 0, 0, 0, t); t.holder.updateMatrixWorld(true);
+      out.palms = t.rig.arms.map(A=>{ const M = new THREE.Matrix3().setFromMatrix4(A.hd.matrixWorld), v = new THREE.Vector3(0, 0, 1).applyMatrix3(M).normalize(); return +v.y.toFixed(2); }); } e.flash = performance.now(); for (let i=0;i<4;i++){ renderGame(); await wait(30); }
     w.alive = 0; m3dKill(w, { dmg:30, maxHp:60, kind:'melee' }); for (let i=0;i<40;i++){ renderGame(); await wait(30); } return out; });
   console.log(JSON.stringify(r4)); await page.screenshot({ path:SHOTS + '/rs873-dead.png' });
-  A(r4.shells >= 15 && r4.keep, 'a coat of shells, its shader kept in the copy', r4); A(r4.shellTris < 1500000, 'the shells kept light: ' + r4.shellTris, r4);
+  A(r4.palms.every(y=>y < -0.6), 'palms down', r4); A(r4.shells >= 15 && r4.keep, 'a coat of shells, its shader kept in the copy', r4); A(r4.shellTris < 1500000, 'the shells kept light: ' + r4.shellTris, r4);
   A(r.manPt && r.manModel, 'a werewolf met in the flesh walks as a man', r); A(r.bestiary, 'the bestiary shows the wolf', r);
   A(r2.stillMan, 'out of reach he is still a man', r2); A(r2.wolf && r2.at===4, 'within sight he changes, and stays where he was', r2); A(r2.said, 'the change is told', r2);
   A(r2.wolfModel, 'the model swaps to the werewolf', r2); A(r2.midScale < 0.97, 'he grows into it', r2);
