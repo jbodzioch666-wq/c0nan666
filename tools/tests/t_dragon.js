@@ -12,15 +12,15 @@ module.exports = async page=>{
       let verts = 0, mem = 0, teeth = 0; e.holder.traverse(x=>{ if (!x.isMesh) return; verts += x.geometry.attributes.position.count; if (x.material.userData.kind==='membrane') mem++; if (x.geometry.type==='ConeGeometry') teeth++; });
       e.anim(rig, 0.7, 0, 0, 1, 0, e); const bites = rig.jaw.rotation.x > jaw0 + 0.4;
       e.anim(rig, 0.7, 1, 0, 0, 0, e);
-      out[nm] = { dragon:!!rig.dragon, legs:rig.legs.length, flip:rig.legs.filter(L=>L.flip).length, heads:rig.necks.length, wings:(rig.wings||[]).length, mem, teeth, verts, bites, minY:+(box.min.y/(box.max.y - box.min.y)).toFixed(3) };
+      out[nm] = { drk:rig.drk||null, dragon:!!rig.dragon, legs:rig.legs.length, flip:rig.legs.filter(L=>L.flip).length, heads:rig.necks.length, wings:(rig.wings||[]).length, mem, teeth, verts, bites, minY:+(box.min.y/(box.max.y - box.min.y)).toFixed(3) };
     }
     return out; });
   const A = (c, m)=>{ if (!c) throw new Error(m+' :: '+JSON.stringify(r)); };
   for (const [nm, d] of Object.entries(r)){
-    A(d.dragon && d.verts > 60000 && d.verts < (d.heads > 1 ? 200000 : 130000), nm+': the high-detail dragon ('+d.verts+' vertices)');
-    A(d.teeth >= 28 && d.bites, nm+': a mouthful of teeth, and it bites');
+    A(d.dragon && d.verts > (d.drk ? 40000 : 60000) && d.verts < (d.heads > 1 ? 200000 : 130000), nm+': the high-detail dragon ('+d.verts+' vertices)');
+    A((d.drk || d.teeth >= 28) && d.bites, nm+': a mouthful of teeth, and it bites');   /* (RS-878: the new dragons' teeth are sculpted, not cones) */
     A(Math.abs(d.minY) < (d.flip ? 0.07 : 0.04), nm+': it stands on the ground (a swimmer paddles just above it)'); }
-  for (const nm of ['blue dragon','ancient dragon','black dragon wyrmling','forest wyrm','white dragon']) A(r[nm].wings===2 && r[nm].mem===2, nm+': two membrane wings');
+  for (const nm of ['blue dragon','ancient dragon','black dragon wyrmling','forest wyrm','white dragon']) A(r[nm].wings===2 && r[nm].mem >= 2, nm+': two membrane wings');   /* (RS-878: a wyvern's frill is webbed with membrane too) */
   A(r['blue dragon'].legs===4 && r.wyvern.legs===2 && r.wyvern.wings===2, 'a dragon on four legs, a wyvern on two');
   A(r['dragon turtle'].wings===0 && r.plesiosaurus.flip===4 && r.plesiosaurus.wings===0, 'a wingless turtle, a plesiosaurus with flippers');
   A(r['king black dragon'].heads===3 && r['blue dragon'].heads===1, 'the King Black Dragon has three heads');

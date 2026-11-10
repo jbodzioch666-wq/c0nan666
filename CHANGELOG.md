@@ -1,5 +1,17 @@
 # Depthcrawl patch notes
 
+## RS-878 - Here Be Dragons
+
+- **New dragons:** every dragon is remade from scratch in three designs, each with a skeleton of jointed parts, sculpted horns, teeth and claws, and bat wings of bone with a membrane scalloped between the fingers.
+- **The drake:** the red, black, blue and white dragons, their wyrmlings and ancients, and the greater forest wyrm. Four legs, a crowned and horned head, a crest of spines down the back and a spade at the tail's end. Ancients grow longer horns and spines, and pale dragons keep a pale back.
+- **The King Black Dragon:** the same drake with three necks and three heads, each one biting and breathing on its own.
+- **The wyvern:** the wyvern and the forest wyrm stand reared up on two great legs, with wings for arms, a long toothed snout under a webbed frill, and (on the wyvern) a barbed sting.
+- **The great wyrm:** a new mythic beast in the spirit of the old Hobbit cartoon's dragon. It is long and low like a great cat, with a whiskered, heavy-lidded face, a shaggy mane, tiger stripes and a tufted tail. It takes the ancient dragon's place among the mythic beasts.
+- **They move:** they walk, rear, bite, beat their wings and breathe on the new joints, and the dragon lair's wake-up scene uses them too.
+- **They fall as ragdolls:** a slain dragon drops as a body of joints with its wings folded along its flanks.
+- **Lighter:** about a third fewer triangles than the old dragons (a drake 139k against 207k, the king 249k against 342k, a wyvern 115k against 183k).
+- **Unchanged:** the hydra, the sea serpent and the dragon turtle keep their old models.
+
 ## RS-877 - Down Like a Wolf, No More Ferries
 
 - **The werewolf falls as a ragdoll:** killed, he no longer topples over stiff as a board. He drops as a body of joints, thrown by the blow, and sprawls limp on the floor: arms flung out, legs folding, head lolling.
