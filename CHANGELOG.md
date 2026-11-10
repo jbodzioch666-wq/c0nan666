@@ -1,5 +1,14 @@
 # Depthcrawl patch notes
 
+## RS-879 - Heads, Shells and Flippers
+
+- **The hydra remade:** the hydra and the hydra of the tides stand on four heavy legs, with five long necks fanned out wide. Each neck ends in its own horned head, and each head sways on its own.
+- **The dragon turtle remade:** a high domed shell of sculpted scutes, with growth rings, dark seams and spikes along its keel and rim. Under it are elephantine legs and a horned, bearded head on a long neck.
+- **The sea serpent remade:** the plesiosaurus has a smooth, streamlined body, four broad paddle flippers that row together, and a long, slender neck holding a small spotted head.
+- **On the dragon skeleton:** all three now walk, rear, bite and breathe on the jointed rig the dragons got in RS-878.
+- **They fall as ragdolls:** a slain dragon turtle goes over onto its shell with its legs in the air. A slain sea serpent sweeps its flippers back along its flanks as it rolls, so they no longer stab through the floor.
+- **Fixed:** the sea serpent's left and right flippers were posed mirror-wrong, one pair tilted up and the other down. The dragon turtle's ankles no longer poke through the ground.
+
 ## RS-878 - Here Be Dragons
 
 - **New dragons:** every dragon is remade from scratch in three designs, each with a skeleton of jointed parts, sculpted horns, teeth and claws, and bat wings of bone with a membrane scalloped between the fingers.

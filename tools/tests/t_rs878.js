@@ -6,7 +6,7 @@ const path = require('path'), SHOTS = path.join(__dirname, 'shots');
 module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.on('pageerror', e=>errs.push(String(e).slice(0, 300)));
   const A = (c, msg, r)=>{ if (!c) throw new Error('assert: ' + msg + ' ' + JSON.stringify(r || {})); };
   const r = await page.evaluate(()=>{ const T = THREE, out = { k:{} }, tris = root=>{ let n = 0; root.traverse(o=>{ if (o.isMesh && o.geometry){ const g = o.geometry; n += (g.index ? g.index.count : g.attributes.position.count)/3*(o.isInstancedMesh ? o.count : 1); } }); return Math.round(n); };
-    const want = { 'ancient dragon':'drake', 'blue dragon wyrmling':'drake', 'white dragon':'drake', 'king black dragon':'drake', 'greater forest wyrm':'drake', 'wyvern':'wyvern', 'forest wyrm':'wyvern', 'great wyrm':'wyrm', 'hydra':null, 'plesiosaurus':null, 'dragon turtle':null };
+    const want = { 'ancient dragon':'drake', 'blue dragon wyrmling':'drake', 'white dragon':'drake', 'king black dragon':'drake', 'greater forest wyrm':'drake', 'wyvern':'wyvern', 'forest wyrm':'wyvern', 'great wyrm':'wyrm', 'hydra':'hydra', 'plesiosaurus':'plesio', 'dragon turtle':'turtle' };   /* (RS-879: the last three remade too) */
     for (const nm in want){ const pt = m3dPortrait({ nm }); if (!pt){ out.k[nm] = { none:1 }; continue; } const e = m3dInstance({ nm }, pt), R = e.rig, k = out.k[nm] = { drk:R.drk||null, want:want[nm] };
       if (!R.drk) continue;
       k.necks = R.necks.length; k.tail = R.tailJ.length; k.legs = R.legs.length; k.wings = (R.wings||[]).length; k.skinned = 0; e.root.traverse(o=>{ if (o.isSkinnedMesh) k.skinned++; });
@@ -21,11 +21,11 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   console.log(JSON.stringify(r));
   for (const [nm, k] of Object.entries(r.k)){
     A(!k.none, nm + ' has a portrait', k); A(k.drk===k.want, nm + ' is built as ' + k.want, k); if (!k.drk) continue;
-    A(k.necks===(nm==='king black dragon' ? 3 : 1) && k.tail >= 8 && k.legs===(k.drk==='wyvern' ? 2 : 4) && k.wings===2, nm + ': necks, tail, legs and wings on its rig', k);
+    if (!/hydra|turtle|plesio/.test(k.drk)) A(k.necks===(nm==='king black dragon' ? 3 : 1) && k.tail >= 8 && k.legs===(k.drk==='wyvern' ? 2 : 4) && k.wings===2, nm + ': necks, tail, legs and wings on its rig', k);
     A(k.skinned > 0, nm + ' is skinned into a few meshes', k); A(k.bad===0, nm + ': no joint goes astray as it walks, rears, bites and breathes', k);
-    A(Math.abs(k.low) < 0.04, nm + ' stands on its feet, neither floating nor sunk', k);
-    if (k.old) A(k.tris < k.old*0.85, nm + ' is lighter than the old dragon', k);
-    A(k.tris < (nm==='king black dragon' ? 280000 : k.drk==='wyrm' ? 340000 : 160000), nm + ' within its triangle budget', k); }
+    A(Math.abs(k.low) < (k.drk==='plesio' ? 0.07 : 0.04), nm + ' stands on its feet, neither floating nor sunk (a swimmer paddles just above it)', k);
+    if (k.old && !/hydra|turtle|plesio/.test(k.drk)) A(k.tris < k.old*0.85, nm + ' is lighter than the old dragon', k);
+    A(k.tris < (nm==='king black dragon' || k.drk==='hydra' ? 280000 : k.drk==='wyrm' ? 340000 : 160000), nm + ' within its triangle budget', k); }
   A(r.mythic0==='great wyrm' && r.mythicKind==='great wyrm', 'the great wyrm is a mythic beast', r);
   /* a drake killed in a dungeon falls as a ragdoll */
   const r2 = await page.evaluate(async ()=>{ const wait = ms=>new Promise(r=>setTimeout(r, ms)); window.__corpseTime = 0; goToCharCreate(); ccBegin(); wgRegenerate(12345); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{}; G.player.hp = G.player.maxHp = 99999;

@@ -8,7 +8,7 @@ module.exports = async page=>{
     for (const nm of ['black dragon wyrmling','blue dragon','ancient dragon','wyvern','dragon turtle','plesiosaurus','king black dragon','forest wyrm','white dragon']){
       const e = m3dInstance({ nm }, m3dPortrait({ nm })), rig = e.rig;
       e.anim(rig, 0.7, 0, 0, 0, 0, e); e.holder.updateMatrixWorld(true);
-      const box = new THREE.Box3(); e.holder.traverse(x=>{ if (x.isMesh) box.expandByObject(x); }); const jaw0 = rig.jaw.rotation.x;
+      const box = new THREE.Box3(); e.holder.traverse(x=>{ if (x.isMesh) box.expandByObject(x, true); });   /* (each vertex where it is, not the turned boxes) */ const jaw0 = rig.jaw.rotation.x;
       let verts = 0, mem = 0, teeth = 0; e.holder.traverse(x=>{ if (!x.isMesh) return; verts += x.geometry.attributes.position.count; if (x.material.userData.kind==='membrane') mem++; if (x.geometry.type==='ConeGeometry') teeth++; });
       e.anim(rig, 0.7, 0, 0, 1, 0, e); const bites = rig.jaw.rotation.x > jaw0 + 0.4;
       e.anim(rig, 0.7, 1, 0, 0, 0, e);
