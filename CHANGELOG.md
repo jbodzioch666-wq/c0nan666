@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-881 - Painted Woods
+
+- **New trees across the open land:** the faceted green balls are gone. Oaks have broad crowns of soft, heaped leaf, darker in their folds and underneath and warm where the sun is on top, on flared trunks that fork into boughs reaching up into the leaves.
+- **Every kind remade:** birches stand on slim white trunks banded with dark marks. Pines have drooping, ragged tiers, and the cold lands' firs carry snow on every tier. Cypresses rise in a tall, twisting flame. Willows let their leaves hang in long, loose strands. Dead trees reach out crooked grey limbs.
+- **Bushes, rocks, cacti and reeds:** bushes are low heaps of leaf. Rocks are rounded, weathered boulders with moss on their backs. Cacti are ribbed, with rounded tops and upturned arms. Reeds grow in bending clumps with brown heads.
+- **Gathering trees match:** the trees you chop wear the same heaped crowns.
+- **Winter snow fits the new shapes:** it settles on each tree's own crown and tiers.
+
 ## RS-880 - Clear Paths
 
 - **No more walking through trees:** you walk from the middle of one tile straight to the middle of the next. Every tree, rock, cactus and bush on the open land now stands in the gaps between those paths, so you pass between the trunks instead of through them. Woods look as thick as before.
