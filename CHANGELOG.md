@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-880 - Clear Paths
+
+- **No more walking through trees:** you walk from the middle of one tile straight to the middle of the next. Every tree, rock, cactus and bush on the open land now stands in the gaps between those paths, so you pass between the trunks instead of through them. Woods look as thick as before.
+- **Leaves thin over you:** a canopy between the camera and your character dithers away while you're under it, so you never vanish into a wood.
+- **Gathering trees and rocks:** stepping onto a tile with a tree to chop or a rock to mine, you stop beside it instead of inside its trunk.
+- **Barrows and dragon lairs kept clear:** trees from the wood next door no longer grow over a barrow's mound or stand over its stairs, and nothing grows into a dragon's crag.
+- **No gathering spots under sites:** the tiles round a barrow or a dragon's lair no longer hold a tree, rock or herb patch that the site's model covered. (On an existing world, the few spots that sat there are gone.)
+
 ## RS-879 - Heads, Shells and Flippers
 
 - **The hydra remade:** the hydra and the hydra of the tides stand on four heavy legs, with five long necks fanned out wide. Each neck ends in its own horned head, and each head sways on its own.
