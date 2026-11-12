@@ -273,6 +273,11 @@
      padding untouched */
   .overlay.tight{ padding:14px 20px; }
   .overlay .panel-title{ font-size:22px; color:var(--amber); margin:0 0 6px; letter-spacing:0.06em; }
+  .flist .fcat{ color:var(--amber); margin:10px 0 4px; font-size:13px; letter-spacing:0.05em; } .flist .frow{ display:flex; align-items:center; gap:8px; padding:3px 0; border-bottom:1px solid rgba(255,255,255,0.06); } .flist .fnm{ flex:1; } .flist .fpr{ min-width:80px; text-align:right; }
+  #hedit{ position:fixed; z-index:40; font-size:12px; color:#e8dcc0; } #hedit.hedit-off{ right:16px; top:260px; } #hedit.hedit-on{ right:12px; top:250px; width:260px; max-height:calc(100vh - 380px); overflow:auto; background:rgba(20,14,8,0.88); border:1px solid #6a5030; border-radius:8px; padding:8px; }
+  #hedit .he-title{ display:flex; justify-content:space-between; align-items:center; color:var(--amber); letter-spacing:0.08em; margin-bottom:6px; } #hedit .he-row, #hedit .he-cats{ display:flex; flex-wrap:wrap; gap:4px; margin:4px 0; }
+  #hedit .btn.small, .flist .btn.small{ padding:2px 8px; font-size:11px; min-width:0; } #hedit .he-list{ display:flex; flex-direction:column; gap:3px; margin-top:4px; } #hedit .hepiece{ text-align:left; } #hedit .he-help{ margin:4px 0; line-height:1.35; } #hedit .he-sel{ border-bottom:1px solid #4a3a24; padding-bottom:6px; margin-bottom:4px; }
+  body.touch #hedit .btn.small{ min-height:36px; font-size:13px; padding:4px 10px; }
   .overlay .sub{ color:var(--ink-faint); font-size:12.5px; margin-bottom:22px; text-align:center; max-width:560px; }
   .ovbody{ width:100%; max-width:640px; }
   .choice-row{
@@ -11392,6 +11397,7 @@ function v3BuildHouse(grp, mats){
     for (const [tx, ty] of roomBenchTiles(k, x, y)){ const hb = new T.Mesh(new T.BoxGeometry(0.95, 1.4, 0.95), new T.MeshBasicMaterial({ visible:false })); hb.position.set(tx + 0.5, 0.7, ty + 0.5); hb.userData.act = { kind:'tile', x:tx, y:ty, label:k==='plot' ? 'Empty plot: build a room' : BENCHES[k].nm }; grp.add(hb); V3.hits.push(hb); } }
   for (const [k, x, y] of (L.deco||[])) v3Bench(k, x + 0.5, y + 0.5 + back(k, x, y), mats, grp, roomBenchRot(k, x, y));
   v3GardenSync(true);
+  try{ v3DecorBuild(grp); }catch(e){ console.error(e); }   /* (RS-904: your furnishings) */
 }
 /* (RS-737) the crop in each garden bed, as far as it's grown: nine plants in rows, sprouting, in leaf, in bud, then flowering in the
    herb's own colour (flax tall, with its blue flowers); a watered bed's earth dark and wet. Rebuilt when a bed's stage changes */
@@ -19244,6 +19250,7 @@ function enterVillage(){
   questOnEnterTown();
   try{ castleRents(); }catch(e){ console.error(e); }   /* (RS-843) */
   estateNpcPlace();
+  furnisherNpcPlace();   /* (RS-904) */
   townAfterEnter();
   wevOnEnterTown();
 }
@@ -26720,6 +26727,7 @@ BENCHES.trough = { nm:'Feed trough', does:'fill it with flax - your animals only
 function houseP(){ const p = G.player; if (!p.house || typeof p.house!=='object') p.house = null; if (!p.house) return null; const h = houseMigrate(p.house);
   if (h.gbeds){ for (let i=1;i<=4;i++) delete h.built['gbed'+i]; delete h.gbeds; }   /* (RS-740: RS-739's garden beds to build are gone - they come with the garden again) */
   if (h.built && h.built.carpentry) delete h.built.carpentry;   /* (RS-745: the carpentry bench stands in the Boatyard now) */
+  if (!Array.isArray(h.decor)) h.decor = []; if (!h.furn || typeof h.furn!=='object') h.furn = {};   /* (RS-904: what's set out, and the furnishings' store) */
   return h; }
 /* (RS-736) a house from before the rooms - one room with every piece of furniture in it - is rebuilt as rooms: the parlour, and a room
    for each kind of furniture it had, on a house big enough to hold them, every piece where it was built */
@@ -26748,6 +26756,249 @@ function houseCostOk(cost){ for (const k in cost){ const have = k==='logs' ? SK_
 function houseCostPay(cost){ const save = chn(skPerk('construction', 'save')); if (save){ logMsg('a careful hand - you save your materials', 'good'); return; }
   for (const k in cost){ if (k==='logs'){ let need = cost[k]; for (const l of SK_LOG){ const h = Math.min(need, skHave(l.id)); if (h){ skAdd(l.id, -h); need -= h; } } } else skAdd(k, -cost[k]); } }
 function houseCostText(cost){ return needHtml(cost, 0, true); }   /* (RS-192: in colour, with what you hold) */
+/* ==== (RS-904) decorating your house, ESO and WoW style. Furnishings bought from the furnisher in town (later: made from plans, won as
+   trophies) go to your house's store (p.house.furn, {kind: count}); in the house, Decorate puts you in the edit mode, where you place
+   them anywhere - moved, turned, raised, stacked on each other, hung on a wall - snapped to a quarter-tile grid and eighth turns, or
+   freely with the snap off. What's placed is p.house.decor, [{k, x, z, y, r}] in the house's own tiles. A big piece on the floor is
+   solid: its tile is walled off (houseDecorSolid) ==== */
+const FURN_CATS = [['seat', 'Seating'], ['table', 'Tables'], ['store', 'Storage'], ['light', 'Lighting'], ['deco', 'Ornaments'], ['wall', 'On the wall'], ['rug', 'Rugs'], ['plant', 'Plants']];
+const FURN = {
+  stool:{ nm:'Three-legged stool', cat:'seat', price:150 }, chair:{ nm:'Carved chair', cat:'seat', price:420 }, armchair:{ nm:'Fireside armchair', cat:'seat', price:1400, solid:1 }, bench:{ nm:'Oak bench', cat:'seat', price:520, solid:1 },
+  rtable:{ nm:'Round table', cat:'table', price:900, solid:1 }, ltable:{ nm:'Trestle table', cat:'table', price:1100, solid:1 }, nstand:{ nm:'Bedside cabinet', cat:'table', price:480 },
+  bookcase:{ nm:'Bookcase', cat:'store', price:1600, solid:1 }, chest:{ nm:'Iron-bound chest', cat:'store', price:950, solid:1 }, wardrobe:{ nm:'Wardrobe', cat:'store', price:2100, solid:1 }, cask:{ nm:'Ale cask', cat:'store', price:300, solid:1 },
+  candle:{ nm:'Brass candlestick', cat:'light', price:200 }, candelabra:{ nm:'Candelabra', cat:'light', price:900 }, lamppost:{ nm:'Standing lantern', cat:'light', price:1200, solid:1 }, brazier:{ nm:'Iron brazier', cat:'light', price:1500, solid:1 },
+  vase:{ nm:'Glazed vase', cat:'deco', price:380 }, fruit:{ nm:'Bowl of apples', cat:'deco', price:160 }, books:{ nm:'Stack of books', cat:'deco', price:220 }, globe:{ nm:'Globe on a stand', cat:'deco', price:2500, solid:1 },
+  painting:{ nm:'Landscape painting', cat:'wall', price:1800, wall:1 }, banner:{ nm:'Hanging banner', cat:'wall', price:800, wall:1 }, shield:{ nm:'Shield and crossed swords', cat:'wall', price:1900, wall:1 },
+  rugr:{ nm:'Round rug', cat:'rug', price:600, flat:1 }, rugl:{ nm:'Long rug', cat:'rug', price:850, flat:1 },
+  fern:{ nm:'Potted fern', cat:'plant', price:260 }, flowers:{ nm:'Pot of flowers', cat:'plant', price:300 }, ptree:{ nm:'Little tree in a tub', cat:'plant', price:1300, solid:1 },
+};
+const FURN_BASIC = ['stool', 'chair', 'bench', 'nstand', 'cask', 'candle', 'fruit', 'books', 'fern', 'flowers', 'rugr', 'vase'];
+/* the furnisher's stock: the plain pieces always, and five of the finer ones that change each day */
+function furnStock(){ const fine = Object.keys(FURN).filter(k=>!FURN_BASIC.includes(k)), day = Math.floor(wevTurn()/DAY_LENGTH), rnd = v3Rng(7919 + day*31 + (G.owPos ? G.owPos.x*7 + G.owPos.y : 0));
+  for (let i=fine.length - 1; i>0; i--){ const j = Math.floor(rnd()*(i + 1)); [fine[i], fine[j]] = [fine[j], fine[i]]; } return FURN_BASIC.concat(fine.slice(0, 5)); }
+function furnOwned(k){ const h = houseP(); if (!h) return 0; return (h.furn[k]||0) + h.decor.filter(d=>d.k===k).length; }
+function furnStored(){ const h = houseP(); if (!h) return 0; let n = 0; for (const k in h.furn) n += h.furn[k]; return n; }
+
+/* ---- the furnisher, on every town square ---- */
+function furnisherNpcPlace(){
+  if (G.interior || (G.villageNpcs||[]).some(n=>n.service==='furnisher')) return;
+  const [wx, wy] = townWpAt();
+  const spot = [[wx + 3, wy], [wx - 3, wy], [wx + 3, wy + 2], [wx - 3, wy + 2]].concat([[9,13],[13,9],[8,9],[14,13],[10,14]].map(([x,y])=>[tX(x), tY(y)])).find(([x,y])=>G.map[x] && G.map[x][y]===T_FLOOR && Math.max(Math.abs(x - wx), Math.abs(y - wy)) > 1 && !(G.player.x===x && G.player.y===y) && !(G.villageNpcs||[]).some(n=>Math.abs(n.x - x) + Math.abs(n.y - y) < 2));
+  if (!spot) return; const [x, y] = spot;
+  G.villageNpcs.push({ x, y, name:'Wenna the furnisher', role:'Furnisher', service:'furnisher', key:'furnisher' });
+  G.map[x][y] = T_VENDOR; G.villageDeco[x][y] = 'npc';
+}
+function buildFurnisher(){
+  const h = houseP(), p = G.player, stock = furnStock();
+  const rows = FURN_CATS.map(([c, cn])=>{ const ks = stock.filter(k=>FURN[k].cat===c); if (!ks.length) return '';
+    return `<div class="fcat">${cn}</div>` + ks.map(k=>{ const F = FURN[k], own = furnOwned(k), fine = !FURN_BASIC.includes(k);
+      return `<div class="frow"><span class="fnm">${esc(F.nm)}${fine ? ' <span class="muted">&middot; today only</span>' : ''}${own ? ` <span class="muted">&middot; you have ${own}</span>` : ''}</span><span class="fpr">${goldHtml(F.price)}</span><button class="btn small" data-fbuy="${k}" ${h && p.gold >= F.price ? '' : 'disabled'} onclick="furnBuy('${k}')">buy</button></div>`; }).join(''); }).join('');
+  return `<h2 class="panel-title">WENNA, FURNISHER</h2>
+    <div class="sub">"Chairs, tables, a good rug, a painting for the wall - whatever makes a house a home. The finer pieces change every day."</div>
+    <div class="ovbody">
+      ${h ? `<div class="qrep">What you buy goes to your house's store - <b>${furnStored()}</b> piece${furnStored()===1 ? '' : 's'} waiting there now. At home, choose <b>Decorate</b> to set them out wherever you like.</div>` : `<div class="qrep">You've no house to put them in - Hollis the estate agent sells them.</div>`}
+      <div class="flist">${rows}</div>
+      <div class="btnrow"><button class="btn" onclick="setUi('playing')">close (Esc)</button></div></div>`;
+}
+function furnBuy(k){ const h = houseP(), p = G.player, F = FURN[k]; if (!h || !F || p.gold < F.price) return; p.gold -= F.price; h.furn[k] = (h.furn[k]||0) + 1;
+  logMsg(`you buy ${/^[aeiou]/i.test(F.nm) ? 'an' : 'a'} ${F.nm.toLowerCase()} - Wenna will have it carried to your house`, 'good'); sfx('gold'); try{ saveCurrentGame(); }catch(e){} renderOverlay(); }
+
+/* ---- the pieces: smooth parts (rounded boxes, 24-sided cylinders, 32-sided lathes and spheres), made once and merged by material ---- */
+let FURN_M = null;
+function furnPaintTex(){ const W = 256, H = 192, c = v3Canvas(W, H), x = c.getContext('2d'), rnd = v3Rng(4242);
+  const sky = x.createLinearGradient(0, 0, 0, H*0.6); sky.addColorStop(0, '#e8b070'); sky.addColorStop(0.6, '#f0d8a0'); sky.addColorStop(1, '#c8d8c0'); x.fillStyle = sky; x.fillRect(0, 0, W, H);
+  const ridge = (y0, amp, col, f)=>{ x.fillStyle = col; x.beginPath(); x.moveTo(0, H); for (let i=0;i<=W;i+=4) x.lineTo(i, y0 - amp*(0.5 + 0.5*Math.sin(i*f + y0)) - amp*0.4*Math.sin(i*f*2.7 + 1)); x.lineTo(W, H); x.fill(); };
+  ridge(H*0.5, 40, '#7a8ab0', 0.02); ridge(H*0.62, 26, '#5a7a5a', 0.03); ridge(H*0.78, 18, '#4a6a30', 0.045);
+  x.fillStyle = '#c8a870'; x.beginPath(); x.moveTo(W*0.42, H); x.quadraticCurveTo(W*0.55, H*0.82, W*0.62, H*0.7); x.lineTo(W*0.64, H*0.7); x.quadraticCurveTo(W*0.6, H*0.85, W*0.56, H); x.fill();
+  for (let i=0;i<5;i++){ const tx = 30 + i*48 + rnd()*20, ty = H*0.74 + rnd()*20; x.fillStyle = '#3a2a18'; x.fillRect(tx - 2, ty, 4, 18); x.fillStyle = ['#2a4a20', '#3a5a24', '#4a6a2a'][i % 3]; x.beginPath(); x.arc(tx, ty - 4, 11 + rnd()*5, 0, Math.PI*2); x.fill(); }
+  for (let i=0;i<900;i++){ x.fillStyle = `rgba(${rnd() < 0.5 ? '255,240,200' : '40,30,20'},${(0.03 + rnd()*0.05).toFixed(3)})`; x.fillRect(rnd()*W, rnd()*H, 2 + rnd()*5, 1 + rnd()*2); }   /* (brushwork) */
+  return v3CanvasTex(c); }
+function furnBannerTex(){ const W = 128, H = 256, c = v3Canvas(W, H), x = c.getContext('2d'); x.fillStyle = '#8a1a18'; x.fillRect(0, 0, W, H);
+  x.strokeStyle = '#d8a840'; x.lineWidth = 6; x.strokeRect(8, 8, W - 16, H - 40); x.fillStyle = '#d8a840';
+  x.beginPath(); x.moveTo(W/2, 50); for (let i=0;i<10;i++){ const a = -Math.PI/2 + i*Math.PI/5, r = i % 2 ? 14 : 34; x.lineTo(W/2 + Math.cos(a)*r, 100 + Math.sin(a)*r); } x.fill();
+  x.fillRect(W/2 - 3, 140, 6, 60); x.beginPath(); x.arc(W/2, 150, 22, Math.PI, 0); x.lineWidth = 5; x.stroke();
+  x.fillStyle = '#5a0e0c'; for (let i=0;i<4;i++){ x.beginPath(); x.moveTo(i*W/4, H); x.lineTo(i*W/4 + W/8, H - 26); x.lineTo((i + 1)*W/4, H); x.fill(); }
+  return v3CanvasTex(c); }
+function furnGlobeTex(){ const W = 256, H = 128, c = v3Canvas(W, H), x = c.getContext('2d'), rnd = v3Rng(77); x.fillStyle = '#2a5a7a'; x.fillRect(0, 0, W, H);
+  for (let i=0;i<14;i++){ const cx = rnd()*W, cy = 20 + rnd()*(H - 40), r = 8 + rnd()*22; x.fillStyle = i % 3 ? '#c8b070' : '#8aa060'; x.beginPath(); for (let k=0;k<=20;k++){ const a = k/20*Math.PI*2, rr = r*(0.7 + 0.5*rnd()); x.lineTo(cx + Math.cos(a)*rr*1.4, cy + Math.sin(a)*rr); } x.fill(); }
+  x.strokeStyle = 'rgba(255,240,200,0.35)'; x.lineWidth = 1; for (let i=1;i<8;i++){ x.beginPath(); x.moveTo(i*W/8, 0); x.lineTo(i*W/8, H); x.stroke(); } for (let i=1;i<4;i++){ x.beginPath(); x.moveTo(0, i*H/4); x.lineTo(W, i*H/4); x.stroke(); }
+  return v3CanvasTex(c); }
+function furnMats(){ if (FURN_M) return FURN_M; const T = THREE, L = c=>new T.Color(c).convertSRGBToLinear(), S = o=>new T.MeshStandardMaterial(o), wm = dgkWood('crate', '#8a643c', 3).map, cv = o3CanvasTex();
+  return (FURN_M = { wood:S({ map:wm, color:L('#a8784e'), roughness:0.66 }), dark:S({ map:wm, color:L('#6a4228'), roughness:0.55 }), oak:S({ map:wm, color:L('#c89a64'), roughness:0.7 }),
+    cloth:S({ map:cv, color:L('#8a2a24'), roughness:0.95 }), green:S({ map:cv, color:L('#2a5a3a'), roughness:0.95 }), linen:S({ map:cv, color:L('#e8dcc0'), roughness:0.95 }),
+    brass:S({ color:L('#d0a850'), metalness:0.55, roughness:0.32 }), iron:S({ color:L('#4a4644'), metalness:0.4, roughness:0.5 }), steel:S({ color:L('#d8dce0'), metalness:0.5, roughness:0.28 }),   /* (half metal: a room has no sky to shine back) */
+    glaze:S({ color:L('#2e6a8a'), roughness:0.15, metalness:0.05 }), terra:S({ color:L('#b0603a'), roughness:0.85 }), soil:S({ color:L('#3a2a1c'), roughness:1 }), leaf:S({ color:L('#3e7a34'), roughness:0.65, side:T.DoubleSide }), leaf2:S({ color:L('#5a9a3a'), roughness:0.65 }),
+    wax:S({ color:L('#f0e6c8'), roughness:0.6 }), flame:new T.MeshBasicMaterial({ color:L('#ffd070') }), glow:S({ color:L('#ffe0a0'), emissive:L('#ffb040'), emissiveIntensity:1.5, roughness:0.3 }),
+    ember:S({ color:L('#ff7a20'), emissive:L('#ff5010'), emissiveIntensity:2.2, roughness:0.8 }), coal:S({ color:L('#2a2624'), roughness:0.95 }), apple:S({ color:L('#b02a20'), roughness:0.35 }), apple2:S({ color:L('#8ab030'), roughness:0.4 }),
+    books:['#7a1a1a', '#1a3a6a', '#2a5a2a', '#6a4a1a', '#4a2a5a', '#8a6a2a'].map(c=>S({ color:L(c), roughness:0.7 })), paper:S({ color:L('#e8dcc0'), roughness:0.9 }),
+    petal:['#e85a7a', '#f0c040', '#f0eef8', '#8a5ae0'].map(c=>S({ color:L(c), roughness:0.6 })),
+    paint:S({ map:furnPaintTex(), roughness:0.85 }), banner:S({ map:furnBannerTex(), side:T.DoubleSide, roughness:0.9 }), globe:S({ map:furnGlobeTex(), roughness:0.5 }), gilt:S({ color:L('#e0b850'), metalness:0.55, roughness:0.3 }),
+    blazon:S({ color:L('#1a3a7a'), roughness:0.6 }) }); }
+function furnModel(k){ const C = furnModel.c || (furnModel.c = {}); if (C[k]) return C[k]; const T = THREE, M = furnMats(), g = new T.Group(), parts = [];
+  const add = (geo, m, x, y, z, rx, ry, rz)=>{ const o = new T.Mesh(geo, m); o.position.set(x||0, y||0, z||0); o.rotation.set(rx||0, ry||0, rz||0); parts.push(o); return o; };
+  const box = (w, h, d, m, x, y, z, r, rx, ry, rz)=>add(v3RBoxGeo(w, h, d, r!=null ? r : Math.min(0.02, Math.min(w, h, d)*0.22)), m, x, y, z, rx, ry, rz);
+  const cyl = (a, b, h, m, x, y, z, rx, ry, rz)=>add(new T.CylinderGeometry(a, b, h, 24), m, x, y, z, rx, ry, rz);
+  const lathe = (pts, m, x, y, z, s)=>add(new T.LatheGeometry(pts.map(([r, h])=>new T.Vector2(Math.max(0.0005, r), h)), s||32), m, x, y, z);
+  const sph = (r, m, x, y, z, sx, sy, sz, lo)=>{ const o = add(new T.SphereGeometry(r, lo ? 12 : 32, lo ? 8 : 22), m, x, y, z); if (sx) o.scale.set(sx, sy, sz); return o; };   /* (lo: a petal's or an apple stalk's small sphere) */
+  const tor = (R, r, m, x, y, z, rx, ry, rz, arc)=>add(new T.TorusGeometry(R, r, 12, 40, arc||Math.PI*2), m, x, y, z, rx, ry, rz);
+  const turned = (x, z, h, r, m)=>lathe([[0, 0], [r*0.85, 0], [r*0.8, h*0.12], [r*1.25, h*0.22], [r*0.7, h*0.32], [r*0.8, h*0.7], [r*1.2, h*0.8], [r*0.9, h*0.92], [r*0.95, h], [0, h]], m, x, 0, z, 20);
+  const bowl = (r, h, m, x, y, z)=>lathe([[0, 0], [r*0.5, 0], [r*0.55, h*0.05], [r*0.9, h*0.45], [r, h], [r*0.94, h], [r*0.84, h*0.5], [r*0.45, h*0.12], [0, h*0.1]], m, x, y, z);   /* (outside up, then back down the inside) */
+  const pot = (r, h, m, y0)=>{ lathe([[0, 0], [r*0.7, 0], [r*0.72, h*0.05], [r, h*0.85], [r*1.12, h*0.9], [r*1.12, h], [r*0.98, h], [r*0.9, h*0.88], [0, h*0.86]], m, 0, y0||0, 0); return h*0.88 + (y0||0); };
+  if (k==='stool'){ lathe([[0, 0.43], [0.16, 0.43], [0.175, 0.445], [0.17, 0.465], [0.15, 0.475], [0, 0.48]], M.oak, 0, 0, 0);
+    for (let i=0;i<3;i++){ const a = i*Math.PI*2/3, l = cyl(0.018, 0.024, 0.46, M.dark, Math.cos(a)*0.1, 0.215, Math.sin(a)*0.1); l.rotation.set(Math.sin(a)*0.2, 0, -Math.cos(a)*0.2); }
+    tor(0.11, 0.01, M.dark, 0, 0.16, 0, Math.PI/2); }
+  else if (k==='chair'){ box(0.46, 0.05, 0.44, M.oak, 0, 0.45, 0); for (const [x, z] of [[-0.19, 0.18], [0.19, 0.18]]) turned(x, z, 0.43, 0.022, M.dark);
+    for (const x of [-0.2, 0.2]){ cyl(0.024, 0.026, 1.02, M.dark, x, 0.51, -0.19); sph(0.036, M.dark, x, 1.05, -0.19); }
+    for (let i=0;i<3;i++) box(0.38, 0.055, 0.025, M.oak, 0, 0.62 + i*0.13, -0.19 - 0.012*(i===1 ? 1 : 0)); box(0.44, 0.08, 0.035, M.dark, 0, 0.98, -0.19);
+    for (const z of [-0.19, 0.18]) cyl(0.012, 0.012, 0.38, M.dark, 0, 0.14, z, 0, 0, Math.PI/2); }
+  else if (k==='armchair'){ for (const [x, z] of [[-0.3, 0.26], [0.3, 0.26], [-0.3, -0.26], [0.3, -0.26]]) lathe([[0, 0], [0.035, 0], [0.045, 0.03], [0.03, 0.06], [0, 0.07]], M.dark, x, 0, z, 20);
+    box(0.74, 0.34, 0.68, M.cloth, 0, 0.24, 0, 0.07); box(0.56, 0.13, 0.56, M.cloth, 0, 0.47, 0.05, 0.05); box(0.74, 0.62, 0.18, M.cloth, 0, 0.72, -0.26, 0.08);
+    for (const x of [-0.32, 0.32]){ cyl(0.085, 0.085, 0.64, M.cloth, x, 0.5, 0.02, Math.PI/2); sph(0.085, M.cloth, x, 0.5, 0.34, 1, 1, 0.4); }
+    for (let i=0;i<5;i++) sph(0.018, M.brass, -0.3 + i*0.15, 0.995, -0.2); }
+  else if (k==='bench'){ box(1.4, 0.06, 0.34, M.oak, 0, 0.44, 0); for (const x of [-0.58, 0.58]){ box(0.06, 0.41, 0.3, M.dark, x, 0.205, 0); } box(1.12, 0.06, 0.04, M.dark, 0, 0.16, 0); }
+  else if (k==='rtable'){ cyl(0.5, 0.5, 0.05, M.oak, 0, 0.75, 0); tor(0.5, 0.025, M.oak, 0, 0.75, 0, Math.PI/2);
+    lathe([[0, 0], [0.3, 0], [0.3, 0.04], [0.14, 0.08], [0.06, 0.18], [0.085, 0.36], [0.05, 0.56], [0.09, 0.66], [0.16, 0.725], [0, 0.73]], M.dark, 0, 0, 0); }
+  else if (k==='ltable'){ box(1.7, 0.07, 0.82, M.oak, 0, 0.765, 0); for (const x of [-0.66, 0.66]){ for (const s of [-1, 1]) box(0.07, 0.82, 0.07, M.dark, x, 0.37, s*0.17, null, s*0.32); box(0.08, 0.06, 0.72, M.dark, x, 0.03, 0); box(0.08, 0.05, 0.6, M.dark, x, 0.7, 0); }
+    box(1.32, 0.08, 0.05, M.dark, 0, 0.32, 0); }
+  else if (k==='nstand'){ box(0.45, 0.55, 0.4, M.wood, 0, 0.33, 0); box(0.5, 0.04, 0.44, M.dark, 0, 0.625, 0); box(0.38, 0.14, 0.02, M.oak, 0, 0.49, 0.205); sph(0.02, M.brass, 0, 0.49, 0.222);
+    box(0.38, 0.27, 0.02, M.oak, 0, 0.24, 0.205); sph(0.018, M.brass, 0.14, 0.24, 0.222); for (const [x, z] of [[-0.19, 0.16], [0.19, 0.16], [-0.19, -0.16], [0.19, -0.16]]) lathe([[0, 0], [0.03, 0], [0.025, 0.05], [0.035, 0.06], [0, 0.06]], M.dark, x, 0, z, 16); }
+  else if (k==='bookcase'){ const rnd = v3Rng(31); for (const x of [-0.48, 0.48]) box(0.05, 1.9, 0.36, M.dark, x, 0.95, 0); box(0.92, 1.88, 0.03, M.wood, 0, 0.95, -0.165); box(1.06, 0.07, 0.42, M.dark, 0, 1.935, 0); box(1.0, 0.08, 0.38, M.dark, 0, 0.04, 0);
+    for (const y of [0.08, 0.54, 1.0, 1.46]){ if (y > 0.1) box(0.92, 0.035, 0.34, M.dark, 0, y, 0); let x = -0.44; while (x < 0.4){ const w = 0.032 + rnd()*0.035, h = 0.26 + rnd()*0.12; if (rnd() < 0.08){ x += 0.06; continue; }
+      box(w, h, 0.24, M.books[Math.floor(rnd()*6)], x + w/2, y + 0.018 + h/2, 0.02, 0.006); x += w + 0.004; } } }
+  else if (k==='chest'){ box(0.72, 0.36, 0.44, M.wood, 0, 0.2, 0, 0.02); add(new T.CylinderGeometry(0.22, 0.22, 0.72, 24, 1, false, 0, Math.PI), M.wood, 0, 0.38, 0, 0, 0, Math.PI/2);
+    for (const x of [-0.24, 0, 0.24]){ box(0.04, 0.37, 0.455, M.iron, x, 0.2, 0, 0.008); tor(0.222, 0.012, M.iron, x, 0.38, 0, 0, Math.PI/2, 0, Math.PI); }
+    box(0.09, 0.11, 0.02, M.brass, 0, 0.33, 0.228); tor(0.025, 0.006, M.brass, 0, 0.29, 0.24); for (const x of [-0.37, 0.37]) tor(0.04, 0.008, M.iron, x, 0.26, 0, 0, Math.PI/2); }
+  else if (k==='wardrobe'){ box(1.0, 1.9, 0.56, M.wood, 0, 1.0, 0); box(1.1, 0.1, 0.64, M.dark, 0, 1.99, 0); box(1.06, 0.1, 0.62, M.dark, 0, 0.05, 0);
+    for (const x of [-0.245, 0.245]){ box(0.47, 1.66, 0.025, M.oak, x, 1.0, 0.285); for (const y of [0.62, 1.38]) box(0.33, 0.6, 0.025, M.wood, x, y, 0.3); sph(0.025, M.brass, x + (x < 0 ? 0.19 : -0.19), 1.0, 0.31); } }
+  else if (k==='cask'){ const P = []; for (let i=0;i<=12;i++){ const y = i/12*0.72; P.push([0.25 + 0.05*Math.sin(Math.PI*y/0.72), y]); } P.push([0.2, 0.72], [0, 0.71]); lathe([[0, 0]].concat(P), M.wood, 0, 0, 0);
+    for (const y of [0.07, 0.22, 0.5, 0.65]) tor(0.25 + 0.05*Math.sin(Math.PI*y/0.72) + 0.004, 0.012, M.iron, 0, y, 0, Math.PI/2);
+    cyl(0.02, 0.02, 0.1, M.brass, 0, 0.14, 0.31, Math.PI/2); cyl(0.012, 0.015, 0.06, M.brass, 0, 0.11, 0.35); }
+  else if (k==='candle'){ lathe([[0, 0], [0.07, 0], [0.075, 0.012], [0.04, 0.03], [0.016, 0.06], [0.022, 0.12], [0.012, 0.19], [0.038, 0.215], [0.03, 0.235], [0, 0.235]], M.brass, 0, 0, 0);
+    cyl(0.016, 0.016, 0.14, M.wax, 0, 0.3, 0); sph(0.013, M.flame, 0, 0.385, 0, 1, 2.2, 1); }
+  else if (k==='candelabra'){ lathe([[0, 0], [0.11, 0], [0.115, 0.015], [0.05, 0.045], [0.02, 0.1], [0.03, 0.2], [0.016, 0.4], [0.03, 0.44], [0, 0.45]], M.brass, 0, 0, 0);
+    tor(0.13, 0.012, M.brass, 0, 0.45, 0, 0, 0, 0, Math.PI); for (const x of [-0.13, 0, 0.13]){ const y = x ? 0.45 : 0.45; lathe([[0, 0], [0.03, 0], [0.035, 0.02], [0, 0.025]], M.brass, x, y, 0, 20); cyl(0.015, 0.015, 0.16, M.wax, x, y + 0.1, 0); sph(0.013, M.flame, x, y + 0.2, 0, 1, 2.2, 1); } }
+  else if (k==='lamppost'){ lathe([[0, 0], [0.16, 0], [0.16, 0.03], [0.07, 0.08], [0.03, 0.16], [0.025, 1.2], [0.04, 1.24], [0, 1.25]], M.iron, 0, 0, 0);
+    box(0.2, 0.26, 0.2, M.glow, 0, 1.4, 0, 0.01); for (const [x, z] of [[-0.1, -0.1], [0.1, -0.1], [-0.1, 0.1], [0.1, 0.1]]) cyl(0.012, 0.012, 0.3, M.iron, x, 1.4, z); box(0.24, 0.025, 0.24, M.iron, 0, 1.27, 0, 0.006);
+    lathe([[0.17, 0], [0.16, 0.02], [0.02, 0.14], [0.03, 0.16], [0, 0.2]], M.iron, 0, 1.54, 0, 4).rotation.y = Math.PI/4; tor(0.04, 0.008, M.iron, 0, 1.76, 0); }
+  else if (k==='brazier'){ for (let i=0;i<3;i++){ const a = i*Math.PI*2/3; const l = cyl(0.016, 0.02, 0.75, M.iron, Math.cos(a)*0.17, 0.36, Math.sin(a)*0.17); l.rotation.set(-Math.sin(a)*0.18, 0, Math.cos(a)*0.18); sph(0.03, M.iron, Math.cos(a)*0.24, 0.02, Math.sin(a)*0.24, 1, 0.6, 1); }
+    bowl(0.3, 0.2, M.iron, 0, 0.66, 0); tor(0.3, 0.018, M.iron, 0, 0.86, 0, Math.PI/2); const rnd = v3Rng(5); for (let i=0;i<12;i++){ const a = rnd()*6.28, r = rnd()*0.2; sph(0.05 + rnd()*0.03, i % 3 ? M.ember : M.coal, Math.cos(a)*r, 0.8, Math.sin(a)*r, 1, 0.7, 1); } }
+  else if (k==='vase'){ lathe([[0, 0], [0.08, 0], [0.085, 0.01], [0.13, 0.09], [0.145, 0.18], [0.12, 0.28], [0.06, 0.37], [0.055, 0.41], [0.075, 0.45], [0.068, 0.455], [0.05, 0.42], [0.052, 0.37], [0, 0.36]], M.glaze, 0, 0, 0); }
+  else if (k==='fruit'){ bowl(0.15, 0.08, M.wood, 0, 0, 0); for (const [x, z, y, c] of [[0, 0, 0.09, 1], [0.06, 0.03, 0.07, 0], [-0.06, 0.03, 0.07, 0], [0.02, -0.06, 0.07, 1], [-0.03, -0.04, 0.12, 0]]){ sph(0.042, c ? M.apple2 : M.apple, x, y, z, 1, 0.92, 1); cyl(0.003, 0.003, 0.025, M.dark, x, y + 0.045, z); } }
+  else if (k==='books'){ const rnd = v3Rng(9); let y = 0; for (let i=0;i<4;i++){ const h = 0.04 + rnd()*0.03; box(0.26 - i*0.02, h, 0.19 - i*0.01, M.books[i % 6], (rnd() - 0.5)*0.03, y + h/2, 0, 0.006, 0, (rnd() - 0.5)*0.5); box(0.25 - i*0.02, h*0.8, 0.005, M.paper, 0, y + h/2, 0.0951 - i*0.005); y += h; } }
+  else if (k==='globe'){ lathe([[0, 0], [0.18, 0], [0.18, 0.03], [0.06, 0.07], [0.03, 0.2], [0.05, 0.5], [0.03, 0.62], [0, 0.63]], M.dark, 0, 0, 0);
+    const gs = sph(0.2, M.globe, 0, 0.86, 0); gs.rotation.z = 0.4; tor(0.225, 0.008, M.gilt, 0, 0.86, 0, 0, 0, 0.4); tor(0.225, 0.012, M.gilt, 0, 0.86, 0, Math.PI/2); }
+  else if (k==='painting'){ box(0.92, 0.72, 0.012, M.dark, 0, 0, 0.006); add(new T.PlaneGeometry(0.84, 0.64), M.paint, 0, 0, 0.014); for (const [w, h, x, y] of [[0.98, 0.07, 0, 0.36], [0.98, 0.07, 0, -0.36], [0.07, 0.78, -0.455, 0], [0.07, 0.78, 0.455, 0]]) box(w, h, 0.045, M.gilt, x, y, 0.022, 0.012); }
+  else if (k==='banner'){ cyl(0.014, 0.014, 0.7, M.brass, 0, 0.62, 0.06, 0, 0, Math.PI/2); for (const x of [-0.36, 0.36]) sph(0.028, M.brass, x, 0.62, 0.06); for (const x of [-0.25, 0.25]) cyl(0.006, 0.006, 0.08, M.dark, x, 0.65, 0.04, 0.6);
+    const pg = new T.PlaneGeometry(0.56, 1.1, 8, 14), pp = pg.attributes.position; for (let i=0;i<pp.count;i++){ const x = pp.getX(i), y = pp.getY(i); pp.setZ(i, 0.012*Math.sin(x*14 + y*3) + 0.01*(0.55 - y)); } pg.computeVertexNormals(); add(pg, M.banner, 0, 0.05, 0.06); }
+  else if (k==='shield'){ const sh = new T.Shape(); sh.moveTo(-0.24, 0.26); sh.lineTo(0.24, 0.26); sh.bezierCurveTo(0.25, 0, 0.18, -0.22, 0, -0.34); sh.bezierCurveTo(-0.18, -0.22, -0.25, 0, -0.24, 0.26);
+    const sg = new T.ExtrudeGeometry(sh, { depth:0.02, bevelEnabled:true, bevelThickness:0.012, bevelSize:0.012, bevelSegments:3, curveSegments:24 }); add(sg, M.blazon, 0, 0, 0.06);
+    const rim = new T.Shape(); rim.moveTo(-0.03, 0.2); rim.lineTo(0.03, 0.2); rim.lineTo(0.03, -0.24); rim.lineTo(-0.03, -0.24); add(new T.ExtrudeGeometry(rim, { depth:0.01, bevelEnabled:true, bevelThickness:0.005, bevelSize:0.005, bevelSegments:2 }), M.gilt, 0, 0, 0.09);
+    add(new T.ExtrudeGeometry(rim, { depth:0.01, bevelEnabled:true, bevelThickness:0.005, bevelSize:0.005, bevelSegments:2 }), M.gilt, 0.0, -0.02, 0.09, 0, 0, Math.PI/2).scale.set(1, 0.7, 1);
+    for (const s of [-1, 1]){ const a = s*0.75, sa = Math.sin(a), ca = Math.cos(a), at = (y, z)=>[-sa*y, ca*y, z];   /* (two swords crossed behind it, pommels down) */
+      for (const [w, h, d, m, y, r] of [[0.045, 0.85, 0.008, M.steel, 0.12, 0.003], [0.22, 0.03, 0.03, M.gilt, -0.32, 0.008]]){ const [x0, y0, z0] = at(y, 0.03); box(w, h, d, m, x0, y0, z0, r, 0, 0, a); }
+      { const [x0, y0, z0] = at(-0.42, 0.03); cyl(0.016, 0.016, 0.16, M.dark, x0, y0, z0, 0, 0, a); } { const [x0, y0, z0] = at(-0.51, 0.03); sph(0.025, M.gilt, x0, y0, z0); } } }
+  else if (k==='rugr'){ const m = add(new T.CircleGeometry(0.85, 48), new T.MeshStandardMaterial({ map:v3TexRug('#2a4a6a', '#d8c890', '#8a2a20', 3).map, roughness:0.95 }), 0, 0.005, 0, -Math.PI/2); m.userData.flat = 1; tor(0.85, 0.014, M.linen, 0, 0.008, 0, Math.PI/2).userData.flat = 1; }   /* (a braided rim) */
+  else if (k==='rugl'){ const m = add(new T.PlaneGeometry(1.5, 2.4), new T.MeshStandardMaterial({ map:v3TexRug('#8a3028', '#c8a050', '#2a3048', 7).map, roughness:0.95 }), 0, 0.005, 0, -Math.PI/2); m.userData.flat = 1;
+    for (const s of [-1, 1]) for (let i=0;i<22;i++){ const f = cyl(0.006, 0.004, 0.09, M.linen, -0.7 + i*1.4/21, 0.006, s*1.245, Math.PI/2 + s*0.05); f.rotation.z = (i % 3 - 1)*0.12; f.userData.flat = 1; } }   /* (the fringe at each end) */
+  else if (k==='fern'){ const top = pot(0.14, 0.26, M.terra); cyl(0.13, 0.13, 0.01, M.soil, 0, top, 0); const rnd = v3Rng(12);
+    for (let i=0;i<11;i++){ const a = i*2.4, L = 0.32 + rnd()*0.12, fg = new T.PlaneGeometry(0.07, L, 1, 8), fp = fg.attributes.position;
+      for (let j=0;j<fp.count;j++){ const v = (fp.getY(j) + L/2)/L, w = fp.getX(j)*Math.sin(Math.PI*Math.min(1, v*1.15)); fp.setXYZ(j, w, Math.sin(v*1.4)*L*0.75, (1 - Math.cos(v*1.4))*L*0.75 + 0.01); } fg.computeVertexNormals();
+      add(fg, M.leaf, 0, top, 0, -0.15, a, 0); } }
+  else if (k==='flowers'){ const top = pot(0.12, 0.2, M.glaze); cyl(0.11, 0.11, 0.01, M.soil, 0, top, 0); const rnd = v3Rng(21);
+    for (let i=0;i<9;i++){ const a = rnd()*6.28, r = rnd()*0.07, h = 0.14 + rnd()*0.12, x = Math.cos(a)*r, z = Math.sin(a)*r; cyl(0.004, 0.004, h, M.leaf2, x, top + h/2, z); const pm = M.petal[i % 4];
+      for (let j=0;j<5;j++){ const b = j*Math.PI*2/5; sph(0.018, pm, x + Math.cos(b)*0.018, top + h, z + Math.sin(b)*0.018, 1, 0.4, 1, 1); } sph(0.01, M.brass, x, top + h + 0.006, z, 1, 1, 1, 1); }
+    for (let i=0;i<6;i++){ const a = i; sph(0.04, M.leaf2, Math.cos(a)*0.06, top + 0.03, Math.sin(a)*0.06, 1, 0.35, 0.6); } }
+  else if (k==='ptree'){ const P = []; for (let i=0;i<=6;i++){ const y = i/6*0.4; P.push([0.22 + 0.03*y/0.4, y]); } lathe([[0, 0]].concat(P, [[0.2, 0.4], [0, 0.38]]), M.wood, 0, 0, 0);
+    for (const y of [0.06, 0.34]) tor(0.225 + 0.03*y/0.4, 0.012, M.iron, 0, y, 0, Math.PI/2); cyl(0.2, 0.2, 0.01, M.soil, 0, 0.38, 0);
+    cyl(0.03, 0.05, 0.9, M.dark, 0, 0.83, 0); const rnd = v3Rng(41); for (let i=0;i<9;i++){ const a = rnd()*6.28, r = 0.08 + rnd()*0.16; sph(0.17 + rnd()*0.08, i % 2 ? M.leaf2 : M.leaf, Math.cos(a)*r, 1.25 + rnd()*0.3, Math.sin(a)*r, 1, 0.85, 1); } }
+  /* merged by material, one mesh each; kept, so a room's rebuild doesn't throw the shapes away */
+  const by = new Map(); for (const o of parts){ if (!by.has(o.material)) by.set(o.material, []); by.get(o.material).push(o); }
+  for (const [m, list] of by){ const mg = m3dMergeMeshes(list).geometry; mg.userData.keep = true; const o = new T.Mesh(mg, m); o.castShadow = !list[0].userData.flat; o.receiveShadow = true; g.add(o); }
+  for (const o of parts) if (o.geometry && !(o.geometry.userData && o.geometry.userData.keep)) o.geometry.dispose();
+  return (C[k] = g); }
+function furnInst(k){ const g = furnModel(k).clone(); g.userData.furn = k; return g; }
+
+/* ---- in the house: the placed pieces, and the solid ones walled off ---- */
+function houseDecorSolid(){ const h = houseP(); if (!h) return; for (const key of (G.houseSolid||[])){ const [x, y] = key.split(',').map(Number); if (G.map[x] && G.map[x][y]===T_WALL) G.map[x][y] = T_FLOOR; } G.houseSolid = new Set();
+  for (const d of h.decor){ const F = FURN[d.k]; if (!F || !F.solid || d.y > 0.05) continue; const x = Math.floor(d.x), y = Math.floor(d.z);
+    if (G.map[x] && G.map[x][y]===T_FLOOR && G.villageDeco[x][y]==='floor' && !(x===G.player.x && y===G.player.y)){ G.map[x][y] = T_WALL; G.houseSolid.add(x + ',' + y); } } }
+function v3DecorBuild(grp){ V3.decorGrp = new THREE.Group(); V3.decorGrp.name = 'decor'; grp.add(V3.decorGrp); V3.heGhost = null; v3DecorSync(); }
+function v3DecorSync(){ const g = V3.decorGrp, h = houseP(); if (!g || !h) return; while (g.children.length) g.remove(g.children[0]);
+  h.decor.forEach((d, i)=>{ if (!FURN[d.k]) return; const o = furnInst(d.k); o.position.set(d.x, d.y||0, d.z); o.rotation.y = d.r||0; o.userData.di = i; g.add(o); }); }
+
+/* ---- the edit mode ---- */
+const HE_STEP = Math.PI/4, HE_FINE = Math.PI/24;
+function heditIn(){ return G.gameMode===3 && G.interior && G.interior.key==='house' && !!houseP(); }
+function heditStart(){ if (!heditIn()) return; G.hedit = { snap:1, sel:null, cat:FURN_CATS[0][0] }; logMsg('decorating: pick a piece from your store, or click one in the room to move it', 'new'); heditPanel(true); }
+function heditEnd(){ if (!G.hedit) return; if (G.hedit.sel) heditCancel(); G.hedit = null; heditGhost(); heditPanel(true); try{ saveCurrentGame(); }catch(e){} }
+function heditGhost(){ const S = G.hedit && G.hedit.sel, grp = V3.decorGrp; if (V3.heGhost && (!S || V3.heGhost.userData.furn!==S.k || V3.heGhost.parent!==(grp && grp.parent))){ if (V3.heGhost.parent) V3.heGhost.parent.remove(V3.heGhost); V3.heGhost = null; }
+  if (!S || !grp || !grp.parent) return; if (!V3.heGhost){ const g = furnInst(S.k), T = THREE; g.userData.ghost = 1;
+    const ring = new T.Mesh(new T.RingGeometry(0.34, 0.42, 40), new T.MeshBasicMaterial({ color:0x60ff80, transparent:true, opacity:0.7, depthWrite:false })); ring.rotation.x = -Math.PI/2; ring.position.y = 0.012; ring.name = 'ring'; g.add(ring); grp.parent.add(g); V3.heGhost = g; }
+  const g = V3.heGhost; g.position.set(S.x, S.y, S.z); g.rotation.y = S.r; const ring = g.getObjectByName('ring'); if (ring){ ring.material.color.set(heditOk(S) ? 0x60ff80 : 0xff5040); ring.position.y = 0.012 - (S.y > 0.3 && !FURN[S.k].wall ? 0 : 0); ring.visible = !FURN[S.k].wall; } }
+/* where a placed piece may go: on the house's open floor (a room, the garden, the farmyard), not in a doorway or the front door, and a solid
+   one not where you stand */
+function heditOk(S){ if (!S) return false; const F = FURN[S.k]; let x = S.x, z = S.z; if (F.wall){ x += Math.sin(S.r)*0.5; z += Math.cos(S.r)*0.5; } const tx = Math.floor(x), ty = Math.floor(z);
+  const fl = G.map[tx] && G.villageDeco[tx] && G.villageDeco[tx][ty]==='floor' && (G.map[tx][ty]===T_FLOOR || (G.houseSolid && G.houseSolid.has(tx + ',' + ty)));
+  if (!fl) return false; const [dx, dy] = houseDoorXY(); if (tx===dx && ty===dy) return false;
+  if (F.solid && !F.wall && S.y < 0.05){ const m6 = v=>((v % 6) + 6) % 6; if (m6(tx - HOUSE_X0)===5 || m6(ty - HOUSE_Y0)===5) return false; if (tx===G.player.x && ty===G.player.y) return false; }
+  return true; }
+function heditAim(ev){ const S = G.hedit && G.hedit.sel; if (!S || !V3.cam || !V3.cv) return; const T = THREE, r = V3.cv.getBoundingClientRect(), F = FURN[S.k];
+  V3.ray.setFromCamera(new T.Vector2(((ev.clientX - r.left)/r.width)*2 - 1, -((ev.clientY - r.top)/r.height)*2 + 1), V3.cam);
+  const snap = G.hedit.snap, q = v=>snap ? Math.round(v*4)/4 : v;
+  if (F.wall){ const hw = (V3.occ||[]).length ? V3.ray.intersectObjects(V3.occ, false)[0] : null;
+    if (hw && hw.face){ const n = hw.face.normal.clone().transformDirection(hw.object.matrixWorld); if (Math.abs(n.y) < 0.3){ S.r = Math.atan2(n.x, n.z); S.x = n.x ? hw.point.x + n.x*0.01 : q(hw.point.x); S.z = n.z ? hw.point.z + n.z*0.01 : q(hw.point.z); S.base = snap ? Math.round(hw.point.y*10)/10 : hw.point.y; S.y = Math.max(0.4, Math.min(2.5, S.base + S.lift)); S.onWall = 1; return; } } }
+  S.onWall = 0; let y = 0, hit = null;
+  if (V3.decorGrp && !F.flat){ V3.decorGrp.updateMatrixWorld(true); for (const h of V3.ray.intersectObjects(V3.decorGrp.children, true)){ const n = h.face && h.face.normal.clone().transformDirection(h.object.matrixWorld); if (n && n.y > 0.6){ hit = h; break; } } }
+  const p = new T.Vector3(); if (hit){ p.copy(hit.point); y = hit.point.y; } else if (!V3.ray.ray.intersectPlane(V3.plane, p)) return;
+  S.x = q(p.x); S.z = q(p.z); S.base = F.flat ? 0.001*(1 + (h3i(S.k)%4)) : F.wall && !hit ? 1.5 : y; S.y = Math.max(0, S.base + S.lift); }
+function heditMove(ev){ if (!G.hedit) return; G.hedit.ev = { clientX:ev.clientX, clientY:ev.clientY }; if (G.hedit.sel){ heditAim(G.hedit.ev); heditGhost(); } }
+function heditPickAt(ev){ if (!V3.decorGrp || !V3.cam) return -1; const T = THREE, r = V3.cv.getBoundingClientRect();
+  V3.ray.setFromCamera(new T.Vector2(((ev.clientX - r.left)/r.width)*2 - 1, -((ev.clientY - r.top)/r.height)*2 + 1), V3.cam);
+  V3.decorGrp.updateMatrixWorld(true); const h = V3.ray.intersectObjects(V3.decorGrp.children, true)[0]; if (!h) return -1; let o = h.object; while (o && o.userData.di===undefined) o = o.parent; return o ? o.userData.di : -1; }
+function heditDown(ev){ const E = G.hedit; if (!E) return; const touch = ev.pointerType==='touch';
+  if (E.sel){ heditAim(ev); heditGhost(); if (touch) return; heditPlace(ev.shiftKey); return; }   /* (on a phone a tap moves it; Place sets it down) */
+  const i = heditPickAt(ev); if (i < 0) return; const h = houseP(), d = h.decor.splice(i, 1)[0]; E.sel = Object.assign({ lift:0 }, d, { y:d.y||0, base:d.y||0, r:d.r||0, orig:d });
+  houseDecorSolid(); v3DecorSync(); heditGhost(); heditPanel(true); sfx('click'); }
+function heditTake(k){ const E = G.hedit, h = houseP(); if (!E || !h || !(h.furn[k] > 0)) return; if (E.sel) heditCancel(); h.furn[k]--; if (!h.furn[k]) delete h.furn[k];
+  const p = G.player, fa = FACING_VECT[(p.facing|0)&3] || [0, 1]; E.sel = { k, x:p.x + 0.5 + fa[0]*1.2, z:p.y + 0.5 + fa[1]*1.2, y:FURN[k].wall ? 1.5 : 0, base:FURN[k].wall ? 1.5 : 0, r:0, lift:0, orig:null };
+  if (E.ev) heditAim(E.ev); heditGhost(); heditPanel(true); }
+function heditPlace(again){ const E = G.hedit, h = houseP(), S = E && E.sel; if (!S || !h) return false; if (!heditOk(S)){ logMsg("it won't go there", ''); sfx('error'); return false; }
+  h.decor.push({ k:S.k, x:+S.x.toFixed(3), z:+S.z.toFixed(3), y:+(S.y||0).toFixed(3), r:+(S.r||0).toFixed(4) }); E.sel = null; houseDecorSolid(); v3DecorSync(); heditGhost(); try{ audPage(); }catch(e){}
+  if (again && h.furn[S.k] > 0) heditTake(S.k); heditPanel(true); return true; }
+function heditCancel(){ const E = G.hedit, h = houseP(), S = E && E.sel; if (!S || !h) return; if (S.orig) h.decor.push(S.orig); else h.furn[S.k] = (h.furn[S.k]||0) + 1; E.sel = null; houseDecorSolid(); v3DecorSync(); heditGhost(); heditPanel(true); }
+function heditStore(){ const E = G.hedit, h = houseP(), S = E && E.sel; if (!S || !h) return; h.furn[S.k] = (h.furn[S.k]||0) + 1; E.sel = null; heditGhost(); heditPanel(true); logMsg(`the ${FURN[S.k].nm.toLowerCase()} goes back in your store`, ''); }
+function heditTurn(s){ const S = G.hedit && G.hedit.sel; if (!S) return; const st = G.hedit.snap ? HE_STEP : HE_FINE; S.r = G.hedit.snap ? Math.round((S.r + s*st)/st)*st : S.r + s*st; heditGhost(); }
+function heditLift(s){ const S = G.hedit && G.hedit.sel; if (!S) return; const st = G.hedit.snap ? 0.1 : 0.025, b = S.base||0; S.lift = Math.max(-b, Math.min(2.5 - b, (S.lift||0) + s*st)); S.y = Math.max(0, b + S.lift); heditGhost(); }
+function h3i(k){ let n = 0; for (let i=0;i<k.length;i++) n = (n*31 + k.charCodeAt(i)) | 0; return Math.abs(n); }
+function heditSnap(){ if (!G.hedit) return; G.hedit.snap = G.hedit.snap ? 0 : 1; heditPanel(true); }
+function heditKey(e){ if (!G.hedit) return false; const k = e.key;
+  if (k==='Escape'){ if (G.hedit.sel) heditCancel(); else heditEnd(); return true; }
+  if (!G.hedit.sel){ return false; }
+  if (k==='q' || k==='Q'){ heditTurn(1); return true; } if (k==='e' || k==='E'){ heditTurn(-1); return true; }
+  if (k==='r' || k==='R'){ heditLift(1); return true; } if (k==='f' || k==='F'){ heditLift(-1); return true; }
+  if (k==='g' || k==='G'){ heditSnap(); return true; } if (k==='x' || k==='X' || k==='Delete'){ heditStore(); return true; }
+  if (k==='Enter'){ heditPlace(e.shiftKey); return true; } return false; }
+/* the decorating panel: the Decorate button at home; editing, what you hold and how to work it, and your store by kind */
+function heditPanel(force){ let el = document.getElementById('hedit'); const on = heditIn() && G.ui==='playing', E = G.hedit, h = houseP();
+  if (!on){ if (el && el.style.display!=='none') el.style.display = 'none'; return; }
+  if (!el){ el = document.createElement('div'); el.id = 'hedit'; document.body.appendChild(el);
+    el.addEventListener('pointerdown', e=>e.stopPropagation()); el.addEventListener('click', e=>{ const b = e.target.closest('[data-he]'); if (!b) return; const a = b.dataset.he, v = b.dataset.v;
+      if (a==='start') heditStart(); else if (a==='end') heditEnd(); else if (a==='take') heditTake(v); else if (a==='cat'){ G.hedit.cat = v; heditPanel(true); } else if (a==='place') heditPlace(false); else if (a==='store') heditStore(); else if (a==='cancel') heditCancel();
+      else if (a==='turnL') heditTurn(1); else if (a==='turnR') heditTurn(-1); else if (a==='up') heditLift(1); else if (a==='down') heditLift(-1); else if (a==='snap') heditSnap(); }); }
+  const key = !E ? 'off' : JSON.stringify([E.cat, E.snap, E.sel && E.sel.k, h.furn, h.decor.length]); if (!force && el.dataset.key===key && el.style.display!=='none') return; el.dataset.key = key; el.style.display = '';
+  if (!E){ el.className = 'hedit-off'; el.innerHTML = `<button class="btn primary" data-he="start">Decorate${furnStored() ? ` <span class="muted">(${furnStored()} in store)</span>` : ''}</button>`; return; }
+  el.className = 'hedit-on'; const S = E.sel, cats = FURN_CATS.filter(([c])=>Object.keys(h.furn).some(k=>FURN[k] && FURN[k].cat===c)), cat = cats.some(([c])=>c===E.cat) ? E.cat : (cats[0] || [''])[0];
+  const list = Object.keys(h.furn).filter(k=>FURN[k] && FURN[k].cat===cat).map(k=>`<button class="btn small hepiece" data-he="take" data-v="${k}">${esc(FURN[k].nm)} <span class="muted">&times;${h.furn[k]}</span></button>`).join('');
+  el.innerHTML = `<div class="he-title">DECORATING <button class="btn small" data-he="end">done</button></div>
+    ${S ? `<div class="he-sel"><b>${esc(FURN[S.k].nm)}</b>
+      <div class="he-row"><button class="btn small" data-he="turnL" title="Q">&#8634; turn</button><button class="btn small" data-he="turnR" title="E">turn &#8635;</button><button class="btn small" data-he="up" title="R">raise</button><button class="btn small" data-he="down" title="F">lower</button></div>
+      <div class="he-row"><button class="btn small primary" data-he="place" title="click, or Enter">place</button><button class="btn small" data-he="store" title="X">to store</button><button class="btn small" data-he="cancel" title="Esc">put back</button></div>
+      <div class="muted he-help">Click to place it (Shift-click to place another), Q/E turn, R/F raise and lower, X to the store, Esc to put it back</div></div>`
+    : `<div class="muted he-help">Click a piece in the room to move it, or take one from your store</div>`}
+    <div class="he-row"><button class="btn small${E.snap ? ' primary' : ''}" data-he="snap" title="G">snap ${E.snap ? 'on' : 'off'}</button></div>
+    ${cats.length ? `<div class="he-cats">${cats.map(([c, cn])=>`<button class="btn small${c===cat ? ' primary' : ''}" data-he="cat" data-v="${c}">${cn}</button>`).join('')}</div><div class="he-list">${list}</div>` : `<div class="muted he-help">Your store is empty - Wenna the furnisher, in any town, sells furnishings</div>`}`; }
+function heditTick(){ if (G.hedit && !heditIn()){ G.hedit = null; heditGhost(); } heditPanel(false); }
+
 // the estate agent on every town square
 function estateNpcPlace(){
   if (G.interior || (G.villageNpcs||[]).some(n=>n.service==='estate')) return;
@@ -26825,6 +27076,7 @@ function houseLayout(){
     for (const [k, lx, ly] of (HOUSE_ROOMS[o.k].deco||[])){ G.map[x0 + lx][y0 + ly] = T_WALL; deco.push([k, x0 + lx, y0 + ly]); } }
   ROOM_LAYOUT.house = { benches, decor:'house', deco };
   if (farmAt) farmHerd(farmAt[0], farmAt[1]);
+  G.houseSolid = null; houseDecorSolid();   /* (RS-904) */
 }
 /* standing where a new room put something solid: the nearest open tile */
 function houseUnstick(){ const p = G.player; if (G.map[p.x] && G.map[p.x][p.y]===T_FLOOR) return;
@@ -38065,7 +38317,7 @@ function v3ParkSnap(){ const snap = {}; for (const k of V3.worldKeys || []) snap
    disposing those blindly made every later figure of the kind upload again), the rest of its geometry freed */
 function v3WorldDrop(w, S){ if (!w) return; S = S || V3; const keep = new Set();
   for (const p of [S.player].concat(S.npcs||[], S.villagers||[])){ if (!p) continue; if (p.e){ try{ m3dRelease(p.e); }catch(e){} if (p.e.holder) p.e.holder.traverse(o=>keep.add(o)); } }
-  w.traverse(o=>{ if (o.geometry && !o.isSprite && !keep.has(o) && !o.geometry.isSkinWrap) o.geometry.dispose(); }); for (const t of w.userData.shireTex||[]) t.dispose(); }   /* (not a sprite's: every sprite shares the one square) */
+  w.traverse(o=>{ if (o.geometry && !o.isSprite && !keep.has(o) && !o.geometry.isSkinWrap && !(o.geometry.userData && o.geometry.userData.keep)) o.geometry.dispose(); }); for (const t of w.userData.shireTex||[]) t.dispose(); }   /* (not a sprite's: every sprite shares the one square) */
 function v3Unpark(P, sc){
   const same = P.map===G.map; Object.assign(V3, P.snap); V3.world = P.world; if (P.world.parent!==sc) sc.add(P.world);
   V3.labels.innerHTML = '';
@@ -38423,7 +38675,7 @@ function v3PathTo(tx, ty, bump){
   return steps;
 }
 function v3WalkTo(act){
-  if (G.sleepFx) return;   /* (RS-389) */
+  if (G.sleepFx || G.hedit) return;   /* (RS-389; RS-904: not while decorating) */
   let path = null;
   if (act.kind==='building'){ const b = act.b; path = v3PathTo(b.door.x, b.door.y, false); }
   else if (act.kind==='tile') path = v3PathTo(act.x, act.y, true);
@@ -38440,6 +38692,7 @@ function v3WalkTo(act){
 // ---------- input ----------
 /* (RS-381) what the cursor is over, once a frame at most (see o3HoverTick) */
 function v3HoverTick(){
+  try{ heditTick(); }catch(e){ console.error(e); }   /* (RS-904) */
   if (!V3.mDirty || !V3.mEv || !v3Active()) return; V3.mDirty = false; const e = V3.mEv, cv = V3.cv; { const rc = cv.getBoundingClientRect(); V3.mxy = { x:e.clientX - rc.left, y:e.clientY - rc.top }; }
   const a = v3Pick(e); V3.hover = a && a.kind!=='ground' ? a : null; const cur = V3.hover ? 'pointer' : 'default'; if (cv.style.cursor!==cur) cv.style.cursor = cur;
 }
@@ -38464,9 +38717,9 @@ function v3Pick(e){
 }
 function v3Input(cv){
   cv.addEventListener('contextmenu', e=>{ if (!v3Active() || G.ui!=='playing') return; e.preventDefault(); v3Context(e); });
-  cv.addEventListener('pointermove', e=>{ if (!v3Active()) return; if (e.pointerType==='touch'){ V3.hover = null; return; } V3.mEv = { clientX:e.clientX, clientY:e.clientY }; V3.mDirty = true; });   /* (RS-381: only noted here - the pick runs once a frame, in v3HoverTick) */
+  cv.addEventListener('pointermove', e=>{ if (!v3Active()) return; if (G.hedit && e.pointerType!=='touch') heditMove(e); if (e.pointerType==='touch'){ V3.hover = null; return; } V3.mEv = { clientX:e.clientX, clientY:e.clientY }; V3.mDirty = true; });   /* (RS-381: only noted here - the pick runs once a frame, in v3HoverTick) */
   cv.addEventListener('pointerleave', ()=>{ V3.mxy = null; V3.mDirty = false; }); cv.addEventListener('pointerdown', e=>{ const rc = cv.getBoundingClientRect(); V3.mxy = { x:e.clientX - rc.left, y:e.clientY - rc.top }; });   /* (RS-374: a citizen's name shows where you point, or tap) */
-  cv.addEventListener('pointerdown', e=>{ if (!v3Active() || G.ui!=='playing' || e.button!==0 || G.portalFx) return; const a = v3Pick(e); if (e.shiftKey){ examineSay(examineAct(a)); return; } if (a && a.kind==='tile' && a.label==='Archery butts' && dummyClick(a.x, a.y)) return; if (a) v3WalkTo(a); });
+  cv.addEventListener('pointerdown', e=>{ if (!v3Active() || G.ui!=='playing' || e.button!==0 || G.portalFx) return; if (G.hedit){ heditDown(e); return; } const a = v3Pick(e); if (e.shiftKey){ examineSay(examineAct(a)); return; } if (a && a.kind==='tile' && a.label==='Archery butts' && dummyClick(a.x, a.y)) return; if (a) v3WalkTo(a); });
   cv.addEventListener('wheel', e=>{ if (!v3Active()) return; e.preventDefault(); V3.dist = clamp(V3.dist * (e.deltaY>0 ? 1.1 : 0.9), 6.5, 20); }, { passive:false });
 }
 // ---------- per-frame ----------
@@ -54490,7 +54743,7 @@ function backOut(){
     case 'charsheet': setUi('playing'); break;
     case 'skills': setUi('playing'); break;
     case 'skguide': setUi(G.skGuideBack||'playing'); break;
-    case 'lamp': case 'tasks': case 'travellog': case 'realms': case 'arms': case 'rareTrader': case 'seacharts': case 'estate': case 'trophies': case 'housePortal': case 'housePlot': case 'arch': case 'temple': case 'guild': case 'arena': case 'games': case 'gamble': case 'mayor': case 'harbour': if (G.ui==='gamble'){ gbLeave(); break; } if (G.ui==='games' && dartsBusy()) break; setUi('playing'); break;   /* (RS-391: not while a stake is on the table) */
+    case 'lamp': case 'tasks': case 'travellog': case 'realms': case 'arms': case 'rareTrader': case 'seacharts': case 'estate': case 'furnisher': case 'trophies': case 'housePortal': case 'housePlot': case 'arch': case 'temple': case 'guild': case 'arena': case 'games': case 'gamble': case 'mayor': case 'harbour': if (G.ui==='gamble'){ gbLeave(); break; } if (G.ui==='games' && dartsBusy()) break; setUi('playing'); break;   /* (RS-391: not while a stake is on the table) */
     case 'wevent': if (G.wevDlg && !G.wevDlg.noEsc) wevChoose(G.wevDlg.opts.length-1); else if (!G.wevDlg) setUi('playing'); break;
     case 'tailor': case 'bench': setUi('playing'); break;
     case 'makeover': makeoverLeave(); break;
@@ -54572,6 +54825,7 @@ function renderOverlay0(){
     case 'rareTrader': el.innerHTML = buildRareTrader(); break;
     case 'seacharts': el.innerHTML = buildSeaCharts(); break;
     case 'estate': el.innerHTML = buildEstate(); break;
+    case 'furnisher': el.innerHTML = buildFurnisher(); break;
     case 'trophies': el.innerHTML = buildTrophies(); break;
     case 'housePortal': el.innerHTML = buildHousePortal(); hpDrawMap(); break;
     case 'housePlot': el.innerHTML = buildHousePlot(); break;
@@ -54589,7 +54843,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-903';
+const GAME_VERSION = 'rs-904';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -57507,6 +57761,7 @@ function handleKeydown(e){
     if (e.target.id==='pinNote' && (e.key==='Escape' || e.key==='Enter')){ e.preventDefault(); if (e.key==='Enter') pinSave(); else pinClose(); }
     return;
   }
+  if (G.hedit && G.ui==='playing' && heditKey(e)){ e.preventDefault(); return; }   /* (RS-904: decorating) */
   if (CTX.open && (e.key==='Escape' || e.key==='`')){ ctxClose(); return; }
   if (G.pinEdit && (e.key==='Escape' || e.key==='`')){ pinClose(); return; }
   { const fk = /^F([1-6])$/.exec(e.key || '');
@@ -57664,7 +57919,7 @@ function handleKeydown(e){
     case 'travellog': case 'realms': { if (k==='Escape') setUi('playing'); break; }
     case 'arms': { if (k==='Escape'){ if (!armsOf()) armsBear(); else { G.armsDraft = null; setUi('playing'); } } break; }   /* (RS-852: the first time, Escape bears the arms shown) */
     case 'rareTrader': { if (k==='Escape') setUi('playing'); break; }
-    case 'seacharts': case 'estate': case 'trophies': case 'housePortal': case 'housePlot': case 'arch': case 'temple': case 'guild': case 'arena': case 'games': case 'gamble': case 'mayor': case 'harbour': { if (k==='Escape'){ if (G.ui==='gamble'){ gbLeave(); break; } if (G.ui==='games' && dartsBusy()) break; setUi('playing'); } break; }
+    case 'seacharts': case 'estate': case 'furnisher': case 'trophies': case 'housePortal': case 'housePlot': case 'arch': case 'temple': case 'guild': case 'arena': case 'games': case 'gamble': case 'mayor': case 'harbour': { if (k==='Escape'){ if (G.ui==='gamble'){ gbLeave(); break; } if (G.ui==='games' && dartsBusy()) break; setUi('playing'); } break; }
     case 'wevent': { if (k>='1' && k<='9') wevChoose(+k-1); else if (k==='Escape') backOut(); break; }
     case 'cook': { if (k==='Escape') setUi(G.cookAt==='fire' || G.interior ? 'playing' : 'tavern'); break; }
     case 'playing': handlePlayingKey(k); break;

@@ -1,3 +1,24 @@
+## RS-904 - House Decorating
+
+- **Decorate your house, ESO and WoW style.** At home, a **Decorate** button puts you in the edit mode. Take a piece from your house's store and it follows the pointer; click to place it anywhere, or Shift-click to place another of the same. While you hold a piece:
+  - **Q/E** turn it.
+  - **R/F** raise and lower it.
+  - **X** sends it back to the store, and **Esc** puts it back where it was.
+- **Stack and hang.** Pieces stand on whatever is under the pointer, so a bowl of apples or a candlestick goes on a table. Paintings, banners and shields hang on the walls.
+- **Snap or free.** Snap (G) sets pieces on a quarter-tile grid in eighth turns. With snap off, you move and turn them freely in fine steps.
+- **Move anything.** Click a placed piece to pick it up again.
+- **Solid pieces.** Tables, bookcases, wardrobes, chests and the like wall off their tile, so you walk round them. Nothing goes in a doorway or in the front door.
+- **Wenna the furnisher** stands on every town square. She always has twelve plain pieces, plus five finer ones that change every day. What you buy is carried to your house's store.
+- **27 furnishings.** Each is built from smooth turned and rounded parts:
+  - stools, carved chairs, a fireside armchair, benches;
+  - round and trestle tables, a bedside cabinet;
+  - a bookcase full of books, an iron-bound chest, a wardrobe, an ale cask;
+  - candlesticks, a candelabra, a standing lantern, an iron brazier;
+  - a glazed vase, a bowl of apples, a stack of books, a globe;
+  - a landscape painting, a banner, a shield with crossed swords;
+  - round and long rugs;
+  - a potted fern, a pot of flowers, a little tree in a tub.
+
 ## RS-903 - Digging for Treasure
 
 - **Digging for treasure is shown.** Digging up a buried cache, digging at a treasure map's X and shovelling a dungeon's loose earth used to hand over the find at once. Now you take out a spade and dig two spadefuls first, and the find comes after.
