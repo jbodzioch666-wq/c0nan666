@@ -1,3 +1,7 @@
+## RS-888 - Square to the Mark
+
+- **Crossbow aim fixed:** shooting a crossbow, you turned your body so far side-on (nearly 60 degrees) that your back and cape faced the camera, and the crossbow looked like it was sticking out of your back. You now stand only half as bladed - side-on to the mark, still facing it, the crossbow shouldered and aimed the same.
+
 ## RS-887 - Map Mended
 
 - **Dungeon minimap crash fixed:** going into some dungeon floors threw "Something went wrong" from the minimap, every frame - the record of which tiles you'd seen had been kept from a floor of another size. It's now fitted to the floor you're on, keeping what you'd already seen.
