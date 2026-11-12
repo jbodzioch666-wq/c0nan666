@@ -1,3 +1,11 @@
+## RS-908 - Garden Furnishings
+
+- **Garden furnishings.** A new Garden kind in your store: a clipped box hedge, a lily pond with reeds, a wrought-iron bench, a stone birdbath with a robin on the rim, a brass sundial, a scarecrow in a straw hat and a wheelbarrow full of flowers.
+- **Two from plans.** A stone well with a windlass and bucket, and a rose arch. Both are made at a carpentry bench like the other plan-only pieces.
+- **At Wenna's.** Each day she stocks two garden pieces as well as her plain and finer furnishings.
+- **For your yard or your house.** They're shrunk to the land's scale in your plot's yard, and full size in the house's rooms and garden.
+- **Wildlife stays outside the fence.** Deer, boar and rabbits no longer graze around your plot or wander into the yard.
+
 ## RS-907 - Your Plot on the Open Land
 
 - **A plot on the open land.** Hollis the estate agent stakes out a plot near any town once you own a house, for 25,000 gold: a fenced yard on open ground, with your house standing at the back of it. It's marked on your map and it turns up in map search.

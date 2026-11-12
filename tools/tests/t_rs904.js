@@ -57,7 +57,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   fs.writeFileSync(path.join(__dirname, 'shots', 'rs904-pieces.jpg'), Buffer.from(after.shot.split(',')[1], 'base64')); delete after.shot;
   console.log(JSON.stringify({ shop, ed, after }));
   A(shop.npc && shop.tile && shop.noHouse, 'Wenna the furnisher on the square; no house, nowhere to put it', shop);
-  A(shop.rows===17 && shop.stock.length===17 && shop.stock.join()!==shop.stock2.join(), 'the plain pieces and five finer ones, changing by the day', shop);
+  A(shop.rows===19 && shop.stock.length===19 && shop.stock.join()!==shop.stock2.join(), 'the plain pieces, five finer ones and two for the garden (RS-908), changing by the day', shop);
   A(shop.paid===420, 'bought for its price', shop);
   A(ed.v3 && ed.btn && ed.on && ed.ghost && ed.ok1, 'Decorate at home: a piece taken from the store follows the pointer', ed);
   A(Math.abs(ed.r1 - Math.PI/4) < 0.01 && ed.snapped && ed.solid, 'placed snapped and turned an eighth; a table walls off its tile', ed);
