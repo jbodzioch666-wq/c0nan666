@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-884 - Needles and Whorls
+
+- **Real firs.** Pines, the snow-laden firs of the cold lands and the cypress are no longer stacked cones. Each is a straight trunk ringed by whorls of branches, long and drooping at the foot and short at the head, every branch carrying crossed sprays of needles, with a spire on top.
+- **The yew grown too.** The yew you chop is now a tall, dense conifer of needled branches round its trunk instead of two dark cones.
+- **Cypress flames.** Short, upswept branches thick with needles, swelling low and narrowing to the point.
+- **Snow on the boughs.** In winter, and on the firs of the cold lands, snow lies along the top of each branch instead of covering the tree in white plates.
+
 ## RS-883 - Grown, Not Glued
 
 - **Trees with real branches.** Every oak, birch, willow, bush, jungle giant and choppable tree is now grown from a trunk that forks into limbs and branches, with a clump of leaves at the end of each. There are gaps between the clumps where you see the boughs and the sky, so it's no longer one ball.

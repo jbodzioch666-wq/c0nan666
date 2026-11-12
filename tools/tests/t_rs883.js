@@ -14,7 +14,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
       if (wd){ const wb = box(wd); o.woodTop = +wb.max.y.toFixed(3); o.woodSpread = +Math.max(wb.max.x - wb.min.x, wb.max.z - wb.min.z).toFixed(3); o.leafSpread = +Math.max(lb.max.x - lb.min.x, lb.max.z - lb.min.z).toFixed(3); } }
     out.snow = Object.keys(O3_WILD_SNOW).map(k=>{ const b = box(O3_WILD_SNOW[k]); return [k, !!O3_WILD_SNOW[k].attributes.color, +(b.max.y - b.min.y).toFixed(3)]; });
     for (const ty of ['tree', 'oak', 'willow', 'maple', 'magic', 'ancient', 'yew']) for (const j of [false, true]){ const g = o3NodeTree(ty, j), o = out.node[ty + (j ? '_j' : '')] = { leafy:0, wood:0, tier:0 };
-      g.traverse(m=>{ if (!m.isMesh) return; if (m.geometry.userData.leafy) o.leafy++; if (m.geometry===o3NodeGeo().tier) o.tier++; }); if (o.leafy) o.wood = g.children.some(c=>c.geometry===o3NodeTreeGeo(ty, j && !!O3_JUNGLE_CROWN[ty]).wood) ? 1 : 0; }
+      g.traverse(m=>{ if (!m.isMesh) return; if (m.geometry.userData.leafy) o.leafy++;  }); if (o.leafy) o.wood = g.children.some(c=>c.geometry===o3NodeTreeGeo(ty, j && !!O3_JUNGLE_CROWN[ty]).wood) ? 1 : 0; }
     out.trunkH = { tree:o3TrunkH('tree'), yew:o3TrunkH('yew') };
     goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{}; G.player.wildWarned = 1; G.gameMode = 0; G.player.clock = DAY_LENGTH*0.4; window.__trans = true; await fr(150);
     O3.renderer.render(O3.scene, O3.cam); out.shot = O3.renderer.domElement.toDataURL('image/jpeg', 0.85); return out; });
@@ -24,7 +24,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   A(r.k.willow.solid > 0 && r.k.willow.leafLow < r.k.willow.leafTop*0.45, 'the willow\'s strands hang low', r.k.willow);
   for (const k of ['oak', 'birch', 'willow', 'jtree']){ const o = r.k[k]; A(o.woodTop > o.leafLow + 0.05, k + ': its limbs reach up into its leaves', o); A(o.woodSpread > o.leafSpread*0.4, k + ': its limbs spread out across the crown', o); }
   for (const [k, col, h] of r.snow){ A(!col, k + ': winter\'s snow plain white', r.snow); if (r.k[k]) A(h < r.k[k].leafTop - r.k[k].leafLow, k + ': its snow caps sit among the leaves', [h, r.k[k]]); }
-  for (const [ty, o] of Object.entries(r.node)){ if (ty==='yew') A(o.tier===2 && !o.leafy, 'the yew keeps its tiers', o); else A(o.leafy===1 && o.wood===1 && !o.tier, ty + ': a gathering tree grown, leaves on limbs', o); }
+  for (const [ty, o] of Object.entries(r.node)){ if (ty==='yew') A(o.leafy===1, 'the yew grown (RS-884: needles, not tiers)', o); else A(o.leafy===1 && o.wood===1 && !o.tier, ty + ': a gathering tree grown, leaves on limbs', o); }
   A(r.trunkH.tree < 1.5 && r.trunkH.yew > 1.5, 'gathering trees fork lower, the yew\'s trunk as it was', r.trunkH);
   A(!errs.length, 'no errors: ' + errs.join(' | '));
 };
