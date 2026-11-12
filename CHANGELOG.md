@@ -1,3 +1,20 @@
+## RS-900 - Quest Scenes
+
+- **Quest scenes rebuilt.** The story quests' places on the open land are built from smooth, detailed parts instead of flat-shaded boxes, five-sided cones and twelve-sided stones:
+  - **The Goblin King's hall:** planks between barked posts on a stone footing, under a lumpy turf roof with earth at its eaves. Tusks cross on each gable over a skull, and skulls stand on pikes by the planked door.
+  - **The goblin war camp:** tents of stitched hides on crossed poles, logs to sit on round the fire pit, and spears stood together and lashed.
+  - **The hermit's hut:** a round wall of dry-laid stones under a ragged thatch with a bound top. It has a stone chimney, a planked door, a woodpile, and an axe in a stump.
+  - **The grave:** a round-headed stone, mossed at its foot, over a grassy mound, with bones and a skull in the grass.
+  - **The ruins:** fluted columns on their bases, one whole under its capital and the last span of the arch, one snapped off. Drums lie toppled in the grass by a cracked plinth.
+  - **The dig:** a pit ringed with its spoil, the heap beside it, a spade standing in the earth, a pick laid by, and the site staked out with sagging rope.
+  - **The stone circle:** lichened standing stones round an altar stone, with a faceted crystal floating over it and shards growing from it.
+  - **The thieves' hideout:** a dark cleft into a crag between boulders, with crates, a hooped barrel, a sack, and a lantern hung by the way in.
+  - **The Herald's obelisk:** a black shaft cut with glowing green runes, topped by a pyramidion, on two steps with skulls on them, with a green fire in an iron brazier.
+  - **The cairn:** stacked stones beside a signpost with two arrow boards.
+- **Fires and banners.** The hall and war camp use the camps' fire pit and swallowtailed banner. A quest's raider camp has them too, instead of a flat flag on a four-sided stick.
+- **Your grave** is a round-headed stone instead of a box with a half-cylinder on it.
+- **Fewer hitches.** Each scene is built once and reused after that. The banner's cloth texture no longer stalls for a sixth of a second the first time a camp is drawn.
+
 ## RS-899 - The Smith's Lean-to
 
 - **The smith's forge in town.** The lean-to against the smithy's east wall was two six-sided posts, a flat slab of roof and boxes for the forge, anvil and trough. Now round posts with knee braces carry a plate and rafters under a shingled roof that falls toward the street.

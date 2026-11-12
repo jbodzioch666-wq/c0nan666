@@ -229,6 +229,7 @@ Screenshots go to `tools/tests/shots/`.
 | `rs897` | | `rs897` | The Dwarf Gate's leaves are bronze relief faces (studded frame, lattice, lozenge, arrowhead hinges, patina), a rune band on each, a ring on a boss; no stone strips; still swing open; built once (`O3_GATELEAF`); shots `rs897-gate.jpg`, `rs897-open.jpg` | |
 | `rs898` | | `rs898` | A halfling town on the land: five hobbit holes dug into turf hills (fine grid, earth on the cut bank), planked doors with knobs in rings of stones, framed barred windows, stone chimneys, no half-balls or low-sided stakes; shots `rs898-shire.jpg`, `rs898-door.jpg` | |
 | `rs899` | | `rs899` | The town's forge lean-to: round braced posts, plate, rafters and shingled roof over the RS-862 forge and anvil, a plank trough, tools on the wall; no six-sided posts, cones or plain boxes; light at the mouth, sparks off the coals; shot `rs899-forge.png` | |
+| `rs900` | | `rs900` | | `rs900` | The quest scenes on the open land: built from smooth parts merged into kept meshes, no flat shading but the crystal, fine part counts, cheap to set down again; your grave the headstone, a quest camp the fire pit and banner. Shot: `shots/rs900-scenes.jpg` | |
 | `rs789` | A shire's door stones and flags are dark: their average vertex colour stays low |
 | `rs788` | The open land has its older grass again: no blade chunks, RS-785's code gone |
 | `rs787` | A battle at a town: the card before and after, the banner's words, the trees told where you stand, no shader built by a fade, new creatures warmed off the frame |

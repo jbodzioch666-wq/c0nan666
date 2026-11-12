@@ -9,17 +9,17 @@ module.exports = async page=>{
     sqStart('gob3'); sqAdvance('gob3');   /* (past "talk to the Captain" to "find the Goblin King's hall") */
     const t = questTarget({ kind:'story', sq:'gob3' }); out.key = sqSceneKey('gob3'); out.t = t && [t.x, t.y];
     if (t){ G.owPos = { x:t.x, y:t.y + 2 }; O3.qKey = null; await frames(8);
-      const near = []; O3.qGrp.traverse(o=>{ if (o.isMesh && Math.hypot(o.position.x - t.x - 0.5, o.position.z - t.y - 0.5) < 0.8) near.push(o.geometry.type); });
+      const near = []; O3.qGrp.traverse(o=>{ if (o.isMesh && Math.hypot(o.position.x - t.x - 0.5, o.position.z - t.y - 0.5) < 0.8) near.push(o.userData.qsPart ? 'qs:' + o.userData.qsPart : o.geometry.type); });   /* (RS-900: the scene's parts merged, marked qsPart) */
       out.meshes = near.length; out.kinds = [...new Set(near)].join(','); }
     // every scene builds
     const g = new THREE.Group(); out.built = {}; for (const k of ['hall','warcamp','hut','grave','ruin','dig','circle','hideout','obelisk','cairn']){ const n0 = g.children.length; const h = o3QuestScene(k, g, 0, 0, 0); out.built[k] = [g.children.length - n0, +h.toFixed(2)]; }
     // the step's done: the hall goes
-    sqAdvance('gob3'); O3.qKey = null; await frames(4); let left = 0; if (t) O3.qGrp.traverse(o=>{ if (o.isMesh && o.geometry.type==='ExtrudeGeometry' && Math.hypot(o.position.x - t.x - 0.5, o.position.z - t.y - 0.5) < 0.8) left++; }); out.gone = left===0;
+    sqAdvance('gob3'); O3.qKey = null; await frames(4); let left = 0; if (t) O3.qGrp.traverse(o=>{ if (o.isMesh && o.userData.qsPart && Math.hypot(o.position.x - t.x - 0.5, o.position.z - t.y - 0.5) < 0.8) left++; }); out.gone = left===0;
     out.key2 = sqSceneKey('gob3');
     return out; });
   console.log(JSON.stringify(r));
   const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
   A(r.key==='hall' && r.t, 'the Goblin King\'s hall is the place to find');
-  A(r.meshes >= 8 && /ExtrudeGeometry/.test(r.kinds), 'the hall stands at the quest\'s spot, roof and all');
-  A(Object.values(r.built).every(([n, h])=>n >= 4 && h > 0.5), 'every scene builds');
+  A(r.meshes >= 8 && /qs:hall/.test(r.kinds), 'the hall stands at the quest\'s spot, roof and all');
+  A(Object.values(r.built).every(([n, h])=>n >= 2 && h > 0.5), 'every scene builds');
 };
