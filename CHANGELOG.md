@@ -1,3 +1,9 @@
+## RS-895 - Fire Pit and Banner
+
+- **Camp fires are fire pits.** A camp's fire was a glow over bare grass. It now burns in a ring of weathered stones, sooty on the side to the flame, over a bed of ash and charcoal, with barked logs leant together and charred black where they burn, and coals glowing at the heart.
+- **A banner over the camp.** The flat red card on a four-sided stick is now a swallowtailed banner with a dark border and a sign of crossed blades, hanging in folds from a crossbar on a pole with an iron point.
+- **Your own fire too.** The campfire you light uses the same pit in place of the twelve-sided pebbles and six-sided logs, and your spit's bar now rests in two forked sticks.
+
 ## RS-894 - Dragon's Maw
 
 - **The lair's mouth is carved rock.** The dragon's door was one smooth grey slab with a bevel. It is now a face of the crag's own rock in relief: lumps and ledges, dark cracks, and a heavy lip round the opening that rolls back into the dark, its edges sinking into the cliff.
