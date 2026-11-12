@@ -225,6 +225,7 @@ Screenshots go to `tools/tests/shots/`.
 | `rs893` | Camp tents are ridge tents (`o3TentKit`, `o3Tent`, `o3TentAt`, `o3CanvasTex`, `o3GridGeo`): sagging canvas darker at the hem, closed back, flaps tied back on a dark inside, poles and guy ropes; a camp's tents face its fire; no four-sided cones. Shots: `shots/rs893-camp.jpg`, `rs893-tent.jpg` |
 | `rs894` | | `rs894` | The dragon lair's mouth is a vertex-coloured rock relief with a rolled lip (no bevelled slab), nine lathed stalactites (no cones), the opening clear and the face round it; shot `rs894-lair.jpg` | |
 | `rs895` | | `rs895` | Camps' fire pits (sooty stone ring, ash, charred barked logs, glowing coals) and swallowtailed banners on a crossbar; no low-sided poles or flat cards; your own fire uses the pit, the spit on forked sticks; shots `rs895-camp.jpg`, `rs895-pit.jpg` | |
+| `rs896` | | `rs896` | The Dwarf Gate's ore cart is a plank tub bound in iron on a frame, axles and four lathed flanged wheels (no four-sided tub); its lantern hangs from a braced arm (cap, panes, bars, base; no iron box); shots `rs896-cart.jpg`, `rs896-lamp.jpg` | |
 | `rs789` | A shire's door stones and flags are dark: their average vertex colour stays low |
 | `rs788` | The open land has its older grass again: no blade chunks, RS-785's code gone |
 | `rs787` | A battle at a town: the card before and after, the banner's words, the trees told where you stand, no shader built by a fade, new creatures warmed off the frame |

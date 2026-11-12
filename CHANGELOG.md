@@ -1,3 +1,8 @@
+## RS-896 - Cart and Lantern
+
+- **A proper ore cart.** The cart by the Dwarf Gate was a four-sided tapered cylinder on plain discs. It is now a tub of planks flaring to its rim, bound in iron at the corners and round the top, on a wooden frame with couplings and two iron axles. It runs on flanged rail wheels with dished centres and hubs, with ore and the rock it came in heaped over the rim.
+- **A hanging lantern.** The iron box on a stick is now a lantern hung from a hook under a braced arm: a ring, a peaked cap, warm glowing panes between four iron bars, and a dished base. The post below has a flared foot.
+
 ## RS-895 - Fire Pit and Banner
 
 - **Camp fires are fire pits.** A camp's fire was a glow over bare grass. It now burns in a ring of weathered stones, sooty on the side to the flame, over a bed of ash and charcoal, with barked logs leant together and charred black where they burn, and coals glowing at the heart.
