@@ -1,3 +1,10 @@
+## RS-902 - Digging and Waterfalls
+
+- **Digging.** Excavating a dig site's hotspot now has its own work. You take the pick in both hands and swing it down into the soil before you, throwing up earth on each blow. You used to stand idle while you dug. The earth thrown up is sandy in the desert and dark on volcanic ground.
+- **Waterfalls.** The rock ledges the waterfalls come down are weathered stone with a rock face. They used to be flat grey facets, seven to a ring.
+  - **Boulders:** the boulders beside each lip are sculpted stones instead of twenty-sided dice.
+  - **Water:** the water runs in finer strips, and each curtain bows out at its middle where the water heaps over the lip.
+
 ## RS-901 - Places of Interest
 
 - **Places of interest rebuilt.** The watchtowers, caches, hamlets, caves, grottoes, ruins, standing stones, old camps, wells, hermits' huts, dig camps and ferries on the land were flat-shaded boxes on five-sided posts. They're now built from smooth, detailed parts:
