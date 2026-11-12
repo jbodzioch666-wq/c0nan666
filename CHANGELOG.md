@@ -1,3 +1,7 @@
+## RS-891 - Meadow Flowers
+
+- **Wild flowers are plants:** the flowers scattered through the open land's grass were little coloured balls floating above the ground. Each one now grows on a curving stalk with two leaves and has a five-petalled head in its own colour with a gold eye, turned and sized its own way. They still sway in the wind.
+
 ## RS-890 - Know Your Town
 
 - **Town sizes on the world map:** hover a town on the world map (M) to see whether it's a village, a town or a city, along with its people (for example "Dwarven city"). The tooltip also shows the combat levels of the land around it, so you can tell at a glance where a town sits on your way up.
