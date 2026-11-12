@@ -1,3 +1,9 @@
+## RS-903 - Digging for Treasure
+
+- **Digging for treasure is shown.** Digging up a buried cache, digging at a treasure map's X and shovelling a dungeon's loose earth used to hand over the find at once. Now you take out a spade and dig two spadefuls first, and the find comes after.
+- **A real spade.** It has a D-grip, a long haft, a riveted iron socket, and a bevelled, dished blade with a tread on each shoulder.
+- **The shovelling.** You drive the blade in with a foot on the tread, lever it back, and lift a clod of earth on the blade. Then you throw the clod over your shoulder, and earth flies on the bite and on the throw. The earth is the colour of the ground you dig: sand in the desert, dark ash on volcanic land, and grey-brown in a dungeon.
+
 ## RS-902 - Digging and Waterfalls
 
 - **Digging.** Excavating a dig site's hotspot now has its own work. You take the pick in both hands and swing it down into the soil before you, throwing up earth on each blow. You used to stand idle while you dug. The earth thrown up is sandy in the desert and dark on volcanic ground.
