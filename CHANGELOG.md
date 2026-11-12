@@ -1,3 +1,9 @@
+## RS-894 - Dragon's Maw
+
+- **The lair's mouth is carved rock.** The dragon's door was one smooth grey slab with a bevel. It is now a face of the crag's own rock in relief: lumps and ledges, dark cracks, and a heavy lip round the opening that rolls back into the dark, its edges sinking into the cliff.
+- **Teeth that drip.** The fangs of rock round the arch were plain seven-sided cones. They now hang as wavering, knobbed stalactites, paler at the root.
+- **No lit walls inside.** The flat grey jambs that showed within the opening are gone; the lip now hides them.
+
 ## RS-893 - Canvas and Rope
 
 - **Real tents in the camps:** the tents in bandit camps, quest camps and wandering camps were four-sided brown cones. They're now ridge tents: woven canvas sagging between the ridge pole and the ground and darker toward the hem, a closed back, and front flaps tied back on a dark inside with a ground sheet. Each has poles fore and aft, a ridge pole, and guy ropes out to pegs. Every tent's door faces the campfire.
