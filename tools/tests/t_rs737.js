@@ -44,6 +44,6 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   A(r1.dlg && r1.sown==='flax' && r1.seeds===2 && r1.w===1 && r1.st===0 && r1.bed===0 && /sprouting/.test(r1.info), 'a bed sown with flax, watered, then asked after: ' + JSON.stringify(r1));
   A(r2.st.join()==='0,1,2,3' && r2.got >= 5 && r2.got <= 12 && r2.xp > 0 && r2.empty, 'it grows on the clock and is picked: ' + JSON.stringify(r2));
   A(r3.needs && r3.hook && r3.seeds.includes('seed_bloodmoss') && r3.seeds.includes('seed_ghostcap') && !r3.mats, 'herbs need their level; seeds in the bag: ' + JSON.stringify(r3));
-  A(r4.stages.join()==='0,1,2,3' && r4.kids.every(n=>n > 0) && r4.kids[1] > r4.kids[0] && r4.kids[3] > r4.kids[1], 'the beds show their crops: ' + JSON.stringify(r4));
+  A(r4.stages.join()==='0,1,2,3' && r4.kids.every(n=>n > 0) && r4.kids[3] > r4.kids[1],   /* (RS-892: beds 0 and 2 are flax, 1 and 3 silverleaf - only like with like is compared; flax sprouts as thin stalks) */ 'the beds show their crops: ' + JSON.stringify(r4));
   A(!errs.length, 'no errors: ' + errs.join(' | '));
 };

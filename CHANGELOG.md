@@ -1,3 +1,8 @@
+## RS-892 - Garden in Bloom
+
+- **Garden beds grow real herbs:** the plants in your house's garden were green blobs topped with balls. They now grow like the herbs out on the open land: two first leaves, then a rosette of arched leaves, then a curving stem in bud, then the open flower.
+- **Each herb its own look:** sunpetals open as yellow daisies, starlilies as six-pointed lilies, and silverleaf has pale leaves and white flowers. Flax comes up in tall thin stalks with blue flowers, ghostcaps push up as mushrooms, and bloodmoss grows in cushions of moss dotted with red flowers.
+
 ## RS-891 - Meadow Flowers
 
 - **Wild flowers are plants:** the flowers scattered through the open land's grass were little coloured balls floating above the ground. Each one now grows on a curving stalk with two leaves and has a five-petalled head in its own colour with a gold eye, turned and sized its own way. They still sway in the wind.
