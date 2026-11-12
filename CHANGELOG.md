@@ -1,3 +1,9 @@
+## RS-899 - The Smith's Lean-to
+
+- **The smith's forge in town.** The lean-to against the smithy's east wall was two six-sided posts, a flat slab of roof and boxes for the forge, anvil and trough. Now round posts with knee braces carry a plate and rafters under a shingled roof that falls toward the street.
+- **The real forge and anvil.** Under the lean-to stand the stone forge from the smithy (arched glowing mouth facing the street, hood and flue up through the roof, bellows at its side) and the shaped anvil on its iron-bound stump. Its light sits at the mouth and its sparks fly off the coals.
+- **Trough and tools.** A quench trough of planks bound in iron holds dark water, and the smith's hammers and tongs hang from a rail on the wall.
+
 ## RS-898 - Hobbit Holes
 
 - **Hobbit holes dug into their hills.** A halfling town on the open land was five half-balls of turf with a flat disc stuck on each. Now each is a lumpy hill whose front is cut back into a bank of earth, with the door set into it.
