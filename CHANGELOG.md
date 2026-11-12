@@ -1,3 +1,9 @@
+## RS-893 - Canvas and Rope
+
+- **Real tents in the camps:** the tents in bandit camps, quest camps and wandering camps were four-sided brown cones. They're now ridge tents: woven canvas sagging between the ridge pole and the ground and darker toward the hem, a closed back, and front flaps tied back on a dark inside with a ground sheet. Each has poles fore and aft, a ridge pole, and guy ropes out to pegs. Every tent's door faces the campfire.
+- **Your own camp:** the tent you pitch with your camp kit is pale canvas, its door to your fire.
+- **The old camp:** the abandoned camp's tent has fallen half over.
+
 ## RS-892 - Garden in Bloom
 
 - **Garden beds grow real herbs:** the plants in your house's garden were green blobs topped with balls. They now grow like the herbs out on the open land: two first leaves, then a rosette of arched leaves, then a curving stem in bud, then the open flower.
