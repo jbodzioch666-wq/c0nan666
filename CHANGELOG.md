@@ -1,3 +1,11 @@
+## RS-885 - Towns Built by Hand
+
+- **Every town on the open land remade:** the little towns you walk up to are rebuilt for each people instead of plain boxes and cones.
+- **Timbered houses:** humans and half-elves live in plastered houses with dark beams, gabled roofs of laid shingles, chimneys, doors, steps and windows that light up at night.
+- **Towers and walls:** round stone towers on battered bases with slit windows and witch-hat roofs topped by gold finials; cities ringed by a walk of merlons and corner towers.
+- **Each people its own:** the dwarves' carved gate in a craggy, shaded hill with braziers either side; elves' slender towers among grown trees; the wood elves' great tree with its railed platform and thatched huts; orc hide tents round a skull totem and fire ring; gnome mushroom houses by a geared tower; the dragon-folk's stepped ziggurat with a brazier on top; tieflings' twisted obsidian spires; and a half-elf windmill with latticed sails.
+- **Same speed:** each town's fixed parts are merged by material, so the open land draws no more than before.
+
 # Depthcrawl patch notes
 
 ## RS-884 - Needles and Whorls
