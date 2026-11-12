@@ -16,7 +16,7 @@ module.exports = async page=>{
     /* (RS-695) every mine in the land built round you has its cliff - one near another, or near a barrow's stair, had none */
     { const L = geo.userData.mines || [], w = O3.win || O3.lastWin; let all = 0, got = 0; const [lx, ly] = [Math.floor(O3.ppos.x) - 40, Math.floor(O3.ppos.z) - 40];
       for (let x=lx;x<lx+80;x++) for (let y=ly;y<ly+80;y++) if (o3Tile(x, y)===OW_MINE){ all++; if (L.some(([a, b])=>a===x && b===y)) got++; } out.allMines = all; out.gotMines = got; }
-    out.ownCrag = 0; if (g) g.traverse(o=>{ if (o.isMesh && o.material && o.material.vertexColors) out.ownCrag++; });
+    out.ownCrag = 0; if (g) g.traverse(o=>{ if (o.isMesh && o.material && o.material.vertexColors && !o.userData.gateLeaf) out.ownCrag++;   /* (RS-897: the bronze leaves are vertex-coloured too) */ });
     /* the land round the gate as a mesh of its own, to cast rays on */
     const P = geo.attributes.position, I = geo.index.array, S = O3_MINE_S, ry = o3SiteYaw(OW_MINE, tx, tz), co = Math.cos(ry), si = Math.sin(ry), cx = tx + 0.5, cz = tz + 0.5, pad = O3.heightAt(cx, cz);
     const W = (u, v)=>[cx + S*(u*co + v*si), cz + S*(-u*si + v*co)], near = k=>Math.abs(P.getX(k) - cx) < 3.2 && Math.abs(P.getZ(k) - cz) < 3.2, ix = [];

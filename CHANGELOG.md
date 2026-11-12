@@ -1,3 +1,10 @@
+## RS-897 - Bronze Doors
+
+- **Bronze doors on the Dwarf Gate.** The gate's leaves were stone slabs with strips laid on, and they read as boxes. They are now cast bronze in relief: a riveted frame, a lattice of diamonds with a stud at every crossing, a stepped lozenge below the rail, and strap hinges ending in arrowheads. The bronze is bright where it stands proud and dark with patina in the hollows.
+- **Runes on the doors.** A band of runes runs across the top of each leaf, and it wakes with the lintel's as you come to the gate.
+- **Ring pulls.** Each leaf has a heavy iron ring hanging from a bronze boss.
+- **Built once.** The doors' relief is made once and shared by every gate, so after the first gate the rest cost almost nothing to build.
+
 ## RS-896 - Cart and Lantern
 
 - **A proper ore cart.** The cart by the Dwarf Gate was a four-sided tapered cylinder on plain discs. It is now a tub of planks flaring to its rim, bound in iron at the corners and round the top, on a wooden frame with couplings and two iron axles. It runs on flanged rail wheels with dished centres and hubs, with ore and the rock it came in heaped over the rim.
