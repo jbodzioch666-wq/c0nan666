@@ -1,3 +1,7 @@
+## RS-887 - Map Mended
+
+- **Dungeon minimap crash fixed:** going into some dungeon floors threw "Something went wrong" from the minimap, every frame - the record of which tiles you'd seen had been kept from a floor of another size. It's now fitted to the floor you're on, keeping what you'd already seen.
+
 ## RS-886 - Weathered Stone
 
 - **Stones, not dice:** every rough stone on the open land - a barrow's kerbs, slabs, door stones and capstone, the boulders round a dragon's lair, the rocks at a mine - is now a weathered, rounded stone broken flat along its beds, with mottled, pitted grain and flecks of lichen, instead of a faceted twelve-sided lump. Each barrow's stone still takes its land's colour.
