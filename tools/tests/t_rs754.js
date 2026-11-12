@@ -22,7 +22,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
     /* outside: the barrow's mound and stones */
     const outside = async s=>{ G.gameMode = 0; setUi('playing'); const q = owNb(s.x, s.y, 0, 1); G.owPos = { x:q[0], y:q[1] }; owReveal(q[0], q[1], 8); O3.win = null; await fr(150);
       let grp = null; O3.scene.traverse(o=>{ if (o.barrowBio && o.doorLintel){ const w = new THREE.Vector3(); o.getWorldPosition(w); const L = o3L(s.x, s.y); if (L && Math.abs(w.x - (L[0] + 0.5)) < 1.2 && Math.abs(w.z - (L[1] + 0.5)) < 1.2) grp = o; } });
-      if (!grp) return { found:false }; const maps = new Set(), rocks = new Set(); grp.traverse(o=>{ if (o.isMesh && o.material){ if (o.material.map) maps.add(o.material.map); if (o.material.flatShading) rocks.add(o.material); } });
+      if (!grp) return { found:false }; const maps = new Set(), rocks = new Set(); grp.traverse(o=>{ if (o.isMesh && o.material){ if (o.material.map) maps.add(o.material.map); if (o.material.map && o.material.map===o3RockTex()) rocks.add(o.material); /* (RS-886: the rock textured, no longer told by its flat shading) */ } });
       return { found:true, bio:grp.barrowBio, sand:maps.has(v3TexSand(O3.tex)), turf:maps.has(v3TexTurf(O3.tex)), rockOwn:[...rocks].some(x=>x!==o3Mats().rock), rockOld:[...rocks].some(x=>x===o3Mats().rock) }; };
     out.outD = await outside(d); out.outG = await outside(g);
     return out; });

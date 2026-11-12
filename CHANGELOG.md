@@ -1,3 +1,9 @@
+## RS-886 - Weathered Stone
+
+- **Stones, not dice:** every rough stone on the open land - a barrow's kerbs, slabs, door stones and capstone, the boulders round a dragon's lair, the rocks at a mine - is now a weathered, rounded stone broken flat along its beds, with mottled, pitted grain and flecks of lichen, instead of a faceted twelve-sided lump. Each barrow's stone still takes its land's colour.
+- **The Necromancer's Tower rebuilt:** a black stone tower on three octagonal steps, battered at its foot and banded by string courses, with four flying buttresses and their pinnacles, pointed windows lit violet, a gabled porch with an iron-banded door and a lamp, skulls on posts with green eyes either side of the way in, a gallery of merlons and bone horns, a slate spire, and a claw of bone holding the glowing orb.
+- **The dragon's gold:** the hoard is a heap of coins catching the light, not a smooth yellow blob.
+
 ## RS-885 - Towns Built by Hand
 
 - **Every town on the open land remade:** the little towns you walk up to are rebuilt for each people instead of plain boxes and cones.
