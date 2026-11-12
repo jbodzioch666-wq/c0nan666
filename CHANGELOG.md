@@ -1,5 +1,12 @@
 # Depthcrawl patch notes
 
+## RS-882 - Leaves, Not Lollipops
+
+- **Crowns made of leaves.** Oaks, birches, willows, bushes and the jungle giants now wear crowns built from dozens of cut-out clusters of painted leaves over a dark heart, instead of a smooth green ball. From the game's camera they read as leafy trees with a ragged edge and depth, not lollipops.
+- **Lit as one crown.** The leaf clusters are shaded as a single round canopy, bright on top and dark beneath, and their backs no longer turn black along the edge.
+- **Gathering trees rebuilt.** The trees you chop have shorter bare trunks, bigger crowns sitting lower on them, and boughs reaching up into the leaves.
+- **Leafy shadows.** Trees cast shadows with the shape of their leaves.
+
 ## RS-881 - Painted Woods
 
 - **New trees across the open land:** the faceted green balls are gone. Oaks have broad crowns of soft, heaped leaf, darker in their folds and underneath and warm where the sun is on top, on flared trunks that fork into boughs reaching up into the leaves.
