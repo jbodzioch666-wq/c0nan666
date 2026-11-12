@@ -227,6 +227,7 @@ Screenshots go to `tools/tests/shots/`.
 | `rs895` | | `rs895` | Camps' fire pits (sooty stone ring, ash, charred barked logs, glowing coals) and swallowtailed banners on a crossbar; no low-sided poles or flat cards; your own fire uses the pit, the spit on forked sticks; shots `rs895-camp.jpg`, `rs895-pit.jpg` | |
 | `rs896` | | `rs896` | The Dwarf Gate's ore cart is a plank tub bound in iron on a frame, axles and four lathed flanged wheels (no four-sided tub); its lantern hangs from a braced arm (cap, panes, bars, base; no iron box); shots `rs896-cart.jpg`, `rs896-lamp.jpg` | |
 | `rs897` | | `rs897` | The Dwarf Gate's leaves are bronze relief faces (studded frame, lattice, lozenge, arrowhead hinges, patina), a rune band on each, a ring on a boss; no stone strips; still swing open; built once (`O3_GATELEAF`); shots `rs897-gate.jpg`, `rs897-open.jpg` | |
+| `rs898` | | `rs898` | A halfling town on the land: five hobbit holes dug into turf hills (fine grid, earth on the cut bank), planked doors with knobs in rings of stones, framed barred windows, stone chimneys, no half-balls or low-sided stakes; shots `rs898-shire.jpg`, `rs898-door.jpg` | |
 | `rs789` | A shire's door stones and flags are dark: their average vertex colour stays low |
 | `rs788` | The open land has its older grass again: no blade chunks, RS-785's code gone |
 | `rs787` | A battle at a town: the card before and after, the banner's words, the trees told where you stand, no shader built by a fade, new creatures warmed off the frame |

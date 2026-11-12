@@ -1,3 +1,11 @@
+## RS-898 - Hobbit Holes
+
+- **Hobbit holes dug into their hills.** A halfling town on the open land was five half-balls of turf with a flat disc stuck on each. Now each is a lumpy hill whose front is cut back into a bank of earth, with the door set into it.
+- **Round doors done properly.** Each door is planked and painted, with a brass knob in the middle, in a ring of eleven dressed stones. Stepping stones lead up to it.
+- **Windows and chimneys.** Round windows either side of the door are framed in the door's colour and crossed with glazing bars. The chimneys are round stone stacks with caps.
+- **The party tree.** The great oak's faceted leaf-balls are now heaped, shaded crowns on barked limbs, and the stockade's stakes and rail are rounder.
+- **Built once.** The hills and the oak's crowns are made once a session, so the town costs no more to rebuild than before.
+
 ## RS-897 - Bronze Doors
 
 - **Bronze doors on the Dwarf Gate.** The gate's leaves were stone slabs with strips laid on, and they read as boxes. They are now cast bronze in relief: a riveted frame, a lattice of diamonds with a stud at every crossing, a stepped lozenge below the rail, and strap hinges ending in arrowheads. The bronze is bright where it stands proud and dark with patina in the hollows.
