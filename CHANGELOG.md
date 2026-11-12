@@ -1,3 +1,19 @@
+## RS-901 - Places of Interest
+
+- **Places of interest rebuilt.** The watchtowers, caches, hamlets, caves, grottoes, ruins, standing stones, old camps, wells, hermits' huts, dig camps and ferries on the land were flat-shaded boxes on five-sided posts. They're now built from smooth, detailed parts:
+  - **Watchtower:** four log legs, splayed and cross-braced, hold a planked deck railed on three sides, with a ladder up the fourth. It has a shingled hip roof and a pennant that still flutters.
+  - **Buried cache:** a sandy mound with an X of red boards, a weathered sign on a stake, the corner of a banded chest showing, and a few coins.
+  - **Hamlet:** a timber-framed cottage under thatch with a chimney, a stone windmill under a cap whose four latticed sails still turn, and fields in furrows.
+  - **Cave and grotto:** a dark way into a crag between boulders. The grotto has a fall of streaming water over its mouth, into a pool ringed with stones.
+  - **Ruins:** walls of squared blocks broken off ragged, fluted columns (one whole under its capital), and a stair going down into the dark in a stone frame.
+  - **Standing stones:** seven lichened stones with a lintel laid across two.
+  - **Old camp:** the fallen tent, a cold ring of stones round charred logs, a hooped barrel, a crate and a pot left lying.
+  - **Well:** a ring of dry-laid stones with a coping and dark water inside. A windlass with a crank, rope and bucket hangs under a little shingled roof.
+  - **Hermit's hut:** the drystone hut from RS-900, its smoke rising from the chimney.
+  - **Dig camp:** a tent, and a trestle table of finds: a pot, a skull, a gilt idol and a green vase. There's also a spoil heap, and a sieve propped by a bucket.
+  - **Ferry pier:** planks on round piles, a bollard and a coil of rope. The ferry is a little boat with a mast and a bellied sail, still bobbing at the end.
+- **Built once.** Each place is built once and reused as you walk on.
+
 ## RS-900 - Quest Scenes
 
 - **Quest scenes rebuilt.** The story quests' places on the open land are built from smooth, detailed parts instead of flat-shaded boxes, five-sided cones and twelve-sided stones:
