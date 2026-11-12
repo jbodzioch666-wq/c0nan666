@@ -27,14 +27,14 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
     out.gold = p.gold; out.cost = HOUSE_SIZES.slice(1).reduce((t, z)=>t + z.gold, 0); enterHouse();
     for (const k of Object.keys(HOUSE_ROOMS)){ if (houseHas(k) || HOUSE_ROOMS[k].out) continue;   /* (the garden and farmyard have tests of their own) */ const S = houseSz(); let at = null; for (let r=0;r<S.r && !at;r++) for (let c=0;c<S.c && !at;c++) if (!houseRoomAt(c, r)) at = { c, r };
       G.housePlot = at; for (const m in HOUSE_ROOMS[k].cost) skAdd(m, HOUSE_ROOMS[k].cost[m]); houseBuildRoom(k); }
-    skAdd('logs', 400); skAdd('ironb', 200); skAdd('essence', 1000);
+    skAdd('logs', 400); skAdd('ironb', 200); skAdd('essence', 1000); skAdd('plank', 40); skAdd('nails', 40);
     for (const s of HOUSE_SPOTS.filter(s=>houseHas(s.room))) for (let t=0; t<(s.tiers ? s.tiers.length : 1); t++){ houseBuildDialog(s); wevChoose(0); }
     setUi('playing'); const h = houseP(), L = ROOM_LAYOUT.house;
     /* every bench and every plot can be walked up to from the door */
     const [dx, dy] = houseDoorXY(), seen = new Set([dx+','+(dy - 1)]), q = [[dx, dy - 1]];
     while (q.length){ const [x, y] = q.shift(); for (const [ix, iy] of [[1,0],[-1,0],[0,1],[0,-1]]){ const nx = x + ix, ny = y + iy, k = nx+','+ny; if (seen.has(k) || !G.map[nx] || G.map[nx][ny]!==T_FLOOR) continue; seen.add(k); q.push([nx, ny]); } }
     const reach = L.benches.filter(([k, x, y])=>roomBenchTiles(k, x, y).some(([tx, ty])=>[[1,0],[-1,0],[0,1],[0,-1]].some(([ix, iy])=>seen.has((tx + ix)+','+(ty + iy)))));
-    Object.assign(out, { size:h.size, rooms:h.rooms.length, built:Object.keys(h.built).length, benches:L.benches.length, reach:reach.length, spots:L.benches.filter(b=>/^spot_|^plot$/.test(b[0])).map(b=>b[0]), cols:COLS, rows:ROWS });
+    Object.assign(out, { nSpots:HOUSE_SPOTS.length, size:h.size, rooms:h.rooms.length, built:Object.keys(h.built).length, benches:L.benches.length, reach:reach.length, spots:L.benches.filter(b=>/^spot_|^plot$/.test(b[0])).map(b=>b[0]), cols:COLS, rows:ROWS });
     p.x = dx; p.y = dy - 1; return out; });
   await frames(25); await page.screenshot({ path:SHOTS + '/rs736_estate.png' });
   const r4 = await ev(async ()=>{ const p = G.player, pr = houseP().rooms.find(o=>o.k==='portal'), [x0, y0] = houseCellXY(pr.c, pr.r); p.x = x0 + 1; p.y = y0 + 4; for (let i=0;i<25;i++){ renderGame(); await new Promise(r=>setTimeout(r, 40)); }
@@ -53,7 +53,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   A(r0.at[0]===r0.door[0] && r0.at[1]===r0.door[1] - 1, 'you come in at the front door');
   A(r1.ui==='housePlot' && r1.rooms===8 && r1.at.c===0 && r1.at.r===1, 'the plot lists the eight rooms: ' + JSON.stringify(r1));
   A(r2.rooms.join()==='parlour@0,0,bedroom@1,0,workshop@0,1' && r2.planks===0 && r2.spots.includes('spot_furnace') && r2.spots.filter(k=>k==='plot').length===1 && r2.free && r2.again===3, 'a workshop built on the plot: ' + JSON.stringify(r2));
-  A(r3.sizes.join()==='House,Manor,Estate' && r3.size===4 && r3.rooms===7 && r3.built===10, 'an estate with every room and every piece of furniture: ' + JSON.stringify(r3));
+  A(r3.sizes.join()==='House,Manor,Estate' && r3.size===4 && r3.rooms===7 && r3.built===r3.nSpots, 'an estate with every room and every piece of furniture: ' + JSON.stringify(r3));
   A(r3.spots.join()==='plot,plot' && r3.reach===r3.benches, 'every piece of furniture and the last two plots within reach: ' + JSON.stringify(r3));
   A(r3.cost===111000 && r3.gold===200000 - r3.cost, 'the sizes cost their gold: ' + r3.gold);
   A(r4.occ > 0 && r4.faded > 0, 'a back wall fades when it hides you: ' + JSON.stringify(r4));

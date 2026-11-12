@@ -5173,6 +5173,7 @@ function useFromInv(idx){
   const it = G.inv[idx];
   if (it.clue){ sqClueRead(idx); return; }
   if (it.tmap){ sqMapRead(idx); return; }
+  if (it.fplan){ furnPlanRead(idx); return; }   /* (RS-906) */
   if (it.tome){ sqTomeRead(idx); return; }
   if (it.tablet){ sqTabletUse(idx); return; }
   if (it.kind==='scroll' && it.reforge){ logMsg('the smith enchants gear with essences now', ''); return; }
@@ -6487,6 +6488,7 @@ function monsterDies(mi){
   // kill specifically also nudges the drop chance itself, on top of that
   G.dropAt = { x:m.x, y:m.y }; setTimeout(()=>{ G.dropAt = null; }, 0); // loot beams rise from the corpse
   if (chn(ES_DROP + playerMF()*0.002)){ const e = esRoll(); esGain(e[0], 1, 'the kill leaves'); }   /* (RS-707) an essence now and then */
+  if (chn(FPLAN_DROP)){ const k = furnPlanRoll(); if (k){ addToInventory(furnPlanItem(k)); logMsg(`the ${esc(m.nm)} was carrying a furnishing plan: the ${FURN[k].nm.toLowerCase()}`, 'loot'); } }   /* (RS-906) */
   const sp = sitePower();
   let dropChance = clamp(0.16 + (G.depth||1)*0.01 + playerMF()*0.01 + sp.lootBonus*0.04, 0.05, 0.65);
   if (m.corrupted) dropChance = mn(0.85, dropChance+0.15);
@@ -20019,6 +20021,7 @@ function bossDefeated(){
   const m = G.mon[G.bossIdx];
   G.player.bossKills = G.player.bossKills || {dungeon:0, castle:0, necro:0, temple:0, graveyard:0, mine:0, lair:0};
   G.player.bossKills[G.siteKind] = (G.player.bossKills[G.siteKind]||0)+1;
+  try{ furnTrophy(G.siteKind, m && m.nm); }catch(e){ console.error(e); }   /* (RS-906) */
   checkAchievements();
   const sp = sitePower();
   logMsg(`*** the ${m.nm} collapses - the ${SITE_WORD[G.siteKind]||'dungeon'} falls silent ***`, 'new');
@@ -26712,6 +26715,7 @@ const HOUSE_SPOTS = [
   { id:'jeweller', k:'jeweller', room:'craft',    lx:0, ly:0, lvl:30, cost:{logs:10, ironb:6}, xp:420, nm:"Jeweller's bench", does:'make jewellery' },
   { id:'cauldron', k:'cauldron', room:'craft',    lx:4, ly:0, lvl:35, cost:{ironb:8}, xp:480, nm:'Brewing cauldron', does:'brew potions' },
   { id:'fletching',k:'fletching',room:'craft',    lx:0, ly:4, lvl:40, cost:{logs:25}, xp:520, nm:'Fletching bench', does:'make bows and arrows' },
+  { id:'workbench', k:'carpentry', room:'workshop', lx:3, ly:0, lvl:10, cost:{plank:6, nails:10}, xp:160, nm:"Carpenter's workbench", does:'make furnishings from your plans (and saw flatpacks)' },   /* (RS-906) */
   { id:'portal',   k:'portal',   room:'portal',   lx:2, ly:2, lvl:45, tiers:[{lvl:45, cost:{ironb:10, essence:50}, xp:600}, {lvl:60, cost:{ironb:20, essence:120}, xp:900}, {lvl:75, cost:{ironb:30, essence:250}, xp:1300}],
     nm:'Portal', does:'step through to any town you know (and, built higher, your charted islands, the dig sites and the great landmarks)' },
 ];
@@ -26729,7 +26733,7 @@ function houseP(){ const p = G.player; if (!p.house || typeof p.house!=='object'
   if (h.gbeds){ for (let i=1;i<=4;i++) delete h.built['gbed'+i]; delete h.gbeds; }   /* (RS-740: RS-739's garden beds to build are gone - they come with the garden again) */
   if (h.built && h.built.carpentry) delete h.built.carpentry;   /* (RS-745: the carpentry bench stands in the Boatyard now) */
   if (!Array.isArray(h.decor)) h.decor = []; if (!h.furn || typeof h.furn!=='object') h.furn = {};   /* (RS-904: what's set out, and the furnishings' store) */
-  if (!h.wpos || typeof h.wpos!=='object') h.wpos = {}; if (h.wheld && !(G.hedit && G.hedit.sel && G.hedit.sel.work===h.wheld)) delete h.wheld;   /* (RS-905: where the working pieces were moved to; one in hand) */
+  if (!h.wpos || typeof h.wpos!=='object') h.wpos = {}; if (p.furnPend){ for (const k in p.furnPend) if (FURN[k]) h.furn[k] = (h.furn[k]||0) + p.furnPend[k]; delete p.furnPend; }   /* (RS-906: kept for you until you had a house) */ if (h.wheld && !(G.hedit && G.hedit.sel && G.hedit.sel.work===h.wheld)) delete h.wheld;   /* (RS-905: where the working pieces were moved to; one in hand) */
   return h; }
 /* (RS-736) a house from before the rooms - one room with every piece of furniture in it - is rebuilt as rooms: the parlour, and a room
    for each kind of furniture it had, on a house big enough to hold them, every piece where it was built */
@@ -26776,10 +26780,54 @@ const FURN = {
   painting:{ nm:'Landscape painting', cat:'wall', price:1800, wall:1 }, banner:{ nm:'Hanging banner', cat:'wall', price:800, wall:1 }, shield:{ nm:'Shield and crossed swords', cat:'wall', price:1900, wall:1 },
   rugr:{ nm:'Round rug', cat:'rug', price:600, flat:1 }, rugl:{ nm:'Long rug', cat:'rug', price:850, flat:1 },
   fern:{ nm:'Potted fern', cat:'plant', price:260 }, flowers:{ nm:'Pot of flowers', cat:'plant', price:300 }, ptree:{ nm:'Little tree in a tub', cat:'plant', price:1300, solid:1 },
+  /* (RS-906) made only from plans */
+  armour:{ nm:'Suit of armour', cat:'deco', price:3200, solid:1, plan:1 }, fountain:{ nm:'Stone fountain', cat:'plant', price:3600, solid:1, plan:1 }, tapestry:{ nm:'Hunting tapestry', cat:'wall', price:2400, wall:1, plan:1 },
+  harp:{ nm:'Gilded harp', cat:'deco', price:2800, solid:1, plan:1 }, clock:{ nm:'Longcase clock', cat:'store', price:3000, solid:1, plan:1 }, wrack:{ nm:'Weapon rack', cat:'store', price:1700, solid:1, plan:1 },
+  /* (RS-906) trophies, from the bosses you've beaten - never sold, never made */
+  tdragon:{ nm:'Mounted dragon head', cat:'trophy', price:9000, wall:1, trophy:1 }, tskull:{ nm:"Giant's skull on a plinth", cat:'trophy', price:6000, solid:1, trophy:1 },
+  tidol:{ nm:'Golden idol', cat:'trophy', price:7000, solid:1, trophy:1 }, tcrown:{ nm:'Crown on a cushion', cat:'trophy', price:8000, trophy:1 },
 };
+for (const k of ['armchair', 'rugr', 'rugl', 'banner', 'tapestry']) FURN[k].cloth = 1;
+for (const k of ['candle', 'candelabra', 'lamppost', 'brazier', 'shield', 'armour', 'clock', 'harp', 'globe', 'wrack']) FURN[k].metal = 1;
+FURN_CATS.push(['trophy', 'Trophies']);
+/* (RS-906) furnishing plans: learned for good (p.fplans), from a scroll that drops, comes in a casket or is bought from Wenna; a piece is made
+   at a carpentry bench - the Boatyard's, or the carpenter's workbench you can build in your own workshop - from planks and nails, linen
+   for the cloth ones and a bar for the metal, by Construction level */
+const FPLAN_DROP = 0.012;
+function furnCost(k){ const F = FURN[k], P = F.price, c = P < 400 ? { plank:2, nails:4 } : P < 1000 ? { oak_plank:3, nails:8 } : P < 2000 ? { maple_plank:4, nails:12 } : { yew_plank:5, nails:16 };
+  if (F.cloth) c.linen = P >= 1000 ? 4 : 2; if (F.metal) c[P >= 2000 ? 'goldb' : P >= 1000 ? 'steelb' : 'ironb'] = P >= 2000 ? 1 : 2; return c; }
+function furnLvl(k){ return Math.max(1, Math.min(90, Math.round(FURN[k].price/35))); }
+function furnXp(k){ return Math.round(FURN[k].price*0.35); }
+function furnPlanPool(){ return Object.keys(FURN).filter(k=>!FURN[k].trophy); }
+function furnPlanItem(k){ const it = newItem(), F = FURN[k]; Object.assign(it, { used:1, consumable:0, kind:'scroll', fplan:k, nm:'Plan: ' + F.nm, desc:`a furnishing plan - read it to learn to make the ${F.nm.toLowerCase()} at a carpentry bench`, price:Math.round(F.price*0.25) }); return it; }
+function furnPlanRoll(){ const p = G.player, known = p.fplans || {}, pool = furnPlanPool().filter(k=>!known[k]); if (!pool.length) return null; const rare = pool.filter(k=>FURN[k].plan);
+  return rare.length && chn(0.4) ? rare[rn(rare.length)] : pool[rn(pool.length)]; }
+function furnPlanRead(idx){ const it = G.inv[idx], p = G.player; if (!it || !it.fplan || !FURN[it.fplan]) return; p.fplans = p.fplans || {};
+  if (p.fplans[it.fplan]){ logMsg(`you already know how to make the ${FURN[it.fplan].nm.toLowerCase()} - the plan would fetch a little at a shop`, ''); return; }
+  p.fplans[it.fplan] = 1; invRemove(idx); logMsg(`you study the plan: you can make the ${FURN[it.fplan].nm.toLowerCase()} at a carpentry bench now (Construction ${furnLvl(it.fplan)})`, 'good'); sfx('achievement'); try{ renderOverlay(); }catch(e){} }
+/* Wenna's three plans of the day */
+function furnPlanStock(){ const pool = furnPlanPool(), day = Math.floor(wevTurn()/DAY_LENGTH), rnd = v3Rng(1301 + day*17); for (let i=pool.length - 1; i>0; i--){ const j = Math.floor(rnd()*(i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; } return pool.slice(0, 3); }
+function furnPlanPrice(k){ return Math.round(FURN[k].price*0.6); }
+function furnPlanBuy(k){ const p = G.player, pr = furnPlanPrice(k); p.fplans = p.fplans || {}; if (p.fplans[k] || p.gold < pr) return; p.gold -= pr; p.fplans[k] = 1; logMsg(`you buy Wenna's plan for the ${FURN[k].nm.toLowerCase()} and learn it`, 'good'); sfx('gold'); renderOverlay(); }
+/* where a piece goes: your house's store, or - with no house yet - kept for you until you have one */
+function furnGive(k, n){ const h = houseP(), p = G.player; if (h){ h.furn[k] = (h.furn[k]||0) + (n||1); return true; } p.furnPend = p.furnPend || {}; p.furnPend[k] = (p.furnPend[k]||0) + (n||1); return false; }
+/* (RS-906) a boss's trophy, the first time you beat each kind */
+const FURN_TROPHY_OF = { lair:'tdragon', castle:'tcrown', city:'tcrown', pyramid:'tidol', temple:'tidol' };
+function furnTrophy(kind, nm){ const k = FURN_TROPHY_OF[kind] || 'tskull', p = G.player; p.ftro = p.ftro || {}; if (p.ftro[k]) return null; p.ftro[k] = 1; const home = furnGive(k, 1);
+  logMsg(`a trophy for your house: the ${FURN[k].nm.toLowerCase()}${home ? ' - it waits in your house\'s store' : ' - kept for you until you have a house'}`, 'good'); return k; }
+function buildFurnCraft(){ const p = G.player, h = houseP(), L = skLvl('construction'), known = Object.keys(p.fplans||{}).filter(k=>FURN[k]).sort((a, b)=>furnLvl(a) - furnLvl(b));
+  const rows = known.map(k=>{ const F = FURN[k], c = furnCost(k), lv = furnLvl(k), ok = !!h && L >= lv && houseCostOk(c);
+    return `<div class="frow"><span class="fnm">${esc(F.nm)} <span class="muted">&middot; Construction <span style="color:${L >= lv ? 'inherit' : '#e05040'}">${lv}</span> &middot; ${skXpShown('construction', furnXp(k))} xp</span><br>${houseCostText(c)}</span><button class="btn small" data-fmake="${k}" ${ok ? '' : 'disabled'} onclick="furnMake('${k}')">make</button></div>`; }).join('');
+  return `<h2 class="panel-title">FURNISHINGS</h2>
+    <div class="sub">Make a piece from a plan you know - it goes to your house's store.</div>
+    <div class="ovbody">${h ? '' : `<div class="qrep">You've no house to send it to - Hollis the estate agent sells them.</div>`}
+      ${known.length ? `<div class="flist">${rows}</div>` : `<div class="qrep">You know no plans yet. They turn up on the fallen, in caskets, and Wenna the furnisher sells a few each day.</div>`}
+      <div class="btnrow"><button class="btn" onclick="setUi('playing')">close (Esc)</button></div></div>`; }
+function furnMake(k){ const p = G.player, h = houseP(), c = furnCost(k); if (!h || !(p.fplans||{})[k] || skLvl('construction') < furnLvl(k) || !houseCostOk(c)) return;
+  houseCostPay(c); skGainXP('construction', furnXp(k)); h.furn[k] = (h.furn[k]||0) + 1; logMsg(`you make the ${FURN[k].nm.toLowerCase()} - it's carried to your house's store`, 'good'); sfx('click'); renderOverlay(); }
 const FURN_BASIC = ['stool', 'chair', 'bench', 'nstand', 'cask', 'candle', 'fruit', 'books', 'fern', 'flowers', 'rugr', 'vase'];
 /* the furnisher's stock: the plain pieces always, and five of the finer ones that change each day */
-function furnStock(){ const fine = Object.keys(FURN).filter(k=>!FURN_BASIC.includes(k)), day = Math.floor(wevTurn()/DAY_LENGTH), rnd = v3Rng(7919 + day*31 + (G.owPos ? G.owPos.x*7 + G.owPos.y : 0));
+function furnStock(){ const fine = Object.keys(FURN).filter(k=>!FURN_BASIC.includes(k) && !FURN[k].plan && !FURN[k].trophy), day = Math.floor(wevTurn()/DAY_LENGTH), rnd = v3Rng(7919 + day*31 + (G.owPos ? G.owPos.x*7 + G.owPos.y : 0));
   for (let i=fine.length - 1; i>0; i--){ const j = Math.floor(rnd()*(i + 1)); [fine[i], fine[j]] = [fine[j], fine[i]]; } return FURN_BASIC.concat(fine.slice(0, 5)); }
 function furnOwned(k){ const h = houseP(); if (!h) return 0; return (h.furn[k]||0) + h.decor.filter(d=>d.k===k).length; }
 function furnStored(){ const h = houseP(); if (!h) return 0; let n = 0; for (const k in h.furn) n += h.furn[k]; return n; }
@@ -26803,6 +26851,7 @@ function buildFurnisher(){
     <div class="ovbody">
       ${h ? `<div class="qrep">What you buy goes to your house's store - <b>${furnStored()}</b> piece${furnStored()===1 ? '' : 's'} waiting there now. At home, choose <b>Decorate</b> to set them out wherever you like.</div>` : `<div class="qrep">You've no house to put them in - Hollis the estate agent sells them.</div>`}
       <div class="flist">${rows}</div>
+      <div class="flist"><div class="fcat">Plans of the day</div>${furnPlanStock().map(k=>{ const known = (p.fplans||{})[k], pr = furnPlanPrice(k); return `<div class="frow"><span class="fnm">Plan: ${esc(FURN[k].nm)} <span class="muted">&middot; make it at a carpentry bench, Construction ${furnLvl(k)}${FURN[k].plan ? ' &middot; not sold made' : ''}</span></span><span class="fpr">${known ? '<span class="muted">known</span>' : goldHtml(pr)}</span><button class="btn small" data-fplan="${k}" ${!known && p.gold >= pr ? '' : 'disabled'} onclick="furnPlanBuy('${k}')">learn</button></div>`; }).join('')}</div>
       <div class="btnrow"><button class="btn" onclick="setUi('playing')">close (Esc)</button></div></div>`;
 }
 function furnBuy(k){ const h = houseP(), p = G.player, F = FURN[k]; if (!h || !F || p.gold < F.price) return; p.gold -= F.price; h.furn[k] = (h.furn[k]||0) + 1;
@@ -26838,7 +26887,18 @@ function furnMats(){ if (FURN_M) return FURN_M; const T = THREE, L = c=>new T.Co
     books:['#7a1a1a', '#1a3a6a', '#2a5a2a', '#6a4a1a', '#4a2a5a', '#8a6a2a'].map(c=>S({ color:L(c), roughness:0.7 })), paper:S({ color:L('#e8dcc0'), roughness:0.9 }),
     petal:['#e85a7a', '#f0c040', '#f0eef8', '#8a5ae0'].map(c=>S({ color:L(c), roughness:0.6 })),
     paint:S({ map:furnPaintTex(), roughness:0.85 }), banner:S({ map:furnBannerTex(), side:T.DoubleSide, roughness:0.9 }), globe:S({ map:furnGlobeTex(), roughness:0.5 }), gilt:S({ color:L('#e0b850'), metalness:0.55, roughness:0.3 }),
-    blazon:S({ color:L('#1a3a7a'), roughness:0.6 }) }); }
+    blazon:S({ color:L('#1a3a7a'), roughness:0.6 }),
+    bone:S({ color:L('#e0d4b4'), roughness:0.7 }), stonew:S({ map:o3RockTex(), color:L('#b8b0a0'), roughness:0.9 }), water:S({ color:L('#3a7a9a'), roughness:0.05, metalness:0.2, transparent:true, opacity:0.8 }),
+    scale:S({ color:L('#3a6a3a'), roughness:0.45, metalness:0.2 }), ruby:S({ color:L('#c01830'), roughness:0.12, metalness:0.1, emissive:L('#400008') }), emerald:S({ color:L('#20a050'), roughness:0.12 }),
+    tap:S({ map:furnTapTex(), side:T.DoubleSide, roughness:0.95 }), face:S({ color:L('#f0e8d0'), roughness:0.6 }), glass:S({ color:L('#c0d8e0'), roughness:0.05, transparent:true, opacity:0.25 }) }); }
+function furnTapTex(){ const W = 160, H = 224, c = v3Canvas(W, H), x = c.getContext('2d'), rnd = v3Rng(808); x.fillStyle = '#2a4a2a'; x.fillRect(0, 0, W, H);
+  const sky = x.createLinearGradient(0, 14, 0, 110); sky.addColorStop(0, '#d8b878'); sky.addColorStop(1, '#8aa070'); x.fillStyle = sky; x.fillRect(14, 14, W - 28, 100);
+  for (let i=0;i<7;i++){ const tx = 20 + i*20 + rnd()*8, ty = 70 + rnd()*30; x.fillStyle = '#3a2618'; x.fillRect(tx - 2, ty, 4, 60); x.fillStyle = ['#1e3a1a', '#2e4a20', '#3a5a24'][i % 3]; x.beginPath(); x.arc(tx, ty, 14 + rnd()*6, 0, Math.PI*2); x.fill(); }
+  x.fillStyle = '#7a5a2a'; x.beginPath(); x.ellipse(80, 150, 22, 10, 0, 0, Math.PI*2); x.fill(); x.fillRect(64, 152, 4, 22); x.fillRect(92, 152, 4, 22); x.fillRect(72, 154, 4, 20); x.fillRect(86, 154, 4, 20); x.beginPath(); x.ellipse(104, 138, 7, 6, 0.4, 0, Math.PI*2); x.fill();
+  x.strokeStyle = '#4a3218'; x.lineWidth = 2; for (const s of [-1, 1]){ x.beginPath(); x.moveTo(104, 132); x.lineTo(104 + s*8, 116); x.lineTo(104 + s*14, 112); x.moveTo(104 + s*6, 120); x.lineTo(104 + s*2, 112); x.stroke(); }
+  x.strokeStyle = '#c8a040'; x.lineWidth = 6; x.strokeRect(6, 6, W - 12, H - 12); x.strokeStyle = '#7a1a18'; x.lineWidth = 2; x.strokeRect(12, 12, W - 24, H - 24);
+  for (let i=0;i<1200;i++){ x.fillStyle = `rgba(${rnd() < 0.5 ? '255,230,180' : '0,0,0'},0.05)`; x.fillRect(rnd()*W, rnd()*H, 1, 3); }   /* (the weave) */
+  return v3CanvasTex(c); }
 function furnModel(k){ const C = furnModel.c || (furnModel.c = {}); if (C[k]) return C[k]; const T = THREE, M = furnMats(), g = new T.Group(), parts = [];
   const add = (geo, m, x, y, z, rx, ry, rz)=>{ const o = new T.Mesh(geo, m); o.position.set(x||0, y||0, z||0); o.rotation.set(rx||0, ry||0, rz||0); parts.push(o); return o; };
   const box = (w, h, d, m, x, y, z, r, rx, ry, rz)=>add(v3RBoxGeo(w, h, d, r!=null ? r : Math.min(0.02, Math.min(w, h, d)*0.22)), m, x, y, z, rx, ry, rz);
@@ -26916,6 +26976,50 @@ function furnModel(k){ const C = furnModel.c || (furnModel.c = {}); if (C[k]) re
   else if (k==='ptree'){ const P = []; for (let i=0;i<=6;i++){ const y = i/6*0.4; P.push([0.22 + 0.03*y/0.4, y]); } lathe([[0, 0]].concat(P, [[0.2, 0.4], [0, 0.38]]), M.wood, 0, 0, 0);
     for (const y of [0.06, 0.34]) tor(0.225 + 0.03*y/0.4, 0.012, M.iron, 0, y, 0, Math.PI/2); cyl(0.2, 0.2, 0.01, M.soil, 0, 0.38, 0);
     cyl(0.03, 0.05, 0.9, M.dark, 0, 0.83, 0); const rnd = v3Rng(41); for (let i=0;i<9;i++){ const a = rnd()*6.28, r = 0.08 + rnd()*0.16; sph(0.17 + rnd()*0.08, i % 2 ? M.leaf2 : M.leaf, Math.cos(a)*r, 1.25 + rnd()*0.3, Math.sin(a)*r, 1, 0.85, 1); } }
+  /* (RS-906) the pieces made only from plans */
+  else if (k==='armour'){ box(0.5, 0.08, 0.4, M.dark, 0, 0.04, 0); cyl(0.025, 0.025, 1.0, M.dark, 0, 0.58, -0.1);
+    for (const s of [-1, 1]){ lathe([[0, 0], [0.06, 0], [0.065, 0.06], [0.05, 0.12], [0.048, 0.36], [0.06, 0.42], [0.058, 0.48], [0.065, 0.78], [0.06, 0.84], [0, 0.85]], M.steel, s*0.09, 0.08, 0, 24); sph(0.055, M.steel, s*0.09, 0.53, 0.02); box(0.1, 0.05, 0.17, M.steel, s*0.09, 0.11, 0.04, 0.02); }
+    lathe([[0, 0], [0.16, 0], [0.18, 0.04], [0.15, 0.12], [0.2, 0.3], [0.22, 0.42], [0.18, 0.5], [0.08, 0.53], [0, 0.53]], M.steel, 0, 0.92, 0, 32).scale.set(1, 1, 0.7);
+    box(0.32, 0.12, 0.2, M.steel, 0, 0.96, 0, 0.05); tor(0.15, 0.012, M.gilt, 0, 1.12, 0, Math.PI/2).scale.set(1.2, 0.75, 1);
+    for (const s of [-1, 1]){ sph(0.11, M.steel, s*0.24, 1.38, 0, 1, 0.75, 1); for (let i=0;i<3;i++) tor(0.1 - i*0.008, 0.008, M.steel, s*0.24, 1.36 - i*0.04, 0, Math.PI/2); cyl(0.05, 0.045, 0.28, M.steel, s*0.27, 1.16, 0, 0, 0, s*0.12); sph(0.05, M.steel, s*0.29, 1.01, 0.01); cyl(0.045, 0.04, 0.26, M.steel, s*0.29, 0.86, 0.05, -0.3); sph(0.05, M.steel, s*0.29, 0.73, 0.1, 1, 0.8, 1.2); }
+    lathe([[0, 0], [0.11, 0], [0.12, 0.04], [0.13, 0.12], [0.125, 0.2], [0.1, 0.26], [0.04, 0.29], [0, 0.295]], M.steel, 0, 1.47, 0, 32); box(0.2, 0.025, 0.04, M.dark, 0, 1.6, 0.11, 0.008); for (let i=0;i<5;i++) box(0.006, 0.08, 0.01, M.dark, -0.06 + i*0.03, 1.55, 0.125);
+    lathe([[0, 0], [0.03, 0], [0.04, 0.1], [0.03, 0.2], [0, 0.26]], M.cloth, 0, 1.74, -0.02, 20).rotation.x = -0.5; }
+  else if (k==='fountain'){ const P = [[0, 0], [0.62, 0], [0.64, 0.04], [0.6, 0.08], [0.64, 0.32], [0.7, 0.34], [0.7, 0.4], [0.62, 0.4], [0.56, 0.12], [0, 0.11]]; lathe(P, M.stonew, 0, 0, 0, 48); cyl(0.58, 0.58, 0.01, M.water, 0, 0.32, 0);
+    lathe([[0, 0], [0.12, 0], [0.09, 0.06], [0.07, 0.3], [0.1, 0.5], [0.06, 0.6], [0, 0.61]], M.stonew, 0, 0.1, 0, 32); bowl(0.26, 0.12, M.stonew, 0, 0.7, 0); cyl(0.235, 0.235, 0.01, M.water, 0, 0.8, 0);
+    lathe([[0, 0], [0.04, 0], [0.03, 0.12], [0.05, 0.16], [0, 0.22]], M.stonew, 0, 0.82, 0, 24); for (let i=0;i<4;i++){ const a = i*Math.PI/2; add(new T.CylinderGeometry(0.008, 0.016, 0.42, 10, 1, true), M.water, Math.cos(a)*0.32, 0.6, Math.sin(a)*0.32, Math.sin(a)*0.5, 0, -Math.cos(a)*0.5); } }
+  else if (k==='tapestry'){ cyl(0.014, 0.014, 1.1, M.brass, 0, 0.78, 0.06, 0, 0, Math.PI/2); for (const x of [-0.56, 0.56]) sph(0.03, M.brass, x, 0.78, 0.06);
+    const pg = new T.PlaneGeometry(1.0, 1.4, 10, 14), pp = pg.attributes.position; for (let i=0;i<pp.count;i++){ const x = pp.getX(i), y = pp.getY(i); pp.setZ(i, 0.01*Math.sin(x*11 + y*2) + 0.008*(0.7 - y)); } pg.computeVertexNormals(); add(pg, M.tap, 0, 0.06, 0.05);
+    for (let i=0;i<20;i++) cyl(0.005, 0.003, 0.08, M.gilt, -0.47 + i*0.94/19, -0.68, 0.055); }
+  else if (k==='harp'){ box(0.32, 0.08, 0.26, M.dark, 0, 0.04, 0); lathe([[0, 0], [0.045, 0], [0.04, 0.1], [0.03, 0.4], [0.045, 0.9], [0.06, 1.25], [0.05, 1.32], [0, 1.33]], M.gilt, -0.1, 0.08, 0, 24);
+    const crv = new T.CatmullRomCurve3([new T.Vector3(-0.1, 1.38, 0), new T.Vector3(0.05, 1.42, 0), new T.Vector3(0.25, 1.3, 0), new T.Vector3(0.4, 1.12, 0), new T.Vector3(0.5, 0.95, 0)]); add(new T.TubeGeometry(crv, 40, 0.035, 14), M.gilt);
+    const sb = box(0.1, 0.98, 0.16, M.wood, 0.24, 0.53, 0, 0.04); sb.rotation.z = -0.5; for (let i=0;i<11;i++){ const t = (i + 0.5)/11, bx = -0.06 + t*0.52, top = crv.getPoint(Math.min(1, t*1.02)).y - 0.03, bot = 0.12 + t*0.82; if (top > bot + 0.05) cyl(0.003, 0.003, top - bot, M.brass, bx, (top + bot)/2, 0); }
+    sph(0.05, M.gilt, -0.1, 1.42, 0); }
+  else if (k==='clock'){ box(0.5, 0.12, 0.34, M.dark, 0, 0.06, 0); box(0.42, 1.2, 0.28, M.wood, 0, 0.72, 0); box(0.5, 0.06, 0.34, M.dark, 0, 1.33, 0); box(0.46, 0.5, 0.3, M.wood, 0, 1.6, 0);
+    add(new T.CylinderGeometry(0.23, 0.23, 0.3, 32, 1, false, 0, Math.PI), M.dark, 0, 1.85, 0, Math.PI/2, Math.PI/2, 0).rotation.set(Math.PI/2, 0, Math.PI/2); box(0.5, 0.05, 0.34, M.dark, 0, 1.36, 0);
+    cyl(0.17, 0.17, 0.02, M.face, 0, 1.62, 0.15, Math.PI/2); tor(0.17, 0.014, M.brass, 0, 1.62, 0.16); for (let i=0;i<12;i++){ const a = i*Math.PI/6; box(0.012, 0.03, 0.005, M.dark, Math.sin(a)*0.14, 1.62 + Math.cos(a)*0.14, 0.163, 0.002, 0, 0, -a); }
+    box(0.012, 0.11, 0.005, M.dark, 0.03, 1.66, 0.166, 0.002, 0, 0, -0.6); box(0.01, 0.14, 0.005, M.dark, -0.02, 1.68, 0.168, 0.002, 0, 0, 0.3);
+    box(0.24, 0.8, 0.02, M.glass, 0, 0.78, 0.145, 0.01); cyl(0.006, 0.006, 0.6, M.brass, 0, 0.98, 0.1); cyl(0.07, 0.07, 0.02, M.brass, 0, 0.62, 0.1, Math.PI/2); for (const x of [-0.06, 0.06]) cyl(0.02, 0.02, 0.22, M.brass, x, 0.9, 0.08); }
+  else if (k==='wrack'){ for (const x of [-0.5, 0.5]){ box(0.07, 1.3, 0.07, M.dark, x, 0.65, -0.08); box(0.08, 0.06, 0.4, M.dark, x, 0.03, 0); } for (const y of [0.15, 1.2]) box(1.06, 0.06, 0.07, M.dark, 0, y, -0.08); box(1.0, 0.05, 0.16, M.dark, 0, 0.3, 0.02);
+    for (let i=0;i<4;i++){ const x = -0.36 + i*0.24; cyl(0.016, 0.016, 1.5, M.wood, x, 0.85, -0.02, -0.12); lathe([[0, 0], [0.03, 0.02], [0.035, 0.08], [0, 0.2]], M.steel, x, 1.6, -0.11, 16).rotation.x = -0.12; }
+    box(0.04, 0.6, 0.008, M.steel, 0.42, 0.75, 0.06, 0.003, 0, 0, 0.08); box(0.16, 0.025, 0.03, M.gilt, 0.43, 0.43, 0.06, 0.008); cyl(0.014, 0.014, 0.12, M.dark, 0.44, 0.36, 0.06); }
+  /* (RS-906) trophies */
+  else if (k==='tdragon'){ const sh = new T.Shape(); sh.moveTo(-0.32, 0.3); sh.lineTo(0.32, 0.3); sh.bezierCurveTo(0.34, -0.05, 0.2, -0.3, 0, -0.4); sh.bezierCurveTo(-0.2, -0.3, -0.34, -0.05, -0.32, 0.3);
+    add(new T.ExtrudeGeometry(sh, { depth:0.04, bevelEnabled:true, bevelThickness:0.015, bevelSize:0.015, bevelSegments:3, curveSegments:24 }), M.dark, 0, 0, 0.0);
+    sph(0.17, M.scale, 0, 0.0, 0.2, 1, 0.9, 1.1); sph(0.12, M.scale, 0, -0.03, 0.42, 0.8, 0.6, 1.7); const jaw = sph(0.1, M.scale, 0, -0.1, 0.36, 0.8, 0.4, 1.3); jaw.rotation.x = 0.2;
+    for (const s of [-1, 1]){ sph(0.018, M.ember, s*0.095, 0.07, 0.32, 1, 0.6, 1); lathe([[0.04, 0], [0.035, 0.06], [0.025, 0.14], [0.012, 0.22], [0, 0.28]], M.dark, s*0.11, 0.1, 0.18, 16).rotation.set(-0.9, 0, s*0.6);
+      for (let i=0;i<4;i++) lathe([[0.01, 0], [0, 0.04]], M.bone, s*0.05, -0.08, 0.36 + i*0.05, 8).rotation.x = Math.PI; sph(0.012, M.coal, s*0.03, 0.0, 0.55); }
+    for (let i=0;i<4;i++) lathe([[0.03, 0], [0.015, 0.06], [0, 0.1]], M.scale, 0, 0.14 - i*0.02, 0.12 - i*0.06, 12).rotation.x = -0.6; }
+  else if (k==='tskull'){ lathe([[0, 0], [0.3, 0], [0.3, 0.06], [0.24, 0.1], [0.2, 0.5], [0.26, 0.56], [0.26, 0.6], [0, 0.6]], M.stonew, 0, 0, 0, 32); const sk = add(dgkSkullGeo(), M.bone, 0, 0.84, 0); sk.scale.set(0.22, 0.21, 0.25); sk.rotation.y = Math.PI;   /* (its face to the front) */
+    const jw = sph(0.15, M.bone, 0, 0.7, 0.1, 1, 0.45, 1.05); jw.rotation.x = 0.15; for (let i=0;i<8;i++){ const a = -0.9 + i*1.8/7; lathe([[0.016, 0], [0.012, 0.03], [0, 0.045]], M.bone, Math.sin(a)*0.13, 0.725, 0.1 + Math.cos(a)*0.13, 10); }
+    for (const s of [-1, 1]){ const hn = lathe([[0.05, 0], [0.045, 0.08], [0.035, 0.18], [0.02, 0.28], [0, 0.36]], M.dark, s*0.17, 0.95, 0, 20); hn.rotation.set(-0.5, 0, -s*1.0); } }   /* (a giant's jaw and teeth, horns of black bone) */
+  else if (k==='tidol'){ lathe([[0, 0], [0.2, 0], [0.2, 0.3], [0.16, 0.32], [0, 0.32]], M.stonew, 0, 0, 0, 32).rotation.y = Math.PI/4;
+    lathe([[0, 0], [0.12, 0], [0.13, 0.04], [0.1, 0.12], [0.14, 0.22], [0.12, 0.32], [0.06, 0.36], [0, 0.37]], M.gilt, 0, 0.32, 0, 32); sph(0.1, M.gilt, 0, 0.78, 0, 0.95, 1.15, 0.85);
+    for (const s of [-1, 1]){ sph(0.018, M.ruby, s*0.038, 0.8, 0.09); cyl(0.028, 0.024, 0.13, M.gilt, s*0.055, 0.56, 0.115, 0, 0, s*1.3); }   /* (arms folded over the belly) */
+    lathe([[0.09, 0], [0.1, 0.03], [0.06, 0.1], [0.07, 0.16], [0.03, 0.24], [0, 0.26]], M.gilt, 0, 0.86, -0.01, 32); for (const s of [-1, 1]) lathe([[0.03, 0], [0.025, 0.08], [0, 0.16]], M.gilt, s*0.1, 0.78, 0, 16).rotation.z = -s*0.4;   /* (a tall crest, flared ear-plates) */ box(0.06, 0.012, 0.02, M.dark, 0, 0.74, 0.09, 0.004); sph(0.035, M.emerald, 0, 0.55, 0.12); }
+  else if (k==='tcrown'){ box(0.4, 0.1, 0.4, M.cloth, 0, 0.05, 0, 0.045); for (const [x, z] of [[-0.19, -0.19], [0.19, -0.19], [-0.19, 0.19], [0.19, 0.19]]){ sph(0.02, M.gilt, x, 0.06, z); lathe([[0, -0.075], [0.008, -0.07], [0.02, -0.03], [0.012, 0]], M.gilt, x, 0.03, z, 10); }
+    add(new T.CylinderGeometry(0.12, 0.11, 0.07, 40, 1, true), M.gilt, 0, 0.145, 0); add(new T.CylinderGeometry(0.115, 0.105, 0.07, 40, 1, true), M.cloth, 0, 0.145, 0).scale.set(0.98, 1, 0.98);
+    for (let i=0;i<8;i++){ const a = i*Math.PI/4; lathe([[0.022, 0], [0.012, 0.05], [0, 0.07]], M.gilt, Math.cos(a)*0.115, 0.18, Math.sin(a)*0.115, 12); sph(0.012, M.gilt, Math.cos(a)*0.115, 0.255, Math.sin(a)*0.115); sph(0.014, i % 2 ? M.ruby : M.emerald, Math.cos(a + 0.39)*0.122, 0.145, Math.sin(a + 0.39)*0.122); } }
+
   /* merged by material, one mesh each; kept, so a room's rebuild doesn't throw the shapes away */
   const by = new Map(); for (const o of parts){ if (!by.has(o.material)) by.set(o.material, []); by.get(o.material).push(o); }
   for (const [m, list] of by){ const mg = m3dMergeMeshes(list).geometry; mg.userData.keep = true; const o = new T.Mesh(mg, m); o.castShadow = !list[0].userData.flat; o.receiveShadow = true; g.add(o); }
@@ -27360,7 +27464,9 @@ function houseBuildDialog(s){
     [[ok ? (t ? 'Upgrade it' : 'Build it') : (L < tier.lvl ? `You need Construction ${tier.lvl}` : 'You need the materials'), ()=>{ if (!ok) return; houseCostPay(tier.cost); const h = houseP(); h.built[s.id] = t + 1; skGainXP('construction', tier.xp);
       logMsg(`you ${t ? 'upgrade' : 'build'} the ${s.nm.toLowerCase()}`, 'magic'); sfx('achievement'); houseLayout(); checkAchievements(); }], ['Not now', ()=>{}]], 'your house');
 }
-function houseCarpentry(){
+function houseCarpentry(){ const n = Object.keys(G.player.fplans||{}).length;   /* (RS-906: furnishings from your plans, or flatpacks) */
+  wevDialog('Carpentry bench', `Make furnishings from the plans you know (${n}), or saw logs into flatpacks.`, [['Make furnishings', ()=>setTimeout(()=>setUi('furnCraft'), 0)], ['Saw flatpacks', ()=>setTimeout(houseFlatpack, 0)], ['Done', ()=>{}]], G.interior && G.interior.key==='house' ? 'your workshop' : 'the Boatyard'); }
+function houseFlatpack(){
   /* (RS-337) the best logs you hold that your Construction level can work - it used to pick your best logs of all (maple, say)
      and tell you that you needed Construction 45, with plain logs right there in your pack */
   const L = skLvl('construction'), held = SK_LOG.slice().reverse().filter(l=>skHave(l.id) >= 4), best = held.find(l=>l.lvl <= L);
@@ -31780,7 +31886,8 @@ function sqCasket(kind){
   if (r < 0.35){ const it = sqGilded(); addToInventory(it); got.push(itemNameHtml(it)); }
   else if (r < 0.55){ const it = sqCosmetic(); addToInventory(it); got.push(itemNameHtml(it)); }
   else if (r < 0.7){ const k = Object.keys(TOMES)[rn(Object.keys(TOMES).length - 1)]; addToInventory(sqTome(k)); got.push('a ' + TOMES[k].nm); }
-  else if (r < 0.85){ addToInventory(sqTreasureMap()); got.push('a treasure map'); }
+  else if (r < 0.78){ addToInventory(sqTreasureMap()); got.push('a treasure map'); }
+  else if (r < 0.85){ const k = furnPlanRoll() || 'armour'; addToInventory(furnPlanItem(k)); got.push('a plan for the ' + FURN[k].nm.toLowerCase()); }   /* (RS-906) */
   else { addToInventory(mkClue()); got.push('another clue scroll'); }
   p.caskets = (p.caskets||0) + 1;
   logMsg(`you open the casket: ${got.join(', ')}`, 'loot', true); try{ audStinger('rare'); }catch(e){} checkAchievements(); renderGame(); saveCurrentGame();
@@ -54767,7 +54874,7 @@ function backOut(){
     case 'charsheet': setUi('playing'); break;
     case 'skills': setUi('playing'); break;
     case 'skguide': setUi(G.skGuideBack||'playing'); break;
-    case 'lamp': case 'tasks': case 'travellog': case 'realms': case 'arms': case 'rareTrader': case 'seacharts': case 'estate': case 'furnisher': case 'trophies': case 'housePortal': case 'housePlot': case 'arch': case 'temple': case 'guild': case 'arena': case 'games': case 'gamble': case 'mayor': case 'harbour': if (G.ui==='gamble'){ gbLeave(); break; } if (G.ui==='games' && dartsBusy()) break; setUi('playing'); break;   /* (RS-391: not while a stake is on the table) */
+    case 'lamp': case 'tasks': case 'travellog': case 'realms': case 'arms': case 'rareTrader': case 'seacharts': case 'estate': case 'furnisher': case 'furnCraft': case 'trophies': case 'housePortal': case 'housePlot': case 'arch': case 'temple': case 'guild': case 'arena': case 'games': case 'gamble': case 'mayor': case 'harbour': if (G.ui==='gamble'){ gbLeave(); break; } if (G.ui==='games' && dartsBusy()) break; setUi('playing'); break;   /* (RS-391: not while a stake is on the table) */
     case 'wevent': if (G.wevDlg && !G.wevDlg.noEsc) wevChoose(G.wevDlg.opts.length-1); else if (!G.wevDlg) setUi('playing'); break;
     case 'tailor': case 'bench': setUi('playing'); break;
     case 'makeover': makeoverLeave(); break;
@@ -54850,6 +54957,7 @@ function renderOverlay0(){
     case 'seacharts': el.innerHTML = buildSeaCharts(); break;
     case 'estate': el.innerHTML = buildEstate(); break;
     case 'furnisher': el.innerHTML = buildFurnisher(); break;
+    case 'furnCraft': el.innerHTML = buildFurnCraft(); break;
     case 'trophies': el.innerHTML = buildTrophies(); break;
     case 'housePortal': el.innerHTML = buildHousePortal(); hpDrawMap(); break;
     case 'housePlot': el.innerHTML = buildHousePlot(); break;
@@ -54867,7 +54975,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-905';
+const GAME_VERSION = 'rs-906';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
@@ -57943,7 +58051,7 @@ function handleKeydown(e){
     case 'travellog': case 'realms': { if (k==='Escape') setUi('playing'); break; }
     case 'arms': { if (k==='Escape'){ if (!armsOf()) armsBear(); else { G.armsDraft = null; setUi('playing'); } } break; }   /* (RS-852: the first time, Escape bears the arms shown) */
     case 'rareTrader': { if (k==='Escape') setUi('playing'); break; }
-    case 'seacharts': case 'estate': case 'furnisher': case 'trophies': case 'housePortal': case 'housePlot': case 'arch': case 'temple': case 'guild': case 'arena': case 'games': case 'gamble': case 'mayor': case 'harbour': { if (k==='Escape'){ if (G.ui==='gamble'){ gbLeave(); break; } if (G.ui==='games' && dartsBusy()) break; setUi('playing'); } break; }
+    case 'seacharts': case 'estate': case 'furnisher': case 'furnCraft': case 'trophies': case 'housePortal': case 'housePlot': case 'arch': case 'temple': case 'guild': case 'arena': case 'games': case 'gamble': case 'mayor': case 'harbour': { if (k==='Escape'){ if (G.ui==='gamble'){ gbLeave(); break; } if (G.ui==='games' && dartsBusy()) break; setUi('playing'); } break; }
     case 'wevent': { if (k>='1' && k<='9') wevChoose(+k-1); else if (k==='Escape') backOut(); break; }
     case 'cook': { if (k==='Escape') setUi(G.cookAt==='fire' || G.interior ? 'playing' : 'tavern'); break; }
     case 'playing': handlePlayingKey(k); break;

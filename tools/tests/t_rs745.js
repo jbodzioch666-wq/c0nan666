@@ -10,7 +10,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
     /* walk up to it and use it */
     skAdd('logs', 8); const xp0 = skP().skills.construction || 0, g0 = p.gold; p.x = 6; p.y = 7; moveDir(0, -1);
     out.dlg = { ui:G.ui, title:G.wevDlg && G.wevDlg.title, sub:G.wevDlg && G.wevDlg.sub };
-    if (G.ui==='wevent') wevChoose(1); out.made = { xp:(skP().skills.construction||0) - xp0, gold:p.gold - g0, logs:skHave('logs') };
+    if (G.ui==='wevent'){ wevChoose(1); await new Promise(r=>setTimeout(r, 30)); if (G.ui==='wevent') wevChoose(1); } out.made = { xp:(skP().skills.construction||0) - xp0, gold:p.gold - g0, logs:skHave('logs') };
     setUi('playing'); p.x = 7; p.y = 8; for (let i=0;i<20;i++){ renderGame(); await new Promise(r=>setTimeout(r, 40)); }
     const T = THREE, R = V3.renderer, sz = R.getSize(new T.Vector2()), c = new T.PerspectiveCamera(40, sz.x/sz.y, 0.05, 100); c.position.set(8.2, 1.9, 8.6); c.lookAt(6.5, 0.6, 6.5); c.updateProjectionMatrix(); R.render(V3.scene, c); out.shot = R.domElement.toDataURL('image/jpeg', 0.88);
     /* the house: no carpentry bench to build, and an old one dropped */

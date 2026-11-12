@@ -1,3 +1,11 @@
+## RS-906 - Furnishing Plans and Trophies
+
+- **Furnishing plans.** A plan teaches you a piece for good. Plans drop now and then from monsters and turn up in treasure caskets, and Wenna the furnisher sells three a day. Read a plan from your pack to learn it; a copy of one you already know stays in the pack.
+- **A carpenter's workbench at home.** A new piece of furniture for your workshop. It, and the Boatyard's carpentry bench, now ask whether to make furnishings or saw flatpacks.
+- **Make your own furniture.** Each piece needs a Construction level and planks and nails, with linen for cloth pieces and a bar for metal ones. It goes to your house's store, ready to place, and gives Construction xp.
+- **Six pieces only from plans.** A suit of armour on a stand, a garden fountain, a woven tapestry, a harp, a long-case clock and a weapon rack.
+- **Boss trophies.** The first time you beat each kind of boss, you get its trophy for your walls and shelves: a dragon's head from a lair, a giant's skull, a golden idol and a fallen king's crown. If you don't have a house yet, it waits for you until you do.
+
 ## RS-905 - Placeable Working Furniture
 
 - **Move your working furniture.** In the edit mode, click your bed, the hearth, the trophy wall, the furnace or anvil, the altar, the craft benches, the portal, a garden bed, the hen house, the byre or the feed trough to pick it up.
