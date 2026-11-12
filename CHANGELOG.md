@@ -1,3 +1,11 @@
+## RS-889 - Stone, Soil and Stem
+
+- **Mining rocks remade:** the open land's rocks were three faceted grey balls with ore poking out as little cones. Each is now three weathered boulders in the textured stone from RS-886, with the ore set into their tops: clusters of six-sided crystals on gem, essence and sunstone rocks and fallen stars, and lumps of metal half sunk in the stone on gold, guild and bog iron rocks. A fallen star's rock is scorched dark.
+- **Clay, sand and rubble:** clay pits and sand banks are lumpy heaps of crumbly earth, not faceted domes. A mined-out rock leaves a scatter of real stones.
+- **Rune altars:** the old altars are a ring of weathered standing stones, leaning a little, round a low stone slab.
+- **Dig sites:** a heap of earth with a steel trowel stuck in it, a square trench of dark turned soil, and four pegs with a cord strung round them.
+- **Herbs grow as plants:** each clump is five plants with rosettes of arched leaves and curving stems. Sunpetals are daisies, starlilies and the other lilies have six pointed petals, and silverleaf has pale leaves and small white flowers. Ghostcaps and ambercaps are mushrooms, bloodmoss grows on cushions of moss, and closed buds are real buds.
+
 ## RS-888 - Square to the Mark
 
 - **Crossbow aim fixed:** shooting a crossbow, you turned your body so far side-on (nearly 60 degrees) that your back and cape faced the camera, and the crossbow looked like it was sticking out of your back. You now stand only half as bladed - side-on to the mark, still facing it, the crossbow shouldered and aimed the same.
