@@ -234,6 +234,7 @@ Screenshots go to `tools/tests/shots/`.
 | `rs902` | | `rs902` | | `rs902` | Excavating a hotspot swings the pick into the soil (o3DigAim + rsMinePose, earth chips); a waterfall's rock smooth with a rock face and uvs, sculpted boulders, finer water. Shots: `shots/rs902-dig.png`, `rs902-fall.png` | |
 | `rs903` | Digging for treasure (cache, map X, dungeon loose earth) plays two spadefuls with a spade before the find; earth thrown up |
 | `rs904` | Furnisher NPC and stock; the house edit mode: take, place snapped/free, turn, raise, stack on a table, hang on a wall, pick up, store; solid tiles; saved; 27 smooth pieces (contact sheet) |
+| `rs905` | The house's working pieces (bed, benches, altar, portal, garden beds, farm pens) picked up and set down a tile at a time in their own room, quarter turns, bed foot follows; Esc back; saved; old houses unchanged |
 | `rs789` | A shire's door stones and flags are dark: their average vertex colour stays low |
 | `rs788` | The open land has its older grass again: no blade chunks, RS-785's code gone |
 | `rs787` | A battle at a town: the card before and after, the banner's words, the trees told where you stand, no shader built by a fade, new creatures warmed off the frame |

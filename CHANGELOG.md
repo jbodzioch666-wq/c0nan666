@@ -1,3 +1,10 @@
+## RS-905 - Placeable Working Furniture
+
+- **Move your working furniture.** In the edit mode, click your bed, the hearth, the trophy wall, the furnace or anvil, the altar, the craft benches, the portal, a garden bed, the hen house, the byre or the feed trough to pick it up.
+- **Set it down in its room.** A working piece goes anywhere in its own room, a tile at a time, so the garden beds stay in the garden and the hen house in the farmyard. **Q/E** turn it a quarter, and the bed's foot follows the way it's turned.
+- **It works where it stands.** A garden bed keeps its crop wherever you put it. **Esc** puts a piece back where it stood. Working pieces are built into the house, so they don't go to the store.
+- **Old houses unchanged.** A house from before keeps every piece where it was built until you move it.
+
 ## RS-904 - House Decorating
 
 - **Decorate your house, ESO and WoW style.** At home, a **Decorate** button puts you in the edit mode. Take a piece from your house's store and it follows the pointer; click to place it anywhere, or Shift-click to place another of the same. While you hold a piece:
