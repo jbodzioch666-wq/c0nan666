@@ -1,5 +1,13 @@
 # Depthcrawl patch notes
 
+## RS-883 - Grown, Not Glued
+
+- **Trees with real branches.** Every oak, birch, willow, bush, jungle giant and choppable tree is now grown from a trunk that forks into limbs and branches, with a clump of leaves at the end of each. There are gaps between the clumps where you see the boughs and the sky, so it's no longer one ball.
+- **No ball inside.** RS-882 laid leaves over the old smooth blob, and close up the blob showed through. It's gone: the leaves go all the way through each clump, darker deep inside and underneath.
+- **Each kind its own shape.** Oaks spread wide and low; birches send many thin limbs steeply up their white trunks; willows arch out and hang long strands from every clump; the jungle giants spread flat at the top.
+- **Choppable trees fork lower.** Shorter bare trunks, with the limbs leaving them where the old trunk used to just end in a ball. Yews keep their dark tiers.
+- **Winter on the clumps.** Snow sits in small caps on the top of each clump among the leaves.
+
 ## RS-882 - Leaves, Not Lollipops
 
 - **Crowns made of leaves.** Oaks, birches, willows, bushes and the jungle giants now wear crowns built from dozens of cut-out clusters of painted leaves over a dark heart, instead of a smooth green ball. From the game's camera they read as leafy trees with a ragged edge and depth, not lollipops.

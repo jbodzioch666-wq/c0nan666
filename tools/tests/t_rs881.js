@@ -12,7 +12,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
     out.snow = Object.keys(O3_WILD_SNOW).filter(k=>O3_WILD_SNOW[k].userData.vc || O3_WILD_SNOW[k].attributes.color);
     goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{}; G.player.wildWarned = 1; G.gameMode = 0; G.player.clock = DAY_LENGTH*0.4; window.__trans = true; await fr(150);
     out.inst = {}; O3.world.traverse(o=>{ if (!o.isInstancedMesh || !o.userData.kind) return; const k = o.userData.kind; out.inst[k] = out.inst[k] || { n:0, vc:0, flat:0 }; out.inst[k].n++; if (o.material.vertexColors) out.inst[k].vc++; if (o.material.flatShading) out.inst[k].flat++; });
-    out.node = { crowns:0, vc:0 }; const G3 = o3NodeGeo(); (O3.nodeGrp ? O3.nodeGrp : O3.world).traverse(o=>{ if (o.isMesh && o.geometry===G3.crown){ out.node.crowns++; if (o.material.vertexColors) out.node.vc++; } });
+    out.node = { crowns:0, vc:0 }; for (const ty of ['tree', 'oak', 'maple']) o3NodeTree(ty).traverse(o=>{ if (o.isMesh && o.geometry.userData.leafy){ out.node.crowns++; if (o.material.vertexColors) out.node.vc++; } });   /* (RS-883: grown crowns) */
     O3.renderer.render(O3.scene, O3.cam); out.shot = O3.renderer.domElement.toDataURL('image/jpeg', 0.85); return out; });
   fs.writeFileSync(path.join(__dirname, 'shots', 'rs881-land.jpg'), Buffer.from(r.shot.split(',')[1], 'base64')); delete r.shot;
   console.log(JSON.stringify(r));
