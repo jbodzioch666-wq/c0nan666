@@ -1,3 +1,7 @@
+## RS-890 - Know Your Town
+
+- **Town sizes on the world map:** hover a town on the world map (M) to see whether it's a village, a town or a city, along with its people (for example "Dwarven city"). The tooltip also shows the combat levels of the land around it, so you can tell at a glance where a town sits on your way up.
+
 ## RS-889 - Stone, Soil and Stem
 
 - **Mining rocks remade:** the open land's rocks were three faceted grey balls with ore poking out as little cones. Each is now three weathered boulders in the textured stone from RS-886, with the ore set into their tops: clusters of six-sided crystals on gem, essence and sunstone rocks and fallen stars, and lumps of metal half sunk in the stone on gold, guild and bog iron rocks. A fallen star's rock is scorched dark.
