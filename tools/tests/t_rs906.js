@@ -26,7 +26,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
     /* made: too low, then with the level and the stuff */
     skP().skills.construction = 0; renderOverlay(); out.lowOff = !!document.querySelector('[data-fmake="armour"][disabled]');
     skP().skills.construction = SK_XP[99]; const c = furnCost('armour'); for (const k in c) skAdd(k, c[k]); renderOverlay(); out.cost = c; out.onBtn = !!document.querySelector('[data-fmake="armour"]:not([disabled])');
-    const x0 = skP().skills.construction, n0 = h.furn.armour||0; furnMake('armour'); out.made = (h.furn.armour||0) - n0; out.spent = Object.keys(c).every(k=>skHave(k) < c[k]);
+    const x0 = skP().skills.construction, n0 = h.furn.armour||0, had = {}; for (const k in c) had[k] = skHave(k); furnMake('armour'); out.made = (h.furn.armour||0) - n0; out.spent = Object.keys(c).every(k=>had[k] - skHave(k)===c[k]);
     setUi('playing');
     /* every new piece: smooth, merged, cheap to set down */
     const KEYS = ['armour', 'fountain', 'tapestry', 'harp', 'clock', 'wrack', 'tdragon', 'tskull', 'tidol', 'tcrown']; out.pieces = {};

@@ -236,6 +236,7 @@ Screenshots go to `tools/tests/shots/`.
 | `rs904` | Furnisher NPC and stock; the house edit mode: take, place snapped/free, turn, raise, stack on a table, hang on a wall, pick up, store; solid tiles; saved; 27 smooth pieces (contact sheet) |
 | `rs905` | The house's working pieces (bed, benches, altar, portal, garden beds, farm pens) picked up and set down a tile at a time in their own room, quarter turns, bed foot follows; Esc back; saved; old houses unchanged |
 | `rs906` | furnishing plans (dropped, in caskets, bought from Wenna), the workshop's carpenter's workbench, pieces made by Construction, six plan-only pieces and four boss trophies |
+| `rs907` | the plot on the open land: bought near a town, the house seen from outside by its size, in and out by its front door, the yard decorated to the land's scale, the portal and map |
 | `rs789` | A shire's door stones and flags are dark: their average vertex colour stays low |
 | `rs788` | The open land has its older grass again: no blade chunks, RS-785's code gone |
 | `rs787` | A battle at a town: the card before and after, the banner's words, the trees told where you stand, no shader built by a fade, new creatures warmed off the frame |

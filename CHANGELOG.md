@@ -1,3 +1,12 @@
+## RS-907 - Your Plot on the Open Land
+
+- **A plot on the open land.** Hollis the estate agent stakes out a plot near any town once you own a house, for 25,000 gold: a fenced yard on open ground, with your house standing at the back of it. It's marked on your map and it turns up in map search.
+- **Your house, seen from outside.** It grows with your house: a timber-framed cottage under thatch, a house with dormers under shingles, a stone manor with a jettied upper floor, and an estate with a round tower. Each has shuttered windows with flower boxes, a lantern by the door and smoke from the chimneys.
+- **Its front door is the way in.** Walk through the gate and up the stepping stones to the door, and you're in your house's rooms. Go out the door again and you're back in the yard. Your house's portal can take you to the plot as well.
+- **Decorate the yard.** Press Decorate inside the fence and place pieces from your store just as you do in the rooms: free or snapped, turned, raised and stacked. They're shrunk to fit the land. Solid pieces block their tile, and nothing can go on the path to the door or hang on a wall out here.
+- **Move it, keep the yard.** Moving the plot to another town costs 5,000 gold, and everything in the yard comes with it. In a new world, Hollis stakes out a new plot for free.
+- **A quiet yard.** The plot's ground is levelled. Nothing grows, gets gathered or roams inside the fence.
+
 ## RS-906 - Furnishing Plans and Trophies
 
 - **Furnishing plans.** A plan teaches you a piece for good. Plans drop now and then from monsters and turn up in treasure caskets, and Wenna the furnisher sells three a day. Read a plan from your pack to learn it; a copy of one you already know stays in the pack.
