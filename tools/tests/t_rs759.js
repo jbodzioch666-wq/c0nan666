@@ -9,8 +9,8 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   await ev(()=>{ window.__noWarmSlice = true;
     goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{}; townClosedCheck = ()=>false;
     const p = G.player; p.clock = p.turnCount = 60; G.owPos = { x:G.ow.spawnPos.x, y:G.ow.spawnPos.y }; enterVillage(); setUi('playing');
-    p.gold = 100000; houseBuy(); skGainXP('construction', 200000); const N = HOUSE_SIZES[2]; for (const k in N.cost) skAdd(k, N.cost[k]); houseUpgrade();
-    enterHouse(); G.housePlot = { c:0, r:1 }; skAdd('oak_plank', 15); skAdd('nails', 20); houseBuildRoom('farmyard'); setUi('playing'); });
+    p.gold = 900000; skGainXP('construction', 5e7); houseBuy(1); houseBuy(3); HOUSE_PLANS[3].herd = { chicken:4, cow:2 };   /* (RS-909: a Manor's pasture - kept to the old pens' room for the counts below) */
+    enterHouse(); setUi('playing'); });
   /* buying: one, then the rest of the pen at once - the menu open throughout */
   const r1 = await ev(()=>{ const p = G.player, g0 = p.gold, opt = re=>G.wevDlg ? G.wevDlg.opts.findIndex(o=>re.test(o[0])) : -1, out = {};
     G.benchXY = ROOM_LAYOUT.house.benches.find(b=>b[0]==='coop').slice(1); useBench('coop'); out.opts0 = G.wevDlg.opts.map(o=>o[0]);
@@ -20,7 +20,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
     out.spent = g0 - p.gold; out.herd = farmP().a.map(a=>a.k).join(); return out; });
   /* grown; you by the hen house in the yard */
   await ev(()=>{ const f = farmP(); for (const a of f.a) a.g = FARM_KIND[a.k].grow; f.feed = 40; f.at = clockNow();
-    const o = houseP().rooms.find(o=>o.k==='farmyard'), [x0, y0] = houseCellXY(o.c, o.r), p = G.player; p.x = x0 + 2; p.y = y0 + 2; houseRelayout(); setUi('playing'); });
+    const o = housePlan().pas, x0 = o.x0, y0 = o.y1 - 4, p = G.player; p.x = x0 + 2; p.y = o.y1 - 1; houseRelayout(); setUi('playing'); });
   await frames(25);
   /* butcher all four hens, watched */
   const shot = (B)=>`(()=>{ const T = THREE, R = V3.renderer, sz = R.getSize(new T.Vector2()), o = V3.butch.q[V3.butch.i], P = V3.player.g.position, g = o.p.g.position, dx = o.go.dx, dz = o.go.dz, big = ${B};

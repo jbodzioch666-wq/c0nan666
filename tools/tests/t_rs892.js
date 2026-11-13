@@ -8,10 +8,10 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   const ev = (f, a)=>page.evaluate(f, a), frames = n=>ev(async n=>{ for (let i=0;i<n;i++){ renderGame(); await new Promise(r=>setTimeout(r, 40)); } }, n);
   await ev(()=>{ goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{}; townClosedCheck = ()=>false;
     const p = G.player; p.clock = p.turnCount = 60; G.owPos = { x:G.ow.spawnPos.x, y:G.ow.spawnPos.y }; enterVillage(); setUi('playing');
-    p.gold = 100000; houseBuy(); skGainXP('construction', 200000); const N = HOUSE_SIZES[2]; for (const k in N.cost) skAdd(k, N.cost[k]); houseUpgrade();
-    enterHouse(); G.housePlot = { c:0, r:1 }; skAdd('plank', 12); houseBuildRoom('garden'); });
+    p.gold = 400000; skGainXP('construction', 200000); houseBuy(1); houseBuy(2);   /* (RS-909: a House, its garden and paddock with it) */
+    enterHouse(); });
   const shoot = (beds)=>ev(async beds=>{ const p = G.player, g = gardenP(), now = p.clock = 9000; beds.forEach(([id, f], i)=>{ g[i] = { id, t0:now - f*GARDEN_GROW[id], w:i & 1 }; });
-    const o = houseP().rooms.find(o=>o.k==='garden'), [x0, y0] = houseCellXY(o.c, o.r); p.x = x0 + 2; p.y = y0 + 4; v3GardenSync(true);
+    const o = housePlan().garden, x0 = o.x0 + 2, y0 = o.y1 - 4; p.x = o.x0; p.y = o.y1; v3GardenSync(true);
     for (let i=0;i<20;i++){ renderGame(); await new Promise(r=>setTimeout(r, 30)); }
     const T = THREE, cx = x0 + 2.5, cz = y0 + 2.5, R = V3.renderer, sz = R.getSize(new T.Vector2()), c = new T.PerspectiveCamera(36, sz.x/sz.y, 0.05, 100); c.position.set(cx + 0.6, 2.2, cz + 3.0); c.lookAt(cx, 0.2, cz); c.updateProjectionMatrix(); R.render(V3.scene, c); const url1 = R.domElement.toDataURL('image/jpeg', 0.88);
     c.position.set(cx - 0.3, 2.0, cz - 2.6); c.lookAt(cx, 0.2, cz); R.render(V3.scene, c); const url2 = R.domElement.toDataURL('image/jpeg', 0.88); const H = gardenHerbGeo(), geos = V3.garden.map(B=>B.g.children.map(m=>Object.keys(H).find(k=>H[k]===m.geometry) || (m.geometry===gardenMoundGeo() ? 'mound' : m.geometry.type)));

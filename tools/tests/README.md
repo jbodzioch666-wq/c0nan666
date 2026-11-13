@@ -238,6 +238,7 @@ Screenshots go to `tools/tests/shots/`.
 | `rs906` | furnishing plans (dropped, in caskets, bought from Wenna), the workshop's carpenter's workbench, pieces made by Construction, six plan-only pieces and four boss trophies |
 | `rs907` | the plot on the open land: bought near a town, the house seen from outside by its size, in and out by its front door, the yard decorated to the land's scale, the portal and map |
 | `rs908` | garden furnishings: hedge, pond, bench, birdbath, sundial, scarecrow, barrow; the well and rose arch from plans; Wenna's two a day; wildlife kept out of the yard |
+| `rs909` | the four houses to their plans: bought and moved for the difference, gardens 2/4/6/8 beds, paddock and pasture, two floors and the stair, every spot reachable, an old house carried over; shots rs909-<size>-<floor>.jpg |
 | `rs789` | A shire's door stones and flags are dark: their average vertex colour stays low |
 | `rs788` | The open land has its older grass again: no blade chunks, RS-785's code gone |
 | `rs787` | A battle at a town: the card before and after, the banner's words, the trees told where you stand, no shader built by a fade, new creatures warmed off the frame |

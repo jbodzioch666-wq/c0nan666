@@ -8,10 +8,10 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   const r0 = await ev(()=>{ window.__noWarmSlice = true;
     goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{}; townClosedCheck = ()=>false;
     const p = G.player; p.clock = p.turnCount = 60; G.owPos = { x:G.ow.spawnPos.x, y:G.ow.spawnPos.y }; enterVillage(); setUi('playing');
-    p.gold = 100000; houseBuy(); skGainXP('construction', 200000); const N = HOUSE_SIZES[2]; for (const k in N.cost) skAdd(k, N.cost[k]); houseUpgrade();
-    enterHouse(); G.housePlot = { c:0, r:1 }; skAdd('oak_plank', 15); skAdd('nails', 20); const o0 = skHave('oak_plank'), n0 = skHave('nails'); houseBuildRoom('farmyard');
-    const h = houseP(), L = ROOM_LAYOUT.house, o = h.rooms.find(o=>o.k==='farmyard');
-    return { rooms:h.rooms.map(o=>o.k), at:o && [o.c, o.r], paid:[o0 - skHave('oak_plank'), n0 - skHave('nails')], benches:L.benches.map(b=>b[0]).filter(k=>/coop|byre|trough/.test(k)), deco:L.deco.map(d=>d[0]), animals:G.villagers.length }; });
+    p.gold = 900000; skGainXP('construction', 5e7); houseBuy(1); houseBuy(3); HOUSE_PLANS[3].herd = { chicken:4, cow:2 };   /* (RS-909: a Manor's pasture - kept to the old pens' room for the counts below) */
+    enterHouse();
+    const h = houseP(), L = ROOM_LAYOUT.house;
+    return { benches:L.benches.map(b=>b[0]).filter(k=>/coop|byre|trough/.test(k)), deco:L.deco.map(d=>d[0]), animals:G.villagers.length }; });
   /* the trough, empty, then filled with flax */
   const r1 = await ev(()=>{ G.benchXY = ROOM_LAYOUT.house.benches.find(b=>b[0]==='trough').slice(1); skAdd('flax', -skHave('flax')); useBench('trough'); const d0 = G.wevDlg && G.wevDlg.opts.map(o=>o[0]); setUi('playing');
     skAdd('flax', 30); useBench('trough'); const d1 = G.wevDlg.opts.map(o=>o[0]); wevChoose(0); return { d0, d1, feed:farmP().feed, flax:skHave('flax') }; });
@@ -34,21 +34,21 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
       uses:resUses('beef').join(' '), src:resSources('chicken').join(' '), food:resCats().find(c=>c[0]==='Fish & food')[1].includes('c_chicken') }; });
   /* they wander the yard, and step aside for you */
   const r5 = await ev(()=>{ const vs = G.villagers.filter(v=>v.farm), at0 = vs.map(v=>v.x+','+v.y).join(' '); for (let i=0;i<12;i++) farmMove();
-    const inYard = vs.every(v=>v.x >= v.farm[0] && v.y >= v.farm[1] && v.x < v.farm[0] + 5 && v.y < v.farm[1] + 5), moved = vs.map(v=>v.x+','+v.y).join(' ')!==at0;
+    const inYard = vs.every(v=>v.x >= v.farm[0] && v.y >= v.farm[1] && v.x < v.farm[0] + v.farm[2] && v.y < v.farm[1] + v.farm[3]), moved = vs.map(v=>v.x+','+v.y).join(' ')!==at0;
     const v = vs[0], p = G.player; let side = null; for (const [a, b] of [[1,0],[-1,0],[0,1],[0,-1]]) if (G.map[v.x + a][v.y + b]===T_FLOOR && !G.villagers.some(o=>o.x===v.x + a && o.y===v.y + b)){ side = [a, b]; break; }
     p.x = v.x + side[0]; p.y = v.y + side[1]; const was = [v.x, v.y]; moveDir(-side[0], -side[1]); return { inYard, moved, stepped:p.x===was[0] && p.y===was[1] && !(v.x===was[0] && v.y===was[1]) }; });
   /* a full yard for the shots: two hens, two chicks, a cow and a calf */
   await ev(()=>{ const f = farmP(); f.a = [{ k:'chicken', g:100 }, { k:'chicken', g:100 }, { k:'chicken', g:10 }, { k:'chicken', g:10 }, { k:'cow', g:300 }, { k:'cow', g:20 }]; f.feed = 40; f.at = clockNow();
-    const o = houseP().rooms.find(o=>o.k==='farmyard'), [x0, y0] = houseCellXY(o.c, o.r), p = G.player; p.x = x0 + 2; p.y = y0 + 5; houseRelayout(); });
+    const o = housePlan().pas, x0 = o.x0, y0 = o.y1 - 4, p = G.player; p.x = x0 + 2; p.y = o.y1; houseRelayout(); });
   await frames(30); await page.screenshot({ path:SHOTS + '/rs738_yard.png' });
-  const r6 = await ev(()=>{ const T = THREE, o = houseP().rooms.find(o=>o.k==='farmyard'), [x0, y0] = houseCellXY(o.c, o.r), R = V3.renderer, sz = R.getSize(new T.Vector2()), out = {};
+  const r6 = await ev(()=>{ const T = THREE, o = housePlan().pas, x0 = o.x0, y0 = o.y1 - 4, R = V3.renderer, sz = R.getSize(new T.Vector2()), out = {};
     const shot = (px, py, pz, lx, ly, lz)=>{ const c = new T.PerspectiveCamera(40, sz.x/sz.y, 0.05, 100); c.position.set(px, py, pz); c.lookAt(lx, ly, lz); c.updateProjectionMatrix(); R.render(V3.scene, c); return R.domElement.toDataURL('image/jpeg', 0.88); };
     out.close = shot(x0 + 3.6, 2.6, y0 + 6.6, x0 + 2.5, 0.3, y0 + 2.4);
     const cow = V3.villagers.find(q=>q.v.animal==='cow'); const g = cow.g.position; out.cow = shot(g.x + 2.2, 0.9, g.z + 0.3, g.x, 0.45, g.z);
     out.made = V3.villagers.filter(q=>q.v.farm).length; return out; });
   const fs = require('fs'); fs.writeFileSync(SHOTS + '/rs738_close.jpg', Buffer.from(r6.close.split(',')[1], 'base64')); fs.writeFileSync(SHOTS + '/rs738_cow.jpg', Buffer.from(r6.cow.split(',')[1], 'base64'));
   console.log(JSON.stringify({ r0, r1, r2, r3, r4, r5, made:r6.made }));
-  A(r0.rooms.includes('farmyard') && r0.at.join()==='0,1' && r0.paid.join()==='15,20' && r0.benches.join()==='coop,byre,trough' && r0.deco.includes('hay') && r0.animals===0, 'a farmyard built: ' + JSON.stringify(r0));
+  A(r0.benches.join()==='coop,byre,trough' && r0.deco.includes('hay') && r0.animals===0, 'the pasture of a Manor (RS-909): ' + JSON.stringify(r0));
   A(r1.d0.join()==='Close' && /^Fill it with flax - 30/.test(r1.d1[0]) && r1.feed===30 && r1.flax===0, 'the trough filled with flax: ' + JSON.stringify(r1));
   A(r2.buys.join()==='0,0,0,0,-1,0,0,-1' && r2.spent===4*25 + 2*150 && r2.herd==='calf,calf,chick,chick,chick,chick', 'four chicks and two calves bought: ' + JSON.stringify(r2));
   A(Math.abs(r3.feed1 - 25) < 0.1 && r3.g1.join()==='50,50,50,50,50,50' && r3.hens===4 && r3.stalled && r3.hungry===1 && /once there is feed/.test(r3.txt), 'they grow while fed, and stop when the trough is empty: ' + JSON.stringify(r3));

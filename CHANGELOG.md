@@ -1,3 +1,12 @@
+## RS-909 - Four Houses
+
+- **Four houses to buy.** Hollis the estate agent now sells four houses outright: the Cottage (50,000), the House (120,000, Construction 15), the Manor (300,000, Construction 35) and the Estate (750,000, Construction 55). Moving to a bigger one costs only the difference. Moving to a smaller one is free, but you get nothing back. There are no more rooms to build plot by plot.
+- **Each house has its own floor plan.** The cottage has a hall, a bedroom and a pantry. The house has a hall, a kitchen, a bedroom and a workshop. The manor has a great hall, kitchen, workshop, trophy room and pantry. The estate adds a craft room and its round tower with the portal.
+- **Two floors.** The Manor and the Estate have an upper floor, reached by the stairs in the stair hall. Upstairs are the master bedroom, the chapel, the study and a guest room; the Estate adds a library and a lookout at the top of its tower.
+- **Gardens and pastures that grow.** Every house has a garden at the back with a water butt and a compost heap: 2 beds for the Cottage, 4 for the House, 6 for the Manor and 8 for the Estate. From the House up there's a paddock for 6 hens. The Manor's pasture holds 8 hens and 3 cows, the Estate's 12 hens and 6 cows.
+- **Every piece has its place.** The bed, hearth, trophy wall, furnace, anvil, altar, craft benches, carpenter's workbench and portal each have a place on every plan, ready to build. In Decorate you can move a piece anywhere indoors, on either floor; garden beds move anywhere in the garden, and pens anywhere in the pasture. Nothing can block a doorway or the foot of the stairs.
+- **Your house carries over.** An existing house becomes the new house of the same size, with every piece you built standing at its place. Furnishings you had set out go back to your store, ready to place again. Your crops and animals come with you. If the house had no garden before, you'll find seeds by the water butt.
+
 ## RS-908 - Garden Furnishings
 
 - **Garden furnishings.** A new Garden kind in your store: a clipped box hedge, a lily pond with reeds, a wrought-iron bench, a stone birdbath with a robin on the rim, a brass sundial, a scarecrow in a straw hat and a wheelbarrow full of flowers.

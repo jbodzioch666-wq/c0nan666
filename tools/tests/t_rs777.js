@@ -8,10 +8,10 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   const r0 = await ev(()=>{ window.__noWarmSlice = true;
     goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{}; townClosedCheck = ()=>false;
     const p = G.player; p.clock = p.turnCount = 60; G.owPos = { x:G.ow.spawnPos.x, y:G.ow.spawnPos.y }; enterVillage(); setUi('playing');
-    p.gold = 100000; houseBuy(); skGainXP('construction', 2000000); const N = HOUSE_SIZES[2]; for (const k in N.cost) skAdd(k, N.cost[k]); houseUpgrade();
-    enterHouse(); G.housePlot = null; const S = HOUSE_SIZES[houseP().size]; for (let c=0;c<S.c && !G.housePlot;c++) for (let r=0;r<S.r;r++) if (!houseRoomAt(c, r)){ G.housePlot = { c, r }; break; } for (const k of ['oak_plank', 'nails', 'logs', 'plank', 'ironb', 'stone', 'limestone', 'clay']) skAdd(k, 200); houseBuildRoom('kitchen');
+    p.gold = 400000; skGainXP('construction', 2000000); houseBuy(1); houseBuy(2);   /* (RS-909) */
+    enterHouse(); for (const k of ['logs', 'ironb']) skAdd(k, 200);
     const h = houseP(); h.built.hearth = 1; houseRelayout(); const b = ROOM_LAYOUT.house.benches.find(b=>b[0]==='hearth');
-    return { rooms:h.rooms.map(o=>o.k + '@' + o.c + ',' + o.r), hearth:b && b.slice(1), sz:[COLS, ROWS] }; });
+    return { rooms:housePlan().floors[0].rooms.map(o=>o.k), hearth:b && b.slice(1), sz:[COLS, ROWS] }; });
   console.log(JSON.stringify(r0));
   const out = [];
   if (r0.hearth) for (const [dx, dy] of [[0,1],[-1,1],[1,1],[-1,0],[1,0],[0,2]]){

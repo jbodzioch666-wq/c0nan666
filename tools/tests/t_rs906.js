@@ -20,13 +20,13 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
     out.roll = furnPlanRoll(); out.rollOk = !!FURN[out.roll] && !FURN[out.roll].trophy && !p.fplans[out.roll];
     /* the workbench in your workshop */
     const wb = HOUSE_SPOTS.find(s=>s.id==='workbench'); out.spot = !!wb && wb.k==='carpentry' && wb.room==='workshop';
-    h.size = 2; h.rooms.push({ k:'workshop', c:0, r:1 }); h.built.workbench = 1; enterHouse(); const wbAt = ROOM_LAYOUT.house.benches.find(b=>b[0]==='carpentry'); out.inHouse = !!wbAt;
+    h.built.workbench = 1; enterHouse();   /* (RS-909: every house has its place) */ const wbAt = ROOM_LAYOUT.house.benches.find(b=>b[0]==='carpentry'); out.inHouse = !!wbAt;
     G.benchXY = wbAt; houseCarpentry(); out.dlg = G.ui==='wevent' && /furnishings/i.test(document.getElementById('overlay').textContent);
     G.wevDlg.opts[0][1](); await new Promise(q=>setTimeout(q, 20)); out.craftUi = G.ui;
     /* made: too low, then with the level and the stuff */
     skP().skills.construction = 0; renderOverlay(); out.lowOff = !!document.querySelector('[data-fmake="armour"][disabled]');
     skP().skills.construction = SK_XP[99]; const c = furnCost('armour'); for (const k in c) skAdd(k, c[k]); renderOverlay(); out.cost = c; out.onBtn = !!document.querySelector('[data-fmake="armour"]:not([disabled])');
-    const x0 = skP().skills.construction, n0 = h.furn.armour||0, had = {}; for (const k in c) had[k] = skHave(k); furnMake('armour'); out.made = (h.furn.armour||0) - n0; out.spent = Object.keys(c).every(k=>had[k] - skHave(k)===c[k]);
+    const x0 = skP().skills.construction, n0 = h.furn.armour||0, had = {}; for (const k in c) had[k] = skHave(k); { const c0 = chn; chn = ()=>false; furnMake('armour'); chn = c0; }   /* (no 'careful hand' at Construction 99) */ out.made = (h.furn.armour||0) - n0; out.spent = Object.keys(c).every(k=>had[k] - skHave(k)===c[k]);
     setUi('playing');
     /* every new piece: smooth, merged, cheap to set down */
     const KEYS = ['armour', 'fountain', 'tapestry', 'harp', 'clock', 'wrack', 'tdragon', 'tskull', 'tidol', 'tcrown']; out.pieces = {};

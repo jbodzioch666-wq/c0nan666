@@ -5,8 +5,8 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   const r = await page.evaluate(async ()=>{
     goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{}; o3Pref = false; try{ v3Pref = false; }catch(e){}
     const p = G.player, out = { price:HOUSE_PRICE };
-    p.gold = 49999; setUi('estate'); out.text = (document.getElementById('overlay').textContent.match(/A cottage of your own: [^.]*/)||[''])[0];
-    out.btnOff = !![...document.querySelectorAll('#overlay button')].find(b=>/buy the house/.test(b.textContent) && b.disabled);
+    p.gold = 49999; setUi('estate'); const row = [...document.querySelectorAll('#overlay .hroom')].find(e=>/Cottage/.test(e.textContent)); out.text = row ? row.textContent.replace(/\s+/g, ' ') : '';   /* (RS-909: the agent's houses) */
+    out.btnOff = !!row && !![...row.querySelectorAll('button')].find(b=>/buy it/.test(b.textContent) && b.disabled);
     houseBuy(); out.short = !houseP() && p.gold===49999;
     p.gold = 50000; houseBuy(); out.bought = !!houseP() && p.gold===0; setUi('playing');
     const H = DIARIES.find(d=>d.id==='heart').tiers; out.t2 = H[1].map(t=>t[0]); out.t3 = H[2].map(t=>t[0]);
