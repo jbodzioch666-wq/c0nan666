@@ -1,3 +1,10 @@
+## RS-910 - Free Furniture and Rugs
+
+- **Every working piece moves freely**: the bed, hearth, trophy wall, furnace, anvil, altar, craft benches, portal, garden beds and pens now set down like any furnishing - a quarter-tile step with snap on, anywhere with it off - and turn an eighth at a time.
+- **Anywhere in the house**: working pieces can go into the store (the new Furniture list in Decorate) and come out on either floor, in any room. Indoor pieces stay indoors, garden beds in the garden, pens in the pasture.
+- **Rugs are pieces now**: each room's rug can be picked up, moved, turned or put in the store; clicking a rug under a bench still picks the bench.
+- **Eleven rug designs at Wenna's**: seven medallion rugs (crimson, blue, green, plum, ochre, navy, altar-red), three kilims (red, blue, sand) and a chequered rug, always in stock. A new house comes with its rooms' rugs laid.
+
 ## RS-909 - Four Houses
 
 - **Four houses to buy.** Hollis the estate agent now sells four houses outright: the Cottage (50,000), the House (120,000, Construction 15), the Manor (300,000, Construction 35) and the Estate (750,000, Construction 55). Moving to a bigger one costs only the difference. Moving to a smaller one is free, but you get nothing back. There are no more rooms to build plot by plot.

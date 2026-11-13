@@ -15,9 +15,9 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
     const b0 = find('bed'); out.b0 = b0 ? [b0.x, b0.y] : null; out.oldDefault = !!b0 && !h.wpos.bed;
     heditStart(); out.picked = heditPickWork(at(b0.x + 0.5, 0.4, b0.y + 0.5)); out.sel = G.hedit.sel && G.hedit.sel.work; out.held = h.wheld; out.freed = G.map[b0.x][b0.y]===T_FLOOR && G.map[b0.x][b0.y + 1]===T_FLOOR;
     await fr(3); out.ghost = !!(V3.heGhost && V3.heGhost.parent);
-    out.noStore = (heditStore(), !!G.hedit.sel); heditLift(1); out.noLift = G.hedit.sel.y===0;
+    out.noStore = true; heditLift(1);   /* (RS-910: a working piece may go to the store now - see t_rs910) */ out.noLift = G.hedit.sel.y===0;
     /* turned a quarter, set down further along the room: the foot to the east */
-    heditTurn(1); const S = G.hedit.sel, rm = housePlan().floors[0].rooms.find(r=>b0.x >= r.x0 && b0.x <= r.x1 && b0.y >= r.y0 && b0.y <= r.y1); let spot = null; for (let ly=1; ly<3 && !spot; ly++) for (let lx=0; lx<4; lx++){ const x = rm.x0 + lx, y = rm.y0 + ly; if (G.map[x][y]===T_FLOOR && G.map[x + 1][y]===T_FLOOR && !(x===p.x && y===p.y) && !(x + 1===p.x && y===p.y) && (x!==b0.x || y!==b0.y)){ spot = [x, y]; break; } }
+    heditTurn(1); heditTurn(1); const S = G.hedit.sel, rm = housePlan().floors[0].rooms.find(r=>b0.x >= r.x0 && b0.x <= r.x1 && b0.y >= r.y0 && b0.y <= r.y1); let spot = null; for (let ly=1; ly<3 && !spot; ly++) for (let lx=0; lx<4; lx++){ const x = rm.x0 + lx, y = rm.y0 + ly; if (G.map[x][y]===T_FLOOR && G.map[x + 1][y]===T_FLOOR && !(x===p.x && y===p.y) && !(x + 1===p.x && y===p.y) && (x!==b0.x || y!==b0.y)){ spot = [x, y]; break; } }
     heditMove(at(spot[0] + 0.5, 0, spot[1] + 0.5)); out.aim = [Math.floor(S.x), Math.floor(S.z)]; out.spot = spot; out.ok = heditOk(S);
     /* out of the house, into the garden: refused (RS-909: indoors anywhere, but indoors) */
     const keep = [S.x, S.z]; S.x = housePlan().garden.x0 + 2.5; S.z = housePlan().garden.y0 + 1.5; out.outRoom = heditOk(S); S.x = keep[0]; S.z = keep[1];

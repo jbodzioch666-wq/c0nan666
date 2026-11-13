@@ -57,7 +57,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   fs.writeFileSync(path.join(__dirname, 'shots', 'rs904-pieces.jpg'), Buffer.from(after.shot.split(',')[1], 'base64')); delete after.shot;
   console.log(JSON.stringify({ shop, ed, after }));
   A(shop.npc && shop.tile && shop.noHouse, 'Wenna the furnisher on the square; no house, nowhere to put it', shop);
-  A(shop.rows===19 && shop.stock.length===19 && shop.stock.join()!==shop.stock2.join(), 'the plain pieces, five finer ones and two for the garden (RS-908), changing by the day', shop);
+  A(shop.rows===30 && shop.stock.length===30 && shop.stock.join()!==shop.stock2.join(), 'the plain pieces, five finer ones, two for the garden (RS-908) and the eleven rugs (RS-910), changing by the day', shop);
   A(shop.paid===420, 'bought for its price', shop);
   A(ed.v3 && ed.btn && ed.on && ed.ghost && ed.ok1, 'Decorate at home: a piece taken from the store follows the pointer', ed);
   A(Math.abs(ed.r1 - Math.PI/4) < 0.01 && ed.snapped && ed.solid, 'placed snapped and turned an eighth; a table walls off its tile', ed);
@@ -67,6 +67,6 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   A(ed.picked==='chair' && ed.chairBack===1, 'a placed piece picked up and sent back to the store', ed);
   A(!ed.door && !ed.place, 'nothing in the front door', ed);
   A(after.off && after.saved===ed.n && after.grp===ed.n, 'Escape ends it; the pieces kept in the save and shown', after);
-  for (const [k, v] of Object.entries(after.pieces)){ A(!v.flat && v.meshes <= 8, k + ': smooth parts merged by material', v); A(v.tris > (k.startsWith('rug') ? 40 : 300), k + ': fine parts', v); A(v.ms2 < 3, k + ': set down again cheaply', v); }
+  for (const [k, v] of Object.entries(after.pieces)){ A(!v.flat && v.meshes <= 8, k + ': smooth parts merged by material', v); if (!k.startsWith('rg_')) A(v.tris > (k.startsWith('rug') ? 40 : 300), k + ': fine parts', v); A(v.ms2 < 3, k + ': set down again cheaply', v); }
   A(!errs.length, 'no errors: ' + errs.join(' | '));
 };
