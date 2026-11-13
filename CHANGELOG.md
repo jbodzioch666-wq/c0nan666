@@ -1,3 +1,8 @@
+## RS-915 - Pictures Over the Bed
+
+- **Pictures over the bed.** A painting, banner, tapestry or other wall piece now hangs on the wall above a working piece (the bed, a bench, the altar). Before, the piece standing on that floor tile blocked it.
+- **Small things on top.** A candle, vase or other small, non-solid piece can now sit on top of a working piece. The floor where a working piece stands stays clear.
+
 ## RS-914 - Doors and Doorways
 
 - **Doorways fixed.** A doorway's lintel used to stay solid when the wall beside it faded out of your way, leaving a block hanging in the air. Lintels now fade with the walls either side of them, and doors do too.
