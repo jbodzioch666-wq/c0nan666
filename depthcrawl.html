@@ -23582,11 +23582,40 @@ const TRAVEL_ACH = ['explorer_25','explorer_50','explorer_90','town_hopper','reg
 // from its heart, in tiles); the land is raised to it, and the far-off view of it uses the same shape
 const VOLC = { R:5.4, rc:1.15, H:6.2, foot:0.1, pit:1.3 };
 function volcProfile(d){ if (d >= VOLC.R) return 0; if (d < VOLC.rc) return VOLC.H - VOLC.pit*(1 - Math.pow(d/VOLC.rc, 2)); return VOLC.H*Math.pow((VOLC.R - d)/(VOLC.R - VOLC.rc), 1.55); }
+/* (RS-918) slate scales for the tower's roof: rows of round-ended tiles, each shaded to its edge, the rows offset by half a tile */
+let O3_SCALETEX = null;
+function o3ScaleTex(){ if (O3_SCALETEX) return O3_SCALETEX; const S = 128, c = v3Canvas(S, S), x = c.getContext('2d'), n = 8, w = S/n, rh = S/8;
+  x.fillStyle = '#5a5a62'; x.fillRect(0, 0, S, S);
+  for (let row=-1; row<=8; row++) for (let i=-1;i<=n;i++){ const cx = i*w + (row%2 ? w/2 : 0) + w/2, top = row*rh, gr = x.createLinearGradient(0, top, 0, top + rh*1.5), v = 200 + ((i*37 + row*61 + 50) % 5)*9;
+    gr.addColorStop(0, 'rgb(' + (v - 40) + ',' + (v - 40) + ',' + (v - 30) + ')'); gr.addColorStop(0.75, 'rgb(' + v + ',' + v + ',' + (v + 8) + ')'); gr.addColorStop(1, 'rgb(' + (v - 90) + ',' + (v - 90) + ',' + (v - 80) + ')');
+    x.fillStyle = gr; x.beginPath(); x.moveTo(cx - w/2 + 1, top); x.lineTo(cx - w/2 + 1, top + rh*0.9); x.arc(cx, top + rh*0.9, w/2 - 1, Math.PI, 0, true); x.lineTo(cx + w/2 - 1, top); x.closePath(); x.fill(); x.strokeStyle = 'rgba(20,20,30,0.55)'; x.lineWidth = 1.2; x.stroke(); }
+  const t = v3CanvasTex(c); t.flipY = false; return (O3_SCALETEX = t); }
 function o3LandmarkModel(lm){
   const T = THREE, g = new T.Group(), mats = [];
   const mat = (col, o)=>{ const m = new T.MeshStandardMaterial(Object.assign({ color:new T.Color(col).convertSRGBToLinear(), roughness:0.9, fog:false }, o||{})); m.userData.base = m.color.clone(); m.userData.own = true; mats.push(m); return m; };
   const basic = (col, o)=>{ const m = new T.MeshBasicMaterial(Object.assign({ color:new T.Color(col).convertSRGBToLinear(), fog:false }, o||{})); m.userData.own = true; return m; };
   const anim = { kind:lm.kind, smoke:[], glow:null, orb:null };
+  /* (RS-918) shared sculpting: a lathe from [r, y] pairs with its texture tiled (su round, sv up), a tube along points that tapers
+     from r0 to r1, a blob of foliage pushed about by noise with its colour running from shade below to sunlit above, and parts
+     merged one mesh per material */
+  const nz = (x, y, z)=>Math.sin(x*1.7 + y*2.3 + Math.sin(z*1.3)*1.4)*0.5 + Math.sin(y*3.1 - z*2.7 + x*0.6)*0.3 + Math.sin(z*4.3 + x*3.7)*0.2;
+  const tile = (geo, su, sv)=>{ const u = geo.attributes.uv; if (u){ for (let i=0;i<u.count;i++) u.setXY(i, u.getX(i)*su, u.getY(i)*sv); u.needsUpdate = true; } return geo; };
+  const lathe = (pr, seg, su, sv)=>tile(new T.LatheGeometry(pr.map(([r, y])=>new T.Vector2(Math.max(0.001, r), y)), seg), su||1, sv||1);
+  const tube = (pts, r0, r1, ts, rs)=>{ const cv = new T.CatmullRomCurve3(pts.map(p=>new T.Vector3(...p))), geo = new T.TubeGeometry(cv, ts, 1, rs, false), P = geo.attributes.position, c = new T.Vector3(), v = new T.Vector3();
+    for (let i=0;i<P.count;i++){ const t = Math.floor(i/(rs + 1))/ts; cv.getPointAt(t, c); v.fromBufferAttribute(P, i).sub(c).multiplyScalar(r0 + (r1 - r0)*Math.pow(t, 0.8)); P.setXYZ(i, c.x + v.x, c.y + v.y, c.z + v.z); }
+    geo.computeVertexNormals(); return geo; };
+  const parts = new Map(), put = (geo, m, x, y, z, rx, ry, rz, s)=>{ const me = new T.Mesh(geo); me.position.set(x||0, y||0, z||0); me.rotation.set(rx||0, ry||0, rz||0); if (s) me.scale.copy(typeof s==='number' ? new T.Vector3(s, s, s) : s); if (!parts.has(m)) parts.set(m, []); parts.get(m).push(me); return me; };
+  const flush = (shadow)=>{ for (const [m, list] of parts){ const me = m3dMergeMeshes(list, m); me.castShadow = shadow!==false; me.receiveShadow = true; g.add(me); list.forEach(l=>l.geometry.dispose()); } parts.clear(); };
+  const arch = (w, h, pointed)=>{ const s = new T.Shape(), hw = w/2; s.moveTo(-hw, 0); s.lineTo(-hw, h - (pointed ? w*0.85 : hw)); if (pointed){ s.quadraticCurveTo(-hw, h - w*0.15, 0, h); s.quadraticCurveTo(hw, h - w*0.15, hw, h - w*0.85); } else s.absarc(0, h - hw, hw, Math.PI, 0, true); s.lineTo(hw, 0); s.lineTo(-hw, 0); return s; };
+  const ext = (shape, d, bev)=>{ const geo = new T.ExtrudeGeometry(shape, { depth:d, bevelEnabled:!!bev, bevelThickness:bev||0, bevelSize:bev||0, bevelSegments:2, curveSegments:14 }); geo.translate(0, 0, -d/2); return geo; };
+  const blob = (r, seed, lo, hi, det)=>{ const geo = new T.IcosahedronGeometry(r, det||4), P = geo.attributes.position, C = new Float32Array(P.count*3), v = new T.Vector3(), a = new T.Color(lo).convertSRGBToLinear(), b = new T.Color(hi).convertSRGBToLinear(), c = new T.Color();
+    for (let i=0;i<P.count;i++){ v.fromBufferAttribute(P, i); const n = v.clone().normalize(), k = 1 + 0.16*nz(n.x*2.2 + seed, n.y*2.2, n.z*2.2 - seed) + 0.07*nz(n.x*6 - seed, n.y*6 + seed, n.z*6); v.copy(n).multiplyScalar(r*k); if (v.y < 0) v.y *= 0.62; P.setXYZ(i, v.x, v.y, v.z);
+      c.copy(a).lerp(b, Math.max(0, Math.min(1, 0.5 + n.y*0.55 + (k - 1)*1.6))); C[i*3] = c.r; C[i*3+1] = c.g; C[i*3+2] = c.b; }
+    geo.setAttribute('color', new T.BufferAttribute(C, 3)); geo.computeVertexNormals();
+    { const N = geo.attributes.normal, acc = new Map(), key = i=>Math.round(P.getX(i)*1e3) + ',' + Math.round(P.getY(i)*1e3) + ',' + Math.round(P.getZ(i)*1e3);   /* (an icosahedron's corners aren't shared: the normals pooled by place, so the leaf billows smooth, not faceted) */
+      for (let i=0;i<P.count;i++){ const k = key(i), s = acc.get(k) || acc.set(k, new T.Vector3()).get(k); s.x += N.getX(i); s.y += N.getY(i); s.z += N.getZ(i); }
+      for (let i=0;i<P.count;i++){ const s = acc.get(key(i)).clone().normalize(); N.setXYZ(i, s.x, s.y, s.z); } }
+    return geo; };
   if (lm.kind==='volcano'){
     const pts = []; for (let i=0;i<=24;i++){ const d = VOLC.R*(1 - i/24); pts.push(new T.Vector2(Math.max(0.001, d), volcProfile(d))); }
     anim.far = new T.Mesh(new T.LatheGeometry(pts, 32), mat('#3e3430', { flatShading:true })); anim.far.castShadow = true; g.add(anim.far);
@@ -23595,45 +23624,88 @@ function o3LandmarkModel(lm){
     const tex = O3.tex.smoke || (O3.tex.smoke = v3Blob('rgba(200,200,200,1)'));
     for (let i=0;i<10;i++){ const sp = new T.Sprite(new T.SpriteMaterial({ map:tex, transparent:true, depthWrite:false, color:0x4a4440, opacity:0.4, fog:false })); sp.material.userData.own = true; g.add(sp); anim.smoke.push({ sp, ph:i/10 }); }
   } else if (lm.kind==='tree'){
-    const trunk = new T.Mesh(new T.CylinderGeometry(0.55, 1.0, 6.5, 10), mat('#5a3e26', { flatShading:true })); trunk.position.y = 3.25; trunk.castShadow = true; g.add(trunk);
-    for (let i=0;i<5;i++){ const a = i/5*Math.PI*2, root = new T.Mesh(new T.CylinderGeometry(0.12, 0.35, 2.2, 6), mat('#4a3420', { flatShading:true }));
-      root.position.set(Math.cos(a)*0.9, 0.35, Math.sin(a)*0.9); root.rotation.set(Math.sin(a)*1.1, 0, -Math.cos(a)*1.1); g.add(root); }
-    const leaf = mat('#3c6a2a', { flatShading:true }), leaf2 = mat('#4a7a32', { flatShading:true });
-    for (const [x,y,z,r,l] of [[0,8.2,0,2.7,0],[1.8,7.1,0.7,1.9,1],[-1.7,7.3,-0.5,2.0,1],[0.5,7.1,-1.8,1.85,0],[-0.5,9.4,0.4,1.8,1],[-0.3,6.9,1.7,1.8,0]]){
-      const b = new T.Mesh(new T.IcosahedronGeometry(r, 1), l ? leaf2 : leaf); b.position.set(x,y,z); b.castShadow = true; g.add(b); }
+    /* (RS-918) the great tree: an old oak out of a Rankin/Bass wood - a gnarled trunk flaring into its roots, ridged and twisted, bark
+       textured; tapering roots gripping the ground, boughs reaching out and up, and a crown of billowing leaf, deep shade beneath and
+       sunlit above */
+    const bk = m3dBarkTex(), bark = mat('#a88a68', { map:bk, bumpMap:bk, bumpScale:1.6, roughness:0.93 }), leaf = mat('#ffffff', { vertexColors:true, roughness:0.82 });
+    const pr = []; for (let i=0;i<=22;i++){ const y = -0.3 + i/22*6.8; pr.push([0.6 + 0.95*Math.exp(-1.25*Math.max(0, y)) + 0.14*Math.max(0, y - 4.9), y]); }
+    const tg = lathe(pr, 36, 3, 4), P = tg.attributes.position;
+    for (let i=0;i<P.count;i++){ const x = P.getX(i), y = P.getY(i), z = P.getZ(i), r = Math.hypot(x, z), a = Math.atan2(z, x) + y*0.13, k = 1 + 0.13*Math.sin(a*7 + y*0.7) + 0.07*nz(Math.cos(a)*2, y*0.9, Math.sin(a)*2);
+      P.setXYZ(i, Math.cos(a)*r*k, y, Math.sin(a)*r*k); }
+    tg.computeVertexNormals(); put(tg, bark);
+    for (let i=0;i<7;i++){ const a = i/7*Math.PI*2 + 0.3*Math.sin(i*2.1), c = Math.cos(a), s = Math.sin(a), L = 2.7 + 0.6*Math.sin(i*3.7);
+      put(tile(tube([[c*0.55, 1.0, s*0.55], [c*1.4, 0.35, s*1.4], [c*(L - 0.6), 0.02, s*(L - 0.6) + 0.2*Math.sin(i)], [c*L, -0.35, s*L]], 0.46, 0.05, 18, 10), 4, 1), bark); }
+    const ends = [];
+    for (let i=0;i<6;i++){ const a = i/6*Math.PI*2 + 0.4, c = Math.cos(a), s = Math.sin(a), y0 = 4.6 + (i%3)*0.45, L = 2.6 + (i%2)*0.6, tw = 0.5*Math.sin(i*1.9);
+      const e = [c*L - s*tw, y0 + 2.1 + (i%2)*0.5, s*L + c*tw]; ends.push(e);
+      put(tile(tube([[c*0.3, y0 - 0.4, s*0.3], [c*1.2, y0 + 0.5, s*1.2], [c*(L*0.7) - s*tw*0.5, y0 + 1.3, s*(L*0.7) + c*tw*0.5], e], 0.42, 0.1, 16, 9), 3, 1), bark);
+      const f = [e[0]*1.15 + s*0.9, e[1] + 0.3, e[2]*1.15 - c*0.9]; put(tile(tube([[c*L*0.65, y0 + 1.15, s*L*0.65], [(c*L*0.65 + f[0])/2, y0 + 1.8, (s*L*0.65 + f[2])/2], f], 0.17, 0.05, 10, 7), 2, 1), bark); ends.push(f); }
+    put(tile(tube([[0, 5.6, 0], [0.3, 7.0, -0.2], [-0.1, 8.6, 0.1]], 0.4, 0.12, 12, 9), 3, 1), bark);
+    const crown = [[0, 9.3, 0, 2.5], [0, 7.8, 0, 2.4], ...ends.map((e, i)=>[e[0], e[1] + 0.5, e[2], i%2 ? 1.45 : 1.95])];
+    crown.forEach(([x, y, z, r], i)=>put(blob(r, i*1.73 + 0.4, '#16301a', '#86ac52'), leaf, x, y, z, 0, i, 0));
+    flush();
     anim.glow = o3Glow('rgba(190,255,140,1)', 1.2); anim.glow.material.fog = false; anim.glow.material.userData.own = true; anim.glow.position.set(1.4, 4.5, 1.4); g.add(anim.glow);
   } else if (lm.kind==='spire'){
     /* (RS-360) the Black Spire: a tall eight-sided shaft of black glass tapering to a crown of jagged spikes, four knife-edged
        buttresses at its foot, slit windows that burn violet, a sealed gate, and a cold violet flame at the top with black
-       smoke rolling off it. Bakshi's dark towers: hard edges, a gloss like obsidian, and nothing welcoming about it */
+       smoke rolling off it. Bakshi's dark towers: hard edges, a gloss like obsidian, and nothing welcoming about it.
+       (RS-918) the buttresses swept blades, the crown's spikes curved thorns, the gate and windows pointed arches in ribbed frames */
     const glass = mat('#1a1624', { flatShading:true, roughness:0.3, metalness:0.35, emissive:new T.Color('#05030a') }), dark = mat('#221c2e', { flatShading:true, roughness:0.45, metalness:0.2 }), rib = mat('#3e3652', { flatShading:true, roughness:0.4, metalness:0.3 });
-    const plinth = new T.Mesh(new T.CylinderGeometry(2.3, 2.7, 0.8, 8), dark); plinth.position.y = 0.4; plinth.castShadow = true; g.add(plinth);
-    const shaft = new T.Mesh(new T.CylinderGeometry(0.95, 1.9, 15, 8), glass); shaft.position.y = 8.3; shaft.castShadow = true; g.add(shaft);
-    for (let i=0;i<4;i++){ const a = i/4*Math.PI*2 + Math.PI/8, fin = new T.Mesh(new T.BoxGeometry(0.35, 6.5, 1.9), dark); fin.position.set(Math.cos(a)*2.2, 3.6, Math.sin(a)*2.2); fin.rotation.y = -a; fin.rotation.z = 0; fin.castShadow = true; g.add(fin);
-      const fg = fin.geometry.attributes.position; for (let k=0;k<fg.count;k++) if (fg.getY(k) > 0) fg.setZ(k, fg.getZ(k)*0.25); fg.needsUpdate = true; fin.geometry.computeVertexNormals(); }
-    const band = new T.Mesh(new T.CylinderGeometry(1.25, 1.25, 0.5, 8), dark); band.position.y = 15.6; g.add(band);
-    for (const y of [2.2, 5.4, 8.6, 11.8]){ const rr = 1.9 - ((y - 0.8)/15)*0.95 + 0.08, r2 = new T.Mesh(new T.CylinderGeometry(rr, rr + 0.1, 0.24, 8), rib); r2.position.y = y; g.add(r2); }   /* (ribs break the slab into storeys, and catch the light) */
-    for (let i=0;i<6;i++){ const a = i/6*Math.PI*2, sp = new T.Mesh(new T.ConeGeometry(0.28, 2.6 + (i%2)*0.9, 5), glass); sp.position.set(Math.cos(a)*1.05, 16.8, Math.sin(a)*1.05); sp.rotation.z = -Math.cos(a)*0.32; sp.rotation.x = Math.sin(a)*0.32; sp.castShadow = true; g.add(sp); }
-    const win = basic('#b070ff');
-    for (const [y,a] of [[3.6,0.3],[4.2,3.5],[7.0,2.4],[7.4,5.5],[10.2,4.3],[10.6,1.1],[13.2,3.4],[13.6,0.2],[14.6,5.6]]){ const rr = 1.9 - ((y - 0.8)/15)*0.95 + 0.03, w = new T.Mesh(new T.PlaneGeometry(0.3, 1.3), win); w.position.set(Math.cos(a)*rr, y, Math.sin(a)*rr); w.lookAt(Math.cos(a)*6, y, Math.sin(a)*6); g.add(w); }
-    const gate = new T.Mesh(new T.PlaneGeometry(1.1, 2.0), basic('#05040a')); gate.position.set(0, 1.8, 1.93); g.add(gate);
-    const seam = new T.Mesh(new T.PlaneGeometry(0.06, 1.9), win); seam.position.set(0, 1.8, 1.95); g.add(seam);
-    anim.orb = new T.Mesh(new T.SphereGeometry(0.4, 14, 10), basic('#d8b0ff')); anim.orb.position.y = 18.4; g.add(anim.orb);
-    anim.glow = o3Glow('rgba(170,90,255,1)', 3.4); anim.glow.material.fog = false; anim.glow.material.userData.own = true; anim.glow.position.y = 18.4; g.add(anim.glow);
-    const tex = O3.tex.smoke || (O3.tex.smoke = v3Blob('rgba(200,200,200,1)'));
-    for (let i=0;i<6;i++){ const sp = new T.Sprite(new T.SpriteMaterial({ map:tex, transparent:true, depthWrite:false, color:0x1a1026, opacity:0.35, fog:false })); sp.material.userData.own = true; g.add(sp); anim.smoke.push({ sp, ph:i/6 }); }
+    const rS = y=>(1.9 - ((y - 0.8)/15)*0.95)*Math.cos(Math.PI/8), q8 = Math.PI/8;   /* (the shaft turned so a flat faces each way the gate and windows look: rS is to a face) */
+    put(new T.CylinderGeometry(2.3, 2.7, 0.8, 8), dark, 0, 0.4, 0, 0, q8, 0); put(new T.CylinderGeometry(2.05, 2.3, 0.3, 8), rib, 0, 0.95, 0, 0, q8, 0);
+    put(new T.CylinderGeometry(0.95, 1.9, 15, 8), glass, 0, 8.3, 0, 0, q8, 0);
+    const blade = new T.Shape(); blade.moveTo(0, 0); blade.lineTo(1.75, 0); blade.quadraticCurveTo(1.15, 2.6, 0.06, 7.6); blade.lineTo(0, 7.6); blade.lineTo(0, 0);
+    for (let i=0;i<4;i++){ const a = i/4*Math.PI*2 + Math.PI/8; put(ext(blade, 0.3, 0.05), dark, Math.cos(a)*1.35, 0, Math.sin(a)*1.35, 0, -a, 0); }
+    put(new T.CylinderGeometry(1.25, 1.25, 0.5, 8), dark, 0, 15.6, 0, 0, q8, 0);
+    for (const y of [2.2, 5.4, 8.6, 11.8]){ const rr = rS(y)/Math.cos(q8) + 0.08; put(new T.CylinderGeometry(rr, rr + 0.1, 0.24, 8), rib, 0, y, 0, 0, q8, 0); }   /* (ribs break the slab into storeys, and catch the light) */
+    for (let i=0;i<6;i++){ const a = i/6*Math.PI*2, c = Math.cos(a), s = Math.sin(a), h = 2.4 + (i%2)*1.0;
+      put(tube([[c*1.0, 15.7, s*1.0], [c*1.12, 16.6, s*1.12], [c*1.45, 15.9 + h*0.75, s*1.45], [c*1.95, 15.8 + h, s*1.95]], 0.3, 0.008, 14, 7), glass); }
+    put(new T.ConeGeometry(0.45, 2.2, 8), glass, 0, 16.9, 0);
+    const win = basic('#b070ff'), framed = (ow, oh, iw, ih, up)=>{ const s = arch(ow, oh, true); s.holes.push(new T.Path(arch(iw, ih, true).getPoints().map(p=>new T.Vector2(p.x, p.y + up)))); return s; };
+    for (const [y, a0] of [[3.6,0.3],[4.2,3.5],[7.0,2.4],[7.4,5.5],[10.2,4.3],[10.6,1.1],[13.2,3.4],[13.6,0.2],[14.6,5.6]]){ const a = Math.round(a0/(Math.PI/4))*Math.PI/4, rr = rS(y) - 0.04, ry = Math.PI/2 - a, x = Math.cos(a), z = Math.sin(a);
+      put(ext(framed(0.48, 1.48, 0.3, 1.3, 0.09), 0.14), rib, x*(rr + 0.06), y - 0.74, z*(rr + 0.06), 0, ry, 0); put(ext(arch(0.3, 1.3, true), 0.04), win, x*(rr + 0.02), y - 0.65, z*(rr + 0.02), 0, ry, 0); }
+    put(ext(framed(1.6, 2.7, 1.1, 2.2, 0.12), 0.26), rib, 0, 0.8, rS(1.6) - 0.02); put(ext(arch(1.1, 2.2, true), 0.06), basic('#05040a'), 0, 0.92, rS(1.6) - 0.06);
+    put(new T.BoxGeometry(0.05, 2.0, 0.05), win, 0, 1.9, rS(1.6) - 0.01);
+    flush();
   } else {
-    const stone = mat('#8a8478', { flatShading:true });
-    const body = new T.Mesh(new T.CylinderGeometry(1.05, 1.35, 8, 12), stone); body.position.y = 4; body.castShadow = true; g.add(body);
-    const ring = new T.Mesh(new T.CylinderGeometry(1.4, 1.4, 0.45, 12), stone); ring.position.y = 8.1; g.add(ring);
-    const roof = new T.Mesh(new T.ConeGeometry(1.7, 3.4, 12), mat('#2a4a9a', { flatShading:true, roughness:0.6 })); roof.position.y = 10; roof.castShadow = true; g.add(roof);
-    const win = basic('#ffd870');
-    for (const [y,a] of [[2.4,0.5],[4.6,2.6],[6.8,4.4],[6.8,1.2]]){ const w = new T.Mesh(new T.PlaneGeometry(0.32, 0.55), win); w.position.set(Math.cos(a)*1.17, y, Math.sin(a)*1.17); w.lookAt(Math.cos(a)*5, y, Math.sin(a)*5); g.add(w); }
-    const door = new T.Mesh(new T.PlaneGeometry(0.6, 1.1), basic('#2a1a0e')); door.position.set(0, 0.55, 1.33); g.add(door);
-    anim.orb = new T.Mesh(new T.SphereGeometry(0.32, 14, 10), basic('#bfe8ff')); anim.orb.position.y = 12.1; g.add(anim.orb);
-    anim.glow = o3Glow('rgba(140,200,255,1)', 2.6); anim.glow.material.fog = false; anim.glow.material.userData.own = true; anim.glow.position.y = 12.1; g.add(anim.glow);
+    /* (RS-918) the wizard's tower: a round tower of dressed stone on a battered foot, a stair up to an arched oak door strapped in iron,
+       lancet windows lit gold in carved surrounds, string courses, a corbelled and battlemented gallery, and over the top drum a tall
+       flared roof of blue slate scales with a gold finial, the orb turning above it; ivy climbing one side */
+    const rk = o3RockTex(), stone = mat('#c4baa8', { map:rk, bumpMap:rk, bumpScale:1.3, roughness:0.94 }), trim = mat('#a89e8c', { map:rk, bumpMap:rk, bumpScale:0.8, roughness:0.9 });
+    const roofM = mat('#3e62b8', { map:o3ScaleTex(), roughness:0.55, metalness:0.1 }), gold = mat('#e8b848', { metalness:0.85, roughness:0.28 }), iron = mat('#2c2a28', { metalness:0.6, roughness:0.5 });
+    const wood = mat('#8a6040', { map:dgkWood('crate', '#8a643c', 4).map, roughness:0.8 }), ivy = mat('#ffffff', { vertexColors:true, roughness:0.85 }), lit = basic('#ffcc66');
+    const rS = y=>1.42 - (y - 1.0)*0.03 + 0.025*Math.sin(Math.PI*Math.max(0, Math.min(1, (y - 1.0)/7.2)));
+    put(lathe([[2.0, -0.4], [2.0, 0.05], [1.92, 0.18], [1.62, 0.92], [1.5, 1.0], [1.47, 1.08]], 48, 9, 1), trim);
+    { const pr = []; for (let i=0;i<=14;i++){ const y = 1.0 + i/14*7.3; pr.push([rS(y), y]); } put(lathe(pr, 56, 7, 5), stone); }
+    for (const y of [3.55, 6.15]) put(new T.TorusGeometry(rS(y) + 0.02, 0.075, 8, 64), trim, 0, y, 0, Math.PI/2, 0, 0);
+    const corb = new T.Shape(); corb.moveTo(0, 0); corb.lineTo(0.1, 0); corb.quadraticCurveTo(0.3, 0.05, 0.32, 0.42); corb.lineTo(0.32, 0.5); corb.lineTo(0, 0.5); corb.lineTo(0, 0);
+    for (let i=0;i<20;i++){ const a = i/20*Math.PI*2; put(ext(corb, 0.17, 0.015), trim, Math.cos(a)*(rS(7.9) - 0.06), 7.88, Math.sin(a)*(rS(7.9) - 0.06), 0, -a, 0); }
+    put(lathe([[1.15, 8.38], [1.68, 8.38], [1.73, 8.47], [1.68, 8.56], [1.66, 9.1], [1.7, 9.16], [1.48, 9.16], [1.5, 8.56], [1.15, 8.56], [1.15, 8.38]], 56, 9, 1), stone);
+    for (let i=0;i<16;i++){ const a = (i + 0.5)/16*Math.PI*2; put(new T.BoxGeometry(0.38, 0.32, 0.2), stone, Math.cos(a)*1.59, 9.32, Math.sin(a)*1.59, 0, Math.PI/2 - a, 0); }
+    put(lathe([[1.12, 8.5], [1.12, 9.95], [1.2, 10.0]], 48, 5, 1), stone);
+    { const pr = [[0.9, 9.9], [1.76, 9.82], [1.78, 9.92]]; for (let i=1;i<=16;i++){ const t = i/16; pr.push([1.7*Math.pow(1 - t, 1.6), 9.92 + t*3.4]); } put(lathe(pr, 48, 12, 6), roofM); }
+    for (let i=0;i<4;i++){ const a = i/4*Math.PI*2 + Math.PI/4, c = Math.cos(a), s = Math.sin(a), r = 1.25;
+      put(ext(arch(0.3, 0.5, false), 0.5), roofM, c*(r + 0.12), 10.25, s*(r + 0.12), 0, Math.PI/2 - a, 0); put(ext(arch(0.18, 0.36, false), 0.04), lit, c*(r + 0.38), 10.29, s*(r + 0.38), 0, Math.PI/2 - a, 0);
+      put(new T.ConeGeometry(0.26, 0.3, 4), roofM, c*(r + 0.14), 10.85, s*(r + 0.14), 0, Math.PI/4 - a, 0); }
+    put(lathe([[0.16, 13.2], [0.11, 13.35], [0.16, 13.48], [0.07, 13.62], [0.045, 14.0], [0.001, 14.12]], 24), gold); put(new T.SphereGeometry(0.11, 20, 14), gold, 0, 13.48, 0);
+    const surround = (w, h)=>{ const s = arch(w + 0.2, h + 0.18, false); s.holes.push(new T.Path(arch(w, h, false).getPoints().map(p=>new T.Vector2(p.x, p.y + 0.09)))); return s; };
+    for (const [y, a] of [[2.3, 0.7], [3.95, 2.6], [4.9, 4.7], [6.7, 1.5], [6.95, 3.9], [7.1, 5.6]]){ const r = rS(y), c = Math.cos(a), s = Math.sin(a), ry = Math.PI/2 - a;
+      put(ext(surround(0.34, 0.62), 0.14), trim, c*(r + 0.03), y - 0.09, s*(r + 0.03), 0, ry, 0); put(ext(arch(0.34, 0.62, false), 0.04), lit, c*(r - 0.01), y, s*(r - 0.01), 0, ry, 0);
+      put(new T.BoxGeometry(0.03, 0.6, 0.03), iron, c*(r + 0.02), y + 0.3, s*(r + 0.02), 0, ry, 0); put(new T.BoxGeometry(0.34, 0.03, 0.03), iron, c*(r + 0.02), y + 0.38, s*(r + 0.02), 0, ry, 0);
+      put(new T.BoxGeometry(0.5, 0.07, 0.14), trim, c*(r + 0.07), y - 0.1, s*(r + 0.07), 0, ry, 0); }
+    /* the door, up three steps on the +z side */
+    const dz = rS(1.0);
+    put(ext(surround(0.74, 1.3), 0.2), trim, 0, 0.92, dz + 0.02); put(ext(arch(0.74, 1.3, false), 0.08), wood, 0, 1.01, dz - 0.02);
+    for (const y of [1.3, 1.85]) put(new T.BoxGeometry(0.72, 0.06, 0.02), iron, 0, y, dz + 0.03);
+    put(new T.TorusGeometry(0.07, 0.016, 8, 20), iron, 0.2, 1.55, dz + 0.04); put(new T.SphereGeometry(0.035, 12, 8), iron, -0.25, 1.6, dz + 0.03);
+    for (let k=0;k<3;k++){ const top = (k + 1)*0.335, z0 = dz - 0.3, z1 = 2.75 - k*0.36; put(new T.BoxGeometry(1.2 - k*0.06, top, z1 - z0), trim, 0, top/2, (z0 + z1)/2); }
+    for (let i=0;i<18;i++){ const t = i/17, a = 3.75 + Math.sin(i*1.7)*0.3 + t*0.3, y = 0.6 + t*5.2 + Math.sin(i*2.3)*0.2, r = rS(y), c = Math.cos(a), s = Math.sin(a), rr = 0.36 - t*0.18;
+      put(blob(rr, i*2.1, '#1c3418', '#5e8a3a', 3), ivy, c*(r + rr*0.25), y, s*(r + rr*0.25), 0, -a, 0, new T.Vector3(0.5, 1.15, 1)); }
+    flush();
+    anim.orb = new T.Mesh(new T.SphereGeometry(0.32, 20, 14), basic('#bfe8ff')); anim.orb.position.y = 14.6; g.add(anim.orb);
+    anim.glow = o3Glow('rgba(140,200,255,1)', 2.6); anim.glow.material.fog = false; anim.glow.material.userData.own = true; anim.glow.position.y = 14.6; g.add(anim.glow);
   }
-  const hbH = lm.kind==='volcano' ? 7 : lm.kind==='spire' ? 19 : 11, hb = new T.Mesh(new T.BoxGeometry(lm.kind==='volcano' ? 5 : 4, hbH, lm.kind==='volcano' ? 5 : 4), O3.nodeHitM || (O3.nodeHitM = new T.MeshBasicMaterial({ visible:false })));
+  const hbH = lm.kind==='volcano' ? 7 : lm.kind==='spire' ? 19 : lm.kind==='tree' ? 12.5 : 15, hb = new T.Mesh(new T.BoxGeometry(lm.kind==='volcano' ? 5 : 4, hbH, lm.kind==='volcano' ? 5 : 4), O3.nodeHitM || (O3.nodeHitM = new T.MeshBasicMaterial({ visible:false })));
   hb.geometry.translate(0, hbH/2, 0); hb.userData.act = { kind:'landmark', id:lm.id, x:lm.x, y:lm.y }; g.add(hb);
   return { g, mats, anim, hb };
 }
@@ -23651,7 +23723,7 @@ function o3SyncLandmarks(dt){
   const sky = O3.scene.background && O3.scene.background.isColor ? O3.scene.background : null, tmp = new T.Color();
   for (const o of O3.lmObjs||[]){
     const lm = o.lm, [cx, cz] = o3C(lm.x, lm.y), d = Math.hypot(cx-pp.x, cz-pp.z);   /* (RS-632: in the frame) */
-    const top = lm.kind==='volcano' ? VOLC.H + 0.5 : lm.kind==='spire' ? 19 : lm.kind==='tower' ? 13 : 10;   /* (RS-647: past the horizon - sunk below the land by the curve - it's out of sight) */
+    const top = lm.kind==='volcano' ? VOLC.H + 0.5 : lm.kind==='spire' ? 19.5 : lm.kind==='tower' ? 15 : 12;   /* (RS-647: past the horizon - sunk below the land by the curve - it's out of sight) */
     o.g.visible = d < 150 && o3CurveK()*d*d < top + 0.5; if (!o.g.visible) continue;
     const inWin = O3.win && Math.abs(cx - 0.5 - O3.win.cx) < O3_W/2 - 2 && Math.abs(cz - 0.5 - O3.win.cy) < O3_W/2 - 2;
     if (lm.kind==='volcano'){ o.g.position.set(cx, VOLC.foot, cz); if (o.anim.far) o.anim.far.visible = !(inWin && O3.volc); }   /* (RS-235: near by, the land itself is the volcano) */
@@ -23666,7 +23738,7 @@ function o3SyncLandmarks(dt){
     if (sky) for (const m of o.mats){ tmp.copy(m.userData.base).lerp(sky, k); m.color.copy(tmp); }
     const a = o.anim, t = O3.t;
     if (a.glow) a.glow.material.opacity = 0.7 + Math.sin(t*(a.kind==='volcano' ? 2.2 : 1.4))*0.25;
-    if (a.orb){ const base = a.kind==='spire' ? 18.4 : 12.1; a.orb.position.y = base + Math.sin(t*1.6)*0.25; a.glow.position.y = a.orb.position.y; }
+    if (a.orb){ const base = a.kind==='spire' ? 18.4 : 14.6; a.orb.position.y = base + Math.sin(t*1.6)*0.25; a.glow.position.y = a.orb.position.y; }
     if (a.kind==='spire'){ for (const s of a.smoke){ const f = (t*0.05 + s.ph) % 1; s.sp.position.set(Math.sin(f*4 + s.ph*9)*0.5 + f*1.2, 18.6 + f*6, Math.cos(f*3 + s.ph*7)*0.5); s.sp.scale.setScalar(1.0 + f*3.5); s.sp.material.opacity = 0.35*(1-f)*Math.min(1, f*6); } }
     else for (const s of a.smoke){ const f = (t*0.07 + s.ph) % 1; s.sp.position.set(Math.sin(f*5 + s.ph*9)*0.6 + f*3, VOLC.H + 0.2 + f*9, Math.cos(f*4 + s.ph*7)*0.5); s.sp.scale.setScalar(1.2 + f*5); s.sp.material.opacity = 0.5*(1-f)*Math.min(1, f*6); }
   }
@@ -55709,7 +55781,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-917';
+const GAME_VERSION = 'rs-918';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

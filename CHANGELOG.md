@@ -1,3 +1,9 @@
+## RS-918 - The Landmarks Remade
+
+- **The wizard's tower rebuilt**: dressed stone on a battered foot, a stair up to an arched oak door strapped in iron, gold-lit lancet windows in carved surrounds, string courses, a corbelled and battlemented gallery, and a tall flared roof of blue slate scales with lit dormers and a gold finial under the turning orb. Ivy climbs one side.
+- **The great tree rebuilt**: a gnarled, twisted trunk with bark that flares into roots gripping the ground, boughs reaching out and up, and a billowing crown, in deep shade below and sunlit on top.
+- **The Black Spire sharpened**: its buttresses are now swept blades, its crown a ring of curved thorns, and the gate and windows are pointed arches in ribbed frames.
+
 ## RS-917 - The Stair and the Plot
 
 - **No quest markers by your plot.** A quest step could pick a spot on or beside your plot and put its cairn and signpost there. Quest spots now keep two tiles clear of the plot's fence, and no quest scenery is drawn there for a quest already set.
