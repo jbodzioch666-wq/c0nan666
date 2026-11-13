@@ -29,7 +29,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
     enterHouse(); const k0 = ROOM_LAYOUT.house.benches.map(b=>b[0]); houseStair(); const k1 = ROOM_LAYOUT.house.benches.map(b=>b[0]); houseStair();
     const out = { v:h.v, size:h.size, portal:houseTier('portal'), kinds:k0.concat(k1).filter(k=>!/^spot_|patch|hstair|coop|byre|trough/.test(k)).sort() }; exitInterior(); return out; });
   console.log(JSON.stringify({ r0, r3, r4, r5 }));
-  A(r0.est && r0.doorTile && r0.spots0.includes('spot_trophy') && r0.spots0.includes('spot_bed') && r0.bed, 'a cottage: its spaces to build in, its bed built first: ' + JSON.stringify(r0));
+  A(r0.est && r0.doorTile && !r0.spots0.some(k=>/^spot_/.test(k)) && r0.bed, 'a cottage: no empty spaces (RS-911: built from Decorate), its bed built at its place: ' + JSON.stringify(r0));
   A(r0.at[0]===r0.door[0] && r0.at[1]===r0.door[1] - 1, 'you come in at the front door');
   A(r3.moved && r3.cost===750000 - 50000 && r3.built && r3.portal===3 && r3.spots===0, 'an estate for the difference, every piece of furniture built: ' + JSON.stringify(r3));
   A(r4.occ > 0 && r4.faded > 0, 'a back wall fades when it hides you: ' + JSON.stringify(r4));

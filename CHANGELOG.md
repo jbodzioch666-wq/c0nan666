@@ -1,3 +1,15 @@
+## RS-911 - Build and Grades
+
+- **Build from Decorate**: the house no longer has empty spaces marked on the floor. Decorate's new **Build** list shows every working piece you haven't made, with its level and materials; building one puts it straight in your hands to set down wherever you like.
+- **Grades, upgraded where they stand**: pick up a working piece in Decorate to see its grade and what the next one needs, and press **upgrade**.
+- **New grades**, each with its own model:
+  - **Straw bed, Oak bed (Con 20), Four-poster bed (Con 50)**: sleeping leaves you **Well rested**, +10% xp in every skill for 300, 600 or 1,200 steps.
+  - **Iron range (Con 30)**: burns half as much of what you cook.
+  - **Blast furnace (Con 40)**: pours a second bar one time in seven.
+  - **Steel anvil (Con 45)**: a tenth more Smithing xp for what you forge.
+  - **Marble altar (Con 50), Gilded altar (Con 70)**: bones give 3.5 and 4 times the Prayer xp.
+  - **Big coop (Con 40), Big byre (Con 55)**: room for 12 hens and 6 cows, as the pasture allows (the plain hen house holds 6, the byre 3).
+
 ## RS-910 - Free Furniture and Rugs
 
 - **Every working piece moves freely**: the bed, hearth, trophy wall, furnace, anvil, altar, craft benches, portal, garden beds and pens now set down like any furnishing - a quarter-tile step with snap on, anywhere with it off - and turn an eighth at a time.
