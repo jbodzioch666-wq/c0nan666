@@ -1,3 +1,12 @@
+## RS-914 - Doors and Doorways
+
+- **Doorways fixed.** A doorway's lintel used to stay solid when the wall beside it faded out of your way, leaving a block hanging in the air. Lintels now fade with the walls either side of them, and doors do too.
+- **Finished doorways.** A doorway in a full wall now has its lintel capped like the wall, with wooden casings down each side.
+- **Doors.** Make them at a carpentry bench (the Boatyard's or your workshop's) with no plan needed, in five woods: the Plank door (Construction 5) and Oak door (20), strapped and ringed in iron; the Maple door (40) and Yew door (60), panelled with brass; and the Magic-wood door (80), fitted in gold with a glowing rune.
+- **Hanging a door.** In Decorate, pick a door from the store and it snaps into the nearest doorway along its wall. Turn it to hang it from the other side. One door to a doorway; doors can't stand on the floor or go in the yard.
+- **Doors swing.** A door swings open, away from you, as you come through, and shuts behind you.
+- **Your house keeps its look.** It is built in your own people's style, whichever town or plot you open its door from. Before, it took the look of the last town you'd been in, so after loading a save it looked like a human house until you visited your race's town.
+
 ## RS-913 - Trophy Cases and Grounds
 
 - **Trophy cases.** Build one from Decorate's Build list (Construction 12) and set it down anywhere indoors, on either floor. Use it to put in trophy scrolls from your bag or take them out again.

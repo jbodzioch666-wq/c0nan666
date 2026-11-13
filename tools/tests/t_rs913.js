@@ -9,6 +9,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   const r = await page.evaluate(async ()=>{ goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{}; townClosedCheck = ()=>false;
     const p = G.player, out = {}; p.clock = p.turnCount = 60; G.owPos = { x:G.ow.spawnPos.x, y:G.ow.spawnPos.y }; enterVillage(); setUi('playing');
     const fr = async n=>{ for (let i=0;i<n;i++){ renderGame(); await new Promise(q=>setTimeout(q, 30)); } };
+    { const roomy = ()=>{ for (let x=0;x<OW_COLS;x++) for (let y=0;y<OW_ROWS;y++) if (G.ow.map[x][y]===OW_TOWN && plotFind(x, y)) return { x, y }; return null; }, t = plotFind(G.owPos.x, G.owPos.y) ? null : roomy(); if (t){ G.owPos = t; enterVillage(); setUi('playing'); } }   /* (a town with open ground near it for a plot) */
     const T0 = { x:G.owPos.x, y:G.owPos.y }; p.gold = 3e6; skGainXP('construction', 6e7); houseBuy(1); out.bought = plotBuy(); out.r1 = plotR();
     try{
     /* the Manor: the grounds grow round the yard */

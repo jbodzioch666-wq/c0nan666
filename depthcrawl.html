@@ -10416,7 +10416,7 @@ function enterInterior(key){
 function exitInterior(){
   if (!G.interior) return;
   const s = G.townState, out = G.interior.out;
-  G.map = s.map; syncGrid(); G.villageDeco = s.deco; G.villageNpcs = s.npcs; G.villagers = s.villagers; G.floorItem = s.floorItem;
+  G.map = s.map; syncGrid(); G.villageDeco = s.deco; G.villageNpcs = s.npcs; G.villagers = s.villagers; G.floorItem = s.floorItem; if (s && 'race' in s) G.villageRace = s.race;   /* (RS-914) */
   G.interior = null; G.townState = null; G.sitAt = null;
   G.player.x = out.x; G.player.y = out.y; G.player.facing = 2; try{ audEnv('door'); }catch(e){}
   if (out.plot){ G.gameMode = 0; G.owPos = { x:out.x, y:out.y }; if (typeof O3!=='undefined') O3.path = []; logMsg('you step out into your yard', 'new'); }   /* (RS-907: out of the plot's front door, back on the open land) */
@@ -11361,7 +11361,7 @@ function v3BuildHouse(grp, mats){
      from what's either side - a room's floor behind it (to its south or east) full, in front low, open ground a fence */
   const side = (x, y, horiz)=>{ const a = horiz ? [x, y + 1] : [x + 1, y], b = horiz ? [x, y - 1] : [x - 1, y]; if (isW(...a) || isW(...b)) return null;
     const pa = ar(...a), pb = ar(...b); return pa==='in' ? 'full' : pb==='in' ? 'low' : (pa && pa!=='door') || (pb && pb!=='door') ? 'fence' : null; };
-  const RANK = { full:3, low:2, fence:1 }, runs = [], fullAt = {};
+  const RANK = { full:3, low:2, fence:1 }, runs = [], fullAt = {}, KA = {};
   const mkRun = (k, x1, z1, x2, z2, horiz)=>{ const g = new T.Group(); grp.add(g); const len = horiz ? x2 - x1 : z2 - z1, cx = (x1 + x2)/2, cz = (z1 + z2)/2;
     if (k==='fence'){ for (let i=0;i<=Math.round(len);i++){ const px = horiz ? x1 + i : cx, pz = horiz ? cz : z1 + i; g.add(v3Box(0.1, 0.85, 0.1, mats.wood, px, 0.425, pz)); }
       for (const y of [0.35, 0.7]) g.add(v3Box(horiz ? len : 0.05, 0.07, horiz ? 0.05 : len, mats.wood, cx, y, cz)); return g; }
@@ -11380,11 +11380,17 @@ function v3BuildHouse(grp, mats){
       let s = 0; while (s < ts.length){ let e = s; while (e + 1 < ts.length && ts[e + 1].k===ts[s].k) e++; const t0 = ts[s], t1 = ts[e], k = t0.k;
         const p0 = horiz ? t0.x : t0.y, p1 = horiz ? t1.x : t1.y, c0 = s===0 && cross(t0.x, t0.y) ? p0 + 0.5 - TH/2 : p0, c1 = e===ts.length - 1 && cross(t1.x, t1.y) ? p1 + 0.5 + TH/2 : p1 + 1;
         const g = horiz ? mkRun(k, c0, t0.y + 0.5, c1, t0.y + 0.5, true) : mkRun(k, t0.x + 0.5, c0, t0.x + 0.5, c1, false);
+        for (let i=s;i<=e;i++) KA[(horiz ? 'h' : 'v') + ts[i].x+','+ts[i].y] = k;
         if (k==='full') for (let i=s;i<=e;i++) if (!fullAt[ts[i].x+','+ts[i].y] || horiz) fullAt[ts[i].x+','+ts[i].y] = g; s = e + 1; } } } }
-  /* a lintel over each doorway in a full wall */
-  const [fx, fy] = P.front;
-  for (const k of D){ const [x, y] = k.split(',').map(Number); if (!fl && x===fx && y===fy) continue; const across = isW(x - 1, y) || isW(x + 1, y), nb = across ? fullAt[(x - 1)+','+y] || fullAt[(x + 1)+','+y] : fullAt[x+','+(y - 1)] || fullAt[x+','+(y + 1)]; if (!nb) continue;
-    nb.add(v3Box(across ? 1 : TH, H - 2.05, across ? TH : 1, wallM, x + 0.5, (H + 2.05)/2, y + 0.5)); nb.add(v3Box(across ? 1.02 : TH + 0.06, 0.1, across ? TH + 0.06 : 1.02, mats.wood, x + 0.5, 2.05, y + 0.5)); }
+  /* (RS-914) each doorway by the wall it's in, along its own line: in a full wall a lintel, capped as the wall is, and cased each side; in a wall
+     cut down to see in (low) it stays open to that height - no lintel left hanging over it. Kept (G.houseDoorKind) for the doors you hang */
+  const [fx, fy] = P.front; G.houseDoorKind = {};
+  for (const k of D){ const [x, y] = k.split(',').map(Number); if (!fl && x===fx && y===fy) continue; const across = isW(x - 1, y) || isW(x + 1, y), d = across ? 'h' : 'v', n1 = across ? (x - 1)+','+y : x+','+(y - 1), n2 = across ? (x + 1)+','+y : x+','+(y + 1), k1 = KA[d + n1], k2 = KA[d + n2];
+    const kind = k1==='low' || k2==='low' ? 'low' : k1==='full' || k2==='full' ? 'full' : (k1 || k2 || null); G.houseDoorKind[k] = { kind, across };
+    if (kind!=='full') continue; if (!fullAt[n1] && !fullAt[n2]) continue; const nb = new T.Group(); grp.add(nb); nb.userData.link = [fullAt[n1], fullAt[n2]].filter(Boolean); V3.occDyn.add(nb); G.houseDoorKind[k].link = nb.userData.link;   /* (it fades with the wall either side of it, never left hanging when one goes) */
+    nb.add(v3Box(across ? 1 : TH, H - 2.05, across ? TH : 1, wallM, x + 0.5, (H + 2.05)/2, y + 0.5)); nb.add(v3Box(across ? 1.02 : TH + 0.06, 0.1, across ? TH + 0.06 : 1.02, mats.wood, x + 0.5, 2.05, y + 0.5));
+    nb.add(v3Box(across ? 1 : TH + 0.1, 0.07, across ? TH + 0.1 : 1, mats.wood, x + 0.5, H + 0.035, y + 0.5));
+    for (const sd of [-1, 1]) nb.add(v3Box(across ? 0.06 : TH + 0.06, 2.05, across ? TH + 0.06 : 0.06, mats.wood, across ? x + 0.5 + sd*0.47 : x + 0.5, 1.025, across ? y + 0.5 : y + 0.5 + sd*0.47)); }
   if (!fl){ v3InteriorDoor(grp, mats, fx, fy + 0.5); grp.add(v3Box(1.0, 0.04, 0.5, mats.planks, fx + 0.5, 0.02, fy + 0.5)); }
   /* each room's back wall: a window if it looks out of the house, and a torch */
   V3.intWin = [];
@@ -27009,6 +27015,9 @@ function houseBuy(size){ size = size || 1; const p = G.player, S = HOUSE_SIZES[s
       if (typeof O3!=='undefined') O3.win = null; }
     logMsg(`you move into the ${S.nm.toLowerCase()} - your furniture stands at its places${back ? `, ${back} furnishing${back > 1 ? 's' : ''} wait${back > 1 ? '' : 's'} in your store to be set out` : ''}${seeds ? `, and ${seeds} crop${seeds > 1 ? 's' : ''} the garden has no room for came back as seed${seeds > 1 ? 's' : ''}` : ''}`, 'magic', true); }
   G.plotSolid = null; sfx('gold'); checkAchievements(); renderOverlay(); saveCurrentGame(); return true; }
+/* (RS-914) the house is built in your own people's way (its walls, boards and plaster), wherever you open its door */
+const HOUSE_RACE_OF = { Human:'human', 'High Elf':'elf', Elf:'elf', 'Wood Elf':'woodelf', Dwarf:'dwarf', Halfling:'halfling', 'Half-Orc':'orc', Gnome:'gnome', Dragonborn:'dragon', Tiefling:'tiefling', 'Half-Elf':'halfelf' };
+function houseRace(){ const h = houseP(), r = (h && h.race) || HOUSE_RACE_OF[G.player && G.player.race] || 'human'; return VILLAGE_RACE_THEME[r] ? r : 'human'; }
 function houseFootOf(k, x, y, rot){ return (k==='bed') ? [x + Math.round(Math.sin(rot||0)), y + Math.round(Math.cos(rot||0))] : null; }
 for (const id of ['flax', 'silverleaf', 'bloodmoss', 'ghostcap', 'sunpetal', 'dragontongue', 'starlily']) SK_CRAFT_MATS.push({ id:'seed_'+id, nm:(id==='flax' ? 'Flax' : SK_HERB.find(h=>h.id===id).nm) + ' seed', lvl:1, xp:0 });   /* (RS-737: the garden's seeds) */
 function houseSz(){ const h = houseP(); return HOUSE_SIZES[(h && h.size) || 1]; }
@@ -27129,15 +27138,42 @@ for (const [id, nm, a, b, c, pat] of RUG_DESIGNS) FURN['rg_'+id] = { nm, cat:'ru
 for (const k of ['armchair', 'rugr', 'rugl', 'banner', 'tapestry', 'scarecrow'].concat(RUG_DESIGNS.map(d=>'rg_'+d[0]))) FURN[k].cloth = 1;
 for (const k of ['candle', 'candelabra', 'lamppost', 'brazier', 'shield', 'armour', 'clock', 'harp', 'globe', 'wrack', 'gbench', 'sundial', 'wbarrow']) FURN[k].metal = 1;
 FURN_CATS.push(['garden', 'Garden'], ['trophy', 'Trophies']);
+/* (RS-914) doors: made at a carpentry bench from any wood, no plan needed, and hung in a doorway of the house - they swing open as you come through */
+const HOUSE_DOOR_WOOD = { door_pine:['#b48a56', 'iron', 0], door_oak:['#8a6a44', 'iron', 1], door_maple:['#c8956a', 'brass', 2], door_yew:['#93412b', 'brass', 3], door_magic:['#4e4470', 'gold', 4] };
+for (const [k, nm, price, cost] of [['door_pine', 'Plank door', 175, { plank:6, nails:10 }], ['door_oak', 'Oak door', 700, { oak_plank:6, nails:14 }], ['door_maple', 'Maple door', 1400, { maple_plank:6, nails:16, ironb:1 }],
+  ['door_yew', 'Yew door', 2100, { yew_plank:6, nails:18, steelb:1 }], ['door_magic', 'Magic-wood door', 2800, { magic_plank:6, nails:20, goldb:1 }]]) FURN[k] = { nm, cat:'door', price, door:1, cost };
+FURN_CATS.push(['door', 'Doors']);
+/* a door: its leaf on a pivot at the hinge (named 'leaf', swung by houseDoorTick), the plank door and oak door strapped and ringed in iron, the
+   finer woods panelled with brass, the magic wood's panels inlaid with a glowing rune and fitted in gold; cut to a low wall's height in one */
+function houseDoorModel(k, cut){ const T = THREE, [col, fit, gr] = HOUSE_DOOR_WOOD[k] || HOUSE_DOOR_WOOD.door_oak, M = furnMats(), MC = houseDoorModel.m || (houseDoorModel.m = {});
+  const wm = MC[k] || (MC[k] = new T.MeshStandardMaterial({ map:v3TexDoorWood(col), roughness:gr >= 2 ? 0.45 : 0.66 })), gm = MC.gold || (MC.gold = new T.MeshStandardMaterial({ color:new T.Color('#e0b048').convertSRGBToLinear(), metalness:0.6, roughness:0.28 }));
+  const fm = fit==='iron' ? M.iron : fit==='brass' ? M.brass : gm, root = new T.Group(), pv = new T.Group(); pv.name = 'leaf'; pv.position.set(-0.44, 0, 0); root.add(pv); root.userData.door = 1;
+  const Hh = cut ? 0.5 : 1.98, W = 0.88, add = (geo, m, x, y, z)=>{ const o = new T.Mesh(geo, m); o.position.set(x, y, z); o.castShadow = o.receiveShadow = true; pv.add(o); return o; };
+  const bx = (w, h, d, m, x, y, z)=>add(v3RBoxGeo(w, h, d, Math.min(0.012, Math.min(w, h, d)*0.3)), m, x, y, z);
+  bx(W, Hh, 0.05, wm, W/2, Hh/2 + 0.02, 0); if (cut) bx(W + 0.02, 0.035, 0.07, wm, W/2, Hh + 0.035, 0);
+  if (gr >= 2){ for (const [py, ph] of [[0.42, 0.5], [1.12, 0.62], [1.7, 0.36]]) if (py + ph/2 < Hh + 0.02) for (const sx of [-1, 1]) for (const sz of [-1, 1]){ bx(W*0.34, ph, 0.018, wm, W/2 + sx*W*0.21, py, sz*0.031); bx(W*0.38, ph + 0.04, 0.008, fm, W/2 + sx*W*0.21, py, sz*0.027); } }
+  else { for (const y of [0.32, 1.62]) if (y < Hh - 0.08) for (const sz of [-1, 1]){ bx(W*0.82, 0.05, 0.012, fm, W*0.43, y, sz*0.031); if (gr===1) for (let i=0;i<5;i++){ const st = add(new T.SphereGeometry(0.012, 10, 8), fm, 0.1 + i*0.16, y, sz*0.039); st.scale.z = 0.5; } }
+    for (let i=1;i<4;i++) if (!cut) for (const sz of [-1, 1]) bx(0.008, Hh - 0.08, 0.004, M.dark, i*W/4, Hh/2 + 0.02, sz*0.027); }
+  if (gr===4 && !cut){ const rm = MC.rune || (MC.rune = new T.MeshStandardMaterial({ color:0x9a80ff, emissive:0x7a5aff, emissiveIntensity:1.4, roughness:0.4 }));
+    for (const sz of [-1, 1]){ const t = add(new T.TorusGeometry(0.12, 0.008, 8, 40), rm, W/2, 1.12, sz*0.042); for (const a of [0, Math.PI/2]){ const l = bx(0.006, 0.3, 0.006, rm, W/2, 1.12, sz*0.042); l.rotation.z = a + Math.PI/4; } } }
+  const hy = Math.min(1.0, Hh - 0.12); for (const sz of [-1, 1]){ if (gr <= 1){ const rg = add(new T.TorusGeometry(0.045, 0.009, 10, 28), fm, W - 0.12, hy - 0.05, sz*0.05); rg.rotation.y = 0; bx(0.05, 0.05, 0.01, fm, W - 0.12, hy, sz*0.03); }
+    else { add(new T.SphereGeometry(0.026, 18, 12), fm, W - 0.1, hy, sz*0.055); bx(0.05, 0.12, 0.008, fm, W - 0.1, hy - 0.02, sz*0.03); } }
+  for (const y of cut ? [0.25] : [0.3, 1.68]) for (const sz of [-1, 1]) bx(gr <= 1 ? 0.2 : 0.07, 0.06, 0.01, fm, gr <= 1 ? 0.1 : 0.035, y, sz*0.031);
+  { const by = new Map(); for (const o of [...pv.children]){ if (!o.isMesh) continue; if (!by.has(o.material)) by.set(o.material, []); by.get(o.material).push(o); pv.remove(o); }   /* (its parts merged, one mesh to a material) */
+    for (const [m, l] of by){ const mm = m3dMergeMeshes(l, m); mm.castShadow = mm.receiveShadow = true; pv.add(mm); } }
+  return root; }
+function houseDoorTick(dt){ const L = V3.hdoors; if (!L || !L.length || !V3.player || !V3.player.g || !(G.interior && G.interior.key==='house')) return; const pp = V3.player.g.position;
+  for (const d of L){ if (!d.pv) continue; const dx = pp.x - d.x, dz = pp.z - d.z, c = Math.cos(d.r), s = Math.sin(d.r), lx = dx*c - dz*s, lz = dx*s + dz*c, near = Math.abs(lx) < 0.75 && Math.abs(lz) < 1.15;
+    if (near && Math.abs(d.a) < 0.05) d.s = lz > 0 ? 1 : -1; const want = near ? d.s*1.45 : 0; d.a += (want - d.a)*Math.min(1, dt*7); d.pv.rotation.y = d.a; } }
 /* (RS-906) furnishing plans: learned for good (p.fplans), from a scroll that drops, comes in a casket or is bought from Wenna; a piece is made
    at a carpentry bench - the Boatyard's, or the carpenter's workbench you can build in your own workshop - from planks and nails, linen
    for the cloth ones and a bar for the metal, by Construction level */
 const FPLAN_DROP = 0.012;
-function furnCost(k){ const F = FURN[k], P = F.price, c = P < 400 ? { plank:2, nails:4 } : P < 1000 ? { oak_plank:3, nails:8 } : P < 2000 ? { maple_plank:4, nails:12 } : { yew_plank:5, nails:16 };
+function furnCost(k){ const F = FURN[k]; if (F.cost) return Object.assign({}, F.cost); const P = F.price, c = P < 400 ? { plank:2, nails:4 } : P < 1000 ? { oak_plank:3, nails:8 } : P < 2000 ? { maple_plank:4, nails:12 } : { yew_plank:5, nails:16 };
   if (F.cloth) c.linen = P >= 1000 ? 4 : 2; if (F.metal) c[P >= 2000 ? 'goldb' : P >= 1000 ? 'steelb' : 'ironb'] = P >= 2000 ? 1 : 2; return c; }
 function furnLvl(k){ return Math.max(1, Math.min(90, Math.round(FURN[k].price/35))); }
 function furnXp(k){ return Math.round(FURN[k].price*0.35); }
-function furnPlanPool(){ return Object.keys(FURN).filter(k=>!FURN[k].trophy); }
+function furnPlanPool(){ return Object.keys(FURN).filter(k=>!FURN[k].trophy && !FURN[k].door); }
 function furnPlanItem(k){ const it = newItem(), F = FURN[k]; Object.assign(it, { used:1, consumable:0, kind:'scroll', fplan:k, nm:'Plan: ' + F.nm, desc:`a furnishing plan - read it to learn to make the ${F.nm.toLowerCase()} at a carpentry bench`, price:Math.round(F.price*0.25) }); return it; }
 function furnPlanRoll(){ const p = G.player, known = p.fplans || {}, pool = furnPlanPool().filter(k=>!known[k]); if (!pool.length) return null; const rare = pool.filter(k=>FURN[k].plan);
   return rare.length && chn(0.4) ? rare[rn(rare.length)] : pool[rn(pool.length)]; }
@@ -27154,7 +27190,7 @@ function furnGive(k, n){ const h = houseP(), p = G.player; if (h){ h.furn[k] = (
 const FURN_TROPHY_OF = { lair:'tdragon', castle:'tcrown', city:'tcrown', pyramid:'tidol', temple:'tidol' };
 function furnTrophy(kind, nm){ const k = FURN_TROPHY_OF[kind] || 'tskull', p = G.player; p.ftro = p.ftro || {}; if (p.ftro[k]) return null; p.ftro[k] = 1; const home = furnGive(k, 1);
   logMsg(`a trophy for your house: the ${FURN[k].nm.toLowerCase()}${home ? ' - it waits in your house\'s store' : ' - kept for you until you have a house'}`, 'good'); return k; }
-function buildFurnCraft(){ const p = G.player, h = houseP(), L = skLvl('construction'), known = Object.keys(p.fplans||{}).filter(k=>FURN[k]).sort((a, b)=>furnLvl(a) - furnLvl(b));
+function buildFurnCraft(){ const p = G.player, h = houseP(), L = skLvl('construction'), known = Object.keys(p.fplans||{}).filter(k=>FURN[k] && !FURN[k].door).concat(Object.keys(FURN).filter(k=>FURN[k].door)).sort((a, b)=>furnLvl(a) - furnLvl(b));
   const rows = known.map(k=>{ const F = FURN[k], c = furnCost(k), lv = furnLvl(k), ok = !!h && L >= lv && houseCostOk(c);
     return `<div class="frow"><span class="fnm">${esc(F.nm)} <span class="muted">&middot; Construction <span style="color:${L >= lv ? 'inherit' : '#e05040'}">${lv}</span> &middot; ${skXpShown('construction', furnXp(k))} xp</span><br>${houseCostText(c)}</span><button class="btn small" data-fmake="${k}" ${ok ? '' : 'disabled'} onclick="furnMake('${k}')">make</button></div>`; }).join('');
   return `<h2 class="panel-title">FURNISHINGS</h2>
@@ -27162,11 +27198,11 @@ function buildFurnCraft(){ const p = G.player, h = houseP(), L = skLvl('construc
     <div class="ovbody">${h ? '' : `<div class="qrep">You've no house to send it to - Hollis the estate agent sells them.</div>`}
       ${known.length ? `<div class="flist">${rows}</div>` : `<div class="qrep">You know no plans yet. They turn up on the fallen, in caskets, and Wenna the furnisher sells a few each day.</div>`}
       <div class="btnrow"><button class="btn" onclick="setUi('playing')">close (Esc)</button></div></div>`; }
-function furnMake(k){ const p = G.player, h = houseP(), c = furnCost(k); if (!h || !(p.fplans||{})[k] || skLvl('construction') < furnLvl(k) || !houseCostOk(c)) return;
+function furnMake(k){ const p = G.player, h = houseP(), c = furnCost(k); if (!h || !FURN[k] || !((p.fplans||{})[k] || FURN[k].door) || skLvl('construction') < furnLvl(k) || !houseCostOk(c)) return;
   houseCostPay(c); skGainXP('construction', furnXp(k)); h.furn[k] = (h.furn[k]||0) + 1; logMsg(`you make the ${FURN[k].nm.toLowerCase()} - it's carried to your house's store`, 'good'); sfx('click'); renderOverlay(); }
 const FURN_BASIC = ['stool', 'chair', 'bench', 'nstand', 'cask', 'candle', 'fruit', 'books', 'fern', 'flowers', 'rugr', 'vase'];
 /* the furnisher's stock: the plain pieces always, and five of the finer ones that change each day */
-function furnStock(){ const fine = Object.keys(FURN).filter(k=>!FURN_BASIC.includes(k) && !FURN[k].plan && !FURN[k].trophy && !FURN[k].rug), day = Math.floor(wevTurn()/DAY_LENGTH), rnd = v3Rng(7919 + day*31 + (G.owPos ? G.owPos.x*7 + G.owPos.y : 0));
+function furnStock(){ const fine = Object.keys(FURN).filter(k=>!FURN_BASIC.includes(k) && !FURN[k].plan && !FURN[k].trophy && !FURN[k].rug && !FURN[k].door), day = Math.floor(wevTurn()/DAY_LENGTH), rnd = v3Rng(7919 + day*31 + (G.owPos ? G.owPos.x*7 + G.owPos.y : 0));
   for (let i=fine.length - 1; i>0; i--){ const j = Math.floor(rnd()*(i + 1)); [fine[i], fine[j]] = [fine[j], fine[i]]; }
   return FURN_BASIC.concat(fine.filter(k=>FURN[k].cat!=='garden').slice(0, 5), fine.filter(k=>FURN[k].cat==='garden').slice(0, 2), Object.keys(FURN).filter(k=>FURN[k].rug)); }   /* (RS-908: and two for the garden each day; RS-910: every rug design) */
 function furnOwned(k){ const h = houseP(); if (!h) return 0; return (h.furn[k]||0) + h.decor.filter(d=>d.k===k).length; }
@@ -27241,7 +27277,7 @@ function furnTapTex(){ const W = 160, H = 224, c = v3Canvas(W, H), x = c.getCont
   x.strokeStyle = '#c8a040'; x.lineWidth = 6; x.strokeRect(6, 6, W - 12, H - 12); x.strokeStyle = '#7a1a18'; x.lineWidth = 2; x.strokeRect(12, 12, W - 24, H - 24);
   for (let i=0;i<1200;i++){ x.fillStyle = `rgba(${rnd() < 0.5 ? '255,230,180' : '0,0,0'},0.05)`; x.fillRect(rnd()*W, rnd()*H, 1, 3); }   /* (the weave) */
   return v3CanvasTex(c); }
-function furnModel(k){ const C = furnModel.c || (furnModel.c = {}); if (C[k]) return C[k]; const T = THREE, M = furnMats(), g = new T.Group(), parts = [];
+function furnModel(k){ const C = furnModel.c || (furnModel.c = {}); if (C[k]) return C[k]; if (FURN[k] && FURN[k].door) return (C[k] = houseDoorModel(k, false));   /* (RS-914) */ const T = THREE, M = furnMats(), g = new T.Group(), parts = [];
   const add = (geo, m, x, y, z, rx, ry, rz)=>{ const o = new T.Mesh(geo, m); o.position.set(x||0, y||0, z||0); o.rotation.set(rx||0, ry||0, rz||0); parts.push(o); return o; };
   const box = (w, h, d, m, x, y, z, r, rx, ry, rz)=>add(v3RBoxGeo(w, h, d, r!=null ? r : Math.min(0.02, Math.min(w, h, d)*0.22)), m, x, y, z, rx, ry, rz);
   const cyl = (a, b, h, m, x, y, z, rx, ry, rz)=>add(new T.CylinderGeometry(a, b, h, 24), m, x, y, z, rx, ry, rz);
@@ -27427,7 +27463,9 @@ function houseDecorSolid(){ const h = houseP(); if (!h) return; for (const key o
     if (G.map[x] && G.map[x][y]===T_FLOOR && G.villageDeco[x][y]==='floor' && !(x===G.player.x && y===G.player.y)){ G.map[x][y] = T_WALL; G.houseSolid.add(x + ',' + y); } } }
 function v3DecorBuild(grp){ V3.decorGrp = new THREE.Group(); V3.decorGrp.name = 'decor'; grp.add(V3.decorGrp); V3.heGhost = null; v3DecorSync(); }
 function v3DecorSync(){ const g = V3.decorGrp, h = houseP(); if (!g || !h) return; while (g.children.length) g.remove(g.children[0]);
-  h.decor.forEach((d, i)=>{ if (!FURN[d.k] || (d.f||0)!==houseFl()) return; const o = furnInst(d.k); o.position.set(d.x, d.y||0, d.z); o.rotation.y = d.r||0; o.userData.di = i; g.add(o); }); }
+  for (const d of (V3.hdoors||[])) if (d.o && V3.occDyn) V3.occDyn.delete(d.o); V3.hdoors = []; h.decor.forEach((d, i)=>{ if (!FURN[d.k] || (d.f||0)!==houseFl()) return; const dk = FURN[d.k].door && G.houseDoorKind && G.houseDoorKind[Math.floor(d.x)+','+Math.floor(d.z)], C = furnModel.c || (furnModel.c = {});
+    const o = dk && dk.kind==='low' ? (C[d.k + '|cut'] || (C[d.k + '|cut'] = houseDoorModel(d.k, true))).clone() : furnInst(d.k); o.position.set(d.x, d.y||0, d.z); o.rotation.y = d.r||0; o.userData.di = i; g.add(o);
+    if (FURN[d.k].door){ V3.hdoors.push({ pv:o.getObjectByName('leaf'), x:d.x, z:d.z, r:d.r||0, a:0, s:1, o }); if (dk && dk.link && V3.occDyn){ o.userData.link = dk.link; V3.occDyn.add(o); } } }); }   /* (RS-914: the doors you hung, to swing) */
 
 /* ---- the edit mode ---- */
 const HE_STEP = Math.PI/4, HE_FINE = Math.PI/24;
@@ -27454,13 +27492,15 @@ function heditGhost(){ const S = G.hedit && G.hedit.sel, C = heCtx(), grp = C.gr
 /* where a placed piece may go: on the house's open floor (a room, the garden, the farmyard), not in a doorway or the front door, and a solid
    one not where you stand */
 function heditOk(S){ if (!S) return false; if (S.yard && !S.work) return plotYardOk(S); if (S.work) return heditWorkTiles(S).every(([x, y])=>G.map[x] && G.map[x][y]===T_FLOOR && houseAreaAt(x, y)===S.area && !(G.houseKeep && G.houseKeep.has(x+','+y)) && !(x===G.player.x && y===G.player.y));   /* (RS-909: anywhere in its kind of ground, the doorways kept clear) */
-  const F = FURN[S.k]; let x = S.x, z = S.z; if (F.wall){ x += Math.sin(S.r)*0.5; z += Math.cos(S.r)*0.5; } const tx = Math.floor(x), ty = Math.floor(z);
+  const F = FURN[S.k]; if (F.door){ if (S.yard) return false; const dk = Math.floor(S.x)+','+Math.floor(S.z), I = G.houseDoorKind && G.houseDoorKind[dk]; return !!I && (I.kind==='full' || I.kind==='low') && !houseP().decor.some(d=>FURN[d.k] && FURN[d.k].door && (d.f||0)===houseFl() && Math.floor(d.x)+','+Math.floor(d.z)===dk); }   /* (RS-914) */
+  let x = S.x, z = S.z; if (F.wall){ x += Math.sin(S.r)*0.5; z += Math.cos(S.r)*0.5; } const tx = Math.floor(x), ty = Math.floor(z);
   const fl = G.map[tx] && G.villageDeco[tx] && G.villageDeco[tx][ty]==='floor' && (G.map[tx][ty]===T_FLOOR || (G.houseSolid && G.houseSolid.has(tx + ',' + ty)));
   if (!fl) return false; const [dx, dy] = houseDoorXY(); if (tx===dx && ty===dy) return false;
   if (F.solid && !F.wall && S.y < 0.05){ if ((G.houseDoors && G.houseDoors.has(tx+','+ty)) || (G.houseKeep && G.houseKeep.has(tx+','+ty))) return false; if (tx===G.player.x && ty===G.player.y) return false; }
   return true; }
 function heditAim(ev){ const S = G.hedit && G.hedit.sel, C = heCtx(); if (!S || !C.cam || !C.cv || !C.grp) return; const T = THREE, F = FURN[S.k] || {}; heRay(C, ev);
   if (S.work){ const p = heGround(C); if (!p) return; const q4 = v=>G.hedit.snap ? Math.round(v*4)/4 : v; S.x = q4(p.x); S.z = q4(p.z); S.y = 0; return; }   /* (RS-910: freely, or to a quarter of a step) */   /* (RS-905: a working piece a tile at a time, in its own room) */
+  if (F.door && !C.yard){ const p = heGround(C); if (!p) return; heditDoorSnap(S, p.x, p.z); return; }   /* (RS-914) */
   const sc = C.sc, snap = G.hedit.snap, q = v=>snap ? Math.round(v*4/sc)*sc/4 : v;   /* (RS-907: in the yard a quarter of a house's step) */
   if (F.wall && !C.yard){ const hw = (V3.occ||[]).length ? C.ray.intersectObjects(V3.occ, false)[0] : null;
     if (hw && hw.face){ const n = hw.face.normal.clone().transformDirection(hw.object.matrixWorld); if (Math.abs(n.y) < 0.3){ S.r = Math.atan2(n.x, n.z); S.x = n.x ? hw.point.x + n.x*0.01 : q(hw.point.x); S.z = n.z ? hw.point.z + n.z*0.01 : q(hw.point.z); S.base = snap ? Math.round(hw.point.y*10)/10 : hw.point.y; S.y = Math.max(0.4, Math.min(2.5, S.base + S.lift)); S.onWall = 1; return; } } }
@@ -27468,6 +27508,8 @@ function heditAim(ev){ const S = G.hedit && G.hedit.sel, C = heCtx(); if (!S || 
   if (!F.flat){ C.grp.updateMatrixWorld(true); for (const h of C.ray.intersectObjects(C.grp.children, true)){ const n = h.face && h.face.normal.clone().transformDirection(h.object.matrixWorld); if (n && n.y > 0.6){ hit = h; break; } } }
   let p; if (hit){ p = C.grp.parent.worldToLocal(hit.point.clone()); y = p.y; } else { p = heGround(C); if (!p) return; }
   S.x = q(p.x); S.z = q(p.z); S.base = F.flat ? 0.001*(1 + (h3i(S.k)%4))*sc : F.wall && !hit ? 1.5 : y; S.y = Math.max(0, S.base + S.lift); }
+function heditDoorSnap(S, px, pz){ let best = null, bd = 2.2; for (const k in (G.houseDoorKind||{})){ const I = G.houseDoorKind[k]; if (I.kind!=='full' && I.kind!=='low') continue; const [x, y] = k.split(',').map(Number), dd = Math.hypot(x + 0.5 - px, y + 0.5 - pz); if (dd < bd){ bd = dd; best = [x, y, I]; } }
+  S.y = 0; S.base = 0; S.lift = 0; if (!best){ S.x = px; S.z = pz; return false; } S.x = best[0] + 0.5; S.z = best[1] + 0.5; const b0 = best[2].across ? 0 : Math.PI/2; S.r = b0 + (Math.cos((S.r||0) - b0) < 0 ? Math.PI : 0); return true; }
 function heditMove(ev){ if (!G.hedit) return; G.hedit.ev = { clientX:ev.clientX, clientY:ev.clientY }; if (G.hedit.sel){ heditAim(G.hedit.ev); heditGhost(); } }
 function heditPickAt(ev){ const C = heCtx(); if (!C.grp || !C.cam) return -1; heRay(C, ev);
   C.grp.updateMatrixWorld(true); const h = C.ray.intersectObjects(C.grp.children, true)[0]; if (!h) return -1; let o = h.object; while (o && o.userData.di===undefined) o = o.parent; return o ? o.userData.di : -1; }
@@ -27485,10 +27527,11 @@ function heditPickWork(ev){ const E = G.hedit, h = houseP(); if (!E || !h || !V3
   h.wheld = w.key; houseRelayout(); heditGhost(); heditPanel(true); sfx('click'); return true; }
 function heditWorkTiles(S){ const x = Math.floor(S.x), y = Math.floor(S.z), t = [[x, y]], f = houseFootOf(S.k, x, y, S.r); if (f) t.push(f); return t; }
 function heditTake(k){ const E = G.hedit, h = houseP(); if (!E || !h || !(h.furn[k] > 0)) return; const C = heCtx();
-  if (C.yard && FURN[k].wall){ logMsg(`the ${FURN[k].nm.toLowerCase()} hangs on a wall - it's for indoors`, ''); sfx('error'); return; }   /* (RS-907) */
+  if (C.yard && (FURN[k].wall || FURN[k].door)){ logMsg(`the ${FURN[k].nm.toLowerCase()} hangs ${FURN[k].door ? 'in a doorway' : 'on a wall'} - it's for indoors`, ''); sfx('error'); return; }   /* (RS-907) */
   if (E.sel) heditCancel(); h.furn[k]--; if (!h.furn[k]) delete h.furn[k];
   if (C.yard){ const P = plotGet(), dx = G.owPos.x - P.x, dy = G.owPos.y - P.y; E.sel = { k, yard:1, x:dx, z:dy + 0.5, y:0, base:0, r:0, lift:0, orig:null }; }
   else { const p = G.player, fa = FACING_VECT[(p.facing|0)&3] || [0, 1]; E.sel = { k, x:p.x + 0.5 + fa[0]*1.2, z:p.y + 0.5 + fa[1]*1.2, y:FURN[k].wall ? 1.5 : 0, base:FURN[k].wall ? 1.5 : 0, r:0, lift:0, orig:null }; }
+  if (FURN[k].door && !C.yard) heditDoorSnap(E.sel, E.sel.x, E.sel.z);   /* (RS-914: into the nearest doorway) */
   if (E.ev) heditAim(E.ev); heditGhost(); heditPanel(true); }
 function heditPlace(again){ const E = G.hedit, h = houseP(), S = E && E.sel; if (!S || !h) return false; if (!heditOk(S)){ logMsg("it won't go there", ''); sfx('error'); return false; }
   if (S.work){ const tau = Math.PI*2, r = ((S.r % tau) + tau) % tau; h.wpos[S.work] = { f:houseFl(), x:Math.floor(S.x), y:Math.floor(S.z), px:+S.x.toFixed(3), pz:+S.z.toFixed(3), rot:+r.toFixed(4) }; delete h.wheld; E.sel = null; heditGhost(); houseRelayout(); heditPanel(true); try{ audPage(); }catch(e){} return true; }   /* (RS-905) */
@@ -27496,7 +27539,7 @@ function heditPlace(again){ const E = G.hedit, h = houseP(), S = E && E.sel; if 
   if (again && h.furn[S.k] > 0) heditTake(S.k); heditPanel(true); return true; }
 function heditCancel(){ const E = G.hedit, h = houseP(), S = E && E.sel; if (!S || !h) return; if (S.work){ delete h.wheld; E.sel = null; heditGhost(); houseRelayout(); heditPanel(true); return; }   /* (RS-905: back where it stood) */ if (S.orig) (S.yard ? h.yard : h.decor).push(S.orig); else h.furn[S.k] = (h.furn[S.k]||0) + 1; E.sel = null; heSync(S.yard); heditGhost(); heditPanel(true); }
 function heditStore(){ const E = G.hedit, h = houseP(), S = E && E.sel; if (!S || !h) return; if (S.work){ h.wpos[S.work] = { s:1 }; delete h.wheld; E.sel = null; heditGhost(); houseRelayout(); heditPanel(true); logMsg(`the ${heditWorkName(S).toLowerCase()} goes into your store - set it out again wherever you like, on either floor`, ''); return; }   /* (RS-910) */ h.furn[S.k] = (h.furn[S.k]||0) + 1; E.sel = null; heditGhost(); heditPanel(true); logMsg(`the ${FURN[S.k].nm.toLowerCase()} goes back in your store`, ''); }
-function heditTurn(s){ const S = G.hedit && G.hedit.sel; if (!S) return; const st = G.hedit.snap ? HE_STEP : HE_FINE; S.r = G.hedit.snap ? Math.round((S.r + s*st)/st)*st : S.r + s*st; heditGhost(); }
+function heditTurn(s){ const S = G.hedit && G.hedit.sel; if (!S) return; if (FURN[S.k] && FURN[S.k].door){ S.r = (S.r||0) + Math.PI; heditGhost(); return; }   /* (RS-914: a door hangs from its other side) */ const st = G.hedit.snap ? HE_STEP : HE_FINE; S.r = G.hedit.snap ? Math.round((S.r + s*st)/st)*st : S.r + s*st; heditGhost(); }
 function heditLift(s){ const S = G.hedit && G.hedit.sel; if (!S || S.work) return; const sc = S.yard ? PLOT_YS : 1, st = (G.hedit.snap ? 0.1 : 0.025)*sc, b = S.base||0; S.lift = Math.max(-b, Math.min(2.5*sc - b, (S.lift||0) + s*st)); S.y = Math.max(0, b + S.lift); heditGhost(); }
 function h3i(k){ let n = 0; for (let i=0;i<k.length;i++) n = (n*31 + k.charCodeAt(i)) | 0; return Math.abs(n); }
 function heditSnap(){ if (!G.hedit) return; G.hedit.snap = G.hedit.snap ? 0 : 1; heditPanel(true); }
@@ -27691,6 +27734,7 @@ function enterHouse(){
    garden beds, the pens, the stair, the garden's water butt and compost heap */
 function houseLayout(){
   const h = houseP(), P = housePlan(), f = houseFl(), F = P.floors[f];
+  if (G.interior && G.interior.key==='house'){ if (G.townState && !('race' in G.townState)) G.townState.race = G.villageRace; G.villageRace = houseRace(); }   /* (RS-914: its own look, whichever town or plot you came in from) */
   setGrid(P.W, P.H); G.map = makeGrid(T_WALL); G.villageDeco = makeGrid('', COLS, ROWS); G.floorItem = makeItemGrid();
   const A = G.houseArea = {}, W = G.houseWalls = new Set(), D = G.houseDoors = new Set(), K = G.houseKeep = new Set();
   const open = (x, y, a)=>{ G.map[x][y] = T_FLOOR; G.villageDeco[x][y] = 'floor'; A[x+','+y] = a; };
@@ -39674,7 +39718,7 @@ function v3Render(){
     }
     V3.ray.far = Infinity;
     const occGroups = new Set([...V3.occ.map(o=>o.userData.grp), ...V3.occDyn]);
-    for (const g of occGroups){ const want = faded.has(g);
+    for (const g of occGroups){ const want = faded.has(g) || !!(g.userData.link && g.userData.link.some(x=>faded.has(x)));   /* (RS-914: a lintel or door with its walls) */
       g.userData.fade = (g.userData.fade||0) + ((want?1:0) - (g.userData.fade||0))*Math.min(1, dt*8);
       const f = g.userData.fade;
       if (f > 0.02 || g.userData.faded){
@@ -39687,7 +39731,7 @@ function v3Render(){
       }
     }
   }
-  v3PortalTick(dt);
+  v3PortalTick(dt); try{ houseDoorTick(dt); }catch(e){}
   { const hv = G.ui==='playing' && V3.hover; let at = null;
     if (hv && hv.kind==='tile') at = [hv.x+0.5, 0.04, hv.y+0.5, 0.55];
     else if (hv && hv.kind==='building' && hv.b.door) at = [hv.b.door.x+0.5, 0.04, hv.b.door.y+0.5, 0.75];
@@ -55639,7 +55683,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-913';
+const GAME_VERSION = 'rs-914';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
