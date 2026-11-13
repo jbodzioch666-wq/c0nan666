@@ -1,3 +1,12 @@
+## RS-912 - Bees, Orchard and Sheep
+
+- **Beehives** (Manor 2, Estate 4, Construction 35): build a **Skep** from Decorate's Build list and set it in the garden. Take a pot of honey and a cake of beeswax a day, keeping up to three days. Upgrade it to a **Wooden hive** (Construction 55) for two pots of honey a day.
+- **The Estate's orchard**: a new walled ground past the pasture, through a gate, for six **apple trees** (Construction 55). A sapling grows for three days, then bears three apples a day.
+- **Sheep** (Manor 4, Estate 8): build a **Sheepfold** (Construction 35) in the pasture and buy lambs there. They grow on the trough's flax like the other animals, then give a fleece of wool a day. Shear them at the fold. A **Big fold** (Construction 60) holds 8.
+- **Spin your wool**: wool spins into **balls of wool** at any spinning wheel, for Crafting xp. You can now build a **Spinning wheel** for your house (Construction 25) and set it anywhere indoors.
+- **Apples and pots of honey are food**: eat them for a little life. Wool, balls of wool, honey, beeswax and apples all sell.
+- **New sculpted sheep** in white-faced, black-faced and brown, their fleece as thick as it has grown.
+
 ## RS-911 - Build and Grades
 
 - **Build from Decorate**: the house no longer has empty spaces marked on the floor. Decorate's new **Build** list shows every working piece you haven't made, with its level and materials; building one puts it straight in your hands to set down wherever you like.

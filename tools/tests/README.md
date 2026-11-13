@@ -241,6 +241,7 @@ Screenshots go to `tools/tests/shots/`.
 | `rs909` | the four houses to their plans: bought and moved for the difference, gardens 2/4/6/8 beds, paddock and pasture, two floors and the stair, every spot reachable, an old house carried over; shots rs909-<size>-<floor>.jpg |
 | `rs910` | Working pieces placed freely, stored and set out on either floor; rugs as pieces, eleven designs at Wenna's |
 | `rs911` | Decorate's Build list; grades upgraded in place (beds, range, blast furnace, steel anvil, altars, big coop and byre) and what they do |
+| `rs912` | Beehives with honey and wax, the Estate's orchard of apple trees, a sheepfold with sheep sheared for wool, spun at the house's spinning wheel |
 | `rs789` | A shire's door stones and flags are dark: their average vertex colour stays low |
 | `rs788` | The open land has its older grass again: no blade chunks, RS-785's code gone |
 | `rs787` | A battle at a town: the card before and after, the banner's words, the trees told where you stand, no shader built by a fade, new creatures warmed off the frame |
