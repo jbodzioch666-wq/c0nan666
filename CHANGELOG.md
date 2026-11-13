@@ -1,3 +1,12 @@
+## RS-913 - Trophy Cases and Grounds
+
+- **Trophy cases.** Build one from Decorate's Build list (Construction 12) and set it down anywhere indoors, on either floor. Use it to put in trophy scrolls from your bag or take them out again.
+- **Three grades.** The Oak case holds 4 trophies, the Glass cabinet 8 behind glazed doors (Construction 35), and the Gallery cabinet 16, gilded under a pediment (Construction 60). Upgrade a case where it stands. You can build up to six.
+- **Mounted trophies.** A fish hangs on its shaped board and a lump of ore sits on a turned plinth. Each is sized by its weight and has a brass plaque.
+- **The plot grows with the house.** It is 7 tiles square for the Cottage, then 9, 11 and 13. Round the yard is a box hedge, with the garden's raised beds to the west and the pasture to the east (a hen house, hay and a trough).
+- **Bigger grounds.** From the Manor the beehives, a thatched byre and a sheepfold show too. The Estate has six apple trees in an orchard behind the house.
+- **Room to grow.** Move up and your plot grows where it lies. If the bigger grounds don't fit there, the plot is staked out again near the same town with the yard and all. If there's no room nearby, the grounds grow as far as the land allows.
+
 ## RS-912 - Bees, Orchard and Sheep
 
 - **Beehives** (Manor 2, Estate 4, Construction 35): build a **Skep** from Decorate's Build list and set it in the garden. Take a pot of honey and a cake of beeswax a day, keeping up to three days. Upgrade it to a **Wooden hive** (Construction 55) for two pots of honey a day.
