@@ -1,3 +1,9 @@
+## RS-917 - The Stair and the Plot
+
+- **No quest markers by your plot.** A quest step could pick a spot on or beside your plot and put its cairn and signpost there. Quest spots now keep two tiles clear of the plot's fence, and no quest scenery is drawn there for a quest already set.
+- **A proper staircase.** The house's stair is now proper joinery: eight treads, each with its riser and a nosed tread, a red runner held by brass rods, a stringer each side, turned balusters under a sloping handrail, and newel posts with ball tops at its foot. The way up shows dark and framed in the wall at its head.
+- **Upstairs.** The stairwell is framed, its top treads going down into the dark, with a balustrade round three sides and a newel at each corner.
+
 ## RS-916 - No Gaps by the Doorways
 
 - **No more gaps beside doorways.** Where a wall turned a corner right beside a doorway, the wall stopped short of the doorway's edge, leaving a gap between it and the lintel and casing. It now runs right up to the doorway, in every house size and on both floors.
