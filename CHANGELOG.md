@@ -1,3 +1,9 @@
+## RS-916 - No Gaps by the Doorways
+
+- **No more gaps beside doorways.** Where a wall turned a corner right beside a doorway, the wall stopped short of the doorway's edge, leaving a gap between it and the lintel and casing. It now runs right up to the doorway, in every house size and on both floors.
+- **Corners between doorways.** A single bit of wall between two doorways, or at a corner, was drawn as a thin fence post. Inside the house it's now solid wall.
+- **Fading.** A doorway's lintel now fades with the walls in its own line, not with a wall crossing beside it.
+
 ## RS-915 - Pictures Over the Bed
 
 - **Pictures over the bed.** A painting, banner, tapestry or other wall piece now hangs on the wall above a working piece (the bed, a bench, the altar). Before, the piece standing on that floor tile blocked it.
