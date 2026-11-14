@@ -251,6 +251,7 @@ Screenshots go to `tools/tests/shots/`.
 | `rs919` | towns' landmarks remade: nine kinds build sound, fit the lot, built once and reused; a town with its landmark |
 | `rs920` | plot grounds show the house garden's real crops by stage and your own animals; they update out on the land |
 | `rs921` | plot turned so its gate faces its town (P.q); old plots turned on load; gate, fence, door and walk-in right all four ways |
+| `rs922` | hearthstone binds to the house by sleeping in your own bed and brings you home; asleep on the mattress under a blanket of the bed's colour; the house's stairs walked up and down |
 | `rs789` | A shire's door stones and flags are dark: their average vertex colour stays low |
 | `rs788` | The open land has its older grass again: no blade chunks, RS-785's code gone |
 | `rs787` | A battle at a town: the card before and after, the banner's words, the trees told where you stand, no shader built by a fade, new creatures warmed off the frame |

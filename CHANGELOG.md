@@ -1,3 +1,9 @@
+## RS-922 - Home to Bed
+
+- **Hearthstone home:** a night in your own bed binds your hearthstone to your house. Press T anywhere in the open and you're home - in at your plot's front door, or, for a town house, through its door in the town you last came home from.
+- **Asleep in bed, properly:** you lie on the bed's own mattress (straw, plain or four-poster, each at its height), head on the pillow, legs together and arms at your sides, under a blanket in the bed's colour that drapes over you and down its sides. The bed no longer turns see-through round you while you sleep.
+- **Walking the stairs:** going up or down the house's stair now walks you up the flight and onto the landing, or down through the well and off the bottom step, instead of a cut.
+
 ## RS-921 - The Gate Faces the Town
 
 - **Your plot's gate faces its town**: a plot is laid out with its gate and front path toward the town you bought it from, so you walk straight in from the road side. The whole plot turns: house, fence, grounds and yard pieces.
