@@ -11,7 +11,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
     const p = G.player, out = {}; p.clock = p.turnCount = 60; G.owPos = { x:G.ow.spawnPos.x, y:G.ow.spawnPos.y }; enterVillage(); setUi('playing');
     { const roomy = ()=>{ for (let x=0;x<OW_COLS;x++) for (let y=0;y<OW_ROWS;y++) if (G.ow.map[x][y]===OW_TOWN && plotFind(x, y)) return { x, y }; return null; }, t = plotFind(G.owPos.x, G.owPos.y) ? null : roomy(); if (t){ G.owPos = t; enterVillage(); setUi('playing'); } }   /* (a town with open ground near it for a plot) */
     p.gold = 400000; houseBuy(); const h = houseP(); setUi('estate'); out.offer = /plot on the open land/.test(document.getElementById('overlay').textContent);
-    const g0 = p.gold; out.bought = plotBuy(); out.paid = g0 - p.gold; const P = plotGet(); out.P = P && { x:P.x, y:P.y, d:Math.hypot(P.x - G.owPos.x, P.y - G.owPos.y) }; out.siteOk = !!P && plotSiteOk(P.x, P.y);
+    const g0 = p.gold; out.bought = plotBuy(); { const PQ = plotGet(); if (PQ) PQ.q = 0; }   /* (RS-921: the gate pinned to the south, as this test's walks expect) */ out.paid = g0 - p.gold; const P = plotGet(); out.P = P && { x:P.x, y:P.y, d:Math.hypot(P.x - G.owPos.x, P.y - G.owPos.y) }; out.siteOk = !!P && plotSiteOk(P.x, P.y);
     out.where = P ? plotWhere(P) : ''; out.again = plotBuy(); setUi('playing');
     out.blocks = P && { door:plotBlock(P.x, P.y - 1), wall:plotBlock(P.x + 1, P.y - 2), fence:plotBlock(P.x - 3, P.y), gate:plotBlock(P.x, P.y + 3), yard:plotBlock(P.x + 2, P.y + 1), out:plotBlock(P.x, P.y + 4) };
     out.passFence = o3Passable(P.x + 3, P.y + 1); out.node = skNodeAt(P.x + 1, P.y + 1); out.taken = owSpotTaken(P.x + 2, P.y + 2);

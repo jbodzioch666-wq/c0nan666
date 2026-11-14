@@ -18,7 +18,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
       cam.position.set(cc.x + s*1.1, cc.y + s*0.6, cc.z + s*1.9); cam.lookAt(cc); R.render(sc, cam); sx.drawImage(cv, (i % cols)*W, Math.floor(i/cols)*H); sx.fillStyle = '#fff'; sx.font = '16px sans-serif'; sx.fillText(k, (i % cols)*W + 8, Math.floor(i/cols)*H + 20); });
     R.dispose(); out.shot = sheet.toDataURL('image/jpeg', 0.88);
     /* set out in the yard */
-    p.gold = 400000; houseBuy(); plotBuy(); const h = houseP(), P = plotGet(); for (const k of KEYS) h.furn[k] = 1; G.gameMode = 0; G.owPos = { x:P.x, y:P.y };
+    p.gold = 400000; houseBuy(); plotBuy(); { const PQ = plotGet(); if (PQ) PQ.q = 0; }   /* (RS-921: the gate pinned to the south, as this test's walks expect) */ const h = houseP(), P = plotGet(); for (const k of KEYS) h.furn[k] = 1; G.gameMode = 0; G.owPos = { x:P.x, y:P.y };
     for (let i=0;i<30;i++){ renderGame(); await new Promise(q=>setTimeout(q, 40)); }
     heditStart(); const spots = { hedge:[-2.2, 0.2, 1.5708], pond:[1.6, 1.3, 0], gbench:[-1.6, 1.8, 0.7], birdbath:[1.0, 0.0, 0], sundial:[-1.0, 0.6, 0], scarecrow:[2.4, -1.8, -0.5], wbarrow:[0.8, 2.2, 2.5], well:[-2.2, -2.0, 0], arch:[0, 2.55, 0] }; out.placed = 0;
     for (const k of KEYS){ heditTake(k); const S = G.hedit.sel, [x, z, r] = spots[k]; S.x = x; S.z = z; S.y = 0; S.r = r; if (heditPlace(false)) out.placed++; else { out.refused = (out.refused||[]).concat(k); heditCancel(); } }

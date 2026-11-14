@@ -9,7 +9,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
     const p = G.player, out = {}; p.clock = p.turnCount = 60; G.owPos = { x:G.ow.spawnPos.x, y:G.ow.spawnPos.y }; enterVillage(); setUi('playing');
     const fr = async n=>{ for (let i=0;i<n;i++){ renderGame(); await new Promise(q=>setTimeout(q, 30)); } };
     { const roomy = ()=>{ for (let x=0;x<OW_COLS;x++) for (let y=0;y<OW_ROWS;y++) if (G.ow.map[x][y]===OW_TOWN && plotFind(x, y)) return { x, y }; return null; }, t = plotFind(G.owPos.x, G.owPos.y) ? null : roomy(); if (t){ G.owPos = t; enterVillage(); setUi('playing'); } }
-    p.gold = 3e6; skGainXP('construction', 6e7); houseBuy(1); out.bought = plotBuy();
+    p.gold = 3e6; skGainXP('construction', 6e7); houseBuy(1); out.bought = plotBuy(); { const PQ = plotGet(); if (PQ) PQ.q = 0; }   /* (RS-921: the gate pinned to the south, as this test's walks expect) */
     try{
     houseBuy(3); const P = plotGet();
     if (plotR() < 5){ let best = null; for (let r=6;r<70 && !best;r++) for (let a=-r;a<=r && !best;a++) for (const [x, y] of [[P.x + a, P.y - r], [P.x + a, P.y + r], [P.x - r, P.y + a], [P.x + r, P.y + a]]) if (!best && x > 8 && y > 8 && x < OW_COLS - 8 && y < OW_ROWS - 8 && plotSiteOk(x, y)) best = [x, y];

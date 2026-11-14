@@ -1,3 +1,8 @@
+## RS-921 - The Gate Faces the Town
+
+- **Your plot's gate faces its town**: a plot is laid out with its gate and front path toward the town you bought it from, so you walk straight in from the road side. The whole plot turns: house, fence, grounds and yard pieces.
+- **Existing plots turn too**: a plot staked before this update turns to face its town once. Everything you set out in the yard turns with it and keeps its place relative to the house.
+
 ## RS-920 - The Grounds Come Alive
 
 - **Your plot's grounds show what's really there**: from the House up, each raised bed on the land grows the crop sown in your house garden's bed of the same number, at its real stage (sprouting, in leaf, in bud, ready). A bed with nothing sown is bare earth.
