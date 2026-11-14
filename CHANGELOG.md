@@ -1,3 +1,10 @@
+## RS-923 - The Yard Remade
+
+- **Real animals in your yard:** the hens, cows and sheep on your plot are now the farmyard's own jointed, furred animals - the same ones as in your house's farmyard - instead of the blobby stand-ins. They breathe, graze and peck while you're near, sized to the yard.
+- **Each in its place:** the sheep stand in the fold, the hens scratch about before their house, the cows graze in the open between - clear of the trough, the bales and each other.
+- **Hay and water:** the hay bales are rolled straw with rounded shoulders, the roll's spiral on their ends, loose wisps and two bands of twine; the trough is a joined plank trough with splayed sides on trestle legs, iron bands and water in it.
+- **The hedge** is round, leafy bushes rather than faceted lumps.
+
 ## RS-922 - Home to Bed
 
 - **Hearthstone home:** a night in your own bed binds your hearthstone to your house. Press T anywhere in the open and you're home - in at your plot's front door, or, for a town house, through its door in the town you last came home from.

@@ -23730,6 +23730,8 @@ function o3LandmarkModel(lm){
   return { g, mats, anim, hb };
 }
 function o3SyncLandmarks(dt){
+  if (O3.yardAnims && O3.yardAnims.length && O3.yardRoot && O3.yardRoot.parent){ const P = O3.ppos, near = !P || O3.yardAnims.some(a=>a.g.parent && P.distanceToSquared(a.g.getWorldPosition(o3YardW || (o3YardW = new THREE.Vector3()))) < 900);   /* (RS-923: your animals breathe, graze and peck while you're near) */
+    if (near) for (const a of O3.yardAnims){ const e = a.e, tt = O3.t + a.ph; try{ if (e.anim) e.anim(e.rig, tt, 0, 0, 0, 0, e); else if (e.beast) m3dPoseBeast(e.rig, tt, 0, 0, 0, 0, e); else m3dPoseHumanoid(e.rig, tt, 0, 0, 0, 0, e); }catch(err){} } }
   if (O3.yardRoot && O3.yardRoot.parent && (O3.t|0)!==O3.yardLiveT){ O3.yardLiveT = O3.t|0; if (o3YardLiveKey()!==O3.yardLiveKey) try{ o3YardLive(); }catch(e){ console.error(e); } }   /* (RS-920: a crop grown, an animal bought) */
   const T = THREE, geo = owGeo(), pp = O3.ppos; if (!pp) return;
   if (!O3.lmGrp) O3.lmGrp = new T.Group();
@@ -27815,8 +27817,10 @@ function o3YardAnimal(kind, look, grown, wool){ const T = THREE, key = kind + ':
     O3_YARDLIVE[key] = [...parts].map(([col, ms])=>{ const g = m3dMergeMeshes(ms, null).geometry; g.userData.keep = true; return [g, col]; }); }
   const g = new T.Group(), sc = grown ? 1 : kind==='chicken' ? 0.7 : 0.62; for (const [geo, col] of O3_YARDLIVE[key]){ const o = new T.Mesh(geo, o3YardAnimMat(col)); o.castShadow = true; g.add(o); } g.scale.setScalar(sc); return g; }
 /* what the grounds show now, as a key: the beds' crops and stages, the animals and how grown */
+let o3YardW = null;
 function o3YardLiveKey(){ const h = houseP(); if (!h) return ''; const beds = Array.isArray(h.garden) ? h.garden : [], f = houseHas('farmyard') && h.farm && Array.isArray(h.farm.a) ? h.farm.a : [];
   return beds.map(b=>b ? b.id + gardenStage(b) + (b.w ? 'w' : '') : '-').join(',') + '|' + f.map(a=>a && FARM_KIND[a.k] ? a.k[0] + (farmGrown(a) ? 'G' : 'y') + (a.k==='sheep' ? Math.round((a.w||0)*4) : '') : '').join(','); }
+const YARD_ANIM_K = 0.62;   /* (RS-923: the yard's scale against the town's) */
 function o3YardLive(){ const T = THREE, root = typeof O3!=='undefined' && O3.yardRoot, h = houseP(); if (!root || !h) return; let g = root.getObjectByName('yardLive'); if (g) root.remove(g);
   g = new T.Group(); g.name = 'yardLive'; root.add(g); O3.yardLiveKey = o3YardLiveKey(); const n = Math.max(1, Math.min(4, h.size||1)), Y = o3YardGeom(n, plotR()); if (!Y) return;
   /* the beds: a house bed's nine plants fill 0.75 of a tile, so the long bed holds a run of them, each a copy of that bed's crop */
@@ -27824,8 +27828,21 @@ function o3YardLive(){ const T = THREE, root = typeof O3!=='undefined' && O3.yar
   for (let b=0;b<Y.nb;b++){ const bed = beds[b], st = gardenStage(bed); if (!bed || st < 0) continue; const runs = Math.max(1, Math.floor((Y.bw - 0.05)/0.78)), w = (Y.bw - 0.05)/runs;
     for (let r=0;r<runs;r++){ const q = new T.Group(); q.position.set(Y.gx - (Y.bw - 0.05)/2 + w*(r + 0.5), 0.12, Y.bedZ(b)); q.scale.set(Math.min(1, w/0.8)*0.92, 0.92, 0.92); gardenBedFill(q, bed, b*3 + r, st); q.traverse(o=>{ if (o.isMesh){ o.castShadow = true; if (o.geometry) o.geometry.userData.keep = true; } }); g.add(q); } }
   /* the animals: spread down the pasture from the hen house, clear of the trough by the house and the byre at the far end */
-  const f = houseHas('farmyard') && h.farm && Array.isArray(h.farm.a) ? h.farm.a : [], spots = []; for (let z = Y.hz + 0.75; z <= Y.z1; z += 0.42) for (const ox of [-0.32, 0.02, 0.34]) if (Math.abs(ox) <= Y.sw/2 - 0.1 && !(ox > 0.2 && Math.abs(z + 0.2) < 0.55)) spots.push([Y.px + ox + (o3Hash(spots.length, 5, 921) - 0.5)*0.08, z + (o3Hash(spots.length, 7, 921) - 0.5)*0.1]);
-  f.forEach((a, i)=>{ if (!a || !FARM_KIND[a.k] || i >= spots.length) return; const s = spots[Math.floor((i + 0.5)*spots.length/f.length)], o = o3YardAnimal(a.k, i, farmGrown(a), 0.35 + (a.w||0)*0.33); o.position.set(s[0], 0, s[1]); o.rotation.y = o3Hash(i, 3, 922)*6.28; o.userData.farm = a.k; g.add(o); }); }
+  /* (RS-923) each the farmyard's own jointed, furred figure (townFolkLook, as in the house's farmyard), at its true size beside you */
+  /* where each kind stands: the hens scratching before their house, the sheep in the fold (the Manor's; else the pasture's far end), the cows
+     in the open between, clear of the trough and the bales. The yard is built smaller than the town, so they are too (YARD_ANIM_K) */
+  const f = houseHas('farmyard') && h.farm && Array.isArray(h.farm.a) ? h.farm.a : [], tx = Y.px + Y.sw/2 - 0.3, fold = n >= 3 && plotR() >= 5, fw = Math.min(Y.sw - 0.2, 1.4), fz = 0.2 + (plotR() - 3)*0.15 + 0.9, used = [];
+  const clear = (x, z, r)=>!(Math.abs(x - tx) < 0.25 + r && Math.abs(z + 0.2) < 0.45 + r) && !(Math.abs(x - Y.px) < Y.sw/2 && z > -2.75 + (plotR() - 4)*0.3 && z < -1.45 + (plotR() - 4)*0.3 && Math.abs(x - Y.px) < 0.45 + r) && !(fold && Math.abs(x - Y.px) < fw/2 + r && Math.abs(z - fz) < 0.55 + r) && used.every(([ux, uz, ur])=>Math.hypot(x - ux, z - uz) > ur + r);
+  const spot = (kind, i, r)=>{ for (let k=0;k<60;k++){ const q = (a)=>o3Hash(i*61 + k, a, 923); let x, z;
+      if (/chick/.test(kind)){ x = Y.px + (q(1) - 0.5)*(Y.sw - 0.3); z = Y.hz + 0.45 + q(2)*0.9; }
+      else if (/sheep|lamb/.test(kind) && fold){ x = Y.px + (q(1) - 0.5)*(fw - 0.35); z = fz + (q(2) - 0.5)*0.7; if (!used.every(([ux, uz, ur])=>Math.hypot(x - ux, z - uz) > ur + r)) continue; used.push([x, z, r]); return [x, z]; }
+      else { x = Y.px + (q(1) - 0.5)*(Y.sw - 2*r - 0.15); z = Y.hz + 1.0 + q(2)*(Y.z1 - Y.hz - 1.3); }
+      if (clear(x, z, r)){ used.push([x, z, r]); return [x, z]; } } return null; };
+  O3.yardAnims = [];
+  f.forEach((a, i)=>{ if (!a || !FARM_KIND[a.k]) return; const grown = farmGrown(a), kind = a.k==='chicken' ? (grown ? 'chicken' : 'chick') : a.k==='cow' ? (grown ? 'cow' : 'calf') : (grown ? 'sheep' : 'lamb'), hh = TOWN_ANIMALS[kind].h*YARD_ANIM_K, s = spot(kind, i, hh*(a.k==='chicken' ? 0.7 : 0.55)); if (!s) return;
+    let o; try{ const p = v3Person(townFolkLook({ animal:kind, look:i }, i), hh, g); o = p.g; if (p.e){ try{ m3dSkinFigure(p.e); }catch(e){} O3.yardAnims.push({ e:p.e, g:o, ph:o3Hash(i, 9, 923)*20 }); } }
+    catch(e){ o = o3YardAnimal(a.k, i, grown, 0.35 + (a.w||0)*0.33); g.add(o); }
+    o.position.set(s[0], 0, s[1]); o.rotation.y = /chick/.test(kind) ? o3Hash(i, 3, 922)*6.28 : (o3Hash(i, 3, 922) < 0.5 ? 0 : Math.PI) + (o3Hash(i, 4, 922) - 0.5)*0.9; o.userData.farm = a.k; o.traverse(m=>{ if (m.isMesh) m.castShadow = true; }); }); }
 /* the plot on the land: the house (by its size) and the fenced yard, in a frame turned to the grid, and the yard's pieces */
 function o3PlotBuild(g, hitM){ const P = plotGet(), h = houseP(); if (!P || !h || !o3InWin(P.x, P.y, plotR() + 1)) return; const T = THREE, M = o3QsMats(), c = o3C(P.x, P.y), ey = o3Rot([0, 1], o3FrameTurn(P.x, P.y)), root = new T.Group();
   root.position.set(c[0], O3.heightAt(c[0], c[1]), c[1]); { const ex = o3Rot([1, 0], o3FrameTurn(P.x, P.y)), V = PLOT_V[plotQ(P)], w = [V[0]*ex[0] + V[1]*ey[0], V[0]*ex[1] + V[1]*ey[1]]; root.rotation.y = Math.atan2(w[0], w[1]); }   /* (RS-921: the gate to the town) */ root.name = 'plot'; g.add(root); O3.yardRoot = root;
@@ -42839,7 +42856,7 @@ function o3QsScene(key){ const C = O3_QS.scenes; if (C[key]) return C[key]; cons
     /* a lamp at the gate */
     { const lx = GAP + 0.32, lz = A - 0.22; seg('iron', [lx, 0, lz], [lx, 0.62, lz], 0.016, 0.012, 12); seg('iron', [lx, 0.6, lz], [lx - 0.1, 0.64, lz], 0.007, 0.007, 8); rb('iron', 0.06, 0.01, 0.06, 0.003, lx - 0.1, 0.62, lz); rb('lamp', 0.042, 0.06, 0.042, 0.006, lx - 0.1, 0.58, lz); rb('iron', 0.06, 0.01, 0.06, 0.003, lx - 0.1, 0.545, lz);
       out.fx.push({ k:'glow', col:'rgba(255,200,120,1)', size:0.4, x:lx - 0.1, y:0.58, z:lz }); }
-    if (A > 3){ const B = 3, gx = -(A + B)/2, px = (A + B)/2, sw = A - B - 0.4, bush = new T.IcosahedronGeometry(0.15, 2), leaf = new T.SphereGeometry(0.055, 10, 8), ball = new T.SphereGeometry(0.03, 10, 8);
+    if (A > 3){ const B = 3, gx = -(A + B)/2, px = (A + B)/2, sw = A - B - 0.4, bush = (()=>{ const g = new T.SphereGeometry(0.15, 28, 20), Q = g.attributes.position; for (let i=0;i<Q.count;i++){ const x = Q.getX(i), y = Q.getY(i), z = Q.getZ(i), k = 1 + 0.07*Math.sin(x*61 + y*23)*Math.sin(z*57 - x*19) + 0.04*Math.sin(y*97 + z*41); Q.setXYZ(i, x*k, y*k, z*k); } g.computeVertexNormals(); return g; })(), leaf = new T.SphereGeometry(0.055, 10, 8), ball = new T.SphereGeometry(0.03, 10, 8);
       /* a box hedge round the yard: clipped, a row of rounded tops */
       const hedge = (x0, z0, x1, z1)=>{ const L = Math.hypot(x1 - x0, z1 - z0), nn = Math.max(1, Math.round(L/0.26)), ry = Math.atan2(x1 - x0, z1 - z0); rb('turf', 0.26, 0.3, L, 0.08, (x0 + x1)/2, 0.15, (z0 + z1)/2, 0, ry, 0);
         for (let i=0;i<=nn;i++){ const t = i/nn, x = x0 + (x1 - x0)*t, z = z0 + (z1 - z0)*t; put('turf', bush, x, 0.29 + 0.025*h(i, Math.round(x*7 + z*3)), z, 0, h(i, 2)*3, 0, 1, 0.7, 1); } };
@@ -42856,8 +42873,21 @@ function o3QsScene(key){ const C = O3_QS.scenes; if (C[key]) return C[key]; cons
         rb('plank', 0.66, 0.36, 0.52, 0.02, px, 0.38, hz); for (const s of [-1, 1]) rb('shingle', 0.74, 0.03, 0.34, 0.01, px, 0.62, hz + s*0.13, s*0.62, 0, 0);
         rb('dark', 0.12, 0.14, 0.02, 0.01, px - 0.34, 0.3, hz, 0, Math.PI/2, 0); rb('plank', 0.1, 0.02, 0.36, 0.005, px - 0.5, 0.12, hz, 0, 0, -0.55);
         /* (RS-920: the animals are your own, o3YardLive) */ }
-      { const tz = -0.2; rb('plank', 0.26, 0.16, 0.8, 0.02, px + sw/2 - 0.3, 0.08, tz); rb('water', 0.2, 0.01, 0.72, 0.004, px + sw/2 - 0.3, 0.15, tz); }
-      for (let i=0;i<(n >= 3 ? 3 : 2);i++){ const bx = px + (sw > 1 ? (i % 2 ? -0.2 : 0.25) : 0.1), bz = -2.5 + i*0.42 + (A - 4)*0.3; put('thatch', new T.CylinderGeometry(0.15, 0.15, 0.36, 24), bx, 0.15, bz, Math.PI/2, 0, 0); }
+      /* (RS-923) the trough: splayed plank sides on trestle legs, its ends let in, iron bands, water standing in it */
+      { const tz = -0.2, tx = px + sw/2 - 0.3, L = 0.84; frame(tx, 0, tz, 0, 0, 0);
+        for (const s of [-1, 1]){ rb('plank', 0.032, 0.17, L, 0.008, s*0.105, 0.2, 0, 0, 0, s*0.28); rb('plank', 0.05, 0.022, L + 0.02, 0.008, s*0.13, 0.29, 0); }
+        rb('plank', 0.17, 0.03, L, 0.008, 0, 0.115, 0); for (const s of [-1, 1]){ rb('door', 0.3, 0.2, 0.04, 0.01, 0, 0.2, s*(L/2 - 0.01));
+          for (const u of [-1, 1]) seg('door', [u*0.15, 0, s*(L/2 - 0.08)], [u*0.06, 0.13, s*(L/2 - 0.08)], 0.018, 0.016, 12); rb('door', 0.3, 0.035, 0.04, 0.008, 0, 0.05, s*(L/2 - 0.08));
+          rb('iron', 0.33, 0.022, 0.05, 0.004, 0, 0.27, s*(L/2 - 0.01)); for (const u of [-1, 1]) put('iron', new T.SphereGeometry(0.008, 8, 6), u*0.1, 0.24, s*(L/2 + 0.012)); }
+        rb('water', 0.21, 0.008, L - 0.06, 0.003, 0, 0.245, 0); unframe(); }
+      /* (RS-923) round bales: rolled straw, the rounded shoulders and the roll's spiral on its ends, loose wisps, two bands of twine */
+      const bale = (()=>{ const L = [[0, -0.18], [0.07, -0.181], [0.115, -0.178], [0.138, -0.17], [0.15, -0.152], [0.154, -0.12], [0.155, 0], [0.154, 0.12], [0.15, 0.152], [0.138, 0.17], [0.115, 0.178], [0.07, 0.181], [0, 0.18]], g = lathe(L, 40), Q = g.attributes.position;
+        for (let i=0;i<Q.count;i++){ const x = Q.getX(i), y = Q.getY(i), z = Q.getZ(i), r = Math.hypot(x, z), a = Math.atan2(z, x), end = Math.abs(y) > 0.17;
+          const k = end ? 1 + 0.03*Math.sin(r*120 + a*1.0) : 1 + 0.025*Math.sin(a*23 + y*40)*Math.sin(a*7 - y*90) + 0.012*Math.sin(a*61); Q.setXYZ(i, x*k, y + (end ? Math.sign(y)*0.006*Math.sin(r*140 + a) : 0), z*k); }
+        g.computeVertexNormals(); return g; })(), twine = new T.TorusGeometry(0.157, 0.005, 6, 48), wisp = new T.CylinderGeometry(0.003, 0.0015, 0.09, 4);
+      for (let i=0;i<(n >= 3 ? 3 : 2);i++){ const bx = px + (sw > 1 ? (i % 2 ? -0.2 : 0.25) : 0.1), bz = -2.5 + i*0.42 + (A - 4)*0.3, ry = (h(i, 71) - 0.5)*0.5;
+        frame(bx, 0.153, bz, 0, ry, 0); put('thatch', bale, 0, 0, 0, Math.PI/2, 0, 0); for (const y of [-0.075, 0.075]) put('dark', twine, 0, 0, y);
+        for (let k=0;k<7;k++){ const a = h(i*7 + k, 72)*6.28, zz = (h(i*7 + k, 73) - 0.5)*0.3; put('thatch', wisp, Math.cos(a)*0.152, Math.sin(a)*0.152, zz, h(k, 74)*2, 0, a + 1.2); } unframe(); }
       if (n >= 3 && A >= 5){ const bz = A - 1.25, bw = sw*0.92;   /* a byre: plastered walls on a stone footing, a thatched roof */
         rb('stone', bw + 0.06, 0.1, 1.06, 0.02, px, 0.05, bz); rb('plaster', bw, 0.62, 1.0, 0.03, px, 0.41, bz);
         for (const s of [-1, 1]) rb('thatch', bw/2 + 0.2, 0.1, 1.2, 0.04, px + s*bw/4, 0.86, bz, 0, 0, s*-0.62);
@@ -55997,7 +56027,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-922';
+const GAME_VERSION = 'rs-923';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{
