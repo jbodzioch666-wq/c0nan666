@@ -1,3 +1,9 @@
+## RS-920 - The Grounds Come Alive
+
+- **Your plot's grounds show what's really there**: from the House up, each raised bed on the land grows the crop sown in your house garden's bed of the same number, at its real stage (sprouting, in leaf, in bud, ready). A bed with nothing sown is bare earth.
+- **Your own animals in the pasture**: your hens, cows and sheep graze in the paddock on the land instead of three stock hens. Young ones are smaller, and each sheep is as woolly as it really is.
+- **It keeps up with you**: a crop growing, an animal bought or butchered shows on the land within a second, without leaving.
+
 ## RS-919 - Town Landmarks Rebuilt
 
 - **Every town's landmark rebuilt**:
