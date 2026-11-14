@@ -17,9 +17,9 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
     for (const g of [1, 3]){ h.built.bed = g; houseRelayout(); await fr(10); let bed = ROOM_LAYOUT[G.interior.key].benches.find(b=>b[0]==='bed'); if (!bed){ G.houseFloor = houseFl() ? 0 : 1; houseLayout(); await fr(10); bed = ROOM_LAYOUT[G.interior.key].benches.find(b=>b[0]==='bed'); } out.bedFl = houseFl(); const bw = ROOM_LAYOUT[G.interior.key].benches.find(b=>b[0]==='bed'); bed = bw; G.benchXY = [bed[1], bed[2]];
       houseBench('bed'); const o = { g, has:!!G.sleepFx }; let mid = null, after = null;
       for (let i=0;i<200 && G.sleepFx;i++){ await fr(1, 25); const F = G.sleepFx; if (!F) break; const inScene = c=>{ let q = c; while (q && q.parent) q = q.parent; return q===V3.scene; };
-        if (!mid && F.t > 0.3){ const b = V3.player.g.position; mid = { y:+b.y.toFixed(3), top:F.top, cover:!!(F.cover && inScene(F.cover)), bed:!!F.bg, L:F.L, Lb:F.Lb, fz:F.fz }; out.shots.push(shot(b, 1.5, 1.3, 1.1)); out.shots.push(shot(b, -1.2, 1.6, -0.3)); }
+        if (!mid && F.t > 0.3){ const b = (F.nf || V3.player).g.position; mid = { y:+b.y.toFixed(3), top:F.top, cover:!!(F.cover && inScene(F.cover)), bed:!!F.bg, night:!!(F.nf && inScene(F.nf.g)), hid:V3.player.g.visible===false, L:F.L, Lb:F.Lb, fz:F.fz }; out.shots.push(shot(b, 1.5, 1.3, 1.1)); out.shots.push(shot(b, -1.2, 1.6, -0.3)); }
         if (!after && F.done && F.t > 2.4){ after = { cover:!!(F.cover && inScene(F.cover)), y:+V3.player.g.position.y.toFixed(3) }; } }
-      o.mid = mid; o.after = after; o.ended = !G.sleepFx; out.sleep.push(o); }
+      o.mid = mid; o.after = after; o.ended = !G.sleepFx; o.shown = V3.player.g.visible!==false; out.sleep.push(o); }
     out.hearth1 = hearthKey(); out.hname = hearthName();
     /* the stairs walked */
     if (houseFl()){ G.houseFloor = 0; houseLayout(); await fr(10); } window.__trans = true; const S = housePlan().stair; p.x = S[0]; p.y = S[1] + 1; await fr(10); const y0 = V3.player.g.position.y;
@@ -38,7 +38,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   console.log(JSON.stringify(r));
   A(!r.err, 'ran through', r);
   A(!r.hearth0 && r.hearth1==='house' && r.hname==='your house', 'a night in your own bed binds the hearthstone to your house', r);
-  A(r.sleep.every(s=>s.has && s.mid && s.mid.bed && s.mid.cover && Math.abs(s.mid.y - (s.mid.top + 0.02)) < 0.03 && s.after && s.after.cover && s.ended), 'on the mattress under its blanket, laid again after dawn', r);
+  A(r.sleep.every(s=>s.has && s.mid && s.mid.bed && s.mid.cover && Math.abs(s.mid.y - (s.mid.top + 0.02)) < 0.03 && s.after && s.after.cover && s.ended && s.mid.night && s.mid.hid && s.shown), 'on the mattress under its blanket, laid again after dawn', r);
   A(r.sleep[1].mid.y > r.sleep[0].mid.y + 0.05, 'higher on the four-poster than on straw', r);
   A(r.walking && r.up.fl===1 && r.up.maxY > 1.2 && r.up.done && r.up.y < 0.1, 'walked up the flight', r);
   A(r.walkingDown && r.down.fl===0 && r.down.minY < -0.5 && r.down.done, 'walked down into the well', r);

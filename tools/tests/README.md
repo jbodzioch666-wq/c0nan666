@@ -253,6 +253,7 @@ Screenshots go to `tools/tests/shots/`.
 | `rs921` | plot turned so its gate faces its town (P.q); old plots turned on load; gate, fence, door and walk-in right all four ways |
 | `rs922` | hearthstone binds to the house by sleeping in your own bed and brings you home; asleep on the mattress under a blanket of the bed's colour; the house's stairs walked up and down |
 | `rs923` | the plot's animals are the farmyard's own figures, sized to the yard and posed; sheep in the fold, hens by their house; sculpted bales, plank trough, smooth hedge |
+| `rs924` | the farmyard's pens remade (v3Pen: hen house, byre, trough, fold, hay) at both grades; you sleep in your nightclothes |
 | `rs789` | A shire's door stones and flags are dark: their average vertex colour stays low |
 | `rs788` | The open land has its older grass again: no blade chunks, RS-785's code gone |
 | `rs787` | A battle at a town: the card before and after, the banner's words, the trees told where you stand, no shader built by a fade, new creatures warmed off the frame |

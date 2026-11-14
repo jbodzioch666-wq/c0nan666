@@ -1,3 +1,11 @@
+## RS-924 - Farmyard and Nightclothes
+
+- **Nightclothes:** you sleep in your nightclothes now - no hat, staff, cape or armour standing up through the blanket or glowing through it - and wake dressed again. The blanket is tucked in at the sides instead of hanging over the bed's rails.
+- **The hen house remade:** up on legs on stone pads, every board its own in board-and-batten, a gabled roof of shingles in courses with barge boards and a ridge, a round-headed pop-hole with its slide, a cleated ramp down to the yard, a nest box with a hinged lid and straw spilling out. The big one has a second nest box, a vented ridge and its wire run.
+- **The byre remade:** a braced timber frame on stone pads, weatherboarded behind and on one side, under a deep thatch laid in courses; a deep straw bedding with loose stalks, a slatted hay rack full of hay, and a stave bucket of water. The big one adds a stall rail, a loft door and a lantern.
+- **The trough remade:** hewn from one timber, splayed and hollowed, on two trestles with iron bands, the feed in it as deep as it is full.
+- **The sheepfold and hay:** the fold's hurdles are woven wattle on their stakes under a coursed lean-to, with a hay rack and straw; the hay bales have rounded shoulders, twine and loose stalks.
+
 ## RS-923 - The Yard Remade
 
 - **Real animals in your yard:** the hens, cows and sheep on your plot are now the farmyard's own jointed, furred animals - the same ones as in your house's farmyard - instead of the blobby stand-ins. They breathe, graze and peck while you're near, sized to the yard.
