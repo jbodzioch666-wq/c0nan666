@@ -8,6 +8,11 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
     const p = G.player, out = { parts:{} }; p.clock = p.turnCount = 60; G.owPos = { x:G.ow.spawnPos.x, y:G.ow.spawnPos.y }; enterVillage(); setUi('playing');
     const fr = async n=>{ for (let i=0;i<n;i++){ renderGame(); await new Promise(q=>setTimeout(q, 30)); } };
     try{
+      p.gold = 5e6; skGainXP('construction', 6e7); houseBuy(3); { const f = farmP(); if (f) f.feed = FARM_FEED_MAX*0.6; }
+      /* the trough's feed lies in its hollow at every fill, never through its sides or floor */
+      out.feed = []; for (const fl of [0.25, 0.6, 1]){ const f = farmP(); if (!f) break; f.feed = FARM_FEED_MAX*fl; const g = new THREE.Group(); v3Pen('trough', g, {}, 1); const tm = GARDEN_M.thatch;
+        const b = new THREE.Box3(); g.children.filter(m=>m.material===tm).forEach(m=>{ m.geometry.computeBoundingBox(); b.union(m.geometry.boundingBox); }); out.feed.push([fl, +b.min.x.toFixed(3), +b.max.x.toFixed(3), +b.min.y.toFixed(3), +b.max.y.toFixed(3), +b.min.z.toFixed(3), +b.max.z.toFixed(3)]); }
+      { const f = farmP(); if (f) f.feed = FARM_FEED_MAX*0.6; }
       const T = THREE, ks = ['coop', 'byre', 'trough', 'fold', 'hay'], W = 300, H = 300, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
       const R = new T.WebGLRenderer({ canvas:cv, antialias:true, preserveDrawingBuffer:true }); R.outputColorSpace = T.SRGBColorSpace; R.shadowMap.enabled = true;
       for (const [nm, ang] of [['a', 0.6], ['b', 2.6]]){ const sheet = document.createElement('canvas'); sheet.width = W*ks.length; sheet.height = H*2; const sx = sheet.getContext('2d');
@@ -19,7 +24,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
         out['sheet' + nm] = sheet.toDataURL('image/jpeg', 0.88); }
       R.dispose();
       /* in the house: a farmyard with all its pens, no errors */
-      p.gold = 5e6; skGainXP('construction', 6e7); houseBuy(3); const h = houseP(); out.has = typeof houseHas==='function' && houseHas('farmyard');
+      const h = houseP(); out.has = typeof houseHas==='function' && houseHas('farmyard');
       enterHouse(); await fr(20); out.inHouse = G.interior && G.interior.key;
     }catch(e){ out.err = String(e.stack).slice(0, 400); }
     return out; });
@@ -28,5 +33,6 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
   A(!r.err, 'ran through', r);
   A(Object.values(r.parts).every(n=>n >= 4 && n <= 30), 'every pen built, merged by material', r);
   A(r.inHouse==='house', 'the house builds with them', r);
+  A(r.feed.length===3 && r.feed.every(([fl, x0, x1, y0, y1, z0, z1])=>x0 > -0.43 && x1 < 0.43 && y0 > 0.19 && y1 < 0.37 && z0 > -0.15 && z1 < 0.15), 'the feed lies in the hollow of the trough', r);
   A(!errs.length, 'no errors: ' + errs.join(' | '));
 };

@@ -1,3 +1,7 @@
+## RS-925 - The Trough Filled Right
+
+- **The trough's feed fixed:** the straw in the farmyard trough lay as one big stretched lump turned at random, so it often stood across the trough and poked out through its sides and floor in a flat orange. It now fills the hollow along its length - real straw, its top heaped a little, loose stalks on it - as deep as the trough is full, and never past its sides.
+
 ## RS-924 - Farmyard and Nightclothes
 
 - **Nightclothes:** you sleep in your nightclothes now - no hat, staff, cape or armour standing up through the blanket or glowing through it - and wake dressed again. The blanket is tucked in at the sides instead of hanging over the bed's rails.
