@@ -1,0 +1,13 @@
+// RS-831: a green town's grass field runs on the card: the state in float targets, the blades reading a packed copy. The wind moves it, a body shoves and crushes it, and it rises again (rs779 holds the numbers), a CPU's fallback gives the same, and a raid's renderer never reads the town's target
+module.exports = async page=>{ page.setDefaultTimeout(0);
+  const r = await page.evaluate(async ()=>{ window.__noLock = true; goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{}; const t = townList().find(t=>(townFlavorAt(t.x, t.y)||{}).race==='halfling'); G.owPos = { x:t.x, y:t.y }; enterVillage(); setUi('playing'); await new Promise(r=>setTimeout(r, 2500));
+    const F = V3.shireField, P = GRASS_GPU, gl = V3.renderer.getContext(), U = shireUniforms(), out = {}; gl.getError();
+    const id = 60 + 60*F.W, read = ()=>shireFieldAt(F, id).bx; let lo = 9, hi = -9; for (let k=0;k<120;k++){ shireGrassTick(1/60); const v = read(); lo = Math.min(lo, v); hi = Math.max(hi, v); } out.swing = +(hi - lo).toFixed(3); out.gl = gl.getError(); out.onCard = P.owner===F && U.tField.value===P.c.texture;
+    let t0 = performance.now(); for (let k=0;k<60;k++) shireGrassTick(1/60); out.ms = +((performance.now() - t0)/60).toFixed(2);
+    /* a frame at a higher rate than the step runs nothing, and reads the same target */ const st = P.ms.uniforms.uT.value; F.acc = 0; shireGrassTick(1/1000); out.noStep = P.ms.uniforms.uT.value===st;
+    /* the fallback */ window.__noGrassGpu = true; const c0 = F.bx[id]; for (let k=0;k<30;k++) shireGrassTick(1/60); out.cpu = { moved:F.bx[id]!==c0, tex:U.tField.value===F.tx }; window.__noGrassGpu = false; for (let k=0;k<4;k++) shireGrassTick(1/60); out.back = U.tField.value===P.c.texture;
+    /* a raid draws on another renderer */ U.tField.value = P.c.texture; const key = G.owPos.x + ',' + G.owPos.y, e = wevP(), idd = ++e.seq; e.town[key] = { kind:'raid', id:idd, until:wevTurn() + 100, done:false }; wevSiegeFight({ kind:'raid', id:idd, camp:'orc', key }); setUi('playing'); await new Promise(r=>setTimeout(r, 1500)); const v = U.tField.value; out.raidTarget = !!(v && v.isRenderTargetTexture);
+    return out; });
+  console.log(JSON.stringify(r)); const A = (c, m)=>{ if (!c) throw new Error(m + ' ' + JSON.stringify(r)); };
+  A(r.onCard && r.gl===0, 'the field is on the card, its shaders valid'); A(r.swing > 0.02, 'the wind moves it'); A(r.ms < 1.5, 'for little of the frame'); A(r.noStep, 'a very short frame takes no step'); A(r.cpu.moved && r.cpu.tex, 'the CPU keeps it where the card cannot'); A(r.back, 'and the card takes it back'); A(!r.raidTarget, 'a raid never reads the town target');
+};
