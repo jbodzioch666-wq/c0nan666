@@ -248,6 +248,7 @@ Screenshots go to `tools/tests/shots/`.
 | `rs916` | the walls meet every doorway's edge, both sides, every house size and floor |
 | `rs917` | no quest spot or cairn by the plot; the house stair as joinery (treads, runner, balusters, handrail, newels) and the upstairs well's balustrade |
 | `rs918` | landmarks remade: tower, tree and spire build sound, fit their hit boxes, sheet from three sides by day and night |
+| `rs919` | towns' landmarks remade: nine kinds build sound, fit the lot, built once and reused; a town with its landmark |
 | `rs789` | A shire's door stones and flags are dark: their average vertex colour stays low |
 | `rs788` | The open land has its older grass again: no blade chunks, RS-785's code gone |
 | `rs787` | A battle at a town: the card before and after, the banner's words, the trees told where you stand, no shader built by a fade, new creatures warmed off the frame |

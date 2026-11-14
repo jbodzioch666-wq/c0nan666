@@ -1,3 +1,16 @@
+## RS-919 - Town Landmarks Rebuilt
+
+- **Every town's landmark rebuilt**:
+  - **The dwarves' mine**: a dressed-stone arch with a keystone, timbered inside, and an ore cart on rails, heaped with ore and a fleck of gold.
+  - **The elves' moonwell**: a marble basin of glowing water under four slender columns joined by silver arches, with crescent moons and vine leaves on top.
+  - **The orcs' war totem**: a carved pole with three snarling faces whose eyes glow red, hide banners, a horned skull, a cairn at its foot and a fire bowl.
+  - **The desert caravan**: two bell tents with pennants, a patterned rug laid with gems, crates, sacks and clay jars.
+  - **The gnomes' workshop**: a riveted brass boiler with a firebox and gauge, a chimney, toothed gears and a workbench with a caged crystal lamp.
+  - **The dragonborn brazier**: an iron fire bowl on clawed legs and a carved pedestal, on a stepped dais between two horned pillars.
+  - **The tiefling altar**: an obsidian altar with rune lights, candles and a floating gem, between two twisted spires among black shards.
+  - **The half-elves' stage**: a plank stage with steps, a pleated curtain, bunting, a drum, a lute and a stool.
+  - **The wood elves' fletchery**: a turned-wood rack of fletched arrows, hanging bows, a straw target on a tripod and a barrel of arrows.
+
 ## RS-918 - The Landmarks Remade
 
 - **The wizard's tower rebuilt**: dressed stone on a battered foot, a stair up to an arched oak door strapped in iron, gold-lit lancet windows in carved surrounds, string courses, a corbelled and battlemented gallery, and a tall flared roof of blue slate scales with lit dormers and a gold finial under the turning orb. Ivy climbs one side.
