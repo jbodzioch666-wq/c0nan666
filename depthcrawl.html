@@ -23869,7 +23869,13 @@ function o3LandmarkModel(lm){
 }
 function o3SyncLandmarks(dt){
   if (O3.yardAnims && O3.yardAnims.length && O3.yardRoot && O3.yardRoot.parent){ const P = O3.ppos, near = !P || O3.yardAnims.some(a=>a.g.parent && P.distanceToSquared(a.g.getWorldPosition(o3YardW || (o3YardW = new THREE.Vector3()))) < 900);   /* (RS-923: your animals breathe, graze and peck while you're near) */
-    if (near) for (const a of O3.yardAnims){ const e = a.e, tt = O3.t + a.ph; try{ if (e.anim) e.anim(e.rig, tt, 0, 0, 0, 0, e); else if (e.beast) m3dPoseBeast(e.rig, tt, 0, 0, 0, 0, e); else m3dPoseHumanoid(e.rig, tt, 0, 0, 0, 0, e); }catch(err){} } }
+    if (near){ const ds = Math.min(0.1, dt || 0.016); for (const a of O3.yardAnims){ const e = a.e, tt = O3.t + a.ph; let mv = 0;
+      if (a.pick){ const dx = a.tx - a.x, dz = a.tz - a.z, d = Math.hypot(dx, dz);   /* (RS-928: they wander their own ground - a few steps, a turn, a while grazing) */
+        if (d > 0.01){ const want = Math.atan2(dx, dz), da = Math.atan2(Math.sin(want - a.g.rotation.y), Math.cos(want - a.g.rotation.y)); a.g.rotation.y += da*Math.min(1, ds*5); a.mx = 1;
+          if (Math.abs(da) < 0.6){ const st = Math.min(d, a.sp*ds), nx = a.x + dx/d*st, nz = a.z + dz/d*st; if (O3.yardAnims.some(b=>b!==a && b.pick && Math.hypot(nx - b.x, nz - b.z) < (a.r + b.r)*0.8 && Math.hypot(nx - b.x, nz - b.z) < Math.hypot(a.x - b.x, a.z - b.z))){ a.tx = a.x; a.tz = a.z; a.wait = 0.5 + Math.random()*1.5; } else { a.x = nx; a.z = nz; a.g.position.x = a.x; a.g.position.z = a.z; mv = 1; } } }
+        else if ((a.wait -= ds) <= 0){ a.pick(); a.wait = /chick/.test(a.kind) ? 0.8 + Math.random()*3 : 3 + Math.random()*9; }
+        if (a.mx){ a.mx = 0; a.g.updateMatrix(); a.g.updateMatrixWorld(true); } }   /* (the plot sits in the landmarks, whose matrices are frozen: o3FreezeStatic) */
+      try{ const m = a.pick ? m3dEaseMv(e, mv, ds) : 0; if (e.anim) e.anim(e.rig, tt, m, 0, 0, 0, e); else if (e.beast) m3dPoseBeast(e.rig, tt, m, 0, 0, 0, e); else m3dPoseHumanoid(e.rig, tt, m, 0, 0, 0, e); }catch(err){} } } }
   if (O3.yardRoot && O3.yardRoot.parent && (O3.t|0)!==O3.yardLiveT){ O3.yardLiveT = O3.t|0; if (o3YardLiveKey()!==O3.yardLiveKey) try{ o3YardLive(); }catch(e){ console.error(e); } }   /* (RS-920: a crop grown, an animal bought) */
   const T = THREE, geo = owGeo(), pp = O3.ppos; if (!pp) return;
   if (!O3.lmGrp) O3.lmGrp = new T.Group();
@@ -27970,7 +27976,11 @@ function o3YardLive(){ const T = THREE, root = typeof O3!=='undefined' && O3.yar
   /* where each kind stands: the hens scratching before their house, the sheep in the fold (the Manor's; else the pasture's far end), the cows
      in the open between, clear of the trough and the bales. The yard is built smaller than the town, so they are too (YARD_ANIM_K) */
   const f = houseHas('farmyard') && h.farm && Array.isArray(h.farm.a) ? h.farm.a : [], tx = Y.px + Y.sw/2 - 0.3, fold = n >= 3 && plotR() >= 5, fw = Math.min(Y.sw - 0.2, 1.4), fz = 0.2 + (plotR() - 3)*0.15 + 0.9, used = [];
-  const clear = (x, z, r)=>!(Math.abs(x - tx) < 0.25 + r && Math.abs(z + 0.2) < 0.45 + r) && !(Math.abs(x - Y.px) < Y.sw/2 && z > -2.75 + (plotR() - 4)*0.3 && z < -1.45 + (plotR() - 4)*0.3 && Math.abs(x - Y.px) < 0.45 + r) && !(fold && Math.abs(x - Y.px) < fw/2 + r && Math.abs(z - fz) < 0.55 + r) && used.every(([ux, uz, ur])=>Math.hypot(x - ux, z - uz) > ur + r);
+  const clear0 = (x, z, r)=>!(Math.abs(x - tx) < 0.25 + r && Math.abs(z + 0.2) < 0.45 + r) && !(Math.abs(x - Y.px) < Y.sw/2 && z > -2.75 + (plotR() - 4)*0.3 && z < -1.45 + (plotR() - 4)*0.3 && Math.abs(x - Y.px) < 0.45 + r) && !(fold && Math.abs(x - Y.px) < fw/2 + r && Math.abs(z - fz) < 0.55 + r), clear = (x, z, r)=>clear0(x, z, r) && used.every(([ux, uz, ur])=>Math.hypot(x - ux, z - uz) > ur + r);
+  /* (RS-928) each kind's own ground, and whether it may stand at x, z: the hens before their house, the sheep inside the fold, the cows in the open */
+  const inZone = (kind, x, z, r)=>/chick/.test(kind) ? Math.abs(x - Y.px) <= (Y.sw - 0.3)/2 && z >= Y.hz + 0.45 && z <= Y.hz + 1.35 && clear0(x, z, r)
+    : /sheep|lamb/.test(kind) && fold ? Math.abs(x - Y.px) <= (fw - 0.35)/2 && Math.abs(z - fz) <= 0.35
+    : Math.abs(x - Y.px) <= (Y.sw - 2*r - 0.15)/2 && z >= Y.hz + 1.0 && z <= Y.z1 - 0.3 && clear0(x, z, r);
   const spot = (kind, i, r)=>{ for (let k=0;k<60;k++){ const q = (a)=>o3Hash(i*61 + k, a, 923); let x, z;
       if (/chick/.test(kind)){ x = Y.px + (q(1) - 0.5)*(Y.sw - 0.3); z = Y.hz + 0.45 + q(2)*0.9; }
       else if (/sheep|lamb/.test(kind) && fold){ x = Y.px + (q(1) - 0.5)*(fw - 0.35); z = fz + (q(2) - 0.5)*0.7; if (!used.every(([ux, uz, ur])=>Math.hypot(x - ux, z - uz) > ur + r)) continue; used.push([x, z, r]); return [x, z]; }
@@ -27978,7 +27988,11 @@ function o3YardLive(){ const T = THREE, root = typeof O3!=='undefined' && O3.yar
       if (clear(x, z, r)){ used.push([x, z, r]); return [x, z]; } } return null; };
   O3.yardAnims = [];
   f.forEach((a, i)=>{ if (!a || !FARM_KIND[a.k]) return; const grown = farmGrown(a), kind = a.k==='chicken' ? (grown ? 'chicken' : 'chick') : a.k==='cow' ? (grown ? 'cow' : 'calf') : (grown ? 'sheep' : 'lamb'), hh = TOWN_ANIMALS[kind].h*YARD_ANIM_K, s = spot(kind, i, hh*(a.k==='chicken' ? 0.7 : 0.55)); if (!s) return;
-    let o; try{ const p = v3Person(townFolkLook({ animal:kind, look:i }, i), hh, g); o = p.g; if (p.e){ try{ m3dSkinFigure(p.e); }catch(e){} O3.yardAnims.push({ e:p.e, g:o, ph:o3Hash(i, 9, 923)*20 }); } }
+    let o; try{ const p = v3Person(townFolkLook({ animal:kind, look:i }, i), hh, g); o = p.g; if (p.e){ try{ m3dSkinFigure(p.e); }catch(e){} const r = hh*(a.k==='chicken' ? 0.7 : 0.55), hen = /chick/.test(kind), sp = { chicken:0.32, chick:0.26, sheep:0.17, lamb:0.21, cow:0.14, calf:0.19 }[kind] || 0.2, far = hen ? 0.55 : /cow|calf/.test(kind) ? 0.9 : 0.6;
+        const A = { e:p.e, g:o, ph:o3Hash(i, 9, 923)*20, kind, r, sp, x:s[0], z:s[1], tx:s[0], tz:s[1], wait:1 + o3Hash(i, 5, 928)*6, n:0 };
+        A.pick = ()=>{ for (let k=0;k<14;k++){ const an = Math.random()*6.2832, d = 0.15 + Math.random()*far, x = A.x + Math.sin(an)*d, z = A.z + Math.cos(an)*d; if (!inZone(kind, x, z, r)) continue; let ok = true; for (let q=1;q<4 && ok;q++) ok = inZone(kind, A.x + (x - A.x)*q/4, A.z + (z - A.z)*q/4, r);
+            if (ok && O3.yardAnims.every(b=>b===A || (Math.hypot(x - b.tx, z - b.tz) > r + b.r && Math.hypot(x - b.x, z - b.z) > r + b.r))){ A.tx = x; A.tz = z; A.n++; return true; } } return false; };
+        O3.yardAnims.push(A); } }
     catch(e){ o = o3YardAnimal(a.k, i, grown, 0.35 + (a.w||0)*0.33); g.add(o); }
     o.position.set(s[0], 0, s[1]); o.rotation.y = /chick/.test(kind) ? o3Hash(i, 3, 922)*6.28 : (o3Hash(i, 3, 922) < 0.5 ? 0 : Math.PI) + (o3Hash(i, 4, 922) - 0.5)*0.9; o.userData.farm = a.k; o.traverse(m=>{ if (m.isMesh) m.castShadow = true; }); }); }
 /* the plot on the land: the house (by its size) and the fenced yard, in a frame turned to the grid, and the yard's pieces */
@@ -56170,7 +56184,7 @@ function renderOverlay0(){
 
 // ---- title screen (resume a saved adventurer, or start new) ----
 // the build's version: shown on the title screen, and read by tools/build-itch.sh to name the zip
-const GAME_VERSION = 'rs-927';
+const GAME_VERSION = 'rs-928';
 function buildTitleScreen(){
   const list = saveIndexList().slice().sort((a,b)=>b.lastPlayed-a.lastPlayed);
   let rows = list.map(e=>{

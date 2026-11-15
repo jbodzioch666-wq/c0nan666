@@ -1,3 +1,9 @@
+## RS-928 - The Yard Comes Alive
+
+- **The yard comes alive:** the animals on your plot wander now instead of standing posed. Each walks a few steps at its own pace, turns to where it's going, then stops to graze, peck or look about. Hens bustle, sheep amble and cows take their time.
+- **Each on its own ground:** hens keep before their hen house, sheep keep inside the fold, and cows keep to the open pasture.
+- **Out of each other's way:** animals walk around the trough, the byre and the bales, and stop rather than walk into one another.
+
 ## RS-927 - Shipshape
 
 - **Sailcloth:** every sail is sewn from narrow panels, with a tabling round the edge, two reef bands with their points, and patches at the corners. Its foot is cut in a curve. The speckled shadow that crawled over the canvas is gone.
