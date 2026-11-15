@@ -255,6 +255,7 @@ Screenshots go to `tools/tests/shots/`.
 | `rs923` | the plot's animals are the farmyard's own figures, sized to the yard and posed; sheep in the fold, hens by their house; sculpted bales, plank trough, smooth hedge |
 | `rs924` | the farmyard's pens remade (v3Pen: hen house, byre, trough, fold, hay) at both grades; you sleep in your nightclothes |
 | `rs926` | House working pieces remade (apple trees, sapling, hive box, water butt, compost) and the Estate orchard's crowns; sheet + orchard shots |
+| `rs927` | Ships' art pass: sailcloth texture, no sail shadow speckle, rudders, wales, anchors, mast tops, ratlines, planked castle tops; still few draws baked; shots rs927-a..e |
 | `rs789` | A shire's door stones and flags are dark: their average vertex colour stays low |
 | `rs788` | The open land has its older grass again: no blade chunks, RS-785's code gone |
 | `rs787` | A battle at a town: the card before and after, the banner's words, the trees told where you stand, no shader built by a fade, new creatures warmed off the frame |

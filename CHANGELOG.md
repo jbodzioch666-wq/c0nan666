@@ -1,3 +1,11 @@
+## RS-927 - Shipshape
+
+- **Sailcloth:** every sail is sewn from narrow panels, with a tabling round the edge, two reef bands with their points, and patches at the corners. Its foot is cut in a curve. The speckled shadow that crawled over the canvas is gone.
+- **A rudder on every ship:** it hangs on the sternpost by iron pintles. The rowboat steers by a tiller; the bigger ships keep their wheel.
+- **Rigging:** from the caravel up, the masts carry fighting tops and caps, and the shrouds have ratlines and deadeyes. Every sailing ship has a mast cap.
+- **Wales and anchors:** thick dark wales run down the hull. Every sailing ship carries an anchor at the cathead, with its ring, stock and flukes.
+- **Castle decks:** the forecastle and the stern castle are planked on top and railed on posts. They used to be a flat black slab.
+
 ## RS-926 - The Orchard in Leaf
 
 - **Apple trees in leaf:** the house's apple trees and the Estate orchard have full, rounded crowns of soft leaves on a forked trunk and spreading boughs, instead of a few balls on a stick. A fruiting tree hangs its apples on the crown and drops a few in the grass.

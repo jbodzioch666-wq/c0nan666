@@ -10,7 +10,7 @@ module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.
     G.owPos = land; owReveal(land.x, land.y, 8); out.back = await until(()=>!O3.boat.visible && Math.abs(O3.player.g.scale.x - 1) < 0.01, 8000); out.land1 = O3.player.g.scale.x; return out; });
   console.log(JSON.stringify(r));
   for (const s of r.ships){ A(s.deckMap && s.bump, 'the deck is plank-mapped with its bump', s); A(Math.abs(s.span - s.L) < 0.01, 'the deck boards are in world units along her', s); A(Math.abs(s.rows - Math.round(s.rows*10)/10) < 0.001 && s.rows >= 0.9, 'a strake is a whole row of boards', s); A(s.out1===0, 'cabin and forecastle stay inside the hull', s); }
-  A(r.ships[0].plans===0 && r.ships[1].plans===0 && r.ships[2].plans===2 && r.ships[3].plans===4 && r.ships[4].plans===4, 'cabins on a caravel up, forecastles from a galleon', r.ships.map(s=>s.plans));
+  A(r.ships.map(s=>s.plans).join()==='1,1,4,7,7', 'cabins on a caravel up, forecastles from a galleon (RS-927: and a rudder on every ship, a planked top on each castle)', r.ships.map(s=>s.plans));
   A(r.land0===1, 'full size ashore', r.land0);
   A(r.shrunk, 'ship scale at sea', r);
   A(Math.abs(r.redressed - 0.45) < 0.01, 'a new figure at sea keeps the scale', r.redressed);
