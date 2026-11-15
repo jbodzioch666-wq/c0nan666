@@ -1,3 +1,10 @@
+## RS-926 - The Orchard in Leaf
+
+- **Apple trees in leaf:** the house's apple trees and the Estate orchard have full, rounded crowns of soft leaves on a forked trunk and spreading boughs, instead of a few balls on a stick. A fruiting tree hangs its apples on the crown and drops a few in the grass.
+- **A staked sapling:** the young tree stands tied to its stake in a ring of turned earth.
+- **A white hive:** the wooden beehive is stacked white boxes under a shingled roof, on a stand with a landing board.
+- **Water butt and compost:** the butt is a coopered barrel with iron hoops, a tap and a dipper, standing on a stone-footed stand. The compost bay is slatted boards around a heap of turned scraps, with a fork left in it.
+
 ## RS-925 - The Trough Filled Right
 
 - **The trough's feed fixed:** the straw in the farmyard trough lay as one big stretched lump turned at random, so it often stood across the trough and poked out through its sides and floor in a flat orange. It now fills the hollow along its length - real straw, its top heaped a little, loose stalks on it - as deep as the trough is full, and never past its sides.
