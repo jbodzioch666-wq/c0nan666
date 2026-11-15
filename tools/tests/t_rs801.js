@@ -1,0 +1,44 @@
+// RS-801: sailing. Momentum, a wind that matters, sails up and down, a turning circle; every tile crossed is an ordinary step; she stops at a coast unless you make for it; a tap sets a course; fishing stops her.
+module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.on('pageerror', e=>errs.push(String(e).slice(0, 300)));
+  const A = (c, m, d)=>{ if (!c) throw new Error(m + ' :: ' + JSON.stringify(d)); };
+  const setup = await page.evaluate(async ()=>{ const fr = n=>new Promise(res=>{ let i = 0; const f = ()=>++i >= n ? res() : requestAnimationFrame(f); requestAnimationFrame(f); }); window.__noLock = true; window.__fr = fr; window.__w = ms=>new Promise(res=>setTimeout(res, ms));
+    goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{}; weatherSync = ()=>{}; const p = G.player; p.hasBoat = 1; p.boatTier = 4; p.clock = 100; G.gameMode = 0; p.hp = p.maxHp = 99999; moveOverworldEncounters = ()=>{}; checkOverworldEncounterTrigger = ()=>{}; wevStep = ()=>false; wgStep = ()=>false; sqWorldStep = ()=>false; questOverworldTurn = ()=>false; checkMythicBeastTrigger = ()=>false;
+    let best = null, bw = -1; for (let x=10;x<OW_COLS-10;x++) for (let y=10;y<OW_ROWS-10;y++){ if (G.ow.map[x][y]!==OW_WATER || owFresh(x, y)) continue; let w = 0; for (let i=-8;i<=8;i+=2) for (let j=-8;j<=8;j+=2) if (G.ow.map[x+i] && G.ow.map[x+i][y+j]===OW_WATER) w++; let run = 0; while (run < 40 && G.ow.map[x+run] && G.ow.map[x+run][y]===OW_WATER && !o3YardNudge(x+run, y) && !owFresh(x+run, y) && (!G.ow.map[x+run][y-2] || G.ow.map[x+run][y-2]===OW_WATER) && (!G.ow.map[x+run][y+2] || G.ow.map[x+run][y+2]===OW_WATER)) run++; if (run < 22) continue; /* clear of a temple's well, where she drops to the plain step */ w += run*3; if (w > bw){ bw = w; best = { x, y }; } }
+    G.owPos = { x:best.x, y:best.y }; owReveal(best.x, best.y, 10); for (let i=0;i<40 && !(O3.boat && O3.boat.visible && O3.ship);i++) await fr(20); await fr(30); window.__seaWind = { a:0, s:1 }; return { best, on:seaOn(), bw }; });
+  console.log('setup', JSON.stringify(setup)); A(setup.on, 'at sea', setup);
+  /* momentum and steps */
+  const a = await page.evaluate(async ()=>{ const p = G.player, S = seaState(), o = {}; S.yaw = O3.boatYaw = Math.PI/2; S.v = 0; const x0 = G.owPos.x, y0 = G.owPos.y, t0 = p.turnCount||0;
+    moveInput(1, 0); await __w(120); o.vEarly = S.v; await __w(4000); o.vTop = S.v; o.movedX = G.owPos.x - x0; o.movedY = G.owPos.y - y0; o.turns = (p.turnCount||0) - t0; o.tilesDist = Math.abs(G.owPos.x - x0) + Math.abs(G.owPos.y - y0); o.boatVis = O3.boat.visible; o.yaw = S.yaw; o.rollNow = S.roll; o.pp = [O3.ppos.x, O3.ppos.z]; o.pl = o3PL();
+    /* into the wind and across it, same ship */
+    return o; });
+  console.log('run', JSON.stringify(a));
+  A(a.vEarly < a.vTop*0.6, 'she gathers way slowly', a); A(a.vTop > 2, 'she makes speed', a); A(a.movedX > 4, 'she carries you east', a); A(a.turns===a.tilesDist || Math.abs(a.turns - a.tilesDist) <= a.tilesDist*0.5, 'each tile crossed is a step', a);
+  A(Math.floor(a.pp[0])===a.pl.x && Math.floor(a.pp[1])===a.pl.y, 'her tile follows her', a);
+  /* sails down: she carries her way, then stops */
+  const b = await page.evaluate(async ()=>{ const S = seaState(), o = {}; o.v0 = S.v; seaSailToggle(); o.sail = S.sail; await __w(300); o.v1 = S.v; await __w(4000); o.v2 = S.v; o.belly = O3.ship.sails[0].scale.y; return o; });
+  console.log('down', JSON.stringify(b));
+  A(b.sail===0 && b.v1 > b.v0*0.4, 'she carries her way', b); A(b.v2 < 0.05, 'then stops', b); A(b.belly < 0.3, 'her sails are in', b);
+  /* the wind: speeds on each point of sail */
+  const w = await page.evaluate(async ()=>{ const S = seaState(), o = {}, home = { x:G.owPos.x, y:G.owPos.y }; for (const [nm, yaw] of [['before', 0], ['abeam', Math.PI/2], ['into', Math.PI]]){ G.owPos.x = home.x; G.owPos.y = home.y; { const L = o3PL(); O3.ppos.x = L.x + 0.5; O3.ppos.z = L.y + 0.5; } /* back on open water: a leg can reach a coast */ S.yaw = O3.boatYaw = yaw; S.want = yaw; S.sail = 1; S.v = 0; S.k = 1; await __w(3500); o[nm] = +S.v.toFixed(2); if (S.blocked) o[nm + 'Blocked'] = [G.owPos.x, G.owPos.y, Math.round(S.yaw*100)/100]; O3.path = []; } seaSailToggle(); await __w(2500); return o; });
+  console.log('wind', JSON.stringify(w));
+  A(w.into < w.abeam*0.5, 'slow into the wind', w); A(w.abeam >= w.before*0.95, 'best with it across her', w);
+  /* the turning circle: a galleon does not spin on the spot */
+  const c = await page.evaluate(async ()=>{ const S = seaState(), o = {}; S.yaw = O3.boatYaw = Math.PI/2; S.want = Math.PI/2; S.sail = 1; await __w(1500); const y0 = S.yaw; moveInput(-1, 0); const held = S.want; await __w(300); o.y0 = y0; o.y1 = S.yaw; o.pos = [G.owPos.x, G.owPos.y]; o.on = seaOn(); o.turned = Math.abs(Math.atan2(Math.sin(S.yaw - y0), Math.cos(S.yaw - y0))); o.want = held; await __w(3500); o.end = Math.abs(Math.atan2(Math.sin(S.yaw - held), Math.cos(S.yaw - held))); seaSailToggle(); await __w(2500); return o; });
+  console.log('turn', JSON.stringify(c)); A(c.turned < 1.2, 'she turns wide', c); A(c.end < 0.05, 'and comes round', c);
+  /* a coast: she stops short, unless you make for it */
+  const d = await page.evaluate(async ()=>{ const o = {}, S = seaState(); let shore = null; for (let x=2;x<OW_COLS-2 && !shore;x++) for (let y=2;y<OW_ROWS-14 && !shore;y++){ const land = t=>t===OW_GRASS||t===OW_FOREST||t===OW_DESERT; if (!land(G.ow.map[x][y+8])) continue; let all = true; for (let k=0;k<8;k++) for (const e of [-1,0,1]) if (G.ow.map[x+e][y+k]!==OW_WATER) all = false; if (all && !wgRoadAt(x,y+8)) shore = { x, y }; }
+    o.found = !!shore; if (!shore) return o; S.v = 0; S.sail = 0; G.owPos = { x:shore.x, y:shore.y + 3 }; owReveal(G.owPos.x, G.owPos.y, 10); await __w(1500); O3.ppos && (O3.ppos.x = o3PL().x + 0.5, O3.ppos.z = o3PL().y + 0.5); moveInput(0, 1); const t0 = performance.now(); while (performance.now() - t0 < 6000 && S.v >= 0){ await __w(100); if (S.blocked) break; } await __w(600); o.blocked = S.blocked; o.tile = G.ow.map[G.owPos.x][G.owPos.y]===OW_WATER; o.vStop = S.v; o.y = G.owPos.y - shore.y; { const ah = G.ow.map[G.owPos.x][G.owPos.y + 1]; o.canLand = o3Passable(G.owPos.x, G.owPos.y + 1) && !OW_SITE_TILES.includes(ah); o.ahead = ah; }
+    /* hold the key: she comes ashore */
+    const t1 = performance.now(); while (performance.now() - t1 < 5000 && seaOn()){ moveInput(0, 1); await __w(90); } o.ashore = !seaOn(); o.onLand = G.ow.map[G.owPos.x][G.owPos.y]!==OW_WATER; await __w(600); o.boatGone = !O3.boat.visible; return o; });
+  console.log('coast', JSON.stringify(d));
+  if (d.found && d.blocked){ A(d.tile, 'she stops at the coast', d); if (d.canLand){ A(d.ashore && d.onLand, 'held into it, you come ashore', d); A(d.boatGone, 'and leave the boat', d); } else console.log('she stopped at a mountain, a lake or a site door, no plain landing there', JSON.stringify(d)); }
+  /* a tap: she steers along the path and arrives */
+  const e = await page.evaluate(async ()=>{ const S = seaState(), o = {}; const off = setupBest(); G.owPos = { x:off.x, y:off.y }; owReveal(off.x, off.y, 10); await __w(1500); const lg = o3PL(); O3.ppos.x = lg.x + 0.5; O3.ppos.z = lg.y + 0.5; S.v = 0; S.sail = 0; const dst = { x:off.x + 5, y:off.y + 3 }; o3WalkTo({ x:dst.x, y:dst.y }); o.steps = O3.path.length; const t0 = performance.now(); while (performance.now() - t0 < 12000 && (O3.path.length || S.v > 0.05)) await __w(100); o.at = [G.owPos.x - dst.x, G.owPos.y - dst.y]; o.path = O3.path.length; o.vEnd = S.v; o.sail = S.sail; return o;
+    function setupBest(){ let best = null, bw = -1; for (let x=10;x<OW_COLS-10;x++) for (let y=10;y<OW_ROWS-10;y++){ if (G.ow.map[x][y]!==OW_WATER || owFresh(x, y)) continue; let w = 0; for (let i=-8;i<=8;i+=2) for (let j=-8;j<=8;j+=2) if (G.ow.map[x+i] && G.ow.map[x+i][y+j]===OW_WATER) w++; if (w > bw){ bw = w; best = { x, y }; } } return best; } });
+  console.log('tap', JSON.stringify(e));
+  A(e.steps > 0 && e.path===0, 'the course is sailed', e); A(Math.abs(e.at[0]) <= 1 && Math.abs(e.at[1]) <= 1, 'she arrives at the tap', e); A(e.sail===0 && e.vEnd < 0.3, 'and takes in sail', e);
+  /* the key and the panel */
+  await page.waitForTimeout(600); const hud = await page.evaluate(()=>{ const el = document.getElementById('seaHud'); return { vis:!!el && el.style.display!=='none', txt:el && el.textContent }; }); console.log('hud', JSON.stringify(hud)); A(hud.vis && /Sails/.test(hud.txt), 'the wind and sail panel shows', hud);
+  await page.evaluate(()=>{ seaState().sail = 0; }); await page.keyboard.press(' '); await page.waitForTimeout(200); const sp = await page.evaluate(()=>seaState().sail); A(sp===1, 'Space hoists the sails', { sp }); await page.waitForTimeout(2500); await page.screenshot({ path:SHOTS + '/rs801_sea.png' });
+  A(!errs.length, 'no page errors', errs);
+};

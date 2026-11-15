@@ -1,0 +1,21 @@
+// RS-841: the throne room dressed as one - a dais under the throne (the throne set up on it), a runner from the doors, round pillars (solid, not walls) hung with banners, arched windows down the side walls with shafts of daylight that follow the hour and go at night; a castle's rooms and its layout mark kept with the floor and in the save.
+const assert = require('assert');
+module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.on('pageerror', e=>errs.push(String(e).slice(0, 300)));
+  const r = await page.evaluate(async ()=>{ const wait = ms=>new Promise(r=>setTimeout(r, ms)); goToCharCreate(); ccBegin(); wgRegenerate(12345); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{}; weatherSync = ()=>{}; G.player.hp = G.player.maxHp = 99999; let cs = null; for (let x=0;x<OW_COLS && !cs;x++) for (let y=0;y<OW_ROWS;y++) if (G.ow.map[x][y]===OW_CASTLE){ cs = [x, y]; break; }
+    G.gameMode = 0; G.owPos = { x:cs[0], y:cs[1] }; G.pendingDungeon = { x:cs[0], y:cs[1] }; enterDungeonConfirm(); setUi('playing'); G.dungeonMaxDepth = Math.max(2, G.dungeonMaxDepth); G.depth = G.dungeonMaxDepth; loadLevel(G.depth); setUi('playing'); tickMonsters = ()=>{};
+    const out = {}, t = G.genRooms.find(r=>r.k==='throne'), tx = t.x + (t.w>>1); G.player.x = tx; G.player.y = t.y + 4; G.player.clock = DAY_LENGTH*0.45;
+    let walls = 0, pil = 0; for (let x=t.x;x<t.x+t.w;x++) for (let y=t.y;y<t.y+t.h;y++){ if (G.map[x][y]===T_WALL) walls++; if (G.dungeonDeco[x][y]==='pillar') pil++; } out.walls = walls; out.pillars = pil; out.solid = DG_SOLID_DECOS.includes('pillar');
+    for (let i=0;i<40;i++){ renderGame(); await wait(30); } const H = FPD.hall; out.hall = !!H; out.shafts = H ? H.shafts.length : 0; out.dayLit = H && H.shafts.every(m=>m.visible && m.material.opacity > 0.05);
+    out.inWorld = !!(H && H.g.parent===FPD.world); let lift = null; FPD.scene.traverse(o=>{ if (o.parent && o.parent.userData && lift==null && o.isGroup && o.position.y > 0.1 && o.position.y < 0.2 && o.parent.children.length===1 && o.children.some(c=>c.geometry && c.geometry.type==='ExtrudeGeometry')) lift = o.position.y; }); out.lift = lift;
+    G.player.clock = DAY_LENGTH*0.05; for (let i=0;i<5;i++){ renderGame(); await wait(30); } out.nightDark = H && H.shafts.every(m=>!m.visible);
+    G.player.clock = DAY_LENGTH*0.74; for (let i=0;i<5;i++){ renderGame(); await wait(30); } out.dusk = H && H.shafts[0].visible && H.shafts[0].material.color.r > H.shafts[0].material.color.b + 0.2;
+    /* kept: the floor's rooms and its mark, in the cache and through the save */ if (!G.dungeonSlot) G.dungeonSlot = 1; saveLevelCache(G.depth); const key = Object.keys(G.dgCache).find(k=>G.dgCache[k].rooms); out.cached = !!key && G.dgCache[key].lay==='castle3';
+    const back = dgCacheDecode(JSON.parse(JSON.stringify(dgCacheEncode()))), c2 = back[key]; out.saved = !!(c2 && c2.lay==='castle3' && c2.rooms && c2.rooms.some(r=>r.k==='throne'));
+    G.genRooms = []; loadLevel(G.depth); setUi('playing'); out.restored = (G.genRooms||[]).some(r=>r.k==='throne'); for (let i=0;i<10;i++){ renderGame(); await wait(30); } out.hallAgain = !!FPD.hall;
+    /* an ordinary dungeon has no throne hall */ G.siteKind = 'dungeon'; G.genRooms = [{ k:'throne', x:1, y:1, w:5, h:5 }]; fpdThroneHall(new THREE.Group()); out.notElsewhere = !FPD.hall; G.siteKind = 'castle';
+    return out; });
+  console.log(JSON.stringify(r)); assert.equal(errs.length, 0, errs.join('|'));
+  assert.equal(r.walls, 0, 'wall blocks still stand in the throne room'); assert.ok(r.pillars >= 4 && r.solid, 'no solid round pillars: ' + r.pillars);
+  assert.ok(r.hall && r.inWorld, 'the throne hall was not built'); assert.ok(r.shafts >= 1 && r.dayLit, 'no daylight through the windows ' + r.shafts); assert.ok(Math.abs((r.lift||0) - 0.14) < 0.01, 'the throne is not up on its dais ' + r.lift);
+  assert.ok(r.nightDark, 'shafts of light at night'); assert.ok(r.dusk, 'the light at dusk is not warm');
+  assert.ok(r.cached && r.saved, 'the castle rooms or mark were not kept ' + JSON.stringify([r.cached, r.saved])); assert.ok(r.restored && r.hallAgain, 'a kept throne room came back bare'); assert.ok(r.notElsewhere, 'a throne hall outside a castle'); };

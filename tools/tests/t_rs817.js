@@ -1,0 +1,23 @@
+// RS-817: the herb in your hand is the colour of the plant you are picking, on the land and in a cave: one colour source, skHerbColOf, the plant's own skNodeCol; nothing yellow left in its head, and a glowing plant's sprig glows.
+module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.on('pageerror', e=>errs.push(String(e).slice(0, 300)));
+  const A = (c, m, d)=>{ if (!c) throw new Error(m + ' :: ' + JSON.stringify(d)); };
+  const r = await page.evaluate(async ()=>{ const fr = n=>new Promise(res=>{ let i = 0; const f = ()=>++i >= n ? res() : requestAnimationFrame(f); requestAnimationFrame(f); }); window.__noLock = true; window.__noPirates = true; goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{}; const p = G.player; p.clock = DAY_LENGTH*0.3; G.gameMode = 0; moveOverworldEncounters = ()=>{}; checkOverworldEncounterTrigger = ()=>{}; wevStep = ()=>false; wgStep = ()=>false; sqWorldStep = ()=>false; questOverworldTurn = ()=>false; checkMythicBeastTrigger = ()=>false; skGainXP = ()=>{}; skNodeTake = ()=>false; skLvl = (lv=>k=>k==='foraging' ? 99 : lv(k))(skLvl);
+    const seen = {}, bad = []; let n = null; for (let x=8;x<OW_COLS-8;x++) for (let y=8;y<OW_ROWS-8;y++){ const q = skNodeAt(x, y); if (!q || q.k!=='foraging') continue; const c = skHerbColOf(skNodeOption(q)); seen[q.type] = c; if (c!==skNodeCol(q)) bad.push([q.type, c, skNodeCol(q)]); if (!n && !q.gone && SK_HERB_COL[q.type]){ let land = true; for (let i=-2;i<=2 && land;i++) for (let j=-2;j<=2;j++) if (G.ow.map[x + i][y + j]!==OW_GRASS){ land = false; break; } if (land) n = q; } }
+    /* every herb's own colour, seasonal ones too, and the plain fallback if the plant has gone */
+    const each = {}, real = skNodeAt; for (const t of ['flax','silverleaf','bloodmoss','ghostcap','sunpetal','dragontongue','starlily','springbell','ambercap','frostlily','cactus']){ skNodeAt = (x, y)=>({ k:'foraging', type:t, glow:false, x, y }); each[t] = skHerbColOf({ k:'foraging', node:{ x:1, y:1 } }); } skNodeAt = (x, y)=>({ k:'foraging', type:'sunpetal', glow:true, x, y }); const gl = { k:'foraging', node:{ x:1, y:1 } }; skHerbColOf(gl); skNodeAt = ()=>null; const gone = skHerbColOf({ k:'foraging', node:{ x:1, y:1 } }); skNodeAt = real; const diffs = {}; for (const t in each) diffs[t] = each[t]===SK_HERB_COL[t];
+    /* a cave plant */ const dsv = G.depth, cv = {}; for (const d of [1, 4, 8]){ G.depth = d; cv[d] = [skHerbColOf({ k:'foraging', vein:{ x:1, y:1 }, cave:d }), SK_HERB_COL[skCaveHerb()]]; } G.depth = dsv; const co = { k:'foraging', vein:{ x:1, y:1 }, cave:1 }; skHerbColOf(co);
+    /* the sprig itself, live in the hand */ let live = null; if (n){ G.owPos = { x:n.x - 1, y:n.y }; owReveal(n.x, n.y, 6); O3.ppos = null; await fr(60); skDo(skNodeOption(n)); const t0 = performance.now(); let col = null, heads = null; while (performance.now() - t0 < 14000){ await fr(2); const e = O3.player && O3.player.e, S = e && e.herbSpr; if (S && S.visible){ col = e.herbCol; const m = []; S.traverse(o=>{ if (o.isMesh && o.geometry.type==='SphereGeometry') m.push(o.material.color.getHexString()); }); heads = m; break; } } live = { type:n.type, col, plant:skNodeCol(n), heads, want:new THREE.Color(skNodeCol(n)).getHexString() }; }
+    /* a glowing plant's sprig glows, a plain one's doesn't */ const pe = O3.player.e, heads = S=>{ let m = null; S.traverse(o=>{ if (o.isMesh && o.geometry.type==='SphereGeometry') m = o.material; }); return m; }, e1 = heads(rsHerbSprig(pe, '#ffd23a', true)).emissiveIntensity, e0 = heads(rsHerbSprig(pe, '#ffd23a', false)).emissive.getHex();
+    return { caveLit:co.herbLit, seen, bad, diffs, each, glLit:gl.herbLit, gone, cv, live, e1, e0 }; });
+  console.log('live', JSON.stringify(r.live), 'seen', JSON.stringify(r.seen));
+  A(!r.bad.length, 'a plant and its sprig differ', r.bad);
+  for (const t in r.diffs) A(r.diffs[t], 'herb colour not its own', [t, r.each[t]]);
+  A(r.each.springbell!==r.each.ambercap && r.each.silverleaf!==r.each.bloodmoss, 'herbs tell apart', r.each);
+  A(r.glLit===true && r.gone==='#9ad06a', 'glow flag and plain fallback', r);
+  for (const d in r.cv) A(r.cv[d][0]===r.cv[d][1], 'cave herb colour', r.cv);
+  A(r.caveLit===true, 'a cave herb glows as its plant does', r.caveLit);
+  A(r.live && r.live.col===r.live.plant, 'sprig in the hand is not the plant colour', r.live);
+  A(r.live.heads.length===7 && r.live.heads.every(h=>h===r.live.want), 'head not all the plant colour', r.live);
+  A(r.e1 > 0.3 && r.e0===0, 'glow on the sprig', [r.e1, r.e0]);
+  A(!errs.length, 'page errors', errs);
+};

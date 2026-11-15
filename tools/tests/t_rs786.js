@@ -1,0 +1,19 @@
+// RS-786: a raid in a shire ran at 12 fps: the battle's see-through rays tested the shire's merged trees and land (over a million triangles) on the CPU every frame, which the town view had stopped doing in RS-779. They're left out here too, and the buildings still fade
+module.exports = async page=>{ page.setDefaultTimeout(0); const errs = []; page.on('pageerror', e=>errs.push(String(e)));
+  const r = await page.evaluate(async ()=>{ const wait = ms=>new Promise(res=>setTimeout(res, ms)); window.__noLock = true; goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{}; G.player.wildWarned = 1; const p = G.player; p.hp = p.maxHp = 999999;
+    const t = townList().find(t=>(townFlavorAt(t.x, t.y)||{}).race==='halfling'); G.owPos = { x:t.x, y:t.y }; const key = t.x + ',' + t.y, e = wevP(), id = ++e.seq; e.town[key] = { kind:'raid', id, until:wevTurn() + 100, done:false }; wevSiegeFight({ kind:'raid', id, camp:'orc', key }); for (const m of G.mon) m.hp = m.maxHp = 9999999;
+    const t0 = performance.now(); while (!(SIEGE_TOWN.cands && SIEGE_TOWN.t0) && performance.now() - t0 < 60000){ renderGame(); await new Promise(r=>requestAnimationFrame(r)); } await wait(1500);
+    const Tn = SIEGE_TOWN; let shireInWorld = 0; Tn.world.traverse(o=>{ if (/^shire(Bark|Land|Leaves)/.test(o.name)) shireInWorld++; });
+    const real = siegeTownTick, ms = []; siegeTownTick = function(){ const a = performance.now(); real(); ms.push(performance.now() - a); }; const end = performance.now() + 2500; while (performance.now() < end) await new Promise(r=>requestAnimationFrame(r)); siegeTownTick = real; ms.sort((a, b)=>a - b);
+    /* a house between the camera and you still fades */
+    let fades = 0, aim = null; const occ = Tn.occ[0], grp = occ.userData.grp, cn = new THREE.Vector3(); new THREE.Box3().setFromObject(occ).getCenter(cn); const c = FPD.cam.position.clone(), k = (0.55 - c.y)/(cn.y - c.y), ps = ISO.player.pos, ox = ps.x, oy = ps.y; aim = { cn:cn.toArray().map(v=>+v.toFixed(2)), c:c.toArray().map(v=>+v.toFixed(2)), k:+k.toFixed(2), vis:occ.visible, tris:occ.geometry && occ.geometry.attributes.position.count }; ps.x = c.x + (cn.x - c.x)*k; ps.y = c.z + (cn.z - c.z)*k; ISO.player.map = G.map; const camHold = FPD.cam.position.clone(); let hits = 0; const inScene = Tn.world.parent===FPD.scene; for (let i=0;i<5;i++){ ps.x = c.x + (cn.x - c.x)*k; ps.y = c.z + (cn.z - c.z)*k; Tn.t0 = performance.now() - 50; real(); if ((grp.userData.fade||0) > 0.05) fades++; } { const T = THREE, ry = new T.Raycaster(), tg = new T.Vector3(ps.x, 0.55, ps.y), dr = tg.clone().sub(FPD.cam.position), ln = dr.length(); ry.set(FPD.cam.position, dr.normalize()); ry.far = ln - 0.2; hits = ry.intersectObjects(Tn.occ, false).length; aim.hits = hits; aim.inScene = inScene; aim.mapOk = ISO.player.map===G.map; aim.fade = grp.userData.fade; aim.mat = !!occ.material; } ps.x = ox; ps.y = oy;
+    return { cands:Tn.cands.length, shireCands:Tn.cands.filter(o=>/^shire/.test(o.name)).length, shireInWorld, occ:Tn.occ.length, n:ms.length, med:+ms[ms.length>>1].toFixed(2), p95:+ms[Math.floor(ms.length*0.95)].toFixed(2), fades, aim }; });
+  console.log('rs786', JSON.stringify(r)); await page.screenshot({ path:SHOTS + '/rs786_shire_raid.jpg', type:'jpeg', quality:80 });
+  const A = (c, m)=>{ if (!c) throw new Error('assert: ' + m + ' ' + JSON.stringify(r)); };
+  A(r.shireInWorld >= 3, 'the raid is fought in a real shire');
+  A(r.shireCands===0, 'the shire\'s merged meshes stay out of the see-through rays');
+  A(r.cands > 50 && r.occ > 0, 'the rest of the town is still tested');
+  A(r.med < 15, 'the see-through tick is cheap (it was 75 ms a frame)');
+  A(r.fades > 0, 'a house between the camera and you still fades');
+  A(!errs.length, 'no page errors: ' + errs.slice(0, 2).join(' | '));
+};

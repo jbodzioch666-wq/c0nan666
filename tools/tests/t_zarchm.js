@@ -1,0 +1,8 @@
+// (probe, not in ALL) which material a dungeon doorway's arch has, floor by floor
+module.exports = async page=>{ page.setDefaultTimeout(0);
+  const r = await page.evaluate(async ()=>{ goToCharCreate(); ccBegin(); wgRegenerate(12345); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{}; const out = []; const S = []; for (let x=0;x<OW_COLS;x++) for (let y=0;y<OW_ROWS;y++) if (G.ow.map[x][y]===OW_DUNGEON) S.push([x, y]);
+    const nameOf = m=>{ for (const k in FPD.mats||{}) if (FPD.mats[k]===m) return k; return m===FPD.trimMat ? 'trim?' : (m.name||'other') + ' #' + m.color.getHexString(); };
+    for (let n=0;n<3;n++){ const [dx, dy] = S[(n*7) % S.length]; G.gameMode = 0; G.owPos = { x:dx, y:dy }; G.pendingDungeon = { x:dx, y:dy }; enterDungeonConfirm(); setUi('playing'); G.mon = []; for (let i=0;i<30;i++){ renderGame(); await new Promise(r=>setTimeout(r, 30)); }
+      const seen = {}; const scene = FPD.scene; scene.updateMatrixWorld(true); scene.traverse(o=>{ if (!o.isMesh || !o.geometry || o.geometry.type!=='ExtrudeGeometry') return; const m = Array.isArray(o.material) ? o.material[0] : o.material, key = nameOf(m) + ' vc:' + !!m.vertexColors + ' col:' + !!o.geometry.attributes.color + ' map:' + !!m.map; seen[key] = (seen[key]||0) + 1; }); out.push({ n, trim:nameOf(FPD.trimMat), trimVc:!!(FPD.trimMat && FPD.trimMat.vertexColors), seen, sample:(()=>{ let s = null; scene.traverse(o=>{ if (!s && o.isMesh && o.geometry.type==='ExtrudeGeometry' && o.position.y===0){ const u = o.geometry.attributes.uv; s = Array.from(u.array.slice(0, 8)).map(v=>+v.toFixed(2)); } }); return s; })() }); }
+    return out; });
+  console.log(JSON.stringify(r, null, 0)); };

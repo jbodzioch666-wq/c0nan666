@@ -1,0 +1,26 @@
+// RS-370: the loot filter has an ammo tag (arrows, bolts and thrown weapons). Kept with it in keep mode; salvaged with it
+// in salvage mode while other gear is left alone. (RS-371) the menu says why pieces in the bag are kept
+module.exports = async page=>{
+  const r = await page.evaluate(async ()=>{
+    goToCharCreate(); ccBegin(); if (G.ui==='worldPreview') confirmWorldPreview(); setUi('playing'); saveCurrentGame = ()=>{}; G.player.wildWarned = 1;
+    const F = lootfP(); F.tiers = LOOTF_TIERS.map((_, i)=>i); F.safeUp = false; lootArrow = ()=>'';
+    const arrows = rsMakeAmmo(1); arrows.qty = 20; const bolts = rsMakeAmmo(RS_BOLT0); bolts.qty = 10; const darts = rsMakeThrown('dart', 1, 20); let sword = genItem(5, 'weapon'); for (let i=0;i<50 && (sword.range || sword.slot!=='weapon');i++) sword = genItem(5, 'weapon'); sword.quality = 0;   /* (a melee weapon, not a bow) */
+    const m = ()=>[arrows, bolts, darts, sword].map(it=>lootfMatch(it, F) ? 1 : 0).join('');
+    const out = { chip:LOOTF_STATS.some(s=>s[0]==='ammo') };
+    F.stats = ['ammo']; F.statMode = 'keep'; out.keep = m();
+    F.statMode = 'match'; out.match = m();
+    F.stats = []; out.none = m();
+    /* (RS-371) the menu says what keeps the bag's pieces back: here, an upgrade held by the safety */
+    G.inv = [sword]; sword.acc = 5; F.stats = ['acc']; F.statMode = 'match'; F.safeUp = true; lootArrow = ()=>'up'; setUi('lootfilter'); out.why = (document.querySelector('#overlay .lf-why')||{}).textContent || ''; lootArrow = ()=>''; setUi('playing');
+    /* (RS-372) and lists what will be salvaged, each with a keep button that locks it */
+    lootArrow = ()=>''; G.inv = [sword]; setUi('lootfilter'); out.list = document.querySelectorAll('#overlay .lf-list .lf-row').length; out.dbg = lootfWhy(sword) + '/' + G.ui + '/' + (document.getElementById('overlay').innerHTML.match(/WILL BE[^<]*/)||[''])[0]; if (!out.list) return out; document.querySelector('#overlay .lf-row .invchip').click(); out.kept = !!sword.locked && !document.querySelector('#overlay .lf-list'); setUi('playing'); lootArrow = ()=>'';
+    setUi('lootfilter'); out.html = [...document.querySelectorAll('#overlay .lf-chip')].some(b=>b.textContent.trim()==='ammo'); setUi('playing');
+    return out; });
+  console.log(JSON.stringify(r));
+  const A = (c, m)=>{ if (!c) throw new Error('assert: '+m+' '+JSON.stringify(r)); };
+  A(r.chip && r.html, 'an ammo tag in the menu');
+  A(r.keep==='0001', 'keep ammo: arrows, bolts and darts kept, the sword salvaged');
+  A(r.match==='1110', 'salvage ammo: only the ammo goes');
+  A(r.list===1 && r.kept, 'the menu lists what will be salvaged; keep locks a piece out of it');
+  A(/1 upgrade/.test(r.why), 'the menu says an upgrade is being kept by the safety: '+r.why);
+};
